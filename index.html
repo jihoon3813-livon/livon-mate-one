@@ -346,6 +346,15 @@
           <button onclick="stepHubFontSize(1)" class="w-6 h-6 flex items-center justify-center rounded-lg text-xs font-black text-slate-600 hover:text-slate-900 hover:bg-white transition-all" title="글자 크게">A+</button>
         </div>
 
+        <!-- Convex Cloud Status Badge -->
+        <a href="https://dashboard.convex.dev/t/jihoon3813/01-livon-care-sys/dev" target="_blank" 
+          class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-900 border border-orange-200 text-xs font-bold transition-all shadow-2xs" 
+          title="Convex Cloud 실시간 대시보드 바로가기">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Convex Cloud</span>
+          <span class="text-[10px] text-orange-600 font-mono">acrobatic-mule-632</span>
+        </a>
+
         <button id="toggleMaskingBtn" onclick="toggleMasking()" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100">
           <i data-lucide="eye-off" class="w-3.5 h-3.5"></i>
           <span id="maskingStatusText">개인정보 마스킹 ON</span>
@@ -551,6 +560,10 @@
         <div>S3 Bucket: <span class="text-purple-300 font-mono">livonmate-audio-raw</span></div>
         <div>STT: <span class="text-purple-300 font-mono">AWS Transcribe v2</span></div>
         <div class="text-emerald-400 font-semibold mt-1">● 리본메이트 원 데이터 서버 정상</div>
+        <div class="text-amber-400 font-semibold text-[10.5px] mt-0.5 flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+          <span>Convex Cloud 실시간 백엔드 연결됨</span>
+        </div>
       </div>
     </aside>
 

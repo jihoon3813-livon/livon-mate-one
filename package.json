@@ -5,7 +5,11 @@
   "main": "server.js",
   "scripts": {
     "dev": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "convex": "npx convex dev"
+  },
+  "dependencies": {
+    "convex": "^1.45.0"
   },
   "keywords": [
     "livoncare",

@@ -6,3 +6,5 @@ test.txt
 Thumbs.db
 npm.cmd
 npx.cmd
+
+.env.local

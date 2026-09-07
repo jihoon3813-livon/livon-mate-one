@@ -714,6 +714,21 @@ var gAdjusters = [];
 var gSamsungList = [];
 var gFormTemplates = [];
 var gFaxRecords = {};
+const CONVEX_URL = 'https://acrobatic-mule-632.convex.cloud';
+
+async function syncToConvex(path, args) {
+  try {
+    const res = await fetch(`${CONVEX_URL}/api/mutation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, args })
+    });
+    return await res.json();
+  } catch (err) {
+    console.warn('[Convex Sync Error]', err);
+    return null;
+  }
+}
 var gExpandedCustomerIds = new Set();
 var gSelectedAppIds = new Set();
 var gLedgerSelection = {
@@ -8478,6 +8493,11 @@ function handleNewAppSubmit(e) {
 
     // Add to applications
     gApps.unshift(newApp);
+
+    // Convex Cloud 실시간 비동기 동기화
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('applications:create', { data: newApp });
+    }
 
     // Increment seq
     incrementAppIdSeq();
