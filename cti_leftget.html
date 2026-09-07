@@ -1,0 +1,98 @@
+cpcode 70011<br>wid 10365<br>Scope 9<br>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=euc-kr">
+	<title></title>
+	<script  type="text/javascript" src="libs/jquery-1.7.1.min.js"></script>
+	<script src="../js/socket.io.js"></script>
+	<script>
+	var socket;
+	var socketID;
+	var Timer;
+	var err=0;
+	var console = window.console || {log:function(){}};
+	socket_connect();
+	
+	socket.on('connect', function(){
+		//console.log("Web","Connect Server!!!");
+	});
+	socket.on('loginfail',function(data){ // 중복아이디 처리용
+		//console.log(data["msg"]);
+		alert("다른 곳에서 같은 아이디로 로그인하였습니다.");
+		socket.disconnect;
+		parent.detail.location.replace("./admin/admin_logout.asp");
+	});
+	socket.on('error',function(){
+		//console.log("error");
+	});
+	socket.on('poppick',function(data){
+		AjaxCall(10365);
+	});
+	socket.on('disconnect', function(){
+		//console.log("Disconnect Server!!!");
+	});
+
+	socket.on('uncaughtException', function (err) {
+		//console.log('Caught exception: ' + err);
+		// restart or safe shutdown 등의 처리
+	});
+	function socket_connect(){
+		socket = io.connect('https://crm.goodars.co.kr:3000', {'forceNew':false,reconnection:true});
+		//console.log(socket);
+		socket.emit('create_client','10365',function(returnCode){
+			if ( returnCode < 0){
+				socket.disconnect;
+			} else {
+				socketID = returnCode;
+				Timer = setTimeout(socket_status,60000);
+			}
+			console.log("Connect : " + socketID);
+		});
+	}
+	function socket_status(){
+		socket.emit('status','10365',function(returnCode){
+			if(returnCode != socketID){
+				socket.emit('create_client','10365',function(returnCode){
+					if ( returnCode < 0){
+						socket.disconnect;
+					} else {
+						socketID = returnCode;
+						Timer = setTimeout(socket_status,60000);
+					}
+					//console.log("Connect : " + socketID);
+				});
+				//console.log("reconnect check : "+returnCode);
+			} else {
+				//console.log("check(OK) : "+returnCode);
+				Timer = setTimeout(socket_status,60000);
+			}
+		});
+	}	
+	</script>
+	
+	<base target="detail">
+</head>
+
+<body onload="window.defaultStatus='System';">
+	<form method=post id=form1 name=form1>
+	<div id="info">
+		<input name="wid" id= "wid" type="text" value="10365">
+		<div id="sub">
+			<p>Start</p>
+		</div>
+	</div>
+	</form>	
+</body>
+</html>
+<script>
+
+		function AjaxCall(str){
+			var param = {wid:str};
+			$.post("WidCk.asp",param,parseData)
+		}
+		
+		
+		function parseData(strText){
+			$("#sub p").append("Result:" + strText + "<br>");
+		}
+</script>

@@ -1,0 +1,72 @@
+
+<html>
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=9"/>
+<meta http-equiv="content-type" content="text/html; charset=euc-kr">
+<script src="js/jquery-latest.js"></script>
+<title>:: ARS 컨택센터 ::</title>
+<script>
+var popObj;
+window.onunload = function() { 
+	if(!popObj){
+		console.log("A"+popObj);
+	}else{
+		popObj.close();
+		$.ajax({
+			type: "POST",
+			url: "admin/C_OutCallClose.asp",
+			data: {},
+			success: function (msg) {
+				//alert("C1");
+				
+			},
+			error:function(request,status,error){
+				//alert("C2");
+			   alert("code:"+request.status+"\n"+"message:"+request.responseText+"\n"+"error:"+error);
+			}
+		});
+		
+	}
+}
+function FrameOUTCALL(nhopephone, nAskSN){
+	var popWidth = 260, popHeight = 236; //팝업 창 사이즈
+
+	var mtWidth = document.documentElement.clientWidth; //현재 브라우저가 있는 모니터의 화면 폭 사이즈
+	var mtHeight = document.documentElement.clientHeight; //현재 브라우저가 있는 모니터의 화면 높이 사이즈
+
+	var scX = window.screenLeft; //현재 브라우저의 x 좌표(모니터 두 대를 합한 총 위치 기준)
+	var scY = window.screenTop; //현재 브라우저의 y 좌표(모니터 두 대를 합한 총 위치 기준)
+
+	var popX = scX + (mtWidth - popWidth) / 2; //팝업 창을 띄울 x 위치 지정(모니터 두 대를 합한 총 위치 기준)
+	var popY = scY + (mtHeight - popHeight) / 2 - 200; //팝업 창을 띄울 y 위치 지정(모니터 두 대를 합한 총 위치 기준)
+	
+	if(!nhopephone){
+		popObj = window.open('C_OutCall.asp', 'Out', 'width=260, height=236,resizable=0,status=0,menubar=no,scrollbaRsAsk=1,' + 'left=' + popX + ',top=' + popY);
+	}else{
+		popObj = window.open('C_OutCall.asp?hopephone=' + nhopephone + '&asksn=' + nAskSN, 'Out', 'width=260, height=236,resizable=0,status=0,menubar=no,scrollbaRsAsk=1,' + 'left=' + popX + ',top=' + popY);
+	}
+	var timer = setInterval(function(){
+		if(popObj.closed){
+			clearInterval(timer);
+			//alert("A1");
+			$.ajax({
+				type: "POST",
+				url: "admin/C_OutCallClose.asp",
+				data: {},
+				success: function (msg) {
+					//self.close();
+				},
+				error:function(request,status,error){
+				   alert("code:"+request.status+"\n"+"message:"+request.responseText+"\n"+"error:"+error);
+				}
+			});
+		}
+	},1000);
+}
+</script>
+</head>
+    <frameset rows="1*" cols="0, 100%" border="0">
+        <frame name="leftFrame" scrolling="no" marginwidth="10" marginheight="0" target_frame="detail" src="LeftGet.asp"></frame>
+        <frame name="detail" scrolling="yes" marginwidth="10" marginheight="0" src="admin/C_Calllog.asp" noresize></frame>
+    </frameset>
+</html>

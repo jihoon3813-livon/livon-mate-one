@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title> :: 전체 콜 현황 :: </title>
+<meta charset="euc-kr">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta http-equiv="Content-Type" content="text/html; charset=euc-kr">
+<script type="text/javascript" src="../js/jquery-1.9.1.min.js"></script>
+<link rel="stylesheet" type="text/css" href="css/wallboard.css"></link>
+<link rel="stylesheet" type="text/css" href="css/ProximaNovafonts.css"></link>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<!--[if lt IE 9]>
+	<script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+<![endif]-->
+<body>
+<script language="javascript">
+
+    function OpenerClose() {
+        //window.opener.closeWin();
+    }
+
+    function LogOut() {
+        $.ajax({
+            type: "POST",
+            url: "Display_Logout.asp",
+            success: function (msg) {
+                $("#wrap").html('');
+                $("#wrap").html(msg);
+                self.close();
+            },
+            error: function (thrownError) {
+                self.close();
+            }
+        });
+    }
+
+    var Timer;
+    var $LoginCpcode ="";
+    var $LoginDstatus ="";
+    var LoopTime=0;
+
+	var cpcode = "70011";
+
+    $(document).ready(function () {
+        // 타이머 시작.	
+			AjaxCall();
+        start();
+		LoopTime=10000;
+    });
+
+    function start() {
+        Timer = setInterval(this.changeImage, LoopTime);
+    }
+
+    function changeImage() {
+
+		$("#sub P").text("");
+			
+				
+		//AJAX 통신을 한다.
+		getCpcode();
+
+        clearInterval(Timer);
+        
+        if( ($LoginCpcode.length) > 0 && ($LoginDstatus.length) > 0){
+			if($LoginCpcode == "60012" || $LoginCpcode == "60023" || $LoginCpcode == "60025" || $LoginCpcode == "60046" || $LoginCpcode == "70015" || $LoginCpcode == "70019" || $LoginCpcode == "70020" || $LoginCpcode == "70022" || $LoginCpcode == "70024"){
+				AjaxCallCombine(); //커스텀
+			}else if($LoginCpcode == "60013"){
+				AjaxCallLienjang(); //리앤장
+			}else if($LoginCpcode == "70035"){
+				AjaxCallMhmall(); //모던하우스
+			}else if($LoginCpcode == "60087"){
+				AjaxCallAuto(); //오토닉스
+			}else{
+				AjaxCall();
+			}
+        }
+        else {
+                $("#wrap").html('<Table Width="100%" Height="100%" style="margin-top:100px;text-align:center" ><tr><td><H1><font color="Red">세션이 단절 되었습니다. 모든 익스플러어 창을 닫으시고 다시 로그인을 하십시요.</font></H1></td></tr></Table>');
+                $("#wrap").html(msg);
+        }
+        start();
+    }
+
+    function AjaxCall() {
+        $.ajax({
+            type: "POST",
+            url: "Display_Ajax.asp",
+            data: "cpcode=" + $LoginCpcode,
+            success: function (msg) {
+                $("#wrap").html('');
+                $("#wrap").html(msg);
+                //$("#t01").show();
+            },
+            error: function (thrownError) {
+                alert(thrownError);
+            }
+        });
+
+    }
+
+	function AjaxCallCombine() {
+        $.ajax({
+            type: "POST",
+            url: "Display_Ajax_Combine.asp",
+            data: "cpcode=" + $LoginCpcode,
+            success: function (msg) {
+                $("#wrap").html('');
+                $("#wrap").html(msg);
+                //$("#t01").show();
+            },
+            error: function (thrownError) {
+                alert(thrownError);
+            }
+        });
+
+    }
+
+	function AjaxCallLienjang(){
+		 $.ajax({
+            type: "POST",
+            url: "Display_Ajax_Lienjang.asp",
+            data: "cpcode=" + $LoginCpcode,
+            success: function (msg) {
+                $("#wrap").html('');
+                $("#wrap").html(msg);
+                //$("#t01").show();
+            },
+            error: function (thrownError) {
+                alert(thrownError);
+            }
+        });
+	}
+
+	function AjaxCallMhmall() {
+        $.ajax({
+            type: "POST",
+            url: "Display_Ajax_Mhmall.asp",
+            data: "cpcode=" + $LoginCpcode,
+            success: function (msg) {
+                $("#wrap").html('');
+                $("#wrap").html(msg);
+                //$("#t01").show();
+            },
+            error: function (thrownError) {
+                alert(thrownError);
+            }
+        });
+
+    }
+	
+	function AjaxCallAuto(){
+		$.ajax({
+            type: "POST",
+            url: "Display_Ajax_Auto.asp",
+            data: "cpcode=" + $LoginCpcode,
+            success: function (msg) {
+                $("#wrap").html('');
+                $("#wrap").html(msg);
+                //$("#t01").show();
+            },
+            error: function (thrownError) {
+                alert(thrownError);
+            }
+        });
+	}
+
+	function getCpcode(){			
+		//1. image Element 구하기.
+		$LoginCpcode = $("#cpcode").attr("value");
+        $LoginDstatus = $("#dstatus").attr("value");
+		$("#sub P").append(70011 + "<br>");
+	}
+
+    function parseData(strText) {
+        $("#sub p").append("Result:" + strText + "<br>");
+    }
+
+    function NewDisplay() {
+        location.reload();
+    }
+
+</script>
+</head>
+<body onload="OpenerClose();">
+    <div id="wrap"></div>
+    <input name="cpcode" id= "cpcode" type="text" value="70011" style="width:0px; visibility: hidden;">
+    <input name="dstatus" id= "dstatus" type="text" value="" style="width:0px; visibility: hidden;" />
+	<div id="sub" style="width:0px; visibility: hidden;">
+		<p></p>
+	</div>
+</body>
+</html>

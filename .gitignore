@@ -1,0 +1,8 @@
+﻿node_modules/
+*.bak
+scratch_*
+test.txt
+.DS_Store
+Thumbs.db
+npm.cmd
+npx.cmd

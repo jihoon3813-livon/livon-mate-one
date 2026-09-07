@@ -1,0 +1,1824 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<title> New Document </title>
+	<meta http-equiv="Content-Type" content="text/html; charset=euc-kr" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <script src="//ajax.googleapis.com/ajax/libs/webfont/1.4.7/webfont.js"></script>
+    <script src="js/font_loader.js"></script>
+	<link rel="stylesheet" type="text/css" href="css/reset.css"></link>
+    <link rel="stylesheet" type="text/css" href="css/comm.css"></link>
+	<link rel="stylesheet" type="text/css" href="css/jquery-ui-1.10.3.custom.css"></link>
+    <script src="js/jquery-latest.js"></script>
+    <script src="js/placeholders.min.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/popFunction.js"></script>
+	<script type="text/javascript" src="js/jquery.simplemodal.js"></script>
+	<script  type="text/javascript" src="js/jquery-ui-1.10.3.custom.js"></script>
+
+	<script type="text/javascript">
+		$(function () {
+			date_init();
+
+			if($("#search_word").val() == "이름 또는 전화번호를 입력하세요"){
+				$("#search_word").val("");
+			}
+	    });
+
+		function formSearch() {
+	        //alert("날짜체크");
+	        var sdate = document.searchForm.start_search_string;
+	        var edate = document.searchForm.end_search_string;
+
+	        date1 = sdate.value.split("-");
+	        date2 = edate.value.split("-");
+
+	        date1 = new Date(date1[0], parseInt(date1[1])-1, date1[2]).valueOf();
+	        date2 = new Date(date2[0], parseInt(date2[1])-1, date2[2]).valueOf();
+
+	        cha = date1 - date2;
+
+	        if (cha > 1) {
+	            alert("기간을 잘못 정하셨습니다.");
+	            sdate.value = "";
+	            edate.value = "";
+	            return;
+	        }
+
+			
+	        document.searchForm.submit();
+	    }
+		function date_init(){
+	        var dates = $("#from1, #to1").datepicker({
+	            showOn: "button",
+	            buttonImage: "image/img_calendar.png",
+	            buttonImageOnly: true,
+	            prevText: '이전 달',
+	            nextText: '다음 달',
+	            monthNames: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'],
+	            monthNamesShort: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'],
+	            dayNames: ['일', '월', '화', '수', '목', '금', '토'],
+	            dayNamesShort: ['일', '월', '화', '수', '목', '금', '토'],
+	            dayNamesMin: ['일', '월', '화', '수', '목', '금', '토'],
+	            dateFormat: 'yy-mm-dd',
+	            showMonthAfterYear: true,
+	            yearSuffix: '년',
+	            onSelect: function (selectedDate) {
+	                /*
+	                var option = this.id == "from1" ? "minDate" : "maxDate",
+	                instance = $( this ).data( "datepicker" ),
+	                date = $.datepicker.parseDate(
+	                instance.settings.dateFormat ||
+	                $.datepicker._defaults.dateFormat,
+	                selectedDate, instance.settings );
+	                dates.not( this ).datepicker( "option", option, date );
+	                */
+	            }
+	        });
+		}
+
+		function CallType(obj){
+			
+			var CallType,AskYN,searchQnAWeb,searchQnAWeb2,searchQnAWeb3,searchCpname,searchNICNAME,searchStr,searchQnAType,search_word
+				if(obj=="X"){
+					CallType ="";
+				}else{
+					CallType=obj;
+				}
+
+				AskYN = document.searchForm.searchAskYN.value;
+				searchQnAWeb = $("select[name=searchQnAWeb]").val();
+				searchQnAWeb2 = $("select[name=searchQnAWeb2]").val();
+				searchQnAWeb3 = $("select[name=searchQnAWeb3]").val();
+				searchCpname = $("select[name=searchCpname]").val();
+				searchNICNAME = $("select[name=searchNICNAME]").val();
+				searchStr = $("select[name=searchStr]").val();
+				searchQnAType = $("select[name=searchQnAType]").val();
+				search_word = document.searchForm.search_word.value;
+
+				start_search_string = $("#from1").val()
+				end_search_string = $("#to1").val()
+				
+				if (searchQnAWeb != ""){
+					searchQnAWeb = escape(searchQnAWeb).replace(/\+/g, '%2B')
+				}
+				if (searchQnAWeb2 != ""){
+					searchQnAWeb2 = escape(searchQnAWeb2).replace(/\+/g, '%2B')
+				}
+				if (searchQnAWeb3 != ""){
+					searchQnAWeb3 = escape(searchQnAWeb3).replace(/\+/g, '%2B')
+				}
+				if (searchCpname != ""){
+					searchCpname = escape(searchCpname).replace(/\+/g, '%2B')
+				}
+				if (searchNICNAME != ""){
+					searchNICNAME = escape(searchNICNAME).replace(/\+/g, '%2B')
+				}
+				if (searchStr != ""){
+					searchStr = escape(searchStr).replace(/\+/g, '%2B')
+				}
+				if (search_word != ""){
+					search_word = escape(search_word).replace(/\+/g, '%2B')
+				}
+				if (searchQnAType != ""){
+					searchQnAType = escape(searchQnAType).replace(/\+/g, '%2B')
+				}
+
+				$.ajax({
+					type: "POST",
+					url: "C_Calllog_ajax.asp",
+					data:"searchCallType="+CallType+"&searchAskYN="+AskYN+"&searchQnAWeb="+searchQnAWeb+"&searchQnAWeb2="+searchQnAWeb2+"&searchQnAWeb3="+searchQnAWeb3
+						+"&searchCpname="+searchCpname+"&searchNICNAME="+searchNICNAME+"&searchStr="+searchStr+"&search_word="+search_word+"&searchQnAType="+searchQnAType+"&start_search_string="+start_search_string+"&end_search_string="+end_search_string,
+					success: function (msg) {
+						$("#searchCallType").val(obj);
+						$("#searchAskYN").val(AskYN);
+						$("#Ajax_Calllog").html('');
+						$("#Ajax_Calllog").html(msg);
+					},
+					error: function (thrownError) {
+						alert(thrownError);
+					}
+				});
+				//location.href="C_Calllog.asp?searchCallType="+CallType+"&searchAskYN="+AskYN+"&searchQnAWeb="+searchQnAWeb+"&searchQnAWeb2="+searchQnAWeb2+"&searchQnAWeb3="+searchQnAWeb3						+"&searchCpname="+searchCpname+"&searchNICNAME="+searchNICNAME+"&searchStr="+searchStr+"&search_word="+search_word+"&start_search_string="+start_search_string+"&end_search_string="+end_search_string
+		}
+
+		function AskYN(obj){
+			var CallType,AskYN,searchQnAWeb,searchQnAWeb2,searchQnAWeb3,searchCpname,searchNICNAME,searchStr,searchQnAType,search_word
+				if(obj=="X"){
+					AskYN ="";
+				}else{
+					AskYN=obj;
+				}
+				CallType = document.searchForm.searchCallType.value;
+				searchQnAWeb = $("select[name=searchQnAWeb]").val();
+				searchQnAWeb2 = $("select[name=searchQnAWeb2]").val();
+				searchQnAWeb3 = $("select[name=searchQnAWeb3]").val();
+				searchCpname = $("select[name=searchCpname]").val();
+				searchNICNAME = $("select[name=searchNICNAME]").val();
+				searchStr = $("select[name=searchStr]").val();
+				searchQnAType = $("select[name=searchQnAType]").val();
+				search_word = document.searchForm.search_word.value;
+
+				start_search_string = $("#from1").val()
+				end_search_string = $("#to1").val()
+				
+				if (searchQnAWeb != ""){
+					searchQnAWeb = escape(searchQnAWeb).replace(/\+/g, '%2B')
+				}
+				if (searchQnAWeb2 != ""){
+					searchQnAWeb2 = escape(searchQnAWeb2).replace(/\+/g, '%2B')
+				}
+				if (searchQnAWeb3 != ""){
+					searchQnAWeb3 = escape(searchQnAWeb3).replace(/\+/g, '%2B')
+				}
+				if (searchCpname != ""){
+					searchCpname = escape(searchCpname).replace(/\+/g, '%2B')
+				}
+				if (searchNICNAME != ""){
+					searchNICNAME = escape(searchNICNAME).replace(/\+/g, '%2B')
+				}
+				if (searchStr != ""){
+					searchStr = escape(searchStr).replace(/\+/g, '%2B')
+				}
+				if (search_word != ""){
+					search_word = escape(search_word).replace(/\+/g, '%2B')
+				}
+				if (searchQnAType != ""){
+					searchQnAType = escape(searchQnAType).replace(/\+/g, '%2B')
+				}
+
+				$.ajax({
+					type: "POST",
+					url: "C_Calllog_ajax.asp",
+					data:"searchCallType="+CallType+"&searchAskYN="+AskYN+"&searchQnAWeb="+searchQnAWeb+"&searchQnAWeb2="+searchQnAWeb2+"&searchQnAWeb3="+searchQnAWeb3
+						+"&searchCpname="+searchCpname+"&searchNICNAME="+searchNICNAME+"&searchStr="+searchStr+"&search_word="+search_word+"&searchQnAType="+searchQnAType+"&start_search_string="+start_search_string+"&end_search_string="+end_search_string,
+					success: function (msg) {
+						$("#searchCallType").val(CallType);
+						$("#searchAskYN").val(obj);
+						$("#Ajax_Calllog").html('');
+						$("#Ajax_Calllog").html(msg);
+					},
+					error: function (thrownError) {
+						alert(thrownError);
+					}
+				});
+
+		}
+
+		function UserGet(cid,sn,UserSN,cpname){
+			location.href="C_Consult.asp?cid="+cid+"&sn="+sn+"&UserSN="+UserSN+"&cpname="+cpname;
+		}
+
+		function logSelectDepth2(selvalue) {
+
+	        SelectDepStr3 = "<span class='ml-2'><select name='searchQnAWeb3' id='searchQnAWeb3'  style='width:118px'>"
+	        SelectDepStr3 = SelectDepStr3 + "<option value='선택'>선택</option>"
+	        SelectDepStr3 = SelectDepStr3 + "</select></span>"
+	        $.ajax({
+	            type: "POST",
+	            url: "C_Consult_Depth_Select.asp",
+	            data: "selValue1=" + escape(selvalue).replace(/\+/g, '%2B') + "&depth=1" + "&tabNB=0",
+	            success: function (msg) {
+	                $("#logSelectDep2").html('');
+	                $("#logSelectDep2").html(msg);
+	                $("#logSelectDep3").html('');
+	                $("#logSelectDep3").html(SelectDepStr3);
+	            },
+	            error: function (thrownError) {
+	                alert(thrownError);
+	            }
+	        });
+	    }
+
+	    function logSelectDepth3(selvalue2) {
+	        selvalue1 = $("#searchQnAWeb").val()
+	        $.ajax({
+	            type: "POST",
+	            url: "C_Consult_Depth_Select.asp",
+	            data: "selValue1=" + escape(selvalue1).replace(/\+/g, '%2B') + "&selValue2=" + escape(selvalue2).replace(/\+/g, '%2B') + "&depth=2" + "&tabNB=0",
+	            success: function (msg) {
+	                $("#logSelectDep3").html('');
+	                $("#logSelectDep3").html(msg);
+	            },
+	            error: function (thrownError) {
+	                alert(thrownError);
+	            }
+	        });
+	    }
+
+		function pop_sms(cid){			
+			$.ajax({
+				type: "POST",
+				url: "inc/pop_sms.asp",
+				data: "cid="+cid,
+				success: function (msg) {
+					 $("#smssender").html('');
+					 $("#smssender").html(msg);
+					 $("#smssender").show();
+				},
+				error: function (thrownError) {
+					alert(thrownError);
+				}
+			});
+		}
+
+		function ExcelDown(spara) {
+	        spara = spara
+	        window.open("C_Calllog_Excel.asp?" + spara, "Distribution", "width=1000,height=800,toolbar=no, scrollbars=yes, status=no, resizable=yes");
+	    }
+
+		function OutCallPhone(nhopephone, nAskSN) {
+
+			/*var popWidth = 260, popHeight = 236; //팝업 창 사이즈
+			//var mtWidth = document.body.clientWidth; //현재 브라우저가 있는 모니터의 화면 폭 사이즈
+			//var mtHeight = document.body.clientHeight; //현재 브라우저가 있는 모니터의 화면 높이 사이즈
+			var mtWidth = document.documentElement.clientWidth; //현재 브라우저가 있는 모니터의 화면 폭 사이즈
+			var mtHeight = document.documentElement.clientHeight; //현재 브라우저가 있는 모니터의 화면 높이 사이즈
+
+			var scX = window.screenLeft; //현재 브라우저의 x 좌표(모니터 두 대를 합한 총 위치 기준)
+			var scY = window.screenTop; //현재 브라우저의 y 좌표(모니터 두 대를 합한 총 위치 기준)
+
+			//	        var popX = scX + (mtWidth - popWidth) / 2 - 50; //팝업 창을 띄울 x 위치 지정(모니터 두 대를 합한 총 위치 기준)
+			//	        var popY = scY + (mtHeight - popHeight) / 2 - 50; //팝업 창을 띄울 y 위치 지정(모니터 두 대를 합한 총 위치 기준)
+
+			var popX = scX + (mtWidth - popWidth) / 2; //팝업 창을 띄울 x 위치 지정(모니터 두 대를 합한 총 위치 기준)
+			var popY = scY + (mtHeight - popHeight) / 2 - 200; //팝업 창을 띄울 y 위치 지정(모니터 두 대를 합한 총 위치 기준)
+
+			$.ajax({
+				type: "POST",
+				url: "C_OutCallAjax.asp",
+				data: {},
+				//data: "cid=" + cid,
+				success: function (msg) {
+					if (msg == "0") {
+					   window.open('C_OutCall.asp?hopephone=' + nhopephone + "&asksn=" + nAskSN, 'Out', 'width=260, height=236,resizable=0,status=0,menubar=0,scrollbaRsAsk=1,' + 'left=' + popX + ',top=' + popY);
+						
+					}
+					else {
+						alert("상담원 전화번호가 LG 인터넷 전화번호가 아닙니다. 관리자에게 문의 주시기 바랍니다.");
+					}
+				},
+				error: function (thrownError) {
+					alert(thrownError);
+				}
+			});*/
+			parent.FrameOUTCALL(nhopephone, nAskSN);
+		}
+		
+		function RecClose(RECid){
+			document.getElementById(RECid).style.display = "none"
+		}
+
+		function RecCount(filePath, filewav, sn, CallType, RECid, RecCnt) {
+			if(RecCnt == 1){
+				 //location.href = 'https://recordCRM.goodars.co.kr/CTIAPI/vox2wav.asp?filePath=' + filePath + '&filewav=' + filewav;
+				 //hiddenRecFrm.location.href = 'https://recordCRM.goodars.co.kr/CTIAPI/vox2wav.asp?filePath=' + filePath + '&filewav=' + filewav;
+				download(filePath,filewav);
+			}else if(RecCnt >= 2){
+				 $.ajax({
+					type: "POST",
+					url: "C_RecList.asp",
+					data: "filePath="+filePath+"&filewav="+filewav+"&sn="+sn+"&CallType="+CallType,
+					success: function (data,msg) {
+						document.getElementById(RECid).style.display = "block"
+						var strArray = data.split(';');
+						var str = "";
+						str +="<div style='text-align:right;' onclick=RecClose('"
+						str +=RECid
+						str +="')>"
+						str +="닫기"
+						str +="</div>"
+						for (i=0;i<strArray.length-1 ;i++ )
+						{
+						if (i%2!=0)
+						{
+
+						}else{
+							
+							str += "<div onclick=download('"
+							str += filePath
+							str += "','"
+							str += strArray[i]							
+							str +="')>"
+								if (i%2==0)
+								{
+									str += strArray[i+1]
+								}
+							str += "</div>"
+						
+						}
+							document.getElementById(RECid).innerHTML = str;
+						}
+					},
+					error: function (thrownError) {
+						alert(thrownError);
+					}
+				});
+			}
+	    }//150916 REC COUNT
+
+		function download(filePath, filewav) {
+			hiddenRecFrm.location.href = 'https://recordCRM.goodars.co.kr/CTIAPI/vox2wav.asp?source=' + filePath + '/' + filewav.slice(0,-4);
+			//hiddenRecFrm.location.href = 'https://recordCRM.goodars.co.kr/CTIAPI/vox2wav.asp?source=' + filePath + '/' + filewav;
+	    }
+		
+		function DetailM(sn){
+			$.ajax({
+				type: "POST",
+				url: "inc/pop_DetailView.asp",
+				data: "sn="+sn,
+				success: function (msg) {
+					 $("#DetailView").html('');
+					 $("#DetailView").html(msg);
+					 $("#DetailView").show();
+				},
+				error: function (thrownError) {
+					alert(thrownError);
+				}
+			});
+		}
+		
+		function Detail_hide(){
+			$("#DetailView").hide('');
+		}
+	</script>
+	</head>
+
+<body>
+
+    <div id="wrap">
+				<script>
+		function pop_sms_header(){			
+			$.ajax({
+				type: "POST",
+				url: "inc/pop_sms.asp",
+				data: {},
+				success: function (msg) {
+					 $("#Hsmssender").html('');
+					 $("#Hsmssender").html(msg);
+					 $("#Hsmssender").show();
+				},
+				error: function (thrownError) {
+					alert(thrownError);
+				}
+			});
+		}
+
+		function goC1(val,wid){
+			var param = {wid_val:wid, C1_val:val};
+			$.post("C_Ajax_C1.asp",param,parseData)
+		}
+
+		function parseData(strText){
+			if(strText=="0"){
+				//alert("자리비움");
+				$("li#go0 a").addClass('away_actv');
+				$("li#go1 a").removeClass('away_actv');
+				$("li#go2 a").removeClass('away_actv');
+				$("li#go3 a").removeClass('away_actv');
+			}else if(strText=="1"){
+				//alert("상담가능");
+				$("li#go1 a").addClass('away_actv');
+				$("li#go0 a").removeClass('away_actv');
+				$("li#go2 a").removeClass('away_actv');
+				$("li#go3 a").removeClass('away_actv');
+			}else if(strText=="2"){
+				//alert("후처리");
+				$("li#go2 a").addClass('away_actv');
+				$("li#go0 a").removeClass('away_actv');
+				$("li#go1 a").removeClass('away_actv');
+				$("li#go3 a").removeClass('away_actv');
+			}else if(strText=="3"){
+				//alert("휴식");
+				$("li#go3 a").addClass('away_actv');
+				$("li#go0 a").removeClass('away_actv');
+				$("li#go1 a").removeClass('away_actv');
+				$("li#go2 a").removeClass('away_actv');
+			}else{
+				alert(strText);
+			};
+		}
+
+		 //OutCall
+	    function OutCall() {
+	        /*var popWidth = 260, popHeight = 236; //팝업 창 사이즈
+	        //var mtWidth = document.body.clientWidth; //현재 브라우저가 있는 모니터의 화면 폭 사이즈
+	        //var mtHeight = document.body.clientHeight; //현재 브라우저가 있는 모니터의 화면 높이 사이즈
+	        var mtWidth = document.documentElement.clientWidth; //현재 브라우저가 있는 모니터의 화면 폭 사이즈
+	        var mtHeight = document.documentElement.clientHeight; //현재 브라우저가 있는 모니터의 화면 높이 사이즈
+
+	        var scX = window.screenLeft; //현재 브라우저의 x 좌표(모니터 두 대를 합한 총 위치 기준)
+	        var scY = window.screenTop; //현재 브라우저의 y 좌표(모니터 두 대를 합한 총 위치 기준)
+
+	        //	        var popX = scX + (mtWidth - popWidth) / 2 - 50; //팝업 창을 띄울 x 위치 지정(모니터 두 대를 합한 총 위치 기준)
+	        //	        var popY = scY + (mtHeight - popHeight) / 2 - 50; //팝업 창을 띄울 y 위치 지정(모니터 두 대를 합한 총 위치 기준)
+
+	        var popX = scX + (mtWidth - popWidth) / 2; //팝업 창을 띄울 x 위치 지정(모니터 두 대를 합한 총 위치 기준)
+	        var popY = scY + (mtHeight - popHeight) / 2 - 200; //팝업 창을 띄울 y 위치 지정(모니터 두 대를 합한 총 위치 기준)
+
+			$.ajax({
+				type: "POST",
+				url: "C_OutCallAjax.asp",
+				data: {},             //Table 생성 파라미터
+				success: function (msg) {
+					if (msg == "0") {
+						window.open('C_OutCall.asp', 'Out', 'width=260, height=236,resizable=0,status=0,menubar=no,scrollbaRsAsk=1,' + 'left=' + popX + ',top=' + popY);
+						//sessionStorage.setItem('popcheck', popcheck);
+
+					}
+					else {
+						alert("상담원 전화번호가 LG 인터넷 전화번호가 아닙니다. 관리자에게 문의 주시기 바랍니다.");
+					}
+				},
+				error: function (thrownError) {
+					alert(thrownError);
+				}
+			});*/
+	       parent.FrameOUTCALL();
+	    }
+//당겨받기
+function goPull(wid){
+    //alert(wid);
+	var param = {wid_val:wid};
+	$.post("C_Pull.asp",param,parsePull)
+}
+
+function parsePull(strText){
+	//alert(strText);
+	if(strText == 'Y'){
+		alert("당겨받기를 하였습니다");	
+	}else if(strText == 'N'){
+		alert("전화상태를 확인해주세요");
+	}else{
+		alert("다른상담원이 당겨받기를 시도하였습니다.");
+	}
+}
+
+//돌려주기
+function goPush(){
+	$.ajax({
+		type: "POST",
+		url: "inc/pop_call_return.asp",
+		data: {},
+		success: function (msg) {
+			 $("#PushCall").html('');
+			 $("#PushCall").html(msg);
+			 $("#PushCall").show();			
+		},
+		error: function (thrownError) {
+			alert(thrownError);
+		}
+	});
+}
+
+function parsePush(strText){
+	//alert(strText);
+	if(strText == '1'){
+		alert("돌려주기를 하였습니다.");
+	}else if(strText == '2'){
+		alert("부재중입니다.");
+	}else if(strText == '3'){
+		alert("돌려줄 상대가 통화중입니다.");
+	}else if(strText == '4'){
+		alert("내선번호를 확인해 주세요");
+	}else{
+		alert("통화중일때만 돌려줄수 있습니다.");
+	}
+}
+</script>
+		<!-- 돌려주기 팝업 -->
+			<div class="popup_layerWrap_Push" id="PushCall" style="display:none;"></div>
+		<!--// 돌려주기  팝업 -->
+
+		<!-- 헤더 문자전송 팝업 -->
+			<div class="popup_layerWrap_sms" id="Hsmssender" style="display:none;"></div>
+		<!--// 헤더문자전송  팝업 -->
+
+		<!-- 공통 우측메뉴 -->
+		
+<script>
+$(document).ready(function () {
+	var BDATE = $("#BDATE").val();
+	var BSN = $("#BSN").val();
+	if(BDATE){
+		BArray = BDATE.split(" ");
+		BYArray = BArray[0].split("-");
+		BHArray = BArray[2].split(":");
+		
+		if (BHArray[0].length == 1){
+			if(BArray[1]=="오후"){
+				BHArray[0] = Number(BHArray[0]) + 12;
+			}
+		}
+		
+		var date = new Date();
+		var year = date.getFullYear(); //년
+		var month = date.getMonth()+1; //월
+		var day = date.getDate(); //일
+		var hour = date.getHours(); //시
+		var minute = date.getMinutes(); //분
+		var second = date.getSeconds();
+
+		if ((month+"").length < 2 ){
+			month = "0" + month;
+		}
+
+		if ((day+"").length < 2 ){
+			day = "0" + day;
+		}
+
+		if ((minute+"").length < 2 ){
+			minute = "0" + minute;
+		}
+
+		//var Date1 = BArray[0]+" "+ BHArray[0]+":"+BHArray[1]+":00";//저장내역
+		//var Date2 = year+"-"+month+"-"+day+" "+hour+":"+minute+":00";//현재시간
+		
+		var Save1 = new Date(BYArray[0],BYArray[1],BYArray[2],BHArray[0],BHArray[1],"00");
+		var Now1 = new Date(year,month,day,hour,minute,second);
+
+		var elapsedMSec = Save1.getTime() - Now1.getTime();
+		//var elapsedMin = parseInt((elapsedMSec/1000/60)*60);
+		var elapsedMin = parseInt(elapsedMSec);
+
+		if(elapsedMin<=0){
+			//alert("A");
+			pop_Booking2(BSN);
+		}else {
+			//alert(elapsedMin);
+			setTimeout(pop_Booking2,elapsedMin,BSN);
+		}
+	}
+});
+
+function leadingZeros(n, digits) {
+  var zero = '';
+  n = n.toString();
+
+  if (n.length < digits) {
+    for (i = 0; i < digits - n.length; i++)
+      zero += '0';
+  }
+  return zero + n;
+}
+
+
+function pop_History(){	
+	$.ajax({
+		type: "POST",
+		url: "inc/navi_cslist.asp",
+		data: {},
+		success: function (msg) {
+			//모든창 닫기
+			$("#LayerCallback").hide();
+			$("#LayerBooking").hide();
+			$("#LayerTask").hide();
+			$("#LayerNotice").hide();
+			//모든창 닫기
+
+			 $("#LayerHistory").html('');
+			 if($("#LayerHistory").css("display")=="block"){
+				 $("#LayerHistory").hide();
+			 }else{
+				 $("#LayerHistory").html(msg);
+				 $("#LayerHistory").show();
+			 }
+		},
+		error: function (thrownError) {
+			alert(thrownError);
+		}
+	});
+}
+
+function pop_Callback(){	
+	$.ajax({
+		type: "POST",
+		url: "inc/navi_callback.asp",
+		data: {},
+		success: function (msg) {
+			//모든창 닫기
+			$("#LayerHistory").hide();
+			$("#LayerBooking").hide();
+			$("#LayerTask").hide();
+			$("#LayerNotice").hide();
+			//모든창 닫기
+
+			 $("#LayerCallback").html('');
+			 if($("#LayerCallback").css("display")=="block"){
+				 $("#LayerCallback").hide();
+			 }else{
+				 $("#LayerCallback").html(msg);
+				 $("#LayerCallback").show();
+			 }
+		},
+		error: function (thrownError) {
+			alert(thrownError);
+		}
+	});
+}
+
+function pop_Booking(){//예약
+	$.ajax({
+		type: "POST",
+		url: "inc/navi_booking.asp",
+		data: {},
+		success: function (msg) {
+			//모든창 닫기
+			$("#LayerHistory").hide();
+			$("#LayerCallback").hide();
+			$("#LayerTask").hide();
+			$("#LayerNotice").hide();
+			//모든창 닫기
+
+			 $("#LayerBooking").html('');
+			 if($("#LayerBooking").css("display")=="block"){
+				 $("#LayerBooking").hide();
+			 }else{
+				 $("#LayerBooking").html(msg);
+				 $("#LayerBooking").show();
+			 }
+		},
+		error: function (thrownError) {
+			alert(thrownError);
+		}
+	});
+}
+
+function pop_Booking2(sn){//예약알림
+	//익스플로러9 이하에선 setTimeout 함수전달 지원하지않음
+	if(!sn){
+		sn = $("#BSN").val();
+	}
+	$.ajax({
+		type: "POST",
+		url: "inc/pop_alarm.asp",
+		data: "sn="+sn,
+		success: function (msg) {
+			 $("#LayerBooking2").html('');
+			 $("#LayerBooking2").html(msg);
+			 $("#LayerBooking2").show();
+		},
+		error: function (thrownError) {
+			alert(thrownError);
+		}
+	});
+}
+
+function pop_Task(){	
+	$.ajax({
+		type: "POST",
+		url: "inc/navi_tranfer.asp",
+		data: {},
+		success: function (msg) {
+			//모든창 닫기
+			$("#LayerHistory").hide();
+			$("#LayerCallback").hide();
+			$("#LayerBooking").hide();
+			$("#LayerNotice").hide();
+			//모든창 닫기
+			$("#LayerTask").html('');	
+			 if($("#LayerTask").css("display")=="block"){
+				 $("#LayerTask").hide();
+			 }else{
+				 $("#LayerTask").html(msg);
+				 $("#LayerTask").show();
+			 }
+		},
+		error: function (thrownError) {
+			alert(thrownError);
+		}
+	});
+}
+
+function pop_Notice(){
+	$.ajax({
+		type: "POST",
+		url: "inc/navi_notice.asp",
+		data: {},
+		success: function (msg) {
+			//모든창 닫기
+			$("#LayerHistory").hide();
+			$("#LayerCallback").hide();
+			$("#LayerBooking").hide();
+			$("#LayerTask").hide();
+			//모든창 닫기
+			 $("#LayerNotice").html('');
+			 if($("#LayerNotice").css("display")=="block"){
+				 $("#LayerNotice").hide();
+			 }else{
+				 $("#LayerNotice").html(msg);
+				 $("#LayerNotice").show();
+			 }
+		},
+		error: function (thrownError) {
+			alert(thrownError);
+		}
+	});
+}
+
+function pop_Notice_W(){
+	$.ajax({
+		type: "POST",
+		url: "inc/navi_notice_write.asp",
+		data: {},
+		success: function (msg) {
+			 $("#LayerNotice").html('');
+			 $("#LayerNotice").html(msg);
+			 $("#LayerNotice").show();
+		},
+		error: function (thrownError) {
+			alert(thrownError);
+		}
+	});
+}
+
+function pop_memo(obj){
+	if (obj=="show"){
+		$("#pop_memo").val(localStorage.memopop);
+		$("#memo_pop").show();
+		
+	}else{
+		$("#memo_pop").hide();
+	}
+
+}
+
+function pop_memoAPP(){
+	if(typeof(Storage) !== "undefined"){
+		localStorage.memopop = $("#pop_memo").val();
+		alert("저장되었습니다.");
+	}else{
+		alert("죄송합니다.Explorer8이상,Firefox,Opera,Chrome,Safari 브라우저를 이용해주세요.");
+	}
+}
+
+function pop_MemList(){ //상담원 상태 리스트
+	$.ajax({
+		type: "POST",
+		url: "inc/navi_Mem_List.asp",
+		data: {},
+		success: function (msg) {
+			 $("#LayerMemList").html('');
+			 $("#LayerMemList").html(msg);
+			 $("#LayerMemList").show();
+		},
+		error: function (thrownError) {
+			alert(thrownError);
+		}
+	});
+}
+</script>
+
+<aside class="aside_wrap">
+	<ul class="aside_inner">
+	<li>
+		<a href="C_MOListKCT.asp" class="cs_mo" title="대화형문자"><span id="ucnt">2</span></a>
+	</li>
+	<li>
+		<a href="#none" onclick="pop_MemList();" class="mem_list" title="상담원리스트"><span style="font-size:10px;">상담원</span></a>
+	</li>
+	<li>
+		<a href="#none" onclick="pop_History();" class="cs_history" title="상담내역"><span>0</span></a>
+	</li>
+	<li>
+		<a href="#none" onclick="pop_Callback();" class="cs_callback" title="콜백요청"><span>0</span></a>
+	</li>
+	<li>
+		<a href="#none" onclick="pop_Booking();" class="cs_booking" title="예약내역"><span>0
+		<input type="hidden" id="BCNT" value="0"><input type="hidden" id="BDATE" value=""><input type="hidden" id="BSN" value=""></span>
+		
+		</a>
+	</li>
+	<li>
+		<a href="#none" onclick="pop_Task();" class="cs_transfer" title="업무이관"><span>0</span></a>
+	</li>
+	<li>
+		<a href="#none" onclick="pop_Notice()" class="cs_notice" title="공지사항"><span>0</span></a>
+	</li>
+	</ul>
+	<div class="cs_memo">
+		<a href="#none" onclick="pop_memo('show');" class="btn_cs_memo" title="메모"><span>메모</span></a>
+		<!-- 메모팝업 -->
+		<section id="memo_pop" class="frm_memo" style="display:none;">
+			<h3 class="h_memo">상담메모</h3>
+			<article class="memo_input"><textarea id="pop_memo" cols="42" rows="15" class="input_memo" style="width:312px; height:285px;"></textarea></article>
+			<a href="#none" onclick="pop_memo('hide');" class="memo_hide" title="최소화"><span>-</span></a>
+			<a href="#" style="margin-left:10px;" class="frm_btn_save"  onclick="pop_memoAPP();" title="등록/저장"><span>저장</span></a>
+		</section>
+		<!-- //메모팝업 -->
+	</div>
+</aside>
+<!-- 상담상태 리스트 팝업-->
+<div class="popup_layerMemlist" id="LayerMemList" style="display:none;"></div>
+<!--// 상담상태 리스트 팝업 -->
+
+<!-- 상담내역 팝업-->
+<div class="popup_layerCslist" id="LayerHistory" style="display:none;"></div>
+<!--// 상담내역 팝업 -->
+
+<!-- 콜백 팝업-->
+<div class="popup_layerCallback" id="LayerCallback" style="display:none;"></div>
+<!--// 콜백 팝업 -->
+
+<!-- 예약 팝업-->
+<div class="popup_layerBooking" id="LayerBooking" style="display:none;"></div>
+<!--// 예약 팝업 -->
+
+<!-- 예약내역 팝업-->
+<div class="popup_layerBooking2" id="LayerBooking2" style="display:none;"></div>
+<!--// 예약내역 팝업 -->
+
+<!-- 업무이관 팝업-->
+<div class="popup_layerTask" id="LayerTask" style="display:none;"></div>
+<!--// 업무이관 팝업 -->
+
+<!-- 공지사항 팝업-->
+<div class="popup_layerNotice" id="LayerNotice" style="display:none;"></div>
+<!--// 공지사항 팝업 -->
+		<!-- //공통 우측메뉴 -->
+		
+
+		<header>
+			<div class="gnb h100 bgimg_01">
+                <div class="gnb_mask h100"> <!-- mask -->
+				<article class="gnb_inner">
+					<h1 class="client_logo3"><a href="#" class="mt50" style="margin-top:65px;display:block; width:130px; height:118px; background:url(image/cp_logo/70011_logo.jpg) no-repeat center top; text-indent:-50000em;"><span style="position:relative; display:block; font-size:0; width:0; height:0; overflow:hidden; z-index:-1;">(주)피플링크 CONTACT CENTER</span></a></h1>
+					<ul class="top_menu">
+					
+					<li><a href="#"  title="상담원 관리">상담원 관리</a>
+						<ul class="sub_menu2 w95">
+						<li><a href="C_Member.asp" title="상담원 관리">상담원 관리</a></li>
+						</ul>
+					</li>
+					
+					<li><a href="#" class="txt_actv"title="콜현황">콜현황</a><span class="menu_actv"></span></a>
+						<ul class="sub_menu2 w95">
+						<li><a href="C_Calllog.asp" title="콜현황">콜현황</a></li>
+						<li><a href="C_Calllog.asp" title="전체 콜">전체 콜</a></li>
+						<!--  -->
+						<li><a href="C_CalllogAsk.asp" title="상담요청 콜">상담요청 콜</a></li>
+						<li><a href="C_Calllog_On.asp" title="업무시간 내 콜">업무시간 내 콜</a></li>
+						<li><a href="C_CalllogOff.asp" title="업무시간 외 콜">업무시간 외 콜</a></li>
+						</ul>
+					</li>
+					<li><a href="#" title="고객관리">고객관리</a></a>
+						<ul class="sub_menu2 w95">
+						<li><a href="C_UserList.asp" title="고객관리">고객관리</a></li>
+						<li><a href="C_UserList.asp" title="전체고객">전체 고객</a></li>
+						</ul>
+					</li>
+					<li><a href="#" title="문자내역">문자내역</a></a>
+						<ul class="sub_menu2 w95">
+						<li><a href="C_SmsListKCT.asp" title="문자내역">문자내역</a></li>
+						<!--<li><a href="C_SmsList69.asp" title="전송결과">전송결과</a></li>-->
+						<li><a href="C_SmsListKCT.asp" title="전송결과">전송결과(KCT)</a></li>
+						<li><a href="C_MoListKCT.asp" title="대화형문자리스트">대화형문자리스트</a></li>
+						</ul>
+					</li>
+					
+					<li><a href="#" title="통계확인">통계확인</a></a>
+						<ul class="sub_menu2 w95">
+						<li><a href="C_Total_Call.asp" title="통계확인">통계확인</a></li>
+						<li><a href="C_Total_Call.asp" title="ARS인입 통계">ARS인입 통계</a></li>
+						<li><a href="C_Total_CallOn.asp" title="ARS인입(업무시간) 통계">ARS인입(업무시간) 통계</a></li>
+						<li><a href="C_Total_Type.asp" title="문의유형 통계">문의유형 통계</a></li>
+						<li><a href="C_Total_Wid.asp" title="상담원 통계">상담원 통계</a></li>
+						<!--<li><a href="C_Total_StatusWid.asp" title="상담원 통계(상태)">상담원 통계(상태)</a></li>-->
+						</ul>
+					</li>
+					
+					<!--  -->
+					<li><a href="C_Consult.asp" title="상담하기">상담하기</a></li>
+					<!--  -->
+					</ul>
+					<ul class="ag_status">
+					<!--<li id="go9"><a href="#" title="로그인" >로그인</a></li>
+					<li id="go5"><a href="#" title="후처리"  onclick="goC1('5',10365)">후처리</a></li>
+					<li id="go3"><a href="#" title="작업"  onclick="goC1('3',10365)">작업</a></li>
+					<li id="go4"><a href="#" title="회의"  onclick="goC1('4',10365)">회의</a></li>-->
+					<li id="go1"><a href="#" title="상담가능" class="away_actv" onclick="goC1('1',10365)">상담가능</a></li>					
+					<li id="go0"><a href="#" title="자리비움"  onclick="goC1('0',10365)">자리비움</a></li>					
+					<li id="go2"><a href="#" title="착신"  onclick="goC1('2',10365)">착신</a></li>
+					<!-- <li id="go3"><a href="#" title="후처리"  onclick="goC1('3',10365)">후처리</a></li>
+					<li id="go4"><a href="#" title="휴식"  onclick="goC1('4',10365)">휴식</a></li> -->
+					</ul>
+					<a href="#" class="btn_logout" title="로그아웃" onclick="location.href='admin_logout.asp'"><span>Logout</span></a>
+				</article>
+			</div>
+		</div>
+		<div class="sta h40">
+			<article class="sta_inner w1180">
+				<h2 class="sta_h">전체 콜</h2>
+				<ul class="side_m">
+				<li style="width:150px; text-align:center;"><span style="color:#ff4d4d;font-weight:bold;font-size:15px;">AI 간병</span> 로그인 중</li>
+				<li><a href="#none" onclick="OutCall();" class="icn_call" title="전화걸기">전화걸기</a></li>
+				<li><a href="#none" onclick="goPush();" class="icn_return" title="돌려주기">돌려주기</a></li>
+				<li><a href="#none" onclick="goPull('10365');" class="icn_pickup" title="당겨받기">당겨받기</a></li>
+				<li><a href="#none" onclick="pop_sms_header();" class="icn_sms" title="문자전송">문자전송</a></li>
+				</ul>
+			</article>
+        </div>
+        </header>
+        <div id="ct2">
+			<!-- 검색 -->
+			<form name="searchForm" method="post" action="C_Calllog.asp">
+			<div class="srch_wrap">
+                <article class="srch">
+					<ul class="srch_inner">
+					<li class="z40">
+						<input type="text" class="vertical-m" id="from1" style="width:86px" name="start_search_string" value="2026-09-07"/>&nbsp; ~ &nbsp;
+						<input type="text" class="vertical-m" id="to1" style="width:86px" name="end_search_string"  value="2026-09-07" />
+					</li>
+					<li class="plnone brodnone"><a href="#" class="tab_sort tab_actv" title="전체" onclick="CallType('X');">전체</a><a href="#" class="tab_sort " onclick="CallType('I');" title="수신">수신</a><a href="#" class="tab_sort " onclick="CallType('O');" title="발신">발신</a><a href="#" class="tab_sort " onclick="CallType('C');" title="콜백">콜백</a></li>
+					<input type="hidden" id="searchCallType" name="searchCallType" value="">
+
+					<li class="mlnone brodnone">
+					<a href="#" style="width:62px;" class="tab_sort2 tab_actv" onclick="AskYN('X');" title="전체">전체</a><a href="#" style="width:62px;" class="tab_sort2 " onclick="AskYN('Y');" title="처리완료">처리완료</a><a href="#" style="width:62px;" class="tab_sort2 " onclick="AskYN('N');" title="처리완료">미처리</a><a href="#" style="width:62px;" class="tab_sort2 " onclick="AskYN('I');" title="보류">보류</a><a href="#" style="width:62px;" class="tab_sort2 " onclick="AskYN('A');" title="업무이관">업무이관</a><a href="#" class="tab_sort2 " style="width:79px;" onclick="AskYN('B');" title="미통화완료">미통화완료</a><a href="#" style="width:62px;" class="tab_sort2 " onclick="AskYN('C');" title="대기">대기</a><a href="#" style="width:62px;" class="tab_sort2 " onclick="AskYN('D');" title="예약상담">예약상담</a></li>
+					<input type="hidden" id="searchAskYN" name="searchAskYN" value="">
+					
+					<li class="brodnone mp0" style="margin-top:7px;">
+						<span>
+							<select name="searchQnAWeb" id="searchQnAWeb" onchange="logSelectDepth2(this.value)" style="width:118px">
+								
+								<option value="선택" >선택</option>
+								  
+								<option value="스마트케어" > 스마트케어</option>
+								  
+								<option value="간병인" > 간병인</option>
+								  
+								<option value="노인장기요양보험" > 노인장기요양보험</option>
+								  
+								<option value="요양보호사 매칭" > 요양보호사 매칭</option>
+								  
+								<option value="병원동행" > 병원동행</option>
+								  
+								<option value="AI스피커" > AI스피커</option>
+								  
+								<option value="CCTV" > CCTV</option>
+								  
+								<option value="위치추적기" > 위치추적기</option>
+								  
+							</select>
+						</span>
+						<span style="margin-left:5px;" id="logSelectDep2" >
+							
+								<select name="searchQnAWeb2" id="searchQnAWeb2" onchange="logSelectDepth3(this.value)" style="width:118px">
+									<option value="선택">선택</option>
+								</select>
+							  
+						</span>
+						<span  style="margin-left:5px;" id="logSelectDep3">
+							
+									<select name="searchQnAWeb3" id="searchQnAWeb3" style="width:118px">
+										<option value="선택">선택</option>
+									</select>
+								  
+						</span>
+					</li>
+					<li style="margin-top:7px;">
+						<div>
+							<select id="label_nme" id="searchCpname" name="searchCpname" title="인입경로 선택">
+								<option value="선택"   >인입경로 선택</option>
+								  
+								<option value="리본케어,16007835" > 리본케어</option>
+								  
+								<option value="삼성화재,18777412" > 삼성화재</option>
+								  
+								<option value="현대해상,15337436" > 현대해상</option>
+								  
+							</select>
+						</div>
+					</li>
+					<li style="margin-top:7px;">
+						<div>
+							<select id="searchNICNAME" name="searchNICNAME" title="상담원 선택">
+								<option value="전체"   >전체 상담원</option>
+								  
+								<option value="경영지원" > 경영지원</option>
+								  
+								<option value="김치형" > 김치형</option>
+								  
+								<option value="이주연" > 이주연</option>
+								  
+								<option value="이주연" > 이주연</option>
+								  
+								<option value="최규만" > 최규만</option>
+								  
+								<option value="AI 간병" > AI 간병</option>
+								  
+							</select>
+						</div>
+					</li>
+					<li style="margin-top:7px;">
+					<span>
+						<select id="searchQnAType" name="searchQnAType" title="ARS경로">
+							<option value="전체"   >ARS경로</option>
+							  
+							<option value="1" > 가입</option>
+							  
+							<option value="2" > 앱사용</option>
+							  
+							<option value="3" > 설치</option>
+							  
+							<option value="4" > 해지</option>
+							  
+							<option value="5" > 요양</option>
+							  
+							<option value="6" > 동행</option>
+							  
+							<option value="7" > 장비</option>
+							  
+							<option value="8" > 기타</option>
+							  
+							<option value="91" > 간병인신청</option>
+							  
+							<option value="81" > 간병인신청</option>
+							  
+							<option value="82" > 상담연결</option>
+							  
+							<option value="92" > 종료</option>
+							  
+							<option value="93" > 기타</option>
+							  
+						</select> 	
+					</span>
+					</li>
+					<li style="margin-top:7px;">
+					<span>
+						<select id="searchStr" name="searchStr" title="전체">
+							<option value="전체" >전체</option>
+							<option value="UserName" >고객이름</option>
+							<option value="cid" >전화번호</option>
+							<option value="Memo" >상담메모</option>
+						</select>
+					</span>
+					<input type="text" id="search_word" name="search_word" value = "" style="width:80px;" placeholder="이름 또는 전화번호를 입력하세요"><input type="button" onclick="formSearch();" class="btn_srch_s" value="검색" title="검색"></li>
+					</ul>
+				</article>
+            </div>
+			<!-- //검색 -->
+			</form>
+			<!-- 간단 건색결과 -->
+			<div id="Ajax_Calllog">
+			<article class="tbl_wrap pl20 pt15 w1160">
+				<table class="tbl_comm mb10">
+				<colgroup>
+					<col style="width:8%">
+					<col style="auto;">
+					<col style="auto;">
+					<col style="width:8%">
+					<col style="width:8%">
+					<col style="width:8%">
+					<col style="width:8%">
+					<col style="width:8%">
+					<col style="width:8%">
+					<col style="width:8%">
+					<col style="width:8%">
+				</colgroup>
+				<thead style="background:#fffef5;">
+				<tr>
+					<th>전체</th>
+					<th>인입콜</th>
+					<th>발신콜</th>
+					<th>연결요청</th>
+					<th>응답호</th>
+					<th>응대율</th>
+					<th>콜백요청</th>
+					<th>포기호</th>
+					<th>고객포기</th>
+					<th>유형미선택</th>
+					<th>버튼선택후종료</th>
+				</tr>
+				</thead>
+				<tbody>
+				<tr>
+					<td>17건</td>
+					<td><a href="#" class="underlne">17</a>/7건</td>
+					<td><a href="#" class="underlne">0</a>/0건</td>
+					<td><a href="#" class="underlne">8</a>건</td>
+					<td><a href="#" class="underlne">7</a>건</td>
+					<td><a href="#" class="underlne">88%</a>건</td>
+					<td><a href="#" class="underlne">0</a>건</td>
+					<td><a href="#" class="underlne">0</a>건</td>
+					<td><a href="#" class="underlne">1</a>건</td>
+					<td><a href="#" class="underlne">7</a>건</td>
+					<td><a href="#" class="underlne">2</a>건</td>
+				</tr>
+				</tbody>
+				</table>
+			</article>
+			<!-- //간단 건색결과 -->
+			<article class="tbl_wrap pl20 pt5 w1160" style="width:1700px;">
+				<table class="tbl_comm">
+				<colgroup>
+					<col style="width:40px;">
+					<col style="width:100px;">
+					<col style="width:110px;">
+					<col style="width:90px;">
+					<col style="width:80px;">
+					<col style="width:80px;">
+					<col style="width:40px;">
+					<col style="width:80px;">
+					<col style="width:80px;">
+					<col style="width:150px;">
+					<col style="width:40px;">
+					<col style="width:40px;">
+					<col style="width:100px;">
+					<col style="width:auto;">
+					<col style="width:70px;">
+					<col style="width:110px;">
+					<col style="width:70px;">
+					<col style="width:110px;">
+					<col style="width:70px;">
+					<col style="width:40px;">
+				</colgroup>
+				<caption class="pt9 pb10">
+					<strong class="cff4d4d lneblck">“2026-09-07 부터 2026-09-07”</strong> 검색 결과 총 17건이 검색되었습니다.
+					<div class="excel_down_wrap" onclick="ExcelDown('start_search_string=2026-09-07&end_search_string=2026-09-07&searchStr=&search_word=&WorkYN=&searchAskYN=&searchQnAType=&searchQnAWeb=&searchQnAWeb2=&searchQnAWeb3=&searchCpname=&searchTcnt=17&searchCallType=&searchNICNAME=');" style="cursor:pointer;"><span class="excel_txt">Excel Download</span><!-- <input type="button" id="" class="btn_excel_dnld" style="border-left:0;" value="1" title="1번째 다운로드"><input type="button" id="" class="btn_excel_dnld" value="2" title="2번째 다운로드"><input type="button" id="" class="btn_excel_dnld" value="3" title="3번째 다운로드"> --></div>
+				</caption>
+				<thead>
+				<tr>
+					<th scope="col">구분</th>
+					<th scope="col">경로</th>
+					<th scope="col">연결시간</th>
+					<th scope="col">전화번호</th>
+					<th scope="col">고객이름</th>
+					<th scope="col">생년월일</th>
+					<th scope="col">성별</th>
+					<th scope="col">질병<br>유형</th>
+					<th scope="col">그룹</th>
+					<th scope="col">ARS경로</th>
+					<th scope="col">연결<br>요청</th>
+					<th scope="col">대기<br>시간</th>
+					<th scope="col">문의유형</th>
+					<th scope="col">상담제목</th>
+					<th scope="col">문자</th>
+					<th scope="col">상담시간</th>
+					<th scope="col">상담현황</th>
+					<th scope="col">처리시간</th>
+					<th scope="col">상담원</th>
+					<th scope="col">녹취</th>
+				</tr>
+				</thead>
+				<tbody>
+				
+				<tr>
+					<td>IN</td>
+					<td>삼성화재</td>
+					<td>2026-09-07 16:01</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01032590982','');">01032590982</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>상담연결</td>
+					<td>Y</td>
+					<td>22</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7102139');return false;">
+						<span class="memo_overview">24시간 케어와 위기 대처 상담</span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01032590982');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>00:01:42</td>
+					<td><strong><a href="#pop" onclick="UserGet('01032590982','7102139','0','삼성화재','이주연');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 16:04</td>
+					<td>이주연</td>
+					<!-- 녹취의경우 재정의(아이콘) -->
+							
+							<td><a class="icn_rec_no"><span>다운못함</span></a></td>
+						
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>리본케어</td>
+					<td>2026-09-07 15:14</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01082007134','');">01082007134</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>기타</td>
+					<td>Y</td>
+					<td>28</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7101517');return false;">
+						<span class="memo_overview">기구 고장 및 서비스 연락 안내</span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01082007134');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>00:01:38</td>
+					<td><strong><a href="#pop" onclick="UserGet('01082007134','7101517','0','리본케어','이주연');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 15:17</td>
+					<td>이주연</td>
+					<!-- 녹취의경우 재정의(아이콘) -->
+							
+							<td><a class="icn_rec_no"><span>다운못함</span></a></td>
+						
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>삼성화재</td>
+					<td>2026-09-07 15:07</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01045844865','');">01045844865</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>상담연결</td>
+					<td>Y</td>
+					<td>5</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7101416');return false;">
+						<span class="memo_overview">입원 및 간병사 관리 안내</span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01045844865');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>00:01:33</td>
+					<td><strong><a href="#pop" onclick="UserGet('01045844865','7101416','0','삼성화재','이주연');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 15:09</td>
+					<td>이주연</td>
+					<!-- 녹취의경우 재정의(아이콘) -->
+							
+							<td><a class="icn_rec_no"><span>다운못함</span></a></td>
+						
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>삼성화재</td>
+					<td>2026-09-07 13:40</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('0221261629','');">0221261629</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>상담연결</td>
+					<td>Y</td>
+					<td>7</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7100110');return false;">
+						<span class="memo_overview"></span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('0221261629');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>00:00:27</td>
+					<td><strong><a href="#pop" onclick="UserGet('0221261629','7100110','0','삼성화재','이주연');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 13:41</td>
+					<td>이주연</td>
+					<!-- 녹취의경우 재정의(아이콘) -->
+							
+							<td><a class="icn_rec_no"><span>다운못함</span></a></td>
+						
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>삼성화재</td>
+					<td>2026-09-07 13:09</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01081039876','');">01081039876</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>상담연결</td>
+					<td>Y</td>
+					<td>14</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7099608');return false;">
+						<span class="memo_overview">지선주님 간병인 배정 문의</span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01081039876');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>00:01:19</td>
+					<td><strong><a href="#pop" onclick="UserGet('01081039876','7099608','0','삼성화재','최규만');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 13:11</td>
+					<td>최규만</td>
+					<!-- 녹취의경우 재정의(아이콘) -->
+							
+							<td><a class="icn_rec_no"><span>다운못함</span></a></td>
+						
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>삼성화재</td>
+					<td>2026-09-07 13:08</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01091404245','');">01091404245</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>상담연결</td>
+					<td>Y</td>
+					<td>6</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7099604');return false;">
+						<span class="memo_overview">이정숙님 보험 계약 문의</span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01091404245');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>00:03:16</td>
+					<td><strong><a href="#pop" onclick="UserGet('01091404245','7099604','0','삼성화재','이주연');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 13:12</td>
+					<td>이주연</td>
+					<!-- 녹취의경우 재정의(아이콘) -->
+							
+							<td><a class="icn_rec_no"><span>다운못함</span></a></td>
+						
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>삼성화재</td>
+					<td>2026-09-07 13:08</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01091404245','');">01091404245</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>간병인신청</td>
+					<td></td>
+					<td>0</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7099595');return false;">
+						<span class="memo_overview"></span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01091404245');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>0</td>
+					<td><strong><a href="#pop" onclick="UserGet('01091404245','7099595','0','삼성화재','');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 13:08</td>
+					<td></td>
+					
+						<td>-</td>
+					
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>삼성화재</td>
+					<td>2026-09-07 12:18</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01091404245','');">01091404245</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>0</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7099297');return false;">
+						<span class="memo_overview"></span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01091404245');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>0</td>
+					<td><strong><a href="#pop" onclick="UserGet('01091404245','7099297','0','삼성화재','');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 12:18</td>
+					<td></td>
+					
+						<td>-</td>
+					
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>삼성화재</td>
+					<td>2026-09-07 12:16</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01091404245','');">01091404245</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>0</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7099288');return false;">
+						<span class="memo_overview"></span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01091404245');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>0</td>
+					<td><strong><a href="#pop" onclick="UserGet('01091404245','7099288','0','삼성화재','');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 12:16</td>
+					<td></td>
+					
+						<td>-</td>
+					
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>삼성화재</td>
+					<td>2026-09-07 12:03</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01081039876','');">01081039876</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>0</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7099230');return false;">
+						<span class="memo_overview"></span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01081039876');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>0</td>
+					<td><strong><a href="#pop" onclick="UserGet('01081039876','7099230','0','삼성화재','');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 12:03</td>
+					<td></td>
+					
+						<td>-</td>
+					
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>삼성화재</td>
+					<td>2026-09-07 12:01</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01067901352','');">01067901352</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>0</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7099221');return false;">
+						<span class="memo_overview"></span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01067901352');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>0</td>
+					<td><strong><a href="#pop" onclick="UserGet('01067901352','7099221','0','삼성화재','');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 12:01</td>
+					<td></td>
+					
+						<td>-</td>
+					
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>삼성화재</td>
+					<td>2026-09-07 11:57</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01091404245','');">01091404245</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>간병인신청</td>
+					<td></td>
+					<td>0</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7099186');return false;">
+						<span class="memo_overview"></span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01091404245');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>0</td>
+					<td><strong><a href="#pop" onclick="UserGet('01091404245','7099186','0','삼성화재','');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 11:57</td>
+					<td></td>
+					
+						<td>-</td>
+					
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>삼성화재</td>
+					<td>2026-09-07 11:21</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01065657754','');">01065657754</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>0</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7098720');return false;">
+						<span class="memo_overview"></span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01065657754');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>0</td>
+					<td><strong><a href="#pop" onclick="UserGet('01065657754','7098720','0','삼성화재','');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 11:21</td>
+					<td></td>
+					
+						<td>-</td>
+					
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>삼성화재</td>
+					<td>2026-09-07 10:26</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01089334898','');">01089334898</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>0</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7097941');return false;">
+						<span class="memo_overview"></span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01089334898');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>0</td>
+					<td><strong><a href="#pop" onclick="UserGet('01089334898','7097941','0','삼성화재','');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 10:26</td>
+					<td></td>
+					
+						<td>-</td>
+					
+				</tr>
+				
+				
+				<tr>
+					<td>IN</td>
+					<td>리본케어</td>
+					<td>2026-09-07 10:20</td>
+					<td>
+						
+								<a href="#pop" onclick="OutCallPhone('01055906814','');">01055906814</a>
+							
+					</td>
+					<td>비회원</td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td></td>
+					<td>0</td>
+					<td>
+						<span align="left"><label id="lblQnaWeb"title=""></label><label id="lblQnaWeb2" title=""></label><label id="lblQnaWeb3" title=""></label></span>
+					</td>
+					<td>
+						<div onClick="DetailM('7097832');return false;">
+						<span class="memo_overview"></span>
+						<!-- detail -->
+						
+						<!-- //detail -->
+						</div>
+					</td>
+					<td><a href="#none" onclick="pop_sms('01055906814');" class="sms_before" title="문자재전송"><span>문자재전송</span></a></td>
+					<td>0</td>
+					<td><strong><a href="#pop" onclick="UserGet('01055906814','7097832','0','리본케어','');return false;" >미처리</a></strong></td>
+					<td>2026-09-07 10:20</td>
+					<td></td>
+					
+						<td>-</td>
+					
+				</tr>
+				
+				
+				</tbody>
+				</table>
+				<div class="tbl_btn_wrap">
+				  <ul>
+					<span class='pg_num'><a href='C_Calllog.asp?page=1&start_search_string=2026-09-07&end_search_string=2026-09-07&searchStr=&search_word=&WorkYN=&searchAskYN=&searchQnAType=&searchQnAWeb=&searchQnAWeb2=&searchQnAWeb3=&searchCpname=&searchTcnt=17&searchCallType=&searchNICNAME=' class='pg_act'>1</a></span><span class='pg_num'><a href='C_Calllog.asp?page=2&start_search_string=2026-09-07&end_search_string=2026-09-07&searchStr=&search_word=&WorkYN=&searchAskYN=&searchQnAType=&searchQnAWeb=&searchQnAWeb2=&searchQnAWeb3=&searchCpname=&searchTcnt=17&searchCallType=&searchNICNAME='>2</a></span>
+				  </ul>
+				</div>
+				<!-- <div class="tbl_btn_wrap"><a href="#" class="pg_prev" title="이전"><span class="prev">이전</span></a><span class="pg_num"><a href="#">1</a><a href="#">2</a><a href="#">3</a><a href="#">4</a><a href="#" class="pg_act">5</a><a href="#">6</a><a href="#">7</a><a href="#">8</a><a href="#">9</a><a href="#">10</a></span><a href="#" class="pg_next" title="다음"><span class="next">다음</span></a></div> -->
+			</article>
+			</div>
+			<!-- 문자전송 팝업 -->
+			<div class="popup_layerWrap_sms" id="smssender" style="display:none;"></div>
+			<!--// 문자전송  팝업 -->
+			
+			<!-- 분석리포트 팝업 -->
+			<div class="popup_layerWrap_DetailView" id="DetailView" style="display:none;"></div>
+			<!--// 분석리포트  팝업 -->
+		</div>
+
+		
+    </div>
+	        <footer>
+            <address>Copyrightⓒ 2014 Peoplelink ARS Customer Center. All Right Reserved.</address>
+        </footer>
+
+	<iframe src="" width="0" height="0" style="display:hidden" name="hiddenRecFrm" id="hiddenRecFrm"></iframe>
+</body>
+</html>

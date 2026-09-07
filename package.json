@@ -1,0 +1,17 @@
+{
+  "name": "livonmate-one",
+  "version": "3.0.0",
+  "description": "Livon Mate One - Livon Care ERP System",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "livoncare",
+    "livonmate-one",
+    "erp"
+  ],
+  "author": "Livon Care Co., Ltd.",
+  "license": "ISC"
+}
