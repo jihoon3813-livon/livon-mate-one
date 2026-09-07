@@ -714,21 +714,82 @@ var gAdjusters = [];
 var gSamsungList = [];
 var gFormTemplates = [];
 var gFaxRecords = {};
-const CONVEX_URL = 'https://rapid-raccoon-895.convex.cloud';
+const CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
 
-async function syncToConvex(path, args) {
+async function syncToConvex(path, args = {}) {
   try {
     const res = await fetch(`${CONVEX_URL}/api/mutation`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path, args })
     });
-    return await res.json();
+    const data = await res.json();
+    console.log(`[Convex Mutation] ${path} 성공:`, data);
+    return data;
   } catch (err) {
-    console.warn('[Convex Sync Error]', err);
+    console.warn(`[Convex Sync Error] ${path}:`, err);
     return null;
   }
 }
+
+async function queryConvex(path, args = {}) {
+  try {
+    const res = await fetch(`${CONVEX_URL}/api/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, args })
+    });
+    return await res.json();
+  } catch (err) {
+    console.warn(`[Convex Query Error] ${path}:`, err);
+    return null;
+  }
+}
+
+async function loadConvexData() {
+  try {
+    const res = await queryConvex('sync:bundleAll', {});
+    if (res && res.status === 'success' && res.value) {
+      const { applications, assignments, claims, payouts, adjusters, careLogs } = res.value;
+      if (Array.isArray(applications) && applications.length > 0) {
+        gApps = applications;
+      }
+      if (Array.isArray(assignments)) gAssigns = assignments;
+      if (Array.isArray(claims)) gClaims = claims;
+      if (Array.isArray(payouts)) gPayouts = payouts;
+      if (Array.isArray(adjusters) && adjusters.length > 0) gAdjusters = adjusters;
+      if (Array.isArray(careLogs) && careLogs.length > 0) gCareLogs = careLogs;
+
+      console.log(`[Convex Cloud] 운영 DB 실시간 동기화 완료 (고객: ${gApps.length}명, 배정: ${gAssigns.length}건, 청구: ${gClaims.length}건, 정산: ${gPayouts.length}건)`);
+      updateConvexStatusBadge(true, gApps.length);
+
+      if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+      if (typeof renderApplications === 'function') renderApplications();
+      if (typeof renderAssignments === 'function') renderAssignments();
+      if (typeof renderClaims === 'function') renderClaims();
+      if (typeof renderPayouts === 'function') renderPayouts();
+      if (typeof renderCareLogs === 'function') renderCareLogs();
+      if (typeof renderDashboard === 'function') renderDashboard();
+    }
+  } catch (err) {
+    console.warn('[Convex Data Load Error]', err);
+    updateConvexStatusBadge(false, gApps.length);
+  }
+}
+
+function updateConvexStatusBadge(connected, count) {
+  const badge = document.getElementById('convexStatusBadgeText');
+  const dot = document.getElementById('convexStatusDot');
+  if (badge) {
+    badge.innerText = connected ? `gallant-weasel-360 (${count}건)` : '오프라인';
+  }
+  if (dot) {
+    dot.className = connected 
+      ? 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse' 
+      : 'w-2 h-2 rounded-full bg-amber-400';
+  }
+}
+
 var gExpandedCustomerIds = new Set();
 var gSelectedAppIds = new Set();
 var gLedgerSelection = {
@@ -854,6 +915,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initThemeAndMasking();
   initAdminSession();
   setupInputFormatters();
+
+  // Convex Cloud 운영 서버 실시간 데이터 동기화
+  if (typeof loadConvexData === 'function') {
+    loadConvexData();
+  }
 
   const addrQueryInput = document.getElementById('addressSearchQuery');
   if (addrQueryInput && typeof addrQueryInput.addEventListener === 'function') {
@@ -3272,6 +3338,11 @@ function toggleCsRecordResolved(appId, recordId, targetStatus) {
   renderUnifiedCareHub();
   if (typeof renderApplications === 'function') renderApplications();
 
+  // Convex Cloud 운영 DB 실시간 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app: app });
+  }
+
   if (typeof showNotification === 'function') {
     showNotification({
       type: targetStatus === '미해결' ? 'warning' : 'success',
@@ -3293,6 +3364,12 @@ function saveCsActionMemo(appId, recordId) {
   if (inputEl) {
     rec.actionTaken = inputEl.value.trim();
     app.updatedAt = new Date().toISOString();
+
+    // Convex Cloud 운영 DB 실시간 동기화
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveApplication', { app: app });
+    }
+
     if (typeof showNotification === 'function') {
       showNotification({
         type: 'success',
@@ -3536,6 +3613,12 @@ function deleteInterimPayout(applyId, payoutId) {
   renderUnifiedCareHub();
   renderCaregiverPayouts();
 
+  // Convex Cloud 운영 DB 실시간 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:deletePayout', { payoutId: payoutId });
+    if (app) syncToConvex('sync:saveApplication', { app: app });
+  }
+
   if (typeof showNotification === 'function') {
     showNotification({
       type: 'info',
@@ -3595,6 +3678,12 @@ function createInterimClaim(applyId, roundNumber, targetDays) {
   renderUnifiedCareHub();
   renderClaims();
 
+  // Convex Cloud 운영 DB 실시간 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveClaim', { claim: newClaim });
+    if (app) syncToConvex('sync:saveApplication', { app: app });
+  }
+
   if (typeof showNotification === 'function') {
     showNotification({
       type: 'success',
@@ -3627,6 +3716,12 @@ function deleteInterimClaim(applyId, claimId) {
   if (claimListModal && !claimListModal.classList.contains('hidden')) openClaimDetailListModal(applyId);
   renderUnifiedCareHub();
   renderClaims();
+
+  // Convex Cloud 운영 DB 실시간 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:deleteClaim', { claimId: claimId });
+    if (app) syncToConvex('sync:saveApplication', { app: app });
+  }
 
   if (typeof showNotification === 'function') {
     showNotification({
@@ -4584,6 +4679,12 @@ function handlePayoutEditSubmit(e) {
   renderUnifiedCareHub();
   renderCaregiverPayouts();
 
+  // Convex Cloud 운영 DB 실시간 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:savePayout', { payout: p });
+    if (app) syncToConvex('sync:saveApplication', { app: app });
+  }
+
   if (typeof showNotification === 'function') {
     showNotification({
       type: 'success',
@@ -4632,6 +4733,13 @@ function togglePayoutStatus(payoutId) {
   }
   renderUnifiedCareHub();
   renderCaregiverPayouts();
+
+  // Convex Cloud 운영 DB 실시간 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:savePayout', { payout: p });
+    const app = (gApps || []).find(a => a.id === p.applyId);
+    if (app) syncToConvex('sync:saveApplication', { app: app });
+  }
 
   if (typeof showNotification === 'function') {
     showNotification({
@@ -5056,6 +5164,12 @@ function toggleClaimDepositStatus(applyId, roundNumber, claimId) {
   }
   renderUnifiedCareHub();
   renderClaims();
+
+  // Convex Cloud 운영 DB 실시간 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveClaim', { claim: claim });
+    if (app) syncToConvex('sync:saveApplication', { app: app });
+  }
 }
 
 
@@ -6940,7 +7054,15 @@ function deleteSelectedApps() {
     gCareLogs = gCareLogs.filter(log => !gSelectedAppIds.has(log.applyId));
 
     // 3. Clear selected set
+    const idsToDelete = Array.from(gSelectedAppIds);
     gSelectedAppIds.clear();
+
+    // Convex Cloud 운영 DB 실시간 비동기 삭제
+    if (typeof syncToConvex === 'function') {
+      idsToDelete.forEach(id => {
+        syncToConvex('sync:deleteApplication', { appId: id });
+      });
+    }
 
     // 4. Re-render all views
     renderUnifiedCareHub();
@@ -6969,6 +7091,11 @@ function deleteSingleApp(appId) {
     gPayouts = gPayouts.filter(p => p.applyId !== appId);
     gSelectedAppIds.delete(appId);
 
+    // Convex Cloud 운영 DB 실시간 삭제
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:deleteApplication', { appId: appId });
+    }
+
     renderUnifiedCareHub();
     renderApplications();
     renderAssignments();
@@ -6989,6 +7116,9 @@ function editCustomerMemo(appId) {
   const newMemo = prompt(`[${app.id} - ${app.patientName} 님] 간병신청대장 비고 및 특이사항 입력:`, currentMemo);
   if (newMemo !== null) {
     app.memo = newMemo.trim();
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:updateMemo', { appId: appId, memo: app.memo });
+    }
     renderUnifiedCareHub();
     renderApplications();
   }
@@ -7618,6 +7748,9 @@ function submitSimulatorLead() {
   };
 
   gApps.unshift(newApp);
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app: newApp });
+  }
   renderUnifiedCareHub();
   renderApplications();
   renderDashboard();
@@ -8494,9 +8627,9 @@ function handleNewAppSubmit(e) {
     // Add to applications
     gApps.unshift(newApp);
 
-    // Convex Cloud 실시간 비동기 동기화
+    // Convex Cloud 운영 DB 실시간 동기화
     if (typeof syncToConvex === 'function') {
-      syncToConvex('applications:create', { data: newApp });
+      syncToConvex('sync:saveApplication', { app: newApp });
     }
 
     // Increment seq
@@ -8605,6 +8738,12 @@ function handleNewAssignSubmit(e) {
   renderApplications();
   renderDashboard();
 
+  // Convex Cloud 운영 DB 실시간 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveAssignment', { assign: newAssign });
+    if (app) syncToConvex('sync:saveApplication', { app: app });
+  }
+
   showCustomAlert({
     title: '간병인 배정 완료 (STEP 2)',
     message: `[${app ? app.patientName : '고객'}] 님에게 간병인 [${name}] 님이 성공적으로 배정되었습니다.\n배정번호: ${newAssign.id} (일급: ${formatCurrency(newAssign.dailyWage)}원)`,
@@ -8711,6 +8850,11 @@ function handleCustomerEditSubmit(e) {
   renderApplications();
   renderDashboard();
 
+  // Convex Cloud 운영 DB 실시간 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app: app });
+  }
+
   showCustomAlert({
     title: '고객 및 접수정보 수정 완료',
     message: `[${app.id} - ${app.patientName}] 고객님의 정보가 성공적으로 수정 및 저장되었습니다.`,
@@ -8768,6 +8912,12 @@ function handleCareScheduleSubmit(e) {
   renderUnifiedCareHub();
   renderAssignments();
   renderPayouts();
+
+  // Convex Cloud 운영 DB 실시간 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveAssignment', { assign: as });
+    if (app) syncToConvex('sync:saveApplication', { app: app });
+  }
 
   showCustomAlert({
     title: '간병 일정 및 일급 수정 완료',
@@ -10002,6 +10152,11 @@ function handleNewCsRecordSubmit(e) {
   renderUnifiedCareHub();
   renderApplications();
 
+  // Convex Cloud 운영 DB 실시간 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app: app });
+  }
+
   showCustomAlert({
     title: 'CS / 민원 이력 등록 완료',
     message: `[${app.patientName}] 고객의 ${type}(${label}) 상담 이력이 안전하게 등록되었으며, 고객 카드 및 대장 라벨에 실시간 반영되었습니다.`,
@@ -10041,6 +10196,11 @@ function deleteCsRecord(appId, recordId) {
   }
   renderUnifiedCareHub();
   renderApplications();
+
+  // Convex Cloud 운영 DB 실시간 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app: app });
+  }
 }
 
 

@@ -10,6 +10,7 @@
 
 import type * as applications from "../applications.js";
 import type * as seed from "../seed.js";
+import type * as sync from "../sync.js";
 
 import type {
   ApiFromModules,
@@ -20,6 +21,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   applications: typeof applications;
   seed: typeof seed;
+  sync: typeof sync;
 }>;
 
 /**
