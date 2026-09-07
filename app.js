@@ -714,7 +714,7 @@ var gAdjusters = [];
 var gSamsungList = [];
 var gFormTemplates = [];
 var gFaxRecords = {};
-const CONVEX_URL = 'https://acrobatic-mule-632.convex.cloud';
+const CONVEX_URL = 'https://rapid-raccoon-895.convex.cloud';
 
 async function syncToConvex(path, args) {
   try {
