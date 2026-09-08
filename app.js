@@ -746,7 +746,47 @@ async function queryConvex(path, args = {}) {
   }
 }
 
-async function loadConvexData() {
+var gIsDataLoading = true;
+
+function renderAllLoadingStates() {
+  const hubList = document.getElementById('hubCustomerCardsList');
+  if (hubList) {
+    hubList.innerHTML = `
+      <div class="col-span-full py-20 flex flex-col items-center justify-center text-slate-500 bg-white rounded-3xl border border-slate-200 shadow-sm">
+        <div class="relative flex items-center justify-center mb-4">
+          <div class="w-14 h-14 border-4 border-emerald-100 rounded-full"></div>
+          <div class="w-14 h-14 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+          <i data-lucide="database" class="w-5 h-5 text-emerald-600 absolute"></i>
+        </div>
+        <h4 class="text-base font-black text-slate-800 tracking-tight">최신 간병 데이터 조회 중...</h4>
+        <p class="text-xs text-slate-500 mt-1">Convex Cloud 실시간 데이터베이스와 동기화하고 있습니다.</p>
+      </div>
+    `;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+  const appTbody = document.getElementById('appTableBody');
+  if (appTbody) {
+    appTbody.innerHTML = `<tr><td colspan="16" class="py-16 text-center bg-white"><div class="flex flex-col items-center justify-center"><div class="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2.5"></div><span class="text-xs font-bold text-slate-700">최신 신청 내역 조회 중...</span></div></td></tr>`;
+  }
+  const assignTbody = document.getElementById('assignTableBody');
+  if (assignTbody) {
+    assignTbody.innerHTML = `<tr><td colspan="15" class="py-16 text-center bg-white"><div class="flex flex-col items-center justify-center"><div class="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2.5"></div><span class="text-xs font-bold text-slate-700">최신 배정 내역 조회 중...</span></div></td></tr>`;
+  }
+  const claimTbody = document.getElementById('claimTableBody');
+  if (claimTbody) {
+    claimTbody.innerHTML = `<tr><td colspan="16" class="py-16 text-center bg-white"><div class="flex flex-col items-center justify-center"><div class="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2.5"></div><span class="text-xs font-bold text-slate-700">최신 청구 내역 조회 중...</span></div></td></tr>`;
+  }
+  const payoutTbody = document.getElementById('payoutTableBody');
+  if (payoutTbody) {
+    payoutTbody.innerHTML = `<tr><td colspan="16" class="py-16 text-center bg-white"><div class="flex flex-col items-center justify-center"><div class="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2.5"></div><span class="text-xs font-bold text-slate-700">최신 지급 내역 조회 중...</span></div></td></tr>`;
+  }
+}
+
+async function loadConvexData(showSpinner = true) {
+  if (showSpinner) {
+    gIsDataLoading = true;
+    renderAllLoadingStates();
+  }
   try {
     const res = await queryConvex('sync:bundleAll', {});
     if (res && res.status === 'success' && res.value) {
@@ -762,18 +802,37 @@ async function loadConvexData() {
 
       console.log(`[Convex Cloud] 운영 DB 실시간 동기화 완료 (고객: ${gApps.length}명, 배정: ${gAssigns.length}건, 청구: ${gClaims.length}건, 정산: ${gPayouts.length}건)`);
       updateConvexStatusBadge(true, gApps.length);
-
-      if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
-      if (typeof renderApplications === 'function') renderApplications();
-      if (typeof renderAssignments === 'function') renderAssignments();
-      if (typeof renderClaims === 'function') renderClaims();
-      if (typeof renderPayouts === 'function') renderPayouts();
-      if (typeof renderCareLogs === 'function') renderCareLogs();
-      if (typeof renderDashboard === 'function') renderDashboard();
     }
   } catch (err) {
     console.warn('[Convex Data Load Error]', err);
     updateConvexStatusBadge(false, gApps.length);
+  } finally {
+    gIsDataLoading = false;
+    if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+    if (typeof renderApplications === 'function') renderApplications();
+    if (typeof renderAssignments === 'function') renderAssignments();
+    if (typeof renderClaims === 'function') renderClaims();
+    if (typeof renderPayouts === 'function') renderPayouts();
+    if (typeof renderCareLogs === 'function') renderCareLogs();
+    if (typeof renderDashboard === 'function') renderDashboard();
+  }
+}
+
+async function refreshLatestData() {
+  const btnIcon = document.getElementById('hubRefreshBtnIcon');
+  if (btnIcon) btnIcon.classList.add('animate-spin');
+  try {
+    await loadConvexData(true);
+    if (typeof showCustomAlert === 'function') {
+      showCustomAlert({
+        title: '최신 데이터 조회 완료',
+        message: `Convex Cloud 운영 DB로부터 최신 데이터(총 ${gApps.length}건)가 정상 동기화되었습니다.`,
+        icon: 'check-circle',
+        iconColor: 'emerald'
+      });
+    }
+  } finally {
+    if (btnIcon) btnIcon.classList.remove('animate-spin');
   }
 }
 
@@ -5644,6 +5703,11 @@ function renderUnifiedCareHub() {
   const container = document.getElementById('hubCustomerCardsList');
   if (!container) return;
 
+  if (typeof gIsDataLoading !== 'undefined' && gIsDataLoading) {
+    renderAllLoadingStates();
+    return;
+  }
+
   updateHubLayoutStyleUI();
 
   // Ensure grid class matches gHubViewCols
@@ -7127,6 +7191,7 @@ function editCustomerMemo(appId) {
 function renderApplications() {
   const tbody = document.getElementById('appTableBody');
   if (!tbody) return;
+  if (typeof gIsDataLoading !== 'undefined' && gIsDataLoading) return;
 
   const query = (document.getElementById('appSearchInput')?.value || '').trim().toLowerCase();
   const insFilter = document.getElementById('appInsuranceFilter')?.value || 'ALL';
@@ -7309,6 +7374,7 @@ function renderAppPagination(totalCount, totalPages) {
 function renderAssignments() {
   const tbody = document.getElementById('assignTableBody');
   if (!tbody) return;
+  if (typeof gIsDataLoading !== 'undefined' && gIsDataLoading) return;
 
   const query = (document.getElementById('assignSearchInput')?.value || '').trim().toLowerCase();
   const centerFilter = document.getElementById('assignCenterFilter')?.value || 'ALL';
@@ -7437,6 +7503,7 @@ function playSampleAudio() {
 function renderClaims() {
   const tbody = document.getElementById('claimTableBody');
   if (!tbody) return;
+  if (typeof gIsDataLoading !== 'undefined' && gIsDataLoading) return;
 
   const query = (document.getElementById('claimSearchInput')?.value || '').trim().toLowerCase();
   const statusFilter = document.getElementById('claimStatusFilter')?.value || 'ALL';
@@ -7537,6 +7604,7 @@ function filterClaimsByStatus(status) {
 function renderPayouts() {
   const tbody = document.getElementById('payoutTableBody');
   if (!tbody) return;
+  if (typeof gIsDataLoading !== 'undefined' && gIsDataLoading) return;
 
   const query = (document.getElementById('payoutSearchInput')?.value || '').trim().toLowerCase();
   const statusFilter = document.getElementById('payoutStatusFilter')?.value || 'ALL';
@@ -8705,21 +8773,33 @@ function handleNewAssignSubmit(e) {
   const name = document.getElementById('newAssignCaregiverName').value.trim();
   const wageRaw = document.getElementById('newAssignDailyWage').value.replace(/[^0-9]/g, '');
 
+  syncCombinedDateTime('newAssignStartDate');
+  syncCombinedDateTime('newAssignEndDate');
+
+  let maxNum = 0;
+  (gAssigns || []).forEach(as => {
+    if (as && as.id) {
+      const n = parseInt(as.id.replace(/[^0-9]/g, ''), 10);
+      if (!isNaN(n) && n > maxNum) maxNum = n;
+    }
+  });
+  const newAssignId = 'A0' + String(maxNum + 1).padStart(3, '0');
+
   const newAssign = {
-    id: 'A0' + (gAssigns.length + 1).toString().padStart(3, '0'),
+    id: newAssignId,
     applyId: applyId,
     patientName: app ? app.patientName : '고객',
     caregiverName: name,
     birthDate: '',
-    phone: document.getElementById('newAssignCaregiverPhone').value,
+    phone: document.getElementById('newAssignCaregiverPhone').value || '',
     centerName: document.getElementById('newAssignCenterName').value || '영등포센터',
     centerPhone: '',
-    settlementType: document.getElementById('newAssignSettlementType').value,
+    settlementType: document.getElementById('newAssignSettlementType').value || '개인',
     dailyWage: Number(wageRaw) || 140000,
     assignedDate: new Date().toISOString().split('T')[0],
-    startDate: document.getElementById('newAssignStartDate').value,
-    endDate: document.getElementById('newAssignEndDate').value,
-    accountInfo: document.getElementById('newAssignAccount').value
+    startDate: document.getElementById('newAssignStartDate').value || '',
+    endDate: document.getElementById('newAssignEndDate').value || '',
+    accountInfo: document.getElementById('newAssignAccount').value || ''
   };
 
   gAssigns.unshift(newAssign);
@@ -8729,10 +8809,40 @@ function handleNewAssignSubmit(e) {
     app.careStartDate = newAssign.startDate;
   }
 
+  // 간병인 풀(gCaregivers)에도 자동 등록/업데이트
+  if (name && Array.isArray(gCaregivers)) {
+    let cg = gCaregivers.find(c => c && c.name === name);
+    if (!cg) {
+      cg = {
+        id: 'CG' + String(gCaregivers.length + 1).padStart(3, '0'),
+        name: name,
+        phone: newAssign.phone,
+        centerName: newAssign.centerName,
+        area: '전국',
+        cert: '간병사 1급',
+        account: newAssign.accountInfo,
+        dailyWage: newAssign.dailyWage,
+        settlementType: newAssign.settlementType,
+        birthDate: '',
+        activeCases: 1,
+        status: '활동중'
+      };
+      gCaregivers.push(cg);
+    } else {
+      if (newAssign.phone) cg.phone = newAssign.phone;
+      if (newAssign.centerName) cg.centerName = newAssign.centerName;
+      if (newAssign.accountInfo) cg.account = newAssign.accountInfo;
+      if (newAssign.dailyWage) cg.dailyWage = newAssign.dailyWage;
+      if (newAssign.settlementType) cg.settlementType = newAssign.settlementType;
+    }
+  }
+
   if (select) select.disabled = false;
 
   closeModal('newAssignModal');
-  moveAppToFront(targetApplyId);
+  if (applyId) {
+    moveAppToFront(applyId);
+  }
   renderUnifiedCareHub();
   renderAssignments();
   renderApplications();
