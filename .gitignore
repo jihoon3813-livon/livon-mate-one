@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 *.bak
 scratch_*
 test.txt
@@ -8,3 +8,4 @@ npm.cmd
 npx.cmd
 
 .env.local
+desktop.ini
