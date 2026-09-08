@@ -2417,7 +2417,12 @@ const FORM_TEMPLATES = [
     insurance: '현대해상',
     category: '접수용',
     description: '고객 유선 접수 직후 고객 인적사항을 기재하여 현대해상 접수처 팩스로 1차 발송하는 표준 신청서',
-    fields: ['고객명', '생년월일', '연락처', '사고일자', '희망간병장소(병원)', '환자상태/병명', '신청인구분'],
+    fields: [
+      '피보험자 성명', '성별', '연락처', '주민등록번호',
+      '신청자 인적사항(동일/성명·연락처·관계)',
+      '신청일자', '사고일자', '사고유형', '신청유형(재택/입원 주소)',
+      '간병시작 희망일', '예상 사용기간', '작성일'
+    ],
     faxTarget: '현대해상 보상접수센터 팩스'
   },
   {
@@ -2449,6 +2454,254 @@ const FORM_TEMPLATES = [
   }
 ];
 
+// =========================================================================
+// 팩스 디렉토리 (원수사 및 손해사정사별 전용 팩스번호 주소록)
+// =========================================================================
+const INITIAL_FAX_DIRECTORY = [
+  {
+    id: 'FDIR-001',
+    insuranceCompany: '현대해상',
+    category: '1차접수',
+    firm: '현대해상화재보험',
+    department: '보상지원센터(특약접수팀)',
+    contactPerson: '보상접수 총괄',
+    faxNumber: '02-2195-5000',
+    phone: '1588-5656',
+    mobile: '-',
+    email: 'claim_hd@hi.co.kr',
+    isDefault: true,
+    memo: '현대해상 1차 고객등록 및 신청 접수서(HD_FORM_01) 수신 공식 전용팩스'
+  },
+  {
+    id: 'FDIR-002',
+    insuranceCompany: '현대해상(SCOR)',
+    category: '정산청구',
+    firm: '에이원손해사정',
+    department: '영등포지사 1팀',
+    contactPerson: '곽주호 손해사정사',
+    faxNumber: '0507-1234-8801',
+    phone: '050-4023-1533',
+    mobile: '010-7712-1533',
+    email: 'jhkwak@aonesonsa.com',
+    isDefault: false,
+    memo: '현대해상 간병서비스비용청구서(HD_FORM_02) 전송'
+  },
+  {
+    id: 'FDIR-003',
+    insuranceCompany: '현대해상',
+    category: '정산청구',
+    firm: '다스카손해사정',
+    department: '대전지사 보상팀',
+    contactPerson: '황인택 손해사정사',
+    faxNumber: '042-829-1466',
+    phone: '042-829-1490',
+    mobile: '010-3847-1490',
+    email: 'ithwang@daska.co.kr',
+    isDefault: false,
+    memo: '충청/대전 권역 간병비 정산 청구'
+  },
+  {
+    id: 'FDIR-004',
+    insuranceCompany: '현대해상',
+    category: '정산청구',
+    firm: '한국손해보험손사',
+    department: '수원지사 2팀',
+    contactPerson: '박승신 손해사정사',
+    faxNumber: '031-2101-2509',
+    phone: '031-2101-2508',
+    mobile: '010-5291-2508',
+    email: 'sspark@koreains.co.kr',
+    isDefault: false,
+    memo: '경기남부권 간병비 확인서 제출'
+  },
+  {
+    id: 'FDIR-005',
+    insuranceCompany: '현대해상',
+    category: '정산청구',
+    firm: '중앙손해사정',
+    department: '대구지사 보상과',
+    contactPerson: '최희승 손해사정사',
+    faxNumber: '053-632-5729',
+    phone: '053-632-5720',
+    mobile: '010-9941-5720',
+    email: 'hschoi@jungang.co.kr',
+    isDefault: false,
+    memo: '대구/경북권 정산 청구'
+  },
+  {
+    id: 'FDIR-006',
+    insuranceCompany: '현대해상',
+    category: '정산청구',
+    firm: '퍼스트손해사정',
+    department: '부산지사 3팀',
+    contactPerson: '정제훈 손해사정사',
+    faxNumber: '051-805-4429',
+    phone: '051-805-4420',
+    mobile: '010-6671-4420',
+    email: 'jhjung@firstsonsa.co.kr',
+    isDefault: false,
+    memo: '부산/경남권 청구 전용'
+  },
+  {
+    id: 'FDIR-007',
+    insuranceCompany: '삼성화재',
+    category: '정산청구',
+    firm: '삼성화재서비스손사',
+    department: '강남보상센터 장기보상팀',
+    contactPerson: '김정현 손해사정사',
+    faxNumber: '02-3485-9100',
+    phone: '02-3485-9114',
+    mobile: '010-4421-9114',
+    email: 'jhkim@samsungfire.com',
+    isDefault: true,
+    memo: '삼성화재 간병비 청구명세서(SF_FORM_01) 전용'
+  },
+  {
+    id: 'FDIR-008',
+    insuranceCompany: '삼성화재',
+    category: '정산청구',
+    firm: '삼성화재애니카손사',
+    department: '강북보상센터 2팀',
+    contactPerson: '이민우 손해사정사',
+    faxNumber: '02-760-5500',
+    phone: '02-760-5521',
+    mobile: '010-8832-5521',
+    email: 'mwlee@samsungfire.com',
+    isDefault: false,
+    memo: '삼성화재 서울 강북/경기북부 보상 청구'
+  },
+  {
+    id: 'FDIR-009',
+    insuranceCompany: 'DB손해보험',
+    category: '공통',
+    firm: 'DB손해보험',
+    department: '장기보상본부 간병지원팀',
+    contactPerson: '장기보상 담당자',
+    faxNumber: '0505-181-4420',
+    phone: '1588-0100',
+    mobile: '-',
+    email: 'care_db@dbins.co.kr',
+    isDefault: true,
+    memo: 'DB손해보험 간병서비스 신청 및 청구'
+  },
+  {
+    id: 'FDIR-010',
+    insuranceCompany: 'KB손해보험',
+    category: '공통',
+    firm: 'KB손해사정',
+    department: '수도권보상센터',
+    contactPerson: '간병보상팀',
+    faxNumber: '0505-581-2290',
+    phone: '1544-0114',
+    mobile: '-',
+    email: 'care_kb@kbinsure.co.kr',
+    isDefault: true,
+    memo: 'KB손해보험 간병비용 청구 접수'
+  }
+];
+
+// =========================================================================
+// 종합 팩스 발송 이력 및 전송 결과 대장 (누적 로그)
+// =========================================================================
+const INITIAL_FAX_LOGS = [
+  {
+    id: 'FLOG-20260908-01',
+    sentDate: '2026.09.08 17:45',
+    appId: 'C0006',
+    patientName: '엄정현',
+    insuranceCompany: '현대해상(SCOR)',
+    category: '1차접수',
+    formCode: 'HD_FORM_01',
+    formName: '[HD_FORM_01] 현대해상 1차 신청 접수서',
+    recipient: '현대해상 보상접수센터',
+    faxNumber: '02-2195-5000',
+    pages: 1,
+    status: '성공',
+    operator: '김관리(운영팀)',
+    resultMsg: '정상 송신 완료 (200 OK)'
+  },
+  {
+    id: 'FLOG-20260908-02',
+    sentDate: '2026.09.08 16:20',
+    appId: 'C0011',
+    patientName: '김미영',
+    insuranceCompany: '현대해상',
+    category: '정산청구',
+    formCode: 'HD_FORM_02',
+    formName: '[HD_FORM_02] 현대해상 간병서비스비용청구서',
+    recipient: '다스카손해사정 황인택 손사',
+    faxNumber: '042-829-1466',
+    pages: 2,
+    status: '성공',
+    operator: '이운영(정산팀)',
+    resultMsg: '정상 송신 완료 (200 OK)'
+  },
+  {
+    id: 'FLOG-20260908-03',
+    sentDate: '2026.09.08 14:10',
+    appId: 'SF-20260903-01',
+    patientName: '김옥경',
+    insuranceCompany: '삼성화재',
+    category: '정산청구',
+    formCode: 'SF_FORM_01',
+    formName: '[SF_FORM_01] 삼성화재 간병비 청구명세서',
+    recipient: '삼성화재서비스손사 김정현 손사',
+    faxNumber: '02-3485-9100',
+    pages: 2,
+    status: '성공',
+    operator: '김관리(운영팀)',
+    resultMsg: '정상 송신 완료 (200 OK)'
+  },
+  {
+    id: 'FLOG-20260907-01',
+    sentDate: '2026.09.07 11:35',
+    appId: 'C0022',
+    patientName: '김진선',
+    insuranceCompany: '현대해상',
+    category: '1차접수',
+    formCode: 'HD_FORM_01',
+    formName: '[HD_FORM_01] 현대해상 1차 신청 접수서',
+    recipient: '현대해상 보상접수센터',
+    faxNumber: '02-2195-5000',
+    pages: 1,
+    status: '성공',
+    operator: '박접수(상담팀)',
+    resultMsg: '정상 송신 완료 (200 OK)'
+  },
+  {
+    id: 'FLOG-20260906-01',
+    sentDate: '2026.09.06 15:50',
+    appId: 'SF-20260903-02',
+    patientName: '이성근',
+    insuranceCompany: '삼성화재',
+    category: '정산청구',
+    formCode: 'SF_FORM_01',
+    formName: '[SF_FORM_01] 삼성화재 간병비 청구명세서',
+    recipient: '삼성화재애니카 이민우 손사',
+    faxNumber: '02-760-5500',
+    pages: 2,
+    status: '실패',
+    operator: '이운영(정산팀)',
+    resultMsg: '통화중/응답없음 (수신처 회선 점유)'
+  },
+  {
+    id: 'FLOG-20260905-01',
+    sentDate: '2026.09.05 10:15',
+    appId: 'C0018',
+    patientName: '김진선',
+    insuranceCompany: '현대해상',
+    category: '정산청구',
+    formCode: 'HD_FORM_02',
+    formName: '[HD_FORM_02] 현대해상 간병서비스비용청구서',
+    recipient: '에이원손해사정 곽주호 손사',
+    faxNumber: '0507-1234-8801',
+    pages: 2,
+    status: '성공',
+    operator: '김관리(운영팀)',
+    resultMsg: '정상 송신 완료 (200 OK)'
+  }
+];
+
 window.REBORN_DATA = {
   faxRecords: {
     "C0309": {
@@ -2458,7 +2711,10 @@ window.REBORN_DATA = {
       "caseType": "간병비 정산 청구서"
     }
   },
-  applications: EXCEL_RAW_DATA.applications || [],
+  applications: (EXCEL_RAW_DATA.applications || []).map(a => ({
+    ...a,
+    accidentDate: a.accidentDate || a.applyDate || '2026.01.15'
+  })),
   assignments: EXCEL_RAW_DATA.assignments || [],
   claims: EXCEL_RAW_DATA.claims || [],
   payouts: EXCEL_RAW_DATA.payouts || [],
@@ -2467,5 +2723,7 @@ window.REBORN_DATA = {
   careLogs: INITIAL_CARE_LOGS,
   adjusters: INITIAL_ADJUSTERS,
   samsungEligibleList: SAMSUNG_ELIGIBLE_LIST,
-  formTemplates: FORM_TEMPLATES
+  formTemplates: FORM_TEMPLATES,
+  faxDirectory: INITIAL_FAX_DIRECTORY,
+  faxLogs: INITIAL_FAX_LOGS
 };

@@ -28,7 +28,11 @@ function moveAppToFront(appId) {
   }
 }
 
-function openGlobalFaxModal() {
+function openNewFaxDispatch() {
+  if (!gApps || gApps.length === 0) {
+    alert('등록된 고객 데이터가 없습니다.');
+    return;
+  }
   const unsentClaimApp = gApps.find(a => {
     if (a.claimCount <= 0) return false;
     const r = typeof gFaxRecords !== 'undefined' && gFaxRecords[a.id];
@@ -37,11 +41,13 @@ function openGlobalFaxModal() {
   });
   if (unsentClaimApp) {
     openFaxModal(unsentClaimApp.id, 2);
-  } else if (gApps.length > 0) {
-    openFaxModal(gApps[0].id, 2);
   } else {
-    alert('등록된 고객 데이터가 없습니다.');
+    openFaxModal(gApps[0].id, 1);
   }
+}
+
+function openGlobalFaxModal() {
+  openNewFaxDispatch();
 }
 
 
@@ -714,6 +720,8 @@ var gAdjusters = [];
 var gSamsungList = [];
 var gFormTemplates = [];
 var gFaxRecords = {};
+var gFaxDirectory = [];
+var gFaxLogs = [];
 const CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
 
 async function syncToConvex(path, args = {}) {
@@ -1018,11 +1026,22 @@ document.addEventListener('DOMContentLoaded', () => {
 // Default mapping areas for templates
 var gFormAreaStore = {
   HD_FORM_01: [
-    { id: 'AREA-01', label: '피보험자(고객명)', mapping: 'patientName', x: 28, y: 15, w: 22, h: 4 },
-    { id: 'AREA-02', label: '생년월일', mapping: 'birthDate', x: 74, y: 15, w: 22, h: 4 },
-    { id: 'AREA-03', label: '환자 연락처', mapping: 'phone', x: 28, y: 21, w: 22, h: 4 },
-    { id: 'AREA-04', label: '사고유형', mapping: 'accidentType', x: 74, y: 21, w: 22, h: 4 },
-    { id: 'AREA-05', label: '간병 희망장소(병원)', mapping: 'addressDetail', x: 28, y: 27, w: 68, h: 4 }
+    { id: 'AREA-01', label: '피보험자 성명', mapping: 'patientName', x: 28, y: 14, w: 22, h: 3.5 },
+    { id: 'AREA-02', label: '피보험자 성별', mapping: 'patientGender', x: 74, y: 14, w: 22, h: 3.5 },
+    { id: 'AREA-03', label: '피보험자 연락처', mapping: 'patientPhone', x: 28, y: 18.5, w: 22, h: 3.5 },
+    { id: 'AREA-04', label: '주민등록번호', mapping: 'patientRrn', x: 74, y: 18.5, w: 22, h: 3.5 },
+    { id: 'AREA-05', label: '신청자 성명', mapping: 'applicantName', x: 28, y: 23, w: 22, h: 3.5 },
+    { id: 'AREA-06', label: '신청자 연락처', mapping: 'applicantPhone', x: 74, y: 23, w: 22, h: 3.5 },
+    { id: 'AREA-07', label: '피보험자와의 관계', mapping: 'applicantRelation', x: 28, y: 27, w: 22, h: 3.5 },
+    { id: 'AREA-08', label: '신청자 동일여부 안내', mapping: 'applicantSameText', x: 55, y: 27, w: 41, h: 3.5 },
+    { id: 'AREA-09', label: '신청일자', mapping: 'applyDate', x: 28, y: 31.5, w: 22, h: 3.5 },
+    { id: 'AREA-10', label: '사고일자', mapping: 'accidentDate', x: 74, y: 31.5, w: 22, h: 3.5 },
+    { id: 'AREA-11', label: '사고유형', mapping: 'accidentType', x: 28, y: 36, w: 22, h: 3.5 },
+    { id: 'AREA-12', label: '신청유형(재택 자택주소)', mapping: 'homeAddress', x: 28, y: 40, w: 68, h: 3.5 },
+    { id: 'AREA-13', label: '신청유형(입원 병원/병실주소)', mapping: 'hospitalAddress', x: 28, y: 44, w: 68, h: 3.5 },
+    { id: 'AREA-14', label: '간병시작 희망일', mapping: 'desiredDate', x: 28, y: 48.5, w: 22, h: 3.5 },
+    { id: 'AREA-15', label: '예상 사용기간', mapping: 'expectedDays', x: 74, y: 48.5, w: 22, h: 3.5 },
+    { id: 'AREA-16', label: '작성일(시행일자)', mapping: 'writeDate', x: 55, y: 88, w: 40, h: 4 }
   ],
   HD_FORM_02: [
     { id: 'AREA-01', label: '증권번호', mapping: 'policyNumber', x: 25, y: 14, w: 24, h: 4 },
@@ -1039,12 +1058,17 @@ var gFormAreaStore = {
   ]
 };
 
-// Load custom areas from localStorage
+// Load custom areas from localStorage (with version management to update default mapping schema)
+const FORM_AREAS_VERSION = 'v20260908_03';
 try {
+  const savedVer = localStorage.getItem('LIVON_FORM_AREAS_VER');
   const savedAreas = localStorage.getItem('LIVON_FORM_AREAS');
-  if (savedAreas) {
+  if (savedVer === FORM_AREAS_VERSION && savedAreas) {
     const parsed = JSON.parse(savedAreas);
     gFormAreaStore = { ...gFormAreaStore, ...parsed };
+  } else {
+    localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
+    localStorage.setItem('LIVON_FORM_AREAS_VER', FORM_AREAS_VERSION);
   }
 } catch (e) {}
 
@@ -1057,6 +1081,54 @@ try {
 
 var gCurrentEditingFormCode = 'HD_FORM_01';
 var gDraggingAreaId = null;
+var gEditorZoom = 1.0;
+
+function changeEditorZoom(delta) {
+  gEditorZoom = Math.round(Math.max(0.6, Math.min(2.5, gEditorZoom + delta)) * 100) / 100;
+  applyEditorZoom();
+}
+
+function setEditorZoomLevel(level) {
+  gEditorZoom = level;
+  applyEditorZoom();
+}
+
+function resetEditorZoom() {
+  gEditorZoom = 1.0;
+  applyEditorZoom();
+}
+
+function applyEditorZoom() {
+  const wrapper = document.getElementById('editorZoomWrapper');
+  const percentEl = document.getElementById('editorZoomPercent');
+  if (!wrapper) return;
+
+  wrapper.style.transform = `scale(${gEditorZoom})`;
+  wrapper.style.transformOrigin = 'top center';
+
+  const baseH = 760;
+  const baseW = 560;
+  const scaledExtraH = Math.max(0, (gEditorZoom - 1) * baseH);
+  const scaledExtraW = Math.max(0, (gEditorZoom - 1) * baseW);
+  wrapper.style.marginBottom = `${scaledExtraH + 30}px`;
+  wrapper.style.marginLeft = `${scaledExtraW / 2 + 10}px`;
+  wrapper.style.marginRight = `${scaledExtraW / 2 + 10}px`;
+
+  if (percentEl) {
+    percentEl.innerText = Math.round(gEditorZoom * 100) + '%';
+  }
+}
+
+function handleEditorCanvasWheel(e) {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      changeEditorZoom(0.1);
+    } else {
+      changeEditorZoom(-0.1);
+    }
+  }
+}
 
 function openFormEditor(formCode) {
   gCurrentEditingFormCode = formCode;
@@ -1066,6 +1138,9 @@ function openFormEditor(formCode) {
   const titleEl = document.getElementById('editorSheetTitle');
   if (codeEl) codeEl.innerText = form.code;
   if (titleEl) titleEl.innerText = form.name;
+
+  gEditorZoom = 1.0;
+  applyEditorZoom();
 
   renderEditorCanvasAndList();
   openModal('formFieldEditorModal');
@@ -1148,6 +1223,104 @@ function removeFormBackground() {
   }
 }
 
+var gSelectedAreaIds = new Set();
+var gResizingAreaId = null;
+var gHasDragged = false;
+
+function toggleSelectArea(areaId, e) {
+  if (e) e.stopPropagation();
+  const isMulti = e && (e.ctrlKey || e.metaKey || e.shiftKey);
+  
+  if (isMulti) {
+    // Ctrl / Cmd / Shift 클릭: 다중 선택 토글
+    if (gSelectedAreaIds.has(areaId)) {
+      gSelectedAreaIds.delete(areaId);
+    } else {
+      gSelectedAreaIds.add(areaId);
+    }
+  } else {
+    // 일반 단일 클릭: 기존 선택을 비우고 해당 필드만 선택 (이미 단독 선택된 상태라면 해제)
+    if (gSelectedAreaIds.size === 1 && gSelectedAreaIds.has(areaId)) {
+      gSelectedAreaIds.clear();
+    } else {
+      gSelectedAreaIds.clear();
+      gSelectedAreaIds.add(areaId);
+    }
+  }
+  renderEditorCanvasAndList();
+}
+
+function clearAreaSelection() {
+  if (gSelectedAreaIds.size > 0) {
+    gSelectedAreaIds.clear();
+    renderEditorCanvasAndList();
+  }
+}
+
+function toggleSelectAllAreas() {
+  const areas = gFormAreaStore[gCurrentEditingFormCode] || [];
+  if (gSelectedAreaIds.size === areas.length && areas.length > 0) {
+    gSelectedAreaIds.clear();
+  } else {
+    gSelectedAreaIds.clear();
+    areas.forEach(a => gSelectedAreaIds.add(a.id));
+  }
+  renderEditorCanvasAndList();
+}
+
+function alignSelectedAreas(direction) {
+  const allAreas = gFormAreaStore[gCurrentEditingFormCode] || [];
+  const selected = allAreas.filter(a => gSelectedAreaIds.has(a.id));
+
+  if (selected.length < 2) {
+    alert('정렬할 필드를 2개 이상 선택해주세요. (오른쪽 패널의 체크박스나 필드 클릭으로 선택 가능)');
+    return;
+  }
+
+  if (direction === 'left') {
+    const minX = Math.min(...selected.map(a => a.x));
+    selected.forEach(a => { a.x = minX; });
+  } else if (direction === 'right') {
+    const maxR = Math.max(...selected.map(a => a.x + a.w));
+    selected.forEach(a => {
+      a.x = Math.max(0, Math.round((maxR - a.w) * 10) / 10);
+    });
+  } else if (direction === 'top') {
+    const minY = Math.min(...selected.map(a => a.y));
+    selected.forEach(a => { a.y = minY; });
+  } else if (direction === 'bottom') {
+    const maxB = Math.max(...selected.map(a => a.y + a.h));
+    selected.forEach(a => {
+      a.y = Math.max(0, Math.round((maxB - a.h) * 10) / 10);
+    });
+  } else if (direction === 'width') {
+    const targetW = selected[0].w;
+    selected.forEach(a => {
+      a.w = targetW;
+      if (a.x + a.w > 100) a.x = Math.max(0, 100 - a.w);
+    });
+  }
+
+  renderEditorCanvasAndList();
+}
+
+function adjustAreaSize(areaId, dimension, delta) {
+  const areas = gFormAreaStore[gCurrentEditingFormCode] || [];
+  const area = areas.find(a => a.id === areaId);
+  if (!area) return;
+
+  if (dimension === 'w') {
+    let newW = Math.round((area.w + delta) * 10) / 10;
+    newW = Math.max(4, Math.min(100 - area.x, newW));
+    area.w = newW;
+  } else if (dimension === 'h') {
+    let newH = Math.round((area.h + delta) * 10) / 10;
+    newH = Math.max(2, Math.min(100 - area.y, newH));
+    area.h = newH;
+  }
+  renderEditorCanvasAndList();
+}
+
 function renderEditorCanvasAndList() {
   const areas = gFormAreaStore[gCurrentEditingFormCode] || [];
   const overlayContainer = document.getElementById('editorOverlaysContainer');
@@ -1156,6 +1329,11 @@ function renderEditorCanvasAndList() {
   const bgImg = document.getElementById('editorBgImage');
   const defaultMock = document.getElementById('editorDefaultMockLayer');
   const btnRemoveBg = document.getElementById('btnRemoveFormBg');
+  const btnSelectAll = document.getElementById('btnToggleSelectAllAreas');
+
+  if (btnSelectAll) {
+    btnSelectAll.innerText = (areas.length > 0 && gSelectedAreaIds.size === areas.length) ? '선택해제' : '전체선택';
+  }
 
   const customBg = gFormBackgroundStore && gFormBackgroundStore[gCurrentEditingFormCode];
   if (customBg) {
@@ -1174,69 +1352,208 @@ function renderEditorCanvasAndList() {
     if (btnRemoveBg) btnRemoveBg.classList.add('hidden');
   }
 
-  if (countBadge) countBadge.innerText = areas.length + '개 영역';
-
-  // 1. Render Overlays on Canvas with Drag-and-Drop
-  if (overlayContainer) {
-    overlayContainer.innerHTML = areas.map(area => `
-      <div id="overlay-${area.id}"
-           class="absolute border-2 border-primary-600 bg-primary-500/20 hover:bg-primary-500/35 rounded-lg flex items-center justify-between px-2 py-0.5 text-[10px] font-black text-primary-950 shadow-sm transition-shadow cursor-move select-none"
-           style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; z-index: 20;"
-           onmousedown="startDragArea(event, '${area.id}')"
-           title="[마우스로 드래그하여 이동] ${area.id}: ${area.label}">
-        <span class="font-mono bg-primary-700 text-white px-1.5 py-0.2 rounded text-[9px] font-black">${area.id}</span>
-        <span class="truncate ml-1.5 text-primary-950 font-black">${area.label}</span>
-        <i data-lucide="move" class="w-3 h-3 text-primary-700 opacity-70 ml-1"></i>
-      </div>
-    `).join('');
+  if (countBadge) {
+    const selCount = gSelectedAreaIds.size;
+    countBadge.innerHTML = `${areas.length}개 영역 ${selCount > 0 ? `<span class="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full text-[10px] font-black">${selCount}개 선택됨</span>` : ''}`;
   }
 
-  // 2. Render Mapping Cards List on Right Panel
-  if (cardsList) {
-    cardsList.innerHTML = areas.map((area, idx) => `
-      <div class="p-3 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2">
-        <div class="flex items-center justify-between">
-          <span class="font-mono font-black text-xs text-primary-700 bg-primary-50 px-2 py-0.5 rounded border border-primary-200">${area.id}</span>
-          <div class="flex items-center gap-2">
-            <span class="text-[10px] text-slate-400 font-mono">X:${Math.round(area.x)}% Y:${Math.round(area.y)}%</span>
-            <button onclick="removeAreaFromForm('${area.id}')" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer" title="영역 삭제">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            </button>
+  // 1. Render Overlays on Canvas with Drag-and-Drop & Resizing
+  if (overlayContainer) {
+    overlayContainer.innerHTML = areas.map(area => {
+      const isSelected = gSelectedAreaIds.has(area.id);
+      return `
+        <div id="overlay-${area.id}"
+             class="absolute border-2 ${isSelected ? 'border-amber-500 bg-amber-400/25 ring-2 ring-amber-400 shadow-md' : 'border-primary-600 bg-primary-500/20 hover:bg-primary-500/35'} rounded-lg flex items-center justify-between px-2 py-0.5 text-[10px] font-black text-slate-900 shadow-sm transition-shadow cursor-move select-none group"
+             style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; z-index: ${isSelected ? 25 : 20};"
+             onmousedown="startDragArea(event, '${area.id}')"
+             title="[클릭: 단일선택 | Ctrl+클릭: 다중선택 | 드래그: 이동 | 모서리: 크기조절] ${area.id}: ${area.label}">
+          
+          <div class="flex items-center gap-1 min-w-0 truncate pointer-events-none">
+            <span class="font-mono ${isSelected ? 'bg-amber-600 text-white' : 'bg-primary-700 text-white'} px-1.5 py-0.2 rounded text-[9px] font-black shrink-0">${area.id}</span>
+            <span class="truncate font-black text-[10px] text-slate-900">${area.label}</span>
+          </div>
+
+          <div class="flex items-center gap-1 shrink-0 ml-1">
+            <i data-lucide="move" class="w-3 h-3 text-slate-700 opacity-60 pointer-events-none"></i>
+          </div>
+
+          <!-- Bottom-Right Resize Handle -->
+          <div class="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-amber-500 hover:bg-amber-600 border-2 border-white rounded-full shadow cursor-se-resize flex items-center justify-center pointer-events-auto z-30"
+               onmousedown="startResizeArea(event, '${area.id}')"
+               title="드래그하여 영역 너비 및 높이 조절">
           </div>
         </div>
+      `;
+    }).join('');
+  }
 
-        <div>
-          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">영역 라벨명</label>
-          <input type="text" value="${area.label}" onchange="updateAreaField('${area.id}', 'label', this.value)" class="w-full p-1.5 border rounded-lg font-bold text-slate-800 text-xs">
-        </div>
+  // 2. Render Mapping Cards List on Right Panel with Width/Height adjust controls
+  if (cardsList) {
+    cardsList.innerHTML = areas.map((area, idx) => {
+      const isSelected = gSelectedAreaIds.has(area.id);
+      return `
+        <div class="p-3 rounded-xl border ${isSelected ? 'border-amber-400 bg-amber-50/40 shadow-xs' : 'border-slate-200 bg-white shadow-2xs'} space-y-2 transition-all">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleSelectArea('${area.id}', event)" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer" title="다중 선택">
+              <span class="font-mono font-black text-xs ${isSelected ? 'text-amber-800 bg-amber-100 border-amber-300' : 'text-primary-700 bg-primary-50 border-primary-200'} px-2 py-0.5 rounded border">${area.id}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] text-slate-400 font-mono">X:${Math.round(area.x)}% Y:${Math.round(area.y)}%</span>
+              <button onclick="removeAreaFromForm('${area.id}')" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer" title="영역 삭제">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
 
-        <div>
-          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">매핑 데이터 소스</label>
-          <select onchange="updateAreaField('${area.id}', 'mapping', this.value)" class="w-full p-1.5 border rounded-lg font-semibold text-slate-700 bg-slate-50 text-xs">
-            <option value="patientName" ${area.mapping === 'patientName' ? 'selected' : ''}>고객 성명 (patientName)</option>
-            <option value="birthDate" ${area.mapping === 'birthDate' ? 'selected' : ''}>생년월일 (birthDate)</option>
-            <option value="phone" ${area.mapping === 'phone' ? 'selected' : ''}>고객 연락처 (phone)</option>
-            <option value="addressDetail" ${area.mapping === 'addressDetail' ? 'selected' : ''}>희망장소/상세주소 (addressDetail)</option>
-            <option value="policyNumber" ${area.mapping === 'policyNumber' ? 'selected' : ''}>증권번호 (policyNumber)</option>
-            <option value="accidentNumber" ${area.mapping === 'accidentNumber' ? 'selected' : ''}>사고번호 (accidentNumber)</option>
-            <option value="adjusterName" ${area.mapping === 'adjusterName' ? 'selected' : ''}>손사 성명 (adjusterName)</option>
-            <option value="caregiverName" ${area.mapping === 'caregiverName' ? 'selected' : ''}>배정 간병인 (caregiverName)</option>
-            <option value="claimAmount" ${area.mapping === 'claimAmount' ? 'selected' : ''}>청구 총액 (claimAmount)</option>
-            <option value="careDays" ${area.mapping === 'careDays' ? 'selected' : ''}>간병 일수 (careDays)</option>
-            <option value="custom" ${area.mapping === 'custom' ? 'selected' : ''}>직접 입력 (custom)</option>
-          </select>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 mb-0.5">영역 라벨명</label>
+            <input type="text" value="${area.label}" onchange="updateAreaField('${area.id}', 'label', this.value)" class="w-full p-1.5 border rounded-lg font-bold text-slate-800 text-xs">
+          </div>
+
+          <!-- Size Controller (Width & Height) -->
+          <div class="bg-slate-50 p-2 rounded-lg border border-slate-200 grid grid-cols-2 gap-2 text-[11px]">
+            <div>
+              <div class="flex items-center justify-between text-[10px] font-bold text-slate-600 mb-1">
+                <span>너비(W): <b class="font-mono text-slate-900">${Math.round(area.w)}%</b></span>
+              </div>
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="adjustAreaSize('${area.id}', 'w', -1)" class="w-6 h-6 rounded bg-white border border-slate-300 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-700 cursor-pointer text-xs" title="너비 1% 축소">-</button>
+                <button type="button" onclick="adjustAreaSize('${area.id}', 'w', -5)" class="px-1 h-6 rounded bg-white border border-slate-300 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-600 cursor-pointer text-[10px]" title="너비 5% 축소">-5</button>
+                <button type="button" onclick="adjustAreaSize('${area.id}', 'w', 1)" class="w-6 h-6 rounded bg-white border border-slate-300 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-700 cursor-pointer text-xs" title="너비 1% 확대">+</button>
+                <button type="button" onclick="adjustAreaSize('${area.id}', 'w', 5)" class="px-1 h-6 rounded bg-white border border-slate-300 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-600 cursor-pointer text-[10px]" title="너비 5% 확대">+5</button>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between text-[10px] font-bold text-slate-600 mb-1">
+                <span>높이(H): <b class="font-mono text-slate-900">${Math.round(area.h)}%</b></span>
+              </div>
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="adjustAreaSize('${area.id}', 'h', -1)" class="w-6 h-6 rounded bg-white border border-slate-300 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-700 cursor-pointer text-xs" title="높이 1% 축소">-</button>
+                <button type="button" onclick="adjustAreaSize('${area.id}', 'h', -3)" class="px-1 h-6 rounded bg-white border border-slate-300 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-600 cursor-pointer text-[10px]" title="높이 3% 축소">-3</button>
+                <button type="button" onclick="adjustAreaSize('${area.id}', 'h', 1)" class="w-6 h-6 rounded bg-white border border-slate-300 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-700 cursor-pointer text-xs" title="높이 1% 확대">+</button>
+                <button type="button" onclick="adjustAreaSize('${area.id}', 'h', 3)" class="px-1 h-6 rounded bg-white border border-slate-300 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-600 cursor-pointer text-[10px]" title="높이 3% 확대">+3</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 mb-0.5">매핑 데이터 소스</label>
+            <select onchange="updateAreaField('${area.id}', 'mapping', this.value)" class="w-full p-1.5 border rounded-lg font-semibold text-slate-700 bg-slate-50 text-xs">
+              ${gCurrentEditingFormCode === 'HD_FORM_01' ? `
+                <optgroup label="1. 피보험자 인적사항">
+                  <option value="patientName" ${area.mapping === 'patientName' ? 'selected' : ''}>피보험자 성명 (patientName)</option>
+                  <option value="patientGender" ${area.mapping === 'patientGender' ? 'selected' : ''}>성별 (patientGender)</option>
+                  <option value="patientPhone" ${area.mapping === 'patientPhone' || area.mapping === 'phone' ? 'selected' : ''}>연락처 (patientPhone)</option>
+                  <option value="patientRrn" ${area.mapping === 'patientRrn' ? 'selected' : ''}>주민등록번호 전체 (patientRrn)</option>
+                  <option value="birthDate" ${area.mapping === 'birthDate' ? 'selected' : ''}>생년월일 (birthDate)</option>
+                </optgroup>
+                <optgroup label="2. 신청자 인적사항">
+                  <option value="applicantSameText" ${area.mapping === 'applicantSameText' ? 'selected' : ''}>신청자 인적사항 ("신청자와 동일함" / 관계·성명·연락처)</option>
+                  <option value="applicantName" ${area.mapping === 'applicantName' ? 'selected' : ''}>신청자 성명 (applicantName)</option>
+                  <option value="applicantPhone" ${area.mapping === 'applicantPhone' ? 'selected' : ''}>신청자 연락처 (applicantPhone)</option>
+                  <option value="applicantRelation" ${area.mapping === 'applicantRelation' ? 'selected' : ''}>피보험자와의 관계 (applicantRelation)</option>
+                </optgroup>
+                <optgroup label="3. 간병인 서비스 신청 내역">
+                  <option value="applyDate" ${area.mapping === 'applyDate' ? 'selected' : ''}>신청일자 (applyDate)</option>
+                  <option value="accidentDate" ${area.mapping === 'accidentDate' ? 'selected' : ''}>사고일자 (accidentDate)</option>
+                  <option value="accidentType" ${area.mapping === 'accidentType' ? 'selected' : ''}>사고유형 (질병/상해) (accidentType)</option>
+                  <option value="homeAddress" ${area.mapping === 'homeAddress' ? 'selected' : ''}>신청유형 [재택] 자택주소 (homeAddress)</option>
+                  <option value="hospitalAddress" ${area.mapping === 'hospitalAddress' ? 'selected' : ''}>신청유형 [입원] 병원명 및 병실주소 (hospitalAddress)</option>
+                  <option value="careLocationAddress" ${area.mapping === 'careLocationAddress' || area.mapping === 'addressDetail' ? 'selected' : ''}>신청유형 (통합: 재택/입원 자동표시)</option>
+                  <option value="desiredDate" ${area.mapping === 'desiredDate' ? 'selected' : ''}>간병시작 희망일 (desiredDate)</option>
+                  <option value="expectedDays" ${area.mapping === 'expectedDays' ? 'selected' : ''}>예상 사용기간 (expectedDays)</option>
+                  <option value="memo" ${area.mapping === 'memo' ? 'selected' : ''}>비고 및 특이사항/진단명 (memo)</option>
+                </optgroup>
+                <optgroup label="4. 문서 공통">
+                  <option value="writeDate" ${area.mapping === 'writeDate' ? 'selected' : ''}>작성일 (시행일자 YYYY.MM.DD)</option>
+                  <option value="docNo" ${area.mapping === 'docNo' ? 'selected' : ''}>문서번호 (docNo)</option>
+                  <option value="custom" ${area.mapping === 'custom' ? 'selected' : ''}>직접 입력 (custom)</option>
+                </optgroup>
+              ` : `
+                <option value="patientName" ${area.mapping === 'patientName' ? 'selected' : ''}>고객 성명 (patientName)</option>
+                <option value="birthDate" ${area.mapping === 'birthDate' ? 'selected' : ''}>생년월일 (birthDate)</option>
+                <option value="phone" ${area.mapping === 'phone' ? 'selected' : ''}>고객 연락처 (phone)</option>
+                <option value="addressDetail" ${area.mapping === 'addressDetail' ? 'selected' : ''}>희망장소/상세주소 (addressDetail)</option>
+                <option value="policyNumber" ${area.mapping === 'policyNumber' ? 'selected' : ''}>증권번호 (policyNumber)</option>
+                <option value="accidentNumber" ${area.mapping === 'accidentNumber' ? 'selected' : ''}>사고번호 (accidentNumber)</option>
+                <option value="adjusterName" ${area.mapping === 'adjusterName' ? 'selected' : ''}>손사 성명 (adjusterName)</option>
+                <option value="caregiverName" ${area.mapping === 'caregiverName' ? 'selected' : ''}>배정 간병인 (caregiverName)</option>
+                <option value="claimAmount" ${area.mapping === 'claimAmount' ? 'selected' : ''}>청구 총액 (claimAmount)</option>
+                <option value="careDays" ${area.mapping === 'careDays' ? 'selected' : ''}>간병 일수 (careDays)</option>
+                <option value="custom" ${area.mapping === 'custom' ? 'selected' : ''}>직접 입력 (custom)</option>
+              `}
+            </select>
+          </div>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
     initIcons();
   }
 }
 
+function startResizeArea(e, areaId) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  gResizingAreaId = areaId;
+  const sheet = document.getElementById('editorCanvasSheet');
+  if (!sheet) return;
+
+  const rect = sheet.getBoundingClientRect();
+  const list = gFormAreaStore[gCurrentEditingFormCode] || [];
+  const area = list.find(a => a.id === areaId);
+  if (!area) return;
+
+  const startClientX = e.clientX;
+  const startClientY = e.clientY;
+  const startW = area.w;
+  const startH = area.h;
+
+  const onMouseMove = (moveEvent) => {
+    if (!gResizingAreaId) return;
+    const deltaX = moveEvent.clientX - startClientX;
+    const deltaY = moveEvent.clientY - startClientY;
+
+    const deltaPercentX = (deltaX / rect.width) * 100;
+    const deltaPercentY = (deltaY / rect.height) * 100;
+
+    let newW = Math.round((startW + deltaPercentX) * 10) / 10;
+    let newH = Math.round((startH + deltaPercentY) * 10) / 10;
+
+    // Boundary constraints: min 4% width, 2% height, max up to 100 - x/y
+    newW = Math.max(4, Math.min(100 - area.x, newW));
+    newH = Math.max(2, Math.min(100 - area.y, newH));
+
+    area.w = newW;
+    area.h = newH;
+
+    const el = document.getElementById(`overlay-${area.id}`);
+    if (el) {
+      el.style.width = newW + '%';
+      el.style.height = newH + '%';
+    }
+  };
+
+  const onMouseUp = () => {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    gResizingAreaId = null;
+    renderEditorCanvasAndList();
+  };
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+}
+
 function startDragArea(e, areaId) {
+  if (gResizingAreaId) return;
   e.preventDefault();
   e.stopPropagation();
 
   gDraggingAreaId = areaId;
+  gHasDragged = false;
   const sheet = document.getElementById('editorCanvasSheet');
   if (!sheet) return;
 
@@ -1254,6 +1571,10 @@ function startDragArea(e, areaId) {
     if (!gDraggingAreaId) return;
     const deltaX = moveEvent.clientX - startClientX;
     const deltaY = moveEvent.clientY - startClientY;
+
+    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+      gHasDragged = true;
+    }
 
     const deltaPercentX = (deltaX / rect.width) * 100;
     const deltaPercentY = (deltaY / rect.height) * 100;
@@ -1274,11 +1595,18 @@ function startDragArea(e, areaId) {
     }
   };
 
-  const onMouseUp = () => {
+  const onMouseUp = (upEvent) => {
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
+    const wasDragged = gHasDragged;
     gDraggingAreaId = null;
-    renderEditorCanvasAndList();
+
+    if (!wasDragged) {
+      // 마우스 이동이 없었으면 단순 클릭으로 판정
+      toggleSelectArea(areaId, upEvent);
+    } else {
+      renderEditorCanvasAndList();
+    }
   };
 
   document.addEventListener('mousemove', onMouseMove);
@@ -1328,6 +1656,54 @@ function saveFormAreas() {
   } catch (e) {}
   alert('💾 [' + gCurrentEditingFormCode + '] 양식의 서식 배경 및 데이터 매핑 설정이 안전하게 저장되었습니다!');
   closeModal('formFieldEditorModal');
+}
+
+function resetFormAreasToDefault() {
+  if (!confirm(`[${gCurrentEditingFormCode}] 양식의 필드 배치를 표준 기본값으로 초기화하시겠습니까?\n(기존에 수정한 위치가 초기화됩니다)`)) {
+    return;
+  }
+  const defaultTemplates = {
+    HD_FORM_01: [
+      { id: 'AREA-01', label: '피보험자 성명', mapping: 'patientName', x: 28, y: 14, w: 22, h: 3.5 },
+      { id: 'AREA-02', label: '피보험자 성별', mapping: 'patientGender', x: 74, y: 14, w: 22, h: 3.5 },
+      { id: 'AREA-03', label: '피보험자 연락처', mapping: 'patientPhone', x: 28, y: 18.5, w: 22, h: 3.5 },
+      { id: 'AREA-04', label: '주민등록번호', mapping: 'patientRrn', x: 74, y: 18.5, w: 22, h: 3.5 },
+      { id: 'AREA-05', label: '신청자 성명', mapping: 'applicantName', x: 28, y: 23, w: 22, h: 3.5 },
+      { id: 'AREA-06', label: '신청자 연락처', mapping: 'applicantPhone', x: 74, y: 23, w: 22, h: 3.5 },
+      { id: 'AREA-07', label: '피보험자와의 관계', mapping: 'applicantRelation', x: 28, y: 27, w: 22, h: 3.5 },
+      { id: 'AREA-08', label: '신청자 동일여부 안내', mapping: 'applicantSameText', x: 55, y: 27, w: 41, h: 3.5 },
+      { id: 'AREA-09', label: '신청일자', mapping: 'applyDate', x: 28, y: 31.5, w: 22, h: 3.5 },
+      { id: 'AREA-10', label: '사고일자', mapping: 'accidentDate', x: 74, y: 31.5, w: 22, h: 3.5 },
+      { id: 'AREA-11', label: '사고유형', mapping: 'accidentType', x: 28, y: 36, w: 22, h: 3.5 },
+      { id: 'AREA-12', label: '신청유형(재택 자택주소)', mapping: 'homeAddress', x: 28, y: 40, w: 68, h: 3.5 },
+      { id: 'AREA-13', label: '신청유형(입원 병원/병실주소)', mapping: 'hospitalAddress', x: 28, y: 44, w: 68, h: 3.5 },
+      { id: 'AREA-14', label: '간병시작 희망일', mapping: 'desiredDate', x: 28, y: 48.5, w: 22, h: 3.5 },
+      { id: 'AREA-15', label: '예상 사용기간', mapping: 'expectedDays', x: 74, y: 48.5, w: 22, h: 3.5 },
+      { id: 'AREA-16', label: '작성일(시행일자)', mapping: 'writeDate', x: 55, y: 88, w: 40, h: 4 }
+    ],
+    HD_FORM_02: [
+      { id: 'AREA-01', label: '증권번호', mapping: 'policyNumber', x: 25, y: 14, w: 24, h: 4 },
+      { id: 'AREA-02', label: '사고번호', mapping: 'accidentNumber', x: 72, y: 14, w: 24, h: 4 },
+      { id: 'AREA-03', label: '피보험자 성명', mapping: 'patientName', x: 25, y: 19, w: 24, h: 4 },
+      { id: 'AREA-04', label: '간병기간/일수', mapping: 'careDays', x: 72, y: 19, w: 24, h: 4 },
+      { id: 'AREA-05', label: '배정 간병인', mapping: 'caregiverName', x: 25, y: 24, w: 24, h: 4 },
+      { id: 'AREA-06', label: '청구금액', mapping: 'claimAmount', x: 72, y: 24, w: 24, h: 4 }
+    ],
+    SF_FORM_01: [
+      { id: 'AREA-01', label: '삼성 피보험자명', mapping: 'patientName', x: 25, y: 16, w: 25, h: 4 },
+      { id: 'AREA-02', label: '삼성 증권/사고번호', mapping: 'policyNumber', x: 68, y: 16, w: 28, h: 4 },
+      { id: 'AREA-03', label: '간병비 정산청구액', mapping: 'claimAmount', x: 25, y: 23, w: 25, h: 4 }
+    ]
+  };
+
+  if (defaultTemplates[gCurrentEditingFormCode]) {
+    gFormAreaStore[gCurrentEditingFormCode] = JSON.parse(JSON.stringify(defaultTemplates[gCurrentEditingFormCode]));
+    try {
+      localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
+    } catch (e) {}
+    gSelectedAreaIds.clear();
+    renderEditorCanvasAndList();
+  }
 }
 
 
@@ -2266,6 +2642,50 @@ function renderForms() {
   initIcons();
 }
 
+function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
+  if (!app) return '';
+  switch (mappingKey) {
+    case 'patientName': return app.patientName || '';
+    case 'patientGender': return app.gender || '남';
+    case 'patientPhone':
+    case 'phone': return app.phone || '';
+    case 'patientRrn': {
+      if (app.patientRrn) {
+        const clean = app.patientRrn.replace(/[^0-9*]/g, '');
+        if (clean.length === 13 && !app.patientRrn.includes('-')) {
+          return `${clean.slice(0, 6)}-${clean.slice(6)}`;
+        }
+        return app.patientRrn;
+      }
+      if (app.rrnFront && app.rrnBack) {
+        return `${app.rrnFront}-${app.rrnBack}`;
+      }
+      if (app.rrnFront) {
+        return `${app.rrnFront}-*******`;
+      }
+      return '';
+    }
+    case 'birthDate': return app.birthDate || (app.rrnFront ? (app.rrnFront.length === 6 ? '19' + app.rrnFront : app.rrnFront) : '');
+    case 'applicantName': return app.applicantName || ((app.isApplicantSame || app.applicantRelation === '본인') ? app.patientName : '');
+    case 'applicantPhone': return app.applicantPhone || ((app.isApplicantSame || app.applicantRelation === '본인') ? app.phone : '');
+    case 'applicantRelation': return app.applicantRelation || ((app.isApplicantSame || !app.applicantName || app.applicantName === app.patientName) ? '본인' : '');
+    case 'applicantSameText': return (app.isApplicantSame || app.applicantRelation === '본인' || (!app.applicantName || app.applicantName === app.patientName)) ? '신청자와 동일함' : `${app.applicantRelation || '가족'} (${app.applicantName || ''})`;
+    case 'applyDate': return app.applyDate || todayStr;
+    case 'accidentDate': return (app.accidentDate && app.accidentDate !== '-') ? app.accidentDate : (app.applyDate || todayStr);
+    case 'accidentType': return app.accidentType || '질병/상해';
+    case 'homeAddress': return app.careType === '자택' ? (app.addressDetail || app.patientAddress || '서울특별시 영등포구 선유동2로 123 (자택)') : '';
+    case 'hospitalAddress': return app.careType !== '자택' ? `${app.hospitalName || ''} ${app.hospitalRoom || app.addressDetail || ''}`.trim() : '';
+    case 'careLocationAddress':
+    case 'addressDetail': return app.careType === '자택' ? (app.addressDetail || app.patientAddress || '자택') : `${app.hospitalName || ''} ${app.addressDetail || ''}`.trim();
+    case 'desiredDate': return app.desiredDate || app.applyDate || todayStr;
+    case 'expectedDays': return app.expectedDays || '30일';
+    case 'memo': return app.memo || '';
+    case 'writeDate': return app.applyDate || todayStr;
+    case 'docNo': return docNo || '';
+    default: return (app && app[mappingKey]) ? app[mappingKey] : '';
+  }
+}
+
 var gCurrentPreviewFormCode = 'HD_FORM_01';
 var gCurrentPreviewAppId = 'C0006';
 
@@ -2278,7 +2698,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006') {
 
   document.getElementById('formPreviewModalTitle').innerHTML = `
     <i data-lucide="file-text" class="w-4 h-4 text-amber-400 flex-shrink-0"></i>
-    <span class="whitespace-nowrap font-bold">${form.name}</span>
+    <span class="font-bold truncate">${form.name}</span>
     <span class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-amber-300 font-normal whitespace-nowrap flex-shrink-0">[환자: ${app.patientName} 님 / ${app.id}]</span>
   `;
 
@@ -2302,119 +2722,173 @@ function previewFormForCustomer(formCode, applyId = 'C0006') {
   if (formCode === 'HD_FORM_01') {
     // =========================================================================
     // [현대해상 1차] 간병인지원 서비스 신청 및 고객 등록 요청서
+    // 에디터에서 등록된 배경 이미지(PDF/이미지)가 있을 경우 A4 시트 위에 좌표 오버레이로 렌더링
     // =========================================================================
-    sheet.innerHTML = `
-      <div class="p-2 space-y-5 text-slate-900 font-sans leading-relaxed" style="font-family:'Pretendard', -apple-system, sans-serif;">
-        <!-- Header: Official Corporate Header -->
-        <div class="flex items-center justify-between border-b-2 border-slate-900 pb-3">
-          <div class="flex items-center gap-2">
-            <span class="text-xl font-black tracking-tighter text-primary-700">(주)리본케어</span>
-            <span class="text-xs font-bold text-slate-500">| 간병운영지원센터</span>
-          </div>
-          <div class="text-right text-[11px] text-slate-500 font-mono">
-            <div>문서번호: <b>${docNo}</b></div>
-            <div>시행일자: <b>${app.applyDate || todayStr}</b></div>
-          </div>
-        </div>
+    const customBg = gFormBackgroundStore && gFormBackgroundStore['HD_FORM_01'];
+    const areas = gFormAreaStore && gFormAreaStore['HD_FORM_01'] ? gFormAreaStore['HD_FORM_01'] : [];
 
-        <!-- Document Recipient & Sender -->
-        <div class="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-          <div class="space-y-1">
-            <div><span class="text-slate-500 font-bold">수 신 처 :</span> <b class="text-blue-900 font-black">현대해상화재보험(주) 보상지원팀 귀중</b></div>
-            <div><span class="text-slate-500 font-bold">수신팩스 :</span> <b class="font-mono text-blue-800 text-sm">02-2195-5000</b></div>
-            <div><span class="text-slate-500 font-bold">참 조 :</span> 간병인지원 특약 보상접수 담당자</div>
-          </div>
-          <div class="space-y-1 text-right sm:text-left sm:pl-4 sm:border-l border-slate-200">
-            <div><span class="text-slate-500 font-bold">발 신 처 :</span> <b>(주)리본케어 간병운영팀</b></div>
-            <div><span class="text-slate-500 font-bold">대표전화 :</span> <b class="font-mono">1566-7011</b></div>
-            <div><span class="text-slate-500 font-bold">회신전용 :</span> <b class="font-mono text-purple-700">010-8006-2268 (SMS 전용)</b></div>
-          </div>
-        </div>
+    if (customBg) {
+      sheet.innerHTML = `
+        <div class="relative w-full aspect-[1/1.414] bg-white rounded-lg overflow-hidden select-none" style="font-family:'Pretendard', -apple-system, sans-serif;">
+          <!-- Uploaded Official Document Background -->
+          <img src="${customBg}" class="absolute inset-0 w-full h-full object-contain pointer-events-none z-0" alt="현대해상 01번 양식">
 
-        <!-- Title -->
-        <div class="text-center py-2">
-          <h2 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight underline decoration-slate-400 underline-offset-8">
-            간병인지원 서비스 신청 및 고객 등록 요청서
-          </h2>
-          <p class="text-xs text-slate-500 mt-2">[현대해상 간병인지원 특약 1차 접수용]</p>
+          <!-- Mapped Customer Data Overlay Fields -->
+          ${areas.map(area => {
+            const val = resolveFormFieldValue(area.mapping, app, docNo, todayStr);
+            return `
+              <div class="absolute flex items-center px-1 font-bold text-slate-950 text-xs z-10 overflow-hidden whitespace-nowrap leading-tight"
+                   style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%;"
+                   title="[${area.id}] ${area.label}: ${val}">
+                <span class="truncate">${val}</span>
+              </div>
+            `;
+          }).join('')}
         </div>
+      `;
+    } else {
+      // 업로드된 배경 이미지가 없는 경우: 표준 테이블 양식에 에디터 매핑 필드(신청자 성명/연락처/관계 분리, 재택/입원 주소 분리)를 완벽 반영하여 렌더링
+      const isApplicantSame = app.isApplicantSame || app.applicantRelation === '본인' || (!app.applicantName || app.applicantName === app.patientName);
+      const appName = isApplicantSame ? app.patientName : (app.applicantName || '-');
+      const appPhone = isApplicantSame ? app.phone : (app.applicantPhone || '-');
+      const appRel = isApplicantSame ? '본인' : (app.applicantRelation || '가족');
+      const homeAddr = app.careType === '자택' ? (app.addressDetail || app.patientAddress || '자택 주소 미기재') : '-';
+      const hospAddr = app.careType !== '자택' ? `${app.hospitalName || ''} ${app.addressDetail || ''}`.trim() : '-';
 
-        <!-- Section 1: Patient Information -->
-        <div class="space-y-1.5">
-          <div class="text-xs font-black text-slate-900 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-blue-600 inline-block"></span> 1. 피보험자(환자) 인적사항
-          </div>
-          <table class="w-full border-collapse border border-slate-300 text-xs">
-            <tr class="border-b border-slate-300">
-              <th class="bg-slate-100 p-2 text-center w-28 text-slate-700 font-bold border-r border-slate-300">피보험자 성명</th>
-              <td class="p-2 font-black text-sm text-slate-900 border-r border-slate-300">${app.patientName} (${app.gender || '미지정'})</td>
-              <th class="bg-slate-100 p-2 text-center w-28 text-slate-700 font-bold border-r border-slate-300">생년월일</th>
-              <td class="p-2 font-mono font-bold">${app.birthDate || '-'}</td>
-            </tr>
-            <tr class="border-b border-slate-300">
-              <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">환자 연락처</th>
-              <td class="p-2 font-mono font-bold text-blue-900 border-r border-slate-300">${app.phone}</td>
-              <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">신청인(관계)</th>
-              <td class="p-2">${app.applicantName || app.patientName} (${app.applicantRelation || '본인'})</td>
-            </tr>
-            <tr>
-              <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">실거주지 주소</th>
-              <td colspan="3" class="p-2 text-slate-800">${app.addressDetail || (app.sido + ' ' + app.sigungu)}</td>
-            </tr>
-          </table>
-        </div>
-
-        <!-- Section 2: Hospital & Care Request -->
-        <div class="space-y-1.5">
-          <div class="text-xs font-black text-slate-900 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-blue-600 inline-block"></span> 2. 사고 및 입원 의료기관 / 간병 희망내역
-          </div>
-          <table class="w-full border-collapse border border-slate-300 text-xs">
-            <tr class="border-b border-slate-300">
-              <th class="bg-slate-100 p-2 text-center w-28 text-slate-700 font-bold border-r border-slate-300">입원 병원명</th>
-              <td class="p-2 font-black text-slate-900 border-r border-slate-300">${app.hospitalName || '병원 미기재'}</td>
-              <th class="bg-slate-100 p-2 text-center w-28 text-slate-700 font-bold border-r border-slate-300">사고유형 / 일자</th>
-              <td class="p-2 font-bold">${app.accidentType || '질병/상해'} (사고일: ${app.accidentDate || '-'})</td>
-            </tr>
-            <tr class="border-b border-slate-300">
-              <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">간병 시작희망일</th>
-              <td class="p-2 font-bold text-blue-900 border-r border-slate-300">${app.desiredDate || app.applyDate || todayStr}</td>
-              <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">예상 사용기간</th>
-              <td class="p-2 font-bold">${app.expectedDays || '30일(퇴원시까지)'}</td>
-            </tr>
-            <tr>
-              <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">환자상태 / 특이사항</th>
-              <td colspan="3" class="p-2 text-slate-700 leading-relaxed">${app.memo || '거동 불편으로 인한 전문 간병인 파견 지원 요청'}</td>
-            </tr>
-          </table>
-        </div>
-
-        <!-- Section 3: Official Request Statement -->
-        <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs text-slate-700">
-          <div class="font-bold text-slate-900">[현대해상 보상지원팀 요청사항]</div>
-          <p class="leading-relaxed">
-            1. 귀 사의 무궁한 발전을 기원합니다.<br>
-            2. 상기 피보험자는 현대해상 간병인지원 특약 가입 고객으로서 당사(리본케어)로 간병인 파견을 유선 신청하였습니다.<br>
-            3. 당사는 접수 즉시 환자 상태에 적합한 전문 간병사를 배정하여 파견을 진행하오니, 귀 사에서는 <b>가입 담보 내역(증권번호, 사고번호, 배정 손사명/연락처)</b>을 확인하시어 당사 콜센터 번호로 <b>회신 문자(SMS)를 발송</b>하여 주시기 바랍니다.
-          </p>
-        </div>
-
-        <!-- Signature Area -->
-        <div class="pt-4 flex items-center justify-between border-t border-slate-200">
-          <div class="text-[11px] text-slate-500 space-y-0.5">
-            <div>* 본 문서는 전자동 ERP 전산망을 통해 안전하게 발행되었습니다.</div>
-            <div>* 회신처: <b>(주)리본케어 간병운영센터 (1566-7011 / SMS: 010-8006-2268)</b></div>
-          </div>
-          <div class="flex items-center gap-3 text-right">
-            <div>
-              <div class="text-xs text-slate-600 font-mono">${todayStr}</div>
-              <div class="text-sm font-black text-slate-900 mt-1">주식회사 리본케어 대표이사</div>
+      sheet.innerHTML = `
+        <div class="p-2 space-y-5 text-slate-900 font-sans leading-relaxed" style="font-family:'Pretendard', -apple-system, sans-serif;">
+          <!-- Header: Official Corporate Header -->
+          <div class="flex items-center justify-between border-b-2 border-slate-900 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-xl font-black tracking-tighter text-primary-700">(주)리본케어</span>
+              <span class="text-xs font-bold text-slate-500">| 간병운영지원센터</span>
             </div>
-            ${redSealSvg}
+            <div class="text-right text-[11px] text-slate-500 font-mono">
+              <div>문서번호: <b>${docNo}</b></div>
+              <div>시행일자: <b>${app.applyDate || todayStr}</b></div>
+            </div>
+          </div>
+
+          <!-- Document Recipient & Sender -->
+          <div class="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+            <div class="space-y-1">
+              <div><span class="text-slate-500 font-bold">수 신 처 :</span> <b class="text-blue-900 font-black">현대해상화재보험(주) 보상지원팀 귀중</b></div>
+              <div><span class="text-slate-500 font-bold">수신팩스 :</span> <b class="font-mono text-blue-800 text-sm">02-2195-5000</b></div>
+              <div><span class="text-slate-500 font-bold">참 조 :</span> 간병인지원 특약 보상접수 담당자</div>
+            </div>
+            <div class="space-y-1 text-right sm:text-left sm:pl-4 sm:border-l border-slate-200">
+              <div><span class="text-slate-500 font-bold">발 신 처 :</span> <b>(주)리본케어 간병운영팀</b></div>
+              <div><span class="text-slate-500 font-bold">대표전화 :</span> <b class="font-mono">1566-7011</b></div>
+              <div><span class="text-slate-500 font-bold">회신전용 :</span> <b class="font-mono text-purple-700">010-8006-2268 (SMS 전용)</b></div>
+            </div>
+          </div>
+
+          <!-- Title -->
+          <div class="text-center py-2">
+            <h2 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight underline decoration-slate-400 underline-offset-8">
+              간병인지원 서비스 신청 및 고객 등록 요청서
+            </h2>
+            <p class="text-xs text-slate-500 mt-2">[현대해상 간병인지원 특약 1차 접수용 · 양식01]</p>
+          </div>
+
+          <!-- Section 1: Patient & Applicant Information -->
+          <div class="space-y-1.5">
+            <div class="text-xs font-black text-slate-900 flex items-center justify-between">
+              <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-blue-600 inline-block"></span> 1. 피보험자(환자) 및 신청자 인적사항</span>
+              <span class="text-[11px] font-bold text-slate-500">${isApplicantSame ? '<span class="text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">신청자와 동일함</span>' : '<span class="text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">별도 신청자</span>'}</span>
+            </div>
+            <table class="w-full border-collapse border border-slate-300 text-xs">
+              <tr class="border-b border-slate-300">
+                <th class="bg-slate-100 p-2 text-center w-28 text-slate-700 font-bold border-r border-slate-300">피보험자 성명</th>
+                <td class="p-2 font-black text-sm text-slate-900 border-r border-slate-300">${app.patientName} (${app.gender || '미지정'})</td>
+                <th class="bg-slate-100 p-2 text-center w-28 text-slate-700 font-bold border-r border-slate-300">주민등록번호</th>
+                <td class="p-2 font-mono font-bold">${app.patientRrn || (app.rrnFront ? `${app.rrnFront}-${app.rrnBack || '*******'}` : '-')}</td>
+              </tr>
+              <tr class="border-b border-slate-300">
+                <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">환자 연락처</th>
+                <td class="p-2 font-mono font-bold text-blue-900 border-r border-slate-300">${app.phone}</td>
+                <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">생년월일</th>
+                <td class="p-2 font-mono">${app.birthDate || '-'}</td>
+              </tr>
+              <tr class="border-b border-slate-300 bg-slate-50/50">
+                <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">신청자 성명 / 관계</th>
+                <td class="p-2 font-bold text-slate-900 border-r border-slate-300">
+                  ${appName} <span class="text-slate-500 font-normal">(관계: <b>${appRel}</b>)</span>
+                </td>
+                <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">신청자 연락처</th>
+                <td class="p-2 font-mono font-bold text-slate-800">${appPhone}</td>
+              </tr>
+              <tr class="border-b border-slate-300">
+                <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">
+                  신청유형 [재택]<br><span class="text-[10px] text-slate-500 font-normal">자택주소</span>
+                </th>
+                <td colspan="3" class="p-2 ${app.careType === '자택' ? 'font-bold text-slate-900 bg-amber-50/40' : 'text-slate-400'}">
+                  ${homeAddr}
+                </td>
+              </tr>
+              <tr>
+                <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">
+                  신청유형 [입원]<br><span class="text-[10px] text-slate-500 font-normal">병원/병실주소</span>
+                </th>
+                <td colspan="3" class="p-2 ${app.careType !== '자택' ? 'font-bold text-slate-900 bg-emerald-50/40' : 'text-slate-400'}">
+                  ${hospAddr}
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Section 2: Hospital & Care Request -->
+          <div class="space-y-1.5">
+            <div class="text-xs font-black text-slate-900 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-blue-600 inline-block"></span> 2. 사고 및 입원 의료기관 / 간병 희망내역
+            </div>
+            <table class="w-full border-collapse border border-slate-300 text-xs">
+              <tr class="border-b border-slate-300">
+                <th class="bg-slate-100 p-2 text-center w-28 text-slate-700 font-bold border-r border-slate-300">신청 구분</th>
+                <td class="p-2 font-bold text-slate-900 border-r border-slate-300"><span class="px-2 py-0.5 rounded ${app.careType === '자택' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'} font-black">${app.careType || '입원'}</span></td>
+                <th class="bg-slate-100 p-2 text-center w-28 text-slate-700 font-bold border-r border-slate-300">사고유형 / 일자</th>
+                <td class="p-2 font-bold">${app.accidentType || '질병/상해'} (사고일: ${(app.accidentDate && app.accidentDate !== '-') ? app.accidentDate : (app.applyDate || todayStr)})</td>
+              </tr>
+              <tr class="border-b border-slate-300">
+                <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">간병 시작희망일</th>
+                <td class="p-2 font-bold text-blue-900 border-r border-slate-300">${app.desiredDate || app.applyDate || todayStr}</td>
+                <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">예상 사용기간</th>
+                <td class="p-2 font-bold">${app.expectedDays || '30일(퇴원시까지)'}</td>
+              </tr>
+              <tr>
+                <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">환자상태 / 특이사항</th>
+                <td colspan="3" class="p-2 text-slate-700 leading-relaxed">${app.memo || '거동 불편으로 인한 전문 간병인 파견 지원 요청'}</td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Section 3: Official Request Statement -->
+          <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs text-slate-700">
+            <div class="font-bold text-slate-900">[현대해상 보상지원팀 요청사항]</div>
+            <p class="leading-relaxed">
+              1. 귀 사의 무궁한 발전을 기원합니다.<br>
+              2. 상기 피보험자는 현대해상 간병인지원 특약 가입 고객으로서 당사(리본케어)로 간병인 파견을 유선 신청하였습니다.<br>
+              3. 당사는 접수 즉시 환자 상태에 적합한 전문 간병사를 배정하여 파견을 진행하오니, 귀 사에서는 <b>가입 담보 내역(증권번호, 사고번호, 배정 손사명/연락처)</b>을 확인하시어 당사 콜센터 번호로 <b>회신 문자(SMS)를 발송</b>하여 주시기 바랍니다.
+            </p>
+          </div>
+
+          <!-- Signature Area -->
+          <div class="pt-4 flex items-center justify-between border-t border-slate-200">
+            <div class="text-[11px] text-slate-500 space-y-0.5">
+              <div>* 본 문서는 전자동 ERP 전산망을 통해 안전하게 발행되었습니다.</div>
+              <div>* 회신처: <b>(주)리본케어 간병운영센터 (1566-7011 / SMS: 010-8006-2268)</b></div>
+            </div>
+            <div class="flex items-center gap-3 text-right">
+              <div>
+                <div class="text-xs text-slate-600 font-mono">${todayStr}</div>
+                <div class="text-sm font-black text-slate-900 mt-1">주식회사 리본케어 대표이사</div>
+              </div>
+              ${redSealSvg}
+            </div>
           </div>
         </div>
-      </div>
-    `;
+      `;
+    }
   } else if (formCode === 'HD_FORM_02') {
     // =========================================================================
     // [현대해상 청구] 간병서비스 제공확인서 및 정산비용 청구서
@@ -2711,18 +3185,53 @@ function previewNewAppDraftFax() {
   const desiredDate = document.getElementById('newAppDesiredDate')?.value.trim() || '2026.09.07';
   const memo = document.getElementById('newAppMemo')?.value.trim() || '전문 간병 파견 신청 건';
 
+  const rrnFront = document.getElementById('newAppRrnFront')?.value?.trim() || '';
+  const rrnBack = document.getElementById('newAppRrnBack')?.value?.trim() || '';
+  let patientRrn = '';
+  if (rrnFront && rrnBack) {
+    patientRrn = `${rrnFront}-${rrnBack}`;
+  } else if (rrnFront) {
+    patientRrn = `${rrnFront}-*******`;
+  }
+
+  const isApplicantSame = document.getElementById('chkApplicantSameAsPatient')?.checked || false;
+  const applicantName = document.getElementById('newAppApplicantName')?.value?.trim() || name;
+  const applicantPhone = document.getElementById('newAppApplicantPhone')?.value?.trim() || phone;
+  let applicantRelation = document.getElementById('newAppApplicantRelation')?.value || '본인';
+  if (applicantRelation === '기타') {
+    applicantRelation = document.getElementById('newAppApplicantRelationOther')?.value?.trim() || '기타';
+  }
+
+  const careTypeVal = document.getElementById('newAppCareType')?.value || '입원';
+  const isHome = (careTypeVal === '자택' || careTypeVal === '재택');
+  const homeAddr = document.getElementById('newAppCareRoadAddress')?.value?.trim() || '';
+  const homeDetail = document.getElementById('newAppCareDetailAddress')?.value?.trim() || '';
+  const hospRoad = document.getElementById('newAppHospitalRoadAddress')?.value?.trim() || '';
+  const hospDetail = document.getElementById('newAppHospitalDetailAddress')?.value?.trim() || '';
+
   const draftApp = {
     id: 'DRAFT-' + Math.floor(Math.random()*1000),
     patientName: name,
     phone: phone,
     gender: document.getElementById('newAppGender')?.value || '남',
-    birthDate: document.getElementById('newAppBirthDate')?.value || '19600101',
+    birthDate: document.getElementById('newAppBirthDate')?.value || (rrnFront ? (rrnFront.length === 6 ? '19' + rrnFront : rrnFront) : '19800101'),
+    rrnFront: rrnFront,
+    rrnBack: rrnBack,
+    patientRrn: patientRrn,
+    careType: isHome ? '자택' : '입원',
     hospitalName: hospName,
+    hospitalRoom: hospDetail,
     desiredDate: desiredDate,
     expectedDays: document.getElementById('newAppExpectedDays')?.value || '30일',
-    applyDate: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+    applyDate: document.getElementById('newAppApplyDate')?.value?.trim() || new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+    accidentDate: document.getElementById('newAppAccidentDate')?.value?.trim() || document.getElementById('newAppApplyDate')?.value?.trim() || new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+    accidentType: document.querySelector('input[name="newAppAccidentTypeRadio"]:checked')?.value || '상해',
     memo: memo,
-    addressDetail: document.getElementById('newAppHospitalRoadAddress')?.value || '서울특별시'
+    isApplicantSame: isApplicantSame,
+    applicantName: applicantName,
+    applicantPhone: applicantPhone,
+    applicantRelation: applicantRelation,
+    addressDetail: isHome ? `${homeAddr} ${homeDetail}`.trim() : `${hospRoad} ${hospDetail}`.trim()
   };
 
   gApps.unshift(draftApp);
@@ -2763,6 +3272,30 @@ function executeSendHyundaiInitialFax() {
   renderAdjusters();
   renderForms();
   renderUnifiedCareHub();
+
+  const now = new Date();
+  const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  const targetNumber = document.getElementById('hdFaxTargetNumber')?.value.trim() || '02-2195-5000';
+  const newLog = {
+    id: 'FLOG-' + Date.now().toString().slice(-6),
+    sentDate: dateStr,
+    appId: app.id,
+    patientName: app.patientName,
+    insuranceCompany: '현대해상',
+    category: '1차접수',
+    formCode: 'HD_FORM_01',
+    formName: '현대해상 1차 고객등록 및 신청 접수서',
+    recipient: '현대해상 보상접수센터',
+    faxNumber: targetNumber,
+    pages: 2,
+    status: '성공',
+    operator: '유선접수담당',
+    resultMsg: '정상 송신 완료 (200 OK)'
+  };
+  if (!Array.isArray(gFaxLogs)) gFaxLogs = [];
+  gFaxLogs.unshift(newLog);
+  if (typeof saveFaxLogs === 'function') saveFaxLogs();
+  if (typeof updateFaxKpis === 'function') updateFaxKpis();
 
   alert(`📠 [현대해상 1차 접수 팩스 발송 완료]\n\n수신: 현대해상 보상접수센터 (02-2195-5000)\n환자: ${app.patientName} (${app.id})\n\n현대해상에서 콜직원 휴대폰으로 보험 가입정보 문자가 오면 [문자정보 등록] 버튼을 눌러 2차 정보를 보강해주세요!`);
 }
@@ -6479,6 +7012,7 @@ function openFaxModal(applyId, defaultCase = 1) {
     else r2.checked = true;
   }
 
+  populateFaxDirectoryDropdownInModal();
   switchFaxCase(defaultCase);
   openModal('faxDispatchModal');
   initIcons();
@@ -6538,8 +7072,8 @@ function executeSendFaxModal() {
   const app = gApps.find(a => a.id === applyId);
   if (!app) return;
 
-  const targetRecipient = document.getElementById('faxTargetRecipient').value.trim();
-  const targetNumber = document.getElementById('faxTargetNumber').value.trim();
+  const targetRecipient = document.getElementById('faxTargetRecipient')?.value.trim() || '수신처 미지정';
+  const targetNumber = document.getElementById('faxTargetNumber')?.value.trim() || '';
   const caseTitle = gCurrentFaxCase === 1 ? '현대해상 고객등록/조회' : '간병비 정산청구';
 
   if (!targetNumber) {
@@ -6557,10 +7091,609 @@ function executeSendFaxModal() {
     caseType: caseTitle
   };
 
+  const isSamsung = (app.insuranceCompany || '').includes('삼성화재');
+  const formCode = gCurrentFaxCase === 1 ? 'HD_FORM_01' : (isSamsung ? 'SF_FORM_01' : 'HD_FORM_02');
+  const formName = gCurrentFaxCase === 1
+    ? '현대해상 1차 고객등록 및 신청 접수서'
+    : (isSamsung ? '삼성화재 간병비 청구서 및 명세서' : '현대해상 간병서비스제공확인서 및 비용청구서');
+
+  const newLog = {
+    id: 'FLOG-' + Date.now().toString().slice(-6),
+    sentDate: dateStr,
+    appId: app.id,
+    patientName: app.patientName,
+    insuranceCompany: app.insuranceCompany,
+    category: gCurrentFaxCase === 1 ? '1차접수' : '정산청구',
+    formCode: formCode,
+    formName: formName,
+    recipient: targetRecipient,
+    faxNumber: targetNumber,
+    pages: formCode === 'SF_FORM_01' ? 3 : 2,
+    status: '성공',
+    operator: '관리자(원스탑)',
+    resultMsg: '정상 송신 완료 (200 OK)'
+  };
+
+  if (!Array.isArray(gFaxLogs)) gFaxLogs = [];
+  gFaxLogs.unshift(newLog);
+  saveFaxLogs();
+  updateFaxKpis();
+  renderFaxLogsTable();
+
   closeModal('faxDispatchModal');
   renderUnifiedCareHub();
 
   alert('📠 [팩스 발송 접수 완료]\n\n발송목적: ' + caseTitle + '\n수신처: ' + targetRecipient + ' (' + targetNumber + ')\n환자명: ' + app.patientName + ' (' + app.id + ')\n접수일시: ' + dateStr + '\n\n정상 발송 처리되었습니다!');
+}
+
+// =========================================================================
+// FAX MANAGEMENT ENGINE & DIRECTORY CONTROLLER
+// =========================================================================
+
+function saveFaxDirectory() {
+  try {
+    localStorage.setItem('LIVON_FAX_DIR', JSON.stringify(gFaxDirectory));
+  } catch (e) {
+    console.warn('saveFaxDirectory error:', e);
+  }
+}
+
+function saveFaxLogs() {
+  try {
+    localStorage.setItem('LIVON_FAX_LOGS', JSON.stringify(gFaxLogs));
+  } catch (e) {
+    console.warn('saveFaxLogs error:', e);
+  }
+}
+
+function switchFaxSubTab(subTab) {
+  const logsSec = document.getElementById('faxSubTabSection-logs');
+  const dirSec = document.getElementById('faxSubTabSection-directory');
+  const logsBtn = document.getElementById('faxSubTabBtn-logs');
+  const dirBtn = document.getElementById('faxSubTabBtn-directory');
+  const badge = document.getElementById('faxSubTabBadge');
+
+  if (subTab === 'logs') {
+    if (logsSec) logsSec.classList.remove('hidden');
+    if (dirSec) dirSec.classList.add('hidden');
+    if (logsBtn) {
+      logsBtn.className = 'px-4 py-2 rounded-xl text-xs font-black transition-all bg-purple-600 text-white shadow-xs cursor-pointer';
+    }
+    if (dirBtn) {
+      dirBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer';
+    }
+    if (badge) badge.innerText = '발송 이력 실시간 대장';
+    renderFaxLogsTable();
+  } else {
+    if (logsSec) logsSec.classList.add('hidden');
+    if (dirSec) dirSec.classList.remove('hidden');
+    if (dirBtn) {
+      dirBtn.className = 'px-4 py-2 rounded-xl text-xs font-black transition-all bg-purple-600 text-white shadow-xs cursor-pointer';
+    }
+    if (logsBtn) {
+      logsBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer';
+    }
+    if (badge) badge.innerText = '원수사/손사 팩스 주소록';
+    renderFaxDirectoryTable();
+  }
+  initIcons();
+}
+
+function updateFaxKpis() {
+  const totalEl = document.getElementById('faxKpiTotal');
+  const rateEl = document.getElementById('faxKpiSuccessRate');
+  const failedEl = document.getElementById('faxKpiFailed');
+  const dirEl = document.getElementById('faxKpiDirectoryCount');
+
+  const logs = gFaxLogs || [];
+  const total = logs.length;
+  const successCount = logs.filter(l => l.status === '성공').length;
+  const failedCount = logs.filter(l => l.status === '실패').length;
+  const rate = total > 0 ? Math.round((successCount / total) * 100) : 100;
+  const dirCount = (gFaxDirectory || []).length;
+
+  if (totalEl) totalEl.innerText = total + '건';
+  if (rateEl) rateEl.innerText = rate + '% (' + successCount + '건)';
+  if (failedEl) failedEl.innerText = failedCount + '건';
+  if (dirEl) dirEl.innerText = dirCount + '처';
+}
+
+function renderFaxManagement() {
+  updateFaxKpis();
+  renderFaxLogsTable();
+  renderFaxDirectoryTable();
+  populateFaxDirectoryDropdownInModal();
+}
+
+function renderFaxLogsTable() {
+  const tbody = document.getElementById('faxLogsTableBody');
+  if (!tbody) return;
+
+  const search = (document.getElementById('faxLogSearchInput')?.value || '').toLowerCase().trim();
+  const statusFilter = document.getElementById('faxLogStatusFilter')?.value || 'ALL';
+  const insFilter = document.getElementById('faxLogInsuranceFilter')?.value || 'ALL';
+
+  let filtered = (gFaxLogs || []).filter(l => {
+    if (statusFilter !== 'ALL' && l.status !== statusFilter) return false;
+    if (insFilter !== 'ALL' && !l.insuranceCompany.includes(insFilter)) return false;
+    if (search) {
+      const match = (
+        (l.patientName && l.patientName.toLowerCase().includes(search)) ||
+        (l.appId && l.appId.toLowerCase().includes(search)) ||
+        (l.recipient && l.recipient.toLowerCase().includes(search)) ||
+        (l.faxNumber && l.faxNumber.includes(search)) ||
+        (l.formName && l.formName.toLowerCase().includes(search)) ||
+        (l.formCode && l.formCode.toLowerCase().includes(search)) ||
+        (l.insuranceCompany && l.insuranceCompany.toLowerCase().includes(search))
+      );
+      if (!match) return false;
+    }
+    return true;
+  });
+
+  const countEl = document.getElementById('faxLogCountText');
+  if (countEl) countEl.innerText = `총 ${filtered.length}건 조회됨`;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" class="p-8 text-center text-slate-400">
+          <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+          조회된 팩스 발송 이력이 없습니다.
+        </td>
+      </tr>
+    `;
+    initIcons(tbody);
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(l => {
+    const isSuccess = l.status === '성공';
+    const isFailed = l.status === '실패';
+    
+    let statusBadge = '';
+    if (isSuccess) {
+      statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 성공 (200 OK)
+      </span>`;
+    } else if (isFailed) {
+      statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center gap-1 cursor-pointer" title="${l.resultMsg || '통신 오류'}">
+        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> 실패 (${l.resultMsg || '오류'})
+      </span>`;
+    } else {
+      statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> 전송진행중
+      </span>`;
+    }
+
+    const insBadge = l.insuranceCompany.includes('현대해상')
+      ? 'bg-blue-50 text-blue-700 border-blue-200'
+      : (l.insuranceCompany.includes('삼성화재')
+        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+        : 'bg-purple-50 text-purple-700 border-purple-200');
+
+    return `
+      <tr class="hover:bg-slate-50/80 transition-colors">
+        <td class="p-3 text-center text-slate-500 font-mono text-[11px] whitespace-nowrap">
+          <i data-lucide="clock" class="w-3 h-3 inline mr-1 text-slate-400"></i>${l.sentDate}
+        </td>
+        <td class="p-3 text-center font-mono font-bold text-slate-800">
+          <span class="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200">${l.appId}</span>
+        </td>
+        <td class="p-3 font-bold text-slate-900 whitespace-nowrap">
+          ${maskName(l.patientName)}
+        </td>
+        <td class="p-3 text-center whitespace-nowrap">
+          <span class="px-2 py-0.5 rounded-md text-[11px] font-bold border ${insBadge}">
+            ${l.insuranceCompany}
+          </span>
+        </td>
+        <td class="p-3 font-medium text-slate-800">
+          <div class="font-bold text-slate-900">${l.recipient}</div>
+          <div class="text-[10px] text-slate-400">${l.category || '정산청구'} · ${l.operator || '시스템'}</div>
+        </td>
+        <td class="p-3 font-mono font-bold text-purple-700 text-xs whitespace-nowrap">
+          <i data-lucide="printer" class="w-3.5 h-3.5 inline mr-1 text-purple-500"></i>${l.faxNumber}
+        </td>
+        <td class="p-3">
+          <div class="font-semibold text-slate-900 flex items-center gap-1.5">
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-mono">${l.formCode || '-'}</span>
+            <span class="truncate max-w-[220px]" title="${l.formName}">${l.formName}</span>
+          </div>
+          <div class="text-[10px] text-slate-400 mt-0.5">${l.pages || 2}장 전송</div>
+        </td>
+        <td class="p-3 text-center whitespace-nowrap">
+          ${statusBadge}
+        </td>
+        <td class="p-3 text-center whitespace-nowrap">
+          <div class="flex items-center justify-center gap-1.5">
+            <button onclick="previewFormForCustomer('${l.formCode || 'HD_FORM_01'}', '${l.appId}')" class="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center gap-1 shadow-2xs" title="발송 서식 미리보기">
+              <i data-lucide="file-text" class="w-3 h-3 text-blue-600"></i>
+              <span>서식보기</span>
+            </button>
+            <button onclick="resendFaxLog('${l.id}')" class="px-2 py-1 rounded-lg bg-purple-50 border border-purple-200 hover:bg-purple-100 text-purple-700 text-[11px] font-semibold flex items-center gap-1 shadow-2xs" title="동일 수신처로 즉시 재전송">
+              <i data-lucide="rotate-cw" class="w-3 h-3 text-purple-600"></i>
+              <span>재전송</span>
+            </button>
+            <button onclick="deleteFaxLog('${l.id}')" class="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50" title="이력 삭제">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  initIcons(tbody);
+}
+
+function renderFaxDirectoryTable() {
+  const tbody = document.getElementById('faxDirectoryTableBody');
+  if (!tbody) return;
+
+  const search = (document.getElementById('faxDirSearchInput')?.value || '').toLowerCase().trim();
+  const insFilter = document.getElementById('faxDirInsuranceFilter')?.value || 'ALL';
+  const catFilter = document.getElementById('faxDirCategoryFilter')?.value || 'ALL';
+
+  let filtered = (gFaxDirectory || []).filter(d => {
+    if (insFilter !== 'ALL' && !d.insuranceCompany.includes(insFilter)) return false;
+    if (catFilter !== 'ALL' && d.category !== catFilter) return false;
+    if (search) {
+      const match = (
+        (d.insuranceCompany && d.insuranceCompany.toLowerCase().includes(search)) ||
+        (d.firm && d.firm.toLowerCase().includes(search)) ||
+        (d.department && d.department.toLowerCase().includes(search)) ||
+        (d.contactPerson && d.contactPerson.toLowerCase().includes(search)) ||
+        (d.faxNumber && d.faxNumber.includes(search)) ||
+        (d.phone && d.phone.includes(search)) ||
+        (d.memo && d.memo.toLowerCase().includes(search))
+      );
+      if (!match) return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" class="p-8 text-center text-slate-400">
+          <i data-lucide="contact-2" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+          조회된 팩스번호 주소록이 없습니다.
+        </td>
+      </tr>
+    `;
+    initIcons(tbody);
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(d => {
+    const insBadge = d.insuranceCompany.includes('현대해상')
+      ? 'bg-blue-50 text-blue-700 border-blue-200'
+      : (d.insuranceCompany.includes('삼성화재')
+        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+        : 'bg-purple-50 text-purple-700 border-purple-200');
+
+    const catBadge = d.category === '1차접수'
+      ? 'bg-amber-50 text-amber-800 border-amber-200'
+      : (d.category === '정산청구'
+        ? 'bg-purple-50 text-purple-800 border-purple-200'
+        : 'bg-slate-100 text-slate-700 border-slate-200');
+
+    const defaultStar = d.isDefault
+      ? `<span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-black border border-amber-300">★ 대표</span>`
+      : '';
+
+    return `
+      <tr class="hover:bg-slate-50/80 transition-colors">
+        <td class="p-3 text-center whitespace-nowrap">
+          <span class="px-2.5 py-1 rounded-md text-[11px] font-bold border ${insBadge}">
+            ${d.insuranceCompany}
+          </span>
+          ${defaultStar}
+        </td>
+        <td class="p-3 font-medium text-slate-900">
+          <div class="font-bold text-slate-900">${d.firm}</div>
+          <div class="text-[11px] text-slate-500">${d.department || '-'}</div>
+        </td>
+        <td class="p-3 font-semibold text-slate-800 whitespace-nowrap">
+          ${d.contactPerson || '-'}
+        </td>
+        <td class="p-3 font-mono font-black text-purple-700 text-xs whitespace-nowrap">
+          <i data-lucide="printer" class="w-3.5 h-3.5 inline mr-1 text-purple-500"></i>${d.faxNumber}
+        </td>
+        <td class="p-3 font-mono text-slate-600 text-xs whitespace-nowrap">
+          <div>${d.phone || '-'}</div>
+          ${d.mobile && d.mobile !== '-' ? `<div class="text-[10px] text-slate-400">${d.mobile}</div>` : ''}
+        </td>
+        <td class="p-3 text-center whitespace-nowrap">
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${catBadge}">
+            ${d.category || '공통'}
+          </span>
+        </td>
+        <td class="p-3 text-slate-600 text-[11px] max-w-xs truncate" title="${d.memo || ''}">
+          ${d.memo || '-'}
+        </td>
+        <td class="p-3 text-center whitespace-nowrap">
+          <div class="flex items-center justify-center gap-1.5">
+            <button onclick="quickDispatchToDirectory('${d.id}')" class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs" title="이 번호로 팩스 발송">
+              <i data-lucide="send" class="w-3 h-3"></i>
+              <span>발송</span>
+            </button>
+            <button onclick="openFaxDirectoryModal('${d.id}')" class="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center gap-1 shadow-2xs" title="주소록 수정">
+              <i data-lucide="edit-3" class="w-3 h-3 text-slate-500"></i>
+              <span>수정</span>
+            </button>
+            <button onclick="deleteFaxDirectoryEntry('${d.id}')" class="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50" title="주소록 삭제">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  initIcons(tbody);
+}
+
+function populateFaxDirectoryDropdownInModal() {
+  const select = document.getElementById('faxModalDirectorySelect');
+  if (!select) return;
+
+  select.innerHTML = '<option value="">-- 등록된 손사 주소록에서 선택 시 자동완성 --</option>' +
+    (gFaxDirectory || []).map(d => {
+      const label = `[${d.insuranceCompany}] ${d.firm} ${d.department ? '(' + d.department + ')' : ''} ${d.contactPerson ? d.contactPerson : ''} - 📠 ${d.faxNumber}`;
+      return `<option value="${d.id}">${label}</option>`;
+    }).join('');
+}
+
+function onSelectFaxDirectoryInModal(dirId) {
+  if (!dirId) return;
+  const d = (gFaxDirectory || []).find(item => item.id === dirId);
+  if (!d) return;
+
+  const recipientInput = document.getElementById('faxTargetRecipient');
+  const numberInput = document.getElementById('faxTargetNumber');
+
+  if (recipientInput) {
+    let name = d.firm;
+    if (d.department) name += ' ' + d.department;
+    if (d.contactPerson) name += ' (' + d.contactPerson + ')';
+    recipientInput.value = name;
+  }
+  if (numberInput) {
+    numberInput.value = d.faxNumber;
+  }
+}
+
+function quickDispatchToDirectory(dirId) {
+  const d = (gFaxDirectory || []).find(item => item.id === dirId);
+  if (!d) return;
+
+  // Find candidate app: if category is 1차접수, find initial, else find settlement app
+  let targetApp = null;
+  if (d.category === '1차접수') {
+    targetApp = (gApps || []).find(a => a.insuranceCompany.includes(d.insuranceCompany.replace('(SCOR)', '')) || a.hdWorkflowStage === '신청접수');
+  } else {
+    targetApp = (gApps || []).find(a => a.insuranceCompany.includes(d.insuranceCompany.replace('(SCOR)', '')) && a.claimCount > 0);
+  }
+  if (!targetApp) targetApp = (gApps || [])[0];
+
+  if (!targetApp) {
+    alert('등록된 고객 데이터가 없습니다.');
+    return;
+  }
+
+  const caseType = d.category === '1차접수' ? 1 : 2;
+  openFaxModal(targetApp.id, caseType);
+
+  // Auto-fill from directory
+  const recipientInput = document.getElementById('faxTargetRecipient');
+  const numberInput = document.getElementById('faxTargetNumber');
+  const dirSelect = document.getElementById('faxModalDirectorySelect');
+
+  if (recipientInput) {
+    let name = d.firm;
+    if (d.department) name += ' ' + d.department;
+    if (d.contactPerson) name += ' (' + d.contactPerson + ')';
+    recipientInput.value = name;
+  }
+  if (numberInput) numberInput.value = d.faxNumber;
+  if (dirSelect) dirSelect.value = d.id;
+}
+
+function openFaxDirectoryModal(editId = null) {
+  const titleEl = document.getElementById('faxDirModalTitle');
+  const form = document.getElementById('faxDirectoryForm');
+  const editIdEl = document.getElementById('faxDirEditId');
+  if (!form) return;
+
+  form.reset();
+
+  if (editId) {
+    const item = (gFaxDirectory || []).find(d => d.id === editId);
+    if (!item) return;
+    if (titleEl) titleEl.innerText = '손사 팩스번호 수정';
+    if (editIdEl) editIdEl.value = item.id;
+
+    document.getElementById('faxDirInsurance').value = item.insuranceCompany || '현대해상';
+    document.getElementById('faxDirCategory').value = item.category || '정산청구';
+    document.getElementById('faxDirFirm').value = item.firm || '';
+    document.getElementById('faxDirDepartment').value = item.department || '';
+    document.getElementById('faxDirContact').value = item.contactPerson || '';
+    document.getElementById('faxDirNumber').value = item.faxNumber || '';
+    document.getElementById('faxDirPhone').value = item.phone || '';
+    document.getElementById('faxDirMobile').value = item.mobile || '';
+    document.getElementById('faxDirMemo').value = item.memo || '';
+    document.getElementById('faxDirIsDefault').checked = !!item.isDefault;
+  } else {
+    if (titleEl) titleEl.innerText = '손사 팩스번호 등록';
+    if (editIdEl) editIdEl.value = '';
+    document.getElementById('faxDirInsurance').value = '현대해상';
+    document.getElementById('faxDirCategory').value = '정산청구';
+    document.getElementById('faxDirIsDefault').checked = false;
+  }
+
+  openModal('faxDirectoryModal');
+  initIcons(document.getElementById('faxDirectoryModal'));
+}
+
+function handleSaveFaxDirectory(e) {
+  e.preventDefault();
+  const editId = document.getElementById('faxDirEditId')?.value;
+  const insuranceCompany = document.getElementById('faxDirInsurance')?.value || '현대해상';
+  const category = document.getElementById('faxDirCategory')?.value || '정산청구';
+  const firm = document.getElementById('faxDirFirm')?.value.trim() || '';
+  const department = document.getElementById('faxDirDepartment')?.value.trim() || '';
+  const contactPerson = document.getElementById('faxDirContact')?.value.trim() || '';
+  const faxNumber = document.getElementById('faxDirNumber')?.value.trim() || '';
+  const phone = document.getElementById('faxDirPhone')?.value.trim() || '-';
+  const mobile = document.getElementById('faxDirMobile')?.value.trim() || '-';
+  const memo = document.getElementById('faxDirMemo')?.value.trim() || '';
+  const isDefault = !!document.getElementById('faxDirIsDefault')?.checked;
+
+  if (!firm || !faxNumber) {
+    alert('손사명(기관명)과 팩스번호는 필수 입력 항목입니다.');
+    return;
+  }
+
+  if (!Array.isArray(gFaxDirectory)) gFaxDirectory = [];
+
+  // If marked as default, unset other defaults for same insurance
+  if (isDefault) {
+    gFaxDirectory.forEach(d => {
+      if (d.insuranceCompany === insuranceCompany && d.id !== editId) {
+        d.isDefault = false;
+      }
+    });
+  }
+
+  if (editId) {
+    const idx = gFaxDirectory.findIndex(d => d.id === editId);
+    if (idx !== -1) {
+      gFaxDirectory[idx] = {
+        ...gFaxDirectory[idx],
+        insuranceCompany,
+        category,
+        firm,
+        department,
+        contactPerson,
+        faxNumber,
+        phone,
+        mobile,
+        memo,
+        isDefault
+      };
+    }
+  } else {
+    const newId = 'FDIR-' + String(gFaxDirectory.length + 1).padStart(3, '0') + '-' + Date.now().toString().slice(-4);
+    const newEntry = {
+      id: newId,
+      insuranceCompany,
+      category,
+      firm,
+      department,
+      contactPerson,
+      faxNumber,
+      phone,
+      mobile,
+      memo,
+      isDefault
+    };
+    gFaxDirectory.unshift(newEntry);
+  }
+
+  saveFaxDirectory();
+  closeModal('faxDirectoryModal');
+  renderFaxDirectoryTable();
+  updateFaxKpis();
+  populateFaxDirectoryDropdownInModal();
+  alert(editId ? '손사 팩스번호 정보가 성공적으로 수정되었습니다.' : '신규 손사 팩스번호가 등록되었습니다.');
+}
+
+function deleteFaxDirectoryEntry(id) {
+  const item = (gFaxDirectory || []).find(d => d.id === id);
+  const name = item ? `${item.firm} (${item.faxNumber})` : '해당 팩스번호';
+  if (!confirm(`[${name}] 를 주소록에서 정말 삭제하시겠습니까?`)) return;
+
+  gFaxDirectory = (gFaxDirectory || []).filter(d => d.id !== id);
+  saveFaxDirectory();
+  renderFaxDirectoryTable();
+  updateFaxKpis();
+  populateFaxDirectoryDropdownInModal();
+  alert('주소록에서 삭제되었습니다.');
+}
+
+function resendFaxLog(logId) {
+  const log = (gFaxLogs || []).find(l => l.id === logId);
+  if (!log) return;
+
+  if (!confirm(`[${maskName(log.patientName)} 님] ${log.formName}\n\n수신처: ${log.recipient} (${log.faxNumber})\n\n해당 팩스를 즉시 재발송하시겠습니까?`)) {
+    return;
+  }
+
+  const now = new Date();
+  const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+  const newLog = {
+    ...log,
+    id: 'FLOG-' + Date.now().toString().slice(-6),
+    sentDate: dateStr,
+    status: '성공',
+    operator: '재전송요청자',
+    resultMsg: '재발송 완료 (200 OK)'
+  };
+
+  gFaxLogs.unshift(newLog);
+  saveFaxLogs();
+  updateFaxKpis();
+  renderFaxLogsTable();
+
+  alert(`📠 [재발송 완료]\n\n수신처: ${log.recipient} (${log.faxNumber})\n서식: ${log.formName}\n성공적으로 재전송되었습니다.`);
+}
+
+function deleteFaxLog(logId) {
+  if (!confirm('해당 발송 이력을 대장에서 삭제하시겠습니까?')) return;
+  gFaxLogs = (gFaxLogs || []).filter(l => l.id !== logId);
+  saveFaxLogs();
+  updateFaxKpis();
+  renderFaxLogsTable();
+}
+
+function exportFaxLogsToCSV() {
+  if (!gFaxLogs || gFaxLogs.length === 0) {
+    alert('내보낼 팩스 발송 이력이 없습니다.');
+    return;
+  }
+
+  const headers = ['발송일시', '신청ID', '환자명', '원수사', '구분', '수신처', '수신팩스번호', '서식코드', '발송서식명', '매수', '전송상태', '담당자', '통신결과'];
+  const rows = gFaxLogs.map(l => [
+    `"${l.sentDate || ''}"`,
+    `"${l.appId || ''}"`,
+    `"${l.patientName || ''}"`,
+    `"${l.insuranceCompany || ''}"`,
+    `"${l.category || ''}"`,
+    `"${(l.recipient || '').replace(/"/g, '""')}"`,
+    `"${l.faxNumber || ''}"`,
+    `"${l.formCode || ''}"`,
+    `"${(l.formName || '').replace(/"/g, '""')}"`,
+    `"${l.pages || 2}"`,
+    `"${l.status || ''}"`,
+    `"${l.operator || ''}"`,
+    `"${(l.resultMsg || '').replace(/"/g, '""')}"`
+  ]);
+
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  a.href = url;
+  a.download = `리본케어_팩스발송관리대장_${dateStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function initData() {
@@ -6585,6 +7718,26 @@ function initData() {
           }
         });
       }
+    }
+    if (window.REBORN_DATA.faxDirectory) {
+      try {
+        const savedDir = localStorage.getItem('LIVON_FAX_DIR');
+        gFaxDirectory = savedDir ? JSON.parse(savedDir) : [...window.REBORN_DATA.faxDirectory];
+      } catch (e) {
+        gFaxDirectory = [...window.REBORN_DATA.faxDirectory];
+      }
+    } else {
+      gFaxDirectory = [];
+    }
+    if (window.REBORN_DATA.faxLogs) {
+      try {
+        const savedLogs = localStorage.getItem('LIVON_FAX_LOGS');
+        gFaxLogs = savedLogs ? JSON.parse(savedLogs) : [...window.REBORN_DATA.faxLogs];
+      } catch (e) {
+        gFaxLogs = [...window.REBORN_DATA.faxLogs];
+      }
+    } else {
+      gFaxLogs = [];
     }
   }
 
@@ -6943,6 +8096,7 @@ function switchTab(tabId, filterParam = null) {
   else if (tabId === 'admins' || tabId === 'adminmgmt') renderAdmins();
   else if (tabId === 'partners') renderPartners();
   else if (tabId === 'settings') renderSettings();
+  else if (tabId === 'faxmgmt') renderFaxManagement();
 
   initIcons(target);
 }
@@ -8367,6 +9521,12 @@ function openNewAppModal() {
     if (picker) picker.value = today;
   });
 
+  const expectedDaysInput = document.getElementById('newAppExpectedDays');
+  if (expectedDaysInput) {
+    if (!expectedDaysInput.value) expectedDaysInput.value = '30일';
+  }
+  calculateAndSetEndDate();
+
   const insuranceSelect = document.getElementById('newAppInsurance');
   if (insuranceSelect) {
     insuranceSelect.value = '현대해상(SCOR)';
@@ -8405,6 +9565,11 @@ function syncDatePickerValue(textId, val) {
   const textEl = document.getElementById(textId);
   if (textEl && val) {
     textEl.value = val;
+    if (textId === 'newAppDesiredDate' || textId === 'newAppExpectedDays') {
+      calculateAndSetEndDate();
+    } else if (textId === 'newAppEndDate') {
+      onEndDateManualChange();
+    }
   }
 }
 
@@ -8547,9 +9712,86 @@ function onApplicantRelationChange(val) {
   }
 }
 
+function calculateAndSetEndDate() {
+  const startDateStr = (document.getElementById('newAppDesiredDate')?.value || '').trim();
+  const expectedDaysStr = (document.getElementById('newAppExpectedDays')?.value || '').trim();
+  const endDateInput = document.getElementById('newAppEndDate');
+  const endDatePicker = document.getElementById('newAppEndDate_picker');
+
+  if (!endDateInput) return;
+
+  // 사용기간이 미정이거나 퇴원시까지, 장기예상 등 불특정 기간인 경우 종료예정일 값 비우기
+  if (!startDateStr || !expectedDaysStr || expectedDaysStr.includes('미정') || expectedDaysStr.includes('퇴원') || expectedDaysStr.includes('장기')) {
+    endDateInput.value = '';
+    if (endDatePicker) endDatePicker.value = '';
+    return;
+  }
+
+  let days = 0;
+  if (expectedDaysStr.includes('주')) {
+    const m = expectedDaysStr.match(/(\d+)\s*주/);
+    if (m) days = parseInt(m[1], 10) * 7;
+  } else if (expectedDaysStr.includes('개월') || expectedDaysStr.includes('달')) {
+    const m = expectedDaysStr.match(/(\d+)\s*(개월|달)/);
+    if (m) days = parseInt(m[1], 10) * 30;
+  } else {
+    const m = expectedDaysStr.match(/\d+/);
+    if (m) days = parseInt(m[0], 10);
+  }
+
+  if (days > 0) {
+    const cleanStart = startDateStr.replace(/\./g, '-');
+    const parts = cleanStart.split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const startDate = new Date(year, month, day);
+      if (!isNaN(startDate.getTime())) {
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + (days - 1));
+
+        const y = endDate.getFullYear();
+        const m = String(endDate.getMonth() + 1).padStart(2, '0');
+        const d = String(endDate.getDate()).padStart(2, '0');
+        const formatted = `${y}-${m}-${d}`;
+
+        endDateInput.value = formatted;
+        if (endDatePicker) endDatePicker.value = formatted;
+        return;
+      }
+    }
+  }
+
+  // 일수 계산이 불가한 경우에도 값 초기화
+  endDateInput.value = '';
+  if (endDatePicker) endDatePicker.value = '';
+}
+
+function onEndDateManualChange() {
+  const startDateStr = (document.getElementById('newAppDesiredDate')?.value || '').trim();
+  const endDateStr = (document.getElementById('newAppEndDate')?.value || '').trim();
+  const daysInput = document.getElementById('newAppExpectedDays');
+  if (!startDateStr || !endDateStr || !daysInput) return;
+
+  const cleanStart = startDateStr.replace(/\./g, '-');
+  const cleanEnd = endDateStr.replace(/\./g, '-');
+  const dStart = new Date(cleanStart);
+  const dEnd = new Date(cleanEnd);
+
+  if (!isNaN(dStart.getTime()) && !isNaN(dEnd.getTime()) && dEnd >= dStart) {
+    const diffTime = dEnd.getTime() - dStart.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    daysInput.value = `${diffDays}일`;
+  }
+}
+
 function setExpectedDaysValue(val) {
   const input = document.getElementById('newAppExpectedDays');
-  if (input) input.value = val;
+  if (input) {
+    input.value = val;
+    calculateAndSetEndDate();
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -8749,7 +9991,11 @@ function handleNewAppSubmit(e) {
     }
     const fullCombinedAddress = roadAddr ? (roadAddr + (detailAddr ? ' ' + detailAddr : '')) : (detailAddr || '상세주소 미입력');
 
-    // Applicant info
+    // Applicant info & RRN
+    const rrnFront = document.getElementById('newAppRrnFront')?.value?.trim() || '';
+    const rrnBack = document.getElementById('newAppRrnBack')?.value?.trim() || '';
+    const isApplicantSame = document.getElementById('chkApplicantSameAsPatient')?.checked || false;
+
     const applicantName = document.getElementById('newAppApplicantName')?.value?.trim() || name;
     const applicantBirth = document.getElementById('newAppApplicantBirth')?.value?.trim() || birthDate;
     const applicantPhone = document.getElementById('newAppApplicantPhone')?.value?.trim() || phone;
@@ -8760,7 +10006,8 @@ function handleNewAppSubmit(e) {
 
     // Care details
     const applyDate = document.getElementById('newAppApplyDate')?.value || new Date().toISOString().split('T')[0];
-    const accidentDate = document.getElementById('newAppAccidentDate')?.value || '-';
+    const accidentDate = document.getElementById('newAppAccidentDate')?.value?.trim() || applyDate;
+    const careEndDate = document.getElementById('newAppEndDate')?.value?.trim() || '';
     const accidentTypeRadio = document.querySelector('input[name="newAppAccidentTypeRadio"]:checked');
     const accidentType = accidentTypeRadio ? accidentTypeRadio.value : '상해';
     const diagnosis = document.getElementById('newAppDiagnosis')?.value?.trim() || '';
@@ -8826,11 +10073,16 @@ function handleNewAppSubmit(e) {
       careType: careType,
       hospitalName: hospitalName,
       expectedDays: expectedDays,
+      careEndDate: careEndDate,
       status: '접수',
       applicantName: applicantName,
       applicantBirth: applicantBirth,
       applicantPhone: applicantPhone,
       applicantRelation: applicantRelation,
+      isApplicantSame: isApplicantSame,
+      rrnFront: rrnFront,
+      rrnBack: rrnBack,
+      patientRrn: (rrnFront && rrnBack) ? `${rrnFront}-${rrnBack}` : (rrnFront ? `${rrnFront}-*******` : ''),
       docAttached: docAttached,
       mobility: mobility,
       accidentDetail: accidentDetail,
