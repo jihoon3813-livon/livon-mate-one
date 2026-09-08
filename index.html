@@ -32,6 +32,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
   <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=47ea97d95fd01f8ab035bf064a186efb&libraries=services"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     body, button, input, select, textarea {
       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
@@ -3281,17 +3282,24 @@
             <h3 class="text-sm font-bold flex items-center gap-2" id="editorModalTitle">
               양식 필드 시각적 에디터 · <span class="text-amber-300 font-mono" id="editorFormCode">HD_FORM_01</span>
             </h3>
-            <p class="text-[11px] text-slate-300">문서 캔버스에 영역을 설정하면 고유영역 번호가 자동 부여되며, 시스템 데이터를 1:1 매핑할 수 있습니다.</p>
+            <p class="text-[11px] text-slate-300">실제 빈양식(PDF/이미지)을 업로드하여 캔버스에 영역을 설정하면 고유영역 번호가 자동 매핑됩니다.</p>
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button onclick="addNewAreaToForm()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 shadow-xs">
+          <input type="file" id="formTemplateFileInput" accept="image/png,image/jpeg,image/webp,application/pdf" class="hidden" onchange="handleFormTemplateUpload(event)">
+          <button type="button" onclick="document.getElementById('formTemplateFileInput').click()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold flex items-center gap-1 shadow-xs transition-colors cursor-pointer" title="빈 양식 이미지(PNG/JPG) 또는 PDF 업로드">
+            <i data-lucide="upload" class="w-3.5 h-3.5"></i> <span>빈양식 업로드 (PDF/이미지)</span>
+          </button>
+          <button type="button" id="btnRemoveFormBg" onclick="removeFormBackground()" class="hidden px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-rose-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1 shadow-xs transition-colors cursor-pointer" title="업로드된 배경 이미지 제거">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> <span>배경 제거</span>
+          </button>
+          <button type="button" onclick="addNewAreaToForm()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer">
             <i data-lucide="plus" class="w-3.5 h-3.5"></i> 새 입력영역 추가
           </button>
-          <button onclick="saveFormAreas()" class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs">
+          <button type="button" onclick="saveFormAreas()" class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs cursor-pointer">
             설정 저장
           </button>
-          <button onclick="closeModal('formFieldEditorModal')" class="p-1.5 text-slate-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+          <button type="button" onclick="closeModal('formFieldEditorModal')" class="p-1.5 text-slate-400 hover:text-white cursor-pointer"><i data-lucide="x" class="w-4 h-4"></i></button>
         </div>
       </div>
 
@@ -3300,28 +3308,33 @@
         
         <!-- Left: Visual Document Canvas Sheet (A4 Simulation) -->
         <div class="flex-1 overflow-y-auto custom-scrollbar p-6 flex justify-center items-start">
-          <div class="relative w-full max-w-[560px] min-h-[720px] bg-white rounded-xl shadow-lg border border-slate-300 p-6 select-none" id="editorCanvasSheet">
+          <div class="relative w-full max-w-[560px] min-h-[720px] bg-white rounded-xl shadow-lg border border-slate-300 p-6 select-none overflow-hidden" id="editorCanvasSheet">
             
-            <!-- Document Background Template Representation -->
-            <div class="border-b-2 border-slate-900 pb-3 text-center mb-6">
-              <h2 class="text-base font-black text-slate-900" id="editorSheetTitle">간병인지원 서비스 신청서 (1차 접수용)</h2>
-              <div class="text-[10px] text-slate-400 mt-0.5">현대해상화재보험 귀중 · 리본케어 공식 서식</div>
-            </div>
+            <!-- Uploaded Background Image Layer (PDF rendered to image or direct image) -->
+            <img id="editorBgImage" class="absolute inset-0 w-full h-full object-contain pointer-events-none hidden z-0 bg-white" alt="빈양식 서식 배경">
 
-            <div class="space-y-4 text-[11px] text-slate-400 opacity-60 pointer-events-none">
-              <div class="p-3 border rounded-lg space-y-2 bg-slate-50">
-                <div class="h-4 bg-slate-200 rounded w-1/3"></div>
-                <div class="h-4 bg-slate-200 rounded w-2/3"></div>
-                <div class="h-4 bg-slate-200 rounded w-1/2"></div>
+            <!-- Document Background Template Representation (Shown when no custom bg) -->
+            <div id="editorDefaultMockLayer" class="relative z-0">
+              <div class="border-b-2 border-slate-900 pb-3 text-center mb-6">
+                <h2 class="text-base font-black text-slate-900" id="editorSheetTitle">간병인지원 서비스 신청서 (1차 접수용)</h2>
+                <div class="text-[10px] text-slate-400 mt-0.5">현대해상화재보험 귀중 · 리본케어 공식 서식</div>
               </div>
-              <div class="p-3 border rounded-lg space-y-2 bg-slate-50">
-                <div class="h-16 bg-slate-200 rounded w-full"></div>
+
+              <div class="space-y-4 text-[11px] text-slate-400 opacity-60 pointer-events-none">
+                <div class="p-3 border rounded-lg space-y-2 bg-slate-50">
+                  <div class="h-4 bg-slate-200 rounded w-1/3"></div>
+                  <div class="h-4 bg-slate-200 rounded w-2/3"></div>
+                  <div class="h-4 bg-slate-200 rounded w-1/2"></div>
+                </div>
+                <div class="p-3 border rounded-lg space-y-2 bg-slate-50">
+                  <div class="h-16 bg-slate-200 rounded w-full"></div>
+                </div>
+                <div class="h-8 bg-slate-200 rounded w-1/4 ml-auto"></div>
               </div>
-              <div class="h-8 bg-slate-200 rounded w-1/4 ml-auto"></div>
             </div>
 
             <!-- Visual Draggable/Clickable Field Area Overlays Injected dynamically -->
-            <div id="editorOverlaysContainer" class="absolute inset-0 p-6 pointer-events-auto">
+            <div id="editorOverlaysContainer" class="absolute inset-0 p-6 pointer-events-auto z-10">
             </div>
 
           </div>

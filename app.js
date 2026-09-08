@@ -1016,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 
 // Default mapping areas for templates
-const gFormAreaStore = {
+var gFormAreaStore = {
   HD_FORM_01: [
     { id: 'AREA-01', label: '피보험자(고객명)', mapping: 'patientName', x: 28, y: 15, w: 22, h: 4 },
     { id: 'AREA-02', label: '생년월일', mapping: 'birthDate', x: 74, y: 15, w: 22, h: 4 },
@@ -1039,18 +1039,113 @@ const gFormAreaStore = {
   ]
 };
 
-gCurrentEditingFormCode = 'HD_FORM_01';
+// Load custom areas from localStorage
+try {
+  const savedAreas = localStorage.getItem('LIVON_FORM_AREAS');
+  if (savedAreas) {
+    const parsed = JSON.parse(savedAreas);
+    gFormAreaStore = { ...gFormAreaStore, ...parsed };
+  }
+} catch (e) {}
+
+// Background image store (supports PNG, JPG, WebP, and PDF rendered to image)
+var gFormBackgroundStore = {};
+try {
+  const savedBg = localStorage.getItem('LIVON_FORM_BACKGROUNDS');
+  if (savedBg) gFormBackgroundStore = JSON.parse(savedBg);
+} catch (e) {}
+
+var gCurrentEditingFormCode = 'HD_FORM_01';
+var gDraggingAreaId = null;
 
 function openFormEditor(formCode) {
   gCurrentEditingFormCode = formCode;
   const form = gFormTemplates.find(f => f.code === formCode) || { name: formCode, code: formCode };
 
-  document.getElementById('editorFormCode').innerText = form.code;
-  document.getElementById('editorSheetTitle').innerText = form.name;
+  const codeEl = document.getElementById('editorFormCode');
+  const titleEl = document.getElementById('editorSheetTitle');
+  if (codeEl) codeEl.innerText = form.code;
+  if (titleEl) titleEl.innerText = form.name;
 
   renderEditorCanvasAndList();
   openModal('formFieldEditorModal');
   initIcons();
+}
+
+async function handleFormTemplateUpload(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+  if (isPdf) {
+    try {
+      if (typeof pdfjsLib === 'undefined') {
+        alert('PDF 변환 엔진을 준비하는 중입니다. 1~2초 후 다시 시도해주세요.');
+        return;
+      }
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+      const arrayBuffer = await file.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      const page = await pdf.getPage(1);
+
+      // 2.0x 고해상도 렌더링
+      const viewport = page.getViewport({ scale: 2.0 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      const dataUrl = canvas.toDataURL('image/png', 0.95);
+
+      saveFormBackgroundData(dataUrl, file.name);
+    } catch (err) {
+      console.error('PDF 변환 오류:', err);
+      alert('PDF 변환 중 오류가 발생했습니다: ' + err.message);
+    }
+  } else {
+    // 이미지 파일 (PNG, JPG, WebP 등)
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      saveFormBackgroundData(evt.target.result, file.name);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  e.target.value = '';
+}
+
+function saveFormBackgroundData(dataUrl, fileName) {
+  gFormBackgroundStore[gCurrentEditingFormCode] = dataUrl;
+  try {
+    localStorage.setItem('LIVON_FORM_BACKGROUNDS', JSON.stringify(gFormBackgroundStore));
+  } catch (e) {
+    console.warn('배경 이미지 저장 경고:', e);
+  }
+  renderEditorCanvasAndList();
+  if (typeof showCustomAlert === 'function') {
+    showCustomAlert({
+      title: '빈양식 배경 적용 완료',
+      message: `[${fileName}] 서식이 캔버스 배경으로 등록되었습니다.\n영역 박스를 마우스로 드래그하여 서식 칸에 맞춰 배치할 수 있습니다.`,
+      icon: 'file-check',
+      iconColor: 'emerald'
+    });
+  } else {
+    alert(`[${fileName}] 서식이 캔버스 배경으로 설정되었습니다.`);
+  }
+}
+
+function removeFormBackground() {
+  if (confirm('현재 양식의 업로드된 배경 이미지를 삭제하고 기본 서식으로 되돌리시겠습니까?')) {
+    delete gFormBackgroundStore[gCurrentEditingFormCode];
+    try {
+      localStorage.setItem('LIVON_FORM_BACKGROUNDS', JSON.stringify(gFormBackgroundStore));
+    } catch (e) {}
+    renderEditorCanvasAndList();
+  }
 }
 
 function renderEditorCanvasAndList() {
@@ -1058,17 +1153,40 @@ function renderEditorCanvasAndList() {
   const overlayContainer = document.getElementById('editorOverlaysContainer');
   const cardsList = document.getElementById('editorAreaCardsList');
   const countBadge = document.getElementById('editorAreaCountBadge');
+  const bgImg = document.getElementById('editorBgImage');
+  const defaultMock = document.getElementById('editorDefaultMockLayer');
+  const btnRemoveBg = document.getElementById('btnRemoveFormBg');
+
+  const customBg = gFormBackgroundStore && gFormBackgroundStore[gCurrentEditingFormCode];
+  if (customBg) {
+    if (bgImg) {
+      bgImg.src = customBg;
+      bgImg.classList.remove('hidden');
+    }
+    if (defaultMock) defaultMock.classList.add('hidden');
+    if (btnRemoveBg) btnRemoveBg.classList.remove('hidden');
+  } else {
+    if (bgImg) {
+      bgImg.src = '';
+      bgImg.classList.add('hidden');
+    }
+    if (defaultMock) defaultMock.classList.remove('hidden');
+    if (btnRemoveBg) btnRemoveBg.classList.add('hidden');
+  }
 
   if (countBadge) countBadge.innerText = areas.length + '개 영역';
 
-  // 1. Render Overlays on Canvas
+  // 1. Render Overlays on Canvas with Drag-and-Drop
   if (overlayContainer) {
     overlayContainer.innerHTML = areas.map(area => `
-      <div class="absolute border-2 border-primary-500 bg-primary-500/15 rounded-lg flex items-center justify-between px-2 py-0.5 text-[10px] font-bold text-primary-900 shadow-2xs hover:bg-primary-500/25 transition-all cursor-pointer"
-           style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%;"
-           title="${area.id}: ${area.label}">
-        <span class="font-mono bg-primary-700 text-white px-1 rounded text-[9px]">${area.id}</span>
-        <span class="truncate ml-1 text-primary-900 font-extrabold">${area.label}</span>
+      <div id="overlay-${area.id}"
+           class="absolute border-2 border-primary-600 bg-primary-500/20 hover:bg-primary-500/35 rounded-lg flex items-center justify-between px-2 py-0.5 text-[10px] font-black text-primary-950 shadow-sm transition-shadow cursor-move select-none"
+           style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; z-index: 20;"
+           onmousedown="startDragArea(event, '${area.id}')"
+           title="[마우스로 드래그하여 이동] ${area.id}: ${area.label}">
+        <span class="font-mono bg-primary-700 text-white px-1.5 py-0.2 rounded text-[9px] font-black">${area.id}</span>
+        <span class="truncate ml-1.5 text-primary-950 font-black">${area.label}</span>
+        <i data-lucide="move" class="w-3 h-3 text-primary-700 opacity-70 ml-1"></i>
       </div>
     `).join('');
   }
@@ -1079,9 +1197,12 @@ function renderEditorCanvasAndList() {
       <div class="p-3 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2">
         <div class="flex items-center justify-between">
           <span class="font-mono font-black text-xs text-primary-700 bg-primary-50 px-2 py-0.5 rounded border border-primary-200">${area.id}</span>
-          <button onclick="removeAreaFromForm('${area.id}')" class="text-slate-400 hover:text-rose-600 p-1">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-          </button>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-slate-400 font-mono">X:${Math.round(area.x)}% Y:${Math.round(area.y)}%</span>
+            <button onclick="removeAreaFromForm('${area.id}')" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer" title="영역 삭제">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
         </div>
 
         <div>
@@ -1111,6 +1232,59 @@ function renderEditorCanvasAndList() {
   }
 }
 
+function startDragArea(e, areaId) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  gDraggingAreaId = areaId;
+  const sheet = document.getElementById('editorCanvasSheet');
+  if (!sheet) return;
+
+  const rect = sheet.getBoundingClientRect();
+  const list = gFormAreaStore[gCurrentEditingFormCode] || [];
+  const area = list.find(a => a.id === areaId);
+  if (!area) return;
+
+  const startClientX = e.clientX;
+  const startClientY = e.clientY;
+  const startLeft = area.x;
+  const startTop = area.y;
+
+  const onMouseMove = (moveEvent) => {
+    if (!gDraggingAreaId) return;
+    const deltaX = moveEvent.clientX - startClientX;
+    const deltaY = moveEvent.clientY - startClientY;
+
+    const deltaPercentX = (deltaX / rect.width) * 100;
+    const deltaPercentY = (deltaY / rect.height) * 100;
+
+    let newX = Math.round((startLeft + deltaPercentX) * 10) / 10;
+    let newY = Math.round((startTop + deltaPercentY) * 10) / 10;
+
+    newX = Math.max(0, Math.min(100 - (area.w || 20), newX));
+    newY = Math.max(0, Math.min(100 - (area.h || 4), newY));
+
+    area.x = newX;
+    area.y = newY;
+
+    const el = document.getElementById(`overlay-${area.id}`);
+    if (el) {
+      el.style.left = newX + '%';
+      el.style.top = newY + '%';
+    }
+  };
+
+  const onMouseUp = () => {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    gDraggingAreaId = null;
+    renderEditorCanvasAndList();
+  };
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+}
+
 function addNewAreaToForm() {
   if (!gFormAreaStore[gCurrentEditingFormCode]) {
     gFormAreaStore[gCurrentEditingFormCode] = [];
@@ -1124,8 +1298,8 @@ function addNewAreaToForm() {
     label: '신규 영역 ' + nextNum,
     mapping: 'custom',
     x: 25,
-    y: Math.min(30 + list.length * 6, 80),
-    w: 30,
+    y: Math.min(25 + list.length * 5, 80),
+    w: 26,
     h: 4
   });
 
@@ -1149,7 +1323,10 @@ function removeAreaFromForm(areaId) {
 }
 
 function saveFormAreas() {
-  alert('💾 [' + gCurrentEditingFormCode + '] 양식의 고유영역 번호 및 데이터 매핑 설정이 안전하게 저장되었습니다!');
+  try {
+    localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
+  } catch (e) {}
+  alert('💾 [' + gCurrentEditingFormCode + '] 양식의 서식 배경 및 데이터 매핑 설정이 안전하게 저장되었습니다!');
   closeModal('formFieldEditorModal');
 }
 
