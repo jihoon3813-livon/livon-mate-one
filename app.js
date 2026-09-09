@@ -7693,6 +7693,7 @@ async function executeSendFaxModal() {
 
     let resultLog = null;
 
+    let sendErrorMsg = '';
     try {
       const res = await fetch('/api/fax/send', {
         method: 'POST',
@@ -7702,15 +7703,19 @@ async function executeSendFaxModal() {
       const data = await res.json();
       if (data && data.success && data.log) {
         resultLog = data.log;
+      } else if (data && !data.success) {
+        sendErrorMsg = data.error || '발송 실패';
       }
     } catch (apiErr) {
       console.warn('[FAX API Local Route Fallback]', apiErr);
+      sendErrorMsg = apiErr.message || '네트워크 연결 오류';
     }
 
     // Fallback if local API is unreachable (e.g. static preview)
     if (!resultLog) {
       const now = new Date();
       const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      const isFailed = Boolean(sendErrorMsg);
       resultLog = {
         id: 'FLOG-' + Date.now().toString().slice(-6),
         sentDate: dateStr,
@@ -7723,9 +7728,9 @@ async function executeSendFaxModal() {
         recipient: targetRecipient,
         faxNumber: targetNumber,
         pages,
-        status: '성공',
+        status: isFailed ? '실패' : '성공',
         operator: '관리자(원스탑)',
-        resultMsg: savedMode === 'barobill' ? '바로빌 게이트웨이 접수 완료 (200 OK)' : '정상 송신 완료 (200 OK)',
+        resultMsg: isFailed ? `발송 실패 (${sendErrorMsg})` : (savedMode === 'barobill' ? '바로빌 접수 완료' : '정상 송신 완료 (200 OK)'),
         provider: savedMode === 'barobill' ? `Barobill (${savedBaroServer === 'prod' ? '운영' : '테스트'})` : (savedMode === 'aligo' ? 'Aligo Fax API' : 'Smart Sandbox (모의 회선)')
       };
     }
@@ -8048,11 +8053,17 @@ async function refreshBarobillFaxStatuses(isSilent = false) {
         const targetLog = gFaxLogs.find(l => l.id === sendKey);
         if (targetLog) {
           const prevStatus = targetLog.status;
-          targetLog.status = st.status; // '성공' | '실패' | '전송중'
-          targetLog.resultMsg = st.resultMsg || targetLog.resultMsg;
-          if (st.endDT) targetLog.completedDate = st.endDT;
-          if (st.fileUrl) targetLog.baroFileUrl = st.fileUrl;
-          if (prevStatus !== st.status) {
+          if (st && st.success) {
+            targetLog.status = st.status; // '성공' | '실패' | '전송중'
+            targetLog.resultMsg = st.resultMsg || targetLog.resultMsg;
+            if (st.endDT) targetLog.completedDate = st.endDT;
+            if (st.fileUrl) targetLog.baroFileUrl = st.fileUrl;
+          } else {
+            targetLog.status = '실패';
+            targetLog.resultMsg = st?.error || '바로빌 전송내역 없음 (실패)';
+          }
+
+          if (prevStatus !== targetLog.status) {
             updatedCount++;
             // Convex 백업 동기화
             if (typeof syncToConvex === 'function') {
@@ -8123,7 +8134,18 @@ async function checkSingleBarobillStatus(sendKey) {
 
       alert(`📠 [바로빌 전송결과 상세]\n\n접수번호: ${sendKey}\n수신처: ${log.recipient} (${log.faxNumber})\n고객명: ${log.patientName}\n\n상태: ${st.statusLabel || st.status}\n상세내용: ${st.resultMsg}\n전송매수: ${st.successPageCount || 1}/${st.sendPageCount || 1}장\n${st.endDT ? '완료일시: ' + st.endDT : ''}`);
     } else {
-      alert(`⚠️ 바로빌 상태 조회 오류: ${st?.error || '알 수 없는 응답'}`);
+      // 바로빌에서 오류(예: '해당 발송정보가 없습니다')를 반환한 경우, 대장 상태도 '실패'로 갱신
+      log.status = '실패';
+      log.resultMsg = st?.error || '바로빌 전송내역 없음 (실패)';
+      saveFaxLogs();
+      updateFaxKpis();
+      renderFaxLogsTable();
+
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:saveFaxRecord', { record: log }).catch(console.warn);
+      }
+
+      alert(`⚠️ [바로빌 전송 조회 오류]\n\n상태: 전송실패 처리됨\n사유: ${st?.error || '알 수 없는 응답'}\n\n대장의 전송상태가 [전송실패]로 갱신되었습니다.`);
     }
   } catch (err) {
     alert(`조회 중 오류가 발생했습니다: ${err.message}`);
@@ -11718,6 +11740,7 @@ async function finalizeNewAppRegistration(newApp) {
       };
 
       let resultLog = null;
+      let sendErrorMessage = '';
       try {
         const res = await fetch('/api/fax/send', {
           method: 'POST',
@@ -11727,14 +11750,18 @@ async function finalizeNewAppRegistration(newApp) {
         const data = await res.json();
         if (data && data.success && data.log) {
           resultLog = data.log;
+        } else if (data && !data.success) {
+          sendErrorMessage = data.error || '발송 실패';
         }
       } catch (apiErr) {
         console.warn('[FAX API Call Error in newApp]', apiErr);
+        sendErrorMessage = apiErr.message || '네트워크 연결 오류';
       }
 
       if (!resultLog) {
         const now = new Date();
         const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        const isFailed = Boolean(sendErrorMessage);
         resultLog = {
           id: 'FLOG-' + Date.now().toString().slice(-6),
           sentDate: dateStr,
@@ -11747,9 +11774,9 @@ async function finalizeNewAppRegistration(newApp) {
           recipient: targetFaxRecipient,
           faxNumber: dispatchFaxNumber,
           pages: 1,
-          status: '성공',
+          status: isFailed ? '실패' : '성공',
           operator: '접수담당자',
-          resultMsg: savedMode === 'barobill' ? '바로빌 게이트웨이 접수 완료 (200 OK)' : '정상 송신 완료 (200 OK)',
+          resultMsg: isFailed ? `발송 실패 (${sendErrorMessage})` : (savedMode === 'barobill' ? '바로빌 접수 완료' : '정상 송신 완료 (200 OK)'),
           provider: savedMode === 'barobill' ? `Barobill (${savedBaroServer === 'prod' ? '운영' : '테스트'})` : (savedMode === 'aligo' ? 'Aligo Fax API' : 'Smart Sandbox (모의 회선)')
         };
       }
