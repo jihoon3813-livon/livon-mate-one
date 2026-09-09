@@ -7666,6 +7666,8 @@ async function executeSendFaxModal() {
       redirectNote = `\n[안전 테스트 리다이렉트 발송: 원본 수신처(${targetRecipient} ${targetNumber}) 대신 테스트 번호(${testRedirectNumber})로 안전 발송됨]`;
     }
 
+    const formSheetHtml = document.getElementById('formPreviewSheet')?.innerHTML || '';
+
     const payload = {
       appId: app.id,
       patientName: app.patientName,
@@ -7678,6 +7680,7 @@ async function executeSendFaxModal() {
       senderNumber: savedSender,
       memo: memoText + redirectNote,
       pages,
+      formHtml: formSheetHtml,
       operator: '관리자(원스탑)',
       provider: savedMode,
       baroCertKey: savedBaroCertKey,
@@ -11534,6 +11537,8 @@ async function finalizeNewAppRegistration(newApp) {
         redirectNote = `\n[안전 테스트 리다이렉트: 원본(${targetFaxRecipient} ${targetFaxNumber}) 대신 테스트번호(${testRedirectNumber})로 송출됨]`;
       }
 
+      const previewHtml = document.getElementById('formPreviewSheet')?.innerHTML || '';
+
       const faxPayload = {
         appId: newApp.id,
         patientName: newApp.patientName,
@@ -11546,6 +11551,7 @@ async function finalizeNewAppRegistration(newApp) {
         senderNumber: savedSender,
         memo: (newApp.memo || '현대해상 1차 고객등록 및 신청 접수 건 송부') + redirectNote,
         pages: 1,
+        formHtml: previewHtml,
         operator: '접수담당자',
         provider: savedMode,
         baroCertKey: savedBaroCertKey,

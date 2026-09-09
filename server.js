@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
-const { createTestPdfBuffer } = require('./pdf-helper');
+const { createDocumentPdfBuffer, createTestPdfBuffer } = require('./pdf-helper');
 const { uploadToBarobillFTP, callBarobillSoap, getBarobillErrorMessage } = require('./barobill-client');
 
 let PORT = parseInt(process.env.PORT, 10) || 8080;
@@ -252,9 +252,10 @@ function startServer(port) {
                 const ftpHost = isProd ? 'ftp.barobill.co.kr' : 'testftp.barobill.co.kr';
                 const ftpPort = isProd ? 9030 : 9031;
                 const pdfFileName = `LIVON_FAX_${Date.now()}.pdf`;
-                const pdfBuffer = createTestPdfBuffer(`리본케어 팩스 발송 [수신: ${recipient} (${cleanFaxNumber})]`);
+                const htmlContent = payload.formHtml || payload.html || '';
+                const pdfBuffer = await createDocumentPdfBuffer(htmlContent, `리본케어 팩스 발송 [수신: ${recipient} (${cleanFaxNumber})]`);
 
-                console.log(`[FAX Barobill Gateway] FTP 파일 업로드 중... (${ftpHost}:${ftpPort}, 파일: ${pdfFileName})`);
+                console.log(`[FAX Barobill Gateway] FTP 파일 업로드 중... (${ftpHost}:${ftpPort}, 파일: ${pdfFileName}, 크기: ${pdfBuffer.length} bytes)`);
                 await uploadToBarobillFTP(ftpHost, ftpPort, baroId, baroPwd, pdfFileName, pdfBuffer);
                 console.log(`[FAX Barobill Gateway] FTP 업로드 성공! SOAP SendFaxFromFTP 호출 중...`);
 

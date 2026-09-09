@@ -1,16 +1,100 @@
-// Generates a simple, valid 1-page PDF byte buffer without external libraries
-function createTestPdfBuffer(title = 'Livon Care Fax Test') {
+const fs = require('fs');
+const path = require('path');
+const { execFile } = require('child_process');
+
+const EDGE_PATHS = [
+  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
+];
+
+function getEdgeExecutable() {
+  for (const p of EDGE_PATHS) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+// Generates an official, perfectly formatted A4 PDF buffer from HTML content using headless Edge
+async function createDocumentPdfBuffer(htmlContent, fallbackTitle = '리본케어 공식 서식') {
+  const edgeExe = getEdgeExecutable();
+  if (edgeExe && htmlContent) {
+    const tmpDir = path.join(__dirname, '.tmp_fax');
+    if (!fs.existsSync(tmpDir)) {
+      try { fs.mkdirSync(tmpDir, { recursive: true }); } catch (e) {}
+    }
+
+    const filePrefix = 'FAX_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    const tmpHtml = path.join(tmpDir, `${filePrefix}.html`);
+    const tmpPdf = path.join(tmpDir, `${filePrefix}.pdf`);
+
+    const fullHtml = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>리본케어 팩스 서식</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @page { size: A4 portrait; margin: 12mm; }
+    body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background: #fff; color: #0f172a; padding: 0; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #cbd5e1; }
+  </style>
+</head>
+<body>
+  ${htmlContent}
+</body>
+</html>`;
+
+    try {
+      fs.writeFileSync(tmpHtml, fullHtml, 'utf-8');
+      await new Promise((resolve, reject) => {
+        execFile(edgeExe, [
+          '--headless',
+          '--disable-gpu',
+          '--no-pdf-header-footer',
+          `--print-to-pdf=${tmpPdf}`,
+          tmpHtml
+        ], { timeout: 15000 }, (err) => {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+
+      if (fs.existsSync(tmpPdf)) {
+        const pdfBuf = fs.readFileSync(tmpPdf);
+        // Clean up temp files
+        try { fs.unlinkSync(tmpHtml); } catch (e) {}
+        try { fs.unlinkSync(tmpPdf); } catch (e) {}
+        if (pdfBuf && pdfBuf.length > 1000) {
+          return pdfBuf;
+        }
+      }
+    } catch (edgeErr) {
+      console.warn('[PDF Edge Render Error, falling back to basic PDF]', edgeErr.message);
+      try { if (fs.existsSync(tmpHtml)) fs.unlinkSync(tmpHtml); } catch (e) {}
+      try { if (fs.existsSync(tmpPdf)) fs.unlinkSync(tmpPdf); } catch (e) {}
+    }
+  }
+
+  // Fallback: Pure PDF buffer without binary dependencies
+  return createSimplePdfBuffer(fallbackTitle);
+}
+
+function createSimplePdfBuffer(title = 'Livon Care Fax Document') {
+  // Strip non-ASCII or sanitize for pure PDF string
+  const cleanTitle = title.replace(/[^\x20-\x7E]/g, ' ').replace(/\s+/g, ' ').trim() || 'Livon Care Fax Document';
   const content = `BT
 /F1 16 Tf
 50 750 Td
-(${title}) Tj
+(${cleanTitle}) Tj
 /F1 12 Tf
 0 -30 Td
-(Sender: 02-6499-3917 / Livon Care) Tj
+(Sender: 02-6499-3917 / Livon Care Service Center) Tj
 0 -20 Td
 (Date: ${new Date().toISOString()}) Tj
 0 -20 Td
-(This is an official test fax transmission from Livon Care.) Tj
+(Official Fax Document Transmission from Livon Care.) Tj
 ET`;
 
   const streamLength = Buffer.byteLength(content);
@@ -50,4 +134,12 @@ startxref
   return Buffer.from(pdf);
 }
 
-module.exports = { createTestPdfBuffer };
+// Compatibility wrapper
+function createTestPdfBuffer(title = 'Livon Care Fax Test') {
+  return createSimplePdfBuffer(title);
+}
+
+module.exports = {
+  createDocumentPdfBuffer,
+  createTestPdfBuffer
+};
