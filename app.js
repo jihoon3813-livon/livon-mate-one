@@ -2917,6 +2917,54 @@ function renderForms() {
   initIcons();
 }
 
+/**
+ * 입원 병원명 및 병원 주소를 "(병원주소)" 형식으로 결합하여 반환
+ * 예: 강원특별자치도속초의료원 234호 (강원특별자치도 속초시 영랑로 3)
+ */
+function formatHospitalDisplay(app) {
+  if (!app) return '';
+  const rawHospName = (app.hospitalName || '').trim();
+  const room = (app.hospitalRoom || '').trim();
+  let road = (app.hospitalRoadAddress || '').trim();
+
+  // 1. 만약 hospitalRoadAddress가 비어있고 addressDetail에 도로명 주소가 들어있다면 추출
+  if (!road && app.addressDetail) {
+    const detail = app.addressDetail.trim();
+    // addressDetail이 병원명과 완전히 동일하지 않다면 도로명/주소로 판단
+    if (detail !== rawHospName && !rawHospName.includes(detail)) {
+      road = detail;
+    }
+  }
+
+  // 2. KOREA_HOSPITALS_DB에서 병원명으로 도로명 주소 보충 검색 (기존 고객 데이터 또는 수기 입력 대응)
+  if (!road && rawHospName && typeof KOREA_HOSPITALS_DB !== 'undefined') {
+    const cleanName = rawHospName.replace(/[\d호\s-]+/g, '').trim(); // 병동/호수 숫자 제외 순수 병원명
+    const found = KOREA_HOSPITALS_DB.find(h => {
+      const hClean = h.name.replace(/[\s()]+/g, '');
+      return hClean.includes(cleanName) || cleanName.includes(hClean);
+    });
+    if (found && found.roadAddress) {
+      road = found.roadAddress;
+    }
+  }
+
+  // 3. 병원명과 호수 구성
+  let baseDisplay = rawHospName;
+  if (room && !baseDisplay.includes(room)) {
+    baseDisplay = (baseDisplay + ' ' + room).trim();
+  }
+
+  // 4. 병원 주소를 괄호로 감싸서 반환
+  if (road) {
+    // 이미 괄호 주소가 병원명에 포함되어 있지 않은 경우에만 부착
+    if (!baseDisplay.includes(road) && !baseDisplay.includes('(' + road + ')')) {
+      return `${baseDisplay} (${road})`.trim();
+    }
+  }
+
+  return baseDisplay || app.addressDetail || '';
+}
+
 function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
   if (!app) return '';
   switch (mappingKey) {
@@ -2949,9 +2997,9 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
     case 'accidentDate': return (app.accidentDate && app.accidentDate !== '-') ? app.accidentDate : (app.applyDate || todayStr);
     case 'accidentType': return app.accidentType || '질병/상해';
     case 'homeAddress': return app.careType === '자택' ? (app.addressDetail || app.patientAddress || '서울특별시 영등포구 선유동2로 123 (자택)') : '';
-    case 'hospitalAddress': return app.careType !== '자택' ? `${app.hospitalName || ''} ${app.hospitalRoom || app.addressDetail || ''}`.trim() : '';
+    case 'hospitalAddress': return app.careType !== '자택' ? formatHospitalDisplay(app) : '';
     case 'careLocationAddress':
-    case 'addressDetail': return app.careType === '자택' ? (app.addressDetail || app.patientAddress || '자택') : `${app.hospitalName || ''} ${app.addressDetail || ''}`.trim();
+    case 'addressDetail': return app.careType === '자택' ? (app.addressDetail || app.patientAddress || '자택') : formatHospitalDisplay(app);
     case 'desiredDate': return app.desiredDate || app.applyDate || todayStr;
     case 'expectedDays': return app.expectedDays || '30일';
     case 'memo': return app.memo || '';
@@ -3028,7 +3076,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006') {
       const appPhone = isApplicantSame ? app.phone : (app.applicantPhone || '-');
       const appRel = isApplicantSame ? '본인' : (app.applicantRelation || '가족');
       const homeAddr = app.careType === '자택' ? (app.addressDetail || app.patientAddress || '자택 주소 미기재') : '-';
-      const hospAddr = app.careType !== '자택' ? `${app.hospitalName || ''} ${app.addressDetail || ''}`.trim() : '-';
+      const hospAddr = app.careType !== '자택' ? formatHospitalDisplay(app) : '-';
 
       sheet.innerHTML = `
         <div class="p-2 space-y-5 text-slate-900 font-sans leading-relaxed" style="font-family:'Pretendard', -apple-system, sans-serif;">
@@ -3496,6 +3544,7 @@ function previewNewAppDraftFax() {
     careType: isHome ? '자택' : '입원',
     hospitalName: hospName,
     hospitalRoom: hospDetail,
+    hospitalRoadAddress: hospRoad,
     desiredDate: desiredDate,
     expectedDays: document.getElementById('newAppExpectedDays')?.value || '30일',
     applyDate: document.getElementById('newAppApplyDate')?.value?.trim() || new Date().toISOString().split('T')[0].replace(/-/g, '.'),
@@ -11167,7 +11216,9 @@ function handleNewAppSubmit(e) {
       applyDate: applyDate,
       desiredDate: desiredDate,
       careType: careType,
-      hospitalName: hospitalName,
+      hospitalName: !isHome ? (document.getElementById('newAppHospitalName')?.value || '').trim() : '자택 간병',
+      hospitalRoom: !isHome ? (document.getElementById('newAppHospitalDetailAddress')?.value || '').trim() : '',
+      hospitalRoadAddress: !isHome ? (document.getElementById('newAppHospitalRoadAddress')?.value || '').trim() : '',
       expectedDays: expectedDays,
       careEndDate: careEndDate,
       status: '접수',
