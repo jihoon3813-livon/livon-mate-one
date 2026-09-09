@@ -7152,6 +7152,109 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
   `;
 }
 
+function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayouts, sched, faxInfo, isHdWaitingSms) {
+  const badges = [];
+
+  // 1. 간병인 미배정 체크
+  if (!as && app.status !== '서비스 취소') {
+    badges.push(`
+      <span class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-300 font-black text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="접수되었으나 아직 간병인이 배정되지 않았습니다.">
+        <i data-lucide="user-x" class="w-3 h-3 text-rose-600"></i> 간병인 미배정
+      </span>
+    `);
+  }
+
+  // 2. 간병비 미지급 체크 (만료 후 미지급 / 등록된 정산 건 미지급)
+  if (sched.isCaregiverPayoutDue) {
+    const dueWage = sched.unpaidPayoutSum > 0 ? sched.unpaidPayoutSum : (careProg ? careProg.totalDays * (as?.dailyWage || 140000) : 0);
+    badges.push(`
+      <span class="px-2 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10.5px] flex items-center gap-1 shadow-2xs animate-pulse whitespace-nowrap" title="간병 기간이 종료되었으나 간병비가 미지급 상태입니다.">
+        <i data-lucide="alert-triangle" class="w-3 h-3 text-white"></i> 🚨 간병비 미지급${dueWage > 0 ? ` (${formatCurrency(dueWage)}원)` : ''}
+      </span>
+    `);
+  } else if (sched.unpaidPayoutSum > 0) {
+    badges.push(`
+      <span class="px-2 py-0.5 rounded-md bg-rose-500 text-white font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="등록된 간병비 정산 중 미지급 건이 있습니다.">
+        <i data-lucide="alert-circle" class="w-3 h-3 text-white"></i> 🚨 간병비 미지급 (${formatCurrency(sched.unpaidPayoutSum)}원)
+      </span>
+    `);
+  } else if (sched.isAllPayoutsPaid && sched.paidPayoutSum > 0) {
+    badges.push(`
+      <span class="px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-300 font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="간병비 전액 지급 완료">
+        <i data-lucide="check" class="w-3 h-3 text-teal-600"></i> ✓ 간병비 지급완료
+      </span>
+    `);
+  }
+
+  // 3. 청구금 미입금 (보험사/손사 미수금) 체크
+  const unpaidClaimAmt = sched.unconfirmedClaimSum || app.estimatedUnpaid || 0;
+  if (sched.hasUnpaidClaim || unpaidClaimAmt > 0) {
+    badges.push(`
+      <span class="px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="보험사로 청구되었으나 아직 입금 확인이 되지 않은 미수금입니다.">
+        <i data-lucide="clock" class="w-3 h-3 text-white"></i> 🚨 청구금 미입금${unpaidClaimAmt > 0 ? ` (${formatCurrency(unpaidClaimAmt)}원)` : ''}
+      </span>
+    `);
+  } else if (sched.isAllClaimsDeposited && (sched.depositedClaimSum || app.depositConfirmedAmount || 0) > 0) {
+    badges.push(`
+      <span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="청구금 전액 입금 확인 완료">
+        <i data-lucide="check-check" class="w-3 h-3 text-emerald-600"></i> ✓ 청구금 입금완료
+      </span>
+    `);
+  }
+
+  // 4. 청구서 미발행 체크 (간병 시작/종료되었으나 청구서 미작성)
+  if (appClaims.length === 0 && as && careProg && (careProg.elapsedDays > 0 || careProg.status === 'completed')) {
+    badges.push(`
+      <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="간병이 시작되었으나 아직 손사 청구서가 작성되지 않았습니다.">
+        <i data-lucide="file-plus" class="w-3 h-3 text-amber-700"></i> ⚠️ 청구서 미발행
+      </span>
+    `);
+  }
+
+  // 5. 청구팩스 미전송 체크 (청구서는 작성되었으나 손사 팩스 미전송)
+  if (appClaims.length > 0 && faxInfo.status !== '전송완료') {
+    badges.push(`
+      <span class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-purple-300 font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="청구서가 작성되었으나 아직 손사 팩스로 발송되지 않았습니다.">
+        <i data-lucide="send" class="w-3 h-3 text-purple-700"></i> ⚠️ 팩스 미전송
+      </span>
+    `);
+  } else if (appClaims.length > 0 && faxInfo.status === '전송완료') {
+    badges.push(`
+      <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-medium text-[10px] flex items-center gap-1 whitespace-nowrap">
+        <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> 팩스완료
+      </span>
+    `);
+  }
+
+  // 6. 현대해상 문자대기 체크
+  if (isHdWaitingSms) {
+    badges.push(`
+      <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 border border-amber-400 font-black text-[10.5px] flex items-center gap-1 shadow-2xs animate-pulse whitespace-nowrap" title="현대해상 회신 문자(사고번호/증권번호) 등록 대기 중입니다.">
+        <i data-lucide="message-square" class="w-3 h-3 text-amber-700"></i> 📱 현대 문자대기
+      </span>
+    `);
+  }
+
+  // 모든 체크 항목이 완료되었거나 이상 없는 경우
+  if (badges.length === 0) {
+    if (sched.isAllPayoutsPaid && sched.isAllClaimsDeposited) {
+      badges.push(`
+        <span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[10.5px] flex items-center gap-1 whitespace-nowrap">
+          <i data-lucide="check-check" class="w-3 h-3 text-emerald-600"></i> ✓ 주요 업무 완료
+        </span>
+      `);
+    } else {
+      badges.push(`
+        <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 font-medium text-[10.5px] flex items-center gap-1 whitespace-nowrap">
+          <i data-lucide="clock" class="w-3 h-3 text-slate-400"></i> 정상 진행중
+        </span>
+      `);
+    }
+  }
+
+  return badges.join('');
+}
+
 function renderUnifiedCareHub() {
   const container = document.getElementById('hubCustomerCardsList');
   if (!container) return;
@@ -7395,6 +7498,9 @@ function renderUnifiedCareHub() {
     const totalClaimAmt = (sched.depositedClaimSum || app.depositConfirmedAmount) + (sched.unconfirmedClaimSum || app.estimatedUnpaid || 0);
     const isHdWaitingSms = app.insuranceCompany.includes('현대해상') && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'));
 
+    // 담당자가 체크해야 할 주요체크사항 라벨(간병비 미지급, 청구금 미입금, 청구서 미발행, 팩스 미전송 등)
+    const checklistBadgesHtml = getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayouts, sched, faxInfo, isHdWaitingSms);
+
     // [모드 1] 간략히 보기 모드 (전화번호/주소 정보는 배제하고 핵심 이름 및 보험 청구금액 표시)
     if (gHubLayoutStyle === 'compact') {
       let safeCenter = '';
@@ -7437,20 +7543,8 @@ function renderUnifiedCareHub() {
           </div>
 
           <div class="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-            ${sched.isCaregiverPayoutDue ? `
-              <span class="text-[10px] px-2 py-0.5 rounded-full bg-rose-600 text-white font-black flex items-center gap-1 shadow-xs animate-pulse">
-                🚨 간병비지급대상
-              </span>
-            ` : ''}
-            ${sched.hasUnpaidClaim ? `
-              <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500 text-white font-black flex items-center gap-1 shadow-xs">
-                🚨 입금미완료
-              </span>
-            ` : ''}
+            ${checklistBadgesHtml}
             ${isHdWaitingSms ? `
-              <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-black flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> 문자수신대기
-              </span>
               <button type="button" onclick="event.stopPropagation(); openHyundaiSmsInputModal('${app.id}')" 
                 class="px-2.5 py-1 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-xs flex items-center gap-1 transition-all" title="현대해상 회신 문자 붙여넣기 및 2차 정보 자동 완성">
                 <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
@@ -7493,22 +7587,26 @@ function renderUnifiedCareHub() {
 
           <div class="flex items-center gap-1.5 flex-wrap justify-end">
             ${sched.isCaregiverPayoutDue ? `
-              <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-rose-600 text-white font-black flex items-center gap-1 shadow-xs animate-pulse whitespace-nowrap" title="간병 기간이 종료되었으나 간병비가 미지급 상태입니다.">
-                <i data-lucide="alert-triangle" class="w-3 h-3"></i> 🚨 간병비 지급대상
+              <span class="text-[10.5px] px-2.5 py-0.5 rounded-full bg-rose-600 text-white font-black flex items-center gap-1 shadow-xs animate-pulse whitespace-nowrap" title="간병 기간이 종료되었으나 간병비가 미지급 상태입니다.">
+                <i data-lucide="alert-triangle" class="w-3 h-3"></i> 🚨 간병비 미지급
+              </span>
+            ` : (sched.unpaidPayoutSum > 0 ? `
+              <span class="text-[10.5px] px-2 py-0.5 rounded-full bg-rose-500 text-white font-bold flex items-center gap-1 shadow-xs whitespace-nowrap" title="등록된 간병비 정산 중 미지급 건이 있습니다.">
+                <i data-lucide="alert-circle" class="w-3 h-3"></i> 간병비 미지급
               </span>
             ` : (sched.isAllPayoutsPaid ? `
-              <span class="text-[10.5px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold flex items-center gap-1 whitespace-nowrap">
-                <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> ✓ 간병비 지급완료
+              <span class="text-[10.5px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-300 font-bold flex items-center gap-1 whitespace-nowrap">
+                <i data-lucide="check" class="w-3 h-3 text-teal-600"></i> ✓ 간병비 지급완료
               </span>
-            ` : '')}
+            ` : ''))}
 
-            ${sched.hasUnpaidClaim ? `
-              <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-500 text-white font-black flex items-center gap-1 shadow-xs whitespace-nowrap" title="보험사로 청구되었으나 입금 확인이 되지 않은 미수금이 있습니다.">
-                <i data-lucide="clock" class="w-3 h-3"></i> 🚨 입금 미완료 (미수)
+            ${(sched.hasUnpaidClaim || (sched.unconfirmedClaimSum || app.estimatedUnpaid || 0) > 0) ? `
+              <span class="text-[10.5px] px-2.5 py-0.5 rounded-full bg-amber-500 text-white font-black flex items-center gap-1 shadow-xs whitespace-nowrap" title="보험사로 청구되었으나 입금 확인이 되지 않은 미수금이 있습니다.">
+                <i data-lucide="clock" class="w-3 h-3"></i> 🚨 청구금 미입금
               </span>
-            ` : (sched.isAllClaimsDeposited ? `
-              <span class="text-[10.5px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold flex items-center gap-1 whitespace-nowrap">
-                <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> ✓ 전액 입금완료
+            ` : (sched.isAllClaimsDeposited && (sched.depositedClaimSum || app.depositConfirmedAmount || 0) > 0 ? `
+              <span class="text-[10.5px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold flex items-center gap-1 whitespace-nowrap">
+                <i data-lucide="check-check" class="w-3 h-3 text-emerald-600"></i> ✓ 청구금 입금완료
               </span>
             ` : '')}
 
@@ -7532,6 +7630,21 @@ function renderUnifiedCareHub() {
               </span>
             `)}
           </div>
+        </div>
+
+        <!-- [주요 체크사항 라벨 바] 담당자가 체크해야 할 핵심 항목(간병비 미지급, 청구금 미입금 등)을 라벨로 노출 -->
+        <div class="px-4 py-2 bg-gradient-to-r from-slate-50 via-slate-50 to-amber-50/40 border-b border-slate-200/80 flex items-center justify-between gap-2 flex-wrap text-xs">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-[11px] font-extrabold text-slate-700 flex items-center gap-1 mr-0.5">
+              <i data-lucide="check-square" class="w-3.5 h-3.5 text-primary-600"></i> 주요체크:
+            </span>
+            ${checklistBadgesHtml}
+          </div>
+          ${as && as.startDate ? `
+            <span class="text-[10.5px] text-slate-500 font-mono hidden sm:inline-block">
+              근무: ${as.startDate.slice(5)} ~ ${(as.endDate || '').slice(5)} (${careProg ? careProg.totalDays : 0}일)
+            </span>
+          ` : ''}
         </div>
 
         <!-- [간략 3단 카드] 차분하고 은은한 글자/배경 톤으로 정신없는 느낌 완전 정돈 -->
