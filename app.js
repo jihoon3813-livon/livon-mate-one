@@ -9995,6 +9995,9 @@ function openNewAppModal() {
   }
 
   openModal('newAppModal');
+  if (form) {
+    form.scrollTop = 0;
+  }
   initIcons(modal);
 }
 
@@ -11082,6 +11085,17 @@ function openModal(modalId) {
     el.style.removeProperty('display');
   }
   el.style.display = 'flex';
+
+  // 모달 열 때 스크롤 위치를 맨 위로 자동 리셋
+  try {
+    el.scrollTop = 0;
+    const scrollableChildren = el.querySelectorAll('.overflow-y-auto, .overflow-auto, form, .custom-scrollbar');
+    scrollableChildren.forEach(child => {
+      child.scrollTop = 0;
+    });
+  } catch (e) {
+    console.warn('Modal scroll reset error:', e);
+  }
 
   // 글자 크기 설정이 상세팝업 및 모든 모달에 즉시 동기화 적용
   if (typeof gHubFontSize !== 'undefined' && typeof FONT_SIZE_LEVELS !== 'undefined') {
