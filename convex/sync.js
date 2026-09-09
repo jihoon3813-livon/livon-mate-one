@@ -5,7 +5,7 @@ import { v } from "convex/values";
 export const bundleAll = query({
   args: {},
   handler: async (ctx) => {
-    const [applications, assignments, claims, payouts, adjusters, careLogs, formConfigs] = await Promise.all([
+    const [applications, assignments, claims, payouts, adjusters, careLogs, formConfigs, faxRecords] = await Promise.all([
       ctx.db.query("applications").order("desc").collect(),
       ctx.db.query("assignments").collect(),
       ctx.db.query("claims").collect(),
@@ -13,8 +13,9 @@ export const bundleAll = query({
       ctx.db.query("adjusters").collect(),
       ctx.db.query("careLogs").collect(),
       ctx.db.query("formConfigs").collect(),
+      ctx.db.query("faxRecords").order("desc").collect(),
     ]);
-    return { applications, assignments, claims, payouts, adjusters, careLogs, formConfigs };
+    return { applications, assignments, claims, payouts, adjusters, careLogs, formConfigs, faxRecords };
   },
 });
 
@@ -228,6 +229,44 @@ export const getFormConfigs = query({
   args: {},
   handler: async (ctx) => {
     return await ctx.db.query("formConfigs").collect();
+  },
+});
+
+// 12. 팩스 발송 기록 저장 (Upsert by id)
+export const saveFaxRecord = mutation({
+  args: {
+    record: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { _id, _creationTime, ...doc } = args.record;
+    if (doc.id) {
+      const existing = await ctx.db
+        .query("faxRecords")
+        .filter((q) => q.eq(q.field("id"), doc.id))
+        .first();
+      if (existing) {
+        await ctx.db.patch(existing._id, doc);
+        return existing._id;
+      }
+    }
+    return await ctx.db.insert("faxRecords", doc);
+  },
+});
+
+// 13. 팩스 발송 기록 삭제
+export const deleteFaxRecord = mutation({
+  args: {
+    recordId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const records = await ctx.db
+      .query("faxRecords")
+      .filter((q) => q.eq(q.field("id"), args.recordId))
+      .collect();
+    for (const r of records) {
+      await ctx.db.delete(r._id);
+    }
+    return { deletedRecordId: args.recordId, count: records.length };
   },
 });
 

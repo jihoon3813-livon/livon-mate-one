@@ -1291,6 +1291,10 @@
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
+            <button onclick="openFaxSettingsModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold cursor-pointer" title="팩스 공급자(알리고/팝빌/샌드박스) 및 발신번호 설정">
+              <i data-lucide="settings-2" class="w-4 h-4 text-purple-600"></i>
+              <span>팩스 연동 설정</span>
+            </button>
             <button onclick="openFaxDirectoryModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold shadow-xs transition-all cursor-pointer">
               <i data-lucide="book-plus" class="w-4 h-4 text-purple-300"></i>
               <span>손사 팩스번호 등록</span>
@@ -3102,6 +3106,74 @@
   </div>
 
   
+  <!-- 5.9 Fax Engine Settings Modal -->
+  <div id="faxSettingsModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200">
+      <div class="p-5 bg-gradient-to-r from-slate-900 to-purple-950 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
+            <i data-lucide="settings-2" class="w-5 h-5 text-purple-300"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black">팩스(FAX) 연동 엔진 설정</h3>
+            <p class="text-xs text-purple-200 mt-0.5">전자 팩스 발송 공급자 및 발신번호 설정</p>
+          </div>
+        </div>
+        <button onclick="closeModal('faxSettingsModal')" class="p-2 text-purple-300 hover:text-white rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 text-xs">
+        <div>
+          <label class="block font-bold text-slate-800 mb-1.5">팩스 발송 엔진 모드 선택 *</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer flex items-center gap-2 hover:bg-purple-50 hover:border-purple-300 transition-all">
+              <input type="radio" name="faxEngineMode" value="sandbox" checked class="w-4 h-4 text-purple-600">
+              <div>
+                <b class="text-slate-900 block">스마트 샌드박스</b>
+                <span class="text-[10px] text-slate-500">모의 회선 및 테스트 발송</span>
+              </div>
+            </label>
+            <label class="p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer flex items-center gap-2 hover:bg-purple-50 hover:border-purple-300 transition-all">
+              <input type="radio" name="faxEngineMode" value="aligo" class="w-4 h-4 text-purple-600">
+              <div>
+                <b class="text-slate-900 block">알리고 (Aligo)</b>
+                <span class="text-[10px] text-slate-500">실무 팩스 송출 REST API</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-800 mb-1.5">리본케어 공식 발신 팩스번호 *</label>
+          <input type="text" id="faxSettingSenderNumber" placeholder="예: 02-556-9114" value="02-556-9114" class="w-full p-2.5 border border-slate-300 rounded-xl font-mono text-slate-900 bg-white focus:ring-2 focus:ring-purple-500">
+          <p class="text-[10px] text-slate-400 mt-1">통신사에 사전 등록된 (주)리본케어 공인 발신번호입니다.</p>
+        </div>
+
+        <div id="aligoConfigSection" class="p-3.5 bg-purple-50/60 rounded-2xl border border-purple-200 space-y-2.5">
+          <div class="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
+            <i data-lucide="key" class="w-3.5 h-3.5 text-purple-600"></i>
+            <span>알리고(Aligo) API 인증 정보 (선택)</span>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">알리고 User ID</label>
+            <input type="text" id="faxSettingAligoUser" placeholder="알리고 아이디 입력" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 mb-1">알리고 REST API Key</label>
+            <input type="password" id="faxSettingAligoKey" placeholder="발급받은 API 키 입력" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white">
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button type="button" onclick="closeModal('faxSettingsModal')" class="px-4 py-2 border rounded-xl font-bold bg-white text-slate-700 hover:bg-slate-100 text-xs">취소</button>
+        <button type="button" onclick="saveFaxSettings()" class="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow-sm">설정 저장</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 6. Insurance Fax Dispatch Modal -->
   <div id="faxDispatchModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden border border-slate-200">

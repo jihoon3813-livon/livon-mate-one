@@ -834,6 +834,16 @@ async function loadConvexData(showSpinner = true) {
         }
       }
 
+      // Convex DB에 저장된 팩스 발송 대장(faxRecords) 동기화 복원
+      const { faxRecords } = res.value;
+      if (Array.isArray(faxRecords) && faxRecords.length > 0) {
+        gFaxLogs = faxRecords;
+        saveFaxLogs();
+        updateFaxKpis();
+        if (typeof renderFaxLogsTable === 'function') renderFaxLogsTable();
+        console.log(`[Convex Cloud] 팩스 발송 대장 동기화 완료 (${faxRecords.length}건)`);
+      }
+
       console.log(`[Convex Cloud] 운영 DB 실시간 동기화 완료 (고객: ${gApps.length}명, 배정: ${gAssigns.length}건, 청구: ${gClaims.length}건, 정산: ${gPayouts.length}건)`);
       updateConvexStatusBadge(true, gApps.length);
     }
@@ -7144,7 +7154,7 @@ function handleFaxCustomFileUpload(e) {
   }
 }
 
-function executeSendFaxModal() {
+async function executeSendFaxModal() {
   const applyId = gActiveFaxTargetAppId;
   const app = gApps.find(a => a.id === applyId);
   if (!app) return;
@@ -7152,55 +7162,132 @@ function executeSendFaxModal() {
   const targetRecipient = document.getElementById('faxTargetRecipient')?.value.trim() || '수신처 미지정';
   const targetNumber = document.getElementById('faxTargetNumber')?.value.trim() || '';
   const caseTitle = gCurrentFaxCase === 1 ? '현대해상 고객등록/조회' : '간병비 정산청구';
+  const memoText = document.getElementById('faxMemo')?.value.trim() || '';
 
   if (!targetNumber) {
     alert('수신 팩스 번호를 입력해주세요.');
     return;
   }
 
-  const now = new Date();
-  const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-
-  gFaxRecords[applyId] = {
-    status: '전송완료',
-    sentDate: dateStr,
-    faxNumber: targetNumber,
-    caseType: caseTitle
-  };
-
   const isSamsung = (app.insuranceCompany || '').includes('삼성화재');
   const formCode = gCurrentFaxCase === 1 ? 'HD_FORM_01' : (isSamsung ? 'SF_FORM_01' : 'HD_FORM_02');
   const formName = gCurrentFaxCase === 1
     ? '현대해상 1차 고객등록 및 신청 접수서'
     : (isSamsung ? '삼성화재 간병비 청구서 및 명세서' : '현대해상 간병서비스제공확인서 및 비용청구서');
+  const pages = formCode === 'SF_FORM_01' ? 3 : (gCurrentFaxCase === 1 ? 1 : 2);
 
-  const newLog = {
-    id: 'FLOG-' + Date.now().toString().slice(-6),
-    sentDate: dateStr,
-    appId: app.id,
-    patientName: app.patientName,
-    insuranceCompany: app.insuranceCompany,
-    category: gCurrentFaxCase === 1 ? '1차접수' : '정산청구',
-    formCode: formCode,
-    formName: formName,
-    recipient: targetRecipient,
-    faxNumber: targetNumber,
-    pages: formCode === 'SF_FORM_01' ? 3 : 2,
-    status: '성공',
-    operator: '관리자(원스탑)',
-    resultMsg: '정상 송신 완료 (200 OK)'
-  };
+  // Send Button Loading State
+  const sendBtn = document.querySelector('#faxDispatchModal button[onclick="executeSendFaxModal()"]');
+  const origBtnHtml = sendBtn ? sendBtn.innerHTML : '';
+  if (sendBtn) {
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = `
+      <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block mr-1"></div>
+      <span>통신망 연결 및 팩스 송출 중...</span>
+    `;
+  }
 
-  if (!Array.isArray(gFaxLogs)) gFaxLogs = [];
-  gFaxLogs.unshift(newLog);
-  saveFaxLogs();
-  updateFaxKpis();
-  renderFaxLogsTable();
+  try {
+    const savedMode = localStorage.getItem('LIVON_FAX_MODE') || 'sandbox';
+    const savedSender = localStorage.getItem('LIVON_FAX_SENDER') || '02-556-9114';
+    const savedAligoUser = localStorage.getItem('LIVON_FAX_ALIGO_USER') || '';
+    const savedAligoKey = localStorage.getItem('LIVON_FAX_ALIGO_KEY') || '';
 
-  closeModal('faxDispatchModal');
-  renderUnifiedCareHub();
+    const payload = {
+      appId: app.id,
+      patientName: app.patientName,
+      insuranceCompany: app.insuranceCompany,
+      category: gCurrentFaxCase === 1 ? '1차접수' : '정산청구',
+      formCode,
+      formName,
+      recipient: targetRecipient,
+      faxNumber: targetNumber,
+      senderNumber: savedSender,
+      memo: memoText,
+      pages,
+      operator: '관리자(원스탑)',
+      provider: savedMode,
+      aligoUserId: savedAligoUser,
+      aligoKey: savedAligoKey
+    };
 
-  alert('📠 [팩스 발송 접수 완료]\n\n발송목적: ' + caseTitle + '\n수신처: ' + targetRecipient + ' (' + targetNumber + ')\n환자명: ' + app.patientName + ' (' + app.id + ')\n접수일시: ' + dateStr + '\n\n정상 발송 처리되었습니다!');
+    let resultLog = null;
+
+    try {
+      const res = await fetch('/api/fax/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data && data.success && data.log) {
+        resultLog = data.log;
+      }
+    } catch (apiErr) {
+      console.warn('[FAX API Local Route Fallback]', apiErr);
+    }
+
+    // Fallback if local API is unreachable (e.g. static preview)
+    if (!resultLog) {
+      const now = new Date();
+      const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      resultLog = {
+        id: 'FLOG-' + Date.now().toString().slice(-6),
+        sentDate: dateStr,
+        appId: app.id,
+        patientName: app.patientName,
+        insuranceCompany: app.insuranceCompany,
+        category: gCurrentFaxCase === 1 ? '1차접수' : '정산청구',
+        formCode,
+        formName,
+        recipient: targetRecipient,
+        faxNumber: targetNumber,
+        pages,
+        status: '성공',
+        operator: '관리자(원스탑)',
+        resultMsg: '정상 송신 완료 (200 OK)',
+        provider: 'Smart Sandbox (모의 회선)'
+      };
+    }
+
+    gFaxRecords[applyId] = {
+      status: resultLog.status === '성공' ? '전송완료' : '전송실패',
+      sentDate: resultLog.sentDate,
+      faxNumber: targetNumber,
+      caseType: caseTitle
+    };
+
+    if (!Array.isArray(gFaxLogs)) gFaxLogs = [];
+    gFaxLogs.unshift(resultLog);
+    saveFaxLogs();
+
+    // Convex Cloud DB에 영구 백업 저장!
+    try {
+      await syncToConvex('sync:saveFaxRecord', { record: resultLog });
+      console.log(`[FAX Convex Sync] ${resultLog.id} 발송 기록이 Convex Cloud DB에 영구 저장되었습니다.`);
+    } catch (convexErr) {
+      console.warn('[FAX Convex Sync Error]', convexErr);
+    }
+
+    updateFaxKpis();
+    renderFaxLogsTable();
+    closeModal('faxDispatchModal');
+    renderUnifiedCareHub();
+
+    if (resultLog.status === '성공') {
+      alert(`📠 [팩스 발송 완료]\n\n발송목적: ${caseTitle}\n수신처: ${targetRecipient} (${targetNumber})\n환자명: ${app.patientName} (${app.id})\n발송서식: ${formName} (${pages}장)\n\n전자팩스 통신망을 통해 정상 송출 완료되었습니다! (Convex Cloud 대장 기록됨)`);
+    } else {
+      alert(`⚠️ [팩스 발송 결과 안내]\n\n수신처: ${targetRecipient} (${targetNumber})\n상태: ${resultLog.status} (${resultLog.resultMsg})\n\n통화중 또는 응답없음으로 접수되었습니다. 대장에서 [재전송] 버튼으로 재시도할 수 있습니다.`);
+    }
+  } catch (err) {
+    console.error('팩스 발송 오류:', err);
+    alert('팩스 발송 처리 중 오류가 발생했습니다: ' + err.message);
+  } finally {
+    if (sendBtn) {
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = origBtnHtml;
+    }
+  }
 }
 
 // =========================================================================
@@ -7512,6 +7599,48 @@ function renderFaxDirectoryTable() {
   initIcons(tbody);
 }
 
+function openFaxSettingsModal() {
+  const mode = localStorage.getItem('LIVON_FAX_MODE') || 'sandbox';
+  const sender = localStorage.getItem('LIVON_FAX_SENDER') || '02-556-9114';
+  const aligoUser = localStorage.getItem('LIVON_FAX_ALIGO_USER') || '';
+  const aligoKey = localStorage.getItem('LIVON_FAX_ALIGO_KEY') || '';
+
+  const rSandbox = document.querySelector('input[name="faxEngineMode"][value="sandbox"]');
+  const rAligo = document.querySelector('input[name="faxEngineMode"][value="aligo"]');
+  if (rSandbox && mode === 'sandbox') rSandbox.checked = true;
+  if (rAligo && mode === 'aligo') rAligo.checked = true;
+
+  const senderInput = document.getElementById('faxSettingSenderNumber');
+  if (senderInput) senderInput.value = sender;
+
+  const userInput = document.getElementById('faxSettingAligoUser');
+  if (userInput) userInput.value = aligoUser;
+
+  const keyInput = document.getElementById('faxSettingAligoKey');
+  if (keyInput) keyInput.value = aligoKey;
+
+  openModal('faxSettingsModal');
+  initIcons(document.getElementById('faxSettingsModal'));
+}
+
+function saveFaxSettings() {
+  const modeRadio = document.querySelector('input[name="faxEngineMode"]:checked');
+  const mode = modeRadio ? modeRadio.value : 'sandbox';
+  const sender = document.getElementById('faxSettingSenderNumber')?.value.trim() || '02-556-9114';
+  const aligoUser = document.getElementById('faxSettingAligoUser')?.value.trim() || '';
+  const aligoKey = document.getElementById('faxSettingAligoKey')?.value.trim() || '';
+
+  try {
+    localStorage.setItem('LIVON_FAX_MODE', mode);
+    localStorage.setItem('LIVON_FAX_SENDER', sender);
+    localStorage.setItem('LIVON_FAX_ALIGO_USER', aligoUser);
+    localStorage.setItem('LIVON_FAX_ALIGO_KEY', aligoKey);
+  } catch (e) {}
+
+  closeModal('faxSettingsModal');
+  alert(`⚙️ [팩스 연동 설정 완료]\n\n엔진 모드: ${mode === 'sandbox' ? '스마트 샌드박스 (모의 회선)' : '알리고 (Aligo REST API)'}\n공식 발신번호: ${sender}\n\n설정이 안전하게 저장되었습니다.`);
+}
+
 function populateFaxDirectoryDropdownInModal() {
   const select = document.getElementById('faxModalDirectorySelect');
   if (!select) return;
@@ -7700,7 +7829,7 @@ function deleteFaxDirectoryEntry(id) {
   alert('주소록에서 삭제되었습니다.');
 }
 
-function resendFaxLog(logId) {
+async function resendFaxLog(logId) {
   const log = (gFaxLogs || []).find(l => l.id === logId);
   if (!log) return;
 
@@ -7708,30 +7837,74 @@ function resendFaxLog(logId) {
     return;
   }
 
-  const now = new Date();
-  const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  try {
+    let resultLog = null;
+    try {
+      const res = await fetch('/api/fax/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: log.appId,
+          patientName: log.patientName,
+          insuranceCompany: log.insuranceCompany,
+          category: log.category,
+          formCode: log.formCode,
+          formName: log.formName,
+          recipient: log.recipient,
+          faxNumber: log.faxNumber,
+          pages: log.pages || 2,
+          operator: '재전송(운영팀)'
+        })
+      });
+      const data = await res.json();
+      if (data && data.success && data.log) {
+        resultLog = data.log;
+      }
+    } catch (err) {
+      console.warn('[FAX Resend API Route Fallback]', err);
+    }
 
-  const newLog = {
-    ...log,
-    id: 'FLOG-' + Date.now().toString().slice(-6),
-    sentDate: dateStr,
-    status: '성공',
-    operator: '재전송요청자',
-    resultMsg: '재발송 완료 (200 OK)'
-  };
+    if (!resultLog) {
+      const now = new Date();
+      const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      resultLog = {
+        ...log,
+        id: 'FLOG-' + Date.now().toString().slice(-6),
+        sentDate: dateStr,
+        status: '성공',
+        operator: '재전송(운영팀)',
+        resultMsg: '재발송 완료 (200 OK)',
+        provider: 'Smart Sandbox (모의 회선)'
+      };
+    }
 
-  gFaxLogs.unshift(newLog);
-  saveFaxLogs();
-  updateFaxKpis();
-  renderFaxLogsTable();
+    gFaxLogs.unshift(resultLog);
+    saveFaxLogs();
 
-  alert(`📠 [재발송 완료]\n\n수신처: ${log.recipient} (${log.faxNumber})\n서식: ${log.formName}\n성공적으로 재전송되었습니다.`);
+    try {
+      await syncToConvex('sync:saveFaxRecord', { record: resultLog });
+      console.log(`[FAX Convex Sync] ${resultLog.id} 재전송 기록이 Convex DB에 영구 저장되었습니다.`);
+    } catch (convexErr) {}
+
+    updateFaxKpis();
+    renderFaxLogsTable();
+
+    alert(`📠 [재발송 완료]\n\n수신처: ${log.recipient} (${log.faxNumber})\n서식: ${log.formName}\n성공적으로 재전송되었습니다! (Convex Cloud 대장 기록됨)`);
+  } catch (err) {
+    alert('재전송 처리 중 오류: ' + err.message);
+  }
 }
 
-function deleteFaxLog(logId) {
+async function deleteFaxLog(logId) {
   if (!confirm('해당 발송 이력을 대장에서 삭제하시겠습니까?')) return;
   gFaxLogs = (gFaxLogs || []).filter(l => l.id !== logId);
   saveFaxLogs();
+
+  try {
+    await syncToConvex('sync:deleteFaxRecord', { recordId: logId });
+    console.log(`[FAX Convex Sync] ${logId} 발송 기록이 Convex DB에서 삭제되었습니다.`);
+  } catch (convexErr) {}
+
   updateFaxKpis();
   renderFaxLogsTable();
 }

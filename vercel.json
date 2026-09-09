@@ -7,6 +7,14 @@
       "dest": "/api/search-hospital.js"
     },
     {
+      "src": "/api/fax/send",
+      "dest": "/api/fax/send.js"
+    },
+    {
+      "src": "/api/fax/status",
+      "dest": "/api/fax/status.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }
