@@ -7925,7 +7925,13 @@ function renderFaxLogsTable() {
           <i data-lucide="clock" class="w-3 h-3 inline mr-1 text-slate-400"></i>${l.sentDate}
         </td>
         <td class="p-3 text-center font-mono font-bold text-slate-800">
-          <span class="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200">${l.appId}</span>
+          ${(typeof gApps !== 'undefined' && gApps.some(a => a.id === l.appId))
+            ? `<button type="button" onclick="openCareCycleModal('${l.appId}')" class="px-2.5 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-900 border border-blue-200 hover:border-blue-400 font-bold transition-all cursor-pointer inline-flex items-center gap-1 shadow-xs hover:shadow group" title="고객 상세 정보 열기">
+                <span>${l.appId}</span>
+                <i data-lucide="external-link" class="w-3 h-3 text-blue-400 group-hover:text-blue-600"></i>
+              </button>`
+            : `<span class="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-600">${l.appId}</span>`
+          }
         </td>
         <td class="p-3 font-bold text-slate-900 whitespace-nowrap">
           ${maskName(l.patientName)}
