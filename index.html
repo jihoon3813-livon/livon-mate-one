@@ -1455,6 +1455,7 @@
               <table class="w-full text-left text-xs text-slate-600 border-collapse whitespace-nowrap">
                 <thead class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-700">
                   <tr>
+                    <th class="p-3 text-center font-bold w-10" title="드래그하여 순서 변경">순서</th>
                     <th class="p-3 text-center font-bold">원수사</th>
                     <th class="p-3 font-bold">손사법인 / 지점</th>
                     <th class="p-3 font-bold">담당자 / 손사명</th>
@@ -2638,24 +2639,44 @@
         </div>
 
         <!-- ==================== 4. 현대해상 선택 시 1차 팩스 발송 안내 배너 ==================== -->
-        <div id="newAppHyundaiBanner" class="p-4 rounded-2xl bg-blue-50/80 border-2 border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black shadow-sm flex-shrink-0">
-              <i data-lucide="printer" class="w-5 h-5"></i>
-            </div>
-            <div class="min-w-0">
-              <div class="font-extrabold text-xs text-blue-950 flex items-center gap-1.5 whitespace-nowrap">
-                <span>현대해상 1차 고객등록 팩스 자동 연계</span>
-                <span class="px-2 py-0.5 rounded-full bg-blue-200/80 text-blue-800 text-[10px] font-bold">1단계 팩스</span>
+        <!-- ==================== 4. 현대해상 선택 시 1차 팩스 발송 안내 배너 ==================== -->
+        <div id="newAppHyundaiBanner" class="p-4 rounded-2xl bg-blue-50/80 border-2 border-blue-200 space-y-3 shadow-2xs">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black shadow-sm flex-shrink-0">
+                <i data-lucide="printer" class="w-5 h-5"></i>
               </div>
-              <p class="text-[11px] text-blue-800 mt-0.5 whitespace-nowrap">
-                신청 완료 시 <b>현대해상 보상센터(02-2195-5000)</b>로 1차 팩스가 전송되며 <b>[문자수신대기]</b>로 등록됩니다. (문자 도착 후 카드에서 1초 등록)
-              </p>
+              <div class="min-w-0">
+                <div class="font-extrabold text-xs text-blue-950 flex items-center gap-1.5 whitespace-nowrap">
+                  <span>현대해상 1차 고객등록 팩스 자동 연계</span>
+                  <span class="px-2 py-0.5 rounded-full bg-blue-200/80 text-blue-800 text-[10px] font-bold">1단계 팩스</span>
+                </div>
+                <p class="text-[11px] text-blue-800 mt-0.5">
+                  신청 완료 시 지정된 팩스 수신처로 1차 접수서가 실시간 발송되며 <b>[문자수신대기]</b>로 등록됩니다.
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <button type="button" onclick="previewNewAppDraftFax()" class="px-3 py-1.5 rounded-xl bg-white border border-blue-300 text-blue-800 hover:bg-blue-100 font-bold text-xs whitespace-nowrap shadow-xs flex items-center gap-1">
+                <i data-lucide="eye" class="w-3.5 h-3.5"></i> 서식 미리보기
+              </button>
             </div>
           </div>
-          <button type="button" onclick="previewNewAppDraftFax()" class="px-3.5 py-2 rounded-xl bg-white border border-blue-300 text-blue-800 hover:bg-blue-100 font-bold text-xs whitespace-nowrap shadow-xs flex items-center gap-1 flex-shrink-0">
-            <i data-lucide="eye" class="w-3.5 h-3.5"></i> 팩스 서식 미리보기
-          </button>
+
+          <!-- 발송 대상 팩스번호 선택 영역 -->
+          <div class="pt-2.5 border-t border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white/70 p-2.5 rounded-xl border">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              <span class="text-[11px] font-bold text-blue-950 whitespace-nowrap flex items-center gap-1">
+                <i data-lucide="send" class="w-3.5 h-3.5 text-blue-600"></i> 발송 수신처:
+              </span>
+              <input type="text" id="newAppFaxRecipient" value="현대해상 보상지원센터" placeholder="수신처명" class="p-1.5 px-2.5 border border-blue-300 rounded-lg text-xs font-bold text-slate-800 bg-white w-44">
+              <input type="text" id="newAppFaxNumber" value="02-2195-5000" placeholder="수신 팩스번호" class="p-1.5 px-2.5 border-2 border-blue-400 rounded-lg text-xs font-mono font-black text-blue-900 bg-white w-36 text-center">
+              <span id="newAppFaxBadge" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">🧪 테스트</span>
+            </div>
+            <button type="button" onclick="openFaxNumberSelectModal('newApp')" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 shadow-2xs whitespace-nowrap cursor-pointer">
+              <i data-lucide="book-marked" class="w-3.5 h-3.5"></i> 팩스번호 주소록에서 선택
+            </button>
+          </div>
         </div>
 
         <!-- Modal Footer Actions -->
@@ -3306,7 +3327,7 @@
         </div>
 
         <!-- Quick Select from Fax Directory -->
-        <div class="p-3 bg-purple-50/80 border border-purple-200 rounded-2xl flex items-center justify-between gap-3 text-xs">
+        <div class="p-3 bg-purple-50/80 border border-purple-200 rounded-2xl flex items-center justify-between gap-2 text-xs">
           <div class="flex items-center gap-1.5 text-purple-950 font-bold whitespace-nowrap">
             <i data-lucide="book-marked" class="w-4 h-4 text-purple-600"></i>
             <span>손사 팩스 주소록</span>
@@ -3314,6 +3335,9 @@
           <select id="faxModalDirectorySelect" onchange="onSelectFaxDirectoryInModal(this.value)" class="flex-1 p-2 border border-purple-300 rounded-xl bg-white font-bold text-slate-800 text-xs">
             <option value="">-- 등록된 주소록에서 선택 시 자동완성 --</option>
           </select>
+          <button type="button" onclick="openFaxNumberSelectModal('faxDispatch')" class="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs flex items-center gap-1 shadow-2xs whitespace-nowrap cursor-pointer">
+            <i data-lucide="search" class="w-3.5 h-3.5"></i> 주소록 검색
+          </button>
         </div>
 
         <!-- 2. Target Info & Fax Number -->
@@ -3459,19 +3483,84 @@
           <textarea id="faxDirMemo" rows="2" class="w-full p-2.5 border rounded-xl text-xs" placeholder="해당 팩스 회선의 유의사항, 관할 권역 또는 담당 손사 특징을 입력하세요."></textarea>
         </div>
 
-        <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-          <label class="flex items-center gap-1.5 cursor-pointer font-bold text-slate-700">
-            <input type="checkbox" id="faxDirIsDefault" class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500">
-            <span>해당 원수사의 기본 팩스번호로 지정</span>
-          </label>
-          <div class="flex gap-2">
-            <button type="button" onclick="closeModal('faxDirectoryModal')" class="px-4 py-2 border rounded-xl font-semibold bg-white cursor-pointer">취소</button>
-            <button type="submit" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-sm cursor-pointer">
-              저장 완료
-            </button>
+        <!-- 옵션: 기본 팩스, 상단 고정, 테스트 번호 -->
+        <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700 text-xs">
+              <input type="checkbox" id="faxDirIsDefault" class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500">
+              <span>★ 해당 원수사의 기본 팩스번호로 지정</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer font-bold text-indigo-700 text-xs">
+              <input type="checkbox" id="faxDirIsPinned" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500">
+              <span>📌 목록 최상단 고정</span>
+            </label>
+          </div>
+          <div class="pt-2 border-t border-slate-200 flex items-center justify-between">
+            <label class="flex items-center gap-2 cursor-pointer font-bold text-amber-900 text-xs">
+              <input type="checkbox" id="faxDirIsTestNumber" class="w-4 h-4 rounded text-amber-600 focus:ring-amber-500">
+              <span>🧪 테스트 전용 팩스번호 (자가 모바일팩스 등 안전 검증용)</span>
+            </label>
+            <span class="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-semibold">TEST 라벨 부착</span>
           </div>
         </div>
+
+        <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2 -mx-6 -mb-6">
+          <button type="button" onclick="closeModal('faxDirectoryModal')" class="px-4 py-2 border rounded-xl font-semibold bg-white cursor-pointer hover:bg-slate-100">취소</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-sm cursor-pointer">
+            저장 완료
+          </button>
+        </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL: FAX NUMBER SELECTOR (팩스 발송 전 주소록에서 수신처 원클릭 선택 모달) -->
+  <div id="faxNumberSelectModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
+      <div class="p-4 bg-gradient-to-r from-slate-900 to-purple-950 text-white flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-purple-600/30 text-purple-300 flex items-center justify-center border border-purple-500/30">
+            <i data-lucide="book-marked" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black">팩스 발송 수신처 선택</h3>
+            <p class="text-xs text-purple-200 mt-0.5">손사 팩스번호 주소록 목록에서 발송할 대상 번호를 클릭하세요.</p>
+          </div>
+        </div>
+        <button onclick="closeModal('faxNumberSelectModal')" class="p-2 text-slate-400 hover:text-white rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Search & Quick Filters -->
+      <div class="p-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0 text-xs">
+        <div class="relative flex-1 min-w-[200px]">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none"></i>
+          <input type="text" id="faxSelectModalSearch" oninput="renderFaxNumberSelectModalList()" placeholder="손사명, 담당자, 팩스번호 검색..." class="w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded-xl bg-white text-xs">
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="faxSelectModalFilter" onchange="renderFaxNumberSelectModalList()" class="p-1.5 border border-slate-300 rounded-xl bg-white text-xs font-bold text-slate-700">
+            <option value="ALL">전체 보기</option>
+            <option value="PINNED">📌 상단 고정만</option>
+            <option value="TEST">🧪 테스트 번호만</option>
+            <option value="현대해상">현대해상</option>
+            <option value="삼성화재">삼성화재</option>
+          </select>
+          <button type="button" onclick="openFaxDirectoryModal()" class="px-2.5 py-1.5 rounded-xl bg-purple-600 text-white font-bold text-xs flex items-center gap-1 hover:bg-purple-700 whitespace-nowrap">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i> 새 번호 등록
+          </button>
+        </div>
+      </div>
+
+      <!-- List Container -->
+      <div class="p-4 overflow-y-auto custom-scrollbar flex-1 space-y-2" id="faxNumberSelectListContainer">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs shrink-0">
+        <span class="text-slate-500">* 항목을 클릭하면 즉시 수신 팩스번호로 적용됩니다.</span>
+        <button type="button" onclick="closeModal('faxNumberSelectModal')" class="px-4 py-1.5 border rounded-xl font-bold bg-white hover:bg-slate-100 text-slate-700">닫기</button>
+      </div>
     </div>
   </div>
 

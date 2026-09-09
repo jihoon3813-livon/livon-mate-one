@@ -2459,6 +2459,22 @@ const FORM_TEMPLATES = [
 // =========================================================================
 const INITIAL_FAX_DIRECTORY = [
   {
+    id: 'FDIR-TEST-01',
+    insuranceCompany: '공통(테스트)',
+    category: '회선시험',
+    firm: '(주)리본케어 모바일팩스',
+    department: '관리자 테스트 전용',
+    contactPerson: '김지훈 팀장',
+    faxNumber: '0504-185-3813',
+    phone: '02-6499-3917',
+    mobile: '010-4322-3813',
+    email: 'jihoon3813@livon.care',
+    isDefault: false,
+    isPinned: true,
+    isTestNumber: true,
+    memo: '관리자 모바일팩스 테스트 수신 회선 (실 발송 검증용)'
+  },
+  {
     id: 'FDIR-001',
     insuranceCompany: '현대해상',
     category: '1차접수',
@@ -2470,6 +2486,8 @@ const INITIAL_FAX_DIRECTORY = [
     mobile: '-',
     email: 'claim_hd@hi.co.kr',
     isDefault: true,
+    isPinned: true,
+    isTestNumber: false,
     memo: '현대해상 1차 고객등록 및 신청 접수서(HD_FORM_01) 수신 공식 전용팩스'
   },
   {

@@ -7797,9 +7797,82 @@ function renderFaxLogsTable() {
   initIcons(tbody);
 }
 
+function sortFaxDirectoryList() {
+  if (!Array.isArray(gFaxDirectory)) return;
+  gFaxDirectory.sort((a, b) => {
+    // 1. Pinned first
+    const pinA = a.isPinned ? 1 : 0;
+    const pinB = b.isPinned ? 1 : 0;
+    if (pinA !== pinB) return pinB - pinA;
+    // 2. Sort order
+    const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : 9999;
+    const orderB = typeof b.sortOrder === 'number' ? b.sortOrder : 9999;
+    return orderA - orderB;
+  });
+}
+
+function togglePinFaxDirectoryEntry(id) {
+  const item = (gFaxDirectory || []).find(d => d.id === id);
+  if (!item) return;
+  item.isPinned = !item.isPinned;
+  saveFaxDirectory();
+  renderFaxDirectoryTable();
+  populateFaxDirectoryDropdownInModal();
+}
+
+function handleFaxDirDragStart(e, id) {
+  e.dataTransfer.setData('text/plain', id);
+  e.dataTransfer.effectAllowed = 'move';
+  const row = e.target.closest('tr');
+  if (row) row.classList.add('opacity-40', 'bg-purple-100');
+}
+
+function handleFaxDirDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const row = e.target.closest('tr');
+  if (row) row.classList.add('bg-purple-50', 'border-t-2', 'border-purple-500');
+}
+
+function handleFaxDirDragLeave(e) {
+  const row = e.target.closest('tr');
+  if (row) row.classList.remove('bg-purple-50', 'border-t-2', 'border-purple-500');
+}
+
+function handleFaxDirDrop(e, targetId) {
+  e.preventDefault();
+  const draggedId = e.dataTransfer.getData('text/plain');
+  const row = e.target.closest('tr');
+  if (row) row.classList.remove('bg-purple-50', 'border-t-2', 'border-purple-500');
+  if (!draggedId || draggedId === targetId) return;
+
+  const dragIdx = gFaxDirectory.findIndex(d => d.id === draggedId);
+  const targetIdx = gFaxDirectory.findIndex(d => d.id === targetId);
+  if (dragIdx === -1 || targetIdx === -1) return;
+
+  const [movedItem] = gFaxDirectory.splice(dragIdx, 1);
+  gFaxDirectory.splice(targetIdx, 0, movedItem);
+
+  // Update sortOrder
+  gFaxDirectory.forEach((d, idx) => {
+    d.sortOrder = idx;
+  });
+
+  saveFaxDirectory();
+  renderFaxDirectoryTable();
+  populateFaxDirectoryDropdownInModal();
+}
+
+function handleFaxDirDragEnd(e) {
+  const row = e.target.closest('tr');
+  if (row) row.classList.remove('opacity-40', 'bg-purple-100');
+}
+
 function renderFaxDirectoryTable() {
   const tbody = document.getElementById('faxDirectoryTableBody');
   if (!tbody) return;
+
+  sortFaxDirectoryList();
 
   const search = (document.getElementById('faxDirSearchInput')?.value || '').toLowerCase().trim();
   const insFilter = document.getElementById('faxDirInsuranceFilter')?.value || 'ALL';
@@ -7826,7 +7899,7 @@ function renderFaxDirectoryTable() {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" class="p-8 text-center text-slate-400">
+        <td colspan="9" class="p-8 text-center text-slate-400">
           <i data-lucide="contact-2" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
           조회된 팩스번호 주소록이 없습니다.
         </td>
@@ -7836,7 +7909,10 @@ function renderFaxDirectoryTable() {
     return;
   }
 
-  tbody.innerHTML = filtered.map(d => {
+  tbody.innerHTML = filtered.map((d, index) => {
+    const isPinned = !!d.isPinned;
+    const isTest = !!d.isTestNumber;
+
     const insBadge = d.insuranceCompany.includes('현대해상')
       ? 'bg-blue-50 text-blue-700 border-blue-200'
       : (d.insuranceCompany.includes('삼성화재')
@@ -7853,16 +7929,43 @@ function renderFaxDirectoryTable() {
       ? `<span class="ml-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-black border border-amber-300">★ 대표</span>`
       : '';
 
+    const testBadge = isTest
+      ? `<span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-900 text-[9px] font-black border border-amber-400">🧪 TEST</span>`
+      : '';
+
+    const pinBtnClass = isPinned
+      ? 'text-amber-500 hover:text-amber-600 bg-amber-50'
+      : 'text-slate-300 hover:text-slate-500';
+
     return `
-      <tr class="hover:bg-slate-50/80 transition-colors">
+      <tr class="hover:bg-slate-50/80 transition-colors ${isPinned ? 'bg-amber-50/20' : ''}" 
+          draggable="true" 
+          ondragstart="handleFaxDirDragStart(event, '${d.id}')"
+          ondragover="handleFaxDirDragOver(event)"
+          ondragleave="handleFaxDirDragLeave(event)"
+          ondrop="handleFaxDirDrop(event, '${d.id}')"
+          ondragend="handleFaxDirDragEnd(event)">
+        <td class="p-3 text-center whitespace-nowrap">
+          <div class="flex items-center justify-center gap-1">
+            <span class="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-600 p-0.5" title="드래그하여 행 순서 이동">
+              <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
+            </span>
+            <button type="button" onclick="togglePinFaxDirectoryEntry('${d.id}')" class="p-1 rounded-md ${pinBtnClass} transition-colors" title="${isPinned ? '상단 고정 해제' : '상단 고정'}">
+              <i data-lucide="pin" class="w-3.5 h-3.5 ${isPinned ? 'fill-amber-500 text-amber-500' : ''}"></i>
+            </button>
+          </div>
+        </td>
         <td class="p-3 text-center whitespace-nowrap">
           <span class="px-2.5 py-1 rounded-md text-[11px] font-bold border ${insBadge}">
             ${d.insuranceCompany}
           </span>
           ${defaultStar}
+          ${testBadge}
         </td>
         <td class="p-3 font-medium text-slate-900">
-          <div class="font-bold text-slate-900">${d.firm}</div>
+          <div class="font-bold text-slate-900 flex items-center gap-1">
+            <span>${d.firm}</span>
+          </div>
           <div class="text-[11px] text-slate-500">${d.department || '-'}</div>
         </td>
         <td class="p-3 font-semibold text-slate-800 whitespace-nowrap">
@@ -7885,15 +7988,15 @@ function renderFaxDirectoryTable() {
         </td>
         <td class="p-3 text-center whitespace-nowrap">
           <div class="flex items-center justify-center gap-1.5">
-            <button onclick="quickDispatchToDirectory('${d.id}')" class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs" title="이 번호로 팩스 발송">
+            <button onclick="quickDispatchToDirectory('${d.id}')" class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer" title="이 번호로 팩스 발송">
               <i data-lucide="send" class="w-3 h-3"></i>
               <span>발송</span>
             </button>
-            <button onclick="openFaxDirectoryModal('${d.id}')" class="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center gap-1 shadow-2xs" title="주소록 수정">
+            <button onclick="openFaxDirectoryModal('${d.id}')" class="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center gap-1 shadow-2xs cursor-pointer" title="주소록 수정">
               <i data-lucide="edit-3" class="w-3 h-3 text-slate-500"></i>
               <span>수정</span>
             </button>
-            <button onclick="deleteFaxDirectoryEntry('${d.id}')" class="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50" title="주소록 삭제">
+            <button onclick="deleteFaxDirectoryEntry('${d.id}')" class="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer" title="주소록 삭제">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -8300,12 +8403,20 @@ function openFaxDirectoryModal(editId = null) {
     document.getElementById('faxDirMobile').value = item.mobile || '';
     document.getElementById('faxDirMemo').value = item.memo || '';
     document.getElementById('faxDirIsDefault').checked = !!item.isDefault;
+    const pinEl = document.getElementById('faxDirIsPinned');
+    if (pinEl) pinEl.checked = !!item.isPinned;
+    const testEl = document.getElementById('faxDirIsTestNumber');
+    if (testEl) testEl.checked = !!item.isTestNumber;
   } else {
     if (titleEl) titleEl.innerText = '손사 팩스번호 등록';
     if (editIdEl) editIdEl.value = '';
     document.getElementById('faxDirInsurance').value = '현대해상';
     document.getElementById('faxDirCategory').value = '정산청구';
     document.getElementById('faxDirIsDefault').checked = false;
+    const pinEl = document.getElementById('faxDirIsPinned');
+    if (pinEl) pinEl.checked = false;
+    const testEl = document.getElementById('faxDirIsTestNumber');
+    if (testEl) testEl.checked = false;
   }
 
   openModal('faxDirectoryModal');
@@ -8325,6 +8436,8 @@ function handleSaveFaxDirectory(e) {
   const mobile = document.getElementById('faxDirMobile')?.value.trim() || '-';
   const memo = document.getElementById('faxDirMemo')?.value.trim() || '';
   const isDefault = !!document.getElementById('faxDirIsDefault')?.checked;
+  const isPinned = !!document.getElementById('faxDirIsPinned')?.checked;
+  const isTestNumber = !!document.getElementById('faxDirIsTestNumber')?.checked;
 
   if (!firm || !faxNumber) {
     alert('손사명(기관명)과 팩스번호는 필수 입력 항목입니다.');
@@ -8356,7 +8469,9 @@ function handleSaveFaxDirectory(e) {
         phone,
         mobile,
         memo,
-        isDefault
+        isDefault,
+        isPinned,
+        isTestNumber
       };
     }
   } else {
@@ -8372,7 +8487,10 @@ function handleSaveFaxDirectory(e) {
       phone,
       mobile,
       memo,
-      isDefault
+      isDefault,
+      isPinned,
+      isTestNumber,
+      sortOrder: isPinned ? 0 : 9999
     };
     gFaxDirectory.unshift(newEntry);
   }
@@ -8396,6 +8514,154 @@ function deleteFaxDirectoryEntry(id) {
   updateFaxKpis();
   populateFaxDirectoryDropdownInModal();
   alert('주소록에서 삭제되었습니다.');
+}
+
+// -------------------------------------------------------------------------
+// FAX NUMBER SELECT MODAL CONTROLLER (팩스 발송 전 수신번호 선택 모달)
+// -------------------------------------------------------------------------
+let gFaxSelectTargetContext = 'newApp'; // 'newApp' | 'faxDispatch'
+
+function openFaxNumberSelectModal(targetContext = 'newApp') {
+  gFaxSelectTargetContext = targetContext;
+  const searchInput = document.getElementById('faxSelectModalSearch');
+  if (searchInput) searchInput.value = '';
+  const filterSelect = document.getElementById('faxSelectModalFilter');
+  if (filterSelect) filterSelect.value = 'ALL';
+
+  renderFaxNumberSelectModalList();
+  openModal('faxNumberSelectModal');
+  initIcons(document.getElementById('faxNumberSelectModal'));
+}
+
+function renderFaxNumberSelectModalList() {
+  const container = document.getElementById('faxNumberSelectListContainer');
+  if (!container) return;
+
+  sortFaxDirectoryList();
+
+  const search = (document.getElementById('faxSelectModalSearch')?.value || '').toLowerCase().trim();
+  const filter = document.getElementById('faxSelectModalFilter')?.value || 'ALL';
+
+  const list = (gFaxDirectory || []).filter(d => {
+    // 1. Filter
+    if (filter === 'PINNED' && !d.isPinned) return false;
+    if (filter === 'TEST' && !d.isTestNumber) return false;
+    if (filter !== 'ALL' && filter !== 'PINNED' && filter !== 'TEST') {
+      if (!d.insuranceCompany.includes(filter)) return false;
+    }
+
+    // 2. Search
+    if (!search) return true;
+    const match = (d.firm || '').toLowerCase().includes(search) ||
+                  (d.department || '').toLowerCase().includes(search) ||
+                  (d.contactPerson || '').toLowerCase().includes(search) ||
+                  (d.faxNumber || '').toLowerCase().includes(search) ||
+                  (d.insuranceCompany || '').toLowerCase().includes(search) ||
+                  (d.memo || '').toLowerCase().includes(search);
+    return match;
+  });
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+        <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+        일치하는 팩스번호 주소록이 없습니다.
+      </div>
+    `;
+    initIcons(container);
+    return;
+  }
+
+  container.innerHTML = list.map(d => {
+    const isPinned = !!d.isPinned;
+    const isTest = !!d.isTestNumber;
+    const isDef = !!d.isDefault;
+
+    const insBadge = d.insuranceCompany.includes('현대해상')
+      ? 'bg-blue-50 text-blue-700 border-blue-200'
+      : (d.insuranceCompany.includes('삼성화재')
+        ? 'bg-orange-50 text-orange-700 border-orange-200'
+        : 'bg-slate-100 text-slate-700 border-slate-200');
+
+    return `
+      <div onclick="selectFaxNumberFromModal('${d.id}')" class="p-3.5 rounded-2xl border ${isTest ? 'border-amber-300 bg-amber-50/40 hover:bg-amber-100/60' : (isPinned ? 'border-purple-200 bg-purple-50/30 hover:bg-purple-100/50' : 'border-slate-200 bg-white hover:bg-slate-50')} flex items-center justify-between gap-3 cursor-pointer transition-all hover:shadow-xs group">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <div class="w-8 h-8 rounded-xl ${isTest ? 'bg-amber-200 text-amber-900' : (isPinned ? 'bg-purple-200 text-purple-900' : 'bg-slate-100 text-slate-600')} flex items-center justify-center shrink-0">
+            <i data-lucide="${isTest ? 'flask-conical' : (isPinned ? 'pin' : 'printer')}" class="w-4 h-4 ${isPinned && !isTest ? 'fill-purple-800' : ''}"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${insBadge}">${d.insuranceCompany}</span>
+              ${isPinned ? '<span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 text-[9px] font-black border border-purple-300">📌 고정</span>' : ''}
+              ${isTest ? '<span class="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-900 text-[9px] font-black border border-amber-400">🧪 TEST</span>' : ''}
+              ${isDef ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-black border border-amber-300">★ 대표</span>' : ''}
+              <b class="text-xs font-bold text-slate-900 truncate">${d.firm}</b>
+              ${d.department ? `<span class="text-[11px] text-slate-500 truncate">(${d.department})</span>` : ''}
+            </div>
+            <div class="text-[11px] text-slate-600 mt-1 flex items-center gap-3">
+              <span>담당: <b class="text-slate-800">${d.contactPerson || '-'}</b></span>
+              ${d.phone && d.phone !== '-' ? `<span class="text-slate-500 font-mono">전화: ${d.phone}</span>` : ''}
+              ${d.memo ? `<span class="text-slate-400 truncate max-w-[200px]" title="${d.memo}">· ${d.memo}</span>` : ''}
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 shrink-0">
+          <div class="text-right">
+            <div class="font-mono text-sm font-black ${isTest ? 'text-amber-950' : 'text-purple-900'}">${d.faxNumber}</div>
+            <span class="text-[10px] text-slate-400">${d.category || '공통'}</span>
+          </div>
+          <button type="button" class="px-3 py-1.5 rounded-xl bg-purple-600 group-hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1 shadow-2xs whitespace-nowrap">
+            선택
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  initIcons(container);
+}
+
+function selectFaxNumberFromModal(id) {
+  const d = (gFaxDirectory || []).find(item => item.id === id);
+  if (!d) return;
+
+  let recipientName = d.firm;
+  if (d.department) recipientName += ' ' + d.department;
+  if (d.contactPerson && !recipientName.includes(d.contactPerson)) recipientName += ' (' + d.contactPerson + ')';
+
+  if (gFaxSelectTargetContext === 'newApp') {
+    const recInput = document.getElementById('newAppFaxRecipient');
+    const numInput = document.getElementById('newAppFaxNumber');
+    const badge = document.getElementById('newAppFaxBadge');
+
+    if (recInput) recInput.value = recipientName;
+    if (numInput) numInput.value = d.faxNumber;
+
+    if (badge) {
+      if (d.isTestNumber) {
+        badge.classList.remove('hidden');
+        badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300';
+        badge.innerText = '🧪 테스트번호';
+      } else if (d.isPinned) {
+        badge.classList.remove('hidden');
+        badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300';
+        badge.innerText = '📌 상단고정';
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+  } else if (gFaxSelectTargetContext === 'faxDispatch') {
+    const recInput = document.getElementById('faxTargetRecipient');
+    const numInput = document.getElementById('faxTargetNumber');
+    const dirSelect = document.getElementById('faxModalDirectorySelect');
+
+    if (recInput) recInput.value = recipientName;
+    if (numInput) numInput.value = d.faxNumber;
+    if (dirSelect) dirSelect.value = d.id;
+  }
+
+  closeModal('faxNumberSelectModal');
 }
 
 async function resendFaxLog(logId) {
@@ -10873,6 +11139,9 @@ function handleNewAppSubmit(e) {
     const isHyundai = insurance.includes('현대해상');
     const defaultHdStage = isHyundai ? '문자수신대기' : '사전명단매칭완료';
 
+    const targetFaxRecipient = document.getElementById('newAppFaxRecipient')?.value?.trim() || (isHyundai ? '현대해상 보상지원센터' : '보상접수센터');
+    const targetFaxNumber = document.getElementById('newAppFaxNumber')?.value?.trim() || (isHyundai ? '02-2195-5000' : adjusterFax || '02-3485-9100');
+
     const newApp = {
       id: newId,
       patientName: name,
@@ -10892,7 +11161,7 @@ function handleNewAppSubmit(e) {
       adjusterFirm: adjusterFirm || (isHyundai ? '하이라이프.부산손사4팀' : '삼성애니카손해사정'),
       adjusterPhone: adjusterPhone || '-',
       adjusterMobile: adjusterMobile || '-',
-      adjusterFax: adjusterFax || (isHyundai ? '02-2195-5000' : '02-3485-9100'),
+      adjusterFax: targetFaxNumber,
       accidentDate: accidentDate,
       accidentType: accidentType,
       applyDate: applyDate,
@@ -10937,8 +11206,8 @@ function handleNewAppSubmit(e) {
         formTitle: '현대해상 간병인지원 신청/고객등록 요청서',
         sentDate: newApp.initialFaxDate,
         status: '전송완료',
-        faxNumber: '02-2195-5000 (현대해상 보상지원팀)',
-        recipient: '현대해상 보상지원팀',
+        faxNumber: targetFaxNumber + ' (' + targetFaxRecipient + ')',
+        recipient: targetFaxRecipient,
         pages: 1,
         deliveryStatus: '성공 (OK - 200)'
       };
@@ -10967,14 +11236,15 @@ function handleNewAppSubmit(e) {
     if (isHyundai) {
       showCustomAlert({
         title: '현대해상 1차 접수 & 팩스 발송 완료',
-        message: `[${newId} - ${name} 님]의 현대해상 1차 접수가 성공적으로 완료되어 현대해상 보상지원팀(FAX 02-2195-5000)으로 고객등록 팩스가 자동 발송되었습니다.\n\n현재 고객 상태는 [문자수신대기]로 등록되었습니다.\n현대해상으로부터 피보험자 가입정보 회신 문자가 도착하면, 고객 카드나 간병신청대장의 [📱 현대 문자 등록] 버튼을 눌러 문자를 붙여넣으시면 증권/사고/손사 정보가 1초 만에 자동 완성됩니다.`,
+        message: `[${newId} - ${name} 님]의 현대해상 1차 접수가 성공적으로 완료되어 ${targetFaxRecipient}(FAX ${targetFaxNumber})으로 고객등록 팩스가 자동 발송되었습니다.\n\n현재 고객 상태는 [문자수신대기]로 등록되었습니다.\n현대해상으로부터 피보험자 가입정보 회신 문자가 도착하면, 고객 카드나 간병신청대장의 [📱 현대 문자 등록] 버튼을 눌러 문자를 붙여넣으시면 증권/사고/손사 정보가 1초 만에 자동 완성됩니다.`,
         icon: 'printer',
         iconColor: 'blue',
         details: [
           `접수번호: ${newId}`,
           `피보험자: ${name} (${gender} · ${phone})`,
           `원수사: ${insurance}`,
-          `발송 팩스: [HD_FORM_01] 간병인지원 신청/고객등록 요청서 (수신: 02-2195-5000)`,
+          `발송 팩스: [HD_FORM_01] 간병인지원 신청/고객등록 요청서 (수신: ${targetFaxNumber})`,
+          `수신처: ${targetFaxRecipient}`,
           `진행 단계: [문자수신대기] (회신 문자 수신 시 [📱 현대 문자 등록]으로 1초 완료)`
         ]
       });
