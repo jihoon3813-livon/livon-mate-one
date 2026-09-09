@@ -1297,20 +1297,16 @@ function toggleSelectArea(areaId, e) {
   const isMulti = e && (e.ctrlKey || e.metaKey || e.shiftKey);
   
   if (isMulti) {
-    // Ctrl / Cmd / Shift 클릭: 다중 선택 토글
+    // Ctrl / Cmd / Shift 클릭: 다중 선택 토글 (있으면 제거, 없으면 추가)
     if (gSelectedAreaIds.has(areaId)) {
       gSelectedAreaIds.delete(areaId);
     } else {
       gSelectedAreaIds.add(areaId);
     }
   } else {
-    // 일반 단일 클릭: 기존 선택을 비우고 해당 필드만 선택 (이미 단독 선택된 상태라면 해제)
-    if (gSelectedAreaIds.size === 1 && gSelectedAreaIds.has(areaId)) {
-      gSelectedAreaIds.clear();
-    } else {
-      gSelectedAreaIds.clear();
-      gSelectedAreaIds.add(areaId);
-    }
+    // 일반 단일 클릭: 기존 선택을 모두 비우고 해당 필드 확실하게 단독 선택!
+    gSelectedAreaIds.clear();
+    gSelectedAreaIds.add(areaId);
   }
   renderEditorCanvasAndList();
 }
@@ -1725,13 +1721,14 @@ function startDragArea(e, areaId) {
 
   const isMultiKey = e.ctrlKey || e.metaKey || e.shiftKey;
 
-  // 클릭한 영역이 아직 선택되어 있지 않은 상태라면 선택 상태 갱신
-  if (!gSelectedAreaIds.has(areaId)) {
+  // 이미 선택된 그룹 안에 있는 필드를 눌렀다면 기존 선택 그룹 유지,
+  // 선택되지 않은 영역을 눌렀다면 이 영역을 선택 대상으로 삼되 DOM 리렌더링은 하지 않음(이벤트 보호)
+  let activeTargetIds = new Set(gSelectedAreaIds);
+  if (!activeTargetIds.has(areaId)) {
     if (!isMultiKey) {
-      gSelectedAreaIds.clear();
+      activeTargetIds.clear();
     }
-    gSelectedAreaIds.add(areaId);
-    renderEditorCanvasAndList();
+    activeTargetIds.add(areaId);
   }
 
   gDraggingAreaId = areaId;
@@ -1742,8 +1739,8 @@ function startDragArea(e, areaId) {
   const rect = sheet.getBoundingClientRect();
   const list = gFormAreaStore[gCurrentEditingFormCode] || [];
 
-  // 이동 대상: 현재 선택된 모든 영역들 (한꺼번에 이동!)
-  const targets = list.filter(a => gSelectedAreaIds.has(a.id));
+  // 이동 대상: 현재 드래그할 대상 영역들
+  const targets = list.filter(a => activeTargetIds.has(a.id));
   const startClientX = e.clientX;
   const startClientY = e.clientY;
 
@@ -1792,9 +1789,11 @@ function startDragArea(e, areaId) {
     gDraggingAreaId = null;
 
     if (!wasDragged) {
-      // 드래그가 아니었으면 토글 선택 처리
+      // 마우스 이동이 없었으면 단순 클릭으로 판정하여 확실한 선택 처리
       toggleSelectArea(areaId, upEvent);
     } else {
+      // 드래그 완료 시 선택 그룹을 확정하고 리렌더링
+      gSelectedAreaIds = activeTargetIds;
       renderEditorCanvasAndList();
     }
   };
