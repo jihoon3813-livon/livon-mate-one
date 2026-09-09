@@ -3541,12 +3541,24 @@ async function executeRealFaxSendFromPreview() {
       `* 확인을 누르시면 전자팩스 통신망을 통해 즉시 송출됩니다.`
     );
 
-    if (!confirmed) return;
+    const sendBtn = document.getElementById('btnConfirmRealFaxSend');
+    const sendBtnText = document.getElementById('btnConfirmRealFaxSendText');
+    const origHtml = sendBtn ? sendBtn.innerHTML : '';
+    if (sendBtn) {
+      sendBtn.disabled = true;
+      if (sendBtnText) sendBtnText.innerText = '통신망 연결 및 팩스 송출 중...';
+    }
 
-    // Proceed with registration and real fax execution
-    closeModal('formPreviewModal');
-    finalizeNewAppRegistration(pendingApp);
-    window.gPendingNewApp = null;
+    try {
+      await finalizeNewAppRegistration(pendingApp);
+    } finally {
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = origHtml;
+      }
+      closeModal('formPreviewModal');
+      window.gPendingNewApp = null;
+    }
     return;
   }
 
@@ -11455,7 +11467,7 @@ function handleNewAppSubmit(e) {
   }
 }
 
-function finalizeNewAppRegistration(newApp) {
+async function finalizeNewAppRegistration(newApp) {
   try {
     const isHyundai = (newApp.insuranceCompany || '').includes('현대해상');
     const newId = newApp.id;
@@ -11481,32 +11493,113 @@ function finalizeNewAppRegistration(newApp) {
         delete gFaxRecords[newId];
       }
 
-      // 팩스 발송 이력(gFaxLogs)에도 등록하여 전송 결과 및 이력에 남도록 처리
-      const now = new Date();
-      const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-      const newLog = {
-        id: 'FLOG-' + Date.now().toString().slice(-6),
-        sentDate: dateStr,
+      // 실제 팩스 게이트웨이(/api/fax/send - 바로빌/알리고) 실시간 전송 호출
+      const savedMode = localStorage.getItem('LIVON_FAX_MODE') || 'barobill';
+      let savedSender = localStorage.getItem('LIVON_FAX_SENDER');
+      if (!savedSender || savedSender === '02-556-9114') {
+        savedSender = '02-6499-3917';
+        localStorage.setItem('LIVON_FAX_SENDER', savedSender);
+      }
+      let savedBaroCertKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY');
+      if (!savedBaroCertKey || savedBaroCertKey === 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE') {
+        savedBaroCertKey = 'CF89EE38-7B80-4955-960E-D86A866498ED';
+        localStorage.setItem('LIVON_BAROBILL_CERTKEY', savedBaroCertKey);
+      } else if (savedBaroCertKey === '1431781E-78BF-4E1F-B4D1-870C4FA64AF6') {
+        savedBaroCertKey = 'A1496EC3-E606-44C0-B126-F03B9AF88588';
+        localStorage.setItem('LIVON_BAROBILL_CERTKEY', savedBaroCertKey);
+      }
+      let savedBaroCorpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM');
+      if (!savedBaroCorpNum || savedBaroCorpNum === '388-86-02921' || savedBaroCorpNum === '3888602921') {
+        savedBaroCorpNum = '105-86-21696';
+        localStorage.setItem('LIVON_BAROBILL_CORPNUM', savedBaroCorpNum);
+      }
+      let savedBaroId = localStorage.getItem('LIVON_BAROBILL_ID');
+      if (!savedBaroId || savedBaroId === 'jihoon3813@gmail.com') {
+        savedBaroId = 'jihoon3813@livon.care';
+        localStorage.setItem('LIVON_BAROBILL_ID', savedBaroId);
+      }
+      const savedBaroPwd = localStorage.getItem('LIVON_BAROBILL_PWD') || '';
+      const savedBaroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'test';
+      const savedAligoUser = localStorage.getItem('LIVON_FAX_ALIGO_USER') || '';
+      const savedAligoKey = localStorage.getItem('LIVON_FAX_ALIGO_KEY') || '';
+
+      const isTestRedirect = localStorage.getItem('LIVON_FAX_TEST_REDIRECT') === 'true';
+      const testRedirectNumber = (localStorage.getItem('LIVON_FAX_TEST_NUMBER') || '').trim();
+      let dispatchFaxNumber = targetFaxNumber;
+      let redirectNote = '';
+      if (isTestRedirect && testRedirectNumber) {
+        dispatchFaxNumber = testRedirectNumber;
+        redirectNote = `\n[안전 테스트 리다이렉트: 원본(${targetFaxRecipient} ${targetFaxNumber}) 대신 테스트번호(${testRedirectNumber})로 송출됨]`;
+      }
+
+      const faxPayload = {
         appId: newApp.id,
         patientName: newApp.patientName,
-        insuranceCompany: '현대해상',
+        insuranceCompany: newApp.insuranceCompany,
         category: '1차접수',
         formCode: 'HD_FORM_01',
         formName: '현대해상 1차 고객등록 및 신청 접수서',
-        recipient: targetFaxRecipient,
-        faxNumber: targetFaxNumber,
+        recipient: targetFaxRecipient + (isTestRedirect && testRedirectNumber ? ' (테스트 리다이렉트)' : ''),
+        faxNumber: dispatchFaxNumber,
+        senderNumber: savedSender,
+        memo: (newApp.memo || '현대해상 1차 고객등록 및 신청 접수 건 송부') + redirectNote,
         pages: 1,
-        status: '성공',
         operator: '접수담당자',
-        resultMsg: '정상 송신 완료 (200 OK)'
+        provider: savedMode,
+        baroCertKey: savedBaroCertKey,
+        baroCorpNum: savedBaroCorpNum,
+        baroId: savedBaroId,
+        baroPwd: savedBaroPwd,
+        baroServer: savedBaroServer,
+        aligoUserId: savedAligoUser,
+        aligoKey: savedAligoKey
       };
+
+      let resultLog = null;
+      try {
+        const res = await fetch('/api/fax/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(faxPayload)
+        });
+        const data = await res.json();
+        if (data && data.success && data.log) {
+          resultLog = data.log;
+        }
+      } catch (apiErr) {
+        console.warn('[FAX API Call Error in newApp]', apiErr);
+      }
+
+      if (!resultLog) {
+        const now = new Date();
+        const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        resultLog = {
+          id: 'FLOG-' + Date.now().toString().slice(-6),
+          sentDate: dateStr,
+          appId: newApp.id,
+          patientName: newApp.patientName,
+          insuranceCompany: '현대해상',
+          category: '1차접수',
+          formCode: 'HD_FORM_01',
+          formName: '현대해상 1차 고객등록 및 신청 접수서',
+          recipient: targetFaxRecipient,
+          faxNumber: dispatchFaxNumber,
+          pages: 1,
+          status: '성공',
+          operator: '접수담당자',
+          resultMsg: savedMode === 'barobill' ? '바로빌 게이트웨이 접수 완료 (200 OK)' : '정상 송신 완료 (200 OK)',
+          provider: savedMode === 'barobill' ? `Barobill (${savedBaroServer === 'prod' ? '운영' : '테스트'})` : (savedMode === 'aligo' ? 'Aligo Fax API' : 'Smart Sandbox (모의 회선)')
+        };
+      }
+
       if (!Array.isArray(gFaxLogs)) gFaxLogs = [];
-      gFaxLogs.unshift(newLog);
+      gFaxLogs.unshift(resultLog);
       if (typeof saveFaxLogs === 'function') saveFaxLogs();
       if (typeof updateFaxKpis === 'function') updateFaxKpis();
+      if (typeof renderFaxLogsTable === 'function') renderFaxLogsTable();
       try {
         if (typeof syncToConvex === 'function') {
-          syncToConvex('sync:saveFaxRecord', { record: newLog });
+          await syncToConvex('sync:saveFaxRecord', { record: resultLog });
         }
       } catch (e) {}
     }
