@@ -3129,19 +3129,26 @@
       <div class="p-6 space-y-4 text-xs">
         <div>
           <label class="block font-bold text-slate-800 mb-1.5">팩스 발송 엔진 모드 선택 *</label>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-3 gap-2">
             <label class="p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer flex items-center gap-2 hover:bg-purple-50 hover:border-purple-300 transition-all">
-              <input type="radio" name="faxEngineMode" value="sandbox" checked class="w-4 h-4 text-purple-600">
+              <input type="radio" name="faxEngineMode" value="barobill" checked onchange="toggleFaxEngineConfig('barobill')" class="w-4 h-4 text-purple-600">
               <div>
-                <b class="text-slate-900 block">스마트 샌드박스</b>
-                <span class="text-[10px] text-slate-500">모의 회선 및 테스트 발송</span>
+                <b class="text-slate-900 block text-[11.5px]">바로빌 (Barobill) ★</b>
+                <span class="text-[9.5px] text-purple-700 font-bold">공식 연동 파트너</span>
               </div>
             </label>
             <label class="p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer flex items-center gap-2 hover:bg-purple-50 hover:border-purple-300 transition-all">
-              <input type="radio" name="faxEngineMode" value="aligo" class="w-4 h-4 text-purple-600">
+              <input type="radio" name="faxEngineMode" value="sandbox" onchange="toggleFaxEngineConfig('sandbox')" class="w-4 h-4 text-purple-600">
               <div>
-                <b class="text-slate-900 block">알리고 (Aligo)</b>
-                <span class="text-[10px] text-slate-500">실무 팩스 송출 REST API</span>
+                <b class="text-slate-900 block text-[11.5px]">스마트 샌드박스</b>
+                <span class="text-[9.5px] text-slate-500">모의 회선 발송</span>
+              </div>
+            </label>
+            <label class="p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer flex items-center gap-2 hover:bg-purple-50 hover:border-purple-300 transition-all">
+              <input type="radio" name="faxEngineMode" value="aligo" onchange="toggleFaxEngineConfig('aligo')" class="w-4 h-4 text-purple-600">
+              <div>
+                <b class="text-slate-900 block text-[11.5px]">알리고 (Aligo)</b>
+                <span class="text-[9.5px] text-slate-500">대체 REST API</span>
               </div>
             </label>
           </div>
@@ -3150,13 +3157,67 @@
         <div>
           <label class="block font-bold text-slate-800 mb-1.5">리본케어 공식 발신 팩스번호 *</label>
           <input type="text" id="faxSettingSenderNumber" placeholder="예: 02-556-9114" value="02-556-9114" class="w-full p-2.5 border border-slate-300 rounded-xl font-mono text-slate-900 bg-white focus:ring-2 focus:ring-purple-500">
-          <p class="text-[10px] text-slate-400 mt-1">통신사에 사전 등록된 (주)리본케어 공인 발신번호입니다.</p>
+          <p class="text-[10px] text-slate-400 mt-1">통신사/바로빌에 사전 등록된 리본케어 공식 발신번호입니다.</p>
         </div>
 
-        <div id="aligoConfigSection" class="p-3.5 bg-purple-50/60 rounded-2xl border border-purple-200 space-y-2.5">
-          <div class="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
+        <!-- 바로빌 (Barobill) 전용 설정 영역 -->
+        <div id="barobillConfigSection" class="p-4 bg-purple-50/80 rounded-2xl border-2 border-purple-300 space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-purple-200">
+            <div class="text-[11.5px] font-black text-purple-950 flex items-center gap-1.5">
+              <i data-lucide="shield-check" class="w-4 h-4 text-purple-600"></i>
+              <span>바로빌(Barobill) 공식 연동 설정</span>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900">리본메이트원</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-[10.5px] font-bold text-slate-700 mb-1">연동 서버 환경 *</label>
+              <select id="faxBarobillServer" class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white font-bold text-purple-900 focus:ring-2 focus:ring-purple-500">
+                <option value="test">테스트 서버 (testws.baroservice.com)</option>
+                <option value="prod">운영 서버 (ws.baroservice.com)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10.5px] font-bold text-slate-700 mb-1">바로빌 아이디 (ID) *</label>
+              <input type="text" id="faxBarobillId" placeholder="예: jihoon3813@gmail.com" value="jihoon3813@gmail.com" class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white font-mono">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-[10.5px] font-bold text-slate-700 mb-1">사업자등록번호 (하이픈 제외) *</label>
+              <input type="text" id="faxBarobillCorpNum" placeholder="3888602921" value="388-86-02921" class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white font-mono font-bold">
+            </div>
+            <div>
+              <label class="block text-[10.5px] font-bold text-slate-700 mb-1">회사명 / 상호</label>
+              <input type="text" id="faxBarobillCorpName" value="주식회사 라이프온케어 (리본메이트원)" readonly class="w-full p-2 border border-slate-200 rounded-xl text-xs bg-slate-100 text-slate-600 font-medium">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[10.5px] font-bold text-slate-700 mb-1">연동 인증키 (CERTKEY) *</label>
+            <input type="text" id="faxBarobillCertKey" placeholder="연동 인증키 입력" value="C53EC844-0FE7-4139-80AA-FE06E3ACAABE" class="w-full p-2 border-2 border-purple-400 rounded-xl text-xs bg-white font-mono font-black text-purple-950">
+            <p class="text-[10px] text-slate-500 mt-1 flex items-center justify-between">
+              <span>* 테스트키: <code class="font-mono text-purple-700">C53EC844-0FE7-4139-80AA-FE06E3ACAABE</code></span>
+              <button type="button" onclick="quickFillBarobillKey('test')" class="text-purple-700 hover:underline font-bold text-[10px]">테스트키 적용</button>
+              <button type="button" onclick="quickFillBarobillKey('prod')" class="text-indigo-700 hover:underline font-bold text-[10px]">운영키 적용</button>
+            </p>
+          </div>
+
+          <div class="pt-1 flex items-center justify-between">
+            <button type="button" onclick="testBarobillConnection()" class="px-3 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs">
+              <i data-lucide="activity" class="w-3.5 h-3.5"></i> 바로빌 연결 및 잔액 테스트
+            </button>
+            <span id="barobillConnStatus" class="text-[11px] font-mono font-bold text-slate-600"></span>
+          </div>
+        </div>
+
+        <!-- 알리고 (Aligo) 설정 영역 -->
+        <div id="aligoConfigSection" class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5 hidden">
+          <div class="text-[11px] font-black text-slate-800 flex items-center gap-1.5">
             <i data-lucide="key" class="w-3.5 h-3.5 text-purple-600"></i>
-            <span>알리고(Aligo) API 인증 정보 (선택)</span>
+            <span>알리고(Aligo) API 인증 정보</span>
           </div>
           <div>
             <label class="block text-[10px] font-bold text-slate-600 mb-1">알리고 User ID</label>
@@ -3280,11 +3341,13 @@
 
       <!-- Footer -->
       <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
-        <span class="text-slate-400 text-[11px]">* 팩스 실제 통신 연동은 추후 진행되며, 현재는 발송 접수 이력이 자동 저장됩니다.</span>
+        <span class="text-purple-700 font-bold text-[11px] flex items-center gap-1">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> 바로빌(Barobill) 전자팩스 게이트웨이를 통해 정식 접수 및 송출됩니다.
+        </span>
         <div class="flex gap-2">
           <button onclick="closeModal('faxDispatchModal')" class="px-4 py-2 border rounded-xl font-semibold bg-white">취소</button>
           <button onclick="executeSendFaxModal()" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold flex items-center gap-1.5 shadow-sm">
-            <i data-lucide="send" class="w-3.5 h-3.5"></i> 팩스 발송 접수
+            <i data-lucide="send" class="w-3.5 h-3.5"></i> 바로빌 팩스 즉시 발송
           </button>
         </div>
       </div>

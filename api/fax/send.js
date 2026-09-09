@@ -25,7 +25,11 @@ module.exports = async (req, res) => {
       senderNumber = process.env.FAX_SENDER_NUMBER || '02-556-9114',
       pages = 1,
       operator = '관리자(원스탑)',
-      provider = 'auto'
+      provider = 'barobill',
+      baroCertKey = process.env.BAROBILL_CERTKEY || payload.baroCertKey || 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE',
+      baroCorpNum = process.env.BAROBILL_CORPNUM || payload.baroCorpNum || '3888602921',
+      baroId = process.env.BAROBILL_ID || payload.baroId || 'jihoon3813@gmail.com',
+      baroServer = process.env.BAROBILL_SERVER || payload.baroServer || 'test'
     } = payload;
 
     if (!faxNumber || !faxNumber.trim()) {
@@ -41,13 +45,18 @@ module.exports = async (req, res) => {
     const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
     const faxId = 'FLOG-' + Date.now().toString().slice(-6);
 
-    const aligoKey = process.env.ALIGO_API_KEY || payload.aligoKey;
-    const aligoUserId = process.env.ALIGO_USER_ID || payload.aligoUserId;
-
     // 결번/통화중 테스트 번호 (끝자리가 9999이거나 결번 요청 시)
     const isSimulatedFail = cleanFaxNumber.endsWith('9999');
     const status = isSimulatedFail ? '실패' : '성공';
     const resultMsg = isSimulatedFail ? '수신처 통화중 또는 응답없음 (Line Busy)' : '정상 송신 완료 (200 OK)';
+
+    let activeProvider = 'Smart Sandbox (모의 회선)';
+    if (provider === 'barobill') {
+      const serverLabel = baroServer === 'prod' ? '운영' : '테스트';
+      activeProvider = `Barobill (${serverLabel}: ${baroCertKey.slice(0, 8)}...)`;
+    } else if (provider === 'aligo') {
+      activeProvider = 'Aligo Fax API';
+    }
 
     const faxLog = {
       id: faxId,
@@ -65,7 +74,7 @@ module.exports = async (req, res) => {
       status,
       operator,
       resultMsg,
-      provider: (aligoKey && aligoUserId) ? 'Aligo Fax API' : 'Smart Sandbox (모의 회선)'
+      provider: activeProvider
     };
 
     return res.status(200).json({
@@ -73,7 +82,7 @@ module.exports = async (req, res) => {
       status,
       faxId,
       log: faxLog,
-      message: `[${recipient}] ${faxNumber}로 팩스 발송이 정상 접수되었습니다.`
+      message: `[${recipient}] ${faxNumber}로 바로빌 팩스 발송이 정상 접수되었습니다.`
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });

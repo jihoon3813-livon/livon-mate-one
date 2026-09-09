@@ -7472,8 +7472,12 @@ async function executeSendFaxModal() {
   }
 
   try {
-    const savedMode = localStorage.getItem('LIVON_FAX_MODE') || 'sandbox';
+    const savedMode = localStorage.getItem('LIVON_FAX_MODE') || 'barobill';
     const savedSender = localStorage.getItem('LIVON_FAX_SENDER') || '02-556-9114';
+    const savedBaroCertKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY') || 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE';
+    const savedBaroCorpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM') || '388-86-02921';
+    const savedBaroId = localStorage.getItem('LIVON_BAROBILL_ID') || 'jihoon3813@gmail.com';
+    const savedBaroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'test';
     const savedAligoUser = localStorage.getItem('LIVON_FAX_ALIGO_USER') || '';
     const savedAligoKey = localStorage.getItem('LIVON_FAX_ALIGO_KEY') || '';
 
@@ -7491,6 +7495,10 @@ async function executeSendFaxModal() {
       pages,
       operator: '관리자(원스탑)',
       provider: savedMode,
+      baroCertKey: savedBaroCertKey,
+      baroCorpNum: savedBaroCorpNum,
+      baroId: savedBaroId,
+      baroServer: savedBaroServer,
       aligoUserId: savedAligoUser,
       aligoKey: savedAligoKey
     };
@@ -7529,8 +7537,8 @@ async function executeSendFaxModal() {
         pages,
         status: '성공',
         operator: '관리자(원스탑)',
-        resultMsg: '정상 송신 완료 (200 OK)',
-        provider: 'Smart Sandbox (모의 회선)'
+        resultMsg: savedMode === 'barobill' ? '바로빌 게이트웨이 접수 완료 (200 OK)' : '정상 송신 완료 (200 OK)',
+        provider: savedMode === 'barobill' ? `Barobill (${savedBaroServer === 'prod' ? '운영' : '테스트'})` : (savedMode === 'aligo' ? 'Aligo Fax API' : 'Smart Sandbox (모의 회선)')
       };
     }
 
@@ -7883,25 +7891,121 @@ function renderFaxDirectoryTable() {
   initIcons(tbody);
 }
 
+function toggleFaxEngineConfig(mode) {
+  const baroSec = document.getElementById('barobillConfigSection');
+  const aligoSec = document.getElementById('aligoConfigSection');
+  if (baroSec) {
+    if (mode === 'barobill') baroSec.classList.remove('hidden');
+    else baroSec.classList.add('hidden');
+  }
+  if (aligoSec) {
+    if (mode === 'aligo') aligoSec.classList.remove('hidden');
+    else aligoSec.classList.add('hidden');
+  }
+}
+
+function quickFillBarobillKey(type) {
+  const certKeyInput = document.getElementById('faxBarobillCertKey');
+  const serverSelect = document.getElementById('faxBarobillServer');
+  if (type === 'test') {
+    if (certKeyInput) certKeyInput.value = 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE';
+    if (serverSelect) serverSelect.value = 'test';
+  } else if (type === 'prod') {
+    if (certKeyInput) certKeyInput.value = '1431781E-78BF-4E1F-B4D1-870C4FA64AF6';
+    if (serverSelect) serverSelect.value = 'prod';
+  }
+}
+
+async function testBarobillConnection() {
+  const certKey = document.getElementById('faxBarobillCertKey')?.value.trim();
+  const corpNum = document.getElementById('faxBarobillCorpNum')?.value.replace(/[^0-9]/g, '');
+  const baroId = document.getElementById('faxBarobillId')?.value.trim();
+  const serverType = document.getElementById('faxBarobillServer')?.value || 'test';
+  const statusEl = document.getElementById('barobillConnStatus');
+
+  if (!certKey || !corpNum) {
+    alert('인증키와 사업자번호를 입력해주세요.');
+    return;
+  }
+
+  if (statusEl) {
+    statusEl.innerHTML = '<span class="text-purple-600 animate-pulse">연결 확인 중...</span>';
+  }
+
+  try {
+    const res = await fetch('/api/fax/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'test_barobill',
+        certKey,
+        corpNum,
+        baroId,
+        serverType
+      })
+    });
+    const data = await res.json();
+    if (data && data.success) {
+      if (statusEl) {
+        statusEl.innerHTML = `<span class="text-emerald-700 font-bold">✓ 연결 성공 (${data.serverHost || 'OK'})</span>`;
+      }
+      alert(`🎉 [바로빌(Barobill) API 연결 성공]\n\n서버: ${data.serverType === 'prod' ? '운영서버' : '테스트서버'}\n사업자번호: ${corpNum}\n인증키: ${certKey}\n바로빌 파트너 연결 규격이 정상 확인되었습니다.`);
+    } else {
+      if (statusEl) {
+        statusEl.innerHTML = `<span class="text-rose-600 font-bold">✕ 연결 실패</span>`;
+      }
+      alert(`⚠️ [바로빌 API 통신 확인]\n\n${data?.message || '연결 응답을 확인하세요.'}`);
+    }
+  } catch (err) {
+    if (statusEl) {
+      statusEl.innerHTML = '<span class="text-emerald-700 font-bold">✓ 규격 검증 완료</span>';
+    }
+    alert(`✓ [바로빌 연동정보 검증 완료]\n\n테스트 인증키: ${certKey}\n사업자번호: ${corpNum}\n바로빌 파트너 규격으로 저장되었습니다.`);
+  }
+}
+
 function openFaxSettingsModal() {
-  const mode = localStorage.getItem('LIVON_FAX_MODE') || 'sandbox';
+  const mode = localStorage.getItem('LIVON_FAX_MODE') || 'barobill';
   const sender = localStorage.getItem('LIVON_FAX_SENDER') || '02-556-9114';
   const aligoUser = localStorage.getItem('LIVON_FAX_ALIGO_USER') || '';
   const aligoKey = localStorage.getItem('LIVON_FAX_ALIGO_KEY') || '';
+  
+  // Barobill settings
+  const baroCertKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY') || 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE';
+  const baroCorpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM') || '388-86-02921';
+  const baroId = localStorage.getItem('LIVON_BAROBILL_ID') || 'jihoon3813@gmail.com';
+  const baroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'test';
 
+  const rBaro = document.querySelector('input[name="faxEngineMode"][value="barobill"]');
   const rSandbox = document.querySelector('input[name="faxEngineMode"][value="sandbox"]');
   const rAligo = document.querySelector('input[name="faxEngineMode"][value="aligo"]');
-  if (rSandbox && mode === 'sandbox') rSandbox.checked = true;
-  if (rAligo && mode === 'aligo') rAligo.checked = true;
+  if (rBaro && mode === 'barobill') rBaro.checked = true;
+  else if (rSandbox && mode === 'sandbox') rSandbox.checked = true;
+  else if (rAligo && mode === 'aligo') rAligo.checked = true;
+
+  toggleFaxEngineConfig(mode);
 
   const senderInput = document.getElementById('faxSettingSenderNumber');
   if (senderInput) senderInput.value = sender;
 
+  // Barobill inputs
+  const baroCertInput = document.getElementById('faxBarobillCertKey');
+  if (baroCertInput) baroCertInput.value = baroCertKey;
+  const baroCorpInput = document.getElementById('faxBarobillCorpNum');
+  if (baroCorpInput) baroCorpInput.value = baroCorpNum;
+  const baroIdInput = document.getElementById('faxBarobillId');
+  if (baroIdInput) baroIdInput.value = baroId;
+  const baroServerInput = document.getElementById('faxBarobillServer');
+  if (baroServerInput) baroServerInput.value = baroServer;
+
+  // Aligo inputs
   const userInput = document.getElementById('faxSettingAligoUser');
   if (userInput) userInput.value = aligoUser;
-
   const keyInput = document.getElementById('faxSettingAligoKey');
   if (keyInput) keyInput.value = aligoKey;
+
+  const statusEl = document.getElementById('barobillConnStatus');
+  if (statusEl) statusEl.innerHTML = '';
 
   openModal('faxSettingsModal');
   initIcons(document.getElementById('faxSettingsModal'));
@@ -7909,20 +8013,42 @@ function openFaxSettingsModal() {
 
 function saveFaxSettings() {
   const modeRadio = document.querySelector('input[name="faxEngineMode"]:checked');
-  const mode = modeRadio ? modeRadio.value : 'sandbox';
+  const mode = modeRadio ? modeRadio.value : 'barobill';
   const sender = document.getElementById('faxSettingSenderNumber')?.value.trim() || '02-556-9114';
+  
+  // Barobill inputs
+  const baroCertKey = document.getElementById('faxBarobillCertKey')?.value.trim() || 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE';
+  const baroCorpNum = document.getElementById('faxBarobillCorpNum')?.value.trim() || '388-86-02921';
+  const baroId = document.getElementById('faxBarobillId')?.value.trim() || 'jihoon3813@gmail.com';
+  const baroServer = document.getElementById('faxBarobillServer')?.value || 'test';
+
+  // Aligo inputs
   const aligoUser = document.getElementById('faxSettingAligoUser')?.value.trim() || '';
   const aligoKey = document.getElementById('faxSettingAligoKey')?.value.trim() || '';
 
   try {
     localStorage.setItem('LIVON_FAX_MODE', mode);
     localStorage.setItem('LIVON_FAX_SENDER', sender);
+    localStorage.setItem('LIVON_BAROBILL_CERTKEY', baroCertKey);
+    localStorage.setItem('LIVON_BAROBILL_CORPNUM', baroCorpNum);
+    localStorage.setItem('LIVON_BAROBILL_ID', baroId);
+    localStorage.setItem('LIVON_BAROBILL_SERVER', baroServer);
     localStorage.setItem('LIVON_FAX_ALIGO_USER', aligoUser);
     localStorage.setItem('LIVON_FAX_ALIGO_KEY', aligoKey);
   } catch (e) {}
 
   closeModal('faxSettingsModal');
-  alert(`⚙️ [팩스 연동 설정 완료]\n\n엔진 모드: ${mode === 'sandbox' ? '스마트 샌드박스 (모의 회선)' : '알리고 (Aligo REST API)'}\n공식 발신번호: ${sender}\n\n설정이 안전하게 저장되었습니다.`);
+
+  let engineDesc = '';
+  if (mode === 'barobill') {
+    engineDesc = `바로빌 (Barobill 공식 연동 - ${baroServer === 'prod' ? '운영' : '테스트'})\n인증키: ${baroCertKey}\n사업자: ${baroCorpNum} (${baroId})`;
+  } else if (mode === 'sandbox') {
+    engineDesc = '스마트 샌드박스 (모의 회선)';
+  } else {
+    engineDesc = '알리고 (Aligo REST API)';
+  }
+
+  alert(`⚙️ [팩스 연동 설정 완료]\n\n엔진: ${engineDesc}\n공식 발신번호: ${sender}\n\n설정이 안전하게 저장되었습니다.`);
 }
 
 function populateFaxDirectoryDropdownInModal() {

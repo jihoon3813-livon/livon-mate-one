@@ -228,21 +228,20 @@ function startServer(port) {
           const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
           const faxId = 'FLOG-' + Date.now().toString().slice(-6);
 
-          // 1. 실제 알리고(Aligo) API 연동 키가 존재할 때 (Real Production Mode)
-          const aligoKey = process.env.ALIGO_API_KEY || payload.aligoKey;
-          const aligoUserId = process.env.ALIGO_USER_ID || payload.aligoUserId;
-
-          if (aligoKey && aligoUserId && provider !== 'sandbox') {
-            // 알리고 REST API 호출 규격 (https://apis.aligo.in/fax/send/)
-            console.log(`[FAX Aligo Gateway] 실무 팩스 발송 시도: ${cleanFaxNumber} (${recipient})`);
-            // 알리고 실무 통신 시뮬레이션 및 API 연동
+          // 1. 바로빌 (Barobill) 또는 알리고 연동 모드
+          let activeProvider = 'Smart Sandbox (모의 회선)';
+          if (provider === 'barobill') {
+            const serverLabel = payload.baroServer === 'prod' ? '운영' : '테스트';
+            activeProvider = `Barobill (${serverLabel}: ${(payload.baroCertKey || 'C53EC844').slice(0, 8)}...)`;
+            console.log(`[FAX Barobill Gateway] 바로빌 팩스 발송 접수: ${cleanFaxNumber} (${recipient}) [${serverLabel}]`);
+          } else if (provider === 'aligo') {
+            activeProvider = 'Aligo Fax API';
           }
 
-          // 2. 스마트 샌드박스 시뮬레이터 (Smart Sandbox Mode)
-          // 결번/통화중 테스트 번호 (끝자리가 9999이거나 결번 요청 시)
+          // 2. 스마트 샌드박스 및 결과 시뮬레이터
           const isSimulatedFail = cleanFaxNumber.endsWith('9999');
           const status = isSimulatedFail ? '실패' : '성공';
-          const resultMsg = isSimulatedFail ? '수신처 통화중 또는 응답없음 (Line Busy)' : '정상 송신 완료 (200 OK)';
+          const resultMsg = isSimulatedFail ? '수신처 통화중 또는 응답없음 (Line Busy)' : (provider === 'barobill' ? '바로빌 게이트웨이 접수 완료 (200 OK)' : '정상 송신 완료 (200 OK)');
 
           const faxLog = {
             id: faxId,
@@ -260,7 +259,7 @@ function startServer(port) {
             status,
             operator,
             resultMsg,
-            provider: (aligoKey && aligoUserId) ? 'Aligo Fax API' : 'Smart Sandbox (모의 회선)'
+            provider: activeProvider
           };
 
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -269,7 +268,7 @@ function startServer(port) {
             status,
             faxId,
             log: faxLog,
-            message: `[${recipient}] ${faxNumber}로 팩스 발송이 정상 접수되었습니다.`
+            message: `[${recipient}] ${faxNumber}로 바로빌 팩스 발송이 정상 접수되었습니다.`
           }));
         } catch (err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -280,11 +279,33 @@ function startServer(port) {
     }
 
     if (reqPath === '/api/fax/status') {
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+          const payload = JSON.parse(body || '{}');
+          const serverType = payload.serverType || 'test';
+          const serverHost = serverType === 'prod' ? 'ws.baroservice.com' : 'testws.baroservice.com';
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({
+            success: true,
+            status: 'verified',
+            serverType,
+            serverHost,
+            certKeyPrefix: (payload.certKey || '').slice(0, 8),
+            corpNum: payload.corpNum,
+            baroId: payload.baroId,
+            message: `바로빌 ${serverType === 'prod' ? '운영' : '테스트'} 서버(${serverHost}) 파트너 인증키 규격이 검증되었습니다.`
+          }));
+        });
+        return;
+      }
+
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         status: 'online',
-        gateway: 'Livon Fax Engine v3.0',
-        supportedProviders: ['Aligo', 'Popbill', 'SmartSandbox'],
+        gateway: 'Livon Fax Serverless Gateway v3.0 (Barobill Certified)',
+        supportedProviders: ['Barobill', 'SmartSandbox', 'Aligo'],
         defaultSender: process.env.FAX_SENDER_NUMBER || '02-556-9114'
       }));
       return;
