@@ -8037,15 +8037,11 @@ function renderFaxDirectoryTable() {
         </td>
         <td class="p-3 text-center whitespace-nowrap">
           <div class="flex items-center justify-center gap-1.5">
-            <button onclick="quickDispatchToDirectory('${d.id}')" class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer" title="이 번호로 팩스 발송">
-              <i data-lucide="send" class="w-3 h-3"></i>
-              <span>발송</span>
-            </button>
-            <button onclick="openFaxDirectoryModal('${d.id}')" class="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center gap-1 shadow-2xs cursor-pointer" title="주소록 수정">
-              <i data-lucide="edit-3" class="w-3 h-3 text-slate-500"></i>
+            <button onclick="openFaxDirectoryModal('${d.id}')" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center gap-1 shadow-2xs cursor-pointer" title="주소록 수정">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5 text-slate-500"></i>
               <span>수정</span>
             </button>
-            <button onclick="deleteFaxDirectoryEntry('${d.id}')" class="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer" title="주소록 삭제">
+            <button onclick="deleteFaxDirectoryEntry('${d.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer" title="주소록 삭제">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
           </div>
