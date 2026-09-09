@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const { createDocumentPdfBuffer, createTestPdfBuffer } = require('./pdf-helper');
-const { uploadToBarobillFTP, callBarobillSoap, getBarobillErrorMessage } = require('./barobill-client');
+const { uploadToBarobillFTP, callBarobillSoap, getBarobillErrorMessage, getBarobillFaxStatus } = require('./barobill-client');
 
 let PORT = parseInt(process.env.PORT, 10) || 8080;
 const BASE_DIR = __dirname;
@@ -284,7 +284,7 @@ function startServer(port) {
                   }));
                 } else if (matchRes) {
                   realBaroReceiptNum = matchRes;
-                  realBaroResult = '성공';
+                  realBaroResult = '전송중';
                 }
               } catch (ftpErr) {
                 console.error(`[FAX Barobill Gateway] 전송 처리 오류:`, ftpErr.message);
@@ -310,7 +310,7 @@ function startServer(port) {
           const isSimulatedFail = cleanFaxNumber.endsWith('9999');
           const status = realBaroResult || (isSimulatedFail ? '실패' : '성공');
           const resultMsg = realBaroReceiptNum
-            ? `바로빌 정식 발송 접수 완료 (접수번호: ${realBaroReceiptNum})`
+            ? `바로빌 접수 완료 (접수번호: ${realBaroReceiptNum}, 회선 송출중)`
             : (isSimulatedFail ? '수신처 통화중 또는 응답없음 (Line Busy)' : '정상 접수 완료 (200 OK)');
 
           const faxLog = {
@@ -352,21 +352,68 @@ function startServer(port) {
       if (req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk; });
-        req.on('end', () => {
-          const payload = JSON.parse(body || '{}');
-          const serverType = payload.serverType || 'test';
-          const serverHost = serverType === 'prod' ? 'ws.baroservice.com' : 'testws.baroservice.com';
-          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-          res.end(JSON.stringify({
-            success: true,
-            status: 'verified',
-            serverType,
-            serverHost,
-            certKeyPrefix: (payload.certKey || '').slice(0, 8),
-            corpNum: payload.corpNum,
-            baroId: payload.baroId,
-            message: `바로빌 ${serverType === 'prod' ? '운영' : '테스트'} 서버(${serverHost}) 파트너 인증키 규격이 검증되었습니다.`
-          }));
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const action = payload.action;
+
+            // 1. 바로빌 팩스 접수건 실시간 전송상태 조회
+            if (action === 'query_barobill_status') {
+              const {
+                certKey = 'A1496EC3-E606-44C0-B126-F03B9AF88588',
+                corpNum = '1058621696',
+                sendKey = '',
+                sendKeyList = [],
+                serverType = 'prod'
+              } = payload;
+
+              const isTest = serverType !== 'prod';
+
+              // 복수 건 조회 요청인 경우
+              if (Array.isArray(sendKeyList) && sendKeyList.length > 0) {
+                const results = {};
+                for (const key of sendKeyList) {
+                  if (!key || typeof key !== 'string' || !key.startsWith('IBB_')) continue;
+                  try {
+                    const st = await getBarobillFaxStatus(certKey, corpNum, key, isTest);
+                    results[key] = st;
+                  } catch (e) {
+                    results[key] = { success: false, error: e.message };
+                  }
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                return res.end(JSON.stringify({ success: true, results }));
+              }
+
+              // 단일 건 조회 요청인 경우
+              if (!sendKey) {
+                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                return res.end(JSON.stringify({ success: false, error: '조회할 팩스 접수번호(SendKey)가 제공되지 않았습니다.' }));
+              }
+
+              const statusResult = await getBarobillFaxStatus(certKey, corpNum, sendKey, isTest);
+              res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+              return res.end(JSON.stringify(statusResult));
+            }
+
+            // 2. 기본 인증키 검증/연결 테스트
+            const serverType = payload.serverType || 'test';
+            const serverHost = serverType === 'prod' ? 'ws.baroservice.com' : 'testws.baroservice.com';
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({
+              success: true,
+              status: 'verified',
+              serverType,
+              serverHost,
+              certKeyPrefix: (payload.certKey || '').slice(0, 8),
+              corpNum: payload.corpNum,
+              baroId: payload.baroId,
+              message: `바로빌 ${serverType === 'prod' ? '운영' : '테스트'} 서버(${serverHost}) 파트너 인증키 규격이 검증되었습니다.`
+            }));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ success: false, error: e.message }));
+          }
         });
         return;
       }

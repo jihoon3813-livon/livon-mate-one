@@ -1388,8 +1388,14 @@
               </select>
             </div>
 
-            <div class="text-xs font-bold text-slate-500" id="faxLogCountText">
-              총 0건 조회됨
+            <div class="flex items-center gap-2">
+              <button onclick="refreshBarobillFaxStatuses()" id="btnRefreshBaroStatus" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold transition-all shadow-2xs cursor-pointer" title="바로빌 서버에서 전송중인 팩스의 최종 성공/실패 결과를 실시간으로 조회하여 동기화합니다.">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-purple-600"></i>
+                <span id="btnRefreshBaroStatusText">바로빌 결과 실시간 동기화</span>
+              </button>
+              <div class="text-xs font-bold text-slate-500" id="faxLogCountText">
+                총 0건 조회됨
+              </div>
             </div>
           </div>
 

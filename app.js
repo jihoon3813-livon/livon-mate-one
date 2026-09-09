@@ -7847,6 +7847,12 @@ function renderFaxManagement() {
   renderFaxLogsTable();
   renderFaxDirectoryTable();
   populateFaxDirectoryDropdownInModal();
+
+  // '전송중' 상태인 바로빌 발송건이 있으면 백그라운드에서 최신 결과 자동 확인
+  const hasPending = (gFaxLogs || []).some(l => l && l.id && l.id.startsWith('IBB_') && l.status === '전송중');
+  if (hasPending) {
+    refreshBarobillFaxStatuses(true);
+  }
 }
 
 function renderFaxLogsTable() {
@@ -7898,18 +7904,29 @@ function renderFaxLogsTable() {
     const isFailed = l.status === '실패';
     
     let statusBadge = '';
+    const isBaro = (l.id && l.id.startsWith('IBB_')) || (l.provider && l.provider.includes('Barobill'));
+
     if (isSuccess) {
-      statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 성공 (200 OK)
-      </span>`;
+      statusBadge = `<div class="inline-flex flex-col items-center">
+        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1 shadow-2xs" title="${l.resultMsg || '전송 성공'}">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 전송성공
+        </span>
+        <span class="text-[9px] text-slate-400 mt-0.5 font-mono max-w-[120px] truncate" title="${l.resultMsg || '전송 완료'}">${isBaro ? '바로빌 전송완료' : '전송완료'}</span>
+      </div>`;
     } else if (isFailed) {
-      statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center gap-1 cursor-pointer" title="${l.resultMsg || '통신 오류'}">
-        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> 실패 (${l.resultMsg || '오류'})
-      </span>`;
+      statusBadge = `<div class="inline-flex flex-col items-center">
+        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center gap-1 shadow-2xs cursor-pointer" title="${l.resultMsg || '통신 오류'}">
+          <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> 전송실패
+        </span>
+        <span class="text-[9px] text-rose-500 mt-0.5 max-w-[130px] truncate" title="${l.resultMsg || '오류'}">${l.resultMsg || '오류'}</span>
+      </div>`;
     } else {
-      statusBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1">
-        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> 전송진행중
-      </span>`;
+      statusBadge = `<div class="inline-flex flex-col items-center">
+        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1 shadow-2xs">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> 전송중
+        </span>
+        <span class="text-[9px] text-amber-600 font-semibold mt-0.5 max-w-[130px] truncate" title="${l.resultMsg || '회선 송출 진행 중'}">${isBaro ? '바로빌 송출중' : '전송 진행중'}</span>
+      </div>`;
     }
 
     const insCompany = l.insuranceCompany || '기타';
@@ -7962,6 +7979,11 @@ function renderFaxLogsTable() {
         </td>
         <td class="p-3 text-center whitespace-nowrap">
           <div class="flex items-center justify-center gap-1.5">
+            ${isBaro ? `
+            <button onclick="checkSingleBarobillStatus('${l.id}')" class="px-2 py-1 rounded-lg bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 text-[11px] font-semibold flex items-center gap-1 shadow-2xs cursor-pointer" title="바로빌 서버에서 전송 결과 즉시 확인">
+              <i data-lucide="refresh-cw" class="w-3 h-3 text-indigo-600"></i>
+              <span>결과확인</span>
+            </button>` : ''}
             <button onclick="previewFormForCustomer('${l.formCode || 'HD_FORM_01'}', '${l.appId}')" class="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center gap-1 shadow-2xs" title="발송 서식 미리보기">
               <i data-lucide="file-text" class="w-3 h-3 text-blue-600"></i>
               <span>서식보기</span>
@@ -7980,6 +8002,132 @@ function renderFaxLogsTable() {
   }).join('');
 
   initIcons(tbody);
+}
+
+// 바로빌 팩스 전송상태 실시간 조회 및 동기화
+async function refreshBarobillFaxStatuses(isSilent = false) {
+  const btn = document.getElementById('btnRefreshBaroStatus');
+  const btnText = document.getElementById('btnRefreshBaroStatusText');
+  const origHtml = btnText ? btnText.innerText : '바로빌 결과 실시간 동기화';
+
+  // 바로빌 접수건(IBB_*) 추출
+  const baroLogs = (gFaxLogs || []).filter(l => l && l.id && l.id.startsWith('IBB_'));
+  if (baroLogs.length === 0) {
+    if (!isSilent) alert('조회할 바로빌 팩스 발송 건이 없습니다.');
+    return;
+  }
+
+  const sendKeyList = baroLogs.map(l => l.id);
+  const certKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY') || 'A1496EC3-E606-44C0-B126-F03B9AF88588';
+  const corpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM') || '105-86-21696';
+  const serverType = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'prod';
+
+  if (btn) {
+    btn.disabled = true;
+    if (btnText) btnText.innerText = '동기화 중...';
+  }
+
+  try {
+    const res = await fetch('/api/fax/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'query_barobill_status',
+        certKey,
+        corpNum,
+        sendKeyList,
+        serverType
+      })
+    });
+    const data = await res.json();
+
+    if (data && data.success && data.results) {
+      let updatedCount = 0;
+      for (const [sendKey, st] of Object.entries(data.results)) {
+        if (!st || !st.success) continue;
+        const targetLog = gFaxLogs.find(l => l.id === sendKey);
+        if (targetLog) {
+          const prevStatus = targetLog.status;
+          targetLog.status = st.status; // '성공' | '실패' | '전송중'
+          targetLog.resultMsg = st.resultMsg || targetLog.resultMsg;
+          if (st.endDT) targetLog.completedDate = st.endDT;
+          if (st.fileUrl) targetLog.baroFileUrl = st.fileUrl;
+          if (prevStatus !== st.status) {
+            updatedCount++;
+            // Convex 백업 동기화
+            if (typeof syncToConvex === 'function') {
+              syncToConvex('sync:saveFaxRecord', { record: targetLog }).catch(console.warn);
+            }
+          }
+        }
+      }
+
+      saveFaxLogs();
+      updateFaxKpis();
+      renderFaxLogsTable();
+
+      if (!isSilent) {
+        alert(`📠 [바로빌 전송결과 동기화 완료]\n\n조회 건수: ${baroLogs.length}건\n상태 변경: ${updatedCount}건 갱신\n\n대장에서 최신 전송 상태가 반영되었습니다.`);
+      }
+    } else {
+      if (!isSilent) alert('바로빌 서버 응답을 확인하지 못했습니다: ' + (data?.error || '통신 오류'));
+    }
+  } catch (err) {
+    console.error('refreshBarobillFaxStatuses error:', err);
+    if (!isSilent) alert('바로빌 상태 조회 중 오류: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      if (btnText) btnText.innerText = origHtml;
+      initIcons(btn);
+    }
+  }
+}
+
+// 개별 바로빌 건 상세 상태 확인
+async function checkSingleBarobillStatus(sendKey) {
+  const log = (gFaxLogs || []).find(l => l.id === sendKey);
+  if (!log) return;
+
+  const certKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY') || 'A1496EC3-E606-44C0-B126-F03B9AF88588';
+  const corpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM') || '105-86-21696';
+  const serverType = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'prod';
+
+  try {
+    const res = await fetch('/api/fax/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'query_barobill_status',
+        certKey,
+        corpNum,
+        sendKey,
+        serverType
+      })
+    });
+    const st = await res.json();
+
+    if (st && st.success) {
+      log.status = st.status;
+      log.resultMsg = st.resultMsg;
+      if (st.endDT) log.completedDate = st.endDT;
+      if (st.fileUrl) log.baroFileUrl = st.fileUrl;
+
+      saveFaxLogs();
+      updateFaxKpis();
+      renderFaxLogsTable();
+
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:saveFaxRecord', { record: log }).catch(console.warn);
+      }
+
+      alert(`📠 [바로빌 전송결과 상세]\n\n접수번호: ${sendKey}\n수신처: ${log.recipient} (${log.faxNumber})\n고객명: ${log.patientName}\n\n상태: ${st.statusLabel || st.status}\n상세내용: ${st.resultMsg}\n전송매수: ${st.successPageCount || 1}/${st.sendPageCount || 1}장\n${st.endDT ? '완료일시: ' + st.endDT : ''}`);
+    } else {
+      alert(`⚠️ 바로빌 상태 조회 오류: ${st?.error || '알 수 없는 응답'}`);
+    }
+  } catch (err) {
+    alert(`조회 중 오류가 발생했습니다: ${err.message}`);
+  }
 }
 
 function sortFaxDirectoryList() {

@@ -108,8 +108,97 @@ async function getBarobillErrorMessage(certKey, errCode, isTest = false) {
   }
 }
 
+async function getBarobillFaxStatus(certKey, corpNum, sendKey, isTest = false) {
+  try {
+    const res = await callBarobillSoap('GetFaxMessageEx2', `
+      <CERTKEY>${certKey}</CERTKEY>
+      <CorpNum>${corpNum.replace(/[^0-9]/g, '')}</CorpNum>
+      <SendKey>${sendKey}</SendKey>
+    `, isTest);
+
+    if (res.status !== 200) {
+      return { success: false, error: `HTTP ${res.status}` };
+    }
+
+    const body = res.body;
+    const sendStateMatch = body.match(/<SendState>(.*?)<\/SendState>/);
+    if (!sendStateMatch) {
+      return { success: false, error: '응답 데이터 파싱 실패' };
+    }
+
+    const sendState = parseInt(sendStateMatch[1], 10);
+    const sendResult = body.match(/<SendResult>(.*?)<\/SendResult>/)?.[1] || '';
+    const sendDT = body.match(/<SendDT>(.*?)<\/SendDT>/)?.[1] || '';
+    const endDT = body.match(/<EndDT>(.*?)<\/EndDT>/)?.[1] || '';
+    const sendPageCount = parseInt(body.match(/<SendPageCount>(.*?)<\/SendPageCount>/)?.[1] || '1', 10);
+    const successPageCount = parseInt(body.match(/<SuccessPageCount>(.*?)<\/SuccessPageCount>/)?.[1] || '0', 10);
+    const fileUrl = body.match(/<fileURLs>[\s\S]*?<string>(.*?)<\/string>/)?.[1] || '';
+
+    // 음수인 경우 에러코드
+    if (sendState < 0) {
+      const errMsg = await getBarobillErrorMessage(certKey, String(sendState), isTest);
+      return {
+        success: false,
+        sendState,
+        error: errMsg,
+        status: '실패',
+        statusLabel: '전송실패',
+        resultMsg: `바로빌 오류: ${errMsg} (${sendState})`
+      };
+    }
+
+    // 0: 파일변환 대기중, 1: 파일변환 중, 2: 파일변환 완료, 3: 전송처리/결과, 4: 전송 오류, 5: 파일변환 오류
+    let status = '전송중';
+    let statusLabel = '전송중';
+    let resultMsg = '팩스 회선 송출 진행 중';
+
+    if (sendState === 0 || sendState === 1 || sendState === 2) {
+      status = '전송중';
+      statusLabel = '전송중 (변환)';
+      resultMsg = '바로빌 통신망 변환 및 전송 대기 중';
+    } else if (sendState === 3) {
+      if (sendResult === '802' || sendResult.toLowerCase() === 'success') {
+        status = '성공';
+        statusLabel = '전송성공';
+        resultMsg = `수신처 전송 성공 (${successPageCount}/${sendPageCount}장 완료)`;
+      } else if (!sendResult || sendResult === '0' || sendResult === '3') {
+        // 아직 회선 전송 중
+        status = '전송중';
+        statusLabel = '전송중 (송출)';
+        resultMsg = '수신처 팩스 기기로 송출 중';
+      } else {
+        status = '실패';
+        statusLabel = '전송실패';
+        resultMsg = `전송 실패 (통신결과코드: ${sendResult})`;
+      }
+    } else if (sendState >= 4) {
+      status = '실패';
+      statusLabel = '전송실패';
+      resultMsg = `전송 오류 (상태코드: ${sendState})`;
+    }
+
+    return {
+      success: true,
+      sendKey,
+      sendState,
+      sendResult,
+      sendDT,
+      endDT,
+      sendPageCount,
+      successPageCount,
+      fileUrl,
+      status,
+      statusLabel,
+      resultMsg
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
 module.exports = {
   uploadToBarobillFTP,
   callBarobillSoap,
-  getBarobillErrorMessage
+  getBarobillErrorMessage,
+  getBarobillFaxStatus
 };
