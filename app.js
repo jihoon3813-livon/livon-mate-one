@@ -11063,6 +11063,17 @@ function openNewAppModal() {
     onCareTypeChange('입원');
   }
 
+  // 기본적으로 팩스 수신처와 수신번호는 빈 상태(미지정)로 초기화
+  const faxRecInput = document.getElementById('newAppFaxRecipient');
+  const faxNumInput = document.getElementById('newAppFaxNumber');
+  const faxBadge = document.getElementById('newAppFaxBadge');
+  if (faxRecInput) faxRecInput.value = '';
+  if (faxNumInput) faxNumInput.value = '';
+  if (faxBadge) {
+    faxBadge.classList.add('hidden');
+    faxBadge.innerText = '';
+  }
+
   openModal('newAppModal');
   if (form) {
     form.scrollTop = 0;
@@ -11121,8 +11132,8 @@ function onNewAppInsuranceChange(insurance) {
     if (samsungCheckArea) samsungCheckArea.classList.add('hidden');
     if (hyundaiWorkflowArea) hyundaiWorkflowArea.classList.remove('hidden');
     if (newAppHyundaiBanner) newAppHyundaiBanner.classList.remove('hidden');
-    if (submitBtnText) submitBtnText.innerText = '1차 접수 저장 & 현대해상 팩스 발송 📠';
-    if (footerNotice) footerNotice.innerHTML = '* 현대해상 접수 시 보상센터(02-2195-5000)로 1차 팩스가 발송되며 [문자수신대기]로 등록됩니다.';
+    if (submitBtnText) submitBtnText.innerText = '1차 접수 저장 & 팩스 발송 확인 📠';
+    if (footerNotice) footerNotice.innerHTML = '* 발송 수신처/팩스번호가 지정된 경우 1차 접수 팩스가 발송되며, 미지정 시 일반 접수로 등록됩니다.';
   }
   initIcons();
 }
@@ -11570,8 +11581,8 @@ function handleNewAppSubmit(e) {
     const isHyundai = insurance.includes('현대해상');
     const defaultHdStage = isHyundai ? '문자수신대기' : '사전명단매칭완료';
 
-    const targetFaxRecipient = document.getElementById('newAppFaxRecipient')?.value?.trim() || (isHyundai ? '현대해상 보상지원센터' : '보상접수센터');
-    const targetFaxNumber = document.getElementById('newAppFaxNumber')?.value?.trim() || (isHyundai ? '02-2195-5000' : adjusterFax || '02-3485-9100');
+    const targetFaxRecipient = document.getElementById('newAppFaxRecipient')?.value?.trim() || '';
+    const targetFaxNumber = document.getElementById('newAppFaxNumber')?.value?.trim() || '';
 
     const newApp = {
       id: newId,
@@ -11627,20 +11638,22 @@ function handleNewAppSubmit(e) {
       updatedAt: new Date().toISOString()
     };
 
-    if (isHyundai) {
-      // 1차 고객등록 및 신청 팩스는 STEP 1 고유 이력으로 저장 (간병비 정산 청구 팩스와 완전 분리)
+    if (isHyundai && targetFaxNumber) {
+      // 1차 고객등록 및 신청 팩스는 수신 팩스번호가 지정된 경우에만 미리보기 및 발송 진행
       newApp.initialFaxSent = true;
       newApp.initialFaxDate = new Date().toISOString().split('T')[0].replace(/-/g, '.');
-      newApp.pendingFaxRecipient = targetFaxRecipient;
+      newApp.pendingFaxRecipient = targetFaxRecipient || '현대해상 보상지원센터';
       newApp.pendingFaxNumber = targetFaxNumber;
 
       // 현대해상인 경우 바로 저장/발송하지 않고, 서식 미리보기 창을 띄워 확인 후 최종 발송을 진행
       window.gPendingNewApp = newApp;
-      previewFormForCustomer('HD_FORM_01', newApp, true, targetFaxRecipient, targetFaxNumber);
+      previewFormForCustomer('HD_FORM_01', newApp, true, newApp.pendingFaxRecipient, targetFaxNumber);
       return;
     }
 
-    // 삼성화재 또는 타 보험사인 경우 즉시 접수 등록
+    // 팩스번호 미지정 또는 타 보험사인 경우 즉시 접수 등록
+    newApp.pendingFaxRecipient = targetFaxRecipient;
+    newApp.pendingFaxNumber = targetFaxNumber;
     finalizeNewAppRegistration(newApp);
   } catch (err) {
     console.error('신규 접수 저장 중 오류 발생:', err);
@@ -11652,28 +11665,30 @@ async function finalizeNewAppRegistration(newApp) {
   try {
     const isHyundai = (newApp.insuranceCompany || '').includes('현대해상');
     const newId = newApp.id;
-    const targetFaxRecipient = newApp.pendingFaxRecipient || (isHyundai ? '현대해상 보상지원센터' : '보상접수센터');
-    const targetFaxNumber = newApp.pendingFaxNumber || (isHyundai ? '02-2195-5000' : '02-3485-9100');
+    const targetFaxRecipient = newApp.pendingFaxRecipient || '';
+    const targetFaxNumber = newApp.pendingFaxNumber || '';
 
-    if (isHyundai) {
-      if (typeof window.gInitialFaxRecords === 'undefined') {
-        window.gInitialFaxRecords = {};
+    // 팩스번호가 실제로 입력된 경우에만 팩스 발송 및 발송 대장 기록 수행
+    if (targetFaxNumber) {
+      if (isHyundai) {
+        if (typeof window.gInitialFaxRecords === 'undefined') {
+          window.gInitialFaxRecords = {};
+        }
+        window.gInitialFaxRecords[newId] = {
+          formType: 'HD_FORM_01',
+          formTitle: '현대해상 간병인지원 신청/고객등록 요청서',
+          sentDate: newApp.initialFaxDate || new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+          status: '전송완료',
+          faxNumber: targetFaxNumber + (targetFaxRecipient ? ' (' + targetFaxRecipient + ')' : ''),
+          recipient: targetFaxRecipient || '현대해상 보상지원센터',
+          pages: 1,
+          deliveryStatus: '성공 (OK - 200)'
+        };
+        // 청구 팩스(Claim Fax) 이력과 섞이지 않도록 gFaxRecords에서는 확실히 제외/삭제
+        if (typeof gFaxRecords !== 'undefined' && gFaxRecords[newId]) {
+          delete gFaxRecords[newId];
+        }
       }
-      window.gInitialFaxRecords[newId] = {
-        formType: 'HD_FORM_01',
-        formTitle: '현대해상 간병인지원 신청/고객등록 요청서',
-        sentDate: newApp.initialFaxDate,
-        status: '전송완료',
-        faxNumber: targetFaxNumber + ' (' + targetFaxRecipient + ')',
-        recipient: targetFaxRecipient,
-        pages: 1,
-        deliveryStatus: '성공 (OK - 200)'
-      };
-      // 청구 팩스(Claim Fax) 이력과 섞이지 않도록 gFaxRecords에서는 확실히 제외/삭제
-      if (typeof gFaxRecords !== 'undefined' && gFaxRecords[newId]) {
-        delete gFaxRecords[newId];
-      }
-
       // 실제 팩스 게이트웨이(/api/fax/send - 바로빌/알리고) 실시간 전송 호출
       const savedMode = localStorage.getItem('LIVON_FAX_MODE') || 'barobill';
       let savedSender = localStorage.getItem('LIVON_FAX_SENDER');
@@ -11809,7 +11824,7 @@ async function finalizeNewAppRegistration(newApp) {
     renderApplications();
     renderDashboard();
 
-    if (isHyundai) {
+    if (isHyundai && targetFaxNumber) {
       showCustomAlert({
         title: '현대해상 1차 접수 & 팩스 발송 완료',
         message: `[${newId} - ${newApp.patientName} 님]의 현대해상 1차 접수가 성공적으로 완료되어 ${targetFaxRecipient}(FAX ${targetFaxNumber})으로 고객등록 팩스가 발송되었습니다.\n\n현재 고객 상태는 [문자수신대기]로 등록되었습니다.\n현대해상으로부터 피보험자 가입정보 회신 문자가 도착하면, 고객 카드나 간병신청대장의 [📱 현대 문자 등록] 버튼을 눌러 문자를 붙여넣으시면 증권/사고/손사 정보가 1초 만에 자동 완성됩니다.`,
