@@ -3825,17 +3825,17 @@
   </div>
 
   <!-- MODAL: FORM PREVIEW & PRINT -->
-  <div id="formPreviewModal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center hidden p-4">
+  <div id="formPreviewModal" class="fixed inset-0 z-[60] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-3xl w-full max-w-5xl max-h-[95vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
       <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between gap-4">
         <h3 class="text-sm font-bold flex items-center gap-2 min-w-0 flex-1 overflow-hidden" id="formPreviewModalTitle">
           <i data-lucide="file-text" class="w-4 h-4 text-amber-400 flex-shrink-0"></i> <span class="truncate">서식 미리보기</span>
         </h3>
         <div class="flex items-center gap-2 flex-shrink-0">
-          <button onclick="openFormEditor(gCurrentPreviewFormCode)" class="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 hover:text-amber-200 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all whitespace-nowrap flex-shrink-0" title="이 서식의 배경 업로드 및 필드 좌표 배치 에디터 열기">
+          <button id="btnFormPreviewEditArea" onclick="openFormEditor(gCurrentPreviewFormCode)" class="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 hover:text-amber-200 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all whitespace-nowrap flex-shrink-0" title="이 서식의 배경 업로드 및 필드 좌표 배치 에디터 열기">
             <i data-lucide="edit-3" class="w-3.5 h-3.5 flex-shrink-0"></i> 서식/좌표 편집
           </button>
-          <button onclick="dispatchFaxFromPreviewModal()" class="px-3.5 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all whitespace-nowrap flex-shrink-0">
+          <button id="btnFormPreviewDispatch" onclick="dispatchFaxFromPreviewModal()" class="px-3.5 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all whitespace-nowrap flex-shrink-0">
             <i data-lucide="send" class="w-3.5 h-3.5 flex-shrink-0"></i> 이 양식으로 팩스 발송
           </button>
           <button onclick="printFormPreviewSheet()" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1 whitespace-nowrap flex-shrink-0">
@@ -3849,6 +3849,33 @@
         <!-- A4 Page Simulation Sheet -->
         <div id="formPreviewSheet" class="w-full max-w-[680px] bg-white p-8 shadow-md rounded-lg text-slate-800 text-xs space-y-5 border border-slate-300">
           <!-- Dynamic Form Content Injected -->
+        </div>
+      </div>
+
+      <!-- Confirmation Footer (Active during Fax Dispatch Verification) -->
+      <div id="formPreviewConfirmFooter" class="hidden px-6 py-4 bg-slate-900 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white">
+        <div class="flex items-center gap-3">
+          <span class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+            <i data-lucide="alert-circle" class="w-5 h-5"></i>
+          </span>
+          <div>
+            <div class="text-xs font-bold flex items-center gap-2">
+              <span>최종 발송 전 입력 데이터 서식 확인</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">최종 확인 단계</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-0.5" id="formPreviewConfirmDesc">
+              서식에 기재된 피보험자 및 입원·주소 정보를 확인 후 [진짜 발송하기]를 누르면 팩스 전송이 진행됩니다.
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-2.5 flex-shrink-0">
+          <button type="button" onclick="cancelFaxFromPreviewModal()" class="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all">
+            취소 / 서식 수정
+          </button>
+          <button type="button" id="btnConfirmRealFaxSend" onclick="executeRealFaxSendFromPreview()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black shadow-lg shadow-blue-500/30 flex items-center gap-1.5 transition-all">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            <span id="btnConfirmRealFaxSendText">진짜 발송하기 (최종 전송) 📠</span>
+          </button>
         </div>
       </div>
     </div>
