@@ -2475,6 +2475,22 @@ const INITIAL_FAX_DIRECTORY = [
     memo: '관리자 모바일팩스 테스트 수신 회선 (실 발송 검증용)'
   },
   {
+    id: 'FDIR-TEST-02',
+    insuranceCompany: '공통(테스트)',
+    category: '회선시험',
+    firm: '(주)리본케어_복합기 관리자',
+    department: '사내 복합기 팩스 수신',
+    contactPerson: '김지훈 팀장',
+    faxNumber: '02-6499-3917',
+    phone: '02-6499-3917',
+    mobile: '010-4322-3813',
+    email: 'jihoon3813@livon.care',
+    isDefault: false,
+    isPinned: true,
+    isTestNumber: true,
+    memo: '사내 복합기(02-6499-3917) 테스트 수신 회선'
+  },
+  {
     id: 'FDIR-001',
     insuranceCompany: '현대해상',
     category: '1차접수',

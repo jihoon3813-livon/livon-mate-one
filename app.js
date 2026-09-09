@@ -7661,7 +7661,21 @@ async function executeSendFaxModal() {
     const testRedirectNumber = (localStorage.getItem('LIVON_FAX_TEST_NUMBER') || '').trim();
     let dispatchFaxNumber = targetNumber;
     let redirectNote = '';
-    if (isTestRedirect && testRedirectNumber) {
+
+    // 대상 수신처가 사내 테스트 회선(복합기, 모바일팩스 등)이거나 사내 번호인 경우 리다이렉트 제외하고 지정 수신처로 직송
+    const cleanTargetNum = (targetNumber || '').replace(/[^0-9]/g, '');
+    const isTargetInternalOrTest = 
+      (targetRecipient && (
+        targetRecipient.includes('복합기') || 
+        targetRecipient.includes('테스트') || 
+        targetRecipient.includes('리본케어') || 
+        targetRecipient.includes('모바일팩스')
+      )) || 
+      cleanTargetNum === '0264993917' ||
+      cleanTargetNum === (testRedirectNumber || '').replace(/[^0-9]/g, '');
+
+    const applyRedirect = isTestRedirect && testRedirectNumber && !isTargetInternalOrTest;
+    if (applyRedirect) {
       dispatchFaxNumber = testRedirectNumber;
       redirectNote = `\n[안전 테스트 리다이렉트 발송: 원본 수신처(${targetRecipient} ${targetNumber}) 대신 테스트 번호(${testRedirectNumber})로 안전 발송됨]`;
     }
@@ -7675,7 +7689,7 @@ async function executeSendFaxModal() {
       category: gCurrentFaxCase === 1 ? '1차접수' : '정산청구',
       formCode,
       formName,
-      recipient: targetRecipient + (isTestRedirect && testRedirectNumber ? ' (테스트 리다이렉트)' : ''),
+      recipient: targetRecipient + (applyRedirect ? ' (테스트 리다이렉트)' : ''),
       faxNumber: dispatchFaxNumber,
       senderNumber: savedSender,
       memo: memoText + redirectNote,
@@ -9200,11 +9214,22 @@ function initData() {
       try {
         const savedDir = localStorage.getItem('LIVON_FAX_DIR');
         gFaxDirectory = savedDir ? JSON.parse(savedDir) : [...window.REBORN_DATA.faxDirectory];
+        // 복합기 관리자 테스트 번호 등 누락된 기본 주소록 항목 자동 병합
+        window.REBORN_DATA.faxDirectory.forEach(initialEntry => {
+          if (!gFaxDirectory.some(d => d.id === initialEntry.id || (d.faxNumber === initialEntry.faxNumber && d.firm.includes('복합기')))) {
+            gFaxDirectory.unshift(initialEntry);
+          }
+        });
       } catch (e) {
         gFaxDirectory = [...window.REBORN_DATA.faxDirectory];
       }
     } else {
       gFaxDirectory = [];
+    }
+    // 안전 테스트 리다이렉트로 인한 수신처 가로채기 혼선 방지 (지정 수신처로 정상 발송되도록 1회 기본 해제)
+    if (localStorage.getItem('LIVON_FAX_TEST_REDIRECT_V2') !== 'true') {
+      localStorage.setItem('LIVON_FAX_TEST_REDIRECT', 'false');
+      localStorage.setItem('LIVON_FAX_TEST_REDIRECT_V2', 'true');
     }
     try {
       const savedLogs = localStorage.getItem('LIVON_FAX_LOGS');
@@ -11723,7 +11748,21 @@ async function finalizeNewAppRegistration(newApp) {
       const testRedirectNumber = (localStorage.getItem('LIVON_FAX_TEST_NUMBER') || '').trim();
       let dispatchFaxNumber = targetFaxNumber;
       let redirectNote = '';
-      if (isTestRedirect && testRedirectNumber) {
+
+      // 대상 수신처가 사내 테스트 회선(복합기, 모바일팩스 등)이거나 사내 번호인 경우 리다이렉트 제외하고 지정 수신처로 직송
+      const cleanTargetNum = (targetFaxNumber || '').replace(/[^0-9]/g, '');
+      const isTargetInternalOrTest = 
+        (targetFaxRecipient && (
+          targetFaxRecipient.includes('복합기') || 
+          targetFaxRecipient.includes('테스트') || 
+          targetFaxRecipient.includes('리본케어') || 
+          targetFaxRecipient.includes('모바일팩스')
+        )) || 
+        cleanTargetNum === '0264993917' ||
+        cleanTargetNum === (testRedirectNumber || '').replace(/[^0-9]/g, '');
+
+      const applyRedirect = isTestRedirect && testRedirectNumber && !isTargetInternalOrTest;
+      if (applyRedirect) {
         dispatchFaxNumber = testRedirectNumber;
         redirectNote = `\n[안전 테스트 리다이렉트: 원본(${targetFaxRecipient} ${targetFaxNumber}) 대신 테스트번호(${testRedirectNumber})로 송출됨]`;
       }
@@ -11737,7 +11776,7 @@ async function finalizeNewAppRegistration(newApp) {
         category: '1차접수',
         formCode: 'HD_FORM_01',
         formName: '현대해상 1차 고객등록 및 신청 접수서',
-        recipient: targetFaxRecipient + (isTestRedirect && testRedirectNumber ? ' (테스트 리다이렉트)' : ''),
+        recipient: targetFaxRecipient + (applyRedirect ? ' (테스트 리다이렉트)' : ''),
         faxNumber: dispatchFaxNumber,
         senderNumber: savedSender,
         memo: (newApp.memo || '현대해상 1차 고객등록 및 신청 접수 건 송부') + redirectNote,
