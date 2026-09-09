@@ -14201,9 +14201,11 @@ function updateHeaderAdminProfile() {
   if (roleEl) roleEl.innerText = `${gCurrentAdmin.role} (${gCurrentAdmin.status || '활성'})`;
 }
 
-function handleAdminLogout() {
-  if (!confirm('정말 로그아웃 하시겠습니까? 로그아웃 시 개인정보 마스킹이 기본값(ON)으로 초기화됩니다.')) {
-    return;
+function handleAdminLogout(isAuto = false) {
+  if (!isAuto) {
+    if (!confirm('정말 로그아웃 하시겠습니까? 로그아웃 시 개인정보 마스킹이 기본값(ON)으로 초기화됩니다.')) {
+      return;
+    }
   }
   // Reset masking to default ON on logout
   gIsMasked = true;
@@ -14343,9 +14345,15 @@ function startInactivityMonitoring() {
     }
 
     if (remainMs <= 0) {
-      // Trigger Auto Logout
-      handleAdminLogout();
+      // Trigger Auto Logout without confirmation prompt
+      handleAdminLogout(true);
       gLastActivityTimestamp = Date.now();
+      showCustomAlert({
+        title: '보안 자동 로그아웃',
+        message: `장시간(${gAutoLogoutMinutes}분) 동안 활동이 없어 개인정보 보호를 위해 자동으로 로그아웃되었습니다.`,
+        icon: 'shield-alert',
+        iconColor: 'rose'
+      });
     }
   }, 1000);
 }
