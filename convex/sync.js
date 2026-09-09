@@ -5,15 +5,16 @@ import { v } from "convex/values";
 export const bundleAll = query({
   args: {},
   handler: async (ctx) => {
-    const [applications, assignments, claims, payouts, adjusters, careLogs] = await Promise.all([
+    const [applications, assignments, claims, payouts, adjusters, careLogs, formConfigs] = await Promise.all([
       ctx.db.query("applications").order("desc").collect(),
       ctx.db.query("assignments").collect(),
       ctx.db.query("claims").collect(),
       ctx.db.query("payouts").collect(),
       ctx.db.query("adjusters").collect(),
       ctx.db.query("careLogs").collect(),
+      ctx.db.query("formConfigs").collect(),
     ]);
-    return { applications, assignments, claims, payouts, adjusters, careLogs };
+    return { applications, assignments, claims, payouts, adjusters, careLogs, formConfigs };
   },
 });
 
@@ -189,6 +190,44 @@ export const deletePayout = mutation({
       await ctx.db.delete(p._id);
     }
     return { deletedPayoutId: args.payoutId, count: payouts.length };
+  },
+});
+
+// 10. 양식 설정 및 배경 저장 (Upsert by formCode)
+export const saveFormConfig = mutation({
+  args: {
+    formCode: v.string(),
+    areas: v.optional(v.any()),
+    background: v.optional(v.string()),
+    updatedAt: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("formConfigs")
+      .filter((q) => q.eq(q.field("formCode"), args.formCode))
+      .first();
+
+    const patchData = {
+      formCode: args.formCode,
+      updatedAt: args.updatedAt || new Date().toISOString(),
+    };
+    if (args.areas !== undefined) patchData.areas = args.areas;
+    if (args.background !== undefined) patchData.background = args.background;
+
+    if (existing) {
+      await ctx.db.patch(existing._id, patchData);
+      return existing._id;
+    } else {
+      return await ctx.db.insert("formConfigs", patchData);
+    }
+  },
+});
+
+// 11. 양식 설정 단독 조회
+export const getFormConfigs = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("formConfigs").collect();
   },
 });
 

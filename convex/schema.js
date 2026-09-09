@@ -1,4 +1,4 @@
-﻿import { defineSchema, defineTable } from "convex/server";
+import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
@@ -28,4 +28,7 @@ export default defineSchema({
 
   // 협력 센터 / 파트너
   partners: defineTable(v.any()),
+
+  // 양식 설정 및 필드 매핑 / 배경 (Form Configs & Backgrounds)
+  formConfigs: defineTable(v.any()),
 });

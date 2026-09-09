@@ -722,7 +722,7 @@ var gFormTemplates = [];
 var gFaxRecords = {};
 var gFaxDirectory = [];
 var gFaxLogs = [];
-const CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
+const CONVEX_URL = (typeof window !== 'undefined' && (window.ENV?.CONVEX_URL || window.CONVEX_URL)) || 'https://gallant-weasel-360.convex.cloud';
 
 async function syncToConvex(path, args = {}) {
   try {
@@ -807,6 +807,32 @@ async function loadConvexData(showSpinner = true) {
       if (Array.isArray(payouts)) gPayouts = payouts;
       if (Array.isArray(adjusters) && adjusters.length > 0) gAdjusters = adjusters;
       if (Array.isArray(careLogs) && careLogs.length > 0) gCareLogs = careLogs;
+
+      // Convex DB에 저장된 양식 설정(영역 좌표 및 배경 이미지) 동기화 복원
+      const { formConfigs } = res.value;
+      if (Array.isArray(formConfigs) && formConfigs.length > 0) {
+        let hasUpdatedConfig = false;
+        formConfigs.forEach(fc => {
+          if (fc.formCode) {
+            if (Array.isArray(fc.areas) && fc.areas.length > 0) {
+              gFormAreaStore[fc.formCode] = fc.areas;
+              hasUpdatedConfig = true;
+            }
+            if (fc.background) {
+              gFormBackgroundStore[fc.formCode] = fc.background;
+            } else if (fc.background === '') {
+              delete gFormBackgroundStore[fc.formCode];
+            }
+          }
+        });
+        if (hasUpdatedConfig) {
+          try {
+            localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
+            localStorage.setItem('LIVON_FORM_BACKGROUNDS', JSON.stringify(gFormBackgroundStore));
+          } catch (e) {}
+          console.log('[Convex Cloud] 양식 설정 및 배경 클라우드 동기화 완료');
+        }
+      }
 
       console.log(`[Convex Cloud] 운영 DB 실시간 동기화 완료 (고객: ${gApps.length}명, 배정: ${gAssigns.length}건, 청구: ${gClaims.length}건, 정산: ${gPayouts.length}건)`);
       updateConvexStatusBadge(true, gApps.length);
@@ -1058,19 +1084,23 @@ var gFormAreaStore = {
   ]
 };
 
-// Load custom areas from localStorage (with version management to update default mapping schema)
-const FORM_AREAS_VERSION = 'v20260908_03';
+// Load custom areas from localStorage (안전한 보존 우선 로드: 버전 변경 시에도 사용자 설정 절대 덮어쓰지 않음)
+const FORM_AREAS_VERSION = 'v20260909_01';
 try {
-  const savedVer = localStorage.getItem('LIVON_FORM_AREAS_VER');
   const savedAreas = localStorage.getItem('LIVON_FORM_AREAS');
-  if (savedVer === FORM_AREAS_VERSION && savedAreas) {
+  if (savedAreas) {
     const parsed = JSON.parse(savedAreas);
-    gFormAreaStore = { ...gFormAreaStore, ...parsed };
-  } else {
-    localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
-    localStorage.setItem('LIVON_FORM_AREAS_VER', FORM_AREAS_VERSION);
+    for (const code in parsed) {
+      if (Array.isArray(parsed[code]) && parsed[code].length > 0) {
+        gFormAreaStore[code] = parsed[code];
+      }
+    }
   }
-} catch (e) {}
+  localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
+  localStorage.setItem('LIVON_FORM_AREAS_VER', FORM_AREAS_VERSION);
+} catch (e) {
+  console.warn('LIVON_FORM_AREAS 로드 경고:', e);
+}
 
 // Background image store (supports PNG, JPG, WebP, and PDF rendered to image)
 var gFormBackgroundStore = {};
@@ -1193,32 +1223,57 @@ async function handleFormTemplateUpload(e) {
   e.target.value = '';
 }
 
-function saveFormBackgroundData(dataUrl, fileName) {
+async function saveFormBackgroundData(dataUrl, fileName) {
   gFormBackgroundStore[gCurrentEditingFormCode] = dataUrl;
   try {
     localStorage.setItem('LIVON_FORM_BACKGROUNDS', JSON.stringify(gFormBackgroundStore));
   } catch (e) {
-    console.warn('배경 이미지 저장 경고:', e);
+    console.warn('배경 이미지 로컬 저장소 용량 초과 경고 (Convex Cloud에 영구 저장됩니다):', e);
   }
+
+  // Convex Cloud DB에 배경 이미지 영구 보존
+  try {
+    await syncToConvex('sync:saveFormConfig', {
+      formCode: gCurrentEditingFormCode,
+      background: dataUrl,
+      updatedAt: new Date().toISOString()
+    });
+    console.log(`[Form Background] ${gCurrentEditingFormCode} 배경 이미지가 Convex Cloud DB에 영구 저장되었습니다.`);
+  } catch (err) {
+    console.warn('[Form Background Convex Save Error]', err);
+  }
+
   renderEditorCanvasAndList();
   if (typeof showCustomAlert === 'function') {
     showCustomAlert({
       title: '빈양식 배경 적용 완료',
-      message: `[${fileName}] 서식이 캔버스 배경으로 등록되었습니다.\n영역 박스를 마우스로 드래그하여 서식 칸에 맞춰 배치할 수 있습니다.`,
+      message: `[${fileName}] 서식이 캔버스 배경으로 등록되었으며, Convex 클라우드 DB에 영구 보존됩니다.\n영역 박스를 마우스로 드래그하여 서식 칸에 맞춰 배치할 수 있습니다.`,
       icon: 'file-check',
       iconColor: 'emerald'
     });
   } else {
-    alert(`[${fileName}] 서식이 캔버스 배경으로 설정되었습니다.`);
+    alert(`[${fileName}] 서식이 캔버스 배경으로 설정 및 영구 저장되었습니다.`);
   }
 }
 
-function removeFormBackground() {
+async function removeFormBackground() {
   if (confirm('현재 양식의 업로드된 배경 이미지를 삭제하고 기본 서식으로 되돌리시겠습니까?')) {
     delete gFormBackgroundStore[gCurrentEditingFormCode];
     try {
       localStorage.setItem('LIVON_FORM_BACKGROUNDS', JSON.stringify(gFormBackgroundStore));
     } catch (e) {}
+
+    try {
+      await syncToConvex('sync:saveFormConfig', {
+        formCode: gCurrentEditingFormCode,
+        background: '',
+        updatedAt: new Date().toISOString()
+      });
+      console.log(`[Form Background] ${gCurrentEditingFormCode} 배경 삭제가 Convex Cloud DB에 반영되었습니다.`);
+    } catch (err) {
+      console.warn('[Form Background Remove Convex Error]', err);
+    }
+
     renderEditorCanvasAndList();
   }
 }
@@ -1650,15 +1705,29 @@ function removeAreaFromForm(areaId) {
   }
 }
 
-function saveFormAreas() {
+async function saveFormAreas() {
   try {
     localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
   } catch (e) {}
-  alert('💾 [' + gCurrentEditingFormCode + '] 양식의 서식 배경 및 데이터 매핑 설정이 안전하게 저장되었습니다!');
+
+  // Convex Cloud DB에 영구 백업 저장!
+  try {
+    const currentAreas = gFormAreaStore[gCurrentEditingFormCode] || [];
+    await syncToConvex('sync:saveFormConfig', {
+      formCode: gCurrentEditingFormCode,
+      areas: currentAreas,
+      updatedAt: new Date().toISOString()
+    });
+    console.log(`[Form Config] ${gCurrentEditingFormCode} 양식 영역 설정이 Convex Cloud DB에 영구 저장되었습니다.`);
+  } catch (err) {
+    console.warn('[Form Config Convex Save Error]', err);
+  }
+
+  alert('💾 [' + gCurrentEditingFormCode + '] 양식의 서식 배경 및 데이터 매핑 설정이 Convex 클라우드 DB와 로컬에 안전하게 영구 저장되었습니다!');
   closeModal('formFieldEditorModal');
 }
 
-function resetFormAreasToDefault() {
+async function resetFormAreasToDefault() {
   if (!confirm(`[${gCurrentEditingFormCode}] 양식의 필드 배치를 표준 기본값으로 초기화하시겠습니까?\n(기존에 수정한 위치가 초기화됩니다)`)) {
     return;
   }
@@ -1701,6 +1770,14 @@ function resetFormAreasToDefault() {
     try {
       localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
     } catch (e) {}
+    try {
+      await syncToConvex('sync:saveFormConfig', {
+        formCode: gCurrentEditingFormCode,
+        areas: gFormAreaStore[gCurrentEditingFormCode],
+        updatedAt: new Date().toISOString()
+      });
+      console.log(`[Form Config] ${gCurrentEditingFormCode} 양식 초기화가 Convex Cloud DB에 반영되었습니다.`);
+    } catch (err) {}
     gSelectedAreaIds.clear();
     renderEditorCanvasAndList();
   }
