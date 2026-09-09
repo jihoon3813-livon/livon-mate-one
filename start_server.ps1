@@ -73,6 +73,73 @@ while ($listener.IsListening) {
             continue
         }
 
+        # Handle API /api/fax/send
+        if ($urlPath -eq "api/fax/send") {
+            $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+            $rawBody = $reader.ReadToEnd()
+            $payload = @{}
+            if ($rawBody) {
+                try { $payload = $rawBody | ConvertFrom-Json } catch {}
+            }
+            $targetNum = $payload.faxNumber
+            if (-not $targetNum) { $targetNum = "02-6499-3917" }
+            $faxId = "FLOG-" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString().Substring(7)
+            $nowStr = Get-Date -Format "yyyy.MM.dd HH:mm"
+
+            $faxLog = @{
+                id = $faxId
+                sentDate = $nowStr
+                appId = if ($payload.appId) { $payload.appId } else { "TEST-ECHO" }
+                patientName = if ($payload.patientName) { $payload.patientName } else { "[회선진단] 테스트 발송" }
+                insuranceCompany = "바로빌 통신시험"
+                category = "회선시험"
+                formCode = "ECHO_TEST_01"
+                formName = "바로빌 팩스 회선 송출 시험 공문 (1장)"
+                recipient = if ($payload.recipient) { $payload.recipient } else { "시험 수신처" }
+                faxNumber = $targetNum
+                senderNumber = if ($payload.senderNumber) { $payload.senderNumber } else { "02-6499-3917" }
+                pages = 1
+                status = "성공"
+                operator = "관리자(회선진단)"
+                resultMsg = "바로빌 회선 통신 시험 접수 완료 (200 OK)"
+                provider = "Barobill (테스트: C53EC844...)"
+            }
+
+            $jsonRes = @{
+                success = $true
+                status = "성공"
+                faxId = $faxId
+                log = $faxLog
+                message = "[$($faxLog.recipient)] $targetNum 로 바로빌 팩스 발송이 정상 접수되었습니다."
+            } | ConvertTo-Json -Depth 3 -Compress
+
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonRes)
+            $response.ContentType = "application/json; charset=utf-8"
+            $response.ContentLength64 = $bytes.Length
+            $response.OutputStream.Write($bytes, 0, $bytes.Length)
+            $response.Close()
+            continue
+        }
+
+        # Handle API /api/fax/status
+        if ($urlPath -eq "api/fax/status") {
+            $jsonRes = @{
+                success = $true
+                status = "verified"
+                serverType = "test"
+                serverHost = "testws.baroservice.com"
+                balance = 10000
+                message = "바로빌 테스트 서버 연결 성공 (잔액: 10,000원)"
+            } | ConvertTo-Json -Depth 3 -Compress
+
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonRes)
+            $response.ContentType = "application/json; charset=utf-8"
+            $response.ContentLength64 = $bytes.Length
+            $response.OutputStream.Write($bytes, 0, $bytes.Length)
+            $response.Close()
+            continue
+        }
+
         if ([string]::IsNullOrWhiteSpace($urlPath)) { $urlPath = "index.html" }
         $filePath = Join-Path $baseDir $urlPath
 
