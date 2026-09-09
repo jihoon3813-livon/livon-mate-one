@@ -7473,7 +7473,11 @@ async function executeSendFaxModal() {
 
   try {
     const savedMode = localStorage.getItem('LIVON_FAX_MODE') || 'barobill';
-    const savedSender = localStorage.getItem('LIVON_FAX_SENDER') || '02-556-9114';
+    let savedSender = localStorage.getItem('LIVON_FAX_SENDER');
+    if (!savedSender || savedSender === '02-556-9114') {
+      savedSender = '02-6499-3917';
+      localStorage.setItem('LIVON_FAX_SENDER', savedSender);
+    }
     const savedBaroCertKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY') || 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE';
     const savedBaroCorpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM') || '388-86-02921';
     const savedBaroId = localStorage.getItem('LIVON_BAROBILL_ID') || 'jihoon3813@gmail.com';
@@ -7966,7 +7970,11 @@ async function testBarobillConnection() {
 
 function openFaxSettingsModal() {
   const mode = localStorage.getItem('LIVON_FAX_MODE') || 'barobill';
-  const sender = localStorage.getItem('LIVON_FAX_SENDER') || '02-556-9114';
+  let sender = localStorage.getItem('LIVON_FAX_SENDER');
+  if (!sender || sender === '02-556-9114') {
+    sender = '02-6499-3917';
+    localStorage.setItem('LIVON_FAX_SENDER', sender);
+  }
   const aligoUser = localStorage.getItem('LIVON_FAX_ALIGO_USER') || '';
   const aligoKey = localStorage.getItem('LIVON_FAX_ALIGO_KEY') || '';
   
@@ -8014,7 +8022,7 @@ function openFaxSettingsModal() {
 function saveFaxSettings() {
   const modeRadio = document.querySelector('input[name="faxEngineMode"]:checked');
   const mode = modeRadio ? modeRadio.value : 'barobill';
-  const sender = document.getElementById('faxSettingSenderNumber')?.value.trim() || '02-556-9114';
+  const sender = document.getElementById('faxSettingSenderNumber')?.value.trim() || '02-6499-3917';
   
   // Barobill inputs
   const baroCertKey = document.getElementById('faxBarobillCertKey')?.value.trim() || 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE';

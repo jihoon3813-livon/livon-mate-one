@@ -22,7 +22,7 @@ module.exports = async (req, res) => {
       formName = '현대해상 1차 고객등록 접수서',
       recipient = '보상접수센터',
       faxNumber = '',
-      senderNumber = process.env.FAX_SENDER_NUMBER || '02-556-9114',
+      senderNumber = process.env.FAX_SENDER_NUMBER || '02-6499-3917',
       pages = 1,
       operator = '관리자(원스탑)',
       provider = 'barobill',

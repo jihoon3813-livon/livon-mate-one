@@ -207,7 +207,7 @@ function startServer(port) {
             formName = '현대해상 1차 고객등록 접수서',
             recipient = '보상접수센터',
             faxNumber = '',
-            senderNumber = process.env.FAX_SENDER_NUMBER || '02-556-9114',
+            senderNumber = process.env.FAX_SENDER_NUMBER || '02-6499-3917',
             pages = 1,
             operator = '관리자(원스탑)',
             provider = 'auto'
@@ -306,7 +306,7 @@ function startServer(port) {
         status: 'online',
         gateway: 'Livon Fax Serverless Gateway v3.0 (Barobill Certified)',
         supportedProviders: ['Barobill', 'SmartSandbox', 'Aligo'],
-        defaultSender: process.env.FAX_SENDER_NUMBER || '02-556-9114'
+        defaultSender: process.env.FAX_SENDER_NUMBER || '02-6499-3917'
       }));
       return;
     }
