@@ -1291,17 +1291,13 @@
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
-            <button onclick="openFaxSettingsModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold cursor-pointer" title="팩스 공급자(알리고/팝빌/샌드박스) 및 발신번호 설정">
-              <i data-lucide="settings-2" class="w-4 h-4 text-purple-600"></i>
-              <span>팩스 연동 설정</span>
+            <button onclick="openFaxSettingsModal()" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 transition-all cursor-pointer" title="팩스 테스트 모드, 리다이렉트 번호 및 바로빌 연동 설정">
+              <i data-lucide="flask-conical" class="w-4 h-4 text-amber-300"></i>
+              <span>팩스 테스트 및 연동 설정</span>
             </button>
             <button onclick="openFaxDirectoryModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold shadow-xs transition-all cursor-pointer">
               <i data-lucide="book-plus" class="w-4 h-4 text-purple-300"></i>
               <span>손사 팩스번호 등록</span>
-            </button>
-            <button onclick="openNewFaxDispatch()" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 transition-all cursor-pointer">
-              <i data-lucide="send" class="w-4 h-4"></i>
-              <span>신규 팩스 발송</span>
             </button>
             <button onclick="exportFaxLogsToCSV()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold cursor-pointer">
               <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
@@ -3110,23 +3106,24 @@
   
   <!-- 5.9 Fax Engine Settings Modal -->
   <div id="faxSettingsModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200">
-      <div class="p-5 bg-gradient-to-r from-slate-900 to-purple-950 text-white flex items-center justify-between">
+    <div class="bg-white rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden border border-slate-200 max-h-[90vh] flex flex-col">
+      <div class="p-5 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white flex items-center justify-between shrink-0">
         <div class="flex items-center gap-2.5">
           <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
-            <i data-lucide="settings-2" class="w-5 h-5 text-purple-300"></i>
+            <i data-lucide="flask-conical" class="w-5 h-5 text-amber-300"></i>
           </div>
           <div>
-            <h3 class="text-base font-black">팩스(FAX) 연동 엔진 설정</h3>
-            <p class="text-xs text-purple-200 mt-0.5">전자 팩스 발송 공급자 및 발신번호 설정</p>
+            <h3 class="text-base font-black">팩스(FAX) 테스트 및 연동 환경 설정</h3>
+            <p class="text-xs text-purple-200 mt-0.5">바로빌 공식 연동 및 안전 테스트 샌드박스 · 회선 진단 시험 발송</p>
           </div>
         </div>
-        <button onclick="closeModal('faxSettingsModal')" class="p-2 text-purple-300 hover:text-white rounded-lg">
+        <button onclick="closeModal('faxSettingsModal')" class="p-2 text-purple-300 hover:text-white rounded-lg cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <div class="p-6 space-y-4 text-xs">
+      <div class="p-6 space-y-4 text-xs overflow-y-auto custom-scrollbar flex-1">
+        <!-- 발송 엔진 선택 -->
         <div>
           <label class="block font-bold text-slate-800 mb-1.5">팩스 발송 엔진 모드 선택 *</label>
           <div class="grid grid-cols-3 gap-2">
@@ -3141,7 +3138,7 @@
               <input type="radio" name="faxEngineMode" value="sandbox" onchange="toggleFaxEngineConfig('sandbox')" class="w-4 h-4 text-purple-600">
               <div>
                 <b class="text-slate-900 block text-[11.5px]">스마트 샌드박스</b>
-                <span class="text-[9.5px] text-slate-500">모의 회선 발송</span>
+                <span class="text-[9.5px] text-slate-500">모의 가상 발송</span>
               </div>
             </label>
             <label class="p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer flex items-center gap-2 hover:bg-purple-50 hover:border-purple-300 transition-all">
@@ -3154,10 +3151,32 @@
           </div>
         </div>
 
+        <!-- 🧪 안전 테스트 모드 및 수신처 강제 리다이렉트 설정 -->
+        <div class="p-4 bg-amber-50/70 rounded-2xl border border-amber-200 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 font-black text-amber-900 text-[11.5px]">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-amber-600"></i>
+              <span>테스트 안전 장치 (실제 손사 오발송 원천 차단)</span>
+            </div>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" id="faxSettingTestRedirect" class="w-4 h-4 text-amber-600 rounded">
+              <span class="font-bold text-amber-900 text-[11px]">안전 리다이렉트 활성화</span>
+            </label>
+          </div>
+          <p class="text-[10px] text-amber-800 leading-relaxed">
+            체크 시 직원이 고객 상세나 정산 화면에서 팩스를 발송하더라도, <strong>실제 보험사/손해사정사 번호 대신 아래 지정된 '테스트 팩스번호'로만 송출</strong>되어 안심하고 모든 기능을 테스트할 수 있습니다.
+          </p>
+          <div>
+            <label class="block text-[10.5px] font-bold text-amber-950 mb-1">테스트 수신 팩스번호 (관리자 모바일팩스 등)</label>
+            <input type="text" id="faxSettingTestNumber" placeholder="예: 0504-1234-5678 (본인 모바일팩스 번호)" class="w-full p-2.5 border border-amber-300 rounded-xl font-mono text-slate-900 bg-white focus:ring-2 focus:ring-amber-500">
+          </div>
+        </div>
+
+        <!-- 공식 발신번호 -->
         <div>
           <label class="block font-bold text-slate-800 mb-1.5">리본케어 공식 발신 팩스번호 *</label>
           <input type="text" id="faxSettingSenderNumber" placeholder="예: 02-6499-3917" value="02-6499-3917" class="w-full p-2.5 border border-slate-300 rounded-xl font-mono text-slate-900 bg-white focus:ring-2 focus:ring-purple-500">
-          <p class="text-[10px] text-slate-400 mt-1">통신사/바로빌에 사전 등록된 리본케어 공식 발신번호입니다.</p>
+          <p class="text-[10px] text-slate-400 mt-1">바로빌에 사전 승인 등록된 리본케어 공식 발신번호입니다.</p>
         </div>
 
         <!-- 바로빌 (Barobill) 전용 설정 영역 -->
@@ -3165,7 +3184,7 @@
           <div class="flex items-center justify-between pb-2 border-b border-purple-200">
             <div class="text-[11.5px] font-black text-purple-950 flex items-center gap-1.5">
               <i data-lucide="shield-check" class="w-4 h-4 text-purple-600"></i>
-              <span>바로빌(Barobill) 공식 연동 설정</span>
+              <span>바로빌(Barobill) 연동 계정 및 서버</span>
             </div>
             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900">리본메이트원</span>
           </div>
@@ -3200,17 +3219,41 @@
             <input type="text" id="faxBarobillCertKey" placeholder="연동 인증키 입력" value="C53EC844-0FE7-4139-80AA-FE06E3ACAABE" class="w-full p-2 border-2 border-purple-400 rounded-xl text-xs bg-white font-mono font-black text-purple-950">
             <p class="text-[10px] text-slate-500 mt-1 flex items-center justify-between">
               <span>* 테스트키: <code class="font-mono text-purple-700">C53EC844-0FE7-4139-80AA-FE06E3ACAABE</code></span>
-              <button type="button" onclick="quickFillBarobillKey('test')" class="text-purple-700 hover:underline font-bold text-[10px]">테스트키 적용</button>
-              <button type="button" onclick="quickFillBarobillKey('prod')" class="text-indigo-700 hover:underline font-bold text-[10px]">운영키 적용</button>
+              <span class="flex gap-2">
+                <button type="button" onclick="quickFillBarobillKey('test')" class="text-purple-700 hover:underline font-bold text-[10px] cursor-pointer">테스트키 적용</button>
+                <button type="button" onclick="quickFillBarobillKey('prod')" class="text-indigo-700 hover:underline font-bold text-[10px] cursor-pointer">운영키 적용</button>
+              </span>
             </p>
           </div>
 
           <div class="pt-1 flex items-center justify-between">
-            <button type="button" onclick="testBarobillConnection()" class="px-3 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs">
+            <button type="button" onclick="testBarobillConnection()" class="px-3 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs cursor-pointer">
               <i data-lucide="activity" class="w-3.5 h-3.5"></i> 바로빌 연결 및 잔액 테스트
             </button>
             <span id="barobillConnStatus" class="text-[11px] font-mono font-bold text-slate-600"></span>
           </div>
+        </div>
+
+        <!-- 🚀 회선 진단 1장 즉시 시험발송 (Echo Test) -->
+        <div class="p-4 bg-slate-900 text-white rounded-2xl space-y-2.5 shadow-md">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 font-bold text-amber-300 text-xs">
+              <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+              <span>회선 진단 1장 시험 발송 (Echo Test)</span>
+            </div>
+            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-400/20 text-amber-300">고객 데이터 무관</span>
+          </div>
+          <p class="text-[10px] text-slate-300">
+            고객 건을 건드리지 않고, 지정된 수신 팩스번호로 <strong>바로빌 회선 통신 시험 공문 1장을 즉시 송출</strong>하여 전송 및 대장 등록을 진단합니다.
+          </p>
+          <div class="flex gap-2">
+            <input type="text" id="faxEchoTargetNumber" placeholder="수신 팩스번호 입력 (예: 0504-1234-5678)" class="flex-1 p-2.5 rounded-xl text-xs bg-slate-800 border border-slate-700 text-white font-mono focus:ring-2 focus:ring-amber-400">
+            <button type="button" onclick="executeFaxEchoTest()" id="btnFaxEchoTest" class="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm cursor-pointer whitespace-nowrap">
+              <i data-lucide="send" class="w-3.5 h-3.5"></i>
+              <span>시험 발송</span>
+            </button>
+          </div>
+          <div id="faxEchoStatus" class="text-[11px] hidden p-2.5 rounded-xl"></div>
         </div>
 
         <!-- 알리고 (Aligo) 설정 영역 -->
@@ -3230,9 +3273,9 @@
         </div>
       </div>
 
-      <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
-        <button type="button" onclick="closeModal('faxSettingsModal')" class="px-4 py-2 border rounded-xl font-bold bg-white text-slate-700 hover:bg-slate-100 text-xs">취소</button>
-        <button type="button" onclick="saveFaxSettings()" class="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow-sm">설정 저장</button>
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+        <button type="button" onclick="closeModal('faxSettingsModal')" class="px-4 py-2 border rounded-xl font-bold bg-white text-slate-700 hover:bg-slate-100 text-xs cursor-pointer">닫기</button>
+        <button type="button" onclick="saveFaxSettings()" class="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow-sm cursor-pointer">설정 저장</button>
       </div>
     </div>
   </div>

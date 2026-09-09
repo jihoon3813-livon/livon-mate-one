@@ -29,21 +29,7 @@ function moveAppToFront(appId) {
 }
 
 function openNewFaxDispatch() {
-  if (!gApps || gApps.length === 0) {
-    alert('등록된 고객 데이터가 없습니다.');
-    return;
-  }
-  const unsentClaimApp = gApps.find(a => {
-    if (a.claimCount <= 0) return false;
-    const r = typeof gFaxRecords !== 'undefined' && gFaxRecords[a.id];
-    const isClaimSent = r && r.status === '전송완료' && r.caseType !== '현대해상 고객등록/조회' && r.formType !== 'HD_FORM_01';
-    return !isClaimSent;
-  });
-  if (unsentClaimApp) {
-    openFaxModal(unsentClaimApp.id, 2);
-  } else {
-    openFaxModal(gApps[0].id, 1);
-  }
+  alert('팩스 발송은 [고객 상세] 또는 [정산 관리] 화면에서 대상 환자를 확인하신 후 [팩스 발송]을 눌러주세요.');
 }
 
 function openGlobalFaxModal() {
@@ -7485,6 +7471,15 @@ async function executeSendFaxModal() {
     const savedAligoUser = localStorage.getItem('LIVON_FAX_ALIGO_USER') || '';
     const savedAligoKey = localStorage.getItem('LIVON_FAX_ALIGO_KEY') || '';
 
+    const isTestRedirect = localStorage.getItem('LIVON_FAX_TEST_REDIRECT') === 'true';
+    const testRedirectNumber = (localStorage.getItem('LIVON_FAX_TEST_NUMBER') || '').trim();
+    let dispatchFaxNumber = targetNumber;
+    let redirectNote = '';
+    if (isTestRedirect && testRedirectNumber) {
+      dispatchFaxNumber = testRedirectNumber;
+      redirectNote = `\n[안전 테스트 리다이렉트 발송: 원본 수신처(${targetRecipient} ${targetNumber}) 대신 테스트 번호(${testRedirectNumber})로 안전 발송됨]`;
+    }
+
     const payload = {
       appId: app.id,
       patientName: app.patientName,
@@ -7492,10 +7487,10 @@ async function executeSendFaxModal() {
       category: gCurrentFaxCase === 1 ? '1차접수' : '정산청구',
       formCode,
       formName,
-      recipient: targetRecipient,
-      faxNumber: targetNumber,
+      recipient: targetRecipient + (isTestRedirect && testRedirectNumber ? ' (테스트 리다이렉트)' : ''),
+      faxNumber: dispatchFaxNumber,
       senderNumber: savedSender,
-      memo: memoText,
+      memo: memoText + redirectNote,
       pages,
       operator: '관리자(원스탑)',
       provider: savedMode,
@@ -7993,6 +7988,13 @@ function openFaxSettingsModal() {
 
   toggleFaxEngineConfig(mode);
 
+  const testRedirect = localStorage.getItem('LIVON_FAX_TEST_REDIRECT') === 'true';
+  const testNumber = localStorage.getItem('LIVON_FAX_TEST_NUMBER') || '';
+  const redirectInput = document.getElementById('faxSettingTestRedirect');
+  if (redirectInput) redirectInput.checked = testRedirect;
+  const testNumberInput = document.getElementById('faxSettingTestNumber');
+  if (testNumberInput) testNumberInput.value = testNumber;
+
   const senderInput = document.getElementById('faxSettingSenderNumber');
   if (senderInput) senderInput.value = sender;
 
@@ -8014,6 +8016,11 @@ function openFaxSettingsModal() {
 
   const statusEl = document.getElementById('barobillConnStatus');
   if (statusEl) statusEl.innerHTML = '';
+  const echoStatusEl = document.getElementById('faxEchoStatus');
+  if (echoStatusEl) {
+    echoStatusEl.className = 'text-[11px] hidden p-2.5 rounded-xl';
+    echoStatusEl.innerHTML = '';
+  }
 
   openModal('faxSettingsModal');
   initIcons(document.getElementById('faxSettingsModal'));
@@ -8023,6 +8030,8 @@ function saveFaxSettings() {
   const modeRadio = document.querySelector('input[name="faxEngineMode"]:checked');
   const mode = modeRadio ? modeRadio.value : 'barobill';
   const sender = document.getElementById('faxSettingSenderNumber')?.value.trim() || '02-6499-3917';
+  const testRedirect = document.getElementById('faxSettingTestRedirect')?.checked || false;
+  const testNumber = document.getElementById('faxSettingTestNumber')?.value.trim() || '';
   
   // Barobill inputs
   const baroCertKey = document.getElementById('faxBarobillCertKey')?.value.trim() || 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE';
@@ -8037,6 +8046,8 @@ function saveFaxSettings() {
   try {
     localStorage.setItem('LIVON_FAX_MODE', mode);
     localStorage.setItem('LIVON_FAX_SENDER', sender);
+    localStorage.setItem('LIVON_FAX_TEST_REDIRECT', testRedirect ? 'true' : 'false');
+    localStorage.setItem('LIVON_FAX_TEST_NUMBER', testNumber);
     localStorage.setItem('LIVON_BAROBILL_CERTKEY', baroCertKey);
     localStorage.setItem('LIVON_BAROBILL_CORPNUM', baroCorpNum);
     localStorage.setItem('LIVON_BAROBILL_ID', baroId);
@@ -8051,12 +8062,112 @@ function saveFaxSettings() {
   if (mode === 'barobill') {
     engineDesc = `바로빌 (Barobill 공식 연동 - ${baroServer === 'prod' ? '운영' : '테스트'})\n인증키: ${baroCertKey}\n사업자: ${baroCorpNum} (${baroId})`;
   } else if (mode === 'sandbox') {
-    engineDesc = '스마트 샌드박스 (모의 회선)';
+    engineDesc = '스마트 샌드박스 (모의 가상 발송)';
   } else {
     engineDesc = '알리고 (Aligo REST API)';
   }
 
-  alert(`⚙️ [팩스 연동 설정 완료]\n\n엔진: ${engineDesc}\n공식 발신번호: ${sender}\n\n설정이 안전하게 저장되었습니다.`);
+  let redirectDesc = testRedirect ? `\n\n🛡️ [안전 테스트 리다이렉트 활성화]\n모든 고객 팩스가 실제 손사 대신 '${testNumber || '미지정'}'(으)로만 송출됩니다.` : '';
+
+  alert(`⚙️ [팩스 테스트 및 연동 설정 완료]\n\n엔진: ${engineDesc}\n공식 발신번호: ${sender}${redirectDesc}\n\n설정이 안전하게 저장되었습니다.`);
+}
+
+async function executeFaxEchoTest() {
+  const echoInput = document.getElementById('faxEchoTargetNumber');
+  const statusEl = document.getElementById('faxEchoStatus');
+  const btn = document.getElementById('btnFaxEchoTest');
+  const targetNumber = echoInput?.value.trim() || '';
+
+  if (!targetNumber) {
+    alert('시험 수신 팩스번호를 입력해주세요 (예: 본인의 모바일 팩스 번호).');
+    echoInput?.focus();
+    return;
+  }
+
+  const cleanNumber = targetNumber.replace(/[^0-9]/g, '');
+  if (cleanNumber.length < 8) {
+    alert('유효한 팩스번호 형식이 아닙니다 (8자리 이상 입력해주세요).');
+    echoInput?.focus();
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="animate-spin inline-block mr-1">⏳</span> 송출 중...`;
+  }
+  if (statusEl) {
+    statusEl.className = 'text-[11px] p-3 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-2';
+    statusEl.innerHTML = `<span>바로빌 회선 통신 시험 공문 송출 중입니다...</span>`;
+    statusEl.classList.remove('hidden');
+  }
+
+  try {
+    const mode = localStorage.getItem('LIVON_FAX_MODE') || 'barobill';
+    const sender = localStorage.getItem('LIVON_FAX_SENDER') || '02-6499-3917';
+    const baroCertKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY') || 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE';
+    const baroCorpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM') || '388-86-02921';
+    const baroId = localStorage.getItem('LIVON_BAROBILL_ID') || 'jihoon3813@gmail.com';
+    const baroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'test';
+
+    const payload = {
+      appId: 'TEST-ECHO',
+      patientName: '[회선진단] 테스트 발송',
+      insuranceCompany: '바로빌 통신시험',
+      category: '회선시험',
+      formCode: 'ECHO_TEST_01',
+      formName: '바로빌 팩스 회선 송출 시험 공문 (1장)',
+      recipient: '시험 수신처',
+      faxNumber: targetNumber,
+      senderNumber: sender,
+      pages: 1,
+      operator: '관리자(회선진단)',
+      provider: mode,
+      baroCertKey,
+      baroCorpNum,
+      baroId,
+      baroServer
+    };
+
+    const res = await fetch('/api/fax/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+
+    if (result.success) {
+      if (statusEl) {
+        statusEl.className = 'text-[11px] p-3 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        statusEl.innerHTML = `
+          <div class="font-bold text-emerald-200 flex items-center gap-1.5 mb-1">
+            <span>✅ 바로빌 회선 시험 발송 성공 (접수ID: ${result.faxId})</span>
+          </div>
+          <div>수신: <b>${targetNumber}</b> | 발신: <b>${sender}</b></div>
+          <div class="text-[10px] text-emerald-400 mt-1">${result.message || '전자팩스 관리 대장에도 시험 발송 이력이 자동 기록되었습니다.'}</div>
+        `;
+      }
+      if (result.log && typeof gFaxLogs !== 'undefined') {
+        gFaxLogs.unshift(result.log);
+        if (typeof renderFaxManagementView === 'function') renderFaxManagementView();
+      }
+    } else {
+      if (statusEl) {
+        statusEl.className = 'text-[11px] p-3 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/40';
+        statusEl.innerHTML = `❌ 시험 발송 실패: ${result.error || '통신 오류'}`;
+      }
+    }
+  } catch (err) {
+    if (statusEl) {
+      statusEl.className = 'text-[11px] p-3 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/40';
+      statusEl.innerHTML = `❌ 시험 발송 통신 오류: ${err.message}`;
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<i data-lucide="send" class="w-3.5 h-3.5"></i> <span>시험 발송</span>`;
+      initIcons(btn);
+    }
+  }
 }
 
 function populateFaxDirectoryDropdownInModal() {
