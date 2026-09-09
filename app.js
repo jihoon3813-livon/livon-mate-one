@@ -7477,7 +7477,11 @@ async function executeSendFaxModal() {
       savedBaroCorpNum = '105-86-21696';
       localStorage.setItem('LIVON_BAROBILL_CORPNUM', savedBaroCorpNum);
     }
-    const savedBaroId = localStorage.getItem('LIVON_BAROBILL_ID') || 'jihoon3813@gmail.com';
+    let savedBaroId = localStorage.getItem('LIVON_BAROBILL_ID');
+    if (!savedBaroId || savedBaroId === 'jihoon3813@gmail.com') {
+      savedBaroId = 'jihoon3813@livon.care';
+      localStorage.setItem('LIVON_BAROBILL_ID', savedBaroId);
+    }
     const savedBaroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'test';
     const savedAligoUser = localStorage.getItem('LIVON_FAX_ALIGO_USER') || '';
     const savedAligoKey = localStorage.getItem('LIVON_FAX_ALIGO_KEY') || '';
@@ -7998,7 +8002,11 @@ function openFaxSettingsModal() {
     baroCorpNum = '105-86-21696';
     localStorage.setItem('LIVON_BAROBILL_CORPNUM', baroCorpNum);
   }
-  const baroId = localStorage.getItem('LIVON_BAROBILL_ID') || 'jihoon3813@gmail.com';
+  let baroId = localStorage.getItem('LIVON_BAROBILL_ID');
+  if (!baroId || baroId === 'jihoon3813@gmail.com') {
+    baroId = 'jihoon3813@livon.care';
+    localStorage.setItem('LIVON_BAROBILL_ID', baroId);
+  }
   const baroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'test';
 
   const rBaro = document.querySelector('input[name="faxEngineMode"][value="barobill"]');
@@ -8058,7 +8066,7 @@ function saveFaxSettings() {
   // Barobill inputs
   const baroCertKey = document.getElementById('faxBarobillCertKey')?.value.trim() || 'CF89EE38-7B80-4955-960E-D86A866498ED';
   const baroCorpNum = document.getElementById('faxBarobillCorpNum')?.value.trim() || '105-86-21696';
-  const baroId = document.getElementById('faxBarobillId')?.value.trim() || 'jihoon3813@gmail.com';
+  const baroId = document.getElementById('faxBarobillId')?.value.trim() || 'jihoon3813@livon.care';
   const baroServer = document.getElementById('faxBarobillServer')?.value || 'test';
 
   // Aligo inputs
@@ -8128,7 +8136,7 @@ async function executeFaxEchoTest() {
     const sender = localStorage.getItem('LIVON_FAX_SENDER') || '02-6499-3917';
     const baroCertKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY') || 'CF89EE38-7B80-4955-960E-D86A866498ED';
     const baroCorpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM') || '105-86-21696';
-    const baroId = localStorage.getItem('LIVON_BAROBILL_ID') || 'jihoon3813@gmail.com';
+    const baroId = localStorage.getItem('LIVON_BAROBILL_ID') || 'jihoon3813@livon.care';
     const baroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'test';
 
     const payload = {

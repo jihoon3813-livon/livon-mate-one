@@ -28,7 +28,7 @@ module.exports = async (req, res) => {
       provider = 'barobill',
       baroCertKey = process.env.BAROBILL_CERTKEY || payload.baroCertKey || 'CF89EE38-7B80-4955-960E-D86A866498ED',
       baroCorpNum = process.env.BAROBILL_CORPNUM || payload.baroCorpNum || '1058621696',
-      baroId = process.env.BAROBILL_ID || payload.baroId || 'jihoon3813@gmail.com',
+      baroId = process.env.BAROBILL_ID || payload.baroId || 'jihoon3813@livon.care',
       baroServer = process.env.BAROBILL_SERVER || payload.baroServer || 'test'
     } = payload;
 
