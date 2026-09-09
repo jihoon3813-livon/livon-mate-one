@@ -4893,6 +4893,12 @@ function deleteInterimPayout(applyId, payoutId) {
   }
 }
 
+function renderCaregiverPayouts() {
+  if (typeof renderPayouts === 'function') {
+    renderPayouts();
+  }
+}
+
 function executeBatchCaregiverPayout(applyId, assignId) {
   const app = (gApps || []).find(a => a.id === applyId);
   const as = (gAssigns || []).find(a => a.id === assignId || a.applyId === applyId);
@@ -4913,6 +4919,7 @@ function executeBatchCaregiverPayout(applyId, assignId) {
     existingPayouts.forEach(p => {
       p.payoutStatus = '지급';
       p.paidDate = new Date().toISOString().split('T')[0];
+      p.updatedAt = new Date().toISOString();
     });
   } else {
     const newPayout = {
@@ -4927,23 +4934,56 @@ function executeBatchCaregiverPayout(applyId, assignId) {
       payoutStatus: '지급',
       payoutDate: new Date().toISOString().split('T')[0],
       paidDate: new Date().toISOString().split('T')[0],
-      memo: '간병 종료에 따른 전액 일괄 지급완료 처리'
+      memo: '간병 종료에 따른 전액 일괄 지급완료 처리',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
     gPayouts.unshift(newPayout);
   }
 
-  savePayouts();
+  // 고객 원장 총 지급액 갱신
+  if (app) {
+    const totalAppPayout = (gPayouts || []).filter(item => item.applyId === app.id).reduce((sum, item) => sum + (item.payoutAmount || 0), 0);
+    app.totalPayout = totalAppPayout;
+    app.updatedAt = new Date().toISOString();
+  }
+
+  // 로컬 캐시 안전 저장
+  try {
+    localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+  } catch (e) {
+    console.warn('Failed to cache payouts', e);
+  }
+
+  // Convex Cloud 운영 DB 실시간 동기화
   if (typeof syncToConvex === 'function') {
     (gPayouts.filter(p => p.applyId === applyId)).forEach(p => {
       syncToConvex('sync:savePayout', { payout: p }).catch(console.warn);
     });
+    if (app) syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
   }
 
-  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+  // 현재 열려있는 원스탑 상세 모달 즉각 실시간 리렌더링
+  if (gActiveHubModalAppId) {
+    openHubCustomerDetailModal(gActiveHubModalAppId);
+  }
+  const payoutListModal = document.getElementById('payoutDetailListModal');
+  if (payoutListModal && !payoutListModal.classList.contains('hidden')) {
+    openPayoutDetailListModal(applyId);
+  }
   renderUnifiedCareHub();
-  if (typeof renderPayouts === 'function') renderPayouts();
+  if (typeof renderPayouts === 'function') {
+    renderPayouts();
+  }
 
-  if (typeof showNotification === 'function') {
+  if (typeof showCustomAlert === 'function') {
+    showCustomAlert({
+      title: '간병비 지급완료',
+      message: `[${maskName(app.patientName)} 님] 간병비 ${formatCurrency(totalWage)}원이 정상적으로 지급완료 처리되었습니다.`,
+      icon: 'check-circle-2',
+      iconColor: 'emerald'
+    });
+  } else if (typeof showNotification === 'function') {
     showNotification({
       type: 'success',
       title: '간병비 지급완료',
