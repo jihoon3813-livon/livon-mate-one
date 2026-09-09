@@ -1612,10 +1612,127 @@ function startResizeArea(e, areaId) {
   document.addEventListener('mouseup', onMouseUp);
 }
 
+// =========================================================================
+// 1. DRAG BOX SELECTION ON CANVAS (캔버스 빈 공간 마우스 드래그 다중 선택)
+// =========================================================================
+function startCanvasBoxSelect(e) {
+  // 클릭 대상이 입력영역(overlay), 크기조절 핸들, 폼 컨트롤이면 패스
+  if (e.target.closest('[id^="overlay-"]') || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+    return;
+  }
+  e.preventDefault();
+
+  const sheet = document.getElementById('editorCanvasSheet');
+  if (!sheet) return;
+
+  const rect = sheet.getBoundingClientRect();
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
+
+  if (!isMulti) {
+    gSelectedAreaIds.clear();
+  }
+
+  const prevSelected = new Set(gSelectedAreaIds);
+
+  let marquee = document.getElementById('editorMarqueeBox');
+  if (!marquee) {
+    marquee = document.createElement('div');
+    marquee.id = 'editorMarqueeBox';
+    marquee.className = 'absolute border-2 border-dashed border-primary-500 bg-primary-500/20 pointer-events-none z-40 rounded transition-none';
+    sheet.appendChild(marquee);
+  }
+
+  marquee.style.left = `${startX - rect.left}px`;
+  marquee.style.top = `${startY - rect.top}px`;
+  marquee.style.width = '0px';
+  marquee.style.height = '0px';
+  marquee.classList.remove('hidden');
+
+  const list = gFormAreaStore[gCurrentEditingFormCode] || [];
+
+  const onMouseMove = (moveEvent) => {
+    const curX = moveEvent.clientX;
+    const curY = moveEvent.clientY;
+
+    const leftPx = Math.min(startX, curX) - rect.left;
+    const topPx = Math.min(startY, curY) - rect.top;
+    const widthPx = Math.abs(curX - startX);
+    const heightPx = Math.abs(curY - startY);
+
+    marquee.style.left = `${leftPx}px`;
+    marquee.style.top = `${topPx}px`;
+    marquee.style.width = `${widthPx}px`;
+    marquee.style.height = `${heightPx}px`;
+
+    // Calculate percentage boundary
+    const pX1 = (leftPx / rect.width) * 100;
+    const pY1 = (topPx / rect.height) * 100;
+    const pX2 = pX1 + (widthPx / rect.width) * 100;
+    const pY2 = pY1 + (heightPx / rect.height) * 100;
+
+    // AABB Collision Detection for each area
+    list.forEach(area => {
+      const aX1 = area.x;
+      const aY1 = area.y;
+      const aX2 = area.x + (area.w || 20);
+      const aY2 = area.y + (area.h || 4);
+
+      const intersects = !(aX2 < pX1 || aX1 > pX2 || aY2 < pY1 || aY1 > pY2);
+      const el = document.getElementById(`overlay-${area.id}`);
+
+      if (intersects) {
+        gSelectedAreaIds.add(area.id);
+      } else if (!prevSelected.has(area.id)) {
+        gSelectedAreaIds.delete(area.id);
+      }
+
+      if (el) {
+        const isSel = gSelectedAreaIds.has(area.id);
+        if (isSel) {
+          el.className = el.className.replace(/border-primary-600 bg-primary-500\/20/g, 'border-amber-500 bg-amber-400/25 ring-2 ring-amber-400 shadow-md');
+        } else {
+          el.className = el.className.replace(/border-amber-500 bg-amber-400\/25 ring-2 ring-amber-400 shadow-md/g, 'border-primary-600 bg-primary-500/20');
+        }
+      }
+    });
+
+    const countBadge = document.getElementById('editorAreaCountBadge');
+    if (countBadge) {
+      countBadge.innerHTML = `${list.length}개 영역 ${gSelectedAreaIds.size > 0 ? `<span class="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full text-[10px] font-black">${gSelectedAreaIds.size}개 선택됨</span>` : ''}`;
+    }
+  };
+
+  const onMouseUp = () => {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    if (marquee) marquee.classList.add('hidden');
+    renderEditorCanvasAndList();
+  };
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+}
+
+// =========================================================================
+// 2. GROUP DRAG & MOVE (선택된 영역들을 마우스로 한꺼번에 동시 이동)
+// =========================================================================
 function startDragArea(e, areaId) {
   if (gResizingAreaId) return;
   e.preventDefault();
   e.stopPropagation();
+
+  const isMultiKey = e.ctrlKey || e.metaKey || e.shiftKey;
+
+  // 클릭한 영역이 아직 선택되어 있지 않은 상태라면 선택 상태 갱신
+  if (!gSelectedAreaIds.has(areaId)) {
+    if (!isMultiKey) {
+      gSelectedAreaIds.clear();
+    }
+    gSelectedAreaIds.add(areaId);
+    renderEditorCanvasAndList();
+  }
 
   gDraggingAreaId = areaId;
   gHasDragged = false;
@@ -1624,13 +1741,19 @@ function startDragArea(e, areaId) {
 
   const rect = sheet.getBoundingClientRect();
   const list = gFormAreaStore[gCurrentEditingFormCode] || [];
-  const area = list.find(a => a.id === areaId);
-  if (!area) return;
 
+  // 이동 대상: 현재 선택된 모든 영역들 (한꺼번에 이동!)
+  const targets = list.filter(a => gSelectedAreaIds.has(a.id));
   const startClientX = e.clientX;
   const startClientY = e.clientY;
-  const startLeft = area.x;
-  const startTop = area.y;
+
+  // 선택된 모든 대상의 시작 위치 캡처
+  const initialPositions = targets.map(area => ({
+    area,
+    startX: area.x,
+    startY: area.y,
+    el: document.getElementById(`overlay-${area.id}`)
+  }));
 
   const onMouseMove = (moveEvent) => {
     if (!gDraggingAreaId) return;
@@ -1644,20 +1767,22 @@ function startDragArea(e, areaId) {
     const deltaPercentX = (deltaX / rect.width) * 100;
     const deltaPercentY = (deltaY / rect.height) * 100;
 
-    let newX = Math.round((startLeft + deltaPercentX) * 10) / 10;
-    let newY = Math.round((startTop + deltaPercentY) * 10) / 10;
+    // 선택된 모든 영역을 동일한 델타값만큼 함께 한꺼번에 이동!
+    initialPositions.forEach(item => {
+      let newX = Math.round((item.startX + deltaPercentX) * 10) / 10;
+      let newY = Math.round((item.startY + deltaPercentY) * 10) / 10;
 
-    newX = Math.max(0, Math.min(100 - (area.w || 20), newX));
-    newY = Math.max(0, Math.min(100 - (area.h || 4), newY));
+      newX = Math.max(0, Math.min(100 - (item.area.w || 20), newX));
+      newY = Math.max(0, Math.min(100 - (item.area.h || 4), newY));
 
-    area.x = newX;
-    area.y = newY;
+      item.area.x = newX;
+      item.area.y = newY;
 
-    const el = document.getElementById(`overlay-${area.id}`);
-    if (el) {
-      el.style.left = newX + '%';
-      el.style.top = newY + '%';
-    }
+      if (item.el) {
+        item.el.style.left = newX + '%';
+        item.el.style.top = newY + '%';
+      }
+    });
   };
 
   const onMouseUp = (upEvent) => {
@@ -1667,7 +1792,7 @@ function startDragArea(e, areaId) {
     gDraggingAreaId = null;
 
     if (!wasDragged) {
-      // 마우스 이동이 없었으면 단순 클릭으로 판정
+      // 드래그가 아니었으면 토글 선택 처리
       toggleSelectArea(areaId, upEvent);
     } else {
       renderEditorCanvasAndList();
@@ -1676,6 +1801,84 @@ function startDragArea(e, areaId) {
 
   document.addEventListener('mousemove', onMouseMove);
   document.addEventListener('mouseup', onMouseUp);
+}
+
+// =========================================================================
+// 3. KEYBOARD ARROW KEY NAVIGATION (키보드 방향키로 0.5% / Shift 2.0% 정밀/일괄 이동)
+// =========================================================================
+function handleEditorKeyDown(e) {
+  const modal = document.getElementById('formFieldEditorModal');
+  if (!modal || modal.classList.contains('hidden')) return;
+
+  // 텍스트 인풋, 텍스트에리어, 셀렉트 포커스 중일 때는 타이핑 기본 동작 허용
+  const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+  if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+    return;
+  }
+
+  // Ctrl+A / Cmd+A 전체 선택
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
+    e.preventDefault();
+    toggleSelectAllAreas();
+    return;
+  }
+
+  // Escape 선택 해제
+  if (e.key === 'Escape') {
+    clearAreaSelection();
+    return;
+  }
+
+  // Delete 또는 Backspace 키로 선택된 필드 삭제
+  if ((e.key === 'Delete' || e.key === 'Backspace') && gSelectedAreaIds.size > 0) {
+    e.preventDefault();
+    const count = gSelectedAreaIds.size;
+    if (confirm(`선택된 ${count}개 영역을 삭제하시겠습니까?`)) {
+      gFormAreaStore[gCurrentEditingFormCode] = (gFormAreaStore[gCurrentEditingFormCode] || []).filter(a => !gSelectedAreaIds.has(a.id));
+      gSelectedAreaIds.clear();
+      renderEditorCanvasAndList();
+    }
+    return;
+  }
+
+  // 화살표 방향키 이동
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+    if (gSelectedAreaIds.size === 0) return;
+    e.preventDefault();
+
+    // Shift 키 누르면 2.0% 단위 빠른 이동, 일반 방향키는 0.5% 단위 초정밀 이동
+    const step = e.shiftKey ? 2.0 : 0.5;
+    let dx = 0;
+    let dy = 0;
+
+    if (e.key === 'ArrowLeft') dx = -step;
+    else if (e.key === 'ArrowRight') dx = step;
+    else if (e.key === 'ArrowUp') dy = -step;
+    else if (e.key === 'ArrowDown') dy = step;
+
+    const list = gFormAreaStore[gCurrentEditingFormCode] || [];
+    list.forEach(area => {
+      if (gSelectedAreaIds.has(area.id)) {
+        let newX = Math.round((area.x + dx) * 10) / 10;
+        let newY = Math.round((area.y + dy) * 10) / 10;
+        area.x = Math.max(0, Math.min(100 - (area.w || 20), newX));
+        area.y = Math.max(0, Math.min(100 - (area.h || 4), newY));
+
+        const el = document.getElementById(`overlay-${area.id}`);
+        if (el) {
+          el.style.left = area.x + '%';
+          el.style.top = area.y + '%';
+        }
+      }
+    });
+
+    renderEditorCanvasAndList();
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.removeEventListener('keydown', handleEditorKeyDown);
+  window.addEventListener('keydown', handleEditorKeyDown);
 }
 
 function addNewAreaToForm() {

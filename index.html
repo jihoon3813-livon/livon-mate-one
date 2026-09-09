@@ -3755,15 +3755,19 @@
                 <i data-lucide="scaling" class="w-3.5 h-3.5"></i>
               </button>
               <span class="text-slate-300 mx-0.5">·</span>
-              <button type="button" onclick="toggleSelectAllAreas()" id="btnToggleSelectAllAreas" class="px-1.5 py-0.5 hover:bg-white rounded-lg text-[10px] font-bold text-slate-600 cursor-pointer transition-colors" title="전체 필드 선택/해제">
+              <button type="button" onclick="toggleSelectAllAreas()" id="btnToggleSelectAllAreas" class="px-1.5 py-0.5 hover:bg-white rounded-lg text-[10px] font-bold text-slate-600 cursor-pointer transition-colors" title="전체 필드 선택/해제 (Ctrl+A)">
                 전체선택
               </button>
+              <span class="text-slate-300 mx-1 hidden sm:inline">|</span>
+              <span class="text-[10px] text-slate-500 font-semibold hidden sm:inline-flex items-center gap-1">
+                <i data-lucide="mouse-pointer-click" class="w-3 h-3 text-primary-600"></i> 드래그:선택 · 필드이동:일괄 · 방향키:0.5%이동(Shift:2%)
+              </span>
             </div>
           </div>
 
           <!-- Scalable Sheet Wrapper -->
           <div id="editorZoomWrapper" class="transition-transform duration-100 origin-top flex justify-center">
-            <div class="relative w-[560px] min-h-[740px] bg-white rounded-xl shadow-xl border border-slate-300 p-6 select-none overflow-hidden" id="editorCanvasSheet">
+            <div class="relative w-[560px] min-h-[740px] bg-white rounded-xl shadow-xl border border-slate-300 p-6 select-none overflow-hidden cursor-crosshair" id="editorCanvasSheet" onmousedown="startCanvasBoxSelect(event)">
               
               <!-- Uploaded Background Image Layer (PDF rendered to image or direct image) -->
               <img id="editorBgImage" class="absolute inset-0 w-full h-full object-contain pointer-events-none hidden z-0 bg-white" alt="빈양식 서식 배경">
