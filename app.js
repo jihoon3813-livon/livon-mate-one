@@ -4132,6 +4132,14 @@ function renderCtiCallBtn(phone, targetName = '', role = '', isCompact = false) 
 // =========================================================================
 var gHubModalViewMode = localStorage.getItem('REBORN_HUB_MODAL_VIEW_MODE') || '3card'; // '3card' | '6step'
 var gActiveHubModalAppId = null;
+var gActiveCaregiverTabAssignId = null;
+
+function switchCaregiverTab(assignId) {
+  gActiveCaregiverTabAssignId = assignId;
+  if (gActiveHubModalAppId) {
+    openHubCustomerDetailModal(gActiveHubModalAppId);
+  }
+}
 
 function switchHubModalViewMode(mode) {
   gHubModalViewMode = mode;
@@ -4598,7 +4606,16 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
 function createInterimPayout(applyId, roundNumber, targetDays) {
   const app = (gApps || []).find(a => a.id === applyId);
   const appAssigns = (gAssigns || []).filter(a => a.applyId === applyId);
-  const as = appAssigns.length > 0 ? appAssigns[0] : null;
+  let as = null;
+  if (appAssigns.length > 0) {
+    if (gActiveCaregiverTabAssignId) {
+      as = appAssigns.find(a => a.id === gActiveCaregiverTabAssignId);
+    }
+    if (!as) {
+      const sorted = appAssigns.slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+      as = sorted[sorted.length - 1];
+    }
+  }
   if (!as) {
     alert('배정된 간병인 정보가 없습니다.');
     return;
@@ -4611,16 +4628,17 @@ function createInterimPayout(applyId, roundNumber, targetDays) {
   const wage = as.dailyWage || 140000;
   const amount = daysToPay * wage;
 
-  const confirmMsg = `[간병비 정산 생성 확인]\n\n환자: ${app ? app.patientName : '고객'}\n간병인: ${as.caregiverName}\n정산 일수: ${daysToPay}일\n정산 금액: ${formatCurrency(amount)}원\n\n해당 내역으로 간병비 정산(미지급)을 생성하시겠습니까?\n(생성 후 언제든지 '원복' 버튼으로 취소할 수 있습니다.)`;
+  const confirmMsg = `[간병비 정산 생성 확인]\n\n환자: ${app ? app.patientName : '고객'}\n간병인: ${as.caregiverName} (${as.id})\n정산 일수: ${daysToPay}일\n정산 금액: ${formatCurrency(amount)}원\n\n해당 내역으로 간병비 정산(미지급)을 생성하시겠습니까?\n(생성 후 언제든지 '원복' 버튼으로 취소할 수 있습니다.)`;
   if (!confirm(confirmMsg)) return;
 
+  const payoutIdSuffix = `${as.id.replace('A', '')}.${roundNumber || 1}`;
   const newPayout = {
-    id: `P${applyId.replace('C', '')}.${roundNumber || 1}`,
+    id: `P${applyId.replace('C', '')}.${payoutIdSuffix}`,
     applyId: applyId,
     patientName: app ? app.patientName : '고객',
     caregiverName: as.caregiverName,
     centerName: as.centerName || '영등포센터',
-    round: `${roundNumber || 1}차 (${daysToPay}일)`,
+    round: `${roundNumber || 1}차 (${as.caregiverName} · ${daysToPay}일)`,
     standardDate: new Date().toISOString().split('T')[0],
     days: daysToPay,
     dailyWage: wage,
@@ -4800,9 +4818,22 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
   const adjPhone = app.adjusterPhone || adjInfo.phone || '';
   const adjMobile = app.adjusterMobile || adjInfo.mobile || '';
 
-  // 1. 간병인 배정 데이터 확인 (첫 번째 배정 건 기준)
-  const hasAssign = appAssigns && appAssigns.length > 0;
-  const as = hasAssign ? appAssigns[0] : null;
+  // 1. 간병인 배정 데이터 확인 및 차수별 정렬 (startDate 오름차순)
+  const sortedAssigns = (appAssigns || []).slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+  const hasAssign = sortedAssigns.length > 0;
+  
+  // 현재 선택된 간병인 탭 매칭 (없거나 유효하지 않으면 가장 최신 배정 건을 기본값으로 설정)
+  let as = null;
+  if (hasAssign) {
+    if (gActiveCaregiverTabAssignId) {
+      as = sortedAssigns.find(a => a.id === gActiveCaregiverTabAssignId);
+    }
+    if (!as) {
+      as = sortedAssigns[sortedAssigns.length - 1]; // 기본은 가장 최근/현재 배정 간병사
+      gActiveCaregiverTabAssignId = as.id;
+    }
+  }
+
   const prog = as ? getCareProgressInfo(as) : null;
   const cg = as ? (gCaregivers || []).find(c => c.name === as.caregiverName) : null;
   const center = as ? (gCenters || []).find(ctr => ctr.name === as.centerName) : null;
@@ -4811,8 +4842,14 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
   const centerPhone = as ? (as.centerPhone || (center && center.phone) || '02-2633-1120') : '-';
   const account = as ? (as.accountInfo || (cg && cg.account) || '-') : '-';
 
+  // 선택된 간병인 전용 정산 내역 필터링 (다수 배정 시 선택된 간병인의 내역을 우선 표시)
+  const activeCaregiverPayouts = as
+    ? (appPayouts || []).filter(p => p.caregiverName === as.caregiverName)
+    : (appPayouts || []);
+  const displayedPayouts = activeCaregiverPayouts.length > 0 ? activeCaregiverPayouts : (appPayouts || []);
+
   // 2. 통합 정산 스케줄 엔진 구동 (실제 경과일수 및 10일 주기 라이프사이클 기반)
-  const schedule = calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts);
+  const schedule = calculateCareSettlementSchedule(app, as, prog, appClaims, displayedPayouts);
   const totalCareDays = schedule.totalCareDays;
   const dailyPrice = schedule.dailyClaimPrice;
   const rounds = schedule.rounds;
@@ -5015,6 +5052,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
         </div>
 
         <!-- ========================================================================= -->
+        <!-- ========================================================================= -->
         <!-- [CARD 2] 간병인 / 센터 관리 (Caregiver & Center Card) -->
         <!-- ========================================================================= -->
         <div class="bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 flex flex-col h-full overflow-hidden transition-all duration-300 hover:shadow-xl">
@@ -5027,14 +5065,24 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               <div>
                 <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5">
                   간병인 / 센터 관리
+                  ${sortedAssigns.length > 1 ? `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-amber-950">총 ${sortedAssigns.length}명 교체이력</span>` : ''}
                 </h4>
                 <span class="text-[10.5px] text-sky-100 font-medium">간병인 프로필, 일정 및 차수별 정산</span>
               </div>
             </div>
-            <button type="button" onclick="openNewAssignModal('${app.id}')" 
-              class="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all flex items-center gap-1 shadow-xs">
-              <i data-lucide="user-plus" class="w-3 h-3"></i> ${hasAssign ? '배정/교체' : '신규 배정'}
-            </button>
+            <div class="flex items-center gap-1.5">
+              ${hasAssign ? `
+                <button type="button" onclick="openNewAssignModal('${app.id}', true)" 
+                  class="px-2.5 py-1 rounded-xl text-[11px] font-black bg-amber-400 hover:bg-amber-300 text-amber-950 shadow-xs transition-all flex items-center gap-1 cursor-pointer" title="기존 간병인 근무 종료 및 후임 간병인 교체 등록">
+                  <i data-lucide="refresh-cw" class="w-3 h-3"></i> 🔄 간병인 교체
+                </button>
+              ` : `
+                <button type="button" onclick="openNewAssignModal('${app.id}', false)" 
+                  class="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all flex items-center gap-1 shadow-xs cursor-pointer">
+                  <i data-lucide="user-plus" class="w-3 h-3"></i> 신규 배정
+                </button>
+              `}
+            </div>
           </div>
 
           <!-- Card Body (flex-1 균등 분할) -->
@@ -5052,7 +5100,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                   </p>
                 </div>
                 <div class="pt-2">
-                  <button type="button" onclick="openNewAssignModal('${app.id}')" 
+                  <button type="button" onclick="openNewAssignModal('${app.id}', false)" 
                     class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold text-xs shadow-md inline-flex items-center gap-1.5 transition-all">
                     <i data-lucide="plus-circle" class="w-4 h-4"></i>
                     <span>간병인 즉시 배정하기</span>
@@ -5062,6 +5110,33 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
             ` : `
               <!-- 배정 완료 시 상세 내역 활성화 -->
               
+              <!-- [간병인 차수별 탭 바] 교체 등으로 간병인이 여러 명일 때 상단 탭으로 즉시 전환 -->
+              ${sortedAssigns.length > 1 ? `
+                <div class="bg-slate-200/80 p-1.5 rounded-2xl flex items-center gap-1.5 overflow-x-auto custom-scrollbar border border-slate-300/80">
+                  ${sortedAssigns.map((aItem, aIdx) => {
+                    const isSelected = aItem.id === as.id;
+                    const isLatest = aIdx === sortedAssigns.length - 1;
+                    const aProg = getCareProgressInfo(aItem);
+                    const isDone = aProg && aProg.status === 'completed';
+                    const roundLabel = `${aIdx + 1}차: ${maskName(aItem.caregiverName)}`;
+                    return `
+                      <button type="button" onclick="switchCaregiverTab('${aItem.id}')"
+                        class="px-3 py-1.5 rounded-xl font-black text-[11px] flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                          isSelected
+                            ? 'bg-sky-600 text-white shadow-sm ring-2 ring-sky-300'
+                            : 'bg-white/80 hover:bg-white text-slate-700 border border-slate-200 hover:text-sky-700'
+                        }">
+                        <span>${roundLabel}</span>
+                        ${isLatest 
+                          ? `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-amber-400 text-slate-900' : 'bg-emerald-100 text-emerald-800'}">현재★</span>`
+                          : `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-white/30 text-white' : 'bg-slate-100 text-slate-500'}">교체종료</span>`
+                        }
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+              ` : ''}
+
               <!-- 1. 간병인 핵심 정보 & 센터 정보 -->
               <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
                 <div class="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -5069,6 +5144,11 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                     <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-mono font-bold text-[10px]">${as.id}</span>
                     <b class="text-sm text-slate-900">${maskName(as.caregiverName)}</b>
                     <span class="text-slate-500 text-[11px]">(${maskBirth(birth)})</span>
+                    ${sortedAssigns.length > 1 ? `
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${as.id === sortedAssigns[sortedAssigns.length - 1].id ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-600 border border-slate-200'}">
+                        ${as.id === sortedAssigns[sortedAssigns.length - 1].id ? '현재 투입중' : '종료(정산보존)'}
+                      </span>
+                    ` : ''}
                   </div>
                   <button type="button" onclick="openCareScheduleModal('${as.id}')" 
                     class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1">
@@ -5114,7 +5194,8 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
                 <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
                   <span class="font-bold text-slate-800 flex items-center gap-1.5">
-                    <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i> 간병일시 관리
+                    <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i>
+                    <span>간병일시 관리 ${sortedAssigns.length > 1 ? `(${maskName(as.caregiverName)})` : ''}</span>
                   </span>
                   <span class="font-mono font-black text-sky-700 text-xs">${prog ? prog.percent : 0}% 진행</span>
                 </div>
@@ -5136,7 +5217,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                       <div class="h-full ${prog.status === 'completed' ? 'bg-slate-400' : 'bg-gradient-to-r from-sky-500 to-emerald-500'} rounded-full transition-all duration-500" style="width: ${prog.percent}%"></div>
                     </div>
                     <div class="flex justify-between items-center text-[10.5px] text-slate-500">
-                      <span>총 <b>${prog.totalDays}</b>일 보장</span>
+                      <span>총 <b>${prog.totalDays}</b>일 근무</span>
                       <span>경과: <b class="text-slate-800">${prog.elapsedDays}일</b></span>
                       <span>잔여: <b class="${prog.remainingDays === 0 ? 'text-slate-400' : 'text-amber-700 font-bold'}">${prog.remainingDays}일</b></span>
                     </div>
@@ -5148,7 +5229,8 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2 mt-auto">
                 <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
                   <span class="font-bold text-slate-800 flex items-center gap-1.5">
-                    <i data-lucide="banknote" class="w-3.5 h-3.5 text-teal-600"></i> 간병비 정산 (차수별 관리)
+                    <i data-lucide="banknote" class="w-3.5 h-3.5 text-teal-600"></i>
+                    <span>간병비 정산 ${sortedAssigns.length > 1 ? `(${maskName(as.caregiverName)})` : ''}</span>
                   </span>
                   <div class="flex items-center gap-2">
                     <span class="font-mono font-extrabold text-teal-700 text-xs">
@@ -5165,9 +5247,9 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                   </div>
                 </div>
 
-                ${appPayouts.length > 0 ? `
+                ${displayedPayouts.length > 0 ? `
                   <div class="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
-                    ${appPayouts.map(p => `
+                    ${displayedPayouts.map(p => `
                       <div class="p-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-[11px]">
                         <div>
                           <div class="font-bold text-slate-900 flex items-center gap-1">
@@ -10626,7 +10708,7 @@ function handleNewAppSubmit(e) {
   }
 }
 
-function openNewAssignModal(targetApplyId = null) {
+function openNewAssignModal(targetApplyId = null, isReplacement = false) {
   const select = document.getElementById('newAssignApplySelect');
   if (select) {
     select.innerHTML = gApps.map(a => `
@@ -10640,10 +10722,58 @@ function openNewAssignModal(targetApplyId = null) {
     }
   }
 
-  // Pre-fill dates if empty
+  // Set replacement mode state
+  const isRepEl = document.getElementById('newAssignIsReplacement');
+  const prevAssignIdEl = document.getElementById('newAssignPrevAssignId');
+  const titleEl = document.getElementById('newAssignModalTitle');
+  const subEl = document.getElementById('newAssignModalSub');
+  const submitBtnEl = document.getElementById('newAssignSubmitBtn');
+
+  // Find existing assignments for this application if in replacement mode
+  let prevAssign = null;
+  if (targetApplyId) {
+    const existingAssigns = (gAssigns || []).filter(a => a.applyId === targetApplyId);
+    if (existingAssigns.length > 0) {
+      const sorted = existingAssigns.slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+      prevAssign = sorted[sorted.length - 1];
+    }
+  }
+
+  if (isReplacement && prevAssign) {
+    if (isRepEl) isRepEl.value = 'true';
+    if (prevAssignIdEl) prevAssignIdEl.value = prevAssign.id;
+    if (titleEl) titleEl.innerText = `간병인 교체 등록 (기존: ${prevAssign.caregiverName} 님)`;
+    if (subEl) subEl.innerText = `기존 간병인 [${prevAssign.caregiverName}] 님의 근무를 종료하고 후임 간병인을 새로 투입합니다. 기존 정산 내역은 안전하게 보존됩니다.`;
+    if (submitBtnEl) submitBtnEl.innerText = '교체 배정 완료 🔄';
+  } else {
+    if (isRepEl) isRepEl.value = 'false';
+    if (prevAssignIdEl) prevAssignIdEl.value = '';
+    if (titleEl) titleEl.innerText = '간병인 배정 등록';
+    if (subEl) subEl.innerText = '신청 건에 매칭할 간병인 및 일급을 등록합니다.';
+    if (submitBtnEl) submitBtnEl.innerText = '배정 완료';
+  }
+
+  // Clear name and input fields for new input
+  const nameEl = document.getElementById('newAssignCaregiverName');
+  if (nameEl) nameEl.value = '';
+  const phoneEl = document.getElementById('newAssignCaregiverPhone');
+  if (phoneEl) phoneEl.value = '';
+  const acctEl = document.getElementById('newAssignAccount');
+  if (acctEl) acctEl.value = '';
+
+  // Pre-fill dates
   const todayStr = new Date().toISOString().split('T')[0];
-  populateCombinedDateTime('newAssignStartDate', todayStr.replace(/-/g, '.') + ' 09:00');
-  populateCombinedDateTime('newAssignEndDate', todayStr.replace(/-/g, '.') + ' 09:00');
+  let defaultStartDate = todayStr.replace(/-/g, '.') + ' 09:00';
+  let defaultEndDate = todayStr.replace(/-/g, '.') + ' 09:00';
+
+  if (isReplacement && prevAssign && prevAssign.endDate) {
+    // If previous caregiver has an endDate, 후임 간병인 starts around now or prevAssign endDate
+    defaultStartDate = todayStr.replace(/-/g, '.') + ' 09:00';
+    defaultEndDate = prevAssign.endDate; // inherit target schedule end date
+  }
+
+  populateCombinedDateTime('newAssignStartDate', defaultStartDate);
+  populateCombinedDateTime('newAssignEndDate', defaultEndDate);
 
   openModal('newAssignModal');
   initIcons();
@@ -10660,6 +10790,10 @@ function handleNewAssignSubmit(e) {
   syncCombinedDateTime('newAssignStartDate');
   syncCombinedDateTime('newAssignEndDate');
 
+  const isRepEl = document.getElementById('newAssignIsReplacement');
+  const isReplacement = isRepEl && isRepEl.value === 'true';
+  const prevAssignId = document.getElementById('newAssignPrevAssignId')?.value || '';
+
   let maxNum = 0;
   (gAssigns || []).forEach(as => {
     if (as && as.id) {
@@ -10668,6 +10802,22 @@ function handleNewAssignSubmit(e) {
     }
   });
   const newAssignId = 'A0' + String(maxNum + 1).padStart(3, '0');
+
+  const newStartDate = document.getElementById('newAssignStartDate').value || '';
+  const newEndDate = document.getElementById('newAssignEndDate').value || '';
+
+  // If replacement mode, safely truncate previous caregiver's endDate to new caregiver's startDate
+  let prevAssign = null;
+  if (isReplacement && prevAssignId) {
+    prevAssign = (gAssigns || []).find(a => a.id === prevAssignId);
+    if (prevAssign) {
+      prevAssign.endDate = newStartDate;
+      prevAssign.updatedAt = new Date().toISOString();
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:saveAssignment', { assign: prevAssign });
+      }
+    }
+  }
 
   const newAssign = {
     id: newAssignId,
@@ -10681,16 +10831,20 @@ function handleNewAssignSubmit(e) {
     settlementType: document.getElementById('newAssignSettlementType').value || '개인',
     dailyWage: Number(wageRaw) || 140000,
     assignedDate: new Date().toISOString().split('T')[0],
-    startDate: document.getElementById('newAssignStartDate').value || '',
-    endDate: document.getElementById('newAssignEndDate').value || '',
+    startDate: newStartDate,
+    endDate: newEndDate,
     accountInfo: document.getElementById('newAssignAccount').value || ''
   };
 
   gAssigns.unshift(newAssign);
+  gActiveCaregiverTabAssignId = newAssign.id; // Switch active caregiver tab to newly assigned caregiver
+
   if (app) {
     app.assignedCaregiverCount = (app.assignedCaregiverCount || 0) + 1;
     app.status = '진행중';
-    app.careStartDate = newAssign.startDate;
+    if (!isReplacement) {
+      app.careStartDate = newAssign.startDate;
+    }
   }
 
   // 간병인 풀(gCaregivers)에도 자동 등록/업데이트
@@ -10744,12 +10898,21 @@ function handleNewAssignSubmit(e) {
     if (app) syncToConvex('sync:saveApplication', { app: app });
   }
 
-  showCustomAlert({
-    title: '간병인 배정 완료 (STEP 2)',
-    message: `[${app ? app.patientName : '고객'}] 님에게 간병인 [${name}] 님이 성공적으로 배정되었습니다.\n배정번호: ${newAssign.id} (일급: ${formatCurrency(newAssign.dailyWage)}원)`,
-    icon: 'user-check',
-    iconColor: 'emerald'
-  });
+  if (isReplacement && prevAssign) {
+    showCustomAlert({
+      title: '간병인 교체 배정 완료 🔄',
+      message: `[${app ? app.patientName : '고객'}] 님의 간병인이 성공적으로 교체되었습니다.\n- 기존 간병인: [${prevAssign.caregiverName}] (종료: ${prevAssign.endDate})\n- 후임 간병인: [${name}] (투입: ${newAssign.startDate})\n기존 간병인의 근무기간 정산 데이터는 카드 탭에서 영구 보존됩니다.`,
+      icon: 'refresh-cw',
+      iconColor: 'amber'
+    });
+  } else {
+    showCustomAlert({
+      title: '간병인 배정 완료 (STEP 2)',
+      message: `[${app ? app.patientName : '고객'}] 님에게 간병인 [${name}] 님이 성공적으로 배정되었습니다.\n배정번호: ${newAssign.id} (일급: ${formatCurrency(newAssign.dailyWage)}원)`,
+      icon: 'user-check',
+      iconColor: 'emerald'
+    });
+  }
 }
 
 // -------------------------------------------------------------------------
