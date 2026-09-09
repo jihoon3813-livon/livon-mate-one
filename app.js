@@ -7941,10 +7941,12 @@ function renderFaxLogsTable() {
         </td>
         <td class="p-3">
           <div class="font-semibold text-slate-900 flex items-center gap-1.5">
-            <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-mono">${l.formCode || '-'}</span>
-            <span class="truncate max-w-[220px]" title="${l.formName}">${l.formName}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-mono flex-shrink-0">${l.formCode || '-'}</span>
+            <span class="truncate max-w-[280px]" title="${l.formName} - ${l.patientName || '고객'}">
+              ${l.formName} <span class="text-blue-700 font-bold">(${l.patientName ? l.patientName + ' 님' : ''})</span>
+            </span>
           </div>
-          <div class="text-[10px] text-slate-400 mt-0.5">${l.pages || 2}장 전송</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">${l.pages || 1}장 전송</div>
         </td>
         <td class="p-3 text-center whitespace-nowrap">
           ${statusBadge}
