@@ -2,6 +2,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
+const { createTestPdfBuffer } = require('./pdf-helper');
+const { uploadToBarobillFTP, callBarobillSoap, getBarobillErrorMessage } = require('./barobill-client');
 
 let PORT = parseInt(process.env.PORT, 10) || 8080;
 const BASE_DIR = __dirname;
@@ -228,23 +230,90 @@ function startServer(port) {
           const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
           const faxId = 'FLOG-' + Date.now().toString().slice(-6);
 
-          // 1. 바로빌 (Barobill) 또는 알리고 연동 모드
+          // 1. 바로빌 (Barobill) 실 발송 연동
           let activeProvider = 'Smart Sandbox (모의 회선)';
+          let realBaroResult = null;
+          let realBaroReceiptNum = '';
+
           if (provider === 'barobill') {
-            const serverLabel = payload.baroServer === 'prod' ? '운영' : '테스트';
-            activeProvider = `Barobill (${serverLabel}: ${(payload.baroCertKey || 'CF89EE38').slice(0, 8)}...)`;
-            console.log(`[FAX Barobill Gateway] 바로빌 팩스 발송 접수: ${cleanFaxNumber} (${recipient}) [${serverLabel}]`);
+            const isProd = payload.baroServer === 'prod';
+            const serverLabel = isProd ? '운영' : '테스트';
+            const certKey = payload.baroCertKey || (isProd ? 'A1496EC3-E606-44C0-B126-F03B9AF88588' : 'CF89EE38-7B80-4955-960E-D86A866498ED');
+            const corpNum = (payload.baroCorpNum || '1058621696').replace(/[^0-9]/g, '');
+            const baroId = payload.baroId || 'livoncare';
+            const baroPwd = payload.baroPwd || '';
+
+            activeProvider = `Barobill (${serverLabel}: ${certKey.slice(0, 8)}...)`;
+            console.log(`[FAX Barobill Gateway] 바로빌 팩스 발송 요청: ${cleanFaxNumber} (${recipient}) [${serverLabel}, ID: ${baroId}]`);
+
+            // 비밀번호가 제공된 경우 바로빌 FTP 업로드 및 실시간 SOAP 발송 시도
+            if (baroPwd) {
+              try {
+                const ftpHost = isProd ? 'ftp.barobill.co.kr' : 'testftp.barobill.co.kr';
+                const ftpPort = isProd ? 9030 : 9031;
+                const pdfFileName = `LIVON_FAX_${Date.now()}.pdf`;
+                const pdfBuffer = createTestPdfBuffer(`리본케어 팩스 발송 [수신: ${recipient} (${cleanFaxNumber})]`);
+
+                console.log(`[FAX Barobill Gateway] FTP 파일 업로드 중... (${ftpHost}:${ftpPort}, 파일: ${pdfFileName})`);
+                await uploadToBarobillFTP(ftpHost, ftpPort, baroId, baroPwd, pdfFileName, pdfBuffer);
+                console.log(`[FAX Barobill Gateway] FTP 업로드 성공! SOAP SendFaxFromFTP 호출 중...`);
+
+                const soapRes = await callBarobillSoap('SendFaxFromFTP', `
+                  <CERTKEY>${certKey}</CERTKEY>
+                  <CorpNum>${corpNum}</CorpNum>
+                  <SenderID>${baroId}</SenderID>
+                  <FileName>${pdfFileName}</FileName>
+                  <FromNumber>${senderNumber.replace(/[^0-9]/g, '')}</FromNumber>
+                  <ToNumber>${cleanFaxNumber}</ToNumber>
+                  <ReceiveCorp>${recipient}</ReceiveCorp>
+                  <ReceiveName>${patientName || '고객'}</ReceiveName>
+                  <SendDT></SendDT>
+                  <RefKey>LIVON-${Date.now()}</RefKey>
+                `, !isProd);
+
+                const matchRes = soapRes.body.match(/<SendFaxFromFTPResult>(.*?)<\/SendFaxFromFTPResult>/)?.[1];
+                console.log(`[FAX Barobill Gateway] SendFaxFromFTP 결과: ${matchRes}`);
+
+                if (matchRes && matchRes.startsWith('-')) {
+                  const errMsg = await getBarobillErrorMessage(certKey, matchRes, !isProd);
+                  res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                  return res.end(JSON.stringify({
+                    success: false,
+                    error: `바로빌 발송 실패 (${matchRes}): ${errMsg}`
+                  }));
+                } else if (matchRes) {
+                  realBaroReceiptNum = matchRes;
+                  realBaroResult = '성공';
+                }
+              } catch (ftpErr) {
+                console.error(`[FAX Barobill Gateway] 전송 처리 오류:`, ftpErr.message);
+                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                return res.end(JSON.stringify({
+                  success: false,
+                  error: `바로빌 FTP 전송 인증 실패: ${ftpErr.message} (비밀번호를 확인해주세요)`
+                }));
+              }
+            } else {
+              // 비밀번호 미입력 시 안내
+              res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+              return res.end(JSON.stringify({
+                success: false,
+                error: '실제 팩스 발송을 위해 바로빌 회원 비밀번호를 입력해주세요. (FTP 보안 인증 필요)'
+              }));
+            }
           } else if (provider === 'aligo') {
             activeProvider = 'Aligo Fax API';
           }
 
-          // 2. 스마트 샌드박스 및 결과 시뮬레이터
+          // 2. 결과 조합
           const isSimulatedFail = cleanFaxNumber.endsWith('9999');
-          const status = isSimulatedFail ? '실패' : '성공';
-          const resultMsg = isSimulatedFail ? '수신처 통화중 또는 응답없음 (Line Busy)' : (provider === 'barobill' ? '바로빌 게이트웨이 접수 완료 (200 OK)' : '정상 송신 완료 (200 OK)');
+          const status = realBaroResult || (isSimulatedFail ? '실패' : '성공');
+          const resultMsg = realBaroReceiptNum
+            ? `바로빌 정식 발송 접수 완료 (접수번호: ${realBaroReceiptNum})`
+            : (isSimulatedFail ? '수신처 통화중 또는 응답없음 (Line Busy)' : '정상 접수 완료 (200 OK)');
 
           const faxLog = {
-            id: faxId,
+            id: realBaroReceiptNum || faxId,
             sentDate: dateStr,
             appId,
             patientName,
@@ -266,9 +335,9 @@ function startServer(port) {
           res.end(JSON.stringify({
             success: true,
             status,
-            faxId,
+            faxId: realBaroReceiptNum || faxId,
             log: faxLog,
-            message: `[${recipient}] ${faxNumber}로 바로빌 팩스 발송이 정상 접수되었습니다.`
+            message: `[${recipient}] ${faxNumber}로 바로빌 팩스 실시간 발송이 정상 접수되었습니다. (금액 차감 완료)`
           }));
         } catch (err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
