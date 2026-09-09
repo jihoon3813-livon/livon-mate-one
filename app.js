@@ -10729,6 +10729,12 @@ function handleNewAssignSubmit(e) {
   renderApplications();
   renderDashboard();
 
+  // 열려있는 고객상세 팝업이 있다면 즉시 최신 간병인 배정 데이터로 재렌더링
+  const hubModal = document.getElementById('hubCustomerDetailModal');
+  if (hubModal && !hubModal.classList.contains('hidden') && (gActiveHubModalAppId || applyId)) {
+    openHubCustomerDetailModal(gActiveHubModalAppId || applyId);
+  }
+
   // Convex Cloud 운영 DB 실시간 동기화
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:saveAssignment', { assign: newAssign });
@@ -10841,6 +10847,12 @@ function handleCustomerEditSubmit(e) {
   renderApplications();
   renderDashboard();
 
+  // 열려있는 고객상세 팝업이 있다면 즉시 갱신
+  const hubModal = document.getElementById('hubCustomerDetailModal');
+  if (hubModal && !hubModal.classList.contains('hidden') && (gActiveHubModalAppId || app.id)) {
+    openHubCustomerDetailModal(gActiveHubModalAppId || app.id);
+  }
+
   // Convex Cloud 운영 DB 실시간 동기화
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:saveApplication', { app: app });
@@ -10903,6 +10915,12 @@ function handleCareScheduleSubmit(e) {
   renderUnifiedCareHub();
   renderAssignments();
   renderPayouts();
+
+  // 열려있는 고객상세 팝업이 있다면 즉시 갱신
+  const hubModal = document.getElementById('hubCustomerDetailModal');
+  if (hubModal && !hubModal.classList.contains('hidden') && (gActiveHubModalAppId || as.applyId)) {
+    openHubCustomerDetailModal(gActiveHubModalAppId || as.applyId);
+  }
 
   // Convex Cloud 운영 DB 실시간 동기화
   if (typeof syncToConvex === 'function') {
