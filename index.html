@@ -335,7 +335,7 @@
 
         <button onclick="switchTab('claims', '미확인')" class="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg" title="미확인 청구건 바로가기">
           <i data-lucide="bell" class="w-5 h-5 text-rose-500"></i>
-          <span id="unpaidAlertBadge" class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border-2 border-white">95</span>
+          <span id="unpaidAlertBadge" class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border-2 border-white" style="display:none;">0</span>
         </button>
 
         <button onclick="switchTab('settings')" class="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all" title="시스템 환경설정">
@@ -500,7 +500,7 @@
                 <i data-lucide="clipboard-list" class="w-3.5 h-3.5 flex-shrink-0 text-sky-400"></i>
                 <span class="tracking-tight">간병신청대장</span>
               </div>
-              <span class="min-w-[28px] h-4 px-1.5 rounded-full bg-slate-800 text-sky-300 font-bold text-[10px] flex items-center justify-center border border-slate-700">254</span>
+              <span id="sidebarAppCount" class="min-w-[28px] h-4 px-1.5 rounded-full bg-slate-800 text-sky-300 font-bold text-[10px] flex items-center justify-center border border-slate-700">-</span>
             </button>
 
             <!-- 2. 간병인배정관리 -->
@@ -509,7 +509,7 @@
                 <i data-lucide="user-check" class="w-3.5 h-3.5 flex-shrink-0 text-emerald-400"></i>
                 <span class="tracking-tight">간병인배정관리</span>
               </div>
-              <span class="min-w-[28px] h-4 px-1.5 rounded-full bg-slate-800 text-emerald-300 font-bold text-[10px] flex items-center justify-center border border-slate-700">239</span>
+              <span id="sidebarAssignCount" class="min-w-[28px] h-4 px-1.5 rounded-full bg-slate-800 text-emerald-300 font-bold text-[10px] flex items-center justify-center border border-slate-700">-</span>
             </button>
 
             <!-- 3. 보험청구 -->
@@ -518,7 +518,7 @@
                 <i data-lucide="receipt" class="w-3.5 h-3.5 flex-shrink-0 text-amber-400"></i>
                 <span class="tracking-tight">보험청구</span>
               </div>
-              <span class="h-4 px-1.5 rounded-full bg-rose-950 text-rose-300 font-black text-[9px] flex items-center justify-center border border-rose-800">미수</span>
+              <span id="sidebarClaimCount" class="min-w-[28px] h-4 px-1.5 rounded-full bg-slate-800 text-amber-300 font-bold text-[10px] flex items-center justify-center border border-slate-700">-</span>
             </button>
 
             <!-- 4. 간병비지급관리 -->
@@ -527,7 +527,7 @@
                 <i data-lucide="banknote" class="w-3.5 h-3.5 flex-shrink-0 text-teal-400"></i>
                 <span class="tracking-tight">간병비지급관리</span>
               </div>
-              <span class="min-w-[28px] h-4 px-1.5 rounded-full bg-slate-800 text-teal-300 font-bold text-[10px] flex items-center justify-center border border-slate-700">442</span>
+              <span id="sidebarPayoutCount" class="min-w-[28px] h-4 px-1.5 rounded-full bg-slate-800 text-teal-300 font-bold text-[10px] flex items-center justify-center border border-slate-700">-</span>
             </button>
           </div>
         </div>
@@ -598,30 +598,30 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-2 relative z-10">
           <button onclick="setHubFilter('ALL')" id="hubFilterBtn-ALL" class="hub-filter-btn active p-3 rounded-xl border transition-all text-left bg-primary-600 text-white border-primary-600 shadow-sm">
             <div class="text-[11px] font-semibold text-primary-100">전체 고객</div>
-            <div class="text-xl font-black mt-0.5" id="hubCount-ALL">245건</div>
+            <div class="text-xl font-black mt-0.5" id="hubCount-ALL">-건</div>
           </button>
           <button onclick="setHubFilter('NEED_ASSIGN')" id="hubFilterBtn-NEED_ASSIGN" class="hub-filter-btn p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
             <div class="text-[11px] font-semibold text-slate-500">① 배정 대기</div>
-            <div class="text-xl font-black text-amber-600 mt-0.5" id="hubCount-NEED_ASSIGN">3건</div>
+            <div class="text-xl font-black text-amber-600 mt-0.5" id="hubCount-NEED_ASSIGN">-건</div>
           </button>
           <button onclick="setHubFilter('IN_PROGRESS')" id="hubFilterBtn-IN_PROGRESS" class="hub-filter-btn p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
             <div class="text-[11px] font-semibold text-slate-500">② 간병 진행중</div>
-            <div class="text-xl font-black text-sky-600 mt-0.5" id="hubCount-IN_PROGRESS">24건</div>
+            <div class="text-xl font-black text-sky-600 mt-0.5" id="hubCount-IN_PROGRESS">-건</div>
           </button>
           <button onclick="setHubFilter('UNPAID_CLAIM')" id="hubFilterBtn-UNPAID_CLAIM" class="hub-filter-btn p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-rose-200">
             <div class="text-[11px] font-bold text-rose-600 flex items-center justify-between">
               <span>④ 미수금 대사</span>
               <span class="w-2 h-2 rounded-full bg-rose-500"></span>
             </div>
-            <div class="text-xl font-black text-rose-600 mt-0.5" id="hubCount-UNPAID_CLAIM">95건</div>
+            <div class="text-xl font-black text-rose-600 mt-0.5" id="hubCount-UNPAID_CLAIM">-건</div>
           </button>
           <button onclick="setHubFilter('NEED_PAYOUT')" id="hubFilterBtn-NEED_PAYOUT" class="hub-filter-btn p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
             <div class="text-[11px] font-semibold text-slate-500">⑤ 지급 대기</div>
-            <div class="text-xl font-black text-teal-600 mt-0.5" id="hubCount-NEED_PAYOUT">5건</div>
+            <div class="text-xl font-black text-teal-600 mt-0.5" id="hubCount-NEED_PAYOUT">-건</div>
           </button>
           <button onclick="setHubFilter('NEED_FAX')" id="hubFilterBtn-NEED_FAX" class="hub-filter-btn p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
             <div class="text-[11px] font-semibold text-slate-500">⑥ 팩스 전송대기</div>
-            <div class="text-xl font-black text-purple-600 mt-0.5" id="hubCount-NEED_FAX">12건</div>
+            <div class="text-xl font-black text-purple-600 mt-0.5" id="hubCount-NEED_FAX">-건</div>
           </button>
         </div>
 
@@ -690,7 +690,7 @@
                 <span class="flex items-center gap-1 font-medium text-slate-500"><span class="w-2 h-2 rounded-full bg-slate-300"></span>일반</span>
               </div>
 
-              <span class="text-xs text-slate-500 font-medium">표시: <b id="hubFilteredCount" class="text-primary-700 font-bold">245</b>건</span>
+              <span class="text-xs text-slate-500 font-medium">표시: <b id="hubFilteredCount" class="text-primary-700 font-bold">-</b>건</span>
             </div>
           </div>
 
@@ -1522,7 +1522,7 @@
                 <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-600"></i>
                 <span>전체 엑셀</span>
               </button>
-              <span class="text-xs text-slate-500">결과: <b id="appFilteredCount" class="text-primary-700 font-bold">245</b>건</span>
+              <span class="text-xs text-slate-500">결과: <b id="appFilteredCount" class="text-primary-700 font-bold">-</b>건</span>
               <button onclick="openNewAppModal()" class="flex items-center gap-1 px-3.5 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold shadow-xs">
                 <i data-lucide="plus" class="w-3.5 h-3.5"></i> 신규신청 등록
               </button>
@@ -1599,7 +1599,7 @@
             </div>
 
             <div class="flex items-center gap-2">
-              <span class="text-xs text-slate-500">배정 건수: <b id="assignFilteredCount" class="text-emerald-700 font-bold">239</b>건</span>
+              <span class="text-xs text-slate-500">배정 건수: <b id="assignFilteredCount" class="text-emerald-700 font-bold">-</b>건</span>
               <button id="btnDeleteSelected-assignments" onclick="deleteSelectedLedgerRows('assignments')" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 <span id="labelDeleteSelected-assignments">선택 삭제 (0)</span>
@@ -1715,13 +1715,13 @@
             </div>
             <div>
               <div class="text-xs text-slate-500 font-semibold">입금확인 완료 건수</div>
-              <div class="text-2xl font-black text-emerald-700 mt-0.5">337건</div>
+              <div class="text-2xl font-black text-emerald-700 mt-0.5" id="claimPaidCountHeader">-건</div>
             </div>
           </div>
           <div class="bg-rose-50 border-2 border-rose-300 p-4 rounded-2xl shadow-xs flex items-center justify-between">
             <div>
               <div class="text-xs text-rose-700 font-bold">미확인 청구 (미수금 집중 관리)</div>
-              <div class="text-2xl font-black text-rose-600 mt-0.5" id="claimUnpaidCountHeader">95건</div>
+              <div class="text-2xl font-black text-rose-600 mt-0.5" id="claimUnpaidCountHeader">-건</div>
             </div>
             <button onclick="filterClaimsByStatus('미확인')" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold">
               미확인만 모아보기
@@ -1812,7 +1812,7 @@
             </div>
 
             <div class="flex items-center gap-2">
-              <span class="text-xs text-slate-500">지급 건수: <b id="payoutFilteredCount" class="text-teal-700 font-bold">442</b>건</span>
+              <span class="text-xs text-slate-500">지급 건수: <b id="payoutFilteredCount" class="text-teal-700 font-bold">-</b>건</span>
               <button id="btnDeleteSelected-payouts" onclick="deleteSelectedLedgerRows('payouts')" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 <span id="labelDeleteSelected-payouts">선택 삭제 (0)</span>

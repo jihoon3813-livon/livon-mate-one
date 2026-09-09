@@ -787,11 +787,24 @@ async function loadConvexData(showSpinner = true) {
       const { applications, assignments, claims, payouts, adjusters, careLogs } = res.value;
       if (Array.isArray(applications) && applications.length > 0) {
         gApps = applications;
+        try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(applications)); } catch (e) {}
       }
-      if (Array.isArray(assignments)) gAssigns = assignments;
-      if (Array.isArray(claims)) gClaims = claims;
-      if (Array.isArray(payouts)) gPayouts = payouts;
-      if (Array.isArray(adjusters) && adjusters.length > 0) gAdjusters = adjusters;
+      if (Array.isArray(assignments)) {
+        gAssigns = assignments;
+        try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(assignments)); } catch (e) {}
+      }
+      if (Array.isArray(claims)) {
+        gClaims = claims;
+        try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(claims)); } catch (e) {}
+      }
+      if (Array.isArray(payouts)) {
+        gPayouts = payouts;
+        try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(payouts)); } catch (e) {}
+      }
+      if (Array.isArray(adjusters) && adjusters.length > 0) {
+        gAdjusters = adjusters;
+        try { localStorage.setItem('LIVON_CACHED_ADJUSTERS', JSON.stringify(adjusters)); } catch (e) {}
+      }
       if (Array.isArray(careLogs) && careLogs.length > 0) gCareLogs = careLogs;
 
       // Convex DB에 저장된 양식 설정(영역 좌표 및 배경 이미지) 동기화 복원
@@ -857,6 +870,7 @@ async function loadConvexData(showSpinner = true) {
     if (typeof renderCareLogs === 'function') renderCareLogs();
     if (typeof renderDashboard === 'function') renderDashboard();
     if (typeof renderFaxManagement === 'function') renderFaxManagement();
+    if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
   }
 }
 
@@ -6876,6 +6890,7 @@ function renderUnifiedCareHub() {
     document.getElementById('hubCount-UNPAID_CLAIM').innerText = unpaidClaimCount + '건';
     document.getElementById('hubCount-NEED_PAYOUT').innerText = needPayoutCount + '건';
     document.getElementById('hubCount-NEED_FAX').innerText = needFaxCount + '건';
+    if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
   }
 
   // Filter application list
@@ -8855,11 +8870,43 @@ function exportFaxLogsToCSV() {
 }
 
 function initData() {
+  // 1. 로컬 캐시(LocalStorage)에서 최신 Convex 동기화 데이터 즉시 복원 (새로고침 시 과거 시드 숫자가 깜빡이는 현상 원천 차단)
+  try {
+    const cachedApps = localStorage.getItem('LIVON_CACHED_APPS');
+    if (cachedApps) gApps = JSON.parse(cachedApps);
+    else if (window.REBORN_DATA && window.REBORN_DATA.applications) gApps = [...window.REBORN_DATA.applications];
+
+    const cachedAssigns = localStorage.getItem('LIVON_CACHED_ASSIGNS');
+    if (cachedAssigns) gAssigns = JSON.parse(cachedAssigns);
+    else if (window.REBORN_DATA && window.REBORN_DATA.assignments) gAssigns = [...window.REBORN_DATA.assignments];
+
+    const cachedClaims = localStorage.getItem('LIVON_CACHED_CLAIMS');
+    if (cachedClaims) gClaims = JSON.parse(cachedClaims);
+    else if (window.REBORN_DATA && window.REBORN_DATA.claims) gClaims = [...window.REBORN_DATA.claims];
+
+    const cachedPayouts = localStorage.getItem('LIVON_CACHED_PAYOUTS');
+    if (cachedPayouts) gPayouts = JSON.parse(cachedPayouts);
+    else if (window.REBORN_DATA && window.REBORN_DATA.payouts) gPayouts = [...window.REBORN_DATA.payouts];
+
+    const cachedAdjusters = localStorage.getItem('LIVON_CACHED_ADJUSTERS');
+    if (cachedAdjusters) gAdjusters = JSON.parse(cachedAdjusters);
+    else if (window.REBORN_DATA && window.REBORN_DATA.adjusters) gAdjusters = [...window.REBORN_DATA.adjusters];
+  } catch (e) {
+    if (window.REBORN_DATA) {
+      gApps = [...window.REBORN_DATA.applications];
+      gAssigns = [...window.REBORN_DATA.assignments];
+      gClaims = [...window.REBORN_DATA.claims];
+      gPayouts = [...window.REBORN_DATA.payouts];
+      gAdjusters = [...window.REBORN_DATA.adjusters];
+    }
+  }
+
   if (window.REBORN_DATA) {
-    gApps = [...window.REBORN_DATA.applications];
-    gAssigns = [...window.REBORN_DATA.assignments];
-    gClaims = [...window.REBORN_DATA.claims];
-    gPayouts = [...window.REBORN_DATA.payouts];
+    if (!gApps || gApps.length === 0) gApps = [...window.REBORN_DATA.applications];
+    if (!gAssigns || gAssigns.length === 0) gAssigns = [...window.REBORN_DATA.assignments];
+    if (!gClaims || gClaims.length === 0) gClaims = [...window.REBORN_DATA.claims];
+    if (!gPayouts || gPayouts.length === 0) gPayouts = [...window.REBORN_DATA.payouts];
+    if (!gAdjusters || gAdjusters.length === 0) gAdjusters = [...window.REBORN_DATA.adjusters];
     gAdmins = [...window.REBORN_DATA.admins];
     gPartners = [...window.REBORN_DATA.partners];
     gCareLogs = [...window.REBORN_DATA.careLogs];
@@ -9052,7 +9099,40 @@ function initData() {
     });
   }
 
+  updateSidebarCounts();
+}
 
+function updateSidebarCounts() {
+  const appCountEl = document.getElementById('sidebarAppCount');
+  if (appCountEl) appCountEl.innerText = (gApps || []).length;
+
+  const assignCountEl = document.getElementById('sidebarAssignCount');
+  if (assignCountEl) assignCountEl.innerText = (gAssigns || []).length;
+
+  const claimCountEl = document.getElementById('sidebarClaimCount');
+  if (claimCountEl) claimCountEl.innerText = (gClaims || []).length;
+
+  const payoutCountEl = document.getElementById('sidebarPayoutCount');
+  if (payoutCountEl) payoutCountEl.innerText = (gPayouts || []).length;
+
+  const adjCountEl = document.getElementById('sidebarAdjusterCount');
+  if (adjCountEl) adjCountEl.innerText = (gAdjusters || []).length;
+
+  const cgCountEl = document.getElementById('sidebarCaregiverCount');
+  if (cgCountEl) cgCountEl.innerText = (gCaregivers || []).length;
+
+  const centerCountEl = document.getElementById('sidebarCenterCount');
+  if (centerCountEl) centerCountEl.innerText = (gCenters || []).length;
+
+  const faxCountEl = document.getElementById('sidebarFaxCount');
+  if (faxCountEl) faxCountEl.innerText = (gFaxLogs || []).length + '건';
+
+  const unpaidBadge = document.getElementById('unpaidAlertBadge');
+  if (unpaidBadge) {
+    const unpaidCount = (gClaims || []).filter(c => c && (c.depositStatus === '미수' || c.depositStatus === '미확인' || c.depositStatus === '부분입금' || !c.depositStatus)).length;
+    unpaidBadge.innerText = unpaidCount;
+    unpaidBadge.style.display = unpaidCount > 0 ? 'flex' : 'none';
+  }
 }
 
 function initIcons() {
@@ -10015,6 +10095,10 @@ function renderClaims() {
   const unconfirmedCount = gClaims.filter(c => c.depositStatus === '미확인').length;
   const headerAlert = document.getElementById('claimUnpaidCountHeader');
   if (headerAlert) headerAlert.innerText = unconfirmedCount + '건';
+
+  const confirmedCount = gClaims.filter(c => c.depositStatus === '입금확인').length;
+  const headerPaid = document.getElementById('claimPaidCountHeader');
+  if (headerPaid) headerPaid.innerText = confirmedCount + '건';
 
   tbody.innerHTML = filtered.map(c => {
     const isChecked = gLedgerSelection.claims && gLedgerSelection.claims.has(c.id);
