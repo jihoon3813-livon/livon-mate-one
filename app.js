@@ -820,14 +820,25 @@ async function loadConvexData(showSpinner = true) {
         }
       }
 
-      // Convex DB에 저장된 팩스 발송 대장(faxRecords) 동기화 복원
+      // Convex DB에 저장된 팩스 발송 대장(faxRecords) 동기화 복원 및 로컬 기록 병합 보존
       const { faxRecords } = res.value;
       if (Array.isArray(faxRecords) && faxRecords.length > 0) {
-        gFaxLogs = faxRecords;
+        const cloudIds = new Set(faxRecords.map(r => r.id));
+        // 로컬에만 존재하는 최신 발송 이력(시험 발송, 실발송 기록 등) 안전하게 보존
+        const localOnly = (gFaxLogs || []).filter(l => l && l.id && !cloudIds.has(l.id));
+        gFaxLogs = [...localOnly, ...faxRecords];
+        // 중복 제거
+        const seenIds = new Set();
+        gFaxLogs = gFaxLogs.filter(item => {
+          if (!item || !item.id) return false;
+          if (seenIds.has(item.id)) return false;
+          seenIds.add(item.id);
+          return true;
+        });
         saveFaxLogs();
         updateFaxKpis();
         if (typeof renderFaxLogsTable === 'function') renderFaxLogsTable();
-        console.log(`[Convex Cloud] 팩스 발송 대장 동기화 완료 (${faxRecords.length}건)`);
+        console.log(`[Convex Cloud] 팩스 발송 대장 동기화 완료 (클라우드: ${faxRecords.length}건, 로컬보존: ${localOnly.length}건, 총 ${gFaxLogs.length}건)`);
       }
 
       console.log(`[Convex Cloud] 운영 DB 실시간 동기화 완료 (고객: ${gApps.length}명, 배정: ${gAssigns.length}건, 청구: ${gClaims.length}건, 정산: ${gPayouts.length}건)`);
@@ -845,6 +856,7 @@ async function loadConvexData(showSpinner = true) {
     if (typeof renderPayouts === 'function') renderPayouts();
     if (typeof renderCareLogs === 'function') renderCareLogs();
     if (typeof renderDashboard === 'function') renderDashboard();
+    if (typeof renderFaxManagement === 'function') renderFaxManagement();
   }
 }
 
@@ -1037,6 +1049,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPayouts();
     renderAdmins();
     renderPartners();
+    if (typeof renderFaxManagement === 'function') renderFaxManagement();
     calculateRuleSplit();
   }, 60);
 });
@@ -3620,6 +3633,9 @@ function executeSendHyundaiInitialFax() {
   gFaxLogs.unshift(newLog);
   if (typeof saveFaxLogs === 'function') saveFaxLogs();
   if (typeof updateFaxKpis === 'function') updateFaxKpis();
+  try {
+    syncToConvex('sync:saveFaxRecord', { record: newLog });
+  } catch (e) {}
 
   alert(`📠 [현대해상 1차 접수 팩스 발송 완료]\n\n수신: 현대해상 보상접수센터 (02-2195-5000)\n환자: ${app.patientName} (${app.id})\n\n현대해상에서 콜직원 휴대폰으로 보험 가입정보 문자가 오면 [문자정보 등록] 버튼을 눌러 2차 정보를 보강해주세요!`);
 }
@@ -7733,8 +7749,10 @@ function renderFaxLogsTable() {
   const insFilter = document.getElementById('faxLogInsuranceFilter')?.value || 'ALL';
 
   let filtered = (gFaxLogs || []).filter(l => {
+    if (!l) return false;
     if (statusFilter !== 'ALL' && l.status !== statusFilter) return false;
-    if (insFilter !== 'ALL' && !l.insuranceCompany.includes(insFilter)) return false;
+    const insCompany = l.insuranceCompany || '';
+    if (insFilter !== 'ALL' && !insCompany.includes(insFilter)) return false;
     if (search) {
       const match = (
         (l.patientName && l.patientName.toLowerCase().includes(search)) ||
@@ -7743,7 +7761,7 @@ function renderFaxLogsTable() {
         (l.faxNumber && l.faxNumber.includes(search)) ||
         (l.formName && l.formName.toLowerCase().includes(search)) ||
         (l.formCode && l.formCode.toLowerCase().includes(search)) ||
-        (l.insuranceCompany && l.insuranceCompany.toLowerCase().includes(search))
+        (insCompany && insCompany.toLowerCase().includes(search))
       );
       if (!match) return false;
     }
@@ -7785,9 +7803,10 @@ function renderFaxLogsTable() {
       </span>`;
     }
 
-    const insBadge = l.insuranceCompany.includes('현대해상')
+    const insCompany = l.insuranceCompany || '기타';
+    const insBadge = insCompany.includes('현대해상')
       ? 'bg-blue-50 text-blue-700 border-blue-200'
-      : (l.insuranceCompany.includes('삼성화재')
+      : (insCompany.includes('삼성화재')
         ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
         : 'bg-purple-50 text-purple-700 border-purple-200');
 
@@ -7804,7 +7823,7 @@ function renderFaxLogsTable() {
         </td>
         <td class="p-3 text-center whitespace-nowrap">
           <span class="px-2 py-0.5 rounded-md text-[11px] font-bold border ${insBadge}">
-            ${l.insuranceCompany}
+            ${insCompany}
           </span>
         </td>
         <td class="p-3 font-medium text-slate-800">
@@ -8334,9 +8353,18 @@ async function executeFaxEchoTest() {
           <div class="text-[10px] text-emerald-400 mt-1">${result.message || '전자팩스 관리 대장에도 시험 발송 이력이 자동 기록되었습니다.'}</div>
         `;
       }
-      if (result.log && typeof gFaxLogs !== 'undefined') {
+      if (result.log) {
+        if (!Array.isArray(gFaxLogs)) gFaxLogs = [];
         gFaxLogs.unshift(result.log);
-        if (typeof renderFaxManagementView === 'function') renderFaxManagementView();
+        saveFaxLogs();
+        try {
+          await syncToConvex('sync:saveFaxRecord', { record: result.log });
+          console.log(`[FAX Test Convex Sync] ${result.log.id} 시험발송 기록이 Convex Cloud DB에 영구 저장되었습니다.`);
+        } catch (convexErr) {
+          console.warn('[FAX Test Convex Sync Error]', convexErr);
+        }
+        updateFaxKpis();
+        renderFaxLogsTable();
       }
     } else {
       if (statusEl) {
@@ -8859,15 +8887,17 @@ function initData() {
     } else {
       gFaxDirectory = [];
     }
-    if (window.REBORN_DATA.faxLogs) {
-      try {
-        const savedLogs = localStorage.getItem('LIVON_FAX_LOGS');
-        gFaxLogs = savedLogs ? JSON.parse(savedLogs) : [...window.REBORN_DATA.faxLogs];
-      } catch (e) {
+    try {
+      const savedLogs = localStorage.getItem('LIVON_FAX_LOGS');
+      if (savedLogs) {
+        gFaxLogs = JSON.parse(savedLogs);
+      } else if (window.REBORN_DATA && window.REBORN_DATA.faxLogs) {
         gFaxLogs = [...window.REBORN_DATA.faxLogs];
+      } else {
+        gFaxLogs = [];
       }
-    } else {
-      gFaxLogs = [];
+    } catch (e) {
+      gFaxLogs = (window.REBORN_DATA && window.REBORN_DATA.faxLogs) ? [...window.REBORN_DATA.faxLogs] : [];
     }
   }
 
