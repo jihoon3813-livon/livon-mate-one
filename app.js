@@ -4144,6 +4144,14 @@ function parseCareDate(dateStr) {
   return new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10));
 }
 
+function formatCareDateStr(d) {
+  if (!d || isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}.${m}.${day}`;
+}
+
 function getCareProgressInfo(assign) {
   if (!assign || !assign.startDate || !assign.endDate) return null;
   const start = parseCareDate(assign.startDate);
@@ -4594,10 +4602,14 @@ function saveCsActionMemo(appId, recordId) {
 // [CORE ENGINE] 간병일수·손사청구·간병인지급 유기적 통합 정산 스케줄러
 // =========================================================================
 function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
-  const totalCareDays = prog ? prog.totalDays : (parseInt(app.expectedDays, 10) || 14);
-  const elapsedDays = prog ? prog.elapsedDays : 0;
-  const remainingDays = prog ? prog.remainingDays : totalCareDays;
-  const isCompleted = prog ? prog.status === 'completed' : false;
+  // 실제 청구 일자 및 일수 기준: 간병인/센터관리에서 간병인을 등록할 때 설정하는 날짜 기준
+  const isCaregiverAssigned = !!(as && as.startDate && as.endDate && prog && prog.totalDays > 0);
+  const totalCareDays = isCaregiverAssigned ? prog.totalDays : 0;
+  const elapsedDays = isCaregiverAssigned ? prog.elapsedDays : 0;
+  const remainingDays = isCaregiverAssigned ? prog.remainingDays : 0;
+  const isCompleted = isCaregiverAssigned ? (prog.status === 'completed' || prog.remainingDays === 0) : false;
+  const careStartDate = isCaregiverAssigned ? as.startDate : null;
+  const careEndDate = isCaregiverAssigned ? as.endDate : null;
 
   const defaultInsPrice = (app.insuranceCompany && app.insuranceCompany.includes('현대해상')) ? 144000 : 144000;
   const dailyClaimPrice = (appClaims && appClaims.length > 0 && (appClaims[0].unitPrice || appClaims[0].dailyWage)) 
@@ -4607,131 +4619,164 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
   const cgDailyWage = as ? (as.dailyWage || 140000) : 140000;
 
   const rounds = [];
-  let remainingDaysToSplit = totalCareDays;
-  let roundIndex = 1;
-  let startDayOffset = 1;
+  if (isCaregiverAssigned && totalCareDays > 0) {
+    const baseStart = parseCareDate(careStartDate);
+    let remainingDaysToSplit = totalCareDays;
+    let roundIndex = 1;
+    let startDayOffset = 1;
 
-  while (remainingDaysToSplit > 0) {
-    const roundDays = Math.min(10, remainingDaysToSplit);
-    const endDayOffset = startDayOffset + roundDays - 1;
+    while (remainingDaysToSplit > 0) {
+      const roundDays = Math.min(10, remainingDaysToSplit);
+      const endDayOffset = startDayOffset + roundDays - 1;
 
-    let stage = 'UPCOMING';
-    let ongoingElapsed = 0;
-    let ongoingRemaining = roundDays;
-
-    if (elapsedDays >= endDayOffset || isCompleted) {
-      stage = 'COMPLETED';
-      ongoingElapsed = roundDays;
-      ongoingRemaining = 0;
-    } else if (elapsedDays >= startDayOffset) {
-      stage = 'ONGOING';
-      ongoingElapsed = elapsedDays - startDayOffset + 1;
-      ongoingRemaining = Math.max(0, roundDays - ongoingElapsed);
-    } else {
-      stage = 'UPCOMING';
-      ongoingElapsed = 0;
-      ongoingRemaining = roundDays;
-    }
-
-    const claimForRound = (appClaims || []).find(c => 
-      String(c.round || '').includes(`${roundIndex}차`) || 
-      String(c.round || '').includes(`${roundIndex}회차`)
-    );
-
-    let claimStatus = 'UPCOMING_WAIT';
-    const fullClaimAmount = roundDays * dailyClaimPrice;
-    const ongoingClaimAmount = ongoingElapsed * dailyClaimPrice;
-
-    if (claimForRound) {
-      const isDepositDone = (claimForRound.depositStatus === '수납완료' || claimForRound.depositStatus === '입금완료' || claimForRound.depositStatus === '입금확인');
-      claimStatus = isDepositDone ? 'DEPOSIT_DONE' : 'CLAIMED_UNPAID';
-    } else {
-      if (stage === 'COMPLETED') {
-        claimStatus = 'READY_TO_CLAIM';
-      } else if (stage === 'ONGOING') {
-        claimStatus = 'ONGOING_WAIT';
-      } else {
-        claimStatus = 'UPCOMING_WAIT';
+      // 차수별 정확한 달력 기간(시작일~종료일) 계산
+      let roundStartDateStr = '';
+      let roundEndDateStr = '';
+      if (baseStart) {
+        const rStart = new Date(baseStart.getTime() + (startDayOffset - 1) * 86400000);
+        const rEnd = new Date(baseStart.getTime() + (endDayOffset - 1) * 86400000);
+        roundStartDateStr = formatCareDateStr(rStart);
+        roundEndDateStr = formatCareDateStr(rEnd);
       }
-    }
 
-    const payoutForRound = (appPayouts || []).find(p => 
-      String(p.round || '').includes(`${roundIndex}차`) || 
-      String(p.round || '').includes(`${roundIndex}회차`)
-    );
+      let stage = 'UPCOMING';
+      let ongoingElapsed = 0;
+      let ongoingRemaining = roundDays;
 
-    let payoutStatus = 'UPCOMING_WAIT';
-    const fullPayoutAmount = roundDays * cgDailyWage;
-    const ongoingPayoutAmount = ongoingElapsed * cgDailyWage;
-
-    if (payoutForRound) {
-      payoutStatus = payoutForRound.payoutStatus === '지급' ? 'PAID' : 'READY_TO_PAY';
-    } else {
-      if (stage === 'COMPLETED') {
-        payoutStatus = 'READY_TO_PAY';
-      } else if (stage === 'ONGOING') {
-        payoutStatus = 'ONGOING_WAIT';
+      if (elapsedDays >= endDayOffset || isCompleted) {
+        stage = 'COMPLETED';
+        ongoingElapsed = roundDays;
+        ongoingRemaining = 0;
+      } else if (elapsedDays >= startDayOffset) {
+        stage = 'ONGOING';
+        ongoingElapsed = elapsedDays - startDayOffset + 1;
+        ongoingRemaining = Math.max(0, roundDays - ongoingElapsed);
       } else {
-        payoutStatus = 'UPCOMING_WAIT';
+        stage = 'UPCOMING';
+        ongoingElapsed = 0;
+        ongoingRemaining = roundDays;
       }
+
+      const claimForRound = (appClaims || []).find(c => 
+        String(c.round || '').includes(`${roundIndex}차`) || 
+        String(c.round || '').includes(`${roundIndex}회차`)
+      );
+
+      let claimStatus = 'UPCOMING_WAIT';
+      const fullClaimAmount = roundDays * dailyClaimPrice;
+      const ongoingClaimAmount = ongoingElapsed * dailyClaimPrice;
+
+      if (claimForRound) {
+        const isDepositDone = (claimForRound.depositStatus === '수납완료' || claimForRound.depositStatus === '입금완료' || claimForRound.depositStatus === '입금확인');
+        claimStatus = isDepositDone ? 'DEPOSIT_DONE' : 'CLAIMED_UNPAID';
+      } else {
+        if (stage === 'COMPLETED' || isCompleted) {
+          claimStatus = 'READY_TO_CLAIM';
+        } else if (stage === 'ONGOING') {
+          claimStatus = 'ONGOING_WAIT';
+        } else {
+          claimStatus = 'UPCOMING_WAIT';
+        }
+      }
+
+      const payoutForRound = (appPayouts || []).find(p => 
+        String(p.round || '').includes(`${roundIndex}차`) || 
+        String(p.round || '').includes(`${roundIndex}회차`)
+      );
+
+      let payoutStatus = 'UPCOMING_WAIT';
+      const fullPayoutAmount = roundDays * cgDailyWage;
+      const ongoingPayoutAmount = ongoingElapsed * cgDailyWage;
+
+      if (payoutForRound) {
+        payoutStatus = payoutForRound.payoutStatus === '지급' ? 'PAID' : 'READY_TO_PAY';
+      } else {
+        if (stage === 'COMPLETED' || isCompleted) {
+          payoutStatus = 'READY_TO_PAY';
+        } else if (stage === 'ONGOING') {
+          payoutStatus = 'ONGOING_WAIT';
+        } else {
+          payoutStatus = 'UPCOMING_WAIT';
+        }
+      }
+
+      const currentClaimAmt = claimForRound 
+        ? (claimForRound.depositAmount || claimForRound.claimAmount || fullClaimAmount) 
+        : (stage === 'COMPLETED' ? fullClaimAmount : ongoingClaimAmount);
+      
+      const currentPayoutAmt = payoutForRound 
+        ? (payoutForRound.payoutAmount || fullPayoutAmount) 
+        : (stage === 'COMPLETED' ? fullPayoutAmount : ongoingPayoutAmount);
+      
+      const marginAmount = currentClaimAmt - currentPayoutAmt;
+      const marginRate = currentClaimAmt > 0 ? ((marginAmount / currentClaimAmt) * 100).toFixed(1) : '0.0';
+
+      rounds.push({
+        roundNumber: roundIndex,
+        label: `${roundIndex}차 (${startDayOffset}~${endDayOffset}일)`,
+        days: roundDays,
+        startDayOffset,
+        endDayOffset,
+        startDateStr: roundStartDateStr,
+        endDateStr: roundEndDateStr,
+        stage,
+        ongoingElapsed,
+        ongoingRemaining,
+        dailyClaimPrice,
+        fullClaimAmount,
+        ongoingClaimAmount,
+        claimId: claimForRound ? claimForRound.id : `Q${app.id.replace('C', '')}.${roundIndex}`,
+        claimStatus,
+        existingClaim: claimForRound,
+        cgDailyWage,
+        fullPayoutAmount,
+        ongoingPayoutAmount,
+        payoutId: payoutForRound ? payoutForRound.id : `P${app.id.replace('C', '')}.${roundIndex}`,
+        payoutStatus,
+        existingPayout: payoutForRound,
+        marginAmount,
+        marginRate
+      });
+
+      remainingDaysToSplit -= roundDays;
+      startDayOffset += roundDays;
+      roundIndex++;
     }
-
-    const currentClaimAmt = claimForRound 
-      ? (claimForRound.depositAmount || claimForRound.claimAmount || fullClaimAmount) 
-      : (stage === 'COMPLETED' ? fullClaimAmount : ongoingClaimAmount);
-    
-    const currentPayoutAmt = payoutForRound 
-      ? (payoutForRound.payoutAmount || fullPayoutAmount) 
-      : (stage === 'COMPLETED' ? fullPayoutAmount : ongoingPayoutAmount);
-    
-    const marginAmount = currentClaimAmt - currentPayoutAmt;
-    const marginRate = currentClaimAmt > 0 ? ((marginAmount / currentClaimAmt) * 100).toFixed(1) : '0.0';
-
-    rounds.push({
-      roundNumber: roundIndex,
-      label: `${roundIndex}차 (${startDayOffset}~${endDayOffset}일)`,
-      days: roundDays,
-      startDayOffset,
-      endDayOffset,
-      stage,
-      ongoingElapsed,
-      ongoingRemaining,
-      dailyClaimPrice,
-      fullClaimAmount,
-      ongoingClaimAmount,
-      claimId: claimForRound ? claimForRound.id : `Q${app.id.replace('C', '')}.${roundIndex}`,
-      claimStatus,
-      existingClaim: claimForRound,
-      cgDailyWage,
-      fullPayoutAmount,
-      ongoingPayoutAmount,
-      payoutId: payoutForRound ? payoutForRound.id : `P${app.id.replace('C', '')}.${roundIndex}`,
-      payoutStatus,
-      existingPayout: payoutForRound,
-      marginAmount,
-      marginRate
-    });
-
-    remainingDaysToSplit -= roundDays;
-    startDayOffset += roundDays;
-    roundIndex++;
   }
 
+  // 간병비 지급 상태 및 지급대상 판정
   const confirmedPayoutSum = (appPayouts || []).reduce((acc, p) => acc + (p.payoutAmount || 0), 0);
   const paidPayoutSum = (appPayouts || []).filter(p => p.payoutStatus === '지급').reduce((acc, p) => acc + (p.payoutAmount || 0), 0);
   const unpaidPayoutSum = confirmedPayoutSum - paidPayoutSum;
+  const unpaidPayoutCount = (appPayouts || []).filter(p => p.payoutStatus !== '지급').length;
+  const isCarePeriodEnded = isCaregiverAssigned && isCompleted;
+  const isAllPayoutsPaid = (appPayouts || []).length > 0 && unpaidPayoutCount === 0;
+  const isCaregiverPayoutDue = isCarePeriodEnded && (!isAllPayoutsPaid || (appPayouts || []).length === 0);
   const totalOngoingPayoutEst = rounds.reduce((acc, r) => acc + (r.existingPayout ? (r.existingPayout.payoutAmount || 0) : r.ongoingPayoutAmount), 0);
 
+  // 손사 청구 상태 및 입금 미완료(미수) 판정
   const confirmedClaimSum = (appClaims || []).reduce((acc, c) => acc + (c.claimAmount || (c.days * (c.unitPrice || dailyClaimPrice))), 0);
   const depositedClaimSum = (appClaims || []).filter(c => c.depositStatus === '수납완료' || c.depositStatus === '입금완료' || c.depositStatus === '입금확인').reduce((acc, c) => acc + (c.depositAmount || c.claimAmount || 0), 0);
-  const unconfirmedClaimSum = (appClaims || []).filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.depositStatus !== '입금확인').reduce((acc, c) => acc + (c.unpaidAmount || c.claimAmount || 0), 0);
+  const unpaidClaims = (appClaims || []).filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.depositStatus !== '입금확인');
+  const unconfirmedClaimSum = unpaidClaims.reduce((acc, c) => acc + (c.unpaidAmount || c.claimAmount || 0), 0);
+  const hasUnpaidClaim = unpaidClaims.length > 0;
+  const isAllClaimsDeposited = (appClaims || []).length > 0 && !hasUnpaidClaim;
   const totalOngoingClaimEst = rounds.reduce((acc, r) => acc + (r.existingClaim ? (r.existingClaim.claimAmount || 0) : r.ongoingClaimAmount), 0);
 
   return {
+    isCaregiverAssigned,
+    careStartDate,
+    careEndDate,
     totalCareDays,
     elapsedDays,
     remainingDays,
     isCompleted,
+    isCarePeriodEnded,
+    isCaregiverPayoutDue,
+    isAllPayoutsPaid,
+    hasUnpaidClaim,
+    isAllClaimsDeposited,
+    unpaidClaims,
     dailyClaimPrice,
     cgDailyWage,
     rounds,
@@ -4848,6 +4893,65 @@ function deleteInterimPayout(applyId, payoutId) {
   }
 }
 
+function executeBatchCaregiverPayout(applyId, assignId) {
+  const app = (gApps || []).find(a => a.id === applyId);
+  const as = (gAssigns || []).find(a => a.id === assignId || a.applyId === applyId);
+  if (!app) return;
+
+  const prog = as ? getCareProgressInfo(as) : null;
+  const totalDays = prog ? prog.totalDays : 10;
+  const wage = as ? (as.dailyWage || 140000) : 140000;
+  const totalWage = totalDays * wage;
+
+  if (!confirm(`[${maskName(app.patientName)} 님 간병비 지급완료 처리]\n\n간병사: ${as ? maskName(as.caregiverName) : '간병인'}\n근무기간: ${totalDays}일 (${as ? as.startDate + ' ~ ' + as.endDate : ''})\n총 지급액: ${formatCurrency(totalWage)}원\n\n간병비 전액을 '지급완료'로 처리하시겠습니까?`)) {
+    return;
+  }
+
+  // 기존 정산 내역이 있으면 지급으로 변경, 없으면 신규 생성
+  const existingPayouts = (gPayouts || []).filter(p => p.applyId === applyId);
+  if (existingPayouts.length > 0) {
+    existingPayouts.forEach(p => {
+      p.payoutStatus = '지급';
+      p.paidDate = new Date().toISOString().split('T')[0];
+    });
+  } else {
+    const newPayout = {
+      id: `P${applyId.replace('C', '')}.1`,
+      applyId: applyId,
+      patientName: app.patientName,
+      caregiverName: as ? as.caregiverName : '간병사',
+      round: `1차 (${totalDays}일 전액)`,
+      days: totalDays,
+      dailyWage: wage,
+      payoutAmount: totalWage,
+      payoutStatus: '지급',
+      payoutDate: new Date().toISOString().split('T')[0],
+      paidDate: new Date().toISOString().split('T')[0],
+      memo: '간병 종료에 따른 전액 일괄 지급완료 처리'
+    };
+    gPayouts.unshift(newPayout);
+  }
+
+  savePayouts();
+  if (typeof syncToConvex === 'function') {
+    (gPayouts.filter(p => p.applyId === applyId)).forEach(p => {
+      syncToConvex('sync:savePayout', { payout: p }).catch(console.warn);
+    });
+  }
+
+  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+  renderUnifiedCareHub();
+  if (typeof renderPayouts === 'function') renderPayouts();
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '간병비 지급완료',
+      message: `[${maskName(app.patientName)} 님] 간병비 ${formatCurrency(totalWage)}원이 지급완료로 처리되었습니다.`
+    });
+  }
+}
+
 function createInterimClaim(applyId, roundNumber, targetDays) {
   const app = (gApps || []).find(a => a.id === applyId);
   const appAssigns = (gAssigns || []).filter(a => a.applyId === applyId);
@@ -4858,8 +4962,9 @@ function createInterimClaim(applyId, roundNumber, targetDays) {
   const daysToClaim = targetDays || (roundInfo ? (roundInfo.stage === 'COMPLETED' ? roundInfo.days : roundInfo.ongoingElapsed) : 1);
   const unitPrice = schedule.dailyClaimPrice;
   const amount = daysToClaim * unitPrice;
+  const periodText = (roundInfo && roundInfo.startDateStr && roundInfo.endDateStr) ? ` (${roundInfo.startDateStr} ~ ${roundInfo.endDateStr})` : '';
 
-  const confirmMsg = `[손사 조기청구 확인]\n\n환자: ${app ? app.patientName : '고객'}\n보험사: ${app ? (app.insuranceCompany || '현대해상') : '현대해상'}\n청구 일수: ${daysToClaim}일분\n청구 금액: ${formatCurrency(amount)}원\n\n현재까지 발생한 일수로 조기 청구서를 생성하시겠습니까?\n(생성 후 언제든지 '원복' 버튼으로 취소할 수 있습니다.)`;
+  const confirmMsg = `[손사 ${roundNumber || 1}차 청구서 생성 확인]\n\n환자: ${app ? maskName(app.patientName) : '고객'}\n보험사: ${app ? (app.insuranceCompany || '현대해상') : '현대해상'}\n청구 일수: ${daysToClaim}일분${periodText}\n청구 금액: ${formatCurrency(amount)}원\n\n해당 기간의 정산청구서를 생성하시겠습니까?\n(생성 후 팩스로 즉시 발송할 수 있습니다.)`;
   if (!confirm(confirmMsg)) return;
 
   const newClaim = {
@@ -4867,8 +4972,10 @@ function createInterimClaim(applyId, roundNumber, targetDays) {
     applyId: applyId,
     patientName: app ? app.patientName : '고객',
     insuranceCompany: app ? (app.insuranceCompany || '현대해상') : '현대해상',
-    round: `${roundNumber || 1}차 (${daysToClaim}일)`,
-    standardDate: new Date().toISOString().split('T')[0],
+    round: `${roundNumber || 1}차 (${daysToClaim}일분)`,
+    standardDate: (roundInfo && roundInfo.startDateStr) ? roundInfo.startDateStr : new Date().toISOString().split('T')[0],
+    startDate: (roundInfo && roundInfo.startDateStr) ? roundInfo.startDateStr : '',
+    endDate: (roundInfo && roundInfo.endDateStr) ? roundInfo.endDateStr : '',
     claimDate: new Date().toISOString().split('T')[0],
     days: daysToClaim,
     unitPrice: unitPrice,
@@ -4879,7 +4986,7 @@ function createInterimClaim(applyId, roundNumber, targetDays) {
     depositStatus: '미수납',
     unpaidAmount: amount,
     adjusterStatus: '청구접수',
-    memo: `${roundNumber || 1}차 손사 조기청구 생성 (${daysToClaim}일분 ${formatCurrency(amount)}원 미수)`
+    memo: `${roundNumber || 1}차 손사 정산청구서 생성 (${daysToClaim}일분 ${formatCurrency(amount)}원 미수)`
   };
 
   gClaims.unshift(newClaim);
@@ -5214,6 +5321,15 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               </div>
             </div>
             <div class="flex items-center gap-1.5">
+              ${schedule.isCaregiverPayoutDue ? `
+                <span class="px-2.5 py-1 rounded-full text-[11px] font-black bg-rose-500 text-white shadow-md animate-pulse flex items-center gap-1">
+                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> 🚨 간병비 지급대상
+                </span>
+              ` : (schedule.isAllPayoutsPaid && schedule.isCarePeriodEnded ? `
+                <span class="px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-400 text-slate-900 shadow-md flex items-center gap-1">
+                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> ✓ 간병비 지급완료
+                </span>
+              ` : '')}
               ${hasAssign ? `
                 <button type="button" onclick="openNewAssignModal('${app.id}', true)" 
                   class="px-2.5 py-1 rounded-xl text-[11px] font-black bg-amber-400 hover:bg-amber-300 text-amber-950 shadow-xs transition-all flex items-center gap-1 cursor-pointer" title="기존 간병인 근무 종료 및 후임 간병인 교체 등록">
@@ -5390,6 +5506,30 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                   </div>
                 </div>
 
+                ${schedule.isCaregiverPayoutDue ? `
+                  <div class="p-3 rounded-2xl bg-gradient-to-r from-rose-50 to-amber-50 border-2 border-rose-400 text-[11.5px] space-y-2 shadow-sm">
+                    <div class="flex items-center justify-between">
+                      <div class="font-black text-rose-950 flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-rose-600 animate-pulse"></span>
+                        <span class="text-xs">🚨 간병비 지급대상 (근무기간 만료)</span>
+                      </div>
+                      <span class="font-mono font-black text-rose-800 text-xs">총 ${formatCurrency(schedule.confirmedPayoutSum > 0 ? schedule.confirmedPayoutSum : (prog ? prog.totalDays * (as.dailyWage || 140000) : 0))}원</span>
+                    </div>
+                    <div class="text-[11px] text-rose-800 flex items-center justify-between gap-2">
+                      <span>근무기간(${as.startDate} ~ ${as.endDate})이 종료되었습니다.</span>
+                      <button type="button" onclick="event.stopPropagation(); executeBatchCaregiverPayout('${app.id}', '${as.id}')" 
+                        class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs shadow-md transition-all cursor-pointer whitespace-nowrap">
+                        간병비 지급완료 처리 ✓
+                      </button>
+                    </div>
+                  </div>
+                ` : (schedule.isAllPayoutsPaid && schedule.isCarePeriodEnded ? `
+                  <div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold flex items-center justify-between">
+                    <span class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i> 간병비 전액 지급완료</span>
+                    <span class="font-mono font-black text-emerald-900">${formatCurrency(schedule.paidPayoutSum)}원 지급완료</span>
+                  </div>
+                ` : '')}
+
                 ${displayedPayouts.length > 0 ? `
                   <div class="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
                     ${displayedPayouts.map(p => `
@@ -5466,12 +5606,24 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5">
                   손사(보험사) 청구 관리
                 </h4>
-                <span class="text-[10.5px] text-purple-100 font-medium">손사 담당자, 10일 차수별 수납 및 팩스</span>
+                <span class="text-[10.5px] text-purple-100 font-medium">손사 담당자, 차수별 청구·팩스 및 입금 관리</span>
               </div>
             </div>
-            <span class="px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold ${faxInfo.status === '전송완료' ? 'bg-emerald-400 text-slate-900' : 'bg-purple-300/30 text-white border border-white/20'}">
-              ${faxInfo.status}
-            </span>
+            <div>
+              ${schedule.hasUnpaidClaim ? `
+                <span class="px-2.5 py-1 rounded-full text-[11px] font-black bg-rose-500 text-white shadow-md animate-pulse flex items-center gap-1">
+                  <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> 🚨 입금 미완료 (미수 ${formatCurrency(schedule.unconfirmedClaimSum)}원)
+                </span>
+              ` : (schedule.isAllClaimsDeposited ? `
+                <span class="px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-400 text-slate-900 shadow-md flex items-center gap-1">
+                  <i data-lucide="check-check" class="w-3.5 h-3.5"></i> ✓ 전액 입금완료
+                </span>
+              ` : `
+                <span class="px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold ${faxInfo.status === '전송완료' ? 'bg-emerald-400 text-slate-900' : 'bg-purple-300/30 text-white border border-white/20'}">
+                  ${faxInfo.status === '전송완료' ? '청구팩스 발송완료' : '청구 대기'}
+                </span>
+              `)}
+            </div>
           </div>
 
           <!-- Card Body (flex-1 균등 분할) -->
@@ -5511,121 +5663,154 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               </div>
             </div>
 
-            <!-- 2. 청구 기준 요약 (1일 청구단가 및 총 산정기간) -->
+            <!-- 2. 청구 기준 요약 (1일 청구단가 및 간병인 배정 기준 총 산정기간) -->
             <div class="grid grid-cols-2 gap-2 text-[11.5px]">
               <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
-                <div class="text-[10.5px] text-slate-400 mb-0.5">청구 금액 (1일 기준)</div>
+                <div class="text-[10.5px] text-slate-400 mb-0.5">청구 단가 (1일 기준)</div>
                 <div class="font-mono font-black text-slate-900 text-sm">${formatCurrency(dailyPrice)}원</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">${app.insuranceCompany || '현대해상'} 약정단가</div>
               </div>
               <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
-                <div class="text-[10.5px] text-slate-400 mb-0.5">청구 기간 (자동 산정)</div>
-                <div class="font-mono font-black text-purple-900 text-sm">${totalCareDays}일간</div>
+                <div class="text-[10.5px] text-slate-400 mb-0.5">총 간병 기간 (배정 기준)</div>
+                ${hasAssign && as && as.startDate ? `
+                  <div class="font-mono font-black text-purple-900 text-sm">${totalCareDays}일간</div>
+                  <div class="text-[10px] text-purple-700 font-bold mt-0.5">${as.startDate} ~ ${as.endDate}</div>
+                ` : `
+                  <div class="font-mono font-black text-amber-600 text-sm">간병인 배정 대기</div>
+                  <div class="text-[10px] text-slate-400 mt-0.5">신청시 예정: ${app.expectedDays || 14}일</div>
+                `}
               </div>
             </div>
 
-            <!-- 3. 청구 금액 세부: 10일 기준 1차, 2차, 3차 수납 일괄 관리 테이블 -->
+            <!-- 3. 청구 금액 세부: 간병인 배정 기반 차수별 수납 일괄 관리 테이블 -->
             <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
               <div class="flex items-center justify-between pb-1.5 border-b border-slate-100">
                 <div class="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
                   <i data-lucide="layers" class="w-3.5 h-3.5 text-purple-600"></i>
-                  <span>10일 기준 차수별 청구 / 입금 관리</span>
+                  <span>차수별 청구 / 입금 관리</span>
                 </div>
                 <div class="flex items-center gap-1.5">
                   <button type="button" onclick="event.stopPropagation(); openClaimDetailListModal('${app.id}')" 
                     class="px-2 py-0.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 font-bold text-[10.5px] flex items-center gap-1 transition-all shadow-2xs" title="차수별 청구/입금 전체 목록을 큰 화면으로 시원하게 보기">
                     <span>상세보기</span> <i data-lucide="external-link" class="w-3 h-3"></i>
                   </button>
-                  <button type="button" onclick="openNewClaimModal('${app.id}')" class="text-purple-700 hover:underline font-bold text-[11px] flex items-center gap-0.5">
-                    <i data-lucide="plus" class="w-3 h-3"></i> 청구추가
+                  <button type="button" onclick="openNewClaimModal('${app.id}')" 
+                    class="px-2 py-0.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-black text-[10.5px] flex items-center gap-1 transition-all shadow-2xs cursor-pointer" title="원하는 기간을 직접 지정하여 청구서 생성">
+                    <i data-lucide="calendar-plus" class="w-3 h-3"></i> + 기간선택 청구서 생성
                   </button>
                 </div>
               </div>
 
-              <div class="space-y-2">
-                ${rounds.map(r => {
-                  const cardBorder = 
-                    r.claimStatus === 'DEPOSIT_DONE' ? 'border-emerald-300 bg-emerald-50/50' :
-                    r.claimStatus === 'CLAIMED_UNPAID' ? 'border-rose-300 bg-rose-50/50' :
-                    r.claimStatus === 'READY_TO_CLAIM' ? 'border-purple-300 bg-purple-50/50' :
-                    r.claimStatus === 'ONGOING_WAIT' ? 'border-sky-300 bg-sky-50/40' :
-                    'border-slate-200 bg-slate-100/60 opacity-65';
+              ${!hasAssign ? `
+                <div class="p-6 text-center bg-purple-50/50 rounded-2xl border-2 border-dashed border-purple-200 space-y-2">
+                  <div class="w-10 h-10 mx-auto rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
+                    <i data-lucide="calendar-clock" class="w-5 h-5"></i>
+                  </div>
+                  <div class="font-black text-purple-950 text-xs">간병인 등록 시 설정된 날짜 기준으로 청구 스케줄이 연동됩니다.</div>
+                  <p class="text-[11px] text-purple-700 max-w-xs mx-auto leading-relaxed">
+                    [간병인 / 센터 관리] 카드에서 간병인을 배정하고 근무일자를 설정하면, 해당 일수에 맞춰 자동으로 청구서 생성이 활성화됩니다.
+                  </p>
+                  <div class="pt-1">
+                    <button type="button" onclick="openNewAssignModal('${app.id}', false)" 
+                      class="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-md transition-all cursor-pointer">
+                      간병인 배정 등록하기
+                    </button>
+                  </div>
+                </div>
+              ` : `
+                <div class="space-y-2">
+                  ${rounds.map(r => {
+                    const cardBorder = 
+                      r.claimStatus === 'DEPOSIT_DONE' ? 'border-emerald-300 bg-emerald-50/50' :
+                      r.claimStatus === 'CLAIMED_UNPAID' ? 'border-2 border-rose-400 bg-rose-50/70 shadow-xs' :
+                      r.claimStatus === 'READY_TO_CLAIM' ? 'border-purple-300 bg-purple-50/50' :
+                      r.claimStatus === 'ONGOING_WAIT' ? 'border-sky-300 bg-sky-50/40' :
+                      'border-slate-200 bg-slate-100/60 opacity-65';
 
-                  const badgeHtml = 
-                    r.claimStatus === 'DEPOSIT_DONE' ? '<span class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800">수납완료</span>' :
-                    r.claimStatus === 'CLAIMED_UNPAID' ? '<span class="px-2 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-800">청구완료 (미수)</span>' :
-                    r.claimStatus === 'READY_TO_CLAIM' ? '<span class="px-2 py-0.5 rounded text-[10px] font-black bg-purple-100 text-purple-800 animate-pulse">간병완료 (청구가능)</span>' :
-                    r.claimStatus === 'ONGOING_WAIT' ? `<span class="px-2 py-0.5 rounded text-[10px] font-black bg-sky-100 text-sky-800 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>진행중 (${r.ongoingElapsed}일차 / D-${r.ongoingRemaining}일)</span>` :
-                    '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600">시작 전 (예정)</span>';
+                    const badgeHtml = 
+                      r.claimStatus === 'DEPOSIT_DONE' ? '<span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i> 입금확인완료</span>' :
+                      r.claimStatus === 'CLAIMED_UNPAID' ? '<span class="px-2.5 py-0.5 rounded text-[10.5px] font-black bg-rose-600 text-white shadow-xs animate-pulse flex items-center gap-1"><i data-lucide="alert-circle" class="w-3 h-3"></i> 🚨 입금 미완료 (미수)</span>' :
+                      r.claimStatus === 'READY_TO_CLAIM' ? '<span class="px-2 py-0.5 rounded text-[10px] font-black bg-purple-100 text-purple-800">간병완료 (청구가능)</span>' :
+                      r.claimStatus === 'ONGOING_WAIT' ? `<span class="px-2 py-0.5 rounded text-[10px] font-black bg-sky-100 text-sky-800 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>진행중 (${r.ongoingElapsed}일차 / D-${r.ongoingRemaining}일)</span>` :
+                      '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600">근무 예정</span>';
 
-                  const amountHtml = 
-                    r.claimStatus === 'DEPOSIT_DONE' ? `<span class="text-emerald-700 font-extrabold font-mono">${formatCurrency(r.existingClaim ? (r.existingClaim.depositAmount || r.existingClaim.claimAmount) : r.fullClaimAmount)}원</span> (수납완료)` :
-                    r.claimStatus === 'CLAIMED_UNPAID' ? `<span class="text-rose-700 font-extrabold font-mono">${formatCurrency(r.existingClaim ? (r.existingClaim.unpaidAmount || r.existingClaim.claimAmount) : r.fullClaimAmount)}원</span> (미수)` :
-                    r.claimStatus === 'READY_TO_CLAIM' ? `<span class="text-purple-800 font-extrabold font-mono">${formatCurrency(r.fullClaimAmount)}원</span> (청구 대기)` :
-                    r.claimStatus === 'ONGOING_WAIT' ? `<span class="text-sky-900 font-extrabold font-mono">${formatCurrency(r.ongoingClaimAmount)}원</span> <span class="text-[10px] text-slate-400 font-normal font-sans">(10일 완결 시 ${formatCurrency(r.fullClaimAmount)}원)</span>` :
-                    `<span class="text-slate-500 font-mono">${formatCurrency(r.fullClaimAmount)}원</span>`;
+                    const dateRangeStr = (r.startDateStr && r.endDateStr) ? `${r.startDateStr} ~ ${r.endDateStr}` : `${r.startDayOffset}~${r.endDayOffset}일차`;
 
-                  return `
-                    <div class="p-2.5 rounded-xl border ${cardBorder} text-[11.5px] transition-all space-y-1.5">
-                      <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-1.5">
-                          <span class="font-black text-slate-900">${r.label}</span>
-                          ${badgeHtml}
+                    const amountHtml = 
+                      r.claimStatus === 'DEPOSIT_DONE' ? `<span class="text-emerald-700 font-extrabold font-mono">${formatCurrency(r.existingClaim ? (r.existingClaim.depositAmount || r.existingClaim.claimAmount) : r.fullClaimAmount)}원</span> (입금확인)` :
+                      r.claimStatus === 'CLAIMED_UNPAID' ? `<span class="text-rose-700 font-extrabold font-mono">${formatCurrency(r.existingClaim ? (r.existingClaim.unpaidAmount || r.existingClaim.claimAmount) : r.fullClaimAmount)}원</span> (미수)` :
+                      r.claimStatus === 'READY_TO_CLAIM' ? `<span class="text-purple-800 font-extrabold font-mono">${formatCurrency(r.fullClaimAmount)}원</span>` :
+                      r.claimStatus === 'ONGOING_WAIT' ? `<span class="text-sky-900 font-extrabold font-mono">${formatCurrency(r.ongoingClaimAmount)}원</span> <span class="text-[10px] text-slate-400 font-normal font-sans">(${r.days}일 완결시 ${formatCurrency(r.fullClaimAmount)}원)</span>` :
+                      `<span class="text-slate-500 font-mono">${formatCurrency(r.fullClaimAmount)}원</span>`;
+
+                    return `
+                      <div class="p-2.5 rounded-xl border ${cardBorder} text-[11.5px] transition-all space-y-1.5">
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center gap-1.5">
+                            <span class="font-black text-slate-900">${r.label}</span>
+                            ${badgeHtml}
+                          </div>
+                          <span class="text-slate-500 font-mono text-[10.5px]">(${dateRangeStr} · ${r.days}일분)</span>
                         </div>
-                        <span class="text-slate-500 font-mono text-[10.5px]">(${r.days}일 × ${formatCurrency(r.dailyClaimPrice)}원)</span>
-                      </div>
 
-                      <div class="flex items-center justify-between">
-                        <div class="font-bold text-slate-700">
-                          금액: ${amountHtml}
+                        <div class="flex items-center justify-between">
+                          <div class="font-bold text-slate-700">
+                            금액: ${amountHtml}
+                          </div>
+
+                          <div class="flex items-center gap-1">
+                            ${r.existingClaim ? `
+                              <button type="button" onclick="event.stopPropagation(); openFaxModal('${app.id}', 2)" 
+                                class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10.5px] shadow-xs flex items-center gap-1 cursor-pointer" title="손사로 정산청구서 팩스 즉시 발송">
+                                <i data-lucide="send" class="w-3 h-3"></i> 청구하기(팩스)
+                              </button>
+                              ${r.claimStatus === 'DEPOSIT_DONE' ? `
+                                <button type="button" onclick="event.stopPropagation(); toggleClaimDepositStatus('${app.id}', ${r.roundNumber}, '${r.existingClaim.id}')" 
+                                  class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-amber-600 text-white font-black text-[10.5px] shadow-xs flex items-center gap-1 transition-all cursor-pointer" title="클릭 시 미수납 상태로 되돌리기">
+                                  <i data-lucide="check" class="w-3 h-3"></i> 입금완료 ✓
+                                </button>
+                              ` : `
+                                <button type="button" onclick="event.stopPropagation(); toggleClaimDepositStatus('${app.id}', ${r.roundNumber}, '${r.existingClaim.id}')" 
+                                  class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-[10.5px] shadow-xs flex items-center gap-1 transition-all cursor-pointer" title="입금 확인 시 입금확인완료로 처리">
+                                  <i data-lucide="circle-dot" class="w-3 h-3"></i> 입금확인완료
+                                </button>
+                              `}
+                              <button type="button" onclick="event.stopPropagation(); openClaimEditModal('${r.existingClaim.id}')" 
+                                class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10.5px] shadow-2xs" title="청구서 직접 수정">
+                                수정
+                              </button>
+                              <button type="button" onclick="event.stopPropagation(); deleteInterimClaim('${app.id}', '${r.existingClaim.id}')" 
+                                class="px-2 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-bold text-[10.5px] shadow-2xs transition-all cursor-pointer" title="청구 취소하고 진행중 상태로 원복">
+                                원복 ↩️
+                              </button>
+                            ` : `
+                              ${r.stage === 'COMPLETED' || schedule.isCompleted ? `
+                                <button type="button" onclick="event.stopPropagation(); createInterimClaim('${app.id}', ${r.roundNumber}, ${r.days})" 
+                                  class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-[10.5px] shadow-xs flex items-center gap-1 transition-all cursor-pointer">
+                                  <i data-lucide="receipt" class="w-3 h-3"></i> 청구서 생성
+                                </button>
+                              ` : r.stage === 'ONGOING' ? `
+                                <button type="button" onclick="event.stopPropagation(); createInterimClaim('${app.id}', ${r.roundNumber}, ${r.ongoingElapsed})" 
+                                  class="px-2 py-1 rounded-lg bg-white hover:bg-sky-100 text-sky-800 border border-sky-300 font-bold text-[10px] shadow-2xs transition-all cursor-pointer" title="현재까지 발생한 일수로 조기 청구서 생성">
+                                  조기 청구서 생성
+                                </button>
+                              ` : `
+                                <span class="text-[10px] text-slate-400 font-mono px-2 py-0.5 rounded bg-slate-100">근무 예정</span>
+                              `}
+                            `}
+                          </div>
                         </div>
 
-                        <div class="flex items-center gap-1">
-                          ${r.existingClaim ? `
-                            <button type="button" onclick="event.stopPropagation(); openClaimEditModal('${r.existingClaim.id}')" 
-                              class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10.5px] shadow-2xs" title="청구서 직접 수정">
-                              수정
-                            </button>
-                            <button type="button" onclick="event.stopPropagation(); deleteInterimClaim('${app.id}', '${r.existingClaim.id}')" 
-                              class="px-2 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-bold text-[10.5px] shadow-2xs transition-all cursor-pointer" title="청구 취소하고 진행중 상태로 원복">
-                              원복 ↩️
-                            </button>
-                          ` : ''}
-
-                          ${r.claimStatus === 'DEPOSIT_DONE' ? `
-                            <button type="button" onclick="event.stopPropagation(); toggleClaimDepositStatus('${app.id}', ${r.roundNumber}, '${r.claimId}')" 
-                              class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-amber-600 text-white font-black text-[10.5px] shadow-xs flex items-center gap-1 transition-all cursor-pointer" title="클릭 시 미수납 상태로 전환">
-                              <i data-lucide="check" class="w-3 h-3"></i> 입금완료
-                            </button>
-                          ` : r.claimStatus === 'CLAIMED_UNPAID' ? `
-                            <button type="button" onclick="event.stopPropagation(); toggleClaimDepositStatus('${app.id}', ${r.roundNumber}, '${r.claimId}')" 
-                              class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-[10.5px] shadow-xs flex items-center gap-1 transition-all cursor-pointer">
-                              <i data-lucide="circle-dot" class="w-3 h-3"></i> 입금확인
-                            </button>
-                          ` : r.claimStatus === 'READY_TO_CLAIM' ? `
-                            <button type="button" onclick="event.stopPropagation(); createInterimClaim('${app.id}', ${r.roundNumber}, ${r.days})" 
-                              class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-[10.5px] shadow-xs flex items-center gap-1 transition-all cursor-pointer">
-                              <i data-lucide="receipt" class="w-3 h-3"></i> 청구서 생성
-                            </button>
-                          ` : r.claimStatus === 'ONGOING_WAIT' ? `
-                            <button type="button" onclick="event.stopPropagation(); createInterimClaim('${app.id}', ${r.roundNumber}, ${r.ongoingElapsed})" 
-                              class="px-2 py-1 rounded-lg bg-white hover:bg-sky-100 text-sky-800 border border-sky-300 font-bold text-[10px] shadow-2xs transition-all cursor-pointer" title="퇴원 등으로 현재까지 발생한 일수로 조기 청구">
-                              조기청구
-                            </button>
-                          ` : `
-                            <span class="text-[10px] text-slate-400 font-mono px-2 py-0.5 rounded bg-slate-100">대기</span>
-                          `}
+                        <!-- 손사 청구 ↔ 간병인 정산 차수별 마진 실시간 연계 표시 -->
+                        <div class="pt-1 border-t border-slate-200/60 flex items-center justify-between text-[10.5px] text-slate-500 font-mono">
+                          <span>간병비: <b>${formatCurrency(r.existingPayout ? (r.existingPayout.payoutAmount || 0) : (r.stage === 'COMPLETED' ? r.fullPayoutAmount : r.ongoingPayoutAmount))}원</b></span>
+                          <span>운영마진: <b class="text-emerald-700 font-black">${formatCurrency(r.marginAmount)}원</b> (${r.marginRate}%)</span>
                         </div>
                       </div>
-
-                      <!-- 손사 청구 ↔ 간병인 정산 차수별 마진 실시간 연계 표시 -->
-                      <div class="pt-1 border-t border-slate-200/60 flex items-center justify-between text-[10.5px] text-slate-500 font-mono">
-                        <span>간병비: <b>${formatCurrency(r.existingPayout ? (r.existingPayout.payoutAmount || 0) : (r.stage === 'COMPLETED' ? r.fullPayoutAmount : r.ongoingPayoutAmount))}원</b></span>
-                        <span>운영마진: <b class="text-emerald-700 font-black">${formatCurrency(r.marginAmount)}원</b> (${r.marginRate}%)</span>
-                      </div>
-                    </div>
-                  `;
-                }).join('')}
-              </div>
+                    `;
+                  }).join('')}
+                </div>
+              `}
             </div>
 
             <!-- 4. 전송 이력 및 청구 요청 팩스 즉시 발송 -->
@@ -6308,15 +6493,15 @@ function openClaimDetailListModal(applyId) {
           </td>
           <td class="py-3 px-3.5 text-center whitespace-nowrap">
             ${isDepositDone ? `
-              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 whitespace-nowrap">
-                <i data-lucide="check" class="w-3.5 h-3.5"></i> 수납완료
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 whitespace-nowrap border border-emerald-300">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i> 입금확인완료
               </span>
             ` : isClaimedUnpaid ? `
-              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 whitespace-nowrap">
-                <i data-lucide="clock" class="w-3.5 h-3.5"></i> 청구완료 (미수)
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-black bg-rose-600 text-white shadow-xs animate-pulse whitespace-nowrap">
+                <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> 🚨 입금 미완료 (미수)
               </span>
             ` : isReadyToClaim ? `
-              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 whitespace-nowrap animate-pulse">
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 whitespace-nowrap">
                 간병완료 (청구가능)
               </span>
             ` : isOngoingWait ? `
@@ -6325,13 +6510,17 @@ function openClaimDetailListModal(applyId) {
               </span>
             ` : `
               <span class="px-2.5 py-0.5 rounded-full text-[10.5px] bg-slate-200 text-slate-600 whitespace-nowrap">
-                시작 전 (예정)
+                근무 예정
               </span>
             `}
           </td>
           <td class="py-3 px-3.5 text-center whitespace-nowrap">
             <div class="flex items-center justify-center gap-1.5 whitespace-nowrap">
               ${r.existingClaim ? `
+                <button type="button" onclick="event.stopPropagation(); openFaxModal('${app.id}', 2)" 
+                  class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] shadow-2xs transition-all whitespace-nowrap flex items-center gap-1 cursor-pointer" title="손사로 정산청구서 팩스 즉시 발송">
+                  <i data-lucide="send" class="w-3 h-3"></i> 청구하기(팩스)
+                </button>
                 <button type="button" onclick="event.stopPropagation(); openClaimEditModal('${r.existingClaim.id}')" 
                   class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[11px] shadow-2xs transition-all whitespace-nowrap">
                   수정 ✏️
@@ -6345,12 +6534,12 @@ function openClaimDetailListModal(applyId) {
               ${isDepositDone ? `
                 <button type="button" onclick="event.stopPropagation(); toggleClaimDepositStatus('${app.id}', ${r.roundNumber}, '${r.claimId}')" 
                   class="px-2.5 py-1 rounded-lg font-bold text-emerald-700 bg-emerald-50 hover:bg-amber-50 hover:text-amber-800 border border-emerald-200 text-[11px] transition-all cursor-pointer whitespace-nowrap" title="클릭 시 미입금 상태로 되돌리기">
-                  수납완료 ✓
+                  입금완료 ✓
                 </button>
               ` : isClaimedUnpaid ? `
                 <button type="button" onclick="event.stopPropagation(); toggleClaimDepositStatus('${app.id}', ${r.roundNumber}, '${r.claimId}')" 
-                  class="px-3 py-1 rounded-lg bg-amber-500 hover:bg-emerald-600 active:scale-95 text-white font-bold text-[11px] shadow-2xs transition-all cursor-pointer whitespace-nowrap">
-                  입금확인
+                  class="px-3 py-1 rounded-lg bg-amber-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-[11px] shadow-2xs transition-all cursor-pointer whitespace-nowrap">
+                  입금확인완료
                 </button>
               ` : isReadyToClaim ? `
                 <button type="button" onclick="event.stopPropagation(); createInterimClaim('${app.id}', ${r.roundNumber}, ${r.days})" 
@@ -7160,9 +7349,10 @@ function renderUnifiedCareHub() {
 
 
     const as = appAssigns.length > 0 ? appAssigns[0] : null;
-    const totalPayoutSum = appPayouts.reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
-    const isPayoutPending = appPayouts.some(p => p.payoutStatus === '미지급');
-    const totalClaimAmt = app.depositConfirmedAmount + (app.estimatedUnpaid || 0);
+    const sched = calculateCareSettlementSchedule(app, as, careProg, appClaims, appPayouts);
+    const totalPayoutSum = sched.confirmedPayoutSum || appPayouts.reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
+    const isPayoutPending = sched.isCaregiverPayoutDue || appPayouts.some(p => p.payoutStatus === '미지급');
+    const totalClaimAmt = (sched.depositedClaimSum || app.depositConfirmedAmount) + (sched.unconfirmedClaimSum || app.estimatedUnpaid || 0);
     const isHdWaitingSms = app.insuranceCompany.includes('현대해상') && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'));
 
     // [모드 1] 간략히 보기 모드 (전화번호/주소 정보는 배제하고 핵심 이름 및 보험 청구금액 표시)
@@ -7206,7 +7396,17 @@ function renderUnifiedCareHub() {
             ` : ''}
           </div>
 
-          <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+            ${sched.isCaregiverPayoutDue ? `
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-rose-600 text-white font-black flex items-center gap-1 shadow-xs animate-pulse">
+                🚨 간병비지급대상
+              </span>
+            ` : ''}
+            ${sched.hasUnpaidClaim ? `
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500 text-white font-black flex items-center gap-1 shadow-xs">
+                🚨 입금미완료
+              </span>
+            ` : ''}
             ${isHdWaitingSms ? `
               <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-black flex items-center gap-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> 문자수신대기
@@ -7251,7 +7451,27 @@ function renderUnifiedCareHub() {
             <span class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-white text-blue-800 border border-blue-200">${app.insuranceCompany}</span>
           </div>
 
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1.5 flex-wrap justify-end">
+            ${sched.isCaregiverPayoutDue ? `
+              <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-rose-600 text-white font-black flex items-center gap-1 shadow-xs animate-pulse whitespace-nowrap" title="간병 기간이 종료되었으나 간병비가 미지급 상태입니다.">
+                <i data-lucide="alert-triangle" class="w-3 h-3"></i> 🚨 간병비 지급대상
+              </span>
+            ` : (sched.isAllPayoutsPaid ? `
+              <span class="text-[10.5px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold flex items-center gap-1 whitespace-nowrap">
+                <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> ✓ 간병비 지급완료
+              </span>
+            ` : '')}
+
+            ${sched.hasUnpaidClaim ? `
+              <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-500 text-white font-black flex items-center gap-1 shadow-xs whitespace-nowrap" title="보험사로 청구되었으나 입금 확인이 되지 않은 미수금이 있습니다.">
+                <i data-lucide="clock" class="w-3 h-3"></i> 🚨 입금 미완료 (미수)
+              </span>
+            ` : (sched.isAllClaimsDeposited ? `
+              <span class="text-[10.5px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold flex items-center gap-1 whitespace-nowrap">
+                <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> ✓ 전액 입금완료
+              </span>
+            ` : '')}
+
             ${isHdWaitingSms ? `
               <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-black flex items-center gap-1 shadow-2xs">
                 <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> 문자수신대기
@@ -7364,14 +7584,16 @@ function renderUnifiedCareHub() {
               <div class="flex justify-between items-center pt-1 border-t border-slate-200/50 text-[10.5px]">
                 <span class="text-slate-400">정산지급:</span>
                 <div class="flex items-center gap-1">
-                  <span class="font-mono text-slate-700">${formatCurrency(totalPayoutSum)}원</span>
-                  ${isPayoutPending ? `
-                    <span class="text-amber-700 font-bold">미지급</span>
-                  ` : (totalPayoutSum > 0 ? `
+                  <span class="font-mono text-slate-700 font-semibold">${formatCurrency(totalPayoutSum)}원</span>
+                  ${sched.isCaregiverPayoutDue ? `
+                    <span class="px-1.5 py-0.2 rounded bg-rose-600 text-white font-black text-[10px] animate-pulse">지급대상🚨</span>
+                  ` : (sched.isAllPayoutsPaid ? `
                     <span class="text-teal-700 font-bold">완료✓</span>
+                  ` : (isPayoutPending ? `
+                    <span class="text-amber-700 font-bold">미지급</span>
                   ` : `
                     <span class="text-slate-400">대기</span>
-                  `)}
+                  `))}
                 </div>
               </div>
             </div>
@@ -7404,8 +7626,8 @@ function renderUnifiedCareHub() {
 
               <div class="flex justify-between items-center">
                 <span class="text-slate-400">입금/미수:</span>
-                <span class="font-mono ${app.estimatedUnpaid > 0 ? 'text-rose-600 font-bold' : (app.depositConfirmedAmount > 0 ? 'text-emerald-700 font-medium' : 'text-slate-500')}">
-                  ${app.estimatedUnpaid > 0 ? `미수 ${formatCurrency(app.estimatedUnpaid)}원` : (app.depositConfirmedAmount > 0 ? '입금완료✓' : '대기')}
+                <span class="font-mono ${sched.hasUnpaidClaim ? 'text-rose-600 font-black' : (sched.isAllClaimsDeposited ? 'text-emerald-700 font-bold' : 'text-slate-500')}">
+                  ${sched.hasUnpaidClaim ? `🚨 미수 ${formatCurrency(sched.unconfirmedClaimSum || app.estimatedUnpaid || 0)}원` : (sched.isAllClaimsDeposited ? '입금완료✓' : (totalClaimAmt > 0 ? '대기' : '-'))}
                 </span>
               </div>
 
@@ -13098,8 +13320,8 @@ function openNewClaimModal(appId) {
   const appClaims = gClaims.filter(c => c.applyId === appId);
   const nextRound = (appClaims.length + 1) + '회차';
 
+  const defaultWage = (app.insuranceCompany && app.insuranceCompany.includes('현대해상')) ? 144000 : 144000;
   const assign = gAssigns.find(as => as.applyId === appId);
-  const defaultWage = assign && assign.dailyWage ? assign.dailyWage : 140000;
 
   document.getElementById('newClaimAppId').value = app.id;
   document.getElementById('newClaimCustomerName').innerText = `${app.patientName} (${app.id})`;
@@ -13133,7 +13355,7 @@ function calcNewClaimTotal() {
   const startVal = document.getElementById('newClaimStartDate')?.value;
   const endVal = document.getElementById('newClaimEndDate')?.value;
   const wageRaw = (document.getElementById('newClaimDailyWage')?.value || '').replace(/[^0-9]/g, '');
-  const wage = Number(wageRaw) || 140000;
+  const wage = Number(wageRaw) || 144000;
 
   let days = 1;
   if (startVal && endVal) {
@@ -13155,7 +13377,7 @@ function calcNewClaimTotal() {
 function calcNewClaimTotalFromDays() {
   const days = Number(document.getElementById('newClaimDays')?.value) || 1;
   const wageRaw = (document.getElementById('newClaimDailyWage')?.value || '').replace(/[^0-9]/g, '');
-  const wage = Number(wageRaw) || 140000;
+  const wage = Number(wageRaw) || 144000;
   const total = days * wage;
   const amountInput = document.getElementById('newClaimAmount');
   if (amountInput) amountInput.value = formatCurrency(total);
@@ -13170,7 +13392,7 @@ function handleNewClaimSubmit(e) {
 
   const round = document.getElementById('newClaimRound').value.trim();
   const wageRaw = document.getElementById('newClaimDailyWage').value.replace(/[^0-9]/g, '');
-  const wage = Number(wageRaw) || 140000;
+  const wage = Number(wageRaw) || 144000;
   const startDate = document.getElementById('newClaimStartDate').value;
   const endDate = document.getElementById('newClaimEndDate').value;
   const days = Number(document.getElementById('newClaimDays').value) || 1;
@@ -13187,15 +13409,18 @@ function handleNewClaimSubmit(e) {
     round: round,
     startDate: startDate,
     endDate: endDate,
+    standardDate: startDate,
+    claimDate: new Date().toISOString().split('T')[0],
     days: days,
     unitPrice: wage,
     dailyWage: wage,
     claimAmount: amount,
     totalAmount: amount,
     depositAmount: 0,
-    depositStatus: '미확인',
-    claimStatus: '청구완료',
-    memo: memo,
+    depositStatus: '미수납',
+    unpaidAmount: amount,
+    adjusterStatus: '청구접수',
+    memo: memo || `${round} 간병비 청구서 생성 (${days}일분 ${formatCurrency(amount)}원)`,
     createdAt: new Date().toISOString()
   };
 
@@ -13207,13 +13432,19 @@ function handleNewClaimSubmit(e) {
   app.updatedAt = new Date().toISOString();
 
   closeModal('newClaimModal');
-  moveAppToFront(claim.applyId);
+  if (typeof moveAppToFront === 'function') moveAppToFront(app.id);
+  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
   renderUnifiedCareHub();
   renderClaims();
 
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveClaim', { claim: newClaim }).catch(console.warn);
+    syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
+  }
+
   showCustomAlert({
     title: '보험 청구서 생성 완료',
-    message: `[${app.patientName}] 고객의 ${round} 청구서(${formatCurrency(amount)}원, ${days}일)가 성공적으로 등록되었습니다.`,
+    message: `[${app.patientName}] 고객의 ${round} 청구서(${formatCurrency(amount)}원, ${days}일)가 성공적으로 등록되었습니다.\n손사청구관리에서 '청구하기(팩스)' 버튼으로 즉시 전송할 수 있습니다.`,
     icon: 'receipt',
     iconColor: 'amber'
   });
