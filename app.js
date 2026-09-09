@@ -7943,7 +7943,7 @@ function renderFaxLogsTable() {
         </td>
         <td class="p-3 text-center font-mono font-bold text-slate-800">
           ${(typeof gApps !== 'undefined' && gApps.some(a => a.id === l.appId))
-            ? `<button type="button" onclick="openCareCycleModal('${l.appId}')" class="px-2.5 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-900 border border-blue-200 hover:border-blue-400 font-bold transition-all cursor-pointer inline-flex items-center gap-1 shadow-xs hover:shadow group" title="고객 상세 정보 열기">
+            ? `<button type="button" onclick="openHubCustomerDetailModal('${l.appId}')" class="px-2.5 py-1 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-900 border border-blue-200 hover:border-blue-400 font-bold transition-all cursor-pointer inline-flex items-center gap-1 shadow-xs hover:shadow group" title="고객 상세 업무 원스탑 모달 열기">
                 <span>${l.appId}</span>
                 <i data-lucide="external-link" class="w-3 h-3 text-blue-400 group-hover:text-blue-600"></i>
               </button>`
