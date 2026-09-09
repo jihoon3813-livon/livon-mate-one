@@ -11,8 +11,8 @@ module.exports = async (req, res) => {
     const payload = req.body || {};
     const { action, certKey, corpNum, baroId, serverType = 'test' } = payload;
 
-    const cleanCorpNum = (corpNum || '3888602921').replace(/[^0-9]/g, '');
-    const activeCertKey = certKey || (serverType === 'prod' ? '1431781E-78BF-4E1F-B4D1-870C4FA64AF6' : 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE');
+    const cleanCorpNum = (corpNum || '1058621696').replace(/[^0-9]/g, '');
+    const activeCertKey = certKey || (serverType === 'prod' ? 'A1496EC3-E606-44C0-B126-F03B9AF88588' : 'CF89EE38-7B80-4955-960E-D86A866498ED');
     const serverHost = serverType === 'prod' ? 'ws.baroservice.com' : 'testws.baroservice.com';
 
     // 바로빌 실시간 SOAP API 통신 (GetBalanceCostAmountEx: 회원사 보유 잔액 확인)

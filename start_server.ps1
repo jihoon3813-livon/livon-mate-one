@@ -102,7 +102,7 @@ while ($listener.IsListening) {
                 status = "성공"
                 operator = "관리자(회선진단)"
                 resultMsg = "바로빌 회선 통신 시험 접수 완료 (200 OK)"
-                provider = "Barobill (테스트: C53EC844...)"
+                provider = "Barobill (테스트: CF89EE38...)"
             }
 
             $jsonRes = @{

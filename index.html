@@ -3186,7 +3186,7 @@
               <i data-lucide="shield-check" class="w-4 h-4 text-purple-600"></i>
               <span>바로빌(Barobill) 연동 계정 및 서버</span>
             </div>
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900">리본메이트원</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900">리본메이트원(간병관리)</span>
           </div>
 
           <div class="grid grid-cols-2 gap-2.5">
@@ -3206,19 +3206,19 @@
           <div class="grid grid-cols-2 gap-2.5">
             <div>
               <label class="block text-[10.5px] font-bold text-slate-700 mb-1">사업자등록번호 (하이픈 제외) *</label>
-              <input type="text" id="faxBarobillCorpNum" placeholder="3888602921" value="388-86-02921" class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white font-mono font-bold">
+              <input type="text" id="faxBarobillCorpNum" placeholder="1058621696" value="105-86-21696" class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white font-mono font-bold">
             </div>
             <div>
               <label class="block text-[10.5px] font-bold text-slate-700 mb-1">회사명 / 상호</label>
-              <input type="text" id="faxBarobillCorpName" value="주식회사 라이프온케어 (리본메이트원)" readonly class="w-full p-2 border border-slate-200 rounded-xl text-xs bg-slate-100 text-slate-600 font-medium">
+              <input type="text" id="faxBarobillCorpName" value="(주)리본케어" readonly class="w-full p-2 border border-slate-200 rounded-xl text-xs bg-slate-100 text-slate-600 font-medium">
             </div>
           </div>
 
           <div>
             <label class="block text-[10.5px] font-bold text-slate-700 mb-1">연동 인증키 (CERTKEY) *</label>
-            <input type="text" id="faxBarobillCertKey" placeholder="연동 인증키 입력" value="C53EC844-0FE7-4139-80AA-FE06E3ACAABE" class="w-full p-2 border-2 border-purple-400 rounded-xl text-xs bg-white font-mono font-black text-purple-950">
+            <input type="text" id="faxBarobillCertKey" placeholder="연동 인증키 입력" value="CF89EE38-7B80-4955-960E-D86A866498ED" class="w-full p-2 border-2 border-purple-400 rounded-xl text-xs bg-white font-mono font-black text-purple-950">
             <p class="text-[10px] text-slate-500 mt-1 flex items-center justify-between">
-              <span>* 테스트키: <code class="font-mono text-purple-700">C53EC844-0FE7-4139-80AA-FE06E3ACAABE</code></span>
+              <span>* 테스트키: <code class="font-mono text-purple-700">CF89EE38-7B80-4955-960E-D86A866498ED</code></span>
               <span class="flex gap-2">
                 <button type="button" onclick="quickFillBarobillKey('test')" class="text-purple-700 hover:underline font-bold text-[10px] cursor-pointer">테스트키 적용</button>
                 <button type="button" onclick="quickFillBarobillKey('prod')" class="text-indigo-700 hover:underline font-bold text-[10px] cursor-pointer">운영키 적용</button>

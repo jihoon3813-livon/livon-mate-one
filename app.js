@@ -7464,8 +7464,19 @@ async function executeSendFaxModal() {
       savedSender = '02-6499-3917';
       localStorage.setItem('LIVON_FAX_SENDER', savedSender);
     }
-    const savedBaroCertKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY') || 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE';
-    const savedBaroCorpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM') || '388-86-02921';
+    let savedBaroCertKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY');
+    if (!savedBaroCertKey || savedBaroCertKey === 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE') {
+      savedBaroCertKey = 'CF89EE38-7B80-4955-960E-D86A866498ED';
+      localStorage.setItem('LIVON_BAROBILL_CERTKEY', savedBaroCertKey);
+    } else if (savedBaroCertKey === '1431781E-78BF-4E1F-B4D1-870C4FA64AF6') {
+      savedBaroCertKey = 'A1496EC3-E606-44C0-B126-F03B9AF88588';
+      localStorage.setItem('LIVON_BAROBILL_CERTKEY', savedBaroCertKey);
+    }
+    let savedBaroCorpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM');
+    if (!savedBaroCorpNum || savedBaroCorpNum === '388-86-02921' || savedBaroCorpNum === '3888602921') {
+      savedBaroCorpNum = '105-86-21696';
+      localStorage.setItem('LIVON_BAROBILL_CORPNUM', savedBaroCorpNum);
+    }
     const savedBaroId = localStorage.getItem('LIVON_BAROBILL_ID') || 'jihoon3813@gmail.com';
     const savedBaroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'test';
     const savedAligoUser = localStorage.getItem('LIVON_FAX_ALIGO_USER') || '';
@@ -7907,10 +7918,10 @@ function quickFillBarobillKey(type) {
   const certKeyInput = document.getElementById('faxBarobillCertKey');
   const serverSelect = document.getElementById('faxBarobillServer');
   if (type === 'test') {
-    if (certKeyInput) certKeyInput.value = 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE';
+    if (certKeyInput) certKeyInput.value = 'CF89EE38-7B80-4955-960E-D86A866498ED';
     if (serverSelect) serverSelect.value = 'test';
   } else if (type === 'prod') {
-    if (certKeyInput) certKeyInput.value = '1431781E-78BF-4E1F-B4D1-870C4FA64AF6';
+    if (certKeyInput) certKeyInput.value = 'A1496EC3-E606-44C0-B126-F03B9AF88588';
     if (serverSelect) serverSelect.value = 'prod';
   }
 }
@@ -7974,8 +7985,19 @@ function openFaxSettingsModal() {
   const aligoKey = localStorage.getItem('LIVON_FAX_ALIGO_KEY') || '';
   
   // Barobill settings
-  const baroCertKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY') || 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE';
-  const baroCorpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM') || '388-86-02921';
+  let baroCertKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY');
+  if (!baroCertKey || baroCertKey === 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE') {
+    baroCertKey = 'CF89EE38-7B80-4955-960E-D86A866498ED';
+    localStorage.setItem('LIVON_BAROBILL_CERTKEY', baroCertKey);
+  } else if (baroCertKey === '1431781E-78BF-4E1F-B4D1-870C4FA64AF6') {
+    baroCertKey = 'A1496EC3-E606-44C0-B126-F03B9AF88588';
+    localStorage.setItem('LIVON_BAROBILL_CERTKEY', baroCertKey);
+  }
+  let baroCorpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM');
+  if (!baroCorpNum || baroCorpNum === '388-86-02921' || baroCorpNum === '3888602921') {
+    baroCorpNum = '105-86-21696';
+    localStorage.setItem('LIVON_BAROBILL_CORPNUM', baroCorpNum);
+  }
   const baroId = localStorage.getItem('LIVON_BAROBILL_ID') || 'jihoon3813@gmail.com';
   const baroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'test';
 
@@ -8034,8 +8056,8 @@ function saveFaxSettings() {
   const testNumber = document.getElementById('faxSettingTestNumber')?.value.trim() || '';
   
   // Barobill inputs
-  const baroCertKey = document.getElementById('faxBarobillCertKey')?.value.trim() || 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE';
-  const baroCorpNum = document.getElementById('faxBarobillCorpNum')?.value.trim() || '388-86-02921';
+  const baroCertKey = document.getElementById('faxBarobillCertKey')?.value.trim() || 'CF89EE38-7B80-4955-960E-D86A866498ED';
+  const baroCorpNum = document.getElementById('faxBarobillCorpNum')?.value.trim() || '105-86-21696';
   const baroId = document.getElementById('faxBarobillId')?.value.trim() || 'jihoon3813@gmail.com';
   const baroServer = document.getElementById('faxBarobillServer')?.value || 'test';
 
@@ -8104,8 +8126,8 @@ async function executeFaxEchoTest() {
   try {
     const mode = localStorage.getItem('LIVON_FAX_MODE') || 'barobill';
     const sender = localStorage.getItem('LIVON_FAX_SENDER') || '02-6499-3917';
-    const baroCertKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY') || 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE';
-    const baroCorpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM') || '388-86-02921';
+    const baroCertKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY') || 'CF89EE38-7B80-4955-960E-D86A866498ED';
+    const baroCorpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM') || '105-86-21696';
     const baroId = localStorage.getItem('LIVON_BAROBILL_ID') || 'jihoon3813@gmail.com';
     const baroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'test';
 

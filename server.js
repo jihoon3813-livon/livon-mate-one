@@ -232,7 +232,7 @@ function startServer(port) {
           let activeProvider = 'Smart Sandbox (모의 회선)';
           if (provider === 'barobill') {
             const serverLabel = payload.baroServer === 'prod' ? '운영' : '테스트';
-            activeProvider = `Barobill (${serverLabel}: ${(payload.baroCertKey || 'C53EC844').slice(0, 8)}...)`;
+            activeProvider = `Barobill (${serverLabel}: ${(payload.baroCertKey || 'CF89EE38').slice(0, 8)}...)`;
             console.log(`[FAX Barobill Gateway] 바로빌 팩스 발송 접수: ${cleanFaxNumber} (${recipient}) [${serverLabel}]`);
           } else if (provider === 'aligo') {
             activeProvider = 'Aligo Fax API';

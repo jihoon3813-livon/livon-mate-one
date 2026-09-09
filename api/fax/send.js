@@ -26,8 +26,8 @@ module.exports = async (req, res) => {
       pages = 1,
       operator = '관리자(원스탑)',
       provider = 'barobill',
-      baroCertKey = process.env.BAROBILL_CERTKEY || payload.baroCertKey || 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE',
-      baroCorpNum = process.env.BAROBILL_CORPNUM || payload.baroCorpNum || '3888602921',
+      baroCertKey = process.env.BAROBILL_CERTKEY || payload.baroCertKey || 'CF89EE38-7B80-4955-960E-D86A866498ED',
+      baroCorpNum = process.env.BAROBILL_CORPNUM || payload.baroCorpNum || '1058621696',
       baroId = process.env.BAROBILL_ID || payload.baroId || 'jihoon3813@gmail.com',
       baroServer = process.env.BAROBILL_SERVER || payload.baroServer || 'test'
     } = payload;
