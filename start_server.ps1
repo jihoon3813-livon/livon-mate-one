@@ -73,6 +73,31 @@ while ($listener.IsListening) {
             continue
         }
 
+        # Handle API /api/fax/config
+        if ($urlPath -eq "api/fax/config") {
+            $configPath = Join-Path $baseDir "fax_config.json"
+            if ($request.HttpMethod -eq "POST") {
+                $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                $rawBody = $reader.ReadToEnd()
+                if ($rawBody) {
+                    [System.IO.File]::WriteAllText($configPath, $rawBody, [System.Text.Encoding]::UTF8)
+                }
+                $jsonRes = @{ success = $true; message = "설정이 저장되었습니다." } | ConvertTo-Json -Compress
+            } else {
+                $cfg = @{}
+                if (Test-Path $configPath) {
+                    try { $cfg = [System.IO.File]::ReadAllText($configPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json } catch {}
+                }
+                $jsonRes = @{ success = $true; config = $cfg } | ConvertTo-Json -Compress
+            }
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonRes)
+            $response.ContentType = "application/json; charset=utf-8"
+            $response.ContentLength64 = $bytes.Length
+            $response.OutputStream.Write($bytes, 0, $bytes.Length)
+            $response.Close()
+            continue
+        }
+
         # Handle API /api/fax/send
         if ($urlPath -eq "api/fax/send") {
             $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)

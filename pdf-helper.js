@@ -35,13 +35,15 @@ async function createDocumentPdfBuffer(htmlContent, fallbackTitle = '리본케�
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    @page { size: A4 portrait; margin: 12mm; }
-    body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background: #fff; color: #0f172a; padding: 0; }
+    @page { size: A4 portrait; margin: 8mm; }
+    html, body { margin: 0; padding: 0; background: #fff; color: #0f172a; font-family: 'Pretendard', 'Malgun Gothic', sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     table { border-collapse: collapse; width: 100%; }
     th, td { border: 1px solid #cbd5e1; }
+    .no-print { display: none !important; }
+    #faxCleanFormTarget { margin: 0 auto; width: 100% !important; max-width: 100% !important; border: none !important; box-shadow: none !important; }
   </style>
 </head>
-<body>
+<body class="p-0 m-0">
   ${htmlContent}
 </body>
 </html>`;

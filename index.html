@@ -67,6 +67,13 @@
       content-visibility: auto;
       contain-intrinsic-size: 1px 160px;
     }
+    /* Hover 시 카드 좌측 라벨 띠 색상이 변하지 않도록 고정보호 */
+    .hub-customer-card.border-l-rose-500:hover {
+      border-left-color: #f43f5e !important;
+    }
+    .hub-customer-card.border-l-blue-500:hover {
+      border-left-color: #3b82f6 !important;
+    }
     tbody tr {
       contain: layout style;
     }
@@ -203,6 +210,83 @@
     body.theme-white main { background-color: #ffffff !important; }
     body.theme-white .sticky-filter-bar { background-color: #ffffff !important; }
 
+    /* Theme 7: Modern Monochrome (눈 편한 흑백·미니멀 모노) */
+    body.theme-mono { --theme-bg: #f4f4f5; background-color: #f4f4f5; color: #18181b; }
+    body.theme-mono header { background-color: #ffffff !important; border-color: #e4e4e7 !important; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important; }
+    body.theme-mono aside { background-color: #18181b !important; border-color: #27272a !important; }
+    body.theme-mono main { background-color: #f4f4f5 !important; }
+    body.theme-mono .sticky-filter-bar { background-color: #f4f4f5 !important; border-color: #e4e4e7 !important; }
+    body.theme-mono #brandLogoBadge { background: #18181b !important; color: #ffffff !important; border: 1px solid #3f3f46 !important; box-shadow: none !important; }
+    body.theme-mono #brandVersionBadge { background-color: #f4f4f5 !important; color: #52525b !important; border-color: #d4d4d8 !important; }
+    
+    /* 모던 모노 테마: 일반 본문 장식용 버튼/배경을 모던 차콜/블랙으로 절제 (눈 피로 최소화) */
+    body.theme-mono main .bg-primary-600 { background-color: #27272a !important; }
+    body.theme-mono main .bg-primary-700 { background-color: #18181b !important; }
+    body.theme-mono main .hover\:bg-primary-700:hover { background-color: #18181b !important; }
+    body.theme-mono main .text-primary-600 { color: #18181b !important; }
+    body.theme-mono main .border-primary-500 { border-color: #3f3f46 !important; }
+    body.theme-mono main .bg-gradient-to-r.from-primary-600 { background-image: none !important; background-color: #27272a !important; }
+    body.theme-mono main .bg-primary-50 { background-color: #f4f4f5 !important; }
+    body.theme-mono main .text-primary-700 { color: #27272a !important; }
+
+    /* [흑백 테마 전용 사이드바]: 통합허브를 제외한 나머지 모든 메뉴 아이콘 & 뱃지는 100% 흑백(무채색) */
+    body.theme-mono aside button:not([data-tab="carehub"]) svg,
+    body.theme-mono aside button:not([data-tab="carehub"]) i,
+    body.theme-mono aside button:not([data-tab="carehub"]) .lucide {
+      color: #94a3b8 !important; /* slate-400 */
+      stroke: #94a3b8 !important;
+      filter: grayscale(100%) !important;
+    }
+    body.theme-mono aside button:not([data-tab="carehub"]):hover svg,
+    body.theme-mono aside button:not([data-tab="carehub"]):hover i {
+      color: #f1f5f9 !important; /* slate-100 */
+      stroke: #f1f5f9 !important;
+    }
+    body.theme-mono aside button:not([data-tab="carehub"]) span[class*="text-"],
+    body.theme-mono aside button:not([data-tab="carehub"]) span[class*="bg-"] {
+      background-color: #1e293b !important; /* slate-800 */
+      color: #cbd5e1 !important; /* slate-300 */
+      border-color: #334155 !important; /* slate-700 */
+      filter: grayscale(100%) !important;
+    }
+
+    /* 참고자료 서브메뉴 내부 아이콘 및 뱃지도 흑백 */
+    body.theme-mono aside #referenceSubmenu svg,
+    body.theme-mono aside #referenceSubmenu i {
+      color: #64748b !important;
+      stroke: #64748b !important;
+      filter: grayscale(100%) !important;
+    }
+
+    /* [통합허브 메뉴]: 흑백 테마에서도 원래의 화려하고 선명한 색상 100% 보존! */
+    body.theme-mono aside button[data-tab="carehub"] {
+      background-image: linear-gradient(to right, #2563eb, #4f46e5) !important;
+      background-color: #2563eb !important;
+      border-color: rgba(99, 102, 241, 0.3) !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important;
+    }
+    body.theme-mono aside button[data-tab="carehub"] svg,
+    body.theme-mono aside button[data-tab="carehub"] i,
+    body.theme-mono aside button[data-tab="carehub"] .lucide {
+      color: #fcd34d !important; /* amber-300 원래 황금빛 */
+      stroke: #fcd34d !important;
+      filter: none !important;
+    }
+    body.theme-mono aside button[data-tab="carehub"] span.rounded-full {
+      background-color: rgba(251, 191, 36, 0.2) !important;
+      color: #fcd34d !important;
+      border-color: rgba(251, 191, 36, 0.3) !important;
+      filter: none !important;
+    }
+    
+    /* 중요 상태 지표(경보/미수금/완료/긴급)는 확실히 눈에 띄도록 선명도 유지 */
+    body.theme-mono .bg-rose-500, body.theme-mono .text-rose-600, body.theme-mono .bg-rose-50,
+    body.theme-mono .bg-emerald-500, body.theme-mono .text-emerald-600, body.theme-mono .bg-emerald-50,
+    body.theme-mono .bg-amber-500, body.theme-mono .text-amber-600, body.theme-mono .bg-amber-50 {
+      /* 보존: 업무상 핵심적인 주의/상태값은 컬러를 살려 즉각적 시선 유도 */
+    }
+
     /* Theme Select Bar Clean 1px Border Guarantee */
     #themeSelect {
       border: 1px solid #cbd5e1 !important;
@@ -306,13 +390,13 @@
       <!-- Left: Logo & Brand -->
       <div class="flex items-center space-x-3">
         <div class="flex items-center space-x-2.5">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-700 via-primary-600 to-sky-500 flex items-center justify-center text-white font-black text-lg shadow-md shadow-primary-500/20">
+          <div id="brandLogoBadge" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-700 via-primary-600 to-sky-500 flex items-center justify-center text-white font-black text-lg shadow-md shadow-primary-500/20 transition-all">
             LM1
           </div>
           <div>
             <div class="flex items-center space-x-2">
               <span class="font-extrabold text-xl tracking-tight text-slate-900">리본메이트 원 <span class="text-sm font-semibold text-primary-600 font-sans">(Livon Mate One)</span></span>
-              <span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200">ERP v3.0</span>
+              <span id="brandVersionBadge" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 transition-all">ERP v3.0</span>
             </div>
             <p class="text-xs text-slate-500 font-medium">(주)리본케어 통합 간병인 매칭 & 보험 정산 시스템</p>
           </div>
@@ -342,10 +426,11 @@
           <i data-lucide="settings" class="w-5 h-5"></i>
         </button>
 
-        <!-- Theme Selector (6가지 테마 원클릭) -->
+        <!-- Theme Selector (7가지 테마 원클릭) -->
         <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200" title="시스템 테마 변경">
           <span class="text-[10px] font-bold text-slate-500 px-1 hidden sm:inline">테마:</span>
           <select id="themeSelect" onchange="setAppTheme(this.value)" class="bg-white border border-slate-300 text-xs font-bold rounded-lg px-2.5 py-1 focus:ring-1 focus:ring-primary-500 cursor-pointer text-slate-800">
+            <option value="theme-mono">🖤 모던 모노 (눈 편한 흑백·미니멀)</option>
             <option value="theme-default">🎨 기본 (슬레이트)</option>
             <option value="theme-gray">🏢 모던 그레이 (뉴트럴)</option>
             <option value="theme-white">⚪ 클린 화이트 (퓨어)</option>
@@ -1250,7 +1335,7 @@
       <section id="tab-forms" class="tab-content hidden space-y-5">
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200 flex-shrink-0">
               <i data-lucide="files" class="w-5 h-5"></i>
             </div>
             <div>
@@ -1262,6 +1347,26 @@
                 현대해상과 삼성화재의 접수 및 정산 청구 공식 서식을 관리하며, 고객 데이터가 자동 채워진 실물 문서를 미리보고 인쇄/팩스 발송합니다.
               </p>
             </div>
+          </div>
+          
+          <!-- 양식 설정 백업/내보내기 & 운영 불러오기 버튼 그룹 -->
+          <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-shrink-0">
+            <!-- 1. 양식 설정 백업/내보내기 -->
+            <button type="button" onclick="exportFormConfigsJson()" 
+              class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap"
+              title="모든 서식의 필드 배치 좌표 및 등록 배경 이미지를 JSON 파일로 백업/내보내기">
+              <i data-lucide="download" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>양식 설정 백업 (내보내기)</span>
+            </button>
+
+            <!-- 2. 양식 설정 불러오기 (가져오기) -->
+            <input type="file" id="importFormConfigFileInput" accept=".json,application/json" class="hidden" onchange="handleImportFormConfigsJson(event)">
+            <button type="button" onclick="document.getElementById('importFormConfigFileInput').click()" 
+              class="px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap"
+              title="개발 환경에서 백업받은 JSON 파일을 불러와 운영 환경에 즉시 100% 동기화 적용">
+              <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+              <span>양식 설정 불러오기 (가져오기)</span>
+            </button>
           </div>
         </div>
 
@@ -1357,6 +1462,9 @@
             </button>
             <button onclick="switchFaxSubTab('directory')" id="faxSubTabBtn-directory" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer">
               <i data-lucide="book-marked" class="w-3.5 h-3.5 inline mr-1"></i> 원수사/손사 팩스번호 주소록
+            </button>
+            <button onclick="switchFaxSubTab('pricing')" id="faxSubTabBtn-pricing" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer">
+              <i data-lucide="coins" class="w-3.5 h-3.5 inline mr-1"></i> 보험사별 청구 단가 설정
             </button>
           </div>
           <span class="text-xs text-slate-400 font-mono" id="faxSubTabBadge">실시간 동기화 상태</span>
@@ -1473,6 +1581,53 @@
                   </tr>
                 </thead>
                 <tbody id="faxDirectoryTableBody" class="divide-y divide-slate-100">
+                  <!-- Injected dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sub-Tab 3: 보험사별 청구 단가 설정 (Pricing Rules) -->
+        <div id="faxSubTabSection-pricing" class="space-y-3 hidden">
+          <!-- Pricing Header & Action -->
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-black text-sm">
+                <i data-lucide="coins" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                  <span>원수사 / 보험사별 1일 기본 청구 약정단가 대장</span>
+                  <span class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10.5px] font-bold">글로벌 기본값</span>
+                </h4>
+                <p class="text-[11px] text-slate-500 mt-0.5">
+                  각 보험사 및 상품 약정별 1일 기준 청구 단가를 관리합니다. 고객 상세 창에서는 기본값이 자동 연동되며, 필요시 고객별로만 단가를 개별 변경할 수 있습니다.
+                </p>
+              </div>
+            </div>
+
+            <button type="button" onclick="openClaimUnitPriceModal()" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i> 새 청구 단가 기준 등록
+            </button>
+          </div>
+
+          <!-- Pricing Table -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div class="overflow-x-auto custom-scrollbar min-h-[300px]">
+              <table class="w-full text-left text-xs text-slate-600 border-collapse whitespace-nowrap">
+                <thead class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-700">
+                  <tr>
+                    <th class="p-3 text-center font-bold w-12">No.</th>
+                    <th class="p-3 font-bold">원수사 / 보험사명</th>
+                    <th class="p-3 font-bold">상품 / 약정 구분</th>
+                    <th class="p-3 text-right font-mono font-bold text-purple-900">1일 기본 청구 단가 (원/일)</th>
+                    <th class="p-3">비고 / 약정 메모</th>
+                    <th class="p-3 text-center font-bold">최종 수정일</th>
+                    <th class="p-3 text-center font-bold w-28">관리</th>
+                  </tr>
+                </thead>
+                <tbody id="claimUnitPriceTableBody" class="divide-y divide-slate-100">
                   <!-- Injected dynamically -->
                 </tbody>
               </table>
@@ -2152,6 +2307,7 @@
             </form>
           </div>
 
+
         </div>
 
       </section>
@@ -2538,8 +2694,8 @@
               </label>
               <div class="w-48">
                 <select id="newAppCareType" onchange="onCareTypeChange(this.value)" class="w-full p-2 border-2 border-emerald-500 rounded-xl bg-white font-extrabold text-emerald-800 text-xs">
-                  <option value="입원" selected>🏥 입원 (병원 / 병실)</option>
-                  <option value="자택">🏡 자택 (자택 간병)</option>
+                  <option value="자택" selected>🏡 재택 (자택 간병)</option>
+                  <option value="입원">🏥 입원 (병원 / 병실)</option>
                 </select>
               </div>
             </div>
@@ -2588,7 +2744,7 @@
             <!-- 재택 시 UI -->
             <div id="careTypeHomeArea" class="space-y-2.5 hidden">
               <div class="flex items-center justify-between">
-                <span class="text-[11px] font-bold text-slate-700">자택 도로명 주소 (전체) *</span>
+                <span class="text-[11px] font-bold text-slate-700">재택(자택) 도로명 주소 (전체) *</span>
                 <button type="button" onclick="openAddressSearchModal('newAppCare')" class="text-xs font-bold text-primary-700 hover:text-primary-800 flex items-center gap-1 hover:underline">
                   <i data-lucide="search" class="w-3.5 h-3.5"></i> 도로명 주소 검색 🔍
                 </button>
@@ -2987,56 +3143,102 @@
       <form id="newClaimForm" onsubmit="handleNewClaimSubmit(event)" class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4 text-xs">
         <input type="hidden" id="newClaimAppId">
         
-        <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-1">
-          <div class="text-[11px] font-bold text-slate-500">대상 고객정보</div>
+        <!-- 대상 고객 및 배정 간병 기간 안내 카드 -->
+        <div class="bg-gradient-to-r from-amber-50 to-orange-50 p-3.5 rounded-2xl border border-amber-200 space-y-2">
+          <div class="text-[11px] font-bold text-amber-800 flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><i data-lucide="shield-check" class="w-3.5 h-3.5 text-amber-600"></i> 대상 고객 & 배정 간병 기간 (청구 기준)</span>
+            <span id="newClaimInsuranceBadge" class="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-200/80 text-amber-900">-</span>
+          </div>
           <div class="flex items-center justify-between">
             <span id="newClaimCustomerName" class="text-sm font-black text-slate-800">-</span>
-            <span id="newClaimInsuranceBadge" class="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-200 text-slate-700">-</span>
+            <div id="newClaimAccidentNo" class="text-[11px] text-slate-500 font-mono">사고번호: -</div>
           </div>
-          <div id="newClaimAccidentNo" class="text-[11px] text-slate-500">사고번호: -</div>
+          <div id="newClaimPeriodGuideBox" class="pt-1.5 border-t border-amber-200/70">
+            <!-- Dynamic Care Period, Already Claimed, and Max Claimable Range -->
+          </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block font-bold text-slate-700 mb-1">청구 회차 *</label>
-            <input type="text" id="newClaimRound" required placeholder="예: 1회차, 2회차, 최종" class="w-full p-2.5 border rounded-xl font-bold">
+            <input type="text" id="newClaimRound" required placeholder="예: 1차, 2차" class="w-full p-2.5 border rounded-xl font-bold bg-slate-50">
           </div>
           <div>
-            <label class="block font-bold text-slate-700 mb-1">고객 일당 (원/일) *</label>
-            <input type="text" id="newClaimDailyWage" required placeholder="140,000" inputmode="numeric" oninput="calcNewClaimTotal()" class="w-full p-2.5 border rounded-xl font-bold text-primary-700">
+            <label class="block font-bold text-slate-700 mb-1">
+              <span>청구 단가 (원/일) *</span>
+            </label>
+            <input type="text" id="newClaimDailyWage" required placeholder="144,000" inputmode="numeric" oninput="calcNewClaimTotal()" class="w-full p-2.5 border rounded-xl font-bold text-primary-700">
           </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block font-bold text-slate-700 mb-1">간병 시작일 *</label>
-            <input type="date" lang="en-CA" id="newClaimStartDate" required onchange="calcNewClaimTotal()" class="w-full p-2.5 border rounded-xl">
+            <label class="block font-bold text-slate-700 mb-1 flex items-center gap-1">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-500"></i> 청구 시작일시 (시간 포함) *
+            </label>
+            <div class="flex items-center gap-1.5">
+              <input type="date" lang="en-CA" id="newClaimStartDate" required onchange="calcNewClaimTotal()" class="flex-1 p-2.5 border rounded-xl font-medium bg-slate-100 cursor-not-allowed">
+              <select id="newClaimStartTime" onchange="calcNewClaimTotal()" class="w-24 p-2.5 border rounded-xl bg-slate-50 font-bold text-xs">
+                <option value="09:00" selected>09:00</option>
+                <option value="00:00">00:00</option>
+                <option value="12:00">12:00</option>
+                <option value="17:30">17:30</option>
+                <option value="18:00">18:00</option>
+              </select>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1">이전 차수 종료 시점에 이어 연속으로 시작됩니다.</p>
           </div>
           <div>
-            <label class="block font-bold text-slate-700 mb-1">간병 종료일 *</label>
-            <input type="date" lang="en-CA" id="newClaimEndDate" required onchange="calcNewClaimTotal()" class="w-full p-2.5 border rounded-xl">
+            <label class="block font-bold text-slate-700 mb-1 flex items-center gap-1">
+              <i data-lucide="calendar-check" class="w-3.5 h-3.5 text-amber-600"></i> 청구 종료일시 (시간 포함) *
+            </label>
+            <div class="flex items-center gap-1.5">
+              <input type="date" lang="en-CA" id="newClaimEndDate" required onchange="calcNewClaimTotal()" class="flex-1 p-2.5 border border-amber-300 rounded-xl font-bold bg-white focus:ring-2 focus:ring-amber-400">
+              <select id="newClaimEndTime" onchange="calcNewClaimTotal()" class="w-24 p-2.5 border rounded-xl bg-white font-bold text-xs">
+                <option value="18:00" selected>18:00</option>
+                <option value="12:00">12:00</option>
+                <option value="15:00">15:00</option>
+                <option value="17:00">17:00</option>
+                <option value="23:59">23:59</option>
+              </select>
+            </div>
+            <p class="text-[10px] text-amber-700 font-bold mt-1">※ 전체 간병 종료일을 넘어서 선택할 수 없습니다.</p>
           </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block font-bold text-slate-700 mb-1">청구 일수 (일)</label>
-            <input type="number" id="newClaimDays" min="1" value="1" oninput="calcNewClaimTotalFromDays()" class="w-full p-2.5 border rounded-xl font-bold">
+            <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+              <span>청구 기간 (일수) *</span>
+              <span id="newClaimHoursDisplay" class="text-[10.5px] font-mono text-purple-700 font-bold">192시간</span>
+            </label>
+            <div class="relative">
+              <input type="number" id="newClaimDays" min="1" value="1" oninput="calcNewClaimTotalFromDays()" class="w-full p-2.5 border-2 border-purple-300 rounded-xl font-black text-purple-900 text-sm focus:border-purple-500">
+              <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-bold">일간</span>
+            </div>
           </div>
           <div>
-            <label class="block font-bold text-slate-700 mb-1">청구 총금액 (원) *</label>
-            <input type="text" id="newClaimAmount" required placeholder="140,000" class="w-full p-2.5 border rounded-xl font-black text-amber-700 text-sm bg-amber-50">
+            <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+              <span>청구 총금액 (시간단위 병기) *</span>
+              <span class="text-[10px] text-slate-400 font-normal">일단위 산출 / 시간단위 표시</span>
+            </label>
+            <input type="text" id="newClaimAmount" required placeholder="144,000" readonly class="w-full p-2.5 border rounded-xl font-black text-amber-800 text-sm bg-amber-50">
           </div>
+        </div>
+
+        <!-- 실시간 차수 자동 분류 안내 박스 (Live Split Preview) -->
+        <div id="newClaimSplitLivePreview">
+          <!-- Dynamically injected: e.g. 1차 8일 청구 시 잔여 2일은 다음 2차 청구로 자동 분류 -->
         </div>
 
         <div>
           <label class="block font-bold text-slate-700 mb-1">청구 메모 / 특이사항</label>
-          <input type="text" id="newClaimMemo" placeholder="특이사항 메모 입력" class="w-full p-2.5 border rounded-xl">
+          <input type="text" id="newClaimMemo" placeholder="특이사항 메모 입력 (예: 8일 정산 분할 청구)" class="w-full p-2.5 border rounded-xl">
         </div>
 
         <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 text-xs">
-          <button type="button" onclick="closeModal('newClaimModal')" class="px-4 py-2 border rounded-xl">취소</button>
-          <button type="submit" class="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-xs">청구서 등록</button>
+          <button type="button" onclick="closeModal('newClaimModal')" class="px-4 py-2 border rounded-xl font-bold text-slate-600 hover:bg-slate-100">취소</button>
+          <button type="submit" class="px-6 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-black rounded-xl shadow-md cursor-pointer">청구서 등록 및 자동 차수 분류</button>
         </div>
       </form>
     </div>
@@ -3228,9 +3430,17 @@
           </div>
 
           <div>
-            <label class="block text-[10.5px] font-bold text-slate-700 mb-1">바로빌 회원 비밀번호 (FTP 전송용) *</label>
-            <input type="password" id="faxBarobillPwd" placeholder="바로빌(barobill.co.kr) 로그인 비밀번호" class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white font-mono">
-            <p class="text-[10px] text-slate-500 mt-0.5">* 실제 팩스 전송 시 바로빌 파일서버(FTP: 9030) 보안 인증에 사용됩니다.</p>
+            <label class="block text-[10.5px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+              <span>바로빌 회원 비밀번호 (FTP 전송용) *</span>
+              <button type="button" onclick="toggleFaxBarobillPwdVisibility()" class="text-[10px] text-purple-600 hover:underline font-normal cursor-pointer">비밀번호 표시</button>
+            </label>
+            <div class="relative">
+              <input type="password" id="faxBarobillPwd" placeholder="바로빌(barobill.co.kr) 로그인 비밀번호" class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white font-mono pr-9">
+              <button type="button" onclick="toggleFaxBarobillPwdVisibility()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer" title="비밀번호 보기/숨기기">
+                <i id="faxBarobillPwdEye" data-lucide="eye" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+            <p class="text-[10px] text-purple-700 font-medium mt-1">* 팩스관리에서 1회만 입력하고 [설정 저장]하시면, 1차 접수/정산청구/서식 미리보기 등 모든 팩스 발송에 자동 적용됩니다.</p>
           </div>
 
           <div class="pt-1 flex items-center justify-between">
@@ -3517,6 +3727,155 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CLAIM UNIT PRICE RULE EDIT (보험사별 1일 기본 청구 단가 등록 및 수정) -->
+  <div id="claimUnitPriceModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200">
+      <div class="p-5 bg-gradient-to-r from-slate-900 to-purple-950 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-purple-600/30 text-purple-300 flex items-center justify-center border border-purple-500/30">
+            <i data-lucide="coins" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black" id="claimUnitPriceModalTitle">보험사 청구 단가 등록</h3>
+            <p class="text-xs text-purple-200 mt-0.5">원수사 및 상품별 1일 기준 기본 약정 청구단가를 설정합니다.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('claimUnitPriceModal')" class="p-2 text-slate-400 hover:text-white rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="claimUnitPriceForm" onsubmit="handleSaveClaimUnitPriceRule(event)" class="p-5 space-y-3.5 text-xs">
+        <input type="hidden" id="claimUnitPriceRuleEditId" value="">
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">원수사(보험사명) *</label>
+          <div>
+            <input type="text" id="claimUnitPriceRuleInsurance" required placeholder="예: 현대해상, 현대해상(SCOR), 삼성화재 등" class="w-full p-2.5 border rounded-xl font-bold text-slate-900">
+            <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              <button type="button" onclick="document.getElementById('claimUnitPriceRuleInsurance').value = '현대해상'" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px]">현대해상</button>
+              <button type="button" onclick="document.getElementById('claimUnitPriceRuleInsurance').value = '현대해상(SCOR)'" class="px-2 py-0.5 rounded bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold text-[10px]">현대해상(SCOR)</button>
+              <button type="button" onclick="document.getElementById('claimUnitPriceRuleInsurance').value = '삼성화재'" class="px-2 py-0.5 rounded bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold text-[10px]">삼성화재</button>
+              <button type="button" onclick="document.getElementById('claimUnitPriceRuleInsurance').value = 'DB손해보험'" class="px-2 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-[10px]">DB손해보험</button>
+              <button type="button" onclick="document.getElementById('claimUnitPriceRuleInsurance').value = 'KB손해보험'" class="px-2 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold text-[10px]">KB손해보험</button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">상품 / 약정 구분</label>
+          <input type="text" id="claimUnitPriceRuleCategory" placeholder="예: 표준/일반, SCOR 재보험, 치매/간병인특약 등" class="w-full p-2.5 border rounded-xl font-semibold">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">1일 기본 청구 단가 (원/일) *</label>
+          <div class="relative">
+            <input type="number" id="claimUnitPriceRuleAmount" required step="1000" min="10000" placeholder="예: 160000 또는 144000" class="w-full pl-3 pr-10 py-2.5 text-sm font-mono font-black border-2 border-purple-300 rounded-xl bg-purple-50/20 text-purple-950">
+            <span class="absolute right-3.5 top-2.5 text-xs font-bold text-slate-400">원</span>
+          </div>
+          <div class="flex items-center gap-1.5 mt-1.5">
+            <button type="button" onclick="document.getElementById('claimUnitPriceRuleAmount').value = 144000" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-[10px]">144,000원</button>
+            <button type="button" onclick="document.getElementById('claimUnitPriceRuleAmount').value = 150000" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-[10px]">150,000원</button>
+            <button type="button" onclick="document.getElementById('claimUnitPriceRuleAmount').value = 160000" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-[10px]">160,000원</button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">비고 및 약정 메모</label>
+          <textarea id="claimUnitPriceRuleMemo" rows="2" class="w-full p-2.5 border rounded-xl text-xs" placeholder="해당 보험사 약정 단가 적용 조건 및 근거 메모"></textarea>
+        </div>
+
+        <div class="p-3 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2 -mx-5 -mb-5 rounded-b-3xl">
+          <button type="button" onclick="closeModal('claimUnitPriceModal')" class="px-4 py-2 border rounded-xl font-semibold bg-white cursor-pointer hover:bg-slate-100">취소</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-xs cursor-pointer">
+            저장 완료
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CUSTOMER CLAIM UNIT PRICE EDIT (해당 고객 전용 1일 청구단가 개별 설정) -->
+  <div id="customerClaimPriceModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200">
+      <div class="p-5 bg-gradient-to-r from-slate-900 to-purple-950 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-purple-600/30 text-purple-300 flex items-center justify-center border border-purple-500/30">
+            <i data-lucide="calculator" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black">고객 청구 단가 개별 설정</h3>
+            <p class="text-xs text-purple-200 mt-0.5">이 고객에게만 적용되는 1일 기준 청구 단가를 지정합니다.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('customerClaimPriceModal')" class="p-2 text-slate-400 hover:text-white rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs">
+        <input type="hidden" id="custPriceModalApplyId" value="">
+
+        <!-- Customer & Default Info -->
+        <div class="p-3 bg-purple-50/70 border border-purple-200 rounded-2xl space-y-1.5">
+          <div class="flex justify-between items-center text-[11.5px]">
+            <span class="text-slate-500">환자명(피보험자):</span>
+            <b class="text-slate-900 font-bold" id="custPriceModalPatientName">-</b>
+          </div>
+          <div class="flex justify-between items-center text-[11.5px]">
+            <span class="text-slate-500">원수사(보험사):</span>
+            <b class="text-purple-900 font-bold" id="custPriceModalInsurance">-</b>
+          </div>
+          <div class="flex justify-between items-center text-[11.5px] pt-1 border-t border-purple-200/60">
+            <span class="text-slate-500">디렉토리 기본 약정단가:</span>
+            <span class="font-mono font-bold text-slate-700" id="custPriceModalDefaultPrice">160,000원/일</span>
+          </div>
+        </div>
+
+        <!-- Input field -->
+        <div>
+          <label class="block font-bold text-slate-800 mb-1.5">1일 청구 단가 (원/일) *</label>
+          <div class="relative">
+            <input type="number" id="custPriceModalInput" step="1000" min="10000" placeholder="예: 144000" 
+              class="w-full pl-3 pr-10 py-2.5 text-base font-mono font-black border-2 border-purple-400 rounded-xl bg-purple-50/20 text-purple-950 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <span class="absolute right-3.5 top-3 text-xs font-bold text-slate-400">원</span>
+          </div>
+          <!-- Quick Preset Buttons -->
+          <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+            <button type="button" onclick="document.getElementById('custPriceModalInput').value = 144000" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-[10.5px]">144,000원</button>
+            <button type="button" onclick="document.getElementById('custPriceModalInput').value = 150000" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-[10.5px]">150,000원</button>
+            <button type="button" onclick="document.getElementById('custPriceModalInput').value = 160000" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-[10.5px]">160,000원</button>
+            <button type="button" onclick="document.getElementById('custPriceModalInput').value = 170000" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-[10.5px]">170,000원</button>
+          </div>
+        </div>
+
+        <!-- Scope Guidance Alert -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 space-y-1">
+          <div class="font-bold text-slate-800 flex items-center gap-1">
+            <i data-lucide="info" class="w-3.5 h-3.5 text-purple-600"></i> 단가 변경 적용 범위
+          </div>
+          <p class="leading-relaxed text-slate-500">
+            • 여기서 수정한 단가는 <b>오직 이 고객의 정산 청구 스케줄</b>에만 적용됩니다.<br>
+            • 기본 약정단가 대장이나 다른 고객들의 단가에는 전혀 영향을 주지 않습니다.
+          </p>
+        </div>
+
+        <div class="pt-2 border-t border-slate-200 flex items-center justify-between gap-2">
+          <button type="button" id="btnResetCustPriceToDefault" onclick="resetCustomerClaimPrice(document.getElementById('custPriceModalApplyId').value)" 
+            class="px-3 py-2 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl font-bold cursor-pointer transition-all">
+            기본 약정단가로 복원
+          </button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button type="button" onclick="closeModal('customerClaimPriceModal')" class="px-3.5 py-2 border rounded-xl font-semibold bg-white cursor-pointer hover:bg-slate-100">취소</button>
+            <button type="button" onclick="saveCustomerClaimPrice()" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-xs cursor-pointer">
+              단가 저장 및 재계산
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -3833,10 +4192,23 @@
   <!-- MODAL: FORM PREVIEW & PRINT -->
   <div id="formPreviewModal" class="fixed inset-0 z-[60] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-3xl w-full max-w-5xl max-h-[95vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
-      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between gap-4">
-        <h3 class="text-sm font-bold flex items-center gap-2 min-w-0 flex-1 overflow-hidden" id="formPreviewModalTitle">
-          <i data-lucide="file-text" class="w-4 h-4 text-amber-400 flex-shrink-0"></i> <span class="truncate">서식 미리보기</span>
-        </h3>
+      <div class="px-5 py-3 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 border-b border-slate-800">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <h3 class="text-sm font-bold flex items-center gap-2 min-w-0 truncate" id="formPreviewModalTitle">
+            <i data-lucide="file-text" class="w-4 h-4 text-amber-400 flex-shrink-0"></i> <span class="truncate">서식 미리보기</span>
+          </h3>
+          <!-- 청구서/신청서 양식 원클릭 교체 셀렉터 (우선 자동선택 + 변경 가능) -->
+          <div id="previewFormSelectorWrapper" class="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700 flex-shrink-0">
+            <span class="text-[11px] text-amber-300 font-bold flex items-center gap-1">
+              <i data-lucide="files" class="w-3.5 h-3.5 text-amber-400"></i> 양식:
+            </span>
+            <select id="previewFormCodeSelector" onchange="onPreviewFormCodeChange(this.value)" class="bg-slate-900 text-white font-black text-xs border border-slate-600 rounded-lg px-2 py-0.5 focus:border-amber-400 focus:outline-none cursor-pointer">
+              <option value="HD_FORM_02">현대해상 (제공확인서·비용청구서)</option>
+              <option value="SF_FORM_01">삼성화재 (비용청구서·명세서)</option>
+              <option value="HD_FORM_01">현대해상 1차 (고객등록·신청서)</option>
+            </select>
+          </div>
+        </div>
         <div class="flex items-center gap-2 flex-shrink-0">
           <button id="btnFormPreviewEditArea" onclick="openFormEditor(gCurrentPreviewFormCode)" class="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 hover:text-amber-200 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all whitespace-nowrap flex-shrink-0" title="이 서식의 배경 업로드 및 필드 좌표 배치 에디터 열기">
             <i data-lucide="edit-3" class="w-3.5 h-3.5 flex-shrink-0"></i> 서식/좌표 편집
@@ -3851,37 +4223,72 @@
         </div>
       </div>
 
-      <div class="flex-1 overflow-y-auto custom-scrollbar p-6 bg-slate-100 flex justify-center">
-        <!-- A4 Page Simulation Sheet -->
-        <div id="formPreviewSheet" class="w-full max-w-[680px] bg-white p-8 shadow-md rounded-lg text-slate-800 text-xs space-y-5 border border-slate-300">
+      <div class="flex-1 overflow-y-auto custom-scrollbar p-6 bg-slate-100 flex justify-center items-start">
+        <!-- A4 Page Simulation Sheet (내용 높이에 맞춰 자연스럽게 늘어나며 서식 뚫림 방지) -->
+        <div id="formPreviewSheet" class="w-full max-w-[680px] bg-white p-6 sm:p-8 shadow-md rounded-2xl text-slate-800 text-xs space-y-5 border border-slate-300 h-auto min-h-full">
           <!-- Dynamic Form Content Injected -->
         </div>
       </div>
 
       <!-- Confirmation Footer (Active during Fax Dispatch Verification) -->
-      <div id="formPreviewConfirmFooter" class="hidden px-6 py-4 bg-slate-900 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white">
-        <div class="flex items-center gap-3">
-          <span class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
-            <i data-lucide="alert-circle" class="w-5 h-5"></i>
-          </span>
-          <div>
-            <div class="text-xs font-bold flex items-center gap-2">
-              <span>최종 발송 전 입력 데이터 서식 확인</span>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">최종 확인 단계</span>
+      <div id="formPreviewConfirmFooter" class="hidden px-6 py-3.5 bg-slate-900 border-t border-slate-800 flex flex-col gap-3 text-white">
+        <!-- 1행: 수신처/손사 주소록 및 팩스번호 선택 -->
+        <div class="bg-slate-800/95 p-3 rounded-2xl border border-slate-700 space-y-2.5 text-xs">
+          <!-- 상단: 손사 주소록 선택 드롭다운 (가로 전체 활용 및 텍스트 넘침 방지) -->
+          <div class="flex items-center gap-2 w-full">
+            <span class="text-amber-400 font-bold flex items-center gap-1 text-xs whitespace-nowrap shrink-0">
+              <i data-lucide="book-user" class="w-4 h-4"></i> 손사 주소록:
+            </span>
+            <div class="flex-1 min-w-0">
+              <select id="previewFaxDirectorySelect" onchange="onPreviewFaxDirectoryChange(this.value)" class="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-1.5 text-xs text-white font-bold cursor-pointer truncate focus:border-amber-400 focus:outline-none">
+                <!-- Dynamic directory entries -->
+              </select>
             </div>
-            <p class="text-[11px] text-slate-400 mt-0.5" id="formPreviewConfirmDesc">
-              서식에 기재된 피보험자 및 입원·주소 정보를 확인 후 [진짜 발송하기]를 누르면 팩스 전송이 진행됩니다.
-            </p>
+          </div>
+
+          <!-- 하단: 실제 발송 수신처 및 팩스번호 독립 입력 필드 (필드 벗어남 방지 및 명확한 테두리) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-slate-700/80">
+            <div class="flex items-center gap-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-600 focus-within:border-amber-400 transition-colors">
+              <span class="text-[11px] text-slate-300 font-bold whitespace-nowrap shrink-0 flex items-center gap-1">
+                <i data-lucide="user-check" class="w-3.5 h-3.5 text-amber-400"></i> 수신처:
+              </span>
+              <input type="text" id="previewFaxRecipientInput" class="flex-1 min-w-0 bg-transparent text-xs font-bold text-amber-300 focus:outline-none border-0 p-0" placeholder="수신처 / 담당자명">
+            </div>
+            <div class="flex items-center gap-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-600 focus-within:border-amber-400 transition-colors">
+              <span class="text-[11px] text-slate-300 font-bold whitespace-nowrap shrink-0 flex items-center gap-1">
+                <i data-lucide="printer" class="w-3.5 h-3.5 text-amber-400"></i> 팩스번호:
+              </span>
+              <input type="text" id="previewFaxNumberInput" class="flex-1 min-w-0 bg-transparent text-xs font-mono font-bold text-white focus:outline-none border-0 p-0" placeholder="0507-1234-8801">
+            </div>
           </div>
         </div>
-        <div class="flex items-center justify-end gap-2.5 flex-shrink-0">
-          <button type="button" onclick="cancelFaxFromPreviewModal()" class="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all">
-            취소 / 서식 수정
-          </button>
-          <button type="button" id="btnConfirmRealFaxSend" onclick="executeRealFaxSendFromPreview()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black shadow-lg shadow-blue-500/30 flex items-center gap-1.5 transition-all">
-            <i data-lucide="send" class="w-4 h-4"></i>
-            <span id="btnConfirmRealFaxSendText">진짜 발송하기 (최종 전송) 📠</span>
-          </button>
+
+        <!-- 2행: 발송 안내 및 발송 실행 버튼 -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-2.5">
+            <span class="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="alert-circle" class="w-4 h-4"></i>
+            </span>
+            <div>
+              <div class="text-xs font-bold flex items-center gap-2">
+                <span>최종 발송 전 입력 데이터 서식 및 수신처 확인</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">최종 확인 단계</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-0.5" id="formPreviewConfirmDesc">
+                서식의 기재 내용과 수신처를 확인 후 [진짜 발송하기]를 누르면 팩스 전송이 진행됩니다.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 flex-shrink-0">
+            <button type="button" onclick="cancelFaxFromPreviewModal()" class="px-4 py-2 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer">
+              취소
+            </button>
+            <button type="button" id="btnConfirmRealFaxSend" onclick="executeRealFaxSendFromPreview()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-black shadow-lg shadow-purple-500/30 flex items-center gap-1.5 transition-all cursor-pointer">
+              <i data-lucide="send" class="w-4 h-4"></i>
+              <span id="btnConfirmRealFaxSendText">진짜 발송하기 (최종 전송) 📠</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -3975,13 +4382,13 @@
 
           <!-- Scalable Sheet Wrapper -->
           <div id="editorZoomWrapper" class="transition-transform duration-100 origin-top flex justify-center">
-            <div class="relative w-[560px] min-h-[740px] bg-white rounded-xl shadow-xl border border-slate-300 p-6 select-none overflow-hidden cursor-crosshair" id="editorCanvasSheet" onmousedown="startCanvasBoxSelect(event)">
+            <div class="relative w-[560px] min-h-[792px] bg-white rounded-2xl shadow-xl border border-slate-300 select-none overflow-hidden cursor-crosshair" id="editorCanvasSheet" onmousedown="startCanvasBoxSelect(event)">
               
               <!-- Uploaded Background Image Layer (PDF rendered to image or direct image) -->
-              <img id="editorBgImage" class="absolute inset-0 w-full h-full object-contain pointer-events-none hidden z-0 bg-white" alt="빈양식 서식 배경">
+              <img id="editorBgImage" class="w-full h-auto block pointer-events-none hidden z-0 bg-white" alt="빈양식 서식 배경">
 
               <!-- Document Background Template Representation (Shown when no custom bg) -->
-              <div id="editorDefaultMockLayer" class="relative z-0">
+              <div id="editorDefaultMockLayer" class="relative z-0 p-6 min-h-[792px]">
                 <div class="border-b-2 border-slate-900 pb-3 text-center mb-6">
                   <h2 class="text-base font-black text-slate-900" id="editorSheetTitle">간병인지원 서비스 신청서 (1차 접수용)</h2>
                   <div class="text-[10px] text-slate-400 mt-0.5">현대해상화재보험 귀중 · 리본케어 공식 서식</div>
@@ -4001,7 +4408,7 @@
               </div>
 
               <!-- Visual Draggable/Clickable Field Area Overlays Injected dynamically -->
-              <div id="editorOverlaysContainer" class="absolute inset-0 p-6 pointer-events-auto z-10">
+              <div id="editorOverlaysContainer" class="absolute inset-0 pointer-events-auto z-10">
               </div>
 
             </div>
@@ -4972,8 +5379,8 @@
   </div>
 
   <!-- ==================== MODAL: HUB CUSTOMER DETAIL POPUP MODAL (주체별 3-Column 단일 뷰) ==================== -->
-  <div id="hubCustomerDetailModal" class="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-3xl w-[96vw] max-w-[1680px] max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+  <div id="hubCustomerDetailModal" class="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-3 sm:p-4">
+    <div id="hubCustomerDetailModalDialog" class="bg-white rounded-3xl w-[94vw] max-w-[1300px] max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 transition-all duration-200">
       <div class="p-4 sm:p-5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-4">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center font-bold text-sky-400 shadow-inner">
@@ -4990,11 +5397,18 @@
         </div>
 
         <div class="flex items-center gap-3">
-          <span class="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 text-sky-400 border border-slate-700 text-xs font-bold">
-            <i data-lucide="columns-3" class="w-3.5 h-3.5"></i>
-            <span>3-Column 통합 대시보드</span>
-          </span>
-          <button onclick="closeModal('hubCustomerDetailModal')" class="p-2 text-slate-400 hover:text-white rounded-lg transition-colors">
+          <div class="bg-slate-800 p-1 rounded-xl flex items-center gap-1 border border-slate-700">
+            <button id="btnHubViewTimeline" type="button" onclick="switchHubModalViewMode('timeline')" class="px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all bg-sky-500 text-white shadow-md cursor-pointer">
+              <i data-lucide="git-merge" class="w-3.5 h-3.5"></i>
+              <span>시계열 정산 연동 뷰</span>
+              <span class="px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 font-black text-[10px]">추천</span>
+            </button>
+            <button id="btnHubView3Card" type="button" onclick="switchHubModalViewMode('3card')" class="px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all text-slate-400 hover:text-white cursor-pointer">
+              <i data-lucide="columns-3" class="w-3.5 h-3.5"></i>
+              <span>3-Column 주체별 뷰</span>
+            </button>
+          </div>
+          <button onclick="closeModal('hubCustomerDetailModal')" class="p-2 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer">
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>
         </div>
@@ -5273,8 +5687,49 @@
     </div>
   </div>
 
+  <!-- ========================================================================= -->
+  <!-- GLOBAL BEAUTIFUL CUSTOM ALERT MODAL (시스템 알럿 대체용 프리미엄 디자인 모달) -->
+  <!-- ========================================================================= -->
+  <div id="livonCustomAlertModal" class="fixed inset-0 z-[999999] hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md transition-all duration-200" style="display: none;">
+    <div class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden transform transition-all duration-200" id="livonCustomAlertCard">
+      <!-- Top Accent Line -->
+      <div id="livonAlertAccentBar" class="h-1.5 w-full bg-gradient-to-r from-primary-500 via-indigo-500 to-purple-600"></div>
+      
+      <div class="p-6 space-y-4">
+        <!-- Header: Icon & Category & Title -->
+        <div class="flex items-start gap-3.5">
+          <div id="livonAlertIconBox" class="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 bg-primary-50 text-primary-600 border border-primary-100 shadow-2xs">
+            <i id="livonAlertIcon" data-lucide="info" class="w-6 h-6"></i>
+          </div>
+          <div class="flex-1 min-w-0 pt-0.5">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span id="livonAlertCategoryBadge" class="text-[10px] font-black tracking-tight px-2 py-0.5 rounded-md bg-primary-100 text-primary-800 border border-primary-200/60">안내</span>
+              <span id="livonAlertSubBadge" class="text-[10px] font-bold text-slate-400">리본케어 시스템</span>
+            </div>
+            <h3 id="livonAlertTitle" class="text-base font-black text-slate-900 mt-1 leading-snug break-keep">알림 안내</h3>
+          </div>
+        </div>
+
+        <!-- Structured Body Content -->
+        <div id="livonAlertContentContainer" class="space-y-2.5 max-h-[50vh] overflow-y-auto custom-scrollbar pr-1">
+          <!-- Dynamically filled with formatted cards, key-value rows, or paragraphs -->
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="pt-2 flex flex-col sm:flex-row items-center justify-end gap-2" id="livonAlertActionContainer">
+          <button id="livonAlertCancelBtn" type="button" onclick="closeCustomAlert(false)" class="hidden w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:scale-95 text-slate-700 font-bold text-xs transition-all cursor-pointer">
+            취소
+          </button>
+          <button id="livonAlertConfirmBtn" type="button" onclick="closeCustomAlert(true)" class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-black text-xs transition-all shadow-md shadow-slate-900/20 cursor-pointer">
+            확인
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- SCRIPTS (Moved to bottom of body for full DOM availability) -->
-  <script src="data.js?v=20260904_1915"></script>
-  <script src="app.js?v=20260904_1915"></script>
+  <script src="data.js?v=20260910_1931"></script>
+  <script src="app.js?v=20260910_1931"></script>
 </body>
 </html>

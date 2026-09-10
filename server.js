@@ -191,6 +191,67 @@ function startServer(port) {
       return;
     }
 
+// Persistent Fax Configuration (저장소 설정 보관 파일)
+const FAX_CONFIG_PATH = path.join(BASE_DIR, 'fax_config.json');
+
+function getSavedFaxConfig() {
+  try {
+    if (fs.existsSync(FAX_CONFIG_PATH)) {
+      const data = fs.readFileSync(FAX_CONFIG_PATH, 'utf-8');
+      return JSON.parse(data || '{}');
+    }
+  } catch (err) {
+    console.warn('[Fax Config Load Error]', err.message);
+  }
+  return {};
+}
+
+function saveSavedFaxConfig(cfg) {
+  try {
+    const existing = getSavedFaxConfig();
+    const merged = { ...existing, ...cfg, updatedAt: new Date().toISOString() };
+    fs.writeFileSync(FAX_CONFIG_PATH, JSON.stringify(merged, null, 2), 'utf-8');
+    console.log('[Fax Config Saved]', Object.keys(merged));
+    return merged;
+  } catch (err) {
+    console.error('[Fax Config Save Error]', err.message);
+    return cfg;
+  }
+}
+
+    // =========================================================================
+    // API Route: FAX Config Settings (설정 저장 및 불러오기)
+    // =========================================================================
+    if (reqPath === '/api/fax/config') {
+      if (req.method === 'GET') {
+        const cfg = getSavedFaxConfig();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({
+          success: true,
+          config: cfg
+        }));
+      } else if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const saved = saveSavedFaxConfig(payload);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({
+              success: true,
+              message: '팩스 연동 설정이 서버에 영구 보관되었습니다.',
+              config: saved
+            }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+    }
+
     // =========================================================================
     // API Route: FAX Gateway Engine (알리고 / 팝빌 / 스마트 샌드박스 팩스 전송)
     // =========================================================================
@@ -200,6 +261,8 @@ function startServer(port) {
       req.on('end', async () => {
         try {
           const payload = JSON.parse(body || '{}');
+          const savedCfg = getSavedFaxConfig();
+
           const {
             appId = 'C0001',
             patientName = '환자명 미기재',
@@ -209,7 +272,7 @@ function startServer(port) {
             formName = '현대해상 1차 고객등록 접수서',
             recipient = '보상접수센터',
             faxNumber = '',
-            senderNumber = process.env.FAX_SENDER_NUMBER || '02-6499-3917',
+            senderNumber = payload.senderNumber || savedCfg.senderNumber || process.env.FAX_SENDER_NUMBER || '02-6499-3917',
             pages = 1,
             operator = '관리자(원스탑)',
             provider = 'auto'
@@ -236,12 +299,17 @@ function startServer(port) {
           let realBaroReceiptNum = '';
 
           if (provider === 'barobill') {
-            const isProd = payload.baroServer === 'prod';
+            const isProd = (payload.baroServer || savedCfg.baroServer) === 'prod';
             const serverLabel = isProd ? '운영' : '테스트';
-            const certKey = payload.baroCertKey || (isProd ? 'A1496EC3-E606-44C0-B126-F03B9AF88588' : 'CF89EE38-7B80-4955-960E-D86A866498ED');
-            const corpNum = (payload.baroCorpNum || '1058621696').replace(/[^0-9]/g, '');
-            const baroId = payload.baroId || 'livoncare';
-            const baroPwd = payload.baroPwd || '';
+            const certKey = payload.baroCertKey || savedCfg.baroCertKey || (isProd ? 'A1496EC3-E606-44C0-B126-F03B9AF88588' : 'CF89EE38-7B80-4955-960E-D86A866498ED');
+            const corpNum = (payload.baroCorpNum || savedCfg.baroCorpNum || '1058621696').replace(/[^0-9]/g, '');
+            const baroId = payload.baroId || savedCfg.baroId || 'livoncare';
+            const baroPwd = payload.baroPwd || savedCfg.baroPwd || '';
+
+            // 발송 시 전달된 비밀번호나 계정이 있으면 서버 설정에도 자동 저장하여 영구 동기화
+            if (payload.baroPwd && payload.baroPwd !== savedCfg.baroPwd) {
+              saveSavedFaxConfig({ baroPwd: payload.baroPwd, baroId, baroCertKey: certKey, baroCorpNum: corpNum, baroServer: isProd ? 'prod' : 'test' });
+            }
 
             activeProvider = `Barobill (${serverLabel}: ${certKey.slice(0, 8)}...)`;
             console.log(`[FAX Barobill Gateway] 바로빌 팩스 발송 요청: ${cleanFaxNumber} (${recipient}) [${serverLabel}, ID: ${baroId}]`);
