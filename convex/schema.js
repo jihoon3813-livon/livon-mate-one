@@ -31,4 +31,19 @@ export default defineSchema({
 
   // 양식 설정 및 필드 매핑 / 배경 (Form Configs & Backgrounds)
   formConfigs: defineTable(v.any()),
+
+  // 삼성화재 사전명단 (누적 가입자 마스터 DB 12대 항목)
+  samsungEligible: defineTable(v.any())
+    .index("by_patientId", ["patientId"])
+    .index("by_lead_id", ["id"])
+    .index("by_policyNumber", ["policyNumber"]),
+
+  // 삼성화재 웹 스프레드시트 시트별 레코드 (target, completed, contacts)
+  samsungSheets: defineTable(v.any()),
+
+  // 삼성화재 이메일 주소록
+  samsungAddressBook: defineTable(v.any()),
+
+  // 삼성화재 이메일 발송 이력 (일일접수/월간청구)
+  samsungEmailLogs: defineTable(v.any()),
 });

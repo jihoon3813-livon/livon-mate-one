@@ -1,11 +1,25 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 
 // 1. 전체 실시간 데이터 번들 조회 (사이트 로딩용 초고속 원클릭 쿼리)
 export const bundleAll = query({
   args: {},
   handler: async (ctx) => {
-    const [applications, assignments, claims, payouts, adjusters, careLogs, formConfigs, faxRecords] = await Promise.all([
+    const [
+      applications,
+      assignments,
+      claims,
+      payouts,
+      adjusters,
+      careLogs,
+      formConfigs,
+      faxRecords,
+      samsungEligible,
+      samsungSheets,
+      samsungAddressBook,
+      samsungEmailLogs,
+    ] = await Promise.all([
       ctx.db.query("applications").order("desc").collect(),
       ctx.db.query("assignments").collect(),
       ctx.db.query("claims").collect(),
@@ -14,8 +28,25 @@ export const bundleAll = query({
       ctx.db.query("careLogs").collect(),
       ctx.db.query("formConfigs").collect(),
       ctx.db.query("faxRecords").order("desc").collect(),
+      ctx.db.query("samsungEligible").order("desc").take(100),
+      ctx.db.query("samsungSheets").collect(),
+      ctx.db.query("samsungAddressBook").collect(),
+      ctx.db.query("samsungEmailLogs").order("desc").collect(),
     ]);
-    return { applications, assignments, claims, payouts, adjusters, careLogs, formConfigs, faxRecords };
+    return {
+      applications,
+      assignments,
+      claims,
+      payouts,
+      adjusters,
+      careLogs,
+      formConfigs,
+      faxRecords,
+      samsungEligible,
+      samsungSheets,
+      samsungAddressBook,
+      samsungEmailLogs,
+    };
   },
 });
 
@@ -269,4 +300,340 @@ export const deleteFaxRecord = mutation({
     return { deletedRecordId: args.recordId, count: records.length };
   },
 });
+
+// 14. 삼성화재 사전명단 등록 및 수정 (Upsert by id or patientId)
+export const saveSamsungEligible = mutation({
+  args: {
+    lead: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { _id, _creationTime, ...doc } = args.lead;
+    const keyId = doc.id || doc.patientId;
+    if (!keyId) {
+      return await ctx.db.insert("samsungEligible", doc);
+    }
+    const existing = await ctx.db
+      .query("samsungEligible")
+      .filter((q) => q.or(
+        q.eq(q.field("id"), keyId),
+        q.eq(q.field("patientId"), keyId)
+      ))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, doc);
+      return existing._id;
+    } else {
+      return await ctx.db.insert("samsungEligible", doc);
+    }
+  },
+});
+
+// 15. 삼성화재 사전명단 청크 일괄 등록 (최대 200건 단위 고속 색인 업서트)
+export const saveSamsungEligibleChunk = mutation({
+  args: {
+    leads: v.array(v.any()),
+  },
+  handler: async (ctx, args) => {
+    let inserted = 0;
+    let updated = 0;
+    for (const lead of args.leads) {
+      const { _id, _creationTime, ...doc } = lead;
+      const pId = doc.patientId || doc.id;
+      let existing = null;
+      if (pId) {
+        existing = await ctx.db
+          .query("samsungEligible")
+          .withIndex("by_patientId", (q) => q.eq("patientId", pId))
+          .first();
+        if (!existing && doc.id) {
+          existing = await ctx.db
+            .query("samsungEligible")
+            .withIndex("by_lead_id", (q) => q.eq("id", doc.id))
+            .first();
+        }
+      }
+      if (existing) {
+        await ctx.db.patch(existing._id, doc);
+        updated++;
+      } else {
+        await ctx.db.insert("samsungEligible", doc);
+        inserted++;
+      }
+    }
+    return { inserted, updated, count: inserted + updated };
+  },
+});
+
+// 15-B. 삼성화재 사전명단 레거시 배치 등록 지원 (호환용)
+export const saveSamsungEligibleBatch = mutation({
+  args: {
+    leads: v.array(v.any()),
+  },
+  handler: async (ctx, args) => {
+    let count = 0;
+    for (const lead of args.leads) {
+      const { _id, _creationTime, ...doc } = lead;
+      const keyId = doc.patientId || doc.id;
+      let existing = null;
+      if (keyId) {
+        existing = await ctx.db
+          .query("samsungEligible")
+          .withIndex("by_patientId", (q) => q.eq("patientId", keyId))
+          .first();
+        if (!existing && doc.id) {
+          existing = await ctx.db
+            .query("samsungEligible")
+            .withIndex("by_id", (q) => q.eq("id", doc.id))
+            .first();
+        }
+      }
+      if (existing) {
+        await ctx.db.patch(existing._id, doc);
+      } else {
+        await ctx.db.insert("samsungEligible", doc);
+      }
+      count++;
+    }
+    return { savedCount: count };
+  },
+});
+
+// 15-C. 삼성화재 사전명단 페이지네이션 조회 (클라우드 대량 로딩용)
+export const getSamsungEligiblePage = query({
+  args: {
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("samsungEligible")
+      .order("desc")
+      .paginate(args.paginationOpts);
+  },
+});
+
+// 15-D. 삼성화재 사전명단 일괄 정리
+export const clearSamsungEligibleAll = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("samsungEligible").take(500);
+    for (const r of rows) {
+      await ctx.db.delete(r._id);
+    }
+    return { deletedCount: rows.length };
+  },
+});
+
+// 16. 삼성화재 사전명단 삭제
+export const deleteSamsungEligible = mutation({
+  args: {
+    leadId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const items = await ctx.db
+      .query("samsungEligible")
+      .filter((q) => q.or(
+        q.eq(q.field("id"), args.leadId),
+        q.eq(q.field("patientId"), args.leadId)
+      ))
+      .collect();
+    for (const it of items) {
+      await ctx.db.delete(it._id);
+    }
+    return { deletedCount: items.length };
+  },
+});
+
+// 17. 삼성화재 스프레드시트 단일 행 저장 (target, completed, contacts)
+export const saveSamsungSheetRow = mutation({
+  args: {
+    sheetKey: v.string(),
+    row: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { _id, _creationTime, ...doc } = args.row;
+    doc.sheetKey = args.sheetKey;
+    const rowId = doc.id || doc.patientId || doc.email || doc.name;
+    if (rowId) {
+      const existing = await ctx.db
+        .query("samsungSheets")
+        .filter((q) => q.and(
+          q.eq(q.field("sheetKey"), args.sheetKey),
+          q.or(
+            q.eq(q.field("id"), rowId),
+            q.eq(q.field("patientId"), rowId),
+            q.eq(q.field("rowId"), rowId),
+            q.eq(q.field("email"), rowId),
+            q.eq(q.field("name"), rowId)
+          )
+        ))
+        .first();
+      if (existing) {
+        await ctx.db.patch(existing._id, doc);
+        return existing._id;
+      }
+    }
+    return await ctx.db.insert("samsungSheets", doc);
+  },
+});
+
+// 18. 삼성화재 스프레드시트 시트별 일괄 저장 / 교체 ([전산 데이터 동기화] 시 사용)
+export const saveSamsungSheetBatch = mutation({
+  args: {
+    sheetKey: v.string(),
+    rows: v.array(v.any()),
+    replace: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    if (args.replace) {
+      const existingRows = await ctx.db
+        .query("samsungSheets")
+        .filter((q) => q.eq(q.field("sheetKey"), args.sheetKey))
+        .collect();
+      for (const r of existingRows) {
+        await ctx.db.delete(r._id);
+      }
+    }
+    let inserted = 0;
+    for (const row of args.rows) {
+      const { _id, _creationTime, ...doc } = row;
+      doc.sheetKey = args.sheetKey;
+      await ctx.db.insert("samsungSheets", doc);
+      inserted++;
+    }
+    return { sheetKey: args.sheetKey, count: inserted };
+  },
+});
+
+// 19. 삼성화재 스프레드시트 행 삭제
+export const deleteSamsungSheetRow = mutation({
+  args: {
+    sheetKey: v.string(),
+    rowId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("samsungSheets")
+      .filter((q) => q.and(
+        q.eq(q.field("sheetKey"), args.sheetKey),
+        q.or(
+          q.eq(q.field("id"), args.rowId),
+          q.eq(q.field("patientId"), args.rowId),
+          q.eq(q.field("rowId"), args.rowId),
+          q.eq(q.field("email"), args.rowId),
+          q.eq(q.field("name"), args.rowId)
+        )
+      ))
+      .collect();
+    for (const r of rows) {
+      await ctx.db.delete(r._id);
+    }
+    return { deletedCount: rows.length };
+  },
+});
+
+// 20. 삼성화재 이메일 주소록 저장 (Upsert by id)
+export const saveSamsungAddressContact = mutation({
+  args: {
+    contact: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { _id, _creationTime, ...doc } = args.contact;
+    if (!doc.id) {
+      doc.id = "SADR_" + Date.now();
+      const newId = await ctx.db.insert("samsungAddressBook", doc);
+      return { id: doc.id, _id: newId, isNew: true };
+    }
+    const existing = await ctx.db
+      .query("samsungAddressBook")
+      .filter((q) => q.eq(q.field("id"), doc.id))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, doc);
+      return { id: doc.id, _id: existing._id, isNew: false };
+    } else {
+      const newId = await ctx.db.insert("samsungAddressBook", doc);
+      return { id: doc.id, _id: newId, isNew: true };
+    }
+  },
+});
+
+// 21. 삼성화재 이메일 주소록 삭제
+export const deleteSamsungAddressContact = mutation({
+  args: {
+    id: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("samsungAddressBook")
+      .filter((q) => q.eq(q.field("id"), args.id))
+      .first();
+    if (existing) {
+      await ctx.db.delete(existing._id);
+      return { success: true, id: args.id };
+    }
+    return { success: false, notFound: true };
+  },
+});
+
+// 22. 삼성화재 이메일 발송 이력 저장
+export const saveSamsungEmailLog = mutation({
+  args: {
+    log: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { _id, _creationTime, ...doc } = args.log;
+    if (!doc.id) {
+      doc.id = "SEML_" + Date.now();
+    }
+    doc.sentAt = doc.sentAt || new Date().toISOString();
+    const newId = await ctx.db.insert("samsungEmailLogs", doc);
+    return { id: doc.id, _id: newId };
+  },
+});
+
+// 23. 케어포트 간병일지 저장 (Upsert by id)
+export const saveCareLog = mutation({
+  args: {
+    log: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { _id, _creationTime, ...doc } = args.log;
+    if (!doc.id) {
+      doc.id = "CLOG-" + Date.now();
+    }
+    const existing = await ctx.db
+      .query("careLogs")
+      .filter((q) => q.eq(q.field("id"), doc.id))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, doc);
+      return { action: "updated", id: doc.id, _id: existing._id };
+    } else {
+      const newId = await ctx.db.insert("careLogs", doc);
+      return { action: "inserted", id: doc.id, _id: newId };
+    }
+  },
+});
+
+// 24. 케어포트 간병일지 삭제
+export const deleteCareLog = mutation({
+  args: {
+    id: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("careLogs")
+      .filter((q) => q.eq(q.field("id"), args.id))
+      .first();
+    if (existing) {
+      await ctx.db.delete(existing._id);
+      return { success: true, id: args.id };
+    }
+    return { success: false, notFound: true };
+  },
+});
+
+
 

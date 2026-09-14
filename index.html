@@ -33,6 +33,9 @@
   <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
   <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=47ea97d95fd01f8ab035bf064a186efb&libraries=services"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- SheetJS & ExcelJS for advanced styling (shrinkToFit, colors, fonts, freeze panes) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="./exceljs.min.js"></script>
   <style>
     body, button, input, select, textarea {
       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
@@ -129,6 +132,19 @@
       box-decoration-break: clone;
       -webkit-box-decoration-break: clone;
       display: inline;
+    }
+
+    /* 신규 접수창 필수정보 미입력 시 빨간색 테두리 강조 스타일 */
+    .field-required-empty {
+      border: 2px solid #ef4444 !important; /* red-500 */
+      background-color: #fef2f2 !important; /* red-50 */
+      box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25) !important;
+      transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .field-required-empty:focus {
+      border-color: #dc2626 !important; /* red-600 */
+      outline: none !important;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35) !important;
     }
 
     /* All Menus Sticky Filter Bar (스크롤 시 화면 내려가다가 검색/필터 행 상단 고정, 뒤쪽 비침 방지 완전 불투명 처리) */
@@ -481,13 +497,13 @@
           <span class="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-bold border border-amber-400/30">All-in-One</span>
         </button>
 
-        <!-- 3. 음성일지 -->
+        <!-- 3. 간병일지 (케어포트) -->
         <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="carelogs" onclick="switchTab('carelogs')">
           <div class="flex items-center space-x-3">
-            <i data-lucide="mic" class="w-4 h-4 flex-shrink-0 text-purple-400"></i>
-            <span class="tracking-tight">음성일지</span>
+            <i data-lucide="clipboard-list" class="w-4 h-4 flex-shrink-0 text-purple-400"></i>
+            <span class="tracking-tight">간병일지 (케어포트)</span>
           </div>
-          <span class="h-5 px-2 rounded-md bg-purple-950 text-purple-300 font-bold text-[10px] flex items-center justify-center border border-purple-800">AWS STT</span>
+          <span class="h-5 px-2 rounded-md bg-purple-950 text-purple-300 font-bold text-[10px] flex items-center justify-center border border-purple-800">CarePort</span>
         </button>
 
         <!-- 4. 손사디렉토리 -->
@@ -517,13 +533,22 @@
           <span class="min-w-[34px] h-5 px-2 rounded-full bg-slate-800 text-sky-300 font-bold text-[11px] flex items-center justify-center border border-slate-700" id="sidebarCenterCount">7</span>
         </button>
 
-        <!-- 7. 삼성화재사전명단 -->
+        <!-- 7. 삼성화재 명단관리 (웹 스프레드시트) -->
         <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="samsunglist" onclick="switchTab('samsunglist')">
           <div class="flex items-center space-x-3">
-            <i data-lucide="file-check-2" class="w-4 h-4 flex-shrink-0 text-sky-400"></i>
-            <span class="tracking-tight">삼성화재사전명단</span>
+            <i data-lucide="file-spreadsheet" class="w-4 h-4 flex-shrink-0 text-sky-400"></i>
+            <span class="tracking-tight font-semibold">삼성화재 명단관리</span>
           </div>
-          <span class="h-5 px-2 rounded-md bg-sky-950 text-sky-300 font-bold text-[10px] flex items-center justify-center border border-sky-800">일일엑셀</span>
+          <span class="h-5 px-2 rounded-md bg-sky-950 text-sky-300 font-bold text-[10px] flex items-center justify-center border border-sky-800">웹엑셀</span>
+        </button>
+
+        <!-- 7-2. 삼성화재 접수/청구관리 (일일접수 & 월간청구 이메일 발송 시스템) -->
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="samsungclaimhub" onclick="switchTab('samsungclaimhub')">
+          <div class="flex items-center space-x-3">
+            <i data-lucide="mail-check" class="w-4 h-4 flex-shrink-0 text-emerald-400"></i>
+            <span class="tracking-tight font-semibold">삼성화재 접수/청구관리</span>
+          </div>
+          <span class="h-5 px-2 rounded-md bg-emerald-950 text-emerald-300 font-bold text-[10px] flex items-center justify-center border border-emerald-800">이메일</span>
         </button>
 
         <!-- 8. 양식 -->
@@ -1013,79 +1038,610 @@
       </section>
 
       
-      <!-- ==================== TAB: SAMSUNG ELIGIBLE LIST ==================== -->
-      <section id="tab-samsunglist" class="tab-content hidden space-y-5">
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-200">
-              <i data-lucide="file-check-2" class="w-5 h-5"></i>
+      <!-- ==================== TAB: SAMSUNG SPREADSHEET (삼성화재 명단관리 웹 엑셀) ==================== -->
+      <section id="tab-samsunglist" class="tab-content hidden space-y-4">
+        <!-- 1. 최상단 헤더 & 컨트롤 바 -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-200 shrink-0 shadow-2xs">
+              <i data-lucide="file-spreadsheet" class="w-5 h-5 text-sky-600"></i>
             </div>
-            <div>
-              <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
-                삼성화재 일일 사전 간병비지원 대상자 명단
-                <span class="text-xs px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold">12대 핵심 항목 완벽 지원</span>
+            <div class="min-w-0">
+              <h2 class="text-xl font-black text-slate-900 flex items-center gap-2 flex-wrap">
+                <span>삼성화재 명단관리</span>
+                <span class="text-xs px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold border border-sky-200">웹 스프레드시트 엔진</span>
               </h2>
-              <p class="text-xs text-slate-500 mt-0.5">
-                삼성화재 엑셀 등록자료의 12대 항목(피보험자ID, 피보험자, 생년월일, 성별, 연락처, 증권번호, 상품코드, 상품명, 계약시작일자, 계약종료일자, 상해/질병 간병인 가입여부)을 관리하며 원클릭 접수 및 고객상세카드에 즉시 연동됩니다.
+              <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                일일 보고용 <b>[대상자]</b> 시트, 월간 청구용 <b>[완료]</b> 시트, 누적 <b>[사전명단]</b>을 웹 엑셀처럼 자유롭게 편집하고 실제 다중 시트 엑셀(.xlsx)로 즉시 다운로드합니다.
               </p>
             </div>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <button onclick="openSamsungExcelModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-xs transition-all">
-              <i data-lucide="upload" class="w-4 h-4"></i>
-              <span>삼성 엑셀 명단 업로드</span>
+          
+          <!-- 우측 상단 메인 액션 버튼 모음 (1줄 통일) -->
+          <div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+            <button type="button" onclick="syncSamsungSpreadsheetData()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap" title="전산에 등록된 삼성화재 접수/완료 고객 데이터를 엑셀 시트에 최신 동기화">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-indigo-600"></i>
+              <span>전산 데이터 동기화</span>
             </button>
-            <button id="btnDeleteSelected-samsunglist" onclick="deleteSelectedLedgerRows('samsunglist')" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                <span id="labelDeleteSelected-samsunglist">선택 삭제 (0)</span>
-              </button>
-              <button id="btnExportSelected-samsunglist" onclick="exportLedgerToExcel('samsunglist', 'SELECTED')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all">
-              <i data-lucide="check-square" class="w-3.5 h-3.5 text-sky-600"></i>
-              <span id="labelExportSelected-samsunglist">선택 엑셀 (0)</span>
+            <button type="button" onclick="addSamsungSpreadsheetRow()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap">
+              <i data-lucide="plus" class="w-3.5 h-3.5 text-slate-600"></i>
+              <span>행 추가</span>
             </button>
-            <button onclick="exportLedgerToExcel('samsunglist', 'ALL')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
-              <i data-lucide="download" class="w-3.5 h-3.5 text-sky-600"></i>
-              <span>전체 엑셀 다운로드</span>
+            <button type="button" onclick="openSamsungExcelModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-xs transition-all whitespace-nowrap shrink-0 cursor-pointer" title="삼성화재에서 일일 전달받은 누적 사전명단 엑셀 업로드">
+              <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+              <span>사전명단 엑셀 업로드</span>
+            </button>
+            <button type="button" onclick="exportSamsungMultiSheetExcel()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs transition-all whitespace-nowrap shrink-0 cursor-pointer" title="[대상자], [완료], [연락처] 시트가 모두 포함된 통합 엑셀 파일 다운로드">
+              <i data-lucide="download" class="w-4 h-4"></i>
+              <span>통합 엑셀 다운로드 (.xlsx)</span>
             </button>
           </div>
         </div>
 
-        <div class="sticky-filter-bar rounded-2xl">
-          <div class="p-4 border border-slate-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 bg-white shadow-xs">
-            <div class="flex items-center gap-2">
-              <input type="text" id="samsungListSearchInput" oninput="renderSamsungList()" placeholder="고객명, 증권번호, 상품명, 상품코드, 손사명 검색..." class="w-72 p-2 text-xs border border-slate-300 rounded-xl bg-white">
+        <!-- 2. 구글 스프레드시트 스타일 시트 탭 바 (Sheet Tabs) -->
+        <div class="flex items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs flex-wrap">
+          <div class="flex items-center gap-1.5 overflow-x-auto custom-scrollbar p-1" id="samsungSheetTabBar">
+            <button type="button" onclick="switchSamsungSheet('eligible')" id="btnSheetTab-eligible" 
+              class="samsung-sheet-tab-btn px-4 py-2 rounded-xl text-xs font-black bg-sky-600 text-white shadow-xs flex items-center gap-2 border border-sky-500 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="database" class="w-3.5 h-3.5 text-white"></i>
+              <span>사전명단 (누적 가입자DB)</span>
+              <span id="badgeSheetCount-eligible" class="px-2 py-0.5 rounded-full bg-white text-sky-900 font-black text-[10.5px] shadow-2xs">0건</span>
+            </button>
+            <button type="button" onclick="switchSamsungSheet('target')" id="btnSheetTab-target" 
+              class="samsung-sheet-tab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="file-text" class="w-3.5 h-3.5 text-sky-600"></i>
+              <span>대상자 (일일 보고)</span>
+              <span id="badgeSheetCount-target" class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold border border-slate-300/60 text-[10.5px]">0건</span>
+            </button>
+            <button type="button" onclick="switchSamsungSheet('completed')" id="btnSheetTab-completed" 
+              class="samsung-sheet-tab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>완료 (월간 청구)</span>
+              <span id="badgeSheetCount-completed" class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold border border-slate-300/60 text-[10.5px]">0건</span>
+            </button>
+            <button type="button" onclick="switchSamsungSheet('contacts')" id="btnSheetTab-contacts" 
+              class="samsung-sheet-tab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="contact" class="w-3.5 h-3.5 text-slate-600"></i>
+              <span>연락처 (담당자)</span>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="relative">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+              <input type="text" id="samsungSheetSearchInput" oninput="renderCurrentSamsungSheet()" placeholder="시트 내 검색 (고객명, 증권번호, 병원명 등)..." 
+                class="pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-sky-500 w-64 transition-all">
             </div>
-            <span class="text-xs text-slate-500">등록 명단: <b id="samsungListCount" class="text-sky-700 font-bold">5</b>건</span>
           </div>
         </div>
 
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-          <div class="overflow-x-auto custom-scrollbar">
-            <table class="w-full text-left text-xs text-slate-600 whitespace-nowrap">
-              <thead class="bg-slate-100 border-b border-slate-200 font-semibold text-slate-700">
-                <tr>
-                  <th class="p-3 pl-4 w-8"><input type="checkbox" onchange="toggleSelectAllRows('samsunglist', this.checked)" class="rounded text-sky-600"></th>
-                  <th class="p-3">피보험자ID</th>
-                  <th class="p-3 font-bold text-slate-900">피보험자(성명)</th>
-                  <th class="p-3">생년월일</th>
-                  <th class="p-3 text-center">성별</th>
-                  <th class="p-3 font-mono">연락처</th>
-                  <th class="p-3 font-mono text-slate-800 font-bold">증권번호</th>
-                  <th class="p-3 font-mono text-sky-800">상품코드</th>
-                  <th class="p-3 font-bold text-slate-900">상품명</th>
-                  <th class="p-3 font-mono">계약시작일자</th>
-                  <th class="p-3 font-mono">계약종료일자</th>
-                  <th class="p-3 text-center">상해입원간병인</th>
-                  <th class="p-3 text-center">질병입원간병인</th>
-                  <th class="p-3 font-mono text-purple-700">사고번호</th>
-                  <th class="p-3 font-semibold text-slate-800">담당손사</th>
-                  <th class="p-3 font-mono text-slate-500">손사연락처/팩스</th>
-                  <th class="p-3 text-center">매칭상태</th>
-                  <th class="p-3 text-center pr-4">원클릭 접수</th>
-                </tr>
-              </thead>
-              <tbody id="samsungListTableBody" class="divide-y divide-slate-100"></tbody>
-            </table>
+        <!-- 3. 스프레드시트 상태 안내 및 우측 상단 페이징 툴바 -->
+        <div class="px-4 py-2.5 bg-white border border-slate-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-2xs">
+          <!-- 좌측: [수정사항 저장] 버튼, 안내 및 선택 행 삭제 -->
+          <div class="flex items-center gap-3 flex-wrap">
+            <div class="flex items-center gap-1.5">
+              <button type="button" id="btnSaveSamsungSheetChanges" onclick="saveSamsungSheetPendingChanges()" disabled 
+                class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-black text-xs transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed bg-slate-200 text-slate-400 cursor-pointer"
+                title="수정된 셀 데이터를 영구 저장합니다.">
+                <i data-lucide="save" class="w-3.5 h-3.5"></i>
+                <span id="btnSaveSamsungSheetChangesText">수정사항 저장</span>
+                <span id="badgePendingSheetChangesCount" class="hidden px-2 py-0.5 rounded-full bg-white text-indigo-700 text-[10.5px] font-black shadow-2xs">0건 미저장</span>
+              </button>
+              <button type="button" id="btnCancelSamsungSheetChanges" onclick="cancelSamsungSheetPendingChanges()" disabled 
+                class="hidden items-center gap-1 px-2.5 py-1.5 rounded-xl font-bold text-xs text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-all cursor-pointer"
+                title="저장되지 않은 셀 수정을 모두 되돌립니다.">
+                <i data-lucide="undo-2" class="w-3 h-3"></i> 취소
+              </button>
+            </div>
+            <div class="flex items-center gap-2 font-medium text-slate-700 border-l border-slate-200 pl-3">
+              <span class="w-2 h-2 rounded-full bg-sky-500 animate-pulse shrink-0"></span>
+              <span id="samsungSheetDescriptionText">💡 셀 클릭은 선택, 더블클릭 시 수정할 수 있으며 좌측 상단 [수정사항 저장]을 눌러야 최종 저장됩니다.</span>
+            </div>
+            <div class="flex items-center gap-2 border-l border-slate-200 pl-3 text-[11px] text-slate-500">
+              <span>표시: <b id="samsungSheetRowCount" class="text-sky-700 font-bold">0</b>건</span>
+              <button type="button" onclick="deleteSamsungSpreadsheetSelectedRows()" id="btnDeleteSelected-samsunglist" disabled 
+                class="text-rose-600 hover:text-rose-800 font-bold disabled:text-slate-300 transition-all cursor-pointer disabled:cursor-not-allowed ml-1">
+                선택 행 삭제
+              </button>
+            </div>
+          </div>
+
+          <!-- 우측 상단: 보기 개수(20/50/100/200/전체) 및 페이징 컨트롤 -->
+          <div class="flex items-center gap-2.5 shrink-0 ml-auto flex-wrap sm:flex-nowrap">
+            <div class="flex items-center gap-1.5 text-slate-600 text-[11px]">
+              <span class="font-bold">보기:</span>
+              <select id="samsungSheetPageSizeSelect" onchange="changeSamsungSheetPageSize(this.value)" 
+                class="border border-slate-300 rounded-lg px-2 py-1 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-2xs">
+                <option value="20">20개</option>
+                <option value="50" selected>50개</option>
+                <option value="100">100개</option>
+                <option value="200">200개</option>
+                <option value="all">전체</option>
+              </select>
+            </div>
+
+            <span id="samsungPaginationSummary" class="text-slate-500 text-[11px] font-medium hidden md:inline">전체 0건 중 0 - 0건</span>
+
+            <div class="flex items-center gap-1" id="samsungPaginationControls">
+              <!-- Dynamically populated by renderSamsungPagination() -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 웹 엑셀 테이블 그리드 렌더링 컨테이너 (행 아래를 막지 않고 시원하게 개방) -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-xs">
+          <div class="overflow-x-auto custom-scrollbar" id="samsungSpreadsheetContainer">
+            <!-- Dynamic Spreadsheet rendered by renderCurrentSamsungSheet() in app.js -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB: SAMSUNG CLAIM & INTAKE HUB (삼성화재 접수/청구관리) ==================== -->
+      <section id="tab-samsungclaimhub" class="tab-content hidden space-y-4">
+        <!-- 1. 최상단 헤더 & 컨트롤 바 -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200 shrink-0 shadow-2xs">
+              <i data-lucide="mail-check" class="w-5 h-5 text-emerald-600"></i>
+            </div>
+            <div class="min-w-0">
+              <h2 class="text-xl font-black text-slate-900 flex items-center gap-2 flex-wrap">
+                <span>삼성화재 접수 / 청구관리</span>
+                <span class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">이메일 일괄발송 시스템</span>
+              </h2>
+              <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                매일 접수한 고객정보 및 간병완료 환자의 간병일지 일일 보고, 월간 간병완료 대상자 일괄 엑셀 청구를 이메일로 발송하고 주소록을 통합 관리합니다.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+            <button type="button" onclick="openSamsungAddressBookModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap">
+              <i data-lucide="book-user" class="w-4 h-4 text-indigo-600"></i>
+              <span>이메일 주소록 관리</span>
+              <span id="samsungAddressCountBadge" class="px-1.5 py-0.2 rounded-full bg-indigo-200 text-indigo-900 text-[10px] font-bold">0</span>
+            </button>
+            <button type="button" onclick="switchTab('samsunglist')" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-sky-600"></i>
+              <span>명단관리 바로가기</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. 서브 탭 바 (Sub Tabs) -->
+        <div class="flex items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs flex-wrap">
+          <div class="flex items-center gap-1.5 overflow-x-auto custom-scrollbar p-1">
+            <button type="button" onclick="switchSamsungClaimHubSubTab('daily')" id="btnSamsungHubTab-daily"
+              class="samsung-hub-subtab-btn px-4 py-2 rounded-xl text-xs font-black bg-emerald-600 text-white shadow-xs flex items-center gap-2 border border-emerald-500 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="calendar-check" class="w-3.5 h-3.5 text-white"></i>
+              <span>일일접수 보고</span>
+              <span id="samsungDailyPendingCountBadge" class="px-2 py-0.5 rounded-full bg-white text-emerald-950 font-black text-[10.5px] shadow-2xs">0건</span>
+            </button>
+            <button type="button" onclick="switchSamsungClaimHubSubTab('claims')" id="btnSamsungHubTab-claims"
+              class="samsung-hub-subtab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="receipt" class="w-3.5 h-3.5 text-indigo-600"></i>
+              <span>월간 청구관리</span>
+              <span id="samsungClaimCompletedCountBadge" class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold border border-slate-300/60 text-[10.5px]">0건</span>
+            </button>
+            <button type="button" onclick="switchSamsungClaimHubSubTab('history')" id="btnSamsungHubTab-history"
+              class="samsung-hub-subtab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="history" class="w-3.5 h-3.5 text-slate-600"></i>
+              <span>발송 이력 및 전송 로그</span>
+              <span id="samsungEmailLogsCountBadge" class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold border border-slate-300/60 text-[10.5px]">0건</span>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500 flex items-center gap-1 font-medium">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>삼성화재 공식 일일보고 및 월간청구 규격 준수</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- 3. 서브 탭 1: 일일접수 보고 (Daily Registration & Care Log Report) -->
+        <div id="samsungHubSubTab-daily" class="space-y-4">
+          <form id="samsungDailyEmailForm" onsubmit="handleSendSamsungDailyReport(event)" class="space-y-4 text-xs">
+            <!-- 그리드 1: 발송 기본 정보 (수신자, 발신자, 제목) -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+              <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-2">
+                <div class="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                  <i data-lucide="send" class="w-4 h-4 text-emerald-600"></i>
+                  <span>일일접수 보고 메일 작성</span>
+                </div>
+                <div class="flex items-center gap-1.5 flex-wrap" id="samsungDailyAddressChipsContainer">
+                  <!-- Dynamic quick pills from address book -->
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <label class="font-bold text-slate-700 flex items-center gap-1">
+                      <span>받는 사람 (이메일) *</span>
+                    </label>
+                    <button type="button" onclick="openSamsungAddressBookModal('daily_to')" class="text-indigo-600 hover:text-indigo-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer">
+                      <i data-lucide="plus-circle" class="w-3 h-3"></i> 주소록에서 선택
+                    </button>
+                  </div>
+                  <input type="text" id="samsungDailyToEmail" required placeholder="예: kjh_care@samsungfire.com (쉼표로 복수 입력 가능)" 
+                    class="w-full p-2.5 border rounded-xl font-medium bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <label class="font-bold text-slate-700">참조 (CC)</label>
+                    <button type="button" onclick="openSamsungAddressBookModal('daily_cc')" class="text-indigo-600 hover:text-indigo-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer">
+                      <i data-lucide="plus-circle" class="w-3 h-3"></i> 주소록에서 선택
+                    </button>
+                  </div>
+                  <input type="text" id="samsungDailyCcEmail" placeholder="예: claims_ops@samsungfire.com, support@reborncare.co.kr" 
+                    class="w-full p-2.5 border rounded-xl font-medium bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 mb-1">보내는 사람</label>
+                  <input type="text" id="samsungDailyFromEmail" required value="리본케어 운영지원팀 &lt;support@reborncare.co.kr&gt;" 
+                    class="w-full p-2.5 border rounded-xl font-medium bg-white">
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 mb-1">메일 제목 *</label>
+                  <input type="text" id="samsungDailySubject" required placeholder="메일 제목" 
+                    class="w-full p-2.5 border rounded-xl font-bold text-slate-900 bg-white focus:ring-2 focus:ring-emerald-500">
+                </div>
+              </div>
+
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">보고 본문 내용</label>
+                <textarea id="samsungDailyBody" rows="5" class="w-full p-3 border rounded-xl leading-relaxed font-sans bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500"></textarea>
+              </div>
+            </div>
+
+            <!-- 그리드 2: 엑셀 첨부 설정 (명단관리 연동 or 외부 엑셀) -->
+            <div id="samsungDailyExcelCard" class="bg-white p-5 rounded-2xl border-2 border-emerald-400/80 shadow-xs space-y-3 transition-all">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
+                <div class="flex items-center gap-2.5">
+                  <label class="flex items-center gap-2 font-black text-slate-900 text-sm cursor-pointer select-none">
+                    <input type="checkbox" id="samsungDailyExcelAttachToggle" checked onchange="toggleSamsungDailyExcelAttachment(this.checked)" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+                    <span>1. 일일 접수 엑셀 첨부 파일 설정</span>
+                  </label>
+                  <span id="samsungDailyExcelAttachBadge" class="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 shadow-2xs">
+                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    <span>엑셀 첨부 완료 📎</span>
+                  </span>
+                </div>
+                <div id="samsungDailyExcelSourceRadioGroup" class="flex items-center gap-2">
+                  <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer">
+                    <input type="radio" name="samsungDailyExcelSource" value="integrated" checked onchange="toggleSamsungDailyExcelSource(this.value)" class="text-emerald-600">
+                    <span>⚡ 명단관리 연동 ([대상자] 시트)</span>
+                  </label>
+                  <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer ml-2">
+                    <input type="radio" name="samsungDailyExcelSource" value="external" onchange="toggleSamsungDailyExcelSource(this.value)" class="text-emerald-600">
+                    <span>📁 외부 엑셀 파일 직접 첨부</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 명단관리 연동 UI -->
+              <div id="samsungDailyExcelIntegratedBox" class="p-3.5 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-2">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="px-2 py-0.5 rounded bg-emerald-600 text-white font-bold text-[10.5px]">연동완료</span>
+                    <span class="text-xs text-emerald-950 font-bold">명단관리의 <b>[대상자]</b> 및 <b>[연락처]</b> 시트가 포함된 통합 엑셀 파일이 자동 첨부됩니다.</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="exportSamsungDailyReportExcel()" 
+                      class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
+                      <i data-lucide="download" class="w-3.5 h-3.5"></i> <span>첨부 엑셀 다운로드</span>
+                    </button>
+                    <button type="button" onclick="previewSamsungExcelAttachment('daily')" 
+                      class="px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-300 shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
+                      <i data-lucide="eye" class="w-3.5 h-3.5"></i> <span>미리보기</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-1 flex-wrap sm:flex-nowrap">
+                  <span class="text-xs font-bold text-slate-600 shrink-0">첨부 파일명 (직접 수정 가능):</span>
+                  <input type="text" id="samsungDailyExcelFileName" value="" oninput="updateSamsungDailyLiveSummary()" class="flex-1 p-2 border border-emerald-300 rounded-xl font-mono font-bold text-xs bg-white text-emerald-900">
+                </div>
+              </div>
+
+              <!-- 외부 엑셀 직접 첨부 UI -->
+              <div id="samsungDailyExcelExternalBox" class="hidden p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-700">외부 엑셀 파일 선택:</span>
+                    <input type="file" id="samsungDailyExternalExcelInput" accept=".xlsx,.xls" onchange="handleSamsungDailyExternalExcelChange(event)" class="text-xs">
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 pt-1 flex-wrap sm:flex-nowrap">
+                  <span class="text-xs font-bold text-slate-600 shrink-0">적용 파일명:</span>
+                  <input type="text" id="samsungDailyExternalExcelFileName" placeholder="업로드 시 자동 입력" oninput="updateSamsungDailyLiveSummary()" class="flex-1 p-2 border rounded-xl font-mono font-bold text-xs bg-white">
+                </div>
+              </div>
+            </div>
+
+            <!-- 그리드 3: 간병일지 첨부 (간병 종료 환자 선택 or 파일 업로드) -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
+                <div class="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                  <i data-lucide="clipboard-check" class="w-4 h-4 text-sky-600"></i>
+                  <span>2. 간병일지 첨부 (케어포트 전산 연동 및 수기일지)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="openImportCarePortLogModal()" 
+                    class="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer">
+                    <i data-lucide="upload" class="w-3.5 h-3.5"></i> <span>케어포트 일지 불러오기 (PDF)</span>
+                  </button>
+                  <span class="text-xs text-slate-500">간병 대상자의 케어포트 PDF 일지를 선택 첨부합니다.</span>
+                </div>
+              </div>
+
+              <div class="overflow-x-auto custom-scrollbar border rounded-xl max-h-56" id="samsungDailyCareLogSelectorContainer">
+                <!-- Dynamic patient care log selection table rendered by app.js -->
+              </div>
+
+              <div class="flex items-center justify-between pt-1 flex-wrap gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-600 font-bold text-xs">수기 일지 / 스캔본 추가 파일:</span>
+                  <input type="file" id="samsungDailyExtraCareLogsInput" multiple accept=".pdf,.jpg,.jpeg,.png" class="text-xs">
+                </div>
+                <span class="text-[11px] text-slate-400">PDF, JPG, PNG 다중 선택 가능</span>
+              </div>
+            </div>
+
+            <!-- 그리드 4: 기타 첨부파일 -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+              <div class="font-extrabold text-slate-800 text-sm flex items-center gap-2 pb-2 border-b border-slate-100">
+                <i data-lucide="paperclip" class="w-4 h-4 text-purple-600"></i>
+                <span>3. 기타 추가 첨부파일 (의무기록사본, 진단서 등)</span>
+              </div>
+              <div class="flex items-center gap-3 flex-wrap">
+                <input type="file" id="samsungDailyOtherFilesInput" multiple class="text-xs">
+                <span class="text-[11px] text-slate-400">필요 시 증빙 서류를 자유롭게 추가 첨부할 수 있습니다.</span>
+              </div>
+            </div>
+
+            <!-- 하단 발송 버튼 영역 -->
+            <div class="p-5 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 shadow-xs space-y-3">
+              <!-- 실시간 첨부파일 상태 안내 바 -->
+              <div class="flex items-center justify-between pb-3 border-b border-emerald-200/80 flex-wrap gap-2 text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="font-black text-emerald-950 flex items-center gap-1.5">
+                    <i data-lucide="layers" class="w-4 h-4 text-emerald-700"></i>
+                    <span>발송 시 첨부 예정 파일:</span>
+                  </span>
+                  <div id="samsungDailyLiveAttachPills" class="flex items-center gap-1.5 flex-wrap">
+                    <!-- Dynamic live pills rendered by app.js -->
+                  </div>
+                </div>
+                <div class="text-[11px] text-emerald-800 font-medium">
+                  발송 완료 시 이메일 발송 이력 탭에 즉시 기록됩니다.
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between flex-wrap gap-3">
+                <div class="text-xs text-emerald-950 font-medium">
+                  <i data-lucide="info" class="w-4 h-4 text-emerald-700 inline-block mr-1"></i>
+                  보고서 내용 및 첨부파일을 최종 확인 후 발송 버튼을 클릭하세요.
+                </div>
+                <button type="submit" class="px-8 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-sm shadow-md flex items-center gap-2 transition-all cursor-pointer">
+                  <i data-lucide="send" class="w-4 h-4 text-white"></i>
+                  <span>일일접수 보고 이메일 발송하기</span>
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- 4. 서브 탭 2: 월간 청구관리 (Monthly Batch Claim) -->
+        <div id="samsungHubSubTab-claims" class="hidden space-y-4">
+          <!-- 상단 청구 요약 통계 배너 -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs">
+              <span class="text-[11px] text-slate-400 font-medium">당월 간병완료 대상자</span>
+              <div class="text-xl font-black text-slate-900 font-mono mt-0.5" id="samsungClaimStatCompletedCount">0명</div>
+            </div>
+            <div class="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs">
+              <span class="text-[11px] text-slate-400 font-medium">총 간병 일수</span>
+              <div class="text-xl font-black text-indigo-700 font-mono mt-0.5" id="samsungClaimStatTotalDays">0일</div>
+            </div>
+            <div class="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs">
+              <span class="text-[11px] text-slate-400 font-medium">당월 총 청구금액</span>
+              <div class="text-xl font-black text-emerald-600 font-mono mt-0.5" id="samsungClaimStatTotalAmount">0원</div>
+            </div>
+            <div class="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs">
+              <span class="text-[11px] text-slate-400 font-medium">청구 진행 상태</span>
+              <div class="text-sm font-black text-slate-900 mt-1 flex items-center gap-1.5" id="samsungClaimStatStatusBadge">
+                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span>정기청구 준비중</span>
+              </div>
+            </div>
+          </div>
+
+          <form id="samsungClaimEmailForm" onsubmit="handleSendSamsungMonthlyClaim(event)" class="space-y-4 text-xs">
+            <!-- 그리드 1: 발송 기본 정보 -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+              <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-2">
+                <div class="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                  <i data-lucide="receipt" class="w-4 h-4 text-indigo-600"></i>
+                  <span>월간 간병완료자 정기청구 메일 작성</span>
+                </div>
+                <div class="flex items-center gap-1.5 flex-wrap" id="samsungClaimAddressChipsContainer">
+                  <!-- Dynamic quick pills from address book -->
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <label class="font-bold text-slate-700">받는 사람 (청구 담당자) *</label>
+                    <button type="button" onclick="openSamsungAddressBookModal('claim_to')" class="text-indigo-600 hover:text-indigo-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer">
+                      <i data-lucide="plus-circle" class="w-3 h-3"></i> 주소록에서 선택
+                    </button>
+                  </div>
+                  <input type="text" id="samsungClaimToEmail" required placeholder="예: kjh_care@samsungfire.com, billing@samsungfire.com" 
+                    class="w-full p-2.5 border rounded-xl font-medium bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <label class="font-bold text-slate-700">참조 (CC)</label>
+                    <button type="button" onclick="openSamsungAddressBookModal('claim_cc')" class="text-indigo-600 hover:text-indigo-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer">
+                      <i data-lucide="plus-circle" class="w-3 h-3"></i> 주소록에서 선택
+                    </button>
+                  </div>
+                  <input type="text" id="samsungClaimCcEmail" placeholder="예: settlement@reborncare.co.kr" 
+                    class="w-full p-2.5 border rounded-xl font-medium bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 mb-1">보내는 사람</label>
+                  <input type="text" id="samsungClaimFromEmail" required value="리본케어 정산지원팀 &lt;settlement@reborncare.co.kr&gt;" 
+                    class="w-full p-2.5 border rounded-xl font-medium bg-white">
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 mb-1">청구 메일 제목 *</label>
+                  <input type="text" id="samsungClaimSubject" required placeholder="청구 메일 제목" 
+                    class="w-full p-2.5 border rounded-xl font-bold text-slate-900 bg-white focus:ring-2 focus:ring-indigo-500">
+                </div>
+              </div>
+
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">청구서 내용 및 정산 안내</label>
+                <textarea id="samsungClaimBody" rows="5" class="w-full p-3 border rounded-xl leading-relaxed font-sans bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500"></textarea>
+              </div>
+            </div>
+
+            <!-- 그리드 2: 월간 청구 엑셀 첨부 설정 -->
+            <div id="samsungClaimExcelCard" class="bg-white p-5 rounded-2xl border-2 border-indigo-400/80 shadow-xs space-y-3 transition-all">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
+                <div class="flex items-center gap-2.5">
+                  <label class="flex items-center gap-2 font-black text-slate-900 text-sm cursor-pointer select-none">
+                    <input type="checkbox" id="samsungClaimExcelAttachToggle" checked onchange="toggleSamsungClaimExcelAttachment(this.checked)" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4 text-indigo-600"></i>
+                    <span>월간 간병완료 청구 엑셀 첨부 설정</span>
+                  </label>
+                  <span id="samsungClaimExcelAttachBadge" class="px-2.5 py-0.5 rounded-full text-xs font-black bg-indigo-100 text-indigo-800 border border-indigo-300 flex items-center gap-1 shadow-2xs">
+                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-indigo-600"></i>
+                    <span>청구 엑셀 첨부 완료 📎</span>
+                  </span>
+                </div>
+                <div id="samsungClaimExcelSourceRadioGroup" class="flex items-center gap-2">
+                  <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer">
+                    <input type="radio" name="samsungClaimExcelSource" value="integrated" checked onchange="toggleSamsungClaimExcelSource(this.value)" class="text-indigo-600">
+                    <span>⚡ 명단관리 연동 ([완료] 시트 데이터)</span>
+                  </label>
+                  <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer ml-2">
+                    <input type="radio" name="samsungClaimExcelSource" value="external" onchange="toggleSamsungClaimExcelSource(this.value)" class="text-indigo-600">
+                    <span>📁 외부 엑셀 파일 직접 첨부</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 명단관리 완료 시트 연동 -->
+              <div id="samsungClaimExcelIntegratedBox" class="p-3.5 bg-indigo-50/70 rounded-xl border border-indigo-200 space-y-2">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="px-2 py-0.5 rounded bg-indigo-600 text-white font-bold text-[10.5px]">자동연동</span>
+                    <span class="text-xs text-indigo-950 font-bold">명단관리의 <b>[대상자]</b>, <b>[완료]</b>, <b>[연락처]</b> 3개 시트 정보 그대로 엑셀 파일로 자동 첨부됩니다.</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="exportSamsungMonthlyClaimExcel()" 
+                      class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
+                      <i data-lucide="download" class="w-3.5 h-3.5"></i> <span>첨부 엑셀 다운로드</span>
+                    </button>
+                    <button type="button" onclick="previewSamsungExcelAttachment('claims')" 
+                      class="px-3 py-1.5 rounded-xl bg-white hover:bg-indigo-100 text-indigo-800 font-bold text-xs border border-indigo-300 shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
+                      <i data-lucide="eye" class="w-3.5 h-3.5"></i> <span>청구 엑셀 미리보기</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-1 flex-wrap sm:flex-nowrap">
+                  <span class="text-xs font-bold text-slate-600 shrink-0">첨부 파일명 (직접 수정 가능):</span>
+                  <input type="text" id="samsungClaimExcelFileName" value="" oninput="updateSamsungClaimLiveSummary()" class="flex-1 p-2 border border-indigo-300 rounded-xl font-mono font-bold text-xs bg-white text-indigo-900">
+                </div>
+              </div>
+
+              <!-- 외부 청구 엑셀 직접 첨부 -->
+              <div id="samsungClaimExcelExternalBox" class="hidden p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-700">외부 청구 엑셀 파일 선택:</span>
+                    <input type="file" id="samsungClaimExternalExcelInput" accept=".xlsx,.xls" onchange="handleSamsungClaimExternalExcelChange(event)" class="text-xs">
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 pt-1 flex-wrap sm:flex-nowrap">
+                  <span class="text-xs font-bold text-slate-600 shrink-0">적용 파일명:</span>
+                  <input type="text" id="samsungClaimExternalExcelFileName" placeholder="업로드 시 자동 입력" oninput="updateSamsungClaimLiveSummary()" class="flex-1 p-2 border rounded-xl font-mono font-bold text-xs bg-white">
+                </div>
+              </div>
+            </div>
+
+            <!-- 하단 발송 버튼 영역 -->
+            <div class="p-5 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-200 shadow-xs space-y-3">
+              <!-- 실시간 첨부파일 상태 안내 바 -->
+              <div class="flex items-center justify-between pb-3 border-b border-indigo-200/80 flex-wrap gap-2 text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="font-black text-indigo-950 flex items-center gap-1.5">
+                    <i data-lucide="layers" class="w-4 h-4 text-indigo-700"></i>
+                    <span>발송 시 첨부 예정 파일:</span>
+                  </span>
+                  <div id="samsungClaimLiveAttachPills" class="flex items-center gap-1.5 flex-wrap">
+                    <!-- Dynamic live pills rendered by app.js -->
+                  </div>
+                </div>
+                <div class="text-[11px] text-indigo-800 font-medium">
+                  발송 완료 시 당월 청구서 상태가 '청구완료'로 기록됩니다.
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between flex-wrap gap-3">
+                <div class="text-xs text-indigo-950 font-medium">
+                  <i data-lucide="info" class="w-4 h-4 text-indigo-700 inline-block mr-1"></i>
+                  청구 통계 및 첨부 엑셀 명세를 최종 확인 후 발송 버튼을 클릭하세요.
+                </div>
+                <button type="submit" class="px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-sm shadow-md flex items-center gap-2 transition-all cursor-pointer">
+                  <i data-lucide="send" class="w-4 h-4 text-white"></i>
+                  <span>월간 정기청구 이메일 발송하기</span>
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- 5. 서브 탭 3: 발송 이력 및 전송 로그 (History) -->
+        <div id="samsungHubSubTab-history" class="hidden space-y-4">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-2">
+              <div>
+                <h3 class="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                  <i data-lucide="history" class="w-4 h-4 text-slate-600"></i>
+                  <span>삼성화재 이메일 발송 이력</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">일일보고 및 월간청구로 발송된 모든 이메일의 수신자, 첨부파일 내역 및 발송 상태</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="openEmailConfigModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-300 transition-all cursor-pointer shadow-2xs">
+                  <i data-lucide="settings" class="w-3.5 h-3.5 text-slate-600"></i>
+                  <span>이메일 발송(SMTP) 설정</span>
+                </button>
+                <select id="samsungHistoryFilterType" onchange="renderSamsungEmailHistoryTable()" class="p-2 border rounded-xl bg-white text-xs font-bold">
+                  <option value="ALL">전체 내역 보기</option>
+                  <option value="DAILY_INTAKE">일일접수 보고만</option>
+                  <option value="MONTHLY_CLAIM">월간 정기청구만</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto custom-scrollbar border rounded-2xl" id="samsungEmailHistoryTableContainer">
+              <!-- Dynamic Table -->
+            </div>
           </div>
         </div>
       </section>
@@ -1809,50 +2365,95 @@
 
       </section>
 
-      <!-- ==================== TAB 4: LIVON MATE CARE LOGS ==================== -->
-      <section id="tab-carelogs" class="tab-content hidden space-y-6">
-        <div class="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 rounded-2xl p-6 text-white shadow-md">
-          <div class="flex items-center gap-2 text-xs font-bold tracking-wider text-purple-300 uppercase">
-            <i data-lucide="smartphone" class="w-4 h-4"></i> 리본메이트(Livon Mate) 모바일 앱 ↔ AWS S3 / STT 실시간 연동
+      <!-- ==================== TAB 4: CAREPORT PDF CARE LOGS (케어포트 간병일지 관리) ==================== -->
+      <section id="tab-carelogs" class="tab-content hidden space-y-5">
+        <!-- 상단 헤더 & 컨트롤 바 -->
+        <div class="bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="space-y-1.5 min-w-0">
+            <div class="flex items-center gap-2 text-xs font-bold tracking-wider text-purple-300">
+              <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+              <span>리본케어 케어포트(CarePort) 전산 간병일지 연동 시스템</span>
+              <span class="px-2 py-0.5 rounded bg-purple-500/30 text-purple-200 border border-purple-400/40 text-[10px] font-bold">PDF 일괄 보관</span>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white">고객별 간병일지 관리 (CarePort PDF)</h2>
+            <p class="text-xs text-purple-200/90 leading-relaxed max-w-2xl">
+              케어포트 전산에 등록된 고객별 공식 간병일지 파일(PDF)을 수동으로 수시 불러오기하여 관리하며, 
+              <b>삼성화재 일일보고/월간청구</b> 및 <b>현대해상/현대해상(SCOR) 팩스 비용청구</b> 시 증빙 서류로 즉시 연동 및 첨부합니다.
+            </p>
           </div>
-          <h2 class="text-xl sm:text-2xl font-black mt-2">1일 1회 음성 간병일지 & AWS Transcribe 자동 텍스트 변환</h2>
-          <p class="text-sm text-purple-200/90 mt-1 max-w-2xl">
-            간병인이 스마트폰 '리본메이트' 앱에서 녹음한 음성 파일이 사내 AWS S3 버킷에 자동 보관되고, 
-            텍스트로 변환된 간병일지를 리본메이트 원에서 실시간 검수하여 손해사정사 청구 증빙으로 원클릭 제출합니다.
-          </p>
+
+          <div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+            <button type="button" onclick="openImportCarePortLogModal()" 
+              class="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-purple-900/40 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="file-up" class="w-4 h-4"></i>
+              <span>케어포트 일지 불러오기 (PDF)</span>
+            </button>
+            <button type="button" onclick="syncCarePortLogs()" 
+              class="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 border border-white/20 transition-all cursor-pointer whitespace-nowrap"
+              title="전산에 등록된 최신 간병일지 데이터 동기화">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-purple-300"></i>
+              <span>전산 동기화</span>
+            </button>
+          </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 flex flex-col h-[650px]">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
-              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                <i data-lucide="list-music" class="w-4 h-4 text-purple-600"></i> S3 녹음 수신 목록
-              </h3>
-              <span class="text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-700 font-bold">AWS S3 연결됨</span>
+        <!-- 검색 & 필터 & 일괄 작업 바 -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <div class="relative w-64">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+              <input type="text" id="careLogSearchInput" oninput="renderCareLogs()" placeholder="고객명, ID, 간병인명, 파일명 검색..." 
+                class="pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 w-full transition-all">
             </div>
-            <div id="careLogsList" class="divide-y divide-slate-100 overflow-y-auto custom-scrollbar flex-1 mt-2">
-            </div>
+
+            <select id="careLogInsuranceFilter" onchange="renderCareLogs()" class="py-1.5 px-3 border border-slate-300 rounded-xl bg-white font-bold text-slate-700 cursor-pointer">
+              <option value="ALL">원수사: 전체</option>
+              <option value="현대해상">현대해상</option>
+              <option value="현대해상(SCOR)">현대해상(SCOR)</option>
+              <option value="삼성화재">삼성화재</option>
+            </select>
+
+            <span class="text-slate-500 text-[11px] border-l border-slate-200 pl-3">
+              보관 일지: <b id="careLogCountBadge" class="text-purple-700 font-bold">0</b>건
+            </span>
           </div>
 
-          <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-xs p-6 flex flex-col justify-between">
-            <div id="careLogDetailContent">
-            </div>
-            <div class="pt-4 border-t border-slate-200 flex items-center justify-between text-xs">
-              <span class="text-slate-500">
-                <i data-lucide="shield-check" class="w-3.5 h-3.5 inline text-emerald-600"></i> 사내 AWS 암호화 저장소 (KMS AES-256)
-              </span>
-              <div class="flex flex-wrap gap-2">
-                <button onclick="playSampleAudio()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl flex items-center gap-1.5">
-                  <i data-lucide="play" class="w-3.5 h-3.5"></i> AWS S3 음성 스트리밍 재생
-                </button>
-                <button onclick="exportLedgerToExcel('carelogs', 'ALL')" class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-xs">
-                  <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> 음성일지 엑셀 다운
-                </button>
-                <button onclick="alert('손해사정사 증빙 제출용 리본메이트 간병일지 공식 PDF가 출력되었습니다.')" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-xl flex items-center gap-1.5">
-                  <i data-lucide="download" class="w-3.5 h-3.5"></i> 손사 제출용 PDF 출력
-                </button>
-              </div>
-            </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="deleteSelectedCareLogs()" id="btnDeleteSelected-carelogs" disabled 
+              class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-400 font-bold text-xs border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5 inline mr-1"></i> 선택 삭제
+            </button>
+            <button type="button" onclick="exportLedgerToExcel('carelogs', 'ALL')" 
+              class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer">
+              <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> <span>목록 엑셀 다운로드</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 간병일지 PDF 리스트 테이블 -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left text-xs border-collapse min-w-[1100px]">
+              <thead class="bg-slate-100 text-slate-700 font-bold border-b select-none">
+                <tr>
+                  <th class="p-2.5 text-center w-10 border-r border-slate-200">
+                    <input type="checkbox" onchange="toggleCareLogSelectAll(this.checked)" id="checkAllCareLogs" class="w-3.5 h-3.5 rounded text-purple-600 focus:ring-purple-500 cursor-pointer">
+                  </th>
+                  <th class="p-2.5 text-center w-12 border-r border-slate-200 font-mono text-slate-500">No</th>
+                  <th class="p-2.5 border-r border-slate-200">피보험자(고객명 / ID)</th>
+                  <th class="p-2.5 border-r border-slate-200">보험사 구분</th>
+                  <th class="p-2.5 border-r border-slate-200">간병 기간</th>
+                  <th class="p-2.5 border-r border-slate-200">담당 간병인 / 센터</th>
+                  <th class="p-2.5 border-r border-slate-200">케어포트 간병일지 (PDF)</th>
+                  <th class="p-2.5 border-r border-slate-200 text-center">불러온 일시</th>
+                  <th class="p-2.5 border-r border-slate-200 text-center">청구/팩스 연동</th>
+                  <th class="p-2.5 text-center w-36">관리</th>
+                </tr>
+              </thead>
+              <tbody id="careLogsTableBody" class="divide-y divide-slate-100 bg-white">
+                <!-- Dynamically rendered by renderCareLogs() in app.js -->
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -2428,8 +3029,11 @@
               신규 간병인지원 서비스 신청 접수 (STEP 1)
               <span class="text-xs px-2.5 py-0.5 rounded-full bg-primary-100 text-primary-800 font-bold">공식 표준 접수</span>
             </h3>
-            <p class="text-xs text-slate-500 mt-0.5">
-              원수사 최우선 선택 ➔ 피보험자/신청자 정보 ➔ 신청 내역 ➔ 팩스/사전명단 연동 ➔ STEP 1 등록
+            <p class="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+              <span>원수사 최우선 선택 ➔ 피보험자/신청자 정보 ➔ 신청 내역 ➔ 팩스/사전명단 연동 ➔ STEP 1 등록</span>
+              <span class="text-[11px] text-rose-600 font-bold bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span> 빨간색 테두리는 필수 입력 항목입니다
+              </span>
             </p>
           </div>
         </div>
@@ -2469,12 +3073,17 @@
           </div>
 
           <!-- 삼성화재 프로토콜 안내 배너 -->
-          <div id="bannerSamsungProtocol" class="p-3 bg-sky-50 border border-sky-200 rounded-xl text-[11px] text-sky-900 hidden items-center justify-between">
+          <div id="bannerSamsungProtocol" class="p-3 bg-sky-50 border border-sky-200 rounded-xl text-[11px] text-sky-900 hidden items-center justify-between flex-wrap gap-2">
             <div class="flex items-center gap-2">
               <i data-lucide="file-check-2" class="w-4 h-4 text-sky-600 flex-shrink-0"></i>
-              <span><b>삼성화재 프로토콜:</b> 고객명/연락처 입력 후 [삼성화재 사전명단 확인]을 누르면 주소, 증권, 사고번호, 손사정보가 자동 채워집니다.</span>
+              <span><b>삼성화재 프로토콜:</b> 사전명단에 등록된 가입 고객을 검색하여 선택하면 12대 항목 및 손사 정보가 자동 완성됩니다.</span>
             </div>
-            <span class="px-2 py-0.5 rounded bg-sky-100 font-bold text-sky-800 text-[10px] whitespace-nowrap">사전명단 자동 연동</span>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="openSamsungLeadSearchModal()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs flex items-center gap-1 cursor-pointer transition-all">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>사전명단 고객 검색 & 채움</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2561,6 +3170,122 @@
           <input type="hidden" id="newAppAdjusterFax">
           <input type="hidden" id="newAppProductName">
           <input type="hidden" id="newAppContractPeriod">
+        </div>
+
+        <!-- ==================== 1-1. 삼성화재 엑셀 사전명단 가입·계약 정보 (삼성화재 전용) ==================== -->
+        <div id="samsungExcelDataCard" class="bg-gradient-to-br from-sky-50/70 via-white to-blue-50/50 p-5 rounded-2xl border-2 border-sky-300 shadow-xs space-y-4 hidden transition-all">
+          <div class="flex items-center justify-between pb-3 border-b border-sky-100 flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-xl bg-sky-600 text-white flex items-center justify-center font-bold shadow-xs">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4 text-white"></i>
+              </div>
+              <div>
+                <h4 class="font-black text-slate-900 text-sm flex items-center gap-1.5">
+                  삼성화재 사전명단 12대 계약 및 보장 담보 정보
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-100 text-sky-800 border border-sky-200">엑셀 마스터 연동</span>
+                </h4>
+                <p class="text-[10.5px] text-slate-500 mt-0.5">삼성화재 일일 엑셀 DB에서 피보험자ID, 증권번호, 상품코드, 계약기간, 담보 정보를 자동으로 가져옵니다.</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="openSamsungLeadSearchModal()" class="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-all">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>사전명단 검색 & 채움</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 그리드 1: 피보험자ID, 증권번호, 상품코드 -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <span>피보험자ID (식별코드)</span>
+                <span class="text-[10px] text-sky-700 font-mono font-semibold">Column A</span>
+              </label>
+              <input type="text" id="newAppSamsungPatientId" placeholder="예: BF05100917" class="w-full p-2.5 border border-sky-200 rounded-xl font-mono font-bold text-sky-950 bg-sky-50/80 focus:bg-white focus:ring-2 focus:ring-sky-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <span>증권번호 *</span>
+                <span class="text-[10px] text-sky-700 font-mono font-semibold">Column F</span>
+              </label>
+              <input type="text" id="newAppSamsungPolicyNumber" placeholder="예: 000508233135000000" class="w-full p-2.5 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 bg-white focus:ring-2 focus:ring-sky-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <span>상품코드</span>
+                <span class="text-[10px] text-sky-700 font-mono font-semibold">Column G</span>
+              </label>
+              <input type="text" id="newAppSamsungProductCode" placeholder="예: 2PB320070" class="w-full p-2.5 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 bg-white focus:ring-2 focus:ring-sky-500">
+            </div>
+          </div>
+
+          <!-- 그리드 2: 상품명 전체 풀네임 -->
+          <div>
+            <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+              <span>보험상품명 *</span>
+              <span class="text-[10px] text-sky-700 font-mono font-semibold">Column H</span>
+            </label>
+            <input type="text" id="newAppSamsungProductName" placeholder="예: 무배당 삼성화재 간편보험 다이렉트(2603.5)(납입면제/해약환급금 미지급형Ⅱ)" class="w-full p-2.5 border border-slate-300 rounded-xl font-bold text-slate-900 bg-white focus:ring-2 focus:ring-sky-500 text-xs">
+          </div>
+
+          <!-- 그리드 3: 계약시작일자, 계약종료일자, 상해간병인, 질병간병인 -->
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <span>계약시작일자</span>
+                <span class="text-[10px] text-sky-700 font-mono font-semibold">Column I</span>
+              </label>
+              <input type="text" id="newAppSamsungContractStartDate" placeholder="2026-09-09" class="w-full p-2.5 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 bg-white focus:ring-2 focus:ring-sky-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <span>계약종료일자</span>
+                <span class="text-[10px] text-sky-700 font-mono font-semibold">Column J</span>
+              </label>
+              <input type="text" id="newAppSamsungContractEndDate" placeholder="2046-09-09" class="w-full p-2.5 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 bg-white focus:ring-2 focus:ring-sky-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <span>상해입원간병인 담보</span>
+                <span class="text-[10px] text-sky-700 font-mono font-semibold">Column K</span>
+              </label>
+              <select id="newAppSamsungHasInjuryCare" class="w-full p-2.5 border border-slate-300 rounded-xl font-bold bg-white focus:ring-2 focus:ring-sky-500">
+                <option value="가입" selected>가입 (Y)</option>
+                <option value="미가입">미가입 (N)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <span>질병입원간병인 담보</span>
+                <span class="text-[10px] text-sky-700 font-mono font-semibold">Column L</span>
+              </label>
+              <select id="newAppSamsungHasDiseaseCare" class="w-full p-2.5 border border-slate-300 rounded-xl font-bold bg-white focus:ring-2 focus:ring-sky-500">
+                <option value="가입" selected>가입 (Y)</option>
+                <option value="미가입">미가입 (N)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 그리드 4: 손사(보험사) 정보 및 사고접수번호 -->
+          <div class="p-3 bg-white rounded-xl border border-sky-200 grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">담당 손해사정사</label>
+              <input type="text" id="newAppSamsungAdjuster" value="김정현" class="w-full p-2 border border-slate-200 rounded-lg font-bold text-slate-900 bg-slate-50">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">손사 연락처</label>
+              <input type="text" id="newAppSamsungAdjusterPhone" value="02-3485-9114" class="w-full p-2 border border-slate-200 rounded-lg font-mono text-slate-900 bg-slate-50">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">손사 수신 FAX</label>
+              <input type="text" id="newAppSamsungAdjusterFax" value="02-3485-9100" class="w-full p-2 border border-slate-200 rounded-lg font-mono text-slate-900 bg-slate-50">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">사고접수번호</label>
+              <input type="text" id="newAppSamsungAccidentNumber" placeholder="26S..." class="w-full p-2 border border-slate-200 rounded-lg font-mono font-bold text-purple-900 bg-purple-50/50">
+            </div>
+          </div>
         </div>
 
         <!-- ==================== 2. 신청자 인적사항 ==================== -->
@@ -3583,12 +4308,35 @@
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <button type="button" onclick="previewCurrentFaxForm()" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-bold text-[11px] text-slate-700">미리보기</button>
+              <button type="button" onclick="previewCurrentFaxForm()" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-bold text-[11px] text-slate-700 cursor-pointer">미리보기</button>
               <label class="px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 font-bold text-[11px] text-slate-700 cursor-pointer">
                 교체
                 <input type="file" class="hidden" onchange="handleFaxCustomFileUpload(event)">
               </label>
             </div>
+          </div>
+        </div>
+
+        <!-- 3-1. CarePort Care Log PDF Attachment for Case 2 (현대해상/현대해상(SCOR) 비용청구) -->
+        <div id="faxCareLogAttachSection" class="p-3.5 bg-purple-50/70 border border-purple-200 rounded-2xl space-y-2 hidden">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+              <i data-lucide="clipboard-check" class="w-4 h-4 text-purple-600"></i>
+              <span>간병일지 첨부 (케어포트 연동)</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-normal">비용청구 증빙</span>
+            </div>
+            <button type="button" onclick="openImportCarePortLogModal(gActiveFaxTargetAppId)" class="text-xs text-purple-700 hover:text-purple-900 font-bold flex items-center gap-1 cursor-pointer">
+              <i data-lucide="upload" class="w-3.5 h-3.5"></i> <span>새 간병일지 불러오기</span>
+            </button>
+          </div>
+          
+          <div class="flex items-center gap-2">
+            <select id="faxCareLogSelect" onchange="onSelectFaxCareLog(this.value)" class="flex-1 p-2 border border-purple-300 rounded-xl bg-white font-bold text-xs text-slate-800">
+              <option value="">-- 간병일지 첨부 안 함 --</option>
+            </select>
+          </div>
+          <div id="faxCareLogInfoText" class="text-[11px] text-purple-900 font-medium">
+            💡 선택된 간병일지가 청구 공문과 함께 팩스로 전송됩니다.
           </div>
         </div>
 
@@ -4204,7 +4952,7 @@
             </span>
             <select id="previewFormCodeSelector" onchange="onPreviewFormCodeChange(this.value)" class="bg-slate-900 text-white font-black text-xs border border-slate-600 rounded-lg px-2 py-0.5 focus:border-amber-400 focus:outline-none cursor-pointer">
               <option value="HD_FORM_02">현대해상 (제공확인서·비용청구서)</option>
-              <option value="SF_FORM_01">삼성화재 (비용청구서·명세서)</option>
+              <option value="HD_FORM_03">현대해상(SCOR) (제공확인서·비용청구서)</option>
               <option value="HD_FORM_01">현대해상 1차 (고객등록·신청서)</option>
             </select>
           </div>
@@ -4653,6 +5401,122 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL: APP ADJUSTER & POLICY EDIT ==================== -->
+  <div id="appAdjusterEditModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+      <div class="p-5 bg-gradient-to-r from-purple-700 to-indigo-800 text-white flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-black flex items-center gap-2">
+            <i data-lucide="briefcase" class="w-5 h-5 text-purple-200"></i>
+            손사(보험사) 및 증권/청구 정보 수정
+            <span id="appAdjusterModalIdBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-white/20 text-white font-mono">C0280</span>
+          </h3>
+          <p class="text-xs text-purple-200 mt-0.5">담당 손해사정인, 연락처, 팩스번호, 증권/사고번호 및 1일 청구단가를 수정합니다.</p>
+        </div>
+        <button type="button" onclick="closeModal('appAdjusterEditModal')" class="p-2 text-purple-200 hover:text-white cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <form id="appAdjusterEditForm" onsubmit="handleAppAdjusterEditSubmit(event)" class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4 text-xs">
+        <input type="hidden" id="adjEditAppId">
+
+        <!-- 1. 원수사 및 담당 손해사정인 정보 -->
+        <div class="bg-purple-50/50 p-4 rounded-2xl border border-purple-200 space-y-3">
+          <div class="font-extrabold text-purple-950 text-xs flex items-center justify-between pb-2 border-b border-purple-200">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="user-check" class="w-4 h-4 text-purple-700"></i> <span class="hl-pen-yellow">담당 손해사정인 (손사) 정보</span>
+            </span>
+            <span class="text-[10.5px] text-purple-700 font-medium">보험사 보상과 담당자</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">원수사(보험사) *</label>
+              <select id="adjEditInsuranceCompany" class="w-full p-2.5 border rounded-xl bg-white font-bold text-purple-900 focus:ring-2 focus:ring-purple-500">
+                <option value="삼성화재">삼성화재</option>
+                <option value="현대해상(SCOR)">현대해상(SCOR)</option>
+                <option value="현대해상">현대해상</option>
+                <option value="DB손해보험">DB손해보험</option>
+                <option value="KB손해보험">KB손해보험</option>
+                <option value="메리츠화재">메리츠화재</option>
+                <option value="기타보험사">기타보험사</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">담당 손해사정인 성명 *</label>
+              <input type="text" id="adjEditName" required placeholder="예: 김정현" class="w-full p-2.5 border rounded-xl font-bold text-slate-900 bg-white focus:ring-2 focus:ring-purple-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">손사 법인 / 소속팀</label>
+              <input type="text" id="adjEditFirm" placeholder="예: 삼성화재 간병지원파트" class="w-full p-2.5 border rounded-xl text-slate-900 bg-white focus:ring-2 focus:ring-purple-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">손사 일반전화 (유선)</label>
+              <input type="tel" id="adjEditPhone" placeholder="02-3485-9114" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono text-slate-900 bg-white focus:ring-2 focus:ring-purple-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">손사 핸드폰 (모바일)</label>
+              <input type="tel" id="adjEditMobile" placeholder="010-0000-0000" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono font-bold text-purple-900 bg-white focus:ring-2 focus:ring-purple-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1 text-purple-900">수신 팩스번호 (FAX)</label>
+              <input type="tel" id="adjEditFax" placeholder="02-3485-9100" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border-2 border-purple-300 rounded-xl font-mono font-bold text-purple-950 bg-white focus:ring-2 focus:ring-purple-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 증권 및 사고 정보 -->
+        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+          <div class="font-extrabold text-slate-800 text-xs flex items-center justify-between pb-2 border-b border-slate-200">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="file-text" class="w-4 h-4 text-indigo-600"></i> <span class="hl-pen-yellow">증권, 사고 및 계약 정보</span>
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">증권번호</label>
+              <input type="text" id="adjEditPolicyNumber" placeholder="SF992817263" class="w-full p-2.5 border rounded-xl font-mono font-bold text-slate-900 bg-white">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">사고접수번호</label>
+              <input type="text" id="adjEditAccidentNumber" placeholder="26S009341" class="w-full p-2.5 border rounded-xl font-mono font-bold text-purple-700 bg-white">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="sm:col-span-2">
+              <label class="block font-bold text-slate-700 mb-1">보험상품명</label>
+              <input type="text" id="adjEditProductName" placeholder="무배당 삼성화재 행복한돌봄간병보험" class="w-full p-2.5 border rounded-xl font-bold text-slate-900 bg-white">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">상품코드</label>
+              <input type="text" id="adjEditProductCode" placeholder="SF-CARE-02" class="w-full p-2.5 border rounded-xl font-mono bg-white">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">계약기간 (시작일 ~ 종료일)</label>
+              <input type="text" id="adjEditContractPeriod" placeholder="2023-11-15 ~ 2043-11-15" class="w-full p-2.5 border rounded-xl font-mono bg-white">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">1일 청구단가 (원)</label>
+              <input type="text" id="adjEditDailyClaimPrice" placeholder="160,000" inputmode="numeric" class="w-full p-2.5 border rounded-xl font-mono font-bold text-emerald-700 bg-white">
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t flex justify-end gap-2">
+          <button type="button" onclick="closeModal('appAdjusterEditModal')" class="px-4 py-2 border rounded-xl font-semibold hover:bg-slate-50 cursor-pointer">취소</button>
+          <button type="submit" class="px-6 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold shadow-xs cursor-pointer">손사 정보 저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ==================== MODAL 2: STEP 2 CARE SCHEDULE & WAGE EDIT ==================== -->
   <div id="careScheduleModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-3xl w-full max-w-xl sm:max-w-2xl shadow-2xl overflow-hidden border border-slate-200">
@@ -4670,14 +5534,35 @@
       <form id="careScheduleForm" onsubmit="handleCareScheduleSubmit(event)" class="p-6 space-y-4 text-xs">
         <input type="hidden" id="schedEditAssignId">
 
-        <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
-          <div>
-            <span class="text-slate-500">배정코드:</span>
-            <b class="text-slate-900 font-mono ml-1" id="schedEditAssignCode">A0001</b>
+        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+            <div>
+              <span class="text-slate-500">배정코드:</span>
+              <b class="text-slate-900 font-mono ml-1" id="schedEditAssignCode">A0001</b>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200">간병인 & 관리센터 정보</span>
           </div>
-          <div>
-            <span class="text-slate-500">간병인:</span>
-            <b class="text-emerald-700 font-bold ml-1" id="schedEditCaregiverName">황지원</b>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">간병인 성명 *</label>
+              <input type="text" id="schedEditCaregiverNameInput" required placeholder="간병인 성명" class="w-full p-2.5 border rounded-xl font-black text-slate-900 bg-white">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">간병인 연락처</label>
+              <input type="tel" id="schedEditCaregiverPhone" placeholder="010-0000-0000" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono font-bold text-slate-900 bg-white">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">관리 센터명</label>
+              <input type="text" id="schedEditCenterName" placeholder="예: 영등포센터" class="w-full p-2.5 border rounded-xl font-bold text-teal-800 bg-white">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">관리센터 연락처</label>
+              <input type="tel" id="schedEditCenterPhone" placeholder="02-2633-1120" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono text-slate-900 bg-white">
+            </div>
           </div>
         </div>
 
@@ -4985,6 +5870,21 @@
           </div>
           <div class="max-h-48 overflow-y-auto custom-scrollbar border rounded-xl p-2 bg-slate-50 space-y-1" id="samsungExcelPreviewList"></div>
         </div>
+
+        <!-- Upload Progress Indicator -->
+        <div id="samsungUploadProgressBox" class="hidden p-3.5 bg-sky-50 border border-sky-200 rounded-2xl space-y-2">
+          <div class="flex items-center justify-between text-xs font-bold text-sky-950">
+            <span id="samsungUploadStatusLabel" class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-sky-600 animate-ping"></span>
+              클라우드 DB 동기화 진행 중...
+            </span>
+            <span id="samsungUploadPercentBadge" class="text-sky-700 bg-white px-2 py-0.5 rounded-full border border-sky-200 font-mono">0%</span>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+            <div id="samsungUploadProgressBar" class="bg-sky-600 h-2.5 rounded-full transition-all duration-150" style="width: 0%"></div>
+          </div>
+          <div id="samsungUploadCountDetail" class="text-[11px] text-sky-800 text-right font-mono">0 / 0건 완료</div>
+        </div>
       </div>
 
       <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
@@ -4995,6 +5895,783 @@
             <i data-lucide="check" class="w-3.5 h-3.5"></i> 삼성화재 명단 일괄 등록
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: SAMSUNG EMAIL DISPATCH (삼성화재 전용 이메일 발송) ==================== -->
+  <div id="samsungEmailModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh]">
+      <!-- Header -->
+      <div class="p-5 bg-gradient-to-r from-sky-700 via-sky-800 to-indigo-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20 shadow-xs">
+            <i data-lucide="mail" class="w-5 h-5 text-sky-200"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              삼성화재 업무 보고 이메일 발송
+              <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-sky-500/30 text-sky-200 border border-sky-400/40 font-bold">원스톱 전송</span>
+            </h3>
+            <p class="text-xs text-sky-200 mt-0.5">일일 접수 보고, 간병종료 일지 전송, 월간 청구 명단을 담당자 이메일로 즉시 발송합니다.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('samsungEmailModal')" class="p-2 text-sky-200 hover:text-white transition-all cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <!-- SMTP Connection Status Banner -->
+      <div id="samsungEmailSmtpStatusBanner" class="px-6 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <span id="samsungEmailSmtpStatusDot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+          <span id="samsungEmailSmtpStatusText" class="font-medium text-slate-700">SMTP 연동 상태 확인 중...</span>
+        </div>
+        <button type="button" onclick="openEmailConfigModal()" class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-[11px] flex items-center gap-1 shadow-2xs transition-all cursor-pointer">
+          <i data-lucide="settings" class="w-3.5 h-3.5 text-slate-500"></i>
+          <span>발송 계정(SMTP) 설정</span>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <form id="samsungEmailForm" onsubmit="handleSamsungEmailSubmit(event)" class="p-6 space-y-4 text-xs flex-1 overflow-y-auto custom-scrollbar">
+        <input type="hidden" id="samsungEmailTargetAppId" value="">
+        <input type="hidden" id="samsungEmailTargetRound" value="1">
+
+        <!-- 1. 보고 유형 선택 (Radio Buttons) -->
+        <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
+          <label class="block font-bold text-slate-800 text-xs">보고 목적 및 메일 템플릿 선택</label>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-white hover:border-sky-400 cursor-pointer transition-all">
+              <input type="radio" name="samsungEmailType" value="DAILY_INTAKE" onchange="onSamsungEmailTypeChange(this.value)" checked class="text-sky-600 focus:ring-sky-500">
+              <div>
+                <b class="text-slate-900 block text-[11.5px]">일일 접수 보고 (STEP 1)</b>
+                <span class="text-[10.5px] text-slate-500">오늘 접수된 대상자 엑셀</span>
+              </div>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-white hover:border-sky-400 cursor-pointer transition-all">
+              <input type="radio" name="samsungEmailType" value="CARE_LOG" onchange="onSamsungEmailTypeChange(this.value)" class="text-sky-600 focus:ring-sky-500">
+              <div>
+                <b class="text-slate-900 block text-[11.5px]">간병 종료 & 일지 보고</b>
+                <span class="text-[10.5px] text-slate-500">종료 고객 간병일지(PDF)</span>
+              </div>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-white hover:border-sky-400 cursor-pointer transition-all">
+              <input type="radio" name="samsungEmailType" value="MONTHLY_CLAIM" onchange="onSamsungEmailTypeChange(this.value)" class="text-sky-600 focus:ring-sky-500">
+              <div>
+                <b class="text-slate-900 block text-[11.5px]">월간 청구 보고 (STEP 3)</b>
+                <span class="text-[10.5px] text-slate-500">완료 시트 엑셀 + 청구서</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- 2. 수신자 & 참조 -->
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+          <div class="sm:col-span-8 space-y-1">
+            <label class="block font-bold text-slate-700">수신자 이메일 (To) *</label>
+            <input type="email" id="samsungEmailRecipient" required placeholder="samsung_care@samsungfire.com" 
+              class="w-full p-2.5 border rounded-xl font-mono text-xs focus:ring-2 focus:ring-sky-500">
+          </div>
+          <div class="sm:col-span-4 space-y-1">
+            <label class="block font-bold text-slate-500 text-[11px]">담당자 주소록 선택</label>
+            <select id="samsungEmailContactSelect" onchange="onSelectSamsungEmailContact(this.value)" class="w-full p-2.5 border rounded-xl bg-slate-50 text-xs">
+              <option value="">-- 주소록에서 선택 --</option>
+              <option value="samsung_caregiver@samsungfire.com">삼성화재 간병지원 보상부 (대표)</option>
+              <option value="claim_settle@samsungfire.com">삼성화재 장기손사 정산팀</option>
+              <option value="kim_adjuster@samsungfire.com">김정현 손사 (서울/경인)</option>
+              <option value="lee_adjuster@samsungfire.com">이민우 손사 (영남/호남)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <label class="block font-bold text-slate-700">참조 (CC)</label>
+          <input type="text" id="samsungEmailCc" placeholder="care_manager@livoncare.co.kr, settlement@livoncare.co.kr" class="w-full p-2.5 border rounded-xl font-mono text-xs">
+        </div>
+
+        <!-- 3. 메일 제목 & 내용 -->
+        <div class="space-y-1">
+          <label class="block font-bold text-slate-700">메일 제목 *</label>
+          <input type="text" id="samsungEmailSubject" required placeholder="[리본케어] 삼성화재 간병인지원 대상건 접수 현황 보고" class="w-full p-2.5 border rounded-xl font-bold text-xs">
+        </div>
+
+        <div class="space-y-1">
+          <label class="block font-bold text-slate-700">본문 내용</label>
+          <textarea id="samsungEmailBody" rows="5" class="w-full p-3 border rounded-xl font-sans text-xs leading-relaxed custom-scrollbar"></textarea>
+        </div>
+
+        <!-- 4. 첨부파일 영역 (사용자 핵심 요구: 원클릭 엑셀 생성/미리보기 + 케어포트 간병일지 PDF) -->
+        <div class="p-4 bg-sky-50/60 rounded-2xl border border-sky-200 space-y-3">
+          <div class="flex items-center justify-between border-b border-sky-200/80 pb-2">
+            <span class="font-extrabold text-sky-950 flex items-center gap-1.5 text-xs">
+              <i data-lucide="paperclip" class="w-4 h-4 text-sky-700"></i>
+              업무 첨부파일 설정 (다중 시트 엑셀 & 케어포트 간병일지)
+            </span>
+            <span class="text-[11px] text-sky-700 font-medium">삼성화재 양식 규격 준수</span>
+          </div>
+
+          <!-- 첨부 1: 삼성화재 다중시트 엑셀 파일 -->
+          <div id="samsungModalExcelCard" class="bg-white p-3.5 rounded-xl border-2 border-sky-400 shadow-2xs space-y-2 transition-all">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div class="flex items-center gap-2">
+                <label class="flex items-center gap-2 font-black text-slate-800 text-xs cursor-pointer select-none">
+                  <input type="checkbox" id="attachSamsungExcelCheckbox" checked onchange="updateSamsungModalAttachBadges()" class="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer">
+                  <span>[첨부 1] 삼성화재 현황 엑셀 파일 (<span id="samsungAttachExcelFilename" class="font-mono text-sky-700">삼성화재_간병인지원_현황_20260914.xlsx</span>)</span>
+                </label>
+                <span id="samsungModalExcelAttachBadge" class="px-2 py-0.5 rounded-full text-[10.5px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 shadow-2xs">
+                  <i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-600"></i>
+                  <span>발송 첨부됨 ✓</span>
+                </span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="previewSamsungReportExcel()" class="px-2.5 py-1 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold text-[11px] flex items-center gap-1 border border-sky-300 transition-all cursor-pointer" title="첨부할 엑셀 파일의 시트별 데이터 오류 검증 및 미리보기">
+                  <i data-lucide="file-search" class="w-3.5 h-3.5 text-sky-700"></i>
+                  <span>엑셀 내용 미리보기</span>
+                </button>
+                <label class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] flex items-center gap-1 border border-slate-300 transition-all cursor-pointer" title="명단관리에서 직접 저장한 PC 엑셀 파일 첨부">
+                  <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                  <span>직접 파일선택</span>
+                  <input type="file" id="samsungAttachCustomExcelInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="onSamsungCustomExcelSelected(this)">
+                </label>
+              </div>
+            </div>
+            <p class="text-[11px] text-slate-500 pl-6 leading-relaxed">
+              * <b>[원클릭 누적 자동첨부]</b> 수동 다운로드/업로드 필요 없이, <b>전체 누적 대상자(오늘 신규 추가건 포함)</b>가 입력된 공식 엑셀 파일이 자동 첨부되어 메일로 발송됩니다.
+            </p>
+          </div>
+
+          <!-- 첨부 2: 케어포트(CarePort) 간병일지 (PDF) - 완료 대상자 수동 첨부 -->
+          <div class="bg-white p-3 rounded-xl border border-purple-200 shadow-2xs space-y-2.5">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <label class="flex items-center gap-2 font-bold text-slate-800 text-xs cursor-pointer">
+                <input type="checkbox" id="attachCarePortPdfCheckbox" class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer">
+                <span class="flex items-center gap-1.5">
+                  <span>[첨부 2] 케어포트(CarePort) 간병일지 (PDF)</span>
+                  <span class="text-[10px] px-2 py-0.2 rounded-full bg-purple-100 text-purple-800 font-bold border border-purple-200">완료 대상자 전용</span>
+                </span>
+              </label>
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="previewCarePortReport()" class="px-2.5 py-1 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold text-[11px] flex items-center gap-1 border border-purple-300 transition-all cursor-pointer" title="리본메이트 음성 녹음 기반 텍스트 변환 간병일지 미리보기 및 PDF 다운로드">
+                  <i data-lucide="file-text" class="w-3.5 h-3.5 text-purple-700"></i>
+                  <span>간병일지 미리보기 / 출력</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-6 pt-1 text-[11px]">
+              <div>
+                <label class="text-slate-600 font-bold block mb-0.5">간병완료 대상 고객 선택 (종료 건만 표시):</label>
+                <select id="samsungCarePortTargetAppSelect" onchange="onSelectCarePortReportTarget(this.value)" class="w-full p-2 border rounded-xl bg-slate-50 text-xs font-medium text-slate-800">
+                  <!-- Filled dynamically with completed customers only -->
+                </select>
+              </div>
+              <div>
+                <label class="text-slate-600 font-bold block mb-0.5">간병일지 기간:</label>
+                <div class="flex items-center gap-1">
+                  <input type="date" id="samsungCarePortDateStart" class="w-full p-2 border rounded-xl text-xs">
+                  <span class="text-slate-400">~</span>
+                  <input type="date" id="samsungCarePortDateEnd" class="w-full p-2 border rounded-xl text-xs">
+                </div>
+              </div>
+            </div>
+
+            <!-- 운영자 간병일지 수동 불러오기 컨트롤 박스 -->
+            <div class="ml-6 p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2 text-xs">
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="file-up" class="w-4 h-4 text-purple-700"></i>
+                  <span class="font-extrabold text-purple-950">간병일지 수동 불러오기 (운영자 직접 첨부)</span>
+                  <span id="samsungManualPdfStatusBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">수동 선택 대기</span>
+                </div>
+                <label class="px-3 py-1 rounded-lg bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all">
+                  <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                  <span>PC에서 PDF 파일 선택</span>
+                  <input type="file" id="samsungModalManualPdfInput" accept=".pdf" class="hidden" onchange="onSelectManualSamsungCareLogPdf(this)">
+                </label>
+              </div>
+              <div id="samsungManualPdfFileInfo" class="text-[11px] text-slate-500 font-medium">
+                ※ 모든 대상자가 아닌 <b>간병이 정상 종료된 완료 대상자</b>의 일지만 운영자가 수동으로 불러와 첨부합니다.
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      <!-- Footer -->
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
+        <span class="text-slate-500 flex items-center gap-1.5">
+          <i data-lucide="shield-check" class="w-4 h-4 text-sky-600"></i>
+          발송 완료 시 고객 정산카드의 상태값에 <b>발송 일시(YYYY.MM.DD HH:mm)</b>가 자동 기록됩니다.
+        </span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeModal('samsungEmailModal')" class="px-4 py-2 border rounded-xl font-semibold bg-white hover:bg-slate-100 transition-all cursor-pointer">취소</button>
+          <button type="button" onclick="document.getElementById('samsungEmailForm').requestSubmit()" id="btnSubmitSamsungEmail" 
+            class="px-6 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-black flex items-center gap-1.5 shadow-md transition-all cursor-pointer">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            <span>이메일 발송하기 🚀</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: EMAIL SMTP CONFIG (실제 이메일 발송 SMTP 설정) ==================== -->
+  <div id="emailConfigModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh]">
+      <!-- Header -->
+      <div class="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-sky-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20 shadow-xs">
+            <i data-lucide="mail-check" class="w-5 h-5 text-sky-300"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              실제 이메일 발송 연동 설정 (SMTP)
+              <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 font-bold">실제 메일 발송</span>
+            </h3>
+            <p class="text-xs text-slate-300 mt-0.5">네이버, Gmail, Daum 또는 회사 메일 계정의 SMTP 정보를 설정하여 실제 이메일을 발송합니다.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('emailConfigModal')" class="p-2 text-slate-300 hover:text-white transition-all cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <!-- Body -->
+      <form id="emailConfigForm" onsubmit="handleSaveEmailConfig(event)" class="p-6 space-y-4 text-xs flex-1 overflow-y-auto custom-scrollbar">
+        <!-- 1. 원클릭 메일 서비스 프리셋 선택 -->
+        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+          <label class="block font-bold text-slate-800 text-xs flex items-center gap-1.5">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+            <span>메일 서비스 프리셋 (원클릭 자동 완성)</span>
+          </label>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button type="button" onclick="applySmtpPreset('naver')" class="p-2.5 rounded-xl border border-slate-200 bg-white hover:border-emerald-500 hover:bg-emerald-50/50 text-left transition-all cursor-pointer group">
+              <b class="text-slate-900 block text-[11.5px] group-hover:text-emerald-700">🟢 네이버 / 웍스</b>
+              <span class="text-[10px] text-slate-500 block">smtp.naver.com : 465</span>
+            </button>
+            <button type="button" onclick="applySmtpPreset('gmail')" class="p-2.5 rounded-xl border border-slate-200 bg-white hover:border-red-500 hover:bg-red-50/50 text-left transition-all cursor-pointer group">
+              <b class="text-slate-900 block text-[11.5px] group-hover:text-red-700">🔴 지메일 (Gmail)</b>
+              <span class="text-[10px] text-slate-500 block">smtp.gmail.com : 465</span>
+            </button>
+            <button type="button" onclick="applySmtpPreset('daum')" class="p-2.5 rounded-xl border border-slate-200 bg-white hover:border-sky-500 hover:bg-sky-50/50 text-left transition-all cursor-pointer group">
+              <b class="text-slate-900 block text-[11.5px] group-hover:text-sky-700">🔵 다음 / 카카오</b>
+              <span class="text-[10px] text-slate-500 block">smtp.daum.net : 465</span>
+            </button>
+            <button type="button" onclick="applySmtpPreset('custom')" class="p-2.5 rounded-xl border border-slate-200 bg-white hover:border-indigo-500 hover:bg-indigo-50/50 text-left transition-all cursor-pointer group">
+              <b class="text-slate-900 block text-[11.5px] group-hover:text-indigo-700">⚙️ 직접 입력</b>
+              <span class="text-[10px] text-slate-500 block">회사 자체 SMTP 서버</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. SMTP 서버 호스트 및 포트 -->
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+          <div class="sm:col-span-7 space-y-1">
+            <label class="block font-bold text-slate-700">SMTP 서버 호스트 (Host) *</label>
+            <input type="text" id="emailSmtpHost" required placeholder="smtp.naver.com" 
+              class="w-full p-2.5 border rounded-xl font-mono text-xs focus:ring-2 focus:ring-sky-500">
+          </div>
+          <div class="sm:col-span-3 space-y-1">
+            <label class="block font-bold text-slate-700">포트 (Port) *</label>
+            <input type="number" id="emailSmtpPort" required placeholder="465" value="465" 
+              class="w-full p-2.5 border rounded-xl font-mono text-xs focus:ring-2 focus:ring-sky-500">
+          </div>
+          <div class="sm:col-span-2 space-y-1 flex flex-col justify-end">
+            <label class="flex items-center gap-1.5 p-2.5 rounded-xl border bg-slate-50 cursor-pointer text-slate-700 font-bold text-xs select-none">
+              <input type="checkbox" id="emailSmtpSecure" checked class="w-4 h-4 rounded text-sky-600 focus:ring-sky-500">
+              <span>SSL/TLS</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 3. 발신 계정 인증 정보 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="space-y-1">
+            <label class="block font-bold text-slate-700">SMTP 로그인 계정 (아이디 또는 전체 이메일) *</label>
+            <input type="text" id="emailSmtpUser" required placeholder="your_id@naver.com" 
+              class="w-full p-2.5 border rounded-xl font-mono text-xs focus:ring-2 focus:ring-sky-500">
+          </div>
+          <div class="space-y-1">
+            <label class="block font-bold text-slate-700 flex items-center justify-between">
+              <span>비밀번호 (또는 2단계 앱 비밀번호) *</span>
+              <button type="button" onclick="toggleEmailPasswordVisible()" class="text-slate-400 hover:text-slate-600 font-normal text-[10.5px]">비밀번호 보기</button>
+            </label>
+            <input type="password" id="emailSmtpPass" required placeholder="메일 비밀번호 또는 앱 비밀번호" 
+              class="w-full p-2.5 border rounded-xl font-mono text-xs focus:ring-2 focus:ring-sky-500">
+          </div>
+        </div>
+
+        <!-- 4. 발신자 표시 정보 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="space-y-1">
+            <label class="block font-bold text-slate-700">발신자 이메일 주소 (From) *</label>
+            <input type="email" id="emailSenderEmail" required placeholder="samsung-ops@reborncare.co.kr" 
+              class="w-full p-2.5 border rounded-xl font-mono text-xs focus:ring-2 focus:ring-sky-500">
+          </div>
+          <div class="space-y-1">
+            <label class="block font-bold text-slate-700">발신자 표기 이름 (Display Name)</label>
+            <input type="text" id="emailSenderName" placeholder="(주)리본케어 삼성화재 운영데스크" value="(주)리본케어 삼성화재 운영데스크" 
+              class="w-full p-2.5 border rounded-xl font-sans text-xs focus:ring-2 focus:ring-sky-500">
+          </div>
+        </div>
+
+        <!-- 5. 중요 설정 가이드 Alert -->
+        <div class="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200 text-amber-900 space-y-1.5 text-[11px] leading-relaxed">
+          <div class="font-bold flex items-center gap-1.5 text-amber-950">
+            <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 shrink-0"></i>
+            <span>메일 서비스별 확인 및 사전 설정 필수 사항</span>
+          </div>
+          <ul class="list-disc list-inside space-y-0.5 pl-1 text-amber-800">
+            <li><b>네이버 메일</b>: 네이버 메일 환경설정 > [POP3/IMAP 설정] > <b>POP3/SMTP 사용을 '사용함'</b>으로 설정해야 외부 프로그램 발송이 가능합니다.</li>
+            <li><b>구글 Gmail</b>: 구글 계정 2단계 인증 사용 시 구글 계정 보안 설정에서 <b>[앱 비밀번호(16자리)]</b>를 생성하여 입력해야 합니다.</li>
+            <li><b>사내 메일 / 웹호스팅</b>: 사내 IT 담당자에게 SMTP 발송 호스트, 포트(465 또는 587) 및 인증 방식을 확인해주세요.</li>
+          </ul>
+        </div>
+
+        <!-- 6. 테스트 발송 영역 -->
+        <div class="p-3.5 bg-sky-50/70 rounded-2xl border border-sky-200 space-y-2">
+          <label class="block font-bold text-sky-950 text-xs flex items-center gap-1.5">
+            <i data-lucide="send" class="w-3.5 h-3.5 text-sky-700"></i>
+            <span>설정 검증 테스트 메일 발송</span>
+          </label>
+          <div class="flex items-center gap-2">
+            <input type="email" id="emailTestRecipient" placeholder="테스트 수신할 본인 이메일 (예: test@naver.com)" 
+              class="flex-1 p-2.5 border rounded-xl bg-white font-mono text-xs focus:ring-2 focus:ring-sky-500">
+            <button type="button" onclick="runEmailSmtpTest()" id="btnRunEmailTest" 
+              class="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+              <span>연결 테스트</span>
+            </button>
+          </div>
+          <div id="emailTestResultArea" class="hidden p-2.5 rounded-xl text-xs"></div>
+        </div>
+      </form>
+
+      <!-- Footer -->
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
+        <span class="text-slate-500 text-[11px]">
+          * 입력된 설정은 서버 및 로컬 브라우저에 안전하게 보관됩니다.
+        </span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeModal('emailConfigModal')" class="px-4 py-2 border rounded-xl font-semibold bg-white hover:bg-slate-100 transition-all cursor-pointer">취소</button>
+          <button type="button" onclick="document.getElementById('emailConfigForm').requestSubmit()" 
+            class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black flex items-center gap-1.5 shadow-md transition-all cursor-pointer">
+            <i data-lucide="save" class="w-4 h-4"></i>
+            <span>설정 저장하기</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: CAREPORT REPORT VIEWER & PDF ==================== -->
+  <div id="carePortReportModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh]">
+      <div class="p-5 bg-gradient-to-r from-purple-700 to-indigo-800 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
+            <i data-lucide="clipboard-check" class="w-5 h-5 text-purple-200"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              케어포트(CarePort) 간병일지 상세 보고서
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/40 font-bold">AI 음성 STT 정밀 변환</span>
+            </h3>
+            <p class="text-xs text-purple-200 mt-0.5">리본메이트 간병인 앱 음성 녹음 데이터 기반 자동 생성 일지</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('carePortReportModal')" class="p-2 text-purple-200 hover:text-white cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-4" id="carePortReportPrintArea">
+        <!-- Dynamically rendered printable care report html -->
+      </div>
+
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
+        <span class="text-slate-500">인쇄하거나 PDF 파일로 저장하여 삼성화재 메일에 즉시 첨부할 수 있습니다.</span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="printCarePortReport()" class="px-4 py-2 border border-purple-200 rounded-xl font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="printer" class="w-4 h-4"></i> 인쇄 / PDF 출력
+          </button>
+          <button type="button" onclick="closeModal('carePortReportModal')" class="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 cursor-pointer">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: SAMSUNG EXCEL PREVIEW ==================== -->
+  <div id="samsungExcelPreviewModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+      <div class="p-5 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-300 flex items-center justify-center border border-sky-400/30">
+            <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              삼성화재 첨부 엑셀 데이터 사전 검증
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 font-bold">규격 검사 통과</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5" id="samsungExcelPreviewSubtitle">이메일에 첨부될 시트별 엑셀 데이터 실시간 검토</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('samsungExcelPreviewModal')" class="p-2 text-slate-400 hover:text-white cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <!-- Modal Body (Scrollable Container) -->
+      <div class="p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        <!-- Cumulative & Today Addition Summary Banner -->
+        <div id="samsungPreviewSummaryBanner" class="p-3.5 bg-sky-50 rounded-2xl border border-sky-200 flex items-center justify-between flex-wrap gap-2 text-xs">
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-1.5 font-bold text-slate-800">
+              <span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
+              <span>누적 대상자: <strong id="previewTotalCumulativeCount" class="text-sky-700 text-sm font-extrabold">0</strong>명</span>
+            </div>
+            <span class="text-slate-300">|</span>
+            <div class="flex items-center gap-1.5 font-bold text-emerald-800">
+              <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-extrabold flex items-center gap-1">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                <span>금일 신규 추가: <strong id="previewTodayNewCount">0</strong>명</span>
+              </span>
+            </div>
+          </div>
+          <span class="text-[11px] text-slate-500">※ 발송되는 엑셀 파일에는 누적 전체 명단이 포함되며, 금일 추가건은 <span class="bg-amber-100 text-amber-900 px-1 rounded font-bold">NEW</span>로 표시됩니다.</span>
+        </div>
+
+        <div class="flex items-center gap-2 border-b pb-3" id="samsungPreviewTabHeader">
+          <button type="button" onclick="switchExcelPreviewSheet('target')" id="btnPreviewSheet-target" class="px-3.5 py-1.5 rounded-xl font-bold bg-sky-600 text-white shadow-xs cursor-pointer">
+            [대상자] 시트 (<span id="previewCountTarget">0</span>건)
+          </button>
+          <button type="button" onclick="switchExcelPreviewSheet('completed')" id="btnPreviewSheet-completed" class="px-3.5 py-1.5 rounded-xl font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer">
+            [완료] 시트 (<span id="previewCountCompleted">0</span>건)
+          </button>
+          <button type="button" onclick="switchExcelPreviewSheet('contacts')" id="btnPreviewSheet-contacts" class="px-3.5 py-1.5 rounded-xl font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer">
+            [연락처] 시트 (<span id="previewCountContacts">0</span>건)
+          </button>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar border rounded-2xl max-h-96" id="samsungExcelPreviewTableContainer">
+          <!-- Dynamic table -->
+        </div>
+      </div>
+
+      <!-- Modal Footer (Fixed bottom) -->
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs flex-wrap gap-2 shrink-0">
+        <span class="text-slate-500 flex items-center gap-1">
+          <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span>데이터 검증 완료 시 <b>[이 엑셀파일 첨부하기]</b>를 클릭하면 메일에 즉시 첨부됩니다.</span>
+        </span>
+        <div class="flex items-center gap-2">
+          <!-- 엑셀 파일 첨부하기 버튼 (사용자 요청 핵심 버튼) -->
+          <button type="button" onclick="applyPreviewExcelToEmailAttachment()" id="btnApplyPreviewExcelToEmail"
+            class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95 transition-all"
+            title="미리보기에서 검토한 누적 엑셀 파일을 메일 첨부파일로 바로 적용합니다">
+            <i data-lucide="paperclip" class="w-4 h-4 text-sky-100"></i>
+            <span>이 엑셀파일 첨부하기 📎</span>
+          </button>
+          <button type="button" onclick="downloadCurrentPreviewExcel()" id="btnDownloadPreviewExcel" 
+            class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all">
+            <i data-lucide="download" class="w-4 h-4"></i> <span>엑셀 다운로드 (.xlsx)</span>
+          </button>
+          <button type="button" onclick="closeModal('samsungExcelPreviewModal')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold cursor-pointer transition-all">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: CAREPORT PDF IMPORT ==================== -->
+  <div id="carePortImportModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
+      <div class="p-5 bg-gradient-to-r from-purple-800 to-indigo-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+            <i data-lucide="file-up" class="w-5 h-5 text-purple-200"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              케어포트 간병일지 파일(PDF) 불러오기
+            </h3>
+            <p class="text-xs text-purple-200 mt-0.5">고객별 케어포트 공식 간병일지 PDF를 등록하여 청구에 연동합니다.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('carePortImportModal')" class="p-2 text-purple-200 hover:text-white cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <form onsubmit="handleExecuteImportCarePortLog(event)" class="p-6 space-y-4 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">대상 고객(피보험자) 선택 *</label>
+          <select id="carePortImportAppSelect" required onchange="onCarePortImportCustomerChange(this.value)" class="w-full p-2.5 border rounded-xl font-bold bg-white text-slate-900 text-xs">
+            <option value="">-- 고객을 선택해주세요 --</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">케어포트 간병일지 파일 (PDF) *</label>
+          <div class="border-2 border-dashed border-purple-300 bg-purple-50/50 hover:bg-purple-50 p-4 rounded-2xl text-center cursor-pointer transition-all" onclick="document.getElementById('carePortPdfFileInput').click()">
+            <input type="file" id="carePortPdfFileInput" accept=".pdf" required onchange="onCarePortPdfFileSelected(event)" class="hidden">
+            <i data-lucide="file-text" class="w-8 h-8 text-purple-600 mx-auto mb-1"></i>
+            <div class="font-bold text-purple-950 text-xs" id="carePortPdfUploadLabel">PDF 파일을 선택하거나 드래그하세요</div>
+            <p class="text-[11px] text-purple-600/70 mt-0.5" id="carePortPdfUploadSubLabel">.pdf 포맷 (케어포트 전산 출력 파일)</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">간병 시작일</label>
+            <input type="date" id="carePortStartDate" class="w-full p-2 border rounded-xl font-bold bg-white text-xs">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">간병 종료일</label>
+            <input type="date" id="carePortEndDate" class="w-full p-2 border rounded-xl font-bold bg-white text-xs">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">담당 간병인</label>
+            <input type="text" id="carePortCaregiverName" placeholder="간병인 성명" class="w-full p-2 border rounded-xl font-bold bg-white text-xs">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">소속 센터</label>
+            <input type="text" id="carePortCenterName" placeholder="센터명 (예: 영등포센터)" class="w-full p-2 border rounded-xl bg-white text-xs">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">특이사항 / 메모</label>
+          <input type="text" id="carePortMemo" placeholder="예: 케어포트 정상 출력본, 10일간 간병 완료" class="w-full p-2 border rounded-xl bg-white text-xs">
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-200">
+          <button type="button" onclick="closeModal('carePortImportModal')" class="px-4 py-2 border rounded-xl font-bold bg-white hover:bg-slate-50 cursor-pointer">취소</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-black flex items-center gap-1.5 shadow-xs cursor-pointer">
+            <i data-lucide="check" class="w-4 h-4"></i>
+            <span>간병일지 등록 (불러오기)</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: CAREPORT PDF PREVIEW ==================== -->
+  <div id="carePortPdfViewModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+      <div class="p-5 bg-gradient-to-r from-purple-800 to-indigo-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+            <i data-lucide="file-check" class="w-5 h-5 text-purple-200"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2" id="carePortViewTitle">
+              케어포트 간병일지 미리보기
+            </h3>
+            <p class="text-xs text-purple-200 mt-0.5" id="carePortViewSubtitle">환자 및 간병 세부 기록</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('carePortPdfViewModal')" class="p-2 text-purple-200 hover:text-white cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-4 text-xs" id="carePortViewContainer">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
+        <span class="text-slate-500">삼성화재 일일/월간보고 및 현대해상 팩스 발송 시 공식 첨부 문서로 활용됩니다.</span>
+        <div class="flex items-center gap-2">
+          <button type="button" id="btnDownloadCarePortView" onclick="downloadCurrentCarePortViewFile()" class="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> PDF 다운로드
+          </button>
+          <button type="button" onclick="closeModal('carePortPdfViewModal')" class="px-5 py-2 rounded-xl bg-slate-800 text-white font-bold hover:bg-slate-900 cursor-pointer">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: SAMSUNG ADDRESS BOOK MANAGEMENT ==================== -->
+  <div id="samsungAddressBookModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh]">
+      <div class="p-5 bg-gradient-to-r from-indigo-700 to-purple-800 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+            <i data-lucide="book-user" class="w-5 h-5 text-indigo-100"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              삼성화재 이메일 주소록 관리
+              <span id="samsungAddressBookBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-white/20 text-white font-mono">0명 등록</span>
+            </h3>
+            <p class="text-xs text-indigo-200 mt-0.5">일일보고 및 월간청구 시 원클릭으로 수신자를 지정할 수 있도록 담당자 연락처를 관리합니다.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('samsungAddressBookModal')" class="p-2 text-indigo-200 hover:text-white cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-5 text-xs">
+        <input type="hidden" id="samsungAddressTargetField" value="">
+
+        <!-- 신규 연락처 추가 및 수정 폼 -->
+        <div class="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-200 space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-indigo-200">
+            <h4 class="font-extrabold text-indigo-950 text-xs flex items-center gap-1.5">
+              <i data-lucide="user-plus" class="w-4 h-4 text-indigo-600"></i>
+              <span id="samsungAddressFormTitle">새 연락처 등록</span>
+            </h4>
+            <button type="button" onclick="resetSamsungAddressForm()" class="text-indigo-600 hover:text-indigo-800 font-bold text-[11px] cursor-pointer">
+              폼 초기화
+            </button>
+          </div>
+
+          <form id="samsungAddressForm" onsubmit="handleSaveSamsungAddress(event)" class="space-y-3">
+            <input type="hidden" id="sadrEditId" value="">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">성명 *</label>
+                <input type="text" id="sadrEditName" required placeholder="예: 김정현" class="w-full p-2 border rounded-xl font-bold bg-white">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">소속 부서 / 팀</label>
+                <input type="text" id="sadrEditTeam" placeholder="예: 간병지원파트" class="w-full p-2 border rounded-xl bg-white">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">이메일 주소 *</label>
+                <input type="email" id="sadrEditEmail" required placeholder="kjh@samsungfire.com" class="w-full p-2 border rounded-xl font-mono font-bold text-indigo-900 bg-white">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">담당 업무/역할 *</label>
+                <select id="sadrEditRole" class="w-full p-2 border rounded-xl bg-white font-bold">
+                  <option value="일일보고 담당">일일보고 담당</option>
+                  <option value="월간청구 담당">월간청구 담당</option>
+                  <option value="수석손사/총괄">수석손사/총괄</option>
+                  <option value="보상기획/심사">보상기획/심사</option>
+                  <option value="기타">기타</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">전화번호</label>
+                <input type="tel" id="sadrEditPhone" placeholder="010-0000-0000" oninput="autoHyphenPhone(this)" class="w-full p-2 border rounded-xl font-mono bg-white">
+              </div>
+              <div class="sm:col-span-2 flex items-center gap-2">
+                <div class="flex-1">
+                  <label class="block font-bold text-slate-700 mb-1">메모 / 특이사항</label>
+                  <input type="text" id="sadrEditMemo" placeholder="예: 매일 17시 이전 보고 요청" class="w-full p-2 border rounded-xl bg-white">
+                </div>
+                <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-xs cursor-pointer shrink-0 mt-auto">
+                  <span id="btnSaveSamsungAddressText">연락처 저장</span>
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- 연락처 목록 테이블 -->
+        <div class="border rounded-2xl overflow-hidden shadow-2xs">
+          <div class="overflow-x-auto custom-scrollbar max-h-80" id="samsungAddressBookTableContainer">
+            <!-- Dynamic table rendered by app.js -->
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
+        <span class="text-slate-500">등록된 주소록은 클라우드에 영구 보존되며, 작성 화면에서 원클릭으로 수신자에 추가됩니다.</span>
+        <button type="button" onclick="closeModal('samsungAddressBookModal')" class="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 cursor-pointer">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: SAMSUNG CARE LOG PREVIEW ==================== -->
+  <div id="samsungCareLogPreviewModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[88vh]">
+      <div class="p-5 bg-gradient-to-r from-sky-700 to-indigo-800 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+            <i data-lucide="clipboard-list" class="w-5 h-5 text-sky-200"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              <span id="samsungLogModalTitle">간병일지 미리보기</span>
+              <span id="samsungLogModalBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-white/20 text-white font-mono">C0280</span>
+            </h3>
+            <p class="text-xs text-sky-200 mt-0.5" id="samsungLogModalSubtitle">간병기간 및 환자 상태 기록 내역</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('samsungCareLogPreviewModal')" class="p-2 text-sky-200 hover:text-white cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-3 text-xs" id="samsungCareLogPreviewContainer">
+        <!-- Dynamic logs -->
+      </div>
+
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
+        <span class="text-slate-500">모바일 음성일지 및 전산 등록된 간병일지 원문입니다.</span>
+        <button type="button" onclick="closeModal('samsungCareLogPreviewModal')" class="px-5 py-2 rounded-xl bg-sky-700 text-white font-bold hover:bg-sky-800 cursor-pointer">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: SAMSUNG LEAD SEARCH FOR NEW APP ==================== -->
+  <div id="samsungLeadSearchModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+      <div class="p-5 bg-gradient-to-r from-sky-600 to-blue-700 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+            <i data-lucide="user-search" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              삼성화재 사전등록 명단 검색 & 원클릭 접수
+              <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-white/20 text-white font-bold">12대 항목 자동 연동</span>
+            </h3>
+            <p class="text-xs text-sky-100 mt-0.5">삼성화재 사전명단 가입 고객을 검색하여 신규 접수 폼에 즉시 채웁니다.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('samsungLeadSearchModal')" class="p-2 text-sky-200 hover:text-white cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar text-xs">
+        <div class="flex items-center gap-2">
+          <div class="relative flex-1">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
+            <input type="text" id="samsungLeadSearchInput" oninput="onSamsungLeadSearchInput(this.value)" placeholder="고객 성명, 생년월일, 연락처, 증권번호로 사전명단 검색..." 
+              class="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-xl font-medium bg-slate-50 focus:bg-white focus:ring-2 focus:ring-sky-500 transition-all text-xs">
+            <button type="button" onclick="clearSamsungLeadSearchInput()" id="btnSamsungLeadSearchClear" class="hidden absolute right-3 top-2.5 p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between px-1 text-[11px] text-slate-500 font-medium">
+          <div id="samsungLeadSearchResultCount" class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+            <span>사전명단 검색 대기중</span>
+          </div>
+          <span class="text-slate-400">⚡ 초고속 인덱스 검색 (상위 최대 50건 표시)</span>
+        </div>
+
+        <div class="border border-slate-200 rounded-2xl overflow-x-auto overflow-y-auto max-h-[420px] custom-scrollbar">
+          <table class="w-full min-w-[760px] text-left text-xs whitespace-nowrap">
+            <thead class="bg-slate-100 text-slate-700 font-bold sticky top-0 z-10 border-b">
+              <tr>
+                <th class="p-3 pl-4">피보험자ID</th>
+                <th class="p-3">성명</th>
+                <th class="p-3">생년월일/성별</th>
+                <th class="p-3 font-mono">연락처</th>
+                <th class="p-3 font-mono">증권번호</th>
+                <th class="p-3">상품명</th>
+                <th class="p-3 text-center">간병담보</th>
+                <th class="p-3 text-center pr-5 min-w-[130px]">선택</th>
+              </tr>
+            </thead>
+            <tbody id="samsungLeadSearchTableBody" class="divide-y divide-slate-100">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
+        <span class="text-slate-500">선택 시 주소, 증권번호, 상품정보 및 손사 정보가 신규 접수창에 안전하게 채워집니다.</span>
+        <button type="button" onclick="closeModal('samsungLeadSearchModal')" class="px-5 py-2 rounded-xl border bg-white hover:bg-slate-100 font-bold cursor-pointer">닫기</button>
       </div>
     </div>
   </div>
@@ -5408,6 +7085,10 @@
               <span>3-Column 주체별 뷰</span>
             </button>
           </div>
+          <button id="btnHubSamsungEmail" type="button" onclick="closeModal('hubCustomerDetailModal'); switchTab('samsungclaimhub', 'daily');" class="hidden px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all bg-sky-600 hover:bg-sky-500 text-white shadow-md cursor-pointer">
+            <i data-lucide="mail" class="w-3.5 h-3.5"></i>
+            <span>📧 삼성 접수/청구 발송</span>
+          </button>
           <button onclick="closeModal('hubCustomerDetailModal')" class="p-2 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer">
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>

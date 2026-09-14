@@ -10,3 +10,4 @@ npx.cmd
 .env.local
 desktop.ini
 fax_config.json
+email_config.json

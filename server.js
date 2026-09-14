@@ -4,6 +4,7 @@ const path = require('path');
 const { exec } = require('child_process');
 const { createDocumentPdfBuffer, createTestPdfBuffer } = require('./pdf-helper');
 const { uploadToBarobillFTP, callBarobillSoap, getBarobillErrorMessage, getBarobillFaxStatus } = require('./barobill-client');
+const { getEmailConfig, saveEmailConfig, sendSmtpMail, testSmtpConnection } = require('./smtp-client');
 
 let PORT = parseInt(process.env.PORT, 10) || 8080;
 const BASE_DIR = __dirname;
@@ -250,6 +251,167 @@ function saveSavedFaxConfig(cfg) {
         });
         return;
       }
+    }
+
+    // =========================================================================
+    // API Route: Email SMTP Config (이메일 발송 설정 저장 및 불러오기)
+    // =========================================================================
+    if (reqPath === '/api/email/config') {
+      if (req.method === 'GET') {
+        const cfg = getEmailConfig();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({
+          success: true,
+          config: cfg
+        }));
+      } else if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const saved = saveEmailConfig(payload);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({
+              success: true,
+              message: '이메일 SMTP 발송 설정이 안전하게 저장되었습니다.',
+              config: saved
+            }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+    }
+
+    // =========================================================================
+    // API Route: Email SMTP Connection Test (SMTP 연결 및 테스트 메일 발송)
+    // =========================================================================
+    if (reqPath === '/api/email/test' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const savedCfg = getEmailConfig();
+          const host = payload.host || savedCfg.host || 'smtp.naver.com';
+          const port = parseInt(payload.port || savedCfg.port || 465, 10);
+          const secure = payload.secure !== undefined ? Boolean(payload.secure) : (savedCfg.secure !== undefined ? Boolean(savedCfg.secure) : (port === 465));
+          const user = payload.user || savedCfg.user;
+          const pass = payload.pass || savedCfg.pass;
+          const senderName = payload.senderName || savedCfg.senderName || '(주)리본케어 운영데스크';
+          const testTo = payload.testTo || user;
+
+          if (!user || !pass) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '계정 아이디와 비밀번호를 입력해주세요.' }));
+          }
+
+          const result = await testSmtpConnection({
+            host,
+            port,
+            secure,
+            user,
+            pass,
+            senderName,
+            testTo
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({
+            success: true,
+            message: `[${testTo}] 주소로 테스트 이메일이 성공적으로 발송되었습니다!`,
+            result
+          }));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    // =========================================================================
+    // API Route: Email Dispatch Engine (실제 이메일 발송)
+    // =========================================================================
+    if (reqPath === '/api/email/send' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const savedCfg = getEmailConfig();
+
+          const host = payload.host || savedCfg.host || 'smtp.naver.com';
+          const port = parseInt(payload.port || savedCfg.port || 465, 10);
+          const secure = payload.secure !== undefined ? Boolean(payload.secure) : (savedCfg.secure !== undefined ? Boolean(savedCfg.secure) : (port === 465));
+          const user = payload.user || savedCfg.user;
+          const pass = payload.pass || savedCfg.pass;
+          const senderName = payload.senderName || savedCfg.senderName || '(주)리본케어 삼성화재 운영데스크';
+          const from = payload.from || savedCfg.senderEmail || user;
+
+          if (!user || !pass) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({
+              success: false,
+              needConfig: true,
+              error: 'SMTP 발송 계정이 설정되지 않았습니다. [발송 설정]에서 네이버, Gmail, 회사 메일 정보를 먼저 입력해주세요.'
+            }));
+          }
+
+          const {
+            to,
+            cc,
+            bcc,
+            subject,
+            text,
+            html,
+            attachments,
+            appId,
+            emailType
+          } = payload;
+
+          if (!to) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '수신자(To) 이메일 주소를 입력해주세요.' }));
+          }
+
+          const result = await sendSmtpMail({
+            host,
+            port,
+            secure,
+            user,
+            pass,
+            from,
+            senderName,
+            to,
+            cc,
+            bcc,
+            subject: subject || '[리본케어] 삼성화재 업무 보고',
+            text,
+            html,
+            attachments: attachments || []
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({
+            success: true,
+            message: `[${to}] 수신처로 이메일 발송이 완료되었습니다.`,
+            sentAt: result.sentAt,
+            recipients: result.recipients,
+            serverReply: result.serverReply,
+            appId,
+            emailType
+          }));
+        } catch (err) {
+          console.error('[Email Send Error]', err);
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
     }
 
     // =========================================================================

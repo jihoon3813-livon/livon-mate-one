@@ -2320,56 +2320,68 @@ const INITIAL_PARTNERS = [
 
 const INITIAL_CARE_LOGS = [
   {
-    "id": "LOG-0301",
-    "applyId": "C0303",
-    "patientName": "[테스트3] 박영호",
+    "id": "CLOG-001",
+    "applyId": "C0006",
+    "patientName": "엄정현",
+    "insuranceCompany": "현대해상",
+    "caregiverName": "황지원",
+    "centerName": "영등포센터",
+    "startDate": "2026-09-01",
+    "endDate": "2026-09-10",
+    "pdfFileName": "[C0006_엄정현]_케어포트_공식간병일지.pdf",
+    "pdfFileSize": "342 KB",
+    "source": "케어포트 전산",
+    "importedAt": "2026-09-14 10:30",
+    "sttText": "환자분 아침 식사(연식) 1/2 공기 정상 섭취하셨으며, 오전 10시경 체위 변경 및 관절 가동 운동 보조 완료함. 오후 혈압 125/82, 체온 36.6도로 안정적이며 기분 양호함.\n이동보조, 복약지도, 환부 위생관리 정상 시행됨.",
+    "vital": { "bp": "125/82", "pulse": 74, "temp": 36.6 }
+  },
+  {
+    "id": "CLOG-002",
+    "applyId": "C0001",
+    "patientName": "김옥경",
+    "insuranceCompany": "현대해상(SCOR)",
+    "caregiverName": "이영희",
+    "centerName": "수원센터",
+    "startDate": "2026-08-25",
+    "endDate": "2026-09-04",
+    "pdfFileName": "[C0001_김옥경]_케어포트_공식간병일지.pdf",
+    "pdfFileSize": "285 KB",
+    "source": "케어포트 전산",
+    "importedAt": "2026-09-14 11:15",
+    "sttText": "김옥경 환자분 오늘 컨디션 양호하십니다. 점심 식사 전량 섭취하셨으며 처방된 고혈압약 복용 확인하였습니다. 체위 변경 2시간 간격으로 시행하였고 보행 보조 20분 완료함.",
+    "vital": { "bp": "130/85", "pulse": 78, "temp": 36.5 }
+  },
+  {
+    "id": "CLOG-003",
+    "applyId": "C0280",
+    "patientName": "이선우",
+    "insuranceCompany": "삼성화재",
     "caregiverName": "김미숙",
-    "logDate": "2026-09-06",
-    "audioDuration": "02:18",
-    "audioUrl": "s3://rebornmate-audio-raw/C0303/20260906.m4a",
-    "sttText": "오늘 박영호 환자분 오전 혈압 128에 84, 맥박 76회, 체온 36.6도로 양호하십니다. 오전 재활 물리치료 40분 보행기 지지하에 동행하였고, 점심 식사 영양죽 한 그릇 남김없이 완식하셨습니다. 침상 안정 중이며 낙상 방지 사이드레일 고정 확인했습니다.",
-    "vital": {
-      "bp": "128/84",
-      "pulse": 76,
-      "temp": 36.6
-    }
+    "centerName": "인천센터",
+    "startDate": "2026-09-04",
+    "endDate": "2026-09-14",
+    "pdfFileName": "[C0280_이선우]_케어포트_공식간병일지.pdf",
+    "pdfFileSize": "395 KB",
+    "source": "케어포트 전산",
+    "importedAt": "2026-09-14 13:40",
+    "sttText": "이선우 환자분 활력징후 안정적이며 담당의 회진 시 이상 징후 없음 확인. 영양죽 식사 보조 및 물리치료실 휠체어 왕복 이송 지원 완료함.",
+    "vital": { "bp": "120/80", "pulse": 72, "temp": 36.5 }
   },
   {
-    "id": "LOG-0302",
-    "applyId": "C0309",
-    "patientName": "[테스트9] 오지훈",
-    "caregiverName": "김명자",
-    "logDate": "2026-07-25",
-    "audioDuration": "02:05",
-    "audioUrl": "s3://rebornmate-audio-raw/C0309/20260725.m4a",
-    "sttText": "오지훈 환자분 내일 오전 퇴원 예정으로 퇴원 약 복용 안내받으셨습니다. 기침 가래 증상 거의 호전되었고 혈압 120에 80으로 정상입니다. 10일 동안 간병 잘 마쳤습니다.",
-    "vital": {
-      "bp": "120/80",
-      "pulse": 72,
-      "temp": 36.5
-    }
-  },
-  {
-    id: 'LOG-001',
-    applyId: 'C0006',
-    patientName: '엄정현',
-    caregiverName: '박순자',
-    logDate: '2026-09-03',
-    audioDuration: '02:45',
-    audioUrl: 's3://rebornmate-audio-raw/C0006/A0006/20260903.m4a',
-    sttText: '오늘 엄정현 환자분 아침 식사로 전복죽 반 그릇 드셨습니다. 혈압은 125에 82로 안정적이시고 체온은 36.5도입니다. 오전 10시에 복도 보행 15분 진행하셨고 무릎 통증 약간 호소하셔서 냉찜질 20분 해드렸습니다. 점심 약 복용 완료하셨고 현재 편안히 낮잠 주무시고 계십니다.',
-    vital: { bp: '125/82', pulse: 74, temp: 36.5 }
-  },
-  {
-    id: 'LOG-002',
-    applyId: 'C0001',
-    patientName: '김옥경',
-    caregiverName: '이영희',
-    logDate: '2026-09-03',
-    audioDuration: '01:58',
-    audioUrl: 's3://rebornmate-audio-raw/C0001/A0001/20260903.m4a',
-    sttText: '김옥경 환자분 오늘 컨디션 매우 양호하십니다. 점심 식사 전량 섭취하셨으며 처방된 고혈압약 복용 확인하였습니다. 체위 변경 2시간 간격으로 시행하였고 욕창 발생 부위 없습니다.',
-    vital: { bp: '130/85', pulse: 78, temp: 36.6 }
+    "id": "CLOG-004",
+    "applyId": "C0303",
+    "patientName": "박영호",
+    "insuranceCompany": "삼성화재",
+    "caregiverName": "최정란",
+    "centerName": "영등포센터",
+    "startDate": "2026-08-28",
+    "endDate": "2026-09-06",
+    "pdfFileName": "[C0303_박영호]_케어포트_공식간병일지.pdf",
+    "pdfFileSize": "310 KB",
+    "source": "케어포트 전산",
+    "importedAt": "2026-09-14 14:00",
+    "sttText": "오전 재활 물리치료 40분 보행기 지지하에 동행하였고, 점심 식사 영양죽 완식하셨습니다. 침상 안정 중이며 낙상 방지 사이드레일 고정 확인했습니다.",
+    "vital": { "bp": "128/84", "pulse": 76, "temp": 36.6 }
   }
 ];
 
@@ -2441,22 +2453,19 @@ const FORM_TEMPLATES = [
     faxTarget: '담당 손해사정사 직통 팩스'
   },
   {
-    code: 'SF_FORM_01',
-    name: '삼성화재 간병인지원 특약 비용 청구서 및 서비스 명세서',
-    insurance: '삼성화재',
+    code: 'HD_FORM_03',
+    name: '현대해상(SCOR) 간병서비스 제공확인서 및 정산비용 청구서',
+    insurance: '현대해상(SCOR)',
     category: '청구용',
-    description: '삼성화재 단기 10일제 및 장기 월단위 간병비 정산 청구 시 손해사정팀에 제출하는 법정 청구 서식',
-    fields: ['접수번호', '사고번호', '피보험자명', '간병업체명', '간병인인적사항', '간병확인내역', '정산청구액'],
-    faxTarget: '삼성화재 담당 보상센터 팩스'
-  },
-  {
-    code: 'COMMON_FAX_COVER',
-    name: '(주)리본케어 손해사정팀 업무 팩스 표준 전송 표지 (Cover)',
-    insurance: '공통',
-    category: '공통',
-    description: '모든 팩스 발송 시 최상단에 자동 부착되는 발신처(리본케어) 및 수신처(손사) 공식 커버 시트',
-    fields: ['수신자', '수신처', '수신팩스', '발신자(리본케어)', '발신번호', '총매수', '전달사항'],
-    faxTarget: '수신처 팩스'
+    description: '현대해상 SCOR 재보험 출재 건 전용 간병서비스 제공확인서 및 정산비용 청구서 양식',
+    fields: [
+      '신규/추가 구분', '사고번호', '청구일', '피보험자명(생년월일 8자리)',
+      '사고유형', '피보험자 연락처', '계약번호', '상품명(SCOR 전용)',
+      '사고내용(질병/상해)', '병원명', '간병인명(생년월일)', '간병인연락처',
+      '최초간병시작일', '예상사용시간(수정가능)', '계속간병여부(선택)',
+      '서비스기간(4행)', '작성일자(한글)', '담당자명 및 연락처'
+    ],
+    faxTarget: '현대해상(SCOR) 담당 손해사정사 직통 팩스'
   }
 ];
 
