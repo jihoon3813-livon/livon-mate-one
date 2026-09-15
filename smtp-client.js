@@ -68,6 +68,87 @@ function parseEmailList(input) {
 }
 
 /**
+ * 수신자/발신자 문자열에서 순수 이메일 주소만 엄격 추출 (RFC 5321 규격)
+ */
+function extractCleanEmail(input) {
+  if (!input) return '';
+  const str = String(input).trim();
+  const angleMatch = str.match(/<([^>]+)>/);
+  if (angleMatch) return angleMatch[1].trim().replace(/^[<>\s]+|[<>\s]+$/g, '');
+  const emailMatch = str.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+  if (emailMatch) return emailMatch[1].trim();
+  return str.replace(/^[<>\s]+|[<>\s]+$/g, '');
+}
+
+/**
+ * 발신자 정보(순수 이메일 주소 및 표시명) 파싱 및 정규화
+ * - envelope sender (MAIL FROM:<...>)는 반드시 RFC 5321 순수 이메일 주소여야 함
+ * - display name은 RFC 5322 MIME 헤더 (From: ...)에 인코딩되어 노출됨
+ */
+function parseSenderInfo(from, senderName, user, host = '') {
+  let resolvedDisplayName = (senderName || '').trim();
+  let candidateEmail = '';
+
+  const rawFrom = (from || '').trim();
+
+  // 1. "홍길동 <email@domain.com>" 또는 "<email@domain.com>" 형식 추출
+  const angleMatch = rawFrom.match(/^(.*?)\s*<([^>]+)>$/);
+  if (angleMatch) {
+    if (angleMatch[1].trim() && !resolvedDisplayName) {
+      resolvedDisplayName = angleMatch[1].trim().replace(/^["']|["']$/g, '');
+    }
+    candidateEmail = angleMatch[2].trim();
+  } else if (rawFrom.includes('@')) {
+    const emailMatch = rawFrom.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    if (emailMatch) {
+      candidateEmail = emailMatch[1].trim();
+      const prefix = rawFrom.replace(emailMatch[0], '').replace(/[<>\(\)\[\]"']/g, '').trim();
+      if (prefix && !resolvedDisplayName) {
+        resolvedDisplayName = prefix;
+      }
+    } else {
+      candidateEmail = rawFrom;
+    }
+  } else if (rawFrom) {
+    // '@'가 없는 한글/문자열 표시명만 들어온 경우 (예: "(주)리본케어_김지훈")
+    if (!resolvedDisplayName) {
+      resolvedDisplayName = rawFrom;
+    }
+    candidateEmail = '';
+  }
+
+  // 2. candidateEmail이 비어있으면 user(인증 계정) 기반 대체
+  let cleanEmail = extractCleanEmail(candidateEmail);
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    if (user && user.includes('@')) {
+      cleanEmail = extractCleanEmail(user);
+    } else if (user) {
+      const trimmedUser = String(user).trim();
+      if (host.includes('naver.com')) {
+        cleanEmail = `${trimmedUser}@naver.com`;
+      } else if (host.includes('daum.net') || host.includes('hanmail.net') || host.includes('kakao.com')) {
+        cleanEmail = `${trimmedUser}@daum.net`;
+      } else if (host.includes('gmail.com')) {
+        cleanEmail = `${trimmedUser}@gmail.com`;
+      } else {
+        cleanEmail = trimmedUser;
+      }
+    }
+  }
+
+  // 불필요한 따옴표나 괄호 정리
+  resolvedDisplayName = resolvedDisplayName.replace(/<[^>]+>/g, '').replace(/^["']|["']$/g, '').trim();
+  if (!resolvedDisplayName) {
+    resolvedDisplayName = cleanEmail;
+  }
+
+  return {
+    cleanEmail,
+    displayName: resolvedDisplayName
+  };
+}
+
+/**
  * 순수 Node.js tls/net 기반 SMTP 메일 발송 엔진
  */
 function sendSmtpMail(options) {
@@ -101,12 +182,11 @@ function sendSmtpMail(options) {
       return reject(new Error('수신자 이메일 주소(To)가 지정되지 않았습니다.'));
     }
 
-    const senderEmail = from || user;
-    const displayName = senderName || senderEmail;
+    const { cleanEmail: senderEmail, displayName } = parseSenderInfo(from, senderName, user, host);
 
     console.log('[sendSmtpMail Start]', {
       host, port, secure,
-      from: senderEmail,
+      envelopeFrom: senderEmail,
       displayName,
       toList,
       ccList,
@@ -278,8 +358,7 @@ function sendSmtpMail(options) {
         return;
       }
       const rcpt = list[idx];
-      const emailMatch = rcpt.match(/<([^>]+)>/) || [null, rcpt];
-      const cleanEmail = (emailMatch[1] || rcpt).trim();
+      const cleanEmail = extractCleanEmail(rcpt);
 
       sendCmd(`RCPT TO:<${cleanEmail}>`);
 
@@ -304,16 +383,24 @@ function buildMimeMessage({ senderName, senderEmail, toList, ccList, subject, te
   const boundaryAlt = '----=_Part_Alt_' + Date.now().toString(36) + Math.random().toString(36).substring(2);
   const nowStr = new Date().toUTCString();
 
-  const formattedFrom = senderName ? `${encodeMimeHeader(senderName)} <${senderEmail}>` : `<${senderEmail}>`;
+  const formattedFrom = (senderName && senderName !== senderEmail)
+    ? `${encodeMimeHeader(senderName)} <${senderEmail}>`
+    : `<${senderEmail}>`;
+
   const formattedTo = toList.map(t => {
     const m = t.match(/^(.*?)\s*<([^>]+)>$/);
-    return m ? `${encodeMimeHeader(m[1].trim())} <${m[2]}>` : t;
+    return m ? `${encodeMimeHeader(m[1].trim())} <${extractCleanEmail(m[2])}>` : `<${extractCleanEmail(t)}>`;
+  }).join(', ');
+
+  const formattedCc = (ccList || []).map(t => {
+    const m = t.match(/^(.*?)\s*<([^>]+)>$/);
+    return m ? `${encodeMimeHeader(m[1].trim())} <${extractCleanEmail(m[2])}>` : `<${extractCleanEmail(t)}>`;
   }).join(', ');
 
   const headers = [
     `From: ${formattedFrom}`,
     `To: ${formattedTo}`,
-    ccList.length > 0 ? `Cc: ${ccList.join(', ')}` : null,
+    (ccList && ccList.length > 0) ? `Cc: ${formattedCc}` : null,
     `Subject: ${encodeMimeHeader(subject)}`,
     `Date: ${nowStr}`,
     `MIME-Version: 1.0`,
@@ -429,7 +516,7 @@ async function testSmtpConnection(options) {
     secure,
     user,
     pass,
-    from: user,
+    from: options.from || user,
     senderName: options.senderName || '(주)리본케어 운영데스크',
     to: targetEmail,
     subject: testSubject,

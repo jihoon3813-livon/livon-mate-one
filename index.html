@@ -87,9 +87,32 @@
       will-change: transform;
     }
   
-    /* Eliminate empty OS locale parentheses in date inputs */
-    input[type="date"] {
+    /* 모든 날짜/시간 입력 필드 및 캘린더 피커 영역 커서 및 클릭 활성화 */
+    input[type="date"],
+    input[type="month"],
+    input[type="time"],
+    input[type="datetime-local"] {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      cursor: pointer !important;
+      position: relative;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator,
+    input[type="month"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-calendar-picker-indicator,
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+      cursor: pointer !important;
+      padding: 3px;
+      border-radius: 6px;
+      opacity: 0.85;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    input[type="date"]:hover::-webkit-calendar-picker-indicator,
+    input[type="month"]:hover::-webkit-calendar-picker-indicator,
+    input[type="time"]:hover::-webkit-calendar-picker-indicator,
+    input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator {
+      opacity: 1;
+      transform: scale(1.15);
+      background-color: rgba(0, 0, 0, 0.05);
     }
 
     /* 형광펜 하이라이트 효과 (Highlighter Pens) */
@@ -497,6 +520,15 @@
           <span class="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-bold border border-amber-400/30">All-in-One</span>
         </button>
 
+        <!-- 2-2. 간병캘린더 (월별/주별 스마트 스케줄러) -->
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="carecalendar" onclick="switchTab('carecalendar')">
+          <div class="flex items-center space-x-3">
+            <i data-lucide="calendar-days" class="w-4 h-4 flex-shrink-0 text-sky-400"></i>
+            <span class="tracking-tight font-semibold">간병캘린더</span>
+          </div>
+          <span class="min-w-[28px] h-5 px-2 rounded-full bg-sky-950 text-sky-300 font-bold text-[10px] flex items-center justify-center border border-sky-800" id="sidebarCalendarCount">스케줄</span>
+        </button>
+
         <!-- 3. 간병일지 (케어포트) -->
         <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="carelogs" onclick="switchTab('carelogs')">
           <div class="flex items-center space-x-3">
@@ -506,31 +538,17 @@
           <span class="h-5 px-2 rounded-md bg-purple-950 text-purple-300 font-bold text-[10px] flex items-center justify-center border border-purple-800">CarePort</span>
         </button>
 
-        <!-- 4. 손사디렉토리 -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="adjusters" onclick="switchTab('adjusters')">
+        <!-- 4. 파트너/인력 디렉토리 (간병인 · 간병센터 · 손사디렉토리 통합) -->
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="directory" onclick="switchTab('directory')">
           <div class="flex items-center space-x-3">
             <i data-lucide="contact-2" class="w-4 h-4 flex-shrink-0 text-emerald-400"></i>
-            <span class="tracking-tight">손사디렉토리</span>
+            <span class="tracking-tight font-semibold">파트너/인력 디렉토리</span>
           </div>
-          <span class="min-w-[34px] h-5 px-2 rounded-full bg-slate-800 text-emerald-300 font-bold text-[11px] flex items-center justify-center border border-slate-700" id="sidebarAdjusterCount">7</span>
-        </button>
-
-        <!-- 5. 간병인인력 -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="caregivers" onclick="switchTab('caregivers')">
-          <div class="flex items-center space-x-3">
-            <i data-lucide="users" class="w-4 h-4 flex-shrink-0 text-emerald-400"></i>
-            <span class="tracking-tight">간병인인력</span>
-          </div>
-          <span class="min-w-[34px] h-5 px-2 rounded-full bg-slate-800 text-emerald-300 font-bold text-[11px] flex items-center justify-center border border-slate-700" id="sidebarCaregiverCount">8</span>
-        </button>
-
-        <!-- 6. 간병센터 -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="centers" onclick="switchTab('centers')">
-          <div class="flex items-center space-x-3">
-            <i data-lucide="building-2" class="w-4 h-4 flex-shrink-0 text-sky-400"></i>
-            <span class="tracking-tight">간병센터</span>
-          </div>
-          <span class="min-w-[34px] h-5 px-2 rounded-full bg-slate-800 text-sky-300 font-bold text-[11px] flex items-center justify-center border border-slate-700" id="sidebarCenterCount">7</span>
+          <span class="min-w-[34px] h-5 px-2 rounded-full bg-slate-800 text-emerald-300 font-bold text-[11px] flex items-center justify-center border border-slate-700" id="sidebarDirectoryCount">22</span>
+          <!-- 하위 호환성을 위한 숨김 카운터 -->
+          <span id="sidebarAdjusterCount" class="hidden">7</span>
+          <span id="sidebarCaregiverCount" class="hidden">8</span>
+          <span id="sidebarCenterCount" class="hidden">7</span>
         </button>
 
         <!-- 7. 삼성화재 명단관리 (웹 스프레드시트) -->
@@ -689,6 +707,10 @@
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
+            <button onclick="switchTab('carecalendar')" class="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-200 text-xs font-black shadow-2xs transition-all cursor-pointer" title="월별/주별 스마트 간병캘린더 화면으로 이동">
+              <i data-lucide="calendar-days" class="w-4 h-4 text-sky-600"></i>
+              <span>간병캘린더</span>
+            </button>
             <button onclick="refreshLatestData()" class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all cursor-pointer" title="Convex Cloud 실시간 최신자료 즉시 조회">
               <i data-lucide="refresh-cw" id="hubRefreshBtnIcon" class="w-4 h-4"></i>
               <span>최신자료 조회</span>
@@ -817,6 +839,268 @@
 
       </section>
 
+      <!-- ========================================================================= -->
+      <!-- [NEW] CARE CALENDAR (스마트 간병캘린더: 월별/주별 + 고객/손사/간병인 + 주요체크사항) -->
+      <!-- ========================================================================= -->
+      <section id="tab-carecalendar" class="tab-content hidden space-y-5">
+        
+        <!-- 1. Top Header & Real-time KPI Cards -->
+        <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-5 sm:p-6 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-5 border border-slate-800">
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-3 py-1 rounded-full text-[11px] font-black bg-sky-500 text-white shadow-xs flex items-center gap-1.5">
+                <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                <span>스마트 간병캘린더</span>
+              </span>
+              <span class="text-slate-400 text-xs font-mono font-medium">Smart Care Schedule Hub</span>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+              <span>간병 스케줄 & 고객 주요체크사항 통합 캘린더</span>
+            </h2>
+            <p class="text-xs text-slate-300 max-w-2xl leading-relaxed">
+              고객(환자), 보험사, 손해사정인, 배정 간병인 및 협력센터의 일정을 한눈에 조망하고, 
+              <b>환자 케어 주의사항(치매, 와상, 낙상주의 등)과 CS/민원 이력</b>을 실시간으로 모니터링합니다.
+            </p>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="flex items-center gap-2 flex-wrap shrink-0">
+            <button type="button" onclick="openNewAppModal()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-500 hover:to-indigo-500 active:scale-95 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition-all cursor-pointer">
+              <i data-lucide="user-plus" class="w-4 h-4"></i>
+              <span>신규 고객접수</span>
+            </button>
+            <button type="button" onclick="switchTab('carehub')" class="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 flex items-center gap-1.5 transition-all cursor-pointer">
+              <i data-lucide="layers" class="w-4 h-4 text-amber-300"></i>
+              <span>통합허브 대장 이동</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI 4 Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <!-- Card 1: 당월 총 일정 -->
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+            <div>
+              <div class="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                <i data-lucide="calendar-check-2" class="w-3.5 h-3.5 text-sky-500"></i>
+                <span id="calKpiTotalMonthLabel">당월 간병일정</span>
+              </div>
+              <div class="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1" id="calKpiTotalCount">0건</div>
+              <div class="text-[10.5px] text-slate-400 mt-0.5" id="calKpiTotalDays">총 0일 케어</div>
+            </div>
+            <div class="w-11 h-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100">
+              <i data-lucide="calendar-range" class="w-5 h-5"></i>
+            </div>
+          </div>
+
+          <!-- Card 2: 현재 활동(진행)중 -->
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+            <div>
+              <div class="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                <i data-lucide="activity" class="w-3.5 h-3.5 text-emerald-500"></i>
+                <span>현재 활동(진행)중</span>
+              </div>
+              <div class="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1" id="calKpiActiveCount">0명</div>
+              <div class="text-[10.5px] text-emerald-600 font-medium mt-0.5 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="calKpiActiveDetail">실시간 근무 진행중</span>
+              </div>
+            </div>
+            <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+              <i data-lucide="user-check" class="w-5 h-5"></i>
+            </div>
+          </div>
+
+          <!-- Card 3: 금주 시작/종료 예정 -->
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+            <div>
+              <div class="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                <i data-lucide="arrow-left-right" class="w-3.5 h-3.5 text-indigo-500"></i>
+                <span>금주 시작 / 종료 예정</span>
+              </div>
+              <div class="text-xl sm:text-2xl font-black text-indigo-900 font-mono mt-1" id="calKpiWeekSchedule">0 / 0건</div>
+              <div class="text-[10.5px] text-slate-500 mt-0.5" id="calKpiWeekScheduleDetail">시작 0건 · 종료 0건</div>
+            </div>
+            <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+              <i data-lucide="clock" class="w-5 h-5"></i>
+            </div>
+          </div>
+
+          <!-- Card 4: 중점 관리 (주의/민원 대상자) -->
+          <div class="bg-white p-4 rounded-2xl border border-amber-200 bg-amber-50/30 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+            <div>
+              <div class="text-[11px] font-bold text-amber-800 flex items-center gap-1">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600"></i>
+                <span>중점관리 (주의·민원)</span>
+              </div>
+              <div class="text-xl sm:text-2xl font-black text-amber-900 font-mono mt-1" id="calKpiAttentionCount">0명</div>
+              <div class="text-[10.5px] text-amber-700 font-medium mt-0.5" id="calKpiAttentionDetail">치매·낙상주의·강성CS 등</div>
+            </div>
+            <div class="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200">
+              <i data-lucide="shield-alert" class="w-5 h-5"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Interactive Navigation & Control Toolbar -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
+            
+            <!-- Left: Date Navigator -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <div class="inline-flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200">
+                <button type="button" onclick="navigateCareCalendar(-1)" class="p-1.5 rounded-lg text-slate-700 hover:bg-white hover:text-slate-900 transition-all cursor-pointer" title="이전">
+                  <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                </button>
+                <button type="button" onclick="navigateCareCalendar(0)" class="px-3 py-1 rounded-lg text-xs font-black text-slate-800 hover:bg-white transition-all cursor-pointer">
+                  오늘
+                </button>
+                <button type="button" onclick="navigateCareCalendar(1)" class="p-1.5 rounded-lg text-slate-700 hover:bg-white hover:text-slate-900 transition-all cursor-pointer" title="다음">
+                  <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+              </div>
+
+              <h3 class="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2 font-mono pl-1" id="calCurrentHeaderLabel">
+                2026년 9월
+              </h3>
+            </div>
+
+            <!-- Right: View Mode Segmented Controls & Legend -->
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <!-- View Mode Toggle (월별 / 주별 / 연결 타임라인 / 연속 바 달력) -->
+              <div class="inline-flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200 shadow-2xs flex-wrap gap-0.5">
+                <button type="button" id="btnCalViewTimeline" onclick="setCareCalendarViewMode('timeline')" 
+                  class="px-3 py-1.5 rounded-lg font-black text-xs flex items-center gap-1.5 transition-all bg-white text-primary-700 shadow-xs cursor-pointer"
+                  title="고객별로 시작일부터 종료일까지 가로 막대가 쭉 연결되는 타임라인 간트뷰">
+                  <i data-lucide="chart-gantt" class="w-3.5 h-3.5 text-primary-600"></i>
+                  <span>연결 타임라인 (NEW)</span>
+                </button>
+                <button type="button" id="btnCalViewSpanMonth" onclick="setCareCalendarViewMode('spanmonth')" 
+                  class="px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 cursor-pointer"
+                  title="월간 달력 그리드 위에서 일정이 날짜를 가로질러 쭉 연결되는 달력">
+                  <i data-lucide="calendar-range" class="w-3.5 h-3.5 text-indigo-600"></i>
+                  <span>연속 바 달력 (NEW)</span>
+                </button>
+                <button type="button" id="btnCalViewMonth" onclick="setCareCalendarViewMode('month')" 
+                  class="px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 cursor-pointer"
+                  title="날짜 셀별 개별 카드 보기 (기존)">
+                  <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-500"></i>
+                  <span>월별 카드 (기존)</span>
+                </button>
+                <button type="button" id="btnCalViewWeek" onclick="setCareCalendarViewMode('week')" 
+                  class="px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 cursor-pointer"
+                  title="주간 시간표형 카드 보기 (기존)">
+                  <i data-lucide="columns-3" class="w-3.5 h-3.5 text-slate-500"></i>
+                  <span>주별 보기 (기존)</span>
+                </button>
+              </div>
+
+              <!-- Color Legend Tooltip Trigger -->
+              <div class="hidden sm:flex items-center gap-2 text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>현대해상</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span>삼성화재</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>기타보험</span>
+                <span class="flex items-center gap-1 text-amber-700 font-black"><i data-lucide="alert-circle" class="w-3 h-3 text-amber-600"></i>주의체크</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Multi Filter Toolbar -->
+          <div class="pt-2.5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+            <!-- Filter: Insurance -->
+            <div>
+              <label class="block text-[11px] font-bold text-slate-500 mb-1">보험사 필터</label>
+              <select id="calFilterInsurance" onchange="onCareCalendarFilterChange()" class="w-full p-2 border border-slate-200 rounded-xl bg-white font-bold text-slate-800">
+                <option value="ALL">전체 보험사</option>
+                <option value="현대해상">현대해상</option>
+                <option value="삼성화재">삼성화재</option>
+                <option value="DB손해보험">DB손해보험</option>
+                <option value="KB손해보험">KB손해보험</option>
+                <option value="메리츠화재">메리츠화재</option>
+              </select>
+            </div>
+
+            <!-- Filter: Care Status -->
+            <div>
+              <label class="block text-[11px] font-bold text-slate-500 mb-1">간병 진행상태</label>
+              <select id="calFilterStatus" onchange="onCareCalendarFilterChange()" class="w-full p-2 border border-slate-200 rounded-xl bg-white font-bold text-slate-800">
+                <option value="ALL">전체 상태</option>
+                <option value="ONGOING">간병진행중 (활동)</option>
+                <option value="UPCOMING">간병예정</option>
+                <option value="COMPLETED">간병종료</option>
+                <option value="ATTENTION">⚠️ 중점관리 (주의·민원만)</option>
+              </select>
+            </div>
+
+            <!-- Filter: Center -->
+            <div>
+              <label class="block text-[11px] font-bold text-slate-500 mb-1">협력센터</label>
+              <select id="calFilterCenter" onchange="onCareCalendarFilterChange()" class="w-full p-2 border border-slate-200 rounded-xl bg-white font-bold text-slate-800">
+                <option value="ALL">전체 센터</option>
+              </select>
+            </div>
+
+            <!-- Filter: Search Keyword -->
+            <div>
+              <label class="block text-[11px] font-bold text-slate-500 mb-1">고객/간병인/병원/손사 검색</label>
+              <div class="relative">
+                <input type="text" id="calFilterKeyword" oninput="onCareCalendarFilterChange()" placeholder="환자명, 간병인명, 병원, 손사..." 
+                  class="w-full p-2 pl-8 border border-slate-200 rounded-xl bg-white text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Main Calendar Container (월별 / 주별 동적 렌더링) -->
+        <div id="careCalendarMainGrid" class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden min-h-[640px]">
+          <!-- Dynamic Calendar Grid injected via JavaScript -->
+        </div>
+
+      </section>
+
+      <!-- ========================================================================= -->
+      <!-- [NEW] CARE CALENDAR DETAIL DRAWER (우측 슬라이딩 간병일정 & 주요체크사항 상세 패널) -->
+      <!-- ========================================================================= -->
+      <div id="careCalendarDetailDrawer" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs transition-opacity duration-300 hidden">
+        <!-- Backdrop Click Area -->
+        <div class="absolute inset-0" onclick="closeCalendarDetailDrawer()"></div>
+
+        <!-- Drawer Content Panel -->
+        <div id="careCalendarDetailDrawerPanel" class="absolute top-0 right-0 bottom-0 w-full max-w-[540px] bg-white shadow-2xl flex flex-col transform transition-transform duration-300 translate-x-full overflow-hidden border-l border-slate-200">
+          
+          <!-- Drawer Header -->
+          <div class="p-5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between gap-3 shrink-0">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-300">
+                <i data-lucide="calendar-heart" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-base font-black text-white" id="drawerPatientName">환자명</h3>
+                  <span class="px-2 py-0.5 rounded-full text-[10.5px] font-black" id="drawerStatusBadge">상태</span>
+                </div>
+                <div class="text-xs text-slate-300 font-mono mt-0.5" id="drawerApplyId">신청ID</div>
+              </div>
+            </div>
+            <button type="button" onclick="closeCalendarDetailDrawer()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Drawer Body (Scrollable) -->
+          <div class="p-5 space-y-5 flex-1 overflow-y-auto custom-scrollbar" id="drawerBodyContent">
+            <!-- Injected via JavaScript -->
+          </div>
+
+          <!-- Drawer Footer Action Bar -->
+          <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0" id="drawerFooterActions">
+            <!-- Injected via JavaScript -->
+          </div>
+
+        </div>
+      </div>
 
       <section id="tab-dashboard" class="tab-content hidden space-y-6" class="tab-content space-y-6">
         
@@ -1241,6 +1525,7 @@
 
         <!-- 3. 서브 탭 1: 일일접수 보고 (Daily Registration & Care Log Report) -->
         <div id="samsungHubSubTab-daily" class="space-y-4">
+          <div id="samsungDailySentSuccessBanner" class="hidden"></div>
           <form id="samsungDailyEmailForm" onsubmit="handleSendSamsungDailyReport(event)" class="space-y-4 text-xs">
             <!-- 그리드 1: 발송 기본 정보 (수신자, 발신자, 제목) -->
             <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
@@ -1299,20 +1584,20 @@
             </div>
 
             <!-- 그리드 2: 엑셀 첨부 설정 (명단관리 연동 or 외부 엑셀) -->
-            <div id="samsungDailyExcelCard" class="bg-white p-5 rounded-2xl border-2 border-emerald-400/80 shadow-xs space-y-3 transition-all">
+            <div id="samsungDailyExcelCard" class="bg-slate-50/50 p-5 rounded-2xl border border-slate-300 opacity-70 shadow-xs space-y-3 transition-all">
               <div class="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
                 <div class="flex items-center gap-2.5">
                   <label class="flex items-center gap-2 font-black text-slate-900 text-sm cursor-pointer select-none">
-                    <input type="checkbox" id="samsungDailyExcelAttachToggle" checked onchange="toggleSamsungDailyExcelAttachment(this.checked)" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer">
-                    <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+                    <input type="checkbox" id="samsungDailyExcelAttachToggle" onchange="toggleSamsungDailyExcelAttachment(this.checked)" class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4 text-slate-500"></i>
                     <span>1. 일일 접수 엑셀 첨부 파일 설정</span>
                   </label>
-                  <span id="samsungDailyExcelAttachBadge" class="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 shadow-2xs">
-                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
-                    <span>엑셀 첨부 완료 📎</span>
+                  <span id="samsungDailyExcelAttachBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-300 flex items-center gap-1 shadow-2xs">
+                    <i data-lucide="x-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                    <span>미첨부 (선택 필요)</span>
                   </span>
                 </div>
-                <div id="samsungDailyExcelSourceRadioGroup" class="flex items-center gap-2">
+                <div id="samsungDailyExcelSourceRadioGroup" class="flex items-center gap-2 opacity-40 pointer-events-none">
                   <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer">
                     <input type="radio" name="samsungDailyExcelSource" value="integrated" checked onchange="toggleSamsungDailyExcelSource(this.value)" class="text-emerald-600">
                     <span>⚡ 명단관리 연동 ([대상자] 시트)</span>
@@ -1325,7 +1610,7 @@
               </div>
 
               <!-- 명단관리 연동 UI -->
-              <div id="samsungDailyExcelIntegratedBox" class="p-3.5 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-2">
+              <div id="samsungDailyExcelIntegratedBox" class="p-3.5 bg-slate-100/60 rounded-xl border border-slate-200 space-y-2 opacity-40 pointer-events-none">
                 <div class="flex items-center justify-between flex-wrap gap-2">
                   <div class="flex items-center gap-2 min-w-0">
                     <span class="px-2 py-0.5 rounded bg-emerald-600 text-white font-bold text-[10.5px]">연동완료</span>
@@ -1462,6 +1747,7 @@
             </div>
           </div>
 
+          <div id="samsungClaimSentSuccessBanner" class="hidden"></div>
           <form id="samsungClaimEmailForm" onsubmit="handleSendSamsungMonthlyClaim(event)" class="space-y-4 text-xs">
             <!-- 그리드 1: 발송 기본 정보 -->
             <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
@@ -1518,20 +1804,20 @@
             </div>
 
             <!-- 그리드 2: 월간 청구 엑셀 첨부 설정 -->
-            <div id="samsungClaimExcelCard" class="bg-white p-5 rounded-2xl border-2 border-indigo-400/80 shadow-xs space-y-3 transition-all">
+            <div id="samsungClaimExcelCard" class="bg-slate-50/50 p-5 rounded-2xl border border-slate-300 opacity-70 shadow-xs space-y-3 transition-all">
               <div class="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
                 <div class="flex items-center gap-2.5">
                   <label class="flex items-center gap-2 font-black text-slate-900 text-sm cursor-pointer select-none">
-                    <input type="checkbox" id="samsungClaimExcelAttachToggle" checked onchange="toggleSamsungClaimExcelAttachment(this.checked)" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer">
-                    <i data-lucide="file-spreadsheet" class="w-4 h-4 text-indigo-600"></i>
+                    <input type="checkbox" id="samsungClaimExcelAttachToggle" onchange="toggleSamsungClaimExcelAttachment(this.checked)" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4 text-slate-500"></i>
                     <span>월간 간병완료 청구 엑셀 첨부 설정</span>
                   </label>
-                  <span id="samsungClaimExcelAttachBadge" class="px-2.5 py-0.5 rounded-full text-xs font-black bg-indigo-100 text-indigo-800 border border-indigo-300 flex items-center gap-1 shadow-2xs">
-                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-indigo-600"></i>
-                    <span>청구 엑셀 첨부 완료 📎</span>
+                  <span id="samsungClaimExcelAttachBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-300 flex items-center gap-1 shadow-2xs">
+                    <i data-lucide="x-circle" class="w-3.5 h-3.5 text-slate-400"></i>
+                    <span>미첨부 (선택 필요)</span>
                   </span>
                 </div>
-                <div id="samsungClaimExcelSourceRadioGroup" class="flex items-center gap-2">
+                <div id="samsungClaimExcelSourceRadioGroup" class="flex items-center gap-2 opacity-40 pointer-events-none">
                   <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700 cursor-pointer">
                     <input type="radio" name="samsungClaimExcelSource" value="integrated" checked onchange="toggleSamsungClaimExcelSource(this.value)" class="text-indigo-600">
                     <span>⚡ 명단관리 연동 ([완료] 시트 데이터)</span>
@@ -1544,7 +1830,7 @@
               </div>
 
               <!-- 명단관리 완료 시트 연동 -->
-              <div id="samsungClaimExcelIntegratedBox" class="p-3.5 bg-indigo-50/70 rounded-xl border border-indigo-200 space-y-2">
+              <div id="samsungClaimExcelIntegratedBox" class="p-3.5 bg-slate-100/60 rounded-xl border border-slate-200 space-y-2 opacity-40 pointer-events-none">
                 <div class="flex items-center justify-between flex-wrap gap-2">
                   <div class="flex items-center gap-2 min-w-0">
                     <span class="px-2 py-0.5 rounded bg-indigo-600 text-white font-bold text-[10.5px]">자동연동</span>
@@ -1617,6 +1903,7 @@
 
         <!-- 5. 서브 탭 3: 발송 이력 및 전송 로그 (History) -->
         <div id="samsungHubSubTab-history" class="hidden space-y-4">
+          <div id="samsungHistoryLastSentBanner" class="hidden"></div>
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
             <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-2">
               <div>
@@ -1646,243 +1933,303 @@
         </div>
       </section>
 
-      <!-- ==================== TAB: ADJUSTER DIRECTORY ==================== -->
-      <section id="tab-adjusters" class="tab-content hidden space-y-5">
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200">
-              <i data-lucide="contact-2" class="w-5 h-5"></i>
+      <!-- ==================== TAB: INTEGRATED DIRECTORY (간병인 · 간병센터 · 손사디렉토리) ==================== -->
+      <section id="tab-directory" class="tab-content hidden space-y-4">
+        <!-- 1. 최상단 통합 헤더 -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200 shrink-0 shadow-2xs">
+              <i data-lucide="contact-2" class="w-5 h-5 text-emerald-600"></i>
             </div>
-            <div>
-              <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
-                손사 디렉토리 관리 (손해사정인·지사·팩스)
-                <span class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">팩스 자동연동</span>
+            <div class="min-w-0">
+              <h2 class="text-xl font-black text-slate-900 flex items-center gap-2 flex-wrap">
+                <span>파트너 & 인력 디렉토리</span>
+                <span class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">원스탑 통합 관리</span>
               </h2>
-              <p class="text-xs text-slate-500 mt-0.5">
-                현대해상 및 삼성화재 보상과 손해사정법인 담당자, 직통번호 및 팩스번호를 통합 관리합니다. 팩스 발송 시 번호가 자동 연동됩니다.
+              <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                간병인 인력 풀, 전국 협력 간병센터, 보험사 손해사정인(손사) 연락망을 한곳에서 통합 관리하며 배정창 및 팩스와 자동 연동됩니다.
               </p>
             </div>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <button onclick="openAdjusterModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all">
-              <i data-lucide="user-plus" class="w-4 h-4"></i>
-              <span>신규 손사 등록</span>
+
+          <div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+            <span class="text-xs text-slate-600 font-bold bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs flex items-center gap-1.5">
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>전체 등록:</span>
+              <b id="dirHeaderTotalCount" class="text-emerald-700 font-black">22명/개소</b>
+            </span>
+          </div>
+        </div>
+
+        <!-- 2. 서브 탭 바 (Sub Tabs) -->
+        <div class="flex items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs flex-wrap">
+          <div class="flex items-center gap-1.5 overflow-x-auto custom-scrollbar p-1">
+            <button type="button" onclick="switchDirectorySubTab('caregivers')" id="btnDirSubTab-caregivers"
+              class="dir-subtab-btn px-4 py-2 rounded-xl text-xs font-black bg-emerald-600 text-white shadow-xs flex items-center gap-2 border border-emerald-500 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="users" class="w-3.5 h-3.5 text-white"></i>
+              <span>간병인 인력</span>
+              <span id="dirCaregiverCountBadge" class="dir-badge px-2 py-0.5 rounded-full bg-white text-emerald-950 font-black text-[10.5px] shadow-2xs">0명</span>
             </button>
-            <button id="btnDeleteSelected-adjusters" onclick="deleteSelectedLedgerRows('adjusters')" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                <span id="labelDeleteSelected-adjusters">선택 삭제 (0)</span>
+            <button type="button" onclick="switchDirectorySubTab('centers')" id="btnDirSubTab-centers"
+              class="dir-subtab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="building-2" class="w-3.5 h-3.5 text-sky-600"></i>
+              <span>간병센터</span>
+              <span id="dirCenterCountBadge" class="dir-badge px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold border border-slate-300/60 text-[10.5px]">0개소</span>
+            </button>
+            <button type="button" onclick="switchDirectorySubTab('adjusters')" id="btnDirSubTab-adjusters"
+              class="dir-subtab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="contact-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>손사 디렉토리</span>
+              <span id="dirAdjusterCountBadge" class="dir-badge px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold border border-slate-300/60 text-[10.5px]">0명</span>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500 flex items-center gap-1 font-medium">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>배정창 연동 · 정산 지급계좌 · 팩스 자동연동</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- 3. 서브 탭 1: 간병인 인력 (Caregivers) -->
+        <div id="dirSubTab-caregivers" class="space-y-4">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200 shrink-0">
+                <i data-lucide="users" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-base font-black text-slate-900 flex items-center gap-2">
+                  간병인 인력 풀 관리 (Caregiver Pool Directory)
+                  <span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">엑셀 일괄 업로드 지원</span>
+                </h3>
+                <p class="text-[11.5px] text-slate-500 mt-0.5">
+                  전국 협약 간병센터 소속 및 개인 간병인의 프로필, 활동지역, 자격증, 정산계좌를 관리하며 배정창에서 즉시 연동됩니다.
+                </p>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="openCaregiverExcelModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold transition-all">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+                <span>간병인 엑셀 일괄 업로드</span>
               </button>
-              <button id="btnExportSelected-adjusters" onclick="exportLedgerToExcel('adjusters', 'SELECTED')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all">
-              <i data-lucide="check-square" class="w-3.5 h-3.5 text-emerald-600"></i>
-              <span id="labelExportSelected-adjusters">선택 엑셀 (0)</span>
-            </button>
-            <button onclick="exportLedgerToExcel('adjusters', 'ALL')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
-              <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-600"></i>
-              <span>전체 엑셀</span>
-            </button>
-          </div>
-        </div>
-
-        <div class="sticky-filter-bar rounded-2xl">
-          <div class="p-4 border border-slate-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 bg-white shadow-xs">
-            <div class="flex items-center gap-2">
-              <input type="text" id="adjusterSearchInput" oninput="renderAdjusters()" placeholder="손사명, 법인명, 지사, 팩스번호 검색..." class="w-64 p-2 text-xs border border-slate-300 rounded-xl bg-white">
-              <select id="adjusterInsFilter" onchange="renderAdjusters()" class="p-2 text-xs border border-slate-300 rounded-xl bg-white font-semibold">
-                <option value="ALL">원수사: 전체</option>
-                <option value="현대해상">현대해상</option>
-                <option value="현대해상(SCOR)">현대해상(SCOR)</option>
-                <option value="삼성화재">삼성화재</option>
-              </select>
-            </div>
-            <span class="text-xs text-slate-500">등록 손사: <b id="adjusterListCount" class="text-emerald-700 font-bold">7</b>명</span>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-          <div class="overflow-x-auto custom-scrollbar">
-            <table class="w-full text-left text-xs text-slate-600 whitespace-nowrap">
-              <thead class="bg-slate-100 border-b border-slate-200 font-semibold text-slate-700">
-                <tr>
-                  <th class="p-3 pl-4 w-8"><input type="checkbox" onchange="toggleSelectAllRows('adjusters', this.checked)" class="rounded text-emerald-600"></th>
-                  <th class="p-3">손사코드</th>
-                  <th class="p-3">보험사</th>
-                  <th class="p-3">손해사정법인</th>
-                  <th class="p-3">관할 지사</th>
-                  <th class="p-3">담당 손사명</th>
-                  <th class="p-3">직통 전화</th>
-                  <th class="p-3">휴대폰</th>
-                  <th class="p-3 font-bold text-purple-700">수신 팩스 (Fax)</th>
-                  <th class="p-3">이메일</th>
-                  <th class="p-3 text-center">진행 배정건</th>
-                  <th class="p-3 text-center pr-4">관리</th>
-                </tr>
-              </thead>
-              <tbody id="adjusterTableBody" class="divide-y divide-slate-100"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- ==================== TAB: CAREGIVER DIRECTORY ==================== -->
-      <section id="tab-caregivers" class="tab-content hidden space-y-5">
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200">
-              <i data-lucide="users" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
-                간병인 인력 풀 관리 (Caregiver Pool Directory)
-                <span class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">엑셀 일괄 업로드 지원</span>
-              </h2>
-              <p class="text-xs text-slate-500 mt-0.5">
-                전국 협약 간병센터 소속 및 개인 간병인의 프로필, 활동지역, 자격증, 정산계좌를 통합 관리하며 배정창에서 즉시 연동됩니다.
-              </p>
-            </div>
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <button onclick="openCaregiverExcelModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold transition-all">
-              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
-              <span>간병인 엑셀 일괄 업로드</span>
-            </button>
-            <button onclick="openCaregiverModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all">
-              <i data-lucide="user-plus" class="w-4 h-4"></i>
-              <span>신규 간병인 등록</span>
-            </button>
-            <button id="btnDeleteSelected-caregivers" onclick="deleteSelectedLedgerRows('caregivers')" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
+              <button onclick="openCaregiverModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all">
+                <i data-lucide="user-plus" class="w-4 h-4"></i>
+                <span>신규 간병인 등록</span>
+              </button>
+              <button id="btnDeleteSelected-caregivers" onclick="deleteSelectedLedgerRows('caregivers')" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 <span id="labelDeleteSelected-caregivers">선택 삭제 (0)</span>
               </button>
               <button id="btnExportSelected-caregivers" onclick="exportLedgerToExcel('caregivers', 'SELECTED')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all">
-              <i data-lucide="check-square" class="w-3.5 h-3.5 text-emerald-600"></i>
-              <span id="labelExportSelected-caregivers">선택 엑셀 (0)</span>
-            </button>
-            <button onclick="exportLedgerToExcel('caregivers', 'ALL')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
-              <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-600"></i>
-              <span>전체 엑셀</span>
-            </button>
+                <i data-lucide="check-square" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span id="labelExportSelected-caregivers">선택 엑셀 (0)</span>
+              </button>
+              <button onclick="exportLedgerToExcel('caregivers', 'ALL')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
+                <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span>전체 엑셀</span>
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div class="sticky-filter-bar rounded-2xl">
-          <div class="p-4 border border-slate-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 bg-white shadow-xs">
-            <div class="flex flex-wrap items-center gap-2">
-              <div class="relative w-64">
-                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-                <input type="text" id="caregiverSearchInput" oninput="renderCaregivers()" placeholder="간병인명, 연락처, 지역, 자격증 검색..." class="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl bg-white">
+          <div class="sticky-filter-bar rounded-2xl">
+            <div class="p-4 border border-slate-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 bg-white shadow-xs">
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="relative w-64">
+                  <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                  <input type="text" id="caregiverSearchInput" oninput="renderCaregivers()" placeholder="간병인명, 연락처, 지역, 자격증 검색..." class="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl bg-white">
+                </div>
+                <select id="caregiverCenterFilter" onchange="renderCaregivers()" class="p-2 text-xs border border-slate-300 rounded-xl bg-white font-semibold">
+                  <option value="ALL">소속센터: 전체</option>
+                </select>
+                <select id="caregiverStatusFilter" onchange="renderCaregivers()" class="p-2 text-xs border border-slate-300 rounded-xl bg-white font-semibold">
+                  <option value="ALL">활동상태: 전체</option>
+                  <option value="활동중">활동중</option>
+                  <option value="대기중">대기중</option>
+                  <option value="휴식중">휴식중</option>
+                </select>
               </div>
-              <select id="caregiverCenterFilter" onchange="renderCaregivers()" class="p-2 text-xs border border-slate-300 rounded-xl bg-white font-semibold">
-                <option value="ALL">소속센터: 전체</option>
-              </select>
-              <select id="caregiverStatusFilter" onchange="renderCaregivers()" class="p-2 text-xs border border-slate-300 rounded-xl bg-white font-semibold">
-                <option value="ALL">활동상태: 전체</option>
-                <option value="활동중">활동중</option>
-                <option value="대기중">대기중</option>
-                <option value="휴식중">휴식중</option>
-              </select>
+              <span class="text-xs text-slate-500">등록 간병인: <b id="caregiverListCount" class="text-emerald-700 font-bold">0</b>명</span>
             </div>
-            <span class="text-xs text-slate-500">등록 간병인: <b id="caregiverListCount" class="text-emerald-700 font-bold">0</b>명</span>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div class="overflow-x-auto custom-scrollbar">
+              <table id="caregiverTable" class="w-full text-left text-xs text-slate-600 whitespace-nowrap">
+                <thead class="bg-slate-100 border-b border-slate-200 font-semibold text-slate-700">
+                  <tr>
+                    <th class="p-3 pl-4 w-8"><input type="checkbox" onchange="toggleSelectAllRows('caregivers', this.checked)" class="rounded text-emerald-600"></th>
+                    <th class="p-3">간병인ID</th>
+                    <th class="p-3">간병인 성명</th>
+                    <th class="p-3 font-mono">연락처</th>
+                    <th class="p-3">소속 간병센터</th>
+                    <th class="p-3">활동 가능지역</th>
+                    <th class="p-3">보유 자격증</th>
+                    <th class="p-3 font-mono">정산 지급계좌</th>
+                    <th class="p-3 text-center">진행 배정건</th>
+                    <th class="p-3 text-center">활동 상태</th>
+                    <th class="p-3 text-center pr-4">관리</th>
+                  </tr>
+                </thead>
+                <tbody id="caregiverTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-          <div class="overflow-x-auto custom-scrollbar">
-            <table id="caregiverTable" class="w-full text-left text-xs text-slate-600 whitespace-nowrap">
-              <thead class="bg-slate-100 border-b border-slate-200 font-semibold text-slate-700">
-                <tr>
-                  <th class="p-3 pl-4 w-8"><input type="checkbox" onchange="toggleSelectAllRows('caregivers', this.checked)" class="rounded text-emerald-600"></th>
-                  <th class="p-3">간병인ID</th>
-                  <th class="p-3">간병인 성명</th>
-                  <th class="p-3 font-mono">연락처</th>
-                  <th class="p-3">소속 간병센터</th>
-                  <th class="p-3">활동 가능지역</th>
-                  <th class="p-3">보유 자격증</th>
-                  <th class="p-3 font-mono">정산 지급계좌</th>
-                  <th class="p-3 text-center">진행 배정건</th>
-                  <th class="p-3 text-center">활동 상태</th>
-                  <th class="p-3 text-center pr-4">관리</th>
-                </tr>
-              </thead>
-              <tbody id="caregiverTableBody" class="divide-y divide-slate-100"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- ==================== TAB: CENTER DIRECTORY ==================== -->
-      <section id="tab-centers" class="tab-content hidden space-y-5">
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-200">
-              <i data-lucide="building-2" class="w-5 h-5"></i>
+        <!-- 4. 서브 탭 2: 간병센터 (Centers) -->
+        <div id="dirSubTab-centers" class="hidden space-y-4">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-200 shrink-0">
+                <i data-lucide="building-2" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-base font-black text-slate-900 flex items-center gap-2">
+                  간병센터 / 협회 디렉토리 관리 (Care Center Directory)
+                  <span class="text-[11px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold">협력망 통합</span>
+                </h3>
+                <p class="text-[11.5px] text-slate-500 mt-0.5">
+                  전국 제휴 간병센터 및 협회 정보, 대표자, 직통전화, 수신 팩스번호, 사업자등록번호 및 정산유형을 관리합니다.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
-                간병센터 / 협회 디렉토리 관리 (Care Center Directory)
-                <span class="text-xs px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold">협력망 통합</span>
-              </h2>
-              <p class="text-xs text-slate-500 mt-0.5">
-                전국 제휴 간병센터 및 협회 정보, 대표자, 직통전화, 수신 팩스번호, 사업자등록번호 및 정산유형을 관리합니다.
-              </p>
-            </div>
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <button onclick="openCenterModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-xs transition-all">
-              <i data-lucide="building" class="w-4 h-4"></i>
-              <span>신규 간병센터 등록</span>
-            </button>
-            <button id="btnDeleteSelected-centers" onclick="deleteSelectedLedgerRows('centers')" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="openCenterModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-xs transition-all">
+                <i data-lucide="building" class="w-4 h-4"></i>
+                <span>신규 간병센터 등록</span>
+              </button>
+              <button id="btnDeleteSelected-centers" onclick="deleteSelectedLedgerRows('centers')" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 <span id="labelDeleteSelected-centers">선택 삭제 (0)</span>
               </button>
               <button id="btnExportSelected-centers" onclick="exportLedgerToExcel('centers', 'SELECTED')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all">
-              <i data-lucide="check-square" class="w-3.5 h-3.5 text-sky-600"></i>
-              <span id="labelExportSelected-centers">선택 엑셀 (0)</span>
-            </button>
-            <button onclick="exportLedgerToExcel('centers', 'ALL')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
-              <i data-lucide="download" class="w-3.5 h-3.5 text-sky-600"></i>
-              <span>전체 엑셀</span>
-            </button>
-          </div>
-        </div>
-
-        <div class="sticky-filter-bar rounded-2xl">
-          <div class="p-4 border border-slate-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 bg-white shadow-xs">
-            <div class="flex items-center gap-2">
-              <div class="relative w-64">
-                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-                <input type="text" id="centerSearchInput" oninput="renderCenters()" placeholder="센터명, 대표자, 관할지역, 팩스 검색..." class="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl bg-white">
-              </div>
-              <select id="centerSettlementFilter" onchange="renderCenters()" class="p-2 text-xs border border-slate-300 rounded-xl bg-white font-semibold">
-                <option value="ALL">정산방식: 전체</option>
-                <option value="센터">센터 정산 (법인 계좌)</option>
-                <option value="개인">개인 정산 (간병인 직접)</option>
-              </select>
+                <i data-lucide="check-square" class="w-3.5 h-3.5 text-sky-600"></i>
+                <span id="labelExportSelected-centers">선택 엑셀 (0)</span>
+              </button>
+              <button onclick="exportLedgerToExcel('centers', 'ALL')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
+                <i data-lucide="download" class="w-3.5 h-3.5 text-sky-600"></i>
+                <span>전체 엑셀</span>
+              </button>
             </div>
-            <span class="text-xs text-slate-500">등록 간병센터: <b id="centerListCount" class="text-sky-700 font-bold">0</b>개소</span>
+          </div>
+
+          <div class="sticky-filter-bar rounded-2xl">
+            <div class="p-4 border border-slate-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 bg-white shadow-xs">
+              <div class="flex items-center gap-2">
+                <div class="relative w-64">
+                  <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                  <input type="text" id="centerSearchInput" oninput="renderCenters()" placeholder="센터명, 대표자, 관할지역, 팩스 검색..." class="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl bg-white">
+                </div>
+                <select id="centerSettlementFilter" onchange="renderCenters()" class="p-2 text-xs border border-slate-300 rounded-xl bg-white font-semibold">
+                  <option value="ALL">정산방식: 전체</option>
+                  <option value="센터">센터 정산 (법인 계좌)</option>
+                  <option value="개인">개인 정산 (간병인 직접)</option>
+                </select>
+              </div>
+              <span class="text-xs text-slate-500">등록 간병센터: <b id="centerListCount" class="text-sky-700 font-bold">0</b>개소</span>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div class="overflow-x-auto custom-scrollbar">
+              <table id="centerTable" class="w-full text-left text-xs text-slate-600 whitespace-nowrap">
+                <thead class="bg-slate-100 border-b border-slate-200 font-semibold text-slate-700">
+                  <tr>
+                    <th class="p-3 pl-4 w-8"><input type="checkbox" onchange="toggleSelectAllRows('centers', this.checked)" class="rounded text-sky-600"></th>
+                    <th class="p-3">센터코드</th>
+                    <th class="p-3">간병센터 / 협회명</th>
+                    <th class="p-3">대표/소장</th>
+                    <th class="p-3 font-mono">대표 전화</th>
+                    <th class="p-3 font-mono font-bold text-purple-700">수신 팩스 (Fax)</th>
+                    <th class="p-3">관할 지역</th>
+                    <th class="p-3 font-mono text-slate-500">사업자등록번호</th>
+                    <th class="p-3 text-center">소속 간병인</th>
+                    <th class="p-3 text-center">정산 유형</th>
+                    <th class="p-3 text-center pr-4">관리</th>
+                  </tr>
+                </thead>
+                <tbody id="centerTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-          <div class="overflow-x-auto custom-scrollbar">
-            <table id="centerTable" class="w-full text-left text-xs text-slate-600 whitespace-nowrap">
-              <thead class="bg-slate-100 border-b border-slate-200 font-semibold text-slate-700">
-                <tr>
-                  <th class="p-3 pl-4 w-8"><input type="checkbox" onchange="toggleSelectAllRows('centers', this.checked)" class="rounded text-sky-600"></th>
-                  <th class="p-3">센터코드</th>
-                  <th class="p-3">간병센터 / 협회명</th>
-                  <th class="p-3">대표/소장</th>
-                  <th class="p-3 font-mono">대표 전화</th>
-                  <th class="p-3 font-mono font-bold text-purple-700">수신 팩스 (Fax)</th>
-                  <th class="p-3">관할 지역</th>
-                  <th class="p-3 font-mono text-slate-500">사업자등록번호</th>
-                  <th class="p-3 text-center">소속 간병인</th>
-                  <th class="p-3 text-center">정산 유형</th>
-                  <th class="p-3 text-center pr-4">관리</th>
-                </tr>
-              </thead>
-              <tbody id="centerTableBody" class="divide-y divide-slate-100"></tbody>
-            </table>
+        <!-- 5. 서브 탭 3: 손사 디렉토리 (Adjusters) -->
+        <div id="dirSubTab-adjusters" class="hidden space-y-4">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200 shrink-0">
+                <i data-lucide="contact-2" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-base font-black text-slate-900 flex items-center gap-2">
+                  손사 디렉토리 관리 (손해사정인·지사·팩스)
+                  <span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">팩스 자동연동</span>
+                </h3>
+                <p class="text-[11.5px] text-slate-500 mt-0.5">
+                  현대해상 및 삼성화재 보상과 손해사정법인 담당자, 직통번호 및 팩스번호를 통합 관리하며 팩스 발송 시 자동 연동됩니다.
+                </p>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="openAdjusterModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all">
+                <i data-lucide="user-plus" class="w-4 h-4"></i>
+                <span>신규 손사 등록</span>
+              </button>
+              <button id="btnDeleteSelected-adjusters" onclick="deleteSelectedLedgerRows('adjusters')" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                <span id="labelDeleteSelected-adjusters">선택 삭제 (0)</span>
+              </button>
+              <button id="btnExportSelected-adjusters" onclick="exportLedgerToExcel('adjusters', 'SELECTED')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all">
+                <i data-lucide="check-square" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span id="labelExportSelected-adjusters">선택 엑셀 (0)</span>
+              </button>
+              <button onclick="exportLedgerToExcel('adjusters', 'ALL')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
+                <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span>전체 엑셀</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="sticky-filter-bar rounded-2xl">
+            <div class="p-4 border border-slate-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 bg-white shadow-xs">
+              <div class="flex items-center gap-2">
+                <input type="text" id="adjusterSearchInput" oninput="renderAdjusters()" placeholder="손사명, 법인명, 지사, 팩스번호 검색..." class="w-64 p-2 text-xs border border-slate-300 rounded-xl bg-white">
+                <select id="adjusterInsFilter" onchange="renderAdjusters()" class="p-2 text-xs border border-slate-300 rounded-xl bg-white font-semibold">
+                  <option value="ALL">원수사: 전체</option>
+                  <option value="현대해상">현대해상</option>
+                  <option value="현대해상(SCOR)">현대해상(SCOR)</option>
+                  <option value="삼성화재">삼성화재</option>
+                </select>
+              </div>
+              <span class="text-xs text-slate-500">등록 손사: <b id="adjusterListCount" class="text-emerald-700 font-bold">7</b>명</span>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div class="overflow-x-auto custom-scrollbar">
+              <table class="w-full text-left text-xs text-slate-600 whitespace-nowrap">
+                <thead class="bg-slate-100 border-b border-slate-200 font-semibold text-slate-700">
+                  <tr>
+                    <th class="p-3 pl-4 w-8"><input type="checkbox" onchange="toggleSelectAllRows('adjusters', this.checked)" class="rounded text-emerald-600"></th>
+                    <th class="p-3">손사코드</th>
+                    <th class="p-3">보험사</th>
+                    <th class="p-3">손해사정법인</th>
+                    <th class="p-3">관할 지사</th>
+                    <th class="p-3">담당 손사명</th>
+                    <th class="p-3">직통 전화</th>
+                    <th class="p-3">휴대폰</th>
+                    <th class="p-3 font-bold text-purple-700">수신 팩스 (Fax)</th>
+                    <th class="p-3">이메일</th>
+                    <th class="p-3 text-center">진행 배정건</th>
+                    <th class="p-3 text-center pr-4">관리</th>
+                  </tr>
+                </thead>
+                <tbody id="adjusterTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
@@ -3271,7 +3618,7 @@
           <div class="p-3 bg-white rounded-xl border border-sky-200 grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
               <label class="block font-bold text-slate-700 mb-1">담당 손해사정사</label>
-              <input type="text" id="newAppSamsungAdjuster" value="김정현" class="w-full p-2 border border-slate-200 rounded-lg font-bold text-slate-900 bg-slate-50">
+              <input type="text" id="newAppSamsungAdjuster" list="allAdjustersDataList" oninput="onAdjusterNameInput(this.value, 'newAppSamsung')" value="김정현" placeholder="손사 성명 검색/입력" class="w-full p-2 border border-slate-200 rounded-lg font-bold text-slate-900 bg-slate-50">
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">손사 연락처</label>
@@ -3343,7 +3690,7 @@
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label class="block font-bold text-slate-700 mb-1">신청일자 *</label>
+              <label onclick="triggerDatePicker('newAppApplyDate_picker')" class="block font-bold text-slate-700 mb-1 cursor-pointer select-none" title="클릭 시 달력 열기">신청일자 *</label>
               <div class="relative flex items-center">
                 <input type="text" id="newAppApplyDate" required placeholder="YYYY-MM-DD" class="w-full p-2.5 pr-10 border rounded-xl font-semibold bg-white cursor-pointer" onclick="triggerDatePicker('newAppApplyDate_picker')">
                 <input type="date" id="newAppApplyDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('newAppApplyDate', this.value)">
@@ -3353,7 +3700,7 @@
               </div>
             </div>
             <div>
-              <label class="block font-bold text-slate-700 mb-1">사고일자 *</label>
+              <label onclick="triggerDatePicker('newAppAccidentDate_picker')" class="block font-bold text-slate-700 mb-1 cursor-pointer select-none" title="클릭 시 달력 열기">사고일자 *</label>
               <div class="relative flex items-center">
                 <input type="text" id="newAppAccidentDate" required placeholder="YYYY-MM-DD" class="w-full p-2.5 pr-10 border rounded-xl font-semibold bg-white cursor-pointer" onclick="triggerDatePicker('newAppAccidentDate_picker')">
                 <input type="date" id="newAppAccidentDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('newAppAccidentDate', this.value)">
@@ -3484,7 +3831,7 @@
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label class="block font-bold text-slate-700 mb-1">간병시작 희망일 *</label>
+              <label onclick="triggerDatePicker('newAppDesiredDate_picker')" class="block font-bold text-slate-700 mb-1 cursor-pointer select-none" title="클릭 시 달력 열기">간병시작 희망일 *</label>
               <div class="relative flex items-center">
                 <input type="text" id="newAppDesiredDate" required placeholder="YYYY-MM-DD" class="w-full p-2.5 pr-10 border rounded-xl font-semibold bg-white cursor-pointer" onclick="triggerDatePicker('newAppDesiredDate_picker')" oninput="calculateAndSetEndDate()">
                 <input type="date" id="newAppDesiredDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('newAppDesiredDate', this.value); calculateAndSetEndDate();">
@@ -3505,7 +3852,7 @@
               <input type="text" id="newAppExpectedDays" oninput="calculateAndSetEndDate()" placeholder="예: 30일, 퇴원시까지" class="w-full p-2.5 border rounded-xl font-bold text-slate-800">
             </div>
             <div>
-              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+              <label onclick="triggerDatePicker('newAppEndDate_picker')" class="block font-bold text-slate-700 mb-1 flex items-center justify-between cursor-pointer select-none" title="클릭 시 달력 열기">
                 <span>간병종료 예정일</span>
                 <span class="text-[10px] text-blue-700 font-bold bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded-md">자동 계산</span>
               </label>
@@ -3740,7 +4087,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label class="block font-bold text-slate-700 mb-1">담당센터</label>
-            <input type="text" id="newAssignCenterName" placeholder="예: 영등포센터" class="w-full p-2.5 border rounded-xl">
+            <input type="text" id="newAssignCenterName" list="allCentersDataList" oninput="onCenterNameInput(this.value, 'newAssign')" placeholder="예: 영등포센터 (입력/선택 시 자동등록)" class="w-full p-2.5 border rounded-xl font-medium">
           </div>
           <div>
             <label class="block font-bold text-slate-700 mb-1">정산유형</label>
@@ -3757,11 +4104,11 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200">
           <div>
-            <label class="block font-bold text-slate-700 mb-1 flex items-center gap-1">
+            <label for="newAssignStartDate_date" onclick="triggerDatePicker('newAssignStartDate_date')" class="block font-bold text-slate-700 mb-1 flex items-center gap-1 cursor-pointer select-none" title="클릭 시 달력 열기">
               <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600"></i> 간병 시작일시 (캘린더+시계) *
             </label>
             <div class="flex items-center gap-1.5 min-w-0">
-              <input type="date" id="newAssignStartDate_date" onchange="syncCombinedDateTime('newAssignStartDate')" class="flex-1 min-w-0 p-2.5 border rounded-xl bg-white font-medium text-xs">
+              <input type="date" id="newAssignStartDate_date" onclick="this.showPicker && this.showPicker()" onchange="syncCombinedDateTime('newAssignStartDate')" class="flex-1 min-w-0 p-2.5 border rounded-xl bg-white font-medium text-xs cursor-pointer" title="클릭 시 달력 열기">
               <select id="newAssignStartDate_time" onchange="syncCombinedDateTime('newAssignStartDate')" class="w-32 flex-shrink-0 p-2.5 border rounded-xl bg-white font-bold text-xs text-emerald-800">
                 <optgroup label="오전 (AM)">
                   <option value="00:00">오전 12:00 (자정)</option>
@@ -3797,11 +4144,11 @@
           </div>
 
           <div>
-            <label class="block font-bold text-slate-700 mb-1 flex items-center gap-1">
+            <label for="newAssignEndDate_date" onclick="triggerDatePicker('newAssignEndDate_date')" class="block font-bold text-slate-700 mb-1 flex items-center gap-1 cursor-pointer select-none" title="클릭 시 달력 열기">
               <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-600"></i> 간병 종료일시 (캘린더+시계) *
             </label>
             <div class="flex items-center gap-1.5 min-w-0">
-              <input type="date" id="newAssignEndDate_date" onchange="syncCombinedDateTime('newAssignEndDate')" class="flex-1 min-w-0 p-2.5 border rounded-xl bg-white font-medium text-xs">
+              <input type="date" id="newAssignEndDate_date" onclick="this.showPicker && this.showPicker()" onchange="syncCombinedDateTime('newAssignEndDate')" class="flex-1 min-w-0 p-2.5 border rounded-xl bg-white font-medium text-xs cursor-pointer" title="클릭 시 달력 열기">
               <select id="newAssignEndDate_time" onchange="syncCombinedDateTime('newAssignEndDate')" class="w-32 flex-shrink-0 p-2.5 border rounded-xl bg-white font-bold text-xs text-emerald-800">
                 <optgroup label="오전 (AM)">
                   <option value="00:00">오전 12:00 (자정)</option>
@@ -3914,11 +4261,11 @@
             <p class="text-[10px] text-slate-400 mt-1">이전 차수 종료 시점에 이어 연속으로 시작됩니다.</p>
           </div>
           <div>
-            <label class="block font-bold text-slate-700 mb-1 flex items-center gap-1">
+            <label for="newClaimEndDate" onclick="triggerDatePicker('newClaimEndDate')" class="block font-bold text-slate-700 mb-1 flex items-center gap-1 cursor-pointer select-none" title="클릭 시 달력 열기">
               <i data-lucide="calendar-check" class="w-3.5 h-3.5 text-amber-600"></i> 청구 종료일시 (시간 포함) *
             </label>
             <div class="flex items-center gap-1.5">
-              <input type="date" lang="en-CA" id="newClaimEndDate" required onchange="calcNewClaimTotal()" class="flex-1 p-2.5 border border-amber-300 rounded-xl font-bold bg-white focus:ring-2 focus:ring-amber-400">
+              <input type="date" lang="en-CA" id="newClaimEndDate" required onclick="this.showPicker && this.showPicker()" onchange="calcNewClaimTotal()" class="flex-1 p-2.5 border border-amber-300 rounded-xl font-bold bg-white focus:ring-2 focus:ring-amber-400 cursor-pointer" title="클릭 시 달력 열기">
               <select id="newClaimEndTime" onchange="calcNewClaimTotal()" class="w-24 p-2.5 border rounded-xl bg-white font-bold text-xs">
                 <option value="18:00" selected>18:00</option>
                 <option value="12:00">12:00</option>
@@ -5284,7 +5631,7 @@
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
               <label class="block font-bold text-slate-700 mb-1">손해사정인 성명</label>
-              <input type="text" id="custEditAdjusterName" placeholder="손사 성명" class="w-full p-2.5 border rounded-xl font-bold">
+              <input type="text" id="custEditAdjusterName" list="allAdjustersDataList" oninput="onAdjusterNameInput(this.value, 'custEdit')" placeholder="손사 성명 (신규입력 시 디렉토리 자동등록)" class="w-full p-2.5 border rounded-xl font-bold">
             </div>
             <div>
               <div class="flex items-center justify-between mb-1">
@@ -5443,7 +5790,7 @@
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">담당 손해사정인 성명 *</label>
-              <input type="text" id="adjEditName" required placeholder="예: 김정현" class="w-full p-2.5 border rounded-xl font-bold text-slate-900 bg-white focus:ring-2 focus:ring-purple-500">
+              <input type="text" id="adjEditName" list="allAdjustersDataList" oninput="onAdjusterNameInput(this.value, 'adjEdit')" required placeholder="예: 김정현 (신규입력 시 디렉토리 자동등록)" class="w-full p-2.5 border rounded-xl font-bold text-slate-900 bg-white focus:ring-2 focus:ring-purple-500">
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">손사 법인 / 소속팀</label>
@@ -5557,7 +5904,7 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block font-bold text-slate-700 mb-1">관리 센터명</label>
-              <input type="text" id="schedEditCenterName" placeholder="예: 영등포센터" class="w-full p-2.5 border rounded-xl font-bold text-teal-800 bg-white">
+              <input type="text" id="schedEditCenterName" list="allCentersDataList" oninput="onCenterNameInput(this.value, 'schedEdit')" placeholder="예: 영등포센터 (신규입력 시 디렉토리 자동등록)" class="w-full p-2.5 border rounded-xl font-bold text-teal-800 bg-white">
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">관리센터 연락처</label>
@@ -5568,11 +5915,11 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200">
           <div>
-            <label class="block font-bold text-slate-700 mb-1 flex items-center gap-1">
+            <label for="schedEditStartDate_date" onclick="triggerDatePicker('schedEditStartDate_date')" class="block font-bold text-slate-700 mb-1 flex items-center gap-1 cursor-pointer select-none" title="클릭 시 달력 열기">
               <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600"></i> 간병 시작일시 (캘린더+시계) *
             </label>
             <div class="flex items-center gap-1.5 min-w-0">
-              <input type="date" id="schedEditStartDate_date" onchange="syncCombinedDateTime('schedEditStartDate')" class="flex-1 min-w-0 p-2.5 border rounded-xl bg-white font-medium text-xs">
+              <input type="date" id="schedEditStartDate_date" onclick="this.showPicker && this.showPicker()" onchange="syncCombinedDateTime('schedEditStartDate')" class="flex-1 min-w-0 p-2.5 border rounded-xl bg-white font-medium text-xs cursor-pointer" title="클릭 시 달력 열기">
               <select id="schedEditStartDate_time" onchange="syncCombinedDateTime('schedEditStartDate')" class="w-32 flex-shrink-0 p-2.5 border rounded-xl bg-white font-bold text-xs text-emerald-800">
                 <optgroup label="오전 (AM)">
                   <option value="00:00">오전 12:00 (자정)</option>
@@ -5608,11 +5955,11 @@
           </div>
 
           <div>
-            <label class="block font-bold text-slate-700 mb-1 flex items-center gap-1">
+            <label for="schedEditEndDate_date" onclick="triggerDatePicker('schedEditEndDate_date')" class="block font-bold text-slate-700 mb-1 flex items-center gap-1 cursor-pointer select-none" title="클릭 시 달력 열기">
               <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-600"></i> 간병 종료일시 (캘린더+시계) *
             </label>
             <div class="flex items-center gap-1.5 min-w-0">
-              <input type="date" id="schedEditEndDate_date" onchange="syncCombinedDateTime('schedEditEndDate')" class="flex-1 min-w-0 p-2.5 border rounded-xl bg-white font-medium text-xs">
+              <input type="date" id="schedEditEndDate_date" onclick="this.showPicker && this.showPicker()" onchange="syncCombinedDateTime('schedEditEndDate')" class="flex-1 min-w-0 p-2.5 border rounded-xl bg-white font-medium text-xs cursor-pointer" title="클릭 시 달력 열기">
               <select id="schedEditEndDate_time" onchange="syncCombinedDateTime('schedEditEndDate')" class="w-32 flex-shrink-0 p-2.5 border rounded-xl bg-white font-bold text-xs text-emerald-800">
                 <optgroup label="오전 (AM)">
                   <option value="00:00">오전 12:00 (자정)</option>
@@ -6010,16 +6357,16 @@
           </div>
 
           <!-- 첨부 1: 삼성화재 다중시트 엑셀 파일 -->
-          <div id="samsungModalExcelCard" class="bg-white p-3.5 rounded-xl border-2 border-sky-400 shadow-2xs space-y-2 transition-all">
+          <div id="samsungModalExcelCard" class="bg-slate-50/50 p-3.5 rounded-xl border border-slate-300 opacity-70 shadow-2xs space-y-2 transition-all">
             <div class="flex items-center justify-between flex-wrap gap-2">
               <div class="flex items-center gap-2">
                 <label class="flex items-center gap-2 font-black text-slate-800 text-xs cursor-pointer select-none">
-                  <input type="checkbox" id="attachSamsungExcelCheckbox" checked onchange="updateSamsungModalAttachBadges()" class="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer">
+                  <input type="checkbox" id="attachSamsungExcelCheckbox" onchange="updateSamsungModalAttachBadges()" class="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer">
                   <span>[첨부 1] 삼성화재 현황 엑셀 파일 (<span id="samsungAttachExcelFilename" class="font-mono text-sky-700">삼성화재_간병인지원_현황_20260914.xlsx</span>)</span>
                 </label>
-                <span id="samsungModalExcelAttachBadge" class="px-2 py-0.5 rounded-full text-[10.5px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 shadow-2xs">
-                  <i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-600"></i>
-                  <span>발송 첨부됨 ✓</span>
+                <span id="samsungModalExcelAttachBadge" class="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-slate-100 text-slate-500 border border-slate-300 flex items-center gap-1 shadow-2xs">
+                  <i data-lucide="x-circle" class="w-3 h-3 text-slate-400"></i>
+                  <span>첨부 안 함 (선택 필요) ✕</span>
                 </span>
               </div>
               <div class="flex items-center gap-1.5">
@@ -6065,11 +6412,11 @@
                 </select>
               </div>
               <div>
-                <label class="text-slate-600 font-bold block mb-0.5">간병일지 기간:</label>
+                <label class="text-slate-600 font-bold block mb-0.5 cursor-pointer select-none" onclick="triggerDatePicker('samsungCarePortDateStart')">간병일지 기간:</label>
                 <div class="flex items-center gap-1">
-                  <input type="date" id="samsungCarePortDateStart" class="w-full p-2 border rounded-xl text-xs">
+                  <input type="date" id="samsungCarePortDateStart" onclick="this.showPicker && this.showPicker()" class="w-full p-2 border rounded-xl text-xs cursor-pointer" title="클릭 시 달력 열기">
                   <span class="text-slate-400">~</span>
-                  <input type="date" id="samsungCarePortDateEnd" class="w-full p-2 border rounded-xl text-xs">
+                  <input type="date" id="samsungCarePortDateEnd" onclick="this.showPicker && this.showPicker()" class="w-full p-2 border rounded-xl text-xs cursor-pointer" title="클릭 시 달력 열기">
                 </div>
               </div>
             </div>
@@ -6415,12 +6762,12 @@
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block font-bold text-slate-700 mb-1">간병 시작일</label>
-            <input type="date" id="carePortStartDate" class="w-full p-2 border rounded-xl font-bold bg-white text-xs">
+            <label for="carePortStartDate" onclick="triggerDatePicker('carePortStartDate')" class="block font-bold text-slate-700 mb-1 cursor-pointer select-none" title="클릭 시 달력 열기">간병 시작일</label>
+            <input type="date" id="carePortStartDate" onclick="this.showPicker && this.showPicker()" class="w-full p-2 border rounded-xl font-bold bg-white text-xs cursor-pointer" title="클릭 시 달력 열기">
           </div>
           <div>
-            <label class="block font-bold text-slate-700 mb-1">간병 종료일</label>
-            <input type="date" id="carePortEndDate" class="w-full p-2 border rounded-xl font-bold bg-white text-xs">
+            <label for="carePortEndDate" onclick="triggerDatePicker('carePortEndDate')" class="block font-bold text-slate-700 mb-1 cursor-pointer select-none" title="클릭 시 달력 열기">간병 종료일</label>
+            <input type="date" id="carePortEndDate" onclick="this.showPicker && this.showPicker()" class="w-full p-2 border rounded-xl font-bold bg-white text-xs cursor-pointer" title="클릭 시 달력 열기">
           </div>
         </div>
 
@@ -7057,7 +7404,7 @@
 
   <!-- ==================== MODAL: HUB CUSTOMER DETAIL POPUP MODAL (주체별 3-Column 단일 뷰) ==================== -->
   <div id="hubCustomerDetailModal" class="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-3 sm:p-4">
-    <div id="hubCustomerDetailModalDialog" class="bg-white rounded-3xl w-[94vw] max-w-[1300px] max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 transition-all duration-200">
+    <div id="hubCustomerDetailModalDialog" class="bg-white rounded-3xl w-[92vw] max-w-[1240px] max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 transition-all duration-200">
       <div class="p-4 sm:p-5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-4">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center font-bold text-sky-400 shadow-inner">
@@ -7085,7 +7432,7 @@
               <span>3-Column 주체별 뷰</span>
             </button>
           </div>
-          <button id="btnHubSamsungEmail" type="button" onclick="closeModal('hubCustomerDetailModal'); switchTab('samsungclaimhub', 'daily');" class="hidden px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all bg-sky-600 hover:bg-sky-500 text-white shadow-md cursor-pointer">
+          <button id="btnHubSamsungEmail" type="button" onclick="closeModal('hubCustomerDetailModal'); switchTab('samsungclaimhub', 'claims');" class="hidden px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all bg-sky-600 hover:bg-sky-500 text-white shadow-md cursor-pointer" title="삼성화재 월간 청구관리 및 이메일 발송 화면으로 이동">
             <i data-lucide="mail" class="w-3.5 h-3.5"></i>
             <span>📧 삼성 접수/청구 발송</span>
           </button>
@@ -7408,6 +7755,10 @@
       </div>
     </div>
   </div>
+
+  <!-- Global Datalists for Directory Autocomplete & Synchronized Inputs -->
+  <datalist id="allCentersDataList"></datalist>
+  <datalist id="allAdjustersDataList"></datalist>
 
   <!-- SCRIPTS (Moved to bottom of body for full DOM availability) -->
   <script src="data.js?v=20260910_1931"></script>

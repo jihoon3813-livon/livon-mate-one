@@ -12,6 +12,7 @@ export const bundleAll = query({
       claims,
       payouts,
       adjusters,
+      partners,
       careLogs,
       formConfigs,
       faxRecords,
@@ -25,6 +26,7 @@ export const bundleAll = query({
       ctx.db.query("claims").collect(),
       ctx.db.query("payouts").collect(),
       ctx.db.query("adjusters").collect(),
+      ctx.db.query("partners").collect(),
       ctx.db.query("careLogs").collect(),
       ctx.db.query("formConfigs").collect(),
       ctx.db.query("faxRecords").order("desc").collect(),
@@ -39,6 +41,7 @@ export const bundleAll = query({
       claims,
       payouts,
       adjusters,
+      partners,
       careLogs,
       formConfigs,
       faxRecords,
@@ -632,6 +635,62 @@ export const deleteCareLog = mutation({
       return { success: true, id: args.id };
     }
     return { success: false, notFound: true };
+  },
+});
+
+// 25. 손해사정인(손사) 등록 및 수정 (Upsert by id or name)
+export const saveAdjuster = mutation({
+  args: {
+    adjuster: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { _id, _creationTime, ...doc } = args.adjuster;
+    if (!doc.id) {
+      doc.id = "ADJ" + Date.now();
+    }
+    const existing = await ctx.db
+      .query("adjusters")
+      .filter((q) => q.or(
+        q.eq(q.field("id"), doc.id),
+        q.eq(q.field("name"), doc.name)
+      ))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, doc);
+      return { action: "updated", id: doc.id, _id: existing._id };
+    } else {
+      const newId = await ctx.db.insert("adjusters", doc);
+      return { action: "inserted", id: doc.id, _id: newId };
+    }
+  },
+});
+
+// 26. 파트너/협력센터 등록 및 수정 (Upsert by id or name)
+export const savePartner = mutation({
+  args: {
+    partner: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { _id, _creationTime, ...doc } = args.partner;
+    if (!doc.id) {
+      doc.id = "CTR" + Date.now();
+    }
+    const existing = await ctx.db
+      .query("partners")
+      .filter((q) => q.or(
+        q.eq(q.field("id"), doc.id),
+        q.eq(q.field("name"), doc.name)
+      ))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, doc);
+      return { action: "updated", id: doc.id, _id: existing._id };
+    } else {
+      const newId = await ctx.db.insert("partners", doc);
+      return { action: "inserted", id: doc.id, _id: newId };
+    }
   },
 });
 

@@ -301,7 +301,8 @@ function saveSavedFaxConfig(cfg) {
           const secure = payload.secure !== undefined ? Boolean(payload.secure) : (savedCfg.secure !== undefined ? Boolean(savedCfg.secure) : (port === 465));
           const user = payload.user || savedCfg.user;
           const pass = payload.pass || savedCfg.pass;
-          const senderName = payload.senderName || savedCfg.senderName || '(주)리본케어 운영데스크';
+          let senderName = payload.senderName || savedCfg.senderName || '(주)리본케어 운영데스크';
+          let from = payload.from || savedCfg.senderEmail || user;
           const testTo = payload.testTo || user;
 
           if (!user || !pass) {
@@ -315,6 +316,7 @@ function saveSavedFaxConfig(cfg) {
             secure,
             user,
             pass,
+            from,
             senderName,
             testTo
           });
@@ -349,8 +351,19 @@ function saveSavedFaxConfig(cfg) {
           const secure = payload.secure !== undefined ? Boolean(payload.secure) : (savedCfg.secure !== undefined ? Boolean(savedCfg.secure) : (port === 465));
           const user = payload.user || savedCfg.user;
           const pass = payload.pass || savedCfg.pass;
-          const senderName = payload.senderName || savedCfg.senderName || '(주)리본케어 삼성화재 운영데스크';
-          const from = payload.from || savedCfg.senderEmail || user;
+          
+          let senderName = payload.senderName || savedCfg.senderName || '(주)리본케어 삼성화재 운영데스크';
+          let from = payload.from;
+
+          // 발신자 항목에 이메일 없이 한글 이름/소속만 입력된 경우, 이름으로 채택하고 실제 계정으로 안전 fallback
+          if (from && !from.includes('@')) {
+            if (!payload.senderName) {
+              senderName = from.trim();
+            }
+            from = savedCfg.senderEmail || user;
+          } else if (!from) {
+            from = savedCfg.senderEmail || user;
+          }
 
           if (!user || !pass) {
             res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
