@@ -25583,32 +25583,56 @@ function renderCareCalendarTimelineView(events) {
 
                     <!-- The Continuous Timeline Span Bar (창 너비에 맞춰 100% 균등 비율로 뻗는 막대) -->
                     <div onclick="openCalendarEventDetail('${evt.applyId}', '${evt.assignId}')"
-                      class="absolute z-10 h-9 rounded-xl bg-gradient-to-r ${barGrad} border shadow-xs px-2.5 flex items-center justify-between gap-1.5 cursor-pointer hover:shadow-md hover:scale-[1.004] transition-all overflow-hidden select-none"
-                      style="left: calc(${leftPercent}% + 2px); width: calc(${widthPercent}% - 4px);"
+                      class="absolute z-10 h-9 rounded-xl bg-gradient-to-r ${barGrad} border shadow-xs ${spanDays === 1 ? 'px-1 justify-center' : 'px-2.5 justify-between'} flex items-center gap-1 cursor-pointer hover:shadow-md hover:scale-[1.006] transition-all overflow-hidden select-none"
+                      style="left: calc(${leftPercent}% + 2px); width: calc(${widthPercent}% - 4px); ${spanDays === 1 ? 'min-width: 44px;' : ''}"
                       title="[${evt.insuranceCompany}] ${evt.patientName} (${evt.startDate} ~ ${evt.endDate}, 총 ${evt.totalDays}일) | 간병인: ${evt.caregiverName} (${(evt.dailyWage || 0).toLocaleString()}원)">
                       
-                      <!-- Bar Left: Continuous arrow or label -->
-                      <div class="flex items-center gap-1.5 truncate min-w-0">
-                        ${hasPrevOverflow ? `<span class="text-[9px] font-black text-amber-200 animate-pulse shrink-0">◀</span>` : ''}
-                        <div class="font-black text-xs truncate flex items-center gap-1">
-                          <span class="truncate">${maskName(evt.patientName)}</span>
-                          <span class="text-[11px] font-normal text-white/80 truncate">(${evt.caregiverName})</span>
-                        </div>
-                        <span class="text-[10px] font-mono font-medium text-white/90 shrink-0 hidden md:inline">
-                          · ${spanDays}일간 (${evt.startDate.slice(5)} ~ ${evt.endDate.slice(5)})
-                        </span>
-                      </div>
-
-                      <!-- Bar Right: Status Badge & Warning -->
-                      <div class="flex items-center gap-1 shrink-0">
-                        ${evt.isAttentionNeeded ? `
-                          <span class="w-4.5 h-4.5 rounded-full bg-rose-500/90 text-white flex items-center justify-center text-[9px] font-black animate-bounce shadow-2xs shrink-0" title="주의체크 필요 환자">
-                            <i data-lucide="alert-triangle" class="w-2.5 h-2.5"></i>
+                      ${spanDays === 1 ? `
+                        <!-- 1일 일정: 고객 이름 100% 최우선 표출 (글자 잘림 및 뱃지 가림 방지) -->
+                        <div class="flex items-center justify-center gap-1 w-full min-w-0 text-center">
+                          ${evt.status === 'ONGOING' ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse shrink-0"></span>` : ''}
+                          <span class="font-black text-[11px] text-white tracking-tight truncate leading-none">
+                            ${maskName(evt.patientName)}
                           </span>
-                        ` : ''}
-                        ${statusBadge}
-                        ${hasNextOverflow ? `<span class="text-[9px] font-black text-amber-200 animate-pulse shrink-0">▶</span>` : ''}
-                      </div>
+                          ${evt.isAttentionNeeded ? `<span class="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0"></span>` : ''}
+                        </div>
+                      ` : spanDays === 2 ? `
+                        <!-- 2일 일정: 고객 이름 및 간병인/미니상태 -->
+                        <div class="flex items-center justify-between w-full min-w-0 gap-1">
+                          <div class="flex items-center gap-1 truncate min-w-0">
+                            <span class="font-black text-xs text-white truncate">${maskName(evt.patientName)}</span>
+                            <span class="text-[10px] text-white/80 font-normal truncate">(${evt.caregiverName.slice(0, 2)})</span>
+                          </div>
+                          <div class="flex items-center gap-0.5 shrink-0">
+                            ${evt.isAttentionNeeded ? `<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>` : ''}
+                            ${evt.status === 'ONGOING' 
+                              ? `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>` 
+                              : `<span class="text-[8.5px] font-mono text-white/70">2일</span>`}
+                          </div>
+                        </div>
+                      ` : `
+                        <!-- 3일 이상 일정: 고객명 + 간병인 + 총일수 + 상세 뱃지 -->
+                        <div class="flex items-center gap-1.5 truncate min-w-0">
+                          ${hasPrevOverflow ? `<span class="text-[9px] font-black text-amber-200 animate-pulse shrink-0">◀</span>` : ''}
+                          <div class="font-black text-xs truncate flex items-center gap-1">
+                            <span class="truncate">${maskName(evt.patientName)}</span>
+                            <span class="text-[11px] font-normal text-white/80 truncate">(${evt.caregiverName})</span>
+                          </div>
+                          <span class="text-[10px] font-mono font-medium text-white/90 shrink-0 hidden md:inline">
+                            · ${spanDays}일간 (${evt.startDate.slice(5)} ~ ${evt.endDate.slice(5)})
+                          </span>
+                        </div>
+
+                        <div class="flex items-center gap-1 shrink-0">
+                          ${evt.isAttentionNeeded ? `
+                            <span class="w-4.5 h-4.5 rounded-full bg-rose-500/90 text-white flex items-center justify-center text-[9px] font-black animate-bounce shadow-2xs shrink-0" title="주의체크 필요 환자">
+                              <i data-lucide="alert-triangle" class="w-2.5 h-2.5"></i>
+                            </span>
+                          ` : ''}
+                          ${statusBadge}
+                          ${hasNextOverflow ? `<span class="text-[9px] font-black text-amber-200 animate-pulse shrink-0">▶</span>` : ''}
+                        </div>
+                      `}
 
                     </div>
 
@@ -25790,28 +25814,37 @@ function renderCareCalendarSpanMonthView(events) {
             return `
               <div class="grid grid-cols-7 gap-1">
                 <div onclick="openCalendarEventDetail('${evt.applyId}', '${evt.assignId}')"
-                  class="py-1 px-2 rounded-lg border text-xs font-bold leading-tight flex items-center justify-between gap-1.5 shadow-2xs hover:shadow-md hover:scale-[1.005] transition-all cursor-pointer select-none ${barColor}"
+                  class="py-1 px-1.5 rounded-lg border text-xs font-bold leading-tight flex items-center ${spanCols === 1 ? 'justify-center' : 'justify-between'} gap-1 shadow-2xs hover:shadow-md hover:scale-[1.005] transition-all cursor-pointer select-none ${barColor}"
                   style="grid-column: ${colStart} / span ${spanCols};"
                   title="[${evt.insuranceCompany}] ${evt.patientName} (${evt.hospitalName}) | 간병인: ${evt.caregiverName} | 기간: ${evt.startDate} ~ ${evt.endDate}">
                   
-                  <div class="flex items-center gap-1 truncate min-w-0">
-                    ${hasLeftCont ? `<span class="text-[10px] font-black text-amber-200">◀</span>` : ''}
-                    <span class="font-black truncate">${maskName(evt.patientName)}</span>
-                    <span class="text-[11px] opacity-90 truncate font-normal">(${evt.caregiverName})</span>
-                    <span class="text-[10px] opacity-80 truncate hidden sm:inline">· ${evt.hospitalName}</span>
-                  </div>
-
-                  <div class="flex items-center gap-1 shrink-0">
-                    ${evt.isAttentionNeeded ? `
-                      <span class="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[9px] font-black">
-                        <i data-lucide="alert-triangle" class="w-2.5 h-2.5"></i>
+                  ${spanCols === 1 ? `
+                    <div class="flex items-center justify-center gap-1 w-full min-w-0 text-center">
+                      <span class="font-black text-[11px] text-white tracking-tight truncate leading-none">
+                        ${maskName(evt.patientName)}
                       </span>
-                    ` : ''}
-                    <span class="text-[10px] font-mono bg-white/20 px-1 py-0.2 rounded font-bold">
-                      ${evt.totalDays}일간
-                    </span>
-                    ${hasRightCont ? `<span class="text-[10px] font-black text-amber-200">▶</span>` : ''}
-                  </div>
+                      ${evt.isAttentionNeeded ? `<span class="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0"></span>` : ''}
+                    </div>
+                  ` : `
+                    <div class="flex items-center gap-1 truncate min-w-0">
+                      ${hasLeftCont ? `<span class="text-[10px] font-black text-amber-200">◀</span>` : ''}
+                      <span class="font-black truncate">${maskName(evt.patientName)}</span>
+                      <span class="text-[11px] opacity-90 truncate font-normal">(${evt.caregiverName})</span>
+                      <span class="text-[10px] opacity-80 truncate hidden sm:inline">· ${evt.hospitalName}</span>
+                    </div>
+
+                    <div class="flex items-center gap-1 shrink-0">
+                      ${evt.isAttentionNeeded ? `
+                        <span class="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[9px] font-black">
+                          <i data-lucide="alert-triangle" class="w-2.5 h-2.5"></i>
+                        </span>
+                      ` : ''}
+                      <span class="text-[10px] font-mono bg-white/20 px-1 py-0.2 rounded font-bold">
+                        ${evt.totalDays}일간
+                      </span>
+                      ${hasRightCont ? `<span class="text-[10px] font-black text-amber-200">▶</span>` : ''}
+                    </div>
+                  `}
 
                 </div>
               </div>
