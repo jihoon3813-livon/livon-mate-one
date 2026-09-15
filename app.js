@@ -25359,7 +25359,9 @@ function populateCalendarCenterFilter(events) {
  * -------------------------------------------------------------------------
  * [NEW] 1-A. TIMELINE GANTT VIEW ENGINE (고객별 연결 타임라인 뷰)
  * 시작일부터 종료일까지 가로 막대가 쭉~ 연결되어 보이며,
- * 고객이 많으면 많은 대로 전수 행(Row)으로 시원하게 펼쳐지는 간트 뷰
+ * - 고객/병원/간병인 열 가로 폭 컴팩트 최적화
+ * - 일자 영역은 브라우저 가로 창 크기를 100% 꽉 채우도록 균등(1fr) 분할
+ * - 30일/말일 이후 빈 영역 없이 끝까지 균등하게 반응형 레이아웃 제공
  * -------------------------------------------------------------------------
  */
 function renderCareCalendarTimelineView(events) {
@@ -25387,12 +25389,13 @@ function renderCareCalendarTimelineView(events) {
   const todayDate = isCurrentMonthNow ? now.getDate() : -1;
 
   const daysHeader = ['일', '월', '화', '수', '목', '금', '토'];
-  const cellWidth = 44; // 날짜 1칸 너비 (px)
-  const totalTimelineWidth = lastDate * cellWidth;
+
+  // 컴팩트하게 최적화된 좌측 고객 열 너비
+  const leftColWidthClass = 'w-[190px] sm:w-[220px]';
 
   let html = `
     <!-- Top Bar Summary -->
-    <div class="p-4 bg-slate-900 text-white flex items-center justify-between flex-wrap gap-3 border-b border-slate-800">
+    <div class="p-3.5 sm:p-4 bg-slate-900 text-white flex items-center justify-between flex-wrap gap-3 border-b border-slate-800">
       <div class="flex items-center gap-2.5">
         <span class="w-8 h-8 rounded-xl bg-primary-500/20 border border-primary-400/30 flex items-center justify-center text-primary-400">
           <i data-lucide="chart-gantt" class="w-4 h-4"></i>
@@ -25405,38 +25408,38 @@ function renderCareCalendarTimelineView(events) {
             </span>
           </div>
           <p class="text-[11px] text-slate-400 mt-0.5">
-            고객별 시작일부터 종료일까지 일정이 <b>가로 막대(Bar)로 쭉 이어져서 표시</b>되며, 고객이 많은 날도 누락 없이 전수 나열됩니다.
+            화면 가로 폭에 맞춰 <b>1일부터 ${lastDate}일까지 균등 분할</b>되며, 시작일부터 종료일까지 가로 막대로 연결되어 표시됩니다.
           </p>
         </div>
       </div>
-      <div class="flex items-center gap-2 text-xs">
-        <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">
+      <div class="flex items-center gap-2 text-xs flex-wrap">
+        <span class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[11px]">
           <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>현대해상
         </span>
-        <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">
+        <span class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[11px]">
           <span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span>삼성화재
         </span>
-        <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">
+        <span class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[11px]">
           <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>기타보험사
         </span>
       </div>
     </div>
 
-    <!-- Timeline Scrollable Viewport -->
-    <div class="overflow-x-auto relative max-h-[820px] overflow-y-auto bg-slate-50/50">
-      <div class="inline-flex min-w-full flex-col">
+    <!-- Timeline Scrollable Viewport (화면 가로 100% 꽉 채우는 반응형 레이아웃) -->
+    <div class="overflow-x-auto relative max-h-[840px] overflow-y-auto bg-white w-full">
+      <div class="flex flex-col min-w-[1000px] w-full">
         
-        <!-- Header Row: Sticky Patient Column + 1..lastDate Days Header -->
-        <div class="sticky top-0 z-30 flex border-b border-slate-200 bg-slate-100/95 backdrop-blur-xs shadow-2xs select-none">
+        <!-- Header Row: Sticky Patient Column + Equal-Width Days Grid -->
+        <div class="sticky top-0 z-30 flex border-b border-slate-200 bg-slate-100/95 backdrop-blur-xs shadow-2xs select-none w-full">
           
-          <!-- Sticky Patient Info Column Header -->
-          <div class="w-[280px] sm:w-[320px] shrink-0 sticky left-0 z-40 bg-slate-100 px-4 py-3 border-r border-slate-200 flex items-center justify-between font-black text-xs text-slate-700 shadow-sm">
+          <!-- Sticky Patient Info Column Header (컴팩트 폭) -->
+          <div class="${leftColWidthClass} shrink-0 sticky left-0 z-40 bg-slate-100 px-3 py-2.5 border-r border-slate-200 flex items-center justify-between font-black text-xs text-slate-700 shadow-sm">
             <span>고객 / 병원 / 간병인</span>
-            <span class="text-[10px] font-mono text-slate-500 font-normal">정산·일당</span>
+            <span class="text-[10px] font-mono text-slate-500 font-normal">일당</span>
           </div>
 
-          <!-- Timeline Days Header (1 ~ lastDate) -->
-          <div class="flex shrink-0 relative" style="width: ${totalTimelineWidth}px;">
+          <!-- Timeline Days Header (1 ~ lastDate) : 100% 너비 균등 분할 -->
+          <div class="flex-1 grid relative w-full" style="grid-template-columns: repeat(${lastDate}, minmax(0, 1fr));">
             ${Array.from({ length: lastDate }, (_, i) => {
               const d = i + 1;
               const dateObj = new Date(curY, curM, d);
@@ -25450,10 +25453,10 @@ function renderCareCalendarTimelineView(events) {
                 isSaturday ? 'bg-sky-50 text-sky-600' : 'bg-transparent text-slate-700';
 
               return `
-                <div class="text-center shrink-0 border-r border-slate-200/80 py-2 flex flex-col items-center justify-center transition-colors ${headerBg}" style="width: ${cellWidth}px;">
-                  <span class="text-[10px] font-medium leading-none">${daysHeader[dayOfWeek]}</span>
-                  <span class="text-xs font-black font-mono mt-0.5 leading-none ${isToday ? 'w-5 h-5 rounded-full bg-sky-600 text-white flex items-center justify-center' : ''}">${d}</span>
-                  ${isToday ? `<span class="text-[8px] font-black text-sky-700 -mt-0.5">오늘</span>` : ''}
+                <div class="text-center border-r border-slate-200/80 py-1.5 flex flex-col items-center justify-center transition-colors min-w-0 ${headerBg}">
+                  <span class="text-[9px] font-medium leading-none">${daysHeader[dayOfWeek]}</span>
+                  <span class="text-[11px] font-black font-mono mt-0.5 leading-none ${isToday ? 'w-4.5 h-4.5 rounded-full bg-sky-600 text-white flex items-center justify-center text-[10px]' : ''}">${d}</span>
+                  ${isToday ? `<span class="text-[7.5px] font-black text-sky-700 -mt-0.5">오늘</span>` : ''}
                 </div>
               `;
             }).join('')}
@@ -25469,17 +25472,7 @@ function renderCareCalendarTimelineView(events) {
             <div class="text-xs text-slate-400">상단 필터를 변경하거나 우측 상단 '신규 고객접수' 버튼으로 등록해보세요.</div>
           </div>
         ` : `
-          <div class="divide-y divide-slate-200 bg-white relative">
-
-            <!-- Today Vertical Guideline Over Entire Timeline Height -->
-            ${todayDate > 0 ? `
-              <div class="absolute top-0 bottom-0 pointer-events-none z-10 border-r-2 border-dashed border-sky-500" 
-                style="left: calc(320px + ${(todayDate - 1) * cellWidth + Math.round(cellWidth / 2)}px);">
-                <div class="sticky top-10 -ml-5 bg-sky-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-xs">
-                  TODAY
-                </div>
-              </div>
-            ` : ''}
+          <div class="divide-y divide-slate-200 bg-white relative w-full">
 
             ${monthEvents.map((evt, rowIdx) => {
               const sDay = Math.max(1, (evt.parsedStart < monthStart ? 1 : evt.parsedStart.getDate()));
@@ -25489,72 +25482,68 @@ function renderCareCalendarTimelineView(events) {
               const hasPrevOverflow = evt.parsedStart < monthStart;
               const hasNextOverflow = evt.parsedEnd > monthEnd;
 
-              const barLeft = (sDay - 1) * cellWidth + 3;
-              const barWidth = Math.max(cellWidth - 6, spanDays * cellWidth - 6);
+              // 비율(%) 기반 위치 계산으로 창 크기에 관계없이 균등 정렬
+              const leftPercent = ((sDay - 1) / lastDate) * 100;
+              const widthPercent = (spanDays / lastDate) * 100;
 
               const isHyundai = evt.insuranceCompany.includes('현대');
               const isSamsung = evt.insuranceCompany.includes('삼성');
               const isDb = evt.insuranceCompany.includes('DB');
 
               const barGrad = isHyundai 
-                ? 'from-indigo-600 via-indigo-700 to-blue-700 text-white border-indigo-700 shadow-indigo-200' 
+                ? 'from-indigo-600 via-indigo-700 to-blue-700 text-white border-indigo-700 shadow-indigo-100' 
                 : isSamsung 
-                  ? 'from-sky-500 via-sky-600 to-cyan-600 text-white border-sky-600 shadow-sky-200' 
+                  ? 'from-sky-500 via-sky-600 to-cyan-600 text-white border-sky-600 shadow-sky-100' 
                   : isDb 
-                    ? 'from-emerald-600 via-teal-600 to-teal-700 text-white border-emerald-700 shadow-emerald-200' 
-                    : 'from-purple-600 via-violet-600 to-indigo-700 text-white border-purple-700 shadow-purple-200';
+                    ? 'from-emerald-600 via-teal-600 to-teal-700 text-white border-emerald-700 shadow-emerald-100' 
+                    : 'from-purple-600 via-violet-600 to-indigo-700 text-white border-purple-700 shadow-purple-100';
 
               const statusBadge = evt.status === 'ONGOING'
-                ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-black bg-emerald-400/90 text-emerald-950 flex items-center gap-1 shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-emerald-950 animate-pulse"></span>진행중</span>`
+                ? `<span class="px-1.5 py-0.2 rounded text-[9.5px] font-black bg-emerald-400/90 text-emerald-950 flex items-center gap-1 shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-emerald-950 animate-pulse"></span>진행중</span>`
                 : evt.status === 'UPCOMING'
-                  ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-black bg-amber-400/90 text-amber-950 shrink-0">예정</span>`
-                  : `<span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-white/30 text-white shrink-0">종료</span>`;
+                  ? `<span class="px-1.5 py-0.2 rounded text-[9.5px] font-black bg-amber-400/90 text-amber-950 shrink-0">예정</span>`
+                  : `<span class="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-white/30 text-white shrink-0">종료</span>`;
 
               return `
-                <div class="flex hover:bg-slate-50/80 transition-colors group">
+                <div class="flex hover:bg-slate-50/70 transition-colors group w-full">
                   
-                  <!-- Sticky Left Info Column -->
-                  <div class="w-[280px] sm:w-[320px] shrink-0 sticky left-0 z-20 bg-white group-hover:bg-slate-50/90 p-3 border-r border-slate-200 flex flex-col justify-between shadow-xs transition-colors">
-                    <div class="flex items-start justify-between gap-1.5">
-                      <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-1.5 flex-wrap">
+                  <!-- Sticky Left Info Column (컴팩트 폭: w-[190px] sm:w-[220px]) -->
+                  <div class="${leftColWidthClass} shrink-0 sticky left-0 z-20 bg-white group-hover:bg-slate-50/90 px-3 py-2 border-r border-slate-200 flex flex-col justify-between shadow-xs transition-colors">
+                    <div>
+                      <div class="flex items-center justify-between gap-1">
+                        <div class="flex items-center gap-1 truncate min-w-0">
                           <span class="font-black text-slate-900 text-xs truncate">
                             ${maskName(evt.patientName)}
                           </span>
-                          ${evt.age ? `<span class="text-[10.5px] text-slate-400 font-mono">(${evt.gender || ''}${evt.age ? evt.age + '세' : ''})</span>` : ''}
-                          <span class="px-1.5 py-0.2 rounded text-[9.5px] font-bold ${isHyundai ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : isSamsung ? 'bg-sky-50 text-sky-700 border border-sky-200' : 'bg-slate-100 text-slate-700'}">
-                            ${evt.insuranceCompany}
-                          </span>
+                          ${evt.age ? `<span class="text-[10px] text-slate-400 font-mono">(${evt.gender || ''}${evt.age ? evt.age : ''})</span>` : ''}
                         </div>
-                        <div class="text-[11px] text-slate-600 truncate mt-0.5 font-medium flex items-center gap-1">
-                          <i data-lucide="building-2" class="w-3 h-3 text-slate-400 shrink-0"></i>
-                          <span class="truncate">${evt.hospitalName} ${evt.roomNumber ? evt.roomNumber + '호' : ''}</span>
-                        </div>
+                        <span class="px-1.5 py-0.2 rounded text-[9px] font-bold shrink-0 ${isHyundai ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : isSamsung ? 'bg-sky-50 text-sky-700 border border-sky-200' : 'bg-slate-100 text-slate-700'}">
+                          ${evt.insuranceCompany.replace('손해보험', '').replace('화재', '')}
+                        </span>
                       </div>
-                      <button type="button" onclick="openCalendarEventDetail('${evt.applyId}', '${evt.assignId}')" 
-                        class="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-all shrink-0 cursor-pointer" title="상세보기">
-                        <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
-                      </button>
+                      <div class="text-[10.5px] text-slate-500 truncate mt-0.5 font-medium flex items-center gap-1">
+                        <i data-lucide="building-2" class="w-3 h-3 text-slate-400 shrink-0"></i>
+                        <span class="truncate">${evt.hospitalName}</span>
+                      </div>
                     </div>
 
-                    <!-- Caregiver & Checkpoint chips -->
-                    <div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10.5px] flex-wrap gap-1">
-                      <div class="text-slate-600 truncate flex items-center gap-1 font-medium">
-                        <i data-lucide="user" class="w-3 h-3 text-slate-400 shrink-0"></i>
-                        <span class="font-bold text-slate-800">${evt.caregiverName}</span>
-                        <span class="text-slate-400 text-[10px]">(${evt.centerName})</span>
+                    <!-- Caregiver & Wage row -->
+                    <div class="mt-1.5 pt-1 border-t border-slate-100 flex items-center justify-between text-[10px] gap-1">
+                      <div class="text-slate-600 truncate flex items-center gap-0.5 font-medium min-w-0">
+                        <i data-lucide="user" class="w-2.5 h-2.5 text-slate-400 shrink-0"></i>
+                        <span class="font-bold text-slate-800 truncate">${evt.caregiverName}</span>
                       </div>
-                      <div class="font-mono font-bold text-slate-700">
+                      <div class="font-mono font-bold text-slate-600 shrink-0 text-[10px]">
                         ${(evt.dailyWage || 0).toLocaleString()}원
                       </div>
                     </div>
 
                     ${evt.checkPoints.length > 0 ? `
-                      <div class="mt-1.5 flex items-center gap-1 flex-wrap">
-                        ${evt.checkPoints.slice(0, 2).map(cp => `
-                          <span class="px-1.5 py-0.2 rounded text-[9.5px] font-bold ${cp.level === 'danger' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-amber-50 text-amber-700 border border-amber-200'} flex items-center gap-0.5">
-                            <i data-lucide="${cp.icon || 'alert-circle'}" class="w-2.5 h-2.5"></i>
-                            <span>${cp.tag}</span>
+                      <div class="mt-1 flex items-center gap-1 flex-wrap">
+                        ${evt.checkPoints.slice(0, 1).map(cp => `
+                          <span class="px-1 py-0.2 rounded text-[9px] font-bold ${cp.level === 'danger' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-amber-50 text-amber-700 border border-amber-200'} flex items-center gap-0.5 truncate">
+                            <i data-lucide="${cp.icon || 'alert-circle'}" class="w-2.5 h-2.5 shrink-0"></i>
+                            <span class="truncate">${cp.tag}</span>
                           </span>
                         `).join('')}
                       </div>
@@ -25562,51 +25551,63 @@ function renderCareCalendarTimelineView(events) {
 
                   </div>
 
-                  <!-- Right Timeline Bar Area -->
-                  <div class="flex shrink-0 relative items-center py-3" style="width: ${totalTimelineWidth}px;">
+                  <!-- Right Timeline Bar Area : 화면 폭을 100% 채우는 균등 그리드 영역 -->
+                  <div class="flex-1 relative w-full py-2.5 min-h-[64px] flex items-center">
                     
-                    <!-- Background Grid Columns (for lines) -->
-                    ${Array.from({ length: lastDate }, (_, colI) => {
-                      const d = colI + 1;
-                      const dayOfWeek = new Date(curY, curM, d).getDay();
-                      const isSunday = (dayOfWeek === 0);
-                      const isSaturday = (dayOfWeek === 6);
-                      const isToday = (d === todayDate);
+                    <!-- Background Grid Columns (Equal 1fr width across entire container) -->
+                    <div class="absolute inset-0 grid w-full h-full pointer-events-none" style="grid-template-columns: repeat(${lastDate}, minmax(0, 1fr));">
+                      ${Array.from({ length: lastDate }, (_, colI) => {
+                        const d = colI + 1;
+                        const dayOfWeek = new Date(curY, curM, d).getDay();
+                        const isSunday = (dayOfWeek === 0);
+                        const isSaturday = (dayOfWeek === 6);
+                        const isToday = (d === todayDate);
 
-                      return `
-                        <div class="shrink-0 h-full border-r border-slate-100 absolute top-0 bottom-0 pointer-events-none
-                          ${isToday ? 'bg-sky-50/40' : isSunday ? 'bg-rose-50/20' : isSaturday ? 'bg-sky-50/20' : ''}" 
-                          style="left: ${colI * cellWidth}px; width: ${cellWidth}px;"></div>
-                      `;
-                    }).join('')}
+                        return `
+                          <div class="h-full border-r border-slate-100/90 
+                            ${isToday ? 'bg-sky-50/50' : isSunday ? 'bg-rose-50/20' : isSaturday ? 'bg-sky-50/20' : ''}">
+                          </div>
+                        `;
+                      }).join('')}
+                    </div>
 
-                    <!-- The Continuous Timeline Span Bar (시작일부터 종료일까지 쭉 연결된 막대) -->
+                    <!-- Today Vertical Guideline inside Right Timeline Area -->
+                    ${todayDate > 0 ? `
+                      <div class="absolute top-0 bottom-0 pointer-events-none z-20 border-r-2 border-dashed border-sky-500" 
+                        style="left: ${((todayDate - 0.5) / lastDate) * 100}%;">
+                        <div class="sticky top-10 -ml-3.5 bg-sky-600 text-white text-[8px] font-black px-1 py-0.2 rounded shadow-xs">
+                          오늘
+                        </div>
+                      </div>
+                    ` : ''}
+
+                    <!-- The Continuous Timeline Span Bar (창 너비에 맞춰 100% 균등 비율로 뻗는 막대) -->
                     <div onclick="openCalendarEventDetail('${evt.applyId}', '${evt.assignId}')"
-                      class="absolute z-10 h-10 rounded-xl bg-gradient-to-r ${barGrad} border shadow-sm px-3 flex items-center justify-between gap-2 cursor-pointer hover:shadow-md hover:scale-[1.008] transition-all overflow-hidden select-none"
-                      style="left: ${barLeft}px; width: ${barWidth}px;"
+                      class="absolute z-10 h-9 rounded-xl bg-gradient-to-r ${barGrad} border shadow-xs px-2.5 flex items-center justify-between gap-1.5 cursor-pointer hover:shadow-md hover:scale-[1.004] transition-all overflow-hidden select-none"
+                      style="left: calc(${leftPercent}% + 2px); width: calc(${widthPercent}% - 4px);"
                       title="[${evt.insuranceCompany}] ${evt.patientName} (${evt.startDate} ~ ${evt.endDate}, 총 ${evt.totalDays}일) | 간병인: ${evt.caregiverName} (${(evt.dailyWage || 0).toLocaleString()}원)">
                       
                       <!-- Bar Left: Continuous arrow or label -->
                       <div class="flex items-center gap-1.5 truncate min-w-0">
-                        ${hasPrevOverflow ? `<span class="text-[10px] font-black text-amber-200 animate-pulse shrink-0">◀</span>` : ''}
+                        ${hasPrevOverflow ? `<span class="text-[9px] font-black text-amber-200 animate-pulse shrink-0">◀</span>` : ''}
                         <div class="font-black text-xs truncate flex items-center gap-1">
-                          <span>${maskName(evt.patientName)}</span>
-                          <span class="text-[11px] font-normal text-white/80">(${evt.caregiverName})</span>
+                          <span class="truncate">${maskName(evt.patientName)}</span>
+                          <span class="text-[11px] font-normal text-white/80 truncate">(${evt.caregiverName})</span>
                         </div>
-                        <span class="text-[10.5px] font-mono font-medium text-white/90 shrink-0 hidden sm:inline">
-                          · ${spanDays}일 케어 (${evt.startDate.slice(5)} ~ ${evt.endDate.slice(5)})
+                        <span class="text-[10px] font-mono font-medium text-white/90 shrink-0 hidden md:inline">
+                          · ${spanDays}일간 (${evt.startDate.slice(5)} ~ ${evt.endDate.slice(5)})
                         </span>
                       </div>
 
                       <!-- Bar Right: Status Badge & Warning -->
-                      <div class="flex items-center gap-1.5 shrink-0">
+                      <div class="flex items-center gap-1 shrink-0">
                         ${evt.isAttentionNeeded ? `
-                          <span class="w-5 h-5 rounded-full bg-rose-500/80 text-white flex items-center justify-center text-[10px] font-black animate-bounce shadow-2xs" title="주의체크 필요 환자">
-                            <i data-lucide="alert-triangle" class="w-3 h-3"></i>
+                          <span class="w-4.5 h-4.5 rounded-full bg-rose-500/90 text-white flex items-center justify-center text-[9px] font-black animate-bounce shadow-2xs shrink-0" title="주의체크 필요 환자">
+                            <i data-lucide="alert-triangle" class="w-2.5 h-2.5"></i>
                           </span>
                         ` : ''}
                         ${statusBadge}
-                        ${hasNextOverflow ? `<span class="text-[10px] font-black text-amber-200 animate-pulse shrink-0">▶</span>` : ''}
+                        ${hasNextOverflow ? `<span class="text-[9px] font-black text-amber-200 animate-pulse shrink-0">▶</span>` : ''}
                       </div>
 
                     </div>
