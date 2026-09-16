@@ -1459,6 +1459,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // 통합허브 검색어 초기화 (브라우저 자동완성/캐시 잔여 방지)
+  const hubInput = document.getElementById('hubSearchInput');
+  if (hubInput) {
+    hubInput.value = '';
+  }
+
   // Render Core Unified Hub immediately for ultra-fast first contentful paint!
   renderUnifiedCareHub();
   initIcons();
@@ -16733,7 +16739,13 @@ function renderUnifiedCareHub() {
   }
   container.classList.add('font-scale-' + gHubFontSize);
 
-  const query = (document.getElementById('hubSearchInput')?.value || '').trim().toLowerCase();
+  const hubInputEl = document.getElementById('hubSearchInput');
+  const query = (hubInputEl?.value || '').trim().toLowerCase();
+  const clearBtn = document.getElementById('btnHubSearchClear');
+  if (clearBtn && hubInputEl) {
+    if (query.length > 0) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
   const insFilter = document.getElementById('hubInsuranceFilter')?.value || 'ALL';
 
   // Helper: 간병비 청구 팩스 발송 완료 여부 판별 (신규 1차 고객등록 팩스는 청구 팩스가 아니므로 제외)
@@ -24352,10 +24364,27 @@ function initFontSize() {
 
 var gHubSearchTimer = null;
 function onHubSearchInput() {
+  const hubInput = document.getElementById('hubSearchInput');
+  const clearBtn = document.getElementById('btnHubSearchClear');
+  if (clearBtn && hubInput) {
+    if (hubInput.value.trim().length > 0) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
   if (gHubSearchTimer) clearTimeout(gHubSearchTimer);
   gHubSearchTimer = setTimeout(() => {
     renderUnifiedCareHub();
   }, 100);
+}
+
+function clearHubSearch() {
+  const hubInput = document.getElementById('hubSearchInput');
+  if (hubInput) {
+    hubInput.value = '';
+    hubInput.focus();
+  }
+  const clearBtn = document.getElementById('btnHubSearchClear');
+  if (clearBtn) clearBtn.classList.add('hidden');
+  renderUnifiedCareHub();
 }
 
 
