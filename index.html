@@ -519,7 +519,7 @@
         </button>
 
         <!-- 2. 통합허브 -->
-        <button class="nav-tab-btn active w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-black transition-all bg-gradient-to-r from-primary-600 to-indigo-600 text-white shadow-md shadow-primary-600/20 border border-primary-500/30" data-tab="carehub" onclick="switchTab('carehub')">
+        <button class="nav-tab-btn active w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-black transition-all bg-gradient-to-r from-primary-600 to-indigo-600 text-white shadow-md shadow-primary-600/20 border border-primary-500/30" data-tab="carehub" onclick="clearHubSearch(); switchTab('carehub')">
           <div class="flex items-center space-x-2.5">
             <i data-lucide="layers" class="w-4 h-4 flex-shrink-0 text-amber-300"></i>
             <span class="tracking-tight text-sm">통합허브</span>
@@ -815,7 +815,7 @@
             <div class="flex items-center gap-2 flex-shrink-0">
               <div class="relative w-48 sm:w-56">
                 <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
-                <input type="text" id="hubSearchInput" autocomplete="off" value="" oninput="onHubSearchInput()" placeholder="고객명, 간병인, 사고번호..." class="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:outline-none bg-slate-50 focus:bg-white font-medium">
+                <input type="search" id="hubSearchInput" name="carehub_search_unique" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other" value="" oninput="onHubSearchInput()" placeholder="고객명, 간병인, 사고번호..." class="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:outline-none bg-slate-50 focus:bg-white font-medium">
                 <button type="button" id="btnHubSearchClear" onclick="clearHubSearch()" class="hidden absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 cursor-pointer" title="검색어 지우기">
                   <i data-lucide="x" class="w-3.5 h-3.5"></i>
                 </button>
@@ -922,7 +922,7 @@
               <i data-lucide="user-plus" class="w-4 h-4"></i>
               <span>신규 고객접수</span>
             </button>
-            <button type="button" onclick="switchTab('carehub')" class="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 flex items-center gap-1.5 transition-all cursor-pointer">
+            <button type="button" onclick="clearHubSearch(); switchTab('carehub')" class="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 flex items-center gap-1.5 transition-all cursor-pointer">
               <i data-lucide="layers" class="w-4 h-4 text-amber-300"></i>
               <span>통합허브 대장 이동</span>
             </button>

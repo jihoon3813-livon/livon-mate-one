@@ -1460,10 +1460,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 통합허브 검색어 초기화 (브라우저 자동완성/캐시 잔여 방지)
-  const hubInput = document.getElementById('hubSearchInput');
-  if (hubInput) {
-    hubInput.value = '';
-  }
+  const clearHubInputSafely = () => {
+    const hubInput = document.getElementById('hubSearchInput');
+    if (hubInput) {
+      hubInput.value = '';
+      const clearBtn = document.getElementById('btnHubSearchClear');
+      if (clearBtn) clearBtn.classList.add('hidden');
+    }
+  };
+  clearHubInputSafely();
+  setTimeout(clearHubInputSafely, 100);
+  setTimeout(clearHubInputSafely, 300);
+  setTimeout(clearHubInputSafely, 600);
+  window.addEventListener('pageshow', clearHubInputSafely);
+  window.addEventListener('load', clearHubInputSafely);
 
   // Render Core Unified Hub immediately for ultra-fast first contentful paint!
   renderUnifiedCareHub();
@@ -16803,6 +16813,9 @@ function renderUnifiedCareHub() {
   container.classList.add('font-scale-' + gHubFontSize);
 
   const hubInputEl = document.getElementById('hubSearchInput');
+  if (hubInputEl && (hubInputEl.value === '342' || hubInputEl.value.trim() === '342')) {
+    hubInputEl.value = '';
+  }
   const query = (hubInputEl?.value || '').trim().toLowerCase();
   const clearBtn = document.getElementById('btnHubSearchClear');
   if (clearBtn && hubInputEl) {
@@ -20215,7 +20228,17 @@ function switchTab(tabId, filterParam = null) {
   }
 
   // Render on-demand for lightning tab transitions
-  if (tabId === 'carehub') renderUnifiedCareHub();
+  if (tabId === 'carehub') {
+    if (!filterParam) {
+      const hubInput = document.getElementById('hubSearchInput');
+      if (hubInput) {
+        hubInput.value = '';
+        const clearBtn = document.getElementById('btnHubSearchClear');
+        if (clearBtn) clearBtn.classList.add('hidden');
+      }
+    }
+    renderUnifiedCareHub();
+  }
   else if (tabId === 'carecalendar') renderCareCalendar();
   else if (tabId === 'samsung' || tabId === 'samsunglist') renderSamsungList();
   else if (tabId === 'samsungclaimhub') renderSamsungClaimHub(filterParam);
