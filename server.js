@@ -5,7 +5,7 @@ const { exec } = require('child_process');
 const { createDocumentPdfBuffer, createTestPdfBuffer } = require('./pdf-helper');
 const { uploadToBarobillFTP, callBarobillSoap, getBarobillErrorMessage, getBarobillFaxStatus } = require('./barobill-client');
 const { getEmailConfig, saveEmailConfig, sendSmtpMail, testSmtpConnection } = require('./smtp-client');
-const { getCtiConfig, saveCtiConfig, makeOutboundCall, getRecentCallLogs } = require('./cti-client');
+const { getCtiConfig, saveCtiConfig, makeOutboundCall, getRecentCallLogs, fetchCtiLogsByDateRange, fetchCtiDetailView, classifySamsungCall } = require('./cti-client');
 
 let PORT = parseInt(process.env.PORT, 10) || 8080;
 const BASE_DIR = __dirname;
@@ -506,20 +506,114 @@ function saveSavedFaxConfig(cfg) {
     // =========================================================================
     // API Route: Samsung Fire Call Analysis Report Engine (삼성화재 콜분석 보고 시스템)
     // =========================================================================
+    // CTI 실시간 로그 수집 및 보고서 동기화 엔드포인트
+    if (reqPath === '/api/samsung/call-report/sync-cti' && req.method === 'GET') {
+      try {
+        const parsedUrl = urlModule.parse(req.url, true);
+        const startDate = parsedUrl.query.start || '2026-08-18';
+        const endDate = parsedUrl.query.end || new Date().toISOString().slice(0, 10);
+        const channel = parsedUrl.query.channel || '삼성화재';
+
+        console.log(`[Samsung Call Report] CTI 동기화 요청: ${startDate} ~ ${endDate} (채널: ${channel})`);
+        const ctiResult = await fetchCtiLogsByDateRange(startDate, endDate, channel);
+
+        // 일자별 추이 및 주차별 롤업 자동 집계
+        const dailyMap = {};
+        // 시작일부터 종료일까지 날짜 초기화
+        let cur = new Date(startDate);
+        const end = new Date(endDate);
+        const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
+
+        while (cur <= end) {
+          const ds = cur.toISOString().slice(0, 10);
+          dailyMap[ds] = {
+            date: ds,
+            dayOfWeek: daysOfWeek[cur.getDay()],
+            callCount: 0,
+            share: 0,
+            note: cur.getDay() === 0 || cur.getDay() === 6 ? '주말' : ''
+          };
+          cur.setDate(cur.getDate() + 1);
+        }
+
+        ctiResult.logs.forEach(l => {
+          const d = (l.callTime || '').slice(0, 10);
+          if (dailyMap[d]) {
+            dailyMap[d].callCount++;
+          }
+        });
+
+        const dailyTrends = Object.values(dailyMap);
+        const totalCalls = ctiResult.logs.length;
+        dailyTrends.forEach(d => {
+          d.share = totalCalls > 0 ? parseFloat((d.callCount / totalCalls).toFixed(4)) : 0;
+        });
+
+        // 7일 단위 주차 롤업
+        const weeklyRollup = [];
+        for (let i = 0; i < dailyTrends.length; i += 7) {
+          const slice = dailyTrends.slice(i, i + 7);
+          const weekCalls = slice.reduce((sum, s) => sum + s.callCount, 0);
+          const wNum = Math.floor(i / 7) + 1;
+          const sDate = slice[0].date.slice(5).replace('-', '/');
+          const eDate = slice[slice.length - 1].date.slice(5).replace('-', '/');
+          weeklyRollup.push({
+            week: `${wNum}주차 (${sDate}~${eDate})`,
+            calls: weekCalls,
+            share: totalCalls > 0 ? parseFloat((weekCalls / totalCalls).toFixed(3)) : 0,
+            dailyAvg: slice.length > 0 ? Math.round(weekCalls / slice.length) : 0
+          });
+        }
+
+        const reportData = {
+          reportInfo: {
+            title: `삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고 (${startDate} ~ ${endDate})`,
+            target: '삼성화재 간병서비스 관련 인바운드 콜',
+            period: `${startDate} ~ ${endDate}`,
+            startDate,
+            endDate,
+            reportDate: new Date().toISOString().slice(0, 10),
+            author: '리본케어 (Livon Care) 운영센터',
+            operatingDays: dailyTrends.length,
+            syncedAt: new Date().toISOString()
+          },
+          summaryStats: {
+            totalCalls,
+            connectReqCalls: ctiResult.logs.filter(c => c.connectReq === 'Y').length,
+            consultedCalls: ctiResult.logs.filter(c => c.title || c.summary).length
+          },
+          dailyTrends,
+          weeklyRollup,
+          callLogs: ctiResult.logs
+        };
+
+        const dataFile = path.join(BASE_DIR, 'samsung_call_report.json');
+        fs.writeFileSync(dataFile, JSON.stringify(reportData, null, 2), 'utf-8');
+
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({
+          success: true,
+          message: `CTI로부터 총 ${totalCalls}건의 인바운드 로그를 성공적으로 동기화하였습니다.`,
+          data: reportData
+        }));
+      } catch (err) {
+        console.error('[Samsung Call Report CTI Sync Error]', err);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    }
+
     if (reqPath === '/api/samsung/call-report/data') {
       const dataFile = path.join(BASE_DIR, 'samsung_call_report.json');
-      const seedFile = path.join(BASE_DIR, 'samsung_call_seed.json');
 
       if (req.method === 'GET') {
         try {
           let reportData = null;
           if (fs.existsSync(dataFile)) {
             reportData = JSON.parse(fs.readFileSync(dataFile, 'utf-8'));
-          } else if (fs.existsSync(seedFile)) {
-            reportData = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
           } else {
             res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-            return res.end(JSON.stringify({ success: false, error: '데이터를 찾을 수 없습니다.' }));
+            return res.end(JSON.stringify({ success: false, error: '데이터를 찾을 수 없습니다. CTI 동기화를 먼저 진행해주세요.' }));
           }
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: true, data: reportData }));

@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>삼성화재 간병(리본케어) 서비스 인바운드 콜분석 보고서</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📞</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+  <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    * { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 antialiased selection:bg-blue-600 selection:text-white pb-16">
+
+  <!-- TOP HEADER BAR -->
+  <header class="bg-white/95 backdrop-blur-md border-b border-slate-200/90 sticky top-0 z-40 shadow-xs">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-600/20">
+          <i data-lucide="phone-call" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-black text-[11px] tracking-wide">삼성화재 공식보고</span>
+            <span class="text-xs text-slate-400 font-mono" id="viewerSyncedAt">CTI 실시간 연동</span>
+          </div>
+          <h1 class="text-base sm:text-lg font-black text-slate-900 leading-tight mt-0.5">
+            삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서
+          </h1>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 flex-wrap">
+        <button type="button" onclick="copyReportLink()" class="px-3.5 py-2 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100 text-blue-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer" title="현재 보고서 웹링크 복사">
+          <i data-lucide="link" class="w-4 h-4 text-blue-600"></i>
+          <span>보고서 링크 복사</span>
+        </button>
+        <button type="button" onclick="exportExcel()" class="px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer" title="3-Sheet 정밀 엑셀 파일 다운로드">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+          <span>엑셀(.xlsx) 다운로드</span>
+        </button>
+        <button type="button" onclick="downloadPdf()" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/20 cursor-pointer" title="A4 3-시트 완본 PDF 다운로드">
+          <i data-lucide="download" class="w-4 h-4 text-white"></i>
+          <span>PDF 다운로드</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-[1600px] mx-auto px-4 sm:px-6 pt-6 space-y-5">
+
+    <!-- 1. DATE FILTER & SEARCH BAR -->
+    <div class="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-5 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+      <div class="flex items-center gap-3 flex-wrap">
+        <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 text-xs font-bold text-slate-700">
+          <i data-lucide="calendar" class="w-4 h-4 text-slate-500 ml-1.5"></i>
+          <span>조회기간:</span>
+          <input type="date" id="reportStartDate" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500">
+          <span>~</span>
+          <input type="date" id="reportEndDate" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500">
+          <button type="button" onclick="applyDateRange()" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs">
+            조회
+          </button>
+        </div>
+
+        <div class="flex items-center gap-1 flex-wrap">
+          <button type="button" onclick="setPresetRange('today')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors">오늘</button>
+          <button type="button" onclick="setPresetRange('yesterday')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors">어제</button>
+          <button type="button" onclick="setPresetRange('thisWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors">이번 주</button>
+          <button type="button" onclick="setPresetRange('lastWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors">지난 주</button>
+          <button type="button" onclick="setPresetRange('last30')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors">최근 30일</button>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <div class="relative w-full sm:w-72">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+          <input type="text" id="globalSearchInput" oninput="handleSearch(this.value)" placeholder="전화번호, 환자명, 키워드, 제목 검색..." class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs bg-slate-50/70 focus:bg-white focus:outline-none focus:border-blue-500 font-medium">
+        </div>
+        <button type="button" onclick="syncLiveCti()" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0 cursor-pointer" title="GoodARS CTI 실시간 최신 통화데이터 즉시 동기화">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="syncIcon"></i>
+          <span>CTI 동기화</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. SUB-TAB SWITCHER -->
+    <div class="flex items-center justify-between border-b border-slate-200 gap-2 flex-wrap px-1">
+      <div class="flex items-center space-x-1 sm:space-x-2">
+        <button type="button" onclick="switchTab('summary')" id="tabBtn-summary" class="px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-2 border-b-2 border-blue-600 text-blue-700 bg-white shadow-2xs transition-all cursor-pointer">
+          <i data-lucide="pie-chart" class="w-4 h-4"></i>
+          <span>시트 1: 분석 요약 (Executive Summary)</span>
+        </button>
+        <button type="button" onclick="switchTab('daily')" id="tabBtn-daily" class="px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-2 border-b-2 border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60 transition-all cursor-pointer">
+          <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+          <span>시트 2: 일자별 인입현황</span>
+        </button>
+        <button type="button" onclick="switchTab('logs')" id="tabBtn-logs" class="px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-2 border-b-2 border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60 transition-all cursor-pointer">
+          <i data-lucide="list-filter" class="w-4 h-4"></i>
+          <span>시트 3: 통화로그(원본)</span>
+          <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-900 font-bold border border-amber-300">2개 컬럼 연동</span>
+        </button>
+      </div>
+
+      <div id="filterTagContainer" class="flex items-center gap-2 pb-1 text-xs"></div>
+    </div>
+
+    <!-- 3. TAB CONTENT CONTAINERS -->
+    <div id="tabContent-summary" class="space-y-6"></div>
+    <div id="tabContent-daily" class="space-y-6 hidden"></div>
+    <div id="tabContent-logs" class="space-y-4 hidden"></div>
+
+  </main>
+
+  <script>
+    let gReportData = null;
+    let gActiveTab = 'summary';
+    let gFilter = {
+      category: '',
+      actor: '',
+      search: '',
+      consultedOnly: true,
+      startDate: '2026-08-18',
+      endDate: new Date().toISOString().slice(0, 10)
+    };
+    let gDailyChartInstance = null;
+
+    const SAMSUNG_CATEGORIES = [
+      { name: '보험 문의·타업무 연결', barClass: 'bg-amber-500', description: '리본케어=보험가입 기관 아님→삼성화재(1588-5114) 이관, 보험금 청구·보장 문의, 담당자 연결' },
+      { name: '이용방식(24시간·교체·산정)', barClass: 'bg-indigo-500', description: '24시간 상주·동일간병인, 간병인 교체(2회 제한), 1일 산정(8시간·1박2일), 대체인력' },
+      { name: '간병 신청·접수·배정', barClass: 'bg-sky-500', description: '본인·보호자 확인/대리신청, 랜덤 배정, 24시간 내 배정, 응급·주말·명절 접수, 재접수' },
+      { name: '협력업체 등록·지역연계', barClass: 'bg-cyan-500', description: '간병업체 파트너 등록·MOU, 지역 지부 연계·파견·일당' },
+      { name: '비용·무상제공 확인', barClass: 'bg-rose-500', description: '180일 무상 현물제공, 추가비용·수당 없음 재확인, 미제공시 실비지원' },
+      { name: '간병인(요양보호사) 등록', barClass: 'bg-teal-500', description: '요양보호사·간병사 개인/가족 등록, 자격증 요건, 근무지역' },
+      { name: '서비스 이용조건·범위', barClass: 'bg-emerald-500', description: '이용대상(가입 필수·지정불가), 질병범위(경증 가능·중환자실/전염병 제외), 가족간병 불가' },
+      { name: '제휴·영업지원 확인', barClass: 'bg-slate-500', description: '리본케어 서비스 정체 확인, 설계사 판매·홍보 자료 요청' }
+    ];
+
+    const SAMSUNG_ACTORS = [
+      { name: '고객(가입자·이용자)', barClass: 'bg-blue-600', description: '실사용·가입 고객의 신청·접수 및 서비스 이해 문의' },
+      { name: '협력업체·간병협회', barClass: 'bg-purple-600', description: '간병업체·협회의 파트너 등록·지역 연계 문의(공급망)' },
+      { name: '간병인 등록희망자', barClass: 'bg-emerald-600', description: '요양보호사 등 간병 인력의 등록·자격 문의(공급 확충)' },
+      { name: '삼성화재 내부(설계사·지점)', barClass: 'bg-amber-600', description: '판매채널(설계사·지점)의 상품설명·규정 확인(교육/자료)' }
+    ];
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('start')) gFilter.startDate = urlParams.get('start');
+      if (urlParams.get('end')) gFilter.endDate = urlParams.get('end');
+
+      document.getElementById('reportStartDate').value = gFilter.startDate;
+      document.getElementById('reportEndDate').value = gFilter.endDate;
+
+      await loadReportData();
+    });
+
+    async function loadReportData() {
+      try {
+        const res = await fetch('/api/samsung/call-report/data');
+        const json = await res.json();
+        if (json.success && json.data) {
+          gReportData = json.data;
+          renderAll();
+        } else {
+          await syncLiveCti();
+        }
+      } catch (err) {
+        console.error('Error loading report:', err);
+      }
+    }
+
+    function renderAll() {
+      if (!gReportData) return;
+      const stats = calculateStats();
+      renderSummarySheet(stats);
+      renderDailySheet(stats);
+      renderLogsSheet(stats);
+      renderFilterTags();
+      if (window.lucide) lucide.createIcons();
+
+      if (gActiveTab === 'daily') {
+        renderDailyTrendChart();
+      }
+    }
+
+    function calculateStats() {
+      const logs = (gReportData && gReportData.callLogs) || [];
+      const totalCalls = logs.length;
+      const connectReqCalls = logs.filter(c => c.connectReq === 'Y' || (c.arsMenu || '').includes('상담연결')).length;
+      const consultedCalls = logs.filter(c => c.title || c.summary || (c.duration && c.duration !== '0'));
+      const consultedCount = consultedCalls.length;
+      const connectRate = totalCalls > 0 ? Math.round((connectReqCalls / totalCalls) * 100) : 0;
+      const opDays = (gReportData.dailyTrends || []).length || 25;
+      const dailyAvg = opDays > 0 ? Math.round(totalCalls / opDays) : 0;
+
+      const catMap = {};
+      SAMSUNG_CATEGORIES.forEach(c => catMap[c.name] = 0);
+      consultedCalls.forEach(c => {
+        if (c.category) catMap[c.category] = (catMap[c.category] || 0) + 1;
+      });
+      const catList = SAMSUNG_CATEGORIES.map(c => {
+        const count = catMap[c.name] || 0;
+        const share = consultedCount > 0 ? count / consultedCount : 0;
+        return { ...c, count, share, pct: (share * 100).toFixed(1) };
+      }).sort((a, b) => b.count - a.count);
+
+      const actorMap = {};
+      SAMSUNG_ACTORS.forEach(a => actorMap[a.name] = 0);
+      consultedCalls.forEach(c => {
+        if (c.actor) actorMap[c.actor] = (actorMap[c.actor] || 0) + 1;
+      });
+      const actorList = SAMSUNG_ACTORS.map(a => {
+        const count = actorMap[a.name] || 0;
+        const share = consultedCount > 0 ? count / consultedCount : 0;
+        return { ...a, count, share, pct: (share * 100).toFixed(1) };
+      }).sort((a, b) => b.count - a.count);
+
+      return { totalCalls, connectReqCalls, connectRate, consultedCount, opDays, dailyAvg, catList, actorList };
+    }
+
+    function renderSummarySheet(stats) {
+      const container = document.getElementById('tabContent-summary');
+      container.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs flex items-center justify-between">
+            <div>
+              <span class="text-xs font-bold text-slate-500">총 인입콜</span>
+              <div class="text-3xl font-black text-slate-900 mt-1">${stats.totalCalls}<span class="text-sm font-bold text-slate-500 ml-1">건</span></div>
+              <p class="text-[11px] text-slate-400 mt-1">인바운드 총량</p>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              <i data-lucide="phone-incoming" class="w-6 h-6"></i>
+            </div>
+          </div>
+          <div class="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs flex items-center justify-between">
+            <div>
+              <span class="text-xs font-bold text-slate-500">상담연결 요청</span>
+              <div class="text-3xl font-black text-indigo-900 mt-1">${stats.connectReqCalls}<span class="text-sm font-bold text-indigo-500 ml-1">건</span></div>
+              <p class="text-[11px] text-indigo-600 mt-1 font-bold">연결 요청률 ${stats.connectRate}%</p>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+              <i data-lucide="phone-forwarded" class="w-6 h-6"></i>
+            </div>
+          </div>
+          <div class="bg-white rounded-3xl border border-blue-200 bg-blue-50/20 p-5 shadow-xs flex items-center justify-between">
+            <div>
+              <span class="text-xs font-bold text-blue-700">실제 상담 (분석 대상)</span>
+              <div class="text-3xl font-black text-blue-900 mt-1">${stats.consultedCount}<span class="text-sm font-bold text-blue-600 ml-1">건</span></div>
+              <p class="text-[11px] text-blue-600 mt-1 font-bold">전수 1:1 정밀 분석</p>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold">
+              <i data-lucide="headphones" class="w-6 h-6"></i>
+            </div>
+          </div>
+          <div class="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs flex items-center justify-between">
+            <div>
+              <span class="text-xs font-bold text-slate-500">일평균 인입</span>
+              <div class="text-3xl font-black text-slate-900 mt-1">${stats.dailyAvg}<span class="text-sm font-bold text-slate-500 ml-1">건</span></div>
+              <p class="text-[11px] text-slate-400 mt-1">운영일 ${stats.opDays}일 기준</p>
+            </div>
+            <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
+              <i data-lucide="calendar" class="w-6 h-6"></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-6 shadow-sm">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="px-2.5 py-0.5 rounded-full bg-blue-500/30 text-blue-200 text-xs font-black border border-blue-400/30">Executive Summary</span>
+            <span class="text-xs text-slate-300">리본케어 간병지원 CTI 분석 브리핑</span>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs leading-relaxed text-slate-200">
+            <div class="bg-white/10 rounded-2xl p-4 border border-white/10">
+              <div class="font-black text-sm text-white mb-1.5 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span> 1. 보험 문의 및 타업무 이관 비중
+              </div>
+              <p>보험 문의 및 보장 확인 유입이 다수를 차지하여, 삼성화재 대표콜센터(1588-5114)로의 원활한 이관 프로세스를 표준화하여 신속히 안내 완료하고 있습니다.</p>
+            </div>
+            <div class="bg-white/10 rounded-2xl p-4 border border-white/10">
+              <div class="font-black text-sm text-white mb-1.5 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-sky-400"></span> 2. 실제 간병 신청 및 이용 안내
+              </div>
+              <p>실사용 고객의 간병 신청·접수 및 24시간 상주, 간병인 교체 등 서비스 이용조건 질의가 꾸준히 증가하고 있어 전수 표준 매뉴얼에 따라 안내하고 있습니다.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-7 bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-xs space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 class="text-base font-black text-slate-900">주요 문의유형 분포 (대분류)</h3>
+                <p class="text-xs text-slate-500 mt-0.5">각 항목 클릭 시 해당 통화로그로 <b class="text-blue-600 underline">즉시 드릴다운</b>됩니다.</p>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-sky-100 text-sky-800 font-bold text-xs">${stats.consultedCount}건 기준</span>
+            </div>
+            <div class="space-y-2.5">
+              ${stats.catList.map((cat, idx) => `
+                <div onclick="drilldown('category', '${cat.name}')" class="p-3 rounded-2xl border border-slate-200/70 hover:border-blue-400 hover:bg-blue-50/40 transition-all cursor-pointer group">
+                  <div class="flex items-center justify-between text-xs mb-1.5">
+                    <div class="flex items-center gap-2">
+                      <span class="w-5 h-5 rounded-lg bg-slate-100 text-slate-700 font-bold text-[10px] flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">${idx + 1}</span>
+                      <span class="font-black text-slate-900 group-hover:text-blue-700">${cat.name}</span>
+                    </div>
+                    <div class="flex items-center gap-2 font-mono">
+                      <span class="font-black text-slate-900 group-hover:text-blue-700">${cat.count}건</span>
+                      <span class="text-slate-400 text-[11px]">(${cat.pct}%)</span>
+                      <i data-lucide="arrow-right" class="w-3 h-3 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all"></i>
+                    </div>
+                  </div>
+                  <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div class="h-full ${cat.barClass} rounded-full transition-all duration-500" style="width: ${cat.pct}%"></div>
+                  </div>
+                  <p class="text-[11px] text-slate-500 mt-1.5 truncate group-hover:text-slate-700">${cat.description}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-xs space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 class="text-base font-black text-slate-900">문의 주체별 분포</h3>
+                <p class="text-xs text-slate-500 mt-0.5">클릭 시 해당 문의 주체의 통화로그만 조회됩니다.</p>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800 font-bold text-xs">누가 문의했는가</span>
+            </div>
+            <div class="space-y-3">
+              ${stats.actorList.map((act) => `
+                <div onclick="drilldown('actor', '${act.name}')" class="p-3.5 rounded-2xl border border-slate-200/70 hover:border-indigo-400 hover:bg-indigo-50/40 transition-all cursor-pointer group">
+                  <div class="flex items-center justify-between text-xs mb-1.5">
+                    <div class="flex items-center gap-2">
+                      <span class="w-2.5 h-2.5 rounded-full ${act.barClass}"></span>
+                      <span class="font-black text-slate-900 group-hover:text-indigo-700">${act.name}</span>
+                    </div>
+                    <div class="flex items-center gap-2 font-mono">
+                      <span class="font-black text-slate-900 group-hover:text-indigo-700">${act.count}건</span>
+                      <span class="text-slate-400 text-[11px]">(${act.pct}%)</span>
+                      <i data-lucide="arrow-right" class="w-3 h-3 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all"></i>
+                    </div>
+                  </div>
+                  <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                    <div class="h-full ${act.barClass} rounded-full transition-all duration-500" style="width: ${act.pct}%"></div>
+                  </div>
+                  <p class="text-[11px] text-slate-500 mt-1.5 group-hover:text-slate-700">${act.description}</p>
+                </div>
+              `).join('')}
+            </div>
+
+            <div class="mt-4 p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-950 text-xs space-y-1">
+              <div class="font-black flex items-center gap-1.5 text-amber-900">
+                <i data-lucide="info" class="w-4 h-4 text-amber-600"></i>
+                삼성화재 상품마케팅TF 요청사항 반영
+              </div>
+              <p class="text-[11.5px] leading-relaxed text-amber-800">
+                위 문의 대분류 및 문의 주체는 <b>통화로그(원본)</b>의 각 항목과 1:1로 직접 연결되어 있습니다. 클릭하여 해당되는 통화 이력을 즉시 확인하실 수 있습니다.
+              </p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDailySheet(stats) {
+      const container = document.getElementById('tabContent-daily');
+      const trends = (gReportData && gReportData.dailyTrends) || [];
+      const weekly = (gReportData && gReportData.weeklyRollup) || [];
+
+      container.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          ${weekly.map(w => `
+            <div class="bg-white rounded-3xl border border-slate-200/90 p-4 shadow-xs">
+              <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+                <span class="font-bold">${w.week}</span>
+                <span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px]">일평균 ${w.dailyAvg}건</span>
+              </div>
+              <div class="text-2xl font-black text-slate-900 mt-1">${w.calls}<span class="text-xs font-bold text-slate-500 ml-1">건</span></div>
+              <div class="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
+                <span>점유 비중</span>
+                <span class="font-bold text-slate-700 font-mono">${(w.share * 100).toFixed(1)}%</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-xs space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 class="text-base font-black text-slate-900">일자별 인입량 추이 그래프</h3>
+              <p class="text-xs text-slate-500 mt-0.5">일자별 인바운드 콜 인입량 및 요일 패턴 (Chart.js Interactive Chart)</p>
+            </div>
+            <span class="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 font-mono text-xs font-bold">총 ${trends.length}일 집계</span>
+          </div>
+          <div class="w-full h-72 sm:h-80 relative">
+            <canvas id="samsungDailyTrendChart"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
+          <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+            <h4 class="text-sm font-black text-slate-900">일자별 인입 데이터 시트</h4>
+          </div>
+          <div class="overflow-x-auto custom-scrollbar max-h-[500px]">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-100/80 text-slate-600 uppercase font-black text-[11px] sticky top-0 z-10 border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">일자</th>
+                  <th class="py-3 px-4 text-center">요일</th>
+                  <th class="py-3 px-4 text-right">인입콜(건)</th>
+                  <th class="py-3 px-4 text-right">점유 비중</th>
+                  <th class="py-3 px-4">비고</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-slate-700">
+                ${trends.map(t => {
+                  const isWeekend = t.dayOfWeek === '토' || t.dayOfWeek === '일';
+                  const share = (t.share * 100).toFixed(1);
+                  return `
+                    <tr class="hover:bg-slate-50 transition-colors ${isWeekend ? 'bg-slate-50/40' : ''}">
+                      <td class="py-2.5 px-4 font-mono font-bold text-slate-900">${t.date}</td>
+                      <td class="py-2.5 px-4 text-center ${isWeekend ? 'text-rose-600 font-black' : 'text-slate-600 font-medium'}">${t.dayOfWeek}</td>
+                      <td class="py-2.5 px-4 text-right font-mono font-black ${t.callCount >= 20 ? 'text-blue-700' : 'text-slate-800'}">${t.callCount}건</td>
+                      <td class="py-2.5 px-4 text-right font-mono text-slate-400">${share}%</td>
+                      <td class="py-2.5 px-4 text-slate-400 font-medium">${t.note || '-'}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDailyTrendChart() {
+      const canvas = document.getElementById('samsungDailyTrendChart');
+      if (!canvas || !gReportData) return;
+
+      const trends = gReportData.dailyTrends || [];
+      const labels = trends.map(t => `${t.date.slice(5)} (${t.dayOfWeek})`);
+      const data = trends.map(t => t.callCount);
+      const backgroundColors = trends.map(t => {
+        if (t.dayOfWeek === '토' || t.dayOfWeek === '일') return 'rgba(203, 213, 225, 0.8)';
+        if (t.callCount >= 25) return 'rgba(29, 78, 216, 0.9)';
+        return 'rgba(56, 189, 248, 0.85)';
+      });
+
+      if (gDailyChartInstance) {
+        gDailyChartInstance.destroy();
+      }
+
+      const ctx = canvas.getContext('2d');
+      gDailyChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: '인입 콜 수 (건)',
+            data,
+            backgroundColor: backgroundColors,
+            borderRadius: 6,
+            borderSkipped: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `인입 콜: ${ctx.parsed.y}건`
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0 }
+            },
+            x: {
+              ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } }
+            }
+          }
+        }
+      });
+    }
+
+    function renderLogsSheet(stats) {
+      const container = document.getElementById('tabContent-logs');
+      let logs = (gReportData && gReportData.callLogs) || [];
+
+      if (gFilter.consultedOnly) {
+        logs = logs.filter(c => c.title || c.summary || (c.duration && c.duration !== '0'));
+      }
+      if (gFilter.category) {
+        logs = logs.filter(c => c.category === gFilter.category);
+      }
+      if (gFilter.actor) {
+        logs = logs.filter(c => c.actor === gFilter.actor);
+      }
+      if (gFilter.search) {
+        const q = gFilter.search.toLowerCase().trim();
+        logs = logs.filter(c =>
+          (c.phone || '').includes(q) ||
+          (c.title || '').toLowerCase().includes(q) ||
+          (c.summary || '').toLowerCase().includes(q) ||
+          (c.keywords || '').toLowerCase().includes(q) ||
+          (c.memberName || '').toLowerCase().includes(q)
+        );
+      }
+
+      container.innerHTML = `
+        <div class="bg-white rounded-3xl border border-slate-200/90 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <label class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer text-xs font-bold text-slate-700 transition-colors">
+              <input type="checkbox" ${gFilter.consultedOnly ? 'checked' : ''} onchange="toggleConsultedOnly(this.checked)" class="rounded text-blue-600">
+              <span>실제 상담건만 보기</span>
+            </label>
+
+            <select onchange="handleCategoryFilter(this.value)" class="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white">
+              <option value="">문의 대분류: 전체 (${SAMSUNG_CATEGORIES.length}종)</option>
+              ${SAMSUNG_CATEGORIES.map(c => `
+                <option value="${c.name}" ${gFilter.category === c.name ? 'selected' : ''}>${c.name}</option>
+              `).join('')}
+            </select>
+
+            <select onchange="handleActorFilter(this.value)" class="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white">
+              <option value="">문의 주체: 전체 (${SAMSUNG_ACTORS.length}종)</option>
+              ${SAMSUNG_ACTORS.map(a => `
+                <option value="${a.name}" ${gFilter.actor === a.name ? 'selected' : ''}>${a.name}</option>
+              `).join('')}
+            </select>
+
+            ${gFilter.category || gFilter.actor || gFilter.search ? `
+              <button type="button" onclick="clearFilters()" class="px-2.5 py-1.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors">
+                초기화
+              </button>
+            ` : ''}
+          </div>
+
+          <span class="text-xs font-bold text-slate-500 font-mono">조회된 통화: <b class="text-blue-700">${logs.length}</b>건</span>
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
+          <div class="overflow-x-auto custom-scrollbar max-h-[640px]">
+            <table class="w-full text-xs text-left min-w-[1700px]">
+              <thead class="bg-slate-900 text-slate-200 uppercase font-bold text-[11px] sticky top-0 z-20 shadow-xs">
+                <tr>
+                  <th class="py-3 px-3 text-center w-12">#</th>
+                  <th class="py-3 px-3">연결시간</th>
+                  <th class="py-3 px-3">경로</th>
+                  <th class="py-3 px-3">전화번호</th>
+                  <th class="py-3 px-3">회원이름</th>
+                  <th class="py-3 px-3">ARS메뉴</th>
+                  <th class="py-3 px-3 text-center">연결</th>
+                  <th class="py-3 px-3 text-center">대기</th>
+                  <th class="py-3 px-3 text-center bg-blue-800 text-amber-300 font-black border-x border-blue-700">문의 대분류 (신규) ✨</th>
+                  <th class="py-3 px-3 text-center bg-blue-800 text-amber-300 font-black border-r border-blue-700">문의 주체 (신규) ✨</th>
+                  <th class="py-3 px-3">상담제목</th>
+                  <th class="py-3 px-3 min-w-[340px]">상담요약 (전문의 내용)</th>
+                  <th class="py-3 px-3 min-w-[180px]">키워드</th>
+                  <th class="py-3 px-3 text-center">통화시간</th>
+                  <th class="py-3 px-3 text-center">상태</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-slate-700">
+                ${logs.length === 0 ? `
+                  <tr>
+                    <td colspan="15" class="py-12 text-center text-slate-400 font-bold">
+                      일치하는 통화로그가 없습니다. 필터 조건을 변경해보세요.
+                    </td>
+                  </tr>
+                ` : logs.map((c, idx) => `
+                  <tr class="hover:bg-blue-50/40 transition-colors ${idx % 2 === 1 ? 'bg-slate-50/50' : ''}">
+                    <td class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">${c.rowNum || (idx + 1)}</td>
+                    <td class="py-2.5 px-3 font-mono text-slate-600 whitespace-nowrap">${c.callTime || '-'}</td>
+                    <td class="py-2.5 px-3 font-bold text-sky-700 whitespace-nowrap">${c.channel || '삼성화재'}</td>
+                    <td class="py-2.5 px-3 font-mono font-bold text-slate-900 whitespace-nowrap">${c.phone || '-'}</td>
+                    <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-800">${c.memberName || '회원아님'}</td>
+                    <td class="py-2.5 px-3 whitespace-nowrap">${c.arsMenu || '-'}</td>
+                    <td class="py-2.5 px-3 text-center font-mono font-bold ${c.connectReq === 'Y' ? 'text-blue-600' : 'text-slate-400'}">${c.connectReq || '-'}</td>
+                    <td class="py-2.5 px-3 text-center font-mono text-slate-500">${c.waitTime ? `${c.waitTime}초` : '0'}</td>
+                    
+                    <td class="py-2 px-3 border-x border-slate-200 bg-sky-50/30 text-center font-bold text-sky-900">
+                      ${c.category || '<span class="text-slate-300">-</span>'}
+                    </td>
+                    <td class="py-2 px-3 border-r border-slate-200 bg-indigo-50/30 text-center font-bold text-indigo-900">
+                      ${c.actor || '<span class="text-slate-300">-</span>'}
+                    </td>
+                    <td class="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">${c.title || '-'}</td>
+                    <td class="py-2.5 px-3 text-slate-600 leading-relaxed">${c.summary || '<span class="text-slate-300">-</span>'}</td>
+                    <td class="py-2.5 px-3 text-slate-500 font-medium">
+                      ${c.keywords ? `
+                        <div class="flex flex-wrap gap-1">
+                          ${c.keywords.split(',').map(k => `
+                            <span class="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px]">${k.trim()}</span>
+                          `).join('')}
+                        </div>
+                      ` : '<span class="text-slate-300">-</span>'}
+                    </td>
+                    <td class="py-2.5 px-3 text-center font-mono font-bold text-slate-700 whitespace-nowrap">${c.duration || '0'}</td>
+                    <td class="py-2.5 px-3 text-center text-slate-500 whitespace-nowrap">${c.status || '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function switchTab(tabId) {
+      gActiveTab = tabId;
+      ['summary', 'daily', 'logs'].forEach(t => {
+        const btn = document.getElementById(`tabBtn-${t}`);
+        const content = document.getElementById(`tabContent-${t}`);
+        if (t === tabId) {
+          btn.className = 'px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-2 border-b-2 border-blue-600 text-blue-700 bg-white shadow-2xs transition-all cursor-pointer';
+          content.classList.remove('hidden');
+        } else {
+          btn.className = 'px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-2 border-b-2 border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60 transition-all cursor-pointer';
+          content.classList.add('hidden');
+        }
+      });
+
+      if (tabId === 'daily') {
+        setTimeout(renderDailyTrendChart, 50);
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function drilldown(type, value) {
+      if (type === 'category') gFilter.category = value;
+      if (type === 'actor') gFilter.actor = value;
+      switchTab('logs');
+      renderAll();
+    }
+
+    function handleCategoryFilter(val) {
+      gFilter.category = val;
+      renderAll();
+    }
+
+    function handleActorFilter(val) {
+      gFilter.actor = val;
+      renderAll();
+    }
+
+    function handleSearch(val) {
+      gFilter.search = val;
+      renderLogsSheet(calculateStats());
+      renderFilterTags();
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function toggleConsultedOnly(checked) {
+      gFilter.consultedOnly = checked;
+      renderLogsSheet(calculateStats());
+    }
+
+    function clearFilters() {
+      gFilter.category = '';
+      gFilter.actor = '';
+      gFilter.search = '';
+      document.getElementById('globalSearchInput').value = '';
+      renderAll();
+    }
+
+    function renderFilterTags() {
+      const container = document.getElementById('filterTagContainer');
+      if (!container) return;
+      if (!gFilter.category && !gFilter.actor) {
+        container.innerHTML = '';
+        return;
+      }
+      container.innerHTML = `
+        <span class="text-xs text-slate-500">적용된 필터:</span>
+        ${gFilter.category ? `<span class="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 font-bold text-xs">대분류: ${gFilter.category}</span>` : ''}
+        ${gFilter.actor ? `<span class="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 font-bold text-xs">주체: ${gFilter.actor}</span>` : ''}
+        <button type="button" onclick="clearFilters()" class="text-xs text-rose-600 font-bold underline ml-1">초기화</button>
+      `;
+    }
+
+    function setPresetRange(type) {
+      const today = new Date();
+      let start = new Date();
+      let end = new Date();
+
+      if (type === 'today') {
+      } else if (type === 'yesterday') {
+        start.setDate(today.getDate() - 1);
+        end.setDate(today.getDate() - 1);
+      } else if (type === 'thisWeek') {
+        const day = today.getDay();
+        const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+        start.setDate(diff);
+      } else if (type === 'lastWeek') {
+        const day = today.getDay();
+        const diff = today.getDate() - day + (day === 0 ? -6 : 1) - 7;
+        start.setDate(diff);
+        end = new Date(start);
+        end.setDate(start.getDate() + 6);
+      } else if (type === 'last30') {
+        start.setDate(today.getDate() - 30);
+      }
+
+      gFilter.startDate = start.toISOString().slice(0, 10);
+      gFilter.endDate = end.toISOString().slice(0, 10);
+      document.getElementById('reportStartDate').value = gFilter.startDate;
+      document.getElementById('reportEndDate').value = gFilter.endDate;
+
+      applyDateRange();
+    }
+
+    async function applyDateRange() {
+      const s = document.getElementById('reportStartDate').value;
+      const e = document.getElementById('reportEndDate').value;
+      if (!s || !e) return;
+      gFilter.startDate = s;
+      gFilter.endDate = e;
+
+      const url = new URL(window.location);
+      url.searchParams.set('start', s);
+      url.searchParams.set('end', e);
+      window.history.replaceState({}, '', url);
+
+      await syncLiveCti();
+    }
+
+    async function syncLiveCti() {
+      const icon = document.getElementById('syncIcon');
+      if (icon) icon.classList.add('animate-spin');
+
+      try {
+        const res = await fetch(`/api/samsung/call-report/sync-cti?start=${gFilter.startDate}&end=${gFilter.endDate}&channel=삼성화재`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          gReportData = json.data;
+          document.getElementById('viewerSyncedAt').innerText = `CTI 동기화: ${new Date().toLocaleTimeString('ko-KR')}`;
+          renderAll();
+        } else {
+          alert('CTI 동기화 중 오류: ' + (json.error || ''));
+        }
+      } catch (err) {
+        alert('서버 통신 오류: ' + err.message);
+      } finally {
+        if (icon) icon.classList.remove('animate-spin');
+      }
+    }
+
+    function copyReportLink() {
+      const url = window.location.href;
+      navigator.clipboard.writeText(url).then(() => {
+        alert('보고서 링크가 클립보드에 복사되었습니다!\n담당자 또는 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.');
+      });
+    }
+
+    async function exportExcel() {
+      if (!gReportData || typeof ExcelJS === 'undefined') return;
+      const stats = calculateStats();
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Livon Care CTI';
+
+      const ws1 = wb.addWorksheet('분석요약');
+      ws1.columns = [{ width: 26 }, { width: 14 }, { width: 14 }, { width: 50 }];
+      ws1.addRow(['삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서']);
+      ws1.addRow([`분석기간: ${gReportData.reportInfo.period} | 보고일자: ${gReportData.reportInfo.reportDate}`]);
+      ws1.addRow([]);
+      ws1.addRow(['[핵심 KPI]']);
+      ws1.addRow(['총 인입콜', `${stats.totalCalls}건`, '상담연결 요청', `${stats.connectReqCalls}건`]);
+      ws1.addRow(['실제 상담(분석대상)', `${stats.consultedCount}건`, '일평균 인입', `${stats.dailyAvg}건`]);
+      ws1.addRow([]);
+      ws1.addRow(['1. 주요 문의유형 분포 (대분류)']);
+      ws1.addRow(['문의 대분류', '건수', '비중', '대표 내용']);
+      stats.catList.forEach(c => ws1.addRow([c.name, c.count, `${c.pct}%`, c.description]));
+      ws1.addRow([]);
+      ws1.addRow(['2. 문의 주체별 분포']);
+      ws1.addRow(['문의 주체', '건수', '비중', '성격 및 목적']);
+      stats.actorList.forEach(a => ws1.addRow([a.name, a.count, `${a.pct}%`, a.description]));
+
+      const ws2 = wb.addWorksheet('일자별 인입현황');
+      ws2.columns = [{ width: 16 }, { width: 10 }, { width: 14 }, { width: 14 }, { width: 30 }];
+      ws2.addRow(['일자', '요일', '인입콜(건)', '점유 비중', '비고']);
+      (gReportData.dailyTrends || []).forEach(t => {
+        ws2.addRow([t.date, t.dayOfWeek, t.callCount, `${(t.share * 100).toFixed(1)}%`, t.note || '']);
+      });
+
+      const ws3 = wb.addWorksheet('통화로그(원본)');
+      ws3.columns = [
+        { header: 'No', key: 'no', width: 6 },
+        { header: '연결시간', key: 'time', width: 18 },
+        { header: '채널', key: 'channel', width: 12 },
+        { header: '전화번호', key: 'phone', width: 16 },
+        { header: '회원이름', key: 'member', width: 12 },
+        { header: 'ARS메뉴', key: 'ars', width: 14 },
+        { header: '연결요청', key: 'connect', width: 10 },
+        { header: '대기시간', key: 'wait', width: 10 },
+        { header: '문의 대분류', key: 'cat', width: 22 },
+        { header: '문의 주체', key: 'act', width: 20 },
+        { header: '상담제목', key: 'title', width: 24 },
+        { header: '상담요약', key: 'summary', width: 45 },
+        { header: '키워드', key: 'keywords', width: 25 },
+        { header: '통화시간', key: 'dur', width: 12 }
+      ];
+      (gReportData.callLogs || []).forEach((c, idx) => {
+        ws3.addRow({
+          no: idx + 1,
+          time: c.callTime,
+          channel: c.channel,
+          phone: c.phone,
+          member: c.memberName,
+          ars: c.arsMenu,
+          connect: c.connectReq,
+          wait: c.waitTime,
+          cat: c.category,
+          act: c.actor,
+          title: c.title,
+          summary: c.summary,
+          keywords: c.keywords,
+          dur: c.duration
+        });
+      });
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `삼성화재_콜분석_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function downloadPdf() {
+      if (!gReportData) return;
+      alert('고화질 3-시트 A4 PDF 문서를 생성 중입니다. 잠시만 기다려주세요...');
+
+      const stats = calculateStats();
+      const info = gReportData.reportInfo || {};
+      const trends = gReportData.dailyTrends || [];
+      const consultedLogs = (gReportData.callLogs || []).filter(c => c.title || c.summary);
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @page { size: A4 portrait; margin: 15mm 12mm; }
+            body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; font-size: 9pt; color: #1e293b; line-height: 1.4; margin: 0; padding: 0; }
+            .page-break { page-break-before: always; }
+            .header { border-bottom: 3px solid #1d4ed8; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end; }
+            .title { font-size: 16pt; font-weight: bold; color: #0f172a; margin: 0; }
+            .sub { font-size: 8.5pt; color: #64748b; margin-top: 4px; }
+            .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+            .kpi-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; text-align: center; }
+            .kpi-num { font-size: 14pt; font-weight: bold; color: #1e3a8a; margin: 2px 0; }
+            .box-title { font-size: 10pt; font-weight: bold; color: #0f172a; margin-bottom: 6px; border-left: 3px solid #2563eb; padding-left: 6px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 8pt; }
+            th, td { border: 1px solid #cbd5e1; padding: 5px 6px; }
+            th { background: #f1f5f9; font-weight: bold; text-align: left; }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .font-mono { font-family: Consolas, monospace; }
+          </style>
+        </head>
+        <body>
+          <!-- SHEET 1: SUMMARY -->
+          <div class="header">
+            <div>
+              <div style="font-size: 8pt; font-weight: bold; color: #2563eb; margin-bottom: 2px;">삼성화재 주간/수시 공식 보고서 (시트 1: 분석 요약)</div>
+              <h1 class="title">${info.title}</h1>
+              <div class="sub">분석기간: <b>${info.period}</b> | 보고일자: <b>${info.reportDate}</b> | 작성: <b>${info.author}</b></div>
+            </div>
+            <div style="text-align: right; font-weight: bold; color: #1d4ed8; font-size: 12pt;">Livon Care</div>
+          </div>
+
+          <div class="kpi-grid">
+            <div class="kpi-box">
+              <div style="font-size: 8pt; color: #64748b;">총 인입콜</div>
+              <div class="kpi-num">${stats.totalCalls}건</div>
+              <div style="font-size: 7.5pt; color: #94a3b8;">인바운드 총량</div>
+            </div>
+            <div class="kpi-box">
+              <div style="font-size: 8pt; color: #64748b;">상담연결 요청</div>
+              <div class="kpi-num">${stats.connectReqCalls}건</div>
+              <div style="font-size: 7.5pt; color: #2563eb;">연결률 ${stats.connectRate}%</div>
+            </div>
+            <div class="kpi-box" style="background: #eff6ff; border-color: #bfdbfe;">
+              <div style="font-size: 8pt; color: #1d4ed8; font-weight: bold;">실제 상담(분석)</div>
+              <div class="kpi-num" style="color: #1e3a8a;">${stats.consultedCount}건</div>
+              <div style="font-size: 7.5pt; color: #1d4ed8;">전수 1:1 분석</div>
+            </div>
+            <div class="kpi-box">
+              <div style="font-size: 8pt; color: #64748b;">일평균 인입</div>
+              <div class="kpi-num">${stats.dailyAvg}건</div>
+              <div style="font-size: 7.5pt; color: #94a3b8;">운영일 ${stats.opDays}일</div>
+            </div>
+          </div>
+
+          <div class="box-title">1. 주요 문의유형 분포 (대분류 8종 집계)</div>
+          <table>
+            <thead>
+              <tr style="background: #1e40af; color: white;">
+                <th style="width: 25%;">문의 대분류</th>
+                <th style="width: 12%; text-align: right;">건수</th>
+                <th style="width: 12%; text-align: right;">비중</th>
+                <th>대표 내용</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${stats.catList.map(c => `
+                <tr>
+                  <td><b>${c.name}</b></td>
+                  <td class="text-right font-mono">${c.count}건</td>
+                  <td class="text-right font-mono">${c.pct}%</td>
+                  <td style="color: #475569; font-size: 7.5pt;">${c.description}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="box-title">2. 문의 주체별 분포 (4종)</div>
+          <table>
+            <thead>
+              <tr style="background: #334155; color: white;">
+                <th style="width: 25%;">문의 주체</th>
+                <th style="width: 12%; text-align: right;">건수</th>
+                <th style="width: 12%; text-align: right;">비중</th>
+                <th>성격 및 목적</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${stats.actorList.map(a => `
+                <tr>
+                  <td><b>${a.name}</b></td>
+                  <td class="text-right font-mono">${a.count}건</td>
+                  <td class="text-right font-mono">${a.pct}%</td>
+                  <td style="color: #475569; font-size: 7.5pt;">${a.description}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <!-- SHEET 2: DAILY -->
+          <div class="page-break"></div>
+          <div class="header">
+            <div>
+              <div style="font-size: 8pt; font-weight: bold; color: #2563eb;">삼성화재 주간/수시 공식 보고서 (시트 2: 일자별 인입현황)</div>
+              <h1 class="title">일자별 콜 인입 추이 및 요일별 집계</h1>
+            </div>
+            <div style="text-align: right; font-weight: bold; color: #1d4ed8; font-size: 12pt;">Livon Care</div>
+          </div>
+
+          <div class="box-title">일자별 전수 인입 내역 (${trends.length}일)</div>
+          <table>
+            <thead>
+              <tr style="background: #0f172a; color: white;">
+                <th style="width: 20%;">일자</th>
+                <th style="width: 15%;" class="text-center">요일</th>
+                <th style="width: 20%;" class="text-right">인입콜(건)</th>
+                <th style="width: 20%;" class="text-right">점유 비중</th>
+                <th>비고</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${trends.map(t => `
+                <tr ${t.dayOfWeek === '토' || t.dayOfWeek === '일' ? 'style="background: #f8fafc;"' : ''}>
+                  <td class="font-mono"><b>${t.date}</b></td>
+                  <td class="text-center font-mono">${t.dayOfWeek}</td>
+                  <td class="text-right font-mono font-bold">${t.callCount}건</td>
+                  <td class="text-right font-mono">${(t.share * 100).toFixed(1)}%</td>
+                  <td style="color: #64748b;">${t.note || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <!-- SHEET 3: LOGS -->
+          <div class="page-break"></div>
+          <div class="header">
+            <div>
+              <div style="font-size: 8pt; font-weight: bold; color: #2563eb;">삼성화재 주간/수시 공식 보고서 (시트 3: 통화로그 원본)</div>
+              <h1 class="title">통화로그 전수 원본 및 신규 컬럼 1:1 연동표</h1>
+            </div>
+            <div style="text-align: right; font-weight: bold; color: #1d4ed8; font-size: 12pt;">Livon Care</div>
+          </div>
+
+          <div class="box-title">실제 상담 인바운드 콜 전수 로그 (${consultedLogs.length}건)</div>
+          <table>
+            <thead>
+              <tr style="background: #1e293b; color: white;">
+                <th style="width: 10%;">일시</th>
+                <th style="width: 10%;">전화번호</th>
+                <th style="width: 15%; background: #1d4ed8; color: #fef08a;">문의 대분류 ✨</th>
+                <th style="width: 13%; background: #1d4ed8; color: #fef08a;">문의 주체 ✨</th>
+                <th style="width: 16%;">상담제목</th>
+                <th>상담요약 (전문의 내용)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${consultedLogs.map(c => `
+                <tr>
+                  <td class="font-mono" style="font-size: 7pt;">${(c.callTime || '').slice(5)}</td>
+                  <td class="font-mono font-bold">${c.phone}</td>
+                  <td style="font-weight: bold; color: #1e40af;">${c.category}</td>
+                  <td style="font-weight: bold; color: #4338ca;">${c.actor}</td>
+                  <td><b>${c.title}</b></td>
+                  <td style="font-size: 7pt; color: #334155; line-height: 1.3;">${c.summary}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `;
+
+      try {
+        const res = await fetch('/api/samsung/call-report/pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            htmlContent: html,
+            title: `삼성화재_간병서비스_콜분석_${info.period || '보고서'}`
+          })
+        });
+
+        if (!res.ok) throw new Error('PDF 생성 서버 에러');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `삼성화재_간병서비스_콜분석_보고서.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('PDF 다운로드 실패: ' + e.message);
+      }
+    }
+  </script>
+</body>
+</html>
