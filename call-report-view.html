@@ -589,19 +589,22 @@
       const container = document.getElementById('tabContent-daily');
       const trends = (gReportData && gReportData.dailyTrends) || [];
       const weekly = (gReportData && gReportData.weeklyRollup) || [];
+      const totalDailyCalls = trends.reduce((sum, t) => sum + (t.callCount || 0), 0) || stats.totalCalls || 0;
+      const opDays = stats.opDays || trends.filter(t => t.callCount > 0).length || trends.length;
+      const dailyAvg = opDays > 0 ? (totalDailyCalls / opDays).toFixed(1) : 0;
 
       container.innerHTML = `
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           ${weekly.map(w => `
             <div class="bg-white rounded-3xl border border-slate-200/90 p-4 shadow-xs">
               <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
                 <span class="font-bold">${w.week}</span>
-                <span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px]">일평균 ${w.dailyAvg}건</span>
+                <span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px]">${(w.share * 100).toFixed(1)}%</span>
               </div>
               <div class="text-2xl font-black text-slate-900 mt-1">${w.calls}<span class="text-xs font-bold text-slate-500 ml-1">건</span></div>
               <div class="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
-                <span>점유 비중</span>
-                <span class="font-bold text-slate-700 font-mono">${(w.share * 100).toFixed(1)}%</span>
+                <span>일평균</span>
+                <span class="font-bold text-slate-700 font-mono">${w.dailyAvg}건 / 일</span>
               </div>
             </div>
           `).join('')}
@@ -613,7 +616,7 @@
               <h3 class="text-base font-black text-slate-900">일자별 인입량 추이 그래프</h3>
               <p class="text-xs text-slate-500 mt-0.5">일자별 인바운드 콜 인입량 및 요일 패턴 (Chart.js Interactive Chart)</p>
             </div>
-            <span class="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 font-mono text-xs font-bold">총 ${trends.length}일 집계</span>
+            <span class="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 font-mono text-xs font-bold">인입 총량: ${totalDailyCalls.toLocaleString()}건</span>
           </div>
           <div class="w-full h-72 sm:h-80 relative">
             <canvas id="samsungDailyTrendChart"></canvas>
@@ -623,28 +626,40 @@
         <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
           <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
             <h4 class="text-sm font-black text-slate-900">일자별 인입 데이터 시트</h4>
+            <span class="text-xs text-slate-400 font-mono">총 ${trends.length}일</span>
           </div>
-          <div class="overflow-x-auto custom-scrollbar max-h-[500px]">
-            <table class="w-full text-xs text-left">
-              <thead class="bg-slate-100/80 text-slate-600 uppercase font-black text-[11px] sticky top-0 z-10 border-b border-slate-200">
-                <tr>
+          <div class="overflow-x-auto custom-scrollbar max-h-[550px] relative border border-slate-200/80 rounded-2xl">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead class="sticky top-0 z-20 shadow-xs">
+                <tr class="bg-slate-100/95 backdrop-blur-xs text-slate-600 uppercase font-black text-[11px] border-b border-slate-200">
                   <th class="py-3 px-4">일자</th>
                   <th class="py-3 px-4 text-center">요일</th>
                   <th class="py-3 px-4 text-right">인입콜(건)</th>
                   <th class="py-3 px-4 text-right">점유 비중</th>
                   <th class="py-3 px-4">비고</th>
                 </tr>
+                <!-- 합계 행: 최상단 첫 행에 배치 및 상단 틀고정 -->
+                <tr class="bg-blue-50/95 backdrop-blur-xs font-black text-slate-900 border-b-2 border-blue-300">
+                  <td class="py-3 px-4 text-blue-900 font-extrabold flex items-center gap-1.5">
+                    <span class="px-2 py-0.5 rounded-md bg-blue-600 text-white text-[10px] font-black tracking-wide">합계</span>
+                    <span>전체 누적</span>
+                  </td>
+                  <td class="py-3 px-4 text-center font-bold text-blue-800">${trends.length}일</td>
+                  <td class="py-3 px-4 text-right font-mono text-blue-700 text-sm font-black">${totalDailyCalls.toLocaleString()}건</td>
+                  <td class="py-3 px-4 text-right font-mono text-blue-900 font-bold">100.0%</td>
+                  <td class="py-3 px-4 text-blue-800 font-medium">일평균 ${dailyAvg}건 (운영 ${opDays}일 기준)</td>
+                </tr>
               </thead>
               <tbody class="divide-y divide-slate-100 text-slate-700">
                 ${trends.map(t => {
                   const isWeekend = t.dayOfWeek === '토' || t.dayOfWeek === '일';
-                  const share = (t.share * 100).toFixed(1);
+                  const share = totalDailyCalls > 0 ? ((t.callCount / totalDailyCalls) * 100).toFixed(1) : '0.0';
                   return `
                     <tr class="hover:bg-slate-50 transition-colors ${isWeekend ? 'bg-slate-50/40' : ''}">
                       <td class="py-2.5 px-4 font-mono font-bold text-slate-900">${t.date}</td>
                       <td class="py-2.5 px-4 text-center ${isWeekend ? 'text-rose-600 font-black' : 'text-slate-600 font-medium'}">${t.dayOfWeek}</td>
                       <td class="py-2.5 px-4 text-right font-mono font-black ${t.callCount >= 20 ? 'text-blue-700' : 'text-slate-800'}">${t.callCount}건</td>
-                      <td class="py-2.5 px-4 text-right font-mono text-slate-400">${share}%</td>
+                      <td class="py-2.5 px-4 text-right font-mono text-slate-500">${share}%</td>
                       <td class="py-2.5 px-4 text-slate-400 font-medium">${t.note || '-'}</td>
                     </tr>
                   `;
@@ -1118,11 +1133,11 @@
       });
 
       // =========================================================================
-      // [시트 2] 일자별 인입현황 + 틀고정
+      // [시트 2] 일자별 인입현황 + 첫행 합계 + 상단 틀고정 (2행 고정)
       // =========================================================================
       const ws2 = wb.addWorksheet('일자별 인입현황');
-      ws2.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
-      ws2.columns = [{ width: 16 }, { width: 10 }, { width: 16 }, { width: 16 }, { width: 28 }];
+      ws2.views = [{ state: 'frozen', xSplit: 0, ySplit: 2 }];
+      ws2.columns = [{ width: 16 }, { width: 10 }, { width: 16 }, { width: 16 }, { width: 32 }];
       
       const dailyHead = ws2.addRow(['일자', '요일', '인입콜(건)', '점유 비중', '비고']);
       dailyHead.eachCell(c => {
@@ -1130,8 +1145,23 @@
         c.font = { color: { argb: 'FFFFFFFF' }, bold: true };
         c.alignment = { horizontal: 'center', vertical: 'middle' };
       });
+
+      const totalDailyCallsExcel = (gReportData.dailyTrends || []).reduce((sum, t) => sum + (t.callCount || 0), 0) || stats.totalCalls || 0;
+      const opDaysExcel = stats.opDays || (gReportData.dailyTrends || []).length || 25;
+      const sumRow = ws2.addRow(['합계', `${(gReportData.dailyTrends || []).length}일`, totalDailyCallsExcel, '100.0%', `일평균 ${stats.dailyAvg || 0}건 (운영 ${opDaysExcel}일 기준)`]);
+      sumRow.font = { bold: true };
+      sumRow.eachCell(cell => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
+        cell.border = thinBorder;
+      });
+      sumRow.getCell(1).alignment = { horizontal: 'center' };
+      sumRow.getCell(2).alignment = { horizontal: 'center' };
+      sumRow.getCell(3).alignment = { horizontal: 'right' };
+      sumRow.getCell(4).alignment = { horizontal: 'right' };
+
       (gReportData.dailyTrends || []).forEach(t => {
-        const r = ws2.addRow([t.date, t.dayOfWeek, t.callCount, `${(t.share * 100).toFixed(1)}%`, t.note || '']);
+        const share = totalDailyCallsExcel > 0 ? ((t.callCount / totalDailyCallsExcel) * 100).toFixed(1) : '0.0';
+        const r = ws2.addRow([t.date, t.dayOfWeek, t.callCount, `${share}%`, t.note || '']);
         r.eachCell(cell => cell.border = thinBorder);
         if (t.dayOfWeek === '토' || t.dayOfWeek === '일') {
           r.eachCell(cell => cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } });
