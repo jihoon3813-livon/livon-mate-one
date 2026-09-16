@@ -98,14 +98,19 @@ function cleanPhoneDigits(phone) {
 function formatPhoneDisplay(phone) {
   if (!phone) return '-';
   const c = cleanPhoneDigits(phone);
-  if (c.length === 11) return c.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
-  if (c.length === 10) {
-    if (c.startsWith('02')) return c.replace(/(\d{2})(\d{4})(\d{4})/, '$1-$2-$3');
-    return c.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  let res = phone;
+  if (c.length === 11) res = c.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+  else if (c.length === 10) {
+    if (c.startsWith('02')) res = c.replace(/(\d{2})(\d{4})(\d{4})/, '$1-$2-$3');
+    else res = c.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
   }
-  if (c.length === 9 && c.startsWith('02')) return c.replace(/(\d{2})(\d{3})(\d{4})/, '$1-$2-$3');
-  if (c.length === 8) return c.replace(/(\d{4})(\d{4})/, '$1-$2');
-  return phone;
+  else if (c.length === 9 && c.startsWith('02')) res = c.replace(/(\d{2})(\d{3})(\d{4})/, '$1-$2-$3');
+  else if (c.length === 8) res = c.replace(/(\d{4})(\d{4})/, '$1-$2');
+  
+  if (typeof maskPhone === 'function') {
+    return maskPhone(res);
+  }
+  return res;
 }
 
 /**

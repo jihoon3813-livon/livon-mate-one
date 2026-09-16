@@ -3685,21 +3685,35 @@ function renderCurrentSamsungSheet() {
             const origVal = row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : '';
             const changeKey = `${gActiveSamsungSheet}_${realIdx}_${col.key}`;
             const hasPending = gSamsungPendingChanges.has(changeKey);
-            let displayVal = hasPending ? gSamsungPendingChanges.get(changeKey).newVal : origVal;
+            let rawVal = hasPending ? gSamsungPendingChanges.get(changeKey).newVal : origVal;
 
             if (col.key === 'birthDate') {
-              displayVal = formatSamsungBirthDate(displayVal);
+              rawVal = formatSamsungBirthDate(rawVal);
             } else if (isSamsungDateColumn(col.key)) {
-              displayVal = formatSamsungDate(displayVal);
+              rawVal = formatSamsungDate(rawVal);
             } else if (col.key === 'applyDateTime') {
-              displayVal = formatSamsungDateTime(displayVal);
+              rawVal = formatSamsungDateTime(rawVal);
             }
+
+            let displayVal = rawVal;
+            if (col.key === 'patientName') {
+              displayVal = maskName(rawVal);
+            } else if (col.key === 'phone') {
+              displayVal = maskPhone(rawVal);
+            } else if (col.key === 'birthDate') {
+              displayVal = maskBirth(rawVal);
+            } else if (col.key === 'applicantContact') {
+              displayVal = maskContactString(rawVal);
+            }
+
+            const rawValAttr = String(rawVal !== undefined && rawVal !== null ? rawVal : '').replace(/"/g, '&quot;');
 
             return `
               <td contenteditable="false" 
                 data-sheet="${gActiveSamsungSheet}" 
                 data-row="${realIdx}" 
                 data-col="${col.key}"
+                data-raw-val="${rawValAttr}"
                 onclick="onSamsungCellClick(event, this, '${gActiveSamsungSheet}', ${realIdx}, '${col.key}')"
                 ondblclick="onSamsungCellDblClick(event, this, '${gActiveSamsungSheet}', ${realIdx}, '${col.key}')"
                 onkeydown="onSamsungCellKeyDown(event, this, '${gActiveSamsungSheet}', ${realIdx}, '${col.key}')"
@@ -3824,6 +3838,12 @@ function onSamsungCellDblClick(e, el, sheetKey, rowIdx, colKey) {
   el.contentEditable = "true";
   el.classList.remove('select-none', 'ring-sky-600', 'bg-sky-100/60');
   el.classList.add('ring-2', 'ring-blue-600', 'ring-inset', 'bg-white', 'samsung-cell-editing', 'text-slate-900');
+  
+  // 마스킹 중인 경우 편집 시작 시 원본 데이터(data-raw-val)를 편집창에 복원
+  const rawVal = el.getAttribute('data-raw-val');
+  if (rawVal !== null && rawVal !== undefined) {
+    el.innerText = rawVal;
+  }
   el.setAttribute('data-prev-edit-val', el.innerText.trim());
 
   el.focus();
@@ -3867,7 +3887,20 @@ function onSamsungCellBlur(el, sheetKey, rowIdx, colKey) {
   } else if (colKey === 'applyDateTime') {
     newVal = formatSamsungDateTime(newVal);
   }
-  el.innerText = newVal;
+
+  el.setAttribute('data-raw-val', newVal);
+
+  let displayVal = newVal;
+  if (colKey === 'patientName') {
+    displayVal = maskName(newVal);
+  } else if (colKey === 'phone') {
+    displayVal = maskPhone(newVal);
+  } else if (colKey === 'birthDate') {
+    displayVal = maskBirth(newVal);
+  } else if (colKey === 'applicantContact') {
+    displayVal = maskContactString(newVal);
+  }
+  el.innerText = displayVal;
 
   const row = gSamsungSheets[sheetKey][rowIdx] || {};
   let origVal = String(row[colKey] !== undefined && row[colKey] !== null ? row[colKey] : '').trim();
@@ -3887,7 +3920,7 @@ function onSamsungCellBlur(el, sheetKey, rowIdx, colKey) {
   } else {
     gSamsungPendingChanges.delete(changeKey);
     el.classList.remove('bg-amber-100/70', 'font-semibold', 'text-amber-950', 'ring-1', 'ring-amber-400');
-    el.setAttribute('title', origVal);
+    el.setAttribute('title', displayVal);
   }
 
   updateSamsungPendingChangesUI();
@@ -8942,11 +8975,11 @@ function renderAdjusters() {
       <td class="p-3 text-slate-700">${adj.firm}</td>
       <td class="p-3 text-slate-600">${adj.branch}</td>
       <td class="p-3 font-black text-slate-900 text-sm">
-        ${adj.name}
+        ${maskName(adj.name)}
         ${adj.source === '통합허브 자동연동' ? '<span class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200">허브연동</span>' : ''}
       </td>
       <td class="p-3 font-mono text-slate-700">${adj.phone}</td>
-      <td class="p-3 font-mono text-slate-500">${adj.mobile}</td>
+      <td class="p-3 font-mono text-slate-500">${maskPhone(adj.mobile)}</td>
       <td class="p-3 font-mono font-black text-purple-900 bg-purple-50/50">${adj.fax}</td>
       <td class="p-3 font-mono text-slate-500">${adj.email}</td>
       <td class="p-3 text-center font-bold text-emerald-700">${adj.activeCases}건</td>
@@ -9373,8 +9406,8 @@ function renderCenters() {
         ${ctr.name}
         ${ctr.source === '통합허브 자동연동' ? '<span class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-black bg-sky-50 text-sky-700 border border-sky-200">허브연동</span>' : ''}
       </td>
-      <td class="p-3 text-slate-700">${ctr.manager || '-'}</td>
-      <td class="p-3 font-mono text-slate-600">${formatPhoneNumber(ctr.phone)}</td>
+      <td class="p-3 text-slate-700">${ctr.manager ? maskName(ctr.manager) : '-'}</td>
+      <td class="p-3 font-mono text-slate-600">${maskPhone(formatPhoneNumber(ctr.phone))}</td>
       <td class="p-3 font-mono font-bold text-purple-700">${formatPhoneNumber(ctr.fax)}</td>
       <td class="p-3 text-slate-600">${ctr.area || '-'}</td>
       <td class="p-3 font-mono text-slate-500">${ctr.businessNumber || '-'}</td>
@@ -18192,8 +18225,8 @@ function renderFaxLogsTable() {
         <td class="p-3">
           <div class="font-semibold text-slate-900 flex items-center gap-1.5">
             <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-mono flex-shrink-0">${l.formCode || '-'}</span>
-            <span class="truncate max-w-[280px]" title="${l.formName} - ${l.patientName || '고객'}">
-              ${l.formName} <span class="text-blue-700 font-bold">(${l.patientName ? l.patientName + ' 님' : ''})</span>
+            <span class="truncate max-w-[280px]" title="${l.formName} - ${l.patientName ? maskName(l.patientName) : '고객'}">
+              ${l.formName} <span class="text-blue-700 font-bold">(${l.patientName ? maskName(l.patientName) + ' 님' : ''})</span>
             </span>
           </div>
           <div class="text-[10px] text-slate-400 mt-0.5">${l.pages || 1}장 전송</div>
@@ -19842,44 +19875,189 @@ function formatCurrency(num) {
 
 function maskName(name) {
   if (!name || !gIsMasked) return name || '';
-  if (name.length <= 1) return name;
-  if (name.length === 2) return name[0] + '*';
-  return name[0] + '*'.repeat(name.length - 2) + name[name.length - 1];
+  const match = String(name).match(/^([가-힣a-zA-Z]+)(\s*\(.*?\))?$/);
+  if (match) {
+    const base = match[1];
+    const suffix = match[2] || '';
+    let maskedBase = base;
+    if (base.length <= 1) maskedBase = base;
+    else if (base.length === 2) maskedBase = base[0] + '*';
+    else maskedBase = base[0] + '*'.repeat(base.length - 2) + base[base.length - 1];
+    return maskedBase + suffix;
+  }
+  const str = String(name);
+  if (str.length <= 1) return str;
+  if (str.length === 2) return str[0] + '*';
+  return str[0] + '*'.repeat(str.length - 2) + str[str.length - 1];
 }
 
 function maskPhone(phone) {
   if (!phone || !gIsMasked) return phone || '';
-  const parts = phone.split('-');
+  const str = String(phone).trim();
+  const cleaned = str.replace(/[^0-9]/g, '');
+  if (cleaned.length === 11) {
+    return cleaned.slice(0, 3) + '-****-' + cleaned.slice(7);
+  } else if (cleaned.length === 10) {
+    if (cleaned.startsWith('02')) {
+      return cleaned.slice(0, 2) + '-****-' + cleaned.slice(6);
+    }
+    return cleaned.slice(0, 3) + '-***-' + cleaned.slice(6);
+  } else if (cleaned.length === 9 && cleaned.startsWith('02')) {
+    return cleaned.slice(0, 2) + '-***-' + cleaned.slice(5);
+  }
+  const parts = str.split('-');
   if (parts.length === 3) {
     return parts[0] + '-****-' + parts[2];
   }
-  return phone;
+  return str;
 }
 
 function maskBirth(birth) {
   if (!birth || !gIsMasked) return birth || '';
-  if (birth.length >= 6) {
-    return birth.slice(0, 4) + '****';
+  const str = String(birth).trim();
+  if (str.length >= 6) {
+    return str.slice(0, 4) + '****' + (str.length > 8 ? str.slice(8) : '');
   }
-  return birth;
+  return str;
 }
 
 function maskAccount(acc) {
   if (!acc || !gIsMasked) return acc || '';
-  return acc.replace(/(\d{3,4})[- ]?(\d{2,4})[- ]?(\d{3,6})/g, '$1-****-****');
+  return String(acc).replace(/(\d{3,4})[- ]?(\d{2,4})[- ]?(\d{3,6})/g, '$1-****-****');
+}
+
+function maskContactString(contact) {
+  if (!contact || !gIsMasked) return contact || '';
+  let str = String(contact);
+  str = str.replace(/(\d{2,3})[- ]?(\d{3,4})[- ]?(\d{4})/g, (m, p1, p2, p3) => `${p1}-****-${p3}`);
+  str = str.replace(/^([가-힣]{2,4})(\s*\(|\s|$)/, (m, name, trail) => {
+    return maskName(name) + trail;
+  });
+  return str;
+}
+
+// Global exposure for all modules (total-call-analysis, samsung-call-report, etc.)
+if (typeof window !== 'undefined') {
+  window.maskName = maskName;
+  window.maskPhone = maskPhone;
+  window.maskBirth = maskBirth;
+  window.maskAccount = maskAccount;
+  window.maskContactString = maskContactString;
 }
 
 function toggleMasking() {
   gIsMasked = !gIsMasked;
-  localStorage.setItem(MASKING_STORAGE_KEY, gIsMasked ? 'true' : 'false');
+  try {
+    const storageKey = typeof MASKING_STORAGE_KEY !== 'undefined' ? MASKING_STORAGE_KEY : 'REBORN_PRIVACY_MASKING_STATE';
+    localStorage.setItem(storageKey, gIsMasked ? 'true' : 'false');
+  } catch (e) {}
   updateMaskingButtonUI();
-  renderUnifiedCareHub();
-  renderSamsungList();
-  renderApplications();
-  renderAssignments();
-  renderClaims();
-  renderPayouts();
+
+  // 1. 현재 활성화된 탭 즉각 재렌더링
+  rerenderActiveTabForMasking();
+
+  // 2. 전체 대장 및 서브 뷰 동기화
+  try { if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub(); } catch (e) {}
+  try { if (typeof renderCurrentSamsungSheet === 'function') renderCurrentSamsungSheet(); } catch (e) {}
+  try { if (typeof renderSamsungList === 'function') renderSamsungList(); } catch (e) {}
+  try { if (typeof renderCareCalendar === 'function') renderCareCalendar(); } catch (e) {}
+  try { if (typeof renderSamsungClaimHub === 'function') renderSamsungClaimHub(); } catch (e) {}
+  try { if (typeof renderApplications === 'function') renderApplications(); } catch (e) {}
+  try { if (typeof renderAssignments === 'function') renderAssignments(); } catch (e) {}
+  try { if (typeof renderClaims === 'function') renderClaims(); } catch (e) {}
+  try { if (typeof renderPayouts === 'function') renderPayouts(); } catch (e) {}
+  try { if (typeof renderCareLogs === 'function') renderCareLogs(); } catch (e) {}
+  try { if (typeof renderDashboard === 'function') renderDashboard(); } catch (e) {}
+  try { if (typeof renderFaxManagement === 'function') renderFaxManagement(); } catch (e) {}
+  try { if (typeof renderCaregivers === 'function') renderCaregivers(); } catch (e) {}
+  try { if (typeof renderAdjusters === 'function') renderAdjusters(); } catch (e) {}
+  try { if (typeof renderCenters === 'function') renderCenters(); } catch (e) {}
+  try { if (typeof renderTotalCallAnalysisTab === 'function') renderTotalCallAnalysisTab(); } catch (e) {}
+  try { if (typeof renderSamsungCallReportTab === 'function') renderSamsungCallReportTab(); } catch (e) {}
+
+  // 3. 열려있는 모달/드로어 실시간 리프레시
+  refreshOpenModalsForMasking();
+
   initIcons();
+}
+
+function rerenderActiveTabForMasking() {
+  const tab = gActiveTab;
+  if (!tab) return;
+
+  if (tab === 'carehub') {
+    if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  } else if (tab === 'carecalendar') {
+    if (typeof renderCareCalendar === 'function') renderCareCalendar();
+  } else if (tab === 'samsung' || tab === 'samsunglist' || tab === 'samsungleads') {
+    if (typeof renderCurrentSamsungSheet === 'function') renderCurrentSamsungSheet();
+    if (typeof renderSamsungList === 'function') renderSamsungList();
+  } else if (tab === 'samsungclaimhub') {
+    if (typeof renderSamsungClaimHub === 'function') renderSamsungClaimHub();
+  } else if (tab === 'samsungcallreport') {
+    if (typeof renderSamsungCallReportTab === 'function') renderSamsungCallReportTab();
+  } else if (tab === 'totalcallanalysis') {
+    if (typeof renderTotalCallAnalysisTab === 'function') renderTotalCallAnalysisTab();
+  } else if (tab === 'directory' || tab === 'caregivers' || tab === 'adjusters' || tab === 'centers') {
+    if (typeof switchDirectorySubTab === 'function') {
+      switchDirectorySubTab(gActiveDirectorySubTab || 'caregivers');
+    } else {
+      if (typeof renderCaregivers === 'function') renderCaregivers();
+      if (typeof renderAdjusters === 'function') renderAdjusters();
+      if (typeof renderCenters === 'function') renderCenters();
+    }
+  } else if (tab === 'applications') {
+    if (typeof renderApplications === 'function') renderApplications();
+  } else if (tab === 'assignments') {
+    if (typeof renderAssignments === 'function') renderAssignments();
+  } else if (tab === 'claims') {
+    if (typeof renderClaims === 'function') renderClaims();
+  } else if (tab === 'payouts') {
+    if (typeof renderPayouts === 'function') renderPayouts();
+  } else if (tab === 'carelogs') {
+    if (typeof renderCareLogs === 'function') renderCareLogs();
+  } else if (tab === 'dashboard') {
+    if (typeof renderDashboard === 'function') renderDashboard();
+  } else if (tab === 'faxmgmt') {
+    if (typeof renderFaxManagement === 'function') renderFaxManagement();
+  } else if (tab === 'forms') {
+    if (typeof renderForms === 'function') renderForms();
+  }
+}
+
+function refreshOpenModalsForMasking() {
+  // 1. 원스탑 통합허브 고객 상세 모달
+  const hubModal = document.getElementById('hubCustomerDetailModal');
+  if (hubModal && !hubModal.classList.contains('hidden') && typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
+    if (typeof openHubCustomerDetailModal === 'function') {
+      openHubCustomerDetailModal(gActiveHubModalAppId);
+    }
+  }
+
+  // 2. 케어사이클 모달
+  const cycleModal = document.getElementById('careCycleModal');
+  if (cycleModal && !cycleModal.classList.contains('hidden')) {
+    const applyId = document.getElementById('modalApplyId')?.innerText?.trim();
+    if (applyId && typeof openCareCycleModal === 'function') {
+      openCareCycleModal(applyId);
+    }
+  }
+
+  // 3. 간병캘린더 우측 상세 드로어
+  const calDrawer = document.getElementById('careCalendarDetailDrawer');
+  if (calDrawer && !calDrawer.classList.contains('hidden') && typeof gActiveCalendarEvent !== 'undefined' && gActiveCalendarEvent) {
+    if (typeof openCareCalendarEventDetail === 'function') {
+      openCareCalendarEventDetail(gActiveCalendarEvent.applyId, gActiveCalendarEvent.assignId);
+    }
+  }
+
+  // 4. CS 상담 이력 모달
+  const csModal = document.getElementById('csHistoryModal');
+  if (csModal && !csModal.classList.contains('hidden') && typeof gActiveCsAppId !== 'undefined' && gActiveCsAppId) {
+    if (typeof openCsHistoryModal === 'function') {
+      openCsHistoryModal(gActiveCsAppId);
+    }
+  }
 }
 
 function setupInputFormatters() {
@@ -26405,7 +26583,7 @@ function renderCareCalendarTimelineView(events) {
                     <div class="mt-1.5 pt-1 border-t border-slate-100 flex items-center justify-between text-[10px] gap-1">
                       <div class="text-slate-600 truncate flex items-center gap-0.5 font-medium min-w-0">
                         <i data-lucide="user" class="w-2.5 h-2.5 text-slate-400 shrink-0"></i>
-                        <span class="font-bold text-slate-800 truncate">${evt.caregiverName}</span>
+                        <span class="font-bold text-slate-800 truncate">${maskName(evt.caregiverName)}</span>
                       </div>
                       <div class="font-mono font-bold text-slate-600 shrink-0 text-[10px]">
                         ${(evt.dailyWage || 0).toLocaleString()}원
@@ -26459,7 +26637,7 @@ function renderCareCalendarTimelineView(events) {
                     <div onclick="openCalendarEventDetail('${evt.applyId}', '${evt.assignId}')"
                       class="absolute z-10 h-9 rounded-xl bg-gradient-to-r ${barGrad} border shadow-xs ${spanDays === 1 ? 'px-1 justify-center' : 'px-2.5 justify-between'} flex items-center gap-1 cursor-pointer hover:shadow-md hover:scale-[1.006] transition-all overflow-hidden select-none"
                       style="left: calc(${leftPercent}% + 2px); width: calc(${widthPercent}% - 4px); ${spanDays === 1 ? 'min-width: 44px;' : ''}"
-                      title="[${evt.insuranceCompany}] ${evt.patientName} (${evt.startDate} ~ ${evt.endDate}, 총 ${evt.totalDays}일) | 간병인: ${evt.caregiverName} (${(evt.dailyWage || 0).toLocaleString()}원)">
+                      title="[${evt.insuranceCompany}] ${maskName(evt.patientName)} (${evt.startDate} ~ ${evt.endDate}, 총 ${evt.totalDays}일) | 간병인: ${maskName(evt.caregiverName)} (${(evt.dailyWage || 0).toLocaleString()}원)">
                       
                       ${spanDays === 1 ? `
                         <!-- 1일 일정: 고객 이름 100% 최우선 표출 (글자 잘림 및 뱃지 가림 방지) -->
@@ -26475,7 +26653,7 @@ function renderCareCalendarTimelineView(events) {
                         <div class="flex items-center justify-between w-full min-w-0 gap-1">
                           <div class="flex items-center gap-1 truncate min-w-0">
                             <span class="font-black text-xs text-white truncate">${maskName(evt.patientName)}</span>
-                            <span class="text-[10px] text-white/80 font-normal truncate">(${evt.caregiverName.slice(0, 2)})</span>
+                            <span class="text-[10px] text-white/80 font-normal truncate">(${maskName(evt.caregiverName).slice(0, 2)})</span>
                           </div>
                           <div class="flex items-center gap-0.5 shrink-0">
                             ${evt.isAttentionNeeded ? `<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>` : ''}
@@ -26490,7 +26668,7 @@ function renderCareCalendarTimelineView(events) {
                           ${hasPrevOverflow ? `<span class="text-[9px] font-black text-amber-200 animate-pulse shrink-0">◀</span>` : ''}
                           <div class="font-black text-xs truncate flex items-center gap-1">
                             <span class="truncate">${maskName(evt.patientName)}</span>
-                            <span class="text-[11px] font-normal text-white/80 truncate">(${evt.caregiverName})</span>
+                            <span class="text-[11px] font-normal text-white/80 truncate">(${maskName(evt.caregiverName)})</span>
                           </div>
                           <span class="text-[10px] font-mono font-medium text-white/90 shrink-0 hidden md:inline">
                             · ${spanDays}일간 (${evt.startDate.slice(5)} ~ ${evt.endDate.slice(5)})
@@ -26690,7 +26868,7 @@ function renderCareCalendarSpanMonthView(events) {
                 <div onclick="openCalendarEventDetail('${evt.applyId}', '${evt.assignId}')"
                   class="py-1 px-1.5 rounded-lg border text-xs font-bold leading-tight flex items-center ${spanCols === 1 ? 'justify-center' : 'justify-between'} gap-1 shadow-2xs hover:shadow-md hover:scale-[1.005] transition-all cursor-pointer select-none ${barColor}"
                   style="grid-column: ${colStart} / span ${spanCols};"
-                  title="[${evt.insuranceCompany}] ${evt.patientName} (${evt.hospitalName}) | 간병인: ${evt.caregiverName} | 기간: ${evt.startDate} ~ ${evt.endDate}">
+                  title="[${evt.insuranceCompany}] ${maskName(evt.patientName)} (${evt.hospitalName}) | 간병인: ${maskName(evt.caregiverName)} | 기간: ${evt.startDate} ~ ${evt.endDate}">
                   
                   ${spanCols === 1 ? `
                     <div class="flex items-center justify-center gap-1 w-full min-w-0 text-center">
@@ -26703,7 +26881,7 @@ function renderCareCalendarSpanMonthView(events) {
                     <div class="flex items-center gap-1 truncate min-w-0">
                       ${hasLeftCont ? `<span class="text-[10px] font-black text-amber-200">◀</span>` : ''}
                       <span class="font-black truncate">${maskName(evt.patientName)}</span>
-                      <span class="text-[11px] opacity-90 truncate font-normal">(${evt.caregiverName})</span>
+                      <span class="text-[11px] opacity-90 truncate font-normal">(${maskName(evt.caregiverName)})</span>
                       <span class="text-[10px] opacity-80 truncate hidden sm:inline">· ${evt.hospitalName}</span>
                     </div>
 
@@ -26869,11 +27047,11 @@ function renderCareCalendarMonthView(events) {
             return `
               <div onclick="openCalendarEventDetail('${evt.applyId}', '${evt.assignId}')" 
                 class="p-1 px-1.5 rounded-lg border text-[11px] font-medium leading-tight truncate flex items-center justify-between gap-1 shadow-2xs transition-all cursor-pointer ${pillColor}"
-                title="[${evt.insuranceCompany}] ${evt.patientName} (${evt.hospitalName}) | 간병인: ${evt.caregiverName} | ${evt.checkPoints.map(c => c.tag).join(', ')}">
+                title="[${evt.insuranceCompany}] ${maskName(evt.patientName)} (${evt.hospitalName}) | 간병인: ${maskName(evt.caregiverName)} | ${evt.checkPoints.map(c => c.tag).join(', ')}">
                 <div class="flex items-center gap-1 truncate min-w-0">
                   <span class="w-1.5 h-1.5 rounded-full ${dotColor} shrink-0"></span>
                   <b class="font-black text-slate-900 truncate shrink-0">${maskName(evt.patientName)}</b>
-                  <span class="text-[10px] text-slate-500 truncate font-normal">(${evt.caregiverName})</span>
+                  <span class="text-[10px] text-slate-500 truncate font-normal">(${maskName(evt.caregiverName)})</span>
                 </div>
                 ${evt.isAttentionNeeded ? `
                   <span class="shrink-0 text-rose-600 font-bold text-[10px] flex items-center gap-0.5 animate-pulse" title="주의체크 요망 환자">
@@ -27025,7 +27203,7 @@ function renderCareCalendarWeekView(events) {
                     <span class="text-slate-500 flex items-center gap-1 font-bold">
                       <i data-lucide="user-check" class="w-3 h-3 text-emerald-600"></i> 간병사:
                     </span>
-                    <b class="text-slate-800">${evt.caregiverName}</b>
+                    <b class="text-slate-800">${maskName(evt.caregiverName)}</b>
                   </div>
                   <div class="flex items-center justify-between text-[10.5px]">
                     <span class="text-slate-400">손사담당:</span>
@@ -27227,7 +27405,7 @@ function openCalendarEventDetail(applyId, assignId) {
       <div class="grid grid-cols-2 gap-2 text-xs">
         <div>
           <span class="text-slate-400 block text-[11px]">간병사 성명:</span>
-          <b class="text-slate-900">${evt.caregiverName}</b>
+          <b class="text-slate-900">${maskName(evt.caregiverName)}</b>
           <span class="text-[10px] text-slate-400 block">자격: ${evt.caregiverCert}</span>
         </div>
         <div>
@@ -27435,7 +27613,7 @@ function openCalendarDayEventsModal(dateStr, eventIds) {
                 <span class="text-[11px] text-slate-500 font-mono">(${evt.hospitalName})</span>
               </div>
               <div class="text-[11px] text-slate-600 mt-1 flex items-center gap-2">
-                <span>간병사: <b>${evt.caregiverName}</b> (${evt.centerName})</span>
+                <span>간병사: <b>${maskName(evt.caregiverName)}</b> (${evt.centerName})</span>
                 <span class="text-slate-400">|</span>
                 <span>손사: ${evt.adjusterName}</span>
               </div>

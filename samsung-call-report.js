@@ -270,22 +270,24 @@ let gMemberPhoneMap = {
 function formatPhoneNumber(num) {
   if (!num) return '-';
   const raw = String(num).replace(/[^0-9]/g, '');
+  let res = num;
   if (raw.length === 11) {
-    return raw.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
-  }
-  if (raw.length === 10) {
+    res = raw.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+  } else if (raw.length === 10) {
     if (raw.startsWith('02')) {
-      return raw.replace(/(\d{2})(\d{4})(\d{4})/, '$1-$2-$3');
+      res = raw.replace(/(\d{2})(\d{4})(\d{4})/, '$1-$2-$3');
+    } else {
+      res = raw.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
     }
-    return raw.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  } else if (raw.length === 9 && raw.startsWith('02')) {
+    res = raw.replace(/(\d{2})(\d{3})(\d{4})/, '$1-$2-$3');
+  } else if (raw.length === 8) {
+    res = raw.replace(/(\d{4})(\d{4})/, '$1-$2');
   }
-  if (raw.length === 9 && raw.startsWith('02')) {
-    return raw.replace(/(\d{2})(\d{3})(\d{4})/, '$1-$2-$3');
+  if (typeof maskPhone === 'function') {
+    return maskPhone(res);
   }
-  if (raw.length === 8) {
-    return raw.replace(/(\d{4})(\d{4})/, '$1-$2');
-  }
-  return num;
+  return res;
 }
 
 function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
@@ -1264,7 +1266,7 @@ function renderReportLogsSubTab(stats) {
                       <div class="flex items-center gap-1.5 mb-1">
                         <span class="font-mono font-black text-slate-900 text-xs">${formattedPhone}</span>
                         ${resolvedName && resolvedName !== '비회원' && resolvedName !== '회원아님' 
-                          ? `<span class="px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 font-bold border border-emerald-200 text-[10px]">${resolvedName}</span>` 
+                          ? `<span class="px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 font-bold border border-emerald-200 text-[10px]">${typeof maskName === 'function' ? maskName(resolvedName) : resolvedName}</span>` 
                           : `<span class="text-slate-400 text-[10px]">비회원</span>`}
                       </div>
                       <div class="flex items-center gap-1 text-[10px] text-slate-500">
@@ -1339,7 +1341,7 @@ function renderReportLogsSubTab(stats) {
                     <!-- CTI 원클릭 전화걸기 -->
                     <td class="py-2.5 px-2 text-center whitespace-nowrap">
                       ${c.phone ? `
-                        <button type="button" onclick="triggerCtiCall('${formattedPhone}', '${resolvedName}', '삼성화재')" 
+                        <button type="button" onclick="triggerCtiCall('${c.phone || c.rawPhone}', '${resolvedName}', '삼성화재')" 
                           class="p-1 rounded-lg hover:bg-blue-100 text-blue-600 transition-colors" title="GoodARS CTI 전화걸기">
                           <i data-lucide="phone" class="w-3.5 h-3.5"></i>
                         </button>
@@ -2027,7 +2029,7 @@ function generateCallReportPdfHtml() {
                 <td style="border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; line-height: 1.35;">
                   <div style="font-family: Consolas, monospace; font-size: 6.5pt; color: #64748b;">${(c.callTime || '').slice(5)}</div>
                   <div style="font-family: Consolas, monospace; font-weight: bold; color: #0f172a; font-size: 7.5pt;">${formattedPhone}</div>
-                  <div style="font-weight: bold; color: #1e40af; font-size: 7.5pt;">${resolvedName}</div>
+                  <div style="font-weight: bold; color: #1e40af; font-size: 7.5pt;">${typeof maskName === 'function' ? maskName(resolvedName) : resolvedName}</div>
                 </td>
                 <td style="border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; font-weight: bold; color: #1e40af;">${c.category}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; font-weight: bold; color: #4338ca;">${c.actor}</td>
