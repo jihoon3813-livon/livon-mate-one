@@ -984,34 +984,37 @@ function renderReportLogsSubTab(stats) {
       <!-- ================================================================= -->
       <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
         <div class="overflow-x-auto custom-scrollbar max-h-[640px]">
-          <table class="w-full text-xs text-left min-w-[1700px]">
+          <table class="w-full text-xs text-left min-w-[1550px]">
             <thead class="bg-slate-900 text-slate-200 uppercase font-bold text-[11px] sticky top-0 z-20 shadow-xs">
               <tr>
-                <th class="py-3 px-3 text-center w-12">#</th>
-                <th class="py-3 px-3">연결시간</th>
-                <th class="py-3 px-3">경로</th>
-                <th class="py-3 px-3">전화번호</th>
-                <th class="py-3 px-3">회원이름</th>
-                <th class="py-3 px-3">ARS메뉴</th>
-                <th class="py-3 px-3 text-center">연결</th>
-                <th class="py-3 px-3 text-center">대기</th>
-                <th class="py-3 px-3 text-center bg-blue-800 text-amber-300 font-black border-x border-blue-700 min-w-[170px] whitespace-nowrap">
-                  문의 대분류 (신규) ✨
+                <th class="py-3 px-2 text-center w-10">#</th>
+                <th class="py-3 px-2.5 whitespace-nowrap">연결시간</th>
+                <th class="py-3 px-2.5 whitespace-nowrap">경로</th>
+                <th class="py-3 px-2.5 whitespace-nowrap">전화번호</th>
+                <th class="py-3 px-2.5 whitespace-nowrap">회원이름</th>
+                <th class="py-3 px-2 text-center whitespace-nowrap">ARS/연결/대기</th>
+                <th class="py-3 px-2.5 text-center bg-blue-800 text-amber-300 font-black border-x border-blue-700 min-w-[130px] whitespace-nowrap">
+                  문의 분류 ✨
                 </th>
-                <th class="py-3 px-3 text-center bg-blue-800 text-amber-300 font-black border-r border-blue-700 min-w-[150px] whitespace-nowrap">
-                  문의 주체 (신규) ✨
+                <th class="py-3 px-2.5 text-center bg-blue-800 text-amber-300 font-black border-r border-blue-700 min-w-[110px] whitespace-nowrap">
+                  문의 주체 ✨
                 </th>
-                <th class="py-3 px-3">상담제목</th>
-                <th class="py-3 px-3 min-w-[340px]">상담요약 (전문의 내용)</th>
-                <th class="py-3 px-3 min-w-[180px]">키워드</th>
-                <th class="py-3 px-3 text-center">상담시간</th>
-                <th class="py-3 px-3 text-center">CTI</th>
+                <th class="py-3 px-2.5 min-w-[140px] max-w-[200px]">상담제목</th>
+                <th class="py-3 px-3 min-w-[500px] bg-slate-800/80 text-white font-black">
+                  <div class="flex items-center justify-between">
+                    <span>상담요약 (핵심 내용)</span>
+                    <span class="text-[10px] text-blue-300 font-normal">📋 요약문 복사 가능</span>
+                  </div>
+                </th>
+                <th class="py-3 px-2.5 min-w-[130px] max-w-[160px]">키워드</th>
+                <th class="py-3 px-2 text-center whitespace-nowrap">상담시간</th>
+                <th class="py-3 px-2 text-center whitespace-nowrap">CTI</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 text-slate-700">
               ${logs.length === 0 ? `
                 <tr>
-                  <td colspan="15" class="py-12 text-center text-slate-400 font-bold">
+                  <td colspan="13" class="py-12 text-center text-slate-400 font-bold">
                     일치하는 통화로그가 없습니다. 필터 조건을 변경해보세요.
                   </td>
                 </tr>
@@ -1021,22 +1024,26 @@ function renderReportLogsSubTab(stats) {
                 const resolvedName = resolveMemberName(c.phone || c.rawPhone, c.memberName);
                 return `
                   <tr class="hover:bg-blue-50/40 transition-colors ${idx % 2 === 1 ? 'bg-slate-50/50' : ''}">
-                    <td class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">${c.rowNum || (idx + 1)}</td>
-                    <td class="py-2.5 px-3 font-mono text-slate-600 whitespace-nowrap">${c.callTime || '-'}</td>
-                    <td class="py-2.5 px-3 font-bold text-sky-700 whitespace-nowrap">${c.channel || '삼성화재'}</td>
-                    <td class="py-2.5 px-3 font-mono font-bold text-slate-900 whitespace-nowrap">${formattedPhone}</td>
-                    <td class="py-2.5 px-3 whitespace-nowrap font-bold ${resolvedName !== '회원아님' ? 'text-blue-700' : 'text-slate-500'}">${resolvedName}</td>
-                    <td class="py-2.5 px-3 whitespace-nowrap">
-                      ${c.arsMenu ? `<span class="px-2 py-0.5 rounded-md bg-slate-100 font-bold text-[10.5px] text-slate-700">${c.arsMenu}</span>` : '-'}
-                    </td>
-                    <td class="py-2.5 px-3 text-center font-mono font-bold ${c.connectReq === 'Y' ? 'text-blue-600' : 'text-slate-400'}">${c.connectReq || '-'}</td>
-                    <td class="py-2.5 px-3 text-center font-mono text-slate-500">${c.waitTime ? `${c.waitTime}초` : '0'}</td>
+                    <td class="py-2.5 px-2 text-center text-slate-400 font-mono text-[10px]">${c.rowNum || (idx + 1)}</td>
+                    <td class="py-2.5 px-2.5 font-mono text-slate-600 whitespace-nowrap text-[11px]">${c.callTime || '-'}</td>
+                    <td class="py-2.5 px-2.5 font-bold text-sky-700 whitespace-nowrap">${c.channel || '삼성화재'}</td>
+                    <td class="py-2.5 px-2.5 font-mono font-bold text-slate-900 whitespace-nowrap">${formattedPhone}</td>
+                    <td class="py-2.5 px-2.5 whitespace-nowrap font-bold ${resolvedName !== '회원아님' ? 'text-blue-700' : 'text-slate-500'}">${resolvedName}</td>
                     
-                    <!-- [필수 신규 컬럼 1] 문의 대분류 인라인 셀렉터 -->
-                    <td class="py-2 px-3 border-x border-slate-200 bg-sky-50/30 whitespace-nowrap min-w-[170px]">
+                    <!-- ARS메뉴 + 연결요청(Y/N) + 대기시간 합친 콤팩트 셀 -->
+                    <td class="py-2 px-2 text-center whitespace-nowrap">
+                      <div class="inline-flex items-center gap-1">
+                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[10px]">${c.arsMenu || '상담연결'}</span>
+                        <span class="px-1 py-0.2 rounded text-[10px] font-mono font-bold ${c.connectReq === 'Y' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-400'}" title="연결요청 여부">${c.connectReq || '-'}</span>
+                        <span class="text-[10px] text-slate-400 font-mono" title="대기시간">${c.waitTime ? `${c.waitTime}s` : '0s'}</span>
+                      </div>
+                    </td>
+                    
+                    <!-- [필수 신규 컬럼 1] 문의 대분류 인라인 셀렉터 (간결 폭) -->
+                    <td class="py-2 px-2 border-x border-slate-200 bg-sky-50/30 whitespace-nowrap min-w-[130px]">
                       ${isConsulted ? `
                         <select onchange="updateCallLogCategory('${c.id}', this.value)" 
-                          class="w-full px-2 py-1 rounded-lg text-xs font-black bg-white border border-sky-300 text-sky-900 shadow-2xs focus:ring-1 focus:ring-sky-500">
+                          class="w-full px-2 py-1 rounded-lg text-[11px] font-black bg-white border border-sky-300 text-sky-900 shadow-2xs focus:ring-1 focus:ring-sky-500 truncate" title="${c.category || ''}">
                           ${SAMSUNG_CATEGORIES.map(cat => `
                             <option value="${cat.name}" ${c.category === cat.name ? 'selected' : ''}>${cat.name}</option>
                           `).join('')}
@@ -1044,11 +1051,11 @@ function renderReportLogsSubTab(stats) {
                       ` : `<span class="text-slate-300 text-[10px]">-</span>`}
                     </td>
 
-                    <!-- [필수 신규 컬럼 2] 문의 주체 인라인 셀렉터 -->
-                    <td class="py-2 px-3 border-r border-slate-200 bg-indigo-50/30 whitespace-nowrap min-w-[150px]">
+                    <!-- [필수 신규 컬럼 2] 문의 주체 인라인 셀렉터 (간결 폭) -->
+                    <td class="py-2 px-2 border-r border-slate-200 bg-indigo-50/30 whitespace-nowrap min-w-[110px]">
                       ${isConsulted ? `
                         <select onchange="updateCallLogActor('${c.id}', this.value)" 
-                          class="w-full px-2 py-1 rounded-lg text-xs font-black bg-white border border-indigo-300 text-indigo-900 shadow-2xs focus:ring-1 focus:ring-indigo-500">
+                          class="w-full px-2 py-1 rounded-lg text-[11px] font-black bg-white border border-indigo-300 text-indigo-900 shadow-2xs focus:ring-1 focus:ring-indigo-500 truncate" title="${c.actor || ''}">
                           ${SAMSUNG_ACTORS.map(actor => `
                             <option value="${actor.name}" ${c.actor === actor.name ? 'selected' : ''}>${actor.name}</option>
                           `).join('')}
@@ -1057,33 +1064,45 @@ function renderReportLogsSubTab(stats) {
                     </td>
 
                     <!-- 상담 제목 -->
-                    <td class="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">${c.title || '-'}</td>
+                    <td class="py-2.5 px-2.5 font-bold text-slate-900 min-w-[140px] max-w-[200px] break-keep leading-snug">
+                      ${c.title || '-'}
+                    </td>
 
-                    <!-- 상담 요약 (더보기 툴팁 지원) -->
-                    <td class="py-2.5 px-3 text-slate-600 leading-relaxed">
-                      <div class="line-clamp-2 hover:line-clamp-none transition-all cursor-pointer" title="클릭 시 전체 상담요약 열기">
-                        ${c.summary || '<span class="text-slate-300">-</span>'}
-                      </div>
+                    <!-- 상담 요약 (가장 넓은 핵심 공간 + 복사 아이콘 버튼) -->
+                    <td class="py-2.5 px-3.5 text-slate-700 leading-relaxed bg-slate-50/30 relative group">
+                      ${c.summary ? `
+                        <div class="flex items-start justify-between gap-2.5">
+                          <div class="flex-1 text-[12px] leading-relaxed break-keep select-text">
+                            ${c.summary}
+                          </div>
+                          <button type="button" 
+                            onclick="copyCallLogSummaryText(this, ${JSON.stringify(c.summary).replace(/"/g, '&quot;')})" 
+                            class="shrink-0 p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-300 text-slate-400 hover:text-blue-600 transition-all shadow-2xs cursor-pointer opacity-70 group-hover:opacity-100" 
+                            title="상담요약 텍스트 복사">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                          </button>
+                        </div>
+                      ` : '<span class="text-slate-300 text-xs">-</span>'}
                     </td>
 
                     <!-- 키워드 -->
-                    <td class="py-2.5 px-3 text-slate-500 font-medium">
+                    <td class="py-2.5 px-2.5 text-slate-500 font-medium min-w-[130px] max-w-[160px]">
                       ${c.keywords ? `
                         <div class="flex flex-wrap gap-1">
                           ${c.keywords.split(',').map(k => `
-                            <span class="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px]">${k.trim()}</span>
+                            <span class="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] whitespace-nowrap">${k.trim()}</span>
                           `).join('')}
                         </div>
                       ` : '-'}
                     </td>
 
                     <!-- 상담 시간 -->
-                    <td class="py-2.5 px-3 text-center font-mono font-bold ${c.duration && c.duration !== '0' ? 'text-blue-700' : 'text-slate-400'} whitespace-nowrap">
+                    <td class="py-2.5 px-2 text-center font-mono font-bold ${c.duration && c.duration !== '0' ? 'text-blue-700' : 'text-slate-400'} whitespace-nowrap">
                       ${c.duration || '0'}
                     </td>
 
                     <!-- CTI 원클릭 전화걸기 -->
-                    <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                    <td class="py-2.5 px-2 text-center whitespace-nowrap">
                       ${c.phone ? `
                         <button type="button" onclick="triggerCtiCall('${formattedPhone}', '${resolvedName}', '삼성화재')" 
                           class="p-1 rounded-lg hover:bg-blue-100 text-blue-600 transition-colors" title="GoodARS CTI 전화걸기">
@@ -2039,5 +2058,31 @@ function openSamsungReportWebView() {
   const reportUrl = `/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
   window.open(reportUrl, '_blank');
 }
+
+/**
+ * 상담요약 텍스트 클립보드 복사 헬퍼 (복사 완료 시 버튼 아이콘 피드백)
+ */
+function copyCallLogSummaryText(btn, text) {
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    if (btn) {
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600"></i>';
+      btn.classList.add('bg-emerald-50', 'border-emerald-300');
+      if (window.lucide) lucide.createIcons();
+      setTimeout(() => {
+        btn.innerHTML = origHtml;
+        btn.classList.remove('bg-emerald-50', 'border-emerald-300');
+        if (window.lucide) lucide.createIcons();
+      }, 1500);
+    }
+    if (typeof showToast === 'function') {
+      showToast('상담요약 전문 내용이 복사되었습니다.', 'success');
+    }
+  }).catch(() => {
+    prompt('아래 상담요약 내용을 복사하세요:', text);
+  });
+}
+
 
 

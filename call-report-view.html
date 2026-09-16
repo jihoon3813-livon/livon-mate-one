@@ -768,30 +768,37 @@
 
         <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
           <div class="overflow-x-auto custom-scrollbar max-h-[640px]">
-            <table class="w-full text-xs text-left min-w-[1700px]">
+            <table class="w-full text-xs text-left min-w-[1550px]">
               <thead class="bg-slate-900 text-slate-200 uppercase font-bold text-[11px] sticky top-0 z-20 shadow-xs">
                 <tr>
-                  <th class="py-3 px-3 text-center w-12">#</th>
-                  <th class="py-3 px-3">연결시간</th>
-                  <th class="py-3 px-3">경로</th>
-                  <th class="py-3 px-3">전화번호</th>
-                  <th class="py-3 px-3">회원이름</th>
-                  <th class="py-3 px-3">ARS메뉴</th>
-                  <th class="py-3 px-3 text-center">연결</th>
-                  <th class="py-3 px-3 text-center">대기</th>
-                  <th class="py-3 px-3 text-center bg-blue-800 text-amber-300 font-black border-x border-blue-700">문의 대분류 (신규) ✨</th>
-                  <th class="py-3 px-3 text-center bg-blue-800 text-amber-300 font-black border-r border-blue-700">문의 주체 (신규) ✨</th>
-                  <th class="py-3 px-3">상담제목</th>
-                  <th class="py-3 px-3 min-w-[340px]">상담요약 (전문의 내용)</th>
-                  <th class="py-3 px-3 min-w-[180px]">키워드</th>
-                  <th class="py-3 px-3 text-center">통화시간</th>
-                  <th class="py-3 px-3 text-center">상태</th>
+                  <th class="py-3 px-2 text-center w-10">#</th>
+                  <th class="py-3 px-2.5 whitespace-nowrap">연결시간</th>
+                  <th class="py-3 px-2.5 whitespace-nowrap">경로</th>
+                  <th class="py-3 px-2.5 whitespace-nowrap">전화번호</th>
+                  <th class="py-3 px-2.5 whitespace-nowrap">회원이름</th>
+                  <th class="py-3 px-2 text-center whitespace-nowrap">ARS/연결/대기</th>
+                  <th class="py-3 px-2.5 text-center bg-blue-800 text-amber-300 font-black border-x border-blue-700 min-w-[130px] whitespace-nowrap">
+                    문의 대분류 ✨
+                  </th>
+                  <th class="py-3 px-2.5 text-center bg-blue-800 text-amber-300 font-black border-r border-blue-700 min-w-[110px] whitespace-nowrap">
+                    문의 주체 ✨
+                  </th>
+                  <th class="py-3 px-2.5 min-w-[140px] max-w-[200px]">상담제목</th>
+                  <th class="py-3 px-3 min-w-[500px] bg-slate-800/80 text-white font-black">
+                    <div class="flex items-center justify-between">
+                      <span>상담요약 (핵심 내용)</span>
+                      <span class="text-[10px] text-blue-300 font-normal">📋 요약문 복사 가능</span>
+                    </div>
+                  </th>
+                  <th class="py-3 px-2.5 min-w-[130px] max-w-[160px]">키워드</th>
+                  <th class="py-3 px-2 text-center whitespace-nowrap">통화시간</th>
+                  <th class="py-3 px-2 text-center whitespace-nowrap">상태</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100 text-slate-700">
                 ${logs.length === 0 ? `
                   <tr>
-                    <td colspan="15" class="py-12 text-center text-slate-400 font-bold">
+                    <td colspan="13" class="py-12 text-center text-slate-400 font-bold">
                       일치하는 통화로그가 없습니다. 필터 조건을 변경해보세요.
                     </td>
                   </tr>
@@ -800,26 +807,50 @@
                   const displayMember = resolveMemberName(c.phone || c.rawPhone, c.memberName);
                   return `
                   <tr class="hover:bg-blue-50/40 transition-colors ${idx % 2 === 1 ? 'bg-slate-50/50' : ''}">
-                    <td class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">${c.rowNum || (idx + 1)}</td>
-                    <td class="py-2.5 px-3 font-mono text-slate-600 whitespace-nowrap">${c.callTime || '-'}</td>
-                    <td class="py-2.5 px-3 font-bold text-sky-700 whitespace-nowrap">${c.channel || '삼성화재'}</td>
-                    <td class="py-2.5 px-3 font-mono font-bold text-slate-900 whitespace-nowrap">${displayPhone}</td>
-                    <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-800">
+                    <td class="py-2.5 px-2 text-center text-slate-400 font-mono text-[10px]">${c.rowNum || (idx + 1)}</td>
+                    <td class="py-2.5 px-2.5 font-mono text-slate-600 whitespace-nowrap text-[11px]">${c.callTime || '-'}</td>
+                    <td class="py-2.5 px-2.5 font-bold text-sky-700 whitespace-nowrap">${c.channel || '삼성화재'}</td>
+                    <td class="py-2.5 px-2.5 font-mono font-bold text-slate-900 whitespace-nowrap">${displayPhone}</td>
+                    <td class="py-2.5 px-2.5 whitespace-nowrap font-medium text-slate-800">
                       ${displayMember !== '비회원' ? `<span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">${displayMember}</span>` : '<span class="text-slate-400">비회원</span>'}
                     </td>
-                    <td class="py-2.5 px-3 whitespace-nowrap">${c.arsMenu || '-'}</td>
-                    <td class="py-2.5 px-3 text-center font-mono font-bold ${c.connectReq === 'Y' ? 'text-blue-600' : 'text-slate-400'}">${c.connectReq || '-'}</td>
-                    <td class="py-2.5 px-3 text-center font-mono text-slate-500">${c.waitTime ? `${c.waitTime}초` : '0'}</td>
                     
-                    <td class="py-2 px-3 border-x border-slate-200 bg-sky-50/20 text-center font-bold text-sky-900 whitespace-nowrap min-w-[170px]">
-                      ${c.category ? `<span class="inline-block px-2.5 py-1 rounded-lg bg-sky-100 text-sky-800 font-bold border border-sky-200 whitespace-nowrap text-xs">${c.category}</span>` : '<span class="text-slate-300">-</span>'}
+                    <!-- ARS메뉴 + 연결요청(Y/N) + 대기시간 합친 콤팩트 셀 -->
+                    <td class="py-2 px-2 text-center whitespace-nowrap">
+                      <div class="inline-flex items-center gap-1">
+                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[10px]">${c.arsMenu || '상담연결'}</span>
+                        <span class="px-1 py-0.2 rounded text-[10px] font-mono font-bold ${c.connectReq === 'Y' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-400'}" title="연결요청 여부">${c.connectReq || '-'}</span>
+                        <span class="text-[10px] text-slate-400 font-mono" title="대기시간">${c.waitTime ? `${c.waitTime}s` : '0s'}</span>
+                      </div>
                     </td>
-                    <td class="py-2 px-3 border-r border-slate-200 bg-indigo-50/20 text-center font-bold text-indigo-900 whitespace-nowrap min-w-[150px]">
-                      ${c.actor ? `<span class="inline-block px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-800 font-bold border border-indigo-200 whitespace-nowrap text-xs">${c.actor}</span>` : '<span class="text-slate-300">-</span>'}
+                    
+                    <td class="py-2 px-2 border-x border-slate-200 bg-sky-50/20 text-center font-bold text-sky-900 whitespace-nowrap min-w-[130px]">
+                      ${c.category ? `<span class="inline-block px-2 py-0.5 rounded-lg bg-sky-100 text-sky-800 font-bold border border-sky-200 whitespace-nowrap text-[11px]">${c.category}</span>` : '<span class="text-slate-300">-</span>'}
                     </td>
-                    <td class="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap min-w-[160px]">${c.title || '-'}</td>
-                    <td class="py-2.5 px-3 text-slate-600 leading-relaxed min-w-[340px] max-w-lg text-[11px]">${c.summary || '<span class="text-slate-300">-</span>'}</td>
-                    <td class="py-2.5 px-3 text-slate-500 font-medium min-w-[160px]">
+                    <td class="py-2 px-2 border-r border-slate-200 bg-indigo-50/20 text-center font-bold text-indigo-900 whitespace-nowrap min-w-[110px]">
+                      ${c.actor ? `<span class="inline-block px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-800 font-bold border border-indigo-200 whitespace-nowrap text-[11px]">${c.actor}</span>` : '<span class="text-slate-300">-</span>'}
+                    </td>
+                    <td class="py-2.5 px-2.5 font-bold text-slate-900 min-w-[140px] max-w-[200px] break-keep leading-snug">${c.title || '-'}</td>
+                    
+                    <!-- 상담 요약 (최대 너비 보장 + 복사 버튼) -->
+                    <td class="py-2.5 px-3.5 text-slate-700 leading-relaxed bg-slate-50/30 relative group">
+                      ${c.summary ? `
+                        <div class="flex items-start justify-between gap-2.5">
+                          <div class="flex-1 text-[12px] leading-relaxed break-keep select-text">
+                            ${c.summary}
+                          </div>
+                          <button type="button" 
+                            onclick="copyViewerSummaryText(this, ${JSON.stringify(c.summary).replace(/"/g, '&quot;')})" 
+                            class="shrink-0 p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-300 text-slate-400 hover:text-blue-600 transition-all shadow-2xs cursor-pointer opacity-70 group-hover:opacity-100" 
+                            title="상담요약 텍스트 복사">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                          </button>
+                        </div>
+                      ` : '<span class="text-slate-300 text-xs">-</span>'}
+                    </td>
+
+                    <!-- 키워드 -->
+                    <td class="py-2.5 px-2.5 text-slate-500 font-medium min-w-[130px] max-w-[160px]">
                       ${c.keywords ? `
                         <div class="flex flex-wrap gap-1">
                           ${c.keywords.split(',').map(k => `
@@ -828,8 +859,8 @@
                         </div>
                       ` : '<span class="text-slate-300">-</span>'}
                     </td>
-                    <td class="py-2.5 px-3 text-center font-mono font-bold text-slate-700 whitespace-nowrap">${c.duration || '0'}</td>
-                    <td class="py-2.5 px-3 text-center text-slate-500 whitespace-nowrap">${c.status || '-'}</td>
+                    <td class="py-2.5 px-2 text-center font-mono font-bold text-slate-700 whitespace-nowrap">${c.duration || '0'}</td>
+                    <td class="py-2.5 px-2 text-center text-slate-500 whitespace-nowrap text-[11px]">${c.status || '-'}</td>
                   </tr>
                 `}).join('')}
               </tbody>
@@ -1412,6 +1443,28 @@
       } finally {
         hidePdfProgress();
       }
+    }
+
+    /**
+     * 웹 뷰어용 상담요약 복사 함수
+     */
+    function copyViewerSummaryText(btn, text) {
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(() => {
+        if (btn) {
+          const origHtml = btn.innerHTML;
+          btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600"></i>';
+          btn.classList.add('bg-emerald-50', 'border-emerald-300');
+          if (window.lucide) lucide.createIcons();
+          setTimeout(() => {
+            btn.innerHTML = origHtml;
+            btn.classList.remove('bg-emerald-50', 'border-emerald-300');
+            if (window.lucide) lucide.createIcons();
+          }, 1500);
+        }
+      }).catch(() => {
+        prompt('아래 상담요약 내용을 복사하세요:', text);
+      });
     }
   </script>
 
