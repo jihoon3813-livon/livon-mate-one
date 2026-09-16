@@ -1389,7 +1389,7 @@ function renderReportLogsSubTab(stats) {
                     <td class="py-2.5 px-3.5 text-slate-700 leading-relaxed bg-slate-50/30 relative group w-full min-w-[520px] align-top">
                       ${c.summary ? `
                         <div class="flex items-start justify-between gap-3">
-                          <div class="flex-1 text-[12px] leading-relaxed break-keep select-text text-slate-800 font-normal">
+                          <div class="flex-1 text-[12px] leading-relaxed break-keep select-text text-slate-800 font-normal line-clamp-3" style="-webkit-line-clamp: 3; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;">
                             ${c.summary}
                           </div>
                           <button type="button" 
@@ -2114,7 +2114,7 @@ function generateCallReportPdfHtml() {
                 <td style="border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; font-weight: bold; color: #1e40af;">${c.category}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; font-weight: bold; color: #4338ca;">${c.actor}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; font-weight: bold; color: #0f172a; line-height: 1.3;">${c.title}</td>
-                <td style="border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; color: #334155; line-height: 1.4; word-break: break-all;">${c.summary}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; color: #334155; line-height: 1.4; word-break: break-all;"><div style="-webkit-line-clamp: 3; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;">${c.summary}</div></td>
               </tr>
             `;}).join('')}
           </tbody>
