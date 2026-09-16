@@ -394,7 +394,7 @@ function renderSamsungCallReportTab() {
       <!-- TOP ACTION BAR: 헤더, 기간 선택기, 내보내기/발송 액션 버튼 -->
       <!-- ================================================================= -->
       <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-4 sm:p-5 flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-4">
-        <div class="min-w-0 flex-1">
+        <div class="min-w-0 md:min-w-[400px] flex-1">
           <div class="flex items-center gap-2.5 flex-wrap">
             <span class="px-2.5 py-1 rounded-xl bg-blue-600 text-white font-black text-xs shadow-xs flex items-center gap-1.5 shrink-0">
               <i data-lucide="phone-call" class="w-3.5 h-3.5"></i> 삼성화재 공식 보고
@@ -416,28 +416,8 @@ function renderSamsungCallReportTab() {
           </p>
         </div>
 
-        <!-- 액션 버튼들: 화면 너비가 좁아지거나 공간이 부족할 때 자연스럽게 2줄로 정렬 (웹 도구 1줄 / 내보내기 도구 1줄 등) -->
-        <div class="flex flex-wrap items-center justify-start 2xl:justify-end gap-2.5 shrink-0 max-w-full">
-          <!-- 타 업무 빠른 이동 -->
-          <div class="flex items-center gap-1 px-2 py-1.5 rounded-2xl bg-slate-100 border border-slate-200 shadow-2xs">
-            <button type="button" onclick="switchTab('carehub')" class="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1 transition-all border border-slate-200 shadow-2xs cursor-pointer whitespace-nowrap" title="통합 간병 운영 허브로 이동">
-              <i data-lucide="layers" class="w-3.5 h-3.5 text-amber-600"></i>
-              <span>운영허브</span>
-            </button>
-            <button type="button" onclick="switchTab('totalcallanalysis')" class="px-2.5 py-1 rounded-xl bg-white hover:bg-cyan-50 text-cyan-800 font-bold text-xs flex items-center gap-1 transition-all border border-cyan-200 shadow-2xs cursor-pointer whitespace-nowrap" title="종합 콜분석 (CTI 전수 상담콜)로 이동">
-              <i data-lucide="phone-call" class="w-3.5 h-3.5 text-cyan-600"></i>
-              <span>종합콜분석</span>
-            </button>
-            <button type="button" onclick="switchTab('samsunglist')" class="px-2.5 py-1 rounded-xl bg-white hover:bg-sky-50 text-sky-800 font-bold text-xs flex items-center gap-1 transition-all border border-sky-200 shadow-2xs cursor-pointer whitespace-nowrap" title="삼성화재 명단관리 (웹 스프레드시트)로 이동">
-              <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-sky-600"></i>
-              <span>명단관리</span>
-            </button>
-            <button type="button" onclick="switchTab('samsungclaimhub')" class="px-2.5 py-1 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 font-bold text-xs flex items-center gap-1 transition-all border border-emerald-200 shadow-2xs cursor-pointer whitespace-nowrap" title="삼성화재 접수/청구관리로 이동">
-              <i data-lucide="mail-check" class="w-3.5 h-3.5 text-emerald-600"></i>
-              <span>접수/청구</span>
-            </button>
-          </div>
-
+        <!-- 액션 버튼들: 웹 도구 / 내보내기 도구 -->
+        <div class="flex flex-wrap items-center justify-start 2xl:justify-end gap-2.5 max-w-full">
           <!-- 삼성화재 웹링크 그룹 -->
           <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-2xl bg-blue-50/90 border border-blue-200/90 shadow-2xs">
             <span class="px-1 text-[11px] font-black text-blue-900 flex items-center gap-1 shrink-0">
