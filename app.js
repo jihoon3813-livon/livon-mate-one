@@ -19911,6 +19911,15 @@ function switchTab(tabId, filterParam = null) {
       }
     }
   }
+  else if (tabId === 'totalcallanalysis') {
+    if (typeof initTotalCallAnalysisModule === 'function') {
+      if (!gTotalCallData) {
+        initTotalCallAnalysisModule();
+      } else {
+        renderTotalCallAnalysisTab();
+      }
+    }
+  }
   else if (tabId === 'directory') switchDirectorySubTab(filterParam || gActiveDirectorySubTab || 'caregivers');
   else if (tabId === 'applications') renderApplications();
   else if (tabId === 'assignments') renderAssignments();
@@ -24287,6 +24296,10 @@ function renderSettings() {
   // Load Barobill Global Fax & Password Settings
   loadBarobillSettingsToInputs();
 
+  if (typeof updateSettingsLabelsPreview === 'function') {
+    updateSettingsLabelsPreview();
+  }
+
   initIcons();
 }
 
@@ -25505,11 +25518,20 @@ function openHubCustomerDetailModal(applyId) {
       const faxInfo = isClaimFax ? rawFax : { status: '미전송', sentDate: null, faxNumber: app.adjusterFax || '0507-XXX-XXXX' };
       const isVoiceSyncOn = typeof isVoiceLogEnabledFor === 'function' ? isVoiceLogEnabledFor(app.insuranceCompany) : false;
 
+      let mainWorkspaceHtml = '';
       if (gHubModalViewMode === '3card') {
-        bodyEl.innerHTML = renderEntityBased3CardWorkspaceHtml(app, assigns, claims, payouts, logs, faxInfo, isVoiceSyncOn);
+        mainWorkspaceHtml = renderEntityBased3CardWorkspaceHtml(app, assigns, claims, payouts, logs, faxInfo, isVoiceSyncOn);
       } else {
-        bodyEl.innerHTML = renderSequentialCareSettlementWorkspaceHtml(app, assigns, claims, payouts, logs, faxInfo, isVoiceSyncOn);
+        mainWorkspaceHtml = renderSequentialCareSettlementWorkspaceHtml(app, assigns, claims, payouts, logs, faxInfo, isVoiceSyncOn);
       }
+
+      // CTI 실제 인바운드 통화 이력 및 상담분류 연동 섹션 부착
+      let ctiSectionHtml = '';
+      if (typeof renderHubCustomerCtiSectionHtml === 'function') {
+        ctiSectionHtml = renderHubCustomerCtiSectionHtml(app);
+      }
+
+      bodyEl.innerHTML = mainWorkspaceHtml + ctiSectionHtml;
       initIcons(bodyEl);
     } catch (err) {
       console.error('Error rendering detail modal workspace:', err);

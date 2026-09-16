@@ -690,6 +690,51 @@ function saveSavedFaxConfig(cfg) {
       }
     }
 
+    // =========================================================================
+    // API Route: Call Annotations & Custom Labels (상담 통화 메모 및 맞춤 라벨 영구저장)
+    // =========================================================================
+    if (reqPath === '/api/call-records/annotations') {
+      const annotFile = path.join(BASE_DIR, 'call_annotations.json');
+
+      if (req.method === 'GET') {
+        try {
+          let data = { memos: {}, labels: {}, customLabels: [] };
+          if (fs.existsSync(annotFile)) {
+            data = JSON.parse(fs.readFileSync(annotFile, 'utf-8'));
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, data }));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      } else if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            let data = { memos: {}, labels: {}, customLabels: [] };
+            if (fs.existsSync(annotFile)) {
+              try { data = JSON.parse(fs.readFileSync(annotFile, 'utf-8')); } catch (e) {}
+            }
+            if (payload.memos !== undefined) data.memos = payload.memos;
+            if (payload.labels !== undefined) data.labels = payload.labels;
+            if (payload.customLabels !== undefined) data.customLabels = payload.customLabels;
+            if (payload.replaceAll && payload.data) data = payload.data;
+
+            fs.writeFileSync(annotFile, JSON.stringify(data, null, 2), 'utf-8');
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true, data }));
+          } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: err.message }));
+          }
+        });
+        return;
+      }
+    }
+
     if (reqPath === '/api/samsung/call-report/pdf' && req.method === 'POST') {
       let body = '';
       req.on('data', chunk => body += chunk);

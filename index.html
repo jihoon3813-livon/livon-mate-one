@@ -578,6 +578,15 @@
           <span class="h-5 px-2 rounded-md bg-blue-950 text-blue-300 font-bold text-[10px] flex items-center justify-center border border-blue-800">주간보고</span>
         </button>
 
+        <!-- 7-4. 종합 콜분석 (CTI 전수 상담콜 통합분석 & 고객/보험사/일자/유형별 분석) -->
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="totalcallanalysis" onclick="switchTab('totalcallanalysis')">
+          <div class="flex items-center space-x-3">
+            <i data-lucide="phone-call" class="w-4 h-4 flex-shrink-0 text-cyan-400"></i>
+            <span class="tracking-tight font-semibold">종합 콜분석</span>
+          </div>
+          <span class="h-5 px-2 rounded-md bg-cyan-950 text-cyan-300 font-bold text-[10px] flex items-center justify-center border border-cyan-800">CTI전수</span>
+        </button>
+
         <!-- 8. 양식 -->
         <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="forms" onclick="switchTab('forms')">
           <div class="flex items-center space-x-3">
@@ -1993,6 +2002,11 @@
         <!-- Dynamically rendered by renderSamsungCallReportTab() in samsung-call-report.js -->
       </section>
 
+      <!-- ==================== TAB: TOTAL CALL ANALYSIS REPORT (종합 콜분석 시스템) ==================== -->
+      <section id="tab-totalcallanalysis" class="tab-content hidden space-y-4">
+        <!-- Dynamically rendered by renderTotalCallAnalysisTab() in total-call-analysis.js -->
+      </section>
+
       <!-- ==================== TAB: INTEGRATED DIRECTORY (간병인 · 간병센터 · 손사디렉토리) ==================== -->
       <section id="tab-directory" class="tab-content hidden space-y-4">
         <!-- 1. 최상단 통합 헤더 -->
@@ -3045,6 +3059,9 @@
                 시스템 설정 ⚙️
               </button>
             </div>
+            <button onclick="openLabelSettingModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-cyan-300 bg-cyan-50 hover:bg-cyan-100 text-cyan-900 text-xs font-bold shadow-xs transition-all">
+              <i data-lucide="tag" class="w-4 h-4 text-cyan-700"></i> 상담 콜 라벨 관리
+            </button>
             <button onclick="openNewAdminModal()" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-all">
               <i data-lucide="user-plus" class="w-4 h-4"></i> 신규 관리자 생성
             </button>
@@ -3315,6 +3332,41 @@
             </form>
           </div>
 
+          <!-- 4. CTI 종합 상담 콜 라벨 관리 설정 -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-5">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 class="text-sm font-black text-slate-900 flex items-center gap-2">
+                <i data-lucide="tag" class="w-4 h-4 text-cyan-600"></i>
+                CTI 종합 상담 콜 라벨 관리 설정
+              </h3>
+              <span class="text-xs px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 font-bold border border-cyan-200">상담 분류/태깅</span>
+            </div>
+
+            <p class="text-xs text-slate-500 leading-relaxed">
+              종합 콜분석 및 통합허브에서 상담콜별로 지정 가능한 태그/라벨(예: 긴급, 확인완료, 재통화필요, 분쟁, 민원 등)을 등록하거나 맞춤형 라벨을 추가·삭제하여 실시간으로 상담 업무에 반영합니다.
+            </p>
+
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-700">현재 활성화된 기본 및 커스텀 라벨</span>
+                <span class="text-[11px] text-slate-400 font-medium">실시간 동기화</span>
+              </div>
+              <div class="flex flex-wrap gap-1.5" id="settingsCallLabelsPreview">
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-600 text-white">🚨 긴급</span>
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 text-white">✅ 확인완료</span>
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500 text-white">📞 재통화필요</span>
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-600 text-white">🧾 청구분쟁</span>
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-red-700 text-white">🛡️ 악성민원</span>
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-600 text-white">📅 일정변경</span>
+              </div>
+            </div>
+
+            <div class="pt-2 flex justify-end">
+              <button type="button" onclick="openLabelSettingModal()" class="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer">
+                <i data-lucide="sliders-horizontal" class="w-4 h-4"></i> 라벨 추가 / 편집 설정창 열기
+              </button>
+            </div>
+          </div>
 
         </div>
 
@@ -8134,6 +8186,7 @@
   <!-- SCRIPTS (Moved to bottom of body for full DOM availability) -->
   <script src="data.js?v=20260910_1931"></script>
   <script src="samsung-call-report.js"></script>
+  <script src="total-call-analysis.js"></script>
   <script src="app.js?v=20260910_1931"></script>
 </body>
 </html>
