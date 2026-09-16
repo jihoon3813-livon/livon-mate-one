@@ -383,19 +383,36 @@ function renderSamsungCallReportTab() {
         </div>
 
         <!-- 액션 버튼들: 화면 너비가 좁아지거나 공간이 부족할 때 자연스럽게 2줄로 정렬 (웹 도구 1줄 / 내보내기 도구 1줄 등) -->
-        <div class="flex flex-wrap items-center justify-start 2xl:justify-end gap-2 shrink-0 max-w-full 2xl:max-w-xl">
-          <!-- 웹 연동 그룹 -->
-          <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            <!-- 보고서 웹링크 복사 -->
-            <button type="button" onclick="copySamsungReportWebLink()" class="px-3.5 py-2 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer whitespace-nowrap" title="담당자 전달용 웹페이지 보고서 링크 복사">
-              <i data-lucide="link" class="w-4 h-4 text-blue-600"></i>
-              <span>🔗 웹링크 복사</span>
+        <div class="flex flex-wrap items-center justify-start 2xl:justify-end gap-2.5 shrink-0 max-w-full">
+          <!-- 삼성화재 웹링크 그룹 -->
+          <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-2xl bg-blue-50/90 border border-blue-200/90 shadow-2xs">
+            <span class="px-1 text-[11px] font-black text-blue-900 flex items-center gap-1 shrink-0">
+              <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+              삼성화재
+            </span>
+            <button type="button" onclick="copyReportWebLink('삼성화재')" class="px-2.5 py-1 rounded-xl bg-white hover:bg-blue-100/70 text-blue-800 font-bold text-xs flex items-center gap-1 transition-all border border-blue-200 shadow-2xs cursor-pointer whitespace-nowrap" title="삼성화재 전용 웹보고서 공유 링크 복사">
+              <i data-lucide="copy" class="w-3.5 h-3.5 text-blue-600"></i>
+              <span>링크 복사</span>
             </button>
+            <button type="button" onclick="openReportWebView('삼성화재')" class="px-2.5 py-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 transition-all shadow-2xs cursor-pointer whitespace-nowrap" title="삼성화재 전용 웹보고서 새 탭 열기">
+              <i data-lucide="external-link" class="w-3.5 h-3.5 text-blue-100"></i>
+              <span>바로가기</span>
+            </button>
+          </div>
 
-            <!-- 웹 바로가기 (새 탭에서 웹 보고서 열기) -->
-            <button type="button" onclick="openSamsungReportWebView()" class="px-3.5 py-2 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer whitespace-nowrap" title="담당자 전달용 웹 보고서 새 탭으로 즉시 열기">
-              <i data-lucide="external-link" class="w-4 h-4 text-indigo-600"></i>
-              <span>🌐 웹 바로가기</span>
+          <!-- 현대해상 웹링크 그룹 -->
+          <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-2xl bg-amber-50/90 border border-amber-300/90 shadow-2xs">
+            <span class="px-1 text-[11px] font-black text-amber-900 flex items-center gap-1 shrink-0">
+              <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+              현대해상
+            </span>
+            <button type="button" onclick="copyReportWebLink('현대해상')" class="px-2.5 py-1 rounded-xl bg-white hover:bg-amber-100/70 text-amber-900 font-bold text-xs flex items-center gap-1 transition-all border border-amber-300 shadow-2xs cursor-pointer whitespace-nowrap" title="현대해상 전용 웹보고서 공유 링크 복사">
+              <i data-lucide="copy" class="w-3.5 h-3.5 text-amber-700"></i>
+              <span>링크 복사</span>
+            </button>
+            <button type="button" onclick="openReportWebView('현대해상')" class="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-bold text-xs flex items-center gap-1 transition-all shadow-2xs cursor-pointer whitespace-nowrap" title="현대해상 전용 웹보고서 새 탭 열기">
+              <i data-lucide="external-link" class="w-3.5 h-3.5 text-amber-100"></i>
+              <span>바로가기</span>
             </button>
           </div>
 
@@ -2351,30 +2368,37 @@ async function syncTabLiveCti(customStart, customEnd, customChannel) {
   }
 }
 
-function copySamsungReportWebLink() {
+function copyReportWebLink(targetChannel = '삼성화재') {
   const s = document.getElementById('tabReportStartDate')?.value || '2026-08-18';
   const e = document.getElementById('tabReportEndDate')?.value || new Date().toISOString().slice(0, 10);
-  const ch = document.getElementById('tabReportChannelSelect')?.value || '삼성화재';
   const origin = window.location.origin;
-  const reportUrl = `${origin}/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
+  const reportUrl = `${origin}/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(targetChannel)}`;
 
   navigator.clipboard.writeText(reportUrl).then(() => {
     if (typeof showToast === 'function') {
-      showToast('보고서 공유 웹링크가 클립보드에 복사되었습니다!', 'success');
+      showToast(`[${targetChannel}] 보고서 전용 웹링크가 복사되었습니다!`, 'success');
     } else {
-      alert(`[보고서 공유 웹링크가 복사되었습니다]\n\n${reportUrl}\n\n삼성화재 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
+      alert(`[${targetChannel} 전용 보고서 공유 웹링크가 복사되었습니다]\n\n${reportUrl}\n\n${targetChannel} 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
     }
   }).catch(() => {
-    prompt('아래 링크를 복사하여 전달해주세요:', reportUrl);
+    prompt(`아래 [${targetChannel}] 전용 보고서 링크를 복사하여 전달해주세요:`, reportUrl);
   });
 }
 
-function openSamsungReportWebView() {
+function openReportWebView(targetChannel = '삼성화재') {
   const s = document.getElementById('tabReportStartDate')?.value || '2026-08-18';
   const e = document.getElementById('tabReportEndDate')?.value || new Date().toISOString().slice(0, 10);
-  const ch = document.getElementById('tabReportChannelSelect')?.value || '삼성화재';
-  const reportUrl = `/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
+  const reportUrl = `/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(targetChannel)}`;
   window.open(reportUrl, '_blank');
+}
+
+// 하위 호환 별칭
+function copySamsungReportWebLink() {
+  copyReportWebLink('삼성화재');
+}
+
+function openSamsungReportWebView() {
+  openReportWebView('삼성화재');
 }
 
 /**

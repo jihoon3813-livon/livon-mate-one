@@ -607,8 +607,20 @@ function saveSavedFaxConfig(cfg) {
           callLogs: ctiResult.logs
         };
 
-        const dataFile = path.join(BASE_DIR, 'samsung_call_report.json');
+        function getCallReportFilePath(ch) {
+          let key = 'samsung';
+          if (ch === '현대해상') key = 'hyundai';
+          else if (ch === '리본케어') key = 'livon';
+          else if (ch === '전체' || ch === 'all') key = 'all';
+          else if (ch) key = ch.toLowerCase().replace(/[^a-z0-9_]/g, '') || 'samsung';
+          return path.join(BASE_DIR, `call_report_${key}.json`);
+        }
+
+        const dataFile = getCallReportFilePath(channel);
         fs.writeFileSync(dataFile, JSON.stringify(reportData, null, 2), 'utf-8');
+        if (channel === '삼성화재') {
+          fs.writeFileSync(path.join(BASE_DIR, 'samsung_call_report.json'), JSON.stringify(reportData, null, 2), 'utf-8');
+        }
 
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         return res.end(JSON.stringify({
@@ -624,13 +636,27 @@ function saveSavedFaxConfig(cfg) {
     }
 
     if (reqPath === '/api/samsung/call-report/data') {
-      const dataFile = path.join(BASE_DIR, 'samsung_call_report.json');
+      const parsedUrl = urlModule.parse(req.url, true);
+      const reqChannel = parsedUrl.query.channel || '삼성화재';
+      
+      function getCallReportFilePath(ch) {
+        let key = 'samsung';
+        if (ch === '현대해상') key = 'hyundai';
+        else if (ch === '리본케어') key = 'livon';
+        else if (ch === '전체' || ch === 'all') key = 'all';
+        else if (ch) key = ch.toLowerCase().replace(/[^a-z0-9_]/g, '') || 'samsung';
+        return path.join(BASE_DIR, `call_report_${key}.json`);
+      }
+
+      const dataFile = getCallReportFilePath(reqChannel);
 
       if (req.method === 'GET') {
         try {
           let reportData = null;
           if (fs.existsSync(dataFile)) {
             reportData = JSON.parse(fs.readFileSync(dataFile, 'utf-8'));
+          } else if (reqChannel === '삼성화재' && fs.existsSync(path.join(BASE_DIR, 'samsung_call_report.json'))) {
+            reportData = JSON.parse(fs.readFileSync(path.join(BASE_DIR, 'samsung_call_report.json'), 'utf-8'));
           } else {
             res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify({ success: false, error: '데이터를 찾을 수 없습니다. CTI 동기화를 먼저 진행해주세요.' }));
@@ -647,7 +673,12 @@ function saveSavedFaxConfig(cfg) {
         req.on('end', () => {
           try {
             const payload = JSON.parse(body || '{}');
-            fs.writeFileSync(dataFile, JSON.stringify(payload, null, 2), 'utf-8');
+            const targetCh = payload.reportInfo?.channel || reqChannel || '삼성화재';
+            const saveFile = getCallReportFilePath(targetCh);
+            fs.writeFileSync(saveFile, JSON.stringify(payload, null, 2), 'utf-8');
+            if (targetCh === '삼성화재') {
+              fs.writeFileSync(path.join(BASE_DIR, 'samsung_call_report.json'), JSON.stringify(payload, null, 2), 'utf-8');
+            }
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify({ success: true, message: '콜분석 보고서 데이터가 성공적으로 저장되었습니다.' }));
           } catch (e) {

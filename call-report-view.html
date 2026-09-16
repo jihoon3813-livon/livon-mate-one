@@ -28,12 +28,12 @@
   <header class="bg-white/95 backdrop-blur-md border-b border-slate-200/90 sticky top-0 z-40 shadow-xs">
     <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
       <div class="flex items-center gap-3 flex-1 min-w-0">
-        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-600/20 shrink-0">
+        <div id="viewerHeaderIcon" class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-600/20 shrink-0">
           <i data-lucide="phone-call" class="w-5 h-5"></i>
         </div>
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-black text-[10px] tracking-wide shrink-0">삼성화재 공식보고</span>
+            <span id="viewerBadge" class="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-black text-[10px] tracking-wide shrink-0">삼성화재 공식보고</span>
             <span class="text-[11px] text-slate-500 font-bold shrink-0" id="viewerChannelLabel">인입경로: 삼성화재</span>
             <span class="text-slate-300">|</span>
             <span class="text-[11px] text-slate-400 font-mono shrink-0" id="viewerSyncedAt">CTI 실시간 연동</span>
@@ -401,6 +401,58 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       { name: '삼성화재 내부(설계사·지점)', barClass: 'bg-amber-600', description: '판매채널(설계사·지점)의 상품설명·규정 확인(교육/자료)' }
     ];
 
+    function updateBranding() {
+      const ch = gFilter.channel || '삼성화재';
+      const badgeEl = document.getElementById('viewerBadge');
+      const titleEl = document.getElementById('viewerReportTitle');
+      const labelEl = document.getElementById('viewerChannelLabel');
+      const headerIcon = document.getElementById('viewerHeaderIcon');
+
+      if (ch === '현대해상') {
+        document.title = '현대해상 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
+        if (badgeEl) {
+          badgeEl.className = 'px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-black text-[10px] tracking-wide shrink-0 border border-amber-300';
+          badgeEl.innerText = '현대해상 공식보고';
+        }
+        if (titleEl) {
+          titleEl.innerText = '현대해상 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
+        }
+        if (labelEl) {
+          labelEl.innerText = '인입경로: 현대해상';
+        }
+        if (headerIcon) {
+          headerIcon.className = 'w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-orange-500 flex items-center justify-center text-white shadow-md shadow-amber-600/20 shrink-0';
+        }
+      } else if (ch === '삼성화재') {
+        document.title = '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
+        if (badgeEl) {
+          badgeEl.className = 'px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-black text-[10px] tracking-wide shrink-0 border border-blue-200';
+          badgeEl.innerText = '삼성화재 공식보고';
+        }
+        if (titleEl) {
+          titleEl.innerText = '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
+        }
+        if (labelEl) {
+          labelEl.innerText = '인입경로: 삼성화재';
+        }
+        if (headerIcon) {
+          headerIcon.className = 'w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-600/20 shrink-0';
+        }
+      } else {
+        document.title = `${ch} 간병(리본케어) 서비스 인바운드 문의 분석 보고서`;
+        if (badgeEl) {
+          badgeEl.className = 'px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-black text-[10px] tracking-wide shrink-0 border border-slate-200';
+          badgeEl.innerText = `${ch} 공식보고`;
+        }
+        if (titleEl) {
+          titleEl.innerText = `${ch} 간병(리본케어) 서비스 인바운드 문의 분석 보고서`;
+        }
+        if (labelEl) {
+          labelEl.innerText = `인입경로: ${ch}`;
+        }
+      }
+    }
+
     window.addEventListener('DOMContentLoaded', async () => {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('start')) gFilter.startDate = urlParams.get('start');
@@ -412,11 +464,13 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const chSelect = document.getElementById('reportChannelSelect');
       if (chSelect) chSelect.value = gFilter.channel;
 
+      updateBranding();
       await loadReportData();
     });
 
     async function handleChannelChange(ch) {
       gFilter.channel = ch;
+      updateBranding();
       const url = new URL(window.location.href);
       url.searchParams.set('channel', ch);
       window.history.replaceState({}, '', url);
@@ -425,13 +479,15 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 
     async function loadReportData() {
       try {
-        const res = await fetch('/api/samsung/call-report/data');
+        updateBranding();
+        const res = await fetch('/api/samsung/call-report/data?channel=' + encodeURIComponent(gFilter.channel));
         const json = await res.json();
         if (json.success && json.data) {
           // If server data matches requested channel/dates, use it; otherwise sync
           const info = json.data.reportInfo || {};
           if (info.channel === gFilter.channel && info.startDate === gFilter.startDate && info.endDate === gFilter.endDate) {
             gReportData = json.data;
+            updateBranding();
             renderAll();
           } else {
             await syncLiveCti();
@@ -510,7 +566,14 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     }
 
     function calculateStats() {
-      const logs = (gReportData && gReportData.callLogs) || [];
+      let logs = (gReportData && gReportData.callLogs) || [];
+      // 엄격한 채널 격리: 해당 회사의 고객/통화만 집계
+      if (gFilter.channel && gFilter.channel !== '전체' && gFilter.channel !== 'all') {
+        logs = logs.filter(c => {
+          const ch = c.channel || '';
+          return ch.includes(gFilter.channel) || gFilter.channel.includes(ch);
+        });
+      }
       const cs = gReportData && gReportData.ctiSummary;
       const totalCalls = (cs && cs.totalInbound !== undefined) ? cs.totalInbound : logs.length;
       const connectReqCalls = (cs && cs.connectRequests !== undefined) ? cs.connectRequests : logs.filter(c => c.connectReq === 'Y').length;
@@ -799,7 +862,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
             <div class="mt-4 p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-950 text-xs space-y-1">
               <div class="font-black flex items-center gap-1.5 text-amber-900">
                 <i data-lucide="info" class="w-4 h-4 text-amber-600"></i>
-                삼성화재 상품마케팅TF 요청사항 반영
+                <span>${gReportData?.reportInfo?.channelLabel || gFilter.channel || '공식'} 전용 분석 및 협의사항 반영</span>
               </div>
               <p class="text-[11.5px] leading-relaxed text-amber-800">
                 위 문의 대분류 및 문의 주체는 <b>통화로그(원본)</b>의 각 항목과 1:1로 직접 연결되어 있습니다. 클릭하여 해당되는 통화 이력을 즉시 확인하실 수 있습니다.
@@ -953,6 +1016,14 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     function renderLogsSheet(stats) {
       const container = document.getElementById('tabContent-logs');
       let logs = (gReportData && gReportData.callLogs) || [];
+
+      // 엄격한 채널 격리: 해당 회사의 고객/통화만 표시
+      if (gFilter.channel && gFilter.channel !== '전체' && gFilter.channel !== 'all') {
+        logs = logs.filter(c => {
+          const ch = c.channel || '';
+          return ch.includes(gFilter.channel) || gFilter.channel.includes(ch);
+        });
+      }
 
       if (gFilter.consultedOnly) {
         logs = logs.filter(c => (c.title && c.title.trim()) || (c.summary && c.summary.trim()) || (c.category && c.category.trim()));
@@ -1254,16 +1325,14 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 
       const ch = document.getElementById('reportChannelSelect')?.value || gFilter.channel || '삼성화재';
       gFilter.channel = ch;
+      updateBranding();
 
       try {
         const res = await fetch(`/api/samsung/call-report/sync-cti?start=${gFilter.startDate}&end=${gFilter.endDate}&channel=${encodeURIComponent(ch)}`);
         const json = await res.json();
         if (json.success && json.data) {
           gReportData = json.data;
-          const label = document.getElementById('viewerChannelLabel');
-          if (label) label.innerText = `인입경로: ${gReportData.reportInfo.channelLabel || ch}`;
-          const title = document.getElementById('viewerReportTitle');
-          if (title) title.innerText = gReportData.reportInfo.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
+          updateBranding();
           document.getElementById('viewerSyncedAt').innerText = `CTI 동기화: ${new Date().toLocaleTimeString('ko-KR')}`;
           
           // Stop spinner BEFORE renderAll so lucide.createIcons() does not retain animate-spin on fresh SVG
@@ -1289,7 +1358,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const reportUrl = `${origin}${pathname}?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
 
       navigator.clipboard.writeText(reportUrl).then(() => {
-        alert(`[보고서 공유 링크가 복사되었습니다]\n\n${reportUrl}\n\n삼성화재 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
+        alert(`[${ch} 전용 보고서 공유 링크가 복사되었습니다]\n\n${reportUrl}\n\n${ch} 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
       }).catch(() => {
         prompt('아래 링크를 복사하여 전달해주세요:', reportUrl);
       });
@@ -1642,7 +1711,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const a = document.createElement('a');
       a.href = url;
       const chLabel = gReportData.reportInfo.channelLabel || gFilter.channel || '삼성화재';
-      a.download = `삼성화재_간병콜분석_${chLabel}_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+      a.download = `${chLabel}_간병콜분석_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1679,7 +1748,8 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         const trends = gReportData.dailyTrends || [];
         const consultedLogs = (gReportData.callLogs || []).filter(c => c.title || c.summary);
 
-        const rawTitle = info.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고';
+        const compName = info.channelLabel || gFilter.channel || '공식';
+        const rawTitle = info.title || `${compName} 간병(리본케어) 서비스 인바운드 문의 분석 보고`;
         const mainTitle = rawTitle.replace(/\s*\([\d\-~.\s]+\)\s*$/, '').trim();
         const periodText = info.period || (rawTitle.match(/\(([\d\-~.\s]+)\)/) ? rawTitle.match(/\(([\d\-~.\s]+)\)/)[1] : '');
 
@@ -1711,7 +1781,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           <!-- SHEET 1: SUMMARY -->
           <div class="header">
             <div>
-              <div style="font-size: 8pt; font-weight: bold; color: #2563eb; margin-bottom: 2px;">삼성화재 주간/수시 공식 보고서 (시트 1: 분석 요약)</div>
+              <div style="font-size: 8pt; font-weight: bold; color: #2563eb; margin-bottom: 2px;">${compName} 주간/수시 공식 보고서 (시트 1: 분석 요약)</div>
               <h1 class="title">${mainTitle}</h1>
               ${periodText ? `<div style="font-size: 9.5pt; font-weight: bold; color: #1d4ed8; margin: 3px 0;">분석기간: ${periodText}</div>` : ''}
               <div class="sub">보고일자: <b>${info.reportDate || ''}</b> | 작성: <b>${info.author || '리본케어'}</b></div>
@@ -1802,7 +1872,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           <div class="page-break"></div>
           <div class="header">
             <div>
-              <div style="font-size: 8pt; font-weight: bold; color: #2563eb;">삼성화재 주간/수시 공식 보고서 (시트 2: 일자별 인입현황)</div>
+              <div style="font-size: 8pt; font-weight: bold; color: #2563eb;">${compName} 주간/수시 공식 보고서 (시트 2: 일자별 인입현황)</div>
               <h1 class="title">일자별 콜 인입 추이 및 요일별 집계</h1>
             </div>
             <div style="text-align: right; font-weight: bold; color: #1d4ed8; font-size: 12pt;">Livon Care</div>
@@ -1836,7 +1906,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           <div class="page-break"></div>
           <div class="header">
             <div>
-              <div style="font-size: 8pt; font-weight: bold; color: #2563eb;">삼성화재 주간/수시 공식 보고서 (시트 3: 통화로그 원본)</div>
+              <div style="font-size: 8pt; font-weight: bold; color: #2563eb;">${compName} 주간/수시 공식 보고서 (시트 3: 통화로그 원본)</div>
               <h1 class="title">통화로그 전수 원본 및 신규 컬럼 1:1 연동표</h1>
             </div>
             <div style="text-align: right; font-weight: bold; color: #1d4ed8; font-size: 12pt;">Livon Care</div>
@@ -1883,7 +1953,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             htmlContent: html,
-            title: `삼성화재_간병서비스_콜분석_${info.period || '보고서'}`
+            title: `${compName}_간병서비스_콜분석_${info.period || '보고서'}`
           })
         });
 
@@ -1893,7 +1963,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `삼성화재_간병서비스_콜분석_보고서.pdf`;
+        a.download = `${compName}_간병서비스_콜분석_보고서.pdf`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

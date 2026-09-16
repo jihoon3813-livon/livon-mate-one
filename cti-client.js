@@ -597,6 +597,12 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
 
         if (tds.length >= 8 && tds[0] === 'IN') {
           const ch = tds[1] || '';
+          // 채널 엄격 격리 (지정된 채널 외 타 채널 로그 유입 원천 차단)
+          if (targetChannel && targetChannel !== '전체' && targetChannel !== 'all') {
+            if (ch && !ch.includes(targetChannel) && !targetChannel.includes(ch)) {
+              continue;
+            }
+          }
           const detailMatch = tr.match(/DetailM\('([0-9]+)'\)/i);
           const askSn = detailMatch ? detailMatch[1] : '';
           const rawPhone = tds[3] || '';
