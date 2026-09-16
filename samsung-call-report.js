@@ -549,7 +549,7 @@ function renderReportSummarySubTab(stats) {
           <div>
             <span class="text-[11px] sm:text-xs font-bold text-slate-500">총 인입콜</span>
             <div class="text-xl sm:text-3xl font-black text-slate-900 mt-0.5 sm:mt-1">${stats.totalCalls}<span class="text-xs sm:text-sm font-bold text-slate-500 ml-1">건</span></div>
-            <p class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 sm:mt-1 font-medium">인바운드 총량</p>
+            <p class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 sm:mt-1 font-medium">전체 인바운드 접수</p>
           </div>
           <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
             <i data-lucide="phone-incoming" class="w-5 h-5 sm:w-6 sm:h-6"></i>
@@ -1193,7 +1193,7 @@ async function exportSamsungCallReportExcel() {
   // KPI Row
   sSummary.getRow(6).values = ['', '총 인입콜', '총 인입콜', '상담연결 요청', '상담연결 요청', '실제 상담(분석대상)', '일평균 인입'];
   sSummary.getRow(7).values = ['', `${stats.totalCalls}건`, `${stats.totalCalls}건`, `${stats.connectReqCalls}건`, `${stats.connectReqCalls}건`, `${stats.consultedCount}건`, `${stats.dailyAvg}건`];
-  sSummary.getRow(8).values = ['', '4주 인바운드 총량', '4주 인바운드 총량', `연결율 ${stats.connectRate}%`, `연결율 ${stats.connectRate}%`, '상담요약 확보건', `운영일 ${stats.opDays}일 기준`];
+  sSummary.getRow(8).values = ['', '전체 인바운드 접수', '전체 인바운드 접수', `연결율 ${stats.connectRate}%`, `연결율 ${stats.connectRate}%`, '상담요약 확보건', `운영일 ${stats.opDays}일 기준`];
 
   sSummary.mergeCells('B6:C6');
   sSummary.mergeCells('B7:C7');
@@ -1473,7 +1473,7 @@ function generateCallReportPdfHtml() {
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; text-align: center;">
           <div style="font-size: 8pt; color: #64748b; font-weight: bold;">총 인입콜</div>
           <div style="font-size: 14pt; font-weight: bold; color: #0f172a; margin: 2px 0;">${stats.totalCalls}건</div>
-          <div style="font-size: 7.5pt; color: #94a3b8;">인바운드 총량</div>
+          <div style="font-size: 7.5pt; color: #94a3b8;">전체 인바운드 접수</div>
         </div>
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; text-align: center;">
           <div style="font-size: 8pt; color: #64748b; font-weight: bold;">상담연결 요청</div>
