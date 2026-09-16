@@ -1484,6 +1484,8 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPartners();
     if (typeof renderFaxManagement === 'function') renderFaxManagement();
     if (typeof loadBarobillSettingsToInputs === 'function') loadBarobillSettingsToInputs();
+    if (typeof initSamsungCallReportModule === 'function') initSamsungCallReportModule();
+    if (typeof initTotalCallAnalysisModule === 'function') initTotalCallAnalysisModule();
     calculateRuleSplit();
   }, 60);
 
