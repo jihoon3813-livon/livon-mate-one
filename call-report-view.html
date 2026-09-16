@@ -71,18 +71,15 @@
           
           <!-- 인입경로 & 조회기간 그룹 -->
           <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-            <!-- 인입경로 선택 필터 (CTI 폼과 1:1 매칭) -->
-            <div class="flex items-center justify-between sm:justify-start gap-1.5 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 text-xs font-bold text-slate-700 shrink-0">
+            <!-- 인입경로 전용 배지 (타 보험사 유출 방지 및 단일 보험사 전용 고정) -->
+            <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 text-xs font-bold text-slate-700 shrink-0">
               <div class="flex items-center gap-1.5 ml-1">
-                <i data-lucide="layers" class="w-4 h-4 text-blue-600"></i>
+                <i data-lucide="shield-check" id="channelShieldIcon" class="w-4 h-4 text-blue-600"></i>
                 <span class="whitespace-nowrap">인입경로:</span>
               </div>
-              <select id="reportChannelSelect" onchange="handleChannelChange(this.value)" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-bold text-xs text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer">
-                <option value="삼성화재">삼성화재</option>
-                <option value="현대해상">현대해상</option>
-                <option value="리본케어">리본케어</option>
-                <option value="전체">인입경로 전체</option>
-              </select>
+              <span id="viewerChannelBadge" class="bg-blue-600 text-white px-3 py-1 rounded-xl font-black text-xs shadow-2xs">
+                삼성화재 전용
+              </span>
             </div>
 
             <!-- 날짜 범위 선택기 (모바일 줄바꿈 방지 및 자동 flex 확장) -->
@@ -123,10 +120,6 @@
             <span id="syncCtiBtnText">CTI 동기화</span>
           </button>
         </div>
-      </div>
-
-      <!-- CTI 원본 공식 집계 요약 스트립 (CTI 웹 화면과 100% 일치) -->
-      <div id="ctiSummaryStrip" class="hidden"></div>
     </div>
 
     <!-- 2. SUB-TAB SWITCHER (모바일 3종 탭 잘림 방지) -->
@@ -407,8 +400,10 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const titleEl = document.getElementById('viewerReportTitle');
       const labelEl = document.getElementById('viewerChannelLabel');
       const headerIcon = document.getElementById('viewerHeaderIcon');
+      const shieldIcon = document.getElementById('channelShieldIcon');
+      const channelBadge = document.getElementById('viewerChannelBadge');
 
-      if (ch === '현대해상') {
+      if (ch.includes('현대')) {
         document.title = '현대해상 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
         if (badgeEl) {
           badgeEl.className = 'px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-black text-[10px] tracking-wide shrink-0 border border-amber-300';
@@ -418,12 +413,17 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           titleEl.innerText = '현대해상 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
         }
         if (labelEl) {
-          labelEl.innerText = '인입경로: 현대해상';
+          labelEl.innerText = '인입경로: 현대해상 전용';
         }
         if (headerIcon) {
           headerIcon.className = 'w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-orange-500 flex items-center justify-center text-white shadow-md shadow-amber-600/20 shrink-0';
         }
-      } else if (ch === '삼성화재') {
+        if (shieldIcon) shieldIcon.className = 'w-4 h-4 text-amber-600';
+        if (channelBadge) {
+          channelBadge.className = 'bg-gradient-to-r from-amber-600 to-orange-600 text-white px-3 py-1 rounded-xl font-black text-xs shadow-2xs';
+          channelBadge.innerText = '현대해상 전용';
+        }
+      } else {
         document.title = '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
         if (badgeEl) {
           badgeEl.className = 'px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-black text-[10px] tracking-wide shrink-0 border border-blue-200';
@@ -433,48 +433,38 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           titleEl.innerText = '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
         }
         if (labelEl) {
-          labelEl.innerText = '인입경로: 삼성화재';
+          labelEl.innerText = '인입경로: 삼성화재 전용';
         }
         if (headerIcon) {
           headerIcon.className = 'w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-600/20 shrink-0';
         }
-      } else {
-        document.title = `${ch} 간병(리본케어) 서비스 인바운드 문의 분석 보고서`;
-        if (badgeEl) {
-          badgeEl.className = 'px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-black text-[10px] tracking-wide shrink-0 border border-slate-200';
-          badgeEl.innerText = `${ch} 공식보고`;
-        }
-        if (titleEl) {
-          titleEl.innerText = `${ch} 간병(리본케어) 서비스 인바운드 문의 분석 보고서`;
-        }
-        if (labelEl) {
-          labelEl.innerText = `인입경로: ${ch}`;
+        if (shieldIcon) shieldIcon.className = 'w-4 h-4 text-blue-600';
+        if (channelBadge) {
+          channelBadge.className = 'bg-blue-600 text-white px-3 py-1 rounded-xl font-black text-xs shadow-2xs';
+          channelBadge.innerText = '삼성화재 전용';
         }
       }
     }
 
     window.addEventListener('DOMContentLoaded', async () => {
       const urlParams = new URLSearchParams(window.location.search);
+      const rawChannel = urlParams.get('channel') || '삼성화재';
+      gFilter.channel = rawChannel.includes('현대') ? '현대해상' : '삼성화재';
+
       if (urlParams.get('start')) gFilter.startDate = urlParams.get('start');
       if (urlParams.get('end')) gFilter.endDate = urlParams.get('end');
-      if (urlParams.get('channel')) gFilter.channel = urlParams.get('channel');
 
       document.getElementById('reportStartDate').value = gFilter.startDate;
       document.getElementById('reportEndDate').value = gFilter.endDate;
-      const chSelect = document.getElementById('reportChannelSelect');
-      if (chSelect) chSelect.value = gFilter.channel;
 
       updateBranding();
       await loadReportData();
     });
 
     async function handleChannelChange(ch) {
-      gFilter.channel = ch;
+      gFilter.channel = (ch || '').includes('현대') ? '현대해상' : '삼성화재';
       updateBranding();
-      const url = new URL(window.location.href);
-      url.searchParams.set('channel', ch);
-      window.history.replaceState({}, '', url);
-      await syncLiveCti();
+      await loadReportData();
     }
 
     async function loadReportData() {
@@ -483,15 +473,21 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         const res = await fetch('/api/samsung/call-report/data?channel=' + encodeURIComponent(gFilter.channel));
         const json = await res.json();
         if (json.success && json.data) {
-          // If server data matches requested channel/dates, use it; otherwise sync
+          gReportData = json.data;
           const info = json.data.reportInfo || {};
-          if (info.channel === gFilter.channel && info.startDate === gFilter.startDate && info.endDate === gFilter.endDate) {
-            gReportData = json.data;
-            updateBranding();
-            renderAll();
-          } else {
-            await syncLiveCti();
+          const urlParams = new URLSearchParams(window.location.search);
+          if (info.startDate && !urlParams.get('start')) {
+            gFilter.startDate = info.startDate;
+            const sEl = document.getElementById('reportStartDate');
+            if (sEl) sEl.value = info.startDate;
           }
+          if (info.endDate && !urlParams.get('end')) {
+            gFilter.endDate = info.endDate;
+            const eEl = document.getElementById('reportEndDate');
+            if (eEl) eEl.value = info.endDate;
+          }
+          updateBranding();
+          renderAll();
         } else {
           await syncLiveCti();
         }
@@ -507,7 +503,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       renderDailySheet(stats);
       renderLogsSheet(stats);
       renderFilterTags();
-      renderCtiSummaryStrip();
+      // 링크페이지: CTI 원본 집계 스트립 완전 제거
       if (window.lucide) lucide.createIcons();
 
       if (gActiveTab === 'daily') {
@@ -516,67 +512,25 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     }
 
     function renderCtiSummaryStrip() {
-      const container = document.getElementById('ctiSummaryStrip');
-      if (!container || !gReportData || !gReportData.ctiSummary) return;
-
-      const cs = gReportData.ctiSummary;
-      const info = gReportData.reportInfo || {};
-
-      container.className = 'bg-gradient-to-r from-blue-50/90 to-indigo-50/60 border border-blue-200/70 rounded-2xl p-3 sm:px-4 sm:py-3 space-y-2.5 text-xs';
-      container.innerHTML = `
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class="px-2 py-0.5 rounded-md bg-blue-600 text-white font-black text-[10px] tracking-wide shrink-0">CTI 원본 집계</span>
-          <span class="text-slate-800 font-bold break-keep text-xs">“${info.startDate || gFilter.startDate} ~ ${info.endDate || gFilter.endDate}” <span class="text-blue-700 font-extrabold">[${info.channelLabel || info.channel || gFilter.channel}]</span> 검색 결과</span>
-        </div>
-        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 text-[11px]">
-          <div class="bg-white/90 border border-blue-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-            <span class="text-[10px] text-slate-500 font-medium">전체 인입</span>
-            <span class="font-black text-blue-700 text-xs mt-0.5">${cs.totalAll || cs.totalInbound}건</span>
-          </div>
-          <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-            <span class="text-[10px] text-slate-500 font-medium">인입콜</span>
-            <span class="font-bold text-slate-900 text-xs mt-0.5">${cs.totalInbound}/${cs.answeredCalls}건</span>
-          </div>
-          <div class="bg-white/90 border border-indigo-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-            <span class="text-[10px] text-indigo-500 font-medium">연결요청</span>
-            <span class="font-bold text-indigo-700 text-xs mt-0.5">${cs.connectRequests}건</span>
-          </div>
-          <div class="bg-white/90 border border-emerald-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-            <span class="text-[10px] text-emerald-600 font-medium">응답호</span>
-            <span class="font-bold text-emerald-700 text-xs mt-0.5">${cs.answeredCalls}건</span>
-          </div>
-          <div class="bg-white/90 border border-emerald-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-            <span class="text-[10px] text-emerald-600 font-medium">응대율</span>
-            <span class="font-bold text-emerald-600 text-xs mt-0.5">${cs.answerRate}</span>
-          </div>
-          <div class="bg-white/90 border border-rose-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-            <span class="text-[10px] text-rose-500 font-medium">포기호</span>
-            <span class="font-bold text-rose-600 text-xs mt-0.5">${cs.abandonedCalls}건</span>
-          </div>
-          <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-            <span class="text-[10px] text-slate-500 font-medium">유형미선택</span>
-            <span class="font-medium text-slate-700 text-xs mt-0.5">${cs.unselectedType}건</span>
-          </div>
-          <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-            <span class="text-[10px] text-slate-500 font-medium">버튼선택종료</span>
-            <span class="font-medium text-slate-700 text-xs mt-0.5">${cs.btnExit}건</span>
-          </div>
-        </div>
-      `;
+      // 링크페이지에서는 CTI 집계 카드를 노출하지 않음
+      return;
     }
 
     function calculateStats() {
       let logs = (gReportData && gReportData.callLogs) || [];
-      // 엄격한 채널 격리: 해당 회사의 고객/통화만 집계
-      if (gFilter.channel && gFilter.channel !== '전체' && gFilter.channel !== 'all') {
-        logs = logs.filter(c => {
-          const ch = c.channel || '';
-          return ch.includes(gFilter.channel) || gFilter.channel.includes(ch);
-        });
-      }
+      // 엄격한 보험사 채널 격리: 해당 보험사 고객만 100% 필터링 (타 보험사 완전 배제)
+      const targetCh = gFilter.channel || '삼성화재';
+      logs = logs.filter(c => {
+        const ch = (c.channel || '').trim();
+        if (targetCh.includes('삼성')) return ch.includes('삼성') || ch === '삼성화재';
+        if (targetCh.includes('현대')) return ch.includes('현대') || ch === '현대해상';
+        return ch.includes(targetCh) || targetCh.includes(ch);
+      });
+
       const cs = gReportData && gReportData.ctiSummary;
-      const totalCalls = (cs && cs.totalInbound !== undefined) ? cs.totalInbound : logs.length;
-      const connectReqCalls = (cs && cs.connectRequests !== undefined) ? cs.connectRequests : logs.filter(c => c.connectReq === 'Y').length;
+      const isMatchingReport = gReportData && gReportData.reportInfo && (gReportData.reportInfo.channel === targetCh);
+      const totalCalls = (cs && cs.totalInbound !== undefined && isMatchingReport) ? cs.totalInbound : logs.length;
+      const connectReqCalls = (cs && cs.connectRequests !== undefined && isMatchingReport) ? cs.connectRequests : logs.filter(c => c.connectReq === 'Y').length;
       const consultedCalls = logs.filter(c => (c.title && c.title.trim()) || (c.summary && c.summary.trim()) || (c.category && c.category.trim()));
       const consultedCount = consultedCalls.length;
       const connectRate = totalCalls > 0 ? Math.round((connectReqCalls / totalCalls) * 100) : 0;
@@ -664,8 +618,8 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     function renderSummarySheet(stats) {
       const container = document.getElementById('tabContent-summary');
       container.innerHTML = `
-        <!-- 4대 핵심 KPI 카드 (모바일 최적화 높이 최소화) -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        <!-- 3대 핵심 KPI 카드 (실제 상담 분석대상 카드 삭제) -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
           <div class="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-3 sm:p-5 shadow-xs flex items-center justify-between">
             <div>
               <span class="text-[11px] sm:text-xs font-bold text-slate-500">총 인입콜</span>
@@ -684,16 +638,6 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
             </div>
             <div class="w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
               <i data-lucide="headset" class="w-4 h-4 sm:w-6 sm:h-6"></i>
-            </div>
-          </div>
-          <div class="bg-white rounded-2xl sm:rounded-3xl border border-blue-300 bg-gradient-to-br from-white to-blue-50/40 p-3 sm:p-5 shadow-xs flex items-center justify-between">
-            <div>
-              <span class="text-[11px] sm:text-xs font-black text-blue-700">실제 상담 (분석대상)</span>
-              <div class="text-xl sm:text-3xl font-black text-blue-900 mt-0.5 sm:mt-1">${stats.consultedCount}<span class="text-xs sm:text-sm font-bold text-blue-700 ml-0.5">건</span></div>
-              <p class="text-[10px] sm:text-[11px] text-blue-600 mt-0.5 sm:mt-1 font-medium">전수 1:1 정밀 분석</p>
-            </div>
-            <div class="w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-md shadow-blue-500/20 shrink-0">
-              <i data-lucide="clipboard-check" class="w-4 h-4 sm:w-6 sm:h-6"></i>
             </div>
           </div>
           <div class="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-3 sm:p-5 shadow-xs flex items-center justify-between">
@@ -1017,13 +961,14 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const container = document.getElementById('tabContent-logs');
       let logs = (gReportData && gReportData.callLogs) || [];
 
-      // 엄격한 채널 격리: 해당 회사의 고객/통화만 표시
-      if (gFilter.channel && gFilter.channel !== '전체' && gFilter.channel !== 'all') {
-        logs = logs.filter(c => {
-          const ch = c.channel || '';
-          return ch.includes(gFilter.channel) || gFilter.channel.includes(ch);
-        });
-      }
+      // 엄격한 보험사 채널 격리: 해당 보험사 고객만 100% 필터링 (타 보험사 완전 배제)
+      const targetCh = gFilter.channel || '삼성화재';
+      logs = logs.filter(c => {
+        const ch = (c.channel || '').trim();
+        if (targetCh.includes('삼성')) return ch.includes('삼성') || ch === '삼성화재';
+        if (targetCh.includes('현대')) return ch.includes('현대') || ch === '현대해상';
+        return ch.includes(targetCh) || targetCh.includes(ch);
+      });
 
       if (gFilter.consultedOnly) {
         logs = logs.filter(c => (c.title && c.title.trim()) || (c.summary && c.summary.trim()) || (c.category && c.category.trim()));
@@ -1120,7 +1065,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
                     <td class="py-2.5 px-3 min-w-[190px] max-w-[220px] whitespace-nowrap text-slate-800 align-top">
                       <div class="flex items-center justify-between gap-1 text-[11px] mb-1">
                         <span class="font-mono text-slate-500 font-bold">${c.callTime || '-'}</span>
-                        <span class="px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 font-extrabold text-[10px] border border-blue-200/60">${c.channel || '삼성화재'}</span>
+                        <span class="px-1.5 py-0.2 rounded ${targetCh.includes('현대') ? 'bg-amber-50 text-amber-800 border-amber-200/60' : 'bg-blue-50 text-blue-700 border-blue-200/60'} font-extrabold text-[10px] border">${c.channel || targetCh}</span>
                       </div>
                       <div class="flex items-center gap-1.5 mb-1">
                         <span class="font-mono font-black text-slate-900 text-xs">${displayPhone}</span>
