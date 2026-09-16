@@ -1806,6 +1806,11 @@ function generateCallReportPdfHtml() {
   const trends = gSamsungReportData.dailyTrends || [];
   const consulted = (gSamsungReportData.callLogs || []).filter(c => c.title || c.summary);
 
+  // 제목에서 날짜(기간) 분리
+  const rawTitle = info.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고';
+  const mainTitle = rawTitle.replace(/\s*\([\d\-~.\s]+\)\s*$/, '').trim();
+  const periodText = info.period || (rawTitle.match(/\(([\d\-~.\s]+)\)/) ? rawTitle.match(/\(([\d\-~.\s]+)\)/)[1] : '');
+
   return `
     <div style="font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; font-size: 9pt; color: #1e293b; line-height: 1.4; max-width: 900px; margin: 0 auto; background: white; padding: 24px;">
       
@@ -1815,9 +1820,10 @@ function generateCallReportPdfHtml() {
       <div style="border-bottom: 3px solid #1d4ed8; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end;">
         <div>
           <span style="background: #1d4ed8; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 8pt;">삼성화재 주간/수시 공식 보고서 (시트 1: 분석 요약)</span>
-          <h1 style="font-size: 15pt; font-weight: bold; color: #0f172a; margin: 6px 0 2px 0;">${info.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고'}</h1>
+          <h1 style="font-size: 15pt; font-weight: bold; color: #0f172a; margin: 6px 0 2px 0;">${mainTitle}</h1>
+          ${periodText ? `<div style="font-size: 9.5pt; font-weight: bold; color: #1d4ed8; margin-bottom: 4px;">분석기간: ${periodText}</div>` : ''}
           <div style="font-size: 8pt; color: #64748b;">
-            분석 기간: <b>${info.period || '2026-08-18 ~ 09-16'}</b> | 보고일자: <b>${info.reportDate || '2026-09-16'}</b> | 작성: <b>${info.author || '리본케어'}</b>
+            보고일자: <b>${info.reportDate || '2026-09-16'}</b> | 작성: <b>${info.author || '리본케어'}</b>
           </div>
         </div>
         <div style="text-align: right; font-weight: bold; color: #1d4ed8; font-size: 12pt;">
@@ -1858,12 +1864,10 @@ function generateCallReportPdfHtml() {
         <ul style="font-size: 8pt; color: #334155; margin: 0; padding-left: 16px; line-height: 1.5;">
           <li><b>실사용 고객 및 이관 안내:</b> 보험 문의 및 보장 확인 유입은 삼성화재 대표콜센터(1588-5114)로 신속히 원스톱 이관 처리함.</li>
           <li><b>간병 접수 및 이용방식 질의:</b> 24시간 상주, 간병인 교체 규정, 서비스 이용조건 질의에 대해 전수 표준 규정대로 안내 완료.</li>
-          <li><b>자료 연동성 개선 반영:</b> 삼성화재 상품마케팅TF 요청사항에 따라 통화로그에 '문의 대분류'와 '문의 주체'를 1:1로 직접 연동 구축함.</li>
+          <li><b>가족 대리 문의 비중:</b> 자녀 및 배우자의 대리 신청 절차 질의가 다수를 차지하여 대리인 위임 절차 안내 집중 제공.</li>
         </ul>
       </div>
 
-      <!-- 문의 대분류 테이블 -->
-      <div style="margin-bottom: 12px;">
         <div style="font-weight: bold; font-size: 8.5pt; color: #0f172a; margin-bottom: 4px; border-left: 3px solid #2563eb; padding-left: 6px;">
           1. 주요 문의유형 분포 (대분류 ${stats.catList.length}종 · 상담 ${stats.consultedCount}건 전수)
         </div>
@@ -1995,13 +1999,11 @@ function generateCallReportPdfHtml() {
         <table style="width: 100%; border-collapse: collapse; font-size: 7pt;">
           <thead>
             <tr style="background: #1e293b; color: white;">
-              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 10%;">일시</th>
-              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 12%;">전화번호</th>
-              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 10%;">회원이름</th>
-              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 15%; background: #1d4ed8; color: #fef08a;">문의 대분류 ✨</th>
-              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 13%; background: #1d4ed8; color: #fef08a;">문의 주체 ✨</th>
-              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 16%;">상담제목</th>
-              <th style="border: 1px solid #cbd5e1; padding: 4px;">상담요약 (전문의 내용)</th>
+              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 15%;">일시 / 전화번호 / 이름</th>
+              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 12%; background: #1d4ed8; color: #fef08a;">문의 대분류 ✨</th>
+              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 11%; background: #1d4ed8; color: #fef08a;">문의 주체 ✨</th>
+              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 14%;">상담제목</th>
+              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 48%;">상담요약 (전문의 내용)</th>
             </tr>
           </thead>
           <tbody>
@@ -2010,13 +2012,15 @@ function generateCallReportPdfHtml() {
               const resolvedName = resolveMemberName(c.phone || c.rawPhone, c.memberName, c.title, c.summary);
               return `
               <tr>
-                <td style="border: 1px solid #cbd5e1; padding: 3px 4px; font-family: Consolas, monospace;">${(c.callTime || '').slice(5)}</td>
-                <td style="border: 1px solid #cbd5e1; padding: 3px 4px; font-family: Consolas, monospace; font-weight: bold;">${formattedPhone}</td>
-                <td style="border: 1px solid #cbd5e1; padding: 3px 4px; font-weight: bold; color: #1e40af;">${resolvedName}</td>
-                <td style="border: 1px solid #cbd5e1; padding: 3px 4px; font-weight: bold; color: #1e40af;">${c.category}</td>
-                <td style="border: 1px solid #cbd5e1; padding: 3px 4px; font-weight: bold; color: #4338ca;">${c.actor}</td>
-                <td style="border: 1px solid #cbd5e1; padding: 3px 4px; font-weight: bold; color: #0f172a;">${c.title}</td>
-                <td style="border: 1px solid #cbd5e1; padding: 3px 4px; color: #334155; line-height: 1.3;">${c.summary}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; line-height: 1.35;">
+                  <div style="font-family: Consolas, monospace; font-size: 6.5pt; color: #64748b;">${(c.callTime || '').slice(5)}</div>
+                  <div style="font-family: Consolas, monospace; font-weight: bold; color: #0f172a; font-size: 7.5pt;">${formattedPhone}</div>
+                  <div style="font-weight: bold; color: #1e40af; font-size: 7.5pt;">${resolvedName}</div>
+                </td>
+                <td style="border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; font-weight: bold; color: #1e40af;">${c.category}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; font-weight: bold; color: #4338ca;">${c.actor}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; font-weight: bold; color: #0f172a; line-height: 1.3;">${c.title}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 4px; vertical-align: top; color: #334155; line-height: 1.4; word-break: break-all;">${c.summary}</td>
               </tr>
             `;}).join('')}
           </tbody>

@@ -1682,8 +1682,9 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         const trends = gReportData.dailyTrends || [];
         const consultedLogs = (gReportData.callLogs || []).filter(c => c.title || c.summary);
 
-        setPdfProgress('2/4 A4 3-시트 완본 레이아웃 구성 중...', 55);
-        await new Promise(r => setTimeout(r, 200));
+        const rawTitle = info.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고';
+        const mainTitle = rawTitle.replace(/\s*\([\d\-~.\s]+\)\s*$/, '').trim();
+        const periodText = info.period || (rawTitle.match(/\(([\d\-~.\s]+)\)/) ? rawTitle.match(/\(([\d\-~.\s]+)\)/)[1] : '');
 
         const html = `
         <!DOCTYPE html>
@@ -1714,8 +1715,9 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           <div class="header">
             <div>
               <div style="font-size: 8pt; font-weight: bold; color: #2563eb; margin-bottom: 2px;">삼성화재 주간/수시 공식 보고서 (시트 1: 분석 요약)</div>
-              <h1 class="title">${info.title}</h1>
-              <div class="sub">분석기간: <b>${info.period}</b> | 보고일자: <b>${info.reportDate}</b> | 작성: <b>${info.author}</b></div>
+              <h1 class="title">${mainTitle}</h1>
+              ${periodText ? `<div style="font-size: 9.5pt; font-weight: bold; color: #1d4ed8; margin: 3px 0;">분석기간: ${periodText}</div>` : ''}
+              <div class="sub">보고일자: <b>${info.reportDate || ''}</b> | 작성: <b>${info.author || '리본케어'}</b></div>
             </div>
             <div style="text-align: right; font-weight: bold; color: #1d4ed8; font-size: 12pt;">Livon Care</div>
           </div>
@@ -1847,28 +1849,28 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           <table>
             <thead>
               <tr style="background: #1e293b; color: white;">
-                <th style="width: 10%;">일시</th>
-                <th style="width: 12%;">전화번호</th>
-                <th style="width: 10%;">회원이름</th>
-                <th style="width: 15%; background: #1d4ed8; color: #fef08a;">문의 대분류 ✨</th>
-                <th style="width: 13%; background: #1d4ed8; color: #fef08a;">문의 주체 ✨</th>
-                <th style="width: 16%;">상담제목</th>
-                <th>상담요약 (전문의 내용)</th>
+                <th style="width: 15%;">일시 / 전화번호 / 이름</th>
+                <th style="width: 12%; background: #1d4ed8; color: #fef08a;">문의 대분류 ✨</th>
+                <th style="width: 11%; background: #1d4ed8; color: #fef08a;">문의 주체 ✨</th>
+                <th style="width: 14%;">상담제목</th>
+                <th style="width: 48%;">상담요약 (전문의 내용)</th>
               </tr>
             </thead>
             <tbody>
               ${consultedLogs.map(c => {
                 const fPhone = formatPhoneNumber(c.phone || c.rawPhone);
-                const mName = resolveMemberName(c.phone || c.rawPhone, c.memberName);
+                const mName = resolveMemberName(c.phone || c.rawPhone, c.memberName, c.title, c.summary);
                 return `
                 <tr>
-                  <td class="font-mono" style="font-size: 7pt;">${(c.callTime || '').slice(5)}</td>
-                  <td class="font-mono font-bold">${fPhone}</td>
-                  <td style="font-weight: bold; color: #1e40af;">${mName}</td>
-                  <td style="font-weight: bold; color: #1e40af;">${c.category}</td>
-                  <td style="font-weight: bold; color: #4338ca;">${c.actor}</td>
-                  <td><b>${c.title}</b></td>
-                  <td style="font-size: 7pt; color: #334155; line-height: 1.3;">${c.summary}</td>
+                  <td style="vertical-align: top; line-height: 1.35;">
+                    <div class="font-mono" style="font-size: 6.5pt; color: #64748b;">${(c.callTime || '').slice(5)}</div>
+                    <div class="font-mono font-bold" style="font-size: 7.5pt; color: #0f172a;">${fPhone}</div>
+                    <div style="font-weight: bold; color: #1e40af; font-size: 7.5pt;">${mName}</div>
+                  </td>
+                  <td style="vertical-align: top; font-weight: bold; color: #1e40af;">${c.category}</td>
+                  <td style="vertical-align: top; font-weight: bold; color: #4338ca;">${c.actor}</td>
+                  <td style="vertical-align: top; font-weight: bold; color: #0f172a; line-height: 1.3;">${c.title}</td>
+                  <td style="vertical-align: top; font-size: 7pt; color: #334155; line-height: 1.4; word-break: break-all;">${c.summary}</td>
                 </tr>
                 `;
               }).join('')}
