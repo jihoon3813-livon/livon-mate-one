@@ -8040,6 +8040,26 @@
     </div>
   </div>
 
+  <!-- PDF 다운로드 진행 상태 모달 -->
+  <div id="pdfProgressModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-slate-100 text-center animate-in fade-in zoom-in duration-200">
+      <div class="w-14 h-14 mx-auto mb-4 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+        <svg class="w-7 h-7 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+      </div>
+      <h3 class="text-base font-bold text-slate-800 mb-1">고화질 PDF 보고서 생성 중</h3>
+      <p id="pdfProgressStepText" class="text-xs text-slate-500 mb-4">보고서 데이터 집계 중...</p>
+      <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden mb-2">
+        <div id="pdfProgressBar" class="bg-gradient-to-r from-blue-600 to-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-out" style="width: 10%"></div>
+      </div>
+      <div class="flex justify-between items-center text-[11px] text-slate-400 font-mono">
+        <span>A4 3-시트 완본</span>
+        <span id="pdfProgressPercent" class="font-bold text-blue-600">10%</span>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== MODAL: SAMSUNG CALL REPORT EMAIL DISPATCH MODAL ==================== -->
   <div id="samsungCallReportEmailModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-3 sm:p-4">
     <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden border border-slate-200">

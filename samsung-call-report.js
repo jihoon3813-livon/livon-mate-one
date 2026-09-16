@@ -107,6 +107,73 @@ const SAMSUNG_ACTORS = [
   }
 ];
 
+const gMemberPhoneMap = {
+  "01082034022": ["김진선"],
+  "01046322336": ["심윤주"],
+  "01036523111": ["이정옥"],
+  "01027558701": ["이춘자"],
+  "01075741088": ["차정옥"],
+  "01064740035": ["김순년"],
+  "01091117027": ["성정주"],
+  "01045901016": ["김미영"],
+  "01073803605": ["이윤진"],
+  "01088055669": ["류미선"],
+  "01064905503": ["고처자"],
+  "01080062268": ["엄정현"],
+  "01071878718": ["이성근"],
+  "01087318863": ["오채은"],
+  "01024732079": ["박지원"],
+  "01038757912": ["김옥경"],
+  "01090606723": ["김미영"],
+  "01086365285": ["성정주"],
+  "01084408025": ["김순년"],
+  "01035798090": ["차정옥"],
+  "01026852721": ["이춘자"],
+  "01086451345": ["심윤주"],
+  "01051801529": ["김진선"],
+  "01056320022": ["김진선"],
+  "01051933507": ["김진선"],
+  "01068614997": ["김옥경"],
+  "01053427053": ["박지원", "이윤진"],
+  "01067189923": ["박영호"],
+  "01091234567": ["강태우"],
+  "01082345678": ["윤서진"],
+  "01073456789": ["최동훈"]
+};
+
+function formatPhoneNumber(num) {
+  if (!num) return '-';
+  const raw = String(num).replace(/[^0-9]/g, '');
+  if (raw.length === 11) {
+    return raw.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+  }
+  if (raw.length === 10) {
+    if (raw.startsWith('02')) {
+      return raw.replace(/(\d{2})(\d{4})(\d{4})/, '$1-$2-$3');
+    }
+    return raw.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  }
+  if (raw.length === 9 && raw.startsWith('02')) {
+    return raw.replace(/(\d{2})(\d{3})(\d{4})/, '$1-$2-$3');
+  }
+  if (raw.length === 8) {
+    return raw.replace(/(\d{4})(\d{4})/, '$1-$2');
+  }
+  return num;
+}
+
+function resolveMemberName(rawPhone, fallbackName) {
+  if (!rawPhone && !fallbackName) return '회원아님';
+  const clean = String(rawPhone || '').replace(/[^0-9]/g, '');
+  if (clean && gMemberPhoneMap[clean] && gMemberPhoneMap[clean].length > 0) {
+    return gMemberPhoneMap[clean].join(', ');
+  }
+  if (fallbackName && fallbackName !== '회원아님' && fallbackName !== '-') {
+    return fallbackName;
+  }
+  return '회원아님';
+}
+
 // 1. Initializer
 async function initSamsungCallReportModule() {
   try {
@@ -151,8 +218,8 @@ function renderSamsungCallReportTab() {
       <!-- TOP ACTION BAR: 헤더, 기간 선택기, 내보내기/발송 액션 버튼 -->
       <!-- ================================================================= -->
       <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-4 sm:p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-        <div>
-          <div class="flex items-center gap-2.5">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2.5 flex-wrap">
             <span class="px-2.5 py-1 rounded-xl bg-blue-600 text-white font-black text-xs shadow-xs flex items-center gap-1.5">
               <i data-lucide="phone-call" class="w-3.5 h-3.5"></i> 삼성화재 공식 보고
             </span>
@@ -164,7 +231,7 @@ function renderSamsungCallReportTab() {
           <h2 class="text-xl sm:text-2xl font-black text-slate-900 mt-2 flex items-center gap-2">
             ${info.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고'}
           </h2>
-          <p class="text-xs text-slate-500 mt-1 flex items-center gap-2">
+          <p class="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
             <span><b>분석 대상:</b> ${info.target || '삼성화재 간병서비스 관련 인바운드 콜'}</span>
             <span class="text-slate-300">|</span>
             <span><b>작성 주체:</b> ${info.author || '리본케어 (Livon Care)'}</span>
@@ -173,26 +240,27 @@ function renderSamsungCallReportTab() {
           </p>
         </div>
 
+        <div class="flex items-center gap-2 flex-nowrap shrink-0 overflow-x-auto pb-1">
           <!-- 보고서 웹링크 복사 -->
-          <button type="button" onclick="copySamsungReportWebLink()" class="px-3.5 py-2 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer" title="담당자 전달용 웹페이지 보고서 링크 복사">
+          <button type="button" onclick="copySamsungReportWebLink()" class="px-3.5 py-2 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer" title="담당자 전달용 웹페이지 보고서 링크 복사">
             <i data-lucide="link" class="w-4 h-4 text-blue-600"></i>
             <span>🔗 웹링크 복사</span>
           </button>
 
           <!-- 3-시트 엑셀 다운로드 -->
-          <button type="button" onclick="exportSamsungCallReportExcel()" class="px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer" title="삼성화재 담당자 전달용 3-Sheet 정밀 서식 엑셀 다운로드">
+          <button type="button" onclick="exportSamsungCallReportExcel()" class="px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer" title="삼성화재 담당자 전달용 3-Sheet 정밀 서식 엑셀 다운로드">
             <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
             <span>엑셀(.xlsx) 다운로드</span>
           </button>
 
           <!-- PDF 미리보기 및 다운로드 -->
-          <button type="button" onclick="openSamsungCallReportPdfModal()" class="px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer" title="공식 보고용 A4 3-시트 완본 PDF 실시간 미리보기 및 다운로드">
+          <button type="button" onclick="openSamsungCallReportPdfModal()" class="px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer" title="공식 보고용 A4 3-시트 완본 PDF 실시간 미리보기 및 다운로드">
             <i data-lucide="file-text" class="w-4 h-4 text-rose-600"></i>
             <span>PDF 보고서 미리보기</span>
           </button>
 
           <!-- 원클릭 이메일 발송 -->
-          <button type="button" onclick="openSamsungCallReportEmailModal()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 cursor-pointer" title="삼성화재 상품마케팅TF 담당자 앞 이메일 즉시 발송">
+          <button type="button" onclick="openSamsungCallReportEmailModal()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 shrink-0 cursor-pointer" title="삼성화재 상품마케팅TF 담당자 앞 이메일 즉시 발송">
             <i data-lucide="send" class="w-4 h-4 text-blue-200"></i>
             <span>담당자 메일 발송</span>
           </button>
@@ -281,48 +349,50 @@ function renderSamsungCallReportTab() {
       <!-- ================================================================= -->
       <!-- SUB-TAB SWITCHER (분석 요약 / 일자별 인입현황 / 통화로그 원본) -->
       <!-- ================================================================= -->
-      <div class="flex items-center justify-between border-b border-slate-200 px-1 gap-2 flex-wrap">
-        <div class="flex items-center space-x-1 sm:space-x-2">
-          <button type="button" onclick="switchReportSubTab('summary')" class="px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-2 border-b-2 transition-all cursor-pointer ${gActiveReportSubTab === 'summary' ? 'border-blue-600 text-blue-700 bg-white shadow-2xs' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'}">
-            <i data-lucide="pie-chart" class="w-4 h-4"></i>
-            <span>시트 1: 분석 요약 (Executive Summary)</span>
-            <span class="px-1.5 py-0.2 rounded-full text-[10px] ${gActiveReportSubTab === 'summary' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700'}">핵심</span>
-          </button>
+      <div class="border-b border-slate-200 px-1 overflow-x-auto scrollbar-none">
+        <div class="flex items-center justify-between gap-2 min-w-max">
+          <div class="flex items-center space-x-1 sm:space-x-2">
+            <button type="button" onclick="switchReportSubTab('summary')" class="px-3 sm:px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${gActiveReportSubTab === 'summary' ? 'border-blue-600 text-blue-700 bg-white shadow-2xs' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'}">
+              <i data-lucide="pie-chart" class="w-4 h-4"></i>
+              <span>분석 요약</span>
+              <span class="px-1.5 py-0.2 rounded-full text-[10px] ${gActiveReportSubTab === 'summary' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700'}">핵심</span>
+            </button>
 
-          <button type="button" onclick="switchReportSubTab('daily')" class="px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-2 border-b-2 transition-all cursor-pointer ${gActiveReportSubTab === 'daily' ? 'border-blue-600 text-blue-700 bg-white shadow-2xs' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'}">
-            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-            <span>시트 2: 일자별 인입현황</span>
-            <span class="px-1.5 py-0.2 rounded-full text-[10px] ${gActiveReportSubTab === 'daily' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700'}">4주 추이</span>
-          </button>
+            <button type="button" onclick="switchReportSubTab('daily')" class="px-3 sm:px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${gActiveReportSubTab === 'daily' ? 'border-blue-600 text-blue-700 bg-white shadow-2xs' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'}">
+              <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+              <span>일자별 인입현황</span>
+              <span class="px-1.5 py-0.2 rounded-full text-[10px] ${gActiveReportSubTab === 'daily' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700'}">4주 추이</span>
+            </button>
 
-          <button type="button" onclick="switchReportSubTab('logs')" class="px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-2 border-b-2 transition-all cursor-pointer ${gActiveReportSubTab === 'logs' ? 'border-blue-600 text-blue-700 bg-white shadow-2xs' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'}">
-            <i data-lucide="list-filter" class="w-4 h-4"></i>
-            <span>시트 3: 통화로그(원본)</span>
-            <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-900 font-bold border border-amber-300 animate-pulse">2개 컬럼 신규 연동 ✨</span>
-          </button>
-        </div>
-
-        <!-- 활성 필터 배지 알림 (드릴다운 시 노출) -->
-        ${gReportFilter.category || gReportFilter.actor ? `
-          <div class="flex items-center gap-2 pb-1">
-            <span class="text-xs text-slate-500 font-medium">적용된 드릴다운 필터:</span>
-            ${gReportFilter.category ? `
-              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-100 text-sky-800 font-bold text-xs border border-sky-300">
-                대분류: ${gReportFilter.category}
-                <button type="button" onclick="clearReportFilter('category')" class="hover:text-rose-600 ml-1">✕</button>
-              </span>
-            ` : ''}
-            ${gReportFilter.actor ? `
-              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-800 font-bold text-xs border border-indigo-300">
-                주체: ${gReportFilter.actor}
-                <button type="button" onclick="clearReportFilter('actor')" class="hover:text-rose-600 ml-1">✕</button>
-              </span>
-            ` : ''}
-            <button type="button" onclick="clearReportFilter('all')" class="text-xs text-slate-500 hover:text-rose-600 underline font-bold">
-              전체 초기화
+            <button type="button" onclick="switchReportSubTab('logs')" class="px-3 sm:px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-1.5 sm:gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${gActiveReportSubTab === 'logs' ? 'border-blue-600 text-blue-700 bg-white shadow-2xs' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'}">
+              <i data-lucide="list-filter" class="w-4 h-4"></i>
+              <span>통화로그(원본)</span>
+              <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-900 font-bold border border-amber-300 animate-pulse whitespace-nowrap">2개 컬럼 신규 연동 ✨</span>
             </button>
           </div>
-        ` : ''}
+
+          <!-- 활성 필터 배지 알림 (드릴다운 시 노출) -->
+          ${gReportFilter.category || gReportFilter.actor ? `
+            <div class="flex items-center gap-2 pb-1 whitespace-nowrap shrink-0">
+              <span class="text-xs text-slate-500 font-medium">적용된 드릴다운 필터:</span>
+              ${gReportFilter.category ? `
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-100 text-sky-800 font-bold text-xs border border-sky-300">
+                  대분류: ${gReportFilter.category}
+                  <button type="button" onclick="clearReportFilter('category')" class="hover:text-rose-600 ml-1">✕</button>
+                </span>
+              ` : ''}
+              ${gReportFilter.actor ? `
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-800 font-bold text-xs border border-indigo-300">
+                  주체: ${gReportFilter.actor}
+                  <button type="button" onclick="clearReportFilter('actor')" class="hover:text-rose-600 ml-1">✕</button>
+                </span>
+              ` : ''}
+              <button type="button" onclick="clearReportFilter('all')" class="text-xs text-slate-500 hover:text-rose-600 underline font-bold">
+                전체 초기화
+              </button>
+            </div>
+          ` : ''}
+        </div>
       </div>
 
       <!-- ================================================================= -->
@@ -470,54 +540,54 @@ function renderReportSummarySubTab(stats) {
     <div class="space-y-6">
 
       <!-- ================================================================= -->
-      <!-- 4대 핵심 KPI 카드 -->
+      <!-- 4대 핵심 KPI 카드 (모바일 최적화) -->
       <!-- ================================================================= -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <!-- 1. 총 인입콜 -->
-        <div class="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs flex items-center justify-between">
+        <div class="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-3 sm:p-5 shadow-xs flex items-center justify-between">
           <div>
-            <span class="text-xs font-bold text-slate-500">총 인입콜</span>
-            <div class="text-3xl font-black text-slate-900 mt-1">${stats.totalCalls}<span class="text-sm font-bold text-slate-500 ml-1">건</span></div>
-            <p class="text-[11px] text-slate-400 mt-1 font-medium">4주 인바운드 총량</p>
+            <span class="text-[11px] sm:text-xs font-bold text-slate-500">총 인입콜</span>
+            <div class="text-xl sm:text-3xl font-black text-slate-900 mt-0.5 sm:mt-1">${stats.totalCalls}<span class="text-xs sm:text-sm font-bold text-slate-500 ml-1">건</span></div>
+            <p class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 sm:mt-1 font-medium">인바운드 총량</p>
           </div>
-          <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-            <i data-lucide="phone-incoming" class="w-6 h-6"></i>
+          <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+            <i data-lucide="phone-incoming" class="w-5 h-5 sm:w-6 sm:h-6"></i>
           </div>
         </div>
 
         <!-- 2. 상담연결 요청 -->
-        <div class="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs flex items-center justify-between">
+        <div class="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-3 sm:p-5 shadow-xs flex items-center justify-between">
           <div>
-            <span class="text-xs font-bold text-slate-500">상담연결 요청</span>
-            <div class="text-3xl font-black text-indigo-900 mt-1">${stats.connectReqCalls}<span class="text-sm font-bold text-slate-500 ml-1">건</span></div>
-            <p class="text-[11px] text-indigo-600 mt-1 font-bold">연결율 ${stats.connectRate}%</p>
+            <span class="text-[11px] sm:text-xs font-bold text-slate-500">상담연결 요청</span>
+            <div class="text-xl sm:text-3xl font-black text-indigo-900 mt-0.5 sm:mt-1">${stats.connectReqCalls}<span class="text-xs sm:text-sm font-bold text-slate-500 ml-1">건</span></div>
+            <p class="text-[10px] sm:text-[11px] text-indigo-600 mt-0.5 sm:mt-1 font-bold">연결율 ${stats.connectRate}%</p>
           </div>
-          <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-            <i data-lucide="headset" class="w-6 h-6"></i>
+          <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+            <i data-lucide="headset" class="w-5 h-5 sm:w-6 sm:h-6"></i>
           </div>
         </div>
 
         <!-- 3. 실제 상담 (분석대상) -->
-        <div class="bg-white rounded-3xl border border-blue-300 p-5 shadow-sm bg-gradient-to-br from-white to-blue-50/50 flex items-center justify-between">
+        <div class="bg-white rounded-2xl sm:rounded-3xl border border-blue-300 p-3 sm:p-5 shadow-sm bg-gradient-to-br from-white to-blue-50/50 flex items-center justify-between">
           <div>
-            <span class="text-xs font-black text-blue-700">실제 상담 (분석 대상)</span>
-            <div class="text-3xl font-black text-blue-900 mt-1">${stats.consultedCount}<span class="text-sm font-bold text-blue-700 ml-1">건</span></div>
-            <p class="text-[11px] text-blue-600 mt-1 font-medium">상담요약 확보건 (100% 분석)</p>
+            <span class="text-[11px] sm:text-xs font-black text-blue-700">실제 상담 (분석)</span>
+            <div class="text-xl sm:text-3xl font-black text-blue-900 mt-0.5 sm:mt-1">${stats.consultedCount}<span class="text-xs sm:text-sm font-bold text-blue-700 ml-1">건</span></div>
+            <p class="text-[10px] sm:text-[11px] text-blue-600 mt-0.5 sm:mt-1 font-medium">1:1 전수 분석</p>
           </div>
-          <div class="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-md shadow-blue-500/20">
-            <i data-lucide="clipboard-check" class="w-6 h-6"></i>
+          <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-md shadow-blue-500/20">
+            <i data-lucide="clipboard-check" class="w-5 h-5 sm:w-6 sm:h-6"></i>
           </div>
         </div>
 
         <!-- 4. 일평균 인입 -->
-        <div class="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs flex items-center justify-between">
+        <div class="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-3 sm:p-5 shadow-xs flex items-center justify-between">
           <div>
-            <span class="text-xs font-bold text-slate-500">일평균 인입콜</span>
-            <div class="text-3xl font-black text-slate-900 mt-1">${stats.dailyAvg}<span class="text-sm font-bold text-slate-500 ml-1">건</span></div>
-            <p class="text-[11px] text-slate-400 mt-1 font-medium">운영일 ${stats.opDays}일 기준</p>
+            <span class="text-[11px] sm:text-xs font-bold text-slate-500">일평균 인입콜</span>
+            <div class="text-xl sm:text-3xl font-black text-slate-900 mt-0.5 sm:mt-1">${stats.dailyAvg}<span class="text-xs sm:text-sm font-bold text-slate-500 ml-1">건</span></div>
+            <p class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 sm:mt-1 font-medium">운영일 ${stats.opDays}일 기준</p>
           </div>
-          <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-            <i data-lucide="calendar" class="w-6 h-6"></i>
+          <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+            <i data-lucide="calendar" class="w-5 h-5 sm:w-6 sm:h-6"></i>
           </div>
         </div>
       </div>
@@ -882,10 +952,10 @@ function renderReportLogsSubTab(stats) {
                 <th class="py-3 px-3">ARS메뉴</th>
                 <th class="py-3 px-3 text-center">연결</th>
                 <th class="py-3 px-3 text-center">대기</th>
-                <th class="py-3 px-3 text-center bg-blue-800 text-amber-300 font-black border-x border-blue-700">
+                <th class="py-3 px-3 text-center bg-blue-800 text-amber-300 font-black border-x border-blue-700 min-w-[170px] whitespace-nowrap">
                   문의 대분류 (신규) ✨
                 </th>
-                <th class="py-3 px-3 text-center bg-blue-800 text-amber-300 font-black border-r border-blue-700">
+                <th class="py-3 px-3 text-center bg-blue-800 text-amber-300 font-black border-r border-blue-700 min-w-[150px] whitespace-nowrap">
                   문의 주체 (신규) ✨
                 </th>
                 <th class="py-3 px-3">상담제목</th>
@@ -904,13 +974,15 @@ function renderReportLogsSubTab(stats) {
                 </tr>
               ` : logs.map((c, idx) => {
                 const isConsulted = c.title || c.summary;
+                const formattedPhone = formatPhoneNumber(c.phone || c.rawPhone);
+                const resolvedName = resolveMemberName(c.phone || c.rawPhone, c.memberName);
                 return `
                   <tr class="hover:bg-blue-50/40 transition-colors ${idx % 2 === 1 ? 'bg-slate-50/50' : ''}">
                     <td class="py-2.5 px-3 text-center text-slate-400 font-mono text-[10px]">${c.rowNum || (idx + 1)}</td>
                     <td class="py-2.5 px-3 font-mono text-slate-600 whitespace-nowrap">${c.callTime || '-'}</td>
                     <td class="py-2.5 px-3 font-bold text-sky-700 whitespace-nowrap">${c.channel || '삼성화재'}</td>
-                    <td class="py-2.5 px-3 font-mono font-bold text-slate-900 whitespace-nowrap">${c.phone || '-'}</td>
-                    <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-800">${c.memberName || '회원아님'}</td>
+                    <td class="py-2.5 px-3 font-mono font-bold text-slate-900 whitespace-nowrap">${formattedPhone}</td>
+                    <td class="py-2.5 px-3 whitespace-nowrap font-bold ${resolvedName !== '회원아님' ? 'text-blue-700' : 'text-slate-500'}">${resolvedName}</td>
                     <td class="py-2.5 px-3 whitespace-nowrap">
                       ${c.arsMenu ? `<span class="px-2 py-0.5 rounded-md bg-slate-100 font-bold text-[10.5px] text-slate-700">${c.arsMenu}</span>` : '-'}
                     </td>
@@ -918,7 +990,7 @@ function renderReportLogsSubTab(stats) {
                     <td class="py-2.5 px-3 text-center font-mono text-slate-500">${c.waitTime ? `${c.waitTime}초` : '0'}</td>
                     
                     <!-- [필수 신규 컬럼 1] 문의 대분류 인라인 셀렉터 -->
-                    <td class="py-2 px-3 border-x border-slate-200 bg-sky-50/30">
+                    <td class="py-2 px-3 border-x border-slate-200 bg-sky-50/30 whitespace-nowrap min-w-[170px]">
                       ${isConsulted ? `
                         <select onchange="updateCallLogCategory('${c.id}', this.value)" 
                           class="w-full px-2 py-1 rounded-lg text-xs font-black bg-white border border-sky-300 text-sky-900 shadow-2xs focus:ring-1 focus:ring-sky-500">
@@ -930,7 +1002,7 @@ function renderReportLogsSubTab(stats) {
                     </td>
 
                     <!-- [필수 신규 컬럼 2] 문의 주체 인라인 셀렉터 -->
-                    <td class="py-2 px-3 border-r border-slate-200 bg-indigo-50/30">
+                    <td class="py-2 px-3 border-r border-slate-200 bg-indigo-50/30 whitespace-nowrap min-w-[150px]">
                       ${isConsulted ? `
                         <select onchange="updateCallLogActor('${c.id}', this.value)" 
                           class="w-full px-2 py-1 rounded-lg text-xs font-black bg-white border border-indigo-300 text-indigo-900 shadow-2xs focus:ring-1 focus:ring-indigo-500">
@@ -970,7 +1042,7 @@ function renderReportLogsSubTab(stats) {
                     <!-- CTI 원클릭 전화걸기 -->
                     <td class="py-2.5 px-3 text-center whitespace-nowrap">
                       ${c.phone ? `
-                        <button type="button" onclick="triggerCtiCall('${c.phone}', '${c.memberName || '삼성고객'}', '삼성화재')" 
+                        <button type="button" onclick="triggerCtiCall('${formattedPhone}', '${resolvedName}', '삼성화재')" 
                           class="p-1 rounded-lg hover:bg-blue-100 text-blue-600 transition-colors" title="GoodARS CTI 전화걸기">
                           <i data-lucide="phone" class="w-3.5 h-3.5"></i>
                         </button>
@@ -1085,10 +1157,11 @@ async function exportSamsungCallReportExcel() {
   const info = gSamsungReportData.reportInfo || {};
 
   // -------------------------------------------------------------
-  // Sheet 1: 분석 요약
+  // -------------------------------------------------------------
+  // Sheet 1: 분석 요약 + 틀고정
   // -------------------------------------------------------------
   const sSummary = wb.addWorksheet('분석 요약', {
-    views: [{ showGridLines: true }]
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 5, showGridLines: true }]
   });
 
   sSummary.columns = [
@@ -1222,10 +1295,10 @@ async function exportSamsungCallReportExcel() {
   });
 
   // -------------------------------------------------------------
-  // Sheet 2: 일자별 인입현황
+  // Sheet 2: 일자별 인입현황 + 틀고정
   // -------------------------------------------------------------
   const sDaily = wb.addWorksheet('일자별 인입현황', {
-    views: [{ showGridLines: true }]
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 1, showGridLines: true }]
   });
   sDaily.columns = [{ width: 14 }, { width: 8 }, { width: 14 }, { width: 30 }];
 
@@ -1259,10 +1332,10 @@ async function exportSamsungCallReportExcel() {
   sDaily.getCell(`C${dailyEndRow}`).font = { bold: true };
 
   // -------------------------------------------------------------
-  // Sheet 3: 통화로그(원본) + [NEW] 문의 대분류 & 문의 주체 컬럼 탑재
+  // Sheet 3: 통화로그(원본) + 틀고정 + 전화번호/회원이름 연동
   // -------------------------------------------------------------
   const sLogs = wb.addWorksheet('통화로그(원본)', {
-    views: [{ showGridLines: true }]
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 1, showGridLines: true }]
   });
 
   // 18 Columns:
@@ -1270,25 +1343,25 @@ async function exportSamsungCallReportExcel() {
     { header: '구분', key: 'type', width: 8 },
     { header: '경로', key: 'channel', width: 10 },
     { header: '연결시간', key: 'callTime', width: 18 },
-    { header: '회원이름', key: 'memberName', width: 12 },
+    { header: '회원이름', key: 'memberName', width: 16 },
     { header: '생년월일', key: 'birthDate', width: 12 },
     { header: '성별', key: 'gender', width: 6 },
     { header: '질병유형', key: 'diseaseType', width: 10 },
     { header: '그룹', key: 'group', width: 8 },
-    { header: '전화번호', key: 'phone', width: 14 },
-    { header: 'ARS메뉴', key: 'arsMenu', width: 12 },
-    { header: '연결요청', key: 'connectReq', width: 8 },
-    { header: '대기시간', key: 'waitTime', width: 8 },
+    { header: '전화번호', key: 'phone', width: 18 },
+    { header: 'ARS메뉴', key: 'arsMenu', width: 14 },
+    { header: '연결요청', key: 'connectReq', width: 10 },
+    { header: '대기시간', key: 'waitTime', width: 10 },
     // **삼성화재 한다솜 프로 요청사항 2개 핵심 컬럼**
-    { header: '문의 대분류', key: 'category', width: 22 },
-    { header: '문의 주체', key: 'actor', width: 20 },
-    { header: '상담제목', key: 'title', width: 26 },
+    { header: '문의 대분류', key: 'category', width: 24 },
+    { header: '문의 주체', key: 'actor', width: 22 },
+    { header: '상담제목', key: 'title', width: 28 },
     { header: '상담요약', key: 'summary', width: 60 },
     { header: '키워드', key: 'keywords', width: 28 },
     { header: '상담시간', key: 'duration', width: 10 }
   ];
 
-  // Header Styling (Highlighting the 2 new columns with gold/blue fill)
+  // Header Styling
   sLogs.getRow(1).eachCell((cell, colNum) => {
     cell.font = { name: '맑은 고딕', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
     if (colNum === 13 || colNum === 14) {
@@ -1299,18 +1372,27 @@ async function exportSamsungCallReportExcel() {
     cell.alignment = { vertical: 'middle', horizontal: 'center' };
   });
 
+  const thinBorder = {
+    top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+    left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+    bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+    right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+  };
+
   const logs = gSamsungReportData.callLogs || [];
-  logs.forEach(c => {
+  logs.forEach((c, idx) => {
+    const formattedPhone = formatPhoneNumber(c.phone || c.rawPhone);
+    const resolvedName = resolveMemberName(c.phone || c.rawPhone, c.memberName);
     const row = sLogs.addRow({
       type: c.type || 'IN',
       channel: c.channel || '삼성화재',
       callTime: c.callTime || '',
-      memberName: c.memberName || '',
+      memberName: resolvedName,
       birthDate: c.birthDate || '',
       gender: c.gender || '',
       diseaseType: c.diseaseType || '',
       group: c.group || '',
-      phone: c.phone || '',
+      phone: formattedPhone,
       arsMenu: c.arsMenu || '',
       connectReq: c.connectReq || '',
       waitTime: c.waitTime || 0,
@@ -1322,11 +1404,20 @@ async function exportSamsungCallReportExcel() {
       duration: c.duration || '0'
     });
 
+    row.eachCell(cell => cell.border = thinBorder);
+    if (idx % 2 === 1) {
+      row.eachCell((cell, col) => {
+        if (col !== 13 && col !== 14) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+      });
+    }
+
     if (c.category) {
       row.getCell('category').font = { bold: true, color: { argb: 'FF0369A1' } };
+      row.getCell('category').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
     }
     if (c.actor) {
       row.getCell('actor').font = { bold: true, color: { argb: 'FF4338CA' } };
+      row.getCell('actor').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
     }
   });
 
@@ -1533,25 +1624,30 @@ function generateCallReportPdfHtml() {
         <table style="width: 100%; border-collapse: collapse; font-size: 7pt;">
           <thead>
             <tr style="background: #1e293b; color: white;">
-              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 11%;">일시</th>
-              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 11%;">전화번호</th>
-              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 16%; background: #1d4ed8; color: #fef08a;">문의 대분류 ✨</th>
-              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 14%; background: #1d4ed8; color: #fef08a;">문의 주체 ✨</th>
-              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 18%;">상담제목</th>
+              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 10%;">일시</th>
+              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 12%;">전화번호</th>
+              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 10%;">회원이름</th>
+              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 15%; background: #1d4ed8; color: #fef08a;">문의 대분류 ✨</th>
+              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 13%; background: #1d4ed8; color: #fef08a;">문의 주체 ✨</th>
+              <th style="border: 1px solid #cbd5e1; padding: 4px; width: 16%;">상담제목</th>
               <th style="border: 1px solid #cbd5e1; padding: 4px;">상담요약 (전문의 내용)</th>
             </tr>
           </thead>
           <tbody>
-            ${consulted.map(c => `
+            ${consulted.map(c => {
+              const formattedPhone = formatPhoneNumber(c.phone || c.rawPhone);
+              const resolvedName = resolveMemberName(c.phone || c.rawPhone, c.memberName);
+              return `
               <tr>
                 <td style="border: 1px solid #cbd5e1; padding: 3px 4px; font-family: Consolas, monospace;">${(c.callTime || '').slice(5)}</td>
-                <td style="border: 1px solid #cbd5e1; padding: 3px 4px; font-family: Consolas, monospace; font-weight: bold;">${c.phone}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 3px 4px; font-family: Consolas, monospace; font-weight: bold;">${formattedPhone}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 3px 4px; font-weight: bold; color: #1e40af;">${resolvedName}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 3px 4px; font-weight: bold; color: #1e40af;">${c.category}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 3px 4px; font-weight: bold; color: #4338ca;">${c.actor}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 3px 4px; font-weight: bold; color: #0f172a;">${c.title}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 3px 4px; color: #334155; line-height: 1.3;">${c.summary}</td>
               </tr>
-            `).join('')}
+            `;}).join('')}
           </tbody>
         </table>
       </div>
@@ -1574,13 +1670,36 @@ function openSamsungCallReportPdfModal() {
   modal.classList.remove('hidden');
 }
 
+function setPdfProgress(stepText, percent) {
+  const modal = document.getElementById('pdfProgressModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  const bar = document.getElementById('pdfProgressBar');
+  if (bar) bar.style.width = `${percent}%`;
+  const stepEl = document.getElementById('pdfProgressStepText');
+  if (stepEl) stepEl.innerText = stepText;
+  const pctEl = document.getElementById('pdfProgressPercent');
+  if (pctEl) pctEl.innerText = `${percent}%`;
+}
+
+function hidePdfProgress() {
+  const modal = document.getElementById('pdfProgressModal');
+  if (modal) {
+    setTimeout(() => modal.classList.add('hidden'), 600);
+  }
+}
+
 // 13. Download PDF via Headless Edge API
 async function downloadCallReportPdf() {
   try {
-    if (typeof showToast === 'function') {
-      showToast('고화질 A4 PDF 문서를 렌더링 중입니다...', 'info');
-    }
+    setPdfProgress('1/4 보고서 데이터 및 차트 집계 중...', 25);
+    await new Promise(r => setTimeout(r, 200));
+
+    setPdfProgress('2/4 A4 3-시트 완본 레이아웃 구성 중...', 55);
     const html = generateCallReportPdfHtml();
+    await new Promise(r => setTimeout(r, 200));
+
+    setPdfProgress('3/4 서버 PDF 고화질 렌더링 중...', 80);
     const res = await fetch('/api/samsung/call-report/pdf', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1592,6 +1711,7 @@ async function downloadCallReportPdf() {
 
     if (!res.ok) throw new Error('PDF 생성 서버 에러');
 
+    setPdfProgress('4/4 PDF 파일 다운로드 중...', 95);
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1601,13 +1721,16 @@ async function downloadCallReportPdf() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+    setPdfProgress('완료되었습니다!', 100);
 
     if (typeof showToast === 'function') {
       showToast('PDF 보고서 다운로드가 완료되었습니다.', 'success');
     }
   } catch (err) {
     console.error('PDF download error:', err);
-    window.print();
+    alert('PDF 다운로드 실패: ' + err.message);
+  } finally {
+    hidePdfProgress();
   }
 }
 

@@ -442,6 +442,46 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
 
   const logs = [];
 
+  // 회원 전화번호 매핑 로드
+  let memberPhoneMap = {};
+  try {
+    const mapPath = path.join(__dirname, 'member_phone_map.json');
+    if (fs.existsSync(mapPath)) {
+      memberPhoneMap = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+    }
+  } catch (e) {
+    console.warn('[CTI Sync] member_phone_map.json 로드 실패:', e.message);
+  }
+
+  function formatPhone(phone) {
+    if (!phone) return '-';
+    const clean = String(phone).replace(/[^0-9]/g, '');
+    if (clean.length === 11) {
+      return clean.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+    } else if (clean.length === 10) {
+      if (clean.startsWith('02')) {
+        return clean.replace(/(\d{2})(\d{4})(\d{4})/, '$1-$2-$3');
+      }
+      return clean.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+    } else if (clean.length === 9 && clean.startsWith('02')) {
+      return clean.replace(/(\d{2})(\d{3})(\d{4})/, '$1-$2-$3');
+    } else if (clean.length === 8) {
+      return clean.replace(/(\d{4})(\d{4})/, '$1-$2');
+    }
+    return phone;
+  }
+
+  function resolveMemberName(phone, ctiMemberName) {
+    const clean = String(phone || '').replace(/[^0-9]/g, '');
+    if (memberPhoneMap[clean] && memberPhoneMap[clean].length > 0) {
+      return memberPhoneMap[clean].join(', ');
+    }
+    if (ctiMemberName && ctiMemberName !== '비회원' && ctiMemberName !== '회원아님') {
+      return ctiMemberName;
+    }
+    return '비회원';
+  }
+
   function parseRowsFromHtml(html) {
     const trs = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
     const pageLogs = [];
@@ -455,13 +495,17 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
           const ch = tds[1] || '';
           const detailMatch = tr.match(/DetailM\('([0-9]+)'\)/i);
           const askSn = detailMatch ? detailMatch[1] : '';
+          const rawPhone = tds[3] || '';
+          const formattedPhone = formatPhone(rawPhone);
+          const memberName = resolveMemberName(rawPhone, tds[4]);
 
           pageLogs.push({
             type: tds[0],
             channel: ch || targetChannel,
             callTime: tds[2] || '',
-            phone: tds[3] || '',
-            memberName: tds[4] === '비회원' ? '회원아님' : (tds[4] || '회원아님'),
+            phone: formattedPhone,
+            rawPhone: rawPhone,
+            memberName: memberName,
             diseaseType: '',
             group: '',
             arsMenu: tds[9] || '',
