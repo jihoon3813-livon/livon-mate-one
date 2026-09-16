@@ -745,7 +745,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
                 <h3 class="text-base font-black text-slate-900">주요 문의유형 분포 (대분류 ${stats.catList.length}종)</h3>
                 <p class="text-xs text-slate-500 mt-0.5">각 항목 클릭 시 해당 통화로그로 <b class="text-blue-600 underline">즉시 드릴다운</b>됩니다.</p>
               </div>
-              <span class="px-2.5 py-1 rounded-full bg-sky-100 text-sky-800 font-bold text-xs">${stats.consultedCount}건 기준</span>
+              <span class="px-2.5 py-1 rounded-lg bg-sky-100 text-sky-800 font-bold text-xs whitespace-nowrap shrink-0">${stats.consultedCount}건 기준</span>
             </div>
             <div class="space-y-2.5">
               ${stats.catList.map((cat, idx) => `
@@ -788,7 +788,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
                 <h3 class="text-base font-black text-slate-900">문의 주체별 분포 (${stats.actorList.length}종)</h3>
                 <p class="text-xs text-slate-500 mt-0.5">클릭 시 해당 문의 주체의 통화로그만 조회됩니다.</p>
               </div>
-              <span class="px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800 font-bold text-xs">누가 문의했는가</span>
+              <span class="px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-800 font-bold text-xs whitespace-nowrap shrink-0">누가 문의했는가</span>
             </div>
             <div class="space-y-3">
               ${stats.actorList.map((act) => `

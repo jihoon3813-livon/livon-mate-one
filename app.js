@@ -15189,6 +15189,9 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               ` : `
                 <div class="space-y-2">
                   ${rounds.map(r => {
+                    const faxSentDateStr = (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
+                      ((faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null);
+
                     // 삼성화재인 경우 해당 월분의 정기 청구서 발송 이력 확인
                     let samsungMonthlyLog = null;
                     if (isSamsung && Array.isArray(gSamsungEmailLogs)) {

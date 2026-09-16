@@ -1008,7 +1008,7 @@ function renderReportSummarySubTab(stats) {
             <div>
               <div class="flex items-center gap-2">
                 <h3 class="text-base font-black text-slate-900">주요 문의유형 분포 (대분류 ${stats.catList.length}종)</h3>
-                <span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-black text-[10.5px]">실제 상담 ${stats.consultedCount}건 기준</span>
+                <span class="px-2 py-0.5 rounded-lg bg-sky-100 text-sky-800 font-black text-[10.5px] whitespace-nowrap shrink-0">실제 상담 ${stats.consultedCount}건 기준</span>
               </div>
               <p class="text-xs text-slate-500 mt-0.5">각 항목 클릭 시 해당 통화로그로 <b class="text-blue-600 underline">즉시 드릴다운</b>됩니다.</p>
             </div>
@@ -1062,7 +1062,7 @@ function renderReportSummarySubTab(stats) {
             <div>
               <div class="flex items-center gap-2">
                 <h3 class="text-base font-black text-slate-900">문의 주체별 분포 (${stats.actorList.length}종)</h3>
-                <span class="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-black text-[10.5px]">누가 문의했는가</span>
+                <span class="px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-800 font-black text-[10.5px] whitespace-nowrap shrink-0">누가 문의했는가</span>
               </div>
               <p class="text-xs text-slate-500 mt-0.5">각 항목 클릭 시 해당 주체의 통화로그만 필터링됩니다.</p>
             </div>
