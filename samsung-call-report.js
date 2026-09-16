@@ -1677,34 +1677,30 @@ async function exportSamsungCallReportExcel() {
     views: [{ state: 'frozen', xSplit: 0, ySplit: 1, showGridLines: true }]
   });
 
-  // 18 Columns:
+  // 14 Columns (불필요한 E~H 생년월일, 성별, 질병유형, 그룹 제거):
   sLogs.columns = [
     { header: '구분', key: 'type', width: 8 },
     { header: '경로', key: 'channel', width: 10 },
     { header: '연결시간', key: 'callTime', width: 18 },
     { header: '회원이름', key: 'memberName', width: 16 },
-    { header: '생년월일', key: 'birthDate', width: 12 },
-    { header: '성별', key: 'gender', width: 6 },
-    { header: '질병유형', key: 'diseaseType', width: 10 },
-    { header: '그룹', key: 'group', width: 8 },
     { header: '전화번호', key: 'phone', width: 18 },
     { header: 'ARS메뉴', key: 'arsMenu', width: 14 },
     { header: '연결요청', key: 'connectReq', width: 10 },
     { header: '대기시간', key: 'waitTime', width: 10 },
-    // **삼성화재 한다솜 프로 요청사항 2개 핵심 컬럼**
+    // **삼성화재 한다솜 프로 요청사항 2개 핵심 컬럼** (9열, 10열)
     { header: '문의 대분류', key: 'category', width: 24 },
     { header: '문의 주체', key: 'actor', width: 22 },
-    { header: '상담제목', key: 'title', width: 28 },
-    { header: '상담요약', key: 'summary', width: 60 },
-    { header: '키워드', key: 'keywords', width: 28 },
-    { header: '상담시간', key: 'duration', width: 10 }
+    { header: '상담제목', key: 'title', width: 30 },
+    { header: '상담요약', key: 'summary', width: 65 },
+    { header: '키워드', key: 'keywords', width: 30 },
+    { header: '상담시간', key: 'duration', width: 12 }
   ];
 
-  // Header Styling
-  sLogs.getRow(1).height = 26;
+  // Header Styling (글자 크기 10pt)
+  sLogs.getRow(1).height = 28;
   sLogs.getRow(1).eachCell((cell, colNum) => {
-    cell.font = { name: '맑은 고딕', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
-    if (colNum === 13 || colNum === 14) {
+    cell.font = { name: '맑은 고딕', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    if (colNum === 9 || colNum === 10) {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } }; // Deep Blue
     } else {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } }; // Slate 900
@@ -1728,10 +1724,6 @@ async function exportSamsungCallReportExcel() {
       channel: c.channel || '삼성화재',
       callTime: c.callTime || '',
       memberName: resolvedName,
-      birthDate: c.birthDate || '',
-      gender: c.gender || '',
-      diseaseType: c.diseaseType || '',
-      group: c.group || '',
       phone: formattedPhone,
       arsMenu: c.arsMenu || '',
       connectReq: c.connectReq || '',
@@ -1747,36 +1739,39 @@ async function exportSamsungCallReportExcel() {
     row.eachCell(cell => {
       cell.border = thinBorder;
       cell.alignment = { vertical: 'middle' };
+      cell.font = { name: '맑은 고딕', size: 10 };
     });
 
     if (idx % 2 === 1) {
       row.eachCell((cell, col) => {
-        if (col !== 13 && col !== 14) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+        if (col !== 9 && col !== 10) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
       });
     }
 
     if (c.category) {
-      row.getCell('category').font = { bold: true, color: { argb: 'FF0369A1' } };
+      row.getCell('category').font = { name: '맑은 고딕', size: 10, bold: true, color: { argb: 'FF0369A1' } };
       row.getCell('category').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
     }
     if (c.actor) {
-      row.getCell('actor').font = { bold: true, color: { argb: 'FF4338CA' } };
+      row.getCell('actor').font = { name: '맑은 고딕', size: 10, bold: true, color: { argb: 'FF4338CA' } };
       row.getCell('actor').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
     }
 
-    // 상담요약 및 제목 열 줄바꿈 설정 및 행 높이 자동 조절
-    row.getCell('title').alignment = { wrapText: true, vertical: 'middle' };
-    row.getCell('summary').alignment = { wrapText: true, vertical: 'middle' };
+    // 상담제목, 상담요약, 키워드 열 자동 줄바꿈(wrapText) 설정 및 행 높이 자동 조절
+    row.getCell('title').alignment = { wrapText: true, vertical: 'top' };
+    row.getCell('summary').alignment = { wrapText: true, vertical: 'top' };
+    row.getCell('keywords').alignment = { wrapText: true, vertical: 'top' };
 
     const sumLen = (c.summary || '').length;
     const titleLen = (c.title || '').length;
-    const maxLen = Math.max(sumLen, titleLen);
+    const kwLen = (c.keywords || '').length;
+    const maxLen = Math.max(sumLen, titleLen, kwLen);
     if (maxLen > 100) {
-      row.height = 42;
+      row.height = 48;
     } else if (maxLen > 45) {
-      row.height = 30;
+      row.height = 34;
     } else {
-      row.height = 22;
+      row.height = 24;
     }
   });
 
