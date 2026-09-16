@@ -1236,18 +1236,19 @@ async function loadConvexData(showSpinner = true) {
     updateConvexStatusBadge(false, gApps.length);
   } finally {
     gIsDataLoading = false;
-    if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
-    if (typeof renderApplications === 'function') renderApplications();
-    if (typeof renderAssignments === 'function') renderAssignments();
-    if (typeof renderClaims === 'function') renderClaims();
-    if (typeof renderPayouts === 'function') renderPayouts();
-    if (typeof renderCareLogs === 'function') renderCareLogs();
-    if (typeof renderDashboard === 'function') renderDashboard();
-    if (typeof renderFaxManagement === 'function') renderFaxManagement();
     if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
-    if (typeof renderAdjusters === 'function' && gActiveTab === 'adjusterDirectory') renderAdjusters();
-    if (typeof renderCaregivers === 'function' && gActiveTab === 'caregiverDirectory') renderCaregivers();
-    if (typeof renderCenters === 'function' && gActiveTab === 'centerDirectory') renderCenters();
+    if (gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+    else if (gActiveTab === 'applications' && typeof renderApplications === 'function') renderApplications();
+    else if (gActiveTab === 'assignments' && typeof renderAssignments === 'function') renderAssignments();
+    else if (gActiveTab === 'claims' && typeof renderClaims === 'function') renderClaims();
+    else if (gActiveTab === 'payouts' && typeof renderPayouts === 'function') renderPayouts();
+    else if (gActiveTab === 'carelogs' && typeof renderCareLogs === 'function') renderCareLogs();
+    else if (gActiveTab === 'dashboard' && typeof renderDashboard === 'function') renderDashboard();
+    else if (gActiveTab === 'faxmgmt' && typeof renderFaxManagement === 'function') renderFaxManagement();
+    else if (gActiveTab === 'carecalendar' && typeof renderCareCalendar === 'function') renderCareCalendar();
+    else if (gActiveTab === 'adjusterDirectory' && typeof renderAdjusters === 'function') renderAdjusters();
+    else if (gActiveTab === 'caregiverDirectory' && typeof renderCaregivers === 'function') renderCaregivers();
+    else if (gActiveTab === 'centerDirectory' && typeof renderCenters === 'function') renderCenters();
   }
 }
 
@@ -1392,9 +1393,13 @@ function getElapsedBusinessHours(isoOrDateStr) {
   }
   if (isNaN(parsed)) return 999999;
 
+  const nowTime = Date.now();
+  if (nowTime <= parsed) return 0;
+  // Fast path: 5일(120시간) 이상 경과 건은 공휴일/주말 감안해도 24 영업시간 초과 확실하므로 즉시 반환
+  if (nowTime - parsed > 5 * 86400000) return 999999;
+
   const start = new Date(parsed);
-  const now = new Date();
-  if (now <= start) return 0;
+  const now = new Date(nowTime);
 
   let current = new Date(start.getTime());
   let businessHours = 0;
@@ -1475,25 +1480,11 @@ document.addEventListener('DOMContentLoaded', () => {
   renderUnifiedCareHub();
   initIcons();
 
-  // Lazy render background tabs during idle time to prevent main-thread freeze
+  // 경량 초기화 작업만 유휴 시점에 실행 (비활성 탭은 탭 클릭 시 온디맨드 렌더링)
   setTimeout(() => {
-    renderSamsungList();
-    renderAdjusters();
-    renderForms();
-    renderDashboard();
-    renderApplications();
-    renderAssignments();
-    renderCareLogs();
-    renderClaims();
-    renderPayouts();
-    renderAdmins();
-    renderPartners();
-    if (typeof renderFaxManagement === 'function') renderFaxManagement();
     if (typeof loadBarobillSettingsToInputs === 'function') loadBarobillSettingsToInputs();
-    if (typeof initSamsungCallReportModule === 'function') initSamsungCallReportModule();
-    if (typeof initTotalCallAnalysisModule === 'function') initTotalCallAnalysisModule();
-    calculateRuleSplit();
-  }, 60);
+    if (typeof calculateRuleSplit === 'function') calculateRuleSplit();
+  }, 100);
 
   window.addEventListener('beforeunload', (e) => {
     if (typeof gSamsungPendingChanges !== 'undefined' && gSamsungPendingChanges && gSamsungPendingChanges.size > 0) {
@@ -12719,9 +12710,11 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         return rNum === roundIndex || String(p.round || '').includes(`${roundIndex}차`) || String(p.round || '').includes(`${roundIndex}회차`);
       });
 
-      // 해당 고객 및 차수에 대한 팩스 청구 발송 이력 확인
-      const roundFaxLog = (window.gFaxLogs || []).find(fl => 
-        String(fl.appId) === String(app ? app.id : '') && 
+      // 해당 고객 및 차수에 대한 팩스 청구 발송 이력 확인 (O(1) Map 기반 고속화)
+      const targetAppId = String(app ? app.id : '');
+      const faxLogList = (window._gFaxLogsByAppId && window._gFaxLogsByAppId.get(targetAppId)) || window.gFaxLogs || [];
+      const roundFaxLog = faxLogList.find(fl => 
+        String(fl.appId) === targetAppId && 
         (fl.roundNumber === roundIndex || (fl.memo && fl.memo.includes(`${roundIndex}차`)) || (fl.category && fl.category.includes('정산') && roundIndex === 1))
       );
       const isFaxClaimSent = Boolean(roundFaxLog && roundFaxLog.sentDate && (roundFaxLog.status === '전송완료' || roundFaxLog.status === '발송완료' || roundFaxLog.status === '성공'));
@@ -16901,7 +16894,16 @@ function renderUnifiedCareHub() {
     return true;
   });
 
-    // Sort filtered list according to gHubSort
+  // Sort filtered list according to gHubSort (Pre-calculate timestamps for ultra-fast comparisons)
+  if (gHubSort === 'created_desc' || gHubSort === 'created_asc' || gHubSort === 'updated_desc') {
+    for (let i = 0; i < filtered.length; i++) {
+      const a = filtered[i];
+      a._updTime = a.updatedAt ? Date.parse(a.updatedAt) || 0 : 0;
+      a._crTime = a.createdAt ? Date.parse(a.createdAt) || 0 : (a.applyDate ? Date.parse(a.applyDate.replace(/\./g, '-')) || 0 : 0);
+      a._maxTime = Math.max(a._updTime, a._crTime);
+    }
+  }
+
   filtered.sort((a, b) => {
     if (gHubSort === 'cs_priority') {
       const getWeight = (app) => {
@@ -16919,27 +16921,15 @@ function renderUnifiedCareHub() {
       return (a.csLatestLabel || 'zzz').localeCompare(b.csLatestLabel || 'zzz', 'ko');
     }
     if (gHubSort === 'created_desc') {
-      const timeA = Math.max(
-        a.updatedAt ? new Date(a.updatedAt).getTime() : 0,
-        a.createdAt ? new Date(a.createdAt).getTime() : 0,
-        a.applyDate ? new Date(a.applyDate.replace(/\./g, '-')).getTime() : 0
-      );
-      const timeB = Math.max(
-        b.updatedAt ? new Date(b.updatedAt).getTime() : 0,
-        b.createdAt ? new Date(b.createdAt).getTime() : 0,
-        b.applyDate ? new Date(b.applyDate.replace(/\./g, '-')).getTime() : 0
-      );
-      return timeB - timeA;
+      return (b._maxTime || 0) - (a._maxTime || 0);
     }
     if (gHubSort === 'created_asc') {
-      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.applyDate ? new Date(a.applyDate.replace(/\./g, '-')).getTime() : 0);
-      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.applyDate ? new Date(b.applyDate.replace(/\./g, '-')).getTime() : 0);
-      return timeA - timeB;
+      return (a._crTime || 0) - (b._crTime || 0);
     }
     if (gHubSort === 'updated_desc') {
-      const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : (a.applyDate ? new Date(a.applyDate.replace(/\./g, '-')).getTime() : 0));
-      const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : (b.applyDate ? new Date(b.applyDate.replace(/\./g, '-')).getTime() : 0));
-      return timeB - timeA;
+      const tA = (a._updTime || a._crTime || 0);
+      const tB = (b._updTime || b._crTime || 0);
+      return tB - tA;
     }
     if (gHubSort === 'name_asc') {
       return (a.patientName || '').localeCompare(b.patientName || '', 'ko');
@@ -16949,7 +16939,6 @@ function renderUnifiedCareHub() {
     }
     return 0;
   });
-
 
   const countEl = document.getElementById('hubFilteredCount');
   if (countEl) countEl.innerText = filtered.length;
@@ -17000,6 +16989,18 @@ function renderUnifiedCareHub() {
     if (!logsMap.has(l.applyId)) logsMap.set(l.applyId, []);
     logsMap.get(l.applyId).push(l);
   }
+  const faxLogsMap = new Map();
+  if (Array.isArray(window.gFaxLogs)) {
+    for (let i = 0; i < window.gFaxLogs.length; i++) {
+      const fl = window.gFaxLogs[i];
+      if (fl && fl.appId) {
+        const sid = String(fl.appId);
+        if (!faxLogsMap.has(sid)) faxLogsMap.set(sid, []);
+        faxLogsMap.get(sid).push(fl);
+      }
+    }
+  }
+  window._gFaxLogsByAppId = faxLogsMap;
 
   container.innerHTML = displayList.map(app => {
     const isChecked = gSelectedAppIds.has(app.id) ? 'checked' : '';
@@ -17324,6 +17325,7 @@ function renderUnifiedCareHub() {
       </div>
     `;
   }).join('');
+  window._gFaxLogsByAppId = null;
 
   renderHubPagination(totalCount, totalPages);
   updateSelectedHubUI();
