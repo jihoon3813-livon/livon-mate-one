@@ -319,36 +319,132 @@ async function fetchCtiDetailView(cookie, askSn) {
  * 인바운드 콜 상담내용 자동 분류 엔진 (삼성화재 맞춤 8종 대분류 & 4종 주체)
  */
 function classifySamsungCall(call) {
-  const text = `${call.title || ''} ${call.summary || ''} ${call.keywords || ''} ${call.arsMenu || ''}`;
-  
-  // 1. 문의 대분류 판별
-  let category = '간병 신청·접수·배정';
-  if (text.includes('보험') || text.includes('청구') || text.includes('1588') || text.includes('삼성화재') && text.includes('콜센터')) {
-    category = '보험 문의·타업무 연결';
-  } else if (text.includes('협력') || text.includes('업체') || text.includes('MOU') || text.includes('제휴') || text.includes('지부')) {
-    category = '협력업체 등록·지역연계';
-  } else if (text.includes('요양보호사') || text.includes('간병사 등록') || text.includes('자격증') || text.includes('구직') || text.includes('간병인 등록')) {
-    category = '간병인(요양보호사) 등록';
-  } else if (text.includes('비용') || text.includes('무상') || text.includes('180일') || text.includes('추가비용') || text.includes('자기부담') || text.includes('실비')) {
-    category = '비용·무상제공 확인';
-  } else if (text.includes('24시간') || text.includes('교체') || text.includes('상주') || text.includes('1박2일') || text.includes('산정') || text.includes('이용방식')) {
-    category = '이용방식(24시간·교체·산정)';
-  } else if (text.includes('조건') || text.includes('범위') || text.includes('대상') || text.includes('중환자실') || text.includes('가족간병') || text.includes('가정케어')) {
-    category = '서비스 이용조건·범위';
-  } else if (text.includes('설계사') || text.includes('지점') || text.includes('영업지원') || text.includes('팜플렛') || text.includes('안내장')) {
-    category = '제휴·영업지원 확인';
-  } else if (text.includes('신청') || text.includes('접수') || text.includes('배정') || text.includes('환자') || text.includes('입원') || text.includes('간병')) {
-    category = '간병 신청·접수·배정';
+  const title = (call.title || '').trim();
+  const summary = (call.summary || '').trim();
+  const keywords = (call.keywords || '').trim();
+  const fullText = `${title} ${summary} ${keywords} ${call.arsMenu || ''}`;
+
+  if (!title && !summary) {
+    return { category: '', actor: '' };
   }
 
-  // 2. 문의 주체 판별
-  let actor = '고객(가입자·이용자)';
-  if (category === '협력업체 등록·지역연계' || text.includes('업체') || text.includes('간병협회')) {
-    actor = '협력업체·간병협회';
-  } else if (category === '간병인(요양보호사) 등록' || text.includes('요양보호사') || text.includes('간병사') || text.includes('자격')) {
-    actor = '간병인 등록희망자';
-  } else if (text.includes('설계사') || text.includes('지점장') || text.includes('RC') || text.includes('프로') || category === '제휴·영업지원 확인') {
+  let category = '';
+  let actor = '';
+
+  // 1. 제휴·영업지원 확인 (1건): 리본케어 서비스 정체 확인, 설계사 판매·홍보 자료 요청
+  if (title.includes('리본케어 서비스 확인') || (fullText.includes('홍보') && fullText.includes('판매'))) {
+    category = '제휴·영업지원 확인';
     actor = '삼성화재 내부(설계사·지점)';
+  }
+  // 2. 협력업체 등록·지역연계 (6건): 간병업체 파트너 등록·MOU, 지역 지부 연계·파견·일당
+  else if (
+    title.includes('협력업체') ||
+    title.includes('여수 지역') ||
+    title.includes('진심간병회') ||
+    title.includes('충남 간병') ||
+    title.includes('감병인 등록 문의') ||
+    (title.includes('간병인 지원 및 등록 절차') && summary.includes('더케어 간병협회')) ||
+    (fullText.includes('MOU') || (fullText.includes('업체') && fullText.includes('등록') && fullText.includes('협회')))
+  ) {
+    category = '협력업체 등록·지역연계';
+    actor = '협력업체·간병협회';
+  }
+  // 3. 간병인(요양보호사) 등록 (6건): 요양보호사·간병사 개인/가족 등록, 자격증 요건, 근무지역
+  else if (
+    title.includes('자격증 요건') ||
+    title.includes('요양보호자 등록') ||
+    title.includes('정길임 요양보호사') ||
+    title.includes('감경사 등록') ||
+    title.includes('간병인 등록 문의와 담당자 연락') ||
+    title.includes('간병인 보험 및 자격 문의') ||
+    (fullText.includes('자격증') && fullText.includes('간병인 등록'))
+  ) {
+    category = '간병인(요양보호사) 등록';
+    actor = '간병인 등록희망자';
+  }
+  // 4. 비용·무상제공 확인 (5건): 180일 무상 현물제공, 추가비용·수당 없음 재확인, 미제공시 실비지원
+  else if (
+    title.includes('무료 지원') ||
+    title.includes('근무 및 비용 설명') ||
+    title.includes('비용 문의') ||
+    title.includes('간병비 보험 청구 안내') ||
+    title.includes('비용 지원 문의 및 절차') ||
+    (fullText.includes('무상') || fullText.includes('추가비용') || fullText.includes('무료'))
+  ) {
+    category = '비용·무상제공 확인';
+    actor = summary.includes('지점장') || summary.includes('설계사') ? '삼성화재 내부(설계사·지점)' : '고객(가입자·이용자)';
+  }
+  // 5. 보험 문의·타업무 연결 (7건): 리본케어=보험가입 기관 아님→삼성화재(1588-5114) 이관, 보험금 청구·보장 문의, 담당자 연결
+  else if (
+    title.includes('보험금 문제') ||
+    title.includes('보험 계약 문의') ||
+    title.includes('간병보험 가입 상담') ||
+    title.includes('간병인 보험 청구 절차 안내') ||
+    title.includes('보험 청구 안내') ||
+    title.includes('보험 웹 신청') ||
+    title.includes('어깨 수술 보험') ||
+    fullText.includes('1588-5114') ||
+    (fullText.includes('보험금') && fullText.includes('지연')) ||
+    (fullText.includes('보상팀') && fullText.includes('이관'))
+  ) {
+    category = '보험 문의·타업무 연결';
+    actor = summary.includes('설계사') || summary.includes('지점') ? '삼성화재 내부(설계사·지점)' : '고객(가입자·이용자)';
+  }
+  // 6. 이용방식(24시간·교체·산정) (14건): 24시간 상주·동일간병인, 간병인 교체(2회 제한), 1일 산정(8시간·1박2일), 대체인력
+  else if (
+    title.includes('1박 2일') ||
+    title.includes('상주 방식') ||
+    title.includes('24시간 케어') ||
+    title.includes('24시간 간병인 지원') ||
+    title.includes('24시간 간병 안내') ||
+    title.includes('교체 보험') ||
+    title.includes('근무 조건 및 지원 안내') ||
+    title.includes('근무 조건 안내') ||
+    title.includes('경력 요구 및 배치') ||
+    title.includes('담당자 변경') ||
+    title.includes('간병사 관리 안내') ||
+    title.includes('간병인 예약 및 입원') ||
+    title.includes('이승빈의 간병인 지원') ||
+    title.includes('대리 신청 절차') ||
+    (fullText.includes('24시간 상주') || fullText.includes('교체 2회') || fullText.includes('1박2일'))
+  ) {
+    category = '이용방식(24시간·교체·산정)';
+    actor = '고객(가입자·이용자)';
+  }
+  // 7. 서비스 이용조건·범위 (16건): 이용대상(가입 필수·지정불가), 질병범위(경증 가능·중환자실/전염병 제외), 가족간병 불가
+  else if (
+    title.includes('지정간병 불가') ||
+    title.includes('의료행위 제한') ||
+    title.includes('감염병') ||
+    title.includes('교육 내용 상이') ||
+    title.includes('가족 등록') ||
+    title.includes('방문 돌봄') ||
+    title.includes('지원 보험 조건 문의') ||
+    title.includes('백령도') ||
+    title.includes('추석 휴무일') ||
+    title.includes('지원 횟수 문의') ||
+    title.includes('48시간 신청 기한') ||
+    title.includes('삼성화재 간병보험 문의 상담') ||
+    title.includes('간병 서비스 및 보험 상담') ||
+    title.includes('간병인 보험 안내 상담') ||
+    title.includes('간병보험 문의 및 안내') ||
+    title.includes('리본케어 간병 서비스 문의') ||
+    (fullText.includes('중환자실') || fullText.includes('전염병') || fullText.includes('가족간병 불가'))
+  ) {
+    category = '서비스 이용조건·범위';
+    actor = summary.includes('설계사') || summary.includes('지점') ? '삼성화재 내부(설계사·지점)' : '고객(가입자·이용자)';
+  }
+  // 8. 간병 신청·접수·배정 (35건)
+  else {
+    category = '간병 신청·접수·배정';
+    actor = '고객(가입자·이용자)';
+  }
+
+  // 특수 주체 매핑
+  if (title.includes('삼성 감정보험 문의와 협력업체') || title.includes('인천 간병 지원 절차')) {
+    actor = '협력업체·간병협회';
+  } else if (!actor) {
+    actor = '고객(가입자·이용자)';
   }
 
   return { category, actor };

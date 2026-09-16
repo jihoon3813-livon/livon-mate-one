@@ -525,8 +525,8 @@ function calculateReportStats() {
   const cs = gSamsungReportData && gSamsungReportData.ctiSummary;
   const totalCalls = (cs && cs.totalInbound !== undefined) ? cs.totalInbound : logs.length;
   const connectReqCalls = (cs && cs.connectRequests !== undefined) ? cs.connectRequests : logs.filter(c => c.connectReq === 'Y').length;
-  const consultedCalls = logs.filter(c => c.title || c.summary || (c.duration && c.duration !== '0'));
-  const consultedCount = (cs && cs.answeredCalls !== undefined) ? cs.answeredCalls : consultedCalls.length;
+  const consultedCalls = logs.filter(c => (c.category && c.category.trim()) || (c.title && c.title.trim()) || (c.summary && c.summary.trim()));
+  const consultedCount = consultedCalls.length || (cs && cs.answeredCalls !== undefined ? cs.answeredCalls : 0);
   const connectRate = totalCalls > 0 ? Math.round((connectReqCalls / totalCalls) * 100) : 0;
   const opDays = (gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.operatingDays) || (gSamsungReportData.dailyTrends || []).length || 25;
   const dailyAvg = opDays > 0 ? Math.round(totalCalls / opDays) : 0;
