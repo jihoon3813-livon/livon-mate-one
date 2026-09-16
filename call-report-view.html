@@ -783,37 +783,33 @@
 
         <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
           <div class="overflow-x-auto custom-scrollbar max-h-[640px]">
-            <table class="w-full text-xs text-left min-w-[1550px]">
+            <table class="w-full text-xs text-left min-w-[1250px]">
               <thead class="bg-slate-900 text-slate-200 uppercase font-bold text-[11px] sticky top-0 z-20 shadow-xs">
                 <tr>
                   <th class="py-3 px-2 text-center w-10">#</th>
-                  <th class="py-3 px-2.5 whitespace-nowrap">연결시간</th>
-                  <th class="py-3 px-2.5 whitespace-nowrap">경로</th>
-                  <th class="py-3 px-2.5 whitespace-nowrap">전화번호</th>
-                  <th class="py-3 px-2.5 whitespace-nowrap">회원이름</th>
-                  <th class="py-3 px-2 text-center whitespace-nowrap">ARS/연결/대기</th>
-                  <th class="py-3 px-2.5 text-center bg-blue-800 text-amber-300 font-black border-x border-blue-700 min-w-[130px] whitespace-nowrap">
+                  <th class="py-3 px-3 whitespace-nowrap min-w-[190px] max-w-[220px]">통화 / 발신 정보</th>
+                  <th class="py-3 px-2.5 text-center bg-blue-800 text-amber-300 font-black border-x border-blue-700 min-w-[125px] whitespace-nowrap">
                     문의 대분류 ✨
                   </th>
                   <th class="py-3 px-2.5 text-center bg-blue-800 text-amber-300 font-black border-r border-blue-700 min-w-[110px] whitespace-nowrap">
                     문의 주체 ✨
                   </th>
-                  <th class="py-3 px-2.5 min-w-[140px] max-w-[200px]">상담제목</th>
-                  <th class="py-3 px-3 min-w-[500px] bg-slate-800/80 text-white font-black">
+                  <th class="py-3 px-2.5 min-w-[130px] max-w-[170px]">상담제목</th>
+                  <th class="py-3 px-3.5 bg-slate-800/90 text-white font-black w-full min-w-[520px]">
                     <div class="flex items-center justify-between">
-                      <span>상담요약 (핵심 내용)</span>
+                      <span class="text-xs">상담요약 (핵심 내용)</span>
                       <span class="text-[10px] text-blue-300 font-normal">📋 요약문 복사 가능</span>
                     </div>
                   </th>
-                  <th class="py-3 px-2.5 min-w-[130px] max-w-[160px]">키워드</th>
-                  <th class="py-3 px-2 text-center whitespace-nowrap">통화시간</th>
-                  <th class="py-3 px-2 text-center whitespace-nowrap">상태</th>
+                  <th class="py-3 px-2.5 min-w-[120px] max-w-[150px]">키워드</th>
+                  <th class="py-3 px-2 text-center whitespace-nowrap w-16">통화시간</th>
+                  <th class="py-3 px-2 text-center whitespace-nowrap w-14">상태</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100 text-slate-700">
                 ${logs.length === 0 ? `
                   <tr>
-                    <td colspan="13" class="py-12 text-center text-slate-400 font-bold">
+                    <td colspan="9" class="py-12 text-center text-slate-400 font-bold">
                       일치하는 통화로그가 없습니다. 필터 조건을 변경해보세요.
                     </td>
                   </tr>
@@ -822,36 +818,40 @@
                   const displayMember = resolveMemberName(c.phone || c.rawPhone, c.memberName);
                   return `
                   <tr class="hover:bg-blue-50/40 transition-colors ${idx % 2 === 1 ? 'bg-slate-50/50' : ''}">
-                    <td class="py-2.5 px-2 text-center text-slate-400 font-mono text-[10px]">${c.rowNum || (idx + 1)}</td>
-                    <td class="py-2.5 px-2.5 font-mono text-slate-600 whitespace-nowrap text-[11px]">${c.callTime || '-'}</td>
-                    <td class="py-2.5 px-2.5 font-bold text-sky-700 whitespace-nowrap">${c.channel || '삼성화재'}</td>
-                    <td class="py-2.5 px-2.5 font-mono font-bold text-slate-900 whitespace-nowrap">${displayPhone}</td>
-                    <td class="py-2.5 px-2.5 whitespace-nowrap font-medium text-slate-800">
-                      ${displayMember !== '비회원' ? `<span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">${displayMember}</span>` : '<span class="text-slate-400">비회원</span>'}
-                    </td>
+                    <td class="py-2.5 px-2 text-center text-slate-400 font-mono text-[10px] align-top pt-3">${c.rowNum || (idx + 1)}</td>
                     
-                    <!-- ARS메뉴 + 연결요청(Y/N) + 대기시간 합친 콤팩트 셀 -->
-                    <td class="py-2 px-2 text-center whitespace-nowrap">
-                      <div class="inline-flex items-center gap-1">
-                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[10px]">${c.arsMenu || '상담연결'}</span>
-                        <span class="px-1 py-0.2 rounded text-[10px] font-mono font-bold ${c.connectReq === 'Y' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-400'}" title="연결요청 여부">${c.connectReq || '-'}</span>
-                        <span class="text-[10px] text-slate-400 font-mono" title="대기시간">${c.waitTime ? `${c.waitTime}s` : '0s'}</span>
+                    <!-- [통합 셀] 연결시간 / 경로 / 전화번호 / 이름 / 대기 정보 -->
+                    <td class="py-2.5 px-3 min-w-[190px] max-w-[220px] whitespace-nowrap text-slate-800 align-top">
+                      <div class="flex items-center justify-between gap-1 text-[11px] mb-1">
+                        <span class="font-mono text-slate-500 font-bold">${c.callTime || '-'}</span>
+                        <span class="px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 font-extrabold text-[10px] border border-blue-200/60">${c.channel || '삼성화재'}</span>
+                      </div>
+                      <div class="flex items-center gap-1.5 mb-1">
+                        <span class="font-mono font-black text-slate-900 text-xs">${displayPhone}</span>
+                        ${displayMember && displayMember !== '비회원' && displayMember !== '회원아님' 
+                          ? `<span class="px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 font-black text-[10px] border border-emerald-200">${displayMember}</span>` 
+                          : `<span class="text-slate-400 text-[10px]">비회원</span>`}
+                      </div>
+                      <div class="flex items-center gap-1 text-[10px] text-slate-500">
+                        <span class="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-bold">${c.arsMenu || '상담연결'}</span>
+                        <span class="px-1 py-0.2 rounded font-mono font-bold ${c.connectReq === 'Y' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-400'}" title="연결요청">요청:${c.connectReq || '-'}</span>
+                        <span class="font-mono text-slate-400" title="대기시간">대기:${c.waitTime ? `${c.waitTime}s` : '0s'}</span>
                       </div>
                     </td>
                     
-                    <td class="py-2 px-2 border-x border-slate-200 bg-sky-50/20 text-center font-bold text-sky-900 whitespace-nowrap min-w-[130px]">
+                    <td class="py-2.5 px-2 border-x border-slate-200 bg-sky-50/20 text-center font-bold text-sky-900 whitespace-nowrap min-w-[125px] align-top pt-3">
                       ${c.category ? `<span class="inline-block px-2 py-0.5 rounded-lg bg-sky-100 text-sky-800 font-bold border border-sky-200 whitespace-nowrap text-[11px]">${c.category}</span>` : '<span class="text-slate-300">-</span>'}
                     </td>
-                    <td class="py-2 px-2 border-r border-slate-200 bg-indigo-50/20 text-center font-bold text-indigo-900 whitespace-nowrap min-w-[110px]">
+                    <td class="py-2.5 px-2 border-r border-slate-200 bg-indigo-50/20 text-center font-bold text-indigo-900 whitespace-nowrap min-w-[110px] align-top pt-3">
                       ${c.actor ? `<span class="inline-block px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-800 font-bold border border-indigo-200 whitespace-nowrap text-[11px]">${c.actor}</span>` : '<span class="text-slate-300">-</span>'}
                     </td>
-                    <td class="py-2.5 px-2.5 font-bold text-slate-900 min-w-[140px] max-w-[200px] break-keep leading-snug">${c.title || '-'}</td>
+                    <td class="py-2.5 px-2.5 font-bold text-slate-900 min-w-[130px] max-w-[170px] break-keep leading-snug align-top pt-3">${c.title || '-'}</td>
                     
-                    <!-- 상담 요약 (최대 너비 보장 + 복사 버튼) -->
-                    <td class="py-2.5 px-3.5 text-slate-700 leading-relaxed bg-slate-50/30 relative group">
+                    <!-- 상담 요약 (가로 폭 최대화 w-full + 복사 버튼) -->
+                    <td class="py-2.5 px-3.5 text-slate-700 leading-relaxed bg-slate-50/30 relative group w-full min-w-[520px] align-top">
                       ${c.summary ? `
-                        <div class="flex items-start justify-between gap-2.5">
-                          <div class="flex-1 text-[12px] leading-relaxed break-keep select-text">
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="flex-1 text-[12px] leading-relaxed break-keep select-text text-slate-800 font-normal">
                             ${c.summary}
                           </div>
                           <button type="button" 
