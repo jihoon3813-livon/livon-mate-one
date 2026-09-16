@@ -217,18 +217,18 @@ function renderSamsungCallReportTab() {
       <!-- ================================================================= -->
       <!-- TOP ACTION BAR: 헤더, 기간 선택기, 내보내기/발송 액션 버튼 -->
       <!-- ================================================================= -->
-      <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-4 sm:p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+      <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-4 sm:p-5 flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-4">
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2.5 flex-wrap">
-            <span class="px-2.5 py-1 rounded-xl bg-blue-600 text-white font-black text-xs shadow-xs flex items-center gap-1.5">
+            <span class="px-2.5 py-1 rounded-xl bg-blue-600 text-white font-black text-xs shadow-xs flex items-center gap-1.5 shrink-0">
               <i data-lucide="phone-call" class="w-3.5 h-3.5"></i> 삼성화재 공식 보고
             </span>
-            <span class="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">
+            <span class="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs shrink-0">
               리본케어 인바운드 CTI 연동
             </span>
-            <span class="text-xs text-slate-400 font-mono">보고일: ${info.reportDate || '2026-09-15'}</span>
+            <span class="text-xs text-slate-400 font-mono shrink-0">보고일: ${info.reportDate || '2026-09-15'}</span>
           </div>
-          <h2 class="text-xl sm:text-2xl font-black text-slate-900 mt-2 flex items-center gap-2">
+          <h2 class="text-xl sm:text-2xl font-black text-slate-900 mt-2 flex items-center gap-2 break-keep leading-tight">
             ${info.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고'}
           </h2>
           <p class="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
@@ -240,36 +240,43 @@ function renderSamsungCallReportTab() {
           </p>
         </div>
 
-        <div class="flex items-center gap-2 flex-nowrap shrink-0 overflow-x-auto pb-1">
-          <!-- 보고서 웹링크 복사 -->
-          <button type="button" onclick="copySamsungReportWebLink()" class="px-3.5 py-2 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer" title="담당자 전달용 웹페이지 보고서 링크 복사">
-            <i data-lucide="link" class="w-4 h-4 text-blue-600"></i>
-            <span>🔗 웹링크 복사</span>
-          </button>
+        <!-- 액션 버튼들: 화면 너비가 좁아지거나 공간이 부족할 때 자연스럽게 2줄로 정렬 (웹 도구 1줄 / 내보내기 도구 1줄 등) -->
+        <div class="flex flex-wrap items-center justify-start 2xl:justify-end gap-2 shrink-0 max-w-full 2xl:max-w-xl">
+          <!-- 웹 연동 그룹 -->
+          <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <!-- 보고서 웹링크 복사 -->
+            <button type="button" onclick="copySamsungReportWebLink()" class="px-3.5 py-2 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer whitespace-nowrap" title="담당자 전달용 웹페이지 보고서 링크 복사">
+              <i data-lucide="link" class="w-4 h-4 text-blue-600"></i>
+              <span>🔗 웹링크 복사</span>
+            </button>
 
-          <!-- 웹 바로가기 (새 탭에서 웹 보고서 열기) -->
-          <button type="button" onclick="openSamsungReportWebView()" class="px-3.5 py-2 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer" title="담당자 전달용 웹 보고서 새 탭으로 즉시 열기">
-            <i data-lucide="external-link" class="w-4 h-4 text-indigo-600"></i>
-            <span>🌐 웹 바로가기</span>
-          </button>
+            <!-- 웹 바로가기 (새 탭에서 웹 보고서 열기) -->
+            <button type="button" onclick="openSamsungReportWebView()" class="px-3.5 py-2 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer whitespace-nowrap" title="담당자 전달용 웹 보고서 새 탭으로 즉시 열기">
+              <i data-lucide="external-link" class="w-4 h-4 text-indigo-600"></i>
+              <span>🌐 웹 바로가기</span>
+            </button>
+          </div>
 
-          <!-- 3-시트 엑셀 다운로드 -->
-          <button type="button" onclick="exportSamsungCallReportExcel()" class="px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer" title="삼성화재 담당자 전달용 3-Sheet 정밀 서식 엑셀 다운로드">
-            <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
-            <span>엑셀(.xlsx) 다운로드</span>
-          </button>
+          <!-- 내보내기 및 발송 그룹 -->
+          <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <!-- 3-시트 엑셀 다운로드 -->
+            <button type="button" onclick="exportSamsungCallReportExcel()" class="px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer whitespace-nowrap" title="삼성화재 담당자 전달용 3-Sheet 정밀 서식 엑셀 다운로드">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+              <span>엑셀(.xlsx) 다운로드</span>
+            </button>
 
-          <!-- PDF 미리보기 및 다운로드 -->
-          <button type="button" onclick="openSamsungCallReportPdfModal()" class="px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer" title="공식 보고용 A4 3-시트 완본 PDF 실시간 미리보기 및 다운로드">
-            <i data-lucide="file-text" class="w-4 h-4 text-rose-600"></i>
-            <span>PDF 보고서 미리보기</span>
-          </button>
+            <!-- PDF 미리보기 및 다운로드 -->
+            <button type="button" onclick="openSamsungCallReportPdfModal()" class="px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer whitespace-nowrap" title="공식 보고용 A4 3-시트 완본 PDF 실시간 미리보기 및 다운로드">
+              <i data-lucide="file-text" class="w-4 h-4 text-rose-600"></i>
+              <span>PDF 보고서 미리보기</span>
+            </button>
 
-          <!-- 원클릭 이메일 발송 -->
-          <button type="button" onclick="openSamsungCallReportEmailModal()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 shrink-0 cursor-pointer" title="삼성화재 상품마케팅TF 담당자 앞 이메일 즉시 발송">
-            <i data-lucide="send" class="w-4 h-4 text-blue-200"></i>
-            <span>담당자 메일 발송</span>
-          </button>
+            <!-- 원클릭 이메일 발송 -->
+            <button type="button" onclick="openSamsungCallReportEmailModal()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 shrink-0 cursor-pointer whitespace-nowrap" title="삼성화재 상품마케팅TF 담당자 앞 이메일 즉시 발송">
+              <i data-lucide="send" class="w-4 h-4 text-blue-200"></i>
+              <span>담당자 메일 발송</span>
+            </button>
+          </div>
         </div>
       </div>
 
