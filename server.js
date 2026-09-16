@@ -592,9 +592,9 @@ function saveSavedFaxConfig(cfg) {
             syncedAt: new Date().toISOString()
           },
           summaryStats: {
-            totalCalls,
-            connectReqCalls: ctiSummary.connectRequests || ctiResult.logs.filter(c => c.connectReq === 'Y').length,
-            answeredCalls: ctiSummary.answeredCalls || ctiResult.logs.filter(c => c.title || c.summary).length,
+            totalCalls: (ctiSummary && ctiSummary.totalInbound !== undefined) ? ctiSummary.totalInbound : totalCalls,
+            connectReqCalls: (ctiSummary && ctiSummary.connectRequests !== undefined) ? ctiSummary.connectRequests : ctiResult.logs.filter(c => c.connectReq === 'Y').length,
+            answeredCalls: (ctiSummary && ctiSummary.answeredCalls !== undefined) ? ctiSummary.answeredCalls : ctiResult.logs.filter(c => c.title || c.summary).length,
             answerRate: ctiSummary.answerRate || (totalCalls > 0 ? Math.round((ctiSummary.answeredCalls / totalCalls) * 100) + '%' : '0%'),
             abandonedCalls: ctiSummary.abandonedCalls || 0,
             unselectedType: ctiSummary.unselectedType || 0,

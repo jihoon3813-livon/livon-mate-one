@@ -326,7 +326,7 @@ function renderSamsungCallReportTab() {
               <span class="text-slate-700 font-bold">“${info.startDate || ''} 부터 ${info.endDate || ''}” <span class="text-blue-700">[${info.channelLabel || info.channel || '삼성화재'}]</span> 검색 결과:</span>
             </div>
             <div class="flex items-center gap-2.5 sm:gap-3.5 text-slate-700 font-semibold flex-wrap text-[11px]">
-              <span>전체: <b class="text-blue-700 font-black">${gSamsungReportData.ctiSummary.totalInbound}건</b></span>
+              <span>전체: <b class="text-blue-700 font-black">${gSamsungReportData.ctiSummary.totalAll || gSamsungReportData.ctiSummary.totalInbound}건</b></span>
               <span class="text-slate-300">|</span>
               <span>인입콜: <b class="text-slate-900 font-bold">${gSamsungReportData.ctiSummary.totalInbound}/${gSamsungReportData.ctiSummary.answeredCalls}건</b></span>
               <span class="text-slate-300">|</span>
@@ -480,12 +480,13 @@ function renderTabDailyTrendChart() {
 // 4. Statistics Calculation Engine
 function calculateReportStats() {
   const logs = (gSamsungReportData && gSamsungReportData.callLogs) || [];
-  const totalCalls = logs.length;
-  const connectReqCalls = logs.filter(c => c.connectReq === 'Y' || (c.arsMenu || '').includes('상담연결')).length;
+  const cs = gSamsungReportData && gSamsungReportData.ctiSummary;
+  const totalCalls = (cs && cs.totalInbound !== undefined) ? cs.totalInbound : logs.length;
+  const connectReqCalls = (cs && cs.connectRequests !== undefined) ? cs.connectRequests : logs.filter(c => c.connectReq === 'Y').length;
   const consultedCalls = logs.filter(c => c.title || c.summary || (c.duration && c.duration !== '0'));
-  const consultedCount = consultedCalls.length;
+  const consultedCount = (cs && cs.answeredCalls !== undefined) ? cs.answeredCalls : consultedCalls.length;
   const connectRate = totalCalls > 0 ? Math.round((connectReqCalls / totalCalls) * 100) : 0;
-  const opDays = (gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.operatingDays) || 25;
+  const opDays = (gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.operatingDays) || (gSamsungReportData.dailyTrends || []).length || 25;
   const dailyAvg = opDays > 0 ? Math.round(totalCalls / opDays) : 0;
 
   // Category counts

@@ -397,6 +397,7 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
 
   // CTI 상단 요약 통계 테이블 파싱
   const ctiSummary = {
+    totalAll: totalCount,
     totalInbound: totalCount,
     answeredCalls: 0,
     connectRequests: 0,
@@ -410,22 +411,13 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
   const summaryTableMatch = p1Html.match(/<table[\s\S]*?인입콜[\s\S]*?<\/table>/i);
   if (summaryTableMatch) {
     const textRows = summaryTableMatch[0].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    // e.g.: 전체 458건 458 /115건 0 /0건 131 건 115 건 88% 건 0 건 14 건 0 건 307 건 20 건
+    // e.g.: 전체 719건 718 /236건 1 /1건 277 건 236 건 85% 건 0 건 36 건 0 건 412 건 29 건
     const nums = textRows.match(/([0-9%]+(?:\s*\/\s*[0-9]+)?)\s*건/g) || [];
-    // nums[0]: "458건" (전체)
-    // nums[1]: "458 /115건" (인입콜)
-    // nums[2]: "0 /0건" (발신콜)
-    // nums[3]: "131 건" (연결요청)
-    // nums[4]: "115 건" (응답호)
-    // nums[5]: "88% 건" (응대율)
-    // nums[6]: "0 건" (콜백요청)
-    // nums[7]: "14 건" (포기호)
-    // nums[8]: "0 건" (고객포기)
-    // nums[9]: "307 건" (유형미선택)
-    // nums[10]: "20 건" (버튼선택후종료)
     if (nums.length >= 10) {
       const getNum = (str) => parseInt(str.replace(/[^0-9]/g, ''), 10) || 0;
-      ctiSummary.totalInbound = getNum(nums[0]);
+      ctiSummary.totalAll = getNum(nums[0]);
+      const inboundMatch = nums[1] ? nums[1].match(/([0-9]+)\s*\/\s*([0-9]+)/) : null;
+      ctiSummary.totalInbound = inboundMatch ? parseInt(inboundMatch[1], 10) : getNum(nums[0]);
       ctiSummary.connectRequests = getNum(nums[3]);
       ctiSummary.answeredCalls = getNum(nums[4]);
       ctiSummary.answerRate = (nums[5] || '').replace(/[^0-9%]/g, '');
@@ -498,6 +490,7 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
           const rawPhone = tds[3] || '';
           const formattedPhone = formatPhone(rawPhone);
           const memberName = resolveMemberName(rawPhone, tds[4]);
+          const isConnectReq = (tds[10] && tds[10].trim().toUpperCase() === 'Y') ? 'Y' : 'N';
 
           pageLogs.push({
             type: tds[0],
@@ -509,7 +502,7 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
             diseaseType: '',
             group: '',
             arsMenu: tds[9] || '',
-            connectReq: tds[10] || (tds[9] ? 'Y' : 'N'),
+            connectReq: isConnectReq,
             waitTime: parseInt(tds[11] || '0', 10) || 0,
             title: tds[13] || '',
             summary: '',
