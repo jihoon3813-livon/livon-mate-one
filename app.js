@@ -1462,18 +1462,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // 통합허브 검색어 초기화 (브라우저 자동완성/캐시 잔여 방지)
   const clearHubInputSafely = () => {
     const hubInput = document.getElementById('hubSearchInput');
-    if (hubInput) {
+    if (hubInput && hubInput.value) {
       hubInput.value = '';
       const clearBtn = document.getElementById('btnHubSearchClear');
       if (clearBtn) clearBtn.classList.add('hidden');
     }
   };
   clearHubInputSafely();
-  setTimeout(clearHubInputSafely, 100);
-  setTimeout(clearHubInputSafely, 300);
-  setTimeout(clearHubInputSafely, 600);
   window.addEventListener('pageshow', clearHubInputSafely);
-  window.addEventListener('load', clearHubInputSafely);
 
   // Render Core Unified Hub immediately for ultra-fast first contentful paint!
   renderUnifiedCareHub();
@@ -16830,12 +16826,28 @@ function renderUnifiedCareHub() {
     return !!(r && r.status === '전송완료' && r.caseType !== '현대해상 고객등록/조회' && r.formType !== 'HD_FORM_01');
   };
 
-  // Compute stats for 6 quick filters
-  const needAssignCount = gApps.filter(a => a.assignedCaregiverCount === 0 && a.status !== '서비스 취소').length;
-  const inProgressCount = gApps.filter(a => a.status.includes('진행') || a.status === '정상' || a.status === '배정완료').length;
-  const unpaidClaimCount = gApps.filter(a => a.unconfirmedClaimCount > 0 || a.estimatedUnpaid > 0).length;
-  const needPayoutCount = gApps.filter(a => gPayouts.some(p => p.applyId === a.id && p.payoutStatus === '미지급')).length;
-  const needFaxCount = gApps.filter(a => a.claimCount > 0 && !isClaimFaxSentHelper(a.id)).length;
+  // Pre-index unpaid payouts Set for ultra-fast O(1) checks
+  const unpaidPayoutAppIdSet = new Set();
+  for (let i = 0; i < gPayouts.length; i++) {
+    const p = gPayouts[i];
+    if (p && p.payoutStatus === '미지급') unpaidPayoutAppIdSet.add(p.applyId);
+  }
+
+  // Compute stats for 6 quick filters in a single efficient pass
+  let needAssignCount = 0;
+  let inProgressCount = 0;
+  let unpaidClaimCount = 0;
+  let needPayoutCount = 0;
+  let needFaxCount = 0;
+
+  for (let i = 0; i < gApps.length; i++) {
+    const a = gApps[i];
+    if (a.assignedCaregiverCount === 0 && a.status !== '서비스 취소') needAssignCount++;
+    if (a.status.includes('진행') || a.status === '정상' || a.status === '배정완료') inProgressCount++;
+    if (a.unconfirmedClaimCount > 0 || a.estimatedUnpaid > 0) unpaidClaimCount++;
+    if (unpaidPayoutAppIdSet.has(a.id)) needPayoutCount++;
+    if (a.claimCount > 0 && !isClaimFaxSentHelper(a.id)) needFaxCount++;
+  }
 
   const countAllEl = document.getElementById('hubCount-ALL');
   if (countAllEl) {
@@ -16848,6 +16860,19 @@ function renderUnifiedCareHub() {
     if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
   }
 
+  // Pre-index caregiver names if searching
+  const cgNamesByAppId = new Map();
+  const digitsQuery = query ? query.replace(/[^0-9]/g, '') : '';
+  if (query) {
+    for (let i = 0; i < gAssigns.length; i++) {
+      const as = gAssigns[i];
+      if (as && as.applyId && as.caregiverName) {
+        const prev = cgNamesByAppId.get(as.applyId) || '';
+        cgNamesByAppId.set(as.applyId, prev + ' ' + as.caregiverName.toLowerCase());
+      }
+    }
+  }
+
   // Filter application list
   const filtered = gApps.filter(app => {
     if (insFilter !== 'ALL' && !app.insuranceCompany.includes(insFilter)) return false;
@@ -16855,21 +16880,22 @@ function renderUnifiedCareHub() {
     if (gHubFilter === 'NEED_ASSIGN' && (app.assignedCaregiverCount > 0 || app.status === '서비스 취소')) return false;
     if (gHubFilter === 'IN_PROGRESS' && (!app.status.includes('진행') && app.status !== '정상' && app.status !== '배정완료')) return false;
     if (gHubFilter === 'UNPAID_CLAIM' && app.unconfirmedClaimCount === 0 && app.estimatedUnpaid === 0) return false;
-    if (gHubFilter === 'NEED_PAYOUT' && !gPayouts.some(p => p.applyId === app.id && p.payoutStatus === '미지급')) return false;
+    if (gHubFilter === 'NEED_PAYOUT' && !unpaidPayoutAppIdSet.has(app.id)) return false;
     if (gHubFilter === 'NEED_FAX') {
       const isSent = isClaimFaxSentHelper(app.id);
       if (app.claimCount === 0 || isSent) return false;
     }
 
     if (query) {
-      const assigns = gAssigns.filter(as => as.applyId === app.id);
-      const caregiverNames = assigns.map(as => as.caregiverName).join(' ');
+      const cgNames = cgNamesByAppId.get(app.id) || '';
+      const phoneClean = (app.phone || '').replace(/[^0-9]/g, '');
       const match = (app.id && app.id.toLowerCase().includes(query)) ||
                     (app.patientName && app.patientName.toLowerCase().includes(query)) ||
                     (app.phone && app.phone.includes(query)) ||
+                    (digitsQuery.length >= 2 && phoneClean.includes(digitsQuery)) ||
                     (app.adjusterName && app.adjusterName.toLowerCase().includes(query)) ||
-                    (app.accidentNumber && app.accidentNumber.includes(query)) ||
-                    (caregiverNames.toLowerCase().includes(query));
+                    (app.accidentNumber && app.accidentNumber.toLowerCase().includes(query)) ||
+                    (cgNames && cgNames.includes(query));
       if (!match) return false;
     }
     return true;
@@ -19873,10 +19899,14 @@ function updateSidebarCounts() {
   updateDirectoryTotalBadge();
 }
 
-function initIcons() {
+function initIcons(root = null) {
   try {
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons();
+      if (root && (root.nodeType === 1 || (typeof Element !== 'undefined' && root instanceof Element))) {
+        window.lucide.createIcons({ root: root });
+      } else {
+        window.lucide.createIcons();
+      }
     }
   } catch (e) {
     console.warn('Lucide icon error:', e);
@@ -20143,17 +20173,7 @@ function setupInputFormatters() {
   safeAddListener('payoutSearchInput', 'input', renderPayouts);
 }
 
-// Duplicate initData removed
-
-function initIcons() {
-  try {
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons();
-    }
-  } catch (e) {
-    console.warn('Lucide icon error:', e);
-  }
-}
+// Duplicate initIcons removed
 
 function toggleReferenceSubmenu(forceOpen = null) {
   const menu = document.getElementById('referenceSubmenu');
@@ -20276,7 +20296,9 @@ function switchTab(tabId, filterParam = null) {
   else if (tabId === 'settings') renderSettings();
   else if (tabId === 'faxmgmt') renderFaxManagement();
 
-  initIcons(target);
+  if (tabId !== 'carehub') {
+    initIcons(target);
+  }
 }
 
 function onCalcInsuranceChange() {
@@ -24604,14 +24626,13 @@ function onHubSearchInput() {
   if (gHubSearchTimer) clearTimeout(gHubSearchTimer);
   gHubSearchTimer = setTimeout(() => {
     renderUnifiedCareHub();
-  }, 100);
+  }, 180);
 }
 
 function clearHubSearch() {
   const hubInput = document.getElementById('hubSearchInput');
   if (hubInput) {
     hubInput.value = '';
-    hubInput.focus();
   }
   const clearBtn = document.getElementById('btnHubSearchClear');
   if (clearBtn) clearBtn.classList.add('hidden');
