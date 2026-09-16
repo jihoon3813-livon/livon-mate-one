@@ -247,6 +247,12 @@ function renderSamsungCallReportTab() {
             <span>🔗 웹링크 복사</span>
           </button>
 
+          <!-- 웹 바로가기 (새 탭에서 웹 보고서 열기) -->
+          <button type="button" onclick="openSamsungReportWebView()" class="px-3.5 py-2 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer" title="담당자 전달용 웹 보고서 새 탭으로 즉시 열기">
+            <i data-lucide="external-link" class="w-4 h-4 text-indigo-600"></i>
+            <span>🌐 웹 바로가기</span>
+          </button>
+
           <!-- 3-시트 엑셀 다운로드 -->
           <button type="button" onclick="exportSamsungCallReportExcel()" class="px-3.5 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer" title="삼성화재 담당자 전달용 3-Sheet 정밀 서식 엑셀 다운로드">
             <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
@@ -1989,4 +1995,13 @@ function copySamsungReportWebLink() {
     prompt('아래 링크를 복사하여 전달해주세요:', reportUrl);
   });
 }
+
+function openSamsungReportWebView() {
+  const s = document.getElementById('tabReportStartDate')?.value || '2026-08-18';
+  const e = document.getElementById('tabReportEndDate')?.value || new Date().toISOString().slice(0, 10);
+  const ch = document.getElementById('tabReportChannelSelect')?.value || '삼성화재';
+  const reportUrl = `/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
+  window.open(reportUrl, '_blank');
+}
+
 
