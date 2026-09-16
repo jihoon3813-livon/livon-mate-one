@@ -426,20 +426,18 @@
   <!-- TOP HEADER -->
   <header class="bg-white border-b border-slate-200 flex-shrink-0 z-30 shadow-xs">
     <div class="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <!-- Left: Logo & Brand -->
+      <!-- Left: Logo & Brand (클릭 시 통합허브로 이동) -->
       <div class="flex items-center space-x-3">
-        <div class="flex items-center space-x-2.5">
-          <div id="brandLogoBadge" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-700 via-primary-600 to-sky-500 flex items-center justify-center text-white font-black text-lg shadow-md shadow-primary-500/20 transition-all">
-            LM1
-          </div>
+        <a href="javascript:void(0)" onclick="switchTab('carehub')" class="flex items-center space-x-2.5 cursor-pointer group select-none transition-transform active:scale-[0.98]" title="통합간병 운영허브로 이동">
+          <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1789551526/unnamed_gwfeg1.webp" alt="LivOn 로고" id="brandLogoBadge" class="w-10 h-10 rounded-xl object-cover shadow-sm border border-slate-200/80 shrink-0 group-hover:shadow-md transition-all">
           <div>
             <div class="flex items-center space-x-2">
-              <span class="font-extrabold text-xl tracking-tight text-slate-900">리본메이트 원 <span class="text-sm font-semibold text-primary-600 font-sans">(Livon Mate One)</span></span>
+              <span class="font-extrabold text-xl tracking-tight text-slate-900 group-hover:text-primary-700 transition-colors">리본메이트 원 <span class="text-sm font-semibold text-primary-600 font-sans">(Livon Mate One)</span></span>
               <span id="brandVersionBadge" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 transition-all">ERP v3.0</span>
             </div>
-            <p class="text-xs text-slate-500 font-medium">(주)리본케어 통합 간병인 매칭 & 보험 정산 시스템</p>
+            <p class="text-xs text-slate-500 font-medium group-hover:text-slate-700 transition-colors">(주)리본케어 통합 간병인 매칭 & 보험 정산 시스템</p>
           </div>
-        </div>
+        </a>
       </div>
 
       <!-- Right: Controls & Profile -->
@@ -456,12 +454,6 @@
           <span id="maskingStatusText">개인정보 마스킹 ON</span>
         </button>
 
-        <!-- 상단 글로벌 바: 삼성화재 콜분석 주간보고 바로가기 -->
-        <button onclick="switchTab('samsungcallreport')" class="hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-2xs cursor-pointer" title="삼성화재 간병서비스 콜분석 주간보고 화면으로 이동">
-          <i data-lucide="phone-forwarded" class="w-3.5 h-3.5 text-blue-600"></i>
-          <span>삼성화재 콜분석</span>
-          <span class="px-1.5 py-0.2 rounded bg-blue-600 text-white font-black text-[10px]">주간보고</span>
-        </button>
 
         <button onclick="switchTab('claims', '미확인')" class="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg" title="미확인 청구건 바로가기">
           <i data-lucide="bell" class="w-5 h-5 text-rose-500"></i>
@@ -791,7 +783,7 @@
             <div class="flex items-center gap-2 flex-shrink-0">
               <div class="relative w-48 sm:w-56">
                 <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
-                <input type="search" id="hubSearchInput" name="carehub_search_unique" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other" value="" oninput="onHubSearchInput()" placeholder="고객명, 간병인, 사고번호..." class="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:outline-none bg-slate-50 focus:bg-white font-medium">
+                <input type="search" id="hubSearchInput" name="carehub_search_unique" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly onfocus="this.removeAttribute('readonly');" onblur="this.setAttribute('readonly', true);" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-form-type="other" aria-autocomplete="none" role="searchbox" value="" oninput="onHubSearchInput()" placeholder="고객명, 간병인, 사고번호..." class="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:outline-none bg-slate-50 focus:bg-white font-medium">
                 <button type="button" id="btnHubSearchClear" onclick="clearHubSearch()" class="hidden absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 cursor-pointer" title="검색어 지우기">
                   <i data-lucide="x" class="w-3.5 h-3.5"></i>
                 </button>
@@ -4642,7 +4634,7 @@
               <button type="button" onclick="toggleFaxBarobillPwdVisibility()" class="text-[10px] text-purple-600 hover:underline font-normal cursor-pointer">비밀번호 표시</button>
             </label>
             <div class="relative">
-              <input type="password" id="faxBarobillPwd" placeholder="바로빌(barobill.co.kr) 로그인 비밀번호" class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white font-mono pr-9">
+              <input type="password" id="faxBarobillPwd" autocomplete="new-password" placeholder="바로빌(barobill.co.kr) 로그인 비밀번호" class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white font-mono pr-9">
               <button type="button" onclick="toggleFaxBarobillPwdVisibility()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer" title="비밀번호 보기/숨기기">
                 <i id="faxBarobillPwdEye" data-lucide="eye" class="w-3.5 h-3.5"></i>
               </button>
@@ -6421,26 +6413,33 @@
         <!-- 1. 보고 유형 선택 (Radio Buttons) -->
         <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
           <label class="block font-bold text-slate-800 text-xs">보고 목적 및 메일 템플릿 선택</label>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
             <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-white hover:border-sky-400 cursor-pointer transition-all">
               <input type="radio" name="samsungEmailType" value="DAILY_INTAKE" onchange="onSamsungEmailTypeChange(this.value)" checked class="text-sky-600 focus:ring-sky-500">
               <div>
-                <b class="text-slate-900 block text-[11.5px]">일일 접수 보고 (STEP 1)</b>
-                <span class="text-[10.5px] text-slate-500">오늘 접수된 대상자 엑셀</span>
+                <b class="text-slate-900 block text-[11.5px]">일일 접수 보고</b>
+                <span class="text-[10.5px] text-slate-500">신규 대상자 엑셀</span>
               </div>
             </label>
             <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-white hover:border-sky-400 cursor-pointer transition-all">
               <input type="radio" name="samsungEmailType" value="CARE_LOG" onchange="onSamsungEmailTypeChange(this.value)" class="text-sky-600 focus:ring-sky-500">
               <div>
-                <b class="text-slate-900 block text-[11.5px]">간병 종료 & 일지 보고</b>
-                <span class="text-[10.5px] text-slate-500">종료 고객 간병일지(PDF)</span>
+                <b class="text-slate-900 block text-[11.5px]">간병종료 일지</b>
+                <span class="text-[10.5px] text-slate-500">종료 고객 간병일지</span>
               </div>
             </label>
             <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-white hover:border-sky-400 cursor-pointer transition-all">
               <input type="radio" name="samsungEmailType" value="MONTHLY_CLAIM" onchange="onSamsungEmailTypeChange(this.value)" class="text-sky-600 focus:ring-sky-500">
               <div>
-                <b class="text-slate-900 block text-[11.5px]">월간 청구 보고 (STEP 3)</b>
-                <span class="text-[10.5px] text-slate-500">완료 시트 엑셀 + 청구서</span>
+                <b class="text-slate-900 block text-[11.5px]">월간 일괄 청구</b>
+                <span class="text-[10.5px] text-slate-500">월간 완료명단 엑셀</span>
+              </div>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-white hover:border-sky-400 cursor-pointer transition-all">
+              <input type="radio" name="samsungEmailType" value="ROUND_CLAIM" onchange="onSamsungEmailTypeChange(this.value)" class="text-sky-600 focus:ring-sky-500">
+              <div>
+                <b class="text-slate-900 block text-[11.5px]">고객별 비용 청구</b>
+                <span class="text-[10.5px] text-slate-500">단일/분할 차수 청구</span>
               </div>
             </label>
           </div>
@@ -6676,7 +6675,7 @@
               <span>비밀번호 (또는 2단계 앱 비밀번호) *</span>
               <button type="button" onclick="toggleEmailPasswordVisible()" class="text-slate-400 hover:text-slate-600 font-normal text-[10.5px]">비밀번호 보기</button>
             </label>
-            <input type="password" id="emailSmtpPass" required placeholder="메일 비밀번호 또는 앱 비밀번호" 
+            <input type="password" id="emailSmtpPass" autocomplete="new-password" required placeholder="메일 비밀번호 또는 앱 비밀번호" 
               class="w-full p-2.5 border rounded-xl font-mono text-xs focus:ring-2 focus:ring-sky-500">
           </div>
         </div>
@@ -7643,11 +7642,11 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block font-bold text-slate-700 mb-1">로그인 아이디 *</label>
-            <input type="text" id="adminNewUsername" required placeholder="영문/숫자 아이디" class="w-full p-2.5 border rounded-xl font-mono font-bold">
+            <input type="text" id="adminNewUsername" autocomplete="username" required placeholder="영문/숫자 아이디" class="w-full p-2.5 border rounded-xl font-mono font-bold">
           </div>
           <div>
             <label class="block font-bold text-slate-700 mb-1">접속 비밀번호 *</label>
-            <input type="password" id="adminNewPassword" required placeholder="8자리 이상 영문/숫자" class="w-full p-2.5 border rounded-xl font-mono">
+            <input type="password" id="adminNewPassword" autocomplete="new-password" required placeholder="8자리 이상 영문/숫자" class="w-full p-2.5 border rounded-xl font-mono">
           </div>
         </div>
 
@@ -7700,7 +7699,7 @@
           <label class="block font-bold text-slate-700 mb-1">관리자 아이디</label>
           <div class="relative">
             <i data-lucide="user" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
-            <input type="text" id="loginUsernameInput" required placeholder="아이디 입력 (기본: superadmin)" value="superadmin" class="w-full pl-9 pr-3 py-2.5 border rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-primary-500">
+            <input type="text" id="loginUsernameInput" autocomplete="username" required placeholder="아이디 입력 (기본: superadmin)" value="superadmin" class="w-full pl-9 pr-3 py-2.5 border rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-primary-500">
           </div>
         </div>
 
@@ -7708,7 +7707,7 @@
           <label class="block font-bold text-slate-700 mb-1">비밀번호</label>
           <div class="relative">
             <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
-            <input type="password" id="loginPasswordInput" required placeholder="비밀번호 입력" value="12345678" class="w-full pl-9 pr-3 py-2.5 border rounded-xl font-mono focus:ring-2 focus:ring-primary-500">
+            <input type="password" id="loginPasswordInput" autocomplete="current-password" required placeholder="비밀번호 입력" value="12345678" class="w-full pl-9 pr-3 py-2.5 border rounded-xl font-mono focus:ring-2 focus:ring-primary-500">
           </div>
         </div>
 
@@ -8209,7 +8208,7 @@
   <!-- SCRIPTS (Moved to bottom of body for full DOM availability) -->
   <script src="data.js?v=20260910_1931"></script>
   <script src="samsung-call-report.js"></script>
-  <script src="total-call-analysis.js"></script>
-  <script src="app.js?v=20260910_1931"></script>
+  <script src="total-call-analysis.js?v=20260916_1855"></script>
+  <script src="app.js?v=20260916_1850"></script>
 </body>
 </html>

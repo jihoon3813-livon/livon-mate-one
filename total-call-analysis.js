@@ -14,10 +14,10 @@
 // 전역 상태
 let gTotalCallData = null;
 let gTotalCallAnnotations = { memos: {}, labels: {}, customLabels: [] };
-let gActiveTotalViewMode = 'customer'; // 'customer' | 'list' | 'company' | 'date' | 'category'
+let gActiveTotalViewMode = 'list'; // 'list' | 'customer' | 'company' | 'date' | 'category'
 let gTotalFilter = {
-  startDate: '2026-08-18',
-  endDate: new Date().toISOString().slice(0, 10),
+  startDate: '',
+  endDate: '',
   channel: 'all', // 'all' | '삼성화재' | '현대해상' | '리본케어'
   search: '',
   category: '',
@@ -25,7 +25,8 @@ let gTotalFilter = {
   onlyMatched: false,
   onlyWithMemo: false,
   onlyAnswered: false,
-  onlyMissedOutcall: false
+  onlyMissedOutcall: false,
+  onlyUrgent: false
 };
 let isTotalSyncing = false;
 
@@ -689,6 +690,90 @@ function getTotalCallLogs() {
 }
 
 /**
+ * 날짜 프리셋 계산 헬퍼
+ */
+function getTotalCallDatePreset(type) {
+  const today = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  if (type === 'today') {
+    return { start: fmt(today), end: fmt(today) };
+  } else if (type === 'yesterday') {
+    const y = new Date(today);
+    y.setDate(today.getDate() - 1);
+    return { start: fmt(y), end: fmt(y) };
+  } else if (type === 'thisWeek') {
+    const day = today.getDay();
+    const diffToMonday = (day === 0 ? -6 : 1) - day;
+    const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diffToMonday);
+    const sunday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diffToMonday + 6);
+    return { start: fmt(monday), end: fmt(sunday) };
+  } else if (type === 'lastWeek') {
+    const day = today.getDay();
+    const diffToLastMonday = (day === 0 ? -6 : 1) - day - 7;
+    const lastMon = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diffToLastMonday);
+    const lastSun = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diffToLastMonday + 6);
+    return { start: fmt(lastMon), end: fmt(lastSun) };
+  } else if (type === 'last30') {
+    const past = new Date(today);
+    past.setDate(today.getDate() - 30);
+    return { start: fmt(past), end: fmt(today) };
+  }
+  return { start: '', end: '' };
+}
+
+function isTotalPresetActive(type) {
+  const range = getTotalCallDatePreset(type);
+  if (type === 'all') {
+    return !gTotalFilter.startDate && !gTotalFilter.endDate;
+  }
+  return gTotalFilter.startDate === range.start && gTotalFilter.endDate === range.end;
+}
+
+function setTotalDatePreset(type) {
+  const range = getTotalCallDatePreset(type);
+  gTotalFilter.startDate = range.start;
+  gTotalFilter.endDate = range.end;
+  gTotalListPage = 1;
+  gTotalCustomerPage = 1;
+  renderTotalCallAnalysisTab();
+}
+
+function handleTotalDateInputChange(key, val) {
+  gTotalFilter[key] = val ? val.trim() : '';
+}
+
+function applyTotalCustomDateRange() {
+  const sInput = document.getElementById('totalCallStartDate');
+  const eInput = document.getElementById('totalCallEndDate');
+  if (sInput) gTotalFilter.startDate = sInput.value ? sInput.value.trim() : '';
+  if (eInput) gTotalFilter.endDate = eInput.value ? eInput.value.trim() : '';
+  gTotalListPage = 1;
+  gTotalCustomerPage = 1;
+  renderTotalCallAnalysisTab();
+}
+
+function resetAllTotalFilters() {
+  gTotalFilter = {
+    startDate: '',
+    endDate: '',
+    channel: 'all',
+    search: '',
+    category: '',
+    label: '',
+    onlyMatched: false,
+    onlyWithMemo: false,
+    onlyAnswered: false,
+    onlyMissedOutcall: false,
+    onlyUrgent: false
+  };
+  gTotalListPage = 1;
+  gTotalCustomerPage = 1;
+  renderTotalCallAnalysisTab();
+}
+
+/**
  * =============================================================================
  * 종합 콜분석 탭 전체 렌더링
  * =============================================================================
@@ -700,8 +785,20 @@ function renderTotalCallAnalysisTab() {
   const logs = getTotalCallLogs();
   const ctiSummary = (gTotalCallData && gTotalCallData.ctiSummary) || {};
 
-  // 필터링 적용
-  let filtered = logs.filter(c => {
+  // 1) 날짜 범위 필터 적용 (KPI 및 분석 기준)
+  const dateFilteredLogs = logs.filter(c => {
+    if (gTotalFilter.startDate || gTotalFilter.endDate) {
+      const callDate = (c.callTime || '').slice(0, 10);
+      if (callDate) {
+        if (gTotalFilter.startDate && callDate < gTotalFilter.startDate) return false;
+        if (gTotalFilter.endDate && callDate > gTotalFilter.endDate) return false;
+      }
+    }
+    return true;
+  });
+
+  // 2) 상세 조건 필터링 적용 (dateFilteredLogs 기준)
+  let filtered = dateFilteredLogs.filter(c => {
     // 1) 채널 필터
     if (gTotalFilter.channel !== 'all' && gTotalFilter.channel !== '전체') {
       const ch = c.channel || '';
@@ -758,20 +855,33 @@ function renderTotalCallAnalysisTab() {
     if (gTotalFilter.onlyMissedOutcall) {
       if (!isCallMissedWaitZero(c)) return false;
     }
+    // 9) 긴급 / 민원주의 라벨 필터
+    if (gTotalFilter.onlyUrgent) {
+      const callId = getCallUniqueId(c);
+      const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
+      if (!labels.includes('긴급') && !labels.includes('민원주의')) return false;
+    }
     return true;
   });
 
-  // KPI 집계
-  const totalInbound = (ctiSummary && ctiSummary.totalInbound !== undefined) ? ctiSummary.totalInbound : logs.length;
-  const answeredCount = logs.filter(c => c.title || c.summary).length;
-  const matchedCalls = logs.filter(c => matchCustomerToMateOne(c).isRegistered);
-  const urgentCalls = logs.filter(c => {
+  // KPI 집계 (날짜 필터링 적용된 dateFilteredLogs 기준)
+  const totalInbound = dateFilteredLogs.length;
+  const answeredCount = dateFilteredLogs.filter(c => c.title || c.summary).length;
+  const matchedCalls = dateFilteredLogs.filter(c => matchCustomerToMateOne(c).isRegistered);
+  const urgentCalls = dateFilteredLogs.filter(c => {
     const callId = getCallUniqueId(c);
     const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
     return labels.includes('긴급') || labels.includes('민원주의');
   });
-  const missedWaitZeroLogs = logs.filter(isCallMissedWaitZero);
+  const missedWaitZeroLogs = dateFilteredLogs.filter(isCallMissedWaitZero);
   const pendingOutcalls = missedWaitZeroLogs.filter(c => !isCallOutcallHandled(getCallUniqueId(c)));
+
+  // KPI 카드별 활성화(필터링 선택) 상태 판별
+  const isKpiAllActive = !gTotalFilter.onlyAnswered && !gTotalFilter.onlyMatched && !gTotalFilter.onlyMissedOutcall && !gTotalFilter.onlyUrgent;
+  const isKpiAnsweredActive = !!gTotalFilter.onlyAnswered;
+  const isKpiMatchedActive = !!gTotalFilter.onlyMatched;
+  const isKpiMissedActive = !!gTotalFilter.onlyMissedOutcall;
+  const isKpiUrgentActive = !!gTotalFilter.onlyUrgent;
 
   container.innerHTML = `
     <!-- 1. 최상단 헤더 & 컨트롤 바 -->
@@ -788,7 +898,7 @@ function renderTotalCallAnalysisTab() {
               </span>
               <span class="text-xs text-slate-500 font-bold">인입경로: 삼성화재 · 현대해상 · 리본케어 전체</span>
               <span class="text-slate-300">|</span>
-              <span class="text-xs text-slate-400 font-mono">총 ${totalInbound}건 수집</span>
+              <span class="text-xs text-slate-400 font-mono">${(gTotalFilter.startDate || gTotalFilter.endDate) ? `${gTotalFilter.startDate || '시작'} ~ ${gTotalFilter.endDate || '현재'} (${dateFilteredLogs.length}건)` : `총 ${logs.length}건 수집`}</span>
             </div>
             <h2 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight mt-0.5">
               종합 콜분석 & CTI 통합 고객 관리 시스템
@@ -853,126 +963,228 @@ function renderTotalCallAnalysisTab() {
         </div>
       ` : ''}
 
-      <!-- 2. 핵심 KPI 스트립 (5대 메트릭) -->
+      <!-- 2. 핵심 KPI 스트립 (5대 메트릭 - 숫자 카드 클릭 필터링 연동) -->
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t border-slate-100 text-xs">
-        <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
-          <span class="text-[11px] font-bold text-slate-500">상담 연결요청 콜</span>
-          <div class="text-xl font-black text-slate-900 mt-1">${logs.length}<span class="text-xs font-normal text-slate-500 ml-1">건</span></div>
-          <span class="text-[10px] text-slate-400 mt-0.5">연결요청 Y 고객 전수</span>
+        <!-- 1) 전체 인바운드 콜 -->
+        <div onclick="handleTotalKpiCardClick('all')" 
+          class="p-3 rounded-2xl flex flex-col justify-between cursor-pointer transition-all duration-150 select-none shadow-2xs hover:shadow-xs active:scale-[0.98] ${isKpiAllActive ? 'bg-slate-900 text-white ring-2 ring-slate-800 shadow-sm' : 'bg-slate-50 hover:bg-slate-100/90 border border-slate-200 text-slate-800'}" 
+          title="클릭 시 전체 인바운드 콜 조회 (필터 해제)">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold ${isKpiAllActive ? 'text-slate-300' : 'text-slate-500'}">전체 인바운드 콜</span>
+            ${isKpiAllActive ? '<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-white/20 text-white">전체</span>' : ''}
+          </div>
+          <div class="text-xl font-black ${isKpiAllActive ? 'text-white' : 'text-slate-900'} mt-1">
+            ${dateFilteredLogs.length}<span class="text-xs font-normal ${isKpiAllActive ? 'text-slate-300' : 'text-slate-500'} ml-1">건</span>
+          </div>
+          <span class="text-[10px] ${isKpiAllActive ? 'text-slate-300' : 'text-slate-400'} mt-0.5 truncate">${(gTotalFilter.startDate || gTotalFilter.endDate) ? `${gTotalFilter.startDate || '시작'} ~ ${gTotalFilter.endDate || '현재'}` : 'CTI 실시간 수집'}</span>
         </div>
 
-        <div class="p-3 rounded-2xl bg-cyan-50/70 border border-cyan-200 flex flex-col justify-between">
-          <span class="text-[11px] font-bold text-cyan-800">실제 상담 (요약 확보)</span>
-          <div class="text-xl font-black text-cyan-700 mt-1">${answeredCount}<span class="text-xs font-normal text-cyan-600 ml-1">건</span></div>
-          <span class="text-[10px] text-cyan-600 mt-0.5">응대율 ${logs.length > 0 ? Math.round((answeredCount / logs.length) * 100) : 0}%</span>
+        <!-- 2) 실제 상담 (요약 확보) -->
+        <div onclick="handleTotalKpiCardClick('answered')" 
+          class="p-3 rounded-2xl flex flex-col justify-between cursor-pointer transition-all duration-150 select-none shadow-2xs hover:shadow-xs active:scale-[0.98] ${isKpiAnsweredActive ? 'bg-cyan-100/90 border-2 border-cyan-600 ring-2 ring-cyan-200 shadow-sm' : 'bg-cyan-50/70 hover:bg-cyan-100/70 border border-cyan-200 text-slate-800'}" 
+          title="클릭 시 실제 상담(요약/제목 확보) 통화만 필터링">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-cyan-800">실제 상담 (요약 확보)</span>
+            ${isKpiAnsweredActive ? '<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-cyan-600 text-white animate-pulse">필터 중</span>' : ''}
+          </div>
+          <div class="text-xl font-black text-cyan-700 mt-1">
+            ${answeredCount}<span class="text-xs font-normal text-cyan-600 ml-1">건</span>
+          </div>
+          <div class="flex items-center justify-between text-[10px] text-cyan-600 mt-0.5">
+            <span>응대율 ${dateFilteredLogs.length > 0 ? Math.round((answeredCount / dateFilteredLogs.length) * 100) : 0}%</span>
+            <span class="text-[9px] font-bold ${isKpiAnsweredActive ? 'text-cyan-800 underline' : 'text-cyan-600'}">${isKpiAnsweredActive ? '해제 ✕' : '클릭 필터 →'}</span>
+          </div>
         </div>
 
-        <div class="p-3 rounded-2xl bg-indigo-50/70 border border-indigo-200 flex flex-col justify-between">
-          <span class="text-[11px] font-bold text-indigo-800">메이트원 고객 매칭</span>
-          <div class="text-xl font-black text-indigo-700 mt-1">${matchedCalls.length}<span class="text-xs font-normal text-indigo-600 ml-1">건</span></div>
-          <span class="text-[10px] text-indigo-600 mt-0.5">현대해상/삼성화재 등록</span>
+        <!-- 3) 메이트원 고객 매칭 -->
+        <div onclick="handleTotalKpiCardClick('matched')" 
+          class="p-3 rounded-2xl flex flex-col justify-between cursor-pointer transition-all duration-150 select-none shadow-2xs hover:shadow-xs active:scale-[0.98] ${isKpiMatchedActive ? 'bg-indigo-100/90 border-2 border-indigo-600 ring-2 ring-indigo-200 shadow-sm' : 'bg-indigo-50/70 hover:bg-indigo-100/70 border border-indigo-200 text-slate-800'}" 
+          title="클릭 시 메이트원 등록 고객(현대해상/삼성화재) 통화만 필터링">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-indigo-800">메이트원 고객 매칭</span>
+            ${isKpiMatchedActive ? '<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-indigo-600 text-white animate-pulse">필터 중</span>' : ''}
+          </div>
+          <div class="text-xl font-black text-indigo-700 mt-1">
+            ${matchedCalls.length}<span class="text-xs font-normal text-indigo-600 ml-1">건</span>
+          </div>
+          <div class="flex items-center justify-between text-[10px] text-indigo-600 mt-0.5">
+            <span>현대해상/삼성화재 등록</span>
+            <span class="text-[9px] font-bold ${isKpiMatchedActive ? 'text-indigo-800 underline' : 'text-indigo-600'}">${isKpiMatchedActive ? '해제 ✕' : '클릭 필터 →'}</span>
+          </div>
         </div>
 
-        <div class="p-3 rounded-2xl bg-rose-50/90 border border-rose-300 flex flex-col justify-between cursor-pointer hover:bg-rose-100/80 transition-colors" onclick="openMissedCallsOutcallModal('pending')" title="클릭 시 아웃콜 집중 관리 모달 열기">
+        <!-- 4) 미연결 · 아웃콜요망 -->
+        <div onclick="handleTotalKpiCardClick('missed')" 
+          class="p-3 rounded-2xl flex flex-col justify-between cursor-pointer transition-all duration-150 select-none shadow-2xs hover:shadow-xs active:scale-[0.98] ${isKpiMissedActive ? 'bg-rose-100 border-2 border-rose-600 ring-2 ring-rose-200 shadow-sm' : 'bg-rose-50/90 hover:bg-rose-100/80 border border-rose-300 text-slate-800'}" 
+          title="클릭 시 상담미연결(상담0초) 대기건 목록 필터링">
           <div class="flex items-center justify-between">
             <span class="text-[11px] font-black text-rose-800 flex items-center gap-1">
               <i data-lucide="phone-missed" class="w-3 h-3 text-rose-600 animate-pulse"></i>
-              <span>상담미연결 · 아웃콜</span>
+              <span>미연결 · 아웃콜요망</span>
             </span>
-            <span class="text-[9px] px-1.5 py-0.2 bg-rose-600 text-white rounded font-bold">상담0초</span>
+            <div class="flex items-center gap-1">
+              <span class="text-[9px] px-1.5 py-0.2 bg-rose-600 text-white rounded font-bold">대기0초</span>
+              ${isKpiMissedActive ? '<span class="text-[9px] px-1.5 py-0.2 bg-rose-800 text-white rounded font-bold animate-pulse">필터 중</span>' : ''}
+            </div>
           </div>
           <div class="text-xl font-black text-rose-700 mt-1">
             ${pendingOutcalls.length}<span class="text-xs font-normal text-rose-600 ml-1">건 대기</span>
           </div>
-          <span class="text-[10px] text-rose-600 font-bold mt-0.5">전체 ${missedWaitZeroLogs.length}건 중 클릭 열기 &rarr;</span>
+          <div class="flex items-center justify-between text-[10px] text-rose-600 font-bold mt-0.5">
+            <span class="${isKpiMissedActive ? 'text-rose-800 underline' : ''}">${isKpiMissedActive ? '필터 해제 ✕' : `전체 ${missedWaitZeroLogs.length}건 필터 →`}</span>
+            <button type="button" onclick="event.stopPropagation(); openMissedCallsOutcallModal('pending');" class="text-[9.5px] px-1.5 py-0.5 rounded bg-white hover:bg-rose-200 text-rose-700 font-bold border border-rose-300 cursor-pointer transition-colors shadow-2xs" title="아웃콜 집중 관리 모달 팝업 열기">모달 ↗</button>
+          </div>
         </div>
 
-        <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-200 flex flex-col justify-between">
-          <span class="text-[11px] font-bold text-amber-900">긴급 / 민원주의 라벨</span>
-          <div class="text-xl font-black text-amber-700 mt-1">${urgentCalls.length}<span class="text-xs font-normal text-amber-600 ml-1">건</span></div>
-          <span class="text-[10px] text-amber-600 mt-0.5">집중 관리 대상</span>
+        <!-- 5) 긴급 / 민원주의 라벨 -->
+        <div onclick="handleTotalKpiCardClick('urgent')" 
+          class="p-3 rounded-2xl flex flex-col justify-between cursor-pointer transition-all duration-150 select-none shadow-2xs hover:shadow-xs active:scale-[0.98] ${isKpiUrgentActive ? 'bg-amber-100 border-2 border-amber-600 ring-2 ring-amber-200 shadow-sm' : 'bg-amber-50/70 hover:bg-amber-100/70 border border-amber-200 text-slate-800'}" 
+          title="클릭 시 긴급 / 민원주의 라벨 부착 통화만 필터링">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-amber-900">긴급 / 민원주의 라벨</span>
+            ${isKpiUrgentActive ? '<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-amber-600 text-white animate-pulse">필터 중</span>' : ''}
+          </div>
+          <div class="text-xl font-black text-amber-700 mt-1">
+            ${urgentCalls.length}<span class="text-xs font-normal text-amber-600 ml-1">건</span>
+          </div>
+          <div class="flex items-center justify-between text-[10px] text-amber-600 mt-0.5">
+            <span>집중 관리 대상</span>
+            <span class="text-[9px] font-bold ${isKpiUrgentActive ? 'text-amber-800 underline' : 'text-amber-600'}">${isKpiUrgentActive ? '해제 ✕' : '클릭 필터 →'}</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 3. 조회 모드 스위처 (리스트 뷰 / 고객 기준 / 보험사 기준 / 날짜 기준 / 유형 기준) -->
-    <div class="bg-white rounded-3xl border border-slate-200/90 p-3 sm:p-4 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-      <!-- 5대 뷰 모드 탭 -->
-      <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 border border-slate-200 overflow-x-auto scrollbar-none shrink-0">
-        <button type="button" onclick="switchTotalViewMode('list')" 
-          class="px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${gActiveTotalViewMode === 'list' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'}">
-          <i data-lucide="list" class="w-4 h-4"></i>
-          <span>📋 리스트 뷰</span>
-        </button>
+    <!-- 3. 조회 모드 스위처 및 필터 제어 바 -->
+    <div class="bg-white rounded-3xl border border-slate-200/90 p-4 shadow-xs space-y-3">
+      <!-- 1행: 5대 뷰 모드 탭 & 검색 / 빠른 체크박스 -->
+      <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+        <!-- 뷰 모드 탭 (기본 리스트 뷰 + 조회 구분: 고객 / 보험사 / 날짜 / 유형) -->
+        <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 border border-slate-200 overflow-x-auto scrollbar-none shrink-0">
+          <button type="button" onclick="switchTotalViewMode('list')" 
+            class="px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${gActiveTotalViewMode === 'list' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'}">
+            <i data-lucide="list" class="w-4 h-4"></i>
+            <span>리스트 뷰</span>
+          </button>
 
-        <button type="button" onclick="switchTotalViewMode('customer')" 
-          class="px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${gActiveTotalViewMode === 'customer' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'}">
-          <i data-lucide="users" class="w-4 h-4"></i>
-          <span>👤 고객 기준</span>
-        </button>
+          <div class="h-4 w-px bg-slate-300 mx-1"></div>
+          <span class="text-[11px] font-bold text-slate-400 px-1 whitespace-nowrap">조회 구분:</span>
 
-        <button type="button" onclick="switchTotalViewMode('company')" 
-          class="px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${gActiveTotalViewMode === 'company' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'}">
-          <i data-lucide="building-2" class="w-4 h-4"></i>
-          <span>🏢 보험사 기준</span>
-        </button>
+          <button type="button" onclick="switchTotalViewMode('customer')" 
+            class="px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${gActiveTotalViewMode === 'customer' ? 'bg-cyan-600 text-white shadow-sm font-black' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'}">
+            <i data-lucide="users" class="w-4 h-4"></i>
+            <span>고객</span>
+          </button>
 
-        <button type="button" onclick="switchTotalViewMode('date')" 
-          class="px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${gActiveTotalViewMode === 'date' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'}">
-          <i data-lucide="calendar" class="w-4 h-4"></i>
-          <span>📅 날짜 기준</span>
-        </button>
+          <button type="button" onclick="switchTotalViewMode('company')" 
+            class="px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${gActiveTotalViewMode === 'company' ? 'bg-cyan-600 text-white shadow-sm font-black' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'}">
+            <i data-lucide="building-2" class="w-4 h-4"></i>
+            <span>보험사</span>
+          </button>
 
-        <button type="button" onclick="switchTotalViewMode('category')" 
-          class="px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${gActiveTotalViewMode === 'category' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'}">
-          <i data-lucide="pie-chart" class="w-4 h-4"></i>
-          <span>🏷️ 유형 기준</span>
-        </button>
-      </div>
+          <button type="button" onclick="switchTotalViewMode('date')" 
+            class="px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${gActiveTotalViewMode === 'date' ? 'bg-cyan-600 text-white shadow-sm font-black' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'}">
+            <i data-lucide="calendar" class="w-4 h-4"></i>
+            <span>날짜</span>
+          </button>
 
-      <!-- 통합 검색 및 상세 필터 바 -->
-      <div class="flex items-center gap-2 flex-wrap flex-1 justify-start md:justify-end min-w-0">
-        <!-- 아웃콜 대상 전용 체크박스 -->
-        <label class="flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 cursor-pointer px-2.5 py-1 rounded-xl transition-colors shrink-0" title="연결요청(Y) 후 상담시간 0초 미연결 아웃콜 대상만 모아보기">
-          <input type="checkbox" ${gTotalFilter.onlyMissedOutcall ? 'checked' : ''} onchange="handleTotalFilterChange('onlyMissedOutcall', this.checked)" class="rounded text-rose-600">
-          <span>🚨 아웃콜(상담0초)만</span>
-        </label>
-
-        <!-- 인입 채널 셀렉트 -->
-        <select onchange="handleTotalFilterChange('channel', this.value)" class="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white">
-          <option value="all" ${gTotalFilter.channel === 'all' ? 'selected' : ''}>경로: 전체 (${logs.length}건)</option>
-          <option value="삼성화재" ${gTotalFilter.channel === '삼성화재' ? 'selected' : ''}>경로: 삼성화재</option>
-          <option value="현대해상" ${gTotalFilter.channel === '현대해상' ? 'selected' : ''}>경로: 현대해상</option>
-          <option value="리본케어" ${gTotalFilter.channel === '리본케어' ? 'selected' : ''}>경로: 리본케어</option>
-        </select>
-
-        <!-- 라벨 필터 -->
-        <select onchange="handleTotalFilterChange('label', this.value)" class="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white">
-          <option value="">라벨: 전체</option>
-          ${getAllAvailableLabels().map(l => `
-            <option value="${l.name}" ${gTotalFilter.label === l.name ? 'selected' : ''}>라벨: ${l.name}</option>
-          `).join('')}
-        </select>
-
-        <!-- 상담유형 필터 -->
-        <select onchange="handleTotalFilterChange('category', this.value)" class="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white">
-          <option value="">상담유형: 전체</option>
-          ${CONSULT_CATEGORIES.map(c => `
-            <option value="${c.name}" ${gTotalFilter.category === c.name ? 'selected' : ''}>${c.name}</option>
-          `).join('')}
-        </select>
-
-        <!-- 검색창 -->
-        <div class="relative min-w-[180px] flex-1 sm:max-w-xs">
-          <input type="text" value="${gTotalFilter.search}" oninput="handleTotalFilterChange('search', this.value)" placeholder="고객명, 전화번호, 상담제목, 메모 검색..." class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-cyan-500">
-          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+          <button type="button" onclick="switchTotalViewMode('category')" 
+            class="px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${gActiveTotalViewMode === 'category' ? 'bg-cyan-600 text-white shadow-sm font-black' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'}">
+            <i data-lucide="pie-chart" class="w-4 h-4"></i>
+            <span>유형</span>
+          </button>
         </div>
 
-        <!-- 매칭 고객 전용 체크박스 -->
-        <label class="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer px-2 py-1 rounded-lg hover:bg-slate-50 shrink-0">
-          <input type="checkbox" ${gTotalFilter.onlyMatched ? 'checked' : ''} onchange="handleTotalFilterChange('onlyMatched', this.checked)" class="rounded text-cyan-600">
-          <span>매칭고객만</span>
-        </label>
+        <!-- 검색창 & 아웃콜/매칭 필터 체크박스 -->
+        <div class="flex items-center gap-2 flex-wrap flex-1 justify-start lg:justify-end min-w-0">
+          <!-- 아웃콜 대상 전용 체크박스 -->
+          <label class="flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 cursor-pointer px-2.5 py-1.5 rounded-xl transition-colors shrink-0" title="연결요청(Y) 후 상담시간 0초 미연결 아웃콜 대상만 모아보기">
+            <input type="checkbox" ${gTotalFilter.onlyMissedOutcall ? 'checked' : ''} onchange="handleTotalFilterChange('onlyMissedOutcall', this.checked)" class="rounded text-rose-600">
+            <span>🚨 아웃콜(상담0초)만</span>
+          </label>
+
+          <!-- 매칭 고객 전용 체크박스 -->
+          <label class="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 shrink-0">
+            <input type="checkbox" ${gTotalFilter.onlyMatched ? 'checked' : ''} onchange="handleTotalFilterChange('onlyMatched', this.checked)" class="rounded text-cyan-600">
+            <span>매칭고객만</span>
+          </label>
+
+          <!-- 검색창 -->
+          <div class="relative min-w-[200px] flex-1 sm:max-w-xs">
+            <input type="text" value="${gTotalFilter.search}" oninput="handleTotalFilterChange('search', this.value)" placeholder="고객명, 전화번호, 상담제목, 메모 검색..." class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-cyan-500">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2행: 날짜 필터링 바 (기간 직접 지정 + 프리셋 퀵버튼) 및 드롭다운 필터 -->
+      <div class="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-2.5 pt-3 border-t border-slate-100 text-xs">
+        <!-- 좌측: 날짜 선택기 & 프리셋 -->
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- 날짜 범위 인풋 -->
+          <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200/90 rounded-2xl p-1.5">
+            <div class="flex items-center gap-1 text-slate-600 font-bold px-1 shrink-0">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-cyan-600"></i>
+              <span>기간:</span>
+            </div>
+            <input type="date" id="totalCallStartDate" value="${gTotalFilter.startDate || ''}" 
+              onchange="handleTotalDateInputChange('startDate', this.value)" 
+              class="bg-white px-2 py-1 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500 shadow-2xs">
+            <span class="text-slate-400 font-normal">~</span>
+            <input type="date" id="totalCallEndDate" value="${gTotalFilter.endDate || ''}" 
+              onchange="handleTotalDateInputChange('endDate', this.value)" 
+              class="bg-white px-2 py-1 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500 shadow-2xs">
+            <button type="button" onclick="applyTotalCustomDateRange()" 
+              class="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 active:scale-95 text-white rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer whitespace-nowrap">
+              조회
+            </button>
+          </div>
+
+          <!-- 프리셋 버튼들 -->
+          <div class="flex items-center gap-1 overflow-x-auto scrollbar-none py-0.5">
+            <button type="button" onclick="setTotalDatePreset('today')" class="px-2.5 py-1.5 rounded-xl border ${isTotalPresetActive('today') ? 'bg-cyan-600 text-white border-cyan-600 font-black shadow-xs' : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold'} transition-all cursor-pointer whitespace-nowrap">오늘</button>
+            <button type="button" onclick="setTotalDatePreset('yesterday')" class="px-2.5 py-1.5 rounded-xl border ${isTotalPresetActive('yesterday') ? 'bg-cyan-600 text-white border-cyan-600 font-black shadow-xs' : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold'} transition-all cursor-pointer whitespace-nowrap">어제</button>
+            <button type="button" onclick="setTotalDatePreset('thisWeek')" class="px-2.5 py-1.5 rounded-xl border ${isTotalPresetActive('thisWeek') ? 'bg-cyan-600 text-white border-cyan-600 font-black shadow-xs' : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold'} transition-all cursor-pointer whitespace-nowrap">이번 주</button>
+            <button type="button" onclick="setTotalDatePreset('lastWeek')" class="px-2.5 py-1.5 rounded-xl border ${isTotalPresetActive('lastWeek') ? 'bg-cyan-600 text-white border-cyan-600 font-black shadow-xs' : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold'} transition-all cursor-pointer whitespace-nowrap">지난 주</button>
+            <button type="button" onclick="setTotalDatePreset('last30')" class="px-2.5 py-1.5 rounded-xl border ${isTotalPresetActive('last30') ? 'bg-cyan-600 text-white border-cyan-600 font-black shadow-xs' : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold'} transition-all cursor-pointer whitespace-nowrap">최근 30일</button>
+            <button type="button" onclick="setTotalDatePreset('all')" class="px-2.5 py-1.5 rounded-xl border ${isTotalPresetActive('all') ? 'bg-slate-800 text-white border-slate-800 font-black shadow-xs' : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold'} transition-all cursor-pointer whitespace-nowrap">전체 기간</button>
+          </div>
+        </div>
+
+        <!-- 우측: 드롭다운 필터 (경로/라벨/상담유형) & 초기화 -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <!-- 인입 채널 셀렉트 -->
+          <select onchange="handleTotalFilterChange('channel', this.value)" class="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white">
+            <option value="all" ${gTotalFilter.channel === 'all' ? 'selected' : ''}>경로: 전체 (${dateFilteredLogs.length}건)</option>
+            <option value="삼성화재" ${gTotalFilter.channel === '삼성화재' ? 'selected' : ''}>경로: 삼성화재</option>
+            <option value="현대해상" ${gTotalFilter.channel === '현대해상' ? 'selected' : ''}>경로: 현대해상</option>
+            <option value="리본케어" ${gTotalFilter.channel === '리본케어' ? 'selected' : ''}>경로: 리본케어</option>
+          </select>
+
+          <!-- 라벨 필터 -->
+          <select onchange="handleTotalFilterChange('label', this.value)" class="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white">
+            <option value="">라벨: 전체</option>
+            ${getAllAvailableLabels().map(l => `
+              <option value="${l.name}" ${gTotalFilter.label === l.name ? 'selected' : ''}>라벨: ${l.name}</option>
+            `).join('')}
+          </select>
+
+          <!-- 상담유형 필터 -->
+          <select onchange="handleTotalFilterChange('category', this.value)" class="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white">
+            <option value="">상담유형: 전체</option>
+            ${CONSULT_CATEGORIES.map(c => `
+              <option value="${c.name}" ${gTotalFilter.category === c.name ? 'selected' : ''}>${c.name}</option>
+            `).join('')}
+          </select>
+
+          ${(gTotalFilter.startDate || gTotalFilter.endDate || gTotalFilter.channel !== 'all' || gTotalFilter.category || gTotalFilter.label || gTotalFilter.search || gTotalFilter.onlyMatched || gTotalFilter.onlyMissedOutcall || gTotalFilter.onlyAnswered || gTotalFilter.onlyUrgent) ? `
+            <button type="button" onclick="resetAllTotalFilters()" 
+              class="px-2 py-1 rounded-lg text-rose-600 hover:bg-rose-50 font-bold text-[11px] flex items-center gap-0.5 cursor-pointer transition-colors" title="모든 검색 및 필터 조건 초기화">
+              <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+              <span>필터 초기화</span>
+            </button>
+          ` : ''}
+        </div>
       </div>
     </div>
 
@@ -997,6 +1209,50 @@ function switchTotalViewMode(mode) {
 
 function handleTotalFilterChange(key, value) {
   gTotalFilter[key] = value;
+  gTotalListPage = 1;
+  gTotalCustomerPage = 1;
+  renderTotalCallAnalysisTab();
+}
+
+/**
+ * 상단 핵심 KPI 숫자 카드 클릭 핸들러
+ * - 'all': 전체 인바운드 콜 (서브 KPI 필터 초기화)
+ * - 'answered': 실제 상담 (요약 확보) 건만 토글 필터링
+ * - 'matched': 메이트원 고객 매칭 건만 토글 필터링
+ * - 'missed': 미연결 아웃콜 대상 건만 토글 필터링
+ * - 'urgent': 긴급 / 민원주의 라벨 건만 토글 필터링
+ */
+function handleTotalKpiCardClick(type) {
+  if (type === 'all') {
+    gTotalFilter.onlyAnswered = false;
+    gTotalFilter.onlyMatched = false;
+    gTotalFilter.onlyMissedOutcall = false;
+    gTotalFilter.onlyUrgent = false;
+  } else if (type === 'answered') {
+    const next = !gTotalFilter.onlyAnswered;
+    gTotalFilter.onlyAnswered = next;
+    gTotalFilter.onlyMatched = false;
+    gTotalFilter.onlyMissedOutcall = false;
+    gTotalFilter.onlyUrgent = false;
+  } else if (type === 'matched') {
+    const next = !gTotalFilter.onlyMatched;
+    gTotalFilter.onlyMatched = next;
+    gTotalFilter.onlyAnswered = false;
+    gTotalFilter.onlyMissedOutcall = false;
+    gTotalFilter.onlyUrgent = false;
+  } else if (type === 'missed') {
+    const next = !gTotalFilter.onlyMissedOutcall;
+    gTotalFilter.onlyMissedOutcall = next;
+    gTotalFilter.onlyAnswered = false;
+    gTotalFilter.onlyMatched = false;
+    gTotalFilter.onlyUrgent = false;
+  } else if (type === 'urgent') {
+    const next = !gTotalFilter.onlyUrgent;
+    gTotalFilter.onlyUrgent = next;
+    gTotalFilter.onlyAnswered = false;
+    gTotalFilter.onlyMatched = false;
+    gTotalFilter.onlyMissedOutcall = false;
+  }
   gTotalListPage = 1;
   gTotalCustomerPage = 1;
   renderTotalCallAnalysisTab();
@@ -1145,13 +1401,12 @@ function renderTotalListView(logs) {
                     </div>
                     <div class="mt-1 flex items-center gap-1">
                       ${match.isRegistered ? `
-                        <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
-                          class="px-2 py-0.5 rounded text-[10.5px] font-black border ${match.badgeClass} hover:opacity-80 transition-opacity cursor-pointer inline-flex items-center gap-1 shadow-2xs" title="원스탑 고객 상세업무 대시보드 열기">
-                          <span>✓ ${match.company} (${match.appId || '매칭'})</span>
-                          <i data-lucide="external-link" class="w-2.5 h-2.5"></i>
-                        </button>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${match.badgeClass} inline-flex items-center gap-0.5 whitespace-nowrap" title="${match.company} 등록고객 (${match.appId || ''})">
+                          <i data-lucide="check" class="w-2.5 h-2.5 shrink-0"></i>
+                          <span>${match.company || '등록고객'}</span>
+                        </span>
                       ` : `
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200 whitespace-nowrap">
                           미등록 인입
                         </span>
                       `}
@@ -1169,10 +1424,13 @@ function renderTotalListView(logs) {
                     ` : ''}
                   </td>
 
-                  <!-- 5. 상담 내용 요약 (마우스 호버 시 툴팁 미리보기, 클릭 시 상세 모달) -->
-                  <td class="py-3 px-3 align-middle relative group/sum">
-                    <div class="cursor-pointer p-1.5 rounded-xl hover:bg-cyan-50/60 border border-transparent hover:border-cyan-200 transition-all" 
-                      onclick="openTotalCallSummaryModal('${callId}')" title="클릭 시 전체 상담 내용 및 메모 모달 열기">
+                  <!-- 5. 상담 내용 요약 (마우스 호버 시 플로팅 툴팁 미리보기, 클릭 시 상세 모달) -->
+                  <td class="py-3 px-3 align-middle">
+                    <div class="cursor-pointer p-1.5 rounded-xl hover:bg-cyan-50/60 border border-transparent hover:border-cyan-200 transition-all group/sum" 
+                      onclick="hideCallPreviewTooltip(); openTotalCallSummaryModal('${callId}')" 
+                      onmouseenter="showCallPreviewTooltip(event, '${callId}')"
+                      onmouseleave="hideCallPreviewTooltip()"
+                      title="클릭 시 전체 상담 내용 및 메모 모달 열기">
                       <div class="flex items-center gap-1.5 font-bold text-slate-900 group-hover/sum:text-cyan-800">
                         <i data-lucide="message-square" class="w-3.5 h-3.5 text-slate-400 group-hover/sum:text-cyan-600 shrink-0"></i>
                         <span class="truncate max-w-[240px] xl:max-w-[320px]">${call.title || '상담 제목 미기재 (클릭하여 확인)'}</span>
@@ -1180,29 +1438,6 @@ function renderTotalListView(logs) {
                       </div>
                       <div class="text-[11px] text-slate-500 truncate max-w-[240px] xl:max-w-[320px] mt-0.5">
                         ${call.summary ? call.summary.replace(/<[^>]*>/g, '') : '(상담 요약 미확보 / 단순 인입)'}
-                      </div>
-                    </div>
-
-                    <!-- 마우스 호버 시 표시되는 플로팅 툴팁 카드 -->
-                    <div class="hidden group-hover/sum:block absolute left-4 bottom-full mb-2 w-96 max-w-md z-50 p-4 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 text-xs pointer-events-none transition-all duration-150">
-                      <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
-                        <div class="font-black text-cyan-400 flex items-center gap-1.5">
-                          <i data-lucide="info" class="w-3.5 h-3.5"></i>
-                          <span>상담 내용 전문 미리보기</span>
-                        </div>
-                        <span class="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full font-bold">클릭 시 전체 모달</span>
-                      </div>
-                      <div class="font-black text-white text-xs mb-1.5">${call.title || '상담 제목 없음'}</div>
-                      <div class="text-[11.5px] text-slate-300 leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap">${call.summary || '상담 요약 내용이 없습니다.'}</div>
-                      ${call.keywords ? `
-                        <div class="mt-2.5 pt-2 border-t border-slate-800 flex items-center gap-1 flex-wrap">
-                          <span class="text-[10px] text-slate-400 font-bold">키워드:</span>
-                          <span class="text-[10.5px] text-cyan-300 font-mono">${call.keywords}</span>
-                        </div>
-                      ` : ''}
-                      <div class="mt-2 flex items-center justify-between text-[10px] text-slate-400 pt-1.5 border-t border-slate-800/80">
-                        <span>통화시간: ${call.duration || '0초'} (대기: ${call.waitTime !== undefined ? call.waitTime : 0}초)</span>
-                        <span>상담원: ${call.operator || '리본케어'}</span>
                       </div>
                     </div>
                   </td>
@@ -1297,6 +1532,99 @@ function renderTotalListView(logs) {
       ${renderPaginationBar()}
     </div>
   `;
+}
+
+/**
+ * 상담 요약 마우스 호버 플로팅 미리보기 툴팁 (화면 및 테이블 상단 잘림 방지 뷰포트 지능형 배치)
+ */
+function showCallPreviewTooltip(event, callId) {
+  const logs = (gTotalCallData && gTotalCallData.callLogs) || [];
+  const call = logs.find(c => getCallUniqueId(c) === callId);
+  if (!call) return;
+
+  let tip = document.getElementById('callLogFloatingTooltip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'callLogFloatingTooltip';
+    tip.className = 'fixed z-[9999] p-4 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 text-xs pointer-events-none transition-opacity duration-150 max-w-md w-96';
+    document.body.appendChild(tip);
+  }
+
+  const cleanSummary = (call.summary || '').trim();
+  tip.innerHTML = `
+    <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
+      <div class="font-black text-cyan-400 flex items-center gap-1.5">
+        <i data-lucide="info" class="w-3.5 h-3.5"></i>
+        <span>상담 내용 전문 미리보기</span>
+      </div>
+      <span class="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full font-bold">클릭 시 전체 모달</span>
+    </div>
+    <div class="font-black text-white text-xs mb-1.5">${call.title || '상담 제목 없음'}</div>
+    <div class="text-[11.5px] text-slate-300 leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap">${cleanSummary || '상담 요약 내용이 없습니다.'}</div>
+    ${call.keywords ? `
+      <div class="mt-2.5 pt-2 border-t border-slate-800 flex items-center gap-1 flex-wrap">
+        <span class="text-[10px] text-slate-400 font-bold">키워드:</span>
+        <span class="text-[10.5px] text-cyan-300 font-mono">${call.keywords}</span>
+      </div>
+    ` : ''}
+    <div class="mt-2 flex items-center justify-between text-[10px] text-slate-400 pt-1.5 border-t border-slate-800/80">
+      <span>통화시간: ${call.duration || '0초'} (대기: ${call.waitTime !== undefined ? call.waitTime : 0}초)</span>
+      <span>상담원: ${call.operator || '리본케어'}</span>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+
+  const target = event.currentTarget || event.target;
+  const rect = target.getBoundingClientRect();
+
+  tip.style.display = 'block';
+  tip.style.opacity = '0';
+  tip.style.left = '-9999px';
+  tip.style.top = '-9999px';
+
+  requestAnimationFrame(() => {
+    const tipRect = tip.getBoundingClientRect();
+    const tipHeight = tipRect.height || 220;
+    const tipWidth = tipRect.width || 384;
+
+    // 상단 공간이 충분하면 상단에 표시, 부족하면 하단에 표시 (상단 잘림 완전 방지)
+    let top;
+    if (rect.top >= tipHeight + 16) {
+      top = rect.top - tipHeight - 8;
+    } else {
+      top = rect.bottom + 8;
+    }
+
+    // 좌우 화면 벗어남 방지
+    let left = rect.left;
+    if (left + tipWidth > window.innerWidth - 16) {
+      left = window.innerWidth - tipWidth - 16;
+    }
+    if (left < 16) left = 16;
+
+    // 상하 화면 벗어남 방지
+    if (top < 10) top = 10;
+    if (top + tipHeight > window.innerHeight - 10) {
+      top = window.innerHeight - tipHeight - 10;
+    }
+
+    tip.style.top = `${Math.round(top)}px`;
+    tip.style.left = `${Math.round(left)}px`;
+    tip.style.opacity = '1';
+  });
+}
+
+function hideCallPreviewTooltip() {
+  const tip = document.getElementById('callLogFloatingTooltip');
+  if (tip) {
+    tip.style.opacity = '0';
+    tip.style.display = 'none';
+  }
+}
+
+if (!window._callTooltipScrollBound) {
+  window.addEventListener('scroll', hideCallPreviewTooltip, true);
+  window._callTooltipScrollBound = true;
 }
 
 /**
@@ -1426,16 +1754,14 @@ function openTotalCallSummaryModal(callId) {
               <span>상담 요약 전문</span>
             </label>
             ${call.summary ? `
-              <button type="button" onclick="copyCallLogSummaryText(this, \`${(call.summary || '').replace(/`/g, '\\`')}\`)" 
+              <button type="button" onclick="copyCallLogSummaryText(this, \`${(call.summary || '').trim().replace(/`/g, '\\`')}\`)" 
                 class="text-xs text-cyan-700 hover:text-cyan-900 font-bold flex items-center gap-1 cursor-pointer">
                 <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                 <span>요약문 복사</span>
               </button>
             ` : ''}
           </div>
-          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 leading-relaxed text-slate-800 whitespace-pre-wrap font-medium">
-            ${call.summary || '상담 요약 전문이 기재되지 않았거나 단순 인입된 통화입니다.'}
-          </div>
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 leading-relaxed text-slate-800 whitespace-pre-wrap font-medium">${(call.summary || '').trim() || '상담 요약 전문이 기재되지 않았거나 단순 인입된 통화입니다.'}</div>
         </div>
 
         <!-- 4. 주요 키워드 -->
@@ -1547,7 +1873,7 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
   }
 
   modal.innerHTML = `
-    <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
       <!-- 모달 헤더 -->
       <div class="p-5 bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 text-white flex items-center justify-between">
         <div class="flex items-center gap-3">
@@ -1605,15 +1931,15 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
         ` : `
           <table class="w-full text-left text-xs border-collapse">
             <thead>
-              <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 font-black text-[11px]">
+              <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 font-black text-[11px] whitespace-nowrap">
                 <th class="py-2.5 px-3 w-10 text-center">#</th>
-                <th class="py-2.5 px-3 w-32">인입일시</th>
-                <th class="py-2.5 px-3 w-28">채널</th>
-                <th class="py-2.5 px-3 w-44">고객명 / 전화번호</th>
-                <th class="py-2.5 px-3 w-32 text-center">상담 / 대기시간</th>
-                <th class="py-2.5 px-3 w-32 text-center">CTI 발신</th>
-                <th class="py-2.5 px-3 w-32 text-center">처리상태</th>
-                <th class="py-2.5 px-3">메모 / 조치</th>
+                <th class="py-2.5 px-3 w-32 whitespace-nowrap">인입일시</th>
+                <th class="py-2.5 px-3 w-24 text-center whitespace-nowrap">채널</th>
+                <th class="py-2.5 px-3 w-40 whitespace-nowrap">고객명 / 전화번호</th>
+                <th class="py-2.5 px-3 w-32 text-center whitespace-nowrap">상담 / 대기시간</th>
+                <th class="py-2.5 px-3 w-28 text-center whitespace-nowrap">CTI 발신</th>
+                <th class="py-2.5 px-3 w-32 text-center whitespace-nowrap">처리상태</th>
+                <th class="py-2.5 px-3 whitespace-nowrap">메모 / 조치</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 text-slate-700">
@@ -1623,13 +1949,16 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
                 const isHandled = isCallOutcallHandled(callId);
                 const formattedPhone = formatPhoneDisplay(c.phone || c.rawPhone);
                 const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
+                const channelBadgeClass = c.channel === '삼성화재'
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : (c.channel === '현대해상' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200');
 
                 return `
                   <tr class="hover:bg-slate-50 transition-colors ${!isHandled ? 'bg-rose-50/20' : ''}">
-                    <td class="py-2.5 px-3 text-center font-mono text-slate-400 text-[11px]">${i + 1}</td>
-                    <td class="py-2.5 px-3 font-mono text-slate-600 text-[11px] font-bold">${c.callTime || '-'}</td>
-                    <td class="py-2.5 px-3">
-                      <span class="px-2 py-0.5 rounded text-[10px] font-black border ${c.channel === '삼성화재' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-800 border-amber-200'}">
+                    <td class="py-2.5 px-3 text-center font-mono text-slate-400 text-[11px] whitespace-nowrap">${i + 1}</td>
+                    <td class="py-2.5 px-3 font-mono text-slate-600 text-[11px] font-bold whitespace-nowrap">${c.callTime || '-'}</td>
+                    <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                      <span class="px-2.5 py-0.5 rounded text-[10.5px] font-black border whitespace-nowrap inline-block ${channelBadgeClass}">
                         ${c.channel || '인입'}
                       </span>
                     </td>
@@ -2067,7 +2396,7 @@ function renderCallDetailCardHtml(call) {
             </div>
           ` : ''}
           ${call.summary ? `
-            <p class="text-[11px] leading-relaxed text-slate-700 whitespace-pre-wrap">${call.summary}</p>
+            <p class="text-[11px] leading-relaxed text-slate-700 whitespace-pre-wrap">${(call.summary || '').trim()}</p>
           ` : ''}
         </div>
       ` : `
@@ -2114,7 +2443,7 @@ function renderCallDetailCardHtml(call) {
 
         <!-- 상담요약 전문 클립보드 복사 -->
         ${call.summary ? `
-          <button type="button" onclick="copyCallLogSummaryText(this, \`${(call.summary || '').replace(/`/g, '\\`')}\`)" 
+          <button type="button" onclick="copyCallLogSummaryText(this, \`${(call.summary || '').trim().replace(/`/g, '\\`')}\`)" 
             class="text-[10.5px] text-cyan-700 hover:text-cyan-900 font-bold flex items-center gap-1 cursor-pointer">
             <i data-lucide="copy" class="w-3 h-3"></i>
             <span>요약 복사</span>
@@ -2341,9 +2670,71 @@ async function exportTotalCallExcel() {
     c.alignment = { horizontal: 'center', vertical: 'middle' };
   });
 
-  const allLabels = getAllAvailableLabels();
+  const allLogs = getTotalCallLogs();
+  const logsToExport = allLogs.filter(c => {
+    if (gTotalFilter.startDate || gTotalFilter.endDate) {
+      const callDate = (c.callTime || '').slice(0, 10);
+      if (callDate) {
+        if (gTotalFilter.startDate && callDate < gTotalFilter.startDate) return false;
+        if (gTotalFilter.endDate && callDate > gTotalFilter.endDate) return false;
+      }
+    }
+    if (gTotalFilter.channel !== 'all' && gTotalFilter.channel !== '전체') {
+      const ch = c.channel || '';
+      if (!ch.includes(gTotalFilter.channel) && !gTotalFilter.channel.includes(ch)) return false;
+    }
+    if (gTotalFilter.search) {
+      const q = gTotalFilter.search.toLowerCase().trim();
+      const callId = getCallUniqueId(c);
+      const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
+      const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
+      const match = matchCustomerToMateOne(c);
+      const matches = 
+        (c.phone || '').includes(q) ||
+        (c.rawPhone || '').includes(q) ||
+        (c.memberName || '').toLowerCase().includes(q) ||
+        (match.patientName || '').toLowerCase().includes(q) ||
+        (match.appId || '').toLowerCase().includes(q) ||
+        (c.title || '').toLowerCase().includes(q) ||
+        (c.summary || '').toLowerCase().includes(q) ||
+        (c.keywords || '').toLowerCase().includes(q) ||
+        memo.toLowerCase().includes(q) ||
+        labels.some(l => l.toLowerCase().includes(q));
+      if (!matches) return false;
+    }
+    if (gTotalFilter.category) {
+      const cat = classifyConsultation(c);
+      if (cat.name !== gTotalFilter.category) return false;
+    }
+    if (gTotalFilter.label) {
+      const callId = getCallUniqueId(c);
+      const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
+      if (!labels.includes(gTotalFilter.label)) return false;
+    }
+    if (gTotalFilter.onlyMatched) {
+      const match = matchCustomerToMateOne(c);
+      if (!match.isRegistered) return false;
+    }
+    if (gTotalFilter.onlyWithMemo) {
+      const callId = getCallUniqueId(c);
+      const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
+      if (!memo.trim()) return false;
+    }
+    if (gTotalFilter.onlyAnswered) {
+      if (!c.title && !c.summary) return false;
+    }
+    if (gTotalFilter.onlyMissedOutcall) {
+      if (!isCallMissedWaitZero(c)) return false;
+    }
+    if (gTotalFilter.onlyUrgent) {
+      const callId = getCallUniqueId(c);
+      const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
+      if (!labels.includes('긴급') && !labels.includes('민원주의')) return false;
+    }
+    return true;
+  });
 
-  gTotalCallData.callLogs.forEach((c, idx) => {
+  logsToExport.forEach((c, idx) => {
     const callId = getCallUniqueId(c);
     const cat = classifyConsultation(c);
     const match = matchCustomerToMateOne(c);
@@ -2375,7 +2766,8 @@ async function exportTotalCallExcel() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `CTI_전수_종합콜분석_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+  const dateSuffix = (gTotalFilter.startDate && gTotalFilter.endDate) ? `_${gTotalFilter.startDate}_${gTotalFilter.endDate}` : `_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+  a.download = `CTI_전수_종합콜분석${dateSuffix}.xlsx`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -2457,3 +2849,276 @@ function renderHubCustomerCtiSectionHtml(app) {
     </div>
   `;
 }
+
+if (typeof window.copyCallLogSummaryText !== 'function') {
+  window.copyCallLogSummaryText = function(btn, text) {
+    const cleanText = (text || '').trim();
+    if (!cleanText) return;
+    navigator.clipboard.writeText(cleanText).then(() => {
+      if (btn) {
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600"></i>';
+        if (window.lucide) lucide.createIcons();
+        setTimeout(() => {
+          btn.innerHTML = origHtml;
+          if (window.lucide) lucide.createIcons();
+        }, 1500);
+      }
+      if (typeof showToast === 'function') {
+        showToast('상담요약 전문 내용이 복사되었습니다.', 'success');
+      }
+    }).catch(() => {
+      prompt('아래 상담요약 내용을 복사하세요:', cleanText);
+    });
+  };
+}
+
+// =========================================================================
+// OUTCALL BOTTOM-RIGHT NOTIFICATION MODAL (TOAST ALERT)
+// =========================================================================
+
+/**
+ * 확인(dismiss)된 아웃콜 ID 목록 가져오기
+ */
+function getDismissedOutcallIds() {
+  try {
+    const raw = localStorage.getItem('LIVON_DISMISSED_OUTCALL_IDS');
+    if (raw) return new Set(JSON.parse(raw));
+  } catch (e) {}
+  return new Set();
+}
+
+/**
+ * 아웃콜 확인 처리 (다시 띄우지 않도록 저장)
+ */
+function dismissOutcallNotificationToast(markAllAsDismissed = true) {
+  const toast = document.getElementById('outcallNotificationToast');
+  if (toast) {
+    toast.classList.add('opacity-0', 'translate-y-4');
+    setTimeout(() => {
+      if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 300);
+  }
+
+  if (markAllAsDismissed) {
+    try {
+      const allLogs = typeof getTotalCallLogs === 'function' ? getTotalCallLogs() : [];
+      const pendingMissed = allLogs.filter(c => isCallMissedWaitZero(c) && !isCallOutcallHandled(getCallUniqueId(c)));
+      const dismissed = getDismissedOutcallIds();
+      pendingMissed.forEach(c => dismissed.add(getCallUniqueId(c)));
+      localStorage.setItem('LIVON_DISMISSED_OUTCALL_IDS', JSON.stringify(Array.from(dismissed)));
+    } catch (e) {}
+  }
+}
+
+/**
+ * 토스트에서 아웃콜 대시보드 모달 열기
+ */
+function openMissedCallsOutcallModalFromToast() {
+  dismissOutcallNotificationToast(true);
+  if (typeof openMissedCallsOutcallModal === 'function') {
+    openMissedCallsOutcallModal('pending');
+  }
+}
+
+/**
+ * 백그라운드 아웃콜 데이터 자동 로더 (메뉴와 관계없이 글로벌 점검용)
+ */
+async function loadOutcallBackgroundData() {
+  if (gTotalCallData && gTotalCallData.callLogs && gTotalCallData.callLogs.length > 0) {
+    return gTotalCallData;
+  }
+
+  // 1) 세션 스토리지 캐시 확인 (0ms)
+  try {
+    const cached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && parsed.callLogs) {
+        gTotalCallData = parsed;
+        window.gTotalCallData = parsed;
+        return gTotalCallData;
+      }
+    }
+  } catch (e) {}
+
+  // 2) API 서버 호출 시도
+  try {
+    const res = await fetch('/api/samsung/call-report/data?channel=all');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.data) {
+        gTotalCallData = json.data;
+        window.gTotalCallData = json.data;
+        try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
+        return gTotalCallData;
+      }
+    }
+  } catch (e) {}
+
+  // 3) 정적 fallback 파일 조회 (절대 및 상대 경로)
+  const fallbacks = [
+    '/call_report_all.json',
+    'call_report_all.json',
+    './call_report_all.json',
+    '/call_report_samsung.json',
+    'call_report_samsung.json'
+  ];
+  for (const url of fallbacks) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const json = await res.json();
+        const data = (json && json.data) ? json.data : json;
+        if (data && data.callLogs) {
+          gTotalCallData = data;
+          window.gTotalCallData = data;
+          try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
+          return gTotalCallData;
+        }
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
+/**
+ * 아웃콜 필요 건 감지 및 우측 하단 모달 팝업 실행
+ * (사용자 규칙: 종합콜분석 화면을 볼 때는 띄우지 않고, 어떤 메뉴페이지든 상관없이 발생하면 바로 표시)
+ */
+async function checkAndTriggerOutcallAlert() {
+  // 사용자가 이미 종합콜분석 화면에 있는 경우 하단 토스트 팝업 띄우지 않음 (사용자 규칙)
+  if (typeof gActiveTab !== 'undefined' && gActiveTab === 'totalcallanalysis') {
+    const existing = document.getElementById('outcallNotificationToast');
+    if (existing) existing.remove();
+    return;
+  }
+
+  // 데이터가 아직 메모리에 없으면 백그라운드 로드 수행
+  if (!gTotalCallData || !gTotalCallData.callLogs) {
+    await loadOutcallBackgroundData();
+  }
+
+  if (typeof getTotalCallLogs !== 'function') return;
+  const allLogs = getTotalCallLogs();
+  if (!allLogs || allLogs.length === 0) return;
+
+  // 전체 미처리 아웃콜 대상 (상담 0초 & 연결요청 Y & 미처리)
+  const pendingMissed = allLogs.filter(c => isCallMissedWaitZero(c) && !isCallOutcallHandled(getCallUniqueId(c)));
+  if (pendingMissed.length === 0) {
+    // 미처리 건이 없으면 열려있던 토스트 제거
+    const existing = document.getElementById('outcallNotificationToast');
+    if (existing) existing.remove();
+    return;
+  }
+
+  // 사용자가 이미 '확인'한 건 제외 (사용자 규칙: 해당 모달은 확인하면 다시 띄우지는 말고)
+  const dismissed = getDismissedOutcallIds();
+  const unnotifiedCalls = pendingMissed.filter(c => !dismissed.has(getCallUniqueId(c)));
+
+  // 확인하지 않은 새로운 아웃콜 대상이 없으면 띄우지 않음!
+  if (unnotifiedCalls.length === 0) {
+    const existing = document.getElementById('outcallNotificationToast');
+    if (existing) existing.remove();
+    return;
+  }
+
+  // 이미 화면에 토스트가 떠있는지 확인
+  let toast = document.getElementById('outcallNotificationToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'outcallNotificationToast';
+    toast.className = 'fixed bottom-5 right-5 z-[9999] w-[360px] sm:w-[400px] max-w-[calc(100vw-32px)] bg-white/95 backdrop-blur-md rounded-3xl border-2 border-rose-400 shadow-2xl shadow-rose-600/30 overflow-hidden transition-all duration-300 transform translate-y-0 opacity-100 flex flex-col';
+    document.body.appendChild(toast);
+  }
+
+  // 가장 최신 미연결 콜 정보
+  const newestCall = unnotifiedCalls[0];
+  const match = typeof matchCustomerToMateOne === 'function' ? matchCustomerToMateOne(newestCall) : { patientName: '미등록 고객' };
+  const formattedPhone = typeof formatPhoneDisplay === 'function' ? formatPhoneDisplay(newestCall.phone || newestCall.rawPhone) : (newestCall.phone || '');
+  const channelBadgeClass = newestCall.channel === '삼성화재'
+    ? 'bg-blue-100 text-blue-800 border-blue-200'
+    : (newestCall.channel === '현대해상' ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-emerald-100 text-emerald-900 border-emerald-300');
+
+  toast.innerHTML = `
+    <!-- 상단 헤더 -->
+    <div class="bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 text-white px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0 animate-pulse">
+          <i data-lucide="phone-missed" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="px-1.5 py-0.2 rounded bg-white text-rose-800 font-black text-[9.5px]">긴급 알림</span>
+            <h4 class="font-black text-xs sm:text-sm tracking-tight">아웃콜(콜백) 대상 발생!</h4>
+          </div>
+          <p class="text-[10px] text-rose-100 font-medium">상담사 연결요청 후 미연결(0초) 종료 건입니다.</p>
+        </div>
+      </div>
+      <button type="button" onclick="dismissOutcallNotificationToast(true)" class="text-rose-200 hover:text-white p-1 cursor-pointer" title="닫기 (확인)">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- 내용 -->
+    <div class="p-3.5 space-y-3 text-xs bg-slate-50/70">
+      <div class="p-2.5 bg-white rounded-2xl border border-rose-200 shadow-2xs space-y-1.5">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="px-2 py-0.5 rounded text-[10px] font-black border whitespace-nowrap ${channelBadgeClass}">
+            ${newestCall.channel || '인입'}
+          </span>
+          <span class="font-mono text-slate-500 font-bold text-[10.5px]">${newestCall.callTime || '-'}</span>
+        </div>
+        <div class="flex items-baseline justify-between pt-0.5">
+          <div class="font-black text-slate-900 text-sm">${typeof maskName === 'function' ? maskName(match.patientName) : match.patientName}</div>
+          <div class="font-mono font-bold text-rose-600 text-xs">${formattedPhone}</div>
+        </div>
+        <div class="text-[10.5px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-100">
+          <span>대기시간: <b class="text-slate-800">${newestCall.waitTime !== undefined ? newestCall.waitTime : 0}초</b> (상담 0초)</span>
+          <span class="text-rose-700 font-bold">🚨 즉시 콜백 권장</span>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between text-[11px] text-slate-600 px-1 font-bold">
+        <span>신규 아웃콜 대상: <b class="text-rose-600">${unnotifiedCalls.length}건</b></span>
+        <span class="text-slate-400 font-medium">총 미처리: <b>${pendingMissed.length}건</b></span>
+      </div>
+
+      <!-- 액션 버튼 -->
+      <div class="space-y-1.5 pt-0.5">
+        <button type="button" onclick="openMissedCallsOutcallModalFromToast()" 
+          class="w-full py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white font-black text-xs shadow-md shadow-rose-600/30 flex items-center justify-center gap-1.5 cursor-pointer transition-all">
+          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          <span>아웃콜 대상 명단 확인하기 (${pendingMissed.length}건)</span>
+        </button>
+        <button type="button" onclick="dismissOutcallNotificationToast(true)" 
+          class="w-full py-1.5 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors">
+          <i data-lucide="check" class="w-3.5 h-3.5 text-slate-500"></i>
+          <span>확인 (다시 보지 않기)</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  if (typeof initTotalIcons === 'function') {
+    initTotalIcons(toast);
+  } else if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons({ root: toast });
+  }
+}
+
+// 글로벌 등록 및 메뉴페이지 무관 백그라운드 자동 점검 (초기 500ms 및 30초 주기)
+if (typeof window !== 'undefined') {
+  window.checkAndTriggerOutcallAlert = checkAndTriggerOutcallAlert;
+  window.loadOutcallBackgroundData = loadOutcallBackgroundData;
+
+  setTimeout(async () => {
+    await loadOutcallBackgroundData();
+    checkAndTriggerOutcallAlert();
+  }, 500);
+
+  setInterval(async () => {
+    checkAndTriggerOutcallAlert();
+  }, 30000);
+}
+

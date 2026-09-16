@@ -39,7 +39,8 @@
             <span class="text-[11px] text-slate-400 font-mono shrink-0" id="viewerSyncedAt">CTI 실시간 연동</span>
           </div>
           <h1 class="text-sm sm:text-base md:text-lg font-black text-slate-900 leading-snug mt-0.5 break-keep whitespace-normal" id="viewerReportTitle">
-            삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서
+            <span>삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서</span>
+            <span class="block text-[11px] sm:text-xs font-bold text-slate-500 font-mono mt-0.5" id="viewerReportDate">(2026-08-25 ~ 2026-09-18)</span>
           </h1>
         </div>
       </div>
@@ -415,14 +416,21 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const shieldIcon = document.getElementById('channelShieldIcon');
       const channelBadge = document.getElementById('viewerChannelBadge');
 
+      const dateStr = (gFilter.startDate && gFilter.endDate)
+        ? `${gFilter.startDate} ~ ${gFilter.endDate}`
+        : ((gReportData && gReportData.reportInfo && gReportData.reportInfo.period) || '2026-08-25 ~ 2026-09-18');
+
       if (ch.includes('현대')) {
-        document.title = '현대해상 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
+        document.title = `현대해상 간병(리본케어) 서비스 인바운드 문의 분석 보고서 (${dateStr})`;
         if (badgeEl) {
           badgeEl.className = 'px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-black text-[10px] tracking-wide shrink-0 border border-amber-300';
           badgeEl.innerText = '현대해상 공식보고';
         }
         if (titleEl) {
-          titleEl.innerText = '현대해상 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
+          titleEl.innerHTML = `
+            <span>현대해상 간병(리본케어) 서비스 인바운드 문의 분석 보고서</span>
+            <span class="block text-[11px] sm:text-xs font-bold text-slate-500 font-mono mt-0.5" id="viewerReportDate">(${dateStr})</span>
+          `;
         }
         if (labelEl) {
           labelEl.innerText = '인입경로: 현대해상 전용';
@@ -436,13 +444,16 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           channelBadge.innerText = '현대해상 전용';
         }
       } else {
-        document.title = '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
+        document.title = `삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서 (${dateStr})`;
         if (badgeEl) {
           badgeEl.className = 'px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-black text-[10px] tracking-wide shrink-0 border border-blue-200';
           badgeEl.innerText = '삼성화재 공식보고';
         }
         if (titleEl) {
-          titleEl.innerText = '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
+          titleEl.innerHTML = `
+            <span>삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서</span>
+            <span class="block text-[11px] sm:text-xs font-bold text-slate-500 font-mono mt-0.5" id="viewerReportDate">(${dateStr})</span>
+          `;
         }
         if (labelEl) {
           labelEl.innerText = '인입경로: 삼성화재 전용';
@@ -509,6 +520,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 
     function renderAll() {
       if (!gReportData) return;
+      updateBranding();
       const stats = calculateStats();
       renderSummarySheet(stats);
       renderDailySheet(stats);

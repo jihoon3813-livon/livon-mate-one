@@ -1484,7 +1484,8 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {
     if (typeof loadBarobillSettingsToInputs === 'function') loadBarobillSettingsToInputs();
     if (typeof calculateRuleSplit === 'function') calculateRuleSplit();
-  }, 100);
+    if (typeof checkAndTriggerOutcallAlert === 'function') checkAndTriggerOutcallAlert();
+  }, 600);
 
   window.addEventListener('beforeunload', (e) => {
     if (typeof gSamsungPendingChanges !== 'undefined' && gSamsungPendingChanges && gSamsungPendingChanges.size > 0) {
@@ -4988,13 +4989,16 @@ function applySamsungLeadToNewApp(leadId) {
 // -------------------------------------------------------------------------
 // SAMSUNG EMAIL DISPATCH MODAL & CAREPORT REPORT ENGINE
 // -------------------------------------------------------------------------
-function openSamsungEmailModal(applyId, stepType = 'DAILY_INTAKE') {
+function openSamsungEmailModal(applyId, stepType = 'DAILY_INTAKE', roundNumber = 1) {
   initSamsungSpreadsheet();
   const app = (gApps || []).find(a => String(a.id) === String(applyId)) || (gApps && gApps[0]);
   if (!app) return;
 
   const targetAppIdEl = document.getElementById('samsungEmailTargetAppId');
   if (targetAppIdEl) targetAppIdEl.value = app.id;
+
+  const targetRoundEl = document.getElementById('samsungEmailTargetRound');
+  if (targetRoundEl) targetRoundEl.value = String(roundNumber || 1);
 
   // Radio button set
   const radios = document.querySelectorAll('input[name="samsungEmailType"]');
@@ -5080,6 +5084,7 @@ function onSelectManualSamsungCareLogPdf(input) {
 
 function onSamsungEmailTypeChange(type) {
   const appId = document.getElementById('samsungEmailTargetAppId')?.value;
+  const roundNum = parseInt(document.getElementById('samsungEmailTargetRound')?.value || '1', 10);
   const app = (gApps || []).find(a => String(a.id) === String(appId)) || (gApps && gApps[0]);
   const patientName = app ? app.patientName : '고객';
   const today = new Date().toISOString().slice(0, 10);
@@ -5114,6 +5119,27 @@ function onSamsungEmailTypeChange(type) {
     }
     if (attachExcelCb) attachExcelCb.checked = false;
     if (excelFilenameEl) excelFilenameEl.innerText = `삼성화재_월간완료명단_${todayMonth.replace(/-/g,'')}.xlsx`;
+    if (attachCarePortCb) attachCarePortCb.checked = false;
+  } else if (type === 'ROUND_CLAIM') {
+    const appAssigns = (gAssigns || []).filter(a => a.applyId === (app ? app.id : ''));
+    const as = appAssigns.length > 0 ? appAssigns[0] : null;
+    const prog = as ? getCareProgressInfo(as) : null;
+    const schedule = (typeof calculateCareSettlementSchedule === 'function' && app) 
+      ? calculateCareSettlementSchedule(app, as, prog, (gClaims || []).filter(c => c.applyId === app.id), (gPayouts || []).filter(p => p.applyId === app.id))
+      : null;
+    const roundInfo = (schedule && schedule.rounds) ? (schedule.rounds.find(r => r.roundNumber === roundNum) || schedule.rounds[0]) : null;
+    const rStart = roundInfo ? roundInfo.startDateStr : (app?.startDate || today);
+    const rEnd = roundInfo ? roundInfo.endDateStr : (app?.careEndDate || today);
+    const rDays = roundInfo ? roundInfo.days : 1;
+    const unitPrice = schedule ? schedule.dailyClaimPrice : (app?.customDailyClaimPrice || 160000);
+    const rAmt = roundInfo ? roundInfo.fullClaimAmount : (rDays * unitPrice);
+    const rTypeDesc = (schedule && schedule.rounds && schedule.rounds.length === 1) ? '당월 간병종료 단일청구' : `${roundInfo ? (roundInfo.targetMonthText || `${roundNum}차`) : `${roundNum}차`} 분할청구`;
+
+    if (subjectEl) subjectEl.value = `[리본케어] 삼성화재 [${patientName}] 고객 ${roundNum}차 간병비 청구서 (${rStart} ~ ${rEnd}, ${rDays}일분)`;
+    if (bodyEl) {
+      bodyEl.value = `안녕하세요. 삼성화재 보상심사팀 담당자님, (주)리본케어 정산관리팀입니다.\n\n삼성화재 간병지원 피보험자 [${patientName}] 고객님의 ${roundNum}차 간병비용 청구 명세를 아래와 같이 송부드립니다.\n\n■ 청구 내역\n1. 피보험자: ${patientName} (증권번호: ${app?.policyNumber || '-'})\n2. 청구 구분: ${roundNum}차 비용청구 (${rTypeDesc})\n3. 산정 기간: ${rStart} ~ ${rEnd} (${rDays}일간 / ${rDays * 24}시간)\n4. 1일 청구단가: ${formatCurrency(unitPrice)}원\n5. 총 청구금액: ${formatCurrency(rAmt)}원\n\n심사 후 지정 입금 계좌로 정산 입금 부탁드립니다.\n문의사항이 있으시면 언제든지 회신 바랍니다.\n\n감사합니다.\n(주)리본케어 정산관리팀: 02-2633-1122`;
+    }
+    if (attachExcelCb) attachExcelCb.checked = false;
     if (attachCarePortCb) attachCarePortCb.checked = false;
   }
   updateSamsungModalAttachBadges();
@@ -5715,8 +5741,14 @@ async function handleSamsungEmailSubmit(e) {
   const timeStr = `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   const app = (gApps || []).find(a => String(a.id) === String(appId));
 
-  // 2. Build clean HTML formatted body
-  const typeLabel = emailType === 'DAILY_INTAKE' ? '일일 접수 보고' : (emailType === 'CARE_LOG' ? '간병일지 송부' : '월간 청구 보고');
+  const targetRoundNum = parseInt(document.getElementById('samsungEmailTargetRound')?.value || '1', 10);
+  const typeLabel = emailType === 'DAILY_INTAKE' 
+    ? '일일 접수 보고' 
+    : (emailType === 'CARE_LOG' 
+        ? '간병일지 송부' 
+        : (emailType === 'ROUND_CLAIM' 
+            ? `${targetRoundNum}차 비용청구` 
+            : '월간 청구 보고'));
   const attachExcel = document.getElementById('attachSamsungExcelCheckbox')?.checked;
   const attachPdf = document.getElementById('attachCarePortPdfCheckbox')?.checked;
 
@@ -5909,7 +5941,59 @@ async function handleSamsungEmailSubmit(e) {
     if (app) {
       app.samsungEmailSentAt = timeStr;
       app.faxStatus = '발송완료';
-      app.memo = (app.memo ? app.memo + '\n' : '') + `[${timeStr}] 삼성화재 실제 이메일 발송완료 (${to}) - ${emailType}`;
+      app.memo = (app.memo ? app.memo + '\n' : '') + `[${timeStr}] 삼성화재 실제 이메일 발송완료 (${to}) - ${typeLabel}`;
+
+      if (emailType === 'ROUND_CLAIM' || emailType === 'MONTHLY_CLAIM') {
+        if (app.cancelledSamsungRounds) {
+          delete app.cancelledSamsungRounds[targetRoundNum];
+        }
+        app.customRoundDates = app.customRoundDates || {};
+        app.customRoundDates[targetRoundNum] = app.customRoundDates[targetRoundNum] || {};
+        app.customRoundDates[targetRoundNum].sentAt = timeStr;
+
+        // Register or update claim in gClaims
+        let claim = (gClaims || []).find(c => String(c.applyId) === String(app.id) && (parseInt(String(c.round || '').replace(/[^0-9]/g, ''), 10) === targetRoundNum));
+        if (!claim) {
+          const appAssigns = (gAssigns || []).filter(a => a.applyId === app.id);
+          const as = appAssigns.length > 0 ? appAssigns[0] : null;
+          const prog = as ? getCareProgressInfo(as) : null;
+          const schedule = (typeof calculateCareSettlementSchedule === 'function')
+            ? calculateCareSettlementSchedule(app, as, prog, (gClaims || []).filter(c => c.applyId === app.id), (gPayouts || []).filter(p => p.applyId === app.id))
+            : null;
+          const roundInfo = (schedule && schedule.rounds) ? (schedule.rounds.find(r => r.roundNumber === targetRoundNum) || schedule.rounds[0]) : null;
+          const days = roundInfo ? roundInfo.days : 1;
+          const unitPrice = schedule ? schedule.dailyClaimPrice : (app.customDailyClaimPrice || 160000);
+          const amt = days * unitPrice;
+          claim = {
+            id: `Q${app.id.replace('C', '')}.${targetRoundNum}`,
+            applyId: app.id,
+            patientName: app.patientName,
+            insuranceCompany: app.insuranceCompany || '삼성화재',
+            round: `${targetRoundNum}차 (${days}일분 / ${days * 24}시간)`,
+            startDate: roundInfo ? roundInfo.startDateStr : timeStr,
+            endDate: roundInfo ? roundInfo.endDateStr : timeStr,
+            claimDate: timeStr,
+            days: days,
+            unitPrice: unitPrice,
+            dailyWage: unitPrice,
+            claimAmount: amt,
+            depositAmount: 0,
+            unitPriceType: '확인',
+            depositStatus: '미수납',
+            unpaidAmount: amt,
+            adjusterStatus: '청구접수',
+            memo: `${targetRoundNum}차 삼성화재 이메일 청구 발송완료 (${timeStr})`
+          };
+          gClaims.unshift(claim);
+        } else {
+          claim.claimDate = timeStr;
+          claim.adjusterStatus = '청구접수';
+        }
+        if (typeof syncToConvex === 'function') {
+          syncToConvex('sync:saveClaim', { claim }).catch(console.warn);
+        }
+      }
+
       if (typeof syncToConvex === 'function') {
         syncToConvex('sync:saveApplication', { app }).catch(console.warn);
       }
@@ -5927,7 +6011,8 @@ async function handleSamsungEmailSubmit(e) {
       excelFileName: excelFileName || '-',
       hasCarePortPdf: attachPdf,
       status: '전송완료',
-      appId: appId || ''
+      appId: appId || '',
+      roundNumber: targetRoundNum
     };
     gSamsungEmailLogs.unshift(newLog);
     if (typeof syncToConvex === 'function') {
@@ -8166,31 +8251,52 @@ function handleSamsungExcelFile(input) {
   const file = input.files[0];
   if (!file) return;
 
+  const countBadge = document.getElementById('samsungExcelCountBadge');
+  const previewArea = document.getElementById('samsungExcelPreviewArea');
+  const listEl = document.getElementById('samsungExcelPreviewList');
+  if (previewArea) previewArea.classList.remove('hidden');
+  if (countBadge) countBadge.innerText = '⚡ 고속 분석 중...';
+  if (listEl) listEl.innerHTML = '<div class="p-4 text-center text-sky-600 font-bold text-xs"><i data-lucide="loader" class="w-4 h-4 inline animate-spin mr-1"></i> 대용량 엑셀 데이터를 고속 색인 분석 중입니다...</div>';
+  if (typeof initIcons === 'function') initIcons(listEl);
+
   const reader = new FileReader();
   const isXlsx = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
 
-  if (isXlsx && typeof XLSX !== 'undefined') {
-    reader.onload = function(e) {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const wb = XLSX.read(data, { type: 'array' });
-        const firstSheetName = wb.SheetNames[0];
-        const ws = wb.Sheets[firstSheetName];
-        const jsonRows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-        parseSamsungSheetJsonRows(jsonRows);
-      } catch (err) {
-        console.error('Error parsing xlsx:', err);
-        alert('엑셀 파일을 읽는 중 오류가 발생했습니다: ' + err.message);
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  } else {
-    reader.onload = function(e) {
-      const text = e.target.result;
-      parseSamsungCsvContent(text);
-    };
-    reader.readAsText(file);
-  }
+  // UI 스레드 렌더링 양보 후 초고속 파싱 실행
+  setTimeout(() => {
+    if (isXlsx && typeof XLSX !== 'undefined') {
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          // High-Performance XLSX options: 스타일/수식/HTML 제외하고 순수 데이터만 초고속 추출
+          const wb = XLSX.read(data, {
+            type: 'array',
+            dense: true,
+            cellFormula: false,
+            cellHTML: false,
+            cellStyles: false,
+            cellDates: false
+          });
+          const firstSheetName = wb.SheetNames[0];
+          const ws = wb.Sheets[firstSheetName];
+          // raw: true 로 셀 포맷터 오버헤드 제거
+          const jsonRows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+          parseSamsungSheetJsonRows(jsonRows);
+        } catch (err) {
+          console.error('Error parsing xlsx:', err);
+          alert('엑셀 파일을 읽는 중 오류가 발생했습니다: ' + err.message);
+          if (countBadge) countBadge.innerText = '오류 발생';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.onload = function(e) {
+        const text = e.target.result;
+        parseSamsungCsvContent(text);
+      };
+      reader.readAsText(file);
+    }
+  }, 20);
 }
 
 function parseSamsungSheetJsonRows(rows) {
@@ -8202,31 +8308,39 @@ function parseSamsungSheetJsonRows(rows) {
     startIdx = 1;
   }
 
-  for (let i = startIdx; i < rows.length; i++) {
+  const nowStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const receiveDateStr = new Date().toISOString().slice(0, 10);
+  const len = rows.length;
+
+  for (let i = startIdx; i < len; i++) {
     const cols = rows[i];
     if (!cols || cols.length < 2) continue;
 
+    const c0 = cols[0] != null ? String(cols[0]).trim() : '';
+    const c1 = cols[1] != null ? String(cols[1]).trim() : '';
+    if (!c0 && !c1) continue;
+
     records.push({
-      id: 'SF-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + String(i).padStart(2, '0'),
-      patientId: String(cols[0] || ('SF-P' + (100 + i))).trim(),
-      patientName: String(cols[1] || ('고객' + i)).trim(),
-      birthDate: String(cols[2] || '19700101').trim(),
-      gender: String(cols[3] || '남').trim(),
-      phone: String(cols[4] || '010-0000-0000').trim(),
-      policyNumber: String(cols[5] || ('SF' + Math.floor(100000000 + Math.random() * 900000000))).trim(),
-      productCode: String(cols[6] || 'SF-CARE-01').trim(),
-      productName: String(cols[7] || '무배당 삼성화재 당신에게 좋은간병보험').trim(),
-      contractStartDate: String(cols[8] || '2024-03-01').trim(),
-      contractEndDate: String(cols[9] || '2044-03-01').trim(),
-      hasInjuryCare: String(cols[10] || '가입').trim(),
-      hasDiseaseCare: String(cols[11] || '가입').trim(),
-      accidentNumber: '26S' + String(Math.floor(100000 + Math.random() * 900000)),
-      adjusterName: i % 2 === 0 ? '김정현' : '이민우',
-      adjusterPhone: i % 2 === 0 ? '02-3485-9114' : '02-760-5521',
-      adjusterFax: i % 2 === 0 ? '02-3485-9100' : '02-760-5500',
+      id: 'SF-' + nowStr + '-' + i,
+      patientId: c0 || ('SF-P' + (100 + i)),
+      patientName: c1 || ('고객' + i),
+      birthDate: cols[2] != null ? String(cols[2]).trim() : '19700101',
+      gender: cols[3] != null ? String(cols[3]).trim() : '남',
+      phone: cols[4] != null ? String(cols[4]).trim() : '010-0000-0000',
+      policyNumber: cols[5] != null ? String(cols[5]).trim() : ('SF' + (100000000 + (i % 900000000))),
+      productCode: cols[6] != null ? String(cols[6]).trim() : 'SF-CARE-01',
+      productName: cols[7] != null ? String(cols[7]).trim() : '무배당 삼성화재 당신에게 좋은간병보험',
+      contractStartDate: cols[8] != null ? String(cols[8]).trim() : '2024-03-01',
+      contractEndDate: cols[9] != null ? String(cols[9]).trim() : '2044-03-01',
+      hasInjuryCare: cols[10] != null ? String(cols[10]).trim() : '가입',
+      hasDiseaseCare: cols[11] != null ? String(cols[11]).trim() : '가입',
+      accidentNumber: '26S' + (100000 + (i % 900000)),
+      adjusterName: (i & 1) === 0 ? '김정현' : '이민우',
+      adjusterPhone: (i & 1) === 0 ? '02-3485-9114' : '02-760-5521',
+      adjusterFax: (i & 1) === 0 ? '02-3485-9100' : '02-760-5500',
       maxDailyLimit: 144000,
       maxDays: 180,
-      receiveDate: new Date().toISOString().slice(0, 10),
+      receiveDate: receiveDateStr,
       matchStatus: '신청대기(미신청)'
     });
   }
@@ -8251,45 +8365,41 @@ function parseSamsungCsvContent(text) {
     startIdx = 1;
   }
 
-  for (let i = startIdx; i < lines.length; i++) {
-    const delimiter = lines[i].includes('\t') ? '\t' : ',';
-    const cols = lines[i].split(delimiter).map(c => c.replace(/^["']|["']$/g, '').trim());
+  const nowStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const receiveDateStr = new Date().toISOString().slice(0, 10);
+  const len = lines.length;
+
+  for (let i = startIdx; i < len; i++) {
+    const line = lines[i];
+    const delimiter = line.includes('\t') ? '\t' : ',';
+    const cols = line.split(delimiter);
     if (cols.length < 2) continue;
 
-    const patientId = cols[0] || ('SF-P' + (100 + i));
-    const patientName = cols[1] || '고객' + i;
-    const birthDate = cols[2] || '19700101';
-    const gender = cols[3] || '남';
-    const phone = cols[4] || '010-0000-0000';
-    const policyNumber = cols[5] || ('SF' + Math.floor(100000000 + Math.random() * 900000000));
-    const productCode = cols[6] || 'SF-CARE-01';
-    const productName = cols[7] || '무배당 삼성화재 당신에게 좋은간병보험';
-    const contractStartDate = cols[8] || '2024-03-01';
-    const contractEndDate = cols[9] || '2044-03-01';
-    const hasInjuryCare = cols[10] || '가입';
-    const hasDiseaseCare = cols[11] || '가입';
+    const c0 = (cols[0] || '').replace(/^["']|["']$/g, '').trim();
+    const c1 = (cols[1] || '').replace(/^["']|["']$/g, '').trim();
+    if (!c0 && !c1) continue;
 
     records.push({
-      id: 'SF-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + String(i).padStart(2, '0'),
-      patientId,
-      patientName,
-      birthDate,
-      gender,
-      phone,
-      policyNumber,
-      productCode,
-      productName,
-      contractStartDate,
-      contractEndDate,
-      hasInjuryCare,
-      hasDiseaseCare,
-      accidentNumber: '26S' + String(Math.floor(100000 + Math.random() * 900000)),
-      adjusterName: i % 2 === 0 ? '김정현' : '이민우',
-      adjusterPhone: i % 2 === 0 ? '02-3485-9114' : '02-760-5521',
-      adjusterFax: i % 2 === 0 ? '02-3485-9100' : '02-760-5500',
+      id: 'SF-' + nowStr + '-' + i,
+      patientId: c0 || ('SF-P' + (100 + i)),
+      patientName: c1 || ('고객' + i),
+      birthDate: (cols[2] || '19700101').replace(/^["']|["']$/g, '').trim(),
+      gender: (cols[3] || '남').replace(/^["']|["']$/g, '').trim(),
+      phone: (cols[4] || '010-0000-0000').replace(/^["']|["']$/g, '').trim(),
+      policyNumber: (cols[5] || ('SF' + (100000000 + (i % 900000000)))).replace(/^["']|["']$/g, '').trim(),
+      productCode: (cols[6] || 'SF-CARE-01').replace(/^["']|["']$/g, '').trim(),
+      productName: (cols[7] || '무배당 삼성화재 당신에게 좋은간병보험').replace(/^["']|["']$/g, '').trim(),
+      contractStartDate: (cols[8] || '2024-03-01').replace(/^["']|["']$/g, '').trim(),
+      contractEndDate: (cols[9] || '2044-03-01').replace(/^["']|["']$/g, '').trim(),
+      hasInjuryCare: (cols[10] || '가입').replace(/^["']|["']$/g, '').trim(),
+      hasDiseaseCare: (cols[11] || '가입').replace(/^["']|["']$/g, '').trim(),
+      accidentNumber: '26S' + (100000 + (i % 900000)),
+      adjusterName: (i & 1) === 0 ? '김정현' : '이민우',
+      adjusterPhone: (i & 1) === 0 ? '02-3485-9114' : '02-760-5521',
+      adjusterFax: (i & 1) === 0 ? '02-3485-9100' : '02-760-5500',
       maxDailyLimit: 144000,
       maxDays: 180,
-      receiveDate: new Date().toISOString().slice(0, 10),
+      receiveDate: receiveDateStr,
       matchStatus: '신청대기(미신청)'
     });
   }
@@ -8373,7 +8483,7 @@ async function confirmSamsungExcelUpload() {
   if (progressBox) progressBox.classList.remove('hidden');
   if (btnConfirm) btnConfirm.disabled = true;
 
-  // 1. 메모리 및 IndexedDB에 즉시 병합 저장 (O(1) Map 중복제거)
+  // 1. 메모리 및 IndexedDB에 즉시 병합 저장 (O(1) Map 중복제거 초고속 처리)
   const existingMap = new Map((gSamsungList || []).map(r => [r.patientId || r.id, r]));
   for (const r of gSamsungUploadedExcelRecords) {
     const key = r.patientId || r.id;
@@ -8381,8 +8491,8 @@ async function confirmSamsungExcelUpload() {
   }
   gSamsungList = Array.from(existingMap.values());
 
-  // IndexedDB에 대용량 안전 영구 저장
-  await LivonDB.saveSamsungEligible(gSamsungList);
+  // IndexedDB에 대용량 안전 영구 저장 (비동기 병렬 실행)
+  const idbSavePromise = LivonDB.saveSamsungEligible(gSamsungList);
 
   // 로컬스토리지는 용량 초과(5MB) 방지를 위해 메타데이터만 안전 보존
   try {
@@ -8394,32 +8504,50 @@ async function confirmSamsungExcelUpload() {
     }
   } catch (e) {}
 
-  // 2. Convex Cloud 청크 단위 분할 업로드 (200건씩 안전 전송)
-  const CHUNK_SIZE = 200;
-  let uploaded = 0;
-
-  if (typeof syncToConvex === 'function') {
-    for (let i = 0; i < total; i += CHUNK_SIZE) {
-      const chunk = gSamsungUploadedExcelRecords.slice(i, i + CHUNK_SIZE);
-      try {
-        await syncToConvex('sync:saveSamsungEligibleChunk', { leads: chunk });
-      } catch (err) {
-        console.warn(`[Convex Cloud] 청크 업로드 실패 (${i} ~ ${i + chunk.length}):`, err);
-      }
-
-      uploaded = Math.min(uploaded + chunk.length, total);
-      const pct = Math.min(100, Math.round((uploaded / total) * 100));
-
-      if (progressBar) progressBar.style.width = pct + '%';
-      if (percentBadge) percentBadge.innerText = pct + '%';
-      if (countDetail) countDetail.innerText = `${uploaded.toLocaleString()} / ${total.toLocaleString()}건 완료`;
-
-      // 브라우저 렌더링 갱신을 위한 짧은 양보
-      await new Promise(r => setTimeout(r, 15));
-    }
+  // 2. Convex Cloud 청크 단위 고속 병렬 파이프라인 업로드 (350건 단위, 6개 병렬 전송)
+  const CHUNK_SIZE = 350;
+  const chunks = [];
+  for (let i = 0; i < total; i += CHUNK_SIZE) {
+    chunks.push(gSamsungUploadedExcelRecords.slice(i, i + CHUNK_SIZE));
   }
 
-  // 3. 완료 후 UI 갱신
+  let uploaded = 0;
+  const CONCURRENCY = 6; // 6개 동시 병렬 파이프라인 전송 (대기 시간 85% 단축)
+
+  if (typeof syncToConvex === 'function' && chunks.length > 0) {
+    let nextChunkIdx = 0;
+
+    async function uploadWorker() {
+      while (nextChunkIdx < chunks.length) {
+        const idx = nextChunkIdx++;
+        const chunk = chunks[idx];
+        try {
+          await syncToConvex('sync:saveSamsungEligibleChunk', { leads: chunk });
+        } catch (err) {
+          console.warn(`[Convex Cloud] 청크 #${idx} 업로드 실패:`, err);
+        }
+
+        uploaded = Math.min(uploaded + chunk.length, total);
+        const pct = Math.min(100, Math.round((uploaded / total) * 100));
+
+        if (progressBar) progressBar.style.width = pct + '%';
+        if (percentBadge) percentBadge.innerText = pct + '%';
+        if (countDetail) countDetail.innerText = `${uploaded.toLocaleString()} / ${total.toLocaleString()}건 완료 (${pct}%)`;
+      }
+    }
+
+    const workers = Array.from({ length: Math.min(CONCURRENCY, chunks.length) }, () => uploadWorker());
+    await Promise.all(workers);
+  } else {
+    if (progressBar) progressBar.style.width = '100%';
+    if (percentBadge) percentBadge.innerText = '100%';
+    if (countDetail) countDetail.innerText = `${total.toLocaleString()} / ${total.toLocaleString()}건 완료 (100%)`;
+  }
+
+  // IndexedDB 저장 완료 대기
+  await idbSavePromise;
+
+  // 3. 완료 후 UI 즉시 갱신
   if (btnConfirm) btnConfirm.disabled = false;
   closeModal('samsungExcelModal');
 
@@ -8431,9 +8559,9 @@ async function confirmSamsungExcelUpload() {
 
   if (typeof showCustomAlert === 'function') {
     showCustomAlert({
-      title: '삼성화재 사전명단 대량 등록 완료',
-      message: `삼성화재 12대 핵심 항목을 포함한 ${total.toLocaleString()}건의 대상자 명단이 클라우드 DB 및 브라우저 로컬 저장소(IndexedDB)에 영구 보존되었습니다.\n(총 누적 사전명단: ${gSamsungList.length.toLocaleString()}건)\n페이지를 새로고침하거나 창을 닫아도 안전하게 보존됩니다.`,
-      icon: 'file-check-2',
+      title: '삼성화재 사전명단 초고속 일괄 등록 완료',
+      message: `삼성화재 12대 핵심 항목을 포함한 ${total.toLocaleString()}건의 대상자 명단이 클라우드 DB 및 브라우저 로컬 저장소(IndexedDB)에 고속 병렬로 영구 보존되었습니다.\n(총 누적 사전명단: ${gSamsungList.length.toLocaleString()}건)\n페이지를 새로고침하거나 창을 닫아도 안전하게 보존됩니다.`,
+      icon: 'zap',
       iconColor: 'sky'
     });
   }
@@ -10915,6 +11043,14 @@ function openClaimFaxPreview(applyId, requestedFormCode = null, preselectedDirId
     return;
   }
 
+  // 삼성화재는 팩스가 아닌 본사 이메일 청구 대상이므로 이메일 모달로 연결
+  if ((app.insuranceCompany || '').includes('삼성')) {
+    if (typeof openSamsungEmailModal === 'function') {
+      openSamsungEmailModal(applyId, 'ROUND_CLAIM', roundNumber);
+      return;
+    }
+  }
+
   // Auto-detect claim form based on insurance company:
   // Samsung Fire -> SF_FORM_01, Hyundai Marine / Hyundai SCOR / Others -> HD_FORM_02
   let formCode = requestedFormCode;
@@ -12677,6 +12813,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
   const isCompleted = isCaregiverAssigned ? (prog.status === 'completed' || prog.remainingDays === 0) : false;
   const careStartDate = isCaregiverAssigned ? as.startDate : null;
   const careEndDate = isCaregiverAssigned ? as.endDate : null;
+  const isSamsung = Boolean(app && (app.insuranceCompany || '').includes('삼성'));
 
   const defaultInsPrice = typeof getDefaultClaimUnitPrice === 'function' ? getDefaultClaimUnitPrice(app.insuranceCompany) : 160000;
   const dailyClaimPrice = (app.customDailyClaimPrice && !isNaN(Number(app.customDailyClaimPrice)) && Number(app.customDailyClaimPrice) > 0)
@@ -12690,6 +12827,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
   const rounds = [];
   if (isCaregiverAssigned && totalCareDays > 0) {
     const baseStart = parseCareDate(careStartDate);
+    const baseEnd = parseCareDate(careEndDate);
     const startTimeStr = (careStartDate && careStartDate.includes(':')) ? careStartDate.split(' ').slice(1).join(' ') : '09:00';
     const endTimeStr = (careEndDate && careEndDate.includes(':')) ? careEndDate.split(' ').slice(1).join(' ') : '18:00';
 
@@ -12698,6 +12836,9 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
     let startDayOffset = 1;
 
     while (remainingDaysToSplit > 0) {
+      // 1. 사용자 수동 지정 날짜 확인
+      const customDates = (app && app.customRoundDates && app.customRoundDates[roundIndex]);
+
       // 해당 차수에 등록된 기존 청구서가 있다면 사용자가 설정한 일수(예: 8일)를 그대로 반영
       // 미등록 차수라면 기본 10일 주기(또는 잔여 일수)로 자동 분할
       const claimForRound = (appClaims || []).find(c => {
@@ -12720,10 +12861,29 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       const isFaxClaimSent = Boolean(roundFaxLog && roundFaxLog.sentDate && (roundFaxLog.status === '전송완료' || roundFaxLog.status === '발송완료' || roundFaxLog.status === '성공'));
 
       let roundDays = 10;
-      if (claimForRound && claimForRound.days && Number(claimForRound.days) > 0) {
+      if (customDates && customDates.days && Number(customDates.days) > 0) {
+        roundDays = Math.min(Number(customDates.days), remainingDaysToSplit);
+      } else if (claimForRound && claimForRound.days && Number(claimForRound.days) > 0) {
         roundDays = Math.min(Number(claimForRound.days), remainingDaysToSplit);
       } else if (payoutForRound && payoutForRound.days && Number(payoutForRound.days) > 0) {
         roundDays = Math.min(Number(payoutForRound.days), remainingDaysToSplit);
+      } else if (isSamsung) {
+        // 삼성화재 2가지 비용청구 기준:
+        // 1) 당월 내 종료되는 경우 (단기): 종료 후 즉시 단일 청구 (전체 일수 1차)
+        // 2) 월을 넘어가는 경우 (장기): 월이 바뀌면 월 단위(해당 월 말일까지)로 자동 분할 청구
+        if (baseStart && baseEnd) {
+          const rStart = new Date(baseStart.getFullYear(), baseStart.getMonth(), baseStart.getDate() + (startDayOffset - 1));
+          const isSameMonthAsEnd = (rStart.getFullYear() === baseEnd.getFullYear() && rStart.getMonth() === baseEnd.getMonth());
+          if (isSameMonthAsEnd) {
+            roundDays = remainingDaysToSplit;
+          } else {
+            const endOfMonth = new Date(rStart.getFullYear(), rStart.getMonth() + 1, 0);
+            const daysTillMonthEnd = Math.max(1, Math.round((endOfMonth - rStart) / (24 * 60 * 60 * 1000)) + 1);
+            roundDays = Math.min(daysTillMonthEnd, remainingDaysToSplit);
+          }
+        } else {
+          roundDays = remainingDaysToSplit;
+        }
       } else {
         roundDays = Math.min(10, remainingDaysToSplit);
       }
@@ -12742,12 +12902,30 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         roundEndDateStr = `${formatCareDateStr(rEnd)} ${eTime}`;
       }
 
-      if (claimForRound && claimForRound.startDate) {
+      if (customDates && customDates.startDate) {
+        roundStartDateStr = formatWithTime(customDates.startDate, '09:00');
+      } else if (claimForRound && claimForRound.startDate) {
         roundStartDateStr = formatWithTime(claimForRound.startDate, '09:00');
       }
-      if (claimForRound && claimForRound.endDate) {
+      if (customDates && customDates.endDate) {
+        roundEndDateStr = formatWithTime(customDates.endDate, '18:00');
+      } else if (claimForRound && claimForRound.endDate) {
         roundEndDateStr = formatWithTime(claimForRound.endDate, '18:00');
       }
+
+      // 대상 연월 정보 산출
+      let targetYear = '';
+      let targetMonth = '';
+      const rDateMatch = (roundEndDateStr || roundStartDateStr).match(/(\d{4})[.-](\d{1,2})/);
+      if (rDateMatch) {
+        targetYear = rDateMatch[1];
+        targetMonth = parseInt(rDateMatch[2], 10);
+      } else {
+        const now = new Date();
+        targetYear = String(now.getFullYear());
+        targetMonth = now.getMonth() + 1;
+      }
+      const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
 
       let stage = 'UPCOMING';
       let ongoingElapsed = 0;
@@ -12847,12 +13025,21 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         isPayoutCreated: !!payoutForRound,
         isPayoutPaid: isPayoutPaid,
         marginAmount,
-        marginRate
+        marginRate,
+        isSamsung,
+        isDateCustomized: Boolean(customDates),
+        targetYear,
+        targetMonth,
+        targetMonthText
       });
 
       remainingDaysToSplit -= roundDays;
       startDayOffset += roundDays;
       roundIndex++;
+    }
+
+    if (isSamsung && rounds.length === 1) {
+      rounds[0].isSingleMonthShortClaim = true;
     }
   }
 
@@ -13337,6 +13524,35 @@ async function deleteInterimClaim(applyId, claimId) {
   gClaims = gClaims.filter(item => item.id !== claimId);
   const app = (gApps || []).find(a => a.id === applyId);
   if (app) {
+    if ((app.insuranceCompany || '').includes('삼성')) {
+      const roundNumber = parseInt(String(c.round || '').replace(/[^0-9]/g, ''), 10) || 1;
+      if (app.customRoundDates && app.customRoundDates[roundNumber]) {
+        delete app.customRoundDates[roundNumber].sentAt;
+      }
+      app.cancelledSamsungRounds = app.cancelledSamsungRounds || {};
+      app.cancelledSamsungRounds[roundNumber] = true;
+
+      if (Array.isArray(gSamsungEmailLogs)) {
+        for (let i = gSamsungEmailLogs.length - 1; i >= 0; i--) {
+          const l = gSamsungEmailLogs[i];
+          if (l && String(l.appId) === String(app.id)) {
+            if (Number(l.roundNumber) === Number(roundNumber) || (l.subject && l.subject.includes(`${roundNumber}차`))) {
+              gSamsungEmailLogs.splice(i, 1);
+            }
+          }
+        }
+        try {
+          localStorage.setItem('LIVON_SAMSUNG_EMAIL_LOGS', JSON.stringify(gSamsungEmailLogs));
+        } catch (e) {}
+      }
+
+      const hasOtherSentRound = Object.keys(app.customRoundDates || {}).some(k => Number(k) !== Number(roundNumber) && app.customRoundDates[k]?.sentAt);
+      const hasOtherEmailLog = (gSamsungEmailLogs || []).some(l => String(l.appId) === String(app.id));
+      if (!hasOtherSentRound && !hasOtherEmailLog) {
+        delete app.samsungEmailSentAt;
+      }
+    }
+
     const remainingClaims = gClaims.filter(item => item.applyId === applyId);
     app.claimCount = remainingClaims.length;
     app.unconfirmedClaimCount = remainingClaims.filter(item => item.depositStatus !== '수납완료' && item.depositStatus !== '입금완료').length;
@@ -13362,6 +13578,539 @@ async function deleteInterimClaim(applyId, claimId) {
       title: '청구 원복(취소) 완료',
       message: `[${c.id}] 청구서가 취소되고 미수금이 정상 차감되었습니다.`,
       icon: 'rotate-ccw'
+    });
+  }
+}
+
+// =========================================================================
+// [ROUND DATE & SAMSUNG CLAIM ENGINE] 차수별 정산 날짜 수정 및 청구 관리
+// =========================================================================
+
+function ensureRoundDateEditModal() {
+  if (document.getElementById('roundDateEditModal')) return;
+  const modalHtml = `
+    <div id="roundDateEditModal" class="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+      <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+        <div class="p-4 sm:p-5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-300">
+              <i data-lucide="calendar" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 id="roundDateEditTitle" class="text-sm font-black text-white">차수 정산·청구 날짜 수정</h3>
+              <p id="roundDateEditSub" class="text-[11px] text-slate-300 font-mono">고객 정보 및 산정 기간</p>
+            </div>
+          </div>
+          <button type="button" onclick="closeModal('roundDateEditModal')" class="p-1.5 text-slate-300 hover:text-white rounded-lg transition-all cursor-pointer">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <form id="roundDateEditForm" onsubmit="handleSaveRoundDateEdit(event)" class="p-5 space-y-4 text-xs">
+          <input type="hidden" id="roundDateEditAppId" value="">
+          <input type="hidden" id="roundDateEditRoundNum" value="1">
+
+          <!-- 간병기간 안내 및 범위 제한 표시 -->
+          <div id="roundDateEditCareNotice" class="p-3 rounded-2xl bg-sky-50 border border-sky-200 text-sky-950 text-xs flex items-start gap-2.5">
+            <i data-lucide="info" class="w-4 h-4 text-sky-600 shrink-0 mt-0.5"></i>
+            <div id="roundDateEditCareNoticeText" class="space-y-0.5 leading-snug">
+              <div class="font-bold text-sky-900">간병기간 범위 내에서만 선택 가능합니다.</div>
+            </div>
+          </div>
+
+          <div class="space-y-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+            <div>
+              <label class="block font-bold text-slate-700 text-[11px] mb-1">시작 일시 (시간 포함)</label>
+              <input type="datetime-local" id="roundEditStartInput" oninput="recalcRoundEditPreview()" required 
+                class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 text-[11px] mb-1">종료 일시 (시간 포함)</label>
+              <input type="datetime-local" id="roundEditEndInput" oninput="recalcRoundEditPreview()" required 
+                class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+            </div>
+          </div>
+
+          <!-- Preview calculation box -->
+          <div class="p-3 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-1.5 font-medium text-slate-700">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-500 font-sans">산정 일수:</span>
+              <span class="font-mono font-black text-indigo-900"><span id="roundEditDaysPreview">0</span>일 (<span id="roundEditHoursPreview">0</span>시간)</span>
+            </div>
+            <div class="flex items-center justify-between text-xs pt-1 border-t border-indigo-100/80">
+              <span class="text-slate-500 font-sans">예상 청구금액:</span>
+              <span class="font-mono font-black text-slate-900"><span id="roundEditClaimAmtPreview">0</span>원</span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-500 font-sans">간병비 지급금액:</span>
+              <span class="font-mono font-black text-teal-800"><span id="roundEditPayoutAmtPreview">0</span>원</span>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+            <button type="button" onclick="resetRoundDateEditToDefault()" 
+              class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-[11px] transition-all cursor-pointer">
+              기본 일정 복원
+            </button>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="closeModal('roundDateEditModal')" 
+                class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all cursor-pointer">
+                취소
+              </button>
+              <button type="submit" 
+                class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-black text-xs shadow-md transition-all cursor-pointer">
+                날짜 저장
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function openRoundDateEditModal(appId, roundNum) {
+  ensureRoundDateEditModal();
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  const appAssigns = (gAssigns || []).filter(a => a.applyId === appId);
+  const as = appAssigns.length > 0 ? appAssigns[0] : null;
+  const prog = as ? getCareProgressInfo(as) : null;
+  const schedule = (typeof calculateCareSettlementSchedule === 'function')
+    ? calculateCareSettlementSchedule(app, as, prog, (gClaims || []).filter(c => c.applyId === appId), (gPayouts || []).filter(p => p.applyId === appId))
+    : null;
+  const r = schedule ? (schedule.rounds.find(x => x.roundNumber === roundNum) || schedule.rounds[0]) : null;
+  if (!r) return;
+
+  document.getElementById('roundDateEditAppId').value = appId;
+  document.getElementById('roundDateEditRoundNum').value = roundNum;
+  document.getElementById('roundDateEditTitle').innerText = `${roundNum}차 정산·청구 날짜 수정`;
+  document.getElementById('roundDateEditSub').innerText = `[${app.id}] ${maskName(app.patientName)} · ${app.insuranceCompany || '보험사'}`;
+
+  function toDatetimeLocal(str, defTime) {
+    if (!str) return '';
+    const match = String(str).match(/(\d{4})[.-](\d{1,2})[.-](\d{1,2})(?:[.\sT]+(\d{1,2}):(\d{1,2}))?/);
+    if (!match) return '';
+    const y = match[1];
+    const m = String(match[2]).padStart(2, '0');
+    const d = String(match[3]).padStart(2, '0');
+    const hh = match[4] ? String(match[4]).padStart(2, '0') : (defTime.slice(0, 2));
+    const mm = match[5] ? String(match[5]).padStart(2, '0') : (defTime.slice(3, 5));
+    return `${y}-${m}-${d}T${hh}:${mm}`;
+  }
+
+  // 전체 간병기간 조회 (간병기간 초과 방지 min/max 설정)
+  let careStartStr = '';
+  let careEndStr = '';
+  if (appAssigns && appAssigns.length > 0) {
+    const sorted = appAssigns.slice().filter(a => a.startDate).sort((a, b) => a.startDate.localeCompare(b.startDate));
+    if (sorted.length > 0) {
+      careStartStr = sorted[0].startDate;
+      const ends = sorted.filter(a => a.endDate).map(a => a.endDate).sort();
+      careEndStr = ends.length > 0 ? ends[ends.length - 1] : sorted[0].endDate;
+    }
+  }
+  if (!careStartStr) careStartStr = app.careStartDate || app.startDate || '';
+  if (!careEndStr) careEndStr = app.careEndDate || app.endDate || '';
+
+  const minDateLocal = careStartStr ? toDatetimeLocal(careStartStr, '09:00') : '';
+  const maxDateLocal = careEndStr ? toDatetimeLocal(careEndStr, '18:00') : '';
+
+  const startInput = document.getElementById('roundEditStartInput');
+  const endInput = document.getElementById('roundEditEndInput');
+
+  if (minDateLocal) {
+    startInput.min = minDateLocal;
+    startInput.setAttribute('data-min-bound', minDateLocal);
+    endInput.min = minDateLocal;
+    endInput.setAttribute('data-min-bound', minDateLocal);
+  } else {
+    startInput.removeAttribute('min');
+    startInput.removeAttribute('data-min-bound');
+    endInput.removeAttribute('min');
+    endInput.removeAttribute('data-min-bound');
+  }
+
+  if (maxDateLocal) {
+    startInput.max = maxDateLocal;
+    startInput.setAttribute('data-max-bound', maxDateLocal);
+    endInput.max = maxDateLocal;
+    endInput.setAttribute('data-max-bound', maxDateLocal);
+  } else {
+    startInput.removeAttribute('max');
+    startInput.removeAttribute('data-max-bound');
+    endInput.removeAttribute('max');
+    endInput.removeAttribute('data-max-bound');
+  }
+
+  const noticeTextEl = document.getElementById('roundDateEditCareNoticeText');
+  if (noticeTextEl) {
+    if (careStartStr || careEndStr) {
+      noticeTextEl.innerHTML = `<div class="font-bold text-sky-950">전체 간병기간: ${careStartStr || '-'} ~ ${careEndStr || '-'}</div><div class="text-[11px] font-normal text-sky-700">간병기간을 초과할 수 없으며 기간 범위 내에서만 선택 가능합니다.</div>`;
+    } else {
+      noticeTextEl.innerHTML = `<div class="font-bold text-sky-900">간병기간 범위 내에서만 선택 가능합니다.</div>`;
+    }
+  }
+
+  const startVal = toDatetimeLocal(r.startDateStr, '09:00');
+  const endVal = toDatetimeLocal(r.endDateStr, '18:00');
+
+  startInput.value = startVal;
+  endInput.value = endVal;
+
+  recalcRoundEditPreview();
+  openModal('roundDateEditModal');
+  if (typeof initIcons === 'function') {
+    initIcons(document.getElementById('roundDateEditModal'));
+  }
+}
+
+function recalcRoundEditPreview() {
+  const startInput = document.getElementById('roundEditStartInput');
+  const endInput = document.getElementById('roundEditEndInput');
+  const startVal = startInput?.value;
+  const endVal = endInput?.value;
+  const appId = document.getElementById('roundDateEditAppId')?.value;
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+
+  const minBound = startInput?.getAttribute('data-min-bound') || '';
+  const maxBound = endInput?.getAttribute('data-max-bound') || '';
+
+  if (startInput && endInput) {
+    endInput.min = startVal || minBound;
+    startInput.max = endVal || maxBound;
+  }
+
+  let days = 1;
+  if (startVal && endVal) {
+    const dStart = new Date(startVal.slice(0, 10));
+    const dEnd = new Date(endVal.slice(0, 10));
+    const oneDay = 24 * 60 * 60 * 1000;
+    days = Math.max(1, Math.round((dEnd - dStart) / oneDay) + 1);
+  }
+
+  const daysEl = document.getElementById('roundEditDaysPreview');
+  const hoursEl = document.getElementById('roundEditHoursPreview');
+  const claimAmtEl = document.getElementById('roundEditClaimAmtPreview');
+  const payoutAmtEl = document.getElementById('roundEditPayoutAmtPreview');
+
+  const unitPrice = (app && app.customDailyClaimPrice) ? Number(app.customDailyClaimPrice) : 160000;
+  const wage = 140000;
+
+  if (daysEl) daysEl.innerText = String(days);
+  if (hoursEl) hoursEl.innerText = String(days * 24);
+  if (claimAmtEl) claimAmtEl.innerText = formatCurrency(days * unitPrice);
+  if (payoutAmtEl) payoutAmtEl.innerText = formatCurrency(days * wage);
+}
+
+async function handleSaveRoundDateEdit(e) {
+  e.preventDefault();
+  const appId = document.getElementById('roundDateEditAppId')?.value;
+  const roundNum = parseInt(document.getElementById('roundDateEditRoundNum')?.value || '1', 10);
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  const startInput = document.getElementById('roundEditStartInput');
+  const endInput = document.getElementById('roundEditEndInput');
+  const startVal = startInput?.value;
+  const endVal = endInput?.value;
+  if (!startVal || !endVal) {
+    alert('시작 일시와 종료 일시를 모두 입력해주세요.');
+    return;
+  }
+
+  const minBound = startInput?.getAttribute('data-min-bound');
+  const maxBound = endInput?.getAttribute('data-max-bound');
+
+  if (minBound && startVal < minBound) {
+    alert(`시작 일시는 전체 간병 시작일시(${minBound.replace('T', ' ')}) 이전일 수 없습니다.`);
+    return;
+  }
+  if (maxBound && endVal > maxBound) {
+    alert(`종료 일시는 전체 간병 종료일시(${maxBound.replace('T', ' ')})를 초과할 수 없습니다.`);
+    return;
+  }
+
+  const dStart = new Date(startVal.slice(0, 10));
+  const dEnd = new Date(endVal.slice(0, 10));
+  if (dStart > dEnd) {
+    alert('시작 일시는 종료 일시보다 이전이어야 합니다.');
+    return;
+  }
+
+  const oneDay = 24 * 60 * 60 * 1000;
+  const days = Math.max(1, Math.round((dEnd - dStart) / oneDay) + 1);
+
+  const startStr = `${startVal.slice(0, 10).replace(/-/g, '.')} ${startVal.slice(11, 16)}`;
+  const endStr = `${endVal.slice(0, 10).replace(/-/g, '.')} ${endVal.slice(11, 16)}`;
+
+  app.customRoundDates = app.customRoundDates || {};
+  const prevSentAt = app.customRoundDates[roundNum]?.sentAt;
+  app.customRoundDates[roundNum] = {
+    startDate: startStr,
+    endDate: endStr,
+    days: days,
+    sentAt: prevSentAt || undefined
+  };
+
+  // Sync with existing claim for this round
+  const claim = (gClaims || []).find(c => String(c.applyId) === String(app.id) && (parseInt(String(c.round || '').replace(/[^0-9]/g, ''), 10) === roundNum));
+  if (claim) {
+    claim.startDate = startStr;
+    claim.endDate = endStr;
+    claim.days = days;
+    const unitPrice = claim.unitPrice || 160000;
+    claim.claimAmount = days * unitPrice;
+    if (claim.depositStatus !== '수납완료' && claim.depositStatus !== '입금완료') {
+      claim.unpaidAmount = claim.claimAmount;
+    }
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveClaim', { claim }).catch(console.warn);
+    }
+  }
+
+  // Sync with existing payout for this round
+  const payout = (gPayouts || []).find(p => String(p.applyId) === String(app.id) && (parseInt(String(p.round || '').replace(/[^0-9]/g, ''), 10) === roundNum));
+  if (payout) {
+    payout.startDate = startStr;
+    payout.endDate = endStr;
+    payout.days = days;
+    const wage = payout.dailyWage || 140000;
+    payout.payoutAmount = days * wage;
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:savePayout', { payout }).catch(console.warn);
+    }
+  }
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+  }
+
+  closeModal('roundDateEditModal');
+  if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
+    openHubCustomerDetailModal(gActiveHubModalAppId);
+  }
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '정산 날짜 수정 완료',
+      message: `[${maskName(app.patientName)} 님] ${roundNum}차 기간이 ${days}일(${startStr} ~ ${endStr})로 저장되었습니다.`,
+      icon: 'calendar'
+    });
+  }
+}
+
+async function resetRoundDateEditToDefault() {
+  const appId = document.getElementById('roundDateEditAppId')?.value;
+  const roundNum = parseInt(document.getElementById('roundDateEditRoundNum')?.value || '1', 10);
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  if (app.customRoundDates && app.customRoundDates[roundNum]) {
+    delete app.customRoundDates[roundNum];
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+    }
+  }
+
+  closeModal('roundDateEditModal');
+  if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
+    openHubCustomerDetailModal(gActiveHubModalAppId);
+  }
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'info',
+      title: '기본 일정 복원',
+      message: `[${maskName(app.patientName)} 님] ${roundNum}차 기간이 기본 분할 일정으로 복원되었습니다.`
+    });
+  }
+}
+
+async function confirmSamsungRoundClaimDirect(appId, roundNumber) {
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+  const now = new Date();
+  const defaultDateStr = formatCareDateTimeStr(now);
+  
+  const confirmed = await showCustomConfirm(
+    `[${maskName(app.patientName)} 님] ${roundNumber}차 비용청구 메일을 발송완료로 등록하시겠습니까?\n\n청구일시: ${defaultDateStr}\n(외부 메일 또는 별도로 발송한 내역을 시스템에 등록합니다.)`,
+    {
+      theme: 'emerald',
+      icon: 'mail-check',
+      title: `${roundNumber}차 청구완료 일시 등록`,
+      confirmText: '청구완료 등록',
+      cancelText: '취소'
+    }
+  );
+  if (!confirmed) return;
+
+  const timeStr = defaultDateStr;
+  if (app.cancelledSamsungRounds) {
+    delete app.cancelledSamsungRounds[roundNumber];
+  }
+  app.customRoundDates = app.customRoundDates || {};
+  app.customRoundDates[roundNumber] = app.customRoundDates[roundNumber] || {};
+  app.customRoundDates[roundNumber].sentAt = timeStr;
+  app.samsungEmailSentAt = timeStr;
+
+  const newLog = {
+    id: 'SEML_' + Date.now(),
+    sentAt: timeStr,
+    type: 'ROUND_CLAIM',
+    typeName: `${roundNumber}차 청구완료(직접등록)`,
+    to: 'samsung_care@samsungfire.com',
+    subject: `[리본케어] 삼성화재 [${app.patientName}] 고객 ${roundNumber}차 간병비 청구 (직접등록)`,
+    excelFileName: '-',
+    hasCarePortPdf: false,
+    status: '전송완료',
+    appId: app.id,
+    roundNumber: roundNumber
+  };
+  gSamsungEmailLogs.unshift(newLog);
+
+  let claim = (gClaims || []).find(c => String(c.applyId) === String(app.id) && (parseInt(String(c.round || '').replace(/[^0-9]/g, ''), 10) === roundNumber));
+  if (!claim) {
+    const appAssigns = (gAssigns || []).filter(a => a.applyId === appId);
+    const as = appAssigns.length > 0 ? appAssigns[0] : null;
+    const prog = as ? getCareProgressInfo(as) : null;
+    const schedule = (typeof calculateCareSettlementSchedule === 'function')
+      ? calculateCareSettlementSchedule(app, as, prog, (gClaims || []).filter(c => c.applyId === appId), (gPayouts || []).filter(p => p.applyId === appId))
+      : null;
+    const roundInfo = schedule ? (schedule.rounds.find(r => r.roundNumber === roundNumber) || schedule.rounds[0]) : null;
+    const days = roundInfo ? roundInfo.days : 1;
+    const unitPrice = schedule ? schedule.dailyClaimPrice : 160000;
+    const amt = days * unitPrice;
+    claim = {
+      id: `Q${app.id.replace('C', '')}.${roundNumber}`,
+      applyId: app.id,
+      patientName: app.patientName,
+      insuranceCompany: app.insuranceCompany || '삼성화재',
+      round: `${roundNumber}차 (${days}일분 / ${days * 24}시간)`,
+      startDate: roundInfo ? roundInfo.startDateStr : timeStr,
+      endDate: roundInfo ? roundInfo.endDateStr : timeStr,
+      claimDate: timeStr,
+      days: days,
+      unitPrice: unitPrice,
+      dailyWage: unitPrice,
+      claimAmount: amt,
+      depositAmount: 0,
+      unitPriceType: '확인',
+      depositStatus: '미수납',
+      unpaidAmount: amt,
+      adjusterStatus: '청구접수',
+      memo: `${roundNumber}차 삼성화재 비용청구 완료 등록 (${timeStr})`
+    };
+    gClaims.unshift(claim);
+  } else {
+    claim.claimDate = timeStr;
+    claim.adjusterStatus = '청구접수';
+  }
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+    syncToConvex('sync:saveClaim', { claim }).catch(console.warn);
+    syncToConvex('sync:saveSamsungEmailLog', { log: newLog }).catch(console.warn);
+  }
+
+  try {
+    localStorage.setItem('LIVON_SAMSUNG_EMAIL_LOGS', JSON.stringify(gSamsungEmailLogs));
+  } catch (e) {}
+
+  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '청구완료 등록 완료',
+      message: `[${maskName(app.patientName)} 님] ${roundNumber}차 청구완료 일시(${timeStr})가 정상 등록되었습니다.`
+    });
+  }
+}
+
+async function cancelSamsungRoundClaim(appId, roundNumber) {
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  const confirmed = await showCustomConfirm(
+    `[${maskName(app.patientName)} 님] ${roundNumber}차 청구 상태를 취소하고 '청구 대기' 상태로 원복하시겠습니까?`,
+    {
+      theme: 'amber',
+      icon: 'rotate-ccw',
+      title: `${roundNumber}차 청구 원복 확인`,
+      confirmText: '청구 원복',
+      cancelText: '취소'
+    }
+  );
+  if (!confirmed) return;
+
+  if (app.customRoundDates && app.customRoundDates[roundNumber]) {
+    delete app.customRoundDates[roundNumber].sentAt;
+  }
+
+  app.cancelledSamsungRounds = app.cancelledSamsungRounds || {};
+  app.cancelledSamsungRounds[roundNumber] = true;
+
+  // gClaims에서 해당 차수 청구서 완전 삭제 및 미수금 차감
+  const claimIdx = (gClaims || []).findIndex(c => String(c.applyId) === String(app.id) && (parseInt(String(c.round || '').replace(/[^0-9]/g, ''), 10) === roundNumber));
+  if (claimIdx !== -1) {
+    const claim = gClaims[claimIdx];
+    if (claim.id && typeof syncToConvex === 'function') {
+      syncToConvex('sync:deleteClaim', { claimId: claim.id }).catch(console.warn);
+    }
+    gClaims.splice(claimIdx, 1);
+    try {
+      localStorage.setItem('LIVON_CLAIMS', JSON.stringify(gClaims));
+    } catch (e) {}
+
+    const remainingClaims = gClaims.filter(item => item.applyId === app.id);
+    app.claimCount = remainingClaims.length;
+    app.unconfirmedClaimCount = remainingClaims.filter(item => item.depositStatus !== '수납완료' && item.depositStatus !== '입금완료').length;
+    app.estimatedUnpaid = remainingClaims.filter(item => item.depositStatus !== '수납완료' && item.depositStatus !== '입금완료').reduce((sum, item) => sum + (item.unpaidAmount || item.claimAmount || 0), 0);
+  }
+
+  // gSamsungEmailLogs에서 해당 차수 발송 기록 제거
+  if (Array.isArray(gSamsungEmailLogs)) {
+    for (let i = gSamsungEmailLogs.length - 1; i >= 0; i--) {
+      const l = gSamsungEmailLogs[i];
+      if (l && String(l.appId) === String(app.id)) {
+        if (Number(l.roundNumber) === Number(roundNumber) || (l.subject && l.subject.includes(`${roundNumber}차`))) {
+          gSamsungEmailLogs.splice(i, 1);
+        }
+      }
+    }
+    try {
+      localStorage.setItem('LIVON_SAMSUNG_EMAIL_LOGS', JSON.stringify(gSamsungEmailLogs));
+    } catch (e) {}
+  }
+
+  // 다른 차수 발송 건이 없으면 app.samsungEmailSentAt 도 제거
+  const hasOtherSentRound = Object.keys(app.customRoundDates || {}).some(k => Number(k) !== Number(roundNumber) && app.customRoundDates[k]?.sentAt);
+  const hasOtherEmailLog = (gSamsungEmailLogs || []).some(l => String(l.appId) === String(app.id));
+  if (!hasOtherSentRound && !hasOtherEmailLog) {
+    delete app.samsungEmailSentAt;
+  }
+  app.updatedAt = new Date().toISOString();
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+  }
+
+  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  if (typeof renderClaims === 'function') renderClaims();
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'info',
+      title: '청구 취소 완료',
+      message: `[${maskName(app.patientName)} 님] ${roundNumber}차 청구가 대기 상태로 원복되었습니다.`
     });
   }
 }
@@ -13897,25 +14646,43 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
               (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
               ((faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null);
 
-            // 삼성화재인 경우 간병기간(종료일 우선, 시작일 보조)을 기준으로 몇월 청구 대상인지 자동 산출
-            let targetYear = '';
-            let targetMonth = '';
-            const rawEnd = r.endDateStr || (as ? as.endDate : null) || app.careEndDate || '';
-            const rawStart = r.startDateStr || (as ? as.startDate : null) || app.careStartDate || '';
-            const dateMatch = (rawEnd || rawStart).match(/(\d{4})[.-](\d{1,2})/);
-            if (dateMatch) {
-              targetYear = dateMatch[1];
-              targetMonth = parseInt(dateMatch[2], 10);
-            } else {
-              const now = new Date();
-              targetYear = String(now.getFullYear());
-              targetMonth = now.getMonth() + 1;
+            // 삼성화재인 경우 간병기간(종료일 우선, 시작일 보조)을 기준으로 몇월 청구 대상인지 산출
+            let targetYear = r.targetYear || '';
+            let targetMonth = r.targetMonth || '';
+            if (!targetYear || !targetMonth) {
+              const rawEnd = r.endDateStr || (as ? as.endDate : null) || app.careEndDate || '';
+              const rawStart = r.startDateStr || (as ? as.startDate : null) || app.careStartDate || '';
+              const dateMatch = (rawEnd || rawStart).match(/(\d{4})[.-](\d{1,2})/);
+              if (dateMatch) {
+                targetYear = dateMatch[1];
+                targetMonth = parseInt(dateMatch[2], 10);
+              } else {
+                const now = new Date();
+                targetYear = String(now.getFullYear());
+                targetMonth = now.getMonth() + 1;
+              }
             }
-            const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
+            const targetMonthText = r.targetMonthText || `${targetYear}년 ${targetMonth}월분`;
 
-            // 해당 월분의 삼성화재 월간 정기 청구서 발송 이력 확인
+            const isRoundCancelled = Boolean(app.cancelledSamsungRounds && app.cancelledSamsungRounds[r.roundNumber]);
+
+            // 삼성화재 개별 발송 로그 및 월간 정기 청구서 발송 이력 확인
+            let samsungIndividualLog = null;
+            if (isSamsung && !isRoundCancelled && Array.isArray(gSamsungEmailLogs)) {
+              samsungIndividualLog = gSamsungEmailLogs.find(l => {
+                if (!l) return false;
+                const isMatchApp = String(l.appId) === String(app.id);
+                if (!isMatchApp) return false;
+                if (l.roundNumber && Number(l.roundNumber) === Number(r.roundNumber)) return true;
+                const subj = l.subject || '';
+                if (subj.includes(`${r.roundNumber}차`)) return true;
+                if (rounds.length === 1) return true;
+                return false;
+              });
+            }
+
             let samsungMonthlyLog = null;
-            if (isSamsung && Array.isArray(gSamsungEmailLogs)) {
+            if (isSamsung && !isRoundCancelled && Array.isArray(gSamsungEmailLogs)) {
               const padMonth = String(targetMonth).padStart(2, '0');
               samsungMonthlyLog = gSamsungEmailLogs.find(l => {
                 if (!l) return false;
@@ -13930,14 +14697,32 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
               });
             }
 
-            const isSamsungClaimSent = Boolean(samsungMonthlyLog);
+            const isCustomRoundSent = Boolean(!isRoundCancelled && app.customRoundDates && app.customRoundDates[r.roundNumber] && app.customRoundDates[r.roundNumber].sentAt);
+            const isSamsungClaimSent = Boolean(!isRoundCancelled && (samsungIndividualLog || isCustomRoundSent || samsungMonthlyLog));
             const isClaimDone = isSamsung 
-              ? (isSamsungClaimSent || Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate)))
+              ? (isSamsungClaimSent || Boolean(!isRoundCancelled && r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate)))
               : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(rawClaimDate));
 
-            const claimDateTimeStr = isSamsung
-              ? (samsungMonthlyLog ? (samsungMonthlyLog.sentAt ? samsungMonthlyLog.sentAt.slice(0, 16) : '발송완료') : formatStatusDateTime(rawClaimDate, '10:00'))
-              : formatStatusDateTime(rawClaimDate, '10:00');
+            let claimDateTimeStr = '';
+            if (isSamsung) {
+              if (!isRoundCancelled) {
+                if (samsungIndividualLog && samsungIndividualLog.sentAt) {
+                  claimDateTimeStr = samsungIndividualLog.sentAt.slice(0, 16);
+                } else if (isCustomRoundSent) {
+                  claimDateTimeStr = app.customRoundDates[r.roundNumber].sentAt.slice(0, 16);
+                } else if (r.existingClaim && r.existingClaim.claimDate) {
+                  claimDateTimeStr = formatStatusDateTime(r.existingClaim.claimDate, '10:00');
+                } else if (samsungMonthlyLog && samsungMonthlyLog.sentAt) {
+                  claimDateTimeStr = samsungMonthlyLog.sentAt.slice(0, 16);
+                } else if (app.samsungEmailSentAt) {
+                  claimDateTimeStr = app.samsungEmailSentAt.slice(0, 16);
+                } else if (rawClaimDate) {
+                  claimDateTimeStr = formatStatusDateTime(rawClaimDate, '10:00');
+                }
+              }
+            } else {
+              claimDateTimeStr = formatStatusDateTime(rawClaimDate, '10:00');
+            }
 
             const isSending = Boolean(window.gBarobillSendingRounds && window.gBarobillSendingRounds.has(`${app.id}_${r.roundNumber}`));
             const isDepositDone = isRoundDepositConfirmed(r);
@@ -13961,17 +14746,26 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                 
                 <!-- Round Top Bar -->
                 <div class="px-5 py-3 bg-slate-50 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
-                  <div class="flex items-center gap-3 flex-wrap">
+                  <div class="flex items-center gap-2.5 flex-wrap">
                     <span class="px-3 py-1 rounded-xl bg-slate-900 text-white font-black text-xs shadow-xs">
                       ${r.roundNumber}차 정산
                     </span>
-                    <div class="flex items-center gap-1.5 font-mono text-xs text-slate-800">
+                    <div class="flex items-center gap-1.5 font-mono text-xs text-slate-800 bg-white px-2.5 py-1 rounded-xl border border-slate-200">
                       <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-500"></i>
                       <b>${r.startDateStr}</b> ~ <b>${r.endDateStr}</b>
                     </div>
-                    <span class="px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-900 font-mono font-black text-xs border border-indigo-200/80">
+                    <span class="px-2.5 py-1 rounded-xl bg-indigo-50 text-indigo-900 font-mono font-black text-xs border border-indigo-200/80">
                       ${r.days}일간 (${hours}시간)
                     </span>
+                    ${r.isDateCustomized ? `
+                      <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[10.5px] border border-amber-300" title="사용자가 직접 날짜를 조정한 차수입니다">
+                        날짜수정됨
+                      </span>
+                    ` : ''}
+                    <button type="button" onclick="openRoundDateEditModal('${app.id}', ${r.roundNumber})" class="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-xs flex items-center gap-1 shadow-2xs transition-all cursor-pointer" title="해당 차수의 시작일/종료일 및 일수 직접 수정">
+                      <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i>
+                      <span>날짜 수정</span>
+                    </button>
                     ${r.stage === 'COMPLETED' ? `
                       <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center gap-1">
                         <i data-lucide="check-circle" class="w-3 h-3 text-emerald-600"></i> 간병완료
@@ -14046,51 +14840,82 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                             </div>
                           ` : isClaimDone ? `
                             <div class="flex items-center gap-1.5 flex-wrap">
-                              <span class="px-2 py-0.5 rounded-lg bg-slate-200 text-slate-800 font-bold text-[11px] flex items-center gap-1" title="${isSamsung ? `${targetMonthText} 정기청구서 발송완료` : (claimDateTimeStr ? '청구 발송일시: ' + claimDateTimeStr : '발송완료')}">
-                                <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> 청구완료 (${isSamsung ? `${targetMonth}월분 청구서 발송완료` : (claimDateTimeStr ? claimDateTimeStr + ' 발송' : '발송완료')})
+                              <span class="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[11px] flex items-center gap-1" title="청구 완료">
+                                <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> 청구완료
                               </span>
                               ${r.existingClaim ? `<span class="text-[10.5px] font-mono text-slate-400">${r.existingClaim.id}</span>` : ''}
                             </div>
                           ` : `
                             <span class="px-2 py-0.5 rounded-lg bg-amber-200/90 text-amber-950 font-black text-[11px] flex items-center gap-1">
-                              <i data-lucide="clock" class="w-3 h-3"></i> 청구전 ${isSamsung ? `(${targetMonth}월분 청구 대상)` : ''}
+                              <i data-lucide="clock" class="w-3 h-3"></i> 청구전 ${isSamsung ? (rounds.length === 1 ? '(당월 간병종료 청구)' : `(${targetMonth}월분 분할청구)`) : ''}
                             </span>
                           `}
                         </div>
                       </div>
 
-                      <!-- 하단 버튼/정보 영역 (삼성화재 이동 버튼 제거, 대상월 및 발송결과 자동 표시) -->
+                      <!-- 하단 버튼/정보 영역 (삼성화재 고객별 청구 요청 및 청구완료 일시 정보 표기) -->
                       <div class="pt-2 border-t ${isClaimDone ? 'border-slate-200' : isSending ? 'border-purple-200' : 'border-amber-200/60'}">
                         ${isSamsung ? `
                           ${isClaimDone ? `
-                            <div class="p-2.5 rounded-xl bg-slate-200/60 border border-slate-300 text-slate-800 text-xs space-y-1">
-                              <div class="flex items-center justify-between font-bold">
-                                <span class="flex items-center gap-1.5 text-slate-800">
-                                  <i data-lucide="mail-check" class="w-3.5 h-3.5 text-emerald-600"></i>
-                                  <span>${targetMonthText} 청구 대상</span>
+                            <div class="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-slate-800 text-xs space-y-2">
+                              <div class="flex items-center justify-between font-black">
+                                <span class="flex items-center gap-1.5 text-emerald-950">
+                                  <i data-lucide="mail-check" class="w-4 h-4 text-emerald-600"></i>
+                                  <span>${rounds.length === 1 ? '단일 비용청구 메일 발송완료' : `${targetMonthText} 분할청구 발송완료`}</span>
                                 </span>
-                                <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-extrabold text-[10.5px] border border-emerald-300">
-                                  정기청구 발송완료
+                                <span class="px-2 py-0.5 rounded-md bg-emerald-600 text-white font-black text-[10.5px] shadow-2xs">
+                                  청구완료
                                 </span>
                               </div>
-                              <p class="text-[11px] text-slate-500 font-mono truncate" title="${samsungMonthlyLog ? (samsungMonthlyLog.sentAt || '') : '월간 일괄청구 완료'}">
-                                ${samsungMonthlyLog ? `발송일시: ${samsungMonthlyLog.sentAt} (${samsungMonthlyLog.to || '본사 이메일'})` : '해당 월분 정기 청구서가 정상 발송되었습니다.'}
-                              </p>
+                              <div class="p-2 rounded-xl bg-white border border-emerald-200/80 space-y-1 font-mono text-[11px]">
+                                <div class="flex items-center justify-between">
+                                  <span class="text-slate-500 font-sans font-medium">청구완료 일시:</span>
+                                  <b class="text-emerald-800 font-black">${claimDateTimeStr || '발송완료'}</b>
+                                </div>
+                                <div class="flex items-center justify-between text-slate-500 text-[10.5px]">
+                                  <span class="font-sans">수신처:</span>
+                                  <span class="text-slate-700 font-sans">${samsungIndividualLog ? samsungIndividualLog.to : 'samsung_care@samsungfire.com'}</span>
+                                </div>
+                              </div>
+                              <div class="flex items-center gap-1.5 pt-1">
+                                <button type="button" onclick="cancelSamsungRoundClaim('${app.id}', ${r.roundNumber})" 
+                                  class="flex-1 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer" title="청구 취소하고 청구 대기 상태로 원복">
+                                  <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                                  <span>청구취소 (원복)</span>
+                                </button>
+                                <button type="button" onclick="openSamsungEmailModal('${app.id}', 'ROUND_CLAIM', ${r.roundNumber})" 
+                                  class="px-3 py-1.5 rounded-xl bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 font-bold text-xs shadow-2xs flex items-center justify-center gap-1 transition-all cursor-pointer" title="이메일 재발송">
+                                  <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                  <span>재발송</span>
+                                </button>
+                              </div>
                             </div>
                           ` : `
-                            <div class="p-2.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-950 text-xs space-y-1">
-                              <div class="flex items-center justify-between font-bold">
-                                <span class="flex items-center gap-1.5 text-sky-900">
-                                  <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i>
-                                  <span>정기청구 대상:</span>
-                                </span>
-                                <span class="px-2 py-0.5 rounded-lg bg-sky-600 text-white font-black text-[11px] shadow-2xs">
-                                  ${targetMonthText} 청구 대상
-                                </span>
+                            <div class="space-y-2">
+                              <div class="p-2.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-950 text-xs space-y-1">
+                                <div class="flex items-center justify-between font-bold">
+                                  <span class="flex items-center gap-1.5 text-sky-900">
+                                    <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i>
+                                    <span>${rounds.length === 1 ? '당월 간병종료 청구 대상' : `${targetMonthText} 분할청구 대상`}</span>
+                                  </span>
+                                  <span class="px-2 py-0.5 rounded-lg bg-sky-600 text-white font-black text-[10.5px] shadow-2xs">
+                                    ${rounds.length === 1 ? '종료 즉시청구' : `${targetMonth}월분`}
+                                  </span>
+                                </div>
+                                <p class="text-[11px] text-sky-700 font-medium">
+                                  ${rounds.length === 1 ? '당월 내 간병 종료 건으로, 아래 버튼을 눌러 본사 이메일 청구를 바로 요청하세요.' : `월을 넘긴 간병 건으로 ${targetMonth}월분(${r.days}일간) 분할청구 메일을 발송합니다.`}
+                                </p>
                               </div>
-                              <p class="text-[11px] text-sky-700 font-medium">
-                                삼성화재는 월 1회 본사 이메일로 일괄 청구됩니다. (${targetMonth}월분 청구서 발송 시 자동 청구완료 처리)
-                              </p>
+                              <button type="button" onclick="openSamsungEmailModal('${app.id}', 'ROUND_CLAIM', ${r.roundNumber})" 
+                                class="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 active:scale-95 text-white font-black text-xs shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer">
+                                <i data-lucide="mail" class="w-4 h-4"></i>
+                                <span>${r.roundNumber}차 비용청구 메일 발송 (${formatCurrency(r.fullClaimAmount)}원)</span>
+                              </button>
+                              <button type="button" onclick="confirmSamsungRoundClaimDirect('${app.id}', ${r.roundNumber})" 
+                                class="w-full py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-[11px] shadow-2xs flex items-center justify-center gap-1 transition-all cursor-pointer" title="외부 메일 또는 별도로 발송한 경우 청구완료 일시 직접 등록">
+                                <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+                                <span>청구 메일 발송완료로 직접 등록</span>
+                              </button>
                             </div>
                           `}
                         ` : isSending ? `
@@ -15189,12 +16014,33 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               ` : `
                 <div class="space-y-2">
                   ${rounds.map(r => {
-                    const faxSentDateStr = (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
-                      ((faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null);
+                    const roundFaxLog = (window.gFaxLogs || []).find(fl => 
+                      String(fl.appId) === String(app.id) && 
+                      (fl.roundNumber === r.roundNumber || (fl.memo && fl.memo.includes(`${r.roundNumber}차`)) || (fl.category && fl.category.includes('정산')))
+                    );
+                    const faxSentDateStr = (roundFaxLog && roundFaxLog.sentDate) ||
+                      (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
+                      ((faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null) || '';
 
-                    // 삼성화재인 경우 해당 월분의 정기 청구서 발송 이력 확인
+                    const isRoundCancelled = Boolean(app.cancelledSamsungRounds && app.cancelledSamsungRounds[r.roundNumber]);
+
+                    // 삼성화재인 경우 개별 발송 및 해당 월분의 정기 청구서 발송 이력 확인
+                    let samsungIndividualLog = null;
+                    if (isSamsung && !isRoundCancelled && Array.isArray(gSamsungEmailLogs)) {
+                      samsungIndividualLog = gSamsungEmailLogs.find(l => {
+                        if (!l) return false;
+                        const isMatchApp = String(l.appId) === String(app.id);
+                        if (!isMatchApp) return false;
+                        if (l.roundNumber && Number(l.roundNumber) === Number(r.roundNumber)) return true;
+                        const subj = l.subject || '';
+                        if (subj.includes(`${r.roundNumber}차`)) return true;
+                        if (rounds.length === 1) return true;
+                        return false;
+                      });
+                    }
+
                     let samsungMonthlyLog = null;
-                    if (isSamsung && Array.isArray(gSamsungEmailLogs)) {
+                    if (isSamsung && !isRoundCancelled && Array.isArray(gSamsungEmailLogs)) {
                       const dateMatch = (r.endDateStr || r.startDateStr || '').match(/(\d{4})[.-](\d{1,2})/);
                       const targetMonth = dateMatch ? parseInt(dateMatch[2], 10) : (new Date().getMonth() + 1);
                       const targetYear = dateMatch ? dateMatch[1] : String(new Date().getFullYear());
@@ -15212,11 +16058,25 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                       });
                     }
 
+                    const isCustomRoundSent = Boolean(!isRoundCancelled && app.customRoundDates && app.customRoundDates[r.roundNumber] && app.customRoundDates[r.roundNumber].sentAt);
                     const isSending = Boolean(window.gBarobillSendingRounds && window.gBarobillSendingRounds.has(`${app.id}_${r.roundNumber}`));
                     const isClaimDone = isSamsung
-                      ? (Boolean(samsungMonthlyLog) || Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate)))
+                      ? (!isRoundCancelled && (Boolean(samsungIndividualLog) || isCustomRoundSent || Boolean(samsungMonthlyLog) || Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate))))
                       : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(faxSentDateStr));
                     const isDepositDone = isRoundDepositConfirmed(r);
+
+                    let timelineClaimSentTimeStr = '';
+                    if (isSamsung && !isRoundCancelled) {
+                      if (samsungIndividualLog && samsungIndividualLog.sentAt) {
+                        timelineClaimSentTimeStr = samsungIndividualLog.sentAt.slice(0, 16);
+                      } else if (isCustomRoundSent) {
+                        timelineClaimSentTimeStr = app.customRoundDates[r.roundNumber].sentAt.slice(0, 16);
+                      } else if (samsungMonthlyLog && samsungMonthlyLog.sentAt) {
+                        timelineClaimSentTimeStr = samsungMonthlyLog.sentAt.slice(0, 16);
+                      } else if (app.samsungEmailSentAt) {
+                        timelineClaimSentTimeStr = app.samsungEmailSentAt.slice(0, 16);
+                      }
+                    }
 
                     const cardBorder = 
                       isSending ? 'border-purple-300 bg-purple-50/70 text-purple-950 ring-2 ring-purple-400/40' :
@@ -15227,7 +16087,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                     const badgeHtml = 
                       isSending ? '<span class="px-2.5 py-0.5 rounded-full text-[10.5px] font-black bg-purple-100 text-purple-900 border border-purple-300 animate-pulse inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 shadow-2xs"><span class="w-2 h-2 rounded-full bg-purple-600 animate-ping"></span>바로빌 청구중...</span>' :
                       isDepositDone ? '<span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1 whitespace-nowrap shrink-0"><i data-lucide="check" class="w-3 h-3 text-emerald-600 shrink-0"></i> 입금확인됨 ✓</span>' :
-                      isClaimDone ? `<span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-amber-100 text-amber-900 border border-amber-300/80 inline-flex items-center gap-1 whitespace-nowrap shrink-0"><i data-lucide="clock" class="w-3 h-3 text-amber-600 shrink-0"></i> 미입금 (${faxSentDateStr ? faxSentDateStr + ' 발송' : (isSamsung ? '이메일 청구' : '청구완료')})</span>` :
+                      isClaimDone ? `<span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-amber-100 text-amber-900 border border-amber-300/80 inline-flex items-center gap-1 whitespace-nowrap shrink-0"><i data-lucide="clock" class="w-3 h-3 text-amber-600 shrink-0"></i> 미입금 (${timelineClaimSentTimeStr || faxSentDateStr || '청구완료'})</span>` :
                       '<span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-amber-200 text-amber-950 whitespace-nowrap shrink-0">청구전</span>';
 
                     const hoursCount = r.days * 24;
@@ -15243,8 +16103,14 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                           <div class="flex items-center gap-1.5 shrink-0">
                             <span class="font-black ${isClaimDone ? 'text-slate-900' : isSending ? 'text-purple-950' : 'text-amber-950'} whitespace-nowrap">${r.label}</span>
                             ${badgeHtml}
+                            ${r.isDateCustomized ? '<span class="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold text-[9.5px]">수정됨</span>' : ''}
                           </div>
-                          <span class="text-slate-500 font-mono text-[10.5px] whitespace-nowrap shrink-0">(${dateRangeStr} · ${r.days}일 / ${hoursCount}시간)</span>
+                          <div class="flex items-center gap-1.5">
+                            <span class="text-slate-500 font-mono text-[10.5px] whitespace-nowrap shrink-0">(${dateRangeStr} · ${r.days}일 / ${hoursCount}시간)</span>
+                            <button type="button" onclick="event.stopPropagation(); openRoundDateEditModal('${app.id}', ${r.roundNumber})" class="px-1.5 py-0.5 rounded bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 font-bold text-[10px] cursor-pointer" title="날짜 수정">
+                              수정
+                            </button>
+                          </div>
                         </div>
 
                         <div class="flex items-center justify-between gap-2 pt-0.5">
@@ -15266,9 +16132,9 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                                 </button>
                               `}
                               ${isSamsung ? `
-                                <button type="button" onclick="closeModal('hubCustomerDetailModal'); switchTab('samsungclaimhub', 'claims');" 
-                                  class="px-2 py-1 rounded-lg bg-white hover:bg-sky-50 text-sky-700 border border-sky-200 font-bold text-[10.5px] shadow-2xs inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0" title="삼성화재 월간 청구관리 화면 이동">
-                                  <i data-lucide="mail-check" class="w-3 h-3 shrink-0"></i> <span>이메일 청구확인</span>
+                                <button type="button" onclick="event.stopPropagation(); openSamsungEmailModal('${app.id}', 'ROUND_CLAIM', ${r.roundNumber})" 
+                                  class="px-2 py-1 rounded-lg bg-white hover:bg-sky-50 text-sky-700 border border-sky-200 font-bold text-[10.5px] shadow-2xs inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0" title="이메일 재발송">
+                                  <i data-lucide="send" class="w-3 h-3 shrink-0"></i> <span>재발송</span>
                                 </button>
                               ` : `
                                 <button type="button" onclick="event.stopPropagation(); openClaimFaxPreview('${app.id}', null, null, ${r.roundNumber})" 
@@ -15276,7 +16142,12 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                                   <i data-lucide="send" class="w-3 h-3 shrink-0"></i> <span>팩스 재발송</span>
                                 </button>
                               `}
-                              ${r.existingClaim ? `
+                              ${isSamsung ? `
+                                <button type="button" onclick="event.stopPropagation(); cancelSamsungRoundClaim('${app.id}', ${r.roundNumber})" 
+                                  class="px-2 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-bold text-[10.5px] shadow-2xs transition-all cursor-pointer whitespace-nowrap shrink-0" title="삼성화재 청구 취소하고 청구 대기 상태로 원복">
+                                  원복
+                                </button>
+                              ` : r.existingClaim ? `
                                 <button type="button" onclick="event.stopPropagation(); openClaimEditModal('${r.existingClaim.id}')" 
                                   class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10.5px] shadow-2xs whitespace-nowrap shrink-0" title="청구서 직접 수정">
                                   수정
@@ -15288,9 +16159,9 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                               ` : ''}
                             ` : `
                               ${isSamsung ? `
-                                <button type="button" onclick="closeModal('hubCustomerDetailModal'); switchTab('samsungclaimhub', 'claims');" 
-                                  class="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold text-[10.5px] shadow-xs inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0" title="삼성화재 월간 청구관리에서 이메일 일괄 청구">
-                                  <i data-lucide="mail" class="w-3 h-3 shrink-0"></i> <span>이메일 청구관리</span>
+                                <button type="button" onclick="event.stopPropagation(); openSamsungEmailModal('${app.id}', 'ROUND_CLAIM', ${r.roundNumber})" 
+                                  class="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold text-[10.5px] shadow-xs inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0" title="삼성화재 이메일 청구 요청">
+                                  <i data-lucide="mail" class="w-3 h-3 shrink-0"></i> <span>청구 메일 발송</span>
                                 </button>
                               ` : isSending ? `
                                 <button disabled class="px-3 py-1 rounded-lg bg-purple-100 text-purple-800 border border-purple-300 font-bold text-[10.5px] shadow-2xs inline-flex items-center gap-1.5 cursor-wait whitespace-nowrap shrink-0">
@@ -16739,19 +17610,22 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
     `);
   }
 
-  // 5. 청구팩스 미전송 체크 (청구서는 작성되었으나 손사 팩스 미전송)
-  if (appClaims.length > 0 && faxInfo.status !== '전송완료') {
-    badges.push(`
-      <span class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-purple-300 font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="청구서가 작성되었으나 아직 손사 팩스로 발송되지 않았습니다.">
-        <i data-lucide="send" class="w-3 h-3 text-purple-700"></i> ⚠️ 팩스 미전송
-      </span>
-    `);
-  } else if (appClaims.length > 0 && faxInfo.status === '전송완료') {
-    badges.push(`
-      <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-medium text-[10px] flex items-center gap-1 whitespace-nowrap">
-        <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> 팩스완료
-      </span>
-    `);
+  // 5. 청구팩스 미전송 체크 (청구서는 작성되었으나 손사 팩스 미전송) - 삼성화재는 본사 이메일 청구 대상이므로 팩스 미전송 뱃지 제외
+  const isSamsung = (app.insuranceCompany || '').includes('삼성');
+  if (!isSamsung) {
+    if (appClaims.length > 0 && faxInfo.status !== '전송완료') {
+      badges.push(`
+        <span class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-purple-300 font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="청구서가 작성되었으나 아직 손사 팩스로 발송되지 않았습니다.">
+          <i data-lucide="send" class="w-3 h-3 text-purple-700"></i> ⚠️ 팩스 미전송
+        </span>
+      `);
+    } else if (appClaims.length > 0 && faxInfo.status === '전송완료') {
+      badges.push(`
+        <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-medium text-[10px] flex items-center gap-1 whitespace-nowrap">
+          <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> 팩스완료
+        </span>
+      `);
+    }
   }
 
   // 6. 현대해상 문자대기 체크
@@ -16816,8 +17690,10 @@ function renderUnifiedCareHub() {
   }
   const insFilter = document.getElementById('hubInsuranceFilter')?.value || 'ALL';
 
-  // Helper: 간병비 청구 팩스 발송 완료 여부 판별 (신규 1차 고객등록 팩스는 청구 팩스가 아니므로 제외)
+  // Helper: 간병비 청구 팩스 발송 완료 여부 판별 (신규 1차 고객등록 팩스는 청구 팩스가 아니므로 제외, 삼성화재는 팩스 대상 제외)
   const isClaimFaxSentHelper = (id) => {
+    const a = (gApps || []).find(item => item.id === id);
+    if (a && (a.insuranceCompany || '').includes('삼성')) return true;
     const r = gFaxRecords && gFaxRecords[id];
     return !!(r && r.status === '전송완료' && r.caseType !== '현대해상 고객등록/조회' && r.formType !== 'HD_FORM_01');
   };
@@ -16842,7 +17718,7 @@ function renderUnifiedCareHub() {
     if (a.status.includes('진행') || a.status === '정상' || a.status === '배정완료') inProgressCount++;
     if (a.unconfirmedClaimCount > 0 || a.estimatedUnpaid > 0) unpaidClaimCount++;
     if (unpaidPayoutAppIdSet.has(a.id)) needPayoutCount++;
-    if (a.claimCount > 0 && !isClaimFaxSentHelper(a.id)) needFaxCount++;
+    if (!a.insuranceCompany.includes('삼성') && a.claimCount > 0 && !isClaimFaxSentHelper(a.id)) needFaxCount++;
   }
 
   const countAllEl = document.getElementById('hubCount-ALL');
@@ -16878,6 +17754,7 @@ function renderUnifiedCareHub() {
     if (gHubFilter === 'UNPAID_CLAIM' && app.unconfirmedClaimCount === 0 && app.estimatedUnpaid === 0) return false;
     if (gHubFilter === 'NEED_PAYOUT' && !unpaidPayoutAppIdSet.has(app.id)) return false;
     if (gHubFilter === 'NEED_FAX') {
+      if (app.insuranceCompany.includes('삼성')) return false;
       const isSent = isClaimFaxSentHelper(app.id);
       if (app.claimCount === 0 || isSent) return false;
     }
@@ -17315,9 +18192,11 @@ function renderUnifiedCareHub() {
               </div>
 
               <div class="flex justify-between items-center pt-1 border-t border-slate-200/50 text-[10.5px]">
-                <span class="text-slate-400">손사팩스:</span>
-                <span class="${faxInfo.status === '전송완료' ? 'text-emerald-700 font-medium' : 'text-slate-400'}">
-                  ${faxInfo.status === '전송완료' ? `발송완료(${faxInfo.sentDate ? faxInfo.sentDate.slice(5) : ''})` : '미발송'}
+                <span class="text-slate-400">${app.insuranceCompany.includes('삼성') ? '본사이메일:' : '손사팩스:'}</span>
+                <span class="${(app.insuranceCompany.includes('삼성') ? app.samsungEmailSentAt : faxInfo.status === '전송완료') ? 'text-emerald-700 font-medium' : 'text-slate-400'}">
+                  ${app.insuranceCompany.includes('삼성') 
+                    ? (app.samsungEmailSentAt ? `발송완료(${app.samsungEmailSentAt.slice(5, 16)})` : '미발송')
+                    : (faxInfo.status === '전송완료' ? `발송완료(${faxInfo.sentDate ? faxInfo.sentDate.slice(5) : ''})` : '미발송')}
                 </span>
               </div>
             </div>
@@ -20213,6 +21092,16 @@ function switchTab(tabId, filterParam = null) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   const target = document.getElementById('tab-' + tabId);
   if (target) target.classList.remove('hidden');
+
+  // 종합콜분석 화면 진입 시 하단 토스트 닫기 / 다른 메뉴 이동 시 아웃콜 필요 건 즉시 체크
+  if (tabId === 'totalcallanalysis') {
+    const existingToast = document.getElementById('outcallNotificationToast');
+    if (existingToast) existingToast.remove();
+  } else {
+    if (typeof checkAndTriggerOutcallAlert === 'function') {
+      checkAndTriggerOutcallAlert();
+    }
+  }
 
   // 참고자료 하위 메뉴(신청대장, 배정, 청구, 지급) 클릭 시 서브메뉴 자동 오픈
   const isReferenceChildTab = ['applications', 'assignments', 'claims', 'payouts'].includes(tabId);

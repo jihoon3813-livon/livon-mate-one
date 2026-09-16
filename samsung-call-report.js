@@ -28,6 +28,10 @@ var gReportFilter = {
   startDate: defaultReportThisWeek.start,
   endDate: defaultReportThisWeek.end
 };
+if (typeof window !== 'undefined') {
+  window.gReportFilter = gReportFilter;
+  window.gSamsungReportFilter = gReportFilter;
+}
 
 const SAMSUNG_CATEGORIES = [
   {
@@ -390,21 +394,31 @@ async function initSamsungCallReportModule() {
       }
     } catch (e) {}
 
-    // 서버 API 부재 시 정적 JSON 파일 고속 fallback
+    // 서버 API 부재 시 정적 JSON 파일 고속 fallback (절대경로 및 상대경로, all_report fallback 지원)
     if (!loaded) {
-      try {
-        const sRes = await fetch('/call_report_samsung.json');
-        if (sRes.ok) {
-          const sJson = await sRes.json();
-          if (sJson.success && sJson.data) {
-            gSamsungReportData = sJson.data;
-            loaded = true;
-          } else if (sJson.callLogs) {
-            gSamsungReportData = sJson;
-            loaded = true;
+      const fallbackUrls = [
+        '/call_report_samsung.json',
+        'call_report_samsung.json',
+        './call_report_samsung.json',
+        '/call_report_all.json',
+        'call_report_all.json'
+      ];
+      for (const u of fallbackUrls) {
+        if (loaded) break;
+        try {
+          const sRes = await fetch(u);
+          if (sRes.ok) {
+            const sJson = await sRes.json();
+            if (sJson.success && sJson.data) {
+              gSamsungReportData = sJson.data;
+              loaded = true;
+            } else if (sJson.callLogs) {
+              gSamsungReportData = sJson;
+              loaded = true;
+            }
           }
-        }
-      } catch (e) {}
+        } catch (e) {}
+      }
     }
 
     if (gSamsungReportData) {
@@ -439,6 +453,15 @@ function renderSamsungCallReportTab() {
   const info = gSamsungReportData.reportInfo || {};
   const stats = calculateReportStats();
 
+  const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || (typeof gSamsungReportFilter !== 'undefined' && gSamsungReportFilter) || {};
+  const dateRangeStr = (curFilter.startDate && curFilter.endDate)
+    ? `${curFilter.startDate} ~ ${curFilter.endDate}`
+    : (info.period || '2026-08-25 ~ 2026-09-18');
+
+  // 제목에서 기존 인라인 괄호 날짜가 있다면 분리하여 베이스 제목 추출
+  const rawTitle = info.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고';
+  const baseTitle = rawTitle.replace(/\s*\([\d\-~.\s]+\)\s*$/, '').trim();
+
   container.innerHTML = `
     <div class="space-y-4 max-w-[1600px] mx-auto pb-12 text-slate-800">
       
@@ -456,15 +479,16 @@ function renderSamsungCallReportTab() {
             </span>
             <span class="text-xs text-slate-400 font-mono shrink-0">보고일: ${info.reportDate || '2026-09-15'}</span>
           </div>
-          <h2 class="text-xl sm:text-2xl font-black text-slate-900 mt-2 flex items-center gap-2 break-keep leading-tight">
-            ${info.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고'}
+          <h2 class="text-xl sm:text-2xl font-black text-slate-900 mt-2 break-keep leading-tight">
+            <span>${baseTitle}</span>
+            <span class="block text-xs sm:text-sm font-bold text-slate-500 font-mono mt-1">(${dateRangeStr})</span>
           </h2>
           <p class="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
             <span><b>분석 대상:</b> ${info.target || '삼성화재 간병서비스 관련 인바운드 콜'}</span>
             <span class="text-slate-300">|</span>
             <span><b>작성 주체:</b> ${info.author || '리본케어 (Livon Care)'}</span>
             <span class="text-slate-300">|</span>
-            <span><b>분석 기간:</b> <b class="text-blue-700 font-mono">${info.period || '2026-08-18 ~ 09-13 (약 4주)'}</b></span>
+            <span><b>분석 기간:</b> <b class="text-blue-700 font-mono">${dateRangeStr}</b></span>
           </p>
         </div>
 
@@ -2511,8 +2535,9 @@ function openSamsungReportWebView() {
  * 상담요약 텍스트 클립보드 복사 헬퍼 (복사 완료 시 버튼 아이콘 피드백)
  */
 function copyCallLogSummaryText(btn, text) {
-  if (!text) return;
-  navigator.clipboard.writeText(text).then(() => {
+  const cleanText = (text || '').trim();
+  if (!cleanText) return;
+  navigator.clipboard.writeText(cleanText).then(() => {
     if (btn) {
       const origHtml = btn.innerHTML;
       btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600"></i>';
