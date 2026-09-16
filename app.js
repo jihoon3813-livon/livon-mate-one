@@ -999,6 +999,7 @@ var gCenters = [];
 var gAdjusters = [];
 var gSamsungList = [];
 var gSamsungAddressBook = [];
+var gSamsungSenders = [];
 var gSamsungEmailLogs = [];
 var gSamsungClaimHubActiveSubTab = 'daily';
 var gSamsungDailySelectedCareLogs = new Set();
@@ -5984,19 +5985,9 @@ function renderSamsungClaimHub(subTabParam = null) {
     if (defaultDailyTo) toDailyEl.value = defaultDailyTo.email;
   }
 
-  // 발송 계정(SMTP) 설정이 되어 있으면 보내는 사람 기본값에 즉시 반영
-  getEmailConfig().then(cfg => {
-    if (cfg && cfg.user) {
-      const formattedSender = cfg.senderName ? `${cfg.senderName} <${cfg.senderEmail || cfg.user}>` : (cfg.senderEmail || cfg.user);
-      const fromDailyEl = document.getElementById('samsungDailyFromEmail');
-      if (fromDailyEl && (!fromDailyEl.value || fromDailyEl.value.includes('support@reborncare.co.kr'))) {
-        fromDailyEl.value = formattedSender;
-      }
-      const fromClaimEl = document.getElementById('samsungClaimFromEmail');
-      if (fromClaimEl && (!fromClaimEl.value || fromClaimEl.value.includes('settlement@reborncare.co.kr'))) {
-        fromClaimEl.value = formattedSender;
-      }
-    }
+  // 발신자(보내는 사람) 목록 및 기본 고정 발신자 초기화/렌더링
+  initSamsungSenders().then(() => {
+    renderSamsungSenderSelects();
   }).catch(console.warn);
 
   const subjDailyEl = document.getElementById('samsungDailySubject');
@@ -6024,10 +6015,16 @@ function renderSamsungClaimHub(subTabParam = null) {
   // 6. [탭 2] 월간 청구 기본 필드 프리필 및 통계 계산
   renderSamsungMonthlyClaimStats(compApps, completedSheetRows);
 
+  // 사용자 요구사항: 월간 청구 메일 작성 시 받는 사람 (청구 담당자)은 기본적으로 공란 유지
   const toClaimEl = document.getElementById('samsungClaimToEmail');
-  if (toClaimEl && !toClaimEl.value.trim()) {
-    const defaultClaimTo = (gSamsungAddressBook || []).find(c => (c.role || '').includes('청구') || (c.role || '').includes('총괄'));
-    if (defaultClaimTo) toClaimEl.value = defaultClaimTo.email;
+  if (toClaimEl) {
+    if (!toClaimEl.dataset.userEdited) {
+      toClaimEl.value = '';
+    }
+    if (!toClaimEl.dataset.listenerAttached) {
+      toClaimEl.addEventListener('input', () => { toClaimEl.dataset.userEdited = 'true'; });
+      toClaimEl.dataset.listenerAttached = 'true';
+    }
   }
 
   const subjClaimEl = document.getElementById('samsungClaimSubject');
@@ -6770,6 +6767,508 @@ function renderSamsungAddressBookTable() {
   html += `</tbody></table>`;
   container.innerHTML = html;
   initIcons(container);
+}
+
+// -------------------------------------------------------------------------
+// SAMSUNG SENDER MANAGEMENT CONTROLLERS (발신자/보내는 사람 목록 관리 및 고정)
+// -------------------------------------------------------------------------
+
+/**
+ * 발신자 표시 문자열 포맷팅
+ * 예: "(주)리본케어_김지훈 <jihoon3813@livon.care>"
+ */
+function formatSamsungSenderDisplay(s) {
+  if (!s) return '';
+  if (s.name && s.email) return `${s.name} <${s.email}>`;
+  return s.email || s.name || '';
+}
+
+/**
+ * 발신자 목록 초기화 및 로드
+ */
+async function initSamsungSenders() {
+  let loaded = false;
+  // 1. localStorage 우선 조회
+  try {
+    const raw = localStorage.getItem('LIVON_SAMSUNG_SENDERS');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        gSamsungSenders = parsed;
+        loaded = true;
+      }
+    }
+  } catch (e) {}
+
+  // 2. 서버 설정(/api/email/config)에서 senders 목록 조회
+  try {
+    const cfg = await getEmailConfig();
+    if (cfg && Array.isArray(cfg.senders) && cfg.senders.length > 0) {
+      gSamsungSenders = cfg.senders;
+      localStorage.setItem('LIVON_SAMSUNG_SENDERS', JSON.stringify(gSamsungSenders));
+      loaded = true;
+    }
+  } catch (e) {}
+
+  // 3. 미등록 시 기본 초기값 생성
+  if (!loaded || !gSamsungSenders || gSamsungSenders.length === 0) {
+    gSamsungSenders = [
+      { id: 'SND_01', name: '(주)리본케어_김지훈', email: 'jihoon3813@livon.care', memo: '김지훈 대표 직통 발송 계정 (기본)', isDefault: true },
+      { id: 'SND_02', name: '리본케어 정산지원팀', email: 'settlement@reborncare.co.kr', memo: '삼성화재 간병비 정기 청구 전용', isDefault: false },
+      { id: 'SND_03', name: '리본케어 운영지원팀', email: 'support@reborncare.co.kr', memo: '일일접수 및 간병일지 보고 전용', isDefault: false },
+      { id: 'SND_04', name: '(주)리본케어 삼성화재 운영데스크', email: 'jihoon3813@livon.care', memo: '삼성화재 전담 통합 데스크', isDefault: false }
+    ];
+    saveSamsungSenders(false);
+  }
+
+  // 기본 고정 발신자가 없으면 첫 번째를 기본으로 설정
+  ensureSamsungSenderDefault();
+}
+
+function ensureSamsungSenderDefault() {
+  if (!Array.isArray(gSamsungSenders) || gSamsungSenders.length === 0) return;
+  const hasDefault = gSamsungSenders.some(s => s.isDefault);
+  if (!hasDefault) {
+    gSamsungSenders[0].isDefault = true;
+  }
+}
+
+/**
+ * 발신자 목록 영구 저장 (localStorage 및 서버 config)
+ */
+async function saveSamsungSenders(syncToServer = true) {
+  try {
+    localStorage.setItem('LIVON_SAMSUNG_SENDERS', JSON.stringify(gSamsungSenders));
+  } catch (e) {}
+
+  if (syncToServer) {
+    try {
+      const defaultSender = gSamsungSenders.find(s => s.isDefault);
+      await fetch('/api/email/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senders: gSamsungSenders,
+          defaultSenderId: defaultSender ? defaultSender.id : null
+        })
+      });
+      gEmailConfigCache = null;
+    } catch (e) {
+      console.warn('[Save Samsung Senders Server Sync Error]', e);
+    }
+  }
+}
+
+/**
+ * 일일접수 및 월간청구 폼의 발신자 드롭다운 목록 렌더링
+ */
+function renderSamsungSenderSelects() {
+  const claimSelect = document.getElementById('samsungClaimSenderSelect');
+  const dailySelect = document.getElementById('samsungDailySenderSelect');
+  const claimFromInput = document.getElementById('samsungClaimFromEmail');
+  const dailyFromInput = document.getElementById('samsungDailyFromEmail');
+
+  const senders = gSamsungSenders || [];
+  const defaultSender = senders.find(s => s.isDefault) || senders[0];
+
+  const buildOptionsHtml = (selectedId) => {
+    let html = '';
+    senders.forEach(s => {
+      const isSelected = s.id === selectedId;
+      const pinText = s.isDefault ? '📌 [기본고정] ' : '';
+      html += `<option value="${s.id}" ${isSelected ? 'selected' : ''}>${pinText}${s.name} (${s.email})</option>`;
+    });
+    html += `<option value="custom">✏️ 직접 입력 (커스텀)</option>`;
+    return html;
+  };
+
+  if (claimSelect) {
+    const currentVal = claimSelect.value;
+    const targetId = (currentVal && senders.some(s => s.id === currentVal)) ? currentVal : (defaultSender ? defaultSender.id : '');
+    claimSelect.innerHTML = buildOptionsHtml(targetId);
+    if (claimSelect.value && claimSelect.value !== 'custom') {
+      const curSender = senders.find(s => s.id === claimSelect.value);
+      if (curSender && claimFromInput && (!claimFromInput.dataset.userEdited || !claimFromInput.value)) {
+        claimFromInput.value = formatSamsungSenderDisplay(curSender);
+      }
+    }
+    updateSenderPinnedBadge('claim', claimSelect.value);
+  }
+
+  if (dailySelect) {
+    const currentVal = dailySelect.value;
+    const targetId = (currentVal && senders.some(s => s.id === currentVal)) ? currentVal : (defaultSender ? defaultSender.id : '');
+    dailySelect.innerHTML = buildOptionsHtml(targetId);
+    if (dailySelect.value && dailySelect.value !== 'custom') {
+      const curSender = senders.find(s => s.id === dailySelect.value);
+      if (curSender && dailyFromInput && (!dailyFromInput.dataset.userEdited || !dailyFromInput.value)) {
+        dailyFromInput.value = formatSamsungSenderDisplay(curSender);
+      }
+    }
+    updateSenderPinnedBadge('daily', dailySelect.value);
+  }
+
+  if (typeof initIcons === 'function') {
+    initIcons(document.getElementById('tab-samsungclaimhub'));
+  }
+}
+
+/**
+ * 발신자 드롭다운 변경 이벤트 핸들러
+ */
+function handleSamsungSenderSelectChange(type, value) {
+  const inputEl = type === 'claim' 
+    ? document.getElementById('samsungClaimFromEmail')
+    : document.getElementById('samsungDailyFromEmail');
+
+  if (value === 'custom') {
+    if (inputEl) {
+      inputEl.dataset.userEdited = 'true';
+      inputEl.focus();
+    }
+    updateSenderPinnedBadge(type, 'custom');
+    return;
+  }
+
+  const sender = (gSamsungSenders || []).find(s => s.id === value);
+  if (sender && inputEl) {
+    inputEl.value = formatSamsungSenderDisplay(sender);
+    delete inputEl.dataset.userEdited;
+  }
+  updateSenderPinnedBadge(type, value);
+}
+
+/**
+ * 발신자 고정 뱃지 표시 여부 갱신
+ */
+function updateSenderPinnedBadge(type, selectedValue) {
+  const badgeEl = type === 'claim'
+    ? document.getElementById('samsungClaimSenderPinnedBadge')
+    : document.getElementById('samsungDailySenderPinnedBadge');
+  if (!badgeEl) return;
+
+  const sender = (gSamsungSenders || []).find(s => s.id === selectedValue);
+  if (sender && sender.isDefault) {
+    badgeEl.classList.remove('hidden');
+    badgeEl.classList.add('inline-flex');
+  } else {
+    badgeEl.classList.add('hidden');
+    badgeEl.classList.remove('inline-flex');
+  }
+}
+
+/**
+ * 현재 선택된 발신자를 기본값으로 고정 (Pin)
+ */
+async function pinCurrentSamsungSender(type) {
+  const selectEl = type === 'claim'
+    ? document.getElementById('samsungClaimSenderSelect')
+    : document.getElementById('samsungDailySenderSelect');
+  const inputEl = type === 'claim'
+    ? document.getElementById('samsungClaimFromEmail')
+    : document.getElementById('samsungDailyFromEmail');
+
+  const selectedVal = selectEl ? selectEl.value : null;
+
+  if (selectedVal && selectedVal !== 'custom') {
+    const sender = (gSamsungSenders || []).find(s => s.id === selectedVal);
+    if (!sender) return;
+
+    gSamsungSenders.forEach(s => { s.isDefault = (s.id === sender.id); });
+    await saveSamsungSenders(true);
+    renderSamsungSenderSelects();
+
+    if (typeof showCustomAlert === 'function') {
+      showCustomAlert({
+        title: '기본 발신자 고정 완료 📌',
+        message: `[${sender.name}]이(가) 기본 발신자로 고정되었습니다.\n\n앞으로 삼성화재 메일 작성 화면이 열릴 때 이 발신자가 기본으로 자동 선택됩니다.`,
+        icon: 'pin',
+        iconColor: 'amber'
+      });
+    }
+  } else {
+    // 커스텀 직접 입력 상태에서 고정하려는 경우: 신규 발신자로 등록 제안
+    const rawVal = inputEl ? inputEl.value.trim() : '';
+    if (!rawVal) {
+      alert('고정할 발신자 정보(이름 및 이메일)를 입력해주세요.');
+      return;
+    }
+
+    let parsedName = rawVal;
+    let parsedEmail = '';
+    const angleMatch = rawVal.match(/^(.*?)\s*<([^>]+)>$/);
+    if (angleMatch) {
+      parsedName = angleMatch[1].trim() || '담당자';
+      parsedEmail = angleMatch[2].trim();
+    } else if (rawVal.includes('@')) {
+      parsedEmail = rawVal;
+      parsedName = rawVal.split('@')[0];
+    } else {
+      alert('유효한 이메일 주소를 포함하여 입력해주세요.\n예: (주)리본케어_김지훈 <jihoon3813@livon.care>');
+      return;
+    }
+
+    const confirmAdd = confirm(`입력된 [${parsedName} <${parsedEmail}>] 정보를 새 발신자로 등록하고 기본값으로 고정하시겠습니까?`);
+    if (!confirmAdd) return;
+
+    const newSender = {
+      id: 'SND_' + Date.now(),
+      name: parsedName,
+      email: parsedEmail,
+      memo: '사용자 직접 추가 (기본 고정됨)',
+      isDefault: true
+    };
+
+    gSamsungSenders.forEach(s => { s.isDefault = false; });
+    gSamsungSenders.unshift(newSender);
+    await saveSamsungSenders(true);
+
+    if (selectEl) selectEl.value = newSender.id;
+    if (inputEl) inputEl.value = formatSamsungSenderDisplay(newSender);
+    delete inputEl.dataset.userEdited;
+
+    renderSamsungSenderSelects();
+
+    if (typeof showCustomAlert === 'function') {
+      showCustomAlert({
+        title: '새 발신자 등록 및 고정 완료 📌',
+        message: `[${newSender.name} - ${newSender.email}] 발신자가 새롭게 등록되고 기본 발신자로 고정되었습니다.`,
+        icon: 'check-circle-2',
+        iconColor: 'emerald'
+      });
+    }
+  }
+}
+
+/**
+ * 발신자 목록 관리 모달 열기
+ */
+function openSamsungSenderManageModal(targetField = null) {
+  if (targetField) {
+    const targetInput = document.getElementById('samsungSenderTargetField');
+    if (targetInput) targetInput.value = targetField;
+  }
+  resetSamsungSenderForm();
+  renderSamsungSenderListTable();
+  openModal('samsungSenderManageModal');
+  if (typeof initIcons === 'function') {
+    initIcons(document.getElementById('samsungSenderManageModal'));
+  }
+}
+
+/**
+ * 발신자 등록 폼 리셋
+ */
+function resetSamsungSenderForm() {
+  const idEl = document.getElementById('samsungSenderEditId');
+  const nameEl = document.getElementById('samsungSenderEditName');
+  const emailEl = document.getElementById('samsungSenderEditEmail');
+  const memoEl = document.getElementById('samsungSenderEditMemo');
+  const defEl = document.getElementById('samsungSenderEditIsDefault');
+  const titleEl = document.getElementById('samsungSenderFormTitle');
+  const btnEl = document.getElementById('btnSaveSamsungSenderText');
+
+  if (idEl) idEl.value = '';
+  if (nameEl) nameEl.value = '';
+  if (emailEl) emailEl.value = '';
+  if (memoEl) memoEl.value = '';
+  if (defEl) defEl.checked = false;
+  if (titleEl) titleEl.innerText = '새 발신자 등록';
+  if (btnEl) btnEl.innerText = '발신자 저장';
+}
+
+/**
+ * 발신자 저장 (신규 등록 및 수정)
+ */
+async function handleSaveSamsungSender(e) {
+  e.preventDefault();
+  const id = document.getElementById('samsungSenderEditId')?.value?.trim();
+  const name = document.getElementById('samsungSenderEditName')?.value?.trim();
+  const email = document.getElementById('samsungSenderEditEmail')?.value?.trim();
+  const memo = document.getElementById('samsungSenderEditMemo')?.value?.trim() || '';
+  const isDefault = Boolean(document.getElementById('samsungSenderEditIsDefault')?.checked);
+
+  if (!name || !email) {
+    alert('발신자 표시명과 이메일 주소를 입력해주세요.');
+    return;
+  }
+
+  if (isDefault) {
+    gSamsungSenders.forEach(s => { s.isDefault = false; });
+  }
+
+  if (id) {
+    const existing = gSamsungSenders.find(s => s.id === id);
+    if (existing) {
+      existing.name = name;
+      existing.email = email;
+      existing.memo = memo;
+      if (isDefault) existing.isDefault = true;
+      existing.updatedAt = new Date().toISOString();
+    }
+  } else {
+    const newSender = {
+      id: 'SND_' + Date.now(),
+      name,
+      email,
+      memo,
+      isDefault: isDefault || gSamsungSenders.length === 0,
+      createdAt: new Date().toISOString()
+    };
+    gSamsungSenders.unshift(newSender);
+  }
+
+  ensureSamsungSenderDefault();
+  await saveSamsungSenders(true);
+
+  resetSamsungSenderForm();
+  renderSamsungSenderListTable();
+  renderSamsungSenderSelects();
+
+  if (typeof showCustomAlert === 'function') {
+    showCustomAlert({
+      title: '발신자 저장 완료 ✅',
+      message: `[${name} <${email}>] 발신자 정보가 성공적으로 저장되었습니다.${isDefault ? '\n(기본 발신자로 고정됨)' : ''}`,
+      icon: 'check-circle-2',
+      iconColor: 'emerald'
+    });
+  }
+}
+
+/**
+ * 발신자 수정 데이터 로드
+ */
+function editSamsungSender(id) {
+  const sender = (gSamsungSenders || []).find(s => s.id === id);
+  if (!sender) return;
+
+  document.getElementById('samsungSenderEditId').value = sender.id;
+  document.getElementById('samsungSenderEditName').value = sender.name || '';
+  document.getElementById('samsungSenderEditEmail').value = sender.email || '';
+  document.getElementById('samsungSenderEditMemo').value = sender.memo || '';
+  document.getElementById('samsungSenderEditIsDefault').checked = Boolean(sender.isDefault);
+
+  document.getElementById('samsungSenderFormTitle').innerText = `발신자 수정: ${sender.name}`;
+  document.getElementById('btnSaveSamsungSenderText').innerText = '수정 완료';
+  document.getElementById('samsungSenderEditName').focus();
+}
+
+/**
+ * 발신자 삭제
+ */
+async function deleteSamsungSender(id) {
+  const sender = (gSamsungSenders || []).find(s => s.id === id);
+  if (!sender) return;
+
+  if (gSamsungSenders.length <= 1) {
+    alert('최소 1개 이상의 발신자 프로필이 유지되어야 합니다.');
+    return;
+  }
+
+  if (!confirm(`[${sender.name}] 발신자를 목록에서 삭제하시겠습니까?`)) return;
+
+  const wasDefault = sender.isDefault;
+  gSamsungSenders = gSamsungSenders.filter(s => s.id !== id);
+  if (wasDefault && gSamsungSenders.length > 0) {
+    gSamsungSenders[0].isDefault = true;
+  }
+
+  await saveSamsungSenders(true);
+  renderSamsungSenderListTable();
+  renderSamsungSenderSelects();
+}
+
+/**
+ * 모달 목록 테이블에서 특정 발신자를 기본값으로 고정
+ */
+async function setSamsungSenderDefault(id) {
+  const sender = (gSamsungSenders || []).find(s => s.id === id);
+  if (!sender) return;
+
+  gSamsungSenders.forEach(s => { s.isDefault = (s.id === id); });
+  await saveSamsungSenders(true);
+
+  renderSamsungSenderListTable();
+  renderSamsungSenderSelects();
+
+  if (typeof showCustomAlert === 'function') {
+    showCustomAlert({
+      title: '기본 발신자 고정 완료 📌',
+      message: `[${sender.name}]이(가) 기본 발신자로 고정되었습니다.\n메일 작성 창이 열릴 때 항상 자동으로 선택됩니다.`,
+      icon: 'pin',
+      iconColor: 'amber'
+    });
+  }
+}
+
+/**
+ * 모달 내부 발신자 목록 테이블 렌더링
+ */
+function renderSamsungSenderListTable() {
+  const container = document.getElementById('samsungSenderListTableContainer');
+  if (!container) return;
+
+  const badge = document.getElementById('samsungSenderCountBadge');
+  const senders = gSamsungSenders || [];
+  if (badge) badge.innerText = `${senders.length}명 등록`;
+
+  if (senders.length === 0) {
+    container.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">등록된 발신자가 없습니다. 위 입력 폼에서 추가해주세요.</div>`;
+    return;
+  }
+
+  let html = `
+    <table class="w-full text-left border-collapse text-xs whitespace-nowrap min-w-[700px]">
+      <thead class="bg-amber-50/70 text-slate-700 font-bold border-b sticky top-0 z-10 text-[11px]">
+        <tr>
+          <th class="p-2.5 whitespace-nowrap min-w-[110px] text-center">기본 고정</th>
+          <th class="p-2.5 whitespace-nowrap min-w-[160px]">발신자 표시명</th>
+          <th class="p-2.5 whitespace-nowrap min-w-[200px]">발신 이메일 주소</th>
+          <th class="p-2.5 whitespace-nowrap min-w-[180px]">용도 및 메모</th>
+          <th class="p-2.5 text-center whitespace-nowrap w-36">관리</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 bg-white">
+  `;
+
+  senders.forEach(s => {
+    const isDef = Boolean(s.isDefault);
+    html += `
+      <tr class="hover:bg-amber-50/30 transition-colors whitespace-nowrap ${isDef ? 'bg-amber-50/20' : ''}">
+        <td class="p-2.5 text-center whitespace-nowrap">
+          ${isDef ? `
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+              <i data-lucide="pin" class="w-3 h-3 text-amber-700"></i> 기본 고정됨
+            </span>
+          ` : `
+            <button type="button" onclick="setSamsungSenderDefault('${s.id}')"
+              class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-slate-100 hover:bg-amber-100 hover:text-amber-900 text-slate-600 font-bold text-[10.5px] border border-slate-200 hover:border-amber-300 transition-all cursor-pointer">
+              <i data-lucide="pin" class="w-2.5 h-2.5"></i> 고정하기
+            </button>
+          `}
+        </td>
+        <td class="p-2.5 font-bold text-slate-900 whitespace-nowrap">
+          <span>${s.name}</span>
+        </td>
+        <td class="p-2.5 font-mono font-bold text-slate-800 whitespace-nowrap">${s.email}</td>
+        <td class="p-2.5 text-slate-500 text-[11px] whitespace-nowrap" title="${s.memo || ''}">${s.memo || '-'}</td>
+        <td class="p-2.5 text-center whitespace-nowrap">
+          <div class="flex items-center justify-center gap-1.5 whitespace-nowrap">
+            <button type="button" onclick="editSamsungSender('${s.id}')" 
+              class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] cursor-pointer whitespace-nowrap border border-slate-200">수정</button>
+            <button type="button" onclick="deleteSamsungSender('${s.id}')" 
+              class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10.5px] cursor-pointer whitespace-nowrap border border-rose-200">삭제</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += `</tbody></table>`;
+  container.innerHTML = html;
+  if (typeof initIcons === 'function') {
+    initIcons(container);
+  }
 }
 
 // -------------------------------------------------------------------------
