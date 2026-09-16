@@ -146,6 +146,11 @@ function extractCustomerNameFromText(title = '', summary = '', memberName = '') 
  * - 현대해상 인입: 통합허브(gApps) 우선 매칭
  * - 전화번호 및 성명 추출 기반 전수 정합성 보장
  */
+const _mateOneMatchCache = new Map();
+function clearMateOneMatchCache() {
+  _mateOneMatchCache.clear();
+}
+
 function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = '', summary = '') {
   let phone = arg1;
   if (arg1 && typeof arg1 === 'object') {
@@ -158,6 +163,10 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
 
   const clean = cleanPhoneDigits(phone);
   const detectedName = extractCustomerNameFromText(title, summary, ctiMemberName);
+  const cacheKey = `${clean}_${detectedName || ''}_${channel || ''}_${ctiMemberName || ''}`;
+  if (_mateOneMatchCache.has(cacheKey)) {
+    return _mateOneMatchCache.get(cacheKey);
+  }
 
   // [삼성화재 명단관리 검색]
   const findInSamsung = () => {
@@ -320,31 +329,30 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
   const isSamsungChannel = (channel || '').includes('삼성');
   const isHyundaiChannel = (channel || '').includes('현대');
 
+  let result = null;
   if (isSamsungChannel) {
-    const sMatch = findInSamsung();
-    if (sMatch) return sMatch;
-    const hMatch = findInHyundai();
-    if (hMatch) return hMatch;
+    result = findInSamsung() || findInHyundai();
   } else if (isHyundaiChannel) {
-    const hMatch = findInHyundai();
-    if (hMatch) return hMatch;
-    const sMatch = findInSamsung();
-    if (sMatch) return sMatch;
+    result = findInHyundai() || findInSamsung();
   } else {
-    const sMatch = findInSamsung();
-    if (sMatch) return sMatch;
-    const hMatch = findInHyundai();
-    if (hMatch) return hMatch;
+    result = findInSamsung() || findInHyundai();
+  }
+
+  if (result) {
+    _mateOneMatchCache.set(cacheKey, result);
+    return result;
   }
 
   // 매칭 실패 시 미등록 인입
-  return {
+  result = {
     isRegistered: false,
     appId: null,
     patientName: detectedName || (ctiMemberName && ctiMemberName !== '비회원' && ctiMemberName !== '-' ? ctiMemberName : '미등록 인입고객'),
     company: '미등록',
     badgeClass: 'bg-slate-100 text-slate-600 border-slate-300'
   };
+  _mateOneMatchCache.set(cacheKey, result);
+  return result;
 }
 
 /**
@@ -425,24 +433,52 @@ function getCallUniqueId(call) {
  * 5. 메모 및 라벨 데이터 로드/저장
  */
 async function loadCallAnnotations() {
+  // 1. 빠른 LocalStorage 선조회
   try {
-    const res = await fetch('/api/call-records/annotations');
-    const json = await res.json();
-    if (json.success && json.data) {
-      gTotalCallAnnotations = json.data;
+    const local = localStorage.getItem('LIVON_CALL_ANNOTATIONS');
+    if (local) {
+      gTotalCallAnnotations = JSON.parse(local);
       if (!gTotalCallAnnotations.memos) gTotalCallAnnotations.memos = {};
       if (!gTotalCallAnnotations.labels) gTotalCallAnnotations.labels = {};
       if (!gTotalCallAnnotations.customLabels) gTotalCallAnnotations.customLabels = [];
-      return;
+      updateSettingsLabelsPreview();
     }
-  } catch (e) {
-    console.warn('서버 통화 어노테이션 로드 실패, 로컬스토리지 사용:', e.message);
-  }
-  // LocalStorage fallback
-  try {
-    const local = localStorage.getItem('LIVON_CALL_ANNOTATIONS');
-    if (local) gTotalCallAnnotations = JSON.parse(local);
   } catch (e) {}
+
+  // 2. 서버 또는 정적 백업 파일에서 어노테이션 동기화
+  try {
+    let loaded = false;
+    try {
+      const res = await fetch('/api/call-records/annotations');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          gTotalCallAnnotations = Object.assign({}, gTotalCallAnnotations, json.data);
+          loaded = true;
+        }
+      }
+    } catch (e) {}
+
+    if (!loaded) {
+      try {
+        const sRes = await fetch('/call_annotations.json');
+        if (sRes.ok) {
+          const sJson = await sRes.json();
+          if (sJson.data) {
+            gTotalCallAnnotations = Object.assign({}, gTotalCallAnnotations, sJson.data);
+          } else if (sJson.memos || sJson.labels) {
+            gTotalCallAnnotations = Object.assign({}, gTotalCallAnnotations, sJson);
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (!gTotalCallAnnotations.memos) gTotalCallAnnotations.memos = {};
+    if (!gTotalCallAnnotations.labels) gTotalCallAnnotations.labels = {};
+    if (!gTotalCallAnnotations.customLabels) gTotalCallAnnotations.customLabels = [];
+  } catch (e) {
+    console.warn('어노테이션 로드 예외:', e.message);
+  }
   updateSettingsLabelsPreview();
 }
 
@@ -503,54 +539,146 @@ async function toggleCallLabel(callId, labelName, triggerBtn) {
   renderTotalCallAnalysisTab();
 }
 
+function initTotalIcons(root) {
+  const target = root || document.getElementById('tab-totalcallanalysis') || document;
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    try {
+      window.lucide.createIcons({ root: target });
+    } catch (e) {
+      window.lucide.createIcons();
+    }
+  }
+}
+
 /**
  * =============================================================================
- * 메인 탭 초기화 및 CTI 전수 데이터 로드
+ * 메인 탭 초기화 및 CTI 전수 데이터 로드 (0ms 즉시 렌더링 + 비동기 병렬 백그라운드 동기화)
  * =============================================================================
  */
 async function initTotalCallAnalysisModule() {
-  await loadCallAnnotations();
   const container = document.getElementById('tab-totalcallanalysis');
   if (!container) return;
 
+  // 1. 메모리 또는 세션 스토리지에 캐시된 데이터가 있으면 대기 스피너 없이 0ms 즉시 렌더링!
+  let hasImmediateData = false;
+  if (gTotalCallData && gTotalCallData.callLogs && gTotalCallData.callLogs.length > 0) {
+    hasImmediateData = true;
+  } else {
+    try {
+      const cached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+      if (cached) {
+        gTotalCallData = JSON.parse(cached);
+        hasImmediateData = true;
+      }
+    } catch (e) {}
+  }
+
+  if (hasImmediateData) {
+    renderTotalCallAnalysisTab();
+    // 백그라운드 병렬 동기화 (화면 차단 없음)
+    Promise.all([loadCallAnnotations(), loadTotalCallData(false, true)]).then(() => {
+      renderTotalCallAnalysisTab();
+    });
+    return;
+  }
+
+  // 2. 최초 방문 시에만 경량 로딩 스피너 표시 후 병렬 로드
   container.innerHTML = `
     <div class="p-12 text-center text-slate-500 space-y-3">
       <i data-lucide="loader-2" class="w-8 h-8 animate-spin mx-auto text-cyan-600"></i>
       <p class="text-sm font-bold text-slate-700">CTI 전수 종합 콜분석 데이터를 불러오는 중입니다...</p>
-      <p class="text-xs text-slate-400">삼성화재, 현대해상, 리본케어 전체 인바운드 콜을 통합 집계합니다.</p>
+      <p class="text-xs text-slate-400">삼성화재, 현대해상, 리본케어 전체 인바운드 콜을 고속 병렬 집계합니다.</p>
     </div>
   `;
-  if (window.lucide) lucide.createIcons();
+  initTotalIcons(container);
 
-  await loadTotalCallData();
+  await Promise.all([loadCallAnnotations(), loadTotalCallData(false, false)]);
 }
 
-async function loadTotalCallData(forceSync = false) {
+async function loadTotalCallData(forceSync = false, isBackground = false) {
   try {
     if (forceSync) {
       isTotalSyncing = true;
       renderTotalCallAnalysisTab();
-      const sUrl = `/api/samsung/call-report/sync-cti?start=${gTotalFilter.startDate}&end=${gTotalFilter.endDate}&channel=all`;
-      const sRes = await fetch(sUrl);
-      const sJson = await sRes.json();
-      if (sJson.success && sJson.data) {
-        gTotalCallData = sJson.data;
+      try {
+        const sUrl = `/api/samsung/call-report/sync-cti?start=${gTotalFilter.startDate}&end=${gTotalFilter.endDate}&channel=all`;
+        const sRes = await fetch(sUrl);
+        if (sRes.ok) {
+          const sJson = await sRes.json();
+          if (sJson.success && sJson.data) {
+            gTotalCallData = sJson.data;
+            clearMateOneMatchCache();
+            try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
+          }
+        }
+      } catch (e) {
+        console.warn('CTI 동기화 API 연결 실패:', e.message);
       }
       isTotalSyncing = false;
     } else {
-      const res = await fetch('/api/samsung/call-report/data?channel=all');
-      const json = await res.json();
-      if (json.success && json.data) {
-        gTotalCallData = json.data;
-      } else {
-        await loadTotalCallData(true);
-        return;
+      let loaded = false;
+
+      // 1) API 서버 호출 시도
+      try {
+        const res = await fetch('/api/samsung/call-report/data?channel=all');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            gTotalCallData = json.data;
+            clearMateOneMatchCache();
+            loaded = true;
+          }
+        }
+      } catch (e) {}
+
+      // 2) 실패 시 초고속 정적 fallback 파일 조회 (Vercel CDN 10~30ms 응답)
+      if (!loaded) {
+        try {
+          const sRes = await fetch('/call_report_all.json');
+          if (sRes.ok) {
+            const sJson = await sRes.json();
+            if (sJson.success && sJson.data) {
+              gTotalCallData = sJson.data;
+              clearMateOneMatchCache();
+              loaded = true;
+            } else if (sJson.callLogs) {
+              gTotalCallData = sJson;
+              clearMateOneMatchCache();
+              loaded = true;
+            }
+          }
+        } catch (e) {}
+      }
+
+      // 3) 백업 삼성 데이터 fallback
+      if (!loaded && !gTotalCallData) {
+        try {
+          const sRes2 = await fetch('/call_report_samsung.json');
+          if (sRes2.ok) {
+            const sJson2 = await sRes2.json();
+            if (sJson2.success && sJson2.data) {
+              gTotalCallData = sJson2.data;
+            } else if (sJson2.callLogs) {
+              gTotalCallData = sJson2;
+            }
+            clearMateOneMatchCache();
+            loaded = true;
+          }
+        } catch (e) {}
+      }
+
+      // 세션 스토리지 캐시 갱신
+      if (gTotalCallData) {
+        try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
       }
     }
   } catch (err) {
     console.error('Total Call Report Load Error:', err);
   }
-  renderTotalCallAnalysisTab();
+
+  if (!isBackground) {
+    renderTotalCallAnalysisTab();
+  }
 }
 
 /**
@@ -847,7 +975,7 @@ function renderTotalCallAnalysisTab() {
     </div>
   `;
 
-  if (window.lucide) lucide.createIcons();
+  initTotalIcons(container);
 }
 
 /**
@@ -855,11 +983,15 @@ function renderTotalCallAnalysisTab() {
  */
 function switchTotalViewMode(mode) {
   gActiveTotalViewMode = mode;
+  gTotalListPage = 1;
+  gTotalCustomerPage = 1;
   renderTotalCallAnalysisTab();
 }
 
 function handleTotalFilterChange(key, value) {
   gTotalFilter[key] = value;
+  gTotalListPage = 1;
+  gTotalCustomerPage = 1;
   renderTotalCallAnalysisTab();
 }
 
@@ -889,6 +1021,16 @@ function renderTotalViewContent(filteredLogs) {
  * - CTI 대기시간 0초 미연결 고객: 🚨 아웃콜 필요 배지 및 원클릭 발신 지원
  * =============================================================================
  */
+let gTotalListPage = 1;
+const TOTAL_LIST_PAGE_SIZE = 50;
+
+function changeTotalListPage(page) {
+  gTotalListPage = page;
+  renderTotalCallAnalysisTab();
+  const el = document.getElementById('totalCallAnalysisContent');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function renderTotalListView(logs) {
   if (!logs || logs.length === 0) {
     return `
@@ -900,10 +1042,43 @@ function renderTotalListView(logs) {
   }
 
   const allLabels = getAllAvailableLabels();
+  const totalCount = logs.length;
+  const totalPages = Math.ceil(totalCount / TOTAL_LIST_PAGE_SIZE) || 1;
+  if (gTotalListPage > totalPages) gTotalListPage = totalPages;
+  if (gTotalListPage < 1) gTotalListPage = 1;
+
+  const startIdx = (gTotalListPage - 1) * TOTAL_LIST_PAGE_SIZE;
+  const endIdx = Math.min(startIdx + TOTAL_LIST_PAGE_SIZE, totalCount);
+  const pagedLogs = logs.slice(startIdx, endIdx);
+
+  const renderPaginationBar = () => `
+    <div class="flex items-center justify-between px-4 py-3 bg-slate-50/90 border-t border-slate-200 text-xs font-bold text-slate-600 select-none flex-wrap gap-2">
+      <span class="text-slate-500">
+        총 <b class="text-cyan-800 font-black">${totalCount}</b>건 중 <b class="text-slate-800">${startIdx + 1} ~ ${endIdx}</b>건 표시
+      </span>
+      <div class="flex items-center gap-1.5">
+        <button type="button" onclick="changeTotalListPage(1)" ${gTotalListPage <= 1 ? 'disabled class="opacity-40 cursor-not-allowed px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-400 text-xs font-bold"' : 'class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200 shadow-2xs cursor-pointer" title="첫 페이지"'}>
+          &laquo; 처음
+        </button>
+        <button type="button" onclick="changeTotalListPage(${gTotalListPage - 1})" ${gTotalListPage <= 1 ? 'disabled class="opacity-40 cursor-not-allowed px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-400 text-xs font-bold"' : 'class="px-2.5 py-1 rounded-lg bg-white hover:bg-cyan-50 text-slate-700 hover:text-cyan-700 text-xs font-bold border border-slate-200 shadow-2xs cursor-pointer"'}>
+          &larr; 이전 50건
+        </button>
+        <span class="px-3 py-1 rounded-lg bg-cyan-50 text-cyan-800 border border-cyan-200 font-mono font-black text-xs">
+          ${gTotalListPage} / ${totalPages} 페이지
+        </span>
+        <button type="button" onclick="changeTotalListPage(${gTotalListPage + 1})" ${gTotalListPage >= totalPages ? 'disabled class="opacity-40 cursor-not-allowed px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-400 text-xs font-bold"' : 'class="px-2.5 py-1 rounded-lg bg-white hover:bg-cyan-50 text-slate-700 hover:text-cyan-700 text-xs font-bold border border-slate-200 shadow-2xs cursor-pointer"'}>
+          다음 50건 &rarr;
+        </button>
+        <button type="button" onclick="changeTotalListPage(${totalPages})" ${gTotalListPage >= totalPages ? 'disabled class="opacity-40 cursor-not-allowed px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-400 text-xs font-bold"' : 'class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200 shadow-2xs cursor-pointer" title="마지막 페이지"'}>
+          끝 &raquo;
+        </button>
+      </div>
+    </div>
+  `;
 
   return `
     <div class="flex items-center justify-between px-2 text-xs font-bold text-slate-500">
-      <span>총 <b class="text-cyan-700 font-black">${logs.length}</b>건의 통화 리스트</span>
+      <span>총 <b class="text-cyan-700 font-black">${totalCount}</b>건의 통화 리스트 (${startIdx + 1} ~ ${endIdx}건 표시)</span>
       <span class="text-slate-400 hidden sm:inline">💡 상담 내용을 마우스 오버하면 전문이 미리보이고, 클릭하면 상세 모달이 열립니다.</span>
     </div>
 
@@ -923,7 +1098,8 @@ function renderTotalListView(logs) {
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 text-slate-700">
-            ${logs.map((call, idx) => {
+            ${pagedLogs.map((call, idx) => {
+              const globalIdx = startIdx + idx + 1;
               const callId = getCallUniqueId(call);
               const match = matchCustomerToMateOne(call);
               const cat = classifyConsultation(call);
@@ -941,7 +1117,7 @@ function renderTotalListView(logs) {
                 <tr class="hover:bg-slate-50/80 transition-colors ${isMissed && !isHandled ? 'bg-rose-50/30' : ''}">
                   <!-- 1. 순번 -->
                   <td class="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-middle">
-                    ${idx + 1}
+                    ${globalIdx}
                   </td>
 
                   <!-- 2. 일시 / 채널 -->
@@ -1109,6 +1285,9 @@ function renderTotalListView(logs) {
           </tbody>
         </table>
       </div>
+
+      <!-- 하단 페이징 툴바 -->
+      ${renderPaginationBar()}
     </div>
   `;
 }
@@ -1317,7 +1496,7 @@ function openTotalCallSummaryModal(callId) {
   `;
 
   modal.classList.remove('hidden');
-  if (window.lucide) lucide.createIcons();
+  initTotalIcons(modal);
 }
 
 function closeTotalCallSummaryModal() {
@@ -1503,7 +1682,7 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
   `;
 
   modal.classList.remove('hidden');
-  if (window.lucide) lucide.createIcons();
+  initTotalIcons(modal);
 }
 
 function closeMissedCallsOutcallModal() {
@@ -1517,6 +1696,16 @@ function closeMissedCallsOutcallModal() {
  * - 인입 전화번호별 그룹화, 메이트원 등록 여부 배지, 통합허브 모달 바로가기
  * =============================================================================
  */
+let gTotalCustomerPage = 1;
+const TOTAL_CUSTOMER_PAGE_SIZE = 24;
+
+function changeTotalCustomerPage(page) {
+  gTotalCustomerPage = page;
+  renderTotalCallAnalysisTab();
+  const el = document.getElementById('totalCallAnalysisContent');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function renderCustomerGroupView(logs) {
   // 전화번호별 그룹화
   const customerMap = {};
@@ -1548,14 +1737,48 @@ function renderCustomerGroupView(logs) {
     `;
   }
 
+  const totalCust = customerList.length;
+  const totalCustPages = Math.ceil(totalCust / TOTAL_CUSTOMER_PAGE_SIZE) || 1;
+  if (gTotalCustomerPage > totalCustPages) gTotalCustomerPage = totalCustPages;
+  if (gTotalCustomerPage < 1) gTotalCustomerPage = 1;
+
+  const startCustIdx = (gTotalCustomerPage - 1) * TOTAL_CUSTOMER_PAGE_SIZE;
+  const endCustIdx = Math.min(startCustIdx + TOTAL_CUSTOMER_PAGE_SIZE, totalCust);
+  const pagedCustomers = customerList.slice(startCustIdx, endCustIdx);
+
+  const renderCustPaginationBar = () => `
+    <div class="flex items-center justify-between px-4 py-3 bg-white rounded-2xl border border-slate-200 text-xs font-bold text-slate-600 select-none flex-wrap gap-2">
+      <span class="text-slate-500">
+        총 <b class="text-cyan-800 font-black">${totalCust}</b>명 중 <b class="text-slate-800">${startCustIdx + 1} ~ ${endCustIdx}</b>명 표시
+      </span>
+      <div class="flex items-center gap-1.5">
+        <button type="button" onclick="changeTotalCustomerPage(1)" ${gTotalCustomerPage <= 1 ? 'disabled class="opacity-40 cursor-not-allowed px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 text-xs font-bold"' : 'class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200 shadow-2xs cursor-pointer" title="첫 페이지"'}>
+          &laquo; 처음
+        </button>
+        <button type="button" onclick="changeTotalCustomerPage(${gTotalCustomerPage - 1})" ${gTotalCustomerPage <= 1 ? 'disabled class="opacity-40 cursor-not-allowed px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 text-xs font-bold"' : 'class="px-2.5 py-1 rounded-lg bg-white hover:bg-cyan-50 text-slate-700 hover:text-cyan-700 text-xs font-bold border border-slate-200 shadow-2xs cursor-pointer"'}>
+          &larr; 이전 24명
+        </button>
+        <span class="px-3 py-1 rounded-lg bg-cyan-50 text-cyan-800 border border-cyan-200 font-mono font-black text-xs">
+          ${gTotalCustomerPage} / ${totalCustPages} 페이지
+        </span>
+        <button type="button" onclick="changeTotalCustomerPage(${gTotalCustomerPage + 1})" ${gTotalCustomerPage >= totalCustPages ? 'disabled class="opacity-40 cursor-not-allowed px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 text-xs font-bold"' : 'class="px-2.5 py-1 rounded-lg bg-white hover:bg-cyan-50 text-slate-700 hover:text-cyan-700 text-xs font-bold border border-slate-200 shadow-2xs cursor-pointer"'}>
+          다음 24명 &rarr;
+        </button>
+        <button type="button" onclick="changeTotalCustomerPage(${totalCustPages})" ${gTotalCustomerPage >= totalCustPages ? 'disabled class="opacity-40 cursor-not-allowed px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 text-xs font-bold"' : 'class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200 shadow-2xs cursor-pointer" title="마지막 페이지"'}>
+          끝 &raquo;
+        </button>
+      </div>
+    </div>
+  `;
+
   return `
     <div class="flex items-center justify-between px-2 text-xs font-bold text-slate-500">
-      <span>총 <b>${customerList.length}</b>명의 인입 고객 (통화 ${logs.length}건)</span>
+      <span>총 <b>${totalCust}</b>명의 인입 고객 (통화 ${logs.length}건, ${startCustIdx + 1} ~ ${endCustIdx}명 표시)</span>
       <span class="text-slate-400">통화 빈도순 정렬</span>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      ${customerList.map((cust, idx) => {
+      ${pagedCustomers.map((cust, idx) => {
         const match = cust.match;
         const formattedPhone = formatPhoneDisplay(cust.phone);
         const answeredCalls = cust.calls.filter(c => c.title || c.summary);
@@ -1606,6 +1829,9 @@ function renderCustomerGroupView(logs) {
         `;
       }).join('')}
     </div>
+
+    <!-- 하단 페이징 툴바 -->
+    ${renderCustPaginationBar()}
   `;
 }
 
@@ -1909,7 +2135,7 @@ function toggleCallLabelDropdown(callId) {
   if (!el) return;
   el.classList.toggle('hidden');
   if (!el.classList.contains('hidden')) {
-    if (window.lucide) lucide.createIcons();
+    initTotalIcons(el);
   }
 }
 
@@ -2011,7 +2237,7 @@ function openLabelSettingModal() {
   `;
 
   modal.classList.remove('hidden');
-  if (window.lucide) lucide.createIcons();
+  initTotalIcons(modal);
 }
 
 function closeLabelSettingModal() {

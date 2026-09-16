@@ -350,15 +350,55 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 }
 
 
-// 1. Initializer
+// 1. Initializer (0ms 캐시 로드 + 정적 백업 파일 fallback 지원)
 async function initSamsungCallReportModule() {
+  if (gSamsungReportData && gSamsungReportData.callLogs) {
+    renderSamsungCallReportTab();
+    return;
+  }
+
   try {
-    const res = await fetch('/api/samsung/call-report/data');
-    const json = await res.json();
-    if (json.success && json.data) {
-      gSamsungReportData = json.data;
-    } else {
-      console.warn('Failed to load call report from server');
+    const cached = sessionStorage.getItem('LIVON_CACHED_SAMSUNG_REPORT_DATA');
+    if (cached) {
+      gSamsungReportData = JSON.parse(cached);
+      renderSamsungCallReportTab();
+    }
+  } catch (e) {}
+
+  try {
+    let loaded = false;
+    try {
+      const res = await fetch('/api/samsung/call-report/data');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          gSamsungReportData = json.data;
+          loaded = true;
+        }
+      }
+    } catch (e) {}
+
+    // 서버 API 부재 시 정적 JSON 파일 고속 fallback
+    if (!loaded) {
+      try {
+        const sRes = await fetch('/call_report_samsung.json');
+        if (sRes.ok) {
+          const sJson = await sRes.json();
+          if (sJson.success && sJson.data) {
+            gSamsungReportData = sJson.data;
+            loaded = true;
+          } else if (sJson.callLogs) {
+            gSamsungReportData = sJson;
+            loaded = true;
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (gSamsungReportData) {
+      try {
+        sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(gSamsungReportData));
+      } catch (e) {}
     }
   } catch (err) {
     console.error('Error fetching samsung call report data:', err);
