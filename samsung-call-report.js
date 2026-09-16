@@ -1499,12 +1499,17 @@ async function exportSamsungCallReportExcel() {
   const sumTitle = sSummary.getCell('B10');
   sumTitle.value = '핵심 요약 (Executive Summary)';
   sumTitle.font = { name: '맑은 고딕', size: 11, bold: true, color: { argb: 'FF1E293B' } };
+  sSummary.getRow(10).height = 24;
+
+  const topCat1 = stats.catList[0];
+  const topCat2 = stats.catList[1];
+  const topActor1 = stats.actorList[0];
 
   const takeaways = [
-    `1.  분석기간 4주간 인입 ${stats.totalCalls}건 중 상담사 연결요청 ${stats.connectReqCalls}건(연결율 ${stats.connectRate}%), 실제 상담이 이뤄져 요약이 확보된 건은 ${stats.consultedCount}건입니다. 본 분석은 상담 90건의 내용을 유형·주체별로 분류한 결과입니다.`,
-    `2.  서비스가 '문의 단계'에서 '실사용 단계'로 진입했습니다. 실제 간병 신청·접수·배정 콜이 35건(39%)으로 최다이며, 문의 주체도 실사용·가입 고객이 71건(79%)으로 대부분을 차지합니다.`,
-    `3.  이용 관련 반복 질의가 뚜렷합니다. ① 이용대상·범위(중환자실/전염병 제외, 요양병원 제외 등) 16건(18%), ② 이용방식(24시간 상주, 간병인 교체 2회 제한, 1일 산정, 대체인력) 14건(16%)으로 서비스 제공 방식에 대한 안내 정착이 필요합니다.`,
-    `4.  리본케어를 '보험 문의처'로 오인해 유입되는 콜이 7건(8%) 확인됩니다. 보험 가입·보장 여부·보험금 청구 등은 간병지원 콜센터 업무범위 밖으로, 삼성화재 보험콜센터(1588-5114)로 이관 안내가 진행되고 있습니다.`
+    `1.  인입 및 연결 현황: 조회기간 내 총 인입 ${stats.totalCalls}건 중 상담사 연결요청 ${stats.connectReqCalls}건(연결율 ${stats.connectRate}%), 실제 상담이 진행되어 요약이 확보된 건은 ${stats.consultedCount}건입니다. 본 분석은 실제 상담 ${stats.consultedCount}건의 내용을 ${stats.catList.length}개 문의유형 및 ${stats.actorList.length}개 주체별로 전수 분석한 결과입니다.`,
+    `2.  최다 문의 유형 및 주요 주체: ${topCat1 ? `가장 많이 유입된 문의는 '${topCat1.name}'(${topCat1.count}건, ${topCat1.pct}%)이며, ` : ''}${topActor1 ? `주요 문의 주체는 '${topActor1.name}'(${topActor1.count}건, ${topActor1.pct}%) 비중이 가장 높습니다.` : ''}${topCat2 ? ` 그 외 '${topCat2.name}'(${topCat2.count}건, ${topCat2.pct}%) 순으로 확인됩니다.` : ''}`,
+    `3.  상위 문의 항목 특이사항: ${stats.catList.slice(0, 2).map((c, i) => `[${i + 1}] ${c.name}(${c.count}건, ${c.pct}%): ${c.description || '세부 기준 안내'}`).join('  |  ') || '조회 기간 내 특이 문의사항 없음'}`,
+    `4.  문의 주체별 대응 현황: ${stats.actorList.slice(0, 2).map((a, i) => `[${i + 1}] ${a.name}(${a.count}건, ${a.pct}%): ${a.description || '표준 안내'}`).join('  |  ') || '조회 기간 내 문의 주체 정보 없음'}`
   ];
 
   takeaways.forEach((t, i) => {
@@ -1513,40 +1518,59 @@ async function exportSamsungCallReportExcel() {
     const c = sSummary.getCell(`B${rowNum}`);
     c.value = t;
     c.font = { name: '맑은 고딕', size: 9, color: { argb: 'FF334155' } };
-    c.alignment = { wrapText: true, vertical: 'middle' };
+    c.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' };
+    
+    // 글자 수 및 줄바꿈에 맞춘 넉넉한 동적 행 높이 산출 (잘림 완전 방지)
+    const lineCount = Math.ceil(t.length / 58) || 1;
+    sSummary.getRow(rowNum).height = Math.max(38, lineCount * 22);
   });
 
   // Category Distribution Table
-  sSummary.mergeCells('B15:G15');
-  const catHeader = sSummary.getCell('B15');
+  const catHeaderRowNum = 16;
+  sSummary.mergeCells(`B${catHeaderRowNum}:G${catHeaderRowNum}`);
+  const catHeader = sSummary.getCell(`B${catHeaderRowNum}`);
   catHeader.value = `주요 문의유형 분포 (실제 상담 ${stats.consultedCount}건 기준)`;
   catHeader.font = { name: '맑은 고딕', size: 11, bold: true, color: { argb: 'FF1E293B' } };
+  sSummary.getRow(catHeaderRowNum).height = 24;
 
-  sSummary.getRow(16).values = ['', '문의 대분류', '건수', '비중', '대표 문의 내용', '대표 문의 내용', '대표 문의 내용'];
-  sSummary.mergeCells('E16:G16');
-  ['B16', 'C16', 'D16', 'E16'].forEach(pos => {
-    const c = sSummary.getCell(pos);
+  const catHeadRowNum = catHeaderRowNum + 1;
+  sSummary.getRow(catHeadRowNum).values = ['', '문의 대분류', '건수', '비중', '대표 문의 내용', '대표 문의 내용', '대표 문의 내용'];
+  sSummary.getRow(catHeadRowNum).height = 24;
+  sSummary.mergeCells(`E${catHeadRowNum}:G${catHeadRowNum}`);
+  ['B', 'C', 'D', 'E'].forEach(col => {
+    const c = sSummary.getCell(`${col}${catHeadRowNum}`);
     c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } };
     c.font = { name: '맑은 고딕', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
     c.alignment = { vertical: 'middle', horizontal: 'center' };
   });
 
   stats.catList.forEach((cat, i) => {
-    const r = 17 + i;
+    const r = catHeadRowNum + 1 + i;
     sSummary.getRow(r).values = ['', cat.name, cat.count, cat.share, cat.description, cat.description, cat.description];
     sSummary.mergeCells(`E${r}:G${r}`);
-    sSummary.getCell(`C${r}`).alignment = { horizontal: 'right' };
+    sSummary.getCell(`B${r}`).alignment = { vertical: 'middle', horizontal: 'left' };
+    sSummary.getCell(`C${r}`).alignment = { vertical: 'middle', horizontal: 'right' };
     sSummary.getCell(`D${r}`).numFmt = '0.0%';
-    sSummary.getCell(`D${r}`).alignment = { horizontal: 'right' };
+    sSummary.getCell(`D${r}`).alignment = { vertical: 'middle', horizontal: 'right' };
+    const descCell = sSummary.getCell(`E${r}`);
+    descCell.alignment = { wrapText: true, vertical: 'middle', horizontal: 'left' };
+
+    const descLen = (cat.description || '').length;
+    const lines = Math.ceil(descLen / 36) || 1;
+    sSummary.getRow(r).height = lines > 1 ? Math.max(26, lines * 19) : 22;
   });
 
   // Category Total Row
-  const catTotalRow = 17 + stats.catList.length;
+  const catTotalRow = catHeadRowNum + 1 + stats.catList.length;
   sSummary.getRow(catTotalRow).values = ['', '합계', stats.consultedCount, 1, '', '', ''];
+  sSummary.getRow(catTotalRow).height = 22;
   sSummary.getCell(`B${catTotalRow}`).font = { bold: true };
+  sSummary.getCell(`B${catTotalRow}`).alignment = { vertical: 'middle', horizontal: 'center' };
   sSummary.getCell(`C${catTotalRow}`).font = { bold: true };
+  sSummary.getCell(`C${catTotalRow}`).alignment = { vertical: 'middle', horizontal: 'right' };
   sSummary.getCell(`D${catTotalRow}`).font = { bold: true };
   sSummary.getCell(`D${catTotalRow}`).numFmt = '0.0%';
+  sSummary.getCell(`D${catTotalRow}`).alignment = { vertical: 'middle', horizontal: 'right' };
 
   // Actor Distribution Table
   const actorStartRow = catTotalRow + 2;
@@ -1554,12 +1578,14 @@ async function exportSamsungCallReportExcel() {
   const actorHeader = sSummary.getCell(`B${actorStartRow}`);
   actorHeader.value = `문의 주체별 분포 (실제 상담 ${stats.consultedCount}건 기준)`;
   actorHeader.font = { name: '맑은 고딕', size: 11, bold: true, color: { argb: 'FF1E293B' } };
+  sSummary.getRow(actorStartRow).height = 24;
 
   const actorHeadRow = actorStartRow + 1;
-  sSummary.getRow(actorHeadRow).values = ['', '문의 주체', '건수', '비중', '성격', '성격', '성격'];
+  sSummary.getRow(actorHeadRow).values = ['', '문의 주체', '건수', '비중', '성격 및 목적', '성격 및 목적', '성격 및 목적'];
+  sSummary.getRow(actorHeadRow).height = 24;
   sSummary.mergeCells(`E${actorHeadRow}:G${actorHeadRow}`);
-  ['B' + actorHeadRow, 'C' + actorHeadRow, 'D' + actorHeadRow, 'E' + actorHeadRow].forEach(pos => {
-    const c = sSummary.getCell(pos);
+  ['B', 'C', 'D', 'E'].forEach(col => {
+    const c = sSummary.getCell(`${col}${actorHeadRow}`);
     c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
     c.font = { name: '맑은 고딕', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
     c.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -1569,18 +1595,29 @@ async function exportSamsungCallReportExcel() {
     const r = actorHeadRow + 1 + i;
     sSummary.getRow(r).values = ['', act.name, act.count, act.share, act.description, act.description, act.description];
     sSummary.mergeCells(`E${r}:G${r}`);
-    sSummary.getCell(`C${r}`).alignment = { horizontal: 'right' };
+    sSummary.getCell(`B${r}`).alignment = { vertical: 'middle', horizontal: 'left' };
+    sSummary.getCell(`C${r}`).alignment = { vertical: 'middle', horizontal: 'right' };
     sSummary.getCell(`D${r}`).numFmt = '0.0%';
-    sSummary.getCell(`D${r}`).alignment = { horizontal: 'right' };
+    sSummary.getCell(`D${r}`).alignment = { vertical: 'middle', horizontal: 'right' };
+    const descCell = sSummary.getCell(`E${r}`);
+    descCell.alignment = { wrapText: true, vertical: 'middle', horizontal: 'left' };
+
+    const descLen = (act.description || '').length;
+    const lines = Math.ceil(descLen / 36) || 1;
+    sSummary.getRow(r).height = lines > 1 ? Math.max(26, lines * 19) : 22;
   });
 
   // Actor Total Row
   const actorTotalRow = actorHeadRow + 1 + stats.actorList.length;
   sSummary.getRow(actorTotalRow).values = ['', '합계', stats.consultedCount, 1, '', '', ''];
+  sSummary.getRow(actorTotalRow).height = 22;
   sSummary.getCell(`B${actorTotalRow}`).font = { bold: true };
+  sSummary.getCell(`B${actorTotalRow}`).alignment = { vertical: 'middle', horizontal: 'center' };
   sSummary.getCell(`C${actorTotalRow}`).font = { bold: true };
+  sSummary.getCell(`C${actorTotalRow}`).alignment = { vertical: 'middle', horizontal: 'right' };
   sSummary.getCell(`D${actorTotalRow}`).font = { bold: true };
   sSummary.getCell(`D${actorTotalRow}`).numFmt = '0.0%';
+  sSummary.getCell(`D${actorTotalRow}`).alignment = { vertical: 'middle', horizontal: 'right' };
 
   // -------------------------------------------------------------
   // Sheet 2: 일자별 인입현황 + 첫행 합계 + 상단 틀고정 (3행 고정)
@@ -1599,32 +1636,38 @@ async function exportSamsungCallReportExcel() {
   dailyTitle.font = { name: '맑은 고딕', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
   dailyTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
   dailyTitle.alignment = { vertical: 'middle', horizontal: 'center' };
+  sDaily.getRow(1).height = 28;
 
   sDaily.getRow(2).values = ['일자', '요일', '인입콜(건)', '비고'];
+  sDaily.getRow(2).height = 24;
   ['A2', 'B2', 'C2', 'D2'].forEach(pos => {
     const c = sDaily.getCell(pos);
     c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
     c.font = { bold: true };
-    c.alignment = { horizontal: 'center' };
+    c.alignment = { vertical: 'middle', horizontal: 'center' };
   });
 
   // 합계 행: 첫 데이터 행(3행)에 배치하고 강조
   sDaily.getRow(3).values = ['합계', `${dailyTrends.length}일`, totalDailyCallsExcel, `일평균 ${(totalDailyCallsExcel / (dailyTrends.length || 1)).toFixed(1)}건`];
   sDaily.getRow(3).font = { bold: true };
+  sDaily.getRow(3).height = 24;
   ['A3', 'B3', 'C3', 'D3'].forEach(pos => {
     const c = sDaily.getCell(pos);
     c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
   });
-  sDaily.getCell('A3').alignment = { horizontal: 'center' };
-  sDaily.getCell('B3').alignment = { horizontal: 'center' };
-  sDaily.getCell('C3').alignment = { horizontal: 'right' };
+  sDaily.getCell('A3').alignment = { vertical: 'middle', horizontal: 'center' };
+  sDaily.getCell('B3').alignment = { vertical: 'middle', horizontal: 'center' };
+  sDaily.getCell('C3').alignment = { vertical: 'middle', horizontal: 'right' };
+  sDaily.getCell('D3').alignment = { vertical: 'middle', horizontal: 'left' };
 
   dailyTrends.forEach((t, i) => {
     const r = 4 + i;
     sDaily.getRow(r).values = [t.date, t.dayOfWeek, t.callCount, t.note || ''];
-    sDaily.getCell(`A${r}`).alignment = { horizontal: 'center' };
-    sDaily.getCell(`B${r}`).alignment = { horizontal: 'center' };
-    sDaily.getCell(`C${r}`).alignment = { horizontal: 'right' };
+    sDaily.getRow(r).height = 20;
+    sDaily.getCell(`A${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
+    sDaily.getCell(`B${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
+    sDaily.getCell(`C${r}`).alignment = { vertical: 'middle', horizontal: 'right' };
+    sDaily.getCell(`D${r}`).alignment = { vertical: 'middle', horizontal: 'left' };
   });
 
   // -------------------------------------------------------------
@@ -1658,6 +1701,7 @@ async function exportSamsungCallReportExcel() {
   ];
 
   // Header Styling
+  sLogs.getRow(1).height = 26;
   sLogs.getRow(1).eachCell((cell, colNum) => {
     cell.font = { name: '맑은 고딕', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
     if (colNum === 13 || colNum === 14) {
@@ -1700,7 +1744,11 @@ async function exportSamsungCallReportExcel() {
       duration: c.duration || '0'
     });
 
-    row.eachCell(cell => cell.border = thinBorder);
+    row.eachCell(cell => {
+      cell.border = thinBorder;
+      cell.alignment = { vertical: 'middle' };
+    });
+
     if (idx % 2 === 1) {
       row.eachCell((cell, col) => {
         if (col !== 13 && col !== 14) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
@@ -1714,6 +1762,21 @@ async function exportSamsungCallReportExcel() {
     if (c.actor) {
       row.getCell('actor').font = { bold: true, color: { argb: 'FF4338CA' } };
       row.getCell('actor').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+    }
+
+    // 상담요약 및 제목 열 줄바꿈 설정 및 행 높이 자동 조절
+    row.getCell('title').alignment = { wrapText: true, vertical: 'middle' };
+    row.getCell('summary').alignment = { wrapText: true, vertical: 'middle' };
+
+    const sumLen = (c.summary || '').length;
+    const titleLen = (c.title || '').length;
+    const maxLen = Math.max(sumLen, titleLen);
+    if (maxLen > 100) {
+      row.height = 42;
+    } else if (maxLen > 45) {
+      row.height = 30;
+    } else {
+      row.height = 22;
     }
   });
 

@@ -1300,6 +1300,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const stats = calculateStats();
       const wb = new ExcelJS.Workbook();
       wb.creator = 'Livon Care (리본케어) CTI 운영센터';
+      wb.created = new Date();
 
       const thinBorder = {
         top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
@@ -1311,138 +1312,269 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       // =========================================================================
       // [시트 1] 분석요약 (Executive Summary) + 틀고정
       // =========================================================================
-      const ws1 = wb.addWorksheet('분석요약');
-      ws1.views = [{ state: 'frozen', xSplit: 0, ySplit: 5 }];
-      ws1.columns = [{ width: 28 }, { width: 14 }, { width: 14 }, { width: 60 }];
+      const ws1 = wb.addWorksheet('분석 요약', {
+        views: [{ state: 'frozen', xSplit: 0, ySplit: 5, showGridLines: true }]
+      });
+      ws1.columns = [
+        { width: 4 },
+        { width: 28 },
+        { width: 14 },
+        { width: 14 },
+        { width: 48 },
+        { width: 20 },
+        { width: 20 }
+      ];
 
-      const titleRow = ws1.addRow([gReportData.reportInfo.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서']);
-      titleRow.font = { name: '맑은 고딕', size: 15, bold: true, color: { argb: 'FF0F172A' } };
-      ws1.addRow([`분석기간: ${gReportData.reportInfo.period} | 보고일자: ${gReportData.reportInfo.reportDate} | 작성: ${gReportData.reportInfo.author || '리본케어'}`]);
-      ws1.addRow([]);
+      // Header Title
+      ws1.mergeCells('B2:G3');
+      const titleCell = ws1.getCell('B2');
+      titleCell.value = gReportData.reportInfo.title || '삼성화재 간병(리본케어) 서비스  |  인바운드 문의 분석 보고';
+      titleCell.font = { name: '맑은 고딕', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+      titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+      titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
 
-      const kpiHead = ws1.addRow(['[핵심 지표]', '총 인입콜', '상담연결 요청', '실제 상담(분석대상)']);
-      kpiHead.font = { bold: true };
-      const kpiVal = ws1.addRow(['집계 현황', `${stats.totalCalls}건`, `${stats.connectReqCalls}건 (연결율 ${stats.connectRate}%)`, `${stats.consultedCount}건 (100% 전수분석)`]);
-      kpiVal.font = { bold: true, color: { argb: 'FF1D4ED8' } };
-      ws1.addRow([]);
+      // Subtitle / Period
+      ws1.mergeCells('B4:G4');
+      const subCell = ws1.getCell('B4');
+      subCell.value = `분석기간 ${gReportData.reportInfo.period || ''}   ·   인입경로: ${gReportData.reportInfo.channelLabel || gFilter.channel || '삼성화재'}   ·   작성: ${gReportData.reportInfo.author || '리본케어'}   ·   보고일 ${gReportData.reportInfo.reportDate || ''}`;
+      subCell.font = { name: '맑은 고딕', size: 9, color: { argb: 'FF475569' } };
+      subCell.alignment = { vertical: 'middle', horizontal: 'center' };
 
-      // 대분류 테이블
-      const catHead = ws1.addRow([`1. 주요 문의유형 분포 (대분류 ${stats.catList.length}종 · 상담 ${stats.consultedCount}건 전수)`, '건수', '비중', '대표 내용']);
-      catHead.eachCell(c => {
-        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E40AF' } };
-        c.font = { color: { argb: 'FFFFFFFF' }, bold: true };
-        c.alignment = { vertical: 'middle' };
-      });
-      stats.catList.forEach((c, idx) => {
-        const r = ws1.addRow([c.name, c.count, `${c.pct}%`, c.description]);
-        if (idx % 2 === 1) r.eachCell(cell => cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } });
-        r.eachCell(cell => cell.border = thinBorder);
-        r.getCell(2).alignment = { horizontal: 'right' };
-        r.getCell(3).alignment = { horizontal: 'right' };
-      });
-      const catSumRow = ws1.addRow(['합계', stats.consultedCount, '100.0%', `전체 ${stats.catList.length}개 문의유형 합계`]);
-      catSumRow.eachCell(c => {
-        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
-        c.font = { bold: true, color: { argb: 'FF1E40AF' } };
-        c.border = thinBorder;
-      });
-      catSumRow.getCell(2).alignment = { horizontal: 'right' };
-      catSumRow.getCell(3).alignment = { horizontal: 'right' };
-      ws1.addRow([]);
+      // KPI Rows
+      ws1.getRow(6).values = ['', '총 인입콜', '총 인입콜', '상담연결 요청', '상담연결 요청', '실제 상담(분석대상)', '일평균 인입'];
+      ws1.getRow(7).values = ['', `${stats.totalCalls}건`, `${stats.totalCalls}건`, `${stats.connectReqCalls}건`, `${stats.connectReqCalls}건`, `${stats.consultedCount}건`, `${stats.dailyAvg}건`];
+      ws1.getRow(8).values = ['', '전체 인바운드 접수', '전체 인바운드 접수', `연결율 ${stats.connectRate}%`, `연결율 ${stats.connectRate}%`, '상담요약 확보건', `운영일 ${stats.opDays || (gReportData.dailyTrends || []).length}일 기준`];
 
-      // 주체별 테이블
-      const actHead = ws1.addRow([`2. 문의 주체별 분포 (${stats.actorList.length}종 · 상담 ${stats.consultedCount}건 전수)`, '건수', '비중', '성격 및 목적']);
-      actHead.eachCell(c => {
-        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
-        c.font = { color: { argb: 'FFFFFFFF' }, bold: true };
-        c.alignment = { vertical: 'middle' };
-      });
-      stats.actorList.forEach((a, idx) => {
-        const r = ws1.addRow([a.name, a.count, `${a.pct}%`, a.description]);
-        if (idx % 2 === 1) r.eachCell(cell => cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } });
-        r.eachCell(cell => cell.border = thinBorder);
-        r.getCell(2).alignment = { horizontal: 'right' };
-        r.getCell(3).alignment = { horizontal: 'right' };
-      });
-      const actSumRow = ws1.addRow(['합계', stats.consultedCount, '100.0%', `전체 ${stats.actorList.length}개 문의주체 합계`]);
-      actSumRow.eachCell(c => {
+      ws1.mergeCells('B6:C6');
+      ws1.mergeCells('B7:C7');
+      ws1.mergeCells('B8:C8');
+      ws1.mergeCells('D6:E6');
+      ws1.mergeCells('D7:E7');
+      ws1.mergeCells('D8:E8');
+
+      ['B6', 'D6', 'F6', 'G6'].forEach(pos => {
+        const c = ws1.getCell(pos);
         c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-        c.font = { bold: true, color: { argb: 'FF334155' } };
-        c.border = thinBorder;
+        c.font = { name: '맑은 고딕', size: 9, bold: true, color: { argb: 'FF475569' } };
+        c.alignment = { vertical: 'middle', horizontal: 'center' };
       });
-      actSumRow.getCell(2).alignment = { horizontal: 'right' };
-      actSumRow.getCell(3).alignment = { horizontal: 'right' };
+
+      ['B7', 'D7', 'F7', 'G7'].forEach(pos => {
+        const c = ws1.getCell(pos);
+        c.font = { name: '맑은 고딕', size: 16, bold: true, color: { argb: 'FF0F172A' } };
+        c.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+
+      // Executive Summary
+      ws1.mergeCells('B10:G10');
+      const sumTitle = ws1.getCell('B10');
+      sumTitle.value = '핵심 요약 (Executive Summary)';
+      sumTitle.font = { name: '맑은 고딕', size: 11, bold: true, color: { argb: 'FF1E293B' } };
+      ws1.getRow(10).height = 24;
+
+      const topCat1 = stats.catList[0];
+      const topCat2 = stats.catList[1];
+      const topActor1 = stats.actorList[0];
+
+      const takeaways = [
+        `1.  인입 및 연결 현황: 조회기간 내 총 인입 ${stats.totalCalls}건 중 상담사 연결요청 ${stats.connectReqCalls}건(연결율 ${stats.connectRate}%), 실제 상담이 진행되어 요약이 확보된 건은 ${stats.consultedCount}건입니다. 본 분석은 실제 상담 ${stats.consultedCount}건의 내용을 ${stats.catList.length}개 문의유형 및 ${stats.actorList.length}개 주체별로 전수 분석한 결과입니다.`,
+        `2.  최다 문의 유형 및 주요 주체: ${topCat1 ? `가장 많이 유입된 문의는 '${topCat1.name}'(${topCat1.count}건, ${topCat1.pct}%)이며, ` : ''}${topActor1 ? `주요 문의 주체는 '${topActor1.name}'(${topActor1.count}건, ${topActor1.pct}%) 비중이 가장 높습니다.` : ''}${topCat2 ? ` 그 외 '${topCat2.name}'(${topCat2.count}건, ${topCat2.pct}%) 순으로 확인됩니다.` : ''}`,
+        `3.  상위 문의 항목 특이사항: ${stats.catList.slice(0, 2).map((c, i) => `[${i + 1}] ${c.name}(${c.count}건, ${c.pct}%): ${c.description || '세부 기준 안내'}`).join('  |  ') || '조회 기간 내 특이 문의사항 없음'}`,
+        `4.  문의 주체별 대응 현황: ${stats.actorList.slice(0, 2).map((a, i) => `[${i + 1}] ${a.name}(${a.count}건, ${a.pct}%): ${a.description || '표준 안내'}`).join('  |  ') || '조회 기간 내 문의 주체 정보 없음'}`
+      ];
+
+      takeaways.forEach((t, i) => {
+        const rowNum = 11 + i;
+        ws1.mergeCells(`B${rowNum}:G${rowNum}`);
+        const c = ws1.getCell(`B${rowNum}`);
+        c.value = t;
+        c.font = { name: '맑은 고딕', size: 9, color: { argb: 'FF334155' } };
+        c.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' };
+        
+        const lineCount = Math.ceil(t.length / 58) || 1;
+        ws1.getRow(rowNum).height = Math.max(38, lineCount * 22);
+      });
+
+      // Category Distribution Table
+      const catHeaderRowNum = 16;
+      ws1.mergeCells(`B${catHeaderRowNum}:G${catHeaderRowNum}`);
+      const catHeader = ws1.getCell(`B${catHeaderRowNum}`);
+      catHeader.value = `주요 문의유형 분포 (실제 상담 ${stats.consultedCount}건 기준)`;
+      catHeader.font = { name: '맑은 고딕', size: 11, bold: true, color: { argb: 'FF1E293B' } };
+      ws1.getRow(catHeaderRowNum).height = 24;
+
+      const catHeadRowNum = catHeaderRowNum + 1;
+      ws1.getRow(catHeadRowNum).values = ['', '문의 대분류', '건수', '비중', '대표 문의 내용', '대표 문의 내용', '대표 문의 내용'];
+      ws1.getRow(catHeadRowNum).height = 24;
+      ws1.mergeCells(`E${catHeadRowNum}:G${catHeadRowNum}`);
+      ['B', 'C', 'D', 'E'].forEach(col => {
+        const c = ws1.getCell(`${col}${catHeadRowNum}`);
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } };
+        c.font = { name: '맑은 고딕', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
+        c.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+
+      stats.catList.forEach((cat, i) => {
+        const r = catHeadRowNum + 1 + i;
+        ws1.getRow(r).values = ['', cat.name, cat.count, cat.share, cat.description, cat.description, cat.description];
+        ws1.mergeCells(`E${r}:G${r}`);
+        ws1.getCell(`B${r}`).alignment = { vertical: 'middle', horizontal: 'left' };
+        ws1.getCell(`C${r}`).alignment = { vertical: 'middle', horizontal: 'right' };
+        ws1.getCell(`D${r}`).numFmt = '0.0%';
+        ws1.getCell(`D${r}`).alignment = { vertical: 'middle', horizontal: 'right' };
+        const descCell = ws1.getCell(`E${r}`);
+        descCell.alignment = { wrapText: true, vertical: 'middle', horizontal: 'left' };
+
+        const descLen = (cat.description || '').length;
+        const lines = Math.ceil(descLen / 36) || 1;
+        ws1.getRow(r).height = lines > 1 ? Math.max(26, lines * 19) : 22;
+      });
+
+      // Category Total Row
+      const catTotalRow = catHeadRowNum + 1 + stats.catList.length;
+      ws1.getRow(catTotalRow).values = ['', '합계', stats.consultedCount, 1, '', '', ''];
+      ws1.getRow(catTotalRow).height = 22;
+      ws1.getCell(`B${catTotalRow}`).font = { bold: true };
+      ws1.getCell(`B${catTotalRow}`).alignment = { vertical: 'middle', horizontal: 'center' };
+      ws1.getCell(`C${catTotalRow}`).font = { bold: true };
+      ws1.getCell(`C${catTotalRow}`).alignment = { vertical: 'middle', horizontal: 'right' };
+      ws1.getCell(`D${catTotalRow}`).font = { bold: true };
+      ws1.getCell(`D${catTotalRow}`).numFmt = '0.0%';
+      ws1.getCell(`D${catTotalRow}`).alignment = { vertical: 'middle', horizontal: 'right' };
+
+      // Actor Distribution Table
+      const actorStartRow = catTotalRow + 2;
+      ws1.mergeCells(`B${actorStartRow}:G${actorStartRow}`);
+      const actorHeader = ws1.getCell(`B${actorStartRow}`);
+      actorHeader.value = `문의 주체별 분포 (실제 상담 ${stats.consultedCount}건 기준)`;
+      actorHeader.font = { name: '맑은 고딕', size: 11, bold: true, color: { argb: 'FF1E293B' } };
+      ws1.getRow(actorStartRow).height = 24;
+
+      const actorHeadRow = actorStartRow + 1;
+      ws1.getRow(actorHeadRow).values = ['', '문의 주체', '건수', '비중', '성격 및 목적', '성격 및 목적', '성격 및 목적'];
+      ws1.getRow(actorHeadRow).height = 24;
+      ws1.mergeCells(`E${actorHeadRow}:G${actorHeadRow}`);
+      ['B', 'C', 'D', 'E'].forEach(col => {
+        const c = ws1.getCell(`${col}${actorHeadRow}`);
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
+        c.font = { name: '맑은 고딕', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
+        c.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+
+      stats.actorList.forEach((act, i) => {
+        const r = actorHeadRow + 1 + i;
+        ws1.getRow(r).values = ['', act.name, act.count, act.share, act.description, act.description, act.description];
+        ws1.mergeCells(`E${r}:G${r}`);
+        ws1.getCell(`B${r}`).alignment = { vertical: 'middle', horizontal: 'left' };
+        ws1.getCell(`C${r}`).alignment = { vertical: 'middle', horizontal: 'right' };
+        ws1.getCell(`D${r}`).numFmt = '0.0%';
+        ws1.getCell(`D${r}`).alignment = { vertical: 'middle', horizontal: 'right' };
+        const descCell = ws1.getCell(`E${r}`);
+        descCell.alignment = { wrapText: true, vertical: 'middle', horizontal: 'left' };
+
+        const descLen = (act.description || '').length;
+        const lines = Math.ceil(descLen / 36) || 1;
+        ws1.getRow(r).height = lines > 1 ? Math.max(26, lines * 19) : 22;
+      });
+
+      // Actor Total Row
+      const actorTotalRow = actorHeadRow + 1 + stats.actorList.length;
+      ws1.getRow(actorTotalRow).values = ['', '합계', stats.consultedCount, 1, '', '', ''];
+      ws1.getRow(actorTotalRow).height = 22;
+      ws1.getCell(`B${actorTotalRow}`).font = { bold: true };
+      ws1.getCell(`B${actorTotalRow}`).alignment = { vertical: 'middle', horizontal: 'center' };
+      ws1.getCell(`C${actorTotalRow}`).font = { bold: true };
+      ws1.getCell(`C${actorTotalRow}`).alignment = { vertical: 'middle', horizontal: 'right' };
+      ws1.getCell(`D${actorTotalRow}`).font = { bold: true };
+      ws1.getCell(`D${actorTotalRow}`).numFmt = '0.0%';
+      ws1.getCell(`D${actorTotalRow}`).alignment = { vertical: 'middle', horizontal: 'right' };
 
       // =========================================================================
-      // [시트 2] 일자별 인입현황 + 첫행 합계 + 상단 틀고정 (2행 고정)
+      // [시트 2] 일자별 인입현황 + 첫행 합계 + 상단 틀고정 (3행 고정)
       // =========================================================================
-      const ws2 = wb.addWorksheet('일자별 인입현황');
-      ws2.views = [{ state: 'frozen', xSplit: 0, ySplit: 2 }];
-      ws2.columns = [{ width: 16 }, { width: 10 }, { width: 16 }, { width: 16 }, { width: 32 }];
-      
-      const dailyHead = ws2.addRow(['일자', '요일', '인입콜(건)', '점유 비중', '비고']);
-      dailyHead.eachCell(c => {
-        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
-        c.font = { color: { argb: 'FFFFFFFF' }, bold: true };
-        c.alignment = { horizontal: 'center', vertical: 'middle' };
+      const dailyTrends = gReportData.dailyTrends || [];
+      const totalDailyCallsExcel = dailyTrends.reduce((sum, t) => sum + (t.callCount || 0), 0) || stats.totalCalls || 0;
+
+      const ws2 = wb.addWorksheet('일자별 인입현황', {
+        views: [{ state: 'frozen', xSplit: 0, ySplit: 3, showGridLines: true }]
+      });
+      ws2.columns = [{ width: 16 }, { width: 10 }, { width: 16 }, { width: 32 }];
+
+      ws2.mergeCells('A1:D1');
+      const dailyTitle = ws2.getCell('A1');
+      dailyTitle.value = `일자별 인입 현황 (인바운드 전체 ${totalDailyCallsExcel.toLocaleString()}건 · ${gReportData.reportInfo.period || ''})`;
+      dailyTitle.font = { name: '맑은 고딕', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+      dailyTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+      dailyTitle.alignment = { vertical: 'middle', horizontal: 'center' };
+      ws2.getRow(1).height = 28;
+
+      ws2.getRow(2).values = ['일자', '요일', '인입콜(건)', '비고'];
+      ws2.getRow(2).height = 24;
+      ['A2', 'B2', 'C2', 'D2'].forEach(pos => {
+        const c = ws2.getCell(pos);
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+        c.font = { bold: true };
+        c.alignment = { vertical: 'middle', horizontal: 'center' };
       });
 
-      const totalDailyCallsExcel = (gReportData.dailyTrends || []).reduce((sum, t) => sum + (t.callCount || 0), 0) || stats.totalCalls || 0;
-      const opDaysExcel = stats.opDays || (gReportData.dailyTrends || []).length || 25;
-      const sumRow = ws2.addRow(['합계', `${(gReportData.dailyTrends || []).length}일`, totalDailyCallsExcel, '100.0%', `일평균 ${stats.dailyAvg || 0}건 (운영 ${opDaysExcel}일 기준)`]);
-      sumRow.font = { bold: true };
-      sumRow.eachCell(cell => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
-        cell.border = thinBorder;
+      // 합계 행: 첫 데이터 행(3행)에 배치하고 강조
+      ws2.getRow(3).values = ['합계', `${dailyTrends.length}일`, totalDailyCallsExcel, `일평균 ${(totalDailyCallsExcel / (dailyTrends.length || 1)).toFixed(1)}건`];
+      ws2.getRow(3).font = { bold: true };
+      ws2.getRow(3).height = 24;
+      ['A3', 'B3', 'C3', 'D3'].forEach(pos => {
+        const c = ws2.getCell(pos);
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
       });
-      sumRow.getCell(1).alignment = { horizontal: 'center' };
-      sumRow.getCell(2).alignment = { horizontal: 'center' };
-      sumRow.getCell(3).alignment = { horizontal: 'right' };
-      sumRow.getCell(4).alignment = { horizontal: 'right' };
+      ws2.getCell('A3').alignment = { vertical: 'middle', horizontal: 'center' };
+      ws2.getCell('B3').alignment = { vertical: 'middle', horizontal: 'center' };
+      ws2.getCell('C3').alignment = { vertical: 'middle', horizontal: 'right' };
+      ws2.getCell('D3').alignment = { vertical: 'middle', horizontal: 'left' };
 
-      (gReportData.dailyTrends || []).forEach(t => {
-        const share = totalDailyCallsExcel > 0 ? ((t.callCount / totalDailyCallsExcel) * 100).toFixed(1) : '0.0';
-        const r = ws2.addRow([t.date, t.dayOfWeek, t.callCount, `${share}%`, t.note || '']);
-        r.eachCell(cell => cell.border = thinBorder);
-        if (t.dayOfWeek === '토' || t.dayOfWeek === '일') {
-          r.eachCell(cell => cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } });
-        }
-        r.getCell(2).alignment = { horizontal: 'center' };
-        r.getCell(3).alignment = { horizontal: 'right' };
-        r.getCell(4).alignment = { horizontal: 'right' };
+      dailyTrends.forEach((t, i) => {
+        const r = 4 + i;
+        ws2.getRow(r).values = [t.date, t.dayOfWeek, t.callCount, t.note || ''];
+        ws2.getRow(r).height = 20;
+        ws2.getCell(`A${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
+        ws2.getCell(`B${r}`).alignment = { vertical: 'middle', horizontal: 'center' };
+        ws2.getCell(`C${r}`).alignment = { vertical: 'middle', horizontal: 'right' };
+        ws2.getCell(`D${r}`).alignment = { vertical: 'middle', horizontal: 'left' };
       });
 
       // =========================================================================
       // [시트 3] 통화로그(원본) + 틀고정
       // =========================================================================
-      const ws3 = wb.addWorksheet('통화로그(원본)');
-      ws3.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+      const ws3 = wb.addWorksheet('통화로그(원본)', {
+        views: [{ state: 'frozen', xSplit: 0, ySplit: 1, showGridLines: true }]
+      });
       ws3.columns = [
-        { header: 'No', key: 'no', width: 8 },
-        { header: '연결시간', key: 'time', width: 20 },
-        { header: '인입채널', key: 'channel', width: 14 },
+        { header: '구분', key: 'type', width: 8 },
+        { header: '경로', key: 'channel', width: 10 },
+        { header: '연결시간', key: 'callTime', width: 18 },
+        { header: '회원이름', key: 'memberName', width: 16 },
+        { header: '생년월일', key: 'birthDate', width: 12 },
+        { header: '성별', key: 'gender', width: 6 },
+        { header: '질병유형', key: 'diseaseType', width: 10 },
+        { header: '그룹', key: 'group', width: 8 },
         { header: '전화번호', key: 'phone', width: 18 },
-        { header: '회원이름', key: 'member', width: 16 },
-        { header: 'ARS메뉴', key: 'ars', width: 16 },
-        { header: '연결요청', key: 'connect', width: 12 },
-        { header: '대기시간', key: 'wait', width: 12 },
-        { header: '문의 대분류 (신규) ✨', key: 'cat', width: 26 },
-        { header: '문의 주체 (신규) ✨', key: 'act', width: 24 },
+        { header: 'ARS메뉴', key: 'arsMenu', width: 14 },
+        { header: '연결요청', key: 'connectReq', width: 10 },
+        { header: '대기시간', key: 'waitTime', width: 10 },
+        { header: '문의 대분류', key: 'category', width: 24 },
+        { header: '문의 주체', key: 'actor', width: 22 },
         { header: '상담제목', key: 'title', width: 28 },
-        { header: '상담요약 (전문의 내용)', key: 'summary', width: 55 },
+        { header: '상담요약', key: 'summary', width: 60 },
         { header: '키워드', key: 'keywords', width: 28 },
-        { header: '통화시간', key: 'dur', width: 12 }
+        { header: '상담시간', key: 'duration', width: 10 }
       ];
 
       const logHead = ws3.getRow(1);
-      logHead.height = 24;
+      logHead.height = 26;
       logHead.eachCell((c, colNum) => {
-        if (colNum === 9 || colNum === 10) {
+        c.font = { name: '맑은 고딕', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
+        if (colNum === 13 || colNum === 14) {
           c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
-          c.font = { color: { argb: 'FFFEF08A' }, bold: true };
         } else {
-          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
-          c.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
         }
         c.alignment = { horizontal: 'center', vertical: 'middle' };
       });
@@ -1451,34 +1583,60 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         const formattedPhone = formatPhoneNumber(c.phone || c.rawPhone);
         const resolvedName = resolveMemberName(c.phone || c.rawPhone, c.memberName, c.title, c.summary);
         const r = ws3.addRow({
-          no: idx + 1,
-          time: c.callTime,
+          type: c.type || 'IN',
           channel: c.channel || '삼성화재',
+          callTime: c.callTime || '',
+          memberName: resolvedName,
+          birthDate: c.birthDate || '',
+          gender: c.gender || '',
+          diseaseType: c.diseaseType || '',
+          group: c.group || '',
           phone: formattedPhone,
-          member: resolvedName,
-          ars: c.arsMenu,
-          connect: c.connectReq,
-          wait: c.waitTime ? `${c.waitTime}초` : '0',
-          cat: c.category,
-          act: c.actor,
-          title: c.title,
-          summary: c.summary,
-          keywords: c.keywords,
-          dur: c.duration
+          arsMenu: c.arsMenu || '',
+          connectReq: c.connectReq || '',
+          waitTime: c.waitTime || 0,
+          category: c.category || '',
+          actor: c.actor || '',
+          title: c.title || '',
+          summary: c.summary || '',
+          keywords: c.keywords || '',
+          duration: c.duration || '0'
         });
-        r.eachCell(cell => cell.border = thinBorder);
+
+        r.eachCell(cell => {
+          cell.border = thinBorder;
+          cell.alignment = { vertical: 'middle' };
+        });
+
         if (idx % 2 === 1) {
           r.eachCell((cell, col) => {
-            if (col !== 9 && col !== 10) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+            if (col !== 13 && col !== 14) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
           });
         }
-        r.getCell(1).alignment = { horizontal: 'center' };
-        r.getCell(4).alignment = { horizontal: 'center' };
-        r.getCell(5).alignment = { horizontal: 'center' };
-        r.getCell(7).alignment = { horizontal: 'center' };
-        r.getCell(8).alignment = { horizontal: 'center' };
-        r.getCell(9).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
-        r.getCell(10).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+
+        if (c.category) {
+          r.getCell('category').font = { bold: true, color: { argb: 'FF0369A1' } };
+          r.getCell('category').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
+        }
+        if (c.actor) {
+          r.getCell('actor').font = { bold: true, color: { argb: 'FF4338CA' } };
+          r.getCell('actor').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+        }
+
+        // 상담요약 및 제목 열 줄바꿈 설정 및 행 높이 자동 조절
+        r.getCell('title').alignment = { wrapText: true, vertical: 'middle' };
+        r.getCell('summary').alignment = { wrapText: true, vertical: 'middle' };
+
+        const sumLen = (c.summary || '').length;
+        const titleLen = (c.title || '').length;
+        const maxLen = Math.max(sumLen, titleLen);
+        if (maxLen > 100) {
+          r.height = 42;
+        } else if (maxLen > 45) {
+          r.height = 30;
+        } else {
+          r.height = 22;
+        }
       });
 
       const buffer = await wb.xlsx.writeBuffer();
