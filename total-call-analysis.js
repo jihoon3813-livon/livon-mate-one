@@ -14,7 +14,7 @@
 // 전역 상태
 let gTotalCallData = null;
 let gTotalCallAnnotations = { memos: {}, labels: {}, customLabels: [] };
-let gActiveTotalViewMode = 'customer'; // 'customer' | 'company' | 'date' | 'category'
+let gActiveTotalViewMode = 'customer'; // 'customer' | 'list' | 'company' | 'date' | 'category'
 let gTotalFilter = {
   startDate: '2026-08-18',
   endDate: new Date().toISOString().slice(0, 10),
@@ -24,7 +24,8 @@ let gTotalFilter = {
   label: '',
   onlyMatched: false,
   onlyWithMemo: false,
-  onlyAnswered: false
+  onlyAnswered: false,
+  onlyMissedOutcall: false
 };
 let isTotalSyncing = false;
 
@@ -114,53 +115,300 @@ function formatPhoneDisplay(phone) {
 }
 
 /**
- * 3. 메이트원 고객 매칭 엔진 (현대해상 / 삼성화재 / 미등록 판별)
+ * 3-1. 스마트 고객명 자동 추출기 (상담제목 및 전문 요약문에서 성명 자동 감지)
  */
-function matchCustomerToMateOne(phone, ctiMemberName = '') {
+function extractCustomerNameFromText(title = '', summary = '', memberName = '') {
+  if (memberName && memberName !== '비회원' && memberName !== '회원아님' && memberName !== '-') {
+    return memberName.trim();
+  }
+  const t = String(title || '');
+  const s = String(summary || '');
+  const m1 = t.match(/^([가-힣]{2,4})(?:님|님의| 환자|의|,| 고객)/);
+  if (m1) {
+    const cand = m1[1];
+    const exclude = ['간병', '상담', '입원', '보험', '수술', '삼성', '리본', '요양', '응급', '추석', '순천', '어린', '방문', '진심', '감염', '여수'];
+    if (!exclude.some(x => cand.includes(x))) return cand;
+  }
+  const m2 = s.match(/([가-힣]{2,4})\s*씨의\s*(?:긴급한|간병|요청|입원|수술)/);
+  if (m2) return m2[1];
+  const m3 = s.match(/계약자\s*['"‘“]([가-힣]{2,4})['"’”]/);
+  if (m3) return m3[1];
+  const m4 = (t + ' ' + s).match(/고객명[:\s]*([가-힣]{2,4})/);
+  if (m4) return m4[1];
+  const m5 = s.match(/환자\s*([가-힣]{2,4})\s*씨/);
+  if (m5) return m5[1];
+  return '';
+}
+
+/**
+ * 3-2. 메이트원 고객 매칭 엔진
+ * - 삼성화재 인입: 삼성화재 명단관리(gSamsungSheets, gSamsungList) 우선 매칭
+ * - 현대해상 인입: 통합허브(gApps) 우선 매칭
+ * - 전화번호 및 성명 추출 기반 전수 정합성 보장
+ */
+function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = '', summary = '') {
+  let phone = arg1;
+  if (arg1 && typeof arg1 === 'object') {
+    phone = arg1.phone || arg1.rawPhone;
+    ctiMemberName = arg1.memberName || arg1.ctiMemberName || '';
+    channel = arg1.channel || '';
+    title = arg1.title || '';
+    summary = arg1.summary || '';
+  }
+
   const clean = cleanPhoneDigits(phone);
-  if (!clean) {
-    return { isRegistered: false, appId: null, patientName: ctiMemberName || '알 수 없음', company: '미등록', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200' };
+  const detectedName = extractCustomerNameFromText(title, summary, ctiMemberName);
+
+  // [삼성화재 명단관리 검색]
+  const findInSamsung = () => {
+    // 1) window.gSamsungSheets
+    const sheets = window.gSamsungSheets;
+    if (sheets) {
+      const allSheetItems = [
+        ...(sheets.eligible || []),
+        ...(sheets.target || []),
+        ...(sheets.completed || [])
+      ];
+      if (clean) {
+        const found = allSheetItems.find(s => {
+          const p1 = cleanPhoneDigits(s.phone || s.applicantContact || s.contact);
+          const p2 = cleanPhoneDigits(s.patientPhone || s.guardianPhone || s.customerPhone);
+          return p1 === clean || p2 === clean;
+        });
+        if (found) {
+          return {
+            isRegistered: true,
+            appId: found.id || found.regNum || found.applicantNo || 'SF-S',
+            patientName: found.patientName || found.customerName || detectedName || '삼성고객',
+            company: '삼성화재',
+            isSamsung: true,
+            rawApp: found,
+            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+          };
+        }
+      }
+      if (detectedName) {
+        const foundByName = allSheetItems.find(s => (s.patientName === detectedName || s.customerName === detectedName));
+        if (foundByName) {
+          return {
+            isRegistered: true,
+            appId: foundByName.id || foundByName.regNum || foundByName.applicantNo || 'SF-S',
+            patientName: foundByName.patientName || foundByName.customerName || detectedName,
+            company: '삼성화재',
+            isSamsung: true,
+            rawApp: foundByName,
+            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+          };
+        }
+      }
+    }
+
+    // 2) window.gSamsungList
+    const list = window.gSamsungList || (window.REBORN_DATA && window.REBORN_DATA.samsungList);
+    if (Array.isArray(list)) {
+      if (clean) {
+        const found = list.find(s => {
+          const p1 = cleanPhoneDigits(s.phone || s.applicantContact || s.contact);
+          const p2 = cleanPhoneDigits(s.patientPhone || s.guardianPhone || s.customerPhone);
+          return p1 === clean || p2 === clean;
+        });
+        if (found) {
+          return {
+            isRegistered: true,
+            appId: found.id || 'SF-L',
+            patientName: found.patientName || found.customerName || detectedName || '삼성고객',
+            company: '삼성화재',
+            isSamsung: true,
+            rawApp: found,
+            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+          };
+        }
+      }
+      if (detectedName) {
+        const foundByName = list.find(s => (s.patientName === detectedName || s.customerName === detectedName));
+        if (foundByName) {
+          return {
+            isRegistered: true,
+            appId: foundByName.id || 'SF-L',
+            patientName: foundByName.patientName || foundByName.customerName || detectedName,
+            company: '삼성화재',
+            isSamsung: true,
+            rawApp: foundByName,
+            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+          };
+        }
+      }
+    }
+
+    // 3) SAMSUNG_ELIGIBLE_LIST
+    const sEligible = (window.SAMSUNG_ELIGIBLE_LIST || (window.REBORN_DATA && window.REBORN_DATA.samsungEligibleList) || []);
+    if (Array.isArray(sEligible)) {
+      if (clean) {
+        const found = sEligible.find(s => cleanPhoneDigits(s.phone || s.applicantContact) === clean);
+        if (found) {
+          return {
+            isRegistered: true,
+            appId: found.id || 'SF-E',
+            patientName: found.patientName || detectedName || '삼성고객',
+            company: '삼성화재',
+            isSamsung: true,
+            rawApp: found,
+            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+          };
+        }
+      }
+      if (detectedName) {
+        const foundByName = sEligible.find(s => s.patientName === detectedName);
+        if (foundByName) {
+          return {
+            isRegistered: true,
+            appId: foundByName.id || 'SF-E',
+            patientName: foundByName.patientName || detectedName,
+            company: '삼성화재',
+            isSamsung: true,
+            rawApp: foundByName,
+            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+          };
+        }
+      }
+    }
+
+    return null;
+  };
+
+  // [현대해상 / 통합허브 명단 검색]
+  const findInHyundai = () => {
+    const appList = (window.gApps || (window.REBORN_DATA && window.REBORN_DATA.applications) || []);
+    if (clean) {
+      const found = appList.find(a => {
+        const p1 = cleanPhoneDigits(a.phone);
+        const p2 = cleanPhoneDigits(a.applicantPhone || a.guardianPhone);
+        return p1 === clean || p2 === clean;
+      });
+      if (found) {
+        const isHyundai = (found.insuranceCompany || '').includes('현대');
+        return {
+          isRegistered: true,
+          appId: found.id,
+          patientName: found.patientName || detectedName || '현대고객',
+          company: found.insuranceCompany || (isHyundai ? '현대해상' : '등록고객'),
+          isHyundai: true,
+          rawApp: found,
+          badgeClass: isHyundai ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-blue-100 text-blue-800 border-blue-300'
+        };
+      }
+    }
+    if (detectedName) {
+      const foundByName = appList.find(a => a.patientName === detectedName || a.applicantName === detectedName);
+      if (foundByName) {
+        const isHyundai = (foundByName.insuranceCompany || '').includes('현대');
+        return {
+          isRegistered: true,
+          appId: foundByName.id,
+          patientName: foundByName.patientName || detectedName,
+          company: foundByName.insuranceCompany || (isHyundai ? '현대해상' : '등록고객'),
+          isHyundai: true,
+          rawApp: foundByName,
+          badgeClass: isHyundai ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-blue-100 text-blue-800 border-blue-300'
+        };
+      }
+    }
+    return null;
+  };
+
+  // 채널별 기준 우선순위 적용: 삼성화재=명단관리 기준 / 현대해상=통합허브 기준
+  const isSamsungChannel = (channel || '').includes('삼성');
+  const isHyundaiChannel = (channel || '').includes('현대');
+
+  if (isSamsungChannel) {
+    const sMatch = findInSamsung();
+    if (sMatch) return sMatch;
+    const hMatch = findInHyundai();
+    if (hMatch) return hMatch;
+  } else if (isHyundaiChannel) {
+    const hMatch = findInHyundai();
+    if (hMatch) return hMatch;
+    const sMatch = findInSamsung();
+    if (sMatch) return sMatch;
+  } else {
+    const sMatch = findInSamsung();
+    if (sMatch) return sMatch;
+    const hMatch = findInHyundai();
+    if (hMatch) return hMatch;
   }
 
-  // 1) gApps (현대해상 등 메이트원 대장 등록 고객)
-  const appList = (window.gApps || (window.REBORN_DATA && window.REBORN_DATA.applications) || []);
-  const foundApp = appList.find(a => cleanPhoneDigits(a.phone) === clean);
-  if (foundApp) {
-    const isHyundai = (foundApp.insuranceCompany || '').includes('현대');
-    return {
-      isRegistered: true,
-      appId: foundApp.id,
-      patientName: foundApp.patientName,
-      company: foundApp.insuranceCompany || (isHyundai ? '현대해상' : '등록고객'),
-      isHyundai: true,
-      rawApp: foundApp,
-      badgeClass: isHyundai ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-blue-100 text-blue-800 border-blue-300'
-    };
-  }
-
-  // 2) SAMSUNG_ELIGIBLE_LIST (삼성화재 적격고객)
-  const samsungList = (window.SAMSUNG_ELIGIBLE_LIST || (window.REBORN_DATA && window.REBORN_DATA.samsungEligibleList) || []);
-  const foundSamsung = samsungList.find(s => cleanPhoneDigits(s.phone) === clean);
-  if (foundSamsung) {
-    return {
-      isRegistered: true,
-      appId: foundSamsung.id,
-      patientName: foundSamsung.patientName,
-      company: '삼성화재',
-      isSamsung: true,
-      rawApp: foundSamsung,
-      badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
-    };
-  }
-
-  // 3) memberPhoneMap 또는 CTI 기재 이름
+  // 매칭 실패 시 미등록 인입
   return {
     isRegistered: false,
     appId: null,
-    patientName: ctiMemberName && ctiMemberName !== '비회원' && ctiMemberName !== '-' ? ctiMemberName : '미등록 인입고객',
+    patientName: detectedName || (ctiMemberName && ctiMemberName !== '비회원' && ctiMemberName !== '-' ? ctiMemberName : '미등록 인입고객'),
     company: '미등록',
     badgeClass: 'bg-slate-100 text-slate-600 border-slate-300'
   };
+}
+
+/**
+ * 3-3. 미연결 & 대기시간 0초 콜 여부 판별기 (아웃콜 대상)
+ */
+function isCallMissedWaitZero(c) {
+  if (!c) return false;
+  const waitRaw = String(c.waitTime !== undefined && c.waitTime !== null ? c.waitTime : '').trim();
+  const waitZero = waitRaw === '0' || waitRaw === '0s' || waitRaw === '0초' || Number(c.waitTime) === 0;
+  if (!waitZero) return false;
+
+  const durRaw = String(c.duration || '').trim();
+  const durZero = !durRaw || durRaw === '0' || durRaw === '0초' || durRaw === '00:00:00' || Number(durRaw) === 0;
+  const noSummary = !c.summary || c.summary.trim() === '';
+  const isMissed = (c.connectReq === 'N' || c.transferResult === 'N' || durZero || noSummary);
+  return isMissed;
+}
+
+/**
+ * 3-4. 아웃콜 완료 처리 상태 관리 (localStorage 영구 보존)
+ */
+const OUTCALL_STORAGE_KEY = 'LIVON_OUTCALL_STATUS_MAP';
+
+function getOutcallStatusMap() {
+  try {
+    const raw = localStorage.getItem(OUTCALL_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveOutcallStatusMap(map) {
+  try {
+    localStorage.setItem(OUTCALL_STORAGE_KEY, JSON.stringify(map));
+  } catch (e) {
+    console.error('Failed to save outcall status map', e);
+  }
+}
+
+function isCallOutcallHandled(callId) {
+  const map = getOutcallStatusMap();
+  return !!(map[callId] && map[callId].status === 'completed');
+}
+
+function toggleCallOutcallStatus(callId, memo = '') {
+  const map = getOutcallStatusMap();
+  const current = map[callId];
+  if (current && current.status === 'completed') {
+    delete map[callId];
+  } else {
+    map[callId] = {
+      status: 'completed',
+      handledAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      handledBy: (window.gCurrentUser && window.gCurrentUser.name) || '상담원',
+      memo: memo || (current && current.memo) || ''
+    };
+  }
+  saveOutcallStatusMap(map);
+  renderTotalCallAnalysisTab();
+  const modal = document.getElementById('missedCallsOutcallModal');
+  if (modal && !modal.classList.contains('hidden')) {
+    openMissedCallsOutcallModal(window._activeOutcallTab || 'all');
+  }
 }
 
 /**
@@ -330,7 +578,7 @@ function renderTotalCallAnalysisTab() {
       const callId = getCallUniqueId(c);
       const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
       const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
-      const match = matchCustomerToMateOne(c.phone || c.rawPhone, c.memberName);
+      const match = matchCustomerToMateOne(c);
 
       const matches = 
         (c.phone || '').includes(q) ||
@@ -358,7 +606,7 @@ function renderTotalCallAnalysisTab() {
     }
     // 5) 등록고객 전용
     if (gTotalFilter.onlyMatched) {
-      const match = matchCustomerToMateOne(c.phone || c.rawPhone, c.memberName);
+      const match = matchCustomerToMateOne(c);
       if (!match.isRegistered) return false;
     }
     // 6) 메모 작성건 전용
@@ -371,18 +619,24 @@ function renderTotalCallAnalysisTab() {
     if (gTotalFilter.onlyAnswered) {
       if (!c.title && !c.summary) return false;
     }
+    // 8) 아웃콜 대상 (대기0초 미연결) 필터
+    if (gTotalFilter.onlyMissedOutcall) {
+      if (!isCallMissedWaitZero(c)) return false;
+    }
     return true;
   });
 
   // KPI 집계
   const totalInbound = (ctiSummary && ctiSummary.totalInbound !== undefined) ? ctiSummary.totalInbound : logs.length;
   const answeredCount = logs.filter(c => c.title || c.summary).length;
-  const matchedCalls = logs.filter(c => matchCustomerToMateOne(c.phone || c.rawPhone, c.memberName).isRegistered);
+  const matchedCalls = logs.filter(c => matchCustomerToMateOne(c).isRegistered);
   const urgentCalls = logs.filter(c => {
     const callId = getCallUniqueId(c);
     const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
     return labels.includes('긴급') || labels.includes('민원주의');
   });
+  const missedWaitZeroLogs = logs.filter(isCallMissedWaitZero);
+  const pendingOutcalls = missedWaitZeroLogs.filter(c => !isCallOutcallHandled(getCallUniqueId(c)));
 
   container.innerHTML = `
     <!-- 1. 최상단 헤더 & 컨트롤 바 -->
@@ -407,8 +661,14 @@ function renderTotalCallAnalysisTab() {
           </div>
         </div>
 
-        <!-- 우측 도구: 라벨 설정 / CTI 동기화 / 엑셀 다운로드 -->
+        <!-- 우측 도구: 아웃콜 모달 / 라벨 설정 / CTI 동기화 / 엑셀 다운로드 -->
         <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-start xl:justify-end">
+          <button type="button" onclick="openMissedCallsOutcallModal('pending')" 
+            class="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-rose-200 shadow-2xs whitespace-nowrap" title="대기0초 미연결 아웃콜 대상 모달 열기">
+            <i data-lucide="phone-outgoing" class="w-4 h-4 text-rose-600"></i>
+            <span>아웃콜 관리 (${pendingOutcalls.length})</span>
+          </button>
+
           <button type="button" onclick="openLabelSettingModal()" 
             class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-slate-300 shadow-2xs whitespace-nowrap" title="상담 라벨 추가 및 색상 설정">
             <i data-lucide="tag" class="w-4 h-4 text-slate-600"></i>
@@ -429,8 +689,37 @@ function renderTotalCallAnalysisTab() {
         </div>
       </div>
 
-      <!-- 2. 핵심 KPI 스트립 -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-slate-100 text-xs">
+      <!-- 긴급 아웃콜(Call-back) 대상 집중 관리 알림 배너 -->
+      ${pendingOutcalls.length > 0 ? `
+        <div class="p-4 rounded-3xl bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 text-white flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-lg shadow-rose-600/20 border border-rose-500">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center text-white shrink-0 animate-pulse">
+              <i data-lucide="phone-missed" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2.5 py-0.5 rounded-full bg-white text-rose-800 font-black text-xs uppercase tracking-wider">긴급 콜백 요망</span>
+                <h4 class="text-sm sm:text-base font-black">CTI 미연결 · 대기시간 0초 고객 아웃콜 관리</h4>
+                <span class="px-2.5 py-0.5 rounded-full bg-rose-900/70 text-rose-100 font-black text-xs border border-rose-400/40">미처리 ${pendingOutcalls.length}건 / 전체 ${missedWaitZeroLogs.length}건</span>
+              </div>
+              <p class="text-xs text-rose-100 mt-0.5">인입 즉시 통화 연결되지 않고 종료(대기 0초)된 고객입니다. 신속한 아웃콜을 통해 상담을 진행해주세요.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" onclick="openMissedCallsOutcallModal('pending')" class="px-4 py-2 rounded-xl bg-white hover:bg-rose-50 active:scale-95 text-rose-700 font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer whitespace-nowrap">
+              <i data-lucide="phone-outgoing" class="w-4 h-4 text-rose-600"></i>
+              <span>아웃콜 대상 모달 열기</span>
+            </button>
+            <button type="button" onclick="handleTotalFilterChange('onlyMissedOutcall', ${!gTotalFilter.onlyMissedOutcall})" class="px-3.5 py-2 rounded-xl ${gTotalFilter.onlyMissedOutcall ? 'bg-rose-950 text-white border border-white/40' : 'bg-rose-800/80 hover:bg-rose-800 text-white'} font-black text-xs flex items-center gap-1 cursor-pointer whitespace-nowrap">
+              <i data-lucide="filter" class="w-3.5 h-3.5"></i>
+              <span>${gTotalFilter.onlyMissedOutcall ? '전체 보기' : '대기건만 필터'}</span>
+            </button>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- 2. 핵심 KPI 스트립 (5대 메트릭) -->
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t border-slate-100 text-xs">
         <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
           <span class="text-[11px] font-bold text-slate-500">전체 인바운드 콜</span>
           <div class="text-xl font-black text-slate-900 mt-1">${totalInbound}<span class="text-xs font-normal text-slate-500 ml-1">건</span></div>
@@ -449,18 +738,38 @@ function renderTotalCallAnalysisTab() {
           <span class="text-[10px] text-indigo-600 mt-0.5">현대해상/삼성화재 등록</span>
         </div>
 
-        <div class="p-3 rounded-2xl bg-rose-50/70 border border-rose-200 flex flex-col justify-between">
-          <span class="text-[11px] font-bold text-rose-800">긴급 / 민원주의 라벨</span>
-          <div class="text-xl font-black text-rose-700 mt-1">${urgentCalls.length}<span class="text-xs font-normal text-rose-600 ml-1">건</span></div>
-          <span class="text-[10px] text-rose-600 mt-0.5">집중 관리 대상</span>
+        <div class="p-3 rounded-2xl bg-rose-50/90 border border-rose-300 flex flex-col justify-between cursor-pointer hover:bg-rose-100/80 transition-colors" onclick="openMissedCallsOutcallModal('pending')" title="클릭 시 아웃콜 집중 관리 모달 열기">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-black text-rose-800 flex items-center gap-1">
+              <i data-lucide="phone-missed" class="w-3 h-3 text-rose-600 animate-pulse"></i>
+              <span>미연결 · 아웃콜요망</span>
+            </span>
+            <span class="text-[9px] px-1.5 py-0.2 bg-rose-600 text-white rounded font-bold">대기0초</span>
+          </div>
+          <div class="text-xl font-black text-rose-700 mt-1">
+            ${pendingOutcalls.length}<span class="text-xs font-normal text-rose-600 ml-1">건 대기</span>
+          </div>
+          <span class="text-[10px] text-rose-600 font-bold mt-0.5">전체 ${missedWaitZeroLogs.length}건 중 클릭 열기 &rarr;</span>
+        </div>
+
+        <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-200 flex flex-col justify-between">
+          <span class="text-[11px] font-bold text-amber-900">긴급 / 민원주의 라벨</span>
+          <div class="text-xl font-black text-amber-700 mt-1">${urgentCalls.length}<span class="text-xs font-normal text-amber-600 ml-1">건</span></div>
+          <span class="text-[10px] text-amber-600 mt-0.5">집중 관리 대상</span>
         </div>
       </div>
     </div>
 
-    <!-- 3. 조회 모드 스위처 (고객 기준 / 보험사 기준 / 날짜 기준 / 유형 기준) -->
+    <!-- 3. 조회 모드 스위처 (리스트 뷰 / 고객 기준 / 보험사 기준 / 날짜 기준 / 유형 기준) -->
     <div class="bg-white rounded-3xl border border-slate-200/90 p-3 sm:p-4 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-      <!-- 4대 뷰 모드 탭 -->
+      <!-- 5대 뷰 모드 탭 -->
       <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 border border-slate-200 overflow-x-auto scrollbar-none shrink-0">
+        <button type="button" onclick="switchTotalViewMode('list')" 
+          class="px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${gActiveTotalViewMode === 'list' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'}">
+          <i data-lucide="list" class="w-4 h-4"></i>
+          <span>📋 리스트 뷰</span>
+        </button>
+
         <button type="button" onclick="switchTotalViewMode('customer')" 
           class="px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${gActiveTotalViewMode === 'customer' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'}">
           <i data-lucide="users" class="w-4 h-4"></i>
@@ -488,6 +797,12 @@ function renderTotalCallAnalysisTab() {
 
       <!-- 통합 검색 및 상세 필터 바 -->
       <div class="flex items-center gap-2 flex-wrap flex-1 justify-start md:justify-end min-w-0">
+        <!-- 아웃콜 대상 전용 체크박스 -->
+        <label class="flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 cursor-pointer px-2.5 py-1 rounded-xl transition-colors shrink-0" title="대기시간 0초 미연결 아웃콜 대상만 모아보기">
+          <input type="checkbox" ${gTotalFilter.onlyMissedOutcall ? 'checked' : ''} onchange="handleTotalFilterChange('onlyMissedOutcall', this.checked)" class="rounded text-rose-600">
+          <span>🚨 아웃콜(대기0초)만</span>
+        </label>
+
         <!-- 인입 채널 셀렉트 -->
         <select onchange="handleTotalFilterChange('channel', this.value)" class="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white">
           <option value="all" ${gTotalFilter.channel === 'all' ? 'selected' : ''}>경로: 전체 (${logs.length}건)</option>
@@ -513,13 +828,13 @@ function renderTotalCallAnalysisTab() {
         </select>
 
         <!-- 검색창 -->
-        <div class="relative min-w-[200px] flex-1 sm:max-w-xs">
+        <div class="relative min-w-[180px] flex-1 sm:max-w-xs">
           <input type="text" value="${gTotalFilter.search}" oninput="handleTotalFilterChange('search', this.value)" placeholder="고객명, 전화번호, 상담제목, 메모 검색..." class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-cyan-500">
           <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
         </div>
 
         <!-- 매칭 고객 전용 체크박스 -->
-        <label class="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer px-2 py-1 rounded-lg hover:bg-slate-50">
+        <label class="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer px-2 py-1 rounded-lg hover:bg-slate-50 shrink-0">
           <input type="checkbox" ${gTotalFilter.onlyMatched ? 'checked' : ''} onchange="handleTotalFilterChange('onlyMatched', this.checked)" class="rounded text-cyan-600">
           <span>매칭고객만</span>
         </label>
@@ -552,7 +867,9 @@ function handleTotalFilterChange(key, value) {
  * 뷰 모드별 컨텐츠 생성 라우터
  */
 function renderTotalViewContent(filteredLogs) {
-  if (gActiveTotalViewMode === 'customer') {
+  if (gActiveTotalViewMode === 'list') {
+    return renderTotalListView(filteredLogs);
+  } else if (gActiveTotalViewMode === 'customer') {
     return renderCustomerGroupView(filteredLogs);
   } else if (gActiveTotalViewMode === 'company') {
     return renderCompanyGroupView(filteredLogs);
@@ -561,7 +878,637 @@ function renderTotalViewContent(filteredLogs) {
   } else if (gActiveTotalViewMode === 'category') {
     return renderCategoryGroupView(filteredLogs);
   }
-  return renderCustomerGroupView(filteredLogs);
+  return renderTotalListView(filteredLogs);
+}
+
+/**
+ * =============================================================================
+ * [모드 0] 리스트 뷰 (List / Table-based View)
+ * - 전수 인바운드 콜을 테이블 형태로 일목요연하게 조회
+ * - 상담 내용: 마우스 오버 시 플로팅 툴팁 미리보기, 클릭 시 상세 모달 팝업
+ * - CTI 대기시간 0초 미연결 고객: 🚨 아웃콜 필요 배지 및 원클릭 발신 지원
+ * =============================================================================
+ */
+function renderTotalListView(logs) {
+  if (!logs || logs.length === 0) {
+    return `
+      <div class="bg-white rounded-3xl border border-slate-200/90 p-12 text-center text-slate-400 font-bold space-y-2">
+        <i data-lucide="list" class="w-10 h-10 mx-auto text-slate-300"></i>
+        <p>조건에 일치하는 통화 상담 데이터가 없습니다.</p>
+      </div>
+    `;
+  }
+
+  const allLabels = getAllAvailableLabels();
+
+  return `
+    <div class="flex items-center justify-between px-2 text-xs font-bold text-slate-500">
+      <span>총 <b class="text-cyan-700 font-black">${logs.length}</b>건의 통화 리스트</span>
+      <span class="text-slate-400 hidden sm:inline">💡 상담 내용을 마우스 오버하면 전문이 미리보이고, 클릭하면 상세 모달이 열립니다.</span>
+    </div>
+
+    <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-black text-[11px] select-none">
+              <th class="py-3 px-3 w-12 text-center">#</th>
+              <th class="py-3 px-3 w-36 whitespace-nowrap">일시 / 채널</th>
+              <th class="py-3 px-3 w-52 whitespace-nowrap">고객 / 매칭정보</th>
+              <th class="py-3 px-3 w-36 whitespace-nowrap">상담유형 / ARS</th>
+              <th class="py-3 px-3 min-w-[280px]">상담 내용 요약 (호버 미리보기 / 클릭 모달)</th>
+              <th class="py-3 px-3 w-40 text-center whitespace-nowrap">통화 / 대기시간</th>
+              <th class="py-3 px-3 w-40 whitespace-nowrap">라벨 / 메모</th>
+              <th class="py-3 px-3 w-28 text-center whitespace-nowrap">액션</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 text-slate-700">
+            ${logs.map((call, idx) => {
+              const callId = getCallUniqueId(call);
+              const match = matchCustomerToMateOne(call);
+              const cat = classifyConsultation(call);
+              const formattedPhone = formatPhoneDisplay(call.phone || call.rawPhone);
+              const isMissed = isCallMissedWaitZero(call);
+              const isHandled = isCallOutcallHandled(callId);
+              const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
+              const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
+
+              const channelBadge = call.channel === '삼성화재'
+                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                : (call.channel === '현대해상' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200');
+
+              return `
+                <tr class="hover:bg-slate-50/80 transition-colors ${isMissed && !isHandled ? 'bg-rose-50/30' : ''}">
+                  <!-- 1. 순번 -->
+                  <td class="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-middle">
+                    ${idx + 1}
+                  </td>
+
+                  <!-- 2. 일시 / 채널 -->
+                  <td class="py-3 px-3 align-middle whitespace-nowrap">
+                    <div class="font-mono font-bold text-slate-700 text-[11px]">${call.callTime || '-'}</div>
+                    <div class="mt-0.5">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-black border ${channelBadge}">
+                        ${call.channel || '인입'}
+                      </span>
+                    </div>
+                  </td>
+
+                  <!-- 3. 고객 / 매칭정보 -->
+                  <td class="py-3 px-3 align-middle">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <span class="font-black text-slate-900 text-xs">${maskName(match.patientName)}</span>
+                      <span class="font-mono text-slate-400 text-[11px]">${formattedPhone}</span>
+                    </div>
+                    <div class="mt-1 flex items-center gap-1">
+                      ${match.isRegistered ? `
+                        <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
+                          class="px-2 py-0.5 rounded text-[10.5px] font-black border ${match.badgeClass} hover:opacity-80 transition-opacity cursor-pointer inline-flex items-center gap-1 shadow-2xs" title="원스탑 고객 상세업무 대시보드 열기">
+                          <span>✓ ${match.company} (${match.appId || '매칭'})</span>
+                          <i data-lucide="external-link" class="w-2.5 h-2.5"></i>
+                        </button>
+                      ` : `
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                          미등록 인입
+                        </span>
+                      `}
+                    </div>
+                  </td>
+
+                  <!-- 4. 상담유형 / ARS -->
+                  <td class="py-3 px-3 align-middle whitespace-nowrap">
+                    <span class="px-2 py-0.5 rounded-md text-[10.5px] font-black border ${cat.badgeClass} inline-flex items-center gap-1">
+                      <i data-lucide="${cat.icon}" class="w-3 h-3"></i>
+                      <span>${cat.name}</span>
+                    </span>
+                    ${call.arsMenu ? `
+                      <div class="text-[10px] text-slate-400 font-medium mt-0.5">ARS: ${call.arsMenu}</div>
+                    ` : ''}
+                  </td>
+
+                  <!-- 5. 상담 내용 요약 (마우스 호버 시 툴팁 미리보기, 클릭 시 상세 모달) -->
+                  <td class="py-3 px-3 align-middle relative group/sum">
+                    <div class="cursor-pointer p-1.5 rounded-xl hover:bg-cyan-50/60 border border-transparent hover:border-cyan-200 transition-all" 
+                      onclick="openTotalCallSummaryModal('${callId}')" title="클릭 시 전체 상담 내용 및 메모 모달 열기">
+                      <div class="flex items-center gap-1.5 font-bold text-slate-900 group-hover/sum:text-cyan-800">
+                        <i data-lucide="message-square" class="w-3.5 h-3.5 text-slate-400 group-hover/sum:text-cyan-600 shrink-0"></i>
+                        <span class="truncate max-w-[240px] xl:max-w-[320px]">${call.title || '상담 제목 미기재 (클릭하여 확인)'}</span>
+                        <span class="text-[9.5px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 group-hover/sum:bg-cyan-600 group-hover/sum:text-white font-bold shrink-0 transition-colors">상세보기</span>
+                      </div>
+                      <div class="text-[11px] text-slate-500 truncate max-w-[240px] xl:max-w-[320px] mt-0.5">
+                        ${call.summary ? call.summary.replace(/<[^>]*>/g, '') : '(상담 요약 미확보 / 단순 인입)'}
+                      </div>
+                    </div>
+
+                    <!-- 마우스 호버 시 표시되는 플로팅 툴팁 카드 -->
+                    <div class="hidden group-hover/sum:block absolute left-4 bottom-full mb-2 w-96 max-w-md z-50 p-4 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 text-xs pointer-events-none transition-all duration-150">
+                      <div class="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
+                        <div class="font-black text-cyan-400 flex items-center gap-1.5">
+                          <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                          <span>상담 내용 전문 미리보기</span>
+                        </div>
+                        <span class="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full font-bold">클릭 시 전체 모달</span>
+                      </div>
+                      <div class="font-black text-white text-xs mb-1.5">${call.title || '상담 제목 없음'}</div>
+                      <div class="text-[11.5px] text-slate-300 leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap">${call.summary || '상담 요약 내용이 없습니다.'}</div>
+                      ${call.keywords ? `
+                        <div class="mt-2.5 pt-2 border-t border-slate-800 flex items-center gap-1 flex-wrap">
+                          <span class="text-[10px] text-slate-400 font-bold">키워드:</span>
+                          <span class="text-[10.5px] text-cyan-300 font-mono">${call.keywords}</span>
+                        </div>
+                      ` : ''}
+                      <div class="mt-2 flex items-center justify-between text-[10px] text-slate-400 pt-1.5 border-t border-slate-800/80">
+                        <span>통화시간: ${call.duration || '0초'} (대기: ${call.waitTime !== undefined ? call.waitTime : 0}초)</span>
+                        <span>상담원: ${call.operator || '리본케어'}</span>
+                      </div>
+                    </div>
+                  </td>
+
+                  <!-- 6. 통화 / 대기시간 & 아웃콜 여부 -->
+                  <td class="py-3 px-3 align-middle text-center whitespace-nowrap">
+                    <div class="font-mono text-xs font-bold text-slate-700">
+                      ${call.duration ? `${call.duration}` : '0초'}
+                    </div>
+                    <div class="text-[10.5px] text-slate-400 font-mono">
+                      대기: <b>${call.waitTime !== undefined ? call.waitTime : 0}초</b>
+                    </div>
+
+                    ${isMissed ? `
+                      <div class="mt-1.5 flex items-center justify-center gap-1">
+                        ${isHandled ? `
+                          <button type="button" onclick="toggleCallOutcallStatus('${callId}')" 
+                            class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200 cursor-pointer inline-flex items-center gap-0.5 shadow-2xs" title="클릭 시 완료 취소">
+                            <i data-lucide="check-circle" class="w-3 h-3 text-emerald-600"></i>
+                            <span>아웃콜 완료</span>
+                          </button>
+                        ` : `
+                          <button type="button" onclick="openMissedCallsOutcallModal('pending')" 
+                            class="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 animate-pulse hover:bg-rose-200 cursor-pointer inline-flex items-center gap-1 shadow-2xs" title="클릭 시 아웃콜 집중 모달 열기">
+                            <span>🚨 아웃콜필요</span>
+                            <span class="text-[9px] bg-rose-600 text-white rounded px-1">대기0초</span>
+                          </button>
+                          <button type="button" onclick="triggerCtiCall('${call.phone || call.rawPhone}', '${match.patientName}', '고객', '${match.appId || ''}', '${match.company || ''}')" 
+                            class="px-2 py-0.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] flex items-center gap-0.5 cursor-pointer shadow-xs" title="즉시 CTI 전화 발신">
+                            <i data-lucide="phone-outgoing" class="w-3 h-3"></i>
+                            <span>발신</span>
+                          </button>
+                        `}
+                      </div>
+                    ` : ''}
+                  </td>
+
+                  <!-- 7. 라벨 / 메모 -->
+                  <td class="py-3 px-3 align-middle">
+                    <div class="flex items-center gap-1 flex-wrap">
+                      ${labels.map(lbl => {
+                        const meta = allLabels.find(l => l.name === lbl) || { bgClass: 'bg-slate-700 text-white' };
+                        return `
+                          <span class="px-1.5 py-0.2 rounded-md text-[9.5px] font-black ${meta.bgClass} shadow-2xs">
+                            ${lbl}
+                          </span>
+                        `;
+                      }).join('')}
+                    </div>
+                    ${memo ? `
+                      <div class="mt-1 text-[10.5px] text-cyan-800 font-bold line-clamp-1 bg-cyan-50/70 px-1.5 py-0.5 rounded border border-cyan-200 flex items-center gap-1" title="${memo}">
+                        <i data-lucide="edit-3" class="w-2.5 h-2.5 text-cyan-600 shrink-0"></i>
+                        <span class="truncate">${memo}</span>
+                      </div>
+                    ` : `
+                      <button type="button" onclick="openTotalCallSummaryModal('${callId}')" class="mt-1 text-[10px] text-slate-400 hover:text-cyan-700 font-medium inline-flex items-center gap-0.5 cursor-pointer">
+                        <i data-lucide="plus" class="w-2.5 h-2.5"></i>
+                        <span>메모 추가</span>
+                      </button>
+                    `}
+                  </td>
+
+                  <!-- 8. 액션 -->
+                  <td class="py-3 px-3 align-middle text-center whitespace-nowrap">
+                    <div class="flex items-center justify-center gap-1">
+                      <button type="button" onclick="triggerCtiCall('${call.phone || call.rawPhone}', '${match.patientName}', '고객', '${match.appId || ''}', '${match.company || ''}')" 
+                        class="p-1.5 rounded-xl bg-slate-100 hover:bg-cyan-600 hover:text-white text-slate-600 transition-all cursor-pointer shadow-2xs" title="CTI 통화 발신">
+                        <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
+                      </button>
+
+                      <button type="button" onclick="openTotalCallSummaryModal('${callId}')" 
+                        class="p-1.5 rounded-xl bg-slate-100 hover:bg-cyan-600 hover:text-white text-slate-600 transition-all cursor-pointer shadow-2xs" title="상담 상세 요약 모달">
+                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                      </button>
+
+                      ${match.isRegistered && match.appId ? `
+                        <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
+                          class="p-1.5 rounded-xl bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 transition-all cursor-pointer shadow-2xs border border-blue-200" title="고객 상세업무 원스탑 대시보드">
+                          <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                        </button>
+                      ` : ''}
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * 상담 상세 요약 및 통화 관리 모달
+ */
+function openTotalCallSummaryModal(callId) {
+  let modal = document.getElementById('totalCallSummaryModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'totalCallSummaryModal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs';
+    document.body.appendChild(modal);
+  }
+
+  const logs = (gTotalCallData && gTotalCallData.callLogs) || [];
+  const call = logs.find(c => getCallUniqueId(c) === callId);
+  if (!call) {
+    alert('해당 통화 데이터를 찾을 수 없습니다.');
+    return;
+  }
+
+  const match = matchCustomerToMateOne(call);
+  const cat = classifyConsultation(call);
+  const formattedPhone = formatPhoneDisplay(call.phone || call.rawPhone);
+  const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
+  const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
+  const allLabels = getAllAvailableLabels();
+  const isMissed = isCallMissedWaitZero(call);
+  const isHandled = isCallOutcallHandled(callId);
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <!-- 모달 헤더 -->
+      <div class="p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-cyan-950 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-400 shrink-0">
+            <i data-lucide="message-square-text" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2 py-0.5 rounded text-[10.5px] font-black border ${cat.badgeClass}">
+                ${cat.name}
+              </span>
+              <span class="px-2 py-0.5 rounded text-[10.5px] font-bold ${call.channel === '삼성화재' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-800'}">
+                ${call.channel || '인입'}
+              </span>
+              <span class="text-xs text-slate-300 font-mono">${call.callTime || '-'}</span>
+            </div>
+            <h3 class="text-base sm:text-lg font-black mt-0.5">
+              ${call.title || '상담 상세 요약'}
+            </h3>
+          </div>
+        </div>
+        <button type="button" onclick="closeTotalCallSummaryModal()" class="text-slate-400 hover:text-white cursor-pointer p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- 본문 스크롤 영역 -->
+      <div class="p-5 overflow-y-auto custom-scrollbar space-y-4 text-xs">
+        <!-- 1. 고객 프로필 & 빠른 CTI 발신 카드 -->
+        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-base font-black text-slate-900">${maskName(match.patientName)}</span>
+              <span class="font-mono text-slate-600 font-bold">${formattedPhone}</span>
+              ${match.isRegistered ? `
+                <span class="px-2 py-0.5 rounded-md text-[10.5px] font-black border ${match.badgeClass}">
+                  ✓ ${match.company} 등록 (${match.appId})
+                </span>
+              ` : `
+                <span class="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-slate-200 text-slate-600">
+                  미등록 고객
+                </span>
+              `}
+            </div>
+            <div class="text-[11px] text-slate-500 flex items-center gap-3">
+              <span>통화시간: <b>${call.duration || '0초'}</b></span>
+              <span>대기시간: <b>${call.waitTime !== undefined ? call.waitTime : 0}초</b></span>
+              <span>상담원: <b>${call.operator || '리본케어'}</b></span>
+              ${call.arsMenu ? `<span>ARS: <b>${call.arsMenu}</b></span>` : ''}
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" onclick="triggerCtiCall('${call.phone || call.rawPhone}', '${match.patientName}', '고객', '${match.appId || ''}', '${match.company || ''}')" 
+              class="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-cyan-600/20 cursor-pointer">
+              <i data-lucide="phone-outgoing" class="w-4 h-4"></i>
+              <span>CTI 전화걸기</span>
+            </button>
+            ${match.isRegistered && match.appId ? `
+              <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
+                class="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black text-xs border border-indigo-200 flex items-center gap-1 cursor-pointer">
+                <i data-lucide="layers" class="w-4 h-4"></i>
+                <span>고객업무 대시보드</span>
+              </button>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- 2. 대기 0초 미연결 콜인 경우 아웃콜 집중 관리 안내 바 -->
+        ${isMissed ? `
+          <div class="p-3.5 rounded-2xl ${isHandled ? 'bg-emerald-50 border border-emerald-200 text-emerald-900' : 'bg-rose-50 border border-rose-300 text-rose-900'} flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="${isHandled ? 'check-circle' : 'alert-circle'}" class="w-5 h-5 ${isHandled ? 'text-emerald-600' : 'text-rose-600 animate-pulse'} shrink-0"></i>
+              <div>
+                <div class="font-black text-xs">
+                  ${isHandled ? '✅ 아웃콜(콜백) 처리 완료된 건입니다.' : '🚨 CTI 미연결 · 대기시간 0초 통화로 즉시 아웃콜이 필요합니다.'}
+                </div>
+                <p class="text-[11px] ${isHandled ? 'text-emerald-700' : 'text-rose-700'} mt-0.5">
+                  고객이 연결 전 종료되었으므로 CTI 발신 버튼을 눌러 고객에게 콜백 상담을 진행하세요.
+                </p>
+              </div>
+            </div>
+            <button type="button" onclick="toggleCallOutcallStatus('${callId}'); openTotalCallSummaryModal('${callId}');" 
+              class="px-3 py-1.5 rounded-xl font-black text-xs border shadow-2xs cursor-pointer whitespace-nowrap ${isHandled ? 'bg-white border-emerald-300 text-emerald-800 hover:bg-emerald-100' : 'bg-rose-600 border-rose-700 text-white hover:bg-rose-700'}">
+              ${isHandled ? '완료 취소' : '✓ 아웃콜 완료 처리'}
+            </button>
+          </div>
+        ` : ''}
+
+        <!-- 3. 상담 요약 전문 영역 -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="font-black text-slate-800 flex items-center gap-1.5">
+              <i data-lucide="file-text" class="w-4 h-4 text-cyan-600"></i>
+              <span>상담 요약 전문</span>
+            </label>
+            ${call.summary ? `
+              <button type="button" onclick="copyCallLogSummaryText(this, \`${(call.summary || '').replace(/`/g, '\\`')}\`)" 
+                class="text-xs text-cyan-700 hover:text-cyan-900 font-bold flex items-center gap-1 cursor-pointer">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span>요약문 복사</span>
+              </button>
+            ` : ''}
+          </div>
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 leading-relaxed text-slate-800 whitespace-pre-wrap font-medium">
+            ${call.summary || '상담 요약 전문이 기재되지 않았거나 단순 인입된 통화입니다.'}
+          </div>
+        </div>
+
+        <!-- 4. 주요 키워드 -->
+        ${call.keywords ? `
+          <div class="space-y-1.5">
+            <label class="font-black text-slate-800 flex items-center gap-1.5">
+              <i data-lucide="key" class="w-4 h-4 text-cyan-600"></i>
+              <span>자동 추출 키워드</span>
+            </label>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              ${call.keywords.split(',').map(k => `
+                <span class="px-2.5 py-1 rounded-xl bg-cyan-50 text-cyan-800 font-bold border border-cyan-200 text-xs">
+                  # ${k.trim()}
+                </span>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- 5. 라벨 관리 -->
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+          <label class="font-black text-slate-800 flex items-center gap-1.5">
+            <i data-lucide="tags" class="w-4 h-4 text-cyan-600"></i>
+            <span>상담 라벨 부착 / 해제</span>
+          </label>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            ${allLabels.map(l => {
+              const isSelected = labels.includes(l.name);
+              return `
+                <button type="button" onclick="toggleCallLabel('${callId}', '${l.name}', this); openTotalCallSummaryModal('${callId}');" 
+                  class="px-2.5 py-1 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1 ${isSelected ? l.bgClass + ' ring-2 ring-cyan-500 shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                  <span>${l.name}</span>
+                  ${isSelected ? '<i data-lucide="check" class="w-3 h-3"></i>' : ''}
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- 6. 담당자 상담 메모 입력 -->
+        <div class="space-y-1.5 pt-2 border-t border-slate-100">
+          <label class="font-black text-slate-800 flex items-center gap-1.5">
+            <i data-lucide="edit-3" class="w-4 h-4 text-cyan-600"></i>
+            <span>상담 후속 조치 메모</span>
+          </label>
+          <textarea id="summaryModalMemoInput-${callId}" rows="3" 
+            placeholder="상담 후속 조치 또는 확인 사항을 입력하세요 (예: 보호자 서류 팩스 발송 완료, 간병인 일정 조율 필요)..." 
+            class="w-full p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-medium focus:outline-none focus:bg-white focus:border-cyan-500 transition-all leading-relaxed">${memo}</textarea>
+          <div class="flex justify-end">
+            <button type="button" onclick="updateCallMemo('${callId}', document.getElementById('summaryModalMemoInput-${callId}').value); alert('메모가 저장되었습니다.'); openTotalCallSummaryModal('${callId}');" 
+              class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-black text-xs shadow-md shadow-cyan-600/20 cursor-pointer">
+              메모 저장
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 모달 푸터 -->
+      <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+        <button type="button" onclick="closeTotalCallSummaryModal()" class="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 text-xs cursor-pointer">
+          닫기
+        </button>
+      </div>
+    </div>
+  `;
+
+  modal.classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeTotalCallSummaryModal() {
+  const modal = document.getElementById('totalCallSummaryModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+/**
+ * CTI 미연결 / 대기시간 0초 고객 아웃콜(Call-back) 집중 관리 모달
+ */
+let gMissedSearchKeyword = '';
+
+function openMissedCallsOutcallModal(filterTab = 'pending') {
+  window._activeOutcallTab = filterTab;
+
+  let modal = document.getElementById('missedCallsOutcallModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'missedCallsOutcallModal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs';
+    document.body.appendChild(modal);
+  }
+
+  const logs = (gTotalCallData && gTotalCallData.callLogs) || [];
+  const missedLogs = logs.filter(isCallMissedWaitZero);
+
+  const pendingList = missedLogs.filter(c => !isCallOutcallHandled(getCallUniqueId(c)));
+  const completedList = missedLogs.filter(c => isCallOutcallHandled(getCallUniqueId(c)));
+
+  let displayList = filterTab === 'pending' ? pendingList : (filterTab === 'completed' ? completedList : missedLogs);
+
+  if (gMissedSearchKeyword) {
+    const q = gMissedSearchKeyword.toLowerCase().trim();
+    displayList = displayList.filter(c => {
+      const match = matchCustomerToMateOne(c);
+      return (c.phone || '').includes(q) ||
+        (c.rawPhone || '').includes(q) ||
+        (match.patientName || '').toLowerCase().includes(q) ||
+        (c.channel || '').toLowerCase().includes(q);
+    });
+  }
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+      <!-- 모달 헤더 -->
+      <div class="p-5 bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center text-white shrink-0 animate-pulse">
+            <i data-lucide="phone-missed" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2.5 py-0.5 rounded-full bg-white text-rose-800 font-black text-xs uppercase tracking-wider">긴급 콜백 요망</span>
+              <h3 class="text-base sm:text-lg font-black">CTI 미연결 · 대기시간 0초 아웃콜(Call-back) 관리 대시보드</h3>
+            </div>
+            <p class="text-xs text-rose-100 mt-0.5">인입 즉시 통화 연결되지 않고 종료(대기 0초)된 고객 명단입니다. 1클릭 CTI 다이얼로 신속히 아웃콜을 진행하세요.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeMissedCallsOutcallModal()" class="text-rose-200 hover:text-white cursor-pointer p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- 상단 탭 & 검색 컨트롤 -->
+      <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <!-- 탭 버튼들 -->
+        <div class="flex items-center gap-1.5 p-1 bg-white rounded-2xl border border-slate-200 shrink-0">
+          <button type="button" onclick="openMissedCallsOutcallModal('pending')" 
+            class="px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${filterTab === 'pending' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+            <span>🚨 처리 대기 (${pendingList.length}건)</span>
+          </button>
+          <button type="button" onclick="openMissedCallsOutcallModal('completed')" 
+            class="px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${filterTab === 'completed' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+            <span>✅ 처리 완료 (${completedList.length}건)</span>
+          </button>
+          <button type="button" onclick="openMissedCallsOutcallModal('all')" 
+            class="px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${filterTab === 'all' ? 'bg-slate-800 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+            <span>전체 (${missedLogs.length}건)</span>
+          </button>
+        </div>
+
+        <!-- 고객/전화번호 검색 -->
+        <div class="relative flex-1 max-w-xs">
+          <input type="text" value="${gMissedSearchKeyword}" 
+            oninput="gMissedSearchKeyword=this.value; openMissedCallsOutcallModal('${filterTab}');" 
+            placeholder="고객명, 전화번호 검색..." 
+            class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs focus:outline-none focus:border-rose-500 font-bold">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+        </div>
+      </div>
+
+      <!-- 리스트 테이블 -->
+      <div class="flex-1 overflow-y-auto custom-scrollbar p-4">
+        ${displayList.length === 0 ? `
+          <div class="p-12 text-center text-slate-400 font-bold space-y-2">
+            <i data-lucide="check-circle-2" class="w-10 h-10 mx-auto text-emerald-500"></i>
+            <p class="text-slate-600 text-sm">해당 분류에 처리할 아웃콜 대상이 없습니다.</p>
+          </div>
+        ` : `
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 font-black text-[11px]">
+                <th class="py-2.5 px-3 w-10 text-center">#</th>
+                <th class="py-2.5 px-3 w-32">인입일시</th>
+                <th class="py-2.5 px-3 w-28">채널</th>
+                <th class="py-2.5 px-3 w-44">고객명 / 전화번호</th>
+                <th class="py-2.5 px-3 w-28 text-center">대기시간</th>
+                <th class="py-2.5 px-3 w-32 text-center">CTI 발신</th>
+                <th class="py-2.5 px-3 w-32 text-center">처리상태</th>
+                <th class="py-2.5 px-3">메모 / 조치</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-700">
+              ${displayList.map((c, i) => {
+                const callId = getCallUniqueId(c);
+                const match = matchCustomerToMateOne(c);
+                const isHandled = isCallOutcallHandled(callId);
+                const formattedPhone = formatPhoneDisplay(c.phone || c.rawPhone);
+                const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
+
+                return `
+                  <tr class="hover:bg-slate-50 transition-colors ${!isHandled ? 'bg-rose-50/20' : ''}">
+                    <td class="py-2.5 px-3 text-center font-mono text-slate-400 text-[11px]">${i + 1}</td>
+                    <td class="py-2.5 px-3 font-mono text-slate-600 text-[11px] font-bold">${c.callTime || '-'}</td>
+                    <td class="py-2.5 px-3">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-black border ${c.channel === '삼성화재' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-800 border-amber-200'}">
+                        ${c.channel || '인입'}
+                      </span>
+                    </td>
+                    <td class="py-2.5 px-3">
+                      <div class="font-black text-slate-900 text-xs">${maskName(match.patientName)}</div>
+                      <div class="font-mono text-slate-400 text-[11px]">${formattedPhone}</div>
+                      ${match.isRegistered ? `
+                        <span class="text-[9.5px] font-bold text-blue-700">✓ ${match.company} (${match.appId})</span>
+                      ` : ''}
+                    </td>
+                    <td class="py-2.5 px-3 text-center font-mono text-rose-600 font-bold text-[11px]">
+                      대기 0초 (미연결)
+                    </td>
+                    <td class="py-2.5 px-3 text-center">
+                      <button type="button" onclick="triggerCtiCall('${c.phone || c.rawPhone}', '${match.patientName}', '고객', '${match.appId || ''}', '${match.company || ''}')" 
+                        class="px-2.5 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs flex items-center justify-center gap-1 shadow-md shadow-rose-600/20 cursor-pointer mx-auto whitespace-nowrap">
+                        <i data-lucide="phone-outgoing" class="w-3.5 h-3.5"></i>
+                        <span>전화걸기</span>
+                      </button>
+                    </td>
+                    <td class="py-2.5 px-3 text-center">
+                      <button type="button" onclick="toggleCallOutcallStatus('${callId}')" 
+                        class="px-2.5 py-1 rounded-xl font-black text-xs border transition-all cursor-pointer whitespace-nowrap ${isHandled ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'}">
+                        ${isHandled ? '✅ 완료 (클릭해제)' : '대기중 (클릭완료)'}
+                      </button>
+                    </td>
+                    <td class="py-2.5 px-3">
+                      <div class="flex items-center gap-1">
+                        <input type="text" id="outcallMemoInput-${callId}" value="${memo.replace(/"/g, '&quot;')}" 
+                          placeholder="통화 후 결과 메모..." 
+                          onkeydown="if(event.key==='Enter'){ updateCallMemo('${callId}', this.value); alert('메모가 저장되었습니다.'); }"
+                          class="flex-1 px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 text-[11px] focus:outline-none focus:bg-white focus:border-cyan-500 font-medium">
+                        <button type="button" onclick="updateCallMemo('${callId}', document.getElementById('outcallMemoInput-${callId}').value); alert('메모가 저장되었습니다.');" 
+                          class="px-2 py-1 rounded-lg bg-slate-200 hover:bg-cyan-600 hover:text-white font-bold text-slate-700 text-[11px] cursor-pointer">
+                          저장
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `}
+      </div>
+
+      <!-- 모달 푸터 -->
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <span class="text-xs text-slate-500 font-bold">
+          대기 0초 미연결 총 <b>${missedLogs.length}</b>건 중 미처리 <b class="text-rose-600">${pendingList.length}</b>건
+        </span>
+        <button type="button" onclick="closeMissedCallsOutcallModal()" class="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 text-xs cursor-pointer">
+          닫기
+        </button>
+      </div>
+    </div>
+  `;
+
+  modal.classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeMissedCallsOutcallModal() {
+  const modal = document.getElementById('missedCallsOutcallModal');
+  if (modal) modal.classList.add('hidden');
 }
 
 /**
@@ -581,7 +1528,7 @@ function renderCustomerGroupView(logs) {
         cleanPhone: clean,
         calls: [],
         latestTime: c.callTime || '',
-        match: matchCustomerToMateOne(c.phone || c.rawPhone, c.memberName)
+        match: matchCustomerToMateOne(c)
       };
     }
     customerMap[clean].calls.push(c);
@@ -815,8 +1762,10 @@ function renderCategoryGroupView(logs) {
 function renderCallDetailCardHtml(call) {
   const callId = getCallUniqueId(call);
   const category = classifyConsultation(call);
-  const match = matchCustomerToMateOne(call.phone || call.rawPhone, call.memberName);
+  const match = matchCustomerToMateOne(call);
   const formattedPhone = formatPhoneDisplay(call.phone || call.rawPhone);
+  const isMissed = isCallMissedWaitZero(call);
+  const isHandled = isCallOutcallHandled(callId);
 
   const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
   const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
@@ -850,12 +1799,36 @@ function renderCallDetailCardHtml(call) {
         </div>
       </div>
 
-      <!-- 2열: 상담제목 & 전문 요약 -->
+      <!-- 대기 0초 미연결 콜인 경우 긴급 아웃콜(콜백) 안내 바 -->
+      ${isMissed ? `
+        <div class="px-2.5 py-1.5 rounded-xl ${isHandled ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' : 'bg-rose-50 border border-rose-300 text-rose-900'} flex items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-1.5 font-bold">
+            <i data-lucide="${isHandled ? 'check-circle' : 'phone-missed'}" class="w-3.5 h-3.5 ${isHandled ? 'text-emerald-600' : 'text-rose-600 animate-pulse'} shrink-0"></i>
+            <span>${isHandled ? '✅ 아웃콜 완료됨' : '🚨 미연결 · 대기 0초 (아웃콜 대상)'}</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button type="button" onclick="toggleCallOutcallStatus('${callId}')" 
+              class="px-2 py-0.5 rounded-lg text-[10px] font-bold border ${isHandled ? 'border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50' : 'border-rose-300 bg-white text-rose-700 hover:bg-rose-50'} cursor-pointer">
+              ${isHandled ? '완료 취소' : '✓ 완료 처리'}
+            </button>
+            <button type="button" onclick="triggerCtiCall('${call.phone || call.rawPhone}', '${match.patientName}', '고객', '${match.appId || ''}', '${match.company || ''}')" 
+              class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-600 hover:bg-rose-700 text-white cursor-pointer flex items-center gap-0.5">
+              <i data-lucide="phone-outgoing" class="w-3 h-3"></i>
+              <span>전화</span>
+            </button>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- 2열: 상담제목 & 전문 요약 (클릭 시 상세 모달) -->
       ${call.title || call.summary ? `
-        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-1">
+        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-1 hover:border-cyan-300 transition-colors cursor-pointer" onclick="openTotalCallSummaryModal('${callId}')" title="클릭 시 전체 상담 내용 및 메모 모달 열기">
           ${call.title ? `
             <div class="font-bold text-slate-900 flex items-center justify-between">
-              <span>${call.title}</span>
+              <span class="flex items-center gap-1">
+                <span>${call.title}</span>
+                <i data-lucide="maximize-2" class="w-3 h-3 text-cyan-600"></i>
+              </span>
               ${call.duration ? `<span class="text-[10px] text-slate-400 font-mono">통화: ${call.duration}초</span>` : ''}
             </div>
           ` : ''}
@@ -1139,7 +2112,7 @@ async function exportTotalCallExcel() {
   gTotalCallData.callLogs.forEach((c, idx) => {
     const callId = getCallUniqueId(c);
     const cat = classifyConsultation(c);
-    const match = matchCustomerToMateOne(c.phone || c.rawPhone, c.memberName);
+    const match = matchCustomerToMateOne(c);
     const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
     const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
 

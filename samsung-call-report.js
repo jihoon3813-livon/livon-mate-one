@@ -296,6 +296,34 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
   if (clean && gMemberPhoneMap[clean] && gMemberPhoneMap[clean].length > 0) {
     return gMemberPhoneMap[clean].join(', ');
   }
+
+  // 삼성화재 명단관리(gSamsungSheets, gSamsungList) 검색
+  if (clean) {
+    const sSheets = window.gSamsungSheets;
+    if (sSheets) {
+      const allS = [...(sSheets.eligible || []), ...(sSheets.target || []), ...(sSheets.completed || [])];
+      const matchS = allS.find(s => {
+        const p1 = String(s.phone || s.applicantContact || s.contact || '').replace(/[^0-9]/g, '');
+        const p2 = String(s.patientPhone || s.guardianPhone || s.customerPhone || '').replace(/[^0-9]/g, '');
+        return p1 === clean || p2 === clean;
+      });
+      if (matchS && (matchS.patientName || matchS.customerName)) {
+        return matchS.patientName || matchS.customerName;
+      }
+    }
+    const sList = window.gSamsungList;
+    if (Array.isArray(sList)) {
+      const matchL = sList.find(s => {
+        const p1 = String(s.phone || s.applicantContact || s.contact || '').replace(/[^0-9]/g, '');
+        const p2 = String(s.patientPhone || s.guardianPhone || s.customerPhone || '').replace(/[^0-9]/g, '');
+        return p1 === clean || p2 === clean;
+      });
+      if (matchL && (matchL.patientName || matchL.customerName)) {
+        return matchL.patientName || matchL.customerName;
+      }
+    }
+  }
+
   if (fallbackName && fallbackName !== '회원아님' && fallbackName !== '비회원' && fallbackName !== '-') {
     return fallbackName;
   }
@@ -313,6 +341,10 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     if (m2) return m2[1];
     const m3 = s.match(/계약자\s*['"‘“]([가-힣]{2,4})['"’”]/);
     if (m3) return m3[1];
+    const m4 = (t + ' ' + s).match(/고객명[:\s]*([가-힣]{2,4})/);
+    if (m4) return m4[1];
+    const m5 = s.match(/환자\s*([가-힣]{2,4})\s*씨/);
+    if (m5) return m5[1];
   }
   return '비회원';
 }

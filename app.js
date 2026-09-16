@@ -3006,8 +3006,36 @@ function initInsuranceWorkflows() {
       { id: 'SF-20260903-02', patientId: 'SF-P002', patientName: '이성근', birthDate: '19800718', gender: '남', phone: '010-7187-8718', policyNumber: 'SF992817263', productCode: 'SF-CARE-02', productName: '무배당 삼성화재 행복한돌봄간병보험', contractStartDate: '2023-11-15', contractEndDate: '2043-11-15', hasInjuryCare: '가입', hasDiseaseCare: '가입', accidentNumber: '26S009341', adjusterName: '이민우', adjusterPhone: '02-760-5521', adjusterFax: '02-760-5500', maxDailyLimit: 144000, maxDays: 180, receiveDate: '2026-09-03', matchStatus: '매칭완료' },
       { id: 'SF-20260903-03', patientId: 'SF-P003', patientName: '강태우', birthDate: '19720415', gender: '남', phone: '010-9123-4567', policyNumber: 'SF881273940', productCode: 'SF-CARE-01', productName: '무배당 삼성화재 당신에게 좋은간병보험', contractStartDate: '2025-01-10', contractEndDate: '2045-01-10', hasInjuryCare: '가입', hasDiseaseCare: '미가입', accidentNumber: '26S011245', adjusterName: '김정현', adjusterPhone: '02-3485-9114', adjusterFax: '02-3485-9100', maxDailyLimit: 144000, maxDays: 180, receiveDate: '2026-09-03', matchStatus: '신청대기(미신청)' },
       { id: 'SF-20260903-04', patientId: 'SF-P004', patientName: '윤서진', birthDate: '19851120', gender: '여', phone: '010-8234-5678', policyNumber: 'SF771928341', productCode: 'SF-CARE-03', productName: '무배당 삼성화재 천만안심간병보험', contractStartDate: '2024-08-20', contractEndDate: '2044-08-20', hasInjuryCare: '가입', hasDiseaseCare: '가입', accidentNumber: '26S012389', adjusterName: '이민우', adjusterPhone: '02-760-5521', adjusterFax: '02-760-5500', maxDailyLimit: 144000, maxDays: 180, receiveDate: '2026-09-03', matchStatus: '신청대기(미신청)' },
-      { id: 'SF-20260903-05', patientId: 'SF-P005', patientName: '최동훈', birthDate: '19590803', gender: '남', phone: '010-7345-6789', policyNumber: 'SF662839102', productCode: 'SF-CARE-01', productName: '무배당 삼성화재 당신에게 좋은간병보험', contractStartDate: '2023-05-01', contractEndDate: '2043-05-01', hasInjuryCare: '미가입', hasDiseaseCare: '가입', accidentNumber: '26S013490', adjusterName: '김정현', adjusterPhone: '02-3485-9114', adjusterFax: '02-3485-9100', maxDailyLimit: 144000, maxDays: 180, receiveDate: '2026-09-03', matchStatus: '신청대기(미신청)' }
+      { id: 'SF-20260903-05', patientId: 'SF-P005', patientName: '최동훈', birthDate: '19590803', gender: '남', phone: '010-7345-6789', policyNumber: 'SF662839102', productCode: 'SF-CARE-01', productName: '무배당 삼성화재 당신에게 좋은간병보험', contractStartDate: '2023-05-01', contractEndDate: '2043-05-01', hasInjuryCare: '미가입', hasDiseaseCare: '가입', accidentNumber: '26S013490', adjusterName: '김정현', adjusterPhone: '02-3485-9114', adjusterFax: '02-3485-9100', maxDailyLimit: 144000, maxDays: 180, receiveDate: '2026-09-03', matchStatus: '신청대기(미신청)' },
+      { id: 'SF-20260916-06', patientId: 'SF-P006', patientName: '박용식', birthDate: '19580512', gender: '남', phone: '010-7736-1790', policyNumber: 'SF551928301', productCode: 'SF-CARE-01', productName: '무배당 삼성화재 당신에게 좋은간병보험', contractStartDate: '2024-01-15', contractEndDate: '2044-01-15', hasInjuryCare: '가입', hasDiseaseCare: '가입', accidentNumber: '26S014892', adjusterName: '김정현', adjusterPhone: '02-3485-9114', adjusterFax: '02-3485-9100', maxDailyLimit: 144000, maxDays: 180, receiveDate: '2026-09-16', matchStatus: '접수진행중' }
     ];
+  }
+
+  // 박용식 고객 보장 (삼성화재 명단관리 등록 보장)
+  if (Array.isArray(gSamsungList) && !gSamsungList.some(r => r.patientName === '박용식' || (r.phone && r.phone.replace(/[^0-9]/g, '') === '01077361790'))) {
+    gSamsungList.push({
+      id: 'SF-20260916-06',
+      patientId: 'SF-P006',
+      patientName: '박용식',
+      birthDate: '19580512',
+      gender: '남',
+      phone: '010-7736-1790',
+      policyNumber: 'SF551928301',
+      productCode: 'SF-CARE-01',
+      productName: '무배당 삼성화재 당신에게 좋은간병보험',
+      contractStartDate: '2024-01-15',
+      contractEndDate: '2044-01-15',
+      hasInjuryCare: '가입',
+      hasDiseaseCare: '가입',
+      accidentNumber: '26S014892',
+      adjusterName: '김정현',
+      adjusterPhone: '02-3485-9114',
+      adjusterFax: '02-3485-9100',
+      maxDailyLimit: 144000,
+      maxDays: 180,
+      receiveDate: '2026-09-16',
+      matchStatus: '접수진행중'
+    });
   }
 
   // Initialize Centers
@@ -25753,7 +25781,39 @@ function openHubCustomerDetailModal(applyId) {
   gActiveHubModalAppId = applyId;
   openModal('hubCustomerDetailModal');
 
-  const app = (gApps || []).find(a => String(a.id) === String(applyId));
+  let app = (gApps || []).find(a => String(a.id) === String(applyId));
+  if (!app) {
+    const sList = window.gSamsungList || [];
+    const foundS = sList.find(s => String(s.id) === String(applyId) || String(s.regNum) === String(applyId));
+    if (foundS) {
+      app = {
+        ...foundS,
+        id: foundS.id || applyId,
+        insuranceCompany: foundS.insuranceCompany || '삼성화재',
+        patientName: foundS.patientName || foundS.customerName,
+        phone: foundS.phone || foundS.applicantContact,
+        notes: foundS.notes || [],
+        logs: foundS.logs || []
+      };
+    } else {
+      const sheets = window.gSamsungSheets;
+      if (sheets) {
+        const allS = [...(sheets.eligible || []), ...(sheets.target || []), ...(sheets.completed || [])];
+        const foundSh = allS.find(s => String(s.id) === String(applyId) || String(s.regNum) === String(applyId) || String(s.applicantNo) === String(applyId));
+        if (foundSh) {
+          app = {
+            ...foundSh,
+            id: foundSh.id || applyId,
+            insuranceCompany: '삼성화재',
+            patientName: foundSh.patientName || foundSh.customerName,
+            phone: foundSh.phone || foundSh.applicantContact,
+            notes: foundSh.notes || [],
+            logs: foundSh.logs || []
+          };
+        }
+      }
+    }
+  }
   if (!app) {
     console.warn('고객 정보 없음:', applyId);
     return;
