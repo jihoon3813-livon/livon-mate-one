@@ -19823,6 +19823,15 @@ function switchTab(tabId, filterParam = null) {
   else if (tabId === 'carecalendar') renderCareCalendar();
   else if (tabId === 'samsung' || tabId === 'samsunglist') renderSamsungList();
   else if (tabId === 'samsungclaimhub') renderSamsungClaimHub(filterParam);
+  else if (tabId === 'samsungcallreport') {
+    if (typeof initSamsungCallReportModule === 'function') {
+      if (!gSamsungReportData) {
+        initSamsungCallReportModule();
+      } else {
+        renderSamsungCallReportTab();
+      }
+    }
+  }
   else if (tabId === 'directory') switchDirectorySubTab(filterParam || gActiveDirectorySubTab || 'caregivers');
   else if (tabId === 'applications') renderApplications();
   else if (tabId === 'assignments') renderAssignments();

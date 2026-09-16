@@ -504,6 +504,130 @@ function saveSavedFaxConfig(cfg) {
     }
 
     // =========================================================================
+    // API Route: Samsung Fire Call Analysis Report Engine (삼성화재 콜분석 보고 시스템)
+    // =========================================================================
+    if (reqPath === '/api/samsung/call-report/data') {
+      const dataFile = path.join(BASE_DIR, 'samsung_call_report.json');
+      const seedFile = path.join(BASE_DIR, 'samsung_call_seed.json');
+
+      if (req.method === 'GET') {
+        try {
+          let reportData = null;
+          if (fs.existsSync(dataFile)) {
+            reportData = JSON.parse(fs.readFileSync(dataFile, 'utf-8'));
+          } else if (fs.existsSync(seedFile)) {
+            reportData = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
+          } else {
+            res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '데이터를 찾을 수 없습니다.' }));
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, data: reportData }));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      } else if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            fs.writeFileSync(dataFile, JSON.stringify(payload, null, 2), 'utf-8');
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true, message: '콜분석 보고서 데이터가 성공적으로 저장되었습니다.' }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+    }
+
+    if (reqPath === '/api/samsung/call-report/pdf' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const { htmlContent, title = '삼성화재_간병서비스_콜분석_보고서' } = payload;
+          if (!htmlContent) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: 'HTML 내용이 누락되었습니다.' }));
+          }
+
+          const pdfBuffer = await createDocumentPdfBuffer(htmlContent, title);
+          res.writeHead(200, {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="${encodeURIComponent(title)}.pdf"`,
+            'Content-Length': pdfBuffer.length
+          });
+          return res.end(pdfBuffer);
+        } catch (err) {
+          console.error('[Samsung Call Report PDF Error]', err);
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/samsung/call-report/email' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const {
+            to = 'dasom.han@samsung.com',
+            cc = '',
+            subject = '[리본케어] 삼성화재 간병서비스 인바운드 콜분석 보고서',
+            html = '',
+            text = '',
+            attachments = []
+          } = payload;
+
+          const emailCfg = getEmailConfig();
+          const activeSender = emailCfg.activeSender || emailCfg.senders?.[0] || {};
+          const from = activeSender.email || emailCfg.from || 'contact@livon.care';
+          const senderName = activeSender.name || emailCfg.senderName || '리본케어';
+          const host = activeSender.host || emailCfg.host;
+          const port = activeSender.port || emailCfg.port;
+          const user = activeSender.user || emailCfg.user;
+          const pass = activeSender.pass || emailCfg.pass;
+
+          const result = await sendSmtpMail({
+            host,
+            port,
+            user,
+            pass,
+            from,
+            senderName,
+            to,
+            cc,
+            subject,
+            text,
+            html,
+            attachments
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({
+            success: true,
+            message: `[${to}] 삼성화재 담당자에게 콜분석 보고서 이메일이 발송되었습니다.`,
+            ...result
+          }));
+        } catch (err) {
+          console.error('[Samsung Call Report Email Error]', err);
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    // =========================================================================
     // API Route: FAX Gateway Engine (알리고 / 팝빌 / 스마트 샌드박스 팩스 전송)
     // =========================================================================
     if (reqPath === '/api/fax/send' && req.method === 'POST') {

@@ -569,6 +569,15 @@
           <span class="h-5 px-2 rounded-md bg-emerald-950 text-emerald-300 font-bold text-[10px] flex items-center justify-center border border-emerald-800">이메일</span>
         </button>
 
+        <!-- 7-3. 삼성화재 콜분석 (인바운드 문의 분석 및 주간보고 시스템) -->
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="samsungcallreport" onclick="switchTab('samsungcallreport')">
+          <div class="flex items-center space-x-3">
+            <i data-lucide="phone-forwarded" class="w-4 h-4 flex-shrink-0 text-blue-400"></i>
+            <span class="tracking-tight font-semibold">삼성화재 콜분석</span>
+          </div>
+          <span class="h-5 px-2 rounded-md bg-blue-950 text-blue-300 font-bold text-[10px] flex items-center justify-center border border-blue-800">주간보고</span>
+        </button>
+
         <!-- 8. 양식 -->
         <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="forms" onclick="switchTab('forms')">
           <div class="flex items-center space-x-3">
@@ -1977,6 +1986,11 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- ==================== TAB: SAMSUNG FIRE CALL ANALYSIS REPORT (삼성화재 간병서비스 콜분석 보고서) ==================== -->
+      <section id="tab-samsungcallreport" class="tab-content hidden space-y-4">
+        <!-- Dynamically rendered by renderSamsungCallReportTab() in samsung-call-report.js -->
       </section>
 
       <!-- ==================== TAB: INTEGRATED DIRECTORY (간병인 · 간병센터 · 손사디렉토리) ==================== -->
@@ -7993,12 +8007,113 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL: SAMSUNG CALL REPORT PDF PREVIEW MODAL ==================== -->
+  <div id="samsungCallReportPdfModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-3 sm:p-4">
+    <div class="bg-white rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+      <div class="p-4 sm:p-5 bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center font-bold">
+            <i data-lucide="file-text" class="w-5 h-5 text-blue-200"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              삼성화재 간병서비스 콜분석 보고서 (PDF 공식 서식)
+            </h3>
+            <p class="text-xs text-blue-100/80 mt-0.5">A4 규격 공식 인쇄 및 PDF 다운로드 미리보기</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="window.print()" class="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer">
+            <i data-lucide="printer" class="w-4 h-4"></i> 인쇄
+          </button>
+          <button type="button" onclick="downloadCallReportPdf()" class="px-3.5 py-1.5 rounded-xl bg-white text-blue-900 font-black text-xs flex items-center gap-1.5 hover:bg-blue-50 transition-all shadow-xs cursor-pointer">
+            <i data-lucide="download" class="w-4 h-4 text-blue-700"></i> PDF 다운로드
+          </button>
+          <button type="button" onclick="closeModal('samsungCallReportPdfModal')" class="p-2 text-blue-200 hover:text-white rounded-lg cursor-pointer">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto custom-scrollbar p-6 bg-slate-100" id="samsungCallReportPdfPreview">
+        <!-- Dynamically rendered -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: SAMSUNG CALL REPORT EMAIL DISPATCH MODAL ==================== -->
+  <div id="samsungCallReportEmailModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-3 sm:p-4">
+    <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden border border-slate-200">
+      <div class="p-4 sm:p-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center font-bold">
+            <i data-lucide="send" class="w-5 h-5 text-blue-200"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              삼성화재 담당자 콜분석 보고서 이메일 발송
+            </h3>
+            <p class="text-xs text-blue-100/80 mt-0.5">분석 요약 브리핑 및 엑셀/PDF 보고서 첨부 발송</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('samsungCallReportEmailModal')" class="p-2 text-blue-200 hover:text-white rounded-lg cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form onsubmit="handleSendCallReportEmailSubmit(event)" class="p-5 space-y-4 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">받는 사람 (삼성화재 상품마케팅TF 담당자)</label>
+          <input type="email" id="reportEmailTo" value="dasom.han@samsung.com" required 
+            class="w-full px-3 py-2 rounded-xl border border-slate-300 font-medium focus:outline-none focus:border-blue-600">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">참조 (CC, 선택)</label>
+          <input type="text" id="reportEmailCc" placeholder="참조 이메일 (쉼표로 여러 명 가능)" 
+            class="w-full px-3 py-2 rounded-xl border border-slate-300 font-medium focus:outline-none focus:border-blue-600">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">메일 제목</label>
+          <input type="text" id="reportEmailSubject" required 
+            class="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold text-slate-900 focus:outline-none focus:border-blue-600">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">본문 미리보기</label>
+          <div id="reportEmailBodyPreview" class="p-4 bg-slate-50 rounded-2xl border border-slate-200 max-h-48 overflow-y-auto custom-scrollbar">
+            <!-- Dynamic Preview -->
+          </div>
+        </div>
+
+        <div class="p-3 bg-blue-50/70 rounded-xl border border-blue-200 text-blue-900 text-[11px] flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="paperclip" class="w-4 h-4 text-blue-600"></i>
+            <span class="font-bold">자동 생성 첨부파일:</span>
+            <span>콜분석 엑셀(.xlsx), 공식 보고서 PDF(.pdf)</span>
+          </div>
+          <span class="px-2 py-0.5 rounded bg-blue-200 text-blue-900 font-bold text-[10px]">자동 첨부</span>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeModal('samsungCallReportEmailModal')" class="px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 font-bold text-slate-700 transition-all cursor-pointer">
+            취소
+          </button>
+          <button type="submit" id="btnSubmitReportEmail" class="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black transition-all shadow-md shadow-blue-600/20 cursor-pointer">
+            이메일 발송하기
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Global Datalists for Directory Autocomplete & Synchronized Inputs -->
   <datalist id="allCentersDataList"></datalist>
   <datalist id="allAdjustersDataList"></datalist>
 
   <!-- SCRIPTS (Moved to bottom of body for full DOM availability) -->
   <script src="data.js?v=20260910_1931"></script>
+  <script src="samsung-call-report.js"></script>
   <script src="app.js?v=20260910_1931"></script>
 </body>
 </html>
