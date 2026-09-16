@@ -354,38 +354,97 @@ function classifySamsungCall(call) {
   return { category, actor };
 }
 
+const CTI_CHANNEL_PARAMS = {
+  '삼성화재': '%BB%EF%BC%BA%C8%AD%C0%E7,18777412',
+  '현대해상': '%C7%F6%B4%EB%C7%D8%BB%F3,15337436',
+  '리본케어': '%B8%AE%BA%BB%C4%C9%BE%EE,16007835',
+  '전체': '',
+  'all': ''
+};
+
 /**
- * 특정 기간 내 전체 CTI 인바운드 콜 로그 다중 페이지 순회 수집
+ * 특정 기간 및 인입경로별 CTI 인바운드 콜 로그 전수 수집 및 CTI 요약 통계 추출
  * @param {string} startDate 'YYYY-MM-DD'
  * @param {string} endDate 'YYYY-MM-DD'
- * @param {string} targetChannel '삼성화재' | 'all'
+ * @param {string} targetChannel '삼성화재' | '현대해상' | '리본케어' | '전체' | 'all'
  */
 async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼성화재') {
   const cookie = await ensureCtiSession();
+  const cpParam = CTI_CHANNEL_PARAMS[targetChannel] !== undefined 
+    ? CTI_CHANNEL_PARAMS[targetChannel] 
+    : (CTI_CHANNEL_PARAMS['삼성화재'] || '');
+
+  // 1. 1페이지 조회하여 총 건수 및 CTI 상단 요약 통계 테이블 추출
+  const p1Path = `/CtiLiVon/admin/C_Calllog.asp?page=1&start_search_string=${startDate}&end_search_string=${endDate}&searchCpname=${cpParam}`;
+  const p1Res = await httpRequest({
+    hostname: 'crm.goodars.co.kr',
+    port: 443,
+    path: p1Path,
+    method: 'GET',
+    headers: {
+      'Cookie': cookie,
+      'Referer': 'https://crm.goodars.co.kr/CtiLiVon/ARS.asp',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LivonMate/3.0'
+    }
+  });
+
+  const decoder = new TextDecoder('euc-kr');
+  const p1Html = decoder.decode(p1Res.body);
+
+  // 총 건수 파싱 (예: 검색 결과 총 458건이 검색되었습니다)
+  const countMatch = p1Html.match(/검색 결과 총\s*([0-9,]+)\s*건이 검색되었습니다/);
+  const totalCount = countMatch ? parseInt(countMatch[1].replace(/,/g, ''), 10) : 0;
+
+  // CTI 상단 요약 통계 테이블 파싱
+  const ctiSummary = {
+    totalInbound: totalCount,
+    answeredCalls: 0,
+    connectRequests: 0,
+    answerRate: '0%',
+    abandonedCalls: 0,
+    customerAbandoned: 0,
+    unselectedType: 0,
+    btnExit: 0
+  };
+
+  const summaryTableMatch = p1Html.match(/<table[\s\S]*?인입콜[\s\S]*?<\/table>/i);
+  if (summaryTableMatch) {
+    const textRows = summaryTableMatch[0].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    // e.g.: 전체 458건 458 /115건 0 /0건 131 건 115 건 88% 건 0 건 14 건 0 건 307 건 20 건
+    const nums = textRows.match(/([0-9%]+(?:\s*\/\s*[0-9]+)?)\s*건/g) || [];
+    // nums[0]: "458건" (전체)
+    // nums[1]: "458 /115건" (인입콜)
+    // nums[2]: "0 /0건" (발신콜)
+    // nums[3]: "131 건" (연결요청)
+    // nums[4]: "115 건" (응답호)
+    // nums[5]: "88% 건" (응대율)
+    // nums[6]: "0 건" (콜백요청)
+    // nums[7]: "14 건" (포기호)
+    // nums[8]: "0 건" (고객포기)
+    // nums[9]: "307 건" (유형미선택)
+    // nums[10]: "20 건" (버튼선택후종료)
+    if (nums.length >= 10) {
+      const getNum = (str) => parseInt(str.replace(/[^0-9]/g, ''), 10) || 0;
+      ctiSummary.totalInbound = getNum(nums[0]);
+      ctiSummary.connectRequests = getNum(nums[3]);
+      ctiSummary.answeredCalls = getNum(nums[4]);
+      ctiSummary.answerRate = (nums[5] || '').replace(/[^0-9%]/g, '');
+      ctiSummary.abandonedCalls = getNum(nums[7]);
+      ctiSummary.customerAbandoned = getNum(nums[8]);
+      ctiSummary.unselectedType = getNum(nums[9]);
+      ctiSummary.btnExit = nums[10] ? getNum(nums[10]) : 0;
+    }
+  }
+
+  // CTI 한 페이지당 15건씩 페이징됨
+  const totalPages = Math.ceil(totalCount / 15);
+  console.log(`[CTI Sync] ${startDate} ~ ${endDate} [${targetChannel}] 총 ${totalCount}건 확인 (${totalPages}페이지)`);
+
   const logs = [];
-  let page = 1;
-  let hasMore = true;
-  const maxPages = 40; // 최대 800~1000건 안전 상한
 
-  while (hasMore && page <= maxPages) {
-    const path = `/CtiLiVon/admin/C_Calllog.asp?page=${page}&start_search_string=${startDate}&end_search_string=${endDate}`;
-    const res = await httpRequest({
-      hostname: 'crm.goodars.co.kr',
-      port: 443,
-      path,
-      method: 'GET',
-      headers: {
-        'Cookie': cookie,
-        'Referer': 'https://crm.goodars.co.kr/CtiLiVon/ARS.asp',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LivonMate/3.0'
-      }
-    });
-
-    const decoder = new TextDecoder('euc-kr');
-    const html = decoder.decode(res.body);
-
+  function parseRowsFromHtml(html) {
     const trs = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
-    let pageCount = 0;
+    const pageLogs = [];
 
     for (const tr of trs) {
       if (tr.includes('<td')) {
@@ -394,56 +453,80 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
 
         if (tds.length >= 8 && tds[0] === 'IN') {
           const ch = tds[1] || '';
-          if (targetChannel === 'all' || ch === targetChannel) {
-            const detailMatch = tr.match(/DetailM\('([0-9]+)'\)/i);
-            const askSn = detailMatch ? detailMatch[1] : '';
+          const detailMatch = tr.match(/DetailM\('([0-9]+)'\)/i);
+          const askSn = detailMatch ? detailMatch[1] : '';
 
-            logs.push({
-              rowNum: logs.length + 1,
-              id: `cti_${Date.now()}_${logs.length + 1}`,
-              type: tds[0],
-              channel: ch || '삼성화재',
-              callTime: tds[2] || '',
-              phone: tds[3] || '',
-              memberName: tds[4] === '비회원' ? '회원아님' : (tds[4] || '회원아님'),
-              diseaseType: '',
-              group: '',
-              arsMenu: tds[9] || '',
-              connectReq: tds[10] || (tds[9] ? 'Y' : 'N'),
-              waitTime: parseInt(tds[11] || '0', 10) || 0,
-              title: tds[13] || '',
-              summary: '',
-              keywords: '',
-              duration: tds[15] || '0',
-              status: tds[16] || '',
-              operator: tds[18] || '',
-              askSn: askSn,
-              category: '',
-              actor: ''
-            });
-            pageCount++;
-          }
+          pageLogs.push({
+            type: tds[0],
+            channel: ch || targetChannel,
+            callTime: tds[2] || '',
+            phone: tds[3] || '',
+            memberName: tds[4] === '비회원' ? '회원아님' : (tds[4] || '회원아님'),
+            diseaseType: '',
+            group: '',
+            arsMenu: tds[9] || '',
+            connectReq: tds[10] || (tds[9] ? 'Y' : 'N'),
+            waitTime: parseInt(tds[11] || '0', 10) || 0,
+            title: tds[13] || '',
+            summary: '',
+            keywords: '',
+            duration: tds[15] || '0',
+            status: tds[16] || '',
+            operator: tds[18] || '',
+            askSn: askSn,
+            category: '',
+            actor: ''
+          });
         }
       }
     }
+    return pageLogs;
+  }
 
-    // 다음 페이지 링크 존재 여부 확인
-    if (!html.includes(`page=${page + 1}&`) && !html.includes(`page=${page + 1}"`) && !html.includes(`page=${page + 1}'`)) {
-      hasMore = false;
-    } else {
-      page++;
-    }
+  // 1페이지 파싱
+  logs.push(...parseRowsFromHtml(p1Html));
 
-    if (pageCount === 0 && !html.includes('C_Calllog.asp?page=')) {
-      break;
+  // 2페이지부터 totalPages까지 순차 수집
+  for (let page = 2; page <= totalPages; page++) {
+    const pagePath = `/CtiLiVon/admin/C_Calllog.asp?page=${page}&start_search_string=${startDate}&end_search_string=${endDate}&searchCpname=${cpParam}`;
+    try {
+      const res = await httpRequest({
+        hostname: 'crm.goodars.co.kr',
+        port: 443,
+        path: pagePath,
+        method: 'GET',
+        headers: {
+          'Cookie': cookie,
+          'Referer': 'https://crm.goodars.co.kr/CtiLiVon/ARS.asp',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LivonMate/3.0'
+        }
+      });
+      const html = decoder.decode(res.body);
+      const pageLogs = parseRowsFromHtml(html);
+      logs.push(...pageLogs);
+
+      // 이미 totalCount에 도달했으면 종료
+      if (logs.length >= totalCount) {
+        break;
+      }
+    } catch (err) {
+      console.error(`[CTI Sync] 페이지 ${page} 수집 실패:`, err.message);
     }
   }
 
-  // askSn이 있는 상담 건들에 대해 세부 상담요약/키워드 동기화 (병렬 5개씩 배치 처리)
-  const detailTargets = logs.filter(l => l.askSn);
-  console.log(`[CTI Sync] 총 ${logs.length}건 인입 중 세부 상담요약 보유 대상: ${detailTargets.length}건 동기화 진행...`);
+  // 정확한 인덱싱 및 고유 ID 부여
+  logs.forEach((item, idx) => {
+    item.rowNum = idx + 1;
+    item.id = `cti_${Date.now()}_${idx + 1}`;
+  });
 
-  const batchSize = 5;
+  console.log(`[CTI Sync] 수집 완료: 총 ${logs.length}건 (CTI 표기 총건수: ${totalCount}건)`);
+
+  // askSn이 있는 상담 건들에 대해 세부 상담요약/키워드 동기화 (병렬 6개씩 배치 처리)
+  const detailTargets = logs.filter(l => l.askSn);
+  console.log(`[CTI Sync] 세부 상담요약 보유 대상: ${detailTargets.length}건 동기화 진행...`);
+
+  const batchSize = 6;
   for (let i = 0; i < detailTargets.length; i += batchSize) {
     const batch = detailTargets.slice(i, i + batchSize);
     await Promise.all(batch.map(async (item) => {
@@ -468,6 +551,7 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
     endDate,
     targetChannel,
     totalCalls: logs.length,
+    ctiSummary,
     logs
   };
 }

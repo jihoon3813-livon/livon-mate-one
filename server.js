@@ -565,10 +565,24 @@ function saveSavedFaxConfig(cfg) {
           });
         }
 
+        const ctiSummary = ctiResult.ctiSummary || {
+          totalInbound: totalCalls,
+          answeredCalls: ctiResult.logs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length,
+          connectRequests: ctiResult.logs.filter(c => c.connectReq === 'Y').length,
+          answerRate: '0%',
+          abandonedCalls: 0,
+          unselectedType: 0,
+          btnExit: 0
+        };
+
+        const channelLabel = channel === 'all' || channel === '전체' ? '전체 인입경로' : channel;
+
         const reportData = {
           reportInfo: {
-            title: `삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고 (${startDate} ~ ${endDate})`,
-            target: '삼성화재 간병서비스 관련 인바운드 콜',
+            title: `${channelLabel} 간병(리본케어) 서비스 인바운드 문의 분석 보고 (${startDate} ~ ${endDate})`,
+            target: `${channelLabel} 관련 인바운드 콜`,
+            channel: channel,
+            channelLabel: channelLabel,
             period: `${startDate} ~ ${endDate}`,
             startDate,
             endDate,
@@ -579,9 +593,15 @@ function saveSavedFaxConfig(cfg) {
           },
           summaryStats: {
             totalCalls,
-            connectReqCalls: ctiResult.logs.filter(c => c.connectReq === 'Y').length,
+            connectReqCalls: ctiSummary.connectRequests || ctiResult.logs.filter(c => c.connectReq === 'Y').length,
+            answeredCalls: ctiSummary.answeredCalls || ctiResult.logs.filter(c => c.title || c.summary).length,
+            answerRate: ctiSummary.answerRate || (totalCalls > 0 ? Math.round((ctiSummary.answeredCalls / totalCalls) * 100) + '%' : '0%'),
+            abandonedCalls: ctiSummary.abandonedCalls || 0,
+            unselectedType: ctiSummary.unselectedType || 0,
+            btnExit: ctiSummary.btnExit || 0,
             consultedCalls: ctiResult.logs.filter(c => c.title || c.summary).length
           },
+          ctiSummary,
           dailyTrends,
           weeklyRollup,
           callLogs: ctiResult.logs
@@ -593,7 +613,7 @@ function saveSavedFaxConfig(cfg) {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         return res.end(JSON.stringify({
           success: true,
-          message: `CTI로부터 총 ${totalCalls}건의 인바운드 로그를 성공적으로 동기화하였습니다.`,
+          message: `CTI로부터 [${channelLabel}] 총 ${totalCalls}건의 인바운드 로그를 성공적으로 동기화하였습니다.`,
           data: reportData
         }));
       } catch (err) {

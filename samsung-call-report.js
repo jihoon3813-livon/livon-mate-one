@@ -200,40 +200,82 @@ function renderSamsungCallReportTab() {
       </div>
 
       <!-- ================================================================= -->
-      <!-- TOOLBAR: 날짜 범위 선택기 + 빠른 프리셋 + 검색창 + CTI 동기화 -->
+      <!-- TOOLBAR: 인입경로 선택 + 날짜 범위 선택기 + 빠른 프리셋 + 검색창 + CTI 동기화 -->
       <!-- ================================================================= -->
-      <div class="bg-white rounded-3xl border border-slate-200/90 p-4 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-        <div class="flex items-center gap-2.5 flex-wrap">
-          <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 text-xs font-bold text-slate-700">
-            <i data-lucide="calendar" class="w-4 h-4 text-slate-500 ml-1.5"></i>
-            <span>기간:</span>
-            <input type="date" id="tabReportStartDate" value="${info.startDate || '2026-08-18'}" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500">
-            <span>~</span>
-            <input type="date" id="tabReportEndDate" value="${info.endDate || new Date().toISOString().slice(0, 10)}" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500">
-            <button type="button" onclick="applyTabDateRange()" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer">
-              조회
+      <div class="bg-white rounded-3xl border border-slate-200/90 p-4 shadow-xs space-y-3">
+        <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <!-- 인입경로 선택 필터 (CTI 폼과 1:1 매칭) -->
+            <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 text-xs font-bold text-slate-700">
+              <i data-lucide="layers" class="w-4 h-4 text-blue-600 ml-1.5"></i>
+              <span>인입경로:</span>
+              <select id="tabReportChannelSelect" onchange="handleTabChannelChange(this.value)" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-bold text-xs text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer">
+                <option value="삼성화재" ${(info.channel || '삼성화재') === '삼성화재' ? 'selected' : ''}>삼성화재</option>
+                <option value="현대해상" ${info.channel === '현대해상' ? 'selected' : ''}>현대해상</option>
+                <option value="리본케어" ${info.channel === '리본케어' ? 'selected' : ''}>리본케어</option>
+                <option value="전체" ${info.channel === '전체' || info.channel === 'all' ? 'selected' : ''}>인입경로 전체</option>
+              </select>
+            </div>
+
+            <!-- 날짜 범위 선택기 -->
+            <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 text-xs font-bold text-slate-700">
+              <i data-lucide="calendar" class="w-4 h-4 text-slate-500 ml-1.5"></i>
+              <span>기간:</span>
+              <input type="date" id="tabReportStartDate" value="${info.startDate || '2026-08-18'}" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500">
+              <span>~</span>
+              <input type="date" id="tabReportEndDate" value="${info.endDate || new Date().toISOString().slice(0, 10)}" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500">
+              <button type="button" onclick="applyTabDateRange()" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer">
+                조회
+              </button>
+            </div>
+
+            <div class="flex items-center gap-1 flex-wrap">
+              <button type="button" onclick="setTabPresetRange('today')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">오늘</button>
+              <button type="button" onclick="setTabPresetRange('yesterday')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">어제</button>
+              <button type="button" onclick="setTabPresetRange('thisWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">이번 주</button>
+              <button type="button" onclick="setTabPresetRange('lastWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">지난 주</button>
+              <button type="button" onclick="setTabPresetRange('last30')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">최근 30일</button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <div class="relative w-full sm:w-64">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+              <input type="text" id="tabReportSearchInput" value="${gReportFilter.search || ''}" oninput="handleReportSearchInput(this.value)" placeholder="전화번호, 환자명, 제목, 키워드..." class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50/70 focus:bg-white focus:outline-none focus:border-blue-500 font-medium">
+            </div>
+            <button type="button" onclick="syncTabLiveCti()" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0 cursor-pointer" title="GoodARS CTI 최신 통화데이터 실시간 수집 및 동기화">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="tabSyncIcon"></i>
+              <span>⚡ 실시간 CTI 동기화</span>
             </button>
           </div>
-
-          <div class="flex items-center gap-1 flex-wrap">
-            <button type="button" onclick="setTabPresetRange('today')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">오늘</button>
-            <button type="button" onclick="setTabPresetRange('yesterday')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">어제</button>
-            <button type="button" onclick="setTabPresetRange('thisWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">이번 주</button>
-            <button type="button" onclick="setTabPresetRange('lastWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">지난 주</button>
-            <button type="button" onclick="setTabPresetRange('last30')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">최근 30일</button>
-          </div>
         </div>
 
-        <div class="flex items-center gap-2">
-          <div class="relative w-full sm:w-64">
-            <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
-            <input type="text" id="tabReportSearchInput" value="${gReportFilter.search || ''}" oninput="handleReportSearchInput(this.value)" placeholder="전화번호, 환자명, 제목, 키워드..." class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-slate-50/70 focus:bg-white focus:outline-none focus:border-blue-500 font-medium">
+        <!-- CTI 원본 공식 집계 요약 스트립 (CTI 웹 화면과 100% 일치) -->
+        ${gSamsungReportData.ctiSummary ? `
+          <div class="bg-gradient-to-r from-blue-50/80 to-indigo-50/50 border border-blue-200/70 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap text-xs">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-md bg-blue-600 text-white font-black text-[10px] tracking-wide">CTI 원본 집계</span>
+              <span class="text-slate-700 font-bold">“${info.startDate || ''} 부터 ${info.endDate || ''}” <span class="text-blue-700">[${info.channelLabel || info.channel || '삼성화재'}]</span> 검색 결과:</span>
+            </div>
+            <div class="flex items-center gap-2.5 sm:gap-3.5 text-slate-700 font-semibold flex-wrap text-[11px]">
+              <span>전체: <b class="text-blue-700 font-black">${gSamsungReportData.ctiSummary.totalInbound}건</b></span>
+              <span class="text-slate-300">|</span>
+              <span>인입콜: <b class="text-slate-900 font-bold">${gSamsungReportData.ctiSummary.totalInbound}/${gSamsungReportData.ctiSummary.answeredCalls}건</b></span>
+              <span class="text-slate-300">|</span>
+              <span>연결요청: <b class="text-indigo-700 font-bold">${gSamsungReportData.ctiSummary.connectRequests}건</b></span>
+              <span class="text-slate-300">|</span>
+              <span>응답호: <b class="text-emerald-700 font-bold">${gSamsungReportData.ctiSummary.answeredCalls}건</b></span>
+              <span class="text-slate-300">|</span>
+              <span>응대율: <b class="text-emerald-600 font-bold">${gSamsungReportData.ctiSummary.answerRate}</b></span>
+              <span class="text-slate-300">|</span>
+              <span>포기호: <b class="text-rose-600 font-bold">${gSamsungReportData.ctiSummary.abandonedCalls}건</b></span>
+              <span class="text-slate-300">|</span>
+              <span>유형미선택: <b class="text-slate-600">${gSamsungReportData.ctiSummary.unselectedType}건</b></span>
+              <span class="text-slate-300">|</span>
+              <span>버튼선택후종료: <b class="text-slate-600">${gSamsungReportData.ctiSummary.btnExit}건</b></span>
+            </div>
           </div>
-          <button type="button" onclick="syncTabLiveCti()" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0 cursor-pointer" title="GoodARS CTI 최신 통화데이터 실시간 수집 및 동기화">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="tabSyncIcon"></i>
-            <span>⚡ 실시간 CTI 동기화</span>
-          </button>
-        </div>
+        ` : ''}
       </div>
 
       <!-- ================================================================= -->
@@ -1756,27 +1798,35 @@ function setTabPresetRange(type) {
   applyTabDateRange();
 }
 
+async function handleTabChannelChange(channel) {
+  const s = document.getElementById('tabReportStartDate')?.value || '2026-08-18';
+  const e = document.getElementById('tabReportEndDate')?.value || new Date().toISOString().slice(0, 10);
+  await syncTabLiveCti(s, e, channel);
+}
+
 async function applyTabDateRange() {
   const s = document.getElementById('tabReportStartDate')?.value;
   const e = document.getElementById('tabReportEndDate')?.value;
+  const ch = document.getElementById('tabReportChannelSelect')?.value || '삼성화재';
   if (!s || !e) return;
 
-  await syncTabLiveCti(s, e);
+  await syncTabLiveCti(s, e, ch);
 }
 
-async function syncTabLiveCti(customStart, customEnd) {
+async function syncTabLiveCti(customStart, customEnd, customChannel) {
   const s = customStart || document.getElementById('tabReportStartDate')?.value || '2026-08-18';
   const e = customEnd || document.getElementById('tabReportEndDate')?.value || new Date().toISOString().slice(0, 10);
+  const ch = customChannel || document.getElementById('tabReportChannelSelect')?.value || '삼성화재';
 
   const icon = document.getElementById('tabSyncIcon');
   if (icon) icon.classList.add('animate-spin');
 
   if (typeof showToast === 'function') {
-    showToast(`GoodARS CTI에서 [${s} ~ ${e}] 통화 데이터를 동기화 중입니다...`, 'info');
+    showToast(`GoodARS CTI에서 [${ch}] ${s} ~ ${e} 통화 데이터를 동기화 중입니다...`, 'info');
   }
 
   try {
-    const res = await fetch(`/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=삼성화재`);
+    const res = await fetch(`/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`);
     const json = await res.json();
     if (json.success && json.data) {
       gSamsungReportData = json.data;
@@ -1785,7 +1835,7 @@ async function syncTabLiveCti(customStart, customEnd) {
         setTimeout(renderTabDailyTrendChart, 60);
       }
       if (typeof showToast === 'function') {
-        showToast(`CTI 통화데이터 ${json.data.callLogs.length}건이 성공적으로 동기화되었습니다!`, 'success');
+        showToast(`[${ch}] CTI 통화데이터 ${json.data.callLogs.length}건이 성공적으로 동기화되었습니다!`, 'success');
       }
     } else {
       alert('CTI 동기화 실패: ' + (json.error || '알 수 없는 오류'));
@@ -1801,8 +1851,9 @@ async function syncTabLiveCti(customStart, customEnd) {
 function copySamsungReportWebLink() {
   const s = document.getElementById('tabReportStartDate')?.value || '2026-08-18';
   const e = document.getElementById('tabReportEndDate')?.value || new Date().toISOString().slice(0, 10);
+  const ch = document.getElementById('tabReportChannelSelect')?.value || '삼성화재';
   const origin = window.location.origin;
-  const reportUrl = `${origin}/call-report-view.html?start=${s}&end=${e}`;
+  const reportUrl = `${origin}/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
 
   navigator.clipboard.writeText(reportUrl).then(() => {
     if (typeof showToast === 'function') {

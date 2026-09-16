@@ -57,39 +57,56 @@
 
   <main class="max-w-[1600px] mx-auto px-4 sm:px-6 pt-6 space-y-5">
 
-    <!-- 1. DATE FILTER & SEARCH BAR -->
-    <div class="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-5 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-      <div class="flex items-center gap-3 flex-wrap">
-        <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 text-xs font-bold text-slate-700">
-          <i data-lucide="calendar" class="w-4 h-4 text-slate-500 ml-1.5"></i>
-          <span>조회기간:</span>
-          <input type="date" id="reportStartDate" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500">
-          <span>~</span>
-          <input type="date" id="reportEndDate" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500">
-          <button type="button" onclick="applyDateRange()" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs">
-            조회
+    <!-- 1. DATE FILTER & CHANNEL & SEARCH BAR -->
+    <div class="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-5 shadow-xs space-y-3">
+      <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div class="flex items-center gap-3 flex-wrap">
+          <!-- 인입경로 선택 필터 (CTI 폼과 1:1 매칭) -->
+          <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 text-xs font-bold text-slate-700">
+            <i data-lucide="layers" class="w-4 h-4 text-blue-600 ml-1.5"></i>
+            <span>인입경로:</span>
+            <select id="reportChannelSelect" onchange="handleChannelChange(this.value)" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-bold text-xs text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer">
+              <option value="삼성화재">삼성화재</option>
+              <option value="현대해상">현대해상</option>
+              <option value="리본케어">리본케어</option>
+              <option value="전체">인입경로 전체</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 text-xs font-bold text-slate-700">
+            <i data-lucide="calendar" class="w-4 h-4 text-slate-500 ml-1.5"></i>
+            <span>조회기간:</span>
+            <input type="date" id="reportStartDate" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500">
+            <span>~</span>
+            <input type="date" id="reportEndDate" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500">
+            <button type="button" onclick="applyDateRange()" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer">
+              조회
+            </button>
+          </div>
+
+          <div class="flex items-center gap-1 flex-wrap">
+            <button type="button" onclick="setPresetRange('today')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">오늘</button>
+            <button type="button" onclick="setPresetRange('yesterday')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">어제</button>
+            <button type="button" onclick="setPresetRange('thisWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">이번 주</button>
+            <button type="button" onclick="setPresetRange('lastWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">지난 주</button>
+            <button type="button" onclick="setPresetRange('last30')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer">최근 30일</button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <div class="relative w-full sm:w-72">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+            <input type="text" id="globalSearchInput" oninput="handleSearch(this.value)" placeholder="전화번호, 환자명, 키워드, 제목 검색..." class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs bg-slate-50/70 focus:bg-white focus:outline-none focus:border-blue-500 font-medium">
+          </div>
+          <button type="button" onclick="syncLiveCti()" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0 cursor-pointer" title="GoodARS CTI 실시간 최신 통화데이터 즉시 동기화">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="syncIcon"></i>
+            <span>CTI 동기화</span>
           </button>
         </div>
-
-        <div class="flex items-center gap-1 flex-wrap">
-          <button type="button" onclick="setPresetRange('today')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors">오늘</button>
-          <button type="button" onclick="setPresetRange('yesterday')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors">어제</button>
-          <button type="button" onclick="setPresetRange('thisWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors">이번 주</button>
-          <button type="button" onclick="setPresetRange('lastWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors">지난 주</button>
-          <button type="button" onclick="setPresetRange('last30')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors">최근 30일</button>
-        </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <div class="relative w-full sm:w-72">
-          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-          <input type="text" id="globalSearchInput" oninput="handleSearch(this.value)" placeholder="전화번호, 환자명, 키워드, 제목 검색..." class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs bg-slate-50/70 focus:bg-white focus:outline-none focus:border-blue-500 font-medium">
-        </div>
-        <button type="button" onclick="syncLiveCti()" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0 cursor-pointer" title="GoodARS CTI 실시간 최신 통화데이터 즉시 동기화">
-          <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="syncIcon"></i>
-          <span>CTI 동기화</span>
-        </button>
-      </div>
+      <!-- CTI 원본 공식 집계 요약 스트립 (CTI 웹 화면과 100% 일치) -->
+      <div id="ctiSummaryStrip" class="hidden"></div>
     </div>
 
     <!-- 2. SUB-TAB SWITCHER -->
@@ -127,6 +144,7 @@
       category: '',
       actor: '',
       search: '',
+      channel: '삼성화재',
       consultedOnly: true,
       startDate: '2026-08-18',
       endDate: new Date().toISOString().slice(0, 10)
@@ -155,20 +173,37 @@
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('start')) gFilter.startDate = urlParams.get('start');
       if (urlParams.get('end')) gFilter.endDate = urlParams.get('end');
+      if (urlParams.get('channel')) gFilter.channel = urlParams.get('channel');
 
       document.getElementById('reportStartDate').value = gFilter.startDate;
       document.getElementById('reportEndDate').value = gFilter.endDate;
+      const chSelect = document.getElementById('reportChannelSelect');
+      if (chSelect) chSelect.value = gFilter.channel;
 
       await loadReportData();
     });
+
+    async function handleChannelChange(ch) {
+      gFilter.channel = ch;
+      const url = new URL(window.location.href);
+      url.searchParams.set('channel', ch);
+      window.history.replaceState({}, '', url);
+      await syncLiveCti();
+    }
 
     async function loadReportData() {
       try {
         const res = await fetch('/api/samsung/call-report/data');
         const json = await res.json();
         if (json.success && json.data) {
-          gReportData = json.data;
-          renderAll();
+          // If server data matches requested channel/dates, use it; otherwise sync
+          const info = json.data.reportInfo || {};
+          if (info.channel === gFilter.channel && info.startDate === gFilter.startDate && info.endDate === gFilter.endDate) {
+            gReportData = json.data;
+            renderAll();
+          } else {
+            await syncLiveCti();
+          }
         } else {
           await syncLiveCti();
         }
@@ -184,11 +219,45 @@
       renderDailySheet(stats);
       renderLogsSheet(stats);
       renderFilterTags();
+      renderCtiSummaryStrip();
       if (window.lucide) lucide.createIcons();
 
       if (gActiveTab === 'daily') {
         renderDailyTrendChart();
       }
+    }
+
+    function renderCtiSummaryStrip() {
+      const container = document.getElementById('ctiSummaryStrip');
+      if (!container || !gReportData || !gReportData.ctiSummary) return;
+
+      const cs = gReportData.ctiSummary;
+      const info = gReportData.reportInfo || {};
+
+      container.className = 'bg-gradient-to-r from-blue-50/80 to-indigo-50/50 border border-blue-200/70 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap text-xs';
+      container.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-0.5 rounded-md bg-blue-600 text-white font-black text-[10px] tracking-wide">CTI 원본 집계</span>
+          <span class="text-slate-700 font-bold">“${info.startDate || gFilter.startDate} 부터 ${info.endDate || gFilter.endDate}” <span class="text-blue-700">[${info.channelLabel || info.channel || gFilter.channel}]</span> 검색 결과:</span>
+        </div>
+        <div class="flex items-center gap-2.5 sm:gap-3.5 text-slate-700 font-semibold flex-wrap text-[11px]">
+          <span>전체: <b class="text-blue-700 font-black">${cs.totalInbound}건</b></span>
+          <span class="text-slate-300">|</span>
+          <span>인입콜: <b class="text-slate-900 font-bold">${cs.totalInbound}/${cs.answeredCalls}건</b></span>
+          <span class="text-slate-300">|</span>
+          <span>연결요청: <b class="text-indigo-700 font-bold">${cs.connectRequests}건</b></span>
+          <span class="text-slate-300">|</span>
+          <span>응답호: <b class="text-emerald-700 font-bold">${cs.answeredCalls}건</b></span>
+          <span class="text-slate-300">|</span>
+          <span>응대율: <b class="text-emerald-600 font-bold">${cs.answerRate}</b></span>
+          <span class="text-slate-300">|</span>
+          <span>포기호: <b class="text-rose-600 font-bold">${cs.abandonedCalls}건</b></span>
+          <span class="text-slate-300">|</span>
+          <span>유형미선택: <b class="text-slate-600">${cs.unselectedType}건</b></span>
+          <span class="text-slate-300">|</span>
+          <span>버튼선택후종료: <b class="text-slate-600">${cs.btnExit}건</b></span>
+        </div>
+      `;
     }
 
     function calculateStats() {
@@ -740,8 +809,11 @@
       const icon = document.getElementById('syncIcon');
       if (icon) icon.classList.add('animate-spin');
 
+      const ch = document.getElementById('reportChannelSelect')?.value || gFilter.channel || '삼성화재';
+      gFilter.channel = ch;
+
       try {
-        const res = await fetch(`/api/samsung/call-report/sync-cti?start=${gFilter.startDate}&end=${gFilter.endDate}&channel=삼성화재`);
+        const res = await fetch(`/api/samsung/call-report/sync-cti?start=${gFilter.startDate}&end=${gFilter.endDate}&channel=${encodeURIComponent(ch)}`);
         const json = await res.json();
         if (json.success && json.data) {
           gReportData = json.data;
@@ -758,9 +830,17 @@
     }
 
     function copyReportLink() {
-      const url = window.location.href;
-      navigator.clipboard.writeText(url).then(() => {
-        alert('보고서 링크가 클립보드에 복사되었습니다!\n담당자 또는 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.');
+      const s = gFilter.startDate;
+      const e = gFilter.endDate;
+      const ch = gFilter.channel || '삼성화재';
+      const origin = window.location.origin;
+      const pathname = window.location.pathname;
+      const reportUrl = `${origin}${pathname}?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
+
+      navigator.clipboard.writeText(reportUrl).then(() => {
+        alert(`[보고서 공유 링크가 복사되었습니다]\n\n${reportUrl}\n\n삼성화재 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
+      }).catch(() => {
+        prompt('아래 링크를 복사하여 전달해주세요:', reportUrl);
       });
     }
 
