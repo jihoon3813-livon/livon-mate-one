@@ -336,9 +336,9 @@ function renderSamsungCallReportTab() {
               <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
               <input type="text" id="tabReportSearchInput" value="${gReportFilter.search || ''}" oninput="handleReportSearchInput(this.value)" placeholder="전화번호, 회원명, 제목..." class="w-full pl-8 pr-3 py-1.5 sm:py-2 rounded-xl border border-slate-200 text-xs bg-slate-50/70 focus:bg-white focus:outline-none focus:border-blue-500 font-medium">
             </div>
-            <button type="button" onclick="syncTabLiveCti()" class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0 whitespace-nowrap cursor-pointer" title="GoodARS CTI 최신 통화데이터 실시간 수집 및 동기화">
+            <button type="button" id="tabSyncCtiBtn" onclick="syncTabLiveCti()" class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0 whitespace-nowrap cursor-pointer" title="GoodARS CTI 최신 통화데이터 실시간 수집 및 동기화">
               <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="tabSyncIcon"></i>
-              <span>CTI 동기화</span>
+              <span id="tabSyncBtnText">CTI 동기화</span>
             </button>
           </div>
         </div>
@@ -2003,6 +2003,10 @@ async function syncTabLiveCti(customStart, customEnd, customChannel) {
   const e = customEnd || document.getElementById('tabReportEndDate')?.value || new Date().toISOString().slice(0, 10);
   const ch = customChannel || document.getElementById('tabReportChannelSelect')?.value || '삼성화재';
 
+  const btn = document.getElementById('tabSyncCtiBtn');
+  const textEl = document.getElementById('tabSyncBtnText');
+  if (btn) btn.classList.add('opacity-75', 'pointer-events-none');
+  if (textEl) textEl.innerText = '동기화 중...';
   const icon = document.getElementById('tabSyncIcon');
   if (icon) icon.classList.add('animate-spin');
 
@@ -2029,7 +2033,13 @@ async function syncTabLiveCti(customStart, customEnd, customChannel) {
     console.error('CTI sync error:', err);
     alert('CTI 서버와의 통신 중 오류가 발생했습니다: ' + err.message);
   } finally {
-    if (icon) icon.classList.remove('animate-spin');
+    if (btn) {
+      btn.classList.remove('opacity-75', 'pointer-events-none');
+      btn.querySelectorAll('.animate-spin').forEach(el => el.classList.remove('animate-spin'));
+    }
+    if (textEl) textEl.innerText = 'CTI 동기화';
+    const ic = document.getElementById('tabSyncIcon');
+    if (ic) ic.classList.remove('animate-spin');
   }
 }
 

@@ -27,18 +27,18 @@
   <!-- TOP HEADER BAR -->
   <header class="bg-white/95 backdrop-blur-md border-b border-slate-200/90 sticky top-0 z-40 shadow-xs">
     <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
-      <div class="flex items-center gap-3 flex-1 min-w-[260px] max-w-xl xl:max-w-2xl">
+      <div class="flex items-center gap-3 flex-1 min-w-0">
         <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-600/20 shrink-0">
           <i data-lucide="phone-call" class="w-5 h-5"></i>
         </div>
-        <div>
+        <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-black text-[10px] tracking-wide shrink-0">삼성화재 공식보고</span>
-            <span class="text-[11px] text-slate-500 font-bold" id="viewerChannelLabel">인입경로: 삼성화재</span>
+            <span class="text-[11px] text-slate-500 font-bold shrink-0" id="viewerChannelLabel">인입경로: 삼성화재</span>
             <span class="text-slate-300">|</span>
-            <span class="text-[11px] text-slate-400 font-mono" id="viewerSyncedAt">CTI 실시간 연동</span>
+            <span class="text-[11px] text-slate-400 font-mono shrink-0" id="viewerSyncedAt">CTI 실시간 연동</span>
           </div>
-          <h1 class="text-sm sm:text-base md:text-lg font-black text-slate-900 leading-snug mt-0.5 break-keep" id="viewerReportTitle">
+          <h1 class="text-sm sm:text-base md:text-lg font-black text-slate-900 leading-snug mt-0.5 break-keep whitespace-normal" id="viewerReportTitle">
             삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서
           </h1>
         </div>
@@ -118,9 +118,9 @@
             <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
             <input type="text" id="globalSearchInput" oninput="handleSearch(this.value)" placeholder="전화번호, 환자명, 키워드 검색..." class="w-full pl-9 pr-3 py-1.5 sm:py-2 rounded-xl border border-slate-200 text-xs bg-slate-50/70 focus:bg-white focus:outline-none focus:border-blue-500 font-medium">
           </div>
-          <button type="button" onclick="syncLiveCti()" class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0 whitespace-nowrap cursor-pointer" title="GoodARS CTI 실시간 최신 통화데이터 즉시 동기화">
+          <button type="button" id="syncCtiBtn" onclick="syncLiveCti()" class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0 whitespace-nowrap cursor-pointer" title="GoodARS CTI 실시간 최신 통화데이터 즉시 동기화">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="syncIcon"></i>
-            <span>CTI 동기화</span>
+            <span id="syncCtiBtnText">CTI 동기화</span>
           </button>
         </div>
       </div>
@@ -988,11 +988,29 @@
       await syncLiveCti();
     }
 
+    function setSyncBtnLoading(loading) {
+      const btn = document.getElementById('syncCtiBtn');
+      const textEl = document.getElementById('syncCtiBtnText');
+      if (loading) {
+        if (btn) btn.classList.add('opacity-75', 'pointer-events-none');
+        if (textEl) textEl.innerText = '동기화 중...';
+        const icons = btn ? btn.querySelectorAll('[data-lucide="refresh-cw"], svg, #syncIcon') : [document.getElementById('syncIcon')];
+        icons.forEach(ic => ic && ic.classList.add('animate-spin'));
+      } else {
+        if (btn) {
+          btn.classList.remove('opacity-75', 'pointer-events-none');
+          btn.querySelectorAll('.animate-spin').forEach(ic => ic.classList.remove('animate-spin'));
+        }
+        if (textEl) textEl.innerText = 'CTI 동기화';
+        const ic = document.getElementById('syncIcon');
+        if (ic) ic.classList.remove('animate-spin');
+      }
+    }
+
     async function syncLiveCti() {
       if (isSyncing) return;
       isSyncing = true;
-      const icon = document.getElementById('syncIcon');
-      if (icon) icon.classList.add('animate-spin');
+      setSyncBtnLoading(true);
 
       const ch = document.getElementById('reportChannelSelect')?.value || gFilter.channel || '삼성화재';
       gFilter.channel = ch;
@@ -1007,6 +1025,9 @@
           const title = document.getElementById('viewerReportTitle');
           if (title) title.innerText = gReportData.reportInfo.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서';
           document.getElementById('viewerSyncedAt').innerText = `CTI 동기화: ${new Date().toLocaleTimeString('ko-KR')}`;
+          
+          // Stop spinner BEFORE renderAll so lucide.createIcons() does not retain animate-spin on fresh SVG
+          setSyncBtnLoading(false);
           renderAll();
         } else {
           alert('CTI 동기화 중 오류: ' + (json.error || ''));
@@ -1015,7 +1036,7 @@
         alert('서버 통신 오류: ' + err.message);
       } finally {
         isSyncing = false;
-        if (icon) icon.classList.remove('animate-spin');
+        setSyncBtnLoading(false);
       }
     }
 
