@@ -11,3 +11,7 @@ npx.cmd
 desktop.ini
 fax_config.json
 email_config.json
+cti_config.json
+
+.vercel
+.env*

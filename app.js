@@ -11931,17 +11931,46 @@ function getCareProgressInfo(assign) {
 }
 
 // =========================================================================
-// CTI (Computer Telephony Integration) Softphone Dialing Engine
+// CTI (Computer Telephony Integration) Outbound Click-to-Call Engine
 // =========================================================================
-function triggerCtiCall(phone, name = '', role = '') {
-  const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
-  if (!cleanPhone) {
-    if (typeof showNotification === 'function') {
-      showNotification({
-        type: 'warning',
-        title: '전화번호 미등록',
+
+/**
+ * CTI 전화걸기 모달 열기
+ */
+function openCtiCallModal(params = {}) {
+  let phone = '';
+  let name = '';
+  let role = '';
+  let appId = '';
+  let insurance = '';
+
+  if (typeof params === 'string') {
+    phone = params;
+  } else if (params && typeof params === 'object') {
+    phone = params.phone || '';
+    name = params.name || params.patientName || '';
+    role = params.role || '고객';
+    appId = params.appId || params.id || '';
+    insurance = params.insurance || params.insuranceCompany || '';
+  }
+
+  // appId가 전달되었거나 없는 경우 gApps에서 검색 보완
+  if (appId) {
+    const app = (gApps || []).find(a => a.id === appId);
+    if (app) {
+      if (!name) name = app.patientName;
+      if (!insurance) insurance = app.insuranceCompany;
+    }
+  }
+
+  const clean = (phone || '').replace(/[^0-9]/g, '');
+  if (!clean) {
+    if (typeof showCustomAlert === 'function') {
+      showCustomAlert({
+        title: '전화번호 미등록 ⚠️',
         message: '연결 가능한 유효한 전화번호가 등록되어 있지 않습니다.',
-        icon: 'phone-off'
+        icon: 'phone-off',
+        iconColor: 'rose'
       });
     } else {
       alert('연결 가능한 전화번호가 등록되어 있지 않습니다.');
@@ -11949,56 +11978,166 @@ function triggerCtiCall(phone, name = '', role = '') {
     return;
   }
 
-  const formatted = typeof formatPhoneNumber === 'function' ? formatPhoneNumber(cleanPhone) : cleanPhone;
-  const targetLabel = `${role ? '[' + role + '] ' : ''}${name ? name + ' ' : ''}(${formatted})`;
+  const formatted = typeof formatPhoneNumber === 'function' ? formatPhoneNumber(clean) : clean;
+  const modal = document.getElementById('ctiCallModal');
+  if (!modal) return;
 
-  // 1. Interactive Toast Notification for CTI Call Initiation
-  if (typeof showNotification === 'function') {
-    showNotification({
-      type: 'success',
-      title: '📞 CTI 전화 발신 연결',
-      message: `${targetLabel}으로 CTI 전화 발신 프로토콜(tel:${cleanPhone})을 전송했습니다. PC 전화 프로그램과 연동됩니다.`,
-      icon: 'phone-call',
-      iconColor: 'emerald'
-    });
+  const phoneInput = document.getElementById('ctiCallTargetPhone');
+  if (phoneInput) phoneInput.value = formatted;
+
+  const nameEl = document.getElementById('ctiCallRecipientName');
+  if (nameEl) nameEl.innerText = name || '상대방';
+
+  const badgeEl = document.getElementById('ctiCallModalTargetBadge');
+  if (badgeEl) badgeEl.innerText = role || '고객';
+
+  const appIdInput = document.getElementById('ctiCallAppId');
+  if (appIdInput) appIdInput.value = appId || '';
+
+  const roleInput = document.getElementById('ctiCallRole');
+  if (roleInput) roleInput.value = role || '';
+
+  const subInfoEl = document.getElementById('ctiCallSubInfo');
+  if (subInfoEl) {
+    subInfoEl.innerText = appId ? `(${appId})` : '';
   }
 
-  // 2. Standard browser tel: protocol trigger for PC softphones (Avaya/Cisco/Skype/MicroSIP 등)
-  try {
-    const telLink = document.createElement('a');
-    telLink.href = 'tel:' + cleanPhone;
-    document.body.appendChild(telLink);
-    telLink.click();
-    document.body.removeChild(telLink);
-  } catch (err) {
-    console.warn('CTI tel: protocol trigger warning:', err);
+  const insBadge = document.getElementById('ctiCallInsuranceBadge');
+  if (insBadge) {
+    insBadge.innerText = insurance || '일반';
+    insBadge.className = (insurance && insurance.includes('현대'))
+      ? 'text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300'
+      : 'text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200';
   }
 
-  // 3. Custom Event for future CTI WebSocket / SIP Server / LG Ericsson API integration
-  window.dispatchEvent(new CustomEvent('cti:outgoing_call', {
-    detail: {
-      phone: cleanPhone,
-      formattedPhone: formatted,
-      targetName: name,
-      targetRole: role,
-      timestamp: new Date().toISOString()
-    }
-  }));
+  // 보험사에 따라 발신 대표번호 자동 기본 선택
+  const optHyundai = document.getElementById('ctiCallerOptHyundai');
+  const optRibon = document.getElementById('ctiCallerOptRibon');
+  if (insurance && insurance.includes('현대')) {
+    if (optHyundai) optHyundai.checked = true;
+  } else {
+    if (optRibon) optRibon.checked = true;
+  }
+
+  // 모바일/PC 다이얼러용 tel: 보조 링크 갱신
+  const directTel = document.getElementById('ctiDirectTelLink');
+  if (directTel) {
+    directTel.href = 'tel:' + clean;
+  }
+
+  openModal('ctiCallModal');
+  if (typeof initIcons === 'function') initIcons(modal);
 }
 
-function renderCtiCallBtn(phone, targetName = '', role = '', isCompact = false) {
+/**
+ * 전역 CTI 통화 트리거 (원클릭 발신 모달 호출)
+ */
+function triggerCtiCall(phone, name = '', role = '', appId = '', insurance = '') {
+  openCtiCallModal({ phone, name, role, appId, insurance });
+}
+
+/**
+ * CTI 발신 실행 요청 (백엔드 /api/cti/call 호출)
+ */
+async function handleTriggerCtiCall(e) {
+  if (e) e.preventDefault();
+
+  const phoneInput = document.getElementById('ctiCallTargetPhone');
+  const rawPhone = phoneInput ? phoneInput.value.trim() : '';
+  const clean = rawPhone.replace(/[^0-9]/g, '');
+
+  if (!clean || clean.length < 8) {
+    alert('올바른 전화번호를 입력해주세요.');
+    return;
+  }
+
+  const callerIdRadio = document.querySelector('input[name="ctiCallerIdOption"]:checked');
+  const callerId = callerIdRadio ? callerIdRadio.value : '16007835';
+  const name = document.getElementById('ctiCallRecipientName')?.innerText || '';
+  const appId = document.getElementById('ctiCallAppId')?.value || '';
+
+  const btnSubmit = document.getElementById('btnCtiCallSubmit');
+  const btnText = document.getElementById('btnCtiCallSubmitText');
+  const origText = btnText ? btnText.innerText : 'CTI 전화 연결하기';
+
+  if (btnSubmit) {
+    btnSubmit.disabled = true;
+    btnSubmit.classList.add('opacity-75', 'cursor-not-allowed');
+    if (btnText) btnText.innerText = 'CTI 회선 발신 연결 중...';
+  }
+
+  try {
+    const res = await fetch('/api/cti/call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: clean,
+        callerId,
+        recipientName: name,
+        appId
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'CTI 발신 요청에 실패했습니다.');
+    }
+
+    closeModal('ctiCallModal');
+
+    if (typeof showCustomAlert === 'function') {
+      await showCustomAlert({
+        title: 'CTI 전화 발신 접수 완료 📞',
+        message: `${data.message}`,
+        icon: 'phone-call',
+        iconColor: 'emerald',
+        details: [
+          `수신 대상자: ${name || '고객'} (${formatPhoneNumber(clean)})`,
+          `발신 대표번호: ${data.callerName}`,
+          `상담원 전화기: 잠시 후 벨이 울리면 수화기를 들어주세요.`,
+          `통화 기록: CTI 서버에 통화 시간 및 녹취가 자동 보존됩니다.`
+        ]
+      });
+    } else {
+      alert(data.message);
+    }
+  } catch (err) {
+    console.error('CTI Call Error:', err);
+    if (typeof showCustomAlert === 'function') {
+      showCustomAlert({
+        title: 'CTI 발신 오류 ⚠️',
+        message: err.message,
+        icon: 'alert-triangle',
+        iconColor: 'rose'
+      });
+    } else {
+      alert('CTI 발신 오류: ' + err.message);
+    }
+  } finally {
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.classList.remove('opacity-75', 'cursor-not-allowed');
+      if (btnText) btnText.innerText = origText;
+    }
+  }
+}
+
+function renderCtiCallBtn(phone, targetName = '', role = '', isCompact = false, appId = '', insurance = '') {
   if (!phone || !phone.trim() || phone === '-') return '';
   const clean = phone.replace(/[^0-9]/g, '');
   if (!clean) return '';
 
   const safeName = (targetName || '').replace(/'/g, "\\'");
   const safeRole = (role || '').replace(/'/g, "\\'");
+  const safeAppId = (appId || '').replace(/'/g, "\\'");
+  const safeInsurance = (insurance || '').replace(/'/g, "\\'");
   const formatted = typeof formatPhoneNumber === 'function' ? formatPhoneNumber(clean) : clean;
   const titleText = `[CTI 원클릭 발신] ${role ? role + ' ' : ''}${targetName ? targetName + ' ' : ''}(${formatted}) 전화걸기`;
 
   if (isCompact) {
     return `
-      <button type="button" onclick="event.stopPropagation(); triggerCtiCall('${phone}', '${safeName}', '${safeRole}')" 
+      <button type="button" onclick="event.stopPropagation(); triggerCtiCall('${phone}', '${safeName}', '${safeRole}', '${safeAppId}', '${safeInsurance}')" 
         class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white text-slate-400 hover:bg-emerald-600 hover:text-white hover:border-emerald-500 active:scale-90 shadow-2xs hover:shadow-emerald-500/40 transition-all cursor-pointer border border-slate-200 ml-1.5 flex-shrink-0 group" 
         title="${titleText}">
         <i data-lucide="phone-call" class="w-2.5 h-2.5 text-slate-400 group-hover:text-white transition-colors"></i>
@@ -12007,7 +12146,7 @@ function renderCtiCallBtn(phone, targetName = '', role = '', isCompact = false) 
   }
 
   return `
-    <button type="button" onclick="event.stopPropagation(); triggerCtiCall('${phone}', '${safeName}', '${safeRole}')" 
+    <button type="button" onclick="event.stopPropagation(); triggerCtiCall('${phone}', '${safeName}', '${safeRole}', '${safeAppId}', '${safeInsurance}')" 
       class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white text-slate-400 hover:bg-emerald-600 hover:text-white hover:border-emerald-500 active:scale-95 text-[10.5px] font-bold shadow-2xs hover:shadow-emerald-500/30 hover:scale-105 transition-all cursor-pointer border border-slate-200 ml-1.5 flex-shrink-0 group" 
       title="${titleText}">
       <i data-lucide="phone-call" class="w-3 h-3 text-slate-400 group-hover:text-white transition-colors"></i>
@@ -20183,7 +20322,7 @@ function renderApplications() {
       <td class="p-3 text-center font-semibold text-slate-800 font-mono whitespace-nowrap">
         <div class="inline-flex items-center justify-center gap-1">
           <span>${maskPhone(app.phone)}</span>
-          ${renderCtiCallBtn(app.phone, app.patientName, '고객', true)}
+          ${renderCtiCallBtn(app.phone, app.patientName, '고객', true, app.id, app.insuranceCompany)}
         </div>
       </td>
       <td class="p-3 text-slate-700 font-medium">${app.sido || '-'}</td>
@@ -20199,7 +20338,7 @@ function renderApplications() {
       <td class="p-3 text-slate-500 font-mono whitespace-nowrap">
         <div class="inline-flex items-center gap-1">
           <span>${formatPhoneNumber(app.adjusterPhone) || '-'}</span>
-          ${renderCtiCallBtn(app.adjusterPhone, app.adjusterName, '손사', true)}
+          ${renderCtiCallBtn(app.adjusterPhone, app.adjusterName, '손사', true, app.id, app.insuranceCompany)}
         </div>
       </td>
       <td class="p-3 text-purple-900 font-mono font-semibold">${formatPhoneNumber(app.adjusterFax) || '-'}</td>

@@ -5,6 +5,7 @@ const { exec } = require('child_process');
 const { createDocumentPdfBuffer, createTestPdfBuffer } = require('./pdf-helper');
 const { uploadToBarobillFTP, callBarobillSoap, getBarobillErrorMessage, getBarobillFaxStatus } = require('./barobill-client');
 const { getEmailConfig, saveEmailConfig, sendSmtpMail, testSmtpConnection } = require('./smtp-client');
+const { getCtiConfig, saveCtiConfig, makeOutboundCall, getRecentCallLogs } = require('./cti-client');
 
 let PORT = parseInt(process.env.PORT, 10) || 8080;
 const BASE_DIR = __dirname;
@@ -425,6 +426,81 @@ function saveSavedFaxConfig(cfg) {
         }
       });
       return;
+    }
+
+    // =========================================================================
+    // API Route: CTI Click-to-Call Engine (GoodARS CTI 전화걸기 연동)
+    // =========================================================================
+    if (reqPath === '/api/cti/config') {
+      if (req.method === 'GET') {
+        const cfg = getCtiConfig();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, config: cfg }));
+      } else if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const saved = saveCtiConfig(payload);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true, message: 'CTI 연동 설정이 저장되었습니다.', config: saved }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+    }
+
+    if (reqPath === '/api/cti/call' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const { phone, callerId, askSn, recipientName, appId } = payload;
+
+          if (!phone) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '수신 전화번호를 입력해주세요.' }));
+          }
+
+          const callResult = await makeOutboundCall({
+            phone,
+            callerId: callerId || '16007835',
+            askSn: askSn || appId || '',
+            recipientName: recipientName || ''
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({
+            success: true,
+            ...callResult,
+            appId
+          }));
+        } catch (err) {
+          console.error('[CTI Call Error]', err);
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/cti/logs' && req.method === 'GET') {
+      try {
+        const parsedUrl = urlModule.parse(req.url, true);
+        const queryDate = parsedUrl.query.date || new Date().toISOString().slice(0, 10);
+        const logData = await getRecentCallLogs(queryDate);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, ...logData }));
+      } catch (err) {
+        console.error('[CTI Logs Error]', err);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
     }
 
     // =========================================================================
