@@ -535,7 +535,10 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
   try {
     const mapPath = path.join(__dirname, 'member_phone_map.json');
     if (fs.existsSync(mapPath)) {
-      memberPhoneMap = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+      let raw = fs.readFileSync(mapPath, 'utf8');
+      if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+      memberPhoneMap = JSON.parse(raw);
+      console.log(`[CTI Sync] member_phone_map.json 정상 로드 완료 (${Object.keys(memberPhoneMap).length}명)`);
     }
   } catch (e) {
     console.warn('[CTI Sync] member_phone_map.json 로드 실패:', e.message);
@@ -559,13 +562,26 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
     return phone;
   }
 
-  function resolveMemberName(phone, ctiMemberName) {
+  function resolveMemberName(phone, ctiMemberName, title = '', summary = '') {
     const clean = String(phone || '').replace(/[^0-9]/g, '');
     if (memberPhoneMap[clean] && memberPhoneMap[clean].length > 0) {
       return memberPhoneMap[clean].join(', ');
     }
-    if (ctiMemberName && ctiMemberName !== '비회원' && ctiMemberName !== '회원아님') {
+    if (ctiMemberName && ctiMemberName !== '비회원' && ctiMemberName !== '회원아님' && ctiMemberName !== '-') {
       return ctiMemberName;
+    }
+    // 제목 및 요약에서 스마트 이름 감지
+    if (title || summary) {
+      const m1 = title.match(/^([가-힣]{2,4})(?:님|님의| 환자|의|,| 고객)/);
+      if (m1) {
+        const cand = m1[1];
+        const exclude = ['간병', '상담', '입원', '보험', '수술', '삼성', '리본', '요양', '응급', '추석', '순천', '어린', '방문', '진심', '감염', '여수'];
+        if (!exclude.some(x => cand.includes(x))) return cand;
+      }
+      const m2 = summary.match(/([가-힣]{2,4})\s*씨의\s*(?:긴급한|간병|요청|입원|수술)/);
+      if (m2) return m2[1];
+      const m3 = summary.match(/계약자\s*['"‘“]([가-힣]{2,4})['"’”]/);
+      if (m3) return m3[1];
     }
     return '비회원';
   }
@@ -585,7 +601,8 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
           const askSn = detailMatch ? detailMatch[1] : '';
           const rawPhone = tds[3] || '';
           const formattedPhone = formatPhone(rawPhone);
-          const memberName = resolveMemberName(rawPhone, tds[4]);
+          const rawTitle = tds[13] || '';
+          const memberName = resolveMemberName(rawPhone, tds[4], rawTitle);
           const isConnectReq = (tds[10] && tds[10].trim().toUpperCase() === 'Y') ? 'Y' : 'N';
 
           pageLogs.push({
