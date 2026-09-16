@@ -368,32 +368,85 @@
       const cs = gReportData && gReportData.ctiSummary;
       const totalCalls = (cs && cs.totalInbound !== undefined) ? cs.totalInbound : logs.length;
       const connectReqCalls = (cs && cs.connectRequests !== undefined) ? cs.connectRequests : logs.filter(c => c.connectReq === 'Y').length;
-      const consultedCalls = logs.filter(c => (c.category && c.category.trim()) || (c.title && c.title.trim()) || (c.summary && c.summary.trim()));
-      const consultedCount = consultedCalls.length || (cs && cs.answeredCalls !== undefined ? cs.answeredCalls : 0);
+      const consultedCalls = logs.filter(c => (c.title && c.title.trim()) || (c.summary && c.summary.trim()) || (c.category && c.category.trim()));
+      const consultedCount = consultedCalls.length;
       const connectRate = totalCalls > 0 ? Math.round((connectReqCalls / totalCalls) * 100) : 0;
       const opDays = (gReportData.dailyTrends || []).length || 25;
       const dailyAvg = opDays > 0 ? Math.round(totalCalls / opDays) : 0;
 
+      // 동적 카테고리 집계 (count > 0 항목만 추출)
       const catMap = {};
-      SAMSUNG_CATEGORIES.forEach(c => catMap[c.name] = 0);
+      const catDescMap = {};
       consultedCalls.forEach(c => {
-        if (c.category) catMap[c.category] = (catMap[c.category] || 0) + 1;
+        const catName = (c.category && c.category.trim()) || '기타/일반상담';
+        catMap[catName] = (catMap[catName] || 0) + 1;
+        if (c.summary && !catDescMap[catName]) {
+          catDescMap[catName] = c.summary;
+        }
       });
-      const catList = SAMSUNG_CATEGORIES.map(c => {
-        const count = catMap[c.name] || 0;
-        const share = consultedCount > 0 ? count / consultedCount : 0;
-        return { ...c, count, share, pct: (share * 100).toFixed(1) };
+
+      const knownCatMeta = {};
+      SAMSUNG_CATEGORIES.forEach(c => { knownCatMeta[c.name] = c; });
+
+      const DEFAULT_PALETTES = [
+        { color: 'sky', barClass: 'bg-sky-500', badgeClass: 'bg-sky-100 text-sky-800 border-sky-300' },
+        { color: 'emerald', barClass: 'bg-emerald-500', badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+        { color: 'indigo', barClass: 'bg-indigo-500', badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
+        { color: 'amber', barClass: 'bg-amber-500', badgeClass: 'bg-amber-100 text-amber-900 border-amber-300' },
+        { color: 'teal', barClass: 'bg-teal-500', badgeClass: 'bg-teal-100 text-teal-800 border-teal-300' },
+        { color: 'cyan', barClass: 'bg-cyan-500', badgeClass: 'bg-cyan-100 text-cyan-800 border-cyan-300' },
+        { color: 'rose', barClass: 'bg-rose-500', badgeClass: 'bg-rose-100 text-rose-800 border-rose-300' },
+        { color: 'purple', barClass: 'bg-purple-500', badgeClass: 'bg-purple-100 text-purple-800 border-purple-300' },
+        { color: 'slate', barClass: 'bg-slate-500', badgeClass: 'bg-slate-100 text-slate-800 border-slate-300' }
+      ];
+
+      const catList = Object.keys(catMap).map((name, idx) => {
+        const count = catMap[name];
+        const share = consultedCount > 0 ? (count / consultedCount) : 0;
+        const meta = knownCatMeta[name] || DEFAULT_PALETTES[idx % DEFAULT_PALETTES.length];
+        const desc = (knownCatMeta[name] && knownCatMeta[name].description) || catDescMap[name] || '관련 문의 및 상담';
+        return {
+          name,
+          count,
+          share,
+          pct: (share * 100).toFixed(1),
+          description: desc,
+          barClass: meta.barClass || 'bg-blue-500',
+          badgeClass: meta.badgeClass || 'bg-slate-100 text-slate-800 border-slate-300'
+        };
       }).sort((a, b) => b.count - a.count);
 
+      // 동적 주체 집계 (count > 0 항목만 추출)
       const actorMap = {};
-      SAMSUNG_ACTORS.forEach(a => actorMap[a.name] = 0);
       consultedCalls.forEach(c => {
-        if (c.actor) actorMap[c.actor] = (actorMap[c.actor] || 0) + 1;
+        const actName = (c.actor && c.actor.trim()) || '고객(가입자·이용자)';
+        actorMap[actName] = (actorMap[actName] || 0) + 1;
       });
-      const actorList = SAMSUNG_ACTORS.map(a => {
-        const count = actorMap[a.name] || 0;
-        const share = consultedCount > 0 ? count / consultedCount : 0;
-        return { ...a, count, share, pct: (share * 100).toFixed(1) };
+
+      const knownActorMeta = {};
+      SAMSUNG_ACTORS.forEach(a => { knownActorMeta[a.name] = a; });
+
+      const DEFAULT_ACTOR_PALETTES = [
+        { color: 'blue', barClass: 'bg-blue-600', badgeClass: 'bg-blue-100 text-blue-800 border-blue-300', description: '실사용·가입 고객의 신청·접수 및 서비스 이해 문의' },
+        { color: 'purple', barClass: 'bg-purple-600', badgeClass: 'bg-purple-100 text-purple-800 border-purple-300', description: '간병업체·협회의 파트너 등록·지역 연계 문의' },
+        { color: 'emerald', barClass: 'bg-emerald-600', badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300', description: '요양보호사 등 간병 인력의 등록·자격 문의' },
+        { color: 'amber', barClass: 'bg-amber-600', badgeClass: 'bg-amber-100 text-amber-900 border-amber-300', description: '삼성화재 판매채널(설계사·지점)의 상품설명·규정 확인' }
+      ];
+
+      const actorList = Object.keys(actorMap).map((name, idx) => {
+        const count = actorMap[name];
+        const share = consultedCount > 0 ? (count / consultedCount) : 0;
+        const meta = knownActorMeta[name] || DEFAULT_ACTOR_PALETTES[idx % DEFAULT_ACTOR_PALETTES.length];
+        const desc = (knownActorMeta[name] && knownActorMeta[name].description) || '관련 주체 문의';
+        return {
+          name,
+          count,
+          share,
+          pct: (share * 100).toFixed(1),
+          description: desc,
+          barClass: meta.barClass || 'bg-indigo-600',
+          badgeClass: meta.badgeClass || 'bg-slate-100 text-slate-800 border-slate-300'
+        };
       }).sort((a, b) => b.count - a.count);
 
       return { totalCalls, connectReqCalls, connectRate, consultedCount, opDays, dailyAvg, catList, actorList };
@@ -468,42 +521,44 @@
                 인입 및 상담 연결 총평
               </div>
               <p class="text-slate-600 pl-6.5 text-[11px] sm:text-xs leading-normal">
-                분석기간 인입 <b>${stats.totalCalls}건</b> 중 상담사 연결요청은 <b>${stats.connectReqCalls}건(연결율 ${stats.connectRate}%)</b>이며, 
-                실제 상담이 이뤄져 세부 요약이 확보된 건은 <b>${stats.consultedCount}건</b>입니다. 본 분석은 실제 상담 내용을 유형·주체별로 정밀 분류한 결과입니다.
+                조회 기간 내 총 인입 <b>${stats.totalCalls}건</b> 중 상담사 연결요청은 <b>${stats.connectReqCalls}건(연결율 ${stats.connectRate}%)</b>이며, 
+                실제 상담이 이뤄져 세부 요약이 확보된 건은 <b>${stats.consultedCount}건</b>입니다. 본 분석은 실제 상담 <b>${stats.consultedCount}건</b>의 내용을 전수 분석하여 유형(${stats.catList.length}종)·주체(${stats.actorList.length}종)별로 도출한 결과입니다.
               </p>
             </div>
 
             <div class="p-3.5 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
               <div class="font-black text-slate-900 flex items-center gap-1.5 text-xs sm:text-sm">
                 <span class="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] flex items-center justify-center font-bold shrink-0">2</span>
-                서비스의 '실사용 단계' 진입 확인
+                최다 문의 유형 및 주요 주체
               </div>
               <p class="text-slate-600 pl-6.5 text-[11px] sm:text-xs leading-normal">
-                서비스가 '단순 문의 단계'에서 <b>'실사용 단계'</b>로 확실히 진입했습니다. 실제 <b>간병 신청·접수·배정 콜</b>이 최다를 차지하며, 
-                문의 주체도 <b>실사용·가입 고객이 대부분</b>입니다. 간병인/협력업체 등 공급망 등록 문의는 점차 안정화 단계에 접어들었습니다.
+                ${stats.catList.length > 0 ? `가장 많이 인입된 문의는 <b>${stats.catList[0].name}</b>(<b>${stats.catList[0].count}건, ${stats.catList[0].pct}%</b>)이며, ` : '분석 대상 상담이 없으며, '}
+                ${stats.actorList.length > 0 ? `문의 주체는 <b>${stats.actorList[0].name}</b>(<b>${stats.actorList[0].count}건, ${stats.actorList[0].pct}%</b>) 비중이 가장 높습니다.` : ''}
+                ${stats.catList.length > 1 ? `그 외 ${stats.catList.slice(1, 3).map(c => `<b>${c.name}</b>(${c.count}건)`).join(', ')} 순으로 확인됩니다.` : ''}
               </p>
             </div>
 
             <div class="p-3.5 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
               <div class="font-black text-slate-900 flex items-center gap-1.5 text-xs sm:text-sm">
                 <span class="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] flex items-center justify-center font-bold shrink-0">3</span>
-                이용 조건 및 방식에 대한 반복 질의
+                상위 문의 항목 특이사항
               </div>
               <p class="text-slate-600 pl-6.5 text-[11px] sm:text-xs leading-normal">
-                ① <b>이용대상·범위</b>(가입 필수, 지정불가 랜덤배정, 중환자실/전염병 제외, 요양병원 제외 등), 
-                ② <b>이용방식</b>(24시간 상주, 간병인 교체 2회 제한, 1일 산정, 대체인력)에 대한 질의가 많아 서비스 제공 방식에 대한 FAQ 안내를 강화하고 있습니다.
+                ${stats.catList.slice(0, 2).map((c, i) => `
+                  ${i > 0 ? '<br>' : ''}① <b>${c.name}</b> (${c.count}건, ${c.pct}%): ${c.description}
+                `).join('') || '조회된 기간 내 세부 상담 데이터가 없습니다.'}
               </p>
             </div>
 
             <div class="p-3.5 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
               <div class="font-black text-slate-900 flex items-center gap-1.5 text-xs sm:text-sm">
                 <span class="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] flex items-center justify-center font-bold shrink-0">4</span>
-                보험 문의처 오인 유입 콜 원스톱 이관
+                문의 주체별 대응 현황
               </div>
               <p class="text-slate-600 pl-6.5 text-[11px] sm:text-xs leading-normal">
-                리본케어를 '삼성화재 보험 문의처'로 오인해 유입되는 콜이 일부 확인됩니다. 
-                보험 가입 여부·보장 내용·보험금 청구 등은 간병지원 콜센터 업무 밖이므로, 
-                <b>삼성화재 대표콜센터(1588-5114)</b>로 신속히 원스톱 이관 안내를 체계적으로 진행하고 있습니다.
+                ${stats.actorList.slice(0, 2).map((a, i) => `
+                  ${i > 0 ? '<br>' : ''}• <b>${a.name}</b> (${a.count}건, ${a.pct}%): ${a.description}
+                `).join('') || '조회된 상담 주체 정보가 없습니다.'}
               </p>
             </div>
           </div>
@@ -513,7 +568,7 @@
           <div class="lg:col-span-7 bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-xs space-y-4">
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 class="text-base font-black text-slate-900">주요 문의유형 분포 (대분류)</h3>
+                <h3 class="text-base font-black text-slate-900">주요 문의유형 분포 (대분류 ${stats.catList.length}종)</h3>
                 <p class="text-xs text-slate-500 mt-0.5">각 항목 클릭 시 해당 통화로그로 <b class="text-blue-600 underline">즉시 드릴다운</b>됩니다.</p>
               </div>
               <span class="px-2.5 py-1 rounded-full bg-sky-100 text-sky-800 font-bold text-xs">${stats.consultedCount}건 기준</span>
@@ -538,13 +593,25 @@
                   <p class="text-[11px] text-slate-500 mt-1.5 truncate group-hover:text-slate-700">${cat.description}</p>
                 </div>
               `).join('')}
+
+              <!-- 문의유형 합계 행 -->
+              <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between text-xs font-bold text-slate-700">
+                <div class="flex items-center gap-2">
+                  <span class="w-5 h-5 rounded-lg bg-blue-600 text-white text-[10px] flex items-center justify-center font-bold">∑</span>
+                  <span>문의유형 전체 합계 (${stats.catList.length}개 유형)</span>
+                </div>
+                <div class="font-mono flex items-center gap-2">
+                  <span class="text-blue-700 font-black">${stats.consultedCount}건</span>
+                  <span class="text-blue-600 text-[11px] font-bold">(100.0%)</span>
+                </div>
+              </div>
             </div>
           </div>
 
           <div class="lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-6 shadow-xs space-y-4">
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 class="text-base font-black text-slate-900">문의 주체별 분포</h3>
+                <h3 class="text-base font-black text-slate-900">문의 주체별 분포 (${stats.actorList.length}종)</h3>
                 <p class="text-xs text-slate-500 mt-0.5">클릭 시 해당 문의 주체의 통화로그만 조회됩니다.</p>
               </div>
               <span class="px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800 font-bold text-xs">누가 문의했는가</span>
@@ -569,6 +636,18 @@
                   <p class="text-[11px] text-slate-500 mt-1.5 group-hover:text-slate-700">${act.description}</p>
                 </div>
               `).join('')}
+
+              <!-- 문의주체 합계 행 -->
+              <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between text-xs font-bold text-slate-700">
+                <div class="flex items-center gap-2">
+                  <span class="w-5 h-5 rounded-lg bg-indigo-600 text-white text-[10px] flex items-center justify-center font-bold">∑</span>
+                  <span>문의주체 전체 합계 (${stats.actorList.length}개 주체)</span>
+                </div>
+                <div class="font-mono flex items-center gap-2">
+                  <span class="text-indigo-700 font-black">${stats.consultedCount}건</span>
+                  <span class="text-indigo-600 text-[11px] font-bold">(100.0%)</span>
+                </div>
+              </div>
             </div>
 
             <div class="mt-4 p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-950 text-xs space-y-1">
@@ -730,7 +809,7 @@
       let logs = (gReportData && gReportData.callLogs) || [];
 
       if (gFilter.consultedOnly) {
-        logs = logs.filter(c => c.title || c.summary || (c.duration && c.duration !== '0'));
+        logs = logs.filter(c => (c.title && c.title.trim()) || (c.summary && c.summary.trim()) || (c.category && c.category.trim()));
       }
       if (gFilter.category) {
         logs = logs.filter(c => c.category === gFilter.category);
@@ -754,20 +833,20 @@
           <div class="flex items-center gap-2.5 flex-wrap">
             <label class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer text-xs font-bold text-slate-700 transition-colors">
               <input type="checkbox" ${gFilter.consultedOnly ? 'checked' : ''} onchange="toggleConsultedOnly(this.checked)" class="rounded text-blue-600">
-              <span>실제 상담건만 보기</span>
+              <span>실제 상담건만 보기 (${stats.consultedCount}건)</span>
             </label>
 
             <select onchange="handleCategoryFilter(this.value)" class="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white">
-              <option value="">문의 대분류: 전체 (${SAMSUNG_CATEGORIES.length}종)</option>
-              ${SAMSUNG_CATEGORIES.map(c => `
-                <option value="${c.name}" ${gFilter.category === c.name ? 'selected' : ''}>${c.name}</option>
+              <option value="">문의 대분류: 전체 (${stats.catList.length}종)</option>
+              ${stats.catList.map(c => `
+                <option value="${c.name}" ${gFilter.category === c.name ? 'selected' : ''}>${c.name} (${c.count}건)</option>
               `).join('')}
             </select>
 
             <select onchange="handleActorFilter(this.value)" class="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white">
-              <option value="">문의 주체: 전체 (${SAMSUNG_ACTORS.length}종)</option>
-              ${SAMSUNG_ACTORS.map(a => `
-                <option value="${a.name}" ${gFilter.actor === a.name ? 'selected' : ''}>${a.name}</option>
+              <option value="">문의 주체: 전체 (${stats.actorList.length}종)</option>
+              ${stats.actorList.map(a => `
+                <option value="${a.name}" ${gFilter.actor === a.name ? 'selected' : ''}>${a.name} (${a.count}건)</option>
               `).join('')}
             </select>
 
@@ -1102,7 +1181,7 @@
       ws1.addRow([]);
 
       // 대분류 테이블
-      const catHead = ws1.addRow(['1. 주요 문의유형 분포 (대분류 8종)', '건수', '비중', '대표 내용']);
+      const catHead = ws1.addRow([`1. 주요 문의유형 분포 (대분류 ${stats.catList.length}종 · 상담 ${stats.consultedCount}건 전수)`, '건수', '비중', '대표 내용']);
       catHead.eachCell(c => {
         c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E40AF' } };
         c.font = { color: { argb: 'FFFFFFFF' }, bold: true };
@@ -1115,10 +1194,18 @@
         r.getCell(2).alignment = { horizontal: 'right' };
         r.getCell(3).alignment = { horizontal: 'right' };
       });
+      const catSumRow = ws1.addRow(['합계', stats.consultedCount, '100.0%', `전체 ${stats.catList.length}개 문의유형 합계`]);
+      catSumRow.eachCell(c => {
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
+        c.font = { bold: true, color: { argb: 'FF1E40AF' } };
+        c.border = thinBorder;
+      });
+      catSumRow.getCell(2).alignment = { horizontal: 'right' };
+      catSumRow.getCell(3).alignment = { horizontal: 'right' };
       ws1.addRow([]);
 
       // 주체별 테이블
-      const actHead = ws1.addRow(['2. 문의 주체별 분포 (4종)', '건수', '비중', '성격 및 목적']);
+      const actHead = ws1.addRow([`2. 문의 주체별 분포 (${stats.actorList.length}종 · 상담 ${stats.consultedCount}건 전수)`, '건수', '비중', '성격 및 목적']);
       actHead.eachCell(c => {
         c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
         c.font = { color: { argb: 'FFFFFFFF' }, bold: true };
@@ -1131,6 +1218,14 @@
         r.getCell(2).alignment = { horizontal: 'right' };
         r.getCell(3).alignment = { horizontal: 'right' };
       });
+      const actSumRow = ws1.addRow(['합계', stats.consultedCount, '100.0%', `전체 ${stats.actorList.length}개 문의주체 합계`]);
+      actSumRow.eachCell(c => {
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+        c.font = { bold: true, color: { argb: 'FF334155' } };
+        c.border = thinBorder;
+      });
+      actSumRow.getCell(2).alignment = { horizontal: 'right' };
+      actSumRow.getCell(3).alignment = { horizontal: 'right' };
 
       // =========================================================================
       // [시트 2] 일자별 인입현황 + 첫행 합계 + 상단 틀고정 (2행 고정)
@@ -1344,7 +1439,7 @@
             </div>
           </div>
 
-          <div class="box-title">1. 주요 문의유형 분포 (대분류 8종 집계)</div>
+          <div class="box-title">1. 주요 문의유형 분포 (대분류 ${stats.catList.length}종 · 상담 ${stats.consultedCount}건 전수)</div>
           <table>
             <thead>
               <tr style="background: #1e40af; color: white;">
@@ -1363,10 +1458,16 @@
                   <td style="color: #475569; font-size: 7.5pt;">${c.description}</td>
                 </tr>
               `).join('')}
+              <tr style="background: #eff6ff; font-weight: bold;">
+                <td style="color: #1e40af;">합계</td>
+                <td class="text-right font-mono" style="color: #1e40af;">${stats.consultedCount}건</td>
+                <td class="text-right font-mono" style="color: #1e40af;">100.0%</td>
+                <td style="color: #1e40af; font-size: 7.5pt;">전체 ${stats.catList.length}개 문의유형 합계</td>
+              </tr>
             </tbody>
           </table>
 
-          <div class="box-title">2. 문의 주체별 분포 (4종)</div>
+          <div class="box-title">2. 문의 주체별 분포 (${stats.actorList.length}종 · 상담 ${stats.consultedCount}건 전수)</div>
           <table>
             <thead>
               <tr style="background: #334155; color: white;">
@@ -1385,6 +1486,12 @@
                   <td style="color: #475569; font-size: 7.5pt;">${a.description}</td>
                 </tr>
               `).join('')}
+              <tr style="background: #f1f5f9; font-weight: bold;">
+                <td style="color: #334155;">합계</td>
+                <td class="text-right font-mono" style="color: #334155;">${stats.consultedCount}건</td>
+                <td class="text-right font-mono" style="color: #334155;">100.0%</td>
+                <td style="color: #334155; font-size: 7.5pt;">전체 ${stats.actorList.length}개 문의주체 합계</td>
+              </tr>
             </tbody>
           </table>
 
