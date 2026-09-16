@@ -7,14 +7,26 @@
 
 var gSamsungReportData = null;
 var gActiveReportSubTab = 'summary'; // 'summary' | 'daily' | 'logs'
+function getThisWeekRange() {
+  const now = new Date();
+  const day = now.getDay();
+  const diffToMonday = (day === 0 ? -6 : 1) - day;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+  const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday + 6);
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return { start: fmt(monday), end: fmt(sunday) };
+}
+
+const defaultReportThisWeek = getThisWeekRange();
 var gReportFilter = {
   category: '',
   actor: '',
   search: '',
   consultedOnly: true,
-  periodKey: 'all',
-  startDate: '',
-  endDate: ''
+  periodKey: 'thisWeek',
+  startDate: defaultReportThisWeek.start,
+  endDate: defaultReportThisWeek.end
 };
 
 const SAMSUNG_CATEGORIES = [
@@ -546,9 +558,9 @@ function renderSamsungCallReportTab() {
                   <span class="whitespace-nowrap text-slate-600">기간:</span>
                 </div>
                 <div class="flex items-center gap-1.5 flex-1 min-w-0">
-                  <input type="date" id="tabReportStartDate" value="${info.startDate || '2026-08-18'}" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
+                  <input type="date" id="tabReportStartDate" value="${gReportFilter.startDate || defaultReportThisWeek.start}" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
                   <span class="text-slate-400 font-normal shrink-0">~</span>
-                  <input type="date" id="tabReportEndDate" value="${info.endDate || new Date().toISOString().slice(0, 10)}" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
+                  <input type="date" id="tabReportEndDate" value="${gReportFilter.endDate || defaultReportThisWeek.end}" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
                   <button type="button" onclick="applyTabDateRange()" class="px-3 py-1.5 sm:py-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-2xs shrink-0 whitespace-nowrap cursor-pointer">
                     조회
                   </button>
@@ -2358,29 +2370,36 @@ async function handleSamsungExcelImport(e) {
 // 17. Toolbar Helpers: Quick Presets, Date Range & Web Link Copy
 function setTabPresetRange(type) {
   const today = new Date();
-  let start = new Date();
-  let end = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  let sStr = '';
+  let eStr = '';
 
   if (type === 'today') {
+    sStr = fmt(today);
+    eStr = fmt(today);
   } else if (type === 'yesterday') {
-    start.setDate(today.getDate() - 1);
-    end.setDate(today.getDate() - 1);
+    const y = new Date(today);
+    y.setDate(today.getDate() - 1);
+    sStr = fmt(y);
+    eStr = fmt(y);
   } else if (type === 'thisWeek') {
-    const day = today.getDay();
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-    start.setDate(diff);
+    const range = getThisWeekRange();
+    sStr = range.start;
+    eStr = range.end;
   } else if (type === 'lastWeek') {
     const day = today.getDay();
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1) - 7;
-    start.setDate(diff);
-    end = new Date(start);
-    end.setDate(start.getDate() + 6);
+    const diffToLastMonday = (day === 0 ? -6 : 1) - day - 7;
+    const lastMon = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diffToLastMonday);
+    const lastSun = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diffToLastMonday + 6);
+    sStr = fmt(lastMon);
+    eStr = fmt(lastSun);
   } else if (type === 'last30') {
-    start.setDate(today.getDate() - 30);
+    const past = new Date(today);
+    past.setDate(today.getDate() - 30);
+    sStr = fmt(past);
+    eStr = fmt(today);
   }
-
-  const sStr = start.toISOString().slice(0, 10);
-  const eStr = end.toISOString().slice(0, 10);
 
   const sInput = document.getElementById('tabReportStartDate');
   const eInput = document.getElementById('tabReportEndDate');
@@ -2391,14 +2410,16 @@ function setTabPresetRange(type) {
 }
 
 async function handleTabChannelChange(channel) {
-  const s = document.getElementById('tabReportStartDate')?.value || '2026-08-18';
-  const e = document.getElementById('tabReportEndDate')?.value || new Date().toISOString().slice(0, 10);
+  const thisWeek = getThisWeekRange();
+  const s = document.getElementById('tabReportStartDate')?.value || thisWeek.start;
+  const e = document.getElementById('tabReportEndDate')?.value || thisWeek.end;
   await syncTabLiveCti(s, e, channel);
 }
 
 async function applyTabDateRange() {
-  const s = document.getElementById('tabReportStartDate')?.value;
-  const e = document.getElementById('tabReportEndDate')?.value;
+  const thisWeek = getThisWeekRange();
+  const s = document.getElementById('tabReportStartDate')?.value || thisWeek.start;
+  const e = document.getElementById('tabReportEndDate')?.value || thisWeek.end;
   const ch = document.getElementById('tabReportChannelSelect')?.value || '삼성화재';
   if (!s || !e) return;
 
@@ -2406,8 +2427,9 @@ async function applyTabDateRange() {
 }
 
 async function syncTabLiveCti(customStart, customEnd, customChannel) {
-  const s = customStart || document.getElementById('tabReportStartDate')?.value || '2026-08-18';
-  const e = customEnd || document.getElementById('tabReportEndDate')?.value || new Date().toISOString().slice(0, 10);
+  const thisWeek = getThisWeekRange();
+  const s = customStart || document.getElementById('tabReportStartDate')?.value || thisWeek.start;
+  const e = customEnd || document.getElementById('tabReportEndDate')?.value || thisWeek.end;
   const ch = customChannel || document.getElementById('tabReportChannelSelect')?.value || '삼성화재';
 
   const btn = document.getElementById('tabSyncCtiBtn');
@@ -2451,8 +2473,9 @@ async function syncTabLiveCti(customStart, customEnd, customChannel) {
 }
 
 function copyReportWebLink(targetChannel = '삼성화재') {
-  const s = document.getElementById('tabReportStartDate')?.value || '2026-08-18';
-  const e = document.getElementById('tabReportEndDate')?.value || new Date().toISOString().slice(0, 10);
+  const thisWeek = getThisWeekRange();
+  const s = document.getElementById('tabReportStartDate')?.value || thisWeek.start;
+  const e = document.getElementById('tabReportEndDate')?.value || thisWeek.end;
   const origin = window.location.origin;
   const reportUrl = `${origin}/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(targetChannel)}`;
 
@@ -2468,8 +2491,9 @@ function copyReportWebLink(targetChannel = '삼성화재') {
 }
 
 function openReportWebView(targetChannel = '삼성화재') {
-  const s = document.getElementById('tabReportStartDate')?.value || '2026-08-18';
-  const e = document.getElementById('tabReportEndDate')?.value || new Date().toISOString().slice(0, 10);
+  const thisWeek = getThisWeekRange();
+  const s = document.getElementById('tabReportStartDate')?.value || thisWeek.start;
+  const e = document.getElementById('tabReportEndDate')?.value || thisWeek.end;
   const reportUrl = `/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(targetChannel)}`;
   window.open(reportUrl, '_blank');
 }
