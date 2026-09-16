@@ -13732,9 +13732,49 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
               (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
               ((faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null);
 
-            const claimDateTimeStr = formatStatusDateTime(rawClaimDate, '10:00');
+            // 삼성화재인 경우 간병기간(종료일 우선, 시작일 보조)을 기준으로 몇월 청구 대상인지 자동 산출
+            let targetYear = '';
+            let targetMonth = '';
+            const rawEnd = r.endDateStr || (as ? as.endDate : null) || app.careEndDate || '';
+            const rawStart = r.startDateStr || (as ? as.startDate : null) || app.careStartDate || '';
+            const dateMatch = (rawEnd || rawStart).match(/(\d{4})[.-](\d{1,2})/);
+            if (dateMatch) {
+              targetYear = dateMatch[1];
+              targetMonth = parseInt(dateMatch[2], 10);
+            } else {
+              const now = new Date();
+              targetYear = String(now.getFullYear());
+              targetMonth = now.getMonth() + 1;
+            }
+            const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
+
+            // 해당 월분의 삼성화재 월간 정기 청구서 발송 이력 확인
+            let samsungMonthlyLog = null;
+            if (isSamsung && Array.isArray(gSamsungEmailLogs)) {
+              const padMonth = String(targetMonth).padStart(2, '0');
+              samsungMonthlyLog = gSamsungEmailLogs.find(l => {
+                if (!l) return false;
+                const isMonthly = l.type === 'MONTHLY_CLAIM' || (l.typeName && l.typeName.includes('월간'));
+                if (!isMonthly) return false;
+                const subj = l.subject || '';
+                const file = l.excelFileName || '';
+                const body = l.body || '';
+                const hasMonth = subj.includes(`${targetMonth}월`) || subj.includes(`${padMonth}월`) || file.includes(`${targetYear}${padMonth}`) || file.includes(`_${padMonth}.`) || body.includes(`${targetMonth}월분`) || body.includes(`${padMonth}월분`);
+                const hasYear = !targetYear || subj.includes(targetYear) || file.includes(targetYear) || body.includes(targetYear);
+                return hasMonth && hasYear;
+              });
+            }
+
+            const isSamsungClaimSent = Boolean(samsungMonthlyLog);
+            const isClaimDone = isSamsung 
+              ? (isSamsungClaimSent || Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate)))
+              : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(rawClaimDate));
+
+            const claimDateTimeStr = isSamsung
+              ? (samsungMonthlyLog ? (samsungMonthlyLog.sentAt ? samsungMonthlyLog.sentAt.slice(0, 16) : '발송완료') : formatStatusDateTime(rawClaimDate, '10:00'))
+              : formatStatusDateTime(rawClaimDate, '10:00');
+
             const isSending = Boolean(window.gBarobillSendingRounds && window.gBarobillSendingRounds.has(`${app.id}_${r.roundNumber}`));
-            const isClaimDone = Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(rawClaimDate);
             const isDepositDone = isRoundDepositConfirmed(r);
             const isPayoutDone = r.isPayoutPaid || (r.existingPayout && r.existingPayout.payoutStatus === '지급');
             const hours = r.hours || (r.days * 24);
@@ -13841,33 +13881,53 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                             </div>
                           ` : isClaimDone ? `
                             <div class="flex items-center gap-1.5 flex-wrap">
-                              <span class="px-2 py-0.5 rounded-lg bg-slate-200 text-slate-700 font-bold text-[11px] flex items-center gap-1" title="청구 발송일시: ${claimDateTimeStr || '발송완료'}">
-                                <i data-lucide="check" class="w-3 h-3"></i> 청구완료 (${claimDateTimeStr ? claimDateTimeStr + ' 발송' : '발송완료'})
+                              <span class="px-2 py-0.5 rounded-lg bg-slate-200 text-slate-800 font-bold text-[11px] flex items-center gap-1" title="${isSamsung ? `${targetMonthText} 정기청구서 발송완료` : (claimDateTimeStr ? '청구 발송일시: ' + claimDateTimeStr : '발송완료')}">
+                                <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> 청구완료 (${isSamsung ? `${targetMonth}월분 청구서 발송완료` : (claimDateTimeStr ? claimDateTimeStr + ' 발송' : '발송완료')})
                               </span>
                               ${r.existingClaim ? `<span class="text-[10.5px] font-mono text-slate-400">${r.existingClaim.id}</span>` : ''}
                             </div>
                           ` : `
                             <span class="px-2 py-0.5 rounded-lg bg-amber-200/90 text-amber-950 font-black text-[11px] flex items-center gap-1">
-                              <i data-lucide="clock" class="w-3 h-3"></i> 청구전
+                              <i data-lucide="clock" class="w-3 h-3"></i> 청구전 ${isSamsung ? `(${targetMonth}월분 청구 대상)` : ''}
                             </span>
                           `}
                         </div>
                       </div>
 
-                      <!-- 하단 버튼 영역 -->
+                      <!-- 하단 버튼/정보 영역 (삼성화재 이동 버튼 제거, 대상월 및 발송결과 자동 표시) -->
                       <div class="pt-2 border-t ${isClaimDone ? 'border-slate-200' : isSending ? 'border-purple-200' : 'border-amber-200/60'}">
                         ${isSamsung ? `
-                          <div class="space-y-1.5">
-                            <div class="text-[10.5px] font-bold text-sky-900 bg-sky-50 border border-sky-200 p-2 rounded-xl flex items-center justify-center gap-1.5">
-                              <i data-lucide="mail" class="w-3.5 h-3.5 text-sky-600 shrink-0"></i>
-                              <span>삼성화재는 월 1회 이메일 일괄 청구 대상입니다.</span>
+                          ${isClaimDone ? `
+                            <div class="p-2.5 rounded-xl bg-slate-200/60 border border-slate-300 text-slate-800 text-xs space-y-1">
+                              <div class="flex items-center justify-between font-bold">
+                                <span class="flex items-center gap-1.5 text-slate-800">
+                                  <i data-lucide="mail-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+                                  <span>${targetMonthText} 청구 대상</span>
+                                </span>
+                                <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-extrabold text-[10.5px] border border-emerald-300">
+                                  정기청구 발송완료
+                                </span>
+                              </div>
+                              <p class="text-[11px] text-slate-500 font-mono truncate" title="${samsungMonthlyLog ? (samsungMonthlyLog.sentAt || '') : '월간 일괄청구 완료'}">
+                                ${samsungMonthlyLog ? `발송일시: ${samsungMonthlyLog.sentAt} (${samsungMonthlyLog.to || '본사 이메일'})` : '해당 월분 정기 청구서가 정상 발송되었습니다.'}
+                              </p>
                             </div>
-                            <button type="button" onclick="closeModal('hubCustomerDetailModal'); switchTab('samsungclaimhub', 'claims');" 
-                              class="w-full py-2 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 active:scale-95 text-white font-black text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer">
-                              <i data-lucide="mail-check" class="w-3.5 h-3.5"></i>
-                              <span>삼성화재 접수/청구관리 이동</span>
-                            </button>
-                          </div>
+                          ` : `
+                            <div class="p-2.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-950 text-xs space-y-1">
+                              <div class="flex items-center justify-between font-bold">
+                                <span class="flex items-center gap-1.5 text-sky-900">
+                                  <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i>
+                                  <span>정기청구 대상:</span>
+                                </span>
+                                <span class="px-2 py-0.5 rounded-lg bg-sky-600 text-white font-black text-[11px] shadow-2xs">
+                                  ${targetMonthText} 청구 대상
+                                </span>
+                              </div>
+                              <p class="text-[11px] text-sky-700 font-medium">
+                                삼성화재는 월 1회 본사 이메일로 일괄 청구됩니다. (${targetMonth}월분 청구서 발송 시 자동 청구완료 처리)
+                              </p>
+                            </div>
+                          `}
                         ` : isSending ? `
                           <button disabled 
                             class="w-full py-2 rounded-xl bg-purple-100 text-purple-800 border border-purple-300 font-bold text-xs shadow-2xs flex items-center justify-center gap-2 cursor-wait">
@@ -13984,9 +14044,9 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                           </button>
                         ` : `
                           <button type="button" onclick="toggleClaimDepositStatus('${app.id}', ${r.roundNumber}, '')" 
-                            class="w-full py-2 rounded-xl bg-amber-100/90 hover:bg-amber-500 hover:text-white text-amber-900 border border-amber-300 font-bold text-xs shadow-2xs flex items-center justify-center gap-1.5 transition-all cursor-pointer" title="청구 전이지만 선입금 등 사전 입금확인이 필요한 경우 클릭">
-                            <i data-lucide="clock" class="w-4 h-4 text-amber-700"></i>
-                            <span>입금확인 처리 (선입금)</span>
+                            class="w-full py-2 rounded-xl bg-amber-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer" title="보험금 입금 확인 시 입금완료로 처리">
+                            <i data-lucide="check-circle" class="w-4 h-4"></i>
+                            <span>보험금 입금확인 처리 ✓</span>
                           </button>
                         `}
                       </div>
@@ -14964,11 +15024,30 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               ` : `
                 <div class="space-y-2">
                   ${rounds.map(r => {
-                    const faxSentDateStr = (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
-                      ((faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null);
+                    // 삼성화재인 경우 해당 월분의 정기 청구서 발송 이력 확인
+                    let samsungMonthlyLog = null;
+                    if (isSamsung && Array.isArray(gSamsungEmailLogs)) {
+                      const dateMatch = (r.endDateStr || r.startDateStr || '').match(/(\d{4})[.-](\d{1,2})/);
+                      const targetMonth = dateMatch ? parseInt(dateMatch[2], 10) : (new Date().getMonth() + 1);
+                      const targetYear = dateMatch ? dateMatch[1] : String(new Date().getFullYear());
+                      const padMonth = String(targetMonth).padStart(2, '0');
+                      samsungMonthlyLog = gSamsungEmailLogs.find(l => {
+                        if (!l) return false;
+                        const isMonthly = l.type === 'MONTHLY_CLAIM' || (l.typeName && l.typeName.includes('월간'));
+                        if (!isMonthly) return false;
+                        const subj = l.subject || '';
+                        const file = l.excelFileName || '';
+                        const body = l.body || '';
+                        const hasMonth = subj.includes(`${targetMonth}월`) || subj.includes(`${padMonth}월`) || file.includes(`${targetYear}${padMonth}`) || file.includes(`_${padMonth}.`) || body.includes(`${targetMonth}월분`) || body.includes(`${padMonth}월분`);
+                        const hasYear = !targetYear || subj.includes(targetYear) || file.includes(targetYear) || body.includes(targetYear);
+                        return hasMonth && hasYear;
+                      });
+                    }
 
                     const isSending = Boolean(window.gBarobillSendingRounds && window.gBarobillSendingRounds.has(`${app.id}_${r.roundNumber}`));
-                    const isClaimDone = Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(faxSentDateStr);
+                    const isClaimDone = isSamsung
+                      ? (Boolean(samsungMonthlyLog) || Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate)))
+                      : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(faxSentDateStr));
                     const isDepositDone = isRoundDepositConfirmed(r);
 
                     const cardBorder = 
