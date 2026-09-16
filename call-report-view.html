@@ -517,7 +517,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     }
 
     function calculateStats() {
-      let logs = (gReportData && gReportData.callLogs) || [];
+      let logs = ((gReportData && gReportData.callLogs) || []).filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
       // 엄격한 보험사 채널 격리: 해당 보험사 고객만 100% 필터링 (타 보험사 완전 배제)
       const targetCh = gFilter.channel || '삼성화재';
       logs = logs.filter(c => {
@@ -959,7 +959,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 
     function renderLogsSheet(stats) {
       const container = document.getElementById('tabContent-logs');
-      let logs = (gReportData && gReportData.callLogs) || [];
+      let logs = ((gReportData && gReportData.callLogs) || []).filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
 
       // 엄격한 보험사 채널 격리: 해당 보험사 고객만 100% 필터링 (타 보험사 완전 배제)
       const targetCh = gFilter.channel || '삼성화재';

@@ -755,9 +755,14 @@ function renderTabDailyTrendChart() {
   }
 }
 
+function getSamsungCallLogs() {
+  const raw = (gSamsungReportData && gSamsungReportData.callLogs) || [];
+  return raw.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
+}
+
 // 4. Statistics Calculation Engine
 function calculateReportStats() {
-  const logs = (gSamsungReportData && gSamsungReportData.callLogs) || [];
+  const logs = getSamsungCallLogs();
   const cs = gSamsungReportData && gSamsungReportData.ctiSummary;
   const totalCalls = (cs && cs.totalInbound !== undefined) ? cs.totalInbound : logs.length;
   const connectReqCalls = (cs && cs.connectRequests !== undefined) ? cs.connectRequests : logs.filter(c => c.connectReq === 'Y').length;
@@ -1214,7 +1219,7 @@ function renderReportDailySubTab(stats) {
 
 // 7. [시트 3: 통화로그(원본) + 2개 컬럼 연동] 렌더러
 function renderReportLogsSubTab(stats) {
-  let logs = (gSamsungReportData && gSamsungReportData.callLogs) || [];
+  let logs = getSamsungCallLogs();
 
   // Apply filters
   if (gReportFilter.consultedOnly) {

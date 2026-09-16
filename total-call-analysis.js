@@ -356,20 +356,21 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
 }
 
 /**
- * 3-3. 미연결 & 대기시간 0초 콜 여부 판별기 (아웃콜 대상)
+ * 3-3. 아웃콜 대상 판별기
+ * - CTI 프로그램에서 연결요청(Y)을 하였으나 실제 상담시간이 0인 고객 (상담 미연결로 신속 콜백 요망)
  */
-function isCallMissedWaitZero(c) {
+function isCallNeedOutcall(c) {
   if (!c) return false;
-  const waitRaw = String(c.waitTime !== undefined && c.waitTime !== null ? c.waitTime : '').trim();
-  const waitZero = waitRaw === '0' || waitRaw === '0s' || waitRaw === '0초' || Number(c.waitTime) === 0;
-  if (!waitZero) return false;
+  // 1) 고객이 상담원 연결을 요청(Y)한 경우만 대상
+  const isConnectReq = (c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
+  if (!isConnectReq) return false;
 
+  // 2) 실제 상담시간(duration)이 0인 경우 (미연결 종료)
   const durRaw = String(c.duration || '').trim();
   const durZero = !durRaw || durRaw === '0' || durRaw === '0초' || durRaw === '00:00:00' || Number(durRaw) === 0;
-  const noSummary = !c.summary || c.summary.trim() === '';
-  const isMissed = (c.connectReq === 'N' || c.transferResult === 'N' || durZero || noSummary);
-  return isMissed;
+  return durZero;
 }
+const isCallMissedWaitZero = isCallNeedOutcall;
 
 /**
  * 3-4. 아웃콜 완료 처리 상태 관리 (localStorage 영구 보존)
@@ -681,6 +682,12 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
   }
 }
 
+function getTotalCallLogs() {
+  const raw = (gTotalCallData && gTotalCallData.callLogs) || [];
+  // CTI 프로그램에서 연결요청(connectReq === 'Y')인 고객만 포함 (상담연결 미요청 고객 제외)
+  return raw.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
+}
+
 /**
  * =============================================================================
  * 종합 콜분석 탭 전체 렌더링
@@ -690,7 +697,7 @@ function renderTotalCallAnalysisTab() {
   const container = document.getElementById('tab-totalcallanalysis');
   if (!container) return;
 
-  const logs = (gTotalCallData && gTotalCallData.callLogs) || [];
+  const logs = getTotalCallLogs();
   const ctiSummary = (gTotalCallData && gTotalCallData.ctiSummary) || {};
 
   // 필터링 적용
@@ -827,10 +834,10 @@ function renderTotalCallAnalysisTab() {
             <div>
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="px-2.5 py-0.5 rounded-full bg-white text-rose-800 font-black text-xs uppercase tracking-wider">긴급 콜백 요망</span>
-                <h4 class="text-sm sm:text-base font-black">CTI 미연결 · 대기시간 0초 고객 아웃콜 관리</h4>
+                <h4 class="text-sm sm:text-base font-black">상담 미연결(연결요청 Y & 상담시간 0초) 고객 아웃콜 관리</h4>
                 <span class="px-2.5 py-0.5 rounded-full bg-rose-900/70 text-rose-100 font-black text-xs border border-rose-400/40">미처리 ${pendingOutcalls.length}건 / 전체 ${missedWaitZeroLogs.length}건</span>
               </div>
-              <p class="text-xs text-rose-100 mt-0.5">인입 즉시 통화 연결되지 않고 종료(대기 0초)된 고객입니다. 신속한 아웃콜을 통해 상담을 진행해주세요.</p>
+              <p class="text-xs text-rose-100 mt-0.5">고객이 상담 연결을 요청(Y)하였으나 통화가 이루어지지 않고 종료(상담시간 0초)된 고객입니다. 신속한 아웃콜을 통해 상담을 진행해주세요.</p>
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
@@ -849,15 +856,15 @@ function renderTotalCallAnalysisTab() {
       <!-- 2. 핵심 KPI 스트립 (5대 메트릭) -->
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t border-slate-100 text-xs">
         <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
-          <span class="text-[11px] font-bold text-slate-500">전체 인바운드 콜</span>
-          <div class="text-xl font-black text-slate-900 mt-1">${totalInbound}<span class="text-xs font-normal text-slate-500 ml-1">건</span></div>
-          <span class="text-[10px] text-slate-400 mt-0.5">CTI 실시간 수집</span>
+          <span class="text-[11px] font-bold text-slate-500">상담 연결요청 콜</span>
+          <div class="text-xl font-black text-slate-900 mt-1">${logs.length}<span class="text-xs font-normal text-slate-500 ml-1">건</span></div>
+          <span class="text-[10px] text-slate-400 mt-0.5">연결요청 Y 고객 전수</span>
         </div>
 
         <div class="p-3 rounded-2xl bg-cyan-50/70 border border-cyan-200 flex flex-col justify-between">
           <span class="text-[11px] font-bold text-cyan-800">실제 상담 (요약 확보)</span>
           <div class="text-xl font-black text-cyan-700 mt-1">${answeredCount}<span class="text-xs font-normal text-cyan-600 ml-1">건</span></div>
-          <span class="text-[10px] text-cyan-600 mt-0.5">응대율 ${totalInbound > 0 ? Math.round((answeredCount / totalInbound) * 100) : 0}%</span>
+          <span class="text-[10px] text-cyan-600 mt-0.5">응대율 ${logs.length > 0 ? Math.round((answeredCount / logs.length) * 100) : 0}%</span>
         </div>
 
         <div class="p-3 rounded-2xl bg-indigo-50/70 border border-indigo-200 flex flex-col justify-between">
@@ -870,9 +877,9 @@ function renderTotalCallAnalysisTab() {
           <div class="flex items-center justify-between">
             <span class="text-[11px] font-black text-rose-800 flex items-center gap-1">
               <i data-lucide="phone-missed" class="w-3 h-3 text-rose-600 animate-pulse"></i>
-              <span>미연결 · 아웃콜요망</span>
+              <span>상담미연결 · 아웃콜</span>
             </span>
-            <span class="text-[9px] px-1.5 py-0.2 bg-rose-600 text-white rounded font-bold">대기0초</span>
+            <span class="text-[9px] px-1.5 py-0.2 bg-rose-600 text-white rounded font-bold">상담0초</span>
           </div>
           <div class="text-xl font-black text-rose-700 mt-1">
             ${pendingOutcalls.length}<span class="text-xs font-normal text-rose-600 ml-1">건 대기</span>
@@ -926,9 +933,9 @@ function renderTotalCallAnalysisTab() {
       <!-- 통합 검색 및 상세 필터 바 -->
       <div class="flex items-center gap-2 flex-wrap flex-1 justify-start md:justify-end min-w-0">
         <!-- 아웃콜 대상 전용 체크박스 -->
-        <label class="flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 cursor-pointer px-2.5 py-1 rounded-xl transition-colors shrink-0" title="대기시간 0초 미연결 아웃콜 대상만 모아보기">
+        <label class="flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 cursor-pointer px-2.5 py-1 rounded-xl transition-colors shrink-0" title="연결요청(Y) 후 상담시간 0초 미연결 아웃콜 대상만 모아보기">
           <input type="checkbox" ${gTotalFilter.onlyMissedOutcall ? 'checked' : ''} onchange="handleTotalFilterChange('onlyMissedOutcall', this.checked)" class="rounded text-rose-600">
-          <span>🚨 아웃콜(대기0초)만</span>
+          <span>🚨 아웃콜(상담0초)만</span>
         </label>
 
         <!-- 인입 채널 셀렉트 -->
@@ -1221,7 +1228,7 @@ function renderTotalListView(logs) {
                           <button type="button" onclick="openMissedCallsOutcallModal('pending')" 
                             class="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 animate-pulse hover:bg-rose-200 cursor-pointer inline-flex items-center gap-1 shadow-2xs" title="클릭 시 아웃콜 집중 모달 열기">
                             <span>🚨 아웃콜필요</span>
-                            <span class="text-[9px] bg-rose-600 text-white rounded px-1">대기0초</span>
+                            <span class="text-[9px] bg-rose-600 text-white rounded px-1">상담0초</span>
                           </button>
                           <button type="button" onclick="triggerCtiCall('${call.phone || call.rawPhone}', '${match.patientName}', '고객', '${match.appId || ''}', '${match.company || ''}')" 
                             class="px-2 py-0.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] flex items-center gap-0.5 cursor-pointer shadow-xs" title="즉시 CTI 전화 발신">
@@ -1520,7 +1527,7 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
     document.body.appendChild(modal);
   }
 
-  const logs = (gTotalCallData && gTotalCallData.callLogs) || [];
+  const logs = getTotalCallLogs();
   const missedLogs = logs.filter(isCallMissedWaitZero);
 
   const pendingList = missedLogs.filter(c => !isCallOutcallHandled(getCallUniqueId(c)));
@@ -1550,9 +1557,9 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
           <div>
             <div class="flex items-center gap-2 flex-wrap">
               <span class="px-2.5 py-0.5 rounded-full bg-white text-rose-800 font-black text-xs uppercase tracking-wider">긴급 콜백 요망</span>
-              <h3 class="text-base sm:text-lg font-black">CTI 미연결 · 대기시간 0초 아웃콜(Call-back) 관리 대시보드</h3>
+              <h3 class="text-base sm:text-lg font-black">상담 미연결(연결요청 Y & 상담시간 0초) 아웃콜 관리 대시보드</h3>
             </div>
-            <p class="text-xs text-rose-100 mt-0.5">인입 즉시 통화 연결되지 않고 종료(대기 0초)된 고객 명단입니다. 1클릭 CTI 다이얼로 신속히 아웃콜을 진행하세요.</p>
+            <p class="text-xs text-rose-100 mt-0.5">고객이 상담 연결을 요청(Y)하였으나 통화가 연결되지 않고 종료(상담시간 0초)된 고객 명단입니다. 1클릭 CTI 다이얼로 신속히 아웃콜을 진행하세요.</p>
           </div>
         </div>
         <button type="button" onclick="closeMissedCallsOutcallModal()" class="text-rose-200 hover:text-white cursor-pointer p-1">
@@ -1603,7 +1610,7 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
                 <th class="py-2.5 px-3 w-32">인입일시</th>
                 <th class="py-2.5 px-3 w-28">채널</th>
                 <th class="py-2.5 px-3 w-44">고객명 / 전화번호</th>
-                <th class="py-2.5 px-3 w-28 text-center">대기시간</th>
+                <th class="py-2.5 px-3 w-32 text-center">상담 / 대기시간</th>
                 <th class="py-2.5 px-3 w-32 text-center">CTI 발신</th>
                 <th class="py-2.5 px-3 w-32 text-center">처리상태</th>
                 <th class="py-2.5 px-3">메모 / 조치</th>
@@ -1633,8 +1640,9 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
                         <span class="text-[9.5px] font-bold text-blue-700">✓ ${match.company} (${match.appId})</span>
                       ` : ''}
                     </td>
-                    <td class="py-2.5 px-3 text-center font-mono text-rose-600 font-bold text-[11px]">
-                      대기 0초 (미연결)
+                    <td class="py-2.5 px-3 text-center">
+                      <div class="font-mono text-rose-600 font-bold text-[11px]">상담 0초 (미연결)</div>
+                      <div class="font-mono text-slate-400 text-[10px]">대기 ${c.waitTime !== undefined ? c.waitTime : 0}초</div>
                     </td>
                     <td class="py-2.5 px-3 text-center">
                       <button type="button" onclick="triggerCtiCall('${c.phone || c.rawPhone}', '${match.patientName}', '고객', '${match.appId || ''}', '${match.company || ''}')" 
@@ -1672,7 +1680,7 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
       <!-- 모달 푸터 -->
       <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
         <span class="text-xs text-slate-500 font-bold">
-          대기 0초 미연결 총 <b>${missedLogs.length}</b>건 중 미처리 <b class="text-rose-600">${pendingList.length}</b>건
+          상담 미연결 총 <b>${missedLogs.length}</b>건 중 미처리 <b class="text-rose-600">${pendingList.length}</b>건
         </span>
         <button type="button" onclick="closeMissedCallsOutcallModal()" class="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 text-xs cursor-pointer">
           닫기
@@ -2025,12 +2033,12 @@ function renderCallDetailCardHtml(call) {
         </div>
       </div>
 
-      <!-- 대기 0초 미연결 콜인 경우 긴급 아웃콜(콜백) 안내 바 -->
+      <!-- 상담시간 0초 미연결 콜인 경우 긴급 아웃콜(콜백) 안내 바 -->
       ${isMissed ? `
         <div class="px-2.5 py-1.5 rounded-xl ${isHandled ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' : 'bg-rose-50 border border-rose-300 text-rose-900'} flex items-center justify-between gap-2 text-xs">
           <div class="flex items-center gap-1.5 font-bold">
             <i data-lucide="${isHandled ? 'check-circle' : 'phone-missed'}" class="w-3.5 h-3.5 ${isHandled ? 'text-emerald-600' : 'text-rose-600 animate-pulse'} shrink-0"></i>
-            <span>${isHandled ? '✅ 아웃콜 완료됨' : '🚨 미연결 · 대기 0초 (아웃콜 대상)'}</span>
+            <span>${isHandled ? '✅ 아웃콜 완료됨' : '🚨 미연결 · 상담시간 0초 (아웃콜 대상)'}</span>
           </div>
           <div class="flex items-center gap-1">
             <button type="button" onclick="toggleCallOutcallStatus('${callId}')" 

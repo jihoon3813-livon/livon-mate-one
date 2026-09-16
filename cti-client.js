@@ -610,6 +610,10 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
           const rawTitle = tds[13] || '';
           const memberName = resolveMemberName(rawPhone, tds[4], rawTitle);
           const isConnectReq = (tds[10] && tds[10].trim().toUpperCase() === 'Y') ? 'Y' : 'N';
+          // CTI 프로그램에서 연결요청이 Y가 아닌 고객은 제외 (상담연결을 요청하지 않은 단순 종료 고객)
+          if (isConnectReq !== 'Y') {
+            continue;
+          }
 
           pageLogs.push({
             type: tds[0],
