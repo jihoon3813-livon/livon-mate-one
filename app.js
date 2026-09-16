@@ -1550,31 +1550,36 @@ var gDefaultFormTemplates = {
     { id: 'AREA-08', label: '계약번호(증권번호)', mapping: 'policyNumber', x: 19.5, y: 33.3, w: 28, h: 2.8 },
     { id: 'AREA-09', label: '상품명(SCOR 전용)', mapping: 'hd2_productName', x: 64, y: 33.3, w: 28, h: 2.8 },
     { id: 'AREA-10', label: '사고내용(진단명)', mapping: 'hd2_accidentContent', x: 19.5, y: 36.3, w: 72.5, h: 2.8 },
-    { id: 'AREA-11', label: '병원명(입원의료기관)', mapping: 'hospitalName', x: 19.5, y: 42.0, w: 42, h: 2.8 },
-    { id: 'AREA-12', label: '간병인명(생년월일)', mapping: 'hd2_caregiverNameBirth', x: 19.5, y: 45.0, w: 42, h: 2.8 },
-    { id: 'AREA-13', label: '간병인 연락처', mapping: 'hd2_caregiverPhone', x: 74, y: 45.0, w: 18, h: 2.8 },
-    { id: 'AREA-14', label: '최초간병시작일', mapping: 'hd2_firstCareStartDate', x: 19.5, y: 48.5, w: 21.5, h: 2.8 },
-    { id: 'AREA-15', label: '예상사용시간(수정가능)', mapping: 'hd2_expectedUsageTime', x: 42, y: 48.5, w: 18, h: 2.8 },
-    { id: 'AREA-16', label: '계속간병여부(선택)', mapping: 'hd2_isContinuingCare', x: 67, y: 48.5, w: 25, h: 2.8 },
-    { id: 'AREA-17', label: '서비스 기간 (1행)', mapping: 'hd2_servicePeriod_row1', x: 19.5, y: 53.5, w: 72.5, h: 2.3 },
-    { id: 'AREA-18', label: '서비스 기간 (2행)', mapping: 'hd2_servicePeriod_row2', x: 19.5, y: 55.9, w: 72.5, h: 2.3 },
-    { id: 'AREA-19', label: '서비스 기간 (3행)', mapping: 'hd2_servicePeriod_row3', x: 19.5, y: 58.3, w: 72.5, h: 2.3 },
-    { id: 'AREA-20', label: '서비스 기간 (4행)', mapping: 'hd2_servicePeriod_row4', x: 19.5, y: 60.7, w: 72.5, h: 2.3 },
-    { id: 'AREA-21', label: '작성일자(YYYY년 M월 D일)', mapping: 'hd2_writeDateKorean', x: 50, y: 78.5, w: 42, h: 2.8 },
-    { id: 'AREA-22', label: '담당자 성명', mapping: 'hd2_managerName', x: 20, y: 84.5, w: 25, h: 2.8 },
-    { id: 'AREA-23', label: '담당자 연락처', mapping: 'hd2_managerPhone', x: 50, y: 84.5, w: 42, h: 2.8 }
+    { id: 'AREA-11', label: '간병 대상자', mapping: 'careTarget', x: 19.5, y: 39.5, w: 42, h: 2.8 },
+    { id: 'AREA-12', label: '간병 장소', mapping: 'careLocation', x: 64, y: 39.5, w: 28, h: 2.8 },
+    { id: 'AREA-13', label: '주소', mapping: 'careAddress', x: 19.5, y: 42.5, w: 72.5, h: 2.8 },
+    { id: 'AREA-14', label: '간병인명(생년월일)', mapping: 'hd2_caregiverNameBirth', x: 19.5, y: 45.5, w: 42, h: 2.8 },
+    { id: 'AREA-15', label: '간병인 연락처', mapping: 'hd2_caregiverPhone', x: 74, y: 45.5, w: 18, h: 2.8 },
+    { id: 'AREA-16', label: '최초간병시작일', mapping: 'hd2_firstCareStartDate', x: 19.5, y: 48.5, w: 21.5, h: 2.8 },
+    { id: 'AREA-17', label: '예상사용시간(수정가능)', mapping: 'hd2_expectedUsageTime', x: 42, y: 48.5, w: 18, h: 2.8 },
+    { id: 'AREA-18', label: '계속간병여부(선택)', mapping: 'hd2_isContinuingCare', x: 67, y: 48.5, w: 25, h: 2.8 },
+    { id: 'AREA-19', label: '서비스 기간 (1행)', mapping: 'hd2_servicePeriod_row1', x: 19.5, y: 53.5, w: 72.5, h: 2.3 },
+    { id: 'AREA-20', label: '서비스 기간 (2행)', mapping: 'hd2_servicePeriod_row2', x: 19.5, y: 55.9, w: 72.5, h: 2.3 },
+    { id: 'AREA-21', label: '서비스 기간 (3행)', mapping: 'hd2_servicePeriod_row3', x: 19.5, y: 58.3, w: 72.5, h: 2.3 },
+    { id: 'AREA-22', label: '서비스 기간 (4행)', mapping: 'hd2_servicePeriod_row4', x: 19.5, y: 60.7, w: 72.5, h: 2.3 },
+    { id: 'AREA-23', label: '작성일자(YYYY년 M월 D일)', mapping: 'hd2_writeDateKorean', x: 50, y: 78.5, w: 42, h: 2.8 },
+    { id: 'AREA-24', label: '담당자 성명', mapping: 'hd2_managerName', x: 20, y: 84.5, w: 25, h: 2.8 },
+    { id: 'AREA-25', label: '담당자 연락처', mapping: 'hd2_managerPhone', x: 50, y: 84.5, w: 42, h: 2.8 }
   ]
 };
 
 var gFormAreaStore = JSON.parse(JSON.stringify(gDefaultFormTemplates));
 
 // =========================================================================
-// 현대해상 간병서비스 제공확인서 및 정산비용 청구서 (HD_FORM_02) 커스텀 상태 저장소
+// 현대해상 간병서비스 제공확인서 및 정산비용 청구서 (HD_FORM_02 / HD_FORM_03) 커스텀 상태 저장소
 // =========================================================================
 var gHdForm02CustomState = {
   claimType: '신규', // '신규' | '추가'
   productName: '무배당 퍼펙트플러스종합보험(Hi2404)', // 고정 텍스트 (사용자가 직접 입력/수정 및 유지)
   accidentContent: '질병', // '질병' | '상해'
+  careTarget: '', // 비어있으면 피보험자명(patientName) 자동 연동
+  careLocation: '재택', // 기본값 '재택' (수정 가능)
+  careAddress: '', // 비어있으면 고객 주소 자동 연동
   expectedUsageTime: '', // 비어있으면 데이터 연동 자동 계산
   isContinuingCare: '계속 사용 중', // '계속 사용 중' | '사용 종료'
   caregiverName: '조정자',
@@ -1589,8 +1594,29 @@ var gHdForm02CustomState = {
     { start: '', end: '', days: '' },
     { start: '', end: '', days: '' }
   ],
-  customerOverrides: {} // 고객별 개별 수정 사항 저장소 { [appId]: { servicePeriods, expectedUsageTime, managerName, managerPhone, ... } }
+  customerOverrides: {} // 고객별 개별 수정 사항 저장소 { [appId]: { servicePeriods, expectedUsageTime, managerName, managerPhone, careTarget, careLocation, careAddress, ... } }
 };
+
+function getHdFormCareTarget(app) {
+  if (!app) return '';
+  const override = gHdForm02CustomState.customerOverrides?.[app.id]?.careTarget;
+  if (override !== undefined && override !== '') return override;
+  return app.patientName || '';
+}
+
+function getHdFormCareLocation(app) {
+  if (!app) return '재택';
+  const override = gHdForm02CustomState.customerOverrides?.[app.id]?.careLocation;
+  if (override !== undefined && override !== '') return override;
+  return gHdForm02CustomState.careLocation || '재택';
+}
+
+function getHdFormCareAddress(app) {
+  if (!app) return '';
+  const override = gHdForm02CustomState.customerOverrides?.[app.id]?.careAddress;
+  if (override !== undefined && override !== '') return override;
+  return app.patientAddress || app.addressDetail || app.homeAddress || '';
+}
 
 try {
   const savedHd2 = localStorage.getItem('LIVON_HD_FORM_02_STATE');
@@ -1808,8 +1834,8 @@ function updateHdForm02Field(field, value, shouldRerender = false, appId = null)
   }
 
   saveHdForm02CustomState();
-  if (shouldRerender && typeof previewFormForCustomer === 'function' && window.gCurrentPreviewFormCode === 'HD_FORM_02') {
-    previewFormForCustomer('HD_FORM_02', targetId, window.gCurrentPreviewIsFaxConfirmation);
+  if (shouldRerender && typeof previewFormForCustomer === 'function' && ['HD_FORM_02', 'HD_FORM_03'].includes(window.gCurrentPreviewFormCode)) {
+    previewFormForCustomer(window.gCurrentPreviewFormCode, targetId, window.gCurrentPreviewIsFaxConfirmation);
   }
 }
 
@@ -1820,8 +1846,8 @@ function setHdForm02ClaimType(type, appId = null) {
   if (!gHdForm02CustomState.customerOverrides[targetId]) gHdForm02CustomState.customerOverrides[targetId] = {};
   gHdForm02CustomState.customerOverrides[targetId].claimType = type;
   saveHdForm02CustomState();
-  if (typeof previewFormForCustomer === 'function' && window.gCurrentPreviewFormCode === 'HD_FORM_02') {
-    previewFormForCustomer('HD_FORM_02', targetId, window.gCurrentPreviewIsFaxConfirmation);
+  if (typeof previewFormForCustomer === 'function' && ['HD_FORM_02', 'HD_FORM_03'].includes(window.gCurrentPreviewFormCode)) {
+    previewFormForCustomer(window.gCurrentPreviewFormCode, targetId, window.gCurrentPreviewIsFaxConfirmation);
   }
 }
 
@@ -1853,13 +1879,13 @@ function updateHdForm02ServicePeriod(rowIdx, col, value, appId = null) {
   gHdForm02CustomState.customerOverrides[targetId].servicePeriods[rowIdx][col] = value;
   gHdForm02CustomState.servicePeriods = gHdForm02CustomState.customerOverrides[targetId].servicePeriods;
   saveHdForm02CustomState();
-  if (typeof previewFormForCustomer === 'function' && window.gCurrentPreviewFormCode === 'HD_FORM_02') {
-    previewFormForCustomer('HD_FORM_02', targetId, window.gCurrentPreviewIsFaxConfirmation);
+  if (typeof previewFormForCustomer === 'function' && ['HD_FORM_02', 'HD_FORM_03'].includes(window.gCurrentPreviewFormCode)) {
+    previewFormForCustomer(window.gCurrentPreviewFormCode, targetId, window.gCurrentPreviewIsFaxConfirmation);
   }
 }
 
 // Load custom areas from localStorage (안전한 보존 우선 로드: 버전 변경 시에도 사용자 설정 절대 덮어쓰지 않음)
-const FORM_AREAS_VERSION = 'v20260910_04';
+const FORM_AREAS_VERSION = 'v20260916_scor';
 try {
   const savedAreas = localStorage.getItem('LIVON_FORM_AREAS');
   if (savedAreas) {
@@ -1873,6 +1899,10 @@ try {
   // HD_FORM_02가 23개 미만인 경우 신규 23개 필드로 자동 확장 업그레이드
   if (!gFormAreaStore.HD_FORM_02 || gFormAreaStore.HD_FORM_02.length < 23) {
     gFormAreaStore.HD_FORM_02 = JSON.parse(JSON.stringify(gDefaultFormTemplates.HD_FORM_02));
+  }
+  // HD_FORM_03 (SCOR)가 25개 미만이거나 11번 영역이 병원명인 경우 신규 25개 필드로 자동 확장 업그레이드
+  if (!gFormAreaStore.HD_FORM_03 || gFormAreaStore.HD_FORM_03.length < 25 || (gFormAreaStore.HD_FORM_03[10] && gFormAreaStore.HD_FORM_03[10].label.includes('병원명'))) {
+    gFormAreaStore.HD_FORM_03 = JSON.parse(JSON.stringify(gDefaultFormTemplates.HD_FORM_03));
   }
   localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
   localStorage.setItem('LIVON_FORM_AREAS_VER', FORM_AREAS_VERSION);
@@ -1945,6 +1975,14 @@ function openFormEditor(formCode) {
   // HD_FORM_02의 등록 영역이 23개 미만인 경우 즉시 신규 23개 필드로 자동 확장 업그레이드
   if (formCode === 'HD_FORM_02' && (!gFormAreaStore.HD_FORM_02 || gFormAreaStore.HD_FORM_02.length < 23)) {
     gFormAreaStore.HD_FORM_02 = JSON.parse(JSON.stringify(gDefaultFormTemplates.HD_FORM_02));
+    try {
+      localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
+    } catch (e) {}
+  }
+
+  // HD_FORM_03의 등록 영역이 25개 미만이거나 11번 영역이 병원명인 경우 신규 25개 필드로 자동 확장 업그레이드
+  if (formCode === 'HD_FORM_03' && (!gFormAreaStore.HD_FORM_03 || gFormAreaStore.HD_FORM_03.length < 25 || (gFormAreaStore.HD_FORM_03[10] && gFormAreaStore.HD_FORM_03[10].label.includes('병원명')))) {
+    gFormAreaStore.HD_FORM_03 = JSON.parse(JSON.stringify(gDefaultFormTemplates.HD_FORM_03));
     try {
       localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
     } catch (e) {}
@@ -2317,7 +2355,7 @@ function renderEditorCanvasAndList() {
                   <option value="docNo" ${area.mapping === 'docNo' ? 'selected' : ''}>문서번호 (docNo)</option>
                   <option value="custom" ${area.mapping === 'custom' ? 'selected' : ''}>직접 입력 (custom)</option>
                 </optgroup>
-              ` : gCurrentEditingFormCode === 'HD_FORM_02' ? `
+              ` : (gCurrentEditingFormCode === 'HD_FORM_02' || gCurrentEditingFormCode === 'HD_FORM_03') ? `
                 <optgroup label="1. 기본 정보 및 계약/사고 사항">
                   <option value="hd2_claimCheck_new" ${area.mapping === 'hd2_claimCheck_new' ? 'selected' : ''}>구분 [신규신청] 체크박스 (✓) (hd2_claimCheck_new)</option>
                   <option value="hd2_claimCheck_add" ${area.mapping === 'hd2_claimCheck_add' ? 'selected' : ''}>구분 [추가신청] 체크박스 (✓) (hd2_claimCheck_add)</option>
@@ -2330,6 +2368,9 @@ function renderEditorCanvasAndList() {
                   <option value="policyNumber" ${area.mapping === 'policyNumber' ? 'selected' : ''}>계약번호/증권번호 (policyNumber)</option>
                   <option value="hd2_productName" ${area.mapping === 'hd2_productName' ? 'selected' : ''}>상품명 [고정/설정 텍스트] (hd2_productName)</option>
                   <option value="hd2_accidentContent" ${area.mapping === 'hd2_accidentContent' ? 'selected' : ''}>사고내용/진단명 [질병/상해/직접입력] (hd2_accidentContent)</option>
+                  <option value="careTarget" ${area.mapping === 'careTarget' ? 'selected' : ''}>간병 대상자 (피보험자명 기본) (careTarget)</option>
+                  <option value="careLocation" ${area.mapping === 'careLocation' ? 'selected' : ''}>간병 장소 (기본: 재택) (careLocation)</option>
+                  <option value="careAddress" ${area.mapping === 'careAddress' ? 'selected' : ''}>간병 주소 (careAddress)</option>
                   <option value="hospitalName" ${area.mapping === 'hospitalName' ? 'selected' : ''}>병원명 [의료기관] (hospitalName)</option>
                 </optgroup>
                 <optgroup label="2. 간병인 및 간병 진행 사항">
@@ -9842,6 +9883,21 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
       const d = parseInt(app.expectedDays, 10) || 10;
       return '₩' + (d * 144000).toLocaleString();
     }
+    case 'careTarget':
+    case 'scorCareTarget':
+      return getHdFormCareTarget(app);
+    case 'careLocation':
+    case 'scorCareLocation':
+      return getHdFormCareLocation(app);
+    case 'careAddress':
+    case 'scorCareAddress':
+      return getHdFormCareAddress(app);
+    case 'hospitalName': {
+      if ((app.insuranceCompany || '').includes('SCOR')) {
+        return getHdFormCareTarget(app);
+      }
+      return formatHospitalDisplay(app) || app.hospitalName || '';
+    }
     default: return (app && app[mappingKey]) ? app[mappingKey] : '';
   }
 }
@@ -10091,9 +10147,13 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
     // =========================================================================
     // [현대해상 / 현대해상(SCOR) 청구] 간병서비스 제공확인서 및 정산비용 청구서 (HD_FORM_02 / HD_FORM_03)
     // =========================================================================
-    const isScor = (formCode === 'HD_FORM_03');
+    const isScor = (formCode === 'HD_FORM_03' || (app && (app.insuranceCompany || '').includes('SCOR')));
     const customBg = gFormBackgroundStore && (gFormBackgroundStore[formCode] || gFormBackgroundStore['HD_FORM_02']);
     const areas = gFormAreaStore && (gFormAreaStore[formCode] || gFormAreaStore['HD_FORM_02']) ? (gFormAreaStore[formCode] || gFormAreaStore['HD_FORM_02']) : [];
+
+    const currentCareTarget = getHdFormCareTarget(app);
+    const currentCareLocation = getHdFormCareLocation(app);
+    const currentCareAddress = getHdFormCareAddress(app);
 
     const patientNameBirth8 = resolveFormFieldValue('hd2_patientNameBirth8', app, docNo, todayStr);
     const koreanWriteDate = resolveFormFieldValue('hd2_writeDateKorean', app, docNo, todayStr);
@@ -10109,7 +10169,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
     const currentClaimType = (app && gHdForm02CustomState.customerOverrides?.[app.id]?.claimType) || gHdForm02CustomState.claimType || '신규';
     const currentAccidentContent = (app && gHdForm02CustomState.customerOverrides?.[app.id]?.accidentContent) || gHdForm02CustomState.accidentContent || (app && app.accidentType && app.accidentType.includes('상해') ? '상해' : '질병');
     const currentContinuingCare = (app && gHdForm02CustomState.customerOverrides?.[app.id]?.isContinuingCare) || gHdForm02CustomState.isContinuingCare || '계속 사용 중';
-    const currentProductName = gHdForm02CustomState.productName || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.productName) || '무배당 퍼펙트플러스종합보험(Hi2404)';
+    const currentProductName = gHdForm02CustomState.productName || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.productName) || (isScor ? '무배당 퍼펙트플러스종합보험(SCOR)' : '무배당 퍼펙트플러스종합보험(Hi2404)');
     const firstCareStartDate = resolveFormFieldValue('hd2_firstCareStartDate', app, docNo, todayStr);
     const caregiverNameBirth = resolveFormFieldValue('hd2_caregiverNameBirth', app, docNo, todayStr);
     const caregiverPhone = resolveFormFieldValue('hd2_caregiverPhone', app, docNo, todayStr);
@@ -10121,7 +10181,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
           <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 text-xs text-slate-800 no-print">
             <div class="flex items-center justify-between pb-2 border-b border-slate-200">
               <span class="font-black text-slate-900 flex items-center gap-1.5">
-                <i data-lucide="sliders" class="w-4 h-4 text-amber-500"></i> HD_FORM_02 실시간 필드 설정 및 즉시 반영
+                <i data-lucide="sliders" class="w-4 h-4 text-amber-500"></i> ${isScor ? '현대해상(SCOR) 실시간 필드 설정 및 즉시 반영' : 'HD_FORM_02 실시간 필드 설정 및 즉시 반영'}
               </span>
               <span class="text-[11px] text-amber-700 bg-amber-100 font-bold px-2 py-0.5 rounded">수정 시 서식에 즉시 반영 및 영구 저장</span>
             </div>
@@ -10180,6 +10240,24 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                 <input type="text" value="${managerPhone}" onchange="updateHdForm02Field('managerPhone', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs font-mono" placeholder="02-6959-7011">
               </div>
             </div>
+
+            ${isScor ? `
+              <!-- 2-2행: 현대해상(SCOR) 전용 간병 대상자, 간병 장소, 주소 -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-slate-200/70">
+                <div>
+                  <label class="block text-[10px] font-bold text-blue-900 mb-0.5">간병 대상자 (피보험자 성명 기본)</label>
+                  <input type="text" value="${currentCareTarget}" onchange="updateHdForm02Field('careTarget', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="피보험자 성명 (수정 가능)">
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-blue-900 mb-0.5">간병 장소 (기본: 재택)</label>
+                  <input type="text" value="${currentCareLocation}" onchange="updateHdForm02Field('careLocation', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="기본: 재택 (수정 가능)">
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-blue-900 mb-0.5">주소 (고객주소 기본)</label>
+                  <input type="text" value="${currentCareAddress}" onchange="updateHdForm02Field('careAddress', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="간병 장소 상세 주소 (수정 가능)">
+                </div>
+              </div>
+            ` : ''}
 
             <!-- 간병 서비스 기간 (1~4행) 빠른 편집 및 자동계산 -->
             <div class="pt-2 border-t border-slate-200">
@@ -10306,12 +10384,31 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                   </div>
                 </td>
               </tr>
-              <tr>
-                <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">병원명(의료기관)</th>
-                <td colspan="3" class="p-2 font-bold text-slate-900">
-                  ${hospitalDisplay}
-                </td>
-              </tr>
+              ${isScor ? `
+                <tr class="border-b border-slate-300">
+                  <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">간병 대상자</th>
+                  <td class="p-1.5 border-r border-slate-300">
+                    <input type="text" value="${currentCareTarget}" onchange="updateHdForm02Field('careTarget', this.value, true, '${app.id}')" class="w-full px-2 py-1 text-xs font-bold text-slate-900 bg-white border border-slate-300 rounded focus:border-blue-500 focus:outline-none" placeholder="피보험자 성명 (수정 가능)">
+                  </td>
+                  <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">간병 장소</th>
+                  <td class="p-1.5">
+                    <input type="text" value="${currentCareLocation}" onchange="updateHdForm02Field('careLocation', this.value, true, '${app.id}')" class="w-full px-2 py-1 text-xs font-bold text-slate-900 bg-white border border-slate-300 rounded focus:border-blue-500 focus:outline-none" placeholder="기본값: 재택 (수정 가능)">
+                  </td>
+                </tr>
+                <tr>
+                  <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">주소</th>
+                  <td colspan="3" class="p-1.5">
+                    <input type="text" value="${currentCareAddress}" onchange="updateHdForm02Field('careAddress', this.value, true, '${app.id}')" class="w-full px-2 py-1 text-xs font-bold text-slate-900 bg-white border border-slate-300 rounded focus:border-blue-500 focus:outline-none" placeholder="간병 장소 상세 주소 (수정 가능)">
+                  </td>
+                </tr>
+              ` : `
+                <tr>
+                  <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">병원명(의료기관)</th>
+                  <td colspan="3" class="p-2 font-bold text-slate-900">
+                    ${hospitalDisplay}
+                  </td>
+                </tr>
+              `}
             </table>
           </div>
 
