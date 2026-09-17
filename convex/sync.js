@@ -694,5 +694,28 @@ export const savePartner = mutation({
   },
 });
 
+// 27. 삼성화재 발송완료 간병일지 히스토리 저장
+export const saveSamsungSentCareLog = mutation({
+  args: {
+    record: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { _id, _creationTime, ...doc } = args.record;
+    if (!doc.id) {
+      doc.id = "SCLH_" + Date.now();
+    }
+    const newId = await ctx.db.insert("samsungSentCareLogs", doc);
+    return { id: doc.id, _id: newId };
+  },
+});
+
+// 28. 삼성화재 발송완료 간병일지 히스토리 조회
+export const getSamsungSentCareLogs = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("samsungSentCareLogs").order("desc").collect();
+  },
+});
+
 
 

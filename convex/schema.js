@@ -46,4 +46,7 @@ export default defineSchema({
 
   // 삼성화재 이메일 발송 이력 (일일접수/월간청구)
   samsungEmailLogs: defineTable(v.any()),
+
+  // 삼성화재 발송완료 간병일지 히스토리
+  samsungSentCareLogs: defineTable(v.any()),
 });

@@ -377,23 +377,26 @@
   <meta charset="UTF-8">
   <title>간병일지_${username}_${consultDate.replace(/[: ]/g, '_')}</title>
   <style>
-    @page { size: A4 portrait; margin: 12mm 15mm; }
+    @page { size: A4 portrait; margin: 5mm 8mm; }
     * { box-sizing: border-box; }
-    body {
+    html, body {
       font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
       background: #fff;
       color: #0f172a;
-      padding: 30px;
+      padding: 10px 14px;
       margin: 0;
-      line-height: 1.5;
+      line-height: 1.4;
+      height: 284mm;
+      max-height: 284mm;
+      overflow: hidden;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    .page { max-width: 820px; margin: 0 auto; background: #fff; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .header h1 { font-size: 30px; font-weight: 900; margin: 0; letter-spacing: -0.5px; }
+    .page { max-width: 820px; max-height: 280mm; margin: 0 auto; background: #fff; overflow: hidden; page-break-inside: avoid; break-inside: avoid; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .header h1 { font-size: 20px; font-weight: 900; margin: 0; letter-spacing: -0.5px; }
     .btn-group { display: flex; gap: 8px; }
-    .btn { padding: 6px 14px; font-size: 12px; font-weight: bold; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+    .btn { padding: 4px 10px; font-size: 11px; font-weight: bold; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
     .btn-download { background: #f8fafc; color: #1e293b; border: 1px solid #cbd5e1; }
     .btn-print { background: #0f172a; color: #fff; border: 1px solid #0f172a; }
     .meta-strip {
@@ -401,20 +404,20 @@
       justify-content: space-between;
       border-top: 1px solid #e2e8f0;
       border-bottom: 1px solid #e2e8f0;
-      padding: 12px 0;
-      margin-bottom: 24px;
+      padding: 5px 0;
+      margin-bottom: 8px;
     }
-    .meta-col { padding: 0 14px; border-right: 1px solid #e2e8f0; flex: 1; }
-    .meta-col:first-child { padding-left: 4px; }
-    .meta-col:last-child { border-right: none; padding-right: 4px; }
-    .meta-col .label { font-size: 12px; color: #64748b; margin-bottom: 4px; font-weight: 500; }
-    .meta-col .val { font-size: 15px; font-weight: 800; color: #0f172a; }
-    .sec-title { font-size: 18px; font-weight: 800; margin: 24px 0 12px; color: #0f172a; }
-    .sub-title { font-size: 15px; font-weight: 800; margin: 16px 0 10px; color: #1e293b; }
+    .meta-col { padding: 0 8px; border-right: 1px solid #e2e8f0; flex: 1; }
+    .meta-col:first-child { padding-left: 2px; }
+    .meta-col:last-child { border-right: none; padding-right: 2px; }
+    .meta-col .label { font-size: 10.5px; color: #64748b; margin-bottom: 2px; font-weight: 500; }
+    .meta-col .val { font-size: 12px; font-weight: 800; color: #0f172a; }
+    .sec-title { font-size: 13.5px; font-weight: 800; margin: 8px 0 4px; color: #0f172a; }
+    .sub-title { font-size: 12px; font-weight: 800; margin: 6px 0 3px; color: #1e293b; }
     .summary-card {
       border: 1px solid #e2e8f0;
       border-radius: 6px;
-      padding: 28px;
+      padding: 10px 14px;
       position: relative;
       background: #ffffff;
       overflow: hidden;
@@ -424,7 +427,7 @@
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      font-size: 100px;
+      font-size: 65px;
       font-weight: 900;
       color: rgba(244, 114, 182, 0.12);
       letter-spacing: 6px;
@@ -433,13 +436,13 @@
       font-family: sans-serif;
     }
     .card-content { position: relative; z-index: 1; }
-    .card-title { font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 10px; }
-    .card-tags { font-size: 13.5px; font-weight: 700; color: #475569; margin-bottom: 20px; }
-    .summary-wrap { margin-top: 20px; padding-top: 10px; }
-    .summary-title { font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
-    .summary-body { font-size: 13.5px; color: #334155; line-height: 1.65; }
+    .card-title { font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 3px; }
+    .card-tags { font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 6px; }
+    .summary-wrap { margin-top: 6px; padding-top: 4px; border-top: 1px dashed #e2e8f0; }
+    .summary-title { font-size: 11.5px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
+    .summary-body { font-size: 11px; color: #334155; line-height: 1.4; }
     @media print {
-      body { padding: 0; }
+      body { padding: 0; margin: 0; }
       .no-print { display: none !important; }
       .summary-card { border: 1px solid #e2e8f0 !important; }
     }
@@ -451,7 +454,7 @@
       <h1>간병일지</h1>
       <div class="btn-group no-print">
         <a href="https://careport.livon.care/careport/consult/${dailyLog.sessionId}" target="_blank" class="btn btn-download">전산 원본 확인</a>
-        <button onclick="window.print()" class="btn btn-print">프린트 (PDF 저장)</button>
+        <button onclick="window.print()" class="btn btn-print">프린트 (1장 PDF 저장)</button>
       </div>
     </div>
 
@@ -481,6 +484,18 @@
       </div>
     </div>
   </div>
+  <script>
+    window.addEventListener('load', function() {
+      var p = document.querySelector('.page');
+      if (!p) return;
+      var maxH = 1040;
+      if (p.scrollHeight > maxH) {
+        var s = (maxH / p.scrollHeight) * 0.97;
+        p.style.transform = 'scale(' + s.toFixed(3) + ')';
+        p.style.transformOrigin = 'top center';
+      }
+    });
+  </script>
 </body>
 </html>`;
     },

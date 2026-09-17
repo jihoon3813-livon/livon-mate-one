@@ -561,6 +561,16 @@
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
+      @page {
+        size: A4 portrait;
+        margin: 5mm 8mm;
+      }
+      body.printing-careport {
+        height: 284mm !important;
+        max-height: 284mm !important;
+        overflow: hidden !important;
+        background: #fff !important;
+      }
       body.printing-careport * {
         visibility: hidden !important;
       }
@@ -569,20 +579,24 @@
         visibility: visible !important;
       }
       body.printing-careport #carePortOfficialModal {
-        position: static !important;
-        inset: auto !important;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        inset: 0 !important;
         width: 100% !important;
-        height: auto !important;
+        height: 284mm !important;
+        max-height: 284mm !important;
         background: transparent !important;
         padding: 0 !important;
         margin: 0 !important;
         display: block !important;
+        overflow: hidden !important;
       }
       body.printing-careport #carePortOfficialModal > div {
         border: none !important;
         box-shadow: none !important;
-        max-height: none !important;
-        overflow: visible !important;
+        max-height: 284mm !important;
+        overflow: hidden !important;
         width: 100% !important;
         max-width: 100% !important;
         margin: 0 !important;
@@ -595,11 +609,73 @@
         top: 0 !important;
         width: 100% !important;
         max-width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
+        height: 280mm !important;
+        max-height: 280mm !important;
+        margin: 0 auto !important;
+        padding: 6px 12px !important;
         box-shadow: none !important;
         border: none !important;
         display: block !important;
+        overflow: hidden !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+      }
+      body.printing-careport #carePortPrintArea h1 {
+        font-size: 20px !important;
+        margin: 0 !important;
+        padding-bottom: 2px !important;
+      }
+      body.printing-careport #carePortPrintArea .my-6 {
+        margin-top: 4px !important;
+        margin-bottom: 4px !important;
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
+      }
+      body.printing-careport #carePortPrintArea .mt-6 {
+        margin-top: 4px !important;
+      }
+      body.printing-careport #carePortPrintArea .mb-6 {
+        margin-bottom: 4px !important;
+      }
+      body.printing-careport #carePortPrintArea .mb-3,
+      body.printing-careport #carePortPrintArea .mb-2 {
+        margin-bottom: 2px !important;
+      }
+      body.printing-careport #carePortPrintArea .p-6,
+      body.printing-careport #carePortPrintArea .sm\:p-8,
+      body.printing-careport #carePortPrintArea .sm\:p-12 {
+        padding: 6px 10px !important;
+      }
+      body.printing-careport #carePortPrintArea .space-y-4 > * + * {
+        margin-top: 4px !important;
+      }
+      body.printing-careport #carePortPrintArea #cpCardTitle {
+        font-size: 13px !important;
+        margin-bottom: 2px !important;
+      }
+      body.printing-careport #carePortPrintArea #cpCardTags {
+        font-size: 11px !important;
+        margin-bottom: 4px !important;
+      }
+      body.printing-careport #carePortPrintArea #cpCardReportItems {
+        font-size: 11px !important;
+        line-height: 1.35 !important;
+      }
+      body.printing-careport #carePortPrintArea #cpCardSummaryContent {
+        font-size: 11px !important;
+        line-height: 1.35 !important;
+      }
+      body.printing-careport #carePortPrintArea #cpCheckboxesList {
+        font-size: 10px !important;
+        row-gap: 2px !important;
+      }
+      body.printing-careport #carePortPrintArea .watermark,
+      body.printing-careport #carePortPrintArea span.text-7xl,
+      body.printing-careport #carePortPrintArea span.sm\:text-9xl {
+        font-size: 60px !important;
+        opacity: 0.15 !important;
       }
       body.printing-careport .no-print {
         display: none !important;
@@ -2067,23 +2143,56 @@
             </div>
 
             <!-- 그리드 3: 간병일지 첨부 (간병 종료 환자 선택 or 파일 업로드) -->
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-              <div class="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
+              <div class="flex items-center justify-between pb-2.5 border-b border-slate-100 flex-wrap gap-2">
                 <div class="font-extrabold text-slate-800 text-sm flex items-center gap-2">
                   <i data-lucide="clipboard-check" class="w-4 h-4 text-sky-600"></i>
                   <span>2. 간병일지 첨부 (케어포트 전산 연동 및 수기일지)</span>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <button type="button" onclick="openSamsungManualCareLogModal()" 
+                    class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                    title="케어포트 외의 수기 일지나 외부 일지를 직접 시스템에 수동 등록합니다">
+                    <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> <span>+ 간병일지 수동 등록</span>
+                  </button>
                   <button type="button" onclick="openImportCarePortLogModal()" 
-                    class="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer">
+                    class="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                    title="케어포트 전산과 연동하여 대상자의 간병일지 PDF를 불러옵니다">
                     <i data-lucide="upload" class="w-3.5 h-3.5"></i> <span>케어포트 일지 불러오기 (PDF)</span>
                   </button>
-                  <span class="text-xs text-slate-500">간병 대상자의 케어포트 PDF 일지를 선택 첨부합니다.</span>
                 </div>
               </div>
 
-              <div class="overflow-x-auto custom-scrollbar border rounded-xl max-h-56" id="samsungDailyCareLogSelectorContainer">
+              <!-- 서브 탭: [미발송 일지 (첨부 대상)] vs [발송완료 이력] -->
+              <div class="flex items-center justify-between gap-2 border-b border-slate-200 pb-2 flex-wrap">
+                <div class="flex items-center gap-1.5" id="samsungDailyCareLogSubTabs">
+                  <button type="button" id="btnSamsungCareLogTab-pending" onclick="switchSamsungCareLogSectionTab('pending')"
+                    class="px-3.5 py-1.5 rounded-xl text-xs font-black bg-purple-600 text-white shadow-xs flex items-center gap-1.5 border border-purple-500 transition-all cursor-pointer">
+                    <i data-lucide="file-check" class="w-3.5 h-3.5"></i>
+                    <span>미발송 일지 (첨부 대상)</span>
+                    <span id="badgeSamsungCareLogPendingCount" class="px-2 py-0.5 rounded-full bg-white text-purple-900 font-black text-[10px] shadow-2xs">0건</span>
+                  </button>
+                  <button type="button" id="btnSamsungCareLogTab-history" onclick="switchSamsungCareLogSectionTab('history')"
+                    class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 border border-slate-200 transition-all cursor-pointer">
+                    <i data-lucide="history" class="w-3.5 h-3.5 text-slate-500"></i>
+                    <span>발송완료 이력 (전송 히스토리)</span>
+                    <span id="badgeSamsungCareLogHistoryCount" class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold text-[10px]">0건</span>
+                  </button>
+                </div>
+                <div class="text-[11.5px] text-slate-500 flex items-center gap-1.5">
+                  <span class="inline-block w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                  <span><b>간병기간 종료 고객 최우선 정렬</b></span>
+                </div>
+              </div>
+
+              <!-- 탭 1: 미발송 일지 선택 목록 (간병 종료 고객 우선 정렬 & 케어포트 연동) -->
+              <div class="overflow-x-auto custom-scrollbar border rounded-xl max-h-64" id="samsungDailyCareLogSelectorContainer">
                 <!-- Dynamic patient care log selection table rendered by app.js -->
+              </div>
+
+              <!-- 탭 2: 발송완료 일지 히스토리 관리 목록 -->
+              <div class="overflow-x-auto custom-scrollbar border rounded-xl max-h-64 hidden" id="samsungDailyCareLogHistoryContainer">
+                <!-- Dynamic sent care logs history table rendered by app.js -->
               </div>
 
               <div class="flex items-center justify-between pt-1 flex-wrap gap-2">
@@ -7678,6 +7787,126 @@
         <span class="text-slate-500">모바일 음성일지 및 전산 등록된 간병일지 원문입니다.</span>
         <button type="button" onclick="closeModal('samsungCareLogPreviewModal')" class="px-5 py-2 rounded-xl bg-sky-700 text-white font-bold hover:bg-sky-800 cursor-pointer">확인</button>
       </div>
+  </div>
+
+  <!-- ==================== MODAL: SAMSUNG MANUAL CARE LOG REGISTRATION ==================== -->
+  <div id="samsungManualCareLogModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh]">
+      <div class="p-5 bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-700 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shadow-2xs">
+            <i data-lucide="file-plus-2" class="w-5 h-5 text-white"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              <span>간병일지 수동 등록</span>
+              <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-white/20 text-white font-bold">전산 영구 연동</span>
+            </h3>
+            <p class="text-xs text-emerald-100 mt-0.5">수기 일지(PDF/이미지) 또는 신규 간병기록을 수동 등록하여 일일보고에 즉시 첨부합니다.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('samsungManualCareLogModal')" class="p-2 text-emerald-100 hover:text-white cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <form id="samsungManualCareLogForm" onsubmit="handleSaveManualCareLog(event)" class="p-6 overflow-y-auto custom-scrollbar space-y-4 text-xs flex-1">
+        <!-- 1. 대상 고객 선택 -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+            <span>대상 환자(고객) 선택 *</span>
+            <span class="text-[11px] text-slate-400 font-normal">삼성화재 접수 고객</span>
+          </label>
+          <select id="manualLogAppSelect" required onchange="onManualLogCustomerChange(this.value)"
+            class="w-full p-2.5 border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 font-bold text-slate-900 text-xs">
+            <option value="">-- 간병 대상 고객을 선택하세요 --</option>
+          </select>
+        </div>
+
+        <!-- 2. 배정 간병인 및 소속 센터 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">담당 간병인 성명 *</label>
+            <input type="text" id="manualLogCaregiverName" required placeholder="예: 김순자"
+              class="w-full p-2.5 border border-slate-300 rounded-xl text-xs bg-white text-slate-900 font-bold">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">소속 협력 센터</label>
+            <input type="text" id="manualLogCenterName" placeholder="예: 영등포센터" value="영등포센터"
+              class="w-full p-2.5 border border-slate-300 rounded-xl text-xs bg-white text-slate-900 font-medium">
+          </div>
+        </div>
+
+        <!-- 3. 간병 기간 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">간병 시작일 *</label>
+            <input type="date" id="manualLogStartDate" required
+              class="w-full p-2.5 border border-slate-300 rounded-xl text-xs bg-white text-slate-900 font-mono font-bold">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">간병 종료일 *</label>
+            <input type="date" id="manualLogEndDate" required
+              class="w-full p-2.5 border border-slate-300 rounded-xl text-xs bg-white text-slate-900 font-mono font-bold">
+          </div>
+        </div>
+
+        <!-- 4. 활력징후 (혈압, 맥박, 체온) -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">환자 활력징후 (선택 입력)</label>
+          <div class="grid grid-cols-3 gap-2.5">
+            <div class="flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-200">
+              <span class="text-[11px] font-bold text-slate-500 shrink-0">혈압:</span>
+              <input type="text" id="manualLogBp" placeholder="120/80" value="120/80"
+                class="w-full bg-transparent font-mono text-xs font-bold text-slate-800 focus:outline-hidden p-0 border-0">
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-200">
+              <span class="text-[11px] font-bold text-slate-500 shrink-0">맥박:</span>
+              <input type="number" id="manualLogPulse" placeholder="72" value="72"
+                class="w-full bg-transparent font-mono text-xs font-bold text-slate-800 focus:outline-hidden p-0 border-0">
+              <span class="text-[10px] text-slate-400 shrink-0">회</span>
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-200">
+              <span class="text-[11px] font-bold text-slate-500 shrink-0">체온:</span>
+              <input type="text" id="manualLogTemp" placeholder="36.5" value="36.5"
+                class="w-full bg-transparent font-mono text-xs font-bold text-slate-800 focus:outline-hidden p-0 border-0">
+              <span class="text-[10px] text-slate-400 shrink-0">℃</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. 간병 상세 내용 및 특이사항 요약 -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">간병 수행 기록 및 환자 상태 요약 *</label>
+          <textarea id="manualLogContent" rows="3" required placeholder="예: 환자 전반적 컨디션 양호. 식사 3회 보조 및 처방약 정시 복용 완료. 체위변경 2시간 간격 실시, 특이사항 없음."
+            class="w-full p-2.5 border border-slate-300 rounded-xl text-xs leading-relaxed bg-white focus:ring-2 focus:ring-emerald-500"></textarea>
+        </div>
+
+        <!-- 6. 간병일지 서류 파일 첨부 (수기 스캔본 / PDF) -->
+        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-700 flex items-center gap-1.5">
+              <i data-lucide="paperclip" class="w-4 h-4 text-emerald-600"></i>
+              <span>일지 파일 첨부 (PDF / 이미지 파일)</span>
+            </span>
+            <span class="text-[10.5px] text-slate-400">미첨부 시 자동 표준서식 PDF 생성</span>
+          </div>
+          <input type="file" id="manualLogFileInput" accept=".pdf,image/png,image/jpeg,image/webp"
+            onchange="onManualLogFileSelected(event)" class="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-100 file:text-emerald-800 hover:file:bg-emerald-200 cursor-pointer">
+          <p id="manualLogFileSummary" class="text-[11px] text-slate-500 font-mono">선택된 파일 없음 (작성 내용 기반 공식 1페이지 PDF 자동 생성)</p>
+        </div>
+
+        <!-- 하단 액션 버튼 -->
+        <div class="pt-2 flex items-center justify-end gap-2.5">
+          <button type="button" onclick="closeModal('samsungManualCareLogModal')"
+            class="px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold transition-all cursor-pointer">
+            취소
+          </button>
+          <button type="submit"
+            class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black shadow-md flex items-center gap-1.5 transition-all cursor-pointer">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+            <span>간병일지 등록 완료 (전산 저장)</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 

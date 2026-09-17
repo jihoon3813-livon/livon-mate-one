@@ -2802,12 +2802,14 @@ async function saveFormAreas() {
   // Convex Cloud DB에 영구 백업 저장!
   try {
     const currentAreas = gFormAreaStore[gCurrentEditingFormCode] || [];
+    const currentBg = gFormBackgroundStore && gFormBackgroundStore[gCurrentEditingFormCode];
     await syncToConvex('sync:saveFormConfig', {
       formCode: gCurrentEditingFormCode,
       areas: currentAreas,
+      background: currentBg || undefined,
       updatedAt: new Date().toISOString()
     });
-    console.log(`[Form Config] ${gCurrentEditingFormCode} 양식 영역 설정이 Convex Cloud DB에 영구 저장되었습니다.`);
+    console.log(`[Form Config] ${gCurrentEditingFormCode} 양식 영역 및 배경 설정이 Convex Cloud DB에 영구 저장되었습니다.`);
   } catch (err) {
     console.warn('[Form Config Convex Save Error]', err);
   }
@@ -3467,13 +3469,13 @@ function updateSamsungSheetTabsUI() {
     const btn = document.getElementById('btnSheetTab-' + key);
     if (!btn) return;
     const isActive = key === gActiveSamsungSheet;
-    const icon = btn.querySelector('i');
+    const icon = btn.querySelector('svg, i');
     const badge = document.getElementById('badgeSheetCount-' + key);
 
     if (isActive) {
       btn.className = 'samsung-sheet-tab-btn px-4 py-2 rounded-xl text-xs font-black bg-sky-600 text-white shadow-xs flex items-center gap-2 border border-sky-500 transition-all cursor-pointer whitespace-nowrap';
       if (icon) {
-        icon.className = 'w-3.5 h-3.5 text-white';
+        icon.setAttribute('class', 'w-3.5 h-3.5 text-white');
       }
       if (badge) {
         badge.className = 'px-2 py-0.5 rounded-full bg-white text-sky-900 font-black text-[10.5px] shadow-2xs';
@@ -3481,7 +3483,7 @@ function updateSamsungSheetTabsUI() {
     } else {
       btn.className = 'samsung-sheet-tab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap';
       if (icon) {
-        icon.className = `w-3.5 h-3.5 ${iconDefault}`;
+        icon.setAttribute('class', `w-3.5 h-3.5 ${iconDefault}`);
       }
       if (badge) {
         badge.className = 'px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold border border-slate-300/60 text-[10.5px]';
@@ -6127,13 +6129,13 @@ function updateSamsungClaimHubTabsUI() {
     }
 
     if (!btn) return;
-    const icon = btn.querySelector('i');
+    const icon = btn.querySelector('svg, i');
     const badge = document.getElementById(t.badgeId);
 
     if (isActive) {
       btn.className = `samsung-hub-subtab-btn px-4 py-2 rounded-xl text-xs font-black ${t.activeBg} text-white shadow-xs flex items-center gap-2 border transition-all cursor-pointer whitespace-nowrap`;
       if (icon) {
-        icon.className = 'w-3.5 h-3.5 text-white';
+        icon.setAttribute('class', 'w-3.5 h-3.5 text-white');
       }
       if (badge) {
         badge.className = `px-2 py-0.5 rounded-full bg-white ${t.activeText} font-black text-[10.5px] shadow-2xs`;
@@ -6141,7 +6143,7 @@ function updateSamsungClaimHubTabsUI() {
     } else {
       btn.className = 'samsung-hub-subtab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap';
       if (icon) {
-        icon.className = `w-3.5 h-3.5 ${t.iconDefault}`;
+        icon.setAttribute('class', `w-3.5 h-3.5 ${t.iconDefault}`);
       }
       if (badge) {
         badge.className = 'px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold border border-slate-300/60 text-[10.5px]';
@@ -6332,26 +6334,147 @@ function appendEmailToInput(targetInputId, email) {
   el.focus();
 }
 
+var gSamsungDailyCareLogTab = 'pending'; // 'pending' | 'history'
+var gSamsungSentCareLogsHistory = [];
+var gManualLogSelectedFile = null;
+
+try {
+  const savedHistory = localStorage.getItem('LIVON_SAMSUNG_SENT_CARE_LOGS');
+  if (savedHistory) {
+    gSamsungSentCareLogsHistory = JSON.parse(savedHistory);
+  } else {
+    gSamsungSentCareLogsHistory = [
+      {
+        id: 'SCLH_INIT_1',
+        appId: 'C0280',
+        patientName: '최순자',
+        policyNumber: 'LA-2024-55829',
+        accidentNumber: '2026-SAM-0912-01',
+        caregiverName: '박영희',
+        carePeriod: '2026-09-02 ~ 2026-09-12',
+        pdfFileName: '[C0280_최순자]_케어포트_공식간병일지.pdf',
+        recipient: 'claim@samsungfire.com',
+        subject: '[리본케어] 삼성화재 간병지원 일일접수 보고서 (2026.09.12)',
+        sentAt: '2026.09.12 18:05',
+        status: '발송완료'
+      },
+      {
+        id: 'SCLH_INIT_2',
+        appId: 'C0278',
+        patientName: '정명숙',
+        policyNumber: 'LA-2024-88412',
+        accidentNumber: '2026-SAM-0908-03',
+        caregiverName: '이복순',
+        carePeriod: '2026-08-28 ~ 2026-09-08',
+        pdfFileName: '[C0278_정명숙]_간병일지_스캔본.pdf',
+        recipient: 'claim@samsungfire.com',
+        subject: '[리본케어] 삼성화재 간병지원 일일접수 보고서 (2026.09.08)',
+        sentAt: '2026.09.08 17:50',
+        status: '발송완료'
+      }
+    ];
+  }
+} catch (e) {}
+
+async function loadSamsungSentCareLogsFromConvex() {
+  try {
+    if (typeof syncToConvex === 'function') {
+      const records = await syncToConvex('sync:getSamsungSentCareLogs', {});
+      if (Array.isArray(records) && records.length > 0) {
+        const existingIds = new Set(gSamsungSentCareLogsHistory.map(r => r.id));
+        let added = false;
+        records.forEach(r => {
+          if (!existingIds.has(r.id)) {
+            gSamsungSentCareLogsHistory.push(r);
+            existingIds.add(r.id);
+            added = true;
+          }
+        });
+        if (added) {
+          gSamsungSentCareLogsHistory.sort((a, b) => (b.sentAt || '').localeCompare(a.sentAt || ''));
+          try {
+            localStorage.setItem('LIVON_SAMSUNG_SENT_CARE_LOGS', JSON.stringify(gSamsungSentCareLogsHistory));
+          } catch (e) {}
+          if (typeof renderSamsungDailyCareLogHistory === 'function') {
+            renderSamsungDailyCareLogHistory();
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Sent Care Logs Convex Load Error]', err);
+  }
+}
+setTimeout(loadSamsungSentCareLogsFromConvex, 2000);
+
+function switchSamsungCareLogSectionTab(tab) {
+  gSamsungDailyCareLogTab = tab || 'pending';
+  const btnPending = document.getElementById('btnSamsungCareLogTab-pending');
+  const btnHistory = document.getElementById('btnSamsungCareLogTab-history');
+  const pendingContainer = document.getElementById('samsungDailyCareLogSelectorContainer');
+  const historyContainer = document.getElementById('samsungDailyCareLogHistoryContainer');
+
+  const isPending = gSamsungDailyCareLogTab === 'pending';
+  if (btnPending) {
+    btnPending.className = isPending
+      ? 'px-3.5 py-1.5 rounded-xl text-xs font-black bg-purple-600 text-white shadow-xs flex items-center gap-1.5 border border-purple-500 transition-all cursor-pointer'
+      : 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 border border-slate-200 transition-all cursor-pointer';
+    const icon = btnPending.querySelector('svg, i');
+    if (icon) icon.setAttribute('class', isPending ? 'w-3.5 h-3.5 text-white' : 'w-3.5 h-3.5 text-slate-500');
+  }
+  if (btnHistory) {
+    btnHistory.className = !isPending
+      ? 'px-3.5 py-1.5 rounded-xl text-xs font-black bg-purple-600 text-white shadow-xs flex items-center gap-1.5 border border-purple-500 transition-all cursor-pointer'
+      : 'px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 border border-slate-200 transition-all cursor-pointer';
+    const icon = btnHistory.querySelector('svg, i');
+    if (icon) icon.setAttribute('class', !isPending ? 'w-3.5 h-3.5 text-white' : 'w-3.5 h-3.5 text-slate-500');
+  }
+
+  if (pendingContainer) pendingContainer.classList.toggle('hidden', !isPending);
+  if (historyContainer) historyContainer.classList.toggle('hidden', isPending);
+
+  if (isPending) {
+    renderSamsungDailyCareLogSelector();
+  } else {
+    renderSamsungDailyCareLogHistory();
+  }
+}
+
 function renderSamsungDailyCareLogSelector() {
   const container = document.getElementById('samsungDailyCareLogSelectorContainer');
   if (!container) return;
 
   const now = new Date();
   const todayStr = `${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')}`;
+  const todayDash = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 
-  // 완료된 대상자만 필터링 (모든 대상자가 아닌 간병 서비스 종료 건만)
-  const completedSamsungApps = (gApps || []).filter(a => {
-    if (!(a.insuranceCompany || '').includes('삼성')) return false;
-    return a.status === '정산완료' || a.status === '종료' || a.status === '진행완료' || 
-           (a.careEndDate && a.careEndDate.slice(0, 10) <= todayStr);
-  });
+  const isEnded = (app) => {
+    if (app.status === '정산완료' || app.status === '종료' || app.status === '진행완료') return true;
+    if (app.careEndDate) {
+      const cleanEnd = app.careEndDate.slice(0, 10).replace(/\./g, '-');
+      return cleanEnd <= todayDash;
+    }
+    return false;
+  };
 
-  if (completedSamsungApps.length === 0) {
+  // 삼성화재 대상자 중 간병기간 종료 고객 최우선 정렬 (종료일 내림차순 -> 진행중 고객 시작일 내림차순)
+  const allSamsungApps = (gApps || []).filter(a => (a.insuranceCompany || '').includes('삼성'));
+  const endedApps = allSamsungApps.filter(isEnded).sort((a, b) => (b.careEndDate || '').localeCompare(a.careEndDate || ''));
+  const ongoingApps = allSamsungApps.filter(a => !isEnded(a)).sort((a, b) => (b.careStartDate || '').localeCompare(a.careStartDate || ''));
+  const sortedApps = [...endedApps, ...ongoingApps];
+
+  // 탭 뱃지 카운트 업데이트
+  const pendingBadge = document.getElementById('badgeSamsungCareLogPendingCount');
+  if (pendingBadge) pendingBadge.innerText = `${sortedApps.length}건`;
+  const historyBadge = document.getElementById('badgeSamsungCareLogHistoryCount');
+  if (historyBadge) historyBadge.innerText = `${gSamsungSentCareLogsHistory.length}건`;
+
+  if (sortedApps.length === 0) {
     container.innerHTML = `
       <div class="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-xl space-y-1">
-        <p class="font-bold text-slate-700">현재 간병이 완료된 대상자가 없습니다.</p>
+        <p class="font-bold text-slate-700">등록된 삼성화재 간병 대상 고객이 없습니다.</p>
         <p class="text-[11px] text-slate-400 leading-relaxed">
-          간병일지 첨부는 전체 접수 고객이 아닌, <b>간병 서비스가 정상 종료된 [완료 대상자]</b>의 일지만 운영자가 수동으로 불러와 첨부합니다.
+          상단 [+ 간병일지 수동 등록]을 누르거나 케어포트 연동을 통해 일지를 등록하세요.
         </p>
       </div>
     `;
@@ -6360,71 +6483,103 @@ function renderSamsungDailyCareLogSelector() {
 
   let html = `
     <table class="w-full text-left border-collapse text-xs">
-      <thead class="bg-slate-100/90 text-slate-700 font-bold border-b sticky top-0 z-10">
+      <thead class="bg-slate-100/95 text-slate-700 font-bold border-b sticky top-0 z-10">
         <tr>
           <th class="p-2.5 text-center w-12">선택</th>
-          <th class="p-2.5">완료 고객명 (관리코드)</th>
+          <th class="p-2.5">환자명 (관리코드)</th>
           <th class="p-2.5">증권/사고번호</th>
-          <th class="p-2.5">배정 간병인</th>
+          <th class="p-2.5">담당 간병인</th>
           <th class="p-2.5">간병 기간</th>
-          <th class="p-2.5 text-center">케어포트 일지 상태</th>
-          <th class="p-2.5 text-center">상태</th>
-          <th class="p-2.5 text-center w-36">운영자 수동 관리</th>
+          <th class="p-2.5 text-center">간병 진행상태</th>
+          <th class="p-2.5 text-center">케어포트/일지 파일 연동</th>
+          <th class="p-2.5 text-center w-48">일지 관리 & 서식</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-100 bg-white">
   `;
 
-  completedSamsungApps.forEach((app) => {
-    const as = (gAssigns || []).find(a => a.applyId === app.id);
+  sortedApps.forEach((app) => {
+    const as = (gAssigns || []).find(a => String(a.applyId) === String(app.id));
     const logs = (gCareLogs || []).filter(l => String(l.applyId) === String(app.id) || l.patientName === app.patientName);
-    
-    // 운영자가 직접 체크한 건만 선택 유지 (자동 일괄 체크 완전 배제)
+    const cpGroup = (typeof gCarePortPatientGroups !== 'undefined' && Array.isArray(gCarePortPatientGroups))
+      ? gCarePortPatientGroups.find(g => g.patientName === app.patientName || g.id === app.id)
+      : null;
+
+    const ended = isEnded(app);
     const isChecked = gSamsungDailySelectedCareLogs.has(app.id);
 
     html += `
-      <tr class="hover:bg-slate-50/80 transition-colors ${isChecked ? 'bg-purple-50/40' : ''}">
+      <tr class="hover:bg-slate-50/80 transition-colors ${isChecked ? 'bg-purple-50/50' : (ended ? 'bg-rose-50/20' : '')}">
         <td class="p-2.5 text-center">
           <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleSamsungDailyCareLog('${app.id}', this.checked)" class="rounded text-purple-600 focus:ring-purple-500 cursor-pointer">
         </td>
         <td class="p-2.5 font-bold text-slate-900">
-          ${typeof maskName === 'function' ? maskName(app.patientName) : app.patientName}
-          <span class="text-[10px] font-mono font-normal text-slate-500">(${app.id})</span>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span>${typeof maskName === 'function' ? maskName(app.patientName) : app.patientName}</span>
+            <span class="text-[10px] font-mono font-normal text-slate-500">(${app.id})</span>
+            ${ended ? '<span class="px-1.5 py-0.2 rounded-md bg-rose-100 text-rose-800 text-[10px] font-black border border-rose-300">종료</span>' : ''}
+          </div>
         </td>
         <td class="p-2.5 font-mono text-slate-600">
           <div>${app.policyNumber || '-'}</div>
           <div class="text-[10.5px] text-purple-700">${app.accidentNumber || '-'}</div>
         </td>
         <td class="p-2.5">
-          <b class="text-slate-800">${as ? (typeof maskName === 'function' ? maskName(as.caregiverName) : as.caregiverName) : '배정완료'}</b>
-          <div class="text-[10.5px] text-slate-500">${as ? (as.centerName || '영등포센터') : '-'}</div>
+          <b class="text-slate-800">${as ? (typeof maskName === 'function' ? maskName(as.caregiverName) : as.caregiverName) : (app.caregiverName || '배정완료')}</b>
+          <div class="text-[10.5px] text-slate-500">${as ? (as.centerName || '영등포센터') : '영등포센터'}</div>
         </td>
         <td class="p-2.5 font-mono text-slate-700">
           ${app.careStartDate ? `${app.careStartDate.slice(0,10)} ~ ${app.careEndDate ? app.careEndDate.slice(0,10) : todayStr}` : '일정완료'}
         </td>
         <td class="p-2.5 text-center">
-          <span class="px-2 py-0.5 rounded-full font-bold text-[10.5px] ${logs.length > 0 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-50 text-amber-800 border border-amber-200'}">
-            ${logs.length > 0 ? `📄 등록완료 (${logs.length}건)` : '미등록 (수동불러오기 필요)'}
-          </span>
+          ${ended ? `
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-black text-[10.5px] bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
+              <span class="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse"></span>
+              간병종료 (우선첨부)
+            </span>
+          ` : `
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10.5px] bg-amber-50 text-amber-800 border border-amber-200">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              간병진행중
+            </span>
+          `}
         </td>
         <td class="p-2.5 text-center">
-          <span class="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-indigo-100 text-indigo-800">
-            ${app.status || '완료'}
-          </span>
+          ${cpGroup ? `
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-black text-[10.5px] bg-purple-100 text-purple-900 border border-purple-300 shadow-2xs" title="케어포트 전산 실시간 연동">
+              <i data-lucide="link" class="w-3 h-3 text-purple-600"></i>
+              CarePort 연동 (${cpGroup.totalDays || (cpGroup.dailyLogs ? cpGroup.dailyLogs.length : 1)}회차)
+            </span>
+          ` : (logs.length > 0 ? `
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10.5px] bg-emerald-100 text-emerald-800 border border-emerald-300" title="${logs[0].pdfFileName || '간병일지 파일'}">
+              <i data-lucide="file-check" class="w-3 h-3 text-emerald-600"></i>
+              일지등록 (${logs.length}건)
+            </span>
+          ` : `
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10.5px] bg-slate-100 text-slate-500 border border-slate-200">
+              미등록
+            </span>
+          `)}
         </td>
         <td class="p-2.5 text-center">
-          <div class="flex items-center justify-center gap-1">
-            <button type="button" onclick="openImportCarePortLogModal('${app.id}')" 
-              class="px-2 py-1 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
-              title="운영자가 해당 완료 대상자의 간병일지(PDF)를 직접 수동으로 불러옵니다">
-              <i data-lucide="upload" class="w-3 h-3"></i> 수동불러오기
-            </button>
-            ${logs.length > 0 ? `
+          <div class="flex items-center justify-center gap-1 flex-wrap">
+            ${cpGroup ? `
+              <button type="button" onclick="openCarePortOfficialModal('${cpGroup.sessionId || (cpGroup.dailyLogs && cpGroup.dailyLogs[0] ? cpGroup.dailyLogs[0].sessionId : 1604)}')" 
+                class="px-2 py-1 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-900 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                title="1페이지 규격 CarePort 공식 간병일지 원문 보기 & 1장 인쇄">
+                <i data-lucide="printer" class="w-3 h-3"></i> 1장인쇄/보기
+              </button>
+            ` : (logs.length > 0 ? `
               <button type="button" onclick="previewCarePortPdfLog('${logs[0].id}')" 
-                class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-2xs">
+                class="px-2 py-1 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-2xs">
                 <i data-lucide="eye" class="w-3 h-3"></i> 보기
               </button>
-            ` : ''}
+            ` : '')}
+            <button type="button" onclick="openSamsungManualCareLogModal('${app.id}')" 
+              class="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+              title="운영자가 해당 대상자의 간병일지 파일 또는 내용을 직접 수동 등록합니다">
+              <i data-lucide="edit-3" class="w-3 h-3"></i> 수동등록
+            </button>
           </div>
         </td>
       </tr>
@@ -6434,6 +6589,293 @@ function renderSamsungDailyCareLogSelector() {
   html += `</tbody></table>`;
   container.innerHTML = html;
   initIcons(container);
+}
+
+function renderSamsungDailyCareLogHistory() {
+  const container = document.getElementById('samsungDailyCareLogHistoryContainer');
+  if (!container) return;
+
+  const historyBadge = document.getElementById('badgeSamsungCareLogHistoryCount');
+  if (historyBadge) historyBadge.innerText = `${gSamsungSentCareLogsHistory.length}건`;
+
+  if (!gSamsungSentCareLogsHistory || gSamsungSentCareLogsHistory.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-xl space-y-1.5">
+        <i data-lucide="history" class="w-8 h-8 mx-auto text-slate-300"></i>
+        <p class="font-bold text-slate-700">아직 일일접수보고를 통해 발송완료된 간병일지 이력이 없습니다.</p>
+        <p class="text-[11px] text-slate-400">
+          [미발송 일지] 탭에서 간병일지를 체크하고 일일접수 보고 이메일을 전송하면 이곳에 히스토리가 자동 기록됩니다.
+        </p>
+      </div>
+    `;
+    initIcons(container);
+    return;
+  }
+
+  let html = `
+    <table class="w-full text-left border-collapse text-xs">
+      <thead class="bg-slate-100/95 text-slate-700 font-bold border-b sticky top-0 z-10">
+        <tr>
+          <th class="p-2.5">발송 일시</th>
+          <th class="p-2.5">환자명 (관리코드)</th>
+          <th class="p-2.5">증권/사고번호</th>
+          <th class="p-2.5">담당 간병인</th>
+          <th class="p-2.5">간병 기간</th>
+          <th class="p-2.5">첨부 발송된 간병일지</th>
+          <th class="p-2.5">수신처 (보험사 담당자)</th>
+          <th class="p-2.5 text-center">전송상태</th>
+          <th class="p-2.5 text-center w-28">관리</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 bg-white">
+  `;
+
+  gSamsungSentCareLogsHistory.forEach((item) => {
+    html += `
+      <tr class="hover:bg-slate-50/80 transition-colors">
+        <td class="p-2.5 font-mono text-slate-800 font-bold whitespace-nowrap">
+          ${item.sentAt || '-'}
+        </td>
+        <td class="p-2.5 font-bold text-slate-900">
+          ${typeof maskName === 'function' ? maskName(item.patientName) : item.patientName}
+          <span class="text-[10px] font-mono font-normal text-slate-500">(${item.appId})</span>
+        </td>
+        <td class="p-2.5 font-mono text-slate-600">
+          <div>${item.policyNumber || '-'}</div>
+          <div class="text-[10.5px] text-purple-700">${item.accidentNumber || '-'}</div>
+        </td>
+        <td class="p-2.5 font-bold text-slate-800">
+          ${item.caregiverName || '-'}
+        </td>
+        <td class="p-2.5 font-mono text-slate-700">
+          ${item.carePeriod || '-'}
+        </td>
+        <td class="p-2.5 font-mono text-xs text-purple-900 font-bold">
+          <div class="flex items-center gap-1">
+            <i data-lucide="file-check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+            <span class="truncate max-w-[200px]" title="${item.pdfFileName}">${item.pdfFileName || '간병일지.pdf'}</span>
+          </div>
+        </td>
+        <td class="p-2.5 font-mono text-slate-700">
+          <div class="truncate max-w-[160px]" title="${item.recipient}">${item.recipient || '-'}</div>
+          <div class="text-[10px] text-slate-400 truncate max-w-[160px]">${item.subject || ''}</div>
+        </td>
+        <td class="p-2.5 text-center">
+          <span class="px-2.5 py-0.5 rounded-full font-black text-[10.5px] bg-emerald-100 text-emerald-900 border border-emerald-300">
+            ${item.status || '발송완료'}
+          </span>
+        </td>
+        <td class="p-2.5 text-center">
+          <div class="flex items-center justify-center gap-1">
+            <button type="button" onclick="openCarePortOfficialModal(1604)" 
+              class="px-2 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+              title="해당 발송 간병일지 서식 보기">
+              <i data-lucide="file-text" class="w-3 h-3"></i> 보기
+            </button>
+            <button type="button" onclick="deleteSamsungSentCareLogRecord('${item.id}')" 
+              class="p-1 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+              title="발송 히스토리 기록 삭제">
+              <i data-lucide="trash-2" class="w-3 h-3"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += `</tbody></table>`;
+  container.innerHTML = html;
+  initIcons(container);
+}
+
+function deleteSamsungSentCareLogRecord(id) {
+  if (!confirm('해당 발송완료 간병일지 이력 기록을 목록에서 삭제하시겠습니까?')) return;
+  gSamsungSentCareLogsHistory = gSamsungSentCareLogsHistory.filter(item => item.id !== id);
+  try {
+    localStorage.setItem('LIVON_SAMSUNG_SENT_CARE_LOGS', JSON.stringify(gSamsungSentCareLogsHistory));
+  } catch (e) {}
+  renderSamsungDailyCareLogHistory();
+}
+
+function openSamsungManualCareLogModal(targetAppId) {
+  const select = document.getElementById('manualLogAppSelect');
+  if (!select) return;
+
+  const now = new Date();
+  const todayDash = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+  const isEnded = (app) => {
+    if (app.status === '정산완료' || app.status === '종료' || app.status === '진행완료') return true;
+    if (app.careEndDate) {
+      const cleanEnd = app.careEndDate.slice(0, 10).replace(/\./g, '-');
+      return cleanEnd <= todayDash;
+    }
+    return false;
+  };
+
+  const allSamsungApps = (gApps || []).filter(a => (a.insuranceCompany || '').includes('삼성'));
+  const endedApps = allSamsungApps.filter(isEnded).sort((a, b) => (b.careEndDate || '').localeCompare(a.careEndDate || ''));
+  const ongoingApps = allSamsungApps.filter(a => !isEnded(a)).sort((a, b) => (b.careStartDate || '').localeCompare(a.careStartDate || ''));
+  const sortedApps = [...endedApps, ...ongoingApps];
+
+  let html = `<option value="">-- 간병 대상 고객을 선택하세요 --</option>`;
+  sortedApps.forEach(app => {
+    const ended = isEnded(app);
+    html += `<option value="${app.id}">[${app.id}] ${app.patientName} (${ended ? '간병종료' : '진행중'}) - ${app.careStartDate || app.startDate || '일정미정'} ~ ${app.careEndDate || app.endDate || ''}</option>`;
+  });
+  select.innerHTML = html;
+
+  if (targetAppId) {
+    select.value = targetAppId;
+    onManualLogCustomerChange(targetAppId);
+  } else {
+    select.value = '';
+    onManualLogCustomerChange('');
+  }
+
+  // Reset file
+  gManualLogSelectedFile = null;
+  const fileInput = document.getElementById('manualLogFileInput');
+  if (fileInput) fileInput.value = '';
+  const fileSummary = document.getElementById('manualLogFileSummary');
+  if (fileSummary) fileSummary.innerText = '선택된 파일 없음 (작성 내용 기반 공식 1페이지 PDF 자동 생성)';
+
+  openModal('samsungManualCareLogModal');
+}
+
+function onManualLogCustomerChange(appId) {
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  const as = (gAssigns || []).find(a => String(a.applyId) === String(appId));
+
+  const cgInput = document.getElementById('manualLogCaregiverName');
+  const centerInput = document.getElementById('manualLogCenterName');
+  const startInput = document.getElementById('manualLogStartDate');
+  const endInput = document.getElementById('manualLogEndDate');
+  const contentInput = document.getElementById('manualLogContent');
+
+  if (!app) {
+    if (cgInput) cgInput.value = '';
+    if (centerInput) centerInput.value = '영등포센터';
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+    return;
+  }
+
+  if (cgInput) cgInput.value = as ? as.caregiverName : (app.caregiverName || '');
+  if (centerInput) centerInput.value = as ? (as.centerName || '영등포센터') : '영등포센터';
+  if (startInput) startInput.value = (app.careStartDate || app.startDate || '2026-09-01').slice(0, 10);
+  if (endInput) endInput.value = (app.careEndDate || app.endDate || '2026-09-10').slice(0, 10);
+  if (contentInput && !contentInput.value) {
+    contentInput.value = `[${app.patientName} 환자 간병일지]\n환자 전반적 컨디션 양호. 식사 3회 보조 및 처방약 정시 복용 완료. 활력징후 안정적이며 특이사항 없음.`;
+  }
+}
+
+function onManualLogFileSelected(event) {
+  const file = event.target.files && event.target.files[0];
+  const summary = document.getElementById('manualLogFileSummary');
+  if (!file) {
+    gManualLogSelectedFile = null;
+    if (summary) summary.innerText = '선택된 파일 없음 (작성 내용 기반 공식 1페이지 PDF 자동 생성)';
+    return;
+  }
+  gManualLogSelectedFile = file;
+  if (summary) {
+    const sizeKb = (file.size / 1024).toFixed(1);
+    summary.innerText = `📄 ${file.name} (${sizeKb} KB) - 파일 업로드 준비 완료`;
+  }
+}
+
+async function handleSaveManualCareLog(event) {
+  if (event && event.preventDefault) event.preventDefault();
+
+  const appId = document.getElementById('manualLogAppSelect')?.value;
+  if (!appId) {
+    alert('대상 환자(고객)을 선택해주세요.');
+    return;
+  }
+
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  const patientName = app ? app.patientName : '고객';
+  const insuranceCompany = app ? (app.insuranceCompany || '삼성화재') : '삼성화재';
+
+  const caregiverName = document.getElementById('manualLogCaregiverName')?.value?.trim() || '간병인';
+  const centerName = document.getElementById('manualLogCenterName')?.value?.trim() || '영등포센터';
+  const startDate = document.getElementById('manualLogStartDate')?.value || '2026-09-01';
+  const endDate = document.getElementById('manualLogEndDate')?.value || '2026-09-10';
+  const bp = document.getElementById('manualLogBp')?.value?.trim() || '120/80';
+  const pulse = parseInt(document.getElementById('manualLogPulse')?.value, 10) || 72;
+  const temp = parseFloat(document.getElementById('manualLogTemp')?.value) || 36.5;
+  const content = document.getElementById('manualLogContent')?.value?.trim() || '환자 상태 안정적';
+
+  const file = gManualLogSelectedFile;
+  let fileName = file ? file.name : `[${appId}_${patientName}]_간병일지_수동등록.pdf`;
+  let fileSize = file ? `${(file.size / 1024).toFixed(0)} KB` : '150 KB';
+  let fileBase64 = null;
+
+  if (file) {
+    try {
+      fileBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const res = reader.result;
+          resolve(typeof res === 'string' ? res.split(',')[1] : '');
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    } catch (err) {
+      console.warn('File read error:', err);
+    }
+  }
+
+  const now = new Date();
+  const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  const newLogId = 'CLOG-MANUAL-' + Date.now().toString().slice(-6);
+  const newLog = {
+    id: newLogId,
+    applyId: appId,
+    patientName: patientName,
+    insuranceCompany: insuranceCompany,
+    caregiverName: caregiverName,
+    centerName: centerName,
+    startDate: startDate,
+    endDate: endDate,
+    pdfFileName: fileName,
+    pdfFileSize: fileSize,
+    pdfBase64: fileBase64,
+    source: '수동등록',
+    importedAt: timeStr,
+    sttText: `[수동 등록 간병일지]\n환자: ${patientName} (${appId})\n간병기간: ${startDate} ~ ${endDate}\n담당: ${caregiverName} (${centerName})\n활력징후: 혈압 ${bp}, 맥박 ${pulse}회, 체온 ${temp}℃\n기록내용: ${content}`,
+    vital: { bp: bp, pulse: pulse, temp: temp }
+  };
+
+  gCareLogs.unshift(newLog);
+  try {
+    localStorage.setItem('LIVON_CARE_LOGS', JSON.stringify(gCareLogs));
+  } catch (e) {}
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveCareLog', { log: newLog }).catch(console.warn);
+  }
+
+  // Auto-select into daily email care log attachment set
+  gSamsungDailySelectedCareLogs.add(appId);
+
+  closeModal('samsungManualCareLogModal');
+  renderSamsungDailyCareLogSelector();
+  updateSamsungDailyLiveSummary();
+
+  if (typeof showCustomAlert === 'function') {
+    showCustomAlert({
+      title: '간병일지 수동 등록 완료 ✅',
+      message: `[${patientName}] 환자의 간병일지가 전산에 성공적으로 등록되었으며,\n일일접수보고 첨부 목록에 자동으로 선택되었습니다!`,
+      icon: 'file-check',
+      iconColor: 'emerald'
+    });
+  } else {
+    alert(`✅ [${patientName}] 환자의 간병일지가 성공적으로 등록되었습니다.`);
+  }
 }
 
 function toggleSamsungDailyCareLog(appId, isChecked) {
@@ -7851,6 +8293,75 @@ async function handleSendSamsungDailyReport(e) {
     try {
       localStorage.setItem('LIVON_SAMSUNG_EMAIL_LOGS', JSON.stringify(gSamsungEmailLogs));
     } catch (err) {}
+
+    // 간병일지 발송완료 히스토리 아카이빙 (미발송 목록 -> 발송완료 이력 탭 자동 이동 및 Convex 동기화)
+    let careLogRecorded = false;
+    if (gSamsungDailySelectedCareLogs && gSamsungDailySelectedCareLogs.size > 0) {
+      for (const appId of gSamsungDailySelectedCareLogs) {
+        const targetApp = (gApps || []).find(a => String(a.id) === String(appId));
+        const cLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs))
+          ? gCareLogs.find(l => String(l.applyId) === String(appId) || (targetApp && l.patientName === targetApp.patientName))
+          : null;
+        const patientName = targetApp ? targetApp.patientName : (cLog ? cLog.patientName : '고객');
+        const pdfFileName = cLog && cLog.pdfFileName ? cLog.pdfFileName : `[${appId}_${patientName}]_간병일지.pdf`;
+        const historyItem = {
+          id: 'SCLH_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          appId: String(appId),
+          patientName: patientName,
+          policyNumber: (targetApp && targetApp.policyNumber) || (cLog && cLog.policyNumber) || '-',
+          accidentNumber: (targetApp && targetApp.accidentNumber) || (cLog && cLog.accidentNumber) || '-',
+          caregiverName: (targetApp && targetApp.caregiverName) || (cLog && cLog.caregiverName) || '-',
+          carePeriod: (targetApp && (targetApp.carePeriod || `${targetApp.careStartDate || ''} ~ ${targetApp.careEndDate || ''}`)) || (cLog && cLog.carePeriod) || '-',
+          pdfFileName: pdfFileName,
+          recipient: to,
+          subject: subject,
+          sentAt: timeStr,
+          status: '발송완료'
+        };
+        gSamsungSentCareLogsHistory.unshift(historyItem);
+        if (typeof syncToConvex === 'function') {
+          syncToConvex('sync:saveSamsungSentCareLog', { record: historyItem }).catch(console.warn);
+        }
+        careLogRecorded = true;
+      }
+      gSamsungDailySelectedCareLogs.clear();
+    }
+
+    if (extraCareFiles && extraCareFiles.length > 0) {
+      for (let i = 0; i < extraCareFiles.length; i++) {
+        const f = extraCareFiles[i];
+        const historyItem = {
+          id: 'SCLH_EXT_' + Date.now() + '_' + i,
+          appId: '수동첨부',
+          patientName: '외부첨부',
+          policyNumber: '-',
+          accidentNumber: '-',
+          caregiverName: '-',
+          carePeriod: '-',
+          pdfFileName: f.name,
+          recipient: to,
+          subject: subject,
+          sentAt: timeStr,
+          status: '발송완료'
+        };
+        gSamsungSentCareLogsHistory.unshift(historyItem);
+        if (typeof syncToConvex === 'function') {
+          syncToConvex('sync:saveSamsungSentCareLog', { record: historyItem }).catch(console.warn);
+        }
+        careLogRecorded = true;
+      }
+      const extraInput = document.getElementById('samsungDailyExtraCareLogsInput');
+      if (extraInput) extraInput.value = '';
+    }
+
+    if (careLogRecorded) {
+      try {
+        localStorage.setItem('LIVON_SAMSUNG_SENT_CARE_LOGS', JSON.stringify(gSamsungSentCareLogsHistory));
+      } catch (e) {}
+      if (typeof renderSamsungDailyCareLogSelector === 'function') renderSamsungDailyCareLogSelector();
+      if (typeof renderSamsungDailyCareLogHistory === 'function') renderSamsungDailyCareLogHistory();
+      if (typeof updateSamsungDailyLiveSummary === 'function') updateSamsungDailyLiveSummary();
+    }
 
     // 첨부파일 체크박스 기본 상태 해제 (중복 발송 방지)
     if (typeof toggleSamsungDailyExcelAttachment === 'function') {
@@ -21895,6 +22406,7 @@ function switchTab(tabId, filterParam = null, triggerReload = true) {
     const btnTab = btn.getAttribute('data-tab');
     // adminmgmt 또는 settings 둘 다 '시스템관리(권한,설정)' 메뉴 버튼과 하이라이트 매칭
     const isMatched = btnTab === tabId || 
+      (btnTab === 'samsunglist' && (tabId === 'samsunglist' || tabId === 'samsungleads' || tabId === 'samsung')) ||
       (btnTab === 'adminmgmt' && (tabId === 'adminmgmt' || tabId === 'settings')) ||
       (btnTab === 'directory' && tabId === 'directory');
     const isSubmenuItem = btn.closest('#referenceSubmenu') !== null;
@@ -23443,13 +23955,29 @@ async function openCarePortOfficialDetail(sessionId) {
 }
 
 function printCarePortModal() {
+  const area = document.getElementById('carePortPrintArea');
+  let prevTransform = '';
+  if (area) {
+    prevTransform = area.style.transform;
+    const maxPrintPx = 1040;
+    const currentH = area.scrollHeight;
+    if (currentH > maxPrintPx) {
+      const scale = (maxPrintPx / currentH) * 0.96;
+      area.style.transform = `scale(${scale})`;
+      area.style.transformOrigin = 'top center';
+    }
+  }
   document.body.classList.add('printing-careport');
   setTimeout(() => {
     window.print();
     setTimeout(() => {
       document.body.classList.remove('printing-careport');
+      if (area) {
+        area.style.transform = prevTransform;
+        area.style.transformOrigin = '';
+      }
     }, 500);
-  }, 100);
+  }, 120);
 }
 
 function downloadCarePortDocumentHtml() {
@@ -23473,23 +24001,26 @@ function downloadCarePortDocumentHtml() {
   <meta charset="UTF-8">
   <title>간병일지_${username}_${consultDate.replace(/[: ]/g, '_')}</title>
   <style>
-    @page { size: A4 portrait; margin: 12mm 15mm; }
+    @page { size: A4 portrait; margin: 5mm 8mm; }
     * { box-sizing: border-box; }
-    body {
+    html, body {
       font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
       background: #fff;
       color: #0f172a;
-      padding: 30px;
+      padding: 10px 14px;
       margin: 0;
-      line-height: 1.5;
+      line-height: 1.4;
+      height: 284mm;
+      max-height: 284mm;
+      overflow: hidden;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    .page { max-width: 820px; margin: 0 auto; background: #fff; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .header h1 { font-size: 30px; font-weight: 900; margin: 0; letter-spacing: -0.5px; }
+    .page { max-width: 820px; max-height: 280mm; margin: 0 auto; background: #fff; overflow: hidden; page-break-inside: avoid; break-inside: avoid; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .header h1 { font-size: 20px; font-weight: 900; margin: 0; letter-spacing: -0.5px; }
     .btn-group { display: flex; gap: 8px; }
-    .btn { padding: 6px 14px; font-size: 12px; font-weight: bold; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+    .btn { padding: 4px 10px; font-size: 11px; font-weight: bold; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
     .btn-download { background: #f8fafc; color: #1e293b; border: 1px solid #cbd5e1; }
     .btn-print { background: #0f172a; color: #fff; border: 1px solid #0f172a; }
     .meta-strip {
@@ -23497,20 +24028,20 @@ function downloadCarePortDocumentHtml() {
       justify-content: space-between;
       border-top: 1px solid #e2e8f0;
       border-bottom: 1px solid #e2e8f0;
-      padding: 12px 0;
-      margin-bottom: 24px;
+      padding: 5px 0;
+      margin-bottom: 8px;
     }
-    .meta-col { padding: 0 14px; border-right: 1px solid #e2e8f0; flex: 1; }
-    .meta-col:first-child { padding-left: 4px; }
-    .meta-col:last-child { border-right: none; padding-right: 4px; }
-    .meta-col .label { font-size: 12px; color: #64748b; margin-bottom: 4px; font-weight: 500; }
-    .meta-col .val { font-size: 15px; font-weight: 800; color: #0f172a; }
-    .sec-title { font-size: 18px; font-weight: 800; margin: 24px 0 12px; color: #0f172a; }
-    .sub-title { font-size: 15px; font-weight: 800; margin: 16px 0 10px; color: #1e293b; }
+    .meta-col { padding: 0 8px; border-right: 1px solid #e2e8f0; flex: 1; }
+    .meta-col:first-child { padding-left: 2px; }
+    .meta-col:last-child { border-right: none; padding-right: 2px; }
+    .meta-col .label { font-size: 10.5px; color: #64748b; margin-bottom: 2px; font-weight: 500; }
+    .meta-col .val { font-size: 12px; font-weight: 800; color: #0f172a; }
+    .sec-title { font-size: 13.5px; font-weight: 800; margin: 8px 0 4px; color: #0f172a; }
+    .sub-title { font-size: 12px; font-weight: 800; margin: 6px 0 3px; color: #1e293b; }
     .summary-card {
       border: 1px solid #e2e8f0;
       border-radius: 6px;
-      padding: 28px;
+      padding: 10px 14px;
       position: relative;
       background: #ffffff;
       overflow: hidden;
@@ -23520,7 +24051,7 @@ function downloadCarePortDocumentHtml() {
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      font-size: 100px;
+      font-size: 65px;
       font-weight: 900;
       color: rgba(244, 114, 182, 0.12);
       letter-spacing: 6px;
@@ -23529,16 +24060,16 @@ function downloadCarePortDocumentHtml() {
       font-family: sans-serif;
     }
     .card-content { position: relative; z-index: 1; }
-    .card-title { font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 10px; }
-    .card-tags { font-size: 13.5px; font-weight: 700; color: #475569; margin-bottom: 20px; }
-    .report-item { margin-bottom: 16px; }
-    .report-item-title { font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
-    .report-item-body { font-size: 13.5px; color: #334155; line-height: 1.65; }
-    .summary-wrap { margin-top: 20px; padding-top: 10px; }
-    .summary-title { font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
-    .summary-body { font-size: 13.5px; color: #334155; line-height: 1.65; }
+    .card-title { font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 3px; }
+    .card-tags { font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 6px; }
+    .report-item { margin-bottom: 6px; }
+    .report-item-title { font-size: 11.5px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
+    .report-item-body { font-size: 11px; color: #334155; line-height: 1.4; }
+    .summary-wrap { margin-top: 6px; padding-top: 4px; border-top: 1px dashed #e2e8f0; }
+    .summary-title { font-size: 11.5px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
+    .summary-body { font-size: 11px; color: #334155; line-height: 1.4; }
     @media print {
-      body { padding: 0; }
+      body { padding: 0; margin: 0; }
       .no-print { display: none !important; }
       .summary-card { border: 1px solid #e2e8f0 !important; }
     }
@@ -23549,7 +24080,7 @@ function downloadCarePortDocumentHtml() {
     <div class="header">
       <h1>간병일지</h1>
       <div class="btn-group no-print">
-        <button onclick="window.print()" class="btn btn-print">프린트 (PDF 저장)</button>
+        <button onclick="window.print()" class="btn btn-print">프린트 (1장 PDF 저장)</button>
       </div>
     </div>
 
@@ -23565,7 +24096,7 @@ function downloadCarePortDocumentHtml() {
 
     <div class="sec-title">상담내용</div>
     ${checkboxesHtml ? `
-      <div style="display: grid; grid-template-columns: 1fr 1fr; column-gap: 40px; row-gap: 12px; font-size: 13px; margin-bottom: 24px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; column-gap: 30px; row-gap: 4px; font-size: 10.5px; margin-bottom: 8px;">
         ${checkboxesHtml}
       </div>
     ` : ''}
@@ -23584,6 +24115,18 @@ function downloadCarePortDocumentHtml() {
       </div>
     </div>
   </div>
+  <script>
+    window.addEventListener('load', function() {
+      var p = document.querySelector('.page');
+      if (!p) return;
+      var maxH = 1040;
+      if (p.scrollHeight > maxH) {
+        var s = (maxH / p.scrollHeight) * 0.97;
+        p.style.transform = 'scale(' + s.toFixed(3) + ')';
+        p.style.transformOrigin = 'top center';
+      }
+    });
+  </script>
 </body>
 </html>`;
 
