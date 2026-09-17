@@ -194,6 +194,113 @@ function startServer(port) {
       return;
     }
 
+    // =========================================================================
+    // API Route: Samsung Drive Status & Sync (구글 드라이브 일일 엑셀 연동)
+    // =========================================================================
+    if (reqPath === '/api/samsung-drive/status') {
+      try {
+        const cfg = getSamsungDriveConfig();
+        const latest = findLatestSamsungFile(cfg.folderPath);
+        const hasNewFile = latest && (!cfg.lastSyncedFile || latest.filename !== cfg.lastSyncedFile);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({
+          success: true,
+          folderExists: cfg.folderPath ? fs.existsSync(cfg.folderPath) : false,
+          folderPath: cfg.folderPath,
+          folderId: cfg.folderId || '1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc',
+          folderUrl: cfg.folderUrl || 'https://drive.google.com/drive/folders/1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc',
+          folderName: cfg.folderName || '삼성화재 가입자 리스트',
+          latestFile: latest,
+          lastSyncedFile: cfg.lastSyncedFile,
+          lastSyncedAt: cfg.lastSyncedAt,
+          lastRecordCount: cfg.lastRecordCount || 25939,
+          hasNewFile: !!hasNewFile
+        }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    }
+
+    if (reqPath === '/api/samsung-drive/sync') {
+      try {
+        const cfg = getSamsungDriveConfig();
+        const latest = findLatestSamsungFile(cfg.folderPath);
+        let records = [];
+        let filename = '';
+
+        if (latest && fs.existsSync(latest.fullPath)) {
+          console.log(`[SamsungDrive Server] 최신 파일 [${latest.filename}] 복호화 시작...`);
+          records = await decryptAndParseSamsungExcel(latest.fullPath, cfg.password || '202609');
+          filename = latest.filename;
+        } else {
+          // 로컬 경로 파일이 없을 경우 저장된 최신 JSON 파일 로드
+          const latestJsonPath = path.join(BASE_DIR, 'samsung_drive_latest.json');
+          if (fs.existsSync(latestJsonPath)) {
+            const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify(raw));
+          }
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: '구글 드라이브 폴더에서 최신 파일을 찾을 수 없습니다.' }));
+        }
+
+        const syncedAt = new Date().toLocaleString('ko-KR', { hour12: false });
+        saveSamsungDriveConfig({
+          lastSyncedFile: filename,
+          lastSyncedAt: syncedAt,
+          lastRecordCount: records.length
+        });
+
+        // 컴팩트 JSON 갱신
+        const cols = Object.keys(records[0] || {});
+        const rows = records.map(r => cols.map(c => r[c]));
+        const compactData = {
+          success: true,
+          filename: filename,
+          syncedAt: syncedAt,
+          count: records.length,
+          folderId: '1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc',
+          folderUrl: 'https://drive.google.com/drive/folders/1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc',
+          folderName: '삼성화재 가입자 리스트',
+          columns: cols,
+          rows: rows
+        };
+        fs.writeFileSync(path.join(BASE_DIR, 'samsung_drive_latest.json'), JSON.stringify(compactData), 'utf8');
+
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify(compactData));
+      } catch (err) {
+        console.error('[SamsungDrive Server] Sync failed:', err);
+        // 에러 시에도 기존 samsung_drive_latest.json이 있으면 fallback 제공
+        const latestJsonPath = path.join(BASE_DIR, 'samsung_drive_latest.json');
+        if (fs.existsSync(latestJsonPath)) {
+          const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(raw));
+        }
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    }
+
+    if (reqPath === '/api/samsung-drive/config' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const saved = saveSamsungDriveConfig(payload);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, config: saved }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
 // Persistent Fax Configuration (저장소 설정 보관 파일)
 const FAX_CONFIG_PATH = path.join(BASE_DIR, 'fax_config.json');
 

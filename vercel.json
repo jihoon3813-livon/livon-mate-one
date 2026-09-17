@@ -11,6 +11,14 @@
       "dest": "/api/fax/send.js"
     },
     {
+      "src": "/api/samsung-drive/status",
+      "dest": "/api/samsung-drive/status.js"
+    },
+    {
+      "src": "/api/samsung-drive/sync",
+      "dest": "/api/samsung-drive/sync.js"
+    },
+    {
       "src": "/api/fax/status",
       "dest": "/api/fax/status.js"
     },
