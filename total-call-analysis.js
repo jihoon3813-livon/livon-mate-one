@@ -77,6 +77,11 @@ function closeTotalSyncProgressModal() {
 window.closeTotalSyncProgressModal = closeTotalSyncProgressModal;
 window.closeTotalSyncProgressCard = closeTotalSyncProgressModal; // 하위 호환 별칭
 
+function renderTotalSyncProgressCardHtml() {
+  return '';
+}
+window.renderTotalSyncProgressCardHtml = renderTotalSyncProgressCardHtml; // 하위 호환 별칭
+
 function renderTotalSyncProgressModalHtml() {
   if (!gTotalSyncProgressState.active) return '';
   const { step, percent, title, message, completed, count } = gTotalSyncProgressState;
@@ -739,13 +744,32 @@ async function initTotalCallAnalysisModule(forceRefresh = false) {
   // 1. 메모리 또는 세션 스토리지에 캐시된 데이터가 있으면 대기 스피너 없이 0ms 즉시 렌더링!
   let hasImmediateData = false;
   if (gTotalCallData && gTotalCallData.callLogs && gTotalCallData.callLogs.length > 0) {
+    window.gTotalCallData = gTotalCallData;
     hasImmediateData = true;
   } else {
     try {
       const cached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
       if (cached) {
         gTotalCallData = JSON.parse(cached);
+        window.gTotalCallData = gTotalCallData;
         hasImmediateData = true;
+      }
+    } catch (e) {}
+  }
+
+  // 캐시가 없으면 정적 fallback 파일 먼저 초고속 로드 시도 (화면 공백 최소화)
+  if (!hasImmediateData) {
+    try {
+      const fastRes = await fetch(`call_report_all.json?t=${Date.now()}`);
+      if (fastRes.ok) {
+        const fastJson = await fastRes.json();
+        const d = (fastJson && fastJson.data) ? fastJson.data : fastJson;
+        if (d && d.callLogs && d.callLogs.length > 0) {
+          gTotalCallData = d;
+          window.gTotalCallData = d;
+          hasImmediateData = true;
+          try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(d)); } catch(e){}
+        }
       }
     } catch (e) {}
   }
@@ -846,6 +870,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
 
       clearMateOneMatchCache();
       if (gTotalCallData) {
+        window.gTotalCallData = gTotalCallData;
         try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
       }
       isTotalSyncing = false;
@@ -925,6 +950,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
 
       // 세션 스토리지 캐시 갱신
       if (gTotalCallData) {
+        window.gTotalCallData = gTotalCallData;
         try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
       }
     }
@@ -1040,8 +1066,9 @@ function renderTotalCallAnalysisTab() {
   const container = document.getElementById('tab-totalcallanalysis');
   if (!container) return;
 
-  const logs = getTotalCallLogs();
-  const ctiSummary = (gTotalCallData && gTotalCallData.ctiSummary) || {};
+  try {
+    const logs = getTotalCallLogs();
+    const ctiSummary = (gTotalCallData && gTotalCallData.ctiSummary) || {};
 
   // 1) 날짜 범위 필터 적용 (KPI 및 분석 기준)
   const dateFilteredLogs = logs.filter(c => {
@@ -1200,9 +1227,6 @@ function renderTotalCallAnalysisTab() {
           </button>
         </div>
       </div>
-
-      <!-- CTI 실시간 동기화 진행상황 알림 카드 -->
-      ${renderTotalSyncProgressCardHtml()}
 
       <!-- 긴급 아웃콜(Call-back) 대상 집중 관리 알림 배너 -->
       ${pendingOutcalls.length > 0 ? `
@@ -1465,6 +1489,24 @@ function renderTotalCallAnalysisTab() {
   `;
 
   initTotalIcons(container);
+  } catch (err) {
+    console.error('[TotalCallAnalysis] renderTotalCallAnalysisTab error:', err);
+    container.innerHTML = `
+      <div class="p-10 text-center text-slate-500 space-y-4 bg-white rounded-3xl border border-slate-200 shadow-sm my-6">
+        <div class="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+          <i data-lucide="alert-circle" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-slate-800">종합 콜분석 화면 구성 중 오류가 발생했습니다</h3>
+          <p class="text-xs text-slate-500 mt-1">${(err && err.message) ? err.message : '알 수 없는 오류'}</p>
+        </div>
+        <button type="button" onclick="loadTotalCallData(true)" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-cyan-600/20 cursor-pointer">
+          데이터 다시 불러오기
+        </button>
+      </div>
+    `;
+    if (typeof initTotalIcons === 'function') initTotalIcons(container);
+  }
 }
 
 /**
