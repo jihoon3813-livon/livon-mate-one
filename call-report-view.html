@@ -1866,13 +1866,10 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const pathname = window.location.pathname;
       const reportUrl = `${origin}${pathname}?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
 
-      const finalUrl = await getShortenedUrl(reportUrl);
-      const isShortened = finalUrl !== reportUrl;
-
-      navigator.clipboard.writeText(finalUrl).then(() => {
-        alert(`[${ch} 전용 보고서 ${isShortened ? '단축 ' : ''}공유 링크가 복사되었습니다]\n\n${finalUrl}\n\n${ch} 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
+      navigator.clipboard.writeText(reportUrl).then(() => {
+        alert(`[${ch} 전용 보고서 공유 링크가 복사되었습니다]\n\n${reportUrl}\n\n${ch} 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
       }).catch(() => {
-        prompt('아래 링크를 복사하여 전달해주세요:', finalUrl);
+        prompt('아래 링크를 복사하여 전달해주세요:', reportUrl);
       });
     }
 

@@ -3220,22 +3220,14 @@ async function copyReportWebLink(targetChannel = '삼성화재') {
     }
   } catch (err) {}
 
-  if (typeof showToast === 'function') {
-    showToast(`[${targetChannel}] 보고서 단축 URL을 생성하는 중입니다...`, 'info');
-  }
-
-  // 단축 URL 생성
-  const finalUrl = await getShortenedUrl(reportUrl);
-  const isShortened = finalUrl !== reportUrl;
-
-  navigator.clipboard.writeText(finalUrl).then(() => {
+  navigator.clipboard.writeText(reportUrl).then(() => {
     if (typeof showToast === 'function') {
-      showToast(`[${targetChannel}] ${isShortened ? '단축 URL' : '웹링크'}가 복사되었습니다! (${finalUrl})`, 'success');
+      showToast(`[${targetChannel}] 웹보고서 링크가 복사되었습니다!`, 'success');
     } else {
-      alert(`[${targetChannel} 전용 보고서 공유 웹링크가 복사되었습니다]\n\n${finalUrl}\n\n${targetChannel} 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
+      alert(`[${targetChannel} 전용 보고서 공유 웹링크가 복사되었습니다]\n\n${reportUrl}\n\n${targetChannel} 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
     }
   }).catch(() => {
-    prompt(`아래 [${targetChannel}] 전용 보고서 링크를 복사하여 전달해주세요:`, finalUrl);
+    prompt(`아래 [${targetChannel}] 전용 보고서 링크를 복사하여 전달해주세요:`, reportUrl);
   });
 }
 
