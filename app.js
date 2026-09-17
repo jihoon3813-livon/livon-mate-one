@@ -12831,8 +12831,8 @@ async function handleTriggerCtiCall(e) {
         details: [
           `수신 대상자: ${name || '고객'} (${formatPhoneNumber(clean)})`,
           `발신 대표번호: ${data.callerName}`,
-          `상담원 전화기: 잠시 후 벨이 울리면 수화기를 들어주세요.`,
-          `통화 기록: CTI 서버에 통화 시간 및 녹취가 자동 보존됩니다.`
+          `상담원 전화기: 잠시 후 걸려오는 대표번호 전화를 받으시면(수신) 즉시 고객과 연결됩니다.`,
+          `통화 기록: CTI 서버에 통화 시간 및 녹취 파일이 자동 보존됩니다.`
         ]
       });
     } else {
