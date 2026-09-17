@@ -162,7 +162,11 @@
       const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday + 6);
       const pad = n => String(n).padStart(2, '0');
       const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-      return { start: fmt(monday), end: fmt(sunday) };
+      const todayStr = fmt(now);
+      const sundayStr = fmt(sunday);
+      // 미래 날짜는 제외하고 오늘까지로 캡핑
+      const endStr = sundayStr > todayStr ? todayStr : sundayStr;
+      return { start: fmt(monday), end: endStr };
     }
 
     const defaultThisWeek = getThisWeekRange();

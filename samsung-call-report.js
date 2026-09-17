@@ -15,19 +15,23 @@ function getThisWeekRange() {
   const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday + 6);
   const pad = n => String(n).padStart(2, '0');
   const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  return { start: fmt(monday), end: fmt(sunday) };
+  const todayStr = fmt(now);
+  const sundayStr = fmt(sunday);
+  // 미래 날짜는 제외하고 오늘까지로 캡핑
+  const endStr = sundayStr > todayStr ? todayStr : sundayStr;
+  return { start: fmt(monday), end: endStr };
 }
 
-const defaultReportRange = { start: '2026-08-18', end: '2026-09-17' };
 const defaultReportThisWeek = getThisWeekRange();
 var gReportFilter = {
   category: '',
   actor: '',
   search: '',
+  channel: '삼성화재',
   consultedOnly: true,
-  periodKey: 'last30',
-  startDate: '2026-08-18',
-  endDate: '2026-09-17'
+  periodKey: 'thisWeek',
+  startDate: defaultReportThisWeek.start,
+  endDate: defaultReportThisWeek.end
 };
 if (typeof window !== 'undefined') {
   window.gReportFilter = gReportFilter;
@@ -368,7 +372,30 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 
 
 // 1. Initializer (0ms 캐시 로드 + 최신 데이터 파일 즉시 반영)
-async function initSamsungCallReportModule() {
+async function initSamsungCallReportModule(resetFilter = true) {
+  // 다른 메뉴를 보다가 들어왔을 때는 항상 이번 주(오늘까지)로 필터 리셋
+  if (resetFilter) {
+    const thisWeek = getThisWeekRange();
+    gReportFilter = {
+      category: '',
+      actor: '',
+      search: '',
+      channel: '삼성화재',
+      consultedOnly: true,
+      periodKey: 'thisWeek',
+      startDate: thisWeek.start,
+      endDate: thisWeek.end
+    };
+    if (typeof window !== 'undefined') {
+      window.gReportFilter = gReportFilter;
+      window.gSamsungReportFilter = gReportFilter;
+    }
+    const sInput = document.getElementById('tabReportStartDate');
+    const eInput = document.getElementById('tabReportEndDate');
+    if (sInput) sInput.value = thisWeek.start;
+    if (eInput) eInput.value = thisWeek.end;
+  }
+
   // 1. 메모리에 최신 데이터가 있으면 즉시 렌더링
   if (gSamsungReportData && gSamsungReportData.callLogs && gSamsungReportData.callLogs.length > 0) {
     renderSamsungCallReportTab();
@@ -433,10 +460,17 @@ function renderSamsungCallReportTab() {
   const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || (typeof gSamsungReportFilter !== 'undefined' && gSamsungReportFilter) || {};
   const stats = calculateReportStats();
 
-  const curStart = curFilter.startDate || info.startDate || defaultReportThisWeek.start;
-  const curEnd = curFilter.endDate || info.endDate || defaultReportThisWeek.end;
+  const thisWeekRange = getThisWeekRange();
+  const curStart = curFilter.startDate || thisWeekRange.start;
+  const curEnd = curFilter.endDate || thisWeekRange.end;
   const curCh = curFilter.channel || info.channelLabel || info.channel || '삼성화재';
   const dateRangeStr = `${curStart} ~ ${curEnd}`;
+  const curPKey = curFilter.periodKey || ((curStart === thisWeekRange.start && curEnd === thisWeekRange.end) ? 'thisWeek' : '');
+  const getPresetBtnClass = (k) => {
+    return curPKey === k
+      ? 'px-2.5 py-1.5 rounded-xl border border-blue-600 bg-blue-600 text-white font-bold text-xs shadow-2xs cursor-pointer shrink-0 whitespace-nowrap'
+      : 'px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap';
+  };
 
   const isCtiMatched = gSamsungReportData && gSamsungReportData.reportInfo &&
     (!curFilter.startDate || gSamsungReportData.reportInfo.startDate === curFilter.startDate) &&
@@ -589,11 +623,11 @@ function renderSamsungCallReportTab() {
 
             <!-- 프리셋 날짜 버튼 (모바일 가로 스크롤) -->
             <div class="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 w-full sm:w-auto">
-              <button type="button" onclick="setTabPresetRange('today')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">오늘</button>
-              <button type="button" onclick="setTabPresetRange('yesterday')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">어제</button>
-              <button type="button" onclick="setTabPresetRange('thisWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">이번 주</button>
-              <button type="button" onclick="setTabPresetRange('lastWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">지난 주</button>
-              <button type="button" onclick="setTabPresetRange('last30')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">최근 30일</button>
+              <button type="button" onclick="setTabPresetRange('today')" class="${getPresetBtnClass('today')}">오늘</button>
+              <button type="button" onclick="setTabPresetRange('yesterday')" class="${getPresetBtnClass('yesterday')}">어제</button>
+              <button type="button" onclick="setTabPresetRange('thisWeek')" class="${getPresetBtnClass('thisWeek')}">이번 주</button>
+              <button type="button" onclick="setTabPresetRange('lastWeek')" class="${getPresetBtnClass('lastWeek')}">지난 주</button>
+              <button type="button" onclick="setTabPresetRange('last30')" class="${getPresetBtnClass('last30')}">최근 30일</button>
             </div>
           </div>
 
@@ -2496,6 +2530,8 @@ function setTabPresetRange(type) {
   const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   let sStr = '';
   let eStr = '';
+
+  gReportFilter.periodKey = type;
 
   if (type === 'today') {
     sStr = fmt(today);

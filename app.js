@@ -21716,11 +21716,7 @@ function switchTab(tabId, filterParam = null, triggerReload = true) {
   }
   else if (tabId === 'samsungcallreport') {
     if (typeof initSamsungCallReportModule === 'function') {
-      if (!gSamsungReportData) {
-        initSamsungCallReportModule();
-      } else {
-        renderSamsungCallReportTab();
-      }
+      initSamsungCallReportModule(true);
     }
   }
   else if (tabId === 'totalcallanalysis') {
