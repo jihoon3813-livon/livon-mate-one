@@ -548,8 +548,19 @@
         touch-action: manipulation;
       }
       /* Ensure text wrapping doesn't push layouts */
-    /* CarePort Official Document Print Styles */
+    /* CarePort Official Document Print Styles (첨부 2번/3번 완벽 A4 일치) */
     @media print {
+      @page {
+        size: A4 portrait;
+        margin: 10mm 12mm;
+      }
+      body.printing-careport {
+        background: #ffffff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
       body.printing-careport * {
         visibility: hidden !important;
       }
@@ -557,28 +568,41 @@
       body.printing-careport #carePortPrintArea * {
         visibility: visible !important;
       }
-      body.printing-careport #carePortPrintArea {
-        position: absolute !important;
-        left: 0 !important;
-        top: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        margin: 0 !important;
-        padding: 24px !important;
-        box-shadow: none !important;
-        border: none !important;
-        display: block !important;
-      }
       body.printing-careport #carePortOfficialModal {
         position: static !important;
+        inset: auto !important;
+        width: 100% !important;
+        height: auto !important;
         background: transparent !important;
         padding: 0 !important;
+        margin: 0 !important;
+        display: block !important;
       }
       body.printing-careport #carePortOfficialModal > div {
         border: none !important;
         box-shadow: none !important;
         max-height: none !important;
         overflow: visible !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+      }
+      body.printing-careport #carePortPrintArea {
+        position: static !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        display: block !important;
+      }
+      body.printing-careport .no-print {
+        display: none !important;
       }
     }
   </style>
@@ -8588,7 +8612,7 @@
   <div id="carePortOfficialModal" class="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 hidden">
     <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[96vh] flex flex-col shadow-2xl border border-slate-300 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
       <!-- Modal Top Navigation Bar -->
-      <div class="px-5 py-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
+      <div class="px-5 py-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0 no-print">
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-xl bg-purple-600 flex items-center justify-center text-white font-black shadow-md">
             <i data-lucide="file-check-2" class="w-5 h-5"></i>
@@ -8598,7 +8622,7 @@
               <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-purple-500/30 text-purple-200 border border-purple-400/30">
                 CarePort Official
               </span>
-              <span id="carePortModalSessionBadge" class="text-xs font-mono text-purple-300 font-bold">#531</span>
+              <span id="carePortModalSessionBadge" class="text-xs font-mono text-purple-300 font-bold">#1604</span>
             </div>
             <h3 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
               <span>케어포트(CarePort) 공식 간병일지 원문</span>
@@ -8608,18 +8632,6 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <!-- Switch View Mode -->
-          <div class="bg-slate-800 p-0.5 rounded-xl flex items-center text-xs">
-            <button type="button" id="btnCarePortTabIframe" onclick="switchCarePortModalView('iframe')"
-              class="px-3 py-1.5 rounded-lg font-bold transition-all bg-purple-600 text-white cursor-pointer">
-              CarePort 웹뷰어
-            </button>
-            <button type="button" id="btnCarePortTabPrint" onclick="switchCarePortModalView('print')"
-              class="px-3 py-1.5 rounded-lg font-bold transition-all text-slate-300 hover:text-white cursor-pointer">
-              공식 인쇄 양식
-            </button>
-          </div>
-
           <button type="button" id="btnCarePortNewTab" onclick="openCarePortInNewTab()" 
             class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
             title="새 창에서 CarePort 공식 원본 페이지 열기">
@@ -8640,24 +8652,14 @@
         </div>
       </div>
 
-      <!-- Modal Content Body -->
+      <!-- Modal Content Body (첨부 2번 이미지 100% 동일 양식) -->
       <div class="flex-1 overflow-y-auto bg-slate-100/80 relative min-h-[550px] flex flex-col custom-scrollbar">
-        <!-- 1. Iframe View (CarePort Live Page) -->
-        <div id="carePortIframeWrapper" class="w-full flex-1 flex flex-col relative h-[78vh]">
-          <div id="carePortIframeLoading" class="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center gap-3 z-10">
-            <div class="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-            <div class="text-sm font-bold text-slate-700">케어포트(CarePort) 공식 일지 원문을 불러오는 중입니다...</div>
-            <div class="text-xs font-mono text-slate-400" id="carePortLoadingUrl">https://careport.livon.care/careport/consult/</div>
-          </div>
-          <iframe id="carePortIframe" src="" class="w-full flex-1 border-0 bg-white" allow="clipboard-write"></iframe>
-        </div>
-
-        <!-- 2. High-Res 1:1 CarePort Document View (첨부 2번 및 3번 이미지 100% 동일 양식) -->
-        <div id="carePortPrintArea" class="hidden p-6 sm:p-12 max-w-4xl mx-auto w-full bg-white shadow-xl my-4 rounded-2xl font-sans relative border border-slate-200">
+        <!-- 1:1 CarePort Document View -->
+        <div id="carePortPrintArea" class="p-6 sm:p-12 max-w-4xl mx-auto w-full bg-white shadow-xl my-4 rounded-2xl font-sans relative border border-slate-200">
           <!-- Top Row: 간병일지 제목 & 다운로드/프린트 버튼 -->
           <div class="flex items-center justify-between pb-3">
             <h1 class="text-3xl font-black text-slate-950 tracking-tight">간병일지</h1>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 no-print">
               <button type="button" onclick="downloadCarePortDocumentHtml()" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg border border-slate-300 transition-all cursor-pointer">
                 다운로드
               </button>
@@ -8667,7 +8669,7 @@
             </div>
           </div>
 
-          <!-- Exact 7 Fields Header (첨부 3번 이미지 완벽 일치: 대상자명 | 연령 | 성별 | 상담자 | 소속기관 | 상담일시 | 상담시간) -->
+          <!-- Exact 7 Fields Header (첨부 2번/3번 이미지 완벽 일치: 대상자명 | 연령 | 성별 | 상담자 | 소속기관 | 상담일시 | 상담시간) -->
           <div class="my-6 py-4 px-1 border-t border-b border-slate-200 flex items-center justify-between text-left flex-wrap gap-y-3 select-none">
             <div class="px-3.5 border-r border-slate-200 min-w-[75px]">
               <div class="text-[12px] text-slate-500 font-medium mb-1">대상자명</div>
@@ -8687,7 +8689,7 @@
             </div>
             <div class="px-3.5 border-r border-slate-200 min-w-[85px]">
               <div class="text-[12px] text-slate-500 font-medium mb-1">소속기관</div>
-              <div class="text-base font-extrabold text-slate-900 text-purple-900" id="cpMetaOrg">-</div>
+              <div class="text-base font-extrabold text-slate-900" id="cpMetaOrg">-</div>
             </div>
             <div class="px-3.5 border-r border-slate-200 min-w-[150px]">
               <div class="text-[12px] text-slate-500 font-medium mb-1">상담일시</div>
@@ -8699,38 +8701,60 @@
             </div>
           </div>
 
-          <!-- Section: 상담내용 (케어포트 공인 평가 항목 7종) -->
-          <div class="my-6">
-            <h2 class="text-xl font-bold text-slate-900 mb-4">상담내용</h2>
-            <div id="cpCheckboxesList" class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 text-sm">
-              <!-- Dynamically populated with exact CarePort badges -->
-            </div>
+          <!-- Section: 상담내용 -->
+          <div class="mt-6 mb-3">
+            <h2 class="text-xl font-bold text-slate-900">상담내용</h2>
           </div>
 
-          <!-- Section: 상담요약 (Livon 워터마크 배경) -->
-          <div class="mt-8 pt-5 border-t border-slate-200 relative min-h-[220px]">
+          <!-- Section: 상담요약 (첨부 2번 이미지와 100% 동일) -->
+          <div class="mb-2">
+            <h3 class="text-base font-bold text-slate-800">상담요약</h3>
+          </div>
+
+          <!-- Bordered Box with livon watermark (첨부 2번 이미지 100% 동일 박스) -->
+          <div class="border border-slate-200 rounded-md p-6 sm:p-8 bg-white relative overflow-hidden">
             <!-- Pink livon watermark behind -->
             <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 select-none z-0">
-              <span class="text-7xl sm:text-8xl font-black tracking-widest text-pink-400 font-sans">livon</span>
+              <span class="text-7xl sm:text-9xl font-black tracking-widest text-pink-300 font-sans select-none">livon</span>
             </div>
-            
-            <div class="relative z-10">
-              <h2 class="text-xl font-bold text-slate-900 mb-3">상담요약</h2>
-              <div id="cpSummaryContent" class="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap font-medium">
-                내용 로딩 중...
+
+            <!-- Content -->
+            <div class="relative z-10 space-y-4">
+              <!-- Title -->
+              <div id="cpCardTitle" class="text-base font-bold text-slate-900">
+                환자 투석 상태 및 퇴원 일정 확인
+              </div>
+
+              <!-- Tags / Keywords -->
+              <div id="cpCardTags" class="text-sm font-semibold text-slate-700">
+                #환자의 컨디션 #퇴원 시기 #투석 #허리 통증 #배변 상태
+              </div>
+
+              <!-- Structured Numbered Sections (1.환자의 현재 컨디션, 2.투석 상황 및 관리...) -->
+              <div id="cpCardReportItems" class="space-y-4 pt-1">
+                <!-- Dynamically populated from consult_report -->
+              </div>
+
+              <!-- Summary (요약) -->
+              <div id="cpCardSummaryWrap" class="pt-3">
+                <div class="font-bold text-sm text-slate-900 mb-1">요약</div>
+                <div id="cpCardSummaryContent" class="text-sm text-slate-700 leading-relaxed font-normal">
+                  내용 로딩 중...
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Footer Notice -->
-          <div class="text-[11px] text-slate-400 text-center pt-8 border-t border-slate-200 mt-8">
-            본 간병일지는 (주)리본케어 케어포트(CarePort) 통합 전산에 등록된 공식 간병일지 원문입니다.
+          <!-- Optional Real Checkboxes Section (only rendered if API returns genuine checkboxes) -->
+          <div id="cpCheckboxesSection" class="mt-6 hidden">
+            <div id="cpCheckboxesList" class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 text-sm">
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Modal Footer -->
-      <div class="px-6 py-3 bg-white border-t border-slate-200 flex items-center justify-between shrink-0">
+      <div class="px-6 py-3 bg-white border-t border-slate-200 flex items-center justify-between shrink-0 no-print">
         <span class="text-xs text-slate-500 font-mono" id="carePortModalFooterInfo">CarePort 공식 연동</span>
         <button type="button" onclick="closeModal('carePortOfficialModal')" 
           class="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 transition-all cursor-pointer">
