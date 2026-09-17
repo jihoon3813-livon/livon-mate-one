@@ -13,24 +13,24 @@
     "syncedAt": "2026-09-17T07:41:30.393Z"
   },
   "summaryStats": {
-    "totalCalls": 165,
+    "totalCalls": 924,
     "connectReqCalls": 165,
     "answeredCalls": 142,
     "answerRate": "86%",
     "abandonedCalls": 23,
-    "unselectedType": 0,
-    "btnExit": 0,
+    "unselectedType": 519,
+    "btnExit": 38,
     "consultedCalls": 110
   },
   "ctiSummary": {
-    "totalAll": 165,
-    "totalInbound": 165,
+    "totalAll": 928,
+    "totalInbound": 924,
     "answeredCalls": 142,
     "connectRequests": 165,
     "answerRate": "86%",
     "abandonedCalls": 23,
-    "unselectedType": 0,
-    "btnExit": 0
+    "unselectedType": 519,
+    "btnExit": 38
   },
   "dailyTrends": [
     {
