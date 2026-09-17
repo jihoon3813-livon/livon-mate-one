@@ -12,11 +12,35 @@ module.exports = async function handler(req, res) {
 
   try {
     const channel = (req.query && req.query.channel) || '삼성화재';
-    const isHyundaiOrAll = channel.includes('전체') || channel === 'all' || channel.includes('현대');
-    const fileName = isHyundaiOrAll ? 'call_report_all.json' : 'call_report_samsung.json';
-    const filePath = path.join(process.cwd(), fileName);
+    const isAll = channel.includes('전체') || channel === 'all';
+    const isHyundai = channel.includes('현대');
+    const isLivon = channel.includes('리본');
+    let fileName = 'call_report_all.json';
+    if (!isAll) {
+      if (isHyundai) fileName = 'call_report_hyundai.json';
+      else if (isLivon) fileName = 'call_report_livon.json';
+      else fileName = 'call_report_samsung.json';
+    }
 
-    if (!fs.existsSync(filePath)) {
+    const candidatePaths = [
+      path.join(process.cwd(), fileName),
+      path.join(__dirname, fileName),
+      path.join(__dirname, '..', fileName),
+      path.join(__dirname, '..', '..', fileName),
+      path.join(__dirname, '..', '..', '..', fileName)
+    ];
+    let filePath = candidatePaths.find(p => fs.existsSync(p));
+
+    // 혹시 채널별 파일이 없으면 call_report_all.json 폴백 탐색
+    if (!filePath) {
+      const allFallbackPaths = [
+        path.join(process.cwd(), 'call_report_all.json'),
+        path.join(__dirname, '..', '..', '..', 'call_report_all.json')
+      ];
+      filePath = allFallbackPaths.find(p => fs.existsSync(p));
+    }
+
+    if (!filePath) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       return res.status(404).json({ success: false, error: '보고서 데이터 파일을 찾을 수 없습니다.' });
     }

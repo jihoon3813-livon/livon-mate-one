@@ -21721,11 +21721,7 @@ function switchTab(tabId, filterParam = null, triggerReload = true) {
   }
   else if (tabId === 'totalcallanalysis') {
     if (typeof initTotalCallAnalysisModule === 'function') {
-      if (!gTotalCallData) {
-        initTotalCallAnalysisModule();
-      } else {
-        renderTotalCallAnalysisTab();
-      }
+      initTotalCallAnalysisModule();
     }
   }
   else if (tabId === 'directory') switchDirectorySubTab(filterParam || gActiveDirectorySubTab || 'caregivers');

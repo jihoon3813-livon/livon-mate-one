@@ -1,6 +1,12 @@
 {
   "version": 2,
   "cleanUrls": true,
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 30,
+      "includeFiles": "*.json"
+    }
+  },
   "routes": [
     {
       "src": "/api/search-hospital",

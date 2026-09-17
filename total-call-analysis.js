@@ -557,9 +557,14 @@ function initTotalIcons(root) {
  * 메인 탭 초기화 및 CTI 전수 데이터 로드 (0ms 즉시 렌더링 + 비동기 병렬 백그라운드 동기화)
  * =============================================================================
  */
-async function initTotalCallAnalysisModule() {
+async function initTotalCallAnalysisModule(forceRefresh = false) {
   const container = document.getElementById('tab-totalcallanalysis');
   if (!container) return;
+
+  if (forceRefresh) {
+    gTotalCallData = null;
+    try { sessionStorage.removeItem('LIVON_CACHED_TOTAL_CALL_DATA'); } catch(e){}
+  }
 
   // 1. 메모리 또는 세션 스토리지에 캐시된 데이터가 있으면 대기 스피너 없이 0ms 즉시 렌더링!
   let hasImmediateData = false;
@@ -577,39 +582,42 @@ async function initTotalCallAnalysisModule() {
 
   if (hasImmediateData) {
     renderTotalCallAnalysisTab();
-    // 백그라운드 병렬 동기화 (화면 차단 없음)
-    Promise.all([loadCallAnnotations(), loadTotalCallData(false, true)]).then(() => {
+    // 백그라운드 실시간 CTI 자동 동기화 (화면 차단 없이 항상 최신 데이터로 자동 갱신!)
+    Promise.all([loadCallAnnotations(), loadTotalCallData(true, true)]).then(() => {
       renderTotalCallAnalysisTab();
     });
     return;
   }
 
-  // 2. 최초 방문 시에만 경량 로딩 스피너 표시 후 병렬 로드
+  // 2. 최초 방문 시 로딩 스피너 표시 후 실시간 CTI 동기화
   container.innerHTML = `
     <div class="p-12 text-center text-slate-500 space-y-3">
       <i data-lucide="loader-2" class="w-8 h-8 animate-spin mx-auto text-cyan-600"></i>
-      <p class="text-sm font-bold text-slate-700">CTI 전수 종합 콜분석 데이터를 불러오는 중입니다...</p>
-      <p class="text-xs text-slate-400">삼성화재, 현대해상, 리본케어 전체 인바운드 콜을 고속 병렬 집계합니다.</p>
+      <p class="text-sm font-bold text-slate-700">CTI 실시간 종합 콜분석 데이터를 동기화하는 중입니다...</p>
+      <p class="text-xs text-slate-400">삼성화재, 현대해상, 리본케어 전체 인바운드 콜을 실시간 집계합니다.</p>
     </div>
   `;
   initTotalIcons(container);
 
-  await Promise.all([loadCallAnnotations(), loadTotalCallData(false, false)]);
+  await Promise.all([loadCallAnnotations(), loadTotalCallData(true, false)]);
 }
 
 async function loadTotalCallData(forceSync = false, isBackground = false) {
   try {
     if (forceSync) {
-      isTotalSyncing = true;
-      renderTotalCallAnalysisTab();
+      if (!isBackground) {
+        isTotalSyncing = true;
+        renderTotalCallAnalysisTab();
+      }
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15초 타임아웃
       let synced = false;
 
       const s = gTotalFilter.startDate || '2026-08-01';
       const e = gTotalFilter.endDate || new Date().toISOString().slice(0, 10);
-      const sUrl = `/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=all`;
+      const ch = gTotalFilter.channel || 'all';
+      const sUrl = `/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
 
       try {
         const sRes = await fetch(sUrl, { signal: controller.signal });
@@ -629,7 +637,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       // API 실패/타임아웃 시 즉각 최신 정적 파일 로드 (무중단 보장)
       if (!synced) {
         const fallbacks = [
-          `/api/samsung/call-report/data?channel=all`,
+          `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
           `call_report_all.json?t=${Date.now()}`,
           `./call_report_all.json?t=${Date.now()}`,
           `/call_report_all.json?t=${Date.now()}`
@@ -657,9 +665,11 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       isTotalSyncing = false;
       renderTotalCallAnalysisTab();
 
-      if (typeof showToast === 'function') {
-        const count = (gTotalCallData && gTotalCallData.callLogs) ? gTotalCallData.callLogs.length : 0;
-        showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 동기화가 완료되었습니다.`, 'success');
+      if (!isBackground && typeof showToast === 'function') {
+        const count = (gTotalCallData && gTotalCallData.summaryStats && gTotalCallData.summaryStats.totalCalls)
+          ? gTotalCallData.summaryStats.totalCalls
+          : ((gTotalCallData && gTotalCallData.callLogs) ? gTotalCallData.callLogs.length : 0);
+        showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 완료되었습니다.`, 'success');
       }
       return;
     } else {
@@ -757,7 +767,11 @@ function getTotalCallDatePreset(type) {
     const diffToMonday = (day === 0 ? -6 : 1) - day;
     const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diffToMonday);
     const sunday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diffToMonday + 6);
-    return { start: fmt(monday), end: fmt(sunday) };
+    const todayStr = fmt(today);
+    const sundayStr = fmt(sunday);
+    // 오지 않은 미래 날짜는 제외하고 오늘까지로 캡핑
+    const endStr = sundayStr > todayStr ? todayStr : sundayStr;
+    return { start: fmt(monday), end: endStr };
   } else if (type === 'lastWeek') {
     const day = today.getDay();
     const diffToLastMonday = (day === 0 ? -6 : 1) - day - 7;
@@ -1014,18 +1028,18 @@ function renderTotalCallAnalysisTab() {
 
       <!-- 2. 핵심 KPI 스트립 (5대 메트릭 - 숫자 카드 클릭 필터링 연동) -->
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t border-slate-100 text-xs">
-        <!-- 1) 전체 인바운드 콜 -->
+        <!-- 1) 총 인입콜 (CTI 전체) -->
         <div onclick="handleTotalKpiCardClick('all')" 
           class="p-3 rounded-2xl flex flex-col justify-between cursor-pointer transition-all duration-150 select-none shadow-2xs hover:shadow-xs active:scale-[0.98] ${isKpiAllActive ? 'bg-slate-900 text-white ring-2 ring-slate-800 shadow-sm' : 'bg-slate-50 hover:bg-slate-100/90 border border-slate-200 text-slate-800'}" 
           title="클릭 시 전체 인바운드 콜 조회 (필터 해제)">
           <div class="flex items-center justify-between">
-            <span class="text-[11px] font-bold ${isKpiAllActive ? 'text-slate-300' : 'text-slate-500'}">전체 인바운드 콜</span>
+            <span class="text-[11px] font-bold ${isKpiAllActive ? 'text-slate-300' : 'text-slate-500'}">총 인입콜 (CTI)</span>
             ${isKpiAllActive ? '<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-white/20 text-white">전체</span>' : ''}
           </div>
           <div class="text-xl font-black ${isKpiAllActive ? 'text-white' : 'text-slate-900'} mt-1">
-            ${dateFilteredLogs.length}<span class="text-xs font-normal ${isKpiAllActive ? 'text-slate-300' : 'text-slate-500'} ml-1">건</span>
+            ${(gTotalFilter.startDate || gTotalFilter.endDate) ? dateFilteredLogs.length : ((ctiSummary && (ctiSummary.totalAll || ctiSummary.totalInbound)) || (gTotalCallData && gTotalCallData.summaryStats && gTotalCallData.summaryStats.totalCalls) || dateFilteredLogs.length)}<span class="text-xs font-normal ${isKpiAllActive ? 'text-slate-300' : 'text-slate-500'} ml-1">건</span>
           </div>
-          <span class="text-[10px] ${isKpiAllActive ? 'text-slate-300' : 'text-slate-400'} mt-0.5 truncate">${(gTotalFilter.startDate || gTotalFilter.endDate) ? `${gTotalFilter.startDate || '시작'} ~ ${gTotalFilter.endDate || '현재'}` : 'CTI 실시간 수집'}</span>
+          <span class="text-[10px] ${isKpiAllActive ? 'text-slate-300' : 'text-slate-400'} mt-0.5 truncate">${(gTotalFilter.startDate || gTotalFilter.endDate) ? `${gTotalFilter.startDate || '시작'} ~ ${gTotalFilter.endDate || '현재'}` : 'CTI 실시간 전체'}</span>
         </div>
 
         <!-- 2) 실제 상담 (요약 확보) -->
