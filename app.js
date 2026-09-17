@@ -8330,8 +8330,17 @@ async function uploadAndDecryptSamsungExcel(file, customPassword = null) {
       })
     });
 
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok || !contentType.includes('application/json')) {
+      if (res.status === 404) {
+        throw new Error('암호화된 .xlsb 복호화 엔진은 로컬 PC 서버(node server.js) 환경이 필요합니다. PC에서 start_server.ps1을 구동하시거나 암호가 해제된 엑셀(.xlsx) 파일을 올려주세요.');
+      }
+      const rawText = await res.text().catch(() => '');
+      throw new Error(`복호화 서버 응답 오류 (HTTP ${res.status}): ${rawText.slice(0, 100)}`);
+    }
+
     const data = await res.json();
-    if (!res.ok || !data.success) {
+    if (!data || !data.success) {
       throw new Error(data.error || '엑셀 복호화에 실패했습니다.');
     }
 
@@ -8667,12 +8676,27 @@ async function handleSaveSamsungExcelPwd(newPwd) {
     alert('비밀번호를 입력해주세요.');
     return;
   }
+  localStorage.setItem('LIVON_SAMSUNG_EXCEL_PWD', pwd);
+
   try {
     const res = await fetch('/api/samsung-drive/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: pwd })
     });
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok || !contentType.includes('application/json')) {
+      // 클라우드 운영 환경: 브라우저 로컬 저장소에 안전 보관
+      if (typeof showCustomAlert === 'function') {
+        showCustomAlert({
+          title: '삼성화재 엑셀 암호 저장 완료',
+          message: `삼성화재 엑셀 복호화 비밀번호가 [${pwd}]로 안전하게 저장되었습니다.`,
+          icon: 'lock',
+          iconColor: 'sky'
+        });
+      }
+      return;
+    }
     const data = await res.json();
     if (data && data.success) {
       if (typeof showCustomAlert === 'function') {
@@ -8687,18 +8711,32 @@ async function handleSaveSamsungExcelPwd(newPwd) {
       alert('비밀번호 저장 실패: ' + (data ? data.error : '오류'));
     }
   } catch (err) {
-    alert('비밀번호 저장 중 통신 오류가 발생했습니다: ' + err.message);
+    if (typeof showCustomAlert === 'function') {
+      showCustomAlert({
+        title: '삼성화재 엑셀 암호 저장 완료',
+        message: `삼성화재 엑셀 복호화 비밀번호가 [${pwd}]로 브라우저에 저장되었습니다.`,
+        icon: 'lock',
+        iconColor: 'sky'
+      });
+    }
   }
 }
 
 async function checkSamsungDriveStatus() {
   const textEl = document.getElementById('samsungDriveSyncText');
   const alertEl = document.getElementById('samsungDriveNewFileAlert');
+  const dotEl = document.getElementById('samsungDriveDot');
 
   try {
     const res = await fetch('/api/samsung-drive/status');
-    if (!res.ok) {
-      if (textEl && !gSamsungDriveLastSyncedAt) textEl.innerText = '로컬 구글 드라이브 연동 대기';
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok || !contentType.includes('application/json')) {
+      if (textEl && !gSamsungDriveLastSyncedAt) {
+        textEl.innerText = '웹 운영 모드 (로컬 드라이브 데몬 미연결)';
+      }
+      if (dotEl && !gSamsungDriveLastSyncedAt) {
+        dotEl.className = 'w-2 h-2 rounded-full bg-slate-400';
+      }
       return;
     }
     const data = await res.json();
@@ -8760,6 +8798,17 @@ async function triggerSamsungDriveSync(isAuto = false) {
 
   try {
     const res = await fetch('/api/samsung-drive/sync', { method: 'POST' });
+    const contentType = res.headers.get('content-type') || '';
+
+    // 404 등 HTML 응답 사전 방어 (Unexpected token 'T' JSON 파싱 에러 방지)
+    if (!res.ok || !contentType.includes('application/json')) {
+      if (res.status === 404) {
+        throw new Error('CLOUD_ENV_NO_LOCAL_DRIVE');
+      }
+      const rawText = await res.text().catch(() => '');
+      throw new Error(`동기화 서버 응답 오류 (HTTP ${res.status}): ${rawText.slice(0, 100)}`);
+    }
+
     const data = await res.json();
 
     if (!res.ok || !data.success) {
@@ -8801,9 +8850,48 @@ async function triggerSamsungDriveSync(isAuto = false) {
     }
   } catch (err) {
     console.error('[SamsungDrive] Sync Error:', err);
-    if (textEl) textEl.innerText = '동기화 실패: ' + err.message;
-    if (!isAuto) {
-      alert('구글 드라이브 동기화 실패: ' + err.message);
+
+    if (err.message === 'CLOUD_ENV_NO_LOCAL_DRIVE') {
+      // 클라우드 웹 운영 환경: 로컬 Windows 드라이브 경로 직접 접근 불가 안내 및 Convex Cloud 동기화 시도
+      if (textEl) textEl.innerText = '웹 운영 모드 (클라우드 DB 동기화)';
+
+      // 만약 클라우드(Convex)에 데이터가 있다면 Convex에서 최신 명단 가져오기 시도
+      let convexSynced = false;
+      if (typeof syncAllSamsungEligibleFromConvex === 'function') {
+        try {
+          if (textEl) textEl.innerText = '클라우드 DB(Convex)에서 명단 가져오는 중...';
+          await syncAllSamsungEligibleFromConvex();
+          convexSynced = (Array.isArray(gSamsungList) && gSamsungList.length > 0);
+        } catch (cErr) {
+          console.warn('[SamsungDrive] Convex sync fallback warning:', cErr);
+        }
+      }
+
+      if (convexSynced) {
+        updateSamsungDriveSyncUI(new Date().toISOString(), 'Convex Cloud DB', gSamsungList.length);
+        if (!isAuto && typeof showCustomAlert === 'function') {
+          showCustomAlert({
+            title: '클라우드 DB 최신 명단 동기화 완료',
+            message: `클라우드 DB(Convex)에 보관된 최신 삼성화재 명단 총 ${gSamsungList.length.toLocaleString()}건을 정상 동기화했습니다.\n\n(참고: PC 로컬 구글 드라이브 폴더의 암호화 엑셀 자동 복호화는 PC 로컬 서버(node server.js) 실행 시 지원됩니다.)`,
+            icon: 'cloud-check',
+            iconColor: 'sky'
+          });
+        }
+      } else {
+        if (!isAuto && typeof showCustomAlert === 'function') {
+          showCustomAlert({
+            title: '로컬 구글 드라이브 연동 안내',
+            message: '현재 접속 중인 환경은 웹 클라우드(운영) 페이지입니다.\n\n구글 드라이브의 암호화된 삼성화재 엑셀(.xlsb) 자동 복호화 연동은 보안 정책상 사용자의 Windows PC 로컬 서버(node server.js)에서 실행됩니다.\n\n💡 최신 명단 반영 방법:\n1. PC에서 로컬 서버(start_server.ps1)를 실행하여 1회 동기화하시면 클라우드(운영페이지)로 자동 전송됩니다.\n2. 또는 하단의 [엑셀 파일 업로드] 버튼으로 최신 파일을 직접 등록하실 수 있습니다.',
+            icon: 'info',
+            iconColor: 'sky'
+          });
+        }
+      }
+    } else {
+      if (textEl) textEl.innerText = '동기화 실패: ' + err.message;
+      if (!isAuto) {
+        alert('구글 드라이브 동기화 실패: ' + err.message);
+      }
     }
   } finally {
     if (btn) btn.disabled = false;
@@ -8839,6 +8927,23 @@ async function applySamsungDriveRecords(records, filename, syncedAt) {
   }
   if (typeof renderCurrentSamsungSheet === 'function') {
     renderCurrentSamsungSheet();
+  }
+
+  // Convex 클라우드 DB에 백그라운드 청크 동기화 전송 (운영 페이지에서도 볼 수 있도록 실시간 동기화)
+  if (typeof syncToConvex === 'function') {
+    (async () => {
+      try {
+        console.log(`[SamsungDrive] Convex 클라우드에 전체 ${records.length.toLocaleString()}건 청크 동기화 시작...`);
+        const chunkSize = 100;
+        for (let i = 0; i < records.length; i += chunkSize) {
+          const chunk = records.slice(i, i + chunkSize);
+          await syncToConvex('sync:saveSamsungEligibleChunk', { leads: chunk });
+        }
+        console.log(`[SamsungDrive] Convex 클라우드에 전송 완료!`);
+      } catch (e) {
+        console.warn('[SamsungDrive] Convex 전송 중 경고:', e);
+      }
+    })();
   }
 }
 
