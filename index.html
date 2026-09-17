@@ -1391,6 +1391,42 @@
           </div>
         </div>
 
+        <!-- 1-2. 구글 드라이브 일일 엑셀 자동 동기화 배너 & 상태 바 -->
+        <div class="flex items-center justify-between gap-3 bg-gradient-to-r from-sky-50 via-indigo-50/40 to-white p-3 rounded-2xl border border-sky-200/80 shadow-2xs flex-wrap">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-8 h-8 rounded-xl bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <i data-lucide="cloud" class="w-4 h-4"></i>
+            </div>
+            <div class="min-w-0 flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                구글 드라이브 일일 자동 연동
+              </span>
+              <span id="samsungDriveSyncBadge" class="text-[11px] px-2.5 py-0.5 rounded-full bg-white border border-sky-200 text-sky-800 font-bold flex items-center gap-1.5 shadow-2xs">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="samsungDriveDot"></span>
+                <span id="samsungDriveSyncText">연동 상태 확인 중...</span>
+              </span>
+              <span id="samsungDriveNewFileAlert" class="hidden text-[10px] px-2.5 py-0.5 rounded-full bg-rose-500 text-white font-black animate-bounce shadow-2xs">
+                ⚡ 신규 파일 감지됨!
+              </span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0">
+            <!-- 비밀번호 설정 인풋 -->
+            <div class="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-2xs text-xs" title="삼성화재 엑셀 파일 복호화 비밀번호">
+              <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-400"></i>
+              <span class="text-[11px] text-slate-500 font-bold">엑셀 암호:</span>
+              <input type="text" id="inputSamsungExcelPwd" value="202609" onchange="handleSaveSamsungExcelPwd(this.value)" class="w-20 px-1 py-0.5 font-mono font-black text-slate-900 border-b border-slate-300 focus:border-sky-500 focus:outline-hidden text-xs text-center" placeholder="암호 입력">
+            </div>
+
+            <!-- 수동 즉시 동기화 버튼 -->
+            <button type="button" id="btnSamsungDriveSync" onclick="triggerSamsungDriveSync()" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="iconSamsungDriveSync"></i>
+              <span>구글 드라이브 최신 동기화</span>
+            </button>
+          </div>
+        </div>
+
         <!-- 2. 구글 스프레드시트 스타일 시트 탭 바 (Sheet Tabs) -->
         <div class="flex items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs flex-wrap">
           <div class="flex items-center gap-1.5 overflow-x-auto custom-scrollbar p-1" id="samsungSheetTabBar">
@@ -6325,9 +6361,9 @@
         <!-- File Upload Area -->
         <div class="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:border-sky-500 transition-all cursor-pointer bg-slate-50" onclick="document.getElementById('samsungExcelInput').click()">
           <i data-lucide="upload-cloud" class="w-10 h-10 text-sky-600 mx-auto mb-2"></i>
-          <p class="font-bold text-slate-700">여기를 클릭하여 삼성화재 엑셀 파일(.xlsx, .csv)을 선택하세요</p>
-          <p class="text-[11px] text-slate-400 mt-1">12대 항목이 포함된 엑셀/CSV 파일 지원</p>
-          <input type="file" id="samsungExcelInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleSamsungExcelFile(this)">
+          <p class="font-bold text-slate-700">여기를 클릭하여 삼성화재 엑셀 파일(.xlsb, .xlsx, .csv)을 선택하세요</p>
+          <p class="text-[11px] text-sky-700 font-semibold mt-1">🔒 암호 걸린 엑셀 파일(.xlsb, .xlsx) 자동 복호화 지원 · 12대 항목 포함 파일</p>
+          <input type="file" id="samsungExcelInput" accept=".xlsb,.xlsx,.xls,.csv" class="hidden" onchange="handleSamsungExcelFile(this)">
         </div>
 
         <!-- Or Paste CSV Text Directly -->

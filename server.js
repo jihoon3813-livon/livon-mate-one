@@ -6,6 +6,7 @@ const { createDocumentPdfBuffer, createTestPdfBuffer } = require('./pdf-helper')
 const { uploadToBarobillFTP, callBarobillSoap, getBarobillErrorMessage, getBarobillFaxStatus } = require('./barobill-client');
 const { getEmailConfig, saveEmailConfig, sendSmtpMail, testSmtpConnection } = require('./smtp-client');
 const { getCtiConfig, saveCtiConfig, makeOutboundCall, getRecentCallLogs, fetchCtiLogsByDateRange, fetchCtiDetailView, classifySamsungCall } = require('./cti-client');
+const { getSamsungDriveConfig, saveSamsungDriveConfig, findLatestSamsungFile, decryptAndParseSamsungExcel } = require('./samsung-drive-helper');
 
 let PORT = parseInt(process.env.PORT, 10) || 8080;
 const BASE_DIR = __dirname;
@@ -1058,6 +1059,139 @@ function saveSavedFaxConfig(cfg) {
         supportedProviders: ['Barobill', 'SmartSandbox', 'Aligo'],
         defaultSender: process.env.FAX_SENDER_NUMBER || '02-6499-3917'
       }));
+      return;
+    }
+
+    // =========================================================================
+    // API Route: Samsung Fire Google Drive Auto Sync & Password Decryption
+    // =========================================================================
+    if (reqPath === '/api/samsung-drive/config') {
+      if (req.method === 'GET') {
+        const cfg = getSamsungDriveConfig();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, config: cfg }));
+      } else if (req.method === 'POST') {
+        let body = '';
+        req.on('data', c => body += c);
+        req.on('end', () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const saved = saveSamsungDriveConfig(payload);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true, message: '삼성화재 드라이브 설정이 저장되었습니다.', config: saved }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+    }
+
+    if (reqPath === '/api/samsung-drive/status') {
+      try {
+        const cfg = getSamsungDriveConfig();
+        const latest = findLatestSamsungFile(cfg.folderPath);
+        const hasNewFile = latest && (latest.filename !== cfg.lastSyncedFile);
+
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({
+          success: true,
+          folderExists: !!(cfg.folderPath && fs.existsSync(cfg.folderPath)),
+          folderPath: cfg.folderPath,
+          latestFile: latest,
+          lastSyncedFile: cfg.lastSyncedFile,
+          lastSyncedAt: cfg.lastSyncedAt,
+          lastRecordCount: cfg.lastRecordCount || 0,
+          hasNewFile: !!hasNewFile
+        }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    }
+
+    if (reqPath === '/api/samsung-drive/sync') {
+      try {
+        const cfg = getSamsungDriveConfig();
+        const latest = findLatestSamsungFile(cfg.folderPath);
+        if (!latest) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: '동기화할 삼성화재 엑셀 파일이 폴더에 존재하지 않습니다.' }));
+        }
+
+        console.log(`[SamsungDrive] Decrypting and syncing latest file: ${latest.filename}...`);
+        const records = await decryptAndParseSamsungExcel(latest.fullPath, cfg.password);
+
+        const now = new Date();
+        const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+        const syncedAt = kstDate.toISOString().replace('T', ' ').slice(0, 19);
+
+        saveSamsungDriveConfig({
+          lastSyncedFile: latest.filename,
+          lastSyncedAt: syncedAt,
+          lastRecordCount: records.length
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({
+          success: true,
+          filename: latest.filename,
+          syncedAt: syncedAt,
+          count: records.length,
+          records: records
+        }));
+      } catch (err) {
+        console.error('[SamsungDrive] Sync Error:', err.message);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    }
+
+    if (reqPath === '/api/samsung-drive/upload-decrypt' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', async () => {
+        let tempUploadPath = null;
+        try {
+          const payload = JSON.parse(body || '{}');
+          const { filename, fileBase64, password } = payload;
+          if (!fileBase64) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '파일 데이터가 전송되지 않았습니다.' }));
+          }
+
+          const cfg = getSamsungDriveConfig();
+          const targetPassword = password || cfg.password || '202609';
+
+          const ext = path.extname(filename || 'upload.xlsb') || '.xlsb';
+          const tmpId = 'sf_upload_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+          tempUploadPath = path.join(os.tmpdir(), `${tmpId}${ext}`);
+
+          // Base64 디코딩하여 임시 파일로 저장
+          const cleanB64 = fileBase64.replace(/^data:.*?;base64,/, '');
+          fs.writeFileSync(tempUploadPath, Buffer.from(cleanB64, 'base64'));
+
+          console.log(`[SamsungDrive] Decrypting uploaded file: ${filename} with password: ${targetPassword}`);
+          const records = await decryptAndParseSamsungExcel(tempUploadPath, targetPassword);
+
+          // 임시 파일 삭제
+          try { if (fs.existsSync(tempUploadPath)) fs.unlinkSync(tempUploadPath); } catch (e) {}
+
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({
+            success: true,
+            filename: filename || '수동업로드.xlsb',
+            count: records.length,
+            records: records
+          }));
+        } catch (err) {
+          try { if (tempUploadPath && fs.existsSync(tempUploadPath)) fs.unlinkSync(tempUploadPath); } catch (e) {}
+          console.error('[SamsungDrive] Upload decrypt error:', err.message);
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
       return;
     }
 

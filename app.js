@@ -8255,20 +8255,26 @@ function handleSamsungExcelFile(input) {
   const previewArea = document.getElementById('samsungExcelPreviewArea');
   const listEl = document.getElementById('samsungExcelPreviewList');
   if (previewArea) previewArea.classList.remove('hidden');
-  if (countBadge) countBadge.innerText = '⚡ 고속 분석 중...';
-  if (listEl) listEl.innerHTML = '<div class="p-4 text-center text-sky-600 font-bold text-xs"><i data-lucide="loader" class="w-4 h-4 inline animate-spin mr-1"></i> 대용량 엑셀 데이터를 고속 색인 분석 중입니다...</div>';
+  if (countBadge) countBadge.innerText = '⚡ 암호 해제 및 고속 분석 중...';
+  if (listEl) listEl.innerHTML = '<div class="p-4 text-center text-sky-600 font-bold text-xs"><i data-lucide="loader" class="w-4 h-4 inline animate-spin mr-1"></i> 대용량 엑셀 데이터를 고속 색인 및 복호화 분석 중입니다...</div>';
   if (typeof initIcons === 'function') initIcons(listEl);
 
-  const reader = new FileReader();
-  const isXlsx = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+  const isXlsb = file.name.toLowerCase().endsWith('.xlsb');
+  const isXlsx = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls');
 
-  // UI 스레드 렌더링 양보 후 초고속 파싱 실행
+  // .xlsb 바이너리 파일이거나 암호화 파일의 경우 서버 복호화 엔진으로 직접 전송
+  if (isXlsb) {
+    uploadAndDecryptSamsungExcel(file);
+    return;
+  }
+
+  // 일반 .xlsx / .xls 파일 시도 -> 에러(암호 보호 등) 발생 시 서버 복호화 엔진으로 자동 Fallback
+  const reader = new FileReader();
   setTimeout(() => {
     if (isXlsx && typeof XLSX !== 'undefined') {
       reader.onload = function(e) {
         try {
           const data = new Uint8Array(e.target.result);
-          // High-Performance XLSX options: 스타일/수식/HTML 제외하고 순수 데이터만 초고속 추출
           const wb = XLSX.read(data, {
             type: 'array',
             dense: true,
@@ -8279,13 +8285,11 @@ function handleSamsungExcelFile(input) {
           });
           const firstSheetName = wb.SheetNames[0];
           const ws = wb.Sheets[firstSheetName];
-          // raw: true 로 셀 포맷터 오버헤드 제거
           const jsonRows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
           parseSamsungSheetJsonRows(jsonRows);
         } catch (err) {
-          console.error('Error parsing xlsx:', err);
-          alert('엑셀 파일을 읽는 중 오류가 발생했습니다: ' + err.message);
-          if (countBadge) countBadge.innerText = '오류 발생';
+          console.warn('Browser XLSX parsing failed (possibly password protected), switching to server decryption engine:', err.message);
+          uploadAndDecryptSamsungExcel(file);
         }
       };
       reader.readAsArrayBuffer(file);
@@ -8297,6 +8301,61 @@ function handleSamsungExcelFile(input) {
       reader.readAsText(file);
     }
   }, 20);
+}
+
+async function uploadAndDecryptSamsungExcel(file, customPassword = null) {
+  const countBadge = document.getElementById('samsungExcelCountBadge');
+  const listEl = document.getElementById('samsungExcelPreviewList');
+  const pwdInput = document.getElementById('inputSamsungExcelPwd');
+  const targetPassword = customPassword || (pwdInput ? pwdInput.value : '') || '202609';
+
+  try {
+    if (countBadge) countBadge.innerText = '🔒 보안 암호 해제 중...';
+
+    // 파일 Base64 변환
+    const base64 = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+
+    const res = await fetch('/api/samsung-drive/upload-decrypt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: file.name,
+        fileBase64: base64,
+        password: targetPassword
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '엑셀 복호화에 실패했습니다.');
+    }
+
+    gSamsungUploadedExcelRecords = data.records || [];
+    renderSamsungExcelPreview();
+
+    if (countBadge) countBadge.innerText = `암호 해제 성공 (${gSamsungUploadedExcelRecords.length.toLocaleString()}건)`;
+  } catch (err) {
+    console.error('uploadAndDecryptSamsungExcel error:', err);
+    const retry = confirm(`엑셀 파일 암호 해제에 실패했습니다: ${err.message}\n\n다른 비밀번호를 입력하여 다시 시도하시겠습니까?`);
+    if (retry) {
+      const newPwd = prompt('삼성화재 엑셀 파일의 비밀번호를 입력해주세요:', targetPassword);
+      if (newPwd && newPwd.trim()) {
+        if (pwdInput) pwdInput.value = newPwd.trim();
+        if (typeof handleSaveSamsungExcelPwd === 'function') {
+          handleSaveSamsungExcelPwd(newPwd.trim());
+        }
+        uploadAndDecryptSamsungExcel(file, newPwd.trim());
+        return;
+      }
+    }
+    if (countBadge) countBadge.innerText = '오류 발생';
+    if (listEl) listEl.innerHTML = `<div class="p-4 text-center text-rose-600 font-bold text-xs">❌ 파일 읽기 실패: ${err.message}</div>`;
+  }
 }
 
 function parseSamsungSheetJsonRows(rows) {
@@ -8483,15 +8542,10 @@ async function confirmSamsungExcelUpload() {
   if (progressBox) progressBox.classList.remove('hidden');
   if (btnConfirm) btnConfirm.disabled = true;
 
-  // 1. 메모리 및 IndexedDB에 즉시 병합 저장 (O(1) Map 중복제거 초고속 처리)
-  const existingMap = new Map((gSamsungList || []).map(r => [r.patientId || r.id, r]));
-  for (const r of gSamsungUploadedExcelRecords) {
-    const key = r.patientId || r.id;
-    if (key) existingMap.set(key, r);
-  }
-  gSamsungList = Array.from(existingMap.values());
+  // 1. 기존 과거 데이터는 완전히 초기화(삭제)하고 최신 엑셀 업로드 데이터(100%)로 완전 교체
+  gSamsungList = gSamsungUploadedExcelRecords;
 
-  // IndexedDB에 대용량 안전 영구 저장 (비동기 병렬 실행)
+  // IndexedDB에 대용량 안전 영구 저장 (기존 스토어 clear 후 새 데이터 저장)
   const idbSavePromise = LivonDB.saveSamsungEligible(gSamsungList);
 
   // 로컬스토리지는 용량 초과(5MB) 방지를 위해 메타데이터만 안전 보존
@@ -8555,6 +8609,7 @@ async function confirmSamsungExcelUpload() {
   gSamsungSheets.eligible = gSamsungList;
   gSamsungSheetPage = 1;
   syncSamsungSpreadsheetData(true);
+  if (typeof updateSamsungSheetBadges === 'function') updateSamsungSheetBadges();
   switchSamsungSheet('eligible');
 
   if (typeof showCustomAlert === 'function') {
@@ -8564,6 +8619,212 @@ async function confirmSamsungExcelUpload() {
       icon: 'zap',
       iconColor: 'sky'
     });
+  }
+}
+
+// =========================================================================
+// SAMSUNG FIRE GOOGLE DRIVE AUTO SYNC & DECRYPTION CONTROLLER
+// =========================================================================
+var gSamsungDriveSyncInterval = null;
+var gSamsungDriveLastSyncedAt = localStorage.getItem('LIVON_SAMSUNG_DRIVE_SYNCED_AT') || null;
+var gSamsungDriveLastSyncedFile = localStorage.getItem('LIVON_SAMSUNG_DRIVE_SYNCED_FILE') || null;
+
+async function initSamsungDriveAutoSync() {
+  await loadSamsungDriveConfig();
+  await checkSamsungDriveStatus();
+
+  // 10분 주기 자동 백그라운드 체크 (새 파일 감지 시 자동 업데이트)
+  if (gSamsungDriveSyncInterval) clearInterval(gSamsungDriveSyncInterval);
+  gSamsungDriveSyncInterval = setInterval(() => {
+    checkSamsungDriveStatus();
+  }, 10 * 60 * 1000);
+}
+
+async function loadSamsungDriveConfig() {
+  try {
+    const res = await fetch('/api/samsung-drive/config');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.success && data.config) {
+      const pwdInput = document.getElementById('inputSamsungExcelPwd');
+      if (pwdInput && data.config.password) {
+        pwdInput.value = data.config.password;
+      }
+      if (data.config.lastSyncedAt) {
+        gSamsungDriveLastSyncedAt = data.config.lastSyncedAt;
+        gSamsungDriveLastSyncedFile = data.config.lastSyncedFile;
+        updateSamsungDriveSyncUI(data.config.lastSyncedAt, data.config.lastSyncedFile, data.config.lastRecordCount);
+      }
+    }
+  } catch (err) {
+    console.warn('[SamsungDrive] Config load failed:', err.message);
+  }
+}
+
+async function handleSaveSamsungExcelPwd(newPwd) {
+  const pwd = (newPwd || '').trim();
+  if (!pwd) {
+    alert('비밀번호를 입력해주세요.');
+    return;
+  }
+  try {
+    const res = await fetch('/api/samsung-drive/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pwd })
+    });
+    const data = await res.json();
+    if (data && data.success) {
+      if (typeof showCustomAlert === 'function') {
+        showCustomAlert({
+          title: '삼성화재 엑셀 암호 저장 완료',
+          message: `삼성화재 엑셀 복호화 비밀번호가 [${pwd}]로 안전하게 저장되었습니다.\n이후 구글 드라이브 신규 파일 자동 동기화 시 이 비밀번호가 적용됩니다.`,
+          icon: 'lock',
+          iconColor: 'sky'
+        });
+      }
+    } else {
+      alert('비밀번호 저장 실패: ' + (data ? data.error : '오류'));
+    }
+  } catch (err) {
+    alert('비밀번호 저장 중 통신 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+async function checkSamsungDriveStatus() {
+  const textEl = document.getElementById('samsungDriveSyncText');
+  const alertEl = document.getElementById('samsungDriveNewFileAlert');
+
+  try {
+    const res = await fetch('/api/samsung-drive/status');
+    if (!res.ok) {
+      if (textEl && !gSamsungDriveLastSyncedAt) textEl.innerText = '로컬 구글 드라이브 연동 대기';
+      return;
+    }
+    const data = await res.json();
+    if (!data || !data.success) return;
+
+    if (data.lastSyncedAt) {
+      gSamsungDriveLastSyncedAt = data.lastSyncedAt;
+      gSamsungDriveLastSyncedFile = data.lastSyncedFile;
+      updateSamsungDriveSyncUI(data.lastSyncedAt, data.lastSyncedFile, data.lastRecordCount);
+    }
+
+    // 브라우저 로컬 데이터 건수와 최신 동기화 파일 건수 비교 (21,693 != 25,939 등 불일치 감지)
+    const currentCount = Array.isArray(gSamsungList) ? gSamsungList.length : 0;
+    const isCountMismatch = data.lastRecordCount > 0 && Math.abs(currentCount - data.lastRecordCount) > 5;
+    const needsSync = data.hasNewFile || isCountMismatch;
+
+    if (needsSync && data.latestFile) {
+      if (alertEl) alertEl.classList.remove('hidden');
+      console.log(`[SamsungDrive] 동기화 필요 감지 (신규파일:${data.hasNewFile}, 브라우저건수:${currentCount}, 최신건수:${data.lastRecordCount}). 자동 동기화를 실행합니다...`);
+      // 최신 파일 데이터를 브라우저에 자동 반영!
+      await triggerSamsungDriveSync(true);
+    } else {
+      if (alertEl) alertEl.classList.add('hidden');
+    }
+  } catch (err) {
+    console.warn('[SamsungDrive] Status check failed:', err.message);
+    if (textEl && !gSamsungDriveLastSyncedAt) textEl.innerText = '드라이브 연결 대기 중';
+  }
+}
+
+function updateSamsungDriveSyncUI(syncedAt, syncedFile, count) {
+  const textEl = document.getElementById('samsungDriveSyncText');
+  const dotEl = document.getElementById('samsungDriveDot');
+  if (!textEl) return;
+
+  if (syncedAt) {
+    const shortTime = syncedAt.length > 16 ? syncedAt.slice(0, 16) : syncedAt;
+    const fileLabel = syncedFile ? (syncedFile.split('_').pop().replace('.xlsb', '').replace('.xlsx', '')) : '';
+    const countStr = count ? ` · ${count.toLocaleString()}건` : '';
+    textEl.innerHTML = `최근 동기화: <b class="text-sky-950 font-mono">${shortTime}</b> <span class="text-slate-500 text-[10px]">(${fileLabel}${countStr})</span>`;
+    if (dotEl) {
+      dotEl.className = 'w-2 h-2 rounded-full bg-emerald-500';
+    }
+  } else {
+    textEl.innerText = '동기화 이력 없음';
+  }
+}
+
+async function triggerSamsungDriveSync(isAuto = false) {
+  const btn = document.getElementById('btnSamsungDriveSync');
+  const icon = document.getElementById('iconSamsungDriveSync');
+  const textEl = document.getElementById('samsungDriveSyncText');
+  const alertEl = document.getElementById('samsungDriveNewFileAlert');
+
+  if (btn) btn.disabled = true;
+  if (icon) icon.classList.add('animate-spin');
+  if (textEl) textEl.innerText = '구글 드라이브 최신 엑셀 복호화 동기화 중...';
+
+  try {
+    const res = await fetch('/api/samsung-drive/sync', { method: 'POST' });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '동기화 중 오류가 발생했습니다.');
+    }
+
+    // 1. 가져온 최신 레코드(25,939건)를 클라이언트 데이터베이스에 고속 적용
+    await applySamsungDriveRecords(data.records, data.filename, data.syncedAt);
+
+    // 2. 동기화 상태 저장
+    gSamsungDriveLastSyncedAt = data.syncedAt;
+    gSamsungDriveLastSyncedFile = data.filename;
+    localStorage.setItem('LIVON_SAMSUNG_DRIVE_SYNCED_AT', data.syncedAt);
+    localStorage.setItem('LIVON_SAMSUNG_DRIVE_SYNCED_FILE', data.filename);
+
+    updateSamsungDriveSyncUI(data.syncedAt, data.filename, data.count);
+    if (alertEl) alertEl.classList.add('hidden');
+
+    if (typeof showCustomAlert === 'function') {
+      showCustomAlert({
+        title: isAuto ? '삼성화재 최신 명단 자동 갱신 완료' : '구글 드라이브 최신 명단 동기화 완료',
+        message: `구글 드라이브 최신 명단 [${data.filename}] 총 ${data.count.toLocaleString()}건이 정상 복호화되어 스프레드시트에 완벽히 반영되었습니다.\n(동기화 일시: ${data.syncedAt})`,
+        icon: 'cloud-check',
+        iconColor: 'sky'
+      });
+    }
+  } catch (err) {
+    console.error('[SamsungDrive] Sync Error:', err);
+    if (textEl) textEl.innerText = '동기화 실패: ' + err.message;
+    if (!isAuto) {
+      alert('구글 드라이브 동기화 실패: ' + err.message);
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+    if (icon) icon.classList.remove('animate-spin');
+  }
+}
+
+async function applySamsungDriveRecords(records, filename, syncedAt) {
+  if (!records || records.length === 0) return;
+
+  // 일일 전달 엑셀은 그 날짜 기준의 누적 전체 명단이므로, 최신 원본 파일 레코드(25,939건)로 완전 교체
+  gSamsungList = records;
+
+  // IndexedDB에 대용량 영구 저장
+  if (window.LivonDB && typeof window.LivonDB.saveSamsungEligible === 'function') {
+    await window.LivonDB.saveSamsungEligible(gSamsungList);
+  }
+
+  // 로컬스토리지 카운트 갱신
+  try {
+    localStorage.setItem('LIVON_SAMSUNG_COUNT', String(gSamsungList.length));
+  } catch (e) {}
+
+  // 스프레드시트 갱신
+  if (window.gSamsungSheets) {
+    window.gSamsungSheets.eligible = gSamsungList;
+  }
+  if (typeof syncSamsungSpreadsheetData === 'function') {
+    syncSamsungSpreadsheetData(true);
+  }
+  if (typeof updateSamsungSheetBadges === 'function') {
+    updateSamsungSheetBadges();
+  }
+  if (typeof renderCurrentSamsungSheet === 'function') {
+    renderCurrentSamsungSheet();
   }
 }
 
@@ -21153,9 +21414,12 @@ function switchTab(tabId, filterParam = null) {
     }
     renderUnifiedCareHub();
   }
-  else if (tabId === 'carecalendar') renderCareCalendar();
-  else if (tabId === 'samsung' || tabId === 'samsunglist') renderSamsungList();
-  else if (tabId === 'samsungclaimhub') renderSamsungClaimHub(filterParam);
+  else if (tabId === 'samsung' || tabId === 'samsunglist') {
+    renderSamsungList();
+    if (typeof checkSamsungDriveStatus === 'function') {
+      checkSamsungDriveStatus();
+    }
+  }
   else if (tabId === 'samsungcallreport') {
     if (typeof initSamsungCallReportModule === 'function') {
       if (!gSamsungReportData) {
@@ -26877,6 +27141,9 @@ function initAdminSession() {
   }
 
   startInactivityMonitoring();
+  if (typeof initSamsungDriveAutoSync === 'function') {
+    initSamsungDriveAutoSync();
+  }
 }
 
 function updateHeaderAdminProfile() {
@@ -26906,6 +27173,12 @@ function handleAdminLogout(isAuto = false) {
   if (overlay) {
     overlay.classList.remove('hidden');
   }
+
+  // Clear any redundant security auto logout alerts in queue
+  if (Array.isArray(window._livonAlertQueue)) {
+    window._livonAlertQueue = window._livonAlertQueue.filter(item => item.options?.title !== '보안 자동 로그아웃');
+  }
+
   initIcons();
 }
 
@@ -27008,13 +27281,26 @@ function handleSaveAutoLogoutSetting(minsStr) {
 }
 
 function startInactivityMonitoring() {
-  const resetTimer = () => { gLastActivityTimestamp = Date.now(); };
+  const resetTimer = () => {
+    const overlay = document.getElementById('adminLoginOverlay');
+    if (overlay && !overlay.classList.contains('hidden')) return;
+    gLastActivityTimestamp = Date.now();
+  };
   ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
     window.addEventListener(evt, resetTimer, { passive: true });
   });
 
   if (gAutoLogoutTimerInterval) clearInterval(gAutoLogoutTimerInterval);
   gAutoLogoutTimerInterval = setInterval(() => {
+    // 1. 이미 로그아웃 화면(오버레이)이 표시 중인 경우 타이머 중지 및 추가 모달 팝업 방지
+    const overlay = document.getElementById('adminLoginOverlay');
+    const isLoggedOut = overlay && !overlay.classList.contains('hidden');
+    if (isLoggedOut) {
+      const badge = document.getElementById('sessionTimerBadge');
+      if (badge) badge.innerText = '세션 만료됨';
+      return;
+    }
+
     if (gAutoLogoutMinutes <= 0) {
       const badge = document.getElementById('sessionTimerBadge');
       if (badge) badge.innerText = '자동 로그아웃 해제됨';
@@ -27037,12 +27323,19 @@ function startInactivityMonitoring() {
       // Trigger Auto Logout without confirmation prompt
       handleAdminLogout(true);
       gLastActivityTimestamp = Date.now();
-      showCustomAlert({
-        title: '보안 자동 로그아웃',
-        message: `장시간(${gAutoLogoutMinutes}분) 동안 활동이 없어 개인정보 보호를 위해 자동으로 로그아웃되었습니다.`,
-        icon: 'shield-alert',
-        iconColor: 'rose'
-      });
+
+      // 이미 보안 로그아웃 모달이 떠 있거나 대기 큐에 있으면 중복 추가 방지
+      const isAlreadyAlerting = window._livonAlertActive && (window._livonAlertActiveOptions?.title === '보안 자동 로그아웃');
+      const isInQueue = Array.isArray(window._livonAlertQueue) && window._livonAlertQueue.some(item => item.options?.title === '보안 자동 로그아웃');
+
+      if (!isAlreadyAlerting && !isInQueue) {
+        showCustomAlert({
+          title: '보안 자동 로그아웃',
+          message: `장시간(${gAutoLogoutMinutes}분) 동안 활동이 없어 개인정보 보호를 위해 자동으로 로그아웃되었습니다.`,
+          icon: 'shield-alert',
+          iconColor: 'rose'
+        });
+      }
     }
   }, 1000);
 }
