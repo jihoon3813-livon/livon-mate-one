@@ -116,6 +116,41 @@
       transition: all 0.15s ease;
     }
 
+    /* 간병 캘린더 타임라인 전체화면(Fullscreen) 모드 */
+    #careCalendarMainGrid.calendar-fullscreen-mode {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      max-width: 100vw !important;
+      max-height: 100vh !important;
+      z-index: 9900 !important;
+      border-radius: 0 !important;
+      border: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      box-shadow: none !important;
+      background-color: #ffffff !important;
+      overflow: hidden !important;
+    }
+    #careCalendarMainGrid.calendar-fullscreen-mode > div:first-child {
+      flex-shrink: 0 !important;
+    }
+    #careCalendarMainGrid.calendar-fullscreen-mode .overflow-x-auto,
+    #careCalendarMainGrid.calendar-fullscreen-mode .overflow-y-auto {
+      flex: 1 1 0% !important;
+      max-height: none !important;
+      height: 100% !important;
+    }
+    body.calendar-fullscreen-active {
+      overflow: hidden !important;
+    }
+    body.calendar-fullscreen-active #careCalendarDetailDrawer {
+      z-index: 9950 !important;
+    }
+
     /* 모든 날짜/시간 입력 필드 및 캘린더 피커 영역 커서 및 클릭 활성화 */
     input[type="date"],
     input[type="month"],
@@ -1231,9 +1266,13 @@
                   <i data-lucide="chevron-right" class="w-4 h-4"></i>
                 </button>
                 <span class="w-px h-4 bg-slate-300 mx-1"></span>
-                <button type="button" id="calBtnAllPeriod" onclick="toggleCareCalendarAllPeriod()" class="px-3 py-1 rounded-lg text-xs font-black text-slate-700 hover:bg-white transition-all cursor-pointer flex items-center gap-1.5" title="전체 기간 간병일정 한눈에 보기">
+                <button type="button" id="calBtnAllPeriod" onclick="toggleCareCalendarAllPeriod()" class="px-3 py-1 rounded-lg text-xs font-black text-slate-700 hover:bg-white transition-all cursor-pointer flex items-center gap-1.5" title="전체 기간(다중월) 타임라인 한눈에 보기">
                   <i data-lucide="calendar-range" class="w-3.5 h-3.5 text-slate-600"></i>
-                  <span>전체보기</span>
+                  <span>전체기간</span>
+                </button>
+                <button type="button" id="btnCalFullscreen" onclick="toggleCareCalendarFullscreen()" class="px-3 py-1 rounded-lg text-xs font-black text-indigo-700 hover:bg-white hover:shadow-xs transition-all cursor-pointer flex items-center gap-1.5 bg-indigo-50/70 border border-indigo-200" title="간병일정 타임라인 전체화면 크게보기">
+                  <i data-lucide="maximize-2" class="w-3.5 h-3.5 text-indigo-600"></i>
+                  <span>전체화면</span>
                 </button>
               </div>
 

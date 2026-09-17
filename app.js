@@ -28444,7 +28444,8 @@ document.addEventListener('keydown', (e) => {
 
 var gCalendarCurrentDate = new Date();
 var gCalendarViewMode = 'timeline'; // 'timeline' (연결 타임라인) | 'spanmonth' (연속 바 달력) | 'month' (월별 카드) | 'week' (주별 보기)
-var gCalendarIsAllPeriod = false; // [전체보기] 전 기간 타임라인 토글 상태
+var gCalendarIsAllPeriod = false; // [전체기간] 전 기간 다중월 타임라인 토글 상태
+var gCalendarIsFullscreen = false; // [전체화면] 캘린더 영역 전체화면 확대 토글 상태
 var gCalendarFilters = {
   insurance: 'ALL',
   status: 'ALL',
@@ -28454,7 +28455,7 @@ var gCalendarFilters = {
 var gActiveCalendarEvent = null;
 
 /**
- * 캘린더 전체보기 (전 기간 타임라인) 토글
+ * 캘린더 전체기간 (전 기간 다중월 타임라인) 토글
  */
 function toggleCareCalendarAllPeriod() {
   gCalendarIsAllPeriod = !gCalendarIsAllPeriod;
@@ -28463,6 +28464,68 @@ function toggleCareCalendarAllPeriod() {
   }
   renderCareCalendar();
 }
+
+/**
+ * 캘린더 타임라인 전체화면 (Fullscreen / 크게보기) 모드 토글
+ */
+function toggleCareCalendarFullscreen(forceState = null) {
+  if (forceState !== null) {
+    gCalendarIsFullscreen = !!forceState;
+  } else {
+    gCalendarIsFullscreen = !gCalendarIsFullscreen;
+  }
+
+  const container = document.getElementById('careCalendarMainGrid');
+  const btnToolbar = document.getElementById('btnCalFullscreen');
+
+  if (gCalendarIsFullscreen) {
+    document.body.classList.add('calendar-fullscreen-active');
+    if (container) container.classList.add('calendar-fullscreen-mode');
+    if (btnToolbar) {
+      btnToolbar.innerHTML = `<i data-lucide="minimize-2" class="w-3.5 h-3.5 text-rose-500"></i><span class="text-rose-600">전체화면 닫기 (ESC)</span>`;
+      btnToolbar.className = 'px-3 py-1 rounded-lg text-xs font-black bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs';
+      btnToolbar.title = '전체화면 모드 종료 (ESC 키로도 가능)';
+    }
+  } else {
+    document.body.classList.remove('calendar-fullscreen-active');
+    if (container) container.classList.remove('calendar-fullscreen-mode');
+    if (btnToolbar) {
+      btnToolbar.innerHTML = `<i data-lucide="maximize-2" class="w-3.5 h-3.5 text-indigo-600"></i><span>전체화면</span>`;
+      btnToolbar.className = 'px-3 py-1 rounded-lg text-xs font-black text-indigo-700 hover:bg-white hover:shadow-xs transition-all cursor-pointer flex items-center gap-1.5 bg-indigo-50/70 border border-indigo-200';
+      btnToolbar.title = '간병일정 타임라인 전체화면 크게보기';
+    }
+  }
+
+  // 타임라인 상단 헤더의 전체화면 버튼들도 동기화
+  const innerBtns = document.querySelectorAll('.btn-calendar-fullscreen-toggle');
+  innerBtns.forEach(btn => {
+    if (gCalendarIsFullscreen) {
+      btn.innerHTML = `<i data-lucide="minimize-2" class="w-3.5 h-3.5 text-rose-200"></i><span>전체화면 닫기 (ESC)</span>`;
+      btn.className = 'btn-calendar-fullscreen-toggle px-2.5 py-1.5 rounded-lg bg-rose-600/90 hover:bg-rose-500 text-white text-[11px] font-black flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer border border-rose-400/40 ml-1';
+      btn.title = '전체화면 모드 종료 (ESC)';
+    } else {
+      btn.innerHTML = `<i data-lucide="maximize-2" class="w-3.5 h-3.5 text-indigo-300"></i><span>전체화면 크게보기</span>`;
+      btn.className = 'btn-calendar-fullscreen-toggle px-2.5 py-1.5 rounded-lg bg-indigo-600/90 hover:bg-indigo-500 text-white text-[11px] font-black flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer border border-indigo-400/40 ml-1';
+      btn.title = '타임라인 전체화면 크게보기';
+    }
+  });
+
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
+}
+
+// ESC 키 입력 시 캘린더 전체화면 모드 종료 처리 (드로어가 열려있는 경우 드로어 우선 닫기)
+window.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && typeof gCalendarIsFullscreen !== 'undefined' && gCalendarIsFullscreen) {
+    const drawer = document.getElementById('careCalendarDetailDrawer');
+    if (drawer && !drawer.classList.contains('hidden')) {
+      closeCalendarDetailDrawer();
+      return;
+    }
+    toggleCareCalendarFullscreen(false);
+  }
+});
 
 /**
  * 캘린더 이벤트 데이터 추출 및 다차원 매핑
@@ -28664,6 +28727,13 @@ function renderCareCalendar() {
     renderCareCalendarMonthView(filteredEvents);
   }
 
+  // 6. 전체화면 클래스 상태 동기화
+  if (gCalendarIsFullscreen) {
+    container.classList.add('calendar-fullscreen-mode');
+  } else {
+    container.classList.remove('calendar-fullscreen-mode');
+  }
+
   // Lucide 아이콘 리프레시
   initIcons(container);
 }
@@ -28733,7 +28803,7 @@ function updateCareCalendarHeaderDisplay() {
       headerLabel.innerHTML = `
         <span>전체 간병일정</span>
         <span class="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-primary-600 text-white shadow-2xs">
-          전체보기 (전체기간)
+          전체기간 (다중월 타임라인)
         </span>
       `;
     } else if (gCalendarViewMode === 'week') {
@@ -28764,13 +28834,27 @@ function updateCareCalendarHeaderDisplay() {
     }
   }
 
-  // 전체보기 버튼 하이라이트 제어
+  // 전체기간 버튼 하이라이트 제어
   const btnAll = document.getElementById('calBtnAllPeriod');
   if (btnAll) {
     if (gCalendarIsAllPeriod) {
       btnAll.className = 'px-3 py-1 rounded-lg text-xs font-black bg-primary-600 text-white shadow-xs hover:bg-primary-700 transition-all cursor-pointer flex items-center gap-1.5';
     } else {
       btnAll.className = 'px-3 py-1 rounded-lg text-xs font-black text-slate-700 hover:bg-white transition-all cursor-pointer flex items-center gap-1.5';
+    }
+  }
+
+  // 전체화면 툴바 버튼 스타일 제어
+  const btnFullscreen = document.getElementById('btnCalFullscreen');
+  if (btnFullscreen) {
+    if (gCalendarIsFullscreen) {
+      btnFullscreen.innerHTML = `<i data-lucide="minimize-2" class="w-3.5 h-3.5 text-rose-500"></i><span class="text-rose-600">전체화면 닫기 (ESC)</span>`;
+      btnFullscreen.className = 'px-3 py-1 rounded-lg text-xs font-black bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs';
+      btnFullscreen.title = '전체화면 모드 종료 (ESC 키로도 가능)';
+    } else {
+      btnFullscreen.innerHTML = `<i data-lucide="maximize-2" class="w-3.5 h-3.5 text-indigo-600"></i><span>전체화면</span>`;
+      btnFullscreen.className = 'px-3 py-1 rounded-lg text-xs font-black text-indigo-700 hover:bg-white hover:shadow-xs transition-all cursor-pointer flex items-center gap-1.5 bg-indigo-50/70 border border-indigo-200';
+      btnFullscreen.title = '간병일정 타임라인 전체화면 크게보기';
     }
   }
 
@@ -28891,6 +28975,12 @@ function renderCareCalendarTimelineView(events) {
         <span class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[11px]">
           <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>기타보험사
         </span>
+        <button type="button" onclick="toggleCareCalendarFullscreen()" 
+          class="btn-calendar-fullscreen-toggle px-2.5 py-1.5 rounded-lg ${gCalendarIsFullscreen ? 'bg-rose-600/90 hover:bg-rose-500 text-white border-rose-400/40' : 'bg-indigo-600/90 hover:bg-indigo-500 text-white border-indigo-400/40'} text-[11px] font-black flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer border ml-1" 
+          title="${gCalendarIsFullscreen ? '전체화면 모드 종료 (ESC)' : '타임라인 전체화면 크게보기'}">
+          <i data-lucide="${gCalendarIsFullscreen ? 'minimize-2' : 'maximize-2'}" class="w-3.5 h-3.5"></i>
+          <span>${gCalendarIsFullscreen ? '전체화면 닫기 (ESC)' : '전체화면 크게보기'}</span>
+        </button>
       </div>
     </div>
 
@@ -29262,6 +29352,12 @@ function renderCareCalendarAllPeriodTimelineView(events) {
         <span class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-[11px]">
           <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>기타보험사
         </span>
+        <button type="button" onclick="toggleCareCalendarFullscreen()" 
+          class="btn-calendar-fullscreen-toggle px-2.5 py-1.5 rounded-lg ${gCalendarIsFullscreen ? 'bg-rose-600/90 hover:bg-rose-500 text-white border-rose-400/40' : 'bg-indigo-600/90 hover:bg-indigo-500 text-white border-indigo-400/40'} text-[11px] font-black flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer border ml-1" 
+          title="${gCalendarIsFullscreen ? '전체화면 모드 종료 (ESC)' : '타임라인 전체화면 크게보기'}">
+          <i data-lucide="${gCalendarIsFullscreen ? 'minimize-2' : 'maximize-2'}" class="w-3.5 h-3.5"></i>
+          <span>${gCalendarIsFullscreen ? '전체화면 닫기 (ESC)' : '전체화면 크게보기'}</span>
+        </button>
       </div>
     </div>
 
@@ -29556,8 +29652,16 @@ function renderCareCalendarSpanMonthView(events) {
           <span class="text-indigo-300 text-[11px] ml-1">달력 날짜를 가로질러 시작일부터 종료일까지 하나의 바로 쭉 연결되어 표시됩니다.</span>
         </div>
       </div>
-      <div class="text-[11px] text-indigo-200 font-medium">
-        ※ 겹치는 일정이 많은 날도 모든 고객의 막대가 아래로 누락 없이 다 표시됩니다.
+      <div class="flex items-center gap-2">
+        <div class="text-[11px] text-indigo-200 font-medium hidden sm:inline">
+          ※ 겹치는 일정이 많은 날도 모든 고객의 막대가 아래로 누락 없이 다 표시됩니다.
+        </div>
+        <button type="button" onclick="toggleCareCalendarFullscreen()" 
+          class="btn-calendar-fullscreen-toggle px-2.5 py-1.5 rounded-lg ${gCalendarIsFullscreen ? 'bg-rose-600/90 hover:bg-rose-500 text-white border-rose-400/40' : 'bg-indigo-600/90 hover:bg-indigo-500 text-white border-indigo-400/40'} text-[11px] font-black flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer border" 
+          title="${gCalendarIsFullscreen ? '전체화면 모드 종료 (ESC)' : '전체화면 크게보기'}">
+          <i data-lucide="${gCalendarIsFullscreen ? 'minimize-2' : 'maximize-2'}" class="w-3.5 h-3.5"></i>
+          <span>${gCalendarIsFullscreen ? '전체화면 닫기 (ESC)' : '전체화면 크게보기'}</span>
+        </button>
       </div>
     </div>
 
