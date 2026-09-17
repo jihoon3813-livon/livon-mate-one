@@ -18,9 +18,9 @@ module.exports = async function handler(req, res) {
   const channelLabel = channel === 'all' || channel === '전체' ? '전체 인입경로' : channel;
 
   // 1. 사전 생성된 최신 보고서 데이터 로드 (초고속 캐시)
-  let baseData = null;
   try {
-    const fileName = (channel === 'all' || channel === '전체') ? 'call_report_all.json' : 'call_report_samsung.json';
+    const isHyundaiOrAll = channel.includes('전체') || channel === 'all' || channel.includes('현대');
+    const fileName = isHyundaiOrAll ? 'call_report_all.json' : 'call_report_samsung.json';
     const filePath = path.join(process.cwd(), fileName);
     if (fs.existsSync(filePath)) {
       baseData = JSON.parse(fs.readFileSync(filePath, 'utf8'));

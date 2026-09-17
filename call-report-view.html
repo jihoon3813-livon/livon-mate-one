@@ -102,24 +102,24 @@
           </div>
 
           <!-- 프리셋 날짜 버튼 (모바일 가로 스크롤) -->
-          <div class="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 w-full sm:w-auto">
-            <button type="button" onclick="setPresetRange('today')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">오늘</button>
-            <button type="button" onclick="setPresetRange('yesterday')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">어제</button>
-            <button type="button" onclick="setPresetRange('thisWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">이번 주</button>
-            <button type="button" onclick="setPresetRange('lastWeek')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">지난 주</button>
-            <button type="button" onclick="setPresetRange('last30')" class="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">최근 30일</button>
+          <div class="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0 w-full sm:w-auto" id="presetButtonsContainer">
+            <button type="button" data-preset="today" onclick="setPresetRange('today')" class="preset-btn px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">오늘</button>
+            <button type="button" data-preset="yesterday" onclick="setPresetRange('yesterday')" class="preset-btn px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">어제</button>
+            <button type="button" data-preset="thisWeek" onclick="setPresetRange('thisWeek')" class="preset-btn px-2.5 py-1.5 rounded-xl border border-blue-600 bg-blue-600 text-white font-bold text-xs shadow-2xs cursor-pointer shrink-0 whitespace-nowrap">이번 주</button>
+            <button type="button" data-preset="lastWeek" onclick="setPresetRange('lastWeek')" class="preset-btn px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">지난 주</button>
+            <button type="button" data-preset="last30" onclick="setPresetRange('last30')" class="preset-btn px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap">최근 30일</button>
           </div>
         </div>
 
-        <!-- 검색창 & CTI 동기화 버튼 -->
+        <!-- 검색창 & 새로고침 버튼 -->
         <div class="flex items-center gap-2 w-full xl:w-auto">
           <div class="relative flex-1 min-w-0 sm:w-72 sm:flex-initial">
             <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
             <input type="text" id="globalSearchInput" oninput="handleSearch(this.value)" placeholder="전화번호, 환자명, 키워드 검색..." class="w-full pl-9 pr-3 py-1.5 sm:py-2 rounded-xl border border-slate-200 text-xs bg-slate-50/70 focus:bg-white focus:outline-none focus:border-blue-500 font-medium">
           </div>
-          <button type="button" id="syncCtiBtn" onclick="syncLiveCti()" class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0 whitespace-nowrap cursor-pointer" title="GoodARS CTI 실시간 최신 통화데이터 즉시 동기화">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="syncIcon"></i>
-            <span id="syncCtiBtnText">CTI 동기화</span>
+          <button type="button" id="syncCtiBtn" onclick="applyDateRange(true)" class="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 whitespace-nowrap cursor-pointer" title="선택된 기간의 통화데이터를 CTI에서 실시간으로 새로고침합니다">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-600" id="syncIcon"></i>
+            <span id="syncCtiBtnText">새로고침</span>
           </button>
         </div>
     </div>
@@ -179,6 +179,7 @@
       search: '',
       channel: '삼성화재',
       consultedOnly: true,
+      periodKey: 'thisWeek',
       startDate: defaultThisWeek.start,
       endDate: defaultThisWeek.end
     };
@@ -412,6 +413,26 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       { name: '삼성화재 내부(설계사·지점)', barClass: 'bg-amber-600', description: '판매채널(설계사·지점)의 상품설명·규정 확인(교육/자료)' }
     ];
 
+    function updatePresetButtons() {
+      const isHyundai = (gFilter.channel || '').includes('현대');
+      const activeClass = isHyundai
+        ? 'border-amber-600 bg-amber-600 text-white font-bold text-xs shadow-2xs cursor-pointer shrink-0 whitespace-nowrap'
+        : 'border-blue-600 bg-blue-600 text-white font-bold text-xs shadow-2xs cursor-pointer shrink-0 whitespace-nowrap';
+      const defaultClass = 'border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap';
+
+      const thisWeek = getThisWeekRange();
+      const curPKey = gFilter.periodKey || ((gFilter.startDate === thisWeek.start && gFilter.endDate === thisWeek.end) ? 'thisWeek' : '');
+
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        const pKey = btn.getAttribute('data-preset');
+        if (pKey === curPKey) {
+          btn.className = `preset-btn px-2.5 py-1.5 rounded-xl border ${activeClass}`;
+        } else {
+          btn.className = `preset-btn px-2.5 py-1.5 rounded-xl border ${defaultClass}`;
+        }
+      });
+    }
+
     function updateBranding() {
       const ch = gFilter.channel || '삼성화재';
       const badgeEl = document.getElementById('viewerBadge');
@@ -472,6 +493,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           channelBadge.innerText = '삼성화재 전용';
         }
       }
+      updatePresetButtons();
     }
 
     window.addEventListener('DOMContentLoaded', async () => {
@@ -479,13 +501,18 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const rawChannel = urlParams.get('channel') || '삼성화재';
       gFilter.channel = rawChannel.includes('현대') ? '현대해상' : '삼성화재';
 
-      if (urlParams.get('start')) gFilter.startDate = urlParams.get('start');
-      if (urlParams.get('end')) gFilter.endDate = urlParams.get('end');
+      const thisWeek = getThisWeekRange();
+      gFilter.startDate = urlParams.get('start') || thisWeek.start;
+      gFilter.endDate = urlParams.get('end') || thisWeek.end;
+      gFilter.periodKey = (gFilter.startDate === thisWeek.start && gFilter.endDate === thisWeek.end) ? 'thisWeek' : (urlParams.get('period') || '');
 
-      document.getElementById('reportStartDate').value = gFilter.startDate;
-      document.getElementById('reportEndDate').value = gFilter.endDate;
+      const sEl = document.getElementById('reportStartDate');
+      const eEl = document.getElementById('reportEndDate');
+      if (sEl) sEl.value = gFilter.startDate;
+      if (eEl) eEl.value = gFilter.endDate;
 
       updateBranding();
+      updatePresetButtons();
       await loadReportData();
     });
 
@@ -498,62 +525,82 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     async function loadReportData() {
       try {
         updateBranding();
+        updatePresetButtons();
         let loaded = false;
+        const isHyundai = (gFilter.channel || '').includes('현대');
+
+        // 1. 세션 스토리지 캐시 확인 (0ms)
         try {
-          const res = await fetch('/api/samsung/call-report/data?channel=' + encodeURIComponent(gFilter.channel));
-          if (res.ok) {
-            const cType = res.headers.get('content-type') || '';
-            if (cType.includes('json')) {
+          const cacheKey = isHyundai ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA';
+          const cached = sessionStorage.getItem(cacheKey);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed && parsed.callLogs && parsed.callLogs.length > 0) {
+              gReportData = parsed;
+              loaded = true;
+              renderAll();
+            }
+          }
+        } catch (e) {}
+
+        // 2. 정적 데이터 파일 우선 고속 로드 (5ms)
+        const primaryFiles = isHyundai ? [
+          `/call_report_all.json?t=${Date.now()}`,
+          `./call_report_all.json?t=${Date.now()}`,
+          `call_report_all.json?t=${Date.now()}`
+        ] : [
+          `/call_report_samsung.json?t=${Date.now()}`,
+          `./call_report_samsung.json?t=${Date.now()}`,
+          `call_report_samsung.json?t=${Date.now()}`,
+          `/call_report_all.json?t=${Date.now()}`
+        ];
+
+        for (const u of primaryFiles) {
+          try {
+            const res = await fetch(u);
+            if (res.ok) {
+              const cType = res.headers.get('content-type') || '';
+              if (cType.includes('json') || !cType.includes('html')) {
+                const json = await res.json();
+                const data = (json && json.data) ? json.data : json;
+                if (data && data.callLogs && data.callLogs.length > 0) {
+                  gReportData = data;
+                  loaded = true;
+                  try {
+                    const cacheKey = isHyundai ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA';
+                    sessionStorage.setItem(cacheKey, JSON.stringify(data));
+                  } catch (e) {}
+                  break;
+                }
+              }
+            }
+          } catch (e) {}
+        }
+
+        // 3. API 엔드포인트 fallback
+        if (!loaded) {
+          try {
+            const res = await fetch('/api/samsung/call-report/data?channel=' + encodeURIComponent(gFilter.channel));
+            if (res.ok) {
               const json = await res.json();
               if (json.success && json.data) {
                 gReportData = json.data;
                 loaded = true;
               }
             }
-          }
-        } catch (e) {}
-
-        if (!loaded) {
-          const fallbacks = [
-            'call_report_all.json',
-            './call_report_all.json',
-            'call_report_samsung.json',
-            './call_report_samsung.json',
-            '/call_report_all.json',
-            '/call_report_samsung.json'
-          ];
-          for (const u of fallbacks) {
-            try {
-              const sRes = await fetch(u);
-              if (sRes.ok) {
-                const sType = sRes.headers.get('content-type') || '';
-                if (sType.includes('json') || !sType.includes('html')) {
-                  const sJson = await sRes.json();
-                  const data = (sJson && sJson.data) ? sJson.data : sJson;
-                  if (data && data.callLogs) {
-                    gReportData = data;
-                    loaded = true;
-                    break;
-                  }
-                }
-              }
-            } catch (e) {}
-          }
+          } catch (e) {}
         }
 
         if (loaded && gReportData) {
           const urlParams = new URLSearchParams(window.location.search);
-          if (urlParams.get('start')) {
-            gFilter.startDate = urlParams.get('start');
-          }
-          if (urlParams.get('end')) {
-            gFilter.endDate = urlParams.get('end');
-          }
+          if (urlParams.get('start')) gFilter.startDate = urlParams.get('start');
+          if (urlParams.get('end')) gFilter.endDate = urlParams.get('end');
           const sEl = document.getElementById('reportStartDate');
           if (sEl) sEl.value = gFilter.startDate;
           const eEl = document.getElementById('reportEndDate');
           if (eEl) eEl.value = gFilter.endDate;
           updateBranding();
+          updatePresetButtons();
           renderAll();
         } else {
           await syncLiveCti();
@@ -1374,6 +1421,8 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       let startStr = '';
       let endStr = '';
 
+      gFilter.periodKey = type;
+
       if (type === 'today') {
         startStr = fmt(today);
         endStr = fmt(today);
@@ -1402,26 +1451,42 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 
       gFilter.startDate = startStr;
       gFilter.endDate = endStr;
-      document.getElementById('reportStartDate').value = gFilter.startDate;
-      document.getElementById('reportEndDate').value = gFilter.endDate;
+      const sInput = document.getElementById('reportStartDate');
+      const eInput = document.getElementById('reportEndDate');
+      if (sInput) sInput.value = gFilter.startDate;
+      if (eInput) eInput.value = gFilter.endDate;
 
+      updatePresetButtons();
       applyDateRange(false);
     }
 
     async function applyDateRange(forceSync = false) {
-      const s = document.getElementById('reportStartDate').value;
-      const e = document.getElementById('reportEndDate').value;
+      const s = document.getElementById('reportStartDate')?.value || gFilter.startDate;
+      const e = document.getElementById('reportEndDate')?.value || gFilter.endDate;
       if (!s || !e) return;
       gFilter.startDate = s;
       gFilter.endDate = e;
 
+      const thisWeek = getThisWeekRange();
+      if (gFilter.startDate !== thisWeek.start || gFilter.endDate !== thisWeek.end) {
+        if (gFilter.periodKey === 'thisWeek') gFilter.periodKey = '';
+      }
+
       const url = new URL(window.location);
       url.searchParams.set('start', s);
       url.searchParams.set('end', e);
+      url.searchParams.set('channel', gFilter.channel);
       window.history.replaceState({}, '', url);
 
-      if (gReportData && Array.isArray(gReportData.callLogs) && gReportData.callLogs.length > 0) {
+      updatePresetButtons();
+      updateBranding();
+
+      const hasData = gReportData && Array.isArray(gReportData.callLogs) && gReportData.callLogs.length > 0;
+
+      // 1. 이미 데이터가 메모리에 로드되어 있다면 0ms 즉각 화면 렌더링
+      if (hasData) {
         renderAll();
+        // 단순 날짜/프리셋 변경(조회 또는 프리셋 클릭)이고 강제 동기화가 아니면 즉시 완료 (0ms 지연 없음)
         if (!forceSync) return;
       }
 
@@ -1433,7 +1498,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const textEl = document.getElementById('syncCtiBtnText');
       if (loading) {
         if (btn) btn.classList.add('opacity-75', 'pointer-events-none');
-        if (textEl) textEl.innerText = '동기화 중...';
+        if (textEl) textEl.innerText = '새로고침 중...';
         const icons = btn ? btn.querySelectorAll('[data-lucide="refresh-cw"], svg, #syncIcon') : [document.getElementById('syncIcon')];
         icons.forEach(ic => ic && ic.classList.add('animate-spin'));
       } else {
@@ -1441,7 +1506,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           btn.classList.remove('opacity-75', 'pointer-events-none');
           btn.querySelectorAll('.animate-spin').forEach(ic => ic.classList.remove('animate-spin'));
         }
-        if (textEl) textEl.innerText = 'CTI 동기화';
+        if (textEl) textEl.innerText = '새로고침';
         const ic = document.getElementById('syncIcon');
         if (ic) ic.classList.remove('animate-spin');
       }
@@ -1480,12 +1545,18 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         }
 
         if (!synced) {
-          const fallbacks = [
-            `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
-            `call_report_all.json?t=${Date.now()}`,
+          const isHyundai = ch.includes('현대');
+          const fallbacks = isHyundai ? [
+            `/call_report_all.json?t=${Date.now()}`,
             `./call_report_all.json?t=${Date.now()}`,
+            `call_report_all.json?t=${Date.now()}`,
+            `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
+          ] : [
+            `/call_report_samsung.json?t=${Date.now()}`,
+            `./call_report_samsung.json?t=${Date.now()}`,
             `call_report_samsung.json?t=${Date.now()}`,
-            `./call_report_samsung.json?t=${Date.now()}`
+            `/call_report_all.json?t=${Date.now()}`,
+            `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
           ];
           for (const u of fallbacks) {
             try {
@@ -1506,6 +1577,13 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           }
         }
 
+        if (gReportData) {
+          try {
+            const cacheKey = ch.includes('현대') ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA';
+            sessionStorage.setItem(cacheKey, JSON.stringify(gReportData));
+          } catch (e) {}
+        }
+
         updateBranding();
         const viewerSyncedAt = document.getElementById('viewerSyncedAt');
         if (viewerSyncedAt) viewerSyncedAt.innerText = `CTI 동기화: ${new Date().toLocaleTimeString('ko-KR')}`;
@@ -1520,6 +1598,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         setSyncBtnLoading(false);
       }
     }
+
 
     function copyReportLink() {
       const s = gFilter.startDate;

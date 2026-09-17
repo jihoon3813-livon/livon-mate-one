@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 
 module.exports = async function handler(req, res) {
@@ -12,7 +12,8 @@ module.exports = async function handler(req, res) {
 
   try {
     const channel = (req.query && req.query.channel) || '삼성화재';
-    const fileName = (channel === 'all' || channel === '전체') ? 'call_report_all.json' : 'call_report_samsung.json';
+    const isHyundaiOrAll = channel.includes('전체') || channel === 'all' || channel.includes('현대');
+    const fileName = isHyundaiOrAll ? 'call_report_all.json' : 'call_report_samsung.json';
     const filePath = path.join(process.cwd(), fileName);
 
     if (!fs.existsSync(filePath)) {
