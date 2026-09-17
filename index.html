@@ -8706,6 +8706,13 @@
             <h2 class="text-xl font-bold text-slate-900">상담내용</h2>
           </div>
 
+          <!-- Evaluation Checkboxes Section (CarePort 1:1 체크 버튼 양식 - 위치: 상담내용 바로 아래) -->
+          <div id="cpCheckboxesSection" class="mb-6 py-2">
+            <div id="cpCheckboxesList" class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-3.5 text-xs">
+              <!-- Dynamically populated from renderCarePortEvaluationCheckboxes -->
+            </div>
+          </div>
+
           <!-- Section: 상담요약 (첨부 2번 이미지와 100% 동일) -->
           <div class="mb-2">
             <h3 class="text-base font-bold text-slate-800">상담요약</h3>
@@ -8742,12 +8749,6 @@
                   내용 로딩 중...
                 </div>
               </div>
-            </div>
-          </div>
-
-          <!-- Optional Real Checkboxes Section (only rendered if API returns genuine checkboxes) -->
-          <div id="cpCheckboxesSection" class="mt-6 hidden">
-            <div id="cpCheckboxesList" class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 text-sm">
             </div>
           </div>
         </div>

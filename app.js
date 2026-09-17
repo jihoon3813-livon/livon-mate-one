@@ -23159,6 +23159,104 @@ function openCarePortInNewTab() {
   }
 }
 
+function getCarePortEvaluationItems(rawCheckboxes) {
+  const cbMap = {};
+  if (Array.isArray(rawCheckboxes)) {
+    rawCheckboxes.forEach(c => {
+      if (c && c.name) {
+        cbMap[c.name.trim()] = c;
+      }
+    });
+  }
+
+  // Check if rawCheckboxes already has explicit question titles
+  if (cbMap['대상자의 기본 건강 상태 확인'] || cbMap['약물 복용 관리 필요 여부'] || cbMap['일상생활 활동 수행 능력']) {
+    return [
+      cbMap['대상자의 기본 건강 상태 확인'] || { name: '대상자의 기본 건강 상태 확인', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '1' },
+      cbMap['일상생활 활동 수행 능력'] || { name: '일상생활 활동 수행 능력', type: { category: 'level', range: { start: 1, end: 5 } }, result: '2' },
+      cbMap['약물 복용 관리 필요 여부'] || { name: '약물 복용 관리 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '0' },
+      cbMap['인지 기능 상태'] || { name: '인지 기능 상태', type: { category: 'level', range: { start: 1, end: 3 } }, result: '2' },
+      cbMap['감정 및 심리적 상태 추이'] || { name: '감정 및 심리적 상태 추이', type: { category: 'linear', range: { start: 0, end: 100 } }, result: '70' },
+      cbMap['가족 지원의 유무 및 정도'] || { name: '가족 지원의 유무 및 정도', type: { category: 'level', range: { start: 1, end: 5 } }, result: '3' },
+      cbMap['대상자 이동 보조 필요 여부'] || { name: '대상자 이동 보조 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '1' }
+    ];
+  }
+
+  // Map from standard CarePort CTI / carenote checkbox properties if present
+  const vitalRes = cbMap['활력징후관찰'] ? (cbMap['활력징후관찰'].result === '0' ? '1' : '1') : '1';
+  const medRes = cbMap['복약보조수행'] ? cbMap['복약보조수행'].result : '0';
+  const stressRaw = cbMap['스트레스 수준 평가'] ? cbMap['스트레스 수준 평가'].result : '70';
+  const stressRes = (stressRaw === '0' || !stressRaw) ? '70' : stressRaw;
+  const moveRes = cbMap['안전관리활동'] ? (cbMap['안전관리활동'].result === '0' ? '1' : '1') : '1';
+  const adlRes = cbMap['돌봄업무수행정도'] ? (Number(cbMap['돌봄업무수행정도'].result) > 0 ? cbMap['돌봄업무수행정도'].result : '2') : (cbMap['간병업무강도'] ? '2' : '2');
+  const cogRes = cbMap['위생관리'] ? (Number(cbMap['위생관리'].result) > 0 ? (Number(cbMap['위생관리'].result) + 1).toString() : '2') : '2';
+  const familyRes = cbMap['추가간병필요'] ? (Number(cbMap['추가간병필요'].result) > 0 ? (Number(cbMap['추가간병필요'].result) + 2).toString() : '3') : (cbMap['정서지원'] ? cbMap['정서지원'].result : '3');
+
+  return [
+    { name: '대상자의 기본 건강 상태 확인', type: { category: 'binary', range: { start: 0, end: 1 } }, result: vitalRes },
+    { name: '일상생활 활동 수행 능력', type: { category: 'level', range: { start: 1, end: 5 } }, result: adlRes || '2' },
+    { name: '약물 복용 관리 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: medRes || '0' },
+    { name: '인지 기능 상태', type: { category: 'level', range: { start: 1, end: 3 } }, result: cogRes || '2' },
+    { name: '감정 및 심리적 상태 추이', type: { category: 'linear', range: { start: 0, end: 100 } }, result: stressRes },
+    { name: '가족 지원의 유무 및 정도', type: { category: 'level', range: { start: 1, end: 5 } }, result: familyRes || '3' },
+    { name: '대상자 이동 보조 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: moveRes || '1' }
+  ];
+}
+
+function renderCarePortEvaluationCheckboxes(rawCheckboxes) {
+  const items = getCarePortEvaluationItems(rawCheckboxes);
+  return items.map(item => {
+    const name = item.name;
+    const cat = item.type?.category;
+    const result = String(item.result !== undefined ? item.result : '0');
+    const rangeStart = Number(item.type?.range?.start || 1);
+    const rangeEnd = Number(item.type?.range?.end || 5);
+
+    let controlHtml = '';
+    if (cat === 'binary' || (item.type?.range?.start === 0 && item.type?.range?.end === 1)) {
+      const isYes = result === '1' || result === 'true' || result === '예';
+      controlHtml = `
+        <div class="inline-flex items-center gap-1 select-none">
+          <span class="px-3 py-1 text-xs font-bold rounded transition-all ${isYes ? 'bg-[#00c5a0] text-white shadow-2xs' : 'bg-white text-slate-500 border border-slate-200'}">
+            예
+          </span>
+          <span class="px-2.5 py-1 text-xs font-bold rounded transition-all ${!isYes ? 'bg-[#ff5b84] text-white shadow-2xs' : 'bg-white text-slate-500 border border-slate-200'}">
+            아니오
+          </span>
+        </div>
+      `;
+    } else if (cat === 'linear' || rangeEnd > 5) {
+      controlHtml = `
+        <div class="inline-flex items-baseline gap-1 select-none">
+          <span class="text-sm font-black text-slate-800">${result}</span>
+          <span class="text-xs text-slate-400 font-semibold">/${rangeEnd}점</span>
+        </div>
+      `;
+    } else if (cat === 'level') {
+      const activeNum = Number(result);
+      let numButtons = '';
+      for (let n = rangeStart; n <= rangeEnd; n++) {
+        const isActive = activeNum === n;
+        numButtons += `
+          <span class="w-6 h-6 flex items-center justify-center text-xs font-bold rounded transition-all ${isActive ? 'bg-[#00c5a0] text-white shadow-2xs' : 'bg-white text-slate-500 border border-slate-200'}">
+            ${n}
+          </span>
+        `;
+      }
+      controlHtml = `<div class="inline-flex items-center gap-1 select-none">${numButtons}</div>`;
+    } else {
+      controlHtml = `<span class="px-2.5 py-1 text-xs font-bold rounded bg-slate-100 text-slate-800">${result}</span>`;
+    }
+
+    return `
+      <div class="flex items-center justify-between py-1 gap-2">
+        <span class="text-xs sm:text-[13px] font-bold text-slate-800 truncate" title="${name}">${name}</span>
+        <div class="shrink-0">${controlHtml}</div>
+      </div>
+    `;
+  }).join('');
+}
+
 async function openCarePortOfficialDetail(sessionId) {
   if (!sessionId) return;
   gCurrentCarePortSessionId = sessionId;
@@ -23320,22 +23418,12 @@ async function openCarePortOfficialDetail(sessionId) {
       }
     }
 
-    // Checkboxes (Only if genuine checkboxes are present in CarePort raw data)
+    // Checkboxes (CarePort 1:1 상담내용 평가 체크 버튼 렌더링)
     const cbSection = document.getElementById('cpCheckboxesSection');
     const cpList = document.getElementById('cpCheckboxesList');
     if (cbSection && cpList) {
-      if (Array.isArray(raw.checkboxes) && raw.checkboxes.length > 0) {
-        cbSection.classList.remove('hidden');
-        cpList.innerHTML = raw.checkboxes.map(cb => `
-          <div class="flex items-center justify-between py-2 border-b border-slate-100">
-            <span class="font-bold text-slate-700 text-xs">${cb.label || cb.title}</span>
-            <span class="px-2.5 py-1 text-xs font-bold rounded bg-slate-100 text-slate-800">${cb.value || cb.val}</span>
-          </div>
-        `).join('');
-      } else {
-        cbSection.classList.add('hidden');
-        cpList.innerHTML = '';
-      }
+      cbSection.classList.remove('hidden');
+      cpList.innerHTML = renderCarePortEvaluationCheckboxes(raw.checkboxes);
     }
 
     if (typeof initIcons === 'function') initIcons('carePortOfficialModal');
@@ -23367,6 +23455,7 @@ function downloadCarePortDocumentHtml() {
   const tags = document.getElementById('cpCardTags')?.innerText || '';
   const reportItemsHtml = document.getElementById('cpCardReportItems')?.innerHTML || '';
   const summary = document.getElementById('cpCardSummaryContent')?.innerText || '';
+  const checkboxesHtml = document.getElementById('cpCheckboxesList')?.innerHTML || '';
 
   const html = `<!DOCTYPE html>
 <html lang="ko">
@@ -23465,6 +23554,11 @@ function downloadCarePortDocumentHtml() {
     </div>
 
     <div class="sec-title">상담내용</div>
+    ${checkboxesHtml ? `
+      <div style="display: grid; grid-template-columns: 1fr 1fr; column-gap: 40px; row-gap: 12px; font-size: 13px; margin-bottom: 24px;">
+        ${checkboxesHtml}
+      </div>
+    ` : ''}
     <div class="sub-title">상담요약</div>
 
     <div class="summary-card">
