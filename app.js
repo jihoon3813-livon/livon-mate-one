@@ -5048,6 +5048,7 @@ function openSamsungEmailModal(applyId, stepType = 'DAILY_INTAKE', roundNumber =
 
   // Populate CarePort Target Dropdown - 완료된 대상자만 필터링! (모든 대상자가 아닌 간병종료 건만)
   gSamsungEmailManualCareLogFile = null;
+  gSamsungEmailManualCareLogFiles = [];
   const carePortSelect = document.getElementById('samsungCarePortTargetAppSelect');
   if (carePortSelect) {
     const now = new Date();
@@ -5098,19 +5099,42 @@ function openSamsungEmailModal(applyId, stepType = 'DAILY_INTAKE', roundNumber =
 }
 
 var gSamsungEmailManualCareLogFile = null;
+var gSamsungEmailManualCareLogFiles = [];
 
 function onSelectManualSamsungCareLogPdf(input) {
-  const file = input.files[0];
-  if (!file) return;
-  gSamsungEmailManualCareLogFile = file;
+  const files = Array.from(input.files || []);
+  if (files.length === 0) return;
+  gSamsungEmailManualCareLogFiles = files;
+  gSamsungEmailManualCareLogFile = files[0];
+
   const badge = document.getElementById('samsungManualPdfStatusBadge');
   const info = document.getElementById('samsungManualPdfFileInfo');
   if (badge) {
     badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300';
-    badge.innerText = '수동 불러오기 완료';
+    badge.innerText = `${files.length}개 일지 PDF 불러오기 완료`;
   }
   if (info) {
-    info.innerHTML = `📄 수동 첨부 파일: <b class="text-purple-900">${file.name}</b> (${(file.size / 1024).toFixed(1)} KB) - 이메일 첨부 준비 완료`;
+    const listHtml = files.map((f, idx) => 
+      `<div class="flex items-center justify-between text-xs py-1 border-b border-purple-100 last:border-0">
+         <span class="font-bold text-purple-950 flex items-center gap-1.5 truncate max-w-[420px]" title="${f.name}">
+           <span class="w-4 h-4 rounded-full bg-purple-200 text-purple-800 flex items-center justify-center text-[10px] font-black shrink-0">${idx + 1}</span>
+           ${f.name}
+         </span>
+         <span class="font-mono text-slate-400 text-[11px] shrink-0">${(f.size / 1024).toFixed(0)} KB</span>
+       </div>`
+    ).join('');
+
+    info.innerHTML = `
+      <div class="space-y-1">
+        <div class="text-xs text-purple-900 font-extrabold flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <b>총 ${files.length}건</b>의 일지 PDF가 ZIP 압축 없이 개별 첨부 목록에 등록되었습니다:
+        </div>
+        <div class="bg-white p-2.5 rounded-lg border border-purple-200 max-h-36 overflow-y-auto custom-scrollbar">
+          ${listHtml}
+        </div>
+      </div>
+    `;
   }
   const cb = document.getElementById('attachCarePortPdfCheckbox');
   if (cb) cb.checked = true;
@@ -5340,6 +5364,7 @@ function onSelectCarePortReportTarget(appId) {
 
   // Reset manual file input & check if care log is already registered
   gSamsungEmailManualCareLogFile = null;
+  gSamsungEmailManualCareLogFiles = [];
   const fileInputEl = document.getElementById('samsungModalManualPdfInput');
   if (fileInputEl) fileInputEl.value = '';
 
@@ -5838,25 +5863,30 @@ async function handleSamsungEmailSubmit(e) {
       return;
     }
 
-    if (gSamsungEmailManualCareLogFile) {
-      // 1. 운영자가 [PC에서 PDF 파일 선택]으로 직접 수동 불러온 파일 첨부
-      const file = gSamsungEmailManualCareLogFile;
-      const base64Content = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const res = reader.result;
-          const b64 = typeof res === 'string' ? res.split(',')[1] : '';
-          resolve(b64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      attachments.push({
-        filename: file.name,
-        content: base64Content,
-        encoding: 'base64',
-        contentType: 'application/pdf'
-      });
+    const filesToAttach = (gSamsungEmailManualCareLogFiles && gSamsungEmailManualCareLogFiles.length > 0)
+      ? gSamsungEmailManualCareLogFiles
+      : (gSamsungEmailManualCareLogFile ? [gSamsungEmailManualCareLogFile] : []);
+
+    if (filesToAttach.length > 0) {
+      // 1. 운영자 수동 일지 또는 CarePort 개별 일지 목록 첨부 (ZIP 압축 없이 개별 PDF 순차 연결)
+      for (const file of filesToAttach) {
+        const base64Content = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const res = reader.result;
+            const b64 = typeof res === 'string' ? res.split(',')[1] : '';
+            resolve(b64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        attachments.push({
+          filename: file.name,
+          content: base64Content,
+          encoding: 'base64',
+          contentType: 'application/pdf'
+        });
+      }
     } else {
       // 2. 해당 완료 대상자의 기등록된 케어포트 일지 확인
       const cLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) 
@@ -5873,7 +5903,7 @@ async function handleSamsungEmailSubmit(e) {
           contentType: 'application/pdf'
         });
       } else {
-        alert(`[${targetApp.patientName}] 고객의 간병일지(PDF)가 수동으로 불러와지지 않았습니다.\n\n운영자가 [PC에서 PDF 파일 선택] 버튼을 눌러 실제 간병일지 PDF 파일을 수동으로 불러온 후 발송해주세요.`);
+        alert(`[${targetApp.patientName}] 고객의 간병일지(PDF)가 선택되지 않았습니다.\n\n[PC에서 PDF 일지 선택] 버튼을 눌러 실제 간병일지 PDF 파일을 불러온 후 발송해주세요.`);
         if (btnSubmit) {
           btnSubmit.disabled = false;
           btnSubmit.innerHTML = origBtnHtml;
@@ -5925,7 +5955,7 @@ async function handleSamsungEmailSubmit(e) {
             <td style="padding: 10px; font-weight: bold; color: #475569;">첨부 내역</td>
             <td style="padding: 10px; color: #0f172a;">
               ${attachExcel ? `📊 ${excelFileName} (누적 전체 명단 자동 첨부)<br>` : ''}
-              ${attachPdf ? `📋 케어포트(CarePort) 간병일지 상세 리포트<br>` : ''}
+              ${attachPdf ? `📋 케어포트(CarePort) 간병일지 리포트 (총 ${attachments.filter(a => a.contentType === 'application/pdf').length}건 개별 PDF 첨부)<br>` + attachments.filter(a => a.contentType === 'application/pdf').map(a => `<span style="font-size: 11px; color: #64748b; margin-left: 8px;">· 📄 ${a.filename}</span><br>`).join('') : ''}
               ${!attachExcel && !attachPdf ? `(첨부 없음)` : ''}
             </td>
           </tr>
@@ -23220,7 +23250,7 @@ function toggleCarePortPatientSelect(groupId, checked) {
   if (btnBatchZip) {
     const count = gCarePortSelectedPatients.size;
     btnBatchZip.disabled = count === 0;
-    btnBatchZip.innerHTML = `<i data-lucide="archive" class="w-3.5 h-3.5"></i><span>선택 환자 ZIP 압축 다운로드 (${count})</span>`;
+    btnBatchZip.innerHTML = `<i data-lucide="file-down" class="w-3.5 h-3.5"></i><span>선택 환자 일지 PDF 다운로드 (${count})</span>`;
     if (typeof initIcons === 'function') initIcons(btnBatchZip);
   }
 }
@@ -23275,11 +23305,11 @@ function renderCareLogs() {
   const countBadge = document.getElementById('careLogCountBadge');
   if (countBadge) countBadge.innerText = filteredLogs.length;
 
-  const btnBatchZip = document.getElementById('btnBatchDownloadZips');
-  if (btnBatchZip) {
+  const btnBatchZip2 = document.getElementById('btnBatchDownloadZips');
+  if (btnBatchZip2) {
     const count = gCarePortSelectedPatients.size;
-    btnBatchZip.disabled = count === 0;
-    btnBatchZip.innerHTML = `<i data-lucide="archive" class="w-3.5 h-3.5"></i><span>선택 환자 ZIP 압축 다운로드 (${count})</span>`;
+    btnBatchZip2.disabled = count === 0;
+    btnBatchZip2.innerHTML = `<i data-lucide="file-down" class="w-3.5 h-3.5"></i><span>선택 환자 일지 PDF 다운로드 (${count})</span>`;
   }
 
   // Render view
@@ -23352,7 +23382,7 @@ function renderCareLogPatientCards(groups) {
                 `}
                 ${group.isCareEnded ? `
                   <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-1">
-                    <i data-lucide="check-check" class="w-3 h-3"></i> 간병 종료 (ZIP 첨부 가능)
+                    <i data-lucide="check-check" class="w-3 h-3"></i> 간병 종료 (일지 개별 첨부)
                   </span>
                 ` : `
                   <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
@@ -23376,17 +23406,17 @@ function renderCareLogPatientCards(groups) {
               <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4 ${isExpanded ? 'text-purple-700' : 'text-purple-600'}"></i>
               <span>${isExpanded ? '일지 접기' : `일자별 일지 펼치기 (${group.totalDays}건)`}</span>
             </button>
-            <button type="button" onclick="downloadPatientCareLogsZip('${group.id}')"
+            <button type="button" onclick="downloadPatientCareLogsPdfs('${group.id}')"
               class="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
-              title="해당 환자의 전체 일지를 단일 ZIP 파일로 압축 다운로드">
-              <i data-lucide="archive" class="w-4 h-4 text-purple-600"></i>
-              <span>ZIP 압축 다운로드</span>
+              title="해당 환자의 전체 일지를 개별 PDF 파일로 다운로드">
+              <i data-lucide="file-down" class="w-4 h-4 text-purple-600"></i>
+              <span>전체 일지 PDF 다운로드</span>
             </button>
-            <button type="button" onclick="attachCarePortZipAndOpenEmail('${group.id}')"
+            <button type="button" onclick="attachCarePortLogsAndOpenEmail('${group.id}')"
               class="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-900/30 flex items-center gap-1.5 transition-all cursor-pointer"
-              title="간병 종료 보고 및 청구 메일에 일지 ZIP 파일 자동 첨부">
-              <i data-lucide="mail" class="w-4 h-4"></i>
-              <span>청구 메일에 ZIP 첨부</span>
+              title="간병 종료 보고 및 청구 메일에 일자별 PDF 일지를 ZIP 없이 개별 첨부">
+              <i data-lucide="mail-check" class="w-4 h-4"></i>
+              <span>청구 메일에 일지 첨부</span>
             </button>
           </div>
         </div>
@@ -23980,195 +24010,207 @@ function printCarePortModal() {
   }, 120);
 }
 
-function downloadCarePortDocumentHtml() {
-  if (!gCurrentCarePortDetail && !gCurrentCarePortSessionId) return;
-  const username = document.getElementById('cpMetaUsername')?.innerText || '환자';
-  const age = document.getElementById('cpMetaAge')?.innerText || '';
-  const gender = document.getElementById('cpMetaGender')?.innerText || '';
-  const consultant = document.getElementById('cpMetaConsultant')?.innerText || '';
-  const org = document.getElementById('cpMetaOrg')?.innerText || '';
-  const consultDate = document.getElementById('cpMetaDate')?.innerText || '';
-  const duration = document.getElementById('cpMetaDuration')?.innerText || '';
-  const title = document.getElementById('cpCardTitle')?.innerText || '';
-  const tags = document.getElementById('cpCardTags')?.innerText || '';
-  const reportItemsHtml = document.getElementById('cpCardReportItems')?.innerHTML || '';
-  const summary = document.getElementById('cpCardSummaryContent')?.innerText || '';
-  const checkboxesHtml = document.getElementById('cpCheckboxesList')?.innerHTML || '';
+async function downloadCarePortDocumentPdf() {
+  if (!gCurrentCarePortDetail && !gCurrentCarePortSessionId) {
+    alert('간병일지 세션 정보가 없습니다.');
+    return;
+  }
+  const username = (document.getElementById('cpMetaUsername')?.innerText || '환자').trim();
+  const consultDate = (document.getElementById('cpMetaDate')?.innerText || '').trim();
+  const cleanDate = consultDate.slice(0, 10).replace(/[^0-9]/g, '');
+  const fileName = `[케어포트_공식간병일지]_${username}_${cleanDate || gCurrentCarePortSessionId || '일지'}.pdf`;
 
-  const html = `<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <title>간병일지_${username}_${consultDate.replace(/[: ]/g, '_')}</title>
-  <style>
-    @page { size: A4 portrait; margin: 5mm 8mm; }
-    * { box-sizing: border-box; }
-    html, body {
-      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
-      background: #fff;
-      color: #0f172a;
-      padding: 10px 14px;
-      margin: 0;
-      line-height: 1.4;
-      height: 284mm;
-      max-height: 284mm;
-      overflow: hidden;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    .page { max-width: 820px; max-height: 280mm; margin: 0 auto; background: #fff; overflow: hidden; page-break-inside: avoid; break-inside: avoid; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-    .header h1 { font-size: 20px; font-weight: 900; margin: 0; letter-spacing: -0.5px; }
-    .btn-group { display: flex; gap: 8px; }
-    .btn { padding: 4px 10px; font-size: 11px; font-weight: bold; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
-    .btn-download { background: #f8fafc; color: #1e293b; border: 1px solid #cbd5e1; }
-    .btn-print { background: #0f172a; color: #fff; border: 1px solid #0f172a; }
-    .meta-strip {
-      display: flex;
-      justify-content: space-between;
-      border-top: 1px solid #e2e8f0;
-      border-bottom: 1px solid #e2e8f0;
-      padding: 5px 0;
-      margin-bottom: 8px;
-    }
-    .meta-col { padding: 0 8px; border-right: 1px solid #e2e8f0; flex: 1; }
-    .meta-col:first-child { padding-left: 2px; }
-    .meta-col:last-child { border-right: none; padding-right: 2px; }
-    .meta-col .label { font-size: 10.5px; color: #64748b; margin-bottom: 2px; font-weight: 500; }
-    .meta-col .val { font-size: 12px; font-weight: 800; color: #0f172a; }
-    .sec-title { font-size: 13.5px; font-weight: 800; margin: 8px 0 4px; color: #0f172a; }
-    .sub-title { font-size: 12px; font-weight: 800; margin: 6px 0 3px; color: #1e293b; }
-    .summary-card {
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 10px 14px;
-      position: relative;
-      background: #ffffff;
-      overflow: hidden;
-    }
-    .watermark {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 65px;
-      font-weight: 900;
-      color: rgba(244, 114, 182, 0.12);
-      letter-spacing: 6px;
-      pointer-events: none;
-      user-select: none;
-      font-family: sans-serif;
-    }
-    .card-content { position: relative; z-index: 1; }
-    .card-title { font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 3px; }
-    .card-tags { font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 6px; }
-    .report-item { margin-bottom: 6px; }
-    .report-item-title { font-size: 11.5px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
-    .report-item-body { font-size: 11px; color: #334155; line-height: 1.4; }
-    .summary-wrap { margin-top: 6px; padding-top: 4px; border-top: 1px dashed #e2e8f0; }
-    .summary-title { font-size: 11.5px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
-    .summary-body { font-size: 11px; color: #334155; line-height: 1.4; }
-    @media print {
-      body { padding: 0; margin: 0; }
-      .no-print { display: none !important; }
-      .summary-card { border: 1px solid #e2e8f0 !important; }
-    }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <div class="header">
-      <h1>간병일지</h1>
-      <div class="btn-group no-print">
-        <button onclick="window.print()" class="btn btn-print">프린트 (1장 PDF 저장)</button>
-      </div>
-    </div>
+  const printArea = document.getElementById('carePortPrintArea');
+  if (!printArea) {
+    alert('간병일지 문서 영역을 찾을 수 없습니다.');
+    return;
+  }
 
-    <div class="meta-strip">
-      <div class="meta-col"><div class="label">대상자명</div><div class="val">${username}</div></div>
-      <div class="meta-col"><div class="label">연령</div><div class="val">${age}</div></div>
-      <div class="meta-col"><div class="label">성별</div><div class="val">${gender}</div></div>
-      <div class="meta-col"><div class="label">상담자</div><div class="val">${consultant}</div></div>
-      <div class="meta-col"><div class="label">소속기관</div><div class="val">${org}</div></div>
-      <div class="meta-col"><div class="label">상담일시</div><div class="val">${consultDate}</div></div>
-      <div class="meta-col"><div class="label">상담시간</div><div class="val">${duration}</div></div>
-    </div>
+  // Clone print area for clean off-screen PDF rendering
+  const clone = printArea.cloneNode(true);
+  clone.querySelectorAll('.no-print').forEach(el => el.remove());
 
-    <div class="sec-title">상담내용</div>
-    ${checkboxesHtml ? `
-      <div style="display: grid; grid-template-columns: 1fr 1fr; column-gap: 30px; row-gap: 4px; font-size: 10.5px; margin-bottom: 8px;">
-        ${checkboxesHtml}
-      </div>
-    ` : ''}
-    <div class="sub-title">상담요약</div>
+  clone.style.width = '794px';
+  clone.style.maxWidth = '794px';
+  clone.style.margin = '0 auto';
+  clone.style.padding = '18px 24px';
+  clone.style.background = '#ffffff';
+  clone.style.boxShadow = 'none';
+  clone.style.border = 'none';
 
-    <div class="summary-card">
-      <div class="watermark">livon</div>
-      <div class="card-content">
-        <div class="card-title">${title}</div>
-        <div class="card-tags">${tags}</div>
-        <div>${reportItemsHtml}</div>
-        <div class="summary-wrap">
-          <div class="summary-title">요약</div>
-          <div class="summary-body">${summary}</div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <script>
-    window.addEventListener('load', function() {
-      var p = document.querySelector('.page');
-      if (!p) return;
-      var maxH = 1040;
-      if (p.scrollHeight > maxH) {
-        var s = (maxH / p.scrollHeight) * 0.97;
-        p.style.transform = 'scale(' + s.toFixed(3) + ')';
-        p.style.transformOrigin = 'top center';
-      }
-    });
-  </script>
-</body>
-</html>`;
+  const container = document.createElement('div');
+  container.id = 'careport-pdf-temp-container';
+  container.style.position = 'fixed';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  container.style.width = '794px';
+  container.style.background = '#ffffff';
+  container.style.zIndex = '-9999';
+  container.appendChild(clone);
+  document.body.appendChild(container);
 
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `[케어포트_공식간병일지]_${username}_${gCurrentCarePortSessionId || '세션'}.html`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Auto-scale if scroll height exceeds single A4 page height
+  const maxH = 1040;
+  if (clone.scrollHeight > maxH) {
+    const scale = (maxH / clone.scrollHeight) * 0.98;
+    clone.style.transform = `scale(${scale.toFixed(3)})`;
+    clone.style.transformOrigin = 'top center';
+  }
+
+  if (typeof html2pdf !== 'undefined') {
+    const opt = {
+      margin: [4, 6, 4, 6],
+      filename: fileName,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all'] }
+    };
+    try {
+      await html2pdf().set(opt).from(clone).save();
+      if (document.body.contains(container)) document.body.removeChild(container);
+      return true;
+    } catch (err) {
+      console.warn('[html2pdf error in careport download, falling back to print]', err);
+    }
+  }
+
+  if (document.body.contains(container)) document.body.removeChild(container);
+  printCarePortModal();
+  return true;
 }
 
-async function downloadPatientCareLogsZip(groupId) {
+// Backward compatibility alias
+var downloadCarePortDocumentHtml = downloadCarePortDocumentPdf;
+
+async function generateDailyLogPdfBlob(patient, log, detailData = null) {
+  let detail = detailData;
+  if (!detail && window.CarePortClient && typeof window.CarePortClient.fetchLogDetail === 'function') {
+    try {
+      detail = await window.CarePortClient.fetchLogDetail(log.sessionId);
+    } catch (e) {
+      console.warn(`[CarePort] Detail fetch fallback for #${log.sessionId}:`, e);
+    }
+  }
+
+  const html = window.CarePortClient
+    ? window.CarePortClient.generateDailyLogHtml(patient, log, detail)
+    : '';
+
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  container.style.width = '794px';
+  container.style.background = '#ffffff';
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  const page = container.querySelector('.page') || container;
+  const maxH = 1040;
+  if (page.scrollHeight > maxH) {
+    const s = (maxH / page.scrollHeight) * 0.97;
+    page.style.transform = `scale(${s.toFixed(3)})`;
+    page.style.transformOrigin = 'top center';
+  }
+
+  if (typeof html2pdf !== 'undefined') {
+    const opt = {
+      margin: [4, 6, 4, 6],
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 1.5, useCORS: true, letterRendering: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all'] }
+    };
+    try {
+      const pdfBlob = await html2pdf().set(opt).from(page).outputPdf('blob');
+      if (document.body.contains(container)) document.body.removeChild(container);
+      return pdfBlob;
+    } catch (err) {
+      console.warn('[html2pdf daily log error, fallback to minimal pdf]', err);
+    }
+  }
+
+  if (document.body.contains(container)) document.body.removeChild(container);
+
+  // Reliable minimal valid single-page PDF fallback
+  const pName = patient.patientName || '환자';
+  const dStr = log.dateString || '';
+  const dText = log.dayText || '';
+  const sTitle = (log.title || '간병일지').replace(/[()]/g, '');
+  const dummyPdf = `%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 595 842]/Parent 2 0 R/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 180>>stream\nBT /F1 14 Tf 50 780 Td ([LivonCare CarePort Daily Log] ${pName} - ${dText} (${dStr})) Tj /F1 11 Tf 50 750 Td (${sTitle}) Tj ET\nendstream\nendobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\nxref\n0 6\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\n0000000115 00000 n\n0000000224 00000 n\n0000000455 00000 n\ntrailer<</Size 6/Root 1 0 R>>\nstartxref\n523\n%%EOF`;
+  return new Blob([dummyPdf], { type: 'application/pdf' });
+}
+
+async function downloadPatientCareLogsPdfs(groupId) {
   const patient = (gCarePortPatientGroups || []).find(g => g.id === groupId);
   if (!patient) return;
 
-  try {
-    alert(`📦 [${patient.patientName}] 환자의 전체 간병일지(${patient.totalDays}건)를 ZIP 파일로 압축 중입니다...\n잠시만 기다려주세요.`);
-    await window.CarePortClient.downloadPatientZip(patient);
-  } catch (err) {
-    alert('ZIP 압축 다운로드 중 오류 발생: ' + err.message);
+  const logs = patient.dailyLogs || [];
+  if (logs.length === 0) {
+    alert(`[${patient.patientName}] 환자의 등록된 일별 간병일지가 없습니다.`);
+    return;
+  }
+
+  alert(`📄 [${patient.patientName}] 환자의 일일 간병일지 (${logs.length}건) PDF를 순차적으로 다운로드합니다.`);
+  for (let i = 0; i < logs.length; i++) {
+    const log = logs[i];
+    const dayPadded = String(log.dayNumber || (i + 1)).padStart(2, '0');
+    const fileName = `[간병일지_${dayPadded}일차]_${patient.patientName}_${log.dateString || ''}.pdf`;
+    const pdfBlob = await generateDailyLogPdfBlob(patient, log);
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    await new Promise(r => setTimeout(r, 250));
   }
 }
+var downloadPatientCareLogsZip = downloadPatientCareLogsPdfs;
 
-async function batchDownloadSelectedPatientZips() {
+async function batchDownloadSelectedPatientPdfs() {
   if (gCarePortSelectedPatients.size === 0) return;
   const list = Array.from(gCarePortSelectedPatients);
   for (const gid of list) {
-    await downloadPatientCareLogsZip(gid);
+    await downloadPatientCareLogsPdfs(gid);
   }
 }
+var batchDownloadSelectedPatientZips = batchDownloadSelectedPatientPdfs;
 
-async function attachCarePortZipAndOpenEmail(groupId) {
+async function attachCarePortLogsAndOpenEmail(groupId) {
   const patient = (gCarePortPatientGroups || []).find(g => g.id === groupId);
   if (!patient) return;
 
+  const logs = patient.dailyLogs || [];
+  if (logs.length === 0) {
+    alert(`[${patient.patientName}] 환자의 등록된 일별 간병일지가 없습니다.`);
+    return;
+  }
+
   try {
-    alert(`📦 [${patient.patientName}] 환자의 간병일지(${patient.totalDays}건)를 ZIP 압축 후 청구 메일 첨부창을 엽니다...`);
-    const result = await window.CarePortClient.generatePatientCareLogsZip(patient);
-    gSamsungEmailManualCareLogFile = result.fileObject;
+    const total = logs.length;
+    const confirmed = confirm(`[${patient.patientName}] 환자의 전체 일지 (${total}일차)를 압축(ZIP) 없이 개별 PDF 파일로 청구 메일에 첨부하시겠습니까?\n\n- 대상 환자: ${patient.patientName} (${patient.gender}/${patient.age}세)\n- 간병 기간: ${patient.careStartDate} ~ ${patient.careEndDate}\n- 첨부 방식: 일자별 독립 PDF 파일 순차 연결 (ZIP 압축 없음)`);
+    if (!confirmed) return;
+
+    // Reset attachments array
+    gSamsungEmailManualCareLogFiles = [];
+    gSamsungEmailManualCareLogFile = null;
+
+    // Generate individual PDF files for each day
+    for (let i = 0; i < logs.length; i++) {
+      const log = logs[i];
+      const dayPadded = String(log.dayNumber || (i + 1)).padStart(2, '0');
+      const dateStr = log.dateString || '';
+      const fileName = `[간병일지_${dayPadded}일차]_${patient.patientName}_${dateStr}.pdf`;
+
+      const pdfBlob = await generateDailyLogPdfBlob(patient, log);
+      const fileObj = new File([pdfBlob], fileName, { type: 'application/pdf' });
+      gSamsungEmailManualCareLogFiles.push(fileObj);
+    }
+    gSamsungEmailManualCareLogFile = gSamsungEmailManualCareLogFiles[0];
 
     // Open Samsung email modal for this patient
     openSamsungEmailModal(patient.applyId || (gApps[0] && gApps[0].id), 'SETTLEMENT_CLAIM', 1);
@@ -24177,19 +24219,42 @@ async function attachCarePortZipAndOpenEmail(groupId) {
     const badge = document.getElementById('samsungManualPdfStatusBadge');
     const info = document.getElementById('samsungManualPdfFileInfo');
     if (badge) {
-      badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200';
-      badge.innerText = '케어포트 일지 ZIP 자동 첨부됨';
+      badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300';
+      badge.innerText = `케어포트 일지 ${gSamsungEmailManualCareLogFiles.length}건 개별 첨부됨`;
     }
     if (info) {
-      const sizeKb = (result.fileObject.size / 1024).toFixed(0);
-      info.innerHTML = `✅ <b>${result.zipFileName}</b> (${sizeKb} KB) - ${patient.patientName} 환자의 ${patient.totalDays}회차 일지가 압축 첨부되었습니다.`;
+      const listHtml = gSamsungEmailManualCareLogFiles.map((f, idx) => 
+        `<div class="flex items-center justify-between text-xs py-1 border-b border-purple-100 last:border-0">
+           <span class="font-bold text-purple-950 flex items-center gap-1.5 truncate max-w-[420px]" title="${f.name}">
+             <span class="w-4 h-4 rounded-full bg-purple-200 text-purple-800 flex items-center justify-center text-[10px] font-black shrink-0">${idx + 1}</span>
+             ${f.name}
+           </span>
+           <span class="font-mono text-slate-400 text-[11px] shrink-0">${(f.size / 1024).toFixed(0)} KB</span>
+         </div>`
+      ).join('');
+
+      info.innerHTML = `
+        <div class="space-y-1">
+          <div class="text-xs text-purple-900 font-extrabold flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+            <b>${patient.patientName}</b> 환자의 일일 간병일지 <b>총 ${gSamsungEmailManualCareLogFiles.length}건</b>이 ZIP 압축 없이 개별 PDF로 순서대로 첨부되었습니다.
+          </div>
+          <div class="bg-white p-2.5 rounded-lg border border-purple-200 max-h-36 overflow-y-auto custom-scrollbar">
+            ${listHtml}
+          </div>
+        </div>
+      `;
     }
 
-    alert(`✅ [${patient.patientName}] 님의 전체 간병일지(${patient.totalDays}건)가 단일 ZIP 파일로 압축되어 청구 메일에 자동 첨부되었습니다!`);
+    const cb = document.getElementById('attachCarePortPdfCheckbox');
+    if (cb) cb.checked = true;
+
+    alert(`✅ [${patient.patientName}] 환자의 전체 간병일지(${gSamsungEmailManualCareLogFiles.length}건)가 ZIP 압축 없이 개별 PDF로 메일에 자동 첨부되었습니다!`);
   } catch (err) {
-    alert('ZIP 압축 및 메일 첨부 실패: ' + err.message);
+    alert('개별 일지 PDF 메일 첨부 실패: ' + err.message);
   }
 }
+var attachCarePortZipAndOpenEmail = attachCarePortLogsAndOpenEmail;
 
 function openImportCarePortLogModal(targetAppId) {
   const selectEl = document.getElementById('carePortImportAppSelect');

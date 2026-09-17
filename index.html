@@ -3327,7 +3327,7 @@
             </h2>
             <p class="text-xs text-purple-200/90 leading-relaxed max-w-3xl">
               리본케어포트 전산에서 매일 생성되는 공식 간병일지(체크박스 지표, 요양보호사 일상 지원 기록)를 실시간 수신하여 
-              환자별로 일차(1일차, 2일차...)를 자동 구분하고, 간병 종료 시 메일 첨부용 <b>압축파일(ZIP)</b>로 일괄 생성합니다.
+              환자별로 일차(1일차, 2일차...)를 자동 구분하고, 간병 종료 시 메일에 <b>일자별 개별 PDF 일지</b>를 압축(ZIP) 없이 순서대로 자동 첨부합니다.
             </p>
           </div>
 
@@ -3382,10 +3382,10 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <button type="button" onclick="batchDownloadSelectedPatientZips()" id="btnBatchDownloadZips" disabled 
+            <button type="button" onclick="batchDownloadSelectedPatientPdfs()" id="btnBatchDownloadZips" disabled 
               class="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1">
-              <i data-lucide="archive" class="w-3.5 h-3.5"></i>
-              <span>선택 환자 ZIP 압축 다운로드</span>
+              <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
+              <span>선택 환자 일지 PDF 다운로드</span>
             </button>
             <button type="button" onclick="exportLedgerToExcel('carelogs', 'ALL')" 
               class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer">
@@ -7096,17 +7096,17 @@
               <div class="flex items-center justify-between flex-wrap gap-2">
                 <div class="flex items-center gap-2">
                   <i data-lucide="file-up" class="w-4 h-4 text-purple-700"></i>
-                  <span class="font-extrabold text-purple-950">간병일지 수동 불러오기 (운영자 직접 첨부)</span>
+                  <span class="font-extrabold text-purple-950">간병일지 개별 첨부 목록 (ZIP 압축 없음)</span>
                   <span id="samsungManualPdfStatusBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">수동 선택 대기</span>
                 </div>
                 <label class="px-3 py-1 rounded-lg bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all">
                   <i data-lucide="upload" class="w-3.5 h-3.5"></i>
-                  <span>PC에서 PDF 파일 선택</span>
-                  <input type="file" id="samsungModalManualPdfInput" accept=".pdf" class="hidden" onchange="onSelectManualSamsungCareLogPdf(this)">
+                  <span>PC에서 PDF 일지 선택 (다중 선택 가능)</span>
+                  <input type="file" id="samsungModalManualPdfInput" accept=".pdf" multiple class="hidden" onchange="onSelectManualSamsungCareLogPdf(this)">
                 </label>
               </div>
               <div id="samsungManualPdfFileInfo" class="text-[11px] text-slate-500 font-medium">
-                ※ 모든 대상자가 아닌 <b>간병이 정상 종료된 완료 대상자</b>의 일지만 운영자가 수동으로 불러와 첨부합니다.
+                ※ 간병일지는 ZIP 압축 없이 <b>일자별 개별 PDF 파일로 순서대로 첨부</b>되어 보험사 청구 메일로 전송됩니다.
               </div>
             </div>
           </div>
@@ -8922,11 +8922,13 @@
           <div class="flex items-center justify-between pb-3">
             <h1 class="text-3xl font-black text-slate-950 tracking-tight">간병일지</h1>
             <div class="flex items-center gap-2 no-print">
-              <button type="button" onclick="downloadCarePortDocumentHtml()" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg border border-slate-300 transition-all cursor-pointer">
-                다운로드
+              <button type="button" onclick="downloadCarePortDocumentPdf()" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg border border-slate-300 transition-all cursor-pointer flex items-center gap-1.5">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span>PDF 다운로드 (1장)</span>
               </button>
-              <button type="button" onclick="printCarePortModal()" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-all cursor-pointer">
-                프린트
+              <button type="button" onclick="printCarePortModal()" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5">
+                <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                <span>프린트</span>
               </button>
             </div>
           </div>
