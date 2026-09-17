@@ -705,28 +705,16 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         (!gFilter.startDate || rInfo.startDate === gFilter.startDate) &&
         (!gFilter.endDate || rInfo.endDate === gFilter.endDate);
 
-      // 1. 전체 인입 건수 (CTI 전체 건수 표시)
+      // 1. 해당 기간의 총 인입콜 건수 (CTI 해당 기간 집계 또는 기간 필터링 합계)
       let totalCalls = 0;
-      if (cs && (cs.totalAll !== undefined || cs.totalInbound !== undefined)) {
-        if (targetCh === '전체' || targetCh === 'all') {
-          totalCalls = cs.totalAll || cs.totalInbound || 919;
-        } else if (targetCh.includes('삼성')) {
-          totalCalls = (rInfo.channel === '삼성화재' ? (cs.totalAll || cs.totalInbound) : 608);
-        } else if (targetCh.includes('현대')) {
-          totalCalls = (rInfo.channel === '현대해상' ? (cs.totalAll || cs.totalInbound) : 147);
-        } else if (targetCh.includes('리본')) {
-          totalCalls = (rInfo.channel === '리본케어' ? (cs.totalAll || cs.totalInbound) : 53);
-        } else {
-          totalCalls = cs.totalAll || cs.totalInbound || logs.length;
-        }
-      } else if (targetCh.includes('삼성')) {
-        totalCalls = 608;
-      } else if (targetCh.includes('현대')) {
-        totalCalls = 147;
-      } else if (targetCh.includes('리본')) {
-        totalCalls = 53;
+      if (isCtiRangeMatch && cs && (cs.totalInbound !== undefined || cs.totalAll !== undefined)) {
+        totalCalls = cs.totalInbound !== undefined ? cs.totalInbound : cs.totalAll;
       } else {
-        totalCalls = 919;
+        // CTI 기간 매칭 전이거나 부분 기간 필터링인 경우:
+        // 해당 기간에 속한 dailyTrends의 합계 또는 필터링된 콜 로그 건수 사용
+        const periodTrends = (gReportData && gReportData.dailyTrends || []).filter(t => (!gFilter.startDate || t.date >= gFilter.startDate) && (!gFilter.endDate || t.date <= gFilter.endDate));
+        const trendsSum = periodTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
+        totalCalls = trendsSum > 0 ? trendsSum : logs.length;
       }
 
       let connectReqCalls = logs.length;
@@ -1562,13 +1550,18 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       updatePresetButtons();
       updateBranding();
 
+      const rInfo = (gReportData && gReportData.reportInfo) || {};
+      const isSameRange = rInfo.startDate === s && rInfo.endDate === e && (
+        (gFilter.channel === '전체' || gFilter.channel === 'all') ? (rInfo.channel === 'all' || rInfo.channel === '전체') : ((rInfo.channel || '').includes(gFilter.channel))
+      );
+
       const hasData = gReportData && Array.isArray(gReportData.callLogs) && gReportData.callLogs.length > 0;
 
       // 1. 이미 데이터가 메모리에 로드되어 있다면 0ms 즉각 화면 렌더링
       if (hasData) {
         renderAll();
-        // 단순 날짜/프리셋 변경(조회 또는 프리셋 클릭)이고 강제 동기화가 아니면 즉시 완료 (0ms 지연 없음)
-        if (!forceSync) return;
+        // 이미 해당 기간 데이터와 일치하고 강제 새로고침이 아니면 즉시 완료
+        if (!forceSync && isSameRange) return;
       }
 
       await syncLiveCti();
@@ -1605,7 +1598,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       try {
         let synced = false;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
         try {
           const res = await fetch(`/api/samsung/call-report/sync-cti?start=${gFilter.startDate}&end=${gFilter.endDate}&channel=${encodeURIComponent(ch)}`, {
             signal: controller.signal

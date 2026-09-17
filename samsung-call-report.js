@@ -685,7 +685,7 @@ function renderSamsungCallReportTab() {
             </div>
             <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
               <span class="text-[10px] text-slate-500 font-medium">인입콜</span>
-              <span class="font-bold text-slate-900 text-xs mt-0.5">${activeCti.totalInbound}/${activeCti.answeredCalls}건</span>
+              <span class="font-bold text-slate-900 text-xs mt-0.5">${activeCti.totalInbound}/${activeCti.connectRequests}건</span>
             </div>
             <div class="bg-white/90 border border-indigo-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
               <span class="text-[10px] text-indigo-500 font-medium">연결요청</span>
@@ -934,28 +934,16 @@ function calculateReportStats() {
     (!s || rInfo.startDate === s) &&
     (!e || rInfo.endDate === e);
 
-  // 1. 전체 인입 건수 (CTI 전체 건수 표시)
+  // 1. 해당 기간의 총 인입콜 건수 (CTI 해당 기간 집계 또는 기간 필터링 합계)
   let totalCalls = 0;
-  if (cs && (cs.totalAll !== undefined || cs.totalInbound !== undefined)) {
-    if (isAllChannel) {
-      totalCalls = cs.totalAll || cs.totalInbound || 919;
-    } else if (ch.includes('삼성')) {
-      totalCalls = (rInfo.channel === '삼성화재' ? (cs.totalAll || cs.totalInbound) : 608);
-    } else if (ch.includes('현대')) {
-      totalCalls = (rInfo.channel === '현대해상' ? (cs.totalAll || cs.totalInbound) : 147);
-    } else if (ch.includes('리본')) {
-      totalCalls = (rInfo.channel === '리본케어' ? (cs.totalAll || cs.totalInbound) : 53);
-    } else {
-      totalCalls = cs.totalAll || cs.totalInbound || logs.length;
-    }
-  } else if (ch.includes('삼성')) {
-    totalCalls = 608;
-  } else if (ch.includes('현대')) {
-    totalCalls = 147;
-  } else if (ch.includes('리본')) {
-    totalCalls = 53;
+  if (isCtiRangeMatch && cs && (cs.totalInbound !== undefined || cs.totalAll !== undefined)) {
+    totalCalls = cs.totalInbound !== undefined ? cs.totalInbound : cs.totalAll;
   } else {
-    totalCalls = 919;
+    // CTI 기간 매칭 전이거나 부분 기간 필터링인 경우:
+    // 해당 기간에 속한 dailyTrends의 합계 또는 필터링된 콜 로그 건수 사용
+    const periodTrends = (gSamsungReportData && gSamsungReportData.dailyTrends || []).filter(t => (!s || t.date >= s) && (!e || t.date <= e));
+    const trendsSum = periodTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
+    totalCalls = trendsSum > 0 ? trendsSum : logs.length;
   }
 
   // 2. 상담원 연결 요청 건수 (현재 필터링된 연결요청 호수 유지)
@@ -2667,24 +2655,28 @@ async function applyTabDateRange(forceSync = false) {
       : gSamsungReportData.callLogs.some(c => (c.channel || '').includes(ch))
   );
 
+  const rInfo = (gSamsungReportData && gSamsungReportData.reportInfo) || {};
+  const isSameRange = rInfo.startDate === s && rInfo.endDate === e && (
+    (ch === '전체' || ch === 'all') ? (rInfo.channel === 'all' || rInfo.channel === '전체') : ((rInfo.channel || '').includes(ch))
+  );
+
   // 1. 이미 데이터가 메모리에 로드되어 있고 해당 채널 데이터가 존재하면 0ms 즉각 화면 렌더링
   if (hasMatchingChannel) {
     renderSamsungCallReportTab();
     if (gActiveReportSubTab === 'daily') {
       setTimeout(renderTabDailyTrendChart, 60);
     }
-  }
-
-  // 단순 기간/채널 필터 변경(조회 클릭 또는 프리셋 클릭)이고 데이터가 이미 있다면 즉시 완료 (네트워크 지연 없음)
-  if (!forceSync && hasMatchingChannel) {
-    const stats = calculateReportStats();
-    if (typeof showToast === 'function') {
-      showToast(`[${ch}] ${s} ~ ${e} 통화데이터(${stats.connectReqCalls}건) 조회가 완료되었습니다.`, 'success');
+    // 이미 해당 기간과 정확히 일치하는 CTI 데이터가 로드되어 있고 강제 새로고침이 아니라면 즉시 반환
+    if (!forceSync && isSameRange) {
+      const stats = calculateReportStats();
+      if (typeof showToast === 'function') {
+        showToast(`[${ch}] ${s} ~ ${e} 통화데이터(${stats.totalCalls}건) 조회가 완료되었습니다.`, 'success');
+      }
+      return;
     }
-    return;
   }
 
-  // 2. 강제 동기화(새로고침 버튼)이거나 초기 데이터가 없는 경우 CTI 서버 동기화 진행
+  // 2. 기간이 변경되었거나 강제 동기화(새로고침 버튼)인 경우 CTI 서버 실시간 동기화 진행
   const qBtn = document.getElementById('tabReportQueryBtn');
   const syncBtn = document.getElementById('tabSyncCtiBtn');
   const syncText = document.getElementById('tabSyncBtnText');
@@ -2719,9 +2711,9 @@ async function applyTabDateRange(forceSync = false) {
 
   try {
     let synced = false;
-    // 3. CTI 실시간 로그 수집 API 호출 (6초 타임아웃 가드 - Vercel 504 방지)
+    // 3. CTI 실시간 로그 수집 API 호출 (15초 타임아웃)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
       const res = await fetch(`/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`, {
         signal: controller.signal
