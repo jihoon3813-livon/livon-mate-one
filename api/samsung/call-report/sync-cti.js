@@ -21,9 +21,10 @@ module.exports = async function handler(req, res) {
 
   // 1. 사전 생성된 최신 보고서 데이터 로드 (초고속 캐시 & 백업)
   try {
-    const isAll = channel.includes('전체') || channel === 'all';
-    const isHyundai = channel.includes('현대');
-    const isLivon = channel.includes('리본');
+    const chLower = channel.toLowerCase();
+    const isAll = channel.includes('전체') || chLower === 'all';
+    const isHyundai = channel.includes('현대') || chLower.includes('hyundai');
+    const isLivon = channel.includes('리본') || chLower.includes('livon');
     let fileName = 'call_report_all.json';
     if (!isAll) {
       if (isHyundai) fileName = 'call_report_hyundai.json';
@@ -229,9 +230,10 @@ module.exports = async function handler(req, res) {
 
     // 로컬 파일시스템에 저장 가능한 환경이면 파일도 즉시 최신화
     try {
-      const isAll = channel.includes('전체') || channel === 'all';
-      const isHyundai = channel.includes('현대');
-      const isLivon = channel.includes('리본');
+      const chLower = channel.toLowerCase();
+      const isAll = channel.includes('전체') || chLower === 'all';
+      const isHyundai = channel.includes('현대') || chLower.includes('hyundai');
+      const isLivon = channel.includes('리본') || chLower.includes('livon');
       let outName = 'call_report_all.json';
       if (!isAll) {
         if (isHyundai) outName = 'call_report_hyundai.json';

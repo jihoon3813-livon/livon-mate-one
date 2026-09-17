@@ -544,9 +544,10 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     document.addEventListener('DOMContentLoaded', async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const rawChannel = urlParams.get('channel') || '삼성화재';
-      if (rawChannel.includes('현대')) gFilter.channel = '현대해상';
-      else if (rawChannel.includes('리본')) gFilter.channel = '리본케어';
-      else if (rawChannel.includes('전체') || rawChannel === 'all') gFilter.channel = '전체';
+      const rawLower = rawChannel.toLowerCase();
+      if (rawChannel.includes('현대') || rawLower.includes('hyundai')) gFilter.channel = '현대해상';
+      else if (rawChannel.includes('리본') || rawLower.includes('livon')) gFilter.channel = '리본케어';
+      else if (rawChannel.includes('전체') || rawLower === 'all') gFilter.channel = '전체';
       else gFilter.channel = '삼성화재';
 
       const thisWeek = getThisWeekRange();
@@ -566,9 +567,10 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 
     async function handleChannelChange(ch) {
       const raw = ch || '';
-      if (raw.includes('현대')) gFilter.channel = '현대해상';
-      else if (raw.includes('리본')) gFilter.channel = '리본케어';
-      else if (raw.includes('전체') || raw === 'all') gFilter.channel = '전체';
+      const rawLower = raw.toLowerCase();
+      if (raw.includes('현대') || rawLower.includes('hyundai')) gFilter.channel = '현대해상';
+      else if (raw.includes('리본') || rawLower.includes('livon')) gFilter.channel = '리본케어';
+      else if (raw.includes('전체') || rawLower === 'all') gFilter.channel = '전체';
       else gFilter.channel = '삼성화재';
       updateBranding();
       await loadReportData();
@@ -581,29 +583,35 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         let loaded = false;
 
         const ch = gFilter.channel || '삼성화재';
-        const isHyundai = ch.includes('현대');
-        const isLivon = ch.includes('리본');
-        const isAll = ch.includes('전체') || ch === 'all';
+        const chLower = ch.toLowerCase();
+        const isHyundai = ch.includes('현대') || chLower.includes('hyundai');
+        const isLivon = ch.includes('리본') || chLower.includes('livon');
+        const isAll = ch.includes('전체') || chLower === 'all';
         const channelCacheKey = isHyundai 
           ? 'LIVON_CACHED_HYUNDAI_REPORT_DATA' 
           : (isLivon ? 'LIVON_CACHED_LIVON_REPORT_DATA' : (isAll ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA'));
 
-        // 1. 해당 채널에 정확히 일치하는 세션 스토리지 캐시 확인 (0ms)
+        // 1. 해당 채널에 정확히 일치하는 세션 스토리지 캐시 확인 (오염된 타 채널 캐시 자동 배제)
         try {
           const cached = sessionStorage.getItem(channelCacheKey);
           if (cached) {
             const parsed = JSON.parse(cached);
-            if (parsed && parsed.callLogs && parsed.callLogs.length >= 100) {
+            if (parsed && Array.isArray(parsed.callLogs) && parsed.callLogs.length >= 10) {
               const rCh = (parsed.reportInfo && parsed.reportInfo.channel) || '';
-              const match = isAll ? true : (isHyundai ? rCh.includes('현대') : (isLivon ? rCh.includes('리본') : rCh.includes('삼성')));
-              if (match) {
+              const match = isAll ? true : (isHyundai ? (rCh.includes('현대') || rCh.toLowerCase().includes('hyundai')) : (isLivon ? (rCh.includes('리본') || rCh.toLowerCase().includes('livon')) : rCh.includes('삼성')));
+              const hasTargetCalls = isAll ? true : parsed.callLogs.some(c => (c.channel || '').includes(isHyundai ? '현대' : (isLivon ? '리본' : '삼성')));
+              if (match && hasTargetCalls) {
                 gReportData = parsed;
                 if (Array.isArray(parsed.callLogs)) {
                   gMasterCallLogs = [...parsed.callLogs];
                 }
                 loaded = true;
                 renderAll();
+              } else {
+                sessionStorage.removeItem(channelCacheKey);
               }
+            } else {
+              sessionStorage.removeItem(channelCacheKey);
             }
           }
         } catch (e) {}
@@ -617,10 +625,9 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           `/${primaryFileName}?t=${Date.now()}`,
           `./${primaryFileName}?t=${Date.now()}`,
           `${primaryFileName}?t=${Date.now()}`,
-          `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
-          // 채널 전용 파일 실패 시에만 fallback으로 확인
-          (primaryFileName !== 'call_report_all.json') ? `/call_report_all.json?t=${Date.now()}` : null,
-          (primaryFileName !== 'call_report_all.json') ? `./call_report_all.json?t=${Date.now()}` : null
+          `/call_report_all.json?t=${Date.now()}`,
+          `./call_report_all.json?t=${Date.now()}`,
+          `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
         ].filter(Boolean);
 
         for (const u of primaryFiles) {

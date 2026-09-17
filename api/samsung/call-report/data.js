@@ -12,9 +12,10 @@ module.exports = async function handler(req, res) {
 
   try {
     const channel = (req.query && req.query.channel) || '삼성화재';
-    const isAll = channel.includes('전체') || channel === 'all';
-    const isHyundai = channel.includes('현대');
-    const isLivon = channel.includes('리본');
+    const chLower = channel.toLowerCase();
+    const isAll = channel.includes('전체') || chLower === 'all';
+    const isHyundai = channel.includes('현대') || chLower.includes('hyundai');
+    const isLivon = channel.includes('리본') || chLower.includes('livon');
     let fileName = 'call_report_all.json';
     if (!isAll) {
       if (isHyundai) fileName = 'call_report_hyundai.json';

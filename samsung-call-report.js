@@ -410,13 +410,17 @@ async function initSamsungCallReportModule(resetFilter = true) {
     : ((rInfo.channel || '').includes(ch));
   const isMatch = isChannelMatch && rInfo.startDate === s && rInfo.endDate === e && gSamsungReportData && Array.isArray(gSamsungReportData.callLogs);
 
-  // 1. 메모리에 채널 전체 마스터 데이터(100건 이상)가 이미 있으면 즉시 렌더링 (0ms)
-  if (gSamsungReportData && Array.isArray(gSamsungMasterLogs) && gSamsungMasterLogs.length >= 100) {
+  // 1. 메모리에 채널 전체 마스터 데이터가 이미 있고 현재 채널 데이터가 포함되어 있으면 즉시 렌더링 (0ms)
+  const isTargetChannelPresent = isAllChannel 
+    ? (gSamsungMasterLogs.length >= 200) 
+    : (Array.isArray(gSamsungMasterLogs) && gSamsungMasterLogs.some(c => (c.channel || '').includes(ch.includes('현대') ? '현대' : (ch.includes('리본') ? '리본' : '삼성'))));
+
+  if (gSamsungReportData && isTargetChannelPresent && gSamsungMasterLogs.length >= 50) {
     renderSamsungCallReportTab();
     return;
   }
 
-  // 2. 채널 전용 정적 데이터 우선 로드 (삼성화재는 call_report_samsung.json, samsung_call_report.json 우선)
+  // 2. 채널 전용 정적 데이터 우선 로드 (삼성화재는 call_report_samsung.json, 현대해상은 call_report_hyundai.json)
   const primaryFileName = isAllChannel
     ? 'call_report_all.json'
     : (ch.includes('현대') ? 'call_report_hyundai.json' : (ch.includes('리본') ? 'call_report_livon.json' : 'call_report_samsung.json'));
@@ -425,10 +429,9 @@ async function initSamsungCallReportModule(resetFilter = true) {
     `/${primaryFileName}?t=${Date.now()}`,
     `./${primaryFileName}?t=${Date.now()}`,
     `${primaryFileName}?t=${Date.now()}`,
-    `/samsung_call_report.json?t=${Date.now()}`,
-    `./samsung_call_report.json?t=${Date.now()}`,
-    `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
-    `/call_report_all.json?t=${Date.now()}`
+    `/call_report_all.json?t=${Date.now()}`,
+    `./call_report_all.json?t=${Date.now()}`,
+    `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
   ];
 
   let loaded = false;
@@ -456,18 +459,24 @@ async function initSamsungCallReportModule(resetFilter = true) {
           }
           gSamsungReportData = finalData;
           if (Array.isArray(finalData.callLogs)) {
-            gSamsungMasterLogs = [...finalData.callLogs];
+            const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
+            finalData.callLogs.forEach(item => {
+              const key = `${item.callTime}_${item.phone || item.rawPhone}`;
+              if (!existingKeys.has(key)) {
+                gSamsungMasterLogs.push(item);
+                existingKeys.add(key);
+              }
+            });
           }
 
-          // 백그라운드에서 전체 채널 마스터 로그 보강 로드 (전체 날짜 즉시 필터링 지원)
+          // 백그라운드에서 전체 채널 마스터 로그(370건 전수) 보강 로드 (채널 전환 즉시 지원)
           fetch(`/call_report_all.json?t=${Date.now()}`)
             .then(r => r.json())
             .then(allData => {
               const allLogs = (allData && allData.callLogs) || (allData && allData.data && allData.data.callLogs);
               if (Array.isArray(allLogs) && allLogs.length > 0) {
-                const targetChannelLogs = isAllChannel ? allLogs : allLogs.filter(l => (l.channel || '').includes(ch));
                 const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
-                targetChannelLogs.forEach(item => {
+                allLogs.forEach(item => {
                   const key = `${item.callTime}_${item.phone || item.rawPhone}`;
                   if (!existingKeys.has(key)) {
                     gSamsungMasterLogs.push(item);
@@ -1011,8 +1020,14 @@ function getSamsungCallLogs() {
 
     // 2) 채널 필터 (전체/all 이 아니면 해당 채널만 매칭)
     if (ch && ch !== '전체' && ch !== 'all') {
-      const callCh = c.channel || '';
-      if (!callCh.includes(ch)) return false;
+      const callCh = (c.channel || '').trim();
+      const isSam = ch.includes('삼성');
+      const isHyd = ch.includes('현대');
+      const isLiv = ch.includes('리본');
+      if (isSam && !callCh.includes('삼성')) return false;
+      if (isHyd && !callCh.includes('현대')) return false;
+      if (isLiv && !callCh.includes('리본')) return false;
+      if (!isSam && !isHyd && !isLiv && !callCh.includes(ch) && !ch.includes(callCh)) return false;
     }
 
     // 3) 기간 필터 (start, end)
@@ -2900,13 +2915,50 @@ function setTabPresetRange(type) {
   applyTabDateRange(false);
 }
 
-function handleTabChannelChange(channel) {
+async function handleTabChannelChange(channel) {
   gReportFilter.channel = channel;
   const s = document.getElementById('tabReportStartDate')?.value;
   const e = document.getElementById('tabReportEndDate')?.value;
   if (s) gReportFilter.startDate = s;
   if (e) gReportFilter.endDate = e;
-  applyTabDateRange(false);
+
+  const isHyundai = channel.includes('현대');
+  const isLivon = channel.includes('리본');
+  const isAll = channel.includes('전체') || channel === 'all';
+  const targetTag = isHyundai ? '현대' : (isLivon ? '리본' : (isAll ? '' : '삼성'));
+
+  const hasChannelLogs = isAll
+    ? (gSamsungMasterLogs.length >= 200)
+    : gSamsungMasterLogs.some(c => (c.channel || '').includes(targetTag));
+
+  if (!hasChannelLogs) {
+    const fileName = isHyundai ? 'call_report_hyundai.json' : (isLivon ? 'call_report_livon.json' : (isAll ? 'call_report_all.json' : 'call_report_samsung.json'));
+    try {
+      const res = await fetch(`/${fileName}?t=${Date.now()}`);
+      if (res.ok) {
+        const json = await res.json();
+        const data = (json && json.data) ? json.data : json;
+        if (data && data.callLogs && data.callLogs.length > 0) {
+          gSamsungReportData = data;
+          const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
+          data.callLogs.forEach(item => {
+            const key = `${item.callTime}_${item.phone || item.rawPhone}`;
+            if (!existingKeys.has(key)) {
+              gSamsungMasterLogs.push(item);
+              existingKeys.add(key);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+  } else {
+    if (gSamsungReportData && gSamsungReportData.reportInfo) {
+      gSamsungReportData.reportInfo.channel = channel;
+      gSamsungReportData.reportInfo.channelLabel = channel;
+    }
+  }
+
+  await applyTabDateRange(false);
 }
 
 async function applyTabDateRange(forceSync = false) {
@@ -2920,17 +2972,37 @@ async function applyTabDateRange(forceSync = false) {
   gReportFilter.endDate = e;
   gReportFilter.channel = ch;
 
-  const hasData = gSamsungReportData && Array.isArray(gSamsungReportData.callLogs) && gSamsungReportData.callLogs.length > 0;
-  const hasMatchingChannel = hasData && (
-    ch === '전체' || ch === 'all' || !ch
-      ? (gSamsungReportData.callLogs.length >= 200 || gSamsungReportData.callLogs.some(c => (c.channel || '').includes('현대')))
-      : gSamsungReportData.callLogs.some(c => (c.channel || '').includes(ch))
-  );
+  const isHyundai = ch.includes('현대');
+  const isLivon = ch.includes('리본');
+  const isAllChannel = !ch || ch === '전체' || ch === 'all';
+  const targetTag = isHyundai ? '현대' : (isLivon ? '리본' : (isAllChannel ? '' : '삼성'));
 
-  const rInfo = (gSamsungReportData && gSamsungReportData.reportInfo) || {};
-  const isSameRange = rInfo.startDate === s && rInfo.endDate === e && (
-    (ch === '전체' || ch === 'all') ? (rInfo.channel === 'all' || rInfo.channel === '전체') : ((rInfo.channel || '').includes(ch))
-  );
+  // 현재 요청된 채널의 로그가 메모리에 있는지 확인
+  const hasMatchingChannel = isAllChannel
+    ? (gSamsungMasterLogs.length >= 200)
+    : gSamsungMasterLogs.some(c => (c.channel || '').includes(targetTag));
+
+  if (!hasMatchingChannel) {
+    const primaryFallback = isHyundai ? 'call_report_hyundai.json' : (isLivon ? 'call_report_livon.json' : (isAllChannel ? 'call_report_all.json' : 'call_report_samsung.json'));
+    try {
+      const sRes = await fetch(`/${primaryFallback}?t=${Date.now()}`);
+      if (sRes.ok) {
+        const sJson = await sRes.json();
+        const data = (sJson && sJson.data) ? sJson.data : sJson;
+        if (data && data.callLogs && data.callLogs.length > 0) {
+          gSamsungReportData = data;
+          const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
+          data.callLogs.forEach(item => {
+            const key = `${item.callTime}_${item.phone || item.rawPhone}`;
+            if (!existingKeys.has(key)) {
+              gSamsungMasterLogs.push(item);
+              existingKeys.add(key);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+  }
 
   // 1. 메모리에 로드된 전체 로그를 바탕으로 0ms 즉각 화면 렌더링
   renderSamsungCallReportTab();
@@ -3125,14 +3197,26 @@ async function copyReportWebLink(targetChannel = '삼성화재') {
   const reportUrl = `${origin}/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(targetChannel)}`;
 
   try {
-    if (gSamsungReportData && gSamsungReportData.callLogs) {
-      const isHyundai = targetChannel.includes('현대');
-      const isLivon = targetChannel.includes('리본');
-      const isAll = targetChannel.includes('전체') || targetChannel === 'all';
-      const cacheKey = isHyundai 
-        ? 'LIVON_CACHED_HYUNDAI_REPORT_DATA' 
-        : (isLivon ? 'LIVON_CACHED_LIVON_REPORT_DATA' : (isAll ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA'));
-      sessionStorage.setItem(cacheKey, JSON.stringify(gSamsungReportData));
+    const isHyundai = targetChannel.includes('현대');
+    const isLivon = targetChannel.includes('리본');
+    const isAll = targetChannel.includes('전체') || targetChannel === 'all';
+    const cacheKey = isHyundai 
+      ? 'LIVON_CACHED_HYUNDAI_REPORT_DATA' 
+      : (isLivon ? 'LIVON_CACHED_LIVON_REPORT_DATA' : (isAll ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA'));
+
+    if (gSamsungReportData && Array.isArray(gSamsungReportData.callLogs)) {
+      const curDataCh = (gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.channel) || '';
+      const isTargetChannelMatch = isAll
+        ? (curDataCh === 'all' || curDataCh === '전체' || gSamsungReportData.callLogs.length >= 200)
+        : (curDataCh.includes(targetChannel) || gSamsungReportData.callLogs.some(c => (c.channel || '').includes(isHyundai ? '현대' : (isLivon ? '리본' : '삼성'))));
+
+      if (isTargetChannelMatch) {
+        sessionStorage.setItem(cacheKey, JSON.stringify(gSamsungReportData));
+      } else {
+        sessionStorage.removeItem(cacheKey);
+      }
+    } else {
+      sessionStorage.removeItem(cacheKey);
     }
   } catch (err) {}
 
@@ -3161,14 +3245,26 @@ function openReportWebView(targetChannel = '삼성화재') {
   const e = document.getElementById('tabReportEndDate')?.value || thisWeek.end;
 
   try {
-    if (gSamsungReportData && gSamsungReportData.callLogs) {
-      const isHyundai = targetChannel.includes('현대');
-      const isLivon = targetChannel.includes('리본');
-      const isAll = targetChannel.includes('전체') || targetChannel === 'all';
-      const cacheKey = isHyundai 
-        ? 'LIVON_CACHED_HYUNDAI_REPORT_DATA' 
-        : (isLivon ? 'LIVON_CACHED_LIVON_REPORT_DATA' : (isAll ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA'));
-      sessionStorage.setItem(cacheKey, JSON.stringify(gSamsungReportData));
+    const isHyundai = targetChannel.includes('현대');
+    const isLivon = targetChannel.includes('리본');
+    const isAll = targetChannel.includes('전체') || targetChannel === 'all';
+    const cacheKey = isHyundai 
+      ? 'LIVON_CACHED_HYUNDAI_REPORT_DATA' 
+      : (isLivon ? 'LIVON_CACHED_LIVON_REPORT_DATA' : (isAll ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA'));
+
+    if (gSamsungReportData && Array.isArray(gSamsungReportData.callLogs)) {
+      const curDataCh = (gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.channel) || '';
+      const isTargetChannelMatch = isAll
+        ? (curDataCh === 'all' || curDataCh === '전체' || gSamsungReportData.callLogs.length >= 200)
+        : (curDataCh.includes(targetChannel) || gSamsungReportData.callLogs.some(c => (c.channel || '').includes(isHyundai ? '현대' : (isLivon ? '리본' : '삼성'))));
+
+      if (isTargetChannelMatch) {
+        sessionStorage.setItem(cacheKey, JSON.stringify(gSamsungReportData));
+      } else {
+        sessionStorage.removeItem(cacheKey);
+      }
+    } else {
+      sessionStorage.removeItem(cacheKey);
     }
   } catch (err) {}
 
