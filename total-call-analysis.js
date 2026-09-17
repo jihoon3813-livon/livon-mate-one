@@ -1849,9 +1849,12 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'missedCallsOutcallModal';
-    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs';
     document.body.appendChild(modal);
   }
+  modal.className = 'fixed inset-0 z-[999999] flex items-center justify-center p-2 sm:p-4 bg-slate-900/70 backdrop-blur-xs';
+  modal.onclick = (e) => {
+    if (e.target === modal) closeMissedCallsOutcallModal();
+  };
 
   const logs = getTotalCallLogs();
   const missedLogs = logs.filter(isCallMissedWaitZero);
@@ -1873,46 +1876,46 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
   }
 
   modal.innerHTML = `
-    <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[90vh]">
       <!-- 모달 헤더 -->
-      <div class="p-5 bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 text-white flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center text-white shrink-0 animate-pulse">
-            <i data-lucide="phone-missed" class="w-5 h-5"></i>
+      <div class="p-3.5 sm:p-5 bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 text-white flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white/20 flex items-center justify-center text-white shrink-0 animate-pulse">
+            <i data-lucide="phone-missed" class="w-4 h-4 sm:w-5 sm:h-5"></i>
           </div>
-          <div>
+          <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="px-2.5 py-0.5 rounded-full bg-white text-rose-800 font-black text-xs uppercase tracking-wider">긴급 콜백 요망</span>
-              <h3 class="text-base sm:text-lg font-black">상담 미연결(연결요청 Y & 상담시간 0초) 아웃콜 관리 대시보드</h3>
+              <span class="px-2 py-0.5 rounded-full bg-white text-rose-800 font-black text-[10px] sm:text-xs uppercase tracking-wider shrink-0">긴급 콜백 요망</span>
+              <h3 class="text-sm sm:text-lg font-black truncate">상담 미연결(0초) 아웃콜 관리 대시보드</h3>
             </div>
-            <p class="text-xs text-rose-100 mt-0.5">고객이 상담 연결을 요청(Y)하였으나 통화가 연결되지 않고 종료(상담시간 0초)된 고객 명단입니다. 1클릭 CTI 다이얼로 신속히 아웃콜을 진행하세요.</p>
+            <p class="text-[11px] sm:text-xs text-rose-100 mt-0.5 line-clamp-1 sm:line-clamp-none">고객이 상담 연결을 요청(Y)하였으나 미연결(0초) 종료된 대상입니다. 1클릭 CTI 다이얼로 신속히 아웃콜을 진행하세요.</p>
           </div>
         </div>
-        <button type="button" onclick="closeMissedCallsOutcallModal()" class="text-rose-200 hover:text-white cursor-pointer p-1">
+        <button type="button" onclick="closeMissedCallsOutcallModal()" class="text-rose-200 hover:text-white cursor-pointer p-1.5 shrink-0 rounded-lg hover:bg-white/10" title="닫기">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
       <!-- 상단 탭 & 검색 컨트롤 -->
-      <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      <div class="p-3 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
         <!-- 탭 버튼들 -->
-        <div class="flex items-center gap-1.5 p-1 bg-white rounded-2xl border border-slate-200 shrink-0">
+        <div class="flex items-center gap-1.5 p-1 bg-white rounded-2xl border border-slate-200 shrink-0 overflow-x-auto custom-scrollbar">
           <button type="button" onclick="openMissedCallsOutcallModal('pending')" 
-            class="px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${filterTab === 'pending' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+            class="px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 ${filterTab === 'pending' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
             <span>🚨 처리 대기 (${pendingList.length}건)</span>
           </button>
           <button type="button" onclick="openMissedCallsOutcallModal('completed')" 
-            class="px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${filterTab === 'completed' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+            class="px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 ${filterTab === 'completed' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
             <span>✅ 처리 완료 (${completedList.length}건)</span>
           </button>
           <button type="button" onclick="openMissedCallsOutcallModal('all')" 
-            class="px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${filterTab === 'all' ? 'bg-slate-800 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+            class="px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 ${filterTab === 'all' ? 'bg-slate-800 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
             <span>전체 (${missedLogs.length}건)</span>
           </button>
         </div>
 
         <!-- 고객/전화번호 검색 -->
-        <div class="relative flex-1 max-w-xs">
+        <div class="relative flex-1 max-w-full sm:max-w-xs">
           <input type="text" value="${gMissedSearchKeyword}" 
             oninput="gMissedSearchKeyword=this.value; openMissedCallsOutcallModal('${filterTab}');" 
             placeholder="고객명, 전화번호 검색..." 
@@ -1922,14 +1925,18 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
       </div>
 
       <!-- 리스트 테이블 -->
-      <div class="flex-1 overflow-y-auto custom-scrollbar p-4">
+      <div class="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar p-2 sm:p-4">
+        <div class="sm:hidden mb-2 px-2.5 py-1.5 bg-rose-50 text-rose-700 text-[10.5px] font-bold rounded-xl flex items-center justify-between border border-rose-200">
+          <span>👉 좌우로 밀어서 CTI 발신 및 메모 작성 가능</span>
+          <span class="font-mono text-rose-600 font-black">${displayList.length}건</span>
+        </div>
         ${displayList.length === 0 ? `
           <div class="p-12 text-center text-slate-400 font-bold space-y-2">
             <i data-lucide="check-circle-2" class="w-10 h-10 mx-auto text-emerald-500"></i>
             <p class="text-slate-600 text-sm">해당 분류에 처리할 아웃콜 대상이 없습니다.</p>
           </div>
         ` : `
-          <table class="w-full text-left text-xs border-collapse">
+          <table class="w-full min-w-[720px] text-left text-xs border-collapse">
             <thead>
               <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 font-black text-[11px] whitespace-nowrap">
                 <th class="py-2.5 px-3 w-10 text-center">#</th>
@@ -2007,11 +2014,11 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
       </div>
 
       <!-- 모달 푸터 -->
-      <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-        <span class="text-xs text-slate-500 font-bold">
+      <div class="p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <span class="text-[11px] sm:text-xs text-slate-500 font-bold">
           상담 미연결 총 <b>${missedLogs.length}</b>건 중 미처리 <b class="text-rose-600">${pendingList.length}</b>건
         </span>
-        <button type="button" onclick="closeMissedCallsOutcallModal()" class="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 text-xs cursor-pointer">
+        <button type="button" onclick="closeMissedCallsOutcallModal()" class="px-4 sm:px-5 py-1.5 sm:py-2 rounded-xl bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 text-xs cursor-pointer">
           닫기
         </button>
       </div>
@@ -2889,7 +2896,42 @@ function getDismissedOutcallIds() {
 }
 
 /**
- * 아웃콜 확인 처리 (다시 띄우지 않도록 저장)
+ * 미처리 아웃콜 상시 플로팅 배지 (모바일 및 PC 모든 화면에서 상시 접근 가능)
+ */
+function renderOutcallFloatingPill(count) {
+  if (typeof gActiveTab !== 'undefined' && gActiveTab === 'totalcallanalysis') {
+    const pill = document.getElementById('outcallFloatingPillBadge');
+    if (pill) pill.remove();
+    return;
+  }
+  if (!count || count <= 0) {
+    const pill = document.getElementById('outcallFloatingPillBadge');
+    if (pill) pill.remove();
+    return;
+  }
+
+  let pill = document.getElementById('outcallFloatingPillBadge');
+  if (!pill) {
+    pill = document.createElement('button');
+    pill.id = 'outcallFloatingPillBadge';
+    pill.type = 'button';
+    pill.className = 'fixed bottom-4 right-3 sm:right-5 z-[99999] px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 text-white font-black text-xs shadow-xl shadow-rose-600/40 flex items-center gap-2 border border-rose-400 cursor-pointer active:scale-95 transition-all animate-pulse';
+    pill.style.bottom = 'max(16px, calc(16px + env(safe-area-inset-bottom, 0px)))';
+    pill.onclick = () => {
+      openMissedCallsOutcallModal('pending');
+    };
+    document.body.appendChild(pill);
+  }
+  pill.innerHTML = `
+    <i data-lucide="phone-missed" class="w-4 h-4 shrink-0"></i>
+    <span class="tracking-tight">🚨 아웃콜 대기 <b>${count}</b>건</span>
+  `;
+  if (typeof initTotalIcons === 'function') initTotalIcons(pill);
+  else if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons({ root: pill });
+}
+
+/**
+ * 아웃콜 확인 처리 (큰 팝업 토스트는 닫고 상시 플로팅 배지로 전환)
  */
 function dismissOutcallNotificationToast(markAllAsDismissed = true) {
   const toast = document.getElementById('outcallNotificationToast');
@@ -2900,15 +2942,21 @@ function dismissOutcallNotificationToast(markAllAsDismissed = true) {
     }, 300);
   }
 
-  if (markAllAsDismissed) {
-    try {
-      const allLogs = typeof getTotalCallLogs === 'function' ? getTotalCallLogs() : [];
-      const pendingMissed = allLogs.filter(c => isCallMissedWaitZero(c) && !isCallOutcallHandled(getCallUniqueId(c)));
+  try {
+    const allLogs = typeof getTotalCallLogs === 'function' ? getTotalCallLogs() : [];
+    const pendingMissed = allLogs.filter(c => isCallMissedWaitZero(c) && !isCallOutcallHandled(getCallUniqueId(c)));
+
+    if (markAllAsDismissed) {
       const dismissed = getDismissedOutcallIds();
       pendingMissed.forEach(c => dismissed.add(getCallUniqueId(c)));
       localStorage.setItem('LIVON_DISMISSED_OUTCALL_IDS', JSON.stringify(Array.from(dismissed)));
-    } catch (e) {}
-  }
+    }
+
+    // 큰 알림 팝업을 닫더라도 미처리 건이 남아있다면 화면 하단 플로팅 배지로 유지
+    if (pendingMissed.length > 0) {
+      renderOutcallFloatingPill(pendingMissed.length);
+    }
+  } catch (e) {}
 }
 
 /**
@@ -2934,7 +2982,7 @@ async function loadOutcallBackgroundData() {
     const cached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
     if (cached) {
       const parsed = JSON.parse(cached);
-      if (parsed && parsed.callLogs) {
+      if (parsed && parsed.callLogs && parsed.callLogs.length > 0) {
         gTotalCallData = parsed;
         window.gTotalCallData = parsed;
         return gTotalCallData;
@@ -2942,27 +2990,14 @@ async function loadOutcallBackgroundData() {
     }
   } catch (e) {}
 
-  // 2) API 서버 호출 시도
-  try {
-    const res = await fetch('/api/samsung/call-report/data?channel=all');
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && json.data) {
-        gTotalCallData = json.data;
-        window.gTotalCallData = json.data;
-        try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
-        return gTotalCallData;
-      }
-    }
-  } catch (e) {}
-
-  // 3) 정적 fallback 파일 조회 (절대 및 상대 경로)
+  // 2) 초고속 정적 파일 먼저 조회 (상대경로 및 절대경로)
   const fallbacks = [
-    '/call_report_all.json',
     'call_report_all.json',
     './call_report_all.json',
-    '/call_report_samsung.json',
-    'call_report_samsung.json'
+    '/call_report_all.json',
+    'call_report_samsung.json',
+    './call_report_samsung.json',
+    '/call_report_samsung.json'
   ];
   for (const url of fallbacks) {
     try {
@@ -2970,7 +3005,7 @@ async function loadOutcallBackgroundData() {
       if (res.ok) {
         const json = await res.json();
         const data = (json && json.data) ? json.data : json;
-        if (data && data.callLogs) {
+        if (data && data.callLogs && data.callLogs.length > 0) {
           gTotalCallData = data;
           window.gTotalCallData = data;
           try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
@@ -2979,18 +3014,35 @@ async function loadOutcallBackgroundData() {
       }
     } catch (e) {}
   }
+
+  // 3) API 서버 호출 시도
+  try {
+    const res = await fetch('/api/samsung/call-report/data?channel=all');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.data && json.data.callLogs) {
+        gTotalCallData = json.data;
+        window.gTotalCallData = json.data;
+        try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
+        return gTotalCallData;
+      }
+    }
+  } catch (e) {}
+
   return null;
 }
 
 /**
- * 아웃콜 필요 건 감지 및 우측 하단 모달 팝업 실행
+ * 아웃콜 필요 건 감지 및 모바일/PC 최적화 모달 및 플로팅 배지 실행
  * (사용자 규칙: 종합콜분석 화면을 볼 때는 띄우지 않고, 어떤 메뉴페이지든 상관없이 발생하면 바로 표시)
  */
 async function checkAndTriggerOutcallAlert() {
-  // 사용자가 이미 종합콜분석 화면에 있는 경우 하단 토스트 팝업 띄우지 않음 (사용자 규칙)
+  // 사용자가 이미 종합콜분석 화면에 있는 경우 하단 토스트 팝업 및 플로팅 배지 숨김
   if (typeof gActiveTab !== 'undefined' && gActiveTab === 'totalcallanalysis') {
     const existing = document.getElementById('outcallNotificationToast');
     if (existing) existing.remove();
+    const pill = document.getElementById('outcallFloatingPillBadge');
+    if (pill) pill.remove();
     return;
   }
 
@@ -3005,10 +3057,24 @@ async function checkAndTriggerOutcallAlert() {
 
   // 전체 미처리 아웃콜 대상 (상담 0초 & 연결요청 Y & 미처리)
   const pendingMissed = allLogs.filter(c => isCallMissedWaitZero(c) && !isCallOutcallHandled(getCallUniqueId(c)));
+
+  // 사이드바 / 드로어 배지 업데이트
+  const sidebarBadge = document.getElementById('sidebarOutcallBadge');
+  if (sidebarBadge) {
+    if (pendingMissed.length > 0) {
+      sidebarBadge.textContent = `${pendingMissed.length}건`;
+      sidebarBadge.classList.remove('hidden');
+    } else {
+      sidebarBadge.classList.add('hidden');
+    }
+  }
+
   if (pendingMissed.length === 0) {
-    // 미처리 건이 없으면 열려있던 토스트 제거
+    // 미처리 건이 없으면 열려있던 토스트 및 플로팅 배지 제거
     const existing = document.getElementById('outcallNotificationToast');
     if (existing) existing.remove();
+    const pill = document.getElementById('outcallFloatingPillBadge');
+    if (pill) pill.remove();
     return;
   }
 
@@ -3016,19 +3082,26 @@ async function checkAndTriggerOutcallAlert() {
   const dismissed = getDismissedOutcallIds();
   const unnotifiedCalls = pendingMissed.filter(c => !dismissed.has(getCallUniqueId(c)));
 
-  // 확인하지 않은 새로운 아웃콜 대상이 없으면 띄우지 않음!
+  // 확인하지 않은 새로운 아웃콜 대상이 없으면 큰 팝업은 닫고, 상시 플로팅 배지 표시
   if (unnotifiedCalls.length === 0) {
     const existing = document.getElementById('outcallNotificationToast');
     if (existing) existing.remove();
+    renderOutcallFloatingPill(pendingMissed.length);
     return;
   }
+
+  // 큰 팝업이 뜰 때는 작은 플로팅 배지는 숨김
+  const pill = document.getElementById('outcallFloatingPillBadge');
+  if (pill) pill.remove();
 
   // 이미 화면에 토스트가 떠있는지 확인
   let toast = document.getElementById('outcallNotificationToast');
   if (!toast) {
     toast = document.createElement('div');
     toast.id = 'outcallNotificationToast';
-    toast.className = 'fixed bottom-5 right-5 z-[9999] w-[360px] sm:w-[400px] max-w-[calc(100vw-32px)] bg-white/95 backdrop-blur-md rounded-3xl border-2 border-rose-400 shadow-2xl shadow-rose-600/30 overflow-hidden transition-all duration-300 transform translate-y-0 opacity-100 flex flex-col';
+    // 모바일: 화면 하단 안전영역 + 좌우 여백 적용, sm 이상: 우측 하단 고정
+    toast.className = 'fixed bottom-4 left-3 right-3 sm:left-auto sm:right-5 sm:bottom-6 z-[999999] w-auto sm:w-[400px] max-w-[calc(100vw-24px)] bg-white/98 backdrop-blur-md rounded-3xl border-2 border-rose-500 shadow-2xl shadow-rose-600/40 overflow-hidden transition-all duration-300 transform translate-y-0 opacity-100 flex flex-col';
+    toast.style.bottom = 'max(16px, calc(16px + env(safe-area-inset-bottom, 0px)))';
     document.body.appendChild(toast);
   }
 
@@ -3055,7 +3128,7 @@ async function checkAndTriggerOutcallAlert() {
           <p class="text-[10px] text-rose-100 font-medium">상담사 연결요청 후 미연결(0초) 종료 건입니다.</p>
         </div>
       </div>
-      <button type="button" onclick="dismissOutcallNotificationToast(true)" class="text-rose-200 hover:text-white p-1 cursor-pointer" title="닫기 (확인)">
+      <button type="button" onclick="dismissOutcallNotificationToast(true)" class="text-rose-200 hover:text-white p-1 cursor-pointer" title="닫기 (배지로 접기)">
         <i data-lucide="x" class="w-4 h-4"></i>
       </button>
     </div>
@@ -3094,7 +3167,7 @@ async function checkAndTriggerOutcallAlert() {
         <button type="button" onclick="dismissOutcallNotificationToast(true)" 
           class="w-full py-1.5 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors">
           <i data-lucide="check" class="w-3.5 h-3.5 text-slate-500"></i>
-          <span>확인 (다시 보지 않기)</span>
+          <span>확인 (작은 배지로 접기)</span>
         </button>
       </div>
     </div>
@@ -3111,6 +3184,11 @@ async function checkAndTriggerOutcallAlert() {
 if (typeof window !== 'undefined') {
   window.checkAndTriggerOutcallAlert = checkAndTriggerOutcallAlert;
   window.loadOutcallBackgroundData = loadOutcallBackgroundData;
+  window.renderOutcallFloatingPill = renderOutcallFloatingPill;
+  window.openMissedCallsOutcallModal = openMissedCallsOutcallModal;
+  window.closeMissedCallsOutcallModal = closeMissedCallsOutcallModal;
+  window.dismissOutcallNotificationToast = dismissOutcallNotificationToast;
+  window.openMissedCallsOutcallModalFromToast = openMissedCallsOutcallModalFromToast;
 
   setTimeout(async () => {
     await loadOutcallBackgroundData();
