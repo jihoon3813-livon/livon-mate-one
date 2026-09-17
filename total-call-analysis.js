@@ -602,21 +602,66 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
     if (forceSync) {
       isTotalSyncing = true;
       renderTotalCallAnalysisTab();
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      let synced = false;
+
+      const s = gTotalFilter.startDate || '2026-08-01';
+      const e = gTotalFilter.endDate || new Date().toISOString().slice(0, 10);
+      const sUrl = `/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=all`;
+
       try {
-        const sUrl = `/api/samsung/call-report/sync-cti?start=${gTotalFilter.startDate}&end=${gTotalFilter.endDate}&channel=all`;
-        const sRes = await fetch(sUrl);
+        const sRes = await fetch(sUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
         if (sRes.ok) {
           const sJson = await sRes.json();
-          if (sJson.success && sJson.data) {
+          if (sJson.success && sJson.data && sJson.data.callLogs) {
             gTotalCallData = sJson.data;
-            clearMateOneMatchCache();
-            try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
+            synced = true;
           }
         }
       } catch (e) {
-        console.warn('CTI 동기화 API 연결 실패:', e.message);
+        clearTimeout(timeoutId);
+        console.warn('CTI 동기화 시간 초과 또는 실패, 최신 정적 캐시로 전환:', e.message);
+      }
+
+      // API 실패/타임아웃 시 즉각 최신 정적 파일 로드 (무중단 보장)
+      if (!synced) {
+        const fallbacks = [
+          `/api/samsung/call-report/data?channel=all`,
+          `call_report_all.json?t=${Date.now()}`,
+          `./call_report_all.json?t=${Date.now()}`,
+          `/call_report_all.json?t=${Date.now()}`
+        ];
+        for (const u of fallbacks) {
+          try {
+            const fbRes = await fetch(u);
+            if (fbRes.ok) {
+              const fbJson = await fbRes.json();
+              const d = (fbJson && fbJson.data) ? fbJson.data : fbJson;
+              if (d && d.callLogs && d.callLogs.length > 0) {
+                gTotalCallData = d;
+                synced = true;
+                break;
+              }
+            }
+          } catch (err) {}
+        }
+      }
+
+      clearMateOneMatchCache();
+      if (gTotalCallData) {
+        try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
       }
       isTotalSyncing = false;
+      renderTotalCallAnalysisTab();
+
+      if (typeof showToast === 'function') {
+        const count = (gTotalCallData && gTotalCallData.callLogs) ? gTotalCallData.callLogs.length : 0;
+        showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 동기화가 완료되었습니다.`, 'success');
+      }
+      return;
     } else {
       let loaded = false;
 
@@ -625,7 +670,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         const res = await fetch('/api/samsung/call-report/data?channel=all');
         if (res.ok) {
           const json = await res.json();
-          if (json.success && json.data) {
+          if (json.success && json.data && json.data.callLogs) {
             gTotalCallData = json.data;
             clearMateOneMatchCache();
             loaded = true;
@@ -635,36 +680,40 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
 
       // 2) 실패 시 초고속 정적 fallback 파일 조회 (Vercel CDN 10~30ms 응답)
       if (!loaded) {
-        try {
-          const sRes = await fetch('/call_report_all.json');
-          if (sRes.ok) {
-            const sJson = await sRes.json();
-            if (sJson.success && sJson.data) {
-              gTotalCallData = sJson.data;
-              clearMateOneMatchCache();
-              loaded = true;
-            } else if (sJson.callLogs) {
-              gTotalCallData = sJson;
-              clearMateOneMatchCache();
-              loaded = true;
+        const staticFallbacks = [
+          `call_report_all.json?t=${Date.now()}`,
+          `./call_report_all.json?t=${Date.now()}`,
+          `/call_report_all.json?t=${Date.now()}`
+        ];
+        for (const u of staticFallbacks) {
+          try {
+            const sRes = await fetch(u);
+            if (sRes.ok) {
+              const sJson = await sRes.json();
+              const d = (sJson && sJson.data) ? sJson.data : sJson;
+              if (d && d.callLogs && d.callLogs.length > 0) {
+                gTotalCallData = d;
+                clearMateOneMatchCache();
+                loaded = true;
+                break;
+              }
             }
-          }
-        } catch (e) {}
+          } catch (e) {}
+        }
       }
 
       // 3) 백업 삼성 데이터 fallback
       if (!loaded && !gTotalCallData) {
         try {
-          const sRes2 = await fetch('/call_report_samsung.json');
+          const sRes2 = await fetch(`call_report_samsung.json?t=${Date.now()}`);
           if (sRes2.ok) {
             const sJson2 = await sRes2.json();
-            if (sJson2.success && sJson2.data) {
-              gTotalCallData = sJson2.data;
-            } else if (sJson2.callLogs) {
-              gTotalCallData = sJson2;
+            const d2 = (sJson2 && sJson2.data) ? sJson2.data : sJson2;
+            if (d2 && d2.callLogs) {
+              gTotalCallData = d2;
+              clearMateOneMatchCache();
+              loaded = true;
             }
-            clearMateOneMatchCache();
-            loaded = true;
           }
         } catch (e) {}
       }

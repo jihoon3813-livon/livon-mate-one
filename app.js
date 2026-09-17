@@ -1472,8 +1472,16 @@ document.addEventListener('DOMContentLoaded', () => {
   clearHubInputSafely();
   window.addEventListener('pageshow', clearHubInputSafely);
 
-  // Render Core Unified Hub immediately for ultra-fast first contentful paint!
-  renderUnifiedCareHub();
+  // URL 쿼리스트링(?tab=...) 또는 세션스토리지에 저장된 메뉴 탭 복원 및 클린 렌더링
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialTab = urlParams.get('tab') || sessionStorage.getItem('LIVON_ACTIVE_TAB') || 'carehub';
+  const initialFilter = urlParams.get('filter') || sessionStorage.getItem('LIVON_ACTIVE_FILTER') || null;
+
+  if (initialTab && initialTab !== 'carehub') {
+    switchTab(initialTab, initialFilter, false);
+  } else {
+    renderUnifiedCareHub();
+  }
   initIcons();
 
   // 경량 초기화 작업만 유휴 시점에 실행 (비활성 탭은 탭 클릭 시 온디맨드 렌더링)
@@ -21584,7 +21592,7 @@ function toggleMobileSidebar(forceState = null) {
 }
 window.toggleMobileSidebar = toggleMobileSidebar;
 
-function switchTab(tabId, filterParam = null) {
+function switchTab(tabId, filterParam = null, triggerReload = true) {
   // 모바일 사이드바 드로어가 열려있는 경우 메뉴 선택 시 자동 닫기
   if (typeof toggleMobileSidebar === 'function' && window.innerWidth < 1024) {
     toggleMobileSidebar(false);
@@ -21604,7 +21612,29 @@ function switchTab(tabId, filterParam = null) {
     filterParam = sub;
   }
 
+  // [사용자 규칙] 다른 메뉴를 클릭하면(메뉴 이동 시) 무조건 클린 페이지 새로고침 적용
+  if (triggerReload && gActiveTab && tabId !== gActiveTab) {
+    try {
+      sessionStorage.setItem('LIVON_ACTIVE_TAB', tabId);
+      if (filterParam) sessionStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
+      else sessionStorage.removeItem('LIVON_ACTIVE_FILTER');
+    } catch (e) {}
+
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set('tab', tabId);
+    if (filterParam) newUrl.searchParams.set('filter', filterParam);
+    else newUrl.searchParams.delete('filter');
+
+    window.location.href = newUrl.toString();
+    return;
+  }
+
   gActiveTab = tabId;
+  try {
+    sessionStorage.setItem('LIVON_ACTIVE_TAB', tabId);
+    if (filterParam) sessionStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
+  } catch (e) {}
+
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   const target = document.getElementById('tab-' + tabId);
   if (target) target.classList.remove('hidden');
@@ -21669,10 +21699,18 @@ function switchTab(tabId, filterParam = null) {
     }
     renderUnifiedCareHub();
   }
-  else if (tabId === 'samsung' || tabId === 'samsunglist') {
+  else if (tabId === 'carecalendar') {
+    if (typeof renderCareCalendar === 'function') renderCareCalendar();
+  }
+  else if (tabId === 'samsung' || tabId === 'samsunglist' || tabId === 'samsungleads') {
     renderSamsungList();
     if (typeof checkSamsungDriveStatus === 'function') {
       checkSamsungDriveStatus();
+    }
+  }
+  else if (tabId === 'samsungclaimhub') {
+    if (typeof renderSamsungClaimHub === 'function') {
+      renderSamsungClaimHub(filterParam);
     }
   }
   else if (tabId === 'samsungcallreport') {
