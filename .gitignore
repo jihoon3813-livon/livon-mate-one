@@ -16,3 +16,5 @@ cti_config.json
 .vercel
 .env*
 ~$*
+chunk_*.js
+careport_*.css

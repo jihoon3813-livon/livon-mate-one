@@ -581,11 +581,14 @@ async function initTotalCallAnalysisModule(forceRefresh = false) {
   }
 
   if (hasImmediateData) {
+    // 1) 기존 캐시 데이터로 0ms 즉시 화면 렌더링 (화면 깜빡임/공백 방지)
     renderTotalCallAnalysisTab();
-    // 백그라운드 실시간 CTI 자동 동기화 (화면 차단 없이 항상 최신 데이터로 자동 갱신!)
-    Promise.all([loadCallAnnotations(), loadTotalCallData(true, true)]).then(() => {
-      renderTotalCallAnalysisTab();
-    });
+
+    // 2) 사용자 요청에 따라 메뉴 클릭 시 곧바로 실시간 CTI 전수 동기화 진행
+    if (!isTotalSyncing) {
+      loadCallAnnotations();
+      loadTotalCallData(true, false);
+    }
     return;
   }
 
@@ -603,10 +606,11 @@ async function initTotalCallAnalysisModule(forceRefresh = false) {
 }
 
 async function loadTotalCallData(forceSync = false, isBackground = false) {
+  if (isTotalSyncing && forceSync) return;
   try {
     if (forceSync) {
+      isTotalSyncing = true;
       if (!isBackground) {
-        isTotalSyncing = true;
         renderTotalCallAnalysisTab();
       }
 
@@ -959,6 +963,15 @@ function renderTotalCallAnalysisTab() {
               <span class="px-2.5 py-0.5 rounded-full bg-cyan-100 text-cyan-900 font-black text-[10px] tracking-wide border border-cyan-300">
                 CTI 전수 통합분석
               </span>
+              ${isTotalSyncing ? `
+                <span class="px-2.5 py-0.5 rounded-full bg-amber-500 text-white font-black text-[10px] tracking-wide animate-pulse flex items-center gap-1 shadow-2xs">
+                  <i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> CTI 실시간 수집 동기화 중...
+                </span>
+              ` : `
+                <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] border border-emerald-300 flex items-center gap-1">
+                  <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> CTI 실시간 연동됨
+                </span>
+              `}
               <span class="text-xs text-slate-500 font-bold">인입경로: 삼성화재 · 현대해상 · 리본케어 전체</span>
               <span class="text-slate-300">|</span>
               <span class="text-xs text-slate-400 font-mono">${(gTotalFilter.startDate || gTotalFilter.endDate) ? `${gTotalFilter.startDate || '시작'} ~ ${gTotalFilter.endDate || '현재'} (${dateFilteredLogs.length}건)` : `총 ${logs.length}건 수집`}</span>

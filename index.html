@@ -218,73 +218,83 @@
       --theme-bg: #f8fafc;
     }
     /* Theme 1: Default Clean Slate */
-    body.theme-default { --theme-bg: #f8fafc; background-color: #f8fafc; color: #1e293b; }
-    body.theme-default main { background-color: #f8fafc !important; }
-    body.theme-default .sticky-filter-bar { background-color: #f1f5f9 !important; }
+    html.theme-default, body.theme-default { --theme-bg: #f8fafc; background-color: #f8fafc; color: #1e293b; }
+    html.theme-default main, body.theme-default main { background-color: #f8fafc !important; }
+    html.theme-default .sticky-filter-bar, body.theme-default .sticky-filter-bar { background-color: #f1f5f9 !important; }
     
     /* Theme 2: Soft Warm Beige */
-    body.theme-warm { --theme-bg: #f7f3ed; background-color: #faf7f2; color: #1e293b; }
-    body.theme-warm header { background-color: #ffffff !important; border-color: #eee7dd !important; }
-    body.theme-warm main { background-color: #f7f3ed !important; }
-    body.theme-warm .sticky-filter-bar { background-color: #f7f3ed !important; }
+    html.theme-warm, body.theme-warm { --theme-bg: #f7f3ed; background-color: #faf7f2; color: #1e293b; }
+    html.theme-warm header, body.theme-warm header { background-color: #ffffff !important; border-color: #eee7dd !important; }
+    html.theme-warm main, body.theme-warm main { background-color: #f7f3ed !important; }
+    html.theme-warm .sticky-filter-bar, body.theme-warm .sticky-filter-bar { background-color: #f7f3ed !important; }
 
     /* Theme 3: Soft Cool Blue */
-    body.theme-blue { --theme-bg: #e8f3ff; background-color: #f0f7ff; color: #1e293b; }
-    body.theme-blue header { background-color: #ffffff !important; border-color: #dbeafe !important; }
-    body.theme-blue main { background-color: #e8f3ff !important; }
-    body.theme-blue .sticky-filter-bar { background-color: #e8f3ff !important; }
+    html.theme-blue, body.theme-blue { --theme-bg: #e8f3ff; background-color: #f0f7ff; color: #1e293b; }
+    html.theme-blue header, body.theme-blue header { background-color: #ffffff !important; border-color: #dbeafe !important; }
+    html.theme-blue main, body.theme-blue main { background-color: #e8f3ff !important; }
+    html.theme-blue .sticky-filter-bar, body.theme-blue .sticky-filter-bar { background-color: #e8f3ff !important; }
 
     /* Theme 4: Soft Mint Green */
-    body.theme-mint { --theme-bg: #e8f9ed; background-color: #f0fdf4; color: #1e293b; }
-    body.theme-mint header { background-color: #ffffff !important; border-color: #dcfce7 !important; }
-    body.theme-mint main { background-color: #e8f9ed !important; }
-    body.theme-mint .sticky-filter-bar { background-color: #e8f9ed !important; }
+    html.theme-mint, body.theme-mint { --theme-bg: #e8f9ed; background-color: #f0fdf4; color: #1e293b; }
+    html.theme-mint header, body.theme-mint header { background-color: #ffffff !important; border-color: #dcfce7 !important; }
+    html.theme-mint main, body.theme-mint main { background-color: #e8f9ed !important; }
+    html.theme-mint .sticky-filter-bar, body.theme-mint .sticky-filter-bar { background-color: #e8f9ed !important; }
 
     /* Theme 5: Modern Neutral Gray */
-    body.theme-gray { --theme-bg: #f3f4f6; background-color: #f3f4f6; color: #111827; }
-    body.theme-gray header { background-color: #ffffff !important; border-color: #e5e7eb !important; }
-    body.theme-gray main { background-color: #f3f4f6 !important; }
-    body.theme-gray .sticky-filter-bar { background-color: #f3f4f6 !important; }
+    html.theme-gray, body.theme-gray { --theme-bg: #f3f4f6; background-color: #f3f4f6; color: #111827; }
+    html.theme-gray header, body.theme-gray header { background-color: #ffffff !important; border-color: #e5e7eb !important; }
+    html.theme-gray main, body.theme-gray main { background-color: #f3f4f6 !important; }
+    html.theme-gray .sticky-filter-bar, body.theme-gray .sticky-filter-bar { background-color: #f3f4f6 !important; }
 
     /* Theme 6: Pure Clean White */
-    body.theme-white { --theme-bg: #ffffff; background-color: #ffffff; color: #0f172a; }
-    body.theme-white header { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
-    body.theme-white main { background-color: #ffffff !important; }
-    body.theme-white .sticky-filter-bar { background-color: #ffffff !important; }
+    html.theme-white, body.theme-white { --theme-bg: #ffffff; background-color: #ffffff; color: #0f172a; }
+    html.theme-white header, body.theme-white header { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
+    html.theme-white main, body.theme-white main { background-color: #ffffff !important; }
+    html.theme-white .sticky-filter-bar, body.theme-white .sticky-filter-bar { background-color: #ffffff !important; }
 
     /* Theme 7: Modern Monochrome (눈 편한 흑백·미니멀 모노) */
-    body.theme-mono { --theme-bg: #f4f4f5; background-color: #f4f4f5; color: #18181b; }
-    body.theme-mono header { background-color: #ffffff !important; border-color: #e4e4e7 !important; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important; }
-    body.theme-mono aside { background-color: #18181b !important; border-color: #27272a !important; }
-    body.theme-mono main { background-color: #f4f4f5 !important; }
-    body.theme-mono .sticky-filter-bar { background-color: #f4f4f5 !important; border-color: #e4e4e7 !important; }
-    body.theme-mono #brandLogoBadge { background: #18181b !important; color: #ffffff !important; border: 1px solid #3f3f46 !important; box-shadow: none !important; }
-    body.theme-mono #brandVersionBadge { background-color: #f4f4f5 !important; color: #52525b !important; border-color: #d4d4d8 !important; }
+    html.theme-mono, body.theme-mono { --theme-bg: #f4f4f5; background-color: #f4f4f5; color: #18181b; }
+    html.theme-mono header, body.theme-mono header { background-color: #ffffff !important; border-color: #e4e4e7 !important; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important; }
+    html.theme-mono aside, body.theme-mono aside { background-color: #18181b !important; border-color: #27272a !important; }
+    html.theme-mono main, body.theme-mono main { background-color: #f4f4f5 !important; }
+    html.theme-mono .sticky-filter-bar, body.theme-mono .sticky-filter-bar { background-color: #f4f4f5 !important; border-color: #e4e4e7 !important; }
+    html.theme-mono #brandLogoBadge, body.theme-mono #brandLogoBadge { background: #18181b !important; color: #ffffff !important; border: 1px solid #3f3f46 !important; box-shadow: none !important; }
+    html.theme-mono #brandVersionBadge, body.theme-mono #brandVersionBadge { background-color: #f4f4f5 !important; color: #52525b !important; border-color: #d4d4d8 !important; }
     
-    /* 모던 모노 테마: 일반 본문 장식용 버튼/배경을 모던 차콜/블랙으로 절제 (눈 피로 최소화) */
-    body.theme-mono main .bg-primary-600 { background-color: #27272a !important; }
-    body.theme-mono main .bg-primary-700 { background-color: #18181b !important; }
-    body.theme-mono main .hover\:bg-primary-700:hover { background-color: #18181b !important; }
-    body.theme-mono main .text-primary-600 { color: #18181b !important; }
-    body.theme-mono main .border-primary-500 { border-color: #3f3f46 !important; }
-    body.theme-mono main .bg-gradient-to-r.from-primary-600 { background-image: none !important; background-color: #27272a !important; }
-    body.theme-mono main .bg-primary-50 { background-color: #f4f4f5 !important; }
-    body.theme-mono main .text-primary-700 { color: #27272a !important; }
+    /* 모던 모노 테마: 일반 본문 및 사이드바 장식용 버튼/배경을 모던 차콜/블랙으로 절제 (눈 피로 최소화) */
+    html.theme-mono main .bg-primary-600, body.theme-mono main .bg-primary-600,
+    html.theme-mono aside .bg-primary-600, body.theme-mono aside .bg-primary-600 { background-color: #27272a !important; color: #ffffff !important; border-color: #3f3f46 !important; }
+    html.theme-mono main .bg-primary-700, body.theme-mono main .bg-primary-700 { background-color: #18181b !important; }
+    html.theme-mono main .hover\:bg-primary-700:hover, body.theme-mono main .hover\:bg-primary-700:hover { background-color: #18181b !important; }
+    html.theme-mono main .text-primary-600, body.theme-mono main .text-primary-600 { color: #18181b !important; }
+    html.theme-mono main .border-primary-500, body.theme-mono main .border-primary-500 { border-color: #3f3f46 !important; }
+    html.theme-mono main .bg-gradient-to-r.from-primary-600, body.theme-mono main .bg-gradient-to-r.from-primary-600 { background-image: none !important; background-color: #27272a !important; }
+    html.theme-mono main .bg-primary-50, body.theme-mono main .bg-primary-50 { background-color: #f4f4f5 !important; }
+    html.theme-mono main .text-primary-700, body.theme-mono main .text-primary-700 { color: #27272a !important; }
 
     /* [흑백 테마 전용 사이드바]: 통합허브를 제외한 나머지 모든 메뉴 아이콘 & 뱃지는 100% 흑백(무채색) */
+    html.theme-mono aside button:not([data-tab="carehub"]) svg,
     body.theme-mono aside button:not([data-tab="carehub"]) svg,
+    html.theme-mono aside button:not([data-tab="carehub"]) i,
     body.theme-mono aside button:not([data-tab="carehub"]) i,
+    html.theme-mono aside button:not([data-tab="carehub"]) .lucide,
     body.theme-mono aside button:not([data-tab="carehub"]) .lucide {
       color: #94a3b8 !important; /* slate-400 */
       stroke: #94a3b8 !important;
       filter: grayscale(100%) !important;
     }
+    html.theme-mono aside button:not([data-tab="carehub"]):hover svg,
     body.theme-mono aside button:not([data-tab="carehub"]):hover svg,
-    body.theme-mono aside button:not([data-tab="carehub"]):hover i {
+    html.theme-mono aside button:not([data-tab="carehub"]):hover i,
+    body.theme-mono aside button:not([data-tab="carehub"]):hover i,
+    html.theme-mono aside button:not([data-tab="carehub"]):hover .lucide,
+    body.theme-mono aside button:not([data-tab="carehub"]):hover .lucide {
       color: #f1f5f9 !important; /* slate-100 */
       stroke: #f1f5f9 !important;
     }
+    html.theme-mono aside button:not([data-tab="carehub"]) span[class*="text-"],
     body.theme-mono aside button:not([data-tab="carehub"]) span[class*="text-"],
+    html.theme-mono aside button:not([data-tab="carehub"]) span[class*="bg-"],
     body.theme-mono aside button:not([data-tab="carehub"]) span[class*="bg-"] {
       background-color: #1e293b !important; /* slate-800 */
       color: #cbd5e1 !important; /* slate-300 */
@@ -293,39 +303,71 @@
     }
 
     /* 참고자료 서브메뉴 내부 아이콘 및 뱃지도 흑백 */
+    html.theme-mono aside #referenceSubmenu svg,
     body.theme-mono aside #referenceSubmenu svg,
+    html.theme-mono aside #referenceSubmenu i,
     body.theme-mono aside #referenceSubmenu i {
       color: #64748b !important;
       stroke: #64748b !important;
       filter: grayscale(100%) !important;
     }
 
-    /* [통합허브 메뉴]: 흑백 테마에서도 원래의 화려하고 선명한 색상 100% 보존! */
-    body.theme-mono aside button[data-tab="carehub"] {
+    /* [통합허브 메뉴]: 흑백 테마에서도 활성 상태일 때만 선명한 그라데이션 유지, 비활성 시에는 모노 스타일 */
+    html.theme-mono aside button[data-tab="carehub"].active,
+    body.theme-mono aside button[data-tab="carehub"].active {
       background-image: linear-gradient(to right, #2563eb, #4f46e5) !important;
       background-color: #2563eb !important;
       border-color: rgba(99, 102, 241, 0.3) !important;
       color: #ffffff !important;
       box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important;
     }
-    body.theme-mono aside button[data-tab="carehub"] svg,
-    body.theme-mono aside button[data-tab="carehub"] i,
-    body.theme-mono aside button[data-tab="carehub"] .lucide {
+    html.theme-mono aside button[data-tab="carehub"].active svg,
+    body.theme-mono aside button[data-tab="carehub"].active svg,
+    html.theme-mono aside button[data-tab="carehub"].active i,
+    body.theme-mono aside button[data-tab="carehub"].active i,
+    html.theme-mono aside button[data-tab="carehub"].active .lucide,
+    body.theme-mono aside button[data-tab="carehub"].active .lucide {
       color: #fcd34d !important; /* amber-300 원래 황금빛 */
       stroke: #fcd34d !important;
       filter: none !important;
     }
-    body.theme-mono aside button[data-tab="carehub"] span.rounded-full {
+    html.theme-mono aside button[data-tab="carehub"].active span.rounded-full,
+    body.theme-mono aside button[data-tab="carehub"].active span.rounded-full {
       background-color: rgba(251, 191, 36, 0.2) !important;
       color: #fcd34d !important;
       border-color: rgba(251, 191, 36, 0.3) !important;
       filter: none !important;
     }
+    html.theme-mono aside button[data-tab="carehub"]:not(.active),
+    body.theme-mono aside button[data-tab="carehub"]:not(.active) {
+      background-image: none !important;
+      background-color: transparent !important;
+      border-color: transparent !important;
+      color: #cbd5e1 !important;
+      box-shadow: none !important;
+    }
+    html.theme-mono aside button[data-tab="carehub"]:not(.active) svg,
+    body.theme-mono aside button[data-tab="carehub"]:not(.active) svg,
+    html.theme-mono aside button[data-tab="carehub"]:not(.active) i,
+    body.theme-mono aside button[data-tab="carehub"]:not(.active) i,
+    html.theme-mono aside button[data-tab="carehub"]:not(.active) .lucide,
+    body.theme-mono aside button[data-tab="carehub"]:not(.active) .lucide {
+      color: #94a3b8 !important;
+      stroke: #94a3b8 !important;
+      filter: grayscale(100%) !important;
+    }
+    html.theme-mono aside button[data-tab="carehub"]:not(.active) span.rounded-full,
+    body.theme-mono aside button[data-tab="carehub"]:not(.active) span.rounded-full {
+      background-color: #1e293b !important;
+      color: #cbd5e1 !important;
+      border-color: #334155 !important;
+      filter: grayscale(100%) !important;
+    }
     
     /* 중요 상태 지표(경보/미수금/완료/긴급)는 확실히 눈에 띄도록 선명도 유지 */
-    body.theme-mono .bg-rose-500, body.theme-mono .text-rose-600, body.theme-mono .bg-rose-50,
-    body.theme-mono .bg-emerald-500, body.theme-mono .text-emerald-600, body.theme-mono .bg-emerald-50,
-    body.theme-mono .bg-amber-500, body.theme-mono .text-amber-600, body.theme-mono .bg-amber-50 {
+    html.theme-mono .bg-rose-500, body.theme-mono .bg-rose-500, html.theme-mono .text-rose-600, body.theme-mono .text-rose-600, html.theme-mono .bg-rose-50, body.theme-mono .bg-rose-50,
+    html.theme-mono .bg-emerald-500, body.theme-mono .bg-emerald-500, html.theme-mono .text-emerald-600, body.theme-mono .text-emerald-600, html.theme-mono .bg-emerald-50, body.theme-mono .bg-emerald-50,
+    html.theme-mono .bg-amber-500, body.theme-mono .bg-amber-500, html.theme-mono .text-amber-600, body.theme-mono .text-amber-600, html.theme-mono .bg-amber-50, body.theme-mono .bg-amber-50 {
       /* 보존: 업무상 핵심적인 주의/상태값은 컬러를 살려 즉각적 시선 유도 */
     }
 
@@ -445,15 +487,63 @@
         touch-action: manipulation;
       }
       /* Ensure text wrapping doesn't push layouts */
-      .break-keep {
-        word-break: keep-all;
+    /* CarePort Official Document Print Styles */
+    @media print {
+      body.printing-careport * {
+        visibility: hidden !important;
+      }
+      body.printing-careport #carePortPrintArea,
+      body.printing-careport #carePortPrintArea * {
+        visibility: visible !important;
+      }
+      body.printing-careport #carePortPrintArea {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 24px !important;
+        box-shadow: none !important;
+        border: none !important;
+        display: block !important;
+      }
+      body.printing-careport #carePortOfficialModal {
+        position: static !important;
+        background: transparent !important;
+        padding: 0 !important;
+      }
+      body.printing-careport #carePortOfficialModal > div {
+        border: none !important;
+        box-shadow: none !important;
+        max-height: none !important;
+        overflow: visible !important;
       }
     }
   </style>
-  <!-- Daum Kakao Postcode API -->
-  <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  <!-- Instant Theme Pre-Initializer (Prevents FOUC / Color Flash on Page Load and Tab Reload) -->
+  <script>
+    (function() {
+      try {
+        var t = localStorage.getItem('REBORN_ACTIVE_THEME') || 'theme-default';
+        if (t === 'theme-dark') t = 'theme-blue';
+        if (t === 'theme-contrast') t = 'theme-mint';
+        document.documentElement.className = (document.documentElement.className ? document.documentElement.className + ' ' : '') + t;
+      } catch(e) {}
+    })();
+  </script>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased h-screen overflow-hidden flex flex-col">
+  <script>
+    (function() {
+      try {
+        var t = localStorage.getItem('REBORN_ACTIVE_THEME') || 'theme-default';
+        if (t === 'theme-dark') t = 'theme-blue';
+        if (t === 'theme-contrast') t = 'theme-mint';
+        document.body.className = (document.body.className ? document.body.className + ' ' : '') + t;
+      } catch(e) {}
+    })();
+  </script>
 
   <!-- TOP HEADER -->
   <header class="bg-white border-b border-slate-200 flex-shrink-0 z-30 shadow-xs sticky top-0">
@@ -733,6 +823,32 @@
         </div>
 
       </div>
+
+      <!-- Instant Tab Button Pre-synchronizer (Prevents Active Tab Flashing) -->
+      <script>
+        (function() {
+          try {
+            var params = new URLSearchParams(window.location.search);
+            var curTab = params.get('tab') || sessionStorage.getItem('LIVON_ACTIVE_TAB') || 'carehub';
+            if (curTab && curTab !== 'carehub') {
+              var hubBtn = document.querySelector('aside button[data-tab="carehub"]');
+              if (hubBtn) {
+                hubBtn.classList.remove('active', 'bg-gradient-to-r', 'from-primary-600', 'to-indigo-600', 'text-white', 'shadow-md', 'border-primary-500/30');
+                hubBtn.classList.add('text-slate-300', 'font-medium');
+              }
+              var targetBtn = document.querySelector('aside button[data-tab="' + curTab + '"]');
+              if (targetBtn) {
+                targetBtn.classList.add('active', 'bg-primary-600', 'text-white', 'font-bold', 'shadow-sm');
+                targetBtn.classList.remove('text-slate-300', 'text-slate-400', 'font-medium', 'hover:bg-slate-800');
+              }
+              if (['applications', 'assignments', 'claims', 'payouts'].indexOf(curTab) !== -1) {
+                var sub = document.getElementById('referenceSubmenu');
+                if (sub) sub.classList.remove('hidden');
+              }
+            }
+          } catch(e) {}
+        })();
+      </script>
 
       <!-- Footer info with AWS status -->
       <div class="p-3 border-t border-slate-800 bg-slate-950/50 text-[11px] text-slate-400 flex-shrink-0">
@@ -1033,6 +1149,11 @@
                 </button>
                 <button type="button" onclick="navigateCareCalendar(1)" class="p-1.5 rounded-lg text-slate-700 hover:bg-white hover:text-slate-900 transition-all cursor-pointer" title="다음">
                   <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+                <span class="w-px h-4 bg-slate-300 mx-1"></span>
+                <button type="button" id="calBtnAllPeriod" onclick="toggleCareCalendarAllPeriod()" class="px-3 py-1 rounded-lg text-xs font-black text-slate-700 hover:bg-white transition-all cursor-pointer flex items-center gap-1.5" title="전체 기간 간병일정 한눈에 보기">
+                  <i data-lucide="calendar-range" class="w-3.5 h-3.5 text-slate-600"></i>
+                  <span>전체보기</span>
                 </button>
               </div>
 
@@ -2903,39 +3024,62 @@
         <!-- 상단 헤더 & 컨트롤 바 -->
         <div class="bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div class="space-y-1.5 min-w-0">
-            <div class="flex items-center gap-2 text-xs font-bold tracking-wider text-purple-300">
-              <i data-lucide="clipboard-list" class="w-4 h-4"></i>
-              <span>리본케어 케어포트(CarePort) 전산 간병일지 연동 시스템</span>
-              <span class="px-2 py-0.5 rounded bg-purple-500/30 text-purple-200 border border-purple-400/40 text-[10px] font-bold">PDF 일괄 보관</span>
+            <div class="flex items-center gap-2 text-xs font-bold tracking-wider text-purple-300 flex-wrap">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-[11px] font-bold">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                케어포트 전산 실시간 연결됨
+              </span>
+              <span class="px-2 py-0.5 rounded bg-purple-500/30 text-purple-200 border border-purple-400/40 text-[10px] font-bold">
+                그룹1: B2C / 그룹2: 현대·삼성 / 그룹3,4: 전체
+              </span>
+              <span class="px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-200 border border-indigo-400/40 text-[10px]">
+                매칭 기준: 이름 + 연령 + 성별 (충돌 시 상담일시 유추)
+              </span>
             </div>
-            <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white">고객별 간병일지 관리 (CarePort PDF)</h2>
-            <p class="text-xs text-purple-200/90 leading-relaxed max-w-2xl">
-              케어포트 전산에 등록된 고객별 공식 간병일지 파일(PDF)을 수동으로 수시 불러오기하여 관리하며, 
-              <b>삼성화재 일일보고/월간청구</b> 및 <b>현대해상/현대해상(SCOR) 팩스 비용청구</b> 시 증빙 서류로 즉시 연동 및 첨부합니다.
+            <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+              <span>고객별 간병일지 관리 (CarePort 전산 연동)</span>
+              <span id="carePortSyncTimeBadge" class="text-xs font-normal text-purple-200/80 bg-white/10 px-2.5 py-0.5 rounded-lg">최근 동기화: 확인 중</span>
+            </h2>
+            <p class="text-xs text-purple-200/90 leading-relaxed max-w-3xl">
+              리본케어포트 전산에서 매일 생성되는 공식 간병일지(체크박스 지표, 요양보호사 일상 지원 기록)를 실시간 수신하여 
+              환자별로 일차(1일차, 2일차...)를 자동 구분하고, 간병 종료 시 메일 첨부용 <b>압축파일(ZIP)</b>로 일괄 생성합니다.
             </p>
           </div>
 
           <div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
-            <button type="button" onclick="openImportCarePortLogModal()" 
-              class="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-purple-900/40 transition-all cursor-pointer whitespace-nowrap">
-              <i data-lucide="file-up" class="w-4 h-4"></i>
-              <span>케어포트 일지 불러오기 (PDF)</span>
+            <button type="button" onclick="syncCarePortLogs(true)" id="btnSyncCarePort"
+              class="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-purple-900/40 transition-all cursor-pointer whitespace-nowrap active:scale-95">
+              <i data-lucide="refresh-cw" id="carePortSyncIcon" class="w-4 h-4 text-white"></i>
+              <span>전산 실시간 동기화</span>
             </button>
-            <button type="button" onclick="syncCarePortLogs()" 
-              class="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 border border-white/20 transition-all cursor-pointer whitespace-nowrap"
-              title="전산에 등록된 최신 간병일지 데이터 동기화">
-              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-purple-300"></i>
-              <span>전산 동기화</span>
+            <button type="button" onclick="openImportCarePortLogModal()" 
+              class="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 border border-white/20 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="file-up" class="w-3.5 h-3.5 text-purple-300"></i>
+              <span>수동 일지 등록</span>
             </button>
           </div>
         </div>
 
-        <!-- 검색 & 필터 & 일괄 작업 바 -->
+        <!-- 검색 & 뷰 모드 토글 & 필터 바 -->
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
           <div class="flex items-center gap-2.5 flex-wrap">
+            <!-- 뷰 모드 전환 버튼 -->
+            <div class="inline-flex rounded-xl p-1 bg-slate-100 border border-slate-200 font-bold">
+              <button type="button" id="btnViewModePatient" onclick="setCareLogViewMode('patient')" 
+                class="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer">
+                <i data-lucide="users" class="w-3.5 h-3.5"></i>
+                <span>환자별 묶음 뷰</span>
+              </button>
+              <button type="button" id="btnViewModeFlat" onclick="setCareLogViewMode('flat')" 
+                class="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 cursor-pointer">
+                <i data-lucide="list" class="w-3.5 h-3.5"></i>
+                <span>일자별 전체 목록</span>
+              </button>
+            </div>
+
             <div class="relative w-64">
               <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
-              <input type="text" id="careLogSearchInput" oninput="renderCareLogs()" placeholder="고객명, ID, 간병인명, 파일명 검색..." 
+              <input type="text" id="careLogSearchInput" oninput="renderCareLogs()" placeholder="환자명, 연령, 간병인명, 접수번호 검색..." 
                 class="pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 w-full transition-all">
             </div>
 
@@ -2947,14 +3091,16 @@
             </select>
 
             <span class="text-slate-500 text-[11px] border-l border-slate-200 pl-3">
-              보관 일지: <b id="careLogCountBadge" class="text-purple-700 font-bold">0</b>건
+              관리 환자: <b id="careLogPatientCountBadge" class="text-purple-700 font-bold">0</b>명
+              (총 일지 <b id="careLogCountBadge" class="text-purple-700 font-bold">0</b>건)
             </span>
           </div>
 
           <div class="flex items-center gap-2">
-            <button type="button" onclick="deleteSelectedCareLogs()" id="btnDeleteSelected-carelogs" disabled 
-              class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-400 font-bold text-xs border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5 inline mr-1"></i> 선택 삭제
+            <button type="button" onclick="batchDownloadSelectedPatientZips()" id="btnBatchDownloadZips" disabled 
+              class="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1">
+              <i data-lucide="archive" class="w-3.5 h-3.5"></i>
+              <span>선택 환자 ZIP 압축 다운로드</span>
             </button>
             <button type="button" onclick="exportLedgerToExcel('carelogs', 'ALL')" 
               class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer">
@@ -2963,8 +3109,13 @@
           </div>
         </div>
 
-        <!-- 간병일지 PDF 리스트 테이블 -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <!-- 1. 환자별 묶음 뷰 (Patient Group Container) -->
+        <div id="careLogPatientCardsContainer" class="space-y-4">
+          <!-- Dynamically populated by renderCareLogs() -->
+        </div>
+
+        <!-- 2. 일자별 전체 목록 테이블 (Flat List View - Hidden by default or toggled) -->
+        <div id="careLogTableContainer" class="hidden bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           <div class="overflow-x-auto custom-scrollbar">
             <table class="w-full text-left text-xs border-collapse min-w-[1100px]">
               <thead class="bg-slate-100 text-slate-700 font-bold border-b select-none">
@@ -2973,14 +3124,15 @@
                     <input type="checkbox" onchange="toggleCareLogSelectAll(this.checked)" id="checkAllCareLogs" class="w-3.5 h-3.5 rounded text-purple-600 focus:ring-purple-500 cursor-pointer">
                   </th>
                   <th class="p-2.5 text-center w-12 border-r border-slate-200 font-mono text-slate-500">No</th>
-                  <th class="p-2.5 border-r border-slate-200">피보험자(고객명 / ID)</th>
-                  <th class="p-2.5 border-r border-slate-200">보험사 구분</th>
-                  <th class="p-2.5 border-r border-slate-200">간병 기간</th>
-                  <th class="p-2.5 border-r border-slate-200">담당 간병인 / 센터</th>
-                  <th class="p-2.5 border-r border-slate-200">케어포트 간병일지 (PDF)</th>
-                  <th class="p-2.5 border-r border-slate-200 text-center">불러온 일시</th>
-                  <th class="p-2.5 border-r border-slate-200 text-center">청구/팩스 연동</th>
-                  <th class="p-2.5 text-center w-36">관리</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">대상자명</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800 text-center w-16">연령</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800 text-center w-14">성별</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">상담자</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">소속기관</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">상담일시</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800 text-center w-20">상담시간</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-purple-900 text-center w-44">공식 간병일지 (CarePort 원본)</th>
+                  <th class="p-2.5 text-center w-20">관리</th>
                 </tr>
               </thead>
               <tbody id="careLogsTableBody" class="divide-y divide-slate-100 bg-white">
@@ -8311,14 +8463,173 @@
     </div>
   </div>
 
+  <!-- ==================== CAREPORT OFFICIAL CARE LOG DETAIL MODAL ==================== -->
+  <div id="carePortOfficialModal" class="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[96vh] flex flex-col shadow-2xl border border-slate-300 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <!-- Modal Top Navigation Bar -->
+      <div class="px-5 py-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-purple-600 flex items-center justify-center text-white font-black shadow-md">
+            <i data-lucide="file-check-2" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-purple-500/30 text-purple-200 border border-purple-400/30">
+                CarePort Official
+              </span>
+              <span id="carePortModalSessionBadge" class="text-xs font-mono text-purple-300 font-bold">#531</span>
+            </div>
+            <h3 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <span>케어포트(CarePort) 공식 간병일지 원문</span>
+              <span class="text-xs font-normal text-slate-400 hidden sm:inline">(전산 공인 원본 리포트)</span>
+            </h3>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Switch View Mode -->
+          <div class="bg-slate-800 p-0.5 rounded-xl flex items-center text-xs">
+            <button type="button" id="btnCarePortTabIframe" onclick="switchCarePortModalView('iframe')"
+              class="px-3 py-1.5 rounded-lg font-bold transition-all bg-purple-600 text-white cursor-pointer">
+              CarePort 웹뷰어
+            </button>
+            <button type="button" id="btnCarePortTabPrint" onclick="switchCarePortModalView('print')"
+              class="px-3 py-1.5 rounded-lg font-bold transition-all text-slate-300 hover:text-white cursor-pointer">
+              공식 인쇄 양식
+            </button>
+          </div>
+
+          <button type="button" id="btnCarePortNewTab" onclick="openCarePortInNewTab()" 
+            class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            title="새 창에서 CarePort 공식 원본 페이지 열기">
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+            <span class="hidden md:inline">새 창 원본</span>
+          </button>
+
+          <button type="button" onclick="printCarePortModal()" 
+            class="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+            title="간병일지 인쇄 및 PDF 저장">
+            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+            <span>PDF 인쇄 / 다운로드</span>
+          </button>
+
+          <button type="button" onclick="closeModal('carePortOfficialModal')" class="p-2 text-slate-400 hover:text-white rounded-lg cursor-pointer">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Content Body -->
+      <div class="flex-1 overflow-y-auto bg-slate-100/80 relative min-h-[550px] flex flex-col custom-scrollbar">
+        <!-- 1. Iframe View (CarePort Live Page) -->
+        <div id="carePortIframeWrapper" class="w-full flex-1 flex flex-col relative h-[78vh]">
+          <div id="carePortIframeLoading" class="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center gap-3 z-10">
+            <div class="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+            <div class="text-sm font-bold text-slate-700">케어포트(CarePort) 공식 일지 원문을 불러오는 중입니다...</div>
+            <div class="text-xs font-mono text-slate-400" id="carePortLoadingUrl">https://careport.livon.care/careport/consult/</div>
+          </div>
+          <iframe id="carePortIframe" src="" class="w-full flex-1 border-0 bg-white" allow="clipboard-write"></iframe>
+        </div>
+
+        <!-- 2. High-Res 1:1 CarePort Document View (첨부 2번 및 3번 이미지 100% 동일 양식) -->
+        <div id="carePortPrintArea" class="hidden p-6 sm:p-12 max-w-4xl mx-auto w-full bg-white shadow-xl my-4 rounded-2xl font-sans relative border border-slate-200">
+          <!-- Top Row: 간병일지 제목 & 다운로드/프린트 버튼 -->
+          <div class="flex items-center justify-between pb-3">
+            <h1 class="text-3xl font-black text-slate-950 tracking-tight">간병일지</h1>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="downloadCarePortDocumentHtml()" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg border border-slate-300 transition-all cursor-pointer">
+                다운로드
+              </button>
+              <button type="button" onclick="printCarePortModal()" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-all cursor-pointer">
+                프린트
+              </button>
+            </div>
+          </div>
+
+          <!-- Exact 7 Fields Header (첨부 3번 이미지 완벽 일치: 대상자명 | 연령 | 성별 | 상담자 | 소속기관 | 상담일시 | 상담시간) -->
+          <div class="my-6 py-4 px-1 border-t border-b border-slate-200 flex items-center justify-between text-left flex-wrap gap-y-3 select-none">
+            <div class="px-3.5 border-r border-slate-200 min-w-[75px]">
+              <div class="text-[12px] text-slate-500 font-medium mb-1">대상자명</div>
+              <div class="text-base font-extrabold text-slate-900" id="cpMetaUsername">-</div>
+            </div>
+            <div class="px-3.5 border-r border-slate-200 min-w-[55px]">
+              <div class="text-[12px] text-slate-500 font-medium mb-1">연령</div>
+              <div class="text-base font-extrabold text-slate-900" id="cpMetaAge">-</div>
+            </div>
+            <div class="px-3.5 border-r border-slate-200 min-w-[55px]">
+              <div class="text-[12px] text-slate-500 font-medium mb-1">성별</div>
+              <div class="text-base font-extrabold text-slate-900" id="cpMetaGender">-</div>
+            </div>
+            <div class="px-3.5 border-r border-slate-200 min-w-[75px]">
+              <div class="text-[12px] text-slate-500 font-medium mb-1">상담자</div>
+              <div class="text-base font-extrabold text-slate-900" id="cpMetaConsultant">-</div>
+            </div>
+            <div class="px-3.5 border-r border-slate-200 min-w-[85px]">
+              <div class="text-[12px] text-slate-500 font-medium mb-1">소속기관</div>
+              <div class="text-base font-extrabold text-slate-900 text-purple-900" id="cpMetaOrg">-</div>
+            </div>
+            <div class="px-3.5 border-r border-slate-200 min-w-[150px]">
+              <div class="text-[12px] text-slate-500 font-medium mb-1">상담일시</div>
+              <div class="text-base font-extrabold text-slate-900 font-mono" id="cpMetaDate">-</div>
+            </div>
+            <div class="px-3.5 min-w-[75px]">
+              <div class="text-[12px] text-slate-500 font-medium mb-1">상담시간</div>
+              <div class="text-base font-extrabold text-slate-900 font-mono" id="cpMetaDuration">-</div>
+            </div>
+          </div>
+
+          <!-- Section: 상담내용 (케어포트 공인 평가 항목 7종) -->
+          <div class="my-6">
+            <h2 class="text-xl font-bold text-slate-900 mb-4">상담내용</h2>
+            <div id="cpCheckboxesList" class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 text-sm">
+              <!-- Dynamically populated with exact CarePort badges -->
+            </div>
+          </div>
+
+          <!-- Section: 상담요약 (Livon 워터마크 배경) -->
+          <div class="mt-8 pt-5 border-t border-slate-200 relative min-h-[220px]">
+            <!-- Pink livon watermark behind -->
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 select-none z-0">
+              <span class="text-7xl sm:text-8xl font-black tracking-widest text-pink-400 font-sans">livon</span>
+            </div>
+            
+            <div class="relative z-10">
+              <h2 class="text-xl font-bold text-slate-900 mb-3">상담요약</h2>
+              <div id="cpSummaryContent" class="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap font-medium">
+                내용 로딩 중...
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer Notice -->
+          <div class="text-[11px] text-slate-400 text-center pt-8 border-t border-slate-200 mt-8">
+            본 간병일지는 (주)리본케어 케어포트(CarePort) 통합 전산에 등록된 공식 간병일지 원문입니다.
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-3 bg-white border-t border-slate-200 flex items-center justify-between shrink-0">
+        <span class="text-xs text-slate-500 font-mono" id="carePortModalFooterInfo">CarePort 공식 연동</span>
+        <button type="button" onclick="closeModal('carePortOfficialModal')" 
+          class="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 transition-all cursor-pointer">
+          닫기
+        </button>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Global Datalists for Directory Autocomplete & Synchronized Inputs -->
   <datalist id="allCentersDataList"></datalist>
   <datalist id="allAdjustersDataList"></datalist>
 
   <!-- SCRIPTS (Moved to bottom of body for full DOM availability) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="data.js?v=20260910_1931"></script>
+  <script src="careport-client.js?v=20260917_1400"></script>
   <script src="samsung-call-report.js?v=20260917_1010"></script>
   <script src="total-call-analysis.js?v=20260917_1000"></script>
-  <script src="app.js?v=20260917_1020"></script>
+  <script src="app.js?v=20260917_1400"></script>
 </body>
 </html>

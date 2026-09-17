@@ -1,347 +1,39 @@
 {
   "reportInfo": {
-    "title": "삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고 (2026-08-01 ~ 2026-09-17)",
+    "title": "삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고 (2026-09-14 ~ 2026-09-17)",
     "target": "삼성화재 관련 인바운드 콜",
     "channel": "삼성화재",
     "channelLabel": "삼성화재",
-    "period": "2026-08-01 ~ 2026-09-17",
-    "startDate": "2026-08-01",
+    "period": "2026-09-14 ~ 2026-09-17",
+    "startDate": "2026-09-14",
     "endDate": "2026-09-17",
     "reportDate": "2026-09-17",
     "author": "리본케어 (Livon Care) 운영센터",
-    "operatingDays": 48,
-    "syncedAt": "2026-09-17T03:02:10.399Z"
+    "operatingDays": 4,
+    "syncedAt": "2026-09-17T05:11:37.625Z"
   },
   "summaryStats": {
-    "totalCalls": 609,
-    "connectReqCalls": 165,
-    "answeredCalls": 142,
-    "answerRate": "86%",
-    "abandonedCalls": 17,
-    "unselectedType": 407,
-    "btnExit": 37,
+    "totalCalls": 87,
+    "connectReqCalls": 23,
+    "answeredCalls": 23,
+    "answerRate": "100%",
+    "abandonedCalls": 0,
+    "unselectedType": 55,
+    "btnExit": 9,
     "consultedCalls": 20
   },
   "ctiSummary": {
-    "totalAll": 609,
-    "totalInbound": 609,
-    "answeredCalls": 142,
-    "connectRequests": 165,
-    "answerRate": "86%",
-    "abandonedCalls": 17,
+    "totalAll": 87,
+    "totalInbound": 87,
+    "answeredCalls": 23,
+    "connectRequests": 23,
+    "answerRate": "100%",
+    "abandonedCalls": 0,
     "customerAbandoned": 0,
-    "unselectedType": 407,
-    "btnExit": 37
+    "unselectedType": 55,
+    "btnExit": 9
   },
   "dailyTrends": [
-    {
-      "date": "2026-08-01",
-      "dayOfWeek": "토",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-02",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-03",
-      "dayOfWeek": "월",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-04",
-      "dayOfWeek": "화",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-05",
-      "dayOfWeek": "수",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-06",
-      "dayOfWeek": "목",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-07",
-      "dayOfWeek": "금",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-08",
-      "dayOfWeek": "토",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-09",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-10",
-      "dayOfWeek": "월",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-11",
-      "dayOfWeek": "화",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-12",
-      "dayOfWeek": "수",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-13",
-      "dayOfWeek": "목",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-14",
-      "dayOfWeek": "금",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-15",
-      "dayOfWeek": "토",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-16",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-17",
-      "dayOfWeek": "월",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-18",
-      "dayOfWeek": "화",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-19",
-      "dayOfWeek": "수",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-20",
-      "dayOfWeek": "목",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-21",
-      "dayOfWeek": "금",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-22",
-      "dayOfWeek": "토",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-23",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-24",
-      "dayOfWeek": "월",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-25",
-      "dayOfWeek": "화",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-26",
-      "dayOfWeek": "수",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-27",
-      "dayOfWeek": "목",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-28",
-      "dayOfWeek": "금",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-08-29",
-      "dayOfWeek": "토",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-30",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-31",
-      "dayOfWeek": "월",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-09-01",
-      "dayOfWeek": "화",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-09-02",
-      "dayOfWeek": "수",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-09-03",
-      "dayOfWeek": "목",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-09-04",
-      "dayOfWeek": "금",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-09-05",
-      "dayOfWeek": "토",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-09-06",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-09-07",
-      "dayOfWeek": "월",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-09-08",
-      "dayOfWeek": "화",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-09-09",
-      "dayOfWeek": "수",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-09-10",
-      "dayOfWeek": "목",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-09-11",
-      "dayOfWeek": "금",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
-    },
-    {
-      "date": "2026-09-12",
-      "dayOfWeek": "토",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-09-13",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
     {
       "date": "2026-09-14",
       "dayOfWeek": "월",
@@ -373,46 +65,10 @@
   ],
   "weeklyRollup": [
     {
-      "week": "1주차 (08/01~08/07)",
-      "calls": 0,
-      "share": 0,
-      "dailyAvg": 0
-    },
-    {
-      "week": "2주차 (08/08~08/14)",
-      "calls": 0,
-      "share": 0,
-      "dailyAvg": 0
-    },
-    {
-      "week": "3주차 (08/15~08/21)",
-      "calls": 0,
-      "share": 0,
-      "dailyAvg": 0
-    },
-    {
-      "week": "4주차 (08/22~08/28)",
-      "calls": 0,
-      "share": 0,
-      "dailyAvg": 0
-    },
-    {
-      "week": "5주차 (08/29~09/04)",
-      "calls": 0,
-      "share": 0,
-      "dailyAvg": 0
-    },
-    {
-      "week": "6주차 (09/05~09/11)",
-      "calls": 0,
-      "share": 0,
-      "dailyAvg": 0
-    },
-    {
-      "week": "7주차 (09/12~09/17)",
+      "week": "1주차 (09/14~09/17)",
       "calls": 23,
       "share": 1,
-      "dailyAvg": 4
+      "dailyAvg": 6
     }
   ],
   "callLogs": [
@@ -438,7 +94,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 1,
-      "id": "cti_1789614123847_1"
+      "id": "cti_1789621897539_1"
     },
     {
       "type": "IN",
@@ -462,7 +118,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 2,
-      "id": "cti_1789614123847_2"
+      "id": "cti_1789621897539_2"
     },
     {
       "type": "IN",
@@ -486,7 +142,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 3,
-      "id": "cti_1789614123847_3"
+      "id": "cti_1789621897539_3"
     },
     {
       "type": "IN",
@@ -510,7 +166,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 4,
-      "id": "cti_1789614123847_4"
+      "id": "cti_1789621897539_4"
     },
     {
       "type": "IN",
@@ -534,7 +190,7 @@
       "category": "",
       "actor": "",
       "rowNum": 5,
-      "id": "cti_1789614123847_5"
+      "id": "cti_1789621897539_5"
     },
     {
       "type": "IN",
@@ -558,7 +214,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 6,
-      "id": "cti_1789614123847_6"
+      "id": "cti_1789621897539_6"
     },
     {
       "type": "IN",
@@ -582,7 +238,7 @@
       "category": "서비스 이용조건·범위",
       "actor": "삼성화재 내부(설계사·지점)",
       "rowNum": 7,
-      "id": "cti_1789614123847_7"
+      "id": "cti_1789621897539_7"
     },
     {
       "type": "IN",
@@ -606,7 +262,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 8,
-      "id": "cti_1789614123847_8"
+      "id": "cti_1789621897539_8"
     },
     {
       "type": "IN",
@@ -630,7 +286,7 @@
       "category": "",
       "actor": "",
       "rowNum": 9,
-      "id": "cti_1789614123847_9"
+      "id": "cti_1789621897539_9"
     },
     {
       "type": "IN",
@@ -654,7 +310,7 @@
       "category": "",
       "actor": "",
       "rowNum": 10,
-      "id": "cti_1789614123847_10"
+      "id": "cti_1789621897539_10"
     },
     {
       "type": "IN",
@@ -678,7 +334,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 11,
-      "id": "cti_1789614123847_11"
+      "id": "cti_1789621897539_11"
     },
     {
       "type": "IN",
@@ -702,7 +358,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 12,
-      "id": "cti_1789614123847_12"
+      "id": "cti_1789621897539_12"
     },
     {
       "type": "IN",
@@ -726,7 +382,7 @@
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
       "rowNum": 13,
-      "id": "cti_1789614123847_13"
+      "id": "cti_1789621897539_13"
     },
     {
       "type": "IN",
@@ -750,7 +406,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 14,
-      "id": "cti_1789614123847_14"
+      "id": "cti_1789621897539_14"
     },
     {
       "type": "IN",
@@ -774,7 +430,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 15,
-      "id": "cti_1789614123847_15"
+      "id": "cti_1789621897539_15"
     },
     {
       "type": "IN",
@@ -798,7 +454,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 16,
-      "id": "cti_1789614123847_16"
+      "id": "cti_1789621897539_16"
     },
     {
       "type": "IN",
@@ -822,7 +478,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 17,
-      "id": "cti_1789614123847_17"
+      "id": "cti_1789621897539_17"
     },
     {
       "type": "IN",
@@ -846,7 +502,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 18,
-      "id": "cti_1789614123847_18"
+      "id": "cti_1789621897539_18"
     },
     {
       "type": "IN",
@@ -870,7 +526,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 19,
-      "id": "cti_1789614123847_19"
+      "id": "cti_1789621897539_19"
     },
     {
       "type": "IN",
@@ -894,7 +550,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 20,
-      "id": "cti_1789614123847_20"
+      "id": "cti_1789621897539_20"
     },
     {
       "type": "IN",
@@ -918,7 +574,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 21,
-      "id": "cti_1789614123847_21"
+      "id": "cti_1789621897539_21"
     },
     {
       "type": "IN",
@@ -942,7 +598,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 22,
-      "id": "cti_1789614123847_22"
+      "id": "cti_1789621897539_22"
     },
     {
       "type": "IN",
@@ -966,7 +622,7 @@
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
       "rowNum": 23,
-      "id": "cti_1789614123847_23"
+      "id": "cti_1789621897539_23"
     }
   ]
 }
