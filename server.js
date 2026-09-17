@@ -612,6 +612,30 @@ function saveSavedFaxConfig(cfg) {
     }
 
     // =========================================================================
+    // API Route: URL Shortening Service (웹보고서 공유용 단축 URL 생성 엔진)
+    // =========================================================================
+    if (reqPath === '/api/shorten-url') {
+      const shortenHandler = require('./api/shorten-url');
+      const parsedUrl = urlModule.parse(req.url, true);
+      req.query = parsedUrl.query;
+      res.status = (code) => {
+        res.statusCode = code;
+        return {
+          json: (data) => {
+            res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(data));
+          },
+          end: () => res.end()
+        };
+      };
+      res.json = (data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      };
+      return shortenHandler(req, res);
+    }
+
+    // =========================================================================
     // API Route: Samsung Fire Call Analysis Report Engine (삼성화재 콜분석 보고 시스템)
     // =========================================================================
     // CTI 실시간 로그 수집 및 보고서 동기화 엔드포인트

@@ -738,65 +738,84 @@ async function initTotalCallAnalysisModule(forceRefresh = false) {
 
   if (forceRefresh) {
     gTotalCallData = null;
+    window.gTotalCallData = null;
     try { sessionStorage.removeItem('LIVON_CACHED_TOTAL_CALL_DATA'); } catch(e){}
   }
 
   // 1. 메모리 또는 세션 스토리지에 캐시된 데이터가 있으면 대기 스피너 없이 0ms 즉시 렌더링!
   let hasImmediateData = false;
-  if (gTotalCallData && gTotalCallData.callLogs && gTotalCallData.callLogs.length > 0) {
-    window.gTotalCallData = gTotalCallData;
+  const currentMemory = gTotalCallData || window.gTotalCallData;
+  if (currentMemory && currentMemory.callLogs && currentMemory.callLogs.length > 0) {
+    gTotalCallData = currentMemory;
+    window.gTotalCallData = currentMemory;
     hasImmediateData = true;
   } else {
     try {
       const cached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
       if (cached) {
-        gTotalCallData = JSON.parse(cached);
-        window.gTotalCallData = gTotalCallData;
-        hasImmediateData = true;
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.callLogs && parsed.callLogs.length > 0) {
+          gTotalCallData = parsed;
+          window.gTotalCallData = parsed;
+          hasImmediateData = true;
+        }
       }
     } catch (e) {}
   }
 
-  // 캐시가 없으면 정적 fallback 파일 먼저 초고속 로드 시도 (화면 공백 최소화)
+  // 캐시가 없으면 정적 fallback 파일들 먼저 초고속 병렬 로드 시도 (화면 공백 최소화)
   if (!hasImmediateData) {
-    try {
-      const fastRes = await fetch(`call_report_all.json?t=${Date.now()}`);
-      if (fastRes.ok) {
-        const fastJson = await fastRes.json();
-        const d = (fastJson && fastJson.data) ? fastJson.data : fastJson;
-        if (d && d.callLogs && d.callLogs.length > 0) {
-          gTotalCallData = d;
-          window.gTotalCallData = d;
-          hasImmediateData = true;
-          try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(d)); } catch(e){}
+    const staticCandidates = [
+      `call_report_all.json?t=${Date.now()}`,
+      `/call_report_all.json?t=${Date.now()}`,
+      `./call_report_all.json?t=${Date.now()}`,
+      `/api/samsung/call-report/data?channel=all`
+    ];
+    for (const url of staticCandidates) {
+      try {
+        const fastRes = await fetch(url);
+        if (fastRes.ok) {
+          const fastJson = await fastRes.json();
+          const d = (fastJson && fastJson.data) ? fastJson.data : fastJson;
+          if (d && d.callLogs && d.callLogs.length > 0) {
+            gTotalCallData = d;
+            window.gTotalCallData = d;
+            hasImmediateData = true;
+            try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(d)); } catch(e){}
+            break;
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
   }
 
   if (hasImmediateData) {
     // 1) 기존 캐시 데이터로 0ms 즉시 화면 렌더링 (화면 깜빡임/공백 방지)
     renderTotalCallAnalysisTab();
 
-    // 2) 사용자 요청에 따라 메뉴 클릭 시 곧바로 실시간 CTI 전수 동기화 진행
+    // 2) 사용자 요청 시 백그라운드(모달 없이 조용히) 최신 CTI 데이터 갱신
     if (!isTotalSyncing) {
       loadCallAnnotations();
-      loadTotalCallData(true, false);
+      loadTotalCallData(true, true); // isBackground = true 로 전체화면 모달 차단
     }
     return;
   }
 
-  // 2. 최초 방문 시 로딩 스피너 표시 후 실시간 CTI 동기화
+  // 2. 캐시 및 로컬 정적 데이터가 모두 비어있는 최초 방문 시 안내 UI 표시 후 동기화
   container.innerHTML = `
-    <div class="p-12 text-center text-slate-500 space-y-3">
-      <i data-lucide="loader-2" class="w-8 h-8 animate-spin mx-auto text-cyan-600"></i>
-      <p class="text-sm font-bold text-slate-700">CTI 실시간 종합 콜분석 데이터를 동기화하는 중입니다...</p>
-      <p class="text-xs text-slate-400">삼성화재, 현대해상, 리본케어 전체 인바운드 콜을 실시간 집계합니다.</p>
+    <div class="bg-white rounded-3xl border border-slate-200/90 p-12 text-center text-slate-500 space-y-4 shadow-sm my-6">
+      <div class="w-12 h-12 rounded-2xl bg-cyan-100 text-cyan-600 flex items-center justify-center mx-auto shadow-sm">
+        <i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-slate-800">CTI 종합 콜분석 데이터를 동기화하는 중입니다...</h3>
+        <p class="text-xs text-slate-400 mt-1">삼성화재 · 현대해상 · 리본케어 전체 인바운드 콜을 실시간 집계합니다.</p>
+      </div>
     </div>
   `;
   initTotalIcons(container);
 
-  await Promise.all([loadCallAnnotations(), loadTotalCallData(true, false)]);
+  await Promise.all([loadCallAnnotations(), loadTotalCallData(true, true)]);
 }
 
 async function loadTotalCallData(forceSync = false, isBackground = false) {
@@ -806,12 +825,11 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       isTotalSyncing = true;
       if (!isBackground) {
         setTotalSyncProgress(1, 15, 'CTI 서버 연결 중', 'CTI 게이트웨이에 접속하여 최신 인바운드 콜 데이터를 요청하고 있습니다...');
-        renderTotalCallAnalysisTab();
       }
 
-      // 초고속 타임아웃 (기존 15초 -> 2초로 대폭 단축하여 지연 방지)
+      // 초고속 타임아웃 (기존 15초 -> 2.5초로 단축하여 정적 데이터와 빠른 전환)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
       let synced = false;
 
       const s = gTotalFilter.startDate || '2026-08-01';
@@ -828,8 +846,9 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         clearTimeout(timeoutId);
         if (sRes.ok) {
           const sJson = await sRes.json();
-          if (sJson.success && sJson.data && sJson.data.callLogs) {
+          if (sJson.success && sJson.data && sJson.data.callLogs && sJson.data.callLogs.length > 0) {
             gTotalCallData = sJson.data;
+            window.gTotalCallData = sJson.data;
             synced = true;
           }
         }
@@ -841,9 +860,10 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       if (!synced) {
         const fallbacks = [
           `call_report_all.json?t=${Date.now()}`,
-          `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
+          `/call_report_all.json?t=${Date.now()}`,
           `./call_report_all.json?t=${Date.now()}`,
-          `/call_report_all.json?t=${Date.now()}`
+          `/api/samsung/call-report/data?channel=all`,
+          `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
         ];
         for (const u of fallbacks) {
           try {
@@ -853,6 +873,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
               const d = (fbJson && fbJson.data) ? fbJson.data : fbJson;
               if (d && d.callLogs && d.callLogs.length > 0) {
                 gTotalCallData = d;
+                window.gTotalCallData = d;
                 synced = true;
                 break;
               }
@@ -863,9 +884,9 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
 
       if (!isBackground) {
         setTotalSyncProgress(3, 80, '보험사별 데이터 통합 중', '인입 채널(삼성화재/현대해상/리본케어) 교차 검증 및 상담 라벨 매칭 중...');
-        await new Promise(r => setTimeout(r, 60)); // 매끄럽고 빠른 60ms 전환
+        await new Promise(r => setTimeout(r, 60));
         setTotalSyncProgress(4, 95, '지표 및 아웃콜 재집계 중', '미연결(0초) 아웃콜 긴급 대상 건을 추출하고 통계 대시보드를 최적화하고 있습니다...');
-        await new Promise(r => setTimeout(r, 60)); // 매끄럽고 빠른 60ms 전환
+        await new Promise(r => setTimeout(r, 60));
       }
 
       clearMateOneMatchCache();
@@ -882,10 +903,9 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
 
       if (!isBackground) {
         setTotalSyncProgress(4, 100, '실시간 동기화 완료!', `총 ${count}건의 CTI 전수 상담 데이터가 성공적으로 반영되었습니다.`, true, count);
-        // 1.2초 후 자동 닫기 (확인 버튼 클릭 시 즉시 닫기 가능)
         setTimeout(() => {
           closeTotalSyncProgressModal();
-        }, 1200);
+        }, 1000);
 
         if (typeof showToast === 'function') {
           showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 완료되었습니다.`, 'success');
@@ -900,20 +920,22 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         const res = await fetch('/api/samsung/call-report/data?channel=all');
         if (res.ok) {
           const json = await res.json();
-          if (json.success && json.data && json.data.callLogs) {
+          if (json.success && json.data && json.data.callLogs && json.data.callLogs.length > 0) {
             gTotalCallData = json.data;
+            window.gTotalCallData = json.data;
             clearMateOneMatchCache();
             loaded = true;
           }
         }
       } catch (e) {}
 
-      // 2) 실패 시 초고속 정적 fallback 파일 조회 (Vercel CDN 10~30ms 응답)
+      // 2) 실패 시 초고속 정적 fallback 파일 조회
       if (!loaded) {
         const staticFallbacks = [
           `call_report_all.json?t=${Date.now()}`,
+          `/call_report_all.json?t=${Date.now()}`,
           `./call_report_all.json?t=${Date.now()}`,
-          `/call_report_all.json?t=${Date.now()}`
+          `call_report_samsung.json?t=${Date.now()}`
         ];
         for (const u of staticFallbacks) {
           try {
@@ -923,6 +945,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
               const d = (sJson && sJson.data) ? sJson.data : sJson;
               if (d && d.callLogs && d.callLogs.length > 0) {
                 gTotalCallData = d;
+                window.gTotalCallData = d;
                 clearMateOneMatchCache();
                 loaded = true;
                 break;
@@ -930,22 +953,6 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
             }
           } catch (e) {}
         }
-      }
-
-      // 3) 백업 삼성 데이터 fallback
-      if (!loaded && !gTotalCallData) {
-        try {
-          const sRes2 = await fetch(`call_report_samsung.json?t=${Date.now()}`);
-          if (sRes2.ok) {
-            const sJson2 = await sRes2.json();
-            const d2 = (sJson2 && sJson2.data) ? sJson2.data : sJson2;
-            if (d2 && d2.callLogs) {
-              gTotalCallData = d2;
-              clearMateOneMatchCache();
-              loaded = true;
-            }
-          }
-        } catch (e) {}
       }
 
       // 세션 스토리지 캐시 갱신
@@ -958,13 +965,13 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
     console.error('Total Call Report Load Error:', err);
   }
 
-  if (!isBackground) {
-    renderTotalCallAnalysisTab();
-  }
+  isTotalSyncing = false;
+  renderTotalCallAnalysisTab();
 }
 
 function getTotalCallLogs() {
-  const raw = (gTotalCallData && gTotalCallData.callLogs) || [];
+  const source = gTotalCallData || window.gTotalCallData;
+  const raw = (source && source.callLogs) || [];
   // CTI 프로그램에서 연결요청(connectReq === 'Y')인 고객만 포함 (상담연결 미요청 고객 제외)
   return raw.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
 }
@@ -1065,6 +1072,49 @@ function resetAllTotalFilters() {
 function renderTotalCallAnalysisTab() {
   const container = document.getElementById('tab-totalcallanalysis');
   if (!container) return;
+
+  // 0. gTotalCallData 및 window.gTotalCallData 상호 동기화 & 세션 캐시 복원
+  if (!gTotalCallData || !gTotalCallData.callLogs || gTotalCallData.callLogs.length === 0) {
+    if (window.gTotalCallData && window.gTotalCallData.callLogs && window.gTotalCallData.callLogs.length > 0) {
+      gTotalCallData = window.gTotalCallData;
+    } else {
+      try {
+        const cached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.callLogs && parsed.callLogs.length > 0) {
+            gTotalCallData = parsed;
+            window.gTotalCallData = parsed;
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  // 여전히 데이터가 없는 경우: 즉각 fallback 정적 파일 로드 트리거 및 친절한 로딩 안내 UI
+  if (!gTotalCallData || !gTotalCallData.callLogs || gTotalCallData.callLogs.length === 0) {
+    container.innerHTML = `
+      <div class="bg-white rounded-3xl border border-slate-200/90 p-12 text-center text-slate-500 space-y-4 shadow-sm my-6">
+        <div class="w-12 h-12 rounded-2xl bg-cyan-100 text-cyan-600 flex items-center justify-center mx-auto shadow-sm">
+          <i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-slate-800">종합 콜분석 데이터를 불러오는 중입니다...</h3>
+          <p class="text-xs text-slate-400 mt-1">삼성화재 · 현대해상 · 리본케어 CTI 전수 상담 데이터를 로드하고 있습니다.</p>
+        </div>
+        <div class="pt-2 flex items-center justify-center gap-2">
+          <button type="button" onclick="loadTotalCallData(true, false)" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-cyan-600/20 cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>데이터 즉시 동기화</span>
+          </button>
+        </div>
+      </div>
+    `;
+    if (typeof initTotalIcons === 'function') initTotalIcons(container);
+    // 조용히 백그라운드에서 정적 데이터 로드 시도
+    loadTotalCallData(false, true);
+    return;
+  }
 
   try {
     const logs = getTotalCallLogs();

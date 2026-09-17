@@ -8818,6 +8818,7 @@ async function checkSamsungDriveStatus() {
     // 오직 실제로 구글 드라이브에 더 최신 파일이 감지된 경우(hasNewFile === true)에만 신규파일 배지를 노출합니다.
     const hasRealNewFile = !!(data && data.hasNewFile);
 
+    const currentCount = (typeof gSamsungData !== 'undefined' && Array.isArray(gSamsungData)) ? gSamsungData.length : 0;
     if (hasRealNewFile) {
       if (alertEl) alertEl.classList.remove('hidden');
       console.log(`[SamsungDrive] 구글 드라이브 최신 명단 신규 파일 감지됨! (파일: ${data.latestFile?.filename || '신규'}). 자동 동기화를 실행합니다...`);
@@ -8921,6 +8922,15 @@ async function triggerSamsungDriveSync(isAuto = false) {
 
     if (isAuto && alreadyConfirmed === syncKey) {
       console.log(`[SamsungDrive] 이미 확인된 최신 명단(${syncKey})이므로 자동 갱신 완료 모달을 다시 띄우지 않습니다.`);
+      return;
+    }
+
+    // 자동 갱신인 경우 현재 탭이 삼성 명단관리 화면이 아니면 전체화면 모달을 띄워 화면을 가리지 않고 토스트로만 조용히 알림
+    if (isAuto && gActiveTab !== 'samsungleads' && gActiveTab !== 'samsung') {
+      localStorage.setItem('LIVON_SAMSUNG_AUTO_SYNC_CONFIRMED', syncKey);
+      if (typeof showToast === 'function') {
+        showToast(`삼성화재 최신 명단(${count.toLocaleString()}건) 자동 갱신이 완료되었습니다.`, 'success');
+      }
       return;
     }
 

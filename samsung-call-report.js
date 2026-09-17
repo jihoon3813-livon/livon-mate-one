@@ -2967,7 +2967,57 @@ async function syncTabLiveCti(customStart, customEnd, customChannel) {
   return await applyTabDateRange(true);
 }
 
-function copyReportWebLink(targetChannel = '삼성화재') {
+/**
+ * 단축 URL 생성 헬퍼 함수
+ * - 1차: 사내 /api/shorten-url 백엔드 프록시 (da.gd / TinyURL 자동 다중 시도)
+ * - 2차: da.gd 직접 호출
+ * - 3차: TinyURL 직접 호출
+ * - 4차: 원본 URL 안전 폴백
+ */
+async function getShortenedUrl(longUrl) {
+  if (!longUrl || typeof longUrl !== 'string') return longUrl;
+
+  // localhost이거나 로컬 IP인 경우 공개 단축 서비스에서 인식이 안 되므로 원본 반환
+  const isLocalHost = longUrl.includes('localhost') || longUrl.includes('127.0.0.1') || longUrl.includes('192.168.');
+  if (isLocalHost) {
+    return longUrl;
+  }
+
+  // 1. 사내 백엔드 프록시 API 호출 (/api/shorten-url)
+  try {
+    const res = await fetch(`/api/shorten-url?url=${encodeURIComponent(longUrl)}`, { method: 'GET' });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success && json.shortUrl && json.shortUrl.startsWith('http')) {
+        return json.shortUrl;
+      }
+    }
+  } catch (e) {}
+
+  // 2. TinyURL 직접 호출 시도 (HTTPS 환경)
+  try {
+    const res2 = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`);
+    if (res2.ok) {
+      const text = (await res2.text()).trim();
+      if (text && text.startsWith('http')) return text;
+    }
+  } catch (e) {}
+
+  // 3. da.gd 직접 호출 시도
+  try {
+    const res3 = await fetch(`https://da.gd/s?url=${encodeURIComponent(longUrl)}`);
+    if (res3.ok) {
+      const text2 = (await res3.text()).trim();
+      if (text2 && text2.startsWith('http')) return text2;
+    }
+  } catch (e) {}
+
+  // 4. 안전 폴백: 원본 URL
+  return longUrl;
+}
+window.getShortenedUrl = getShortenedUrl;
+
+async function copyReportWebLink(targetChannel = '삼성화재') {
   const thisWeek = getThisWeekRange();
   const s = document.getElementById('tabReportStartDate')?.value || thisWeek.start;
   const e = document.getElementById('tabReportEndDate')?.value || thisWeek.end;
@@ -2986,14 +3036,22 @@ function copyReportWebLink(targetChannel = '삼성화재') {
     }
   } catch (err) {}
 
-  navigator.clipboard.writeText(reportUrl).then(() => {
+  if (typeof showToast === 'function') {
+    showToast(`[${targetChannel}] 보고서 단축 URL을 생성하는 중입니다...`, 'info');
+  }
+
+  // 단축 URL 생성
+  const finalUrl = await getShortenedUrl(reportUrl);
+  const isShortened = finalUrl !== reportUrl;
+
+  navigator.clipboard.writeText(finalUrl).then(() => {
     if (typeof showToast === 'function') {
-      showToast(`[${targetChannel}] 보고서 전용 웹링크가 복사되었습니다!`, 'success');
+      showToast(`[${targetChannel}] ${isShortened ? '단축 URL' : '웹링크'}가 복사되었습니다! (${finalUrl})`, 'success');
     } else {
-      alert(`[${targetChannel} 전용 보고서 공유 웹링크가 복사되었습니다]\n\n${reportUrl}\n\n${targetChannel} 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
+      alert(`[${targetChannel} 전용 보고서 공유 웹링크가 복사되었습니다]\n\n${finalUrl}\n\n${targetChannel} 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
     }
   }).catch(() => {
-    prompt(`아래 [${targetChannel}] 전용 보고서 링크를 복사하여 전달해주세요:`, reportUrl);
+    prompt(`아래 [${targetChannel}] 전용 보고서 링크를 복사하여 전달해주세요:`, finalUrl);
   });
 }
 

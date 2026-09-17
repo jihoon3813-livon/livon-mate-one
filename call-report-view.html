@@ -1759,7 +1759,41 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     }
 
 
-    function copyReportLink() {
+    async function getShortenedUrl(longUrl) {
+      if (!longUrl || typeof longUrl !== 'string') return longUrl;
+      const isLocalHost = longUrl.includes('localhost') || longUrl.includes('127.0.0.1') || longUrl.includes('192.168.');
+      if (isLocalHost) return longUrl;
+
+      try {
+        const res = await fetch(`/api/shorten-url?url=${encodeURIComponent(longUrl)}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.success && json.shortUrl && json.shortUrl.startsWith('http')) {
+            return json.shortUrl;
+          }
+        }
+      } catch (e) {}
+
+      try {
+        const res2 = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`);
+        if (res2.ok) {
+          const text = (await res2.text()).trim();
+          if (text && text.startsWith('http')) return text;
+        }
+      } catch (e) {}
+
+      try {
+        const res3 = await fetch(`https://da.gd/s?url=${encodeURIComponent(longUrl)}`);
+        if (res3.ok) {
+          const text2 = (await res3.text()).trim();
+          if (text2 && text2.startsWith('http')) return text2;
+        }
+      } catch (e) {}
+
+      return longUrl;
+    }
+
+    async function copyReportLink() {
       const s = gFilter.startDate;
       const e = gFilter.endDate;
       const ch = gFilter.channel || '삼성화재';
@@ -1767,10 +1801,13 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const pathname = window.location.pathname;
       const reportUrl = `${origin}${pathname}?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
 
-      navigator.clipboard.writeText(reportUrl).then(() => {
-        alert(`[${ch} 전용 보고서 공유 링크가 복사되었습니다]\n\n${reportUrl}\n\n${ch} 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
+      const finalUrl = await getShortenedUrl(reportUrl);
+      const isShortened = finalUrl !== reportUrl;
+
+      navigator.clipboard.writeText(finalUrl).then(() => {
+        alert(`[${ch} 전용 보고서 ${isShortened ? '단축 ' : ''}공유 링크가 복사되었습니다]\n\n${finalUrl}\n\n${ch} 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
       }).catch(() => {
-        prompt('아래 링크를 복사하여 전달해주세요:', reportUrl);
+        prompt('아래 링크를 복사하여 전달해주세요:', finalUrl);
       });
     }
 
