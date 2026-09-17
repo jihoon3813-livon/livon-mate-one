@@ -530,18 +530,31 @@ function isCallOutcallHandled(callId) {
   return !!(map[callId] && map[callId].status === 'completed');
 }
 
-function toggleCallOutcallStatus(callId, memo = '') {
+function isCallOutcallCheckedOnly(callId) {
+  const map = getOutcallStatusMap();
+  const item = map[callId];
+  return !!(item && (item.type === 'checked' || (item.memo && item.memo.includes('확인'))));
+}
+
+function toggleCallOutcallStatus(callId, memo = '', type = 'checked') {
   const map = getOutcallStatusMap();
   const current = map[callId];
   if (current && current.status === 'completed') {
     delete map[callId];
+    if (typeof showToast === 'function') {
+      showToast('아웃콜 필요(대기) 상태로 다시 변경되었습니다.', 'info');
+    }
   } else {
     map[callId] = {
       status: 'completed',
+      type: type || 'checked',
       handledAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
       handledBy: (window.gCurrentUser && window.gCurrentUser.name) || '상담원',
-      memo: memo || (current && current.memo) || ''
+      memo: memo || (type === 'checked' ? '아웃콜 불필요 확인 완료' : '아웃콜 통화 완료')
     };
+    if (typeof showToast === 'function') {
+      showToast(type === 'checked' ? '아웃콜 불필요 확인이 완료되었습니다.' : '아웃콜 완료 처리되었습니다.', 'success');
+    }
   }
   saveOutcallStatusMap(map);
   renderTotalCallAnalysisTab();
@@ -549,6 +562,11 @@ function toggleCallOutcallStatus(callId, memo = '') {
   if (modal && !modal.classList.contains('hidden')) {
     openMissedCallsOutcallModal(window._activeOutcallTab || 'all');
   }
+}
+
+function markCallOutcallChecked(callId, e) {
+  if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+  toggleCallOutcallStatus(callId, '아웃콜 불필요 확인 완료', 'checked');
 }
 
 /**
@@ -1584,7 +1602,7 @@ function renderTotalListView(logs) {
               <th class="py-3 px-3 w-52 whitespace-nowrap">고객 / 매칭정보</th>
               <th class="py-3 px-3 w-36 whitespace-nowrap">상담유형 / ARS</th>
               <th class="py-3 px-3 min-w-[280px]">상담 내용 요약 (호버 미리보기 / 클릭 모달)</th>
-              <th class="py-3 px-3 w-40 text-center whitespace-nowrap">통화 / 대기시간</th>
+              <th class="py-3 px-3 w-48 text-center whitespace-nowrap">통화 / 대기시간</th>
               <th class="py-3 px-3 w-40 whitespace-nowrap">라벨 / 메모</th>
               <th class="py-3 px-3 w-28 text-center whitespace-nowrap">액션</th>
             </tr>
@@ -1598,6 +1616,7 @@ function renderTotalListView(logs) {
               const formattedPhone = formatPhoneDisplay(call.phone || call.rawPhone);
               const isMissed = isCallMissedWaitZero(call);
               const isHandled = isCallOutcallHandled(callId);
+              const isCheckedOnly = isCallOutcallCheckedOnly(callId);
               const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
               const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
 
@@ -1681,23 +1700,32 @@ function renderTotalListView(logs) {
                     </div>
 
                     ${isMissed ? `
-                      <div class="mt-1.5 flex items-center justify-center gap-1">
+                      <div class="mt-1.5 flex items-center justify-center gap-1 flex-wrap">
                         ${isHandled ? `
-                          <button type="button" onclick="toggleCallOutcallStatus('${callId}')" 
-                            class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200 cursor-pointer inline-flex items-center gap-0.5 shadow-2xs" title="클릭 시 완료 취소">
-                            <i data-lucide="check-circle" class="w-3 h-3 text-emerald-600"></i>
-                            <span>아웃콜 완료</span>
+                          <button type="button" onclick="markCallOutcallChecked('${callId}', event)" 
+                            class="px-2 py-0.5 rounded-md text-[10px] font-black ${isCheckedOnly ? 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300'} border cursor-pointer inline-flex items-center gap-1 shadow-2xs transition-colors group" 
+                            title="${isCheckedOnly ? '아웃콜 불필요 확인완료 (클릭 시 확인 취소)' : '아웃콜 완료 (클릭 시 취소)'}">
+                            <i data-lucide="${isCheckedOnly ? 'check-check' : 'check-circle'}" class="w-3 h-3 ${isCheckedOnly ? 'text-slate-500' : 'text-emerald-600'} group-hover:hidden"></i>
+                            <i data-lucide="x" class="w-3 h-3 text-rose-600 hidden group-hover:inline"></i>
+                            <span class="group-hover:hidden">${isCheckedOnly ? '확인완료' : '아웃콜 완료'}</span>
+                            <span class="hidden group-hover:inline">취소</span>
                           </button>
                         ` : `
                           <button type="button" onclick="openMissedCallsOutcallModal('pending')" 
-                            class="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 animate-pulse hover:bg-rose-200 cursor-pointer inline-flex items-center gap-1 shadow-2xs" title="클릭 시 아웃콜 집중 모달 열기">
+                            class="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 animate-pulse hover:bg-rose-200 cursor-pointer inline-flex items-center gap-0.5 shadow-2xs" title="클릭 시 아웃콜 집중 모달 열기">
                             <span>🚨 아웃콜필요</span>
-                            <span class="text-[9px] bg-rose-600 text-white rounded px-1">상담0초</span>
+                            <span class="text-[8.5px] bg-rose-600 text-white rounded px-1">상담0초</span>
                           </button>
                           <button type="button" onclick="triggerCtiCall('${call.phone || call.rawPhone}', '${match.patientName}', '고객', '${match.appId || ''}', '${match.company || ''}')" 
                             class="px-2 py-0.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] flex items-center gap-0.5 cursor-pointer shadow-xs" title="즉시 CTI 전화 발신">
                             <i data-lucide="phone-outgoing" class="w-3 h-3"></i>
                             <span>발신</span>
+                          </button>
+                          <button type="button" onclick="markCallOutcallChecked('${callId}', event)" 
+                            class="px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-700 border border-emerald-300 font-black text-[10px] flex items-center gap-0.5 cursor-pointer shadow-2xs transition-all active:scale-95" 
+                            title="아웃콜 불필요 또는 이미 확인된 건으로 확인 처리">
+                            <i data-lucide="check" class="w-3 h-3"></i>
+                            <span>확인</span>
                           </button>
                         `}
                       </div>
@@ -1883,6 +1911,7 @@ function openTotalCallSummaryModal(callId) {
   const allLabels = getAllAvailableLabels();
   const isMissed = isCallMissedWaitZero(call);
   const isHandled = isCallOutcallHandled(callId);
+  const isCheckedOnly = isCallOutcallCheckedOnly(callId);
 
   modal.innerHTML = `
     <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -1897,48 +1926,47 @@ function openTotalCallSummaryModal(callId) {
               <span class="px-2 py-0.5 rounded text-[10.5px] font-black border ${cat.badgeClass}">
                 ${cat.name}
               </span>
-              <span class="px-2 py-0.5 rounded text-[10.5px] font-bold ${call.channel === '삼성화재' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-800'}">
-                ${call.channel || '인입'}
-              </span>
-              <span class="text-xs text-slate-300 font-mono">${call.callTime || '-'}</span>
+              <h3 class="text-base font-black truncate">${call.title || '상담 상세 내용'}</h3>
             </div>
-            <h3 class="text-base sm:text-lg font-black mt-0.5">
-              ${call.title || '상담 상세 요약'}
-            </h3>
+            <div class="flex items-center gap-2 text-xs text-slate-300 font-mono mt-1 flex-wrap">
+              <span>${call.callTime || '-'}</span>
+              <span>·</span>
+              <span class="text-cyan-300">${call.channel || '인입'}</span>
+              <span>·</span>
+              <span>통화: <b>${call.duration || '0'}초</b></span>
+              <span>·</span>
+              <span>대기: <b>${call.waitTime !== undefined ? call.waitTime : 0}초</b></span>
+            </div>
           </div>
         </div>
-        <button type="button" onclick="closeTotalCallSummaryModal()" class="text-slate-400 hover:text-white cursor-pointer p-1">
+        <button type="button" onclick="closeTotalCallSummaryModal()" class="text-slate-400 hover:text-white cursor-pointer p-1 rounded-lg">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <!-- 본문 스크롤 영역 -->
-      <div class="p-5 overflow-y-auto custom-scrollbar space-y-4 text-xs">
-        <!-- 1. 고객 프로필 & 빠른 CTI 발신 카드 -->
-        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-base font-black text-slate-900">${maskName(match.patientName)}</span>
-              <span class="font-mono text-slate-600 font-bold">${formattedPhone}</span>
-              ${match.isRegistered ? `
-                <span class="px-2 py-0.5 rounded-md text-[10.5px] font-black border ${match.badgeClass}">
-                  ✓ ${match.company} 등록 (${match.appId})
-                </span>
-              ` : `
-                <span class="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-slate-200 text-slate-600">
-                  미등록 고객
-                </span>
-              `}
+      <!-- 모달 바디 (스크롤) -->
+      <div class="p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        <!-- 1. 고객 매칭 정보 바 -->
+        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 flex-wrap">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-slate-200 flex items-center justify-center text-slate-700 font-black text-xs">
+              ${match.patientName ? match.patientName.slice(0, 1) : '고'}
             </div>
-            <div class="text-[11px] text-slate-500 flex items-center gap-3">
-              <span>통화시간: <b>${call.duration || '0초'}</b></span>
-              <span>대기시간: <b>${call.waitTime !== undefined ? call.waitTime : 0}초</b></span>
-              <span>상담원: <b>${call.operator || '리본케어'}</b></span>
-              ${call.arsMenu ? `<span>ARS: <b>${call.arsMenu}</b></span>` : ''}
+            <div>
+              <div class="font-black text-xs text-slate-900 flex items-center gap-1.5">
+                <span>${maskName(match.patientName)}</span>
+                <span class="font-mono text-slate-500 text-[11px] font-normal">${formattedPhone}</span>
+                <span class="px-2 py-0.2 rounded-full text-[9.5px] font-black border ${match.badgeClass}">
+                  ${match.company}
+                </span>
+              </div>
+              <div class="text-[11px] text-slate-400 font-mono mt-0.5">
+                ${match.isRegistered && match.appId ? `신청번호: ${match.appId}` : '메이트원 미등록 인입'}
+              </div>
             </div>
           </div>
 
-          <div class="flex items-center gap-2 shrink-0">
+          <div class="flex items-center gap-1.5">
             <button type="button" onclick="triggerCtiCall('${call.phone || call.rawPhone}', '${match.patientName}', '고객', '${match.appId || ''}', '${match.company || ''}')" 
               class="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-cyan-600/20 cursor-pointer">
               <i data-lucide="phone-outgoing" class="w-4 h-4"></i>
@@ -1956,22 +1984,30 @@ function openTotalCallSummaryModal(callId) {
 
         <!-- 2. 대기 0초 미연결 콜인 경우 아웃콜 집중 관리 안내 바 -->
         ${isMissed ? `
-          <div class="p-3.5 rounded-2xl ${isHandled ? 'bg-emerald-50 border border-emerald-200 text-emerald-900' : 'bg-rose-50 border border-rose-300 text-rose-900'} flex items-center justify-between gap-3">
+          <div class="p-3.5 rounded-2xl ${isHandled ? (isCheckedOnly ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-emerald-50 border border-emerald-200 text-emerald-900') : 'bg-rose-50 border border-rose-300 text-rose-900'} flex items-center justify-between gap-3 flex-wrap">
             <div class="flex items-center gap-2.5">
-              <i data-lucide="${isHandled ? 'check-circle' : 'alert-circle'}" class="w-5 h-5 ${isHandled ? 'text-emerald-600' : 'text-rose-600 animate-pulse'} shrink-0"></i>
+              <i data-lucide="${isHandled ? (isCheckedOnly ? 'check-check' : 'check-circle') : 'alert-circle'}" class="w-5 h-5 ${isHandled ? (isCheckedOnly ? 'text-slate-500' : 'text-emerald-600') : 'text-rose-600 animate-pulse'} shrink-0"></i>
               <div>
                 <div class="font-black text-xs">
-                  ${isHandled ? '✅ 아웃콜(콜백) 처리 완료된 건입니다.' : '🚨 CTI 미연결 · 대기시간 0초 통화로 즉시 아웃콜이 필요합니다.'}
+                  ${isHandled ? (isCheckedOnly ? '✅ 아웃콜 불필요 확인 완료 건입니다.' : '✅ 아웃콜(콜백) 처리 완료된 건입니다.') : '🚨 CTI 미연결 · 상담시간 0초 통화로 아웃콜이 필요합니다.'}
                 </div>
-                <p class="text-[11px] ${isHandled ? 'text-emerald-700' : 'text-rose-700'} mt-0.5">
-                  고객이 연결 전 종료되었으므로 CTI 발신 버튼을 눌러 고객에게 콜백 상담을 진행하세요.
+                <p class="text-[11px] ${isHandled ? 'text-slate-500' : 'text-rose-700'} mt-0.5">
+                  ${isHandled ? '필요 시 우측 버튼을 눌러 상태를 취소하거나 변경할 수 있습니다.' : '아웃콜이 불필요한 경우 [확인]을 누르고, 통화가 필요하면 CTI 발신 후 완료 처리하세요.'}
                 </p>
               </div>
             </div>
-            <button type="button" onclick="toggleCallOutcallStatus('${callId}'); openTotalCallSummaryModal('${callId}');" 
-              class="px-3 py-1.5 rounded-xl font-black text-xs border shadow-2xs cursor-pointer whitespace-nowrap ${isHandled ? 'bg-white border-emerald-300 text-emerald-800 hover:bg-emerald-100' : 'bg-rose-600 border-rose-700 text-white hover:bg-rose-700'}">
-              ${isHandled ? '완료 취소' : '✓ 아웃콜 완료 처리'}
-            </button>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="toggleCallOutcallStatus('${callId}', '아웃콜 불필요 확인 완료', 'checked'); openTotalCallSummaryModal('${callId}');" 
+                class="px-3 py-1.5 rounded-xl font-black text-xs border shadow-2xs cursor-pointer whitespace-nowrap ${isHandled ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100' : 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700'}">
+                ${isHandled ? (isCheckedOnly ? '확인 취소' : '아웃콜 취소') : '✓ 아웃콜 불필요 확인'}
+              </button>
+              ${!isHandled ? `
+                <button type="button" onclick="toggleCallOutcallStatus('${callId}', '아웃콜 통화 완료', 'called'); openTotalCallSummaryModal('${callId}');" 
+                  class="px-3 py-1.5 rounded-xl font-black text-xs border border-rose-700 bg-rose-600 hover:bg-rose-700 text-white shadow-2xs cursor-pointer whitespace-nowrap">
+                  ✓ 아웃콜 완료 처리
+                </button>
+              ` : ''}
+            </div>
           </div>
         ` : ''}
 
@@ -2183,6 +2219,7 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
                 const callId = getCallUniqueId(c);
                 const match = matchCustomerToMateOne(c);
                 const isHandled = isCallOutcallHandled(callId);
+                const isCheckedOnly = isCallOutcallCheckedOnly(callId);
                 const formattedPhone = formatPhoneDisplay(c.phone || c.rawPhone);
                 const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
                 const channelBadgeClass = c.channel === '삼성화재'
@@ -2217,10 +2254,23 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
                       </button>
                     </td>
                     <td class="py-2.5 px-3 text-center">
-                      <button type="button" onclick="toggleCallOutcallStatus('${callId}')" 
-                        class="px-2.5 py-1 rounded-xl font-black text-xs border transition-all cursor-pointer whitespace-nowrap ${isHandled ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'}">
-                        ${isHandled ? '✅ 완료 (클릭해제)' : '대기중 (클릭완료)'}
-                      </button>
+                      ${isHandled ? `
+                        <button type="button" onclick="toggleCallOutcallStatus('${callId}')" 
+                          class="px-2.5 py-1 rounded-xl font-black text-xs border transition-all cursor-pointer whitespace-nowrap ${isCheckedOnly ? 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300'}">
+                          ${isCheckedOnly ? '✓ 확인완료 (해제)' : '✅ 아웃콜완료 (해제)'}
+                        </button>
+                      ` : `
+                        <div class="flex items-center justify-center gap-1">
+                          <button type="button" onclick="markCallOutcallChecked('${callId}', event)" 
+                            class="px-2 py-1 rounded-xl font-black text-[11px] bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-700 border border-emerald-300 transition-all cursor-pointer whitespace-nowrap" title="아웃콜 불필요 확인">
+                            ✓ 확인
+                          </button>
+                          <button type="button" onclick="toggleCallOutcallStatus('${callId}', '아웃콜 통화 완료', 'called')" 
+                            class="px-2 py-1 rounded-xl font-black text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition-all cursor-pointer whitespace-nowrap" title="통화 완료 처리">
+                            통화완료
+                          </button>
+                        </div>
+                      `}
                     </td>
                     <td class="py-2.5 px-3">
                       <div class="flex items-center gap-1">
@@ -2565,6 +2615,7 @@ function renderCallDetailCardHtml(call) {
   const formattedPhone = formatPhoneDisplay(call.phone || call.rawPhone);
   const isMissed = isCallMissedWaitZero(call);
   const isHandled = isCallOutcallHandled(callId);
+  const isCheckedOnly = isCallOutcallCheckedOnly(callId);
 
   const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
   const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
@@ -2600,21 +2651,28 @@ function renderCallDetailCardHtml(call) {
 
       <!-- 상담시간 0초 미연결 콜인 경우 긴급 아웃콜(콜백) 안내 바 -->
       ${isMissed ? `
-        <div class="px-2.5 py-1.5 rounded-xl ${isHandled ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' : 'bg-rose-50 border border-rose-300 text-rose-900'} flex items-center justify-between gap-2 text-xs">
+        <div class="px-2.5 py-1.5 rounded-xl ${isHandled ? (isCheckedOnly ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-emerald-50 border border-emerald-200 text-emerald-800') : 'bg-rose-50 border border-rose-300 text-rose-900'} flex items-center justify-between gap-2 text-xs">
           <div class="flex items-center gap-1.5 font-bold">
-            <i data-lucide="${isHandled ? 'check-circle' : 'phone-missed'}" class="w-3.5 h-3.5 ${isHandled ? 'text-emerald-600' : 'text-rose-600 animate-pulse'} shrink-0"></i>
-            <span>${isHandled ? '✅ 아웃콜 완료됨' : '🚨 미연결 · 상담시간 0초 (아웃콜 대상)'}</span>
+            <i data-lucide="${isHandled ? (isCheckedOnly ? 'check-check' : 'check-circle') : 'phone-missed'}" class="w-3.5 h-3.5 ${isHandled ? (isCheckedOnly ? 'text-slate-500' : 'text-emerald-600') : 'text-rose-600 animate-pulse'} shrink-0"></i>
+            <span>${isHandled ? (isCheckedOnly ? '✓ 확인완료 (불필요)' : '✅ 아웃콜 완료됨') : '🚨 미연결 · 상담시간 0초 (아웃콜 대상)'}</span>
           </div>
           <div class="flex items-center gap-1">
-            <button type="button" onclick="toggleCallOutcallStatus('${callId}')" 
-              class="px-2 py-0.5 rounded-lg text-[10px] font-bold border ${isHandled ? 'border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50' : 'border-rose-300 bg-white text-rose-700 hover:bg-rose-50'} cursor-pointer">
-              ${isHandled ? '완료 취소' : '✓ 완료 처리'}
-            </button>
-            <button type="button" onclick="triggerCtiCall('${call.phone || call.rawPhone}', '${match.patientName}', '고객', '${match.appId || ''}', '${match.company || ''}')" 
-              class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-600 hover:bg-rose-700 text-white cursor-pointer flex items-center gap-0.5">
-              <i data-lucide="phone-outgoing" class="w-3 h-3"></i>
-              <span>전화</span>
-            </button>
+            ${isHandled ? `
+              <button type="button" onclick="toggleCallOutcallStatus('${callId}')" 
+                class="px-2 py-0.5 rounded-lg text-[10px] font-bold border border-slate-300 bg-white text-slate-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 cursor-pointer">
+                ${isCheckedOnly ? '확인 취소' : '완료 취소'}
+              </button>
+            ` : `
+              <button type="button" onclick="markCallOutcallChecked('${callId}', event)" 
+                class="px-2 py-0.5 rounded-lg text-[10px] font-bold border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white cursor-pointer transition-colors" title="아웃콜 불필요 확인">
+                ✓ 확인
+              </button>
+              <button type="button" onclick="triggerCtiCall('${call.phone || call.rawPhone}', '${match.patientName}', '고객', '${match.appId || ''}', '${match.company || ''}')" 
+                class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-600 hover:bg-rose-700 text-white cursor-pointer flex items-center gap-0.5">
+                <i data-lucide="phone-outgoing" class="w-3 h-3"></i>
+                <span>전화</span>
+              </button>
+            `}
           </div>
         </div>
       ` : ''}
