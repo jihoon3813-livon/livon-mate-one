@@ -8710,8 +8710,9 @@ async function checkSamsungDriveStatus() {
       updateSamsungDriveSyncUI(data.lastSyncedAt, data.lastSyncedFile, data.lastRecordCount);
     }
 
-    // 브라우저 로컬 데이터 건수와 최신 동기화 파일 건수 비교 (21,693 != 25,939 등 불일치 감지)
-    const currentCount = Array.isArray(gSamsungList) ? gSamsungList.length : 0;
+    // 브라우저 로컬 데이터 건수와 최신 동기화 파일 건수 비교
+    const storedCount = Number(localStorage.getItem('LIVON_SAMSUNG_COUNT')) || 0;
+    const currentCount = (Array.isArray(gSamsungList) && gSamsungList.length > 0) ? gSamsungList.length : storedCount;
     const isCountMismatch = data.lastRecordCount > 0 && Math.abs(currentCount - data.lastRecordCount) > 5;
     const needsSync = data.hasNewFile || isCountMismatch;
 
@@ -8777,12 +8778,25 @@ async function triggerSamsungDriveSync(isAuto = false) {
     updateSamsungDriveSyncUI(data.syncedAt, data.filename, data.count);
     if (alertEl) alertEl.classList.add('hidden');
 
+    // 3. 사용자 확인 여부 추적 (파일명 + 건수 기준 고유 키)
+    const syncKey = `${data.filename}_${data.count}`;
+    const alreadyConfirmed = localStorage.getItem('LIVON_SAMSUNG_AUTO_SYNC_CONFIRMED');
+
+    if (isAuto && alreadyConfirmed === syncKey) {
+      console.log(`[SamsungDrive] 이미 확인된 최신 명단(${syncKey})이므로 자동 갱신 완료 모달을 다시 띄우지 않습니다.`);
+      return;
+    }
+
+    // 모달 표시 (확인 시 다음부터 띄우지 않도록 기록)
     if (typeof showCustomAlert === 'function') {
+      localStorage.setItem('LIVON_SAMSUNG_AUTO_SYNC_CONFIRMED', syncKey);
       showCustomAlert({
         title: isAuto ? '삼성화재 최신 명단 자동 갱신 완료' : '구글 드라이브 최신 명단 동기화 완료',
         message: `구글 드라이브 최신 명단 [${data.filename}] 총 ${data.count.toLocaleString()}건이 정상 복호화되어 스프레드시트에 완벽히 반영되었습니다.\n(동기화 일시: ${data.syncedAt})`,
         icon: 'cloud-check',
         iconColor: 'sky'
+      }).then(() => {
+        localStorage.setItem('LIVON_SAMSUNG_AUTO_SYNC_CONFIRMED', syncKey);
       });
     }
   } catch (err) {
