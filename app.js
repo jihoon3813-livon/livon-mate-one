@@ -1477,10 +1477,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const initialTab = urlParams.get('tab') || sessionStorage.getItem('LIVON_ACTIVE_TAB') || 'carehub';
   const initialFilter = urlParams.get('filter') || sessionStorage.getItem('LIVON_ACTIVE_FILTER') || null;
 
+  // 상단 멀티 탭 및 데스크톱 사이드바 상태 초기화
+  if (typeof initOpenAppTabs === 'function') initOpenAppTabs();
+  if (typeof initDesktopSidebarState === 'function') initDesktopSidebarState();
+
   if (initialTab && initialTab !== 'carehub') {
     switchTab(initialTab, initialFilter, false);
   } else {
     renderUnifiedCareHub();
+    if (typeof renderMultiTabBar === 'function') renderMultiTabBar();
   }
   initIcons();
 
@@ -21610,6 +21615,199 @@ function toggleMobileSidebar(forceState = null) {
 }
 window.toggleMobileSidebar = toggleMobileSidebar;
 
+// ==========================================
+// 데스크톱 사이드바 숨기기 / 보이기 관리
+// ==========================================
+function toggleDesktopSidebar(forceCollapse = null) {
+  const sidebar = document.getElementById('mainAppSidebar');
+  const icon = document.getElementById('desktopSidebarToggleIcon');
+  const btn = document.getElementById('btnToggleDesktopSidebar');
+  if (!sidebar) return;
+
+  const isCollapsed = sidebar.classList.contains('sidebar-collapsed-desktop');
+  const shouldCollapse = forceCollapse !== null ? forceCollapse : !isCollapsed;
+
+  if (shouldCollapse) {
+    sidebar.classList.add('sidebar-collapsed-desktop');
+    if (icon) icon.setAttribute('data-lucide', 'panel-left-open');
+    if (btn) {
+      btn.title = '사이드바 메뉴 펼치기 (단축키 Alt+B)';
+      btn.classList.add('text-primary-600', 'bg-primary-50');
+      btn.classList.remove('text-slate-600');
+    }
+    try { localStorage.setItem('LIVON_SIDEBAR_COLLAPSED', 'true'); } catch(e){}
+  } else {
+    sidebar.classList.remove('sidebar-collapsed-desktop');
+    if (icon) icon.setAttribute('data-lucide', 'panel-left-close');
+    if (btn) {
+      btn.title = '사이드바 메뉴 숨기기 (단축키 Alt+B)';
+      btn.classList.remove('text-primary-600', 'bg-primary-50');
+      btn.classList.add('text-slate-600');
+    }
+    try { localStorage.setItem('LIVON_SIDEBAR_COLLAPSED', 'false'); } catch(e){}
+  }
+
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    lucide.createIcons();
+  }
+}
+window.toggleDesktopSidebar = toggleDesktopSidebar;
+
+function initDesktopSidebarState() {
+  try {
+    const isCollapsed = localStorage.getItem('LIVON_SIDEBAR_COLLAPSED') === 'true';
+    if (isCollapsed && window.innerWidth >= 1024) {
+      toggleDesktopSidebar(true);
+    }
+  } catch(e) {}
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.altKey && (e.key === 'b' || e.key === 'B')) {
+    e.preventDefault();
+    toggleDesktopSidebar();
+  }
+});
+
+// ==========================================
+// 상단 멀티 탭 시스템 (브라우저/IDE 형태 탭)
+// ==========================================
+const APP_TAB_META = {
+  carehub: { name: '통합허브', icon: 'layers', color: 'text-amber-500' },
+  dashboard: { name: '대시보드', icon: 'layout-dashboard', color: 'text-sky-500' },
+  carecalendar: { name: '간병캘린더', icon: 'calendar-days', color: 'text-sky-500' },
+  carelogs: { name: '간병일지 (케어포트)', icon: 'clipboard-list', color: 'text-purple-500' },
+  directory: { name: '파트너/인력 디렉토리', icon: 'contact-2', color: 'text-emerald-500' },
+  samsunglist: { name: '삼성화재 명단관리', icon: 'file-spreadsheet', color: 'text-sky-500' },
+  samsungclaimhub: { name: '삼성화재 접수/청구', icon: 'mail-check', color: 'text-emerald-500' },
+  samsungcallreport: { name: '삼성화재 콜분석', icon: 'phone-forwarded', color: 'text-blue-500' },
+  totalcallanalysis: { name: '종합 콜분석', icon: 'phone-call', color: 'text-cyan-500' },
+  forms: { name: '양식', icon: 'files', color: 'text-amber-500' },
+  faxmgmt: { name: '팩스관리', icon: 'printer', color: 'text-purple-500' },
+  adminmgmt: { name: '시스템관리(권한,설정)', icon: 'settings', color: 'text-amber-500' },
+  branchmall: { name: '분양몰관리', icon: 'store', color: 'text-pink-500' },
+  applications: { name: '간병신청대장', icon: 'clipboard-list', color: 'text-sky-500' },
+  assignments: { name: '간병인배정관리', icon: 'user-check', color: 'text-emerald-500' },
+  claims: { name: '보험청구', icon: 'receipt', color: 'text-amber-500' },
+  payouts: { name: '간병비지급관리', icon: 'banknote', color: 'text-teal-500' },
+  settings: { name: '환경설정', icon: 'settings', color: 'text-slate-500' }
+};
+
+let gOpenAppTabs = ['carehub'];
+
+function initOpenAppTabs() {
+  try {
+    const saved = localStorage.getItem('LIVON_OPEN_TABS');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        gOpenAppTabs = parsed.filter(t => APP_TAB_META[t]);
+      }
+    }
+  } catch (e) {}
+
+  if (!gOpenAppTabs || gOpenAppTabs.length === 0) {
+    gOpenAppTabs = ['carehub'];
+  }
+}
+
+function saveOpenAppTabs() {
+  try {
+    localStorage.setItem('LIVON_OPEN_TABS', JSON.stringify(gOpenAppTabs));
+  } catch (e) {}
+}
+
+function addAppTab(tabId) {
+  if (!tabId || !APP_TAB_META[tabId]) return;
+  if (!gOpenAppTabs.includes(tabId)) {
+    gOpenAppTabs.push(tabId);
+    saveOpenAppTabs();
+  }
+}
+
+function renderMultiTabBar() {
+  const container = document.getElementById('appMultiTabBar');
+  if (!container) return;
+
+  const currentTab = gActiveTab || 'carehub';
+  if (!gOpenAppTabs.includes(currentTab) && APP_TAB_META[currentTab]) {
+    gOpenAppTabs.push(currentTab);
+    saveOpenAppTabs();
+  }
+
+  container.innerHTML = gOpenAppTabs.map(tId => {
+    const meta = APP_TAB_META[tId] || { name: tId, icon: 'file-text', color: 'text-slate-400' };
+    const isActive = tId === currentTab;
+
+    return `
+      <div 
+        class="multi-tab-item group flex items-center gap-1.5 px-3 py-1.5 rounded-xl cursor-pointer text-xs font-bold transition-all shrink-0 border select-none ${
+          isActive 
+            ? 'bg-white text-primary-800 border-slate-300 shadow-xs border-b-2 border-b-primary-600 ring-1 ring-primary-500/10' 
+            : 'bg-slate-100 hover:bg-white text-slate-600 hover:text-slate-900 border-transparent hover:border-slate-200'
+        }"
+        onclick="switchMultiTab('${tId}')"
+        title="${meta.name} (클릭 시 새로고침 없이 즉시 이동)"
+      >
+        <i data-lucide="${meta.icon}" class="w-3.5 h-3.5 ${isActive ? meta.color || 'text-primary-600' : 'text-slate-400 group-hover:text-slate-600'} shrink-0"></i>
+        <span class="tracking-tight whitespace-nowrap">${meta.name}</span>
+        ${gOpenAppTabs.length > 1 ? `
+          <button 
+            type="button" 
+            onclick="closeMultiTab('${tId}', event)" 
+            class="ml-0.5 p-0.5 rounded-md hover:bg-slate-200 hover:text-rose-600 text-slate-400 transition-colors cursor-pointer"
+            title="탭 닫기"
+          >
+            <i data-lucide="x" class="w-3 h-3"></i>
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    lucide.createIcons();
+  }
+}
+window.renderMultiTabBar = renderMultiTabBar;
+
+function switchMultiTab(tabId) {
+  // [사용자 요구사항] 탭 클릭 시에는 자동새로고침 없이 초고속 화면 전환
+  switchTab(tabId, null, false);
+}
+window.switchMultiTab = switchMultiTab;
+
+function closeMultiTab(tabId, event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  const idx = gOpenAppTabs.indexOf(tabId);
+  if (idx === -1) return;
+
+  gOpenAppTabs.splice(idx, 1);
+  if (gOpenAppTabs.length === 0) {
+    gOpenAppTabs = ['carehub'];
+  }
+  saveOpenAppTabs();
+
+  // 닫은 탭이 현재 활성화된 탭이었을 경우 인접 탭으로 자동 이동 (새로고침 없이)
+  if (gActiveTab === tabId) {
+    const nextTab = gOpenAppTabs[Math.max(0, idx - 1)] || gOpenAppTabs[0] || 'carehub';
+    switchMultiTab(nextTab);
+  } else {
+    renderMultiTabBar();
+  }
+}
+window.closeMultiTab = closeMultiTab;
+
+function closeAllMultiTabs() {
+  const currentTab = gActiveTab || 'carehub';
+  gOpenAppTabs = [currentTab];
+  saveOpenAppTabs();
+  renderMultiTabBar();
+}
+window.closeAllMultiTabs = closeAllMultiTabs;
+
 function switchTab(tabId, filterParam = null, triggerReload = true) {
   // 모바일 사이드바 드로어가 열려있는 경우 메뉴 선택 시 자동 닫기
   if (typeof toggleMobileSidebar === 'function' && window.innerWidth < 1024) {
@@ -21630,7 +21828,12 @@ function switchTab(tabId, filterParam = null, triggerReload = true) {
     filterParam = sub;
   }
 
-  // [사용자 규칙] 다른 메뉴를 클릭하면(메뉴 이동 시) 무조건 클린 페이지 새로고침 적용
+  // 상단 멀티 탭 목록에 추가
+  if (typeof addAppTab === 'function') {
+    addAppTab(tabId);
+  }
+
+  // [사용자 규칙] 좌측 메뉴를 클릭하면(triggerReload === true) 무조건 클린 페이지 새로고침 적용
   if (triggerReload && gActiveTab && tabId !== gActiveTab) {
     try {
       sessionStorage.setItem('LIVON_ACTIVE_TAB', tabId);
@@ -21651,6 +21854,11 @@ function switchTab(tabId, filterParam = null, triggerReload = true) {
   try {
     sessionStorage.setItem('LIVON_ACTIVE_TAB', tabId);
     if (filterParam) sessionStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set('tab', tabId);
+    if (filterParam) newUrl.searchParams.set('filter', filterParam);
+    else newUrl.searchParams.delete('filter');
+    window.history.replaceState(null, '', newUrl.toString());
   } catch (e) {}
 
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -21764,6 +21972,11 @@ function switchTab(tabId, filterParam = null, triggerReload = true) {
 
   if (tabId !== 'carehub') {
     initIcons(target);
+  }
+
+  // 상단 멀티 탭 바 동기화
+  if (typeof renderMultiTabBar === 'function') {
+    renderMultiTabBar();
   }
 }
 

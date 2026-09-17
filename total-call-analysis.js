@@ -30,6 +30,136 @@ let gTotalFilter = {
 };
 let isTotalSyncing = false;
 
+// ==========================================
+// CTI 실시간 동기화 진행상황 상태 및 렌더러
+// ==========================================
+let gTotalSyncProgressState = {
+  active: false,
+  step: 1,
+  percent: 0,
+  title: '',
+  message: '',
+  completed: false,
+  count: 0
+};
+
+function setTotalSyncProgress(step, percent, title, message, completed = false, count = 0) {
+  gTotalSyncProgressState = {
+    active: true,
+    step,
+    percent,
+    title,
+    message,
+    completed,
+    count
+  };
+
+  const existing = document.getElementById('totalCallSyncProgressCard');
+  if (existing) {
+    existing.outerHTML = renderTotalSyncProgressCardHtml();
+  } else {
+    const tab = document.getElementById('tab-totalcallanalysis');
+    if (tab) {
+      const topBanner = tab.querySelector('.bg-white.rounded-3xl');
+      if (topBanner) {
+        topBanner.insertAdjacentHTML('afterend', renderTotalSyncProgressCardHtml());
+      }
+    }
+  }
+
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    lucide.createIcons();
+  }
+}
+
+function closeTotalSyncProgressCard() {
+  gTotalSyncProgressState.active = false;
+  const card = document.getElementById('totalCallSyncProgressCard');
+  if (card) {
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(-8px)';
+    card.style.transition = 'all 0.3s ease';
+    setTimeout(() => { if (card) card.remove(); }, 300);
+  }
+}
+window.closeTotalSyncProgressCard = closeTotalSyncProgressCard;
+
+function renderTotalSyncProgressCardHtml() {
+  if (!gTotalSyncProgressState.active) return '';
+  const { step, percent, title, message, completed, count } = gTotalSyncProgressState;
+
+  const stepsList = [
+    { num: 1, label: 'CTI 서버 연결' },
+    { num: 2, label: '콜/STT 수신' },
+    { num: 3, label: '보험사별 데이터 통합' },
+    { num: 4, label: '지표·아웃콜 재집계' }
+  ];
+
+  return `
+    <div id="totalCallSyncProgressCard" class="my-4 p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white border border-cyan-500/40 shadow-xl space-y-3.5 transition-all">
+      <div class="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-10 h-10 rounded-2xl ${completed ? 'bg-emerald-500' : 'bg-cyan-500'} flex items-center justify-center text-white shadow-md shadow-cyan-500/20 shrink-0">
+            <i data-lucide="${completed ? 'check-circle' : 'refresh-cw'}" class="w-5 h-5 ${completed ? '' : 'animate-spin'}"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${completed ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse'}">
+                ${completed ? '동기화 완료' : `${step}단계 진행 중`}
+              </span>
+              <h4 class="text-sm sm:text-base font-black text-white truncate">${title}</h4>
+            </div>
+            <p class="text-xs text-slate-300 mt-0.5 line-clamp-1 sm:line-clamp-none">${message}</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 shrink-0 ml-auto sm:ml-0">
+          <div class="text-right">
+            <div class="text-xl sm:text-2xl font-black font-mono ${completed ? 'text-emerald-400' : 'text-cyan-400'}">${percent}%</div>
+            <div class="text-[10px] text-slate-400 font-bold">${completed ? `총 ${count}건 반영됨` : '실시간 전수 수집'}</div>
+          </div>
+          <button type="button" onclick="closeTotalSyncProgressCard()" class="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer" title="닫기">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Animated Glowing Progress Bar -->
+      <div class="w-full bg-slate-800/80 rounded-full h-3 overflow-hidden border border-slate-700/60 relative p-0.5 shadow-inner">
+        <div class="h-full rounded-full transition-all duration-500 ease-out ${completed ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 'bg-gradient-to-r from-cyan-500 via-sky-400 to-teal-400'}" style="width: ${percent}%;"></div>
+      </div>
+
+      <!-- 4-Step Visual Indicators -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5 text-xs">
+        ${stepsList.map(s => {
+          const isCurrent = step === s.num && !completed;
+          const isDone = step > s.num || completed;
+          return `
+            <div class="flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
+              isDone 
+                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 font-bold' 
+                : isCurrent 
+                  ? 'bg-cyan-950/70 border-cyan-400 text-cyan-100 font-black shadow-xs ring-1 ring-cyan-400/40' 
+                  : 'bg-slate-800/40 border-slate-800/80 text-slate-400'
+            }">
+              <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
+                isDone 
+                  ? 'bg-emerald-500 text-slate-950' 
+                  : isCurrent 
+                    ? 'bg-cyan-400 text-slate-950 animate-pulse' 
+                    : 'bg-slate-700 text-slate-400'
+              }">
+                ${isDone ? '✓' : s.num}
+              </span>
+              <span class="truncate tracking-tight">${s.label}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
 // 기본 제공 라벨 프리셋
 const DEFAULT_CALL_LABELS = [
   { id: 'lbl_urgent', name: '긴급', color: 'rose', bgClass: 'bg-rose-600 text-white', borderClass: 'border-rose-700', icon: 'alert-triangle' },
@@ -611,6 +741,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
     if (forceSync) {
       isTotalSyncing = true;
       if (!isBackground) {
+        setTotalSyncProgress(1, 15, 'CTI 서버 연결 중', 'CTI 게이트웨이에 접속하여 최신 인바운드 콜 데이터를 요청하고 있습니다...');
         renderTotalCallAnalysisTab();
       }
 
@@ -622,6 +753,10 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       const e = gTotalFilter.endDate || new Date().toISOString().slice(0, 10);
       const ch = gTotalFilter.channel || 'all';
       const sUrl = `/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
+
+      if (!isBackground) {
+        setTotalSyncProgress(2, 45, '콜로그 및 녹취 STT 수신 중', '삼성화재·현대해상·리본케어 인바운드 콜 녹취 및 STT 전문 데이터를 파싱하고 있습니다...');
+      }
 
       try {
         const sRes = await fetch(sUrl, { signal: controller.signal });
@@ -662,6 +797,13 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         }
       }
 
+      if (!isBackground) {
+        setTotalSyncProgress(3, 75, '보험사별 데이터 통합 중', '인입 채널(삼성화재/현대해상/리본케어) 교차 검증 및 상담 라벨 매칭 중...');
+        await new Promise(r => setTimeout(r, 200));
+        setTotalSyncProgress(4, 92, '지표 및 아웃콜 재집계 중', '미연결(0초) 아웃콜 긴급 대상 건을 추출하고 통계 대시보드를 최적화하고 있습니다...');
+        await new Promise(r => setTimeout(r, 200));
+      }
+
       clearMateOneMatchCache();
       if (gTotalCallData) {
         try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
@@ -669,11 +811,19 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       isTotalSyncing = false;
       renderTotalCallAnalysisTab();
 
-      if (!isBackground && typeof showToast === 'function') {
-        const count = (gTotalCallData && gTotalCallData.summaryStats && gTotalCallData.summaryStats.totalCalls)
-          ? gTotalCallData.summaryStats.totalCalls
-          : ((gTotalCallData && gTotalCallData.callLogs) ? gTotalCallData.callLogs.length : 0);
-        showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 완료되었습니다.`, 'success');
+      const count = (gTotalCallData && gTotalCallData.summaryStats && gTotalCallData.summaryStats.totalCalls)
+        ? gTotalCallData.summaryStats.totalCalls
+        : ((gTotalCallData && gTotalCallData.callLogs) ? gTotalCallData.callLogs.length : 0);
+
+      if (!isBackground) {
+        setTotalSyncProgress(4, 100, '실시간 동기화 완료!', `총 ${count}건의 CTI 전수 상담 데이터가 성공적으로 반영되었습니다.`, true, count);
+        setTimeout(() => {
+          closeTotalSyncProgressCard();
+        }, 5000);
+
+        if (typeof showToast === 'function') {
+          showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 완료되었습니다.`, 'success');
+        }
       }
       return;
     } else {
@@ -1009,6 +1159,9 @@ function renderTotalCallAnalysisTab() {
           </button>
         </div>
       </div>
+
+      <!-- CTI 실시간 동기화 진행상황 알림 카드 -->
+      ${renderTotalSyncProgressCardHtml()}
 
       <!-- 긴급 아웃콜(Call-back) 대상 집중 관리 알림 배너 -->
       ${pendingOutcalls.length > 0 ? `

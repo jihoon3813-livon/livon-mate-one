@@ -89,7 +89,33 @@
     canvas {
       will-change: transform;
     }
-  
+
+    /* 데스크톱 사이드바 접힘 스타일 */
+    @media (min-width: 1024px) {
+      #mainAppSidebar {
+        transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease, min-width 0.22s ease, max-width 0.22s ease, margin 0.22s ease !important;
+      }
+      #mainAppSidebar.sidebar-collapsed-desktop {
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        margin-left: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        overflow: hidden !important;
+        border: none !important;
+      }
+    }
+
+    /* 멀티 탭 바 스크롤바 숨김 및 애니메이션 */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .multi-tab-item {
+      transition: all 0.15s ease;
+    }
+
     /* 모든 날짜/시간 입력 필드 및 캘린더 피커 영역 커서 및 클릭 활성화 */
     input[type="date"],
     input[type="month"],
@@ -555,6 +581,11 @@
           <i data-lucide="menu" class="w-5 h-5"></i>
         </button>
 
+        <!-- 데스크톱 사이드바 접기/펼치기 토글 버튼 (데스크톱 전용: lg 이상 표시) -->
+        <button type="button" id="btnToggleDesktopSidebar" onclick="toggleDesktopSidebar()" class="hidden lg:flex items-center justify-center p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 transition-all shrink-0 cursor-pointer border border-transparent hover:border-slate-200" title="사이드바 메뉴 숨기기/펼치기 (단축키 Alt+B)">
+          <i data-lucide="panel-left-close" id="desktopSidebarToggleIcon" class="w-5 h-5"></i>
+        </button>
+
         <a href="javascript:void(0)" onclick="switchTab('carehub')" class="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none transition-transform active:scale-[0.98] min-w-0" title="통합간병 운영허브로 이동">
           <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1789612570/%EB%A6%AC%EB%B3%B8%EB%A9%94%EC%9D%B4%ED%8A%B8%EC%9B%90_xeppip.png" alt="LivOn 로고" id="brandLogoBadge" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-contain bg-white shadow-sm border border-slate-200/80 shrink-0 group-hover:shadow-md transition-all">
           <div class="min-w-0">
@@ -639,6 +670,17 @@
         </div>
         <button type="button" onclick="toggleMobileSidebar(false)" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- 데스크톱 상단 접기 헤더 (데스크톱 전용) -->
+      <div class="hidden lg:flex items-center justify-between px-3.5 py-2.5 border-b border-slate-800/80 bg-slate-950/40">
+        <div class="flex items-center gap-2 text-xs font-bold text-slate-400">
+          <i data-lucide="menu" class="w-3.5 h-3.5 text-primary-400"></i>
+          <span>메뉴 탐색기</span>
+        </div>
+        <button type="button" onclick="toggleDesktopSidebar(true)" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer" title="사이드바 메뉴 숨기기 (단축키 Alt+B)">
+          <i data-lucide="panel-left-close" class="w-4 h-4"></i>
         </button>
       </div>
 
@@ -865,11 +907,49 @@
       </div>
     </aside>
 
-    <!-- MAIN VIEW -->
-    <!-- HUB CARD FOCUS BACKDROP DIM OVERLAY -->
-  <div id="hubCardDimBackdrop" class="hidden" onclick="closeAllCareCardExpands()"></div>
+    <!-- 데스크톱 사이드바 접힘 초기 상태 즉시 반영 (깜빡임 방지) -->
+    <script>
+      (function() {
+        try {
+          if (localStorage.getItem('LIVON_SIDEBAR_COLLAPSED') === 'true' && window.innerWidth >= 1024) {
+            var sb = document.getElementById('mainAppSidebar');
+            if (sb) sb.classList.add('sidebar-collapsed-desktop');
+            var ic = document.getElementById('desktopSidebarToggleIcon');
+            if (ic) ic.setAttribute('data-lucide', 'panel-left-open');
+            var btn = document.getElementById('btnToggleDesktopSidebar');
+            if (btn) {
+              btn.title = '사이드바 메뉴 펼치기 (단축키 Alt+B)';
+              btn.classList.add('text-primary-600', 'bg-primary-50');
+              btn.classList.remove('text-slate-600');
+            }
+          }
+        } catch(e) {}
+      })();
+    </script>
 
-  <main class="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 bg-[#f1f5f9]">
+    <!-- MAIN VIEW & MULTI-TAB WRAPPER -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+
+      <!-- MULTI-TAB NAVIGATION BAR (브라우저/IDE 형태의 상단 멀티 탭 시스템) -->
+      <div id="appMultiTabBarContainer" class="bg-white/95 backdrop-blur-xs border-b border-slate-200/90 px-2 sm:px-4 py-1.5 flex items-center justify-between gap-2 shrink-0 select-none z-20 shadow-2xs">
+        <!-- 좌측 탭 스크롤 영역 -->
+        <div class="flex items-center gap-1.5 min-w-0 flex-1 overflow-x-auto no-scrollbar py-0.5" id="appMultiTabBar">
+          <!-- Dynamic Tabs rendered by renderMultiTabBar() in app.js -->
+        </div>
+
+        <!-- 우측 액션: 모든 탭 닫기 -->
+        <div class="flex items-center gap-1 shrink-0 pl-1 border-l border-slate-200">
+          <button type="button" onclick="closeAllMultiTabs()" class="px-2 py-1 text-[11px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all flex items-center gap-1 cursor-pointer border border-transparent hover:border-rose-200" title="현재 활성 탭을 제외한 모든 탭 닫기">
+            <i data-lucide="x" class="w-3 h-3"></i>
+            <span class="hidden sm:inline">탭 모두 닫기</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- HUB CARD FOCUS BACKDROP DIM OVERLAY -->
+      <div id="hubCardDimBackdrop" class="hidden" onclick="closeAllCareCardExpands()"></div>
+
+      <main class="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 bg-[#f1f5f9]">
 
       <!-- ==================== TAB 1: DASHBOARD ==================== -->
       
@@ -3638,7 +3718,9 @@
 
     </main>
 
-  </div>
+    </div><!-- End of MAIN VIEW & MULTI-TAB WRAPPER -->
+
+  </div><!-- End of BODY WRAPPER -->
 
   <!-- ==================== MODALS ==================== -->
 
@@ -8629,7 +8711,7 @@
   <script src="data.js?v=20260910_1931"></script>
   <script src="careport-client.js?v=20260917_1400"></script>
   <script src="samsung-call-report.js?v=20260917_1010"></script>
-  <script src="total-call-analysis.js?v=20260917_1000"></script>
-  <script src="app.js?v=20260917_1400"></script>
+  <script src="total-call-analysis.js?v=20260917_1430"></script>
+  <script src="app.js?v=20260917_1430"></script>
 </body>
 </html>
