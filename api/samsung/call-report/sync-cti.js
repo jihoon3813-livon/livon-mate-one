@@ -207,8 +207,25 @@ module.exports = async function handler(req, res) {
       ctiSummary,
       dailyTrends,
       weeklyRollup,
-      callLogs: (ctiResult.logs || []).filter(c => c.connectReq === 'Y')
+      callLogs: []
     };
+
+    // 기존 전체 데이터와 병합하여 전체 이력이 보존된 완본으로 저장
+    const existingMasterLogs = (baseData && Array.isArray(baseData.callLogs)) ? baseData.callLogs : [];
+    const masterMap = new Map();
+    existingMasterLogs.forEach(l => {
+      const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+      masterMap.set(key, l);
+    });
+    (ctiResult.logs || []).forEach(l => {
+      const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+      masterMap.set(key, l);
+    });
+    const allMasterLogs = Array.from(masterMap.values());
+    allMasterLogs.sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
+    allMasterLogs.forEach((l, idx) => { l.rowNum = idx + 1; });
+
+    reportData.callLogs = allMasterLogs.filter(c => c.connectReq === 'Y');
 
     // 로컬 파일시스템에 저장 가능한 환경이면 파일도 즉시 최신화
     try {

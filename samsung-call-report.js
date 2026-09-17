@@ -6,6 +6,7 @@
 // =========================================================================
 
 var gSamsungReportData = null;
+var gSamsungMasterLogs = [];
 var gActiveReportSubTab = 'summary'; // 'summary' | 'daily' | 'logs'
 function getThisWeekRange() {
   const now = new Date();
@@ -409,40 +410,11 @@ async function initSamsungCallReportModule(resetFilter = true) {
     : ((rInfo.channel || '').includes(ch));
   const isMatch = isChannelMatch && rInfo.startDate === s && rInfo.endDate === e && gSamsungReportData && Array.isArray(gSamsungReportData.callLogs);
 
-  // 1. 메모리에 채널 데이터가 이미 있으면 즉시 렌더링 (0ms)
-  if (gSamsungReportData && Array.isArray(gSamsungReportData.callLogs) && gSamsungReportData.callLogs.length > 0) {
+  // 1. 메모리에 채널 전체 마스터 데이터(100건 이상)가 이미 있으면 즉시 렌더링 (0ms)
+  if (gSamsungReportData && Array.isArray(gSamsungMasterLogs) && gSamsungMasterLogs.length >= 100) {
     renderSamsungCallReportTab();
     return;
   }
-
-  // 1-1. 혹시 종합콜(gTotalCallData 또는 세션 스토리지)에 이미 데이터가 있다면 0ms 즉시 합성 렌더링!
-  try {
-    const totalCached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
-    const totalData = window.gTotalCallData || (totalCached ? JSON.parse(totalCached) : null);
-    if (totalData && Array.isArray(totalData.callLogs) && totalData.callLogs.length > 0) {
-      const samLogs = isAllChannel ? totalData.callLogs : totalData.callLogs.filter(l => (l.channel || '').includes(ch));
-      if (samLogs.length > 0) {
-        gSamsungReportData = {
-          reportInfo: {
-            title: `${ch} 간병(리본케어) 서비스 인바운드 문의 분석 보고`,
-            target: `${ch} 관련 인바운드 콜`,
-            channel: ch,
-            channelLabel: ch,
-            period: totalData.reportInfo?.period || '2026-09-14 ~ 2026-09-17',
-            startDate: totalData.reportInfo?.startDate || '2026-09-14',
-            endDate: totalData.reportInfo?.endDate || '2026-09-17',
-            reportDate: '2026-09-17',
-            author: '리본케어 (Livon Care) 운영센터',
-            operatingDays: 4
-          },
-          ctiSummary: totalData.ctiSummary,
-          summaryStats: totalData.summaryStats,
-          callLogs: samLogs
-        };
-        renderSamsungCallReportTab();
-      }
-    }
-  } catch (e) {}
 
   // 2. 채널 전용 정적 데이터 우선 로드 (삼성화재는 call_report_samsung.json, samsung_call_report.json 우선)
   const primaryFileName = isAllChannel
@@ -483,6 +455,29 @@ async function initSamsungCallReportModule(resetFilter = true) {
             }
           }
           gSamsungReportData = finalData;
+          if (Array.isArray(finalData.callLogs)) {
+            gSamsungMasterLogs = [...finalData.callLogs];
+          }
+
+          // 백그라운드에서 전체 채널 마스터 로그 보강 로드 (전체 날짜 즉시 필터링 지원)
+          fetch(`/call_report_all.json?t=${Date.now()}`)
+            .then(r => r.json())
+            .then(allData => {
+              const allLogs = (allData && allData.callLogs) || (allData && allData.data && allData.data.callLogs);
+              if (Array.isArray(allLogs) && allLogs.length > 0) {
+                const targetChannelLogs = isAllChannel ? allLogs : allLogs.filter(l => (l.channel || '').includes(ch));
+                const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
+                targetChannelLogs.forEach(item => {
+                  const key = `${item.callTime}_${item.phone || item.rawPhone}`;
+                  if (!existingKeys.has(key)) {
+                    gSamsungMasterLogs.push(item);
+                    existingKeys.add(key);
+                  }
+                });
+              }
+            })
+            .catch(() => {});
+
           try {
             sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(finalData));
           } catch (e) {}
@@ -896,49 +891,58 @@ function switchReportSubTab(tabName) {
 
 let gTabDailyChartInstance = null;
 
-function renderTabDailyTrendChart() {
-  const canvas = document.getElementById('tabSamsungDailyTrendChart');
-  if (!canvas || !gSamsungReportData) return;
-
+function getTabFilteredDailyTrends(logs) {
   const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
   const s = curFilter.startDate;
   const e = curFilter.endDate;
-
-  // 현재 필터링된 콜 로그 목록 가져오기 (채널 및 날짜 필터가 100% 적용됨)
-  const logs = getSamsungCallLogs();
   const dailyMap = {};
   const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
 
   if (s && e) {
-    const cur = new Date(s);
-    const end = new Date(e);
+    const cur = new Date(s + 'T00:00:00');
+    const end = new Date(e + 'T00:00:00');
+    const pad = n => String(n).padStart(2, '0');
+    const fmtLocal = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     while (cur <= end) {
-      const ds = cur.toISOString().slice(0, 10);
+      const ds = fmtLocal(cur);
       dailyMap[ds] = {
         date: ds,
         dayOfWeek: daysOfWeek[cur.getDay()],
-        callCount: 0
+        callCount: 0,
+        note: cur.getDay() === 0 || cur.getDay() === 6 ? '주말' : ''
       };
       cur.setDate(cur.getDate() + 1);
     }
   }
 
-  logs.forEach(c => {
-    const d = (c.callTime || c.date || c.startedAt || '').slice(0, 10);
+  const callList = logs || getSamsungCallLogs();
+  callList.forEach(c => {
+    const dRaw = (c.callTime || c.date || c.startedAt || '').slice(0, 10);
+    const d = dRaw.replace(/[./]/g, '-');
     if (d) {
       if (!dailyMap[d]) {
+        const parsedD = new Date(d + 'T00:00:00');
+        const dow = daysOfWeek[parsedD.getDay()] || '';
         dailyMap[d] = {
           date: d,
-          dayOfWeek: daysOfWeek[new Date(d).getDay()] || '',
-          callCount: 0
+          dayOfWeek: dow,
+          callCount: 0,
+          note: dow === '토' || dow === '일' ? '주말' : ''
         };
       }
       dailyMap[d].callCount++;
     }
   });
 
-  const sortedDates = Object.keys(dailyMap).sort();
-  const trends = sortedDates.map(d => dailyMap[d]);
+  return Object.keys(dailyMap).sort().map(d => dailyMap[d]);
+}
+
+function renderTabDailyTrendChart() {
+  const canvas = document.getElementById('tabSamsungDailyTrendChart');
+  if (!canvas || !gSamsungReportData) return;
+
+  const logs = getSamsungCallLogs();
+  const trends = getTabFilteredDailyTrends(logs);
   const labels = trends.map(t => `${t.date.slice(5)} (${t.dayOfWeek})`);
   const data = trends.map(t => t.callCount);
   const backgroundColors = trends.map(t => {
@@ -991,13 +995,16 @@ function renderTabDailyTrendChart() {
 }
 
 function getSamsungCallLogs() {
-  const raw = (gSamsungReportData && gSamsungReportData.callLogs) || [];
+  const allLogs = (gSamsungMasterLogs && gSamsungMasterLogs.length > 0)
+    ? gSamsungMasterLogs
+    : ((gSamsungReportData && gSamsungReportData.callLogs) || []);
   const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
   const ch = curFilter.channel || (gSamsungReportData && gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.channel) || '';
-  const start = curFilter.startDate || (gSamsungReportData && gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.startDate) || '';
-  const end = curFilter.endDate || (gSamsungReportData && gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.endDate) || '';
+  const normDate = d => (d || '').slice(0, 10).replace(/[./]/g, '-');
+  const start = normDate(curFilter.startDate);
+  const end = normDate(curFilter.endDate);
 
-  return raw.filter(c => {
+  return allLogs.filter(c => {
     // 1) 상담원 연결요청(Y) 건 필터링
     const isConn = (c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
     if (!isConn) return false;
@@ -1010,7 +1017,7 @@ function getSamsungCallLogs() {
 
     // 3) 기간 필터 (start, end)
     if (start || end) {
-      const callDate = (c.callTime || c.date || c.startedAt || '').slice(0, 10);
+      const callDate = normDate(c.callTime || c.date || c.startedAt);
       if (callDate) {
         if (start && callDate < start) return false;
         if (end && callDate > end) return false;
@@ -1032,26 +1039,33 @@ function calculateReportStats() {
   const cs = gSamsungReportData && gSamsungReportData.ctiSummary;
   const rInfo = (gSamsungReportData && gSamsungReportData.reportInfo) || {};
 
+  const normDate = d => (d || '').slice(0, 10).replace(/[./]/g, '-');
+  const startNorm = normDate(s);
+  const endNorm = normDate(e);
+
   const isChannelMatch = isAllChannel
     ? (rInfo.channel === 'all' || rInfo.channel === '전체' || !rInfo.channel)
     : (rInfo.channel && rInfo.channel.includes(ch));
 
   const isCtiRangeMatch = isChannelMatch &&
-    (!s || rInfo.startDate === s) &&
-    (!e || rInfo.endDate === e);
+    (!startNorm || normDate(rInfo.startDate) === startNorm) &&
+    (!endNorm || normDate(rInfo.endDate) === endNorm);
 
   // 1. 해당 기간의 총 인입콜 건수 (CTI 해당 기간 집계 또는 기간 필터링 합계)
   let totalCalls = 0;
   if (isCtiRangeMatch && cs && (cs.totalInbound !== undefined || cs.totalAll !== undefined)) {
     totalCalls = cs.totalInbound !== undefined ? cs.totalInbound : cs.totalAll;
   } else if (isChannelMatch && gSamsungReportData && Array.isArray(gSamsungReportData.dailyTrends)) {
-    // CTI 기간 매칭 전이거나 부분 기간 필터링인 경우: 동일 채널의 dailyTrends 합계 활용
-    const periodTrends = gSamsungReportData.dailyTrends.filter(t => (!s || t.date >= s) && (!e || t.date <= e));
+    const periodTrends = gSamsungReportData.dailyTrends.filter(t => {
+      const td = normDate(t.date);
+      return (!startNorm || td >= startNorm) && (!endNorm || td <= endNorm);
+    });
     const trendsSum = periodTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
     totalCalls = trendsSum > 0 ? trendsSum : logs.length;
   } else {
     totalCalls = logs.length;
   }
+  totalCalls = Math.max(totalCalls, logs.length);
 
   // 2. 상담원 연결 요청 건수 (현재 필터링된 연결요청 호수 유지)
   let connectReqCalls = logs.length;
@@ -1069,10 +1083,8 @@ function calculateReportStats() {
   const consultedCount = consultedCalls.length;
 
   // 5. 비율 지표 계산
-  // ARS 인입 대비 상담원 연결 요청률 (e.g. 22 / 85 = 26%)
   const connectReqRate = totalCalls > 0 ? Math.round((connectReqCalls / totalCalls) * 100) : (connectReqCalls > 0 ? 100 : 0);
   
-  // CTI 공식 상담원 응대율 (연결요청 중 응답 완료 비율 e.g. 22 / 22 = 100%)
   let answerRate = '100%';
   if (isCtiRangeMatch && cs && cs.answerRate) {
     answerRate = cs.answerRate;
@@ -1080,18 +1092,15 @@ function calculateReportStats() {
     answerRate = Math.round((answeredCalls / connectReqCalls) * 100) + '%';
   }
 
-  // 응답 상담 대비 분석 완료율
   const consultRate = answeredCalls > 0 ? Math.round((consultedCount / answeredCalls) * 100) : (consultedCount > 0 ? 100 : 0);
 
   // 6. 운영일수 및 일평균 계산
   let opDays = 1;
-  if (s && e) {
-    const d1 = new Date(s);
-    const d2 = new Date(e);
+  if (startNorm && endNorm) {
+    const d1 = new Date(startNorm + 'T00:00:00');
+    const d2 = new Date(endNorm + 'T00:00:00');
     const diffTime = Math.abs(d2 - d1);
     opDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  } else if (filteredTrends.length > 0) {
-    opDays = filteredTrends.length;
   } else {
     opDays = (gSamsungReportData && gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.operatingDays) || 7;
   }
@@ -1451,12 +1460,11 @@ function renderReportDailySubTab(stats) {
   const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
   const s = curFilter.startDate;
   const e = curFilter.endDate;
-  const allTrends = (gSamsungReportData && gSamsungReportData.dailyTrends) || [];
-  const trends = allTrends.filter(t => (!s || t.date >= s) && (!e || t.date <= e));
+  const trends = getTabFilteredDailyTrends();
   const weekly = (gSamsungReportData && gSamsungReportData.weeklyRollup) || [];
   const maxCall = Math.max(...(trends.map(t => t.callCount).concat([50])));
   const totalDailyCalls = trends.reduce((sum, t) => sum + (t.callCount || 0), 0) || (stats && stats.totalCalls) || 0;
-  const opDays = trends.length || (stats && stats.opDays) || 1;
+  const opDays = (stats && stats.opDays) || trends.filter(t => t.callCount > 0).length || trends.length || 1;
   const dailyAvg = opDays > 0 ? (totalDailyCalls / opDays).toFixed(1) : 0;
 
   return `
@@ -2924,60 +2932,29 @@ async function applyTabDateRange(forceSync = false) {
     (ch === '전체' || ch === 'all') ? (rInfo.channel === 'all' || rInfo.channel === '전체') : ((rInfo.channel || '').includes(ch))
   );
 
-  // 1. 이미 데이터가 메모리에 로드되어 있고 해당 채널 데이터가 존재하면 0ms 즉각 화면 렌더링
-  if (hasMatchingChannel) {
-    renderSamsungCallReportTab();
-    if (gActiveReportSubTab === 'daily') {
-      setTimeout(renderTabDailyTrendChart, 60);
-    }
-    // 이미 해당 기간과 정확히 일치하는 CTI 데이터가 로드되어 있고 강제 새로고침이 아니라면 즉시 반환
-    if (!forceSync && isSameRange) {
-      const stats = calculateReportStats();
-      if (typeof showToast === 'function') {
-        showToast(`[${ch}] ${s} ~ ${e} 통화데이터(${stats.totalCalls}건) 조회가 완료되었습니다.`, 'success');
-      }
-      return;
-    }
+  // 1. 메모리에 로드된 전체 로그를 바탕으로 0ms 즉각 화면 렌더링
+  renderSamsungCallReportTab();
+  if (gActiveReportSubTab === 'daily') {
+    setTimeout(renderTabDailyTrendChart, 60);
   }
 
-  // 2. 기간이 변경되었거나 강제 동기화(새로고침 버튼)인 경우 CTI 서버 실시간 동기화 진행
-  const qBtn = document.getElementById('tabReportQueryBtn');
+  // 2. 사용자가 [새로고침] 버튼을 명시적으로 눌렀을 때만(forceSync === true) CTI 동기화 요청
+  if (!forceSync) return;
+
   const syncBtn = document.getElementById('tabSyncCtiBtn');
   const syncText = document.getElementById('tabSyncBtnText');
   const syncIcon = document.getElementById('tabSyncIcon');
 
-  if (qBtn && !hasMatchingChannel) {
-    qBtn.disabled = true;
-    qBtn.classList.add('opacity-75', 'cursor-not-allowed');
-    qBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span id="tabReportQueryBtnText">조회 중...</span>`;
-    if (typeof initIcons === 'function') initIcons(qBtn);
-  }
   if (syncBtn) {
     syncBtn.classList.add('opacity-75', 'pointer-events-none');
     if (syncText) syncText.innerText = '동기화 중...';
     if (syncIcon) syncIcon.classList.add('animate-spin');
   }
 
-  // 기존 데이터가 아예 없는 초기 로딩인 경우에만 화면 전체 스피너 노출
-  const contentArea = document.getElementById('samsungReportSubTabContent');
-  if (!hasMatchingChannel && contentArea) {
-    contentArea.innerHTML = `
-      <div class="py-16 text-center space-y-3 bg-white rounded-3xl border border-slate-200/90 shadow-xs">
-        <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 animate-spin mb-1">
-          <i data-lucide="loader-2" class="w-6 h-6"></i>
-        </div>
-        <p class="text-sm font-black text-slate-800">[${ch}] ${s} ~ ${e} 통화 데이터 조회 및 동기화 중...</p>
-        <p class="text-xs text-slate-500 font-medium">GoodARS CTI 원본 데이터와 1:1 전수 분석 통계를 실시간으로 불러오고 있습니다.</p>
-      </div>
-    `;
-    if (typeof initIcons === 'function') initIcons(contentArea);
-  }
-
   try {
     let synced = false;
-    // 3. CTI 실시간 로그 수집 API 호출 (2.5초 빠른 타임아웃)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
     try {
       const res = await fetch(`/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`, {
         signal: controller.signal
@@ -2989,48 +2966,25 @@ async function applyTabDateRange(forceSync = false) {
           const json = await res.json();
           if (json.success && json.data) {
             gSamsungReportData = json.data;
+            if (Array.isArray(json.data.callLogs)) {
+              const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
+              json.data.callLogs.forEach(item => {
+                const key = `${item.callTime}_${item.phone || item.rawPhone}`;
+                if (!existingKeys.has(key)) {
+                  gSamsungMasterLogs.push(item);
+                  existingKeys.add(key);
+                }
+              });
+            }
             synced = true;
           }
         }
       }
     } catch (apiErr) {
       clearTimeout(timeoutId);
-      console.warn('Backend CTI sync API unavailable or timed out, falling back to static cache', apiErr);
     }
 
-    // 4. API 실패 시 종합콜 캐시 합성 시도 (0ms 즉시 복구)
-    if (!synced && (!gSamsungReportData || !hasMatchingChannel)) {
-      try {
-        const totalCached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
-        const totalData = window.gTotalCallData || (totalCached ? JSON.parse(totalCached) : null);
-        if (totalData && Array.isArray(totalData.callLogs) && totalData.callLogs.length > 0) {
-          const samLogs = isAllChannel ? totalData.callLogs : totalData.callLogs.filter(l => (l.channel || '').includes(ch));
-          if (samLogs.length > 0) {
-            gSamsungReportData = {
-              reportInfo: {
-                title: `${ch} 간병(리본케어) 서비스 인바운드 문의 분석 보고`,
-                target: `${ch} 관련 인바운드 콜`,
-                channel: ch,
-                channelLabel: ch,
-                period: totalData.reportInfo?.period || `${s} ~ ${e}`,
-                startDate: s,
-                endDate: e,
-                reportDate: '2026-09-17',
-                author: '리본케어 (Livon Care) 운영센터',
-                operatingDays: 4
-              },
-              ctiSummary: totalData.ctiSummary,
-              summaryStats: totalData.summaryStats,
-              callLogs: samLogs
-            };
-            synced = true;
-          }
-        }
-      } catch (e) {}
-    }
-
-    // 5. 정적 엔드포인트 및 사전 생성 파일 로드 (해당 채널 전용 파일 우선)
-    if (!synced && (!gSamsungReportData || !hasMatchingChannel)) {
+    if (!synced) {
       const primaryFallback = (ch === '전체' || ch === 'all')
         ? 'call_report_all.json'
         : (ch.includes('현대') ? 'call_report_hyundai.json' : (ch.includes('리본') ? 'call_report_livon.json' : 'call_report_samsung.json'));
@@ -3040,39 +2994,28 @@ async function applyTabDateRange(forceSync = false) {
         `./${primaryFallback}?t=${Date.now()}`,
         `${primaryFallback}?t=${Date.now()}`,
         `/samsung_call_report.json?t=${Date.now()}`,
-        `./samsung_call_report.json?t=${Date.now()}`,
-        `/call_report_all.json?t=${Date.now()}`,
-        `./call_report_all.json?t=${Date.now()}`,
-        `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
-      ].filter(Boolean);
+        `./samsung_call_report.json?t=${Date.now()}`
+      ];
       for (const u of staticFallbacks) {
         try {
           const sRes = await fetch(u);
           if (sRes.ok) {
-            const sType = sRes.headers.get('content-type') || '';
-            if (sType.includes('json') || !sType.includes('html')) {
-              const sJson = await sRes.json();
-              const data = (sJson && sJson.data) ? sJson.data : sJson;
-              if (data && data.callLogs && data.callLogs.length > 0) {
-                let finalData = data;
-                if (!isAllChannel && u.includes('call_report_all')) {
-                  const filtered = data.callLogs.filter(l => (l.channel || '').includes(ch));
-                  if (filtered.length > 0) {
-                    finalData = {
-                      ...data,
-                      reportInfo: {
-                        ...data.reportInfo,
-                        channel: ch,
-                        channelLabel: ch
-                      },
-                      callLogs: filtered
-                    };
+            const sJson = await sRes.json();
+            const data = (sJson && sJson.data) ? sJson.data : sJson;
+            if (data && data.callLogs && data.callLogs.length > 0) {
+              gSamsungReportData = data;
+              if (Array.isArray(data.callLogs)) {
+                const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
+                data.callLogs.forEach(item => {
+                  const key = `${item.callTime}_${item.phone || item.rawPhone}`;
+                  if (!existingKeys.has(key)) {
+                    gSamsungMasterLogs.push(item);
+                    existingKeys.add(key);
                   }
-                }
-                gSamsungReportData = finalData;
-                synced = true;
-                break;
+                });
               }
+              synced = true;
+              break;
             }
           }
         } catch (e) {}
