@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { fetchCtiLogsByDateRange } = require('../../../cti-client');
 
 module.exports = async function handler(req, res) {
@@ -9,13 +11,30 @@ module.exports = async function handler(req, res) {
     return res.status(204).end();
   }
 
-  try {
-    const q = req.query || {};
-    const startDate = q.start || '2026-08-18';
-    const endDate = q.end || new Date().toISOString().slice(0, 10);
-    const channel = q.channel || '삼성화재';
+  const q = req.query || {};
+  const startDate = q.start || '2026-08-18';
+  const endDate = q.end || new Date().toISOString().slice(0, 10);
+  const channel = q.channel || '삼성화재';
+  const channelLabel = channel === 'all' || channel === '전체' ? '전체 인입경로' : channel;
 
-    const ctiResult = await fetchCtiLogsByDateRange(startDate, endDate, channel);
+  // 1. 사전 생성된 최신 보고서 데이터 로드 (초고속 캐시)
+  let baseData = null;
+  try {
+    const fileName = (channel === 'all' || channel === '전체') ? 'call_report_all.json' : 'call_report_samsung.json';
+    const filePath = path.join(process.cwd(), fileName);
+    if (fs.existsSync(filePath)) {
+      baseData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    }
+  } catch (e) {
+    console.warn('[Sync-CTI] Pre-generated file read warning:', e.message);
+  }
+
+  // 2. 실시간 CTI 동기화 시도 (최대 5.5초 타임아웃 가드로 Vercel 504 원천 차단)
+  try {
+    const livePromise = fetchCtiLogsByDateRange(startDate, endDate, channel);
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 5500));
+
+    const ctiResult = await Promise.race([livePromise, timeoutPromise]);
 
     const dailyMap = {};
     let cur = new Date(startDate);
@@ -72,8 +91,6 @@ module.exports = async function handler(req, res) {
       btnExit: 0
     };
 
-    const channelLabel = channel === 'all' || channel === '전체' ? '전체 인입경로' : channel;
-
     const reportData = {
       reportInfo: {
         title: `${channelLabel} 간병(리본케어) 서비스 인바운드 문의 분석 보고 (${startDate} ~ ${endDate})`,
@@ -111,7 +128,15 @@ module.exports = async function handler(req, res) {
       data: reportData
     });
   } catch (err) {
-    console.error('[Samsung Call Report CTI Sync Error]', err);
+    console.warn('[Sync-CTI] 실시간 동기화 시간 초과 또는 오류, 최신 데이터 파일로 자동 전환:', err.message);
+    if (baseData) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.status(200).json({
+        success: true,
+        message: `[${channelLabel}] 최근 동기화된 최신 분석 통계 데이터를 안전하게 불러왔습니다.`,
+        data: baseData
+      });
+    }
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.status(500).json({ success: false, error: err.message });
   }

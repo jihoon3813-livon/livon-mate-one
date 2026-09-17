@@ -35,6 +35,10 @@
       "dest": "/api/cti/logs.js"
     },
     {
+      "src": "/api/samsung/call-report/data",
+      "dest": "/api/samsung/call-report/data.js"
+    },
+    {
       "src": "/api/samsung/call-report/sync-cti",
       "dest": "/api/samsung/call-report/sync-cti.js"
     },

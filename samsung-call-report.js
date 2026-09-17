@@ -18,15 +18,16 @@ function getThisWeekRange() {
   return { start: fmt(monday), end: fmt(sunday) };
 }
 
+const defaultReportRange = { start: '2026-08-18', end: '2026-09-17' };
 const defaultReportThisWeek = getThisWeekRange();
 var gReportFilter = {
   category: '',
   actor: '',
   search: '',
   consultedOnly: true,
-  periodKey: 'thisWeek',
-  startDate: defaultReportThisWeek.start,
-  endDate: defaultReportThisWeek.end
+  periodKey: 'last30',
+  startDate: '2026-08-18',
+  endDate: '2026-09-17'
 };
 if (typeof window !== 'undefined') {
   window.gReportFilter = gReportFilter;
@@ -366,76 +367,47 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 }
 
 
-// 1. Initializer (0ms 캐시 로드 + 정적 백업 파일 fallback 지원)
+// 1. Initializer (0ms 캐시 로드 + 최신 데이터 파일 즉시 반영)
 async function initSamsungCallReportModule() {
-  if (gSamsungReportData && gSamsungReportData.callLogs) {
+  // 1. 메모리에 최신 데이터가 있으면 즉시 렌더링
+  if (gSamsungReportData && gSamsungReportData.callLogs && gSamsungReportData.callLogs.length > 0) {
     renderSamsungCallReportTab();
     return;
   }
 
+  // 2. 최신 정적 데이터 파일(/call_report_samsung.json) 고속 로드 (10ms)
+  const staticUrls = [
+    `/call_report_samsung.json?t=${Date.now()}`,
+    `./call_report_samsung.json?t=${Date.now()}`,
+    `/api/samsung/call-report/data`
+  ];
+
+  for (const u of staticUrls) {
+    try {
+      const res = await fetch(u);
+      if (res.ok) {
+        const json = await res.json();
+        const data = (json && json.data) ? json.data : json;
+        if (data && data.callLogs && data.callLogs.length > 0) {
+          gSamsungReportData = data;
+          try {
+            sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(data));
+          } catch (e) {}
+          renderSamsungCallReportTab();
+          return;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. 세션 스토리지 캐시 확인 (fallback)
   try {
     const cached = sessionStorage.getItem('LIVON_CACHED_SAMSUNG_REPORT_DATA');
     if (cached) {
       gSamsungReportData = JSON.parse(cached);
-      renderSamsungCallReportTab();
     }
   } catch (e) {}
 
-  try {
-    let loaded = false;
-    try {
-      const res = await fetch('/api/samsung/call-report/data');
-      if (res.ok) {
-        const cType = res.headers.get('content-type') || '';
-        if (cType.includes('json')) {
-          const json = await res.json();
-          if (json.success && json.data) {
-            gSamsungReportData = json.data;
-            loaded = true;
-          }
-        }
-      }
-    } catch (e) {}
-
-    // 서버 API 부재 시 정적 JSON 파일 고속 fallback (상대경로 우선, all_report fallback 지원)
-    if (!loaded) {
-      const fallbackUrls = [
-        'call_report_samsung.json',
-        './call_report_samsung.json',
-        '/call_report_samsung.json',
-        'call_report_all.json',
-        './call_report_all.json',
-        '/call_report_all.json'
-      ];
-      for (const u of fallbackUrls) {
-        if (loaded) break;
-        try {
-          const sRes = await fetch(u);
-          if (sRes.ok) {
-            const sType = sRes.headers.get('content-type') || '';
-            if (sType.includes('json') || !sType.includes('html')) {
-              const sJson = await sRes.json();
-              if (sJson.success && sJson.data) {
-                gSamsungReportData = sJson.data;
-                loaded = true;
-              } else if (sJson.callLogs) {
-                gSamsungReportData = sJson;
-                loaded = true;
-              }
-            }
-          }
-        } catch (e) {}
-      }
-    }
-
-    if (gSamsungReportData) {
-      try {
-        sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(gSamsungReportData));
-      } catch (e) {}
-    }
-  } catch (err) {
-    console.error('Error fetching samsung call report data:', err);
-  }
   renderSamsungCallReportTab();
 }
 
@@ -607,7 +579,7 @@ function renderSamsungCallReportTab() {
                   <input type="date" id="tabReportStartDate" value="${curStart}" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
                   <span class="text-slate-400 font-normal shrink-0">~</span>
                   <input type="date" id="tabReportEndDate" value="${curEnd}" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
-                  <button type="button" id="tabReportQueryBtn" onclick="applyTabDateRange()" class="px-3.5 py-1.5 sm:py-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-2xs shrink-0 whitespace-nowrap cursor-pointer flex items-center gap-1.5" title="선택한 기간의 CTI 데이터를 실시간 조회 및 동기화합니다">
+                  <button type="button" id="tabReportQueryBtn" onclick="applyTabDateRange(false)" class="px-3.5 py-1.5 sm:py-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-2xs shrink-0 whitespace-nowrap cursor-pointer flex items-center gap-1.5" title="선택한 기간의 CTI 데이터를 조회합니다">
                     <i data-lucide="search" class="w-3.5 h-3.5"></i>
                     <span id="tabReportQueryBtnText">조회</span>
                   </button>
@@ -631,7 +603,7 @@ function renderSamsungCallReportTab() {
               <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
               <input type="text" id="tabReportSearchInput" value="${curFilter.search || ''}" oninput="handleReportSearchInput(this.value)" placeholder="전화번호, 회원명, 제목..." class="w-full pl-8 pr-3 py-1.5 sm:py-2 rounded-xl border border-slate-200 text-xs bg-slate-50/70 focus:bg-white focus:outline-none focus:border-blue-500 font-medium">
             </div>
-            <button type="button" id="tabSyncCtiBtn" onclick="applyTabDateRange()" class="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 whitespace-nowrap cursor-pointer" title="선택된 기간의 통화데이터를 CTI에서 실시간으로 새로고침합니다">
+            <button type="button" id="tabSyncCtiBtn" onclick="applyTabDateRange(true)" class="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 whitespace-nowrap cursor-pointer" title="선택된 기간의 통화데이터를 CTI에서 실시간으로 새로고침합니다">
               <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="tabSyncIcon"></i>
               <span id="tabSyncBtnText" class="hidden sm:inline">새로고침</span>
             </button>
@@ -2556,7 +2528,7 @@ function setTabPresetRange(type) {
   if (sInput) sInput.value = sStr;
   if (eInput) eInput.value = eStr;
 
-  applyTabDateRange();
+  applyTabDateRange(false);
 }
 
 function handleTabChannelChange(channel) {
@@ -2565,10 +2537,10 @@ function handleTabChannelChange(channel) {
   const e = document.getElementById('tabReportEndDate')?.value;
   if (s) gReportFilter.startDate = s;
   if (e) gReportFilter.endDate = e;
-  applyTabDateRange();
+  applyTabDateRange(false);
 }
 
-async function applyTabDateRange() {
+async function applyTabDateRange(forceSync = false) {
   const thisWeek = getThisWeekRange();
   const s = document.getElementById('tabReportStartDate')?.value || gReportFilter.startDate || thisWeek.start;
   const e = document.getElementById('tabReportEndDate')?.value || gReportFilter.endDate || thisWeek.end;
@@ -2579,13 +2551,32 @@ async function applyTabDateRange() {
   gReportFilter.endDate = e;
   gReportFilter.channel = ch;
 
-  // 1. 조회 버튼 및 새로고침 버튼 로딩 인디케이터 적용
+  const hasData = gSamsungReportData && Array.isArray(gSamsungReportData.callLogs) && gSamsungReportData.callLogs.length > 0;
+
+  // 1. 이미 데이터가 메모리에 로드되어 있다면 0ms 즉각 화면 렌더링
+  if (hasData) {
+    renderSamsungCallReportTab();
+    if (gActiveReportSubTab === 'daily') {
+      setTimeout(renderTabDailyTrendChart, 60);
+    }
+  }
+
+  // 단순 기간/채널 필터 변경(조회 클릭 또는 프리셋 클릭)이고 데이터가 이미 있다면 즉시 완료 (네트워크 지연 없음)
+  if (!forceSync && hasData) {
+    const stats = calculateReportStats();
+    if (typeof showToast === 'function') {
+      showToast(`[${ch}] ${s} ~ ${e} 통화데이터(${stats.totalCalls}건) 조회가 완료되었습니다.`, 'success');
+    }
+    return;
+  }
+
+  // 2. 강제 동기화(새로고침 버튼)이거나 초기 데이터가 없는 경우 CTI 서버 동기화 진행
   const qBtn = document.getElementById('tabReportQueryBtn');
   const syncBtn = document.getElementById('tabSyncCtiBtn');
   const syncText = document.getElementById('tabSyncBtnText');
   const syncIcon = document.getElementById('tabSyncIcon');
 
-  if (qBtn) {
+  if (qBtn && !hasData) {
     qBtn.disabled = true;
     qBtn.classList.add('opacity-75', 'cursor-not-allowed');
     qBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span id="tabReportQueryBtnText">조회 중...</span>`;
@@ -2597,9 +2588,9 @@ async function applyTabDateRange() {
     if (syncIcon) syncIcon.classList.add('animate-spin');
   }
 
-  // 2. 메인 컨텐츠 영역 로딩 안내 표시 (즉각적 피드백)
+  // 기존 데이터가 아예 없는 초기 로딩인 경우에만 화면 전체 스피너 노출
   const contentArea = document.getElementById('samsungReportSubTabContent');
-  if (contentArea) {
+  if (!hasData && contentArea) {
     contentArea.innerHTML = `
       <div class="py-16 text-center space-y-3 bg-white rounded-3xl border border-slate-200/90 shadow-xs">
         <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 animate-spin mb-1">
@@ -2614,9 +2605,14 @@ async function applyTabDateRange() {
 
   try {
     let synced = false;
-    // 3. CTI 실시간 로그 수집 API 호출
+    // 3. CTI 실시간 로그 수집 API 호출 (6초 타임아웃 가드 - Vercel 504 방지)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
     try {
-      const res = await fetch(`/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`);
+      const res = await fetch(`/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const cType = res.headers.get('content-type') || '';
         if (cType.includes('json')) {
@@ -2628,16 +2624,18 @@ async function applyTabDateRange() {
         }
       }
     } catch (apiErr) {
-      console.warn('Backend CTI sync API unavailable, falling back to static cache', apiErr);
+      clearTimeout(timeoutId);
+      console.warn('Backend CTI sync API unavailable or timed out, falling back to static cache', apiErr);
     }
 
-    // 4. API 서버 부재(정적 호스팅) 시 최신 정적 JSON 로드
+    // 4. API 실패 시 정적 엔드포인트 및 사전 생성 캐시 로드
     if (!synced && (!gSamsungReportData || !gSamsungReportData.callLogs)) {
       const staticFallbacks = [
-        `call_report_all.json?t=${Date.now()}`,
-        `./call_report_all.json?t=${Date.now()}`,
+        `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
         `call_report_samsung.json?t=${Date.now()}`,
-        `./call_report_samsung.json?t=${Date.now()}`
+        `./call_report_samsung.json?t=${Date.now()}`,
+        `call_report_all.json?t=${Date.now()}`,
+        `./call_report_all.json?t=${Date.now()}`
       ];
       for (const u of staticFallbacks) {
         try {
@@ -2673,7 +2671,7 @@ async function applyTabDateRange() {
 
     const stats = calculateReportStats();
     if (typeof showToast === 'function') {
-      showToast(`[${ch}] ${s} ~ ${e} 통화데이터(${stats.totalCalls}건) 조회가 완료되었습니다.`, 'success');
+      showToast(`[${ch}] ${s} ~ ${e} 통화데이터(${stats.totalCalls}건) 동기화가 완료되었습니다.`, 'success');
     }
   } catch (err) {
     console.error('Error applying report date range:', err);
@@ -2700,7 +2698,7 @@ async function syncTabLiveCti(customStart, customEnd, customChannel) {
   if (customStart) gReportFilter.startDate = customStart;
   if (customEnd) gReportFilter.endDate = customEnd;
   if (customChannel) gReportFilter.channel = customChannel;
-  return await applyTabDateRange();
+  return await applyTabDateRange(true);
 }
 
 function copyReportWebLink(targetChannel = '삼성화재') {

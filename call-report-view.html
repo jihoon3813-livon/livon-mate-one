@@ -94,7 +94,7 @@
                 <input type="date" id="reportStartDate" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
                 <span class="text-slate-400 font-normal shrink-0">~</span>
                 <input type="date" id="reportEndDate" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
-                <button type="button" onclick="applyDateRange()" class="px-3 py-1.5 sm:py-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-2xs shrink-0 whitespace-nowrap cursor-pointer">
+                <button type="button" onclick="applyDateRange(false)" class="px-3 py-1.5 sm:py-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-2xs shrink-0 whitespace-nowrap cursor-pointer">
                   조회
                 </button>
               </div>
@@ -1401,10 +1401,10 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       document.getElementById('reportStartDate').value = gFilter.startDate;
       document.getElementById('reportEndDate').value = gFilter.endDate;
 
-      applyDateRange();
+      applyDateRange(false);
     }
 
-    async function applyDateRange() {
+    async function applyDateRange(forceSync = false) {
       const s = document.getElementById('reportStartDate').value;
       const e = document.getElementById('reportEndDate').value;
       if (!s || !e) return;
@@ -1415,6 +1415,11 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       url.searchParams.set('start', s);
       url.searchParams.set('end', e);
       window.history.replaceState({}, '', url);
+
+      if (gReportData && Array.isArray(gReportData.callLogs) && gReportData.callLogs.length > 0) {
+        renderAll();
+        if (!forceSync) return;
+      }
 
       await syncLiveCti();
     }
@@ -1449,8 +1454,13 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 
       try {
         let synced = false;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
         try {
-          const res = await fetch(`/api/samsung/call-report/sync-cti?start=${gFilter.startDate}&end=${gFilter.endDate}&channel=${encodeURIComponent(ch)}`);
+          const res = await fetch(`/api/samsung/call-report/sync-cti?start=${gFilter.startDate}&end=${gFilter.endDate}&channel=${encodeURIComponent(ch)}`, {
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
           if (res.ok) {
             const cType = res.headers.get('content-type') || '';
             if (cType.includes('json')) {
@@ -1461,10 +1471,13 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
               }
             }
           }
-        } catch (e) {}
+        } catch (e) {
+          clearTimeout(timeoutId);
+        }
 
         if (!synced) {
           const fallbacks = [
+            `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
             `call_report_all.json?t=${Date.now()}`,
             `./call_report_all.json?t=${Date.now()}`,
             `call_report_samsung.json?t=${Date.now()}`,
