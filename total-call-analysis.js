@@ -343,9 +343,11 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
           return p1 === clean || p2 === clean;
         });
         if (found) {
+          const sAppId = found.id || found.regNum || found.applicantNo || found.patientId || (clean ? ('SF-' + clean) : ('SF-' + (found.patientName || detectedName || 'S')));
+          if (!found.id) found.id = sAppId;
           return {
             isRegistered: true,
-            appId: found.id || found.regNum || found.applicantNo || 'SF-S',
+            appId: sAppId,
             patientName: found.patientName || found.customerName || detectedName || '삼성고객',
             company: '삼성화재',
             isSamsung: true,
@@ -357,9 +359,11 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
       if (detectedName) {
         const foundByName = allSheetItems.find(s => (s.patientName === detectedName || s.customerName === detectedName));
         if (foundByName) {
+          const sAppId = foundByName.id || foundByName.regNum || foundByName.applicantNo || foundByName.patientId || (clean ? ('SF-' + clean) : ('SF-' + (foundByName.patientName || detectedName || 'S')));
+          if (!foundByName.id) foundByName.id = sAppId;
           return {
             isRegistered: true,
-            appId: foundByName.id || foundByName.regNum || foundByName.applicantNo || 'SF-S',
+            appId: sAppId,
             patientName: foundByName.patientName || foundByName.customerName || detectedName,
             company: '삼성화재',
             isSamsung: true,
@@ -380,9 +384,11 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
           return p1 === clean || p2 === clean;
         });
         if (found) {
+          const sAppId = found.id || found.regNum || found.applicantNo || found.patientId || (clean ? ('SF-' + clean) : ('SF-' + (found.patientName || detectedName || 'L')));
+          if (!found.id) found.id = sAppId;
           return {
             isRegistered: true,
-            appId: found.id || 'SF-L',
+            appId: sAppId,
             patientName: found.patientName || found.customerName || detectedName || '삼성고객',
             company: '삼성화재',
             isSamsung: true,
@@ -394,9 +400,11 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
       if (detectedName) {
         const foundByName = list.find(s => (s.patientName === detectedName || s.customerName === detectedName));
         if (foundByName) {
+          const sAppId = foundByName.id || foundByName.regNum || foundByName.applicantNo || foundByName.patientId || (clean ? ('SF-' + clean) : ('SF-' + (foundByName.patientName || detectedName || 'L')));
+          if (!foundByName.id) foundByName.id = sAppId;
           return {
             isRegistered: true,
-            appId: foundByName.id || 'SF-L',
+            appId: sAppId,
             patientName: foundByName.patientName || foundByName.customerName || detectedName,
             company: '삼성화재',
             isSamsung: true,
@@ -413,9 +421,11 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
       if (clean) {
         const found = sEligible.find(s => cleanPhoneDigits(s.phone || s.applicantContact) === clean);
         if (found) {
+          const sAppId = found.id || found.regNum || found.applicantNo || found.patientId || (clean ? ('SF-' + clean) : ('SF-' + (found.patientName || detectedName || 'E')));
+          if (!found.id) found.id = sAppId;
           return {
             isRegistered: true,
-            appId: found.id || 'SF-E',
+            appId: sAppId,
             patientName: found.patientName || detectedName || '삼성고객',
             company: '삼성화재',
             isSamsung: true,
@@ -427,9 +437,11 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
       if (detectedName) {
         const foundByName = sEligible.find(s => s.patientName === detectedName);
         if (foundByName) {
+          const sAppId = foundByName.id || foundByName.regNum || foundByName.applicantNo || foundByName.patientId || (clean ? ('SF-' + clean) : ('SF-' + (foundByName.patientName || detectedName || 'E')));
+          if (!foundByName.id) foundByName.id = sAppId;
           return {
             isRegistered: true,
-            appId: foundByName.id || 'SF-E',
+            appId: sAppId,
             patientName: foundByName.patientName || detectedName,
             company: '삼성화재',
             isSamsung: true,

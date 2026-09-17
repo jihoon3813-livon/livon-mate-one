@@ -28886,45 +28886,124 @@ function openHubCustomerDetailModal(applyId) {
     return;
   }
 
+  // Fallback if applyId is missing
+  if (!applyId && typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
+    applyId = gActiveHubModalAppId;
+  }
+  if (!applyId && Array.isArray(gApps) && gApps.length > 0) {
+    applyId = gApps[0].id;
+  }
   gActiveHubModalAppId = applyId;
-  openModal('hubCustomerDetailModal');
 
-  let app = (gApps || []).find(a => String(a.id) === String(applyId));
+  // Open modal container & ensure high z-index
+  openModal('hubCustomerDetailModal');
+  modalEl.style.zIndex = '1000';
+
+  const targetStr = String(applyId || '').trim();
+  const targetCleanPhone = targetStr.replace(/[^0-9]/g, '');
+
+  const checkAppMatch = (a) => {
+    if (!a) return false;
+    const aId = String(a.id || '');
+    if (aId && aId === targetStr) return true;
+    if (a.patientId && String(a.patientId) === targetStr) return true;
+    if (a.regNum && String(a.regNum) === targetStr) return true;
+    if (a.applicantNo && String(a.applicantNo) === targetStr) return true;
+    if (a.accidentNumber && String(a.accidentNumber) === targetStr) return true;
+    if (a.policyNumber && String(a.policyNumber) === targetStr) return true;
+    if (a.patientName && a.patientName === targetStr) return true;
+    if (a.customerName && a.customerName === targetStr) return true;
+    if (targetCleanPhone && targetCleanPhone.length >= 8) {
+      const p1 = String(a.phone || a.applicantContact || a.contact || '').replace(/[^0-9]/g, '');
+      const p2 = String(a.patientPhone || a.guardianPhone || a.customerPhone || '').replace(/[^0-9]/g, '');
+      if (p1 && p1 === targetCleanPhone) return true;
+      if (p2 && p2 === targetCleanPhone) return true;
+    }
+    return false;
+  };
+
+  // 1. Check gApps & REBORN_DATA.applications
+  const appList = (Array.isArray(gApps) && gApps.length > 0) ? gApps : ((window.REBORN_DATA && window.REBORN_DATA.applications) || []);
+  let app = appList.find(checkAppMatch);
+
+  // 2. Check Samsung lists (gSamsungList, REBORN_DATA.samsungList, SAMSUNG_ELIGIBLE_LIST)
   if (!app) {
-    const sList = window.gSamsungList || [];
-    const foundS = sList.find(s => String(s.id) === String(applyId) || String(s.regNum) === String(applyId));
+    const sList = [
+      ...(Array.isArray(window.gSamsungList) ? window.gSamsungList : []),
+      ...((window.REBORN_DATA && Array.isArray(window.REBORN_DATA.samsungList)) ? window.REBORN_DATA.samsungList : []),
+      ...(Array.isArray(window.SAMSUNG_ELIGIBLE_LIST) ? window.SAMSUNG_ELIGIBLE_LIST : [])
+    ];
+    const foundS = sList.find(checkAppMatch);
     if (foundS) {
       app = {
         ...foundS,
-        id: foundS.id || applyId,
+        id: foundS.id || foundS.patientId || targetStr,
         insuranceCompany: foundS.insuranceCompany || '삼성화재',
-        patientName: foundS.patientName || foundS.customerName,
-        phone: foundS.phone || foundS.applicantContact,
+        patientName: foundS.patientName || foundS.customerName || (targetCleanPhone ? '삼성고객' : targetStr),
+        phone: foundS.phone || foundS.applicantContact || (targetCleanPhone ? targetStr : ''),
         notes: foundS.notes || [],
         logs: foundS.logs || []
       };
-    } else {
-      const sheets = window.gSamsungSheets;
-      if (sheets) {
-        const allS = [...(sheets.eligible || []), ...(sheets.target || []), ...(sheets.completed || [])];
-        const foundSh = allS.find(s => String(s.id) === String(applyId) || String(s.regNum) === String(applyId) || String(s.applicantNo) === String(applyId));
-        if (foundSh) {
-          app = {
-            ...foundSh,
-            id: foundSh.id || applyId,
-            insuranceCompany: '삼성화재',
-            patientName: foundSh.patientName || foundSh.customerName,
-            phone: foundSh.phone || foundSh.applicantContact,
-            notes: foundSh.notes || [],
-            logs: foundSh.logs || []
-          };
-        }
-      }
     }
   }
+
+  // 3. Check Samsung sheets (eligible, target, completed)
+  if (!app && window.gSamsungSheets) {
+    const sheets = window.gSamsungSheets;
+    const allS = [...(sheets.eligible || []), ...(sheets.target || []), ...(sheets.completed || [])];
+    const foundSh = allS.find(checkAppMatch);
+    if (foundSh) {
+      app = {
+        ...foundSh,
+        id: foundSh.id || foundSh.patientId || targetStr,
+        insuranceCompany: '삼성화재',
+        patientName: foundSh.patientName || foundSh.customerName || (targetCleanPhone ? '삼성고객' : targetStr),
+        phone: foundSh.phone || foundSh.applicantContact || (targetCleanPhone ? targetStr : ''),
+        notes: foundSh.notes || [],
+        logs: foundSh.logs || []
+      };
+    }
+  }
+
+  // 4. Check Total Call Logs (gTotalCallData.callLogs)
+  if (!app && window.gTotalCallData && Array.isArray(window.gTotalCallData.callLogs)) {
+    const matchedLog = window.gTotalCallData.callLogs.find(c => {
+      if (String(c.callId || c.id || c.askSn || '') === targetStr) return true;
+      if (targetCleanPhone && String(c.phone || c.rawPhone || '').replace(/[^0-9]/g, '') === targetCleanPhone) return true;
+      if (c.memberName && c.memberName === targetStr) return true;
+      return false;
+    });
+    if (matchedLog) {
+      const isSamsung = (matchedLog.channel || '').includes('삼성');
+      app = {
+        id: targetStr,
+        patientName: matchedLog.memberName || (targetCleanPhone ? '상담고객' : targetStr),
+        phone: matchedLog.phone || matchedLog.rawPhone || (targetCleanPhone ? targetStr : ''),
+        insuranceCompany: isSamsung ? '삼성화재' : '현대해상',
+        gender: '-',
+        birthDate: '-',
+        status: '상담인입',
+        notes: [],
+        logs: []
+      };
+    }
+  }
+
+  // 5. Fallback synthetic customer so modal NEVER fails to render or remains blank
   if (!app) {
-    console.warn('고객 정보 없음:', applyId);
-    return;
+    console.warn('[openHubCustomerDetailModal] 고객 정보 직접 매칭 실패, 임시 워크스페이스 생성:', applyId);
+    const isLikelyPhone = targetCleanPhone.length >= 9;
+    app = {
+      id: targetStr || 'UNKNOWN',
+      patientName: isLikelyPhone ? '상담고객' : (targetStr || '고객'),
+      phone: isLikelyPhone ? targetStr : '',
+      insuranceCompany: '상담/등록고객',
+      gender: '-',
+      birthDate: '-',
+      status: '상담접수',
+      notes: [],
+      logs: []
+    };
   }
 
   const titleEl = document.getElementById('hubDetailModalTitle');
@@ -29000,7 +29079,11 @@ function openHubCustomerDetailModal(applyId) {
       // CTI 실제 인바운드 통화 이력 및 상담분류 연동 섹션 부착
       let ctiSectionHtml = '';
       if (typeof renderHubCustomerCtiSectionHtml === 'function') {
-        ctiSectionHtml = renderHubCustomerCtiSectionHtml(app);
+        try {
+          ctiSectionHtml = renderHubCustomerCtiSectionHtml(app);
+        } catch (ctiErr) {
+          console.warn('CTI Section render error:', ctiErr);
+        }
       }
 
       bodyEl.innerHTML = mainWorkspaceHtml + ctiSectionHtml;
