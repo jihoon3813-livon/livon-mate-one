@@ -21334,7 +21334,32 @@ function toggleReferenceSubmenu(forceOpen = null) {
   }
 }
 
+function toggleMobileSidebar(forceState = null) {
+  const sidebar = document.getElementById('mainAppSidebar');
+  const backdrop = document.getElementById('mobileSidebarBackdrop');
+  if (!sidebar || !backdrop) return;
+  
+  const isCurrentlyOpen = !sidebar.classList.contains('-translate-x-full');
+  const shouldOpen = forceState !== null ? forceState : !isCurrentlyOpen;
+  
+  if (shouldOpen) {
+    sidebar.classList.remove('-translate-x-full');
+    backdrop.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden', 'lg:overflow-auto');
+  } else {
+    sidebar.classList.add('-translate-x-full');
+    backdrop.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden', 'lg:overflow-auto');
+  }
+}
+window.toggleMobileSidebar = toggleMobileSidebar;
+
 function switchTab(tabId, filterParam = null) {
+  // 모바일 사이드바 드로어가 열려있는 경우 메뉴 선택 시 자동 닫기
+  if (typeof toggleMobileSidebar === 'function' && window.innerWidth < 1024) {
+    toggleMobileSidebar(false);
+  }
+
   // 명단관리(samsungleads)에서 다른 메뉴로 이동 시 저장되지 않은 수정사항 확인
   if (gActiveTab === 'samsungleads' && tabId !== 'samsungleads' && typeof gSamsungPendingChanges !== 'undefined' && gSamsungPendingChanges && gSamsungPendingChanges.size > 0) {
     const ans = confirm(`⚠️ 명단관리에 저장되지 않은 셀 수정사항이 ${gSamsungPendingChanges.size}건 있습니다.\n\n수정사항을 저장하지 않고 다른 메뉴로 이동하시겠습니까?\n(취소를 누르면 현재 명단관리 화면에 머무릅니다)`);

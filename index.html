@@ -420,6 +420,35 @@
       display: none !important;
       pointer-events: none !important;
     }
+
+    /* =========================================================================
+       MOBILE-FIRST RESPONSIVE ENGINE (모바일 최적화 규칙)
+       ========================================================================= */
+    @media (max-width: 768px) {
+      /* Smooth touch scrolling */
+      .overflow-x-auto, .overflow-y-auto, .custom-scrollbar {
+        -webkit-overflow-scrolling: touch;
+      }
+      /* Ensure modals fit perfectly on mobile screens */
+      [id$="Modal"] > div, .modal-dialog {
+        width: 96vw !important;
+        max-width: 96vw !important;
+        max-height: 94vh !important;
+        border-radius: 1.25rem !important;
+      }
+      /* Prevent table cell breaking & maintain readable minimum sizes */
+      table {
+        min-width: 100%;
+      }
+      /* Form controls tap target sizing */
+      button, input, select, textarea {
+        touch-action: manipulation;
+      }
+      /* Ensure text wrapping doesn't push layouts */
+      .break-keep {
+        word-break: keep-all;
+      }
+    }
   </style>
   <!-- Daum Kakao Postcode API -->
   <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
@@ -427,49 +456,54 @@
 <body class="bg-slate-50 text-slate-800 antialiased h-screen overflow-hidden flex flex-col">
 
   <!-- TOP HEADER -->
-  <header class="bg-white border-b border-slate-200 flex-shrink-0 z-30 shadow-xs">
-    <div class="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <!-- Left: Logo & Brand (클릭 시 통합허브로 이동) -->
-      <div class="flex items-center space-x-3">
-        <a href="javascript:void(0)" onclick="switchTab('carehub')" class="flex items-center space-x-2.5 cursor-pointer group select-none transition-transform active:scale-[0.98]" title="통합간병 운영허브로 이동">
-          <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1789551526/unnamed_gwfeg1.webp" alt="LivOn 로고" id="brandLogoBadge" class="w-10 h-10 rounded-xl object-cover shadow-sm border border-slate-200/80 shrink-0 group-hover:shadow-md transition-all">
-          <div>
-            <div class="flex items-center space-x-2">
-              <span class="font-extrabold text-xl tracking-tight text-slate-900 group-hover:text-primary-700 transition-colors">리본메이트 원 <span class="text-sm font-semibold text-primary-600 font-sans">(Livon Mate One)</span></span>
-              <span id="brandVersionBadge" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 transition-all">ERP v3.0</span>
+  <header class="bg-white border-b border-slate-200 flex-shrink-0 z-30 shadow-xs sticky top-0">
+    <div class="w-full px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+      <!-- Left: Mobile Menu Toggle & Logo & Brand -->
+      <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+        <!-- 햄버거 메뉴 토글 버튼 (모바일 전용: lg 미만에서 표시) -->
+        <button type="button" onclick="toggleMobileSidebar()" class="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 transition-all shrink-0 cursor-pointer" title="메뉴 열기">
+          <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+
+        <a href="javascript:void(0)" onclick="switchTab('carehub')" class="flex items-center gap-2 sm:gap-2.5 cursor-pointer group select-none transition-transform active:scale-[0.98] min-w-0" title="통합간병 운영허브로 이동">
+          <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1789551526/unnamed_gwfeg1.webp" alt="LivOn 로고" id="brandLogoBadge" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover shadow-sm border border-slate-200/80 shrink-0 group-hover:shadow-md transition-all">
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5 sm:gap-2">
+              <span class="font-black text-base sm:text-xl tracking-tight text-slate-900 group-hover:text-primary-700 transition-colors truncate">리본메이트 원</span>
+              <span id="brandVersionBadge" class="hidden sm:inline-block text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 shrink-0">v3.0</span>
             </div>
-            <p class="text-xs text-slate-500 font-medium group-hover:text-slate-700 transition-colors">(주)리본케어 통합 간병인 매칭 & 보험 정산 시스템</p>
+            <p class="text-[10px] sm:text-xs text-slate-500 font-medium group-hover:text-slate-700 transition-colors hidden sm:block truncate">(주)리본케어 통합 간병인 매칭 & 보험 정산 시스템</p>
           </div>
         </a>
       </div>
 
       <!-- Right: Controls & Profile -->
-      <div class="flex items-center space-x-2.5">
-        <!-- Global Font Scale Widget -->
-        <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200" title="화면 글자 크기 조절 (상담원 편의)">
-          <button onclick="stepHubFontSize(-1)" class="w-6 h-6 flex items-center justify-center rounded-lg text-xs font-black text-slate-600 hover:text-slate-900 hover:bg-white transition-all" title="글자 작게">A-</button>
+      <div class="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        <!-- Global Font Scale Widget (md 이상에서만 표시) -->
+        <div class="hidden md:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200" title="화면 글자 크기 조절 (상담원 편의)">
+          <button onclick="stepHubFontSize(-1)" class="w-6 h-6 flex items-center justify-center rounded-lg text-xs font-black text-slate-600 hover:text-slate-900 hover:bg-white transition-all cursor-pointer" title="글자 작게">A-</button>
           <span id="headerFontSizeLabel" class="px-1 text-[11px] font-extrabold text-primary-700 min-w-[36px] text-center select-none">100%</span>
-          <button onclick="stepHubFontSize(1)" class="w-6 h-6 flex items-center justify-center rounded-lg text-xs font-black text-slate-600 hover:text-slate-900 hover:bg-white transition-all" title="글자 크게">A+</button>
+          <button onclick="stepHubFontSize(1)" class="w-6 h-6 flex items-center justify-center rounded-lg text-xs font-black text-slate-600 hover:text-slate-900 hover:bg-white transition-all cursor-pointer" title="글자 크게">A+</button>
         </div>
 
-        <button id="toggleMaskingBtn" onclick="toggleMasking()" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100">
+        <!-- 개인정보 마스킹 토글 (모바일에서는 간소화) -->
+        <button id="toggleMaskingBtn" onclick="toggleMasking()" class="flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg border text-xs font-semibold transition-all bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 shrink-0 cursor-pointer">
           <i data-lucide="eye-off" class="w-3.5 h-3.5"></i>
-          <span id="maskingStatusText">개인정보 마스킹 ON</span>
+          <span id="maskingStatusText" class="hidden xs:inline sm:inline">마스킹 ON</span>
         </button>
 
-
-        <button onclick="switchTab('claims', '미확인')" class="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg" title="미확인 청구건 바로가기">
-          <i data-lucide="bell" class="w-5 h-5 text-rose-500"></i>
-          <span id="unpaidAlertBadge" class="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border-2 border-white" style="display:none;">0</span>
+        <button onclick="switchTab('claims', '미확인')" class="relative p-1.5 sm:p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg shrink-0 cursor-pointer" title="미확인 청구건 바로가기">
+          <i data-lucide="bell" class="w-4 h-4 sm:w-5 sm:h-5 text-rose-500"></i>
+          <span id="unpaidAlertBadge" class="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] sm:min-w-[18px] sm:h-[18px] px-1 bg-rose-500 text-white text-[9px] sm:text-[10px] font-black rounded-full flex items-center justify-center shadow-xs border-2 border-white" style="display:none;">0</span>
         </button>
 
-        <button onclick="switchTab('settings')" class="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all" title="시스템 환경설정">
-          <i data-lucide="settings" class="w-5 h-5"></i>
+        <button onclick="switchTab('settings')" class="p-1.5 sm:p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all shrink-0 cursor-pointer" title="시스템 환경설정">
+          <i data-lucide="settings" class="w-4 h-4 sm:w-5 sm:h-5"></i>
         </button>
 
-        <!-- Theme Selector (7가지 테마 원클릭) -->
-        <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200" title="시스템 테마 변경">
-          <span class="text-[10px] font-bold text-slate-500 px-1 hidden sm:inline">테마:</span>
+        <!-- Theme Selector (lg 이상에서만 표시) -->
+        <div class="hidden lg:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0" title="시스템 테마 변경">
+          <span class="text-[10px] font-bold text-slate-500 px-1">테마:</span>
           <select id="themeSelect" onchange="setAppTheme(this.value)" class="bg-white border border-slate-300 text-xs font-bold rounded-lg px-2.5 py-1 focus:ring-1 focus:ring-primary-500 cursor-pointer text-slate-800">
             <option value="theme-mono">🖤 모던 모노 (눈 편한 흑백·미니멀)</option>
             <option value="theme-default">🎨 기본 (슬레이트)</option>
@@ -481,15 +515,16 @@
           </select>
         </div>
 
-        <div class="flex items-center space-x-2 pl-2 border-l border-slate-200">
-          <div class="w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-xs" id="headerAdminAvatar">
+        <!-- Admin Profile & Logout -->
+        <div class="flex items-center gap-1.5 sm:gap-2 pl-1.5 sm:pl-2 border-l border-slate-200 shrink-0">
+          <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-[11px] sm:text-xs shrink-0" id="headerAdminAvatar">
             리본
           </div>
           <div class="hidden xl:block text-left">
             <div class="text-xs font-bold text-slate-800" id="headerAdminName">김리본 (대표)</div>
             <div class="text-[10px] text-slate-500" id="headerAdminRole">최고관리자 (SUPER_ADMIN)</div>
           </div>
-          <button onclick="handleAdminLogout()" class="px-2.5 py-1.5 rounded-lg border border-slate-300 hover:bg-rose-50 hover:text-rose-700 text-slate-600 text-xs font-bold flex items-center gap-1 transition-all" title="관리자 로그아웃">
+          <button onclick="handleAdminLogout()" class="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-slate-300 hover:bg-rose-50 hover:text-rose-700 text-slate-600 text-xs font-bold flex items-center gap-1 transition-all shrink-0 cursor-pointer" title="관리자 로그아웃">
             <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
             <span class="hidden sm:inline">로그아웃</span>
           </button>
@@ -499,10 +534,24 @@
   </header>
 
   <!-- BODY WRAPPER -->
-  <div class="flex flex-1 overflow-hidden">
+  <div class="flex flex-1 overflow-hidden relative">
 
-    <!-- SIDEBAR -->
-    <aside class="w-72 bg-slate-900 text-slate-300 flex-shrink-0 flex flex-col justify-between hidden lg:flex z-20 h-full overflow-hidden">
+    <!-- MOBILE SIDEBAR BACKDROP (모바일 딤 오버레이) -->
+    <div id="mobileSidebarBackdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 hidden lg:hidden transition-opacity" onclick="toggleMobileSidebar(false)"></div>
+
+    <!-- SIDEBAR (데스크톱 고정 + 모바일 슬라이드 드로어) -->
+    <aside id="mainAppSidebar" class="w-72 bg-slate-900 text-slate-300 flex-shrink-0 flex flex-col justify-between fixed lg:static inset-y-0 left-0 z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-200 ease-in-out h-full overflow-hidden shadow-2xl lg:shadow-none">
+      <!-- 모바일 상단 닫기 헤더 -->
+      <div class="flex items-center justify-between p-3.5 border-b border-slate-800 lg:hidden bg-slate-950/80">
+        <div class="flex items-center gap-2">
+          <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1789551526/unnamed_gwfeg1.webp" class="w-6 h-6 rounded-lg object-cover">
+          <span class="font-black text-white text-sm">전체 메뉴</span>
+        </div>
+        <button type="button" onclick="toggleMobileSidebar(false)" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
       <div class="py-4 px-3.5 space-y-1.5 flex-1 overflow-y-auto custom-scrollbar">
         
         <!-- 1. 대시보드 -->
@@ -709,82 +758,82 @@
       <section id="tab-carehub" class="tab-content space-y-5">
         
         <!-- Header & Quick KPIs -->
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div class="flex items-center gap-2.5">
-              <span class="p-2 rounded-xl bg-gradient-to-tr from-primary-600 to-indigo-600 text-white font-black text-sm shadow-xs">
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
+          <div class="min-w-0">
+            <div class="flex items-start sm:items-center gap-2.5 sm:gap-3">
+              <span class="shrink-0 p-2 sm:p-2.5 rounded-xl bg-gradient-to-tr from-primary-600 to-indigo-600 text-white font-black text-sm shadow-xs mt-0.5 sm:mt-0">
                 <i data-lucide="layers" class="w-5 h-5"></i>
               </span>
-              <div>
-                <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                  통합 간병 운영 허브 <span class="text-xs px-2.5 py-1 rounded-full bg-primary-50 text-primary-700 font-bold border border-primary-200">고객 전과정 원스탑</span>
+              <div class="min-w-0">
+                <h1 class="text-lg sm:text-2xl font-black text-slate-900 tracking-tight flex flex-wrap items-center gap-1.5 sm:gap-2 break-keep">
+                  <span>통합 간병 운영 허브</span>
+                  <span class="text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-primary-50 text-primary-700 font-bold border border-primary-200 shrink-0">고객 전과정 원스탑</span>
                 </h1>
-                <p class="text-xs text-slate-500 mt-0.5">
+                <p class="text-[11px] sm:text-xs text-slate-500 mt-1 line-clamp-2 sm:line-clamp-none break-keep">
                   고객 1명을 중심으로 [접수 ➔ 간병인 배정 ➔ 음성일지 ➔ 보험 청구/수납 ➔ 센터 지급 ➔ 손사 팩스 전송]까지 모든 업무를 한 화면에서 종결합니다.
                 </p>
               </div>
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2">
-
-            <button onclick="switchTab('carecalendar')" class="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-200 text-xs font-black shadow-2xs transition-all cursor-pointer" title="월별/주별 스마트 간병캘린더 화면으로 이동">
-              <i data-lucide="calendar-days" class="w-4 h-4 text-sky-600"></i>
-              <span>간병캘린더</span>
+          <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto">
+            <button onclick="switchTab('carecalendar')" class="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-200 text-xs font-black shadow-2xs transition-all cursor-pointer" title="월별/주별 스마트 간병캘린더 화면으로 이동">
+              <i data-lucide="calendar-days" class="w-4 h-4 text-sky-600 shrink-0"></i>
+              <span class="truncate">간병캘린더</span>
             </button>
-            <button onclick="refreshLatestData()" class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all cursor-pointer" title="Convex Cloud 실시간 최신자료 즉시 조회">
-              <i data-lucide="refresh-cw" id="hubRefreshBtnIcon" class="w-4 h-4"></i>
-              <span>최신자료 조회</span>
+            <button onclick="refreshLatestData()" class="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all cursor-pointer" title="Convex Cloud 실시간 최신자료 즉시 조회">
+              <i data-lucide="refresh-cw" id="hubRefreshBtnIcon" class="w-4 h-4 shrink-0"></i>
+              <span class="truncate">최신자료 조회</span>
             </button>
-            <button onclick="openNewAppModal()" class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold shadow-md shadow-primary-600/20 transition-all">
-              <i data-lucide="user-plus" class="w-4 h-4"></i>
-              <span>신규 고객 접수</span>
+            <button onclick="openNewAppModal()" class="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold shadow-md shadow-primary-600/20 transition-all">
+              <i data-lucide="user-plus" class="w-4 h-4 shrink-0"></i>
+              <span class="truncate">신규 고객 접수</span>
             </button>
-            <button onclick="exportTableToCSV('hubListTable', '통합간병운영허브.csv')" class="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold">
-              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
-              <span>전체 엑셀</span>
+            <button onclick="exportTableToCSV('hubListTable', '통합간병운영허브.csv')" class="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-3 sm:py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+              <span class="truncate">전체 엑셀</span>
             </button>
           </div>
         </div>
 
         <!-- 6-Stage Pipeline Quick Filter Tabs -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-2 relative z-10">
-          <button onclick="setHubFilter('ALL')" id="hubFilterBtn-ALL" class="hub-filter-btn active p-3 rounded-xl border transition-all text-left bg-primary-600 text-white border-primary-600 shadow-sm">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5 mb-2 relative z-10">
+          <button onclick="setHubFilter('ALL')" id="hubFilterBtn-ALL" class="hub-filter-btn active p-2.5 sm:p-3 rounded-xl border transition-all text-left bg-primary-600 text-white border-primary-600 shadow-sm">
             <div class="text-[11px] font-semibold text-primary-100">전체 고객</div>
-            <div class="text-xl font-black mt-0.5" id="hubCount-ALL">-건</div>
+            <div class="text-lg sm:text-xl font-black mt-0.5" id="hubCount-ALL">-건</div>
           </button>
-          <button onclick="setHubFilter('NEED_ASSIGN')" id="hubFilterBtn-NEED_ASSIGN" class="hub-filter-btn p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
+          <button onclick="setHubFilter('NEED_ASSIGN')" id="hubFilterBtn-NEED_ASSIGN" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
             <div class="text-[11px] font-semibold text-slate-500">① 배정 대기</div>
-            <div class="text-xl font-black text-amber-600 mt-0.5" id="hubCount-NEED_ASSIGN">-건</div>
+            <div class="text-lg sm:text-xl font-black text-amber-600 mt-0.5" id="hubCount-NEED_ASSIGN">-건</div>
           </button>
-          <button onclick="setHubFilter('IN_PROGRESS')" id="hubFilterBtn-IN_PROGRESS" class="hub-filter-btn p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
+          <button onclick="setHubFilter('IN_PROGRESS')" id="hubFilterBtn-IN_PROGRESS" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
             <div class="text-[11px] font-semibold text-slate-500">② 간병 진행중</div>
-            <div class="text-xl font-black text-sky-600 mt-0.5" id="hubCount-IN_PROGRESS">-건</div>
+            <div class="text-lg sm:text-xl font-black text-sky-600 mt-0.5" id="hubCount-IN_PROGRESS">-건</div>
           </button>
-          <button onclick="setHubFilter('UNPAID_CLAIM')" id="hubFilterBtn-UNPAID_CLAIM" class="hub-filter-btn p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-rose-200">
+          <button onclick="setHubFilter('UNPAID_CLAIM')" id="hubFilterBtn-UNPAID_CLAIM" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-rose-200">
             <div class="text-[11px] font-bold text-rose-600 flex items-center justify-between">
               <span>④ 미수금 대사</span>
               <span class="w-2 h-2 rounded-full bg-rose-500"></span>
             </div>
-            <div class="text-xl font-black text-rose-600 mt-0.5" id="hubCount-UNPAID_CLAIM">-건</div>
+            <div class="text-lg sm:text-xl font-black text-rose-600 mt-0.5" id="hubCount-UNPAID_CLAIM">-건</div>
           </button>
-          <button onclick="setHubFilter('NEED_PAYOUT')" id="hubFilterBtn-NEED_PAYOUT" class="hub-filter-btn p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
+          <button onclick="setHubFilter('NEED_PAYOUT')" id="hubFilterBtn-NEED_PAYOUT" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
             <div class="text-[11px] font-semibold text-slate-500">⑤ 지급 대기</div>
-            <div class="text-xl font-black text-teal-600 mt-0.5" id="hubCount-NEED_PAYOUT">-건</div>
+            <div class="text-lg sm:text-xl font-black text-teal-600 mt-0.5" id="hubCount-NEED_PAYOUT">-건</div>
           </button>
-          <button onclick="setHubFilter('NEED_FAX')" id="hubFilterBtn-NEED_FAX" class="hub-filter-btn p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
+          <button onclick="setHubFilter('NEED_FAX')" id="hubFilterBtn-NEED_FAX" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
             <div class="text-[11px] font-semibold text-slate-500">⑥ 팩스 전송대기</div>
-            <div class="text-xl font-black text-purple-600 mt-0.5" id="hubCount-NEED_FAX">-건</div>
+            <div class="text-lg sm:text-xl font-black text-purple-600 mt-0.5" id="hubCount-NEED_FAX">-건</div>
           </button>
         </div>
 
         <!-- STICKY FILTER & SEARCH CONTROLS BAR (세로 스크롤 시 상단 완전 불투명 고정 및 슬림 1행 디자인) -->
         <div class="sticky-filter-bar rounded-2xl">
           
-          <div class="bg-white px-3.5 py-2.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-2 overflow-x-auto whitespace-nowrap">
+          <div class="bg-white px-3 sm:px-3.5 py-2.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-2 overflow-x-auto whitespace-nowrap custom-scrollbar">
             <!-- Left Controls: 검색 + 원수사 + 정렬 + 열보기(1열/2열/3열) -->
-            <div class="flex items-center gap-2 flex-shrink-0">
-              <div class="relative w-48 sm:w-56">
+            <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+              <div class="relative w-36 sm:w-56">
                 <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
                 <input type="search" id="hubSearchInput" name="carehub_search_unique" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly onfocus="this.removeAttribute('readonly');" onblur="this.setAttribute('readonly', true);" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-form-type="other" aria-autocomplete="none" role="searchbox" value="" oninput="onHubSearchInput()" placeholder="고객명, 간병인, 사고번호..." class="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:outline-none bg-slate-50 focus:bg-white font-medium">
                 <button type="button" id="btnHubSearchClear" onclick="clearHubSearch()" class="hidden absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 cursor-pointer" title="검색어 지우기">
@@ -1366,30 +1415,30 @@
           </div>
           
           <!-- 우측 상단 메인 액션 버튼 모음 (1줄 통일) -->
-          <div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
-            <button type="button" onclick="switchTab('samsungcallreport')" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap" title="삼성화재 콜분석 (주간보고) 바로가기">
-              <i data-lucide="phone-forwarded" class="w-3.5 h-3.5 text-blue-600"></i>
-              <span>콜분석 바로가기</span>
+          <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full xl:w-auto">
+            <button type="button" onclick="switchTab('samsungcallreport')" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap" title="삼성화재 콜분석 (주간보고) 바로가기">
+              <i data-lucide="phone-forwarded" class="w-3.5 h-3.5 text-blue-600 shrink-0"></i>
+              <span class="truncate">콜분석 바로가기</span>
             </button>
-            <button type="button" onclick="switchTab('samsungclaimhub')" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap" title="삼성화재 접수/청구관리 (이메일) 바로가기">
-              <i data-lucide="mail-check" class="w-3.5 h-3.5 text-emerald-600"></i>
-              <span>접수/청구관리</span>
+            <button type="button" onclick="switchTab('samsungclaimhub')" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap" title="삼성화재 접수/청구관리 (이메일) 바로가기">
+              <i data-lucide="mail-check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+              <span class="truncate">접수/청구관리</span>
             </button>
-            <button type="button" onclick="syncSamsungSpreadsheetData()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap" title="전산에 등록된 삼성화재 접수/완료 고객 데이터를 엑셀 시트에 최신 동기화">
-              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-indigo-600"></i>
-              <span>전산 데이터 동기화</span>
+            <button type="button" onclick="syncSamsungSpreadsheetData()" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap" title="전산에 등록된 삼성화재 접수/완료 고객 데이터를 엑셀 시트에 최신 동기화">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-indigo-600 shrink-0"></i>
+              <span class="truncate">전산 동기화</span>
             </button>
-            <button type="button" onclick="addSamsungSpreadsheetRow()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap">
-              <i data-lucide="plus" class="w-3.5 h-3.5 text-slate-600"></i>
-              <span>행 추가</span>
+            <button type="button" onclick="addSamsungSpreadsheetRow()" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap">
+              <i data-lucide="plus" class="w-3.5 h-3.5 text-slate-600 shrink-0"></i>
+              <span class="truncate">행 추가</span>
             </button>
-            <button type="button" onclick="openSamsungExcelModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-xs transition-all whitespace-nowrap shrink-0 cursor-pointer" title="삼성화재에서 일일 전달받은 누적 사전명단 엑셀 업로드">
-              <i data-lucide="upload" class="w-3.5 h-3.5"></i>
-              <span>사전명단 엑셀 업로드</span>
+            <button type="button" onclick="openSamsungExcelModal()" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-xs transition-all whitespace-nowrap shrink-0 cursor-pointer" title="삼성화재에서 일일 전달받은 누적 사전명단 엑셀 업로드">
+              <i data-lucide="upload" class="w-3.5 h-3.5 shrink-0"></i>
+              <span class="truncate">사전명단 업로드</span>
             </button>
-            <button type="button" onclick="exportSamsungMultiSheetExcel()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs transition-all whitespace-nowrap shrink-0 cursor-pointer" title="[대상자], [완료], [연락처] 시트가 모두 포함된 통합 엑셀 파일 다운로드">
-              <i data-lucide="download" class="w-4 h-4"></i>
-              <span>통합 엑셀 다운로드 (.xlsx)</span>
+            <button type="button" onclick="exportSamsungMultiSheetExcel()" class="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs transition-all whitespace-nowrap shrink-0 cursor-pointer" title="[대상자], [완료], [연락처] 시트가 모두 포함된 통합 엑셀 파일 다운로드">
+              <i data-lucide="download" class="w-4 h-4 shrink-0"></i>
+              <span class="truncate">통합 엑셀 다운</span>
             </button>
           </div>
         </div>
@@ -1547,19 +1596,19 @@
             </div>
           </div>
 
-          <div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
-            <button type="button" onclick="switchTab('samsungcallreport')" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap" title="삼성화재 콜분석 (주간보고) 바로가기">
-              <i data-lucide="phone-forwarded" class="w-4 h-4 text-blue-600"></i>
-              <span>콜분석 바로가기</span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 xl:flex xl:flex-wrap items-center gap-2 w-full xl:w-auto">
+            <button type="button" onclick="switchTab('samsungcallreport')" class="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap" title="삼성화재 콜분석 (주간보고) 바로가기">
+              <i data-lucide="phone-forwarded" class="w-4 h-4 text-blue-600 shrink-0"></i>
+              <span class="truncate">콜분석 바로가기</span>
             </button>
-            <button type="button" onclick="openSamsungAddressBookModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap">
-              <i data-lucide="book-user" class="w-4 h-4 text-indigo-600"></i>
-              <span>이메일 주소록 관리</span>
+            <button type="button" onclick="openSamsungAddressBookModal()" class="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap">
+              <i data-lucide="book-user" class="w-4 h-4 text-indigo-600 shrink-0"></i>
+              <span class="truncate">이메일 주소록</span>
               <span id="samsungAddressCountBadge" class="px-1.5 py-0.2 rounded-full bg-indigo-200 text-indigo-900 text-[10px] font-bold">0</span>
             </button>
-            <button type="button" onclick="switchTab('samsunglist')" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap">
-              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-sky-600"></i>
-              <span>명단관리 바로가기</span>
+            <button type="button" onclick="switchTab('samsunglist')" class="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-sky-600 shrink-0"></i>
+              <span class="truncate">명단관리 바로가기</span>
             </button>
           </div>
         </div>
@@ -2364,14 +2413,14 @@
 
       <!-- ==================== TAB: FORM TEMPLATE CENTER ==================== -->
       <section id="tab-forms" class="tab-content hidden space-y-5">
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200 flex-shrink-0">
               <i data-lucide="files" class="w-5 h-5"></i>
             </div>
             <div>
-              <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
-                보험사별 양식/서식 센터 (Form Template Center)
+              <h2 class="text-base sm:text-xl font-black text-slate-900 flex flex-wrap items-center gap-1.5 sm:gap-2 break-keep">
+                <span>보험사별 양식/서식 센터 (Form Template Center)</span>
                 <span class="text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">공문서 표준</span>
               </h2>
               <p class="text-xs text-slate-500 mt-0.5">
@@ -2381,22 +2430,22 @@
           </div>
           
           <!-- 양식 설정 백업/내보내기 & 운영 불러오기 버튼 그룹 -->
-          <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-shrink-0">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full sm:w-auto flex-shrink-0">
             <!-- 1. 양식 설정 백업/내보내기 -->
             <button type="button" onclick="exportFormConfigsJson()" 
-              class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap"
+              class="px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap"
               title="모든 서식의 필드 배치 좌표 및 등록 배경 이미지를 JSON 파일로 백업/내보내기">
-              <i data-lucide="download" class="w-3.5 h-3.5 text-amber-400"></i>
-              <span>양식 설정 백업 (내보내기)</span>
+              <i data-lucide="download" class="w-3.5 h-3.5 text-amber-400 shrink-0"></i>
+              <span class="truncate">양식 설정 백업</span>
             </button>
 
             <!-- 2. 양식 설정 불러오기 (가져오기) -->
             <input type="file" id="importFormConfigFileInput" accept=".json,application/json" class="hidden" onchange="handleImportFormConfigsJson(event)">
             <button type="button" onclick="document.getElementById('importFormConfigFileInput').click()" 
-              class="px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap"
+              class="px-3.5 py-2 sm:py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap"
               title="개발 환경에서 백업받은 JSON 파일을 불러와 운영 환경에 즉시 100% 동기화 적용">
-              <i data-lucide="upload" class="w-3.5 h-3.5"></i>
-              <span>양식 설정 불러오기 (가져오기)</span>
+              <i data-lucide="upload" class="w-3.5 h-3.5 shrink-0"></i>
+              <span class="truncate">양식 설정 가져오기</span>
             </button>
           </div>
         </div>
@@ -2410,14 +2459,14 @@
       <section id="tab-faxmgmt" class="tab-content hidden space-y-5">
         
         <!-- Top Header Banner -->
-        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div class="flex items-center gap-3.5">
             <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-200 shadow-2xs flex-shrink-0">
               <i data-lucide="printer" class="w-6 h-6"></i>
             </div>
             <div>
-              <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
-                종합 팩스 발송 관리 (Fax Management)
+              <h2 class="text-base sm:text-xl font-black text-slate-900 flex flex-wrap items-center gap-1.5 sm:gap-2 break-keep">
+                <span>종합 팩스 발송 관리 (Fax Management)</span>
                 <span class="text-xs px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold border border-purple-200">송신·결과·디렉토리</span>
               </h2>
               <p class="text-xs text-slate-500 mt-0.5">
@@ -2426,18 +2475,18 @@
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2">
-            <button onclick="openFaxSettingsModal()" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 transition-all cursor-pointer" title="팩스 테스트 모드, 리다이렉트 번호 및 바로빌 연동 설정">
-              <i data-lucide="flask-conical" class="w-4 h-4 text-amber-300"></i>
-              <span>팩스 테스트 및 연동 설정</span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full md:w-auto">
+            <button onclick="openFaxSettingsModal()" class="flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 transition-all cursor-pointer whitespace-nowrap" title="팩스 테스트 모드, 리다이렉트 번호 및 바로빌 연동 설정">
+              <i data-lucide="flask-conical" class="w-4 h-4 text-amber-300 shrink-0"></i>
+              <span class="truncate">연동 설정</span>
             </button>
-            <button onclick="openFaxDirectoryModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold shadow-xs transition-all cursor-pointer">
-              <i data-lucide="book-plus" class="w-4 h-4 text-purple-300"></i>
-              <span>손사 팩스번호 등록</span>
+            <button onclick="openFaxDirectoryModal()" class="flex items-center justify-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold shadow-xs transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="book-plus" class="w-4 h-4 text-purple-300 shrink-0"></i>
+              <span class="truncate">손사 팩스 등록</span>
             </button>
-            <button onclick="exportFaxLogsToCSV()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold cursor-pointer">
-              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
-              <span>발송대장 엑셀</span>
+            <button onclick="exportFaxLogsToCSV()" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold cursor-pointer whitespace-nowrap">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+              <span class="truncate">발송대장 엑셀</span>
             </button>
           </div>
         </div>
@@ -2674,8 +2723,8 @@
         
         <div class="sticky-filter-bar rounded-2xl">
           <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-            <div class="flex flex-wrap items-center gap-2.5">
-              <div class="relative w-64">
+            <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+              <div class="relative w-full sm:w-64">
                 <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
                 <input type="text" id="appSearchInput" placeholder="고객명, 신청ID, 연락처, 손사..." class="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:outline-none">
               </div>
@@ -2700,24 +2749,24 @@
               </select>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
               <!-- Batch Delete Button -->
-              <button id="btnDeleteSelectedApps" onclick="deleteSelectedApps()" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                <span id="deleteSelectedAppsText">선택 삭제 (0)</span>
+              <button id="btnDeleteSelectedApps" onclick="deleteSelectedApps()" disabled class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5 shrink-0"></i>
+                <span id="deleteSelectedAppsText" class="truncate">선택 삭제 (0)</span>
               </button>
-              <button id="btnExportSelected-applications" onclick="exportLedgerToExcel('applications', 'SELECTED')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all">
-                <i data-lucide="check-square" class="w-3.5 h-3.5 text-emerald-600"></i>
-                <span id="labelExportSelected-applications">선택 엑셀 (0)</span>
+              <button id="btnExportSelected-applications" onclick="exportLedgerToExcel('applications', 'SELECTED')" class="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all">
+                <i data-lucide="check-square" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+                <span id="labelExportSelected-applications" class="truncate">선택 엑셀 (0)</span>
               </button>
-              <button onclick="exportLedgerToExcel('applications', 'ALL')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
-                <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-600"></i>
-                <span>전체 엑셀</span>
+              <button onclick="exportLedgerToExcel('applications', 'ALL')" class="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
+                <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+                <span class="truncate">전체 엑셀</span>
               </button>
-              <span class="text-xs text-slate-500">결과: <b id="appFilteredCount" class="text-primary-700 font-bold">-</b>건</span>
-              <button onclick="openNewAppModal()" class="flex items-center gap-1 px-3.5 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold shadow-xs">
-                <i data-lucide="plus" class="w-3.5 h-3.5"></i> 신규신청 등록
+              <button onclick="openNewAppModal()" class="flex items-center justify-center gap-1 px-3.5 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold shadow-xs">
+                <i data-lucide="plus" class="w-3.5 h-3.5 shrink-0"></i> <span class="truncate">신규신청 등록</span>
               </button>
+              <span class="text-xs text-slate-500 col-span-2 text-center sm:text-left sm:col-span-1">결과: <b id="appFilteredCount" class="text-primary-700 font-bold">-</b>건</span>
             </div>
           </div>
         </div>
@@ -2774,8 +2823,8 @@
         
         <div class="sticky-filter-bar rounded-2xl">
           <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-            <div class="flex flex-wrap items-center gap-2.5">
-              <div class="relative w-64">
+            <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+              <div class="relative w-full sm:w-64">
                 <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
                 <input type="text" id="assignSearchInput" placeholder="간병인명, 고객명, 배정ID, 센터..." class="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:outline-none">
               </div>
@@ -2790,23 +2839,23 @@
               </select>
             </div>
 
-            <div class="flex items-center gap-2">
-              <span class="text-xs text-slate-500">배정 건수: <b id="assignFilteredCount" class="text-emerald-700 font-bold">-</b>건</span>
-              <button id="btnDeleteSelected-assignments" onclick="deleteSelectedLedgerRows('assignments')" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                <span id="labelDeleteSelected-assignments">선택 삭제 (0)</span>
+            <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
+              <button id="btnDeleteSelected-assignments" onclick="deleteSelectedLedgerRows('assignments')" disabled class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5 shrink-0"></i>
+                <span id="labelDeleteSelected-assignments" class="truncate">선택 삭제 (0)</span>
               </button>
-              <button id="btnExportSelected-assignments" onclick="exportLedgerToExcel('assignments', 'SELECTED')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all">
-                <i data-lucide="check-square" class="w-3.5 h-3.5 text-emerald-600"></i>
-                <span id="labelExportSelected-assignments">선택 엑셀 (0)</span>
+              <button id="btnExportSelected-assignments" onclick="exportLedgerToExcel('assignments', 'SELECTED')" class="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all">
+                <i data-lucide="check-square" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+                <span id="labelExportSelected-assignments" class="truncate">선택 엑셀 (0)</span>
               </button>
-              <button onclick="exportLedgerToExcel('assignments', 'ALL')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
-                <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-600"></i>
-                <span>전체 엑셀</span>
+              <button onclick="exportLedgerToExcel('assignments', 'ALL')" class="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
+                <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+                <span class="truncate">전체 엑셀</span>
               </button>
-              <button onclick="openNewAssignModal()" class="flex items-center gap-1 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs">
-                <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> 간병인 배정 등록
+              <button onclick="openNewAssignModal()" class="flex items-center justify-center gap-1 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs">
+                <i data-lucide="user-plus" class="w-3.5 h-3.5 shrink-0"></i> <span class="truncate">배정 등록</span>
               </button>
+              <span class="text-xs text-slate-500 col-span-2 text-center sm:text-left sm:col-span-1">배정: <b id="assignFilteredCount" class="text-emerald-700 font-bold">-</b>건</span>
             </div>
           </div>
         </div>
@@ -2968,8 +3017,8 @@
 
         <div class="sticky-filter-bar rounded-2xl">
           <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-            <div class="flex flex-wrap items-center gap-2.5">
-              <div class="relative w-64">
+            <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+              <div class="relative w-full sm:w-64">
                 <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
                 <input type="text" id="claimSearchInput" placeholder="고객명, 청구ID, 회차, 메모..." class="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:outline-none">
               </div>
@@ -2981,21 +3030,21 @@
               </select>
             </div>
 
-            <div class="flex items-center gap-2">
-              <button onclick="openRuleClaimCalcModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs">
-                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> 청구금액 수정 ✏️
+            <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
+              <button onclick="openRuleClaimCalcModal()" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5 shrink-0"></i> <span class="truncate">청구금액 수정 ✏️</span>
               </button>
-              <button id="btnDeleteSelected-claims" onclick="deleteSelectedLedgerRows('claims')" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                <span id="labelDeleteSelected-claims">선택 삭제 (0)</span>
+              <button id="btnDeleteSelected-claims" onclick="deleteSelectedLedgerRows('claims')" disabled class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5 shrink-0"></i>
+                <span id="labelDeleteSelected-claims" class="truncate">선택 삭제 (0)</span>
               </button>
-              <button id="btnExportSelected-claims" onclick="exportLedgerToExcel('claims', 'SELECTED')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all">
-                <i data-lucide="check-square" class="w-3.5 h-3.5 text-amber-600"></i>
-                <span id="labelExportSelected-claims">선택 엑셀 (0)</span>
+              <button id="btnExportSelected-claims" onclick="exportLedgerToExcel('claims', 'SELECTED')" class="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all">
+                <i data-lucide="check-square" class="w-3.5 h-3.5 text-amber-600 shrink-0"></i>
+                <span id="labelExportSelected-claims" class="truncate">선택 엑셀 (0)</span>
               </button>
-              <button onclick="exportLedgerToExcel('claims', 'ALL')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
-                <i data-lucide="download" class="w-3.5 h-3.5 text-amber-600"></i>
-                <span>전체 엑셀</span>
+              <button onclick="exportLedgerToExcel('claims', 'ALL')" class="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
+                <i data-lucide="download" class="w-3.5 h-3.5 text-amber-600 shrink-0"></i>
+                <span class="truncate">전체 엑셀</span>
               </button>
             </div>
           </div>
@@ -3036,8 +3085,8 @@
         
         <div class="sticky-filter-bar rounded-2xl">
           <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-            <div class="flex flex-wrap items-center gap-2.5">
-              <div class="relative w-64">
+            <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+              <div class="relative w-full sm:w-64">
                 <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
                 <input type="text" id="payoutSearchInput" placeholder="간병인명, 고객명, 지급ID, 회차..." class="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:outline-none">
               </div>
@@ -3048,20 +3097,20 @@
               </select>
             </div>
 
-            <div class="flex items-center gap-2">
-              <span class="text-xs text-slate-500">지급 건수: <b id="payoutFilteredCount" class="text-teal-700 font-bold">-</b>건</span>
-              <button id="btnDeleteSelected-payouts" onclick="deleteSelectedLedgerRows('payouts')" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                <span id="labelDeleteSelected-payouts">선택 삭제 (0)</span>
+            <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
+              <button id="btnDeleteSelected-payouts" onclick="deleteSelectedLedgerRows('payouts')" disabled class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5 shrink-0"></i>
+                <span id="labelDeleteSelected-payouts" class="truncate">선택 삭제 (0)</span>
               </button>
-              <button id="btnExportSelected-payouts" onclick="exportLedgerToExcel('payouts', 'SELECTED')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all">
-                <i data-lucide="check-square" class="w-3.5 h-3.5 text-teal-600"></i>
-                <span id="labelExportSelected-payouts">선택 엑셀 (0)</span>
+              <button id="btnExportSelected-payouts" onclick="exportLedgerToExcel('payouts', 'SELECTED')" class="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition-all">
+                <i data-lucide="check-square" class="w-3.5 h-3.5 text-teal-600 shrink-0"></i>
+                <span id="labelExportSelected-payouts" class="truncate">선택 엑셀 (0)</span>
               </button>
-              <button onclick="exportLedgerToExcel('payouts', 'ALL')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
-                <i data-lucide="download" class="w-3.5 h-3.5 text-teal-600"></i>
-                <span>전체 엑셀</span>
+              <button onclick="exportLedgerToExcel('payouts', 'ALL')" class="flex items-center justify-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all">
+                <i data-lucide="download" class="w-3.5 h-3.5 text-teal-600 shrink-0"></i>
+                <span class="truncate">전체 엑셀</span>
               </button>
+              <span class="text-xs text-slate-500 flex items-center justify-center col-span-1 text-center sm:text-left">지급: <b id="payoutFilteredCount" class="text-teal-700 font-bold ml-1">-</b>건</span>
             </div>
           </div>
         </div>
