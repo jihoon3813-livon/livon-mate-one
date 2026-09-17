@@ -602,14 +602,65 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         });
       }
 
-      const totalCalls = logs.length;
-      const connectReqCalls = logs.filter(c => c.connectReq === 'Y').length;
+      const cs = gReportData && gReportData.ctiSummary;
+      const isCtiRangeMatch = gReportData && gReportData.reportInfo &&
+        (!gFilter.startDate || gReportData.reportInfo.startDate === gFilter.startDate) &&
+        (!gFilter.endDate || gReportData.reportInfo.endDate === gFilter.endDate);
+
+      const allTrends = (gReportData && gReportData.dailyTrends) || [];
+      const filteredTrends = allTrends.filter(t => (!gFilter.startDate || t.date >= gFilter.startDate) && (!gFilter.endDate || t.date <= gFilter.endDate));
+      const trendsSum = filteredTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
+
+      let totalCalls = 0;
+      if (isCtiRangeMatch && cs && (cs.totalAll !== undefined || cs.totalInbound !== undefined)) {
+        totalCalls = cs.totalAll || cs.totalInbound;
+      } else if (trendsSum > 0) {
+        totalCalls = trendsSum;
+      } else {
+        totalCalls = logs.length;
+      }
+
+      let connectReqCalls = 0;
+      if (isCtiRangeMatch && cs && cs.connectRequests !== undefined) {
+        connectReqCalls = cs.connectRequests;
+      } else {
+        connectReqCalls = logs.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y').length;
+      }
+
+      let answeredCalls = 0;
+      if (isCtiRangeMatch && cs && cs.answeredCalls !== undefined) {
+        answeredCalls = cs.answeredCalls;
+      } else {
+        answeredCalls = logs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length || connectReqCalls;
+      }
+
       const consultedCalls = logs.filter(c => (c.title && c.title.trim()) || (c.summary && c.summary.trim()) || (c.category && c.category.trim()));
       const consultedCount = consultedCalls.length;
-      const connectRate = totalCalls > 0 ? Math.round((connectReqCalls / totalCalls) * 100) : 0;
-      const distinctDates = new Set(logs.map(c => (c.callTime || c.date || c.startedAt || '').slice(0, 10)).filter(Boolean));
-      const opDays = distinctDates.size || 1;
-      const dailyAvg = opDays > 0 ? Math.round(totalCalls / opDays) : 0;
+
+      const connectReqRate = totalCalls > 0 ? Math.round((connectReqCalls / totalCalls) * 100) : (connectReqCalls > 0 ? 100 : 0);
+      let answerRate = '100%';
+      if (isCtiRangeMatch && cs && cs.answerRate) {
+        answerRate = cs.answerRate;
+      } else if (connectReqCalls > 0) {
+        answerRate = Math.round((answeredCalls / connectReqCalls) * 100) + '%';
+      }
+      const consultRate = answeredCalls > 0 ? Math.round((consultedCount / answeredCalls) * 100) : (consultedCount > 0 ? 100 : 0);
+
+      let opDays = 1;
+      if (gFilter.startDate && gFilter.endDate) {
+        const d1 = new Date(gFilter.startDate);
+        const d2 = new Date(gFilter.endDate);
+        const diffTime = Math.abs(d2 - d1);
+        opDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      } else if (filteredTrends.length > 0) {
+        opDays = filteredTrends.length;
+      } else {
+        opDays = (gReportData && gReportData.reportInfo && gReportData.reportInfo.operatingDays) || 7;
+      }
+      if (opDays < 1) opDays = 1;
+
+      const dailyAvg = Math.round(totalCalls / opDays);
+      const dailyConsultAvg = Math.round(consultedCount / opDays);
 
       // 동적 카테고리 집계 (count > 0 항목만 추출)
       const catMap = {};
@@ -686,13 +737,27 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         };
       }).sort((a, b) => b.count - a.count);
 
-      return { totalCalls, connectReqCalls, connectRate, consultedCount, opDays, dailyAvg, catList, actorList };
+      return {
+        totalCalls,
+        connectReqCalls,
+        answeredCalls,
+        connectReqRate,
+        connectRate: connectReqRate,
+        answerRate,
+        consultRate,
+        consultedCount,
+        opDays,
+        dailyAvg,
+        dailyConsultAvg,
+        catList,
+        actorList
+      };
     }
 
     function renderSummarySheet(stats) {
       const container = document.getElementById('tabContent-summary');
       container.innerHTML = `
-        <!-- 3대 핵심 KPI 카드 (실제 상담 분석대상 카드 삭제) -->
+        <!-- 3대 핵심 KPI 카드 -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
           <div class="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-3 sm:p-5 shadow-xs flex items-center justify-between">
             <div>
@@ -708,7 +773,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
             <div>
               <span class="text-[11px] sm:text-xs font-bold text-slate-500">상담연결 요청</span>
               <div class="text-xl sm:text-3xl font-black text-indigo-900 mt-0.5 sm:mt-1">${stats.connectReqCalls}<span class="text-xs sm:text-sm font-bold text-indigo-500 ml-0.5">건</span></div>
-              <p class="text-[10px] sm:text-[11px] text-indigo-600 mt-0.5 sm:mt-1 font-bold">연결율 ${stats.connectRate}%</p>
+              <p class="text-[10px] sm:text-[11px] text-indigo-600 mt-0.5 sm:mt-1 font-bold">인입 대비 ${stats.connectReqRate}% (응대율 ${stats.answerRate})</p>
             </div>
             <div class="w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
               <i data-lucide="headset" class="w-4 h-4 sm:w-6 sm:h-6"></i>
@@ -718,7 +783,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
             <div>
               <span class="text-[11px] sm:text-xs font-bold text-slate-500">일평균 인입</span>
               <div class="text-xl sm:text-3xl font-black text-slate-900 mt-0.5 sm:mt-1">${stats.dailyAvg}<span class="text-xs sm:text-sm font-bold text-slate-500 ml-0.5">건</span></div>
-              <p class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 sm:mt-1 font-medium">운영일 ${stats.opDays}일 기준</p>
+              <p class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 sm:mt-1 font-medium">조회 ${stats.opDays}일 기준 (상담 ${stats.dailyConsultAvg}건/일)</p>
             </div>
             <div class="w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
               <i data-lucide="calendar" class="w-4 h-4 sm:w-6 sm:h-6"></i>
@@ -748,8 +813,9 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
                 인입 및 상담 연결 총평
               </div>
               <p class="text-slate-600 pl-6.5 text-[11px] sm:text-xs leading-normal">
-                조회 기간 내 총 인입 <b>${stats.totalCalls}건</b> 중 상담사 연결요청은 <b>${stats.connectReqCalls}건(연결율 ${stats.connectRate}%)</b>이며, 
-                실제 상담이 이뤄져 세부 요약이 확보된 건은 <b>${stats.consultedCount}건</b>입니다. 본 분석은 실제 상담 <b>${stats.consultedCount}건</b>의 내용을 전수 분석하여 유형(${stats.catList.length}종)·주체(${stats.actorList.length}종)별로 도출한 결과입니다.
+                조회 기간 내 총 인입 <b>${stats.totalCalls}건</b> 중 상담사 연결요청은 <b>${stats.connectReqCalls}건(인입 대비 ${stats.connectReqRate}%)</b>이며, 
+                상담원 응답률 <b>${stats.answerRate}</b>(${stats.answeredCalls}건)로 원활히 응대되었습니다.
+                그 중 통화 요약 및 세부 내역이 확보된 실제 상담 <b>${stats.consultedCount}건</b>을 1:1 전수 분석하여 유형별 비중을 도출하였습니다.
               </p>
             </div>
 

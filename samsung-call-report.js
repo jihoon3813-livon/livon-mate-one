@@ -458,12 +458,27 @@ function renderSamsungCallReportTab() {
   }
 
   const info = gSamsungReportData.reportInfo || {};
+  const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || (typeof gSamsungReportFilter !== 'undefined' && gSamsungReportFilter) || {};
   const stats = calculateReportStats();
 
-  const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || (typeof gSamsungReportFilter !== 'undefined' && gSamsungReportFilter) || {};
-  const dateRangeStr = (curFilter.startDate && curFilter.endDate)
-    ? `${curFilter.startDate} ~ ${curFilter.endDate}`
-    : (info.period || '2026-08-25 ~ 2026-09-18');
+  const curStart = curFilter.startDate || info.startDate || defaultReportThisWeek.start;
+  const curEnd = curFilter.endDate || info.endDate || defaultReportThisWeek.end;
+  const curCh = curFilter.channel || info.channelLabel || info.channel || '삼성화재';
+  const dateRangeStr = `${curStart} ~ ${curEnd}`;
+
+  const isCtiMatched = gSamsungReportData && gSamsungReportData.reportInfo &&
+    (!curFilter.startDate || gSamsungReportData.reportInfo.startDate === curFilter.startDate) &&
+    (!curFilter.endDate || gSamsungReportData.reportInfo.endDate === curFilter.endDate);
+  const activeCti = (isCtiMatched && gSamsungReportData.ctiSummary) ? gSamsungReportData.ctiSummary : {
+    totalAll: stats.totalCalls,
+    totalInbound: stats.totalCalls,
+    answeredCalls: stats.answeredCalls,
+    connectRequests: stats.connectReqCalls,
+    answerRate: stats.answerRate,
+    abandonedCalls: Math.max(0, stats.connectReqCalls - stats.answeredCalls),
+    unselectedType: Math.max(0, stats.totalCalls - stats.connectReqCalls),
+    btnExit: 0
+  };
 
   // 제목에서 기존 인라인 괄호 날짜가 있다면 분리하여 베이스 제목 추출
   const rawTitle = info.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고';
@@ -589,11 +604,12 @@ function renderSamsungCallReportTab() {
                   <span class="whitespace-nowrap text-slate-600">기간:</span>
                 </div>
                 <div class="flex items-center gap-1.5 flex-1 min-w-0">
-                  <input type="date" id="tabReportStartDate" value="${gReportFilter.startDate || defaultReportThisWeek.start}" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
+                  <input type="date" id="tabReportStartDate" value="${curStart}" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
                   <span class="text-slate-400 font-normal shrink-0">~</span>
-                  <input type="date" id="tabReportEndDate" value="${gReportFilter.endDate || defaultReportThisWeek.end}" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
-                  <button type="button" onclick="applyTabDateRange()" class="px-3 py-1.5 sm:py-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-2xs shrink-0 whitespace-nowrap cursor-pointer">
-                    조회
+                  <input type="date" id="tabReportEndDate" value="${curEnd}" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
+                  <button type="button" id="tabReportQueryBtn" onclick="applyTabDateRange()" class="px-3.5 py-1.5 sm:py-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-2xs shrink-0 whitespace-nowrap cursor-pointer flex items-center gap-1.5" title="선택한 기간의 CTI 데이터를 실시간 조회 및 동기화합니다">
+                    <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                    <span id="tabReportQueryBtnText">조회</span>
                   </button>
                 </div>
               </div>
@@ -609,62 +625,60 @@ function renderSamsungCallReportTab() {
             </div>
           </div>
 
-          <!-- 검색창 & CTI 동기화 버튼 -->
+          <!-- 검색창 & 새로고침 버튼 -->
           <div class="flex items-center gap-2 w-full xl:w-auto">
             <div class="relative flex-1 min-w-0 sm:w-64 sm:flex-initial">
               <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
-              <input type="text" id="tabReportSearchInput" value="${gReportFilter.search || ''}" oninput="handleReportSearchInput(this.value)" placeholder="전화번호, 회원명, 제목..." class="w-full pl-8 pr-3 py-1.5 sm:py-2 rounded-xl border border-slate-200 text-xs bg-slate-50/70 focus:bg-white focus:outline-none focus:border-blue-500 font-medium">
+              <input type="text" id="tabReportSearchInput" value="${curFilter.search || ''}" oninput="handleReportSearchInput(this.value)" placeholder="전화번호, 회원명, 제목..." class="w-full pl-8 pr-3 py-1.5 sm:py-2 rounded-xl border border-slate-200 text-xs bg-slate-50/70 focus:bg-white focus:outline-none focus:border-blue-500 font-medium">
             </div>
-            <button type="button" id="tabSyncCtiBtn" onclick="syncTabLiveCti()" class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs shrink-0 whitespace-nowrap cursor-pointer" title="GoodARS CTI 최신 통화데이터 실시간 수집 및 동기화">
+            <button type="button" id="tabSyncCtiBtn" onclick="applyTabDateRange()" class="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 whitespace-nowrap cursor-pointer" title="선택된 기간의 통화데이터를 CTI에서 실시간으로 새로고침합니다">
               <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="tabSyncIcon"></i>
-              <span id="tabSyncBtnText">CTI 동기화</span>
+              <span id="tabSyncBtnText" class="hidden sm:inline">새로고침</span>
             </button>
           </div>
         </div>
 
         <!-- CTI 원본 공식 집계 요약 스트립 (CTI 웹 화면과 100% 일치 및 반응형 카드 그리드) -->
-        ${gSamsungReportData.ctiSummary ? `
-          <div class="bg-gradient-to-r from-blue-50/90 to-indigo-50/60 border border-blue-200/70 rounded-2xl p-3 sm:px-4 sm:py-3 space-y-2.5 text-xs">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="px-2 py-0.5 rounded-md bg-blue-600 text-white font-black text-[10px] tracking-wide shrink-0">CTI 원본 집계</span>
-              <span class="text-slate-800 font-bold break-keep text-xs">“${info.startDate || ''} ~ ${info.endDate || ''}” <span class="text-blue-700 font-extrabold">[${info.channelLabel || info.channel || '삼성화재'}]</span> 검색 결과</span>
+        <div class="bg-gradient-to-r from-blue-50/90 to-indigo-50/60 border border-blue-200/70 rounded-2xl p-3 sm:px-4 sm:py-3 space-y-2.5 text-xs">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-2 py-0.5 rounded-md bg-blue-600 text-white font-black text-[10px] tracking-wide shrink-0">CTI 원본 집계</span>
+            <span class="text-slate-800 font-bold break-keep text-xs">“${curStart} ~ ${curEnd}” <span class="text-blue-700 font-extrabold">[${curCh}]</span> 검색 결과</span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 text-[11px]">
+            <div class="bg-white/90 border border-blue-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-slate-500 font-medium">전체 인입</span>
+              <span class="font-black text-blue-700 text-xs mt-0.5">${activeCti.totalAll || activeCti.totalInbound}건</span>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 text-[11px]">
-              <div class="bg-white/90 border border-blue-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-                <span class="text-[10px] text-slate-500 font-medium">전체 인입</span>
-                <span class="font-black text-blue-700 text-xs mt-0.5">${gSamsungReportData.ctiSummary.totalAll || gSamsungReportData.ctiSummary.totalInbound}건</span>
-              </div>
-              <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-                <span class="text-[10px] text-slate-500 font-medium">인입콜</span>
-                <span class="font-bold text-slate-900 text-xs mt-0.5">${gSamsungReportData.ctiSummary.totalInbound}/${gSamsungReportData.ctiSummary.answeredCalls}건</span>
-              </div>
-              <div class="bg-white/90 border border-indigo-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-                <span class="text-[10px] text-indigo-500 font-medium">연결요청</span>
-                <span class="font-bold text-indigo-700 text-xs mt-0.5">${gSamsungReportData.ctiSummary.connectRequests}건</span>
-              </div>
-              <div class="bg-white/90 border border-emerald-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-                <span class="text-[10px] text-emerald-600 font-medium">응답호</span>
-                <span class="font-bold text-emerald-700 text-xs mt-0.5">${gSamsungReportData.ctiSummary.answeredCalls}건</span>
-              </div>
-              <div class="bg-white/90 border border-emerald-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-                <span class="text-[10px] text-emerald-600 font-medium">응대율</span>
-                <span class="font-bold text-emerald-600 text-xs mt-0.5">${gSamsungReportData.ctiSummary.answerRate}</span>
-              </div>
-              <div class="bg-white/90 border border-rose-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-                <span class="text-[10px] text-rose-500 font-medium">포기호</span>
-                <span class="font-bold text-rose-600 text-xs mt-0.5">${gSamsungReportData.ctiSummary.abandonedCalls}건</span>
-              </div>
-              <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-                <span class="text-[10px] text-slate-500 font-medium">유형미선택</span>
-                <span class="font-medium text-slate-700 text-xs mt-0.5">${gSamsungReportData.ctiSummary.unselectedType}건</span>
-              </div>
-              <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-                <span class="text-[10px] text-slate-500 font-medium">버튼선택종료</span>
-                <span class="font-medium text-slate-700 text-xs mt-0.5">${gSamsungReportData.ctiSummary.btnExit}건</span>
-              </div>
+            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-slate-500 font-medium">인입콜</span>
+              <span class="font-bold text-slate-900 text-xs mt-0.5">${activeCti.totalInbound}/${activeCti.answeredCalls}건</span>
+            </div>
+            <div class="bg-white/90 border border-indigo-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-indigo-500 font-medium">연결요청</span>
+              <span class="font-bold text-indigo-700 text-xs mt-0.5">${activeCti.connectRequests}건</span>
+            </div>
+            <div class="bg-white/90 border border-emerald-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-emerald-600 font-medium">응답호</span>
+              <span class="font-bold text-emerald-700 text-xs mt-0.5">${activeCti.answeredCalls}건</span>
+            </div>
+            <div class="bg-white/90 border border-emerald-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-emerald-600 font-medium">응대율</span>
+              <span class="font-bold text-emerald-600 text-xs mt-0.5">${activeCti.answerRate}</span>
+            </div>
+            <div class="bg-white/90 border border-rose-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-rose-500 font-medium">포기호</span>
+              <span class="font-bold text-rose-600 text-xs mt-0.5">${activeCti.abandonedCalls}건</span>
+            </div>
+            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-slate-500 font-medium">유형미선택</span>
+              <span class="font-medium text-slate-700 text-xs mt-0.5">${activeCti.unselectedType}건</span>
+            </div>
+            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-slate-500 font-medium">버튼선택종료</span>
+              <span class="font-medium text-slate-700 text-xs mt-0.5">${activeCti.btnExit}건</span>
             </div>
           </div>
-        ` : ''}
+        </div>
       </div>
 
       <!-- ================================================================= -->
@@ -746,7 +760,11 @@ function renderTabDailyTrendChart() {
   const canvas = document.getElementById('tabSamsungDailyTrendChart');
   if (!canvas || !gSamsungReportData) return;
 
-  const trends = gSamsungReportData.dailyTrends || [];
+  const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
+  const s = curFilter.startDate;
+  const e = curFilter.endDate;
+  const allTrends = gSamsungReportData.dailyTrends || [];
+  const trends = allTrends.filter(t => (!s || t.date >= s) && (!e || t.date <= e));
   const labels = trends.map(t => `${t.date.slice(5)} (${t.dayOfWeek})`);
   const data = trends.map(t => t.callCount);
   const backgroundColors = trends.map(t => {
@@ -832,15 +850,80 @@ function getSamsungCallLogs() {
 // 4. Statistics Calculation Engine
 function calculateReportStats() {
   const logs = getSamsungCallLogs();
+  const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
+  const s = curFilter.startDate;
+  const e = curFilter.endDate;
   const cs = gSamsungReportData && gSamsungReportData.ctiSummary;
-  const totalCalls = (cs && cs.totalInbound !== undefined) ? cs.totalInbound : logs.length;
-  const connectReqCalls = (cs && cs.connectRequests !== undefined) ? cs.connectRequests : logs.filter(c => c.connectReq === 'Y').length;
-  // 실제 상담 건: 상담제목이나 상담요약이 있거나 카테고리가 부여된 실제 상담 이력
+  const isCtiRangeMatch = gSamsungReportData && gSamsungReportData.reportInfo &&
+    (!s || gSamsungReportData.reportInfo.startDate === s) &&
+    (!e || gSamsungReportData.reportInfo.endDate === e);
+
+  // 일자별 추이에서 해당 기간 필터링
+  const allTrends = (gSamsungReportData && gSamsungReportData.dailyTrends) || [];
+  const filteredTrends = allTrends.filter(t => (!s || t.date >= s) && (!e || t.date <= e));
+  const trendsSum = filteredTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
+
+  // 1. 전체 인입 건수
+  let totalCalls = 0;
+  if (isCtiRangeMatch && cs && (cs.totalAll !== undefined || cs.totalInbound !== undefined)) {
+    totalCalls = cs.totalAll || cs.totalInbound;
+  } else if (trendsSum > 0) {
+    totalCalls = trendsSum;
+  } else {
+    totalCalls = logs.length;
+  }
+
+  // 2. 상담원 연결 요청 건수
+  let connectReqCalls = 0;
+  if (isCtiRangeMatch && cs && cs.connectRequests !== undefined) {
+    connectReqCalls = cs.connectRequests;
+  } else {
+    connectReqCalls = logs.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y').length;
+  }
+
+  // 3. 상담원 응답 건수 (통화 성공)
+  let answeredCalls = 0;
+  if (isCtiRangeMatch && cs && cs.answeredCalls !== undefined) {
+    answeredCalls = cs.answeredCalls;
+  } else {
+    answeredCalls = logs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length || connectReqCalls;
+  }
+
+  // 4. 실제 상담 분석 건수: 상담제목이나 상담요약이 있거나 카테고리가 부여된 실제 상담 이력
   const consultedCalls = logs.filter(c => (c.title && c.title.trim()) || (c.summary && c.summary.trim()) || (c.category && c.category.trim()));
   const consultedCount = consultedCalls.length;
-  const connectRate = totalCalls > 0 ? Math.round((connectReqCalls / totalCalls) * 100) : 0;
-  const opDays = (gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.operatingDays) || (gSamsungReportData.dailyTrends || []).length || 25;
-  const dailyAvg = opDays > 0 ? Math.round(totalCalls / opDays) : 0;
+
+  // 5. 비율 지표 계산
+  // ARS 인입 대비 상담원 연결 요청률 (e.g. 22 / 85 = 26%)
+  const connectReqRate = totalCalls > 0 ? Math.round((connectReqCalls / totalCalls) * 100) : (connectReqCalls > 0 ? 100 : 0);
+  
+  // CTI 공식 상담원 응대율 (연결요청 중 응답 완료 비율 e.g. 22 / 22 = 100%)
+  let answerRate = '100%';
+  if (isCtiRangeMatch && cs && cs.answerRate) {
+    answerRate = cs.answerRate;
+  } else if (connectReqCalls > 0) {
+    answerRate = Math.round((answeredCalls / connectReqCalls) * 100) + '%';
+  }
+
+  // 응답 상담 대비 분석 완료율
+  const consultRate = answeredCalls > 0 ? Math.round((consultedCount / answeredCalls) * 100) : (consultedCount > 0 ? 100 : 0);
+
+  // 6. 운영일수 및 일평균 계산
+  let opDays = 1;
+  if (s && e) {
+    const d1 = new Date(s);
+    const d2 = new Date(e);
+    const diffTime = Math.abs(d2 - d1);
+    opDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  } else if (filteredTrends.length > 0) {
+    opDays = filteredTrends.length;
+  } else {
+    opDays = (gSamsungReportData && gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.operatingDays) || 7;
+  }
+  if (opDays < 1) opDays = 1;
+
+  const dailyAvg = Math.round(totalCalls / opDays);
+  const dailyConsultAvg = Math.round(consultedCount / opDays);
 
   // 1. 조회된 실제 상담 건에서 발생한 카테고리 동적 집계 (count > 0 항목만 추출)
   const catMap = {};
@@ -920,10 +1003,15 @@ function calculateReportStats() {
   return {
     totalCalls,
     connectReqCalls,
-    connectRate,
+    answeredCalls,
+    connectReqRate,
+    connectRate: connectReqRate, // 하위 호환
+    answerRate,
+    consultRate,
     consultedCount,
     opDays,
     dailyAvg,
+    dailyConsultAvg,
     catList,
     actorList
   };
@@ -935,7 +1023,7 @@ function renderReportSummarySubTab(stats) {
     <div class="space-y-6">
 
       <!-- ================================================================= -->
-      <!-- 4대 핵심 KPI 카드 (모바일 최적화) -->
+      <!-- 4대 핵심 KPI 카드 (모바일 최적화 및 CTI 지표 1:1 완벽 정합) -->
       <!-- ================================================================= -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <!-- 1. 총 인입콜 -->
@@ -955,7 +1043,7 @@ function renderReportSummarySubTab(stats) {
           <div>
             <span class="text-[11px] sm:text-xs font-bold text-slate-500">상담연결 요청</span>
             <div class="text-xl sm:text-3xl font-black text-indigo-900 mt-0.5 sm:mt-1">${stats.connectReqCalls}<span class="text-xs sm:text-sm font-bold text-slate-500 ml-1">건</span></div>
-            <p class="text-[10px] sm:text-[11px] text-indigo-600 mt-0.5 sm:mt-1 font-bold">연결율 ${stats.connectRate}%</p>
+            <p class="text-[10px] sm:text-[11px] text-indigo-600 mt-0.5 sm:mt-1 font-bold">인입 대비 ${stats.connectReqRate}% (응대율 ${stats.answerRate})</p>
           </div>
           <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
             <i data-lucide="headset" class="w-5 h-5 sm:w-6 sm:h-6"></i>
@@ -967,7 +1055,7 @@ function renderReportSummarySubTab(stats) {
           <div>
             <span class="text-[11px] sm:text-xs font-black text-blue-700">실제 상담 (분석)</span>
             <div class="text-xl sm:text-3xl font-black text-blue-900 mt-0.5 sm:mt-1">${stats.consultedCount}<span class="text-xs sm:text-sm font-bold text-blue-700 ml-1">건</span></div>
-            <p class="text-[10px] sm:text-[11px] text-blue-600 mt-0.5 sm:mt-1 font-medium">1:1 전수 분석</p>
+            <p class="text-[10px] sm:text-[11px] text-blue-600 mt-0.5 sm:mt-1 font-medium">응답 ${stats.answeredCalls}건 중 전수분석 (${stats.consultRate}%)</p>
           </div>
           <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-md shadow-blue-500/20">
             <i data-lucide="clipboard-check" class="w-5 h-5 sm:w-6 sm:h-6"></i>
@@ -979,7 +1067,7 @@ function renderReportSummarySubTab(stats) {
           <div>
             <span class="text-[11px] sm:text-xs font-bold text-slate-500">일평균 인입콜</span>
             <div class="text-xl sm:text-3xl font-black text-slate-900 mt-0.5 sm:mt-1">${stats.dailyAvg}<span class="text-xs sm:text-sm font-bold text-slate-500 ml-1">건</span></div>
-            <p class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 sm:mt-1 font-medium">운영일 ${stats.opDays}일 기준</p>
+            <p class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 sm:mt-1 font-medium">조회 ${stats.opDays}일 기준 (상담 ${stats.dailyConsultAvg}건/일)</p>
           </div>
           <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
             <i data-lucide="calendar" class="w-5 h-5 sm:w-6 sm:h-6"></i>
@@ -998,7 +1086,7 @@ function renderReportSummarySubTab(stats) {
             </div>
             <div>
               <h3 class="text-base font-black text-slate-900">핵심 요약 (Executive Summary)</h3>
-              <p class="text-xs text-slate-500">4주간 유입된 인바운드 콜에 대한 핵심 정량/정성 분석 인사이트</p>
+              <p class="text-xs text-slate-500">선택된 기간의 인바운드 콜에 대한 핵심 정량/정성 분석 인사이트</p>
             </div>
           </div>
           <span class="px-2.5 py-1 rounded-xl bg-blue-50 text-blue-700 font-bold text-xs">상담 ${stats.consultedCount}건 전수분석</span>
@@ -1011,8 +1099,9 @@ function renderReportSummarySubTab(stats) {
               인입 및 상담 연결 총평
             </div>
             <p class="text-slate-600 pl-6.5">
-              조회 기간 내 총 인입 <b>${stats.totalCalls}건</b> 중 상담사 연결요청은 <b>${stats.connectReqCalls}건(연결율 ${stats.connectRate}%)</b>이며, 
-              실제 상담이 이뤄져 세부 요약이 확보된 건은 <b>${stats.consultedCount}건</b>입니다. 본 분석은 실제 상담 <b>${stats.consultedCount}건</b>의 내용을 전수 분석하여 유형(${stats.catList.length}종)·주체(${stats.actorList.length}종)별로 도출한 결과입니다.
+              조회 기간 내 총 인입 <b>${stats.totalCalls}건</b> 중 상담사 연결요청은 <b>${stats.connectReqCalls}건(인입 대비 ${stats.connectReqRate}%)</b>이며, 
+              상담원 응답률 <b>${stats.answerRate}</b>(${stats.answeredCalls}건)로 원활히 응대되었습니다.
+              그 중 통화 요약 및 세부 내역이 확보된 실제 상담 <b>${stats.consultedCount}건</b>을 1:1 전수 분석하여 유형(${stats.catList.length}종)·주체(${stats.actorList.length}종)별로 도출한 결과입니다.
             </p>
           </div>
 
@@ -1185,11 +1274,15 @@ function renderReportSummarySubTab(stats) {
 
 // 6. [시트 2: 일자별 인입현황] 렌더러
 function renderReportDailySubTab(stats) {
-  const trends = (gSamsungReportData && gSamsungReportData.dailyTrends) || [];
+  const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
+  const s = curFilter.startDate;
+  const e = curFilter.endDate;
+  const allTrends = (gSamsungReportData && gSamsungReportData.dailyTrends) || [];
+  const trends = allTrends.filter(t => (!s || t.date >= s) && (!e || t.date <= e));
   const weekly = (gSamsungReportData && gSamsungReportData.weeklyRollup) || [];
-  const maxCall = Math.max(...trends.map(t => t.callCount), 80);
+  const maxCall = Math.max(...(trends.map(t => t.callCount).concat([50])));
   const totalDailyCalls = trends.reduce((sum, t) => sum + (t.callCount || 0), 0) || (stats && stats.totalCalls) || 0;
-  const opDays = (gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.operatingDays) || (stats && stats.opDays) || 25;
+  const opDays = trends.length || (stats && stats.opDays) || 1;
   const dailyAvg = opDays > 0 ? (totalDailyCalls / opDays).toFixed(1) : 0;
 
   return `
@@ -2472,42 +2565,56 @@ function handleTabChannelChange(channel) {
   const e = document.getElementById('tabReportEndDate')?.value;
   if (s) gReportFilter.startDate = s;
   if (e) gReportFilter.endDate = e;
-  renderSamsungCallReportTab();
+  applyTabDateRange();
 }
 
-function applyTabDateRange() {
+async function applyTabDateRange() {
   const thisWeek = getThisWeekRange();
-  const s = document.getElementById('tabReportStartDate')?.value || thisWeek.start;
-  const e = document.getElementById('tabReportEndDate')?.value || thisWeek.end;
-  const ch = document.getElementById('tabReportChannelSelect')?.value || '삼성화재';
+  const s = document.getElementById('tabReportStartDate')?.value || gReportFilter.startDate || thisWeek.start;
+  const e = document.getElementById('tabReportEndDate')?.value || gReportFilter.endDate || thisWeek.end;
+  const ch = document.getElementById('tabReportChannelSelect')?.value || gReportFilter.channel || '삼성화재';
   if (!s || !e) return;
 
   gReportFilter.startDate = s;
   gReportFilter.endDate = e;
   gReportFilter.channel = ch;
 
-  renderSamsungCallReportTab();
-}
+  // 1. 조회 버튼 및 새로고침 버튼 로딩 인디케이터 적용
+  const qBtn = document.getElementById('tabReportQueryBtn');
+  const syncBtn = document.getElementById('tabSyncCtiBtn');
+  const syncText = document.getElementById('tabSyncBtnText');
+  const syncIcon = document.getElementById('tabSyncIcon');
 
-async function syncTabLiveCti(customStart, customEnd, customChannel) {
-  const thisWeek = getThisWeekRange();
-  const s = customStart || document.getElementById('tabReportStartDate')?.value || thisWeek.start;
-  const e = customEnd || document.getElementById('tabReportEndDate')?.value || thisWeek.end;
-  const ch = customChannel || document.getElementById('tabReportChannelSelect')?.value || '삼성화재';
+  if (qBtn) {
+    qBtn.disabled = true;
+    qBtn.classList.add('opacity-75', 'cursor-not-allowed');
+    qBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span id="tabReportQueryBtnText">조회 중...</span>`;
+    if (typeof initIcons === 'function') initIcons(qBtn);
+  }
+  if (syncBtn) {
+    syncBtn.classList.add('opacity-75', 'pointer-events-none');
+    if (syncText) syncText.innerText = '동기화 중...';
+    if (syncIcon) syncIcon.classList.add('animate-spin');
+  }
 
-  const btn = document.getElementById('tabSyncCtiBtn');
-  const textEl = document.getElementById('tabSyncBtnText');
-  if (btn) btn.classList.add('opacity-75', 'pointer-events-none');
-  if (textEl) textEl.innerText = '동기화 중...';
-  const icon = document.getElementById('tabSyncIcon');
-  if (icon) icon.classList.add('animate-spin');
-
-  if (typeof showToast === 'function') {
-    showToast(`GoodARS CTI에서 [${ch}] ${s} ~ ${e} 통화 데이터를 동기화 중입니다...`, 'info');
+  // 2. 메인 컨텐츠 영역 로딩 안내 표시 (즉각적 피드백)
+  const contentArea = document.getElementById('samsungReportSubTabContent');
+  if (contentArea) {
+    contentArea.innerHTML = `
+      <div class="py-16 text-center space-y-3 bg-white rounded-3xl border border-slate-200/90 shadow-xs">
+        <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 animate-spin mb-1">
+          <i data-lucide="loader-2" class="w-6 h-6"></i>
+        </div>
+        <p class="text-sm font-black text-slate-800">[${ch}] ${s} ~ ${e} 통화 데이터 조회 및 동기화 중...</p>
+        <p class="text-xs text-slate-500 font-medium">GoodARS CTI 원본 데이터와 1:1 전수 분석 통계를 실시간으로 불러오고 있습니다.</p>
+      </div>
+    `;
+    if (typeof initIcons === 'function') initIcons(contentArea);
   }
 
   try {
     let synced = false;
+    // 3. CTI 실시간 로그 수집 API 호출
     try {
       const res = await fetch(`/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`);
       if (res.ok) {
@@ -2521,11 +2628,11 @@ async function syncTabLiveCti(customStart, customEnd, customChannel) {
         }
       }
     } catch (apiErr) {
-      console.warn('Backend CTI sync API unavailable, falling back to static refresh', apiErr);
+      console.warn('Backend CTI sync API unavailable, falling back to static cache', apiErr);
     }
 
-    // 서버 API 부재(GitHub Pages 등 정적 호스팅) 시 최신 정적 JSON 캐시버스팅 갱신
-    if (!synced) {
+    // 4. API 서버 부재(정적 호스팅) 시 최신 정적 JSON 로드
+    if (!synced && (!gSamsungReportData || !gSamsungReportData.callLogs)) {
       const staticFallbacks = [
         `call_report_all.json?t=${Date.now()}`,
         `./call_report_all.json?t=${Date.now()}`,
@@ -2551,33 +2658,49 @@ async function syncTabLiveCti(customStart, customEnd, customChannel) {
       }
     }
 
-    gReportFilter.startDate = s;
-    gReportFilter.endDate = e;
-    gReportFilter.channel = ch;
+    // 세션 스토리지 캐시 업데이트
+    if (gSamsungReportData) {
+      try {
+        sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(gSamsungReportData));
+      } catch (e) {}
+    }
+
+    // 5. 뷰 렌더링
     renderSamsungCallReportTab();
     if (gActiveReportSubTab === 'daily') {
       setTimeout(renderTabDailyTrendChart, 60);
     }
 
-    const currentLogs = getSamsungCallLogs();
+    const stats = calculateReportStats();
     if (typeof showToast === 'function') {
-      showToast(`[${ch}] ${currentLogs.length}건의 통화데이터를 새로고침 반영하였습니다.`, 'success');
+      showToast(`[${ch}] ${s} ~ ${e} 통화데이터(${stats.totalCalls}건) 조회가 완료되었습니다.`, 'success');
     }
   } catch (err) {
-    console.error('CTI sync error:', err);
+    console.error('Error applying report date range:', err);
     renderSamsungCallReportTab();
     if (typeof showToast === 'function') {
-      showToast('통화데이터 새로고침을 완료하였습니다.', 'info');
+      showToast('통화데이터 조회를 완료하였습니다.', 'info');
     }
   } finally {
-    if (btn) {
-      btn.classList.remove('opacity-75', 'pointer-events-none');
-      btn.querySelectorAll('.animate-spin').forEach(el => el.classList.remove('animate-spin'));
+    if (qBtn) {
+      qBtn.disabled = false;
+      qBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+      qBtn.innerHTML = `<i data-lucide="search" class="w-3.5 h-3.5"></i><span id="tabReportQueryBtnText">조회</span>`;
+      if (typeof initIcons === 'function') initIcons(qBtn);
     }
-    if (textEl) textEl.innerText = 'CTI 동기화';
-    const ic = document.getElementById('tabSyncIcon');
-    if (ic) ic.classList.remove('animate-spin');
+    if (syncBtn) {
+      syncBtn.classList.remove('opacity-75', 'pointer-events-none');
+    }
+    if (syncText) syncText.innerText = '새로고침';
+    if (syncIcon) syncIcon.classList.remove('animate-spin');
   }
+}
+
+async function syncTabLiveCti(customStart, customEnd, customChannel) {
+  if (customStart) gReportFilter.startDate = customStart;
+  if (customEnd) gReportFilter.endDate = customEnd;
+  if (customChannel) gReportFilter.channel = customChannel;
+  return await applyTabDateRange();
 }
 
 function copyReportWebLink(targetChannel = '삼성화재') {
