@@ -8810,18 +8810,19 @@ async function checkSamsungDriveStatus() {
     gSamsungDriveLastSyncedFile = syncedFile;
     updateSamsungDriveSyncUI(syncedAt, syncedFile, count);
 
-    // 브라우저 로컬 데이터 건수와 구글 드라이브 최신 동기화 파일 건수 비교
-    const storedCount = Number(localStorage.getItem('LIVON_SAMSUNG_COUNT')) || 0;
-    const currentCount = (Array.isArray(gSamsungList) && gSamsungList.length > 0) ? gSamsungList.length : storedCount;
-    const isCountMismatch = count > 0 && Math.abs(currentCount - count) > 10;
-    const needsSync = data.hasNewFile || isCountMismatch;
+    // 오직 실제로 구글 드라이브에 더 최신 파일이 감지된 경우(hasNewFile === true)에만 신규파일 배지를 노출합니다.
+    const hasRealNewFile = !!(data && data.hasNewFile);
 
-    if (needsSync) {
+    if (hasRealNewFile) {
       if (alertEl) alertEl.classList.remove('hidden');
-      console.log(`[SamsungDrive] 구글 드라이브 최신 명단 자동 반영 감지 (신규파일:${data.hasNewFile}, 브라우저건수:${currentCount}, 구글드라이브건수:${count}). 자동 동기화를 실행합니다...`);
+      console.log(`[SamsungDrive] 구글 드라이브 최신 명단 신규 파일 감지됨! (파일: ${data.latestFile?.filename || '신규'}). 자동 동기화를 실행합니다...`);
       await triggerSamsungDriveSync(true);
     } else {
       if (alertEl) alertEl.classList.add('hidden');
+      // 신규 파일은 없으나 브라우저 메모리에 명단이 비어있는 경우 화면 깜빡임 없이 조용히 기존 캐시 데이터 로드
+      if (currentCount === 0 && count > 0) {
+        await triggerSamsungDriveSync(true);
+      }
     }
   } catch (err) {
     console.warn('[SamsungDrive] Status check failed:', err.message);
