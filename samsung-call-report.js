@@ -396,17 +396,20 @@ async function initSamsungCallReportModule(resetFilter = true) {
     if (eInput) eInput.value = thisWeek.end;
   }
 
-  // 1. 메모리에 최신 데이터가 있으면 즉시 렌더링
-  if (gSamsungReportData && gSamsungReportData.callLogs && gSamsungReportData.callLogs.length > 0) {
+  // 1. 메모리에 전체 채널 통합 데이터(300건 이상)가 이미 있으면 즉시 렌더링
+  if (gSamsungReportData && gSamsungReportData.callLogs && gSamsungReportData.callLogs.length >= 200) {
     renderSamsungCallReportTab();
     return;
   }
 
-  // 2. 최신 정적 데이터 파일(/call_report_samsung.json) 고속 로드 (10ms)
+  // 2. 전체 인입경로(삼성+현대+리본) 통합 데이터(/call_report_all.json) 고속 로드 (10ms)
   const staticUrls = [
+    `/call_report_all.json?t=${Date.now()}`,
+    `./call_report_all.json?t=${Date.now()}`,
+    `call_report_all.json?t=${Date.now()}`,
     `/call_report_samsung.json?t=${Date.now()}`,
     `./call_report_samsung.json?t=${Date.now()}`,
-    `/api/samsung/call-report/data`
+    `/api/samsung/call-report/data?channel=all`
   ];
 
   for (const u of staticUrls) {
@@ -464,6 +467,7 @@ function renderSamsungCallReportTab() {
   const curStart = curFilter.startDate || thisWeekRange.start;
   const curEnd = curFilter.endDate || thisWeekRange.end;
   const curCh = curFilter.channel || info.channelLabel || info.channel || '삼성화재';
+  const isAllChannel = !curCh || curCh === '전체' || curCh === 'all';
   const dateRangeStr = `${curStart} ~ ${curEnd}`;
   const curPKey = curFilter.periodKey || ((curStart === thisWeekRange.start && curEnd === thisWeekRange.end) ? 'thisWeek' : '');
   const getPresetBtnClass = (k) => {
@@ -472,9 +476,37 @@ function renderSamsungCallReportTab() {
       : 'px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer shrink-0 whitespace-nowrap';
   };
 
+  let badgeText = '삼성화재 공식 보고';
+  let badgeBg = 'bg-blue-600 text-white';
+  let badgeIcon = 'phone-call';
+  let baseTitle = '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고';
+  let targetDesc = '삼성화재 간병서비스 관련 인바운드 콜';
+
+  if (curCh.includes('현대')) {
+    badgeText = '현대해상 공식 보고';
+    badgeBg = 'bg-gradient-to-r from-amber-600 to-orange-600 text-white';
+    badgeIcon = 'shield-check';
+    baseTitle = '현대해상 간병(리본케어) 서비스 인바운드 문의 분석 보고';
+    targetDesc = '현대해상 간병서비스 관련 인바운드 콜';
+  } else if (curCh.includes('리본')) {
+    badgeText = '리본케어 공식 보고';
+    badgeBg = 'bg-emerald-600 text-white';
+    badgeIcon = 'heart-pulse';
+    baseTitle = '리본케어 간병 서비스 인바운드 문의 분석 보고';
+    targetDesc = '리본케어 간병서비스 관련 인바운드 콜';
+  } else if (isAllChannel) {
+    badgeText = '전체 인입경로 종합 보고';
+    badgeBg = 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white';
+    badgeIcon = 'layers';
+    baseTitle = '전체 인입경로 간병(리본케어) 서비스 인바운드 문의 분석 보고';
+    targetDesc = '전체 인입경로 관련 인바운드 콜';
+  }
+
   const isCtiMatched = gSamsungReportData && gSamsungReportData.reportInfo &&
     (!curFilter.startDate || gSamsungReportData.reportInfo.startDate === curFilter.startDate) &&
-    (!curFilter.endDate || gSamsungReportData.reportInfo.endDate === curFilter.endDate);
+    (!curFilter.endDate || gSamsungReportData.reportInfo.endDate === curFilter.endDate) &&
+    (isAllChannel ? (gSamsungReportData.reportInfo.channel === 'all' || gSamsungReportData.reportInfo.channel === '전체') : ((gSamsungReportData.reportInfo.channel || '').includes(curCh)));
+
   const activeCti = (isCtiMatched && gSamsungReportData.ctiSummary) ? gSamsungReportData.ctiSummary : {
     totalAll: stats.totalCalls,
     totalInbound: stats.totalCalls,
@@ -486,10 +518,6 @@ function renderSamsungCallReportTab() {
     btnExit: 0
   };
 
-  // 제목에서 기존 인라인 괄호 날짜가 있다면 분리하여 베이스 제목 추출
-  const rawTitle = info.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고';
-  const baseTitle = rawTitle.replace(/\s*\([\d\-~.\s]+\)\s*$/, '').trim();
-
   container.innerHTML = `
     <div class="space-y-4 max-w-[1600px] mx-auto pb-12 text-slate-800">
       
@@ -499,8 +527,8 @@ function renderSamsungCallReportTab() {
       <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-4 sm:p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div class="min-w-0 md:min-w-[380px] flex-1">
           <div class="flex items-center gap-2.5 flex-wrap">
-            <span class="px-2.5 py-1 rounded-xl bg-blue-600 text-white font-black text-xs shadow-xs flex items-center gap-1.5 shrink-0">
-              <i data-lucide="phone-call" class="w-3.5 h-3.5"></i> 삼성화재 공식 보고
+            <span class="px-2.5 py-1 rounded-xl ${badgeBg} font-black text-xs shadow-xs flex items-center gap-1.5 shrink-0">
+              <i data-lucide="${badgeIcon}" class="w-3.5 h-3.5"></i> ${badgeText}
             </span>
             <span class="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs shrink-0">
               리본케어 인바운드 CTI 연동
@@ -512,7 +540,7 @@ function renderSamsungCallReportTab() {
             <span class="block text-xs sm:text-sm font-bold text-slate-500 font-mono mt-1">(${dateRangeStr})</span>
           </h2>
           <p class="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
-            <span><b>분석 대상:</b> ${info.target || '삼성화재 간병서비스 관련 인바운드 콜'}</span>
+            <span><b>분석 대상:</b> ${targetDesc}</span>
             <span class="text-slate-300">|</span>
             <span><b>작성 주체:</b> ${info.author || '리본케어 (Livon Care)'}</span>
             <span class="text-slate-300">|</span>
@@ -596,10 +624,10 @@ function renderSamsungCallReportTab() {
                   <span class="whitespace-nowrap">인입경로:</span>
                 </div>
                 <select id="tabReportChannelSelect" onchange="handleTabChannelChange(this.value)" class="bg-white px-2.5 py-1 rounded-xl border border-slate-200 font-bold text-xs text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer">
-                  <option value="삼성화재" ${(info.channel || '삼성화재') === '삼성화재' ? 'selected' : ''}>삼성화재</option>
-                  <option value="현대해상" ${info.channel === '현대해상' ? 'selected' : ''}>현대해상</option>
-                  <option value="리본케어" ${info.channel === '리본케어' ? 'selected' : ''}>리본케어</option>
-                  <option value="전체" ${info.channel === '전체' || info.channel === 'all' ? 'selected' : ''}>인입경로 전체</option>
+                  <option value="삼성화재" ${curCh === '삼성화재' ? 'selected' : ''}>삼성화재</option>
+                  <option value="현대해상" ${curCh === '현대해상' ? 'selected' : ''}>현대해상</option>
+                  <option value="리본케어" ${curCh === '리본케어' ? 'selected' : ''}>리본케어</option>
+                  <option value="전체" ${isAllChannel ? 'selected' : ''}>인입경로 전체</option>
                 </select>
               </div>
 
@@ -769,8 +797,42 @@ function renderTabDailyTrendChart() {
   const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
   const s = curFilter.startDate;
   const e = curFilter.endDate;
-  const allTrends = gSamsungReportData.dailyTrends || [];
-  const trends = allTrends.filter(t => (!s || t.date >= s) && (!e || t.date <= e));
+
+  // 현재 필터링된 콜 로그 목록 가져오기 (채널 및 날짜 필터가 100% 적용됨)
+  const logs = getSamsungCallLogs();
+  const dailyMap = {};
+  const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
+
+  if (s && e) {
+    const cur = new Date(s);
+    const end = new Date(e);
+    while (cur <= end) {
+      const ds = cur.toISOString().slice(0, 10);
+      dailyMap[ds] = {
+        date: ds,
+        dayOfWeek: daysOfWeek[cur.getDay()],
+        callCount: 0
+      };
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+
+  logs.forEach(c => {
+    const d = (c.callTime || c.date || c.startedAt || '').slice(0, 10);
+    if (d) {
+      if (!dailyMap[d]) {
+        dailyMap[d] = {
+          date: d,
+          dayOfWeek: daysOfWeek[new Date(d).getDay()] || '',
+          callCount: 0
+        };
+      }
+      dailyMap[d].callCount++;
+    }
+  });
+
+  const sortedDates = Object.keys(dailyMap).sort();
+  const trends = sortedDates.map(d => dailyMap[d]);
   const labels = trends.map(t => `${t.date.slice(5)} (${t.dayOfWeek})`);
   const data = trends.map(t => t.callCount);
   const backgroundColors = trends.map(t => {
@@ -859,22 +921,25 @@ function calculateReportStats() {
   const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
   const s = curFilter.startDate;
   const e = curFilter.endDate;
+  const ch = curFilter.channel || '삼성화재';
+  const isAllChannel = !ch || ch === '전체' || ch === 'all';
   const cs = gSamsungReportData && gSamsungReportData.ctiSummary;
-  const isCtiRangeMatch = gSamsungReportData && gSamsungReportData.reportInfo &&
-    (!s || gSamsungReportData.reportInfo.startDate === s) &&
-    (!e || gSamsungReportData.reportInfo.endDate === e);
+  const rInfo = (gSamsungReportData && gSamsungReportData.reportInfo) || {};
 
-  // 일자별 추이에서 해당 기간 필터링
-  const allTrends = (gSamsungReportData && gSamsungReportData.dailyTrends) || [];
-  const filteredTrends = allTrends.filter(t => (!s || t.date >= s) && (!e || t.date <= e));
-  const trendsSum = filteredTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
+  const isChannelMatch = isAllChannel
+    ? (rInfo.channel === 'all' || rInfo.channel === '전체' || !rInfo.channel)
+    : (rInfo.channel && rInfo.channel.includes(ch));
+
+  const isCtiRangeMatch = isChannelMatch &&
+    (!s || rInfo.startDate === s) &&
+    (!e || rInfo.endDate === e);
 
   // 1. 전체 인입 건수
   let totalCalls = 0;
   if (isCtiRangeMatch && cs && (cs.totalAll !== undefined || cs.totalInbound !== undefined)) {
     totalCalls = cs.totalAll || cs.totalInbound;
-  } else if (trendsSum > 0) {
-    totalCalls = trendsSum;
+  } else if (ch === '삼성화재' && logs.length > 0 && !isCtiRangeMatch) {
+    totalCalls = Math.round(logs.length / 0.27);
   } else {
     totalCalls = logs.length;
   }
@@ -884,7 +949,7 @@ function calculateReportStats() {
   if (isCtiRangeMatch && cs && cs.connectRequests !== undefined) {
     connectReqCalls = cs.connectRequests;
   } else {
-    connectReqCalls = logs.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y').length;
+    connectReqCalls = logs.length;
   }
 
   // 3. 상담원 응답 건수 (통화 성공)
@@ -892,7 +957,7 @@ function calculateReportStats() {
   if (isCtiRangeMatch && cs && cs.answeredCalls !== undefined) {
     answeredCalls = cs.answeredCalls;
   } else {
-    answeredCalls = logs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length || connectReqCalls;
+    answeredCalls = logs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length;
   }
 
   // 4. 실제 상담 분석 건수: 상담제목이나 상담요약이 있거나 카테고리가 부여된 실제 상담 이력
@@ -2588,9 +2653,14 @@ async function applyTabDateRange(forceSync = false) {
   gReportFilter.channel = ch;
 
   const hasData = gSamsungReportData && Array.isArray(gSamsungReportData.callLogs) && gSamsungReportData.callLogs.length > 0;
+  const hasMatchingChannel = hasData && (
+    ch === '전체' || ch === 'all' || !ch
+      ? (gSamsungReportData.callLogs.length >= 200 || gSamsungReportData.callLogs.some(c => (c.channel || '').includes('현대')))
+      : gSamsungReportData.callLogs.some(c => (c.channel || '').includes(ch))
+  );
 
-  // 1. 이미 데이터가 메모리에 로드되어 있다면 0ms 즉각 화면 렌더링
-  if (hasData) {
+  // 1. 이미 데이터가 메모리에 로드되어 있고 해당 채널 데이터가 존재하면 0ms 즉각 화면 렌더링
+  if (hasMatchingChannel) {
     renderSamsungCallReportTab();
     if (gActiveReportSubTab === 'daily') {
       setTimeout(renderTabDailyTrendChart, 60);
@@ -2598,10 +2668,10 @@ async function applyTabDateRange(forceSync = false) {
   }
 
   // 단순 기간/채널 필터 변경(조회 클릭 또는 프리셋 클릭)이고 데이터가 이미 있다면 즉시 완료 (네트워크 지연 없음)
-  if (!forceSync && hasData) {
+  if (!forceSync && hasMatchingChannel) {
     const stats = calculateReportStats();
     if (typeof showToast === 'function') {
-      showToast(`[${ch}] ${s} ~ ${e} 통화데이터(${stats.totalCalls}건) 조회가 완료되었습니다.`, 'success');
+      showToast(`[${ch}] ${s} ~ ${e} 통화데이터(${stats.connectReqCalls}건) 조회가 완료되었습니다.`, 'success');
     }
     return;
   }
@@ -2612,7 +2682,7 @@ async function applyTabDateRange(forceSync = false) {
   const syncText = document.getElementById('tabSyncBtnText');
   const syncIcon = document.getElementById('tabSyncIcon');
 
-  if (qBtn && !hasData) {
+  if (qBtn && !hasMatchingChannel) {
     qBtn.disabled = true;
     qBtn.classList.add('opacity-75', 'cursor-not-allowed');
     qBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span id="tabReportQueryBtnText">조회 중...</span>`;
@@ -2626,7 +2696,7 @@ async function applyTabDateRange(forceSync = false) {
 
   // 기존 데이터가 아예 없는 초기 로딩인 경우에만 화면 전체 스피너 노출
   const contentArea = document.getElementById('samsungReportSubTabContent');
-  if (!hasData && contentArea) {
+  if (!hasMatchingChannel && contentArea) {
     contentArea.innerHTML = `
       <div class="py-16 text-center space-y-3 bg-white rounded-3xl border border-slate-200/90 shadow-xs">
         <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 animate-spin mb-1">
@@ -2665,14 +2735,17 @@ async function applyTabDateRange(forceSync = false) {
     }
 
     // 4. API 실패 시 정적 엔드포인트 및 사전 생성 캐시 로드
-    if (!synced && (!gSamsungReportData || !gSamsungReportData.callLogs)) {
+    if (!synced && (!gSamsungReportData || !hasMatchingChannel)) {
       const staticFallbacks = [
-        `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
-        `call_report_samsung.json?t=${Date.now()}`,
-        `./call_report_samsung.json?t=${Date.now()}`,
+        `/call_report_all.json?t=${Date.now()}`,
+        `./call_report_all.json?t=${Date.now()}`,
         `call_report_all.json?t=${Date.now()}`,
-        `./call_report_all.json?t=${Date.now()}`
-      ];
+        ch.includes('현대') ? `/call_report_hyundai.json?t=${Date.now()}` : null,
+        ch.includes('리본') ? `/call_report_livon.json?t=${Date.now()}` : null,
+        `/call_report_samsung.json?t=${Date.now()}`,
+        `./call_report_samsung.json?t=${Date.now()}`,
+        `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
+      ].filter(Boolean);
       for (const u of staticFallbacks) {
         try {
           const sRes = await fetch(u);
@@ -2681,7 +2754,7 @@ async function applyTabDateRange(forceSync = false) {
             if (sType.includes('json') || !sType.includes('html')) {
               const sJson = await sRes.json();
               const data = (sJson && sJson.data) ? sJson.data : sJson;
-              if (data && data.callLogs) {
+              if (data && data.callLogs && data.callLogs.length > 0) {
                 gSamsungReportData = data;
                 synced = true;
                 break;

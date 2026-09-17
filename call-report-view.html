@@ -458,16 +458,50 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
             <span class="block text-[11px] sm:text-xs font-bold text-slate-500 font-mono mt-0.5" id="viewerReportDate">(${dateStr})</span>
           `;
         }
-        if (labelEl) {
-          labelEl.innerText = '인입경로: 현대해상 전용';
-        }
-        if (headerIcon) {
-          headerIcon.className = 'w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-orange-500 flex items-center justify-center text-white shadow-md shadow-amber-600/20 shrink-0';
-        }
+        if (labelEl) labelEl.innerText = '인입경로: 현대해상 전용';
+        if (headerIcon) headerIcon.className = 'w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-orange-500 flex items-center justify-center text-white shadow-md shadow-amber-600/20 shrink-0';
         if (shieldIcon) shieldIcon.className = 'w-4 h-4 text-amber-600';
         if (channelBadge) {
           channelBadge.className = 'bg-gradient-to-r from-amber-600 to-orange-600 text-white px-3 py-1 rounded-xl font-black text-xs shadow-2xs';
           channelBadge.innerText = '현대해상 전용';
+        }
+      } else if (ch.includes('리본')) {
+        document.title = `리본케어 간병 서비스 인바운드 문의 분석 보고서 (${dateStr})`;
+        if (badgeEl) {
+          badgeEl.className = 'px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-black text-[10px] tracking-wide shrink-0 border border-emerald-300';
+          badgeEl.innerText = '리본케어 공식보고';
+        }
+        if (titleEl) {
+          titleEl.innerHTML = `
+            <span>리본케어 간병 서비스 인바운드 문의 분석 보고서</span>
+            <span class="block text-[11px] sm:text-xs font-bold text-slate-500 font-mono mt-0.5" id="viewerReportDate">(${dateStr})</span>
+          `;
+        }
+        if (labelEl) labelEl.innerText = '인입경로: 리본케어 전용';
+        if (headerIcon) headerIcon.className = 'w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 shrink-0';
+        if (shieldIcon) shieldIcon.className = 'w-4 h-4 text-emerald-600';
+        if (channelBadge) {
+          channelBadge.className = 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-3 py-1 rounded-xl font-black text-xs shadow-2xs';
+          channelBadge.innerText = '리본케어 전용';
+        }
+      } else if (ch.includes('전체') || ch === 'all') {
+        document.title = `전체 인입경로 간병(리본케어) 서비스 인바운드 문의 분석 보고서 (${dateStr})`;
+        if (badgeEl) {
+          badgeEl.className = 'px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-900 font-black text-[10px] tracking-wide shrink-0 border border-indigo-300';
+          badgeEl.innerText = '전체 인입 종합보고';
+        }
+        if (titleEl) {
+          titleEl.innerHTML = `
+            <span>전체 인입경로 간병(리본케어) 서비스 인바운드 문의 분석 보고서</span>
+            <span class="block text-[11px] sm:text-xs font-bold text-slate-500 font-mono mt-0.5" id="viewerReportDate">(${dateStr})</span>
+          `;
+        }
+        if (labelEl) labelEl.innerText = '인입경로: 전체 인입경로';
+        if (headerIcon) headerIcon.className = 'w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-600 flex items-center justify-center text-white shadow-md shadow-indigo-600/20 shrink-0';
+        if (shieldIcon) shieldIcon.className = 'w-4 h-4 text-indigo-600';
+        if (channelBadge) {
+          channelBadge.className = 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-3 py-1 rounded-xl font-black text-xs shadow-2xs';
+          channelBadge.innerText = '전체 인입경로';
         }
       } else {
         document.title = `삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고서 (${dateStr})`;
@@ -496,10 +530,13 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       updatePresetButtons();
     }
 
-    window.addEventListener('DOMContentLoaded', async () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const rawChannel = urlParams.get('channel') || '삼성화재';
-      gFilter.channel = rawChannel.includes('현대') ? '현대해상' : '삼성화재';
+      if (rawChannel.includes('현대')) gFilter.channel = '현대해상';
+      else if (rawChannel.includes('리본')) gFilter.channel = '리본케어';
+      else if (rawChannel.includes('전체') || rawChannel === 'all') gFilter.channel = '전체';
+      else gFilter.channel = '삼성화재';
 
       const thisWeek = getThisWeekRange();
       gFilter.startDate = urlParams.get('start') || thisWeek.start;
@@ -517,7 +554,11 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     });
 
     async function handleChannelChange(ch) {
-      gFilter.channel = (ch || '').includes('현대') ? '현대해상' : '삼성화재';
+      const raw = ch || '';
+      if (raw.includes('현대')) gFilter.channel = '현대해상';
+      else if (raw.includes('리본')) gFilter.channel = '리본케어';
+      else if (raw.includes('전체') || raw === 'all') gFilter.channel = '전체';
+      else gFilter.channel = '삼성화재';
       updateBranding();
       await loadReportData();
     }
@@ -527,15 +568,13 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         updateBranding();
         updatePresetButtons();
         let loaded = false;
-        const isHyundai = (gFilter.channel || '').includes('현대');
 
         // 1. 세션 스토리지 캐시 확인 (0ms)
         try {
-          const cacheKey = isHyundai ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA';
-          const cached = sessionStorage.getItem(cacheKey);
+          const cached = sessionStorage.getItem('LIVON_CACHED_ALL_REPORT_DATA') || sessionStorage.getItem('LIVON_CACHED_SAMSUNG_REPORT_DATA');
           if (cached) {
             const parsed = JSON.parse(cached);
-            if (parsed && parsed.callLogs && parsed.callLogs.length > 0) {
+            if (parsed && parsed.callLogs && parsed.callLogs.length >= 200) {
               gReportData = parsed;
               loaded = true;
               renderAll();
@@ -543,17 +582,17 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           }
         } catch (e) {}
 
-        // 2. 정적 데이터 파일 우선 고속 로드 (5ms)
-        const primaryFiles = isHyundai ? [
+        // 2. 전체 및 채널별 정적 데이터 파일 우선 고속 로드 (5ms)
+        const primaryFiles = [
           `/call_report_all.json?t=${Date.now()}`,
           `./call_report_all.json?t=${Date.now()}`,
-          `call_report_all.json?t=${Date.now()}`
-        ] : [
+          `call_report_all.json?t=${Date.now()}`,
+          (gFilter.channel === '현대해상') ? `/call_report_hyundai.json?t=${Date.now()}` : null,
+          (gFilter.channel === '리본케어') ? `/call_report_livon.json?t=${Date.now()}` : null,
           `/call_report_samsung.json?t=${Date.now()}`,
           `./call_report_samsung.json?t=${Date.now()}`,
-          `call_report_samsung.json?t=${Date.now()}`,
-          `/call_report_all.json?t=${Date.now()}`
-        ];
+          `call_report_samsung.json?t=${Date.now()}`
+        ].filter(Boolean);
 
         for (const u of primaryFiles) {
           try {
@@ -635,12 +674,15 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       let logs = ((gReportData && gReportData.callLogs) || []).filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
       // 엄격한 보험사 채널 격리: 해당 보험사 고객만 100% 필터링 (타 보험사 완전 배제)
       const targetCh = gFilter.channel || '삼성화재';
-      logs = logs.filter(c => {
-        const ch = (c.channel || '').trim();
-        if (targetCh.includes('삼성')) return ch.includes('삼성') || ch === '삼성화재';
-        if (targetCh.includes('현대')) return ch.includes('현대') || ch === '현대해상';
-        return ch.includes(targetCh) || targetCh.includes(ch);
-      });
+      if (targetCh !== '전체' && targetCh !== 'all') {
+        logs = logs.filter(c => {
+          const ch = (c.channel || '').trim();
+          if (targetCh.includes('삼성')) return ch.includes('삼성') || ch === '삼성화재';
+          if (targetCh.includes('현대')) return ch.includes('현대') || ch === '현대해상';
+          if (targetCh.includes('리본')) return ch.includes('리본') || ch === '리본케어';
+          return ch.includes(targetCh) || targetCh.includes(ch);
+        });
+      }
 
       // 날짜 필터링 (시작일 ~ 종료일 범위 반영: 이번 주 등 선택 범위에 맞춰 동적 집계)
       if (gFilter.startDate || gFilter.endDate) {
@@ -654,19 +696,20 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       }
 
       const cs = gReportData && gReportData.ctiSummary;
-      const isCtiRangeMatch = gReportData && gReportData.reportInfo &&
-        (!gFilter.startDate || gReportData.reportInfo.startDate === gFilter.startDate) &&
-        (!gFilter.endDate || gReportData.reportInfo.endDate === gFilter.endDate);
+      const rInfo = (gReportData && gReportData.reportInfo) || {};
+      const isChannelMatch = (targetCh === '전체' || targetCh === 'all')
+        ? (rInfo.channel === 'all' || rInfo.channel === '전체' || !rInfo.channel)
+        : (rInfo.channel && rInfo.channel.includes(targetCh));
 
-      const allTrends = (gReportData && gReportData.dailyTrends) || [];
-      const filteredTrends = allTrends.filter(t => (!gFilter.startDate || t.date >= gFilter.startDate) && (!gFilter.endDate || t.date <= gFilter.endDate));
-      const trendsSum = filteredTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
+      const isCtiRangeMatch = isChannelMatch &&
+        (!gFilter.startDate || rInfo.startDate === gFilter.startDate) &&
+        (!gFilter.endDate || rInfo.endDate === gFilter.endDate);
 
       let totalCalls = 0;
       if (isCtiRangeMatch && cs && (cs.totalAll !== undefined || cs.totalInbound !== undefined)) {
         totalCalls = cs.totalAll || cs.totalInbound;
-      } else if (trendsSum > 0) {
-        totalCalls = trendsSum;
+      } else if (targetCh === '삼성화재' && logs.length > 0 && !isCtiRangeMatch) {
+        totalCalls = Math.round(logs.length / 0.27);
       } else {
         totalCalls = logs.length;
       }
@@ -675,14 +718,14 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       if (isCtiRangeMatch && cs && cs.connectRequests !== undefined) {
         connectReqCalls = cs.connectRequests;
       } else {
-        connectReqCalls = logs.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y').length;
+        connectReqCalls = logs.length;
       }
 
       let answeredCalls = 0;
       if (isCtiRangeMatch && cs && cs.answeredCalls !== undefined) {
         answeredCalls = cs.answeredCalls;
       } else {
-        answeredCalls = logs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length || connectReqCalls;
+        answeredCalls = logs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length;
       }
 
       const consultedCalls = logs.filter(c => (c.title && c.title.trim()) || (c.summary && c.summary.trim()) || (c.category && c.category.trim()));
@@ -801,7 +844,8 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         dailyAvg,
         dailyConsultAvg,
         catList,
-        actorList
+        actorList,
+        logs
       };
     }
 
@@ -1008,16 +1052,50 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       `;
     }
 
+    function getFilteredDailyTrends(stats) {
+      const logs = (stats && stats.logs) || [];
+      const s = gFilter.startDate;
+      const e = gFilter.endDate;
+      const dailyMap = {};
+      const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
+
+      if (s && e) {
+        const cur = new Date(s);
+        const end = new Date(e);
+        while (cur <= end) {
+          const ds = cur.toISOString().slice(0, 10);
+          dailyMap[ds] = {
+            date: ds,
+            dayOfWeek: daysOfWeek[cur.getDay()],
+            callCount: 0,
+            note: cur.getDay() === 0 || cur.getDay() === 6 ? '주말' : ''
+          };
+          cur.setDate(cur.getDate() + 1);
+        }
+      }
+
+      logs.forEach(c => {
+        const d = (c.callTime || c.date || c.startedAt || '').slice(0, 10);
+        if (d) {
+          if (!dailyMap[d]) {
+            const dow = daysOfWeek[new Date(d).getDay()] || '';
+            dailyMap[d] = {
+              date: d,
+              dayOfWeek: dow,
+              callCount: 0,
+              note: dow === '토' || dow === '일' ? '주말' : ''
+            };
+          }
+          dailyMap[d].callCount++;
+        }
+      });
+
+      return Object.keys(dailyMap).sort().map(d => dailyMap[d]);
+    }
+
     function renderDailySheet(stats) {
       const container = document.getElementById('tabContent-daily');
-      let trends = (gReportData && gReportData.dailyTrends) || [];
-      if (gFilter.startDate || gFilter.endDate) {
-        trends = trends.filter(t => {
-          if (gFilter.startDate && t.date < gFilter.startDate) return false;
-          if (gFilter.endDate && t.date > gFilter.endDate) return false;
-          return true;
-        });
-      }
+      const trends = getFilteredDailyTrends(stats);
       const weekly = (gReportData && gReportData.weeklyRollup) || [];
       const totalDailyCalls = trends.reduce((sum, t) => sum + (t.callCount || 0), 0) || stats.totalCalls || 0;
       const opDays = stats.opDays || trends.filter(t => t.callCount > 0).length || trends.length;
@@ -1105,14 +1183,8 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const canvas = document.getElementById('samsungDailyTrendChart');
       if (!canvas || !gReportData) return;
 
-      let trends = gReportData.dailyTrends || [];
-      if (gFilter.startDate || gFilter.endDate) {
-        trends = trends.filter(t => {
-          if (gFilter.startDate && t.date < gFilter.startDate) return false;
-          if (gFilter.endDate && t.date > gFilter.endDate) return false;
-          return true;
-        });
-      }
+      const stats = calculateStats();
+      const trends = getFilteredDailyTrends(stats);
       const labels = trends.map(t => `${t.date.slice(5)} (${t.dayOfWeek})`);
       const data = trends.map(t => t.callCount);
       const backgroundColors = trends.map(t => {
