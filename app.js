@@ -12797,6 +12797,15 @@ async function handleTriggerCtiCall(e) {
       })
     });
 
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const raw = await res.text().catch(() => '');
+      if (res.status === 404) {
+        throw new Error('CTI 발신 서버 엔드포인트(/api/cti/call)에 연결할 수 없습니다. (HTTP 404)');
+      }
+      throw new Error(`CTI 서버 응답 오류 (HTTP ${res.status}): ${raw.slice(0, 100)}`);
+    }
+
     const data = await res.json();
 
     if (!res.ok || !data.success) {
