@@ -62,6 +62,10 @@
           <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-600"></i>
           <span>엑셀 다운로드</span>
         </button>
+        <button type="button" onclick="printReport()" class="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-[11px] sm:text-xs flex items-center gap-1 sm:gap-1.5 transition-all shadow-2xs cursor-pointer whitespace-nowrap shrink-0" title="A4 전체 페이지 인쇄 및 PDF 저장">
+          <i data-lucide="printer" class="w-3.5 h-3.5 text-slate-600"></i>
+          <span>인쇄</span>
+        </button>
         <button type="button" onclick="downloadPdf()" class="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[11px] sm:text-xs flex items-center gap-1 sm:gap-1.5 transition-all shadow-md shadow-blue-600/20 cursor-pointer whitespace-nowrap shrink-0" title="A4 3-시트 완본 PDF 다운로드">
           <i data-lucide="download" class="w-3.5 h-3.5 text-white"></i>
           <span>PDF 다운로드</span>
@@ -2190,23 +2194,22 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       }
     }
 
-    async function downloadPdf() {
+    function printReport() {
       if (!gReportData) return;
-      try {
-        setPdfProgress('1/4 보고서 데이터 및 차트 집계 중...', 25);
-        await new Promise(r => setTimeout(r, 200));
+      const stats = calculateStats();
+      const info = gReportData.reportInfo || {};
+      const trends = gReportData.dailyTrends || [];
+      const consultedLogs = (gReportData.callLogs || []).filter(c => c.title || c.summary);
+      const compName = info.channelLabel || gFilter.channel || '공식';
+      const rawTitle = info.title || `${compName} 간병(리본케어) 서비스 인바운드 문의 분석 보고`;
+      const mainTitle = rawTitle.replace(/\s*\([\d\-~.\s]+\)\s*$/, '').trim();
+      const periodText = info.period || (rawTitle.match(/\(([\d\-~.\s]+)\)/) ? rawTitle.match(/\(([\d\-~.\s]+)\)/)[1] : '');
+      const html = buildViewerReportHtml(stats, info, trends, consultedLogs, compName, mainTitle, periodText);
+      triggerNativePrintPdf(html, mainTitle);
+    }
 
-        const stats = calculateStats();
-        const info = gReportData.reportInfo || {};
-        const trends = gReportData.dailyTrends || [];
-        const consultedLogs = (gReportData.callLogs || []).filter(c => c.title || c.summary);
-
-        const compName = info.channelLabel || gFilter.channel || '공식';
-        const rawTitle = info.title || `${compName} 간병(리본케어) 서비스 인바운드 문의 분석 보고`;
-        const mainTitle = rawTitle.replace(/\s*\([\d\-~.\s]+\)\s*$/, '').trim();
-        const periodText = info.period || (rawTitle.match(/\(([\d\-~.\s]+)\)/) ? rawTitle.match(/\(([\d\-~.\s]+)\)/)[1] : '');
-
-        const html = `
+    function buildViewerReportHtml(stats, info, trends, consultedLogs, compName, mainTitle, periodText) {
+      return `
         <!DOCTYPE html>
         <html>
         <head>
@@ -2214,9 +2217,11 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           <style>
             @page { size: A4 portrait; margin: 12mm 10mm; }
             * { box-sizing: border-box; }
-            body { font-family: 'Malgun Gothic', '맑은 고딕', 'Pretendard', sans-serif; font-size: 8.5pt; color: #1e293b; line-height: 1.4; margin: 0; padding: 0; background: #fff; }
+            html, body { font-family: 'Malgun Gothic', '맑은 고딕', 'Pretendard', sans-serif; font-size: 8.5pt; color: #1e293b; line-height: 1.4; margin: 0; padding: 0; background: #fff; height: auto !important; max-height: none !important; overflow: visible !important; }
             .page-break { page-break-before: always; break-before: page; }
-            tr { page-break-inside: avoid; break-inside: avoid; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 8pt; page-break-inside: auto !important; }
+            tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+            thead { display: table-header-group; }
             .header { border-bottom: 3px solid #1d4ed8; padding-bottom: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-end; }
             .title { font-size: 15pt; font-weight: bold; color: #0f172a; margin: 0; }
             .sub { font-size: 8pt; color: #64748b; margin-top: 3px; }
@@ -2224,7 +2229,6 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
             .kpi-box { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 6px; text-align: center; }
             .kpi-num { font-size: 13.5pt; font-weight: bold; color: #1e3a8a; margin: 2px 0; }
             .box-title { font-size: 9.5pt; font-weight: bold; color: #0f172a; margin-bottom: 5px; border-left: 3px solid #2563eb; padding-left: 6px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 8pt; }
             th, td { border: 1px solid #cbd5e1; padding: 4.5px 5.5px; }
             th { background: #f1f5f9; font-weight: bold; text-align: left; }
             .text-center { text-align: center; }
@@ -2401,7 +2405,27 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         </body>
         </html>
       `;
+    }
 
+    async function downloadPdf() {
+      if (!gReportData) return;
+      try {
+        setPdfProgress('1/4 보고서 데이터 및 차트 집계 중...', 25);
+        await new Promise(r => setTimeout(r, 200));
+
+        const stats = calculateStats();
+        const info = gReportData.reportInfo || {};
+        const trends = gReportData.dailyTrends || [];
+        const consultedLogs = (gReportData.callLogs || []).filter(c => c.title || c.summary);
+
+        const compName = info.channelLabel || gFilter.channel || '공식';
+        const rawTitle = info.title || `${compName} 간병(리본케어) 서비스 인바운드 문의 분석 보고`;
+        const mainTitle = rawTitle.replace(/\s*\([\d\-~.\s]+\)\s*$/, '').trim();
+        const periodText = info.period || (rawTitle.match(/\(([\d\-~.\s]+)\)/) ? rawTitle.match(/\(([\d\-~.\s]+)\)/)[1] : '');
+
+        setPdfProgress('2/4 A4 3-시트 완본 레이아웃 구성 중...', 55);
+        const html = buildViewerReportHtml(stats, info, trends, consultedLogs, compName, mainTitle, periodText);
+        await new Promise(r => setTimeout(r, 150));
         setPdfProgress('3/4 고화질 PDF 생성 및 렌더링 중...', 80);
 
         let serverPdfSuccess = false;

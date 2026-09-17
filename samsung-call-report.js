@@ -2604,11 +2604,70 @@ async function executeSamsungCallReportClientPdf(html, reportTitle) {
   return true;
 }
 
+function printSamsungCallReportModal() {
+  const html = generateCallReportPdfHtml();
+  if (!html) return;
+  const info = (gSamsungReportData && gSamsungReportData.reportInfo) || {};
+  const periodText = info.period || '';
+  const reportTitle = `삼성화재_간병서비스_콜분석_${periodText || new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+  triggerSamsungCallReportPrintPdf(html, reportTitle);
+}
+
 function triggerSamsungCallReportPrintPdf(html, reportTitle) {
+  const fullHtml = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>${reportTitle}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm 10mm;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff !important;
+      color: #0f172a;
+      font-family: 'Pretendard', 'Malgun Gothic', '맑은 고딕', sans-serif;
+      font-size: 8.5pt;
+      line-height: 1.4;
+      height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .page-break,
+    div[style*="page-break-before: always"] {
+      page-break-before: always !important;
+      break-before: page !important;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      page-break-inside: auto !important;
+    }
+    tr {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+    thead {
+      display: table-header-group;
+    }
+  </style>
+</head>
+<body style="background:#fff; margin:0; padding:10px;">
+  ${html}
+</body>
+</html>`;
+
   const printWindow = window.open('', '_blank', 'width=1000,height=900');
   if (printWindow) {
     printWindow.document.open();
-    printWindow.document.write(html);
+    printWindow.document.write(fullHtml);
     printWindow.document.close();
     printWindow.focus();
     setTimeout(() => {
@@ -2625,7 +2684,7 @@ function triggerSamsungCallReportPrintPdf(html, reportTitle) {
     document.body.appendChild(iframe);
     const doc = iframe.contentWindow.document;
     doc.open();
-    doc.write(html);
+    doc.write(fullHtml);
     doc.close();
     iframe.contentWindow.focus();
     setTimeout(() => {
