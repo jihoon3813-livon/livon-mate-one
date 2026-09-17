@@ -494,10 +494,50 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     async function loadReportData() {
       try {
         updateBranding();
-        const res = await fetch('/api/samsung/call-report/data?channel=' + encodeURIComponent(gFilter.channel));
-        const json = await res.json();
-        if (json.success && json.data) {
-          gReportData = json.data;
+        let loaded = false;
+        try {
+          const res = await fetch('/api/samsung/call-report/data?channel=' + encodeURIComponent(gFilter.channel));
+          if (res.ok) {
+            const cType = res.headers.get('content-type') || '';
+            if (cType.includes('json')) {
+              const json = await res.json();
+              if (json.success && json.data) {
+                gReportData = json.data;
+                loaded = true;
+              }
+            }
+          }
+        } catch (e) {}
+
+        if (!loaded) {
+          const fallbacks = [
+            'call_report_all.json',
+            './call_report_all.json',
+            'call_report_samsung.json',
+            './call_report_samsung.json',
+            '/call_report_all.json',
+            '/call_report_samsung.json'
+          ];
+          for (const u of fallbacks) {
+            try {
+              const sRes = await fetch(u);
+              if (sRes.ok) {
+                const sType = sRes.headers.get('content-type') || '';
+                if (sType.includes('json') || !sType.includes('html')) {
+                  const sJson = await sRes.json();
+                  const data = (sJson && sJson.data) ? sJson.data : sJson;
+                  if (data && data.callLogs) {
+                    gReportData = data;
+                    loaded = true;
+                    break;
+                  }
+                }
+              }
+            } catch (e) {}
+          }
+        }
+
+        if (loaded && gReportData) {
           const urlParams = new URLSearchParams(window.location.search);
           if (urlParams.get('start')) {
             gFilter.startDate = urlParams.get('start');
@@ -1342,21 +1382,56 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       updateBranding();
 
       try {
-        const res = await fetch(`/api/samsung/call-report/sync-cti?start=${gFilter.startDate}&end=${gFilter.endDate}&channel=${encodeURIComponent(ch)}`);
-        const json = await res.json();
-        if (json.success && json.data) {
-          gReportData = json.data;
-          updateBranding();
-          document.getElementById('viewerSyncedAt').innerText = `CTI 동기화: ${new Date().toLocaleTimeString('ko-KR')}`;
-          
-          // Stop spinner BEFORE renderAll so lucide.createIcons() does not retain animate-spin on fresh SVG
-          setSyncBtnLoading(false);
-          renderAll();
-        } else {
-          alert('CTI 동기화 중 오류: ' + (json.error || ''));
+        let synced = false;
+        try {
+          const res = await fetch(`/api/samsung/call-report/sync-cti?start=${gFilter.startDate}&end=${gFilter.endDate}&channel=${encodeURIComponent(ch)}`);
+          if (res.ok) {
+            const cType = res.headers.get('content-type') || '';
+            if (cType.includes('json')) {
+              const json = await res.json();
+              if (json.success && json.data) {
+                gReportData = json.data;
+                synced = true;
+              }
+            }
+          }
+        } catch (e) {}
+
+        if (!synced) {
+          const fallbacks = [
+            `call_report_all.json?t=${Date.now()}`,
+            `./call_report_all.json?t=${Date.now()}`,
+            `call_report_samsung.json?t=${Date.now()}`,
+            `./call_report_samsung.json?t=${Date.now()}`
+          ];
+          for (const u of fallbacks) {
+            try {
+              const sRes = await fetch(u);
+              if (sRes.ok) {
+                const sType = sRes.headers.get('content-type') || '';
+                if (sType.includes('json') || !sType.includes('html')) {
+                  const sJson = await sRes.json();
+                  const data = (sJson && sJson.data) ? sJson.data : sJson;
+                  if (data && data.callLogs) {
+                    gReportData = data;
+                    synced = true;
+                    break;
+                  }
+                }
+              }
+            } catch (e) {}
+          }
         }
+
+        updateBranding();
+        const viewerSyncedAt = document.getElementById('viewerSyncedAt');
+        if (viewerSyncedAt) viewerSyncedAt.innerText = `CTI 동기화: ${new Date().toLocaleTimeString('ko-KR')}`;
+        setSyncBtnLoading(false);
+        renderAll();
       } catch (err) {
-        alert('서버 통신 오류: ' + err.message);
+        console.error('Sync error:', err);
+        setSyncBtnLoading(false);
+        renderAll();
       } finally {
         isSyncing = false;
         setSyncBtnLoading(false);

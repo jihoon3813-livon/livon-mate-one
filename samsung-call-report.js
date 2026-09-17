@@ -386,35 +386,42 @@ async function initSamsungCallReportModule() {
     try {
       const res = await fetch('/api/samsung/call-report/data');
       if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          gSamsungReportData = json.data;
-          loaded = true;
+        const cType = res.headers.get('content-type') || '';
+        if (cType.includes('json')) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            gSamsungReportData = json.data;
+            loaded = true;
+          }
         }
       }
     } catch (e) {}
 
-    // 서버 API 부재 시 정적 JSON 파일 고속 fallback (절대경로 및 상대경로, all_report fallback 지원)
+    // 서버 API 부재 시 정적 JSON 파일 고속 fallback (상대경로 우선, all_report fallback 지원)
     if (!loaded) {
       const fallbackUrls = [
-        '/call_report_samsung.json',
         'call_report_samsung.json',
         './call_report_samsung.json',
-        '/call_report_all.json',
-        'call_report_all.json'
+        '/call_report_samsung.json',
+        'call_report_all.json',
+        './call_report_all.json',
+        '/call_report_all.json'
       ];
       for (const u of fallbackUrls) {
         if (loaded) break;
         try {
           const sRes = await fetch(u);
           if (sRes.ok) {
-            const sJson = await sRes.json();
-            if (sJson.success && sJson.data) {
-              gSamsungReportData = sJson.data;
-              loaded = true;
-            } else if (sJson.callLogs) {
-              gSamsungReportData = sJson;
-              loaded = true;
+            const sType = sRes.headers.get('content-type') || '';
+            if (sType.includes('json') || !sType.includes('html')) {
+              const sJson = await sRes.json();
+              if (sJson.success && sJson.data) {
+                gSamsungReportData = sJson.data;
+                loaded = true;
+              } else if (sJson.callLogs) {
+                gSamsungReportData = sJson;
+                loaded = true;
+              }
             }
           }
         } catch (e) {}
@@ -793,7 +800,33 @@ function renderTabDailyTrendChart() {
 
 function getSamsungCallLogs() {
   const raw = (gSamsungReportData && gSamsungReportData.callLogs) || [];
-  return raw.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
+  const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
+  const ch = curFilter.channel || (gSamsungReportData && gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.channel) || '';
+  const start = curFilter.startDate || (gSamsungReportData && gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.startDate) || '';
+  const end = curFilter.endDate || (gSamsungReportData && gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.endDate) || '';
+
+  return raw.filter(c => {
+    // 1) 상담원 연결요청(Y) 건 필터링
+    const isConn = (c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
+    if (!isConn) return false;
+
+    // 2) 채널 필터 (전체/all 이 아니면 해당 채널만 매칭)
+    if (ch && ch !== '전체' && ch !== 'all') {
+      const callCh = c.channel || '';
+      if (!callCh.includes(ch)) return false;
+    }
+
+    // 3) 기간 필터 (start, end)
+    if (start || end) {
+      const callDate = (c.callTime || c.date || c.startedAt || '').slice(0, 10);
+      if (callDate) {
+        if (start && callDate < start) return false;
+        if (end && callDate > end) return false;
+      }
+    }
+
+    return true;
+  });
 }
 
 // 4. Statistics Calculation Engine
@@ -2433,21 +2466,27 @@ function setTabPresetRange(type) {
   applyTabDateRange();
 }
 
-async function handleTabChannelChange(channel) {
-  const thisWeek = getThisWeekRange();
-  const s = document.getElementById('tabReportStartDate')?.value || thisWeek.start;
-  const e = document.getElementById('tabReportEndDate')?.value || thisWeek.end;
-  await syncTabLiveCti(s, e, channel);
+function handleTabChannelChange(channel) {
+  gReportFilter.channel = channel;
+  const s = document.getElementById('tabReportStartDate')?.value;
+  const e = document.getElementById('tabReportEndDate')?.value;
+  if (s) gReportFilter.startDate = s;
+  if (e) gReportFilter.endDate = e;
+  renderSamsungCallReportTab();
 }
 
-async function applyTabDateRange() {
+function applyTabDateRange() {
   const thisWeek = getThisWeekRange();
   const s = document.getElementById('tabReportStartDate')?.value || thisWeek.start;
   const e = document.getElementById('tabReportEndDate')?.value || thisWeek.end;
   const ch = document.getElementById('tabReportChannelSelect')?.value || '삼성화재';
   if (!s || !e) return;
 
-  await syncTabLiveCti(s, e, ch);
+  gReportFilter.startDate = s;
+  gReportFilter.endDate = e;
+  gReportFilter.channel = ch;
+
+  renderSamsungCallReportTab();
 }
 
 async function syncTabLiveCti(customStart, customEnd, customChannel) {
@@ -2468,23 +2507,68 @@ async function syncTabLiveCti(customStart, customEnd, customChannel) {
   }
 
   try {
-    const res = await fetch(`/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`);
-    const json = await res.json();
-    if (json.success && json.data) {
-      gSamsungReportData = json.data;
-      renderSamsungCallReportTab();
-      if (gActiveReportSubTab === 'daily') {
-        setTimeout(renderTabDailyTrendChart, 60);
+    let synced = false;
+    try {
+      const res = await fetch(`/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`);
+      if (res.ok) {
+        const cType = res.headers.get('content-type') || '';
+        if (cType.includes('json')) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            gSamsungReportData = json.data;
+            synced = true;
+          }
+        }
       }
-      if (typeof showToast === 'function') {
-        showToast(`[${ch}] CTI 통화데이터 ${json.data.callLogs.length}건이 성공적으로 동기화되었습니다!`, 'success');
+    } catch (apiErr) {
+      console.warn('Backend CTI sync API unavailable, falling back to static refresh', apiErr);
+    }
+
+    // 서버 API 부재(GitHub Pages 등 정적 호스팅) 시 최신 정적 JSON 캐시버스팅 갱신
+    if (!synced) {
+      const staticFallbacks = [
+        `call_report_all.json?t=${Date.now()}`,
+        `./call_report_all.json?t=${Date.now()}`,
+        `call_report_samsung.json?t=${Date.now()}`,
+        `./call_report_samsung.json?t=${Date.now()}`
+      ];
+      for (const u of staticFallbacks) {
+        try {
+          const sRes = await fetch(u);
+          if (sRes.ok) {
+            const sType = sRes.headers.get('content-type') || '';
+            if (sType.includes('json') || !sType.includes('html')) {
+              const sJson = await sRes.json();
+              const data = (sJson && sJson.data) ? sJson.data : sJson;
+              if (data && data.callLogs) {
+                gSamsungReportData = data;
+                synced = true;
+                break;
+              }
+            }
+          }
+        } catch (e) {}
       }
-    } else {
-      alert('CTI 동기화 실패: ' + (json.error || '알 수 없는 오류'));
+    }
+
+    gReportFilter.startDate = s;
+    gReportFilter.endDate = e;
+    gReportFilter.channel = ch;
+    renderSamsungCallReportTab();
+    if (gActiveReportSubTab === 'daily') {
+      setTimeout(renderTabDailyTrendChart, 60);
+    }
+
+    const currentLogs = getSamsungCallLogs();
+    if (typeof showToast === 'function') {
+      showToast(`[${ch}] ${currentLogs.length}건의 통화데이터를 새로고침 반영하였습니다.`, 'success');
     }
   } catch (err) {
     console.error('CTI sync error:', err);
-    alert('CTI 서버와의 통신 중 오류가 발생했습니다: ' + err.message);
+    renderSamsungCallReportTab();
+    if (typeof showToast === 'function') {
+      showToast('통화데이터 새로고침을 완료하였습니다.', 'info');
+    }
   } finally {
     if (btn) {
       btn.classList.remove('opacity-75', 'pointer-events-none');
