@@ -25579,6 +25579,24 @@ function openModal(modalId) {
   }
   el.style.display = 'flex';
 
+  // 다중 모달(예: 고객 상세 원스탑 모달 위에 간병인 배정 등 서브 모달 오픈 시) z-index 자동 스태킹
+  try {
+    const otherOpenModals = Array.from(document.querySelectorAll('.fixed.inset-0:not(.hidden)'))
+      .filter(m => m.id !== modalId && m.id !== 'mobileSidebarBackdrop' && m.style.display !== 'none');
+    if (otherOpenModals.length > 0) {
+      let maxZ = 50;
+      otherOpenModals.forEach(m => {
+        const computedZ = parseInt(window.getComputedStyle(m).zIndex, 10);
+        if (!isNaN(computedZ) && computedZ >= maxZ && computedZ < 9000) {
+          maxZ = computedZ;
+        }
+      });
+      el.style.zIndex = (maxZ + 10).toString();
+    }
+  } catch (e) {
+    console.warn('Modal z-index stacking warning:', e);
+  }
+
   // 모달 열 때 스크롤 위치를 맨 위로 자동 리셋
   try {
     el.scrollTop = 0;
@@ -25603,6 +25621,7 @@ function closeModal(modalId) {
   el.classList.add('hidden');
   if (el.style.removeProperty) {
     el.style.removeProperty('display');
+    el.style.removeProperty('z-index');
   }
   el.style.display = 'none';
 }

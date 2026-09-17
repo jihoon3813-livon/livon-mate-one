@@ -537,10 +537,10 @@
   <div class="flex flex-1 overflow-hidden relative">
 
     <!-- MOBILE SIDEBAR BACKDROP (모바일 딤 오버레이) -->
-    <div id="mobileSidebarBackdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 hidden lg:hidden transition-opacity" onclick="toggleMobileSidebar(false)"></div>
+    <div id="mobileSidebarBackdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-30 hidden lg:hidden transition-opacity" onclick="toggleMobileSidebar(false)"></div>
 
     <!-- SIDEBAR (데스크톱 고정 + 모바일 슬라이드 드로어) -->
-    <aside id="mainAppSidebar" class="w-72 bg-slate-900 text-slate-300 flex-shrink-0 flex flex-col justify-between fixed lg:static inset-y-0 left-0 z-50 transform -translate-x-full lg:translate-x-0 transition-transform duration-200 ease-in-out h-full overflow-hidden shadow-2xl lg:shadow-none">
+    <aside id="mainAppSidebar" class="w-72 bg-slate-900 text-slate-300 flex-shrink-0 flex flex-col justify-between fixed lg:static inset-y-0 left-0 z-40 lg:z-auto transform -translate-x-full lg:translate-x-0 transition-transform duration-200 ease-in-out h-full overflow-hidden shadow-2xl lg:shadow-none">
       <!-- 모바일 상단 닫기 헤더 -->
       <div class="flex items-center justify-between p-3.5 border-b border-slate-800 lg:hidden bg-slate-950/80">
         <div class="flex items-center gap-2">
@@ -7831,7 +7831,7 @@
   </div>
 
   <!-- ==================== MODAL: HUB CUSTOMER DETAIL POPUP MODAL (주체별 3-Column 단일 뷰) ==================== -->
-  <div id="hubCustomerDetailModal" class="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-2 sm:p-4">
+  <div id="hubCustomerDetailModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-2 sm:p-4">
     <div id="hubCustomerDetailModalDialog" class="bg-white rounded-2xl sm:rounded-3xl w-[96vw] sm:w-[92vw] max-w-[1240px] max-h-[96vh] sm:max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 transition-all duration-200">
       <div class="p-3 sm:p-5 bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-4">
         <!-- Top row: Title + Mobile Close Button -->
