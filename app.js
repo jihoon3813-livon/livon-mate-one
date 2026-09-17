@@ -22797,11 +22797,14 @@ function renderCareLogPatientCards(groups) {
       : 'bg-sky-100 text-sky-800 border-sky-200';
 
     const dailyLogs = group.dailyLogs || [];
+    const cardBorderClass = isSelected
+      ? 'border-purple-500 shadow-md ring-2 ring-purple-400/20'
+      : (isExpanded ? 'border-purple-300 shadow-sm ring-1 ring-purple-200/60' : 'border-slate-200 shadow-2xs');
 
     return `
-      <div class="bg-white rounded-3xl border ${isSelected ? 'border-purple-400 shadow-md ring-2 ring-purple-400/20' : 'border-slate-200 shadow-2xs'} transition-all overflow-hidden">
+      <div class="bg-white rounded-3xl border ${cardBorderClass} transition-all overflow-hidden">
         <!-- Patient Card Header -->
-        <div class="p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-50/40 border-b border-slate-100">
+        <div class="p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 ${isExpanded ? 'bg-purple-50/20 border-b border-purple-100' : 'bg-slate-50/40 border-b border-slate-100'}">
           <div class="flex items-start gap-3.5">
             <input type="checkbox" ${isSelected ? 'checked' : ''} 
               onchange="toggleCarePortPatientSelect('${group.id}', this.checked)"
@@ -22847,8 +22850,8 @@ function renderCareLogPatientCards(groups) {
           <!-- Quick Action Buttons -->
           <div class="flex items-center gap-2 self-end lg:self-center shrink-0">
             <button type="button" onclick="toggleCarePortPatientAccordion('${group.id}')"
-              class="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer">
-              <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4 text-purple-600"></i>
+              class="px-3.5 py-2 rounded-xl ${isExpanded ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'} font-bold text-xs border shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer">
+              <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4 ${isExpanded ? 'text-purple-700' : 'text-purple-600'}"></i>
               <span>${isExpanded ? '일지 접기' : `일자별 일지 펼치기 (${group.totalDays}건)`}</span>
             </button>
             <button type="button" onclick="downloadPatientCareLogsZip('${group.id}')"
@@ -22866,68 +22869,69 @@ function renderCareLogPatientCards(groups) {
           </div>
         </div>
 
-        <!-- Accordion Body: Daily Logs Timeline -->
-        <div id="patient-accordion-${group.id}" class="${isExpanded ? '' : 'hidden'} p-5 bg-white border-t border-slate-100 space-y-3">
-          <div class="flex items-center justify-between">
-            <h5 class="font-bold text-xs text-slate-700 flex items-center gap-1.5">
-              <i data-lucide="calendar" class="w-3.5 h-3.5 text-purple-600"></i>
-              <span>일자별 공식 간병일지 타임라인 (CarePort 실시간 연동)</span>
-            </h5>
-            <span class="text-[11px] text-slate-400">총 ${dailyLogs.length}회차 기록</span>
+        <!-- Accordion Body: Daily Logs Compact List (명확한 서브 계층 배경 및 콤팩트 리스트) -->
+        <div id="patient-accordion-${group.id}" class="${isExpanded ? '' : 'hidden'} px-4 py-4 sm:px-6 sm:py-5 bg-slate-50/80 border-t-2 border-purple-200/80 space-y-2.5">
+          <div class="flex items-center justify-between px-1">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-purple-100 text-purple-700">
+                <i data-lucide="corner-down-right" class="w-3.5 h-3.5"></i>
+              </span>
+              <h5 class="font-bold text-xs text-slate-800">
+                [${maskedName} 님] 일자별 공식 간병일지 목록
+              </h5>
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-purple-100 text-purple-800 border border-purple-200">
+                총 ${dailyLogs.length}회차
+              </span>
+            </div>
+            <span class="text-[11px] text-slate-400 font-medium hidden sm:inline">CarePort 전산 실시간 연동</span>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
-            ${dailyLogs.map(log => {
+          <!-- Compact List Table / Rows -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-2xs divide-y divide-slate-100 overflow-hidden">
+            ${dailyLogs.length === 0 ? `
+              <div class="py-6 text-center text-xs text-slate-400 font-medium">등록된 일별 간병일지가 없습니다.</div>
+            ` : dailyLogs.map((log, idx) => {
               const sid = log.sessionId || (log.id ? String(log.id).replace(/\D/g, '') : '531');
-              const pName = log.username || group.patientName;
-              const age = log.age ? `${String(log.age).replace('세', '')}` : `${group.age}`;
-              const gender = log.gender || group.gender || '-';
               const consultant = log.consultantName || log.caregiver || group.caregiverName || '-';
               const org = log.organizationName || log.orgName || group.centerName || group.insuranceCompany || '삼성화재';
               const consultDate = log.consultDate ? log.consultDate.slice(0, 16) : log.dateString;
-              const duration = log.duration ? `${String(log.duration).replace('s', '')}s` : '-';
+              const duration = log.duration ? `${String(log.duration).replace('s', '')}초` : '-';
+              const title = log.title || '일상 지원 및 환자 상태 점검';
 
               return `
-                <div class="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:border-purple-300 hover:shadow-xs transition-all space-y-3">
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                      <span class="px-2.5 py-0.5 rounded-lg font-black text-xs bg-purple-600 text-white shadow-2xs">
-                        ${log.dayText}
-                      </span>
-                      <span class="font-mono text-xs font-bold text-slate-700">${consultDate}</span>
-                    </div>
-                    <span class="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded font-bold">#${sid}</span>
+                <div class="px-4 py-2.5 hover:bg-purple-50/40 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs">
+                  <!-- Left: Day badge, Date, Title -->
+                  <div class="flex items-center gap-3 min-w-0 flex-1">
+                    <span class="px-2 py-0.5 rounded-md font-black text-[11px] bg-purple-600 text-white shrink-0 shadow-2xs">
+                      ${log.dayText}
+                    </span>
+                    <span class="font-mono text-slate-700 font-bold shrink-0 text-xs">
+                      ${consultDate}
+                    </span>
+                    <span class="font-bold text-slate-900 truncate" title="${title}">
+                      ${title}
+                    </span>
                   </div>
 
-                  <!-- Exact 7 Fields Header Strip (첨부 3번 이미지 기준: 대상자명/연령/성별/상담자/소속기관/상담일시/상담시간) -->
-                  <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs space-y-1.5">
-                    <div class="grid grid-cols-3 gap-1.5">
-                      <div><span class="text-slate-400 text-[11px] block">대상자명</span><b class="text-slate-900">${pName}</b></div>
-                      <div><span class="text-slate-400 text-[11px] block">연령</span><b class="text-slate-800">${age}</b></div>
-                      <div><span class="text-slate-400 text-[11px] block">성별</span><b class="text-slate-800">${gender}</b></div>
+                  <!-- Right: Consultant, Org, Duration, ID, Action Buttons -->
+                  <div class="flex items-center gap-3 shrink-0 flex-wrap justify-end">
+                    <div class="flex items-center gap-1.5 text-slate-500 text-[11px]">
+                      <span>상담자: <b class="text-slate-700 font-semibold">${consultant}</b></span>
+                      <span class="text-slate-300">·</span>
+                      <span class="text-slate-500 max-w-[140px] truncate" title="${org}">${org}</span>
+                      <span class="text-slate-300">·</span>
+                      <span class="font-mono text-purple-700 font-bold">${duration}</span>
                     </div>
-                    <div class="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-200/60">
-                      <div><span class="text-slate-400 text-[11px] block">상담자</span><b class="text-slate-800">${consultant}</b></div>
-                      <div><span class="text-slate-400 text-[11px] block">소속기관</span><b class="text-purple-700 truncate block">${org}</b></div>
-                    </div>
-                    <div class="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-200/60 font-mono text-[11px]">
-                      <div class="col-span-2"><span class="text-slate-400 block">상담일시</span><b class="text-slate-800">${consultDate}</b></div>
-                      <div><span class="text-slate-400 block">상담시간</span><b class="text-purple-700 font-bold">${duration}</b></div>
-                    </div>
-                  </div>
+                    <span class="font-mono text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-medium">#${sid}</span>
 
-                  <div class="flex items-center justify-between pt-1">
-                    <div class="text-xs font-bold text-slate-700 truncate max-w-[170px]" title="${log.title || ''}">
-                      ${log.title || '일상 지원 및 환자 상태 점검'}
-                    </div>
-                    <div class="flex items-center gap-1.5 shrink-0">
+                    <div class="flex items-center gap-1 shrink-0 ml-1">
                       <button type="button" onclick="openCarePortOfficialDetail(${sid})"
-                        class="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer">
-                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                        class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
+                        <i data-lucide="file-text" class="w-3 h-3"></i>
                         <span>원문(PDF)</span>
                       </button>
                       <button type="button" onclick="window.open('https://careport.livon.care/careport/consult/${sid}', '_blank')"
-                        class="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
+                        class="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
                         title="새 창에서 CarePort 원본 열기">
                         <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
                       </button>
