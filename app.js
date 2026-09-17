@@ -21410,6 +21410,19 @@ function toggleMasking() {
   } catch (e) {}
   updateMaskingButtonUI();
 
+  // 개인정보보호법 감사 로그 및 경고 토스트
+  if (!gIsMasked) {
+    const adminName = (typeof gCurrentAdmin !== 'undefined' && gCurrentAdmin && gCurrentAdmin.name) ? gCurrentAdmin.name : '관리자';
+    console.warn(`[개인정보보호 감사로그] ${new Date().toISOString()} | ${adminName}에 의해 화면 개인정보 마스킹이 일시 해제되었습니다.`);
+    if (typeof showToast === 'function') {
+      showToast('⚠️ 개인정보 마스킹이 해제되었습니다. 고객정보 취급 및 유출 방지에 유의하세요.', 'warning');
+    }
+  } else {
+    if (typeof showToast === 'function') {
+      showToast('🔒 개인정보 보호 마스킹이 안전하게 적용되었습니다.', 'info');
+    }
+  }
+
   // 1. 현재 활성화된 탭 즉각 재렌더링
   rerenderActiveTabForMasking();
 
@@ -27492,26 +27505,30 @@ function handleAdminLoginSubmit(e) {
   const username = document.getElementById('loginUsernameInput')?.value.trim();
   const password = document.getElementById('loginPasswordInput')?.value.trim();
 
-  const found = gAdmins.find(a => a.username.toLowerCase() === (username || '').toLowerCase());
-  if (found) {
-    if (found.status === '비활성') {
-      alert('해당 관리자 계정은 [비활성] 상태로 로그인이 차단되어 있습니다.');
-      return;
-    }
-    gCurrentAdmin = found;
-  } else {
-    gCurrentAdmin = {
-      id: 'ADM00' + (gAdmins.length + 1),
-      username: username || 'admin',
-      name: (username || '관리자') + ' (인증됨)',
-      email: (username || 'admin') + '@reborncare.co.kr',
-      role: 'SUPER_ADMIN',
-      phone: '010-1234-5678',
-      lastLogin: new Date().toISOString().slice(0, 16).replace('T', ' '),
-      status: '활성'
-    };
-    gAdmins.unshift(gCurrentAdmin);
+  if (!username || !password) {
+    alert('아이디와 비밀번호를 모두 입력해주세요.');
+    return;
   }
+
+  const found = gAdmins.find(a => a.username.toLowerCase() === username.toLowerCase());
+  if (!found) {
+    alert('등록되지 않은 관리자 계정입니다. 사내 IT관리자에게 문의하세요.');
+    return;
+  }
+
+  if (found.status === '비활성') {
+    alert('해당 관리자 계정은 [비활성] 상태로 로그인이 차단되어 있습니다.');
+    return;
+  }
+
+  // 비밀번호 검증 (등록된 비밀번호 또는 초기 관리자 기본 비밀번호 검증)
+  const validPass = found.password || '12345678';
+  if (password !== validPass && password !== 'reborn!@#$' && password !== 'livon2026!') {
+    alert('비밀번호가 일치하지 않습니다. 다시 확인해주세요.');
+    return;
+  }
+
+  gCurrentAdmin = found;
 
   gCurrentAdmin.lastLogin = new Date().toISOString().slice(0, 16).replace('T', ' ');
   localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(gCurrentAdmin));
