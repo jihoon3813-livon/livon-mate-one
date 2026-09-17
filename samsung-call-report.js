@@ -2836,6 +2836,18 @@ function copyReportWebLink(targetChannel = '삼성화재') {
   const origin = window.location.origin;
   const reportUrl = `${origin}/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(targetChannel)}`;
 
+  try {
+    if (gSamsungReportData && gSamsungReportData.callLogs) {
+      const isHyundai = targetChannel.includes('현대');
+      const isLivon = targetChannel.includes('리본');
+      const isAll = targetChannel.includes('전체') || targetChannel === 'all';
+      const cacheKey = isHyundai 
+        ? 'LIVON_CACHED_HYUNDAI_REPORT_DATA' 
+        : (isLivon ? 'LIVON_CACHED_LIVON_REPORT_DATA' : (isAll ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA'));
+      sessionStorage.setItem(cacheKey, JSON.stringify(gSamsungReportData));
+    }
+  } catch (err) {}
+
   navigator.clipboard.writeText(reportUrl).then(() => {
     if (typeof showToast === 'function') {
       showToast(`[${targetChannel}] 보고서 전용 웹링크가 복사되었습니다!`, 'success');
@@ -2851,6 +2863,19 @@ function openReportWebView(targetChannel = '삼성화재') {
   const thisWeek = getThisWeekRange();
   const s = document.getElementById('tabReportStartDate')?.value || thisWeek.start;
   const e = document.getElementById('tabReportEndDate')?.value || thisWeek.end;
+
+  try {
+    if (gSamsungReportData && gSamsungReportData.callLogs) {
+      const isHyundai = targetChannel.includes('현대');
+      const isLivon = targetChannel.includes('리본');
+      const isAll = targetChannel.includes('전체') || targetChannel === 'all';
+      const cacheKey = isHyundai 
+        ? 'LIVON_CACHED_HYUNDAI_REPORT_DATA' 
+        : (isLivon ? 'LIVON_CACHED_LIVON_REPORT_DATA' : (isAll ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA'));
+      sessionStorage.setItem(cacheKey, JSON.stringify(gSamsungReportData));
+    }
+  } catch (err) {}
+
   const reportUrl = `/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(targetChannel)}`;
   window.open(reportUrl, '_blank');
 }

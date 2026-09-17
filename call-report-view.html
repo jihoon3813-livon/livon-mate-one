@@ -122,7 +122,11 @@
             <span id="syncCtiBtnText">새로고침</span>
           </button>
         </div>
+      </div>
     </div>
+
+    <!-- CTI 원본 집계 스트립 컨테이너 -->
+    <div id="ctiSummaryContainer"></div>
 
     <!-- 2. SUB-TAB SWITCHER (모바일 3종 탭 잘림 방지) -->
     <div class="flex items-center justify-between border-b border-slate-200 gap-2 px-1">
@@ -569,29 +573,44 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         updatePresetButtons();
         let loaded = false;
 
-        // 1. 세션 스토리지 캐시 확인 (0ms)
+        const ch = gFilter.channel || '삼성화재';
+        const isHyundai = ch.includes('현대');
+        const isLivon = ch.includes('리본');
+        const isAll = ch.includes('전체') || ch === 'all';
+        const channelCacheKey = isHyundai 
+          ? 'LIVON_CACHED_HYUNDAI_REPORT_DATA' 
+          : (isLivon ? 'LIVON_CACHED_LIVON_REPORT_DATA' : (isAll ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA'));
+
+        // 1. 해당 채널에 정확히 일치하는 세션 스토리지 캐시 확인 (0ms)
         try {
-          const cached = sessionStorage.getItem('LIVON_CACHED_ALL_REPORT_DATA') || sessionStorage.getItem('LIVON_CACHED_SAMSUNG_REPORT_DATA');
+          const cached = sessionStorage.getItem(channelCacheKey);
           if (cached) {
             const parsed = JSON.parse(cached);
-            if (parsed && parsed.callLogs && parsed.callLogs.length >= 200) {
-              gReportData = parsed;
-              loaded = true;
-              renderAll();
+            if (parsed && parsed.callLogs && parsed.callLogs.length > 0) {
+              const rCh = (parsed.reportInfo && parsed.reportInfo.channel) || '';
+              const match = isAll ? true : (isHyundai ? rCh.includes('현대') : (isLivon ? rCh.includes('리본') : rCh.includes('삼성')));
+              if (match) {
+                gReportData = parsed;
+                loaded = true;
+                renderAll();
+              }
             }
           }
         } catch (e) {}
 
-        // 2. 전체 및 채널별 정적 데이터 파일 우선 고속 로드 (5ms)
+        // 2. 채널별 전용 정적 데이터 파일 우선 고속 로드 (5ms)
+        const primaryFileName = isHyundai 
+          ? 'call_report_hyundai.json' 
+          : (isLivon ? 'call_report_livon.json' : (isAll ? 'call_report_all.json' : 'call_report_samsung.json'));
+
         const primaryFiles = [
-          `/call_report_all.json?t=${Date.now()}`,
-          `./call_report_all.json?t=${Date.now()}`,
-          `call_report_all.json?t=${Date.now()}`,
-          (gFilter.channel === '현대해상') ? `/call_report_hyundai.json?t=${Date.now()}` : null,
-          (gFilter.channel === '리본케어') ? `/call_report_livon.json?t=${Date.now()}` : null,
-          `/call_report_samsung.json?t=${Date.now()}`,
-          `./call_report_samsung.json?t=${Date.now()}`,
-          `call_report_samsung.json?t=${Date.now()}`
+          `/${primaryFileName}?t=${Date.now()}`,
+          `./${primaryFileName}?t=${Date.now()}`,
+          `${primaryFileName}?t=${Date.now()}`,
+          `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
+          // 채널 전용 파일 실패 시에만 fallback으로 확인
+          (primaryFileName !== 'call_report_all.json') ? `/call_report_all.json?t=${Date.now()}` : null,
+          (primaryFileName !== 'call_report_all.json') ? `./call_report_all.json?t=${Date.now()}` : null
         ].filter(Boolean);
 
         for (const u of primaryFiles) {
@@ -606,8 +625,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
                   gReportData = data;
                   loaded = true;
                   try {
-                    const cacheKey = isHyundai ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA';
-                    sessionStorage.setItem(cacheKey, JSON.stringify(data));
+                    sessionStorage.setItem(channelCacheKey, JSON.stringify(data));
                   } catch (e) {}
                   break;
                 }
@@ -653,11 +671,11 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       if (!gReportData) return;
       updateBranding();
       const stats = calculateStats();
+      renderCtiSummaryStrip(stats);
       renderSummarySheet(stats);
       renderDailySheet(stats);
       renderLogsSheet(stats);
       renderFilterTags();
-      // 링크페이지: CTI 원본 집계 스트립 완전 제거
       if (window.lucide) lucide.createIcons();
 
       if (gActiveTab === 'daily') {
@@ -665,9 +683,70 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       }
     }
 
-    function renderCtiSummaryStrip() {
-      // 링크페이지에서는 CTI 집계 카드를 노출하지 않음
-      return;
+    function renderCtiSummaryStrip(stats) {
+      const container = document.getElementById('ctiSummaryContainer');
+      if (!container) return;
+
+      const cs = gReportData && gReportData.ctiSummary;
+      const rInfo = (gReportData && gReportData.reportInfo) || {};
+      const curStart = gFilter.startDate || rInfo.startDate || '';
+      const curEnd = gFilter.endDate || rInfo.endDate || '';
+      const curCh = gFilter.channel || rInfo.channel || '삼성화재';
+
+      const st = stats || calculateStats();
+      const activeCti = cs || {
+        totalAll: st.totalCalls,
+        totalInbound: st.totalCalls,
+        answeredCalls: st.answeredCalls,
+        connectRequests: st.connectReqCalls,
+        answerRate: st.answerRate,
+        abandonedCalls: Math.max(0, st.connectReqCalls - st.answeredCalls),
+        unselectedType: Math.max(0, st.totalCalls - st.connectReqCalls),
+        btnExit: 0
+      };
+
+      container.innerHTML = `
+        <div class="bg-gradient-to-r from-blue-50/90 to-indigo-50/60 border border-blue-200/70 rounded-2xl p-3 sm:px-4 sm:py-3 space-y-2.5 text-xs mb-3">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-2 py-0.5 rounded-md bg-blue-600 text-white font-black text-[10px] tracking-wide shrink-0">CTI 원본 집계</span>
+            <span class="text-slate-800 font-bold break-keep text-xs">"${curStart} ~ ${curEnd}" <span class="text-blue-700 font-extrabold">[${curCh}]</span> 검색 결과</span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 text-[11px]">
+            <div class="bg-white/90 border border-blue-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-slate-500 font-medium">전체 인입</span>
+              <span class="font-black text-blue-700 text-xs mt-0.5">${activeCti.totalAll || activeCti.totalInbound || st.totalCalls}건</span>
+            </div>
+            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-slate-500 font-medium">인입콜</span>
+              <span class="font-bold text-slate-900 text-xs mt-0.5">${activeCti.totalInbound || st.totalCalls}/${activeCti.connectRequests || st.connectReqCalls}건</span>
+            </div>
+            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-slate-500 font-medium">연결요청</span>
+              <span class="font-bold text-slate-900 text-xs mt-0.5">${activeCti.connectRequests || st.connectReqCalls}건</span>
+            </div>
+            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-slate-500 font-medium">응답호</span>
+              <span class="font-bold text-emerald-700 text-xs mt-0.5">${activeCti.answeredCalls || st.answeredCalls}건</span>
+            </div>
+            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-slate-500 font-medium">응답율</span>
+              <span class="font-bold text-emerald-700 text-xs mt-0.5">${activeCti.answerRate || st.answerRate}</span>
+            </div>
+            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-slate-500 font-medium">포기호</span>
+              <span class="font-bold text-rose-600 text-xs mt-0.5">${activeCti.abandonedCalls || 0}건</span>
+            </div>
+            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-slate-500 font-medium">유형미선택</span>
+              <span class="font-bold text-slate-700 text-xs mt-0.5">${activeCti.unselectedType || 0}건</span>
+            </div>
+            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
+              <span class="text-[10px] text-slate-500 font-medium">버튼선택종료</span>
+              <span class="font-bold text-slate-700 text-xs mt-0.5">${activeCti.btnExit || 0}건</span>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
     function calculateStats() {
@@ -709,12 +788,13 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       let totalCalls = 0;
       if (isCtiRangeMatch && cs && (cs.totalInbound !== undefined || cs.totalAll !== undefined)) {
         totalCalls = cs.totalInbound !== undefined ? cs.totalInbound : cs.totalAll;
-      } else {
-        // CTI 기간 매칭 전이거나 부분 기간 필터링인 경우:
-        // 해당 기간에 속한 dailyTrends의 합계 또는 필터링된 콜 로그 건수 사용
-        const periodTrends = (gReportData && gReportData.dailyTrends || []).filter(t => (!gFilter.startDate || t.date >= gFilter.startDate) && (!gFilter.endDate || t.date <= gFilter.endDate));
+      } else if (isChannelMatch && gReportData && Array.isArray(gReportData.dailyTrends)) {
+        // CTI 기간 매칭 전이거나 부분 기간 필터링인 경우: 동일 채널의 dailyTrends 합계 활용
+        const periodTrends = gReportData.dailyTrends.filter(t => (!gFilter.startDate || t.date >= gFilter.startDate) && (!gFilter.endDate || t.date <= gFilter.endDate));
         const trendsSum = periodTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
         totalCalls = trendsSum > 0 ? trendsSum : logs.length;
+      } else {
+        totalCalls = logs.length;
       }
 
       let connectReqCalls = logs.length;
@@ -1620,18 +1700,18 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 
         if (!synced) {
           const isHyundai = ch.includes('현대');
-          const fallbacks = isHyundai ? [
-            `/call_report_all.json?t=${Date.now()}`,
-            `./call_report_all.json?t=${Date.now()}`,
-            `call_report_all.json?t=${Date.now()}`,
-            `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
-          ] : [
-            `/call_report_samsung.json?t=${Date.now()}`,
-            `./call_report_samsung.json?t=${Date.now()}`,
-            `call_report_samsung.json?t=${Date.now()}`,
-            `/call_report_all.json?t=${Date.now()}`,
-            `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
-          ];
+          const isLivon = ch.includes('리본');
+          const isAll = ch.includes('전체') || ch === 'all';
+          const primaryFallback = isHyundai ? 'call_report_hyundai.json' : (isLivon ? 'call_report_livon.json' : (isAll ? 'call_report_all.json' : 'call_report_samsung.json'));
+
+          const fallbacks = [
+            `/${primaryFallback}?t=${Date.now()}`,
+            `./${primaryFallback}?t=${Date.now()}`,
+            `${primaryFallback}?t=${Date.now()}`,
+            `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
+            (primaryFallback !== 'call_report_all.json') ? `/call_report_all.json?t=${Date.now()}` : null
+          ].filter(Boolean);
+
           for (const u of fallbacks) {
             try {
               const sRes = await fetch(u);
@@ -1653,7 +1733,12 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 
         if (gReportData) {
           try {
-            const cacheKey = ch.includes('현대') ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA';
+            const isHyundai = ch.includes('현대');
+            const isLivon = ch.includes('리본');
+            const isAll = ch.includes('전체') || ch === 'all';
+            const cacheKey = isHyundai 
+              ? 'LIVON_CACHED_HYUNDAI_REPORT_DATA' 
+              : (isLivon ? 'LIVON_CACHED_LIVON_REPORT_DATA' : (isAll ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA'));
             sessionStorage.setItem(cacheKey, JSON.stringify(gReportData));
           } catch (e) {}
         }
