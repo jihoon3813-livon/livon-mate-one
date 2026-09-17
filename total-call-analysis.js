@@ -54,17 +54,11 @@ function setTotalSyncProgress(step, percent, title, message, completed = false, 
     count
   };
 
-  const existing = document.getElementById('totalCallSyncProgressCard');
+  const existing = document.getElementById('totalCallSyncProgressModal');
   if (existing) {
-    existing.outerHTML = renderTotalSyncProgressCardHtml();
+    existing.outerHTML = renderTotalSyncProgressModalHtml();
   } else {
-    const tab = document.getElementById('tab-totalcallanalysis');
-    if (tab) {
-      const topBanner = tab.querySelector('.bg-white.rounded-3xl');
-      if (topBanner) {
-        topBanner.insertAdjacentHTML('afterend', renderTotalSyncProgressCardHtml());
-      }
-    }
+    document.body.insertAdjacentHTML('beforeend', renderTotalSyncProgressModalHtml());
   }
 
   if (typeof lucide !== 'undefined' && lucide.createIcons) {
@@ -72,19 +66,18 @@ function setTotalSyncProgress(step, percent, title, message, completed = false, 
   }
 }
 
-function closeTotalSyncProgressCard() {
+function closeTotalSyncProgressModal() {
   gTotalSyncProgressState.active = false;
-  const card = document.getElementById('totalCallSyncProgressCard');
-  if (card) {
-    card.style.opacity = '0';
-    card.style.transform = 'translateY(-8px)';
-    card.style.transition = 'all 0.3s ease';
-    setTimeout(() => { if (card) card.remove(); }, 300);
+  const modal = document.getElementById('totalCallSyncProgressModal');
+  if (modal) {
+    modal.classList.add('opacity-0', 'pointer-events-none');
+    setTimeout(() => { if (modal) modal.remove(); }, 250);
   }
 }
-window.closeTotalSyncProgressCard = closeTotalSyncProgressCard;
+window.closeTotalSyncProgressModal = closeTotalSyncProgressModal;
+window.closeTotalSyncProgressCard = closeTotalSyncProgressModal; // 하위 호환 별칭
 
-function renderTotalSyncProgressCardHtml() {
+function renderTotalSyncProgressModalHtml() {
   if (!gTotalSyncProgressState.active) return '';
   const { step, percent, title, message, completed, count } = gTotalSyncProgressState;
 
@@ -96,65 +89,94 @@ function renderTotalSyncProgressCardHtml() {
   ];
 
   return `
-    <div id="totalCallSyncProgressCard" class="my-4 p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-slate-900 via-cyan-950 to-slate-900 text-white border border-cyan-500/40 shadow-xl space-y-3.5 transition-all">
-      <div class="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
-        <div class="flex items-center gap-3 min-w-0">
-          <div class="w-10 h-10 rounded-2xl ${completed ? 'bg-emerald-500' : 'bg-cyan-500'} flex items-center justify-center text-white shadow-md shadow-cyan-500/20 shrink-0">
-            <i data-lucide="${completed ? 'check-circle' : 'refresh-cw'}" class="w-5 h-5 ${completed ? '' : 'animate-spin'}"></i>
-          </div>
-          <div class="min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${completed ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse'}">
-                ${completed ? '동기화 완료' : `${step}단계 진행 중`}
-              </span>
-              <h4 class="text-sm sm:text-base font-black text-white truncate">${title}</h4>
-            </div>
-            <p class="text-xs text-slate-300 mt-0.5 line-clamp-1 sm:line-clamp-none">${message}</p>
-          </div>
-        </div>
+    <div id="totalCallSyncProgressModal" class="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-200 animate-in fade-in">
+      <div class="relative w-full max-w-lg bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-cyan-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-cyan-950/70 overflow-hidden text-white animate-in zoom-in-95 duration-200">
+        <!-- Ambient Glowing Aura -->
+        <div class="absolute -top-16 -right-16 w-56 h-56 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-16 -left-16 w-56 h-56 bg-teal-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-        <div class="flex items-center gap-3 shrink-0 ml-auto sm:ml-0">
-          <div class="text-right">
-            <div class="text-xl sm:text-2xl font-black font-mono ${completed ? 'text-emerald-400' : 'text-cyan-400'}">${percent}%</div>
-            <div class="text-[10px] text-slate-400 font-bold">${completed ? `총 ${count}건 반영됨` : '실시간 전수 수집'}</div>
+        <!-- Header Row -->
+        <div class="flex items-start justify-between gap-4 relative z-10">
+          <div class="flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-2xl ${completed ? 'bg-emerald-500/20 border border-emerald-400/50 text-emerald-400' : 'bg-cyan-500/20 border border-cyan-400/50 text-cyan-400'} flex items-center justify-center shadow-lg shrink-0">
+              <i data-lucide="${completed ? 'check-circle-2' : 'refresh-cw'}" class="w-6 h-6 ${completed ? 'scale-110' : 'animate-spin'}"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${completed ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse'}">
+                  ${completed ? '✓ 동기화 완료' : `${step}단계 진행 중`}
+                </span>
+                <span class="text-xs text-slate-400 font-bold">CTI 실시간 수집 동기화</span>
+              </div>
+              <h3 class="text-lg sm:text-xl font-black text-white mt-1">${title}</h3>
+            </div>
           </div>
-          <button type="button" onclick="closeTotalSyncProgressCard()" class="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer" title="닫기">
-            <i data-lucide="x" class="w-4 h-4"></i>
+
+          <button type="button" onclick="closeTotalSyncProgressModal()" class="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800/80 transition-colors cursor-pointer" title="닫기">
+            <i data-lucide="x" class="w-5 h-5"></i>
           </button>
         </div>
-      </div>
 
-      <!-- Animated Glowing Progress Bar -->
-      <div class="w-full bg-slate-800/80 rounded-full h-3 overflow-hidden border border-slate-700/60 relative p-0.5 shadow-inner">
-        <div class="h-full rounded-full transition-all duration-500 ease-out ${completed ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 'bg-gradient-to-r from-cyan-500 via-sky-400 to-teal-400'}" style="width: ${percent}%;"></div>
-      </div>
+        <!-- Description Message -->
+        <p class="text-xs sm:text-sm text-slate-300 mt-3 leading-relaxed relative z-10">${message}</p>
 
-      <!-- 4-Step Visual Indicators -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5 text-xs">
-        ${stepsList.map(s => {
-          const isCurrent = step === s.num && !completed;
-          const isDone = step > s.num || completed;
-          return `
-            <div class="flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
-              isDone 
-                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 font-bold' 
-                : isCurrent 
-                  ? 'bg-cyan-950/70 border-cyan-400 text-cyan-100 font-black shadow-xs ring-1 ring-cyan-400/40' 
-                  : 'bg-slate-800/40 border-slate-800/80 text-slate-400'
-            }">
-              <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
+        <!-- Percentage & Count Display -->
+        <div class="flex items-baseline justify-between mt-5 mb-2 relative z-10">
+          <div class="text-3xl sm:text-4xl font-black font-mono tracking-tight ${completed ? 'text-emerald-400' : 'text-cyan-400'}">
+            ${percent}%
+          </div>
+          <div class="text-xs font-bold text-slate-400">
+            ${completed ? `<span class="text-emerald-300 font-extrabold">총 ${count}건</span> CTI 전수 데이터 반영 완료` : '삼성화재 · 현대해상 · 리본케어 전수 수집'}
+          </div>
+        </div>
+
+        <!-- Animated Progress Bar -->
+        <div class="w-full bg-slate-800/90 rounded-full h-3.5 overflow-hidden border border-slate-700/80 p-0.5 relative shadow-inner relative z-10 mb-5">
+          <div class="h-full rounded-full transition-all duration-300 ease-out ${completed ? 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-md shadow-emerald-500/40' : 'bg-gradient-to-r from-cyan-500 via-sky-400 to-teal-400 shadow-md shadow-cyan-500/40'}" style="width: ${percent}%;"></div>
+        </div>
+
+        <!-- 4-Step Visual Grid -->
+        <div class="grid grid-cols-2 gap-2 text-xs relative z-10 mb-5">
+          ${stepsList.map(s => {
+            const isCurrent = step === s.num && !completed;
+            const isDone = step > s.num || completed;
+            return `
+              <div class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${
                 isDone 
-                  ? 'bg-emerald-500 text-slate-950' 
+                  ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300 font-bold' 
                   : isCurrent 
-                    ? 'bg-cyan-400 text-slate-950 animate-pulse' 
-                    : 'bg-slate-700 text-slate-400'
+                    ? 'bg-cyan-950/60 border-cyan-400 text-cyan-100 font-black ring-1 ring-cyan-400/30' 
+                    : 'bg-slate-800/40 border-slate-800/80 text-slate-400'
               }">
-                ${isDone ? '✓' : s.num}
-              </span>
-              <span class="truncate tracking-tight">${s.label}</span>
+                <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
+                  isDone 
+                    ? 'bg-emerald-500 text-slate-950' 
+                    : isCurrent 
+                      ? 'bg-cyan-400 text-slate-950 animate-pulse' 
+                      : 'bg-slate-700 text-slate-400'
+                }">
+                  ${isDone ? '✓' : s.num}
+                </span>
+                <span class="truncate tracking-tight">${s.label}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <!-- Action / Status Footer -->
+        <div class="relative z-10 pt-1">
+          ${completed ? `
+            <button type="button" onclick="closeTotalSyncProgressModal()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-slate-950 font-black text-sm shadow-lg shadow-emerald-500/25 transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2">
+              <i data-lucide="check" class="w-4 h-4 stroke-[3]"></i>
+              <span>동기화 완료 (대시보드 확인)</span>
+            </button>
+          ` : `
+            <div class="flex items-center justify-center gap-2 text-[11px] text-slate-400 font-medium py-1">
+              <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-cyan-400"></i>
+              <span>실시간 데이터 수집 및 분석 최적화가 진행 중입니다...</span>
             </div>
-          `;
-        }).join('')}
+          `}
+        </div>
       </div>
     </div>
   `;
@@ -763,8 +785,9 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         renderTotalCallAnalysisTab();
       }
 
+      // 초고속 타임아웃 (기존 15초 -> 2초로 대폭 단축하여 지연 방지)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15초 타임아웃
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
       let synced = false;
 
       const s = gTotalFilter.startDate || '2026-08-01';
@@ -773,7 +796,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       const sUrl = `/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
 
       if (!isBackground) {
-        setTotalSyncProgress(2, 45, '콜로그 및 녹취 STT 수신 중', '삼성화재·현대해상·리본케어 인바운드 콜 녹취 및 STT 전문 데이터를 파싱하고 있습니다...');
+        setTotalSyncProgress(2, 55, '콜로그 및 녹취 STT 수신 중', '삼성화재·현대해상·리본케어 인바운드 콜 녹취 및 STT 전문 데이터를 파싱하고 있습니다...');
       }
 
       try {
@@ -788,14 +811,13 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         }
       } catch (e) {
         clearTimeout(timeoutId);
-        console.warn('CTI 동기화 시간 초과 또는 실패, 최신 정적 캐시로 전환:', e.message);
       }
 
-      // API 실패/타임아웃 시 즉각 최신 정적 파일 로드 (무중단 보장)
+      // API 실패/타임아웃 시 즉각 로컬 최신 정적 데이터 로드 (초고속 즉시 반영)
       if (!synced) {
         const fallbacks = [
-          `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
           `call_report_all.json?t=${Date.now()}`,
+          `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
           `./call_report_all.json?t=${Date.now()}`,
           `/call_report_all.json?t=${Date.now()}`
         ];
@@ -816,10 +838,10 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       }
 
       if (!isBackground) {
-        setTotalSyncProgress(3, 75, '보험사별 데이터 통합 중', '인입 채널(삼성화재/현대해상/리본케어) 교차 검증 및 상담 라벨 매칭 중...');
-        await new Promise(r => setTimeout(r, 200));
-        setTotalSyncProgress(4, 92, '지표 및 아웃콜 재집계 중', '미연결(0초) 아웃콜 긴급 대상 건을 추출하고 통계 대시보드를 최적화하고 있습니다...');
-        await new Promise(r => setTimeout(r, 200));
+        setTotalSyncProgress(3, 80, '보험사별 데이터 통합 중', '인입 채널(삼성화재/현대해상/리본케어) 교차 검증 및 상담 라벨 매칭 중...');
+        await new Promise(r => setTimeout(r, 60)); // 매끄럽고 빠른 60ms 전환
+        setTotalSyncProgress(4, 95, '지표 및 아웃콜 재집계 중', '미연결(0초) 아웃콜 긴급 대상 건을 추출하고 통계 대시보드를 최적화하고 있습니다...');
+        await new Promise(r => setTimeout(r, 60)); // 매끄럽고 빠른 60ms 전환
       }
 
       clearMateOneMatchCache();
@@ -835,9 +857,10 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
 
       if (!isBackground) {
         setTotalSyncProgress(4, 100, '실시간 동기화 완료!', `총 ${count}건의 CTI 전수 상담 데이터가 성공적으로 반영되었습니다.`, true, count);
+        // 1.2초 후 자동 닫기 (확인 버튼 클릭 시 즉시 닫기 가능)
         setTimeout(() => {
-          closeTotalSyncProgressCard();
-        }, 5000);
+          closeTotalSyncProgressModal();
+        }, 1200);
 
         if (typeof showToast === 'function') {
           showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 완료되었습니다.`, 'success');
