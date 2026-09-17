@@ -2494,7 +2494,7 @@ function hidePdfProgress() {
   }
 }
 
-// 13. Download PDF via Headless Edge API
+// 13. Download PDF via Headless Edge API or Client-side Hybrid Engine
 async function downloadCallReportPdf() {
   try {
     setPdfProgress('1/4 보고서 데이터 및 차트 집계 중...', 25);
@@ -2504,38 +2504,136 @@ async function downloadCallReportPdf() {
     const html = generateCallReportPdfHtml();
     await new Promise(r => setTimeout(r, 200));
 
-    setPdfProgress('3/4 서버 PDF 고화질 렌더링 중...', 80);
-    const res = await fetch('/api/samsung/call-report/pdf', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        htmlContent: html,
-        title: `삼성화재_간병서비스_콜분석_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`
-      })
-    });
+    setPdfProgress('3/4 고화질 PDF 생성 및 렌더링 중...', 80);
+    const reportTitle = `삼성화재_간병서비스_콜분석_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
 
-    if (!res.ok) throw new Error('PDF 생성 서버 에러');
+    let serverPdfSuccess = false;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const res = await fetch('/api/samsung/call-report/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          htmlContent: html,
+          title: reportTitle
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
 
-    setPdfProgress('4/4 PDF 파일 다운로드 중...', 95);
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `삼성화재_간병서비스_콜분석_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-    setPdfProgress('완료되었습니다!', 100);
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/pdf')) {
+          const blob = await res.blob();
+          if (blob && blob.size > 500) {
+            setPdfProgress('4/4 PDF 파일 다운로드 중...', 95);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${reportTitle}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            setPdfProgress('완료되었습니다!', 100);
+            serverPdfSuccess = true;
+          }
+        }
+      }
+    } catch (serverErr) {
+      console.log('[Server PDF unavailable, switching to client rendering]', serverErr.message);
+    }
+
+    if (!serverPdfSuccess) {
+      // Client-side PDF export fallback
+      await executeSamsungCallReportClientPdf(html, reportTitle);
+    }
 
     if (typeof showToast === 'function') {
       showToast('PDF 보고서 다운로드가 완료되었습니다.', 'success');
     }
   } catch (err) {
     console.error('PDF download error:', err);
-    alert('PDF 다운로드 실패: ' + err.message);
+    alert('PDF 다운로드 처리 중 오류: ' + err.message);
   } finally {
     hidePdfProgress();
+  }
+}
+
+async function executeSamsungCallReportClientPdf(html, reportTitle) {
+  const fileName = `${reportTitle}.pdf`;
+
+  if (typeof html2pdf !== 'undefined') {
+    setPdfProgress('3/4 클라이언트 고화질 PDF 렌더링 중...', 85);
+    const container = document.createElement('div');
+    container.id = 'samsung-pdf-render-virtual-container';
+    container.style.position = 'fixed';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    container.style.width = '794px';
+    container.style.background = '#ffffff';
+    container.style.color = '#0f172a';
+    container.style.zIndex = '-9999';
+    container.innerHTML = html;
+    document.body.appendChild(container);
+
+    const opt = {
+      margin: [10, 8, 10, 8],
+      filename: fileName,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] }
+    };
+
+    try {
+      await html2pdf().set(opt).from(container).save();
+      setPdfProgress('완료되었습니다! PDF 다운로드 완료', 100);
+      if (document.body.contains(container)) document.body.removeChild(container);
+      return true;
+    } catch (err) {
+      console.warn('[html2pdf execution error, switching to native print window]', err);
+      if (document.body.contains(container)) document.body.removeChild(container);
+    }
+  }
+
+  setPdfProgress('3/4 고화질 A4 인쇄 / PDF 저장 창 준비 중...', 90);
+  triggerSamsungCallReportPrintPdf(html, reportTitle);
+  setPdfProgress('완료되었습니다!', 100);
+  return true;
+}
+
+function triggerSamsungCallReportPrintPdf(html, reportTitle) {
+  const printWindow = window.open('', '_blank', 'width=1000,height=900');
+  if (printWindow) {
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 450);
+  } else {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+    iframe.contentWindow.focus();
+    setTimeout(() => {
+      iframe.contentWindow.print();
+      setTimeout(() => {
+        if (document.body.contains(iframe)) document.body.removeChild(iframe);
+      }, 1500);
+    }, 400);
   }
 }
 
