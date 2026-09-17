@@ -12758,20 +12758,20 @@ function switchHubModalViewMode(mode) {
       dialogEl.classList.remove('max-w-[1240px]', 'max-w-[1280px]', 'max-w-[1300px]', 'w-[92vw]', 'w-[94vw]');
       dialogEl.classList.add('max-w-[1680px]', 'w-[96vw]');
     } else {
-      dialogEl.classList.remove('max-w-[1680px]', 'w-[96vw]');
-      dialogEl.classList.add('max-w-[1240px]', 'w-[92vw]');
+      dialogEl.classList.remove('max-w-[1680px]');
+      dialogEl.classList.add('max-w-[1240px]', 'w-[96vw]', 'sm:w-[92vw]');
     }
   }
 
   if (btnTimeline && btn3Card) {
     if (mode === '3card') {
-      btn3Card.className = 'px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all bg-sky-500 text-white shadow-md cursor-pointer';
-      btnTimeline.className = 'px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all text-slate-400 hover:text-white cursor-pointer';
+      btn3Card.className = 'px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-sky-500 text-white shadow-md cursor-pointer';
+      btnTimeline.className = 'px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all text-slate-400 hover:text-white cursor-pointer';
       if (footerNote) footerNote.innerText = '✨ [3-Column 주체별 뷰] 고객/접수, 간병인/센터, 손사/보험사 3대 주체별 대시보드 화면입니다.';
       if (subtitle) subtitle.innerText = '고객 1명을 중심으로 3대 핵심 주체(고객/접수, 간병인/센터, 손사/보험사)별로 균형있게 통합 관리합니다.';
     } else {
-      btnTimeline.className = 'px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all bg-sky-500 text-white shadow-md cursor-pointer';
-      btn3Card.className = 'px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all text-slate-400 hover:text-white cursor-pointer';
+      btnTimeline.className = 'px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-sky-500 text-white shadow-md cursor-pointer';
+      btn3Card.className = 'px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all text-slate-400 hover:text-white cursor-pointer';
       if (footerNote) footerNote.innerText = '✨ [시계열 정산 연동 뷰] 간병제공 ➡️ 보험금청구 ➡️ 입금확인 ➡️ 간병비지급 순으로 차수별 1:1 동기화 관리합니다.';
       if (subtitle) subtitle.innerText = '간병 제공부터 보험사 청구, 입금 확인, 간병비 지급까지 차수별 시계열 흐름으로 원스탑 관리합니다.';
     }
@@ -14784,9 +14784,9 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-slate-400 font-medium">일급 / 정산계좌:</span>
-                  <div class="flex items-center gap-1.5">
-                    <span class="px-1.5 py-0.2 rounded bg-teal-50 text-teal-800 font-mono font-bold text-[10.5px]">${formatCurrency(cgDailyWage)}원</span>
-                    <span class="font-mono text-slate-600 text-[10.5px] truncate max-w-[120px]" title="${account}">${maskAccount(account)}</span>
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <span class="px-1.5 py-0.2 rounded bg-teal-50 text-teal-800 font-mono font-bold text-[10.5px] shrink-0 whitespace-nowrap">${formatCurrency(cgDailyWage)}원</span>
+                    <span class="font-mono text-slate-600 text-[10.5px] truncate" title="${account}">${maskAccount(account)}</span>
                   </div>
                 </div>
               </div>
@@ -14802,10 +14802,10 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                     <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden flex">
                       <div class="h-full ${prog.status === 'completed' ? 'bg-slate-400' : 'bg-gradient-to-r from-sky-500 to-emerald-500'} rounded-full transition-all duration-500" style="width: ${prog.percent}%"></div>
                     </div>
-                    <div class="flex justify-between items-center text-[10px] text-slate-500">
-                      <span>진행률: <b class="text-sky-700 font-bold">${prog.percent}%</b></span>
-                      <span>경과: <b class="text-slate-800">${prog.elapsedDays}일 (${elapsedHours}시간)</b></span>
-                      <span>잔여: <b class="${prog.remainingDays === 0 ? 'text-slate-400' : 'text-amber-700 font-bold'}">${prog.remainingDays}일 (${remainingHours}시간)</b></span>
+                    <div class="flex justify-between items-center text-[10px] text-slate-500 flex-wrap gap-1">
+                      <span class="whitespace-nowrap">진행률: <b class="text-sky-700 font-bold">${prog.percent}%</b></span>
+                      <span class="whitespace-nowrap">경과: <b class="text-slate-800">${prog.elapsedDays}일 (${elapsedHours}시간)</b></span>
+                      <span class="whitespace-nowrap">잔여: <b class="${prog.remainingDays === 0 ? 'text-slate-400' : 'text-amber-700 font-bold'}">${prog.remainingDays}일 (${remainingHours}시간)</b></span>
                     </div>
                   </div>
                 ` : `
@@ -14842,20 +14842,20 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
         
         <!-- Workflow Top Action & Principle Header -->
         <div class="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="px-2.5 py-0.5 rounded-full text-[10.5px] font-black bg-sky-500 text-white shadow-xs">
+          <div class="space-y-1.5">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+              <span class="w-fit px-2.5 py-0.5 rounded-full text-[10.5px] font-black bg-sky-500 text-white shadow-xs whitespace-nowrap shrink-0">
                 시계열 정산 연동 프로세스
               </span>
-              <h4 class="text-base font-black flex items-center gap-1.5 text-white">
-                <span>간병제공</span>
-                <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-sky-400"></i>
-                <span class="text-amber-300">보험금 청구</span>
-                <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-sky-400"></i>
-                <span class="text-emerald-300">입금 확인</span>
-                <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-sky-400"></i>
-                <span class="text-teal-300">간병비 지급</span>
-              </h4>
+              <div class="flex items-center gap-1 sm:gap-1.5 flex-wrap text-xs sm:text-sm font-black text-white">
+                <span class="px-2 py-0.5 rounded-md bg-white/10 whitespace-nowrap">간병제공</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 text-sky-400 shrink-0"></i>
+                <span class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-400/30 whitespace-nowrap">보험금 청구</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 text-sky-400 shrink-0"></i>
+                <span class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 whitespace-nowrap">입금 확인</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 text-sky-400 shrink-0"></i>
+                <span class="px-2 py-0.5 rounded-md bg-teal-500/20 text-teal-300 border border-teal-400/30 whitespace-nowrap">간병비 지급</span>
+              </div>
             </div>
             <p class="text-xs text-slate-300">
               💡 <b>정산 동기화 원칙</b>: 보험금 청구 일수(예: 8일 분할)에 맞춰 간병비 정산 차수가 1:1로 동일하게 동기화되며, <b>보험금 입금 확인 후 간병비가 안전하게 지급</b>되도록 관리합니다.
@@ -15542,6 +15542,48 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
   `;
 }
 
+var gActive3CardMobileTab = 'card1';
+
+function switch3CardMobileSubTab(cardId) {
+  gActive3CardMobileTab = cardId;
+  const cards = {
+    card1: document.getElementById('hubCard1'),
+    card2: document.getElementById('hubCard2'),
+    card3: document.getElementById('hubCard3')
+  };
+  const btns = {
+    card1: document.getElementById('tabBtnCard1'),
+    card2: document.getElementById('tabBtnCard2'),
+    card3: document.getElementById('tabBtnCard3')
+  };
+
+  const activeStyles = {
+    card1: 'bg-emerald-600 text-white shadow-xs',
+    card2: 'bg-sky-600 text-white shadow-xs',
+    card3: 'bg-purple-600 text-white shadow-xs'
+  };
+  const inactiveStyle = 'text-slate-600 hover:bg-slate-100';
+
+  ['card1', 'card2', 'card3'].forEach(k => {
+    const cardEl = cards[k];
+    const btnEl = btns[k];
+    if (cardEl) {
+      if (k === cardId) {
+        cardEl.classList.remove('hidden');
+        cardEl.classList.add('flex');
+      } else {
+        cardEl.classList.remove('flex');
+        cardEl.classList.add('hidden');
+      }
+    }
+    if (btnEl) {
+      btnEl.className = `flex-1 py-2 px-1 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${k === cardId ? activeStyles[k] : inactiveStyle}`;
+    }
+  });
+
+  if (typeof initIcons === 'function') initIcons();
+}
+
 /**
  * 신규 주체별 3-Column 카드 팝업 렌더러 (고객/접수, 간병인/센터, 손사/보험사)
  * 3개 카드가 동일한 높이(h-full)와 일관된 섹션 모듈 구조를 가집니다.
@@ -15646,40 +15688,61 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
     <div class="p-1 sm:p-2">
       ${unresolvedBannerHtml}
 
+      <!-- Mobile Sub-tab Switcher (Visible only on < lg) -->
+      <div class="lg:hidden mb-3 bg-white p-1 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-1">
+        <button type="button" onclick="switch3CardMobileSubTab('card1')" id="tabBtnCard1"
+          class="flex-1 py-2 px-1 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${gActive3CardMobileTab === 'card1' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'}">
+          <i data-lucide="user" class="w-3.5 h-3.5 shrink-0"></i>
+          <span class="whitespace-nowrap">고객/접수</span>
+        </button>
+        <button type="button" onclick="switch3CardMobileSubTab('card2')" id="tabBtnCard2"
+          class="flex-1 py-2 px-1 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${gActive3CardMobileTab === 'card2' ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'}">
+          <i data-lucide="users" class="w-3.5 h-3.5 shrink-0"></i>
+          <span class="whitespace-nowrap">간병인/센터</span>
+          ${schedule.isCaregiverPayoutDue ? '<span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse shrink-0"></span>' : ''}
+        </button>
+        <button type="button" onclick="switch3CardMobileSubTab('card3')" id="tabBtnCard3"
+          class="flex-1 py-2 px-1 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${gActive3CardMobileTab === 'card3' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'}">
+          <i data-lucide="receipt" class="w-3.5 h-3.5 shrink-0"></i>
+          <span class="whitespace-nowrap">손사/보험사</span>
+          ${schedule.hasUnpaidClaim ? '<span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse shrink-0"></span>' : ''}
+        </button>
+      </div>
+
       <!-- 3개 카드 동일 높이(items-stretch) 및 통일된 3열 반응형 그리드 -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 items-stretch">
 
         <!-- ========================================================================= -->
         <!-- [CARD 1] 고객 / 접수 정보 (Customer & Intake Card) -->
         <!-- ========================================================================= -->
-        <div class="bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 flex flex-col h-[78vh] max-h-[820px] overflow-hidden transition-all duration-300 hover:shadow-xl">
+        <div id="hubCard1" class="${gActive3CardMobileTab === 'card1' ? 'flex' : 'hidden'} lg:flex bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 flex-col h-auto lg:h-[78vh] lg:max-h-[820px] overflow-hidden transition-all duration-300 hover:shadow-xl">
           <!-- Card Header (통일된 헤더 높이 및 배지/버튼) -->
-          <div class="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-4 text-white flex items-center justify-between min-h-[64px] shrink-0">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center font-bold">
+          <div class="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-3.5 sm:p-4 text-white flex items-center justify-between min-h-[56px] sm:min-h-[64px] shrink-0 gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center font-bold shrink-0">
                 <i data-lucide="user" class="w-4 h-4 text-emerald-200"></i>
               </div>
-              <div>
-                <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5">
+              <div class="min-w-0">
+                <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5 truncate">
                   고객 / 접수 정보
                 </h4>
-                <span class="text-[10.5px] text-emerald-100 font-medium">피보험자 인적사항 및 접수계약</span>
+                <span class="text-[10px] sm:text-[10.5px] text-emerald-100 font-medium truncate block">피보험자 인적사항 및 접수계약</span>
               </div>
             </div>
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 shrink-0">
               <button type="button" onclick="openCustomerEditModal('${app.id}')" 
-                class="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all flex items-center gap-1 shadow-xs cursor-pointer">
-                <i data-lucide="edit" class="w-3 h-3"></i> 정보수정
+                class="px-2 sm:px-2.5 py-1 rounded-xl text-[10.5px] sm:text-[11px] font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all flex items-center gap-1 shadow-xs cursor-pointer whitespace-nowrap">
+                <i data-lucide="edit" class="w-3 h-3"></i> <span>정보수정</span>
               </button>
-              <span class="px-2.5 py-1 rounded-xl text-[11px] font-black ${(app.insuranceCompany || '').includes('삼성') ? 'bg-sky-50 text-sky-900 border border-sky-200' : 'bg-white text-emerald-950 border border-white/80'} shadow-xs flex items-center gap-1 shrink-0" title="가입 보험사: ${app.insuranceCompany || '미지정'}">
+              <span class="px-2 sm:px-2.5 py-1 rounded-xl text-[10.5px] sm:text-[11px] font-black ${(app.insuranceCompany || '').includes('삼성') ? 'bg-sky-50 text-sky-900 border border-sky-200' : 'bg-white text-emerald-950 border border-white/80'} shadow-xs flex items-center gap-1 shrink-0 whitespace-nowrap" title="가입 보험사: ${app.insuranceCompany || '미지정'}">
                 <i data-lucide="shield" class="w-3 h-3 ${(app.insuranceCompany || '').includes('삼성') ? 'text-sky-600' : 'text-emerald-700'}"></i>
                 <span>${app.insuranceCompany || '보험사 미지정'}</span>
               </span>
             </div>
           </div>
 
-          <!-- Card Body (카드 전체 내부 세로 스크롤) -->
-          <div class="p-4 sm:p-5 flex-1 overflow-y-auto custom-scrollbar space-y-3.5 text-xs bg-slate-50/50">
+          <!-- Card Body -->
+          <div class="p-3.5 sm:p-5 flex-1 overflow-y-visible lg:overflow-y-auto custom-scrollbar space-y-3.5 text-xs bg-slate-50/50">
             
             <!-- 섹션 1: 고객 핵심 인적사항 & 연락처 -->
             <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
@@ -15785,50 +15848,49 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
         </div>
 
         <!-- ========================================================================= -->
-        <!-- ========================================================================= -->
         <!-- [CARD 2] 간병인 / 센터 관리 (Caregiver & Center Card) -->
         <!-- ========================================================================= -->
-        <div class="bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 flex flex-col h-[78vh] max-h-[820px] overflow-hidden transition-all duration-300 hover:shadow-xl">
+        <div id="hubCard2" class="${gActive3CardMobileTab === 'card2' ? 'flex' : 'hidden'} lg:flex bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 flex-col h-auto lg:h-[78vh] lg:max-h-[820px] overflow-hidden transition-all duration-300 hover:shadow-xl">
           <!-- Card Header (통일된 헤더 높이 및 배지/버튼) -->
-          <div class="bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 p-4 text-white flex items-center justify-between min-h-[64px] shrink-0">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center font-bold">
+          <div class="bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 p-3.5 sm:p-4 text-white flex items-center justify-between min-h-[56px] sm:min-h-[64px] shrink-0 gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center font-bold shrink-0">
                 <i data-lucide="users" class="w-4 h-4 text-sky-200"></i>
               </div>
-              <div>
-                <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5">
-                  간병인 / 센터 관리
-                  ${sortedAssigns.length > 1 ? `<span class="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-amber-950">총 ${sortedAssigns.length}명 교체이력</span>` : ''}
+              <div class="min-w-0">
+                <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5 truncate">
+                  <span>간병인 / 센터 관리</span>
+                  ${sortedAssigns.length > 1 ? `<span class="px-1.5 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-black bg-amber-400 text-amber-950 shrink-0">총 ${sortedAssigns.length}명 교체이력</span>` : ''}
                 </h4>
-                <span class="text-[10.5px] text-sky-100 font-medium">간병인 프로필, 일정 및 차수별 정산</span>
+                <span class="text-[10px] sm:text-[10.5px] text-sky-100 font-medium truncate block">간병인 프로필, 일정 및 차수별 정산</span>
               </div>
             </div>
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 shrink-0">
               ${schedule.isCaregiverPayoutDue ? `
-                <span class="px-2.5 py-1 rounded-full text-[11px] font-black bg-rose-500 text-white shadow-md animate-pulse flex items-center gap-1">
-                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> 🚨 간병비 지급대상
+                <span class="px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-rose-500 text-white shadow-md animate-pulse flex items-center gap-1 whitespace-nowrap">
+                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">🚨</span> <span>지급대상</span>
                 </span>
               ` : (schedule.isAllPayoutsPaid && schedule.isCarePeriodEnded ? `
-                <span class="px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-400 text-slate-900 shadow-md flex items-center gap-1">
-                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> ✓ 간병비 지급완료
+                <span class="px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-emerald-400 text-slate-900 shadow-md flex items-center gap-1 whitespace-nowrap">
+                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> <span>지급완료</span>
                 </span>
               ` : '')}
               ${hasAssign ? `
                 <button type="button" onclick="openNewAssignModal('${app.id}', true)" 
-                  class="px-2.5 py-1 rounded-xl text-[11px] font-black bg-amber-400 hover:bg-amber-300 text-amber-950 shadow-xs transition-all flex items-center gap-1 cursor-pointer" title="기존 간병인 근무 종료 및 후임 간병인 교체 등록">
-                  <i data-lucide="refresh-cw" class="w-3 h-3"></i> 🔄 간병인 교체
+                  class="px-2 sm:px-2.5 py-1 rounded-xl text-[10.5px] sm:text-[11px] font-black bg-amber-400 hover:bg-amber-300 text-amber-950 shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap" title="기존 간병인 근무 종료 및 후임 간병인 교체 등록">
+                  <i data-lucide="refresh-cw" class="w-3 h-3"></i> <span>간병인 교체</span>
                 </button>
               ` : `
                 <button type="button" onclick="openNewAssignModal('${app.id}', false)" 
-                  class="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all flex items-center gap-1 shadow-xs cursor-pointer">
-                  <i data-lucide="user-plus" class="w-3 h-3"></i> 신규 배정
+                  class="px-2 sm:px-2.5 py-1 rounded-xl text-[10.5px] sm:text-[11px] font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all flex items-center gap-1 shadow-xs cursor-pointer whitespace-nowrap">
+                  <i data-lucide="user-plus" class="w-3 h-3"></i> <span>신규 배정</span>
                 </button>
               `}
             </div>
           </div>
 
-          <!-- Card Body (카드 전체 내부 세로 스크롤) -->
-          <div class="p-4 sm:p-5 flex-1 overflow-y-auto custom-scrollbar space-y-3.5 text-xs bg-slate-50/50">
+          <!-- Card Body -->
+          <div class="p-3.5 sm:p-5 flex-1 overflow-y-visible lg:overflow-y-auto custom-scrollbar space-y-3.5 text-xs bg-slate-50/50">
             ${!hasAssign ? `
               <!-- 간병인 미배정 시 닫혀있는 잠금/접힘 카드 이미지 UI -->
               <div class="my-auto p-8 text-center bg-slate-100/80 rounded-2xl border-2 border-dashed border-slate-300 space-y-3">
@@ -15958,10 +16020,10 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                     <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner flex">
                       <div class="h-full ${prog.status === 'completed' ? 'bg-slate-400' : 'bg-gradient-to-r from-sky-500 to-emerald-500'} rounded-full transition-all duration-500" style="width: ${prog.percent}%"></div>
                     </div>
-                    <div class="flex justify-between items-center text-[10.5px] text-slate-500">
-                      <span>총 <b>${prog.totalDays}</b>일 (${prog.totalDays * 24}시간) 근무</span>
-                      <span>경과: <b class="text-slate-800">${prog.elapsedDays}일 (${prog.elapsedDays * 24}시간)</b></span>
-                      <span>잔여: <b class="${prog.remainingDays === 0 ? 'text-slate-400' : 'text-amber-700 font-bold'}">${prog.remainingDays}일 (${prog.remainingDays * 24}시간)</b></span>
+                    <div class="flex justify-between items-center text-[10px] sm:text-[10.5px] text-slate-500 flex-wrap gap-1">
+                      <span class="whitespace-nowrap">총 <b>${prog.totalDays}</b>일 (${prog.totalDays * 24}시간) 근무</span>
+                      <span class="whitespace-nowrap">경과: <b class="text-slate-800">${prog.elapsedDays}일 (${prog.elapsedDays * 24}시간)</b></span>
+                      <span class="whitespace-nowrap">잔여: <b class="${prog.remainingDays === 0 ? 'text-slate-400' : 'text-amber-700 font-bold'}">${prog.remainingDays}일 (${prog.remainingDays * 24}시간)</b></span>
                     </div>
                   </div>
                 ` : ''}
@@ -16103,41 +16165,41 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
         <!-- ========================================================================= -->
         <!-- [CARD 3] 손사(보험사) 청구 관리 (Adjuster & Claim Billing Card) -->
         <!-- ========================================================================= -->
-        <div class="bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 flex flex-col h-[78vh] max-h-[820px] overflow-hidden transition-all duration-300 hover:shadow-xl">
+        <div id="hubCard3" class="${gActive3CardMobileTab === 'card3' ? 'flex' : 'hidden'} lg:flex bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 flex-col h-auto lg:h-[78vh] lg:max-h-[820px] overflow-hidden transition-all duration-300 hover:shadow-xl">
           <!-- Card Header (통일된 헤더 높이 및 배지/버튼) -->
-          <div class="bg-gradient-to-r ${isSamsung ? 'from-sky-700 via-indigo-700 to-sky-800' : 'from-purple-600 via-indigo-600 to-purple-700'} p-4 text-white flex items-center justify-between min-h-[64px] shrink-0">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center font-bold">
+          <div class="bg-gradient-to-r ${isSamsung ? 'from-sky-700 via-indigo-700 to-sky-800' : 'from-purple-600 via-indigo-600 to-purple-700'} p-3.5 sm:p-4 text-white flex items-center justify-between min-h-[56px] sm:min-h-[64px] shrink-0 gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center font-bold shrink-0">
                 <i data-lucide="${isSamsung ? 'mail-check' : 'receipt'}" class="w-4 h-4 ${isSamsung ? 'text-sky-200' : 'text-purple-200'}"></i>
               </div>
-              <div>
-                <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5">
+              <div class="min-w-0">
+                <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5 truncate">
                   ${isSamsung ? '삼성화재 본사 청구 관리' : '손사(보험사) 청구 관리'}
                 </h4>
-                <span class="text-[10.5px] ${isSamsung ? 'text-sky-100' : 'text-purple-100'} font-medium">
+                <span class="text-[10px] sm:text-[10.5px] ${isSamsung ? 'text-sky-100' : 'text-purple-100'} font-medium truncate block">
                   ${isSamsung ? '삼성화재 본사 이메일 직송 청구 및 입금 관리' : '손사 담당자, 차수별 청구·팩스 및 입금 관리'}
                 </span>
               </div>
             </div>
-            <div>
+            <div class="shrink-0">
               ${schedule.hasUnpaidClaim ? `
-                <span class="px-2.5 py-1 rounded-full text-[11px] font-black bg-rose-500 text-white shadow-md animate-pulse flex items-center gap-1">
-                  <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> 🚨 입금 미완료 (미수 ${formatCurrency(schedule.unconfirmedClaimSum)}원)
+                <span class="px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-rose-500 text-white shadow-md animate-pulse flex items-center gap-1 whitespace-nowrap">
+                  <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> <span>입금 미완료</span>
                 </span>
               ` : (schedule.isAllClaimsDeposited ? `
-                <span class="px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-400 text-slate-900 shadow-md flex items-center gap-1">
-                  <i data-lucide="check-check" class="w-3.5 h-3.5"></i> ✓ 전액 입금완료
+                <span class="px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-emerald-400 text-slate-900 shadow-md flex items-center gap-1 whitespace-nowrap">
+                  <i data-lucide="check-check" class="w-3.5 h-3.5"></i> <span>전액 입금완료</span>
                 </span>
               ` : `
-                <span class="px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold ${faxInfo.status === '전송완료' ? 'bg-emerald-400 text-slate-900' : (isSamsung ? 'bg-sky-300/30 text-white border border-white/20' : 'bg-purple-300/30 text-white border border-white/20')}">
+                <span class="px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-extrabold whitespace-nowrap ${faxInfo.status === '전송완료' ? 'bg-emerald-400 text-slate-900' : (isSamsung ? 'bg-sky-300/30 text-white border border-white/20' : 'bg-purple-300/30 text-white border border-white/20')}">
                   ${faxInfo.status === '전송완료' ? (isSamsung ? '이메일 발송완료' : '청구팩스 발송완료') : '청구 대기'}
                 </span>
               `)}
             </div>
           </div>
 
-          <!-- Card Body (카드 전체 내부 세로 스크롤) -->
-          <div class="p-4 sm:p-5 flex-1 overflow-y-auto custom-scrollbar space-y-3.5 text-xs bg-slate-50/50">
+          <!-- Card Body -->
+          <div class="p-3.5 sm:p-5 flex-1 overflow-y-visible lg:overflow-y-auto custom-scrollbar space-y-3.5 text-xs bg-slate-50/50">
             
             <!-- 1. 손사(보험사) 담당자 연락처 정보 (삼성화재인 경우 본사 직송 이메일 청구 안내 표시) -->
             ${isSamsung ? `
@@ -27089,26 +27151,26 @@ function openHubCustomerDetailModal(applyId) {
       dialogEl.classList.remove('max-w-[1240px]', 'max-w-[1280px]', 'max-w-[1300px]', 'w-[92vw]', 'w-[94vw]');
       dialogEl.classList.add('max-w-[1680px]', 'w-[96vw]');
     } else {
-      dialogEl.classList.remove('max-w-[1680px]', 'w-[96vw]');
-      dialogEl.classList.add('max-w-[1240px]', 'w-[92vw]');
+      dialogEl.classList.remove('max-w-[1680px]');
+      dialogEl.classList.add('max-w-[1240px]', 'w-[96vw]', 'sm:w-[92vw]');
     }
   }
 
   if (bodyEl) {
     bodyEl.className = gHubModalViewMode === '3card' 
-      ? 'flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-6 bg-slate-200' 
-      : 'flex-1 overflow-y-auto custom-scrollbar p-3 sm:p-4 bg-slate-100/90';
+      ? 'flex-1 overflow-y-auto custom-scrollbar p-2 sm:p-5 bg-slate-200' 
+      : 'flex-1 overflow-y-auto custom-scrollbar p-2 sm:p-4 bg-slate-100/90';
   }
 
   if (btnTimeline && btn3Card) {
     if (gHubModalViewMode === '3card') {
-      btn3Card.className = 'px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all bg-sky-500 text-white shadow-md cursor-pointer';
-      btnTimeline.className = 'px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all text-slate-400 hover:text-white cursor-pointer';
+      btn3Card.className = 'px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-sky-500 text-white shadow-md cursor-pointer';
+      btnTimeline.className = 'px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all text-slate-400 hover:text-white cursor-pointer';
       if (footerNote) footerNote.innerText = '✨ [3-Column 주체별 뷰] 고객/접수, 간병인/센터, 손사/보험사 3대 주체별 대시보드 화면입니다.';
       if (subtitle) subtitle.innerText = '고객 1명을 중심으로 3대 핵심 주체(고객/접수, 간병인/센터, 손사/보험사)별로 균형있게 통합 관리합니다.';
     } else {
-      btnTimeline.className = 'px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all bg-sky-500 text-white shadow-md cursor-pointer';
-      btn3Card.className = 'px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all text-slate-400 hover:text-white cursor-pointer';
+      btnTimeline.className = 'px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-sky-500 text-white shadow-md cursor-pointer';
+      btn3Card.className = 'px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all text-slate-400 hover:text-white cursor-pointer';
       if (footerNote) footerNote.innerText = '✨ [시계열 정산 연동 뷰] 간병제공 ➡️ 보험금청구 ➡️ 입금확인 ➡️ 간병비지급 순으로 차수별 1:1 동기화 관리합니다.';
       if (subtitle) subtitle.innerText = '간병 제공부터 보험사 청구, 입금 확인, 간병비 지급까지 차수별 시계열 흐름으로 원스탑 관리합니다.';
     }

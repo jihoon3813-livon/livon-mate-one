@@ -7819,46 +7819,53 @@
   </div>
 
   <!-- ==================== MODAL: HUB CUSTOMER DETAIL POPUP MODAL (주체별 3-Column 단일 뷰) ==================== -->
-  <div id="hubCustomerDetailModal" class="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-3 sm:p-4">
-    <div id="hubCustomerDetailModalDialog" class="bg-white rounded-3xl w-[92vw] max-w-[1240px] max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 transition-all duration-200">
-      <div class="p-4 sm:p-5 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center font-bold text-sky-400 shadow-inner">
-            <i data-lucide="user-check" class="w-6 h-6"></i>
+  <div id="hubCustomerDetailModal" class="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-2 sm:p-4">
+    <div id="hubCustomerDetailModalDialog" class="bg-white rounded-2xl sm:rounded-3xl w-[96vw] sm:w-[92vw] max-w-[1240px] max-h-[96vh] sm:max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 transition-all duration-200">
+      <div class="p-3 sm:p-5 bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-4">
+        <!-- Top row: Title + Mobile Close Button -->
+        <div class="flex items-center justify-between gap-2 min-w-0">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/10 flex items-center justify-center font-bold text-sky-400 shadow-inner shrink-0">
+              <i data-lucide="user-check" class="w-4 h-4 sm:w-6 sm:h-6"></i>
+            </div>
+            <div class="min-w-0">
+              <h3 class="text-sm sm:text-lg font-black truncate text-white" id="hubDetailModalTitle">
+                고객 상세 업무 원스탑 모달
+              </h3>
+              <p class="text-[10px] sm:text-xs text-slate-400 truncate mt-0.5" id="hubDetailModalSubtitle">
+                고객 1명을 중심으로 3대 핵심 주체별로 균형있게 통합 관리합니다.
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 class="text-lg font-black flex items-center gap-2" id="hubDetailModalTitle">
-              고객 상세 업무 원스탑 모달
-            </h3>
-            <p class="text-xs text-slate-400 mt-0.5" id="hubDetailModalSubtitle">
-              고객 1명을 중심으로 3대 핵심 주체(고객/접수, 간병인/센터, 손사/보험사)별로 균형있게 통합 관리합니다.
-            </p>
-          </div>
+          <button onclick="closeModal('hubCustomerDetailModal')" class="p-1 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0 sm:hidden">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
         </div>
 
-        <div class="flex items-center gap-3">
-          <div class="bg-slate-800 p-1 rounded-xl flex items-center gap-1 border border-slate-700">
-            <button id="btnHubViewTimeline" type="button" onclick="switchHubModalViewMode('timeline')" class="px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all bg-sky-500 text-white shadow-md cursor-pointer">
+        <!-- Bottom row on mobile (Right side on desktop): View Mode Switchers -->
+        <div class="flex items-center justify-between sm:justify-end gap-2 overflow-x-auto custom-scrollbar pb-0.5 sm:pb-0">
+          <div class="bg-slate-800 p-1 rounded-xl flex items-center gap-1 border border-slate-700 shrink-0">
+            <button id="btnHubViewTimeline" type="button" onclick="switchHubModalViewMode('timeline')" class="px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-sky-500 text-white shadow-md cursor-pointer">
               <i data-lucide="git-merge" class="w-3.5 h-3.5"></i>
               <span>시계열 정산 연동 뷰</span>
               <span class="px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 font-black text-[10px]">추천</span>
             </button>
-            <button id="btnHubView3Card" type="button" onclick="switchHubModalViewMode('3card')" class="px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all text-slate-400 hover:text-white cursor-pointer">
+            <button id="btnHubView3Card" type="button" onclick="switchHubModalViewMode('3card')" class="px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all text-slate-400 hover:text-white cursor-pointer">
               <i data-lucide="columns-3" class="w-3.5 h-3.5"></i>
               <span>3-Column 주체별 뷰</span>
             </button>
           </div>
-          <button id="btnHubSamsungEmail" type="button" onclick="closeModal('hubCustomerDetailModal'); switchTab('samsungclaimhub', 'claims');" class="hidden px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all bg-sky-600 hover:bg-sky-500 text-white shadow-md cursor-pointer" title="삼성화재 월간 청구관리 및 이메일 발송 화면으로 이동">
+          <button id="btnHubSamsungEmail" type="button" onclick="closeModal('hubCustomerDetailModal'); switchTab('samsungclaimhub', 'claims');" class="hidden px-2.5 sm:px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-sky-600 hover:bg-sky-500 text-white shadow-md cursor-pointer" title="삼성화재 월간 청구관리 및 이메일 발송 화면으로 이동">
             <i data-lucide="mail" class="w-3.5 h-3.5"></i>
-            <span>📧 삼성 접수/청구 발송</span>
+            <span>삼성 접수/청구</span>
           </button>
-          <button onclick="closeModal('hubCustomerDetailModal')" class="p-2 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer">
+          <button onclick="closeModal('hubCustomerDetailModal')" class="hidden sm:block p-2 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0">
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>
         </div>
       </div>
 
-      <div class="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-6 bg-slate-200" id="hubDetailModalBody">
+      <div class="flex-1 overflow-y-auto custom-scrollbar p-2.5 sm:p-6 bg-slate-200" id="hubDetailModalBody">
         <!-- Dynamically injected -->
       </div>
 
