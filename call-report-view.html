@@ -66,10 +66,6 @@
           <i data-lucide="printer" class="w-3.5 h-3.5 text-slate-600"></i>
           <span>인쇄</span>
         </button>
-        <button type="button" onclick="downloadPdf()" class="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[11px] sm:text-xs flex items-center gap-1 sm:gap-1.5 transition-all shadow-md shadow-blue-600/20 cursor-pointer whitespace-nowrap shrink-0" title="A4 3-시트 완본 PDF 다운로드">
-          <i data-lucide="download" class="w-3.5 h-3.5 text-white"></i>
-          <span>PDF 다운로드</span>
-        </button>
       </div>
     </div>
   </header>
@@ -101,9 +97,9 @@
                 <span class="whitespace-nowrap text-slate-600">조회기간:</span>
               </div>
               <div class="flex items-center gap-1.5 flex-1 min-w-0">
-                <input type="date" id="reportStartDate" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
+                <input type="date" id="reportStartDate" onchange="applyDateRange(false)" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
                 <span class="text-slate-400 font-normal shrink-0">~</span>
-                <input type="date" id="reportEndDate" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
+                <input type="date" id="reportEndDate" onchange="applyDateRange(false)" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
                 <button type="button" onclick="applyDateRange(false)" class="px-3 py-1.5 sm:py-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-2xs shrink-0 whitespace-nowrap cursor-pointer">
                   조회
                 </button>
@@ -198,6 +194,7 @@
       endDate: defaultThisWeek.end
     };
     let gDailyChartInstance = null;
+    let gMasterCallLogs = [];
 
     // 전화번호 -> 회원명 매핑 데이터 (중복 등록 지원)
     let gMemberPhoneMap = {
@@ -601,6 +598,9 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
               const match = isAll ? true : (isHyundai ? rCh.includes('현대') : (isLivon ? rCh.includes('리본') : rCh.includes('삼성')));
               if (match) {
                 gReportData = parsed;
+                if (Array.isArray(parsed.callLogs)) {
+                  gMasterCallLogs = [...parsed.callLogs];
+                }
                 loaded = true;
                 renderAll();
               }
@@ -659,6 +659,27 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         }
 
         if (loaded && gReportData) {
+          if (Array.isArray(gReportData.callLogs)) {
+            gMasterCallLogs = [...gReportData.callLogs];
+          }
+          // 백그라운드에서 전체 채널 마스터 로그 보강 로드 (날짜 변경 시 전 기간 즉시 필터링 가능)
+          fetch(`/call_report_all.json?t=${Date.now()}`)
+            .then(r => r.json())
+            .then(allData => {
+              const allLogs = (allData && allData.callLogs) || (allData && allData.data && allData.data.callLogs);
+              if (Array.isArray(allLogs) && allLogs.length > 0) {
+                const existingKeys = new Set(gMasterCallLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
+                allLogs.forEach(item => {
+                  const key = `${item.callTime}_${item.phone || item.rawPhone}`;
+                  if (!existingKeys.has(key)) {
+                    gMasterCallLogs.push(item);
+                    existingKeys.add(key);
+                  }
+                });
+              }
+            })
+            .catch(() => {});
+
           const urlParams = new URLSearchParams(window.location.search);
           if (urlParams.get('start')) gFilter.startDate = urlParams.get('start');
           if (urlParams.get('end')) gFilter.endDate = urlParams.get('end');
@@ -703,8 +724,13 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const curEnd = gFilter.endDate || rInfo.endDate || '';
       const curCh = gFilter.channel || rInfo.channel || '삼성화재';
 
+      const normDate = d => (d || '').slice(0, 10).replace(/[./]/g, '-');
+      const isCtiRangeMatch = (!curStart || normDate(rInfo.startDate) === normDate(curStart)) &&
+        (!curEnd || normDate(rInfo.endDate) === normDate(curEnd)) &&
+        ((curCh === '전체' || curCh === 'all') ? (rInfo.channel === 'all' || rInfo.channel === '전체') : ((rInfo.channel || '').includes(curCh)));
+
       const st = stats || calculateStats();
-      const activeCti = cs || {
+      const activeCti = (isCtiRangeMatch && cs) ? cs : {
         totalAll: st.totalCalls,
         totalInbound: st.totalCalls,
         answeredCalls: st.answeredCalls,
@@ -760,7 +786,11 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     }
 
     function calculateStats() {
-      let logs = ((gReportData && gReportData.callLogs) || []).filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
+      const allLogs = (gMasterCallLogs && gMasterCallLogs.length > 0)
+        ? gMasterCallLogs
+        : ((gReportData && gReportData.callLogs) || []);
+      let logs = allLogs.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
+
       // 엄격한 보험사 채널 격리: 해당 보험사 고객만 100% 필터링 (타 보험사 완전 배제)
       const targetCh = gFilter.channel || '삼성화재';
       if (targetCh !== '전체' && targetCh !== 'all') {
@@ -774,12 +804,16 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       }
 
       // 날짜 필터링 (시작일 ~ 종료일 범위 반영: 이번 주 등 선택 범위에 맞춰 동적 집계)
-      if (gFilter.startDate || gFilter.endDate) {
+      const normDate = d => (d || '').slice(0, 10).replace(/[./]/g, '-');
+      const startNorm = normDate(gFilter.startDate);
+      const endNorm = normDate(gFilter.endDate);
+
+      if (startNorm || endNorm) {
         logs = logs.filter(c => {
-          const dStr = (c.callTime || c.date || c.startedAt || '').slice(0, 10);
+          const dStr = normDate(c.callTime || c.date || c.startedAt);
           if (!dStr) return true;
-          if (gFilter.startDate && dStr < gFilter.startDate) return false;
-          if (gFilter.endDate && dStr > gFilter.endDate) return false;
+          if (startNorm && dStr < startNorm) return false;
+          if (endNorm && dStr > endNorm) return false;
           return true;
         });
       }
@@ -791,8 +825,8 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         : (rInfo.channel && rInfo.channel.includes(targetCh));
 
       const isCtiRangeMatch = isChannelMatch &&
-        (!gFilter.startDate || rInfo.startDate === gFilter.startDate) &&
-        (!gFilter.endDate || rInfo.endDate === gFilter.endDate);
+        (!startNorm || normDate(rInfo.startDate) === startNorm) &&
+        (!endNorm || normDate(rInfo.endDate) === endNorm);
 
       // 1. 해당 기간의 총 인입콜 건수 (CTI 해당 기간 집계 또는 기간 필터링 합계)
       let totalCalls = 0;
@@ -800,12 +834,16 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         totalCalls = cs.totalInbound !== undefined ? cs.totalInbound : cs.totalAll;
       } else if (isChannelMatch && gReportData && Array.isArray(gReportData.dailyTrends)) {
         // CTI 기간 매칭 전이거나 부분 기간 필터링인 경우: 동일 채널의 dailyTrends 합계 활용
-        const periodTrends = gReportData.dailyTrends.filter(t => (!gFilter.startDate || t.date >= gFilter.startDate) && (!gFilter.endDate || t.date <= gFilter.endDate));
+        const periodTrends = gReportData.dailyTrends.filter(t => {
+          const td = normDate(t.date);
+          return (!startNorm || td >= startNorm) && (!endNorm || td <= endNorm);
+        });
         const trendsSum = periodTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
         totalCalls = trendsSum > 0 ? trendsSum : logs.length;
       } else {
         totalCalls = logs.length;
       }
+      totalCalls = Math.max(totalCalls, logs.length);
 
       let connectReqCalls = logs.length;
 
@@ -829,13 +867,11 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const consultRate = answeredCalls > 0 ? Math.round((consultedCount / answeredCalls) * 100) : (consultedCount > 0 ? 100 : 0);
 
       let opDays = 1;
-      if (gFilter.startDate && gFilter.endDate) {
-        const d1 = new Date(gFilter.startDate);
-        const d2 = new Date(gFilter.endDate);
+      if (startNorm && endNorm) {
+        const d1 = new Date(startNorm + 'T00:00:00');
+        const d2 = new Date(endNorm + 'T00:00:00');
         const diffTime = Math.abs(d2 - d1);
         opDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-      } else if (filteredTrends.length > 0) {
-        opDays = filteredTrends.length;
       } else {
         opDays = (gReportData && gReportData.reportInfo && gReportData.reportInfo.operatingDays) || 7;
       }
@@ -1147,10 +1183,12 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
 
       if (s && e) {
-        const cur = new Date(s);
-        const end = new Date(e);
+        const cur = new Date(s + 'T00:00:00');
+        const end = new Date(e + 'T00:00:00');
+        const pad = n => String(n).padStart(2, '0');
+        const fmtLocal = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
         while (cur <= end) {
-          const ds = cur.toISOString().slice(0, 10);
+          const ds = fmtLocal(cur);
           dailyMap[ds] = {
             date: ds,
             dayOfWeek: daysOfWeek[cur.getDay()],
@@ -1162,10 +1200,12 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       }
 
       logs.forEach(c => {
-        const d = (c.callTime || c.date || c.startedAt || '').slice(0, 10);
+        const dRaw = (c.callTime || c.date || c.startedAt || '').slice(0, 10);
+        const d = dRaw.replace(/[./]/g, '-');
         if (d) {
           if (!dailyMap[d]) {
-            const dow = daysOfWeek[new Date(d).getDay()] || '';
+            const parsedD = new Date(d + 'T00:00:00');
+            const dow = daysOfWeek[parsedD.getDay()] || '';
             dailyMap[d] = {
               date: d,
               dayOfWeek: dow,
@@ -1323,24 +1363,34 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 
     function renderLogsSheet(stats) {
       const container = document.getElementById('tabContent-logs');
-      let logs = ((gReportData && gReportData.callLogs) || []).filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
+      const allLogs = (gMasterCallLogs && gMasterCallLogs.length > 0)
+        ? gMasterCallLogs
+        : ((gReportData && gReportData.callLogs) || []);
+      let logs = allLogs.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
 
       // 엄격한 보험사 채널 격리: 해당 보험사 고객만 100% 필터링 (타 보험사 완전 배제)
       const targetCh = gFilter.channel || '삼성화재';
-      logs = logs.filter(c => {
-        const ch = (c.channel || '').trim();
-        if (targetCh.includes('삼성')) return ch.includes('삼성') || ch === '삼성화재';
-        if (targetCh.includes('현대')) return ch.includes('현대') || ch === '현대해상';
-        return ch.includes(targetCh) || targetCh.includes(ch);
-      });
+      if (targetCh !== '전체' && targetCh !== 'all') {
+        logs = logs.filter(c => {
+          const ch = (c.channel || '').trim();
+          if (targetCh.includes('삼성')) return ch.includes('삼성') || ch === '삼성화재';
+          if (targetCh.includes('현대')) return ch.includes('현대') || ch === '현대해상';
+          if (targetCh.includes('리본')) return ch.includes('리본') || ch === '리본케어';
+          return ch.includes(targetCh) || targetCh.includes(ch);
+        });
+      }
 
       // 날짜 필터링 (시작일 ~ 종료일 범위 반영)
-      if (gFilter.startDate || gFilter.endDate) {
+      const normDate = d => (d || '').slice(0, 10).replace(/[./]/g, '-');
+      const startNorm = normDate(gFilter.startDate);
+      const endNorm = normDate(gFilter.endDate);
+
+      if (startNorm || endNorm) {
         logs = logs.filter(c => {
-          const dStr = (c.callTime || c.date || c.startedAt || '').slice(0, 10);
+          const dStr = normDate(c.callTime || c.date || c.startedAt);
           if (!dStr) return true;
-          if (gFilter.startDate && dStr < gFilter.startDate) return false;
-          if (gFilter.endDate && dStr > gFilter.endDate) return false;
+          if (startNorm && dStr < startNorm) return false;
+          if (endNorm && dStr > endNorm) return false;
           return true;
         });
       }
@@ -1640,21 +1690,13 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       updatePresetButtons();
       updateBranding();
 
-      const rInfo = (gReportData && gReportData.reportInfo) || {};
-      const isSameRange = rInfo.startDate === s && rInfo.endDate === e && (
-        (gFilter.channel === '전체' || gFilter.channel === 'all') ? (rInfo.channel === 'all' || rInfo.channel === '전체') : ((rInfo.channel || '').includes(gFilter.channel))
-      );
+      // 1. 메모리에 로드된 전체 로그를 바탕으로 0ms 즉각 화면 렌더링
+      renderAll();
 
-      const hasData = gReportData && Array.isArray(gReportData.callLogs) && gReportData.callLogs.length > 0;
-
-      // 1. 이미 데이터가 메모리에 로드되어 있다면 0ms 즉각 화면 렌더링
-      if (hasData) {
-        renderAll();
-        // 이미 해당 기간 데이터와 일치하고 강제 새로고침이 아니면 즉시 완료
-        if (!forceSync && isSameRange) return;
+      // 2. 사용자가 [새로고침] 버튼을 명시적으로 눌렀을 때만(forceSync === true) CTI 동기화 요청
+      if (forceSync) {
+        await syncLiveCti();
       }
-
-      await syncLiveCti();
     }
 
     function setSyncBtnLoading(loading) {
@@ -1688,7 +1730,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       try {
         let synced = false;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
         try {
           const res = await fetch(`/api/samsung/call-report/sync-cti?start=${gFilter.startDate}&end=${gFilter.endDate}&channel=${encodeURIComponent(ch)}`, {
             signal: controller.signal
@@ -1742,6 +1784,9 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         }
 
         if (gReportData) {
+          if (Array.isArray(gReportData.callLogs)) {
+            gMasterCallLogs = [...gReportData.callLogs];
+          }
           try {
             const isHyundai = ch.includes('현대');
             const isLivon = ch.includes('리본');
