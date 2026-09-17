@@ -27,7 +27,9 @@ module.exports = async function handler(req, res) {
       path.join(__dirname, fileName),
       path.join(__dirname, '..', fileName),
       path.join(__dirname, '..', '..', fileName),
-      path.join(__dirname, '..', '..', '..', fileName)
+      path.join(__dirname, '..', '..', '..', fileName),
+      path.join(process.cwd(), 'samsung_call_report.json'),
+      path.join(__dirname, '..', '..', '..', 'samsung_call_report.json')
     ];
     let filePath = candidatePaths.find(p => fs.existsSync(p));
 

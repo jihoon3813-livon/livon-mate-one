@@ -409,13 +409,42 @@ async function initSamsungCallReportModule(resetFilter = true) {
     : ((rInfo.channel || '').includes(ch));
   const isMatch = isChannelMatch && rInfo.startDate === s && rInfo.endDate === e && gSamsungReportData && Array.isArray(gSamsungReportData.callLogs);
 
-  // 1. 메모리에 현재 필터(채널 + 기간)와 정확히 일치하는 최신 데이터가 있으면 즉시 렌더링 (0ms)
-  if (isMatch) {
+  // 1. 메모리에 채널 데이터가 이미 있으면 즉시 렌더링 (0ms)
+  if (gSamsungReportData && Array.isArray(gSamsungReportData.callLogs) && gSamsungReportData.callLogs.length > 0) {
     renderSamsungCallReportTab();
     return;
   }
 
-  // 2. 채널 전용 정적 데이터 우선 로드 (삼성화재는 call_report_samsung.json 우선)
+  // 1-1. 혹시 종합콜(gTotalCallData 또는 세션 스토리지)에 이미 데이터가 있다면 0ms 즉시 합성 렌더링!
+  try {
+    const totalCached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+    const totalData = window.gTotalCallData || (totalCached ? JSON.parse(totalCached) : null);
+    if (totalData && Array.isArray(totalData.callLogs) && totalData.callLogs.length > 0) {
+      const samLogs = isAllChannel ? totalData.callLogs : totalData.callLogs.filter(l => (l.channel || '').includes(ch));
+      if (samLogs.length > 0) {
+        gSamsungReportData = {
+          reportInfo: {
+            title: `${ch} 간병(리본케어) 서비스 인바운드 문의 분석 보고`,
+            target: `${ch} 관련 인바운드 콜`,
+            channel: ch,
+            channelLabel: ch,
+            period: totalData.reportInfo?.period || '2026-09-14 ~ 2026-09-17',
+            startDate: totalData.reportInfo?.startDate || '2026-09-14',
+            endDate: totalData.reportInfo?.endDate || '2026-09-17',
+            reportDate: '2026-09-17',
+            author: '리본케어 (Livon Care) 운영센터',
+            operatingDays: 4
+          },
+          ctiSummary: totalData.ctiSummary,
+          summaryStats: totalData.summaryStats,
+          callLogs: samLogs
+        };
+        renderSamsungCallReportTab();
+      }
+    }
+  } catch (e) {}
+
+  // 2. 채널 전용 정적 데이터 우선 로드 (삼성화재는 call_report_samsung.json, samsung_call_report.json 우선)
   const primaryFileName = isAllChannel
     ? 'call_report_all.json'
     : (ch.includes('현대') ? 'call_report_hyundai.json' : (ch.includes('리본') ? 'call_report_livon.json' : 'call_report_samsung.json'));
@@ -424,7 +453,10 @@ async function initSamsungCallReportModule(resetFilter = true) {
     `/${primaryFileName}?t=${Date.now()}`,
     `./${primaryFileName}?t=${Date.now()}`,
     `${primaryFileName}?t=${Date.now()}`,
-    `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
+    `/samsung_call_report.json?t=${Date.now()}`,
+    `./samsung_call_report.json?t=${Date.now()}`,
+    `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
+    `/call_report_all.json?t=${Date.now()}`
   ];
 
   let loaded = false;
@@ -435,24 +467,34 @@ async function initSamsungCallReportModule(resetFilter = true) {
         const json = await res.json();
         const data = (json && json.data) ? json.data : json;
         if (data && data.callLogs && data.callLogs.length > 0) {
-          const info = data.reportInfo || {};
-          const fMatch = (isAllChannel ? (info.channel === 'all' || info.channel === '전체') : ((info.channel || '').includes(ch))) &&
-                        (!s || info.startDate === s) && (!e || info.endDate === e);
-          if (fMatch) {
-            gSamsungReportData = data;
-            try {
-              sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(data));
-            } catch (e) {}
-            renderSamsungCallReportTab();
-            loaded = true;
-            return;
+          let finalData = data;
+          if (!isAllChannel && u.includes('call_report_all')) {
+            const filtered = data.callLogs.filter(l => (l.channel || '').includes(ch));
+            if (filtered.length > 0) {
+              finalData = {
+                ...data,
+                reportInfo: {
+                  ...data.reportInfo,
+                  channel: ch,
+                  channelLabel: ch
+                },
+                callLogs: filtered
+              };
+            }
           }
+          gSamsungReportData = finalData;
+          try {
+            sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(finalData));
+          } catch (e) {}
+          renderSamsungCallReportTab();
+          loaded = true;
+          return;
         }
       }
     } catch (e) {}
   }
 
-  // 3. 정적 파일이 없거나 기간/채널이 일치하지 않으면 CTI 실시간 조회 및 동기화 수행
+  // 3. 정적 파일이 없거나 추가 조회가 필요하면 CTI 실시간 조회 수행
   if (!loaded) {
     applyTabDateRange(false);
   }
@@ -464,12 +506,59 @@ function renderSamsungCallReportTab() {
   if (!container) return;
 
   if (!gSamsungReportData) {
+    try {
+      const cached = sessionStorage.getItem('LIVON_CACHED_SAMSUNG_REPORT_DATA');
+      if (cached) {
+        gSamsungReportData = JSON.parse(cached);
+      }
+    } catch (e) {}
+  }
+
+  if (!gSamsungReportData) {
+    try {
+      const totalCached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+      const totalData = window.gTotalCallData || (totalCached ? JSON.parse(totalCached) : null);
+      if (totalData && Array.isArray(totalData.callLogs) && totalData.callLogs.length > 0) {
+        const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
+        const ch = curFilter.channel || '삼성화재';
+        const isAllChannel = !ch || ch === '전체' || ch === 'all';
+        const samLogs = isAllChannel ? totalData.callLogs : totalData.callLogs.filter(l => (l.channel || '').includes(ch));
+        if (samLogs.length > 0) {
+          gSamsungReportData = {
+            reportInfo: {
+              title: `${ch} 간병(리본케어) 서비스 인바운드 문의 분석 보고`,
+              target: `${ch} 관련 인바운드 콜`,
+              channel: ch,
+              channelLabel: ch,
+              period: totalData.reportInfo?.period || '2026-09-14 ~ 2026-09-17',
+              startDate: totalData.reportInfo?.startDate || '2026-09-14',
+              endDate: totalData.reportInfo?.endDate || '2026-09-17',
+              reportDate: '2026-09-17',
+              author: '리본케어 (Livon Care) 운영센터',
+              operatingDays: 4
+            },
+            ctiSummary: totalData.ctiSummary,
+            summaryStats: totalData.summaryStats,
+            callLogs: samLogs
+          };
+        }
+      }
+    } catch (e) {}
+  }
+
+  if (!gSamsungReportData) {
     container.innerHTML = `
       <div class="p-12 text-center">
         <div class="inline-block p-4 rounded-2xl bg-sky-50 text-sky-600 mb-3 animate-spin">
           <i data-lucide="loader" class="w-8 h-8"></i>
         </div>
         <p class="text-sm font-bold text-slate-700">삼성화재 콜분석 데이터를 불러오는 중입니다...</p>
+        <p class="text-xs text-slate-400 mt-1">네트워크 환경에 따라 로딩이 지연될 수 있습니다.</p>
+        <div class="mt-4 flex items-center justify-center gap-2">
+          <button onclick="initSamsungCallReportModule(true)" class="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition shadow-xs cursor-pointer">
+            데이터 다시 시도
+          </button>
+        </div>
       </div>
     `;
     if (typeof initIcons === 'function') initIcons(container);
@@ -2729,9 +2818,9 @@ async function applyTabDateRange(forceSync = false) {
 
   try {
     let synced = false;
-    // 3. CTI 실시간 로그 수집 API 호출 (15초 타임아웃)
+    // 3. CTI 실시간 로그 수집 API 호출 (2.5초 빠른 타임아웃)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
     try {
       const res = await fetch(`/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`, {
         signal: controller.signal
@@ -2752,7 +2841,38 @@ async function applyTabDateRange(forceSync = false) {
       console.warn('Backend CTI sync API unavailable or timed out, falling back to static cache', apiErr);
     }
 
-    // 4. API 실패 시 정적 엔드포인트 및 사전 생성 캐시 로드 (해당 채널 전용 파일 우선)
+    // 4. API 실패 시 종합콜 캐시 합성 시도 (0ms 즉시 복구)
+    if (!synced && (!gSamsungReportData || !hasMatchingChannel)) {
+      try {
+        const totalCached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+        const totalData = window.gTotalCallData || (totalCached ? JSON.parse(totalCached) : null);
+        if (totalData && Array.isArray(totalData.callLogs) && totalData.callLogs.length > 0) {
+          const samLogs = isAllChannel ? totalData.callLogs : totalData.callLogs.filter(l => (l.channel || '').includes(ch));
+          if (samLogs.length > 0) {
+            gSamsungReportData = {
+              reportInfo: {
+                title: `${ch} 간병(리본케어) 서비스 인바운드 문의 분석 보고`,
+                target: `${ch} 관련 인바운드 콜`,
+                channel: ch,
+                channelLabel: ch,
+                period: totalData.reportInfo?.period || `${s} ~ ${e}`,
+                startDate: s,
+                endDate: e,
+                reportDate: '2026-09-17',
+                author: '리본케어 (Livon Care) 운영센터',
+                operatingDays: 4
+              },
+              ctiSummary: totalData.ctiSummary,
+              summaryStats: totalData.summaryStats,
+              callLogs: samLogs
+            };
+            synced = true;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 5. 정적 엔드포인트 및 사전 생성 파일 로드 (해당 채널 전용 파일 우선)
     if (!synced && (!gSamsungReportData || !hasMatchingChannel)) {
       const primaryFallback = (ch === '전체' || ch === 'all')
         ? 'call_report_all.json'
@@ -2762,7 +2882,10 @@ async function applyTabDateRange(forceSync = false) {
         `/${primaryFallback}?t=${Date.now()}`,
         `./${primaryFallback}?t=${Date.now()}`,
         `${primaryFallback}?t=${Date.now()}`,
+        `/samsung_call_report.json?t=${Date.now()}`,
+        `./samsung_call_report.json?t=${Date.now()}`,
         `/call_report_all.json?t=${Date.now()}`,
+        `./call_report_all.json?t=${Date.now()}`,
         `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
       ].filter(Boolean);
       for (const u of staticFallbacks) {
@@ -2774,7 +2897,22 @@ async function applyTabDateRange(forceSync = false) {
               const sJson = await sRes.json();
               const data = (sJson && sJson.data) ? sJson.data : sJson;
               if (data && data.callLogs && data.callLogs.length > 0) {
-                gSamsungReportData = data;
+                let finalData = data;
+                if (!isAllChannel && u.includes('call_report_all')) {
+                  const filtered = data.callLogs.filter(l => (l.channel || '').includes(ch));
+                  if (filtered.length > 0) {
+                    finalData = {
+                      ...data,
+                      reportInfo: {
+                        ...data.reportInfo,
+                        channel: ch,
+                        channelLabel: ch
+                      },
+                      callLogs: filtered
+                    };
+                  }
+                }
+                gSamsungReportData = finalData;
                 synced = true;
                 break;
               }

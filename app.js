@@ -21941,7 +21941,7 @@ function switchTab(tabId, filterParam = null, triggerReload = true) {
   }
   else if (tabId === 'samsungcallreport') {
     if (typeof initSamsungCallReportModule === 'function') {
-      initSamsungCallReportModule(true);
+      initSamsungCallReportModule(false);
     }
   }
   else if (tabId === 'totalcallanalysis') {

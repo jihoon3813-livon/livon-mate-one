@@ -36,7 +36,9 @@ module.exports = async function handler(req, res) {
       path.join(__dirname, fileName),
       path.join(__dirname, '..', fileName),
       path.join(__dirname, '..', '..', fileName),
-      path.join(__dirname, '..', '..', '..', fileName)
+      path.join(__dirname, '..', '..', '..', fileName),
+      path.join(process.cwd(), 'samsung_call_report.json'),
+      path.join(__dirname, '..', '..', '..', 'samsung_call_report.json')
     ];
     let filePath = candidatePaths.find(p => fs.existsSync(p));
     if (!filePath) {
@@ -55,8 +57,8 @@ module.exports = async function handler(req, res) {
 
   // 2. 실시간 CTI 동기화 시도 (스마트 증분 / 고속 병렬 수집)
   try {
-    // 12초 타임아웃 가드
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 12000));
+    // 4초 타임아웃 가드 (서버리스 환경에서 빠른 캐시 폴백 보장)
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 4000));
 
     // 전체 기간(14일 초과) 요청이면서 기존 baseline 데이터가 있는 경우:
     // 전체 통계(Page 1) + 최근 3일 증분 로그만 초고속 수집하여 병합 (1~2초 내 완료!)

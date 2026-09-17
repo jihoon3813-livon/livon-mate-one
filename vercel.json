@@ -49,11 +49,11 @@
       "dest": "/api/samsung/call-report/sync-cti.js"
     },
     {
-      "src": "/(.*)(_config|phone_map|annotations|call_report|package|credentials|secret|\\.env)(.*)",
-      "status": 403
+      "src": "/(call_report_.*\\.json|samsung_call_report\\.json|call_annotations\\.json)",
+      "dest": "/$1"
     },
     {
-      "src": "/(.*)\\.json",
+      "src": "/(.*)(_config|phone_map|package\\.json|package-lock\\.json|credentials|secret|\\.env)(.*)",
       "status": 403
     },
     {
