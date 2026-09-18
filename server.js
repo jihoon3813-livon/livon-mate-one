@@ -638,160 +638,30 @@ function saveSavedFaxConfig(cfg) {
     // =========================================================================
     // API Route: Samsung Fire Call Analysis Report Engine (삼성화재 콜분석 보고 시스템)
     // =========================================================================
-    // CTI 실시간 로그 수집 및 보고서 동기화 엔드포인트 (삼성콜분석 및 종합콜분석 독립 지원)
+    // CTI 실시간 로그 수집 및 보고서 동기화 엔드포인트 (초고속 증분 엔진 핸들러 위임)
     if ((reqPath === '/api/samsung/call-report/sync-cti' || reqPath === '/api/total/call-report/sync-cti') && req.method === 'GET') {
-      try {
-        const parsedUrl = urlModule.parse(req.url, true);
-        const isTotal = reqPath === '/api/total/call-report/sync-cti';
-        const startDate = parsedUrl.query.start || (isTotal ? '2026-08-01' : '2026-08-18');
-        const endDate = parsedUrl.query.end || new Date().toISOString().slice(0, 10);
-        const channel = parsedUrl.query.channel || (isTotal ? 'all' : '삼성화재');
+      const isTotal = reqPath === '/api/total/call-report/sync-cti';
+      const syncHandler = isTotal
+        ? require('./api/total/call-report/sync-cti')
+        : require('./api/samsung/call-report/sync-cti');
 
-        console.log(`[${isTotal ? 'Total' : 'Samsung'} Call Report] CTI 동기화 요청: ${startDate} ~ ${endDate} (채널: ${channel})`);
-        const ctiResult = await fetchCtiLogsByDateRange(startDate, endDate, channel);
-
-        // 일자별 추이 및 주차별 롤업 자동 집계
-        const dailyMap = {};
-        // 시작일부터 종료일까지 날짜 초기화
-        let cur = new Date(startDate);
-        const end = new Date(endDate);
-        const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
-
-        while (cur <= end) {
-          const ds = cur.toISOString().slice(0, 10);
-          dailyMap[ds] = {
-            date: ds,
-            dayOfWeek: daysOfWeek[cur.getDay()],
-            callCount: 0,
-            share: 0,
-            note: cur.getDay() === 0 || cur.getDay() === 6 ? '주말' : ''
-          };
-          cur.setDate(cur.getDate() + 1);
-        }
-
-        ctiResult.logs.forEach(l => {
-          const d = (l.callTime || '').slice(0, 10);
-          if (dailyMap[d]) {
-            dailyMap[d].callCount++;
-          }
-        });
-
-        const dailyTrends = Object.values(dailyMap);
-        const totalCalls = ctiResult.logs.length;
-        dailyTrends.forEach(d => {
-          d.share = totalCalls > 0 ? parseFloat((d.callCount / totalCalls).toFixed(4)) : 0;
-        });
-
-        // 7일 단위 주차 롤업
-        const weeklyRollup = [];
-        for (let i = 0; i < dailyTrends.length; i += 7) {
-          const slice = dailyTrends.slice(i, i + 7);
-          const weekCalls = slice.reduce((sum, s) => sum + s.callCount, 0);
-          const wNum = Math.floor(i / 7) + 1;
-          const sDate = slice[0].date.slice(5).replace('-', '/');
-          const eDate = slice[slice.length - 1].date.slice(5).replace('-', '/');
-          weeklyRollup.push({
-            week: `${wNum}주차 (${sDate}~${eDate})`,
-            calls: weekCalls,
-            share: totalCalls > 0 ? parseFloat((weekCalls / totalCalls).toFixed(3)) : 0,
-            dailyAvg: slice.length > 0 ? Math.round(weekCalls / slice.length) : 0
-          });
-        }
-
-        const ctiSummary = ctiResult.ctiSummary || {
-          totalInbound: totalCalls,
-          answeredCalls: ctiResult.logs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length,
-          connectRequests: ctiResult.logs.filter(c => c.connectReq === 'Y').length,
-          answerRate: '0%',
-          abandonedCalls: 0,
-          unselectedType: 0,
-          btnExit: 0
-        };
-
-        const channelLabel = channel === 'all' || channel === '전체' ? '전체 인입경로' : channel;
-
-        const reportData = {
-          reportInfo: {
-            title: `${channelLabel} 간병(리본케어) 서비스 인바운드 문의 분석 보고 (${startDate} ~ ${endDate})`,
-            target: `${channelLabel} 관련 인바운드 콜`,
-            channel: channel,
-            channelLabel: channelLabel,
-            period: `${startDate} ~ ${endDate}`,
-            startDate,
-            endDate,
-            reportDate: new Date().toISOString().slice(0, 10),
-            author: '리본케어 (Livon Care) 운영센터',
-            operatingDays: dailyTrends.length,
-            syncedAt: new Date().toISOString()
+      const parsedUrl = urlModule.parse(req.url, true);
+      req.query = parsedUrl.query;
+      res.status = (code) => {
+        res.statusCode = code;
+        return {
+          json: (data) => {
+            res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(data));
           },
-          summaryStats: {
-            totalCalls: (ctiSummary && ctiSummary.totalInbound !== undefined) ? ctiSummary.totalInbound : totalCalls,
-            connectReqCalls: (ctiSummary && ctiSummary.connectRequests !== undefined) ? ctiSummary.connectRequests : ctiResult.logs.filter(c => c.connectReq === 'Y').length,
-            answeredCalls: (ctiSummary && ctiSummary.answeredCalls !== undefined) ? ctiSummary.answeredCalls : ctiResult.logs.filter(c => c.title || c.summary).length,
-            answerRate: ctiSummary.answerRate || (totalCalls > 0 ? Math.round((ctiSummary.answeredCalls / totalCalls) * 100) + '%' : '0%'),
-            abandonedCalls: ctiSummary.abandonedCalls || 0,
-            unselectedType: ctiSummary.unselectedType || 0,
-            btnExit: ctiSummary.btnExit || 0,
-            consultedCalls: ctiResult.logs.filter(c => c.title || c.summary).length
-          },
-          ctiSummary,
-          dailyTrends,
-          weeklyRollup,
-          callLogs: ctiResult.logs || []
+          end: () => res.end()
         };
-
-        function getCallReportFilePath(ch) {
-          let key = 'samsung';
-          if (ch === '현대해상') key = 'hyundai';
-          else if (ch === '리본케어') key = 'livon';
-          else if (ch === '전체' || ch === 'all') key = 'all';
-          else if (ch) key = ch.toLowerCase().replace(/[^a-z0-9_]/g, '') || 'samsung';
-          return path.join(BASE_DIR, `call_report_${key}.json`);
-        }
-
-        const dataFile = getCallReportFilePath(channel);
-        let existingMasterLogs = [];
-        try {
-          if (fs.existsSync(dataFile)) {
-            const old = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
-            if (old && Array.isArray(old.callLogs)) existingMasterLogs = old.callLogs;
-          }
-        } catch (e) {}
-
-        const masterMap = new Map();
-        existingMasterLogs.forEach(l => {
-          const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
-          masterMap.set(key, l);
-        });
-        (ctiResult.logs || []).forEach(l => {
-          const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
-          masterMap.set(key, l);
-        });
-        const allMasterLogs = Array.from(masterMap.values());
-        allMasterLogs.sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
-        allMasterLogs.forEach((l, idx) => { l.rowNum = idx + 1; });
-
-        const fileData = {
-          ...reportData,
-          callLogs: allMasterLogs
-        };
-
-        fs.writeFileSync(dataFile, JSON.stringify(fileData, null, 2), 'utf-8');
-        if (channel === '삼성화재') {
-          fs.writeFileSync(path.join(BASE_DIR, 'samsung_call_report.json'), JSON.stringify(fileData, null, 2), 'utf-8');
-        }
-
+      };
+      res.json = (data) => {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        return res.end(JSON.stringify({
-          success: true,
-          message: `CTI로부터 [${channelLabel}] 총 ${totalCalls}건의 인바운드 로그를 성공적으로 동기화하였습니다.`,
-          data: reportData
-        }));
-      } catch (err) {
-        console.error('[Samsung Call Report CTI Sync Error]', err);
-        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-        return res.end(JSON.stringify({ success: false, error: err.message }));
-      }
+        res.end(JSON.stringify(data));
+      };
+      return syncHandler(req, res);
     }
 
     if (reqPath === '/api/samsung/call-report/data') {

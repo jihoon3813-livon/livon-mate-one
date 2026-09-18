@@ -23,43 +23,26 @@ module.exports = async function handler(req, res) {
 
   let baseData = null;
 
-  // 1. 종합콜분석 전용 사전 데이터(call_report_all.json) 로드 (로컬 파일 + 정적 호스팅 fallback)
+  // 1. 종합콜분석 전용 사전 데이터(call_report_all.json) 초고속 로드 (Vercel 번들링 0ms 즉시 확보)
   try {
-    const candidatePaths = [
-      path.join(process.cwd(), 'call_report_all.json'),
-      path.join(__dirname, 'call_report_all.json'),
-      path.join(__dirname, '..', 'call_report_all.json'),
-      path.join(__dirname, '..', '..', 'call_report_all.json'),
-      path.join(__dirname, '..', '..', '..', 'call_report_all.json')
-    ];
-    const filePath = candidatePaths.find(p => fs.existsSync(p));
-    if (filePath && fs.existsSync(filePath)) {
-      baseData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    }
+    baseData = require('../../../call_report_all.json');
   } catch (e) {
-    console.warn('[Total-Sync-CTI] call_report_all.json local read warning:', e.message);
-  }
-
-  // Vercel 서버리스 환경 등 로컬 파일 부재 시 정적 호스팅 경로에서 고속 fetch fallback
-  if (!baseData && req.headers && req.headers.host) {
     try {
-      const proto = req.headers['x-forwarded-proto'] || 'https';
-      const fetchUrl = `${proto}://${req.headers.host}/call_report_all.json`;
-      const fbController = new AbortController();
-      const fbTimeout = setTimeout(() => fbController.abort(), 2000);
-      const resFb = await fetch(fetchUrl, { signal: fbController.signal });
-      clearTimeout(fbTimeout);
-      if (resFb.ok) {
-        baseData = await resFb.json();
+      const candidatePaths = [
+        path.join(process.cwd(), 'call_report_all.json'),
+        path.join(__dirname, 'call_report_all.json'),
+        path.join(__dirname, '..', '..', '..', 'call_report_all.json')
+      ];
+      const filePath = candidatePaths.find(p => fs.existsSync(p));
+      if (filePath && fs.existsSync(filePath)) {
+        baseData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
       }
-    } catch (err) {
-      // fallback 실패 시 계속 진행
-    }
+    } catch (err) {}
   }
 
   // 2. 실시간 CTI 동기화 시도 (스마트 초고속 증분 수집)
   try {
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 8000));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 5000));
 
     const sDateObj = new Date(startDate);
     const eDateObj = new Date(endDate);
@@ -79,23 +62,17 @@ module.exports = async function handler(req, res) {
     }
 
     // [초고속 증분 수집 엔진]:
-    // 전체 기간 통계(Page 1 요약, 250ms) + 당일 및 전일(최근 1일) 최신 증분만 수집 (수백ms 내 즉시 완료!)
+    // 기존 캐시가 이미 완비되어 있으므로 당일(오늘자) 증분만 단일 요청으로 0.5초 내 수집! (세션 충돌 원천 차단)
     if (baseData && baseData.callLogs && baseData.callLogs.length > 0) {
-      // 최근 1일치 (어제~오늘) 계산: 오늘자 신규 콜 및 어제 수정분 100% 포괄
-      const recentStart = new Date(eDateObj);
-      recentStart.setDate(recentStart.getDate() - 1);
-      const recentStartStr = recentStart.toISOString().slice(0, 10);
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const recentStartStr = (diffDays <= 1) ? startDate : todayStr;
 
-      // 1) 전체 기간의 CTI 헤더 요약 통계(Page 1 요약만, 250ms) & 2) 당일/전일 상세 로그 조회 병렬 실행
-      const [fullSummaryRes, recentLogsRes] = await Promise.race([
-        Promise.all([
-          fetchCtiLogsByDateRange(startDate, endDate, channel, { summaryOnly: true }).catch(() => null),
-          fetchCtiLogsByDateRange(recentStartStr, endDate, channel, { knownDetailsMap: knownMap }).catch(() => null)
-        ]),
+      const recentLogsRes = await Promise.race([
+        fetchCtiLogsByDateRange(recentStartStr, endDate, channel, { knownDetailsMap: knownMap }).catch(() => null),
         timeoutPromise
       ]);
 
-      const activeCtiSummary = (fullSummaryRes && fullSummaryRes.ctiSummary) || (recentLogsRes && recentLogsRes.ctiSummary) || baseData.ctiSummary;
+      const activeCtiSummary = (recentLogsRes && recentLogsRes.ctiSummary) || baseData.ctiSummary;
       const recentLogs = (recentLogsRes && recentLogsRes.logs) || [];
 
       // 기존 baseline 데이터에 최신 로그 병합 (askSn 또는 callTime+phone 기준 고유 식별)

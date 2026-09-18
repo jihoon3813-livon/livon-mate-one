@@ -19,63 +19,38 @@ module.exports = async function handler(req, res) {
 
   let baseData = null;
 
-  // 1. 사전 생성된 최신 보고서 데이터 로드 (초고속 캐시 & 백업)
+  // 1. 사전 생성된 최신 보고서 데이터 초고속 로드 (Vercel 번들링 0ms 확보)
   try {
-    const chLower = channel.toLowerCase();
-    const isAll = channel.includes('전체') || chLower === 'all';
-    const isHyundai = channel.includes('현대') || chLower.includes('hyundai');
-    const isLivon = channel.includes('리본') || chLower.includes('livon');
-    let fileName = 'call_report_all.json';
-    if (!isAll) {
-      if (isHyundai) fileName = 'call_report_hyundai.json';
-      else if (isLivon) fileName = 'call_report_livon.json';
-      else fileName = 'call_report_samsung.json';
-    }
-
-    const candidatePaths = [
-      path.join(process.cwd(), fileName),
-      path.join(__dirname, fileName),
-      path.join(__dirname, '..', fileName),
-      path.join(__dirname, '..', '..', fileName),
-      path.join(__dirname, '..', '..', '..', fileName),
-      path.join(process.cwd(), 'samsung_call_report.json'),
-      path.join(__dirname, '..', '..', '..', 'samsung_call_report.json')
-    ];
-    let filePath = candidatePaths.find(p => fs.existsSync(p));
-    if (!filePath && isAll) {
-      const allFallbackPaths = [
-        path.join(process.cwd(), 'call_report_all.json'),
-        path.join(__dirname, '..', '..', '..', 'call_report_all.json')
-      ];
-      filePath = allFallbackPaths.find(p => fs.existsSync(p));
-    }
-    if (filePath && fs.existsSync(filePath)) {
-      baseData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    }
+    if (channel.includes('삼성')) baseData = require('../../../call_report_samsung.json');
+    else if (channel.includes('현대')) baseData = require('../../../call_report_hyundai.json');
+    else if (channel.includes('리본')) baseData = require('../../../call_report_livon.json');
+    else baseData = require('../../../call_report_all.json');
   } catch (e) {
-    console.warn('[Sync-CTI] Pre-generated file read warning:', e.message);
-  }
-
-  // Vercel 서버리스 환경 등 로컬 파일 부재 시 정적 호스팅 경로에서 고속 fetch fallback
-  if (!baseData && req.headers && req.headers.host) {
     try {
-      const proto = req.headers['x-forwarded-proto'] || 'https';
-      const fetchUrl = `${proto}://${req.headers.host}/call_report_samsung.json`;
-      const fbController = new AbortController();
-      const fbTimeout = setTimeout(() => fbController.abort(), 2000);
-      const resFb = await fetch(fetchUrl, { signal: fbController.signal });
-      clearTimeout(fbTimeout);
-      if (resFb.ok) {
-        baseData = await resFb.json();
+      const chLower = channel.toLowerCase();
+      const isAll = channel.includes('전체') || chLower === 'all';
+      const isHyundai = channel.includes('현대') || chLower.includes('hyundai');
+      const isLivon = channel.includes('리본') || chLower.includes('livon');
+      let fileName = 'call_report_all.json';
+      if (!isAll) {
+        if (isHyundai) fileName = 'call_report_hyundai.json';
+        else if (isLivon) fileName = 'call_report_livon.json';
+        else fileName = 'call_report_samsung.json';
       }
+      const candidatePaths = [
+        path.join(process.cwd(), fileName),
+        path.join(__dirname, fileName),
+        path.join(__dirname, '..', '..', '..', fileName)
+      ];
+      let filePath = candidatePaths.find(p => fs.existsSync(p));
+      if (filePath) baseData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     } catch (err) {}
   }
 
   // 2. 실시간 CTI 동기화 시도 (스마트 초고속 증분 수집)
   try {
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 8000));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 5000));
 
-    // 전체 통계(Page 1, 200ms) + 당일/전일(최근 1일) 증분 로그만 초고속 수집하여 병합 (0.3~0.5초 내 완료!)
     const sDateObj = new Date(startDate);
     const eDateObj = new Date(endDate);
     const diffDays = Math.ceil((eDateObj - sDateObj) / (1000 * 60 * 60 * 24)) + 1;
@@ -94,17 +69,11 @@ module.exports = async function handler(req, res) {
     }
 
     if (baseData && baseData.callLogs && baseData.callLogs.length > 0) {
-      // 최근 1일치(어제~오늘) 계산: 오늘 신규 콜 및 어제 수정분 100% 포괄
-      const recentStart = new Date(eDateObj);
-      recentStart.setDate(recentStart.getDate() - 1);
-      const recentStartStr = recentStart.toISOString().slice(0, 10);
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const recentStartStr = (diffDays <= 1) ? startDate : todayStr;
 
-      // 1) 전체 기간의 CTI 헤더 요약 통계(Page 1 요약만, 200ms) & 2) 최근 1일치 상세 로그 조회 병렬 실행
-      const [fullSummaryRes, recentLogsRes] = await Promise.race([
-        Promise.all([
-          fetchCtiLogsByDateRange(startDate, endDate, channel, { summaryOnly: true }).catch(() => null),
-          fetchCtiLogsByDateRange(recentStartStr, endDate, channel, { knownDetailsMap: knownMap }).catch(() => null)
-        ]),
+      const recentLogsRes = await Promise.race([
+        fetchCtiLogsByDateRange(recentStartStr, endDate, channel, { knownDetailsMap: knownMap }).catch(() => null),
         timeoutPromise
       ]);
 
