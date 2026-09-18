@@ -24697,62 +24697,58 @@ async function openCarePortOfficialDetail(sessionId) {
   }
 }
 
-function printCarePortModal() {
-  const area = document.getElementById('carePortPrintArea');
-  let prevTransform = '';
-  if (area) {
-    prevTransform = area.style.transform;
-    const maxPrintPx = 1040;
-    const currentH = area.scrollHeight;
-    if (currentH > maxPrintPx) {
-      const scale = (maxPrintPx / currentH) * 0.96;
-      area.style.transform = `scale(${scale})`;
-      area.style.transformOrigin = 'top center';
-    }
-  }
-  document.body.classList.add('printing-careport');
-  setTimeout(() => {
-    window.print();
-    setTimeout(() => {
-      document.body.classList.remove('printing-careport');
-      if (area) {
-        area.style.transform = prevTransform;
-        area.style.transformOrigin = '';
-      }
-    }, 500);
-  }, 120);
+// =========================================================================
+// 고해상도 A4 단일 페이지 (1장 꽉차게) PDF 생성 & 직접 다운로드 유틸리티
+// =========================================================================
+async function ensureHtml2CanvasLoaded() {
+  if (typeof html2canvas !== 'undefined') return true;
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = './html2canvas.min.js';
+    s.onload = () => resolve(true);
+    s.onerror = () => {
+      const cdnScript = document.createElement('script');
+      cdnScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      cdnScript.onload = () => resolve(true);
+      cdnScript.onerror = reject;
+      document.head.appendChild(cdnScript);
+    };
+    document.head.appendChild(s);
+  });
 }
 
-async function downloadCarePortDocumentPdf() {
-  if (!gCurrentCarePortDetail && !gCurrentCarePortSessionId) {
-    alert('간병일지 세션 정보가 없습니다.');
-    return;
-  }
-  const username = (document.getElementById('cpMetaUsername')?.innerText || '환자').trim();
-  const consultDate = (document.getElementById('cpMetaDate')?.innerText || '').trim();
-  const cleanDate = consultDate.slice(0, 10).replace(/[^0-9]/g, '');
-  const fileName = `[케어포트_공식간병일지]_${username}_${cleanDate || gCurrentCarePortSessionId || '일지'}.pdf`;
+function triggerDirectPdfDownload(pdfBytes, fileName) {
+  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
 
-  const printArea = document.getElementById('carePortPrintArea');
-  if (!printArea) {
-    alert('간병일지 문서 영역을 찾을 수 없습니다.');
-    return;
-  }
+async function renderElementToSinglePageA4PdfBytes(sourceElement, customMargin = 12) {
+  if (!sourceElement) throw new Error('PDF 렌더링 대상 요소를 찾을 수 없습니다.');
+  await ensureHtml2CanvasLoaded();
 
-  // Clone print area for clean off-screen PDF rendering
-  const clone = printArea.cloneNode(true);
+  // Create clean clone offscreen
+  const clone = sourceElement.cloneNode(true);
   clone.querySelectorAll('.no-print').forEach(el => el.remove());
 
   clone.style.width = '794px';
   clone.style.maxWidth = '794px';
-  clone.style.margin = '0 auto';
-  clone.style.padding = '18px 24px';
+  clone.style.margin = '0';
+  clone.style.padding = '20px 24px';
   clone.style.background = '#ffffff';
   clone.style.boxShadow = 'none';
   clone.style.border = 'none';
+  clone.style.borderRadius = '0';
+  clone.style.boxSizing = 'border-box';
+  clone.style.transform = 'none';
 
   const container = document.createElement('div');
-  container.id = 'careport-pdf-temp-container';
   container.style.position = 'fixed';
   container.style.left = '-9999px';
   container.style.top = '0';
@@ -24762,35 +24758,113 @@ async function downloadCarePortDocumentPdf() {
   container.appendChild(clone);
   document.body.appendChild(container);
 
-  // Auto-scale if scroll height exceeds single A4 page height
-  const maxH = 1040;
-  if (clone.scrollHeight > maxH) {
-    const scale = (maxH / clone.scrollHeight) * 0.98;
-    clone.style.transform = `scale(${scale.toFixed(3)})`;
-    clone.style.transformOrigin = 'top center';
-  }
+  try {
+    const canvas = await html2canvas(clone, {
+      scale: 2, // 2x retina sharpness
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      windowWidth: 794
+    });
 
-  if (typeof html2pdf !== 'undefined') {
-    const opt = {
-      margin: [4, 6, 4, 6],
-      filename: fileName,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all'] }
-    };
-    try {
-      await html2pdf().set(opt).from(clone).save();
-      if (document.body.contains(container)) document.body.removeChild(container);
-      return true;
-    } catch (err) {
-      console.warn('[html2pdf error in careport download, falling back to print]', err);
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    const arrayBuf = await blob.arrayBuffer();
+    const pngBytes = new Uint8Array(arrayBuf);
+
+    if (typeof PDFLib === 'undefined' || !PDFLib.PDFDocument) {
+      throw new Error('PDFLib 라이브러리를 찾을 수 없습니다.');
+    }
+
+    const pdfDoc = await PDFLib.PDFDocument.create();
+    const pngImage = await pdfDoc.embedPng(pngBytes);
+
+    // Standard A4 dimensions in points: 595.28 x 841.89
+    const pageW = 595.28;
+    const pageH = 841.89;
+
+    const margin = customMargin;
+    const availW = pageW - (margin * 2);
+    const availH = pageH - (margin * 2);
+
+    const imgW = pngImage.width;
+    const imgH = pngImage.height;
+
+    // Strict proportional scaling to guarantee 100% fit on 1 page (1장으로 꽉차게)
+    const scale = Math.min(availW / imgW, availH / imgH);
+    const finalW = imgW * scale;
+    const finalH = imgH * scale;
+
+    // Exactly center horizontally and vertically
+    const posX = (pageW - finalW) / 2;
+    const posY = (pageH - finalH) / 2;
+
+    const page = pdfDoc.addPage([pageW, pageH]);
+    page.drawImage(pngImage, {
+      x: posX,
+      y: posY,
+      width: finalW,
+      height: finalH
+    });
+
+    return await pdfDoc.save();
+  } finally {
+    if (document.body.contains(container)) {
+      document.body.removeChild(container);
     }
   }
+}
 
-  if (document.body.contains(container)) document.body.removeChild(container);
-  printCarePortModal();
-  return true;
+function printCarePortModal() {
+  // 브라우저 인쇄창(window.print) 대신 깔끔한 1장 A4 PDF 직접 다운로드 실행
+  return downloadCarePortDocumentPdf();
+}
+
+async function downloadCarePortDocumentPdf() {
+  const printArea = document.getElementById('carePortPrintArea');
+  if (!printArea) {
+    alert('간병일지 문서 영역을 찾을 수 없습니다.');
+    return;
+  }
+
+  const username = (document.getElementById('cpMetaUsername')?.innerText || '환자').trim();
+  const consultDate = (document.getElementById('cpMetaDate')?.innerText || '').trim();
+  const cleanDate = consultDate.slice(0, 10).replace(/[^0-9]/g, '');
+  const fileName = `[케어포트_공식간병일지]_${username}_${cleanDate || gCurrentCarePortSessionId || '일지'}.pdf`;
+
+  const toast = document.createElement('div');
+  toast.id = 'careport-pdf-loading-toast';
+  toast.className = 'fixed bottom-6 right-6 z-[9999] bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-purple-400/40 text-xs font-bold';
+  toast.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 text-purple-400 animate-spin"></i><span>간병일지 1장 PDF 다운로드 준비 중...</span>`;
+  document.body.appendChild(toast);
+  if (typeof initIcons === 'function') initIcons(toast);
+
+  try {
+    const pdfBytes = await renderElementToSinglePageA4PdfBytes(printArea, 12);
+    triggerDirectPdfDownload(pdfBytes, fileName);
+
+    // 삼성화재 연동 데이터에 자동 등록
+    if (gCurrentCarePortSessionId) {
+      window.gSamsungCustomerCareLogFiles = window.gSamsungCustomerCareLogFiles || {};
+      const matchedApp = (gApps || []).find(app => app.patientName === username);
+      if (matchedApp) {
+        window.gSamsungCustomerCareLogFiles[matchedApp.id] = window.gSamsungCustomerCareLogFiles[matchedApp.id] || [];
+        window.gSamsungCustomerCareLogFiles[matchedApp.id].push({
+          name: fileName,
+          size: pdfBytes.byteLength,
+          bytes: pdfBytes,
+          date: new Date().toISOString()
+        });
+      }
+    }
+  } catch (err) {
+    console.error('간병일지 1장 PDF 다운로드 실패:', err);
+    alert('간병일지 PDF 다운로드 중 오류가 발생했습니다: ' + err.message);
+  } finally {
+    if (document.body.contains(toast)) {
+      document.body.removeChild(toast);
+    }
+  }
 }
 
 // Backward compatibility alias
@@ -24820,39 +24894,18 @@ async function generateDailyLogPdfBlob(patient, log, detailData = null) {
   document.body.appendChild(container);
 
   const page = container.querySelector('.page') || container;
-  const maxH = 1040;
-  if (page.scrollHeight > maxH) {
-    const s = (maxH / page.scrollHeight) * 0.97;
-    page.style.transform = `scale(${s.toFixed(3)})`;
-    page.style.transformOrigin = 'top center';
-  }
 
-  if (typeof html2pdf !== 'undefined') {
-    const opt = {
-      margin: [4, 6, 4, 6],
-      image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: { scale: 1.5, useCORS: true, letterRendering: true, logging: false },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all'] }
-    };
-    try {
-      const pdfBlob = await html2pdf().set(opt).from(page).outputPdf('blob');
-      if (document.body.contains(container)) document.body.removeChild(container);
-      return pdfBlob;
-    } catch (err) {
-      console.warn('[html2pdf daily log error, fallback to minimal pdf]', err);
+  try {
+    const pdfBytes = await renderElementToSinglePageA4PdfBytes(page, 12);
+    return new Blob([pdfBytes], { type: 'application/pdf' });
+  } catch (err) {
+    console.warn('generateDailyLogPdfBlob single page export error:', err);
+    return null;
+  } finally {
+    if (document.body.contains(container)) {
+      document.body.removeChild(container);
     }
   }
-
-  if (document.body.contains(container)) document.body.removeChild(container);
-
-  // Reliable minimal valid single-page PDF fallback
-  const pName = patient.patientName || '환자';
-  const dStr = log.dateString || '';
-  const dText = log.dayText || '';
-  const sTitle = (log.title || '간병일지').replace(/[()]/g, '');
-  const dummyPdf = `%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 595 842]/Parent 2 0 R/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 180>>stream\nBT /F1 14 Tf 50 780 Td ([LivonCare CarePort Daily Log] ${pName} - ${dText} (${dStr})) Tj /F1 11 Tf 50 750 Td (${sTitle}) Tj ET\nendstream\nendobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\nxref\n0 6\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\n0000000115 00000 n\n0000000224 00000 n\n0000000455 00000 n\ntrailer<</Size 6/Root 1 0 R>>\nstartxref\n523\n%%EOF`;
-  return new Blob([dummyPdf], { type: 'application/pdf' });
 }
 
 async function downloadPatientCareLogsPdfs(groupId) {
@@ -25490,20 +25543,14 @@ async function downloadCarePortPdfLog(id) {
     `;
 
     document.body.appendChild(tempContainer);
-    const opt = {
-      margin: [6, 8, 6, 8],
-      filename: fileName,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
 
     try {
-      await html2pdf().set(opt).from(tempContainer).save();
+      const pdfBytes = await renderElementToSinglePageA4PdfBytes(tempContainer, 12);
+      triggerDirectPdfDownload(pdfBytes, fileName);
       if (document.body.contains(tempContainer)) document.body.removeChild(tempContainer);
       return;
     } catch (e) {
-      console.warn('html2pdf download error, falling back to valid RFC binary PDF:', e);
+      console.warn('renderElementToSinglePageA4PdfBytes error, falling back to RFC binary PDF:', e);
       if (document.body.contains(tempContainer)) document.body.removeChild(tempContainer);
     }
   }

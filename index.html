@@ -40,8 +40,12 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="./exceljs.min.js"></script>
   <script src="./html2pdf.bundle.min.js"></script>
+  <script src="./html2canvas.min.js"></script>
   <script src="./pdf-lib.min.js"></script>
   <script>
+    if (typeof html2canvas === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>');
+    }
     if (typeof PDFLib === 'undefined') {
       document.write('<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"><\/script>');
     }
@@ -8911,11 +8915,11 @@
             <span class="hidden md:inline">새 창 원본</span>
           </button>
 
-          <button type="button" onclick="printCarePortModal()" 
-            class="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
-            title="간병일지 인쇄 및 PDF 저장">
-            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
-            <span>PDF 인쇄 / 다운로드</span>
+          <button type="button" onclick="downloadCarePortDocumentPdf()" 
+            class="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-md cursor-pointer active:scale-95"
+            title="A4 1장에 깔끔하게 꽉 차도록 PDF 파일로 직접 다운로드합니다">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>공식 일지 PDF 다운로드 (1장 꽉차게)</span>
           </button>
 
           <button type="button" onclick="closeModal('carePortOfficialModal')" class="p-2 text-slate-400 hover:text-white rounded-lg cursor-pointer">
@@ -8928,17 +8932,14 @@
       <div class="flex-1 overflow-y-auto bg-slate-100/80 relative min-h-[550px] flex flex-col custom-scrollbar">
         <!-- 1:1 CarePort Document View -->
         <div id="carePortPrintArea" class="p-6 sm:p-12 max-w-4xl mx-auto w-full bg-white shadow-xl my-4 rounded-2xl font-sans relative border border-slate-200">
-          <!-- Top Row: 간병일지 제목 & 다운로드/프린트 버튼 -->
+          <!-- Top Row: 간병일지 제목 & 다운로드 버튼 -->
           <div class="flex items-center justify-between pb-3">
             <h1 class="text-3xl font-black text-slate-950 tracking-tight">간병일지</h1>
             <div class="flex items-center gap-2 no-print">
-              <button type="button" onclick="downloadCarePortDocumentPdf()" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg border border-slate-300 transition-all cursor-pointer flex items-center gap-1.5">
+              <button type="button" onclick="downloadCarePortDocumentPdf()" 
+                class="px-4 py-2 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-black rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
                 <i data-lucide="download" class="w-3.5 h-3.5"></i>
-                <span>PDF 다운로드 (1장)</span>
-              </button>
-              <button type="button" onclick="printCarePortModal()" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5">
-                <i data-lucide="printer" class="w-3.5 h-3.5"></i>
-                <span>프린트</span>
+                <span>PDF 다운로드 (1장 꽉차게)</span>
               </button>
             </div>
           </div>
