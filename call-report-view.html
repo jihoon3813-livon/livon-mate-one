@@ -649,9 +649,12 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           : (isLivon ? 'call_report_livon.json' : (isAll ? 'call_report_all.json' : 'call_report_samsung.json'));
 
         const primaryFiles = [
-          `/${primaryFileName}?t=${Date.now()}`,
           `./${primaryFileName}?t=${Date.now()}`,
           `${primaryFileName}?t=${Date.now()}`,
+          `/${primaryFileName}?t=${Date.now()}`,
+          `./call_report_all.json?t=${Date.now()}`,
+          `call_report_all.json?t=${Date.now()}`,
+          `/call_report_all.json?t=${Date.now()}`,
           `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
         ];
 
@@ -1875,11 +1878,12 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           const primaryFallback = isHyundai ? 'call_report_hyundai.json' : (isLivon ? 'call_report_livon.json' : (isAll ? 'call_report_all.json' : 'call_report_samsung.json'));
 
           const fallbacks = [
-            `/${primaryFallback}?t=${Date.now()}`,
             `./${primaryFallback}?t=${Date.now()}`,
             `${primaryFallback}?t=${Date.now()}`,
-            `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`,
-            (primaryFallback !== 'call_report_all.json') ? `/call_report_all.json?t=${Date.now()}` : null
+            `/${primaryFallback}?t=${Date.now()}`,
+            (primaryFallback !== 'call_report_all.json') ? `./call_report_all.json?t=${Date.now()}` : null,
+            (primaryFallback !== 'call_report_all.json') ? `call_report_all.json?t=${Date.now()}` : null,
+            `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
           ].filter(Boolean);
 
           for (const u of fallbacks) {

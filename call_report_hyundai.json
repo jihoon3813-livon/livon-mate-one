@@ -1,376 +1,441 @@
 {
   "reportInfo": {
-    "title": "현대해상 간병(리본케어) 서비스 인바운드 문의 분석 보고 (2026-08-01 ~ 2026-09-17)",
+    "title": "현대해상 간병(리본케어) 서비스 인바운드 문의 분석 보고 (2026-08-01 ~ 2026-09-18)",
     "target": "현대해상 관련 인바운드 콜",
     "channel": "현대해상",
     "channelLabel": "현대해상",
-    "period": "2026-08-01 ~ 2026-09-17",
+    "period": "2026-08-01 ~ 2026-09-18",
     "startDate": "2026-08-01",
-    "endDate": "2026-09-17",
-    "reportDate": "2026-09-17",
+    "endDate": "2026-09-18",
+    "reportDate": "2026-09-18",
     "author": "리본케어 (Livon Care) 운영센터",
-    "operatingDays": 48,
-    "syncedAt": "2026-09-17T07:41:30.420Z"
+    "operatingDays": 37,
+    "syncedAt": "2026-09-18T03:53:08.728Z"
   },
   "summaryStats": {
-    "totalCalls": 152,
-    "connectReqCalls": 152,
-    "answeredCalls": 118,
+    "totalCalls": 235,
+    "connectReqCalls": 157,
+    "answeredCalls": 123,
     "answerRate": "78%",
     "abandonedCalls": 34,
-    "unselectedType": 0,
+    "unselectedType": 78,
     "btnExit": 0,
-    "consultedCalls": 68
+    "consultedCalls": 72
   },
   "ctiSummary": {
-    "totalAll": 152,
-    "totalInbound": 152,
-    "answeredCalls": 118,
-    "connectRequests": 152,
+    "totalAll": 235,
+    "totalInbound": 235,
+    "answeredCalls": 123,
+    "connectRequests": 157,
     "answerRate": "78%",
     "abandonedCalls": 34,
-    "unselectedType": 0,
+    "unselectedType": 78,
     "btnExit": 0
   },
   "dailyTrends": [
     {
-      "date": "2026-08-01",
-      "dayOfWeek": "토",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-02",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
       "date": "2026-08-03",
-      "dayOfWeek": "월",
       "callCount": 5,
-      "share": 0.0329,
-      "note": ""
+      "share": 0.0213
     },
     {
       "date": "2026-08-04",
-      "dayOfWeek": "화",
-      "callCount": 2,
-      "share": 0.0132,
-      "note": ""
+      "callCount": 3,
+      "share": 0.0128
     },
     {
       "date": "2026-08-05",
-      "dayOfWeek": "수",
-      "callCount": 4,
-      "share": 0.0263,
-      "note": ""
+      "callCount": 5,
+      "share": 0.0213
     },
     {
       "date": "2026-08-06",
-      "dayOfWeek": "목",
-      "callCount": 9,
-      "share": 0.0592,
-      "note": ""
+      "callCount": 14,
+      "share": 0.0596
     },
     {
       "date": "2026-08-07",
-      "dayOfWeek": "금",
-      "callCount": 4,
-      "share": 0.0263,
-      "note": ""
+      "callCount": 9,
+      "share": 0.0383
     },
     {
       "date": "2026-08-08",
-      "dayOfWeek": "토",
-      "callCount": 3,
-      "share": 0.0197,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-09",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
+      "callCount": 7,
+      "share": 0.0298
     },
     {
       "date": "2026-08-10",
-      "dayOfWeek": "월",
-      "callCount": 3,
-      "share": 0.0197,
-      "note": ""
+      "callCount": 7,
+      "share": 0.0298
     },
     {
       "date": "2026-08-11",
-      "dayOfWeek": "화",
       "callCount": 5,
-      "share": 0.0329,
-      "note": ""
+      "share": 0.0213
     },
     {
       "date": "2026-08-12",
-      "dayOfWeek": "수",
-      "callCount": 3,
-      "share": 0.0197,
-      "note": ""
-    },
-    {
-      "date": "2026-08-13",
-      "dayOfWeek": "목",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
+      "callCount": 4,
+      "share": 0.017
     },
     {
       "date": "2026-08-14",
-      "dayOfWeek": "금",
-      "callCount": 14,
-      "share": 0.0921,
-      "note": ""
+      "callCount": 19,
+      "share": 0.0809
     },
     {
       "date": "2026-08-15",
-      "dayOfWeek": "토",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-16",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
+      "callCount": 10,
+      "share": 0.0426
     },
     {
       "date": "2026-08-17",
-      "dayOfWeek": "월",
-      "callCount": 0,
-      "share": 0,
-      "note": ""
+      "callCount": 2,
+      "share": 0.0085
     },
     {
       "date": "2026-08-18",
-      "dayOfWeek": "화",
-      "callCount": 9,
-      "share": 0.0592,
-      "note": ""
+      "callCount": 12,
+      "share": 0.0511
     },
     {
       "date": "2026-08-19",
-      "dayOfWeek": "수",
-      "callCount": 18,
-      "share": 0.1184,
-      "note": ""
+      "callCount": 23,
+      "share": 0.0979
     },
     {
       "date": "2026-08-20",
-      "dayOfWeek": "목",
       "callCount": 5,
-      "share": 0.0329,
-      "note": ""
+      "share": 0.0213
     },
     {
       "date": "2026-08-21",
-      "dayOfWeek": "금",
-      "callCount": 3,
-      "share": 0.0197,
-      "note": ""
+      "callCount": 4,
+      "share": 0.017
     },
     {
       "date": "2026-08-22",
-      "dayOfWeek": "토",
-      "callCount": 1,
-      "share": 0.0066,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-23",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
+      "callCount": 2,
+      "share": 0.0085
     },
     {
       "date": "2026-08-24",
-      "dayOfWeek": "월",
-      "callCount": 4,
-      "share": 0.0263,
-      "note": ""
+      "callCount": 5,
+      "share": 0.0213
     },
     {
       "date": "2026-08-25",
-      "dayOfWeek": "화",
-      "callCount": 3,
-      "share": 0.0197,
-      "note": ""
+      "callCount": 6,
+      "share": 0.0255
     },
     {
       "date": "2026-08-26",
-      "dayOfWeek": "수",
       "callCount": 3,
-      "share": 0.0197,
-      "note": ""
+      "share": 0.0128
     },
     {
       "date": "2026-08-27",
-      "dayOfWeek": "목",
-      "callCount": 1,
-      "share": 0.0066,
-      "note": ""
+      "callCount": 2,
+      "share": 0.0085
     },
     {
       "date": "2026-08-28",
-      "dayOfWeek": "금",
-      "callCount": 3,
-      "share": 0.0197,
-      "note": ""
-    },
-    {
-      "date": "2026-08-29",
-      "dayOfWeek": "토",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-08-30",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
+      "callCount": 6,
+      "share": 0.0255
     },
     {
       "date": "2026-08-31",
-      "dayOfWeek": "월",
-      "callCount": 4,
-      "share": 0.0263,
-      "note": ""
+      "callCount": 5,
+      "share": 0.0213
     },
     {
       "date": "2026-09-01",
-      "dayOfWeek": "화",
-      "callCount": 4,
-      "share": 0.0263,
-      "note": ""
+      "callCount": 5,
+      "share": 0.0213
     },
     {
       "date": "2026-09-02",
-      "dayOfWeek": "수",
-      "callCount": 3,
-      "share": 0.0197,
-      "note": ""
+      "callCount": 4,
+      "share": 0.017
     },
     {
       "date": "2026-09-03",
-      "dayOfWeek": "목",
-      "callCount": 2,
-      "share": 0.0132,
-      "note": ""
+      "callCount": 3,
+      "share": 0.0128
     },
     {
       "date": "2026-09-04",
-      "dayOfWeek": "금",
       "callCount": 2,
-      "share": 0.0132,
-      "note": ""
-    },
-    {
-      "date": "2026-09-05",
-      "dayOfWeek": "토",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-09-06",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
+      "share": 0.0085
     },
     {
       "date": "2026-09-07",
-      "dayOfWeek": "월",
       "callCount": 1,
-      "share": 0.0066,
-      "note": ""
+      "share": 0.0043
     },
     {
       "date": "2026-09-08",
-      "dayOfWeek": "화",
       "callCount": 3,
-      "share": 0.0197,
-      "note": ""
+      "share": 0.0128
     },
     {
       "date": "2026-09-09",
-      "dayOfWeek": "수",
-      "callCount": 2,
-      "share": 0.0132,
-      "note": ""
+      "callCount": 7,
+      "share": 0.0298
     },
     {
       "date": "2026-09-10",
-      "dayOfWeek": "목",
       "callCount": 2,
-      "share": 0.0132,
-      "note": ""
+      "share": 0.0085
     },
     {
       "date": "2026-09-11",
-      "dayOfWeek": "금",
-      "callCount": 4,
-      "share": 0.0263,
-      "note": ""
-    },
-    {
-      "date": "2026-09-12",
-      "dayOfWeek": "토",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
-    },
-    {
-      "date": "2026-09-13",
-      "dayOfWeek": "일",
-      "callCount": 0,
-      "share": 0,
-      "note": "주말"
+      "callCount": 6,
+      "share": 0.0255
     },
     {
       "date": "2026-09-14",
-      "dayOfWeek": "월",
-      "callCount": 7,
-      "share": 0.0461,
-      "note": ""
+      "callCount": 11,
+      "share": 0.0468
     },
     {
       "date": "2026-09-15",
-      "dayOfWeek": "화",
       "callCount": 3,
-      "share": 0.0197,
-      "note": ""
+      "share": 0.0128
     },
     {
       "date": "2026-09-16",
-      "dayOfWeek": "수",
-      "callCount": 5,
-      "share": 0.0329,
-      "note": ""
+      "callCount": 6,
+      "share": 0.0255
     },
     {
       "date": "2026-09-17",
-      "dayOfWeek": "목",
+      "callCount": 11,
+      "share": 0.0468
+    },
+    {
+      "date": "2026-09-18",
       "callCount": 8,
-      "share": 0.0526,
-      "note": ""
+      "share": 0.034
     }
   ],
   "callLogs": [
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-18 12:11",
+      "phone": "010-7629-1155",
+      "rawPhone": "01076291155",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7155066",
+      "category": "",
+      "actor": "",
+      "rowNum": 1,
+      "id": "cti_1789702616387_1"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-18 11:27",
+      "phone": "010-3721-8786",
+      "rawPhone": "01037218786",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "기타",
+      "connectReq": "Y",
+      "waitTime": 5,
+      "title": "가족간병 절차 및 비용 탐색",
+      "summary": "이번 상담에서는 가족 간병에 대한 안내가 주요 주제로 다루어졌습니다. 피상담자는 가족의 간병 방법에 대해 질문하였으며, 상담자는 다음과 같이 설명하였습니다. 가족 간병 방식은 간병협회에서 제공하는 서비스이며, 지원자는 협회에 등록하고 해당 협회가 발급하는 간병사 확인서를 받아야 합니다. 간병 지원에 따른 비용은 협회의 약관 등에 따라 달라질 수 있으며, 명확한 금액은 제시되지 않았습니다. 피상담자는 또한 간병인 자격증에 대해 문의하였으며, 상담자는 간병인 자격증이 민간자격증일 뿐 국가가 공식적으로 인정하는 자격은 아니라고 답변하였습니다. 전반적으로, 가족 간병은 사전에 협회와 절차적 상세 사항을 확인한 후 진행하는 것이 중요하다는 점이 강조되었습니다.",
+      "keywords": "가족간병, 간병사 등록, 간병 비용, 자격증",
+      "duration": "00:01:31",
+      "status": "미처리",
+      "operator": "이주연",
+      "askSn": "7154679",
+      "category": "간병 신청·접수·배정",
+      "actor": "고객(가입자·이용자)",
+      "rowNum": 2,
+      "id": "cti_1789702616387_2"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-18 11:08",
+      "phone": "010-6338-9998",
+      "rawPhone": "01063389998",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "기타",
+      "connectReq": "Y",
+      "waitTime": 5,
+      "title": "보험 청구 절차 상담",
+      "summary": "이번 상담에서는 보험 청구 절차에 대한 논의가 진행되었습니다. 피상담자는 현대 실비보험을 청구하는 절차에 대해 궁금증을 갖고 있었습니다. 주된 질문은 병원에서 처방을 받은 약국 약제비에 대한 청구 시, 병원의 진료 세부 내역서가 필요한지 여부였습니다. 상담자는 약국에서 제공하는 약봉투에 포함된 영수증만으로는 보험 청구가 가능하며, 병원 치료비에 대한 청구시에는 병원의 진료 세부 내역서도 함께 제출해야 한다고 안내하였습니다. 피상담자는 약국과 병원 청구 절차가 별도로 진행되어야 한다는 점에 대한 재차 확인을 요청하였고, 상담자는 추가적인 서류 요청 시 필요 서류를 준비하면 된다는 점도 설명하였습니다. 전반적으로 피상담자는 상담자의 안내를 통해 보험 청구 과정을 이해한 것으로 보입니다.",
+      "keywords": "보험 청구 절차, 약국 영수증 처리, 세부 내역서 필요성",
+      "duration": "00:02:57",
+      "status": "미처리",
+      "operator": "이주연",
+      "askSn": "7154503",
+      "category": "간병 신청·접수·배정",
+      "actor": "고객(가입자·이용자)",
+      "rowNum": 3,
+      "id": "cti_1789702616387_4"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-18 11:08",
+      "phone": "010-6338-9998",
+      "rawPhone": "01063389998",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7154493",
+      "category": "",
+      "actor": "",
+      "rowNum": 4,
+      "id": "cti_1789702616387_5"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-18 11:06",
+      "phone": "010-6338-9998",
+      "rawPhone": "01063389998",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7154474",
+      "category": "",
+      "actor": "",
+      "rowNum": 5,
+      "id": "cti_1789702616387_6"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-18 11:04",
+      "phone": "010-2588-7203",
+      "rawPhone": "01025887203",
+      "memberName": "임형순(남)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "기타",
+      "connectReq": "Y",
+      "waitTime": 5,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "00:00:30",
+      "status": "미처리",
+      "operator": "이주연",
+      "askSn": "7154451",
+      "category": "",
+      "actor": "",
+      "rowNum": 6,
+      "id": "cti_1789702616387_7"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-18 11:03",
+      "phone": "010-2588-7203",
+      "rawPhone": "01025887203",
+      "memberName": "임형순(남)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7154440",
+      "category": "",
+      "actor": "",
+      "rowNum": 7,
+      "id": "cti_1789702616387_8"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-18 09:35",
+      "phone": "010-2073-8509",
+      "rawPhone": "01020738509",
+      "memberName": "남경임(여)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "종료",
+      "connectReq": "Y",
+      "waitTime": 18,
+      "title": "간병인 계약 종료 및 정산 문제",
+      "summary": "이번 상담은 간병인 비용과 관련된 분쟁에 관한 것입니다. 피상담자 김수영님은 최근까지 간병인을 고용하셨으나, 9월 17일부로 간병인을 그만두게 되었습니다. 대화 내용을 통해 간병인이 9월 16일 저녁에 작업을 마쳤으나, 9월 17일 오전까지 근무한 것으로 처리해달라는 요청을 받았음을 확인할 수 있었습니다. 또한, 이전 간병인들과의 문제도 언급되었습니다. 두 명의 간병인이 근무했으며, 이들은 일상적인 간병 서비스와 달리 밥상을 요구하는 등 비정상적인 요구를 하였고, 비용 문제가 발생했습니다. 특히, 김수영님의 어머니가 제대로 식사를 하지 못했다는 점도 피상담자의 불만 사항입니다. 김수영님은 간병인 협회에 비용을 지불해야 하는 상황의 정리와 송금 절차에 대해 문의하였고, 계좌 정보를 제공하여 직접 처리하기로 하였습니다.",
+      "keywords": "간병인 계약 종료, 비용 정산 문제, 서비스 품질, 보호자 지원",
+      "duration": "00:04:21",
+      "status": "미처리",
+      "operator": "이주연",
+      "askSn": "7153408",
+      "category": "간병 신청·접수·배정",
+      "actor": "고객(가입자·이용자)",
+      "rowNum": 8,
+      "id": "cti_1789702616387_15"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-17 16:31",
+      "phone": "010-3658-9239",
+      "rawPhone": "01036589239",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "간병인신청",
+      "connectReq": "Y",
+      "waitTime": 7,
+      "title": "감정인 호출 및 교체 절차",
+      "summary": "이번 상담은 감정인 호출 조건에 대한 피상담자의 질문을 중심으로 진행되었습니다. 피상담자는 감정인 등록 후, 본인을 대신하여 타인이 감정인을 호출할 수 있는지에 대해 문의하였으며, 특히 가족 외의 지인이나 설계사가 개인정보를 알고 있는 상황에서 호출이 가능한지 질문하였습니다. 상담자는 이에 대해 '가족만 가능하다'고 답변하였습니다.\n또한, 감정인의 교체 절차에 대한 질문도 이어졌습니다. 피상담자는 감정인이 마음에 들지 않을 경우, 재배치 시에도 처음과 같은 대기 시간이 필요한지 물었고, 상담자는 '교체 과정은 기존 간병사와 새 담당자가 맞교대를 하는 방식으로 진행되며, 길어야 24시간 이내에 완료된다'고 설명하였습니다. 본 상담을 통해 피상담자는 감정인 호출 및 교체 절차에 대해 명확한 이해를 가지고 대화를 마무리하였습니다.",
+      "keywords": "감정인 호출, 가족 대리 요청, 교체 절차, 대기 시간",
+      "duration": "00:01:21",
+      "status": "미처리",
+      "operator": "이주연",
+      "askSn": "7151990",
+      "category": "간병 신청·접수·배정",
+      "actor": "고객(가입자·이용자)",
+      "rowNum": 9,
+      "id": "cti_1789702616387_23"
+    },
     {
       "type": "IN",
       "channel": "현대해상",
@@ -392,8 +457,8 @@
       "askSn": "7150721",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 1,
-      "id": "cti_1789627544523_1"
+      "rowNum": 10,
+      "id": "cti_1789702616387_24"
     },
     {
       "type": "IN",
@@ -416,8 +481,8 @@
       "askSn": "7150258",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 2,
-      "id": "cti_1789627544523_2"
+      "rowNum": 11,
+      "id": "cti_1789702616387_25"
     },
     {
       "type": "IN",
@@ -440,8 +505,32 @@
       "askSn": "7149170",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 4,
-      "id": "cti_1789627544523_4"
+      "rowNum": 12,
+      "id": "cti_1789702616387_27"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-17 11:21",
+      "phone": "010-6325-6565",
+      "rawPhone": "01063256565",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7149025",
+      "category": "",
+      "actor": "",
+      "rowNum": 13,
+      "id": "cti_1789702616387_28"
     },
     {
       "type": "IN",
@@ -464,8 +553,8 @@
       "askSn": "7149003",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 5,
-      "id": "cti_1789627544523_5"
+      "rowNum": 14,
+      "id": "cti_1789702616387_29"
     },
     {
       "type": "IN",
@@ -488,8 +577,8 @@
       "askSn": "7148855",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 6,
-      "id": "cti_1789627544523_6"
+      "rowNum": 15,
+      "id": "cti_1789702616387_30"
     },
     {
       "type": "IN",
@@ -512,8 +601,8 @@
       "askSn": "7148516",
       "category": "",
       "actor": "",
-      "rowNum": 7,
-      "id": "cti_1789627544523_7"
+      "rowNum": 16,
+      "id": "cti_1789702616387_31"
     },
     {
       "type": "IN",
@@ -536,8 +625,8 @@
       "askSn": "7147750",
       "category": "",
       "actor": "",
-      "rowNum": 8,
-      "id": "cti_1789627544523_8"
+      "rowNum": 17,
+      "id": "cti_1789702616387_33"
     },
     {
       "type": "IN",
@@ -560,8 +649,32 @@
       "askSn": "7147724",
       "category": "",
       "actor": "",
-      "rowNum": 9,
-      "id": "cti_1789627544523_9"
+      "rowNum": 18,
+      "id": "cti_1789702616387_34"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-17 09:22",
+      "phone": "010-6206-7835",
+      "rawPhone": "01062067835",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7147713",
+      "category": "",
+      "actor": "",
+      "rowNum": 19,
+      "id": "cti_1789702616387_35"
     },
     {
       "type": "IN",
@@ -584,8 +697,8 @@
       "askSn": "7146987",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 10,
-      "id": "cti_1789627544523_10"
+      "rowNum": 20,
+      "id": "cti_1789702616387_39"
     },
     {
       "type": "IN",
@@ -608,8 +721,8 @@
       "askSn": "7146081",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 14,
-      "id": "cti_1789627544523_14"
+      "rowNum": 21,
+      "id": "cti_1789702616387_46"
     },
     {
       "type": "IN",
@@ -632,8 +745,8 @@
       "askSn": "7145235",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 16,
-      "id": "cti_1789627544523_16"
+      "rowNum": 22,
+      "id": "cti_1789702616387_49"
     },
     {
       "type": "IN",
@@ -656,8 +769,8 @@
       "askSn": "7145084",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 17,
-      "id": "cti_1789627544523_17"
+      "rowNum": 23,
+      "id": "cti_1789702616387_50"
     },
     {
       "type": "IN",
@@ -680,8 +793,32 @@
       "askSn": "7143439",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 21,
-      "id": "cti_1789627544523_21"
+      "rowNum": 24,
+      "id": "cti_1789702616387_57"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-16 09:50",
+      "phone": "010-3161-7092",
+      "rawPhone": "01031617092",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7142311",
+      "category": "",
+      "actor": "",
+      "rowNum": 25,
+      "id": "cti_1789702616387_63"
     },
     {
       "type": "IN",
@@ -704,8 +841,8 @@
       "askSn": "7140950",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 29,
-      "id": "cti_1789627544523_29"
+      "rowNum": 26,
+      "id": "cti_1789702616387_72"
     },
     {
       "type": "IN",
@@ -728,8 +865,8 @@
       "askSn": "7136417",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 39,
-      "id": "cti_1789627544523_39"
+      "rowNum": 27,
+      "id": "cti_1789702616387_94"
     },
     {
       "type": "IN",
@@ -752,8 +889,32 @@
       "askSn": "7135934",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 41,
-      "id": "cti_1789627544523_41"
+      "rowNum": 28,
+      "id": "cti_1789702616387_101"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-14 18:35",
+      "phone": "010-2940-0032",
+      "rawPhone": "01029400032",
+      "memberName": "김임순(여)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7135498",
+      "category": "",
+      "actor": "",
+      "rowNum": 29,
+      "id": "cti_1789702616387_105"
     },
     {
       "type": "IN",
@@ -776,8 +937,8 @@
       "askSn": "7135316",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 42,
-      "id": "cti_1789627544523_42"
+      "rowNum": 30,
+      "id": "cti_1789702616387_108"
     },
     {
       "type": "IN",
@@ -800,8 +961,32 @@
       "askSn": "7135229",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 43,
-      "id": "cti_1789627544523_43"
+      "rowNum": 31,
+      "id": "cti_1789702616387_112"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-14 17:28",
+      "phone": "010-2940-0032",
+      "rawPhone": "01029400032",
+      "memberName": "김임순(여)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7135203",
+      "category": "",
+      "actor": "",
+      "rowNum": 32,
+      "id": "cti_1789702616387_113"
     },
     {
       "type": "IN",
@@ -824,8 +1009,32 @@
       "askSn": "7135189",
       "category": "비용·무상제공 확인",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 44,
-      "id": "cti_1789627544523_44"
+      "rowNum": 33,
+      "id": "cti_1789702616387_114"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-14 16:57",
+      "phone": "02-2127-3147",
+      "rawPhone": "0221273147",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7134888",
+      "category": "",
+      "actor": "",
+      "rowNum": 34,
+      "id": "cti_1789702616387_116"
     },
     {
       "type": "IN",
@@ -848,8 +1057,8 @@
       "askSn": "7134117",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 47,
-      "id": "cti_1789627544523_47"
+      "rowNum": 35,
+      "id": "cti_1789702616387_121"
     },
     {
       "type": "IN",
@@ -872,8 +1081,8 @@
       "askSn": "7133817",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 48,
-      "id": "cti_1789627544523_48"
+      "rowNum": 36,
+      "id": "cti_1789702616387_122"
     },
     {
       "type": "IN",
@@ -896,8 +1105,8 @@
       "askSn": "7132653",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 49,
-      "id": "cti_1789627544523_49"
+      "rowNum": 37,
+      "id": "cti_1789702616387_125"
     },
     {
       "type": "IN",
@@ -920,8 +1129,32 @@
       "askSn": "7131173",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 50,
-      "id": "cti_1789627544523_50"
+      "rowNum": 38,
+      "id": "cti_1789702616387_127"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-14 09:27",
+      "phone": "010-3686-2365",
+      "rawPhone": "01036862365",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7129059",
+      "category": "",
+      "actor": "",
+      "rowNum": 39,
+      "id": "cti_1789702616387_149"
     },
     {
       "type": "IN",
@@ -944,8 +1177,8 @@
       "askSn": "7126083",
       "category": "",
       "actor": "",
-      "rowNum": 60,
-      "id": "cti_1789627544523_60"
+      "rowNum": 40,
+      "id": "cti_1789702616387_168"
     },
     {
       "type": "IN",
@@ -968,8 +1201,32 @@
       "askSn": "7124499",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 65,
-      "id": "cti_1789627544523_65"
+      "rowNum": 41,
+      "id": "cti_1789702616387_176"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-11 10:20",
+      "phone": "010-3579-2742",
+      "rawPhone": "01035792742",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7121919",
+      "category": "",
+      "actor": "",
+      "rowNum": 42,
+      "id": "cti_1789702616387_188"
     },
     {
       "type": "IN",
@@ -992,8 +1249,8 @@
       "askSn": "7121223",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 74,
-      "id": "cti_1789627544523_74"
+      "rowNum": 43,
+      "id": "cti_1789702616387_191"
     },
     {
       "type": "IN",
@@ -1016,8 +1273,32 @@
       "askSn": "7121178",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 75,
-      "id": "cti_1789627544523_75"
+      "rowNum": 44,
+      "id": "cti_1789702616387_192"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-11 08:53",
+      "phone": "032-222-1690",
+      "rawPhone": "0322221690",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7120901",
+      "category": "",
+      "actor": "",
+      "rowNum": 45,
+      "id": "cti_1789702616387_197"
     },
     {
       "type": "IN",
@@ -1040,8 +1321,8 @@
       "askSn": "7116736",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 82,
-      "id": "cti_1789627544523_82"
+      "rowNum": 46,
+      "id": "cti_1789702616387_211"
     },
     {
       "type": "IN",
@@ -1064,8 +1345,56 @@
       "askSn": "7116713",
       "category": "",
       "actor": "",
-      "rowNum": 83,
-      "id": "cti_1789627544523_83"
+      "rowNum": 47,
+      "id": "cti_1789702616387_212"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-09 12:25",
+      "phone": "010-4711-6055",
+      "rawPhone": "01047116055",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7111902",
+      "category": "",
+      "actor": "",
+      "rowNum": 48,
+      "id": "cti_1789702616387_225"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-09 11:34",
+      "phone": "010-3307-4439",
+      "rawPhone": "01033074439",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7111587",
+      "category": "",
+      "actor": "",
+      "rowNum": 49,
+      "id": "cti_1789702616387_227"
     },
     {
       "type": "IN",
@@ -1088,8 +1417,32 @@
       "askSn": "7111000",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 91,
-      "id": "cti_1789627544523_91"
+      "rowNum": 50,
+      "id": "cti_1789702616387_230"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-09 10:46",
+      "phone": "044-850-1961",
+      "rawPhone": "0448501961",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7110965",
+      "category": "",
+      "actor": "",
+      "rowNum": 51,
+      "id": "cti_1789702616387_231"
     },
     {
       "type": "IN",
@@ -1112,8 +1465,56 @@
       "askSn": "7110000",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 94,
-      "id": "cti_1789627544523_94"
+      "rowNum": 52,
+      "id": "cti_1789702616387_234"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-09 09:21",
+      "phone": "010-4413-9515",
+      "rawPhone": "01044139515",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7109979",
+      "category": "",
+      "actor": "",
+      "rowNum": 53,
+      "id": "cti_1789702616387_235"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-09 09:21",
+      "phone": "010-4413-9515",
+      "rawPhone": "01044139515",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7109978",
+      "category": "",
+      "actor": "",
+      "rowNum": 54,
+      "id": "cti_1789702616387_236"
     },
     {
       "type": "IN",
@@ -1136,8 +1537,8 @@
       "askSn": "7107354",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 96,
-      "id": "cti_1789627544523_96"
+      "rowNum": 55,
+      "id": "cti_1789702616387_241"
     },
     {
       "type": "IN",
@@ -1160,8 +1561,8 @@
       "askSn": "7106942",
       "category": "",
       "actor": "",
-      "rowNum": 98,
-      "id": "cti_1789627544523_98"
+      "rowNum": 56,
+      "id": "cti_1789702616387_244"
     },
     {
       "type": "IN",
@@ -1184,8 +1585,8 @@
       "askSn": "7104134",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 99,
-      "id": "cti_1789627544523_99"
+      "rowNum": 57,
+      "id": "cti_1789702616387_250"
     },
     {
       "type": "IN",
@@ -1208,8 +1609,8 @@
       "askSn": "7103050",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 100,
-      "id": "cti_1789627544523_100"
+      "rowNum": 58,
+      "id": "cti_1789702616387_256"
     },
     {
       "type": "IN",
@@ -1232,8 +1633,8 @@
       "askSn": "7090880",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 117,
-      "id": "cti_1789627544523_117"
+      "rowNum": 59,
+      "id": "cti_1789702616387_297"
     },
     {
       "type": "IN",
@@ -1256,8 +1657,32 @@
       "askSn": "7090813",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 119,
-      "id": "cti_1789627544523_119"
+      "rowNum": 60,
+      "id": "cti_1789702616387_299"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-03 15:47",
+      "phone": "010-5524-2963",
+      "rawPhone": "01055242963",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7087592",
+      "category": "",
+      "actor": "",
+      "rowNum": 61,
+      "id": "cti_1789702616387_317"
     },
     {
       "type": "IN",
@@ -1280,8 +1705,8 @@
       "askSn": "7087580",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 126,
-      "id": "cti_1789627544523_126"
+      "rowNum": 62,
+      "id": "cti_1789702616387_318"
     },
     {
       "type": "IN",
@@ -1304,8 +1729,8 @@
       "askSn": "7084577",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 134,
-      "id": "cti_1789627544523_134"
+      "rowNum": 63,
+      "id": "cti_1789702616387_330"
     },
     {
       "type": "IN",
@@ -1328,8 +1753,32 @@
       "askSn": "7081270",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 137,
-      "id": "cti_1789627544523_137"
+      "rowNum": 64,
+      "id": "cti_1789702616387_340"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-02 13:56",
+      "phone": "010-6641-3967",
+      "rawPhone": "01066413967",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7080485",
+      "category": "",
+      "actor": "",
+      "rowNum": 65,
+      "id": "cti_1789702616387_342"
     },
     {
       "type": "IN",
@@ -1352,8 +1801,8 @@
       "askSn": "7080171",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 140,
-      "id": "cti_1789627544523_140"
+      "rowNum": 66,
+      "id": "cti_1789702616387_345"
     },
     {
       "type": "IN",
@@ -1376,8 +1825,32 @@
       "askSn": "7079740",
       "category": "",
       "actor": "",
-      "rowNum": 142,
-      "id": "cti_1789627544523_142"
+      "rowNum": 67,
+      "id": "cti_1789702616387_347"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-09-01 18:10",
+      "phone": "010-3034-2309",
+      "rawPhone": "01030342309",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7077176",
+      "category": "",
+      "actor": "",
+      "rowNum": 68,
+      "id": "cti_1789702616387_369"
     },
     {
       "type": "IN",
@@ -1400,8 +1873,8 @@
       "askSn": "7075953",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 150,
-      "id": "cti_1789627544523_150"
+      "rowNum": 69,
+      "id": "cti_1789702616387_375"
     },
     {
       "type": "IN",
@@ -1424,8 +1897,8 @@
       "askSn": "7075402",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 152,
-      "id": "cti_1789627544523_152"
+      "rowNum": 70,
+      "id": "cti_1789702616387_377"
     },
     {
       "type": "IN",
@@ -1448,8 +1921,8 @@
       "askSn": "7075386",
       "category": "",
       "actor": "",
-      "rowNum": 153,
-      "id": "cti_1789627544523_153"
+      "rowNum": 71,
+      "id": "cti_1789702616387_378"
     },
     {
       "type": "IN",
@@ -1472,8 +1945,8 @@
       "askSn": "7072031",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 156,
-      "id": "cti_1789627544523_156"
+      "rowNum": 72,
+      "id": "cti_1789702616387_383"
     },
     {
       "type": "IN",
@@ -1496,8 +1969,8 @@
       "askSn": "7070377",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 158,
-      "id": "cti_1789627544523_158"
+      "rowNum": 73,
+      "id": "cti_1789702616387_386"
     },
     {
       "type": "IN",
@@ -1520,8 +1993,8 @@
       "askSn": "7068159",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 161,
-      "id": "cti_1789627544523_161"
+      "rowNum": 74,
+      "id": "cti_1789702616387_389"
     },
     {
       "type": "IN",
@@ -1544,8 +2017,8 @@
       "askSn": "7067579",
       "category": "",
       "actor": "",
-      "rowNum": 162,
-      "id": "cti_1789627544523_162"
+      "rowNum": 75,
+      "id": "cti_1789702616387_392"
     },
     {
       "type": "IN",
@@ -1568,8 +2041,32 @@
       "askSn": "7064951",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 163,
-      "id": "cti_1789627544523_163"
+      "rowNum": 76,
+      "id": "cti_1789702616387_394"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-31 09:34",
+      "phone": "010-3766-1636",
+      "rawPhone": "01037661636",
+      "memberName": "김진숙(여)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7064756",
+      "category": "",
+      "actor": "",
+      "rowNum": 77,
+      "id": "cti_1789702616387_396"
     },
     {
       "type": "IN",
@@ -1592,8 +2089,8 @@
       "askSn": "7057672",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 169,
-      "id": "cti_1789627544523_169"
+      "rowNum": 78,
+      "id": "cti_1789702616387_407"
     },
     {
       "type": "IN",
@@ -1616,8 +2113,56 @@
       "askSn": "7057533",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 171,
-      "id": "cti_1789627544523_171"
+      "rowNum": 79,
+      "id": "cti_1789702616387_410"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-28 10:28",
+      "phone": "010-9175-1675",
+      "rawPhone": "01091751675",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7057234",
+      "category": "",
+      "actor": "",
+      "rowNum": 80,
+      "id": "cti_1789702616387_412"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-28 10:10",
+      "phone": "010-9175-1675",
+      "rawPhone": "01091751675",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7057036",
+      "category": "",
+      "actor": "",
+      "rowNum": 81,
+      "id": "cti_1789702616387_413"
     },
     {
       "type": "IN",
@@ -1640,8 +2185,56 @@
       "askSn": "7056719",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 172,
-      "id": "cti_1789627544523_172"
+      "rowNum": 82,
+      "id": "cti_1789702616387_416"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-28 06:02",
+      "phone": "010-3686-3988",
+      "rawPhone": "01036863988",
+      "memberName": "김순자(여)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7056117",
+      "category": "",
+      "actor": "",
+      "rowNum": 83,
+      "id": "cti_1789702616387_418"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-27 18:09",
+      "phone": "010-3686-3988",
+      "rawPhone": "01036863988",
+      "memberName": "김순자(여)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7055929",
+      "category": "",
+      "actor": "",
+      "rowNum": 84,
+      "id": "cti_1789702616387_421"
     },
     {
       "type": "IN",
@@ -1664,8 +2257,8 @@
       "askSn": "7054425",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 175,
-      "id": "cti_1789627544523_175"
+      "rowNum": 85,
+      "id": "cti_1789702616387_427"
     },
     {
       "type": "IN",
@@ -1688,8 +2281,8 @@
       "askSn": "7050250",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 181,
-      "id": "cti_1789627544523_181"
+      "rowNum": 86,
+      "id": "cti_1789702616387_443"
     },
     {
       "type": "IN",
@@ -1712,8 +2305,8 @@
       "askSn": "7048562",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 184,
-      "id": "cti_1789627544523_184"
+      "rowNum": 87,
+      "id": "cti_1789702616387_450"
     },
     {
       "type": "IN",
@@ -1736,8 +2329,8 @@
       "askSn": "7045975",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 192,
-      "id": "cti_1789627544523_192"
+      "rowNum": 88,
+      "id": "cti_1789702616387_462"
     },
     {
       "type": "IN",
@@ -1760,8 +2353,8 @@
       "askSn": "7042901",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 197,
-      "id": "cti_1789627544523_197"
+      "rowNum": 89,
+      "id": "cti_1789702616387_472"
     },
     {
       "type": "IN",
@@ -1784,8 +2377,56 @@
       "askSn": "7042826",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 198,
-      "id": "cti_1789627544523_198"
+      "rowNum": 90,
+      "id": "cti_1789702616387_473"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-25 12:26",
+      "phone": "010-9968-8645",
+      "rawPhone": "01099688645",
+      "memberName": "김용재(남)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7041322",
+      "category": "",
+      "actor": "",
+      "rowNum": 91,
+      "id": "cti_1789702616387_476"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-25 11:21",
+      "phone": "010-8868-0811",
+      "rawPhone": "01088680811",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7040804",
+      "category": "",
+      "actor": "",
+      "rowNum": 92,
+      "id": "cti_1789702616387_479"
     },
     {
       "type": "IN",
@@ -1808,8 +2449,32 @@
       "askSn": "7039920",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 202,
-      "id": "cti_1789627544523_202"
+      "rowNum": 93,
+      "id": "cti_1789702616387_482"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-25 07:58",
+      "phone": "010-6338-9998",
+      "rawPhone": "01063389998",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7038967",
+      "category": "",
+      "actor": "",
+      "rowNum": 94,
+      "id": "cti_1789702616387_486"
     },
     {
       "type": "IN",
@@ -1832,8 +2497,32 @@
       "askSn": "7038303",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 204,
-      "id": "cti_1789627544523_204"
+      "rowNum": 95,
+      "id": "cti_1789702616387_494"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-24 14:01",
+      "phone": "052-290-5412",
+      "rawPhone": "0522905412",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7035841",
+      "category": "",
+      "actor": "",
+      "rowNum": 96,
+      "id": "cti_1789702616387_507"
     },
     {
       "type": "IN",
@@ -1856,8 +2545,8 @@
       "askSn": "7033383",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 213,
-      "id": "cti_1789627544523_213"
+      "rowNum": 97,
+      "id": "cti_1789702616387_517"
     },
     {
       "type": "IN",
@@ -1880,8 +2569,8 @@
       "askSn": "7033160",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 214,
-      "id": "cti_1789627544523_214"
+      "rowNum": 98,
+      "id": "cti_1789702616387_519"
     },
     {
       "type": "IN",
@@ -1904,8 +2593,8 @@
       "askSn": "7032714",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 217,
-      "id": "cti_1789627544523_217"
+      "rowNum": 99,
+      "id": "cti_1789702616387_522"
     },
     {
       "type": "IN",
@@ -1928,8 +2617,56 @@
       "askSn": "7030787",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 218,
-      "id": "cti_1789627544523_218"
+      "rowNum": 100,
+      "id": "cti_1789702616387_531"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-22 12:40",
+      "phone": "010-2090-9220",
+      "rawPhone": "01020909220",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7030731",
+      "category": "",
+      "actor": "",
+      "rowNum": 101,
+      "id": "cti_1789702616387_532"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-21 15:25",
+      "phone": "010-8246-6788",
+      "rawPhone": "01082466788",
+      "memberName": "안운자(여)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7028510",
+      "category": "",
+      "actor": "",
+      "rowNum": 102,
+      "id": "cti_1789702616387_539"
     },
     {
       "type": "IN",
@@ -1952,8 +2689,8 @@
       "askSn": "7028486",
       "category": "",
       "actor": "",
-      "rowNum": 222,
-      "id": "cti_1789627544523_222"
+      "rowNum": 103,
+      "id": "cti_1789702616387_540"
     },
     {
       "type": "IN",
@@ -1976,8 +2713,8 @@
       "askSn": "7027728",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 224,
-      "id": "cti_1789627544523_224"
+      "rowNum": 104,
+      "id": "cti_1789702616387_545"
     },
     {
       "type": "IN",
@@ -2000,8 +2737,8 @@
       "askSn": "7025326",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 226,
-      "id": "cti_1789627544523_226"
+      "rowNum": 105,
+      "id": "cti_1789702616387_552"
     },
     {
       "type": "IN",
@@ -2024,8 +2761,8 @@
       "askSn": "7023546",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 229,
-      "id": "cti_1789627544523_229"
+      "rowNum": 106,
+      "id": "cti_1789702616387_570"
     },
     {
       "type": "IN",
@@ -2048,8 +2785,8 @@
       "askSn": "7022497",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 234,
-      "id": "cti_1789627544523_234"
+      "rowNum": 107,
+      "id": "cti_1789702616387_577"
     },
     {
       "type": "IN",
@@ -2072,8 +2809,8 @@
       "askSn": "7022419",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 235,
-      "id": "cti_1789627544523_235"
+      "rowNum": 108,
+      "id": "cti_1789702616387_578"
     },
     {
       "type": "IN",
@@ -2096,8 +2833,8 @@
       "askSn": "7022361",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 236,
-      "id": "cti_1789627544523_236"
+      "rowNum": 109,
+      "id": "cti_1789702616387_579"
     },
     {
       "type": "IN",
@@ -2120,8 +2857,8 @@
       "askSn": "7019615",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 241,
-      "id": "cti_1789627544523_241"
+      "rowNum": 110,
+      "id": "cti_1789702616387_590"
     },
     {
       "type": "IN",
@@ -2144,8 +2881,8 @@
       "askSn": "7018323",
       "category": "",
       "actor": "",
-      "rowNum": 245,
-      "id": "cti_1789627544523_245"
+      "rowNum": 111,
+      "id": "cti_1789702616387_604"
     },
     {
       "type": "IN",
@@ -2168,8 +2905,8 @@
       "askSn": "7018246",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 246,
-      "id": "cti_1789627544523_246"
+      "rowNum": 112,
+      "id": "cti_1789702616387_605"
     },
     {
       "type": "IN",
@@ -2192,8 +2929,8 @@
       "askSn": "7017964",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 247,
-      "id": "cti_1789627544523_247"
+      "rowNum": 113,
+      "id": "cti_1789702616387_608"
     },
     {
       "type": "IN",
@@ -2216,8 +2953,8 @@
       "askSn": "7017804",
       "category": "",
       "actor": "",
-      "rowNum": 248,
-      "id": "cti_1789627544523_248"
+      "rowNum": 114,
+      "id": "cti_1789702616387_609"
     },
     {
       "type": "IN",
@@ -2240,8 +2977,8 @@
       "askSn": "7017015",
       "category": "",
       "actor": "",
-      "rowNum": 250,
-      "id": "cti_1789627544523_250"
+      "rowNum": 115,
+      "id": "cti_1789702616387_612"
     },
     {
       "type": "IN",
@@ -2264,8 +3001,8 @@
       "askSn": "7016995",
       "category": "",
       "actor": "",
-      "rowNum": 251,
-      "id": "cti_1789627544523_251"
+      "rowNum": 116,
+      "id": "cti_1789702616387_613"
     },
     {
       "type": "IN",
@@ -2288,8 +3025,8 @@
       "askSn": "7015333",
       "category": "",
       "actor": "",
-      "rowNum": 252,
-      "id": "cti_1789627544523_252"
+      "rowNum": 117,
+      "id": "cti_1789702616387_617"
     },
     {
       "type": "IN",
@@ -2312,8 +3049,8 @@
       "askSn": "7015160",
       "category": "",
       "actor": "",
-      "rowNum": 253,
-      "id": "cti_1789627544523_253"
+      "rowNum": 118,
+      "id": "cti_1789702616387_618"
     },
     {
       "type": "IN",
@@ -2336,8 +3073,80 @@
       "askSn": "7015029",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 254,
-      "id": "cti_1789627544523_254"
+      "rowNum": 119,
+      "id": "cti_1789702616387_619"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-19 12:52",
+      "phone": "010-4455-6049",
+      "rawPhone": "01044556049",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7014952",
+      "category": "",
+      "actor": "",
+      "rowNum": 120,
+      "id": "cti_1789702616387_620"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-19 12:06",
+      "phone": "010-3819-5799",
+      "rawPhone": "01038195799",
+      "memberName": "박노진(남)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7014785",
+      "category": "",
+      "actor": "",
+      "rowNum": 121,
+      "id": "cti_1789702616387_622"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-19 12:05",
+      "phone": "010-3345-1783",
+      "rawPhone": "01033451783",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7014776",
+      "category": "",
+      "actor": "",
+      "rowNum": 122,
+      "id": "cti_1789702616387_623"
     },
     {
       "type": "IN",
@@ -2360,8 +3169,8 @@
       "askSn": "7014656",
       "category": "",
       "actor": "",
-      "rowNum": 255,
-      "id": "cti_1789627544523_255"
+      "rowNum": 123,
+      "id": "cti_1789702616387_624"
     },
     {
       "type": "IN",
@@ -2384,8 +3193,8 @@
       "askSn": "7014617",
       "category": "",
       "actor": "",
-      "rowNum": 256,
-      "id": "cti_1789627544523_256"
+      "rowNum": 124,
+      "id": "cti_1789702616387_625"
     },
     {
       "type": "IN",
@@ -2408,8 +3217,8 @@
       "askSn": "7014561",
       "category": "",
       "actor": "",
-      "rowNum": 257,
-      "id": "cti_1789627544523_257"
+      "rowNum": 125,
+      "id": "cti_1789702616387_626"
     },
     {
       "type": "IN",
@@ -2432,8 +3241,8 @@
       "askSn": "7014495",
       "category": "",
       "actor": "",
-      "rowNum": 259,
-      "id": "cti_1789627544523_259"
+      "rowNum": 126,
+      "id": "cti_1789702616387_628"
     },
     {
       "type": "IN",
@@ -2456,8 +3265,8 @@
       "askSn": "7014382",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 261,
-      "id": "cti_1789627544523_261"
+      "rowNum": 127,
+      "id": "cti_1789702616387_631"
     },
     {
       "type": "IN",
@@ -2480,8 +3289,32 @@
       "askSn": "7014311",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 262,
-      "id": "cti_1789627544523_262"
+      "rowNum": 128,
+      "id": "cti_1789702616387_632"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-19 11:19",
+      "phone": "010-3345-1783",
+      "rawPhone": "01033451783",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7014301",
+      "category": "",
+      "actor": "",
+      "rowNum": 129,
+      "id": "cti_1789702616387_633"
     },
     {
       "type": "IN",
@@ -2504,8 +3337,8 @@
       "askSn": "7014278",
       "category": "",
       "actor": "",
-      "rowNum": 263,
-      "id": "cti_1789627544523_263"
+      "rowNum": 130,
+      "id": "cti_1789702616387_634"
     },
     {
       "type": "IN",
@@ -2528,8 +3361,8 @@
       "askSn": "7013974",
       "category": "",
       "actor": "",
-      "rowNum": 266,
-      "id": "cti_1789627544523_266"
+      "rowNum": 131,
+      "id": "cti_1789702616387_637"
     },
     {
       "type": "IN",
@@ -2552,8 +3385,56 @@
       "askSn": "7013905",
       "category": "",
       "actor": "",
-      "rowNum": 267,
-      "id": "cti_1789627544523_267"
+      "rowNum": 132,
+      "id": "cti_1789702616387_638"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-19 10:34",
+      "phone": "010-9838-6080",
+      "rawPhone": "01098386080",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7013728",
+      "category": "",
+      "actor": "",
+      "rowNum": 133,
+      "id": "cti_1789702616387_640"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-18 18:46",
+      "phone": "010-3101-9994",
+      "rawPhone": "01031019994",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7012285",
+      "category": "",
+      "actor": "",
+      "rowNum": 134,
+      "id": "cti_1789702616387_681"
     },
     {
       "type": "IN",
@@ -2576,8 +3457,8 @@
       "askSn": "7011901",
       "category": "",
       "actor": "",
-      "rowNum": 278,
-      "id": "cti_1789627544523_278"
+      "rowNum": 135,
+      "id": "cti_1789702616387_684"
     },
     {
       "type": "IN",
@@ -2600,8 +3481,8 @@
       "askSn": "7010799",
       "category": "",
       "actor": "",
-      "rowNum": 279,
-      "id": "cti_1789627544523_279"
+      "rowNum": 136,
+      "id": "cti_1789702616387_688"
     },
     {
       "type": "IN",
@@ -2624,8 +3505,8 @@
       "askSn": "7010612",
       "category": "",
       "actor": "",
-      "rowNum": 281,
-      "id": "cti_1789627544523_281"
+      "rowNum": 137,
+      "id": "cti_1789702616387_690"
     },
     {
       "type": "IN",
@@ -2648,8 +3529,8 @@
       "askSn": "7010557",
       "category": "",
       "actor": "",
-      "rowNum": 282,
-      "id": "cti_1789627544523_282"
+      "rowNum": 138,
+      "id": "cti_1789702616387_691"
     },
     {
       "type": "IN",
@@ -2672,8 +3553,8 @@
       "askSn": "7010526",
       "category": "",
       "actor": "",
-      "rowNum": 283,
-      "id": "cti_1789627544523_283"
+      "rowNum": 139,
+      "id": "cti_1789702616387_693"
     },
     {
       "type": "IN",
@@ -2696,8 +3577,8 @@
       "askSn": "7010456",
       "category": "",
       "actor": "",
-      "rowNum": 284,
-      "id": "cti_1789627544523_284"
+      "rowNum": 140,
+      "id": "cti_1789702616387_694"
     },
     {
       "type": "IN",
@@ -2720,8 +3601,32 @@
       "askSn": "7007635",
       "category": "",
       "actor": "",
-      "rowNum": 292,
-      "id": "cti_1789627544523_292"
+      "rowNum": 141,
+      "id": "cti_1789702616387_707"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-18 11:26",
+      "phone": "010-9838-6080",
+      "rawPhone": "01098386080",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7007459",
+      "category": "",
+      "actor": "",
+      "rowNum": 142,
+      "id": "cti_1789702616387_708"
     },
     {
       "type": "IN",
@@ -2744,8 +3649,8 @@
       "askSn": "7006832",
       "category": "",
       "actor": "",
-      "rowNum": 293,
-      "id": "cti_1789627544523_293"
+      "rowNum": 143,
+      "id": "cti_1789702616387_710"
     },
     {
       "type": "IN",
@@ -2768,8 +3673,392 @@
       "askSn": "7005868",
       "category": "",
       "actor": "",
-      "rowNum": 295,
-      "id": "cti_1789627544523_295"
+      "rowNum": 144,
+      "id": "cti_1789702616387_729"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-18 07:54",
+      "phone": "010-9321-7671",
+      "rawPhone": "01093217671",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7005186",
+      "category": "",
+      "actor": "",
+      "rowNum": 145,
+      "id": "cti_1789702616387_770"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-17 12:03",
+      "phone": "010-5032-3515",
+      "rawPhone": "01050323515",
+      "memberName": "(남), 차상옥(남)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7004490",
+      "category": "",
+      "actor": "",
+      "rowNum": 146,
+      "id": "cti_1789702616387_773"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-17 10:32",
+      "phone": "010-2704-2244",
+      "rawPhone": "01027042244",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7004310",
+      "category": "",
+      "actor": "",
+      "rowNum": 147,
+      "id": "cti_1789702616387_774"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-15 09:27",
+      "phone": "010-3376-1557",
+      "rawPhone": "01033761557",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7002252",
+      "category": "",
+      "actor": "",
+      "rowNum": 148,
+      "id": "cti_1789702616387_776"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-15 09:27",
+      "phone": "010-3376-1557",
+      "rawPhone": "01033761557",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7002251",
+      "category": "",
+      "actor": "",
+      "rowNum": 149,
+      "id": "cti_1789702616387_777"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-15 09:20",
+      "phone": "010-6640-0759",
+      "rawPhone": "01066400759",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7002242",
+      "category": "",
+      "actor": "",
+      "rowNum": 150,
+      "id": "cti_1789702616387_778"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-15 09:18",
+      "phone": "010-5476-1357",
+      "rawPhone": "01054761357",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7002240",
+      "category": "",
+      "actor": "",
+      "rowNum": 151,
+      "id": "cti_1789702616387_779"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-15 09:14",
+      "phone": "010-5476-1357",
+      "rawPhone": "01054761357",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7002233",
+      "category": "",
+      "actor": "",
+      "rowNum": 152,
+      "id": "cti_1789702616387_780"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-15 09:11",
+      "phone": "010-5476-1357",
+      "rawPhone": "01054761357",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7002229",
+      "category": "",
+      "actor": "",
+      "rowNum": 153,
+      "id": "cti_1789702616387_781"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-15 09:09",
+      "phone": "010-5476-1357",
+      "rawPhone": "01054761357",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7002225",
+      "category": "",
+      "actor": "",
+      "rowNum": 154,
+      "id": "cti_1789702616387_782"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-15 09:07",
+      "phone": "010-5476-1357",
+      "rawPhone": "01054761357",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7002220",
+      "category": "",
+      "actor": "",
+      "rowNum": 155,
+      "id": "cti_1789702616387_783"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-15 09:05",
+      "phone": "010-5476-1357",
+      "rawPhone": "01054761357",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7002218",
+      "category": "",
+      "actor": "",
+      "rowNum": 156,
+      "id": "cti_1789702616387_784"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-15 09:04",
+      "phone": "010-5476-1357",
+      "rawPhone": "01054761357",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7002215",
+      "category": "",
+      "actor": "",
+      "rowNum": 157,
+      "id": "cti_1789702616387_785"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-14 20:43",
+      "phone": "010-5476-1357",
+      "rawPhone": "01054761357",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7002115",
+      "category": "",
+      "actor": "",
+      "rowNum": 158,
+      "id": "cti_1789702616387_786"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-14 18:44",
+      "phone": "010-5476-1357",
+      "rawPhone": "01054761357",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7002042",
+      "category": "",
+      "actor": "",
+      "rowNum": 159,
+      "id": "cti_1789702616387_787"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-14 18:33",
+      "phone": "010-3376-1557",
+      "rawPhone": "01033761557",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7002036",
+      "category": "",
+      "actor": "",
+      "rowNum": 160,
+      "id": "cti_1789702616387_788"
     },
     {
       "type": "IN",
@@ -2792,8 +4081,8 @@
       "askSn": "7001536",
       "category": "",
       "actor": "",
-      "rowNum": 297,
-      "id": "cti_1789627544523_297"
+      "rowNum": 161,
+      "id": "cti_1789702616387_790"
     },
     {
       "type": "IN",
@@ -2816,8 +4105,8 @@
       "askSn": "7000832",
       "category": "",
       "actor": "",
-      "rowNum": 298,
-      "id": "cti_1789627544523_298"
+      "rowNum": 162,
+      "id": "cti_1789702616387_791"
     },
     {
       "type": "IN",
@@ -2840,8 +4129,8 @@
       "askSn": "7000814",
       "category": "",
       "actor": "",
-      "rowNum": 299,
-      "id": "cti_1789627544523_299"
+      "rowNum": 163,
+      "id": "cti_1789702616387_792"
     },
     {
       "type": "IN",
@@ -2864,8 +4153,8 @@
       "askSn": "7000791",
       "category": "",
       "actor": "",
-      "rowNum": 300,
-      "id": "cti_1789627544523_300"
+      "rowNum": 164,
+      "id": "cti_1789702616387_793"
     },
     {
       "type": "IN",
@@ -2888,8 +4177,8 @@
       "askSn": "7000604",
       "category": "",
       "actor": "",
-      "rowNum": 301,
-      "id": "cti_1789627544523_301"
+      "rowNum": 165,
+      "id": "cti_1789702616387_794"
     },
     {
       "type": "IN",
@@ -2912,8 +4201,8 @@
       "askSn": "6999430",
       "category": "",
       "actor": "",
-      "rowNum": 302,
-      "id": "cti_1789627544523_302"
+      "rowNum": 166,
+      "id": "cti_1789702616387_796"
     },
     {
       "type": "IN",
@@ -2936,8 +4225,8 @@
       "askSn": "6999387",
       "category": "",
       "actor": "",
-      "rowNum": 303,
-      "id": "cti_1789627544523_303"
+      "rowNum": 167,
+      "id": "cti_1789702616387_797"
     },
     {
       "type": "IN",
@@ -2960,8 +4249,8 @@
       "askSn": "6998999",
       "category": "",
       "actor": "",
-      "rowNum": 304,
-      "id": "cti_1789627544523_304"
+      "rowNum": 168,
+      "id": "cti_1789702616387_799"
     },
     {
       "type": "IN",
@@ -2984,8 +4273,8 @@
       "askSn": "6998645",
       "category": "",
       "actor": "",
-      "rowNum": 305,
-      "id": "cti_1789627544523_305"
+      "rowNum": 169,
+      "id": "cti_1789702616387_800"
     },
     {
       "type": "IN",
@@ -3008,8 +4297,8 @@
       "askSn": "6998468",
       "category": "",
       "actor": "",
-      "rowNum": 306,
-      "id": "cti_1789627544523_306"
+      "rowNum": 170,
+      "id": "cti_1789702616387_801"
     },
     {
       "type": "IN",
@@ -3032,8 +4321,8 @@
       "askSn": "6998168",
       "category": "",
       "actor": "",
-      "rowNum": 307,
-      "id": "cti_1789627544523_307"
+      "rowNum": 171,
+      "id": "cti_1789702616387_804"
     },
     {
       "type": "IN",
@@ -3056,8 +4345,32 @@
       "askSn": "6998050",
       "category": "",
       "actor": "",
-      "rowNum": 308,
-      "id": "cti_1789627544523_308"
+      "rowNum": 172,
+      "id": "cti_1789702616387_805"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-14 10:17",
+      "phone": "010-5222-1950",
+      "rawPhone": "01052221950",
+      "memberName": "최재승(남)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6998049",
+      "category": "",
+      "actor": "",
+      "rowNum": 173,
+      "id": "cti_1789702616387_806"
     },
     {
       "type": "IN",
@@ -3080,8 +4393,8 @@
       "askSn": "6997994",
       "category": "",
       "actor": "",
-      "rowNum": 309,
-      "id": "cti_1789627544523_309"
+      "rowNum": 174,
+      "id": "cti_1789702616387_808"
     },
     {
       "type": "IN",
@@ -3104,8 +4417,32 @@
       "askSn": "6997633",
       "category": "",
       "actor": "",
-      "rowNum": 311,
-      "id": "cti_1789627544523_311"
+      "rowNum": 175,
+      "id": "cti_1789702616387_811"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-14 09:32",
+      "phone": "010-5222-1950",
+      "rawPhone": "01052221950",
+      "memberName": "최재승(남)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6997539",
+      "category": "",
+      "actor": "",
+      "rowNum": 176,
+      "id": "cti_1789702616387_818"
     },
     {
       "type": "IN",
@@ -3128,8 +4465,8 @@
       "askSn": "6990622",
       "category": "",
       "actor": "",
-      "rowNum": 315,
-      "id": "cti_1789627544523_315"
+      "rowNum": 177,
+      "id": "cti_1789702616387_842"
     },
     {
       "type": "IN",
@@ -3152,8 +4489,32 @@
       "askSn": "6990447",
       "category": "",
       "actor": "",
-      "rowNum": 316,
-      "id": "cti_1789627544523_316"
+      "rowNum": 178,
+      "id": "cti_1789702616387_843"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-12 13:51",
+      "phone": "010-8389-9599",
+      "rawPhone": "01083899599",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6988931",
+      "category": "",
+      "actor": "",
+      "rowNum": 179,
+      "id": "cti_1789702616387_845"
     },
     {
       "type": "IN",
@@ -3176,8 +4537,8 @@
       "askSn": "6987040",
       "category": "",
       "actor": "",
-      "rowNum": 318,
-      "id": "cti_1789627544523_318"
+      "rowNum": 180,
+      "id": "cti_1789702616387_846"
     },
     {
       "type": "IN",
@@ -3200,8 +4561,8 @@
       "askSn": "6983606",
       "category": "",
       "actor": "",
-      "rowNum": 320,
-      "id": "cti_1789627544523_320"
+      "rowNum": 181,
+      "id": "cti_1789702616387_854"
     },
     {
       "type": "IN",
@@ -3224,8 +4585,8 @@
       "askSn": "6983026",
       "category": "",
       "actor": "",
-      "rowNum": 322,
-      "id": "cti_1789627544523_322"
+      "rowNum": 182,
+      "id": "cti_1789702616387_856"
     },
     {
       "type": "IN",
@@ -3248,8 +4609,8 @@
       "askSn": "6981970",
       "category": "",
       "actor": "",
-      "rowNum": 323,
-      "id": "cti_1789627544523_323"
+      "rowNum": 183,
+      "id": "cti_1789702616387_857"
     },
     {
       "type": "IN",
@@ -3272,8 +4633,8 @@
       "askSn": "6981909",
       "category": "",
       "actor": "",
-      "rowNum": 324,
-      "id": "cti_1789627544523_324"
+      "rowNum": 184,
+      "id": "cti_1789702616387_858"
     },
     {
       "type": "IN",
@@ -3296,8 +4657,80 @@
       "askSn": "6981543",
       "category": "",
       "actor": "",
-      "rowNum": 326,
-      "id": "cti_1789627544523_326"
+      "rowNum": 185,
+      "id": "cti_1789702616387_860"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-10 17:09",
+      "phone": "010-7171-2489",
+      "rawPhone": "01071712489",
+      "memberName": "고수연",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6978908",
+      "category": "",
+      "actor": "",
+      "rowNum": 186,
+      "id": "cti_1789702616387_861"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-10 17:08",
+      "phone": "010-5598-4351",
+      "rawPhone": "01055984351",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6978898",
+      "category": "",
+      "actor": "",
+      "rowNum": 187,
+      "id": "cti_1789702616387_862"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-10 17:07",
+      "phone": "010-5598-4351",
+      "rawPhone": "01055984351",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6978879",
+      "category": "",
+      "actor": "",
+      "rowNum": 188,
+      "id": "cti_1789702616387_863"
     },
     {
       "type": "IN",
@@ -3320,8 +4753,8 @@
       "askSn": "6978619",
       "category": "",
       "actor": "",
-      "rowNum": 327,
-      "id": "cti_1789627544523_327"
+      "rowNum": 189,
+      "id": "cti_1789702616387_864"
     },
     {
       "type": "IN",
@@ -3344,8 +4777,32 @@
       "askSn": "6976673",
       "category": "",
       "actor": "",
-      "rowNum": 328,
-      "id": "cti_1789627544523_328"
+      "rowNum": 190,
+      "id": "cti_1789702616387_865"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-10 13:58",
+      "phone": "010-2639-5170",
+      "rawPhone": "01026395170",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6976576",
+      "category": "",
+      "actor": "",
+      "rowNum": 191,
+      "id": "cti_1789702616387_866"
     },
     {
       "type": "IN",
@@ -3368,8 +4825,8 @@
       "askSn": "6973031",
       "category": "",
       "actor": "",
-      "rowNum": 329,
-      "id": "cti_1789627544523_329"
+      "rowNum": 192,
+      "id": "cti_1789702616387_867"
     },
     {
       "type": "IN",
@@ -3392,8 +4849,8 @@
       "askSn": "6971697",
       "category": "",
       "actor": "",
-      "rowNum": 330,
-      "id": "cti_1789627544523_330"
+      "rowNum": 193,
+      "id": "cti_1789702616387_869"
     },
     {
       "type": "IN",
@@ -3416,8 +4873,104 @@
       "askSn": "6971638",
       "category": "",
       "actor": "",
-      "rowNum": 331,
-      "id": "cti_1789627544523_331"
+      "rowNum": 194,
+      "id": "cti_1789702616387_870"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-08 12:30",
+      "phone": "010-5598-4351",
+      "rawPhone": "01055984351",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6971506",
+      "category": "",
+      "actor": "",
+      "rowNum": 195,
+      "id": "cti_1789702616387_871"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-08 12:30",
+      "phone": "010-5598-4351",
+      "rawPhone": "01055984351",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6971505",
+      "category": "",
+      "actor": "",
+      "rowNum": 196,
+      "id": "cti_1789702616387_872"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-08 12:30",
+      "phone": "010-5598-4351",
+      "rawPhone": "01055984351",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6971503",
+      "category": "",
+      "actor": "",
+      "rowNum": 197,
+      "id": "cti_1789702616387_873"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-08 11:21",
+      "phone": "010-2639-5170",
+      "rawPhone": "01026395170",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6971363",
+      "category": "",
+      "actor": "",
+      "rowNum": 198,
+      "id": "cti_1789702616387_874"
     },
     {
       "type": "IN",
@@ -3440,8 +4993,8 @@
       "askSn": "6971286",
       "category": "",
       "actor": "",
-      "rowNum": 332,
-      "id": "cti_1789627544523_332"
+      "rowNum": 199,
+      "id": "cti_1789702616387_875"
     },
     {
       "type": "IN",
@@ -3464,8 +5017,8 @@
       "askSn": "6968927",
       "category": "",
       "actor": "",
-      "rowNum": 334,
-      "id": "cti_1789627544523_334"
+      "rowNum": 200,
+      "id": "cti_1789702616387_878"
     },
     {
       "type": "IN",
@@ -3488,8 +5041,56 @@
       "askSn": "6968900",
       "category": "",
       "actor": "",
-      "rowNum": 335,
-      "id": "cti_1789627544523_335"
+      "rowNum": 201,
+      "id": "cti_1789702616387_879"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-07 14:40",
+      "phone": "010-8300-1327",
+      "rawPhone": "01083001327",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6968882",
+      "category": "",
+      "actor": "",
+      "rowNum": 202,
+      "id": "cti_1789702616387_880"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-07 13:59",
+      "phone": "010-9680-8732",
+      "rawPhone": "01096808732",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6968441",
+      "category": "",
+      "actor": "",
+      "rowNum": 203,
+      "id": "cti_1789702616387_886"
     },
     {
       "type": "IN",
@@ -3512,8 +5113,80 @@
       "askSn": "6967903",
       "category": "",
       "actor": "",
-      "rowNum": 340,
-      "id": "cti_1789627544523_340"
+      "rowNum": 204,
+      "id": "cti_1789702616387_887"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-07 12:29",
+      "phone": "010-3115-1503",
+      "rawPhone": "01031151503",
+      "memberName": "정대석(남)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6967677",
+      "category": "",
+      "actor": "",
+      "rowNum": 205,
+      "id": "cti_1789702616387_888"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-07 12:29",
+      "phone": "010-9153-2533",
+      "rawPhone": "01091532533",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6967676",
+      "category": "",
+      "actor": "",
+      "rowNum": 206,
+      "id": "cti_1789702616387_889"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-07 12:28",
+      "phone": "010-9153-2533",
+      "rawPhone": "01091532533",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6967669",
+      "category": "",
+      "actor": "",
+      "rowNum": 207,
+      "id": "cti_1789702616387_890"
     },
     {
       "type": "IN",
@@ -3536,8 +5209,8 @@
       "askSn": "6965775",
       "category": "",
       "actor": "",
-      "rowNum": 342,
-      "id": "cti_1789627544523_342"
+      "rowNum": 208,
+      "id": "cti_1789702616387_892"
     },
     {
       "type": "IN",
@@ -3560,8 +5233,32 @@
       "askSn": "6964320",
       "category": "",
       "actor": "",
-      "rowNum": 345,
-      "id": "cti_1789627544523_345"
+      "rowNum": 209,
+      "id": "cti_1789702616387_908"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-06 15:42",
+      "phone": "042-229-1763",
+      "rawPhone": "0422291763",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6964202",
+      "category": "",
+      "actor": "",
+      "rowNum": 210,
+      "id": "cti_1789702616387_909"
     },
     {
       "type": "IN",
@@ -3584,8 +5281,8 @@
       "askSn": "6964165",
       "category": "",
       "actor": "",
-      "rowNum": 346,
-      "id": "cti_1789627544523_346"
+      "rowNum": 211,
+      "id": "cti_1789702616387_910"
     },
     {
       "type": "IN",
@@ -3608,8 +5305,8 @@
       "askSn": "6964027",
       "category": "",
       "actor": "",
-      "rowNum": 347,
-      "id": "cti_1789627544523_347"
+      "rowNum": 212,
+      "id": "cti_1789702616387_911"
     },
     {
       "type": "IN",
@@ -3632,8 +5329,8 @@
       "askSn": "6963997",
       "category": "",
       "actor": "",
-      "rowNum": 348,
-      "id": "cti_1789627544523_348"
+      "rowNum": 213,
+      "id": "cti_1789702616387_912"
     },
     {
       "type": "IN",
@@ -3656,8 +5353,8 @@
       "askSn": "6963973",
       "category": "",
       "actor": "",
-      "rowNum": 349,
-      "id": "cti_1789627544523_349"
+      "rowNum": 214,
+      "id": "cti_1789702616387_913"
     },
     {
       "type": "IN",
@@ -3680,8 +5377,8 @@
       "askSn": "6963250",
       "category": "",
       "actor": "",
-      "rowNum": 350,
-      "id": "cti_1789627544523_350"
+      "rowNum": 215,
+      "id": "cti_1789702616387_914"
     },
     {
       "type": "IN",
@@ -3704,8 +5401,32 @@
       "askSn": "6963167",
       "category": "",
       "actor": "",
-      "rowNum": 351,
-      "id": "cti_1789627544523_351"
+      "rowNum": 216,
+      "id": "cti_1789702616387_915"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-06 12:02",
+      "phone": "010-6488-1453",
+      "rawPhone": "01064881453",
+      "memberName": "설아림(여)",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6962180",
+      "category": "",
+      "actor": "",
+      "rowNum": 217,
+      "id": "cti_1789702616387_916"
     },
     {
       "type": "IN",
@@ -3728,8 +5449,80 @@
       "askSn": "6962087",
       "category": "",
       "actor": "",
-      "rowNum": 352,
-      "id": "cti_1789627544523_352"
+      "rowNum": 218,
+      "id": "cti_1789702616387_917"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-06 11:45",
+      "phone": "010-2605-6517",
+      "rawPhone": "01026056517",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6962048",
+      "category": "",
+      "actor": "",
+      "rowNum": 219,
+      "id": "cti_1789702616387_918"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-06 11:44",
+      "phone": "010-8622-0701",
+      "rawPhone": "01086220701",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6962039",
+      "category": "",
+      "actor": "",
+      "rowNum": 220,
+      "id": "cti_1789702616387_919"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-06 11:42",
+      "phone": "062-350-1350",
+      "rawPhone": "0623501350",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6962020",
+      "category": "",
+      "actor": "",
+      "rowNum": 221,
+      "id": "cti_1789702616387_920"
     },
     {
       "type": "IN",
@@ -3752,8 +5545,8 @@
       "askSn": "6960822",
       "category": "",
       "actor": "",
-      "rowNum": 354,
-      "id": "cti_1789627544523_354"
+      "rowNum": 222,
+      "id": "cti_1789702616387_923"
     },
     {
       "type": "IN",
@@ -3776,8 +5569,8 @@
       "askSn": "6959670",
       "category": "",
       "actor": "",
-      "rowNum": 355,
-      "id": "cti_1789627544523_355"
+      "rowNum": 223,
+      "id": "cti_1789702616387_925"
     },
     {
       "type": "IN",
@@ -3800,8 +5593,32 @@
       "askSn": "6959076",
       "category": "",
       "actor": "",
-      "rowNum": 356,
-      "id": "cti_1789627544523_356"
+      "rowNum": 224,
+      "id": "cti_1789702616387_926"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-05 16:15",
+      "phone": "010-9634-4918",
+      "rawPhone": "01096344918",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6959007",
+      "category": "",
+      "actor": "",
+      "rowNum": 225,
+      "id": "cti_1789702616387_927"
     },
     {
       "type": "IN",
@@ -3824,8 +5641,8 @@
       "askSn": "6957993",
       "category": "",
       "actor": "",
-      "rowNum": 357,
-      "id": "cti_1789627544523_357"
+      "rowNum": 226,
+      "id": "cti_1789702616387_928"
     },
     {
       "type": "IN",
@@ -3848,8 +5665,8 @@
       "askSn": "6956273",
       "category": "",
       "actor": "",
-      "rowNum": 358,
-      "id": "cti_1789627544523_358"
+      "rowNum": 227,
+      "id": "cti_1789702616387_929"
     },
     {
       "type": "IN",
@@ -3872,8 +5689,8 @@
       "askSn": "6952806",
       "category": "",
       "actor": "",
-      "rowNum": 363,
-      "id": "cti_1789627544523_363"
+      "rowNum": 228,
+      "id": "cti_1789702616387_935"
     },
     {
       "type": "IN",
@@ -3896,8 +5713,32 @@
       "askSn": "6952194",
       "category": "",
       "actor": "",
-      "rowNum": 365,
-      "id": "cti_1789627544523_365"
+      "rowNum": 229,
+      "id": "cti_1789702616387_937"
+    },
+    {
+      "type": "IN",
+      "channel": "현대해상",
+      "callTime": "2026-08-04 12:25",
+      "phone": "010-6410-7032",
+      "rawPhone": "01064107032",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6951150",
+      "category": "",
+      "actor": "",
+      "rowNum": 230,
+      "id": "cti_1789702616387_938"
     },
     {
       "type": "IN",
@@ -3920,8 +5761,8 @@
       "askSn": "6946605",
       "category": "",
       "actor": "",
-      "rowNum": 366,
-      "id": "cti_1789627544523_366"
+      "rowNum": 231,
+      "id": "cti_1789702616387_941"
     },
     {
       "type": "IN",
@@ -3944,8 +5785,8 @@
       "askSn": "6946528",
       "category": "",
       "actor": "",
-      "rowNum": 367,
-      "id": "cti_1789627544523_367"
+      "rowNum": 232,
+      "id": "cti_1789702616387_942"
     },
     {
       "type": "IN",
@@ -3968,8 +5809,8 @@
       "askSn": "6946486",
       "category": "",
       "actor": "",
-      "rowNum": 368,
-      "id": "cti_1789627544523_368"
+      "rowNum": 233,
+      "id": "cti_1789702616387_943"
     },
     {
       "type": "IN",
@@ -3992,8 +5833,8 @@
       "askSn": "6945805",
       "category": "",
       "actor": "",
-      "rowNum": 369,
-      "id": "cti_1789627544523_369"
+      "rowNum": 234,
+      "id": "cti_1789702616387_945"
     },
     {
       "type": "IN",
@@ -4016,8 +5857,8 @@
       "askSn": "6943468",
       "category": "",
       "actor": "",
-      "rowNum": 370,
-      "id": "cti_1789627544523_370"
+      "rowNum": 235,
+      "id": "cti_1789702616387_946"
     }
   ]
 }

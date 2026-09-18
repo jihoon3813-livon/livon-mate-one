@@ -9,55 +9,55 @@
   },
   "routes": [
     {
-      "src": "/api/search-hospital",
-      "dest": "/api/search-hospital.js"
+      "src": "/api/search-hospital(\\?.*)?",
+      "dest": "/api/search-hospital.js$1"
     },
     {
-      "src": "/api/fax/send",
-      "dest": "/api/fax/send.js"
+      "src": "/api/fax/send(\\?.*)?",
+      "dest": "/api/fax/send.js$1"
     },
     {
-      "src": "/api/samsung-drive/status",
-      "dest": "/api/samsung-drive/status.js"
+      "src": "/api/samsung-drive/status(\\?.*)?",
+      "dest": "/api/samsung-drive/status.js$1"
     },
     {
-      "src": "/api/samsung-drive/sync",
-      "dest": "/api/samsung-drive/sync.js"
+      "src": "/api/samsung-drive/sync(\\?.*)?",
+      "dest": "/api/samsung-drive/sync.js$1"
     },
     {
-      "src": "/api/fax/status",
-      "dest": "/api/fax/status.js"
+      "src": "/api/fax/status(\\?.*)?",
+      "dest": "/api/fax/status.js$1"
     },
     {
-      "src": "/api/cti/call",
-      "dest": "/api/cti/call.js"
+      "src": "/api/cti/call(\\?.*)?",
+      "dest": "/api/cti/call.js$1"
     },
     {
-      "src": "/api/cti/config",
-      "dest": "/api/cti/config.js"
+      "src": "/api/cti/config(\\?.*)?",
+      "dest": "/api/cti/config.js$1"
     },
     {
-      "src": "/api/cti/logs",
-      "dest": "/api/cti/logs.js"
+      "src": "/api/cti/logs(\\?.*)?",
+      "dest": "/api/cti/logs.js$1"
     },
     {
-      "src": "/api/samsung/call-report/data",
-      "dest": "/api/samsung/call-report/data.js"
+      "src": "/api/samsung/call-report/data(\\?.*)?",
+      "dest": "/api/samsung/call-report/data.js$1"
     },
     {
-      "src": "/api/samsung/call-report/sync-cti",
-      "dest": "/api/samsung/call-report/sync-cti.js"
+      "src": "/api/samsung/call-report/sync-cti(\\?.*)?",
+      "dest": "/api/samsung/call-report/sync-cti.js$1"
     },
     {
-      "src": "/api/samsung/call-report/pdf",
-      "dest": "/api/samsung/call-report/pdf.js"
+      "src": "/api/samsung/call-report/pdf(\\?.*)?",
+      "dest": "/api/samsung/call-report/pdf.js$1"
     },
     {
-      "src": "/api/shorten-url",
-      "dest": "/api/shorten-url.js"
+      "src": "/api/shorten-url(\\?.*)?",
+      "dest": "/api/shorten-url.js$1"
     },
     {
-      "src": "/(call_report_.*\\.json|samsung_call_report\\.json|call_annotations\\.json)",
+      "src": "/(call_report_.*\\.json|samsung_call_report\\.json|call_annotations\\.json)(\\?.*)?",
       "dest": "/$1"
     },
     {

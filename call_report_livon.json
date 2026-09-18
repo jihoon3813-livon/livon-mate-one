@@ -1,163 +1,229 @@
 {
   "reportInfo": {
-    "title": "리본케어 간병 서비스 인바운드 문의 분석 보고 (2026-08-01 ~ 2026-09-17)",
+    "title": "리본케어 간병(리본케어) 서비스 인바운드 문의 분석 보고 (2026-08-01 ~ 2026-09-18)",
     "target": "리본케어 관련 인바운드 콜",
     "channel": "리본케어",
     "channelLabel": "리본케어",
-    "period": "2026-08-01 ~ 2026-09-17",
+    "period": "2026-08-01 ~ 2026-09-18",
     "startDate": "2026-08-01",
-    "endDate": "2026-09-17",
-    "reportDate": "2026-09-17",
+    "endDate": "2026-09-18",
+    "reportDate": "2026-09-18",
     "author": "리본케어 (Livon Care) 운영센터",
-    "operatingDays": 48,
-    "syncedAt": "2026-09-17T02:39:26.414Z"
+    "operatingDays": 33,
+    "syncedAt": "2026-09-18T03:53:08.748Z"
   },
   "summaryStats": {
-    "totalCalls": 53,
-    "connectReqCalls": 53,
-    "answeredCalls": 32,
-    "answerRate": "60%",
+    "totalCalls": 90,
+    "connectReqCalls": 54,
+    "answeredCalls": 33,
+    "answerRate": "61%",
     "abandonedCalls": 21,
-    "consultedCalls": 28
+    "unselectedType": 36,
+    "btnExit": 0,
+    "consultedCalls": 29
   },
   "ctiSummary": {
-    "totalAll": 53,
-    "totalInbound": 53,
-    "answeredCalls": 32,
-    "connectRequests": 53,
-    "answerRate": "60%",
+    "totalAll": 90,
+    "totalInbound": 90,
+    "answeredCalls": 33,
+    "connectRequests": 54,
+    "answerRate": "61%",
     "abandonedCalls": 21,
-    "unselectedType": 0,
+    "unselectedType": 36,
     "btnExit": 0
   },
   "dailyTrends": [
     {
+      "date": "2026-08-01",
+      "callCount": 1,
+      "share": 0.0111
+    },
+    {
+      "date": "2026-08-03",
+      "callCount": 3,
+      "share": 0.0333
+    },
+    {
       "date": "2026-08-04",
-      "dayOfWeek": "화",
-      "callCount": 4
+      "callCount": 4,
+      "share": 0.0444
     },
     {
       "date": "2026-08-05",
-      "dayOfWeek": "수",
-      "callCount": 1
+      "callCount": 3,
+      "share": 0.0333
     },
     {
       "date": "2026-08-06",
-      "dayOfWeek": "목",
-      "callCount": 1
+      "callCount": 2,
+      "share": 0.0222
     },
     {
       "date": "2026-08-07",
-      "dayOfWeek": "금",
-      "callCount": 2
+      "callCount": 3,
+      "share": 0.0333
+    },
+    {
+      "date": "2026-08-09",
+      "callCount": 1,
+      "share": 0.0111
     },
     {
       "date": "2026-08-11",
-      "dayOfWeek": "화",
-      "callCount": 1
+      "callCount": 1,
+      "share": 0.0111
     },
     {
       "date": "2026-08-12",
-      "dayOfWeek": "수",
-      "callCount": 1
+      "callCount": 1,
+      "share": 0.0111
     },
     {
       "date": "2026-08-14",
-      "dayOfWeek": "금",
-      "callCount": 2
+      "callCount": 4,
+      "share": 0.0444
     },
     {
       "date": "2026-08-18",
-      "dayOfWeek": "화",
-      "callCount": 1
+      "callCount": 1,
+      "share": 0.0111
     },
     {
       "date": "2026-08-19",
-      "dayOfWeek": "수",
-      "callCount": 3
+      "callCount": 4,
+      "share": 0.0444
     },
     {
       "date": "2026-08-20",
-      "dayOfWeek": "목",
-      "callCount": 6
+      "callCount": 8,
+      "share": 0.0889
     },
     {
       "date": "2026-08-21",
-      "dayOfWeek": "금",
-      "callCount": 1
+      "callCount": 2,
+      "share": 0.0222
     },
     {
       "date": "2026-08-24",
-      "dayOfWeek": "월",
-      "callCount": 2
+      "callCount": 4,
+      "share": 0.0444
     },
     {
       "date": "2026-08-25",
-      "dayOfWeek": "화",
-      "callCount": 5
+      "callCount": 5,
+      "share": 0.0556
     },
     {
       "date": "2026-08-26",
-      "dayOfWeek": "수",
-      "callCount": 2
+      "callCount": 5,
+      "share": 0.0556
     },
     {
       "date": "2026-08-27",
-      "dayOfWeek": "목",
-      "callCount": 1
+      "callCount": 1,
+      "share": 0.0111
+    },
+    {
+      "date": "2026-08-28",
+      "callCount": 2,
+      "share": 0.0222
     },
     {
       "date": "2026-08-31",
-      "dayOfWeek": "월",
-      "callCount": 1
+      "callCount": 1,
+      "share": 0.0111
     },
     {
       "date": "2026-09-02",
-      "dayOfWeek": "수",
-      "callCount": 3
+      "callCount": 6,
+      "share": 0.0667
     },
     {
       "date": "2026-09-03",
-      "dayOfWeek": "목",
-      "callCount": 1
+      "callCount": 1,
+      "share": 0.0111
     },
     {
       "date": "2026-09-04",
-      "dayOfWeek": "금",
-      "callCount": 1
+      "callCount": 2,
+      "share": 0.0222
+    },
+    {
+      "date": "2026-09-05",
+      "callCount": 2,
+      "share": 0.0222
     },
     {
       "date": "2026-09-07",
-      "dayOfWeek": "월",
-      "callCount": 2
+      "callCount": 3,
+      "share": 0.0333
+    },
+    {
+      "date": "2026-09-09",
+      "callCount": 1,
+      "share": 0.0111
     },
     {
       "date": "2026-09-10",
-      "dayOfWeek": "목",
-      "callCount": 1
+      "callCount": 1,
+      "share": 0.0111
     },
     {
       "date": "2026-09-11",
-      "dayOfWeek": "금",
-      "callCount": 3
+      "callCount": 4,
+      "share": 0.0444
+    },
+    {
+      "date": "2026-09-12",
+      "callCount": 1,
+      "share": 0.0111
     },
     {
       "date": "2026-09-14",
-      "dayOfWeek": "월",
-      "callCount": 2
+      "callCount": 4,
+      "share": 0.0444
     },
     {
       "date": "2026-09-15",
-      "dayOfWeek": "화",
-      "callCount": 2
+      "callCount": 3,
+      "share": 0.0333
     },
     {
       "date": "2026-09-16",
-      "dayOfWeek": "수",
-      "callCount": 4
+      "callCount": 5,
+      "share": 0.0556
+    },
+    {
+      "date": "2026-09-18",
+      "callCount": 1,
+      "share": 0.0111
     }
   ],
   "callLogs": [
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-18 11:01",
+      "phone": "010-7129-4318",
+      "rawPhone": "01071294318",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "기타",
+      "connectReq": "Y",
+      "waitTime": 28,
+      "title": "임형순 간병비 청구 서류 제출",
+      "summary": "현대해상에서 임형순님이 간병을 신청하였으나, 관련 서류가 제출되지 않아 확인 요청이 이루어졌습니다. 간병 사용 확인서, 영수증, 간병비 확인서, 간병사 등록 확인서 등이 필요하며, 간병일지도 추가 제출을 요청받았습니다. 간병 기간은 7월 15일부터 7월 17일까지로 되어 있으나, 총 16일 동안 진행된 것으로 확인되었습니다. 지급 비용은 알 수 없는 상황입니다. 김인준 담당자의 팩스 번호는 0504 278 4318로 확인되었으며, 서류는 해당 번호로 제출 예정입니다.",
+      "keywords": "재택간병 신청, 간병 서류, 청구 서류, 서류 제출 방법, 팩스 정보",
+      "duration": "00:02:35",
+      "status": "미처리",
+      "operator": "이주연",
+      "askSn": "7154412",
+      "category": "간병 신청·접수·배정",
+      "actor": "고객(가입자·이용자)",
+      "rowNum": 1,
+      "id": "cti_1789702616387_9"
+    },
     {
       "type": "IN",
       "channel": "리본케어",
@@ -179,8 +245,8 @@
       "askSn": "7146828",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 6,
-      "id": "cti_1789610004336_6"
+      "rowNum": 2,
+      "id": "cti_1789702616387_42"
     },
     {
       "type": "IN",
@@ -203,8 +269,8 @@
       "askSn": "7145458",
       "category": "",
       "actor": "",
-      "rowNum": 9,
-      "id": "cti_1789610004336_9"
+      "rowNum": 3,
+      "id": "cti_1789702616387_48"
     },
     {
       "type": "IN",
@@ -227,8 +293,32 @@
       "askSn": "7145005",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 12,
-      "id": "cti_1789610004336_12"
+      "rowNum": 4,
+      "id": "cti_1789702616387_51"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-16 14:15",
+      "phone": "010-5851-9108",
+      "rawPhone": "01058519108",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7144997",
+      "category": "",
+      "actor": "",
+      "rowNum": 5,
+      "id": "cti_1789702616387_52"
     },
     {
       "type": "IN",
@@ -251,8 +341,8 @@
       "askSn": "7143454",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 14,
-      "id": "cti_1789610004336_14"
+      "rowNum": 6,
+      "id": "cti_1789702616387_56"
     },
     {
       "type": "IN",
@@ -275,8 +365,8 @@
       "askSn": "7141299",
       "category": "",
       "actor": "",
-      "rowNum": 20,
-      "id": "cti_1789610004336_20"
+      "rowNum": 7,
+      "id": "cti_1789702616387_68"
     },
     {
       "type": "IN",
@@ -299,8 +389,56 @@
       "askSn": "7141213",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 22,
-      "id": "cti_1789610004336_22"
+      "rowNum": 8,
+      "id": "cti_1789702616387_70"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-15 08:24",
+      "phone": "010-7306-5055",
+      "rawPhone": "01073065055",
+      "memberName": "정은숙",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7135696",
+      "category": "",
+      "actor": "",
+      "rowNum": 9,
+      "id": "cti_1789702616387_103"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-14 16:56",
+      "phone": "02-820-9123",
+      "rawPhone": "028209123",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7134868",
+      "category": "",
+      "actor": "",
+      "rowNum": 10,
+      "id": "cti_1789702616387_117"
     },
     {
       "type": "IN",
@@ -323,8 +461,32 @@
       "askSn": "7131120",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 45,
-      "id": "cti_1789610004336_45"
+      "rowNum": 11,
+      "id": "cti_1789702616387_128"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-14 11:39",
+      "phone": "010-9017-7508",
+      "rawPhone": "01090177508",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7131116",
+      "category": "",
+      "actor": "",
+      "rowNum": 12,
+      "id": "cti_1789702616387_129"
     },
     {
       "type": "IN",
@@ -347,8 +509,32 @@
       "askSn": "7129250",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 48,
-      "id": "cti_1789610004336_48"
+      "rowNum": 13,
+      "id": "cti_1789702616387_144"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-12 15:50",
+      "phone": "010-7306-5055",
+      "rawPhone": "01073065055",
+      "memberName": "정은숙",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7127597",
+      "category": "",
+      "actor": "",
+      "rowNum": 14,
+      "id": "cti_1789702616387_162"
     },
     {
       "type": "IN",
@@ -371,8 +557,32 @@
       "askSn": "7125772",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 56,
-      "id": "cti_1789610004336_56"
+      "rowNum": 15,
+      "id": "cti_1789702616387_171"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-11 15:18",
+      "phone": "02-820-9783",
+      "rawPhone": "028209783",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "기타",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7124823",
+      "category": "",
+      "actor": "",
+      "rowNum": 16,
+      "id": "cti_1789702616387_175"
     },
     {
       "type": "IN",
@@ -395,8 +605,8 @@
       "askSn": "7124397",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 60,
-      "id": "cti_1789610004336_60"
+      "rowNum": 17,
+      "id": "cti_1789702616387_177"
     },
     {
       "type": "IN",
@@ -419,8 +629,8 @@
       "askSn": "7121998",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 66,
-      "id": "cti_1789610004336_66"
+      "rowNum": 18,
+      "id": "cti_1789702616387_187"
     },
     {
       "type": "IN",
@@ -443,8 +653,32 @@
       "askSn": "7116491",
       "category": "비용·무상제공 확인",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 78,
-      "id": "cti_1789610004336_78"
+      "rowNum": 19,
+      "id": "cti_1789702616387_213"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-09 16:11",
+      "phone": "010-5449-7738",
+      "rawPhone": "01054497738",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7114458",
+      "category": "",
+      "actor": "",
+      "rowNum": 20,
+      "id": "cti_1789702616387_222"
     },
     {
       "type": "IN",
@@ -467,8 +701,32 @@
       "askSn": "7101517",
       "category": "비용·무상제공 확인",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 96,
-      "id": "cti_1789610004336_96"
+      "rowNum": 21,
+      "id": "cti_1789702616387_258"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-07 10:20",
+      "phone": "010-5590-6814",
+      "rawPhone": "01055906814",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7097832",
+      "category": "",
+      "actor": "",
+      "rowNum": 22,
+      "id": "cti_1789702616387_271"
     },
     {
       "type": "IN",
@@ -491,8 +749,56 @@
       "askSn": "7097819",
       "category": "",
       "actor": "",
-      "rowNum": 101,
-      "id": "cti_1789610004336_101"
+      "rowNum": 23,
+      "id": "cti_1789702616387_272"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-05 09:25",
+      "phone": "010-8200-7134",
+      "rawPhone": "01082007134",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7094822",
+      "category": "",
+      "actor": "",
+      "rowNum": 24,
+      "id": "cti_1789702616387_279"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-05 08:47",
+      "phone": "010-7225-7789",
+      "rawPhone": "01072257789",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7094610",
+      "category": "",
+      "actor": "",
+      "rowNum": 25,
+      "id": "cti_1789702616387_284"
     },
     {
       "type": "IN",
@@ -515,8 +821,32 @@
       "askSn": "7092915",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 109,
-      "id": "cti_1789610004336_109"
+      "rowNum": 26,
+      "id": "cti_1789702616387_290"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-04 15:11",
+      "phone": "010-8963-6574",
+      "rawPhone": "01089636574",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7092896",
+      "category": "",
+      "actor": "",
+      "rowNum": 27,
+      "id": "cti_1789702616387_291"
     },
     {
       "type": "IN",
@@ -539,8 +869,8 @@
       "askSn": "7088278",
       "category": "비용·무상제공 확인",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 116,
-      "id": "cti_1789610004336_116"
+      "rowNum": 28,
+      "id": "cti_1789702616387_311"
     },
     {
       "type": "IN",
@@ -563,8 +893,8 @@
       "askSn": "7082873",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 129,
-      "id": "cti_1789610004336_129"
+      "rowNum": 29,
+      "id": "cti_1789702616387_337"
     },
     {
       "type": "IN",
@@ -587,8 +917,32 @@
       "askSn": "7082850",
       "category": "",
       "actor": "",
-      "rowNum": 130,
-      "id": "cti_1789610004336_130"
+      "rowNum": 30,
+      "id": "cti_1789702616387_338"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-02 16:42",
+      "phone": "010-2334-7355",
+      "rawPhone": "01023347355",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7082491",
+      "category": "",
+      "actor": "",
+      "rowNum": 31,
+      "id": "cti_1789702616387_339"
     },
     {
       "type": "IN",
@@ -611,8 +965,56 @@
       "askSn": "7079897",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 135,
-      "id": "cti_1789610004336_135"
+      "rowNum": 32,
+      "id": "cti_1789702616387_346"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-02 12:38",
+      "phone": "070-4099-4659",
+      "rawPhone": "07040994659",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7079645",
+      "category": "",
+      "actor": "",
+      "rowNum": 33,
+      "id": "cti_1789702616387_350"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-09-02 12:26",
+      "phone": "010-3483-1285",
+      "rawPhone": "01034831285",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7079621",
+      "category": "",
+      "actor": "",
+      "rowNum": 34,
+      "id": "cti_1789702616387_351"
     },
     {
       "type": "IN",
@@ -635,8 +1037,56 @@
       "askSn": "7069323",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 153,
-      "id": "cti_1789610004336_153"
+      "rowNum": 35,
+      "id": "cti_1789702616387_387"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-28 14:04",
+      "phone": "010-4327-3751",
+      "rawPhone": "01043273751",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7059242",
+      "category": "",
+      "actor": "",
+      "rowNum": 36,
+      "id": "cti_1789702616387_404"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-28 05:57",
+      "phone": "010-4327-3751",
+      "rawPhone": "01043273751",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7056116",
+      "category": "",
+      "actor": "",
+      "rowNum": 37,
+      "id": "cti_1789702616387_419"
     },
     {
       "type": "IN",
@@ -659,8 +1109,8 @@
       "askSn": "7054505",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 168,
-      "id": "cti_1789610004336_168"
+      "rowNum": 38,
+      "id": "cti_1789702616387_426"
     },
     {
       "type": "IN",
@@ -683,8 +1133,80 @@
       "askSn": "7049002",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 177,
-      "id": "cti_1789610004336_177"
+      "rowNum": 39,
+      "id": "cti_1789702616387_448"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-26 14:51",
+      "phone": "010-5207-8713",
+      "rawPhone": "01052078713",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7048688",
+      "category": "",
+      "actor": "",
+      "rowNum": 40,
+      "id": "cti_1789702616387_449"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-26 12:37",
+      "phone": "010-5207-8713",
+      "rawPhone": "01052078713",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7047218",
+      "category": "",
+      "actor": "",
+      "rowNum": 41,
+      "id": "cti_1789702616387_455"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-26 10:45",
+      "phone": "010-2460-1482",
+      "rawPhone": "01024601482",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7046328",
+      "category": "",
+      "actor": "",
+      "rowNum": 42,
+      "id": "cti_1789702616387_460"
     },
     {
       "type": "IN",
@@ -707,8 +1229,8 @@
       "askSn": "7045905",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 187,
-      "id": "cti_1789610004336_187"
+      "rowNum": 43,
+      "id": "cti_1789702616387_463"
     },
     {
       "type": "IN",
@@ -731,8 +1253,8 @@
       "askSn": "7044382",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 188,
-      "id": "cti_1789610004336_188"
+      "rowNum": 44,
+      "id": "cti_1789702616387_469"
     },
     {
       "type": "IN",
@@ -755,8 +1277,8 @@
       "askSn": "7044012",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 189,
-      "id": "cti_1789610004336_189"
+      "rowNum": 45,
+      "id": "cti_1789702616387_470"
     },
     {
       "type": "IN",
@@ -779,8 +1301,8 @@
       "askSn": "7043810",
       "category": "",
       "actor": "",
-      "rowNum": 190,
-      "id": "cti_1789610004336_190"
+      "rowNum": 46,
+      "id": "cti_1789702616387_471"
     },
     {
       "type": "IN",
@@ -803,8 +1325,8 @@
       "askSn": "7042719",
       "category": "",
       "actor": "",
-      "rowNum": 193,
-      "id": "cti_1789610004336_193"
+      "rowNum": 47,
+      "id": "cti_1789702616387_474"
     },
     {
       "type": "IN",
@@ -827,8 +1349,8 @@
       "askSn": "7040210",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 195,
-      "id": "cti_1789610004336_195"
+      "rowNum": 48,
+      "id": "cti_1789702616387_481"
     },
     {
       "type": "IN",
@@ -851,8 +1373,32 @@
       "askSn": "7035276",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 203,
-      "id": "cti_1789610004336_203"
+      "rowNum": 49,
+      "id": "cti_1789702616387_509"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-24 13:23",
+      "phone": "010-5210-1393",
+      "rawPhone": "01052101393",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7035270",
+      "category": "",
+      "actor": "",
+      "rowNum": 50,
+      "id": "cti_1789702616387_510"
     },
     {
       "type": "IN",
@@ -875,8 +1421,32 @@
       "askSn": "7033775",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 206,
-      "id": "cti_1789610004336_206"
+      "rowNum": 51,
+      "id": "cti_1789702616387_516"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-24 08:50",
+      "phone": "010-4566-1976",
+      "rawPhone": "01045661976",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7032143",
+      "category": "",
+      "actor": "",
+      "rowNum": 52,
+      "id": "cti_1789702616387_524"
     },
     {
       "type": "IN",
@@ -899,8 +1469,56 @@
       "askSn": "7029795",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 213,
-      "id": "cti_1789610004336_213"
+      "rowNum": 53,
+      "id": "cti_1789702616387_534"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-21 08:34",
+      "phone": "010-6340-6000",
+      "rawPhone": "01063406000",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7024457",
+      "category": "",
+      "actor": "",
+      "rowNum": 54,
+      "id": "cti_1789702616387_566"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-20 23:12",
+      "phone": "010-7528-9415",
+      "rawPhone": "01075289415",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7024289",
+      "category": "",
+      "actor": "",
+      "rowNum": 55,
+      "id": "cti_1789702616387_567"
     },
     {
       "type": "IN",
@@ -923,8 +1541,8 @@
       "askSn": "7023629",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 221,
-      "id": "cti_1789610004336_221"
+      "rowNum": 56,
+      "id": "cti_1789702616387_568"
     },
     {
       "type": "IN",
@@ -947,8 +1565,32 @@
       "askSn": "7023589",
       "category": "",
       "actor": "",
-      "rowNum": 222,
-      "id": "cti_1789610004336_222"
+      "rowNum": 57,
+      "id": "cti_1789702616387_569"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-20 15:48",
+      "phone": "010-3477-7493",
+      "rawPhone": "01034777493",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7023098",
+      "category": "",
+      "actor": "",
+      "rowNum": 58,
+      "id": "cti_1789702616387_571"
     },
     {
       "type": "IN",
@@ -971,8 +1613,8 @@
       "askSn": "7022825",
       "category": "",
       "actor": "",
-      "rowNum": 224,
-      "id": "cti_1789610004336_224"
+      "rowNum": 59,
+      "id": "cti_1789702616387_572"
     },
     {
       "type": "IN",
@@ -995,8 +1637,8 @@
       "askSn": "7022746",
       "category": "",
       "actor": "",
-      "rowNum": 225,
-      "id": "cti_1789610004336_225"
+      "rowNum": 60,
+      "id": "cti_1789702616387_573"
     },
     {
       "type": "IN",
@@ -1019,8 +1661,8 @@
       "askSn": "7022593",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 227,
-      "id": "cti_1789610004336_227"
+      "rowNum": 61,
+      "id": "cti_1789702616387_576"
     },
     {
       "type": "IN",
@@ -1043,8 +1685,8 @@
       "askSn": "7019287",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 237,
-      "id": "cti_1789610004336_237"
+      "rowNum": 62,
+      "id": "cti_1789702616387_593"
     },
     {
       "type": "IN",
@@ -1067,8 +1709,8 @@
       "askSn": "7014020",
       "category": "",
       "actor": "",
-      "rowNum": 259,
-      "id": "cti_1789610004336_259"
+      "rowNum": 63,
+      "id": "cti_1789702616387_636"
     },
     {
       "type": "IN",
@@ -1091,8 +1733,8 @@
       "askSn": "7012991",
       "category": "",
       "actor": "",
-      "rowNum": 268,
-      "id": "cti_1789610004336_268"
+      "rowNum": 64,
+      "id": "cti_1789702616387_655"
     },
     {
       "type": "IN",
@@ -1115,8 +1757,32 @@
       "askSn": "7012751",
       "category": "",
       "actor": "",
-      "rowNum": 270,
-      "id": "cti_1789610004336_270"
+      "rowNum": 65,
+      "id": "cti_1789702616387_676"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-19 08:56",
+      "phone": "010-6241-4137",
+      "rawPhone": "01062414137",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7012557",
+      "category": "",
+      "actor": "",
+      "rowNum": 66,
+      "id": "cti_1789702616387_677"
     },
     {
       "type": "IN",
@@ -1139,8 +1805,56 @@
       "askSn": "7006025",
       "category": "",
       "actor": "",
-      "rowNum": 288,
-      "id": "cti_1789610004336_288"
+      "rowNum": 67,
+      "id": "cti_1789702616387_722"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-14 12:41",
+      "phone": "010-7332-7933",
+      "rawPhone": "01073327933",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6999209",
+      "category": "",
+      "actor": "",
+      "rowNum": 68,
+      "id": "cti_1789702616387_798"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-14 10:55",
+      "phone": "010-5730-2981",
+      "rawPhone": "01057302981",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6998452",
+      "category": "",
+      "actor": "",
+      "rowNum": 69,
+      "id": "cti_1789702616387_802"
     },
     {
       "type": "IN",
@@ -1163,8 +1877,8 @@
       "askSn": "6997701",
       "category": "",
       "actor": "",
-      "rowNum": 304,
-      "id": "cti_1789610004336_304"
+      "rowNum": 70,
+      "id": "cti_1789702616387_809"
     },
     {
       "type": "IN",
@@ -1187,8 +1901,8 @@
       "askSn": "6997564",
       "category": "",
       "actor": "",
-      "rowNum": 306,
-      "id": "cti_1789610004336_306"
+      "rowNum": 71,
+      "id": "cti_1789702616387_814"
     },
     {
       "type": "IN",
@@ -1211,8 +1925,8 @@
       "askSn": "6989293",
       "category": "",
       "actor": "",
-      "rowNum": 311,
-      "id": "cti_1789610004336_311"
+      "rowNum": 72,
+      "id": "cti_1789702616387_844"
     },
     {
       "type": "IN",
@@ -1235,8 +1949,56 @@
       "askSn": "6981728",
       "category": "",
       "actor": "",
-      "rowNum": 319,
-      "id": "cti_1789610004336_319"
+      "rowNum": 73,
+      "id": "cti_1789702616387_859"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-09 12:50",
+      "phone": "010-7271-7976",
+      "rawPhone": "01072717976",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6972417",
+      "category": "",
+      "actor": "",
+      "rowNum": 74,
+      "id": "cti_1789702616387_868"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-07 21:05",
+      "phone": "010-6290-3993",
+      "rawPhone": "01062903993",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6970789",
+      "category": "",
+      "actor": "",
+      "rowNum": 75,
+      "id": "cti_1789702616387_876"
     },
     {
       "type": "IN",
@@ -1259,8 +2021,8 @@
       "askSn": "6968697",
       "category": "",
       "actor": "",
-      "rowNum": 332,
-      "id": "cti_1789610004336_332"
+      "rowNum": 76,
+      "id": "cti_1789702616387_883"
     },
     {
       "type": "IN",
@@ -1283,8 +2045,32 @@
       "askSn": "6966786",
       "category": "",
       "actor": "",
-      "rowNum": 335,
-      "id": "cti_1789610004336_335"
+      "rowNum": 77,
+      "id": "cti_1789702616387_891"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-06 10:54",
+      "phone": "02-2621-7767",
+      "rawPhone": "0226217767",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6961565",
+      "category": "",
+      "actor": "",
+      "rowNum": 78,
+      "id": "cti_1789702616387_921"
     },
     {
       "type": "IN",
@@ -1307,8 +2093,56 @@
       "askSn": "6960995",
       "category": "",
       "actor": "",
-      "rowNum": 347,
-      "id": "cti_1789610004336_347"
+      "rowNum": 79,
+      "id": "cti_1789702616387_922"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-05 20:25",
+      "phone": "010-6877-1059",
+      "rawPhone": "01068771059",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6959963",
+      "category": "",
+      "actor": "",
+      "rowNum": 80,
+      "id": "cti_1789702616387_924"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-05 10:43",
+      "phone": "010-8817-7241",
+      "rawPhone": "01088177241",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6955809",
+      "category": "",
+      "actor": "",
+      "rowNum": 81,
+      "id": "cti_1789702616387_930"
     },
     {
       "type": "IN",
@@ -1331,8 +2165,8 @@
       "askSn": "6955375",
       "category": "",
       "actor": "",
-      "rowNum": 353,
-      "id": "cti_1789610004336_353"
+      "rowNum": 82,
+      "id": "cti_1789702616387_931"
     },
     {
       "type": "IN",
@@ -1355,8 +2189,8 @@
       "askSn": "6953361",
       "category": "",
       "actor": "",
-      "rowNum": 354,
-      "id": "cti_1789610004336_354"
+      "rowNum": 83,
+      "id": "cti_1789702616387_932"
     },
     {
       "type": "IN",
@@ -1379,8 +2213,8 @@
       "askSn": "6953309",
       "category": "",
       "actor": "",
-      "rowNum": 355,
-      "id": "cti_1789610004336_355"
+      "rowNum": 84,
+      "id": "cti_1789702616387_933"
     },
     {
       "type": "IN",
@@ -1403,8 +2237,8 @@
       "askSn": "6953258",
       "category": "",
       "actor": "",
-      "rowNum": 356,
-      "id": "cti_1789610004336_356"
+      "rowNum": 85,
+      "id": "cti_1789702616387_934"
     },
     {
       "type": "IN",
@@ -1427,8 +2261,104 @@
       "askSn": "6952503",
       "category": "",
       "actor": "",
-      "rowNum": 358,
-      "id": "cti_1789610004336_358"
+      "rowNum": 86,
+      "id": "cti_1789702616387_936"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-03 21:00",
+      "phone": "010-7937-4800",
+      "rawPhone": "01079374800",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6948969",
+      "category": "",
+      "actor": "",
+      "rowNum": 87,
+      "id": "cti_1789702616387_939"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-03 16:45",
+      "phone": "010-2523-7166",
+      "rawPhone": "01025237166",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6948198",
+      "category": "",
+      "actor": "",
+      "rowNum": 88,
+      "id": "cti_1789702616387_940"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-03 14:17",
+      "phone": "010-8776-3605",
+      "rawPhone": "01087763605",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6946312",
+      "category": "",
+      "actor": "",
+      "rowNum": 89,
+      "id": "cti_1789702616387_944"
+    },
+    {
+      "type": "IN",
+      "channel": "리본케어",
+      "callTime": "2026-08-01 18:24",
+      "phone": "010-2226-8081",
+      "rawPhone": "01022268081",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "6941355",
+      "category": "",
+      "actor": "",
+      "rowNum": 90,
+      "id": "cti_1789702616387_947"
     }
   ]
 }

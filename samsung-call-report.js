@@ -426,9 +426,13 @@ async function initSamsungCallReportModule(resetFilter = true) {
     : (ch.includes('현대') ? 'call_report_hyundai.json' : (ch.includes('리본') ? 'call_report_livon.json' : 'call_report_samsung.json'));
 
   const staticUrls = [
-    `/${primaryFileName}?t=${Date.now()}`,
     `./${primaryFileName}?t=${Date.now()}`,
     `${primaryFileName}?t=${Date.now()}`,
+    `/${primaryFileName}?t=${Date.now()}`,
+    `./call_report_all.json?t=${Date.now()}`,
+    `call_report_all.json?t=${Date.now()}`,
+    `/call_report_all.json?t=${Date.now()}`,
+    `./samsung_call_report.json?t=${Date.now()}`,
     `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
   ];
 
@@ -3062,24 +3066,41 @@ async function handleTabChannelChange(channel) {
 
   if (!hasChannelLogs) {
     const fileName = isHyundai ? 'call_report_hyundai.json' : (isLivon ? 'call_report_livon.json' : (isAll ? 'call_report_all.json' : 'call_report_samsung.json'));
-    try {
-      const res = await fetch(`/${fileName}?t=${Date.now()}`);
-      if (res.ok) {
-        const json = await res.json();
-        const data = (json && json.data) ? json.data : json;
-        if (data && data.callLogs && data.callLogs.length > 0) {
-          gSamsungReportData = data;
-          const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
-          data.callLogs.forEach(item => {
-            const key = `${item.callTime}_${item.phone || item.rawPhone}`;
-            if (!existingKeys.has(key)) {
-              gSamsungMasterLogs.push(item);
-              existingKeys.add(key);
+    const candidates = [
+      `./${fileName}?t=${Date.now()}`,
+      `${fileName}?t=${Date.now()}`,
+      `/${fileName}?t=${Date.now()}`,
+      `./call_report_all.json?t=${Date.now()}`,
+      `call_report_all.json?t=${Date.now()}`
+    ];
+    for (const u of candidates) {
+      try {
+        const res = await fetch(u);
+        if (res.ok) {
+          const json = await res.json();
+          const data = (json && json.data) ? json.data : json;
+          if (data && data.callLogs && data.callLogs.length > 0) {
+            let finalData = data;
+            if (!isAll && u.includes('call_report_all')) {
+              const filtered = data.callLogs.filter(l => (l.channel || '').includes(targetTag));
+              if (filtered.length > 0) {
+                finalData = { ...data, reportInfo: { ...data.reportInfo, channel, channelLabel: channel }, callLogs: filtered };
+              }
             }
-          });
+            gSamsungReportData = finalData;
+            const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
+            finalData.callLogs.forEach(item => {
+              const key = `${item.callTime}_${item.phone || item.rawPhone}`;
+              if (!existingKeys.has(key)) {
+                gSamsungMasterLogs.push(item);
+                existingKeys.add(key);
+              }
+            });
+            break;
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
   } else {
     if (gSamsungReportData && gSamsungReportData.reportInfo) {
       gSamsungReportData.reportInfo.channel = channel;
@@ -3113,24 +3134,41 @@ async function applyTabDateRange(forceSync = false) {
 
   if (!hasMatchingChannel) {
     const primaryFallback = isHyundai ? 'call_report_hyundai.json' : (isLivon ? 'call_report_livon.json' : (isAllChannel ? 'call_report_all.json' : 'call_report_samsung.json'));
-    try {
-      const sRes = await fetch(`/${primaryFallback}?t=${Date.now()}`);
-      if (sRes.ok) {
-        const sJson = await sRes.json();
-        const data = (sJson && sJson.data) ? sJson.data : sJson;
-        if (data && data.callLogs && data.callLogs.length > 0) {
-          gSamsungReportData = data;
-          const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
-          data.callLogs.forEach(item => {
-            const key = `${item.callTime}_${item.phone || item.rawPhone}`;
-            if (!existingKeys.has(key)) {
-              gSamsungMasterLogs.push(item);
-              existingKeys.add(key);
+    const candidates = [
+      `./${primaryFallback}?t=${Date.now()}`,
+      `${primaryFallback}?t=${Date.now()}`,
+      `/${primaryFallback}?t=${Date.now()}`,
+      `./call_report_all.json?t=${Date.now()}`,
+      `call_report_all.json?t=${Date.now()}`
+    ];
+    for (const u of candidates) {
+      try {
+        const sRes = await fetch(u);
+        if (sRes.ok) {
+          const sJson = await sRes.json();
+          const data = (sJson && sJson.data) ? sJson.data : sJson;
+          if (data && data.callLogs && data.callLogs.length > 0) {
+            let finalData = data;
+            if (!isAllChannel && u.includes('call_report_all')) {
+              const filtered = data.callLogs.filter(l => (l.channel || '').includes(targetTag));
+              if (filtered.length > 0) {
+                finalData = { ...data, reportInfo: { ...data.reportInfo, channel: ch, channelLabel: ch }, callLogs: filtered };
+              }
             }
-          });
+            gSamsungReportData = finalData;
+            const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
+            finalData.callLogs.forEach(item => {
+              const key = `${item.callTime}_${item.phone || item.rawPhone}`;
+              if (!existingKeys.has(key)) {
+                gSamsungMasterLogs.push(item);
+                existingKeys.add(key);
+              }
+            });
+            break;
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
   }
 
   // 1. 메모리에 로드된 전체 로그를 바탕으로 0ms 즉각 화면 렌더링

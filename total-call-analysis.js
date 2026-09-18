@@ -28,6 +28,25 @@ let gTotalFilter = {
   onlyMissedOutcall: false,
   onlyUrgent: false
 };
+let gTotalListPage = 1;
+let gTotalCustomerPage = 1;
+const TOTAL_LIST_PAGE_SIZE = 50;
+const TOTAL_CUSTOMER_PAGE_SIZE = 24;
+
+function safeMaskName(name) {
+  if (typeof window !== 'undefined' && typeof window.maskName === 'function') {
+    return window.maskName(name);
+  }
+  if (typeof maskName === 'function') {
+    return maskName(name);
+  }
+  if (!name || typeof name !== 'string') return '-';
+  const trimmed = name.trim();
+  if (trimmed.length <= 1) return trimmed;
+  if (trimmed.length === 2) return trimmed[0] + '*';
+  return trimmed[0] + '*'.repeat(trimmed.length - 2) + trimmed[trimmed.length - 1];
+}
+
 let isTotalSyncing = false;
 
 // ==========================================
@@ -1658,8 +1677,6 @@ function renderTotalViewContent(filteredLogs) {
  * - CTI 대기시간 0초 미연결 고객: 🚨 아웃콜 필요 배지 및 원클릭 발신 지원
  * =============================================================================
  */
-let gTotalListPage = 1;
-const TOTAL_LIST_PAGE_SIZE = 50;
 
 function changeTotalListPage(page) {
   gTotalListPage = page;
@@ -1771,7 +1788,7 @@ function renderTotalListView(logs) {
                   <!-- 3. 고객 / 매칭정보 -->
                   <td class="py-3 px-3 align-middle">
                     <div class="flex items-center gap-1.5 flex-wrap">
-                      <span class="font-black text-slate-900 text-xs">${maskName(match.patientName)}</span>
+                      <span class="font-black text-slate-900 text-xs">${safeMaskName(match.patientName)}</span>
                       <span class="font-mono text-slate-400 text-[11px]">${formattedPhone}</span>
                     </div>
                     <div class="mt-1 flex items-center gap-1">
@@ -2081,7 +2098,7 @@ function openTotalCallSummaryModal(callId) {
             </div>
             <div>
               <div class="font-black text-xs text-slate-900 flex items-center gap-1.5">
-                <span>${maskName(match.patientName)}</span>
+                <span>${safeMaskName(match.patientName)}</span>
                 <span class="font-mono text-slate-500 text-[11px] font-normal">${formattedPhone}</span>
                 <span class="px-2 py-0.2 rounded-full text-[9.5px] font-black border ${match.badgeClass}">
                   ${match.company}
@@ -2363,7 +2380,7 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
                       </span>
                     </td>
                     <td class="py-2.5 px-3">
-                      <div class="font-black text-slate-900 text-xs">${maskName(match.patientName)}</div>
+                      <div class="font-black text-slate-900 text-xs">${safeMaskName(match.patientName)}</div>
                       <div class="font-mono text-slate-400 text-[11px]">${formattedPhone}</div>
                       ${match.isRegistered ? `
                         <span class="text-[9.5px] font-bold text-blue-700">✓ ${match.company} (${match.appId})</span>
@@ -2446,8 +2463,6 @@ function closeMissedCallsOutcallModal() {
  * - 인입 전화번호별 그룹화, 메이트원 등록 여부 배지, 통합허브 모달 바로가기
  * =============================================================================
  */
-let gTotalCustomerPage = 1;
-const TOTAL_CUSTOMER_PAGE_SIZE = 24;
 
 function changeTotalCustomerPage(page) {
   gTotalCustomerPage = page;
@@ -2549,7 +2564,7 @@ function renderCustomerGroupView(logs) {
                       미등록 인입고객
                     </span>
                   `}
-                  <h3 class="text-base font-black text-slate-900">${maskName(match.patientName)}</h3>
+                  <h3 class="text-base font-black text-slate-900">${safeMaskName(match.patientName)}</h3>
                   <span class="font-mono text-xs text-slate-500 font-bold">${formattedPhone}</span>
                 </div>
                 <div class="text-[11px] text-slate-400 flex items-center gap-2">
@@ -2766,11 +2781,11 @@ function renderCallDetailCardHtml(call) {
             <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
               class="px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold text-[10.5px] border border-blue-200 flex items-center gap-1 cursor-pointer" title="통합허브 상세 대시보드">
               <span class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-              <span>${maskName(match.patientName)} (${match.appId})</span>
+              <span>${safeMaskName(match.patientName)} (${match.appId})</span>
               <i data-lucide="external-link" class="w-3 h-3 text-blue-600"></i>
             </button>
           ` : `
-            <span class="text-slate-600 font-bold">${maskName(match.patientName)}</span>
+            <span class="text-slate-600 font-bold">${safeMaskName(match.patientName)}</span>
           `}
           <span class="font-mono text-slate-500">${formattedPhone}</span>
         </div>
@@ -3557,7 +3572,7 @@ async function checkAndTriggerOutcallAlert() {
           <span class="font-mono text-slate-500 font-bold text-[10.5px]">${newestCall.callTime || '-'}</span>
         </div>
         <div class="flex items-baseline justify-between pt-0.5">
-          <div class="font-black text-slate-900 text-sm">${typeof maskName === 'function' ? maskName(match.patientName) : match.patientName}</div>
+          <div class="font-black text-slate-900 text-sm">${safeMaskName(match.patientName)}</div>
           <div class="font-mono font-bold text-rose-600 text-xs">${formattedPhone}</div>
         </div>
         <div class="text-[10.5px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-100">
