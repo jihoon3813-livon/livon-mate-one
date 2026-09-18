@@ -441,7 +441,6 @@ async function initSamsungCallReportModule(resetFilter = true) {
       if (res.ok) {
         const json = await res.json();
         const data = (json && json.data) ? json.data : json;
-        if (data && data.callLogs && data.callLogs.length > 0) {
           let finalData = data;
           if (!isAllChannel && u.includes('call_report_all')) {
             const filtered = data.callLogs.filter(l => (l.channel || '').includes(ch));
@@ -457,6 +456,28 @@ async function initSamsungCallReportModule(resetFilter = true) {
               };
             }
           }
+
+          // 기존 메모리/세션에 이미 존재하는 최신 수신 콜(예: 20번째 콜 등)이 오래된 정적 파일로 덮어씌워져 유실되지 않도록 스마트 병합
+          const existingLogs = (gSamsungMasterLogs && gSamsungMasterLogs.length > 0)
+            ? gSamsungMasterLogs
+            : ((gSamsungReportData && gSamsungReportData.callLogs) || []);
+
+          if (existingLogs.length > 0) {
+            const mergedMap = new Map();
+            (finalData.callLogs || []).forEach(l => {
+              const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+              mergedMap.set(key, l);
+            });
+            existingLogs.forEach(l => {
+              const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+              mergedMap.set(key, l);
+            });
+            const mergedLogs = Array.from(mergedMap.values());
+            mergedLogs.sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
+            mergedLogs.forEach((l, idx) => { l.rowNum = idx + 1; });
+            finalData.callLogs = mergedLogs;
+          }
+
           gSamsungReportData = finalData;
           if (Array.isArray(finalData.callLogs)) {
             gSamsungMasterLogs = [...finalData.callLogs];
@@ -467,8 +488,14 @@ async function initSamsungCallReportModule(resetFilter = true) {
           } catch (e) {}
           renderSamsungCallReportTab();
           loaded = true;
+
+          // 백그라운드 최신 CTI 자동 검증 동기화 (최신 콜 유실 원천 방지)
+          setTimeout(() => {
+            if (typeof syncSamsungCallReportCti === 'function') {
+              syncSamsungCallReportCti(true, true);
+            }
+          }, 300);
           return;
-        }
       }
     } catch (e) {}
   }
@@ -3073,7 +3100,7 @@ async function handleTabChannelChange(channel) {
   await applyTabDateRange(false);
 }
 
-async function applyTabDateRange(forceSync = false) {
+async function applyTabDateRange(forceSync = false, isBackground = false) {
   const thisWeek = getThisWeekRange();
   const s = document.getElementById('tabReportStartDate')?.value || gReportFilter.startDate || thisWeek.start;
   const e = document.getElementById('tabReportEndDate')?.value || gReportFilter.endDate || thisWeek.end;
@@ -3134,7 +3161,7 @@ async function applyTabDateRange(forceSync = false) {
     setTimeout(renderTabDailyTrendChart, 60);
   }
 
-  // 2. 사용자가 [새로고침] 버튼을 명시적으로 눌렀을 때만(forceSync === true) CTI 동기화 요청
+  // 2. 사용자가 [새로고침] 버튼을 명시적으로 눌렀거나 메뉴 진입 시(forceSync === true) CTI 동기화 요청
   if (!forceSync) return;
 
   const syncBtn = document.getElementById('tabSyncCtiBtn');
@@ -3143,14 +3170,14 @@ async function applyTabDateRange(forceSync = false) {
 
   if (syncBtn) {
     syncBtn.classList.add('opacity-75', 'pointer-events-none');
-    if (syncText) syncText.innerText = '동기화 중...';
+    if (syncText) syncText.innerText = isBackground ? '실시간 연동 중...' : '동기화 중...';
     if (syncIcon) syncIcon.classList.add('animate-spin');
   }
 
   try {
     let synced = false;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
       const res = await fetch(`/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`, {
         signal: controller.signal
@@ -3160,12 +3187,29 @@ async function applyTabDateRange(forceSync = false) {
       if (cType.includes('json') || res.ok) {
         const json = await res.json();
         if (json && json.success && json.data) {
-          gSamsungReportData = json.data;
-          if (Array.isArray(json.data.callLogs)) {
-            gSamsungMasterLogs = [...json.data.callLogs];
+          let finalData = json.data;
+          if (Array.isArray(finalData.callLogs)) {
+            // 메모리의 최신 수신 콜이 절대 유실되지 않도록 스마트 양방향 병합
+            const mergedMap = new Map();
+            (finalData.callLogs || []).forEach(l => {
+              const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+              mergedMap.set(key, l);
+            });
+            (gSamsungMasterLogs || []).forEach(l => {
+              const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+              if (!mergedMap.has(key)) {
+                mergedMap.set(key, l);
+              }
+            });
+            const mergedLogs = Array.from(mergedMap.values());
+            mergedLogs.sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
+            mergedLogs.forEach((l, idx) => { l.rowNum = idx + 1; });
+            finalData.callLogs = mergedLogs;
+            gSamsungMasterLogs = [...mergedLogs];
           }
+          gSamsungReportData = finalData;
           try {
-            sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(json.data));
+            sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(finalData));
           } catch (e) {}
           synced = true;
         }
@@ -3226,28 +3270,39 @@ async function applyTabDateRange(forceSync = false) {
     }
 
     const stats = calculateReportStats();
-    if (typeof showToast === 'function') {
+    if (!isBackground && typeof showToast === 'function') {
       showToast(`[${ch}] ${s} ~ ${e} 통화데이터(${stats.totalCalls}건) 동기화가 완료되었습니다.`, 'success');
     }
   } catch (err) {
     console.error('Error applying report date range:', err);
     renderSamsungCallReportTab();
-    if (typeof showToast === 'function') {
+    if (!isBackground && typeof showToast === 'function') {
       showToast('통화데이터 조회를 완료하였습니다.', 'info');
     }
   } finally {
-    if (qBtn) {
-      qBtn.disabled = false;
-      qBtn.classList.remove('opacity-75', 'cursor-not-allowed');
-      qBtn.innerHTML = `<i data-lucide="search" class="w-3.5 h-3.5"></i><span id="tabReportQueryBtnText">조회</span>`;
-      if (typeof initIcons === 'function') initIcons(qBtn);
-    }
     if (syncBtn) {
       syncBtn.classList.remove('opacity-75', 'pointer-events-none');
+      if (syncText) syncText.innerText = '새로고침';
+      if (syncIcon) syncIcon.classList.remove('animate-spin');
     }
-    if (syncText) syncText.innerText = '새로고침';
-    if (syncIcon) syncIcon.classList.remove('animate-spin');
   }
+}
+
+// [사용자 요구사항]: 삼성화재 콜분석 좌측 메뉴 클릭 시 즉시 화면 표시(0ms) 및 최신 CTI 데이터 자동 동기화
+function triggerSamsungCallReportLeftMenuClick() {
+  if (typeof switchTab === 'function') {
+    switchTab('samsungcallreport', null, false);
+  }
+  // 1) 기존 캐시 데이터로 즉각 0ms 화면 렌더링 (화면 깜빡임/대기 없음)
+  if (gSamsungReportData && gSamsungReportData.callLogs && gSamsungReportData.callLogs.length > 0) {
+    renderSamsungCallReportTab();
+  }
+  // 2) 최신 CTI 데이터 백그라운드 자동 동기화 (오늘 최신 콜 20건 전수 수신)
+  applyTabDateRange(true, true);
+}
+
+if (typeof window !== 'undefined') {
+  window.triggerSamsungCallReportLeftMenuClick = triggerSamsungCallReportLeftMenuClick;
 }
 
 async function syncTabLiveCti(customStart, customEnd, customChannel) {
