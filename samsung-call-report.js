@@ -741,17 +741,17 @@ function renderSamsungCallReportTab() {
                 </select>
               </div>
 
-              <!-- 날짜 범위 선택기 (모바일 줄바꿈 방지 및 flex-1 확장) -->
-              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 text-xs font-bold text-slate-700 flex-1 min-w-0">
-                <div class="flex items-center gap-1 px-1 shrink-0">
-                  <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-500"></i>
-                  <span class="whitespace-nowrap text-slate-600">기간:</span>
+              <!-- 날짜 범위 선택기 (모바일 줄바꿈 방지 및 넓은 터치 영역/선명한 날짜 표시) -->
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 sm:p-2 text-xs font-bold text-slate-700 flex-1 min-w-0">
+                <div class="flex items-center gap-1.5 px-1 shrink-0">
+                  <i data-lucide="calendar" class="w-4 h-4 text-blue-600"></i>
+                  <span class="whitespace-nowrap text-slate-700 font-black">기간:</span>
                 </div>
-                <div class="flex items-center gap-1.5 flex-1 min-w-0">
-                  <input type="date" id="tabReportStartDate" value="${curStart}" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
-                  <span class="text-slate-400 font-normal shrink-0">~</span>
-                  <input type="date" id="tabReportEndDate" value="${curEnd}" class="flex-1 min-w-0 bg-white px-2 py-1.5 sm:py-1 rounded-xl border border-slate-200 font-mono text-xs text-center focus:outline-none focus:border-blue-500 shadow-2xs">
-                  <button type="button" id="tabReportQueryBtn" onclick="applyTabDateRange(false)" class="px-3.5 py-1.5 sm:py-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-2xs shrink-0 whitespace-nowrap cursor-pointer flex items-center gap-1.5" title="선택한 기간의 CTI 데이터를 조회합니다">
+                <div class="flex items-center gap-1.5 flex-1 min-w-0 w-full">
+                  <input type="date" id="tabReportStartDate" value="${curStart}" class="flex-1 min-w-0 bg-white px-2 py-2 sm:py-1 rounded-xl border border-slate-300 font-bold text-xs sm:text-sm text-center text-slate-900 focus:outline-none focus:border-blue-500 shadow-2xs h-9 sm:h-8">
+                  <span class="text-slate-400 font-black shrink-0">~</span>
+                  <input type="date" id="tabReportEndDate" value="${curEnd}" class="flex-1 min-w-0 bg-white px-2 py-2 sm:py-1 rounded-xl border border-slate-300 font-bold text-xs sm:text-sm text-center text-slate-900 focus:outline-none focus:border-blue-500 shadow-2xs h-9 sm:h-8">
+                  <button type="button" id="tabReportQueryBtn" onclick="applyTabDateRange(false)" class="px-3.5 py-2 sm:py-1 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all shadow-xs shrink-0 whitespace-nowrap cursor-pointer flex items-center gap-1.5 h-9 sm:h-8" title="선택한 기간의 CTI 데이터를 조회합니다">
                     <i data-lucide="search" class="w-3.5 h-3.5"></i>
                     <span id="tabReportQueryBtnText">조회</span>
                   </button>
@@ -831,22 +831,22 @@ function renderSamsungCallReportTab() {
       <div class="border-b border-slate-200 px-1 overflow-x-auto scrollbar-none">
         <div class="flex items-center justify-between gap-2 w-full sm:w-auto">
           <div class="flex items-center space-x-1 sm:space-x-2 overflow-x-auto scrollbar-none">
-            <button type="button" onclick="switchReportSubTab('summary')" class="px-2.5 py-2 sm:px-4 sm:py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-1 sm:gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${gActiveReportSubTab === 'summary' ? 'border-blue-600 text-blue-700 bg-white shadow-2xs' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'}">
+            <button type="button" onclick="switchReportSubTab('summary')" class="px-3 py-2 sm:px-4 sm:py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-1 sm:gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${gActiveReportSubTab === 'summary' ? 'border-blue-600 text-blue-700 bg-white shadow-2xs' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'}">
               <i data-lucide="pie-chart" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
-              <span>분석 요약</span>
-              <span class="px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] ${gActiveReportSubTab === 'summary' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700'}">핵심</span>
+              <span class="whitespace-nowrap">분석 요약</span>
+              <span class="px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] ${gActiveReportSubTab === 'summary' ? 'bg-blue-100 text-blue-800 font-bold' : 'bg-slate-200 text-slate-700'} whitespace-nowrap">핵심</span>
             </button>
 
-            <button type="button" onclick="switchReportSubTab('daily')" class="px-2.5 py-2 sm:px-4 sm:py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-1 sm:gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${gActiveReportSubTab === 'daily' ? 'border-blue-600 text-blue-700 bg-white shadow-2xs' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'}">
+            <button type="button" onclick="switchReportSubTab('daily')" class="px-3 py-2 sm:px-4 sm:py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-1 sm:gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${gActiveReportSubTab === 'daily' ? 'border-blue-600 text-blue-700 bg-white shadow-2xs' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'}">
               <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
-              <span>일자별 인입<span class="hidden sm:inline">현황</span></span>
-              <span class="px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] ${gActiveReportSubTab === 'daily' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700'}">4주 추이</span>
+              <span class="whitespace-nowrap">일자별 인입현황</span>
+              <span class="px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] ${gActiveReportSubTab === 'daily' ? 'bg-blue-100 text-blue-800 font-bold' : 'bg-slate-200 text-slate-700'} whitespace-nowrap">4주 추이</span>
             </button>
 
-            <button type="button" onclick="switchReportSubTab('logs')" class="px-2.5 py-2 sm:px-4 sm:py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-1 sm:gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${gActiveReportSubTab === 'logs' ? 'border-blue-600 text-blue-700 bg-white shadow-2xs' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'}">
+            <button type="button" onclick="switchReportSubTab('logs')" class="px-3 py-2 sm:px-4 sm:py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-1 sm:gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${gActiveReportSubTab === 'logs' ? 'border-blue-600 text-blue-700 bg-white shadow-2xs' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'}">
               <i data-lucide="list-filter" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
-              <span>상세 통화목록</span>
-              <span class="px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] bg-blue-100 text-blue-900 font-bold border border-blue-200 whitespace-nowrap">실제상담</span>
+              <span class="whitespace-nowrap">상세 통화목록</span>
+              <span class="px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] bg-blue-100 text-blue-900 font-bold border border-blue-200 whitespace-nowrap inline-flex items-center">실제상담</span>
             </button>
           </div>
 
@@ -1625,10 +1625,14 @@ function renderReportLogsSubTab(stats) {
       <div class="bg-white rounded-3xl border border-slate-200/90 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-2.5 flex-wrap">
           
-          <!-- 상담요약 건만 보기 토글 -->
-          <label class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer text-xs font-bold text-slate-700 transition-colors">
-            <input type="checkbox" ${gReportFilter.consultedOnly ? 'checked' : ''} onchange="toggleConsultedOnly(this.checked)" class="rounded text-blue-600">
-            <span>실제 상담건만 보기 (${stats.consultedCount}건)</span>
+          <!-- 실제 상담건만 보기 토글 스위치 (모바일 한줄 고정 및 고대비 토글) -->
+          <label class="flex items-center gap-2.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100/80 active:bg-blue-200/80 cursor-pointer transition-all shadow-2xs whitespace-nowrap shrink-0 select-none">
+            <span class="relative inline-flex items-center cursor-pointer shrink-0">
+              <input type="checkbox" ${gReportFilter.consultedOnly ? 'checked' : ''} onchange="toggleConsultedOnly(this.checked)" class="sr-only peer">
+              <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:bg-blue-600 transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all after:shadow-sm peer-checked:after:translate-x-4"></div>
+            </span>
+            <span class="font-black text-xs sm:text-sm text-blue-900 whitespace-nowrap">실제 상담건만 보기</span>
+            <span class="px-1.5 py-0.5 rounded-md bg-blue-600 text-white font-mono text-[10px] font-black shrink-0 whitespace-nowrap">${stats.consultedCount}건</span>
           </label>
 
           <!-- 문의 대분류 셀렉터 -->
