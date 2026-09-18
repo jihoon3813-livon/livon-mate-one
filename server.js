@@ -736,7 +736,7 @@ function saveSavedFaxConfig(cfg) {
           ctiSummary,
           dailyTrends,
           weeklyRollup,
-          callLogs: (ctiResult.logs || []).filter(c => c.connectReq === 'Y')
+          callLogs: ctiResult.logs || []
         };
 
         function getCallReportFilePath(ch) {

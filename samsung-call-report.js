@@ -815,11 +815,11 @@ function renderSamsungCallReportTab() {
             </div>
             <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
               <span class="text-[10px] text-slate-500 font-medium">유형미선택</span>
-              <span class="font-medium text-slate-700 text-xs mt-0.5">${activeCti.unselectedType || 519}건</span>
+              <span class="font-medium text-slate-700 text-xs mt-0.5">${activeCti.unselectedType !== undefined ? activeCti.unselectedType : 0}건</span>
             </div>
             <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
               <span class="text-[10px] text-slate-500 font-medium">버튼선택종료</span>
-              <span class="font-medium text-slate-700 text-xs mt-0.5">${activeCti.btnExit || 38}건</span>
+              <span class="font-medium text-slate-700 text-xs mt-0.5">${activeCti.btnExit !== undefined ? activeCti.btnExit : 0}건</span>
             </div>
           </div>
         </div>
@@ -1003,7 +1003,7 @@ function renderTabDailyTrendChart() {
   }
 }
 
-function getSamsungCallLogs() {
+function getSamsungCallLogs(includeAll = false) {
   const allLogs = (gSamsungMasterLogs && gSamsungMasterLogs.length > 0)
     ? gSamsungMasterLogs
     : ((gSamsungReportData && gSamsungReportData.callLogs) || []);
@@ -1014,9 +1014,11 @@ function getSamsungCallLogs() {
   const end = normDate(curFilter.endDate);
 
   return allLogs.filter(c => {
-    // 1) 상담원 연결요청(Y) 건 필터링
-    const isConn = (c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
-    if (!isConn) return false;
+    // 1) 상담원 연결요청(Y) 건 필터링 (includeAll = true 시 미연결 N건도 포함)
+    if (!includeAll) {
+      const isConn = (c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
+      if (!isConn) return false;
+    }
 
     // 2) 채널 필터 (전체/all 이 아니면 해당 채널만 매칭)
     if (ch && ch !== '전체' && ch !== 'all') {
@@ -1045,7 +1047,9 @@ function getSamsungCallLogs() {
 
 // 4. Statistics Calculation Engine
 function calculateReportStats() {
-  const logs = getSamsungCallLogs();
+  const connLogs = getSamsungCallLogs(false);
+  const allLogs = getSamsungCallLogs(true);
+  const logs = connLogs;
   const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
   const s = curFilter.startDate;
   const e = curFilter.endDate;
@@ -1070,30 +1074,18 @@ function calculateReportStats() {
   let totalCalls = 0;
   if (isCtiRangeMatch && cs && (cs.totalInbound !== undefined || cs.totalAll !== undefined)) {
     totalCalls = cs.totalInbound !== undefined ? cs.totalInbound : cs.totalAll;
-  } else {
-    // 날짜 필터링이 적용된 경우: 전체 채널 마스터 로그에서 해당 기간의 전체 콜 집계
-    const masterLogs = (gSamsungMasterLogs && gSamsungMasterLogs.length > 0)
-      ? gSamsungMasterLogs
-      : ((gSamsungReportData && gSamsungReportData.callLogs) || []);
-    const allMasterDateLogs = masterLogs.filter(c => {
-      const cd = normDate(c.callTime || c.date || c.startedAt);
-      return (!startNorm || cd >= startNorm) && (!endNorm || cd <= endNorm);
+  } else if (allLogs.length > 0) {
+    // 날짜/채널 필터링 적용 시: 마스터 로그에서 해당 조건의 전체 인입콜 수 정확 반영
+    totalCalls = allLogs.length;
+  } else if (gSamsungReportData && Array.isArray(gSamsungReportData.dailyTrends)) {
+    const periodTrends = gSamsungReportData.dailyTrends.filter(t => {
+      const td = normDate(t.date);
+      return (!startNorm || td >= startNorm) && (!endNorm || td <= endNorm);
     });
-
-    if (allMasterDateLogs.length > 0) {
-      // CTI 전체 인입콜(924건) 대비 상담연결 요청(370건) 배율 반영 (약 2.5배)
-      const ivrScale = 924 / 370;
-      totalCalls = Math.round(allMasterDateLogs.length * ivrScale);
-    } else if (gSamsungReportData && Array.isArray(gSamsungReportData.dailyTrends)) {
-      const periodTrends = gSamsungReportData.dailyTrends.filter(t => {
-        const td = normDate(t.date);
-        return (!startNorm || td >= startNorm) && (!endNorm || td <= endNorm);
-      });
-      const trendsSum = periodTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
-      totalCalls = trendsSum > 0 ? Math.round(trendsSum * (924 / 370)) : logs.length;
-    } else {
-      totalCalls = (cs && (cs.totalInbound || cs.totalAll)) || 924;
-    }
+    const trendsSum = periodTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
+    totalCalls = trendsSum > 0 ? trendsSum : logs.length;
+  } else {
+    totalCalls = (cs && (cs.totalInbound || cs.totalAll)) || logs.length;
   }
   totalCalls = Math.max(totalCalls, logs.length);
 
@@ -1601,7 +1593,7 @@ function renderReportDailySubTab(stats) {
 
 // 7. [시트 3: 통화로그(원본) + 2개 컬럼 연동] 렌더러
 function renderReportLogsSubTab(stats) {
-  let logs = getSamsungCallLogs();
+  let logs = getSamsungCallLogs(!gReportFilter.consultedOnly);
 
   // Apply filters
   if (gReportFilter.consultedOnly) {

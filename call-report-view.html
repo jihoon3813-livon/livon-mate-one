@@ -789,18 +789,16 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         });
 
         if (allMasterDateLogs.length > 0) {
-          // CTI 전체 인입콜(924건) 대비 상담연결 요청(370건) 배율 반영 (약 2.5배)
-          const ivrScale = 924 / 370;
-          totalCalls = Math.round(allMasterDateLogs.length * ivrScale);
+          totalCalls = allMasterDateLogs.length;
         } else if (gReportData && Array.isArray(gReportData.dailyTrends)) {
           const periodTrends = gReportData.dailyTrends.filter(t => {
             const td = normDate(t.date);
             return (!startNorm || td >= startNorm) && (!endNorm || td <= endNorm);
           });
           const trendsSum = periodTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
-          totalCalls = trendsSum > 0 ? Math.round(trendsSum * (924 / 370)) : logs.length;
+          totalCalls = trendsSum > 0 ? trendsSum : logs.length;
         } else {
-          totalCalls = (cs && (cs.totalInbound || cs.totalAll)) || 924;
+          totalCalls = (cs && (cs.totalInbound || cs.totalAll)) || logs.length;
         }
       }
       totalCalls = Math.max(totalCalls, logs.length);
@@ -1351,7 +1349,9 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const allLogs = (gMasterCallLogs && gMasterCallLogs.length > 0)
         ? gMasterCallLogs
         : ((gReportData && gReportData.callLogs) || []);
-      let logs = allLogs.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
+      let logs = gFilter.consultedOnly
+        ? allLogs.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y')
+        : allLogs;
 
       // 엄격한 보험사 채널 격리: 해당 보험사 고객만 100% 필터링 (타 보험사 완전 배제)
       const targetCh = gFilter.channel || '삼성화재';
