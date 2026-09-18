@@ -1878,8 +1878,6 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
             `./${primaryFallback}?t=${Date.now()}`,
             `${primaryFallback}?t=${Date.now()}`,
             `/${primaryFallback}?t=${Date.now()}`,
-            (primaryFallback !== 'call_report_all.json') ? `./call_report_all.json?t=${Date.now()}` : null,
-            (primaryFallback !== 'call_report_all.json') ? `call_report_all.json?t=${Date.now()}` : null,
             `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
           ].filter(Boolean);
 

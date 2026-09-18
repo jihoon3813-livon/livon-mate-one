@@ -2,6 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const { fetchCtiLogsByDateRange } = require('../../../cti-client');
 
+/**
+ * 종합콜분석(전체 인입경로) 전용 실시간 CTI 동기화 엔드포인트
+ * 삼성콜분석과 완전히 독립되어 동작하며, call_report_all.json 만을 대상으로 실시간 동기화를 수행합니다.
+ */
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -12,57 +16,34 @@ module.exports = async function handler(req, res) {
   }
 
   const q = req.query || {};
-  const startDate = q.start || '2026-08-18';
+  const startDate = q.start || '2026-08-01';
   const endDate = q.end || new Date().toISOString().slice(0, 10);
-  const channel = q.channel || '삼성화재';
-  const channelLabel = channel === 'all' || channel === '전체' ? '전체 인입경로' : channel;
+  const channel = q.channel || 'all';
+  const channelLabel = (channel === 'all' || channel === '전체') ? '전체 인입경로' : channel;
 
   let baseData = null;
 
-  // 1. 사전 생성된 최신 보고서 데이터 로드 (초고속 캐시 & 백업)
+  // 1. 종합콜분석 전용 사전 데이터(call_report_all.json) 로드
   try {
-    const chLower = channel.toLowerCase();
-    const isAll = channel.includes('전체') || chLower === 'all';
-    const isHyundai = channel.includes('현대') || chLower.includes('hyundai');
-    const isLivon = channel.includes('리본') || chLower.includes('livon');
-    let fileName = 'call_report_all.json';
-    if (!isAll) {
-      if (isHyundai) fileName = 'call_report_hyundai.json';
-      else if (isLivon) fileName = 'call_report_livon.json';
-      else fileName = 'call_report_samsung.json';
-    }
-
     const candidatePaths = [
-      path.join(process.cwd(), fileName),
-      path.join(__dirname, fileName),
-      path.join(__dirname, '..', fileName),
-      path.join(__dirname, '..', '..', fileName),
-      path.join(__dirname, '..', '..', '..', fileName),
-      path.join(process.cwd(), 'samsung_call_report.json'),
-      path.join(__dirname, '..', '..', '..', 'samsung_call_report.json')
+      path.join(process.cwd(), 'call_report_all.json'),
+      path.join(__dirname, 'call_report_all.json'),
+      path.join(__dirname, '..', 'call_report_all.json'),
+      path.join(__dirname, '..', '..', 'call_report_all.json'),
+      path.join(__dirname, '..', '..', '..', 'call_report_all.json')
     ];
-    let filePath = candidatePaths.find(p => fs.existsSync(p));
-    if (!filePath && isAll) {
-      const allFallbackPaths = [
-        path.join(process.cwd(), 'call_report_all.json'),
-        path.join(__dirname, '..', '..', '..', 'call_report_all.json')
-      ];
-      filePath = allFallbackPaths.find(p => fs.existsSync(p));
-    }
+    const filePath = candidatePaths.find(p => fs.existsSync(p));
     if (filePath && fs.existsSync(filePath)) {
       baseData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     }
   } catch (e) {
-    console.warn('[Sync-CTI] Pre-generated file read warning:', e.message);
+    console.warn('[Total-Sync-CTI] call_report_all.json read warning:', e.message);
   }
 
   // 2. 실시간 CTI 동기화 시도 (스마트 증분 / 고속 병렬 수집)
   try {
-    // 25초 타임아웃 가드 (서버리스 maxDuration 30초 내에서 안정적인 CTI 실시간 수집 보장)
     const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 25000));
 
-    // 전체 기간(14일 초과) 요청이면서 기존 baseline 데이터가 있는 경우:
-    // 전체 통계(Page 1, 200ms) + 최근 3일 증분 로그만 초고속 수집하여 병합 (1~2초 내 완료!)
     const sDateObj = new Date(startDate);
     const eDateObj = new Date(endDate);
     const diffDays = Math.ceil((eDateObj - sDateObj) / (1000 * 60 * 60 * 24)) + 1;
@@ -92,12 +73,12 @@ module.exports = async function handler(req, res) {
       const mergedMap = new Map();
 
       existingLogs.forEach(l => {
-        const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone}`;
+        const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
         mergedMap.set(key, l);
       });
 
       recentLogs.forEach(l => {
-        const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone}`;
+        const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
         mergedMap.set(key, l);
       });
 
@@ -165,46 +146,42 @@ module.exports = async function handler(req, res) {
       dailyMap[ds] = {
         date: ds,
         dayOfWeek: daysOfWeek[cur.getDay()],
-        callCount: 0,
-        share: 0,
-        note: cur.getDay() === 0 || cur.getDay() === 6 ? '주말' : ''
+        total: 0,
+        connected: 0,
+        consulted: 0,
+        canceled: 0,
+        abandoned: 0,
+        unselected: 0,
+        btnExit: 0,
+        channels: { '삼성화재': 0, '현대해상': 0, '리본케어': 0, '기타': 0 }
       };
       cur.setDate(cur.getDate() + 1);
     }
 
-    (ctiResult.logs || []).forEach(l => {
-      const d = (l.callTime || '').slice(0, 10);
-      if (dailyMap[d]) {
-        dailyMap[d].callCount++;
+    (ctiResult.logs || []).forEach(log => {
+      const dt = (log.callTime || '').slice(0, 10);
+      if (dailyMap[dt]) {
+        dailyMap[dt].total++;
+        if (log.connectReq === 'Y') dailyMap[dt].connected++;
+        if (log.title || log.summary) dailyMap[dt].consulted++;
+        const chName = (log.channel || '').includes('삼성') ? '삼성화재'
+          : ((log.channel || '').includes('현대') ? '현대해상'
+          : ((log.channel || '').includes('리본') ? '리본케어' : '기타'));
+        dailyMap[dt].channels[chName] = (dailyMap[dt].channels[chName] || 0) + 1;
       }
     });
 
     const dailyTrends = Object.values(dailyMap);
-    const totalCalls = ctiResult.logs.length;
-    dailyTrends.forEach(d => {
-      d.share = totalCalls > 0 ? parseFloat((d.callCount / totalCalls).toFixed(4)) : 0;
-    });
 
-    const weeklyRollup = [];
-    for (let i = 0; i < dailyTrends.length; i += 7) {
-      const slice = dailyTrends.slice(i, i + 7);
-      const weekCalls = slice.reduce((sum, s) => sum + s.callCount, 0);
-      const wNum = Math.floor(i / 7) + 1;
-      const sDate = slice[0].date.slice(5).replace('-', '/');
-      const eDate = slice[slice.length - 1].date.slice(5).replace('-', '/');
-      weeklyRollup.push({
-        week: `${wNum}주차 (${sDate}~${eDate})`,
-        calls: weekCalls,
-        share: totalCalls > 0 ? parseFloat((weekCalls / totalCalls).toFixed(3)) : 0,
-        dailyAvg: slice.length > 0 ? Math.round(weekCalls / slice.length) : 0
-      });
-    }
+    const totalCalls = ctiResult.totalCalls || (ctiResult.logs ? ctiResult.logs.length : 0);
+    const totalConnected = dailyTrends.reduce((sum, d) => sum + d.connected, 0);
+    const totalConsulted = dailyTrends.reduce((sum, d) => sum + d.consulted, 0);
 
     const ctiSummary = ctiResult.ctiSummary || {
       totalAll: totalCalls,
       totalInbound: totalCalls,
-      answeredCalls: ctiResult.logs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length,
-      connectRequests: ctiResult.logs.filter(c => c.connectReq === 'Y').length,
+      answeredCalls: totalConsulted,
+      connectRequests: totalConnected,
       answerRate: '0%',
       abandonedCalls: 0,
       unselectedType: 0,
@@ -213,8 +190,8 @@ module.exports = async function handler(req, res) {
 
     const reportData = {
       reportInfo: {
-        title: `${channelLabel} 간병(리본케어) 서비스 인바운드 문의 분석 보고 (${startDate} ~ ${endDate})`,
-        target: `${channelLabel} 관련 인바운드 콜`,
+        title: `종합(전체 인입경로) 간병(리본케어) 서비스 인바운드 분석 보고 (${startDate} ~ ${endDate})`,
+        target: '전체 인입경로(삼성화재 · 현대해상 · 리본케어) 관련 인바운드 콜',
         channel: channel,
         channelLabel: channelLabel,
         period: `${startDate} ~ ${endDate}`,
@@ -227,17 +204,16 @@ module.exports = async function handler(req, res) {
       },
       summaryStats: {
         totalCalls: (ctiSummary && ctiSummary.totalInbound !== undefined) ? ctiSummary.totalInbound : totalCalls,
-        connectReqCalls: (ctiSummary && ctiSummary.connectRequests !== undefined) ? ctiSummary.connectRequests : ctiResult.logs.filter(c => c.connectReq === 'Y').length,
-        answeredCalls: (ctiSummary && ctiSummary.answeredCalls !== undefined) ? ctiSummary.answeredCalls : ctiResult.logs.filter(c => c.title || c.summary).length,
+        connectReqCalls: (ctiSummary && ctiSummary.connectRequests !== undefined) ? ctiSummary.connectRequests : totalConnected,
+        answeredCalls: (ctiSummary && ctiSummary.answeredCalls !== undefined) ? ctiSummary.answeredCalls : totalConsulted,
         answerRate: ctiSummary.answerRate || (totalCalls > 0 ? Math.round((ctiSummary.answeredCalls / totalCalls) * 100) + '%' : '0%'),
         abandonedCalls: ctiSummary.abandonedCalls || 0,
         unselectedType: ctiSummary.unselectedType || 0,
         btnExit: ctiSummary.btnExit || 0,
-        consultedCalls: ctiResult.logs.filter(c => c.title || c.summary).length
+        consultedCalls: totalConsulted
       },
       ctiSummary,
       dailyTrends,
-      weeklyRollup,
       callLogs: []
     };
 
@@ -258,37 +234,25 @@ module.exports = async function handler(req, res) {
 
     reportData.callLogs = allMasterLogs;
 
-    // 로컬 파일시스템에 저장 가능한 환경이면 파일도 즉시 최신화
+    // 로컬 파일시스템에 저장 가능한 환경이면 call_report_all.json 최신화
     try {
-      const chLower = channel.toLowerCase();
-      const isAll = channel.includes('전체') || chLower === 'all';
-      const isHyundai = channel.includes('현대') || chLower.includes('hyundai');
-      const isLivon = channel.includes('리본') || chLower.includes('livon');
-      let outName = 'call_report_all.json';
-      if (!isAll) {
-        if (isHyundai) outName = 'call_report_hyundai.json';
-        else if (isLivon) outName = 'call_report_livon.json';
-        else outName = 'call_report_samsung.json';
-      }
-      const outPath = path.join(process.cwd(), outName);
+      const outPath = path.join(process.cwd(), 'call_report_all.json');
       fs.writeFileSync(outPath, JSON.stringify(reportData, null, 2), 'utf8');
-    } catch (saveErr) {
-      // Vercel serverless에서는 읽기 전용 fs일 수 있으므로 무시
-    }
+    } catch (saveErr) {}
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.status(200).json({
       success: true,
-      message: `CTI로부터 [${channelLabel}] 최신 인바운드 로그(총 ${reportData.summaryStats.totalCalls}건)를 성공적으로 실시간 동기화하였습니다.`,
+      message: `CTI로부터 종합콜분석 최신 인바운드 로그(총 ${reportData.summaryStats.totalCalls}건)를 성공적으로 실시간 동기화하였습니다.`,
       data: reportData
     });
   } catch (err) {
-    console.warn('[Sync-CTI] 실시간 동기화 오류/타임아웃, 최신 데이터 캐시로 안전 전환:', err.message);
+    console.warn('[Total-Sync-CTI] 실시간 동기화 오류/타임아웃, 최신 데이터 캐시로 전환:', err.message);
     if (baseData) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       return res.status(200).json({
         success: true,
-        message: `[${channelLabel}] 최근 동기화된 최신 분석 통계 데이터를 안전하게 불러왔습니다.`,
+        message: `종합콜분석 최근 동기화된 최신 통계 데이터를 안전하게 불러왔습니다.`,
         data: baseData
       });
     }

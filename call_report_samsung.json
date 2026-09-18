@@ -1,84 +1,345 @@
 {
   "reportInfo": {
-    "title": "삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고 (2026-09-14 ~ 2026-09-18)",
+    "title": "삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고 (2026-08-18 ~ 2026-09-18)",
     "target": "삼성화재 관련 인바운드 콜",
     "channel": "삼성화재",
     "channelLabel": "삼성화재",
-    "period": "2026-09-14 ~ 2026-09-18",
-    "startDate": "2026-09-14",
+    "period": "2026-08-18 ~ 2026-09-18",
+    "startDate": "2026-08-18",
     "endDate": "2026-09-18",
     "reportDate": "2026-09-18",
     "author": "리본케어 (Livon Care) 운영센터",
-    "operatingDays": 5,
-    "syncedAt": "2026-09-18T06:41:28.567Z"
+    "operatingDays": 32,
+    "syncedAt": "2026-09-18T06:53:36.597Z"
   },
   "summaryStats": {
-    "totalCalls": 632,
-    "connectReqCalls": 35,
-    "answeredCalls": 35,
-    "answerRate": "100%",
-    "abandonedCalls": 0,
-    "unselectedType": 62,
-    "btnExit": 13,
-    "consultedCalls": 32
+    "totalCalls": 570,
+    "connectReqCalls": 167,
+    "answeredCalls": 151,
+    "answerRate": "90%",
+    "abandonedCalls": 14,
+    "unselectedType": 369,
+    "btnExit": 34,
+    "consultedCalls": 123
   },
   "ctiSummary": {
-    "totalAll": 110,
-    "totalInbound": 110,
-    "answeredCalls": 35,
-    "connectRequests": 35,
-    "answerRate": "100%",
-    "abandonedCalls": 0,
+    "totalAll": 570,
+    "totalInbound": 570,
+    "answeredCalls": 151,
+    "connectRequests": 167,
+    "answerRate": "90%",
+    "abandonedCalls": 14,
     "customerAbandoned": 0,
-    "unselectedType": 62,
-    "btnExit": 13
+    "unselectedType": 369,
+    "btnExit": 34
   },
   "dailyTrends": [
+    {
+      "date": "2026-08-18",
+      "dayOfWeek": "화",
+      "callCount": 80,
+      "share": 0.1404,
+      "note": ""
+    },
+    {
+      "date": "2026-08-19",
+      "dayOfWeek": "수",
+      "callCount": 49,
+      "share": 0.086,
+      "note": ""
+    },
+    {
+      "date": "2026-08-20",
+      "dayOfWeek": "목",
+      "callCount": 22,
+      "share": 0.0386,
+      "note": ""
+    },
+    {
+      "date": "2026-08-21",
+      "dayOfWeek": "금",
+      "callCount": 27,
+      "share": 0.0474,
+      "note": ""
+    },
+    {
+      "date": "2026-08-22",
+      "dayOfWeek": "토",
+      "callCount": 1,
+      "share": 0.0018,
+      "note": "주말"
+    },
+    {
+      "date": "2026-08-23",
+      "dayOfWeek": "일",
+      "callCount": 1,
+      "share": 0.0018,
+      "note": "주말"
+    },
+    {
+      "date": "2026-08-24",
+      "dayOfWeek": "월",
+      "callCount": 33,
+      "share": 0.0579,
+      "note": ""
+    },
+    {
+      "date": "2026-08-25",
+      "dayOfWeek": "화",
+      "callCount": 12,
+      "share": 0.0211,
+      "note": ""
+    },
+    {
+      "date": "2026-08-26",
+      "dayOfWeek": "수",
+      "callCount": 16,
+      "share": 0.0281,
+      "note": ""
+    },
+    {
+      "date": "2026-08-27",
+      "dayOfWeek": "목",
+      "callCount": 18,
+      "share": 0.0316,
+      "note": ""
+    },
+    {
+      "date": "2026-08-28",
+      "dayOfWeek": "금",
+      "callCount": 10,
+      "share": 0.0175,
+      "note": ""
+    },
+    {
+      "date": "2026-08-29",
+      "dayOfWeek": "토",
+      "callCount": 3,
+      "share": 0.0053,
+      "note": "주말"
+    },
+    {
+      "date": "2026-08-30",
+      "dayOfWeek": "일",
+      "callCount": 0,
+      "share": 0,
+      "note": "주말"
+    },
+    {
+      "date": "2026-08-31",
+      "dayOfWeek": "월",
+      "callCount": 7,
+      "share": 0.0123,
+      "note": ""
+    },
+    {
+      "date": "2026-09-01",
+      "dayOfWeek": "화",
+      "callCount": 12,
+      "share": 0.0211,
+      "note": ""
+    },
+    {
+      "date": "2026-09-02",
+      "dayOfWeek": "수",
+      "callCount": 23,
+      "share": 0.0404,
+      "note": ""
+    },
+    {
+      "date": "2026-09-03",
+      "dayOfWeek": "목",
+      "callCount": 22,
+      "share": 0.0386,
+      "note": ""
+    },
+    {
+      "date": "2026-09-04",
+      "dayOfWeek": "금",
+      "callCount": 20,
+      "share": 0.0351,
+      "note": ""
+    },
+    {
+      "date": "2026-09-05",
+      "dayOfWeek": "토",
+      "callCount": 10,
+      "share": 0.0175,
+      "note": "주말"
+    },
+    {
+      "date": "2026-09-06",
+      "dayOfWeek": "일",
+      "callCount": 0,
+      "share": 0,
+      "note": "주말"
+    },
+    {
+      "date": "2026-09-07",
+      "dayOfWeek": "월",
+      "callCount": 14,
+      "share": 0.0246,
+      "note": ""
+    },
+    {
+      "date": "2026-09-08",
+      "dayOfWeek": "화",
+      "callCount": 16,
+      "share": 0.0281,
+      "note": ""
+    },
+    {
+      "date": "2026-09-09",
+      "dayOfWeek": "수",
+      "callCount": 9,
+      "share": 0.0158,
+      "note": ""
+    },
+    {
+      "date": "2026-09-10",
+      "dayOfWeek": "목",
+      "callCount": 19,
+      "share": 0.0333,
+      "note": ""
+    },
+    {
+      "date": "2026-09-11",
+      "dayOfWeek": "금",
+      "callCount": 20,
+      "share": 0.0351,
+      "note": ""
+    },
+    {
+      "date": "2026-09-12",
+      "dayOfWeek": "토",
+      "callCount": 6,
+      "share": 0.0105,
+      "note": "주말"
+    },
+    {
+      "date": "2026-09-13",
+      "dayOfWeek": "일",
+      "callCount": 8,
+      "share": 0.014,
+      "note": "주말"
+    },
     {
       "date": "2026-09-14",
       "dayOfWeek": "월",
       "callCount": 33,
-      "share": 0.3,
+      "share": 0.0579,
       "note": ""
     },
     {
       "date": "2026-09-15",
       "dayOfWeek": "화",
       "callCount": 31,
-      "share": 0.2818,
+      "share": 0.0544,
       "note": ""
     },
     {
       "date": "2026-09-16",
       "dayOfWeek": "수",
       "callCount": 18,
-      "share": 0.1636,
+      "share": 0.0316,
       "note": ""
     },
     {
       "date": "2026-09-17",
       "dayOfWeek": "목",
       "callCount": 11,
-      "share": 0.1,
+      "share": 0.0193,
       "note": ""
     },
     {
       "date": "2026-09-18",
       "dayOfWeek": "금",
-      "callCount": 17,
-      "share": 0.1545,
+      "callCount": 19,
+      "share": 0.0333,
       "note": ""
     }
   ],
   "weeklyRollup": [
     {
-      "week": "1주차 (09/14~09/18)",
-      "calls": 110,
-      "share": 1,
-      "dailyAvg": 22
+      "week": "1주차 (08/18~08/24)",
+      "calls": 213,
+      "share": 0.374,
+      "dailyAvg": 30
+    },
+    {
+      "week": "2주차 (08/25~08/31)",
+      "calls": 66,
+      "share": 0.116,
+      "dailyAvg": 9
+    },
+    {
+      "week": "3주차 (09/01~09/07)",
+      "calls": 101,
+      "share": 0.177,
+      "dailyAvg": 14
+    },
+    {
+      "week": "4주차 (09/08~09/14)",
+      "calls": 111,
+      "share": 0.195,
+      "dailyAvg": 16
+    },
+    {
+      "week": "5주차 (09/15~09/18)",
+      "calls": 79,
+      "share": 0.139,
+      "dailyAvg": 20
     }
   ],
   "callLogs": [
+    {
+      "type": "IN",
+      "channel": "삼성화재",
+      "callTime": "2026-09-18 15:45",
+      "phone": "010-2782-7320",
+      "rawPhone": "01027827320",
+      "memberName": "김주영",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "상담연결",
+      "connectReq": "Y",
+      "waitTime": 6,
+      "title": "김주영 환자 입원 및 간병 관리",
+      "summary": "본 상담은 김주영 환자의 입원 및 수술 준비와 관련된 내용입니다. 환자는 서울에 위치한 서담구 세란병원에 입원할 예정이며, 입원 날짜는 내일 오후 3시로 설정되어 있습니다. 수술은 오른쪽 팔의 골절 수술이며, 수술 후 입원 기간은 대략 일주일로 예상하고 있습니다. 환자의 가족인 아들은 외국에 거주 중이며, 환자의 일반 연락처는 010-2389-4940입니다. 간병사는 아직 확정되지 않았으며, 김주영 환자와의 통화는 병원 측에서 직접 진행할 예정입니다.",
+      "keywords": "환자 정보 확인, 입원 예약, 전화 연락처 제공, 간병사 배정",
+      "duration": "00:03:23",
+      "status": "미처리",
+      "operator": "이주연",
+      "askSn": "7157140",
+      "category": "간병 신청·접수·배정",
+      "actor": "고객(가입자·이용자)",
+      "rowNum": 1,
+      "id": "cti_1789714416325_1"
+    },
+    {
+      "type": "IN",
+      "channel": "삼성화재",
+      "callTime": "2026-09-18 15:44",
+      "phone": "010-2782-7320",
+      "rawPhone": "01027827320",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "간병인신청",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7157134",
+      "category": "",
+      "actor": "",
+      "rowNum": 2,
+      "id": "cti_1789714416325_2"
+    },
     {
       "type": "IN",
       "channel": "삼성화재",
@@ -100,8 +361,8 @@
       "askSn": "7157057",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 1,
-      "id": "cti_1789713880682_1"
+      "rowNum": 3,
+      "id": "cti_1789714416325_3"
     },
     {
       "type": "IN",
@@ -124,8 +385,8 @@
       "askSn": "7157031",
       "category": "",
       "actor": "",
-      "rowNum": 2,
-      "id": "cti_1789713880682_2"
+      "rowNum": 4,
+      "id": "cti_1789714416325_4"
     },
     {
       "type": "IN",
@@ -148,8 +409,8 @@
       "askSn": "7156608",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 3,
-      "id": "cti_1789713880682_3"
+      "rowNum": 5,
+      "id": "cti_1789714416325_5"
     },
     {
       "type": "IN",
@@ -172,8 +433,8 @@
       "askSn": "7156580",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 4,
-      "id": "cti_1789713880682_4"
+      "rowNum": 6,
+      "id": "cti_1789714416325_6"
     },
     {
       "type": "IN",
@@ -196,8 +457,8 @@
       "askSn": "7156542",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 5,
-      "id": "cti_1789713880682_5"
+      "rowNum": 7,
+      "id": "cti_1789714416325_7"
     },
     {
       "type": "IN",
@@ -220,8 +481,8 @@
       "askSn": "7156448",
       "category": "",
       "actor": "",
-      "rowNum": 6,
-      "id": "cti_1789713880682_6"
+      "rowNum": 8,
+      "id": "cti_1789714416325_8"
     },
     {
       "type": "IN",
@@ -244,8 +505,8 @@
       "askSn": "7156123",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 7,
-      "id": "cti_1789713880682_7"
+      "rowNum": 9,
+      "id": "cti_1789714416325_9"
     },
     {
       "type": "IN",
@@ -268,8 +529,8 @@
       "askSn": "7155557",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 8,
-      "id": "cti_1789713880682_8"
+      "rowNum": 10,
+      "id": "cti_1789714416325_10"
     },
     {
       "type": "IN",
@@ -292,8 +553,8 @@
       "askSn": "7155547",
       "category": "",
       "actor": "",
-      "rowNum": 9,
-      "id": "cti_1789713880682_9"
+      "rowNum": 11,
+      "id": "cti_1789714416325_11"
     },
     {
       "type": "IN",
@@ -316,8 +577,8 @@
       "askSn": "7155199",
       "category": "",
       "actor": "",
-      "rowNum": 10,
-      "id": "cti_1789713880682_10"
+      "rowNum": 12,
+      "id": "cti_1789714416325_12"
     },
     {
       "type": "IN",
@@ -340,8 +601,8 @@
       "askSn": "7154605",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 11,
-      "id": "cti_1789713880682_11"
+      "rowNum": 13,
+      "id": "cti_1789714416325_13"
     },
     {
       "type": "IN",
@@ -364,8 +625,8 @@
       "askSn": "7154100",
       "category": "",
       "actor": "",
-      "rowNum": 12,
-      "id": "cti_1789713880682_12"
+      "rowNum": 14,
+      "id": "cti_1789714416325_14"
     },
     {
       "type": "IN",
@@ -388,8 +649,8 @@
       "askSn": "7153978",
       "category": "",
       "actor": "",
-      "rowNum": 13,
-      "id": "cti_1789713880682_13"
+      "rowNum": 15,
+      "id": "cti_1789714416325_15"
     },
     {
       "type": "IN",
@@ -412,8 +673,8 @@
       "askSn": "7153955",
       "category": "",
       "actor": "",
-      "rowNum": 14,
-      "id": "cti_1789713880682_14"
+      "rowNum": 16,
+      "id": "cti_1789714416325_16"
     },
     {
       "type": "IN",
@@ -436,8 +697,8 @@
       "askSn": "7153941",
       "category": "",
       "actor": "",
-      "rowNum": 15,
-      "id": "cti_1789713880682_15"
+      "rowNum": 17,
+      "id": "cti_1789714416325_17"
     },
     {
       "type": "IN",
@@ -460,8 +721,8 @@
       "askSn": "7153565",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 16,
-      "id": "cti_1789713880682_16"
+      "rowNum": 18,
+      "id": "cti_1789714416325_18"
     },
     {
       "type": "IN",
@@ -484,8 +745,8 @@
       "askSn": "7153237",
       "category": "",
       "actor": "",
-      "rowNum": 17,
-      "id": "cti_1789713880682_17"
+      "rowNum": 19,
+      "id": "cti_1789714416325_19"
     },
     {
       "type": "IN",
@@ -508,8 +769,8 @@
       "askSn": "7152724",
       "category": "",
       "actor": "",
-      "rowNum": 18,
-      "id": "cti_1789713685431_18"
+      "rowNum": 20,
+      "id": "cti_1789714416325_20"
     },
     {
       "type": "IN",
@@ -532,8 +793,8 @@
       "askSn": "7152598",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 19,
-      "id": "cti_1789713685431_19"
+      "rowNum": 21,
+      "id": "cti_1789714416325_21"
     },
     {
       "type": "IN",
@@ -556,8 +817,8 @@
       "askSn": "7152551",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 20,
-      "id": "cti_1789713685431_20"
+      "rowNum": 22,
+      "id": "cti_1789714416325_22"
     },
     {
       "type": "IN",
@@ -580,8 +841,8 @@
       "askSn": "7152422",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 21,
-      "id": "cti_1789713685431_21"
+      "rowNum": 23,
+      "id": "cti_1789714416325_23"
     },
     {
       "type": "IN",
@@ -604,8 +865,8 @@
       "askSn": "7152419",
       "category": "",
       "actor": "",
-      "rowNum": 22,
-      "id": "cti_1789713685431_22"
+      "rowNum": 24,
+      "id": "cti_1789714416325_24"
     },
     {
       "type": "IN",
@@ -628,8 +889,8 @@
       "askSn": "7152025",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 23,
-      "id": "cti_1789713685431_23"
+      "rowNum": 25,
+      "id": "cti_1789714416326_25"
     },
     {
       "type": "IN",
@@ -652,8 +913,8 @@
       "askSn": "7149248",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 24,
-      "id": "cti_1789713685431_24"
+      "rowNum": 26,
+      "id": "cti_1789714416326_26"
     },
     {
       "type": "IN",
@@ -676,8 +937,8 @@
       "askSn": "7148471",
       "category": "",
       "actor": "",
-      "rowNum": 25,
-      "id": "cti_1789713685431_25"
+      "rowNum": 27,
+      "id": "cti_1789714416326_27"
     },
     {
       "type": "IN",
@@ -700,8 +961,8 @@
       "askSn": "7147622",
       "category": "",
       "actor": "",
-      "rowNum": 26,
-      "id": "cti_1789713685431_26"
+      "rowNum": 28,
+      "id": "cti_1789714416326_28"
     },
     {
       "type": "IN",
@@ -724,8 +985,8 @@
       "askSn": "7147620",
       "category": "",
       "actor": "",
-      "rowNum": 27,
-      "id": "cti_1789713685431_27"
+      "rowNum": 29,
+      "id": "cti_1789714416326_29"
     },
     {
       "type": "IN",
@@ -748,8 +1009,8 @@
       "askSn": "7147616",
       "category": "",
       "actor": "",
-      "rowNum": 28,
-      "id": "cti_1789713685431_28"
+      "rowNum": 30,
+      "id": "cti_1789714416326_30"
     },
     {
       "type": "IN",
@@ -772,8 +1033,8 @@
       "askSn": "7146961",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 29,
-      "id": "cti_1789713685431_29"
+      "rowNum": 31,
+      "id": "cti_1789714416326_31"
     },
     {
       "type": "IN",
@@ -796,8 +1057,8 @@
       "askSn": "7146904",
       "category": "",
       "actor": "",
-      "rowNum": 30,
-      "id": "cti_1789713685431_30"
+      "rowNum": 32,
+      "id": "cti_1789714416326_32"
     },
     {
       "type": "IN",
@@ -820,8 +1081,8 @@
       "askSn": "7146336",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 31,
-      "id": "cti_1789713685431_31"
+      "rowNum": 33,
+      "id": "cti_1789714416326_33"
     },
     {
       "type": "IN",
@@ -844,8 +1105,8 @@
       "askSn": "7146318",
       "category": "",
       "actor": "",
-      "rowNum": 32,
-      "id": "cti_1789713685431_32"
+      "rowNum": 34,
+      "id": "cti_1789714416326_34"
     },
     {
       "type": "IN",
@@ -868,8 +1129,8 @@
       "askSn": "7146126",
       "category": "",
       "actor": "",
-      "rowNum": 33,
-      "id": "cti_1789713685431_33"
+      "rowNum": 35,
+      "id": "cti_1789714416326_35"
     },
     {
       "type": "IN",
@@ -892,8 +1153,8 @@
       "askSn": "7145755",
       "category": "",
       "actor": "",
-      "rowNum": 34,
-      "id": "cti_1789713685431_34"
+      "rowNum": 36,
+      "id": "cti_1789714416326_36"
     },
     {
       "type": "IN",
@@ -916,8 +1177,8 @@
       "askSn": "7144270",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 35,
-      "id": "cti_1789713685431_35"
+      "rowNum": 37,
+      "id": "cti_1789714416326_37"
     },
     {
       "type": "IN",
@@ -940,8 +1201,8 @@
       "askSn": "7143947",
       "category": "",
       "actor": "",
-      "rowNum": 36,
-      "id": "cti_1789713685431_36"
+      "rowNum": 38,
+      "id": "cti_1789714416326_38"
     },
     {
       "type": "IN",
@@ -964,8 +1225,8 @@
       "askSn": "7143896",
       "category": "",
       "actor": "",
-      "rowNum": 37,
-      "id": "cti_1789713685431_37"
+      "rowNum": 39,
+      "id": "cti_1789714416326_39"
     },
     {
       "type": "IN",
@@ -988,8 +1249,8 @@
       "askSn": "7142807",
       "category": "",
       "actor": "",
-      "rowNum": 38,
-      "id": "cti_1789713685431_38"
+      "rowNum": 40,
+      "id": "cti_1789714416326_40"
     },
     {
       "type": "IN",
@@ -1012,8 +1273,8 @@
       "askSn": "7142531",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 39,
-      "id": "cti_1789713685431_39"
+      "rowNum": 41,
+      "id": "cti_1789714416326_41"
     },
     {
       "type": "IN",
@@ -1036,8 +1297,8 @@
       "askSn": "7142511",
       "category": "",
       "actor": "",
-      "rowNum": 40,
-      "id": "cti_1789713685431_40"
+      "rowNum": 42,
+      "id": "cti_1789714416326_42"
     },
     {
       "type": "IN",
@@ -1060,8 +1321,8 @@
       "askSn": "7142431",
       "category": "",
       "actor": "",
-      "rowNum": 41,
-      "id": "cti_1789713685431_41"
+      "rowNum": 43,
+      "id": "cti_1789714416326_43"
     },
     {
       "type": "IN",
@@ -1084,8 +1345,8 @@
       "askSn": "7142376",
       "category": "서비스 이용조건·범위",
       "actor": "삼성화재 내부(설계사·지점)",
-      "rowNum": 42,
-      "id": "cti_1789713685431_42"
+      "rowNum": 44,
+      "id": "cti_1789714416326_44"
     },
     {
       "type": "IN",
@@ -1108,8 +1369,8 @@
       "askSn": "7142309",
       "category": "",
       "actor": "",
-      "rowNum": 43,
-      "id": "cti_1789713685431_43"
+      "rowNum": 45,
+      "id": "cti_1789714416326_45"
     },
     {
       "type": "IN",
@@ -1132,8 +1393,8 @@
       "askSn": "7142245",
       "category": "",
       "actor": "",
-      "rowNum": 44,
-      "id": "cti_1789713685431_44"
+      "rowNum": 46,
+      "id": "cti_1789714416326_46"
     },
     {
       "type": "IN",
@@ -1156,8 +1417,8 @@
       "askSn": "7142208",
       "category": "",
       "actor": "",
-      "rowNum": 45,
-      "id": "cti_1789713685431_45"
+      "rowNum": 47,
+      "id": "cti_1789714416326_47"
     },
     {
       "type": "IN",
@@ -1180,8 +1441,8 @@
       "askSn": "7142062",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 46,
-      "id": "cti_1789713685431_46"
+      "rowNum": 48,
+      "id": "cti_1789714416326_48"
     },
     {
       "type": "IN",
@@ -1204,8 +1465,8 @@
       "askSn": "7141270",
       "category": "",
       "actor": "",
-      "rowNum": 47,
-      "id": "cti_1789713685431_47"
+      "rowNum": 49,
+      "id": "cti_1789714416326_49"
     },
     {
       "type": "IN",
@@ -1228,8 +1489,8 @@
       "askSn": "7141085",
       "category": "",
       "actor": "",
-      "rowNum": 48,
-      "id": "cti_1789713685431_48"
+      "rowNum": 50,
+      "id": "cti_1789714416326_50"
     },
     {
       "type": "IN",
@@ -1252,8 +1513,8 @@
       "askSn": "7140903",
       "category": "",
       "actor": "",
-      "rowNum": 49,
-      "id": "cti_1789713685431_49"
+      "rowNum": 51,
+      "id": "cti_1789714416326_51"
     },
     {
       "type": "IN",
@@ -1276,8 +1537,8 @@
       "askSn": "7140814",
       "category": "",
       "actor": "",
-      "rowNum": 50,
-      "id": "cti_1789713685431_50"
+      "rowNum": 52,
+      "id": "cti_1789714416326_52"
     },
     {
       "type": "IN",
@@ -1300,8 +1561,8 @@
       "askSn": "7140689",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 51,
-      "id": "cti_1789713685431_51"
+      "rowNum": 53,
+      "id": "cti_1789714416326_53"
     },
     {
       "type": "IN",
@@ -1324,8 +1585,8 @@
       "askSn": "7140663",
       "category": "",
       "actor": "",
-      "rowNum": 52,
-      "id": "cti_1789713685431_52"
+      "rowNum": 54,
+      "id": "cti_1789714416326_54"
     },
     {
       "type": "IN",
@@ -1348,8 +1609,8 @@
       "askSn": "7140451",
       "category": "",
       "actor": "",
-      "rowNum": 53,
-      "id": "cti_1789713685431_53"
+      "rowNum": 55,
+      "id": "cti_1789714416326_55"
     },
     {
       "type": "IN",
@@ -1372,8 +1633,8 @@
       "askSn": "7139576",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 54,
-      "id": "cti_1789713685431_54"
+      "rowNum": 56,
+      "id": "cti_1789714416326_56"
     },
     {
       "type": "IN",
@@ -1396,8 +1657,8 @@
       "askSn": "7139313",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 55,
-      "id": "cti_1789713685431_55"
+      "rowNum": 57,
+      "id": "cti_1789714416326_57"
     },
     {
       "type": "IN",
@@ -1420,8 +1681,8 @@
       "askSn": "7139055",
       "category": "",
       "actor": "",
-      "rowNum": 56,
-      "id": "cti_1789713685431_56"
+      "rowNum": 58,
+      "id": "cti_1789714416326_58"
     },
     {
       "type": "IN",
@@ -1444,8 +1705,8 @@
       "askSn": "7138681",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 57,
-      "id": "cti_1789713685431_57"
+      "rowNum": 59,
+      "id": "cti_1789714416326_59"
     },
     {
       "type": "IN",
@@ -1468,8 +1729,8 @@
       "askSn": "7138649",
       "category": "",
       "actor": "",
-      "rowNum": 58,
-      "id": "cti_1789713685431_58"
+      "rowNum": 60,
+      "id": "cti_1789714416326_60"
     },
     {
       "type": "IN",
@@ -1492,8 +1753,8 @@
       "askSn": "7138200",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 59,
-      "id": "cti_1789713685431_59"
+      "rowNum": 61,
+      "id": "cti_1789714416326_61"
     },
     {
       "type": "IN",
@@ -1516,8 +1777,8 @@
       "askSn": "7138171",
       "category": "",
       "actor": "",
-      "rowNum": 60,
-      "id": "cti_1789713685431_60"
+      "rowNum": 62,
+      "id": "cti_1789714416326_62"
     },
     {
       "type": "IN",
@@ -1540,8 +1801,8 @@
       "askSn": "7138123",
       "category": "",
       "actor": "",
-      "rowNum": 61,
-      "id": "cti_1789713685431_61"
+      "rowNum": 63,
+      "id": "cti_1789714416326_63"
     },
     {
       "type": "IN",
@@ -1564,8 +1825,8 @@
       "askSn": "7138099",
       "category": "",
       "actor": "",
-      "rowNum": 62,
-      "id": "cti_1789713685431_62"
+      "rowNum": 64,
+      "id": "cti_1789714416326_64"
     },
     {
       "type": "IN",
@@ -1588,8 +1849,8 @@
       "askSn": "7138060",
       "category": "",
       "actor": "",
-      "rowNum": 63,
-      "id": "cti_1789713685431_63"
+      "rowNum": 65,
+      "id": "cti_1789714416326_65"
     },
     {
       "type": "IN",
@@ -1612,8 +1873,8 @@
       "askSn": "7137792",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 64,
-      "id": "cti_1789713685431_64"
+      "rowNum": 66,
+      "id": "cti_1789714416326_66"
     },
     {
       "type": "IN",
@@ -1636,8 +1897,8 @@
       "askSn": "7137757",
       "category": "",
       "actor": "",
-      "rowNum": 65,
-      "id": "cti_1789713685431_65"
+      "rowNum": 67,
+      "id": "cti_1789714416326_67"
     },
     {
       "type": "IN",
@@ -1660,8 +1921,8 @@
       "askSn": "7137439",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 66,
-      "id": "cti_1789713685431_66"
+      "rowNum": 68,
+      "id": "cti_1789714416326_68"
     },
     {
       "type": "IN",
@@ -1684,8 +1945,8 @@
       "askSn": "7137315",
       "category": "",
       "actor": "",
-      "rowNum": 67,
-      "id": "cti_1789713685431_67"
+      "rowNum": 69,
+      "id": "cti_1789714416326_69"
     },
     {
       "type": "IN",
@@ -1708,8 +1969,8 @@
       "askSn": "7136844",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 68,
-      "id": "cti_1789713685431_68"
+      "rowNum": 70,
+      "id": "cti_1789714416326_70"
     },
     {
       "type": "IN",
@@ -1732,8 +1993,8 @@
       "askSn": "7136827",
       "category": "",
       "actor": "",
-      "rowNum": 69,
-      "id": "cti_1789713685431_69"
+      "rowNum": 71,
+      "id": "cti_1789714416326_71"
     },
     {
       "type": "IN",
@@ -1756,8 +2017,8 @@
       "askSn": "7136386",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 70,
-      "id": "cti_1789713685431_70"
+      "rowNum": 72,
+      "id": "cti_1789714416326_72"
     },
     {
       "type": "IN",
@@ -1780,8 +2041,8 @@
       "askSn": "7136376",
       "category": "",
       "actor": "",
-      "rowNum": 71,
-      "id": "cti_1789713685431_71"
+      "rowNum": 73,
+      "id": "cti_1789714416326_73"
     },
     {
       "type": "IN",
@@ -1804,8 +2065,8 @@
       "askSn": "7136347",
       "category": "",
       "actor": "",
-      "rowNum": 72,
-      "id": "cti_1789713685431_72"
+      "rowNum": 74,
+      "id": "cti_1789714416326_74"
     },
     {
       "type": "IN",
@@ -1828,8 +2089,8 @@
       "askSn": "7136217",
       "category": "",
       "actor": "",
-      "rowNum": 73,
-      "id": "cti_1789713685431_73"
+      "rowNum": 75,
+      "id": "cti_1789714416326_75"
     },
     {
       "type": "IN",
@@ -1852,8 +2113,8 @@
       "askSn": "7136092",
       "category": "",
       "actor": "",
-      "rowNum": 74,
-      "id": "cti_1789713685431_74"
+      "rowNum": 76,
+      "id": "cti_1789714416326_76"
     },
     {
       "type": "IN",
@@ -1876,8 +2137,8 @@
       "askSn": "7136077",
       "category": "",
       "actor": "",
-      "rowNum": 75,
-      "id": "cti_1789713685431_75"
+      "rowNum": 77,
+      "id": "cti_1789714416326_77"
     },
     {
       "type": "IN",
@@ -1900,8 +2161,8 @@
       "askSn": "7135703",
       "category": "",
       "actor": "",
-      "rowNum": 76,
-      "id": "cti_1789713685431_76"
+      "rowNum": 78,
+      "id": "cti_1789714416326_78"
     },
     {
       "type": "IN",
@@ -1924,8 +2185,8 @@
       "askSn": "7135662",
       "category": "",
       "actor": "",
-      "rowNum": 77,
-      "id": "cti_1789713685431_77"
+      "rowNum": 79,
+      "id": "cti_1789714416326_79"
     },
     {
       "type": "IN",
@@ -1948,7 +2209,7 @@
       "askSn": "7135460",
       "category": "",
       "actor": "",
-      "rowNum": 78,
+      "rowNum": 80,
       "id": "cti_1789713685431_78"
     },
     {
@@ -1972,7 +2233,7 @@
       "askSn": "7135427",
       "category": "",
       "actor": "",
-      "rowNum": 79,
+      "rowNum": 81,
       "id": "cti_1789713685431_79"
     },
     {
@@ -1996,7 +2257,7 @@
       "askSn": "7135269",
       "category": "",
       "actor": "",
-      "rowNum": 80,
+      "rowNum": 82,
       "id": "cti_1789713685431_80"
     },
     {
@@ -2020,7 +2281,7 @@
       "askSn": "7135265",
       "category": "",
       "actor": "",
-      "rowNum": 81,
+      "rowNum": 83,
       "id": "cti_1789713685431_81"
     },
     {
@@ -2044,7 +2305,7 @@
       "askSn": "7135262",
       "category": "",
       "actor": "",
-      "rowNum": 82,
+      "rowNum": 84,
       "id": "cti_1789713685431_82"
     },
     {
@@ -2068,7 +2329,7 @@
       "askSn": "7134979",
       "category": "",
       "actor": "",
-      "rowNum": 83,
+      "rowNum": 85,
       "id": "cti_1789713685431_83"
     },
     {
@@ -2092,7 +2353,7 @@
       "askSn": "7134664",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 84,
+      "rowNum": 86,
       "id": "cti_1789713685431_84"
     },
     {
@@ -2116,7 +2377,7 @@
       "askSn": "7134572",
       "category": "",
       "actor": "",
-      "rowNum": 85,
+      "rowNum": 87,
       "id": "cti_1789713685431_85"
     },
     {
@@ -2140,7 +2401,7 @@
       "askSn": "7134126",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 86,
+      "rowNum": 88,
       "id": "cti_1789713685431_86"
     },
     {
@@ -2164,7 +2425,7 @@
       "askSn": "7133086",
       "category": "",
       "actor": "",
-      "rowNum": 87,
+      "rowNum": 89,
       "id": "cti_1789713685431_87"
     },
     {
@@ -2188,7 +2449,7 @@
       "askSn": "7133081",
       "category": "",
       "actor": "",
-      "rowNum": 88,
+      "rowNum": 90,
       "id": "cti_1789713685431_88"
     },
     {
@@ -2212,7 +2473,7 @@
       "askSn": "7132275",
       "category": "",
       "actor": "",
-      "rowNum": 89,
+      "rowNum": 91,
       "id": "cti_1789713685431_89"
     },
     {
@@ -2236,7 +2497,7 @@
       "askSn": "7130818",
       "category": "",
       "actor": "",
-      "rowNum": 90,
+      "rowNum": 92,
       "id": "cti_1789713685431_90"
     },
     {
@@ -2260,7 +2521,7 @@
       "askSn": "7130804",
       "category": "",
       "actor": "",
-      "rowNum": 91,
+      "rowNum": 93,
       "id": "cti_1789713685431_91"
     },
     {
@@ -2284,7 +2545,7 @@
       "askSn": "7130726",
       "category": "",
       "actor": "",
-      "rowNum": 92,
+      "rowNum": 94,
       "id": "cti_1789713685431_92"
     },
     {
@@ -2308,7 +2569,7 @@
       "askSn": "7130686",
       "category": "",
       "actor": "",
-      "rowNum": 93,
+      "rowNum": 95,
       "id": "cti_1789713685431_93"
     },
     {
@@ -2332,7 +2593,7 @@
       "askSn": "7130682",
       "category": "",
       "actor": "",
-      "rowNum": 94,
+      "rowNum": 96,
       "id": "cti_1789713685431_94"
     },
     {
@@ -2356,7 +2617,7 @@
       "askSn": "7130225",
       "category": "",
       "actor": "",
-      "rowNum": 95,
+      "rowNum": 97,
       "id": "cti_1789713685431_95"
     },
     {
@@ -2380,7 +2641,7 @@
       "askSn": "7130175",
       "category": "",
       "actor": "",
-      "rowNum": 96,
+      "rowNum": 98,
       "id": "cti_1789713685431_96"
     },
     {
@@ -2404,7 +2665,7 @@
       "askSn": "7130173",
       "category": "",
       "actor": "",
-      "rowNum": 97,
+      "rowNum": 99,
       "id": "cti_1789713685431_97"
     },
     {
@@ -2428,7 +2689,7 @@
       "askSn": "7130110",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 98,
+      "rowNum": 100,
       "id": "cti_1789713685431_98"
     },
     {
@@ -2452,7 +2713,7 @@
       "askSn": "7129785",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 99,
+      "rowNum": 101,
       "id": "cti_1789713685431_99"
     },
     {
@@ -2476,7 +2737,7 @@
       "askSn": "7129429",
       "category": "",
       "actor": "",
-      "rowNum": 100,
+      "rowNum": 102,
       "id": "cti_1789713685431_100"
     },
     {
@@ -2500,7 +2761,7 @@
       "askSn": "7129289",
       "category": "",
       "actor": "",
-      "rowNum": 101,
+      "rowNum": 103,
       "id": "cti_1789713685431_101"
     },
     {
@@ -2524,7 +2785,7 @@
       "askSn": "7129286",
       "category": "",
       "actor": "",
-      "rowNum": 102,
+      "rowNum": 104,
       "id": "cti_1789713685431_102"
     },
     {
@@ -2548,7 +2809,7 @@
       "askSn": "7129285",
       "category": "",
       "actor": "",
-      "rowNum": 103,
+      "rowNum": 105,
       "id": "cti_1789713685431_103"
     },
     {
@@ -2572,7 +2833,7 @@
       "askSn": "7129209",
       "category": "",
       "actor": "",
-      "rowNum": 104,
+      "rowNum": 106,
       "id": "cti_1789713685431_104"
     },
     {
@@ -2596,7 +2857,7 @@
       "askSn": "7129147",
       "category": "",
       "actor": "",
-      "rowNum": 105,
+      "rowNum": 107,
       "id": "cti_1789713685431_105"
     },
     {
@@ -2620,7 +2881,7 @@
       "askSn": "7129125",
       "category": "",
       "actor": "",
-      "rowNum": 106,
+      "rowNum": 108,
       "id": "cti_1789713685431_106"
     },
     {
@@ -2644,7 +2905,7 @@
       "askSn": "7129081",
       "category": "",
       "actor": "",
-      "rowNum": 107,
+      "rowNum": 109,
       "id": "cti_1789713685431_107"
     },
     {
@@ -2668,7 +2929,7 @@
       "askSn": "7128969",
       "category": "",
       "actor": "",
-      "rowNum": 108,
+      "rowNum": 110,
       "id": "cti_1789713685431_108"
     },
     {
@@ -2692,7 +2953,7 @@
       "askSn": "7128953",
       "category": "",
       "actor": "",
-      "rowNum": 109,
+      "rowNum": 111,
       "id": "cti_1789713685431_109"
     },
     {
@@ -2716,7 +2977,7 @@
       "askSn": "7128899",
       "category": "",
       "actor": "",
-      "rowNum": 110,
+      "rowNum": 112,
       "id": "cti_1789713685431_110"
     },
     {
@@ -2740,7 +3001,7 @@
       "askSn": "7128370",
       "category": "",
       "actor": "",
-      "rowNum": 111,
+      "rowNum": 113,
       "id": "cti_1789709212875_105"
     },
     {
@@ -2764,7 +3025,7 @@
       "askSn": "7128369",
       "category": "",
       "actor": "",
-      "rowNum": 112,
+      "rowNum": 114,
       "id": "cti_1789709212875_106"
     },
     {
@@ -2788,7 +3049,7 @@
       "askSn": "7128260",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 113,
+      "rowNum": 115,
       "id": "cti_1789709212875_107"
     },
     {
@@ -2812,7 +3073,7 @@
       "askSn": "7128258",
       "category": "",
       "actor": "",
-      "rowNum": 114,
+      "rowNum": 116,
       "id": "cti_1789709212875_108"
     },
     {
@@ -2836,7 +3097,7 @@
       "askSn": "7128257",
       "category": "",
       "actor": "",
-      "rowNum": 115,
+      "rowNum": 117,
       "id": "cti_1789709212875_109"
     },
     {
@@ -2860,7 +3121,7 @@
       "askSn": "7128198",
       "category": "",
       "actor": "",
-      "rowNum": 116,
+      "rowNum": 118,
       "id": "cti_1789709212875_110"
     },
     {
@@ -2884,7 +3145,7 @@
       "askSn": "7128179",
       "category": "",
       "actor": "",
-      "rowNum": 117,
+      "rowNum": 119,
       "id": "cti_1789709212875_111"
     },
     {
@@ -2908,7 +3169,7 @@
       "askSn": "7128125",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 118,
+      "rowNum": 120,
       "id": "cti_1789709212875_112"
     },
     {
@@ -2932,7 +3193,7 @@
       "askSn": "7127598",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 119,
+      "rowNum": 121,
       "id": "cti_1789709212875_113"
     },
     {
@@ -2956,7 +3217,7 @@
       "askSn": "7127495",
       "category": "",
       "actor": "",
-      "rowNum": 120,
+      "rowNum": 122,
       "id": "cti_1789709212875_114"
     },
     {
@@ -2980,7 +3241,7 @@
       "askSn": "7127481",
       "category": "",
       "actor": "",
-      "rowNum": 121,
+      "rowNum": 123,
       "id": "cti_1789709212875_115"
     },
     {
@@ -3004,7 +3265,7 @@
       "askSn": "7127297",
       "category": "",
       "actor": "",
-      "rowNum": 122,
+      "rowNum": 124,
       "id": "cti_1789709212875_116"
     },
     {
@@ -3028,7 +3289,7 @@
       "askSn": "7127233",
       "category": "",
       "actor": "",
-      "rowNum": 123,
+      "rowNum": 125,
       "id": "cti_1789709212875_117"
     },
     {
@@ -3052,7 +3313,7 @@
       "askSn": "7126895",
       "category": "",
       "actor": "",
-      "rowNum": 124,
+      "rowNum": 126,
       "id": "cti_1789709212875_118"
     },
     {
@@ -3076,7 +3337,7 @@
       "askSn": "7126003",
       "category": "",
       "actor": "",
-      "rowNum": 125,
+      "rowNum": 127,
       "id": "cti_1789709212875_119"
     },
     {
@@ -3100,7 +3361,7 @@
       "askSn": "7125993",
       "category": "",
       "actor": "",
-      "rowNum": 126,
+      "rowNum": 128,
       "id": "cti_1789709212875_120"
     },
     {
@@ -3124,7 +3385,7 @@
       "askSn": "7125758",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 127,
+      "rowNum": 129,
       "id": "cti_1789709212875_121"
     },
     {
@@ -3148,7 +3409,7 @@
       "askSn": "7125212",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 128,
+      "rowNum": 130,
       "id": "cti_1789709212875_122"
     },
     {
@@ -3172,7 +3433,7 @@
       "askSn": "7125134",
       "category": "",
       "actor": "",
-      "rowNum": 129,
+      "rowNum": 131,
       "id": "cti_1789709212875_123"
     },
     {
@@ -3196,7 +3457,7 @@
       "askSn": "7124230",
       "category": "비용·무상제공 확인",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 130,
+      "rowNum": 132,
       "id": "cti_1789709212875_124"
     },
     {
@@ -3220,7 +3481,7 @@
       "askSn": "7123449",
       "category": "",
       "actor": "",
-      "rowNum": 131,
+      "rowNum": 133,
       "id": "cti_1789709212875_125"
     },
     {
@@ -3244,7 +3505,7 @@
       "askSn": "7123183",
       "category": "",
       "actor": "",
-      "rowNum": 132,
+      "rowNum": 134,
       "id": "cti_1789709212875_126"
     },
     {
@@ -3268,7 +3529,7 @@
       "askSn": "7123083",
       "category": "",
       "actor": "",
-      "rowNum": 133,
+      "rowNum": 135,
       "id": "cti_1789709212875_127"
     },
     {
@@ -3292,7 +3553,7 @@
       "askSn": "7123080",
       "category": "",
       "actor": "",
-      "rowNum": 134,
+      "rowNum": 136,
       "id": "cti_1789709212875_128"
     },
     {
@@ -3316,7 +3577,7 @@
       "askSn": "7122880",
       "category": "보험 문의·타업무 연결",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 135,
+      "rowNum": 137,
       "id": "cti_1789709212875_129"
     },
     {
@@ -3340,7 +3601,7 @@
       "askSn": "7122647",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 136,
+      "rowNum": 138,
       "id": "cti_1789709212875_130"
     },
     {
@@ -3364,7 +3625,7 @@
       "askSn": "7122545",
       "category": "",
       "actor": "",
-      "rowNum": 137,
+      "rowNum": 139,
       "id": "cti_1789709212875_131"
     },
     {
@@ -3388,7 +3649,7 @@
       "askSn": "7122334",
       "category": "",
       "actor": "",
-      "rowNum": 138,
+      "rowNum": 140,
       "id": "cti_1789709212875_132"
     },
     {
@@ -3412,7 +3673,7 @@
       "askSn": "7121462",
       "category": "",
       "actor": "",
-      "rowNum": 139,
+      "rowNum": 141,
       "id": "cti_1789709212875_133"
     },
     {
@@ -3436,7 +3697,7 @@
       "askSn": "7121448",
       "category": "",
       "actor": "",
-      "rowNum": 140,
+      "rowNum": 142,
       "id": "cti_1789709212875_134"
     },
     {
@@ -3460,7 +3721,7 @@
       "askSn": "7121136",
       "category": "",
       "actor": "",
-      "rowNum": 141,
+      "rowNum": 143,
       "id": "cti_1789709212875_135"
     },
     {
@@ -3484,7 +3745,7 @@
       "askSn": "7121124",
       "category": "",
       "actor": "",
-      "rowNum": 142,
+      "rowNum": 144,
       "id": "cti_1789709212875_136"
     },
     {
@@ -3508,7 +3769,7 @@
       "askSn": "7121082",
       "category": "",
       "actor": "",
-      "rowNum": 143,
+      "rowNum": 145,
       "id": "cti_1789709212875_137"
     },
     {
@@ -3532,7 +3793,7 @@
       "askSn": "7121017",
       "category": "",
       "actor": "",
-      "rowNum": 144,
+      "rowNum": 146,
       "id": "cti_1789709212875_138"
     },
     {
@@ -3556,7 +3817,7 @@
       "askSn": "7120655",
       "category": "",
       "actor": "",
-      "rowNum": 145,
+      "rowNum": 147,
       "id": "cti_1789709212875_139"
     },
     {
@@ -3580,7 +3841,7 @@
       "askSn": "7120386",
       "category": "",
       "actor": "",
-      "rowNum": 146,
+      "rowNum": 148,
       "id": "cti_1789709212875_140"
     },
     {
@@ -3604,7 +3865,7 @@
       "askSn": "7119542",
       "category": "",
       "actor": "",
-      "rowNum": 147,
+      "rowNum": 149,
       "id": "cti_1789709212875_141"
     },
     {
@@ -3628,7 +3889,7 @@
       "askSn": "7119529",
       "category": "",
       "actor": "",
-      "rowNum": 148,
+      "rowNum": 150,
       "id": "cti_1789709212875_142"
     },
     {
@@ -3652,7 +3913,7 @@
       "askSn": "7118970",
       "category": "",
       "actor": "",
-      "rowNum": 149,
+      "rowNum": 151,
       "id": "cti_1789709212875_143"
     },
     {
@@ -3676,7 +3937,7 @@
       "askSn": "7118949",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 150,
+      "rowNum": 152,
       "id": "cti_1789709212875_144"
     },
     {
@@ -3700,7 +3961,7 @@
       "askSn": "7118767",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 151,
+      "rowNum": 153,
       "id": "cti_1789709212875_145"
     },
     {
@@ -3724,7 +3985,7 @@
       "askSn": "7117753",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 152,
+      "rowNum": 154,
       "id": "cti_1789709212875_146"
     },
     {
@@ -3748,7 +4009,7 @@
       "askSn": "7117707",
       "category": "서비스 이용조건·범위",
       "actor": "삼성화재 내부(설계사·지점)",
-      "rowNum": 153,
+      "rowNum": 155,
       "id": "cti_1789709212875_147"
     },
     {
@@ -3772,7 +4033,7 @@
       "askSn": "7117686",
       "category": "",
       "actor": "",
-      "rowNum": 154,
+      "rowNum": 156,
       "id": "cti_1789709212875_148"
     },
     {
@@ -3796,7 +4057,7 @@
       "askSn": "7117482",
       "category": "",
       "actor": "",
-      "rowNum": 155,
+      "rowNum": 157,
       "id": "cti_1789709212875_149"
     },
     {
@@ -3820,7 +4081,7 @@
       "askSn": "7117133",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 156,
+      "rowNum": 158,
       "id": "cti_1789709212875_150"
     },
     {
@@ -3844,7 +4105,7 @@
       "askSn": "7117123",
       "category": "",
       "actor": "",
-      "rowNum": 157,
+      "rowNum": 159,
       "id": "cti_1789709212875_151"
     },
     {
@@ -3868,7 +4129,7 @@
       "askSn": "7116106",
       "category": "",
       "actor": "",
-      "rowNum": 158,
+      "rowNum": 160,
       "id": "cti_1789709212875_152"
     },
     {
@@ -3892,7 +4153,7 @@
       "askSn": "7116081",
       "category": "",
       "actor": "",
-      "rowNum": 159,
+      "rowNum": 161,
       "id": "cti_1789709212875_153"
     },
     {
@@ -3916,7 +4177,7 @@
       "askSn": "7115996",
       "category": "",
       "actor": "",
-      "rowNum": 160,
+      "rowNum": 162,
       "id": "cti_1789709212875_154"
     },
     {
@@ -3940,7 +4201,7 @@
       "askSn": "7115909",
       "category": "",
       "actor": "",
-      "rowNum": 161,
+      "rowNum": 163,
       "id": "cti_1789709212875_155"
     },
     {
@@ -3964,7 +4225,7 @@
       "askSn": "7115784",
       "category": "",
       "actor": "",
-      "rowNum": 162,
+      "rowNum": 164,
       "id": "cti_1789709212875_156"
     },
     {
@@ -3988,7 +4249,7 @@
       "askSn": "7115723",
       "category": "",
       "actor": "",
-      "rowNum": 163,
+      "rowNum": 165,
       "id": "cti_1789709212875_157"
     },
     {
@@ -4012,7 +4273,7 @@
       "askSn": "7114763",
       "category": "간병 신청·접수·배정",
       "actor": "협력업체·간병협회",
-      "rowNum": 164,
+      "rowNum": 166,
       "id": "cti_1789709212875_158"
     },
     {
@@ -4036,7 +4297,7 @@
       "askSn": "7114730",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 165,
+      "rowNum": 167,
       "id": "cti_1789709212875_159"
     },
     {
@@ -4060,7 +4321,7 @@
       "askSn": "7113167",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 166,
+      "rowNum": 168,
       "id": "cti_1789709212875_160"
     },
     {
@@ -4084,7 +4345,7 @@
       "askSn": "7112689",
       "category": "",
       "actor": "",
-      "rowNum": 167,
+      "rowNum": 169,
       "id": "cti_1789709212875_161"
     },
     {
@@ -4108,7 +4369,7 @@
       "askSn": "7111692",
       "category": "",
       "actor": "",
-      "rowNum": 168,
+      "rowNum": 170,
       "id": "cti_1789709212875_162"
     },
     {
@@ -4132,7 +4393,7 @@
       "askSn": "7111406",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 169,
+      "rowNum": 171,
       "id": "cti_1789709212875_163"
     },
     {
@@ -4156,7 +4417,7 @@
       "askSn": "7111251",
       "category": "",
       "actor": "",
-      "rowNum": 170,
+      "rowNum": 172,
       "id": "cti_1789709212875_164"
     },
     {
@@ -4180,7 +4441,7 @@
       "askSn": "7110914",
       "category": "",
       "actor": "",
-      "rowNum": 171,
+      "rowNum": 173,
       "id": "cti_1789709212875_165"
     },
     {
@@ -4204,7 +4465,7 @@
       "askSn": "7110162",
       "category": "보험 문의·타업무 연결",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 172,
+      "rowNum": 174,
       "id": "cti_1789709212875_166"
     },
     {
@@ -4228,7 +4489,7 @@
       "askSn": "7109047",
       "category": "",
       "actor": "",
-      "rowNum": 173,
+      "rowNum": 175,
       "id": "cti_1789709212875_167"
     },
     {
@@ -4252,7 +4513,7 @@
       "askSn": "7107813",
       "category": "",
       "actor": "",
-      "rowNum": 174,
+      "rowNum": 176,
       "id": "cti_1789709212875_168"
     },
     {
@@ -4276,7 +4537,7 @@
       "askSn": "7107800",
       "category": "",
       "actor": "",
-      "rowNum": 175,
+      "rowNum": 177,
       "id": "cti_1789709212875_169"
     },
     {
@@ -4300,7 +4561,7 @@
       "askSn": "7107585",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 176,
+      "rowNum": 178,
       "id": "cti_1789709212875_170"
     },
     {
@@ -4324,7 +4585,7 @@
       "askSn": "7106954",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 177,
+      "rowNum": 179,
       "id": "cti_1789709212875_171"
     },
     {
@@ -4348,7 +4609,7 @@
       "askSn": "7106947",
       "category": "",
       "actor": "",
-      "rowNum": 178,
+      "rowNum": 180,
       "id": "cti_1789709212875_172"
     },
     {
@@ -4372,7 +4633,7 @@
       "askSn": "7106273",
       "category": "",
       "actor": "",
-      "rowNum": 179,
+      "rowNum": 181,
       "id": "cti_1789709212875_173"
     },
     {
@@ -4396,7 +4657,7 @@
       "askSn": "7105420",
       "category": "",
       "actor": "",
-      "rowNum": 180,
+      "rowNum": 182,
       "id": "cti_1789709212875_174"
     },
     {
@@ -4420,7 +4681,7 @@
       "askSn": "7104998",
       "category": "",
       "actor": "",
-      "rowNum": 181,
+      "rowNum": 183,
       "id": "cti_1789709212875_175"
     },
     {
@@ -4444,7 +4705,7 @@
       "askSn": "7104225",
       "category": "",
       "actor": "",
-      "rowNum": 182,
+      "rowNum": 184,
       "id": "cti_1789709212875_176"
     },
     {
@@ -4468,7 +4729,7 @@
       "askSn": "7104181",
       "category": "",
       "actor": "",
-      "rowNum": 183,
+      "rowNum": 185,
       "id": "cti_1789709212875_177"
     },
     {
@@ -4492,7 +4753,7 @@
       "askSn": "7103960",
       "category": "",
       "actor": "",
-      "rowNum": 184,
+      "rowNum": 186,
       "id": "cti_1789709212875_178"
     },
     {
@@ -4516,7 +4777,7 @@
       "askSn": "7103956",
       "category": "",
       "actor": "",
-      "rowNum": 185,
+      "rowNum": 187,
       "id": "cti_1789709212875_179"
     },
     {
@@ -4540,7 +4801,7 @@
       "askSn": "7103955",
       "category": "",
       "actor": "",
-      "rowNum": 186,
+      "rowNum": 188,
       "id": "cti_1789709212875_180"
     },
     {
@@ -4564,7 +4825,7 @@
       "askSn": "7103951",
       "category": "",
       "actor": "",
-      "rowNum": 187,
+      "rowNum": 189,
       "id": "cti_1789709212875_181"
     },
     {
@@ -4588,7 +4849,7 @@
       "askSn": "7103950",
       "category": "",
       "actor": "",
-      "rowNum": 188,
+      "rowNum": 190,
       "id": "cti_1789709212875_182"
     },
     {
@@ -4612,7 +4873,7 @@
       "askSn": "7102139",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 189,
+      "rowNum": 191,
       "id": "cti_1789709212875_183"
     },
     {
@@ -4636,7 +4897,7 @@
       "askSn": "7101416",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 190,
+      "rowNum": 192,
       "id": "cti_1789709212875_184"
     },
     {
@@ -4660,7 +4921,7 @@
       "askSn": "7100110",
       "category": "",
       "actor": "",
-      "rowNum": 191,
+      "rowNum": 193,
       "id": "cti_1789709212875_185"
     },
     {
@@ -4684,7 +4945,7 @@
       "askSn": "7099608",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 192,
+      "rowNum": 194,
       "id": "cti_1789709212875_186"
     },
     {
@@ -4708,7 +4969,7 @@
       "askSn": "7099604",
       "category": "보험 문의·타업무 연결",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 193,
+      "rowNum": 195,
       "id": "cti_1789709212875_187"
     },
     {
@@ -4732,7 +4993,7 @@
       "askSn": "7099595",
       "category": "",
       "actor": "",
-      "rowNum": 194,
+      "rowNum": 196,
       "id": "cti_1789709212875_188"
     },
     {
@@ -4756,7 +5017,7 @@
       "askSn": "7099297",
       "category": "",
       "actor": "",
-      "rowNum": 195,
+      "rowNum": 197,
       "id": "cti_1789709212875_189"
     },
     {
@@ -4780,7 +5041,7 @@
       "askSn": "7099288",
       "category": "",
       "actor": "",
-      "rowNum": 196,
+      "rowNum": 198,
       "id": "cti_1789709212875_190"
     },
     {
@@ -4804,7 +5065,7 @@
       "askSn": "7099230",
       "category": "",
       "actor": "",
-      "rowNum": 197,
+      "rowNum": 199,
       "id": "cti_1789709212875_191"
     },
     {
@@ -4828,7 +5089,7 @@
       "askSn": "7099221",
       "category": "",
       "actor": "",
-      "rowNum": 198,
+      "rowNum": 200,
       "id": "cti_1789709212875_192"
     },
     {
@@ -4852,7 +5113,7 @@
       "askSn": "7099186",
       "category": "",
       "actor": "",
-      "rowNum": 199,
+      "rowNum": 201,
       "id": "cti_1789709212875_193"
     },
     {
@@ -4876,7 +5137,7 @@
       "askSn": "7098720",
       "category": "",
       "actor": "",
-      "rowNum": 200,
+      "rowNum": 202,
       "id": "cti_1789709212875_194"
     },
     {
@@ -4900,7 +5161,7 @@
       "askSn": "7097941",
       "category": "",
       "actor": "",
-      "rowNum": 201,
+      "rowNum": 203,
       "id": "cti_1789709212875_195"
     },
     {
@@ -4924,7 +5185,7 @@
       "askSn": "7096640",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 202,
+      "rowNum": 204,
       "id": "cti_1789709212875_196"
     },
     {
@@ -4948,7 +5209,7 @@
       "askSn": "7095831",
       "category": "",
       "actor": "",
-      "rowNum": 203,
+      "rowNum": 205,
       "id": "cti_1789709212875_197"
     },
     {
@@ -4972,7 +5233,7 @@
       "askSn": "7095490",
       "category": "보험 문의·타업무 연결",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 204,
+      "rowNum": 206,
       "id": "cti_1789709212875_198"
     },
     {
@@ -4996,7 +5257,7 @@
       "askSn": "7095392",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 205,
+      "rowNum": 207,
       "id": "cti_1789709212875_199"
     },
     {
@@ -5020,7 +5281,7 @@
       "askSn": "7095373",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 206,
+      "rowNum": 208,
       "id": "cti_1789709212875_200"
     },
     {
@@ -5044,7 +5305,7 @@
       "askSn": "7095281",
       "category": "",
       "actor": "",
-      "rowNum": 207,
+      "rowNum": 209,
       "id": "cti_1789709212875_201"
     },
     {
@@ -5068,7 +5329,7 @@
       "askSn": "7094821",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 208,
+      "rowNum": 210,
       "id": "cti_1789709212875_202"
     },
     {
@@ -5092,7 +5353,7 @@
       "askSn": "7094818",
       "category": "",
       "actor": "",
-      "rowNum": 209,
+      "rowNum": 211,
       "id": "cti_1789709212875_203"
     },
     {
@@ -5116,7 +5377,7 @@
       "askSn": "7094701",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 210,
+      "rowNum": 212,
       "id": "cti_1789709212875_204"
     },
     {
@@ -5140,7 +5401,7 @@
       "askSn": "7094699",
       "category": "",
       "actor": "",
-      "rowNum": 211,
+      "rowNum": 213,
       "id": "cti_1789709212875_205"
     },
     {
@@ -5164,7 +5425,7 @@
       "askSn": "7094515",
       "category": "",
       "actor": "",
-      "rowNum": 212,
+      "rowNum": 214,
       "id": "cti_1789709212875_206"
     },
     {
@@ -5188,7 +5449,7 @@
       "askSn": "7094497",
       "category": "",
       "actor": "",
-      "rowNum": 213,
+      "rowNum": 215,
       "id": "cti_1789709212875_207"
     },
     {
@@ -5212,7 +5473,7 @@
       "askSn": "7094444",
       "category": "",
       "actor": "",
-      "rowNum": 214,
+      "rowNum": 216,
       "id": "cti_1789709212875_208"
     },
     {
@@ -5236,7 +5497,7 @@
       "askSn": "7093643",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 215,
+      "rowNum": 217,
       "id": "cti_1789709212875_209"
     },
     {
@@ -5260,7 +5521,7 @@
       "askSn": "7093297",
       "category": "",
       "actor": "",
-      "rowNum": 216,
+      "rowNum": 218,
       "id": "cti_1789709212875_210"
     },
     {
@@ -5284,7 +5545,7 @@
       "askSn": "7092648",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 217,
+      "rowNum": 219,
       "id": "cti_1789709212875_211"
     },
     {
@@ -5308,7 +5569,7 @@
       "askSn": "7091867",
       "category": "",
       "actor": "",
-      "rowNum": 218,
+      "rowNum": 220,
       "id": "cti_1789709212875_212"
     },
     {
@@ -5332,7 +5593,7 @@
       "askSn": "7091547",
       "category": "",
       "actor": "",
-      "rowNum": 219,
+      "rowNum": 221,
       "id": "cti_1789709212875_213"
     },
     {
@@ -5356,7 +5617,7 @@
       "askSn": "7090908",
       "category": "",
       "actor": "",
-      "rowNum": 220,
+      "rowNum": 222,
       "id": "cti_1789709212875_214"
     },
     {
@@ -5380,7 +5641,7 @@
       "askSn": "7090904",
       "category": "",
       "actor": "",
-      "rowNum": 221,
+      "rowNum": 223,
       "id": "cti_1789709212875_215"
     },
     {
@@ -5404,7 +5665,7 @@
       "askSn": "7090870",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 222,
+      "rowNum": 224,
       "id": "cti_1789709212875_216"
     },
     {
@@ -5428,7 +5689,7 @@
       "askSn": "7090099",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 223,
+      "rowNum": 225,
       "id": "cti_1789709212875_217"
     },
     {
@@ -5452,7 +5713,7 @@
       "askSn": "7090090",
       "category": "",
       "actor": "",
-      "rowNum": 224,
+      "rowNum": 226,
       "id": "cti_1789709212875_218"
     },
     {
@@ -5476,7 +5737,7 @@
       "askSn": "7090000",
       "category": "",
       "actor": "",
-      "rowNum": 225,
+      "rowNum": 227,
       "id": "cti_1789709212875_219"
     },
     {
@@ -5500,7 +5761,7 @@
       "askSn": "7089995",
       "category": "",
       "actor": "",
-      "rowNum": 226,
+      "rowNum": 228,
       "id": "cti_1789709212875_220"
     },
     {
@@ -5524,7 +5785,7 @@
       "askSn": "7089908",
       "category": "",
       "actor": "",
-      "rowNum": 227,
+      "rowNum": 229,
       "id": "cti_1789709212875_221"
     },
     {
@@ -5548,7 +5809,7 @@
       "askSn": "7089766",
       "category": "",
       "actor": "",
-      "rowNum": 228,
+      "rowNum": 230,
       "id": "cti_1789709212875_222"
     },
     {
@@ -5572,7 +5833,7 @@
       "askSn": "7089352",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 229,
+      "rowNum": 231,
       "id": "cti_1789709212875_223"
     },
     {
@@ -5596,7 +5857,7 @@
       "askSn": "7089343",
       "category": "",
       "actor": "",
-      "rowNum": 230,
+      "rowNum": 232,
       "id": "cti_1789709212875_224"
     },
     {
@@ -5620,7 +5881,7 @@
       "askSn": "7089339",
       "category": "",
       "actor": "",
-      "rowNum": 231,
+      "rowNum": 233,
       "id": "cti_1789709212875_225"
     },
     {
@@ -5644,7 +5905,7 @@
       "askSn": "7089334",
       "category": "",
       "actor": "",
-      "rowNum": 232,
+      "rowNum": 234,
       "id": "cti_1789709212875_226"
     },
     {
@@ -5668,7 +5929,7 @@
       "askSn": "7088825",
       "category": "",
       "actor": "",
-      "rowNum": 233,
+      "rowNum": 235,
       "id": "cti_1789709212875_227"
     },
     {
@@ -5692,7 +5953,7 @@
       "askSn": "7088030",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 234,
+      "rowNum": 236,
       "id": "cti_1789709212875_228"
     },
     {
@@ -5716,7 +5977,7 @@
       "askSn": "7087852",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 235,
+      "rowNum": 237,
       "id": "cti_1789709212875_229"
     },
     {
@@ -5740,7 +6001,7 @@
       "askSn": "7087801",
       "category": "",
       "actor": "",
-      "rowNum": 236,
+      "rowNum": 238,
       "id": "cti_1789709212875_230"
     },
     {
@@ -5764,7 +6025,7 @@
       "askSn": "7087715",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 237,
+      "rowNum": 239,
       "id": "cti_1789709212875_231"
     },
     {
@@ -5788,7 +6049,7 @@
       "askSn": "7087691",
       "category": "",
       "actor": "",
-      "rowNum": 238,
+      "rowNum": 240,
       "id": "cti_1789709212875_232"
     },
     {
@@ -5812,7 +6073,7 @@
       "askSn": "7087164",
       "category": "",
       "actor": "",
-      "rowNum": 239,
+      "rowNum": 241,
       "id": "cti_1789709212875_233"
     },
     {
@@ -5836,7 +6097,7 @@
       "askSn": "7087025",
       "category": "",
       "actor": "",
-      "rowNum": 240,
+      "rowNum": 242,
       "id": "cti_1789709212875_234"
     },
     {
@@ -5860,7 +6121,7 @@
       "askSn": "7087012",
       "category": "",
       "actor": "",
-      "rowNum": 241,
+      "rowNum": 243,
       "id": "cti_1789709212875_235"
     },
     {
@@ -5884,7 +6145,7 @@
       "askSn": "7086993",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 242,
+      "rowNum": 244,
       "id": "cti_1789709212875_236"
     },
     {
@@ -5908,7 +6169,7 @@
       "askSn": "7086322",
       "category": "",
       "actor": "",
-      "rowNum": 243,
+      "rowNum": 245,
       "id": "cti_1789709212875_237"
     },
     {
@@ -5932,7 +6193,7 @@
       "askSn": "7086224",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 244,
+      "rowNum": 246,
       "id": "cti_1789709212875_238"
     },
     {
@@ -5956,7 +6217,7 @@
       "askSn": "7086149",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 245,
+      "rowNum": 247,
       "id": "cti_1789709212875_239"
     },
     {
@@ -5980,7 +6241,7 @@
       "askSn": "7086141",
       "category": "",
       "actor": "",
-      "rowNum": 246,
+      "rowNum": 248,
       "id": "cti_1789709212875_240"
     },
     {
@@ -6004,7 +6265,7 @@
       "askSn": "7086030",
       "category": "협력업체 등록·지역연계",
       "actor": "협력업체·간병협회",
-      "rowNum": 247,
+      "rowNum": 249,
       "id": "cti_1789709212875_241"
     },
     {
@@ -6028,7 +6289,7 @@
       "askSn": "7085941",
       "category": "",
       "actor": "",
-      "rowNum": 248,
+      "rowNum": 250,
       "id": "cti_1789709212875_242"
     },
     {
@@ -6052,7 +6313,7 @@
       "askSn": "7085517",
       "category": "",
       "actor": "",
-      "rowNum": 249,
+      "rowNum": 251,
       "id": "cti_1789709212875_243"
     },
     {
@@ -6076,7 +6337,7 @@
       "askSn": "7083989",
       "category": "",
       "actor": "",
-      "rowNum": 250,
+      "rowNum": 252,
       "id": "cti_1789709212875_244"
     },
     {
@@ -6100,7 +6361,7 @@
       "askSn": "7083964",
       "category": "",
       "actor": "",
-      "rowNum": 251,
+      "rowNum": 253,
       "id": "cti_1789709212875_245"
     },
     {
@@ -6124,7 +6385,7 @@
       "askSn": "7083733",
       "category": "",
       "actor": "",
-      "rowNum": 252,
+      "rowNum": 254,
       "id": "cti_1789709212875_246"
     },
     {
@@ -6148,7 +6409,7 @@
       "askSn": "7083721",
       "category": "",
       "actor": "",
-      "rowNum": 253,
+      "rowNum": 255,
       "id": "cti_1789709212875_247"
     },
     {
@@ -6172,7 +6433,7 @@
       "askSn": "7083720",
       "category": "",
       "actor": "",
-      "rowNum": 254,
+      "rowNum": 256,
       "id": "cti_1789709212875_248"
     },
     {
@@ -6196,7 +6457,7 @@
       "askSn": "7083032",
       "category": "",
       "actor": "",
-      "rowNum": 255,
+      "rowNum": 257,
       "id": "cti_1789709212875_249"
     },
     {
@@ -6220,7 +6481,7 @@
       "askSn": "7080487",
       "category": "",
       "actor": "",
-      "rowNum": 256,
+      "rowNum": 258,
       "id": "cti_1789709212875_250"
     },
     {
@@ -6244,7 +6505,7 @@
       "askSn": "7080455",
       "category": "",
       "actor": "",
-      "rowNum": 257,
+      "rowNum": 259,
       "id": "cti_1789709212875_251"
     },
     {
@@ -6268,7 +6529,7 @@
       "askSn": "7080427",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 258,
+      "rowNum": 260,
       "id": "cti_1789709212875_252"
     },
     {
@@ -6292,7 +6553,7 @@
       "askSn": "7079719",
       "category": "",
       "actor": "",
-      "rowNum": 259,
+      "rowNum": 261,
       "id": "cti_1789709212875_253"
     },
     {
@@ -6316,7 +6577,7 @@
       "askSn": "7079648",
       "category": "",
       "actor": "",
-      "rowNum": 260,
+      "rowNum": 262,
       "id": "cti_1789709212875_254"
     },
     {
@@ -6340,7 +6601,7 @@
       "askSn": "7078633",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 261,
+      "rowNum": 263,
       "id": "cti_1789709212875_255"
     },
     {
@@ -6364,7 +6625,7 @@
       "askSn": "7078405",
       "category": "",
       "actor": "",
-      "rowNum": 262,
+      "rowNum": 264,
       "id": "cti_1789709212875_256"
     },
     {
@@ -6388,7 +6649,7 @@
       "askSn": "7078329",
       "category": "",
       "actor": "",
-      "rowNum": 263,
+      "rowNum": 265,
       "id": "cti_1789709212875_257"
     },
     {
@@ -6412,7 +6673,7 @@
       "askSn": "7078158",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 264,
+      "rowNum": 266,
       "id": "cti_1789709212875_258"
     },
     {
@@ -6436,7 +6697,7 @@
       "askSn": "7077968",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 265,
+      "rowNum": 267,
       "id": "cti_1789709212875_259"
     },
     {
@@ -6460,7 +6721,7 @@
       "askSn": "7077729",
       "category": "",
       "actor": "",
-      "rowNum": 266,
+      "rowNum": 268,
       "id": "cti_1789709212875_260"
     },
     {
@@ -6484,7 +6745,7 @@
       "askSn": "7077711",
       "category": "",
       "actor": "",
-      "rowNum": 267,
+      "rowNum": 269,
       "id": "cti_1789709212875_261"
     },
     {
@@ -6508,7 +6769,7 @@
       "askSn": "7077709",
       "category": "",
       "actor": "",
-      "rowNum": 268,
+      "rowNum": 270,
       "id": "cti_1789709212875_262"
     },
     {
@@ -6532,7 +6793,7 @@
       "askSn": "7077706",
       "category": "",
       "actor": "",
-      "rowNum": 269,
+      "rowNum": 271,
       "id": "cti_1789709212875_263"
     },
     {
@@ -6556,7 +6817,7 @@
       "askSn": "7077705",
       "category": "",
       "actor": "",
-      "rowNum": 270,
+      "rowNum": 272,
       "id": "cti_1789709212875_264"
     },
     {
@@ -6580,7 +6841,7 @@
       "askSn": "7077703",
       "category": "",
       "actor": "",
-      "rowNum": 271,
+      "rowNum": 273,
       "id": "cti_1789709212875_265"
     },
     {
@@ -6604,7 +6865,7 @@
       "askSn": "7077702",
       "category": "",
       "actor": "",
-      "rowNum": 272,
+      "rowNum": 274,
       "id": "cti_1789709212875_266"
     },
     {
@@ -6628,7 +6889,7 @@
       "askSn": "7077701",
       "category": "",
       "actor": "",
-      "rowNum": 273,
+      "rowNum": 275,
       "id": "cti_1789709212875_267"
     },
     {
@@ -6652,7 +6913,7 @@
       "askSn": "7077699",
       "category": "",
       "actor": "",
-      "rowNum": 274,
+      "rowNum": 276,
       "id": "cti_1789709212875_268"
     },
     {
@@ -6676,7 +6937,7 @@
       "askSn": "7077698",
       "category": "",
       "actor": "",
-      "rowNum": 275,
+      "rowNum": 277,
       "id": "cti_1789709212875_269"
     },
     {
@@ -6700,7 +6961,7 @@
       "askSn": "7077697",
       "category": "",
       "actor": "",
-      "rowNum": 276,
+      "rowNum": 278,
       "id": "cti_1789709212875_270"
     },
     {
@@ -6724,7 +6985,7 @@
       "askSn": "7077361",
       "category": "",
       "actor": "",
-      "rowNum": 277,
+      "rowNum": 279,
       "id": "cti_1789709212875_271"
     },
     {
@@ -6748,7 +7009,7 @@
       "askSn": "7077120",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 278,
+      "rowNum": 280,
       "id": "cti_1789709212875_272"
     },
     {
@@ -6772,7 +7033,7 @@
       "askSn": "7076859",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 279,
+      "rowNum": 281,
       "id": "cti_1789709212875_273"
     },
     {
@@ -6796,7 +7057,7 @@
       "askSn": "7076855",
       "category": "",
       "actor": "",
-      "rowNum": 280,
+      "rowNum": 282,
       "id": "cti_1789709212875_274"
     },
     {
@@ -6820,7 +7081,7 @@
       "askSn": "7076692",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 281,
+      "rowNum": 283,
       "id": "cti_1789709212875_275"
     },
     {
@@ -6844,7 +7105,7 @@
       "askSn": "7076600",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 282,
+      "rowNum": 284,
       "id": "cti_1789709212875_276"
     },
     {
@@ -6868,7 +7129,7 @@
       "askSn": "7075531",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 283,
+      "rowNum": 285,
       "id": "cti_1789709212875_277"
     },
     {
@@ -6892,7 +7153,7 @@
       "askSn": "7074172",
       "category": "보험 문의·타업무 연결",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 284,
+      "rowNum": 286,
       "id": "cti_1789709212875_278"
     },
     {
@@ -6916,7 +7177,7 @@
       "askSn": "7072751",
       "category": "보험 문의·타업무 연결",
       "actor": "삼성화재 내부(설계사·지점)",
-      "rowNum": 285,
+      "rowNum": 287,
       "id": "cti_1789709212875_279"
     },
     {
@@ -6940,7 +7201,7 @@
       "askSn": "7072407",
       "category": "",
       "actor": "",
-      "rowNum": 286,
+      "rowNum": 288,
       "id": "cti_1789709212875_280"
     },
     {
@@ -6964,7 +7225,7 @@
       "askSn": "7072116",
       "category": "",
       "actor": "",
-      "rowNum": 287,
+      "rowNum": 289,
       "id": "cti_1789709212875_281"
     },
     {
@@ -6988,7 +7249,7 @@
       "askSn": "7071511",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 288,
+      "rowNum": 290,
       "id": "cti_1789709212875_282"
     },
     {
@@ -7012,7 +7273,7 @@
       "askSn": "7071061",
       "category": "",
       "actor": "",
-      "rowNum": 289,
+      "rowNum": 291,
       "id": "cti_1789709212875_283"
     },
     {
@@ -7036,7 +7297,7 @@
       "askSn": "7068908",
       "category": "",
       "actor": "",
-      "rowNum": 290,
+      "rowNum": 292,
       "id": "cti_1789709212875_284"
     },
     {
@@ -7060,7 +7321,7 @@
       "askSn": "7067973",
       "category": "",
       "actor": "",
-      "rowNum": 291,
+      "rowNum": 293,
       "id": "cti_1789709212875_285"
     },
     {
@@ -7084,7 +7345,7 @@
       "askSn": "7067621",
       "category": "",
       "actor": "",
-      "rowNum": 292,
+      "rowNum": 294,
       "id": "cti_1789709212875_286"
     },
     {
@@ -7108,7 +7369,7 @@
       "askSn": "7067353",
       "category": "",
       "actor": "",
-      "rowNum": 293,
+      "rowNum": 295,
       "id": "cti_1789709212875_287"
     },
     {
@@ -7132,7 +7393,7 @@
       "askSn": "7064829",
       "category": "",
       "actor": "",
-      "rowNum": 294,
+      "rowNum": 296,
       "id": "cti_1789709212875_288"
     },
     {
@@ -7156,7 +7417,7 @@
       "askSn": "7064561",
       "category": "",
       "actor": "",
-      "rowNum": 295,
+      "rowNum": 297,
       "id": "cti_1789709212875_289"
     },
     {
@@ -7180,7 +7441,7 @@
       "askSn": "7064559",
       "category": "",
       "actor": "",
-      "rowNum": 296,
+      "rowNum": 298,
       "id": "cti_1789709212875_290"
     },
     {
@@ -7204,7 +7465,7 @@
       "askSn": "7062808",
       "category": "",
       "actor": "",
-      "rowNum": 297,
+      "rowNum": 299,
       "id": "cti_1789709212875_291"
     },
     {
@@ -7228,7 +7489,7 @@
       "askSn": "7062477",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 298,
+      "rowNum": 300,
       "id": "cti_1789709212875_292"
     },
     {
@@ -7252,7 +7513,7 @@
       "askSn": "7062407",
       "category": "",
       "actor": "",
-      "rowNum": 299,
+      "rowNum": 301,
       "id": "cti_1789709212875_293"
     },
     {
@@ -7276,7 +7537,7 @@
       "askSn": "7061058",
       "category": "",
       "actor": "",
-      "rowNum": 300,
+      "rowNum": 302,
       "id": "cti_1789709212875_294"
     },
     {
@@ -7300,7 +7561,7 @@
       "askSn": "7060079",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 301,
+      "rowNum": 303,
       "id": "cti_1789709212875_295"
     },
     {
@@ -7324,7 +7585,7 @@
       "askSn": "7058974",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 302,
+      "rowNum": 304,
       "id": "cti_1789709212875_296"
     },
     {
@@ -7348,7 +7609,7 @@
       "askSn": "7057962",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 303,
+      "rowNum": 305,
       "id": "cti_1789709212875_297"
     },
     {
@@ -7372,7 +7633,7 @@
       "askSn": "7057671",
       "category": "",
       "actor": "",
-      "rowNum": 304,
+      "rowNum": 306,
       "id": "cti_1789709212875_298"
     },
     {
@@ -7396,7 +7657,7 @@
       "askSn": "7057633",
       "category": "",
       "actor": "",
-      "rowNum": 305,
+      "rowNum": 307,
       "id": "cti_1789709212875_299"
     },
     {
@@ -7420,7 +7681,7 @@
       "askSn": "7057277",
       "category": "",
       "actor": "",
-      "rowNum": 306,
+      "rowNum": 308,
       "id": "cti_1789709212875_300"
     },
     {
@@ -7444,7 +7705,7 @@
       "askSn": "7056853",
       "category": "",
       "actor": "",
-      "rowNum": 307,
+      "rowNum": 309,
       "id": "cti_1789709212875_301"
     },
     {
@@ -7468,7 +7729,7 @@
       "askSn": "7056849",
       "category": "",
       "actor": "",
-      "rowNum": 308,
+      "rowNum": 310,
       "id": "cti_1789709212875_302"
     },
     {
@@ -7492,7 +7753,7 @@
       "askSn": "7056538",
       "category": "",
       "actor": "",
-      "rowNum": 309,
+      "rowNum": 311,
       "id": "cti_1789709212875_303"
     },
     {
@@ -7516,7 +7777,7 @@
       "askSn": "7056100",
       "category": "",
       "actor": "",
-      "rowNum": 310,
+      "rowNum": 312,
       "id": "cti_1789709212875_304"
     },
     {
@@ -7540,7 +7801,7 @@
       "askSn": "7055885",
       "category": "",
       "actor": "",
-      "rowNum": 311,
+      "rowNum": 313,
       "id": "cti_1789709212875_305"
     },
     {
@@ -7564,7 +7825,7 @@
       "askSn": "7055117",
       "category": "",
       "actor": "",
-      "rowNum": 312,
+      "rowNum": 314,
       "id": "cti_1789709212875_306"
     },
     {
@@ -7588,7 +7849,7 @@
       "askSn": "7055105",
       "category": "",
       "actor": "",
-      "rowNum": 313,
+      "rowNum": 315,
       "id": "cti_1789709212875_307"
     },
     {
@@ -7612,7 +7873,7 @@
       "askSn": "7054910",
       "category": "협력업체 등록·지역연계",
       "actor": "협력업체·간병협회",
-      "rowNum": 314,
+      "rowNum": 316,
       "id": "cti_1789709212875_308"
     },
     {
@@ -7636,7 +7897,7 @@
       "askSn": "7053866",
       "category": "비용·무상제공 확인",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 315,
+      "rowNum": 317,
       "id": "cti_1789709212875_309"
     },
     {
@@ -7660,7 +7921,7 @@
       "askSn": "7052648",
       "category": "",
       "actor": "",
-      "rowNum": 316,
+      "rowNum": 318,
       "id": "cti_1789709212875_310"
     },
     {
@@ -7684,7 +7945,7 @@
       "askSn": "7052643",
       "category": "",
       "actor": "",
-      "rowNum": 317,
+      "rowNum": 319,
       "id": "cti_1789709212875_311"
     },
     {
@@ -7708,7 +7969,7 @@
       "askSn": "7052172",
       "category": "",
       "actor": "",
-      "rowNum": 318,
+      "rowNum": 320,
       "id": "cti_1789709212875_312"
     },
     {
@@ -7732,7 +7993,7 @@
       "askSn": "7051936",
       "category": "간병인(요양보호사) 등록",
       "actor": "간병인 등록희망자",
-      "rowNum": 319,
+      "rowNum": 321,
       "id": "cti_1789709212875_313"
     },
     {
@@ -7756,7 +8017,7 @@
       "askSn": "7051563",
       "category": "",
       "actor": "",
-      "rowNum": 320,
+      "rowNum": 322,
       "id": "cti_1789709212875_314"
     },
     {
@@ -7780,7 +8041,7 @@
       "askSn": "7051548",
       "category": "",
       "actor": "",
-      "rowNum": 321,
+      "rowNum": 323,
       "id": "cti_1789709212875_315"
     },
     {
@@ -7804,7 +8065,7 @@
       "askSn": "7051274",
       "category": "",
       "actor": "",
-      "rowNum": 322,
+      "rowNum": 324,
       "id": "cti_1789709212875_316"
     },
     {
@@ -7828,7 +8089,7 @@
       "askSn": "7051135",
       "category": "보험 문의·타업무 연결",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 323,
+      "rowNum": 325,
       "id": "cti_1789709212875_317"
     },
     {
@@ -7852,7 +8113,7 @@
       "askSn": "7050985",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 324,
+      "rowNum": 326,
       "id": "cti_1789709212875_318"
     },
     {
@@ -7876,7 +8137,7 @@
       "askSn": "7050891",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 325,
+      "rowNum": 327,
       "id": "cti_1789709212875_319"
     },
     {
@@ -7900,7 +8161,7 @@
       "askSn": "7050744",
       "category": "",
       "actor": "",
-      "rowNum": 326,
+      "rowNum": 328,
       "id": "cti_1789709212875_320"
     },
     {
@@ -7924,7 +8185,7 @@
       "askSn": "7050686",
       "category": "",
       "actor": "",
-      "rowNum": 327,
+      "rowNum": 329,
       "id": "cti_1789709212875_321"
     },
     {
@@ -7948,7 +8209,7 @@
       "askSn": "7050537",
       "category": "",
       "actor": "",
-      "rowNum": 328,
+      "rowNum": 330,
       "id": "cti_1789709212875_322"
     },
     {
@@ -7972,7 +8233,7 @@
       "askSn": "7050353",
       "category": "",
       "actor": "",
-      "rowNum": 329,
+      "rowNum": 331,
       "id": "cti_1789709212875_323"
     },
     {
@@ -7996,7 +8257,7 @@
       "askSn": "7050045",
       "category": "",
       "actor": "",
-      "rowNum": 330,
+      "rowNum": 332,
       "id": "cti_1789709212875_324"
     },
     {
@@ -8020,7 +8281,7 @@
       "askSn": "7049366",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 331,
+      "rowNum": 333,
       "id": "cti_1789709212875_325"
     },
     {
@@ -8044,7 +8305,7 @@
       "askSn": "7049122",
       "category": "",
       "actor": "",
-      "rowNum": 332,
+      "rowNum": 334,
       "id": "cti_1789709212875_326"
     },
     {
@@ -8068,7 +8329,7 @@
       "askSn": "7049082",
       "category": "",
       "actor": "",
-      "rowNum": 333,
+      "rowNum": 335,
       "id": "cti_1789709212875_327"
     },
     {
@@ -8092,7 +8353,7 @@
       "askSn": "7048531",
       "category": "",
       "actor": "",
-      "rowNum": 334,
+      "rowNum": 336,
       "id": "cti_1789709212875_328"
     },
     {
@@ -8116,7 +8377,7 @@
       "askSn": "7048250",
       "category": "",
       "actor": "",
-      "rowNum": 335,
+      "rowNum": 337,
       "id": "cti_1789709212875_329"
     },
     {
@@ -8140,7 +8401,7 @@
       "askSn": "7047770",
       "category": "간병인(요양보호사) 등록",
       "actor": "간병인 등록희망자",
-      "rowNum": 336,
+      "rowNum": 338,
       "id": "cti_1789709212875_330"
     },
     {
@@ -8164,7 +8425,7 @@
       "askSn": "7047459",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 337,
+      "rowNum": 339,
       "id": "cti_1789709212875_331"
     },
     {
@@ -8188,7 +8449,7 @@
       "askSn": "7046825",
       "category": "",
       "actor": "",
-      "rowNum": 338,
+      "rowNum": 340,
       "id": "cti_1789709212875_332"
     },
     {
@@ -8212,7 +8473,7 @@
       "askSn": "7046711",
       "category": "협력업체 등록·지역연계",
       "actor": "협력업체·간병협회",
-      "rowNum": 339,
+      "rowNum": 341,
       "id": "cti_1789709212875_333"
     },
     {
@@ -8236,7 +8497,7 @@
       "askSn": "7046623",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 340,
+      "rowNum": 342,
       "id": "cti_1789709212875_334"
     },
     {
@@ -8260,7 +8521,7 @@
       "askSn": "7046524",
       "category": "협력업체 등록·지역연계",
       "actor": "협력업체·간병협회",
-      "rowNum": 341,
+      "rowNum": 343,
       "id": "cti_1789709212875_335"
     },
     {
@@ -8284,7 +8545,7 @@
       "askSn": "7046263",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 342,
+      "rowNum": 344,
       "id": "cti_1789709212875_336"
     },
     {
@@ -8308,7 +8569,7 @@
       "askSn": "7045536",
       "category": "",
       "actor": "",
-      "rowNum": 343,
+      "rowNum": 345,
       "id": "cti_1789709212875_337"
     },
     {
@@ -8332,7 +8593,7 @@
       "askSn": "7044862",
       "category": "",
       "actor": "",
-      "rowNum": 344,
+      "rowNum": 346,
       "id": "cti_1789709212875_338"
     },
     {
@@ -8356,7 +8617,7 @@
       "askSn": "7044748",
       "category": "",
       "actor": "",
-      "rowNum": 345,
+      "rowNum": 347,
       "id": "cti_1789709212875_339"
     },
     {
@@ -8380,7 +8641,7 @@
       "askSn": "7044746",
       "category": "",
       "actor": "",
-      "rowNum": 346,
+      "rowNum": 348,
       "id": "cti_1789709212875_340"
     },
     {
@@ -8404,7 +8665,7 @@
       "askSn": "7044744",
       "category": "",
       "actor": "",
-      "rowNum": 347,
+      "rowNum": 349,
       "id": "cti_1789709212875_341"
     },
     {
@@ -8428,7 +8689,7 @@
       "askSn": "7041614",
       "category": "",
       "actor": "",
-      "rowNum": 348,
+      "rowNum": 350,
       "id": "cti_1789709212875_342"
     },
     {
@@ -8452,7 +8713,7 @@
       "askSn": "7041295",
       "category": "",
       "actor": "",
-      "rowNum": 349,
+      "rowNum": 351,
       "id": "cti_1789709212875_343"
     },
     {
@@ -8476,7 +8737,7 @@
       "askSn": "7041271",
       "category": "",
       "actor": "",
-      "rowNum": 350,
+      "rowNum": 352,
       "id": "cti_1789709212875_344"
     },
     {
@@ -8500,7 +8761,7 @@
       "askSn": "7040386",
       "category": "",
       "actor": "",
-      "rowNum": 351,
+      "rowNum": 353,
       "id": "cti_1789709212875_345"
     },
     {
@@ -8524,7 +8785,7 @@
       "askSn": "7039560",
       "category": "",
       "actor": "",
-      "rowNum": 352,
+      "rowNum": 354,
       "id": "cti_1789709212875_346"
     },
     {
@@ -8548,7 +8809,7 @@
       "askSn": "7039323",
       "category": "",
       "actor": "",
-      "rowNum": 353,
+      "rowNum": 355,
       "id": "cti_1789709212875_347"
     },
     {
@@ -8572,7 +8833,7 @@
       "askSn": "7039253",
       "category": "",
       "actor": "",
-      "rowNum": 354,
+      "rowNum": 356,
       "id": "cti_1789709212875_348"
     },
     {
@@ -8596,7 +8857,7 @@
       "askSn": "7038918",
       "category": "",
       "actor": "",
-      "rowNum": 355,
+      "rowNum": 357,
       "id": "cti_1789709212875_349"
     },
     {
@@ -8620,7 +8881,7 @@
       "askSn": "7038707",
       "category": "",
       "actor": "",
-      "rowNum": 356,
+      "rowNum": 358,
       "id": "cti_1789709212875_350"
     },
     {
@@ -8644,7 +8905,7 @@
       "askSn": "7038582",
       "category": "",
       "actor": "",
-      "rowNum": 357,
+      "rowNum": 359,
       "id": "cti_1789709212875_351"
     },
     {
@@ -8668,7 +8929,7 @@
       "askSn": "7038519",
       "category": "",
       "actor": "",
-      "rowNum": 358,
+      "rowNum": 360,
       "id": "cti_1789709212875_352"
     },
     {
@@ -8692,7 +8953,7 @@
       "askSn": "7038410",
       "category": "제휴·영업지원 확인",
       "actor": "삼성화재 내부(설계사·지점)",
-      "rowNum": 359,
+      "rowNum": 361,
       "id": "cti_1789709212875_353"
     },
     {
@@ -8716,7 +8977,7 @@
       "askSn": "7038405",
       "category": "",
       "actor": "",
-      "rowNum": 360,
+      "rowNum": 362,
       "id": "cti_1789709212875_354"
     },
     {
@@ -8740,7 +9001,7 @@
       "askSn": "7038357",
       "category": "",
       "actor": "",
-      "rowNum": 361,
+      "rowNum": 363,
       "id": "cti_1789709212875_355"
     },
     {
@@ -8764,7 +9025,7 @@
       "askSn": "7038215",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 362,
+      "rowNum": 364,
       "id": "cti_1789709212875_356"
     },
     {
@@ -8788,7 +9049,7 @@
       "askSn": "7037786",
       "category": "",
       "actor": "",
-      "rowNum": 363,
+      "rowNum": 365,
       "id": "cti_1789709212875_357"
     },
     {
@@ -8812,7 +9073,7 @@
       "askSn": "7037555",
       "category": "",
       "actor": "",
-      "rowNum": 364,
+      "rowNum": 366,
       "id": "cti_1789709212875_358"
     },
     {
@@ -8836,7 +9097,7 @@
       "askSn": "7036736",
       "category": "",
       "actor": "",
-      "rowNum": 365,
+      "rowNum": 367,
       "id": "cti_1789709212875_359"
     },
     {
@@ -8860,7 +9121,7 @@
       "askSn": "7036522",
       "category": "협력업체 등록·지역연계",
       "actor": "협력업체·간병협회",
-      "rowNum": 366,
+      "rowNum": 368,
       "id": "cti_1789709212875_360"
     },
     {
@@ -8884,7 +9145,7 @@
       "askSn": "7036398",
       "category": "",
       "actor": "",
-      "rowNum": 367,
+      "rowNum": 369,
       "id": "cti_1789709212875_361"
     },
     {
@@ -8908,7 +9169,7 @@
       "askSn": "7036369",
       "category": "",
       "actor": "",
-      "rowNum": 368,
+      "rowNum": 370,
       "id": "cti_1789709212875_362"
     },
     {
@@ -8932,7 +9193,7 @@
       "askSn": "7036332",
       "category": "",
       "actor": "",
-      "rowNum": 369,
+      "rowNum": 371,
       "id": "cti_1789709212875_363"
     },
     {
@@ -8956,7 +9217,7 @@
       "askSn": "7036329",
       "category": "",
       "actor": "",
-      "rowNum": 370,
+      "rowNum": 372,
       "id": "cti_1789709212875_364"
     },
     {
@@ -8980,7 +9241,7 @@
       "askSn": "7036307",
       "category": "서비스 이용조건·범위",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 371,
+      "rowNum": 373,
       "id": "cti_1789709212875_365"
     },
     {
@@ -9004,7 +9265,7 @@
       "askSn": "7036273",
       "category": "",
       "actor": "",
-      "rowNum": 372,
+      "rowNum": 374,
       "id": "cti_1789709212875_366"
     },
     {
@@ -9028,7 +9289,7 @@
       "askSn": "7035991",
       "category": "",
       "actor": "",
-      "rowNum": 373,
+      "rowNum": 375,
       "id": "cti_1789709212875_367"
     },
     {
@@ -9052,7 +9313,7 @@
       "askSn": "7035660",
       "category": "",
       "actor": "",
-      "rowNum": 374,
+      "rowNum": 376,
       "id": "cti_1789709212875_368"
     },
     {
@@ -9076,7 +9337,7 @@
       "askSn": "7034753",
       "category": "",
       "actor": "",
-      "rowNum": 375,
+      "rowNum": 377,
       "id": "cti_1789709212875_369"
     },
     {
@@ -9100,7 +9361,7 @@
       "askSn": "7034740",
       "category": "",
       "actor": "",
-      "rowNum": 376,
+      "rowNum": 378,
       "id": "cti_1789709212875_370"
     },
     {
@@ -9124,7 +9385,7 @@
       "askSn": "7034428",
       "category": "비용·무상제공 확인",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 377,
+      "rowNum": 379,
       "id": "cti_1789709212875_371"
     },
     {
@@ -9148,7 +9409,7 @@
       "askSn": "7034119",
       "category": "협력업체 등록·지역연계",
       "actor": "협력업체·간병협회",
-      "rowNum": 378,
+      "rowNum": 380,
       "id": "cti_1789709212875_372"
     },
     {
@@ -9172,7 +9433,7 @@
       "askSn": "7033778",
       "category": "",
       "actor": "",
-      "rowNum": 379,
+      "rowNum": 381,
       "id": "cti_1789709212875_373"
     },
     {
@@ -9196,7 +9457,7 @@
       "askSn": "7033290",
       "category": "",
       "actor": "",
-      "rowNum": 380,
+      "rowNum": 382,
       "id": "cti_1789709212875_374"
     },
     {
@@ -9220,7 +9481,7 @@
       "askSn": "7032897",
       "category": "비용·무상제공 확인",
       "actor": "삼성화재 내부(설계사·지점)",
-      "rowNum": 381,
+      "rowNum": 383,
       "id": "cti_1789709212875_375"
     },
     {
@@ -9244,7 +9505,7 @@
       "askSn": "7032747",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 382,
+      "rowNum": 384,
       "id": "cti_1789709212875_376"
     },
     {
@@ -9268,7 +9529,7 @@
       "askSn": "7032212",
       "category": "",
       "actor": "",
-      "rowNum": 383,
+      "rowNum": 385,
       "id": "cti_1789709212875_377"
     },
     {
@@ -9292,7 +9553,7 @@
       "askSn": "7032080",
       "category": "",
       "actor": "",
-      "rowNum": 384,
+      "rowNum": 386,
       "id": "cti_1789709212875_378"
     },
     {
@@ -9316,7 +9577,7 @@
       "askSn": "7031992",
       "category": "",
       "actor": "",
-      "rowNum": 385,
+      "rowNum": 387,
       "id": "cti_1789709212875_379"
     },
     {
@@ -9340,7 +9601,7 @@
       "askSn": "7031974",
       "category": "",
       "actor": "",
-      "rowNum": 386,
+      "rowNum": 388,
       "id": "cti_1789709212875_380"
     },
     {
@@ -9364,7 +9625,7 @@
       "askSn": "7031967",
       "category": "",
       "actor": "",
-      "rowNum": 387,
+      "rowNum": 389,
       "id": "cti_1789709212875_381"
     },
     {
@@ -9388,7 +9649,7 @@
       "askSn": "7031966",
       "category": "",
       "actor": "",
-      "rowNum": 388,
+      "rowNum": 390,
       "id": "cti_1789709212875_382"
     },
     {
@@ -9412,7 +9673,7 @@
       "askSn": "7031534",
       "category": "",
       "actor": "",
-      "rowNum": 389,
+      "rowNum": 391,
       "id": "cti_1789709212875_383"
     },
     {
@@ -9436,7 +9697,7 @@
       "askSn": "7030216",
       "category": "",
       "actor": "",
-      "rowNum": 390,
+      "rowNum": 392,
       "id": "cti_1789709212875_384"
     },
     {
@@ -9460,7 +9721,7 @@
       "askSn": "7028812",
       "category": "",
       "actor": "",
-      "rowNum": 391,
+      "rowNum": 393,
       "id": "cti_1789709212875_385"
     },
     {
@@ -9484,7 +9745,7 @@
       "askSn": "7028789",
       "category": "",
       "actor": "",
-      "rowNum": 392,
+      "rowNum": 394,
       "id": "cti_1789709212875_386"
     },
     {
@@ -9508,7 +9769,7 @@
       "askSn": "7028698",
       "category": "비용·무상제공 확인",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 393,
+      "rowNum": 395,
       "id": "cti_1789709212875_387"
     },
     {
@@ -9532,7 +9793,7 @@
       "askSn": "7028614",
       "category": "간병 신청·접수·배정",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 394,
+      "rowNum": 396,
       "id": "cti_1789709212875_388"
     },
     {
@@ -9556,7 +9817,7 @@
       "askSn": "7028454",
       "category": "",
       "actor": "",
-      "rowNum": 395,
+      "rowNum": 397,
       "id": "cti_1789709212875_389"
     },
     {
@@ -9580,7 +9841,7 @@
       "askSn": "7028186",
       "category": "",
       "actor": "",
-      "rowNum": 396,
+      "rowNum": 398,
       "id": "cti_1789709212875_390"
     },
     {
@@ -9604,7 +9865,7 @@
       "askSn": "7027884",
       "category": "",
       "actor": "",
-      "rowNum": 397,
+      "rowNum": 399,
       "id": "cti_1789709212875_391"
     },
     {
@@ -9628,7 +9889,7 @@
       "askSn": "7027780",
       "category": "협력업체 등록·지역연계",
       "actor": "협력업체·간병협회",
-      "rowNum": 398,
+      "rowNum": 400,
       "id": "cti_1789709212875_392"
     },
     {
@@ -9652,7 +9913,7 @@
       "askSn": "7026959",
       "category": "",
       "actor": "",
-      "rowNum": 399,
+      "rowNum": 401,
       "id": "cti_1789709212875_393"
     },
     {
@@ -9676,7 +9937,7 @@
       "askSn": "7026619",
       "category": "",
       "actor": "",
-      "rowNum": 400,
+      "rowNum": 402,
       "id": "cti_1789709212875_394"
     },
     {
@@ -9700,7 +9961,7 @@
       "askSn": "7025763",
       "category": "",
       "actor": "",
-      "rowNum": 401,
+      "rowNum": 403,
       "id": "cti_1789709212875_395"
     },
     {
@@ -9724,7 +9985,7 @@
       "askSn": "7025718",
       "category": "",
       "actor": "",
-      "rowNum": 402,
+      "rowNum": 404,
       "id": "cti_1789709212875_396"
     },
     {
@@ -9748,7 +10009,7 @@
       "askSn": "7025628",
       "category": "",
       "actor": "",
-      "rowNum": 403,
+      "rowNum": 405,
       "id": "cti_1789709212875_397"
     },
     {
@@ -9772,7 +10033,7 @@
       "askSn": "7025625",
       "category": "",
       "actor": "",
-      "rowNum": 404,
+      "rowNum": 406,
       "id": "cti_1789709212875_398"
     },
     {
@@ -9796,7 +10057,7 @@
       "askSn": "7025226",
       "category": "",
       "actor": "",
-      "rowNum": 405,
+      "rowNum": 407,
       "id": "cti_1789709212875_399"
     },
     {
@@ -9820,7 +10081,7 @@
       "askSn": "7025150",
       "category": "",
       "actor": "",
-      "rowNum": 406,
+      "rowNum": 408,
       "id": "cti_1789709212875_400"
     },
     {
@@ -9844,7 +10105,7 @@
       "askSn": "7024885",
       "category": "",
       "actor": "",
-      "rowNum": 407,
+      "rowNum": 409,
       "id": "cti_1789709212875_401"
     },
     {
@@ -9868,7 +10129,7 @@
       "askSn": "7024800",
       "category": "",
       "actor": "",
-      "rowNum": 408,
+      "rowNum": 410,
       "id": "cti_1789709212875_402"
     },
     {
@@ -9892,7 +10153,7 @@
       "askSn": "7024797",
       "category": "",
       "actor": "",
-      "rowNum": 409,
+      "rowNum": 411,
       "id": "cti_1789709212875_403"
     },
     {
@@ -9916,7 +10177,7 @@
       "askSn": "7024796",
       "category": "",
       "actor": "",
-      "rowNum": 410,
+      "rowNum": 412,
       "id": "cti_1789709212875_404"
     },
     {
@@ -9940,7 +10201,7 @@
       "askSn": "7024774",
       "category": "",
       "actor": "",
-      "rowNum": 411,
+      "rowNum": 413,
       "id": "cti_1789709212875_405"
     },
     {
@@ -9964,7 +10225,7 @@
       "askSn": "7024773",
       "category": "",
       "actor": "",
-      "rowNum": 412,
+      "rowNum": 414,
       "id": "cti_1789709212875_406"
     },
     {
@@ -9988,7 +10249,7 @@
       "askSn": "7024765",
       "category": "",
       "actor": "",
-      "rowNum": 413,
+      "rowNum": 415,
       "id": "cti_1789709212875_407"
     },
     {
@@ -10012,7 +10273,7 @@
       "askSn": "7024764",
       "category": "",
       "actor": "",
-      "rowNum": 414,
+      "rowNum": 416,
       "id": "cti_1789709212875_408"
     },
     {
@@ -10036,7 +10297,7 @@
       "askSn": "7024763",
       "category": "",
       "actor": "",
-      "rowNum": 415,
+      "rowNum": 417,
       "id": "cti_1789709212875_409"
     },
     {
@@ -10060,7 +10321,7 @@
       "askSn": "7024761",
       "category": "",
       "actor": "",
-      "rowNum": 416,
+      "rowNum": 418,
       "id": "cti_1789709212875_410"
     },
     {
@@ -10084,7 +10345,7 @@
       "askSn": "7024697",
       "category": "",
       "actor": "",
-      "rowNum": 417,
+      "rowNum": 419,
       "id": "cti_1789709212875_411"
     },
     {
@@ -10108,7 +10369,7 @@
       "askSn": "7022686",
       "category": "협력업체 등록·지역연계",
       "actor": "협력업체·간병협회",
-      "rowNum": 418,
+      "rowNum": 420,
       "id": "cti_1789709212875_412"
     },
     {
@@ -10132,7 +10393,7 @@
       "askSn": "7022679",
       "category": "",
       "actor": "",
-      "rowNum": 419,
+      "rowNum": 421,
       "id": "cti_1789709212875_413"
     },
     {
@@ -10156,7 +10417,7 @@
       "askSn": "7021757",
       "category": "",
       "actor": "",
-      "rowNum": 420,
+      "rowNum": 422,
       "id": "cti_1789709212875_414"
     },
     {
@@ -10180,7 +10441,7 @@
       "askSn": "7021446",
       "category": "",
       "actor": "",
-      "rowNum": 421,
+      "rowNum": 423,
       "id": "cti_1789709212875_415"
     },
     {
@@ -10204,7 +10465,7 @@
       "askSn": "7020604",
       "category": "비용·무상제공 확인",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 422,
+      "rowNum": 424,
       "id": "cti_1789709212875_416"
     },
     {
@@ -10228,7 +10489,7 @@
       "askSn": "7020550",
       "category": "",
       "actor": "",
-      "rowNum": 423,
+      "rowNum": 425,
       "id": "cti_1789709212875_417"
     },
     {
@@ -10252,7 +10513,7 @@
       "askSn": "7020446",
       "category": "",
       "actor": "",
-      "rowNum": 424,
+      "rowNum": 426,
       "id": "cti_1789709212875_418"
     },
     {
@@ -10276,7 +10537,7 @@
       "askSn": "7020214",
       "category": "",
       "actor": "",
-      "rowNum": 425,
+      "rowNum": 427,
       "id": "cti_1789709212875_419"
     },
     {
@@ -10300,7 +10561,7 @@
       "askSn": "7020060",
       "category": "보험 문의·타업무 연결",
       "actor": "삼성화재 내부(설계사·지점)",
-      "rowNum": 426,
+      "rowNum": 428,
       "id": "cti_1789709212875_420"
     },
     {
@@ -10324,7 +10585,7 @@
       "askSn": "7020052",
       "category": "",
       "actor": "",
-      "rowNum": 427,
+      "rowNum": 429,
       "id": "cti_1789709212875_421"
     },
     {
@@ -10348,7 +10609,7 @@
       "askSn": "7020030",
       "category": "간병인(요양보호사) 등록",
       "actor": "간병인 등록희망자",
-      "rowNum": 428,
+      "rowNum": 430,
       "id": "cti_1789709212875_422"
     },
     {
@@ -10372,7 +10633,7 @@
       "askSn": "7019704",
       "category": "서비스 이용조건·범위",
       "actor": "삼성화재 내부(설계사·지점)",
-      "rowNum": 429,
+      "rowNum": 431,
       "id": "cti_1789709212875_423"
     },
     {
@@ -10396,7 +10657,7 @@
       "askSn": "7019495",
       "category": "협력업체 등록·지역연계",
       "actor": "협력업체·간병협회",
-      "rowNum": 430,
+      "rowNum": 432,
       "id": "cti_1789709212875_424"
     },
     {
@@ -10420,7 +10681,7 @@
       "askSn": "7019327",
       "category": "",
       "actor": "",
-      "rowNum": 431,
+      "rowNum": 433,
       "id": "cti_1789709212875_425"
     },
     {
@@ -10444,7 +10705,7 @@
       "askSn": "7019121",
       "category": "",
       "actor": "",
-      "rowNum": 432,
+      "rowNum": 434,
       "id": "cti_1789709212875_426"
     },
     {
@@ -10468,7 +10729,7 @@
       "askSn": "7019109",
       "category": "",
       "actor": "",
-      "rowNum": 433,
+      "rowNum": 435,
       "id": "cti_1789709212875_427"
     },
     {
@@ -10492,7 +10753,7 @@
       "askSn": "7019084",
       "category": "이용방식(24시간·교체·산정)",
       "actor": "고객(가입자·이용자)",
-      "rowNum": 434,
+      "rowNum": 436,
       "id": "cti_1789709212875_428"
     },
     {
@@ -10516,7 +10777,7 @@
       "askSn": "7019082",
       "category": "",
       "actor": "",
-      "rowNum": 435,
+      "rowNum": 437,
       "id": "cti_1789709212875_429"
     },
     {
@@ -10540,7 +10801,7 @@
       "askSn": "7018983",
       "category": "",
       "actor": "",
-      "rowNum": 436,
+      "rowNum": 438,
       "id": "cti_1789709212875_430"
     },
     {
@@ -10564,7 +10825,7 @@
       "askSn": "7018786",
       "category": "",
       "actor": "",
-      "rowNum": 437,
+      "rowNum": 439,
       "id": "cti_1789709212875_431"
     },
     {
@@ -10588,7 +10849,7 @@
       "askSn": "7018774",
       "category": "",
       "actor": "",
-      "rowNum": 438,
+      "rowNum": 440,
       "id": "cti_1789709212875_432"
     },
     {
@@ -10612,7 +10873,7 @@
       "askSn": "7018718",
       "category": "",
       "actor": "",
-      "rowNum": 439,
+      "rowNum": 441,
       "id": "cti_1789709212875_433"
     },
     {
@@ -10636,7 +10897,7 @@
       "askSn": "7018614",
       "category": "",
       "actor": "",
-      "rowNum": 440,
+      "rowNum": 442,
       "id": "cti_1789709212875_434"
     },
     {
@@ -10660,7 +10921,7 @@
       "askSn": "7018496",
       "category": "",
       "actor": "",
-      "rowNum": 441,
+      "rowNum": 443,
       "id": "cti_1789709212875_435"
     },
     {
@@ -10684,7 +10945,7 @@
       "askSn": "7018185",
       "category": "",
       "actor": "",
-      "rowNum": 442,
+      "rowNum": 444,
       "id": "cti_1789709212875_436"
     },
     {
@@ -10708,7 +10969,7 @@
       "askSn": "7018160",
       "category": "",
       "actor": "",
-      "rowNum": 443,
+      "rowNum": 445,
       "id": "cti_1789709212875_437"
     },
     {
@@ -10732,7 +10993,7 @@
       "askSn": "7017093",
       "category": "",
       "actor": "",
-      "rowNum": 444,
+      "rowNum": 446,
       "id": "cti_1789709212875_438"
     },
     {
@@ -10756,7 +11017,7 @@
       "askSn": "7017033",
       "category": "",
       "actor": "",
-      "rowNum": 445,
+      "rowNum": 447,
       "id": "cti_1789709212875_439"
     },
     {
@@ -10780,7 +11041,7 @@
       "askSn": "7015977",
       "category": "",
       "actor": "",
-      "rowNum": 446,
+      "rowNum": 448,
       "id": "cti_1789709212875_440"
     },
     {
@@ -10804,7 +11065,7 @@
       "askSn": "7015614",
       "category": "",
       "actor": "",
-      "rowNum": 447,
+      "rowNum": 449,
       "id": "cti_1789709212875_441"
     },
     {
@@ -10828,7 +11089,7 @@
       "askSn": "7015357",
       "category": "",
       "actor": "",
-      "rowNum": 448,
+      "rowNum": 450,
       "id": "cti_1789709212875_442"
     },
     {
@@ -10852,7 +11113,7 @@
       "askSn": "7014827",
       "category": "",
       "actor": "",
-      "rowNum": 449,
+      "rowNum": 451,
       "id": "cti_1789709212875_443"
     },
     {
@@ -10876,7 +11137,7 @@
       "askSn": "7014522",
       "category": "",
       "actor": "",
-      "rowNum": 450,
+      "rowNum": 452,
       "id": "cti_1789709212875_444"
     },
     {
@@ -10900,7 +11161,7 @@
       "askSn": "7014491",
       "category": "",
       "actor": "",
-      "rowNum": 451,
+      "rowNum": 453,
       "id": "cti_1789709212875_445"
     },
     {
@@ -10924,7 +11185,7 @@
       "askSn": "7014450",
       "category": "간병인(요양보호사) 등록",
       "actor": "간병인 등록희망자",
-      "rowNum": 452,
+      "rowNum": 454,
       "id": "cti_1789709212875_446"
     },
     {
@@ -10948,7 +11209,7 @@
       "askSn": "7014189",
       "category": "",
       "actor": "",
-      "rowNum": 453,
+      "rowNum": 455,
       "id": "cti_1789709212875_447"
     },
     {
@@ -10972,7 +11233,7 @@
       "askSn": "7013897",
       "category": "",
       "actor": "",
-      "rowNum": 454,
+      "rowNum": 456,
       "id": "cti_1789709212875_448"
     },
     {
@@ -10996,7 +11257,7 @@
       "askSn": "7013680",
       "category": "",
       "actor": "",
-      "rowNum": 455,
+      "rowNum": 457,
       "id": "cti_1789709212875_449"
     },
     {
@@ -11020,7 +11281,7 @@
       "askSn": "7013664",
       "category": "",
       "actor": "",
-      "rowNum": 456,
+      "rowNum": 458,
       "id": "cti_1789709212875_450"
     },
     {
@@ -11044,7 +11305,7 @@
       "askSn": "7013646",
       "category": "",
       "actor": "",
-      "rowNum": 457,
+      "rowNum": 459,
       "id": "cti_1789709212875_451"
     },
     {
@@ -11068,7 +11329,7 @@
       "askSn": "7013558",
       "category": "",
       "actor": "",
-      "rowNum": 458,
+      "rowNum": 460,
       "id": "cti_1789709212875_452"
     },
     {
@@ -11092,7 +11353,7 @@
       "askSn": "7013537",
       "category": "",
       "actor": "",
-      "rowNum": 459,
+      "rowNum": 461,
       "id": "cti_1789709212875_453"
     },
     {
@@ -11116,7 +11377,7 @@
       "askSn": "7013488",
       "category": "",
       "actor": "",
-      "rowNum": 460,
+      "rowNum": 462,
       "id": "cti_1789709212875_454"
     },
     {
@@ -11140,7 +11401,7 @@
       "askSn": "7013259",
       "category": "",
       "actor": "",
-      "rowNum": 461,
+      "rowNum": 463,
       "id": "cti_1789709212875_455"
     },
     {
@@ -11164,7 +11425,7 @@
       "askSn": "7013235",
       "category": "",
       "actor": "",
-      "rowNum": 462,
+      "rowNum": 464,
       "id": "cti_1789709212875_456"
     },
     {
@@ -11188,7 +11449,7 @@
       "askSn": "7013136",
       "category": "",
       "actor": "",
-      "rowNum": 463,
+      "rowNum": 465,
       "id": "cti_1789709212875_457"
     },
     {
@@ -11212,7 +11473,7 @@
       "askSn": "7013119",
       "category": "",
       "actor": "",
-      "rowNum": 464,
+      "rowNum": 466,
       "id": "cti_1789709212875_458"
     },
     {
@@ -11236,7 +11497,7 @@
       "askSn": "7013093",
       "category": "",
       "actor": "",
-      "rowNum": 465,
+      "rowNum": 467,
       "id": "cti_1789709212875_459"
     },
     {
@@ -11260,7 +11521,7 @@
       "askSn": "7013038",
       "category": "",
       "actor": "",
-      "rowNum": 466,
+      "rowNum": 468,
       "id": "cti_1789709212875_460"
     },
     {
@@ -11284,7 +11545,7 @@
       "askSn": "7013024",
       "category": "",
       "actor": "",
-      "rowNum": 467,
+      "rowNum": 469,
       "id": "cti_1789709212875_461"
     },
     {
@@ -11308,7 +11569,7 @@
       "askSn": "7013010",
       "category": "",
       "actor": "",
-      "rowNum": 468,
+      "rowNum": 470,
       "id": "cti_1789709212875_462"
     },
     {
@@ -11332,7 +11593,7 @@
       "askSn": "7012989",
       "category": "",
       "actor": "",
-      "rowNum": 469,
+      "rowNum": 471,
       "id": "cti_1789709212875_463"
     },
     {
@@ -11356,7 +11617,7 @@
       "askSn": "7012938",
       "category": "",
       "actor": "",
-      "rowNum": 470,
+      "rowNum": 472,
       "id": "cti_1789709212875_464"
     },
     {
@@ -11380,7 +11641,7 @@
       "askSn": "7012929",
       "category": "",
       "actor": "",
-      "rowNum": 471,
+      "rowNum": 473,
       "id": "cti_1789709212875_465"
     },
     {
@@ -11404,7 +11665,7 @@
       "askSn": "7012928",
       "category": "",
       "actor": "",
-      "rowNum": 472,
+      "rowNum": 474,
       "id": "cti_1789709212875_466"
     },
     {
@@ -11428,7 +11689,7 @@
       "askSn": "7012880",
       "category": "",
       "actor": "",
-      "rowNum": 473,
+      "rowNum": 475,
       "id": "cti_1789709212875_467"
     },
     {
@@ -11452,7 +11713,7 @@
       "askSn": "7012877",
       "category": "",
       "actor": "",
-      "rowNum": 474,
+      "rowNum": 476,
       "id": "cti_1789709212875_468"
     },
     {
@@ -11476,7 +11737,7 @@
       "askSn": "7012876",
       "category": "",
       "actor": "",
-      "rowNum": 475,
+      "rowNum": 477,
       "id": "cti_1789709212875_469"
     },
     {
@@ -11500,7 +11761,7 @@
       "askSn": "7012872",
       "category": "",
       "actor": "",
-      "rowNum": 476,
+      "rowNum": 478,
       "id": "cti_1789709212875_470"
     },
     {
@@ -11524,7 +11785,7 @@
       "askSn": "7012804",
       "category": "",
       "actor": "",
-      "rowNum": 477,
+      "rowNum": 479,
       "id": "cti_1789709212875_471"
     },
     {
@@ -11548,7 +11809,7 @@
       "askSn": "7012803",
       "category": "",
       "actor": "",
-      "rowNum": 478,
+      "rowNum": 480,
       "id": "cti_1789709212875_472"
     },
     {
@@ -11572,7 +11833,7 @@
       "askSn": "7012801",
       "category": "",
       "actor": "",
-      "rowNum": 479,
+      "rowNum": 481,
       "id": "cti_1789709212875_473"
     },
     {
@@ -11596,7 +11857,7 @@
       "askSn": "7012799",
       "category": "",
       "actor": "",
-      "rowNum": 480,
+      "rowNum": 482,
       "id": "cti_1789709212875_474"
     },
     {
@@ -11620,7 +11881,7 @@
       "askSn": "7012796",
       "category": "",
       "actor": "",
-      "rowNum": 481,
+      "rowNum": 483,
       "id": "cti_1789709212875_475"
     },
     {
@@ -11644,7 +11905,7 @@
       "askSn": "7012794",
       "category": "",
       "actor": "",
-      "rowNum": 482,
+      "rowNum": 484,
       "id": "cti_1789709212875_476"
     },
     {
@@ -11668,7 +11929,7 @@
       "askSn": "7012793",
       "category": "",
       "actor": "",
-      "rowNum": 483,
+      "rowNum": 485,
       "id": "cti_1789709212875_477"
     },
     {
@@ -11692,7 +11953,7 @@
       "askSn": "7012788",
       "category": "",
       "actor": "",
-      "rowNum": 484,
+      "rowNum": 486,
       "id": "cti_1789709212875_478"
     },
     {
@@ -11716,7 +11977,7 @@
       "askSn": "7012777",
       "category": "",
       "actor": "",
-      "rowNum": 485,
+      "rowNum": 487,
       "id": "cti_1789709212875_479"
     },
     {
@@ -11740,7 +12001,7 @@
       "askSn": "7012775",
       "category": "",
       "actor": "",
-      "rowNum": 486,
+      "rowNum": 488,
       "id": "cti_1789709212875_480"
     },
     {
@@ -11764,7 +12025,7 @@
       "askSn": "7012769",
       "category": "",
       "actor": "",
-      "rowNum": 487,
+      "rowNum": 489,
       "id": "cti_1789709212875_481"
     },
     {
@@ -11788,7 +12049,7 @@
       "askSn": "7012752",
       "category": "",
       "actor": "",
-      "rowNum": 488,
+      "rowNum": 490,
       "id": "cti_1789709212875_482"
     },
     {
@@ -11812,7 +12073,7 @@
       "askSn": "7012357",
       "category": "",
       "actor": "",
-      "rowNum": 489,
+      "rowNum": 491,
       "id": "cti_1789702616387_678"
     },
     {
@@ -11836,7 +12097,7 @@
       "askSn": "7012315",
       "category": "",
       "actor": "",
-      "rowNum": 490,
+      "rowNum": 492,
       "id": "cti_1789702616387_679"
     },
     {
@@ -11860,7 +12121,7 @@
       "askSn": "7012313",
       "category": "",
       "actor": "",
-      "rowNum": 491,
+      "rowNum": 493,
       "id": "cti_1789702616387_680"
     },
     {
@@ -11884,7 +12145,7 @@
       "askSn": "7011934",
       "category": "",
       "actor": "",
-      "rowNum": 492,
+      "rowNum": 494,
       "id": "cti_1789702616387_682"
     },
     {
@@ -11908,7 +12169,7 @@
       "askSn": "7011910",
       "category": "",
       "actor": "",
-      "rowNum": 493,
+      "rowNum": 495,
       "id": "cti_1789702616387_683"
     },
     {
@@ -11932,7 +12193,7 @@
       "askSn": "7011628",
       "category": "",
       "actor": "",
-      "rowNum": 494,
+      "rowNum": 496,
       "id": "cti_1789702616387_685"
     },
     {
@@ -11956,7 +12217,7 @@
       "askSn": "7011155",
       "category": "",
       "actor": "",
-      "rowNum": 495,
+      "rowNum": 497,
       "id": "cti_1789702616387_686"
     },
     {
@@ -11980,7 +12241,7 @@
       "askSn": "7011052",
       "category": "",
       "actor": "",
-      "rowNum": 496,
+      "rowNum": 498,
       "id": "cti_1789702616387_687"
     },
     {
@@ -12004,7 +12265,7 @@
       "askSn": "7010661",
       "category": "",
       "actor": "",
-      "rowNum": 497,
+      "rowNum": 499,
       "id": "cti_1789702616387_689"
     },
     {
@@ -12028,7 +12289,7 @@
       "askSn": "7010548",
       "category": "",
       "actor": "",
-      "rowNum": 498,
+      "rowNum": 500,
       "id": "cti_1789702616387_692"
     },
     {
@@ -12052,7 +12313,7 @@
       "askSn": "7010040",
       "category": "",
       "actor": "",
-      "rowNum": 499,
+      "rowNum": 501,
       "id": "cti_1789702616387_695"
     },
     {
@@ -12076,7 +12337,7 @@
       "askSn": "7009829",
       "category": "",
       "actor": "",
-      "rowNum": 500,
+      "rowNum": 502,
       "id": "cti_1789702616387_696"
     },
     {
@@ -12100,7 +12361,7 @@
       "askSn": "7009532",
       "category": "",
       "actor": "",
-      "rowNum": 501,
+      "rowNum": 503,
       "id": "cti_1789702616387_697"
     },
     {
@@ -12124,7 +12385,7 @@
       "askSn": "7009482",
       "category": "",
       "actor": "",
-      "rowNum": 502,
+      "rowNum": 504,
       "id": "cti_1789702616387_698"
     },
     {
@@ -12148,7 +12409,7 @@
       "askSn": "7009472",
       "category": "",
       "actor": "",
-      "rowNum": 503,
+      "rowNum": 505,
       "id": "cti_1789702616387_699"
     },
     {
@@ -12172,7 +12433,7 @@
       "askSn": "7008929",
       "category": "",
       "actor": "",
-      "rowNum": 504,
+      "rowNum": 506,
       "id": "cti_1789702616387_700"
     },
     {
@@ -12196,7 +12457,7 @@
       "askSn": "7008913",
       "category": "",
       "actor": "",
-      "rowNum": 505,
+      "rowNum": 507,
       "id": "cti_1789702616387_701"
     },
     {
@@ -12220,7 +12481,7 @@
       "askSn": "7008909",
       "category": "",
       "actor": "",
-      "rowNum": 506,
+      "rowNum": 508,
       "id": "cti_1789702616387_702"
     },
     {
@@ -12244,7 +12505,7 @@
       "askSn": "7008359",
       "category": "",
       "actor": "",
-      "rowNum": 507,
+      "rowNum": 509,
       "id": "cti_1789702616387_703"
     },
     {
@@ -12268,7 +12529,7 @@
       "askSn": "7008273",
       "category": "",
       "actor": "",
-      "rowNum": 508,
+      "rowNum": 510,
       "id": "cti_1789702616387_704"
     },
     {
@@ -12292,7 +12553,7 @@
       "askSn": "7008105",
       "category": "",
       "actor": "",
-      "rowNum": 509,
+      "rowNum": 511,
       "id": "cti_1789702616387_705"
     },
     {
@@ -12316,7 +12577,7 @@
       "askSn": "7008047",
       "category": "",
       "actor": "",
-      "rowNum": 510,
+      "rowNum": 512,
       "id": "cti_1789702616387_706"
     },
     {
@@ -12340,7 +12601,7 @@
       "askSn": "7007338",
       "category": "",
       "actor": "",
-      "rowNum": 511,
+      "rowNum": 513,
       "id": "cti_1789702616387_709"
     },
     {
@@ -12364,7 +12625,7 @@
       "askSn": "7006729",
       "category": "",
       "actor": "",
-      "rowNum": 512,
+      "rowNum": 514,
       "id": "cti_1789702616387_711"
     },
     {
@@ -12388,7 +12649,7 @@
       "askSn": "7006628",
       "category": "",
       "actor": "",
-      "rowNum": 513,
+      "rowNum": 515,
       "id": "cti_1789702616387_712"
     },
     {
@@ -12412,7 +12673,7 @@
       "askSn": "7006369",
       "category": "",
       "actor": "",
-      "rowNum": 514,
+      "rowNum": 516,
       "id": "cti_1789702616387_713"
     },
     {
@@ -12436,7 +12697,7 @@
       "askSn": "7006359",
       "category": "",
       "actor": "",
-      "rowNum": 515,
+      "rowNum": 517,
       "id": "cti_1789702616387_714"
     },
     {
@@ -12460,7 +12721,7 @@
       "askSn": "7006357",
       "category": "",
       "actor": "",
-      "rowNum": 516,
+      "rowNum": 518,
       "id": "cti_1789702616387_715"
     },
     {
@@ -12484,7 +12745,7 @@
       "askSn": "7006337",
       "category": "",
       "actor": "",
-      "rowNum": 517,
+      "rowNum": 519,
       "id": "cti_1789702616387_716"
     },
     {
@@ -12508,7 +12769,7 @@
       "askSn": "7006224",
       "category": "",
       "actor": "",
-      "rowNum": 518,
+      "rowNum": 520,
       "id": "cti_1789702616387_717"
     },
     {
@@ -12532,7 +12793,7 @@
       "askSn": "7006170",
       "category": "",
       "actor": "",
-      "rowNum": 519,
+      "rowNum": 521,
       "id": "cti_1789702616387_718"
     },
     {
@@ -12556,7 +12817,7 @@
       "askSn": "7006123",
       "category": "",
       "actor": "",
-      "rowNum": 520,
+      "rowNum": 522,
       "id": "cti_1789702616387_719"
     },
     {
@@ -12580,7 +12841,7 @@
       "askSn": "7006118",
       "category": "",
       "actor": "",
-      "rowNum": 521,
+      "rowNum": 523,
       "id": "cti_1789702616387_720"
     },
     {
@@ -12604,7 +12865,7 @@
       "askSn": "7006061",
       "category": "",
       "actor": "",
-      "rowNum": 522,
+      "rowNum": 524,
       "id": "cti_1789702616387_721"
     },
     {
@@ -12628,7 +12889,7 @@
       "askSn": "7006002",
       "category": "",
       "actor": "",
-      "rowNum": 523,
+      "rowNum": 525,
       "id": "cti_1789702616387_723"
     },
     {
@@ -12652,7 +12913,7 @@
       "askSn": "7005998",
       "category": "",
       "actor": "",
-      "rowNum": 524,
+      "rowNum": 526,
       "id": "cti_1789702616387_724"
     },
     {
@@ -12676,7 +12937,7 @@
       "askSn": "7005910",
       "category": "",
       "actor": "",
-      "rowNum": 525,
+      "rowNum": 527,
       "id": "cti_1789702616387_725"
     },
     {
@@ -12700,7 +12961,7 @@
       "askSn": "7005876",
       "category": "",
       "actor": "",
-      "rowNum": 526,
+      "rowNum": 528,
       "id": "cti_1789702616387_726"
     },
     {
@@ -12724,7 +12985,7 @@
       "askSn": "7005875",
       "category": "",
       "actor": "",
-      "rowNum": 527,
+      "rowNum": 529,
       "id": "cti_1789702616387_727"
     },
     {
@@ -12748,7 +13009,7 @@
       "askSn": "7005874",
       "category": "",
       "actor": "",
-      "rowNum": 528,
+      "rowNum": 530,
       "id": "cti_1789702616387_728"
     },
     {
@@ -12772,7 +13033,7 @@
       "askSn": "7005864",
       "category": "",
       "actor": "",
-      "rowNum": 529,
+      "rowNum": 531,
       "id": "cti_1789702616387_730"
     },
     {
@@ -12796,7 +13057,7 @@
       "askSn": "7005862",
       "category": "",
       "actor": "",
-      "rowNum": 530,
+      "rowNum": 532,
       "id": "cti_1789702616387_731"
     },
     {
@@ -12820,7 +13081,7 @@
       "askSn": "7005831",
       "category": "",
       "actor": "",
-      "rowNum": 531,
+      "rowNum": 533,
       "id": "cti_1789702616387_732"
     },
     {
@@ -12844,7 +13105,7 @@
       "askSn": "7005819",
       "category": "",
       "actor": "",
-      "rowNum": 532,
+      "rowNum": 534,
       "id": "cti_1789702616387_733"
     },
     {
@@ -12868,7 +13129,7 @@
       "askSn": "7005801",
       "category": "",
       "actor": "",
-      "rowNum": 533,
+      "rowNum": 535,
       "id": "cti_1789702616387_734"
     },
     {
@@ -12892,7 +13153,7 @@
       "askSn": "7005799",
       "category": "",
       "actor": "",
-      "rowNum": 534,
+      "rowNum": 536,
       "id": "cti_1789702616387_735"
     },
     {
@@ -12916,7 +13177,7 @@
       "askSn": "7005798",
       "category": "",
       "actor": "",
-      "rowNum": 535,
+      "rowNum": 537,
       "id": "cti_1789702616387_736"
     },
     {
@@ -12940,7 +13201,7 @@
       "askSn": "7005796",
       "category": "",
       "actor": "",
-      "rowNum": 536,
+      "rowNum": 538,
       "id": "cti_1789702616387_737"
     },
     {
@@ -12964,7 +13225,7 @@
       "askSn": "7005790",
       "category": "",
       "actor": "",
-      "rowNum": 537,
+      "rowNum": 539,
       "id": "cti_1789702616387_738"
     },
     {
@@ -12988,7 +13249,7 @@
       "askSn": "7005788",
       "category": "",
       "actor": "",
-      "rowNum": 538,
+      "rowNum": 540,
       "id": "cti_1789702616387_739"
     },
     {
@@ -13012,7 +13273,7 @@
       "askSn": "7005787",
       "category": "",
       "actor": "",
-      "rowNum": 539,
+      "rowNum": 541,
       "id": "cti_1789702616387_740"
     },
     {
@@ -13036,7 +13297,7 @@
       "askSn": "7005786",
       "category": "",
       "actor": "",
-      "rowNum": 540,
+      "rowNum": 542,
       "id": "cti_1789702616387_741"
     },
     {
@@ -13060,7 +13321,7 @@
       "askSn": "7005785",
       "category": "",
       "actor": "",
-      "rowNum": 541,
+      "rowNum": 543,
       "id": "cti_1789702616387_742"
     },
     {
@@ -13084,7 +13345,7 @@
       "askSn": "7005782",
       "category": "",
       "actor": "",
-      "rowNum": 542,
+      "rowNum": 544,
       "id": "cti_1789702616387_743"
     },
     {
@@ -13108,7 +13369,7 @@
       "askSn": "7005781",
       "category": "",
       "actor": "",
-      "rowNum": 543,
+      "rowNum": 545,
       "id": "cti_1789702616387_744"
     },
     {
@@ -13132,7 +13393,7 @@
       "askSn": "7005779",
       "category": "",
       "actor": "",
-      "rowNum": 544,
+      "rowNum": 546,
       "id": "cti_1789702616387_745"
     },
     {
@@ -13156,7 +13417,7 @@
       "askSn": "7005778",
       "category": "",
       "actor": "",
-      "rowNum": 545,
+      "rowNum": 547,
       "id": "cti_1789702616387_746"
     },
     {
@@ -13180,7 +13441,7 @@
       "askSn": "7005777",
       "category": "",
       "actor": "",
-      "rowNum": 546,
+      "rowNum": 548,
       "id": "cti_1789702616387_747"
     },
     {
@@ -13204,7 +13465,7 @@
       "askSn": "7005773",
       "category": "",
       "actor": "",
-      "rowNum": 547,
+      "rowNum": 549,
       "id": "cti_1789702616387_748"
     },
     {
@@ -13228,7 +13489,7 @@
       "askSn": "7005772",
       "category": "",
       "actor": "",
-      "rowNum": 548,
+      "rowNum": 550,
       "id": "cti_1789702616387_749"
     },
     {
@@ -13252,7 +13513,7 @@
       "askSn": "7005769",
       "category": "",
       "actor": "",
-      "rowNum": 549,
+      "rowNum": 551,
       "id": "cti_1789702616387_750"
     },
     {
@@ -13276,7 +13537,7 @@
       "askSn": "7005745",
       "category": "",
       "actor": "",
-      "rowNum": 550,
+      "rowNum": 552,
       "id": "cti_1789702616387_751"
     },
     {
@@ -13300,7 +13561,7 @@
       "askSn": "7005737",
       "category": "",
       "actor": "",
-      "rowNum": 551,
+      "rowNum": 553,
       "id": "cti_1789702616387_752"
     },
     {
@@ -13324,7 +13585,7 @@
       "askSn": "7005736",
       "category": "",
       "actor": "",
-      "rowNum": 552,
+      "rowNum": 554,
       "id": "cti_1789702616387_753"
     },
     {
@@ -13348,7 +13609,7 @@
       "askSn": "7005691",
       "category": "",
       "actor": "",
-      "rowNum": 553,
+      "rowNum": 555,
       "id": "cti_1789702616387_754"
     },
     {
@@ -13372,7 +13633,7 @@
       "askSn": "7005685",
       "category": "",
       "actor": "",
-      "rowNum": 554,
+      "rowNum": 556,
       "id": "cti_1789702616387_755"
     },
     {
@@ -13396,7 +13657,7 @@
       "askSn": "7005664",
       "category": "",
       "actor": "",
-      "rowNum": 555,
+      "rowNum": 557,
       "id": "cti_1789702616387_756"
     },
     {
@@ -13420,7 +13681,7 @@
       "askSn": "7005663",
       "category": "",
       "actor": "",
-      "rowNum": 556,
+      "rowNum": 558,
       "id": "cti_1789702616387_757"
     },
     {
@@ -13444,7 +13705,7 @@
       "askSn": "7005658",
       "category": "",
       "actor": "",
-      "rowNum": 557,
+      "rowNum": 559,
       "id": "cti_1789702616387_758"
     },
     {
@@ -13468,7 +13729,7 @@
       "askSn": "7005657",
       "category": "",
       "actor": "",
-      "rowNum": 558,
+      "rowNum": 560,
       "id": "cti_1789702616387_759"
     },
     {
@@ -13492,7 +13753,7 @@
       "askSn": "7005655",
       "category": "",
       "actor": "",
-      "rowNum": 559,
+      "rowNum": 561,
       "id": "cti_1789702616387_760"
     },
     {
@@ -13516,7 +13777,7 @@
       "askSn": "7005653",
       "category": "",
       "actor": "",
-      "rowNum": 560,
+      "rowNum": 562,
       "id": "cti_1789702616387_761"
     },
     {
@@ -13540,7 +13801,7 @@
       "askSn": "7005651",
       "category": "",
       "actor": "",
-      "rowNum": 561,
+      "rowNum": 563,
       "id": "cti_1789702616387_762"
     },
     {
@@ -13564,7 +13825,7 @@
       "askSn": "7005645",
       "category": "",
       "actor": "",
-      "rowNum": 562,
+      "rowNum": 564,
       "id": "cti_1789702616387_763"
     },
     {
@@ -13588,7 +13849,7 @@
       "askSn": "7005635",
       "category": "",
       "actor": "",
-      "rowNum": 563,
+      "rowNum": 565,
       "id": "cti_1789702616387_764"
     },
     {
@@ -13612,7 +13873,7 @@
       "askSn": "7005630",
       "category": "",
       "actor": "",
-      "rowNum": 564,
+      "rowNum": 566,
       "id": "cti_1789702616387_765"
     },
     {
@@ -13636,7 +13897,7 @@
       "askSn": "7005562",
       "category": "",
       "actor": "",
-      "rowNum": 565,
+      "rowNum": 567,
       "id": "cti_1789702616387_766"
     },
     {
@@ -13660,7 +13921,7 @@
       "askSn": "7005548",
       "category": "",
       "actor": "",
-      "rowNum": 566,
+      "rowNum": 568,
       "id": "cti_1789702616387_767"
     },
     {
@@ -13684,7 +13945,7 @@
       "askSn": "7005543",
       "category": "",
       "actor": "",
-      "rowNum": 567,
+      "rowNum": 569,
       "id": "cti_1789702616387_768"
     },
     {
@@ -13708,7 +13969,7 @@
       "askSn": "7005473",
       "category": "",
       "actor": "",
-      "rowNum": 568,
+      "rowNum": 570,
       "id": "cti_1789702616387_769"
     },
     {
@@ -13732,7 +13993,7 @@
       "askSn": "7004686",
       "category": "",
       "actor": "",
-      "rowNum": 569,
+      "rowNum": 571,
       "id": "cti_1789702616387_771"
     },
     {
@@ -13756,7 +14017,7 @@
       "askSn": "7004685",
       "category": "",
       "actor": "",
-      "rowNum": 570,
+      "rowNum": 572,
       "id": "cti_1789702616387_772"
     },
     {
@@ -13780,7 +14041,7 @@
       "askSn": "7003823",
       "category": "",
       "actor": "",
-      "rowNum": 571,
+      "rowNum": 573,
       "id": "cti_1789702616387_775"
     },
     {
@@ -13804,7 +14065,7 @@
       "askSn": "7001904",
       "category": "",
       "actor": "",
-      "rowNum": 572,
+      "rowNum": 574,
       "id": "cti_1789702616387_789"
     },
     {
@@ -13828,7 +14089,7 @@
       "askSn": "6999829",
       "category": "",
       "actor": "",
-      "rowNum": 573,
+      "rowNum": 575,
       "id": "cti_1789702616387_795"
     },
     {
@@ -13852,7 +14113,7 @@
       "askSn": "6998253",
       "category": "",
       "actor": "",
-      "rowNum": 574,
+      "rowNum": 576,
       "id": "cti_1789702616387_803"
     },
     {
@@ -13876,7 +14137,7 @@
       "askSn": "6998002",
       "category": "",
       "actor": "",
-      "rowNum": 575,
+      "rowNum": 577,
       "id": "cti_1789702616387_807"
     },
     {
@@ -13900,7 +14161,7 @@
       "askSn": "6997645",
       "category": "",
       "actor": "",
-      "rowNum": 576,
+      "rowNum": 578,
       "id": "cti_1789702616387_810"
     },
     {
@@ -13924,7 +14185,7 @@
       "askSn": "6997577",
       "category": "",
       "actor": "",
-      "rowNum": 577,
+      "rowNum": 579,
       "id": "cti_1789702616387_812"
     },
     {
@@ -13948,7 +14209,7 @@
       "askSn": "6997569",
       "category": "",
       "actor": "",
-      "rowNum": 578,
+      "rowNum": 580,
       "id": "cti_1789702616387_813"
     },
     {
@@ -13972,7 +14233,7 @@
       "askSn": "6997557",
       "category": "",
       "actor": "",
-      "rowNum": 579,
+      "rowNum": 581,
       "id": "cti_1789702616387_815"
     },
     {
@@ -13996,7 +14257,7 @@
       "askSn": "6997548",
       "category": "",
       "actor": "",
-      "rowNum": 580,
+      "rowNum": 582,
       "id": "cti_1789702616387_816"
     },
     {
@@ -14020,7 +14281,7 @@
       "askSn": "6997545",
       "category": "",
       "actor": "",
-      "rowNum": 581,
+      "rowNum": 583,
       "id": "cti_1789702616387_817"
     },
     {
@@ -14044,7 +14305,7 @@
       "askSn": "6997499",
       "category": "",
       "actor": "",
-      "rowNum": 582,
+      "rowNum": 584,
       "id": "cti_1789702616387_819"
     },
     {
@@ -14068,7 +14329,7 @@
       "askSn": "6997468",
       "category": "",
       "actor": "",
-      "rowNum": 583,
+      "rowNum": 585,
       "id": "cti_1789702616387_820"
     },
     {
@@ -14092,7 +14353,7 @@
       "askSn": "6997455",
       "category": "",
       "actor": "",
-      "rowNum": 584,
+      "rowNum": 586,
       "id": "cti_1789702616387_821"
     },
     {
@@ -14116,7 +14377,7 @@
       "askSn": "6997451",
       "category": "",
       "actor": "",
-      "rowNum": 585,
+      "rowNum": 587,
       "id": "cti_1789702616387_822"
     },
     {
@@ -14140,7 +14401,7 @@
       "askSn": "6997440",
       "category": "",
       "actor": "",
-      "rowNum": 586,
+      "rowNum": 588,
       "id": "cti_1789702616387_823"
     },
     {
@@ -14164,7 +14425,7 @@
       "askSn": "6997411",
       "category": "",
       "actor": "",
-      "rowNum": 587,
+      "rowNum": 589,
       "id": "cti_1789702616387_824"
     },
     {
@@ -14188,7 +14449,7 @@
       "askSn": "6997403",
       "category": "",
       "actor": "",
-      "rowNum": 588,
+      "rowNum": 590,
       "id": "cti_1789702616387_825"
     },
     {
@@ -14212,7 +14473,7 @@
       "askSn": "6997402",
       "category": "",
       "actor": "",
-      "rowNum": 589,
+      "rowNum": 591,
       "id": "cti_1789702616387_826"
     },
     {
@@ -14236,7 +14497,7 @@
       "askSn": "6997401",
       "category": "",
       "actor": "",
-      "rowNum": 590,
+      "rowNum": 592,
       "id": "cti_1789702616387_827"
     },
     {
@@ -14260,7 +14521,7 @@
       "askSn": "6997355",
       "category": "",
       "actor": "",
-      "rowNum": 591,
+      "rowNum": 593,
       "id": "cti_1789702616387_828"
     },
     {
@@ -14284,7 +14545,7 @@
       "askSn": "6994800",
       "category": "",
       "actor": "",
-      "rowNum": 592,
+      "rowNum": 594,
       "id": "cti_1789702616387_829"
     },
     {
@@ -14308,7 +14569,7 @@
       "askSn": "6994559",
       "category": "",
       "actor": "",
-      "rowNum": 593,
+      "rowNum": 595,
       "id": "cti_1789702616387_830"
     },
     {
@@ -14332,7 +14593,7 @@
       "askSn": "6992970",
       "category": "",
       "actor": "",
-      "rowNum": 594,
+      "rowNum": 596,
       "id": "cti_1789702616387_831"
     },
     {
@@ -14356,7 +14617,7 @@
       "askSn": "6992411",
       "category": "",
       "actor": "",
-      "rowNum": 595,
+      "rowNum": 597,
       "id": "cti_1789702616387_832"
     },
     {
@@ -14380,7 +14641,7 @@
       "askSn": "6992191",
       "category": "",
       "actor": "",
-      "rowNum": 596,
+      "rowNum": 598,
       "id": "cti_1789702616387_833"
     },
     {
@@ -14404,7 +14665,7 @@
       "askSn": "6992188",
       "category": "",
       "actor": "",
-      "rowNum": 597,
+      "rowNum": 599,
       "id": "cti_1789702616387_834"
     },
     {
@@ -14428,7 +14689,7 @@
       "askSn": "6992184",
       "category": "",
       "actor": "",
-      "rowNum": 598,
+      "rowNum": 600,
       "id": "cti_1789702616387_835"
     },
     {
@@ -14452,7 +14713,7 @@
       "askSn": "6992095",
       "category": "",
       "actor": "",
-      "rowNum": 599,
+      "rowNum": 601,
       "id": "cti_1789702616387_836"
     },
     {
@@ -14476,7 +14737,7 @@
       "askSn": "6992067",
       "category": "",
       "actor": "",
-      "rowNum": 600,
+      "rowNum": 602,
       "id": "cti_1789702616387_837"
     },
     {
@@ -14500,7 +14761,7 @@
       "askSn": "6992054",
       "category": "",
       "actor": "",
-      "rowNum": 601,
+      "rowNum": 603,
       "id": "cti_1789702616387_838"
     },
     {
@@ -14524,7 +14785,7 @@
       "askSn": "6992030",
       "category": "",
       "actor": "",
-      "rowNum": 602,
+      "rowNum": 604,
       "id": "cti_1789702616387_839"
     },
     {
@@ -14548,7 +14809,7 @@
       "askSn": "6991191",
       "category": "",
       "actor": "",
-      "rowNum": 603,
+      "rowNum": 605,
       "id": "cti_1789702616387_840"
     },
     {
@@ -14572,7 +14833,7 @@
       "askSn": "6990951",
       "category": "",
       "actor": "",
-      "rowNum": 604,
+      "rowNum": 606,
       "id": "cti_1789702616387_841"
     },
     {
@@ -14596,7 +14857,7 @@
       "askSn": "6986654",
       "category": "",
       "actor": "",
-      "rowNum": 605,
+      "rowNum": 607,
       "id": "cti_1789702616387_847"
     },
     {
@@ -14620,7 +14881,7 @@
       "askSn": "6986406",
       "category": "",
       "actor": "",
-      "rowNum": 606,
+      "rowNum": 608,
       "id": "cti_1789702616387_848"
     },
     {
@@ -14644,7 +14905,7 @@
       "askSn": "6986219",
       "category": "",
       "actor": "",
-      "rowNum": 607,
+      "rowNum": 609,
       "id": "cti_1789702616387_849"
     },
     {
@@ -14668,7 +14929,7 @@
       "askSn": "6986215",
       "category": "",
       "actor": "",
-      "rowNum": 608,
+      "rowNum": 610,
       "id": "cti_1789702616387_850"
     },
     {
@@ -14692,7 +14953,7 @@
       "askSn": "6985785",
       "category": "",
       "actor": "",
-      "rowNum": 609,
+      "rowNum": 611,
       "id": "cti_1789702616387_851"
     },
     {
@@ -14716,7 +14977,7 @@
       "askSn": "6985744",
       "category": "",
       "actor": "",
-      "rowNum": 610,
+      "rowNum": 612,
       "id": "cti_1789702616387_852"
     },
     {
@@ -14740,7 +15001,7 @@
       "askSn": "6984666",
       "category": "",
       "actor": "",
-      "rowNum": 611,
+      "rowNum": 613,
       "id": "cti_1789702616387_853"
     },
     {
@@ -14764,7 +15025,7 @@
       "askSn": "6983507",
       "category": "",
       "actor": "",
-      "rowNum": 612,
+      "rowNum": 614,
       "id": "cti_1789702616387_855"
     },
     {
@@ -14788,7 +15049,7 @@
       "askSn": "6968969",
       "category": "",
       "actor": "",
-      "rowNum": 613,
+      "rowNum": 615,
       "id": "cti_1789702616387_877"
     },
     {
@@ -14812,7 +15073,7 @@
       "askSn": "6968848",
       "category": "",
       "actor": "",
-      "rowNum": 614,
+      "rowNum": 616,
       "id": "cti_1789702616387_881"
     },
     {
@@ -14836,7 +15097,7 @@
       "askSn": "6968820",
       "category": "",
       "actor": "",
-      "rowNum": 615,
+      "rowNum": 617,
       "id": "cti_1789702616387_882"
     },
     {
@@ -14860,7 +15121,7 @@
       "askSn": "6968610",
       "category": "",
       "actor": "",
-      "rowNum": 616,
+      "rowNum": 618,
       "id": "cti_1789702616387_884"
     },
     {
@@ -14884,7 +15145,7 @@
       "askSn": "6968599",
       "category": "",
       "actor": "",
-      "rowNum": 617,
+      "rowNum": 619,
       "id": "cti_1789702616387_885"
     },
     {
@@ -14908,7 +15169,7 @@
       "askSn": "6965358",
       "category": "",
       "actor": "",
-      "rowNum": 618,
+      "rowNum": 620,
       "id": "cti_1789702616387_893"
     },
     {
@@ -14932,7 +15193,7 @@
       "askSn": "6965354",
       "category": "",
       "actor": "",
-      "rowNum": 619,
+      "rowNum": 621,
       "id": "cti_1789702616387_894"
     },
     {
@@ -14956,7 +15217,7 @@
       "askSn": "6965352",
       "category": "",
       "actor": "",
-      "rowNum": 620,
+      "rowNum": 622,
       "id": "cti_1789702616387_895"
     },
     {
@@ -14980,7 +15241,7 @@
       "askSn": "6965349",
       "category": "",
       "actor": "",
-      "rowNum": 621,
+      "rowNum": 623,
       "id": "cti_1789702616387_896"
     },
     {
@@ -15004,7 +15265,7 @@
       "askSn": "6965346",
       "category": "",
       "actor": "",
-      "rowNum": 622,
+      "rowNum": 624,
       "id": "cti_1789702616387_897"
     },
     {
@@ -15028,7 +15289,7 @@
       "askSn": "6965153",
       "category": "",
       "actor": "",
-      "rowNum": 623,
+      "rowNum": 625,
       "id": "cti_1789702616387_898"
     },
     {
@@ -15052,7 +15313,7 @@
       "askSn": "6965147",
       "category": "",
       "actor": "",
-      "rowNum": 624,
+      "rowNum": 626,
       "id": "cti_1789702616387_899"
     },
     {
@@ -15076,7 +15337,7 @@
       "askSn": "6965146",
       "category": "",
       "actor": "",
-      "rowNum": 625,
+      "rowNum": 627,
       "id": "cti_1789702616387_900"
     },
     {
@@ -15100,7 +15361,7 @@
       "askSn": "6965078",
       "category": "",
       "actor": "",
-      "rowNum": 626,
+      "rowNum": 628,
       "id": "cti_1789702616387_901"
     },
     {
@@ -15124,7 +15385,7 @@
       "askSn": "6965062",
       "category": "",
       "actor": "",
-      "rowNum": 627,
+      "rowNum": 629,
       "id": "cti_1789702616387_902"
     },
     {
@@ -15148,7 +15409,7 @@
       "askSn": "6965042",
       "category": "",
       "actor": "",
-      "rowNum": 628,
+      "rowNum": 630,
       "id": "cti_1789702616387_903"
     },
     {
@@ -15172,7 +15433,7 @@
       "askSn": "6964732",
       "category": "",
       "actor": "",
-      "rowNum": 629,
+      "rowNum": 631,
       "id": "cti_1789702616387_904"
     },
     {
@@ -15196,7 +15457,7 @@
       "askSn": "6964664",
       "category": "",
       "actor": "",
-      "rowNum": 630,
+      "rowNum": 632,
       "id": "cti_1789702616387_905"
     },
     {
@@ -15220,7 +15481,7 @@
       "askSn": "6964621",
       "category": "",
       "actor": "",
-      "rowNum": 631,
+      "rowNum": 633,
       "id": "cti_1789702616387_906"
     },
     {
@@ -15244,7 +15505,7 @@
       "askSn": "6964574",
       "category": "",
       "actor": "",
-      "rowNum": 632,
+      "rowNum": 634,
       "id": "cti_1789702616387_907"
     }
   ]

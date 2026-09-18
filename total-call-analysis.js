@@ -858,15 +858,15 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         setTotalSyncProgress(1, 15, 'CTI 서버 연결 중', 'CTI 게이트웨이에 접속하여 최신 인바운드 콜 데이터를 요청하고 있습니다...');
       }
 
-      // 초고속 타임아웃 (기존 15초 -> 2.5초로 단축하여 정적 데이터와 빠른 전환)
+      // 25초 타임아웃 가드
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
       let synced = false;
 
       const s = gTotalFilter.startDate || '2026-08-01';
       const e = gTotalFilter.endDate || new Date().toISOString().slice(0, 10);
       const ch = gTotalFilter.channel || 'all';
-      const sUrl = `/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
+      const sUrl = `/api/total/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
 
       if (!isBackground) {
         setTotalSyncProgress(2, 55, '콜로그 및 녹취 STT 수신 중', '삼성화재·현대해상·리본케어 인바운드 콜 녹취 및 STT 전문 데이터를 파싱하고 있습니다...');
@@ -893,8 +893,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
           `call_report_all.json?t=${Date.now()}`,
           `/call_report_all.json?t=${Date.now()}`,
           `./call_report_all.json?t=${Date.now()}`,
-          `/api/samsung/call-report/data?channel=all`,
-          `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
+          `/api/samsung/call-report/data?channel=all`
         ];
         for (const u of fallbacks) {
           try {
@@ -965,8 +964,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         const staticFallbacks = [
           `call_report_all.json?t=${Date.now()}`,
           `/call_report_all.json?t=${Date.now()}`,
-          `./call_report_all.json?t=${Date.now()}`,
-          `call_report_samsung.json?t=${Date.now()}`
+          `./call_report_all.json?t=${Date.now()}`
         ];
         for (const u of staticFallbacks) {
           try {
@@ -3423,10 +3421,7 @@ async function loadOutcallBackgroundData() {
   const fallbacks = [
     'call_report_all.json',
     './call_report_all.json',
-    '/call_report_all.json',
-    'call_report_samsung.json',
-    './call_report_samsung.json',
-    '/call_report_samsung.json'
+    '/call_report_all.json'
   ];
   for (const url of fallbacks) {
     try {

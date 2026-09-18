@@ -427,12 +427,12 @@ async function initSamsungCallReportModule(resetFilter = true) {
     `./${primaryFileName}?t=${Date.now()}`,
     `${primaryFileName}?t=${Date.now()}`,
     `/${primaryFileName}?t=${Date.now()}`,
-    `./call_report_all.json?t=${Date.now()}`,
-    `call_report_all.json?t=${Date.now()}`,
-    `/call_report_all.json?t=${Date.now()}`,
-    `./samsung_call_report.json?t=${Date.now()}`,
+    isAllChannel ? `./call_report_all.json?t=${Date.now()}` : null,
+    isAllChannel ? `call_report_all.json?t=${Date.now()}` : null,
+    isAllChannel ? `/call_report_all.json?t=${Date.now()}` : null,
+    !isAllChannel ? `./samsung_call_report.json?t=${Date.now()}` : null,
     `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
-  ];
+  ].filter(Boolean);
 
   let loaded = false;
   for (const u of staticUrls) {
@@ -3037,9 +3037,9 @@ async function handleTabChannelChange(channel) {
       `./${fileName}?t=${Date.now()}`,
       `${fileName}?t=${Date.now()}`,
       `/${fileName}?t=${Date.now()}`,
-      `./call_report_all.json?t=${Date.now()}`,
-      `call_report_all.json?t=${Date.now()}`
-    ];
+      isAll ? `./call_report_all.json?t=${Date.now()}` : null,
+      isAll ? `call_report_all.json?t=${Date.now()}` : null
+    ].filter(Boolean);
     for (const u of candidates) {
       try {
         const res = await fetch(u);
@@ -3100,9 +3100,9 @@ async function applyTabDateRange(forceSync = false) {
       `./${primaryFallback}?t=${Date.now()}`,
       `${primaryFallback}?t=${Date.now()}`,
       `/${primaryFallback}?t=${Date.now()}`,
-      `./call_report_all.json?t=${Date.now()}`,
-      `call_report_all.json?t=${Date.now()}`
-    ];
+      isAllChannel ? `./call_report_all.json?t=${Date.now()}` : null,
+      isAllChannel ? `call_report_all.json?t=${Date.now()}` : null
+    ].filter(Boolean);
     for (const u of candidates) {
       try {
         const sRes = await fetch(u);

@@ -455,7 +455,9 @@ const CTI_CHANNEL_PARAMS = {
   '현대해상': '%C7%F6%B4%EB%C7%D8%BB%F3,15337436',
   '리본케어': '%B8%AE%BA%BB%C4%C9%BE%EE,16007835',
   '전체': '',
-  'all': ''
+  'all': '',
+  '전체 인입경로': '',
+  '종합': ''
 };
 
 /**
@@ -463,12 +465,14 @@ const CTI_CHANNEL_PARAMS = {
  * @param {string} startDate 'YYYY-MM-DD'
  * @param {string} endDate 'YYYY-MM-DD'
  * @param {string} targetChannel '삼성화재' | '현대해상' | '리본케어' | '전체' | 'all'
+ * @param {object} options { summaryOnly?: boolean, maxPages?: number }
  */
-async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼성화재') {
+async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼성화재', options = {}) {
+  const isAll = !targetChannel || targetChannel === '전체' || targetChannel === 'all' || targetChannel === '전체 인입경로' || targetChannel === '종합';
   const cookie = await ensureCtiSession();
-  const cpParam = CTI_CHANNEL_PARAMS[targetChannel] !== undefined 
+  const cpParam = isAll ? '' : (CTI_CHANNEL_PARAMS[targetChannel] !== undefined 
     ? CTI_CHANNEL_PARAMS[targetChannel] 
-    : (CTI_CHANNEL_PARAMS['삼성화재'] || '');
+    : (CTI_CHANNEL_PARAMS['삼성화재'] || ''));
 
   // 1. 1페이지 조회하여 총 건수 및 CTI 상단 요약 통계 테이블 추출
   const p1Path = `/CtiLiVon/admin/C_Calllog.asp?page=1&start_search_string=${startDate}&end_search_string=${endDate}&searchCpname=${cpParam}`;
@@ -522,6 +526,18 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
       ctiSummary.unselectedType = getNum(nums[9]);
       ctiSummary.btnExit = nums[10] ? getNum(nums[10]) : 0;
     }
+  }
+
+  // 통계 요약만 필요한 경우 1페이지 메타데이터 파싱 후 즉시 반환 (300ms 초고속)
+  if (options.summaryOnly) {
+    return {
+      startDate,
+      endDate,
+      targetChannel,
+      totalCalls: totalCount,
+      ctiSummary,
+      logs: []
+    };
   }
 
   // CTI 한 페이지당 15건씩 페이징됨
@@ -598,7 +614,7 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
         if (tds.length >= 8 && tds[0] === 'IN') {
           const ch = tds[1] || '';
           // 채널 엄격 격리 (지정된 채널 외 타 채널 로그 유입 원천 차단)
-          if (targetChannel && targetChannel !== '전체' && targetChannel !== 'all') {
+          if (!isAll && targetChannel) {
             if (ch && !ch.includes(targetChannel) && !targetChannel.includes(ch)) {
               continue;
             }
@@ -643,7 +659,9 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
   logs.push(...parseRowsFromHtml(p1Html));
 
   // 2페이지부터 totalPages까지 순차 수집
-  for (let page = 2; page <= totalPages; page++) {
+  const maxPages = options.maxPages || totalPages;
+  const effectivePages = Math.min(totalPages, maxPages);
+  for (let page = 2; page <= effectivePages; page++) {
     const pagePath = `/CtiLiVon/admin/C_Calllog.asp?page=${page}&start_search_string=${startDate}&end_search_string=${endDate}&searchCpname=${cpParam}`;
     try {
       const res = await httpRequest({

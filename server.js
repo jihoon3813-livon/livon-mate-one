@@ -638,15 +638,16 @@ function saveSavedFaxConfig(cfg) {
     // =========================================================================
     // API Route: Samsung Fire Call Analysis Report Engine (삼성화재 콜분석 보고 시스템)
     // =========================================================================
-    // CTI 실시간 로그 수집 및 보고서 동기화 엔드포인트
-    if (reqPath === '/api/samsung/call-report/sync-cti' && req.method === 'GET') {
+    // CTI 실시간 로그 수집 및 보고서 동기화 엔드포인트 (삼성콜분석 및 종합콜분석 독립 지원)
+    if ((reqPath === '/api/samsung/call-report/sync-cti' || reqPath === '/api/total/call-report/sync-cti') && req.method === 'GET') {
       try {
         const parsedUrl = urlModule.parse(req.url, true);
-        const startDate = parsedUrl.query.start || '2026-08-18';
+        const isTotal = reqPath === '/api/total/call-report/sync-cti';
+        const startDate = parsedUrl.query.start || (isTotal ? '2026-08-01' : '2026-08-18');
         const endDate = parsedUrl.query.end || new Date().toISOString().slice(0, 10);
-        const channel = parsedUrl.query.channel || '삼성화재';
+        const channel = parsedUrl.query.channel || (isTotal ? 'all' : '삼성화재');
 
-        console.log(`[Samsung Call Report] CTI 동기화 요청: ${startDate} ~ ${endDate} (채널: ${channel})`);
+        console.log(`[${isTotal ? 'Total' : 'Samsung'} Call Report] CTI 동기화 요청: ${startDate} ~ ${endDate} (채널: ${channel})`);
         const ctiResult = await fetchCtiLogsByDateRange(startDate, endDate, channel);
 
         // 일자별 추이 및 주차별 롤업 자동 집계

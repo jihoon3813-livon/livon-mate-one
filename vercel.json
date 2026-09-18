@@ -49,6 +49,10 @@
       "dest": "/api/samsung/call-report/sync-cti.js$1"
     },
     {
+      "src": "/api/total/call-report/sync-cti(\\?.*)?",
+      "dest": "/api/total/call-report/sync-cti.js$1"
+    },
+    {
       "src": "/api/samsung/call-report/pdf(\\?.*)?",
       "dest": "/api/samsung/call-report/pdf.js$1"
     },
