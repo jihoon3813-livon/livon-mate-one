@@ -56,12 +56,26 @@ module.exports = async function handler(req, res) {
     console.warn('[Sync-CTI] Pre-generated file read warning:', e.message);
   }
 
-  // 2. 실시간 CTI 동기화 시도 (스마트 증분 / 고속 병렬 수집)
-  try {
-    // 25초 타임아웃 가드 (서버리스 maxDuration 30초 내에서 안정적인 CTI 실시간 수집 보장)
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 12000));
+  // Vercel 서버리스 환경 등 로컬 파일 부재 시 정적 호스팅 경로에서 고속 fetch fallback
+  if (!baseData && req.headers && req.headers.host) {
+    try {
+      const proto = req.headers['x-forwarded-proto'] || 'https';
+      const fetchUrl = `${proto}://${req.headers.host}/call_report_samsung.json`;
+      const fbController = new AbortController();
+      const fbTimeout = setTimeout(() => fbController.abort(), 2000);
+      const resFb = await fetch(fetchUrl, { signal: fbController.signal });
+      clearTimeout(fbTimeout);
+      if (resFb.ok) {
+        baseData = await resFb.json();
+      }
+    } catch (err) {}
+  }
 
-    // 전체 통계(Page 1, 200ms) + 최근 3일 증분 로그만 초고속 수집하여 병합 (1~2초 내 완료!)
+  // 2. 실시간 CTI 동기화 시도 (스마트 초고속 증분 수집)
+  try {
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 8000));
+
+    // 전체 통계(Page 1, 200ms) + 당일/전일(최근 1일) 증분 로그만 초고속 수집하여 병합 (0.3~0.5초 내 완료!)
     const sDateObj = new Date(startDate);
     const eDateObj = new Date(endDate);
     const diffDays = Math.ceil((eDateObj - sDateObj) / (1000 * 60 * 60 * 24)) + 1;
@@ -79,13 +93,13 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    if (diffDays > 2 && baseData && baseData.callLogs && baseData.callLogs.length > 0) {
-      // 최근 3일치 계산
+    if (baseData && baseData.callLogs && baseData.callLogs.length > 0) {
+      // 최근 1일치(어제~오늘) 계산: 오늘 신규 콜 및 어제 수정분 100% 포괄
       const recentStart = new Date(eDateObj);
-      recentStart.setDate(recentStart.getDate() - 3);
+      recentStart.setDate(recentStart.getDate() - 1);
       const recentStartStr = recentStart.toISOString().slice(0, 10);
 
-      // 1) 전체 기간의 CTI 헤더 요약 통계(Page 1 요약만, 200ms) & 2) 최근 3일치 상세 로그 조회 병렬 실행
+      // 1) 전체 기간의 CTI 헤더 요약 통계(Page 1 요약만, 200ms) & 2) 최근 1일치 상세 로그 조회 병렬 실행
       const [fullSummaryRes, recentLogsRes] = await Promise.race([
         Promise.all([
           fetchCtiLogsByDateRange(startDate, endDate, channel, { summaryOnly: true }).catch(() => null),

@@ -934,26 +934,17 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       let progressTimer = null;
 
       if (!isBackground) {
-        setTotalSyncProgress(1, 20, 'CTI 서버 연결 중', 'CTI 게이트웨이에 접속하여 최신 인바운드 콜 데이터를 요청하고 있습니다...');
+        setTotalSyncProgress(1, 35, 'CTI 서버 연결 중', 'CTI 게이트웨이 접속 및 최신 인바운드 콜 요청...');
         setTimeout(() => {
           if (isTotalSyncing && !isBackground) {
-            setTotalSyncProgress(2, 55, '콜로그 및 녹취 STT 수신 중', '삼성화재·현대해상·리본케어 인바운드 콜 녹취 및 STT 전문 데이터를 파싱하고 있습니다...');
-            // 55%에서 정체되지 않도록 부드러운 진행 펄스
-            let p = 55;
-            progressTimer = setInterval(() => {
-              if (isTotalSyncing && p < 85) {
-                p += Math.floor(Math.random() * 6) + 3;
-                if (p > 85) p = 85;
-                setTotalSyncProgress(2, p, '콜로그 및 녹취 STT 수신 중', '삼성화재·현대해상·리본케어 인바운드 콜 녹취 및 STT 전문 데이터를 파싱하고 있습니다...');
-              }
-            }, 300);
+            setTotalSyncProgress(2, 75, '최신 콜로그 및 STT 수신 중', '당일 최신 인바운드 콜 녹취 및 STT 전문 데이터를 파싱하고 있습니다...');
           }
-        }, 200);
+        }, 120);
       }
 
-      // 10초 타임아웃 가드 (고속 응답 보장)
+      // 6초 고속 타임아웃 가드 (체감 대기시간 최소화)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
       let synced = false;
 
       const s = gTotalFilter.startDate || '2026-08-01';
@@ -1006,8 +997,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       }
 
       if (!isBackground) {
-        setTotalSyncProgress(3, 90, '보험사별 데이터 통합 중', '인입 채널(삼성화재/현대해상/리본케어) 교차 검증 및 상담 라벨 매칭 중...');
-        setTotalSyncProgress(4, 98, '지표 및 대시보드 최적화 중', '미연결 아웃콜 긴급 대상 건을 추출하고 통계를 최적화하고 있습니다...');
+        setTotalSyncProgress(3, 95, '보험사별 데이터 통합 중', '인입 채널(삼성화재/현대해상/리본케어) 교차 검증 및 상담 라벨 매칭 중...');
       }
 
       clearMateOneMatchCache();
@@ -1026,10 +1016,14 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         setTotalSyncProgress(4, 100, '실시간 동기화 완료!', `총 ${count}건의 CTI 전수 상담 데이터가 성공적으로 반영되었습니다.`, true, count);
         setTimeout(() => {
           closeTotalSyncProgressModal();
-        }, 300);
+        }, 180);
 
         if (typeof showToast === 'function') {
           showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 완료되었습니다.`, 'success');
+        }
+      } else {
+        if (typeof showToast === 'function') {
+          showToast(`전체 인입경로 CTI 최신 데이터(${count}건) 동기화 완료`, 'success');
         }
       }
       return;
@@ -1384,7 +1378,7 @@ function renderTotalCallAnalysisTab() {
             <span>라벨 관리/설정</span>
           </button>
           
-          <button type="button" onclick="loadTotalCallData(true)" 
+          <button type="button" onclick="loadTotalCallData(true, true)" 
             class="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all shadow-md shadow-cyan-600/20 cursor-pointer whitespace-nowrap ${isTotalSyncing ? 'opacity-70 pointer-events-none' : ''}">
             <i data-lucide="refresh-cw" class="w-4 h-4 ${isTotalSyncing ? 'animate-spin' : ''}"></i>
             <span>${isTotalSyncing ? 'CTI 수집 중...' : 'CTI 실시간 동기화'}</span>
