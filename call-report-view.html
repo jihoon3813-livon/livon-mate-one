@@ -132,8 +132,8 @@
       </div>
     </div>
 
-    <!-- CTI 원본 집계 스트립 컨테이너 -->
-    <div id="ctiSummaryContainer"></div>
+    <!-- CTI 원본 집계 스트립: 메이트원 ERP 전용 항목이므로 링크 페이지에서는 미노출 -->
+    <div id="ctiSummaryContainer" class="hidden"></div>
 
     <!-- 2. SUB-TAB SWITCHER (모바일 3종 탭 잘림 방지) -->
     <div class="flex items-center justify-between border-b border-slate-200 gap-2 px-1">
@@ -713,7 +713,6 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       if (!gReportData) return;
       updateBranding();
       const stats = calculateStats();
-      renderCtiSummaryStrip(stats);
       renderSummarySheet(stats);
       renderDailySheet(stats);
       renderLogsSheet(stats);
@@ -726,75 +725,11 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     }
 
     function renderCtiSummaryStrip(stats) {
+      // CTI 원본 집계 스트립은 메이트원 내부 ERP에서만 표시되는 관리자용 지표로, 외부 공유 웹링크 페이지에서는 노출하지 않습니다.
       const container = document.getElementById('ctiSummaryContainer');
-      if (!container) return;
-
-      const cs = gReportData && gReportData.ctiSummary;
-      const rInfo = (gReportData && gReportData.reportInfo) || {};
-      const curStart = gFilter.startDate || rInfo.startDate || '';
-      const curEnd = gFilter.endDate || rInfo.endDate || '';
-      const curCh = gFilter.channel || rInfo.channel || '삼성화재';
-
-      const normDate = d => (d || '').slice(0, 10).replace(/[./]/g, '-');
-      const isCtiRangeMatch = (!curStart || normDate(rInfo.startDate) === normDate(curStart)) &&
-        (!curEnd || normDate(rInfo.endDate) === normDate(curEnd)) &&
-        ((curCh === '전체' || curCh === 'all') ? (rInfo.channel === 'all' || rInfo.channel === '전체') : ((rInfo.channel || '').includes(curCh)));
-
-      const st = stats || calculateStats();
-      const activeCti = (isCtiRangeMatch && cs) ? cs : {
-        totalAll: st.totalCalls,
-        totalInbound: st.totalCalls,
-        answeredCalls: st.answeredCalls,
-        connectRequests: st.connectReqCalls,
-        answerRate: st.answerRate,
-        abandonedCalls: Math.max(0, st.connectReqCalls - st.answeredCalls),
-        unselectedType: Math.max(0, st.totalCalls - st.connectReqCalls),
-        btnExit: 0
-      };
-
-      container.innerHTML = `
-        <div class="bg-gradient-to-r from-blue-50/90 to-indigo-50/60 border border-blue-200/70 rounded-2xl p-3 sm:px-4 sm:py-3 space-y-2.5 text-xs mb-3">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="px-2 py-0.5 rounded-md bg-blue-600 text-white font-black text-[10px] tracking-wide shrink-0">CTI 실시간 집계</span>
-            <span class="text-slate-800 font-bold break-keep text-xs">"${curStart} ~ ${curEnd}" <span class="text-blue-700 font-extrabold">[${curCh}]</span> 검색 결과</span>
-          </div>
-          <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 text-[11px]">
-            <div class="bg-white/90 border border-blue-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-              <span class="text-[10px] text-slate-500 font-medium">총인입 (전체콜)</span>
-              <span class="font-black text-blue-700 text-xs mt-0.5">${activeCti.totalAll || activeCti.totalInbound || st.totalCalls}건</span>
-            </div>
-            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-              <span class="text-[10px] text-slate-500 font-medium">인입/연결요청</span>
-              <span class="font-bold text-slate-900 text-xs mt-0.5">${activeCti.totalInbound || st.totalCalls}/${st.connectReqCalls}건</span>
-            </div>
-            <div class="bg-white/90 border border-indigo-100 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-              <span class="text-[10px] text-indigo-500 font-medium">연결요청 (${curCh})</span>
-              <span class="font-bold text-indigo-700 text-xs mt-0.5">${st.connectReqCalls}건</span>
-            </div>
-            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-              <span class="text-[10px] text-slate-500 font-medium">응답호</span>
-              <span class="font-bold text-emerald-700 text-xs mt-0.5">${activeCti.answeredCalls || st.answeredCalls}건</span>
-            </div>
-            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-              <span class="text-[10px] text-slate-500 font-medium">응답율</span>
-              <span class="font-bold text-emerald-700 text-xs mt-0.5">${activeCti.answerRate || st.answerRate}</span>
-            </div>
-            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-              <span class="text-[10px] text-slate-500 font-medium">포기호</span>
-              <span class="font-bold text-rose-600 text-xs mt-0.5">${activeCti.abandonedCalls || 0}건</span>
-            </div>
-            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-              <span class="text-[10px] text-slate-500 font-medium">유형미선택</span>
-              <span class="font-bold text-slate-700 text-xs mt-0.5">${activeCti.unselectedType || 0}건</span>
-            </div>
-            <div class="bg-white/90 border border-slate-200/80 rounded-xl px-2.5 py-1.5 flex flex-col justify-center shadow-2xs">
-              <span class="text-[10px] text-slate-500 font-medium">버튼선택종료</span>
-              <span class="font-bold text-slate-700 text-xs mt-0.5">${activeCti.btnExit || 0}건</span>
-            </div>
-          </div>
-        </div>
-      `;
+      if (container) container.innerHTML = '';
     }
+
 
     function calculateStats() {
       const allLogs = (gMasterCallLogs && gMasterCallLogs.length > 0)
