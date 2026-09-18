@@ -29447,10 +29447,21 @@ var gLastActivityTimestamp = Date.now();
 var gAutoLogoutTimerInterval = null;
 
 function initAdminSession() {
+  // 브라우저 캐시나 로컬스토리지에 오염된 '342' 잔여 데이터 즉시 영구 정화
+  const rememberedUser = localStorage.getItem('REBORN_REMEMBERED_USERNAME');
+  if (rememberedUser === '342' || (rememberedUser && rememberedUser.trim() === '342')) {
+    localStorage.removeItem('REBORN_REMEMBERED_USERNAME');
+  }
+
   const savedAdmin = localStorage.getItem('REBORN_CURRENT_ADMIN');
   if (savedAdmin) {
     try {
-      gCurrentAdmin = JSON.parse(savedAdmin);
+      const parsed = JSON.parse(savedAdmin);
+      if (parsed && (parsed.username === '342' || parsed.name === '342')) {
+        gCurrentAdmin = gAdmins[0] || null;
+      } else {
+        gCurrentAdmin = parsed;
+      }
     } catch (e) {
       gCurrentAdmin = gAdmins[0] || null;
     }
@@ -29464,6 +29475,36 @@ function initAdminSession() {
     gAutoLogoutMinutes = parseInt(savedMins, 10);
     const select = document.getElementById('settingAutoLogoutMinutes');
     if (select) select.value = gAutoLogoutMinutes.toString();
+  }
+
+  // 로그인 폼 및 아이디 기억하기 초기화 & 브라우저 자동완성 342 원천 차단 가드
+  const usernameInput = document.getElementById('loginUsernameInput');
+  const passwordInput = document.getElementById('loginPasswordInput');
+  const rememberCheckbox = document.getElementById('loginRememberMe');
+  const validRemembered = localStorage.getItem('REBORN_REMEMBERED_USERNAME');
+
+  if (passwordInput) {
+    passwordInput.value = '';
+  }
+
+  if (usernameInput) {
+    if (validRemembered && validRemembered !== '342') {
+      usernameInput.value = validRemembered;
+    } else {
+      usernameInput.value = '';
+    }
+
+    // 브라우저 비밀번호 관리자/자동완성에 의한 '342' 비동기 강제 삽입 즉시 차단
+    usernameInput.addEventListener('input', () => {
+      if (usernameInput.value === '342' || usernameInput.value.trim() === '342') {
+        const s = localStorage.getItem('REBORN_REMEMBERED_USERNAME');
+        usernameInput.value = (s && s !== '342') ? s : '';
+      }
+    });
+  }
+
+  if (rememberCheckbox) {
+    rememberCheckbox.checked = !!(validRemembered && validRemembered !== '342');
   }
 
   startInactivityMonitoring();
@@ -29499,6 +29540,34 @@ function handleAdminLogout(isAuto = false) {
   if (overlay) {
     overlay.classList.remove('hidden');
   }
+
+  // 로그인 모달 입력값 초기화 및 브라우저 '342' 자동채움 다중 차단
+  const sanitizeLoginInputs = () => {
+    const uInput = document.getElementById('loginUsernameInput');
+    const pInput = document.getElementById('loginPasswordInput');
+    const rememberCheckbox = document.getElementById('loginRememberMe');
+    const savedUser = localStorage.getItem('REBORN_REMEMBERED_USERNAME');
+
+    if (pInput) {
+      pInput.value = '';
+    }
+    if (uInput) {
+      if (savedUser && savedUser !== '342') {
+        uInput.value = savedUser;
+      } else if (uInput.value === '342' || uInput.value.trim() === '342' || !savedUser) {
+        uInput.value = '';
+      }
+    }
+    if (rememberCheckbox) {
+      rememberCheckbox.checked = !!(savedUser && savedUser !== '342');
+    }
+  };
+
+  sanitizeLoginInputs();
+  setTimeout(sanitizeLoginInputs, 50);
+  setTimeout(sanitizeLoginInputs, 150);
+  setTimeout(sanitizeLoginInputs, 300);
+  setTimeout(sanitizeLoginInputs, 600);
 
   // Clear any redundant security auto logout alerts in queue
   if (Array.isArray(window._livonAlertQueue)) {
@@ -29540,6 +29609,17 @@ function handleAdminLoginSubmit(e) {
 
   gCurrentAdmin.lastLogin = new Date().toISOString().slice(0, 16).replace('T', ' ');
   localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(gCurrentAdmin));
+
+  // 아이디 기억하기 상태 저장
+  const rememberCheckbox = document.getElementById('loginRememberMe');
+  if (rememberCheckbox && rememberCheckbox.checked) {
+    if (username && username !== '342') {
+      localStorage.setItem('REBORN_REMEMBERED_USERNAME', username);
+    }
+  } else {
+    localStorage.removeItem('REBORN_REMEMBERED_USERNAME');
+  }
+
   updateHeaderAdminProfile();
   renderAdmins();
 
