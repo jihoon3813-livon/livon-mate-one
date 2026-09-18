@@ -2259,185 +2259,188 @@ window.openSamsungPreRegisteredModal = function(appId, customerName, rawAppOpt) 
   window._activeSamsungLead = lead;
 
   modal.innerHTML = `
-    <div class="bg-white rounded-3xl border-2 border-amber-500/40 shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
+    <div class="bg-white rounded-3xl border-2 border-amber-500/40 shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
       
-      <!-- 1. 모달 상단 헤더 (삼성화재 블루 & 앰버 조합) -->
-      <div class="px-6 py-4.5 bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white flex items-center justify-between border-b border-amber-500/30">
-        <div class="flex items-center gap-3.5">
-          <div class="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-400 shadow-inner shrink-0">
+      <!-- 1. 모달 상단 헤더 (삼성화재 블루 & 앰버 조합, 넉넉한 여백) -->
+      <div class="px-7 py-5 bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white flex items-center justify-between border-b border-amber-500/30 shrink-0">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-400 shadow-inner shrink-0">
             <i data-lucide="file-spreadsheet" class="w-6 h-6"></i>
           </div>
           <div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-400 text-slate-950 border border-amber-300 shadow-xs flex items-center gap-1">
-                <i data-lucide="clock" class="w-3 h-3"></i>
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <span class="px-3 py-1 rounded-full text-xs font-black bg-amber-400 text-slate-950 border border-amber-300 shadow-xs flex items-center gap-1.5">
+                <i data-lucide="clock" class="w-3.5 h-3.5"></i>
                 <span>삼성화재 사전명단 (신청대기)</span>
               </span>
-              <span class="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-500/25 text-blue-200 border border-blue-400/40 font-mono">
+              <span class="px-3 py-1 rounded-full text-[11px] font-bold bg-blue-500/25 text-blue-200 border border-blue-400/40 font-mono tracking-wide">
                 원장 ID: ${lead.id || lead.patientId || appId}
               </span>
             </div>
-            <h3 class="text-lg font-black text-white mt-1 flex items-center gap-2">
+            <h3 class="text-xl font-black text-white mt-1.5 flex items-center gap-2.5">
               <span>${safeMaskName(patientName)} 고객님 계약 원장</span>
-              <span class="text-xs font-normal text-slate-300 font-mono">(${formatPhoneDisplay(phone) || '연락처 없음'})</span>
+              <span class="text-sm font-medium text-slate-300 font-mono">(${formatPhoneDisplay(phone) || '연락처 없음'})</span>
             </h3>
           </div>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-3">
           <button type="button" onclick="handleRegisterFromSamsungModal()" 
-            class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs shadow-md shadow-blue-500/30 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95">
+            class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs shadow-md shadow-blue-500/30 flex items-center gap-2 transition-all cursor-pointer active:scale-95">
             <i data-lucide="user-plus" class="w-4 h-4 text-amber-300"></i>
             <span>간병신청서 정식 접수 등록 ⚡</span>
           </button>
-          <button type="button" onclick="closeSamsungPreRegisteredModal()" class="text-slate-400 hover:text-white cursor-pointer p-1.5 rounded-xl hover:bg-white/10 transition-colors">
+          <button type="button" onclick="closeSamsungPreRegisteredModal()" class="text-slate-400 hover:text-white cursor-pointer p-2 rounded-xl hover:bg-white/10 transition-colors">
             <i data-lucide="x" class="w-5 h-5"></i>
           </button>
         </div>
       </div>
 
-      <!-- 2. 모달 본문 영역 -->
-      <div class="p-6 overflow-y-auto space-y-5 custom-scrollbar bg-slate-50/60 flex-1">
+      <!-- 2. 모달 본문 영역 (넉넉하고 편안한 패딩 적용) -->
+      <div class="p-7 overflow-y-auto space-y-6 custom-scrollbar bg-slate-50/70 flex-1">
         
-        <!-- 신청대기 상태 핵심 안내 배너 (통합허브 오인 방지 알림) -->
-        <div class="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300/90 text-amber-950 flex items-start gap-3.5 shadow-xs">
-          <div class="p-2 rounded-xl bg-amber-500 text-white shrink-0 mt-0.5 shadow-xs">
+        <!-- 신청대기 상태 핵심 안내 배너 (넓은 패딩과 편안한 행간) -->
+        <div class="p-5 rounded-2xl bg-amber-50/90 border border-amber-300/90 text-amber-950 flex items-start gap-4 shadow-xs">
+          <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
             <i data-lucide="alert-triangle" class="w-5 h-5"></i>
           </div>
-          <div class="text-xs space-y-1">
-            <div class="font-black text-[13px] text-amber-950 flex items-center gap-2">
+          <div class="text-xs space-y-1.5 flex-1">
+            <div class="font-black text-sm text-amber-950 flex items-center gap-2">
               <span>통합허브 미등록 · 삼성화재 구글 드라이브 사전명단 대상건입니다</span>
-              <span class="px-2 py-0.2 rounded bg-amber-200 text-amber-900 text-[10.5px] font-black border border-amber-300">신청대기</span>
+              <span class="px-2 py-0.5 rounded bg-amber-200 text-amber-900 text-[11px] font-black border border-amber-300">신청대기</span>
             </div>
-            <p class="text-amber-900/90 leading-relaxed font-medium">
+            <p class="text-amber-900/90 leading-relaxed font-medium text-[12.5px]">
               본 고객은 삼성화재 구글 드라이브 가입자 사전명단(지원대상)에 등재되어 있으나, <b>통합허브 정식 간병 신청서가 아직 접수되지 않은 상태</b>입니다.<br/>
               간병인 배정, 캘린더 일정표, 실시간 청구·정산 업무를 수행하시려면 상단 또는 하단의 <b>[간병신청서 정식 접수 등록 ⚡]</b>을 클릭하여 정식 신청서로 등록해 주시기 바랍니다. (엑셀 원장 12개 항목이 자동 입력됩니다)
             </p>
           </div>
         </div>
 
-        <!-- 계약 원장 정보 & 보상 담당자 정보 2-Column 그리드 -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- 계약 원장 정보 & 보상 담당자 정보 2-Column 그리드 (카드형 셀 구조) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
           <!-- 좌측: 계약 및 보장 상세 내역 -->
-          <div class="p-4.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3.5">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div class="flex items-center gap-2">
-                <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
-                  <i data-lucide="shield-check" class="w-4 h-4"></i>
+          <div class="p-6 rounded-2xl bg-white border border-slate-200/90 shadow-sm space-y-4">
+            <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold shadow-2xs">
+                  <i data-lucide="shield-check" class="w-4.5 h-4.5"></i>
                 </div>
-                <h4 class="font-black text-sm text-slate-800">삼성화재 가입 계약 및 보장 내역</h4>
+                <h4 class="font-black text-[15px] text-slate-800">삼성화재 가입 계약 및 보장 내역</h4>
               </div>
-              <span class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
+              <span class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
                 원장 정보
               </span>
             </div>
 
-            <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-              <div>
-                <span class="text-slate-400 font-medium block text-[11px]">피보험자(고객)명</span>
-                <span class="font-black text-slate-900 text-sm">${safeMaskName(patientName)}</span>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+              <div class="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/70 flex flex-col justify-between">
+                <span class="text-slate-400 font-bold block text-[11px] mb-1">피보험자(고객)명</span>
+                <span class="font-black text-slate-900 text-base">${safeMaskName(patientName)}</span>
               </div>
-              <div>
-                <span class="text-slate-400 font-medium block text-[11px]">생년월일 / 성별</span>
-                <span class="font-bold text-slate-700 font-mono">${birthDate} (${gender})</span>
+              <div class="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/70 flex flex-col justify-between">
+                <span class="text-slate-400 font-bold block text-[11px] mb-1">생년월일 / 성별</span>
+                <span class="font-bold text-slate-800 font-mono text-sm">${birthDate} (${gender})</span>
               </div>
-              <div>
-                <span class="text-slate-400 font-medium block text-[11px]">등록 연락처</span>
-                <div class="flex items-center gap-1.5 mt-0.5">
-                  <span class="font-bold text-slate-800 font-mono">${formatPhoneDisplay(phone) || '-'}</span>
+              <div class="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/70 flex flex-col justify-between">
+                <span class="text-slate-400 font-bold block text-[11px] mb-1">등록 연락처</span>
+                <div class="flex items-center justify-between gap-1.5 mt-0.5">
+                  <span class="font-bold text-slate-900 font-mono text-sm">${formatPhoneDisplay(phone) || '-'}</span>
                   ${phone ? `
                     <button type="button" onclick="triggerCtiCall('${phone}', '${patientName}', '고객', '${lead.id || ''}', '삼성화재')" 
-                      class="px-1.5 py-0.5 rounded bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 text-[10px] font-bold flex items-center gap-0.5 cursor-pointer" title="CTI 통화 발신">
-                      <i data-lucide="phone-call" class="w-2.5 h-2.5"></i>
+                      class="px-2 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white text-[10.5px] font-bold flex items-center gap-1 shadow-xs cursor-pointer transition-colors" title="CTI 통화 발신">
+                      <i data-lucide="phone-call" class="w-3 h-3"></i>
                       <span>통화</span>
                     </button>
                   ` : ''}
                 </div>
               </div>
-              <div>
-                <span class="text-slate-400 font-medium block text-[11px]">증권번호</span>
-                <span class="font-bold text-slate-700 font-mono text-[11px] truncate block" title="${policyNumber}">${policyNumber}</span>
+              <div class="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/70 flex flex-col justify-between">
+                <span class="text-slate-400 font-bold block text-[11px] mb-1">증권번호</span>
+                <span class="font-bold text-slate-800 font-mono text-xs truncate block select-all" title="${policyNumber}">${policyNumber}</span>
               </div>
-              <div class="col-span-2">
-                <span class="text-slate-400 font-medium block text-[11px]">가입 상품명</span>
-                <span class="font-bold text-slate-800 leading-snug block">${productName}</span>
+              <div class="col-span-2 bg-blue-50/30 rounded-xl p-4 border border-blue-100/80">
+                <span class="text-blue-700/80 font-bold block text-[11px] mb-1.5 flex items-center gap-1">
+                  <i data-lucide="file-text" class="w-3 h-3 text-blue-600"></i>
+                  가입 상품명
+                </span>
+                <span class="font-bold text-slate-900 text-[13px] leading-relaxed block">${productName}</span>
               </div>
-              <div class="col-span-2">
-                <span class="text-slate-400 font-medium block text-[11px]">보험 보장기간</span>
-                <span class="font-bold text-slate-700 font-mono text-[11.5px]">${contractPeriod}</span>
+              <div class="col-span-2 bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/70">
+                <span class="text-slate-400 font-bold block text-[11px] mb-1">보험 보장기간</span>
+                <span class="font-bold text-slate-800 font-mono text-xs">${contractPeriod}</span>
               </div>
-              <div>
-                <span class="text-slate-400 font-medium block text-[11px]">담보 가입 여부</span>
-                <div class="flex items-center gap-2 mt-0.5">
-                  <span class="px-1.5 py-0.5 rounded text-[10.5px] font-bold ${injuryCare === '가입' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500'}">
+              <div class="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/70 flex flex-col justify-between">
+                <span class="text-slate-400 font-bold block text-[11px] mb-1.5">담보 가입 여부</span>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded-md text-[11px] font-bold ${injuryCare === '가입' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-200 text-slate-600'}">
                     상해: ${injuryCare}
                   </span>
-                  <span class="px-1.5 py-0.5 rounded text-[10.5px] font-bold ${diseaseCare === '가입' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500'}">
+                  <span class="px-2 py-0.5 rounded-md text-[11px] font-bold ${diseaseCare === '가입' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-200 text-slate-600'}">
                     질병: ${diseaseCare}
                   </span>
                 </div>
               </div>
-              <div>
-                <span class="text-slate-400 font-medium block text-[11px]">간병비 지원 한도</span>
-                <span class="font-bold text-blue-700 font-mono">1일 ${maxDailyLimit} / 최대 ${maxDays}</span>
+              <div class="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/70 flex flex-col justify-between">
+                <span class="text-slate-400 font-bold block text-[11px] mb-1">간병비 지원 한도</span>
+                <span class="font-black text-blue-700 font-mono text-[13px]">1일 ${maxDailyLimit} / 최대 ${maxDays}</span>
               </div>
             </div>
           </div>
 
           <!-- 우측: 사고번호 및 손해사정 조사원 정보 -->
-          <div class="p-4.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3.5 flex flex-col justify-between">
-            <div class="space-y-3.5">
-              <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                <div class="flex items-center gap-2">
-                  <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
-                    <i data-lucide="briefcase" class="w-4 h-4"></i>
+          <div class="p-6 rounded-2xl bg-white border border-slate-200/90 shadow-sm flex flex-col justify-between space-y-4">
+            <div class="space-y-4">
+              <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold shadow-2xs">
+                    <i data-lucide="briefcase" class="w-4.5 h-4.5"></i>
                   </div>
-                  <h4 class="font-black text-sm text-slate-800">삼성화재 보상 담당 손사(조사원) 정보</h4>
+                  <h4 class="font-black text-[15px] text-slate-800">삼성화재 보상 담당 손사(조사원) 정보</h4>
                 </div>
-                <span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[11px] font-bold border border-indigo-200">
+                <span class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200">
                   사고관리
                 </span>
               </div>
 
-              <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                <div>
-                  <span class="text-slate-400 font-medium block text-[11px]">삼성 접수 사고번호</span>
-                  <span class="font-black text-slate-900 font-mono text-sm">${accidentNumber}</span>
+              <div class="grid grid-cols-2 gap-3 text-xs">
+                <div class="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/70 flex flex-col justify-between">
+                  <span class="text-slate-400 font-bold block text-[11px] mb-1">삼성 접수 사고번호</span>
+                  <span class="font-black text-slate-900 font-mono text-base tracking-wide">${accidentNumber}</span>
                 </div>
-                <div>
-                  <span class="text-slate-400 font-medium block text-[11px]">담당 손사(조사원)</span>
-                  <span class="font-black text-slate-900">${adjusterName}</span>
+                <div class="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/70 flex flex-col justify-between">
+                  <span class="text-slate-400 font-bold block text-[11px] mb-1">담당 손사(조사원)</span>
+                  <span class="font-black text-slate-900 text-base">${adjusterName}</span>
                 </div>
-                <div>
-                  <span class="text-slate-400 font-medium block text-[11px]">직통 연락처</span>
-                  <div class="flex items-center gap-1.5 mt-0.5">
-                    <span class="font-bold text-slate-800 font-mono">${adjusterPhone}</span>
+                <div class="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/70 flex flex-col justify-between">
+                  <span class="text-slate-400 font-bold block text-[11px] mb-1">직통 연락처</span>
+                  <div class="flex items-center justify-between gap-1.5 mt-0.5">
+                    <span class="font-bold text-slate-900 font-mono text-sm">${adjusterPhone}</span>
                     ${adjusterPhone && adjusterPhone !== '-' ? `
                       <button type="button" onclick="triggerCtiCall('${adjusterPhone}', '${adjusterName}', '손해사정사', '${lead.id || ''}', '삼성화재')" 
-                        class="px-1.5 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-bold flex items-center gap-0.5 cursor-pointer" title="손사 통화 발신">
-                        <i data-lucide="phone-outgoing" class="w-2.5 h-2.5"></i>
+                        class="px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10.5px] font-bold flex items-center gap-1 shadow-xs cursor-pointer transition-colors" title="손사 통화 발신">
+                        <i data-lucide="phone-outgoing" class="w-3 h-3"></i>
                         <span>발신</span>
                       </button>
                     ` : ''}
                   </div>
                 </div>
-                <div>
-                  <span class="text-slate-400 font-medium block text-[11px]">담당부서 팩스(FAX)</span>
-                  <span class="font-bold text-slate-700 font-mono">${adjusterFax}</span>
+                <div class="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/70 flex flex-col justify-between">
+                  <span class="text-slate-400 font-bold block text-[11px] mb-1">담당부서 팩스(FAX)</span>
+                  <span class="font-bold text-slate-800 font-mono text-sm">${adjusterFax}</span>
                 </div>
-                <div class="col-span-2">
-                  <span class="text-slate-400 font-medium block text-[11px]">명단 동기화 원본 출처</span>
-                  <span class="text-[11px] text-slate-500 font-mono break-all truncate block" title="${sourceOrigin}">${sourceOrigin}</span>
+                <div class="col-span-2 bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/70">
+                  <span class="text-slate-400 font-bold block text-[11px] mb-1">명단 동기화 원본 출처</span>
+                  <span class="text-xs text-slate-600 font-mono break-all truncate block select-all" title="${sourceOrigin}">${sourceOrigin}</span>
                 </div>
               </div>
             </div>
 
-            <div class="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2">
-              <div class="text-[11px] text-slate-500 font-medium">
+            <div class="mt-4 p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 flex items-center justify-between gap-3 shadow-xs">
+              <div class="text-xs text-blue-950 font-bold leading-normal">
                 <span>정식 접수 시 손사 담당자 번호 및 팩스가 신청서에 자동 연동됩니다.</span>
               </div>
               <button type="button" onclick="handleRegisterFromSamsungModal()" 
-                class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-xs cursor-pointer shrink-0">
+                class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-sm cursor-pointer shrink-0 transition-colors">
                 접수 폼 이동
               </button>
             </div>
@@ -2445,44 +2448,47 @@ window.openSamsungPreRegisteredModal = function(appId, customerName, rawAppOpt) 
 
         </div>
 
-        <!-- 3. 해당 고객의 CTI 종합콜 통화 인입 이력 목록 -->
-        <div class="p-4.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
-          <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-            <div class="flex items-center gap-2">
-              <div class="w-7 h-7 rounded-lg bg-cyan-50 text-cyan-700 flex items-center justify-center font-bold">
-                <i data-lucide="history" class="w-4 h-4"></i>
+        <!-- 3. 해당 고객의 CTI 종합콜 통화 인입 이력 목록 (여백과 가독성 극대화) -->
+        <div class="p-6 rounded-2xl bg-white border border-slate-200/90 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-3.5 border-b border-slate-100">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-xl bg-cyan-50 text-cyan-700 flex items-center justify-center font-bold shadow-2xs">
+                <i data-lucide="history" class="w-4.5 h-4.5"></i>
               </div>
-              <h4 class="font-black text-sm text-slate-800">해당 고객 종합콜 통화 상담 내역 (${matchedCalls.length}건)</h4>
+              <h4 class="font-black text-[15px] text-slate-800">해당 고객 종합콜 통화 상담 내역 (${matchedCalls.length}건)</h4>
             </div>
-            <span class="text-xs text-slate-400 font-mono">인입 전화번호 기준 실시간 연동</span>
+            <span class="text-xs text-slate-400 font-medium">인입 전화번호 기준 실시간 연동</span>
           </div>
 
           ${matchedCalls.length > 0 ? `
-            <div class="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+            <div class="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-1.5">
               ${matchedCalls.map(c => {
                 const cId = getCallUniqueId(c);
                 const cCat = classifyConsultation(c);
                 const cMemo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[cId]) || '';
                 return `
-                  <div class="p-3 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-cyan-300 transition-all space-y-1.5 text-xs">
-                    <div class="flex items-center justify-between gap-2 flex-wrap">
-                      <div class="flex items-center gap-2">
-                        <span class="font-mono text-slate-500 font-bold">${c.callTime || '-'}</span>
-                        <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">${c.channel || '삼성화재'}</span>
-                        <span class="px-2 py-0.2 rounded-md text-[10px] font-black border ${cCat.badgeClass}">${cCat.name}</span>
-                        <span class="text-slate-500 text-[11px]">통화: <b>${c.duration || 0}초</b> (대기: ${c.waitTime !== undefined ? c.waitTime : 0}초)</span>
+                  <div class="p-4.5 rounded-xl border border-slate-200/90 bg-slate-50/70 hover:bg-white hover:border-cyan-400 hover:shadow-sm transition-all space-y-3 text-xs">
+                    <div class="flex items-center justify-between gap-2.5 flex-wrap">
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-mono text-slate-600 font-bold text-xs">${c.callTime || '-'}</span>
+                        <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">${c.channel || '삼성화재'}</span>
+                        <span class="px-2.5 py-0.5 rounded-md text-[11px] font-black border ${cCat.badgeClass}">${cCat.name}</span>
+                        <span class="text-slate-500 text-xs">통화: <b class="text-slate-800">${c.duration || 0}초</b> (대기: ${c.waitTime !== undefined ? c.waitTime : 0}초)</span>
                       </div>
                       <button type="button" onclick="openTotalCallSummaryModal('${cId}')" 
-                        class="px-2 py-0.5 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[10.5px] cursor-pointer">
+                        class="px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[11px] cursor-pointer transition-colors">
                         상담 전체보기
                       </button>
                     </div>
-                    <div class="text-slate-700 font-medium line-clamp-2 leading-relaxed">
+                    
+                    <!-- 상담 요약 내용 전용 여백 박스 -->
+                    <div class="p-3.5 rounded-lg bg-white border border-slate-200/80 text-slate-800 font-normal text-[13px] leading-relaxed shadow-2xs">
                       ${c.summary || c.title || '상담 요약 내용 없음'}
                     </div>
+
                     ${cMemo ? `
-                      <div class="text-[11px] text-cyan-800 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200 inline-flex items-center gap-1">
-                        <i data-lucide="edit-3" class="w-3 h-3 text-cyan-600"></i>
+                      <div class="text-xs text-cyan-800 font-bold bg-cyan-50 px-3 py-1 rounded-lg border border-cyan-200 inline-flex items-center gap-1.5">
+                        <i data-lucide="edit-3" class="w-3.5 h-3.5 text-cyan-600"></i>
                         <span>${cMemo}</span>
                       </div>
                     ` : ''}
@@ -2491,8 +2497,8 @@ window.openSamsungPreRegisteredModal = function(appId, customerName, rawAppOpt) 
               }).join('')}
             </div>
           ` : `
-            <div class="py-7 text-center text-slate-400 text-xs">
-              <i data-lucide="phone-off" class="w-7 h-7 mx-auto mb-1.5 opacity-40"></i>
+            <div class="py-8 text-center text-slate-400 text-xs">
+              <i data-lucide="phone-off" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
               <span>조회된 CTI 통화 인입 이력이 없습니다.</span>
             </div>
           `}
@@ -2500,12 +2506,12 @@ window.openSamsungPreRegisteredModal = function(appId, customerName, rawAppOpt) 
 
       </div>
 
-      <!-- 4. 모달 하단 푸터 액션바 -->
-      <div class="p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between gap-3 flex-wrap">
-        <div class="flex items-center gap-2">
+      <!-- 4. 모달 하단 푸터 액션바 (넓은 버튼 및 여유로운 간격) -->
+      <div class="px-7 py-4.5 bg-slate-100/90 border-t border-slate-200 flex items-center justify-between gap-4 flex-wrap shrink-0">
+        <div class="flex items-center gap-3">
           ${phone ? `
             <button type="button" onclick="triggerCtiCall('${phone}', '${patientName}', '고객', '${lead.id || ''}', '삼성화재')" 
-              class="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-cyan-600/20 cursor-pointer">
+              class="px-4.5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-black text-xs flex items-center gap-2 shadow-md shadow-cyan-600/20 cursor-pointer transition-colors">
               <i data-lucide="phone-outgoing" class="w-4 h-4"></i>
               <span>고객에게 CTI 전화걸기</span>
             </button>
@@ -2515,14 +2521,14 @@ window.openSamsungPreRegisteredModal = function(appId, customerName, rawAppOpt) 
           </span>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2.5">
           <button type="button" onclick="handleRegisterFromSamsungModal()" 
-            class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs shadow-lg shadow-blue-600/25 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-transform">
+            class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs shadow-lg shadow-blue-600/25 flex items-center gap-2 cursor-pointer active:scale-95 transition-all">
             <i data-lucide="zap" class="w-4 h-4 text-amber-300"></i>
             <span>간병신청서 정식 접수 등록</span>
           </button>
           <button type="button" onclick="closeSamsungPreRegisteredModal()" 
-            class="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-200 font-bold text-slate-700 text-xs border border-slate-300 cursor-pointer">
+            class="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-200 font-bold text-slate-700 text-xs border border-slate-300 cursor-pointer transition-colors">
             닫기
           </button>
         </div>
