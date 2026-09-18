@@ -410,8 +410,11 @@ async function initSamsungCallReportModule(resetFilter = true) {
     : ((rInfo.channel || '').includes(ch));
   const isMatch = isChannelMatch && rInfo.startDate === s && rInfo.endDate === e && gSamsungReportData && Array.isArray(gSamsungReportData.callLogs);
 
-  // 1. 메모리에 캐시가 있으면 빠른 1차 렌더링(0ms)을 제공하고, 백그라운드에서 최신 정적 데이터 파일을 즉시 로드하여 완벽 동기화
-  if (gSamsungReportData && isTargetChannelPresent && gSamsungMasterLogs.length >= 50) {
+  // 1. 메모리 또는 전용 세션 캐시가 있으면 빠른 1차 렌더링(0ms)을 제공하고, 백그라운드에서 최신 정적 데이터 파일을 즉시 로드하여 완벽 동기화
+  if (gSamsungReportData && Array.isArray(gSamsungReportData.callLogs) && gSamsungReportData.callLogs.length >= 10) {
+    if (gSamsungMasterLogs.length === 0) {
+      gSamsungMasterLogs = [...gSamsungReportData.callLogs];
+    }
     renderSamsungCallReportTab();
   }
 
@@ -493,36 +496,9 @@ function renderSamsungCallReportTab() {
     } catch (e) {}
   }
 
-  if (!gSamsungReportData) {
-    try {
-      const totalCached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
-      const totalData = window.gTotalCallData || (totalCached ? JSON.parse(totalCached) : null);
-      if (totalData && Array.isArray(totalData.callLogs) && totalData.callLogs.length > 0) {
-        const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
-        const ch = curFilter.channel || '삼성화재';
-        const isAllChannel = !ch || ch === '전체' || ch === 'all';
-        const samLogs = isAllChannel ? totalData.callLogs : totalData.callLogs.filter(l => (l.channel || '').includes(ch));
-        if (samLogs.length > 0) {
-          gSamsungReportData = {
-            reportInfo: {
-              title: `${ch} 간병(리본케어) 서비스 인바운드 문의 분석 보고`,
-              target: `${ch} 관련 인바운드 콜`,
-              channel: ch,
-              channelLabel: ch,
-              period: totalData.reportInfo?.period || '2026-09-14 ~ 2026-09-17',
-              startDate: totalData.reportInfo?.startDate || '2026-09-14',
-              endDate: totalData.reportInfo?.endDate || '2026-09-17',
-              reportDate: '2026-09-17',
-              author: '리본케어 (Livon Care) 운영센터',
-              operatingDays: 4
-            },
-            ctiSummary: totalData.ctiSummary,
-            summaryStats: totalData.summaryStats,
-            callLogs: samLogs
-          };
-        }
-      }
-    } catch (e) {}
+  // 데이터가 아직 없는 경우: 자체 독립 데이터 로더 즉시 실행
+  if (!gSamsungReportData || !Array.isArray(gSamsungReportData.callLogs) || gSamsungReportData.callLogs.length === 0) {
+    initSamsungCallReportModule(false);
   }
 
   if (!gSamsungReportData) {
