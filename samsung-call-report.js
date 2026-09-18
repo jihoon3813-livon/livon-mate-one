@@ -410,14 +410,9 @@ async function initSamsungCallReportModule(resetFilter = true) {
     : ((rInfo.channel || '').includes(ch));
   const isMatch = isChannelMatch && rInfo.startDate === s && rInfo.endDate === e && gSamsungReportData && Array.isArray(gSamsungReportData.callLogs);
 
-  // 1. 메모리에 채널 전체 마스터 데이터가 이미 있고 현재 채널 데이터가 포함되어 있으면 즉시 렌더링 (0ms)
-  const isTargetChannelPresent = isAllChannel 
-    ? (gSamsungMasterLogs.length >= 200) 
-    : (Array.isArray(gSamsungMasterLogs) && gSamsungMasterLogs.some(c => (c.channel || '').includes(ch.includes('현대') ? '현대' : (ch.includes('리본') ? '리본' : '삼성'))));
-
+  // 1. 메모리에 캐시가 있으면 빠른 1차 렌더링(0ms)을 제공하고, 백그라운드에서 최신 정적 데이터 파일을 즉시 로드하여 완벽 동기화
   if (gSamsungReportData && isTargetChannelPresent && gSamsungMasterLogs.length >= 50) {
     renderSamsungCallReportTab();
-    return;
   }
 
   // 2. 채널 전용 정적 데이터 우선 로드 (삼성화재는 call_report_samsung.json, 현대해상은 call_report_hyundai.json)
@@ -461,14 +456,7 @@ async function initSamsungCallReportModule(resetFilter = true) {
           }
           gSamsungReportData = finalData;
           if (Array.isArray(finalData.callLogs)) {
-            const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
-            finalData.callLogs.forEach(item => {
-              const key = `${item.callTime}_${item.phone || item.rawPhone}`;
-              if (!existingKeys.has(key)) {
-                gSamsungMasterLogs.push(item);
-                existingKeys.add(key);
-              }
-            });
+            gSamsungMasterLogs = [...finalData.callLogs];
           }
 
           try {
@@ -498,6 +486,9 @@ function renderSamsungCallReportTab() {
       const cached = sessionStorage.getItem('LIVON_CACHED_SAMSUNG_REPORT_DATA');
       if (cached) {
         gSamsungReportData = JSON.parse(cached);
+        if (gSamsungReportData && Array.isArray(gSamsungReportData.callLogs) && gSamsungMasterLogs.length === 0) {
+          gSamsungMasterLogs = [...gSamsungReportData.callLogs];
+        }
       }
     } catch (e) {}
   }
@@ -3088,14 +3079,9 @@ async function handleTabChannelChange(channel) {
               }
             }
             gSamsungReportData = finalData;
-            const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
-            finalData.callLogs.forEach(item => {
-              const key = `${item.callTime}_${item.phone || item.rawPhone}`;
-              if (!existingKeys.has(key)) {
-                gSamsungMasterLogs.push(item);
-                existingKeys.add(key);
-              }
-            });
+            if (Array.isArray(finalData.callLogs)) {
+              gSamsungMasterLogs = [...finalData.callLogs];
+            }
             break;
           }
         }
@@ -3156,14 +3142,9 @@ async function applyTabDateRange(forceSync = false) {
               }
             }
             gSamsungReportData = finalData;
-            const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
-            finalData.callLogs.forEach(item => {
-              const key = `${item.callTime}_${item.phone || item.rawPhone}`;
-              if (!existingKeys.has(key)) {
-                gSamsungMasterLogs.push(item);
-                existingKeys.add(key);
-              }
-            });
+            if (Array.isArray(finalData.callLogs)) {
+              gSamsungMasterLogs = [...finalData.callLogs];
+            }
             break;
           }
         }

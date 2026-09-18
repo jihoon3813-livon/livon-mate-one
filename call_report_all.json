@@ -13,7 +13,7 @@
     "syncedAt": "2026-09-18T03:36:59.493Z"
   },
   "summaryStats": {
-    "totalCalls": 947,
+    "totalCalls": 948,
     "connectReqCalls": 382,
     "answeredCalls": 304,
     "answerRate": "80%",
@@ -423,6 +423,30 @@
     }
   ],
   "callLogs": [
+    {
+      "type": "IN",
+      "channel": "삼성화재",
+      "callTime": "2026-09-18 12:51",
+      "phone": "010-5244-7529",
+      "rawPhone": "01052447529",
+      "memberName": "비회원",
+      "diseaseType": "",
+      "group": "",
+      "arsMenu": "",
+      "connectReq": "N",
+      "waitTime": 0,
+      "title": "",
+      "summary": "",
+      "keywords": "",
+      "duration": "0",
+      "status": "미처리",
+      "operator": "",
+      "askSn": "7155199",
+      "category": "",
+      "actor": "",
+      "rowNum": 1,
+      "id": "cti_1789704710831_1"
+    },
     {
       "type": "IN",
       "channel": "현대해상",
