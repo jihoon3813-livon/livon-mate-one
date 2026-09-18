@@ -855,7 +855,7 @@
       <div class="py-4 px-3.5 space-y-1.5 flex-1 overflow-y-auto custom-scrollbar">
         
         <!-- 1. 대시보드 -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="dashboard" onclick="switchTab('dashboard')">
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="dashboard" onclick="handleLeftMenuClick('dashboard')">
           <div class="flex items-center space-x-3">
             <i data-lucide="layout-dashboard" class="w-4 h-4 flex-shrink-0 text-sky-400"></i>
             <span class="tracking-tight font-semibold">대시보드</span>
@@ -863,7 +863,7 @@
         </button>
 
         <!-- 2. 통합허브 -->
-        <button class="nav-tab-btn active w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-black transition-all bg-gradient-to-r from-primary-600 to-indigo-600 text-white shadow-md shadow-primary-600/20 border border-primary-500/30" data-tab="carehub" onclick="switchTab('carehub')">
+        <button class="nav-tab-btn active w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-black transition-all bg-gradient-to-r from-primary-600 to-indigo-600 text-white shadow-md shadow-primary-600/20 border border-primary-500/30" data-tab="carehub" onclick="handleLeftMenuClick('carehub')">
           <div class="flex items-center space-x-2.5">
             <i data-lucide="layers" class="w-4 h-4 flex-shrink-0 text-amber-300"></i>
             <span class="tracking-tight text-sm">통합허브</span>
@@ -872,7 +872,7 @@
         </button>
 
         <!-- 2-2. 간병캘린더 (월별/주별 스마트 스케줄러) -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="carecalendar" onclick="switchTab('carecalendar')">
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="carecalendar" onclick="handleLeftMenuClick('carecalendar')">
           <div class="flex items-center space-x-3">
             <i data-lucide="calendar-days" class="w-4 h-4 flex-shrink-0 text-sky-400"></i>
             <span class="tracking-tight font-semibold">간병캘린더</span>
@@ -881,7 +881,7 @@
         </button>
 
         <!-- 3. 간병일지 (케어포트) -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="carelogs" onclick="switchTab('carelogs')">
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="carelogs" onclick="handleLeftMenuClick('carelogs')">
           <div class="flex items-center space-x-3">
             <i data-lucide="clipboard-list" class="w-4 h-4 flex-shrink-0 text-purple-400"></i>
             <span class="tracking-tight">간병일지 (케어포트)</span>
@@ -890,7 +890,7 @@
         </button>
 
         <!-- 4. 파트너/인력 디렉토리 (간병인 · 간병센터 · 손사디렉토리 통합) -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="directory" onclick="switchTab('directory')">
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="directory" onclick="handleLeftMenuClick('directory')">
           <div class="flex items-center space-x-3">
             <i data-lucide="contact-2" class="w-4 h-4 flex-shrink-0 text-emerald-400"></i>
             <span class="tracking-tight font-semibold">파트너/인력 디렉토리</span>
@@ -903,7 +903,7 @@
         </button>
 
         <!-- 7. 삼성화재 명단관리 (웹 스프레드시트) -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="samsunglist" onclick="switchTab('samsunglist')">
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="samsunglist" onclick="handleLeftMenuClick('samsunglist')">
           <div class="flex items-center space-x-3">
             <i data-lucide="file-spreadsheet" class="w-4 h-4 flex-shrink-0 text-sky-400"></i>
             <span class="tracking-tight font-semibold">삼성화재 명단관리</span>
@@ -912,7 +912,7 @@
         </button>
 
         <!-- 7-2. 삼성화재 접수/청구관리 (일일접수 & 월간청구 이메일 발송 시스템) -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="samsungclaimhub" onclick="switchTab('samsungclaimhub')">
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="samsungclaimhub" onclick="handleLeftMenuClick('samsungclaimhub')">
           <div class="flex items-center space-x-3">
             <i data-lucide="mail-check" class="w-4 h-4 flex-shrink-0 text-emerald-400"></i>
             <span class="tracking-tight font-semibold">삼성화재 접수/청구관리</span>
@@ -921,7 +921,7 @@
         </button>
 
         <!-- 7-3. 삼성화재 콜분석 (인바운드 문의 분석 및 주간보고 시스템) -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="samsungcallreport" onclick="triggerSamsungCallReportLeftMenuClick()">
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="samsungcallreport" onclick="handleLeftMenuClick('samsungcallreport')">
           <div class="flex items-center space-x-3">
             <i data-lucide="phone-forwarded" class="w-4 h-4 flex-shrink-0 text-blue-400"></i>
             <span class="tracking-tight font-semibold">삼성화재 콜분석</span>
@@ -930,7 +930,7 @@
         </button>
 
         <!-- 7-4. 종합 콜분석 (CTI 전수 상담콜 통합분석 & 고객/보험사/일자/유형별 분석) -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="totalcallanalysis" onclick="triggerTotalCallAnalysisLeftMenuClick()">
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="totalcallanalysis" onclick="handleLeftMenuClick('totalcallanalysis')">
           <div class="flex items-center space-x-3">
             <i data-lucide="phone-call" class="w-4 h-4 flex-shrink-0 text-cyan-400"></i>
             <span class="tracking-tight font-semibold">종합 콜분석</span>
@@ -942,7 +942,7 @@
         </button>
 
         <!-- 8. 양식 -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="forms" onclick="switchTab('forms')">
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="forms" onclick="handleLeftMenuClick('forms')">
           <div class="flex items-center space-x-3">
             <i data-lucide="files" class="w-4 h-4 flex-shrink-0 text-amber-400"></i>
             <span class="tracking-tight">양식</span>
@@ -951,7 +951,7 @@
         </button>
 
         <!-- 9. 팩스관리 -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="faxmgmt" onclick="switchTab('faxmgmt')">
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="faxmgmt" onclick="handleLeftMenuClick('faxmgmt')">
           <div class="flex items-center space-x-3">
             <i data-lucide="printer" class="w-4 h-4 flex-shrink-0 text-purple-400"></i>
             <span class="tracking-tight font-semibold">팩스관리</span>
@@ -960,7 +960,7 @@
         </button>
 
         <!-- 9. 시스템관리(권한,설정) -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="adminmgmt" onclick="switchTab('adminmgmt')">
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="adminmgmt" onclick="handleLeftMenuClick('adminmgmt')">
           <div class="flex items-center space-x-3">
             <i data-lucide="settings" class="w-4 h-4 flex-shrink-0 text-amber-400"></i>
             <span class="tracking-tight">시스템관리(권한,설정)</span>
@@ -969,7 +969,7 @@
         </button>
 
         <!-- 10. 분양몰관리 -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="branchmall" onclick="switchTab('branchmall')">
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="branchmall" onclick="handleLeftMenuClick('branchmall')">
           <div class="flex items-center space-x-3">
             <i data-lucide="store" class="w-4 h-4 flex-shrink-0 text-pink-400"></i>
             <span class="tracking-tight">분양몰관리</span>
@@ -995,7 +995,7 @@
           <!-- 하위 메뉴 영역 (기본 숨김, 더보기 클릭 시 노출) -->
           <div id="referenceSubmenu" class="hidden pl-2 pr-1 py-1.5 space-y-1 bg-slate-950/40 rounded-xl mt-1 border border-slate-800/60 transition-all">
             <!-- 1. 간병신청대장 -->
-            <button class="nav-tab-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-all" data-tab="applications" onclick="switchTab('applications')">
+            <button class="nav-tab-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-all" data-tab="applications" onclick="handleLeftMenuClick('applications')">
               <div class="flex items-center space-x-2.5">
                 <i data-lucide="clipboard-list" class="w-3.5 h-3.5 flex-shrink-0 text-sky-400"></i>
                 <span class="tracking-tight">간병신청대장</span>
@@ -1004,7 +1004,7 @@
             </button>
 
             <!-- 2. 간병인배정관리 -->
-            <button class="nav-tab-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-all" data-tab="assignments" onclick="switchTab('assignments')">
+            <button class="nav-tab-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-all" data-tab="assignments" onclick="handleLeftMenuClick('assignments')">
               <div class="flex items-center space-x-2.5">
                 <i data-lucide="user-check" class="w-3.5 h-3.5 flex-shrink-0 text-emerald-400"></i>
                 <span class="tracking-tight">간병인배정관리</span>
@@ -1013,7 +1013,7 @@
             </button>
 
             <!-- 3. 보험청구 -->
-            <button class="nav-tab-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-all" data-tab="claims" onclick="switchTab('claims')">
+            <button class="nav-tab-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-all" data-tab="claims" onclick="handleLeftMenuClick('claims')">
               <div class="flex items-center space-x-2.5">
                 <i data-lucide="receipt" class="w-3.5 h-3.5 flex-shrink-0 text-amber-400"></i>
                 <span class="tracking-tight">보험청구</span>
@@ -1022,7 +1022,7 @@
             </button>
 
             <!-- 4. 간병비지급관리 -->
-            <button class="nav-tab-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-all" data-tab="payouts" onclick="switchTab('payouts')">
+            <button class="nav-tab-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-all" data-tab="payouts" onclick="handleLeftMenuClick('payouts')">
               <div class="flex items-center space-x-2.5">
                 <i data-lucide="banknote" class="w-3.5 h-3.5 flex-shrink-0 text-teal-400"></i>
                 <span class="tracking-tight">간병비지급관리</span>

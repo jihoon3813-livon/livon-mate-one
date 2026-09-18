@@ -22440,10 +22440,141 @@ function renderMultiTabBar() {
 window.renderMultiTabBar = renderMultiTabBar;
 
 function switchMultiTab(tabId) {
-  // [사용자 요구사항] 탭 클릭 시에는 자동새로고침 없이 초고속 화면 전환
+  // [사용자 요구사항] 상단 멀티 탭 클릭 시에는 기존 화면 그대로 초고속 유지 (데이터 재조회/새로고침 없이 0ms 즉시 표시)
   switchTab(tabId, null, false);
 }
 window.switchMultiTab = switchMultiTab;
+
+/**
+ * [사용자 요구사항]: 모든 좌측메뉴는 클릭하면 항상 최신 데이터를 불러옴 (탭은 기존화면 그대로, 좌측메뉴는 최신데이터)
+ */
+function handleLeftMenuClick(tabId, filterParam = null) {
+  // 1. 기존 화면/캐시 데이터로 0ms 즉각 전환 (화면 공백/깜빡임 없이 즉시 전환)
+  switchTab(tabId, filterParam, false);
+
+  // 2. 좌측 메뉴 클릭 시에만 해당 메뉴별 최신 데이터 새로고침 / 실시간 동기화 실행
+  refreshTabData(tabId, filterParam);
+}
+window.handleLeftMenuClick = handleLeftMenuClick;
+
+/**
+ * 메뉴별 최신 데이터 새로고침 & 실시간 동기화 엔진
+ */
+function refreshTabData(tabId, filterParam = null) {
+  try {
+    switch (tabId) {
+      // 1. 종합 콜분석: CTI 실시간 전수 동기화 및 대시보드 갱신
+      case 'totalcallanalysis':
+        if (typeof loadTotalCallData === 'function') {
+          loadTotalCallData(true, true);
+        }
+        break;
+
+      // 2. 삼성화재 콜분석: CTI 실시간 삼성화재 콜 동기화
+      case 'samsungcallreport':
+        if (typeof applyTabDateRange === 'function') {
+          applyTabDateRange(true, true);
+        }
+        break;
+
+      // 3. 삼성화재 명단관리: 구글 드라이브 및 최신 시트 동기화
+      case 'samsunglist':
+      case 'samsungleads':
+      case 'samsung':
+        if (typeof checkSamsungDriveStatus === 'function') {
+          checkSamsungDriveStatus();
+        }
+        if (typeof syncSamsungSpreadsheetData === 'function') {
+          syncSamsungSpreadsheetData(true);
+        }
+        if (typeof renderCurrentSamsungSheet === 'function') {
+          renderCurrentSamsungSheet();
+        }
+        break;
+
+      // 4. 삼성화재 접수/청구관리: 접수/청구 최신 내역 갱신
+      case 'samsungclaimhub':
+        if (typeof renderSamsungClaimHub === 'function') {
+          renderSamsungClaimHub(filterParam);
+        }
+        break;
+
+      // 5. 간병일지 (케어포트): 케어포트 실시간 동기화
+      case 'carelogs':
+        if (typeof syncCarePortLogs === 'function') {
+          syncCarePortLogs(true);
+        }
+        break;
+
+      // 6. 통합허브: 통합 데이터 리프레시 및 아웃콜 긴급 체크
+      case 'carehub':
+        if (typeof renderUnifiedCareHub === 'function') {
+          renderUnifiedCareHub();
+        }
+        if (typeof checkAndTriggerOutcallAlert === 'function') {
+          checkAndTriggerOutcallAlert();
+        }
+        break;
+
+      // 7. 간병캘린더: 최신 배정 스케줄 갱신
+      case 'carecalendar':
+        if (typeof renderCareCalendar === 'function') {
+          renderCareCalendar();
+        }
+        break;
+
+      // 8. 파트너/인력 디렉토리: 최신 인력/센터/손사 명단 갱신
+      case 'directory':
+        if (typeof renderDirectoryHeaderStats === 'function') {
+          renderDirectoryHeaderStats();
+        }
+        if (typeof switchDirectorySubTab === 'function') {
+          switchDirectorySubTab(filterParam || gActiveDirectorySubTab || 'caregivers');
+        }
+        break;
+
+      // 9. 팩스관리: 팩스 최신 송수신 내역 갱신
+      case 'faxmgmt':
+        if (typeof renderFaxManagement === 'function') {
+          renderFaxManagement();
+        }
+        break;
+
+      // 10. 대시보드: 전체 통계 및 차트 재계산
+      case 'dashboard':
+        if (typeof renderDashboard === 'function') {
+          renderDashboard();
+        }
+        break;
+
+      // 11. 참고자료 서브메뉴
+      case 'applications':
+        if (typeof renderApplications === 'function') renderApplications();
+        break;
+      case 'assignments':
+        if (typeof renderAssignments === 'function') renderAssignments();
+        break;
+      case 'claims':
+        if (typeof renderClaims === 'function') renderClaims();
+        break;
+      case 'payouts':
+        if (typeof renderPayouts === 'function') renderPayouts();
+        break;
+      case 'forms':
+        if (typeof renderForms === 'function') renderForms();
+        break;
+      case 'adminmgmt':
+      case 'admins':
+        if (typeof renderAdmins === 'function') renderAdmins();
+        break;
+      default:
+        break;
+    }
+  } catch (err) {
+    console.warn('[refreshTabData error]', tabId, err);
+  }
+}
+window.refreshTabData = refreshTabData;
 
 function closeMultiTab(tabId, event) {
   if (event) {
