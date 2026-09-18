@@ -782,10 +782,10 @@ function renderSamsungCallReportTab() {
           </div>
         </div>
 
-        <!-- CTI 원본 공식 집계 요약 스트립 (CTI 웹 화면과 100% 일치 및 반응형 카드 그리드) -->
+        <!-- CTI 실시간 공식 집계 요약 스트립 (CTI 웹 화면과 100% 일치 및 반응형 카드 그리드) -->
         <div class="bg-gradient-to-r from-blue-50/90 to-indigo-50/60 border border-blue-200/70 rounded-2xl p-3 sm:px-4 sm:py-3 space-y-2.5 text-xs">
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="px-2 py-0.5 rounded-md bg-blue-600 text-white font-black text-[10px] tracking-wide shrink-0">CTI 원본 집계</span>
+            <span class="px-2 py-0.5 rounded-md bg-blue-600 text-white font-black text-[10px] tracking-wide shrink-0">CTI 실시간 집계</span>
             <span class="text-slate-800 font-bold break-keep text-xs">“${curStart} ~ ${curEnd}” <span class="text-blue-700 font-extrabold">[${curCh}]</span> 검색 결과</span>
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2 text-[11px]">
@@ -826,7 +826,7 @@ function renderSamsungCallReportTab() {
       </div>
 
       <!-- ================================================================= -->
-      <!-- SUB-TAB SWITCHER (분석 요약 / 일자별 인입현황 / 통화로그 원본 - 모바일 잘림 방지) -->
+      <!-- SUB-TAB SWITCHER (분석 요약 / 일자별 인입현황 / 상세 통화목록 - 모바일 잘림 방지) -->
       <!-- ================================================================= -->
       <div class="border-b border-slate-200 px-1 overflow-x-auto scrollbar-none">
         <div class="flex items-center justify-between gap-2 w-full sm:w-auto">
@@ -845,8 +845,8 @@ function renderSamsungCallReportTab() {
 
             <button type="button" onclick="switchReportSubTab('logs')" class="px-2.5 py-2 sm:px-4 sm:py-2.5 rounded-t-xl text-xs sm:text-sm font-black flex items-center gap-1 sm:gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${gActiveReportSubTab === 'logs' ? 'border-blue-600 text-blue-700 bg-white shadow-2xs' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-100/60'}">
               <i data-lucide="list-filter" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
-              <span>통화로그<span class="hidden sm:inline">(원본)</span></span>
-              <span class="px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] bg-amber-100 text-amber-900 font-bold border border-amber-300 whitespace-nowrap">CTI 연동</span>
+              <span>상세 통화목록</span>
+              <span class="px-1.5 py-0.2 rounded-full text-[9px] sm:text-[10px] bg-blue-100 text-blue-900 font-bold border border-blue-200 whitespace-nowrap">실제상담</span>
             </button>
           </div>
 
@@ -1481,8 +1481,8 @@ function renderReportSummarySubTab(stats) {
               삼성화재 상품마케팅TF 요청사항 반영 안내
             </div>
             <p class="text-[11.5px] leading-normal text-amber-800">
-              본 시스템의 모든 문의 대분류(8종)와 문의 주체(4종)는 하단의 <b>통화로그(원본)</b> 테이블과 1:1로 실시간 연동되어 있습니다. 
-              위 항목 중 아무거나 클릭하시면 해당되는 35건, 71건의 원본 통화 기록을 즉시 조회하실 수 있습니다.
+              본 시스템의 모든 문의 대분류(8종)와 문의 주체(4종)는 하단의 <b>상세 통화목록</b> 테이블과 1:1로 실시간 연동되어 있습니다. 
+              위 항목 중 아무거나 클릭하시면 해당되는 통화 기록을 즉시 조회하실 수 있습니다.
             </p>
           </div>
         </div>
@@ -1677,9 +1677,55 @@ function renderReportLogsSubTab(stats) {
       </div>
 
       <!-- ================================================================= -->
-      <!-- 18개 컬럼 통화로그 원본 테이블 그리드 -->
+      <!-- 모바일 전용 카드 뷰 (768px 미만) -->
       <!-- ================================================================= -->
-      <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
+      <div class="block md:hidden space-y-3">
+        ${logs.length === 0 ? `
+          <div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-slate-400 font-bold text-xs">
+            일치하는 통화내역이 없습니다.
+          </div>
+        ` : logs.map((c, idx) => {
+          const formattedPhone = formatPhoneNumber(c.phone || c.rawPhone);
+          const resolvedName = resolveMemberName(c.phone || c.rawPhone, c.memberName, c.title, c.summary);
+          return `
+            <div class="bg-white rounded-2xl border border-slate-200/90 p-3.5 shadow-2xs space-y-2 text-xs">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-mono text-[10px] text-slate-400 font-bold">#${c.rowNum || (idx + 1)}</span>
+                  <span class="font-mono font-black text-slate-900 text-xs">${formattedPhone}</span>
+                  ${resolvedName && resolvedName !== '비회원' && resolvedName !== '회원아님'
+                    ? `<span class="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 font-black text-[10px] border border-emerald-200">${typeof maskName === 'function' ? maskName(resolvedName) : resolvedName}</span>`
+                    : `<span class="text-slate-400 text-[10px]">비회원</span>`}
+                </div>
+                <div class="flex items-center gap-1 text-[10px] font-mono text-slate-500">
+                  <span>${(c.callTime || '').slice(5)}</span>
+                  <span class="px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 font-bold border border-blue-200/60">${c.channel || '삼성화재'}</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                ${c.category ? `<span class="px-2 py-0.5 rounded-lg bg-sky-100 text-sky-800 font-bold text-[11px] border border-sky-200">${c.category}</span>` : ''}
+                ${c.actor ? `<span class="px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-800 font-bold text-[11px] border border-indigo-200">${c.actor}</span>` : ''}
+                ${c.title ? `<span class="font-bold text-slate-900 text-xs">${c.title}</span>` : ''}
+              </div>
+              ${c.summary ? `
+                <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-slate-700 text-[11.5px] leading-relaxed select-text">
+                  ${c.summary}
+                  <div class="mt-2 flex justify-end">
+                    <button type="button" onclick="copyCallLogSummaryText(this, ${JSON.stringify(c.summary).replace(/"/g, '&quot;')})" class="px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-blue-600 font-bold text-[10px] flex items-center gap-1 transition-all shadow-2xs">
+                      <i data-lucide="copy" class="w-3 h-3"></i> 요약 복사
+                    </button>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- PC 데스크톱 18개 컬럼 통화로그 테이블 그리드 (768px 이상) -->
+      <!-- ================================================================= -->
+      <div class="hidden md:block bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
         <div class="overflow-x-auto custom-scrollbar min-h-[580px]" style="max-height: max(820px, calc(100vh - 240px));">
           <table class="w-full text-xs text-left min-w-[1250px]">
             <thead class="bg-slate-900 text-slate-200 uppercase font-bold text-[11px] sticky top-0 z-20 shadow-xs">
@@ -1755,16 +1801,16 @@ function renderReportLogsSubTab(stats) {
                       ${isConsulted ? `
                         <select onchange="updateCallLogActor('${c.id}', this.value)" 
                           class="w-full px-2 py-1 rounded-lg text-[11px] font-black bg-white border border-indigo-300 text-indigo-900 shadow-2xs focus:ring-1 focus:ring-indigo-500 truncate" title="${c.actor || ''}">
-                          ${SAMSUNG_ACTORS.map(actor => `
-                            <option value="${actor.name}" ${c.actor === actor.name ? 'selected' : ''}>${actor.name}</option>
+                          ${SAMSUNG_ACTORS.map(act => `
+                            <option value="${act.name}" ${c.actor === act.name ? 'selected' : ''}>${act.name}</option>
                           `).join('')}
                         </select>
                       ` : `<span class="text-slate-300 text-[10px]">-</span>`}
                     </td>
 
-                    <!-- 상담 제목 -->
+                    <!-- 상담제목 (수정 가능 인풋) -->
                     <td class="py-2.5 px-2.5 font-bold text-slate-900 min-w-[130px] max-w-[170px] break-keep leading-snug align-top pt-3">
-                      ${c.title || '-'}
+                      <div class="line-clamp-2" title="${c.title || ''}">${c.title || '-'}</div>
                     </td>
 
                     <!-- 상담 요약 (가장 넓은 핵심 공간 + 복사 아이콘 버튼) -->
@@ -1784,19 +1830,19 @@ function renderReportLogsSubTab(stats) {
                       ` : '<span class="text-slate-300 text-xs">-</span>'}
                     </td>
 
-                    <!-- 키워드 -->
-                    <td class="py-2.5 px-2.5 text-slate-500 font-medium min-w-[130px] max-w-[160px]">
+                    <!-- 키워드 태그 -->
+                    <td class="py-2.5 px-2.5 text-slate-500 font-medium min-w-[120px] max-w-[150px]">
                       ${c.keywords ? `
                         <div class="flex flex-wrap gap-1">
                           ${c.keywords.split(',').map(k => `
                             <span class="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] whitespace-nowrap">${k.trim()}</span>
                           `).join('')}
                         </div>
-                      ` : '-'}
+                      ` : '<span class="text-slate-300">-</span>'}
                     </td>
 
-                    <!-- 상담 시간 -->
-                    <td class="py-2.5 px-2 text-center font-mono font-bold ${c.duration && c.duration !== '0' ? 'text-blue-700' : 'text-slate-400'} whitespace-nowrap">
+                    <!-- 상담시간 -->
+                    <td class="py-2.5 px-2 text-center font-mono font-bold text-slate-700 whitespace-nowrap">
                       ${c.duration || '0'}
                     </td>
 
@@ -1825,8 +1871,93 @@ function renderReportLogsSubTab(stats) {
 function drilldownToCallLogs(filterType, filterValue) {
   gReportFilter[filterType] = filterValue;
   gReportFilter.consultedOnly = true;
+  
+  // 모바일 화면(768px 미만)에서는 테이블로 화면전환하지 않고 모달로 상세 상담 내역 표시
+  if (window.innerWidth < 768) {
+    openSamsungMobileCallDetailModal(filterType, filterValue);
+    return;
+  }
+  
   gActiveReportSubTab = 'logs';
   renderSamsungCallReportTab();
+}
+
+function openSamsungMobileCallDetailModal(filterType, filterValue) {
+  const stats = calculateTabStats();
+  const logs = (stats && stats.logs) || [];
+  const filtered = logs.filter(c => {
+    if (filterType === 'category') return c.category === filterValue;
+    if (filterType === 'actor') return c.actor === filterValue;
+    return true;
+  });
+  const typeLabel = filterType === 'category' ? '문의 대분류' : '문의 주체';
+  
+  let modal = document.getElementById('samsungMobileCallDetailModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'samsungMobileCallDetailModal';
+    modal.className = 'fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4';
+    document.body.appendChild(modal);
+  }
+  modal.classList.remove('hidden');
+  modal.innerHTML = `
+    <div class="bg-white w-full sm:max-w-2xl max-h-[85vh] rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+      <div class="p-4 bg-gradient-to-r from-blue-700 to-indigo-800 text-white flex items-center justify-between shrink-0">
+        <div>
+          <div class="flex items-center gap-1.5 text-[11px] text-blue-200 font-bold">
+            <span>${typeLabel}</span>
+            <span>•</span>
+            <span>실제 상담 상세 내역</span>
+          </div>
+          <h3 class="text-sm sm:text-base font-black text-white mt-0.5">${filterValue} <span class="text-xs font-normal text-blue-100">(${filtered.length}건)</span></h3>
+        </div>
+        <button type="button" onclick="closeSamsungMobileCallDetailModal()" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-all cursor-pointer font-bold">
+          ✕
+        </button>
+      </div>
+      <div class="p-3 sm:p-4 overflow-y-auto space-y-3 divide-y divide-slate-100">
+        ${filtered.length === 0 ? `
+          <div class="py-12 text-center text-slate-400 font-bold text-xs">상세 통화 내역이 없습니다.</div>
+        ` : filtered.map((c, i) => {
+          const fPhone = formatPhoneNumber(c.phone || c.rawPhone);
+          const mName = resolveMemberName(c.phone || c.rawPhone, c.memberName, c.title, c.summary);
+          return `
+            <div class="pt-3 first:pt-0 space-y-2 text-xs">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-mono text-[10px] text-slate-400 font-bold">#${i + 1}</span>
+                  <span class="font-mono font-black text-slate-900 text-xs">${fPhone}</span>
+                  ${mName && mName !== '비회원' ? `<span class="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 font-bold text-[10px] border border-emerald-200">${typeof maskName === 'function' ? maskName(mName) : mName}</span>` : ''}
+                </div>
+                <span class="text-[10px] text-slate-400 font-mono">${(c.callTime || '').slice(5)}</span>
+              </div>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="px-2 py-0.5 rounded-lg bg-sky-50 text-sky-700 font-bold text-[11px] border border-sky-200">${c.category || '-'}</span>
+                <span class="px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-[11px] border border-indigo-200">${c.actor || '-'}</span>
+                <span class="font-bold text-slate-800 text-xs">${c.title || ''}</span>
+              </div>
+              ${c.summary ? `
+                <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-slate-700 text-[11.5px] leading-relaxed select-text">
+                  ${c.summary}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-100 text-center shrink-0">
+        <button type="button" onclick="closeSamsungMobileCallDetailModal()" class="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs transition-colors cursor-pointer">
+          닫기
+        </button>
+      </div>
+    </div>
+  `;
+  if (typeof initIcons === 'function') initIcons(modal);
+}
+
+function closeSamsungMobileCallDetailModal() {
+  const modal = document.getElementById('samsungMobileCallDetailModal');
+  if (modal) modal.classList.add('hidden');
 }
 
 function clearReportFilter(type) {
