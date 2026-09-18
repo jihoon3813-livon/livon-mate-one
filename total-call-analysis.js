@@ -340,7 +340,22 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
 
   const clean = cleanPhoneDigits(phone);
   const detectedName = extractCustomerNameFromText(title, summary, ctiMemberName);
-  const cacheKey = `${clean}_${detectedName || ''}_${channel || ''}_${ctiMemberName || ''}`;
+
+  // 통화 요약 또는 본문에서 언급된 환자 실제 연락처 추출 (예: "환자의 일반 연락처는 010-2389-4940입니다")
+  let summaryPhone = '';
+  const textToScan = `${title} ${summary}`;
+  const phoneMatches = textToScan.match(/01[0-9]-?[0-9]{3,4}-?[0-9]{4}/g);
+  if (phoneMatches && phoneMatches.length > 0) {
+    for (const rawP of phoneMatches) {
+      const cP = cleanPhoneDigits(rawP);
+      if (cP && cP !== clean && cP.length >= 10) {
+        summaryPhone = cP;
+        break;
+      }
+    }
+  }
+
+  const cacheKey = `${clean}_${summaryPhone || ''}_${detectedName || ''}_${channel || ''}_${ctiMemberName || ''}`;
   if (_mateOneMatchCache.has(cacheKey)) {
     return _mateOneMatchCache.get(cacheKey);
   }
@@ -355,6 +370,30 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
         ...(sheets.target || []),
         ...(sheets.completed || [])
       ];
+
+      // 1-1. 통화 요약 본문 내 환자 연락처(summaryPhone)가 있는 경우 최우선 매칭
+      if (summaryPhone) {
+        const foundBySummaryPhone = allSheetItems.find(s => {
+          const p1 = cleanPhoneDigits(s.phone || s.applicantContact || s.contact);
+          const p2 = cleanPhoneDigits(s.patientPhone || s.guardianPhone || s.customerPhone);
+          return p1 === summaryPhone || p2 === summaryPhone;
+        });
+        if (foundBySummaryPhone) {
+          const sAppId = foundBySummaryPhone.id || foundBySummaryPhone.regNum || foundBySummaryPhone.applicantNo || foundBySummaryPhone.patientId || ('SF-' + summaryPhone);
+          if (!foundBySummaryPhone.id) foundBySummaryPhone.id = sAppId;
+          return {
+            isRegistered: true,
+            appId: sAppId,
+            patientName: foundBySummaryPhone.patientName || foundBySummaryPhone.customerName || detectedName || '삼성고객',
+            company: '삼성화재',
+            isSamsung: true,
+            rawApp: foundBySummaryPhone,
+            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+          };
+        }
+      }
+
+      // 1-2. 인입 발신번호(clean) 일치 확인
       if (clean) {
         const found = allSheetItems.find(s => {
           const p1 = cleanPhoneDigits(s.phone || s.applicantContact || s.contact);
@@ -375,9 +414,19 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
           };
         }
       }
+
+      // 1-3. 환자명 일치 확인 (동명이인이 있을 경우 summaryPhone 또는 clean 우선 고려)
       if (detectedName) {
-        const foundByName = allSheetItems.find(s => (s.patientName === detectedName || s.customerName === detectedName));
-        if (foundByName) {
+        const sameNameItems = allSheetItems.filter(s => (s.patientName === detectedName || s.customerName === detectedName));
+        if (sameNameItems.length > 0) {
+          let foundByName = sameNameItems[0];
+          if (summaryPhone) {
+            const exactPhone = sameNameItems.find(s => {
+              const p1 = cleanPhoneDigits(s.phone || s.applicantContact || s.contact);
+              return p1 === summaryPhone;
+            });
+            if (exactPhone) foundByName = exactPhone;
+          }
           const sAppId = foundByName.id || foundByName.regNum || foundByName.applicantNo || foundByName.patientId || (clean ? ('SF-' + clean) : ('SF-' + (foundByName.patientName || detectedName || 'S')));
           if (!foundByName.id) foundByName.id = sAppId;
           return {
@@ -387,7 +436,6 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
             company: '삼성화재',
             isSamsung: true,
             rawApp: foundByName,
-            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
           };
         }
       }
@@ -396,6 +444,26 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
     // 2) window.gSamsungList
     const list = window.gSamsungList || (window.REBORN_DATA && window.REBORN_DATA.samsungList);
     if (Array.isArray(list)) {
+      if (summaryPhone) {
+        const foundBySummaryPhone = list.find(s => {
+          const p1 = cleanPhoneDigits(s.phone || s.applicantContact || s.contact);
+          const p2 = cleanPhoneDigits(s.patientPhone || s.guardianPhone || s.customerPhone);
+          return p1 === summaryPhone || p2 === summaryPhone;
+        });
+        if (foundBySummaryPhone) {
+          const sAppId = foundBySummaryPhone.id || foundBySummaryPhone.regNum || foundBySummaryPhone.applicantNo || foundBySummaryPhone.patientId || ('SF-' + summaryPhone);
+          if (!foundBySummaryPhone.id) foundBySummaryPhone.id = sAppId;
+          return {
+            isRegistered: true,
+            appId: sAppId,
+            patientName: foundBySummaryPhone.patientName || foundBySummaryPhone.customerName || detectedName || '삼성고객',
+            company: '삼성화재',
+            isSamsung: true,
+            rawApp: foundBySummaryPhone,
+            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+          };
+        }
+      }
       if (clean) {
         const found = list.find(s => {
           const p1 = cleanPhoneDigits(s.phone || s.applicantContact || s.contact);
@@ -417,8 +485,16 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
         }
       }
       if (detectedName) {
-        const foundByName = list.find(s => (s.patientName === detectedName || s.customerName === detectedName));
-        if (foundByName) {
+        const sameNameItems = list.filter(s => (s.patientName === detectedName || s.customerName === detectedName));
+        if (sameNameItems.length > 0) {
+          let foundByName = sameNameItems[0];
+          if (summaryPhone) {
+            const exactPhone = sameNameItems.find(s => {
+              const p1 = cleanPhoneDigits(s.phone || s.applicantContact || s.contact);
+              return p1 === summaryPhone;
+            });
+            if (exactPhone) foundByName = exactPhone;
+          }
           const sAppId = foundByName.id || foundByName.regNum || foundByName.applicantNo || foundByName.patientId || (clean ? ('SF-' + clean) : ('SF-' + (foundByName.patientName || detectedName || 'L')));
           if (!foundByName.id) foundByName.id = sAppId;
           return {

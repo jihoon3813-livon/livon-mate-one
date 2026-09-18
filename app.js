@@ -3023,6 +3023,10 @@ function initInsuranceWorkflows() {
       if (gActiveSamsungSheet === 'eligible') {
         renderCurrentSamsungSheet();
       }
+      if (typeof gActiveTab !== 'undefined' && gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') {
+        const hubInput = document.getElementById('hubSearchInput');
+        if (hubInput && hubInput.value.trim()) renderUnifiedCareHub();
+      }
       console.log(`[LivonDB] IndexedDB로부터 삼성화재 사전명단 ${cached.length.toLocaleString()}건 날짜 정규화 및 로드 완료`);
     } else {
       // IndexedDB에 명단이 없거나 소량일 경우, 구글 드라이브 최신 명단(25,939건) 자동 로드
@@ -3040,6 +3044,10 @@ function initInsuranceWorkflows() {
               updateSamsungSheetBadges();
               if (gActiveSamsungSheet === 'eligible' && typeof renderCurrentSamsungSheet === 'function') {
                 renderCurrentSamsungSheet();
+              }
+              if (typeof gActiveTab !== 'undefined' && gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') {
+                const hubInput = document.getElementById('hubSearchInput');
+                if (hubInput && hubInput.value.trim()) renderUnifiedCareHub();
               }
               updateSamsungDriveSyncUI(data.syncedAt, data.filename, records.length);
               console.log(`[SamsungDrive] 구글 드라이브 최신 명단 ${records.length.toLocaleString()}건 초기 로드 완료`);
@@ -18947,6 +18955,83 @@ function renderUnifiedCareHub() {
     return true;
   });
 
+  // [사용자 요구사항] 검색어(query) 입력 시, 삼성화재 사전등록 명단(gSamsungList / window.gSamsungSheets)에서도 고객을 실시간 매칭 검색
+  if (query && (insFilter === 'ALL' || insFilter.includes('삼성'))) {
+    const existingAppIds = new Set((gApps || []).map(a => String(a.id || '')));
+    const existingAccidentNums = new Set((gApps || []).map(a => String(a.accidentNumber || '')).filter(Boolean));
+
+    const sSource = [
+      ...(Array.isArray(window.gSamsungList) ? window.gSamsungList : []),
+      ...((window.gSamsungSheets && Array.isArray(window.gSamsungSheets.eligible)) ? window.gSamsungSheets.eligible : [])
+    ];
+
+    const seenSamsungIds = new Set();
+    const matchedSamsungApps = [];
+
+    for (let i = 0; i < sSource.length; i++) {
+      const s = sSource[i];
+      if (!s) continue;
+      const sId = String(s.id || s.patientId || '');
+      if (!sId || seenSamsungIds.has(sId)) continue;
+      seenSamsungIds.add(sId);
+
+      // 이미 gApps에 등록된 건이면 중복 추가 배제
+      if (existingAppIds.has(sId)) continue;
+      if (s.accidentNumber && existingAccidentNums.has(String(s.accidentNumber))) continue;
+
+      const sPhoneClean = (s.phone || s.applicantContact || '').replace(/[^0-9]/g, '');
+      const sName = (s.patientName || s.customerName || '').toLowerCase();
+      const sAccident = (s.accidentNumber || '').toLowerCase();
+      const sPolicy = (s.policyNumber || '').toLowerCase();
+      const sAdjuster = (s.adjusterName || '').toLowerCase();
+
+      const match = (sId && sId.toLowerCase().includes(query)) ||
+                    (sName && sName.includes(query)) ||
+                    (s.phone && s.phone.includes(query)) ||
+                    (digitsQuery.length >= 2 && sPhoneClean.includes(digitsQuery)) ||
+                    (sAccident && sAccident.includes(query)) ||
+                    (sPolicy && sPolicy.includes(query)) ||
+                    (sAdjuster && sAdjuster.includes(query));
+
+      if (match) {
+        matchedSamsungApps.push({
+          id: sId,
+          patientId: s.patientId || sId,
+          patientName: s.patientName || s.customerName || '고객',
+          birthDate: s.birthDate || '-',
+          gender: s.gender || '-',
+          phone: s.phone || s.applicantContact || '',
+          insuranceCompany: '삼성화재',
+          status: s.matchStatus || '신청대기(미신청)',
+          accidentNumber: s.accidentNumber || '-',
+          policyNumber: s.policyNumber || '-',
+          productName: s.productName || '삼성화재 간병지원',
+          productCode: s.productCode || '',
+          adjusterName: s.adjusterName || '-',
+          adjusterPhone: s.adjusterPhone || '-',
+          adjusterFax: s.adjusterFax || '-',
+          applyDate: s.receiveDate || (s.contractStartDate || '-'),
+          createdAt: s.receiveDate || new Date().toISOString(),
+          assignedCaregiverCount: 0,
+          claimCount: 0,
+          unconfirmedClaimCount: 0,
+          estimatedUnpaid: 0,
+          depositConfirmedAmount: 0,
+          totalPayout: 0,
+          isPreRegistered: true,
+          notes: s.notes || [],
+          logs: s.logs || []
+        });
+
+        if (matchedSamsungApps.length >= 50) break;
+      }
+    }
+
+    if (matchedSamsungApps.length > 0) {
+      filtered.push(...matchedSamsungApps);
+    }
+  }
+
   // Sort filtered list according to gHubSort (Pre-calculate timestamps for ultra-fast comparisons)
   if (gHubSort === 'created_desc' || gHubSort === 'created_asc' || gHubSort === 'updated_desc') {
     for (let i = 0; i < filtered.length; i++) {
@@ -19147,10 +19232,10 @@ function renderUnifiedCareHub() {
               ${getCsLabelBadge(app)}
             </h3>
             <span class="text-xs text-slate-400 font-normal">(${app.gender || '-'}·${maskBirth(app.birthDate)})</span>
-            <span class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">${app.insuranceCompany}</span>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded-md ${app.isPreRegistered ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-blue-50 text-blue-800 border border-blue-200'}">${app.insuranceCompany}${app.isPreRegistered ? ' (사전등록)' : ''}</span>
             <span class="text-slate-300">|</span>
             <span class="text-xs ${as ? 'text-slate-700 font-semibold' : 'text-amber-700 font-bold'}">
-              ${as ? `${maskName(as.caregiverName)}${safeCenter}` : '간병인 미배정'}
+              ${as ? `${maskName(as.caregiverName)}${safeCenter}` : (app.isPreRegistered ? '신청대기 (미배정)' : '간병인 미배정')}
             </span>
             <span class="text-slate-300">|</span>
             <span class="text-xs font-mono font-bold ${app.estimatedUnpaid > 0 ? 'text-rose-600' : 'text-purple-800'} bg-purple-50/70 px-2 py-0.5 rounded-md border border-purple-200/60">
@@ -19163,7 +19248,11 @@ function renderUnifiedCareHub() {
           </div>
 
           <div class="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-            ${checklistBadgesHtml}
+            ${app.isPreRegistered ? `
+              <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold flex items-center gap-1">
+                <i data-lucide="clock" class="w-3 h-3 text-amber-700"></i> 사전등록
+              </span>
+            ` : checklistBadgesHtml}
             ${careProg ? `
               <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full ${careProg.status === 'completed' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'} text-[11px] font-bold">
                 <i data-lucide="${careProg.status === 'completed' ? 'check-circle' : 'clock'}" class="w-3 h-3 ${careProg.status === 'completed' ? 'text-slate-400' : 'text-emerald-600'}"></i>
@@ -19171,7 +19260,7 @@ function renderUnifiedCareHub() {
               </div>
             ` : `
               <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-bold">
-                배정대기
+                ${app.isPreRegistered ? '신청대기' : '배정대기'}
               </span>
             `}
           </div>
@@ -19195,7 +19284,7 @@ function renderUnifiedCareHub() {
               ${getCsLabelBadge(app)}
             </h3>
             <span class="text-xs text-slate-500 font-medium">(${app.gender || '-'}·${maskBirth(app.birthDate)})</span>
-            <span class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-white text-blue-800 border border-blue-200">${app.insuranceCompany}</span>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded-md ${app.isPreRegistered ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-white text-blue-800 border border-blue-200'}">${app.insuranceCompany}${app.isPreRegistered ? ' (사전등록)' : ''}</span>
           </div>
 
           <div class="flex items-center gap-1.5 flex-wrap justify-end">
@@ -19206,7 +19295,7 @@ function renderUnifiedCareHub() {
               </div>
             ` : `
               <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 font-bold flex items-center gap-1">
-                <i data-lucide="alert-circle" class="w-3 h-3 text-amber-600"></i> 간병인 미배정
+                <i data-lucide="alert-circle" class="w-3 h-3 text-amber-600"></i> ${app.isPreRegistered ? '신청대기(미신청)' : '간병인 미배정'}
               </span>
             `}
           </div>
@@ -19218,7 +19307,11 @@ function renderUnifiedCareHub() {
             <span class="text-[11px] font-extrabold text-slate-700 flex items-center gap-1 mr-0.5">
               <i data-lucide="check-square" class="w-3.5 h-3.5 text-primary-600"></i> 주요체크:
             </span>
-            ${checklistBadgesHtml}
+            ${app.isPreRegistered ? `
+              <span class="px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                <i data-lucide="clock" class="w-3 h-3 text-amber-700"></i> 삼성화재 사전등록건 (신청대기)
+              </span>
+            ` : checklistBadgesHtml}
           </div>
           ${as && as.startDate ? `
             <span class="text-[10.5px] text-slate-500 font-mono hidden sm:inline-block">
@@ -19275,6 +19368,13 @@ function renderUnifiedCareHub() {
                   <button type="button" onclick="event.stopPropagation(); openHyundaiSmsInputModal('${app.id}')" class="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-700 text-white font-black text-[10px] shadow-2xs">
                     문자등록 ⚡
                   </button>
+                </div>
+              ` : ''}
+
+              ${app.isPreRegistered ? `
+                <div class="mt-1.5 p-1.5 rounded-lg bg-amber-50/90 border border-amber-300 text-amber-950 text-[10.5px] flex items-center justify-between shadow-2xs">
+                  <span class="flex items-center gap-1 font-extrabold"><i data-lucide="file-spreadsheet" class="w-3 h-3 text-amber-700"></i> 삼성화재 시트 사전등록</span>
+                  <span class="font-bold text-[10px] px-1.5 py-0.5 rounded bg-amber-600 text-white">신청대기</span>
                 </div>
               ` : ''}
             </div>
