@@ -453,7 +453,7 @@
     <div class="header">
       <h1>간병일지</h1>
       <div class="btn-group no-print">
-        <a href="https://careport.livon.care/careport/consult/${dailyLog.sessionId}" target="_blank" class="btn btn-download">전산 원본 확인</a>
+        <a href="https://careport.livon.care/#/careport/consult/${dailyLog.sessionId}" target="_blank" class="btn btn-download">전산 원본 확인</a>
         <button onclick="window.print()" class="btn btn-print">프린트 (1장 PDF 저장)</button>
       </div>
     </div>

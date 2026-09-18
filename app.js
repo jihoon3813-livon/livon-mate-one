@@ -23830,7 +23830,7 @@ function renderCareLogPatientCards(groups) {
                         <i data-lucide="file-text" class="w-3 h-3"></i>
                         <span>원문(PDF)</span>
                       </button>
-                      <button type="button" onclick="window.open('https://careport.livon.care/careport/consult/${sid}', '_blank')"
+                      <button type="button" onclick="window.open('https://careport.livon.care/#/careport/consult/${sid}', '_blank')"
                         class="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
                         title="새 창에서 CarePort 원본 열기">
                         <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
@@ -23933,7 +23933,7 @@ function renderCareLogFlatTable(filtered) {
         </td>
         <!-- 관리 -->
         <td class="p-2.5 text-center">
-          <button type="button" onclick="window.open('https://careport.livon.care/careport/consult/${sid || 0}', '_blank')"
+          <button type="button" onclick="window.open('https://careport.livon.care/#/careport/consult/${sid || 0}', '_blank')"
             class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer inline-flex items-center"
             title="CarePort 원본 새창 바로가기">
             <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
@@ -24055,7 +24055,7 @@ function switchCarePortModalView(mode) {
 
 function openCarePortInNewTab() {
   if (gCurrentCarePortSessionId) {
-    window.open(`https://careport.livon.care/careport/consult/${gCurrentCarePortSessionId}`, '_blank');
+    window.open(`https://careport.livon.care/#/careport/consult/${gCurrentCarePortSessionId}`, '_blank');
   }
 }
 
