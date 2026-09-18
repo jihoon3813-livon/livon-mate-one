@@ -3150,7 +3150,7 @@ async function applyTabDateRange(forceSync = false) {
   try {
     let synced = false;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
     try {
       const res = await fetch(`/api/samsung/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`, {
         signal: controller.signal
@@ -3163,15 +3163,11 @@ async function applyTabDateRange(forceSync = false) {
           if (json.success && json.data) {
             gSamsungReportData = json.data;
             if (Array.isArray(json.data.callLogs)) {
-              const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
-              json.data.callLogs.forEach(item => {
-                const key = `${item.callTime}_${item.phone || item.rawPhone}`;
-                if (!existingKeys.has(key)) {
-                  gSamsungMasterLogs.push(item);
-                  existingKeys.add(key);
-                }
-              });
+              gSamsungMasterLogs = [...json.data.callLogs];
             }
+            try {
+              sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(json.data));
+            } catch (e) {}
             synced = true;
           }
         }

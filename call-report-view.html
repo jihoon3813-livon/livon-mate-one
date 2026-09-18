@@ -1848,7 +1848,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       try {
         let synced = false;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
         try {
           const res = await fetch(`/api/samsung/call-report/sync-cti?start=${gFilter.startDate}&end=${gFilter.endDate}&channel=${encodeURIComponent(ch)}`, {
             signal: controller.signal
