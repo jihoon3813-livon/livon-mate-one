@@ -429,8 +429,6 @@ async function initSamsungCallReportModule(resetFilter = true) {
     `/${primaryFileName}?t=${Date.now()}`,
     `./${primaryFileName}?t=${Date.now()}`,
     `${primaryFileName}?t=${Date.now()}`,
-    `/call_report_all.json?t=${Date.now()}`,
-    `./call_report_all.json?t=${Date.now()}`,
     `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
   ];
 
@@ -468,24 +466,6 @@ async function initSamsungCallReportModule(resetFilter = true) {
               }
             });
           }
-
-          // 백그라운드에서 전체 채널 마스터 로그(370건 전수) 보강 로드 (채널 전환 즉시 지원)
-          fetch(`/call_report_all.json?t=${Date.now()}`)
-            .then(r => r.json())
-            .then(allData => {
-              const allLogs = (allData && allData.callLogs) || (allData && allData.data && allData.data.callLogs);
-              if (Array.isArray(allLogs) && allLogs.length > 0) {
-                const existingKeys = new Set(gSamsungMasterLogs.map(l => `${l.callTime}_${l.phone || l.rawPhone}`));
-                allLogs.forEach(item => {
-                  const key = `${item.callTime}_${item.phone || item.rawPhone}`;
-                  if (!existingKeys.has(key)) {
-                    gSamsungMasterLogs.push(item);
-                    existingKeys.add(key);
-                  }
-                });
-              }
-            })
-            .catch(() => {});
 
           try {
             sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(finalData));
@@ -1070,22 +1050,21 @@ function calculateReportStats() {
     (!startNorm || normDate(rInfo.startDate) === startNorm) &&
     (!endNorm || normDate(rInfo.endDate) === endNorm);
 
-  // 1. 해당 기간의 총 인입콜 건수 (CTI 전체콜 기준: 총인입 = CTI 전체 인입콜)
-  let totalCalls = 0;
-  if (isCtiRangeMatch && cs && (cs.totalInbound !== undefined || cs.totalAll !== undefined)) {
-    totalCalls = cs.totalInbound !== undefined ? cs.totalInbound : cs.totalAll;
-  } else if (allLogs.length > 0) {
-    // 날짜/채널 필터링 적용 시: 마스터 로그에서 해당 조건의 전체 인입콜 수 정확 반영
-    totalCalls = allLogs.length;
-  } else if (gSamsungReportData && Array.isArray(gSamsungReportData.dailyTrends)) {
-    const periodTrends = gSamsungReportData.dailyTrends.filter(t => {
-      const td = normDate(t.date);
-      return (!startNorm || td >= startNorm) && (!endNorm || td <= endNorm);
-    });
-    const trendsSum = periodTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
-    totalCalls = trendsSum > 0 ? trendsSum : logs.length;
-  } else {
-    totalCalls = (cs && (cs.totalInbound || cs.totalAll)) || logs.length;
+  // 1. 해당 기간의 총 인입콜 건수 (동적으로 필터링된 전체콜을 1순위로 정확히 반영)
+  let totalCalls = allLogs.length;
+  if (totalCalls === 0) {
+    if (isCtiRangeMatch && cs && (cs.totalInbound !== undefined || cs.totalAll !== undefined)) {
+      totalCalls = cs.totalInbound !== undefined ? cs.totalInbound : cs.totalAll;
+    } else if (gSamsungReportData && Array.isArray(gSamsungReportData.dailyTrends)) {
+      const periodTrends = gSamsungReportData.dailyTrends.filter(t => {
+        const td = normDate(t.date);
+        return (!startNorm || td >= startNorm) && (!endNorm || td <= endNorm);
+      });
+      const trendsSum = periodTrends.reduce((sum, t) => sum + (t.callCount || 0), 0);
+      totalCalls = trendsSum > 0 ? trendsSum : logs.length;
+    } else {
+      totalCalls = (cs && (cs.totalInbound || cs.totalAll)) || logs.length;
+    }
   }
   totalCalls = Math.max(totalCalls, logs.length);
 

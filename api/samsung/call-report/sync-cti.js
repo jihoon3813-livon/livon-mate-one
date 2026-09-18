@@ -105,18 +105,48 @@ module.exports = async function handler(req, res) {
       // 최신순 정렬
       mergedLogs.sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
 
+      // 요청된 기간 및 채널에 맞춰 엄격 필터링
+      const normDate = d => (d || '').slice(0, 10).replace(/[./]/g, '-');
+      const sNorm = normDate(startDate);
+      const eNorm = normDate(endDate);
+
+      const filteredLogs = mergedLogs.filter(l => {
+        const d = normDate(l.callTime || l.date || l.startedAt);
+        if (sNorm && d < sNorm) return false;
+        if (eNorm && d > eNorm) return false;
+        if (channel && channel !== '전체' && channel !== 'all') {
+          const lCh = (l.channel || '').trim();
+          if (channel.includes('삼성') && !lCh.includes('삼성')) return false;
+          if (channel.includes('현대') && !lCh.includes('현대')) return false;
+          if (channel.includes('리본') && !lCh.includes('리본')) return false;
+        }
+        return true;
+      });
+
       // 번호 재부여
-      mergedLogs.forEach((l, idx) => {
+      filteredLogs.forEach((l, idx) => {
         l.rowNum = idx + 1;
       });
+
+      const totalFiltered = filteredLogs.length;
+      const connFiltered = filteredLogs.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y').length;
+      const ansFiltered = filteredLogs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length;
+      const ansRate = connFiltered > 0 ? Math.round((ansFiltered / connFiltered) * 100) + '%' : '100%';
 
       ctiResult = {
         startDate,
         endDate,
         targetChannel: channel,
-        totalCalls: mergedLogs.length,
-        ctiSummary: activeCtiSummary,
-        logs: mergedLogs
+        totalCalls: totalFiltered,
+        ctiSummary: {
+          ...activeCtiSummary,
+          totalAll: totalFiltered,
+          totalInbound: totalFiltered,
+          connectRequests: connFiltered,
+          answeredCalls: ansFiltered,
+          answerRate: ansRate
+        },
+        logs: filteredLogs
       };
     } else {
       // 단기 범위(14일 이내)이거나 baseline 데이터가 없는 경우 직접 전수 수집
@@ -226,7 +256,7 @@ module.exports = async function handler(req, res) {
     allMasterLogs.sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
     allMasterLogs.forEach((l, idx) => { l.rowNum = idx + 1; });
 
-    reportData.callLogs = allMasterLogs.filter(c => c.connectReq === 'Y');
+    reportData.callLogs = allMasterLogs;
 
     // 로컬 파일시스템에 저장 가능한 환경이면 파일도 즉시 최신화
     try {

@@ -749,9 +749,35 @@ function saveSavedFaxConfig(cfg) {
         }
 
         const dataFile = getCallReportFilePath(channel);
-        fs.writeFileSync(dataFile, JSON.stringify(reportData, null, 2), 'utf-8');
+        let existingMasterLogs = [];
+        try {
+          if (fs.existsSync(dataFile)) {
+            const old = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
+            if (old && Array.isArray(old.callLogs)) existingMasterLogs = old.callLogs;
+          }
+        } catch (e) {}
+
+        const masterMap = new Map();
+        existingMasterLogs.forEach(l => {
+          const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+          masterMap.set(key, l);
+        });
+        (ctiResult.logs || []).forEach(l => {
+          const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+          masterMap.set(key, l);
+        });
+        const allMasterLogs = Array.from(masterMap.values());
+        allMasterLogs.sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
+        allMasterLogs.forEach((l, idx) => { l.rowNum = idx + 1; });
+
+        const fileData = {
+          ...reportData,
+          callLogs: allMasterLogs
+        };
+
+        fs.writeFileSync(dataFile, JSON.stringify(fileData, null, 2), 'utf-8');
         if (channel === '삼성화재') {
-          fs.writeFileSync(path.join(BASE_DIR, 'samsung_call_report.json'), JSON.stringify(reportData, null, 2), 'utf-8');
+          fs.writeFileSync(path.join(BASE_DIR, 'samsung_call_report.json'), JSON.stringify(fileData, null, 2), 'utf-8');
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
