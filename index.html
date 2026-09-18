@@ -40,9 +40,10 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="./exceljs.min.js"></script>
   <script src="./html2pdf.bundle.min.js"></script>
+  <script src="./pdf-lib.min.js"></script>
   <script>
-    if (typeof html2pdf === 'undefined') {
-      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>');
+    if (typeof PDFLib === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"><\/script>');
     }
   </script>
   <style>
@@ -2180,16 +2181,16 @@
               <div class="flex items-center justify-between pb-2.5 border-b border-slate-100 flex-wrap gap-2">
                 <div class="font-extrabold text-slate-800 text-sm flex items-center gap-2">
                   <i data-lucide="clipboard-check" class="w-4 h-4 text-sky-600"></i>
-                  <span>2. 간병일지 첨부 (케어포트 전산 연동 및 수기일지)</span>
+                  <span>2. 간병일지 첨부 (케어포트 전산 연동)</span>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
-                  <button type="button" onclick="openSamsungManualCareLogModal()" 
-                    class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-                    title="케어포트 외의 수기 일지나 외부 일지를 직접 시스템에 수동 등록합니다">
-                    <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> <span>+ 간병일지 수동 등록</span>
+                  <button type="button" onclick="previewSamsungMergedCareLogPdf()" 
+                    class="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                    title="선택된 모든 간병일지를 하나의 단일 PDF로 통합하여 미리 확인합니다">
+                    <i data-lucide="file-search" class="w-3.5 h-3.5"></i> <span>간병일지 통합 미리보기 (PDF)</span>
                   </button>
                   <button type="button" onclick="openImportCarePortLogModal()" 
-                    class="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                    class="px-3.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
                     title="케어포트 전산과 연동하여 대상자의 간병일지 PDF를 불러옵니다">
                     <i data-lucide="upload" class="w-3.5 h-3.5"></i> <span>케어포트 일지 불러오기 (PDF)</span>
                   </button>
@@ -2218,13 +2219,13 @@
                 </div>
               </div>
 
-              <!-- 탭 1: 미발송 일지 선택 목록 (간병 종료 고객 우선 정렬 & 케어포트 연동) -->
-              <div class="overflow-x-auto custom-scrollbar border rounded-xl max-h-64" id="samsungDailyCareLogSelectorContainer">
+              <!-- 탭 1: 미발송 일지 선택 목록 (전체 목록 한눈에 표시, 스크롤 제거) -->
+              <div class="overflow-x-auto custom-scrollbar border rounded-xl" id="samsungDailyCareLogSelectorContainer">
                 <!-- Dynamic patient care log selection table rendered by app.js -->
               </div>
 
-              <!-- 탭 2: 발송완료 일지 히스토리 관리 목록 -->
-              <div class="overflow-x-auto custom-scrollbar border rounded-xl max-h-64 hidden" id="samsungDailyCareLogHistoryContainer">
+              <!-- 탭 2: 발송완료 일지 히스토리 관리 목록 (전체 목록 한눈에 표시, 스크롤 제거) -->
+              <div class="overflow-x-auto custom-scrollbar border rounded-xl hidden" id="samsungDailyCareLogHistoryContainer">
                 <!-- Dynamic sent care logs history table rendered by app.js -->
               </div>
 
@@ -7422,11 +7423,15 @@
 
         <div>
           <label class="block font-bold text-slate-700 mb-1">케어포트 간병일지 파일 (PDF) *</label>
-          <div class="border-2 border-dashed border-purple-300 bg-purple-50/50 hover:bg-purple-50 p-4 rounded-2xl text-center cursor-pointer transition-all" onclick="document.getElementById('carePortPdfFileInput').click()">
-            <input type="file" id="carePortPdfFileInput" accept=".pdf" required onchange="onCarePortPdfFileSelected(event)" class="hidden">
+          <div class="border-2 border-dashed border-purple-300 bg-purple-50/50 hover:bg-purple-50 p-4 rounded-2xl text-center cursor-pointer transition-all" 
+               onclick="document.getElementById('carePortPdfFileInput').click()"
+               ondragover="event.preventDefault(); this.classList.add('border-purple-600', 'bg-purple-100/60')"
+               ondragleave="event.preventDefault(); this.classList.remove('border-purple-600', 'bg-purple-100/60')"
+               ondrop="handleCarePortPdfDrop(event, this)">
+            <input type="file" id="carePortPdfFileInput" accept=".pdf" multiple required onchange="onCarePortPdfFileSelected(event)" class="hidden">
             <i data-lucide="file-text" class="w-8 h-8 text-purple-600 mx-auto mb-1"></i>
-            <div class="font-bold text-purple-950 text-xs" id="carePortPdfUploadLabel">PDF 파일을 선택하거나 드래그하세요</div>
-            <p class="text-[11px] text-purple-600/70 mt-0.5" id="carePortPdfUploadSubLabel">.pdf 포맷 (케어포트 전산 출력 파일)</p>
+            <div class="font-bold text-purple-950 text-xs" id="carePortPdfUploadLabel">PDF 파일을 선택하거나 마우스로 드래그하세요</div>
+            <p class="text-[11px] text-purple-600/70 mt-0.5" id="carePortPdfUploadSubLabel">.pdf 포맷 (단일 또는 복수 파일 일괄 선택/드래그 지원)</p>
           </div>
         </div>
 
@@ -9031,7 +9036,66 @@
           닫기
         </button>
       </div>
+    </div>
+  </div>
 
+  <!-- ==================== MODAL: SAMSUNG MERGED CARE LOG PREVIEW ==================== -->
+  <div id="samsungMergedCareLogPreviewModal" class="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 hidden">
+    <div class="bg-white rounded-3xl w-full max-w-5xl h-[92vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
+      <!-- Modal Header -->
+      <div class="px-5 py-4 bg-gradient-to-r from-purple-800 via-indigo-900 to-slate-900 text-white flex items-center justify-between shrink-0 shadow-sm">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center border border-white/20">
+            <i data-lucide="file-check-2" class="w-5 h-5 text-purple-200"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-black tracking-tight" id="samsungMergedPreviewTitle">삼성화재 간병일지 통합 미리보기</h3>
+              <span id="samsungMergedPreviewBadge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/30">통합 PDF</span>
+            </div>
+            <p class="text-xs text-purple-200/80 mt-0.5" id="samsungMergedPreviewSubtitle">선택된 간병일지를 하나의 단일 PDF 파일로 결합한 미리보기입니다.</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="downloadSamsungMergedCareLogPdf()" 
+            class="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+            title="통합된 간병일지 PDF를 내 PC에 다운로드합니다">
+            <i data-lucide="download" class="w-4 h-4"></i> <span>다운로드</span>
+          </button>
+          <button type="button" onclick="openSamsungMergedCareLogPdfNewTab()" 
+            class="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-white/20"
+            title="새 탭에서 큰 화면으로 열어 확인하거나 인쇄합니다">
+            <i data-lucide="external-link" class="w-4 h-4"></i> <span>새 탭 열기</span>
+          </button>
+          <button type="button" onclick="closeModal('samsungMergedCareLogPreviewModal')" 
+            class="p-2 text-purple-200 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Preview Iframe & Loading Indicator -->
+      <div class="flex-1 w-full bg-slate-100 relative p-2 sm:p-3 overflow-hidden flex flex-col">
+        <div id="samsungMergedPreviewLoading" class="absolute inset-0 bg-slate-100/90 backdrop-blur-xs flex flex-col items-center justify-center z-10 hidden">
+          <i data-lucide="loader-2" class="w-8 h-8 text-purple-600 animate-spin mb-2"></i>
+          <p class="font-bold text-slate-700 text-sm">간병일지 PDF 통합 생성 중...</p>
+          <p class="text-xs text-slate-500 mt-1">여러 고객의 간병일지를 단일 PDF로 결합하고 있습니다.</p>
+        </div>
+        <iframe id="samsungMergedCareLogPreviewIframe" class="w-full h-full rounded-2xl border border-slate-300 shadow-inner bg-white" src="about:blank"></iframe>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-between shrink-0">
+        <div class="text-xs text-slate-600 flex items-center gap-3 flex-wrap font-medium">
+          <span id="samsungMergedPreviewMetaInfo">총 0명 / 0페이지</span>
+          <span class="text-slate-300">|</span>
+          <span class="text-[11px] text-slate-500">※ 이 통합 PDF 파일이 삼성화재 일일보고 메일 발송 시 단일 첨부파일로 전송됩니다.</span>
+        </div>
+        <button type="button" onclick="closeModal('samsungMergedCareLogPreviewModal')" 
+          class="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 text-xs transition-all cursor-pointer">
+          닫기
+        </button>
+      </div>
     </div>
   </div>
 
