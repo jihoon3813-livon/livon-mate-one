@@ -1854,14 +1854,12 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
             signal: controller.signal
           });
           clearTimeout(timeoutId);
-          if (res.ok) {
-            const cType = res.headers.get('content-type') || '';
-            if (cType.includes('json')) {
-              const json = await res.json();
-              if (json.success && json.data) {
-                gReportData = json.data;
-                synced = true;
-              }
+          const cType = res.headers.get('content-type') || '';
+          if (cType.includes('json') || res.ok) {
+            const json = await res.json();
+            if (json && json.success && json.data) {
+              gReportData = json.data;
+              synced = true;
             }
           }
         } catch (e) {

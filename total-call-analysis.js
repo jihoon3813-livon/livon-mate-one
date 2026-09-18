@@ -875,9 +875,10 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       try {
         const sRes = await fetch(sUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
-        if (sRes.ok) {
+        const cType = sRes.headers.get('content-type') || '';
+        if (cType.includes('json') || sRes.ok) {
           const sJson = await sRes.json();
-          if (sJson.success && sJson.data && sJson.data.callLogs && sJson.data.callLogs.length > 0) {
+          if (sJson && sJson.success && sJson.data && sJson.data.callLogs && sJson.data.callLogs.length > 0) {
             gTotalCallData = sJson.data;
             window.gTotalCallData = sJson.data;
             synced = true;

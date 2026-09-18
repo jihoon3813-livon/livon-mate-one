@@ -3156,20 +3156,18 @@ async function applyTabDateRange(forceSync = false) {
         signal: controller.signal
       });
       clearTimeout(timeoutId);
-      if (res.ok) {
-        const cType = res.headers.get('content-type') || '';
-        if (cType.includes('json')) {
-          const json = await res.json();
-          if (json.success && json.data) {
-            gSamsungReportData = json.data;
-            if (Array.isArray(json.data.callLogs)) {
-              gSamsungMasterLogs = [...json.data.callLogs];
-            }
-            try {
-              sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(json.data));
-            } catch (e) {}
-            synced = true;
+      const cType = res.headers.get('content-type') || '';
+      if (cType.includes('json') || res.ok) {
+        const json = await res.json();
+        if (json && json.success && json.data) {
+          gSamsungReportData = json.data;
+          if (Array.isArray(json.data.callLogs)) {
+            gSamsungMasterLogs = [...json.data.callLogs];
           }
+          try {
+            sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(json.data));
+          } catch (e) {}
+          synced = true;
         }
       }
     } catch (apiErr) {
