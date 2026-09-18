@@ -29525,15 +29525,25 @@ function openHubCustomerDetailModal(applyId) {
   const appList = (Array.isArray(gApps) && gApps.length > 0) ? gApps : ((window.REBORN_DATA && window.REBORN_DATA.applications) || []);
   let app = appList.find(checkAppMatch);
 
-  // 2. Check Samsung lists (gSamsungList, REBORN_DATA.samsungList, SAMSUNG_ELIGIBLE_LIST)
+  // 2. Check Samsung lists (gSamsungList, REBORN_DATA.samsungList, SAMSUNG_ELIGIBLE_LIST, gSamsungSheets)
   if (!app) {
     const sList = [
       ...(Array.isArray(window.gSamsungList) ? window.gSamsungList : []),
       ...((window.REBORN_DATA && Array.isArray(window.REBORN_DATA.samsungList)) ? window.REBORN_DATA.samsungList : []),
       ...(Array.isArray(window.SAMSUNG_ELIGIBLE_LIST) ? window.SAMSUNG_ELIGIBLE_LIST : [])
     ];
-    const foundS = sList.find(checkAppMatch);
+    let foundS = sList.find(checkAppMatch);
+    if (!foundS && window.gSamsungSheets) {
+      const sheets = window.gSamsungSheets;
+      const allS = [...(sheets.eligible || []), ...(sheets.target || []), ...(sheets.completed || [])];
+      foundS = allS.find(checkAppMatch);
+    }
     if (foundS) {
+      if (typeof openSamsungPreRegisteredModal === 'function') {
+        closeModal('hubCustomerDetailModal');
+        openSamsungPreRegisteredModal(foundS.id || foundS.patientId || targetStr, foundS.patientName || foundS.customerName, foundS);
+        return;
+      }
       app = {
         ...foundS,
         id: foundS.id || foundS.patientId || targetStr,
@@ -29542,24 +29552,6 @@ function openHubCustomerDetailModal(applyId) {
         phone: foundS.phone || foundS.applicantContact || (targetCleanPhone ? targetStr : ''),
         notes: foundS.notes || [],
         logs: foundS.logs || []
-      };
-    }
-  }
-
-  // 3. Check Samsung sheets (eligible, target, completed)
-  if (!app && window.gSamsungSheets) {
-    const sheets = window.gSamsungSheets;
-    const allS = [...(sheets.eligible || []), ...(sheets.target || []), ...(sheets.completed || [])];
-    const foundSh = allS.find(checkAppMatch);
-    if (foundSh) {
-      app = {
-        ...foundSh,
-        id: foundSh.id || foundSh.patientId || targetStr,
-        insuranceCompany: '삼성화재',
-        patientName: foundSh.patientName || foundSh.customerName || (targetCleanPhone ? '삼성고객' : targetStr),
-        phone: foundSh.phone || foundSh.applicantContact || (targetCleanPhone ? targetStr : ''),
-        notes: foundSh.notes || [],
-        logs: foundSh.logs || []
       };
     }
   }

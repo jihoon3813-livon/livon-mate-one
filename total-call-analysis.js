@@ -381,14 +381,17 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
         if (foundBySummaryPhone) {
           const sAppId = foundBySummaryPhone.id || foundBySummaryPhone.regNum || foundBySummaryPhone.applicantNo || foundBySummaryPhone.patientId || ('SF-' + summaryPhone);
           if (!foundBySummaryPhone.id) foundBySummaryPhone.id = sAppId;
+          const inHub = (window.gApps || []).some(a => String(a.id) === String(sAppId) || (a.phone && cleanPhoneDigits(a.phone) === summaryPhone));
           return {
             isRegistered: true,
             appId: sAppId,
             patientName: foundBySummaryPhone.patientName || foundBySummaryPhone.customerName || detectedName || '삼성고객',
             company: '삼성화재',
             isSamsung: true,
+            isInHub: inHub,
+            isPreRegistered: !inHub,
             rawApp: foundBySummaryPhone,
-            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+            badgeClass: inHub ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-amber-100 text-amber-900 border-amber-300'
           };
         }
       }
@@ -403,14 +406,17 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
         if (found) {
           const sAppId = found.id || found.regNum || found.applicantNo || found.patientId || (clean ? ('SF-' + clean) : ('SF-' + (found.patientName || detectedName || 'S')));
           if (!found.id) found.id = sAppId;
+          const inHub = (window.gApps || []).some(a => String(a.id) === String(sAppId) || (a.phone && cleanPhoneDigits(a.phone) === clean));
           return {
             isRegistered: true,
             appId: sAppId,
             patientName: found.patientName || found.customerName || detectedName || '삼성고객',
             company: '삼성화재',
             isSamsung: true,
+            isInHub: inHub,
+            isPreRegistered: !inHub,
             rawApp: found,
-            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+            badgeClass: inHub ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-amber-100 text-amber-900 border-amber-300'
           };
         }
       }
@@ -429,13 +435,17 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
           }
           const sAppId = foundByName.id || foundByName.regNum || foundByName.applicantNo || foundByName.patientId || (clean ? ('SF-' + clean) : ('SF-' + (foundByName.patientName || detectedName || 'S')));
           if (!foundByName.id) foundByName.id = sAppId;
+          const inHub = (window.gApps || []).some(a => String(a.id) === String(sAppId) || (a.patientName === detectedName));
           return {
             isRegistered: true,
             appId: sAppId,
             patientName: foundByName.patientName || foundByName.customerName || detectedName,
             company: '삼성화재',
             isSamsung: true,
+            isInHub: inHub,
+            isPreRegistered: !inHub,
             rawApp: foundByName,
+            badgeClass: inHub ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-amber-100 text-amber-900 border-amber-300'
           };
         }
       }
@@ -453,14 +463,17 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
         if (foundBySummaryPhone) {
           const sAppId = foundBySummaryPhone.id || foundBySummaryPhone.regNum || foundBySummaryPhone.applicantNo || foundBySummaryPhone.patientId || ('SF-' + summaryPhone);
           if (!foundBySummaryPhone.id) foundBySummaryPhone.id = sAppId;
+          const inHub = (window.gApps || []).some(a => String(a.id) === String(sAppId) || (a.phone && cleanPhoneDigits(a.phone) === summaryPhone));
           return {
             isRegistered: true,
             appId: sAppId,
             patientName: foundBySummaryPhone.patientName || foundBySummaryPhone.customerName || detectedName || '삼성고객',
             company: '삼성화재',
             isSamsung: true,
+            isInHub: inHub,
+            isPreRegistered: !inHub,
             rawApp: foundBySummaryPhone,
-            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+            badgeClass: inHub ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-amber-100 text-amber-900 border-amber-300'
           };
         }
       }
@@ -473,14 +486,17 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
         if (found) {
           const sAppId = found.id || found.regNum || found.applicantNo || found.patientId || (clean ? ('SF-' + clean) : ('SF-' + (found.patientName || detectedName || 'L')));
           if (!found.id) found.id = sAppId;
+          const inHub = (window.gApps || []).some(a => String(a.id) === String(sAppId) || (a.phone && cleanPhoneDigits(a.phone) === clean));
           return {
             isRegistered: true,
             appId: sAppId,
             patientName: found.patientName || found.customerName || detectedName || '삼성고객',
             company: '삼성화재',
             isSamsung: true,
+            isInHub: inHub,
+            isPreRegistered: !inHub,
             rawApp: found,
-            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+            badgeClass: inHub ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-amber-100 text-amber-900 border-amber-300'
           };
         }
       }
@@ -497,14 +513,17 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
           }
           const sAppId = foundByName.id || foundByName.regNum || foundByName.applicantNo || foundByName.patientId || (clean ? ('SF-' + clean) : ('SF-' + (foundByName.patientName || detectedName || 'L')));
           if (!foundByName.id) foundByName.id = sAppId;
+          const inHub = (window.gApps || []).some(a => String(a.id) === String(sAppId) || (a.patientName === detectedName));
           return {
             isRegistered: true,
             appId: sAppId,
             patientName: foundByName.patientName || foundByName.customerName || detectedName,
             company: '삼성화재',
             isSamsung: true,
+            isInHub: inHub,
+            isPreRegistered: !inHub,
             rawApp: foundByName,
-            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+            badgeClass: inHub ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-amber-100 text-amber-900 border-amber-300'
           };
         }
       }
@@ -518,14 +537,17 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
         if (found) {
           const sAppId = found.id || found.regNum || found.applicantNo || found.patientId || (clean ? ('SF-' + clean) : ('SF-' + (found.patientName || detectedName || 'E')));
           if (!found.id) found.id = sAppId;
+          const inHub = (window.gApps || []).some(a => String(a.id) === String(sAppId) || (a.phone && cleanPhoneDigits(a.phone) === clean));
           return {
             isRegistered: true,
             appId: sAppId,
             patientName: found.patientName || detectedName || '삼성고객',
             company: '삼성화재',
             isSamsung: true,
+            isInHub: inHub,
+            isPreRegistered: !inHub,
             rawApp: found,
-            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+            badgeClass: inHub ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-amber-100 text-amber-900 border-amber-300'
           };
         }
       }
@@ -534,14 +556,17 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
         if (foundByName) {
           const sAppId = foundByName.id || foundByName.regNum || foundByName.applicantNo || foundByName.patientId || (clean ? ('SF-' + clean) : ('SF-' + (foundByName.patientName || detectedName || 'E')));
           if (!foundByName.id) foundByName.id = sAppId;
+          const inHub = (window.gApps || []).some(a => String(a.id) === String(sAppId) || (a.patientName === detectedName));
           return {
             isRegistered: true,
             appId: sAppId,
             patientName: foundByName.patientName || detectedName,
             company: '삼성화재',
             isSamsung: true,
+            isInHub: inHub,
+            isPreRegistered: !inHub,
             rawApp: foundByName,
-            badgeClass: 'bg-blue-100 text-blue-900 border-blue-300'
+            badgeClass: inHub ? 'bg-blue-100 text-blue-900 border-blue-300' : 'bg-amber-100 text-amber-900 border-amber-300'
           };
         }
       }
@@ -567,6 +592,8 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
           patientName: found.patientName || detectedName || '현대고객',
           company: found.insuranceCompany || (isHyundai ? '현대해상' : '등록고객'),
           isHyundai: true,
+          isInHub: true,
+          isPreRegistered: false,
           rawApp: found,
           badgeClass: isHyundai ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-blue-100 text-blue-800 border-blue-300'
         };
@@ -582,6 +609,8 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
           patientName: foundByName.patientName || detectedName,
           company: foundByName.insuranceCompany || (isHyundai ? '현대해상' : '등록고객'),
           isHyundai: true,
+          isInHub: true,
+          isPreRegistered: false,
           rawApp: foundByName,
           badgeClass: isHyundai ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-blue-100 text-blue-800 border-blue-300'
         };
@@ -1876,9 +1905,9 @@ function renderTotalListView(logs) {
                     </div>
                     <div class="mt-1 flex items-center gap-1">
                       ${match.isRegistered ? `
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${match.badgeClass} inline-flex items-center gap-0.5 whitespace-nowrap" title="${match.company} 등록고객 (${match.appId || ''})">
-                          <i data-lucide="check" class="w-2.5 h-2.5 shrink-0"></i>
-                          <span>${match.company || '등록고객'}</span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${match.badgeClass} inline-flex items-center gap-0.5 whitespace-nowrap" title="${match.company} ${match.isInHub ? '정식등록고객' : '사전명단(신청대기)'} (${match.appId || ''})">
+                          <i data-lucide="${match.isInHub ? 'check' : 'clock'}" class="w-2.5 h-2.5 shrink-0"></i>
+                          <span>${match.company}${match.isInHub ? '' : ' 사전명단'}</span>
                         </span>
                       ` : `
                         <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200 whitespace-nowrap">
@@ -1998,10 +2027,17 @@ function renderTotalListView(logs) {
                       </button>
 
                       ${match.isRegistered && match.appId ? `
-                        <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
-                          class="p-1.5 rounded-xl bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 transition-all cursor-pointer shadow-2xs border border-blue-200" title="고객 상세업무 원스탑 대시보드">
-                          <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-                        </button>
+                        ${match.isInHub ? `
+                          <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
+                            class="p-1.5 rounded-xl bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 transition-all cursor-pointer shadow-2xs border border-blue-200" title="통합허브 고객 상세업무 원스탑 대시보드">
+                            <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                          </button>
+                        ` : `
+                          <button type="button" onclick="openSamsungPreRegisteredModal('${match.appId}', '${match.patientName || ''}')" 
+                            class="p-1.5 rounded-xl bg-amber-50 hover:bg-amber-600 hover:text-white text-amber-700 transition-all cursor-pointer shadow-2xs border border-amber-300" title="삼성화재 사전명단 상세 (신청대기)">
+                            <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+                          </button>
+                        `}
                       ` : ''}
                     </div>
                   </td>
@@ -2112,6 +2148,420 @@ if (!window._callTooltipScrollBound) {
 }
 
 /**
+ * =============================================================================
+ * 삼성화재 가입자 사전등록 명단(신청대기) 전용 상세 모달
+ * - 통합허브 정식 등록건과 혼동되지 않도록 명확한 구분 안내 및 UI 제공
+ * - 엑셀 원장 12대 항목(증권번호, 상품명, 담보내용, 일당한도, 담당손사 등) 표시
+ * - 해당 고객의 CTI 통화 인입 이력 실시간 연동 표시
+ * - [간병신청서 정식 접수 등록 ⚡] 원클릭 데이터 사전 입력 전환 지원
+ * =============================================================================
+ */
+window.openSamsungPreRegisteredModal = function(appId, customerName, rawAppOpt) {
+  let modal = document.getElementById('samsungPreRegisteredModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'samsungPreRegisteredModal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs hidden';
+    document.body.appendChild(modal);
+  }
+
+  // 1. 고객 리드 데이터 탐색
+  let lead = rawAppOpt || null;
+  const targetId = String(appId || '').trim();
+  const cleanDigits = targetId.replace(/[^0-9]/g, '');
+
+  if (!lead) {
+    const allSamsungSources = [
+      ...(Array.isArray(window.gSamsungList) ? window.gSamsungList : []),
+      ...((window.REBORN_DATA && Array.isArray(window.REBORN_DATA.samsungList)) ? window.REBORN_DATA.samsungList : []),
+      ...(Array.isArray(window.SAMSUNG_ELIGIBLE_LIST) ? window.SAMSUNG_ELIGIBLE_LIST : []),
+      ...(window.gSamsungSheets ? [
+        ...(window.gSamsungSheets.eligible || []),
+        ...(window.gSamsungSheets.target || []),
+        ...(window.gSamsungSheets.completed || [])
+      ] : [])
+    ];
+
+    lead = allSamsungSources.find(l => {
+      if (!l) return false;
+      const lId = String(l.id || l.patientId || l.regNum || l.applicantNo || '');
+      if (lId && (lId === targetId || ('SF-' + lId) === targetId || targetId === ('SF-' + lId))) return true;
+      if (l.accidentNumber && String(l.accidentNumber) === targetId) return true;
+      if (l.policyNumber && String(l.policyNumber) === targetId) return true;
+      return false;
+    });
+
+    if (!lead && cleanDigits && cleanDigits.length >= 8) {
+      lead = allSamsungSources.find(l => {
+        const p1 = cleanPhoneDigits(l.phone || l.applicantContact || l.contact);
+        const p2 = cleanPhoneDigits(l.patientPhone || l.guardianPhone || l.customerPhone);
+        return p1 === cleanDigits || p2 === cleanDigits;
+      });
+    }
+
+    if (!lead && customerName) {
+      const cName = String(customerName).trim();
+      lead = allSamsungSources.find(l => (l.patientName === cName || l.customerName === cName));
+    }
+  }
+
+  // 기본 객체 보정 (누락 항목 방지)
+  if (!lead) {
+    lead = {
+      id: appId || 'SF-UNKNOWN',
+      patientName: customerName || '삼성화재 고객',
+      phone: cleanDigits.length >= 9 ? cleanDigits : '',
+      productName: '삼성화재 간병인지원 담보 가입자',
+      accidentNumber: '-',
+      policyNumber: '-',
+      contractStartDate: '-',
+      contractEndDate: '-',
+      hasInjuryCare: '가입',
+      hasDiseaseCare: '가입',
+      maxDailyLimit: 144000,
+      maxDays: 180,
+      adjusterName: '미지정',
+      adjusterPhone: '-',
+      adjusterFax: '-'
+    };
+  }
+
+  const patientName = lead.patientName || lead.customerName || customerName || '삼성고객';
+  const phone = lead.phone || lead.applicantContact || lead.contact || lead.patientPhone || '';
+  const cleanPhone = cleanPhoneDigits(phone);
+  const birthDate = lead.birthDate ? (typeof formatSamsungDate === 'function' ? formatSamsungDate(String(lead.birthDate)) : String(lead.birthDate)) : '-';
+  const gender = lead.gender || '-';
+  const policyNumber = lead.policyNumber || '-';
+  const productName = lead.productName || '삼성화재 간병지원 담보상품';
+  const contractPeriod = (lead.contractStartDate && lead.contractEndDate) 
+    ? `${(typeof formatSamsungDate === 'function' ? formatSamsungDate(lead.contractStartDate) : lead.contractStartDate)} ~ ${(typeof formatSamsungDate === 'function' ? formatSamsungDate(lead.contractEndDate) : lead.contractEndDate)}`
+    : (lead.contractPeriod || '-');
+  const injuryCare = (lead.hasInjuryCare === 'Y' || lead.hasInjuryCare === '가입') ? '가입' : '미가입';
+  const diseaseCare = (lead.hasDiseaseCare === 'Y' || lead.hasDiseaseCare === '가입') ? '가입' : '미가입';
+  const accidentNumber = lead.accidentNumber || '-';
+  const adjusterName = lead.adjusterName || '-';
+  const adjusterPhone = lead.adjusterPhone || '-';
+  const adjusterFax = lead.adjusterFax || '-';
+  const maxDailyLimit = lead.maxDailyLimit ? Number(lead.maxDailyLimit).toLocaleString() + '원' : '144,000원';
+  const maxDays = lead.maxDays ? lead.maxDays + '일' : '180일';
+  const sourceOrigin = lead.sourceOrigin || lead.source || '삼성화재 구글 드라이브 최신 가입명단';
+
+  // 2. 해당 고객의 CTI 통화 이력 매칭
+  const logs = (gTotalCallData && gTotalCallData.callLogs) || [];
+  const matchedCalls = logs.filter(c => {
+    const cPhone = cleanPhoneDigits(c.phone || c.rawPhone);
+    if (cleanPhone && cPhone === cleanPhone) return true;
+    if (patientName && (c.patientName === patientName || c.memberName === patientName || (c.title && c.title.includes(patientName)))) return true;
+    return false;
+  });
+
+  // 간병 접수 전환을 위해 전역 활성 리드에 저장
+  window._activeSamsungLead = lead;
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-3xl border-2 border-amber-500/40 shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150">
+      
+      <!-- 1. 모달 상단 헤더 (삼성화재 블루 & 앰버 조합) -->
+      <div class="px-6 py-4.5 bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white flex items-center justify-between border-b border-amber-500/30">
+        <div class="flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-400 shadow-inner shrink-0">
+            <i data-lucide="file-spreadsheet" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-400 text-slate-950 border border-amber-300 shadow-xs flex items-center gap-1">
+                <i data-lucide="clock" class="w-3 h-3"></i>
+                <span>삼성화재 사전명단 (신청대기)</span>
+              </span>
+              <span class="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-500/25 text-blue-200 border border-blue-400/40 font-mono">
+                원장 ID: ${lead.id || lead.patientId || appId}
+              </span>
+            </div>
+            <h3 class="text-lg font-black text-white mt-1 flex items-center gap-2">
+              <span>${safeMaskName(patientName)} 고객님 계약 원장</span>
+              <span class="text-xs font-normal text-slate-300 font-mono">(${formatPhoneDisplay(phone) || '연락처 없음'})</span>
+            </h3>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="handleRegisterFromSamsungModal()" 
+            class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs shadow-md shadow-blue-500/30 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95">
+            <i data-lucide="user-plus" class="w-4 h-4 text-amber-300"></i>
+            <span>간병신청서 정식 접수 등록 ⚡</span>
+          </button>
+          <button type="button" onclick="closeSamsungPreRegisteredModal()" class="text-slate-400 hover:text-white cursor-pointer p-1.5 rounded-xl hover:bg-white/10 transition-colors">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. 모달 본문 영역 -->
+      <div class="p-6 overflow-y-auto space-y-5 custom-scrollbar bg-slate-50/60 flex-1">
+        
+        <!-- 신청대기 상태 핵심 안내 배너 (통합허브 오인 방지 알림) -->
+        <div class="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300/90 text-amber-950 flex items-start gap-3.5 shadow-xs">
+          <div class="p-2 rounded-xl bg-amber-500 text-white shrink-0 mt-0.5 shadow-xs">
+            <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+          </div>
+          <div class="text-xs space-y-1">
+            <div class="font-black text-[13px] text-amber-950 flex items-center gap-2">
+              <span>통합허브 미등록 · 삼성화재 구글 드라이브 사전명단 대상건입니다</span>
+              <span class="px-2 py-0.2 rounded bg-amber-200 text-amber-900 text-[10.5px] font-black border border-amber-300">신청대기</span>
+            </div>
+            <p class="text-amber-900/90 leading-relaxed font-medium">
+              본 고객은 삼성화재 구글 드라이브 가입자 사전명단(지원대상)에 등재되어 있으나, <b>통합허브 정식 간병 신청서가 아직 접수되지 않은 상태</b>입니다.<br/>
+              간병인 배정, 캘린더 일정표, 실시간 청구·정산 업무를 수행하시려면 상단 또는 하단의 <b>[간병신청서 정식 접수 등록 ⚡]</b>을 클릭하여 정식 신청서로 등록해 주시기 바랍니다. (엑셀 원장 12개 항목이 자동 입력됩니다)
+            </p>
+          </div>
+        </div>
+
+        <!-- 계약 원장 정보 & 보상 담당자 정보 2-Column 그리드 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          
+          <!-- 좌측: 계약 및 보장 상세 내역 -->
+          <div class="p-4.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3.5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+                  <i data-lucide="shield-check" class="w-4 h-4"></i>
+                </div>
+                <h4 class="font-black text-sm text-slate-800">삼성화재 가입 계약 및 보장 내역</h4>
+              </div>
+              <span class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
+                원장 정보
+              </span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+              <div>
+                <span class="text-slate-400 font-medium block text-[11px]">피보험자(고객)명</span>
+                <span class="font-black text-slate-900 text-sm">${safeMaskName(patientName)}</span>
+              </div>
+              <div>
+                <span class="text-slate-400 font-medium block text-[11px]">생년월일 / 성별</span>
+                <span class="font-bold text-slate-700 font-mono">${birthDate} (${gender})</span>
+              </div>
+              <div>
+                <span class="text-slate-400 font-medium block text-[11px]">등록 연락처</span>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <span class="font-bold text-slate-800 font-mono">${formatPhoneDisplay(phone) || '-'}</span>
+                  ${phone ? `
+                    <button type="button" onclick="triggerCtiCall('${phone}', '${patientName}', '고객', '${lead.id || ''}', '삼성화재')" 
+                      class="px-1.5 py-0.5 rounded bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 text-[10px] font-bold flex items-center gap-0.5 cursor-pointer" title="CTI 통화 발신">
+                      <i data-lucide="phone-call" class="w-2.5 h-2.5"></i>
+                      <span>통화</span>
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+              <div>
+                <span class="text-slate-400 font-medium block text-[11px]">증권번호</span>
+                <span class="font-bold text-slate-700 font-mono text-[11px] truncate block" title="${policyNumber}">${policyNumber}</span>
+              </div>
+              <div class="col-span-2">
+                <span class="text-slate-400 font-medium block text-[11px]">가입 상품명</span>
+                <span class="font-bold text-slate-800 leading-snug block">${productName}</span>
+              </div>
+              <div class="col-span-2">
+                <span class="text-slate-400 font-medium block text-[11px]">보험 보장기간</span>
+                <span class="font-bold text-slate-700 font-mono text-[11.5px]">${contractPeriod}</span>
+              </div>
+              <div>
+                <span class="text-slate-400 font-medium block text-[11px]">담보 가입 여부</span>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <span class="px-1.5 py-0.5 rounded text-[10.5px] font-bold ${injuryCare === '가입' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500'}">
+                    상해: ${injuryCare}
+                  </span>
+                  <span class="px-1.5 py-0.5 rounded text-[10.5px] font-bold ${diseaseCare === '가입' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500'}">
+                    질병: ${diseaseCare}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <span class="text-slate-400 font-medium block text-[11px]">간병비 지원 한도</span>
+                <span class="font-bold text-blue-700 font-mono">1일 ${maxDailyLimit} / 최대 ${maxDays}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 우측: 사고번호 및 손해사정 조사원 정보 -->
+          <div class="p-4.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3.5 flex flex-col justify-between">
+            <div class="space-y-3.5">
+              <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div class="flex items-center gap-2">
+                  <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+                    <i data-lucide="briefcase" class="w-4 h-4"></i>
+                  </div>
+                  <h4 class="font-black text-sm text-slate-800">삼성화재 보상 담당 손사(조사원) 정보</h4>
+                </div>
+                <span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[11px] font-bold border border-indigo-200">
+                  사고관리
+                </span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                <div>
+                  <span class="text-slate-400 font-medium block text-[11px]">삼성 접수 사고번호</span>
+                  <span class="font-black text-slate-900 font-mono text-sm">${accidentNumber}</span>
+                </div>
+                <div>
+                  <span class="text-slate-400 font-medium block text-[11px]">담당 손사(조사원)</span>
+                  <span class="font-black text-slate-900">${adjusterName}</span>
+                </div>
+                <div>
+                  <span class="text-slate-400 font-medium block text-[11px]">직통 연락처</span>
+                  <div class="flex items-center gap-1.5 mt-0.5">
+                    <span class="font-bold text-slate-800 font-mono">${adjusterPhone}</span>
+                    ${adjusterPhone && adjusterPhone !== '-' ? `
+                      <button type="button" onclick="triggerCtiCall('${adjusterPhone}', '${adjusterName}', '손해사정사', '${lead.id || ''}', '삼성화재')" 
+                        class="px-1.5 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-bold flex items-center gap-0.5 cursor-pointer" title="손사 통화 발신">
+                        <i data-lucide="phone-outgoing" class="w-2.5 h-2.5"></i>
+                        <span>발신</span>
+                      </button>
+                    ` : ''}
+                  </div>
+                </div>
+                <div>
+                  <span class="text-slate-400 font-medium block text-[11px]">담당부서 팩스(FAX)</span>
+                  <span class="font-bold text-slate-700 font-mono">${adjusterFax}</span>
+                </div>
+                <div class="col-span-2">
+                  <span class="text-slate-400 font-medium block text-[11px]">명단 동기화 원본 출처</span>
+                  <span class="text-[11px] text-slate-500 font-mono break-all truncate block" title="${sourceOrigin}">${sourceOrigin}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2">
+              <div class="text-[11px] text-slate-500 font-medium">
+                <span>정식 접수 시 손사 담당자 번호 및 팩스가 신청서에 자동 연동됩니다.</span>
+              </div>
+              <button type="button" onclick="handleRegisterFromSamsungModal()" 
+                class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-xs cursor-pointer shrink-0">
+                접수 폼 이동
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 3. 해당 고객의 CTI 종합콜 통화 인입 이력 목록 -->
+        <div class="p-4.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-cyan-50 text-cyan-700 flex items-center justify-center font-bold">
+                <i data-lucide="history" class="w-4 h-4"></i>
+              </div>
+              <h4 class="font-black text-sm text-slate-800">해당 고객 종합콜 통화 상담 내역 (${matchedCalls.length}건)</h4>
+            </div>
+            <span class="text-xs text-slate-400 font-mono">인입 전화번호 기준 실시간 연동</span>
+          </div>
+
+          ${matchedCalls.length > 0 ? `
+            <div class="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+              ${matchedCalls.map(c => {
+                const cId = getCallUniqueId(c);
+                const cCat = classifyConsultation(c);
+                const cMemo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[cId]) || '';
+                return `
+                  <div class="p-3 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-white hover:border-cyan-300 transition-all space-y-1.5 text-xs">
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                      <div class="flex items-center gap-2">
+                        <span class="font-mono text-slate-500 font-bold">${c.callTime || '-'}</span>
+                        <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">${c.channel || '삼성화재'}</span>
+                        <span class="px-2 py-0.2 rounded-md text-[10px] font-black border ${cCat.badgeClass}">${cCat.name}</span>
+                        <span class="text-slate-500 text-[11px]">통화: <b>${c.duration || 0}초</b> (대기: ${c.waitTime !== undefined ? c.waitTime : 0}초)</span>
+                      </div>
+                      <button type="button" onclick="openTotalCallSummaryModal('${cId}')" 
+                        class="px-2 py-0.5 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[10.5px] cursor-pointer">
+                        상담 전체보기
+                      </button>
+                    </div>
+                    <div class="text-slate-700 font-medium line-clamp-2 leading-relaxed">
+                      ${c.summary || c.title || '상담 요약 내용 없음'}
+                    </div>
+                    ${cMemo ? `
+                      <div class="text-[11px] text-cyan-800 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200 inline-flex items-center gap-1">
+                        <i data-lucide="edit-3" class="w-3 h-3 text-cyan-600"></i>
+                        <span>${cMemo}</span>
+                      </div>
+                    ` : ''}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          ` : `
+            <div class="py-7 text-center text-slate-400 text-xs">
+              <i data-lucide="phone-off" class="w-7 h-7 mx-auto mb-1.5 opacity-40"></i>
+              <span>조회된 CTI 통화 인입 이력이 없습니다.</span>
+            </div>
+          `}
+        </div>
+
+      </div>
+
+      <!-- 4. 모달 하단 푸터 액션바 -->
+      <div class="p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-2">
+          ${phone ? `
+            <button type="button" onclick="triggerCtiCall('${phone}', '${patientName}', '고객', '${lead.id || ''}', '삼성화재')" 
+              class="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-cyan-600/20 cursor-pointer">
+              <i data-lucide="phone-outgoing" class="w-4 h-4"></i>
+              <span>고객에게 CTI 전화걸기</span>
+            </button>
+          ` : ''}
+          <span class="text-xs text-slate-500 font-medium hidden sm:inline">
+            사전명단 상태에서는 통합허브 배정 및 캘린더가 지원되지 않습니다.
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="handleRegisterFromSamsungModal()" 
+            class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs shadow-lg shadow-blue-600/25 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-transform">
+            <i data-lucide="zap" class="w-4 h-4 text-amber-300"></i>
+            <span>간병신청서 정식 접수 등록</span>
+          </button>
+          <button type="button" onclick="closeSamsungPreRegisteredModal()" 
+            class="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-200 font-bold text-slate-700 text-xs border border-slate-300 cursor-pointer">
+            닫기
+          </button>
+        </div>
+      </div>
+
+    </div>
+  `;
+
+  modal.classList.remove('hidden');
+  initTotalIcons(modal);
+};
+
+window.closeSamsungPreRegisteredModal = function() {
+  const modal = document.getElementById('samsungPreRegisteredModal');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.handleRegisterFromSamsungModal = function() {
+  const lead = window._activeSamsungLead;
+  closeSamsungPreRegisteredModal();
+
+  if (typeof openNewAppModal === 'function') {
+    openNewAppModal();
+  } else {
+    alert('신청서 작성 모달을 열 수 없습니다.');
+    return;
+  }
+
+  if (lead && typeof populateSamsungLeadDataToForm === 'function') {
+    setTimeout(() => {
+      populateSamsungLeadDataToForm(lead);
+      if (typeof showToast === 'function') {
+        showToast(`[${lead.patientName || '삼성고객'}] 고객님의 사전명단 12개 항목이 자동 입력되었습니다.`, 'success');
+      }
+    }, 150);
+  }
+};
+
+/**
  * 상담 상세 요약 및 통화 관리 모달
  */
 function openTotalCallSummaryModal(callId) {
@@ -2184,11 +2634,11 @@ function openTotalCallSummaryModal(callId) {
                 <span>${safeMaskName(match.patientName)}</span>
                 <span class="font-mono text-slate-500 text-[11px] font-normal">${formattedPhone}</span>
                 <span class="px-2 py-0.2 rounded-full text-[9.5px] font-black border ${match.badgeClass}">
-                  ${match.company}
+                  ${match.company}${match.isInHub ? '' : ' 사전명단'}
                 </span>
               </div>
               <div class="text-[11px] text-slate-400 font-mono mt-0.5">
-                ${match.isRegistered && match.appId ? `신청번호: ${match.appId}` : '메이트원 미등록 인입'}
+                ${match.isRegistered && match.appId ? (match.isInHub ? `신청번호: ${match.appId}` : `삼성사전명단: ${match.appId} (신청대기)`) : '메이트원 미등록 인입'}
               </div>
             </div>
           </div>
@@ -2200,11 +2650,19 @@ function openTotalCallSummaryModal(callId) {
               <span>CTI 전화걸기</span>
             </button>
             ${match.isRegistered && match.appId ? `
-              <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
-                class="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black text-xs border border-indigo-200 flex items-center gap-1 cursor-pointer">
-                <i data-lucide="layers" class="w-4 h-4"></i>
-                <span>고객업무 대시보드</span>
-              </button>
+              ${match.isInHub ? `
+                <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
+                  class="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black text-xs border border-indigo-200 flex items-center gap-1 cursor-pointer">
+                  <i data-lucide="layers" class="w-4 h-4"></i>
+                  <span>고객업무 대시보드</span>
+                </button>
+              ` : `
+                <button type="button" onclick="openSamsungPreRegisteredModal('${match.appId}', '${match.patientName || ''}')" 
+                  class="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-black text-xs border border-amber-300 flex items-center gap-1 cursor-pointer">
+                  <i data-lucide="file-spreadsheet" class="w-4 h-4 text-amber-600"></i>
+                  <span>삼성사전명단(신청대기)</span>
+                </button>
+              `}
             ` : ''}
           </div>
         </div>
@@ -2640,7 +3098,7 @@ function renderCustomerGroupView(logs) {
                   <!-- 메이트원 등록 상태 배지 -->
                   ${match.isRegistered ? `
                     <span class="px-2.5 py-0.5 rounded-md font-black text-xs border ${match.badgeClass}">
-                      ✓ ${match.company} 등록 (${match.appId || '매칭'})
+                      ✓ ${match.company} ${match.isInHub ? '등록' : '사전명단(신청대기)'} (${match.appId || '매칭'})
                     </span>
                   ` : `
                     <span class="px-2 py-0.5 rounded-md font-bold text-xs bg-slate-100 text-slate-600 border border-slate-200">
@@ -2657,13 +3115,21 @@ function renderCustomerGroupView(logs) {
                 </div>
               </div>
 
-              <!-- 등록 고객인 경우 통합허브 상세 모달 바로가기 버튼 (캘린더 연동 방식) -->
+              <!-- 등록 고객인 경우 통합허브 상세 모달 or 삼성 사전등록 모달 바로가기 버튼 -->
               ${match.isRegistered && match.appId ? `
-                <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
-                  class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs shadow-md shadow-blue-500/20 flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shrink-0" title="통합허브 고객 상세 업무 3-Column 대시보드 즉시 열기">
-                  <i data-lucide="layers" class="w-3.5 h-3.5 text-amber-300"></i>
-                  <span>고객 상세업무</span>
-                </button>
+                ${match.isInHub ? `
+                  <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
+                    class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs shadow-md shadow-blue-500/20 flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shrink-0" title="통합허브 고객 상세 업무 3-Column 대시보드 즉시 열기">
+                    <i data-lucide="layers" class="w-3.5 h-3.5 text-amber-300"></i>
+                    <span>고객 상세업무</span>
+                  </button>
+                ` : `
+                  <button type="button" onclick="openSamsungPreRegisteredModal('${match.appId}', '${match.patientName || ''}')" 
+                    class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs shadow-md shadow-amber-500/20 flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shrink-0" title="삼성화재 사전등록 명단 상세 (신청대기)">
+                    <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-white"></i>
+                    <span>삼성 사전명단</span>
+                  </button>
+                `}
               ` : `
                 <span class="text-[11px] text-slate-400 font-medium shrink-0">단순 인입</span>
               `}
@@ -2861,12 +3327,21 @@ function renderCallDetailCardHtml(call) {
         <!-- 고객 매칭 및 모달 호출 링크 -->
         <div class="flex items-center gap-1">
           ${match.isRegistered && match.appId ? `
-            <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
-              class="px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold text-[10.5px] border border-blue-200 flex items-center gap-1 cursor-pointer" title="통합허브 상세 대시보드">
-              <span class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-              <span>${safeMaskName(match.patientName)} (${match.appId})</span>
-              <i data-lucide="external-link" class="w-3 h-3 text-blue-600"></i>
-            </button>
+            ${match.isInHub ? `
+              <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
+                class="px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold text-[10.5px] border border-blue-200 flex items-center gap-1 cursor-pointer" title="통합허브 상세 대시보드">
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                <span>${safeMaskName(match.patientName)} (${match.appId})</span>
+                <i data-lucide="external-link" class="w-3 h-3 text-blue-600"></i>
+              </button>
+            ` : `
+              <button type="button" onclick="openSamsungPreRegisteredModal('${match.appId}', '${match.patientName || ''}')" 
+                class="px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-[10.5px] border border-amber-300 flex items-center gap-1 cursor-pointer" title="삼성화재 사전등록 명단 상세 (신청대기)">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                <span>${safeMaskName(match.patientName)} (사전명단)</span>
+                <i data-lucide="file-spreadsheet" class="w-3 h-3 text-amber-700"></i>
+              </button>
+            `}
           ` : `
             <span class="text-slate-600 font-bold">${safeMaskName(match.patientName)}</span>
           `}
