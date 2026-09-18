@@ -6,6 +6,39 @@ window._livonAlertQueue = [];
 window._livonAlertActive = false;
 window._livonAlertResolver = null;
 
+function showToast(message, type = 'success') {
+  let toastContainer = document.getElementById('livonGlobalToastContainer');
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'livonGlobalToastContainer';
+    toastContainer.className = 'fixed bottom-6 right-6 z-[99999] flex flex-col gap-2 pointer-events-none';
+    document.body.appendChild(toastContainer);
+  }
+
+  const toast = document.createElement('div');
+  const isSuccess = type === 'success';
+  const bgClass = isSuccess ? 'bg-slate-900/95 text-white border-emerald-500/40 shadow-emerald-950/30' : 'bg-slate-900/95 text-white border-sky-500/40 shadow-sky-950/30';
+  const iconHtml = isSuccess 
+    ? '<span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0">✓</span>'
+    : '<span class="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center text-xs font-bold shrink-0">ℹ</span>';
+
+  toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-xl border backdrop-blur-md text-xs font-semibold transform transition-all duration-300 translate-y-2 opacity-0 ${bgClass}`;
+  toast.innerHTML = `${iconHtml}<span>${message}</span>`;
+  toastContainer.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.remove('translate-y-2', 'opacity-0');
+    toast.classList.add('translate-y-0', 'opacity-100');
+  });
+
+  setTimeout(() => {
+    toast.classList.remove('translate-y-0', 'opacity-100');
+    toast.classList.add('translate-y-2', 'opacity-0');
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
+}
+window.showToast = showToast;
+
 function showCustomAlert(message, options = {}) {
   let rawText = '';
   if (typeof message === 'object' && message !== null) {
@@ -1287,14 +1320,10 @@ async function refreshLatestData() {
   const btnIcon = document.getElementById('hubRefreshBtnIcon');
   if (btnIcon) btnIcon.classList.add('animate-spin');
   try {
-    await loadConvexData(true);
-    if (typeof showCustomAlert === 'function') {
-      showCustomAlert({
-        title: '최신 데이터 조회 완료',
-        message: `Convex Cloud 운영 DB로부터 최신 데이터(총 ${gApps.length}건)가 정상 동기화되었습니다.`,
-        icon: 'check-circle',
-        iconColor: 'emerald'
-      });
+    // 배경 동기화로 기존 목록이 깜빡이거나 사라지지 않고 즉시 갱신
+    await loadConvexData(false);
+    if (typeof showToast === 'function') {
+      showToast(`통합허브 최신 데이터(총 ${gApps.length}건)가 실시간 반영되었습니다.`, 'success');
     }
   } finally {
     if (btnIcon) btnIcon.classList.remove('animate-spin');
@@ -22447,7 +22476,7 @@ function closeAllMultiTabs() {
 }
 window.closeAllMultiTabs = closeAllMultiTabs;
 
-function switchTab(tabId, filterParam = null, triggerReload = true) {
+function switchTab(tabId, filterParam = null, triggerReload = false) {
   // 모바일 사이드바 드로어가 열려있는 경우 메뉴 선택 시 자동 닫기
   if (typeof toggleMobileSidebar === 'function' && window.innerWidth < 1024) {
     toggleMobileSidebar(false);

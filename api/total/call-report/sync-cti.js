@@ -56,11 +56,17 @@ module.exports = async function handler(req, res) {
       recentStart.setDate(recentStart.getDate() - 3);
       const recentStartStr = recentStart.toISOString().slice(0, 10);
 
+      // 기존 로그의 상담요약 맵 생성하여 불필요한 HTTP 요청 100% 차단 (초고속화)
+      const knownMap = new Map();
+      (baseData.callLogs || []).forEach(l => {
+        if (l.askSn) knownMap.set(l.askSn, l);
+      });
+
       // 1) 전체 기간의 CTI 헤더 요약 통계(Page 1 요약만, 200ms) & 2) 최근 3일치 상세 로그 조회 병렬 실행
       const [fullSummaryRes, recentLogsRes] = await Promise.race([
         Promise.all([
           fetchCtiLogsByDateRange(startDate, endDate, channel, { summaryOnly: true }).catch(() => null),
-          fetchCtiLogsByDateRange(recentStartStr, endDate, channel).catch(() => null)
+          fetchCtiLogsByDateRange(recentStartStr, endDate, channel, { knownDetailsMap: knownMap }).catch(() => null)
         ]),
         timeoutPromise
       ]);

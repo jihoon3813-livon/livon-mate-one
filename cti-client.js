@@ -696,11 +696,26 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
 
   console.log(`[CTI Sync] 수집 완료: 총 ${logs.length}건 (CTI 표기 총건수: ${totalCount}건)`);
 
-  // askSn이 있는 상담 건들에 대해 세부 상담요약/키워드 동기화 (병렬 6개씩 배치 처리)
-  const detailTargets = logs.filter(l => l.askSn);
-  console.log(`[CTI Sync] 세부 상담요약 보유 대상: ${detailTargets.length}건 동기화 진행...`);
+  // askSn이 있는 상담 건들에 대해 세부 상담요약/키워드 동기화 (기존 보유 건은 재호출 생략하여 초고속 동기화)
+  const knownDetailsMap = options.knownDetailsMap || null;
+  const detailTargets = logs.filter(l => {
+    if (!l.askSn) return false;
+    if (knownDetailsMap) {
+      const known = knownDetailsMap.get(l.askSn) || (l.phone ? knownDetailsMap.get(`${l.callTime}_${l.phone}`) : null);
+      if (known && (known.title || known.summary)) {
+        l.title = known.title;
+        l.summary = known.summary;
+        l.keywords = known.keywords;
+        l.category = known.category;
+        l.actor = known.actor;
+        return false; // 이미 확보된 상세내용이므로 추가 HTTP 요청 생략 (초고속 캐싱)
+      }
+    }
+    return true;
+  });
+  console.log(`[CTI Sync] 신규 세부 상담요약 필요 대상: ${detailTargets.length}건 (기존 보존: ${logs.filter(l => l.askSn).length - detailTargets.length}건)`);
 
-  const batchSize = 6;
+  const batchSize = 10;
   for (let i = 0; i < detailTargets.length; i += batchSize) {
     const batch = detailTargets.slice(i, i + batchSize);
     await Promise.all(batch.map(async (item) => {

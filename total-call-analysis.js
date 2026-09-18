@@ -823,12 +823,8 @@ async function initTotalCallAnalysisModule(forceRefresh = false) {
   if (hasImmediateData) {
     // 1) 기존 캐시 데이터로 0ms 즉시 화면 렌더링 (화면 깜빡임/공백 방지)
     renderTotalCallAnalysisTab();
-
-    // 2) 사용자 요청 시 백그라운드(모달 없이 조용히) 최신 CTI 데이터 갱신
-    if (!isTotalSyncing) {
-      loadCallAnnotations();
-      loadTotalCallData(true, true); // isBackground = true 로 전체화면 모달 차단
-    }
+    loadCallAnnotations();
+    // [사용자 요구사항]: 상단 열린 탭을 클릭하면 동기화는 수동으로 (자동 CTI 동기화 제외)
     return;
   }
 
@@ -850,7 +846,12 @@ async function initTotalCallAnalysisModule(forceRefresh = false) {
 }
 
 async function loadTotalCallData(forceSync = false, isBackground = false) {
-  if (isTotalSyncing && forceSync) return;
+  if (isTotalSyncing && forceSync) {
+    if (!isBackground) {
+      setTotalSyncProgress(2, 50, 'CTI 데이터 수신 중', 'CTI 게이트웨이와 실시간 동기화를 진행하고 있습니다...');
+    }
+    return;
+  }
   try {
     if (forceSync) {
       isTotalSyncing = true;
@@ -914,10 +915,8 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       }
 
       if (!isBackground) {
-        setTotalSyncProgress(3, 80, '보험사별 데이터 통합 중', '인입 채널(삼성화재/현대해상/리본케어) 교차 검증 및 상담 라벨 매칭 중...');
-        await new Promise(r => setTimeout(r, 60));
-        setTotalSyncProgress(4, 95, '지표 및 아웃콜 재집계 중', '미연결(0초) 아웃콜 긴급 대상 건을 추출하고 통계 대시보드를 최적화하고 있습니다...');
-        await new Promise(r => setTimeout(r, 60));
+        setTotalSyncProgress(3, 85, '보험사별 데이터 통합 중', '인입 채널(삼성화재/현대해상/리본케어) 교차 검증 및 상담 라벨 매칭 중...');
+        setTotalSyncProgress(4, 98, '지표 및 대시보드 최적화 중', '미연결 아웃콜 긴급 대상 건을 추출하고 통계를 최적화하고 있습니다...');
       }
 
       clearMateOneMatchCache();
@@ -936,7 +935,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         setTotalSyncProgress(4, 100, '실시간 동기화 완료!', `총 ${count}건의 CTI 전수 상담 데이터가 성공적으로 반영되었습니다.`, true, count);
         setTimeout(() => {
           closeTotalSyncProgressModal();
-        }, 1000);
+        }, 300);
 
         if (typeof showToast === 'function') {
           showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 완료되었습니다.`, 'success');
@@ -3605,8 +3604,18 @@ async function checkAndTriggerOutcallAlert() {
   }
 }
 
+// [사용자 요구사항]: 종합콜분석 좌측 메뉴 클릭 시 무조건 실시간 CTI 동기화 진행
+function triggerTotalCallAnalysisLeftMenuClick() {
+  if (typeof switchTab === 'function') {
+    switchTab('totalcallanalysis', null, false);
+  }
+  // 좌측 메뉴 클릭 시 무조건 실시간 CTI 동기화 진행
+  loadTotalCallData(true, false);
+}
+
 // 글로벌 등록 및 메뉴페이지 무관 백그라운드 자동 점검 (초기 500ms 및 30초 주기)
 if (typeof window !== 'undefined') {
+  window.triggerTotalCallAnalysisLeftMenuClick = triggerTotalCallAnalysisLeftMenuClick;
   window.checkAndTriggerOutcallAlert = checkAndTriggerOutcallAlert;
   window.loadOutcallBackgroundData = loadOutcallBackgroundData;
   window.renderOutcallFloatingPill = renderOutcallFloatingPill;
