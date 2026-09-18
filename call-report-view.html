@@ -777,17 +777,17 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const cs = gReportData && gReportData.ctiSummary;
       const rInfo = (gReportData && gReportData.reportInfo) || {};
 
+      const isHeaderChMatch = (!targetCh || targetCh === '전체' || targetCh === 'all')
+        ? (rInfo.channel === 'all' || rInfo.channel === '전체' || !rInfo.channel)
+        : (rInfo.channel && rInfo.channel.includes(targetCh));
+
+      const isCtiRangeMatch = isHeaderChMatch &&
+        (!startNorm || normDate(rInfo.startDate) === startNorm) &&
+        (!endNorm || normDate(rInfo.endDate) === endNorm);
+
       // 1. 해당 기간의 총 인입콜 건수 (동적으로 필터링된 전체콜을 1순위로 정확히 반영)
       let totalCalls = dateFilteredAllLogs.length;
       if (totalCalls === 0) {
-        const isHeaderChMatch = (!targetCh || targetCh === '전체' || targetCh === 'all')
-          ? (rInfo.channel === 'all' || rInfo.channel === '전체' || !rInfo.channel)
-          : (rInfo.channel && rInfo.channel.includes(targetCh));
-
-        const isCtiRangeMatch = isHeaderChMatch &&
-          (!startNorm || normDate(rInfo.startDate) === startNorm) &&
-          (!endNorm || normDate(rInfo.endDate) === endNorm);
-
         if (isCtiRangeMatch && cs && (cs.totalInbound !== undefined || cs.totalAll !== undefined)) {
           totalCalls = cs.totalInbound !== undefined ? cs.totalInbound : cs.totalAll;
         } else if (gReportData && Array.isArray(gReportData.dailyTrends)) {
