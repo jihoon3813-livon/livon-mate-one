@@ -658,33 +658,48 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
   // 1페이지 파싱
   logs.push(...parseRowsFromHtml(p1Html));
 
-  // 2페이지부터 totalPages까지 순차 수집
+  // 2페이지부터 totalPages까지 고속 병렬 수집 (한 번에 6페이지씩 동시 요청하여 수집 속도 극대화)
   const maxPages = options.maxPages || totalPages;
   const effectivePages = Math.min(totalPages, maxPages);
-  for (let page = 2; page <= effectivePages; page++) {
-    const pagePath = `/CtiLiVon/admin/C_Calllog.asp?page=${page}&start_search_string=${startDate}&end_search_string=${endDate}&searchCpname=${cpParam}`;
-    try {
-      const res = await httpRequest({
-        hostname: 'crm.goodars.co.kr',
-        port: 443,
-        path: pagePath,
-        method: 'GET',
-        headers: {
-          'Cookie': cookie,
-          'Referer': 'https://crm.goodars.co.kr/CtiLiVon/ARS.asp',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LivonMate/3.0'
+  if (effectivePages >= 2 && logs.length < totalCount) {
+    const pageNumbers = [];
+    for (let p = 2; p <= effectivePages; p++) {
+      pageNumbers.push(p);
+    }
+    const PAGE_CONCURRENCY = 6;
+    for (let i = 0; i < pageNumbers.length; i += PAGE_CONCURRENCY) {
+      const pageBatch = pageNumbers.slice(i, i + PAGE_CONCURRENCY);
+      const batchResults = await Promise.all(pageBatch.map(async (page) => {
+        const pagePath = `/CtiLiVon/admin/C_Calllog.asp?page=${page}&start_search_string=${startDate}&end_search_string=${endDate}&searchCpname=${cpParam}`;
+        try {
+          const res = await httpRequest({
+            hostname: 'crm.goodars.co.kr',
+            port: 443,
+            path: pagePath,
+            method: 'GET',
+            headers: {
+              'Cookie': cookie,
+              'Referer': 'https://crm.goodars.co.kr/CtiLiVon/ARS.asp',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LivonMate/3.0'
+            }
+          });
+          const html = decoder.decode(res.body);
+          return { page, logs: parseRowsFromHtml(html) };
+        } catch (err) {
+          console.error(`[CTI Sync] 페이지 ${page} 수집 실패:`, err.message);
+          return { page, logs: [] };
         }
-      });
-      const html = decoder.decode(res.body);
-      const pageLogs = parseRowsFromHtml(html);
-      logs.push(...pageLogs);
+      }));
 
-      // 이미 totalCount에 도달했으면 종료
+      // 페이지 순서 보장 정렬 후 병합
+      batchResults.sort((a, b) => a.page - b.page);
+      for (const br of batchResults) {
+        logs.push(...br.logs);
+      }
+
       if (logs.length >= totalCount) {
         break;
       }
-    } catch (err) {
-      console.error(`[CTI Sync] 페이지 ${page} 수집 실패:`, err.message);
     }
   }
 
@@ -715,7 +730,7 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
   });
   console.log(`[CTI Sync] 신규 세부 상담요약 필요 대상: ${detailTargets.length}건 (기존 보존: ${logs.filter(l => l.askSn).length - detailTargets.length}건)`);
 
-  const batchSize = 10;
+  const batchSize = 15;
   for (let i = 0; i < detailTargets.length; i += batchSize) {
     const batch = detailTargets.slice(i, i + batchSize);
     await Promise.all(batch.map(async (item) => {

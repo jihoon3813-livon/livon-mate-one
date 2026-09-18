@@ -42,7 +42,7 @@ module.exports = async function handler(req, res) {
 
   // 2. 실시간 CTI 동기화 시도 (스마트 증분 / 고속 병렬 수집)
   try {
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 25000));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 12000));
 
     const sDateObj = new Date(startDate);
     const eDateObj = new Date(endDate);
@@ -50,17 +50,24 @@ module.exports = async function handler(req, res) {
 
     let ctiResult = null;
 
-    if (diffDays > 14 && baseData && baseData.callLogs && baseData.callLogs.length > 0) {
+    // 기존 로그의 상담요약 맵 생성하여 불필요한 CTI 상세조회 HTTP 요청 100% 차단 (초고속 캐싱)
+    const knownMap = new Map();
+    if (baseData && Array.isArray(baseData.callLogs)) {
+      baseData.callLogs.forEach(l => {
+        if (l.askSn) knownMap.set(l.askSn, l);
+        if (l.callTime && (l.phone || l.rawPhone)) {
+          knownMap.set(`${l.callTime}_${l.phone || l.rawPhone}`, l);
+        }
+      });
+    }
+
+    // 2일 초과 기간이면서 baseline 데이터가 존재하는 경우:
+    // CTI 헤더 전수 요약 통계(Page 1, 200ms) + 최근 3일치 로그만 초고속 병렬 수집하여 병합 (1~2초 내 완료)
+    if (diffDays > 2 && baseData && baseData.callLogs && baseData.callLogs.length > 0) {
       // 최근 3일치 계산
       const recentStart = new Date(eDateObj);
       recentStart.setDate(recentStart.getDate() - 3);
       const recentStartStr = recentStart.toISOString().slice(0, 10);
-
-      // 기존 로그의 상담요약 맵 생성하여 불필요한 HTTP 요청 100% 차단 (초고속화)
-      const knownMap = new Map();
-      (baseData.callLogs || []).forEach(l => {
-        if (l.askSn) knownMap.set(l.askSn, l);
-      });
 
       // 1) 전체 기간의 CTI 헤더 요약 통계(Page 1 요약만, 200ms) & 2) 최근 3일치 상세 로그 조회 병렬 실행
       const [fullSummaryRes, recentLogsRes] = await Promise.race([
@@ -136,8 +143,9 @@ module.exports = async function handler(req, res) {
         logs: filteredLogs
       };
     } else {
-      // 단기 범위(14일 이내)이거나 baseline 데이터가 없는 경우 직접 전수 수집
-      const livePromise = fetchCtiLogsByDateRange(startDate, endDate, channel);
+      // 초단기 범위(2일 이내)이거나 baseline 데이터가 없는 경우
+      // knownMap을 전달하여 이미 알고 있는 상세 로그는 CTI 재호출을 스킵 (초고속 수집)
+      const livePromise = fetchCtiLogsByDateRange(startDate, endDate, channel, { knownDetailsMap: knownMap });
       ctiResult = await Promise.race([livePromise, timeoutPromise]);
     }
 

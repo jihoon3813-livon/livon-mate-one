@@ -848,20 +848,36 @@ async function initTotalCallAnalysisModule(forceRefresh = false) {
 async function loadTotalCallData(forceSync = false, isBackground = false) {
   if (isTotalSyncing && forceSync) {
     if (!isBackground) {
-      setTotalSyncProgress(2, 50, 'CTI 데이터 수신 중', 'CTI 게이트웨이와 실시간 동기화를 진행하고 있습니다...');
+      setTotalSyncProgress(2, 60, 'CTI 데이터 수신 중', 'CTI 게이트웨이와 실시간 동기화를 진행하고 있습니다...');
     }
     return;
   }
   try {
     if (forceSync) {
       isTotalSyncing = true;
+      let progressTimer = null;
+
       if (!isBackground) {
-        setTotalSyncProgress(1, 15, 'CTI 서버 연결 중', 'CTI 게이트웨이에 접속하여 최신 인바운드 콜 데이터를 요청하고 있습니다...');
+        setTotalSyncProgress(1, 20, 'CTI 서버 연결 중', 'CTI 게이트웨이에 접속하여 최신 인바운드 콜 데이터를 요청하고 있습니다...');
+        setTimeout(() => {
+          if (isTotalSyncing && !isBackground) {
+            setTotalSyncProgress(2, 55, '콜로그 및 녹취 STT 수신 중', '삼성화재·현대해상·리본케어 인바운드 콜 녹취 및 STT 전문 데이터를 파싱하고 있습니다...');
+            // 55%에서 정체되지 않도록 부드러운 진행 펄스
+            let p = 55;
+            progressTimer = setInterval(() => {
+              if (isTotalSyncing && p < 85) {
+                p += Math.floor(Math.random() * 6) + 3;
+                if (p > 85) p = 85;
+                setTotalSyncProgress(2, p, '콜로그 및 녹취 STT 수신 중', '삼성화재·현대해상·리본케어 인바운드 콜 녹취 및 STT 전문 데이터를 파싱하고 있습니다...');
+              }
+            }, 300);
+          }
+        }, 200);
       }
 
-      // 25초 타임아웃 가드
+      // 10초 타임아웃 가드 (고속 응답 보장)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       let synced = false;
 
       const s = gTotalFilter.startDate || '2026-08-01';
@@ -869,13 +885,11 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       const ch = gTotalFilter.channel || 'all';
       const sUrl = `/api/total/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
 
-      if (!isBackground) {
-        setTotalSyncProgress(2, 55, '콜로그 및 녹취 STT 수신 중', '삼성화재·현대해상·리본케어 인바운드 콜 녹취 및 STT 전문 데이터를 파싱하고 있습니다...');
-      }
-
       try {
         const sRes = await fetch(sUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
+        if (progressTimer) clearInterval(progressTimer);
+
         const cType = sRes.headers.get('content-type') || '';
         if (cType.includes('json') || sRes.ok) {
           const sJson = await sRes.json();
@@ -887,6 +901,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         }
       } catch (e) {
         clearTimeout(timeoutId);
+        if (progressTimer) clearInterval(progressTimer);
       }
 
       // API 실패/타임아웃 시 즉각 로컬 최신 정적 데이터 로드 (초고속 즉시 반영)
@@ -915,7 +930,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       }
 
       if (!isBackground) {
-        setTotalSyncProgress(3, 85, '보험사별 데이터 통합 중', '인입 채널(삼성화재/현대해상/리본케어) 교차 검증 및 상담 라벨 매칭 중...');
+        setTotalSyncProgress(3, 90, '보험사별 데이터 통합 중', '인입 채널(삼성화재/현대해상/리본케어) 교차 검증 및 상담 라벨 매칭 중...');
         setTotalSyncProgress(4, 98, '지표 및 대시보드 최적화 중', '미연결 아웃콜 긴급 대상 건을 추출하고 통계를 최적화하고 있습니다...');
       }
 
@@ -3604,13 +3619,17 @@ async function checkAndTriggerOutcallAlert() {
   }
 }
 
-// [사용자 요구사항]: 종합콜분석 좌측 메뉴 클릭 시 무조건 실시간 CTI 동기화 진행
+// [사용자 요구사항]: 종합콜분석 좌측 메뉴 클릭 시 즉시 화면 렌더링(0ms 체감) 및 백그라운드 실시간 CTI 동기화
 function triggerTotalCallAnalysisLeftMenuClick() {
   if (typeof switchTab === 'function') {
     switchTab('totalcallanalysis', null, false);
   }
-  // 좌측 메뉴 클릭 시 무조건 실시간 CTI 동기화 진행
-  loadTotalCallData(true, false);
+  // 기존 캐시가 이미 존재하면 즉각 화면 렌더링 (블로킹/대기시간 0ms)
+  if (window.gTotalCallData && window.gTotalCallData.callLogs && window.gTotalCallData.callLogs.length > 0) {
+    renderTotalCallAnalysisTab();
+  }
+  // 백그라운드에서 실시간 CTI 동기화 수행 (화면 가림 모달 없이 쾌속 갱신)
+  loadTotalCallData(true, true);
 }
 
 // 글로벌 등록 및 메뉴페이지 무관 백그라운드 자동 점검 (초기 500ms 및 30초 주기)
