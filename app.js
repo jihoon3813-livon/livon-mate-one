@@ -22563,10 +22563,10 @@ window.handleLeftMenuClick = handleLeftMenuClick;
 function refreshTabData(tabId, filterParam = null) {
   try {
     switch (tabId) {
-      // 1. 종합 콜분석: CTI 실시간 전수 동기화 및 대시보드 갱신
+      // 1. 종합 콜분석: CTI 실시간 전수 동기화 및 대시보드 갱신 (CTI 동기화 모달 팝업)
       case 'totalcallanalysis':
         if (typeof loadTotalCallData === 'function') {
-          loadTotalCallData(true, true);
+          loadTotalCallData(true, false);
         }
         break;
 

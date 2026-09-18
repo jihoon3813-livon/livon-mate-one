@@ -1045,7 +1045,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         setTotalSyncProgress(4, 100, '실시간 동기화 완료!', `총 ${count}건의 CTI 전수 상담 데이터가 성공적으로 반영되었습니다.`, true, count);
         setTimeout(() => {
           closeTotalSyncProgressModal();
-        }, 180);
+        }, 750);
 
         if (typeof showToast === 'function') {
           showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 완료되었습니다.`, 'success');
@@ -1407,7 +1407,7 @@ function renderTotalCallAnalysisTab() {
             <span>라벨 관리/설정</span>
           </button>
           
-          <button type="button" onclick="loadTotalCallData(true, true)" 
+          <button type="button" onclick="loadTotalCallData(true, false)" 
             class="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-700 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all shadow-md shadow-cyan-600/20 cursor-pointer whitespace-nowrap ${isTotalSyncing ? 'opacity-70 pointer-events-none' : ''}">
             <i data-lucide="refresh-cw" class="w-4 h-4 ${isTotalSyncing ? 'animate-spin' : ''}"></i>
             <span>${isTotalSyncing ? 'CTI 수집 중...' : 'CTI 실시간 동기화'}</span>
