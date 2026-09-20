@@ -19,37 +19,50 @@ module.exports = async function handler(req, res) {
 
   let baseData = null;
 
-  // 1. 사전 생성된 최신 보고서 데이터 초고속 로드 (Vercel 번들링 0ms 확보)
+  // 1. 사전 생성된 최신 보고서 데이터 초고속 로드 (require 캐싱 방지)
   try {
-    if (channel.includes('삼성')) baseData = require('../../../call_report_samsung.json');
-    else if (channel.includes('현대')) baseData = require('../../../call_report_hyundai.json');
-    else if (channel.includes('리본')) baseData = require('../../../call_report_livon.json');
-    else baseData = require('../../../call_report_all.json');
-  } catch (e) {
+    const chLower = channel.toLowerCase();
+    const isAll = channel.includes('전체') || chLower === 'all';
+    const isHyundai = channel.includes('현대') || chLower.includes('hyundai');
+    const isLivon = channel.includes('리본') || chLower.includes('livon');
+    let fileName = 'call_report_all.json';
+    if (!isAll) {
+      if (isHyundai) fileName = 'call_report_hyundai.json';
+      else if (isLivon) fileName = 'call_report_livon.json';
+      else fileName = 'call_report_samsung.json';
+    }
+    const candidatePaths = [
+      path.join(process.cwd(), fileName),
+      path.join(__dirname, fileName),
+      path.join(__dirname, '..', '..', '..', fileName)
+    ];
+    const filePath = candidatePaths.find(p => fs.existsSync(p));
+    if (filePath && fs.existsSync(filePath)) {
+      baseData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    }
+  } catch (err) {}
+
+  if (!baseData) {
     try {
-      const chLower = channel.toLowerCase();
-      const isAll = channel.includes('전체') || chLower === 'all';
-      const isHyundai = channel.includes('현대') || chLower.includes('hyundai');
-      const isLivon = channel.includes('리본') || chLower.includes('livon');
-      let fileName = 'call_report_all.json';
-      if (!isAll) {
-        if (isHyundai) fileName = 'call_report_hyundai.json';
-        else if (isLivon) fileName = 'call_report_livon.json';
-        else fileName = 'call_report_samsung.json';
+      if (channel.includes('삼성')) {
+        delete require.cache[require.resolve('../../../call_report_samsung.json')];
+        baseData = require('../../../call_report_samsung.json');
+      } else if (channel.includes('현대')) {
+        delete require.cache[require.resolve('../../../call_report_hyundai.json')];
+        baseData = require('../../../call_report_hyundai.json');
+      } else if (channel.includes('리본')) {
+        delete require.cache[require.resolve('../../../call_report_livon.json')];
+        baseData = require('../../../call_report_livon.json');
+      } else {
+        delete require.cache[require.resolve('../../../call_report_all.json')];
+        baseData = require('../../../call_report_all.json');
       }
-      const candidatePaths = [
-        path.join(process.cwd(), fileName),
-        path.join(__dirname, fileName),
-        path.join(__dirname, '..', '..', '..', fileName)
-      ];
-      let filePath = candidatePaths.find(p => fs.existsSync(p));
-      if (filePath) baseData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    } catch (err) {}
+    } catch (e) {}
   }
 
   // 2. 실시간 CTI 동기화 시도 (스마트 초고속 증분 수집)
   try {
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 5000));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 9000));
 
     const sDateObj = new Date(startDate);
     const eDateObj = new Date(endDate);
@@ -59,25 +72,36 @@ module.exports = async function handler(req, res) {
 
     // 기존 로그의 상담요약 맵 생성하여 불필요한 HTTP 요청 100% 차단 (초고속화)
     const knownMap = new Map();
+    let latestKnownDate = null;
     if (baseData && Array.isArray(baseData.callLogs)) {
       baseData.callLogs.forEach(l => {
         if (l.askSn) knownMap.set(l.askSn, l);
         if (l.callTime && (l.phone || l.rawPhone)) {
           knownMap.set(`${l.callTime}_${l.phone || l.rawPhone}`, l);
         }
+        if (l.callDate && (!latestKnownDate || l.callDate > latestKnownDate)) {
+          latestKnownDate = l.callDate;
+        }
       });
     }
 
+    // 한국 시간(KST) 기준 오늘 일자 계산
+    const nowKst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const todayKst = nowKst.toISOString().slice(0, 10);
+
+    // 최근 7일 전 일자 계산 (중간 누락, 주말, 전일 신규 콜 완벽 포괄)
+    const lookbackDays = 7;
+    const lookbackKst = new Date(Date.now() + 9 * 60 * 60 * 1000 - lookbackDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
     if (baseData && baseData.callLogs && baseData.callLogs.length > 0) {
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const recentStartStr = (diffDays <= 1) ? startDate : todayStr;
+      const recentStartStr = (startDate > lookbackKst) ? startDate : (endDate < lookbackKst ? startDate : lookbackKst);
 
       const recentLogsRes = await Promise.race([
         fetchCtiLogsByDateRange(recentStartStr, endDate, channel, { knownDetailsMap: knownMap }).catch(() => null),
         timeoutPromise
       ]);
 
-      const activeCtiSummary = (fullSummaryRes && fullSummaryRes.ctiSummary) || (recentLogsRes && recentLogsRes.ctiSummary) || baseData.ctiSummary;
+      const activeCtiSummary = (recentLogsRes && recentLogsRes.ctiSummary) || baseData.ctiSummary;
       const recentLogs = (recentLogsRes && recentLogsRes.logs) || [];
 
       // 기존 baseline 데이터에 최신 로그 병합 (askSn 또는 callTime+phone 기준 고유 식별)

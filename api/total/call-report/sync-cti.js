@@ -23,26 +23,29 @@ module.exports = async function handler(req, res) {
 
   let baseData = null;
 
-  // 1. 종합콜분석 전용 사전 데이터(call_report_all.json) 초고속 로드 (Vercel 번들링 0ms 즉시 확보)
+  // 1. 종합콜분석 전용 사전 데이터(call_report_all.json) 실시간 신선 로드 (require 캐싱 방지)
   try {
-    baseData = require('../../../call_report_all.json');
-  } catch (e) {
+    const candidatePaths = [
+      path.join(process.cwd(), 'call_report_all.json'),
+      path.join(__dirname, 'call_report_all.json'),
+      path.join(__dirname, '..', '..', '..', 'call_report_all.json')
+    ];
+    const filePath = candidatePaths.find(p => fs.existsSync(p));
+    if (filePath && fs.existsSync(filePath)) {
+      baseData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    }
+  } catch (err) {}
+
+  if (!baseData) {
     try {
-      const candidatePaths = [
-        path.join(process.cwd(), 'call_report_all.json'),
-        path.join(__dirname, 'call_report_all.json'),
-        path.join(__dirname, '..', '..', '..', 'call_report_all.json')
-      ];
-      const filePath = candidatePaths.find(p => fs.existsSync(p));
-      if (filePath && fs.existsSync(filePath)) {
-        baseData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      }
-    } catch (err) {}
+      delete require.cache[require.resolve('../../../call_report_all.json')];
+      baseData = require('../../../call_report_all.json');
+    } catch (e) {}
   }
 
   // 2. 실시간 CTI 동기화 시도 (스마트 초고속 증분 수집)
   try {
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 5000));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 9000));
 
     const sDateObj = new Date(startDate);
     const eDateObj = new Date(endDate);
@@ -52,20 +55,32 @@ module.exports = async function handler(req, res) {
 
     // 기존 로그의 상담요약 맵 생성하여 불필요한 CTI 상세조회 HTTP 요청 100% 차단 (초고속 캐싱)
     const knownMap = new Map();
+    let latestKnownDate = null;
     if (baseData && Array.isArray(baseData.callLogs)) {
       baseData.callLogs.forEach(l => {
         if (l.askSn) knownMap.set(l.askSn, l);
         if (l.callTime && (l.phone || l.rawPhone)) {
           knownMap.set(`${l.callTime}_${l.phone || l.rawPhone}`, l);
         }
+        const d = (l.callTime || l.date || '').slice(0, 10);
+        if (d && (!latestKnownDate || d > latestKnownDate)) {
+          latestKnownDate = d;
+        }
       });
     }
 
-    // [초고속 증분 수집 엔진]:
-    // 기존 캐시가 이미 완비되어 있으므로 당일(오늘자) 증분만 단일 요청으로 0.5초 내 수집! (세션 충돌 원천 차단)
+    // 한국 시간(KST) 기준 오늘 일자 계산
+    const nowKst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const todayKst = nowKst.toISOString().slice(0, 10);
+
+    // 최근 7일 전 일자 계산 (중간 누락, 주말, 전일 신규 콜 완벽 포괄)
+    const lookbackDays = 7;
+    const lookbackKst = new Date(Date.now() + 9 * 60 * 60 * 1000 - lookbackDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    // [초고속 실시간 증분 수집 엔진]:
+    // 최근 수집 시작일: 지정된 시작일이 최근 7일 이내면 startDate, 아니면 최근 7일 전부터 오늘까지 전수 수집
     if (baseData && baseData.callLogs && baseData.callLogs.length > 0) {
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const recentStartStr = (diffDays <= 1) ? startDate : todayStr;
+      const recentStartStr = (startDate > lookbackKst) ? startDate : (endDate < lookbackKst ? startDate : lookbackKst);
 
       const recentLogsRes = await Promise.race([
         fetchCtiLogsByDateRange(recentStartStr, endDate, channel, { knownDetailsMap: knownMap }).catch(() => null),
@@ -198,35 +213,6 @@ module.exports = async function handler(req, res) {
       btnExit: 0
     };
 
-    const reportData = {
-      reportInfo: {
-        title: `종합(전체 인입경로) 간병(리본케어) 서비스 인바운드 분석 보고 (${startDate} ~ ${endDate})`,
-        target: '전체 인입경로(삼성화재 · 현대해상 · 리본케어) 관련 인바운드 콜',
-        channel: channel,
-        channelLabel: channelLabel,
-        period: `${startDate} ~ ${endDate}`,
-        startDate,
-        endDate,
-        reportDate: new Date().toISOString().slice(0, 10),
-        author: '리본케어 (Livon Care) 운영센터',
-        operatingDays: dailyTrends.length,
-        syncedAt: new Date().toISOString()
-      },
-      summaryStats: {
-        totalCalls: (ctiSummary && ctiSummary.totalInbound !== undefined) ? ctiSummary.totalInbound : totalCalls,
-        connectReqCalls: (ctiSummary && ctiSummary.connectRequests !== undefined) ? ctiSummary.connectRequests : totalConnected,
-        answeredCalls: (ctiSummary && ctiSummary.answeredCalls !== undefined) ? ctiSummary.answeredCalls : totalConsulted,
-        answerRate: ctiSummary.answerRate || (totalCalls > 0 ? Math.round((ctiSummary.answeredCalls / totalCalls) * 100) + '%' : '0%'),
-        abandonedCalls: ctiSummary.abandonedCalls || 0,
-        unselectedType: ctiSummary.unselectedType || 0,
-        btnExit: ctiSummary.btnExit || 0,
-        consultedCalls: totalConsulted
-      },
-      ctiSummary,
-      dailyTrends,
-      callLogs: []
-    };
-
     // 기존 전체 데이터와 병합하여 전체 이력이 보존된 완본으로 저장
     const existingMasterLogs = (baseData && Array.isArray(baseData.callLogs)) ? baseData.callLogs : [];
     const masterMap = new Map();
@@ -242,12 +228,68 @@ module.exports = async function handler(req, res) {
     allMasterLogs.sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
     allMasterLogs.forEach((l, idx) => { l.rowNum = idx + 1; });
 
-    reportData.callLogs = allMasterLogs;
+    const allMasterTotal = allMasterLogs.length;
+    const allMasterConn = allMasterLogs.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y').length;
+    const allMasterAns = allMasterLogs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length;
+    const allMasterConsulted = allMasterLogs.filter(c => c.title || c.summary).length;
+    const allMasterRate = allMasterConn > 0 ? Math.round((allMasterAns / allMasterConn) * 100) + '%' : '100%';
 
-    // 로컬 파일시스템에 저장 가능한 환경이면 call_report_all.json 최신화
+    const isAllPeriod = (!startDate || startDate === '2026-08-01') && (!channel || channel === 'all' || channel === '전체');
+
+    const reportData = {
+      reportInfo: {
+        title: `종합(전체 인입경로) 간병(리본케어) 서비스 인바운드 분석 보고 (${startDate} ~ ${endDate})`,
+        target: '전체 인입경로(삼성화재 · 현대해상 · 리본케어) 관련 인바운드 콜',
+        channel: channel,
+        channelLabel: channelLabel,
+        period: `${startDate} ~ ${endDate}`,
+        startDate,
+        endDate,
+        reportDate: new Date().toISOString().slice(0, 10),
+        author: '리본케어 (Livon Care) 운영센터',
+        operatingDays: dailyTrends.length,
+        syncedAt: new Date().toISOString()
+      },
+      summaryStats: {
+        totalCalls: isAllPeriod ? allMasterTotal : totalCalls,
+        connectReqCalls: isAllPeriod ? allMasterConn : totalConnected,
+        answeredCalls: isAllPeriod ? allMasterAns : totalConsulted,
+        answerRate: isAllPeriod ? allMasterRate : (ctiSummary.answerRate || (totalCalls > 0 ? Math.round((totalConsulted / totalCalls) * 100) + '%' : '0%')),
+        abandonedCalls: ctiSummary.abandonedCalls || 0,
+        unselectedType: ctiSummary.unselectedType || 0,
+        btnExit: ctiSummary.btnExit || 0,
+        consultedCalls: isAllPeriod ? allMasterConsulted : totalConsulted
+      },
+      ctiSummary: {
+        ...ctiSummary,
+        totalAll: isAllPeriod ? allMasterTotal : totalCalls,
+        totalInbound: isAllPeriod ? allMasterTotal : totalCalls,
+        connectRequests: isAllPeriod ? allMasterConn : totalConnected,
+        answeredCalls: isAllPeriod ? allMasterAns : totalConsulted,
+        answerRate: isAllPeriod ? allMasterRate : (ctiSummary.answerRate || '0%')
+      },
+      dailyTrends,
+      callLogs: isAllPeriod ? allMasterLogs : ctiResult.logs
+    };
+
+    // 로컬 파일시스템에 저장 가능한 환경이면 call_report_all.json 완본 최신화
     try {
       const outPath = path.join(process.cwd(), 'call_report_all.json');
-      fs.writeFileSync(outPath, JSON.stringify(reportData, null, 2), 'utf8');
+      const fileSaveData = {
+        ...reportData,
+        summaryStats: {
+          totalCalls: allMasterTotal,
+          connectReqCalls: allMasterConn,
+          answeredCalls: allMasterAns,
+          answerRate: allMasterRate,
+          abandonedCalls: ctiSummary.abandonedCalls || 0,
+          unselectedType: ctiSummary.unselectedType || 0,
+          btnExit: ctiSummary.btnExit || 0,
+          consultedCalls: allMasterConsulted
+        },
+        callLogs: allMasterLogs
+      };
+      fs.writeFileSync(outPath, JSON.stringify(fileSaveData, null, 2), 'utf8');
     } catch (saveErr) {}
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');

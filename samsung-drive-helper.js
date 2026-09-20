@@ -155,7 +155,7 @@ try {
       // ps1 스크립트 정리
       try { if (fs.existsSync(tempPs1Path)) fs.unlinkSync(tempPs1Path); } catch (e) {}
 
-      if (err || (stdout && stdout.includes('DECRYPT_ERROR'))) {
+      if ((err && (!stdout || !stdout.includes('DECRYPT_SUCCESS'))) || (stdout && stdout.includes('DECRYPT_ERROR'))) {
         try { if (fs.existsSync(tempCsvPath)) fs.unlinkSync(tempCsvPath); } catch (e) {}
         const msg = stdout || stderr || (err ? err.message : '');
         if (msg.includes('암호가 올바르지 않습니다') || msg.includes('password') || msg.includes('암호')) {

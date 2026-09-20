@@ -638,12 +638,13 @@ function saveSavedFaxConfig(cfg) {
     // =========================================================================
     // API Route: Samsung Fire Call Analysis Report Engine (삼성화재 콜분석 보고 시스템)
     // =========================================================================
-    // CTI 실시간 로그 수집 및 보고서 동기화 엔드포인트 (초고속 증분 엔진 핸들러 위임)
     if ((reqPath === '/api/samsung/call-report/sync-cti' || reqPath === '/api/total/call-report/sync-cti') && req.method === 'GET') {
       const isTotal = reqPath === '/api/total/call-report/sync-cti';
-      const syncHandler = isTotal
-        ? require('./api/total/call-report/sync-cti')
-        : require('./api/samsung/call-report/sync-cti');
+      const targetPath = isTotal
+        ? require.resolve('./api/total/call-report/sync-cti')
+        : require.resolve('./api/samsung/call-report/sync-cti');
+      delete require.cache[targetPath];
+      const syncHandler = require(targetPath);
 
       const parsedUrl = urlModule.parse(req.url, true);
       req.query = parsedUrl.query;
@@ -662,6 +663,253 @@ function saveSavedFaxConfig(cfg) {
         res.end(JSON.stringify(data));
       };
       return syncHandler(req, res);
+    }
+
+    // =========================================================================
+    // API Route: Google Spreadsheet Fetch Proxy (CORS 우회 및 엑셀 버퍼 반환)
+    // =========================================================================
+    if (reqPath === '/api/sheets/fetch' && req.method === 'GET') {
+      const parsedUrl = urlModule.parse(req.url, true);
+      const targetUrl = parsedUrl.query.url;
+      if (!targetUrl) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: '구글 스프레드시트 URL이 필요합니다.' }));
+      }
+
+      // 구글 스프레드시트 ID 및 GID 추출
+      const idMatch = targetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      if (!idMatch) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: '유효한 구글 스프레드시트 URL 형식이 아닙니다.' }));
+      }
+
+      const sheetId = idMatch[1];
+      const gidMatch = targetUrl.match(/[#&?]gid=([0-9]+)/);
+      const gidParam = gidMatch ? `&gid=${gidMatch[1]}` : '';
+      const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx${gidParam}`;
+
+      // 리다이렉트 추적 다운로드 헬퍼
+      function fetchRedirect(url, maxRedirects = 5) {
+        return new Promise((resolve, reject) => {
+          if (maxRedirects <= 0) return reject(new Error('리다이렉트 초과'));
+          const client = url.startsWith('https') ? https : http;
+          client.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } }, (response) => {
+            if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+              return resolve(fetchRedirect(response.headers.location, maxRedirects - 1));
+            }
+            if (response.statusCode !== 200) {
+              return reject(new Error(`구글 시트 응답 실패 (HTTP ${response.statusCode})`));
+            }
+            const chunks = [];
+            response.on('data', c => chunks.push(c));
+            response.on('end', () => resolve({
+              headers: response.headers,
+              buffer: Buffer.concat(chunks)
+            }));
+          }).on('error', reject);
+        });
+      }
+
+      try {
+        const { buffer } = await fetchRedirect(exportUrl);
+        res.writeHead(200, {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Length': buffer.length,
+          'Access-Control-Allow-Origin': '*'
+        });
+        return res.end(buffer);
+      } catch (err) {
+        console.warn('[Google Sheets Fetch Error]', err.message);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: `구글 스프레드시트 로드 실패: ${err.message}. 시트의 공유 권한('링크가 있는 모든 사용자')을 확인해주세요.` }));
+      }
+    }
+
+    // =========================================================================
+    // API Route: 통합허브 런칭 실데이터 영구 보존 API
+    // =========================================================================
+    if (reqPath === '/api/hub/real-data') {
+      const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+
+      if (req.method === 'GET') {
+        try {
+          if (fs.existsSync(realDataFile)) {
+            const content = fs.readFileSync(realDataFile, 'utf-8');
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(content);
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, data: null }));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      }
+
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            let stored = {
+              updatedAt: new Date().toISOString(),
+              sources: {},
+              applications: []
+            };
+
+            if (fs.existsSync(realDataFile)) {
+              try { stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8')); } catch (e) {}
+            }
+
+            const { company, applications, assignments, claims, payouts, sourceInfo } = payload;
+            if (company && sourceInfo) {
+              stored.sources = stored.sources || {};
+              stored.sources[company] = sourceInfo;
+            }
+
+            if (Array.isArray(applications)) {
+              if (payload.replaceAll) {
+                stored.applications = applications;
+              } else if (company) {
+                // 해당 회사의 기존 데이터만 새 데이터로 교체하고 타 보험사 데이터는 보존
+                const otherApps = (stored.applications || []).filter(a => {
+                  const c = a.insuranceCompany || '';
+                  if ((company.includes('현대') || company === 'hyundai') && c.includes('현대')) return false;
+                  if ((company.includes('삼성') || company === 'samsung') && c.includes('삼성')) return false;
+                  return true;
+                });
+                stored.applications = [...otherApps, ...applications];
+              } else {
+                stored.applications = applications;
+              }
+            }
+
+            if (Array.isArray(assignments)) {
+              stored.assignments = assignments;
+            }
+            if (Array.isArray(claims)) {
+              stored.claims = claims;
+            }
+            if (Array.isArray(payouts)) {
+              stored.payouts = payouts;
+            }
+            if (Array.isArray(payload.caregivers)) {
+              stored.caregivers = payload.caregivers;
+            }
+            if (Array.isArray(payload.centers)) {
+              stored.centers = payload.centers;
+            }
+            if (Array.isArray(payload.adjusters)) {
+              stored.adjusters = payload.adjusters;
+            }
+
+            stored.updatedAt = new Date().toISOString();
+            fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({
+              success: true,
+              message: '통합허브 실데이터가 서버에 안전하게 영구 저장되었습니다.',
+              totalApps: (stored.applications || []).length,
+              stored
+            }));
+          } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: err.message }));
+          }
+        });
+        return;
+      }
+    }
+
+    // =========================================================================
+    // API Route: 통합허브 고객 개별 필드(신청유형, 청구분류, 입금확인금액, 추정미수금 등) 실시간 업데이트 API
+    // =========================================================================
+    if (reqPath === '/api/hub/customer/update-fields' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { appId, applyId, fields } = JSON.parse(body || '{}');
+          const targetId = appId || applyId;
+          if (!targetId || !fields) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: 'appId(또는 applyId)와 fields가 필요합니다.' }));
+          }
+          const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+          let stored = { applications: [] };
+          if (fs.existsSync(realDataFile)) {
+            try { stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8')); } catch (e) {}
+          }
+          stored.applications = stored.applications || [];
+          const idx = stored.applications.findIndex(a => {
+            if (a.id === targetId) return true;
+            if (targetId && targetId.startsWith('H') && a.id === targetId.replace(/^H/, 'C')) return true;
+            if (targetId && targetId.startsWith('C') && a.id === targetId.replace(/^C/, 'H')) return true;
+            if (a.patientId && a.patientId === targetId) return true;
+            if (fields.patientName && a.patientName === fields.patientName) return true;
+            return false;
+          });
+          if (idx !== -1) {
+            stored.applications[idx] = {
+              ...stored.applications[idx],
+              ...fields,
+              updatedAt: new Date().toISOString()
+            };
+            stored.updatedAt = new Date().toISOString();
+            fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true, updatedApp: stored.applications[idx] }));
+          } else {
+            res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '해당 고객을 찾을 수 없습니다.' }));
+          }
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    // =========================================================================
+    // API Route: CarePort Care Notes (리본케어포트 간병일지 동기화 및 상세조회)
+    // =========================================================================
+    if (reqPath === '/api/careport/sync') {
+      const syncHandler = require('./api/careport/sync');
+      const parsedUrl = urlModule.parse(req.url, true);
+      req.query = parsedUrl.query;
+      res.status = (code) => ({
+        json: (data) => {
+          res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(data));
+        },
+        end: () => res.end()
+      });
+      res.json = (data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      };
+      return syncHandler(req, res);
+    }
+
+    if (reqPath === '/api/careport/detail') {
+      const detailHandler = require('./api/careport/detail');
+      const parsedUrl = urlModule.parse(req.url, true);
+      req.query = parsedUrl.query;
+      res.status = (code) => ({
+        json: (data) => {
+          res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(data));
+        },
+        end: () => res.end()
+      });
+      res.json = (data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      };
+      return detailHandler(req, res);
     }
 
     if (reqPath === '/api/samsung/call-report/data') {

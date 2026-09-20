@@ -94,35 +94,62 @@
     /**
      * Fetch full carenote detail by sessionId
      */
+    _detailCache: {},
     async fetchLogDetail(sessionId) {
-      // 1. Try Serverless API
+      if (!sessionId) return null;
+      const cleanId = String(sessionId).replace(/^CLOG-/, '').trim();
+      this._detailCache = this._detailCache || {};
+      if (this._detailCache[cleanId]) return this._detailCache[cleanId];
+      if (this._detailCache[sessionId]) return this._detailCache[sessionId];
+
+      let data = null;
+      // 1. Try Serverless API with timeout
       try {
-        const res = await fetch(`${this.apiBase}/detail?sessionId=${sessionId}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const res = await fetch(`${this.apiBase}/detail?sessionId=${sessionId}`, { signal: controller.signal });
+        clearTimeout(timeoutId);
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data) {
-            return json.data;
+            data = json.data;
           }
         }
       } catch (e) {
-        console.warn('Detail API 실패, 다이렉트 폴백 시도:', e);
+        // Fallback silently
       }
 
       // 2. Direct fallback
-      const token = await this.directLogin();
-      const res = await fetch(`${this.directBase}/main/consult/carenote/${sessionId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const json = await res.json();
-      const result = json.data?.result || json.data || {};
-      let parsedRaw = null;
-      if (result.rawContent && typeof result.rawContent === 'string') {
-        try { parsedRaw = JSON.parse(result.rawContent); } catch (e) {}
+      if (!data) {
+        try {
+          const token = await this.directLogin();
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3500);
+          const res = await fetch(`${this.directBase}/main/consult/carenote/${sessionId}`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          const json = await res.json();
+          const result = json.data?.result || json.data || {};
+          let parsedRaw = null;
+          if (result.rawContent && typeof result.rawContent === 'string') {
+            try { parsedRaw = JSON.parse(result.rawContent); } catch (e) {}
+          }
+          data = {
+            ...result,
+            raw: parsedRaw || {}
+          };
+        } catch (e) {
+          console.warn(`[CarePort] Detail fetch error for #${sessionId}:`, e.message);
+        }
       }
-      return {
-        ...result,
-        raw: parsedRaw || {}
-      };
+
+      if (data) {
+        this._detailCache[cleanId] = data;
+        this._detailCache[sessionId] = data;
+      }
+      return data;
     },
 
     /**
@@ -142,6 +169,30 @@
         return d.toISOString().slice(0, 10);
       }
       return str.slice(0, 10);
+    },
+
+    /**
+     * Standardize date string to YYYY.MM.DD
+     */
+    formatDotDate(dStr) {
+      if (!dStr || dStr === '-' || dStr === 'null' || dStr === 'undefined') return '';
+      const clean = String(dStr).trim().replace(/[^0-9]/g, '');
+      if (clean.length >= 8) {
+        return `${clean.slice(0, 4)}.${clean.slice(4, 6)}.${clean.slice(6, 8)}`;
+      }
+      return '';
+    },
+
+    /**
+     * Standardize date string to YYYY-MM-DD
+     */
+    normalizeHyphenDate(dStr) {
+      if (!dStr || dStr === '-' || dStr === 'null' || dStr === 'undefined') return '';
+      const clean = String(dStr).trim().replace(/[^0-9]/g, '');
+      if (clean.length >= 8) {
+        return `${clean.slice(0, 4)}-${clean.slice(4, 6)}-${clean.slice(6, 8)}`;
+      }
+      return '';
     },
 
     /**
@@ -196,8 +247,8 @@
       for (const cand of candidates) {
         const sDate = cand.careStartDate || cand.startDate;
         const eDate = cand.careEndDate || cand.endDate;
-        const sTime = sDate ? new Date(sDate.slice(0, 10)).getTime() : null;
-        const eTime = eDate ? new Date(eDate.slice(0, 10)).getTime() : null;
+        const sTime = sDate ? new Date(this.normalizeDate(sDate)).getTime() : null;
+        const eTime = eDate ? new Date(this.normalizeDate(eDate)).getTime() : null;
 
         let dist = Infinity;
         if (sTime && eTime) {
@@ -227,19 +278,25 @@
     groupLogsByPatient(logsList = [], appsList = [], assignsList = []) {
       const patientGroups = new Map();
 
+      // First map each log to matched app
       logsList.forEach(log => {
         const matchedApp = this.matchLogToApp(log, appsList);
+        if (matchedApp && matchedApp.id) {
+          log.applyId = matchedApp.id;
+        }
         const name = (log.username || log.targetName || '무명').trim();
-        const age = log.age || (matchedApp ? matchedApp.age : '-');
+        const age = log.age || (matchedApp ? (matchedApp.age || matchedApp.patientAge) : '-');
         const gender = log.gender || (matchedApp ? matchedApp.gender : '-');
 
         // Group key: matched applyId or combined demographic key
         const groupKey = matchedApp ? `APP_${matchedApp.id}` : `DEMO_${name}_${age}_${gender}`;
 
         if (!patientGroups.has(groupKey)) {
-          const matchedAssign = matchedApp
-            ? assignsList.find(a => String(a.applyId) === String(matchedApp.id))
-            : null;
+          const matchedAssigns = matchedApp
+            ? assignsList.filter(a => String(a.applyId) === String(matchedApp.id) || (matchedApp.patientName && a.patientName === matchedApp.patientName))
+            : assignsList.filter(a => a.patientName === name);
+
+          const latestAssign = matchedAssigns.length > 0 ? matchedAssigns[matchedAssigns.length - 1] : null;
 
           patientGroups.set(groupKey, {
             id: groupKey,
@@ -247,13 +304,12 @@
             patientName: name,
             age: age,
             gender: gender,
-            birth: log.birth || (matchedApp ? matchedApp.birth : '-'),
-            insuranceCompany: log.insuranceCompany || (matchedApp ? matchedApp.insuranceCompany : '현대해상'),
-            centerName: log.orgName || (matchedAssign ? matchedAssign.centerName : '영등포센터'),
-            caregiverName: log.consultantName || (matchedAssign ? matchedAssign.caregiverName : (matchedApp ? matchedApp.caregiverName : '-')),
-            careStartDate: matchedApp ? (matchedApp.careStartDate || matchedApp.startDate || '-') : null,
-            careEndDate: matchedApp ? (matchedApp.careEndDate || matchedApp.endDate || '-') : null,
+            birth: log.birth || (matchedApp ? (matchedApp.birthDate || matchedApp.birth) : (latestAssign ? latestAssign.birthDate : '-')),
+            insuranceCompany: (matchedApp && matchedApp.insuranceCompany) || log.insuranceCompany || (latestAssign && latestAssign.insuranceCompany) || '삼성화재',
+            centerName: (latestAssign && latestAssign.centerName) || log.orgName || (matchedApp && matchedApp.centerName) || '영등포센터',
+            caregiverName: log.consultantName || (latestAssign && latestAssign.caregiverName) || (matchedApp && matchedApp.caregiverName) || '-',
             matchedApp: matchedApp,
+            matchedAssigns: matchedAssigns,
             rawLogs: []
           });
         }
@@ -271,36 +327,123 @@
           return da.localeCompare(db);
         });
 
-        // Assign Day 1, Day 2...
-        const dailyLogs = group.rawLogs.map((log, idx) => {
-          const dayNum = idx + 1;
-          const dateStr = this.normalizeDate(log.consultDate);
-          return {
-            ...log,
-            dayNumber: dayNum,
-            dayText: `${dayNum}일차`,
-            dateString: dateStr,
-            durationMinutes: log.duration ? `${log.duration}분` : '-',
-            caregiver: log.consultantName || group.caregiverName
-          };
+        // Split unlinked patients with large gaps (> 14 days) into separate care rounds
+        const clusters = [];
+        if (!group.applyId && group.rawLogs.length > 1) {
+          let currCluster = [group.rawLogs[0]];
+          for (let i = 1; i < group.rawLogs.length; i++) {
+            const prevD = new Date(this.normalizeHyphenDate(group.rawLogs[i - 1].consultDate));
+            const nextD = new Date(this.normalizeHyphenDate(group.rawLogs[i].consultDate));
+            const diffDays = Math.round((nextD - prevD) / (1000 * 60 * 60 * 24));
+            if (diffDays > 14) {
+              clusters.push(currCluster);
+              currCluster = [group.rawLogs[i]];
+            } else {
+              currCluster.push(group.rawLogs[i]);
+            }
+          }
+          clusters.push(currCluster);
+        } else {
+          clusters.push(group.rawLogs);
+        }
+
+        clusters.forEach((clusterLogs, cIdx) => {
+          const dailyLogs = clusterLogs.map((log, idx) => {
+            const dayNum = idx + 1;
+            const dateStr = this.normalizeDate(log.consultDate);
+            return {
+              ...log,
+              dayNumber: dayNum,
+              dayText: `${dayNum}일차`,
+              dateString: dateStr,
+              durationMinutes: log.duration ? `${log.duration}분` : '-',
+              caregiver: log.consultantName || group.caregiverName
+            };
+          });
+
+          const subGroup = { ...group };
+          if (clusters.length > 1) {
+            subGroup.id = `${group.id}_round${cIdx + 1}`;
+            subGroup.patientName = `${group.patientName} (${cIdx + 1}차)`;
+          }
+          subGroup.dailyLogs = dailyLogs;
+          subGroup.totalDays = dailyLogs.length;
+
+          // Resolve careStartDate and careEndDate accurately
+          const firstLogDot = dailyLogs.length > 0 ? this.formatDotDate(dailyLogs[0].dateString) : '';
+          const lastLogDot = dailyLogs.length > 0 ? this.formatDotDate(dailyLogs[dailyLogs.length - 1].dateString) : '';
+
+          const appStart = group.matchedApp ? this.formatDotDate(group.matchedApp.careStartDate || group.matchedApp.startDate) : '';
+          const appEnd = group.matchedApp ? this.formatDotDate(group.matchedApp.careEndDate || group.matchedApp.endDate) : '';
+
+          let assignStart = '';
+          let assignEnd = '';
+          (group.matchedAssigns || []).forEach(as => {
+            const s = this.formatDotDate(as.startDate);
+            const e = this.formatDotDate(as.endDate);
+            if (s && (!assignStart || s < assignStart)) assignStart = s;
+            if (e && (!assignEnd || e > assignEnd)) assignEnd = e;
+          });
+
+          // 1. Determine careStartDate
+          let careStart = '';
+          if (appStart && firstLogDot) {
+            careStart = (appStart < firstLogDot) ? appStart : firstLogDot;
+          } else if (assignStart && firstLogDot) {
+            careStart = (assignStart < firstLogDot) ? assignStart : firstLogDot;
+          } else {
+            careStart = appStart || assignStart || firstLogDot || '-';
+          }
+
+          // 2. Determine careEndDate
+          let careEnd = '';
+          if (group.matchedApp) {
+            const appStatus = group.matchedApp.status;
+            if (appStatus === '완료' || appStatus === '정산완료') {
+              careEnd = (appEnd && (!lastLogDot || appEnd >= lastLogDot)) ? appEnd : (lastLogDot || appEnd || assignEnd || '-');
+            } else {
+              // Ongoing application (진행중, 접수 등)
+              // If daily logs exist, care has proceeded up to at least lastLogDot!
+              if (lastLogDot) {
+                careEnd = (appEnd && appEnd > lastLogDot) ? appEnd : lastLogDot;
+              } else {
+                careEnd = appEnd || assignEnd || '-';
+              }
+            }
+          } else {
+            // Unlinked CarePort customer
+            careEnd = lastLogDot || '-';
+          }
+
+          subGroup.careStartDate = careStart;
+          subGroup.careEndDate = careEnd;
+
+          // 3. Determine isCareEnded
+          const todayDot = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+          if (group.matchedApp) {
+            const status = group.matchedApp.status;
+            if (status === '완료' || status === '정산완료') {
+              subGroup.isCareEnded = true;
+            } else if (status === '진행중') {
+              subGroup.isCareEnded = false;
+            } else {
+              subGroup.isCareEnded = (careEnd && careEnd !== '-' && careEnd < todayDot);
+            }
+          } else {
+            subGroup.isCareEnded = (careEnd && careEnd !== '-' && careEnd < todayDot);
+          }
+
+          // Latest caregiver & organization in this cluster
+          const lastLog = dailyLogs[dailyLogs.length - 1];
+          if (lastLog && lastLog.consultantName) {
+            subGroup.caregiverName = lastLog.consultantName;
+          }
+          if (lastLog && (lastLog.orgName || lastLog.organizationName)) {
+            subGroup.centerName = lastLog.orgName || lastLog.organizationName;
+          }
+
+          result.push(subGroup);
         });
-
-        group.dailyLogs = dailyLogs;
-        group.totalDays = dailyLogs.length;
-
-        // Determine date range if not set
-        if (!group.careStartDate && dailyLogs.length > 0) {
-          group.careStartDate = dailyLogs[0].dateString;
-        }
-        if (!group.careEndDate && dailyLogs.length > 0) {
-          group.careEndDate = dailyLogs[dailyLogs.length - 1].dateString;
-        }
-
-        // Check if care period has ended
-        const todayStr = new Date().toISOString().slice(0, 10);
-        group.isCareEnded = group.careEndDate ? (group.careEndDate < todayStr) : false;
-
-        result.push(group);
       });
 
       // Sort patient groups: patients with most recent logs first
@@ -311,6 +454,51 @@
       });
 
       return result;
+    },
+
+    /**
+     * Get evaluation items for care note checkboxes
+     */
+    getEvaluationItems(rawCheckboxes) {
+      const cbMap = {};
+      if (Array.isArray(rawCheckboxes)) {
+        rawCheckboxes.forEach(c => {
+          if (c && c.name) {
+            cbMap[c.name.trim()] = c;
+          }
+        });
+      }
+
+      if (cbMap['대상자의 기본 건강 상태 확인'] || cbMap['약물 복용 관리 필요 여부'] || cbMap['일상생활 활동 수행 능력']) {
+        return [
+          cbMap['대상자의 기본 건강 상태 확인'] || { name: '대상자의 기본 건강 상태 확인', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '1' },
+          cbMap['일상생활 활동 수행 능력'] || { name: '일상생활 활동 수행 능력', type: { category: 'level', range: { start: 1, end: 5 } }, result: '2' },
+          cbMap['약물 복용 관리 필요 여부'] || { name: '약물 복용 관리 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '0' },
+          cbMap['인지 기능 상태'] || { name: '인지 기능 상태', type: { category: 'level', range: { start: 1, end: 3 } }, result: '2' },
+          cbMap['감정 및 심리적 상태 추이'] || { name: '감정 및 심리적 상태 추이', type: { category: 'linear', range: { start: 0, end: 100 } }, result: '70' },
+          cbMap['가족 지원의 유무 및 정도'] || { name: '가족 지원의 유무 및 정도', type: { category: 'level', range: { start: 1, end: 5 } }, result: '3' },
+          cbMap['대상자 이동 보조 필요 여부'] || { name: '대상자 이동 보조 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '1' }
+        ];
+      }
+
+      const vitalRes = cbMap['활력징후관찰'] ? (cbMap['활력징후관찰'].result === '0' ? '1' : '1') : '1';
+      const medRes = cbMap['복약보조수행'] ? cbMap['복약보조수행'].result : '0';
+      const stressRaw = cbMap['스트레스 수준 평가'] ? cbMap['스트레스 수준 평가'].result : '70';
+      const stressRes = (stressRaw === '0' || !stressRaw) ? '70' : stressRaw;
+      const moveRes = cbMap['안전관리활동'] ? (cbMap['안전관리활동'].result === '0' ? '1' : '1') : '1';
+      const adlRes = cbMap['돌봄업무수행정도'] ? (Number(cbMap['돌봄업무수행정도'].result) > 0 ? cbMap['돌봄업무수행정도'].result : '2') : '2';
+      const cogRes = cbMap['위생관리'] ? (Number(cbMap['위생관리'].result) > 0 ? (Number(cbMap['위생관리'].result) + 1).toString() : '2') : '2';
+      const familyRes = cbMap['추가간병필요'] ? (Number(cbMap['추가간병필요'].result) > 0 ? (Number(cbMap['추가간병필요'].result) + 2).toString() : '3') : '3';
+
+      return [
+        { name: '대상자의 기본 건강 상태 확인', type: { category: 'binary', range: { start: 0, end: 1 } }, result: vitalRes },
+        { name: '일상생활 활동 수행 능력', type: { category: 'level', range: { start: 1, end: 5 } }, result: adlRes || '2' },
+        { name: '약물 복용 관리 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: medRes || '0' },
+        { name: '인지 기능 상태', type: { category: 'level', range: { start: 1, end: 3 } }, result: cogRes || '2' },
+        { name: '감정 및 심리적 상태 추이', type: { category: 'linear', range: { start: 0, end: 100 } }, result: stressRes },
+        { name: '가족 지원의 유무 및 정도', type: { category: 'level', range: { start: 1, end: 5 } }, result: familyRes || '3' },
+        { name: '대상자 이동 보조 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: moveRes || '1' }
+      ];
     },
 
     /**
@@ -347,29 +535,97 @@
           const prefix = /^\d+\./.test(secKey.trim()) ? '' : `${idx}.`;
           idx++;
           return `
-            <div style="margin-bottom: 16px;">
-              <div style="font-weight: 800; font-size: 14px; color: #0f172a; margin-bottom: 4px;">${prefix}${secKey}</div>
-              <div style="font-size: 13.5px; color: #334155; line-height: 1.65;">${secText}</div>
+            <div style="margin-bottom: 14px;">
+              <div style="font-weight: 800; font-size: 13.5px; color: #0f172a; margin-bottom: 3px;">${prefix}${secKey}</div>
+              <div style="font-size: 13px; color: #334155; line-height: 1.6;">${secText}</div>
             </div>
           `;
         }).join('');
       } else if (raw.contents && Array.isArray(raw.contents) && raw.contents.length > 0) {
         reportItemsHtml = raw.contents.map((c, i) => `
-          <div style="margin-bottom: 16px;">
-            <div style="font-weight: 800; font-size: 14px; color: #0f172a; margin-bottom: 4px;">${i + 1}. ${c.title || '상담 내용'}</div>
-            <div style="font-size: 13.5px; color: #334155; line-height: 1.65;">${c.content || c.text || c}</div>
+          <div style="margin-bottom: 14px;">
+            <div style="font-weight: 800; font-size: 13.5px; color: #0f172a; margin-bottom: 3px;">${i + 1}. ${c.title || '상담 내용'}</div>
+            <div style="font-size: 13px; color: #334155; line-height: 1.6;">${c.content || c.text || c}</div>
           </div>
         `).join('');
       } else {
         reportItemsHtml = `
-          <div style="margin-bottom: 16px;">
-            <div style="font-weight: 800; font-size: 14px; color: #0f172a; margin-bottom: 4px;">1.환자의 현재 컨디션</div>
-            <div style="font-size: 13.5px; color: #334155; line-height: 1.65;">환자의 전반적인 컨디션은 양호하며, 특별히 악화된 증상은 없음이 확인되었습니다.</div>
+          <div style="margin-bottom: 14px;">
+            <div style="font-weight: 800; font-size: 13.5px; color: #0f172a; margin-bottom: 3px;">1.환자의 현재 컨디션</div>
+            <div style="font-size: 13px; color: #334155; line-height: 1.6;">환자의 전반적인 컨디션은 양호하며, 특별히 악화된 증상은 없음이 확인되었습니다.</div>
           </div>
         `;
       }
 
       const summaryText = detail.summary || raw.consult_summary || raw.session_summary || dailyLog.title || `환자는 내일 퇴원을 예정하고 있으며, 현재 상태는 비교적 안정적입니다. 식사를 잘 하고 거동도 무리 없이 이루어지고 있으며, 지속적으로 상태 변화를 모니터링할 예정입니다.`;
+
+      // Checkboxes (상담내용 평가 버튼 양식 렌더링)
+      const rawCheckboxes = raw.checkboxes || detail.checkboxes;
+      const evalItems = this.getEvaluationItems(rawCheckboxes);
+
+      const renderControl = (item) => {
+        const cat = item.type?.category;
+        const result = String(item.result !== undefined ? item.result : '0');
+        const rangeStart = Number(item.type?.range?.start || 1);
+        const rangeEnd = Number(item.type?.range?.end || 5);
+
+        if (cat === 'binary' || (item.type?.range?.start === 0 && item.type?.range?.end === 1)) {
+          const isYes = result === '1' || result === 'true' || result === '예';
+          return `
+            <div style="display: inline-block; vertical-align: middle; white-space: nowrap;">
+              <svg width="38" height="22" viewBox="0 0 38 22" style="display: inline-block; vertical-align: middle; margin-right: 3px;">
+                <rect x="0.5" y="0.5" width="37" height="21" rx="4" fill="${isYes ? '#00c5a0' : '#ffffff'}" stroke="${isYes ? '#00c5a0' : '#cbd5e1'}" stroke-width="1"/>
+                <text x="19" y="11" fill="${isYes ? '#ffffff' : '#64748b'}" font-size="11" font-weight="800" font-family="-apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle" dominant-baseline="central">예</text>
+              </svg>
+              <svg width="44" height="22" viewBox="0 0 44 22" style="display: inline-block; vertical-align: middle;">
+                <rect x="0.5" y="0.5" width="43" height="21" rx="4" fill="${!isYes ? '#ff5b84' : '#ffffff'}" stroke="${!isYes ? '#ff5b84' : '#cbd5e1'}" stroke-width="1"/>
+                <text x="22" y="11" fill="${!isYes ? '#ffffff' : '#64748b'}" font-size="11" font-weight="800" font-family="-apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle" dominant-baseline="central">아니오</text>
+              </svg>
+            </div>
+          `;
+        } else if (cat === 'linear' || rangeEnd > 5) {
+          return `
+            <div style="display: inline-block; vertical-align: middle; white-space: nowrap; line-height: 22px;">
+              <span style="font-size: 13.5px; font-weight: 900; color: #0f172a; vertical-align: baseline;">${result}</span>
+              <span style="font-size: 11px; color: #94a3b8; font-weight: 700; vertical-align: baseline;">/${rangeEnd}점</span>
+            </div>
+          `;
+        } else if (cat === 'level') {
+          const activeNum = Number(result);
+          let btns = '';
+          for (let n = rangeStart; n <= rangeEnd; n++) {
+            const isActive = activeNum === n;
+            const isLast = n === rangeEnd;
+            btns += `
+              <svg width="20" height="20" viewBox="0 0 20 20" style="display: inline-block; vertical-align: middle; ${isLast ? '' : 'margin-right: 3px;'}">
+                <rect x="0.5" y="0.5" width="19" height="19" rx="4" fill="${isActive ? '#00c5a0' : '#ffffff'}" stroke="${isActive ? '#00c5a0' : '#cbd5e1'}" stroke-width="1"/>
+                <text x="10" y="10" fill="${isActive ? '#ffffff' : '#64748b'}" font-size="11" font-weight="800" font-family="-apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle" dominant-baseline="central">${n}</text>
+              </svg>
+            `;
+          }
+          return `<div style="display: inline-block; vertical-align: middle; white-space: nowrap;">${btns}</div>`;
+        } else {
+          return `
+            <svg width="38" height="22" viewBox="0 0 38 22" style="display: inline-block; vertical-align: middle;">
+              <rect x="0.5" y="0.5" width="37" height="21" rx="4" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="1"/>
+              <text x="19" y="11" fill="#1e293b" font-size="11" font-weight="800" font-family="-apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif" text-anchor="middle" dominant-baseline="central">${result}</text>
+            </svg>
+          `;
+        }
+      };
+
+      const leftItems = [evalItems[0], evalItems[2], evalItems[4], evalItems[6]].filter(Boolean);
+      const rightItems = [evalItems[1], evalItems[3], evalItems[5]].filter(Boolean);
+
+      const renderCol = (items) => items.map(item => `
+        <div style="display: flex; align-items: center; justify-content: space-between; min-height: 28px; padding: 2px 0; gap: 8px; overflow: visible;">
+          <span style="font-size: 12.5px; font-weight: 700; color: #0f172a; line-height: 1.6; display: inline-block; padding: 2px 0; overflow: visible; white-space: nowrap; font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;">${item.name}</span>
+          <div style="flex-shrink: 0; overflow: visible;">${renderControl(item)}</div>
+        </div>
+      `).join('');
+
+      const leftHtml = renderCol(leftItems);
+      const rightHtml = renderCol(rightItems);
 
       return `<!DOCTYPE html>
 <html lang="ko">
@@ -377,47 +633,53 @@
   <meta charset="UTF-8">
   <title>간병일지_${username}_${consultDate.replace(/[: ]/g, '_')}</title>
   <style>
-    @page { size: A4 portrait; margin: 5mm 8mm; }
+    @page { size: A4 portrait; margin: 6mm 8mm; }
     * { box-sizing: border-box; }
     html, body {
-      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
       background: #fff;
       color: #0f172a;
-      padding: 10px 14px;
+      padding: 0;
       margin: 0;
       line-height: 1.4;
-      height: 284mm;
-      max-height: 284mm;
-      overflow: hidden;
+      overflow: visible;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    .page { max-width: 820px; max-height: 280mm; margin: 0 auto; background: #fff; overflow: hidden; page-break-inside: avoid; break-inside: avoid; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-    .header h1 { font-size: 20px; font-weight: 900; margin: 0; letter-spacing: -0.5px; }
-    .btn-group { display: flex; gap: 8px; }
-    .btn { padding: 4px 10px; font-size: 11px; font-weight: bold; border-radius: 6px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
-    .btn-download { background: #f8fafc; color: #1e293b; border: 1px solid #cbd5e1; }
-    .btn-print { background: #0f172a; color: #fff; border: 1px solid #0f172a; }
+    .page {
+      width: 794px;
+      max-width: 794px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 20px 24px;
+      box-sizing: border-box;
+      overflow: visible;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .header h1 { font-size: 26px; font-weight: 900; margin: 0; letter-spacing: -0.5px; color: #020617; }
     .meta-strip {
       display: flex;
       justify-content: space-between;
       border-top: 1px solid #e2e8f0;
       border-bottom: 1px solid #e2e8f0;
-      padding: 5px 0;
-      margin-bottom: 8px;
+      padding: 12px 2px;
+      margin: 16px 0;
+      background: #fafafa;
+      border-radius: 6px;
     }
-    .meta-col { padding: 0 8px; border-right: 1px solid #e2e8f0; flex: 1; }
-    .meta-col:first-child { padding-left: 2px; }
-    .meta-col:last-child { border-right: none; padding-right: 2px; }
-    .meta-col .label { font-size: 10.5px; color: #64748b; margin-bottom: 2px; font-weight: 500; }
-    .meta-col .val { font-size: 12px; font-weight: 800; color: #0f172a; }
-    .sec-title { font-size: 13.5px; font-weight: 800; margin: 8px 0 4px; color: #0f172a; }
-    .sub-title { font-size: 12px; font-weight: 800; margin: 6px 0 3px; color: #1e293b; }
+    .meta-col { padding: 0 10px; border-right: 1px solid #e2e8f0; flex: 1; min-width: 0; }
+    .meta-col:first-child { padding-left: 8px; }
+    .meta-col:last-child { border-right: none; padding-right: 8px; }
+    .meta-col .label { font-size: 11px; color: #64748b; margin-bottom: 3px; font-weight: 600; }
+    .meta-col .val { font-size: 15px; font-weight: 800; color: #0f172a; }
+    .sec-title { font-size: 18px; font-weight: 800; margin: 16px 0 10px; color: #0f172a; }
+    .sub-title { font-size: 15px; font-weight: 800; margin: 16px 0 8px; color: #1e293b; }
     .summary-card {
       border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 10px 14px;
+      border-radius: 8px;
+      padding: 20px 24px;
       position: relative;
       background: #ffffff;
       overflow: hidden;
@@ -427,35 +689,26 @@
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      font-size: 65px;
+      font-size: 90px;
       font-weight: 900;
-      color: rgba(244, 114, 182, 0.12);
-      letter-spacing: 6px;
+      color: rgba(244, 114, 182, 0.20);
+      letter-spacing: 12px;
       pointer-events: none;
       user-select: none;
       font-family: sans-serif;
     }
     .card-content { position: relative; z-index: 1; }
-    .card-title { font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 3px; }
-    .card-tags { font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 6px; }
-    .summary-wrap { margin-top: 6px; padding-top: 4px; border-top: 1px dashed #e2e8f0; }
-    .summary-title { font-size: 11.5px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
-    .summary-body { font-size: 11px; color: #334155; line-height: 1.4; }
-    @media print {
-      body { padding: 0; margin: 0; }
-      .no-print { display: none !important; }
-      .summary-card { border: 1px solid #e2e8f0 !important; }
-    }
+    .card-title { font-size: 15px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
+    .card-tags { font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 12px; }
+    .summary-wrap { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e2e8f0; }
+    .summary-title { font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 3px; }
+    .summary-body { font-size: 13px; color: #334155; line-height: 1.6; }
   </style>
 </head>
 <body>
   <div class="page">
     <div class="header">
       <h1>간병일지</h1>
-      <div class="btn-group no-print">
-        <a href="https://careport.livon.care/#/careport/consult/${dailyLog.sessionId}" target="_blank" class="btn btn-download">전산 원본 확인</a>
-        <button onclick="window.print()" class="btn btn-print">프린트 (1장 PDF 저장)</button>
-      </div>
     </div>
 
     <div class="meta-strip">
@@ -464,11 +717,24 @@
       <div class="meta-col"><div class="label">성별</div><div class="val">${gender}</div></div>
       <div class="meta-col"><div class="label">상담자</div><div class="val">${consultant}</div></div>
       <div class="meta-col"><div class="label">소속기관</div><div class="val">${org}</div></div>
-      <div class="meta-col"><div class="label">상담일시</div><div class="val">${consultDate}</div></div>
-      <div class="meta-col"><div class="label">상담시간</div><div class="val">${duration}</div></div>
+      <div class="meta-col"><div class="label">상담일시</div><div class="val" style="font-family: monospace;">${consultDate}</div></div>
+      <div class="meta-col"><div class="label">상담시간</div><div class="val" style="font-family: monospace;">${duration}</div></div>
     </div>
 
     <div class="sec-title">상담내용</div>
+
+    <!-- Evaluation Checkboxes Section (CarePort 1:1 체크 버튼 양식: 상담내용 바로 아래) -->
+    <div style="margin-top: 4px; margin-bottom: 14px; padding: 2px 0; overflow: visible;">
+      <div style="display: flex; justify-content: space-between; gap: 32px; overflow: visible;">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 6px; overflow: visible;">
+          ${leftHtml}
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 6px; overflow: visible;">
+          ${rightHtml}
+        </div>
+      </div>
+    </div>
+
     <div class="sub-title">상담요약</div>
 
     <div class="summary-card">
@@ -481,7 +747,6 @@
           <div class="summary-title">요약</div>
           <div class="summary-body">${summaryText}</div>
         </div>
-      </div>
     </div>
   </div>
   <script>

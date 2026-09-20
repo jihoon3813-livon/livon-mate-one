@@ -2854,6 +2854,7 @@ window.REBORN_DATA = {
   },
   applications: (EXCEL_RAW_DATA.applications || []).map(a => ({
     ...a,
+    claimClassification: a.claimClassification || a.claimCategory || '',
     accidentDate: a.accidentDate || a.applyDate || '2026.01.15'
   })),
   assignments: EXCEL_RAW_DATA.assignments || [],

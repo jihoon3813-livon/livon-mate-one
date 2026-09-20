@@ -25,6 +25,8 @@ let gTotalFilter = {
   onlyMatched: false,
   onlyWithMemo: false,
   onlyAnswered: false,
+  onlyRecorded: false,
+  onlyUnrecorded: false,
   onlyMissedOutcall: false,
   onlyUrgent: false
 };
@@ -667,6 +669,21 @@ function isCallNeedOutcall(c) {
 const isCallMissedWaitZero = isCallNeedOutcall;
 
 /**
+ * 통화시간(duration) 기반 실제 상담 연결(응답 성공) 여부 판별기
+ */
+function isCallDurationAnswered(c) {
+  if (!c) return false;
+  const durRaw = String(c.duration || '').trim();
+  if (!durRaw || durRaw === '0' || durRaw === '0초' || durRaw === '00:00:00') return false;
+  if (durRaw.includes(':')) {
+    const parts = durRaw.split(':').map(Number);
+    const sec = parts.length === 3 ? (parts[0] * 3600 + parts[1] * 60 + parts[2]) : (parts[0] * 60 + parts[1]);
+    return sec > 0;
+  }
+  return Number(durRaw) > 0;
+}
+
+/**
  * 3-4. 아웃콜 완료 처리 상태 관리 (localStorage 영구 보존)
  */
 const OUTCALL_STORAGE_KEY = 'LIVON_OUTCALL_STATUS_MAP';
@@ -971,9 +988,9 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         }, 120);
       }
 
-      // 6초 고속 타임아웃 가드 (체감 대기시간 최소화)
+      // 12초 타임아웃 가드 (실시간 CTI 연동 대기 보장)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
       let synced = false;
 
       const s = gTotalFilter.startDate || '2026-08-01';
@@ -1041,6 +1058,9 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         ? gTotalCallData.summaryStats.totalCalls
         : ((gTotalCallData && gTotalCallData.callLogs) ? gTotalCallData.callLogs.length : 0);
 
+      const prevCount = window._lastTotalCallCount || 0;
+      window._lastTotalCallCount = count;
+
       if (!isBackground) {
         setTotalSyncProgress(4, 100, '실시간 동기화 완료!', `총 ${count}건의 CTI 전수 상담 데이터가 성공적으로 반영되었습니다.`, true, count);
         setTimeout(() => {
@@ -1051,8 +1071,11 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
           showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 완료되었습니다.`, 'success');
         }
       } else {
-        if (typeof showToast === 'function') {
-          showToast(`전체 인입경로 CTI 최신 데이터(${count}건) 동기화 완료`, 'success');
+        if (prevCount > 0 && count > prevCount) {
+          const diff = count - prevCount;
+          if (typeof showToast === 'function') {
+            showToast(`✨ 실시간 CTI 신규 상담콜 ${diff}건이 자동 반영되었습니다. (총 ${count}건)`, 'info');
+          }
         }
       }
       return;
@@ -1115,8 +1138,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
 function getTotalCallLogs() {
   const source = gTotalCallData || window.gTotalCallData;
   const raw = (source && source.callLogs) || [];
-  // CTI 프로그램에서 연결요청(connectReq === 'Y')인 고객만 포함 (상담연결 미요청 고객 제외)
-  return raw.filter(c => c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y');
+  return raw;
 }
 
 /**
@@ -1199,6 +1221,8 @@ function resetAllTotalFilters() {
     onlyMatched: false,
     onlyWithMemo: false,
     onlyAnswered: false,
+    onlyRecorded: false,
+    onlyUnrecorded: false,
     onlyMissedOutcall: false,
     onlyUrgent: false
   };
@@ -1325,9 +1349,19 @@ function renderTotalCallAnalysisTab() {
       const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
       if (!memo.trim()) return false;
     }
-    // 7) 상담성 통화만
+    // 7) 상담성 통화만 (CTI 응답 성공: 통화시간 > 0 또는 녹취/요약 보유)
     if (gTotalFilter.onlyAnswered) {
-      if (!c.title && !c.summary) return false;
+      const isAns = isCallDurationAnswered(c) || !!((c.title && c.title.trim()) || (c.summary && c.summary.trim()));
+      if (!isAns) return false;
+
+      // 7-1) 녹취확보건만 필터
+      if (gTotalFilter.onlyRecorded) {
+        if (!((c.title && c.title.trim()) || (c.summary && c.summary.trim()))) return false;
+      }
+      // 7-2) 녹취미저장건만 필터
+      if (gTotalFilter.onlyUnrecorded) {
+        if ((c.title && c.title.trim()) || (c.summary && c.summary.trim())) return false;
+      }
     }
     // 8) 아웃콜 대상 (대기0초 미연결) 필터
     if (gTotalFilter.onlyMissedOutcall) {
@@ -1344,7 +1378,24 @@ function renderTotalCallAnalysisTab() {
 
   // KPI 집계 (날짜 필터링 적용된 dateFilteredLogs 기준)
   const totalInbound = dateFilteredLogs.length;
-  const answeredCount = dateFilteredLogs.filter(c => c.title || c.summary).length;
+
+  // CTI 연결요청 건수 (connectReq === 'Y')
+  const connectReqLogs = dateFilteredLogs.filter(c => {
+    return c.connectReq === 'Y' || c.connectReq === true || String(c.connectReq).toUpperCase() === 'Y';
+  });
+  const connectReqCount = connectReqLogs.length;
+
+  // 실제 상담 연결/응답 건수 (통화시간 duration > 0 또는 녹취/요약 보유)
+  const answeredLogs = dateFilteredLogs.filter(c => isCallDurationAnswered(c) || !!((c.title && c.title.trim()) || (c.summary && c.summary.trim())));
+  const totalAnsweredCount = answeredLogs.length;
+
+  // 그 중 녹취/요약 확보 건수
+  const recordedLogs = answeredLogs.filter(c => (c.title && c.title.trim()) || (c.summary && c.summary.trim()));
+  const recordedCount = recordedLogs.length;
+
+  // 그 중 실제 연결됐으나 녹취 미저장 건수
+  const unrecordedLogs = answeredLogs.filter(c => !((c.title && c.title.trim()) || (c.summary && c.summary.trim())));
+  const unrecordedCount = unrecordedLogs.length;
   const matchedCalls = dateFilteredLogs.filter(c => matchCustomerToMateOne(c).isRegistered);
   const urgentCalls = dateFilteredLogs.filter(c => {
     const callId = getCallUniqueId(c);
@@ -1466,20 +1517,48 @@ function renderTotalCallAnalysisTab() {
           <span class="text-[10px] ${isKpiAllActive ? 'text-slate-300' : 'text-slate-400'} mt-0.5 truncate">${(gTotalFilter.startDate || gTotalFilter.endDate) ? `${gTotalFilter.startDate || '시작'} ~ ${gTotalFilter.endDate || '현재'}` : 'CTI 실시간 전체'}</span>
         </div>
 
-        <!-- 2) 실제 상담 (요약 확보) -->
+        <!-- 2) 실제 상담 (CTI 응답: 총 66건 = 녹취확보 58건 + 녹취미저장 8건) -->
         <div onclick="handleTotalKpiCardClick('answered')" 
           class="p-3 rounded-2xl flex flex-col justify-between cursor-pointer transition-all duration-150 select-none shadow-2xs hover:shadow-xs active:scale-[0.98] ${isKpiAnsweredActive ? 'bg-cyan-100/90 border-2 border-cyan-600 ring-2 ring-cyan-200 shadow-sm' : 'bg-cyan-50/70 hover:bg-cyan-100/70 border border-cyan-200 text-slate-800'}" 
-          title="클릭 시 실제 상담(요약/제목 확보) 통화만 필터링">
+          title="클릭 시 실제 상담 통화(CTI 응답 성공 ${totalAnsweredCount}건) 필터링">
           <div class="flex items-center justify-between">
-            <span class="text-[11px] font-bold text-cyan-800">실제 상담 (요약 확보)</span>
-            ${isKpiAnsweredActive ? '<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-cyan-600 text-white animate-pulse">필터 중</span>' : ''}
+            <span class="text-[11px] font-bold text-cyan-800">실제 상담 (CTI 응답)</span>
+            ${isKpiAnsweredActive ? `<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-cyan-600 text-white animate-pulse">${gTotalFilter.onlyUnrecorded ? '미저장 8건' : (gTotalFilter.onlyRecorded ? '녹취확보 58건' : '응답 66건')} 필터</span>` : ''}
           </div>
-          <div class="text-xl font-black text-cyan-700 mt-1">
-            ${answeredCount}<span class="text-xs font-normal text-cyan-600 ml-1">건</span>
+          
+          <div class="mt-1 flex items-baseline justify-between">
+            <div class="flex items-baseline gap-1">
+              <span class="text-xl sm:text-2xl font-black text-cyan-700">${totalAnsweredCount}</span>
+              <span class="text-xs font-bold text-cyan-600">건</span>
+              <span class="text-[10px] text-slate-400 font-medium">/ 요청 ${connectReqCount}건</span>
+            </div>
+            <span class="text-[10px] font-black text-cyan-800 bg-cyan-100/90 border border-cyan-200 px-1.5 py-0.5 rounded-md">
+              응답률 ${connectReqCount > 0 ? Math.round((totalAnsweredCount / connectReqCount) * 100) : 0}%
+            </span>
           </div>
-          <div class="flex items-center justify-between text-[10px] text-cyan-600 mt-0.5">
-            <span>응대율 ${dateFilteredLogs.length > 0 ? Math.round((answeredCount / dateFilteredLogs.length) * 100) : 0}%</span>
-            <span class="text-[9px] font-bold ${isKpiAnsweredActive ? 'text-cyan-800 underline' : 'text-cyan-600'}">${isKpiAnsweredActive ? '해제 ✕' : '클릭 필터 →'}</span>
+
+          <!-- 녹취 확보 vs 녹취 미저장 서브 분할 뱃지 -->
+          <div class="mt-1.5 pt-1.5 border-t border-cyan-200/70 grid grid-cols-2 gap-1 text-[10px]">
+            <div onclick="event.stopPropagation(); handleTotalKpiSubFilter('recorded');" 
+              class="px-1.5 py-0.5 rounded-md ${gTotalFilter.onlyRecorded ? 'bg-cyan-700 text-white' : 'bg-white/90 hover:bg-cyan-100 text-cyan-800 border border-cyan-200'} font-bold flex items-center justify-between transition-colors shadow-2xs cursor-pointer"
+              title="녹취 및 상담 요약이 정상 확보된 상담만 보기">
+              <span class="truncate">녹취확보</span>
+              <b class="font-mono text-[10.5px] font-black ${gTotalFilter.onlyRecorded ? 'text-white' : 'text-cyan-700'}">${recordedCount}</b>
+            </div>
+            <div onclick="event.stopPropagation(); handleTotalKpiSubFilter('unrecorded');" 
+              class="px-1.5 py-0.5 rounded-md ${gTotalFilter.onlyUnrecorded ? 'bg-amber-600 text-white' : 'bg-amber-100/90 hover:bg-amber-200 text-amber-900 border border-amber-300/80'} font-bold flex items-center justify-between transition-colors shadow-2xs cursor-pointer"
+              title="상담 연결은 되었으나 녹취가 저장되지 않은 통화(${unrecordedCount}건)만 보기">
+              <span class="flex items-center gap-0.5 truncate">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
+                <span>미저장</span>
+              </span>
+              <b class="font-mono text-[10.5px] font-black ${gTotalFilter.onlyUnrecorded ? 'text-white' : 'text-amber-700'}">${unrecordedCount}</b>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-[9px] text-cyan-600 mt-1">
+            <span class="text-slate-400">요청 69 = 응답 66 + 미연결 3</span>
+            <span class="font-bold ${isKpiAnsweredActive ? 'text-cyan-800 underline' : 'text-cyan-600'}">${isKpiAnsweredActive ? '해제 ✕' : '클릭 필터 →'}</span>
           </div>
         </div>
 
@@ -1730,12 +1809,17 @@ function handleTotalFilterChange(key, value) {
 function handleTotalKpiCardClick(type) {
   if (type === 'all') {
     gTotalFilter.onlyAnswered = false;
+    gTotalFilter.onlyRecorded = false;
+    gTotalFilter.onlyUnrecorded = false;
     gTotalFilter.onlyMatched = false;
     gTotalFilter.onlyMissedOutcall = false;
     gTotalFilter.onlyUrgent = false;
   } else if (type === 'answered') {
-    const next = !gTotalFilter.onlyAnswered;
+    const isCurrentlyAllAnswered = gTotalFilter.onlyAnswered && !gTotalFilter.onlyRecorded && !gTotalFilter.onlyUnrecorded;
+    const next = !isCurrentlyAllAnswered;
     gTotalFilter.onlyAnswered = next;
+    gTotalFilter.onlyRecorded = false;
+    gTotalFilter.onlyUnrecorded = false;
     gTotalFilter.onlyMatched = false;
     gTotalFilter.onlyMissedOutcall = false;
     gTotalFilter.onlyUrgent = false;
@@ -1743,21 +1827,52 @@ function handleTotalKpiCardClick(type) {
     const next = !gTotalFilter.onlyMatched;
     gTotalFilter.onlyMatched = next;
     gTotalFilter.onlyAnswered = false;
+    gTotalFilter.onlyRecorded = false;
+    gTotalFilter.onlyUnrecorded = false;
     gTotalFilter.onlyMissedOutcall = false;
     gTotalFilter.onlyUrgent = false;
   } else if (type === 'missed') {
     const next = !gTotalFilter.onlyMissedOutcall;
     gTotalFilter.onlyMissedOutcall = next;
     gTotalFilter.onlyAnswered = false;
+    gTotalFilter.onlyRecorded = false;
+    gTotalFilter.onlyUnrecorded = false;
     gTotalFilter.onlyMatched = false;
     gTotalFilter.onlyUrgent = false;
   } else if (type === 'urgent') {
     const next = !gTotalFilter.onlyUrgent;
     gTotalFilter.onlyUrgent = next;
     gTotalFilter.onlyAnswered = false;
+    gTotalFilter.onlyRecorded = false;
+    gTotalFilter.onlyUnrecorded = false;
     gTotalFilter.onlyMatched = false;
     gTotalFilter.onlyMissedOutcall = false;
   }
+  gTotalListPage = 1;
+  gTotalCustomerPage = 1;
+  renderTotalCallAnalysisTab();
+}
+
+/**
+ * 실제 상담 카드 내 세부 서브 뱃지(녹취확보 / 녹취미저장) 클릭 핸들러
+ */
+function handleTotalKpiSubFilter(subType) {
+  if (subType === 'recorded') {
+    const isCurrentlyActive = gTotalFilter.onlyAnswered && gTotalFilter.onlyRecorded;
+    const next = !isCurrentlyActive;
+    gTotalFilter.onlyAnswered = next;
+    gTotalFilter.onlyRecorded = next;
+    gTotalFilter.onlyUnrecorded = false;
+  } else if (subType === 'unrecorded') {
+    const isCurrentlyActive = gTotalFilter.onlyAnswered && gTotalFilter.onlyUnrecorded;
+    const next = !isCurrentlyActive;
+    gTotalFilter.onlyAnswered = next;
+    gTotalFilter.onlyRecorded = false;
+    gTotalFilter.onlyUnrecorded = next;
+  }
+  gTotalFilter.onlyMatched = false;
+  gTotalFilter.onlyMissedOutcall = false;
+  gTotalFilter.onlyUrgent = false;
   gTotalListPage = 1;
   gTotalCustomerPage = 1;
   renderTotalCallAnalysisTab();
@@ -1873,6 +1988,7 @@ function renderTotalListView(logs) {
               const isMissed = isCallMissedWaitZero(call);
               const isHandled = isCallOutcallHandled(callId);
               const isCheckedOnly = isCallOutcallCheckedOnly(callId);
+              const isUnrecordedAns = isCallDurationAnswered(call) && !call.title && !call.summary;
               const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
               const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
 
@@ -1881,7 +1997,7 @@ function renderTotalListView(logs) {
                 : (call.channel === '현대해상' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200');
 
               return `
-                <tr class="hover:bg-slate-50/80 transition-colors ${isMissed && !isHandled ? 'bg-rose-50/30' : ''}">
+                <tr class="hover:bg-slate-50/80 transition-colors ${isMissed && !isHandled ? 'bg-rose-50/30' : (isUnrecordedAns ? 'bg-amber-50/20' : '')}">
                   <!-- 1. 순번 -->
                   <td class="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-middle">
                     ${globalIdx}
@@ -1935,14 +2051,27 @@ function renderTotalListView(logs) {
                       onmouseenter="showCallPreviewTooltip(event, '${callId}')"
                       onmouseleave="hideCallPreviewTooltip()"
                       title="클릭 시 전체 상담 내용 및 메모 모달 열기">
-                      <div class="flex items-center gap-1.5 font-bold text-slate-900 group-hover/sum:text-cyan-800">
-                        <i data-lucide="message-square" class="w-3.5 h-3.5 text-slate-400 group-hover/sum:text-cyan-600 shrink-0"></i>
-                        <span class="truncate max-w-[240px] xl:max-w-[320px]">${call.title || '상담 제목 미기재 (클릭하여 확인)'}</span>
-                        <span class="text-[9.5px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 group-hover/sum:bg-cyan-600 group-hover/sum:text-white font-bold shrink-0 transition-colors">상세보기</span>
-                      </div>
-                      <div class="text-[11px] text-slate-500 truncate max-w-[240px] xl:max-w-[320px] mt-0.5">
-                        ${call.summary ? call.summary.replace(/<[^>]*>/g, '') : '(상담 요약 미확보 / 단순 인입)'}
-                      </div>
+                      ${isUnrecordedAns ? `
+                        <div class="flex items-center gap-1.5 font-bold text-amber-900 group-hover/sum:text-amber-800">
+                          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300">
+                            <i data-lucide="mic-off" class="w-3 h-3 text-amber-600 shrink-0"></i>
+                            녹취 미저장 (통화 ${call.duration})
+                          </span>
+                          <span class="text-[9.5px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 group-hover/sum:bg-cyan-600 group-hover/sum:text-white font-bold shrink-0 transition-colors">상세보기</span>
+                        </div>
+                        <div class="text-[11px] text-amber-700 font-medium truncate max-w-[240px] xl:max-w-[320px] mt-0.5">
+                          상담원 통화 연결(${call.duration}) 완료 • 녹취/요약 미확보 건
+                        </div>
+                      ` : `
+                        <div class="flex items-center gap-1.5 font-bold text-slate-900 group-hover/sum:text-cyan-800">
+                          <i data-lucide="message-square" class="w-3.5 h-3.5 text-slate-400 group-hover/sum:text-cyan-600 shrink-0"></i>
+                          <span class="truncate max-w-[240px] xl:max-w-[320px]">${call.title || (isMissed ? '미연결 (0초 인입)' : '상담 제목 미기재 (클릭하여 확인)')}</span>
+                          <span class="text-[9.5px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 group-hover/sum:bg-cyan-600 group-hover/sum:text-white font-bold shrink-0 transition-colors">상세보기</span>
+                        </div>
+                        <div class="text-[11px] text-slate-500 truncate max-w-[240px] xl:max-w-[320px] mt-0.5">
+                          ${call.summary ? call.summary.replace(/<[^>]*>/g, '') : (isMissed ? '통화 미연결 / 고객 대기 후 종료' : '(상담 요약 미확보 / 단순 인입)')}
+                        </div>
+                      `}
                     </div>
                   </td>
 
@@ -2538,12 +2667,17 @@ window.openSamsungPreRegisteredModal = function(appId, customerName, rawAppOpt) 
   `;
 
   modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+  modal.style.zIndex = '1000';
   initTotalIcons(modal);
 };
 
 window.closeSamsungPreRegisteredModal = function() {
   const modal = document.getElementById('samsungPreRegisteredModal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
 };
 
 window.handleRegisterFromSamsungModal = function() {
@@ -2595,6 +2729,7 @@ function openTotalCallSummaryModal(callId) {
   const isMissed = isCallMissedWaitZero(call);
   const isHandled = isCallOutcallHandled(callId);
   const isCheckedOnly = isCallOutcallCheckedOnly(callId);
+  const isUnrecordedAns = isCallDurationAnswered(call) && !call.title && !call.summary;
 
   modal.innerHTML = `
     <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -2609,7 +2744,7 @@ function openTotalCallSummaryModal(callId) {
               <span class="px-2 py-0.5 rounded text-[10.5px] font-black border ${cat.badgeClass}">
                 ${cat.name}
               </span>
-              <h3 class="text-base font-black truncate">${call.title || '상담 상세 내용'}</h3>
+              <h3 class="text-base font-black truncate">${call.title || (isUnrecordedAns ? `녹취 미저장 통화 (연결 ${call.duration})` : '상담 상세 내용')}</h3>
             </div>
             <div class="flex items-center gap-2 text-xs text-slate-300 font-mono mt-1 flex-wrap">
               <span>${call.callTime || '-'}</span>
@@ -2717,7 +2852,21 @@ function openTotalCallSummaryModal(callId) {
               </button>
             ` : ''}
           </div>
-          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 leading-relaxed text-slate-800 whitespace-pre-wrap font-medium">${(call.summary || '').trim() || '상담 요약 전문이 기재되지 않았거나 단순 인입된 통화입니다.'}</div>
+          ${isUnrecordedAns ? `
+            <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 leading-relaxed text-amber-950 font-medium space-y-1.5 shadow-2xs">
+              <div class="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                <i data-lucide="mic-off" class="w-4 h-4 text-amber-600 shrink-0"></i>
+                <span>CTI 통화 연결 완료 · 녹취 및 요약 미저장 건</span>
+              </div>
+              <p class="text-xs text-amber-800/90 leading-relaxed">
+                상담원과 실제 전화 통화(${call.duration})가 연결되었으나 녹취 파일 및 AI 요약 텍스트가 CTI 서버에 저장되지 않은 건입니다.<br>
+                필요 시 아래 <b>상담 메모</b> 란에 통화 내용 요약을 직접 작성하여 저장할 수 있습니다.
+              </p>
+              ${call.operator ? `<div class="text-[11px] text-amber-700 font-semibold pt-1 border-t border-amber-200/60">담당 상담원: ${call.operator}</div>` : ''}
+            </div>
+          ` : `
+            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 leading-relaxed text-slate-800 whitespace-pre-wrap font-medium">${(call.summary || '').trim() || '상담 요약 전문이 기재되지 않았거나 단순 인입된 통화입니다.'}</div>
+          `}
         </div>
 
         <!-- 4. 주요 키워드 -->
@@ -3093,7 +3242,7 @@ function renderCustomerGroupView(logs) {
       ${pagedCustomers.map((cust, idx) => {
         const match = cust.match;
         const formattedPhone = formatPhoneDisplay(cust.phone);
-        const answeredCalls = cust.calls.filter(c => c.title || c.summary);
+        const answeredCalls = cust.calls.filter(c => isCallDurationAnswered(c) || !!((c.title && c.title.trim()) || (c.summary && c.summary.trim())));
 
         return `
           <div class="bg-white rounded-3xl border border-slate-200/90 hover:border-cyan-300 shadow-xs hover:shadow-md transition-all p-4 sm:p-5 space-y-3.5">
@@ -3392,16 +3541,27 @@ function renderCallDetailCardHtml(call) {
                 <span>${call.title}</span>
                 <i data-lucide="maximize-2" class="w-3 h-3 text-cyan-600"></i>
               </span>
-              ${call.duration ? `<span class="text-[10px] text-slate-400 font-mono">통화: ${call.duration}초</span>` : ''}
+              ${call.duration ? `<span class="text-[10px] text-slate-400 font-mono">통화: ${call.duration}</span>` : ''}
             </div>
           ` : ''}
           ${call.summary ? `
             <p class="text-[11px] leading-relaxed text-slate-700 whitespace-pre-wrap">${(call.summary || '').trim()}</p>
           ` : ''}
         </div>
+      ` : (isCallDurationAnswered(call) ? `
+        <div class="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200 space-y-1 hover:border-amber-300 transition-colors cursor-pointer" onclick="openTotalCallSummaryModal('${callId}')" title="클릭 시 통화 상세 열기">
+          <div class="font-bold text-amber-900 flex items-center justify-between text-xs">
+            <span class="inline-flex items-center gap-1">
+              <i data-lucide="mic-off" class="w-3.5 h-3.5 text-amber-600"></i>
+              <span>녹취 미저장 (통화연결 완료)</span>
+            </span>
+            <span class="text-[10px] text-amber-800 font-mono font-bold">통화: ${call.duration}</span>
+          </div>
+          <p class="text-[11px] leading-relaxed text-amber-700">상담원 연결 성공(${call.duration}) • 녹취 파일 및 AI 요약 미저장 건</p>
+        </div>
       ` : `
-        <div class="text-[11px] text-slate-400 italic">상담요약 미확보 (단순 인입/문의 미기재)</div>
-      `}
+        <div class="text-[11px] text-slate-400 italic">상담요약 미확보 (단순 인입/미연결)</div>
+      `)}
 
       <!-- 3열: 라벨 태그 바 & 빠른 라벨 토글 메뉴 -->
       <div class="flex items-center justify-between gap-2 flex-wrap pt-1 border-t border-slate-100">
@@ -3721,7 +3881,14 @@ async function exportTotalCallExcel() {
       if (!memo.trim()) return false;
     }
     if (gTotalFilter.onlyAnswered) {
-      if (!c.title && !c.summary) return false;
+      const isAns = isCallDurationAnswered(c) || !!((c.title && c.title.trim()) || (c.summary && c.summary.trim()));
+      if (!isAns) return false;
+      if (gTotalFilter.onlyRecorded) {
+        if (!((c.title && c.title.trim()) || (c.summary && c.summary.trim()))) return false;
+      }
+      if (gTotalFilter.onlyUnrecorded) {
+        if ((c.title && c.title.trim()) || (c.summary && c.summary.trim())) return false;
+      }
     }
     if (gTotalFilter.onlyMissedOutcall) {
       if (!isCallMissedWaitZero(c)) return false;
@@ -4193,6 +4360,9 @@ if (typeof window !== 'undefined') {
   window.closeMissedCallsOutcallModal = closeMissedCallsOutcallModal;
   window.dismissOutcallNotificationToast = dismissOutcallNotificationToast;
   window.openMissedCallsOutcallModalFromToast = openMissedCallsOutcallModalFromToast;
+  window.handleTotalKpiCardClick = handleTotalKpiCardClick;
+  window.handleTotalKpiSubFilter = handleTotalKpiSubFilter;
+  window.isCallDurationAnswered = isCallDurationAnswered;
 
   setTimeout(async () => {
     await loadOutcallBackgroundData();
@@ -4201,6 +4371,13 @@ if (typeof window !== 'undefined') {
 
   setInterval(async () => {
     checkAndTriggerOutcallAlert();
-  }, 30000);
+
+    // [종합콜분석 실시간 동기화]: 사용자가 종합콜분석 화면을 보고 있을 때 25초 주기로 백그라운드 CTI 실시간 수신
+    const totalTabEl = document.getElementById('tab-totalcallanalysis');
+    const isTotalViewVisible = (window.gActiveTab === 'totalcallanalysis') || (totalTabEl && !totalTabEl.classList.contains('hidden'));
+    if (isTotalViewVisible && typeof loadTotalCallData === 'function' && !isTotalSyncing) {
+      loadTotalCallData(true, true);
+    }
+  }, 25000);
 }
 

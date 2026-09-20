@@ -18,3 +18,7 @@ cti_config.json
 ~$*
 chunk_*.js
 careport_*.css
+*_backup_*.json
+check_excel.js
+test_care_dates.js
+sync_*.js
