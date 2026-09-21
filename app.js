@@ -1295,6 +1295,39 @@ async function loadConvexData(showSpinner = true) {
       }
       if (Array.isArray(careLogs) && careLogs.length > 0) gCareLogs = careLogs;
 
+      // Convex DB에 저장된 관리자 계정(admins) 동기화 복원 및 로컬 신규 관리자 자동 백업
+      const { admins } = res.value;
+      let localAdmins = [];
+      try {
+        const saved = localStorage.getItem('LIVON_ADMINS');
+        if (saved) localAdmins = JSON.parse(saved);
+      } catch (e) {}
+
+      // 로컬에만 있고 클라우드에 아직 없는 신규 관리자 계정 식별 (다른 PC에서 로그인할 수 있도록 자동 백업)
+      const cloudAdminUsernames = new Set((admins || []).map(a => (a.username || '').toLowerCase()));
+      const localOnlyAdmins = (localAdmins || []).filter(a => a && a.username && !cloudAdminUsernames.has(a.username.toLowerCase()));
+
+      if (Array.isArray(admins) && admins.length > 0) {
+        // 클라우드 관리자 목록 + 로컬 전용 신규 관리자 병합
+        const merged = [...admins];
+        localOnlyAdmins.forEach(la => {
+          merged.push(la);
+        });
+        gAdmins = merged;
+        try { localStorage.setItem('LIVON_ADMINS', JSON.stringify(gAdmins)); } catch (e) {}
+
+        // 로컬 전용 관리자가 있었다면 즉시 클라우드에 일괄 업로드하여 영구 보존
+        if (localOnlyAdmins.length > 0) {
+          console.log(`[Convex Cloud] 로컬 전용 신규 관리자 ${localOnlyAdmins.length}명을 클라우드 DB에 자동 백업합니다.`);
+          syncToConvex('sync:saveAdminsChunk', { admins: localOnlyAdmins });
+        }
+        if (typeof renderAdmins === 'function') renderAdmins();
+        console.log(`[Convex Cloud] 관리자 계정 동기화 완료 (총 ${gAdmins.length}명)`);
+      } else if (localAdmins.length > 0) {
+        gAdmins = localAdmins;
+        syncToConvex('sync:saveAdminsChunk', { admins: localAdmins });
+      }
+
       // Convex DB에 저장된 양식 설정(영역 좌표 및 배경 이미지) 동기화 복원
       const { formConfigs } = res.value;
       if (Array.isArray(formConfigs) && formConfigs.length > 0) {
@@ -37570,7 +37603,7 @@ function handleAdminLogout(isAuto = false) {
   initIcons();
 }
 
-function handleAdminLoginSubmit(e) {
+async function handleAdminLoginSubmit(e) {
   if (e && e.preventDefault) e.preventDefault();
   const username = document.getElementById('loginUsernameInput')?.value.trim();
   const password = document.getElementById('loginPasswordInput')?.value.trim();
@@ -37580,7 +37613,26 @@ function handleAdminLoginSubmit(e) {
     return;
   }
 
-  const found = gAdmins.find(a => a.username.toLowerCase() === username.toLowerCase());
+  let found = (gAdmins || []).find(a => a.username.toLowerCase() === username.toLowerCase());
+
+  // [핵심 해결]: 로컬 메모리에 해당 계정이 없으면 즉시 Convex Cloud DB에서 최신 관리자 목록을 실시간 조회
+  if (!found && typeof queryConvex === 'function') {
+    try {
+      const qRes = await queryConvex('sync:getAdmins', {});
+      if (qRes && qRes.status === 'success' && Array.isArray(qRes.value) && qRes.value.length > 0) {
+        // 기존 로컬 관리자와 클라우드 관리자 안전하게 병합
+        const cloudAdmins = qRes.value;
+        const existingMap = new Map((gAdmins || []).map(a => [a.id, a]));
+        cloudAdmins.forEach(ca => existingMap.set(ca.id, ca));
+        gAdmins = Array.from(existingMap.values());
+        try { localStorage.setItem('LIVON_ADMINS', JSON.stringify(gAdmins)); } catch (err) {}
+        found = gAdmins.find(a => a.username.toLowerCase() === username.toLowerCase());
+      }
+    } catch (netErr) {
+      console.warn('[Admin Login] Convex 실시간 관리자 조회 에러:', netErr);
+    }
+  }
+
   if (!found) {
     alert('등록되지 않은 관리자 계정입니다. 사내 IT관리자에게 문의하세요.');
     return;
@@ -37636,6 +37688,11 @@ function handleAdminLoginSubmit(e) {
   saveAdminsToStorage();
   localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(gCurrentAdmin));
 
+  // Convex Cloud DB에 최근 로그인 상태 비동기 영구 저장
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveAdmin', { admin: gCurrentAdmin });
+  }
+
   // 아이디 기억하기 상태 저장
   const rememberCheckbox = document.getElementById('loginRememberMe');
   if (rememberCheckbox && rememberCheckbox.checked) {
@@ -37670,6 +37727,10 @@ function saveAdminsToStorage() {
     localStorage.setItem('LIVON_ADMINS', JSON.stringify(gAdmins));
   } catch (e) {
     console.error('Failed to save admins to localStorage', e);
+  }
+  // Convex Cloud DB 실시간 일괄 동기화 (다른 PC에서도 즉시 로그인 가능)
+  if (typeof syncToConvex === 'function' && Array.isArray(gAdmins) && gAdmins.length > 0) {
+    syncToConvex('sync:saveAdminsChunk', { admins: gAdmins });
   }
 }
 
@@ -37956,6 +38017,9 @@ function deleteAdmin(adminId) {
 
   gAdmins = gAdmins.filter(a => a.id !== adminId);
   saveAdminsToStorage();
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:deleteAdminDoc', { adminId });
+  }
   renderAdmins();
 
   showCustomAlert({

@@ -20,6 +20,7 @@ export const bundleAll = query({
       samsungSheets,
       samsungAddressBook,
       samsungEmailLogs,
+      admins,
     ] = await Promise.all([
       ctx.db.query("applications").order("desc").collect(),
       ctx.db.query("assignments").collect(),
@@ -34,6 +35,7 @@ export const bundleAll = query({
       ctx.db.query("samsungSheets").collect(),
       ctx.db.query("samsungAddressBook").collect(),
       ctx.db.query("samsungEmailLogs").order("desc").collect(),
+      ctx.db.query("admins").collect(),
     ]);
     return {
       applications,
@@ -49,6 +51,7 @@ export const bundleAll = query({
       samsungSheets,
       samsungAddressBook,
       samsungEmailLogs,
+      admins,
     };
   },
 });
@@ -1012,6 +1015,81 @@ export const purgeStaleRecordsNotInList = mutation({
     return { deletedAssigns, deletedClaims, deletedPayouts, timestamp: new Date().toISOString() };
   },
 });
+
+// 47. 관리자 목록 조회 (클라우드 동기화용)
+export const getAdmins = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("admins").collect();
+  },
+});
+
+// 48. 관리자 단일 저장/수정
+export const saveAdmin = mutation({
+  args: {
+    admin: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const admin = args.admin;
+    if (!admin || !admin.id) return { success: false, error: "Invalid admin document" };
+    const existing = await ctx.db
+      .query("admins")
+      .filter((q) => q.eq(q.field("id"), admin.id))
+      .first();
+    const { _id, _creationTime, ...rest } = admin;
+    if (existing) {
+      await ctx.db.replace(existing._id, rest);
+      return { success: true, action: "updated", id: admin.id };
+    } else {
+      await ctx.db.insert("admins", rest);
+      return { success: true, action: "inserted", id: admin.id };
+    }
+  },
+});
+
+// 49. 관리자 목록 일괄 저장/동기화
+export const saveAdminsChunk = mutation({
+  args: {
+    admins: v.array(v.any()),
+  },
+  handler: async (ctx, args) => {
+    let count = 0;
+    for (const adm of args.admins) {
+      if (!adm || !adm.id) continue;
+      const existing = await ctx.db
+        .query("admins")
+        .filter((q) => q.eq(q.field("id"), adm.id))
+        .first();
+      const { _id, _creationTime, ...rest } = adm;
+      if (existing) {
+        await ctx.db.replace(existing._id, rest);
+      } else {
+        await ctx.db.insert("admins", rest);
+      }
+      count++;
+    }
+    return { count, timestamp: new Date().toISOString() };
+  },
+});
+
+// 50. 관리자 계정 삭제
+export const deleteAdminDoc = mutation({
+  args: {
+    adminId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("admins")
+      .filter((q) => q.eq(q.field("id"), args.adminId))
+      .first();
+    if (existing) {
+      await ctx.db.delete(existing._id);
+      return { success: true, id: args.adminId };
+    }
+    return { success: false, error: "Not found" };
+  },
+});
+
 
 
 
