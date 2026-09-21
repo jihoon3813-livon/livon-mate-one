@@ -26264,8 +26264,16 @@ function initData() {
     if (!gAssigns || gAssigns.length === 0) gAssigns = [...window.REBORN_DATA.assignments];
     if (!gClaims || gClaims.length === 0) gClaims = [...window.REBORN_DATA.claims];
     if (!gPayouts || gPayouts.length === 0) gPayouts = [...window.REBORN_DATA.payouts];
-    if (!gAdjusters || gAdjusters.length === 0) gAdjusters = [...window.REBORN_DATA.adjusters];
-    gAdmins = [...window.REBORN_DATA.admins];
+    try {
+      const savedAdmins = localStorage.getItem('LIVON_ADMINS');
+      if (savedAdmins) {
+        gAdmins = JSON.parse(savedAdmins);
+      } else {
+        gAdmins = [...window.REBORN_DATA.admins];
+      }
+    } catch (e) {
+      gAdmins = [...window.REBORN_DATA.admins];
+    }
     gPartners = [...window.REBORN_DATA.partners];
     try {
       const savedCareLogs = localStorage.getItem('LIVON_CARE_LOGS');
@@ -27043,6 +27051,13 @@ window.switchMultiTab = switchMultiTab;
  * [사용자 요구사항]: 모든 좌측메뉴는 클릭하면 항상 최신 데이터를 불러옴 (탭은 기존화면 그대로, 좌측메뉴는 최신데이터)
  */
 function handleLeftMenuClick(tabId, filterParam = null) {
+  if (gCurrentAdmin && gCurrentAdmin.role !== 'SUPER_ADMIN') {
+    const allowed = gCurrentAdmin.allowedMenus || ['all'];
+    if (!allowed.includes('all') && !allowed.includes('*') && !allowed.includes(tabId)) {
+      alert(`[${tabId}] 메뉴에 대한 접근 권한이 없습니다. 시스템 관리자에게 문의하세요.`);
+      return;
+    }
+  }
   // 1. 기존 화면/캐시 데이터로 0ms 즉각 전환 (화면 공백/깜빡임 없이 즉시 전환)
   switchTab(tabId, filterParam, false);
 
@@ -31041,58 +31056,97 @@ function executePayoutItem(payoutId) {
   });
 }
 
+const ADMIN_MENU_NAME_MAP = {
+  dashboard: '대시보드',
+  carehub: '통합허브',
+  carecalendar: '간병캘린더',
+  carelogs: '간병일지(케어포트)',
+  directory: '인력/파트너',
+  samsunglist: '삼성명단',
+  samsungclaimhub: '삼성접수/청구',
+  hyundaiclaimhub: '현대청구',
+  samsungcallreport: '삼성콜분석',
+  totalcallanalysis: '종합콜분석',
+  forms: '양식관리',
+  faxmgmt: '팩스관리',
+  adminmgmt: '시스템관리',
+  branchmall: '분양몰',
+  applications: '간병신청대장',
+  assignments: '간병인배정',
+  claims: '보험청구',
+  payouts: '간병비지급'
+};
+
+function formatAdminAllowedMenus(adm) {
+  const allowed = adm.allowedMenus || ['all'];
+  const allCount = Object.keys(ADMIN_MENU_NAME_MAP).length;
+  if (adm.role === 'SUPER_ADMIN' || allowed.includes('all') || allowed.includes('*') || allowed.length >= allCount) {
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs">전체 메뉴 (${allCount}개)</span>`;
+  }
+  if (!allowed || allowed.length === 0) {
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-500">권한 없음</span>`;
+  }
+  const names = allowed.map(k => ADMIN_MENU_NAME_MAP[k] || k);
+  if (names.length <= 2) {
+    return `<div class="flex flex-wrap gap-1">${names.map(n => `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-slate-100 text-slate-700 border border-slate-200">${n}</span>`).join('')}</div>`;
+  }
+  const preview = names.slice(0, 2).join(', ');
+  return `<span class="text-xs font-semibold text-slate-800" title="${names.join(', ')}">${preview} <span class="text-indigo-600 font-bold">외 ${names.length - 2}개</span> <span class="text-[10px] text-slate-400 font-normal">(${names.length}/${allCount})</span></span>`;
+}
+
 function renderAdmins() {
   const tbody = document.getElementById('adminTableBody');
   if (!tbody) return;
 
   tbody.innerHTML = gAdmins.map(adm => `
-    <tr class="hover:bg-slate-50">
-      <td class="p-3 pl-5 font-bold text-indigo-700">${adm.id}</td>
-      <td class="p-3 font-bold text-slate-900">${adm.name}</td>
-      <td class="p-3 text-slate-600">${adm.username} / ${adm.email}</td>
-      <td class="p-3">${formatPhoneNumber(adm.phone)}</td>
+    <tr class="hover:bg-slate-50 transition-colors">
+      <td class="p-3 pl-5 font-bold font-mono text-indigo-700">${adm.id}</td>
+      <td class="p-3">
+        <div class="font-bold text-slate-900">${adm.name}</div>
+        ${adm.dept ? `<div class="text-[11px] text-slate-500 font-normal">${adm.dept}</div>` : ''}
+      </td>
+      <td class="p-3 text-slate-600">
+        <div class="font-mono font-bold text-slate-800 text-xs">${adm.username}</div>
+        <div class="text-[11px] text-slate-500">${adm.email}</div>
+      </td>
+      <td class="p-3 font-mono text-slate-700">${formatPhoneNumber(adm.phone)}</td>
       <td class="p-3">
         <span class="px-2.5 py-1 rounded-md text-xs font-bold ${
           adm.role === 'SUPER_ADMIN' ? 'bg-indigo-100 text-indigo-800' :
           adm.role === 'FINANCE_ADMIN' ? 'bg-amber-100 text-amber-800' :
-          adm.role === 'COUNSEL_ADMIN' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-700'
+          adm.role === 'COUNSEL_ADMIN' ? 'bg-blue-100 text-blue-800' :
+          adm.role === 'PARTNER_CENTER' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
         }">${adm.role}</span>
       </td>
-      <td class="p-3 text-xs text-slate-500">
-        ${
-          adm.role === 'SUPER_ADMIN' ? '모든 권한 (AWS 관리, 정산, 감사로그)' :
-          adm.role === 'FINANCE_ADMIN' ? '보험청구, 수납대사, 간병비지급 승인' :
-          adm.role === 'COUNSEL_ADMIN' ? '간병신청 접수, 간병인 배정, 상담' : '소속 간병인 배정 및 지급 내역 조회'
-        }
+      <td class="p-3">
+        ${formatAdminAllowedMenus(adm)}
       </td>
-      <td class="p-3 text-slate-500">${adm.lastLogin}</td>
-      <td class="p-3"><span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">${adm.status}</span></td>
+      <td class="p-3 text-slate-600">
+        <div class="font-medium text-slate-800">${adm.lastLogin || '미접속'}</div>
+        <div class="text-[11px] font-mono text-slate-400 mt-0.5 flex items-center gap-1">
+          <i data-lucide="network" class="w-3 h-3 text-slate-400"></i>
+          <span>${adm.lastIp || '112.170.45.12'}</span>
+        </div>
+      </td>
+      <td class="p-3">
+        <span class="px-2 py-0.5 rounded text-[11px] font-bold ${
+          adm.status === '활성' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+        }">${adm.status || '활성'}</span>
+      </td>
       <td class="p-3 text-center pr-5">
-        <button onclick="alert('${adm.name} 님의 권한 설정')" class="px-2.5 py-1 rounded border hover:bg-slate-50 text-slate-700">설정</button>
+        <div class="flex items-center justify-center gap-1.5">
+          <button onclick="openEditAdminModal('${adm.id}')" class="px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs">
+            <i data-lucide="sliders" class="w-3 h-3 text-indigo-600"></i> 설정
+          </button>
+          ${adm.id !== 'ADM001' ? `
+          <button onclick="deleteAdmin('${adm.id}')" class="px-2 py-1 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold text-xs transition-colors">
+            삭제
+          </button>` : ''}
+        </div>
       </td>
     </tr>
   `).join('');
-}
-
-function openNewAdminModal() {
-  const username = prompt('신규 관리자 아이디를 입력하세요:');
-  if (!username) return;
-  const name = prompt('관리자 성명 및 직급을 입력하세요:');
-  if (!name) return;
-
-  const newAdmin = {
-    id: 'ADM00' + (gAdmins.length + 1),
-    username,
-    name,
-    email: username + '@reborncare.co.kr',
-    role: 'COUNSEL_ADMIN',
-    phone: '010-0000-0000',
-    lastLogin: '미접속',
-    status: '활성'
-  };
-  gAdmins.push(newAdmin);
-  renderAdmins();
-  alert('신규 관리자 계정 [' + username + ']이 생성되었습니다.');
+  initIcons();
 }
 
 function renderPartners() {
@@ -35633,6 +35687,9 @@ function initAdminSession() {
     gCurrentAdmin = gAdmins[0] || null;
   }
   updateHeaderAdminProfile();
+  if (typeof applyAdminMenuPermissions === 'function') {
+    applyAdminMenuPermissions(gCurrentAdmin);
+  }
 
   const savedMins = localStorage.getItem('REBORN_AUTO_LOGOUT_MINUTES');
   if (savedMins !== null) {
@@ -35771,7 +35828,35 @@ function handleAdminLoginSubmit(e) {
 
   gCurrentAdmin = found;
 
+  // 최근 접속 일시 및 IP 갱신
   gCurrentAdmin.lastLogin = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  if (!gCurrentAdmin.lastIp) {
+    gCurrentAdmin.lastIp = '112.170.45.12';
+  }
+
+  // 실제 클라이언트 접속 IP 비동기 조회 및 실시간 반영
+  try {
+    fetch('https://api.ipify.org?format=json')
+      .then(res => res.json())
+      .then(d => {
+        if (d && d.ip && gCurrentAdmin) {
+          gCurrentAdmin.lastIp = d.ip;
+          const target = gAdmins.find(a => a.id === gCurrentAdmin.id);
+          if (target) target.lastIp = d.ip;
+          saveAdminsToStorage();
+          if (typeof renderAdmins === 'function') renderAdmins();
+        }
+      })
+      .catch(() => {});
+  } catch (err) {}
+
+  // gAdmins 배열 내 해당 관리자 데이터 동기화
+  const targetAdm = gAdmins.find(a => a.id === gCurrentAdmin.id);
+  if (targetAdm) {
+    targetAdm.lastLogin = gCurrentAdmin.lastLogin;
+    targetAdm.lastIp = gCurrentAdmin.lastIp;
+  }
+  saveAdminsToStorage();
   localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(gCurrentAdmin));
 
   // 아이디 기억하기 상태 저장
@@ -35785,6 +35870,9 @@ function handleAdminLoginSubmit(e) {
   }
 
   updateHeaderAdminProfile();
+  if (typeof applyAdminMenuPermissions === 'function') {
+    applyAdminMenuPermissions(gCurrentAdmin);
+  }
   renderAdmins();
 
   const overlay = document.getElementById('adminLoginOverlay');
@@ -35794,54 +35882,368 @@ function handleAdminLoginSubmit(e) {
 
   showCustomAlert({
     title: '관리자 보안 로그인 성공',
-    message: `[${gCurrentAdmin.name}] 관리자님, 환영합니다. KMS 보안 세션이 정상 연결되었습니다.`,
+    message: `[${gCurrentAdmin.name}] 관리자님, 환영합니다. KMS 보안 세션 및 접근 권한이 정상 연결되었습니다.`,
     icon: 'shield-check',
     iconColor: 'emerald'
   });
 }
 
-function handleNewAdminSubmit(e) {
-  if (e && e.preventDefault) e.preventDefault();
-  const name = document.getElementById('adminNewName').value.trim();
-  const phone = document.getElementById('adminNewPhone').value.trim();
-  const username = document.getElementById('adminNewUsername').value.trim();
-  const email = document.getElementById('adminNewEmail').value.trim();
-  const role = document.getElementById('adminNewRole').value;
-  const status = document.getElementById('adminNewStatus').value;
-
-  if (gAdmins.some(a => a.username.toLowerCase() === username.toLowerCase())) {
-    alert('이미 존재하는 관리자 아이디입니다.');
-    return;
+function saveAdminsToStorage() {
+  try {
+    localStorage.setItem('LIVON_ADMINS', JSON.stringify(gAdmins));
+  } catch (e) {
+    console.error('Failed to save admins to localStorage', e);
   }
+}
 
-  const newAdmin = {
-    id: 'ADM00' + (gAdmins.length + 1),
-    username: username,
-    name: name,
-    email: email,
-    role: role,
-    phone: phone,
-    lastLogin: '미접속',
-    status: status
-  };
+function handleAdminRolePresetChange(role) {
+  const checkboxes = document.querySelectorAll('input[name="adminMenuCheck"]');
+  if (!checkboxes || checkboxes.length === 0) return;
 
-  gAdmins.push(newAdmin);
-  renderAdmins();
-  closeModal('adminCreateModal');
+  if (role === 'SUPER_ADMIN') {
+    checkboxes.forEach(cb => cb.checked = true);
+  } else if (role === 'FINANCE_ADMIN') {
+    const targets = ['carehub', 'samsunglist', 'samsungclaimhub', 'hyundaiclaimhub', 'claims', 'payouts', 'forms', 'faxmgmt'];
+    checkboxes.forEach(cb => cb.checked = targets.includes(cb.value));
+  } else if (role === 'COUNSEL_ADMIN') {
+    const targets = ['dashboard', 'carehub', 'carecalendar', 'carelogs', 'directory', 'samsungcallreport', 'totalcallanalysis', 'applications', 'assignments', 'forms', 'faxmgmt'];
+    checkboxes.forEach(cb => cb.checked = targets.includes(cb.value));
+  } else if (role === 'PARTNER_CENTER') {
+    const targets = ['carecalendar', 'carelogs', 'directory', 'assignments'];
+    checkboxes.forEach(cb => cb.checked = targets.includes(cb.value));
+  }
+}
 
-  showCustomAlert({
-    title: '신규 관리자 등록 완료',
-    message: `[${name} / ${username}] 관리자 계정이 성공적으로 생성되었습니다.`,
-    icon: 'user-plus',
-    iconColor: 'indigo'
-  });
+function toggleAllMenuCheckboxes(checked) {
+  const checkboxes = document.querySelectorAll('input[name="adminMenuCheck"]');
+  checkboxes.forEach(cb => cb.checked = !!checked);
 }
 
 function openNewAdminModal() {
-  document.getElementById('adminCreateForm')?.reset();
+  const form = document.getElementById('adminCreateForm');
+  if (form) form.reset();
+
+  const editIdEl = document.getElementById('adminEditId');
+  if (editIdEl) editIdEl.value = '';
+
+  const titleEl = document.getElementById('adminModalTitle');
+  if (titleEl) titleEl.innerText = '신규 시스템 관리자 계정 등록';
+
+  const subtitleEl = document.getElementById('adminModalSubtitle');
+  if (subtitleEl) subtitleEl.innerText = '관리자 인적정보, 역할(RBAC) 및 보안 계정을 생성합니다.';
+
+  const btnTextEl = document.getElementById('adminModalSubmitBtnText');
+  if (btnTextEl) btnTextEl.innerText = '관리자 생성 완료';
+
+  const reqMark = document.getElementById('adminPasswordReqMark');
+  if (reqMark) reqMark.classList.remove('hidden');
+
+  const pwInput = document.getElementById('adminNewPassword');
+  if (pwInput) {
+    pwInput.required = true;
+    pwInput.value = '';
+  }
+
+  const accessInfo = document.getElementById('adminModalAccessInfo');
+  if (accessInfo) accessInfo.classList.add('hidden');
+
+  const roleSelect = document.getElementById('adminNewRole');
+  if (roleSelect) {
+    roleSelect.value = 'COUNSEL_ADMIN';
+    handleAdminRolePresetChange('COUNSEL_ADMIN');
+  }
+
+  const statusSelect = document.getElementById('adminNewStatus');
+  if (statusSelect) statusSelect.value = '활성';
+
   openModal('adminCreateModal');
   initIcons();
 }
+
+function openEditAdminModal(adminId) {
+  const adm = gAdmins.find(a => a.id === adminId);
+  if (!adm) {
+    alert('해당 관리자 정보를 찾을 수 없습니다.');
+    return;
+  }
+
+  const form = document.getElementById('adminCreateForm');
+  if (form) form.reset();
+
+  const editIdEl = document.getElementById('adminEditId');
+  if (editIdEl) editIdEl.value = adm.id;
+
+  const titleEl = document.getElementById('adminModalTitle');
+  if (titleEl) titleEl.innerText = `[${adm.name}] 관리자 계정 & 권한 설정 (RBAC)`;
+
+  const subtitleEl = document.getElementById('adminModalSubtitle');
+  if (subtitleEl) subtitleEl.innerText = '아이디/비밀번호, 인적정보, 허용 메뉴 권한 및 활성 상태를 통합 수정합니다.';
+
+  const btnTextEl = document.getElementById('adminModalSubmitBtnText');
+  if (btnTextEl) btnTextEl.innerText = '관리자 정보 & 권한 저장';
+
+  const reqMark = document.getElementById('adminPasswordReqMark');
+  if (reqMark) reqMark.classList.add('hidden');
+
+  const pwInput = document.getElementById('adminNewPassword');
+  if (pwInput) {
+    pwInput.required = false;
+    pwInput.value = '';
+  }
+
+  const uInput = document.getElementById('adminNewUsername');
+  if (uInput) uInput.value = adm.username || '';
+
+  const nInput = document.getElementById('adminNewName');
+  if (nInput) nInput.value = adm.name || '';
+
+  const dInput = document.getElementById('adminNewDept');
+  if (dInput) dInput.value = adm.dept || '';
+
+  const pInput = document.getElementById('adminNewPhone');
+  if (pInput) pInput.value = adm.phone || '';
+
+  const eInput = document.getElementById('adminNewEmail');
+  if (eInput) eInput.value = adm.email || '';
+
+  const rSelect = document.getElementById('adminNewRole');
+  if (rSelect) rSelect.value = adm.role || 'CUSTOM';
+
+  const sSelect = document.getElementById('adminNewStatus');
+  if (sSelect) sSelect.value = adm.status || '활성';
+
+  const lastIpEl = document.getElementById('adminLastIp');
+  if (lastIpEl) lastIpEl.value = adm.lastIp || '112.170.45.12';
+
+  const lastLoginEl = document.getElementById('adminLastLogin');
+  if (lastLoginEl) lastLoginEl.value = adm.lastLogin || '미접속';
+
+  const accessInfo = document.getElementById('adminModalAccessInfo');
+  const lastLoginText = document.getElementById('adminModalLastLoginText');
+  const lastIpText = document.getElementById('adminModalLastIpText');
+  if (accessInfo && lastLoginText && lastIpText) {
+    lastLoginText.innerText = adm.lastLogin || '미접속';
+    lastIpText.innerText = adm.lastIp || '112.170.45.12';
+    accessInfo.classList.remove('hidden');
+  }
+
+  // 체크박스 세팅
+  const allowed = adm.allowedMenus || ['all'];
+  const isAll = adm.role === 'SUPER_ADMIN' || allowed.includes('all') || allowed.includes('*');
+  const checkboxes = document.querySelectorAll('input[name="adminMenuCheck"]');
+  checkboxes.forEach(cb => {
+    cb.checked = isAll || allowed.includes(cb.value);
+  });
+
+  openModal('adminCreateModal');
+  initIcons();
+}
+
+function handleAdminFormSubmit(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const editId = document.getElementById('adminEditId')?.value?.trim();
+  const username = document.getElementById('adminNewUsername')?.value?.trim();
+  const password = document.getElementById('adminNewPassword')?.value?.trim();
+  const name = document.getElementById('adminNewName')?.value?.trim();
+  const dept = document.getElementById('adminNewDept')?.value?.trim() || '';
+  const phone = document.getElementById('adminNewPhone')?.value?.trim();
+  const email = document.getElementById('adminNewEmail')?.value?.trim();
+  const role = document.getElementById('adminNewRole')?.value || 'CUSTOM';
+  const status = document.getElementById('adminNewStatus')?.value || '활성';
+
+  if (!username || !name || !phone || !email) {
+    alert('필수 입력 항목(성명, 연락처, 아이디, 이메일)을 모두 입력해주세요.');
+    return;
+  }
+
+  // 선택된 메뉴 목록 수집
+  const checkedBoxes = document.querySelectorAll('input[name="adminMenuCheck"]:checked');
+  const allBoxes = document.querySelectorAll('input[name="adminMenuCheck"]');
+  let allowedMenus = Array.from(checkedBoxes).map(cb => cb.value);
+  if (role === 'SUPER_ADMIN' || (allBoxes.length > 0 && checkedBoxes.length === allBoxes.length)) {
+    allowedMenus = ['all'];
+  }
+
+  if (editId) {
+    // 관리자 수정 처리
+    const targetIdx = gAdmins.findIndex(a => a.id === editId);
+    if (targetIdx === -1) {
+      alert('수정 대상 관리자를 찾을 수 없습니다.');
+      return;
+    }
+
+    // 아이디 중복 검사 (다른 계정과 중복 여부)
+    if (gAdmins.some((a, idx) => idx !== targetIdx && a.username.toLowerCase() === username.toLowerCase())) {
+      alert('이미 존재하는 다른 관리자 아이디입니다. 다른 아이디를 입력해주세요.');
+      return;
+    }
+
+    const current = gAdmins[targetIdx];
+    current.username = username;
+    current.name = name;
+    current.dept = dept;
+    current.phone = phone;
+    current.email = email;
+    current.role = role;
+    current.status = status;
+    current.allowedMenus = allowedMenus;
+    if (password) {
+      current.password = password;
+    }
+
+    // 현재 로그인된 관리자 본인이면 세션 동기화
+    if (gCurrentAdmin && gCurrentAdmin.id === current.id) {
+      gCurrentAdmin = { ...current };
+      localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(gCurrentAdmin));
+      updateHeaderAdminProfile();
+      applyAdminMenuPermissions(gCurrentAdmin);
+    }
+
+    saveAdminsToStorage();
+    renderAdmins();
+    closeModal('adminCreateModal');
+
+    showCustomAlert({
+      title: '관리자 정보 및 권한 수정 완료',
+      message: `[${name} / ${username}] 관리자의 계정 정보 및 허용 메뉴 권한이 성공적으로 저장되었습니다.`,
+      icon: 'check-circle',
+      iconColor: 'indigo'
+    });
+  } else {
+    // 신규 관리자 생성 처리
+    if (!password) {
+      alert('신규 관리자 계정 생성을 위해 비밀번호를 입력해주세요.');
+      return;
+    }
+    if (gAdmins.some(a => a.username.toLowerCase() === username.toLowerCase())) {
+      alert('이미 존재하는 관리자 아이디입니다.');
+      return;
+    }
+
+    let maxNum = 0;
+    gAdmins.forEach(a => {
+      const num = parseInt((a.id || '').replace(/[^0-9]/g, ''), 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    });
+    const newId = 'ADM' + String(maxNum + 1).padStart(3, '0');
+
+    const newAdmin = {
+      id: newId,
+      username: username,
+      password: password,
+      name: name,
+      dept: dept,
+      email: email,
+      role: role,
+      phone: phone,
+      lastLogin: '미접속',
+      lastIp: '112.170.45.12',
+      status: status,
+      allowedMenus: allowedMenus
+    };
+
+    gAdmins.push(newAdmin);
+    saveAdminsToStorage();
+    renderAdmins();
+    closeModal('adminCreateModal');
+
+    showCustomAlert({
+      title: '신규 관리자 등록 완료',
+      message: `[${name} / ${username}] 관리자 계정이 성공적으로 등록되었습니다.`,
+      icon: 'user-plus',
+      iconColor: 'indigo'
+    });
+  }
+}
+
+// 하위 호환성용 별칭
+function handleNewAdminSubmit(e) {
+  handleAdminFormSubmit(e);
+}
+
+function deleteAdmin(adminId) {
+  if (adminId === 'ADM001') {
+    alert('최고관리자(SUPER_ADMIN) 계정은 삭제할 수 없습니다.');
+    return;
+  }
+  if (gCurrentAdmin && gCurrentAdmin.id === adminId) {
+    alert('현재 로그인 중인 관리자 본인 계정은 삭제할 수 없습니다.');
+    return;
+  }
+  const target = gAdmins.find(a => a.id === adminId);
+  if (!target) return;
+
+  if (!confirm(`정말 [${target.name} (${target.username})] 관리자 계정을 영구 삭제하시겠습니까?`)) {
+    return;
+  }
+
+  gAdmins = gAdmins.filter(a => a.id !== adminId);
+  saveAdminsToStorage();
+  renderAdmins();
+
+  showCustomAlert({
+    title: '관리자 계정 삭제 완료',
+    message: `[${target.name}] 계정이 시스템에서 삭제되었습니다.`,
+    icon: 'trash-2',
+    iconColor: 'rose'
+  });
+}
+
+function applyAdminMenuPermissions(admin) {
+  if (!admin) return;
+  const allowed = admin.allowedMenus || ['all'];
+  const isSuper = admin.role === 'SUPER_ADMIN' || allowed.includes('all') || allowed.includes('*');
+
+  // 사이드바 모든 탭 버튼 제어
+  const navBtns = document.querySelectorAll('.nav-tab-btn[data-tab]');
+  const visibleTabs = [];
+
+  navBtns.forEach(btn => {
+    const tabKey = btn.getAttribute('data-tab');
+    if (!tabKey) return;
+    const isAllowed = isSuper || allowed.includes(tabKey);
+    if (isAllowed) {
+      btn.classList.remove('hidden');
+      visibleTabs.push(tabKey);
+    } else {
+      btn.classList.add('hidden');
+    }
+  });
+
+  // 참고자료 더보기 아코디언 컨테이너 제어
+  const refSubmenu = document.getElementById('referenceSubmenu');
+  if (refSubmenu && refSubmenu.parentElement) {
+    const refBtns = refSubmenu.querySelectorAll('.nav-tab-btn[data-tab]');
+    const anyRefVisible = Array.from(refBtns).some(b => !b.classList.contains('hidden'));
+    if (anyRefVisible || isSuper) {
+      refSubmenu.parentElement.classList.remove('hidden');
+    } else {
+      refSubmenu.parentElement.classList.add('hidden');
+    }
+  }
+
+  // 현재 열려있는 탭이 권한이 없어 숨겨졌다면, 허용된 첫 번째 탭으로 자동 이동
+  const currentTab = window.gCurrentTab || 'carehub';
+  if (!isSuper && !allowed.includes(currentTab) && visibleTabs.length > 0) {
+    const nextTab = visibleTabs[0];
+    if (typeof handleLeftMenuClick === 'function') {
+      handleLeftMenuClick(nextTab);
+    } else if (typeof switchTab === 'function') {
+      switchTab(nextTab);
+    }
+  }
+}
+
+// 전역 window 바인딩
+window.openNewAdminModal = openNewAdminModal;
+window.openEditAdminModal = openEditAdminModal;
+window.handleAdminFormSubmit = handleAdminFormSubmit;
+window.handleNewAdminSubmit = handleNewAdminSubmit;
+window.handleAdminRolePresetChange = handleAdminRolePresetChange;
+window.toggleAllMenuCheckboxes = toggleAllMenuCheckboxes;
+window.deleteAdmin = deleteAdmin;
+window.applyAdminMenuPermissions = applyAdminMenuPermissions;
+window.saveAdminsToStorage = saveAdminsToStorage;
 
 function handleSaveAutoLogoutSetting(minsStr) {
   gAutoLogoutMinutes = parseInt(minsStr, 10);

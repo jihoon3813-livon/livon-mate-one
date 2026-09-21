@@ -2306,10 +2306,10 @@ const EXCEL_RAW_DATA = {
 };
 
 const INITIAL_ADMINS = [
-  { id: 'ADM001', username: 'superadmin', name: '김리본 (대표)', email: 'ceo@reborncare.co.kr', role: 'SUPER_ADMIN', phone: '010-1234-5678', lastLogin: '2026-09-03 16:45', status: '활성' },
-  { id: 'ADM002', username: 'settle_mgr', name: '박정산 (팀장)', email: 'settle@reborncare.co.kr', role: 'FINANCE_ADMIN', phone: '010-9876-5432', lastLogin: '2026-09-03 15:20', status: '활성' },
-  { id: 'ADM003', username: 'care_counsel', name: '이매칭 (상담원)', email: 'counsel@reborncare.co.kr', role: 'COUNSEL_ADMIN', phone: '010-5555-4444', lastLogin: '2026-09-03 14:10', status: '활성' },
-  { id: 'ADM004', username: 'ydp_center', name: '영등포센터 (파트너)', email: 'ydp@partnercare.kr', role: 'PARTNER_CENTER', phone: '02-8888-9999', lastLogin: '2026-09-02 18:00', status: '활성' }
+  { id: 'ADM001', username: 'superadmin', name: '김리본', dept: '대표이사', email: 'ceo@reborncare.co.kr', role: 'SUPER_ADMIN', phone: '010-1234-5678', lastLogin: '2026-09-21 15:30', lastIp: '112.170.45.12', status: '활성', allowedMenus: ['all'], password: 'superadmin1234!' },
+  { id: 'ADM002', username: 'settle_mgr', name: '박정산', dept: '재무정산팀 팀장', email: 'settle@reborncare.co.kr', role: 'FINANCE_ADMIN', phone: '010-9876-5432', lastLogin: '2026-09-21 14:15', lastIp: '211.234.110.85', status: '활성', allowedMenus: ['carehub', 'samsunglist', 'samsungclaimhub', 'hyundaiclaimhub', 'claims', 'payouts', 'forms', 'faxmgmt'], password: 'settle1234!' },
+  { id: 'ADM003', username: 'care_counsel', name: '이매칭', dept: '고객상담팀 주임', email: 'counsel@reborncare.co.kr', role: 'COUNSEL_ADMIN', phone: '010-5555-4444', lastLogin: '2026-09-21 11:20', lastIp: '121.134.82.91', status: '활성', allowedMenus: ['carehub', 'carecalendar', 'carelogs', 'directory', 'samsungcallreport', 'totalcallanalysis', 'applications', 'assignments', 'forms', 'faxmgmt'], password: 'counsel1234!' },
+  { id: 'ADM004', username: 'ydp_center', name: '영등포센터', dept: '협력 간병센터장', email: 'ydp@partnercare.kr', role: 'PARTNER_CENTER', phone: '02-8888-9999', lastLogin: '2026-09-20 18:00', lastIp: '175.209.198.34', status: '활성', allowedMenus: ['carecalendar', 'carelogs', 'directory', 'assignments'], password: 'partner1234!' }
 ];
 
 const INITIAL_PARTNERS = [
