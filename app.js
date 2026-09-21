@@ -30827,13 +30827,20 @@ function getAppIdSettings() {
   const prefix = localStorage.getItem(APP_ID_PREFIX_KEY) || 'C';
   let seq = parseInt(localStorage.getItem(APP_ID_SEQ_KEY), 10);
 
-  // 현재 시스템에 등록된 전체 고객 데이터(gApps) 중 가장 큰 번호 산출
+  // 현재 시스템에 등록된 전체 고객 데이터(gApps) 중 해당 접두어의 가장 큰 번호 산출
   let maxNum = 0;
-  (gApps || []).forEach(a => {
-    const match = (a.id || '').match(/\d+/);
-    if (match) {
-      const num = parseInt(match[0], 10);
-      if (num > maxNum) maxNum = num;
+  const allApps = [
+    ...(Array.isArray(gApps) ? gApps : []),
+    ...(window.gApps && Array.isArray(window.gApps) ? window.gApps : []),
+    ...((window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) ? window.REBORN_DATA.applications : [])
+  ];
+  allApps.forEach(a => {
+    if (a && a.id && String(a.id).startsWith(prefix)) {
+      const match = String(a.id).slice(prefix.length).match(/\d+/);
+      if (match) {
+        const num = parseInt(match[0], 10);
+        if (num > maxNum) maxNum = num;
+      }
     }
   });
 
@@ -30854,23 +30861,52 @@ function generateNextAppId(insurance = '') {
   const isSamsung = (ins || '').includes('삼성');
   const prefix = isSamsung ? 'S' : 'C';
 
-  const usedNums = new Set();
-  (gApps || []).forEach(a => {
-    if (a.id && a.id.startsWith(prefix)) {
-      const match = a.id.slice(prefix.length).match(/\d+/);
-      if (match) usedNums.add(parseInt(match[0], 10));
-    }
-  });
+  // 1. 등록된 모든 소스(gApps, window.gApps, REBORN_DATA.applications) 취합
+  const allApps = [
+    ...(Array.isArray(gApps) ? gApps : []),
+    ...(window.gApps && Array.isArray(window.gApps) ? window.gApps : []),
+    ...((window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) ? window.REBORN_DATA.applications : [])
+  ];
 
-  let seq = 1;
-  while (usedNums.has(seq)) {
-    seq++;
+  // 2. 해당 접두어(C 또는 S)를 가진 고객 중 가장 큰 일련번호(MAX) 산출
+  let maxNum = 0;
+  const seenIds = new Set();
+
+  for (let i = 0; i < allApps.length; i++) {
+    const a = allApps[i];
+    if (!a || !a.id || seenIds.has(a.id)) continue;
+    seenIds.add(a.id);
+
+    const aIdStr = String(a.id).trim();
+    if (aIdStr.startsWith(prefix)) {
+      const match = aIdStr.slice(prefix.length).match(/\d+/);
+      if (match) {
+        const num = parseInt(match[0], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
   }
-  return `${prefix}${seq.toString().padStart(4, '0')}`;
+
+  // 3. 만약 환경설정(localStorage)에 저장된 시작번호/일련번호가 maxNum보다 크면 그것을 존중
+  if (!isSamsung) {
+    const savedSeq = parseInt(localStorage.getItem(APP_ID_SEQ_KEY), 10);
+    if (!isNaN(savedSeq) && savedSeq > maxNum) {
+      maxNum = savedSeq - 1;
+    }
+  }
+
+  // 4. 다음 일련번호는 항상 (기존 최대값 + 1)
+  const nextSeq = Math.max(maxNum + 1, 1);
+  return `${prefix}${nextSeq.toString().padStart(4, '0')}`;
 }
 
 function incrementAppIdSeq() {
-  // Automatic duplicate-free sequence calculation used
+  const current = generateNextAppId();
+  const match = current.match(/\d+/);
+  if (match) {
+    const nextVal = parseInt(match[0], 10) + 1;
+    localStorage.setItem(APP_ID_SEQ_KEY, nextVal.toString());
+  }
 }
 
 const VOICE_LOG_CHANNELS_KEY = 'reborn_voice_log_channels';
