@@ -1123,20 +1123,79 @@ async function loadConvexData(showSpinner = true) {
     if (res && res.status === 'success' && res.value) {
       const { applications, assignments, claims, payouts, adjusters, partners, careLogs } = res.value;
       if (Array.isArray(applications) && applications.length > 0) {
-        gApps = applications;
-        try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+        // 로컬에 저장된 실데이터(isRealLaunchData)가 있는 경우, 원격 목업 데이터로 덮어쓰지 않고 로컬 실데이터 보호
+        const cachedRaw = localStorage.getItem('LIVON_CACHED_APPS');
+        let localRealApps = null;
+        if (cachedRaw) {
+          try {
+            const parsed = JSON.parse(cachedRaw);
+            if (Array.isArray(parsed) && parsed.some(a => a.isRealLaunchData)) {
+              localRealApps = parsed;
+            }
+          } catch (e) {}
+        }
+        const hasRealRemote = applications.some(a => a.isRealLaunchData);
+        if (localRealApps && !hasRealRemote) {
+          console.log('[DataSync] 로컬에 저장된 실데이터(' + localRealApps.length + '건) 보존 및 원격 동기화');
+          gApps = localRealApps;
+          if (typeof syncRealLaunchDataToConvex === 'function') {
+            syncRealLaunchDataToConvex(gApps);
+          }
+        } else {
+          gApps = applications;
+          try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+        }
       }
       if (Array.isArray(assignments)) {
-        gAssigns = assignments;
-        try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(assignments)); } catch (e) {}
+        const cachedRaw = localStorage.getItem('LIVON_CACHED_ASSIGNS');
+        let localReal = null;
+        if (cachedRaw) {
+          try {
+            const parsed = JSON.parse(cachedRaw);
+            if (Array.isArray(parsed) && parsed.some(a => a.isRealLaunchData)) localReal = parsed;
+          } catch (e) {}
+        }
+        if (localReal && !assignments.some(a => a.isRealLaunchData)) {
+          gAssigns = localReal;
+          if (typeof syncRealLaunchDataToConvex === 'function') syncRealLaunchDataToConvex(null, gAssigns);
+        } else {
+          gAssigns = assignments;
+          try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(assignments)); } catch (e) {}
+        }
       }
       if (Array.isArray(claims)) {
-        gClaims = claims;
-        try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(claims)); } catch (e) {}
+        const cachedRaw = localStorage.getItem('LIVON_CACHED_CLAIMS');
+        let localReal = null;
+        if (cachedRaw) {
+          try {
+            const parsed = JSON.parse(cachedRaw);
+            if (Array.isArray(parsed) && parsed.some(c => c.isRealLaunchData)) localReal = parsed;
+          } catch (e) {}
+        }
+        if (localReal && !claims.some(c => c.isRealLaunchData)) {
+          gClaims = localReal;
+          if (typeof syncRealLaunchDataToConvex === 'function') syncRealLaunchDataToConvex(null, null, gClaims);
+        } else {
+          gClaims = claims;
+          try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(claims)); } catch (e) {}
+        }
       }
       if (Array.isArray(payouts)) {
-        gPayouts = payouts;
-        try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(payouts)); } catch (e) {}
+        const cachedRaw = localStorage.getItem('LIVON_CACHED_PAYOUTS');
+        let localReal = null;
+        if (cachedRaw) {
+          try {
+            const parsed = JSON.parse(cachedRaw);
+            if (Array.isArray(parsed) && parsed.some(p => p.isRealLaunchData)) localReal = parsed;
+          } catch (e) {}
+        }
+        if (localReal && !payouts.some(p => p.isRealLaunchData)) {
+          gPayouts = localReal;
+          if (typeof syncRealLaunchDataToConvex === 'function') syncRealLaunchDataToConvex(null, null, null, gPayouts);
+        } else {
+          gPayouts = payouts;
+          try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(payouts)); } catch (e) {}
+        }
       }
       if (Array.isArray(adjusters) && adjusters.length > 0) {
         gAdjusters = adjusters;
@@ -37115,6 +37174,46 @@ function saveLaunchConfig(update) {
 }
 
 /**
+ * 전산 런칭 실데이터를 Convex 클라우드 백엔드에 청크 단위로 영구 보존 동기화
+ */
+async function syncRealLaunchDataToConvex(apps = null, assigns = null, claims = null, payouts = null, clearCompany = null) {
+  if (typeof syncToConvex !== 'function') return;
+  try {
+    const CHUNK_SIZE = 50;
+    if (Array.isArray(apps) && apps.length > 0) {
+      for (let i = 0; i < apps.length; i += CHUNK_SIZE) {
+        const chunk = apps.slice(i, i + CHUNK_SIZE);
+        await syncToConvex('sync:saveApplicationsChunk', {
+          apps: chunk,
+          clearCompany: (i === 0 && clearCompany) ? clearCompany : undefined
+        });
+      }
+    }
+    if (Array.isArray(assigns) && assigns.length > 0) {
+      for (let i = 0; i < assigns.length; i += CHUNK_SIZE) {
+        const chunk = assigns.slice(i, i + CHUNK_SIZE);
+        await syncToConvex('sync:saveAssignmentsChunk', { assigns: chunk });
+      }
+    }
+    if (Array.isArray(claims) && claims.length > 0) {
+      for (let i = 0; i < claims.length; i += CHUNK_SIZE) {
+        const chunk = claims.slice(i, i + CHUNK_SIZE);
+        await syncToConvex('sync:saveClaimsChunk', { claims: chunk });
+      }
+    }
+    if (Array.isArray(payouts) && payouts.length > 0) {
+      for (let i = 0; i < payouts.length; i += CHUNK_SIZE) {
+        const chunk = payouts.slice(i, i + CHUNK_SIZE);
+        await syncToConvex('sync:savePayoutsChunk', { payouts: chunk });
+      }
+    }
+  } catch (err) {
+    console.warn('[Convex Real Launch Data Sync Warn]', err);
+  }
+}
+window.syncRealLaunchDataToConvex = syncRealLaunchDataToConvex;
+
+/**
  * 환경설정 탭 진입 시 실데이터 연동 상태 초기화 및 화면 표시
  */
 function initLaunchDataSettings() {
@@ -38372,7 +38471,12 @@ async function executeApplyLaunchData(company) {
   saveDirectoryToStorage();
   updateDirectoryTotalBadge();
 
-  // 6. 서버 영구 백업 (/api/hub/real-data) 전송
+  // 6. Convex 클라우드 백엔드 동기화 (새로고침 시 영구 반영)
+  if (typeof syncRealLaunchDataToConvex === 'function') {
+    syncRealLaunchDataToConvex(newApps, newAssigns, newClaims, newPayouts, companyLabel);
+  }
+
+  // 7. 서버 영구 백업 (/api/hub/real-data) 전송
   try {
     await fetch('/api/hub/real-data', {
       method: 'POST',

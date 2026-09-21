@@ -717,5 +717,86 @@ export const getSamsungSentCareLogs = query({
   },
 });
 
+// 29. 전산 런칭 실데이터 일괄 동기화 (신청 대장 청크 저장)
+export const saveApplicationsChunk = mutation({
+  args: {
+    apps: v.array(v.any()),
+    clearCompany: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    if (args.clearCompany) {
+      const comp = args.clearCompany;
+      const allApps = await ctx.db.query("applications").collect();
+      for (const a of allApps) {
+        const c = a.insuranceCompany || "";
+        if (comp.includes("현대") && c.includes("현대")) {
+          await ctx.db.delete(a._id);
+        } else if (comp.includes("삼성") && c.includes("삼성")) {
+          await ctx.db.delete(a._id);
+        }
+      }
+    }
+    for (const item of args.apps) {
+      const { _id, _creationTime, ...doc } = item;
+      if (!doc.id) {
+        await ctx.db.insert("applications", doc);
+        continue;
+      }
+      const existing = await ctx.db
+        .query("applications")
+        .filter((q) => q.eq(q.field("id"), doc.id))
+        .first();
+      if (existing) {
+        await ctx.db.patch(existing._id, doc);
+      } else {
+        await ctx.db.insert("applications", doc);
+      }
+    }
+  },
+});
+
+// 30. 전산 런칭 실데이터 일괄 동기화 (배정 대장 청크 저장)
+export const saveAssignmentsChunk = mutation({
+  args: { assigns: v.array(v.any()) },
+  handler: async (ctx, args) => {
+    for (const item of args.assigns) {
+      const { _id, _creationTime, ...doc } = item;
+      if (!doc.id) { await ctx.db.insert("assignments", doc); continue; }
+      const existing = await ctx.db.query("assignments").filter((q) => q.eq(q.field("id"), doc.id)).first();
+      if (existing) await ctx.db.patch(existing._id, doc);
+      else await ctx.db.insert("assignments", doc);
+    }
+  }
+});
+
+// 31. 전산 런칭 실데이터 일괄 동기화 (청구 대장 청크 저장)
+export const saveClaimsChunk = mutation({
+  args: { claims: v.array(v.any()) },
+  handler: async (ctx, args) => {
+    for (const item of args.claims) {
+      const { _id, _creationTime, ...doc } = item;
+      if (!doc.id) { await ctx.db.insert("claims", doc); continue; }
+      const existing = await ctx.db.query("claims").filter((q) => q.eq(q.field("id"), doc.id)).first();
+      if (existing) await ctx.db.patch(existing._id, doc);
+      else await ctx.db.insert("claims", doc);
+    }
+  }
+});
+
+// 32. 전산 런칭 실데이터 일괄 동기화 (지급 대장 청크 저장)
+export const savePayoutsChunk = mutation({
+  args: { payouts: v.array(v.any()) },
+  handler: async (ctx, args) => {
+    for (const item of args.payouts) {
+      const { _id, _creationTime, ...doc } = item;
+      if (!doc.id) { await ctx.db.insert("payouts", doc); continue; }
+      const existing = await ctx.db.query("payouts").filter((q) => q.eq(q.field("id"), doc.id)).first();
+      if (existing) await ctx.db.patch(existing._id, doc);
+      else await ctx.db.insert("payouts", doc);
+    }
+  }
+});
+
+
 
 
