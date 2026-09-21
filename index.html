@@ -1221,23 +1221,33 @@
           </div>
         </div>
 
-        <!-- 6-Stage Pipeline Quick Filter Tabs -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5 mb-2 relative z-10">
+        <!-- 7-Stage Pipeline Quick Filter Tabs -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-2.5 mb-2 relative z-10">
           <button onclick="setHubFilter('ALL')" id="hubFilterBtn-ALL" class="hub-filter-btn active p-2.5 sm:p-3 rounded-xl border transition-all text-left bg-primary-600 text-white border-primary-600 shadow-sm">
             <div class="text-[11px] font-semibold text-primary-100" id="hubCount-ALL-label">전체 고객</div>
             <div class="text-lg sm:text-xl font-black mt-0.5" id="hubCount-ALL">-건</div>
           </button>
-          <button onclick="setHubFilter('NEED_ASSIGN')" id="hubFilterBtn-NEED_ASSIGN" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
+          <button onclick="setHubFilter('COMPLETED')" id="hubFilterBtn-COMPLETED" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-emerald-200 shadow-2xs">
             <div class="text-[11px] font-bold text-emerald-700 flex items-center justify-between">
-              <span>① 배정 대기</span>
-              <span class="text-[10px] text-emerald-600 font-semibold">(미배정)</span>
+              <span>간병 완료</span>
               <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
             </div>
-            <div class="text-lg sm:text-xl font-black text-emerald-600 mt-0.5" id="hubCount-NEED_ASSIGN">-건</div>
+            <div class="text-lg sm:text-xl font-black text-emerald-600 mt-0.5" id="hubCount-COMPLETED">-건</div>
           </button>
-          <button onclick="setHubFilter('IN_PROGRESS')" id="hubFilterBtn-IN_PROGRESS" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
-            <div class="text-[11px] font-semibold text-slate-500">② 간병 진행중</div>
-            <div class="text-lg sm:text-xl font-black text-sky-600 mt-0.5" id="hubCount-IN_PROGRESS">-건</div>
+          <button onclick="setHubFilter('NEED_ASSIGN')" id="hubFilterBtn-NEED_ASSIGN" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200 shadow-2xs">
+            <div class="text-[11px] font-bold text-slate-600 flex items-center justify-between">
+              <span>① 배정 대기</span>
+              <span class="text-[10px] text-slate-400 font-semibold">(미배정)</span>
+              <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+            </div>
+            <div class="text-lg sm:text-xl font-black text-slate-600 mt-0.5" id="hubCount-NEED_ASSIGN">-건</div>
+          </button>
+          <button onclick="setHubFilter('IN_PROGRESS')" id="hubFilterBtn-IN_PROGRESS" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-amber-200 shadow-2xs">
+            <div class="text-[11px] font-bold text-amber-700 flex items-center justify-between">
+              <span>② 간병 진행중</span>
+              <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+            </div>
+            <div class="text-lg sm:text-xl font-black text-amber-600 mt-0.5" id="hubCount-IN_PROGRESS">-건</div>
           </button>
           <button onclick="setHubFilter('UNPAID_CLAIM')" id="hubFilterBtn-UNPAID_CLAIM" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-rose-200">
             <div class="text-[11px] font-bold text-rose-600 flex items-center justify-between">
@@ -1337,12 +1347,12 @@
                   <span class="w-2 h-2 rounded-full bg-blue-500"></span>신규
                 </button>
                 <span class="text-slate-300">|</span>
-                <button type="button" onclick="toggleHubStatusFilter('대기')" id="hubStatusLegend-대기" class="flex items-center gap-1 font-bold text-emerald-700 hover:opacity-80 transition-all cursor-pointer">
-                  <span class="w-2 h-2 rounded-full bg-emerald-500"></span>배정대기(미배정)
+                <button type="button" onclick="toggleHubStatusFilter('대기')" id="hubStatusLegend-대기" class="flex items-center gap-1 font-bold text-slate-600 hover:opacity-80 transition-all cursor-pointer">
+                  <span class="w-2 h-2 rounded-full bg-slate-400"></span>배정대기(미배정)
                 </button>
                 <span class="text-slate-300">|</span>
-                <button type="button" onclick="toggleHubStatusFilter('진행중')" id="hubStatusLegend-진행중" class="flex items-center gap-1 font-bold text-sky-700 hover:opacity-80 transition-all cursor-pointer">
-                  <span class="w-2 h-2 rounded-full bg-sky-500"></span>간병진행중
+                <button type="button" onclick="toggleHubStatusFilter('진행중')" id="hubStatusLegend-진행중" class="flex items-center gap-1 font-bold text-amber-700 hover:opacity-80 transition-all cursor-pointer">
+                  <span class="w-2 h-2 rounded-full bg-amber-500"></span>간병진행중
                 </button>
                 <span class="text-slate-300">|</span>
                 <button type="button" onclick="toggleHubStatusFilter('완료')" id="hubStatusLegend-완료" class="flex items-center gap-1 font-bold text-emerald-700 hover:opacity-80 transition-all cursor-pointer">

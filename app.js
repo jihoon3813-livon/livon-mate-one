@@ -16634,16 +16634,22 @@ const hubFilterConfig = {
     activeSubTitle: 'text-primary-100',
     activeCount: 'text-white'
   },
-  'NEED_ASSIGN': { 
+  'COMPLETED': {
     countColor: 'text-emerald-600',
     activeClass: 'bg-emerald-600 text-white border-emerald-600 shadow-sm',
     activeSubTitle: 'text-emerald-100',
     activeCount: 'text-white'
   },
+  'NEED_ASSIGN': { 
+    countColor: 'text-slate-600',
+    activeClass: 'bg-slate-600 text-white border-slate-600 shadow-sm',
+    activeSubTitle: 'text-slate-200',
+    activeCount: 'text-white'
+  },
   'IN_PROGRESS': { 
-    countColor: 'text-sky-600',
-    activeClass: 'bg-sky-600 text-white border-sky-600 shadow-sm',
-    activeSubTitle: 'text-sky-100',
+    countColor: 'text-amber-600',
+    activeClass: 'bg-amber-500 text-white border-amber-500 shadow-sm',
+    activeSubTitle: 'text-amber-100',
     activeCount: 'text-white'
   },
   'UNPAID_CLAIM': { 
@@ -16674,16 +16680,20 @@ function setHubFilter(filterType) {
     const btn = document.getElementById('hubFilterBtn-' + type);
     if (btn) {
       let borderClass = 'border-slate-200';
-      if (type === 'UNPAID_CLAIM') borderClass = 'border-rose-200';
+      if (type === 'COMPLETED') borderClass = 'border-emerald-200';
+      else if (type === 'UNPAID_CLAIM') borderClass = 'border-rose-200';
       else if (type === 'NEED_PAYOUT') borderClass = 'border-orange-200';
-      else if (type === 'NEED_ASSIGN') borderClass = 'border-emerald-200';
+      else if (type === 'IN_PROGRESS') borderClass = 'border-amber-200';
+      else if (type === 'NEED_ASSIGN') borderClass = 'border-slate-200';
 
       btn.className = `hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left ${borderClass} shadow-2xs`;
       const subTitle = btn.querySelector('div:first-child');
       if (subTitle) {
-        if (type === 'UNPAID_CLAIM') subTitle.className = 'text-[11px] font-bold text-rose-600 flex items-center justify-between';
+        if (type === 'COMPLETED') subTitle.className = 'text-[11px] font-bold text-emerald-700 flex items-center justify-between';
+        else if (type === 'IN_PROGRESS') subTitle.className = 'text-[11px] font-bold text-amber-700 flex items-center justify-between';
+        else if (type === 'NEED_ASSIGN') subTitle.className = 'text-[11px] font-bold text-slate-600 flex items-center justify-between';
+        else if (type === 'UNPAID_CLAIM') subTitle.className = 'text-[11px] font-bold text-rose-600 flex items-center justify-between';
         else if (type === 'NEED_PAYOUT') subTitle.className = 'text-[11px] font-bold text-orange-600 flex items-center justify-between';
-        else if (type === 'NEED_ASSIGN') subTitle.className = 'text-[11px] font-bold text-emerald-700 flex items-center justify-between';
         else subTitle.className = 'text-[11px] font-semibold text-slate-500';
       }
       const countDiv = btn.querySelector('[id^="hubCount-"]');
@@ -19050,25 +19060,25 @@ function getCustomerCardStatusTheme(app) {
       statusText: rawSt || '완료'
     };
   } else if (rawSt.includes('진행') || rawSt.includes('파견') || rawSt === '간병중') {
-    // 진행중: 하늘색(sky) 세로 라벨 + 배지 (상단 ② 간병 진행중 sky-600과 1:1 완벽 일치)
+    // 진행중: 연한 주황(amber/orange) 세로 라벨 + 배지 (상단 ② 간병 진행중 amber와 1:1 일치)
     return {
       type: 'in_progress',
-      stripeClass: 'border-l-[10px] border-l-sky-500 shadow-sky-200/60',
-      bgClass: 'bg-white border-sky-300/70',
+      stripeClass: 'border-l-[10px] border-l-amber-500 shadow-amber-200/60',
+      bgClass: 'bg-white border-amber-300/80',
       innerBgClass: 'bg-white',
-      headerBgClass: 'bg-sky-50/90 border-sky-200 text-sky-950',
-      badgeClass: 'bg-sky-100 text-sky-900 border border-sky-300',
+      headerBgClass: 'bg-amber-50/90 border-amber-200 text-amber-950',
+      badgeClass: 'bg-amber-100 text-amber-900 border border-amber-300',
       statusText: rawSt || '진행중'
     };
   } else if (rawSt.includes('예정') || rawSt.includes('대기') || (app && app.isPreRegistered)) {
-    // 예정/배정대기: 녹색(emerald) 세로 라벨 + 배지 (상단 ① 배정 대기 emerald-600과 1:1 완벽 일치)
+    // 예정/배정대기: 연한 회색(slate) 세로 라벨 + 배지 (상단 ① 배정 대기 slate와 1:1 일치)
     return {
       type: 'upcoming',
-      stripeClass: 'border-l-[10px] border-l-emerald-500 shadow-emerald-200/60',
-      bgClass: 'bg-white border-emerald-300/70',
+      stripeClass: 'border-l-[10px] border-l-slate-400 shadow-slate-200/60',
+      bgClass: 'bg-white border-slate-300/80',
       innerBgClass: 'bg-white',
-      headerBgClass: 'bg-emerald-50/90 border-emerald-200 text-emerald-950',
-      badgeClass: 'bg-emerald-100 text-emerald-900 border border-emerald-300',
+      headerBgClass: 'bg-slate-100/90 border-slate-200 text-slate-800',
+      badgeClass: 'bg-slate-100 text-slate-700 border border-slate-300',
       statusText: rawSt || (app && app.isPreRegistered ? '사전등록' : '배정대기')
     };
   } else {
@@ -23398,6 +23408,7 @@ function renderUnifiedCareHub() {
   if (bAll) bAll.innerText = allTotal + '건';
 
   // 2. 선택된 원수사(탭) 기준 6개 파이프라인 KPI 카운트 산출
+  let completedCount = 0;
   let needAssignCount = 0;
   let inProgressCount = 0;
   let unpaidClaimCount = 0;
@@ -23432,6 +23443,12 @@ function renderUnifiedCareHub() {
     return st === '서비스 취소' || st === '취소' || st === '미해당' || st === '완료';
   };
 
+  const isCompletedHelper = (app) => {
+    if (!app) return false;
+    const st = app.status || '';
+    return st === '완료' || st === '정산완료' || st.includes('완료') || st.includes('종료') || st.includes('종결');
+  };
+
   const isNeedAssignHelper = (app) => {
     if (isAssignedCaregiverHelper(app)) return false;
     if (isCancelledOrDone(app)) return false;
@@ -23446,6 +23463,7 @@ function renderUnifiedCareHub() {
       continue;
     }
     scopedTotal++;
+    if (isCompletedHelper(a)) completedCount++;
     if (isNeedAssignHelper(a)) needAssignCount++;
     if (aSt.includes('진행') || aSt === '정상' || aSt === '배정완료') inProgressCount++;
     if (a.unconfirmedClaimCount > 0 || a.estimatedUnpaid > 0) unpaidClaimCount++;
@@ -23456,6 +23474,8 @@ function renderUnifiedCareHub() {
   const countAllEl = document.getElementById('hubCount-ALL');
   if (countAllEl) {
     countAllEl.innerText = scopedTotal + '건';
+    const countCompEl = document.getElementById('hubCount-COMPLETED');
+    if (countCompEl) countCompEl.innerText = completedCount + '건';
     document.getElementById('hubCount-NEED_ASSIGN').innerText = needAssignCount + '건';
     document.getElementById('hubCount-IN_PROGRESS').innerText = inProgressCount + '건';
     document.getElementById('hubCount-UNPAID_CLAIM').innerText = unpaidClaimCount + '건';
@@ -23513,6 +23533,7 @@ function renderUnifiedCareHub() {
       if (!isMod) return false;
     }
 
+    if (gHubFilter === 'COMPLETED' && !isCompletedHelper(app)) return false;
     if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
     if (gHubFilter === 'IN_PROGRESS' && (!appSt.includes('진행') && appSt !== '정상' && appSt !== '배정완료')) return false;
     if (gHubFilter === 'UNPAID_CLAIM' && app.unconfirmedClaimCount === 0 && app.estimatedUnpaid === 0) return false;
