@@ -1136,8 +1136,19 @@ function renderAllLoadingStates() {
 
 function filterInvalidSamsungDuplicates(apps) {
   if (!Array.isArray(apps)) return [];
-  // 과거 레거시 목업/임의채번 S-id 삼성 데이터 정리 (실데이터 C-id 보존)
-  return apps.filter(a => !(a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성')));
+  // 1. 과거 레거시 목업/임의채번 S-id 삼성 데이터 정리 (실데이터 C-id 보존)
+  const valid = apps.filter(a => !(a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성')));
+  // 2. ID 중복 제거 (동일 id가 여러 번 존재하는 경우 최신/확장 데이터인 마지막 항목 보존)
+  const map = new Map();
+  for (let i = 0; i < valid.length; i++) {
+    const item = valid[i];
+    if (item && item.id) {
+      map.set(String(item.id), item);
+    } else {
+      map.set(Symbol(), item);
+    }
+  }
+  return Array.from(map.values());
 }
 window.filterInvalidSamsungDuplicates = filterInvalidSamsungDuplicates;
 
@@ -8321,6 +8332,7 @@ function updateSamsungClaimHubTabsUI() {
   const tabs = [
     { key: 'daily', activeBg: 'bg-emerald-600 border-emerald-500', activeText: 'text-emerald-950', iconDefault: 'text-emerald-600', badgeId: 'samsungDailyPendingCountBadge' },
     { key: 'claims', activeBg: 'bg-indigo-600 border-indigo-500', activeText: 'text-indigo-950', iconDefault: 'text-indigo-600', badgeId: 'samsungClaimCompletedCountBadge' },
+    { key: 'contacts', activeBg: 'bg-sky-600 border-sky-500', activeText: 'text-sky-950', iconDefault: 'text-sky-600', badgeId: 'samsungContactsCountBadge' },
     { key: 'history', activeBg: 'bg-slate-800 border-slate-700', activeText: 'text-slate-950', iconDefault: 'text-slate-600', badgeId: 'samsungEmailLogsCountBadge' }
   ];
 
@@ -8349,6 +8361,14 @@ function updateSamsungClaimHubTabsUI() {
           class="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs shadow-md transition-all cursor-pointer whitespace-nowrap">
           <i data-lucide="send" class="w-4 h-4"></i>
           <span>📧 월간 청구 이메일 발송</span>
+        </button>
+      `;
+    } else if (gSamsungClaimHubActiveSubTab === 'contacts') {
+      dispatchBtnContainer.innerHTML = `
+        <button type="button" onclick="addSamsungSpreadsheetRow()" id="btnAddSamsungContactRow"
+          class="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-black text-xs shadow-md transition-all cursor-pointer whitespace-nowrap">
+          <i data-lucide="user-plus" class="w-4 h-4"></i>
+          <span>➕ 담당자 행 추가</span>
         </button>
       `;
     }
@@ -8401,6 +8421,12 @@ function renderSamsungClaimHub(subTabParam = null) {
   const countBadgeClaim = document.getElementById('samsungClaimCompletedCountBadge');
   if (countBadgeClaim) countBadgeClaim.innerText = `${completedSheetRows.length}건`;
 
+  const countBadgeContacts = document.getElementById('samsungContactsCountBadge');
+  const contactsCount = (gSamsungSheets && gSamsungSheets.contacts && gSamsungSheets.contacts.length > 0)
+    ? gSamsungSheets.contacts.length
+    : (gSamsungAddressBook || []).length;
+  if (countBadgeContacts) countBadgeContacts.innerText = `${contactsCount}명`;
+
   const countBadgeLogs = document.getElementById('samsungEmailLogsCountBadge');
   if (countBadgeLogs) countBadgeLogs.innerText = `${(gSamsungEmailLogs || []).length}건`;
 
@@ -8434,6 +8460,9 @@ function renderSamsungClaimHub(subTabParam = null) {
     if (statTotalDays) statTotalDays.innerText = `${totalDays.toLocaleString()}일`;
     if (statTotalAmount) statTotalAmount.innerText = `${totalAmt.toLocaleString()}원`;
 
+    renderCurrentSamsungSheet();
+  } else if (gSamsungClaimHubActiveSubTab === 'contacts') {
+    gActiveSamsungSheet = 'contacts';
     renderCurrentSamsungSheet();
   } else if (gSamsungClaimHubActiveSubTab === 'history') {
     renderSamsungEmailHistoryTable();
@@ -16500,13 +16529,21 @@ function getHyundaiClaimStatus(app) {
   if (app.claimCategory === '미청구(완료·무청구)') {
     return { isClaimed: true, isUnbilled: true, statusText: '무청구(종결)', lastSentDate: null };
   }
-  if (app.claimCategory === '미청구(청구지연)') {
-    return { isClaimed: false, isDelayed: true, statusText: '청구지연', lastSentDate: null };
+
+  const pName = (app.patientName || '').trim();
+
+  // 1. Check gClaims (신청ID 또는 환자명으로 정밀 대조)
+  const c = (gClaims || []).find(claim =>
+    (String(claim.applyId) === String(app.id) || (pName && claim.patientName && claim.patientName.trim() === pName)) &&
+    (claim.claimDate || claim.faxStatus === '전송완료' || ['수납완료', '입금완료', '입금확인'].includes(claim.depositStatus) || (claim.days && claim.days > 0))
+  );
+  if (c) {
+    return { isClaimed: true, statusText: '청구완료', lastSentDate: c.claimDate || c.faxSentDate || '청구완료' };
   }
 
-  // 1. Check gFaxLogs for successful claims
+  // 2. Check gFaxLogs for successful claims
   const logs = (gFaxLogs || []).filter(l =>
-    String(l.appId) === String(app.id) &&
+    (String(l.appId) === String(app.id) || (pName && l.patientName && l.patientName.trim() === pName)) &&
     (l.formCode === 'HD_FORM_02' || l.formCode === 'HD_FORM_03' || l.category === '정산청구' || (l.formName && l.formName.includes('비용청구서'))) &&
     (l.status === '성공' || l.status === '전송성공' || l.status === '완료')
   );
@@ -16514,13 +16551,8 @@ function getHyundaiClaimStatus(app) {
     return { isClaimed: true, statusText: '청구완료', lastSentDate: logs[0].sentDate };
   }
 
-  // 2. Check gClaims
-  const c = (gClaims || []).find(claim =>
-    String(claim.applyId) === String(app.id) &&
-    (claim.claimDate || claim.faxStatus === '전송완료' || ['수납완료', '입금완료', '입금확인'].includes(claim.depositStatus))
-  );
-  if (c) {
-    return { isClaimed: true, statusText: '청구완료', lastSentDate: c.claimDate || c.faxSentDate || '청구완료' };
+  if (app.claimCategory === '미청구(청구지연)') {
+    return { isClaimed: false, isDelayed: true, statusText: '청구지연', lastSentDate: null };
   }
 
   const ended = isHyundaiCareEnded(app);
@@ -24431,21 +24463,20 @@ function renderUnifiedCareHub() {
   };
 
   // Pre-index unpaid payouts Set for ultra-fast O(1) checks
-  // [사용자 규칙]: 엑셀 업로드 시 기존 데이터 전면 초기화 → 엑셀 원장의 payoutStatus만 기준
-  // Phase 1 ONLY: gPayouts에 명시적으로 '미지급' 상태인 레코드만 카운트 (스케줄 계산 제외)
+  // [사용자 규칙]: 엑셀에서 '지급' 또는 '선지급완료'로 표기되지 않은 것은 모두 미지급(지급대기)
   const unpaidPayoutAppIdSet = new Set();
   if (Array.isArray(gPayouts)) {
     for (let i = 0; i < gPayouts.length; i++) {
       const p = gPayouts[i];
       if (!p) continue;
       const st = String(p.payoutStatus || p.status || '').trim();
-      const isPaid = st === '지급' || st === '지급완료' || p.isPaid === true;
-      if (!isPaid && st) {
+      const isPaid = (st === '지급' || st === '지급완료' || st === '선지급완료' || p.isPaid === true);
+      if (!isPaid) {
         if (p.applyId) {
-          unpaidPayoutAppIdSet.add(p.applyId);
+          unpaidPayoutAppIdSet.add(String(p.applyId));
         } else if (p.patientName) {
-          const matchedApp = (gApps || []).find(a => a.patientName === p.patientName);
-          if (matchedApp) unpaidPayoutAppIdSet.add(matchedApp.id);
+          const matchedApp = (gApps || []).find(a => a.patientName && a.patientName.trim() === p.patientName.trim());
+          if (matchedApp) unpaidPayoutAppIdSet.add(String(matchedApp.id));
         }
       }
     }
@@ -24539,7 +24570,7 @@ function renderUnifiedCareHub() {
     if (isNeedAssignHelper(a)) needAssignCount++;
     if (aSt.includes('진행') || aSt === '정상' || aSt === '배정완료') inProgressCount++;
     if (a.unconfirmedClaimCount > 0 || a.estimatedUnpaid > 0) unpaidClaimCount++;
-    if (unpaidPayoutAppIdSet.has(a.id)) needPayoutCount++;
+    if (unpaidPayoutAppIdSet.has(String(a.id))) needPayoutCount++;
     if (!aIns.includes('삼성') && a.claimCount > 0 && !isClaimFaxSentHelper(a.id)) needFaxCount++;
   }
 
@@ -24609,7 +24640,7 @@ function renderUnifiedCareHub() {
     if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
     if (gHubFilter === 'IN_PROGRESS' && (!appSt.includes('진행') && appSt !== '정상' && appSt !== '배정완료')) return false;
     if (gHubFilter === 'UNPAID_CLAIM' && app.unconfirmedClaimCount === 0 && app.estimatedUnpaid === 0) return false;
-    if (gHubFilter === 'NEED_PAYOUT' && !unpaidPayoutAppIdSet.has(app.id)) return false;
+    if (gHubFilter === 'NEED_PAYOUT' && !unpaidPayoutAppIdSet.has(String(app.id))) return false;
     if (gHubFilter === 'NEED_FAX') {
       if (appIns.includes('삼성')) return false;
       const isSent = isClaimFaxSentHelper(app.id);
@@ -41057,10 +41088,11 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
           const dailyWage = Number(String(r[7] || 0).replace(/[^0-9]/g, '')) || 0;
           const payoutAmount = Number(String(r[8] || 0).replace(/[^0-9]/g, '')) || 0;
           const payoutStatusRaw = String(r[9] !== undefined ? r[9] : '').trim();
-          const isUnpaid = payoutStatusRaw.includes('지급요함') || payoutStatusRaw.includes('미지급') || payoutStatusRaw.includes('대기') || payoutStatusRaw === '미';
-          const payoutStatus = isUnpaid ? '미지급' : '지급완료';
+          // [사용자 규칙]: 엑셀에서 '지급' 또는 '선지급완료'로 표기되지 않은 것은 모두 미지급(지급대기)
+          const isPaid = (payoutStatusRaw === '지급' || payoutStatusRaw === '선지급완료' || payoutStatusRaw === '지급완료');
+          const payoutStatus = isPaid ? '지급완료' : '미지급';
           let memo = String(r[10] !== undefined ? r[10] : '').trim();
-          if (isUnpaid && payoutStatusRaw && payoutStatusRaw !== '미지급') {
+          if (!isPaid && payoutStatusRaw && payoutStatusRaw !== '미지급') {
             memo = memo ? `[${payoutStatusRaw}] ${memo}` : `[${payoutStatusRaw}]`;
           }
 

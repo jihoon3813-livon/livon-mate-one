@@ -1973,23 +1973,6 @@
               <span>사전명단 (누적 가입자DB)</span>
               <span id="badgeSheetCount-eligible" class="px-2 py-0.5 rounded-full bg-white text-sky-900 font-black text-[10.5px] shadow-2xs">0건</span>
             </button>
-            <button type="button" onclick="switchSamsungSheet('target')" id="btnSheetTab-target" 
-              class="samsung-sheet-tab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap">
-              <i data-lucide="file-text" class="w-3.5 h-3.5 text-sky-600"></i>
-              <span>대상자 (일일 보고)</span>
-              <span id="badgeSheetCount-target" class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold border border-slate-300/60 text-[10.5px]">0건</span>
-            </button>
-            <button type="button" onclick="switchSamsungSheet('completed')" id="btnSheetTab-completed" 
-              class="samsung-sheet-tab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap">
-              <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
-              <span>완료 (월간 청구)</span>
-              <span id="badgeSheetCount-completed" class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold border border-slate-300/60 text-[10.5px]">0건</span>
-            </button>
-            <button type="button" onclick="switchSamsungSheet('contacts')" id="btnSheetTab-contacts" 
-              class="samsung-sheet-tab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap">
-              <i data-lucide="contact" class="w-3.5 h-3.5 text-slate-600"></i>
-              <span>연락처 (담당자)</span>
-            </button>
           </div>
 
           <div class="flex items-center gap-2 flex-wrap">
@@ -2112,6 +2095,12 @@
               <i data-lucide="receipt" class="w-3.5 h-3.5 text-indigo-600"></i>
               <span>월간 청구관리 (완료 시트)</span>
               <span id="samsungClaimCompletedCountBadge" class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold border border-slate-300/60 text-[10.5px]">0건</span>
+            </button>
+            <button type="button" onclick="switchSamsungClaimHubSubTab('contacts')" id="btnSamsungHubTab-contacts"
+              class="samsung-hub-subtab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="contact" class="w-3.5 h-3.5 text-sky-600"></i>
+              <span>연락처 (담당자)</span>
+              <span id="samsungContactsCountBadge" class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold border border-slate-300/60 text-[10.5px]">0건</span>
             </button>
             <button type="button" onclick="switchSamsungClaimHubSubTab('history')" id="btnSamsungHubTab-history"
               class="samsung-hub-subtab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap">
