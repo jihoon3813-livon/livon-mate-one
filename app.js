@@ -24274,7 +24274,7 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
           <span class="flex items-center gap-1" title="${complaintInfo.title || '민원 접수'}: ${complaintInfo.summary || ''}">
             <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-white"></i> 🚨 민원 발생${cTime ? ` (${cTime})` : ''}
           </span>
-          <button type="button" onclick="confirmHubAppAlert('${app.id}', event)" class="px-1.5 py-0.2 rounded bg-white text-purple-900 hover:bg-purple-100 font-black text-[10px] shadow-xs cursor-pointer transition-all flex items-center gap-0.5" title="확인 완료 시 원래 신청일 순서로 돌아갑니다">
+          <button type="button" onclick="confirmHubAppAlert('${app.id}', event)" class="px-1.5 h-[16px] leading-none rounded bg-white text-purple-900 hover:bg-purple-100 font-black text-[9.5px] shadow-xs cursor-pointer transition-all inline-flex items-center justify-center gap-0.5 border-0" title="확인 완료 시 원래 신청일 순서로 돌아갑니다">
             확인
           </button>
         </span>
@@ -24294,7 +24294,7 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
           <span class="flex items-center gap-1" title="고객 정보가 수정되었습니다.">
             <i data-lucide="edit-3" class="w-3.5 h-3.5 text-white"></i> ⚡ 수정발생
           </span>
-          <button type="button" onclick="confirmHubAppAlert('${app.id}', event)" class="px-1.5 py-0.2 rounded bg-white text-indigo-900 hover:bg-indigo-100 font-black text-[10px] shadow-xs cursor-pointer transition-all flex items-center gap-0.5" title="확인 완료 시 원래 신청일 순서로 돌아갑니다">
+          <button type="button" onclick="confirmHubAppAlert('${app.id}', event)" class="px-1.5 h-[16px] leading-none rounded bg-white text-indigo-900 hover:bg-indigo-100 font-black text-[9.5px] shadow-xs cursor-pointer transition-all inline-flex items-center justify-center gap-0.5 border-0" title="확인 완료 시 원래 신청일 순서로 돌아갑니다">
             확인
           </button>
         </span>
@@ -25085,7 +25085,7 @@ function renderUnifiedCareHub() {
         class="hub-customer-card ${cardTheme.bgClass} rounded-2xl border border-slate-200/90 hover:shadow-md shadow-xs overflow-hidden flex flex-col justify-between cursor-pointer transition-all duration-200 ${cardTheme.stripeClass}">
         
         <!-- [이름 바] 카드 헤더: 바닥과 뚜렷하게 구분되는 차분하고 선명한 회색조 배경 및 경계선 -->
-        <div class="px-4 py-2.5 ${cardTheme.headerBgClass} border-b flex items-center justify-between gap-2 flex-wrap">
+        <div class="px-4 py-2.5 ${cardTheme.headerBgClass} border-b flex items-center justify-between gap-2 flex-wrap min-h-[46px]">
           <div class="flex items-center gap-2 flex-wrap">
             <input type="checkbox" value="${app.id}" ${isChecked} onclick="event.stopPropagation();" onchange="toggleSelectApp('${app.id}', this.checked)" class="app-row-checkbox w-4 h-4 rounded text-primary-600 focus:ring-primary-500 cursor-pointer accent-primary-600">
             <span class="px-2 py-0.5 rounded-md bg-white text-slate-800 border border-slate-300 font-mono font-bold text-xs">${app.id}</span>
@@ -36661,26 +36661,26 @@ function getCsLabelBadge(app) {
   
   switch (label) {
     case '강성':
-      return `<span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-rose-600 text-white border border-rose-700 shadow-xs flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>[${type}:강성]</span>`;
+      return `<span class="inline-flex items-center gap-1 px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-black bg-rose-600 text-white border border-rose-700 shadow-2xs align-middle"><span class="w-1.5 h-1.5 rounded-full bg-white animate-ping shrink-0"></span><span>[${type}:강성]</span></span>`;
     case '긴급':
-      return `<span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-rose-600 text-white border border-rose-700 shadow-xs flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>[${type}:긴급]</span>`;
+      return `<span class="inline-flex items-center gap-1 px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-black bg-rose-600 text-white border border-rose-700 shadow-2xs align-middle"><span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0"></span><span>[${type}:긴급]</span></span>`;
     case '중요':
-      return `<span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-500 text-white border border-amber-600 shadow-xs flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>[${type}:중요]</span>`;
+      return `<span class="inline-flex items-center gap-1 px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-black bg-amber-500 text-white border border-amber-600 shadow-2xs align-middle"><span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0"></span><span>[${type}:중요]</span></span>`;
     case '민원': {
       const isConf = typeof isAppAlertConfirmed === 'function' && isAppAlertConfirmed(app.id);
       if (!isConf) {
-        return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-600 text-white border border-purple-700 shadow-xs animate-pulse" title="${cInfo ? (cInfo.title + ': ' + cInfo.summary) : '민원 접수건'}"><span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>[${type}:민원]<button type="button" onclick="confirmHubAppAlert('${app.id}', event)" class="ml-1 px-1.5 py-0.2 rounded bg-white text-purple-900 hover:bg-purple-100 font-extrabold text-[9.5px] cursor-pointer shadow-xs" title="확인 완료 시 원래 신청일 순서로 이동합니다">확인</button></span>`;
+        return `<span class="inline-flex items-center gap-1 px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-black bg-purple-600 text-white border border-purple-700 shadow-2xs animate-pulse align-middle" title="${cInfo ? (cInfo.title + ': ' + cInfo.summary) : '민원 접수건'}"><span class="w-1.5 h-1.5 rounded-full bg-white animate-ping shrink-0"></span><span>[${type}:민원]</span><button type="button" onclick="confirmHubAppAlert('${app.id}', event)" class="ml-0.5 px-1 h-[14px] leading-none rounded bg-white text-purple-900 hover:bg-purple-100 font-black text-[9px] cursor-pointer shadow-2xs border-0 inline-flex items-center justify-center shrink-0" title="확인 완료 시 원래 신청일 순서로 이동합니다">확인</button></span>`;
       }
-      return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300" title="민원 확인 완료됨">[${type}:민원확인]</span>`;
+      return `<span class="inline-flex items-center gap-1 px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300 align-middle" title="민원 확인 완료됨"><span>[${type}:민원확인]</span></span>`;
     }
     case '일반':
-      return `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">[${type}:일반]</span>`;
+      return `<span class="inline-flex items-center px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300 align-middle">[${type}:일반]</span>`;
     case '처리완료':
-      return `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">[${type}:완료]</span>`;
+      return `<span class="inline-flex items-center px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 align-middle">[${type}:완료]</span>`;
     case '처리불가':
-      return `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-200 text-slate-700 border border-slate-300">[${type}:불가]</span>`;
+      return `<span class="inline-flex items-center px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-bold bg-slate-200 text-slate-700 border border-slate-300 align-middle">[${type}:불가]</span>`;
     default:
-      return `<span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-600">[${label}]</span>`;
+      return `<span class="inline-flex items-center px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-medium bg-slate-100 text-slate-600 align-middle">[${label}]</span>`;
   }
 }
 
