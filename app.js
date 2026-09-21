@@ -15218,7 +15218,8 @@ function formatHyundaiDate(val) {
 
 function isHyundaiCareEnded(app) {
   if (!app) return false;
-  if (app.status === '서비스 취소' || app.status === '취소') return false;
+  if (app.status === '서비스 취소' || app.status === '취소' || app.status === '미해당' || app.claimCategory === '제외') return false;
+  if (app.claimCategory === '미청구(완료·무청구)') return false; // 무청구 종결 건은 청구대상에서 제외
   if (['완료', '종료', '정산완료', '진행완료'].includes(app.status)) return true;
 
   const now = new Date();
@@ -15246,8 +15247,14 @@ function isHyundaiCareEnded(app) {
 
 function getHyundaiClaimStatus(app) {
   if (!app) return { isClaimed: false, statusText: '미확인', lastSentDate: null };
-  if (app.status === '서비스 취소' || app.status === '취소') {
-    return { isClaimed: false, statusText: '취소', lastSentDate: null };
+  if (app.status === '서비스 취소' || app.status === '취소' || app.status === '미해당' || app.claimCategory === '제외') {
+    return { isClaimed: true, isExcluded: true, statusText: '제외', lastSentDate: null };
+  }
+  if (app.claimCategory === '미청구(완료·무청구)') {
+    return { isClaimed: true, isUnbilled: true, statusText: '무청구(종결)', lastSentDate: null };
+  }
+  if (app.claimCategory === '미청구(청구지연)') {
+    return { isClaimed: false, isDelayed: true, statusText: '청구지연', lastSentDate: null };
   }
 
   // 1. Check gFaxLogs for successful claims
@@ -15282,9 +15289,13 @@ function getHyundaiFormCode(app) {
 }
 
 function getHyundaiClaimFeeInfo(app) {
-  const dailyRate = 144000;
-  let days = 0;
+  const dailyRate = Number(app.claimUnitPrice || app.customDailyClaimPrice) || 144000;
 
+  if (app.claimCategory === '미청구(완료·무청구)' || app.claimCategory === '제외' || app.status === '미해당' || app.status === '서비스 취소' || app.status === '취소') {
+    return { days: 0, dailyRate, totalAmount: 0, isUnbilled: true };
+  }
+
+  let days = 0;
   if (app.careStartDate && (app.careEndDate || app.lastClaimDate)) {
     const startStr = formatHyundaiDate(app.careStartDate);
     const endStr = formatHyundaiDate(app.careEndDate || app.lastClaimDate);
@@ -15295,6 +15306,10 @@ function getHyundaiClaimFeeInfo(app) {
       if (diff > 0 && diff < 365) days = diff;
     }
   }
+  if (days <= 0 && app.expectedDays) {
+    const parsed = parseInt(app.expectedDays, 10);
+    if (parsed > 0) days = parsed;
+  }
   if (days <= 0 && app.elapsedDays) {
     const parsed = parseInt(app.elapsedDays, 10);
     if (parsed > 0) days = parsed;
@@ -15302,9 +15317,9 @@ function getHyundaiClaimFeeInfo(app) {
   if (days <= 0 && app.depositConfirmedAmount > 0) {
     days = Math.round(app.depositConfirmedAmount / dailyRate);
   }
-  if (days <= 0) days = 8;
+  if (days <= 0) days = 1;
 
-  const totalAmount = app.depositConfirmedAmount || (days * dailyRate);
+  const totalAmount = app.depositConfirmedAmount > 0 ? app.depositConfirmedAmount : (days * dailyRate);
   return { days, dailyRate, totalAmount };
 }
 
@@ -15372,7 +15387,7 @@ function updateHyundaiClaimKpis() {
         endedPendingCount++;
         totalPendingAmount += fee.totalAmount;
       }
-    } else if (app.status !== '서비스 취소' && app.status !== '취소') {
+    } else if (app.status !== '서비스 취소' && app.status !== '취소' && app.status !== '미해당' && app.claimCategory !== '제외') {
       ongoingCount++;
     }
   });
@@ -15384,7 +15399,7 @@ function updateHyundaiClaimKpis() {
     (l.formName && l.formName.includes('현대해상'))
   );
 
-  // 엑셀 보험청구 시트 미수금(113건, 124,817,000원) 정합 연동
+  // 엑셀 보험청구 시트 미수금(118건, 126,855,000원) 정합 연동
   let unconfirmedClaimSum = 0;
   let unconfirmedClaimCount = 0;
   if (Array.isArray(gClaims) && gClaims.length > 0) {
@@ -15392,7 +15407,11 @@ function updateHyundaiClaimKpis() {
       const isHd = (c.insuranceCompany || '').includes('현대') || (c.applyId && String(c.applyId).startsWith('C'));
       if (isHd && (c.depositStatus === '미확인' || !['수납완료', '입금완료', '입금확인'].includes(c.depositStatus))) {
         unconfirmedClaimCount++;
-        unconfirmedClaimSum += (Number(c.unpaidAmount) || (Number(c.days || 0) * (Number(c.unitPrice) || 142000)));
+        const days = Number(c.days || 0);
+        const unpaid = (c.unpaidAmount !== undefined && c.unpaidAmount !== null && c.unpaidAmount !== '')
+          ? Number(c.unpaidAmount)
+          : (days * 142000);
+        unconfirmedClaimSum += unpaid;
       }
     });
   }
@@ -15638,7 +15657,7 @@ function renderHyundaiClaimTable() {
 
   // 1. Sub-tab filtering: 'ended' shows only care-ended customers
   if (gHyundaiClaimSubTab === 'ended') {
-    list = list.filter(app => isHyundaiCareEnded(app) && app.status !== '서비스 취소' && app.status !== '취소');
+    list = list.filter(app => isHyundaiCareEnded(app) && app.status !== '서비스 취소' && app.status !== '취소' && app.status !== '미해당' && app.claimCategory !== '제외');
   }
 
   // 2. Company filter
@@ -15652,12 +15671,17 @@ function renderHyundaiClaimTable() {
   if (statusFilter === 'pending') {
     list = list.filter(app => {
       const s = getHyundaiClaimStatus(app);
-      return !s.isClaimed && app.status !== '서비스 취소' && app.status !== '취소';
+      return !s.isClaimed && !s.isUnbilled && !s.isExcluded && app.status !== '서비스 취소' && app.status !== '취소' && app.status !== '미해당' && app.claimCategory !== '제외';
+    });
+  } else if (statusFilter === 'unbilled') {
+    list = list.filter(app => {
+      const s = getHyundaiClaimStatus(app);
+      return s.isUnbilled || s.isExcluded || app.claimCategory === '미청구(완료·무청구)' || app.claimCategory === '제외' || app.status === '미해당';
     });
   } else if (statusFilter === 'completed') {
     list = list.filter(app => {
       const s = getHyundaiClaimStatus(app);
-      return s.isClaimed;
+      return s.isClaimed && !s.isUnbilled && !s.isExcluded;
     });
   }
 
@@ -15755,6 +15779,8 @@ function renderHyundaiClaimTable() {
       const isAllChecked = grp.apps.length > 0 && grp.apps.every(a => gHyundaiSelectedClaimApps.has(a.id));
       const hasPending = grp.pendingAppsCount > 0;
       const isEnded = grp.apps.some(a => isHyundaiCareEnded(a));
+      const isUnbilledAll = grp.apps.length > 0 && grp.apps.every(a => a.claimCategory === '미청구(완료·무청구)');
+      const isExcludedAll = grp.apps.length > 0 && grp.apps.every(a => a.claimCategory === '제외' || a.status === '미해당' || a.status === '서비스 취소');
 
       let adjName = grp.adjusterName || '-';
       let adjFirm = grp.adjusterFirm || '';
@@ -15779,7 +15805,10 @@ function renderHyundaiClaimTable() {
           <!-- 환자명 / 원수사 -->
           <td class="p-3">
             <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="font-black text-slate-900 text-sm cursor-pointer hover:text-orange-600" onclick="toggleHyundaiCustomerAccordion('${grp.key}')">${grp.patientName || '무명'}</span>
+              <span class="font-black text-slate-900 text-sm cursor-pointer hover:text-orange-600 hover:underline inline-flex items-center gap-1" onclick="openHubCustomerDetailModal('${grp.apps[0].id}')" title="고객 상세정보 모달 열기">${grp.patientName || '무명'}</span>
+              <button type="button" onclick="openHubCustomerDetailModal('${grp.apps[0].id}')" class="p-1 rounded-md text-slate-400 hover:text-orange-600 hover:bg-orange-50 transition-colors cursor-pointer" title="고객 상세정보 모달 열기">
+                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+              </button>
               ${(grp.insuranceCompany || '').includes('SCOR')
                 ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200">SCOR</span>'
                 : '<span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-orange-100 text-orange-800 border border-orange-200">현대</span>'
@@ -15790,7 +15819,9 @@ function renderHyundaiClaimTable() {
               }
             </div>
             <div class="text-[10.5px] text-slate-400 font-mono mt-0.5">
-              ${grp.apps.length === 1 ? `ID: ${grp.apps[0].id}` : `신청 ${grp.apps.map(a => a.id).join(', ')}`}
+              ${grp.apps.length === 1 
+                ? `<button type="button" onclick="openHubCustomerDetailModal('${grp.apps[0].id}')" class="hover:text-orange-600 hover:underline cursor-pointer">ID: ${grp.apps[0].id}</button>` 
+                : `신청 ${grp.apps.map(a => `<button type="button" onclick="openHubCustomerDetailModal('${a.id}')" class="hover:text-orange-600 hover:underline cursor-pointer font-bold">${a.id}</button>`).join(', ')}`}
             </div>
           </td>
 
@@ -15812,17 +15843,25 @@ function renderHyundaiClaimTable() {
           <!-- 신청/청구 구성 -->
           <td class="p-3">
             <div class="flex items-center gap-1 flex-wrap">
-              ${grp.pendingAppsCount > 0
-                ? `<span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-rose-50 text-rose-700 border border-rose-200">미청구 ${grp.pendingAppsCount}건</span>`
-                : ''
-              }
-              ${grp.claimedAppsCount > 0
-                ? `<span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">완료 ${grp.claimedAppsCount}건</span>`
-                : ''
-              }
-              ${grp.ongoingAppsCount > 0
-                ? `<span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-sky-50 text-sky-700 border border-sky-200">진행 ${grp.ongoingAppsCount}건</span>`
-                : ''
+              ${isUnbilledAll
+                ? '<span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-slate-100 text-slate-700 border border-slate-200">무청구 종결</span>'
+                : (isExcludedAll
+                    ? '<span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-slate-100 text-slate-500 border border-slate-200">제외</span>'
+                    : `
+                      ${grp.pendingAppsCount > 0
+                        ? `<span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-rose-50 text-rose-700 border border-rose-200">미청구 ${grp.pendingAppsCount}건</span>`
+                        : ''
+                      }
+                      ${grp.claimedAppsCount > 0
+                        ? `<span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">완료 ${grp.claimedAppsCount}건</span>`
+                        : ''
+                      }
+                      ${grp.ongoingAppsCount > 0
+                        ? `<span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-sky-50 text-sky-700 border border-sky-200">진행 ${grp.ongoingAppsCount}건</span>`
+                        : ''
+                      }
+                    `
+                  )
               }
             </div>
           </td>
@@ -15840,25 +15879,45 @@ function renderHyundaiClaimTable() {
 
           <!-- 총 산정비용 -->
           <td class="p-3 text-right">
-            <div class="font-black text-slate-900 font-mono text-xs">${grp.totalFee.toLocaleString()}원</div>
-            <div class="text-[10px] text-slate-400 font-mono">14.4만 × ${grp.totalDays}일</div>
+            ${isUnbilledAll
+              ? '<div class="font-black text-slate-500 font-mono text-xs">0원</div><div class="text-[10px] text-slate-400 font-mono">무청구 종결</div>'
+              : (isExcludedAll
+                  ? '<div class="font-black text-slate-400 font-mono text-xs">0원</div><div class="text-[10px] text-slate-400 font-mono">청구 제외</div>'
+                  : `<div class="font-black text-slate-900 font-mono text-xs">${grp.totalFee.toLocaleString()}원</div>
+                     <div class="text-[10px] text-slate-400 font-mono">14.4만 × ${grp.totalDays}일</div>`
+                )
+            }
           </td>
 
           <!-- 종합 상태 -->
           <td class="p-3 text-center">
-            ${hasPending
-              ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-black border border-rose-300 text-[10.5px]">
-                  <span class="w-1.5 h-1.5 rounded-full bg-rose-600"></span> <span>청구필요</span>
+            ${isUnbilledAll
+              ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200 text-[10.5px]">
+                  <span>무청구(종결)</span>
                  </span>`
-              : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 font-black border border-emerald-200 text-[10.5px]">
-                  <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> <span>청구완료</span>
-                 </span>`
+              : (isExcludedAll
+                  ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 font-bold border border-slate-200 text-[10.5px]">
+                      <span>제외</span>
+                     </span>`
+                  : (hasPending
+                      ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-black border border-rose-300 text-[10.5px]">
+                          <span class="w-1.5 h-1.5 rounded-full bg-rose-600"></span> <span>청구필요</span>
+                         </span>`
+                      : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 font-black border border-emerald-200 text-[10.5px]">
+                          <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> <span>청구완료</span>
+                         </span>`
+                    )
+                )
             }
           </td>
 
           <!-- 원스탑 액션 -->
           <td class="p-3 text-center">
             <div class="flex items-center justify-center gap-1.5">
+              <button type="button" onclick="openHubCustomerDetailModal('${grp.apps[0].id}')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] flex items-center gap-1 border border-slate-200 cursor-pointer transition-all" title="고객 상세정보 모달 열기">
+                <i data-lucide="user" class="w-3 h-3 text-slate-500"></i>
+                <span>상세</span>
+              </button>
               ${grp.apps.length > 1
                 ? `<button type="button" onclick="toggleHyundaiCustomerAccordion('${grp.key}')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${isExpanded ? 'bg-orange-100 text-orange-950 border-orange-300 shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'} flex items-center gap-1">
                     <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-3.5 h-3.5 ${isExpanded ? 'text-orange-700' : 'text-slate-500'}"></i>
@@ -15919,7 +15978,7 @@ function renderHyundaiClaimTable() {
                             <input type="checkbox" ${subChecked ? 'checked' : ''} onchange="toggleHyundaiClaimSelect('${subApp.id}', this.checked)" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer">
                           </td>
                           <td class="p-2 font-mono font-bold text-slate-800">
-                            ${subApp.id}
+                            <button type="button" onclick="openHubCustomerDetailModal('${subApp.id}')" class="text-orange-600 hover:underline cursor-pointer font-bold" title="고객 상세정보 모달 열기">${subApp.id}</button>
                           </td>
                           <td class="p-2">
                             <span class="font-medium text-slate-800">${subStart} ~ ${subEnd}</span>
@@ -15935,16 +15994,28 @@ function renderHyundaiClaimTable() {
                             ${subFee.totalAmount.toLocaleString()}원
                           </td>
                           <td class="p-2 text-center">
-                            ${subStatus.isClaimed
-                              ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">청구완료</span>`
-                              : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">청구필요</span>`
+                            ${subStatus.isUnbilled
+                              ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">무청구</span>'
+                              : (subStatus.isExcluded
+                                  ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-400">제외</span>'
+                                  : (subStatus.isClaimed
+                                      ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">청구완료</span>'
+                                      : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">청구필요</span>'
+                                    )
+                                )
                             }
                           </td>
                           <td class="p-2 text-center">
-                            <button type="button" onclick="openClaimFaxPreview('${subApp.id}', '${subFormCode}')" class="px-2 py-0.5 rounded bg-orange-600 hover:bg-orange-700 text-white font-bold text-[10px] inline-flex items-center gap-1 cursor-pointer shadow-2xs">
-                              <i data-lucide="printer" class="w-2.5 h-2.5"></i>
-                              <span>팩스청구</span>
-                            </button>
+                            <div class="flex items-center justify-center gap-1">
+                              <button type="button" onclick="openHubCustomerDetailModal('${subApp.id}')" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] inline-flex items-center gap-1 cursor-pointer" title="고객 상세정보 모달 열기">
+                                <i data-lucide="user" class="w-2.5 h-2.5"></i>
+                                <span>상세</span>
+                              </button>
+                              <button type="button" onclick="openClaimFaxPreview('${subApp.id}', '${subFormCode}')" class="px-2 py-0.5 rounded bg-orange-600 hover:bg-orange-700 text-white font-bold text-[10px] inline-flex items-center gap-1 cursor-pointer shadow-2xs">
+                                <i data-lucide="printer" class="w-2.5 h-2.5"></i>
+                                <span>팩스청구</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       `;
@@ -16029,14 +16100,19 @@ function renderHyundaiClaimTable() {
 
         <!-- 환자명 / 관리코드 -->
         <td class="p-3">
-          <div class="flex items-center gap-2">
-            <span class="font-black text-slate-900 text-xs">${app.patientName || '무명'}</span>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="font-black text-slate-900 text-xs cursor-pointer hover:text-orange-600 hover:underline inline-flex items-center gap-1" onclick="openHubCustomerDetailModal('${app.id}')" title="고객 상세정보 모달 열기">${app.patientName || '무명'}</span>
+            <button type="button" onclick="openHubCustomerDetailModal('${app.id}')" class="p-0.5 rounded text-slate-400 hover:text-orange-600 hover:bg-orange-50 transition-colors cursor-pointer" title="고객 상세정보 모달 열기">
+              <i data-lucide="external-link" class="w-3 h-3"></i>
+            </button>
             ${(app.insuranceCompany || '').includes('SCOR')
               ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200">SCOR</span>'
               : '<span class="px-1.5 py-0.5 rounded text-[10px] font-black bg-orange-100 text-orange-800 border border-orange-200">현대</span>'
             }
           </div>
-          <div class="text-[10.5px] text-slate-400 font-mono mt-0.5">ID: ${app.id}</div>
+          <div class="text-[10.5px] text-slate-400 font-mono mt-0.5">
+            <button type="button" onclick="openHubCustomerDetailModal('${app.id}')" class="hover:text-orange-600 hover:underline cursor-pointer">ID: ${app.id}</button>
+          </div>
         </td>
 
         <!-- 증권번호 / 사고번호 -->
@@ -16089,24 +16165,40 @@ function renderHyundaiClaimTable() {
 
         <!-- 청구비용 산정 -->
         <td class="p-3 text-right">
-          <div class="font-black text-slate-900 font-mono text-xs">${fee.totalAmount.toLocaleString()}원</div>
-          <div class="text-[10px] text-slate-400 font-mono">14.4만 × ${fee.days}일</div>
+          ${claimStatus.isUnbilled
+            ? '<div class="font-black text-slate-500 font-mono text-xs">0원</div><div class="text-[10px] text-slate-400 font-mono">무청구 종결</div>'
+            : (claimStatus.isExcluded
+                ? '<div class="font-black text-slate-400 font-mono text-xs">0원</div><div class="text-[10px] text-slate-400 font-mono">청구 제외</div>'
+                : `<div class="font-black text-slate-900 font-mono text-xs">${fee.totalAmount.toLocaleString()}원</div>
+                   <div class="text-[10px] text-slate-400 font-mono">14.4만 × ${fee.days}일</div>`
+              )
+          }
         </td>
 
         <!-- 청구상태 -->
         <td class="p-3 text-center">
-          ${claimStatus.isClaimed
-            ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 font-black border border-emerald-200 text-[10.5px]">
-                <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> <span>청구완료</span>
-               </span>
-               <div class="text-[9.5px] text-emerald-700 font-mono mt-0.5">${claimStatus.lastSentDate ? claimStatus.lastSentDate.slice(0, 10) : ''}</div>`
-            : (isEnded
-                ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-black border border-rose-300 text-[10.5px] animate-pulse">
-                    <span class="w-1.5 h-1.5 rounded-full bg-rose-600"></span> <span>청구필요</span>
+          ${claimStatus.isUnbilled
+            ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200 text-[10.5px]">
+                <span>무청구(종결)</span>
+               </span>`
+            : (claimStatus.isExcluded
+                ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 font-bold border border-slate-200 text-[10.5px]">
+                    <span>제외</span>
                    </span>`
-                : (app.status === '서비스 취소'
-                    ? '<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 font-bold text-[10px]">취소</span>'
-                    : '<span class="px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 font-bold border border-sky-200 text-[10px]">진행중</span>')
+                : (claimStatus.isClaimed
+                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 font-black border border-emerald-200 text-[10.5px]">
+                        <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> <span>청구완료</span>
+                       </span>
+                       <div class="text-[9.5px] text-emerald-700 font-mono mt-0.5">${claimStatus.lastSentDate ? claimStatus.lastSentDate.slice(0, 10) : ''}</div>`
+                    : (isEnded
+                        ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-black border border-rose-300 text-[10.5px] animate-pulse">
+                            <span class="w-1.5 h-1.5 rounded-full bg-rose-600"></span> <span>청구필요</span>
+                           </span>`
+                        : (app.status === '서비스 취소'
+                            ? '<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 font-bold text-[10px]">취소</span>'
+                            : '<span class="px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 font-bold border border-sky-200 text-[10px]">진행중</span>')
+                      )
+                  )
               )
           }
         </td>
@@ -16114,6 +16206,12 @@ function renderHyundaiClaimTable() {
         <!-- 원스탑 액션 -->
         <td class="p-3 text-center">
           <div class="flex items-center justify-center gap-1.5">
+            <button type="button" onclick="openHubCustomerDetailModal('${app.id}')"
+              class="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 border border-slate-200 transition-all cursor-pointer"
+              title="고객 상세정보 모달 열기">
+              <i data-lucide="user" class="w-3 h-3 text-slate-500"></i>
+              <span>상세</span>
+            </button>
             <button type="button" onclick="openClaimFaxPreview('${app.id}', '${formCode}')" 
               class="px-2.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 active:scale-95 text-white font-black text-xs flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
               title="현대해상 담당 손사에게 제공확인서 및 정산비용청구서(HD_FORM_02/03) 팩스 즉시 발송">

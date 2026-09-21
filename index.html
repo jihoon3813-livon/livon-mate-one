@@ -2613,7 +2613,7 @@
             <p class="text-[11px] text-emerald-700/90 font-medium">손사/보상팀 팩스 발송 성공</p>
           </div>
 
-          <!-- 카드 4: 청구대상 총금액 (엑셀 124,817,000원 정합 일치) -->
+          <!-- 카드 4: 청구대상 총금액 (엑셀 126,855,000원 정합 일치) -->
           <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs relative overflow-hidden">
             <div class="flex items-center justify-between">
               <span class="text-xs font-bold text-slate-600 flex items-center gap-1.5">
@@ -2623,10 +2623,10 @@
               <span class="text-[10px] font-black text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">엑셀 일치</span>
             </div>
             <div class="mt-2 flex items-baseline gap-1">
-              <span id="hyundaiKpiTotalAmount" class="text-2xl font-black text-slate-900 font-mono tracking-tight">124,817,000</span>
+              <span id="hyundaiKpiTotalAmount" class="text-2xl font-black text-slate-900 font-mono tracking-tight">126,855,000</span>
               <span class="text-xs font-bold text-slate-500">원</span>
             </div>
-            <p class="text-[11px] text-purple-700 font-medium">보험청구 미수금 (미확인 113건 기준)</p>
+            <p class="text-[11px] text-purple-700 font-medium">보험청구 미수금 (미확인 118건 기준)</p>
           </div>
         </div>
 
@@ -2670,7 +2670,8 @@
             </div>
             <select id="hyundaiClaimStatusFilter" onchange="renderHyundaiClaimTable()" class="p-1.5 border rounded-xl bg-white text-xs font-bold text-slate-700 cursor-pointer">
               <option value="all">청구상태: 전체</option>
-              <option value="pending" selected>청구필요 (미청구)</option>
+              <option value="pending" selected>청구필요 (청구대기)</option>
+              <option value="unbilled">무청구·제외 (종결)</option>
               <option value="completed">청구완료</option>
             </select>
             <select id="hyundaiClaimCompanyFilter" onchange="renderHyundaiClaimTable()" class="p-1.5 border rounded-xl bg-white text-xs font-bold text-slate-700 cursor-pointer">

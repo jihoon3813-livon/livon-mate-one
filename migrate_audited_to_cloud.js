@@ -1,9 +1,9 @@
 const xlsx = require('./node_modules/.xlsx-TKVotygl');
 const fs = require('fs');
 
-const filePath = fs.existsSync('./hoon/간병서비스 관리대장(new)_20260814 (3).xlsx')
-  ? './hoon/간병서비스 관리대장(new)_20260814 (3).xlsx'
-  : 'G:\\내 드라이브\\01. 리본케어\\99. 자료\\260921_간병서비스 관리대장(new)_20260814 (3).xlsx';
+const filePath = fs.existsSync('./hoon/간병서비스 관리대장(new)_20260814 (4).xlsx')
+  ? './hoon/간병서비스 관리대장(new)_20260814 (4).xlsx'
+  : 'G:\\내 드라이브\\01. 리본케어\\99. 자료\\260921_간병서비스 관리대장(new)_20260814 (4).xlsx';
 const wb = xlsx.readFile(filePath);
 
 function normDate(v) {
@@ -236,11 +236,10 @@ for (let i = 1; i < appRows.length; i++) {
     const expectedDays = r[21] ? String(r[21]).trim() : '';
     const status = r[22] ? String(r[22]).trim() : '접수';
 
-    // Strict ID-based linking with name-based fallback
+    // Strict ID-based linking ONLY (Do NOT fallback to name-based claims!)
     const appAssigns = assignsByAppId.get(id) || [];
     const directClaims = claimsByAppId.get(id) || [];
-    const nameClaims = claimsByName.get(patientName) || [];
-    const appClaims = directClaims.length > 0 ? directClaims : nameClaims;
+    const appClaims = directClaims;
     const appPayouts = payoutsByAppId.get(id) || [];
 
     // Derive totals
@@ -418,7 +417,7 @@ const allAdjusters = Array.from(adjMap.values());
 const payload = {
   updatedAt: new Date().toISOString(),
   sources: {
-    fileName: '260921_간병서비스 관리대장(new)_20260814 (3).xlsx',
+    fileName: '260921_간병서비스 관리대장(new)_20260814 (4).xlsx',
     auditedAt: new Date().toISOString()
   },
   applications: allApplications,
