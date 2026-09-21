@@ -52,9 +52,9 @@ module.exports = async function handler(req, res) {
     } catch (e) {}
   }
 
-  // 2. 실시간 CTI 동기화 시도 (스마트 초고속 증분 수집)
+  // 2. 실시간 CTI 동기화 시도 (스마트 초고속 증분 수집 - 최대 3.5초 대기 가드)
   try {
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 9000));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 3500));
 
     const sDateObj = new Date(startDate);
     const eDateObj = new Date(endDate);
@@ -310,11 +310,31 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     console.warn('[Total-Sync-CTI] 실시간 동기화 오류/타임아웃, 최신 데이터 캐시로 전환:', err.message);
     if (baseData) {
+      const normDate = d => (d || '').slice(0, 10).replace(/[./]/g, '-');
+      const sNorm = normDate(startDate);
+      const eNorm = normDate(endDate);
+      const allLogs = Array.isArray(baseData.callLogs) ? baseData.callLogs : [];
+      const filteredLogs = isExplicitAll ? allLogs : allLogs.filter(l => {
+        const d = normDate(l.callTime || l.date || l.startedAt);
+        if (sNorm && d < sNorm) return false;
+        if (eNorm && d > eNorm) return false;
+        return true;
+      });
+
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       return res.status(200).json({
         success: true,
         message: `종합콜분석 최근 동기화된 최신 통계 데이터를 안전하게 불러왔습니다.`,
-        data: baseData
+        data: {
+          ...baseData,
+          reportInfo: {
+            ...(baseData.reportInfo || {}),
+            period: `${startDate} ~ ${endDate}`,
+            startDate,
+            endDate
+          },
+          callLogs: filteredLogs.length > 0 ? filteredLogs : (isExplicitAll ? allLogs : allLogs.slice(0, 50))
+        }
       });
     }
     res.setHeader('Content-Type', 'application/json; charset=utf-8');

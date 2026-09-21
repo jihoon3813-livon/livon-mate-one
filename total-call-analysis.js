@@ -82,6 +82,8 @@ let gTotalSyncProgressState = {
   count: 0
 };
 
+let gSyncModalSafetyTimer = null;
+
 function setTotalSyncProgress(step, percent, title, message, completed = false, count = 0) {
   gTotalSyncProgressState = {
     active: true,
@@ -103,14 +105,23 @@ function setTotalSyncProgress(step, percent, title, message, completed = false, 
   if (typeof lucide !== 'undefined' && lucide.createIcons) {
     lucide.createIcons();
   }
+
+  // 모달이 화면을 영구 차단하지 않도록 안전 자동 종료 (완료 시 500ms, 미완료 시 최대 2.5초)
+  if (gSyncModalSafetyTimer) clearTimeout(gSyncModalSafetyTimer);
+  gSyncModalSafetyTimer = setTimeout(() => {
+    closeTotalSyncProgressModal();
+  }, completed ? 500 : 2500);
 }
 
 function closeTotalSyncProgressModal() {
   gTotalSyncProgressState.active = false;
+  if (gSyncModalSafetyTimer) {
+    clearTimeout(gSyncModalSafetyTimer);
+    gSyncModalSafetyTimer = null;
+  }
   const modal = document.getElementById('totalCallSyncProgressModal');
   if (modal) {
-    modal.classList.add('opacity-0', 'pointer-events-none');
-    setTimeout(() => { if (modal) modal.remove(); }, 250);
+    modal.remove();
   }
 }
 window.closeTotalSyncProgressModal = closeTotalSyncProgressModal;
@@ -987,10 +998,7 @@ async function initTotalCallAnalysisModule(forceRefresh = false) {
 }
 
 async function loadTotalCallData(forceSync = false, isBackground = false) {
-  if (isTotalSyncing && forceSync) {
-    if (!isBackground) {
-      setTotalSyncProgress(2, 60, 'CTI 데이터 수신 중', 'CTI 게이트웨이와 실시간 동기화를 진행하고 있습니다...');
-    }
+  if (isTotalSyncing) {
     return;
   }
   try {
@@ -1007,9 +1015,9 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         }, 120);
       }
 
-      // 12초 타임아웃 가드 (실시간 CTI 연동 대기 보장)
+      // 4.5초 타임아웃 가드 (실시간 CTI 연동 대기 보장)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), 4500);
       let synced = false;
 
       const thisWeek = (typeof getTotalThisWeekRange === 'function') ? getTotalThisWeekRange() : { start: '', end: '' };
@@ -1062,17 +1070,11 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         }
       }
 
-      if (!isBackground) {
-        setTotalSyncProgress(3, 95, '보험사별 데이터 통합 중', '인입 채널(삼성화재/현대해상/리본케어) 교차 검증 및 상담 라벨 매칭 중...');
-      }
-
       clearMateOneMatchCache();
       if (gTotalCallData) {
         window.gTotalCallData = gTotalCallData;
         try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
       }
-      isTotalSyncing = false;
-      renderTotalCallAnalysisTab();
 
       const count = (gTotalCallData && gTotalCallData.summaryStats && gTotalCallData.summaryStats.totalCalls)
         ? gTotalCallData.summaryStats.totalCalls
@@ -1085,12 +1087,13 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         setTotalSyncProgress(4, 100, '실시간 동기화 완료!', `총 ${count}건의 CTI 전수 상담 데이터가 성공적으로 반영되었습니다.`, true, count);
         setTimeout(() => {
           closeTotalSyncProgressModal();
-        }, 750);
+        }, 500);
 
         if (typeof showToast === 'function') {
           showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 완료되었습니다.`, 'success');
         }
       } else {
+        closeTotalSyncProgressModal();
         if (prevCount > 0 && count > prevCount) {
           const diff = count - prevCount;
           if (typeof showToast === 'function') {
@@ -1098,7 +1101,6 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
           }
         }
       }
-      return;
     } else {
       let loaded = false;
 
@@ -1149,10 +1151,11 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
     }
   } catch (err) {
     console.error('Total Call Report Load Error:', err);
+  } finally {
+    isTotalSyncing = false;
+    closeTotalSyncProgressModal();
+    renderTotalCallAnalysisTab();
   }
-
-  isTotalSyncing = false;
-  renderTotalCallAnalysisTab();
 }
 
 function getTotalCallLogs() {
@@ -1214,8 +1217,8 @@ function setTotalDatePreset(type) {
   gTotalListPage = 1;
   gTotalCustomerPage = 1;
   renderTotalCallAnalysisTab();
-  // 사용자가 프리셋을 변경했을 때 해당 기간의 CTI 데이터를 실시간으로 즉시 동기화
-  loadTotalCallData(true, false);
+  // 사용자가 프리셋을 변경했을 때 해당 기간의 CTI 데이터를 실시간으로 백그라운드 동기화 (모달 차단 없음)
+  loadTotalCallData(true, true);
 }
 
 function handleTotalDateInputChange(key, val) {
@@ -1230,8 +1233,8 @@ function applyTotalCustomDateRange() {
   gTotalListPage = 1;
   gTotalCustomerPage = 1;
   renderTotalCallAnalysisTab();
-  // 지정된 기간으로 CTI 실시간 동기화 요청
-  loadTotalCallData(true, false);
+  // 지정된 기간으로 CTI 실시간 백그라운드 동기화 요청
+  loadTotalCallData(true, true);
 }
 
 function resetAllTotalFilters() {
@@ -1255,7 +1258,7 @@ function resetAllTotalFilters() {
   gTotalListPage = 1;
   gTotalCustomerPage = 1;
   renderTotalCallAnalysisTab();
-  loadTotalCallData(true, false);
+  loadTotalCallData(true, true);
 }
 
 /**
