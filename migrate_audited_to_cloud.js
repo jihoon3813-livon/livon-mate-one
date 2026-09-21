@@ -175,8 +175,12 @@ for (let i = 1; i < payoutRows.length; i++) {
     const dailyWage = Number(r[7]) || 0;
     const payoutAmount = Number(r[8]) || 0;
     const payoutStatusRaw = r[9] ? String(r[9]).trim() : '';
-    const payoutStatus = payoutStatusRaw.includes('미') ? '미지급' : '지급완료';
+    const isPaid = (payoutStatusRaw === '지급' || payoutStatusRaw === '선지급완료');
+    const payoutStatus = isPaid ? '지급완료' : '미지급';
     const memo = r[10] ? String(r[10]).trim() : '';
+    const fullMemo = (!isPaid && payoutStatusRaw && payoutStatusRaw !== '미지급')
+      ? `[${payoutStatusRaw}] ${memo}`.trim()
+      : memo;
 
     const payout = {
       id,
@@ -189,9 +193,10 @@ for (let i = 1; i < payoutRows.length; i++) {
       dailyWage,
       payoutAmount,
       payoutStatus,
-      payoutDate: standardDate,
-      payoutTime: standardDate,
-      memo,
+      payoutDate: isPaid ? standardDate : '',
+      payoutTime: isPaid ? standardDate : '',
+      paidDate: isPaid ? standardDate : null,
+      memo: fullMemo,
       isRealLaunchData: true,
       importedAt: new Date().toISOString()
     };

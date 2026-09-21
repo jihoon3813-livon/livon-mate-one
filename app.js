@@ -16642,10 +16642,11 @@ function formatWithTime(dtStr, defaultTime = '09:00') {
 
 function parseCareDateTime(dateTimeStr) {
   if (!dateTimeStr) return null;
-  const str = String(dateTimeStr).trim();
+  const str = String(dateTimeStr).trim().replace(/2029[.-]/g, '2026.');
   const match = str.match(/(\d{4})[.-](\d{1,2})[.-](\d{1,2})(?:[.\sT]+(\d{1,2}):(\d{1,2}))?/);
   if (!match) return null;
-  const y = parseInt(match[1], 10);
+  let y = parseInt(match[1], 10);
+  if (y === 2029) y = 2026;
   const m = parseInt(match[2], 10) - 1;
   const d = parseInt(match[3], 10);
   const hh = match[4] !== undefined ? parseInt(match[4], 10) : 9;
@@ -16655,9 +16656,12 @@ function parseCareDateTime(dateTimeStr) {
 
 function parseCareDate(dateStr) {
   if (!dateStr) return null;
-  const match = String(dateStr).trim().match(/^(\d{4})[.-](\d{1,2})[.-](\d{1,2})/);
+  const str = String(dateStr).trim().replace(/2029[.-]/g, '2026.');
+  const match = str.match(/^(\d{4})[.-](\d{1,2})[.-](\d{1,2})/);
   if (!match) return null;
-  return new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10));
+  let y = parseInt(match[1], 10);
+  if (y === 2029) y = 2026;
+  return new Date(y, parseInt(match[2], 10) - 1, parseInt(match[3], 10));
 }
 
 function formatCareDateStr(d) {
@@ -17866,7 +17870,7 @@ async function executeImmediatePayout(applyId, roundNumber, targetDays) {
     return rNum === roundNumber;
   });
   if (existing) {
-    if (existing.payoutStatus !== '지급') {
+    if (existing.payoutStatus !== '지급' && existing.payoutStatus !== '지급완료') {
       await togglePayoutStatus(existing.id);
     }
     return;
@@ -18012,7 +18016,7 @@ function renderCaregiverPayouts() {
   }
 }
 
-function executeBatchCaregiverPayout(applyId, assignId) {
+async function executeBatchCaregiverPayout(applyId, assignId) {
   const app = (gApps || []).find(a => a.id === applyId);
   const as = (gAssigns || []).find(a => a.id === assignId || a.applyId === applyId);
   if (!app) return;
@@ -18022,15 +18026,23 @@ function executeBatchCaregiverPayout(applyId, assignId) {
   const wage = as ? (as.dailyWage || 140000) : 140000;
   const totalWage = totalDays * wage;
 
-  if (!confirm(`[${maskName(app.patientName)} 님 간병비 지급완료 처리]\n\n간병사: ${as ? maskName(as.caregiverName) : '간병인'}\n근무기간: ${totalDays}일 (${as ? as.startDate + ' ~ ' + as.endDate : ''})\n총 지급액: ${formatCurrency(totalWage)}원\n\n간병비 전액을 '지급완료'로 처리하시겠습니까?`)) {
-    return;
-  }
+  const confirmed = await showCustomConfirm(
+    `[${maskName(app.patientName)} 님 간병비 지급완료 처리]\n\n간병사: ${as ? maskName(as.caregiverName) : '간병인'}\n근무기간: ${totalDays}일 (${as ? as.startDate + ' ~ ' + as.endDate : ''})\n총 지급액: ${formatCurrency(totalWage)}원\n\n간병비 전액을 '지급완료'로 처리하시겠습니까?`,
+    {
+      theme: 'primary',
+      icon: 'check-circle-2',
+      title: '간병비 지급완료 처리',
+      confirmText: '지급완료 실행',
+      cancelText: '취소'
+    }
+  );
+  if (!confirmed) return;
 
-  // 기존 정산 내역이 있으면 지급으로 변경, 없으면 신규 생성
+  // 기존 정산 내역이 있으면 지급완료로 변경, 없으면 신규 생성
   const existingPayouts = (gPayouts || []).filter(p => p.applyId === applyId);
   if (existingPayouts.length > 0) {
     existingPayouts.forEach(p => {
-      p.payoutStatus = '지급';
+      p.payoutStatus = '지급완료';
       p.paidDate = formatCareDateTimeStr(new Date());
       p.updatedAt = new Date().toISOString();
     });
@@ -18044,7 +18056,7 @@ function executeBatchCaregiverPayout(applyId, assignId) {
       days: totalDays,
       dailyWage: wage,
       payoutAmount: totalWage,
-      payoutStatus: '지급',
+      payoutStatus: '지급완료',
       payoutDate: formatCareDateTimeStr(new Date()),
       paidDate: formatCareDateTimeStr(new Date()),
       memo: '간병 종료에 따른 전액 일괄 지급완료 처리',
@@ -18828,26 +18840,26 @@ function getCustomerCardStatusTheme(app) {
       statusText: rawSt || '완료'
     };
   } else if (rawSt.includes('진행') || rawSt.includes('파견') || rawSt === '간병중') {
-    // 진행중: 노란색(amber/yellow) 세로 라벨
+    // 진행중: 하늘색(sky) 세로 라벨 + 배지 (상단 ② 간병 진행중 sky-600과 1:1 완벽 일치)
     return {
       type: 'in_progress',
-      stripeClass: 'border-l-[10px] border-l-amber-400 shadow-amber-200/60',
+      stripeClass: 'border-l-[10px] border-l-sky-500 shadow-sky-200/60',
+      bgClass: 'bg-white border-sky-300/70',
+      innerBgClass: 'bg-white',
+      headerBgClass: 'bg-sky-50/90 border-sky-200 text-sky-950',
+      badgeClass: 'bg-sky-100 text-sky-900 border border-sky-300',
+      statusText: rawSt || '진행중'
+    };
+  } else if (rawSt.includes('예정') || rawSt.includes('대기') || (app && app.isPreRegistered)) {
+    // 예정/배정대기: 황색(amber) 세로 라벨 + 배지 (상단 ① 배정 대기 amber-600과 1:1 완벽 일치)
+    return {
+      type: 'upcoming',
+      stripeClass: 'border-l-[10px] border-l-amber-500 shadow-amber-200/60',
       bgClass: 'bg-white border-amber-300/70',
       innerBgClass: 'bg-white',
       headerBgClass: 'bg-amber-50/90 border-amber-200 text-amber-950',
       badgeClass: 'bg-amber-100 text-amber-900 border border-amber-300',
-      statusText: rawSt || '진행중'
-    };
-  } else if (rawSt.includes('예정') || rawSt.includes('대기') || (app && app.isPreRegistered)) {
-    // 예정: 보라색(purple) 세로 라벨
-    return {
-      type: 'upcoming',
-      stripeClass: 'border-l-[10px] border-l-purple-500 shadow-purple-200/60',
-      bgClass: 'bg-white border-purple-300/70',
-      innerBgClass: 'bg-white',
-      headerBgClass: 'bg-purple-50/90 border-purple-200 text-purple-950',
-      badgeClass: 'bg-purple-100 text-purple-900 border border-purple-300',
-      statusText: rawSt || '예정'
+      statusText: rawSt || (app && app.isPreRegistered ? '사전등록' : '배정대기')
     };
   } else {
     // 신규(접수/신규 등): 파란색 세로 라벨 (지금처럼)
@@ -21894,6 +21906,14 @@ async function togglePayoutStatus(payoutId) {
     });
   }
 }
+if (typeof window !== 'undefined') {
+  window.togglePayoutStatus = togglePayoutStatus;
+  window.executeBatchCaregiverPayout = executeBatchCaregiverPayout;
+  window.executeImmediatePayout = executeImmediatePayout;
+  window.deleteInterimPayout = deleteInterimPayout;
+  window.openPayoutEditModal = openPayoutEditModal;
+  window.openPayoutDetailListModal = openPayoutDetailListModal;
+}
 
 // =========================================================================
 // [NEW] 차수별 간병비 정산 전체 항목 시원하게 보기 모달
@@ -23039,7 +23059,7 @@ function toggleHubStatusFilter(status) {
 }
 
 function updateHubStatusLegendUI() {
-  const statuses = ['신규', '진행중', '완료', '취소', '예정'];
+  const statuses = ['신규', '대기', '진행중', '완료', '취소', '예정'];
   statuses.forEach(st => {
     const el = document.getElementById(`hubStatusLegend-${st}`);
     if (!el) return;
@@ -35874,19 +35894,30 @@ function extractCareCalendarEvents() {
     const cg = caregivers.find(c => c && c.name === as.caregiverName) || {};
     const adj = adjusters.find(d => d && d.name === app.adjusterName) || {};
 
-    const startStr = as.startDate || app.startDate || '';
-    const endStr = as.endDate || app.endDate || '';
-    const parsedStart = parseCareDate(startStr);
-    const parsedEnd = parseCareDate(endStr);
+    const startStr = (as.startDate || app.startDate || '').trim();
+    const endStr = (as.endDate || app.endDate || '').trim();
+    let parsedStart = parseCareDate(startStr);
+    let parsedEnd = parseCareDate(endStr);
 
-    // 날짜가 없는 배정 건은 스킵
-    if (!parsedStart || !parsedEnd) return;
+    // 날짜가 없는 배정 건은 스킵하되, 시작일이 있고 진행중인 건은 정상적으로 포함
+    if (!parsedStart) return;
+    const now = new Date();
+    const isAppOngoing = (app.status || '').includes('진행') || (as.status || '').includes('진행') || (!endStr);
+
+    if (!parsedEnd) {
+      if (isAppOngoing) {
+        const expDays = parseInt(String(app.expectedDays || '').replace(/[^0-9]/g, ''), 10) || 10;
+        const estEnd = new Date(parsedStart.getTime() + expDays * 24 * 60 * 60 * 1000);
+        parsedEnd = estEnd > now ? estEnd : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+      } else {
+        return;
+      }
+    }
 
     // 총 간병 일수 및 경과 일수 계산
     const diffTime = parsedEnd.getTime() - parsedStart.getTime();
     const totalDays = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1);
 
-    const now = new Date();
     const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startZero = new Date(parsedStart.getFullYear(), parsedStart.getMonth(), parsedStart.getDate());
     const endZero = new Date(parsedEnd.getFullYear(), parsedEnd.getMonth(), parsedEnd.getDate());
@@ -35894,7 +35925,7 @@ function extractCareCalendarEvents() {
     let status = 'ONGOING'; // 기본: 진행중
     if (todayZero < startZero) {
       status = 'UPCOMING'; // 예정
-    } else if (todayZero > endZero || as.status === '종료' || as.status === '취소') {
+    } else if (as.status === '종료' || as.status === '취소' || app.status === '완료' || app.status === '취소' || (!isAppOngoing && todayZero > endZero)) {
       status = 'COMPLETED'; // 종료
     }
 
@@ -35903,9 +35934,9 @@ function extractCareCalendarEvents() {
       Math.min(totalDays, Math.max(1, Math.round((todayZero.getTime() - startZero.getTime()) / (1000 * 60 * 60 * 24)) + 1));
     const remainingDays = Math.max(0, totalDays - elapsedDays);
 
-    // 💡 [핵심] 고객별 주요체크사항 파싱 (환자 임상 주의점 + 메모 + CS/민원 이력)
+    // 💡 [핵심] 고객별 주요체크사항 파싱 (환자 임상 주의점 + 진단명 + 메모 + CS/민원 이력)
     const checkPoints = [];
-    const fullNotes = `${app.diseaseName || ''} ${app.memo || ''} ${app.specialNotes || ''} ${app.careNotes || ''} ${as.memo || ''}`;
+    const fullNotes = `${app.diseaseName || ''} ${app.diagnosis || ''} ${app.memo || ''} ${app.specialNotes || ''} ${app.careNotes || ''} ${as.memo || ''}`;
 
     if (/치매|알츠하이머/i.test(fullNotes)) {
       checkPoints.push({ tag: '치매주의', icon: 'brain', color: 'purple', level: 'warn', desc: '인지장애 및 배회 가능성 주의' });
@@ -35916,17 +35947,32 @@ function extractCareCalendarEvents() {
     if (/와상|거동불가|부동/i.test(fullNotes)) {
       checkPoints.push({ tag: '와상환자', icon: 'bed', color: 'indigo', level: 'info', desc: '2시간 주기 체위변경 및 욕창 방지 관리' });
     }
-    if (/석션|가래|흡인/i.test(fullNotes)) {
+    if (/석션|썩션|가래|흡인/i.test(fullNotes)) {
       checkPoints.push({ tag: '석션필요', icon: 'activity', color: 'amber', level: 'warn', desc: '기도 분비물 및 흡인 주의 관리' });
     }
     if (/비위관|콧줄|경관|피딩/i.test(fullNotes)) {
       checkPoints.push({ tag: '비위관(피딩)', icon: 'pipette', color: 'teal', level: 'info', desc: '경관영양 주입 시 상체 거치 필수' });
     }
-    if (/감염|격리|cre|vre|옴/i.test(fullNotes)) {
+    if (/감염|격리|cre|vre|옴|결핵/i.test(fullNotes)) {
       checkPoints.push({ tag: '감염격리', icon: 'shield-alert', color: 'rose', level: 'danger', desc: '격리 지침 준수 및 보호장구 착용 필수' });
     }
     if (/섬망|수면장애/i.test(fullNotes)) {
       checkPoints.push({ tag: '야간섬망', icon: 'moon', color: 'amber', level: 'warn', desc: '야간 수면 및 섬망 발현 시 보호자 즉시 공유' });
+    }
+    if (/중환자실|icu/i.test(fullNotes)) {
+      checkPoints.push({ tag: '중환자실 집중케어', icon: 'heart-pulse', color: 'rose', level: 'danger', desc: '중환자실 입원 및 집중 관찰 필요' });
+    }
+    if (/산소|호흡기/i.test(fullNotes)) {
+      checkPoints.push({ tag: '산소호흡기', icon: 'wind', color: 'sky', level: 'warn', desc: '산소투여 및 호흡상태 지속 관찰' });
+    }
+    if (/골절/i.test(fullNotes)) {
+      checkPoints.push({ tag: '골절환자 케어', icon: 'bone', color: 'amber', level: 'warn', desc: '골절 부위 고정 및 체위 이동 시 주의' });
+    }
+    if (/암|말기/i.test(fullNotes)) {
+      checkPoints.push({ tag: '중증 암환자', icon: 'shield-alert', color: 'rose', level: 'warn', desc: '통증 조절 및 환자 전신 상태 세심 관찰' });
+    }
+    if (/교체/i.test(fullNotes)) {
+      checkPoints.push({ tag: '간병인 교체이력', icon: 'user-x', color: 'amber', level: 'warn', desc: '간병사 교체 요청 발생 이력 관리' });
     }
 
     // CS 및 민원 이력 분석
@@ -35991,6 +36037,87 @@ function extractCareCalendarEvents() {
       hasUrgentComplaint,
       rawApp: app,
       rawAssign: as
+    });
+  });
+
+  // 배정 건에는 없으나 통합허브에서 '진행중'인 신청건 (예: C0257 차상옥 등)을 누락 없이 이벤트에 포함
+  const processedAppIds = new Set(events.map(e => e.applyId));
+  apps.forEach((app, aIdx) => {
+    if (!app || processedAppIds.has(app.id)) return;
+    if (!(app.status || '').includes('진행')) return;
+
+    const startStr = (app.careStartDate || app.desiredStartDate || app.applyDate || '').trim();
+    let parsedStart = parseCareDate(startStr);
+    const now = new Date();
+    if (!parsedStart) parsedStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+
+    const expDays = parseInt(String(app.expectedDays || '').replace(/[^0-9]/g, ''), 10) || 10;
+    const estEnd = new Date(parsedStart.getTime() + expDays * 24 * 60 * 60 * 1000);
+    const parsedEnd = estEnd > now ? estEnd : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+
+    const diffTime = parsedEnd.getTime() - parsedStart.getTime();
+    const totalDays = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1);
+    const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startZero = new Date(parsedStart.getFullYear(), parsedStart.getMonth(), parsedStart.getDate());
+    const endZero = new Date(parsedEnd.getFullYear(), parsedEnd.getMonth(), parsedEnd.getDate());
+    const elapsedDays = Math.max(1, Math.round((todayZero.getTime() - startZero.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+    const checkPoints = [];
+    const fullNotes = `${app.diseaseName || ''} ${app.diagnosis || ''} ${app.memo || ''} ${app.specialNotes || ''}`;
+    if (/치매|알츠하이머/i.test(fullNotes)) checkPoints.push({ tag: '치매주의', icon: 'brain', color: 'purple', level: 'warn', desc: '인지장애 및 배회 가능성 주의' });
+    if (/낙상|부축|낙상주의|낙상고위험/i.test(fullNotes)) checkPoints.push({ tag: '낙상고위험', icon: 'alert-triangle', color: 'rose', level: 'danger', desc: '침상 이동 및 보행 시 1:1 밀착 부축 필수' });
+    if (/와상|거동불가|부동/i.test(fullNotes)) checkPoints.push({ tag: '와상환자', icon: 'bed', color: 'indigo', level: 'info', desc: '2시간 주기 체위변경 및 욕창 방지 관리' });
+    if (/석션|썩션|가래|흡인/i.test(fullNotes)) checkPoints.push({ tag: '석션필요', icon: 'activity', color: 'amber', level: 'warn', desc: '기도 분비물 및 흡인 주의 관리' });
+    if (/비위관|콧줄|경관|피딩/i.test(fullNotes)) checkPoints.push({ tag: '비위관(피딩)', icon: 'pipette', color: 'teal', level: 'info', desc: '경관영양 주입 시 상체 거치 필수' });
+    if (/감염|격리|cre|vre|옴|결핵/i.test(fullNotes)) checkPoints.push({ tag: '감염격리', icon: 'shield-alert', color: 'rose', level: 'danger', desc: '격리 지침 준수 및 보호장구 착용 필수' });
+    if (/중환자실|icu/i.test(fullNotes)) checkPoints.push({ tag: '중환자실 집중케어', icon: 'heart-pulse', color: 'rose', level: 'danger', desc: '중환자실 입원 및 집중 관찰 필요' });
+    if (/골절/i.test(fullNotes)) checkPoints.push({ tag: '골절환자 케어', icon: 'bone', color: 'amber', level: 'warn', desc: '골절 부위 고정 및 체위 이동 시 주의' });
+    if (/암|말기/i.test(fullNotes)) checkPoints.push({ tag: '중증 암환자', icon: 'shield-alert', color: 'rose', level: 'warn', desc: '통증 조절 및 환자 전신 상태 세심 관찰' });
+
+    events.push({
+      id: `EVT-APP-${app.id}`,
+      assignId: '',
+      applyId: app.id,
+      patientName: app.patientName || '고객',
+      phone: app.phone || '',
+      age: app.age || '',
+      gender: app.gender || '',
+      hospitalName: app.hospitalName || app.addressDetail || '병원 미지정',
+      roomNumber: app.roomNumber || '',
+      diseaseName: app.diseaseName || '일반케어',
+      sido: app.sido || '',
+      sigungu: app.sigungu || '',
+      specialNotes: app.specialNotes || app.memo || '',
+      insuranceCompany: app.insuranceCompany || '현대해상',
+      policyNumber: app.policyNumber || app.accidentNumber || '-',
+      adjusterName: app.adjusterName || '-',
+      adjusterPhone: app.adjusterPhone || '',
+      adjusterFax: app.adjusterFax || '',
+      adjusterFirm: app.adjusterFirm || '',
+      caregiverName: app.caregiverName || '간병인 배정 대기',
+      caregiverPhone: '',
+      centerName: '배정 진행중',
+      centerPhone: '',
+      dailyWage: 140000,
+      settlementType: '센터',
+      caregiverCert: '간병사',
+      startDate: startStr,
+      endDate: '',
+      parsedStart,
+      parsedEnd,
+      startZero,
+      endZero,
+      totalDays,
+      elapsedDays,
+      remainingDays: Math.max(0, totalDays - elapsedDays),
+      status: 'ONGOING',
+      checkPoints,
+      csRecords: app.csRecords || [],
+      isAttentionNeeded: checkPoints.length > 0,
+      hasAngryComplaint: false,
+      hasUrgentComplaint: false,
+      rawApp: app,
+      rawAssign: null
     });
   });
 
@@ -36109,6 +36236,9 @@ function updateCareCalendarKpis(events) {
   const elActiveCount = document.getElementById('calKpiActiveCount');
   if (elActiveCount) elActiveCount.innerText = `${activeCount}명`;
 
+  const elActiveDetail = document.getElementById('calKpiActiveDetail');
+  if (elActiveDetail) elActiveDetail.innerText = `현재 병원 근무 간병사 ${activeCount}명`;
+
   const elWeekSchedule = document.getElementById('calKpiWeekSchedule');
   if (elWeekSchedule) elWeekSchedule.innerText = `${weekStarts} / ${weekEnds}건`;
 
@@ -36117,6 +36247,9 @@ function updateCareCalendarKpis(events) {
 
   const elAttentionCount = document.getElementById('calKpiAttentionCount');
   if (elAttentionCount) elAttentionCount.innerText = `${attentionCount}명`;
+
+  const elAttentionDetail = document.getElementById('calKpiAttentionDetail');
+  if (elAttentionDetail) elAttentionDetail.innerText = `석션·중환자실·골절·교체 등 ${attentionCount}명`;
 }
 
 /**
