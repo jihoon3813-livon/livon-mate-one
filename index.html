@@ -9423,101 +9423,119 @@
 
       <!-- Modal Content Body (첨부 2번 이미지 100% 동일 양식) -->
       <div class="flex-1 overflow-y-auto bg-slate-100/80 relative min-h-[550px] flex flex-col custom-scrollbar">
-        <!-- 1:1 CarePort Document View -->
-        <div id="carePortPrintArea" class="p-6 sm:p-12 max-w-4xl mx-auto w-full bg-white shadow-xl my-4 rounded-2xl font-sans relative border border-slate-200">
-          <!-- Top Row: 간병일지 제목 & 다운로드 버튼 -->
-          <div class="flex items-center justify-between pb-3">
-            <h1 class="text-3xl font-black text-slate-950 tracking-tight">간병일지</h1>
-            <div class="flex items-center gap-2 no-print">
-              <button type="button" onclick="downloadCarePortDocumentPdf()" 
-                class="px-4 py-2 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-black rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
-                <i data-lucide="download" class="w-3.5 h-3.5"></i>
-                <span>PDF 다운로드</span>
-              </button>
+        <!-- 1:1 CarePort Modern Document View -->
+        <div id="carePortPrintArea" class="p-6 sm:p-10 max-w-4xl mx-auto w-full bg-white shadow-xl my-4 rounded-2xl font-sans relative border border-slate-200">
+          <!-- Top Header -->
+          <div class="flex items-center justify-between pb-4 border-b border-slate-200">
+            <div>
+              <div class="text-[11px] font-extrabold text-teal-600 tracking-wider uppercase">보호자 안내용 · 공식 간병일지</div>
+              <h1 class="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mt-0.5">간병일지</h1>
             </div>
-          </div>
-
-          <!-- Exact 7 Fields Header (첨부 2번/3번 이미지 완벽 일치: 대상자명 | 연령 | 성별 | 상담자 | 소속기관 | 상담일시 | 상담시간) -->
-          <div class="my-6 py-4 px-1 border-t border-b border-slate-200 flex items-center justify-between text-left flex-wrap gap-y-3 select-none">
-            <div class="px-3.5 border-r border-slate-200 min-w-[75px]">
-              <div class="text-[12px] text-slate-500 font-medium mb-1">대상자명</div>
-              <div class="text-base font-extrabold text-slate-900" id="cpMetaUsername">-</div>
-            </div>
-            <div class="px-3.5 border-r border-slate-200 min-w-[55px]">
-              <div class="text-[12px] text-slate-500 font-medium mb-1">연령</div>
-              <div class="text-base font-extrabold text-slate-900" id="cpMetaAge">-</div>
-            </div>
-            <div class="px-3.5 border-r border-slate-200 min-w-[55px]">
-              <div class="text-[12px] text-slate-500 font-medium mb-1">성별</div>
-              <div class="text-base font-extrabold text-slate-900" id="cpMetaGender">-</div>
-            </div>
-            <div class="px-3.5 border-r border-slate-200 min-w-[75px]">
-              <div class="text-[12px] text-slate-500 font-medium mb-1">상담자</div>
-              <div class="text-base font-extrabold text-slate-900" id="cpMetaConsultant">-</div>
-            </div>
-            <div class="px-3.5 border-r border-slate-200 min-w-[85px]">
-              <div class="text-[12px] text-slate-500 font-medium mb-1">소속기관</div>
-              <div class="text-base font-extrabold text-slate-900" id="cpMetaOrg">-</div>
-            </div>
-            <div class="px-3.5 border-r border-slate-200 min-w-[150px]">
-              <div class="text-[12px] text-slate-500 font-medium mb-1">상담일시</div>
-              <div class="text-base font-extrabold text-slate-900 font-mono" id="cpMetaDate">-</div>
-            </div>
-            <div class="px-3.5 min-w-[75px]">
-              <div class="text-[12px] text-slate-500 font-medium mb-1">상담시간</div>
-              <div class="text-base font-extrabold text-slate-900 font-mono" id="cpMetaDuration">-</div>
-            </div>
-          </div>
-
-          <!-- Section: 상담내용 -->
-          <div class="mt-6 mb-3">
-            <h2 class="text-xl font-bold text-slate-900">상담내용</h2>
-          </div>
-
-          <!-- Evaluation Checkboxes Section (CarePort 1:1 체크 버튼 양식 - 위치: 상담내용 바로 아래) -->
-          <div id="cpCheckboxesSection" class="mb-6 py-2 overflow-visible">
-            <div id="cpCheckboxesList" class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-3.5 text-xs overflow-visible">
-              <!-- Dynamically populated from renderCarePortEvaluationCheckboxes -->
-            </div>
-          </div>
-
-          <!-- Section: 상담요약 (첨부 2번 이미지와 100% 동일) -->
-          <div class="mb-2">
-            <h3 class="text-base font-bold text-slate-800">상담요약</h3>
-          </div>
-
-          <!-- Bordered Box with livon watermark (첨부 2번 이미지 100% 동일 박스) -->
-          <div class="border border-slate-200 rounded-md p-6 sm:p-8 bg-white relative overflow-hidden">
-            <!-- Pink livon watermark behind -->
-            <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20 select-none z-0">
-              <span class="text-7xl sm:text-9xl font-black tracking-widest text-pink-300 font-sans select-none">livon</span>
-            </div>
-
-            <!-- Content -->
-            <div class="relative z-10 space-y-4">
-              <!-- Title -->
-              <div id="cpCardTitle" class="text-base font-bold text-slate-900">
-                환자 투석 상태 및 퇴원 일정 확인
+            <div class="text-right flex items-center gap-3">
+              <div class="flex items-center gap-2">
+                <span id="cpDayBadge" class="px-2.5 py-1 rounded-lg text-xs font-black bg-teal-600 text-white shadow-2xs">1일차</span>
+                <span id="cpMetaDate" class="text-xs sm:text-sm font-mono font-extrabold text-slate-700">-</span>
               </div>
-
-              <!-- Tags / Keywords -->
-              <div id="cpCardTags" class="text-sm font-semibold text-slate-700">
-                #환자의 컨디션 #퇴원 시기 #투석 #허리 통증 #배변 상태
-              </div>
-
-              <!-- Structured Numbered Sections (1.환자의 현재 컨디션, 2.투석 상황 및 관리...) -->
-              <div id="cpCardReportItems" class="space-y-4 pt-1">
-                <!-- Dynamically populated from consult_report -->
-              </div>
-
-              <!-- Summary (요약) -->
-              <div id="cpCardSummaryWrap" class="pt-3">
-                <div class="font-bold text-sm text-slate-900 mb-1">요약</div>
-                <div id="cpCardSummaryContent" class="text-sm text-slate-700 leading-relaxed font-normal">
-                  내용 로딩 중...
-                </div>
+              <div class="no-print">
+                <button type="button" onclick="downloadCarePortDocumentPdf()" 
+                  class="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white text-xs font-black rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                  <span>PDF 다운로드</span>
+                </button>
               </div>
             </div>
+          </div>
+
+          <!-- Demographics Strip (고객명, 간병인, 간병기간) -->
+          <div class="my-4 p-3.5 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <div class="text-[11px] text-slate-500 font-bold mb-0.5">고객명 (피보험자)</div>
+              <div class="text-sm font-black text-slate-900 flex items-center gap-1.5">
+                <span id="cpMetaUsername">-</span>
+                <span class="text-xs font-bold text-slate-500" id="cpMetaAgeGender">(-세·-)</span>
+              </div>
+            </div>
+            <div class="sm:border-l sm:border-slate-200 sm:pl-3.5">
+              <div class="text-[11px] text-slate-500 font-bold mb-0.5">담당 간병인 (소속)</div>
+              <div class="text-sm font-black text-slate-900 flex items-center gap-1">
+                <span id="cpMetaConsultant">-</span>
+                <span class="text-xs font-normal text-slate-500" id="cpMetaOrg">(-)</span>
+              </div>
+            </div>
+            <div class="sm:border-l sm:border-slate-200 sm:pl-3.5">
+              <div class="text-[11px] text-slate-500 font-bold mb-0.5">간병 기간</div>
+              <div class="text-xs font-mono font-extrabold text-slate-800" id="cpMetaCarePeriod">-</div>
+            </div>
+          </div>
+
+          <!-- Section 1: 금일 환자 상태 체크 (신호등 & 세부 상태) -->
+          <div class="mt-5 mb-2 flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
+            <h2 class="text-sm font-black text-slate-900">금일 환자 상태 체크</h2>
+            <div class="text-[10px] font-bold text-slate-500 flex items-center gap-2.5">
+              <span><b class="text-emerald-500">●</b> 양호·안정</span>
+              <span><b class="text-amber-500">●</b> 주의·부분보조</span>
+              <span><b class="text-rose-500">●</b> 악화·주의필요</span>
+            </div>
+          </div>
+
+          <!-- Overall Status Verdict Card -->
+          <div id="cpOverallVerdictBox" class="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between mb-3 shadow-2xs">
+            <div class="flex items-center gap-3">
+              <span id="cpOverallToneBadge" class="px-2.5 py-0.5 rounded-md text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-300">● 전반상태</span>
+              <div id="cpOverallTrafficSvg"></div>
+              <span id="cpOverallDesc" class="text-xs font-bold text-slate-800">전반적으로 안정적</span>
+            </div>
+            <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-bold text-[11px]">종합 판정</span>
+          </div>
+
+          <!-- 4 Category Status Cards (식사, 거동, 수면, 통증) -->
+          <div id="cpCategoryCardsContainer" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Section 2: 금일 활력징후 (7 Vital Signs) -->
+          <div class="mt-4 mb-2 flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
+            <h2 class="text-sm font-black text-slate-900">금일 활력징후</h2>
+            <span class="text-[10px] text-slate-400 font-medium">정상 범위 기준 정밀 측정</span>
+          </div>
+          <div id="cpVitalsGrid" class="grid grid-cols-3 sm:grid-cols-7 gap-1.5 mb-4">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Section 3: 금일 간병 수행 내역 (5 Rows) -->
+          <div class="mt-4 mb-2 flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
+            <h2 class="text-sm font-black text-slate-900">금일 간병 수행 내역</h2>
+            <span class="text-[10px] text-slate-400 font-medium">표준 간병 프로세스 준수</span>
+          </div>
+          <div id="cpCareLogList" class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 p-2 mb-4">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Section 4: 오늘의 중요사항 및 종합 요약 -->
+          <div class="mt-4 mb-2 flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
+            <h2 class="text-sm font-black text-slate-900">오늘의 중요사항 및 종합 요약</h2>
+            <span class="text-[10px] font-bold text-teal-600">CarePort Verified</span>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-xl p-4 mb-4 space-y-2">
+            <div id="cpCardTitle" class="text-sm font-extrabold text-slate-900">환자 상태 보고</div>
+            <div id="cpCardTags" class="flex flex-wrap gap-1"></div>
+            <div id="cpCardSummaryContent" class="text-xs text-slate-700 leading-relaxed p-3 bg-slate-50 rounded-lg border-l-4 border-teal-500">
+              내용 로딩 중...
+            </div>
+          </div>
+
+          <!-- Section 5: 보호자 전달사항 (6 Items) -->
+          <div class="mt-4 mb-2 flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
+            <h2 class="text-sm font-black text-slate-900">보호자 전달사항</h2>
+            <span class="text-[10px] text-slate-400 font-medium">안심 소통 리포트</span>
+          </div>
+          <div id="cpGuardianNotesGrid" class="bg-white border border-slate-200 rounded-xl p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Footer -->
+          <div class="pt-3 border-t border-slate-200 text-center text-[10.5px] text-slate-400 font-medium">
+            본 간병일지는 리본케어(CarePort) 공식 전산을 통해 실시간 작성·인증된 법적 공인 간병기록입니다.
           </div>
         </div>
       </div>
