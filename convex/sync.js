@@ -907,6 +907,29 @@ export const purgeMockData = mutation({
   },
 });
 
+// 34. 삼성화재 중복 C-id 신청 건 영구 정리
+export const purgeDuplicateSamsungApplications = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const apps = await ctx.db.query("applications").collect();
+    let deletedCount = 0;
+    const deletedIds = [];
+    for (const a of apps) {
+      if (a.id && a.id.startsWith("C") && (a.insuranceCompany || "").includes("삼성")) {
+        await ctx.db.delete(a._id);
+        deletedCount++;
+        deletedIds.push(a.id);
+      }
+    }
+    return {
+      deletedCount,
+      deletedIds,
+      timestamp: new Date().toISOString(),
+    };
+  },
+});
+
+
 
 
 

@@ -22478,18 +22478,20 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
     `);
   }
 
-  // 4. 청구서 미발행 체크 (간병 시작/종료되었으나 청구서 미작성)
-  if (appClaims.length === 0 && as && careProg && (careProg.elapsedDays > 0 || careProg.status === 'completed')) {
-    badges.push(`
-      <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="간병이 시작되었으나 아직 손사 청구서가 작성되지 않았습니다.">
-        <i data-lucide="file-plus" class="w-3 h-3 text-amber-700"></i> ⚠️ 청구서 미발행
-      </span>
-    `);
+  // 4. 청구서 미발행 체크 (간병 시작/종료되었으나 청구서 미작성) - 삼성화재 및 엑셀 등록 자료는 청구서 미발행 뱃지 제외
+  const isSamsung = (app.insuranceCompany || '').includes('삼성');
+  const isExcelData = Boolean(app.isRealLaunchData || app.importedFromExcel);
+  if (!isSamsung && !isExcelData) {
+    if (appClaims.length === 0 && as && careProg && (careProg.elapsedDays > 0 || careProg.status === 'completed')) {
+      badges.push(`
+        <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="간병이 시작되었으나 아직 손사 청구서가 작성되지 않았습니다.">
+          <i data-lucide="file-plus" class="w-3 h-3 text-amber-700"></i> ⚠️ 청구서 미발행
+        </span>
+      `);
+    }
   }
 
   // 5. 청구팩스 미전송 체크 (청구서는 작성되었으나 손사 팩스 미전송) - 삼성화재 및 엑셀 등록 자료는 팩스 미전송 뱃지 제외
-  const isSamsung = (app.insuranceCompany || '').includes('삼성');
-  const isExcelData = Boolean(app.isRealLaunchData || app.importedFromExcel);
   if (!isSamsung && !isExcelData) {
     if (appClaims.length > 0 && faxInfo.status !== '전송완료') {
       badges.push(`
@@ -38175,6 +38177,15 @@ function mapRowToApplicationRecord(
     if (!colName) return '';
     return rowObj[colName] !== undefined ? rowObj[colName] : '';
   };
+
+  // 보험사 격리 검증: 현대해상 업로드 시 삼성 데이터 건너뜀, 삼성 업로드 시 현대 데이터 건너뜀
+  const detectedCompany = String(getVal('insuranceCompany') || rowObj['원수사'] || rowObj['보험사'] || '').trim();
+  if (companyKey === 'hyundai' && detectedCompany.includes('삼성')) {
+    return null;
+  }
+  if (companyKey === 'samsung' && detectedCompany.includes('현대')) {
+    return null;
+  }
 
   // 고유 ID 발급: 현대는 'C', 삼성화재는 'S', 중복 시 다른 번호를 임의로 자동 생성
   let rawId = String(getVal('id')).trim();
