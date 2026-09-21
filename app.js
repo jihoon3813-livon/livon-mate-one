@@ -1200,98 +1200,59 @@ async function loadConvexData(showSpinner = true) {
   try {
     const res = await queryConvex('sync:bundleAll', {});
     if (res && res.status === 'success' && res.value) {
-      const { applications, assignments, claims, payouts, adjusters, partners, careLogs } = res.value;
-      if (Array.isArray(applications) && applications.length > 0) {
-        // 로컬에 저장된 실데이터(isRealLaunchData) 확인
-        const cachedRaw = localStorage.getItem('LIVON_CACHED_APPS');
-        let localRealApps = null;
-        if (cachedRaw) {
-          try {
-            const parsed = JSON.parse(cachedRaw);
-            const cleaned = filterInvalidSamsungDuplicates(parsed);
-            if (Array.isArray(cleaned) && cleaned.some(a => a.isRealLaunchData)) {
-              localRealApps = cleaned.filter(a => a.isRealLaunchData);
-            }
-          } catch (e) {}
-        }
-        // 원격 데이터 중 실데이터 추출
-        const remoteRealApps = filterInvalidSamsungDuplicates(applications).filter(a => a.isRealLaunchData);
-        if (remoteRealApps.length > 0 || (localRealApps && localRealApps.length > 0)) {
-          // 실데이터가 존재하는 경우: 목업 데이터는 원천 차단하고 실데이터만 채택
-          if (localRealApps && localRealApps.length > remoteRealApps.length) {
-            console.log('[DataSync] 로컬 실데이터(' + localRealApps.length + '건) 우선 보존 및 원격 백업');
-            gApps = localRealApps;
-            if (typeof syncRealLaunchDataToConvex === 'function') {
-              syncRealLaunchDataToConvex(gApps);
-            }
-          } else {
-            gApps = remoteRealApps.length > 0 ? remoteRealApps : localRealApps;
-          }
-          gApps = filterInvalidSamsungDuplicates(gApps);
-          try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
-        } else {
-          gApps = filterInvalidSamsungDuplicates(applications);
-          try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
-        }
+      const { applications, assignments, claims, payouts, adjusters, partners, careLogs, caregivers, systemSettings } = res.value;
+
+      // 1. 고객 신청 대장: Convex 원격 DB가 단 하나의 절대적 기준(Single Source of Truth)
+      if (Array.isArray(applications)) {
+        gApps = filterInvalidSamsungDuplicates(applications);
+        try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
       }
+
+      // 2. 간병인 배정 대장
       if (Array.isArray(assignments)) {
-        const cachedRaw = localStorage.getItem('LIVON_CACHED_ASSIGNS');
-        let localReal = null;
-        if (cachedRaw) {
-          try {
-            const parsed = JSON.parse(cachedRaw);
-            if (Array.isArray(parsed) && parsed.some(a => a.isRealLaunchData)) localReal = parsed.filter(a => a.isRealLaunchData);
-          } catch (e) {}
-        }
-        const remoteReal = assignments.filter(a => a.isRealLaunchData);
-        if (remoteReal.length > 0 || (localReal && localReal.length > 0)) {
-          gAssigns = (localReal && localReal.length > remoteReal.length) ? localReal : (remoteReal.length > 0 ? remoteReal : localReal);
-        } else {
-          gAssigns = assignments;
-        }
+        gAssigns = assignments;
         try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
       }
+
+      // 3. 보험 청구 대장
       if (Array.isArray(claims)) {
-        const cachedRaw = localStorage.getItem('LIVON_CACHED_CLAIMS');
-        let localReal = null;
-        if (cachedRaw) {
-          try {
-            const parsed = JSON.parse(cachedRaw);
-            if (Array.isArray(parsed) && parsed.some(c => c.isRealLaunchData)) localReal = parsed.filter(c => c.isRealLaunchData);
-          } catch (e) {}
-        }
-        const remoteReal = claims.filter(c => c.isRealLaunchData);
-        if (remoteReal.length > 0 || (localReal && localReal.length > 0)) {
-          gClaims = (localReal && localReal.length > remoteReal.length) ? localReal : (remoteReal.length > 0 ? remoteReal : localReal);
-        } else {
-          gClaims = claims;
-        }
+        gClaims = claims;
         try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
       }
+
+      // 4. 간병비 지급 대장
       if (Array.isArray(payouts)) {
-        const cachedRaw = localStorage.getItem('LIVON_CACHED_PAYOUTS');
-        let localReal = null;
-        if (cachedRaw) {
-          try {
-            const parsed = JSON.parse(cachedRaw);
-            if (Array.isArray(parsed) && parsed.some(p => p.isRealLaunchData)) localReal = parsed.filter(p => p.isRealLaunchData);
-          } catch (e) {}
-        }
-        const remoteReal = payouts.filter(p => p.isRealLaunchData);
-        if (remoteReal.length > 0 || (localReal && localReal.length > 0)) {
-          gPayouts = (localReal && localReal.length > remoteReal.length) ? localReal : (remoteReal.length > 0 ? remoteReal : localReal);
-        } else {
-          gPayouts = payouts;
-        }
+        gPayouts = payouts;
         try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
       }
+
+      // 5. 손해사정사 디렉토리
       if (Array.isArray(adjusters) && adjusters.length > 0) {
         gAdjusters = adjusters;
         try { localStorage.setItem('LIVON_CACHED_ADJUSTERS', JSON.stringify(adjusters)); } catch (e) {}
       }
+
+      // 6. 협력 센터 / 파트너
       if (Array.isArray(partners) && partners.length > 0) {
         gCenters = partners;
         try { localStorage.setItem('LIVON_CACHED_CENTERS', JSON.stringify(partners)); } catch (e) {}
+      }
+
+      // 7. 인력 (간병인 풀) 디렉토리
+      if (Array.isArray(caregivers) && caregivers.length > 0) {
+        gCaregivers = caregivers;
+        try { localStorage.setItem('LIVON_CACHED_CAREGIVERS', JSON.stringify(caregivers)); } catch (e) {}
+      }
+
+      // 8. 시스템 환경설정 및 런칭 연동 메타데이터 복원
+      if (Array.isArray(systemSettings) && systemSettings.length > 0) {
+        systemSettings.forEach(s => {
+          if (s && s.key === STORAGE_LAUNCH_CONFIG && s.value) {
+            try {
+              localStorage.setItem(STORAGE_LAUNCH_CONFIG, JSON.stringify(s.value));
+            } catch (e) {}
+          }
+        });
       }
       if (Array.isArray(careLogs) && careLogs.length > 0) gCareLogs = careLogs;
 
@@ -13122,6 +13083,10 @@ function autoSyncCaregiverToDirectory(info, silent = false) {
     }, true);
   }
 
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveCaregiver', { caregiver: cg }).catch(console.warn);
+  }
+
   if (!silent) {
     saveDirectoryToStorage();
     updateDirectoryTotalBadge();
@@ -20661,19 +20626,48 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
         <!-- ========================================================================= -->
         <!-- [MEMO BAR] 비고 / 특이사항 바 (3뷰와 동일) -->
         <!-- ========================================================================= -->
-        <div class="bg-white p-3.5 rounded-2xl border ${app.memo ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200/90'} shadow-xs flex items-center justify-between gap-3 text-xs">
+        <div class="bg-white p-3.5 rounded-2xl border ${(app.memo || app.specialNotes) ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200/90'} shadow-xs flex items-center justify-between gap-3 text-xs">
           <div class="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
             <span class="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 font-bold text-[10.5px] flex items-center gap-1 shrink-0">
               <i data-lucide="clipboard-pen" class="w-3.5 h-3.5 text-amber-700"></i> 비고 / 특이사항
             </span>
-            <p class="text-slate-800 text-[11.5px] font-medium leading-relaxed truncate" title="${app.memo || ''}">
-              ${app.memo || '<span class="text-slate-400 italic">등록된 비고 및 특이사항이 없습니다.</span>'}
+            <p class="text-slate-800 text-[11.5px] font-medium leading-relaxed truncate" title="${app.memo || app.specialNotes || ''}">
+              ${app.memo || app.specialNotes || '<span class="text-slate-400 italic">등록된 비고 및 특이사항이 없습니다.</span>'}
             </p>
           </div>
           <button type="button" onclick="editCustomerMemo('${app.id}')" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer shrink-0">
             <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
           </button>
         </div>
+
+        <!-- [MEMO BAR] 지급비고 (간병비지급 시트 비고란) -->
+        ${(() => {
+          const payoutMemos = (appPayouts || []).map(p => (p.memo || '').trim()).filter(Boolean);
+          const payoutMemoText = Array.from(new Set(payoutMemos)).join(' / ');
+          return payoutMemoText ? `
+            <div class="bg-white p-3 rounded-2xl border border-orange-200 bg-orange-50/40 shadow-xs flex items-start gap-2.5 text-xs">
+              <span class="px-2 py-0.5 rounded-lg bg-orange-100 text-orange-900 font-bold text-[10.5px] flex items-center gap-1 shrink-0">
+                <i data-lucide="message-square" class="w-3.5 h-3.5 text-orange-700"></i> 지급비고
+              </span>
+              <p class="text-orange-900 text-[11.5px] font-medium leading-relaxed" title="${escapeHtml(payoutMemoText)}">${escapeHtml(payoutMemoText)}</p>
+            </div>
+          ` : '';
+        })()}
+
+        <!-- [MEMO BAR] 청구비고 (보험청구 시트 비고란) -->
+        ${(() => {
+          const claimMemos = (appClaims || []).map(c => (c.memo || '').trim()).filter(Boolean);
+          const claimMemoText = Array.from(new Set(claimMemos)).join(' / ');
+          return claimMemoText ? `
+            <div class="bg-white p-3 rounded-2xl border border-purple-200 bg-purple-50/40 shadow-xs flex items-start gap-2.5 text-xs">
+              <span class="px-2 py-0.5 rounded-lg bg-purple-100 text-purple-900 font-bold text-[10.5px] flex items-center gap-1 shrink-0">
+                <i data-lucide="file-text" class="w-3.5 h-3.5 text-purple-700"></i> 청구비고
+              </span>
+              <p class="text-purple-900 text-[11.5px] font-medium leading-relaxed" title="${escapeHtml(claimMemoText)}">${escapeHtml(claimMemoText)}</p>
+            </div>
+          ` : '';
+        })()}
+
       </div>
 
       <!-- ========================================================================= -->
@@ -21791,7 +21785,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
             </div>
 
             <!-- 섹션 3: 비고 및 특이사항 -->
-            <div class="bg-white p-3.5 rounded-2xl border ${app.memo ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200/80'} shadow-2xs space-y-1.5 mt-auto">
+            <div class="bg-white p-3.5 rounded-2xl border ${(app.memo || app.specialNotes) ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200/80'} shadow-2xs space-y-1.5 mt-auto">
               <div class="flex items-center justify-between text-xs pb-1 border-b border-slate-100">
                 <span class="font-bold text-slate-800 flex items-center gap-1.5">
                   <i data-lucide="clipboard-pen" class="w-3.5 h-3.5 text-amber-600"></i> 비고 / 특이사항
@@ -21801,7 +21795,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 </button>
               </div>
               <p class="text-slate-700 leading-relaxed text-[11.5px] whitespace-pre-wrap font-medium">
-                ${app.memo || '<span class="text-slate-400 italic">등록된 비고 및 특이사항이 없습니다.</span>'}
+                ${app.memo || app.specialNotes || '<span class="text-slate-400 italic">등록된 비고 및 특이사항이 없습니다.</span>'}
               </p>
             </div>
 
@@ -22126,6 +22120,23 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 </div>
               </div>
             `}
+
+            <!-- 섹션: 지급비고 (엑셀 간병비지급 시트 비고란) -->
+            ${(() => {
+              const payoutMemos = (appPayouts || []).map(p => (p.memo || '').trim()).filter(Boolean);
+              const payoutMemoText = Array.from(new Set(payoutMemos)).join(' / ');
+              return payoutMemoText ? `
+                <div class="bg-white p-3 rounded-2xl border border-orange-200 bg-orange-50/40 shadow-2xs space-y-1 mt-auto mx-4 mb-4">
+                  <div class="flex items-center gap-1.5 text-xs pb-1 border-b border-orange-100">
+                    <span class="font-bold text-orange-800 flex items-center gap-1">
+                      <i data-lucide="message-square" class="w-3.5 h-3.5 text-orange-600"></i> 지급비고
+                    </span>
+                  </div>
+                  <p class="text-orange-900 leading-relaxed text-[11.5px] whitespace-pre-wrap font-medium">${escapeHtml(payoutMemoText)}</p>
+                </div>
+              ` : '';
+            })()}
+
           </div>
         </div>
 
@@ -22550,6 +22561,22 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 </div>
               `}
             </div>
+
+            <!-- 섹션: 청구비고 (엑셀 보험청구 시트 비고란) -->
+            ${(() => {
+              const claimMemos = (appClaims || []).map(c => (c.memo || '').trim()).filter(Boolean);
+              const claimMemoText = Array.from(new Set(claimMemos)).join(' / ');
+              return claimMemoText ? `
+                <div class="bg-white p-3 rounded-2xl border border-purple-200 bg-purple-50/40 shadow-2xs space-y-1 mt-auto mx-4 mb-4">
+                  <div class="flex items-center gap-1.5 text-xs pb-1 border-b border-purple-100">
+                    <span class="font-bold text-purple-800 flex items-center gap-1">
+                      <i data-lucide="file-text" class="w-3.5 h-3.5 text-purple-600"></i> 청구비고
+                    </span>
+                  </div>
+                  <p class="text-purple-900 leading-relaxed text-[11.5px] whitespace-pre-wrap font-medium">${escapeHtml(claimMemoText)}</p>
+                </div>
+              ` : '';
+            })()}
 
           </div>
         </div>
@@ -24439,6 +24466,8 @@ function renderUnifiedCareHub() {
   };
 
   // Pre-index unpaid payouts Set for ultra-fast O(1) checks
+  // [사용자 규칙]: 엑셀 업로드 시 기존 데이터 전면 초기화 → 엑셀 원장의 payoutStatus만 기준
+  // Phase 1 ONLY: gPayouts에 명시적으로 '미지급' 상태인 레코드만 카운트 (스케줄 계산 제외)
   const unpaidPayoutAppIdSet = new Set();
   if (Array.isArray(gPayouts)) {
     for (let i = 0; i < gPayouts.length; i++) {
@@ -24446,7 +24475,7 @@ function renderUnifiedCareHub() {
       if (!p) continue;
       const st = String(p.payoutStatus || p.status || '').trim();
       const isPaid = st === '지급' || st === '지급완료' || p.isPaid === true;
-      if (!isPaid && (st === '미지급' || st.includes('대기') || (p.payoutAmount || 0) > 0)) {
+      if (!isPaid && st) {
         if (p.applyId) {
           unpaidPayoutAppIdSet.add(p.applyId);
         } else if (p.patientName) {
@@ -24530,32 +24559,8 @@ function renderUnifiedCareHub() {
     return true;
   };
 
-  // 🚨 [지급 대기 (간병비 미지급) 완벽 연동]: 등록된 미지급 정산서가 있거나, 간병 진행/완료 후 간병비 지급이 도래한 건(C0286 등) 연동
-  for (let i = 0; i < activeHubApps.length; i++) {
-    const a = activeHubApps[i];
-    if (unpaidPayoutAppIdSet.has(a.id)) continue;
-    const aSt = a.status || '';
-    if (aSt === '서비스 취소' || aSt === '취소' || aSt === '미해당') continue;
-
-    const as = (Array.isArray(gAssigns) ? gAssigns : []).find(x => x.applyId === a.id);
-    if (as && as.caregiverName && as.caregiverName !== '-' && as.caregiverName !== '미배정') {
-      const appPayouts = (Array.isArray(gPayouts) ? gPayouts : []).filter(p => p.applyId === a.id);
-      const hasUnpaidRec = appPayouts.some(p => {
-        const st = String(p.payoutStatus || p.status || '').trim();
-        return st !== '지급' && st !== '지급완료';
-      });
-      if (hasUnpaidRec) {
-        unpaidPayoutAppIdSet.add(a.id);
-        continue;
-      }
-      const careProg = typeof getCareProgressInfo === 'function' ? getCareProgressInfo(as) : null;
-      const appClaims = (Array.isArray(gClaims) ? gClaims : []).filter(c => c.applyId === a.id);
-      const sched = typeof calculateCareSettlementSchedule === 'function' ? calculateCareSettlementSchedule(a, as, careProg, appClaims, appPayouts) : null;
-      if (sched && (sched.isCaregiverPayoutDue || sched.unpaidPayoutSum > 0)) {
-        unpaidPayoutAppIdSet.add(a.id);
-      }
-    }
-  }
+  // [Phase 2 제거됨]: 스케줄 기반 간병비 도래 계산은 엑셀 원장 기준과 불일치하여 제거
+  // 지급대기 카운트는 오직 gPayouts의 payoutStatus가 명시적으로 '미지급'인 건만 반영
 
   for (let i = 0; i < activeHubApps.length; i++) {
     const a = activeHubApps[i];
@@ -40434,6 +40439,9 @@ function saveLaunchConfig(update) {
     const current = getLaunchConfig();
     const merged = { ...current, ...update };
     localStorage.setItem(STORAGE_LAUNCH_CONFIG, JSON.stringify(merged));
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveSystemSetting', { key: STORAGE_LAUNCH_CONFIG, value: merged }).catch(console.warn);
+    }
     return merged;
   } catch (e) {
     return update;
@@ -41794,8 +41802,14 @@ async function executeApplyLaunchData(company) {
   const newPayouts = data.payouts || [];
 
   if (companyKey === 'samsung') {
-    const confirmed = confirm(`🚨 [삼성화재 관리대장 반영 확인]\n\n삼성화재 관리대장 엑셀 총 ${newApps.length.toLocaleString()}건을 [삼성화재 접수/청구관리] 대장에 반영하고, [종합관리대장 > 통합허브]의 삼성화재 고객 상세 정보(상품명 등)를 자동 연동하시겠습니까?\n\n- [삼성화재 접수/청구관리]의 일일접수 및 완료 명단이 본 엑셀 기준으로 전면 갱신됩니다.\n- [종합관리대장 > 통합허브] 내 동일 고객의 상품명, 계약정보가 실시간 보강됩니다.`);
+    const confirmed = confirm(`🚨 [삼성화재 관리대장 반영 확인]\n\n삼성화재 관리대장 엑셀 총 ${newApps.length.toLocaleString()}건을 [삼성화재 접수/청구관리] 대장에 반영하시겠습니까?\n\n- 기존 실서버(Convex) 및 로컬의 삼성화재 관련 등록 데이터는 모두 초기화(삭제)되고 새로 등록하는 엑셀 데이터를 기준으로 다시 세팅됩니다.\n- [종합관리대장 > 통합허브] 내 동일 고객의 상품명, 계약정보가 실시간 보강됩니다.`);
     if (!confirmed) return;
+
+    // 0. Convex 실서버 기존 삼성화재 데이터 전면 초기화 (Reset)
+    if (typeof syncToConvex === 'function') {
+      showToast('[삼성화재 접수/청구관리] 기존 데이터를 초기화하고 클라우드에 신규 세팅 중입니다...', 'info');
+      await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'samsung' });
+    }
 
     // 1. 삼성화재 스프레드시트 대장 갱신 (gSamsungSheets)
     initSamsungSpreadsheet();
@@ -41825,13 +41839,12 @@ async function executeApplyLaunchData(company) {
       console.warn('[Samsung Excel Ledger LocalStorage Save Warn]', e);
     }
 
-    // 3. Convex 클라우드 백엔드 동기화
+    // 3. Convex 클라우드 백엔드 신규 데이터 등록
     if (typeof syncToConvex === 'function') {
-      showToast('[삼성화재 접수/청구관리] 대장을 클라우드 DB에 동기화 중입니다...', 'info');
-      syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'target', rows: gSamsungSheets.target, replace: true }).catch(console.warn);
-      syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'completed', rows: gSamsungSheets.completed, replace: true }).catch(console.warn);
+      await syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'target', rows: gSamsungSheets.target, replace: true });
+      await syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'completed', rows: gSamsungSheets.completed, replace: true });
       if (gSamsungSheets.contacts && gSamsungSheets.contacts.length > 0) {
-        syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'contacts', rows: gSamsungSheets.contacts, replace: true }).catch(console.warn);
+        await syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'contacts', rows: gSamsungSheets.contacts, replace: true });
       }
     }
 
@@ -41876,67 +41889,37 @@ async function executeApplyLaunchData(company) {
     if (typeof renderSamsungSpreadsheet === 'function') renderSamsungSpreadsheet();
     if (typeof renderSamsungClaimHub === 'function' && gActiveTab === 'samsungclaimhub') renderSamsungClaimHub();
 
-    showToast(`🎉 [삼성화재 간병 관리대장] ${newApps.length.toLocaleString()}건이 [삼성화재 접수/청구관리] 대장에 성공적으로 반영되었으며, 통합허브 삼성화재 고객 ${enrichedCount}건의 상품명 등 상세 정보가 연동되었습니다!`, 'success');
+    showToast(`🎉 [삼성화재 간병 관리대장] ${newApps.length.toLocaleString()}건이 실서버(Convex)에 성공적으로 초기화 및 신규 반영되었습니다!`, 'success');
     return;
   }
 
-  const confirmed = confirm(`🚨 [전산 런칭 실데이터 반영 확인]\n\n${companyLabel} 실데이터 총 ${newApps.length.toLocaleString()}건 (배정: ${newAssigns.length}건, 청구: ${newClaims.length}건, 지급: ${newPayouts.length}건)을 통합허브 및 관련 대장에 반영하시겠습니까?\n\n- 기존 ${companyLabel} 목업 데이터는 실제 대장 데이터로 전면 교체됩니다.\n- 타 보험사 데이터는 안전하게 보존됩니다.`);
+  const confirmed = confirm(`🚨 [전산 런칭 실데이터 반영 확인]\n\n${companyLabel} 실데이터 총 ${newApps.length.toLocaleString()}건 (배정: ${newAssigns.length}건, 청구: ${newClaims.length}건, 지급: ${newPayouts.length}건)을 통합허브 및 관련 대장에 반영하시겠습니까?\n\n- 기존에 등록되어 있던 모든 접수/배정/청구/지급 데이터는 실서버(Convex)와 로컬에서 모두 깨끗이 초기화(삭제)되고, 새로 등록하는 엑셀 데이터를 기준으로 다시 세팅됩니다.`);
   if (!confirmed) return;
 
   const isComprehensive = (companyKey === 'hyundai' || String(companyLabel).includes('종합'));
 
-  // 1. 통합허브(gApps) 교체: 종합 대장 적용 시 전면 교체(과거 팬텀 C05xx/더미 중복 제거), 단독 보험사 적용 시 해당 보험사만 정밀 교체
-  const newAppIdSet = new Set(newApps.map(a => a.id));
-  const otherApps = isComprehensive ? [] : (gApps || []).filter(a => {
-    if (!a.isRealLaunchData) return false;
-    if (a.id && a.id.startsWith('S') && (a.insuranceCompany || '').includes('삼성')) return false;
-    if ((companyKey === 'samsung') && (a.insuranceCompany || '').includes('삼성')) return false;
-    if (newAppIdSet.has(a.id)) return false;
-    return true;
-  });
-  gApps = [...newApps, ...otherApps];
-  // 1-1. 삼성화재 관리대장 상품명 등 추가 상세 정보 자동 연동
+  // 0. Convex 실서버 기존 전체 데이터 전면 초기화 (Reset)
+  if (typeof syncToConvex === 'function') {
+    showToast(`[${companyLabel}] 기존 데이터를 클라우드 서버에서 전면 초기화(삭제) 중입니다...`, 'info');
+    await syncToConvex('sync:resetAndPurgeLaunchData', { company: isComprehensive ? 'all' : companyKey });
+  }
+
+  // 1. 통합허브(gApps) 전면 교체: 새 엑셀 데이터로 100% 리셋
+  gApps = [...newApps];
   enrichHubSamsungCustomersFromSamsungExcel();
   try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
-  // 2. 간병인 배정(gAssigns) 교체
-  if (newAssigns.length > 0) {
-    const newAssignIdSet = new Set(newAssigns.map(a => a.id));
-    const otherAssigns = isComprehensive ? [] : (gAssigns || []).filter(a => {
-      if (!a.isRealLaunchData) return false;
-      if (a.applyId && a.applyId.startsWith('S')) return false;
-      if (newAssignIdSet.has(a.id)) return false;
-      return true;
-    });
-    gAssigns = [...newAssigns, ...otherAssigns];
-    try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
-  }
+  // 2. 간병인 배정(gAssigns) 전면 교체
+  gAssigns = [...newAssigns];
+  try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
 
-  // 3. 보험 청구(gClaims) 교체
-  if (newClaims.length > 0) {
-    const newClaimIdSet = new Set(newClaims.map(c => c.id));
-    const otherClaims = isComprehensive ? [] : (gClaims || []).filter(c => {
-      if (!c.isRealLaunchData) return false;
-      if (c.applyId && c.applyId.startsWith('S')) return false;
-      if (newClaimIdSet.has(c.id)) return false;
-      return true;
-    });
-    gClaims = [...newClaims, ...otherClaims];
-    try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
-  }
+  // 3. 보험 청구(gClaims) 전면 교체
+  gClaims = [...newClaims];
+  try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
 
-  // 4. 간병비 지급(gPayouts) 교체
-  if (newPayouts.length > 0) {
-    const newPayoutIdSet = new Set(newPayouts.map(p => p.id));
-    const otherPayouts = isComprehensive ? [] : (gPayouts || []).filter(p => {
-      if (!p.isRealLaunchData) return false;
-      if (p.applyId && p.applyId.startsWith('S')) return false;
-      if (newPayoutIdSet.has(p.id)) return false;
-      return true;
-    });
-    gPayouts = [...newPayouts, ...otherPayouts];
-    try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
-  }
+  // 4. 간병비 지급(gPayouts) 전면 교체
+  gPayouts = [...newPayouts];
+  try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
 
   // 5. 파트너/인력 디렉토리(간병인 인력, 협력센터, 손해사정인) 자동 동기화 & 최신화
   if (data.contacts && data.contacts.length > 0) {
@@ -41957,9 +41940,14 @@ async function executeApplyLaunchData(company) {
   saveDirectoryToStorage();
   updateDirectoryTotalBadge();
 
-  // 6. Convex 클라우드 백엔드 동기화 (새로고침 시 영구 반영)
+  // 5-1. 간병인 인력풀 Convex 영구 보존 동기화
+  if (typeof syncToConvex === 'function' && Array.isArray(gCaregivers) && gCaregivers.length > 0) {
+    syncToConvex('sync:saveCaregiversChunk', { caregivers: gCaregivers }).catch(console.warn);
+  }
+
+  // 6. Convex 클라우드 백엔드 동기화 (새 데이터 일괄 등록)
   if (typeof syncRealLaunchDataToConvex === 'function') {
-    showToast(`[${companyLabel}] 전산 런칭 실데이터를 클라우드 DB에 동기화 중입니다...`, 'info');
+    showToast(`[${companyLabel}] 신규 엑셀 실데이터를 클라우드 DB에 세팅 중입니다...`, 'info');
     await syncRealLaunchDataToConvex(newApps, newAssigns, newClaims, newPayouts, companyLabel);
   }
 

@@ -21,6 +21,8 @@ export const bundleAll = query({
       samsungAddressBook,
       samsungEmailLogs,
       admins,
+      caregivers,
+      systemSettings,
     ] = await Promise.all([
       ctx.db.query("applications").order("desc").collect(),
       ctx.db.query("assignments").collect(),
@@ -36,6 +38,8 @@ export const bundleAll = query({
       ctx.db.query("samsungAddressBook").collect(),
       ctx.db.query("samsungEmailLogs").order("desc").collect(),
       ctx.db.query("admins").collect(),
+      ctx.db.query("caregivers").collect(),
+      ctx.db.query("systemSettings").collect(),
     ]);
     return {
       applications,
@@ -52,6 +56,8 @@ export const bundleAll = query({
       samsungAddressBook,
       samsungEmailLogs,
       admins,
+      caregivers,
+      systemSettings,
     };
   },
 });
@@ -1089,6 +1095,227 @@ export const deleteAdminDoc = mutation({
     return { success: false, error: "Not found" };
   },
 });
+
+// =============================================================================
+// [전산 런칭] 엑셀 업로드 시 기존 데이터 전면 초기화(Reset & Sync) 및 인력/설정 관리
+// =============================================================================
+
+// 51. 엑셀 업로드 전 기존 데이터 완전 삭제 (Reset)
+export const resetAndPurgeLaunchData = mutation({
+  args: {
+    company: v.string(), // 'hyundai' | 'samsung' | 'all'
+  },
+  handler: async (ctx, args) => {
+    const target = (args.company || '').toLowerCase();
+    let deletedApps = 0;
+    let deletedAssigns = 0;
+    let deletedClaims = 0;
+    let deletedPayouts = 0;
+    let deletedSheets = 0;
+
+    if (target === 'hyundai' || target === 'all' || target.includes('종합')) {
+      // 종합 관리대장 업로드 시: applications, assignments, claims, payouts 완전 초기화
+      const apps = await ctx.db.query("applications").collect();
+      for (const a of apps) {
+        await ctx.db.delete(a._id);
+        deletedApps++;
+      }
+
+      const assigns = await ctx.db.query("assignments").collect();
+      for (const as of assigns) {
+        await ctx.db.delete(as._id);
+        deletedAssigns++;
+      }
+
+      const claims = await ctx.db.query("claims").collect();
+      for (const c of claims) {
+        await ctx.db.delete(c._id);
+        deletedClaims++;
+      }
+
+      const payouts = await ctx.db.query("payouts").collect();
+      for (const p of payouts) {
+        await ctx.db.delete(p._id);
+        deletedPayouts++;
+      }
+    } else if (target === 'samsung') {
+      // 삼성화재 관리대장 업로드 시: samsungSheets 완전 초기화 및 삼성 접수/청구/지급 연관 데이터 삭제
+      const sheets = await ctx.db.query("samsungSheets").collect();
+      for (const s of sheets) {
+        await ctx.db.delete(s._id);
+        deletedSheets++;
+      }
+
+      const apps = await ctx.db.query("applications").collect();
+      for (const a of apps) {
+        if ((a.insuranceCompany || '').includes('삼성') || (a.id && String(a.id).startsWith('S'))) {
+          await ctx.db.delete(a._id);
+          deletedApps++;
+        }
+      }
+
+      const assigns = await ctx.db.query("assignments").collect();
+      for (const as of assigns) {
+        if ((as.insuranceCompany || '').includes('삼성') || (as.applyId && String(as.applyId).startsWith('S'))) {
+          await ctx.db.delete(as._id);
+          deletedAssigns++;
+        }
+      }
+
+      const claims = await ctx.db.query("claims").collect();
+      for (const c of claims) {
+        if ((c.insuranceCompany || '').includes('삼성') || (c.applyId && String(c.applyId).startsWith('S'))) {
+          await ctx.db.delete(c._id);
+          deletedClaims++;
+        }
+      }
+
+      const payouts = await ctx.db.query("payouts").collect();
+      for (const p of payouts) {
+        if ((p.insuranceCompany || '').includes('삼성') || (p.applyId && String(p.applyId).startsWith('S'))) {
+          await ctx.db.delete(p._id);
+          deletedPayouts++;
+        }
+      }
+    }
+
+    return {
+      company: args.company,
+      deletedApps,
+      deletedAssigns,
+      deletedClaims,
+      deletedPayouts,
+      deletedSheets,
+      timestamp: new Date().toISOString(),
+    };
+  },
+});
+
+// 52. 간병인 인력 단일 등록 및 수정 (Upsert by id or name)
+export const saveCaregiver = mutation({
+  args: {
+    caregiver: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const { _id, _creationTime, ...doc } = args.caregiver;
+    if (!doc.id && !doc.name) return { success: false, error: "Invalid caregiver" };
+    
+    let existing = null;
+    if (doc.id) {
+      existing = await ctx.db
+        .query("caregivers")
+        .withIndex("by_cg_id", (q) => q.eq("id", doc.id))
+        .first();
+    }
+    if (!existing && doc.name) {
+      existing = await ctx.db
+        .query("caregivers")
+        .withIndex("by_name", (q) => q.eq("name", doc.name))
+        .first();
+    }
+
+    if (existing) {
+      await ctx.db.patch(existing._id, doc);
+      return { action: "updated", id: doc.id || existing.id, _id: existing._id };
+    } else {
+      if (!doc.id) doc.id = "CG_" + Date.now();
+      const newId = await ctx.db.insert("caregivers", doc);
+      return { action: "inserted", id: doc.id, _id: newId };
+    }
+  },
+});
+
+// 53. 간병인 인력 일괄 청크 등록 및 동기화
+export const saveCaregiversChunk = mutation({
+  args: {
+    caregivers: v.array(v.any()),
+  },
+  handler: async (ctx, args) => {
+    let count = 0;
+    for (const item of args.caregivers) {
+      const { _id, _creationTime, ...doc } = item;
+      if (!doc.id && !doc.name) continue;
+
+      let existing = null;
+      if (doc.id) {
+        existing = await ctx.db
+          .query("caregivers")
+          .withIndex("by_cg_id", (q) => q.eq("id", doc.id))
+          .first();
+      }
+      if (!existing && doc.name) {
+        existing = await ctx.db
+          .query("caregivers")
+          .withIndex("by_name", (q) => q.eq("name", doc.name))
+          .first();
+      }
+
+      if (existing) {
+        await ctx.db.patch(existing._id, doc);
+      } else {
+        if (!doc.id) doc.id = "CG_" + Date.now() + "_" + count;
+        await ctx.db.insert("caregivers", doc);
+      }
+      count++;
+    }
+    return { count, timestamp: new Date().toISOString() };
+  },
+});
+
+// 54. 간병인 인력 삭제
+export const deleteCaregiver = mutation({
+  args: {
+    id: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("caregivers")
+      .filter((q) => q.or(q.eq(q.field("id"), args.id), q.eq(q.field("name"), args.id)))
+      .first();
+    if (existing) {
+      await ctx.db.delete(existing._id);
+      return { success: true, id: args.id };
+    }
+    return { success: false, error: "Not found" };
+  },
+});
+
+// 55. 시스템 환경설정 저장 (Upsert by key)
+export const saveSystemSetting = mutation({
+  args: {
+    key: v.string(),
+    value: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("systemSettings")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .first();
+
+    const patchDoc = {
+      key: args.key,
+      value: args.value,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (existing) {
+      await ctx.db.patch(existing._id, patchDoc);
+      return { action: "updated", key: args.key, _id: existing._id };
+    } else {
+      const newId = await ctx.db.insert("systemSettings", patchDoc);
+      return { action: "inserted", key: args.key, _id: newId };
+    }
+  },
+});
+
+// 56. 시스템 환경설정 조회
+export const getSystemSettings = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("systemSettings").collect();
+  },
+});
+
 
 
 

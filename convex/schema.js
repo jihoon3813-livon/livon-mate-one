@@ -29,6 +29,15 @@ export default defineSchema({
   // 협력 센터 / 파트너
   partners: defineTable(v.any()),
 
+  // 간병인 인력풀 (Caregivers Directory)
+  caregivers: defineTable(v.any())
+    .index("by_name", ["name"])
+    .index("by_cg_id", ["id"]),
+
+  // 시스템 환경설정 및 런칭 연동 메타데이터 (System Settings & Configs)
+  systemSettings: defineTable(v.any())
+    .index("by_key", ["key"]),
+
   // 양식 설정 및 필드 매핑 / 배경 (Form Configs & Backgrounds)
   formConfigs: defineTable(v.any()),
 
