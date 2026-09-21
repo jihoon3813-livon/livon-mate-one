@@ -16479,12 +16479,42 @@ window.debounceHyundaiClaimSearch = debounceHyundaiClaimSearch;
 // =========================================================================
 
 const hubFilterConfig = {
-  'ALL': { countColor: 'text-slate-900' },
-  'NEED_ASSIGN': { countColor: 'text-amber-600' },
-  'IN_PROGRESS': { countColor: 'text-sky-600' },
-  'UNPAID_CLAIM': { countColor: 'text-rose-600' },
-  'NEED_PAYOUT': { countColor: 'text-teal-600' },
-  'NEED_FAX': { countColor: 'text-purple-600' }
+  'ALL': { 
+    countColor: 'text-slate-900',
+    activeClass: 'bg-primary-600 text-white border-primary-600 shadow-sm',
+    activeSubTitle: 'text-primary-100',
+    activeCount: 'text-white'
+  },
+  'NEED_ASSIGN': { 
+    countColor: 'text-emerald-600',
+    activeClass: 'bg-emerald-600 text-white border-emerald-600 shadow-sm',
+    activeSubTitle: 'text-emerald-100',
+    activeCount: 'text-white'
+  },
+  'IN_PROGRESS': { 
+    countColor: 'text-sky-600',
+    activeClass: 'bg-sky-600 text-white border-sky-600 shadow-sm',
+    activeSubTitle: 'text-sky-100',
+    activeCount: 'text-white'
+  },
+  'UNPAID_CLAIM': { 
+    countColor: 'text-rose-600',
+    activeClass: 'bg-rose-600 text-white border-rose-600 shadow-sm',
+    activeSubTitle: 'text-rose-100',
+    activeCount: 'text-white'
+  },
+  'NEED_PAYOUT': { 
+    countColor: 'text-orange-600',
+    activeClass: 'bg-orange-500 text-white border-orange-500 shadow-sm',
+    activeSubTitle: 'text-orange-100',
+    activeCount: 'text-white'
+  },
+  'NEED_FAX': { 
+    countColor: 'text-purple-600',
+    activeClass: 'bg-purple-600 text-white border-purple-600 shadow-sm',
+    activeSubTitle: 'text-purple-100',
+    activeCount: 'text-white'
+  }
 };
 
 function setHubFilter(filterType) {
@@ -16494,22 +16524,33 @@ function setHubFilter(filterType) {
   Object.keys(hubFilterConfig).forEach(type => {
     const btn = document.getElementById('hubFilterBtn-' + type);
     if (btn) {
-      btn.className = 'hub-filter-btn p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200 shadow-2xs';
+      let borderClass = 'border-slate-200';
+      if (type === 'UNPAID_CLAIM') borderClass = 'border-rose-200';
+      else if (type === 'NEED_PAYOUT') borderClass = 'border-orange-200';
+      else if (type === 'NEED_ASSIGN') borderClass = 'border-emerald-200';
+
+      btn.className = `hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left ${borderClass} shadow-2xs`;
       const subTitle = btn.querySelector('div:first-child');
-      if (subTitle) subTitle.className = 'text-[11px] font-semibold text-slate-500';
-      const countDiv = btn.querySelector('.text-xl');
-      if (countDiv) countDiv.className = 'text-xl font-black mt-0.5 ' + hubFilterConfig[type].countColor;
+      if (subTitle) {
+        if (type === 'UNPAID_CLAIM') subTitle.className = 'text-[11px] font-bold text-rose-600 flex items-center justify-between';
+        else if (type === 'NEED_PAYOUT') subTitle.className = 'text-[11px] font-bold text-orange-600 flex items-center justify-between';
+        else if (type === 'NEED_ASSIGN') subTitle.className = 'text-[11px] font-bold text-emerald-700 flex items-center justify-between';
+        else subTitle.className = 'text-[11px] font-semibold text-slate-500';
+      }
+      const countDiv = btn.querySelector('[id^="hubCount-"]');
+      if (countDiv) countDiv.className = 'text-lg sm:text-xl font-black mt-0.5 ' + hubFilterConfig[type].countColor;
     }
   });
 
-  // 2. Set active button with crisp white text on primary blue
+  // 2. Set active button with its distinct theme color
   const targetBtn = document.getElementById('hubFilterBtn-' + filterType);
   if (targetBtn) {
-    targetBtn.className = 'hub-filter-btn active p-3 rounded-xl border transition-all text-left bg-primary-600 text-white border-primary-600 shadow-sm';
+    const cfg = hubFilterConfig[filterType] || hubFilterConfig['ALL'];
+    targetBtn.className = 'hub-filter-btn active p-2.5 sm:p-3 rounded-xl border transition-all text-left ' + cfg.activeClass;
     const subTitle = targetBtn.querySelector('div:first-child');
-    if (subTitle) subTitle.className = 'text-[11px] font-semibold text-primary-100';
-    const countDiv = targetBtn.querySelector('.text-xl');
-    if (countDiv) countDiv.className = 'text-xl font-black mt-0.5 text-white';
+    if (subTitle) subTitle.className = 'text-[11px] font-bold ' + cfg.activeSubTitle + ' flex items-center justify-between';
+    const countDiv = targetBtn.querySelector('[id^="hubCount-"]');
+    if (countDiv) countDiv.className = 'text-lg sm:text-xl font-black mt-0.5 ' + cfg.activeCount;
   }
 
   gHubCurrentPage = 1;
@@ -18871,14 +18912,14 @@ function getCustomerCardStatusTheme(app) {
       statusText: rawSt || '진행중'
     };
   } else if (rawSt.includes('예정') || rawSt.includes('대기') || (app && app.isPreRegistered)) {
-    // 예정/배정대기: 황색(amber) 세로 라벨 + 배지 (상단 ① 배정 대기 amber-600과 1:1 완벽 일치)
+    // 예정/배정대기: 녹색(emerald) 세로 라벨 + 배지 (상단 ① 배정 대기 emerald-600과 1:1 완벽 일치)
     return {
       type: 'upcoming',
-      stripeClass: 'border-l-[10px] border-l-amber-500 shadow-amber-200/60',
-      bgClass: 'bg-white border-amber-300/70',
+      stripeClass: 'border-l-[10px] border-l-emerald-500 shadow-emerald-200/60',
+      bgClass: 'bg-white border-emerald-300/70',
       innerBgClass: 'bg-white',
-      headerBgClass: 'bg-amber-50/90 border-amber-200 text-amber-950',
-      badgeClass: 'bg-amber-100 text-amber-900 border border-amber-300',
+      headerBgClass: 'bg-emerald-50/90 border-emerald-200 text-emerald-950',
+      badgeClass: 'bg-emerald-100 text-emerald-900 border border-emerald-300',
       statusText: rawSt || (app && app.isPreRegistered ? '사전등록' : '배정대기')
     };
   } else {
@@ -22958,28 +22999,28 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
     }
   }
 
-  // 1. 간병인 미배정 체크 (접수, 신청, 진행중, 예정, 배정대기 등 활성 건만 표시하고 완료/취소/미해당/정산완료 건은 제외)
+  // 1. 간병인 미배정 체크 (접수, 신청, 진행중, 예정, 배정대기 등 활성 건만 표시하고 완료/취소/미해당/정산완료 건은 제외) -> 녹색!
   const isFinishedOrCancelled = app.status === '완료' || app.status === '서비스 취소' || app.status === '취소' || app.status === '미해당' || app.status === '정산완료';
   if (!as && !isFinishedOrCancelled) {
     badges.push(`
-      <span class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-300 font-black text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="접수되었으나 아직 간병인이 배정되지 않았습니다.">
-        <i data-lucide="user-x" class="w-3 h-3 text-rose-600"></i> 간병인 미배정
+      <span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-300 font-black text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="접수되었으나 아직 간병인이 배정되지 않았습니다.">
+        <i data-lucide="user-x" class="w-3 h-3 text-emerald-600"></i> 간병인 미배정 (배정대기)
       </span>
     `);
   }
 
-  // 2. 간병비 미지급 체크 (만료 후 미지급 / 등록된 정산 건 미지급)
+  // 2. 간병비 미지급 체크 (만료 후 미지급 / 등록된 정산 건 미지급) -> 오렌지색!
   if (sched.isCaregiverPayoutDue) {
     const dueWage = sched.unpaidPayoutSum > 0 ? sched.unpaidPayoutSum : (careProg ? careProg.totalDays * (as?.dailyWage || 140000) : 0);
     badges.push(`
-      <span class="px-2 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10.5px] flex items-center gap-1 shadow-2xs animate-pulse whitespace-nowrap" title="간병 기간이 종료되었으나 간병비가 미지급 상태입니다.">
-        <i data-lucide="alert-triangle" class="w-3 h-3 text-white"></i> 🚨 간병비 미지급${dueWage > 0 ? ` (${formatCurrency(dueWage)}원)` : ''}
+      <span class="px-2 py-0.5 rounded-md bg-orange-500 text-white font-black text-[10.5px] flex items-center gap-1 shadow-2xs animate-pulse whitespace-nowrap" title="간병 기간이 종료되었으나 간병비가 미지급 상태입니다.">
+        <i data-lucide="alert-triangle" class="w-3 h-3 text-white"></i> 🚨 간병비 미지급 (지급대기)${dueWage > 0 ? ` (${formatCurrency(dueWage)}원)` : ''}
       </span>
     `);
   } else if (sched.unpaidPayoutSum > 0) {
     badges.push(`
-      <span class="px-2 py-0.5 rounded-md bg-rose-500 text-white font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="등록된 간병비 정산 중 미지급 건이 있습니다.">
-        <i data-lucide="alert-circle" class="w-3 h-3 text-white"></i> 🚨 간병비 미지급 (${formatCurrency(sched.unpaidPayoutSum)}원)
+      <span class="px-2 py-0.5 rounded-md bg-orange-500 text-white font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="등록된 간병비 정산 중 미지급 건이 있습니다.">
+        <i data-lucide="alert-circle" class="w-3 h-3 text-white"></i> 🚨 간병비 미지급 (지급대기) (${formatCurrency(sched.unpaidPayoutSum)}원)
       </span>
     `);
   } else if (sched.isAllPayoutsPaid && sched.paidPayoutSum > 0) {
@@ -22990,12 +23031,12 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
     `);
   }
 
-  // 3. 청구금 미입금 (보험사/손사 미수금) 체크
+  // 3. 청구금 미입금 (보험사/손사 미수금) 체크 -> 빨강색!
   const unpaidClaimAmt = sched.unconfirmedClaimSum || app.estimatedUnpaid || 0;
   if (sched.hasUnpaidClaim || unpaidClaimAmt > 0) {
     badges.push(`
-      <span class="px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="보험사로 청구되었으나 아직 입금 확인이 되지 않은 미수금입니다.">
-        <i data-lucide="clock" class="w-3 h-3 text-white"></i> 🚨 청구금 미입금${unpaidClaimAmt > 0 ? ` (${formatCurrency(unpaidClaimAmt)}원)` : ''}
+      <span class="px-2 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="보험사로 청구되었으나 아직 입금 확인이 되지 않은 미수금(청구금 미입금)입니다.">
+        <i data-lucide="alert-circle" class="w-3 h-3 text-white"></i> 🚨 청구금 미입금 (미수금)${unpaidClaimAmt > 0 ? ` (${formatCurrency(unpaidClaimAmt)}원)` : ''}
       </span>
     `);
   } else if (sched.isAllClaimsDeposited && (sched.depositedClaimSum || app.depositConfirmedAmount || 0) > 0) {
@@ -23542,7 +23583,7 @@ function renderUnifiedCareHub() {
           ? { label: '간병 종료', color: 'slate' } 
           : (app.status === '서비스 취소' || app.status === '취소' || app.status === '미해당'
               ? { label: '취소/미해당', color: 'slate' }
-              : { label: '간병인 배정대기', color: 'amber' }));
+              : { label: '간병인 미배정 (배정대기)', color: 'emerald' }));
     
     // 원수사(판매채널)별 음성일지 동기화 여부 확인
     const isVoiceSyncOn = isVoiceLogEnabledFor(app.insuranceCompany);
@@ -23554,11 +23595,11 @@ function renderUnifiedCareHub() {
         : { label: '일지 대기', color: 'slate' });
 
     const s4_claim = app.unconfirmedClaimCount > 0
-      ? { label: '미수 ' + formatCurrency(app.estimatedUnpaid) + '원', color: 'rose' }
+      ? { label: '청구금 미입금 (' + formatCurrency(app.estimatedUnpaid) + '원)', color: 'rose' }
       : (app.claimCount > 0 ? { label: '수납완료 (' + formatCurrency(app.depositConfirmedAmount) + '원)', color: 'emerald' } : { label: '미청구', color: 'slate' });
 
     const s5_payout = appPayouts.some(p => p.payoutStatus === '미지급')
-      ? { label: '지급대기', color: 'amber' }
+      ? { label: '간병비 미지급 (지급대기)', color: 'orange' }
       : (appPayouts.length > 0 ? { label: '지급완료 (' + formatCurrency(app.totalPayout) + '원)', color: 'teal' } : { label: '지급없음', color: 'slate' });
 
     const s6_fax = faxInfo.status === '전송완료'
@@ -23827,14 +23868,14 @@ function renderUnifiedCareHub() {
               ${as ? `
                 <span class="text-[10px] text-slate-500 font-medium truncate max-w-[110px]" title="${as.centerName || '센터'}">${as.centerName || '센터'}</span>
               ` : `
-                <span class="text-[10px] text-amber-700 font-bold">미배정</span>
+                <span class="text-[10px] text-emerald-700 font-bold">미배정</span>
               `}
             </div>
 
             <div class="space-y-1 text-[11px]">
               <div class="flex justify-between items-center">
                 <span class="text-slate-400">간병인:</span>
-                <div class="flex items-center gap-1 font-medium ${as ? 'text-slate-800' : 'text-amber-700 font-bold'}">
+                <div class="flex items-center gap-1 font-medium ${as ? 'text-slate-800' : 'text-emerald-700 font-bold'}">
                   <span>${as ? maskName(as.caregiverName) : '배정 대기중'}</span>
                   ${as && as.phone ? renderCtiCallBtn(as.phone, as.caregiverName, '간병인') : ''}
                 </div>
@@ -23857,11 +23898,11 @@ function renderUnifiedCareHub() {
                 <div class="flex items-center gap-1">
                   <span class="font-mono text-slate-700 font-semibold">${formatCurrency(totalPayoutSum)}원</span>
                   ${sched.isCaregiverPayoutDue ? `
-                    <span class="px-1.5 py-0.2 rounded bg-rose-600 text-white font-black text-[10px] animate-pulse">지급대상🚨</span>
+                    <span class="px-1.5 py-0.2 rounded bg-orange-500 text-white font-black text-[10px] animate-pulse">지급대상🚨</span>
                   ` : (sched.isAllPayoutsPaid ? `
                     <span class="text-teal-700 font-bold">완료✓</span>
                   ` : (isPayoutPending ? `
-                    <span class="text-amber-700 font-bold">미지급</span>
+                    <span class="text-orange-600 font-bold">미지급</span>
                   ` : `
                     <span class="text-slate-400">대기</span>
                   `))}
