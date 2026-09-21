@@ -1,16 +1,20 @@
 const fs = require('fs');
 const path = require('path');
 
-const DATA_FILE = 'hub_real_data.json';
+const DATA_FILES = ['hub_apps_real.json', 'hub_real_data.json'];
 
 function getFilePath() {
-  const candidatePaths = [
-    path.join(process.cwd(), DATA_FILE),
-    path.join(__dirname, DATA_FILE),
-    path.join(__dirname, '..', DATA_FILE),
-    path.join(__dirname, '..', '..', DATA_FILE)
-  ];
-  return candidatePaths.find(p => fs.existsSync(p)) || path.join(process.cwd(), DATA_FILE);
+  for (const f of DATA_FILES) {
+    const candidatePaths = [
+      path.join(process.cwd(), f),
+      path.join(__dirname, f),
+      path.join(__dirname, '..', f),
+      path.join(__dirname, '..', '..', f)
+    ];
+    const found = candidatePaths.find(p => fs.existsSync(p));
+    if (found) return found;
+  }
+  return path.join(process.cwd(), 'hub_apps_real.json');
 }
 
 module.exports = async function handler(req, res) {
@@ -112,7 +116,11 @@ module.exports = async function handler(req, res) {
         updatedAt: new Date().toISOString()
       };
 
-      fs.writeFileSync(filePath, JSON.stringify(mergedPayload, null, 2), 'utf8');
+      try {
+        fs.writeFileSync(filePath, JSON.stringify(mergedPayload, null, 2), 'utf8');
+      } catch (writeErr) {
+        console.warn('[hub/real-data] Read-only disk or write error (e.g. Vercel Lambda):', writeErr.message);
+      }
 
       return res.status(200).json({
         success: true,

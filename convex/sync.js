@@ -722,8 +722,15 @@ export const saveApplicationsChunk = mutation({
   args: {
     apps: v.array(v.any()),
     clearCompany: v.optional(v.string()),
+    purgeMock: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    if (args.purgeMock) {
+      const allApps = await ctx.db.query("applications").collect();
+      for (const a of allApps) {
+        if (!a.isRealLaunchData) await ctx.db.delete(a._id);
+      }
+    }
     if (args.clearCompany) {
       const comp = args.clearCompany;
       const allApps = await ctx.db.query("applications").collect();
@@ -757,8 +764,27 @@ export const saveApplicationsChunk = mutation({
 
 // 30. 전산 런칭 실데이터 일괄 동기화 (배정 대장 청크 저장)
 export const saveAssignmentsChunk = mutation({
-  args: { assigns: v.array(v.any()) },
+  args: {
+    assigns: v.array(v.any()),
+    clearCompany: v.optional(v.string()),
+    purgeMock: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
+    if (args.purgeMock) {
+      const all = await ctx.db.query("assignments").collect();
+      for (const item of all) {
+        if (!item.isRealLaunchData) await ctx.db.delete(item._id);
+      }
+    }
+    if (args.clearCompany) {
+      const comp = args.clearCompany;
+      const all = await ctx.db.query("assignments").collect();
+      for (const item of all) {
+        const c = item.insuranceCompany || "";
+        if (comp.includes("현대") && c.includes("현대")) await ctx.db.delete(item._id);
+        else if (comp.includes("삼성") && c.includes("삼성")) await ctx.db.delete(item._id);
+      }
+    }
     for (const item of args.assigns) {
       const { _id, _creationTime, ...doc } = item;
       if (!doc.id) { await ctx.db.insert("assignments", doc); continue; }
@@ -771,8 +797,27 @@ export const saveAssignmentsChunk = mutation({
 
 // 31. 전산 런칭 실데이터 일괄 동기화 (청구 대장 청크 저장)
 export const saveClaimsChunk = mutation({
-  args: { claims: v.array(v.any()) },
+  args: {
+    claims: v.array(v.any()),
+    clearCompany: v.optional(v.string()),
+    purgeMock: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
+    if (args.purgeMock) {
+      const all = await ctx.db.query("claims").collect();
+      for (const item of all) {
+        if (!item.isRealLaunchData) await ctx.db.delete(item._id);
+      }
+    }
+    if (args.clearCompany) {
+      const comp = args.clearCompany;
+      const all = await ctx.db.query("claims").collect();
+      for (const item of all) {
+        const c = item.insuranceCompany || "";
+        if (comp.includes("현대") && c.includes("현대")) await ctx.db.delete(item._id);
+        else if (comp.includes("삼성") && c.includes("삼성")) await ctx.db.delete(item._id);
+      }
+    }
     for (const item of args.claims) {
       const { _id, _creationTime, ...doc } = item;
       if (!doc.id) { await ctx.db.insert("claims", doc); continue; }
@@ -785,8 +830,27 @@ export const saveClaimsChunk = mutation({
 
 // 32. 전산 런칭 실데이터 일괄 동기화 (지급 대장 청크 저장)
 export const savePayoutsChunk = mutation({
-  args: { payouts: v.array(v.any()) },
+  args: {
+    payouts: v.array(v.any()),
+    clearCompany: v.optional(v.string()),
+    purgeMock: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
+    if (args.purgeMock) {
+      const all = await ctx.db.query("payouts").collect();
+      for (const item of all) {
+        if (!item.isRealLaunchData) await ctx.db.delete(item._id);
+      }
+    }
+    if (args.clearCompany) {
+      const comp = args.clearCompany;
+      const all = await ctx.db.query("payouts").collect();
+      for (const item of all) {
+        const c = item.insuranceCompany || "";
+        if (comp.includes("현대") && c.includes("현대")) await ctx.db.delete(item._id);
+        else if (comp.includes("삼성") && c.includes("삼성")) await ctx.db.delete(item._id);
+      }
+    }
     for (const item of args.payouts) {
       const { _id, _creationTime, ...doc } = item;
       if (!doc.id) { await ctx.db.insert("payouts", doc); continue; }
@@ -796,6 +860,53 @@ export const savePayoutsChunk = mutation({
     }
   }
 });
+
+// 33. 목업 데이터 전면 영구 삭제 (전산 런칭 실데이터 전환용)
+export const purgeMockData = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const apps = await ctx.db.query("applications").collect();
+    let deletedApps = 0;
+    for (const a of apps) {
+      if (!a.isRealLaunchData) {
+        await ctx.db.delete(a._id);
+        deletedApps++;
+      }
+    }
+    const assigns = await ctx.db.query("assignments").collect();
+    let deletedAssigns = 0;
+    for (const as of assigns) {
+      if (!as.isRealLaunchData) {
+        await ctx.db.delete(as._id);
+        deletedAssigns++;
+      }
+    }
+    const claims = await ctx.db.query("claims").collect();
+    let deletedClaims = 0;
+    for (const c of claims) {
+      if (!c.isRealLaunchData) {
+        await ctx.db.delete(c._id);
+        deletedClaims++;
+      }
+    }
+    const payouts = await ctx.db.query("payouts").collect();
+    let deletedPayouts = 0;
+    for (const p of payouts) {
+      if (!p.isRealLaunchData) {
+        await ctx.db.delete(p._id);
+        deletedPayouts++;
+      }
+    }
+    return {
+      deletedApps,
+      deletedAssigns,
+      deletedClaims,
+      deletedPayouts,
+      timestamp: new Date().toISOString(),
+    };
+  },
+});
+
 
 
 
