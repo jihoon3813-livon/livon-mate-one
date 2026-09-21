@@ -26369,10 +26369,10 @@ window.handleLeftMenuClick = handleLeftMenuClick;
 function refreshTabData(tabId, filterParam = null) {
   try {
     switch (tabId) {
-      // 1. 종합 콜분석: 백그라운드 CTI 실시간 전수 동기화 (화면 가림 모달 없이 0ms 즉각 전환)
+      // 1. 종합 콜분석: 메뉴 클릭 시 자동 동기화 없이 즉시 렌더링 (동기화는 수동 버튼 및 5분 주기 자동 타이머로 실행)
       case 'totalcallanalysis':
-        if (typeof loadTotalCallData === 'function') {
-          loadTotalCallData(true, true);
+        if (typeof renderTotalCallAnalysisTab === 'function') {
+          renderTotalCallAnalysisTab();
         }
         break;
 

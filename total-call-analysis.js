@@ -981,29 +981,15 @@ async function initTotalCallAnalysisModule(forceRefresh = false) {
   }
 
   if (hasImmediateData) {
-    // 1) 기존 캐시 데이터로 0ms 즉시 화면 렌더링 (화면 깜빡임/공백 방지)
+    // 1) 기존 캐시 데이터로 0ms 즉시 화면 렌더링 (메뉴 클릭 시 자동 동기화 없이 기존 데이터 즉각 표시)
     renderTotalCallAnalysisTab();
     loadCallAnnotations();
-    // 2) 백그라운드에서 이번주 기준 실시간 최신 CTI 데이터 무조건 신선 동기화
-    loadTotalCallData(true, true);
     return;
   }
 
-  // 2. 캐시 및 로컬 정적 데이터가 모두 비어있는 최초 방문 시 안내 UI 표시 후 동기화
-  container.innerHTML = `
-    <div class="bg-white rounded-3xl border border-slate-200/90 p-12 text-center text-slate-500 space-y-4 shadow-sm my-6">
-      <div class="w-12 h-12 rounded-2xl bg-cyan-100 text-cyan-600 flex items-center justify-center mx-auto shadow-sm">
-        <i data-lucide="loader-2" class="w-6 h-6 animate-spin"></i>
-      </div>
-      <div>
-        <h3 class="text-base font-bold text-slate-800">CTI 종합 콜분석 데이터를 동기화하는 중입니다...</h3>
-        <p class="text-xs text-slate-400 mt-1">삼성화재 · 현대해상 · 리본케어 전체 인바운드 콜을 실시간 집계합니다.</p>
-      </div>
-    </div>
-  `;
-  initTotalIcons(container);
-
-  await Promise.all([loadCallAnnotations(), loadTotalCallData(true, true)]);
+  // 2. 캐시 및 로컬 정적 데이터가 모두 비어있는 최초 방문 시 로컬 정적 데이터 로드 후 렌더링
+  renderTotalCallAnalysisTab();
+  await loadCallAnnotations();
 }
 
 async function loadTotalCallData(forceSync = false, isBackground = false) {
@@ -1227,8 +1213,6 @@ function setTotalDatePreset(type) {
   gTotalListPage = 1;
   gTotalCustomerPage = 1;
   renderTotalCallAnalysisTab();
-  // 사용자가 프리셋을 변경했을 때 해당 기간의 CTI 데이터를 실시간으로 백그라운드 동기화 (모달 차단 없음)
-  loadTotalCallData(true, true);
 }
 
 function handleTotalDateInputChange(key, val) {
@@ -1243,8 +1227,6 @@ function applyTotalCustomDateRange() {
   gTotalListPage = 1;
   gTotalCustomerPage = 1;
   renderTotalCallAnalysisTab();
-  // 지정된 기간으로 CTI 실시간 백그라운드 동기화 요청
-  loadTotalCallData(true, true);
 }
 
 function resetAllTotalFilters() {
@@ -1268,7 +1250,6 @@ function resetAllTotalFilters() {
   gTotalListPage = 1;
   gTotalCustomerPage = 1;
   renderTotalCallAnalysisTab();
-  loadTotalCallData(true, true);
 }
 
 /**
@@ -4411,13 +4392,16 @@ if (typeof window !== 'undefined') {
 
   setInterval(async () => {
     checkAndTriggerOutcallAlert();
+  }, 30000);
 
-    // [종합콜분석 실시간 동기화]: 사용자가 종합콜분석 화면을 보고 있을 때 25초 주기로 백그라운드 CTI 실시간 수신
+  // [종합콜분석 5분 주기 자동 동기화]: 사용자가 종합콜분석 탭을 보고 있을 때만 5분(300,000ms) 주기로 백그라운드 동기화
+  setInterval(() => {
     const totalTabEl = document.getElementById('tab-totalcallanalysis');
     const isTotalViewVisible = (window.gActiveTab === 'totalcallanalysis') || (totalTabEl && !totalTabEl.classList.contains('hidden'));
     if (isTotalViewVisible && typeof loadTotalCallData === 'function' && !isTotalSyncing) {
+      console.log('[TotalCallAnalysis] 탭 활성 상태 감지: 5분 주기 백그라운드 CTI 자동 동기화 실행');
       loadTotalCallData(true, true);
     }
-  }, 25000);
+  }, 5 * 60 * 1000);
 }
 
