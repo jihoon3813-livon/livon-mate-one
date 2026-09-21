@@ -5274,6 +5274,9 @@ function renderCurrentSamsungSheet() {
             }
 
             const rawValAttr = String(rawVal !== undefined && rawVal !== null ? rawVal : '').replace(/"/g, '&quot;');
+            const cellTitle = hasPending 
+              ? `수정됨 (기존: ${gSamsungPendingChanges.get(changeKey).origVal || '(빈값)'}) - [수정사항 저장] 클릭 시 최종 반영` 
+              : rawValAttr;
 
             return `
               <td contenteditable="false" 
@@ -5287,7 +5290,7 @@ function renderCurrentSamsungSheet() {
                 onblur="onSamsungCellBlur(this, '${gActiveSamsungSheet}', ${realIdx}, '${col.key}')" 
                 class="p-2 border-r border-slate-200 whitespace-nowrap overflow-hidden text-ellipsis transition-all cursor-cell select-none ${hasPending ? 'bg-amber-100/70 font-semibold text-amber-950 ring-1 ring-amber-400' : 'text-slate-800 hover:bg-sky-50/60'}" 
                 style="min-width: ${col.width}" 
-                title="${hasPending ? `수정됨 (기존: ${gSamsungPendingChanges.get(changeKey).origVal || '(빈값)'}) - [수정사항 저장] 클릭 시 최종 반영` : displayVal}">
+                title="${cellTitle}">
                 ${displayVal}
               </td>
             `;
@@ -24389,7 +24392,8 @@ function renderUnifiedCareHub() {
     if (query.length > 0) clearBtn.classList.remove('hidden');
     else clearBtn.classList.add('hidden');
   }
-  const insFilter = gHubInsuranceTab || document.getElementById('hubInsuranceFilter')?.value || 'ALL';
+  const rawInsFilter = gHubInsuranceTab || document.getElementById('hubInsuranceFilter')?.value || 'ALL';
+  const insFilter = (rawInsFilter === 'SAMSUNG' || rawInsFilter === '삼성화재') ? '삼성' : ((rawInsFilter === 'HYUNDAI' || rawInsFilter === '현대해상') ? '현대' : 'ALL');
   if (typeof updateHubInsuranceTabUI === 'function') updateHubInsuranceTabUI();
 
   // Helper: 간병비 청구 팩스 발송 완료 여부 판별 (신규 1차 고객등록 팩스는 청구 팩스가 아니므로 제외, 삼성화재 및 엑셀 등록 자료는 팩스 대상 제외)
@@ -24403,9 +24407,21 @@ function renderUnifiedCareHub() {
 
   // Pre-index unpaid payouts Set for ultra-fast O(1) checks
   const unpaidPayoutAppIdSet = new Set();
-  for (let i = 0; i < gPayouts.length; i++) {
-    const p = gPayouts[i];
-    if (p && p.payoutStatus === '미지급') unpaidPayoutAppIdSet.add(p.applyId);
+  if (Array.isArray(gPayouts)) {
+    for (let i = 0; i < gPayouts.length; i++) {
+      const p = gPayouts[i];
+      if (!p) continue;
+      const st = String(p.payoutStatus || p.status || '').trim();
+      const isPaid = st === '지급' || st === '지급완료' || p.isPaid === true;
+      if (!isPaid && (st === '미지급' || st.includes('대기') || (p.payoutAmount || 0) > 0)) {
+        if (p.applyId) {
+          unpaidPayoutAppIdSet.add(p.applyId);
+        } else if (p.patientName) {
+          const matchedApp = (gApps || []).find(a => a.patientName === p.patientName);
+          if (matchedApp) unpaidPayoutAppIdSet.add(matchedApp.id);
+        }
+      }
+    }
   }
 
   // 1. 원수사 탭 뱃지 총 건수 산출
@@ -24480,6 +24496,33 @@ function renderUnifiedCareHub() {
     if (isCancelledOrDone(app)) return false;
     return true;
   };
+
+  // 🚨 [지급 대기 (간병비 미지급) 완벽 연동]: 등록된 미지급 정산서가 있거나, 간병 진행/완료 후 간병비 지급이 도래한 건(C0286 등) 연동
+  for (let i = 0; i < activeHubApps.length; i++) {
+    const a = activeHubApps[i];
+    if (unpaidPayoutAppIdSet.has(a.id)) continue;
+    const aSt = a.status || '';
+    if (aSt === '서비스 취소' || aSt === '취소' || aSt === '미해당') continue;
+
+    const as = (Array.isArray(gAssigns) ? gAssigns : []).find(x => x.applyId === a.id);
+    if (as && as.caregiverName && as.caregiverName !== '-' && as.caregiverName !== '미배정') {
+      const appPayouts = (Array.isArray(gPayouts) ? gPayouts : []).filter(p => p.applyId === a.id);
+      const hasUnpaidRec = appPayouts.some(p => {
+        const st = String(p.payoutStatus || p.status || '').trim();
+        return st !== '지급' && st !== '지급완료';
+      });
+      if (hasUnpaidRec) {
+        unpaidPayoutAppIdSet.add(a.id);
+        continue;
+      }
+      const careProg = typeof getCareProgressInfo === 'function' ? getCareProgressInfo(as) : null;
+      const appClaims = (Array.isArray(gClaims) ? gClaims : []).filter(c => c.applyId === a.id);
+      const sched = typeof calculateCareSettlementSchedule === 'function' ? calculateCareSettlementSchedule(a, as, careProg, appClaims, appPayouts) : null;
+      if (sched && (sched.isCaregiverPayoutDue || sched.unpaidPayoutSum > 0)) {
+        unpaidPayoutAppIdSet.add(a.id);
+      }
+    }
+  }
 
   for (let i = 0; i < activeHubApps.length; i++) {
     const a = activeHubApps[i];
@@ -24829,16 +24872,23 @@ function renderUnifiedCareHub() {
       ? { label: '청구금 미입금 (' + formatCurrency(app.estimatedUnpaid) + '원)', color: 'rose' }
       : (app.claimCount > 0 ? { label: '수납완료 (' + formatCurrency(app.depositConfirmedAmount) + '원)', color: 'emerald' } : { label: '미청구', color: 'slate' });
 
-    const s5_payout = appPayouts.some(p => p.payoutStatus === '미지급')
+    // 간병 기간 진행 경과 계산 (STEP 2 및 카드 헤더용)
+    const careProg = as ? getCareProgressInfo(as) : (appAssigns.length > 0 ? getCareProgressInfo(appAssigns[0]) : null);
+    const sched = calculateCareSettlementSchedule(app, as, careProg, appClaims, appPayouts);
+
+    const hasUnpaidPayout = appPayouts.some(p => {
+      const st = String(p.payoutStatus || p.status || '').trim();
+      return st !== '지급' && st !== '지급완료' && (p.payoutAmount || 0) > 0;
+    });
+    const isPayoutDueOrUnpaid = hasUnpaidPayout || sched.isCaregiverPayoutDue || sched.unpaidPayoutSum > 0;
+
+    const s5_payout = isPayoutDueOrUnpaid
       ? { label: '간병비 미지급 (지급대기)', color: 'orange' }
       : (appPayouts.length > 0 ? { label: '지급완료 (' + formatCurrency(app.totalPayout) + '원)', color: 'teal' } : { label: '지급없음', color: 'slate' });
 
     const s6_fax = faxInfo.status === '전송완료'
       ? { label: '팩스완료 (' + faxInfo.sentDate + ')', color: 'emerald' }
       : { label: '팩스 미전송', color: 'purple' };
-
-    // 간병 기간 진행 경과 계산 (STEP 2 및 카드 헤더용)
-    const careProg = as ? getCareProgressInfo(as) : (appAssigns.length > 0 ? getCareProgressInfo(appAssigns[0]) : null);
 
     // When card is expanded in 2 or 3 col view, expand to full width (col-span-full) so details look like 1-col view!
     // Calculate 24 business hours status (excluding weekends and Korean holidays)
@@ -24848,9 +24898,8 @@ function renderUnifiedCareHub() {
     // [사용자 요구사항]: 고객 카드 좌측 세로 라벨(신규: 파랑, 진행중: 노랑, 완료: 녹색+음영, 취소: 검정+음영, 예정: 보라)
     const cardTheme = getCustomerCardStatusTheme(app);
 
-    const sched = calculateCareSettlementSchedule(app, as, careProg, appClaims, appPayouts);
     const totalPayoutSum = sched.confirmedPayoutSum || appPayouts.reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
-    const isPayoutPending = sched.isCaregiverPayoutDue || appPayouts.some(p => p.payoutStatus === '미지급');
+    const isPayoutPending = isPayoutDueOrUnpaid;
     const totalClaimAmt = (sched.depositedClaimSum || app.depositConfirmedAmount) + (sched.unconfirmedClaimSum || app.estimatedUnpaid || 0);
     const isHdWaitingSms = app.insuranceCompany.includes('현대해상') && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'));
     const isSamsung = (app.insuranceCompany || '').includes('삼성');
