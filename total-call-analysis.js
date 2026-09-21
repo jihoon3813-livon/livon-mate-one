@@ -16,6 +16,15 @@ let gTotalCallData = null;
 let gTotalCallAnnotations = { memos: {}, labels: {}, customLabels: [] };
 let gActiveTotalViewMode = 'list'; // 'list' | 'customer' | 'company' | 'date' | 'category'
 
+function getTotalLast30Range() {
+  const now = new Date();
+  const past = new Date(now);
+  past.setDate(now.getDate() - 30);
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return { start: fmt(past), end: fmt(now) };
+}
+
 function getTotalThisWeekRange() {
   const now = new Date();
   const day = now.getDay();
@@ -30,12 +39,12 @@ function getTotalThisWeekRange() {
   return { start: fmt(monday), end: endStr };
 }
 
-const defaultTotalRange = getTotalThisWeekRange();
+const defaultTotalRange = getTotalLast30Range();
 
 let gTotalFilter = {
   startDate: defaultTotalRange.start,
   endDate: defaultTotalRange.end,
-  periodKey: 'thisWeek',
+  periodKey: 'last30',
   channel: 'all', // 'all' | '삼성화재' | '현대해상' | '리본케어'
   search: '',
   category: '',
@@ -1015,14 +1024,14 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         }, 120);
       }
 
-      // 4.5초 타임아웃 가드 (실시간 CTI 연동 대기 보장)
+      // 7초 타임아웃 가드 (실시간 CTI 연동 대기 보장)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4500);
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
       let synced = false;
 
-      const thisWeek = (typeof getTotalThisWeekRange === 'function') ? getTotalThisWeekRange() : { start: '', end: '' };
-      const s = gTotalFilter.startDate || thisWeek.start;
-      const e = gTotalFilter.endDate || thisWeek.end || new Date().toISOString().slice(0, 10);
+      const defRange = (typeof getTotalLast30Range === 'function') ? getTotalLast30Range() : { start: '', end: '' };
+      const s = gTotalFilter.startDate || defRange.start;
+      const e = gTotalFilter.endDate || defRange.end || new Date().toISOString().slice(0, 10);
       const ch = gTotalFilter.channel || 'all';
       const sUrl = `/api/total/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
 
@@ -1104,14 +1113,15 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
     } else {
       let loaded = false;
 
-      // 1) API 서버 호출 시도
+      // 1) 전체 데이터 파일 로드 시도
       try {
-        const res = await fetch('/api/samsung/call-report/data?channel=all');
+        const res = await fetch(`/call_report_all.json?t=${Date.now()}`);
         if (res.ok) {
           const json = await res.json();
-          if (json.success && json.data && json.data.callLogs && json.data.callLogs.length > 0) {
-            gTotalCallData = json.data;
-            window.gTotalCallData = json.data;
+          const d = (json && json.data) ? json.data : json;
+          if (d && d.callLogs && d.callLogs.length > 0) {
+            gTotalCallData = d;
+            window.gTotalCallData = d;
             clearMateOneMatchCache();
             loaded = true;
           }
@@ -1238,11 +1248,11 @@ function applyTotalCustomDateRange() {
 }
 
 function resetAllTotalFilters() {
-  const thisWeek = (typeof getTotalThisWeekRange === 'function') ? getTotalThisWeekRange() : { start: '', end: '' };
+  const defRange = (typeof getTotalLast30Range === 'function') ? getTotalLast30Range() : { start: '', end: '' };
   gTotalFilter = {
-    startDate: thisWeek.start,
-    endDate: thisWeek.end,
-    periodKey: 'thisWeek',
+    startDate: defRange.start,
+    endDate: defRange.end,
+    periodKey: 'last30',
     channel: 'all',
     search: '',
     category: '',

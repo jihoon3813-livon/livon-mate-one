@@ -666,7 +666,7 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
     for (let p = 2; p <= effectivePages; p++) {
       pageNumbers.push(p);
     }
-    const PAGE_CONCURRENCY = 6;
+    const PAGE_CONCURRENCY = 8;
     for (let i = 0; i < pageNumbers.length; i += PAGE_CONCURRENCY) {
       const pageBatch = pageNumbers.slice(i, i + PAGE_CONCURRENCY);
       const batchResults = await Promise.all(pageBatch.map(async (page) => {
@@ -711,28 +711,42 @@ async function fetchCtiLogsByDateRange(startDate, endDate, targetChannel = '삼�
 
   console.log(`[CTI Sync] 수집 완료: 총 ${logs.length}건 (CTI 표기 총건수: ${totalCount}건)`);
 
-  // askSn이 있는 상담 건들에 대해 세부 상담요약/키워드 동기화 (기존 보유 건은 재호출 생략하여 초고속 동기화)
+  // askSn이 있는 상담 건들에 대해 세부 상담요약/키워드 동기화 (기존 보유 건 및 과거 빈 건은 재호출 생략하여 초고속 동기화)
   const knownDetailsMap = options.knownDetailsMap || null;
+  const nowKst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const todayKstStr = nowKst.toISOString().slice(0, 10);
   const detailTargets = logs.filter(l => {
     if (!l.askSn) return false;
     if (knownDetailsMap) {
       const known = knownDetailsMap.get(l.askSn) || (l.phone ? knownDetailsMap.get(`${l.callTime}_${l.phone}`) : null);
-      if (known && (known.title || known.summary)) {
-        l.title = known.title;
-        l.summary = known.summary;
-        l.keywords = known.keywords;
-        l.category = known.category;
-        l.actor = known.actor;
-        return false; // 이미 확보된 상세내용이므로 추가 HTTP 요청 생략 (초고속 캐싱)
+      if (known) {
+        l.title = known.title || l.title || '';
+        l.summary = known.summary || '';
+        l.keywords = known.keywords || '';
+        l.category = known.category || '';
+        l.actor = known.actor || '';
+        // 과거 날짜(오늘 이전)이고 이미 기존 DB에 등록된 건이면 추가 HTTP 상세 조회를 생략 (0ms 캐싱)
+        const callDate = (l.callTime || '').slice(0, 10);
+        if (callDate && callDate < todayKstStr) {
+          return false;
+        }
+        // 당일 건이라도 이미 제목/요약이 확보되어 있다면 재조회 생략
+        if (known.title || known.summary) {
+          return false;
+        }
       }
     }
     return true;
   });
-  console.log(`[CTI Sync] 신규 세부 상담요약 필요 대상: ${detailTargets.length}건 (기존 보존: ${logs.filter(l => l.askSn).length - detailTargets.length}건)`);
+
+  // 신규/당일 건 중 최신 순 최대 30건에 대해서만 세부 상담내용 조회
+  const maxDetails = options.maxDetails || 30;
+  const targets = detailTargets.slice(0, maxDetails);
+  console.log(`[CTI Sync] 신규 세부 상담요약 필요 대상: ${targets.length}건 (후보: ${detailTargets.length}건, 기존 보존: ${logs.filter(l => l.askSn).length - detailTargets.length}건)`);
 
   const batchSize = 15;
-  for (let i = 0; i < detailTargets.length; i += batchSize) {
-    const batch = detailTargets.slice(i, i + batchSize);
+  for (let i = 0; i < targets.length; i += batchSize) {
+    const batch = targets.slice(i, i + batchSize);
     await Promise.all(batch.map(async (item) => {
       const detail = await fetchCtiDetailView(cookie, item.askSn);
       if (detail.title) item.title = detail.title;

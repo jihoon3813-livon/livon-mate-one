@@ -16,16 +16,14 @@ module.exports = async function handler(req, res) {
   }
 
   const q = req.query || {};
-  // 한국 시간(KST) 기준 이번 주 월요일 계산 (기본값: 이번 주)
+  // 한국 시간(KST) 기준 최근 30일 계산 (기본값: 최근 30일)
   const nowKst = new Date(Date.now() + 9 * 60 * 60 * 1000);
-  const day = nowKst.getUTCDay();
-  const diffToMonday = (day === 0 ? -6 : 1) - day;
-  const mondayKst = new Date(nowKst.getTime() + diffToMonday * 24 * 60 * 60 * 1000);
-  const thisWeekMondayStr = mondayKst.toISOString().slice(0, 10);
+  const past30Kst = new Date(nowKst.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const last30Str = past30Kst.toISOString().slice(0, 10);
   const todayKstStr = nowKst.toISOString().slice(0, 10);
 
   const isExplicitAll = q.all === 'true' || q.start === 'all';
-  const startDate = isExplicitAll ? '2026-08-01' : (q.start || thisWeekMondayStr);
+  const startDate = isExplicitAll ? '2026-08-01' : (q.start || last30Str);
   const endDate = q.end || todayKstStr;
   const channel = q.channel || 'all';
   const channelLabel = (channel === 'all' || channel === '전체') ? '전체 인입경로' : channel;
@@ -52,9 +50,9 @@ module.exports = async function handler(req, res) {
     } catch (e) {}
   }
 
-  // 2. 실시간 CTI 동기화 시도 (스마트 초고속 증분 수집 - 최대 3.5초 대기 가드)
+  // 2. 실시간 CTI 동기화 시도 (스마트 초고속 증분 수집 - 최대 6초 대기 가드)
   try {
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 3500));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 6000));
 
     const sDateObj = new Date(startDate);
     const eDateObj = new Date(endDate);
