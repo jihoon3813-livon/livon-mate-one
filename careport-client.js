@@ -655,6 +655,67 @@
     },
 
     /**
+     * Generate authentic SVG line chart for CarePort trend scores (matching Image 2)
+     */
+    generateTrendChartSvg(trendList) {
+      const list = (trendList && trendList.length > 0) ? trendList : [
+        { dayIndex: 4, overallScore: 4, mobilityScore: 3, dietScore: 5, sleepScore: 5, painScore: 1 },
+        { dayIndex: 5, overallScore: 3, mobilityScore: 2, dietScore: 4, sleepScore: 3, painScore: 2 },
+        { dayIndex: 6, overallScore: 3, mobilityScore: 3, dietScore: 3, sleepScore: 2, painScore: 3 }
+      ];
+      const width = 740;
+      const height = 135;
+      const paddingX = 55;
+      const paddingY = 22;
+      const chartW = width - paddingX * 2;
+      const chartH = height - paddingY * 2;
+      
+      const numDays = list.length;
+      const getX = (idx) => paddingX + (numDays === 1 ? chartW / 2 : (idx / (numDays - 1)) * chartW);
+      const getY = (val) => height - paddingY - ((val - 1) / 4) * chartH;
+      
+      // Grid lines 1 to 5
+      let gridSvg = '';
+      for (let s = 1; s <= 5; s++) {
+        const y = getY(s);
+        gridSvg += `<line x1="${paddingX - 10}" y1="${y}" x2="${width - paddingX + 10}" y2="${y}" stroke="#e5e9ed" stroke-width="1"/>`;
+        gridSvg += `<text x="${paddingX - 22}" y="${y + 3.5}" font-size="10" font-weight="bold" fill="#94a3b8" text-anchor="middle" font-family="sans-serif">${s}</text>`;
+      }
+      
+      // X labels
+      let xLabelsSvg = '';
+      list.forEach((item, idx) => {
+        const x = getX(idx);
+        const label = item.dayIndex ? `${item.dayIndex}일차` : `${idx + 1}일차`;
+        xLabelsSvg += `<text x="${x}" y="${height - 4}" font-size="11" font-weight="bold" fill="#475569" text-anchor="middle" font-family="sans-serif">${label}</text>`;
+      });
+      
+      const lines = [
+        { key: 'overallScore', color: '#06C8BB', dash: '' },
+        { key: 'mobilityScore', color: '#2BBB77', dash: '' },
+        { key: 'dietScore', color: '#F4A61E', dash: '' },
+        { key: 'sleepScore', color: '#6366f1', dash: '' },
+        { key: 'painScore', color: '#FE6FB0', dash: 'stroke-dasharray="6,4"' }
+      ];
+      
+      let linesSvg = '';
+      lines.forEach(line => {
+        let pts = [];
+        list.forEach((item, idx) => {
+          const val = (line.key === 'painScore' && item.painScore != null && item.painScore > 3) ? (6 - item.painScore) : (item[line.key] || 3);
+          pts.push(`${getX(idx)},${getY(val)}`);
+        });
+        linesSvg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${line.color}" stroke-width="2.5" ${line.dash}/>`;
+        pts.forEach(pt => {
+          const [px, py] = pt.split(',');
+          linesSvg += `<circle cx="${px}" cy="${py}" r="4.5" fill="#ffffff" stroke="${line.color}" stroke-width="2.5"/>`;
+        });
+      });
+      
+      return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="width: 100%; max-width: ${width}px; height: auto;">${gridSvg}${xLabelsSvg}${linesSvg}</svg>`;
+    },
+
+    /**
      * Generate printable HTML report for a single daily log (100% CarePort Modern Caregiver Layout)
      */
     generateDailyLogHtml(patient, dailyLog, detailData = null) {
@@ -716,6 +777,12 @@
       const keywordsPills = d.keywords.map(k => `
         <span style="display: inline-block; font-size: 10.5px; font-weight: 700; color: #079f98; background: #eafaf8; border: 1px solid #a7f3d0; border-radius: 12px; padding: 2px 8px; margin-right: 4px; margin-bottom: 4px;">#${k}</span>
       `).join('');
+
+      const trendChartSvg = this.generateTrendChartSvg(d.trendScores || patient.trendScores || [
+        { dayIndex: 4, overallScore: 4, mobilityScore: 3, dietScore: 5, sleepScore: 5, painScore: 1 },
+        { dayIndex: 5, overallScore: 3, mobilityScore: 2, dietScore: 4, sleepScore: 3, painScore: 2 },
+        { dayIndex: 6, overallScore: 3, mobilityScore: 3, dietScore: 3, sleepScore: 2, painScore: 3 }
+      ]);
 
       return `<!DOCTYPE html>
 <html lang="ko">
@@ -797,6 +864,21 @@
         <span style="font-size: 10.5px; color: #64748b; font-weight: 700; display: block; margin-bottom: 2px;">간병 기간</span>
         <strong style="font-size: 12.5px; font-weight: 800; color: #0f172a; font-family: monospace;">${d.carePeriod}</strong>
       </div>
+    </div>
+
+    <!-- Section: 간병 일자별 환자 상태 변화 (Image 2 style) -->
+    <div class="sec-head" style="border-bottom: 2px solid #10bdb2;">
+      <span class="sec-title">간병 일자별 환자 상태 변화</span>
+      <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; gap: 8px;">
+        <span style="color: #06C8BB;">― 총합상태</span>
+        <span style="color: #2BBB77;">― 거동능력</span>
+        <span style="color: #F4A61E;">― 식사상태</span>
+        <span style="color: #6366f1;">― 수면상태</span>
+        <span style="color: #FE6FB0;">┄ 통증수준</span>
+      </div>
+    </div>
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; text-align: center;">
+      ${trendChartSvg}
     </div>
 
     <!-- Section 1: 금일 환자 상태 체크 (신호등 & 세부 상태) -->

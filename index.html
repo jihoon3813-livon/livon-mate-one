@@ -9599,13 +9599,20 @@
         <div class="flex items-center gap-2">
           <button type="button" id="btnCarePortNewTab" onclick="openCarePortInNewTab()" 
             class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-            title="새 창에서 CarePort 공식 원본 페이지 열기">
+            title="새 창에서 공식 간병일지 열기">
             <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
             <span class="hidden md:inline">새 창 원본</span>
           </button>
 
+          <button type="button" onclick="printCarePortDocument()" 
+            class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            title="간병일지 즉시 인쇄">
+            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">프린트</span>
+          </button>
+
           <button type="button" onclick="downloadCarePortDocumentPdf()" 
-            class="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-md cursor-pointer active:scale-95"
+            class="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-md cursor-pointer active:scale-95"
             title="케어포트 공식 간병일지 PDF 다운로드">
             <i data-lucide="download" class="w-4 h-4"></i>
             <span>공식 일지 PDF 다운로드</span>
@@ -9617,50 +9624,85 @@
         </div>
       </div>
 
+      <!-- Interactive Multi-Day Tab Selector (환자 회차별 일지 간편 전환) -->
+      <div id="cpDaySelectorContainer" class="px-6 py-2 bg-slate-100 border-b border-slate-200 flex items-center justify-between gap-2 overflow-x-auto no-print">
+        <div class="flex items-center gap-1.5 text-xs font-bold text-slate-600 shrink-0">
+          <i data-lucide="calendar" class="w-4 h-4 text-teal-600"></i>
+          <span>간병 회차:</span>
+        </div>
+        <div id="cpDaySelectorBar" class="flex items-center gap-1.5 overflow-x-auto custom-scrollbar flex-1 py-0.5">
+          <!-- Dynamic day pills injected here -->
+        </div>
+      </div>
+
       <!-- Modal Content Body (첨부 2번 이미지 100% 동일 양식) -->
       <div class="flex-1 overflow-y-auto bg-slate-100/80 relative min-h-[550px] flex flex-col custom-scrollbar">
         <!-- 1:1 CarePort Modern Document View -->
         <div id="carePortPrintArea" class="p-6 sm:p-10 max-w-4xl mx-auto w-full bg-white shadow-xl my-4 rounded-2xl font-sans relative border border-slate-200">
+          <!-- Top Action Buttons Inside Document (Image 2 style) -->
+          <div class="flex items-center justify-end gap-2 mb-3 no-print">
+            <button type="button" onclick="downloadCarePortDocumentPdf()" 
+              class="px-4 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-slate-800 text-xs font-bold shadow-2xs transition-all cursor-pointer">
+              다운로드
+            </button>
+            <button type="button" onclick="printCarePortDocument()" 
+              class="px-4 py-1.5 bg-[#0a192f] hover:bg-slate-900 text-white rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer">
+              프린트
+            </button>
+          </div>
+
           <!-- Top Header -->
           <div class="flex items-center justify-between pb-4 border-b border-slate-200">
             <div>
-              <div class="text-[11px] font-extrabold text-teal-600 tracking-wider uppercase">보호자 안내용 · 공식 간병일지</div>
+              <div class="text-[12px] font-bold text-slate-500 tracking-wider">보호자 안내용</div>
               <h1 class="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mt-0.5">간병일지</h1>
             </div>
-            <div class="text-right flex items-center gap-3">
-              <div class="flex items-center gap-2">
-                <span id="cpDayBadge" class="px-2.5 py-1 rounded-lg text-xs font-black bg-teal-600 text-white shadow-2xs">1일차</span>
-                <span id="cpMetaDate" class="text-xs sm:text-sm font-mono font-extrabold text-slate-700">-</span>
-              </div>
-              <div class="no-print">
-                <button type="button" onclick="downloadCarePortDocumentPdf()" 
-                  class="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white text-xs font-black rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
-                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
-                  <span>PDF 다운로드</span>
-                </button>
-              </div>
+            <!-- Day Badge in Signature Teal Card (Image 2 style) -->
+            <div class="bg-[#10bdb2] text-white px-6 py-2.5 rounded-2xl text-center shadow-xs min-w-[150px]">
+              <div id="cpDayBadge" class="text-xl sm:text-2xl font-black tracking-tight leading-tight">6일차</div>
+              <div id="cpMetaDate" class="text-xs font-bold opacity-95 mt-0.5">2026-09-20 (일)</div>
             </div>
           </div>
 
-          <!-- Demographics Strip (고객명, 간병인, 간병기간) -->
-          <div class="my-4 p-3.5 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <div class="text-[11px] text-slate-500 font-bold mb-0.5">고객명 (피보험자)</div>
-              <div class="text-sm font-black text-slate-900 flex items-center gap-1.5">
-                <span id="cpMetaUsername">-</span>
-                <span class="text-xs font-bold text-slate-500" id="cpMetaAgeGender">(-세·-)</span>
+          <!-- Demographics Strip (고객명, 간병인, 간병기간) - Image 2 style -->
+          <div class="my-5 p-4 bg-[#f8fafc] border border-slate-200/80 rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="bg-white sm:bg-transparent p-2.5 sm:p-0 rounded-xl">
+              <div class="text-[11px] text-slate-400 font-bold mb-1">고객명</div>
+              <div class="text-sm sm:text-base font-black text-slate-900 flex items-center gap-1.5">
+                <span id="cpMetaUsernameText">윤석찬 (51세·남)</span>
+                <!-- hidden backward-compat span -->
+                <span id="cpMetaUsername" class="hidden">윤석찬</span>
+                <span id="cpMetaAgeGender" class="hidden">(51세·남)</span>
               </div>
             </div>
-            <div class="sm:border-l sm:border-slate-200 sm:pl-3.5">
-              <div class="text-[11px] text-slate-500 font-bold mb-0.5">담당 간병인 (소속)</div>
-              <div class="text-sm font-black text-slate-900 flex items-center gap-1">
-                <span id="cpMetaConsultant">-</span>
-                <span class="text-xs font-normal text-slate-500" id="cpMetaOrg">(-)</span>
+            <div class="bg-white sm:bg-transparent p-2.5 sm:p-0 rounded-xl sm:border-l sm:border-slate-200 sm:pl-5">
+              <div class="text-[11px] text-slate-400 font-bold mb-1">간병인</div>
+              <div class="text-sm sm:text-base font-black text-slate-900 flex items-center gap-1">
+                <span id="cpMetaCaregiverText">이명선</span>
+                <!-- hidden backward-compat span -->
+                <span id="cpMetaConsultant" class="hidden">이명선</span>
+                <span id="cpMetaOrg" class="hidden">(삼성화재)</span>
               </div>
             </div>
-            <div class="sm:border-l sm:border-slate-200 sm:pl-3.5">
-              <div class="text-[11px] text-slate-500 font-bold mb-0.5">간병 기간</div>
-              <div class="text-xs font-mono font-extrabold text-slate-800" id="cpMetaCarePeriod">-</div>
+            <div class="bg-white sm:bg-transparent p-2.5 sm:p-0 rounded-xl sm:border-l sm:border-slate-200 sm:pl-5">
+              <div class="text-[11px] text-slate-400 font-bold mb-1">간병기간</div>
+              <div class="text-sm sm:text-base font-black text-slate-900 font-mono" id="cpMetaCarePeriodText">09.15~09.20 (일)</div>
+              <!-- hidden backward-compat span -->
+              <span id="cpMetaCarePeriod" class="hidden">09.15~09.20 (일)</span>
+            </div>
+          </div>
+
+          <!-- Section: 간병 일자별 환자 상태 변화 (첨부 2번 이미지 꺾은선 차트) -->
+          <div class="mt-6 mb-6" id="cpChartSection">
+            <div class="flex items-center justify-between mb-1.5">
+              <h2 class="text-base font-black text-slate-900">간병 일자별 환자 상태 변화</h2>
+              <span class="text-xs text-slate-400 font-medium" id="cpChartDaysCount">상태 변화 추이 (1~5점)</span>
+            </div>
+            <div class="h-[2px] bg-[#10bdb2] w-full mb-3"></div>
+            <div class="bg-white border border-slate-200/80 rounded-2xl p-3 sm:p-4 shadow-2xs">
+              <div class="relative w-full h-[230px]">
+                <canvas id="cpStatusChart"></canvas>
+              </div>
             </div>
           </div>
 
