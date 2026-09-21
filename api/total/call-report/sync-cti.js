@@ -241,7 +241,7 @@ module.exports = async function handler(req, res) {
     const allMasterConsulted = allMasterLogs.filter(c => c.title || c.summary).length;
     const allMasterRate = allMasterConn > 0 ? Math.round((allMasterAns / allMasterConn) * 100) + '%' : '100%';
 
-    const isAllPeriod = isExplicitAll;
+    const isAllPeriod = true;
 
     const reportData = {
       reportInfo: {
@@ -258,25 +258,25 @@ module.exports = async function handler(req, res) {
         syncedAt: new Date().toISOString()
       },
       summaryStats: {
-        totalCalls: isAllPeriod ? allMasterTotal : totalCalls,
-        connectReqCalls: isAllPeriod ? allMasterConn : (ctiResult && ctiResult.ctiSummary ? ctiResult.ctiSummary.connectRequests : totalConnected),
-        answeredCalls: isAllPeriod ? allMasterAns : (ctiResult && ctiResult.ctiSummary ? ctiResult.ctiSummary.answeredCalls : totalConsulted),
-        answerRate: isAllPeriod ? allMasterRate : ((ctiResult && ctiResult.ctiSummary && ctiResult.ctiSummary.answerRate) || (totalCalls > 0 ? Math.round((totalConsulted / totalCalls) * 100) + '%' : '0%')),
+        totalCalls: allMasterTotal,
+        connectReqCalls: allMasterConn,
+        answeredCalls: allMasterAns,
+        answerRate: allMasterRate,
         abandonedCalls: ctiSummary.abandonedCalls || 0,
         unselectedType: ctiSummary.unselectedType || 0,
         btnExit: ctiSummary.btnExit || 0,
-        consultedCalls: isAllPeriod ? allMasterConsulted : (ctiResult && ctiResult.ctiSummary ? ctiResult.ctiSummary.answeredCalls : totalConsulted)
+        consultedCalls: allMasterConsulted
       },
       ctiSummary: {
         ...ctiSummary,
-        totalAll: isAllPeriod ? allMasterTotal : totalCalls,
-        totalInbound: isAllPeriod ? allMasterTotal : totalCalls,
-        connectRequests: isAllPeriod ? allMasterConn : (ctiResult && ctiResult.ctiSummary ? ctiResult.ctiSummary.connectRequests : totalConnected),
-        answeredCalls: isAllPeriod ? allMasterAns : (ctiResult && ctiResult.ctiSummary ? ctiResult.ctiSummary.answeredCalls : totalConsulted),
-        answerRate: isAllPeriod ? allMasterRate : ((ctiResult && ctiResult.ctiSummary && ctiResult.ctiSummary.answerRate) || (ctiSummary.answerRate || '0%'))
+        totalAll: allMasterTotal,
+        totalInbound: allMasterTotal,
+        connectRequests: allMasterConn,
+        answeredCalls: allMasterAns,
+        answerRate: allMasterRate
       },
       dailyTrends,
-      callLogs: isAllPeriod ? allMasterLogs : ctiResult.logs
+      callLogs: allMasterLogs
     };
 
     // 로컬 파일시스템에 저장 가능한 환경이면 call_report_all.json 완본 최신화
@@ -362,7 +362,7 @@ module.exports = async function handler(req, res) {
             startDate,
             endDate
           },
-          callLogs: filteredLogs.length > 0 ? filteredLogs : (isExplicitAll ? allLogs : allLogs.slice(0, 50))
+          callLogs: allLogs.length > 0 ? allLogs : filteredLogs
         }
       });
     }

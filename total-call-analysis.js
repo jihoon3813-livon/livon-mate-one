@@ -115,11 +115,11 @@ function setTotalSyncProgress(step, percent, title, message, completed = false, 
     lucide.createIcons();
   }
 
-  // 모달이 화면을 영구 차단하지 않도록 안전 자동 종료 (완료 시 500ms, 미완료 시 최대 2.5초)
+  // 모달이 화면을 영구 차단하지 않도록 안전 자동 종료 (완료 시 100ms 즉시 닫힘, 진행 중일 시 30초 대기)
   if (gSyncModalSafetyTimer) clearTimeout(gSyncModalSafetyTimer);
   gSyncModalSafetyTimer = setTimeout(() => {
     closeTotalSyncProgressModal();
-  }, completed ? 500 : 2500);
+  }, completed ? 100 : 30000);
 }
 
 function closeTotalSyncProgressModal() {
@@ -1001,9 +1001,10 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       isTotalSyncing = true;
       let progressTimer = null;
 
+      let step2Timer = null;
       if (!isBackground) {
         setTotalSyncProgress(1, 35, 'CTI 서버 연결 중', 'CTI 게이트웨이 접속 및 최신 인바운드 콜 요청...');
-        setTimeout(() => {
+        step2Timer = setTimeout(() => {
           if (isTotalSyncing && !isBackground) {
             setTotalSyncProgress(2, 75, '최신 콜로그 및 STT 수신 중', '당일 최신 인바운드 콜 녹취 및 STT 전문 데이터를 파싱하고 있습니다...');
           }
@@ -1026,6 +1027,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         const sRes = await fetch(sUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
         if (progressTimer) clearInterval(progressTimer);
+        if (step2Timer) clearTimeout(step2Timer);
 
         const cType = sRes.headers.get('content-type') || '';
         if (cType.includes('json') || sRes.ok) {
@@ -1040,6 +1042,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       } catch (e) {
         clearTimeout(timeoutId);
         if (progressTimer) clearInterval(progressTimer);
+        if (step2Timer) clearTimeout(step2Timer);
       }
 
       // API 실패/타임아웃 시 즉각 로컬 최신 정적 데이터 로드 (초고속 즉시 반영)
@@ -1074,8 +1077,12 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
       }
 
-      // 최신 동기화 콜이 맨 위에 즉시 보이도록 1페이지로 리셋
+      // 최신 동기화 콜이 맨 위에 즉시 보이도록 1페이지로 리셋 및 오늘 날짜 필터 보정
       gTotalListPage = 1;
+      const nowKst = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      if (gTotalFilter.endDate && gTotalFilter.endDate < nowKst) {
+        gTotalFilter.endDate = nowKst;
+      }
 
       const count = (gTotalCallData && gTotalCallData.summaryStats && gTotalCallData.summaryStats.totalCalls)
         ? gTotalCallData.summaryStats.totalCalls
@@ -1084,27 +1091,29 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       const prevCount = window._lastTotalCallCount || 0;
       window._lastTotalCallCount = count;
 
+      // [핵심 1] CTI 데이터 수신 즉시 0ms 동기식 화면 렌더링을 먼저 수행하여 리스트 즉시 최신화!
+      renderTotalCallAnalysisTab();
+
       if (!isBackground) {
+        // [핵심 2] 100% 완료 상태 표시 후 80ms 만에 모달을 즉시 자동 닫아 딜레이 완전 제거
         if (isFallbackData) {
-          setTotalSyncProgress(4, 100, '동기화 완료 (캐시 유지)', `CTI 응답 지연으로 최근 보존된 ${count}건의 상담 데이터를 유지합니다.`, true, count);
+          setTotalSyncProgress(4, 100, '동기화 완료 (캐시 유지)', `CTI 응답 지연으로 최근 보존된 ${count}건의 상담 데이터를 즉시 표시합니다.`, true, count);
         } else {
           setTotalSyncProgress(4, 100, '실시간 동기화 완료!', `총 ${count}건의 CTI 전수 상담 데이터가 즉시 반영되었습니다.`, true, count);
         }
         setTimeout(() => {
           closeTotalSyncProgressModal();
-          renderTotalCallAnalysisTab();
-        }, 300);
+        }, 80);
 
         if (typeof showToast === 'function') {
           if (isFallbackData) {
-            showToast(`CTI 게이트웨이 응답 지연으로 최근 데이터(${count}건)를 유지합니다. 잠시 후 다시 시도해주세요.`, 'warning');
+            showToast(`CTI 게이트웨이 응답 지연으로 최근 데이터(${count}건)를 유지합니다.`, 'warning');
           } else {
-            showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 즉시 반영되었습니다.`, 'success');
+            showToast(`✅ 전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 즉시 반영되었습니다.`, 'success');
           }
         }
       } else {
         closeTotalSyncProgressModal();
-        renderTotalCallAnalysisTab();
         if (prevCount > 0 && count > prevCount) {
           const diff = count - prevCount;
           if (typeof showToast === 'function') {
