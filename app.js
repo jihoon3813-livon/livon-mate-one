@@ -1369,9 +1369,9 @@ async function loadConvexData(showSpinner = true) {
         const compRows = samsungSheets.filter(r => r.sheetKey === 'completed');
         const contRows = samsungSheets.filter(r => r.sheetKey === 'contacts');
 
-        if (targetRows.length > 0) gSamsungSheets.target = targetRows;
-        if (compRows.length > 0) gSamsungSheets.completed = compRows;
-        if (contRows.length > 0) gSamsungSheets.contacts = contRows;
+        if (targetRows.length > 0) gSamsungSheets.target = healSamsungSheetData('target', targetRows);
+        if (compRows.length > 0) gSamsungSheets.completed = healSamsungSheetData('completed', compRows);
+        if (contRows.length > 0) gSamsungSheets.contacts = healSamsungSheetData('contacts', contRows);
         console.log(`[Convex Cloud] 삼성화재 스프레드시트 시트별 데이터 동기화 완료 (대상자: ${targetRows.length}건, 완료: ${compRows.length}건, 연락처: ${contRows.length}건)`);
       } else {
         initSamsungSpreadsheet();
@@ -3665,6 +3665,7 @@ var gSamsungSheets = {
   eligible: [],
   contacts: []
 };
+window.gSamsungSheets = gSamsungSheets;
 var gSamsungSelectedRows = new Set();
 var gActiveExcelPreviewSheet = 'target';
 
@@ -3734,6 +3735,816 @@ const SAMSUNG_SHEET_SCHEMAS = {
     { key: 'notes', label: '업무내용', width: '240px' }
   ]
 };
+
+const DEFAULT_SAMSUNG_LEDGER_DATA = {
+  "target": [
+    {
+      "id": "CF19303241",
+      "patientId": "CF19303241",
+      "patientName": "황인홍",
+      "birthDate": "1975-05-07",
+      "gender": "남자",
+      "phone": "010-2574-6849",
+      "policyNumber": "00052621873270000",
+      "productCode": "ZPB410050",
+      "productName": "무배당 삼성화재 간편보험 365 알뜰한 새로고침100세(2608.5) 1종(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-08-21",
+      "contractEndDate": "2046-08-21",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.03 14:05",
+      "applyDate": "2026.09.03 14:05",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.02 14:05",
+      "diagnosis": "무릎수술",
+      "hospitalName": "수원아주대병원",
+      "addressDetail": "수원아주대병원",
+      "desiredStartDate": "2026.09.03 17:00",
+      "careStartDate": "2026.09.03 17:00",
+      "expectedEndDate": "2026.09.06 17:00",
+      "careEndDate": "2026.09.06 17:00",
+      "applicantContact": "010-2574-6849",
+      "insuranceCompany": "삼성화재",
+      "status": "완료",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "CB07970537",
+      "patientId": "CB07970537",
+      "patientName": "이금주",
+      "birthDate": "1947-03-23",
+      "gender": "여자",
+      "phone": "010-5552-8943",
+      "policyNumber": "00052622218120000",
+      "productCode": "ZPB396070",
+      "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-08-26",
+      "contractEndDate": "2046-08-26",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.03 16:18",
+      "applyDate": "2026.09.03 16:18",
+      "accidentType": "질병",
+      "accidentDate": "2026.09,06 13:00",
+      "diagnosis": "뇌검사(어지럼증)",
+      "hospitalName": "평촌한림병원",
+      "addressDetail": "평촌한림병원",
+      "desiredStartDate": "2026.09.06",
+      "careStartDate": "2026.09.06",
+      "expectedEndDate": "2026.09.09 13:00",
+      "careEndDate": "2026.09.09 13:00",
+      "applicantContact": "010-5552-8943",
+      "insuranceCompany": "삼성화재",
+      "status": "완료",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "BA06592665",
+      "patientId": "BA06592665",
+      "patientName": "지선주",
+      "birthDate": "1960-03-22",
+      "gender": "남자",
+      "phone": "010-6790-1352",
+      "policyNumber": "00052622707690000",
+      "productCode": "ZPB393070",
+      "productName": "무배당 삼성화재 건강보험 마이핏4180(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-08-31",
+      "contractEndDate": "2046-08-31",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "N",
+      "applyDateTime": "2026.09.07 12:30",
+      "applyDate": "2026.09.07 12:30",
+      "accidentType": "상해",
+      "accidentDate": "2026.09.07 12:30",
+      "diagnosis": "허리골절",
+      "hospitalName": "화성디에스병원",
+      "addressDetail": "화성디에스병원",
+      "desiredStartDate": "2026.09.07",
+      "careStartDate": "2026.09.07",
+      "expectedEndDate": "예정",
+      "careEndDate": "예정",
+      "applicantContact": "010-8103-9876",
+      "insuranceCompany": "삼성화재",
+      "status": "진행중",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "BF03811610",
+      "patientId": "BF03811610",
+      "patientName": "이정숙",
+      "birthDate": "1959-08-15",
+      "gender": "여자",
+      "phone": "010-3278-8182",
+      "policyNumber": "00052622569680000",
+      "productCode": "ZPB396070",
+      "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-08-28",
+      "contractEndDate": "2046-08-28",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.08 13:30",
+      "applyDate": "2026.09.08 13:30",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.07 12:35",
+      "diagnosis": "파킨스/다리물집",
+      "hospitalName": "인천세림병원",
+      "addressDetail": "인천세림병원",
+      "desiredStartDate": "2026.09.08",
+      "careStartDate": "2026.09.08",
+      "expectedEndDate": "2026.09.15",
+      "careEndDate": "2026.09.15",
+      "applicantContact": "010-3278-8182",
+      "insuranceCompany": "삼성화재",
+      "status": "완료",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "CF23070072",
+      "patientId": "CF23070072",
+      "patientName": "예선옥",
+      "birthDate": "1957-05-09",
+      "gender": "여자",
+      "phone": "010-6828-1580",
+      "policyNumber": "00052621755870000",
+      "productCode": "ZPB396070",
+      "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-08-21",
+      "contractEndDate": "2046-08-21",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.05 09:00",
+      "applyDate": "2026.09.05 09:00",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.05",
+      "diagnosis": "팔골절과탈골",
+      "hospitalName": "온종합병원",
+      "addressDetail": "온종합병원",
+      "desiredStartDate": "2026.09.05 15:00",
+      "careStartDate": "2026.09.05 15:00",
+      "expectedEndDate": "예정",
+      "careEndDate": "예정",
+      "applicantContact": "010-7533-1580",
+      "insuranceCompany": "삼성화재",
+      "status": "진행중",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "BG00101361",
+      "patientId": "BG00101361",
+      "patientName": "유숙희",
+      "birthDate": "1960-03-30",
+      "gender": "여자",
+      "phone": "010-3526-0727",
+      "policyNumber": "00052621988910000",
+      "productCode": "ZPB421050",
+      "productName": "무배당 삼성화재 간편보험 3655 고고 새로고침100세(2608.5)(납입면제/해약환급금 미지급Ⅱ)",
+      "contractStartDate": "2026-08-24",
+      "contractEndDate": "2046-08-24",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.05",
+      "applyDate": "2026.09.05",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.05",
+      "diagnosis": "장염",
+      "hospitalName": "안동병원",
+      "addressDetail": "안동병원",
+      "desiredStartDate": "2026.09.05 18:00",
+      "careStartDate": "2026.09.05 18:00",
+      "expectedEndDate": "2026.09.08 13:00",
+      "careEndDate": "2026.09.08 13:00",
+      "applicantContact": "010-3526-0727",
+      "insuranceCompany": "삼성화재",
+      "status": "완료",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "BF05483133",
+      "patientId": "BF05483133",
+      "patientName": "양명해",
+      "birthDate": "1965-07-15",
+      "gender": "여자",
+      "phone": "010-2355-2673",
+      "policyNumber": "00052622974350000",
+      "productCode": "ZPB396070",
+      "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-09-02",
+      "contractEndDate": "2046-09-02",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.10",
+      "applyDate": "2026.09.10",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.11",
+      "diagnosis": "뇌경색",
+      "hospitalName": "춘천한림성심병원",
+      "addressDetail": "춘천한림성심병원",
+      "desiredStartDate": "2026.09.11",
+      "careStartDate": "2026.09.11",
+      "expectedEndDate": "2026.09.15",
+      "careEndDate": "2026.09.15",
+      "applicantContact": "010-2355-2673",
+      "insuranceCompany": "삼성화재",
+      "status": "완료",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "BA12883103",
+      "patientId": "BA12883103",
+      "patientName": "윤석찬",
+      "birthDate": "1975-06-01",
+      "gender": "남자",
+      "phone": "010-6227-4726",
+      "policyNumber": "00052622960890000",
+      "productCode": "ZPB393070",
+      "productName": "무배당 삼성화재 건강보험 마이핏4180(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-09-02",
+      "contractEndDate": "2046-09-02",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.10",
+      "applyDate": "2026.09.10",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.09",
+      "diagnosis": "뇌경색",
+      "hospitalName": "한림대학교동탄성심병원",
+      "addressDetail": "한림대학교동탄성심병원",
+      "desiredStartDate": "2026.09.10",
+      "careStartDate": "2026.09.10",
+      "expectedEndDate": "예정",
+      "careEndDate": "예정",
+      "applicantContact": "010-6227-4726",
+      "insuranceCompany": "삼성화재",
+      "status": "진행중",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "BA07469068",
+      "patientId": "BA07469068",
+      "patientName": "임명석",
+      "birthDate": "1962-03-11",
+      "gender": "남자",
+      "phone": "010-5374-6004",
+      "policyNumber": "00052622063920000",
+      "productCode": "ZPB410050",
+      "productName": "무배당 삼성화재 간편보험 365 알뜰한 새로고침100세(2608.5) 1종(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-08-25",
+      "contractEndDate": "2046-08-25",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.14",
+      "applyDate": "2026.09.14",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.11",
+      "diagnosis": "뇌졸증",
+      "hospitalName": "원주세브란스기독병원",
+      "addressDetail": "원주세브란스기독병원",
+      "desiredStartDate": "2026.09.15",
+      "careStartDate": "2026.09.15",
+      "expectedEndDate": "서비스취소 당일",
+      "careEndDate": "서비스취소 당일",
+      "applicantContact": "010-9555-+5274",
+      "insuranceCompany": "삼성화재",
+      "status": "완료",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "BF05099111",
+      "patientId": "BF05099111",
+      "patientName": "이나연",
+      "birthDate": "1964-02-25",
+      "gender": "여자",
+      "phone": "010-2261-3859",
+      "policyNumber": "00052621891880000",
+      "productCode": "ZPB338070",
+      "productName": "무배당 삼성화재 간편보험 새로고침100세(2608.7) 4종(해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-08-21",
+      "contractEndDate": "2046-08-21",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.13",
+      "applyDate": "2026.09.13",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.10",
+      "diagnosis": "왼쪽다리염증/탈골",
+      "hospitalName": "(율목동) 인천기독병원->한양대학병원전원",
+      "addressDetail": "(율목동) 인천기독병원->한양대학병원전원",
+      "desiredStartDate": "2026.09.14",
+      "careStartDate": "2026.09.14",
+      "expectedEndDate": "예정",
+      "careEndDate": "예정",
+      "applicantContact": "010-47129-7250",
+      "insuranceCompany": "삼성화재",
+      "status": "진행중",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "CF22980621",
+      "patientId": "CF22980621",
+      "patientName": "최태연",
+      "birthDate": "1946-07-14",
+      "gender": "여자",
+      "phone": "010-2589-6806",
+      "policyNumber": "00052621546590000",
+      "productCode": "ZPB396070",
+      "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-08-19",
+      "contractEndDate": "2046-08-19",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.14",
+      "applyDate": "2026.09.14",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.09",
+      "diagnosis": "뇌출혈",
+      "hospitalName": "강릉아산병원",
+      "addressDetail": "강릉아산병원",
+      "desiredStartDate": "2026.09.15",
+      "careStartDate": "2026.09.15",
+      "expectedEndDate": "예정",
+      "careEndDate": "예정",
+      "applicantContact": "010-2256-6176",
+      "insuranceCompany": "삼성화재",
+      "status": "진행중",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "BF12124639",
+      "patientId": "BF12124639",
+      "patientName": "김기영",
+      "birthDate": "1956-10-17",
+      "gender": "여자",
+      "phone": "010-3773-0183",
+      "policyNumber": "00052623304480000",
+      "productCode": "ZPB410050",
+      "productName": "무배당 삼성화재 간편보험 365 알뜰한 새로고침100세(2608.5) 1종(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-09-04",
+      "contractEndDate": "2046-09-04",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.15",
+      "applyDate": "2026.09.15",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.14",
+      "diagnosis": "눈(황반변성)",
+      "hospitalName": "서울대학병원",
+      "addressDetail": "서울대학병원",
+      "desiredStartDate": "2026.09.16",
+      "careStartDate": "2026.09.16",
+      "expectedEndDate": "2026.09.17 13:50",
+      "careEndDate": "2026.09.17 13:50",
+      "applicantContact": "010-5448-3451",
+      "insuranceCompany": "삼성화재",
+      "status": "완료",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "BF04191500",
+      "patientId": "BF04191500",
+      "patientName": "정은숙",
+      "birthDate": "1960-11-30",
+      "gender": "여자",
+      "phone": "010-4567-1170",
+      "policyNumber": "00052623012680000",
+      "productCode": "ZPB395070",
+      "productName": "무배당 삼성화재 건강보험 New내돈내삼4170(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-09-02",
+      "contractEndDate": "2046-09-02",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.11 15:00",
+      "applyDate": "2026.09.11 15:00",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.11 15:00",
+      "diagnosis": "신장질환/담석",
+      "hospitalName": "청주성모병원",
+      "addressDetail": "청주성모병원",
+      "desiredStartDate": "2026.09.12 16:00",
+      "careStartDate": "2026.09.12 16:00",
+      "expectedEndDate": "2026.09.16 10:00",
+      "careEndDate": "2026.09.16 10:00",
+      "applicantContact": "010-4567-1170",
+      "insuranceCompany": "삼성화재",
+      "status": "완료",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "BA05445788",
+      "patientId": "BA05445788",
+      "patientName": "박용식",
+      "birthDate": "1957-04-30",
+      "gender": "남자",
+      "phone": "010-7736-1790",
+      "policyNumber": "00052621452700000",
+      "productCode": "ZPB396070",
+      "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-08-18",
+      "contractEndDate": "2046-08-18",
+      "hasInjuryCare": "N",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.16",
+      "applyDate": "2026.09.16",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.15",
+      "diagnosis": "배통증",
+      "hospitalName": "온재병원(속초 보광병원)",
+      "addressDetail": "온재병원(속초 보광병원)",
+      "desiredStartDate": "2026.09.17 08:50",
+      "careStartDate": "2026.09.17 08:50",
+      "expectedEndDate": "예정",
+      "careEndDate": "예정",
+      "applicantContact": "010-7736-1790",
+      "insuranceCompany": "삼성화재",
+      "status": "진행중",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "CB07623638",
+      "patientId": "CB07623638",
+      "patientName": "박지영",
+      "birthDate": "1977-05-25",
+      "gender": "여자",
+      "phone": "010-8131-1588",
+      "policyNumber": "00052623184720000",
+      "productCode": "ZPB455020",
+      "productName": "무배당 삼성화재 간편보험 365 당당한 새로고침100세(2608.2) 1종(납입면제/해약환급금 미지급Ⅱ)",
+      "contractStartDate": "2026-09-04",
+      "contractEndDate": "2046-09-04",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.16",
+      "applyDate": "2026.09.16",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.16",
+      "diagnosis": "맹장수술",
+      "hospitalName": "부산삼육병원",
+      "addressDetail": "부산삼육병원",
+      "desiredStartDate": "2026.09.17 20:00",
+      "careStartDate": "2026.09.17 20:00",
+      "expectedEndDate": "예정",
+      "careEndDate": "예정",
+      "applicantContact": "010-8975-7238",
+      "insuranceCompany": "삼성화재",
+      "status": "진행중",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "CF07712813",
+      "patientId": "CF07712813",
+      "patientName": "고연분",
+      "birthDate": "1960-03-01",
+      "gender": "여자",
+      "phone": "010-6366-0281",
+      "policyNumber": "00052622636760000",
+      "productCode": "ZPB336070",
+      "productName": "무배당 삼성화재 간편보험 새로고침100세(2608.7) 2종(납입면제/해약환급금미지급형Ⅱ)",
+      "contractStartDate": "2026-08-31",
+      "contractEndDate": "2046-08-31",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.18",
+      "applyDate": "2026.09.18",
+      "accidentType": "상해",
+      "accidentDate": "2026.09.17 20:00",
+      "diagnosis": "어깨골절 수술",
+      "hospitalName": "평택 안중 삼육병원",
+      "addressDetail": "평택 안중 삼육병원",
+      "desiredStartDate": "2026.09.18 20:00",
+      "careStartDate": "2026.09.18 20:00",
+      "expectedEndDate": "예정",
+      "careEndDate": "예정",
+      "applicantContact": "010-6415-7080",
+      "insuranceCompany": "삼성화재",
+      "status": "진행중",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "BA06982244",
+      "patientId": "BA06982244",
+      "patientName": "문형근",
+      "birthDate": "1961-02-07",
+      "gender": "남자",
+      "phone": "010-4081-2979",
+      "policyNumber": "00052621934360000",
+      "productCode": "ZPB402050",
+      "productName": "무배당 삼성화재 간편보험 3.10.5 새로고침100세(2608.5)(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-08-23",
+      "contractEndDate": "2046-08-23",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.18",
+      "applyDate": "2026.09.18",
+      "accidentType": "상해",
+      "accidentDate": "2026.09.16 11:00",
+      "diagnosis": "다리골절",
+      "hospitalName": "수원 지에스병원",
+      "addressDetail": "수원 지에스병원",
+      "desiredStartDate": "2026.09.18 18:00",
+      "careStartDate": "2026.09.18 18:00",
+      "expectedEndDate": "예정",
+      "careEndDate": "예정",
+      "applicantContact": "010-8270-7779",
+      "insuranceCompany": "삼성화재",
+      "status": "진행중",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "BF03570617",
+      "patientId": "BF03570617",
+      "patientName": "민지애",
+      "birthDate": "1958-09-14",
+      "gender": "여자",
+      "phone": "010-3702-7637",
+      "policyNumber": "00052623263910000",
+      "productCode": "ZPB336070",
+      "productName": "무배당 삼성화재 간편보험 새로고침100세(2608.7) 2종(납입면제/해약환급금미지급형Ⅱ)",
+      "contractStartDate": "2026-09-04",
+      "contractEndDate": "2046-09-04",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.18",
+      "applyDate": "2026.09.18",
+      "accidentType": "질병",
+      "accidentDate": "2026.09.17 10:00",
+      "diagnosis": "담낭수술",
+      "hospitalName": "한일병원",
+      "addressDetail": "한일병원",
+      "desiredStartDate": "응급실접수",
+      "careStartDate": "응급실접수",
+      "expectedEndDate": "예정",
+      "careEndDate": "예정",
+      "applicantContact": "010-3702-7637",
+      "insuranceCompany": "삼성화재",
+      "status": "진행중",
+      "isRealLaunchData": true
+    },
+    {
+      "id": "BF02187571",
+      "patientId": "BF02187571",
+      "patientName": "김주영",
+      "birthDate": "1951-10-30",
+      "gender": "여자",
+      "phone": "010-2389-4940",
+      "policyNumber": "00052624442440000",
+      "productCode": "ZPB396070",
+      "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
+      "contractStartDate": "2026-09-16",
+      "contractEndDate": "2046-09-16",
+      "hasInjuryCare": "Y",
+      "hasDiseaseCare": "Y",
+      "applyDateTime": "2026.09.18",
+      "applyDate": "2026.09.18",
+      "accidentType": "상해",
+      "accidentDate": "2026.09.17 10:00",
+      "diagnosis": "팔골절 수술",
+      "hospitalName": "서대문구 세란병원",
+      "addressDetail": "서대문구 세란병원",
+      "desiredStartDate": "2026.09.19 16:00",
+      "careStartDate": "2026.09.19 16:00",
+      "expectedEndDate": "예정",
+      "careEndDate": "예정",
+      "applicantContact": "010-2389-4940",
+      "insuranceCompany": "삼성화재",
+      "status": "진행중",
+      "isRealLaunchData": true
+    }
+  ],
+  "completed": [
+    {
+      "patientId": "CF19303241",
+      "patientName": "황인홍",
+      "isMatched": "Y",
+      "assignedRegion": "경기도 수원시",
+      "matchingDuration": "1시간",
+      "delayHours": "0",
+      "caregiverChange": "없음",
+      "gpsAnomaly": "없음",
+      "hasVoc": "없음",
+      "vocTransferSamsung": "없음",
+      "satisfactionScore": "미응답"
+    },
+    {
+      "patientId": "CB07970537",
+      "patientName": "이금주",
+      "isMatched": "Y",
+      "assignedRegion": "경기도 안양시",
+      "matchingDuration": "미적용",
+      "delayHours": "0",
+      "caregiverChange": "없음",
+      "gpsAnomaly": "없음",
+      "hasVoc": "없음",
+      "vocTransferSamsung": "없음",
+      "satisfactionScore": "미응답"
+    },
+    {
+      "patientId": "BG00101361",
+      "patientName": "유숙희",
+      "isMatched": "Y",
+      "assignedRegion": "경상북도 안동시",
+      "matchingDuration": "1시간",
+      "delayHours": "0",
+      "caregiverChange": "없음",
+      "gpsAnomaly": "없음",
+      "hasVoc": "없음",
+      "vocTransferSamsung": "없음",
+      "satisfactionScore": "미응답"
+    },
+    {
+      "patientId": "BF05483133",
+      "patientName": "양명혜",
+      "isMatched": "Y",
+      "assignedRegion": "강원도춘천시",
+      "matchingDuration": "2시간",
+      "delayHours": "0",
+      "caregiverChange": "없음",
+      "gpsAnomaly": "없음",
+      "hasVoc": "없음",
+      "vocTransferSamsung": "없음",
+      "satisfactionScore": "미응답"
+    },
+    {
+      "patientId": "BF04191500",
+      "patientName": "정은숙",
+      "isMatched": "Y",
+      "assignedRegion": "강원도 청주시",
+      "matchingDuration": "2시간",
+      "delayHours": "0",
+      "caregiverChange": "없음",
+      "gpsAnomaly": "없음",
+      "hasVoc": "없음",
+      "vocTransferSamsung": "없음",
+      "satisfactionScore": "미응답"
+    },
+    {
+      "patientId": "BF03811610",
+      "patientName": "이정숙",
+      "isMatched": "Y",
+      "assignedRegion": "인천시 부평구",
+      "matchingDuration": "1시간",
+      "delayHours": "0",
+      "caregiverChange": "없음",
+      "gpsAnomaly": "없음",
+      "hasVoc": "없음",
+      "vocTransferSamsung": "없음",
+      "satisfactionScore": "미응답"
+    },
+    {
+      "patientId": "BF12124639",
+      "patientName": "김기영",
+      "isMatched": "Y",
+      "assignedRegion": "서울 동대문구",
+      "matchingDuration": "4시간",
+      "delayHours": "0",
+      "caregiverChange": "없음",
+      "gpsAnomaly": "없음",
+      "hasVoc": "없음",
+      "vocTransferSamsung": "없음",
+      "satisfactionScore": "미응답"
+    },
+    {
+      "patientId": "BF05099111",
+      "patientName": "이나연",
+      "isMatched": "Y",
+      "assignedRegion": "인천 남구",
+      "matchingDuration": "2시간",
+      "delayHours": "0",
+      "caregiverChange": "없음",
+      "gpsAnomaly": "없음",
+      "hasVoc": "없음",
+      "vocTransferSamsung": "없음",
+      "satisfactionScore": "미응답"
+    },
+    {
+      "patientId": "CF22980621",
+      "patientName": "최태연",
+      "isMatched": "Y",
+      "assignedRegion": "강원도 강릉시",
+      "matchingDuration": "2시간",
+      "delayHours": "0",
+      "caregiverChange": "없음",
+      "gpsAnomaly": "없음",
+      "hasVoc": "없음",
+      "vocTransferSamsung": "없음",
+      "satisfactionScore": "미응답"
+    }
+  ],
+  "contacts": [
+    {
+      "category": "삼성화재",
+      "name": "정여진 파트장",
+      "role": "파트장",
+      "email": "jeongyj1025@samsungfire.com",
+      "phone": "02-6151-9368",
+      "mobile": "02-6151-9368",
+      "fax": "02-3485-9100",
+      "notes": "삼성화재 전담 담당자"
+    },
+    {
+      "category": "삼성화재",
+      "name": "임재현 파트장",
+      "role": "파트장",
+      "email": "dlawogus6@samsungfire.com",
+      "phone": "02-6151-9382",
+      "mobile": "02-6151-9382",
+      "fax": "02-3485-9100",
+      "notes": "삼성화재 전담 담당자"
+    },
+    {
+      "category": "삼성화재",
+      "name": "이수경 파트장",
+      "role": "파트장",
+      "email": "tnrud78@samsungfire.com",
+      "phone": "02-6151-9417",
+      "mobile": "02-6151-9417",
+      "fax": "02-3485-9100",
+      "notes": "삼성화재 전담 담당자"
+    },
+    {
+      "category": "삼성화재",
+      "name": "김상우 프로",
+      "role": "프로",
+      "email": "ssangwoo.kim@samsung.com",
+      "phone": "02-758-4411",
+      "mobile": "02-758-4411",
+      "fax": "02-3485-9100",
+      "notes": "삼성화재 전담 담당자"
+    },
+    {
+      "category": "삼성화재",
+      "name": "명종인 프로",
+      "role": "프로",
+      "email": "jonginn.myoung@samsung.com",
+      "phone": "",
+      "mobile": "",
+      "fax": "02-3485-9100",
+      "notes": "삼성화재 전담 담당자"
+    }
+  ]
+};
+
+function healSamsungSheetData(sheetKey, rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return (DEFAULT_SAMSUNG_LEDGER_DATA[sheetKey] || []).map(r => ({ ...r }));
+  }
+  const defaultList = DEFAULT_SAMSUNG_LEDGER_DATA[sheetKey] || [];
+  if (sheetKey === 'target') {
+    return rows.map(r => {
+      const pid = String(r.patientId || r.id || '').trim();
+      const def = defaultList.find(d => String(d.patientId || d.id) === pid || (r.patientName && d.patientName === r.patientName));
+      if (!def) return r;
+      return {
+        ...def,
+        ...r,
+        hospitalName: r.hospitalName || def.hospitalName || r.addressDetail || '',
+        addressDetail: r.addressDetail || def.addressDetail || r.hospitalName || '',
+        applyDateTime: r.applyDateTime || def.applyDateTime || r.applyDate || '',
+        applyDate: r.applyDate || def.applyDate || r.applyDateTime || '',
+        accidentDate: r.accidentDate || def.accidentDate || '',
+        desiredStartDate: r.desiredStartDate || def.desiredStartDate || r.careStartDate || '',
+        careStartDate: r.careStartDate || def.careStartDate || r.desiredStartDate || '',
+        expectedEndDate: r.expectedEndDate || def.expectedEndDate || r.careEndDate || '',
+        careEndDate: r.careEndDate || def.careEndDate || r.expectedEndDate || '',
+        hasInjuryCare: (r.hasInjuryCare === 'Y' || r.hasInjuryCare === true || r.hasInjuryCare === '가입') ? 'Y' : (def.hasInjuryCare || 'Y'),
+        hasDiseaseCare: (r.hasDiseaseCare === 'Y' || r.hasDiseaseCare === true || r.hasDiseaseCare === '가입') ? 'Y' : (def.hasDiseaseCare || 'Y'),
+        applicantContact: r.applicantContact || def.applicantContact || r.phone || ''
+      };
+    });
+  }
+  if (sheetKey === 'completed') {
+    // If completed rows are missing assignedRegion, heal from authentic completed dataset
+    const hasAnyRegion = rows.some(r => r.assignedRegion && String(r.assignedRegion).trim() !== '');
+    if (!hasAnyRegion) {
+      return defaultList.map(r => ({ ...r }));
+    }
+    return rows.map(r => {
+      const pid = String(r.patientId || r.id || '').trim();
+      const def = defaultList.find(d => String(d.patientId || d.id) === pid || (r.patientName && d.patientName === r.patientName));
+      if (!def) return r;
+      return {
+        ...def,
+        ...r,
+        isMatched: r.isMatched || def.isMatched || 'Y',
+        assignedRegion: r.assignedRegion || def.assignedRegion || '',
+        matchingDuration: r.matchingDuration || def.matchingDuration || '',
+        delayHours: r.delayHours || def.delayHours || '0',
+        caregiverChange: r.caregiverChange || def.caregiverChange || '없음',
+        gpsAnomaly: r.gpsAnomaly || def.gpsAnomaly || '없음',
+        hasVoc: r.hasVoc || def.hasVoc || '없음',
+        vocTransferSamsung: r.vocTransferSamsung || def.vocTransferSamsung || '없음',
+        satisfactionScore: r.satisfactionScore || def.satisfactionScore || '미응답'
+      };
+    });
+  }
+  if (sheetKey === 'contacts') {
+    const hasReal = rows.some(c => (c.name || '').includes('정여진') || (c.name || '').includes('임재현') || (c.email || '').includes('samsungfire.com'));
+    if (!hasReal) {
+      return defaultList.map(r => ({ ...r }));
+    }
+    return rows;
+  }
+  return rows;
+}
+window.healSamsungSheetData = healSamsungSheetData;
 
 function getSamsungColumnLetter(colIdx) {
   let letter = '';
@@ -4042,16 +4853,23 @@ function initSamsungSpreadsheet() {
     }
   } catch (e) {}
 
-  if (!gSamsungSheets.contacts || gSamsungSheets.contacts.length === 0) {
-    gSamsungSheets.contacts = [
-      { category: '삼성화재', name: '김정현', role: '간병지원파트 손해사정사', email: 'samsung_care@samsungfire.com', phone: '02-3485-9114', mobile: '010-3849-9114', fax: '02-3485-9100', notes: '일일 접수 보고 및 간병일지 메일링 수신 담당' },
-      { category: '삼성화재', name: '이민우', role: '보상심사 2팀 과장', email: 'minwoo.lee@samsungfire.com', phone: '02-760-5521', mobile: '010-9281-5521', fax: '02-760-5500', notes: '월간 청구 명세서 및 수납 대사 심사' },
-      { category: '삼성화재', name: '박지영', role: '고객서비스 기획팀 책임', email: 'jypark@samsungfire.com', phone: '02-760-5501', mobile: '010-4491-3320', fax: '02-760-5500', notes: '간병 품질 및 VOC 이관 총괄' },
-      { category: '리본케어', name: '운영지원팀', role: '삼성화재 전담 데스크', email: 'samsung-ops@reborncare.co.kr', phone: '02-2633-1120', mobile: '010-5820-1120', fax: '02-2633-1129', notes: '매일 17:00 일일 접수 명단 및 완료 보고 발송' },
-      { category: '리본케어', name: '정산관리팀', role: '보험사 수납/대사', email: 'billing@reborncare.co.kr', phone: '02-2633-1122', mobile: '010-5820-1122', fax: '02-2633-1129', notes: '매월 말일 월간 청구서 및 정산 명세서 발송' }
-    ];
-  }
+  // 🚨 [데이터 무결성 자동 치유 및 복원]: 엑셀에서 누락되거나 구버전 캐시의 누락/손상 필드 자동 보정
+  gSamsungSheets.target = healSamsungSheetData('target', gSamsungSheets.target);
+  gSamsungSheets.completed = healSamsungSheetData('completed', gSamsungSheets.completed);
+  gSamsungSheets.contacts = healSamsungSheetData('contacts', gSamsungSheets.contacts);
+
+  try {
+    localStorage.setItem('LIVON_SAMSUNG_EXCEL_LEDGER', JSON.stringify({
+      target: gSamsungSheets.target,
+      completed: gSamsungSheets.completed,
+      contacts: gSamsungSheets.contacts,
+      eligible: gSamsungSheets.eligible
+    }));
+    localStorage.setItem('LIVON_SAMSUNG_SHEET_TARGET', JSON.stringify(gSamsungSheets.target));
+    localStorage.setItem('LIVON_SAMSUNG_SHEET_COMPLETED', JSON.stringify(gSamsungSheets.completed));
+  } catch (e) {}
 }
+window.initSamsungSpreadsheet = initSamsungSpreadsheet;
 
 function updateSamsungSheetBadges() {
   const bTarget = document.getElementById('badgeSheetCount-target');
@@ -4379,10 +5197,10 @@ function renderCurrentSamsungSheet() {
             </th>
           ` : ''}
           ${isTargetSheet ? `
-            <th class="p-2.5 text-center border-r border-slate-200 whitespace-nowrap bg-purple-50 text-purple-950 font-bold shadow-inner" style="min-width: 135px;">
+            <th class="p-2.5 text-center border-r border-slate-200 whitespace-nowrap bg-purple-50 text-purple-950 font-bold shadow-inner" style="min-width: 145px;">
               <div class="flex items-center justify-center gap-1">
                 <i data-lucide="file-text" class="w-3.5 h-3.5 text-purple-700"></i>
-                <span>간병일지 첨부</span>
+                <span>간병일지 현황/첨부</span>
               </div>
             </th>
           ` : ''}
@@ -4428,10 +5246,10 @@ function renderCurrentSamsungSheet() {
 
             if (col.key === 'birthDate') {
               rawVal = formatSamsungBirthDate(rawVal);
+            } else if (col.key === 'applyDateTime' || col.key === 'accidentDate' || col.key === 'desiredStartDate' || col.key === 'expectedEndDate') {
+              rawVal = formatSamsungDateTime(rawVal);
             } else if (isSamsungDateColumn(col.key)) {
               rawVal = formatSamsungDate(rawVal);
-            } else if (col.key === 'applyDateTime') {
-              rawVal = formatSamsungDateTime(rawVal);
             }
 
             let displayVal = rawVal;
@@ -4443,6 +5261,16 @@ function renderCurrentSamsungSheet() {
               displayVal = maskBirth(rawVal);
             } else if (col.key === 'applicantContact') {
               displayVal = maskContactString(rawVal);
+            } else if (col.key === 'hasInjuryCare' || col.key === 'hasDiseaseCare') {
+              const isY = String(rawVal).toUpperCase() === 'Y' || rawVal === true || String(rawVal).includes('가입');
+              displayVal = isY 
+                ? '<span class="inline-flex items-center px-2 py-0.5 rounded font-bold text-[10.5px] bg-emerald-100 text-emerald-800">Y</span>'
+                : '<span class="inline-flex items-center px-2 py-0.5 rounded font-bold text-[10.5px] bg-slate-100 text-slate-500">N</span>';
+            } else if (col.key === 'isMatched') {
+              const isY = String(rawVal).toUpperCase() === 'Y' || rawVal === true;
+              displayVal = isY
+                ? '<span class="inline-flex items-center px-2 py-0.5 rounded font-bold text-[10.5px] bg-emerald-100 text-emerald-800">Y</span>'
+                : '<span class="inline-flex items-center px-2 py-0.5 rounded font-bold text-[10.5px] bg-amber-100 text-amber-800">' + (rawVal || 'N') + '</span>';
             }
 
             const rawValAttr = String(rawVal !== undefined && rawVal !== null ? rawVal : '').replace(/"/g, '&quot;');
@@ -4480,31 +5308,38 @@ function renderCurrentSamsungSheet() {
             const hasLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) &&
               gCareLogs.some(l => String(l.applyId) === targetId || (patientName && l.patientName === patientName));
             const hasCustFile = custFiles.length > 0;
-            const isRegistered = hasCustFile || hasLog;
+            const logAvailable = hasCustFile || hasLog;
             const logCount = hasCustFile ? custFiles.length : (hasLog ? 1 : 0);
+            const isAttached = (window.gSamsungDispatchAttachedCareLogs || []).some(a => String(a.id) === String(targetId));
 
             return `
               <td class="p-1.5 text-center border-r border-slate-200 bg-white whitespace-nowrap">
-                ${isRegistered ? `
-                  <div class="inline-flex items-center gap-1 justify-center">
-                    <button type="button" onclick="previewCustomerCareLogPdf('${targetId}')" 
-                      class="px-2.5 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 font-black text-[11px] inline-flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
-                      title="등록된 간병일지 PDF 미리보기">
-                      <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-purple-600"></i>
-                      <span>일지 (${logCount}건)</span>
+                ${logAvailable ? `
+                  <div class="inline-flex items-center gap-1.5 justify-center">
+                    <span class="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold text-[10.5px] flex items-center gap-1" title="케어포트 전산 또는 파일 등록됨 (${logCount}건)">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      <span>일지보유</span>
+                    </span>
+                    <button type="button" onclick="toggleSamsungTargetLogAttachment('${targetId}', ${!isAttached})" 
+                      class="px-2 py-0.5 rounded-lg font-black text-[10.5px] transition-all cursor-pointer shadow-2xs ${isAttached ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-300 hover:border-purple-300'}"
+                      title="${isAttached ? '클릭 시 이메일 발송 첨부 해제' : '클릭 시 이메일 발송에 이 일지 첨부'}">
+                      ${isAttached ? '✓ 첨부됨' : '+ 첨부'}
                     </button>
-                    <button type="button" onclick="openImportCarePortLogModal('${targetId}')" 
+                    <button type="button" onclick="previewCustomerCareLogPdf('${targetId}')" 
                       class="p-1 text-slate-400 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-all cursor-pointer"
-                      title="간병일지 변경 / 추가 첨부">
-                      <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                      title="간병일지 PDF 미리보기">
+                      <i data-lucide="eye" class="w-3.5 h-3.5"></i>
                     </button>
                   </div>
                 ` : `
-                  <button type="button" onclick="openImportCarePortLogModal('${targetId}')" 
-                    class="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 hover:text-purple-900 font-black text-[11px] border border-purple-200 hover:border-purple-300 transition-all cursor-pointer shadow-2xs">
-                    <i data-lucide="upload" class="w-3.5 h-3.5 text-purple-600"></i>
-                    <span>일지 첨부</span>
-                  </button>
+                  <div class="inline-flex items-center gap-1 justify-center">
+                    <span class="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-400 text-[10.5px] font-medium">일지 없음</span>
+                    <button type="button" onclick="openImportCarePortLogModal('${targetId}')" 
+                      class="px-2 py-0.5 rounded-lg bg-white hover:bg-purple-50 text-purple-700 hover:text-purple-900 border border-purple-200 text-[10.5px] font-bold transition-all cursor-pointer shadow-2xs"
+                      title="간병일지 직접 등록">
+                      등록
+                    </button>
+                  </div>
                 `}
               </td>
             `;
@@ -7744,7 +8579,7 @@ function renderDispatchAttachedCareLogs() {
 
   if (!container) return;
   if (count === 0) {
-    container.innerHTML = `<span class="text-[11px] text-slate-400 font-medium" id="samsungCareLogEmptyNotice">첨부된 간병일지가 없습니다. 위 검색창에서 환자명을 검색하여 추가하세요.</span>`;
+    container.innerHTML = `<span class="text-[11px] text-slate-400 font-medium" id="samsungCareLogEmptyNotice">첨부된 간병일지가 없습니다. (기본 미첨부 발송)</span>`;
     return;
   }
 
@@ -7762,6 +8597,220 @@ function renderDispatchAttachedCareLogs() {
   container.innerHTML = html;
   initIcons(container);
 }
+
+function toggleSamsungTargetLogAttachment(targetId, attach) {
+  if (!window.gSamsungDispatchAttachedCareLogs) window.gSamsungDispatchAttachedCareLogs = [];
+  const tid = String(targetId);
+  const targetRows = (gSamsungSheets && gSamsungSheets.target) || [];
+  const tr = targetRows.find(r => String(r.patientId || r.id) === tid);
+  const patientName = tr ? tr.patientName : '고객';
+
+  if (attach) {
+    if (!window.gSamsungDispatchAttachedCareLogs.some(a => String(a.id) === tid)) {
+      const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[tid]) || [];
+      const fn = custFiles.length > 0 ? custFiles[0].name : `[${tid}_${patientName}]_케어포트_공식간병일지.pdf`;
+      window.gSamsungDispatchAttachedCareLogs.push({
+        id: tid,
+        patientName: patientName,
+        policyNumber: tr?.policyNumber || '-',
+        accidentNumber: tr?.accidentNumber || '-',
+        carePeriod: `${tr?.desiredStartDate || tr?.contractStartDate || ''} ~ ${tr?.expectedEndDate || tr?.contractEndDate || ''}`,
+        filename: fn,
+        source: custFiles.length > 0 ? 'local' : 'careport',
+        file: custFiles.length > 0 ? custFiles[0] : null
+      });
+    }
+  } else {
+    window.gSamsungDispatchAttachedCareLogs = window.gSamsungDispatchAttachedCareLogs.filter(a => String(a.id) !== tid);
+  }
+
+  renderDispatchAttachedCareLogs();
+  renderCurrentSamsungSheet();
+  if (typeof updateSamsungDailyEmailBodyText === 'function') updateSamsungDailyEmailBodyText();
+}
+window.toggleSamsungTargetLogAttachment = toggleSamsungTargetLogAttachment;
+
+function renderSamsungDailyAvailableLogsSelector() {
+  const container = document.getElementById('samsungDailyAvailableLogsContainer');
+  if (!container) return;
+
+  const targetRows = (gSamsungSheets && gSamsungSheets.target) || [];
+  const availableLogs = [];
+
+  targetRows.forEach(tr => {
+    const tid = String(tr.patientId || tr.id || '');
+    const name = tr.patientName;
+    const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[tid]) || [];
+    const hasLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) &&
+      gCareLogs.some(l => String(l.applyId) === tid || (name && l.patientName === name));
+    if (custFiles.length > 0 || hasLog) {
+      availableLogs.push({
+        id: tid,
+        patientName: name,
+        policyNumber: tr.policyNumber || '-',
+        accidentNumber: tr.accidentNumber || '-',
+        hospitalName: tr.hospitalName || '-',
+        carePeriod: `${tr.desiredStartDate || tr.careStartDate || ''} ~ ${tr.expectedEndDate || tr.careEndDate || ''}`,
+        filename: custFiles.length > 0 ? custFiles[0].name : `[${tid}_${name}]_케어포트_공식간병일지.pdf`,
+        source: custFiles.length > 0 ? 'local' : 'careport',
+        file: custFiles.length > 0 ? custFiles[0] : null
+      });
+    }
+  });
+
+  const attachedIds = new Set((window.gSamsungDispatchAttachedCareLogs || []).map(a => String(a.id)));
+
+  if (availableLogs.length === 0) {
+    container.innerHTML = `
+      <div class="p-2.5 text-center text-slate-500 text-xs bg-white rounded-xl border border-purple-100">
+        대상자 중 등록된 간병일지가 없습니다. (기본 미첨부 발송)
+      </div>
+    `;
+    return;
+  }
+
+  let html = `
+    <div class="flex items-center justify-between pb-2 border-b border-purple-200/60 flex-wrap gap-2">
+      <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+        <span>간병일지 보유 환자 선택 (${availableLogs.length}명 보유 중, 현재 <b class="text-purple-700 font-black">${attachedIds.size}</b>건 첨부 선택됨)</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <button type="button" onclick="toggleAllSamsungDailyCareLogs(true)" class="px-2 py-1 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-900 font-bold text-[10.5px] cursor-pointer shadow-2xs">
+          전체 선택
+        </button>
+        <button type="button" onclick="toggleAllSamsungDailyCareLogs(false)" class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] border border-slate-200 cursor-pointer shadow-2xs">
+          전체 해제 (기본)
+        </button>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar pt-1">
+      ${availableLogs.map(item => {
+        const isChecked = attachedIds.has(String(item.id));
+        return `
+          <div class="p-2 bg-white rounded-xl border ${isChecked ? 'border-purple-400 ring-1 ring-purple-300 bg-purple-50/40' : 'border-slate-200'} flex items-center justify-between gap-2 text-xs transition-all shadow-2xs">
+            <label class="flex items-center gap-2 min-w-0 cursor-pointer select-none flex-1">
+              <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleSamsungDispatchCareLog('${item.id}', this.checked)" class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer shrink-0">
+              <div class="min-w-0 truncate">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-black text-slate-900">${item.patientName}</span>
+                  <span class="font-mono text-[10.5px] text-slate-500">(${item.id})</span>
+                  <span class="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold text-[9.5px]">보유</span>
+                </div>
+                <div class="text-[10.5px] text-slate-500 truncate mt-0.5">
+                  ${item.hospitalName} | ${item.carePeriod}
+                </div>
+              </div>
+            </label>
+            <button type="button" onclick="previewCustomerCareLogPdf('${item.id}')" class="p-1 text-slate-400 hover:text-purple-700 rounded cursor-pointer shrink-0" title="일지 미리보기">
+              <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+  container.innerHTML = html;
+  if (typeof initIcons === 'function') initIcons(container);
+}
+window.renderSamsungDailyAvailableLogsSelector = renderSamsungDailyAvailableLogsSelector;
+
+function toggleSamsungDispatchCareLog(targetId, isChecked) {
+  const tid = String(targetId);
+  const targetRows = (gSamsungSheets && gSamsungSheets.target) || [];
+  const tr = targetRows.find(r => String(r.patientId || r.id) === tid);
+  const name = tr ? tr.patientName : '고객';
+
+  if (!window.gSamsungDispatchAttachedCareLogs) window.gSamsungDispatchAttachedCareLogs = [];
+
+  if (isChecked) {
+    if (!window.gSamsungDispatchAttachedCareLogs.some(a => String(a.id) === tid)) {
+      const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[tid]) || [];
+      const fn = custFiles.length > 0 ? custFiles[0].name : `[${tid}_${name}]_케어포트_공식간병일지.pdf`;
+      window.gSamsungDispatchAttachedCareLogs.push({
+        id: tid,
+        patientName: name,
+        policyNumber: tr?.policyNumber || '-',
+        accidentNumber: tr?.accidentNumber || '-',
+        carePeriod: `${tr?.desiredStartDate || tr?.careStartDate || ''} ~ ${tr?.expectedEndDate || tr?.careEndDate || ''}`,
+        filename: fn,
+        source: custFiles.length > 0 ? 'local' : 'careport',
+        file: custFiles.length > 0 ? custFiles[0] : null
+      });
+    }
+  } else {
+    window.gSamsungDispatchAttachedCareLogs = window.gSamsungDispatchAttachedCareLogs.filter(a => String(a.id) !== tid);
+  }
+
+  renderDispatchAttachedCareLogs();
+  renderSamsungDailyAvailableLogsSelector();
+  renderCurrentSamsungSheet();
+  updateSamsungDailyEmailBodyText();
+}
+window.toggleSamsungDispatchCareLog = toggleSamsungDispatchCareLog;
+
+function toggleAllSamsungDailyCareLogs(selectAll) {
+  const targetRows = (gSamsungSheets && gSamsungSheets.target) || [];
+  if (!window.gSamsungDispatchAttachedCareLogs) window.gSamsungDispatchAttachedCareLogs = [];
+
+  if (!selectAll) {
+    window.gSamsungDispatchAttachedCareLogs = [];
+  } else {
+    targetRows.forEach(tr => {
+      const tid = String(tr.patientId || tr.id || '');
+      const name = tr.patientName;
+      const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[tid]) || [];
+      const hasLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) &&
+        gCareLogs.some(l => String(l.applyId) === tid || (name && l.patientName === name));
+      if (custFiles.length > 0 || hasLog) {
+        if (!window.gSamsungDispatchAttachedCareLogs.some(a => String(a.id) === tid)) {
+          const fn = custFiles.length > 0 ? custFiles[0].name : `[${tid}_${name}]_케어포트_공식간병일지.pdf`;
+          window.gSamsungDispatchAttachedCareLogs.push({
+            id: tid,
+            patientName: name,
+            policyNumber: tr?.policyNumber || '-',
+            accidentNumber: tr?.accidentNumber || '-',
+            carePeriod: `${tr?.desiredStartDate || tr?.careStartDate || ''} ~ ${tr?.expectedEndDate || tr?.careEndDate || ''}`,
+            filename: fn,
+            source: custFiles.length > 0 ? 'local' : 'careport',
+            file: custFiles.length > 0 ? custFiles[0] : null
+          });
+        }
+      }
+    });
+  }
+
+  renderDispatchAttachedCareLogs();
+  renderSamsungDailyAvailableLogsSelector();
+  renderCurrentSamsungSheet();
+  updateSamsungDailyEmailBodyText();
+}
+window.toggleAllSamsungDailyCareLogs = toggleAllSamsungDailyCareLogs;
+
+function updateSamsungDailyEmailBodyText() {
+  const bodyEl = document.getElementById('samsungDispatchBody');
+  if (!bodyEl) return;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const date = String(now.getDate()).padStart(2, '0');
+  const todayFormatted = `${year}년 ${month}월 ${date}일`;
+
+  const targetRows = (gSamsungSheets && gSamsungSheets.target) || [];
+  const attachedLogs = window.gSamsungDispatchAttachedCareLogs || [];
+
+  const summaryLines = targetRows.slice(0, 10).map((r, idx) => 
+    `${idx + 1}. [${r.patientName || '-'}] 증권:${r.policyNumber || '-'} | 사고:${r.accidentNumber || '-'} | 병원:${r.hospitalName || '-'} | 간병:${r.desiredStartDate || r.careStartDate || '-'}`
+  ).join('\n');
+
+  const logStatusText = attachedLogs.length > 0
+    ? `- 간병일지 첨부: 총 ${attachedLogs.length}건 (${attachedLogs.map(a => a.patientName).join(', ')})`
+    : `- 간병일지 첨부: 미첨부 (당일 신규 접수 보고 건으로 일지 별도 보관 / 필요시 요청 시 송부 가능)`;
+
+  bodyEl.value = `안녕하세요. 삼성화재 간병지원 보상운영 담당자님,\n리본케어 운영지원팀입니다.\n\n${todayFormatted} 기준 당일 신규 접수 내역 및 간병 진행 현황을 엑셀 보고서로 첨부하여 보고드립니다.\n\n[주요 요약]\n- 일일 접수/진행 관리 대상: 총 ${targetRows.length}건\n${logStatusText}\n\n[주요 접수 목록]\n${summaryLines || '접수 건 정보가 없습니다.'}\n\n상세 데이터는 첨부된 엑셀 보고서${attachedLogs.length > 0 ? ' 및 간병일지' : ''}를 참고 부탁드립니다.\n감사합니다.\n\n리본케어 운영지원팀 드림 (02-2633-1120)`;
+}
+window.updateSamsungDailyEmailBodyText = updateSamsungDailyEmailBodyText;
 
 // -------------------------------------------------------------------------
 // SAMSUNG EMAIL DISPATCH MODAL CONTROLLER
@@ -7795,32 +8844,12 @@ function openSamsungEmailDispatchModal(type = 'daily') {
   const compRows = (gSamsungSheets && gSamsungSheets.completed) || [];
 
   if (type === 'daily') {
+    // 🚨 [사용자 지침 준수]: 일일접수보고에서 간병일지는 기본적으로 첨부하지 않으며(기본 0건),
+    // 간병일지 보유 여부만 안내하고 첨부 여부는 관리자가 직접 선택/토글하도록 합니다.
     if (!window.gSamsungDispatchAttachedCareLogs) window.gSamsungDispatchAttachedCareLogs = [];
-    const existingDispatchIds = new Set(window.gSamsungDispatchAttachedCareLogs.map(a => String(a.id)));
-    targetRows.forEach(tr => {
-      const tid = String(tr.patientId || tr.id || '');
-      const name = tr.patientName;
-      const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[tid]) || [];
-      const hasLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) &&
-        gCareLogs.some(l => String(l.applyId) === tid || (name && l.patientName === name));
-      if ((custFiles.length > 0 || hasLog) && !existingDispatchIds.has(tid)) {
-        existingDispatchIds.add(tid);
-        const fn = custFiles.length > 0 ? custFiles[0].name : `[${tid}_${name}]_케어포트_공식간병일지.pdf`;
-        window.gSamsungDispatchAttachedCareLogs.push({
-          id: tid,
-          patientName: name,
-          policyNumber: tr.policyNumber || '-',
-          accidentNumber: tr.accidentNumber || '-',
-          carePeriod: `${tr.desiredStartDate || tr.contractStartDate || ''} ~ ${tr.expectedEndDate || tr.contractEndDate || ''}`,
-          filename: fn,
-          source: 'careport',
-          file: custFiles.length > 0 ? custFiles[0] : null
-        });
-      }
-    });
 
     if (titleEl) titleEl.innerText = '삼성화재 일일접수 보고 이메일 발송';
-    if (subtitleEl) subtitleEl.innerText = '작성된 [대상자] 엑셀 시트와 검색된 간병일지를 첨부하여 일일보고 메일을 발송합니다.';
+    if (subtitleEl) subtitleEl.innerText = '작성된 [대상자] 엑셀 시트를 기본 첨부하며, 간병일지는 필요 시 선택하여 발송합니다.';
     if (iconBox) {
       iconBox.className = 'w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300';
       iconBox.innerHTML = '<i data-lucide="mail-check" class="w-5 h-5"></i>';
@@ -7833,12 +8862,9 @@ function openSamsungEmailDispatchModal(type = 'daily') {
       if (defaultTo) toEmailEl.value = defaultTo.email;
     }
     if (subjectEl) subjectEl.value = `[삼성화재 간병지원] ${todayFormatted} 일일 접수 및 간병일지 보고서 (리본케어)`;
-    if (bodyEl) {
-      const summaryLines = targetRows.slice(0, 10).map((r, idx) => 
-        `${idx + 1}. [${r.patientName || '-'}] 증권:${r.policyNumber || '-'} | 사고:${r.accidentNumber || '-'} | 병원:${r.hospitalName || '-'} | 간병:${r.carePeriod || '-'}`
-      ).join('\n');
-      bodyEl.value = `안녕하세요. 삼성화재 간병지원 보상운영 담당자님,\n리본케어 운영지원팀입니다.\n\n${todayFormatted} 기준 당일 신규 접수 내역 및 간병 진행 현황을 엑셀 보고서로 첨부하여 보고드립니다.\n\n[주요 요약]\n- 일일 접수/진행 관리 대상: 총 ${targetRows.length}건\n- 간병일지 첨부: ${window.gSamsungDispatchAttachedCareLogs ? window.gSamsungDispatchAttachedCareLogs.length : 0}건\n\n[주요 접수 목록]\n${summaryLines || '접수 건 정보가 없습니다.'}\n\n상세 데이터는 첨부된 엑셀 보고서 및 간병일지를 참고 부탁드립니다.\n감사합니다.\n\n리본케어 운영지원팀 드림 (02-2633-1120)`;
-    }
+    updateSamsungDailyEmailBodyText();
+    renderSamsungDailyAvailableLogsSelector();
+
     if (submitBtn) {
       submitBtn.className = 'px-8 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs shadow-md flex items-center gap-2 transition-all cursor-pointer';
     }
@@ -39941,10 +40967,11 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
   }
 
   // =========================================================================
-  // 시트 (삼성): 완료 시트 연동 (매칭 완료 여부 및 배정지역 매핑)
+  // 시트 (삼성): 완료 시트 연동 (매칭 완료 여부 및 완료 대장 전 컬럼 보존)
   // =========================================================================
   const completedSheetName = sheetNames.find(n => n.includes('완료') || n.includes('종결'));
   const completedMap = {};
+  const validCompletedRows = [];
   if (completedSheetName && workbook.Sheets[completedSheetName]) {
     try {
       const rawCompleted = XLSX.utils.sheet_to_json(workbook.Sheets[completedSheetName], { header: 1, defval: '' });
@@ -39952,7 +40979,7 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
         let hIdx = 0;
         for (let i = 0; i < Math.min(rawCompleted.length, 5); i++) {
           const s = rawCompleted[i].map(String).join(' ');
-          if (s.includes('피보험자') || s.includes('매칭') || s.includes('ID') || s.includes('배정')) {
+          if (s.includes('피보험자') || s.includes('매칭') || s.includes('ID') || s.includes('배정') || s.includes('환자')) {
             hIdx = i; break;
           }
         }
@@ -39964,6 +40991,21 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
           const matched = String(r[2] || '').trim().toUpperCase() === 'Y';
           const region = String(r[3] || '').trim();
           completedMap[pid] = { matched, region, raw: r };
+
+          validCompletedRows.push({
+            patientId: pid,
+            patientName: String(r[1] || '').trim(),
+            isMatched: String(r[2] || (matched ? 'Y' : 'N')).trim() || 'Y',
+            assignedRegion: region,
+            matchingDuration: String(r[4] || '').trim(),
+            delayHours: String(r[5] || '0').trim(),
+            caregiverChange: String(r[6] || '없음').trim(),
+            gpsAnomaly: String(r[7] || '없음').trim(),
+            hasVoc: String(r[8] || '없음').trim(),
+            vocTransferSamsung: String(r[9] || '없음').trim(),
+            satisfactionScore: String(r[10] || '미응답').trim(),
+            sheetKey: 'completed'
+          });
         }
       }
     } catch (e) {
@@ -39981,21 +41023,45 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
       const rawContacts = XLSX.utils.sheet_to_json(workbook.Sheets[contactSheetName], { header: 1, defval: '' });
       if (rawContacts && rawContacts.length > 1) {
         let hIdx = 0;
+        let colName = -1, colEmail = -1, colPhone = -1, colRole = -1;
         for (let i = 0; i < Math.min(rawContacts.length, 5); i++) {
-          const s = rawContacts[i].map(String).join(' ');
-          if (s.includes('이름') || s.includes('연락처') || s.includes('이메일') || s.includes('구분')) {
-            hIdx = i; break;
+          const row = rawContacts[i];
+          if (!Array.isArray(row)) continue;
+          row.forEach((cell, cIdx) => {
+            const cs = String(cell || '').trim();
+            if (cs.includes('이름') || cs.includes('성명') || cs.includes('담당자')) colName = cIdx;
+            if (cs.includes('이메일') || cs.includes('email') || cs.includes('메일')) colEmail = cIdx;
+            if (cs.includes('연락처') || cs.includes('전화') || cs.includes('휴대폰')) colPhone = cIdx;
+            if (cs.includes('직책') || cs.includes('부서') || cs.includes('구분') || cs.includes('역할')) colRole = cIdx;
+          });
+          if (colName !== -1 && (colEmail !== -1 || colPhone !== -1)) {
+            hIdx = i;
+            break;
           }
         }
+        if (colName === -1) colName = 1;
+        if (colEmail === -1) colEmail = 2;
+        if (colPhone === -1) colPhone = 3;
+
         for (let i = hIdx + 1; i < rawContacts.length; i++) {
           const r = rawContacts[i];
           if (!r || r.every(v => !v || String(v).trim() === '')) continue;
-          const name = String(r[0] || '').trim();
-          const email = String(r[1] || '').trim();
-          const phone = normLaunchPhone(r[2]);
-          const role = String(r[3] || '').trim();
+          const name = String(r[colName] || '').trim();
           if (!name) continue;
-          validContacts.push({ name, email, phone, role, insuranceCompany: companyLabel });
+          const email = String(r[colEmail] || '').trim();
+          const phone = normLaunchPhone(r[colPhone]);
+          const role = (colRole !== -1 && r[colRole]) ? String(r[colRole]).trim() : (name.includes('파트장') ? '파트장' : (name.includes('프로') ? '프로' : '담당자'));
+          validContacts.push({
+            category: '삼성화재',
+            name,
+            role,
+            email,
+            phone,
+            mobile: phone,
+            fax: '02-3485-9100',
+            notes: '삼성화재 전담 담당자',
+            insuranceCompany: companyLabel
+          });
         }
       }
     } catch (e) {
@@ -40127,6 +41193,7 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
     claims: validClaims,
     payouts: validPayouts,
     contacts: validContacts,
+    completedRows: validCompletedRows,
     sheetCounts: {
       apps: validApplications.length,
       assigns: validAssignments.length,
@@ -40188,19 +41255,24 @@ function detectHeaderMapping(rawHeaders) {
     birthDate: ['생년월일', '주민번호', '생일', '주민등록번호', '나이/성별'],
     gender: ['성별', '구분'],
     insuranceCompany: ['원수사', '원수사명', '보험사', '보험회사', '보험'],
-    applyDate: ['신청일시', '간병신청일시', '접수일시', '신청일자', '신청일', '간병인청구접수일', '청구접수일', '접수일', '접수일자', '의뢰일', '통보일자', '통보일', '접수', '계약일자'],
+    applyDateTime: ['간병신청 접수일시', '간병신청접수일시', '간병신청일시', '간병인 청구 접수일', '간병인청구접수일', '신청일시', '접수일시'],
+    applyDate: ['신청일시', '간병신청일시', '접수일시', '간병인 청구 접수일', '간병인청구접수일', '신청일자', '신청일', '간병인청구접수일', '청구접수일', '접수일', '접수일자', '의뢰일', '통보일자', '통보일', '접수', '계약일자'],
     accidentNumber: ['사고번호', '접수번호', '청구번호'],
     policyNumber: ['증권번호', '계약번호', '증서번호'],
     productName: ['상품명', '보험상품명', '가입상품명', '가입상품', '상품', '보험명'],
     productCode: ['상품코드', '상품cd', '코드'],
     contractStartDate: ['계약시작일자', '계약시작일', '계약일자', '보험개시일', '가입일자', '가입일', '계약일'],
     contractEndDate: ['계약종료일자', '계약종료일', '만기일자', '보험만기일', '만기일', '계약만기일', '종기일자'],
-    hasInjuryCare: ['상해간병인가입여부', '상해가입여부', '상해가입', '상해간병', '상해담보'],
-    hasDiseaseCare: ['질병간병인가입여부', '질병가입여부', '질병가입', '질병간병', '질병담보'],
+    hasInjuryCare: ['상해입원간병인 가입여부', '상해입원간병인', '상해간병인가입여부', '상해가입여부', '상해가입', '상해간병', '상해담보'],
+    hasDiseaseCare: ['질병입원간병인 가입여부', '질병입원간병인', '질병간병인가입여부', '질병가입여부', '질병가입', '질병간병', '질병담보'],
     patientId: ['피보험자id', '고객id', '환자id', '고객번호', '환자번호'],
-    applicantContact: ['신청인연락처', '보호자연락처', '환자연락처', '연락가능한연락처'],
-    accidentType: ['상해/질병여부', '상해/질병 여부', '상해/질병', '사고유형', '담보구분', '담보'],
+    applicantContact: ['보호자 성명 및 연락처', '보호자성명및연락처', '연락가능한 연락처', '연락가능한연락처', '신청인연락처', '보호자연락처', '환자연락처'],
+    accidentType: ['상해/질병여부', '상해/질병 여부', '상해/질병', '상해질병', '사고유형', '담보구분', '담보'],
+    accidentDate: ['사고일시', '사고일자', '사고일', '발병일자', '발병일'],
+    hospitalName: ['병원명', '입원병원', '요양병원', '병원', '소재지', '주소'],
+    desiredStartDate: ['간병시작희망일자', '간병시작희망일시', '시작희망일자', '간병시작일자', '간병시작일시'],
     careStartDate: ['간병시작일자', '간병시작일시', '간병시작일', '시작희망일', '간병개시일', '개시일', '입원일', '파견일', '시작일'],
+    expectedEndDate: ['간병종료예정일자', '간병종료예정일시', '종료예정일자', '간병종료일자', '간병종료일시'],
     careEndDate: ['간병종료일자', '간병종료일시', '간병종료일', '퇴원일', '완료일', '간병종료', '종료일'],
     expectedDays: ['예상사용일수', '예상기간', '신청기간', '기간', '일수', '사용일수'],
     addressDetail: ['병원명', '상세주소', '병원', '입원병원', '요양병원', '소재지', '주소', '병원/주소'],
@@ -40412,19 +41484,34 @@ function mapRowToApplicationRecord(
     productCode: String(rowObj['상품코드'] || getVal('productCode') || '').trim(),
     contractStartDate: normLaunchDate(rowObj['계약시작일자'] || rowObj['계약일자'] || getVal('contractStartDate')),
     contractEndDate: normLaunchDate(rowObj['계약종료일자'] || rowObj['만기일자'] || getVal('contractEndDate')),
-    hasInjuryCare: rowObj['상해간병인가입여부'] !== undefined ? (String(rowObj['상해간병인가입여부']).includes('가입') || rowObj['상해간병인가입여부'] === true) : (getVal('hasInjuryCare') ? (String(getVal('hasInjuryCare')).includes('가입') || getVal('hasInjuryCare') === true) : false),
-    hasDiseaseCare: rowObj['질병간병인가입여부'] !== undefined ? (String(rowObj['질병간병인가입여부']).includes('가입') || rowObj['질병간병인가입여부'] === true) : (getVal('hasDiseaseCare') ? (String(getVal('hasDiseaseCare')).includes('가입') || getVal('hasDiseaseCare') === true) : false),
+    hasInjuryCare: (() => {
+      const v = rowObj['상해입원간병인 가입여부'] ?? rowObj['상해입원간병인'] ?? rowObj['상해간병인가입여부'] ?? getVal('hasInjuryCare');
+      if (v === undefined || v === null || v === '') return 'Y';
+      const s = String(v).trim().toUpperCase();
+      return (s === 'Y' || s === 'YES' || s === '가입' || s === 'TRUE' || v === true) ? 'Y' : 'N';
+    })(),
+    hasDiseaseCare: (() => {
+      const v = rowObj['질병입원간병인 가입여부'] ?? rowObj['질병입원간병인'] ?? rowObj['질병간병인가입여부'] ?? getVal('hasDiseaseCare');
+      if (v === undefined || v === null || v === '') return 'Y';
+      const s = String(v).trim().toUpperCase();
+      return (s === 'Y' || s === 'YES' || s === '가입' || s === 'TRUE' || v === true) ? 'Y' : 'N';
+    })(),
+    applyDateTime: String(rowObj['간병인 청구 접수일'] || rowObj['간병인청구접수일'] || rowObj['간병신청 접수일시'] || getVal('applyDateTime') || getVal('applyDate') || applyDate || '').trim(),
+    accidentDate: String(rowObj['사고일시'] || rowObj['사고일자'] || rowObj['사고일'] || getVal('accidentDate') || '').trim(),
+    hospitalName: String(rowObj['병원명'] || getVal('hospitalName') || getVal('addressDetail') || '').trim(),
+    desiredStartDate: String(rowObj['간병시작희망일자'] || rowObj['간병시작일자'] || getVal('desiredStartDate') || careStartDate || '').trim(),
+    expectedEndDate: String(rowObj['간병종료예정일자'] || rowObj['간병종료일자'] || getVal('expectedEndDate') || careEndDate || '').trim(),
     patientId: String(rowObj['피보험자ID'] || rowObj['피보험자id'] || getVal('patientId') || '').trim(),
-    applicantContact: normLaunchPhone(rowObj['신청인연락처'] || getVal('applicantContact') || phone),
+    applicantContact: String(rowObj['보호자 성명 및 연락처'] || rowObj['연락가능한 연락처'] || rowObj['신청인연락처'] || getVal('applicantContact') || phone || '').trim(),
     accidentType: String(getVal('accidentType') || (insuranceCompany.includes('삼성') ? '질병' : '상해')).trim(),
     careType: String(rowObj['신청유형'] || getVal('applyType') || '입원').trim(),
     applyType: String(rowObj['신청유형'] || getVal('applyType') || '입원').trim(),
     claimClassification: String(rowObj['청구분류'] || getVal('claimClassification') || '').trim(),
     claimCategory: String(rowObj['청구분류'] || getVal('claimClassification') || '').trim(),
-    careStartDate,
-    careEndDate,
+    careStartDate: String(rowObj['간병시작희망일자'] || rowObj['간병시작일자'] || getVal('desiredStartDate') || careStartDate || '').trim(),
+    careEndDate: String(rowObj['간병종료예정일자'] || rowObj['간병종료일자'] || getVal('expectedEndDate') || careEndDate || '').trim(),
     expectedDays: String(getVal('expectedDays') || '2일').trim(),
-    addressDetail: String(getVal('addressDetail') || '').trim(),
+    addressDetail: String(rowObj['병원명'] || getVal('hospitalName') || getVal('addressDetail') || '').trim(),
     sido: String(getVal('sido') || '').trim(),
     sigungu: String(getVal('sigungu') || '').trim(),
     caregiverName,
@@ -40600,8 +41687,12 @@ async function executeApplyLaunchData(company) {
     // 1. 삼성화재 스프레드시트 대장 갱신 (gSamsungSheets)
     initSamsungSpreadsheet();
     gSamsungSheets.target = newApps;
-    const completedOnes = newApps.filter(a => a.status === '완료' || a.status === '정산완료' || a.status === '진행중');
-    gSamsungSheets.completed = completedOnes.length > 0 ? completedOnes : newApps;
+    if (data.completedRows && data.completedRows.length > 0) {
+      gSamsungSheets.completed = data.completedRows;
+    } else {
+      const completedOnes = newApps.filter(a => a.status === '완료' || a.status === '정산완료' || a.status === '진행중');
+      gSamsungSheets.completed = completedOnes.length > 0 ? completedOnes : newApps;
+    }
     if (data.contacts && data.contacts.length > 0) {
       gSamsungSheets.contacts = data.contacts;
     }
