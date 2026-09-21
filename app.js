@@ -19111,106 +19111,96 @@ async function createInterimPayout(applyId, roundNumber, targetDays) {
 }
 
 async function executeImmediatePayout(applyId, roundNumber, targetDays) {
-  const existing = (gPayouts || []).find(p => {
-    if (p.applyId !== applyId) return false;
-    const rNum = parseInt(String(p.round || '').replace(/[^0-9]/g, ''), 10);
-    return rNum === roundNumber;
-  });
-  if (existing) {
-    if (existing.payoutStatus !== '지급' && existing.payoutStatus !== '지급완료') {
-      await togglePayoutStatus(existing.id);
+  try {
+    const app = (gApps || []).find(a => a.id === applyId);
+    if (!app) {
+      alert('고객 정보를 찾을 수 없습니다.');
+      return;
     }
-    return;
-  }
 
-  const app = (gApps || []).find(a => a.id === applyId);
-  const appAssigns = (gAssigns || []).filter(a => a.applyId === applyId);
-  let as = null;
-  if (appAssigns.length > 0) {
-    if (gActiveCaregiverTabAssignId) {
-      as = appAssigns.find(a => a.id === gActiveCaregiverTabAssignId);
+    // 기존 해당 차수 지급 내역이 있는지 먼저 검색
+    let existing = (gPayouts || []).find(p => {
+      if (p.applyId !== applyId) return false;
+      const rNum = parseInt(String(p.round || '').replace(/[^0-9]/g, ''), 10);
+      return rNum === roundNumber;
+    });
+
+    if (existing) {
+      const confirmed = confirm(`[${existing.caregiverName || '간병인'}] [${existing.round || `${roundNumber || 1}차`}] 간병비 ${formatCurrency(existing.payoutAmount)}원을 '지급완료'로 처리하시겠습니까?`);
+      if (!confirmed) return;
+
+      existing.payoutStatus = '지급완료';
+      existing.paidDate = formatCareDateTimeStr(new Date());
+      existing.updatedAt = new Date().toISOString();
+
+      try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:savePayout', { payout: existing });
+        syncToConvex('sync:saveApplication', { app: app });
+      }
+
+      if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+      renderUnifiedCareHub();
+      renderCaregiverPayouts();
+      showToast(`[${existing.caregiverName || '간병사'}] ${roundNumber || 1}차 간병비가 정상적으로 지급완료 처리되었습니다.`, 'success');
+      return;
     }
-    if (!as) {
-      const sorted = appAssigns.slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
-      as = sorted[sorted.length - 1];
-    }
-  }
-  if (!as) {
-    alert('배정된 간병인 정보가 없습니다.');
-    return;
-  }
 
-  const prog = getCareProgressInfo(as);
-  const schedule = calculateCareSettlementSchedule(app, as, prog, gClaims.filter(c => c.applyId === applyId), gPayouts.filter(p => p.applyId === applyId));
-  const roundInfo = schedule.rounds.find(r => r.roundNumber === roundNumber) || schedule.rounds[0];
-  const daysToPay = targetDays || (roundInfo ? roundInfo.days : 1);
-  const hoursToPay = daysToPay * 24;
-  const wage = as.dailyWage || 140000;
-  const amount = daysToPay * wage;
-  const periodText = (roundInfo && roundInfo.startDateStr && roundInfo.endDateStr) ? ` (${roundInfo.startDateStr} ~ ${roundInfo.endDateStr})` : '';
+    // 신규 지급건 생성: 간병인 정보 확보 (배정 대장 우선, 고객 정보 보조)
+    const appAssigns = (gAssigns || []).filter(a => a.applyId === applyId);
+    let as = appAssigns.length > 0 ? (appAssigns.find(a => a.id === gActiveCaregiverTabAssignId) || appAssigns[0]) : null;
 
-  const isDepositDone = roundInfo ? roundInfo.isClaimDeposited : false;
-  let depositNotice = '';
-  if (!isDepositDone) {
-    depositNotice = '\n\n⚠️ [주의: 손사 보험금 미입금]\n해당 차수의 보험금이 아직 입금 확인되지 않았습니다.\n(시계열 원칙: 입금 확인 후 간병비 지급 권장)';
-  } else {
-    depositNotice = '\n\n✅ [손사 보험금 입금 확인완료]\n보험사로부터 해당 차수 보험금이 정상 입금 확인된 상태입니다.';
-  }
+    const cgName = as ? as.caregiverName : (app.caregiverName || '간병인');
+    const ctrName = as ? (as.centerName || '영등포센터') : (app.centerName || '영등포센터');
+    const wage = as ? (as.dailyWage || 140000) : (app.dailyRate || 140000);
+    const daysToPay = targetDays || 10;
+    const hoursToPay = daysToPay * 24;
+    const amount = daysToPay * wage;
+    const now = new Date();
 
-  const confirmMsg = `[간병비 ${roundNumber || 1}차 지급완료 처리 확인]\n\n환자: ${app ? maskName(app.patientName) : '고객'}\n지급 간병인: ${as.caregiverName} (${as.centerName || '영등포센터'})\n근무 일수: ${daysToPay}일분 (${hoursToPay}시간)${periodText}\n지급 금액: ${formatCurrency(amount)}원 (1일 ${formatCurrency(wage)}원)${depositNotice}\n\n간병비를 즉시 [지급완료] 처리하시겠습니까?`;
-  const confirmed = await showCustomConfirm(confirmMsg, {
-    theme: isDepositDone ? 'primary' : 'fax',
-    icon: isDepositDone ? 'banknote' : 'alert-triangle',
-    title: `간병비 ${roundNumber || 1}차 지급완료 처리`,
-    confirmText: '지급완료 처리',
-    cancelText: '취소'
-  });
-  if (!confirmed) return;
+    const confirmed = confirm(`[간병비 ${roundNumber || 1}차 지급완료 처리]\n\n환자: ${maskName(app.patientName)}\n지급 간병인: ${cgName} (${ctrName})\n근무 기간: ${daysToPay}일분 (${hoursToPay}시간)\n지급 금액: ${formatCurrency(amount)}원\n\n간병비를 '지급완료' 처리하시겠습니까?`);
+    if (!confirmed) return;
 
-  const now = new Date();
-  const payoutIdSuffix = `${as.id.replace('A', '')}.${roundNumber || 1}`;
-  const newPayout = {
-    id: `P${applyId.replace('C', '')}.${payoutIdSuffix}`,
-    applyId: applyId,
-    patientName: app ? app.patientName : '고객',
-    caregiverName: as.caregiverName,
-    centerName: as.centerName || '영등포센터',
-    round: `${roundNumber || 1}차 (${as.caregiverName} · ${daysToPay}일분 / ${hoursToPay}시간)`,
-    standardDate: formatCareDateStr(now),
-    startDate: (roundInfo && roundInfo.startDateStr) ? roundInfo.startDateStr : '',
-    endDate: (roundInfo && roundInfo.endDateStr) ? roundInfo.endDateStr : '',
-    days: daysToPay,
-    dailyWage: wage,
-    payoutAmount: amount,
-    payoutStatus: '지급',
-    paidDate: formatCareDateTimeStr(now),
-    memo: `간병비 ${daysToPay}일분 (${hoursToPay}시간) 지급완료 처리`
-  };
+    const newPayout = {
+      id: `P${applyId.replace('C', '')}.${roundNumber || 1}`,
+      applyId: applyId,
+      patientName: app.patientName,
+      caregiverName: cgName,
+      centerName: ctrName,
+      round: `${roundNumber || 1}차 (${cgName} · ${daysToPay}일분 / ${hoursToPay}시간)`,
+      standardDate: formatCareDateStr(now),
+      startDate: as ? as.startDate : (app.startDate || ''),
+      endDate: as ? as.endDate : (app.endDate || ''),
+      days: daysToPay,
+      dailyWage: wage,
+      payoutAmount: amount,
+      payoutStatus: '지급완료',
+      paidDate: formatCareDateTimeStr(now),
+      memo: `간병비 ${daysToPay}일분 (${hoursToPay}시간) 지급완료 처리`
+    };
 
-  gPayouts.unshift(newPayout);
-  if (app) {
+    gPayouts.unshift(newPayout);
     app.totalPayout = (gPayouts.filter(p => p.applyId === applyId)).reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
     app.updatedAt = now.toISOString();
-  }
 
-  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
-  const payoutListModal = document.getElementById('payoutDetailListModal');
-  if (payoutListModal && !payoutListModal.classList.contains('hidden')) openPayoutDetailListModal(applyId);
-  renderUnifiedCareHub();
-  renderCaregiverPayouts();
+    try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
+    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
-  if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:savePayout', { payout: newPayout });
-    if (app) syncToConvex('sync:saveApplication', { app: app });
-  }
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:savePayout', { payout: newPayout });
+      syncToConvex('sync:saveApplication', { app: app });
+    }
 
-  if (typeof showNotification === 'function') {
-    showNotification({
-      type: 'success',
-      title: '간병비 지급완료 처리',
-      message: `[${as.caregiverName} 간병사] ${roundNumber}차 간병비 ${formatCurrency(amount)}원이 지급완료 처리되었습니다.`,
-      icon: 'check-circle-2'
-    });
+    if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+    const payoutListModal = document.getElementById('payoutDetailListModal');
+    if (payoutListModal && !payoutListModal.classList.contains('hidden')) openPayoutDetailListModal(applyId);
+    renderUnifiedCareHub();
+    renderCaregiverPayouts();
+
+    showToast(`[${cgName}] ${roundNumber || 1}차 간병비 ${formatCurrency(amount)}원이 정상적으로 지급완료 처리되었습니다.`, 'success');
+  } catch (err) {
+    console.error('executeImmediatePayout error:', err);
+    alert('간병비 지급완료 처리 중 오류: ' + err.message);
   }
 }
 
@@ -19218,14 +19208,7 @@ async function deleteInterimPayout(applyId, payoutId) {
   const p = (gPayouts || []).find(item => item.id === payoutId);
   if (!p) return;
 
-  const confirmMsg = `[간병비 정산 원복(취소)]\n\n정산번호: ${p.id}\n정산내역: [${p.round}] ${formatCurrency(p.payoutAmount)}원\n\n해당 정산 건을 취소하고 원복하시겠습니까?\n취소 시 간병 진행중(대기) 상태로 다시 복원됩니다.`;
-  const confirmed = await showCustomConfirm(confirmMsg, {
-    theme: 'primary',
-    icon: 'rotate-ccw',
-    title: '간병비 정산 취소(원복)',
-    confirmText: '정산 취소 실행',
-    cancelText: '닫기'
-  });
+  const confirmed = confirm(`[간병비 정산 삭제/원복]\n\n정산번호: ${p.id}\n정산내역: [${p.round || ''}] ${formatCurrency(p.payoutAmount)}원\n\n해당 정산 건을 삭제하시겠습니까?`);
   if (!confirmed) return;
 
   gPayouts = gPayouts.filter(item => item.id !== payoutId);
@@ -19235,26 +19218,21 @@ async function deleteInterimPayout(applyId, payoutId) {
     app.updatedAt = new Date().toISOString();
   }
 
+  try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
+  try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+
   if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
   const payoutListModal = document.getElementById('payoutDetailListModal');
   if (payoutListModal && !payoutListModal.classList.contains('hidden')) openPayoutDetailListModal(applyId);
   renderUnifiedCareHub();
   renderCaregiverPayouts();
 
-  // Convex Cloud 운영 DB 실시간 동기화
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:deletePayout', { payoutId: payoutId });
     if (app) syncToConvex('sync:saveApplication', { app: app });
   }
 
-  if (typeof showNotification === 'function') {
-    showNotification({
-      type: 'info',
-      title: '정산 원복(취소) 완료',
-      message: `[${p.id}] 정산 건이 취소되고 진행중 대기 상태로 원복되었습니다.`,
-      icon: 'rotate-ccw'
-    });
-  }
+  showToast(`[${p.id}] 정산 내역이 정상적으로 삭제되었습니다.`, 'info');
 }
 
 function renderCaregiverPayouts() {
@@ -19264,103 +19242,70 @@ function renderCaregiverPayouts() {
 }
 
 async function executeBatchCaregiverPayout(applyId, assignId) {
-  const app = (gApps || []).find(a => a.id === applyId);
-  const as = (gAssigns || []).find(a => a.id === assignId || a.applyId === applyId);
-  if (!app) return;
-
-  const prog = as ? getCareProgressInfo(as) : null;
-  const totalDays = prog ? prog.totalDays : 10;
-  const wage = as ? (as.dailyWage || 140000) : 140000;
-  const totalWage = totalDays * wage;
-
-  const confirmed = await showCustomConfirm(
-    `[${maskName(app.patientName)} 님 간병비 지급완료 처리]\n\n간병사: ${as ? maskName(as.caregiverName) : '간병인'}\n근무기간: ${totalDays}일 (${as ? as.startDate + ' ~ ' + as.endDate : ''})\n총 지급액: ${formatCurrency(totalWage)}원\n\n간병비 전액을 '지급완료'로 처리하시겠습니까?`,
-    {
-      theme: 'primary',
-      icon: 'check-circle-2',
-      title: '간병비 지급완료 처리',
-      confirmText: '지급완료 실행',
-      cancelText: '취소'
-    }
-  );
-  if (!confirmed) return;
-
-  // 기존 정산 내역이 있으면 지급완료로 변경, 없으면 신규 생성
-  const existingPayouts = (gPayouts || []).filter(p => p.applyId === applyId);
-  if (existingPayouts.length > 0) {
-    existingPayouts.forEach(p => {
-      p.payoutStatus = '지급완료';
-      p.paidDate = formatCareDateTimeStr(new Date());
-      p.updatedAt = new Date().toISOString();
-    });
-  } else {
-    const newPayout = {
-      id: `P${applyId.replace('C', '')}.1`,
-      applyId: applyId,
-      patientName: app.patientName,
-      caregiverName: as ? as.caregiverName : '간병사',
-      round: `1차 (${totalDays}일 전액)`,
-      days: totalDays,
-      dailyWage: wage,
-      payoutAmount: totalWage,
-      payoutStatus: '지급완료',
-      payoutDate: formatCareDateTimeStr(new Date()),
-      paidDate: formatCareDateTimeStr(new Date()),
-      memo: '간병 종료에 따른 전액 일괄 지급완료 처리',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    gPayouts.unshift(newPayout);
-  }
-
-  // 고객 원장 총 지급액 갱신
-  if (app) {
-    const totalAppPayout = (gPayouts || []).filter(item => item.applyId === app.id).reduce((sum, item) => sum + (item.payoutAmount || 0), 0);
-    app.totalPayout = totalAppPayout;
-    app.updatedAt = new Date().toISOString();
-  }
-
-  // 로컬 캐시 안전 저장
   try {
-    localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
-  } catch (e) {
-    console.warn('Failed to cache payouts', e);
-  }
+    const app = (gApps || []).find(a => a.id === applyId);
+    if (!app) { alert('고객 정보를 찾을 수 없습니다.'); return; }
+    const as = (gAssigns || []).find(a => a.id === assignId || a.applyId === applyId);
+    const cgName = as ? as.caregiverName : (app.caregiverName || '간병인');
+    const totalDays = as ? (getCareProgressInfo(as)?.totalDays || 10) : 10;
+    const wage = as ? (as.dailyWage || 140000) : (app.dailyRate || 140000);
+    const totalWage = totalDays * wage;
 
-  // Convex Cloud 운영 DB 실시간 동기화
-  if (typeof syncToConvex === 'function') {
-    (gPayouts.filter(p => p.applyId === applyId)).forEach(p => {
-      syncToConvex('sync:savePayout', { payout: p }).catch(console.warn);
-    });
-    if (app) syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
-  }
+    const confirmed = confirm(`[${maskName(app.patientName)} 님 간병비 지급완료 처리]\n\n간병사: ${cgName}\n총 지급액: ${formatCurrency(totalWage)}원 (${totalDays}일분)\n\n간병비 전액을 '지급완료'로 처리하시겠습니까?`);
+    if (!confirmed) return;
 
-  // 현재 열려있는 원스탑 상세 모달 즉각 실시간 리렌더링
-  if (gActiveHubModalAppId) {
-    openHubCustomerDetailModal(gActiveHubModalAppId);
-  }
-  const payoutListModal = document.getElementById('payoutDetailListModal');
-  if (payoutListModal && !payoutListModal.classList.contains('hidden')) {
-    openPayoutDetailListModal(applyId);
-  }
-  renderUnifiedCareHub();
-  if (typeof renderPayouts === 'function') {
-    renderPayouts();
-  }
+    const existingPayouts = (gPayouts || []).filter(p => p.applyId === applyId);
+    const now = new Date();
+    if (existingPayouts.length > 0) {
+      existingPayouts.forEach(p => {
+        p.payoutStatus = '지급완료';
+        p.paidDate = formatCareDateTimeStr(now);
+        p.updatedAt = now.toISOString();
+      });
+    } else {
+      const newPayout = {
+        id: `P${applyId.replace('C', '')}.1`,
+        applyId: applyId,
+        patientName: app.patientName,
+        caregiverName: cgName,
+        centerName: as ? as.centerName : (app.centerName || '영등포센터'),
+        round: `1차 (${totalDays}일 전액)`,
+        days: totalDays,
+        dailyWage: wage,
+        payoutAmount: totalWage,
+        payoutStatus: '지급완료',
+        payoutDate: formatCareDateTimeStr(now),
+        paidDate: formatCareDateTimeStr(now),
+        memo: '간병 종료에 따른 전액 일괄 지급완료 처리',
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString()
+      };
+      gPayouts.unshift(newPayout);
+    }
 
-  if (typeof showCustomAlert === 'function') {
-    showCustomAlert({
-      title: '간병비 지급완료',
-      message: `[${maskName(app.patientName)} 님] 간병비 ${formatCurrency(totalWage)}원이 정상적으로 지급완료 처리되었습니다.`,
-      icon: 'check-circle-2',
-      iconColor: 'emerald'
-    });
-  } else if (typeof showNotification === 'function') {
-    showNotification({
-      type: 'success',
-      title: '간병비 지급완료',
-      message: `[${maskName(app.patientName)} 님] 간병비 ${formatCurrency(totalWage)}원이 지급완료로 처리되었습니다.`
-    });
+    app.totalPayout = (gPayouts.filter(p => p.applyId === applyId)).reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
+    app.updatedAt = now.toISOString();
+
+    try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
+    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+
+    if (typeof syncToConvex === 'function') {
+      (gPayouts.filter(p => p.applyId === applyId)).forEach(p => {
+        syncToConvex('sync:savePayout', { payout: p }).catch(console.warn);
+      });
+      syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
+    }
+
+    if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+    const payoutListModal = document.getElementById('payoutDetailListModal');
+    if (payoutListModal && !payoutListModal.classList.contains('hidden')) openPayoutDetailListModal(applyId);
+    renderUnifiedCareHub();
+    renderCaregiverPayouts();
+
+    showToast(`[${maskName(app.patientName)} 님] 간병비 ${formatCurrency(totalWage)}원이 정상적으로 지급완료 처리되었습니다.`, 'success');
+  } catch (err) {
+    console.error('executeBatchCaregiverPayout error:', err);
+    alert('간병비 일괄 지급완료 처리 중 오류: ' + err.message);
   }
 }
 
@@ -23156,86 +23101,55 @@ window.saveRoundDepositAmount = saveRoundDepositAmount;
 
 
 async function togglePayoutStatus(payoutId) {
-  const p = (gPayouts || []).find(item => item.id === payoutId);
-  if (!p) return;
-
-  const isAlreadyPaid = (p.payoutStatus === '지급' || p.payoutStatus === '지급완료');
-  const nextStatus = isAlreadyPaid ? '미지급' : '지급완료';
-
-  if (!isAlreadyPaid) {
-    const relatedClaims = (gClaims || []).filter(c => isMatchApp(c.applyId, p.applyId, ''));
-    const rNum = parseInt(String(p.round || '').replace(/[^0-9]/g, ''), 10);
-    const matchingClaim = relatedClaims.find(c => {
-      const cNum = parseInt(String(c.round || '').replace(/[^0-9]/g, ''), 10);
-      return cNum === rNum;
-    });
-
-    const isClaimDeposited = matchingClaim && (matchingClaim.depositStatus === '수납완료' || matchingClaim.depositStatus === '입금완료' || matchingClaim.depositStatus === '입금확인');
-
-    let warningText = '';
-    let theme = 'primary';
-    let icon = 'banknote';
-    if (!matchingClaim) {
-      warningText = '⚠️ [주의: 손사 청구서 미등록]\n아직 해당 차수의 손사 청구서가 등록되지 않았습니다.\n(시계열 원칙: 청구 ➡️ 입금확인 ➡️ 간병비지급)\n정말 간병비를 먼저 지급하시겠습니까?';
-      theme = 'fax';
-      icon = 'alert-triangle';
-    } else if (!isClaimDeposited) {
-      warningText = `⚠️ [주의: 손사 보험금 미입금]\n해당 차수의 보험금(${formatCurrency(matchingClaim.claimAmount)}원)이 아직 입금 확인되지 않았습니다!\n(시계열 원칙: 입금 확인 후 간병비 지급 권장)\n\n입금 전 간병비를 먼저 지급하시겠습니까?`;
-      theme = 'fax';
-      icon = 'alert-octagon';
-    } else {
-      warningText = `✅ [손사 보험금 입금 확인완료]\n손사로부터 해당 차수 보험금(${formatCurrency(matchingClaim.claimAmount)}원)이 정상 입금 확인된 건입니다.`;
+  try {
+    const p = (gPayouts || []).find(item => item.id === payoutId);
+    if (!p) {
+      alert('해당 정산 건을 찾을 수 없습니다.');
+      return;
     }
 
-    const confirmMsg = `[간병비 지급 확인]\n\n정산건: [${p.round || ''}]\n지급 대상 간병사: ${p.caregiverName || '간병인'}\n지급 금액: ${formatCurrency(p.payoutAmount)}원 (${p.days || 1}일 / ${(p.days || 1) * 24}시간)\n\n${warningText}`;
-    const confirmed = await showCustomConfirm(confirmMsg, {
-      theme: theme,
-      icon: icon,
-      title: `간병비 지급 실행 [${p.round || ''}]`,
-      confirmText: '지급완료 처리',
-      cancelText: '취소'
-    });
+    const isAlreadyPaid = (p.payoutStatus === '지급' || p.payoutStatus === '지급완료');
+    const nextStatus = isAlreadyPaid ? '미지급' : '지급완료';
+
+    const confirmed = confirm(
+      isAlreadyPaid 
+        ? `[${p.round || ''}] 지급완료된 건을 '미지급(지급 대기)' 상태로 되돌리시겠습니까?`
+        : `[${p.caregiverName || '간병인'}] [${p.round || ''}] 간병비 ${formatCurrency(p.payoutAmount)}원을 '지급완료'로 처리하시겠습니까?`
+    );
     if (!confirmed) return;
-  } else {
-    const confirmMsg = `[${p.id}] [${p.round || ''}] 지급완료된 건을 '미지급(지급 대기)' 상태로 되돌리시겠습니까?`;
-    const confirmed = await showCustomConfirm(confirmMsg, {
-      theme: 'primary',
-      icon: 'rotate-ccw',
-      title: '지급 상태 원복 확인',
-      confirmText: '미지급으로 변경',
-      cancelText: '취소'
-    });
-    if (!confirmed) return;
-  }
 
-  p.payoutStatus = nextStatus;
-  p.paidDate = (!isAlreadyPaid) ? formatCareDateTimeStr(new Date()) : null;
-  p.updatedAt = new Date().toISOString();
+    p.payoutStatus = nextStatus;
+    p.paidDate = (!isAlreadyPaid) ? formatCareDateTimeStr(new Date()) : null;
+    p.updatedAt = new Date().toISOString();
 
-  if (gActiveHubModalAppId) {
-    openHubCustomerDetailModal(gActiveHubModalAppId);
-  }
-  const payoutListModal = document.getElementById('payoutDetailListModal');
-  if (payoutListModal && !payoutListModal.classList.contains('hidden') && p.applyId) {
-    openPayoutDetailListModal(p.applyId);
-  }
-  renderUnifiedCareHub();
-  renderCaregiverPayouts();
-
-  // Save to backend hub real json if available
-  if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:savePayout', { payout: p });
     const app = (gApps || []).find(a => a.id === p.applyId);
-    if (app) syncToConvex('sync:saveApplication', { app: app });
-  }
+    if (app) {
+      app.totalPayout = (gPayouts.filter(item => item.applyId === p.applyId && (item.payoutStatus === '지급' || item.payoutStatus === '지급완료'))).reduce((sum, item) => sum + (item.payoutAmount || 0), 0);
+      app.updatedAt = new Date().toISOString();
+    }
 
-  if (typeof showNotification === 'function') {
-    showNotification({
-      type: 'info',
-      title: '정산 상태 변경 완료',
-      message: `[${p.id}] 상태가 [${nextStatus}]으로 변경되었습니다.`,
-      icon: 'refresh-cw'
-    });
+    try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
+    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:savePayout', { payout: p });
+      if (app) syncToConvex('sync:saveApplication', { app: app });
+    }
+
+    if (gActiveHubModalAppId) {
+      openHubCustomerDetailModal(gActiveHubModalAppId);
+    }
+    const payoutListModal = document.getElementById('payoutDetailListModal');
+    if (payoutListModal && !payoutListModal.classList.contains('hidden') && p.applyId) {
+      openPayoutDetailListModal(p.applyId);
+    }
+    renderUnifiedCareHub();
+    renderCaregiverPayouts();
+
+    showToast(`[${p.caregiverName || '간병인'}] 간병비가 [${nextStatus}]로 처리되었습니다.`, 'success');
+  } catch (err) {
+    console.error('togglePayoutStatus error:', err);
+    alert('상태 변경 중 오류: ' + err.message);
   }
 }
 if (typeof window !== 'undefined') {
@@ -29978,25 +29892,7 @@ async function syncCarePortLogs(isManual = false) {
     const groups = window.CarePortClient.groupLogsByPatient(logs, gApps || [], gAssigns || []);
     gCarePortPatientGroups = groups;
 
-    // 2-1. 케어포트 공인 상세 데이터 사전 병렬 로드 (요약, 키워드, 활력징후, 상담보고)
-    const sessionIdsToFetch = [];
-    groups.forEach(grp => {
-      (grp.dailyLogs || []).forEach(l => {
-        if (l.sessionId && (!window.CarePortClient._detailCache || !window.CarePortClient._detailCache[l.sessionId])) {
-          sessionIdsToFetch.push(l.sessionId);
-        }
-      });
-    });
-
-    if (sessionIdsToFetch.length > 0) {
-      try {
-        await Promise.all(
-          sessionIdsToFetch.map(sid => window.CarePortClient.fetchLogDetail(sid).catch(() => null))
-        );
-      } catch (e) {}
-    }
-
-    // 환자 그룹 일별 일지에도 세부 상세 정보 연결
+    // 환자 그룹 일별 일지에 캐시된 세부 정보가 있으면 즉시 연결 (원격 전수 호출 병목 제거)
     groups.forEach(grp => {
       (grp.dailyLogs || []).forEach(l => {
         const d = (window.CarePortClient && window.CarePortClient._detailCache) ? window.CarePortClient._detailCache[l.sessionId] : null;

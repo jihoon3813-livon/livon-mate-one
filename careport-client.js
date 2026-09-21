@@ -48,9 +48,15 @@
      * Fetch CarePort daily logs (via Serverless API with direct fallback)
      */
     async fetchDailyLogs() {
-      // 1. Try Vercel Serverless API
+      // 1. Try Vercel Serverless API with fast 3s timeout
       try {
-        const res = await fetch(`${this.apiBase}/sync`, { method: 'GET' });
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 3000) : null;
+        const res = await fetch(`${this.apiBase}/sync`, { 
+          method: 'GET',
+          signal: controller ? controller.signal : undefined 
+        });
+        if (timeoutId) clearTimeout(timeoutId);
         if (res.ok) {
           const json = await res.json();
           if (json.success && Array.isArray(json.logs)) {
