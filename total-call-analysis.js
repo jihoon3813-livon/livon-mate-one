@@ -15,9 +15,27 @@
 let gTotalCallData = null;
 let gTotalCallAnnotations = { memos: {}, labels: {}, customLabels: [] };
 let gActiveTotalViewMode = 'list'; // 'list' | 'customer' | 'company' | 'date' | 'category'
+
+function getTotalThisWeekRange() {
+  const now = new Date();
+  const day = now.getDay();
+  const diffToMonday = (day === 0 ? -6 : 1) - day;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+  const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday + 6);
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const todayStr = fmt(now);
+  const sundayStr = fmt(sunday);
+  const endStr = sundayStr > todayStr ? todayStr : sundayStr;
+  return { start: fmt(monday), end: endStr };
+}
+
+const defaultTotalRange = getTotalThisWeekRange();
+
 let gTotalFilter = {
-  startDate: '',
-  endDate: '',
+  startDate: defaultTotalRange.start,
+  endDate: defaultTotalRange.end,
+  periodKey: 'thisWeek',
   channel: 'all', // 'all' | '삼성화재' | '현대해상' | '리본케어'
   search: '',
   category: '',
@@ -946,7 +964,8 @@ async function initTotalCallAnalysisModule(forceRefresh = false) {
     // 1) 기존 캐시 데이터로 0ms 즉시 화면 렌더링 (화면 깜빡임/공백 방지)
     renderTotalCallAnalysisTab();
     loadCallAnnotations();
-    // [사용자 요구사항]: 상단 열린 탭을 클릭하면 동기화는 수동으로 (자동 CTI 동기화 제외)
+    // 2) 백그라운드에서 이번주 기준 실시간 최신 CTI 데이터 무조건 신선 동기화
+    loadTotalCallData(true, true);
     return;
   }
 
@@ -993,8 +1012,9 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       const timeoutId = setTimeout(() => controller.abort(), 12000);
       let synced = false;
 
-      const s = gTotalFilter.startDate || '2026-08-01';
-      const e = gTotalFilter.endDate || new Date().toISOString().slice(0, 10);
+      const thisWeek = (typeof getTotalThisWeekRange === 'function') ? getTotalThisWeekRange() : { start: '', end: '' };
+      const s = gTotalFilter.startDate || thisWeek.start;
+      const e = gTotalFilter.endDate || thisWeek.end || new Date().toISOString().slice(0, 10);
       const ch = gTotalFilter.channel || 'all';
       const sUrl = `/api/total/call-report/sync-cti?start=${s}&end=${e}&channel=${encodeURIComponent(ch)}`;
 
@@ -1194,6 +1214,8 @@ function setTotalDatePreset(type) {
   gTotalListPage = 1;
   gTotalCustomerPage = 1;
   renderTotalCallAnalysisTab();
+  // 사용자가 프리셋을 변경했을 때 해당 기간의 CTI 데이터를 실시간으로 즉시 동기화
+  loadTotalCallData(true, false);
 }
 
 function handleTotalDateInputChange(key, val) {
@@ -1208,12 +1230,16 @@ function applyTotalCustomDateRange() {
   gTotalListPage = 1;
   gTotalCustomerPage = 1;
   renderTotalCallAnalysisTab();
+  // 지정된 기간으로 CTI 실시간 동기화 요청
+  loadTotalCallData(true, false);
 }
 
 function resetAllTotalFilters() {
+  const thisWeek = (typeof getTotalThisWeekRange === 'function') ? getTotalThisWeekRange() : { start: '', end: '' };
   gTotalFilter = {
-    startDate: '',
-    endDate: '',
+    startDate: thisWeek.start,
+    endDate: thisWeek.end,
+    periodKey: 'thisWeek',
     channel: 'all',
     search: '',
     category: '',
@@ -1229,6 +1255,7 @@ function resetAllTotalFilters() {
   gTotalListPage = 1;
   gTotalCustomerPage = 1;
   renderTotalCallAnalysisTab();
+  loadTotalCallData(true, false);
 }
 
 /**
@@ -1517,13 +1544,13 @@ function renderTotalCallAnalysisTab() {
           <span class="text-[10px] ${isKpiAllActive ? 'text-slate-300' : 'text-slate-400'} mt-0.5 truncate">${(gTotalFilter.startDate || gTotalFilter.endDate) ? `${gTotalFilter.startDate || '시작'} ~ ${gTotalFilter.endDate || '현재'}` : 'CTI 실시간 전체'}</span>
         </div>
 
-        <!-- 2) 실제 상담 (CTI 응답: 총 66건 = 녹취확보 58건 + 녹취미저장 8건) -->
+        <!-- 2) 실제 상담 (CTI 응답) -->
         <div onclick="handleTotalKpiCardClick('answered')" 
           class="p-3 rounded-2xl flex flex-col justify-between cursor-pointer transition-all duration-150 select-none shadow-2xs hover:shadow-xs active:scale-[0.98] ${isKpiAnsweredActive ? 'bg-cyan-100/90 border-2 border-cyan-600 ring-2 ring-cyan-200 shadow-sm' : 'bg-cyan-50/70 hover:bg-cyan-100/70 border border-cyan-200 text-slate-800'}" 
           title="클릭 시 실제 상담 통화(CTI 응답 성공 ${totalAnsweredCount}건) 필터링">
           <div class="flex items-center justify-between">
             <span class="text-[11px] font-bold text-cyan-800">실제 상담 (CTI 응답)</span>
-            ${isKpiAnsweredActive ? `<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-cyan-600 text-white animate-pulse">${gTotalFilter.onlyUnrecorded ? '미저장 8건' : (gTotalFilter.onlyRecorded ? '녹취확보 58건' : '응답 66건')} 필터</span>` : ''}
+            ${isKpiAnsweredActive ? `<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-cyan-600 text-white animate-pulse">${gTotalFilter.onlyUnrecorded ? `미저장 ${unrecordedCount}건` : (gTotalFilter.onlyRecorded ? `녹취확보 ${recordedCount}건` : `응답 ${totalAnsweredCount}건`)} 필터</span>` : ''}
           </div>
           
           <div class="mt-1 flex items-baseline justify-between">
@@ -1557,7 +1584,7 @@ function renderTotalCallAnalysisTab() {
           </div>
 
           <div class="flex items-center justify-between text-[9px] text-cyan-600 mt-1">
-            <span class="text-slate-400">요청 69 = 응답 66 + 미연결 3</span>
+            <span class="text-slate-400">요청 ${connectReqCount} = 응답 ${totalAnsweredCount} + 미연결 ${Math.max(0, connectReqCount - totalAnsweredCount)}</span>
             <span class="font-bold ${isKpiAnsweredActive ? 'text-cyan-800 underline' : 'text-cyan-600'}">${isKpiAnsweredActive ? '해제 ✕' : '클릭 필터 →'}</span>
           </div>
         </div>

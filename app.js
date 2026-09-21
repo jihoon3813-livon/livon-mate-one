@@ -3757,6 +3757,7 @@ function renderCurrentSamsungSheet() {
   const pageRows = filteredRows.slice(startIdx, endIdx);
 
   const isEligibleSheet = gActiveSamsungSheet === 'eligible';
+  const isTargetSheet = gActiveSamsungSheet === 'target';
 
   let html = `
     <table class="w-full text-left text-xs border-collapse font-sans min-w-[1400px]">
@@ -3772,6 +3773,9 @@ function renderCurrentSamsungSheet() {
           `).join('')}
           ${isEligibleSheet ? `
             <th class="p-1.5 text-center border-r border-slate-200 font-bold bg-sky-100/60 text-sky-800" style="min-width: 105px;">${getSamsungColumnLetter(schema.length)}</th>
+          ` : ''}
+          ${isTargetSheet ? `
+            <th class="p-1.5 text-center border-r border-slate-200 font-bold bg-purple-100/60 text-purple-800" style="min-width: 135px;">${getSamsungColumnLetter(schema.length)}</th>
           ` : ''}
         </tr>
 
@@ -3807,6 +3811,14 @@ function renderCurrentSamsungSheet() {
               </div>
             </th>
           ` : ''}
+          ${isTargetSheet ? `
+            <th class="p-2.5 text-center border-r border-slate-200 whitespace-nowrap bg-purple-50 text-purple-950 font-bold shadow-inner" style="min-width: 135px;">
+              <div class="flex items-center justify-center gap-1">
+                <i data-lucide="file-text" class="w-3.5 h-3.5 text-purple-700"></i>
+                <span>간병일지 첨부</span>
+              </div>
+            </th>
+          ` : ''}
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-200 bg-white">
@@ -3815,7 +3827,7 @@ function renderCurrentSamsungSheet() {
   if (filteredRows.length === 0) {
     html += `
       <tr>
-        <td colspan="${schema.length + (isEligibleSheet ? 3 : 2)}" class="p-12 text-center text-slate-400 bg-slate-50/50">
+        <td colspan="${schema.length + ((isEligibleSheet || isTargetSheet) ? 3 : 2)}" class="p-12 text-center text-slate-400 bg-slate-50/50">
           <i data-lucide="folder-open" class="w-10 h-10 text-slate-300 mx-auto mb-2"></i>
           <p class="font-bold text-slate-600">등록된 데이터가 없거나 검색 조건과 일치하는 항목이 없습니다.</p>
           <p class="text-[11px] text-slate-400 mt-1">상단의 [전산 데이터 동기화]를 누르거나 [행 추가]를 클릭하여 데이터를 직접 입력해보세요.</p>
@@ -3829,7 +3841,14 @@ function renderCurrentSamsungSheet() {
       html += `
         <tr class="hover:bg-sky-50/50 transition-colors ${isSelected ? 'bg-sky-50/70' : (displayIdx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white')}">
           <td class="p-2 text-center border-r border-slate-200 bg-slate-50/30">
-            <input type="checkbox" value="${realIdx}" ${isSelected ? 'checked' : ''} onchange="toggleSamsungRowSelect(${realIdx}, this.checked)" class="w-3.5 h-3.5 rounded text-sky-600 focus:ring-sky-500 cursor-pointer">
+            <div class="inline-flex items-center gap-1.5 justify-center">
+              <input type="checkbox" value="${realIdx}" ${isSelected ? 'checked' : ''} onchange="toggleSamsungRowSelect(${realIdx}, this.checked)" class="w-3.5 h-3.5 rounded text-sky-600 focus:ring-sky-500 cursor-pointer">
+              <button type="button" onclick="deleteSamsungSheetSingleRow(${realIdx})" 
+                class="p-0.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded transition-all cursor-pointer"
+                title="이 행 삭제">
+                <i data-lucide="trash-2" class="w-3 h-3"></i>
+              </button>
+            </div>
           </td>
           <td class="p-2 text-center border-r border-slate-200 font-mono text-slate-400 text-[11px] select-none bg-slate-50/30">
             ${displayIdx + 1}
@@ -3887,6 +3906,42 @@ function renderCurrentSamsungSheet() {
               </button>
             </td>
           ` : ''}
+          ${isTargetSheet ? (() => {
+            const targetId = String(row.patientId || row.id || ('SF_' + realIdx));
+            const patientName = row.patientName || '';
+            const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[targetId]) || [];
+            const hasLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) &&
+              gCareLogs.some(l => String(l.applyId) === targetId || (patientName && l.patientName === patientName));
+            const hasCustFile = custFiles.length > 0;
+            const isRegistered = hasCustFile || hasLog;
+            const logCount = hasCustFile ? custFiles.length : (hasLog ? 1 : 0);
+
+            return `
+              <td class="p-1.5 text-center border-r border-slate-200 bg-white whitespace-nowrap">
+                ${isRegistered ? `
+                  <div class="inline-flex items-center gap-1 justify-center">
+                    <button type="button" onclick="previewCustomerCareLogPdf('${targetId}')" 
+                      class="px-2.5 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 font-black text-[11px] inline-flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                      title="등록된 간병일지 PDF 미리보기">
+                      <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-purple-600"></i>
+                      <span>일지 (${logCount}건)</span>
+                    </button>
+                    <button type="button" onclick="openImportCarePortLogModal('${targetId}')" 
+                      class="p-1 text-slate-400 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-all cursor-pointer"
+                      title="간병일지 변경 / 추가 첨부">
+                      <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </div>
+                ` : `
+                  <button type="button" onclick="openImportCarePortLogModal('${targetId}')" 
+                    class="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 hover:text-purple-900 font-black text-[11px] border border-purple-200 hover:border-purple-300 transition-all cursor-pointer shadow-2xs">
+                    <i data-lucide="upload" class="w-3.5 h-3.5 text-purple-600"></i>
+                    <span>일지 첨부</span>
+                  </button>
+                `}
+              </td>
+            `;
+          })() : ''}
         </tr>
       `;
     });
@@ -3899,6 +3954,8 @@ function renderCurrentSamsungSheet() {
   // 페이지네이션 컨트롤 바 렌더링
   renderSamsungPagination(totalItems, totalPages);
   updateSamsungPendingChangesUI();
+  updateSamsungDeleteSelectedButtons();
+  updateSamsungDailyCareLogCountBadge();
 }
 
 function renderSamsungPagination(totalItems, totalPages) {
@@ -4198,14 +4255,42 @@ function cancelSamsungSheetPendingChanges(silent = false) {
   renderCurrentSamsungSheet();
 }
 
+function updateSamsungDeleteSelectedButtons() {
+  const count = gSamsungSelectedRows.size;
+  const btnHub = document.getElementById('btnDeleteSelected-samsungclaimhub');
+  if (btnHub) {
+    btnHub.disabled = count === 0;
+    if (count > 0) {
+      btnHub.innerHTML = `<i data-lucide="trash-2" class="w-3.5 h-3.5 shrink-0 inline"></i> <span>선택 행 삭제 (${count}건)</span>`;
+      btnHub.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-black text-xs shadow-xs cursor-pointer transition-all ml-1";
+    } else {
+      btnHub.innerHTML = `<i data-lucide="trash-2" class="w-3.5 h-3.5 shrink-0 inline"></i> <span>선택 행 삭제</span>`;
+      btnHub.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs border border-slate-200 cursor-not-allowed transition-all shadow-2xs ml-1";
+    }
+    if (typeof initIcons === 'function') initIcons(btnHub);
+  }
+
+  const btnList = document.getElementById('btnDeleteSelected-samsunglist');
+  if (btnList) {
+    btnList.disabled = count === 0;
+    if (count > 0) {
+      btnList.innerHTML = `<i data-lucide="trash-2" class="w-3.5 h-3.5 shrink-0 inline"></i> <span>선택 행 삭제 (${count}건)</span>`;
+      btnList.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-black text-xs shadow-xs cursor-pointer transition-all ml-1";
+    } else {
+      btnList.innerHTML = `<i data-lucide="trash-2" class="w-3.5 h-3.5 shrink-0 inline"></i> <span>선택 행 삭제</span>`;
+      btnList.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs border border-slate-200 cursor-not-allowed transition-all shadow-2xs ml-1";
+    }
+    if (typeof initIcons === 'function') initIcons(btnList);
+  }
+}
+
 function toggleSamsungRowSelect(rowIdx, checked) {
   if (checked) {
     gSamsungSelectedRows.add(rowIdx);
   } else {
     gSamsungSelectedRows.delete(rowIdx);
   }
-  const btnDel = document.getElementById('btnDeleteSelected-samsunglist');
-  if (btnDel) btnDel.disabled = gSamsungSelectedRows.size === 0;
+  updateSamsungDeleteSelectedButtons();
 }
 
 function toggleSamsungSelectAll(checked) {
@@ -4215,7 +4300,20 @@ function toggleSamsungSelectAll(checked) {
   } else {
     gSamsungSelectedRows.clear();
   }
+  updateSamsungDeleteSelectedButtons();
   renderCurrentSamsungSheet();
+}
+
+function deleteSamsungSheetSingleRow(rowIdx) {
+  const currentRows = gSamsungSheets[gActiveSamsungSheet] || [];
+  const targetRow = currentRows[rowIdx];
+  if (!targetRow) return;
+  const name = targetRow.patientName || targetRow.name || targetRow.patientId || '선택한';
+  if (!confirm(`[${name}] 행 데이터를 정말로 삭제하시겠습니까?`)) return;
+
+  gSamsungSelectedRows.clear();
+  gSamsungSelectedRows.add(rowIdx);
+  deleteSamsungSpreadsheetSelectedRows(true);
 }
 
 function addSamsungSpreadsheetRow() {
@@ -4228,6 +4326,7 @@ function addSamsungSpreadsheetRow() {
   // Default values depending on sheet
   if (gActiveSamsungSheet === 'target') {
     newRow.patientId = 'SF-P' + (100 + (gSamsungSheets.target.length + 1));
+    newRow.id = newRow.patientId;
     newRow.applyDateTime = new Date().toISOString().slice(0, 10) + ' ' + new Date().toTimeString().slice(0, 5);
     newRow.hasInjuryCare = '가입';
     newRow.hasDiseaseCare = '가입';
@@ -4236,6 +4335,7 @@ function addSamsungSpreadsheetRow() {
     newRow.productName = '무배당 삼성화재 당신에게 좋은간병보험';
   } else if (gActiveSamsungSheet === 'completed') {
     newRow.patientId = 'SF-P' + (100 + (gSamsungSheets.completed.length + 1));
+    newRow.id = newRow.patientId;
     newRow.isMatched = '매칭완료';
     newRow.matchingDuration = '1시간 00분';
     newRow.delayHours = '0시간';
@@ -4246,6 +4346,7 @@ function addSamsungSpreadsheetRow() {
     newRow.satisfactionScore = '98점';
   } else if (gActiveSamsungSheet === 'eligible') {
     newRow.patientId = 'SF-P' + (100 + (gSamsungSheets.eligible.length + 1));
+    newRow.id = newRow.patientId;
     newRow.gender = '남';
     newRow.hasInjuryCare = '가입';
     newRow.hasDiseaseCare = '가입';
@@ -4266,6 +4367,9 @@ function addSamsungSpreadsheetRow() {
       syncToConvex('sync:saveSamsungEligible', { lead: newRow }).catch(console.warn);
     }
   } else {
+    try {
+      localStorage.setItem('LIVON_SAMSUNG_SHEET_' + gActiveSamsungSheet.toUpperCase(), JSON.stringify(gSamsungSheets[gActiveSamsungSheet]));
+    } catch (e) {}
     if (typeof syncToConvex === 'function') {
       syncToConvex('sync:saveSamsungSheetRow', { sheetKey: gActiveSamsungSheet, row: newRow }).catch(console.warn);
     }
@@ -4280,14 +4384,18 @@ function addSamsungSpreadsheetRow() {
   if (container) container.scrollTop = container.scrollHeight;
 }
 
-function deleteSamsungSpreadsheetSelectedRows() {
+function deleteSamsungSpreadsheetSelectedRows(skipConfirm = false) {
   if (gSamsungSelectedRows.size === 0) return;
-  if (!confirm(`선택한 ${gSamsungSelectedRows.size}개 행을 정말로 삭제하시겠습니까?`)) return;
+  if (!skipConfirm && !confirm(`선택한 ${gSamsungSelectedRows.size}개 행을 정말로 삭제하시겠습니까?`)) return;
 
   const currentRows = gSamsungSheets[gActiveSamsungSheet] || [];
   const toDelete = currentRows.filter((_, idx) => gSamsungSelectedRows.has(idx));
   gSamsungSheets[gActiveSamsungSheet] = currentRows.filter((_, idx) => !gSamsungSelectedRows.has(idx));
   
+  try {
+    localStorage.setItem('LIVON_SAMSUNG_SHEET_' + gActiveSamsungSheet.toUpperCase(), JSON.stringify(gSamsungSheets[gActiveSamsungSheet]));
+  } catch (e) {}
+
   if (gActiveSamsungSheet === 'eligible') {
     gSamsungList = gSamsungSheets.eligible.slice();
     LivonDB.saveSamsungEligible(gSamsungList);
@@ -4304,21 +4412,451 @@ function deleteSamsungSpreadsheetSelectedRows() {
   } else {
     if (typeof syncToConvex === 'function') {
       toDelete.forEach(row => {
-        const rowId = row.id || row.patientId || row.rowId || row.email || row.name;
+        const rowId = row.id || row.patientId || row.rowId || row.policyNumber || row.email || row.name;
         if (rowId) syncToConvex('sync:deleteSamsungSheetRow', { sheetKey: gActiveSamsungSheet, rowId }).catch(console.warn);
       });
+      syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: gActiveSamsungSheet, rows: gSamsungSheets[gActiveSamsungSheet], replace: true }).catch(console.warn);
     }
   }
 
   gSamsungSelectedRows.clear();
+  updateSamsungDeleteSelectedButtons();
   updateSamsungSheetBadges();
   renderCurrentSamsungSheet();
+  if (typeof renderSamsungClaimHub === 'function' && gActiveTab === 'samsungclaimhub') {
+    renderSamsungClaimHub();
+  }
 
   showCustomAlert({
     title: '행 삭제 완료',
-    message: '선택한 행이 성공적으로 삭제되었습니다 (Convex Cloud 동기화 완료).',
+    message: '선택한 행이 성공적으로 삭제되었습니다 (클라우드 동기화 완료).',
     icon: 'trash-2',
     iconColor: 'rose'
+  });
+}
+
+// -------------------------------------------------------------------------
+// SAMSUNG DAILY CARE LOG ATTACHMENT CONTROLLER (대상자 시트 간병일지 연동 엔진)
+// -------------------------------------------------------------------------
+
+function updateSamsungDailyCareLogCountBadge() {
+  const targetRows = (gSamsungSheets && gSamsungSheets.target) || [];
+  let attachedCount = 0;
+  targetRows.forEach(tr => {
+    const tid = String(tr.patientId || tr.id || '');
+    const name = tr.patientName;
+    const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[tid]) || [];
+    const hasLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) &&
+      gCareLogs.some(l => String(l.applyId) === tid || (name && l.patientName === name));
+    if (custFiles.length > 0 || hasLog) attachedCount++;
+  });
+
+  const badge = document.getElementById('samsungDailyCareLogCountBadge');
+  if (badge) badge.innerText = `${attachedCount}건`;
+  const modalBadge = document.getElementById('samsungDailyCareLogModalStatAttached');
+  if (modalBadge) modalBadge.innerText = `${attachedCount}건`;
+}
+
+function openSamsungDailyCareLogModal() {
+  renderSamsungDailyCareLogModalContent();
+  openModal('samsungDailyCareLogModal');
+  if (typeof initIcons === 'function') initIcons('samsungDailyCareLogModal');
+}
+
+function renderSamsungDailyCareLogModalContent() {
+  const listContainer = document.getElementById('samsungDailyCareLogModalListContainer');
+  if (!listContainer) return;
+
+  const targetRows = (gSamsungSheets && gSamsungSheets.target) || [];
+  const searchInput = document.getElementById('samsungDailyCareLogModalSearchInput');
+  const q = (searchInput?.value || '').trim().toLowerCase();
+
+  const totalEl = document.getElementById('samsungDailyCareLogModalStatTotal');
+  const attachedEl = document.getElementById('samsungDailyCareLogModalStatAttached');
+  const pendingEl = document.getElementById('samsungDailyCareLogModalStatPending');
+
+  let attachedCount = 0;
+  const patientStatuses = targetRows.map(tr => {
+    const tid = String(tr.patientId || tr.id || '');
+    const name = tr.patientName || '';
+    const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[tid]) || [];
+    const hasLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) &&
+      gCareLogs.some(l => String(l.applyId) === tid || (name && l.patientName === name));
+    const isReg = (custFiles.length > 0) || hasLog;
+    if (isReg) attachedCount++;
+    const fileName = custFiles.length > 0 ? custFiles[0].name : (hasLog ? `[${name}]_케어포트_공식간병일지.pdf` : '');
+    const fileSize = custFiles.length > 0 ? `${(custFiles[0].size / 1024).toFixed(0)} KB` : '전산 일지';
+    return {
+      tr,
+      tid,
+      name,
+      isReg,
+      fileName,
+      fileSize,
+      fileCount: custFiles.length > 0 ? custFiles.length : (hasLog ? 1 : 0)
+    };
+  });
+
+  if (totalEl) totalEl.innerText = `${targetRows.length}명`;
+  if (attachedEl) attachedEl.innerText = `${attachedCount}건`;
+  if (pendingEl) pendingEl.innerText = `${targetRows.length - attachedCount}건`;
+
+  const filtered = patientStatuses.filter(item => {
+    if (!q) return true;
+    return (item.name && item.name.toLowerCase().includes(q)) ||
+           (item.tid && item.tid.toLowerCase().includes(q)) ||
+           (item.tr.policyNumber && item.tr.policyNumber.toLowerCase().includes(q)) ||
+           (item.tr.hospitalName && item.tr.hospitalName.toLowerCase().includes(q));
+  });
+
+  if (filtered.length === 0) {
+    listContainer.innerHTML = `
+      <div class="p-8 text-center text-slate-400 bg-slate-50/60 rounded-2xl border border-slate-200">
+        <i data-lucide="file-x" class="w-8 h-8 text-slate-300 mx-auto mb-1.5"></i>
+        <p class="font-bold text-slate-600">등록된 대상자가 없거나 검색 조건과 일치하는 항목이 없습니다.</p>
+      </div>
+    `;
+    if (typeof initIcons === 'function') initIcons(listContainer);
+    return;
+  }
+
+  let html = filtered.map((item, idx) => {
+    const tr = item.tr;
+    return `
+      <div class="p-3.5 bg-white hover:bg-purple-50/40 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 shadow-2xs transition-all">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-mono text-xs text-slate-400 font-bold">#${idx + 1}</span>
+            <span class="font-black text-slate-900 text-xs">${typeof maskName === 'function' ? maskName(item.name) : item.name}</span>
+            <span class="font-mono text-[11px] text-slate-500 font-semibold">(${item.tid})</span>
+            ${item.isReg ? `
+              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-black text-[10.5px] bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                <i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-600"></i>
+                <span>일지 등록완료 (${item.fileCount}건)</span>
+              </span>
+            ` : `
+              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[10.5px] bg-slate-100 text-slate-500 border border-slate-200">
+                <i data-lucide="alert-circle" class="w-3 h-3 text-slate-400"></i>
+                <span>미등록</span>
+              </span>
+            `}
+          </div>
+
+          <div class="text-[11px] text-slate-500 flex items-center gap-3 mt-1 flex-wrap">
+            <span>증권번호: <b class="font-mono text-slate-700">${tr.policyNumber || '-'}</b></span>
+            <span>병원: <b class="text-slate-700">${tr.hospitalName || '-'}</b></span>
+            <span>간병기간: <b class="font-mono text-slate-700">${tr.desiredStartDate || tr.contractStartDate || '-'} ~ ${tr.expectedEndDate || tr.contractEndDate || '-'}</b></span>
+          </div>
+
+          ${item.isReg ? `
+            <div class="mt-1.5 flex items-center gap-2 text-[11px] text-purple-700 bg-purple-50 px-2.5 py-1 rounded-xl border border-purple-200/80 w-fit">
+              <i data-lucide="file-text" class="w-3.5 h-3.5 text-purple-600 shrink-0"></i>
+              <span class="font-bold truncate max-w-[280px]" title="${item.fileName}">${item.fileName}</span>
+              <span class="text-purple-500 font-mono text-[10px]">(${item.fileSize})</span>
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="flex items-center gap-1.5 shrink-0">
+          ${item.isReg ? `
+            <button type="button" onclick="previewCustomerCareLogPdf('${item.tid}')" 
+              class="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-900 font-black text-xs transition-all cursor-pointer shadow-2xs"
+              title="등록된 간병일지 PDF 미리보기">
+              <i data-lucide="eye" class="w-3.5 h-3.5 text-purple-700"></i>
+              <span>미리보기</span>
+            </button>
+            <button type="button" onclick="autoFetchCarePortLogForTargetPatient('${item.tid}')" 
+              class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-300 transition-all cursor-pointer shadow-2xs"
+              title="케어포트 전산 일지 새로고침 / 재연동">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              <span>재연동</span>
+            </button>
+            <button type="button" onclick="removeCareLogFromTargetPatient('${item.tid}')" 
+              class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer border border-transparent hover:border-rose-200"
+              title="일지 첨부 해제">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          ` : `
+            <button type="button" onclick="autoFetchCarePortLogForTargetPatient('${item.tid}')" 
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-xs shadow-xs transition-all cursor-pointer"
+              title="케어포트 전산 일지를 1-클릭으로 자동 연동합니다">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              <span>전산 연동</span>
+            </button>
+            <label class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs border border-slate-300 shadow-2xs transition-all cursor-pointer"
+              title="PC의 PDF 파일을 직접 첨부합니다">
+              <i data-lucide="upload" class="w-3.5 h-3.5 text-slate-500"></i>
+              <span>파일 첨부</span>
+              <input type="file" accept=".pdf" class="hidden" onchange="handleSamsungDailyCareLogPatientFileSelect(event, '${item.tid}')">
+            </label>
+          `}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  listContainer.innerHTML = html;
+  if (typeof initIcons === 'function') initIcons(listContainer);
+}
+
+async function autoFetchCarePortLogForTargetPatient(targetId) {
+  const targetRows = (gSamsungSheets && gSamsungSheets.target) || [];
+  const tr = targetRows.find(r => String(r.patientId || r.id) === String(targetId));
+  const patientName = tr ? tr.patientName : '고객';
+
+  try {
+    const generated = await generateCarePortPdfBytesForApp(targetId);
+    if (!generated || !generated.bytes) {
+      alert(`[${patientName}] 고객의 케어포트 간병일지 생성에 실패했습니다.`);
+      return;
+    }
+    window.gSamsungCustomerCareLogFiles = window.gSamsungCustomerCareLogFiles || {};
+    window.gSamsungCustomerCareLogFiles[targetId] = [{
+      name: generated.fileName || `[케어포트_공식간병일지]_${patientName}.pdf`,
+      bytes: generated.bytes,
+      size: generated.bytes.byteLength,
+      date: new Date().toISOString()
+    }];
+
+    const newLogId = 'CLOG-' + String(Date.now()).slice(-4);
+    const now = new Date();
+    const importedAt = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const newLog = {
+      id: newLogId,
+      applyId: targetId,
+      patientName: patientName,
+      insuranceCompany: '삼성화재',
+      caregiverName: tr?.caregiverName || '안연희',
+      centerName: '영등포센터',
+      startDate: tr?.desiredStartDate || tr?.contractStartDate || '2026-09-01',
+      endDate: tr?.expectedEndDate || tr?.contractEndDate || '2026-09-10',
+      pdfFileName: generated.fileName || `[케어포트_공식간병일지]_${patientName}.pdf`,
+      pdfFileSize: `${(generated.bytes.byteLength / 1024).toFixed(0)} KB`,
+      fileCount: 1,
+      source: '케어포트 전산',
+      importedAt: importedAt
+    };
+    gCareLogs = gCareLogs || [];
+    gCareLogs.unshift(newLog);
+    try {
+      localStorage.setItem('LIVON_CARE_LOGS', JSON.stringify(gCareLogs));
+    } catch (e) {}
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveCareLog', { log: newLog }).catch(console.warn);
+    }
+
+    gSamsungDailySelectedCareLogs.add(targetId);
+
+    if (!window.gSamsungDispatchAttachedCareLogs) window.gSamsungDispatchAttachedCareLogs = [];
+    if (!window.gSamsungDispatchAttachedCareLogs.some(a => String(a.id) === String(targetId))) {
+      window.gSamsungDispatchAttachedCareLogs.push({
+        id: targetId,
+        patientName: patientName,
+        policyNumber: tr?.policyNumber || '-',
+        accidentNumber: tr?.accidentNumber || '-',
+        carePeriod: `${tr?.desiredStartDate || '2026-09-01'} ~ ${tr?.expectedEndDate || '2026-09-10'}`,
+        filename: generated.fileName,
+        source: 'careport',
+        file: null
+      });
+    }
+
+    updateSamsungDailyCareLogCountBadge();
+    renderCurrentSamsungSheet();
+    renderSamsungDailyCareLogModalContent();
+
+    showCustomAlert({
+      title: '간병일지 연동 완료 ✅',
+      message: `[${patientName}] 고객의 케어포트 공식 간병일지가 성공적으로 연동되었습니다!`,
+      icon: 'file-check',
+      iconColor: 'purple'
+    });
+  } catch (err) {
+    console.error('간병일지 연동 오류:', err);
+    alert('간병일지 연동 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+async function autoFetchAllCarePortLogsForTarget() {
+  const targetRows = (gSamsungSheets && gSamsungSheets.target) || [];
+  if (targetRows.length === 0) {
+    alert('대상자 시트에 등록된 환자가 없습니다.');
+    return;
+  }
+
+  let successCount = 0;
+  for (const tr of targetRows) {
+    const tid = String(tr.patientId || tr.id || '');
+    if (!tid) continue;
+    try {
+      await autoFetchCarePortLogForTargetPatient(tid);
+      successCount++;
+    } catch (e) {
+      console.warn('Auto fetch care log failed for:', tid, e);
+    }
+  }
+
+  updateSamsungDailyCareLogCountBadge();
+  renderCurrentSamsungSheet();
+  renderSamsungDailyCareLogModalContent();
+
+  showCustomAlert({
+    title: '전체 간병일지 연동 완료 🎉',
+    message: `총 ${successCount}명의 대상자 공식 간병일지가 케어포트 전산과 완벽히 연동되었습니다!`,
+    icon: 'sparkles',
+    iconColor: 'emerald'
+  });
+}
+
+function handleSamsungDailyCareLogPatientFileSelect(event, targetId) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const targetRows = (gSamsungSheets && gSamsungSheets.target) || [];
+  const tr = targetRows.find(r => String(r.patientId || r.id) === String(targetId));
+  const patientName = tr ? tr.patientName : '고객';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const bytes = new Uint8Array(e.target.result);
+    window.gSamsungCustomerCareLogFiles = window.gSamsungCustomerCareLogFiles || {};
+    window.gSamsungCustomerCareLogFiles[targetId] = [{
+      name: file.name,
+      bytes: bytes,
+      size: file.size,
+      date: new Date().toISOString()
+    }];
+
+    gSamsungDailySelectedCareLogs.add(targetId);
+
+    if (!window.gSamsungDispatchAttachedCareLogs) window.gSamsungDispatchAttachedCareLogs = [];
+    if (!window.gSamsungDispatchAttachedCareLogs.some(a => String(a.id) === String(targetId))) {
+      window.gSamsungDispatchAttachedCareLogs.push({
+        id: targetId,
+        patientName: patientName,
+        policyNumber: tr?.policyNumber || '-',
+        accidentNumber: tr?.accidentNumber || '-',
+        carePeriod: `${tr?.desiredStartDate || ''} ~ ${tr?.expectedEndDate || ''}`,
+        filename: file.name,
+        source: 'local',
+        file: file
+      });
+    }
+
+    updateSamsungDailyCareLogCountBadge();
+    renderCurrentSamsungSheet();
+    renderSamsungDailyCareLogModalContent();
+
+    showCustomAlert({
+      title: '간병일지 첨부 완료 ✅',
+      message: `[${patientName}] 고객에게 [${file.name}] 파일이 성공적으로 첨부되었습니다.`,
+      icon: 'file-check',
+      iconColor: 'purple'
+    });
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value = '';
+}
+
+async function handleSamsungDailyCareLogMultiFileUpload(event) {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
+
+  const targetRows = (gSamsungSheets && gSamsungSheets.target) || [];
+  let attachedCount = 0;
+
+  const readAsUint8Array = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result));
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const fname = f.name;
+    let matchedRow = targetRows.find(tr => {
+      const name = tr.patientName;
+      const pid = tr.patientId;
+      return (name && fname.includes(name)) || (pid && fname.includes(pid));
+    });
+
+    if (!matchedRow && targetRows[i]) {
+      matchedRow = targetRows[i];
+    }
+
+    if (matchedRow) {
+      const tid = String(matchedRow.patientId || matchedRow.id);
+      const bytes = await readAsUint8Array(f);
+      window.gSamsungCustomerCareLogFiles = window.gSamsungCustomerCareLogFiles || {};
+      window.gSamsungCustomerCareLogFiles[tid] = [{
+        name: f.name,
+        bytes: bytes,
+        size: f.size,
+        date: new Date().toISOString()
+      }];
+
+      gSamsungDailySelectedCareLogs.add(tid);
+
+      if (!window.gSamsungDispatchAttachedCareLogs) window.gSamsungDispatchAttachedCareLogs = [];
+      if (!window.gSamsungDispatchAttachedCareLogs.some(a => String(a.id) === tid)) {
+        window.gSamsungDispatchAttachedCareLogs.push({
+          id: tid,
+          patientName: matchedRow.patientName,
+          policyNumber: matchedRow.policyNumber || '-',
+          accidentNumber: matchedRow.accidentNumber || '-',
+          carePeriod: `${matchedRow.desiredStartDate || ''} ~ ${matchedRow.expectedEndDate || ''}`,
+          filename: f.name,
+          source: 'local',
+          file: f
+        });
+      }
+      attachedCount++;
+    }
+  }
+
+  updateSamsungDailyCareLogCountBadge();
+  renderCurrentSamsungSheet();
+  renderSamsungDailyCareLogModalContent();
+
+  showCustomAlert({
+    title: 'PC 파일 일괄 등록 완료 ✅',
+    message: `선택하신 ${attachedCount}개의 간병일지 파일이 대상자에게 정상 등록되었습니다.`,
+    icon: 'file-check',
+    iconColor: 'purple'
+  });
+  event.target.value = '';
+}
+
+function removeCareLogFromTargetPatient(targetId) {
+  const targetRows = (gSamsungSheets && gSamsungSheets.target) || [];
+  const tr = targetRows.find(r => String(r.patientId || r.id) === String(targetId));
+  const name = tr ? tr.patientName : '해당';
+
+  if (!confirm(`[${name}] 고객의 간병일지 첨부를 해제하시겠습니까?`)) return;
+
+  if (window.gSamsungCustomerCareLogFiles) {
+    delete window.gSamsungCustomerCareLogFiles[targetId];
+  }
+  gCareLogs = (gCareLogs || []).filter(l => String(l.applyId) !== String(targetId) && l.patientName !== name);
+  try {
+    localStorage.setItem('LIVON_CARE_LOGS', JSON.stringify(gCareLogs));
+  } catch (e) {}
+
+  gSamsungDailySelectedCareLogs.delete(targetId);
+  if (window.gSamsungDispatchAttachedCareLogs) {
+    window.gSamsungDispatchAttachedCareLogs = window.gSamsungDispatchAttachedCareLogs.filter(a => String(a.id) !== String(targetId));
+  }
+
+  updateSamsungDailyCareLogCountBadge();
+  renderCurrentSamsungSheet();
+  renderSamsungDailyCareLogModalContent();
+
+  showCustomAlert({
+    title: '간병일지 해제 완료',
+    message: `[${name}] 고객의 간병일지 첨부가 해제되었습니다.`,
+    icon: 'trash-2',
+    iconColor: 'slate'
   });
 }
 
@@ -6690,6 +7228,30 @@ function openSamsungEmailDispatchModal(type = 'daily') {
   const compRows = (gSamsungSheets && gSamsungSheets.completed) || [];
 
   if (type === 'daily') {
+    if (!window.gSamsungDispatchAttachedCareLogs) window.gSamsungDispatchAttachedCareLogs = [];
+    const existingDispatchIds = new Set(window.gSamsungDispatchAttachedCareLogs.map(a => String(a.id)));
+    targetRows.forEach(tr => {
+      const tid = String(tr.patientId || tr.id || '');
+      const name = tr.patientName;
+      const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[tid]) || [];
+      const hasLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) &&
+        gCareLogs.some(l => String(l.applyId) === tid || (name && l.patientName === name));
+      if ((custFiles.length > 0 || hasLog) && !existingDispatchIds.has(tid)) {
+        existingDispatchIds.add(tid);
+        const fn = custFiles.length > 0 ? custFiles[0].name : `[${tid}_${name}]_케어포트_공식간병일지.pdf`;
+        window.gSamsungDispatchAttachedCareLogs.push({
+          id: tid,
+          patientName: name,
+          policyNumber: tr.policyNumber || '-',
+          accidentNumber: tr.accidentNumber || '-',
+          carePeriod: `${tr.desiredStartDate || tr.contractStartDate || ''} ~ ${tr.expectedEndDate || tr.contractEndDate || ''}`,
+          filename: fn,
+          source: 'careport',
+          file: custFiles.length > 0 ? custFiles[0] : null
+        });
+      }
+    });
+
     if (titleEl) titleEl.innerText = '삼성화재 일일접수 보고 이메일 발송';
     if (subtitleEl) subtitleEl.innerText = '작성된 [대상자] 엑셀 시트와 검색된 간병일지를 첨부하여 일일보고 메일을 발송합니다.';
     if (iconBox) {
@@ -16274,6 +16836,7 @@ function isClaimDepositConfirmed(claim) {
 
 function isRoundDepositConfirmed(round) {
   if (!round) return false;
+  if (round.depositAmount !== undefined && Number(round.depositAmount) > 0) return true;
   if (round.isClaimDeposited || round.isDepositDone) return true;
   if (round.existingClaim && isClaimDepositConfirmed(round.existingClaim)) return true;
   return false;
@@ -16353,11 +16916,21 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       }
       const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
 
-      const isClaimDeposited = Boolean(claimForRound && isClaimDepositConfirmed(claimForRound));
-      const isPayoutPaid = Boolean(payoutForRound && isPayoutStatusPaid(payoutForRound.payoutStatus));
-
-      const fullClaimAmount = Number(claimForRound.depositAmount) || Number(claimForRound.claimAmount) || (roundDays * dailyClaimPrice);
+      const fullClaimAmount = Number(claimForRound.claimAmount) || (roundDays * dailyClaimPrice);
       const fullPayoutAmount = Number(payoutForRound ? payoutForRound.payoutAmount : 0) || (roundDays * cgDailyWage);
+
+      let depositAmount = (claimForRound.depositAmount !== undefined && claimForRound.depositAmount !== null && claimForRound.depositAmount !== '')
+        ? Number(claimForRound.depositAmount)
+        : (isClaimDepositConfirmed(claimForRound) ? fullClaimAmount : 0);
+
+      if (!depositAmount && app && app.roundDeposits && app.roundDeposits[roundIndex] !== undefined) {
+        depositAmount = Number(app.roundDeposits[roundIndex]) || 0;
+      } else if (!depositAmount && app && app.depositConfirmedAmount > 0 && sortedClaims.length === 1) {
+        depositAmount = Math.min(fullClaimAmount, Number(app.depositConfirmedAmount));
+      }
+
+      const isClaimDeposited = Boolean(depositAmount > 0 || isClaimDepositConfirmed(claimForRound));
+      const isPayoutPaid = Boolean(payoutForRound && isPayoutStatusPaid(payoutForRound.payoutStatus));
 
       const marginAmount = fullClaimAmount - fullPayoutAmount;
       const marginRate = fullClaimAmount > 0 ? ((marginAmount / fullClaimAmount) * 100).toFixed(1) : '0.0';
@@ -16376,6 +16949,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         ongoingRemaining: 0,
         dailyClaimPrice,
         fullClaimAmount,
+        depositAmount,
         ongoingClaimAmount: fullClaimAmount,
         claimId: claimForRound.id || `Q${app.id.replace('C', '')}.${roundIndex}`,
         claimStatus: isClaimDeposited ? 'DEPOSIT_DONE' : 'CLAIMED_UNPAID',
@@ -16516,15 +17090,28 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         ongoingRemaining = roundDays;
       }
 
-      const isClaimDeposited = Boolean(claimForRound && isClaimDepositConfirmed(claimForRound));
-      const isPayoutPaid = Boolean(payoutForRound && isPayoutStatusPaid(payoutForRound.payoutStatus));
-
-      let claimStatus = 'UPCOMING_WAIT';
       const fullClaimAmount = roundDays * dailyClaimPrice;
       const ongoingClaimAmount = ongoingElapsed * dailyClaimPrice;
 
+      let depositAmount = 0;
+      if (claimForRound) {
+        depositAmount = (claimForRound.depositAmount !== undefined && claimForRound.depositAmount !== null && claimForRound.depositAmount !== '')
+          ? Number(claimForRound.depositAmount)
+          : (isClaimDepositConfirmed(claimForRound) ? fullClaimAmount : 0);
+      } else if (app && app.roundDeposits && app.roundDeposits[roundIndex] !== undefined) {
+        depositAmount = Number(app.roundDeposits[roundIndex]) || 0;
+      } else if (app && app.depositConfirmedAmount > 0) {
+        depositAmount = Math.min(fullClaimAmount, Number(app.depositConfirmedAmount));
+      }
+
+      const isClaimDeposited = Boolean(depositAmount > 0 || (claimForRound && isClaimDepositConfirmed(claimForRound)));
+      const isPayoutPaid = Boolean(payoutForRound && isPayoutStatusPaid(payoutForRound.payoutStatus));
+
+      let claimStatus = 'UPCOMING_WAIT';
       if (claimForRound) {
         claimStatus = isClaimDeposited ? 'DEPOSIT_DONE' : 'CLAIMED_UNPAID';
+      } else if (isClaimDeposited) {
+        claimStatus = 'DEPOSIT_DONE';
       } else if (isFaxClaimSent) {
         claimStatus = 'CLAIMED_UNPAID';
       } else {
@@ -16578,6 +17165,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         ongoingRemaining,
         dailyClaimPrice,
         fullClaimAmount,
+        depositAmount,
         ongoingClaimAmount,
         claimId: claimForRound ? claimForRound.id : `Q${app.id.replace('C', '')}.${roundIndex}`,
         claimStatus,
@@ -18691,29 +19279,56 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                         </div>
 
                         <!-- 2행: 금액 정보 -->
-                        <div class="flex items-baseline justify-between">
-                          <span class="text-xs text-slate-500 font-medium">실입금액:</span>
-                          <div class="text-right">
-                            <b class="text-base font-black ${isDepositDone ? 'text-slate-900' : 'text-amber-950'} font-mono">${formatCurrency(r.existingClaim ? (r.existingClaim.depositAmount || r.existingClaim.claimAmount) : r.fullClaimAmount)}원</b>
-                            <div class="text-[10.5px] ${isDepositDone ? 'text-slate-500' : 'text-amber-800'} font-mono">(${r.days}일 / ${hours}시간)</div>
-                          </div>
-                        </div>
-
-                        <!-- 3행: 상태값 정보 -->
-                        <div class="pt-0.5 flex items-center justify-between text-xs">
-                          <span class="text-slate-500">입금 상태:</span>
-                          ${isDepositDone ? `
-                            <div class="flex items-center gap-1.5 flex-wrap">
-                              <span class="px-2 py-0.5 rounded-lg bg-slate-200 text-slate-700 font-bold text-[11px] flex items-center gap-1" title="보험금 입금확인 일시: ${depositDateTimeStr || '입금확인됨'}">
-                                <i data-lucide="check" class="w-3 h-3"></i> 입금완료 (${depositDateTimeStr || '입금확인됨'})
-                              </span>
+                        <!-- 2행: 금액 정보 -->
+                        ${(() => {
+                          const roundDepositVal = r.existingClaim ? (r.existingClaim.depositAmount !== undefined ? r.existingClaim.depositAmount : (isRoundDepositConfirmed(r) ? r.fullClaimAmount : 0)) : (r.depositAmount || 0);
+                          const isPartial = roundDepositVal > 0 && roundDepositVal < r.fullClaimAmount;
+                          return `
+                            <div class="flex items-baseline justify-between">
+                              <span class="text-xs text-slate-500 font-medium">실입금액:</span>
+                              <div class="text-right">
+                                <b class="text-base font-black ${isDepositDone ? 'text-slate-900' : 'text-amber-950'} font-mono">${formatCurrency(roundDepositVal)}원</b>
+                                <div class="text-[10.5px] ${isDepositDone ? 'text-slate-500' : 'text-amber-800'} font-mono">
+                                  ${roundDepositVal > 0 ? (isPartial ? `<span class="text-amber-700 font-bold">청구 대비 ${formatCurrency(r.fullClaimAmount - roundDepositVal)}원 미수</span>` : '<span class="text-emerald-700 font-bold">청구 전액 완납 ✓</span>') : `청구액: ${formatCurrency(r.fullClaimAmount)}원`}
+                                </div>
+                              </div>
                             </div>
-                          ` : `
-                            <span class="px-2 py-0.5 rounded-lg bg-amber-200/90 text-amber-950 font-black text-[11px] flex items-center gap-1">
-                              <i data-lucide="clock" class="w-3 h-3"></i> 미입금 (대기)
-                            </span>
-                          `}
-                        </div>
+
+                            <!-- 3행: 상태값 정보 -->
+                            <div class="pt-0.5 flex items-center justify-between text-xs">
+                              <span class="text-slate-500">입금 상태:</span>
+                              ${isDepositDone ? `
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                  <span class="px-2 py-0.5 rounded-lg ${isPartial ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-emerald-100 text-emerald-800 border border-emerald-300'} font-bold text-[11px] flex items-center gap-1" title="보험금 입금확인 일시: ${depositDateTimeStr || '입금확인됨'}">
+                                    <i data-lucide="check" class="w-3 h-3"></i> ${isPartial ? `부분입금 (${formatCurrency(roundDepositVal)}원)` : `입금완료 (${depositDateTimeStr || '입금확인됨'})`}
+                                  </span>
+                                </div>
+                              ` : `
+                                <span class="px-2 py-0.5 rounded-lg bg-amber-200/90 text-amber-950 font-black text-[11px] flex items-center gap-1">
+                                  <i data-lucide="clock" class="w-3 h-3"></i> 미입금 (대기)
+                                </span>
+                              `}
+                            </div>
+
+                            <!-- 차수별 입금액 직접 입력/수정 인라인 -->
+                            <div class="bg-white/95 p-2 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between gap-1.5">
+                              <span class="text-[11px] font-bold text-slate-600 whitespace-nowrap">입금액:</span>
+                              <div class="relative flex-1">
+                                <input type="text" id="timelineRoundDepositInput_${app.id}_${r.roundNumber}" 
+                                  value="${formatCurrency(roundDepositVal)}" 
+                                  placeholder="${formatCurrency(r.fullClaimAmount)}"
+                                  oninput="formatCurrencyInputElement(this)"
+                                  onkeydown="if(event.key==='Enter'){event.preventDefault();saveRoundDepositAmount('${app.id}', ${r.roundNumber}, 'timeline');}"
+                                  class="w-full text-right font-mono font-black text-xs p-1.5 pr-6 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-400 bg-white" />
+                                <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 font-bold">원</span>
+                              </div>
+                              <button type="button" onclick="event.stopPropagation(); saveRoundDepositAmount('${app.id}', ${r.roundNumber}, 'timeline')"
+                                class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[11px] shadow-xs cursor-pointer whitespace-nowrap flex items-center gap-1 transition-all" title="이 차수의 입금액 저장">
+                                <i data-lucide="check" class="w-3.5 h-3.5"></i> <span>저장</span>
+                              </button>
+                            </div>
+                          `;
+                        })()}
                       </div>
 
                       <!-- 하단 버튼 영역 -->
@@ -19822,63 +20437,6 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               </div>
             </div>
 
-            <!-- [입금확인 카드] 입금확인금액(AB열) 및 잔여 미수금(=추정미수금) 관리 -->
-            <div class="bg-gradient-to-br from-purple-50/90 via-white to-purple-50/40 p-3.5 rounded-2xl border-2 border-purple-200/90 shadow-2xs space-y-2.5">
-              <div class="flex items-center justify-between pb-1.5 border-b border-purple-100">
-                <div class="flex items-center gap-1.5 font-bold text-slate-900 text-xs">
-                  <i data-lucide="wallet" class="w-3.5 h-3.5 text-purple-600"></i>
-                  <span>입금확인 및 잔여 미수금(=추정미수금) 정산</span>
-                </div>
-                <span class="px-2 py-0.5 rounded-md text-[10px] font-black ${appEstimatedUnpaid <= 0 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-rose-100 text-rose-800 border border-rose-200'}">
-                  ${appEstimatedUnpaid <= 0 ? '전액 입금 완료 ✓' : '미수금 발생 ⚠️'}
-                </span>
-              </div>
-
-              <!-- 3단 금액 요약 박스 -->
-              <div class="grid grid-cols-3 gap-2 text-center">
-                <div class="bg-white p-2 rounded-xl border border-purple-100 shadow-2xs">
-                  <div class="text-[10px] font-bold text-slate-400 mb-0.5">총 청구금액</div>
-                  <div class="font-mono font-black text-slate-900 text-[11.5px] sm:text-xs">
-                    ${formatCurrency(appTotalClaim)}원
-                  </div>
-                </div>
-
-                <div class="bg-white p-2 rounded-xl border-2 border-emerald-200 shadow-2xs">
-                  <div class="text-[10px] font-black text-emerald-700 mb-0.5">입금확인금액 (AB열)</div>
-                  <div class="font-mono font-black text-emerald-700 text-[11.5px] sm:text-xs" id="modalDepositConfirmedDisplay_${app.id}">
-                    ${formatCurrency(appDepositConfirmed)}원
-                  </div>
-                </div>
-
-                <div class="bg-white p-2 rounded-xl border-2 ${appEstimatedUnpaid > 0 ? 'border-rose-300 bg-rose-50/40' : 'border-slate-200'} shadow-2xs">
-                  <div class="text-[10px] font-black ${appEstimatedUnpaid > 0 ? 'text-rose-700' : 'text-slate-500'} mb-0.5">
-                    잔여 미수금=추정미수금
-                  </div>
-                  <div class="font-mono font-black ${appEstimatedUnpaid > 0 ? 'text-rose-600' : 'text-slate-400'} text-[11.5px] sm:text-xs" id="modalEstimatedUnpaidDisplay_${app.id}">
-                    ${formatCurrency(appEstimatedUnpaid)}원
-                  </div>
-                </div>
-              </div>
-
-              <!-- 입금확인금액 입력 및 저장 인라인 -->
-              <div class="bg-white p-2 rounded-xl border border-purple-100 flex items-center gap-2">
-                <span class="text-[11px] font-bold text-slate-600 whitespace-nowrap">입금확인금액:</span>
-                <div class="relative flex-1">
-                  <input type="number" id="modalInputDepositAmount_${app.id}" value="${appDepositConfirmed}" 
-                    data-total-claim="${appTotalClaim}"
-                    oninput="calculateUnpaidRealtime('${app.id}')"
-                    class="w-full text-right font-mono font-black text-xs p-1.5 pr-6 rounded-lg border border-slate-300 focus:ring-2 focus:ring-purple-400 bg-slate-50/50" 
-                    placeholder="0" />
-                  <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 font-bold">원</span>
-                </div>
-                <button type="button" onclick="saveDepositConfirmedAmount('${app.id}')" 
-                  class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-xs shadow-xs transition-all cursor-pointer whitespace-nowrap flex items-center gap-1">
-                  <i data-lucide="check" class="w-3.5 h-3.5"></i>
-                  <span>저장</span>
-                </button>
-              </div>
-            </div>
-
             <!-- 3. 청구 금액 세부: 간병인 배정 기반 차수별 수납 일괄 관리 테이블 -->
             <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
               <div class="flex items-center justify-between pb-1.5 border-b border-slate-100">
@@ -19902,6 +20460,32 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                       <i data-lucide="calendar-plus" class="w-3 h-3"></i> + 기간선택 청구서 생성
                     </button>
                   `}
+                </div>
+              </div>
+
+              <!-- 3단 금액 요약 바 (AB열 및 차수별 입금액 자동 집계) -->
+              <div class="grid grid-cols-3 gap-2 text-center p-2 rounded-xl bg-purple-50/60 border border-purple-100 shadow-2xs">
+                <div>
+                  <div class="text-[10px] font-bold text-slate-400 mb-0.5">총 청구금액</div>
+                  <div class="font-mono font-black text-slate-900 text-[11.5px] sm:text-xs">
+                    ${formatCurrency(appTotalClaim)}원
+                  </div>
+                </div>
+
+                <div class="border-x border-purple-200/60 px-1">
+                  <div class="text-[10px] font-black text-emerald-700 mb-0.5">입금확인금액 (AB열)</div>
+                  <div class="font-mono font-black text-emerald-700 text-[11.5px] sm:text-xs" id="modalDepositConfirmedDisplay_${app.id}">
+                    ${formatCurrency(appDepositConfirmed)}원
+                  </div>
+                </div>
+
+                <div>
+                  <div class="text-[10px] font-black ${appEstimatedUnpaid > 0 ? 'text-rose-700' : 'text-slate-500'} mb-0.5">
+                    잔여 미수금
+                  </div>
+                  <div class="font-mono font-black ${appEstimatedUnpaid > 0 ? 'text-rose-600' : 'text-slate-400'} text-[11.5px] sm:text-xs" id="modalEstimatedUnpaidDisplay_${app.id}">
+                    ${formatCurrency(appEstimatedUnpaid)}원
+                  </div>
                 </div>
               </div>
 
@@ -19994,9 +20578,12 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                       isClaimDone ? 'border-slate-300 bg-slate-100/80 text-slate-700' :
                       'border-amber-200 bg-amber-50/70 text-amber-950';
 
+                    const roundDepositAmt = r.existingClaim ? (r.existingClaim.depositAmount !== undefined ? r.existingClaim.depositAmount : (isRoundDepositConfirmed(r) ? r.fullClaimAmount : 0)) : (r.depositAmount || 0);
+                    const isPartiallyDeposited = roundDepositAmt > 0 && roundDepositAmt < r.fullClaimAmount;
+
                     const badgeHtml = 
                       isSending ? '<span class="px-2.5 py-0.5 rounded-full text-[10.5px] font-black bg-purple-100 text-purple-900 border border-purple-300 animate-pulse inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 shadow-2xs"><span class="w-2 h-2 rounded-full bg-purple-600 animate-ping"></span>바로빌 청구중...</span>' :
-                      isDepositDone ? '<span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1 whitespace-nowrap shrink-0"><i data-lucide="check" class="w-3 h-3 text-emerald-600 shrink-0"></i> 입금확인됨 ✓</span>' :
+                      isDepositDone ? (isPartiallyDeposited ? `<span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-amber-100 text-amber-800 border border-amber-300 inline-flex items-center gap-1 whitespace-nowrap shrink-0"><i data-lucide="check" class="w-3 h-3 text-amber-600 shrink-0"></i> 부분입금 (${formatCurrency(roundDepositAmt)}원)</span>` : '<span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1 whitespace-nowrap shrink-0"><i data-lucide="check" class="w-3 h-3 text-emerald-600 shrink-0"></i> 입금확인됨 ✓</span>') :
                       isClaimDone ? `<span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-amber-100 text-amber-900 border border-amber-300/80 inline-flex items-center gap-1 whitespace-nowrap shrink-0"><i data-lucide="clock" class="w-3 h-3 text-amber-600 shrink-0"></i> 미입금 (${timelineClaimSentTimeStr || faxSentDateStr || '청구완료'})</span>` :
                       '<span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-amber-200 text-amber-950 whitespace-nowrap shrink-0">청구전</span>';
 
@@ -20004,11 +20591,11 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                     const dateRangeStr = (r.startDateStr && r.endDateStr) ? `${r.startDateStr} ~ ${r.endDateStr}` : `${r.startDayOffset}~${r.endDayOffset}일차`;
 
                     const amountHtml = 
-                      isClaimDone ? `<span class="text-slate-900 font-extrabold font-mono">${formatCurrency(r.existingClaim ? (r.existingClaim.depositAmount || r.existingClaim.claimAmount) : r.fullClaimAmount)}원</span> <span class="text-[10px] text-slate-500 font-medium">(${r.days}일 / ${hoursCount}시간)</span>` :
+                      isClaimDone ? `<span class="text-slate-900 font-extrabold font-mono">${formatCurrency(r.fullClaimAmount)}원</span> <span class="text-[10px] text-slate-500 font-medium">(${r.days}일 / ${hoursCount}시간)</span>` :
                       `<span class="text-amber-950 font-extrabold font-mono">${formatCurrency(r.fullClaimAmount)}원</span> <span class="text-[10px] text-amber-800">(${r.days}일 / ${hoursCount}시간)</span>`;
 
                     return `
-                      <div class="p-2.5 rounded-xl border ${cardBorder} text-[11.5px] transition-all space-y-1.5">
+                      <div class="p-2.5 rounded-xl border ${cardBorder} text-[11.5px] transition-all space-y-2">
                         <div class="flex items-center justify-between gap-1.5 flex-wrap">
                           <div class="flex items-center gap-1.5 shrink-0">
                             <span class="font-black ${isClaimDone ? 'text-slate-900' : isSending ? 'text-purple-950' : 'text-amber-950'} whitespace-nowrap">${r.label}</span>
@@ -20025,20 +20612,20 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
                         <div class="flex items-center justify-between gap-2 pt-0.5">
                           <div class="font-bold text-slate-700 min-w-0">
-                            금액: ${amountHtml}
+                            청구액: ${amountHtml}
                           </div>
 
                           <div class="flex items-center gap-1 shrink-0">
                             ${isClaimDone ? `
                               ${isDepositDone ? `
                                 <button type="button" onclick="event.stopPropagation(); toggleClaimDepositStatus('${app.id}', ${r.roundNumber}, '${r.existingClaim ? r.existingClaim.id : ''}')" 
-                                  class="px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300 font-bold text-[10.5px] shadow-2xs inline-flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shrink-0" title="입금확인 완료 상태입니다 (클릭 시 미입금 상태로 되돌리기)">
-                                  <i data-lucide="check-check" class="w-3 h-3 shrink-0 text-emerald-600"></i> <span>입금확인됨</span>
+                                  class="px-2 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-bold text-[10.5px] shadow-2xs inline-flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shrink-0" title="입금 취소하고 미입금 상태로 원복">
+                                  <i data-lucide="rotate-ccw" class="w-3 h-3 shrink-0"></i> <span>입금취소</span>
                                 </button>
                               ` : `
                                 <button type="button" onclick="event.stopPropagation(); toggleClaimDepositStatus('${app.id}', ${r.roundNumber}, '${r.existingClaim ? r.existingClaim.id : ''}')" 
-                                  class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-[10.5px] shadow-xs inline-flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shrink-0" title="입금 확인 시 입금완료로 처리">
-                                  <i data-lucide="check-circle" class="w-3 h-3 shrink-0"></i> <span>입금확인</span>
+                                  class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-[10.5px] shadow-xs inline-flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shrink-0" title="청구 전액 입금확인 처리">
+                                  <i data-lucide="check-circle" class="w-3 h-3 shrink-0"></i> <span>전액 입금확인</span>
                                 </button>
                               `}
                               ${isSamsung ? `
@@ -20085,6 +20672,34 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                                 </button>
                               `}
                             `}
+                          </div>
+                        </div>
+
+                        <!-- [차수별 입금액 입력 & 관리 인라인] -->
+                        <div class="p-2 rounded-lg bg-white/95 border border-slate-200/90 flex items-center justify-between gap-2 shadow-2xs">
+                          <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                            <span class="text-[10.5px] font-bold text-slate-600 whitespace-nowrap">입금액:</span>
+                            <div class="relative flex-1 max-w-[140px]">
+                              <input type="text" id="roundDepositInput_${app.id}_${r.roundNumber}" 
+                                value="${formatCurrency(roundDepositAmt)}" 
+                                placeholder="${formatCurrency(r.fullClaimAmount)}"
+                                oninput="formatCurrencyInputElement(this)"
+                                onkeydown="if(event.key==='Enter'){event.preventDefault();saveRoundDepositAmount('${app.id}', ${r.roundNumber}, 'card3');}"
+                                class="w-full text-right font-mono font-black text-xs py-1 px-1.5 pr-5 rounded-md border border-slate-300 focus:ring-2 focus:ring-purple-400 bg-slate-50/50" />
+                              <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">원</span>
+                            </div>
+                            <button type="button" onclick="event.stopPropagation(); saveRoundDepositAmount('${app.id}', ${r.roundNumber}, 'card3')"
+                              class="px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-[10.5px] shadow-xs cursor-pointer whitespace-nowrap flex items-center gap-1 transition-all" title="이 차수의 입금액 저장">
+                              <i data-lucide="check" class="w-3 h-3"></i> <span>저장</span>
+                            </button>
+                          </div>
+                          <div class="text-right text-[10.5px] font-mono shrink-0">
+                            ${(() => {
+                              const unpAmt = Math.max(0, r.fullClaimAmount - roundDepositAmt);
+                              return unpAmt > 0 
+                                ? `<span class="text-rose-600 font-bold">미수: ${formatCurrency(unpAmt)}원</span>`
+                                : `<span class="text-emerald-700 font-bold">완납 ✓</span>`;
+                            })()}
                           </div>
                         </div>
 
@@ -20482,7 +21097,7 @@ async function updateCustomerField(appId, field, value) {
 function calculateUnpaidRealtime(appId) {
   const inputEl = document.getElementById(`modalInputDepositAmount_${appId}`);
   if (!inputEl) return;
-  const val = Number(inputEl.value) || 0;
+  const val = Number(String(inputEl.value || '').replace(/[^0-9]/g, '')) || 0;
   const totalClaim = Number(inputEl.getAttribute('data-total-claim')) || 0;
   const unpaid = Math.max(0, totalClaim - val);
 
@@ -20507,7 +21122,7 @@ async function saveDepositConfirmedAmount(appId) {
   const inputEl = document.getElementById(`modalInputDepositAmount_${appId}`);
   if (!inputEl) return;
 
-  const val = Number(inputEl.value) || 0;
+  const val = Number(String(inputEl.value || '').replace(/[^0-9]/g, '')) || 0;
   const totalClaim = Number(inputEl.getAttribute('data-total-claim')) || app.totalClaimAmount || 0;
   const unpaid = Math.max(0, totalClaim - val);
 
@@ -20551,6 +21166,130 @@ async function saveDepositConfirmedAmount(appId) {
 window.updateCustomerField = updateCustomerField;
 window.calculateUnpaidRealtime = calculateUnpaidRealtime;
 window.saveDepositConfirmedAmount = saveDepositConfirmedAmount;
+
+async function saveRoundDepositAmount(appId, roundNumber, source = 'card3') {
+  const app = (gApps || []).find(a => a.id === appId);
+  if (!app) return;
+
+  const inputId = (source === 'timeline') 
+    ? `timelineRoundDepositInput_${appId}_${roundNumber}`
+    : `roundDepositInput_${appId}_${roundNumber}`;
+  const inputEl = document.getElementById(inputId) || document.getElementById(`roundDepositInput_${appId}_${roundNumber}`) || document.getElementById(`timelineRoundDepositInput_${appId}_${roundNumber}`);
+  if (!inputEl) return;
+
+  const cleanStr = String(inputEl.value || '').replace(/[^0-9]/g, '');
+  const val = Math.max(0, Number(cleanStr) || 0);
+
+  const as = (gAssigns || []).find(a => a.applyId === appId);
+  const prog = as ? getCareProgressInfo(as) : null;
+  const schedule = calculateCareSettlementSchedule(app, as, prog, (gClaims || []).filter(c => c.applyId === appId), (gPayouts || []).filter(p => p.applyId === appId));
+  const roundInfo = (schedule.rounds || []).find(r => r.roundNumber === roundNumber) || (schedule.rounds && schedule.rounds[0]);
+  const roundClaimAmt = roundInfo ? roundInfo.fullClaimAmount : val;
+  const isDeposited = val > 0;
+
+  let claim = (gClaims || []).find(c => {
+    if (c.applyId !== appId) return false;
+    const rNum = parseInt(String(c.round || '').replace(/[^0-9]/g, ''), 10);
+    return rNum === roundNumber || String(c.round || '').includes(`${roundNumber}차`);
+  });
+
+  if (!claim) {
+    const roundDays = roundInfo ? roundInfo.days : 10;
+    const dailyPrice = schedule.dailyClaimPrice || 160000;
+    claim = {
+      id: `CLM-${Date.now().toString().slice(-6)}`,
+      applyId: appId,
+      patientName: app.patientName || '고객',
+      insuranceCompany: app.insuranceCompany || '현대해상',
+      round: `${roundNumber}차 (${roundDays}일분 / ${roundDays * 24}시간)`,
+      days: roundDays,
+      unitPrice: dailyPrice,
+      dailyWage: dailyPrice,
+      claimAmount: roundClaimAmt,
+      startDate: roundInfo ? roundInfo.startDateStr : '',
+      endDate: roundInfo ? roundInfo.endDateStr : '',
+      claimDate: formatCareDateTimeStr(new Date()),
+      depositDate: isDeposited ? formatCareDateTimeStr(new Date()) : null,
+      depositStatus: isDeposited ? '입금확인됨' : '미확인',
+      depositAmount: val,
+      unpaidAmount: Math.max(0, roundClaimAmt - val),
+      adjusterStatus: isDeposited ? '입금완료' : '청구접수',
+      memo: `${roundNumber}차 입금액: ${formatCurrency(val)}원`,
+      isRealLaunchData: true,
+      importedAt: new Date().toISOString()
+    };
+    gClaims.unshift(claim);
+  } else {
+    claim.depositAmount = val;
+    claim.depositStatus = isDeposited ? '입금확인됨' : '미확인';
+    claim.unpaidAmount = Math.max(0, (claim.claimAmount || roundClaimAmt) - val);
+    claim.depositDate = isDeposited ? (claim.depositDate || formatCareDateTimeStr(new Date())) : null;
+    claim.adjusterStatus = isDeposited ? '입금완료' : '청구접수';
+    claim.updatedAt = new Date().toISOString();
+  }
+
+  if (!app.roundDeposits) app.roundDeposits = {};
+  app.roundDeposits[roundNumber] = val;
+
+  const currentAppClaims = (gClaims || []).filter(c => c.applyId === appId);
+  let totalDepositConfirmed = 0;
+  if (currentAppClaims.length > 0) {
+    totalDepositConfirmed = currentAppClaims.reduce((s, c) => s + (Number(c.depositAmount) || 0), 0);
+  } else if (app.roundDeposits) {
+    totalDepositConfirmed = Object.values(app.roundDeposits).reduce((s, v) => s + (Number(v) || 0), 0);
+  } else {
+    totalDepositConfirmed = val;
+  }
+
+  const appTotalClaim = (currentAppClaims.length > 0)
+    ? currentAppClaims.reduce((s, c) => s + (Number(c.claimAmount) || 0), 0)
+    : (schedule.rounds || []).reduce((s, r) => s + (r.fullClaimAmount || 0), 0);
+
+  const totalUnpaid = Math.max(0, appTotalClaim - totalDepositConfirmed);
+
+  app.depositConfirmedAmount = totalDepositConfirmed;
+  app.estimatedUnpaid = totalUnpaid;
+  app.updatedAt = new Date().toISOString();
+
+  try {
+    await fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: appId,
+        fields: {
+          depositConfirmedAmount: totalDepositConfirmed,
+          estimatedUnpaid: totalUnpaid,
+          roundDeposits: app.roundDeposits,
+          claim: claim
+        }
+      })
+    });
+  } catch (err) {
+    console.warn('Update fields warn:', err);
+  }
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveClaim', { claim }).catch(console.warn);
+    syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+  }
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: `${roundNumber}차 입금액 저장 완료`,
+      message: `${roundNumber}차 입금액 ${formatCurrency(val)}원이 저장되었습니다. (전체 입금합계: ${formatCurrency(totalDepositConfirmed)}원 / 잔여미수: ${formatCurrency(totalUnpaid)}원)`,
+      icon: 'check-circle-2'
+    });
+  }
+
+  renderUnifiedCareHub();
+  renderClaims();
+  if (gActiveHubModalAppId === appId) {
+    openHubCustomerDetailModal(appId);
+  }
+}
+window.saveRoundDepositAmount = saveRoundDepositAmount;
 
 
 async function togglePayoutStatus(payoutId) {
@@ -21080,6 +21819,34 @@ async function toggleClaimDepositStatus(applyId, roundNumber, claimId) {
       claim.adjusterStatus = '청구접수';
     }
     claim.updatedAt = new Date().toISOString();
+  }
+
+  if (app) {
+    if (!app.roundDeposits) app.roundDeposits = {};
+    app.roundDeposits[roundNumber] = claim.depositAmount || 0;
+
+    const currentAppClaims = (gClaims || []).filter(c => c.applyId === applyId);
+    const totalDeposit = currentAppClaims.reduce((s, c) => s + (Number(c.depositAmount) || 0), 0);
+    const appTotalClaim = currentAppClaims.reduce((s, c) => s + (Number(c.claimAmount) || 0), 0);
+    app.depositConfirmedAmount = totalDeposit;
+    app.estimatedUnpaid = Math.max(0, appTotalClaim - totalDeposit);
+    app.updatedAt = new Date().toISOString();
+
+    try {
+      fetch('/api/hub/customer/update-fields', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: applyId,
+          fields: {
+            depositConfirmedAmount: totalDeposit,
+            estimatedUnpaid: app.estimatedUnpaid,
+            roundDeposits: app.roundDeposits,
+            claim: claim
+          }
+        })
+      }).catch(console.warn);
+    } catch (e) {}
   }
 
   // 모달 및 화면 리렌더링
@@ -25068,6 +25835,24 @@ function formatCurrency(num) {
   return Math.round(num).toLocaleString('ko-KR');
 }
 
+function formatCurrencyInputElement(el) {
+  if (!el) return;
+  const raw = String(el.value || '').replace(/[^0-9]/g, '');
+  if (!raw) {
+    el.value = '';
+    return;
+  }
+  const num = Number(raw);
+  const formatted = num.toLocaleString('ko-KR');
+  const prevVal = el.value;
+  const prevCursor = el.selectionStart || prevVal.length;
+  el.value = formatted;
+  if (prevCursor >= prevVal.length) {
+    try { el.setSelectionRange(formatted.length, formatted.length); } catch (e) {}
+  }
+}
+window.formatCurrencyInputElement = formatCurrencyInputElement;
+
 function maskName(name) {
   if (!name || !gIsMasked) return name || '';
   const match = String(name).match(/^([가-힣a-zA-Z]+)(\s*\(.*?\))?$/);
@@ -28130,13 +28915,29 @@ function openImportCarePortLogModal(targetAppId) {
 
   // Populate customer select
   let html = `<option value="">-- 간병 대상 고객을 선택하세요 --</option>`;
+  const existingAppIds = new Set();
   (gApps || []).forEach(app => {
+    existingAppIds.add(String(app.id));
     const rawStart = app.careStartDate || app.startDate || '일정미정';
     const displayStart = typeof formatToIsoDateString === 'function' ? (formatToIsoDateString(rawStart, rawStart)) : rawStart;
     const hasCp = typeof hasCarePortLogsForCustomer === 'function' ? hasCarePortLogsForCustomer(app) : false;
     const tag = hasCp ? '⚡ [일지보유]' : '';
     html += `<option value="${app.id}">[${app.id}] ${app.patientName} (${app.insuranceCompany || '삼성화재'}) - ${displayStart} ${tag}</option>`;
   });
+
+  // Samsung target sheet patients
+  ((gSamsungSheets && gSamsungSheets.target) || []).forEach(tr => {
+    const tid = String(tr.patientId || tr.id || '');
+    if (tid && !existingAppIds.has(tid)) {
+      existingAppIds.add(tid);
+      const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[tid]) || [];
+      const hasLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) &&
+        gCareLogs.some(l => String(l.applyId) === tid || (tr.patientName && l.patientName === tr.patientName));
+      const tag = (custFiles.length > 0 || hasLog) ? '⚡ [일지보유]' : '';
+      html += `<option value="${tid}">[${tid}] ${tr.patientName || '고객'} (삼성화재 대상자) - ${tr.desiredStartDate || tr.contractStartDate || '접수'} ${tag}</option>`;
+    }
+  });
+
   selectEl.innerHTML = html;
 
   if (targetAppId) {
@@ -28173,7 +28974,23 @@ function onCarePortImportCustomerChange(appId) {
     return;
   }
 
-  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  let app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) {
+    const tr = ((gSamsungSheets && gSamsungSheets.target) || []).find(r => String(r.patientId || r.id) === String(appId));
+    if (tr) {
+      app = {
+        id: tr.patientId || tr.id,
+        patientName: tr.patientName,
+        careStartDate: tr.desiredStartDate || tr.contractStartDate,
+        careEndDate: tr.expectedEndDate || tr.contractEndDate,
+        insuranceCompany: '삼성화재',
+        policyNumber: tr.policyNumber,
+        accidentNumber: tr.accidentNumber,
+        caregiverName: tr.caregiverName || '안연희'
+      };
+    }
+  }
+
   const as = (gAssigns || []).find(a => String(a.applyId) === String(appId));
 
   const rawStart = app ? (app.careStartDate || app.startDate) : null;
@@ -28624,6 +29441,8 @@ async function handleAutoGenerateAndImportCarePortLog() {
     if (typeof renderSamsungDailyCareLogSelector === 'function') renderSamsungDailyCareLogSelector();
     if (typeof updateSamsungDailyLiveSummary === 'function') updateSamsungDailyLiveSummary();
     if (typeof renderHyundaiClaimHub === 'function' && gActiveTab === 'hyundaiclaimhub') renderHyundaiClaimHub();
+    if (typeof renderCurrentSamsungSheet === 'function') renderCurrentSamsungSheet();
+    if (typeof updateSamsungDailyCareLogCountBadge === 'function') updateSamsungDailyCareLogCountBadge();
 
     // 완료 즉시 생성된 멀티페이지 케어포트 PDF 미리보기 창 오픈!
     if (typeof previewCustomerCareLogPdf === 'function') {
@@ -28760,6 +29579,8 @@ async function handleExecuteImportCarePortLog(event) {
   if (typeof renderCareLogs === 'function') renderCareLogs();
   if (typeof renderSamsungDailyCareLogSelector === 'function') renderSamsungDailyCareLogSelector();
   if (typeof updateSamsungDailyLiveSummary === 'function') updateSamsungDailyLiveSummary();
+  if (typeof renderCurrentSamsungSheet === 'function') renderCurrentSamsungSheet();
+  if (typeof updateSamsungDailyCareLogCountBadge === 'function') updateSamsungDailyCareLogCountBadge();
 
   if (typeof showCustomAlert === 'function') {
     showCustomAlert({
@@ -36956,7 +37777,7 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
   dataRows.forEach((row, rowIdx) => {
     if (!row || row.every(val => !val || String(val).trim() === '')) return;
 
-    const rowObj = {};
+    const rowObj = { __rawRow: row };
     rawHeaders.forEach((h, colIdx) => {
       if (h) rowObj[h] = row[colIdx];
     });
@@ -37120,6 +37941,8 @@ function detectHeaderMapping(rawHeaders) {
     status: ['현재상태', '진행상태', '상태', '처리현황', '종결여부', '진행현황'],
     claimClassification: ['청구분류', '청구구분', '청구유형', '청구상태'],
     applyType: ['신청유형', '이용유형', '서비스유형'],
+    depositConfirmedAmount: ['입금확인금액', '입금확인', '입금금액', '수납금액', '입금완료금액', '입금액', '입금확인금액(ab열)', '입금확인(ab열)'],
+    estimatedUnpaid: ['추정미수금', '미수금', '잔여미수금', '미수금액', '미입금액', '추정미수', '추정미수금(ac열)'],
     memo: ['진단명/증상', '진단명', '증상', '비고', '메모', '특이사항', '상담내용', '요청사항']
   };
 
@@ -37240,24 +38063,41 @@ function mapRowToApplicationRecord(
     if (!careEndDate && aInfo.endDate) careEndDate = aInfo.endDate;
   }
 
-  // 2. 청구 시트(보험청구) 교차 연동
+  // 2. 청구 시트(보험청구) 및 엑셀 AB열(27) / AC열(28) 연동
+  const rawRow = rowObj.__rawRow || [];
+  let excelDeposit = 0;
+  if (rowObj['입금확인금액'] !== undefined && rowObj['입금확인금액'] !== null && String(rowObj['입금확인금액']).trim() !== '' && String(rowObj['입금확인금액']).trim() !== '-') {
+    excelDeposit = Number(String(rowObj['입금확인금액']).replace(/[^0-9.-]/g, '')) || 0;
+  } else if (getVal('depositConfirmedAmount') !== undefined && getVal('depositConfirmedAmount') !== null && String(getVal('depositConfirmedAmount')).trim() !== '' && String(getVal('depositConfirmedAmount')).trim() !== '-') {
+    excelDeposit = Number(String(getVal('depositConfirmedAmount')).replace(/[^0-9.-]/g, '')) || 0;
+  } else if (rawRow[27] !== undefined && rawRow[27] !== null && String(rawRow[27]).trim() !== '' && String(rawRow[27]).trim() !== '-') {
+    excelDeposit = Number(String(rawRow[27]).replace(/[^0-9.-]/g, '')) || 0;
+  }
+
+  let excelUnpaid = 0;
+  if (rowObj['추정미수금'] !== undefined && rowObj['추정미수금'] !== null && String(rowObj['추정미수금']).trim() !== '' && String(rowObj['추정미수금']).trim() !== '-') {
+    excelUnpaid = Number(String(rowObj['추정미수금']).replace(/[^0-9.-]/g, '')) || 0;
+  } else if (getVal('estimatedUnpaid') !== undefined && getVal('estimatedUnpaid') !== null && String(getVal('estimatedUnpaid')).trim() !== '' && String(getVal('estimatedUnpaid')).trim() !== '-') {
+    excelUnpaid = Number(String(getVal('estimatedUnpaid')).replace(/[^0-9.-]/g, '')) || 0;
+  } else if (rawRow[28] !== undefined && rawRow[28] !== null && String(rawRow[28]).trim() !== '' && String(rawRow[28]).trim() !== '-') {
+    excelUnpaid = Number(String(rawRow[28]).replace(/[^0-9.-]/g, '')) || 0;
+  }
+
   let claimCount = status === '완료' || status === '정산완료' ? 1 : 0;
   let unconfirmedClaimCount = 0;
-  let depositConfirmedAmount = 0;
-  let estimatedUnpaid = 0;
+  let depositConfirmedAmount = excelDeposit;
+  let estimatedUnpaid = excelUnpaid;
 
   if (claimAggMap && claimAggMap[rawId]) {
     const cAgg = claimAggMap[rawId];
     claimCount = cAgg.count;
     unconfirmedClaimCount = cAgg.unconfirmed;
-    depositConfirmedAmount = cAgg.depositSum;
-    estimatedUnpaid = cAgg.unpaidSum;
+    depositConfirmedAmount = (excelDeposit > 0) ? excelDeposit : (cAgg.depositSum || 0);
+    estimatedUnpaid = (excelUnpaid > 0) ? excelUnpaid : (cAgg.unpaidSum || 0);
   } else {
     // 엑셀 자체의 컬럼 값이 있으면 활용
     if (rowObj['청구건수'] !== undefined) claimCount = Number(rowObj['청구건수']) || 0;
     if (rowObj['미확인청구건수'] !== undefined) unconfirmedClaimCount = Number(rowObj['미확인청구건수']) || 0;
-    if (rowObj['입금확인금액'] !== undefined) depositConfirmedAmount = Number(rowObj['입금확인금액']) || 0;
-    if (rowObj['추정미수금'] !== undefined) estimatedUnpaid = Number(rowObj['추정미수금']) || 0;
   }
 
   // 3. 지급 시트(간병비지급) 교차 연동

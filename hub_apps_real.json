@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-20T11:12:15.663Z",
+  "updatedAt": "2026-09-20T23:48:40.487Z",
   "sources": {
     "현대해상": {
       "sourceType": "file",
@@ -10144,8 +10144,8 @@
       "assignedCaregiverCount": 1,
       "claimCount": 1,
       "unconfirmedClaimCount": 0,
-      "depositConfirmedAmount": 1152000,
-      "estimatedUnpaid": 0,
+      "depositConfirmedAmount": 700000,
+      "estimatedUnpaid": 100000,
       "totalPayout": 1680000,
       "memo": "",
       "isRealLaunchData": true,
@@ -10153,7 +10153,34 @@
       "applyType": "입원",
       "claimCategory": "정상",
       "productCode": "ZPB396070",
-      "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)(납입면제/해약환급금 미지급형Ⅱ)"
+      "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
+      "roundDeposits": {
+        "1": 700000
+      },
+      "claim": {
+        "id": "CLM-113790",
+        "applyId": "S0021",
+        "patientName": "박용식",
+        "insuranceCompany": "삼성화재",
+        "round": "1차 (5일분 / 120시간)",
+        "days": 5,
+        "unitPrice": 160000,
+        "dailyWage": 160000,
+        "claimAmount": 800000,
+        "startDate": "2026.09.17 08:50",
+        "endDate": "2026.09.21 18:00",
+        "claimDate": "2026.09.21 08:48",
+        "depositDate": "2026.09.21 08:48",
+        "depositStatus": "입금확인됨",
+        "depositAmount": 700000,
+        "unpaidAmount": 100000,
+        "adjusterStatus": "입금완료",
+        "memo": "1차 입금액: 800,000원",
+        "isRealLaunchData": true,
+        "importedAt": "2026-09-20T23:48:33.790Z",
+        "updatedAt": "2026-09-20T23:48:40.445Z"
+      },
+      "updatedAt": "2026-09-20T23:48:40.487Z"
     },
     {
       "id": "C0287",

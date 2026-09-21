@@ -16,8 +16,17 @@ module.exports = async function handler(req, res) {
   }
 
   const q = req.query || {};
-  const startDate = q.start || '2026-08-01';
-  const endDate = q.end || new Date().toISOString().slice(0, 10);
+  // 한국 시간(KST) 기준 이번 주 월요일 계산 (기본값: 이번 주)
+  const nowKst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const day = nowKst.getUTCDay();
+  const diffToMonday = (day === 0 ? -6 : 1) - day;
+  const mondayKst = new Date(nowKst.getTime() + diffToMonday * 24 * 60 * 60 * 1000);
+  const thisWeekMondayStr = mondayKst.toISOString().slice(0, 10);
+  const todayKstStr = nowKst.toISOString().slice(0, 10);
+
+  const isExplicitAll = q.all === 'true' || q.start === 'all';
+  const startDate = isExplicitAll ? '2026-08-01' : (q.start || thisWeekMondayStr);
+  const endDate = q.end || todayKstStr;
   const channel = q.channel || 'all';
   const channelLabel = (channel === 'all' || channel === '전체') ? '전체 인입경로' : channel;
 
@@ -234,7 +243,7 @@ module.exports = async function handler(req, res) {
     const allMasterConsulted = allMasterLogs.filter(c => c.title || c.summary).length;
     const allMasterRate = allMasterConn > 0 ? Math.round((allMasterAns / allMasterConn) * 100) + '%' : '100%';
 
-    const isAllPeriod = (!startDate || startDate === '2026-08-01') && (!channel || channel === 'all' || channel === '전체');
+    const isAllPeriod = isExplicitAll;
 
     const reportData = {
       reportInfo: {
@@ -252,21 +261,21 @@ module.exports = async function handler(req, res) {
       },
       summaryStats: {
         totalCalls: isAllPeriod ? allMasterTotal : totalCalls,
-        connectReqCalls: isAllPeriod ? allMasterConn : totalConnected,
-        answeredCalls: isAllPeriod ? allMasterAns : totalConsulted,
-        answerRate: isAllPeriod ? allMasterRate : (ctiSummary.answerRate || (totalCalls > 0 ? Math.round((totalConsulted / totalCalls) * 100) + '%' : '0%')),
+        connectReqCalls: isAllPeriod ? allMasterConn : (ctiResult && ctiResult.ctiSummary ? ctiResult.ctiSummary.connectRequests : totalConnected),
+        answeredCalls: isAllPeriod ? allMasterAns : (ctiResult && ctiResult.ctiSummary ? ctiResult.ctiSummary.answeredCalls : totalConsulted),
+        answerRate: isAllPeriod ? allMasterRate : ((ctiResult && ctiResult.ctiSummary && ctiResult.ctiSummary.answerRate) || (totalCalls > 0 ? Math.round((totalConsulted / totalCalls) * 100) + '%' : '0%')),
         abandonedCalls: ctiSummary.abandonedCalls || 0,
         unselectedType: ctiSummary.unselectedType || 0,
         btnExit: ctiSummary.btnExit || 0,
-        consultedCalls: isAllPeriod ? allMasterConsulted : totalConsulted
+        consultedCalls: isAllPeriod ? allMasterConsulted : (ctiResult && ctiResult.ctiSummary ? ctiResult.ctiSummary.answeredCalls : totalConsulted)
       },
       ctiSummary: {
         ...ctiSummary,
         totalAll: isAllPeriod ? allMasterTotal : totalCalls,
         totalInbound: isAllPeriod ? allMasterTotal : totalCalls,
-        connectRequests: isAllPeriod ? allMasterConn : totalConnected,
-        answeredCalls: isAllPeriod ? allMasterAns : totalConsulted,
-        answerRate: isAllPeriod ? allMasterRate : (ctiSummary.answerRate || '0%')
+        connectRequests: isAllPeriod ? allMasterConn : (ctiResult && ctiResult.ctiSummary ? ctiResult.ctiSummary.connectRequests : totalConnected),
+        answeredCalls: isAllPeriod ? allMasterAns : (ctiResult && ctiResult.ctiSummary ? ctiResult.ctiSummary.answeredCalls : totalConsulted),
+        answerRate: isAllPeriod ? allMasterRate : ((ctiResult && ctiResult.ctiSummary && ctiResult.ctiSummary.answerRate) || (ctiSummary.answerRate || '0%'))
       },
       dailyTrends,
       callLogs: isAllPeriod ? allMasterLogs : ctiResult.logs

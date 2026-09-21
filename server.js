@@ -852,11 +852,21 @@ function saveSavedFaxConfig(cfg) {
             return false;
           });
           if (idx !== -1) {
+            const { claim, ...appFields } = fields;
             stored.applications[idx] = {
               ...stored.applications[idx],
-              ...fields,
+              ...appFields,
               updatedAt: new Date().toISOString()
             };
+            if (claim && claim.id) {
+              stored.claims = stored.claims || [];
+              const cIdx = stored.claims.findIndex(c => c.id === claim.id);
+              if (cIdx !== -1) {
+                stored.claims[cIdx] = { ...stored.claims[cIdx], ...claim, updatedAt: new Date().toISOString() };
+              } else {
+                stored.claims.unshift(claim);
+              }
+            }
             stored.updatedAt = new Date().toISOString();
             fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
