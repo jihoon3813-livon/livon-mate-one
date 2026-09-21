@@ -171,94 +171,7 @@ module.exports = async function handler(req, res) {
       ctiResult = await Promise.race([livePromise, timeoutPromise]);
     }
 
-    // 일자별 추이 계산
-    const dailyMap = {};
-    let cur = new Date(startDate);
-    const end = new Date(endDate);
-    const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
-
-    while (cur <= end) {
-      const ds = cur.toISOString().slice(0, 10);
-      dailyMap[ds] = {
-        date: ds,
-        dayOfWeek: daysOfWeek[cur.getDay()],
-        callCount: 0,
-        share: 0,
-        note: cur.getDay() === 0 || cur.getDay() === 6 ? '주말' : ''
-      };
-      cur.setDate(cur.getDate() + 1);
-    }
-
-    (ctiResult.logs || []).forEach(l => {
-      const d = (l.callTime || '').slice(0, 10);
-      if (dailyMap[d]) {
-        dailyMap[d].callCount++;
-      }
-    });
-
-    const dailyTrends = Object.values(dailyMap);
-    const totalCalls = ctiResult.logs.length;
-    dailyTrends.forEach(d => {
-      d.share = totalCalls > 0 ? parseFloat((d.callCount / totalCalls).toFixed(4)) : 0;
-    });
-
-    const weeklyRollup = [];
-    for (let i = 0; i < dailyTrends.length; i += 7) {
-      const slice = dailyTrends.slice(i, i + 7);
-      const weekCalls = slice.reduce((sum, s) => sum + s.callCount, 0);
-      const wNum = Math.floor(i / 7) + 1;
-      const sDate = slice[0].date.slice(5).replace('-', '/');
-      const eDate = slice[slice.length - 1].date.slice(5).replace('-', '/');
-      weeklyRollup.push({
-        week: `${wNum}주차 (${sDate}~${eDate})`,
-        calls: weekCalls,
-        share: totalCalls > 0 ? parseFloat((weekCalls / totalCalls).toFixed(3)) : 0,
-        dailyAvg: slice.length > 0 ? Math.round(weekCalls / slice.length) : 0
-      });
-    }
-
-    const ctiSummary = ctiResult.ctiSummary || {
-      totalAll: totalCalls,
-      totalInbound: totalCalls,
-      answeredCalls: ctiResult.logs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length,
-      connectRequests: ctiResult.logs.filter(c => c.connectReq === 'Y').length,
-      answerRate: '0%',
-      abandonedCalls: 0,
-      unselectedType: 0,
-      btnExit: 0
-    };
-
-    const reportData = {
-      reportInfo: {
-        title: `${channelLabel} 간병(리본케어) 서비스 인바운드 문의 분석 보고 (${startDate} ~ ${endDate})`,
-        target: `${channelLabel} 관련 인바운드 콜`,
-        channel: channel,
-        channelLabel: channelLabel,
-        period: `${startDate} ~ ${endDate}`,
-        startDate,
-        endDate,
-        reportDate: new Date().toISOString().slice(0, 10),
-        author: '리본케어 (Livon Care) 운영센터',
-        operatingDays: dailyTrends.length,
-        syncedAt: new Date().toISOString()
-      },
-      summaryStats: {
-        totalCalls: (ctiSummary && ctiSummary.totalInbound !== undefined) ? ctiSummary.totalInbound : totalCalls,
-        connectReqCalls: (ctiSummary && ctiSummary.connectRequests !== undefined) ? ctiSummary.connectRequests : ctiResult.logs.filter(c => c.connectReq === 'Y').length,
-        answeredCalls: (ctiSummary && ctiSummary.answeredCalls !== undefined) ? ctiSummary.answeredCalls : ctiResult.logs.filter(c => c.title || c.summary).length,
-        answerRate: ctiSummary.answerRate || (totalCalls > 0 ? Math.round((ctiSummary.answeredCalls / totalCalls) * 100) + '%' : '0%'),
-        abandonedCalls: ctiSummary.abandonedCalls || 0,
-        unselectedType: ctiSummary.unselectedType || 0,
-        btnExit: ctiSummary.btnExit || 0,
-        consultedCalls: ctiResult.logs.filter(c => c.title || c.summary).length
-      },
-      ctiSummary,
-      dailyTrends,
-      weeklyRollup,
-      callLogs: []
-    };
-
-    // 기존 전체 데이터와 병합하여 전체 이력이 보존된 완본으로 저장
+    // 기존 전체 데이터와 병합하여 전체 이력이 보존된 완본으로 먼저 구성 (마스터 로그 기준 일자별 추이 계산용)
     const existingMasterLogs = (baseData && Array.isArray(baseData.callLogs)) ? baseData.callLogs : [];
     const masterMap = new Map();
     existingMasterLogs.forEach(l => {
@@ -273,9 +186,98 @@ module.exports = async function handler(req, res) {
     allMasterLogs.sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
     allMasterLogs.forEach((l, idx) => { l.rowNum = idx + 1; });
 
-    reportData.callLogs = allMasterLogs;
+    // 일자별 추이 계산 (마스터 로그 전체 일자 범위 기준)
+    const allDates = Array.from(new Set(allMasterLogs.map(l => (l.callTime || '').slice(0, 10)).filter(Boolean))).sort();
+    const trendMinDate = allDates.length > 0 ? allDates[0] : startDate;
+    const trendMaxDate = allDates.length > 0 && allDates[allDates.length - 1] > endDate ? allDates[allDates.length - 1] : endDate;
 
-    // 로컬 파일시스템에 저장 가능한 환경이면 파일도 즉시 최신화
+    const dailyMap = {};
+    let cur = new Date(trendMinDate);
+    const end = new Date(trendMaxDate);
+    const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
+
+    while (cur <= end) {
+      const ds = cur.toISOString().slice(0, 10);
+      dailyMap[ds] = {
+        date: ds,
+        dayOfWeek: daysOfWeek[cur.getDay()],
+        callCount: 0,
+        share: 0,
+        note: cur.getDay() === 0 || cur.getDay() === 6 ? '주말' : ''
+      };
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    allMasterLogs.forEach(l => {
+      const d = (l.callTime || '').slice(0, 10);
+      if (dailyMap[d]) {
+        dailyMap[d].callCount++;
+      }
+    });
+
+    const dailyTrends = Object.values(dailyMap);
+    const totalMasterCalls = allMasterLogs.length;
+    dailyTrends.forEach(d => {
+      d.share = totalMasterCalls > 0 ? parseFloat((d.callCount / totalMasterCalls).toFixed(4)) : 0;
+    });
+
+    const weeklyRollup = [];
+    for (let i = 0; i < dailyTrends.length; i += 7) {
+      const slice = dailyTrends.slice(i, i + 7);
+      const weekCalls = slice.reduce((sum, s) => sum + s.callCount, 0);
+      const wNum = Math.floor(i / 7) + 1;
+      const sDate = slice[0].date.slice(5).replace('-', '/');
+      const eDate = slice[slice.length - 1].date.slice(5).replace('-', '/');
+      weeklyRollup.push({
+        week: `${wNum}주차 (${sDate}~${eDate})`,
+        calls: weekCalls,
+        share: totalMasterCalls > 0 ? parseFloat((weekCalls / totalMasterCalls).toFixed(3)) : 0,
+        dailyAvg: slice.length > 0 ? Math.round(weekCalls / slice.length) : 0
+      });
+    }
+
+    const ctiSummary = ctiResult.ctiSummary || {
+      totalAll: totalMasterCalls,
+      totalInbound: totalMasterCalls,
+      connectRequests: allMasterLogs.filter(c => c.connectReq === 'Y' || c.connectReq === true).length,
+      answeredCalls: allMasterLogs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length,
+      answerRate: '100%',
+      abandonedCalls: 0,
+      unselectedType: 0,
+      btnExit: 0
+    };
+
+    const reportData = {
+      reportInfo: {
+        title: `${channelLabel} 간병(리본케어) 서비스 인바운드 문의 분석 보고 (${startDate} ~ ${endDate})`,
+        target: `${channelLabel} 관련 인바운드 콜`,
+        channel,
+        channelLabel,
+        period: `${trendMinDate} ~ ${trendMaxDate}`,
+        startDate: trendMinDate,
+        endDate: trendMaxDate,
+        reportDate: new Date().toISOString().slice(0, 10),
+        author: '리본케어 (Livon Care) 운영센터',
+        operatingDays: dailyTrends.length,
+        syncedAt: new Date().toISOString()
+      },
+      summaryStats: {
+        totalCalls: totalMasterCalls,
+        connectReqCalls: allMasterLogs.filter(c => c.connectReq === 'Y' || c.connectReq === true).length,
+        answeredCalls: allMasterLogs.filter(c => c.duration && c.duration !== '0' && c.duration !== '00:00:00').length,
+        answerRate: ctiSummary.answerRate || (totalMasterCalls > 0 ? Math.round((ctiSummary.answeredCalls / totalMasterCalls) * 100) + '%' : '0%'),
+        abandonedCalls: ctiSummary.abandonedCalls || 0,
+        unselectedType: ctiSummary.unselectedType || 0,
+        btnExit: ctiSummary.btnExit || 0,
+        consultedCalls: allMasterLogs.filter(c => c.title || c.summary).length
+      },
+      ctiSummary,
+      dailyTrends,
+      weeklyRollup,
+      callLogs: allMasterLogs
+    };
+
+    // 로컬 파일시스템에 저장 가능한 환경이면 파일도 즉시 최신화 (양방향 크로스 동기화)
     try {
       const chLower = channel.toLowerCase();
       const isAll = channel.includes('전체') || chLower === 'all';
@@ -289,6 +291,26 @@ module.exports = async function handler(req, res) {
       }
       const outPath = path.join(process.cwd(), outName);
       fs.writeFileSync(outPath, JSON.stringify(reportData, null, 2), 'utf8');
+
+      // 삼성화재 데이터인 경우 call_report_all.json에도 실시간 크로스 반영
+      if (!isAll && channel.includes('삼성')) {
+        const allPath = path.join(process.cwd(), 'call_report_all.json');
+        if (fs.existsSync(allPath)) {
+          const allData = JSON.parse(fs.readFileSync(allPath, 'utf8'));
+          const allMap = new Map();
+          (allData.callLogs || []).forEach(l => {
+            const k = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+            allMap.set(k, l);
+          });
+          allMasterLogs.forEach(l => {
+            const k = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+            allMap.set(k, l);
+          });
+          allData.callLogs = Array.from(allMap.values()).sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
+          allData.callLogs.forEach((l, idx) => { l.rowNum = idx + 1; });
+          fs.writeFileSync(allPath, JSON.stringify(allData, null, 2), 'utf8');
+        }
+      }
     } catch (saveErr) {
       // Vercel serverless에서는 읽기 전용 fs일 수 있으므로 무시
     }

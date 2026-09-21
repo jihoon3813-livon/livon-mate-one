@@ -297,6 +297,35 @@ module.exports = async function handler(req, res) {
         callLogs: allMasterLogs
       };
       fs.writeFileSync(outPath, JSON.stringify(fileSaveData, null, 2), 'utf8');
+
+      // 삼성화재 데이터도 call_report_samsung.json에 실시간 크로스 최신화
+      try {
+        const sPath = path.join(process.cwd(), 'call_report_samsung.json');
+        if (fs.existsSync(sPath)) {
+          const sData = JSON.parse(fs.readFileSync(sPath, 'utf8'));
+          const sMap = new Map();
+          (sData.callLogs || []).forEach(l => {
+            const k = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+            sMap.set(k, l);
+          });
+          allMasterLogs.filter(l => (l.channel || '').includes('삼성')).forEach(l => {
+            const k = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+            sMap.set(k, l);
+          });
+          const mergedS = Array.from(sMap.values()).sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
+          mergedS.forEach((l, idx) => { l.rowNum = idx + 1; });
+          sData.callLogs = mergedS;
+          sData.summaryStats = {
+            ...(sData.summaryStats || {}),
+            totalCalls: mergedS.length
+          };
+          sData.reportInfo = {
+            ...(sData.reportInfo || {}),
+            syncedAt: new Date().toISOString()
+          };
+          fs.writeFileSync(sPath, JSON.stringify(sData, null, 2), 'utf8');
+        }
+      } catch (sErr) {}
     } catch (saveErr) {}
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
