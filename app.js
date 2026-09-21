@@ -1113,6 +1113,12 @@ function renderAllLoadingStates() {
   }
 }
 
+function filterInvalidSamsungDuplicates(apps) {
+  if (!Array.isArray(apps)) return [];
+  return apps.filter(a => !(a && a.id && String(a.id).startsWith('C') && (a.insuranceCompany || '').includes('삼성')));
+}
+window.filterInvalidSamsungDuplicates = filterInvalidSamsungDuplicates;
+
 async function loadConvexData(showSpinner = true) {
   if (showSpinner) {
     gIsDataLoading = true;
@@ -1129,13 +1135,14 @@ async function loadConvexData(showSpinner = true) {
         if (cachedRaw) {
           try {
             const parsed = JSON.parse(cachedRaw);
-            if (Array.isArray(parsed) && parsed.some(a => a.isRealLaunchData)) {
-              localRealApps = parsed.filter(a => a.isRealLaunchData);
+            const cleaned = filterInvalidSamsungDuplicates(parsed);
+            if (Array.isArray(cleaned) && cleaned.some(a => a.isRealLaunchData)) {
+              localRealApps = cleaned.filter(a => a.isRealLaunchData);
             }
           } catch (e) {}
         }
         // 원격 데이터 중 실데이터 추출
-        const remoteRealApps = applications.filter(a => a.isRealLaunchData);
+        const remoteRealApps = filterInvalidSamsungDuplicates(applications).filter(a => a.isRealLaunchData);
         if (remoteRealApps.length > 0 || (localRealApps && localRealApps.length > 0)) {
           // 실데이터가 존재하는 경우: 목업 데이터는 원천 차단하고 실데이터만 채택
           if (localRealApps && localRealApps.length > remoteRealApps.length) {
@@ -1147,9 +1154,10 @@ async function loadConvexData(showSpinner = true) {
           } else {
             gApps = remoteRealApps.length > 0 ? remoteRealApps : localRealApps;
           }
+          gApps = filterInvalidSamsungDuplicates(gApps);
           try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
         } else {
-          gApps = applications;
+          gApps = filterInvalidSamsungDuplicates(applications);
           try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
         }
       }
@@ -1220,7 +1228,7 @@ async function loadConvexData(showSpinner = true) {
         if (realRes.ok) {
           const realJson = await realRes.json();
           if (realJson && Array.isArray(realJson.applications) && realJson.applications.length > 0) {
-            const serverRealApps = realJson.applications.filter(a => a.isRealLaunchData);
+            const serverRealApps = filterInvalidSamsungDuplicates(realJson.applications).filter(a => a.isRealLaunchData);
             if (serverRealApps.length >= gApps.length) {
               gApps = serverRealApps;
               try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
@@ -1386,7 +1394,7 @@ async function loadConvexData(showSpinner = true) {
       if (realRes.ok) {
         const realJson = await realRes.json();
         if (realJson && Array.isArray(realJson.applications) && realJson.applications.length > 0) {
-          gApps = realJson.applications;
+          gApps = filterInvalidSamsungDuplicates(realJson.applications);
           try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
         }
       }
@@ -22571,6 +22579,12 @@ function renderUnifiedCareHub() {
   const container = document.getElementById('hubCustomerCardsList');
   if (!container) return;
 
+  // [중요] 삼성화재 중복 C-id(현대 엑셀 업로드 오파싱 잔여물) 브라우저 로컬 캐시 및 전역 데이터 즉시 영구 제거
+  if (Array.isArray(gApps) && gApps.some(a => a && a.id && String(a.id).startsWith('C') && (a.insuranceCompany || '').includes('삼성'))) {
+    gApps = filterInvalidSamsungDuplicates(gApps);
+    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+  }
+
   if (typeof gIsDataLoading !== 'undefined' && gIsDataLoading) {
     renderAllLoadingStates();
     return;
@@ -22620,7 +22634,7 @@ function renderUnifiedCareHub() {
 
   // 1. 원수사 탭 뱃지 총 건수 산출
   const hasAnyRealApp = (gApps || []).some(x => x.isRealLaunchData);
-  const activeHubApps = hasAnyRealApp ? (gApps || []).filter(x => x.isRealLaunchData) : (gApps || []);
+  const activeHubApps = filterInvalidSamsungDuplicates(hasAnyRealApp ? (gApps || []).filter(x => x.isRealLaunchData) : (gApps || []));
 
   let samsungTotal = 0;
   let hyundaiTotal = 0;
@@ -25560,11 +25574,13 @@ function initData() {
     const cachedApps = localStorage.getItem('LIVON_CACHED_APPS');
     if (cachedApps) {
       const parsed = JSON.parse(cachedApps);
-      if (Array.isArray(parsed) && parsed.some(a => a.isRealLaunchData)) {
-        gApps = parsed.filter(a => a.isRealLaunchData);
+      const cleaned = (typeof filterInvalidSamsungDuplicates === 'function') ? filterInvalidSamsungDuplicates(parsed) : (Array.isArray(parsed) ? parsed.filter(a => !(a && a.id && String(a.id).startsWith('C') && (a.insuranceCompany || '').includes('삼성'))) : []);
+      if (Array.isArray(cleaned) && cleaned.some(a => a.isRealLaunchData)) {
+        gApps = cleaned.filter(a => a.isRealLaunchData);
       } else {
-        gApps = parsed;
+        gApps = cleaned;
       }
+      try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
     } else if (window.REBORN_DATA && window.REBORN_DATA.applications) {
       gApps = [...window.REBORN_DATA.applications];
     }
@@ -37238,6 +37254,7 @@ async function syncRealLaunchDataToConvex(apps = null, assigns = null, claims = 
   try {
     const CHUNK_SIZE = 50;
     if (Array.isArray(apps) && apps.length > 0) {
+      apps = (typeof filterInvalidSamsungDuplicates === 'function') ? filterInvalidSamsungDuplicates(apps) : apps;
       for (let i = 0; i < apps.length; i += CHUNK_SIZE) {
         const chunk = apps.slice(i, i + CHUNK_SIZE);
         await syncToConvex('sync:saveApplicationsChunk', {

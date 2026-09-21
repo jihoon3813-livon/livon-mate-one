@@ -44,6 +44,9 @@ module.exports = async function handler(req, res) {
       }
       const raw = fs.readFileSync(filePath, 'utf8');
       const data = JSON.parse(raw);
+      if (Array.isArray(data.applications)) {
+        data.applications = data.applications.filter(a => !(a && a.id && String(a.id).startsWith('C') && (a.insuranceCompany || '').includes('삼성')));
+      }
       return res.status(200).json({
         success: true,
         ...data
@@ -93,7 +96,8 @@ module.exports = async function handler(req, res) {
         return true;
       });
 
-      const updatedApps = [...(body.applications || []), ...filterOther(currentData.applications)];
+      const updatedApps = [...(body.applications || []), ...filterOther(currentData.applications)]
+        .filter(a => !(a && a.id && String(a.id).startsWith('C') && (a.insuranceCompany || '').includes('삼성')));
       const updatedAssigns = [...(body.assignments || []), ...filterOther(currentData.assignments)];
       const updatedClaims = [...(body.claims || []), ...filterOther(currentData.claims)];
       const updatedPayouts = [...(body.payouts || []), ...filterOther(currentData.payouts)];

@@ -36,7 +36,7 @@ export const bundleAll = query({
       ctx.db.query("samsungEmailLogs").order("desc").collect(),
     ]);
     return {
-      applications,
+      applications: applications.filter(a => !(a.id && String(a.id).startsWith("C") && (a.insuranceCompany || "").includes("삼성"))),
       assignments,
       claims,
       payouts,
@@ -745,6 +745,9 @@ export const saveApplicationsChunk = mutation({
     }
     for (const item of args.apps) {
       const { _id, _creationTime, ...doc } = item;
+      if (doc.id && String(doc.id).startsWith("C") && (doc.insuranceCompany || "").includes("삼성")) {
+        continue; // C-id 삼성 중복 건은 저장 방지
+      }
       if (!doc.id) {
         await ctx.db.insert("applications", doc);
         continue;
