@@ -1010,10 +1010,11 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         }, 120);
       }
 
-      // 7초 타임아웃 가드 (실시간 CTI 연동 대기 보장)
+      // 25초 타임아웃 가드 (실시간 CTI 연동 충분 대기 보장)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 7000);
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
       let synced = false;
+      let isFallbackData = false;
 
       const defRange = (typeof getTotalLast30Range === 'function') ? getTotalLast30Range() : { start: '', end: '' };
       const s = gTotalFilter.startDate || defRange.start;
@@ -1033,6 +1034,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
             gTotalCallData = sJson.data;
             window.gTotalCallData = sJson.data;
             synced = true;
+            isFallbackData = !!sJson.isFallback;
           }
         }
       } catch (e) {
@@ -1042,6 +1044,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
 
       // API 실패/타임아웃 시 즉각 로컬 최신 정적 데이터 로드 (초고속 즉시 반영)
       if (!synced) {
+        isFallbackData = true;
         const fallbacks = [
           `call_report_all.json?t=${Date.now()}`,
           `/call_report_all.json?t=${Date.now()}`,
@@ -1071,6 +1074,9 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
       }
 
+      // 최신 동기화 콜이 맨 위에 즉시 보이도록 1페이지로 리셋
+      gTotalListPage = 1;
+
       const count = (gTotalCallData && gTotalCallData.summaryStats && gTotalCallData.summaryStats.totalCalls)
         ? gTotalCallData.summaryStats.totalCalls
         : ((gTotalCallData && gTotalCallData.callLogs) ? gTotalCallData.callLogs.length : 0);
@@ -1079,16 +1085,26 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       window._lastTotalCallCount = count;
 
       if (!isBackground) {
-        setTotalSyncProgress(4, 100, '실시간 동기화 완료!', `총 ${count}건의 CTI 전수 상담 데이터가 성공적으로 반영되었습니다.`, true, count);
+        if (isFallbackData) {
+          setTotalSyncProgress(4, 100, '동기화 완료 (캐시 유지)', `CTI 응답 지연으로 최근 보존된 ${count}건의 상담 데이터를 유지합니다.`, true, count);
+        } else {
+          setTotalSyncProgress(4, 100, '실시간 동기화 완료!', `총 ${count}건의 CTI 전수 상담 데이터가 즉시 반영되었습니다.`, true, count);
+        }
         setTimeout(() => {
           closeTotalSyncProgressModal();
-        }, 500);
+          renderTotalCallAnalysisTab();
+        }, 300);
 
         if (typeof showToast === 'function') {
-          showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 완료되었습니다.`, 'success');
+          if (isFallbackData) {
+            showToast(`CTI 게이트웨이 응답 지연으로 최근 데이터(${count}건)를 유지합니다. 잠시 후 다시 시도해주세요.`, 'warning');
+          } else {
+            showToast(`전체 인입경로 CTI 전수 데이터(${count}건) 실시간 동기화가 즉시 반영되었습니다.`, 'success');
+          }
         }
       } else {
         closeTotalSyncProgressModal();
+        renderTotalCallAnalysisTab();
         if (prevCount > 0 && count > prevCount) {
           const diff = count - prevCount;
           if (typeof showToast === 'function') {

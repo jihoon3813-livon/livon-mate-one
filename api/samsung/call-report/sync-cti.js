@@ -60,9 +60,9 @@ module.exports = async function handler(req, res) {
     } catch (e) {}
   }
 
-  // 2. 실시간 CTI 동기화 시도 (스마트 초고속 증분 수집)
+  // 2. 실시간 CTI 동기화 시도 (스마트 초고속 증분 수집 - 최대 20초 대기 가드)
   try {
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 9000));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('CTI_TIMEOUT')), 20000));
 
     const sDateObj = new Date(startDate);
     const eDateObj = new Date(endDate);
@@ -318,6 +318,7 @@ module.exports = async function handler(req, res) {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.status(200).json({
       success: true,
+      isFallback: false,
       message: `CTI로부터 [${channelLabel}] 최신 인바운드 로그(총 ${reportData.summaryStats.totalCalls}건)를 성공적으로 실시간 동기화하였습니다.`,
       data: reportData
     });
@@ -327,7 +328,8 @@ module.exports = async function handler(req, res) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       return res.status(200).json({
         success: true,
-        message: `[${channelLabel}] 최근 동기화된 최신 분석 통계 데이터를 안전하게 불러왔습니다.`,
+        isFallback: true,
+        message: `[${channelLabel}] CTI 게이트웨이 응답 지연으로 최근 분석 통계 데이터를 불러왔습니다.`,
         data: baseData
       });
     }
