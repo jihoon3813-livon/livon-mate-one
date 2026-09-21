@@ -1263,11 +1263,20 @@
               <select id="careHubSortSelect" onchange="changeHubSort(this.value)" class="py-1.5 px-2.5 text-xs border border-slate-300 rounded-xl bg-white font-bold text-slate-700">
                 <option value="cs_priority">정렬: CS/민원 우선</option>
                 <option value="cs_label">정렬: CS/민원 라벨순</option>
-                <option value="created_desc" selected>정렬: 신청일 최신순</option>
+                <option value="created_desc" selected>정렬: 신청일 최신순 (수정건 맨 앞순위)</option>
                 <option value="created_asc">정렬: 신청일 과거순</option>
                 <option value="updated_desc">정렬: 최근 수정순</option>
                 <option value="name_asc">정렬: 가나다순</option>
               </select>
+
+              <!-- 수정·민원 발생 모아보기 토글 버튼 -->
+              <button type="button" id="btnHubModifiedToggle" onclick="toggleHubModifiedFilter()" 
+                class="px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 border transition-all cursor-pointer bg-white text-purple-700 border-purple-300 hover:bg-purple-50 shadow-2xs whitespace-nowrap" 
+                title="수정 또는 민원이 발생한 고객만 모아보기 토글">
+                <i data-lucide="zap" class="w-3.5 h-3.5 text-purple-600"></i>
+                <span>수정발생</span>
+                <span id="hubModifiedCountBadge" class="px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-800 text-[10px] font-extrabold">0</span>
+              </button>
 
               <!-- VIEW COLUMN SELECTOR (1열 / 2열(기본) / 3열 보기 토글) -->
               <div class="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200">

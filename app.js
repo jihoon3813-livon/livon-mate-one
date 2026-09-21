@@ -1591,12 +1591,116 @@ function getElapsedBusinessHours(isoOrDateStr) {
 }
 
 var gHubSort = 'created_desc';
+var gHubOnlyModified = false;
 
 function changeHubSort(val) {
   gHubSort = val;
   gHubCurrentPage = 1;
   renderUnifiedCareHub();
 }
+
+function toggleHubModifiedFilter() {
+  gHubOnlyModified = !gHubOnlyModified;
+  gHubCurrentPage = 1;
+  renderUnifiedCareHub();
+}
+window.toggleHubModifiedFilter = toggleHubModifiedFilter;
+
+// CTI 상담콜 및 CS 기록 기반 고객 민원/불만 감지 엔진
+function getCustomerCtiComplaintInfo(app) {
+  if (!app) return null;
+
+  // 1. 고객 대장에 직접 등록된 CS 민원/긴급 라벨 확인
+  if (app.csLatestLabel === '민원' || app.csLatestLabel === '긴급' || app.csLatestLabel === '강성') {
+    return {
+      hasComplaint: true,
+      label: app.csLatestLabel,
+      callTime: app.updatedAt ? app.updatedAt.slice(0, 16).replace('T', ' ') : '',
+      title: app.csLatestMemo || `${app.csLatestLabel} 접수`,
+      summary: app.csLatestMemo || ''
+    };
+  }
+
+  // 2. CTI 상담콜 로그에서 민원/불만/긴급/교체 상담 탐색
+  const clean = (p) => String(p || '').replace(/[^0-9]/g, '');
+  const appPhone = clean(app.phone);
+  const appName = (app.patientName || '').trim();
+
+  let callLogs = (window.gTotalCallData && Array.isArray(window.gTotalCallData.callLogs)) 
+    ? window.gTotalCallData.callLogs 
+    : null;
+
+  if (!callLogs) {
+    try {
+      const cached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && Array.isArray(parsed.callLogs)) callLogs = parsed.callLogs;
+      }
+    } catch (e) {}
+  }
+
+  if (callLogs && callLogs.length > 0) {
+    for (let i = 0; i < callLogs.length; i++) {
+      const c = callLogs[i];
+      const cPhone = clean(c.phone || c.rawPhone);
+      const cName = (c.memberName || '').trim();
+
+      const phoneMatch = appPhone && cPhone && (appPhone === cPhone || (appPhone.length >= 10 && cPhone.includes(appPhone)) || (cPhone.length >= 10 && appPhone.includes(cPhone)));
+      const nameMatch = appName && cName && (cName.includes(appName) || appName.includes(cName));
+
+      if (phoneMatch || nameMatch) {
+        const full = `${c.title || ''} ${c.summary || ''} ${c.keywords || ''} ${c.arsMenu || ''}`.toLowerCase();
+        const isComp = full.includes('불만') || full.includes('항의') || full.includes('태도') || 
+                       full.includes('교체') || full.includes('소통 오류') || full.includes('컴플레인') || 
+                       full.includes('사고') || full.includes('낙상') || c.category === '불만·민원·긴급지원';
+        if (isComp) {
+          return {
+            hasComplaint: true,
+            label: '민원',
+            callTime: c.callTime || '',
+            title: c.title || '민원 상담',
+            summary: c.summary || '',
+            keywords: c.keywords || '',
+            operator: c.operator || ''
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+window.getCustomerCtiComplaintInfo = getCustomerCtiComplaintInfo;
+
+// 수정/민원 발생 여부 판별기
+function isAppModifiedOrComplaint(app) {
+  if (!app) return false;
+  const c = getCustomerCtiComplaintInfo(app);
+  if (c && c.hasComplaint) return true;
+  if (app.updatedAt) return true;
+  if (app.hasManualUpdate) return true;
+  if (app.csLatestLabel && app.csLatestLabel !== '일반') return true;
+  if (app.csRecords && app.csRecords.length > 0) return true;
+  return false;
+}
+window.isAppModifiedOrComplaint = isAppModifiedOrComplaint;
+
+function getAppLatestEventTime(app) {
+  let t = 0;
+  if (app.updatedAt) {
+    const p = Date.parse(app.updatedAt);
+    if (!isNaN(p) && p > t) t = p;
+  }
+  const c = getCustomerCtiComplaintInfo(app);
+  if (c && c.callTime) {
+    const s = String(c.callTime).trim().replace(/[.\/]+/g, '-');
+    const p = Date.parse(s);
+    if (!isNaN(p) && p > t) t = p;
+  }
+  return t;
+}
+window.getAppLatestEventTime = getAppLatestEventTime;
 
 
 
@@ -22439,6 +22543,17 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
 function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayouts, sched, faxInfo, isHdWaitingSms) {
   const badges = [];
 
+  // 0. CTI 민원 / 불만 접수 체크
+  const complaintInfo = typeof getCustomerCtiComplaintInfo === 'function' ? getCustomerCtiComplaintInfo(app) : null;
+  if (complaintInfo && complaintInfo.hasComplaint) {
+    const cTime = complaintInfo.callTime ? complaintInfo.callTime.slice(5, 16) : '';
+    badges.push(`
+      <span class="px-2 py-0.5 rounded-md bg-purple-600 text-white font-black text-[10.5px] flex items-center gap-1 shadow-2xs animate-pulse whitespace-nowrap" title="${complaintInfo.title || '민원 접수'}: ${complaintInfo.summary || ''}">
+        <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-white"></i> 🚨 민원 발생${cTime ? ` (${cTime})` : ''}
+      </span>
+    `);
+  }
+
   // 1. 간병인 미배정 체크
   if (!as && app.status !== '서비스 취소') {
     badges.push(`
@@ -22717,6 +22832,29 @@ function renderUnifiedCareHub() {
     if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
   }
 
+  // 3. 수정발생 (또는 CTI 민원발생) 건수 카운트 & 토글 버튼 UI 갱신
+  let modifiedTotal = 0;
+  for (let i = 0; i < activeHubApps.length; i++) {
+    const a = activeHubApps[i];
+    if (insFilter !== 'ALL' && !a.insuranceCompany.includes(insFilter)) continue;
+    if (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a)) {
+      modifiedTotal++;
+    }
+  }
+
+  const modBadge = document.getElementById('hubModifiedCountBadge');
+  if (modBadge) modBadge.innerText = modifiedTotal;
+  const modBtn = document.getElementById('btnHubModifiedToggle');
+  if (modBtn) {
+    if (gHubOnlyModified) {
+      modBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 border transition-all cursor-pointer bg-purple-600 text-white border-purple-700 shadow-md whitespace-nowrap";
+      if (modBadge) modBadge.className = "px-1.5 py-0.2 rounded-full bg-white text-purple-800 text-[10px] font-black";
+    } else {
+      modBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 border transition-all cursor-pointer bg-white text-purple-700 border-purple-300 hover:bg-purple-50 shadow-2xs whitespace-nowrap";
+      if (modBadge) modBadge.className = "px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-800 text-[10px] font-extrabold";
+    }
+  }
+
   // Pre-index caregiver names if searching
   const cgNamesByAppId = new Map();
   const digitsQuery = query ? query.replace(/[^0-9]/g, '') : '';
@@ -22733,6 +22871,9 @@ function renderUnifiedCareHub() {
   // Filter application list
   const filtered = activeHubApps.filter(app => {
     if (insFilter !== 'ALL' && !app.insuranceCompany.includes(insFilter)) return false;
+
+    // [수정발생 모아보기 토글 필터]
+    if (gHubOnlyModified && typeof isAppModifiedOrComplaint === 'function' && !isAppModifiedOrComplaint(app)) return false;
 
     if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
     if (gHubFilter === 'IN_PROGRESS' && (!app.status.includes('진행') && app.status !== '정상' && app.status !== '배정완료')) return false;
@@ -22796,6 +22937,7 @@ function renderUnifiedCareHub() {
     const a = filtered[i];
     a._applyTime = parseApplySortTimestamp(a.applyDate);
     a._updTime = a.updatedAt ? Date.parse(a.updatedAt) || 0 : 0;
+    a._latestEventTime = typeof getAppLatestEventTime === 'function' ? getAppLatestEventTime(a) : (a._updTime || 0);
   }
 
   filtered.sort((a, b) => {
@@ -22822,6 +22964,15 @@ function renderUnifiedCareHub() {
       return (a.csLatestLabel || 'zzz').localeCompare(b.csLatestLabel || 'zzz', 'ko');
     }
     if (gHubSort === 'created_desc') {
+      // [사용자 요구사항]: 기본 정렬은 신청일 최신순이지만, 고객정보 수정(민원발생 등)이 발생하면 맨 앞순위로 최상단 노출
+      const modA = typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a) ? 1 : 0;
+      const modB = typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(b) ? 1 : 0;
+      if (modA !== modB) return modB - modA;
+      if (modA === 1 && modB === 1) {
+        // 둘 다 수정/민원 발생건이면 최근 발생일시 최신순
+        const evDiff = (b._latestEventTime || 0) - (a._latestEventTime || 0);
+        if (evDiff !== 0) return evDiff;
+      }
       // 등록순 최신 = 고객접수일(applyDate) 최신순
       const diff = (b._applyTime || 0) - (a._applyTime || 0);
       if (diff !== 0) return diff;
@@ -22834,8 +22985,8 @@ function renderUnifiedCareHub() {
       return (a.id || '').localeCompare(b.id || '', undefined, { numeric: true });
     }
     if (gHubSort === 'updated_desc') {
-      const tA = (a._updTime || a._applyTime || 0);
-      const tB = (b._updTime || b._applyTime || 0);
+      const tA = (a._latestEventTime || a._updTime || a._applyTime || 0);
+      const tB = (b._latestEventTime || b._updTime || b._applyTime || 0);
       return tB - tA;
     }
     if (gHubSort === 'name_asc') {
@@ -22873,22 +23024,46 @@ function renderUnifiedCareHub() {
 
   // Pre-index auxiliary data for O(1) lookup speed boost
   const assignsMap = new Map();
+  const assignsByNameMap = new Map();
   for (let i = 0; i < gAssigns.length; i++) {
     const as = gAssigns[i];
-    if (!assignsMap.has(as.applyId)) assignsMap.set(as.applyId, []);
-    assignsMap.get(as.applyId).push(as);
+    if (as.applyId) {
+      if (!assignsMap.has(as.applyId)) assignsMap.set(as.applyId, []);
+      assignsMap.get(as.applyId).push(as);
+    }
+    if (as.patientName) {
+      const pKey = as.patientName.trim();
+      if (!assignsByNameMap.has(pKey)) assignsByNameMap.set(pKey, []);
+      assignsByNameMap.get(pKey).push(as);
+    }
   }
   const claimsMap = new Map();
+  const claimsByNameMap = new Map();
   for (let i = 0; i < gClaims.length; i++) {
     const c = gClaims[i];
-    if (!claimsMap.has(c.applyId)) claimsMap.set(c.applyId, []);
-    claimsMap.get(c.applyId).push(c);
+    if (c.applyId) {
+      if (!claimsMap.has(c.applyId)) claimsMap.set(c.applyId, []);
+      claimsMap.get(c.applyId).push(c);
+    }
+    if (c.patientName) {
+      const pKey = c.patientName.trim();
+      if (!claimsByNameMap.has(pKey)) claimsByNameMap.set(pKey, []);
+      claimsByNameMap.get(pKey).push(c);
+    }
   }
   const payoutsMap = new Map();
+  const payoutsByNameMap = new Map();
   for (let i = 0; i < gPayouts.length; i++) {
     const p = gPayouts[i];
-    if (!payoutsMap.has(p.applyId)) payoutsMap.set(p.applyId, []);
-    payoutsMap.get(p.applyId).push(p);
+    if (p.applyId) {
+      if (!payoutsMap.has(p.applyId)) payoutsMap.set(p.applyId, []);
+      payoutsMap.get(p.applyId).push(p);
+    }
+    if (p.patientName) {
+      const pKey = p.patientName.trim();
+      if (!payoutsByNameMap.has(pKey)) payoutsByNameMap.set(pKey, []);
+      payoutsByNameMap.get(pKey).push(p);
+    }
   }
   const logsMap = new Map();
   for (let i = 0; i < gCareLogs.length; i++) {
@@ -22912,16 +23087,35 @@ function renderUnifiedCareHub() {
   container.innerHTML = displayList.map(app => {
     const isChecked = gSelectedAppIds.has(app.id) ? 'checked' : '';
 
-    const appAssigns = assignsMap.get(app.id) || [];
-    const appClaims = claimsMap.get(app.id) || [];
-    const appPayouts = payoutsMap.get(app.id) || [];
+    const appAssigns = (assignsMap.get(app.id) && assignsMap.get(app.id).length > 0)
+      ? assignsMap.get(app.id)
+      : (assignsByNameMap.get((app.patientName || '').trim()) || []);
+    const appClaims = (claimsMap.get(app.id) && claimsMap.get(app.id).length > 0)
+      ? claimsMap.get(app.id)
+      : (claimsByNameMap.get((app.patientName || '').trim()) || []);
+    const appPayouts = (payoutsMap.get(app.id) && payoutsMap.get(app.id).length > 0)
+      ? payoutsMap.get(app.id)
+      : (payoutsByNameMap.get((app.patientName || '').trim()) || []);
     const appLogs = logsMap.get(app.id) || [];
     const rawFax = gFaxRecords[app.id];
     const isClaimFax = rawFax && rawFax.status === '전송완료' && rawFax.caseType !== '현대해상 고객등록/조회' && rawFax.formType !== 'HD_FORM_01';
     const faxInfo = isClaimFax ? rawFax : { status: '미전송', sentDate: null, faxNumber: app.adjusterFax || '0507-XXX-XXXX' };
 
-    const s2_assign = appAssigns.length > 0 
-      ? { label: maskName(appAssigns[0].caregiverName) + ' 배정 (' + (appAssigns[0].centerName || '개인') + ')', color: 'emerald', count: appAssigns.length }
+    let as = appAssigns.length > 0 ? appAssigns[0] : null;
+    if (!as && app.caregiverName && app.caregiverName !== '-' && !app.caregiverName.includes('미배정') && !app.caregiverName.includes('배정대기')) {
+      as = {
+        applyId: app.id,
+        caregiverName: app.caregiverName,
+        phone: app.caregiverPhone || app.phone || '',
+        centerName: app.caregiverCenter || app.centerName || '협력센터',
+        dailyWage: app.dailyWage || 150000,
+        startDate: app.serviceStartDate || app.careStartDate || app.startDate || '',
+        endDate: app.serviceEndDate || app.careEndDate || app.endDate || ''
+      };
+    }
+
+    const s2_assign = as 
+      ? { label: maskName(as.caregiverName) + ' 배정 (' + (as.centerName || '개인') + ')', color: 'emerald', count: Math.max(appAssigns.length, 1) }
       : { label: '간병인 미배정', color: 'amber' };
     
     // 원수사(판매채널)별 음성일지 동기화 여부 확인
@@ -22946,7 +23140,7 @@ function renderUnifiedCareHub() {
       : { label: '팩스 미전송', color: 'purple' };
 
     // 간병 기간 진행 경과 계산 (STEP 2 및 카드 헤더용)
-    const careProg = appAssigns.length > 0 ? getCareProgressInfo(appAssigns[0]) : null;
+    const careProg = as ? getCareProgressInfo(as) : (appAssigns.length > 0 ? getCareProgressInfo(appAssigns[0]) : null);
 
     // When card is expanded in 2 or 3 col view, expand to full width (col-span-full) so details look like 1-col view!
     // Calculate 24 business hours status (excluding weekends and Korean holidays)
@@ -22956,7 +23150,6 @@ function renderUnifiedCareHub() {
     // [사용자 요구사항]: 고객 카드 좌측 세로 라벨(신규: 파랑, 진행중: 노랑, 완료: 녹색+음영, 취소: 검정+음영, 예정: 보라)
     const cardTheme = getCustomerCardStatusTheme(app);
 
-    const as = appAssigns.length > 0 ? appAssigns[0] : null;
     const sched = calculateCareSettlementSchedule(app, as, careProg, appClaims, appPayouts);
     const totalPayoutSum = sched.confirmedPayoutSum || appPayouts.reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
     const isPayoutPending = sched.isCaregiverPayoutDue || appPayouts.some(p => p.payoutStatus === '미지급');
@@ -33967,9 +34160,16 @@ function handleClaimEditSubmit(e) {
 // CUSTOMER CS & COMPLAINT HISTORY MANAGEMENT ENGINE
 // =========================================================
 function getCsLabelBadge(app) {
-  if (!app || !app.csLatestLabel) return '';
-  const label = app.csLatestLabel;
-  const type = app.csLatestType || 'CS';
+  if (!app) return '';
+  let label = app.csLatestLabel;
+  let type = app.csLatestType || 'CS';
+  
+  const cInfo = typeof getCustomerCtiComplaintInfo === 'function' ? getCustomerCtiComplaintInfo(app) : null;
+  if (!label && cInfo && cInfo.hasComplaint) {
+    label = cInfo.label || '민원';
+    type = 'CTI';
+  }
+  if (!label) return '';
   
   switch (label) {
     case '강성':
@@ -33979,7 +34179,7 @@ function getCsLabelBadge(app) {
     case '중요':
       return `<span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-500 text-white border border-amber-600 shadow-xs flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>[${type}:중요]</span>`;
     case '민원':
-      return `<span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-600 text-white border border-purple-700 shadow-xs flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>[${type}:민원]</span>`;
+      return `<span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-600 text-white border border-purple-700 shadow-xs flex items-center gap-1 animate-pulse" title="${cInfo ? (cInfo.title + ': ' + cInfo.summary) : '민원 접수건'}"><span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>[${type}:민원]</span>`;
     case '일반':
       return `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">[${type}:일반]</span>`;
     case '처리완료':
