@@ -739,11 +739,11 @@
       "adjusterFax": "",
       "status": "진행중",
       "assignedCaregiverCount": 0,
-      "claimCount": 6,
-      "unconfirmedClaimCount": 0,
-      "depositConfirmedAmount": 12960000,
-      "estimatedUnpaid": 441000,
-      "totalPayout": 13380000,
+      "claimCount": 1,
+      "unconfirmedClaimCount": 1,
+      "depositConfirmedAmount": 0,
+      "estimatedUnpaid": 0,
+      "totalPayout": 420000,
       "memo": "",
       "isRealLaunchData": true,
       "importedAt": "2026-09-20T03:18:33.354Z",
@@ -778,11 +778,11 @@
       "adjusterFax": "",
       "status": "진행중",
       "assignedCaregiverCount": 1,
-      "claimCount": 5,
-      "unconfirmedClaimCount": 0,
-      "depositConfirmedAmount": 2835000,
-      "estimatedUnpaid": 3064000,
-      "totalPayout": 7165000,
+      "claimCount": 1,
+      "unconfirmedClaimCount": 1,
+      "depositConfirmedAmount": 0,
+      "estimatedUnpaid": 0,
+      "totalPayout": 280000,
       "memo": "",
       "isRealLaunchData": true,
       "importedAt": "2026-09-20T03:18:33.354Z",
@@ -817,11 +817,11 @@
       "adjusterFax": "",
       "status": "진행중",
       "assignedCaregiverCount": 1,
-      "claimCount": 1,
+      "claimCount": 0,
       "unconfirmedClaimCount": 0,
-      "depositConfirmedAmount": 700000,
-      "estimatedUnpaid": 100000,
-      "totalPayout": 1680000,
+      "depositConfirmedAmount": 0,
+      "estimatedUnpaid": 0,
+      "totalPayout": 560000,
       "memo": "",
       "isRealLaunchData": true,
       "importedAt": "2026-09-20T03:18:33.354Z",
@@ -10535,17 +10535,17 @@
       "addressDetail": "명주로 77변길",
       "sido": "강원도",
       "sigungu": "강릉시",
-      "caregiverName": "",
-      "caregiverPhone": "",
-      "dailyRate": "",
+      "caregiverName": "이필용",
+      "caregiverPhone": "010-8603-4059",
+      "dailyRate": 80000,
       "adjusterName": "이주형",
       "adjusterPhone": "02-818-4717",
       "adjusterFax": "",
       "status": "접수",
-      "assignedCaregiverCount": 0,
-      "claimCount": 1,
+      "assignedCaregiverCount": 1,
+      "claimCount": 0,
       "unconfirmedClaimCount": 0,
-      "depositConfirmedAmount": 1290000,
+      "depositConfirmedAmount": 0,
       "estimatedUnpaid": 0,
       "totalPayout": 0,
       "memo": "",
@@ -10581,11 +10581,11 @@
       "adjusterFax": "",
       "status": "진행중",
       "assignedCaregiverCount": 1,
-      "claimCount": 2,
+      "claimCount": 0,
       "unconfirmedClaimCount": 0,
-      "depositConfirmedAmount": 1728000,
+      "depositConfirmedAmount": 0,
       "estimatedUnpaid": 0,
-      "totalPayout": 2520000,
+      "totalPayout": 840000,
       "memo": "",
       "isRealLaunchData": true,
       "importedAt": "2026-09-21T01:15:27.085Z"
@@ -10623,7 +10623,7 @@
       "unconfirmedClaimCount": 0,
       "depositConfirmedAmount": 0,
       "estimatedUnpaid": 0,
-      "totalPayout": 0,
+      "totalPayout": 420000,
       "memo": "호흡기질환",
       "isRealLaunchData": true,
       "importedAt": "2026-09-21T01:15:27.085Z"
@@ -10784,7 +10784,7 @@
   "assignments": [
     {
       "id": "A0001",
-      "applyId": "C0006",
+      "applyId": "C0113",
       "patientName": "엄정현",
       "caregiverName": "황지원",
       "birthDate": "",
@@ -10802,7 +10802,7 @@
     },
     {
       "id": "A0002",
-      "applyId": "C0010",
+      "applyId": "C0150",
       "patientName": "김미영",
       "caregiverName": "이영자",
       "birthDate": "",
@@ -10982,7 +10982,7 @@
     },
     {
       "id": "A0012",
-      "applyId": "C0022",
+      "applyId": "C0215",
       "patientName": "김진선",
       "caregiverName": "박기남",
       "birthDate": "",
@@ -11036,7 +11036,7 @@
     },
     {
       "id": "A0015",
-      "applyId": "C0025",
+      "applyId": "C0215",
       "patientName": "김진선",
       "caregiverName": "박기남",
       "birthDate": "",
@@ -11090,7 +11090,7 @@
     },
     {
       "id": "A0018",
-      "applyId": "C0028",
+      "applyId": "C0215",
       "patientName": "김진선",
       "caregiverName": "박기남",
       "birthDate": "",
@@ -11810,7 +11810,7 @@
     },
     {
       "id": "A0058",
-      "applyId": "C0069",
+      "applyId": "C0324",
       "patientName": "이윤정",
       "caregiverName": "문홍자",
       "birthDate": "",
@@ -11936,7 +11936,7 @@
     },
     {
       "id": "A0066",
-      "applyId": "C0077",
+      "applyId": "C0332",
       "patientName": "안순옥",
       "caregiverName": "강영숙",
       "birthDate": "",
@@ -12062,7 +12062,7 @@
     },
     {
       "id": "A0073",
-      "applyId": "C0084",
+      "applyId": "C0022",
       "patientName": "김옥경",
       "caregiverName": "-",
       "birthDate": "",
@@ -12080,7 +12080,7 @@
     },
     {
       "id": "A0074",
-      "applyId": "C0085",
+      "applyId": "C0340",
       "patientName": "고수연",
       "caregiverName": "김은정",
       "birthDate": "",
@@ -12242,7 +12242,7 @@
     },
     {
       "id": "A0083",
-      "applyId": "C0094",
+      "applyId": "C0349",
       "patientName": "김정은",
       "caregiverName": "이성헌",
       "birthDate": "",
@@ -13070,7 +13070,7 @@
     },
     {
       "id": "A0129",
-      "applyId": "C0145",
+      "applyId": "C0394",
       "patientName": "최재식",
       "caregiverName": "지주현",
       "birthDate": "",
@@ -13124,7 +13124,7 @@
     },
     {
       "id": "A0132",
-      "applyId": "C0148",
+      "applyId": "C0397",
       "patientName": "김수지",
       "caregiverName": "정은선",
       "birthDate": "",
@@ -13142,7 +13142,7 @@
     },
     {
       "id": "A0133",
-      "applyId": "C0149",
+      "applyId": "C0397",
       "patientName": "김수지",
       "caregiverName": "정은선",
       "birthDate": "",
@@ -13214,7 +13214,7 @@
     },
     {
       "id": "A0137",
-      "applyId": "C0154",
+      "applyId": "C0349",
       "patientName": "김정은",
       "caregiverName": "이성헌",
       "birthDate": "",
@@ -13610,7 +13610,7 @@
     },
     {
       "id": "A0159",
-      "applyId": "C0181",
+      "applyId": "C0424",
       "patientName": "하성임",
       "caregiverName": "하선경",
       "birthDate": "",
@@ -13628,7 +13628,7 @@
     },
     {
       "id": "A0160",
-      "applyId": "C0182",
+      "applyId": "C0424",
       "patientName": "하성임",
       "caregiverName": "하선경",
       "birthDate": "재택",
@@ -13646,7 +13646,7 @@
     },
     {
       "id": "A0161",
-      "applyId": "C0183",
+      "applyId": "C0424",
       "patientName": "하성임",
       "caregiverName": "김광숙",
       "birthDate": "재택",
@@ -13844,7 +13844,7 @@
     },
     {
       "id": "A0172",
-      "applyId": "C0194",
+      "applyId": "C0436",
       "patientName": "정영수",
       "caregiverName": "이명희",
       "birthDate": "",
@@ -13862,7 +13862,7 @@
     },
     {
       "id": "A0173",
-      "applyId": "C0195",
+      "applyId": "C0436",
       "patientName": "정영수",
       "caregiverName": "심봉화",
       "birthDate": "",
@@ -13880,7 +13880,7 @@
     },
     {
       "id": "A0174",
-      "applyId": "C0196",
+      "applyId": "C0436",
       "patientName": "정영수",
       "caregiverName": "심봉화",
       "birthDate": "",
@@ -14024,7 +14024,7 @@
     },
     {
       "id": "A0182",
-      "applyId": "C0206",
+      "applyId": "C0447",
       "patientName": "최영자",
       "caregiverName": "최수완",
       "birthDate": "",
@@ -14078,7 +14078,7 @@
     },
     {
       "id": "A0185",
-      "applyId": "C0209",
+      "applyId": "C0450",
       "patientName": "윤경자",
       "caregiverName": "이영숙",
       "birthDate": "",
@@ -14168,7 +14168,7 @@
     },
     {
       "id": "A0190",
-      "applyId": "C0214",
+      "applyId": "C0455",
       "patientName": "임형순",
       "caregiverName": "황지원",
       "birthDate": "",
@@ -14240,7 +14240,7 @@
     },
     {
       "id": "A0194",
-      "applyId": "C0220",
+      "applyId": "C0460",
       "patientName": "안운자",
       "caregiverName": "손명자",
       "birthDate": "",
@@ -14708,7 +14708,7 @@
     },
     {
       "id": "A0220",
-      "applyId": "C0001",
+      "applyId": "C0022",
       "patientName": "김옥경",
       "caregiverName": "박선득",
       "birthDate": "",
@@ -14726,7 +14726,7 @@
     },
     {
       "id": "A0221",
-      "applyId": "C0002",
+      "applyId": "C0025",
       "patientName": "박지원",
       "caregiverName": "신현정",
       "birthDate": "",
@@ -14744,7 +14744,7 @@
     },
     {
       "id": "A0222",
-      "applyId": "C0009",
+      "applyId": "C0142",
       "patientName": "이윤진",
       "caregiverName": "신현정",
       "birthDate": "",
@@ -14762,7 +14762,7 @@
     },
     {
       "id": "A0224",
-      "applyId": "C0238",
+      "applyId": "C0475",
       "patientName": "곽은정",
       "caregiverName": "박제아",
       "birthDate": "",
@@ -15050,7 +15050,7 @@
     },
     {
       "id": "A0240",
-      "applyId": "C0264",
+      "applyId": "S0001",
       "patientName": "황인홍",
       "caregiverName": "박금옥",
       "birthDate": "540707-6760025",
@@ -15068,7 +15068,7 @@
     },
     {
       "id": "A0241",
-      "applyId": "C0266",
+      "applyId": "S0005",
       "patientName": "이금주",
       "caregiverName": "김영금",
       "birthDate": "490916-6100499",
@@ -15086,7 +15086,7 @@
     },
     {
       "id": "A0242",
-      "applyId": "C0265",
+      "applyId": "S0002",
       "patientName": "예선옥",
       "caregiverName": "박명옥",
       "birthDate": "",
@@ -15104,7 +15104,7 @@
     },
     {
       "id": "A0242",
-      "applyId": "C0268",
+      "applyId": "S0007",
       "patientName": "유숙희",
       "caregiverName": "임경옥",
       "birthDate": "",
@@ -15122,7 +15122,7 @@
     },
     {
       "id": "A0243",
-      "applyId": "C0269",
+      "applyId": "S0008",
       "patientName": "지선주",
       "caregiverName": "박금옥",
       "birthDate": "540707-6760025",
@@ -15140,7 +15140,7 @@
     },
     {
       "id": "A0244",
-      "applyId": "C0270",
+      "applyId": "S0009",
       "patientName": "이정숙",
       "caregiverName": "이향순",
       "birthDate": "691115-2155031",
@@ -15176,7 +15176,7 @@
     },
     {
       "id": "A0246",
-      "applyId": "C0275",
+      "applyId": "S0012",
       "patientName": "윤석찬",
       "caregiverName": "김명옥",
       "birthDate": "530527-6760011",
@@ -15194,7 +15194,7 @@
     },
     {
       "id": "A0247",
-      "applyId": "C0277",
+      "applyId": "S0013",
       "patientName": "양명해",
       "caregiverName": "안경순",
       "birthDate": "",
@@ -15212,7 +15212,7 @@
     },
     {
       "id": "A0248",
-      "applyId": "C0274",
+      "applyId": "C0511",
       "patientName": "정근래",
       "caregiverName": "강기종",
       "birthDate": "",
@@ -15230,7 +15230,7 @@
     },
     {
       "id": "A0249",
-      "applyId": "C0278",
+      "applyId": "C0515",
       "patientName": "이지은",
       "caregiverName": "서동화",
       "birthDate": "",
@@ -15248,7 +15248,7 @@
     },
     {
       "id": "A0250",
-      "applyId": "C0280",
+      "applyId": "S0014",
       "patientName": "정은숙",
       "caregiverName": "이순화",
       "birthDate": "",
@@ -15284,7 +15284,7 @@
     },
     {
       "id": "A0252",
-      "applyId": "C0275",
+      "applyId": "S0012",
       "patientName": "윤석찬",
       "caregiverName": "이영상",
       "birthDate": "",
@@ -15302,7 +15302,7 @@
     },
     {
       "id": "A0253",
-      "applyId": "C0282",
+      "applyId": "S0016",
       "patientName": "이나연",
       "caregiverName": "허동화",
       "birthDate": "740108-6320017",
@@ -15320,7 +15320,7 @@
     },
     {
       "id": "A0254",
-      "applyId": "C0284",
+      "applyId": "S0018",
       "patientName": "임명석",
       "caregiverName": "",
       "birthDate": "",
@@ -15338,7 +15338,7 @@
     },
     {
       "id": "A0255",
-      "applyId": "C0084",
+      "applyId": "C0022",
       "patientName": "김옥경",
       "caregiverName": "",
       "birthDate": "",
@@ -15356,7 +15356,7 @@
     },
     {
       "id": "A0256",
-      "applyId": "C0085",
+      "applyId": "C0523",
       "patientName": "최명자",
       "caregiverName": "이필용",
       "birthDate": "",
@@ -15392,7 +15392,7 @@
     },
     {
       "id": "A0258",
-      "applyId": "C0280",
+      "applyId": "S0014",
       "patientName": "정은숙",
       "caregiverName": "이명순",
       "birthDate": "교체",
@@ -15428,7 +15428,7 @@
     },
     {
       "id": "A0260",
-      "applyId": "C0088",
+      "applyId": "S0020",
       "patientName": "김기영",
       "caregiverName": "지복단",
       "birthDate": "",
@@ -15446,7 +15446,7 @@
     },
     {
       "id": "A0261",
-      "applyId": "C0090",
+      "applyId": "S0021",
       "patientName": "박용식",
       "caregiverName": "김금옥",
       "birthDate": "",
@@ -15482,7 +15482,7 @@
     },
     {
       "id": "A0263",
-      "applyId": "C0093",
+      "applyId": "S0022",
       "patientName": "박지영",
       "caregiverName": "박종수",
       "birthDate": "",
@@ -15500,7 +15500,7 @@
     },
     {
       "id": "A0264",
-      "applyId": "C0094",
+      "applyId": "S0023",
       "patientName": "고연분",
       "caregiverName": "권은지",
       "birthDate": "",
@@ -15518,7 +15518,7 @@
     },
     {
       "id": "A0265",
-      "applyId": "C0095",
+      "applyId": "S0024",
       "patientName": "문형근",
       "caregiverName": "강기종",
       "birthDate": "",
@@ -15554,7 +15554,7 @@
     },
     {
       "id": "A0267",
-      "applyId": "C0097",
+      "applyId": "S0025",
       "patientName": "김주영",
       "caregiverName": "성옥녀",
       "birthDate": "650824-2259558",
@@ -15572,7 +15572,7 @@
     },
     {
       "id": "A0268",
-      "applyId": "C0098",
+      "applyId": "S0026",
       "patientName": "민지애",
       "caregiverName": "신명숙",
       "birthDate": "",
@@ -15610,7 +15610,7 @@
   "claims": [
     {
       "id": "Q0001",
-      "applyId": "C0005",
+      "applyId": "C0113",
       "patientName": "엄정현",
       "round": "4월 1차",
       "standardDate": "2026.03.13",
@@ -15630,7 +15630,7 @@
     },
     {
       "id": "Q0002",
-      "applyId": "C0005",
+      "applyId": "C0113",
       "patientName": "엄정현",
       "round": "7월 2차",
       "standardDate": "2026.07.20",
@@ -15650,7 +15650,7 @@
     },
     {
       "id": "Q0003",
-      "applyId": "C0006",
+      "applyId": "C0113",
       "patientName": "엄정현",
       "round": "4월 1차",
       "standardDate": "2026.03.13",
@@ -15670,7 +15670,7 @@
     },
     {
       "id": "Q0004",
-      "applyId": "C0008",
+      "applyId": "C0137",
       "patientName": "류미선",
       "round": "4월 1차",
       "standardDate": "2026.04.29",
@@ -15690,7 +15690,7 @@
     },
     {
       "id": "Q0005",
-      "applyId": "C0010",
+      "applyId": "C0150",
       "patientName": "김미영",
       "round": "5월 1차",
       "standardDate": "2026.03.30",
@@ -15710,7 +15710,7 @@
     },
     {
       "id": "Q0006",
-      "applyId": "C0011",
+      "applyId": "C0150",
       "patientName": "김미영",
       "round": "5월 1차",
       "standardDate": "2026.04.02",
@@ -16470,7 +16470,7 @@
     },
     {
       "id": "Q0044",
-      "applyId": "C0022",
+      "applyId": "C0215",
       "patientName": "김진선",
       "round": "4월 2차",
       "standardDate": "2026.04.19",
@@ -16490,7 +16490,7 @@
     },
     {
       "id": "Q0045",
-      "applyId": "C0022",
+      "applyId": "C0215",
       "patientName": "김진선",
       "round": "4월 3차",
       "standardDate": "2026.05.20",
@@ -18010,7 +18010,7 @@
     },
     {
       "id": "Q0121",
-      "applyId": "C0069",
+      "applyId": "C0324",
       "patientName": "이윤정",
       "round": "5월 1차",
       "standardDate": "2026.04.11",
@@ -18350,7 +18350,7 @@
     },
     {
       "id": "Q0138",
-      "applyId": "C0085",
+      "applyId": "C0340",
       "patientName": "고수연",
       "round": "6월 1차",
       "standardDate": "2026.06.02",
@@ -18610,7 +18610,7 @@
     },
     {
       "id": "Q0151",
-      "applyId": "C0094",
+      "applyId": "C0349",
       "patientName": "김정은",
       "round": "4월 3차",
       "standardDate": "2026.04.24",
@@ -20450,7 +20450,7 @@
     },
     {
       "id": "Q0243",
-      "applyId": "C0143",
+      "applyId": "C0392",
       "patientName": "박흥규",
       "round": "6월 1차",
       "standardDate": "2026.05.28",
@@ -20570,7 +20570,7 @@
     },
     {
       "id": "Q0249",
-      "applyId": "C0145",
+      "applyId": "C0394",
       "patientName": "최재식",
       "round": "6월 1차",
       "standardDate": "2026.05.26",
@@ -20630,7 +20630,7 @@
     },
     {
       "id": "Q0252",
-      "applyId": "C0148",
+      "applyId": "C0397",
       "patientName": "김수지",
       "round": "6월 1차",
       "standardDate": "2026.06.06",
@@ -20650,7 +20650,7 @@
     },
     {
       "id": "Q0253",
-      "applyId": "C0149",
+      "applyId": "C0397",
       "patientName": "김수지",
       "round": "6월 1차",
       "standardDate": "2026.06.22",
@@ -20830,7 +20830,7 @@
     },
     {
       "id": "Q0262",
-      "applyId": "C0154",
+      "applyId": "C0349",
       "patientName": "김정은",
       "round": "6월 1차",
       "standardDate": "2026.06.11",
@@ -21610,7 +21610,7 @@
     },
     {
       "id": "Q0301",
-      "applyId": "C0181",
+      "applyId": "C0424",
       "patientName": "하성임",
       "round": "6월 3차",
       "standardDate": "2026.06.20",
@@ -21630,7 +21630,7 @@
     },
     {
       "id": "Q0302",
-      "applyId": "C0182",
+      "applyId": "C0424",
       "patientName": "하성임",
       "round": "8월 1차",
       "standardDate": "2026.07.25",
@@ -21870,7 +21870,7 @@
     },
     {
       "id": "Q0314",
-      "applyId": "C0194",
+      "applyId": "C0436",
       "patientName": "정영수",
       "round": "7월 2차",
       "standardDate": "2026.06.30",
@@ -21890,7 +21890,7 @@
     },
     {
       "id": "Q0315",
-      "applyId": "C0195",
+      "applyId": "C0436",
       "patientName": "정영수",
       "round": "7월 1차",
       "standardDate": "2026.07.03",
@@ -21910,7 +21910,7 @@
     },
     {
       "id": "Q0316",
-      "applyId": "C0196",
+      "applyId": "C0436",
       "patientName": "정영수",
       "round": "7월 1차",
       "standardDate": "2026.07.10",
@@ -21930,7 +21930,7 @@
     },
     {
       "id": "Q0317",
-      "applyId": "C0196",
+      "applyId": "C0436",
       "patientName": "정영수",
       "round": "7월 2차",
       "standardDate": "2026.07.16",
@@ -22510,7 +22510,7 @@
     },
     {
       "id": "Q0346",
-      "applyId": "C0001",
+      "applyId": "C0022",
       "patientName": "김옥경",
       "round": "11월 2차",
       "standardDate": "2025.11.12",
@@ -22530,7 +22530,7 @@
     },
     {
       "id": "Q0347",
-      "applyId": "C0002",
+      "applyId": "C0025",
       "patientName": "박지원",
       "round": "12월 4차",
       "standardDate": "2026.12.30",
@@ -22550,7 +22550,7 @@
     },
     {
       "id": "Q0348",
-      "applyId": "C0009",
+      "applyId": "C0142",
       "patientName": "이윤진",
       "round": "1월 4차",
       "standardDate": "2026.01.31",
@@ -22570,7 +22570,7 @@
     },
     {
       "id": "Q0349",
-      "applyId": "C0025",
+      "applyId": "C0215",
       "patientName": "김진선",
       "round": "5월 2차",
       "standardDate": "2026.05.12",
@@ -22610,7 +22610,7 @@
     },
     {
       "id": "Q0351",
-      "applyId": "C0028",
+      "applyId": "C0215",
       "patientName": "김진선",
       "round": "5월 3차",
       "standardDate": "2026.05.20",
@@ -23190,7 +23190,7 @@
     },
     {
       "id": "Q0381",
-      "applyId": "C0238",
+      "applyId": "C0475",
       "patientName": "곽은정",
       "round": "8월 2차",
       "standardDate": "2026.08.19",
@@ -23290,7 +23290,7 @@
     },
     {
       "id": "Q0386",
-      "applyId": "C0220",
+      "applyId": "C0460",
       "patientName": "안운자",
       "round": "8월 2차",
       "standardDate": "2026.08.21",
@@ -23430,7 +23430,7 @@
     },
     {
       "id": "Q0393",
-      "applyId": "C0183",
+      "applyId": "C0424",
       "patientName": "하성임",
       "round": "8월 2차",
       "standardDate": "2026.08.10",
@@ -23450,7 +23450,7 @@
     },
     {
       "id": "Q0394",
-      "applyId": "C0209",
+      "applyId": "C0450",
       "patientName": "윤경자",
       "round": "7월 3차",
       "standardDate": "2026.07.24",
@@ -23470,7 +23470,7 @@
     },
     {
       "id": "Q0395",
-      "applyId": "C0214",
+      "applyId": "C0455",
       "patientName": "임형순",
       "round": "7월 4차",
       "standardDate": "2026.07.31",
@@ -23490,7 +23490,7 @@
     },
     {
       "id": "Q0396",
-      "applyId": "C0206",
+      "applyId": "C0447",
       "patientName": "최영자",
       "round": "7월 4차",
       "standardDate": "",
@@ -24170,7 +24170,7 @@
     },
     {
       "id": "Q0430",
-      "applyId": "C0206",
+      "applyId": "C0447",
       "patientName": "최영자",
       "round": "8월 3차",
       "standardDate": "2026.08.31",
@@ -24290,7 +24290,7 @@
     },
     {
       "id": "Q0436",
-      "applyId": "C0264",
+      "applyId": "S0001",
       "patientName": "황인홍",
       "round": "9월 1차",
       "standardDate": "2029.09.06",
@@ -24410,7 +24410,7 @@
     },
     {
       "id": "Q0442",
-      "applyId": "C0266",
+      "applyId": "S0005",
       "patientName": "이금주",
       "round": "9월 1차",
       "standardDate": "2026.09.09",
@@ -24430,7 +24430,7 @@
     },
     {
       "id": "Q0443",
-      "applyId": "C0268",
+      "applyId": "S0007",
       "patientName": "유숙희",
       "round": "9월 1차",
       "standardDate": "2026.09.08",
@@ -24670,7 +24670,7 @@
     },
     {
       "id": "Q0455",
-      "applyId": "C0278",
+      "applyId": "C0515",
       "patientName": "이지은",
       "round": "9월 2차",
       "standardDate": "2026.09.13",
@@ -24750,7 +24750,7 @@
     },
     {
       "id": "Q0459",
-      "applyId": "C0206",
+      "applyId": "C0447",
       "patientName": "최영자",
       "round": "9월 1차",
       "standardDate": "2026.09.10",
@@ -24790,7 +24790,7 @@
     },
     {
       "id": "Q0461",
-      "applyId": "C0264",
+      "applyId": "C0511",
       "patientName": "정근래",
       "round": "9월 2차",
       "standardDate": "2026.09.15",
@@ -24810,7 +24810,7 @@
     },
     {
       "id": "Q0462",
-      "applyId": "C0277",
+      "applyId": "S0013",
       "patientName": "양명해",
       "round": "9월 2차",
       "standardDate": "2026.09.15",
@@ -24830,7 +24830,7 @@
     },
     {
       "id": "Q0463",
-      "applyId": "C0280",
+      "applyId": "S0014",
       "patientName": "정은숙",
       "round": "9월 2차",
       "standardDate": "2026.09.16",
@@ -24850,7 +24850,7 @@
     },
     {
       "id": "Q0464",
-      "applyId": "C0265",
+      "applyId": "S0002",
       "patientName": "예선옥",
       "round": "9월 1차",
       "standardDate": "2029.09.10",
@@ -24870,7 +24870,7 @@
     },
     {
       "id": "Q0465",
-      "applyId": "C0264",
+      "applyId": "S0001",
       "patientName": "황인홍",
       "round": "9월 1차",
       "standardDate": "2026.09.06",
@@ -24890,7 +24890,7 @@
     },
     {
       "id": "Q0466",
-      "applyId": "C0270",
+      "applyId": "S0009",
       "patientName": "이정숙",
       "round": "9월 1차",
       "standardDate": "2026.09.15",
@@ -24910,7 +24910,7 @@
     },
     {
       "id": "Q0467",
-      "applyId": "C0088",
+      "applyId": "S0020",
       "patientName": "김기영",
       "round": "9월 2차",
       "standardDate": "2026.09.17",
@@ -24930,7 +24930,7 @@
     },
     {
       "id": "Q0468",
-      "applyId": "C0269",
+      "applyId": "S0008",
       "patientName": "지선주",
       "round": "9월 2차",
       "standardDate": "2029.09.10",
@@ -25150,7 +25150,7 @@
     },
     {
       "id": "Q0479",
-      "applyId": "C0265",
+      "applyId": "S0002",
       "patientName": "예선옥",
       "round": "9월 2차",
       "standardDate": "2029.09.20",
@@ -25170,7 +25170,7 @@
     },
     {
       "id": "Q0480",
-      "applyId": "C0269",
+      "applyId": "S0008",
       "patientName": "지선주",
       "round": "9월 2차",
       "standardDate": "2029.09.20",
@@ -25190,7 +25190,7 @@
     },
     {
       "id": "Q0481",
-      "applyId": "C0087",
+      "applyId": "S0019",
       "patientName": "최태연",
       "round": "9월 2차",
       "standardDate": "2026.09.18",
@@ -25212,7 +25212,7 @@
   "payouts": [
     {
       "id": "P0001",
-      "applyId": "C0006",
+      "applyId": "C0113",
       "patientName": "엄정현",
       "caregiverName": "황지원",
       "round": "7월 3차",
@@ -25896,7 +25896,7 @@
     },
     {
       "id": "P0050",
-      "applyId": "C0022",
+      "applyId": "C0215",
       "patientName": "김진선",
       "caregiverName": "박기남",
       "round": "4월 2차",
@@ -25968,7 +25968,7 @@
     },
     {
       "id": "P0058",
-      "applyId": "C0025",
+      "applyId": "C0215",
       "patientName": "김진선",
       "caregiverName": "박기남",
       "round": "5월 1차",
@@ -26022,7 +26022,7 @@
     },
     {
       "id": "P0065",
-      "applyId": "C0028",
+      "applyId": "C0215",
       "patientName": "김진선",
       "caregiverName": "박기남",
       "round": "5월 2차",
@@ -28056,7 +28056,7 @@
     },
     {
       "id": "P0250",
-      "applyId": "C0094",
+      "applyId": "C0349",
       "patientName": "김정은",
       "caregiverName": "이성헌",
       "round": "5월 1차",
@@ -29928,7 +29928,7 @@
     },
     {
       "id": "P0380",
-      "applyId": "C0145",
+      "applyId": "C0394",
       "patientName": "최재식",
       "caregiverName": "지주현",
       "round": "5월 3차",
@@ -30000,7 +30000,7 @@
     },
     {
       "id": "P0384",
-      "applyId": "C0148",
+      "applyId": "C0397",
       "patientName": "김수지",
       "caregiverName": "정은선",
       "round": "6월 2차",
@@ -30018,7 +30018,7 @@
     },
     {
       "id": "P0385",
-      "applyId": "C0149",
+      "applyId": "C0397",
       "patientName": "김수지",
       "caregiverName": "정은선",
       "round": "6월 2차",
@@ -30882,7 +30882,7 @@
     },
     {
       "id": "P0436",
-      "applyId": "C0181",
+      "applyId": "C0424",
       "patientName": "하성임",
       "caregiverName": "하선경",
       "round": "7월 1차",
@@ -30900,7 +30900,7 @@
     },
     {
       "id": "P0437",
-      "applyId": "C0182",
+      "applyId": "C0424",
       "patientName": "하성임",
       "caregiverName": "하선경",
       "round": "7월 3차",
@@ -30918,7 +30918,7 @@
     },
     {
       "id": "P0438",
-      "applyId": "C0183",
+      "applyId": "C0424",
       "patientName": "하성임",
       "caregiverName": "김광숙",
       "round": "7월 3차",
@@ -31134,7 +31134,7 @@
     },
     {
       "id": "P0450",
-      "applyId": "C0194",
+      "applyId": "C0436",
       "patientName": "정영수",
       "caregiverName": "이명희",
       "round": "7월 3차",
@@ -31152,7 +31152,7 @@
     },
     {
       "id": "P0451",
-      "applyId": "C0195",
+      "applyId": "C0436",
       "patientName": "정영수",
       "caregiverName": "심봉화",
       "round": "7월 1차",
@@ -31170,7 +31170,7 @@
     },
     {
       "id": "P0452",
-      "applyId": "C0196",
+      "applyId": "C0436",
       "patientName": "정영수",
       "caregiverName": "심봉화",
       "round": "7월 1차",
@@ -31188,7 +31188,7 @@
     },
     {
       "id": "P0453",
-      "applyId": "C0196",
+      "applyId": "C0436",
       "patientName": "정영수",
       "caregiverName": "심봉화",
       "round": "7월 3차",
@@ -31530,7 +31530,7 @@
     },
     {
       "id": "P0473",
-      "applyId": "C0209",
+      "applyId": "C0450",
       "patientName": "윤경자",
       "caregiverName": "이영숙",
       "round": "7월 3차",
@@ -31710,7 +31710,7 @@
     },
     {
       "id": "P0483",
-      "applyId": "C0220",
+      "applyId": "C0460",
       "patientName": "안운자",
       "caregiverName": "손명자",
       "round": "8월 1차",
@@ -32304,7 +32304,7 @@
     },
     {
       "id": "P0517",
-      "applyId": "C0001",
+      "applyId": "C0022",
       "patientName": "김옥경",
       "caregiverName": "박선득",
       "round": "11월 2차",
@@ -32322,7 +32322,7 @@
     },
     {
       "id": "P0518",
-      "applyId": "C0002",
+      "applyId": "C0025",
       "patientName": "박지원",
       "caregiverName": "신현정",
       "round": "12월 4차",
@@ -32340,7 +32340,7 @@
     },
     {
       "id": "P0519",
-      "applyId": "C0009",
+      "applyId": "C0142",
       "patientName": "이윤진",
       "caregiverName": "신현정",
       "round": "1월 4차",
@@ -32376,7 +32376,7 @@
     },
     {
       "id": "P0521",
-      "applyId": "C0238",
+      "applyId": "C0475",
       "patientName": "곽은정",
       "caregiverName": "박제아",
       "round": "8월 2차",
@@ -32466,7 +32466,7 @@
     },
     {
       "id": "P0526",
-      "applyId": "C0220",
+      "applyId": "C0460",
       "patientName": "안운자",
       "caregiverName": "손명자",
       "round": "8월 2차",
@@ -32502,7 +32502,7 @@
     },
     {
       "id": "P0528",
-      "applyId": "C0183",
+      "applyId": "C0424",
       "patientName": "하성임",
       "caregiverName": "김광숙",
       "round": "8월 2차",
@@ -32592,7 +32592,7 @@
     },
     {
       "id": "P0533",
-      "applyId": "C0214",
+      "applyId": "C0455",
       "patientName": "임형순",
       "caregiverName": "황지원",
       "round": "7월 4차",
@@ -32610,7 +32610,7 @@
     },
     {
       "id": "P0534",
-      "applyId": "C0206",
+      "applyId": "C0447",
       "patientName": "최영자",
       "caregiverName": "최수완",
       "round": "7월 4차",
@@ -32682,7 +32682,7 @@
     },
     {
       "id": "P0538",
-      "applyId": "C0069",
+      "applyId": "C0324",
       "patientName": "이윤정",
       "caregiverName": "문홍자",
       "round": "4월 2차",
@@ -33132,7 +33132,7 @@
     },
     {
       "id": "P0564",
-      "applyId": "C0206",
+      "applyId": "C0447",
       "patientName": "최영자",
       "caregiverName": "최수완",
       "round": "8월 3차",
@@ -33204,7 +33204,7 @@
     },
     {
       "id": "P0568",
-      "applyId": "C0264",
+      "applyId": "S0001",
       "patientName": "황인홍",
       "caregiverName": "박금옥",
       "round": "9월 1차",
@@ -33312,7 +33312,7 @@
     },
     {
       "id": "P0574",
-      "applyId": "C0266",
+      "applyId": "S0005",
       "patientName": "이금주",
       "caregiverName": "김영금",
       "round": "9월 1차",
@@ -33330,7 +33330,7 @@
     },
     {
       "id": "P0575",
-      "applyId": "C0268",
+      "applyId": "S0007",
       "patientName": "유숙희",
       "caregiverName": "임경옥",
       "round": "9월 1차",
@@ -33546,7 +33546,7 @@
     },
     {
       "id": "P0587",
-      "applyId": "C0265",
+      "applyId": "S0002",
       "patientName": "예선옥",
       "caregiverName": "박명옥",
       "round": "9월 1차",
@@ -33564,7 +33564,7 @@
     },
     {
       "id": "P0588",
-      "applyId": "C0269",
+      "applyId": "S0008",
       "patientName": "지선주",
       "caregiverName": "박금옥",
       "round": "9월 1차",
@@ -33582,7 +33582,7 @@
     },
     {
       "id": "P0589",
-      "applyId": "C0270",
+      "applyId": "S0009",
       "patientName": "이정숙",
       "caregiverName": "이향순",
       "round": "9월 1차",
@@ -33618,7 +33618,7 @@
     },
     {
       "id": "P0591",
-      "applyId": "C0278",
+      "applyId": "C0515",
       "patientName": "이지은",
       "caregiverName": "서동화",
       "round": "9월 2차",
@@ -33672,7 +33672,7 @@
     },
     {
       "id": "P0594",
-      "applyId": "C0206",
+      "applyId": "C0447",
       "patientName": "최영자",
       "caregiverName": "최수완",
       "round": "9월 1차",
@@ -33690,7 +33690,7 @@
     },
     {
       "id": "P0595",
-      "applyId": "C0275",
+      "applyId": "S0012",
       "patientName": "윤석찬",
       "caregiverName": "김명옥",
       "round": "9월 2차",
@@ -33726,7 +33726,7 @@
     },
     {
       "id": "P0597",
-      "applyId": "C0280",
+      "applyId": "S0014",
       "patientName": "정은숙",
       "caregiverName": "이순화",
       "round": "9월 2차",
@@ -33744,7 +33744,7 @@
     },
     {
       "id": "P0598",
-      "applyId": "C0270",
+      "applyId": "S0009",
       "patientName": "이정숙",
       "caregiverName": "이향순",
       "round": "9월 2차",
@@ -33762,7 +33762,7 @@
     },
     {
       "id": "P0599",
-      "applyId": "C0274",
+      "applyId": "C0511",
       "patientName": "정근래",
       "caregiverName": "강기종",
       "round": "9월 2차",
@@ -33780,7 +33780,7 @@
     },
     {
       "id": "P0600",
-      "applyId": "C0277",
+      "applyId": "S0013",
       "patientName": "양명해",
       "caregiverName": "안경순",
       "round": "9월 2차",
@@ -33798,7 +33798,7 @@
     },
     {
       "id": "P0601",
-      "applyId": "C0280",
+      "applyId": "S0014",
       "patientName": "정은숙",
       "caregiverName": "이명순",
       "round": "9월 2차",
@@ -33816,7 +33816,7 @@
     },
     {
       "id": "P0602",
-      "applyId": "C0088",
+      "applyId": "S0020",
       "patientName": "김기영",
       "caregiverName": "지복단",
       "round": "9월 2차",
@@ -34014,7 +34014,7 @@
     },
     {
       "id": "P0613",
-      "applyId": "C0265",
+      "applyId": "S0002",
       "patientName": "예선옥",
       "caregiverName": "박명옥",
       "round": "9월 2차",
@@ -34032,7 +34032,7 @@
     },
     {
       "id": "P0614",
-      "applyId": "C0269",
+      "applyId": "S0008",
       "patientName": "지선주",
       "caregiverName": "박금옥",
       "round": "9월 2차",
@@ -34050,7 +34050,7 @@
     },
     {
       "id": "P0615",
-      "applyId": "C0275",
+      "applyId": "S0012",
       "patientName": "윤석찬",
       "caregiverName": "이영상",
       "round": "9월 2차",
@@ -34068,7 +34068,7 @@
     },
     {
       "id": "P0616",
-      "applyId": "C0282",
+      "applyId": "S0016",
       "patientName": "이나연",
       "caregiverName": "허동화",
       "round": "9월 2차",
@@ -34104,7 +34104,7 @@
     },
     {
       "id": "P0618",
-      "applyId": "C0090",
+      "applyId": "S0021",
       "patientName": "박용식",
       "caregiverName": "김금옥",
       "round": "9월 2차",
@@ -34158,7 +34158,7 @@
     },
     {
       "id": "P0621",
-      "applyId": "C0087",
+      "applyId": "S0019",
       "patientName": "최태연",
       "caregiverName": "전지민",
       "round": "9월 2차",

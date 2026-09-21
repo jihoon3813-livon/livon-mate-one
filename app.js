@@ -1702,6 +1702,56 @@ function getAppLatestEventTime(app) {
 }
 window.getAppLatestEventTime = getAppLatestEventTime;
 
+// =========================================================================
+// MULTI-KEY CUSTOMER & RECORD MATCHER (신청아이디/이름/핸드폰/사고번호/증권번호)
+// =========================================================================
+function isMatchCustomerRecord(app, item) {
+  if (!app || !item) return false;
+
+  const aName = (app.patientName || app.customerName || '').trim();
+  const iName = (item.patientName || item.customerName || item.memberName || '').trim();
+
+  // If both have names and they don't match, NEVER match! (prevents cross-contamination when application IDs are duplicated or misaligned)
+  if (aName && iName && aName !== iName && !aName.includes(iName) && !iName.includes(aName)) {
+    return false;
+  }
+
+  const clean = (s) => String(s || '').replace(/[^0-9a-zA-Z가-힣]/g, '').toLowerCase();
+
+  const aId = String(app.id || app.patientId || '').trim();
+  const iApplyId = String(item.applyId || item.id || '').trim();
+  const idMatch = Boolean(aId && iApplyId && (aId === iApplyId || aId.replace(/^H/, 'C') === iApplyId.replace(/^H/, 'C') || aId.replace(/^C/, 'H') === iApplyId.replace(/^C/, 'H')));
+
+  const aPhone = clean(app.phone || app.applicantPhone);
+  const iPhone = clean(item.phone || item.contact || item.applicantContact || item.applicantPhone);
+  const phoneMatch = Boolean(aPhone && iPhone && (aPhone === iPhone || (aPhone.length >= 8 && iPhone.includes(aPhone)) || (iPhone.length >= 8 && aPhone.includes(iPhone))));
+
+  const aAcc = clean(app.accidentNumber);
+  const iAcc = clean(item.accidentNumber);
+  const accMatch = Boolean(aAcc && iAcc && aAcc === iAcc);
+
+  const aPol = clean(app.policyNumber);
+  const iPol = clean(item.policyNumber);
+  const polMatch = Boolean(aPol && iPol && aPol === iPol);
+
+  const nameMatch = Boolean(aName && iName && (aName === iName || aName.includes(iName) || iName.includes(aName)));
+
+  // 1) ID matches AND names are compatible (checked above)
+  if (idMatch) return true;
+
+  // 2) Name matches AND (phone OR accidentNumber OR policyNumber matches)
+  if (nameMatch && (phoneMatch || accMatch || polMatch)) return true;
+
+  // 3) Phone matches AND (accidentNumber OR policyNumber matches)
+  if (phoneMatch && (accMatch || polMatch)) return true;
+
+  // 4) Fallback: Name matches and neither has contradictory applyId
+  if (nameMatch && aName.length >= 2 && !iApplyId) return true;
+
+  return false;
+}
+window.isMatchCustomerRecord = isMatchCustomerRecord;
+
 
 
 // =========================================================================
@@ -17291,7 +17341,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           : (isClaimDepositConfirmed(claimForRound) ? fullClaimAmount : 0);
       } else if (app && app.roundDeposits && app.roundDeposits[roundIndex] !== undefined) {
         depositAmount = Number(app.roundDeposits[roundIndex]) || 0;
-      } else if (app && app.depositConfirmedAmount > 0) {
+      } else if (app && app.depositConfirmedAmount > 0 && (isFaxClaimSent || (app.claimCount > 0 && isCompleted))) {
         depositAmount = Math.min(fullClaimAmount, Number(app.depositConfirmedAmount));
       }
 
@@ -23087,15 +23137,17 @@ function renderUnifiedCareHub() {
   container.innerHTML = displayList.map(app => {
     const isChecked = gSelectedAppIds.has(app.id) ? 'checked' : '';
 
-    const appAssigns = (assignsMap.get(app.id) && assignsMap.get(app.id).length > 0)
-      ? assignsMap.get(app.id)
-      : (assignsByNameMap.get((app.patientName || '').trim()) || []);
-    const appClaims = (claimsMap.get(app.id) && claimsMap.get(app.id).length > 0)
-      ? claimsMap.get(app.id)
-      : (claimsByNameMap.get((app.patientName || '').trim()) || []);
-    const appPayouts = (payoutsMap.get(app.id) && payoutsMap.get(app.id).length > 0)
-      ? payoutsMap.get(app.id)
-      : (payoutsByNameMap.get((app.patientName || '').trim()) || []);
+    const getMatchedItems = (idMap, nameMap) => {
+      const byId = idMap.get(app.id) || [];
+      const validById = byId.filter(item => (typeof isMatchCustomerRecord === 'function' ? isMatchCustomerRecord(app, item) : true));
+      if (validById.length > 0) return validById;
+      const byName = nameMap.get((app.patientName || '').trim()) || [];
+      return byName.filter(item => (typeof isMatchCustomerRecord === 'function' ? isMatchCustomerRecord(app, item) : true));
+    };
+
+    const appAssigns = getMatchedItems(assignsMap, assignsByNameMap);
+    const appClaims = getMatchedItems(claimsMap, claimsByNameMap);
+    const appPayouts = getMatchedItems(payoutsMap, payoutsByNameMap);
     const appLogs = logsMap.get(app.id) || [];
     const rawFax = gFaxRecords[app.id];
     const isClaimFax = rawFax && rawFax.status === '전송완료' && rawFax.caseType !== '현대해상 고객등록/조회' && rawFax.formType !== 'HD_FORM_01';
@@ -34881,14 +34933,7 @@ function openHubCustomerDetailModal(applyId) {
 
   if (bodyEl) {
     try {
-      const isMatchApp = (item) => {
-        if (!item) return false;
-        if (String(item.applyId) === String(app.id)) return true;
-        if (app.id && app.id.startsWith('H') && String(item.applyId) === app.id.replace(/^H/, 'C')) return true;
-        if (app.id && app.id.startsWith('C') && String(item.applyId) === app.id.replace(/^C/, 'H')) return true;
-        if (app.patientName && item.patientName && app.patientName === item.patientName) return true;
-        return false;
-      };
+      const isMatchApp = (item) => (typeof isMatchCustomerRecord === 'function' ? isMatchCustomerRecord(app, item) : (String(item.applyId) === String(app.id)));
       const assigns = (gAssigns || []).filter(isMatchApp);
       const claims = (gClaims || []).filter(isMatchApp);
       const payouts = (gPayouts || []).filter(isMatchApp);
