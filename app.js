@@ -1219,25 +1219,25 @@ async function loadConvexData(showSpinner = true) {
       const { applications, assignments, claims, payouts, adjusters, partners, careLogs, caregivers, systemSettings } = res.value;
 
       // 1. 고객 신청 대장: Convex 원격 DB가 단 하나의 절대적 기준(Single Source of Truth)
-      if (Array.isArray(applications)) {
+      if (Array.isArray(applications) && applications.length > 0) {
         gApps = filterInvalidSamsungDuplicates(applications);
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
       }
 
       // 2. 간병인 배정 대장
-      if (Array.isArray(assignments)) {
+      if (Array.isArray(assignments) && assignments.length > 0) {
         gAssigns = assignments;
         try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
       }
 
       // 3. 보험 청구 대장
-      if (Array.isArray(claims)) {
+      if (Array.isArray(claims) && claims.length > 0) {
         gClaims = claims;
         try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
       }
 
       // 4. 간병비 지급 대장
-      if (Array.isArray(payouts)) {
+      if (Array.isArray(payouts) && payouts.length > 0) {
         gPayouts = payouts;
         try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
       }
@@ -2015,7 +2015,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Convex Cloud 운영 서버 실시간 데이터 동기화
   if (typeof loadConvexData === 'function') {
-    loadConvexData();
+    await loadConvexData(false);
   }
 
   const addrQueryInput = document.getElementById('addressSearchQuery');
@@ -32960,10 +32960,12 @@ function submitSimulatorLead() {
     unconfirmedClaimCount: 0,
     depositConfirmedAmount: 0,
     estimatedUnpaid: 0,
-    memo: '[분양몰 자동접수] ' + partnerText + ' 유입 고객'
+    memo: '[분양몰 자동접수] ' + partnerText + ' 유입 고객',
+    isRealLaunchData: true
   };
 
   gApps.unshift(newApp);
+  try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:saveApplication', { app: newApp });
   }
@@ -34262,6 +34264,7 @@ function handleNewAppSubmit(e) {
       sigungu: sigungu || '',
       addressDetail: fullCombinedAddress,
       insuranceCompany: insurance,
+      isRealLaunchData: true,
       productName: productName || (isHyundai ? '무배당현대해상내삶엔(3N)맞춤간편건강보험' : '삼성화재 다이렉트 간병보험'),
       contractPeriod: contractPeriod || (isHyundai ? '2025-07-17 ~ 2045-07-17' : '2024-03-01 ~ 2044-03-01'),
       policyNumber: policyNumber || '-',
@@ -34372,155 +34375,12 @@ async function finalizeNewAppRegistration(newApp) {
     const targetFaxRecipient = newApp.pendingFaxRecipient || '';
     const targetFaxNumber = newApp.pendingFaxNumber || '';
 
-    // 팩스번호가 실제로 입력된 경우에만 팩스 발송 및 발송 대장 기록 수행
-    if (targetFaxNumber) {
-      if (isHyundai) {
-        if (typeof window.gInitialFaxRecords === 'undefined') {
-          window.gInitialFaxRecords = {};
-        }
-        window.gInitialFaxRecords[newId] = {
-          formType: 'HD_FORM_01',
-          formTitle: '현대해상 간병인지원 신청/고객등록 요청서',
-          sentDate: newApp.initialFaxDate || new Date().toISOString().split('T')[0].replace(/-/g, '.'),
-          status: '전송완료',
-          faxNumber: targetFaxNumber + (targetFaxRecipient ? ' (' + targetFaxRecipient + ')' : ''),
-          recipient: targetFaxRecipient || '현대해상 보상지원센터',
-          pages: 1,
-          deliveryStatus: '성공 (OK - 200)'
-        };
-        // 청구 팩스(Claim Fax) 이력과 섞이지 않도록 gFaxRecords에서는 확실히 제외/삭제
-        if (typeof gFaxRecords !== 'undefined' && gFaxRecords[newId]) {
-          delete gFaxRecords[newId];
-        }
-      }
-      // 실제 팩스 게이트웨이(/api/fax/send - 바로빌/알리고) 실시간 전송 호출
-      const cfg = getBarobillConfig();
-      let savedBaroPwd = cfg.baroPwd;
-      if (!savedBaroPwd) {
-        savedBaroPwd = await ensureBarobillPassword();
-      }
+    // 1. 신규 고객은 전산 런칭 실데이터로 영구 표출되도록 보장
+    newApp.isRealLaunchData = true;
 
-      if (!savedBaroPwd && cfg.mode === 'barobill') {
-        showCustomAlert({
-          title: '바로빌 팩스 비밀번호 확인 필요',
-          message: '현대해상 1차 고객등록 팩스 발송을 위한 바로빌 계정 비밀번호가 아직 설정되지 않았습니다.\n\n[팩스관리]의 [팩스 설정] 창에서 비밀번호를 1회만 등록하시면 모든 팩스 발송에 자동 적용됩니다.',
-          icon: 'shield-alert',
-          iconColor: 'amber',
-          confirmText: '팩스 설정 열기',
-          onConfirm: () => {
-            openFaxSettingsModal();
-            setTimeout(() => {
-              const pwdEl = document.getElementById('faxBarobillPwd');
-              if (pwdEl) pwdEl.focus();
-            }, 300);
-          }
-        });
-        return;
-      }
-
-      let dispatchFaxNumber = targetFaxNumber;
-      let redirectNote = '';
-
-      // 대상 수신처가 사내 테스트 회선(복합기, 모바일팩스 등)이거나 사내 번호인 경우 리다이렉트 제외하고 지정 수신처로 직송
-      const cleanTargetNum = (targetFaxNumber || '').replace(/[^0-9]/g, '');
-      const isTargetInternalOrTest = 
-        (targetFaxRecipient && (
-          targetFaxRecipient.includes('복합기') || 
-          targetFaxRecipient.includes('테스트') || 
-          targetFaxRecipient.includes('리본케어') || 
-          targetFaxRecipient.includes('모바일팩스')
-        )) || 
-        cleanTargetNum === '0264993917' ||
-        cleanTargetNum === (cfg.testRedirectNumber || '').replace(/[^0-9]/g, '');
-
-      const applyRedirect = cfg.isTestRedirect && cfg.testRedirectNumber && !isTargetInternalOrTest;
-      if (applyRedirect) {
-        dispatchFaxNumber = cfg.testRedirectNumber;
-        redirectNote = `\n[안전 테스트 리다이렉트: 원본(${targetFaxRecipient} ${targetFaxNumber}) 대신 테스트번호(${cfg.testRedirectNumber})로 송출됨]`;
-      }
-
-      const previewHtml = getCleanFaxTransmissionHtml('HD_FORM_01');
-
-      const faxPayload = {
-        appId: newApp.id,
-        patientName: newApp.patientName,
-        insuranceCompany: newApp.insuranceCompany,
-        category: '1차접수',
-        formCode: 'HD_FORM_01',
-        formName: '현대해상 1차 고객등록 및 신청 접수서',
-        recipient: targetFaxRecipient + (applyRedirect ? ' (테스트 리다이렉트)' : ''),
-        faxNumber: dispatchFaxNumber,
-        senderNumber: cfg.sender,
-        memo: (newApp.memo || '현대해상 1차 고객등록 및 신청 접수 건 송부') + redirectNote,
-        pages: 1,
-        formHtml: previewHtml,
-        operator: '접수담당자',
-        provider: cfg.mode,
-        baroCertKey: cfg.certKey,
-        baroCorpNum: cfg.corpNum,
-        baroId: cfg.baroId,
-        baroPwd: savedBaroPwd,
-        baroServer: cfg.baroServer,
-        aligoUserId: cfg.aligoUser,
-        aligoKey: cfg.aligoKey
-      };
-
-      let resultLog = null;
-      let sendErrorMessage = '';
-      try {
-        const res = await fetch('/api/fax/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(faxPayload)
-        });
-        const data = await res.json();
-        if (data && data.success && data.log) {
-          resultLog = data.log;
-        } else if (data && !data.success) {
-          sendErrorMessage = data.error || '발송 실패';
-        }
-      } catch (apiErr) {
-        console.warn('[FAX API Call Error in newApp]', apiErr);
-        sendErrorMessage = apiErr.message || '네트워크 연결 오류';
-      }
-
-      if (!resultLog) {
-        const now = new Date();
-        const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-        const isFailed = Boolean(sendErrorMessage);
-        resultLog = {
-          id: 'FLOG-' + Date.now().toString().slice(-6),
-          sentDate: dateStr,
-          appId: newApp.id,
-          patientName: newApp.patientName,
-          insuranceCompany: '현대해상',
-          category: '1차접수',
-          formCode: 'HD_FORM_01',
-          formName: '현대해상 1차 고객등록 및 신청 접수서',
-          recipient: targetFaxRecipient,
-          faxNumber: dispatchFaxNumber,
-          pages: 1,
-          status: isFailed ? '실패' : '성공',
-          operator: '접수담당자',
-          resultMsg: isFailed ? `발송 실패 (${sendErrorMessage})` : (savedMode === 'barobill' ? '바로빌 접수 완료' : '정상 송신 완료 (200 OK)'),
-          provider: savedMode === 'barobill' ? `Barobill (${savedBaroServer === 'prod' ? '운영' : '테스트'})` : (savedMode === 'aligo' ? 'Aligo Fax API' : 'Smart Sandbox (모의 회선)')
-        };
-      }
-
-      if (!Array.isArray(gFaxLogs)) gFaxLogs = [];
-      gFaxLogs.unshift(resultLog);
-      if (typeof saveFaxLogs === 'function') saveFaxLogs();
-      if (typeof updateFaxKpis === 'function') updateFaxKpis();
-      if (typeof renderFaxLogsTable === 'function') renderFaxLogsTable();
-      try {
-        if (typeof syncToConvex === 'function') {
-          await syncToConvex('sync:saveFaxRecord', { record: resultLog });
-        }
-      } catch (e) {}
-    }
-
-    // Add to applications
+    // 2. 고객 신청 대장에 최우선 즉시 등록 (팩스 성공 여부와 무관하게 100% 안전 보존)
     gApps.unshift(newApp);
+    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
     // 손해사정인 정보 디렉토리 자동반영 & 동기화
     if (newApp.adjusterName) {
@@ -34533,20 +34393,173 @@ async function finalizeNewAppRegistration(newApp) {
       });
     }
 
-    // Convex Cloud 운영 DB 실시간 동기화
+    // Convex Cloud 운영 DB 실시간 영구 동기화
     if (typeof syncToConvex === 'function') {
-      syncToConvex('sync:saveApplication', { app: newApp });
+      syncToConvex('sync:saveApplication', { app: newApp }).catch(console.warn);
     }
 
     // Increment seq
     incrementAppIdSeq();
 
     closeModal('newAppModal');
-    renderUnifiedCareHub();
-    renderApplications();
-    renderDashboard();
+    if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+    if (typeof renderApplications === 'function') renderApplications();
+    if (typeof renderDashboard === 'function') renderDashboard();
 
-    if (isHyundai && targetFaxNumber) {
+    // 3. 팩스 발송 (팩스번호가 지정된 경우 별도 비동기 처리)
+    let faxSentSuccess = false;
+    let faxSentErrorMsg = '';
+
+    if (targetFaxNumber) {
+      try {
+        if (isHyundai) {
+          if (typeof window.gInitialFaxRecords === 'undefined') {
+            window.gInitialFaxRecords = {};
+          }
+          window.gInitialFaxRecords[newId] = {
+            formType: 'HD_FORM_01',
+            formTitle: '현대해상 간병인지원 신청/고객등록 요청서',
+            sentDate: newApp.initialFaxDate || new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+            status: '전송완료',
+            faxNumber: targetFaxNumber + (targetFaxRecipient ? ' (' + targetFaxRecipient + ')' : ''),
+            recipient: targetFaxRecipient || '현대해상 보상지원센터',
+            pages: 1,
+            deliveryStatus: '성공 (OK - 200)'
+          };
+          if (typeof gFaxRecords !== 'undefined' && gFaxRecords[newId]) {
+            delete gFaxRecords[newId];
+          }
+        }
+
+        const cfg = getBarobillConfig();
+        let savedBaroPwd = cfg.baroPwd;
+        if (!savedBaroPwd) {
+          savedBaroPwd = await ensureBarobillPassword();
+        }
+
+        if (!savedBaroPwd && cfg.mode === 'barobill') {
+          showCustomAlert({
+            title: '고객 등록 완료 (팩스 비밀번호 필요)',
+            message: `[${newId} - ${newApp.patientName} 님]의 접수가 성공적으로 완료되었습니다.\n\n단, 바로빌 팩스 비밀번호가 설정되지 않아 고객등록 팩스는 발송 대기 상태입니다. [팩스관리]의 [팩스 설정] 창에서 비밀번호를 등록하시면 언제든 바로 발송하실 수 있습니다.`,
+            icon: 'shield-alert',
+            iconColor: 'amber',
+            confirmText: '팩스 설정 열기',
+            onConfirm: () => {
+              openFaxSettingsModal();
+              setTimeout(() => {
+                const pwdEl = document.getElementById('faxBarobillPwd');
+                if (pwdEl) pwdEl.focus();
+              }, 300);
+            }
+          });
+          return;
+        }
+
+        let dispatchFaxNumber = targetFaxNumber;
+        let redirectNote = '';
+        const cleanTargetNum = (targetFaxNumber || '').replace(/[^0-9]/g, '');
+        const isTargetInternalOrTest = 
+          (targetFaxRecipient && (
+            targetFaxRecipient.includes('복합기') || 
+            targetFaxRecipient.includes('테스트') || 
+            targetFaxRecipient.includes('리본케어') || 
+            targetFaxRecipient.includes('모바일팩스')
+          )) || 
+          cleanTargetNum === '0264993917' ||
+          cleanTargetNum === (cfg.testRedirectNumber || '').replace(/[^0-9]/g, '');
+
+        const applyRedirect = cfg.isTestRedirect && cfg.testRedirectNumber && !isTargetInternalOrTest;
+        if (applyRedirect) {
+          dispatchFaxNumber = cfg.testRedirectNumber;
+          redirectNote = `\n[안전 테스트 리다이렉트: 원본(${targetFaxRecipient} ${targetFaxNumber}) 대신 테스트번호(${cfg.testRedirectNumber})로 송출됨]`;
+        }
+
+        const previewHtml = getCleanFaxTransmissionHtml('HD_FORM_01');
+        const faxPayload = {
+          appId: newApp.id,
+          patientName: newApp.patientName,
+          insuranceCompany: newApp.insuranceCompany,
+          category: '1차접수',
+          formCode: 'HD_FORM_01',
+          formName: '현대해상 1차 고객등록 및 신청 접수서',
+          recipient: targetFaxRecipient + (applyRedirect ? ' (테스트 리다이렉트)' : ''),
+          faxNumber: dispatchFaxNumber,
+          senderNumber: cfg.sender,
+          memo: (newApp.memo || '현대해상 1차 고객등록 및 신청 접수 건 송부') + redirectNote,
+          pages: 1,
+          formHtml: previewHtml,
+          operator: '접수담당자',
+          provider: cfg.mode,
+          baroCertKey: cfg.certKey,
+          baroCorpNum: cfg.corpNum,
+          baroId: cfg.baroId,
+          baroPwd: savedBaroPwd,
+          baroServer: cfg.baroServer,
+          aligoUserId: cfg.aligoUser,
+          aligoKey: cfg.aligoKey
+        };
+
+        let resultLog = null;
+        let sendErrorMessage = '';
+        try {
+          const res = await fetch('/api/fax/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(faxPayload)
+          });
+          const data = await res.json();
+          if (data && data.success && data.log) {
+            resultLog = data.log;
+            faxSentSuccess = true;
+          } else if (data && !data.success) {
+            sendErrorMessage = data.error || '발송 실패';
+          }
+        } catch (apiErr) {
+          console.warn('[FAX API Call Error in newApp]', apiErr);
+          sendErrorMessage = apiErr.message || '네트워크 연결 오류';
+        }
+
+        if (!resultLog) {
+          const now = new Date();
+          const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+          const isFailed = Boolean(sendErrorMessage);
+          resultLog = {
+            id: 'FLOG-' + Date.now().toString().slice(-6),
+            sentDate: dateStr,
+            appId: newApp.id,
+            patientName: newApp.patientName,
+            insuranceCompany: '현대해상',
+            category: '1차접수',
+            formCode: 'HD_FORM_01',
+            formName: '현대해상 1차 고객등록 및 신청 접수서',
+            recipient: targetFaxRecipient,
+            faxNumber: dispatchFaxNumber,
+            pages: 1,
+            status: isFailed ? '실패' : '성공',
+            operator: '접수담당자',
+            resultMsg: isFailed ? `발송 실패 (${sendErrorMessage})` : (cfg.mode === 'barobill' ? '바로빌 접수 완료' : '정상 송신 완료 (200 OK)'),
+            provider: cfg.mode === 'barobill' ? `Barobill (${cfg.baroServer === 'prod' ? '운영' : '테스트'})` : (cfg.mode === 'aligo' ? 'Aligo Fax API' : 'Smart Sandbox (모의 회선)')
+          };
+          if (!isFailed) faxSentSuccess = true;
+        }
+
+        if (!Array.isArray(gFaxLogs)) gFaxLogs = [];
+        gFaxLogs.unshift(resultLog);
+        if (typeof saveFaxLogs === 'function') saveFaxLogs();
+        if (typeof updateFaxKpis === 'function') updateFaxKpis();
+        if (typeof renderFaxLogsTable === 'function') renderFaxLogsTable();
+        try {
+          if (typeof syncToConvex === 'function') {
+            await syncToConvex('sync:saveFaxRecord', { record: resultLog });
+          }
+        } catch (e) {}
+      } catch (faxErr) {
+        console.warn('[Fax Sending Non-blocking Error]', faxErr);
+        faxSentErrorMsg = faxErr.message;
+      }
+    }
+
+    if (isHyundai && targetFaxNumber && faxSentSuccess) {
       showCustomAlert({
         title: '현대해상 1차 접수 & 팩스 발송 완료',
         message: `[${newId} - ${newApp.patientName} 님]의 현대해상 1차 접수가 성공적으로 완료되어 ${targetFaxRecipient}(FAX ${targetFaxNumber})으로 고객등록 팩스가 발송되었습니다.\n\n현재 고객 상태는 [문자수신대기]로 등록되었습니다.\n현대해상으로부터 피보험자 가입정보 회신 문자가 도착하면, 고객 카드나 간병신청대장의 [📱 현대 문자 등록] 버튼을 눌러 문자를 붙여넣으시면 증권/사고/손사 정보가 1초 만에 자동 완성됩니다.`,
@@ -40452,7 +40465,7 @@ function saveLaunchConfig(update) {
 async function syncRealLaunchDataToConvex(apps = null, assigns = null, claims = null, payouts = null, clearCompany = null) {
   if (typeof syncToConvex !== 'function') return;
   try {
-    const CHUNK_SIZE = 50;
+    const CHUNK_SIZE = 20;
     if (Array.isArray(apps) && apps.length > 0) {
       apps = (typeof filterInvalidSamsungDuplicates === 'function') ? filterInvalidSamsungDuplicates(apps) : apps;
       for (let i = 0; i < apps.length; i += CHUNK_SIZE) {
@@ -41044,10 +41057,10 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
           const dailyWage = Number(String(r[7] || 0).replace(/[^0-9]/g, '')) || 0;
           const payoutAmount = Number(String(r[8] || 0).replace(/[^0-9]/g, '')) || 0;
           const payoutStatusRaw = String(r[9] !== undefined ? r[9] : '').trim();
-          const isPaid = (payoutStatusRaw === '지급' || payoutStatusRaw === '선지급완료');
-          const payoutStatus = isPaid ? '지급완료' : '미지급';
+          const isUnpaid = payoutStatusRaw.includes('지급요함') || payoutStatusRaw.includes('미지급') || payoutStatusRaw.includes('대기') || payoutStatusRaw === '미';
+          const payoutStatus = isUnpaid ? '미지급' : '지급완료';
           let memo = String(r[10] !== undefined ? r[10] : '').trim();
-          if (!isPaid && payoutStatusRaw && payoutStatusRaw !== '미지급') {
+          if (isUnpaid && payoutStatusRaw && payoutStatusRaw !== '미지급') {
             memo = memo ? `[${payoutStatusRaw}] ${memo}` : `[${payoutStatusRaw}]`;
           }
 
