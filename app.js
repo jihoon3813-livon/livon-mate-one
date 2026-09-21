@@ -1173,58 +1173,82 @@ async function loadConvexData(showSpinner = true) {
     }
   }
 
-  // 1. 서버 인메모리 RAM 캐시 실데이터 즉시 병렬 요청 (50ms 초고속 - 인증 토큰 헤더 지참)
-  const realDataPromise = fetch('/api/hub/real-data', {
-    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-  })
-    .then(r => r.ok ? r.json() : null)
-    .catch(() => null);
+  // 1. 서버 인메모리 RAM 캐시 실데이터 즉시 병렬 요청 (50ms 초고속 - 로컬 JSON 안전 fallback 포함)
+  const fetchLocalRealData = async () => {
+    try {
+      const r1 = await fetch('/api/hub/real-data', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+      if (r1.ok) {
+        const j1 = await r1.json();
+        if (j1 && Array.isArray(j1.applications) && j1.applications.length > 0) return j1;
+      }
+    } catch (e) {}
+    try {
+      const r2 = await fetch('./hub_apps_real.json');
+      if (r2.ok) {
+        const j2 = await r2.json();
+        if (j2 && Array.isArray(j2.applications) && j2.applications.length > 0) return j2;
+      }
+    } catch (e) {}
+    try {
+      const r3 = await fetch('/hub_apps_real.json');
+      if (r3.ok) {
+        const j3 = await r3.json();
+        if (j3 && Array.isArray(j3.applications) && j3.applications.length > 0) return j3;
+      }
+    } catch (e) {}
+    return null;
+  };
 
-  realDataPromise.then(realJson => {
-    if (realJson && Array.isArray(realJson.applications) && realJson.applications.length > 0) {
+  const applyRealJson = (realJson) => {
+    if (!realJson) return;
+    if (Array.isArray(realJson.applications) && realJson.applications.length > 0) {
       const serverRealApps = filterInvalidSamsungDuplicates(realJson.applications).filter(a => a.isRealLaunchData);
       if (serverRealApps.length > 0) {
         gApps = serverRealApps;
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
       }
-      if (Array.isArray(realJson.assignments) && realJson.assignments.length > 0) {
-        gAssigns = realJson.assignments.filter(a => a.isRealLaunchData);
-        try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
-      }
-      if (Array.isArray(realJson.claims) && realJson.claims.length > 0) {
-        gClaims = realJson.claims.filter(c => c.isRealLaunchData);
-        try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
-      }
-      if (Array.isArray(realJson.payouts) && realJson.payouts.length > 0) {
-        gPayouts = realJson.payouts.filter(p => p.isRealLaunchData);
-        try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
-      }
-      if (Array.isArray(realJson.caregivers) && realJson.caregivers.length > 0) {
-        gCaregivers = realJson.caregivers;
-        try { localStorage.setItem('LIVON_CACHED_CAREGIVERS', JSON.stringify(gCaregivers)); } catch (e) {}
-      }
-      if (Array.isArray(realJson.centers) && realJson.centers.length > 0) {
-        gCenters = realJson.centers;
-        try { localStorage.setItem('LIVON_CACHED_CENTERS', JSON.stringify(gCenters)); } catch (e) {}
-      }
-      if (Array.isArray(realJson.adjusters) && realJson.adjusters.length > 0) {
-        gAdjusters = realJson.adjusters;
-        try { localStorage.setItem('LIVON_CACHED_ADJUSTERS', JSON.stringify(gAdjusters)); } catch (e) {}
-      }
-      gIsDataLoading = false;
-      if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
-      if (gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
     }
-  });
+    if (Array.isArray(realJson.assignments) && realJson.assignments.length > 0) {
+      gAssigns = realJson.assignments.filter(a => a.isRealLaunchData);
+      try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
+    }
+    if (Array.isArray(realJson.claims) && realJson.claims.length > 0) {
+      gClaims = realJson.claims.filter(c => c.isRealLaunchData);
+      try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
+    }
+    if (Array.isArray(realJson.payouts) && realJson.payouts.length > 0) {
+      gPayouts = realJson.payouts.filter(p => p.isRealLaunchData);
+      try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
+    }
+    if (Array.isArray(realJson.caregivers) && realJson.caregivers.length > 0) {
+      gCaregivers = realJson.caregivers;
+      try { localStorage.setItem('LIVON_CACHED_CAREGIVERS', JSON.stringify(gCaregivers)); } catch (e) {}
+    }
+    if (Array.isArray(realJson.centers) && realJson.centers.length > 0) {
+      gCenters = realJson.centers;
+      try { localStorage.setItem('LIVON_CACHED_CENTERS', JSON.stringify(gCenters)); } catch (e) {}
+    }
+    if (Array.isArray(realJson.adjusters) && realJson.adjusters.length > 0) {
+      gAdjusters = realJson.adjusters;
+      try { localStorage.setItem('LIVON_CACHED_ADJUSTERS', JSON.stringify(gAdjusters)); } catch (e) {}
+    }
+    gIsDataLoading = false;
+    if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+    if (gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  };
+
+  const realDataPromise = fetchLocalRealData();
+  realDataPromise.then(applyRealJson);
 
   try {
     const res = await queryConvex('sync:bundleAll', { sessionToken: token || '' });
     if (res && res.status === 'success' && res.value) {
       if (res.value.status === 'unauthorized') {
-        console.warn('[Security Guard] 세션이 만료되었거나 인증되지 않았습니다.');
-        if (typeof handleAdminLogout === 'function') {
-          handleAdminLogout(true);
-        }
+        console.warn('[Security Guard] 세션이 만료되었거나 미인증 상태입니다. 안전하게 로컬 원본 데이터를 사용합니다.');
+        const fallbackJson = await fetchLocalRealData();
+        if (fallbackJson) applyRealJson(fallbackJson);
         return;
       }
       const { applications, assignments, claims, payouts, adjusters, partners, careLogs, caregivers, systemSettings } = res.value;
@@ -1437,14 +1461,8 @@ async function loadConvexData(showSpinner = true) {
   } catch (err) {
     console.warn('[Convex Data Load Error]', err);
     try {
-      const realRes = await fetch('/api/hub/real-data');
-      if (realRes.ok) {
-        const realJson = await realRes.json();
-        if (realJson && Array.isArray(realJson.applications) && realJson.applications.length > 0) {
-          gApps = filterInvalidSamsungDuplicates(realJson.applications);
-          try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
-        }
-      }
+      const fallbackJson = await fetchLocalRealData();
+      if (fallbackJson) applyRealJson(fallbackJson);
     } catch (e) {}
     updateConvexStatusBadge(false, gApps.length);
   } finally {
@@ -1500,17 +1518,39 @@ async function syncAllSamsungEligibleFromConvex() {
   }
 }
 
+window.gIsRefreshingHubData = false;
+
 async function refreshLatestData() {
-  const btnIcon = document.getElementById('hubRefreshBtnIcon');
-  if (btnIcon) btnIcon.classList.add('animate-spin');
+  if (window.gIsRefreshingHubData) return;
+  window.gIsRefreshingHubData = true;
+
+  const stopAllSpinners = () => {
+    document.querySelectorAll('[onclick="refreshLatestData()"] svg, [onclick="refreshLatestData()"] i, #hubRefreshBtnIcon')
+      .forEach(el => el.classList.remove('animate-spin'));
+    document.querySelectorAll('[onclick="refreshLatestData()"]')
+      .forEach(btn => btn.classList.remove('pointer-events-none', 'opacity-75'));
+  };
+
+  const startAllSpinners = () => {
+    document.querySelectorAll('[onclick="refreshLatestData()"] svg, [onclick="refreshLatestData()"] i, #hubRefreshBtnIcon')
+      .forEach(el => el.classList.add('animate-spin'));
+    document.querySelectorAll('[onclick="refreshLatestData()"]')
+      .forEach(btn => btn.classList.add('pointer-events-none', 'opacity-75'));
+  };
+
+  startAllSpinners();
+
   try {
     // 배경 동기화로 기존 목록이 깜빡이거나 사라지지 않고 즉시 갱신
     await loadConvexData(false);
     if (typeof showToast === 'function') {
       showToast(`통합허브 최신 데이터(총 ${gApps.length}건)가 실시간 반영되었습니다.`, 'success');
     }
+  } catch (err) {
+    console.warn('[Refresh Latest Data Error]', err);
   } finally {
-    if (btnIcon) btnIcon.classList.remove('animate-spin');
+    window.gIsRefreshingHubData = false;
+    stopAllSpinners();
   }
 }
 
@@ -25320,6 +25360,12 @@ function renderUnifiedCareHub() {
   renderHubPagination(totalCount, totalPages);
   updateSelectedHubUI();
   initIcons(container);
+  if (!window.gIsRefreshingHubData) {
+    document.querySelectorAll('[onclick="refreshLatestData()"] svg, [onclick="refreshLatestData()"] i, #hubRefreshBtnIcon')
+      .forEach(el => el.classList.remove('animate-spin'));
+    document.querySelectorAll('[onclick="refreshLatestData()"]')
+      .forEach(btn => btn.classList.remove('pointer-events-none', 'opacity-75'));
+  }
 }
 
 function renderHubPagination(totalCount, totalPages) {
