@@ -1278,6 +1278,209 @@ function resetAllTotalFilters() {
 }
 
 /**
+ * 한글 초성 검색 보조 리스트 및 유틸리티
+ */
+const KOREAN_CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+
+function getKoreanChosung(str) {
+  if (!str) return '';
+  let result = '';
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i) - 44032;
+    if (code >= 0 && code <= 11171) {
+      result += KOREAN_CHOSUNG_LIST[Math.floor(code / 588)];
+    } else {
+      result += str.charAt(i);
+    }
+  }
+  return result;
+}
+
+/**
+ * 종합 콜 대장 전방위 필터링 함수 (초성 검색, 전화번호 하이픈 무관 검색, 전방위 필드 포함)
+ */
+function filterTotalCallLogs(logsList) {
+  if (!Array.isArray(logsList)) logsList = getTotalCallLogs();
+
+  return logsList.filter(c => {
+    // 1) 날짜 범위 필터 (단독 호출 시)
+    if (gTotalFilter.startDate || gTotalFilter.endDate) {
+      const callDate = (c.callTime || '').slice(0, 10);
+      if (callDate) {
+        if (gTotalFilter.startDate && callDate < gTotalFilter.startDate) return false;
+        if (gTotalFilter.endDate && callDate > gTotalFilter.endDate) return false;
+      }
+    }
+    // 2) 채널 필터
+    if (gTotalFilter.channel !== 'all' && gTotalFilter.channel !== '전체') {
+      const ch = c.channel || '';
+      if (!ch.includes(gTotalFilter.channel) && !gTotalFilter.channel.includes(ch)) return false;
+    }
+    // 3) 검색어 필터 (한글 초성 검색, 전화번호 숫자 검색, 고객명, 등록환자명, 상담제목, 요약, 키워드, 라벨, 메모)
+    if (gTotalFilter.search) {
+      const q = gTotalFilter.search.toLowerCase().trim();
+      const isChosungOnly = /^[ㄱ-ㅎ]+$/.test(q);
+      const cleanQ = q.replace(/[^0-9]/g, '');
+
+      const callId = getCallUniqueId(c);
+      const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
+      const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
+      const match = matchCustomerToMateOne(c);
+
+      const pName = (match.patientName || '').toLowerCase();
+      const mName = (c.memberName || '').toLowerCase();
+      const title = (c.title || '').toLowerCase();
+      const summary = (c.summary || '').toLowerCase();
+      const keywords = (c.keywords || '').toLowerCase();
+      const channel = (c.channel || '').toLowerCase();
+      const operator = (c.operator || '').toLowerCase();
+      const arsMenu = (c.arsMenu || '').toLowerCase();
+      const appId = (match.appId || '').toLowerCase();
+      const cat = classifyConsultation(c).name.toLowerCase();
+
+      const phoneDigits = (c.phone || '').replace(/[^0-9]/g, '');
+      const rawPhoneDigits = (c.rawPhone || '').replace(/[^0-9]/g, '');
+
+      let matches = 
+        (c.phone || '').includes(q) ||
+        (c.rawPhone || '').includes(q) ||
+        (cleanQ.length >= 2 && (phoneDigits.includes(cleanQ) || rawPhoneDigits.includes(cleanQ))) ||
+        pName.includes(q) ||
+        mName.includes(q) ||
+        appId.includes(q) ||
+        title.includes(q) ||
+        summary.includes(q) ||
+        keywords.includes(q) ||
+        channel.includes(q) ||
+        operator.includes(q) ||
+        arsMenu.includes(q) ||
+        cat.includes(q) ||
+        memo.toLowerCase().includes(q) ||
+        labels.some(l => l.toLowerCase().includes(q));
+
+      if (!matches && isChosungOnly) {
+        matches = 
+          getKoreanChosung(pName).includes(q) ||
+          getKoreanChosung(mName).includes(q) ||
+          getKoreanChosung(title).includes(q) ||
+          getKoreanChosung(summary).includes(q) ||
+          getKoreanChosung(keywords).includes(q) ||
+          getKoreanChosung(channel).includes(q) ||
+          getKoreanChosung(operator).includes(q) ||
+          getKoreanChosung(memo).includes(q);
+      }
+      if (!matches) return false;
+    }
+    // 4) 유형 필터
+    if (gTotalFilter.category) {
+      const cat = classifyConsultation(c);
+      if (cat.name !== gTotalFilter.category) return false;
+    }
+    // 5) 라벨 필터
+    if (gTotalFilter.label) {
+      const callId = getCallUniqueId(c);
+      const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
+      if (!labels.includes(gTotalFilter.label)) return false;
+    }
+    // 6) 등록고객 전용
+    if (gTotalFilter.onlyMatched) {
+      const match = matchCustomerToMateOne(c);
+      if (!match.isRegistered) return false;
+    }
+    // 7) 메모 작성건 전용
+    if (gTotalFilter.onlyWithMemo) {
+      const callId = getCallUniqueId(c);
+      const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
+      if (!memo.trim()) return false;
+    }
+    // 8) 상담성 통화만
+    if (gTotalFilter.onlyAnswered) {
+      const isAns = isCallDurationAnswered(c) || !!((c.title && c.title.trim()) || (c.summary && c.summary.trim()));
+      if (!isAns) return false;
+      if (gTotalFilter.onlyRecorded) {
+        if (!((c.title && c.title.trim()) || (c.summary && c.summary.trim()))) return false;
+      }
+      if (gTotalFilter.onlyUnrecorded) {
+        if ((c.title && c.title.trim()) || (c.summary && c.summary.trim())) return false;
+      }
+    }
+    // 9) 아웃콜 대상 (대기0초 미연결) 필터
+    if (gTotalFilter.onlyMissedOutcall) {
+      if (!isCallMissedWaitZero(c)) return false;
+    }
+    // 10) 긴급 / 민원주의 라벨 필터
+    if (gTotalFilter.onlyUrgent) {
+      const callId = getCallUniqueId(c);
+      const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
+      if (!labels.includes('긴급') && !labels.includes('민원주의')) return false;
+    }
+    return true;
+  });
+}
+
+let _totalSearchDebounceTimer = null;
+function handleTotalSearchInput(value) {
+  gTotalFilter.search = value;
+  gTotalListPage = 1;
+  gTotalCustomerPage = 1;
+
+  // 검색어 삭제(X) 버튼 토글
+  const clearBtn = document.getElementById('btnTotalSearchClear');
+  if (clearBtn) {
+    if (value && value.trim()) clearBtn.classList.remove('hidden');
+    else clearBtn.classList.add('hidden');
+  }
+
+  // 필터 초기화 버튼 토글
+  const resetBtn = document.getElementById('btnTotalFilterReset');
+  if (resetBtn) {
+    const hasFilter = !!(gTotalFilter.startDate || gTotalFilter.endDate || gTotalFilter.channel !== 'all' || gTotalFilter.category || gTotalFilter.label || gTotalFilter.search || gTotalFilter.onlyMatched || gTotalFilter.onlyMissedOutcall || gTotalFilter.onlyAnswered || gTotalFilter.onlyUrgent);
+    if (hasFilter) resetBtn.classList.remove('hidden');
+    else resetBtn.classList.add('hidden');
+  }
+
+  // 검색 인풋 포커스 및 한글 조합(IME)을 깨뜨리지 않고 컨텐츠만 고속 갱신
+  if (_totalSearchDebounceTimer) clearTimeout(_totalSearchDebounceTimer);
+  _totalSearchDebounceTimer = setTimeout(() => {
+    updateTotalViewOnly();
+  }, 40);
+}
+
+function clearTotalSearchInput() {
+  const input = document.getElementById('totalCallSearchInput');
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+  handleTotalSearchInput('');
+}
+
+function updateTotalViewOnly() {
+  const contentContainer = document.getElementById('totalCallAnalysisContent');
+  if (contentContainer) {
+    const logs = getTotalCallLogs();
+    // 1) 날짜 범위 필터 적용
+    const dateFilteredLogs = logs.filter(c => {
+      if (gTotalFilter.startDate || gTotalFilter.endDate) {
+        const callDate = (c.callTime || '').slice(0, 10);
+        if (callDate) {
+          if (gTotalFilter.startDate && callDate < gTotalFilter.startDate) return false;
+          if (gTotalFilter.endDate && callDate > gTotalFilter.endDate) return false;
+        }
+      }
+      return true;
+    });
+    const filtered = filterTotalCallLogs(dateFilteredLogs);
+    contentContainer.innerHTML = renderTotalViewContent(filtered);
+    if (typeof initTotalIcons === 'function') {
+      initTotalIcons(contentContainer);
+    }
+  } else {
+    renderTotalCallAnalysisTab();
+  }
+}
+
+/**
  * =============================================================================
  * 종합 콜분석 탭 전체 렌더링
  * =============================================================================
@@ -1285,6 +1488,12 @@ function resetAllTotalFilters() {
 function renderTotalCallAnalysisTab() {
   const container = document.getElementById('tab-totalcallanalysis');
   if (!container) return;
+
+  // 인풋 포커스 및 커서 위치 백업 (전체 탭 리렌더링 시 포커스 잃음 방지)
+  const searchInput = document.getElementById('totalCallSearchInput');
+  const wasFocused = (searchInput && document.activeElement === searchInput);
+  const selStart = searchInput ? searchInput.selectionStart : null;
+  const selEnd = searchInput ? searchInput.selectionEnd : null;
 
   // 0. gTotalCallData 및 window.gTotalCallData 상호 동기화 & 세션 캐시 복원
   if (!gTotalCallData || !gTotalCallData.callLogs || gTotalCallData.callLogs.length === 0) {
@@ -1345,82 +1554,8 @@ function renderTotalCallAnalysisTab() {
     return true;
   });
 
-  // 2) 상세 조건 필터링 적용 (dateFilteredLogs 기준)
-  let filtered = dateFilteredLogs.filter(c => {
-    // 1) 채널 필터
-    if (gTotalFilter.channel !== 'all' && gTotalFilter.channel !== '전체') {
-      const ch = c.channel || '';
-      if (!ch.includes(gTotalFilter.channel) && !gTotalFilter.channel.includes(ch)) return false;
-    }
-    // 2) 검색어 필터
-    if (gTotalFilter.search) {
-      const q = gTotalFilter.search.toLowerCase().trim();
-      const callId = getCallUniqueId(c);
-      const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
-      const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
-      const match = matchCustomerToMateOne(c);
-
-      const matches = 
-        (c.phone || '').includes(q) ||
-        (c.rawPhone || '').includes(q) ||
-        (c.memberName || '').toLowerCase().includes(q) ||
-        (match.patientName || '').toLowerCase().includes(q) ||
-        (match.appId || '').toLowerCase().includes(q) ||
-        (c.title || '').toLowerCase().includes(q) ||
-        (c.summary || '').toLowerCase().includes(q) ||
-        (c.keywords || '').toLowerCase().includes(q) ||
-        memo.toLowerCase().includes(q) ||
-        labels.some(l => l.toLowerCase().includes(q));
-      if (!matches) return false;
-    }
-    // 3) 유형 필터
-    if (gTotalFilter.category) {
-      const cat = classifyConsultation(c);
-      if (cat.name !== gTotalFilter.category) return false;
-    }
-    // 4) 라벨 필터
-    if (gTotalFilter.label) {
-      const callId = getCallUniqueId(c);
-      const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
-      if (!labels.includes(gTotalFilter.label)) return false;
-    }
-    // 5) 등록고객 전용
-    if (gTotalFilter.onlyMatched) {
-      const match = matchCustomerToMateOne(c);
-      if (!match.isRegistered) return false;
-    }
-    // 6) 메모 작성건 전용
-    if (gTotalFilter.onlyWithMemo) {
-      const callId = getCallUniqueId(c);
-      const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
-      if (!memo.trim()) return false;
-    }
-    // 7) 상담성 통화만 (CTI 응답 성공: 통화시간 > 0 또는 녹취/요약 보유)
-    if (gTotalFilter.onlyAnswered) {
-      const isAns = isCallDurationAnswered(c) || !!((c.title && c.title.trim()) || (c.summary && c.summary.trim()));
-      if (!isAns) return false;
-
-      // 7-1) 녹취확보건만 필터
-      if (gTotalFilter.onlyRecorded) {
-        if (!((c.title && c.title.trim()) || (c.summary && c.summary.trim()))) return false;
-      }
-      // 7-2) 녹취미저장건만 필터
-      if (gTotalFilter.onlyUnrecorded) {
-        if ((c.title && c.title.trim()) || (c.summary && c.summary.trim())) return false;
-      }
-    }
-    // 8) 아웃콜 대상 (대기0초 미연결) 필터
-    if (gTotalFilter.onlyMissedOutcall) {
-      if (!isCallMissedWaitZero(c)) return false;
-    }
-    // 9) 긴급 / 민원주의 라벨 필터
-    if (gTotalFilter.onlyUrgent) {
-      const callId = getCallUniqueId(c);
-      const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
-      if (!labels.includes('긴급') && !labels.includes('민원주의')) return false;
-    }
-    return true;
-  });
+  // 2) 상세 조건 필터링 적용 (dateFilteredLogs 기준 - 초성검색, 전화번호 매칭, 메모/라벨 통합 필터링)
+  let filtered = filterTotalCallLogs(dateFilteredLogs);
 
   // KPI 집계 (날짜 필터링 적용된 dateFilteredLogs 기준)
   const totalInbound = dateFilteredLogs.length;
@@ -1723,8 +1858,11 @@ function renderTotalCallAnalysisTab() {
 
           <!-- 검색창 -->
           <div class="relative min-w-[200px] flex-1 sm:max-w-xs">
-            <input type="text" value="${gTotalFilter.search}" oninput="handleTotalFilterChange('search', this.value)" placeholder="고객명, 전화번호, 상담제목, 메모 검색..." class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-cyan-500">
+            <input type="text" id="totalCallSearchInput" value="${gTotalFilter.search}" oninput="handleTotalSearchInput(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();updateTotalViewOnly();}" placeholder="고객명, 전화번호, 상담제목, 메모 검색..." class="w-full pl-8 pr-8 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-cyan-500 font-medium">
             <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+            <button type="button" id="btnTotalSearchClear" onclick="clearTotalSearchInput()" class="${gTotalFilter.search ? '' : 'hidden'} absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 cursor-pointer" title="검색어 지우기">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
           </div>
         </div>
       </div>
@@ -1789,13 +1927,11 @@ function renderTotalCallAnalysisTab() {
             `).join('')}
           </select>
 
-          ${(gTotalFilter.startDate || gTotalFilter.endDate || gTotalFilter.channel !== 'all' || gTotalFilter.category || gTotalFilter.label || gTotalFilter.search || gTotalFilter.onlyMatched || gTotalFilter.onlyMissedOutcall || gTotalFilter.onlyAnswered || gTotalFilter.onlyUrgent) ? `
-            <button type="button" onclick="resetAllTotalFilters()" 
-              class="px-2 py-1 rounded-lg text-rose-600 hover:bg-rose-50 font-bold text-[11px] flex items-center gap-0.5 cursor-pointer transition-colors" title="모든 검색 및 필터 조건 초기화">
-              <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
-              <span>필터 초기화</span>
-            </button>
-          ` : ''}
+          <button type="button" id="btnTotalFilterReset" onclick="resetAllTotalFilters()" 
+            class="${(gTotalFilter.startDate || gTotalFilter.endDate || gTotalFilter.channel !== 'all' || gTotalFilter.category || gTotalFilter.label || gTotalFilter.search || gTotalFilter.onlyMatched || gTotalFilter.onlyMissedOutcall || gTotalFilter.onlyAnswered || gTotalFilter.onlyUrgent) ? '' : 'hidden'} px-2 py-1 rounded-lg text-rose-600 hover:bg-rose-50 font-bold text-[11px] flex items-center gap-0.5 cursor-pointer transition-colors" title="모든 검색 및 필터 조건 초기화">
+            <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+            <span>필터 초기화</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1807,6 +1943,17 @@ function renderTotalCallAnalysisTab() {
   `;
 
   initTotalIcons(container);
+
+  // 리렌더링 전 인풋 포커스 상태였다면 포커스 및 캐럿 복원 (한글 입력 끊김 방지)
+  if (wasFocused) {
+    const newInp = document.getElementById('totalCallSearchInput');
+    if (newInp) {
+      newInp.focus();
+      if (selStart !== null && selEnd !== null) {
+        try { newInp.setSelectionRange(selStart, selEnd); } catch(e) {}
+      }
+    }
+  }
   } catch (err) {
     console.error('[TotalCallAnalysis] renderTotalCallAnalysisTab error:', err);
     container.innerHTML = `
@@ -1841,7 +1988,11 @@ function handleTotalFilterChange(key, value) {
   gTotalFilter[key] = value;
   gTotalListPage = 1;
   gTotalCustomerPage = 1;
-  renderTotalCallAnalysisTab();
+  if (key === 'search') {
+    handleTotalSearchInput(value);
+  } else {
+    renderTotalCallAnalysisTab();
+  }
 }
 
 /**
@@ -3007,6 +3158,12 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
     if (e.target === modal) closeMissedCallsOutcallModal();
   };
 
+  // 인풋 포커스 백업
+  const searchInput = document.getElementById('outcallModalSearch');
+  const wasFocused = (searchInput && document.activeElement === searchInput);
+  const selStart = searchInput ? searchInput.selectionStart : null;
+  const selEnd = searchInput ? searchInput.selectionEnd : null;
+
   const logs = getTotalCallLogs();
   const missedLogs = logs.filter(isCallMissedWaitZero);
 
@@ -3017,12 +3174,25 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
 
   if (gMissedSearchKeyword) {
     const q = gMissedSearchKeyword.toLowerCase().trim();
+    const cleanQ = cleanPhoneDigits(q);
+    const isChosungOnly = /^[ㄱ-ㅎ]+$/.test(q);
     displayList = displayList.filter(c => {
       const match = matchCustomerToMateOne(c);
-      return (c.phone || '').includes(q) ||
-        (c.rawPhone || '').includes(q) ||
-        (match.patientName || '').toLowerCase().includes(q) ||
-        (c.channel || '').toLowerCase().includes(q);
+      const pName = (match.patientName || '').toLowerCase();
+      const phone = cleanPhoneDigits(c.phone || c.rawPhone || '');
+      const appId = (match.appId || '').toLowerCase();
+      const ch = (c.channel || '').toLowerCase();
+
+      let matches = 
+        phone.includes(cleanQ || q) ||
+        pName.includes(q) ||
+        appId.includes(q) ||
+        ch.includes(q);
+
+      if (!matches && isChosungOnly) {
+        matches = getKoreanChosung(pName).includes(q);
+      }
+      return matches;
     });
   }
 
@@ -3067,11 +3237,14 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
 
         <!-- 고객/전화번호 검색 -->
         <div class="relative flex-1 max-w-full sm:max-w-xs">
-          <input type="text" value="${gMissedSearchKeyword}" 
+          <input type="text" id="outcallModalSearch" value="${gMissedSearchKeyword}" 
             oninput="gMissedSearchKeyword=this.value; openMissedCallsOutcallModal('${filterTab}');" 
             placeholder="고객명, 전화번호 검색..." 
-            class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs focus:outline-none focus:border-rose-500 font-bold">
+            class="w-full pl-8 pr-8 py-1.5 rounded-xl bg-white border border-slate-200 text-xs focus:outline-none focus:border-rose-500 font-bold">
           <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+          <button type="button" onclick="gMissedSearchKeyword=''; openMissedCallsOutcallModal('${filterTab}');" class="${gMissedSearchKeyword ? '' : 'hidden'} absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 cursor-pointer" title="검색어 지우기">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+          </button>
         </div>
       </div>
 
@@ -3192,6 +3365,16 @@ function openMissedCallsOutcallModal(filterTab = 'pending') {
 
   modal.classList.remove('hidden');
   initTotalIcons(modal);
+
+  if (wasFocused) {
+    const newInp = document.getElementById('outcallModalSearch');
+    if (newInp) {
+      newInp.focus();
+      if (selStart !== null && selEnd !== null) {
+        try { newInp.setSelectionRange(selStart, selEnd); } catch(e) {}
+      }
+    }
+  }
 }
 
 function closeMissedCallsOutcallModal() {
@@ -3877,7 +4060,7 @@ async function exportTotalCallExcel() {
   });
 
   const allLogs = getTotalCallLogs();
-  const logsToExport = allLogs.filter(c => {
+  const dateFilteredLogs = allLogs.filter(c => {
     if (gTotalFilter.startDate || gTotalFilter.endDate) {
       const callDate = (c.callTime || '').slice(0, 10);
       if (callDate) {
@@ -3885,67 +4068,9 @@ async function exportTotalCallExcel() {
         if (gTotalFilter.endDate && callDate > gTotalFilter.endDate) return false;
       }
     }
-    if (gTotalFilter.channel !== 'all' && gTotalFilter.channel !== '전체') {
-      const ch = c.channel || '';
-      if (!ch.includes(gTotalFilter.channel) && !gTotalFilter.channel.includes(ch)) return false;
-    }
-    if (gTotalFilter.search) {
-      const q = gTotalFilter.search.toLowerCase().trim();
-      const callId = getCallUniqueId(c);
-      const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
-      const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
-      const match = matchCustomerToMateOne(c);
-      const matches = 
-        (c.phone || '').includes(q) ||
-        (c.rawPhone || '').includes(q) ||
-        (c.memberName || '').toLowerCase().includes(q) ||
-        (match.patientName || '').toLowerCase().includes(q) ||
-        (match.appId || '').toLowerCase().includes(q) ||
-        (c.title || '').toLowerCase().includes(q) ||
-        (c.summary || '').toLowerCase().includes(q) ||
-        (c.keywords || '').toLowerCase().includes(q) ||
-        memo.toLowerCase().includes(q) ||
-        labels.some(l => l.toLowerCase().includes(q));
-      if (!matches) return false;
-    }
-    if (gTotalFilter.category) {
-      const cat = classifyConsultation(c);
-      if (cat.name !== gTotalFilter.category) return false;
-    }
-    if (gTotalFilter.label) {
-      const callId = getCallUniqueId(c);
-      const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
-      if (!labels.includes(gTotalFilter.label)) return false;
-    }
-    if (gTotalFilter.onlyMatched) {
-      const match = matchCustomerToMateOne(c);
-      if (!match.isRegistered) return false;
-    }
-    if (gTotalFilter.onlyWithMemo) {
-      const callId = getCallUniqueId(c);
-      const memo = (gTotalCallAnnotations.memos && gTotalCallAnnotations.memos[callId]) || '';
-      if (!memo.trim()) return false;
-    }
-    if (gTotalFilter.onlyAnswered) {
-      const isAns = isCallDurationAnswered(c) || !!((c.title && c.title.trim()) || (c.summary && c.summary.trim()));
-      if (!isAns) return false;
-      if (gTotalFilter.onlyRecorded) {
-        if (!((c.title && c.title.trim()) || (c.summary && c.summary.trim()))) return false;
-      }
-      if (gTotalFilter.onlyUnrecorded) {
-        if ((c.title && c.title.trim()) || (c.summary && c.summary.trim())) return false;
-      }
-    }
-    if (gTotalFilter.onlyMissedOutcall) {
-      if (!isCallMissedWaitZero(c)) return false;
-    }
-    if (gTotalFilter.onlyUrgent) {
-      const callId = getCallUniqueId(c);
-      const labels = (gTotalCallAnnotations.labels && gTotalCallAnnotations.labels[callId]) || [];
-      if (!labels.includes('긴급') && !labels.includes('민원주의')) return false;
-    }
     return true;
   });
+  const logsToExport = filterTotalCallLogs(dateFilteredLogs);
 
   logsToExport.forEach((c, idx) => {
     const callId = getCallUniqueId(c);

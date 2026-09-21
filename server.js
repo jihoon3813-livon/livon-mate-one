@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const { exec } = require('child_process');
 const { createDocumentPdfBuffer, createTestPdfBuffer } = require('./pdf-helper');
 const { uploadToBarobillFTP, callBarobillSoap, getBarobillErrorMessage, getBarobillFaxStatus } = require('./barobill-client');
@@ -160,6 +161,38 @@ async function fetchOnlineHospitals(query) {
     req.on('error', () => resolve([]));
     req.on('timeout', () => { req.destroy(); resolve([]); });
   });
+}
+
+let gCachedRealDataBuf = null;
+let gCachedRealDataGzip = null;
+let gCachedRealDataMtime = 0;
+
+function getCachedRealDataPayload() {
+  const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+  if (!fs.existsSync(realDataFile)) return null;
+  try {
+    const stats = fs.statSync(realDataFile);
+    if (gCachedRealDataBuf && stats.mtimeMs === gCachedRealDataMtime) {
+      return { buf: gCachedRealDataBuf, gzip: gCachedRealDataGzip };
+    }
+    const buf = fs.readFileSync(realDataFile);
+    gCachedRealDataBuf = buf;
+    try {
+      gCachedRealDataGzip = zlib.gzipSync(buf);
+    } catch (ze) {
+      gCachedRealDataGzip = null;
+    }
+    gCachedRealDataMtime = stats.mtimeMs;
+    return { buf: gCachedRealDataBuf, gzip: gCachedRealDataGzip };
+  } catch (e) {
+    return null;
+  }
+}
+
+function invalidateRealDataCache() {
+  gCachedRealDataBuf = null;
+  gCachedRealDataGzip = null;
+  gCachedRealDataMtime = 0;
 }
 
 function startServer(port) {
@@ -733,10 +766,22 @@ function saveSavedFaxConfig(cfg) {
 
       if (req.method === 'GET') {
         try {
-          if (fs.existsSync(realDataFile)) {
-            const content = fs.readFileSync(realDataFile, 'utf-8');
-            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            return res.end(content);
+          const payload = getCachedRealDataPayload();
+          if (payload) {
+            const acceptGzip = (req.headers['accept-encoding'] || '').includes('gzip');
+            if (acceptGzip && payload.gzip) {
+              res.writeHead(200, {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Content-Encoding': 'gzip',
+                'Cache-Control': 'public, max-age=3'
+              });
+              return res.end(payload.gzip);
+            }
+            res.writeHead(200, {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Cache-Control': 'public, max-age=3'
+            });
+            return res.end(payload.buf);
           }
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: true, data: null }));
@@ -806,6 +851,7 @@ function saveSavedFaxConfig(cfg) {
 
             stored.updatedAt = new Date().toISOString();
             fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+            invalidateRealDataCache();
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify({

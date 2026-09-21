@@ -44,9 +44,6 @@ module.exports = async function handler(req, res) {
       }
       const raw = fs.readFileSync(filePath, 'utf8');
       const data = JSON.parse(raw);
-      if (Array.isArray(data.applications)) {
-        data.applications = data.applications.filter(a => !(a && a.id && String(a.id).startsWith('C') && (a.insuranceCompany || '').includes('삼성')));
-      }
       return res.status(200).json({
         success: true,
         ...data
@@ -88,16 +85,20 @@ module.exports = async function handler(req, res) {
         } catch (e) {}
       }
 
-      // 다른 원수사 데이터는 보존하고, 현재 원수사 데이터만 교체
-      const filterOther = (arr) => (arr || []).filter(item => {
-        const c = item.insuranceCompany || '';
-        if (isHyundai && c.includes('현대')) return false;
-        if (isSamsung && c.includes('삼성')) return false;
-        return true;
-      });
+      // 종합 관리대장은 전수(현대해상, SCOR, 삼성화재 등)를 모두 포함하는 마스터 대장이므로,
+      // 종합/현대해상 데이터 적용 시 기존 데이터의 중복(과거 팬텀 C05xx 등)을 100% 제거하고 깔끔하게 교체
+      const isComprehensive = isHyundai || company.includes('종합') || body.isComprehensive;
 
-      const updatedApps = [...(body.applications || []), ...filterOther(currentData.applications)]
-        .filter(a => !(a && a.id && String(a.id).startsWith('C') && (a.insuranceCompany || '').includes('삼성')));
+      const filterOther = (arr) => {
+        if (isComprehensive) return [];
+        return (arr || []).filter(item => {
+          const c = item.insuranceCompany || '';
+          if (isSamsung && c.includes('삼성')) return false;
+          return true;
+        });
+      };
+
+      const updatedApps = [...(body.applications || []), ...filterOther(currentData.applications)];
       const updatedAssigns = [...(body.assignments || []), ...filterOther(currentData.assignments)];
       const updatedClaims = [...(body.claims || []), ...filterOther(currentData.claims)];
       const updatedPayouts = [...(body.payouts || []), ...filterOther(currentData.payouts)];

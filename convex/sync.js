@@ -36,7 +36,7 @@ export const bundleAll = query({
       ctx.db.query("samsungEmailLogs").order("desc").collect(),
     ]);
     return {
-      applications: applications.filter(a => !(a.id && String(a.id).startsWith("C") && (a.insuranceCompany || "").includes("삼성"))),
+      applications,
       assignments,
       claims,
       payouts,
@@ -745,9 +745,6 @@ export const saveApplicationsChunk = mutation({
     }
     for (const item of args.apps) {
       const { _id, _creationTime, ...doc } = item;
-      if (doc.id && String(doc.id).startsWith("C") && (doc.insuranceCompany || "").includes("삼성")) {
-        continue; // C-id 삼성 중복 건은 저장 방지
-      }
       if (!doc.id) {
         await ctx.db.insert("applications", doc);
         continue;
@@ -910,18 +907,36 @@ export const purgeMockData = mutation({
   },
 });
 
-// 34. 삼성화재 중복 C-id 신청 건 영구 정리
-export const purgeDuplicateSamsungApplications = mutation({
+// 34. 레거시 S-id 삼성 임의채번 데이터 정리 (공식 통합대장의 C-id와 중복 방지)
+export const purgeLegacyDummySamsungApplications = mutation({
   args: {},
   handler: async (ctx) => {
     const apps = await ctx.db.query("applications").collect();
     let deletedCount = 0;
     const deletedIds = [];
     for (const a of apps) {
-      if (a.id && a.id.startsWith("C") && (a.insuranceCompany || "").includes("삼성")) {
+      if (a.id && a.id.startsWith("S") && (a.insuranceCompany || "").includes("삼성")) {
         await ctx.db.delete(a._id);
         deletedCount++;
         deletedIds.push(a.id);
+      }
+    }
+    const assigns = await ctx.db.query("assignments").collect();
+    for (const as of assigns) {
+      if (as.applyId && as.applyId.startsWith("S")) {
+        await ctx.db.delete(as._id);
+      }
+    }
+    const claims = await ctx.db.query("claims").collect();
+    for (const cl of claims) {
+      if (cl.applyId && cl.applyId.startsWith("S")) {
+        await ctx.db.delete(cl._id);
+      }
+    }
+    const payouts = await ctx.db.query("payouts").collect();
+    for (const p of payouts) {
+      if (p.applyId && p.applyId.startsWith("S")) {
+        await ctx.db.delete(p._id);
       }
     }
     return {
@@ -931,6 +946,73 @@ export const purgeDuplicateSamsungApplications = mutation({
     };
   },
 });
+
+// 35. 전수조사 공식 대장 외 잔여 레거시/오파싱 고객 데이터 정리
+export const purgeStaleApplicationsNotInList = mutation({
+  args: {
+    validIds: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const validSet = new Set(args.validIds);
+    const allApps = await ctx.db.query("applications").collect();
+    let deletedCount = 0;
+    const deletedIds = [];
+    for (const a of allApps) {
+      if (!a.id || !validSet.has(a.id)) {
+        await ctx.db.delete(a._id);
+        deletedCount++;
+        if (a.id) deletedIds.push(a.id);
+      }
+    }
+    return { deletedCount, deletedIds, timestamp: new Date().toISOString() };
+  },
+});
+
+// 36. 전수조사 공식 대장 외 잔여 배정/청구/지급 데이터 정리
+export const purgeStaleRecordsNotInList = mutation({
+  args: {
+    validAssignIds: v.optional(v.array(v.string())),
+    validClaimIds: v.optional(v.array(v.string())),
+    validPayoutIds: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    let deletedAssigns = 0;
+    if (args.validAssignIds) {
+      const set = new Set(args.validAssignIds);
+      const rows = await ctx.db.query("assignments").collect();
+      for (const r of rows) {
+        if (!r.id || !set.has(r.id)) {
+          await ctx.db.delete(r._id);
+          deletedAssigns++;
+        }
+      }
+    }
+    let deletedClaims = 0;
+    if (args.validClaimIds) {
+      const set = new Set(args.validClaimIds);
+      const rows = await ctx.db.query("claims").collect();
+      for (const r of rows) {
+        if (!r.id || !set.has(r.id)) {
+          await ctx.db.delete(r._id);
+          deletedClaims++;
+        }
+      }
+    }
+    let deletedPayouts = 0;
+    if (args.validPayoutIds) {
+      const set = new Set(args.validPayoutIds);
+      const rows = await ctx.db.query("payouts").collect();
+      for (const r of rows) {
+        if (!r.id || !set.has(r.id)) {
+          await ctx.db.delete(r._id);
+          deletedPayouts++;
+        }
+      }
+    }
+    return { deletedAssigns, deletedClaims, deletedPayouts, timestamp: new Date().toISOString() };
+  },
+});
+
 
 
 

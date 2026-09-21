@@ -1261,10 +1261,11 @@
               <input type="hidden" id="hubInsuranceFilter" value="ALL">
 
               <select id="careHubSortSelect" onchange="changeHubSort(this.value)" class="py-1.5 px-2.5 text-xs border border-slate-300 rounded-xl bg-white font-bold text-slate-700">
+                <option value="created_desc" selected>정렬: 신청일 최신순 (수정건 맨 앞순위)</option>
+                <option value="created_pure_desc">정렬: 신청일 최신순</option>
+                <option value="created_asc">정렬: 신청일 과거순</option>
                 <option value="cs_priority">정렬: CS/민원 우선</option>
                 <option value="cs_label">정렬: CS/민원 라벨순</option>
-                <option value="created_desc" selected>정렬: 신청일 최신순 (수정건 맨 앞순위)</option>
-                <option value="created_asc">정렬: 신청일 과거순</option>
                 <option value="updated_desc">정렬: 최근 수정순</option>
                 <option value="name_asc">정렬: 가나다순</option>
               </select>
@@ -3160,9 +3161,6 @@
             <button onclick="switchFaxSubTab('directory')" id="faxSubTabBtn-directory" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer">
               <i data-lucide="book-marked" class="w-3.5 h-3.5 inline mr-1"></i> 원수사/손사 팩스번호 주소록
             </button>
-            <button onclick="switchFaxSubTab('pricing')" id="faxSubTabBtn-pricing" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer">
-              <i data-lucide="coins" class="w-3.5 h-3.5 inline mr-1"></i> 보험사별 청구 단가 설정
-            </button>
           </div>
           <span class="text-xs text-slate-400 font-mono" id="faxSubTabBadge">실시간 동기화 상태</span>
         </div>
@@ -3284,54 +3282,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Sub-Tab 3: 보험사별 청구 단가 설정 (Pricing Rules) -->
-        <div id="faxSubTabSection-pricing" class="space-y-3 hidden">
-          <!-- Pricing Header & Action -->
-          <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-2.5">
-              <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-black text-sm">
-                <i data-lucide="coins" class="w-5 h-5"></i>
-              </div>
-              <div>
-                <h4 class="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                  <span>원수사 / 보험사별 1일 기본 청구 약정단가 대장</span>
-                  <span class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10.5px] font-bold">글로벌 기본값</span>
-                </h4>
-                <p class="text-[11px] text-slate-500 mt-0.5">
-                  각 보험사 및 상품 약정별 1일 기준 청구 단가를 관리합니다. 고객 상세 창에서는 기본값이 자동 연동되며, 필요시 고객별로만 단가를 개별 변경할 수 있습니다.
-                </p>
-              </div>
-            </div>
-
-            <button type="button" onclick="openClaimUnitPriceModal()" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer">
-              <i data-lucide="plus" class="w-3.5 h-3.5"></i> 새 청구 단가 기준 등록
-            </button>
-          </div>
-
-          <!-- Pricing Table -->
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-            <div class="overflow-x-auto custom-scrollbar min-h-[300px]">
-              <table class="w-full text-left text-xs text-slate-600 border-collapse whitespace-nowrap">
-                <thead class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-700">
-                  <tr>
-                    <th class="p-3 text-center font-bold w-12">No.</th>
-                    <th class="p-3 font-bold">원수사 / 보험사명</th>
-                    <th class="p-3 font-bold">상품 / 약정 구분</th>
-                    <th class="p-3 text-right font-mono font-bold text-purple-900">1일 기본 청구 단가 (원/일)</th>
-                    <th class="p-3">비고 / 약정 메모</th>
-                    <th class="p-3 text-center font-bold">최종 수정일</th>
-                    <th class="p-3 text-center font-bold w-28">관리</th>
-                  </tr>
-                </thead>
-                <tbody id="claimUnitPriceTableBody" class="divide-y divide-slate-100">
-                  <!-- Injected dynamically -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
       </section>
 
 
@@ -4136,7 +4086,7 @@
                     <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">정식 런칭 전산화</span>
                   </div>
                   <p class="text-xs text-slate-500 mt-1 leading-relaxed">
-                    실제 운영 중인 <b>현대해상</b> 및 <b>삼성화재</b>의 엑셀 관리 파일(.xlsx, .xls) 또는 <b>구글 스프레드시트 주소(URL)</b>를 등록하여 통합허브(<span class="font-mono text-primary-700 font-bold">gApps</span>)에 실데이터로 전면 반영합니다.
+                    실제 운영 중인 <b>종합 간병(현대해상 등)</b> 및 <b>삼성화재</b>의 엑셀 관리 파일(.xlsx, .xls) 또는 <b>구글 스프레드시트 주소(URL)</b>를 등록하여 통합허브(<span class="font-mono text-primary-700 font-bold">gApps</span>)에 실데이터로 전면 반영합니다.
                     <span class="text-slate-400 block sm:inline mt-0.5 sm:mt-0 sm:ml-1">※ 삼성화재 가입자 사전명단(2.5만건)은 현행 구글 드라이브 실시간 연동 체계가 안전하게 유지됩니다.</span>
                   </p>
                 </div>
@@ -4152,14 +4102,14 @@
             <!-- 현대해상 & 삼성화재 2열 카드 그리드 -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-              <!-- [카드 1] 현대해상 실데이터 관리대장 -->
+              <!-- [카드 1] 종합 간병 관리대장 -->
               <div class="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-4 hover:border-blue-300 transition-colors">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div class="flex items-center gap-2">
                     <span class="w-3 h-3 rounded-full bg-blue-600"></span>
-                    <h4 class="text-sm font-black text-slate-900">현대해상 간병 관리대장</h4>
+                    <h4 class="text-sm font-black text-slate-900">종합 간병 관리대장</h4>
                   </div>
-                  <span class="text-[11px] px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold border border-blue-200">현대해상 전용</span>
+                  <span class="text-[11px] px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold border border-blue-200">종합 / 현대해상</span>
                 </div>
 
                 <!-- 방식 선택 탭 (엑셀 파일 업로드 vs 구글 시트 URL) -->
@@ -4177,7 +4127,7 @@
                   <div class="border-2 border-dashed border-blue-200 hover:border-blue-400 bg-blue-50/30 hover:bg-blue-50/60 rounded-2xl p-4 text-center transition-all cursor-pointer" onclick="document.getElementById('fileLaunch_hyundai').click()">
                     <input type="file" id="fileLaunch_hyundai" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleLaunchFileSelected('hyundai', this)">
                     <i data-lucide="file-spreadsheet" class="w-8 h-8 text-blue-500 mx-auto mb-1.5"></i>
-                    <p class="text-xs font-bold text-slate-800">현대해상 엑셀 관리대장 파일 선택</p>
+                    <p class="text-xs font-bold text-slate-800">종합 간병 엑셀 관리대장 파일 선택</p>
                     <p class="text-[11px] text-slate-400 mt-0.5">클릭하거나 파일을 여기로 드래그하세요 (.xlsx, .xls, .csv)</p>
                   </div>
                   <div id="fileInfo_hyundai" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
@@ -4878,7 +4828,7 @@
             </h4>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label onclick="triggerDatePicker('newAppApplyDate_picker')" class="block font-bold text-slate-700 cursor-pointer select-none" title="클릭 시 달력 열기">신청일시 (고객접수일) *</label>
@@ -4913,6 +4863,16 @@
                 <label class="flex items-center gap-1.5 cursor-pointer font-bold text-slate-800">
                   <input type="radio" name="newAppAccidentTypeRadio" value="상해" checked class="accent-primary-600 w-4 h-4"> 상해
                 </label>
+              </div>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <span class="hl-pen-yellow">1일 청구단가 *</span>
+                <span class="text-[10px] text-purple-700 font-bold bg-purple-50 px-1 py-0.2 rounded border border-purple-200">고객 개별단가</span>
+              </label>
+              <div class="relative">
+                <input type="text" id="newAppClaimUnitPrice" required placeholder="160,000" value="160,000" inputmode="numeric" oninput="formatNumberInput(this)" class="w-full p-2.5 border-2 border-purple-400 rounded-xl font-mono font-black text-purple-900 bg-purple-50/20 focus:ring-2 focus:ring-purple-500">
+                <span class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">원</span>
               </div>
             </div>
           </div>
@@ -6020,74 +5980,6 @@
     </div>
   </div>
 
-  <!-- MODAL: CLAIM UNIT PRICE RULE EDIT (보험사별 1일 기본 청구 단가 등록 및 수정) -->
-  <div id="claimUnitPriceModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200">
-      <div class="p-5 bg-gradient-to-r from-slate-900 to-purple-950 text-white flex items-center justify-between">
-        <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-xl bg-purple-600/30 text-purple-300 flex items-center justify-center border border-purple-500/30">
-            <i data-lucide="coins" class="w-5 h-5"></i>
-          </div>
-          <div>
-            <h3 class="text-base font-black" id="claimUnitPriceModalTitle">보험사 청구 단가 등록</h3>
-            <p class="text-xs text-purple-200 mt-0.5">원수사 및 상품별 1일 기준 기본 약정 청구단가를 설정합니다.</p>
-          </div>
-        </div>
-        <button type="button" onclick="closeModal('claimUnitPriceModal')" class="p-2 text-slate-400 hover:text-white rounded-lg">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <form id="claimUnitPriceForm" onsubmit="handleSaveClaimUnitPriceRule(event)" class="p-5 space-y-3.5 text-xs">
-        <input type="hidden" id="claimUnitPriceRuleEditId" value="">
-
-        <div>
-          <label class="block font-bold text-slate-700 mb-1">원수사(보험사명) *</label>
-          <div>
-            <input type="text" id="claimUnitPriceRuleInsurance" required placeholder="예: 현대해상, 현대해상(SCOR), 삼성화재 등" class="w-full p-2.5 border rounded-xl font-bold text-slate-900">
-            <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
-              <button type="button" onclick="document.getElementById('claimUnitPriceRuleInsurance').value = '현대해상'" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px]">현대해상</button>
-              <button type="button" onclick="document.getElementById('claimUnitPriceRuleInsurance').value = '현대해상(SCOR)'" class="px-2 py-0.5 rounded bg-purple-100 hover:bg-purple-200 text-purple-800 font-bold text-[10px]">현대해상(SCOR)</button>
-              <button type="button" onclick="document.getElementById('claimUnitPriceRuleInsurance').value = '삼성화재'" class="px-2 py-0.5 rounded bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold text-[10px]">삼성화재</button>
-              <button type="button" onclick="document.getElementById('claimUnitPriceRuleInsurance').value = 'DB손해보험'" class="px-2 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-[10px]">DB손해보험</button>
-              <button type="button" onclick="document.getElementById('claimUnitPriceRuleInsurance').value = 'KB손해보험'" class="px-2 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold text-[10px]">KB손해보험</button>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <label class="block font-bold text-slate-700 mb-1">상품 / 약정 구분</label>
-          <input type="text" id="claimUnitPriceRuleCategory" placeholder="예: 표준/일반, SCOR 재보험, 치매/간병인특약 등" class="w-full p-2.5 border rounded-xl font-semibold">
-        </div>
-
-        <div>
-          <label class="block font-bold text-slate-700 mb-1">1일 기본 청구 단가 (원/일) *</label>
-          <div class="relative">
-            <input type="number" id="claimUnitPriceRuleAmount" required step="1000" min="10000" placeholder="예: 160000 또는 144000" class="w-full pl-3 pr-10 py-2.5 text-sm font-mono font-black border-2 border-purple-300 rounded-xl bg-purple-50/20 text-purple-950">
-            <span class="absolute right-3.5 top-2.5 text-xs font-bold text-slate-400">원</span>
-          </div>
-          <div class="flex items-center gap-1.5 mt-1.5">
-            <button type="button" onclick="document.getElementById('claimUnitPriceRuleAmount').value = 144000" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-[10px]">144,000원</button>
-            <button type="button" onclick="document.getElementById('claimUnitPriceRuleAmount').value = 150000" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-[10px]">150,000원</button>
-            <button type="button" onclick="document.getElementById('claimUnitPriceRuleAmount').value = 160000" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-[10px]">160,000원</button>
-          </div>
-        </div>
-
-        <div>
-          <label class="block font-bold text-slate-700 mb-1">비고 및 약정 메모</label>
-          <textarea id="claimUnitPriceRuleMemo" rows="2" class="w-full p-2.5 border rounded-xl text-xs" placeholder="해당 보험사 약정 단가 적용 조건 및 근거 메모"></textarea>
-        </div>
-
-        <div class="p-3 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2 -mx-5 -mb-5 rounded-b-3xl">
-          <button type="button" onclick="closeModal('claimUnitPriceModal')" class="px-4 py-2 border rounded-xl font-semibold bg-white cursor-pointer hover:bg-slate-100">취소</button>
-          <button type="submit" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-xs cursor-pointer">
-            저장 완료
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <!-- MODAL: CUSTOMER CLAIM UNIT PRICE EDIT (해당 고객 전용 1일 청구단가 개별 설정) -->
   <div id="customerClaimPriceModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200">
@@ -6781,7 +6673,7 @@
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div class="sm:col-span-2">
+            <div>
               <label class="block font-bold text-slate-700 mb-1">주민등록번호 (전체 13자리)</label>
               <input type="text" id="custEditRrn" placeholder="주민번호 13자리 입력" class="w-full p-2.5 border rounded-xl font-mono">
             </div>
@@ -6792,6 +6684,16 @@
                 <option value="현대해상">현대해상</option>
                 <option value="삼성화재">삼성화재</option>
               </select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <span class="hl-pen-yellow">1일 청구단가 *</span>
+                <span class="text-[10px] text-purple-700 font-bold bg-purple-50 px-1 py-0.2 rounded border border-purple-200">고객 개별단가</span>
+              </label>
+              <div class="relative">
+                <input type="text" id="custEditClaimUnitPrice" placeholder="160,000" inputmode="numeric" oninput="formatNumberInput(this)" class="w-full p-2.5 border-2 border-purple-400 rounded-xl font-mono font-black text-purple-900 bg-purple-50/20 focus:ring-2 focus:ring-purple-500">
+                <span class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">원</span>
+              </div>
             </div>
           </div>
 
@@ -9692,7 +9594,7 @@
   </div>
 
   <!-- 글로벌 작업 진행상황 표시 모달 (PDF 생성, 단일/전체 다운로드, 일지 통합 등) -->
-  <div id="globalCareLogProgressModal" class="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+  <div id="globalProgressModal" class="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4 hidden">
     <div class="bg-white rounded-3xl border border-purple-200 shadow-2xl p-6 sm:p-7 max-w-md w-full relative overflow-hidden text-center animate-in fade-in zoom-in-95 duration-200">
       <!-- Top glowing accent bar -->
       <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-purple-500 via-indigo-500 to-rose-500"></div>
@@ -9709,7 +9611,7 @@
       <h3 id="globalProgressTitle" class="text-base sm:text-lg font-black text-slate-900 tracking-tight">
         간병일지 PDF 처리 중
       </h3>
-      <p id="globalProgressSubtitle" class="text-xs text-slate-500 mt-1 line-clamp-2" id="globalProgressSubtitle">
+      <p id="globalProgressSubtitle" class="text-xs text-slate-500 mt-1 line-clamp-2">
         잠시만 기다려주세요...
       </p>
 
@@ -9720,7 +9622,7 @@
 
       <!-- Live Status Text & Percent -->
       <div class="flex items-center justify-between text-xs mt-2.5 px-1">
-        <span id="globalProgressStatusText" class="text-slate-600 font-semibold truncate max-w-[280px] text-left">
+        <span id="globalProgressStatus" class="text-slate-600 font-semibold truncate max-w-[280px] text-left">
           준비 중...
         </span>
         <span id="globalProgressPercent" class="font-mono font-black text-purple-700 shrink-0 ml-2">
