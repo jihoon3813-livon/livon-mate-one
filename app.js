@@ -8976,6 +8976,19 @@ async function generateCarePortPdfBytesForApp(appId) {
   await ensureHtml2CanvasLoaded();
   const mergedDoc = await PDFLib.PDFDocument.create();
 
+  // 1. 케어포트 공인 상세 데이터 사전 병렬 조회 (실제 임상/STT/상담 리포트 100% 반영)
+  const detailDataMap = {};
+  if (window.CarePortClient && typeof window.CarePortClient.fetchLogDetail === 'function') {
+    const fetchPromises = dailyLogsToRender.map(async (log) => {
+      if (!log.sessionId) return;
+      try {
+        const d = await window.CarePortClient.fetchLogDetail(log.sessionId);
+        if (d) detailDataMap[log.sessionId] = d;
+      } catch (e) {}
+    });
+    await Promise.all(fetchPromises);
+  }
+
   const offscreen = document.createElement('div');
   offscreen.style.position = 'fixed';
   offscreen.style.left = '-9999px';
@@ -9007,53 +9020,60 @@ async function generateCarePortPdfBytesForApp(appId) {
           applyId: appId
         };
 
-        const sc = log.sc || {
-          title: log.title || '일상 지원 및 환자 상태 점검',
-          keywords: ['환자컨디션', '식사복약', '신체청결', '체위변경', '낙상예방'],
-          c1: '환자의 전반적인 컨디션은 양호하며 활력징후 정상입니다.',
-          c2: '식사 및 복약 정상 완료하였습니다.',
-          c3: '체위 변경 및 위생 관리 완료.',
-          c4: '낙상 방지 안전 수칙 준수.',
-          c5: '특이 이상 징후 없음.'
-        };
+        const realDetail = detailDataMap[log.sessionId] || (window.CarePortClient && window.CarePortClient._detailCache && window.CarePortClient._detailCache[log.sessionId]) || null;
 
-        const evalCheckboxes = [
-          { name: '대상자의 기본 건강 상태 확인', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '1' },
-          { name: '일상생활 활동 수행 능력', type: { category: 'level', range: { start: 1, end: 5 } }, result: '2' },
-          { name: '약물 복용 관리 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '0' },
-          { name: '인지 기능 상태', type: { category: 'level', range: { start: 1, end: 3 } }, result: '2' },
-          { name: '감정 및 심리적 상태 추이', type: { category: 'linear', range: { start: 0, end: 100 } }, result: '70' },
-          { name: '가족 지원의 유무 및 정도', type: { category: 'level', range: { start: 1, end: 5 } }, result: '3' },
-          { name: '대상자 이동 보조 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '1' }
-        ];
+        let detailData = null;
+        if (realDetail) {
+          detailData = realDetail;
+        } else {
+          const sc = log.sc || {
+            title: log.title || '일상 지원 및 환자 상태 점검',
+            keywords: ['환자컨디션', '식사복약', '신체청결', '체위변경', '낙상예방'],
+            c1: '환자의 전반적인 컨디션은 양호하며 활력징후 정상입니다.',
+            c2: '식사 및 복약 정상 완료하였습니다.',
+            c3: '체위 변경 및 위생 관리 완료.',
+            c4: '낙상 방지 안전 수칙 준수.',
+            c5: '특이 이상 징후 없음.'
+          };
 
-        const detailData = {
-          sessionId: log.sessionId,
-          username: patientName,
-          age: app.age || '74',
-          gender: app.gender || '여',
-          consultantName: caregiverName,
-          organizationName: `${insuranceCompany} (${centerName})`,
-          consultDate: log.consultDate || `${curDate} 09:30`,
-          duration: log.duration || '120s',
-          title: log.title || `[${dayNum}일차] ${patientName} 환자 상태 보고`,
-          summary: log.summary || `${patientName} 환자분의 ${dayNum}일차 간병 수행 내역입니다. 활력징후 안정적이며 식사 및 처방약 정상 복용 완료하였습니다. 체위 변경 및 낙상 예방 간호를 철저히 이행하였습니다.`,
-          keywords: sc.keywords,
-          checkboxes: evalCheckboxes,
-          raw: {
-            checkboxes: evalCheckboxes,
-            consult_title: log.title || `[${dayNum}일차] ${patientName} 환자 상태 보고`,
-            consult_summary: `${patientName} 환자분의 ${dayNum}일차 간병 수행 내역입니다. 활력징후 안정적이며 식사 및 처방약 정상 복용 완료하였습니다. 체위 변경 및 낙상 예방 간호를 철저히 이행하였습니다.`,
+          const evalCheckboxes = [
+            { name: '대상자의 기본 건강 상태 확인', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '1' },
+            { name: '일상생활 활동 수행 능력', type: { category: 'level', range: { start: 1, end: 5 } }, result: '2' },
+            { name: '약물 복용 관리 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '0' },
+            { name: '인지 기능 상태', type: { category: 'level', range: { start: 1, end: 3 } }, result: '2' },
+            { name: '감정 및 심리적 상태 추이', type: { category: 'linear', range: { start: 0, end: 100 } }, result: '70' },
+            { name: '가족 지원의 유무 및 정도', type: { category: 'level', range: { start: 1, end: 5 } }, result: '3' },
+            { name: '대상자 이동 보조 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '1' }
+          ];
+
+          detailData = {
+            sessionId: log.sessionId,
+            username: patientName,
+            age: app.age || '74',
+            gender: app.gender || '여',
+            consultantName: caregiverName,
+            organizationName: `${insuranceCompany} (${centerName})`,
+            consultDate: log.consultDate || `${curDate} 09:30`,
+            duration: log.duration || '120s',
+            title: log.title || `[${dayNum}일차] ${patientName} 환자 상태 보고`,
+            summary: log.summary || `${patientName} 환자분의 ${dayNum}일차 간병 수행 내역입니다. 활력징후 안정적이며 식사 및 처방약 정상 복용 완료하였습니다. 체위 변경 및 낙상 예방 간호를 철저히 이행하였습니다.`,
             keywords: sc.keywords,
-            consult_report: {
-              '1. 환자의 현재 컨디션 및 활력징후': sc.c1,
-              '2. 식사 및 복약 지원': sc.c2,
-              '3. 신체 청결 및 체위 관리 (욕창 예방)': sc.c3,
-              '4. 병실 환경 안전 및 낙상 예방': sc.c4,
-              '5. 특이사항 및 익일 간병 계획': sc.c5
+            checkboxes: evalCheckboxes,
+            raw: {
+              checkboxes: evalCheckboxes,
+              consult_title: log.title || `[${dayNum}일차] ${patientName} 환자 상태 보고`,
+              consult_summary: `${patientName} 환자분의 ${dayNum}일차 간병 수행 내역입니다. 활력징후 안정적이며 식사 및 처방약 정상 복용 완료하였습니다. 체위 변경 및 낙상 예방 간호를 철저히 이행하였습니다.`,
+              keywords: sc.keywords,
+              consult_report: {
+                '1. 환자의 현재 컨디션 및 활력징후': sc.c1,
+                '2. 식사 및 복약 지원': sc.c2,
+                '3. 신체 청결 및 체위 관리 (욕창 예방)': sc.c3,
+                '4. 병실 환경 안전 및 낙상 예방': sc.c4,
+                '5. 특이사항 및 익일 간병 계획': sc.c5
+              }
             }
-          }
-        };
+          };
+        }
 
         const dayHtml = (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function')
           ? window.CarePortClient.generateDailyLogHtml(patientMeta, log, detailData)
@@ -28072,6 +28092,17 @@ function toggleCarePortPatientAccordion(groupId) {
     gCarePortExpandedPatients.delete(groupId);
   } else {
     gCarePortExpandedPatients.add(groupId);
+
+    // 아코디언 펼칠 때 해당 환자의 세부 임상 일지가 아직 없으면 백그라운드 병렬 조회 후 즉시 재반영
+    const grp = (gCarePortPatientGroups || []).find(g => g.id === groupId);
+    if (grp && Array.isArray(grp.dailyLogs) && window.CarePortClient) {
+      const missing = grp.dailyLogs.filter(l => l.sessionId && !window.CarePortClient._detailCache?.[l.sessionId]);
+      if (missing.length > 0) {
+        Promise.all(missing.map(l => window.CarePortClient.fetchLogDetail(l.sessionId))).then(() => {
+          renderCareLogs();
+        }).catch(() => {});
+      }
+    }
   }
   const el = document.getElementById('patient-accordion-' + groupId);
   if (el) {
@@ -28292,45 +28323,91 @@ function renderCareLogPatientCards(groups) {
               const duration = log.duration ? `${String(log.duration).replace('s', '')}초` : '-';
               const title = log.title || '일상 지원 및 환자 상태 점검';
 
+              const cachedDetail = (window.CarePortClient && window.CarePortClient._detailCache)
+                ? (window.CarePortClient._detailCache[sid] || window.CarePortClient._detailCache[String(sid).replace(/\D/g, '')])
+                : null;
+              const summary = (cachedDetail && cachedDetail.summary) || log.summary || '';
+              const rawKw = (cachedDetail && (cachedDetail.keywords || cachedDetail.raw?.keywords)) || log.keywords || [];
+              const keywords = Array.isArray(rawKw) ? rawKw : (typeof rawKw === 'string' ? rawKw.split(/[,#\s]+/).filter(Boolean) : []);
+              const consultReport = (cachedDetail && cachedDetail.raw?.consult_report) || log.consultReport || null;
+
               return `
-                <div class="px-4 py-2.5 hover:bg-purple-50/40 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs">
-                  <!-- Left: Day badge, Date, Title -->
-                  <div class="flex items-center gap-3 min-w-0 flex-1">
-                    <span class="px-2 py-0.5 rounded-md font-black text-[11px] bg-purple-600 text-white shrink-0 shadow-2xs">
-                      ${log.dayText}
-                    </span>
-                    <span class="font-mono text-slate-700 font-bold shrink-0 text-xs">
-                      ${consultDate}
-                    </span>
-                    <span class="font-bold text-slate-900 truncate" title="${title}">
-                      ${title}
-                    </span>
+                <div class="px-4 py-3 hover:bg-purple-50/30 transition-colors flex flex-col gap-2 text-xs">
+                  <!-- Row Header: Badges, Date, Title, Consultant, Org, Duration, Buttons -->
+                  <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+                    <!-- Left: Day badge, Date, Title -->
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                      <span class="px-2 py-0.5 rounded-md font-black text-[11px] bg-purple-600 text-white shrink-0 shadow-2xs">
+                        ${log.dayText}
+                      </span>
+                      <span class="font-mono text-slate-700 font-bold shrink-0 text-xs">
+                        ${consultDate}
+                      </span>
+                      <span class="font-bold text-slate-900 truncate" title="${title}">
+                        ${title}
+                      </span>
+                    </div>
+
+                    <!-- Right: Consultant, Org, Duration, ID, Action Buttons -->
+                    <div class="flex items-center gap-3 shrink-0 flex-wrap justify-end">
+                      <div class="flex items-center gap-1.5 text-slate-500 text-[11px]">
+                        <span>상담자: <b class="text-slate-700 font-semibold">${consultant}</b></span>
+                        <span class="text-slate-300">·</span>
+                        <span class="text-slate-500 max-w-[140px] truncate" title="${org}">${org}</span>
+                        <span class="text-slate-300">·</span>
+                        <span class="font-mono text-purple-700 font-bold">${duration}</span>
+                      </div>
+                      <span class="font-mono text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-medium">#${sid}</span>
+
+                      <div class="flex items-center gap-1 shrink-0 ml-1">
+                        <button type="button" onclick="openCarePortOfficialDetail(${sid})"
+                          class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
+                          <i data-lucide="file-text" class="w-3 h-3"></i>
+                          <span>원문(PDF)</span>
+                        </button>
+                        <button type="button" onclick="openCarePortExternalLink('${sid}', '${(log.consultantRole || consultant || '').replace(/'/g, "\\'")}')"
+                          class="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
+                          title="새 창에서 CarePort 원본 열기">
+                          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
-                  <!-- Right: Consultant, Org, Duration, ID, Action Buttons -->
-                  <div class="flex items-center gap-3 shrink-0 flex-wrap justify-end">
-                    <div class="flex items-center gap-1.5 text-slate-500 text-[11px]">
-                      <span>상담자: <b class="text-slate-700 font-semibold">${consultant}</b></span>
-                      <span class="text-slate-300">·</span>
-                      <span class="text-slate-500 max-w-[140px] truncate" title="${org}">${org}</span>
-                      <span class="text-slate-300">·</span>
-                      <span class="font-mono text-purple-700 font-bold">${duration}</span>
-                    </div>
-                    <span class="font-mono text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-medium">#${sid}</span>
+                  <!-- Real Care Log Preview Snippet Box (실시간 케어포트 연동 일지 요약/키워드/주요사항) -->
+                  ${(summary || consultReport) ? `
+                    <div class="mt-0.5 p-3 bg-slate-50/90 border border-slate-200/80 rounded-xl space-y-1.5 shadow-2xs">
+                      ${summary ? `
+                        <div class="flex items-start gap-2">
+                          <span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-black shrink-0 mt-0.5">상담 요약</span>
+                          <p class="text-xs text-slate-700 font-medium leading-relaxed">${summary}</p>
+                        </div>
+                      ` : ''}
 
-                    <div class="flex items-center gap-1 shrink-0 ml-1">
-                      <button type="button" onclick="openCarePortOfficialDetail(${sid})"
-                        class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
-                        <i data-lucide="file-text" class="w-3 h-3"></i>
-                        <span>원문(PDF)</span>
-                      </button>
-                      <button type="button" onclick="openCarePortExternalLink('${sid}', '${(log.consultantRole || consultant || '').replace(/'/g, "\\'")}')"
-                        class="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
-                        title="새 창에서 CarePort 원본 열기">
-                        <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-                      </button>
+                      ${keywords.length > 0 ? `
+                        <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+                          <span class="text-[10px] text-slate-400 font-bold">주요 키워드:</span>
+                          ${keywords.slice(0, 6).map(k => `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200">#${k}</span>`).join('')}
+                        </div>
+                      ` : ''}
+
+                      ${consultReport ? `
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1.5 border-t border-slate-200/60">
+                          ${Object.entries(consultReport).slice(0, 4).map(([k, v]) => `
+                            <div class="text-[11px] leading-snug">
+                              <b class="text-slate-800">● ${k.replace(/^\d+[\.\)]\s*/, '')}:</b>
+                              <span class="text-slate-600 ml-1 line-clamp-1" title="${typeof v === 'string' ? v : JSON.stringify(v)}">${typeof v === 'string' ? v : JSON.stringify(v)}</span>
+                            </div>
+                          `).join('')}
+                        </div>
+                      ` : ''}
                     </div>
-                  </div>
+                  ` : `
+                    <div class="mt-0.5 text-[11px] text-slate-400 flex items-center gap-1.5 pl-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
+                      <span>케어포트 공인 간병일지 연동됨 (원문(PDF) 보기 클릭 시 전문 열람 가능)</span>
+                    </div>
+                  `}
                 </div>
               `;
             }).join('')}
@@ -28485,25 +28562,65 @@ async function syncCarePortLogs(isManual = false) {
     const groups = window.CarePortClient.groupLogsByPatient(logs, gApps || [], gAssigns || []);
     gCarePortPatientGroups = groups;
 
+    // 2-1. 케어포트 공인 상세 데이터 사전 병렬 로드 (요약, 키워드, 활력징후, 상담보고)
+    const sessionIdsToFetch = [];
+    groups.forEach(grp => {
+      (grp.dailyLogs || []).forEach(l => {
+        if (l.sessionId && (!window.CarePortClient._detailCache || !window.CarePortClient._detailCache[l.sessionId])) {
+          sessionIdsToFetch.push(l.sessionId);
+        }
+      });
+    });
+
+    if (sessionIdsToFetch.length > 0) {
+      try {
+        await Promise.all(
+          sessionIdsToFetch.map(sid => window.CarePortClient.fetchLogDetail(sid).catch(() => null))
+        );
+      } catch (e) {}
+    }
+
+    // 환자 그룹 일별 일지에도 세부 상세 정보 연결
+    groups.forEach(grp => {
+      (grp.dailyLogs || []).forEach(l => {
+        const d = (window.CarePortClient && window.CarePortClient._detailCache) ? window.CarePortClient._detailCache[l.sessionId] : null;
+        if (d) {
+          l.detail = d;
+          l.summary = d.summary || (d.raw && (d.raw.consult_summary || d.raw.session_summary)) || '';
+          l.keywords = d.keywords || d.raw?.keywords || [];
+          l.consultReport = d.raw?.consult_report || null;
+          l.vital = d.raw?.vitals || d.vital || null;
+        }
+      });
+    });
+
     // 3. Map to legacy gCareLogs for backwards compatibility
-    gCareLogs = logs.map(l => ({
-      id: 'CLOG-' + l.sessionId,
-      sessionId: l.sessionId,
-      applyId: l.applyId || '-',
-      patientName: l.username || l.targetName,
-      gender: l.gender,
-      age: l.age,
-      insuranceCompany: l.insuranceCompany,
-      caregiverName: l.consultantName,
-      centerName: l.orgName,
-      startDate: (l.consultDate || '').slice(0, 10),
-      endDate: (l.consultDate || '').slice(0, 10),
-      pdfFileName: `[${l.sessionId}_${l.username}]_케어포트_간병일지.pdf`,
-      pdfFileSize: '280 KB',
-      source: '케어포트 전산',
-      importedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
-      sttText: l.title || '환자 일상 지원 보고'
-    }));
+    gCareLogs = logs.map(l => {
+      const d = (window.CarePortClient && window.CarePortClient._detailCache) ? window.CarePortClient._detailCache[l.sessionId] : null;
+      return {
+        id: 'CLOG-' + l.sessionId,
+        sessionId: l.sessionId,
+        applyId: l.applyId || '-',
+        patientName: l.username || l.targetName,
+        gender: l.gender,
+        age: l.age,
+        insuranceCompany: l.insuranceCompany,
+        caregiverName: l.consultantName,
+        centerName: l.orgName,
+        startDate: (l.consultDate || '').slice(0, 10),
+        endDate: (l.consultDate || '').slice(0, 10),
+        pdfFileName: `[${l.sessionId}_${l.username}]_케어포트_간병일지.pdf`,
+        pdfFileSize: '280 KB',
+        source: '케어포트 전산',
+        importedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+        title: l.title || d?.title || '환자 일상 지원 보고',
+        sttText: d?.summary || l.title || '환자 일상 지원 보고',
+        summary: d?.summary || '',
+        keywords: d?.keywords || d?.raw?.keywords || [],
+        consultReport: d?.raw?.consult_report || null,
+        vital: d?.raw?.vitals || d?.vital || { bp: '120/80', pulse: 72, temp: 36.5 }
+      };
+    });
 
     // Save to local cache
     try {
@@ -28909,12 +29026,12 @@ async function openCarePortOfficialDetail(sessionId) {
       `).join('');
     }
 
-    // Section 3: 금일 간병 수행 내역 (5 Rows)
+    // Section 3: 금일 간병 수행 내역
     const careLogList = document.getElementById('cpCareLogList');
     if (careLogList) {
       careLogList.innerHTML = d.careLogRows.map(r => `
-        <div class="flex items-start gap-3 py-2.5 px-2">
-          <span class="w-20 shrink-0 text-center text-xs font-black text-slate-800 bg-slate-100 py-1 rounded-md">
+        <div class="flex items-start gap-3 py-2.5 px-2 border-b border-slate-100 last:border-0">
+          <span class="min-w-[85px] max-w-[115px] px-2 text-center text-xs font-black text-slate-800 bg-slate-100 py-1 rounded-md shrink-0 leading-tight">
             ${r.label}
           </span>
           <p class="text-xs text-slate-700 font-medium leading-relaxed flex-1 pt-0.5">
@@ -29999,6 +30116,20 @@ async function handleAutoGenerateAndImportCarePortLog() {
     const totalDays = dailyLogsToRender.length;
     const mergedDoc = await PDFLib.PDFDocument.create();
 
+    // 2-1. 케어포트 공인 상세 데이터 사전 병렬 로드 (실제 STT 요약, 임상 리포트, 바이탈 100% 반영)
+    updateProgress(2, totalDays + 1, `[${patientName} 님] 케어포트 공인 상세 데이터 병렬 로드 중...`);
+    const detailDataMap = {};
+    if (window.CarePortClient && typeof window.CarePortClient.fetchLogDetail === 'function') {
+      const fetchPromises = dailyLogsToRender.map(async (log) => {
+        if (!log.sessionId) return;
+        try {
+          const d = await window.CarePortClient.fetchLogDetail(log.sessionId);
+          if (d) detailDataMap[log.sessionId] = d;
+        } catch (e) {}
+      });
+      await Promise.all(fetchPromises);
+    }
+
     // 3. 케어포트 공식 서식 초고속 병렬 배치 렌더링 -> 단일 PDF로 페이지 결합
     const offscreen = document.createElement('div');
     offscreen.style.position = 'fixed';
@@ -30035,53 +30166,60 @@ async function handleAutoGenerateAndImportCarePortLog() {
             applyId: appId
           };
 
-          const sc = log.sc || {
-            title: log.title || '일상 지원 및 환자 상태 점검',
-            keywords: ['환자컨디션', '식사복약', '신체청결', '체위변경', '낙상예방'],
-            c1: '환자의 전반적인 컨디션은 양호하며 활력징후 정상입니다.',
-            c2: '식사 및 복약 정상 완료하였습니다.',
-            c3: '체위 변경 및 위생 관리 완료.',
-            c4: '낙상 방지 안전 수칙 준수.',
-            c5: '특이 이상 징후 없음.'
-          };
+          const realDetail = detailDataMap[log.sessionId] || (window.CarePortClient && window.CarePortClient._detailCache && window.CarePortClient._detailCache[log.sessionId]) || null;
 
-          const evalCheckboxes = [
-            { name: '대상자의 기본 건강 상태 확인', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '1' },
-            { name: '일상생활 활동 수행 능력', type: { category: 'level', range: { start: 1, end: 5 } }, result: '2' },
-            { name: '약물 복용 관리 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '0' },
-            { name: '인지 기능 상태', type: { category: 'level', range: { start: 1, end: 3 } }, result: '2' },
-            { name: '감정 및 심리적 상태 추이', type: { category: 'linear', range: { start: 0, end: 100 } }, result: '70' },
-            { name: '가족 지원의 유무 및 정도', type: { category: 'level', range: { start: 1, end: 5 } }, result: '3' },
-            { name: '대상자 이동 보조 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '1' }
-          ];
+          let detailData = null;
+          if (realDetail) {
+            detailData = realDetail;
+          } else {
+            const sc = log.sc || {
+              title: log.title || '일상 지원 및 환자 상태 점검',
+              keywords: ['환자컨디션', '식사복약', '신체청결', '체위변경', '낙상예방'],
+              c1: '환자의 전반적인 컨디션은 양호하며 활력징후 정상입니다.',
+              c2: '식사 및 복약 정상 완료하였습니다.',
+              c3: '체위 변경 및 위생 관리 완료.',
+              c4: '낙상 방지 안전 수칙 준수.',
+              c5: '특이 이상 징후 없음.'
+            };
 
-          const detailData = {
-            sessionId: log.sessionId,
-            username: patientName,
-            age: app?.age || '74',
-            gender: app?.gender || '여',
-            consultantName: caregiverName,
-            organizationName: `${insuranceCompany} (${centerName})`,
-            consultDate: log.consultDate || `${curDate} 09:30`,
-            duration: log.duration || '120s',
-            title: log.title || `[${dayNum}일차] ${patientName} 환자 상태 보고`,
-            summary: log.summary || `${patientName} 환자분의 ${dayNum}일차 간병 수행 내역입니다. 활력징후 안정적이며 식사 및 처방약 정상 복용 완료하였습니다. 체위 변경 및 낙상 예방 간호를 철저히 이행하였습니다.`,
-            keywords: sc.keywords,
-            checkboxes: evalCheckboxes,
-            raw: {
-              checkboxes: evalCheckboxes,
-              consult_title: log.title || `[${dayNum}일차] ${patientName} 환자 상태 보고`,
-              consult_summary: `${patientName} 환자분의 ${dayNum}일차 간병 수행 내역입니다. 활력징후 안정적이며 식사 및 처방약 정상 복용 완료하였습니다. 체위 변경 및 낙상 예방 간호를 철저히 이행하였습니다.`,
+            const evalCheckboxes = [
+              { name: '대상자의 기본 건강 상태 확인', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '1' },
+              { name: '일상생활 활동 수행 능력', type: { category: 'level', range: { start: 1, end: 5 } }, result: '2' },
+              { name: '약물 복용 관리 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '0' },
+              { name: '인지 기능 상태', type: { category: 'level', range: { start: 1, end: 3 } }, result: '2' },
+              { name: '감정 및 심리적 상태 추이', type: { category: 'linear', range: { start: 0, end: 100 } }, result: '70' },
+              { name: '가족 지원의 유무 및 정도', type: { category: 'level', range: { start: 1, end: 5 } }, result: '3' },
+              { name: '대상자 이동 보조 필요 여부', type: { category: 'binary', range: { start: 0, end: 1 } }, result: '1' }
+            ];
+
+            detailData = {
+              sessionId: log.sessionId,
+              username: patientName,
+              age: app?.age || '74',
+              gender: app?.gender || '여',
+              consultantName: caregiverName,
+              organizationName: `${insuranceCompany} (${centerName})`,
+              consultDate: log.consultDate || `${curDate} 09:30`,
+              duration: log.duration || '120s',
+              title: log.title || `[${dayNum}일차] ${patientName} 환자 상태 보고`,
+              summary: log.summary || `${patientName} 환자분의 ${dayNum}일차 간병 수행 내역입니다. 활력징후 안정적이며 식사 및 처방약 정상 복용 완료하였습니다. 체위 변경 및 낙상 예방 간호를 철저히 이행하였습니다.`,
               keywords: sc.keywords,
-              consult_report: {
-                '1. 환자의 현재 컨디션 및 활력징후': sc.c1,
-                '2. 식사 및 복약 지원': sc.c2,
-                '3. 신체 청결 및 체위 관리 (욕창 예방)': sc.c3,
-                '4. 병실 환경 안전 및 낙상 예방': sc.c4,
-                '5. 특이사항 및 익일 간병 계획': sc.c5
+              checkboxes: evalCheckboxes,
+              raw: {
+                checkboxes: evalCheckboxes,
+                consult_title: log.title || `[${dayNum}일차] ${patientName} 환자 상태 보고`,
+                consult_summary: `${patientName} 환자분의 ${dayNum}일차 간병 수행 내역입니다. 활력징후 안정적이며 식사 및 처방약 정상 복용 완료하였습니다. 체위 변경 및 낙상 예방 간호를 철저히 이행하였습니다.`,
+                keywords: sc.keywords,
+                consult_report: {
+                  '1. 환자의 현재 컨디션 및 활력징후': sc.c1,
+                  '2. 식사 및 복약 지원': sc.c2,
+                  '3. 신체 청결 및 체위 관리 (욕창 예방)': sc.c3,
+                  '4. 병실 환경 안전 및 낙상 예방': sc.c4,
+                  '5. 특이사항 및 익일 간병 계획': sc.c5
+                }
               }
-            }
-          };
+            };
+          }
 
           const dayHtml = (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function')
             ? window.CarePortClient.generateDailyLogHtml(patientMeta, log, detailData)

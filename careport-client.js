@@ -546,25 +546,34 @@
         { key: 'sleep', label: '수면', value: vit.sleep_minutes ? `${Math.floor(vit.sleep_minutes / 60)}시간` : '7시간', unit: '' }
       ];
 
-      // 4. Care Log Rows (5 standard rows)
-      const cLog = raw.care_log || {};
-      const careLogRows = [
-        { key: 'meal', label: '식사·영양', value: cLog.diet_nutrition || findInReport(['식사', '복약']) || '정규 식사 보조 및 수분 섭취 지원, 식후 처방 약 복용 확인 완료' },
-        { key: 'hygiene', label: '위생', value: cLog.hygiene || findInReport(['위생', '청결', '체위', '욕창']) || '구강 및 세면 청결 관리, 침구 및 환의 정돈, 쾌적한 환경 유지' },
-        { key: 'mobility', label: '이동·활동', value: cLog.mobility_activity || findInReport(['거동', '활동', '보행', '낙상']) || '침상 내 체위 변경 주기적 실시, 실내 이동 시 밀착 부축으로 낙상 방지' },
-        { key: 'health', label: '건강관리', value: cLog.health_management || findInReport(['컨디션', '활력징후', '투석', '상태']) || '혈압, 맥박, 체온 등 기본 활력징후 측정 및 전반적 회복 상태 모니터링' },
-        { key: 'emotion', label: '정서 지원', value: cLog.emotional_support || findInReport(['정서', '상담', '계획']) || '환자 상태 경청 및 심리적 안정 유도, 말벗 대화 및 안심 케어 수행' }
-      ];
+      // 4. Care Log Rows (Use 100% authentic consult_report items if available, fallback to 5 standard rows)
+      let careLogRows = [];
+      if (raw.consult_report && typeof raw.consult_report === 'object' && Object.keys(raw.consult_report).length > 0) {
+        careLogRows = Object.entries(raw.consult_report).map(([label, value], idx) => ({
+          key: `report_${idx}`,
+          label: label.replace(/^\d+[\.\)]\s*/, '').trim(),
+          value: typeof value === 'string' ? value : JSON.stringify(value)
+        }));
+      } else {
+        const cLog = raw.care_log || {};
+        careLogRows = [
+          { key: 'meal', label: '식사·영양', value: cLog.diet_nutrition || findInReport(['식사', '복약']) || '정규 식사 보조 및 수분 섭취 지원, 식후 처방 약 복용 확인 완료' },
+          { key: 'hygiene', label: '위생', value: cLog.hygiene || findInReport(['위생', '청결', '체위', '욕창']) || '구강 및 세면 청결 관리, 침구 및 환의 정돈, 쾌적한 환경 유지' },
+          { key: 'mobility', label: '이동·활동', value: cLog.mobility_activity || findInReport(['거동', '활동', '보행', '낙상']) || '침상 내 체위 변경 주기적 실시, 실내 이동 시 밀착 부축으로 낙상 방지' },
+          { key: 'health', label: '건강관리', value: cLog.health_management || findInReport(['컨디션', '활력징후', '투석', '상태']) || '혈압, 맥박, 체온 등 기본 활력징후 측정 및 전반적 회복 상태 모니터링' },
+          { key: 'emotion', label: '정서 지원', value: cLog.emotional_support || findInReport(['정서', '상담', '계획']) || '환자 상태 경청 및 심리적 안정 유도, 말벗 대화 및 안심 케어 수행' }
+        ];
+      }
 
       // 5. Guardian Notes (6 items)
       const gNotes = raw.guardian_notes || {};
       const guardianNotes = [
-        { key: 'diet', label: '식사', value: gNotes.diet || '식사와 수분 섭취는 모두 원활하게 잘 이루어졌습니다.' },
-        { key: 'pain', label: '통증', value: gNotes.pain || findInReport(['통증']) || '특이 통증이나 극심한 불편을 호소하지 않고 안정적입니다.' },
-        { key: 'sleep', label: '수면', value: gNotes.sleep || '밤 사이 편안하게 휴식을 취하셨습니다.' },
+        { key: 'diet', label: '식사', value: gNotes.diet || findInReport(['식사', '섭취', '영양']) || '식사와 수분 섭취는 모두 원활하게 잘 이루어졌습니다.' },
+        { key: 'pain', label: '통증', value: gNotes.pain || findInReport(['통증', '불편']) || '특이 통증이나 극심한 불편을 호소하지 않고 안정적입니다.' },
+        { key: 'sleep', label: '수면', value: gNotes.sleep || findInReport(['수면', '휴식']) || '밤 사이 편안하게 휴식을 취하셨습니다.' },
         { key: 'excretion', label: '배변·배뇨', value: gNotes.excretion || findInReport(['배변', '대변', '소변', '기저귀']) || '배변 및 배뇨 상태를 확인하였으며 특이사항 없습니다.' },
-        { key: 'activity', label: '활동', value: gNotes.activity || findInReport(['거동', '활동']) || '이동이나 활동 시 부축을 받아 무리 없이 진행되었습니다.' },
-        { key: 'emotional', label: '정서', value: gNotes.emotional || '심리적으로 평온하고 안정된 상태를 유지하셨습니다.' }
+        { key: 'activity', label: '활동', value: gNotes.activity || findInReport(['거동', '활동', '보행', '물리치료', '휠체어']) || '이동이나 활동 시 부축을 받아 무리 없이 진행되었습니다.' },
+        { key: 'emotional', label: '정서', value: gNotes.emotional || findInReport(['정서', '교육', '보호자', '안정', '계획']) || '심리적으로 평온하고 안정된 상태를 유지하셨습니다.' }
       ];
 
       // 6. Keywords
@@ -689,9 +698,9 @@
       `).join('');
 
       const careLogHtml = d.careLogRows.map(r => `
-        <div style="display: flex; align-items: flex-start; gap: 12px; padding: 6px 0; border-bottom: 1px solid #f1f5f9;">
-          <strong style="width: 76px; flex-shrink: 0; font-size: 11.5px; font-weight: 800; color: #0f172a; background: #f1f5f9; padding: 3px 6px; border-radius: 4px; text-align: center;">${r.label}</strong>
-          <span style="flex: 1; font-size: 12px; color: #334155; line-height: 1.5; font-weight: 500;">${r.value}</span>
+        <div style="display: flex; align-items: flex-start; gap: 10px; padding: 5px 0; border-bottom: 1px solid #f1f5f9;">
+          <strong style="min-width: 82px; max-width: 115px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; padding: 3px 6px; border-radius: 4px; text-align: center; line-height: 1.35;">${r.label}</strong>
+          <span style="flex: 1; font-size: 11.5px; color: #334155; line-height: 1.45; font-weight: 500;">${r.value}</span>
         </div>
       `).join('');
 
