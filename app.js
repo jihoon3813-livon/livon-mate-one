@@ -19242,6 +19242,15 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                       `}
                     </div>
                   ` : ''}
+
+                  ${(app.memo || app.specialNotes) ? `
+                    <div class="mt-2 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 text-[11px] text-amber-950">
+                      <div class="font-extrabold text-amber-800 flex items-center gap-1 mb-1">
+                        <i data-lucide="file-text" class="w-3.5 h-3.5 text-amber-600"></i> 신청 대장 비고 (엑셀 원장)
+                      </div>
+                      <div class="break-words whitespace-pre-wrap text-slate-800 leading-relaxed font-medium">${escapeHtml(app.memo || app.specialNotes)}</div>
+                    </div>
+                  ` : ''}
                 </div>
               </div>
             </div>
@@ -19737,6 +19746,13 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                             </span>
                           `}
                         </div>
+
+                        ${r.existingClaim && r.existingClaim.memo ? `
+                          <div class="mt-1.5 p-2 rounded-xl bg-purple-50/90 border border-purple-200 text-purple-950 text-[11px] flex items-start gap-1 shadow-2xs">
+                            <span class="font-extrabold text-purple-800 shrink-0 flex items-center gap-0.5"><i data-lucide="file-text" class="w-3 h-3 text-purple-600"></i> 청구비고:</span>
+                            <span class="break-words font-medium text-purple-900 leading-snug">${escapeHtml(r.existingClaim.memo)}</span>
+                          </div>
+                        ` : ''}
                       </div>
 
                       <!-- 하단 버튼/정보 영역 (삼성화재 고객별 청구 요청 및 청구완료 일시 정보 표기) -->
@@ -20005,6 +20021,13 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                             </span>
                           `}
                         </div>
+
+                        ${r.existingPayout && r.existingPayout.memo ? `
+                          <div class="mt-1.5 p-2 rounded-xl bg-orange-50/90 border border-orange-200 text-orange-950 text-[11px] flex items-start gap-1 shadow-2xs">
+                            <span class="font-extrabold text-orange-800 shrink-0 flex items-center gap-0.5"><i data-lucide="message-square" class="w-3 h-3 text-orange-600"></i> 지급비고:</span>
+                            <span class="break-words font-medium text-orange-900 leading-snug">${escapeHtml(r.existingPayout.memo)}</span>
+                          </div>
+                        ` : ''}
                       </div>
 
                       <!-- 하단 버튼 영역 -->
@@ -22048,6 +22071,7 @@ function openPayoutDetailListModal(applyId) {
             <td class="py-3 px-3.5 whitespace-nowrap">
               <div class="font-bold text-slate-900 text-xs">${maskName(p.caregiverName || cgName)}</div>
               <div class="text-[10.5px] text-slate-500 font-medium mt-0.5">${p.centerName || centerName}</div>
+              ${p.memo ? `<div class="text-[10.5px] text-orange-800 font-semibold mt-0.5 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200 inline-block" title="비고: ${escapeHtml(p.memo)}">💬 ${escapeHtml(p.memo)}</div>` : ''}
             </td>
             <td class="py-3 px-3.5 text-right font-mono font-bold text-slate-800 whitespace-nowrap">${p.days || r.days}일</td>
             <td class="py-3 px-3.5 text-right font-mono font-semibold text-slate-700 whitespace-nowrap">${formatCurrency(p.dailyWage || r.cgDailyWage)}원</td>
@@ -22240,6 +22264,7 @@ function openClaimDetailListModal(applyId) {
           <td class="py-3 px-3.5 whitespace-nowrap">
             <div class="font-bold text-slate-900 text-xs">${app.insuranceCompany || '현대해상'}</div>
             <div class="text-[10.5px] text-slate-500 font-medium mt-0.5">${app.adjusterName || '손사담당'} 손사 <span class="text-slate-400">(${r.existingClaim ? (formatWithTime(r.existingClaim.claimDate, '16:00') || '-') : (isOngoingWait ? '진행중' : '-')})</span></div>
+            ${r.existingClaim && r.existingClaim.memo ? `<div class="text-[10.5px] text-purple-800 font-semibold mt-0.5 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 inline-block" title="청구비고: ${escapeHtml(r.existingClaim.memo)}">📑 ${escapeHtml(r.existingClaim.memo)}</div>` : ''}
           </td>
           <td class="py-3 px-3.5 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
             ${isOngoingWait ? `${r.ongoingElapsed}일 <span class="text-[10px] text-slate-400">(${r.ongoingElapsed * 24}시간)</span>` : `${r.days}일 <span class="text-[10px] text-slate-400">(${r.days * 24}시간)</span>`}
@@ -23624,6 +23649,14 @@ function renderUnifiedCareHub() {
     const isHdWaitingSms = app.insuranceCompany.includes('현대해상') && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'));
     const isSamsung = (app.insuranceCompany || '').includes('삼성');
 
+    // [사용자 요구사항]: 엑셀 각 시트별 비고란(신청, 배정, 간병비지급, 보험청구) 정보 추출
+    const applyMemoText = (app.memo || app.specialNotes || '').trim();
+    const asAccountInfo = (as?.accountInfo || as?.지급계좌 || as?.bankAccount || '').trim();
+    const payoutMemos = (appPayouts || []).map(p => (p.memo || '').trim()).filter(Boolean);
+    const payoutMemoText = Array.from(new Set(payoutMemos)).join(' / ');
+    const claimMemos = (appClaims || []).map(c => (c.memo || '').trim()).filter(Boolean);
+    const claimMemoText = Array.from(new Set(claimMemos)).join(' / ');
+
     // 담당자가 체크해야 할 주요체크사항 라벨(간병비 미지급, 청구금 미입금, 청구서 미발행, 팩스 미전송 등)
     const checklistBadgesHtml = getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayouts, sched, faxInfo, isHdWaitingSms);
 
@@ -23856,6 +23889,15 @@ function renderUnifiedCareHub() {
                   <span class="font-bold text-[10px] px-1.5 py-0.5 rounded bg-amber-600 text-white">신청대기</span>
                 </div>
               ` : ''}
+
+              ${applyMemoText ? `
+                <div class="mt-1.5 p-1.5 rounded-lg bg-amber-50/90 border border-amber-200 text-amber-950 text-[10.5px] flex items-start gap-1 shadow-2xs">
+                  <span class="font-extrabold text-amber-800 shrink-0 flex items-center gap-0.5">
+                    <i data-lucide="file-text" class="w-3 h-3 text-amber-600"></i> 비고:
+                  </span>
+                  <span class="line-clamp-2 break-all text-slate-700 font-medium" title="${escapeHtml(applyMemoText)}">${escapeHtml(applyMemoText)}</span>
+                </div>
+              ` : ''}
             </div>
           </div>
 
@@ -23908,6 +23950,22 @@ function renderUnifiedCareHub() {
                   `))}
                 </div>
               </div>
+
+              ${asAccountInfo ? `
+                <div class="flex items-center gap-1 text-[10px] text-slate-500 truncate pt-0.5" title="정산계좌: ${escapeHtml(asAccountInfo)}">
+                  <span class="text-slate-400 shrink-0">계좌:</span>
+                  <span class="font-mono truncate text-slate-600">${escapeHtml(asAccountInfo)}</span>
+                </div>
+              ` : ''}
+
+              ${payoutMemoText ? `
+                <div class="mt-1 p-1.5 rounded-lg bg-orange-50/90 border border-orange-200 text-orange-950 text-[10.5px] flex items-start gap-1 shadow-2xs">
+                  <span class="font-extrabold text-orange-800 shrink-0 flex items-center gap-0.5">
+                    <i data-lucide="message-square" class="w-3 h-3 text-orange-600"></i> 지급비고:
+                  </span>
+                  <span class="line-clamp-2 break-all text-orange-900 font-medium" title="${escapeHtml(payoutMemoText)}">${escapeHtml(payoutMemoText)}</span>
+                </div>
+              ` : ''}
             </div>
           </div>
 
@@ -23951,6 +24009,15 @@ function renderUnifiedCareHub() {
                     : (faxInfo.status === '전송완료' ? `발송완료(${faxInfo.sentDate ? faxInfo.sentDate.slice(5) : ''})` : '미발송')}
                 </span>
               </div>
+
+              ${claimMemoText ? `
+                <div class="mt-1 p-1.5 rounded-lg bg-purple-50/90 border border-purple-200 text-purple-950 text-[10.5px] flex items-start gap-1 shadow-2xs">
+                  <span class="font-extrabold text-purple-800 shrink-0 flex items-center gap-0.5">
+                    <i data-lucide="file-text" class="w-3 h-3 text-purple-600"></i> 청구비고:
+                  </span>
+                  <span class="line-clamp-2 break-all text-purple-900 font-medium" title="${escapeHtml(claimMemoText)}">${escapeHtml(claimMemoText)}</span>
+                </div>
+              ` : ''}
             </div>
           </div>
 
@@ -36841,7 +36908,8 @@ function extractCareCalendarEvents() {
     // 날짜가 없는 배정 건은 스킵하되, 시작일이 있고 진행중인 건은 정상적으로 포함
     if (!parsedStart) return;
     const now = new Date();
-    const isAppOngoing = (app.status || '').includes('진행') || (as.status || '').includes('진행') || (!endStr);
+    // 통합허브 '간병 진행중' 기준과 1:1 완벽 일치 (status가 '진행' 포함, '정상', '배정완료')
+    const isAppOngoing = (app.status || '').includes('진행') || app.status === '정상' || app.status === '배정완료';
 
     if (!parsedEnd) {
       if (isAppOngoing) {
@@ -36861,11 +36929,13 @@ function extractCareCalendarEvents() {
     const startZero = new Date(parsedStart.getFullYear(), parsedStart.getMonth(), parsedStart.getDate());
     const endZero = new Date(parsedEnd.getFullYear(), parsedEnd.getMonth(), parsedEnd.getDate());
 
-    let status = 'ONGOING'; // 기본: 진행중
-    if (todayZero < startZero) {
+    let status = 'COMPLETED'; // 기본
+    if (isAppOngoing) {
+      status = 'ONGOING'; // 통합허브 기준 진행중
+    } else if (todayZero < startZero || (app.status || '').includes('예정')) {
       status = 'UPCOMING'; // 예정
-    } else if (as.status === '종료' || as.status === '취소' || app.status === '완료' || app.status === '취소' || (!isAppOngoing && todayZero > endZero)) {
-      status = 'COMPLETED'; // 종료
+    } else {
+      status = 'COMPLETED'; // 완료/종료
     }
 
     const elapsedDays = status === 'UPCOMING' ? 0 : 
@@ -37151,7 +37221,16 @@ function updateCareCalendarKpis(events) {
 
   const totalDaysSum = targetEvents.reduce((acc, cur) => acc + cur.totalDays, 0);
 
-  const activeCount = events.filter(e => e.status === 'ONGOING').length;
+  // 통합허브 '간병 진행중' 기준과 1:1 완벽 동기화 (원수사 필터 반영)
+  const activeHubApps = (typeof filterInvalidSamsungDuplicates === 'function')
+    ? filterInvalidSamsungDuplicates((gApps || []).some(x => x.isRealLaunchData) ? (gApps || []).filter(x => x.isRealLaunchData) : (gApps || []))
+    : (gApps || []);
+  const inProgressHubApps = activeHubApps.filter(a => {
+    if (!a) return false;
+    if (gCalendarFilters.insurance !== 'ALL' && !(a.insuranceCompany || '').includes(gCalendarFilters.insurance)) return false;
+    return (a.status && (a.status.includes('진행') || a.status === '정상' || a.status === '배정완료'));
+  });
+  const activeCount = inProgressHubApps.length;
   const attentionCount = events.filter(e => e.isAttentionNeeded).length;
 
   // 금주(월~일) 시작/종료 건수
@@ -37164,19 +37243,19 @@ function updateCareCalendarKpis(events) {
   const weekEnds = events.filter(e => e.parsedEnd >= weekStart && e.parsedEnd <= weekEnd).length;
 
   const elMonthLabel = document.getElementById('calKpiTotalMonthLabel');
-  if (elMonthLabel) elMonthLabel.innerText = gCalendarIsAllPeriod ? '전체 간병일정' : `${curM + 1}월 간병일정`;
+  if (elMonthLabel) elMonthLabel.innerText = gCalendarIsAllPeriod ? '전체 간병일정' : `${curM + 1}월 전체 간병일정`;
 
   const elTotalCount = document.getElementById('calKpiTotalCount');
   if (elTotalCount) elTotalCount.innerText = `${targetEvents.length}건`;
 
   const elTotalDays = document.getElementById('calKpiTotalDays');
-  if (elTotalDays) elTotalDays.innerText = `총 ${totalDaysSum.toLocaleString()}일 케어`;
+  if (elTotalDays) elTotalDays.innerText = `당월 진행·예정·완료 (총 ${totalDaysSum.toLocaleString()}일)`;
 
   const elActiveCount = document.getElementById('calKpiActiveCount');
-  if (elActiveCount) elActiveCount.innerText = `${activeCount}명`;
+  if (elActiveCount) elActiveCount.innerText = `${activeCount}건`;
 
   const elActiveDetail = document.getElementById('calKpiActiveDetail');
-  if (elActiveDetail) elActiveDetail.innerText = `현재 병원 근무 간병사 ${activeCount}명`;
+  if (elActiveDetail) elActiveDetail.innerText = `실시간 간병 진행중 ${activeCount}건 (통합허브 동기화)`;
 
   const elWeekSchedule = document.getElementById('calKpiWeekSchedule');
   if (elWeekSchedule) elWeekSchedule.innerText = `${weekStarts} / ${weekEnds}건`;
@@ -39583,9 +39662,13 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
           const days = Number(r[6]) || 0;
           const dailyWage = Number(String(r[7] || 0).replace(/[^0-9]/g, '')) || 0;
           const payoutAmount = Number(String(r[8] || 0).replace(/[^0-9]/g, '')) || 0;
-          const payoutStatusRaw = String(r[9] || '').trim();
-          const payoutStatus = payoutStatusRaw.includes('미') ? '미지급' : '지급완료';
-          const memo = String(r[10] || '').trim();
+          const payoutStatusRaw = String(r[9] !== undefined ? r[9] : '').trim();
+          const isPaid = (payoutStatusRaw === '지급' || payoutStatusRaw === '선지급완료');
+          const payoutStatus = isPaid ? '지급완료' : '미지급';
+          let memo = String(r[10] !== undefined ? r[10] : '').trim();
+          if (!isPaid && payoutStatusRaw && payoutStatusRaw !== '미지급') {
+            memo = memo ? `[${payoutStatusRaw}] ${memo}` : `[${payoutStatusRaw}]`;
+          }
 
           const item = {
             id,

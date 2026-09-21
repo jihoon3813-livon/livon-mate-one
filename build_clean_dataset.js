@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const XLSX = require('./node_modules/.xlsx-TKVotygl/xlsx.js');
 
-const filePath = path.join(__dirname, 'hoon', '간병서비스 관리대장(new)_20260814 (3).xlsx');
+const filePath = path.join(__dirname, 'hoon', '간병서비스 관리대장(new)_20260814 (4).xlsx');
 if (!fs.existsSync(filePath)) {
   console.error('File not found:', filePath);
   process.exit(1);
@@ -133,9 +133,13 @@ payoutRows.forEach((r, idx) => {
   const days = Number(r['일수']) || 0;
   const dailyWage = Number(String(r['일급'] || 0).replace(/[^0-9]/g, '')) || 0;
   let payoutAmount = Number(String(r['지급액'] || 0).replace(/[^0-9]/g, '')) || 0;
-  const payoutStatusRaw = String(r['지급여부'] || '').trim();
-  const payoutStatus = payoutStatusRaw.includes('미') ? '미지급' : '지급완료';
-  const memo = String(r['비고'] || '').trim();
+  const payoutStatusRaw = String(r['지급여부'] !== undefined ? r['지급여부'] : '').trim();
+  const isPaid = (payoutStatusRaw === '지급' || payoutStatusRaw === '선지급완료');
+  const payoutStatus = isPaid ? '지급완료' : '미지급';
+  let memo = String(r['비고'] !== undefined ? r['비고'] : '').trim();
+  if (!isPaid && payoutStatusRaw && payoutStatusRaw !== '미지급') {
+    memo = memo ? `[${payoutStatusRaw}] ${memo}` : `[${payoutStatusRaw}]`;
+  }
 
   // 사용자 감사 확정: 박용식(C0291, P0618) 김금옥 4일 140,000원 = 560,000원
   if (id === 'P0618' || (applyId === 'C0291' && patientName === '박용식')) {
@@ -256,6 +260,7 @@ appRows.forEach((r, idx) => {
     estimatedUnpaid: cAgg.unpaidSum || excelUnpaid,
     totalPayoutAmount: pAgg.totalPayout || excelTotalPayout,
     payoutCount: pAgg.count || 0,
+    memo: String(r['비고'] || '').trim(),
     isRealLaunchData: true,
     importedAt: new Date().toISOString()
   };
