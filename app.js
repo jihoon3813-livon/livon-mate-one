@@ -36137,21 +36137,44 @@ function initAdminSession() {
     localStorage.removeItem('REBORN_REMEMBERED_USERNAME');
   }
 
+  const isExplicitlyLoggedOut = localStorage.getItem('LIVON_LOGGED_OUT') === 'true' || sessionStorage.getItem('LIVON_LOGGED_OUT') === 'true';
   const savedAdmin = localStorage.getItem('REBORN_CURRENT_ADMIN');
-  if (savedAdmin) {
+
+  let validSessionAdmin = null;
+  if (!isExplicitlyLoggedOut && savedAdmin) {
     try {
       const parsed = JSON.parse(savedAdmin);
-      if (parsed && (parsed.username === '342' || parsed.name === '342')) {
-        gCurrentAdmin = gAdmins[0] || null;
-      } else {
-        gCurrentAdmin = parsed;
+      if (parsed && parsed.id && parsed.username !== '342' && parsed.name !== '342') {
+        const found = gAdmins.find(a => a.id === parsed.id && a.status !== '비활성');
+        if (found) {
+          validSessionAdmin = found;
+        }
       }
     } catch (e) {
-      gCurrentAdmin = gAdmins[0] || null;
+      validSessionAdmin = null;
     }
-  } else {
-    gCurrentAdmin = gAdmins[0] || null;
   }
+
+  const overlay = document.getElementById('adminLoginOverlay');
+
+  if (validSessionAdmin) {
+    // 정상 로그인 세션 유지
+    gCurrentAdmin = validSessionAdmin;
+    document.documentElement.classList.remove('livon-locked');
+    localStorage.removeItem('LIVON_LOGGED_OUT');
+    sessionStorage.removeItem('LIVON_LOGGED_OUT');
+    if (overlay) overlay.classList.add('hidden');
+  } else {
+    // 🚨 절대 gAdmins[0]으로 자동 로그인되지 않도록 강제 차단 및 로그인 모달 즉시 노출
+    gCurrentAdmin = null;
+    localStorage.removeItem('REBORN_CURRENT_ADMIN');
+    sessionStorage.removeItem('REBORN_CURRENT_ADMIN');
+    localStorage.setItem('LIVON_LOGGED_OUT', 'true');
+    sessionStorage.setItem('LIVON_LOGGED_OUT', 'true');
+    document.documentElement.classList.add('livon-locked');
+    if (overlay) overlay.classList.remove('hidden');
+  }
+
   updateHeaderAdminProfile();
   if (typeof applyAdminMenuPermissions === 'function') {
     applyAdminMenuPermissions(gCurrentAdmin);
@@ -36201,11 +36224,16 @@ function initAdminSession() {
 }
 
 function updateHeaderAdminProfile() {
-  if (!gCurrentAdmin) return;
   const avatar = document.getElementById('headerAdminAvatar');
   const nameEl = document.getElementById('headerAdminName');
   const roleEl = document.getElementById('headerAdminRole');
 
+  if (!gCurrentAdmin) {
+    if (avatar) avatar.innerText = '인증';
+    if (nameEl) nameEl.innerText = '로그인 필요';
+    if (roleEl) roleEl.innerText = '세션 만료됨';
+    return;
+  }
   if (avatar) avatar.innerText = (gCurrentAdmin.name || '리본').slice(0, 2);
   if (nameEl) nameEl.innerText = gCurrentAdmin.name || '김리본 (대표)';
   if (roleEl) roleEl.innerText = `${gCurrentAdmin.role} (${gCurrentAdmin.status || '활성'})`;
@@ -36217,18 +36245,33 @@ function handleAdminLogout(isAuto = false) {
       return;
     }
   }
-  // Reset masking to default ON on logout
+  // 1. Reset masking to default ON on logout
   gIsMasked = true;
   localStorage.setItem(MASKING_STORAGE_KEY, 'true');
   updateMaskingButtonUI();
 
-  // Show login overlay
+  // 2. Clear current admin session and enforce logged-out state
+  gCurrentAdmin = null;
+  localStorage.removeItem('REBORN_CURRENT_ADMIN');
+  sessionStorage.removeItem('REBORN_CURRENT_ADMIN');
+  localStorage.setItem('LIVON_LOGGED_OUT', 'true');
+  sessionStorage.setItem('LIVON_LOGGED_OUT', 'true');
+  document.documentElement.classList.add('livon-locked');
+
+  // 3. Update header profile to logged-out indicator
+  updateHeaderAdminProfile();
+
+  // 4. Show login overlay immediately
   const overlay = document.getElementById('adminLoginOverlay');
   if (overlay) {
     overlay.classList.remove('hidden');
   }
 
-  // 로그인 모달 입력값 초기화 및 브라우저 '342' 자동채움 다중 차단
+  // 5. Update session timer badge
+  const badge = document.getElementById('sessionTimerBadge');
+  if (badge) badge.innerText = '세션 만료됨';
+
+  // 6. 로그인 모달 입력값 초기화 및 브라우저 '342' 자동채움 다중 차단
   const sanitizeLoginInputs = () => {
     const uInput = document.getElementById('loginUsernameInput');
     const pInput = document.getElementById('loginPasswordInput');
@@ -36293,6 +36336,11 @@ function handleAdminLoginSubmit(e) {
   }
 
   gCurrentAdmin = found;
+
+  // Clear logged-out state and release lock
+  localStorage.removeItem('LIVON_LOGGED_OUT');
+  sessionStorage.removeItem('LIVON_LOGGED_OUT');
+  document.documentElement.classList.remove('livon-locked');
 
   // 최근 접속 일시 및 IP 갱신
   gCurrentAdmin.lastLogin = new Date().toISOString().slice(0, 16).replace('T', ' ');
