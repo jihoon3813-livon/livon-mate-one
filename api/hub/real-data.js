@@ -28,8 +28,20 @@ module.exports = async function handler(req, res) {
 
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
-  // 1. GET: 저장된 통합 실데이터 반환
+  // 1. GET: 저장된 통합 실데이터 반환 (KMS 보안 세션 인증 필수)
   if (req.method === 'GET') {
+    const authHeader = req.headers['authorization'] || req.headers['x-livon-auth'] || '';
+    if (!authHeader || (!authHeader.startsWith('Bearer lvn_') && !authHeader.startsWith('lvn_'))) {
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: KMS Admin session token required',
+        applications: [],
+        assignments: [],
+        claims: [],
+        payouts: []
+      });
+    }
+
     try {
       const filePath = getFilePath();
       if (!fs.existsSync(filePath)) {

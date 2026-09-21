@@ -51,10 +51,11 @@
     }
   </script>
   <script>
-    // 🚨 [보안] 로그아웃 상태에서 새로고침 시 메인화면 노출 없이 즉시 잠금 화면 렌더링
+    // 🚨 [보안] 로그아웃 또는 미인증 상태에서 새로고침 시 즉시 잠금 화면 렌더링
     (function() {
       try {
-        var isLoggedOut = localStorage.getItem('LIVON_LOGGED_OUT') === 'true' || sessionStorage.getItem('LIVON_LOGGED_OUT') === 'true' || !localStorage.getItem('REBORN_CURRENT_ADMIN');
+        var token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
+        var isLoggedOut = localStorage.getItem('LIVON_LOGGED_OUT') === 'true' || sessionStorage.getItem('LIVON_LOGGED_OUT') === 'true' || !localStorage.getItem('REBORN_CURRENT_ADMIN') || !token;
         if (isLoggedOut) {
           document.documentElement.classList.add('livon-locked');
         }

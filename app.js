@@ -1142,6 +1142,13 @@ function filterInvalidSamsungDuplicates(apps) {
 window.filterInvalidSamsungDuplicates = filterInvalidSamsungDuplicates;
 
 async function loadConvexData(showSpinner = true) {
+  // 🚨 [보안] 미인증 세션에서는 고객 및 정산 데이터를 서버에서 절대 요청하지 않음
+  const token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
+  if (!token && !gCurrentAdmin) {
+    console.warn('[Security Guard] 미인증 세션에서는 고객 및 정산 데이터를 로드할 수 없습니다.');
+    return;
+  }
+
   const hasLocalData = (Array.isArray(gApps) && gApps.length > 0) || !!localStorage.getItem('LIVON_CACHED_APPS');
 
   // Stale-While-Revalidate: 로컬 캐시가 있으면 스피너 없이 0초 즉시 화면 표출
@@ -1155,8 +1162,10 @@ async function loadConvexData(showSpinner = true) {
     }
   }
 
-  // 1. 서버 인메모리 RAM 캐시 실데이터 즉시 병렬 요청 (50ms 초고속)
-  const realDataPromise = fetch('/api/hub/real-data')
+  // 1. 서버 인메모리 RAM 캐시 실데이터 즉시 병렬 요청 (50ms 초고속 - 인증 토큰 헤더 지참)
+  const realDataPromise = fetch('/api/hub/real-data', {
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+  })
     .then(r => r.ok ? r.json() : null)
     .catch(() => null);
 
@@ -1198,8 +1207,15 @@ async function loadConvexData(showSpinner = true) {
   });
 
   try {
-    const res = await queryConvex('sync:bundleAll', {});
+    const res = await queryConvex('sync:bundleAll', { sessionToken: token || '' });
     if (res && res.status === 'success' && res.value) {
+      if (res.value.status === 'unauthorized') {
+        console.warn('[Security Guard] 세션이 만료되었거나 인증되지 않았습니다.');
+        if (typeof handleAdminLogout === 'function') {
+          handleAdminLogout(true);
+        }
+        return;
+      }
       const { applications, assignments, claims, payouts, adjusters, partners, careLogs, caregivers, systemSettings } = res.value;
 
       // 1. 고객 신청 대장: Convex 원격 DB가 단 하나의 절대적 기준(Single Source of Truth)
@@ -1954,14 +1970,48 @@ window.isMatchCustomerRecord = isMatchCustomerRecord;
 // =========================================================================
 // APPLICATION INITIALIZATION (DOMContentLoaded)
 // =========================================================================
-document.addEventListener('DOMContentLoaded', () => {
-  initData();
-  initInsuranceWorkflows();
+document.addEventListener('DOMContentLoaded', async () => {
   initFontSize();
   initThemeAndMasking();
-  initAdminSession();
   setupInputFormatters();
   setupGlobalDatePickerTriggers();
+
+  // 1. 🚨 [보안] 관리자 서버 인증 세션 상태 우선 검증 (단순 CSS 가림 탈피)
+  let isAuthenticated = false;
+  if (typeof initAdminSession === 'function') {
+    try {
+      isAuthenticated = await initAdminSession();
+    } catch (authErr) {
+      console.warn('[Security Guard] 세션 검증 에러:', authErr);
+      isAuthenticated = false;
+    }
+  }
+
+  // 2. 🚨 [보안] 미인증(로그아웃) 상태: 고객·정산 민감 데이터의 메모리/DOM 적재를 원천 차단
+  if (!isAuthenticated) {
+    console.warn('[Security Guard] 미인증 상태: 고객 및 정산 민감 데이터의 메모리 및 DOM 적재를 원천 차단합니다.');
+    gApps = [];
+    gAssigns = [];
+    gClaims = [];
+    gPayouts = [];
+    gCaregivers = [];
+    gCareLogs = [];
+    // 백그라운드 DOM을 완전한 스켈레톤(공백) 상태로 비우기
+    const hubList = document.getElementById('hubCustomerCardsList');
+    if (hubList) hubList.innerHTML = '';
+    const appBody = document.getElementById('appTableBody');
+    if (appBody) appBody.innerHTML = '';
+    const claimBody = document.getElementById('claimTableBody');
+    if (claimBody) claimBody.innerHTML = '';
+    const payoutBody = document.getElementById('payoutTableBody');
+    if (payoutBody) payoutBody.innerHTML = '';
+    initIcons();
+    return;
+  }
+
+  // 3. 정상 인증된 세션에서만 데이터 초기화 및 실데이터 동기화 수행
+  initData();
+  initInsuranceWorkflows();
 
   // Convex Cloud 운영 서버 실시간 데이터 동기화
   if (typeof loadConvexData === 'function') {
@@ -2006,6 +2056,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof renderMultiTabBar === 'function') renderMultiTabBar();
   }
   initIcons();
+
 
   // 경량 초기화 작업만 유휴 시점에 실행 (비활성 탭은 탭 클릭 시 온디맨드 렌더링)
   setTimeout(() => {
@@ -27499,6 +27550,13 @@ function exportFaxLogsToCSV() {
 }
 
 function initData() {
+  // 🚨 [보안] 미인증 세션에서는 데이터를 로컬 메모리에 적재하지 않음
+  const token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
+  if (!token && !gCurrentAdmin) {
+    console.warn('[Security Guard] 미인증 세션: initData 실행이 거부되었습니다.');
+    return;
+  }
+
   // 1. 로컬 캐시(LocalStorage)에서 최신 Convex 동기화 데이터 즉시 복원 (새로고침 시 과거 시드 숫자가 깜빡이는 현상 원천 차단)
   try {
     const cachedApps = localStorage.getItem('LIVON_CACHED_APPS');
@@ -37327,7 +37385,7 @@ var gAutoLogoutMinutes = 30;
 var gLastActivityTimestamp = Date.now();
 var gAutoLogoutTimerInterval = null;
 
-function initAdminSession() {
+async function initAdminSession() {
   // 브라우저 캐시나 로컬스토리지에 오염된 '342' 잔여 데이터 즉시 영구 정화
   const rememberedUser = localStorage.getItem('REBORN_REMEMBERED_USERNAME');
   if (rememberedUser === '342' || (rememberedUser && rememberedUser.trim() === '342')) {
@@ -37336,15 +37394,30 @@ function initAdminSession() {
 
   const isExplicitlyLoggedOut = localStorage.getItem('LIVON_LOGGED_OUT') === 'true' || sessionStorage.getItem('LIVON_LOGGED_OUT') === 'true';
   const savedAdmin = localStorage.getItem('REBORN_CURRENT_ADMIN');
+  const savedToken = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
 
   let validSessionAdmin = null;
-  if (!isExplicitlyLoggedOut && savedAdmin) {
+
+  if (!isExplicitlyLoggedOut && savedToken && savedAdmin) {
     try {
       const parsed = JSON.parse(savedAdmin);
       if (parsed && parsed.id && parsed.username !== '342' && parsed.name !== '342') {
-        const found = gAdmins.find(a => a.id === parsed.id && a.status !== '비활성');
-        if (found) {
-          validSessionAdmin = found;
+        // 서버 측 세션 토큰 유효성 비동기 검증 (KMS 보안 세션)
+        if (typeof queryConvex === 'function') {
+          try {
+            const vRes = await queryConvex('sync:verifyAdminSession', { token: savedToken });
+            if (vRes && vRes.status === 'success' && vRes.value && vRes.value.valid) {
+              validSessionAdmin = { ...parsed, ...vRes.value.admin };
+            } else {
+              validSessionAdmin = null;
+            }
+          } catch (netErr) {
+            console.warn('[Session Verify] 네트워크 일시 지연:', netErr);
+            // 네트워크 연결 실패 시 로컬 캐시 임시 세션 허용
+            validSessionAdmin = parsed;
+          }
+        } else {
+          validSessionAdmin = parsed;
         }
       }
     } catch (e) {
@@ -37362,10 +37435,12 @@ function initAdminSession() {
     sessionStorage.removeItem('LIVON_LOGGED_OUT');
     if (overlay) overlay.classList.add('hidden');
   } else {
-    // 🚨 절대 gAdmins[0]으로 자동 로그인되지 않도록 강제 차단 및 로그인 모달 즉시 노출
+    // 🚨 미인증 상태: 모든 세션 토큰 및 로컬 캐시 즉시 파기 & 화면 완전 잠금
     gCurrentAdmin = null;
     localStorage.removeItem('REBORN_CURRENT_ADMIN');
     sessionStorage.removeItem('REBORN_CURRENT_ADMIN');
+    localStorage.removeItem('REBORN_ADMIN_SESSION_TOKEN');
+    sessionStorage.removeItem('REBORN_ADMIN_SESSION_TOKEN');
     localStorage.setItem('LIVON_LOGGED_OUT', 'true');
     sessionStorage.setItem('LIVON_LOGGED_OUT', 'true');
     document.documentElement.classList.add('livon-locked');
@@ -37401,7 +37476,6 @@ function initAdminSession() {
       usernameInput.value = '';
     }
 
-    // 브라우저 비밀번호 관리자/자동완성에 의한 '342' 비동기 강제 삽입 즉시 차단
     usernameInput.addEventListener('input', () => {
       if (usernameInput.value === '342' || usernameInput.value.trim() === '342') {
         const s = localStorage.getItem('REBORN_REMEMBERED_USERNAME');
@@ -37418,6 +37492,8 @@ function initAdminSession() {
   if (typeof initSamsungDriveAutoSync === 'function') {
     initSamsungDriveAutoSync();
   }
+
+  return !!validSessionAdmin;
 }
 
 function updateHeaderAdminProfile() {
@@ -37438,37 +37514,85 @@ function updateHeaderAdminProfile() {
 
 function handleAdminLogout(isAuto = false) {
   if (!isAuto) {
-    if (!confirm('정말 로그아웃 하시겠습니까? 로그아웃 시 개인정보 마스킹이 기본값(ON)으로 초기화됩니다.')) {
+    if (!confirm('정말 로그아웃 하시겠습니까? 로그아웃 시 개인정보 마스킹이 기본값(ON)으로 초기화되고 모든 데이터가 메모리에서 안전하게 파기됩니다.')) {
       return;
     }
   }
-  // 1. Reset masking to default ON on logout
-  gIsMasked = true;
-  localStorage.setItem(MASKING_STORAGE_KEY, 'true');
-  updateMaskingButtonUI();
+
+  // 1. 서버 세션 토큰 무효화 비동기 요청 (KMS 보안 세션 파기)
+  const savedToken = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
+  if (savedToken && typeof syncToConvex === 'function') {
+    try {
+      syncToConvex('sync:logoutAdmin', { token: savedToken });
+    } catch (e) {}
+  }
 
   // 2. Clear current admin session and enforce logged-out state
   gCurrentAdmin = null;
   localStorage.removeItem('REBORN_CURRENT_ADMIN');
   sessionStorage.removeItem('REBORN_CURRENT_ADMIN');
+  localStorage.removeItem('REBORN_ADMIN_SESSION_TOKEN');
+  sessionStorage.removeItem('REBORN_ADMIN_SESSION_TOKEN');
   localStorage.setItem('LIVON_LOGGED_OUT', 'true');
   sessionStorage.setItem('LIVON_LOGGED_OUT', 'true');
   document.documentElement.classList.add('livon-locked');
 
-  // 3. Update header profile to logged-out indicator
+  // 3. 🚨 [보안] 메모리 상의 고객·정산 민감 데이터 완전 파기 (Zero-Data in Memory)
+  gApps = [];
+  gAssigns = [];
+  gClaims = [];
+  gPayouts = [];
+  gCaregivers = [];
+  gCareLogs = [];
+  gCarePortRawLogs = [];
+  gSamsungSheets = {};
+
+  // 4. 🚨 [보안] 로컬 스토리지 캐시 전면 파기
+  localStorage.removeItem('LIVON_CACHED_APPS');
+  localStorage.removeItem('LIVON_CACHED_ASSIGNS');
+  localStorage.removeItem('LIVON_CACHED_CLAIMS');
+  localStorage.removeItem('LIVON_CACHED_PAYOUTS');
+  localStorage.removeItem('LIVON_CACHED_CAREGIVERS');
+  localStorage.removeItem('LIVON_CACHED_CENTERS');
+  localStorage.removeItem('LIVON_CACHED_ADJUSTERS');
+  localStorage.removeItem('LIVON_CARE_LOGS');
+
+  // 5. 🚨 [보안] DOM 상의 고객·정산 노드 완전 소거 (Zero-Data in DOM)
+  const containersToPurge = [
+    'hubCustomerCardsList',
+    'appTableBody',
+    'claimTableBody',
+    'payoutTableBody',
+    'cgTableBody',
+    'careLogList',
+    'careLogVoiceTimelineContainer',
+    'samsungWebGridContainer',
+    'samsungAppTableBody'
+  ];
+  containersToPurge.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+
+  // 6. Reset masking to default ON on logout
+  gIsMasked = true;
+  localStorage.setItem(MASKING_STORAGE_KEY, 'true');
+  updateMaskingButtonUI();
+
+  // 7. Update header profile to logged-out indicator
   updateHeaderAdminProfile();
 
-  // 4. Show login overlay immediately
+  // 8. Show login overlay immediately
   const overlay = document.getElementById('adminLoginOverlay');
   if (overlay) {
     overlay.classList.remove('hidden');
   }
 
-  // 5. Update session timer badge
+  // 9. Update session timer badge
   const badge = document.getElementById('sessionTimerBadge');
   if (badge) badge.innerText = '세션 만료됨';
 
-  // 6. 로그인 모달 입력값 초기화 및 브라우저 '342' 자동채움 다중 차단
+  // 10. 로그인 모달 입력값 초기화 및 브라우저 '342' 자동채움 다중 차단
   const sanitizeLoginInputs = () => {
     const uInput = document.getElementById('loginUsernameInput');
     const pInput = document.getElementById('loginPasswordInput');
@@ -37514,55 +37638,35 @@ async function handleAdminLoginSubmit(e) {
     return;
   }
 
-  let found = (gAdmins || []).find(a => a.username.toLowerCase() === username.toLowerCase());
-
-  // [핵심 해결]: 로컬 메모리에 해당 계정이 없으면 즉시 Convex Cloud DB에서 최신 관리자 목록을 실시간 조회
-  if (!found && typeof queryConvex === 'function') {
+  // 🚨 [보안] 서버 인증(Server-side Authentication) 호출 (비밀번호 클라이언트 노출 원천 차단)
+  let authResult = null;
+  if (typeof syncToConvex === 'function') {
     try {
-      const qRes = await queryConvex('sync:getAdmins', {});
-      if (qRes && qRes.status === 'success' && Array.isArray(qRes.value) && qRes.value.length > 0) {
-        // 기존 로컬 관리자와 클라우드 관리자 안전하게 병합
-        const cloudAdmins = qRes.value;
-        const existingMap = new Map((gAdmins || []).map(a => [a.id, a]));
-        cloudAdmins.forEach(ca => existingMap.set(ca.id, ca));
-        gAdmins = Array.from(existingMap.values());
-        try { localStorage.setItem('LIVON_ADMINS', JSON.stringify(gAdmins)); } catch (err) {}
-        found = gAdmins.find(a => a.username.toLowerCase() === username.toLowerCase());
-      }
+      authResult = await syncToConvex('sync:loginAdmin', { username, password });
     } catch (netErr) {
-      console.warn('[Admin Login] Convex 실시간 관리자 조회 에러:', netErr);
+      console.warn('[Admin Login] Convex 서버 인증 통신 에러:', netErr);
     }
   }
 
-  if (!found) {
-    alert('등록되지 않은 관리자 계정입니다. 사내 IT관리자에게 문의하세요.');
+  // 서버 응답 검증
+  if (!authResult || !authResult.value || !authResult.value.success) {
+    const errMsg = authResult?.value?.error || '로그인 인증에 실패했습니다. 아이디 또는 비밀번호를 다시 확인해주세요.';
+    alert(errMsg);
     return;
   }
 
-  if (found.status === '비활성') {
-    alert('해당 관리자 계정은 [비활성] 상태로 로그인이 차단되어 있습니다.');
-    return;
-  }
+  const { token, admin } = authResult.value;
+  gCurrentAdmin = admin;
 
-  // 비밀번호 검증 (등록된 비밀번호 또는 초기 관리자 기본 비밀번호 검증)
-  const validPass = found.password || '12345678';
-  if (password !== validPass && password !== 'reborn!@#$' && password !== 'livon2026!') {
-    alert('비밀번호가 일치하지 않습니다. 다시 확인해주세요.');
-    return;
-  }
-
-  gCurrentAdmin = found;
+  // 세션 토큰 및 계정 정보 안전 저장
+  localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
+  sessionStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
+  localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(gCurrentAdmin));
 
   // Clear logged-out state and release lock
   localStorage.removeItem('LIVON_LOGGED_OUT');
   sessionStorage.removeItem('LIVON_LOGGED_OUT');
   document.documentElement.classList.remove('livon-locked');
-
-  // 최근 접속 일시 및 IP 갱신
-  gCurrentAdmin.lastLogin = new Date().toISOString().slice(0, 16).replace('T', ' ');
-  if (!gCurrentAdmin.lastIp) {
-    gCurrentAdmin.lastIp = '112.170.45.12';
-  }
 
   // 실제 클라이언트 접속 IP 비동기 조회 및 실시간 반영
   try {
@@ -37571,28 +37675,11 @@ async function handleAdminLoginSubmit(e) {
       .then(d => {
         if (d && d.ip && gCurrentAdmin) {
           gCurrentAdmin.lastIp = d.ip;
-          const target = gAdmins.find(a => a.id === gCurrentAdmin.id);
-          if (target) target.lastIp = d.ip;
-          saveAdminsToStorage();
-          if (typeof renderAdmins === 'function') renderAdmins();
+          localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(gCurrentAdmin));
         }
       })
       .catch(() => {});
   } catch (err) {}
-
-  // gAdmins 배열 내 해당 관리자 데이터 동기화
-  const targetAdm = gAdmins.find(a => a.id === gCurrentAdmin.id);
-  if (targetAdm) {
-    targetAdm.lastLogin = gCurrentAdmin.lastLogin;
-    targetAdm.lastIp = gCurrentAdmin.lastIp;
-  }
-  saveAdminsToStorage();
-  localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(gCurrentAdmin));
-
-  // Convex Cloud DB에 최근 로그인 상태 비동기 영구 저장
-  if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:saveAdmin', { admin: gCurrentAdmin });
-  }
 
   // 아이디 기억하기 상태 저장
   const rememberCheckbox = document.getElementById('loginRememberMe');
@@ -37608,12 +37695,27 @@ async function handleAdminLoginSubmit(e) {
   if (typeof applyAdminMenuPermissions === 'function') {
     applyAdminMenuPermissions(gCurrentAdmin);
   }
-  renderAdmins();
 
   const overlay = document.getElementById('adminLoginOverlay');
   if (overlay) overlay.classList.add('hidden');
 
   gLastActivityTimestamp = Date.now();
+
+  // 🚨 [보안] 정상 인증 완료 후에 비로소 데이터 초기화 및 실데이터 동기화 시작
+  initData();
+  initInsuranceWorkflows();
+  if (typeof loadConvexData === 'function') {
+    loadConvexData(true);
+  }
+
+  // 현재 활성 탭 렌더링
+  if (gActiveTab && gActiveTab !== 'carehub') {
+    switchTab(gActiveTab, null, false);
+  } else {
+    renderUnifiedCareHub();
+    if (typeof renderMultiTabBar === 'function') renderMultiTabBar();
+  }
+  initIcons();
 
   showCustomAlert({
     title: '관리자 보안 로그인 성공',

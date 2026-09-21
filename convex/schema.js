@@ -58,4 +58,10 @@ export default defineSchema({
 
   // 삼성화재 발송완료 간병일지 히스토리
   samsungSentCareLogs: defineTable(v.any()),
+
+  // 관리자 인증 세션 (Server-side Auth Sessions)
+  adminSessions: defineTable(v.any())
+    .index("by_token", ["token"])
+    .index("by_adminId", ["adminId"]),
 });
+
