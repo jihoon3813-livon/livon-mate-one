@@ -1,5 +1,21 @@
 
 // =========================================================================
+// GLOBAL HTML SANITIZATION UTILITY
+// =========================================================================
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+if (typeof window !== 'undefined') {
+  window.escapeHtml = escapeHtml;
+}
+
+// =========================================================================
 // GLOBAL BEAUTIFUL CUSTOM ALERT & DIALOG SYSTEM (프리미엄 시스템 알럿 대체 시스템)
 // =========================================================================
 window._livonAlertQueue = [];
@@ -1064,14 +1080,19 @@ async function syncToConvex(path, args = {}) {
 }
 
 async function queryConvex(path, args = {}) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 10000) : null;
   try {
     const res = await fetch(`${CONVEX_URL}/api/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path, args })
+      body: JSON.stringify({ path, args }),
+      signal: controller ? controller.signal : undefined
     });
+    if (timeoutId) clearTimeout(timeoutId);
     return await res.json();
   } catch (err) {
+    if (timeoutId) clearTimeout(timeoutId);
     console.warn(`[Convex Query Error] ${path}:`, err);
     return null;
   }
@@ -1360,7 +1381,7 @@ async function loadConvexData(showSpinner = true) {
       }
 
       updateSamsungSheetBadges();
-      if (typeof renderCurrentSamsungSheet === 'function') {
+      if (typeof renderCurrentSamsungSheet === 'function' && (gActiveTab === 'samsungclaimhub' || gActiveTab === 'samsungfire')) {
         renderCurrentSamsungSheet();
       }
 
@@ -1382,6 +1403,10 @@ async function loadConvexData(showSpinner = true) {
 
       console.log(`[Convex Cloud] 운영 DB 실시간 동기화 완료 (고객: ${gApps.length}명, 배정: ${gAssigns.length}건, 청구: ${gClaims.length}건, 정산: ${gPayouts.length}건)`);
       updateConvexStatusBadge(true, gApps.length);
+      // 삼성화재 관리대장 상품명 등 통합허브 고객 상세정보 자동 연동
+      if (typeof enrichHubSamsungCustomersFromSamsungExcel === 'function') {
+        enrichHubSamsungCustomersFromSamsungExcel();
+      }
 
       // 고객 및 배정 정보에 신규 입력된 간병인/협력센터/손사 디렉토리 자동 실시간 동기화
       if (typeof syncDirectoriesFromAllExistingRecords === 'function') {
@@ -3493,9 +3518,11 @@ function initInsuranceWorkflows() {
       if (gActiveSamsungSheet === 'eligible') {
         renderCurrentSamsungSheet();
       }
+      if (typeof enrichHubSamsungCustomersFromSamsungExcel === 'function') {
+        enrichHubSamsungCustomersFromSamsungExcel();
+      }
       if (typeof gActiveTab !== 'undefined' && gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') {
-        const hubInput = document.getElementById('hubSearchInput');
-        if (hubInput && hubInput.value.trim()) renderUnifiedCareHub();
+        renderUnifiedCareHub();
       }
       console.log(`[LivonDB] IndexedDB로부터 삼성화재 사전명단 ${cached.length.toLocaleString()}건 날짜 정규화 및 로드 완료`);
     } else {
@@ -3508,6 +3535,7 @@ function initInsuranceWorkflows() {
             if (records.length > 0) {
               records.forEach(normalizeSamsungRecordDates);
               gSamsungList = records;
+              window._gSamsungDriveCache = records;
               initSamsungSpreadsheet();
               gSamsungSheets.eligible = records;
               LivonDB.saveSamsungEligible(records);
@@ -3515,9 +3543,11 @@ function initInsuranceWorkflows() {
               if (gActiveSamsungSheet === 'eligible' && typeof renderCurrentSamsungSheet === 'function') {
                 renderCurrentSamsungSheet();
               }
+              if (typeof enrichHubSamsungCustomersFromSamsungExcel === 'function') {
+                enrichHubSamsungCustomersFromSamsungExcel();
+              }
               if (typeof gActiveTab !== 'undefined' && gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') {
-                const hubInput = document.getElementById('hubSearchInput');
-                if (hubInput && hubInput.value.trim()) renderUnifiedCareHub();
+                renderUnifiedCareHub();
               }
               updateSamsungDriveSyncUI(data.syncedAt, data.filename, records.length);
               console.log(`[SamsungDrive] 구글 드라이브 최신 명단 ${records.length.toLocaleString()}건 초기 로드 완료`);
@@ -3811,7 +3841,207 @@ function normalizeSamsungRecordDates(record) {
   return record;
 }
 
+// =========================================================================
+// SAMSUNG FIRE CUSTOMER ENRICHMENT ENGINE (통합허브 삼성화재 고객 상세정보 연동)
+// =========================================================================
+function enrichHubSamsungCustomersFromSamsungExcel(extraSamsungRecords = null) {
+  if (!Array.isArray(gApps) || gApps.length === 0) return 0;
+
+  const samsungApps = gApps.filter(a => a && (a.insuranceCompany || '').includes('삼성'));
+  if (samsungApps.length === 0) return 0;
+
+  // 이미 모두 연동되어 상품명이 등록된 상태이고 외부 레코드 주입이 없으면 즉시 반환 (0ms 캐싱)
+  if (!extraSamsungRecords && samsungApps.every(a => a.isSamsungExcelEnriched && a.productName)) {
+    return 0;
+  }
+
+  // 1. 삼성화재 엑셀 관리대장 데이터 소스 풀 취합 (중복 전개 및 콜스택 오버플로우 방지)
+  const pool = [];
+  if (Array.isArray(extraSamsungRecords) && extraSamsungRecords.length > 0) {
+    for (let i = 0; i < extraSamsungRecords.length; i++) pool.push(extraSamsungRecords[i]);
+  }
+  if (window.gSamsungSheets) {
+    if (Array.isArray(gSamsungSheets.target)) {
+      for (let i = 0; i < gSamsungSheets.target.length; i++) pool.push(gSamsungSheets.target[i]);
+    }
+    if (Array.isArray(gSamsungSheets.completed)) {
+      for (let i = 0; i < gSamsungSheets.completed.length; i++) pool.push(gSamsungSheets.completed[i]);
+    }
+  }
+
+  let eligibleList = null;
+  if (window.gSamsungSheets && Array.isArray(gSamsungSheets.eligible) && gSamsungSheets.eligible.length > 0) {
+    eligibleList = gSamsungSheets.eligible;
+  } else if (Array.isArray(window.gSamsungList) && window.gSamsungList.length > 0) {
+    eligibleList = window.gSamsungList;
+  } else if (Array.isArray(window._gSamsungDriveCache) && window._gSamsungDriveCache.length > 0) {
+    eligibleList = window._gSamsungDriveCache;
+  }
+  if (eligibleList && eligibleList.length > 0) {
+    for (let i = 0; i < eligibleList.length; i++) pool.push(eligibleList[i]);
+  }
+
+  if (pool.length === 0) return 0;
+
+  // 2. 고속 O(1) 매칭용 인덱스 맵 구축
+  const mapByPolicy = new Map();
+  const mapByPhone = new Map();
+  const mapByName = new Map();
+  const mapById = new Map();
+  const mapByAccident = new Map();
+
+  const addRecord = (r) => {
+    if (!r) return;
+    const policy = String(r.policyNumber || '').replace(/[^0-9]/g, '');
+    const phone = String(r.phone || r.applicantContact || '').replace(/[^0-9]/g, '');
+    const name = String(r.patientName || r.customerName || '').trim();
+    const pid = String(r.patientId || r.id || '').trim();
+    const acc = String(r.accidentNumber || '').trim();
+
+    if (policy && policy.length >= 6 && !mapByPolicy.has(policy)) mapByPolicy.set(policy, r);
+    if (phone && phone.length >= 8 && !mapByPhone.has(phone)) mapByPhone.set(phone, r);
+    if (name && !mapByName.has(name)) mapByName.set(name, r);
+    if (pid && !mapById.has(pid)) mapById.set(pid, r);
+    if (acc && acc !== '-' && !mapByAccident.has(acc)) mapByAccident.set(acc, r);
+  };
+
+  for (let i = 0; i < pool.length; i++) {
+    addRecord(pool[i]);
+  }
+
+  // 3. gApps(종합관리대장 > 통합허브) 내 삼성화재 고객 매칭 및 상세정보(상품명 등) 반영
+  let enrichedCount = 0;
+  for (let i = 0; i < gApps.length; i++) {
+    const app = gApps[i];
+    if (!app) continue;
+    const isSamsung = (app.insuranceCompany || '').includes('삼성');
+    const cleanPhone = String(app.phone || '').replace(/[^0-9]/g, '');
+    const cleanPolicy = String(app.policyNumber || '').replace(/[^0-9]/g, '');
+    const cleanName = String(app.patientName || '').trim();
+    const cleanId = String(app.patientId || app.id || '').trim();
+    const cleanAcc = String(app.accidentNumber || '').trim();
+
+    // 매칭 우선순위: 증권번호 > 연락처 > 피보험자ID > 사고번호 > 환자성명(삼성화재 고객인 경우)
+    let matched = null;
+    if (cleanPolicy && cleanPolicy.length >= 6 && mapByPolicy.has(cleanPolicy)) {
+      matched = mapByPolicy.get(cleanPolicy);
+    } else if (cleanPhone && cleanPhone.length >= 8 && mapByPhone.has(cleanPhone)) {
+      matched = mapByPhone.get(cleanPhone);
+    } else if (cleanId && mapById.has(cleanId)) {
+      matched = mapById.get(cleanId);
+    } else if (cleanAcc && cleanAcc !== '-' && mapByAccident.has(cleanAcc)) {
+      matched = mapByAccident.get(cleanAcc);
+    } else if (isSamsung && cleanName && mapByName.has(cleanName)) {
+      matched = mapByName.get(cleanName);
+    }
+
+    if (matched) {
+      let modified = false;
+      if (matched.productName && app.productName !== matched.productName) {
+        app.productName = matched.productName;
+        modified = true;
+      }
+      if (matched.productCode && app.productCode !== matched.productCode) {
+        app.productCode = matched.productCode;
+        modified = true;
+      }
+      if (matched.policyNumber && (!app.policyNumber || app.policyNumber === '-' || app.policyNumber.length < 5)) {
+        app.policyNumber = matched.policyNumber;
+        modified = true;
+      }
+      if (matched.contractStartDate && !app.contractStartDate) {
+        app.contractStartDate = matched.contractStartDate;
+        modified = true;
+      }
+      if (matched.contractEndDate && !app.contractEndDate) {
+        app.contractEndDate = matched.contractEndDate;
+        modified = true;
+      }
+      if (matched.hasInjuryCare && !app.hasInjuryCare) {
+        app.hasInjuryCare = matched.hasInjuryCare;
+        modified = true;
+      }
+      if (matched.hasDiseaseCare && !app.hasDiseaseCare) {
+        app.hasDiseaseCare = matched.hasDiseaseCare;
+        modified = true;
+      }
+      if (matched.patientId && !app.patientId) {
+        app.patientId = matched.patientId;
+        modified = true;
+      }
+      if (matched.accidentNumber && (!app.accidentNumber || app.accidentNumber === '-')) {
+        app.accidentNumber = matched.accidentNumber;
+        modified = true;
+      }
+      if (matched.diagnosis && (!app.diagnosis || app.diagnosis === '-')) {
+        app.diagnosis = matched.diagnosis;
+        modified = true;
+      }
+      if (matched.applicantContact && !app.applicantContact) {
+        app.applicantContact = matched.applicantContact;
+        modified = true;
+      }
+      app.isSamsungExcelEnriched = true;
+      if (modified) enrichedCount++;
+    }
+  }
+
+  if (enrichedCount > 0) {
+    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+  }
+  return enrichedCount;
+}
+window.enrichHubSamsungCustomersFromSamsungExcel = enrichHubSamsungCustomersFromSamsungExcel;
+
 function initSamsungSpreadsheet() {
+  if (!gSamsungSheets) {
+    gSamsungSheets = { target: [], completed: [], eligible: [], contacts: [] };
+  }
+
+  // 로컬스토리지에 저장된 삼성화재 관리대장 엑셀 데이터 복원
+  try {
+    const rawLedger = localStorage.getItem('LIVON_SAMSUNG_EXCEL_LEDGER');
+    if (rawLedger) {
+      const parsedLedger = JSON.parse(rawLedger);
+      if (parsedLedger) {
+        if (Array.isArray(parsedLedger.target) && parsedLedger.target.length > 0 && (!gSamsungSheets.target || gSamsungSheets.target.length === 0)) {
+          gSamsungSheets.target = parsedLedger.target;
+        }
+        if (Array.isArray(parsedLedger.completed) && parsedLedger.completed.length > 0 && (!gSamsungSheets.completed || gSamsungSheets.completed.length === 0)) {
+          gSamsungSheets.completed = parsedLedger.completed;
+        }
+        if (Array.isArray(parsedLedger.contacts) && parsedLedger.contacts.length > 0 && (!gSamsungSheets.contacts || gSamsungSheets.contacts.length === 0)) {
+          gSamsungSheets.contacts = parsedLedger.contacts;
+        }
+        if (Array.isArray(parsedLedger.eligible) && parsedLedger.eligible.length > 0 && (!gSamsungSheets.eligible || gSamsungSheets.eligible.length === 0)) {
+          gSamsungSheets.eligible = parsedLedger.eligible;
+        }
+      }
+    }
+
+    if (!gSamsungSheets.target || gSamsungSheets.target.length === 0) {
+      const cachedTarget = localStorage.getItem('LIVON_SAMSUNG_SHEET_TARGET');
+      if (cachedTarget) {
+        const parsed = JSON.parse(cachedTarget);
+        if (Array.isArray(parsed) && parsed.length > 0) gSamsungSheets.target = parsed;
+      }
+    }
+    if (!gSamsungSheets.completed || gSamsungSheets.completed.length === 0) {
+      const cachedComp = localStorage.getItem('LIVON_SAMSUNG_SHEET_COMPLETED');
+      if (cachedComp) {
+        const parsed = JSON.parse(cachedComp);
+        if (Array.isArray(parsed) && parsed.length > 0) gSamsungSheets.completed = parsed;
+      }
+    }
+    if (!gSamsungSheets.eligible || gSamsungSheets.eligible.length === 0) {
+      const cachedElig = localStorage.getItem('LIVON_SAMSUNG_SHEET_ELIGIBLE');
+      if (cachedElig) {
+        const parsed = JSON.parse(cachedElig);
+        if (Array.isArray(parsed) && parsed.length > 0) gSamsungSheets.eligible = parsed;
+      }
+    }
+  } catch (e) {}
+
   if (!gSamsungSheets.contacts || gSamsungSheets.contacts.length === 0) {
     gSamsungSheets.contacts = [
       { category: '삼성화재', name: '김정현', role: '간병지원파트 손해사정사', email: 'samsung_care@samsungfire.com', phone: '02-3485-9114', mobile: '010-3849-9114', fax: '02-3485-9100', notes: '일일 접수 보고 및 간병일지 메일링 수신 담당' },
@@ -3842,119 +4072,38 @@ function syncSamsungSpreadsheetData(silent = false) {
     gSamsungSheets.eligible = gSamsungList;
   }
 
-  // 빠른 O(1) 매칭용 색인 맵 구축
-  const leadById = new Map();
-  const leadByName = new Map();
-  if (Array.isArray(gSamsungList)) {
-    for (let i = 0; i < gSamsungList.length; i++) {
-      const l = gSamsungList[i];
-      if (l.patientId && !leadById.has(l.patientId)) leadById.set(l.patientId, l);
-      if (l.id && !leadById.has(l.id)) leadById.set(l.id, l);
-      if (l.patientName && !leadByName.has(l.patientName)) leadByName.set(l.patientName, l);
-    }
-  }
-
-  // 2. [대상자] 동기화: gApps 중 삼성화재 건 -> gSamsungSheets.target
-  const samsungApps = (gApps || []).filter(a => (a.insuranceCompany || '').includes('삼성'));
-  gSamsungSheets.target = samsungApps.map(a => {
-    const lead = (a.patientId && leadById.get(a.patientId)) || (a.id && leadById.get(a.id)) || (a.patientName && leadByName.get(a.patientName));
-    return normalizeSamsungRecordDates({
-      patientId: a.patientId || (lead ? lead.patientId : a.id),
-      patientName: a.patientName || '',
-      birthDate: formatSamsungBirthDate(a.birthDate || (lead ? lead.birthDate : '')),
-      gender: a.gender || (lead ? lead.gender : '남'),
-      phone: a.phone || (lead ? lead.phone : ''),
-      policyNumber: a.policyNumber || (lead ? lead.policyNumber : ''),
-      productCode: a.productCode || (lead ? lead.productCode : 'SF-CARE-01'),
-      productName: a.productName || (lead ? lead.productName : '무배당 삼성화재 당신에게 좋은간병보험'),
-      contractStartDate: formatSamsungDate(a.contractStartDate || (lead ? lead.contractStartDate : '2024-03-01')),
-      contractEndDate: formatSamsungDate(a.contractEndDate || (lead ? lead.contractEndDate : '2044-03-01')),
-      hasInjuryCare: a.hasInjuryCare || (lead ? lead.hasInjuryCare : '가입'),
-      hasDiseaseCare: a.hasDiseaseCare || (lead ? lead.hasDiseaseCare : '가입'),
-      applyDateTime: a.applyDate ? (a.applyDate.includes(':') ? a.applyDate.replace(/\./g, '-') : `${formatSamsungDate(a.applyDate)} 09:30`) : '2026-09-04 09:30',
-      accidentType: a.accidentType || '질병',
-      accidentDate: formatSamsungDate(a.accidentDate || a.applyDate || '2026-09-01'),
-      diagnosis: a.diagnosis || (a.memo && a.memo.includes('진단명') ? (a.memo.match(/\[진단명:\s*([^\]]+)\]/)?.[1] || '상세불명의 질환') : '급성 뇌경색'),
-      hospitalName: a.hospitalName || a.hospital || '서울아산병원',
-      desiredStartDate: formatSamsungDate(a.desiredDate || a.startDate || '2026-09-04'),
-      expectedEndDate: formatSamsungDate(a.careEndDate || a.expectedEndDate || '2026-09-18'),
-      applicantContact: `${a.applicantName || '보호자'} (${a.applicantPhone || a.phone || '-'})`
-    });
-  });
-
-  // 3. [완료] 동기화: 간병종료/정산완료 건 또는 배정 건 -> gSamsungSheets.completed
-  const completedApps = samsungApps.filter(a => a.status === '정산완료' || a.status === '종료' || a.status === '진행중' || a.assignedCaregiverCount > 0);
-  gSamsungSheets.completed = (completedApps.length > 0 ? completedApps : samsungApps).map((a, idx) => {
-    const lead = (a.patientId && leadById.get(a.patientId)) || (a.id && leadById.get(a.id)) || (a.patientName && leadByName.get(a.patientName));
-    return {
-      patientId: a.patientId || (lead ? lead.patientId : a.id),
-      patientName: a.patientName || '',
-      isMatched: '매칭완료',
-      assignedRegion: `${a.sido || '서울'} ${a.sigungu || '중구'}`,
-      matchingDuration: (idx % 2 === 0) ? '1시간 15분' : '45분',
-      delayHours: '0시간',
-      caregiverChange: '정상완료(교체없음)',
-      gpsAnomaly: '정상',
-      hasVoc: '없음',
-      vocTransferSamsung: '해당없음',
-      satisfactionScore: (idx % 2 === 0) ? '98점 (매우만족)' : '95점 (만족)'
-    };
-  });
-
-  // 전산에 아직 등록된 삼성화재 접수건이 없을 경우, 사전명단 기반으로 초기 샘플 행 생성하여 표시
-  if (samsungApps.length === 0 && gSamsungList && gSamsungList.length > 0) {
-    gSamsungSheets.target = gSamsungList.slice(0, 2).map((lead, idx) => ({
-      patientId: lead.patientId || lead.id,
-      patientName: lead.patientName,
-      birthDate: lead.birthDate,
-      gender: lead.gender,
-      phone: lead.phone,
-      policyNumber: lead.policyNumber,
-      productCode: lead.productCode || 'SF-CARE-01',
-      productName: lead.productName || '무배당 삼성화재 당신에게 좋은간병보험',
-      contractStartDate: lead.contractStartDate || '2024-03-01',
-      contractEndDate: lead.contractEndDate || '2044-03-01',
-      hasInjuryCare: lead.hasInjuryCare || '가입',
-      hasDiseaseCare: lead.hasDiseaseCare || '가입',
-      applyDateTime: '2026-09-04 09:30',
-      accidentType: idx === 0 ? '질병' : '상해',
-      accidentDate: '2026-09-01',
-      diagnosis: idx === 0 ? '급성 뇌경색 (I63)' : '대퇴골 골절 (S72)',
-      hospitalName: idx === 0 ? '서울아산병원' : '삼성서울병원',
-      desiredStartDate: '2026-09-04',
-      expectedEndDate: '2026-09-18',
-      applicantContact: idx === 0 ? '보호자 김민석 (010-9988-1122)' : '배우자 이영희 (010-7766-3344)'
-    }));
-
-    gSamsungSheets.completed = gSamsungList.slice(0, 2).map((lead, idx) => ({
-      patientId: lead.patientId || lead.id,
-      patientName: lead.patientName,
-      isMatched: '매칭완료',
-      assignedRegion: idx === 0 ? '서울 송파구' : '서울 강남구',
-      matchingDuration: idx === 0 ? '1시간 15분' : '45분',
-      delayHours: '0시간',
-      caregiverChange: '정상완료(교체없음)',
-      gpsAnomaly: '정상',
-      hasVoc: '없음',
-      vocTransferSamsung: '해당없음',
-      satisfactionScore: idx === 0 ? '98점 (매우만족)' : '95점 (만족)'
-    }));
-  }
+  // 2. 🚨 [사용자 지침 준수]: 삼성화재 접수/청구관리 데이터는 환경설정의 삼성화재 관리대장 엑셀을 기준으로 유지하며,
+  // 종합관리대장(gApps) 정보를 가져오지 않습니다.
+  // 대신, 종합관리대장 > 통합허브 내 삼성화재 고객 중 삼성화재 엑셀 관리대장과 동일한 고객이 있다면
+  // 상품명 등 추가 정보를 가져와서 통합허브에 자동 반영합니다.
+  const enrichedCount = enrichHubSamsungCustomersFromSamsungExcel();
 
   // Convex Cloud에 스프레드시트 데이터 실시간 일괄 동기화 및 영구 저장
   if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'target', rows: gSamsungSheets.target, replace: true }).catch(console.warn);
-    syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'completed', rows: gSamsungSheets.completed, replace: true }).catch(console.warn);
-    syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'contacts', rows: gSamsungSheets.contacts, replace: true }).catch(console.warn);
+    if (gSamsungSheets.target && gSamsungSheets.target.length > 0) {
+      syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'target', rows: gSamsungSheets.target, replace: true }).catch(console.warn);
+    }
+    if (gSamsungSheets.completed && gSamsungSheets.completed.length > 0) {
+      syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'completed', rows: gSamsungSheets.completed, replace: true }).catch(console.warn);
+    }
+    if (gSamsungSheets.contacts && gSamsungSheets.contacts.length > 0) {
+      syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'contacts', rows: gSamsungSheets.contacts, replace: true }).catch(console.warn);
+    }
   }
 
   updateSamsungSheetBadges();
   renderCurrentSamsungSheet();
+  if (typeof renderSamsungClaimHub === 'function' && gActiveTab === 'samsungclaimhub') {
+    renderSamsungClaimHub();
+  }
+  if (typeof renderUnifiedCareHub === 'function' && gActiveTab === 'carehub') {
+    renderUnifiedCareHub();
+  }
 
   if (!silent && typeof showCustomAlert === 'function') {
     showCustomAlert({
-      title: '전산 데이터 최신 동기화 완료',
-      message: `삼성화재 사전명단 ${gSamsungSheets.eligible.length}건, 대상자 ${gSamsungSheets.target.length}건, 완료 ${gSamsungSheets.completed.length}건이 웹 스프레드시트 및 Convex Cloud에 성공적으로 동기화되었습니다.`,
+      title: '삼성화재 관리대장 동기화 완료',
+      message: `삼성화재 접수/청구관리 대장 데이터가 정상 유지되었으며, 통합허브 삼성화재 고객 ${enrichedCount}건의 상품명 등 상세 정보가 연동되었습니다.`,
       icon: 'refresh-cw',
       iconColor: 'indigo'
     });
@@ -23165,15 +23314,20 @@ function renderUnifiedCareHub() {
   const container = document.getElementById('hubCustomerCardsList');
   if (!container) return;
 
+  if (typeof gIsDataLoading !== 'undefined' && gIsDataLoading) {
+    renderAllLoadingStates();
+    return;
+  }
+
   // [중요] 레거시 더미 S-id 삼성 데이터 브라우저 로컬 캐시 및 전역 데이터 즉시 영구 제거 (실데이터 C-id 보존)
   if (Array.isArray(gApps) && gApps.some(a => a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성'))) {
     gApps = filterInvalidSamsungDuplicates(gApps);
     try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
   }
 
-  if (typeof gIsDataLoading !== 'undefined' && gIsDataLoading) {
-    renderAllLoadingStates();
-    return;
+  // [삼성화재 관리대장 상품명 연동]: 통합허브 렌더링 전 삼성화재 고객 상세 정보 자동 연동 (캐시 기반 0ms)
+  if (typeof enrichHubSamsungCustomersFromSamsungExcel === 'function') {
+    enrichHubSamsungCustomersFromSamsungExcel();
   }
 
   updateHubLayoutStyleUI();
@@ -23286,15 +23440,17 @@ function renderUnifiedCareHub() {
 
   for (let i = 0; i < activeHubApps.length; i++) {
     const a = activeHubApps[i];
-    if (insFilter !== 'ALL' && !a.insuranceCompany.includes(insFilter)) {
+    const aIns = a.insuranceCompany || '';
+    const aSt = a.status || '';
+    if (insFilter !== 'ALL' && !aIns.includes(insFilter)) {
       continue;
     }
     scopedTotal++;
     if (isNeedAssignHelper(a)) needAssignCount++;
-    if (a.status.includes('진행') || a.status === '정상' || a.status === '배정완료') inProgressCount++;
+    if (aSt.includes('진행') || aSt === '정상' || aSt === '배정완료') inProgressCount++;
     if (a.unconfirmedClaimCount > 0 || a.estimatedUnpaid > 0) unpaidClaimCount++;
     if (unpaidPayoutAppIdSet.has(a.id)) needPayoutCount++;
-    if (!a.insuranceCompany.includes('삼성') && a.claimCount > 0 && !isClaimFaxSentHelper(a.id)) needFaxCount++;
+    if (!aIns.includes('삼성') && a.claimCount > 0 && !isClaimFaxSentHelper(a.id)) needFaxCount++;
   }
 
   const countAllEl = document.getElementById('hubCount-ALL');
@@ -23312,7 +23468,8 @@ function renderUnifiedCareHub() {
   let modifiedTotal = 0;
   for (let i = 0; i < activeHubApps.length; i++) {
     const a = activeHubApps[i];
-    if (insFilter !== 'ALL' && !a.insuranceCompany.includes(insFilter)) continue;
+    const aIns = a.insuranceCompany || '';
+    if (insFilter !== 'ALL' && !aIns.includes(insFilter)) continue;
     if (typeof isAppUnconfirmedModified === 'function' ? isAppUnconfirmedModified(a) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a))) {
       modifiedTotal++;
     }
@@ -23346,7 +23503,9 @@ function renderUnifiedCareHub() {
 
   // Filter application list
   const filtered = activeHubApps.filter(app => {
-    if (insFilter !== 'ALL' && !app.insuranceCompany.includes(insFilter)) return false;
+    const appIns = app.insuranceCompany || '';
+    const appSt = app.status || '';
+    if (insFilter !== 'ALL' && !appIns.includes(insFilter)) return false;
 
     // [수정발생 모아보기 토글 필터]
     if (gHubOnlyModified) {
@@ -23355,11 +23514,11 @@ function renderUnifiedCareHub() {
     }
 
     if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
-    if (gHubFilter === 'IN_PROGRESS' && (!app.status.includes('진행') && app.status !== '정상' && app.status !== '배정완료')) return false;
+    if (gHubFilter === 'IN_PROGRESS' && (!appSt.includes('진행') && appSt !== '정상' && appSt !== '배정완료')) return false;
     if (gHubFilter === 'UNPAID_CLAIM' && app.unconfirmedClaimCount === 0 && app.estimatedUnpaid === 0) return false;
     if (gHubFilter === 'NEED_PAYOUT' && !unpaidPayoutAppIdSet.has(app.id)) return false;
     if (gHubFilter === 'NEED_FAX') {
-      if (app.insuranceCompany.includes('삼성')) return false;
+      if (appIns.includes('삼성')) return false;
       const isSent = isClaimFaxSentHelper(app.id);
       if (app.claimCount === 0 || isSent) return false;
     }
@@ -29461,8 +29620,8 @@ async function openCarePortOfficialDetail(sessionId) {
     // Section 1: 금일 환자 상태 체크 (Overall Tone, Traffic Light SVG, Description)
     const toneBadge = document.getElementById('cpOverallToneBadge');
     if (toneBadge) {
-      toneBadge.innerText = `● ${d.overallStatus.label}`;
-      toneBadge.className = 'px-2.5 py-0.5 rounded-md text-xs font-black ' + 
+      toneBadge.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-current mr-1.5 shrink-0"></span><span>${d.overallStatus.label}</span>`;
+      toneBadge.className = 'inline-flex items-center justify-center h-6 px-2.5 rounded-md text-xs font-black leading-none ' + 
         (d.overallStatus.tone === 'good' ? 'bg-emerald-50 text-emerald-700 border border-emerald-300' :
          d.overallStatus.tone === 'warning' ? 'bg-amber-50 text-amber-700 border border-amber-300' :
          'bg-rose-50 text-rose-700 border border-rose-300');
@@ -29482,7 +29641,10 @@ async function openCarePortOfficialDetail(sessionId) {
         return `
           <div class="bg-slate-50/70 border border-slate-200 rounded-xl p-3 flex flex-col justify-between gap-2 shadow-2xs">
             <div class="flex items-center justify-between">
-              <span class="px-2 py-0.5 rounded-md text-[11px] font-black ${pillCls}">● ${c.label}</span>
+              <span class="inline-flex items-center justify-center h-5 px-2 rounded-md text-[11px] font-black leading-none ${pillCls}">
+                <span class="inline-block w-1.5 h-1.5 rounded-full bg-current mr-1 shrink-0"></span>
+                <span>${c.label}</span>
+              </span>
               ${window.CarePortClient.renderTrafficLightSvg(c.tone, 'vertical')}
             </div>
             <p class="text-xs text-slate-700 font-medium leading-relaxed mt-1 line-clamp-2" title="${c.description}">
@@ -35883,6 +36045,11 @@ function openHubCustomerDetailModal(applyId) {
   }
   gActiveHubModalAppId = applyId;
 
+  // [삼성화재 관리대장 연동]: 모달 상세 데이터 조회 전 삼성화재 고객 상세정보(상품명 등) 최신 연동
+  if (typeof enrichHubSamsungCustomersFromSamsungExcel === 'function') {
+    enrichHubSamsungCustomersFromSamsungExcel();
+  }
+
   // Open modal container & ensure high z-index and visible flex layout
   openModal('hubCustomerDetailModal');
   modalEl.classList.remove('hidden');
@@ -40003,6 +40170,14 @@ function detectHeaderMapping(rawHeaders) {
     applyDate: ['신청일시', '간병신청일시', '접수일시', '신청일자', '신청일', '간병인청구접수일', '청구접수일', '접수일', '접수일자', '의뢰일', '통보일자', '통보일', '접수', '계약일자'],
     accidentNumber: ['사고번호', '접수번호', '청구번호'],
     policyNumber: ['증권번호', '계약번호', '증서번호'],
+    productName: ['상품명', '보험상품명', '가입상품명', '가입상품', '상품', '보험명'],
+    productCode: ['상품코드', '상품cd', '코드'],
+    contractStartDate: ['계약시작일자', '계약시작일', '계약일자', '보험개시일', '가입일자', '가입일', '계약일'],
+    contractEndDate: ['계약종료일자', '계약종료일', '만기일자', '보험만기일', '만기일', '계약만기일', '종기일자'],
+    hasInjuryCare: ['상해간병인가입여부', '상해가입여부', '상해가입', '상해간병', '상해담보'],
+    hasDiseaseCare: ['질병간병인가입여부', '질병가입여부', '질병가입', '질병간병', '질병담보'],
+    patientId: ['피보험자id', '고객id', '환자id', '고객번호', '환자번호'],
+    applicantContact: ['신청인연락처', '보호자연락처', '환자연락처', '연락가능한연락처'],
     accidentType: ['상해/질병여부', '상해/질병 여부', '상해/질병', '사고유형', '담보구분', '담보'],
     careStartDate: ['간병시작일자', '간병시작일시', '간병시작일', '시작희망일', '간병개시일', '개시일', '입원일', '파견일', '시작일'],
     careEndDate: ['간병종료일자', '간병종료일시', '간병종료일', '퇴원일', '완료일', '간병종료', '종료일'],
@@ -40212,6 +40387,14 @@ function mapRowToApplicationRecord(
     applyDate,
     accidentNumber: String(getVal('accidentNumber') || '').trim(),
     policyNumber: String(getVal('policyNumber') || '').trim(),
+    productName: String(rowObj['상품명'] || getVal('productName') || '').trim(),
+    productCode: String(rowObj['상품코드'] || getVal('productCode') || '').trim(),
+    contractStartDate: normLaunchDate(rowObj['계약시작일자'] || rowObj['계약일자'] || getVal('contractStartDate')),
+    contractEndDate: normLaunchDate(rowObj['계약종료일자'] || rowObj['만기일자'] || getVal('contractEndDate')),
+    hasInjuryCare: rowObj['상해간병인가입여부'] !== undefined ? (String(rowObj['상해간병인가입여부']).includes('가입') || rowObj['상해간병인가입여부'] === true) : (getVal('hasInjuryCare') ? (String(getVal('hasInjuryCare')).includes('가입') || getVal('hasInjuryCare') === true) : false),
+    hasDiseaseCare: rowObj['질병간병인가입여부'] !== undefined ? (String(rowObj['질병간병인가입여부']).includes('가입') || rowObj['질병간병인가입여부'] === true) : (getVal('hasDiseaseCare') ? (String(getVal('hasDiseaseCare')).includes('가입') || getVal('hasDiseaseCare') === true) : false),
+    patientId: String(rowObj['피보험자ID'] || rowObj['피보험자id'] || getVal('patientId') || '').trim(),
+    applicantContact: normLaunchPhone(rowObj['신청인연락처'] || getVal('applicantContact') || phone),
     accidentType: String(getVal('accidentType') || (insuranceCompany.includes('삼성') ? '질병' : '상해')).trim(),
     careType: String(rowObj['신청유형'] || getVal('applyType') || '입원').trim(),
     applyType: String(rowObj['신청유형'] || getVal('applyType') || '입원').trim(),
@@ -40389,6 +40572,89 @@ async function executeApplyLaunchData(company) {
   const newClaims = data.claims || [];
   const newPayouts = data.payouts || [];
 
+  if (companyKey === 'samsung') {
+    const confirmed = confirm(`🚨 [삼성화재 관리대장 반영 확인]\n\n삼성화재 관리대장 엑셀 총 ${newApps.length.toLocaleString()}건을 [삼성화재 접수/청구관리] 대장에 반영하고, [종합관리대장 > 통합허브]의 삼성화재 고객 상세 정보(상품명 등)를 자동 연동하시겠습니까?\n\n- [삼성화재 접수/청구관리]의 일일접수 및 완료 명단이 본 엑셀 기준으로 전면 갱신됩니다.\n- [종합관리대장 > 통합허브] 내 동일 고객의 상품명, 계약정보가 실시간 보강됩니다.`);
+    if (!confirmed) return;
+
+    // 1. 삼성화재 스프레드시트 대장 갱신 (gSamsungSheets)
+    initSamsungSpreadsheet();
+    gSamsungSheets.target = newApps;
+    const completedOnes = newApps.filter(a => a.status === '완료' || a.status === '정산완료' || a.status === '진행중');
+    gSamsungSheets.completed = completedOnes.length > 0 ? completedOnes : newApps;
+    if (data.contacts && data.contacts.length > 0) {
+      gSamsungSheets.contacts = data.contacts;
+    }
+    updateSamsungSheetBadges();
+
+    // 2. 로컬 스토리지에 삼성화재 관리대장 전용 캐시 저장
+    try {
+      localStorage.setItem('LIVON_SAMSUNG_EXCEL_LEDGER', JSON.stringify({
+        target: gSamsungSheets.target,
+        completed: gSamsungSheets.completed,
+        contacts: gSamsungSheets.contacts,
+        eligible: gSamsungSheets.eligible
+      }));
+      localStorage.setItem('LIVON_SAMSUNG_SHEET_TARGET', JSON.stringify(gSamsungSheets.target));
+      localStorage.setItem('LIVON_SAMSUNG_SHEET_COMPLETED', JSON.stringify(gSamsungSheets.completed));
+    } catch (e) {
+      console.warn('[Samsung Excel Ledger LocalStorage Save Warn]', e);
+    }
+
+    // 3. Convex 클라우드 백엔드 동기화
+    if (typeof syncToConvex === 'function') {
+      showToast('[삼성화재 접수/청구관리] 대장을 클라우드 DB에 동기화 중입니다...', 'info');
+      syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'target', rows: gSamsungSheets.target, replace: true }).catch(console.warn);
+      syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'completed', rows: gSamsungSheets.completed, replace: true }).catch(console.warn);
+      if (gSamsungSheets.contacts && gSamsungSheets.contacts.length > 0) {
+        syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'contacts', rows: gSamsungSheets.contacts, replace: true }).catch(console.warn);
+      }
+    }
+
+    // 4. 통합허브(gApps) 내 삼성화재 고객 중 삼성화재 엑셀 관리대장에 있는 고객과 동일한 고객 상세정보(상품명 등) 반영
+    const enrichedCount = enrichHubSamsungCustomersFromSamsungExcel(newApps);
+
+    // 5. 디렉토리(담당자) 동기화
+    if (data.contacts && data.contacts.length > 0) {
+      data.contacts.forEach(cnt => {
+        if (typeof autoSyncAdjusterToDirectory === 'function') {
+          autoSyncAdjusterToDirectory({
+            name: cnt.name,
+            insuranceCompany: '삼성화재',
+            firm: cnt.role || '삼성화재 전담팀',
+            phone: cnt.phone,
+            email: cnt.email,
+            mobile: cnt.phone
+          }, true);
+        }
+      });
+      syncDirectoriesFromAllExistingRecords(true);
+      saveDirectoryToStorage();
+      updateDirectoryTotalBadge();
+    }
+
+    // 6. 환경설정 및 상태 카드 갱신
+    const currentCfg = getLaunchConfig();
+    currentCfg['samsung'] = {
+      ...(currentCfg['samsung'] || {}),
+      ...(data.meta || {}),
+      count: newApps.length,
+      appliedAt: new Date().toISOString()
+    };
+    saveLaunchConfig(currentCfg);
+    updateLaunchStatusCard('samsung', currentCfg['samsung']);
+
+    // 7. 화면 리렌더링
+    if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+    if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+    if (typeof renderApplications === 'function') renderApplications();
+    if (typeof renderDashboard === 'function') renderDashboard();
+    if (typeof renderSamsungSpreadsheet === 'function') renderSamsungSpreadsheet();
+    if (typeof renderSamsungClaimHub === 'function' && gActiveTab === 'samsungclaimhub') renderSamsungClaimHub();
+
+    showToast(`🎉 [삼성화재 간병 관리대장] ${newApps.length.toLocaleString()}건이 [삼성화재 접수/청구관리] 대장에 성공적으로 반영되었으며, 통합허브 삼성화재 고객 ${enrichedCount}건의 상품명 등 상세 정보가 연동되었습니다!`, 'success');
+    return;
+  }
+
   const confirmed = confirm(`🚨 [전산 런칭 실데이터 반영 확인]\n\n${companyLabel} 실데이터 총 ${newApps.length.toLocaleString()}건 (배정: ${newAssigns.length}건, 청구: ${newClaims.length}건, 지급: ${newPayouts.length}건)을 통합허브 및 관련 대장에 반영하시겠습니까?\n\n- 기존 ${companyLabel} 목업 데이터는 실제 대장 데이터로 전면 교체됩니다.\n- 타 보험사 데이터는 안전하게 보존됩니다.`);
   if (!confirmed) return;
 
@@ -40404,6 +40670,8 @@ async function executeApplyLaunchData(company) {
     return true;
   });
   gApps = [...newApps, ...otherApps];
+  // 1-1. 삼성화재 관리대장 상품명 등 추가 상세 정보 자동 연동
+  enrichHubSamsungCustomersFromSamsungExcel();
   try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
   // 2. 간병인 배정(gAssigns) 교체
@@ -40511,13 +40779,9 @@ async function executeApplyLaunchData(company) {
   };
   saveLaunchConfig(currentCfg);
 
-  // 8. 삼성화재인 경우 삼성화재 스프레드시트 target / completed도 동기화
-  if (companyLabel.includes('삼성') && typeof initSamsungSpreadsheet === 'function') {
-    initSamsungSpreadsheet();
-    gSamsungSheets.target = newApps;
-    const completedOnes = newApps.filter(a => a.status === '완료' || a.status === '정산완료' || a.status === '진행중');
-    gSamsungSheets.completed = completedOnes.length > 0 ? completedOnes : newApps;
-    updateSamsungSheetBadges();
+  // 8. 삼성화재 상품명 등 통합허브 고객 상세정보 자동 연동
+  if (typeof enrichHubSamsungCustomersFromSamsungExcel === 'function') {
+    enrichHubSamsungCustomersFromSamsungExcel();
   }
 
   // 9. 상태 카드 갱신

@@ -731,17 +731,20 @@
 
       const catCardsHtml = d.categories.map(c => {
         const cPillStyle = c.tone === 'good'
-          ? 'background: #eafaf8; color: #079f98;'
-          : (c.tone === 'warning' ? 'background: #fef6e7; color: #d97706;' : 'background: #fdecee; color: #dc2626;');
+          ? 'background: #eafaf8; color: #079f98; border: 1px solid #10bdb2;'
+          : (c.tone === 'warning' ? 'background: #fef6e7; color: #d97706; border: 1px solid #f5aa18;' : 'background: #fdecee; color: #dc2626; border: 1px solid #eb5c60;');
         const vSvg = this.renderTrafficLightSvg(c.tone, 'vertical');
 
         return `
           <div style="flex: 1; min-width: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
-              <span style="font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 6px; ${cPillStyle}">● ${c.label}</span>
+              <span class="careport-badge-pill" style="height: 22px; font-size: 11px; font-weight: 800; padding: 0 8px; border-radius: 6px; ${cPillStyle}">
+                <span class="careport-dot" style="width: 5px; height: 5px; margin-right: 4px;"></span>
+                <span>${c.label}</span>
+              </span>
               ${vSvg}
             </div>
-            <div style="font-size: 11.5px; color: #334155; line-height: 1.4; font-weight: 500;">
+            <div style="font-size: 11.5px; color: #334155; line-height: 1.45; font-weight: 500;">
               ${c.description}
             </div>
           </div>
@@ -759,8 +762,8 @@
       `).join('');
 
       const careLogHtml = d.careLogRows.map(r => `
-        <div style="display: flex; align-items: flex-start; gap: 10px; padding: 5px 0; border-bottom: 1px solid #f1f5f9;">
-          <strong style="min-width: 82px; max-width: 115px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; padding: 3px 6px; border-radius: 4px; text-align: center; line-height: 1.35;">${r.label}</strong>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #f1f5f9;">
+          <strong class="careport-badge-pill" style="min-width: 86px; max-width: 115px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; height: 24px; padding: 0 8px;">${r.label}</strong>
           <span style="flex: 1; font-size: 11.5px; color: #334155; line-height: 1.45; font-weight: 500;">${r.value}</span>
         </div>
       `).join('');
@@ -775,7 +778,7 @@
       `).join('');
 
       const keywordsPills = d.keywords.map(k => `
-        <span style="display: inline-block; font-size: 10.5px; font-weight: 700; color: #079f98; background: #eafaf8; border: 1px solid #a7f3d0; border-radius: 12px; padding: 2px 8px; margin-right: 4px; margin-bottom: 4px;">#${k}</span>
+        <span class="careport-badge-pill" style="font-size: 11px; font-weight: 700; color: #079f98; background: #eafaf8; border: 1px solid #a7f3d0; border-radius: 12px; height: 22px; padding: 0 9px; margin-right: 4px; margin-bottom: 4px;">#${k}</span>
       `).join('');
 
       const trendChartSvg = this.generateTrendChartSvg(d.trendScores || patient.trendScores || [
@@ -829,6 +832,22 @@
       color: #0f172a;
       letter-spacing: -0.3px;
     }
+    .careport-badge-pill {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      vertical-align: middle !important;
+      box-sizing: border-box !important;
+      line-height: 1 !important;
+      text-align: center !important;
+      white-space: nowrap !important;
+    }
+    .careport-dot {
+      display: inline-block !important;
+      border-radius: 50% !important;
+      background: currentColor !important;
+      flex-shrink: 0 !important;
+    }
   </style>
 </head>
 <body>
@@ -841,8 +860,8 @@
       </div>
       <div style="text-align: right;">
         <div style="display: inline-flex; align-items: center; gap: 6px;">
-          <span style="background: #10bdb2; color: #ffffff; font-size: 11px; font-weight: 900; padding: 2px 8px; border-radius: 6px;">${d.dayText}</span>
-          <span style="font-size: 12.5px; font-weight: 800; color: #334155; font-family: monospace;">${d.consultDate}</span>
+          <span class="careport-badge-pill" style="background: #10bdb2; color: #ffffff; font-size: 11.5px; font-weight: 900; height: 22px; padding: 0 9px; border-radius: 6px;">${d.dayText}</span>
+          <span style="font-size: 12.5px; font-weight: 800; color: #334155; font-family: monospace; display: inline-flex; align-items: center; height: 22px; line-height: 1;">${d.consultDate}</span>
         </div>
         <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">리본케어포트(CarePort) 전산 공인 인증 일지</div>
       </div>
@@ -894,11 +913,14 @@
     <!-- Overall Status Verdict Banner -->
     <div style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px;">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 11px; font-weight: 900; padding: 2px 10px; border-radius: 6px; ${toneBadgeClass}">● ${d.overallStatus.label}</span>
+        <span class="careport-badge-pill" style="font-size: 11.5px; font-weight: 900; height: 24px; padding: 0 10px; border-radius: 6px; ${toneBadgeClass}">
+          <span class="careport-dot" style="width: 6px; height: 6px; margin-right: 5px;"></span>
+          <span>${d.overallStatus.label}</span>
+        </span>
         ${overallLightSvg}
-        <span style="font-size: 12px; font-weight: 700; color: #1e293b;">${d.overallStatus.description}</span>
+        <span style="font-size: 12px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; height: 24px; line-height: 1.3;">${d.overallStatus.description}</span>
       </div>
-      <span style="font-size: 11px; font-weight: 800; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">종합 판정</span>
+      <span class="careport-badge-pill" style="font-size: 11px; font-weight: 800; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; height: 24px; padding: 0 9px; border-radius: 5px;">종합 판정</span>
     </div>
 
     <!-- 4 Category Cards (식사, 거동, 수면, 통증) -->
@@ -984,14 +1006,14 @@
     .page { max-width: 900px; margin: 0 auto; background: #fff; padding: 40px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
     .header { border-bottom: 3px solid #6366f1; padding-bottom: 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
     .header h1 { margin: 0; font-size: 26px; color: #1e1b4b; font-weight: 900; }
-    .badge { background: #e0e7ff; color: #4338ca; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: bold; }
+    .badge { background: #e0e7ff; color: #4338ca; padding: 0 10px; height: 26px; border-radius: 8px; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle; box-sizing: border-box; }
     .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
     .meta-table th { background: #f8fafc; padding: 12px; text-align: left; font-size: 13px; color: #475569; width: 20%; border-bottom: 1px solid #e2e8f0; }
     .meta-table td { padding: 12px; font-size: 14px; font-weight: 600; color: #0f172a; border-bottom: 1px solid #e2e8f0; width: 30%; }
     .logs-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
     .logs-table th { background: #f1f5f9; padding: 10px; border: 1px solid #cbd5e1; text-align: center; color: #334155; font-weight: 700; }
     .logs-table td { padding: 10px; border: 1px solid #e2e8f0; color: #1e293b; vertical-align: middle; }
-    .day-tag { font-weight: 900; color: #6366f1; background: #eef2ff; padding: 3px 8px; border-radius: 6px; display: inline-block; }
+    .day-tag { font-weight: 900; color: #6366f1; background: #eef2ff; padding: 0 8px; height: 22px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle; box-sizing: border-box; }
     .footer { margin-top: 36px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #64748b; }
   </style>
 </head>

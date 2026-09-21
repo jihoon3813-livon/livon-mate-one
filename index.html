@@ -4213,6 +4213,7 @@
                   </div>
                   <span class="text-[11px] px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 font-bold border border-sky-200">삼성화재 전용</span>
                 </div>
+                <p class="text-[11px] text-slate-500 -mt-2">※ 본 엑셀을 기준으로 [삼성화재 접수/청구관리]가 작성되며, [종합관리대장 &gt; 통합허브]의 삼성화재 고객 상품명 등 상세 정보가 자동 연동됩니다.</p>
 
                 <!-- 방식 선택 탭 (엑셀 파일 업로드 vs 구글 시트 URL) -->
                 <div class="flex rounded-xl bg-slate-100 p-1 text-xs font-bold text-slate-600">
@@ -4277,7 +4278,7 @@
                     데이터 미리보기 🔍
                   </button>
                   <button type="button" onclick="executeApplyLaunchData('samsung')" id="btnApply_samsung" disabled class="flex-1 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
-                    통합허브에 실데이터 반영
+                    삼성화재 대장 & 통합허브 반영
                   </button>
                 </div>
               </div>
@@ -9733,11 +9734,14 @@
           <!-- Overall Status Verdict Card -->
           <div id="cpOverallVerdictBox" class="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between mb-3 shadow-2xs">
             <div class="flex items-center gap-3">
-              <span id="cpOverallToneBadge" class="px-2.5 py-0.5 rounded-md text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-300">● 전반상태</span>
+              <span id="cpOverallToneBadge" class="inline-flex items-center justify-center h-6 px-2.5 rounded-md text-xs font-black leading-none bg-emerald-50 text-emerald-700 border border-emerald-300">
+                <span class="inline-block w-1.5 h-1.5 rounded-full bg-current mr-1.5 shrink-0"></span>
+                <span>전반상태</span>
+              </span>
               <div id="cpOverallTrafficSvg"></div>
               <span id="cpOverallDesc" class="text-xs font-bold text-slate-800">전반적으로 안정적</span>
             </div>
-            <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-bold text-[11px]">종합 판정</span>
+            <span class="inline-flex items-center justify-center h-6 px-2 rounded bg-slate-100 text-slate-600 font-bold text-[11px] leading-none">종합 판정</span>
           </div>
 
           <!-- 4 Category Status Cards (식사, 거동, 수면, 통증) -->
