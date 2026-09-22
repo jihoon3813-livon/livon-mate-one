@@ -18824,8 +18824,8 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
   const isCaregiverAssigned = Boolean(as && (as.startDate || as.caregiverName));
   const totalCareDays = prog ? prog.totalDays : (as && as.startDate && as.endDate ? Math.max(1, Math.round((parseCareDate(as.endDate) - parseCareDate(as.startDate)) / (24*60*60*1000)) + 1) : 0);
   const elapsedDays = prog ? prog.elapsedDays : totalCareDays;
-  const remainingDays = prog ? prog.remainingDays : 0;
-  const isCompleted = prog ? (prog.status === 'completed' || prog.remainingDays === 0) : Boolean(as && as.endDate && as.endDate !== '진행중');
+  const isOngoingCare = Boolean(as && (!as.endDate || as.endDate === '진행중' || as.endDate === '예정') && (!prog || prog.isOngoing));
+  const isCompleted = isOngoingCare ? false : (prog ? (prog.status === 'completed' && prog.remainingDays === 0) : Boolean(as && as.endDate && as.endDate !== '진행중' && as.endDate !== '예정'));
   const careStartDate = as ? as.startDate : null;
   const careEndDate = as ? as.endDate : null;
   const isSamsung = Boolean(app && (app.insuranceCompany || '').includes('삼성'));
@@ -20328,64 +20328,119 @@ async function cancelSamsungRoundClaim(appId, roundNumber) {
  * - 취소: 검은색 (카드도 음영을 줘)
  * - 예정: 보라색
  */
-function getCustomerCardStatusTheme(app) {
-  const rawSt = String((app && app.status) || '').trim();
+/**
+ * [실제 간병기간 및 특수 종료문구 기반 현재상태 판정 엔진]
+ * 신청대장 W열을 맹신하지 않고, 간병인배정 시트의 시작일시와 종료일시 정보를 최우선 기준으로 판정
+ * - 종료일시에 '당일서비스취소', '서비스불가 안내', '제외' 등의 문구가 있으면 -> 해당 특수 상태 반영
+ * - 시작일시가 있고 종료일시 값이 없으면 -> 무조건 '진행중'
+ * - 시작일시와 종료일시 값이 모두 있고 유효한 날짜이면 -> '완료'
+ */
+function determineRealCareStatus(app, specificAssigns) {
+  if (!app) return '신규';
 
-  if (rawSt.includes('취소') || rawSt.includes('철회') || rawSt.includes('미해당')) {
-    const isNotApp = rawSt.includes('미해당');
-    // 취소 / 미해당: 검은색 세로 라벨 + 카드 음영(회색조 톤다운 및 투명도)
+  let assigns = specificAssigns;
+  if (!assigns && Array.isArray(window.gAssigns)) {
+    assigns = window.gAssigns.filter(a => a && String(a.applyId) === String(app.id));
+  }
+  const as = (assigns && assigns.length > 0) ? assigns[assigns.length - 1] : null;
+
+  const sDate = (as && as.startDate) || app.careStartDate || '';
+  const eDate = (as && as.endDate) || app.careEndDate || '';
+  const eTrim = String(eDate).trim();
+
+  // 1. 간병종료일시에 특수 문구가 있는 경우 (당일서비스취소, 서비스불가 안내, 제외, 취소 등)
+  if (eTrim) {
+    if (eTrim.includes('당일서비스취소') || eTrim.includes('당일취소')) return '당일서비스취소';
+    if (eTrim.includes('서비스불가') || eTrim.includes('서비스 불가')) return '서비스불가 안내';
+    if (eTrim.includes('제외')) return '제외';
+    if (eTrim.includes('취소') || eTrim.includes('철회')) return '취소';
+    if (eTrim.includes('미해당')) return '미해당';
+  }
+
+  // 1-2. 특수 상태가 수동으로 설정되었거나 수동 갱신된 상태가 있는 경우 존중
+  const rawSt = String(app.status || '').trim();
+  if (rawSt === '당일서비스취소' || rawSt.includes('서비스불가') || rawSt === '제외') {
+    return rawSt.includes('서비스불가') ? '서비스불가 안내' : rawSt;
+  }
+  if (app.hasManualUpdate && rawSt) {
+    return rawSt;
+  }
+
+  // 2. 간병 시작일시 자체가 없거나 간병인 배정이 없는 경우
+  if (!sDate || (!as && !app.caregiverName)) {
+    if (rawSt.includes('취소') || rawSt.includes('철회')) return '취소';
+    if (rawSt.includes('미해당')) return '미해당';
+    if (app.isPreRegistered || rawSt.includes('대기')) return '배정대기';
+    return rawSt || '신규';
+  }
+
+  // 3. 간병 시작일시가 있고, 간병종료일시 값이 없거나 '진행중'인 경우 -> 무조건 '진행중'
+  if (!eTrim || eTrim === '진행중' || eTrim === '예정' || eTrim === '-') {
+    return '진행중';
+  }
+
+  // 4. 간병종료일시 값이 실제 날짜로 존재하는 경우 -> '완료'
+  return '완료';
+}
+window.determineRealCareStatus = determineRealCareStatus;
+
+/**
+ * 고객 카드 및 모달 상태 테마 산출 (실제 간병기간 및 특수 종료문구 기반)
+ */
+function getCustomerCardStatusTheme(app, specificAssigns) {
+  const realSt = determineRealCareStatus(app, specificAssigns);
+
+  if (realSt === '당일서비스취소' || realSt.includes('서비스불가') || realSt === '제외' || realSt.includes('취소') || realSt.includes('철회') || realSt.includes('미해당')) {
+    const isNotApp = realSt.includes('미해당');
+    const isSpecialCancel = realSt === '당일서비스취소' || realSt.includes('서비스불가') || realSt === '제외';
     return {
       type: isNotApp ? 'not_applicable' : 'cancelled',
-      stripeClass: isNotApp ? 'border-l-[10px] border-l-slate-800 shadow-slate-300/60' : 'border-l-[10px] border-l-slate-900 shadow-slate-300/60',
+      stripeClass: isNotApp ? 'border-l-[10px] border-l-slate-800 shadow-slate-300/60' : (isSpecialCancel ? 'border-l-[10px] border-l-rose-700 shadow-rose-200/60' : 'border-l-[10px] border-l-slate-900 shadow-slate-300/60'),
       bgClass: 'bg-slate-200/85 border-slate-400 opacity-80 hover:opacity-100 transition-all shadow-inner',
       innerBgClass: 'bg-slate-300/40',
       headerBgClass: 'bg-slate-300/90 border-slate-400 text-slate-800',
-      badgeClass: isNotApp ? 'bg-zinc-800 text-amber-200 border border-zinc-950 font-black' : 'bg-slate-900 text-white border border-slate-950',
-      statusText: isNotApp ? '미해당' : (rawSt || '취소')
+      badgeClass: isNotApp ? 'bg-zinc-800 text-amber-200 border border-zinc-950 font-black' : (isSpecialCancel ? 'bg-rose-100 text-rose-800 border border-rose-300 font-black' : 'bg-slate-900 text-white border border-slate-950'),
+      statusText: realSt
     };
-  } else if (rawSt.includes('완료') || rawSt.includes('정산') || rawSt.includes('종료') || rawSt.includes('종결')) {
-    // 완료: 녹색 세로 라벨 + 카드 음영(녹색 톤다운 차분한 배경)
+  } else if (realSt === '완료' || realSt.includes('정산') || realSt.includes('종료') || realSt.includes('종결')) {
     return {
       type: 'completed',
       stripeClass: 'border-l-[10px] border-l-emerald-600 shadow-emerald-200/60',
       bgClass: 'bg-emerald-50/60 border-emerald-300/80 opacity-90 hover:opacity-100 transition-all shadow-xs',
       innerBgClass: 'bg-emerald-100/30',
       headerBgClass: 'bg-emerald-100/90 border-emerald-300 text-emerald-950',
-      badgeClass: 'bg-emerald-700 text-white border border-emerald-800',
-      statusText: rawSt || '완료'
+      badgeClass: 'bg-emerald-700 text-white border border-emerald-800 font-bold',
+      statusText: '완료'
     };
-  } else if (rawSt.includes('진행') || rawSt.includes('파견') || rawSt === '간병중') {
-    // 진행중: 연한 주황(amber/orange) 세로 라벨 + 배지 (상단 ② 간병 진행중 amber와 1:1 일치)
+  } else if (realSt === '진행중' || realSt.includes('진행') || realSt.includes('파견') || realSt === '간병중') {
     return {
       type: 'in_progress',
       stripeClass: 'border-l-[10px] border-l-amber-500 shadow-amber-200/60',
       bgClass: 'bg-white border-amber-300/80',
       innerBgClass: 'bg-white',
       headerBgClass: 'bg-amber-50/90 border-amber-200 text-amber-950',
-      badgeClass: 'bg-amber-100 text-amber-900 border border-amber-300',
-      statusText: rawSt || '진행중'
+      badgeClass: 'bg-amber-100 text-amber-900 border border-amber-300 font-bold',
+      statusText: '진행중'
     };
-  } else if (rawSt.includes('예정') || rawSt.includes('대기') || (app && app.isPreRegistered)) {
-    // 예정/배정대기: 연한 회색(slate) 세로 라벨 + 배지 (상단 ① 배정 대기 slate와 1:1 일치)
+  } else if (realSt.includes('예정') || realSt.includes('대기') || (app && app.isPreRegistered)) {
     return {
       type: 'upcoming',
       stripeClass: 'border-l-[10px] border-l-slate-400 shadow-slate-200/60',
       bgClass: 'bg-white border-slate-300/80',
       innerBgClass: 'bg-white',
       headerBgClass: 'bg-slate-100/90 border-slate-200 text-slate-800',
-      badgeClass: 'bg-slate-100 text-slate-700 border border-slate-300',
-      statusText: rawSt || (app && app.isPreRegistered ? '사전등록' : '배정대기')
+      badgeClass: 'bg-slate-100 text-slate-700 border border-slate-300 font-bold',
+      statusText: realSt || (app && app.isPreRegistered ? '사전등록' : '배정대기')
     };
   } else {
-    // 신규(접수/신규 등): 파란색 세로 라벨 (지금처럼)
     return {
       type: 'new',
       stripeClass: 'border-l-[10px] border-l-blue-500 shadow-blue-200/60',
       bgClass: 'bg-white border-slate-200/90',
       innerBgClass: 'bg-white',
       headerBgClass: 'bg-slate-100/90 border-slate-200 text-slate-800',
-      badgeClass: 'bg-blue-50 text-blue-800 border border-blue-200',
-      statusText: rawSt || '신규'
+      badgeClass: 'bg-blue-50 text-blue-800 border border-blue-200 font-bold',
+      statusText: realSt || '신규'
     };
   }
 }
@@ -20499,8 +20554,8 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
   const elapsedHours = (prog ? prog.elapsedDays : 0) * 24;
   const remainingHours = (prog ? prog.remainingDays : 0) * 24;
 
-  const cardTheme = getCustomerCardStatusTheme(app);
-  const currentStatus = String(app.status || '').trim();
+  const cardTheme = getCustomerCardStatusTheme(app, appAssigns);
+  const currentStatus = determineRealCareStatus(app, appAssigns);
   const claimVal = String(app.claimClassification || app.claimCategory || '').trim();
 
   return `
@@ -20560,7 +20615,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                       <span class="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono font-bold text-[10.5px] shrink-0">${app.id}</span>
                       <b class="text-sm text-slate-900 font-black truncate">${maskName(app.patientName)}</b>
                       <span class="text-xs text-slate-500 font-medium whitespace-nowrap">(${app.gender || '-'}, ${maskBirth(app.birthDate || '-')})</span>
-                      <span class="px-1.5 py-0.5 rounded-md text-[10px] font-black ${cardTheme.badgeClass}" title="현재상태 (W열)">${cardTheme.statusText}</span>
+                      <span class="px-1.5 py-0.5 rounded-md text-[10px] font-black ${cardTheme.badgeClass}" title="현재상태 (실제 간병기간 기준)">${cardTheme.statusText}</span>
                       <span class="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-purple-50 text-purple-800 border border-purple-200" title="청구분류 (AG열)">${claimVal || '정상'}</span>
                     </div>
                   </div>
@@ -20598,23 +20653,27 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                   </div>
                 </div>
 
-                <!-- [관리자 설정] 현재상태(W열) & 청구분류(AG열) -->
+                <!-- [관리자 설정] 현재상태(간병기간 실반영) & 청구분류(AG열) -->
                 <div class="p-2.5 rounded-xl bg-gradient-to-r from-indigo-50/50 via-white to-purple-50/50 border border-indigo-100 text-[11px] space-y-1.5 my-1">
                   <div class="flex items-center justify-between font-bold text-slate-800">
-                    <span class="text-indigo-950 font-black flex items-center gap-1"><i data-lucide="sliders" class="w-3 h-3 text-indigo-600"></i> 분류 관리 (관리자 설정)</span>
+                    <span class="text-indigo-950 font-black flex items-center gap-1"><i data-lucide="sliders" class="w-3 h-3 text-indigo-600"></i> 분류 관리 (간병기간 실반영)</span>
                     <span class="text-[9.5px] text-indigo-600 font-medium">선택 시 즉시 저장됨 ✓</span>
                   </div>
                   <div class="grid grid-cols-2 gap-2">
                     <div>
-                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">현재상태 <span class="text-indigo-600 font-mono font-black">(W열)</span></label>
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">현재상태 <span class="text-indigo-600 font-mono font-black">(간병기간 실반영)</span></label>
                       <select onchange="updateCustomerField('${app.id}', 'status', this.value)" class="w-full text-[11px] font-bold p-1 rounded-lg border border-slate-300 bg-white text-slate-800 cursor-pointer focus:ring-2 focus:ring-indigo-400">
                         <option value="신규" ${currentStatus === '신규' ? 'selected' : ''}>신규</option>
+                        <option value="배정대기" ${currentStatus === '배정대기' ? 'selected' : ''}>배정대기</option>
                         <option value="진행중" ${currentStatus === '진행중' ? 'selected' : ''}>진행중</option>
                         <option value="완료" ${currentStatus === '완료' || currentStatus === '정산완료' ? 'selected' : ''}>완료</option>
+                        <option value="당일서비스취소" ${currentStatus === '당일서비스취소' ? 'selected' : ''}>당일서비스취소</option>
+                        <option value="서비스불가 안내" ${currentStatus === '서비스불가 안내' || currentStatus === '서비스불가' ? 'selected' : ''}>서비스불가 안내</option>
+                        <option value="제외" ${currentStatus === '제외' ? 'selected' : ''}>제외</option>
                         <option value="취소" ${currentStatus === '취소' || currentStatus === '서비스 취소' ? 'selected' : ''}>취소</option>
                         <option value="미해당" ${currentStatus === '미해당' ? 'selected' : ''}>미해당</option>
                         <option value="예정" ${currentStatus === '예정' || currentStatus === '대기' ? 'selected' : ''}>예정</option>
-                        ${(currentStatus && !['신규', '진행중', '완료', '취소', '미해당', '예정', '서비스 취소', '정산완료', '대기'].includes(currentStatus)) ? `<option value="${currentStatus}" selected>${currentStatus}</option>` : ''}
+                        ${(currentStatus && !['신규', '배정대기', '진행중', '완료', '당일서비스취소', '서비스불가 안내', '서비스불가', '제외', '취소', '미해당', '예정', '서비스 취소', '정산완료', '대기'].includes(currentStatus)) ? `<option value="${currentStatus}" selected>${currentStatus}</option>` : ''}
                       </select>
                     </div>
                     <div>
@@ -21064,7 +21123,19 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                 const body = l.body || '';
                 const hasMonth = subj.includes(`${targetMonth}월`) || subj.includes(`${padMonth}월`) || file.includes(`${targetYear}${padMonth}`) || file.includes(`_${padMonth}.`) || body.includes(`${targetMonth}월분`) || body.includes(`${padMonth}월분`);
                 const hasYear = !targetYear || subj.includes(targetYear) || file.includes(targetYear) || body.includes(targetYear);
-                return hasMonth && hasYear;
+                if (!hasMonth || !hasYear) return false;
+
+                // 해당 고객이 실제로 해당 월간 청구 대상에 포함되어 있었는지 엄격 검증
+                const pName = app.patientName || '';
+                const accNum = app.accidentNumber || '';
+                const polNum = app.policyNumber || '';
+                const isCustomerIncluded = Boolean(
+                  (pName && (body.includes(pName) || subj.includes(pName))) ||
+                  (accNum && accNum !== '-' && body.includes(accNum)) ||
+                  (polNum && polNum !== '-' && body.includes(polNum)) ||
+                  (Array.isArray(l.appIds) && l.appIds.includes(app.id))
+                );
+                return isCustomerIncluded;
               });
             }
 
@@ -21831,8 +21902,8 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
     `;
   }
 
-  const cardTheme = getCustomerCardStatusTheme(app);
-  const currentStatus = String(app.status || '').trim();
+  const cardTheme = getCustomerCardStatusTheme(app, appAssigns);
+  const currentStatus = determineRealCareStatus(app, appAssigns);
   const claimVal = String(app.claimClassification || app.claimCategory || '').trim();
 
   return `
@@ -21902,7 +21973,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                   <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-mono font-bold text-[11px]">${app.id}</span>
                   <b class="text-sm text-slate-900 font-black">${maskName(app.patientName)}</b>
                   <span class="text-slate-500 font-medium text-[11px]">(${app.gender || '-'}, ${maskBirth(app.birthDate || '-')})</span>
-                  <span class="px-1.5 py-0.5 rounded-md text-[10px] font-black ${cardTheme.badgeClass}" title="현재상태(W열)">${cardTheme.statusText}</span>
+                  <span class="px-1.5 py-0.5 rounded-md text-[10px] font-black ${cardTheme.badgeClass}" title="현재상태 (실제 간병기간 기준)">${cardTheme.statusText}</span>
                   <span class="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-purple-50 text-purple-800 border border-purple-200" title="청구분류(AG열)">${claimVal || '정상'}</span>
                 </div>
                 <div class="flex items-center gap-2">
@@ -21943,27 +22014,31 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               </div>
             </div>
 
-            <!-- 섹션 2: [관리자 설정] 현재상태(W열) & 청구분류(AG열) -->
+            <!-- 섹션 2: [관리자 설정] 현재상태(간병기간 실반영) & 청구분류(AG열) -->
             <div class="bg-white p-3 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/40 via-white to-purple-50/40 shadow-2xs space-y-2 text-[11.5px]">
               <div class="font-bold text-slate-800 flex items-center justify-between pb-1 border-b border-indigo-100/80 text-xs">
                 <span class="flex items-center gap-1.5 text-indigo-950 font-black">
-                  <i data-lucide="sliders" class="w-3.5 h-3.5 text-indigo-600"></i> 상태/분류 관리 (관리자 설정)
+                  <i data-lucide="sliders" class="w-3.5 h-3.5 text-indigo-600"></i> 상태/분류 관리 (간병기간 실반영)
                 </span>
                 <span class="text-[10px] text-indigo-600 font-semibold">선택 시 즉시 저장됨 ✓</span>
               </div>
               <div class="grid grid-cols-2 gap-2">
                 <div>
                   <label class="text-[10.5px] font-bold text-slate-600 block mb-1">
-                    현재상태 <span class="text-indigo-600 font-mono font-black">(W열)</span>
+                    현재상태 <span class="text-indigo-600 font-mono font-black">(간병기간 실반영)</span>
                   </label>
                   <select onchange="updateCustomerField('${app.id}', 'status', this.value)" class="w-full text-xs font-bold p-1.5 rounded-xl border border-slate-300 bg-white text-slate-800 shadow-2xs focus:ring-2 focus:ring-indigo-400 cursor-pointer">
                     <option value="신규" ${currentStatus === '신규' ? 'selected' : ''}>신규</option>
+                    <option value="배정대기" ${currentStatus === '배정대기' ? 'selected' : ''}>배정대기</option>
                     <option value="진행중" ${currentStatus === '진행중' ? 'selected' : ''}>진행중</option>
                     <option value="완료" ${currentStatus === '완료' || currentStatus === '정산완료' ? 'selected' : ''}>완료</option>
+                    <option value="당일서비스취소" ${currentStatus === '당일서비스취소' ? 'selected' : ''}>당일서비스취소</option>
+                    <option value="서비스불가 안내" ${currentStatus === '서비스불가 안내' || currentStatus === '서비스불가' ? 'selected' : ''}>서비스불가 안내</option>
+                    <option value="제외" ${currentStatus === '제외' ? 'selected' : ''}>제외</option>
                     <option value="취소" ${currentStatus === '취소' || currentStatus === '서비스 취소' ? 'selected' : ''}>취소</option>
                     <option value="미해당" ${currentStatus === '미해당' ? 'selected' : ''}>미해당</option>
                     <option value="예정" ${currentStatus === '예정' || currentStatus === '대기' ? 'selected' : ''}>예정</option>
-                    ${(currentStatus && !['신규', '진행중', '완료', '취소', '미해당', '예정', '서비스 취소', '정산완료', '대기'].includes(currentStatus)) ? `<option value="${currentStatus}" selected>${currentStatus}</option>` : ''}
+                    ${(currentStatus && !['신규', '배정대기', '진행중', '완료', '당일서비스취소', '서비스불가 안내', '서비스불가', '제외', '취소', '미해당', '예정', '서비스 취소', '정산완료', '대기'].includes(currentStatus)) ? `<option value="${currentStatus}" selected>${currentStatus}</option>` : ''}
                   </select>
                 </div>
                 <div>
@@ -24896,14 +24971,14 @@ function renderUnifiedCareHub() {
   };
 
   const isCancelledOrDone = (app) => {
-    const st = app.status || '';
-    return st === '서비스 취소' || st === '취소' || st === '미해당' || st === '완료';
+    const realSt = determineRealCareStatus(app);
+    return realSt === '서비스 취소' || realSt === '취소' || realSt === '미해당' || realSt === '완료' || realSt === '당일서비스취소' || realSt.includes('서비스불가') || realSt === '제외';
   };
 
   const isCompletedHelper = (app) => {
     if (!app) return false;
-    const st = app.status || '';
-    return st === '완료' || st === '정산완료' || st.includes('완료') || st.includes('종료') || st.includes('종결');
+    const realSt = determineRealCareStatus(app);
+    return realSt === '완료' || realSt === '정산완료' || realSt.includes('완료') || realSt.includes('종료') || realSt.includes('종결');
   };
 
   const isNeedAssignHelper = (app) => {
@@ -24918,14 +24993,14 @@ function renderUnifiedCareHub() {
   for (let i = 0; i < activeHubApps.length; i++) {
     const a = activeHubApps[i];
     const aIns = a.insuranceCompany || '';
-    const aSt = a.status || '';
+    const aRealSt = determineRealCareStatus(a);
     if (insFilter !== 'ALL' && !aIns.includes(insFilter)) {
       continue;
     }
     scopedTotal++;
     if (isCompletedHelper(a)) completedCount++;
     if (isNeedAssignHelper(a)) needAssignCount++;
-    if (aSt.includes('진행') || aSt === '정상' || aSt === '배정완료') inProgressCount++;
+    if (aRealSt === '진행중') inProgressCount++;
     if (a.unconfirmedClaimCount > 0 || a.estimatedUnpaid > 0) unpaidClaimCount++;
     if (unpaidPayoutAppIdSet.has(String(a.id))) needPayoutCount++;
     if (!aIns.includes('삼성') && a.claimCount > 0 && !isClaimFaxSentHelper(a.id)) needFaxCount++;
@@ -24995,7 +25070,7 @@ function renderUnifiedCareHub() {
 
     if (gHubFilter === 'COMPLETED' && !isCompletedHelper(app)) return false;
     if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
-    if (gHubFilter === 'IN_PROGRESS' && (!appSt.includes('진행') && appSt !== '정상' && appSt !== '배정완료')) return false;
+    if (gHubFilter === 'IN_PROGRESS' && determineRealCareStatus(app) !== '진행중') return false;
     if (gHubFilter === 'UNPAID_CLAIM' && app.unconfirmedClaimCount === 0 && app.estimatedUnpaid === 0) return false;
     if (gHubFilter === 'NEED_PAYOUT' && !unpaidPayoutAppIdSet.has(String(app.id))) return false;
     if (gHubFilter === 'NEED_FAX') {
@@ -25010,7 +25085,7 @@ function renderUnifiedCareHub() {
       if (gHubStatusFilter === '신규' && theme.type === 'new') match = true;
       else if (gHubStatusFilter === '진행중' && theme.type === 'in_progress') match = true;
       else if (gHubStatusFilter === '완료' && theme.type === 'completed') match = true;
-      else if (gHubStatusFilter === '취소' && (theme.type === 'cancelled' || theme.type === 'not_applicable' || app.status === '미해당' || (app.status && app.status.includes('취소')))) match = true;
+      else if (gHubStatusFilter === '취소' && (theme.type === 'cancelled' || theme.type === 'not_applicable' || theme.statusText === '당일서비스취소' || theme.statusText.includes('서비스불가') || theme.statusText === '제외' || app.status === '미해당' || (app.status && app.status.includes('취소')))) match = true;
       else if (gHubStatusFilter === '예정' && theme.type === 'upcoming') match = true;
       if (!match) return false;
     }
@@ -25287,7 +25362,7 @@ function renderUnifiedCareHub() {
     const createdElapsed = app.createdAt ? getElapsedBusinessHours(app.createdAt) : (app.applyDate ? getElapsedBusinessHours(app.applyDate) : 999999);
 
     // [사용자 요구사항]: 고객 카드 좌측 세로 라벨(신규: 파랑, 진행중: 노랑, 완료: 녹색+음영, 취소: 검정+음영, 예정: 보라)
-    const cardTheme = getCustomerCardStatusTheme(app);
+    const cardTheme = getCustomerCardStatusTheme(app, as ? [as] : null);
 
     const totalPayoutSum = sched.confirmedPayoutSum || appPayouts.reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
     const isPayoutPending = isPayoutDueOrUnpaid;
@@ -25353,7 +25428,7 @@ function renderUnifiedCareHub() {
             </h3>
             <span class="text-xs text-slate-400 font-normal">(${app.gender || '-'}·${maskBirth(app.birthDate)})</span>
             <span class="text-[11px] font-bold px-2 py-0.5 rounded-md ${app.isPreRegistered ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-blue-50 text-blue-800 border border-blue-200'}">${app.insuranceCompany}${app.isPreRegistered ? ' (사전등록)' : ''}</span>
-            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ${cardTheme.badgeClass}" title="현재상태 (W열)">${cardTheme.statusText}</span>
+            <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ${cardTheme.badgeClass}" title="현재상태 (실제 간병기간 기준)">${cardTheme.statusText}</span>
             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200" title="청구분류 (AG열)">${app.claimClassification || app.claimCategory || '정상'}</span>
             ${app.applyDate ? `
               <span class="text-[10.5px] font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-300 shadow-2xs flex items-center gap-1 shrink-0" title="신청일시: ${app.applyDate}">
@@ -25412,7 +25487,7 @@ function renderUnifiedCareHub() {
             </h3>
             <span class="text-xs text-slate-500 font-medium">(${app.gender || '-'}·${maskBirth(app.birthDate)})</span>
             <span class="text-[11px] font-bold px-2 py-0.5 rounded-md ${app.isPreRegistered ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-white text-blue-800 border border-blue-200'}">${app.insuranceCompany}${app.isPreRegistered ? ' (사전등록)' : ''}</span>
-            <span class="text-[10.5px] font-bold px-1.5 py-0.5 rounded-md ${cardTheme.badgeClass}" title="현재상태 (W열)">${cardTheme.statusText}</span>
+            <span class="text-[10.5px] font-bold px-1.5 py-0.5 rounded-md ${cardTheme.badgeClass}" title="현재상태 (실제 간병기간 기준)">${cardTheme.statusText}</span>
             <span class="text-[10.5px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200" title="청구분류 (AG열)">${app.claimClassification || app.claimCategory || '정상'}</span>
           </div>
 
@@ -42005,7 +42080,7 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
             importedAt: new Date().toISOString()
           };
           validAssignments.push(item);
-          if (applyId && !assignmentMap[applyId]) {
+          if (applyId) {
             assignmentMap[applyId] = item;
           }
         }
@@ -42943,25 +43018,11 @@ function mapRowToApplicationRecord(
   const rawApplyVal = rowObj['신청일시'] || rowObj['간병신청일시'] || rowObj['접수일시'] || getVal('applyDate') || '';
   const applyDate = normLaunchDateTime(rawApplyVal) || new Date().toISOString().slice(0, 10).replace(/-/g, '.');
   let careStartDate = normLaunchDateTime(rowObj['간병시작일시'] || rowObj['시작희망일'] || getVal('careStartDate'));
-  let careEndDate = normLaunchDateTime(rowObj['간병종료일시'] || getVal('careEndDate'));
+  const rawEndVal = rowObj['간병종료일시'] || getVal('careEndDate') || '';
+  let careEndDate = normLaunchDateTime(rawEndVal);
+  let careEndRaw = String(rawEndVal).trim();
 
-  // 진행상태 판정
-  let status = '접수';
-  const rawStatus = String(getVal('status') || '').trim();
-  if (rawStatus) {
-    if (rawStatus.includes('종료') || rawStatus.includes('완료') || rawStatus.includes('종결')) status = '완료';
-    else if (rawStatus.includes('정산')) status = '정산완료';
-    else if (rawStatus.includes('진행') || rawStatus.includes('파견')) status = '진행중';
-    else if (rawStatus.includes('배정완료')) status = '배정완료';
-    else if (rawStatus.includes('미해당')) status = '미해당';
-    else if (rawStatus.includes('취소') || rawStatus.includes('철회')) status = '취소';
-  } else if (completedMap && completedMap[rawId] && completedMap[rawId].matched) {
-    status = '완료';
-  } else if (careEndDate === '예정' || (careStartDate && !careEndDate)) {
-    status = '진행중';
-  }
-
-  // 1. 배정 시트(간병인배정) 교차 연동
+  // 1. 배정 시트(간병인배정) 교차 연동 우선 실행 (시작/종료일시 및 간병인 정보 확보)
   let caregiverName = String(getVal('caregiverName') || '').trim();
   let caregiverPhone = normLaunchPhone(getVal('caregiverPhone'));
   let dailyRate = String(getVal('dailyRate') || '').trim();
@@ -42972,7 +43033,53 @@ function mapRowToApplicationRecord(
     if (!caregiverPhone && aInfo.phone) caregiverPhone = aInfo.phone;
     if (!dailyRate && aInfo.dailyWage) dailyRate = String(aInfo.dailyWage);
     if (!careStartDate && aInfo.startDate) careStartDate = aInfo.startDate;
-    if (!careEndDate && aInfo.endDate) careEndDate = aInfo.endDate;
+    if (aInfo.endDate) {
+      careEndDate = normLaunchDateTime(aInfo.endDate) || aInfo.endDate;
+      careEndRaw = String(aInfo.endDate).trim();
+    }
+  }
+
+  // [사용자 요구사항]: 진행상태 판정
+  // 신청대장의 W열(rawStatus)을 맹신하지 않고, 간병인배정 시트의 간병시작일시/종료일시 정보를 최우선 기준으로 판정
+  let status = '신규';
+  const rawStatus = String(getVal('status') || '').trim();
+
+  // (1) 간병종료일시에 특수 문구가 있는 경우 (당일서비스취소, 서비스불가 안내, 제외 등)
+  if (careEndRaw.includes('당일서비스취소') || careEndRaw.includes('당일취소')) {
+    status = '당일서비스취소';
+  } else if (careEndRaw.includes('서비스불가') || careEndRaw.includes('서비스 불가')) {
+    status = '서비스불가 안내';
+  } else if (careEndRaw.includes('제외')) {
+    status = '제외';
+  } else if (careEndRaw.includes('취소') || careEndRaw.includes('철회')) {
+    status = '취소';
+  } else if (careEndRaw.includes('미해당')) {
+    status = '미해당';
+  }
+  // (2) W열에 취소/미해당이 명시된 경우
+  else if (rawStatus.includes('취소') || rawStatus.includes('철회')) {
+    status = '취소';
+  } else if (rawStatus.includes('미해당')) {
+    status = '미해당';
+  }
+  // (3) 간병 시작일시가 있고, 간병종료일시 값이 없거나 '진행중'인 경우 -> 무조건 '진행중'
+  else if (careStartDate && (!careEndRaw || careEndRaw === '진행중' || careEndRaw === '예정' || careEndRaw === '-')) {
+    status = '진행중';
+  }
+  // (4) 간병 시작일시와 간병종료일시 값이 모두 유효하게 존재하는 경우 -> '완료'
+  else if (careStartDate && careEndDate) {
+    status = '완료';
+  }
+  // (5) 시작일시가 없거나 미배정인 경우
+  else if (!caregiverName && !careStartDate) {
+    if (rawStatus.includes('대기')) status = '배정대기';
+    else status = rawStatus || '신규';
+  }
+  // (6) 기타 완료 매핑 fallback
+  else if (completedMap && completedMap[rawId] && completedMap[rawId].matched) {
+    status = '완료';
+  } else {
+    status = rawStatus || '신규';
   }
 
   // 2. 청구 시트(보험청구) 및 엑셀 AB열(27) / AC열(28) 연동
