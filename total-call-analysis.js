@@ -16,6 +16,20 @@ let gTotalCallData = null;
 let gTotalCallAnnotations = { memos: {}, labels: {}, customLabels: [] };
 let gActiveTotalViewMode = 'list'; // 'list' | 'customer' | 'company' | 'date' | 'category'
 
+// CTI 종합콜분석 로컬/세션 캐시 즉시 동기식 복원 (첫 진입 화면 깜빡임/순서 점프 방지)
+try {
+  const _cachedCallJson = (typeof localStorage !== 'undefined' ? localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA') : null) || 
+                          (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA') : null);
+  if (_cachedCallJson) {
+    const _parsed = JSON.parse(_cachedCallJson);
+    const _d = (_parsed && _parsed.data && _parsed.data.callLogs) ? _parsed.data : _parsed;
+    if (_d && Array.isArray(_d.callLogs) && _d.callLogs.length > 0) {
+      gTotalCallData = _d;
+      if (typeof window !== 'undefined') window.gTotalCallData = _d;
+    }
+  }
+} catch (e) {}
+
 function getTotalLast30Range() {
   const now = new Date();
   const past = new Date(now);
@@ -931,9 +945,10 @@ async function initTotalCallAnalysisModule(forceRefresh = false) {
     gTotalCallData = null;
     window.gTotalCallData = null;
     try { sessionStorage.removeItem('LIVON_CACHED_TOTAL_CALL_DATA'); } catch(e){}
+    try { localStorage.removeItem('LIVON_CACHED_TOTAL_CALL_DATA'); } catch(e){}
   }
 
-  // 1. 메모리 또는 세션 스토리지에 캐시된 데이터가 있으면 대기 스피너 없이 0ms 즉시 렌더링!
+  // 1. 메모리 또는 로컬/세션 스토리지에 캐시된 데이터가 있으면 대기 스피너 없이 0ms 즉시 렌더링!
   let hasImmediateData = false;
   const currentMemory = gTotalCallData || window.gTotalCallData;
   if (currentMemory && currentMemory.callLogs && currentMemory.callLogs.length > 0) {
@@ -942,12 +957,13 @@ async function initTotalCallAnalysisModule(forceRefresh = false) {
     hasImmediateData = true;
   } else {
     try {
-      const cached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+      const cached = localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA') || sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed && parsed.callLogs && parsed.callLogs.length > 0) {
-          gTotalCallData = parsed;
-          window.gTotalCallData = parsed;
+        const d = (parsed && parsed.data && parsed.data.callLogs) ? parsed.data : parsed;
+        if (d && d.callLogs && d.callLogs.length > 0) {
+          gTotalCallData = d;
+          window.gTotalCallData = d;
           hasImmediateData = true;
         }
       }
@@ -972,7 +988,10 @@ async function initTotalCallAnalysisModule(forceRefresh = false) {
             gTotalCallData = d;
             window.gTotalCallData = d;
             hasImmediateData = true;
-            try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(d)); } catch(e){}
+            try {
+              sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(d));
+              localStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(d));
+            } catch(e){}
             break;
           }
         }
@@ -1074,7 +1093,10 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
       clearMateOneMatchCache();
       if (gTotalCallData) {
         window.gTotalCallData = gTotalCallData;
-        try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
+        try {
+          sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData));
+          localStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData));
+        } catch(e){}
       }
 
       // 최신 동기화 콜이 맨 위에 즉시 보이도록 1페이지로 리셋 및 오늘 날짜 필터 보정
@@ -1164,10 +1186,13 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
         }
       }
 
-      // 세션 스토리지 캐시 갱신
+      // 로컬/세션 스토리지 캐시 갱신
       if (gTotalCallData) {
         window.gTotalCallData = gTotalCallData;
-        try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
+        try {
+          sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData));
+          localStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData));
+        } catch(e){}
       }
     }
   } catch (err) {
@@ -1501,12 +1526,13 @@ function renderTotalCallAnalysisTab() {
       gTotalCallData = window.gTotalCallData;
     } else {
       try {
-        const cached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+        const cached = localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA') || sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (parsed && parsed.callLogs && parsed.callLogs.length > 0) {
-            gTotalCallData = parsed;
-            window.gTotalCallData = parsed;
+          const d = (parsed && parsed.data && parsed.data.callLogs) ? parsed.data : parsed;
+          if (d && d.callLogs && d.callLogs.length > 0) {
+            gTotalCallData = d;
+            window.gTotalCallData = d;
           }
         }
       } catch (e) {}
@@ -4385,14 +4411,22 @@ async function loadOutcallBackgroundData() {
     return gTotalCallData;
   }
 
-  // 1) 세션 스토리지 캐시 확인 (0ms)
+  const hadPreviousData = !!(gTotalCallData && gTotalCallData.callLogs && gTotalCallData.callLogs.length > 0);
+
+  // 1) 로컬/세션 스토리지 캐시 확인 (0ms)
   try {
-    const cached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+    const cached = localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA') || sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
     if (cached) {
       const parsed = JSON.parse(cached);
-      if (parsed && parsed.callLogs && parsed.callLogs.length > 0) {
-        gTotalCallData = parsed;
-        window.gTotalCallData = parsed;
+      const d = (parsed && parsed.data && parsed.data.callLogs) ? parsed.data : parsed;
+      if (d && d.callLogs && d.callLogs.length > 0) {
+        gTotalCallData = d;
+        window.gTotalCallData = d;
+        try {
+          if (!localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA')) {
+            localStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(d));
+          }
+        } catch(e){}
         return gTotalCallData;
       }
     }
@@ -4413,7 +4447,13 @@ async function loadOutcallBackgroundData() {
         if (data && data.callLogs && data.callLogs.length > 0) {
           gTotalCallData = data;
           window.gTotalCallData = data;
-          try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
+          try {
+            sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData));
+            localStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData));
+          } catch(e){}
+          if (!hadPreviousData && window.gActiveTab === 'carehub' && typeof window.renderUnifiedCareHub === 'function') {
+            window.renderUnifiedCareHub();
+          }
           return gTotalCallData;
         }
       }
@@ -4428,7 +4468,13 @@ async function loadOutcallBackgroundData() {
       if (json.success && json.data && json.data.callLogs) {
         gTotalCallData = json.data;
         window.gTotalCallData = json.data;
-        try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData)); } catch(e){}
+        try {
+          sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData));
+          localStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData));
+        } catch(e){}
+        if (!hadPreviousData && window.gActiveTab === 'carehub' && typeof window.renderUnifiedCareHub === 'function') {
+          window.renderUnifiedCareHub();
+        }
         return gTotalCallData;
       }
     }
@@ -4631,7 +4677,7 @@ if (typeof window !== 'undefined') {
   window.handleTotalKpiSubFilter = handleTotalKpiSubFilter;
   window.isCallDurationAnswered = isCallDurationAnswered;
 
-  setTimeout(async () => {
+  const triggerInitialOutcallCheck = async () => {
     const overlay = document.getElementById('adminLoginOverlay');
     const isLoginScreen = (typeof window.isUserOnLoginScreen === 'function' && window.isUserOnLoginScreen()) ||
       (document.documentElement && document.documentElement.classList.contains('livon-locked')) ||
@@ -4641,7 +4687,8 @@ if (typeof window !== 'undefined') {
 
     await loadOutcallBackgroundData();
     checkAndTriggerOutcallAlert();
-  }, 500);
+  };
+  triggerInitialOutcallCheck();
 
   setInterval(async () => {
     const overlay = document.getElementById('adminLoginOverlay');

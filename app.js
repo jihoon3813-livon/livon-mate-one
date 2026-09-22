@@ -1934,10 +1934,20 @@ function getCustomerCtiComplaintInfo(app) {
 
   if (!callLogs) {
     try {
-      const cached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+      const cached = localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA') || sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed && Array.isArray(parsed.callLogs)) callLogs = parsed.callLogs;
+        const d = (parsed && parsed.data && parsed.data.callLogs) ? parsed.data : parsed;
+        if (d && Array.isArray(d.callLogs)) {
+          callLogs = d.callLogs;
+          window.gTotalCallData = d;
+          if (typeof gTotalCallData !== 'undefined') gTotalCallData = d;
+          try {
+            if (!localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA')) {
+              localStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', cached);
+            }
+          } catch (e) {}
+        }
       }
     } catch (e) {}
   }
@@ -2147,12 +2157,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 상단 멀티 탭 및 데스크톱 사이드바 상태 초기화
   if (typeof initOpenAppTabs === 'function') initOpenAppTabs();
   if (typeof initDesktopSidebarState === 'function') initDesktopSidebarState();
+  if (typeof renderMultiTabBar === 'function') renderMultiTabBar();
 
   if (initialTab && initialTab !== 'carehub') {
     switchTab(initialTab, initialFilter, false);
   } else {
     renderUnifiedCareHub();
-    if (typeof renderMultiTabBar === 'function') renderMultiTabBar();
   }
   initIcons();
 
@@ -28125,6 +28135,26 @@ function initData() {
     console.warn('[Security Guard] 미인증 세션: initData 실행이 거부되었습니다.');
     return;
   }
+
+  // 0. CTI 종합콜분석 로컬/세션 캐시 즉시 동기식 복원 (통합허브 첫 렌더링 시 민원건 최상단 노출 및 화면 깜빡임/순서 점프 원천 차단)
+  try {
+    if (!window.gTotalCallData || !window.gTotalCallData.callLogs || window.gTotalCallData.callLogs.length === 0) {
+      const cachedCalls = localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA') || sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+      if (cachedCalls) {
+        const parsedCalls = JSON.parse(cachedCalls);
+        const callData = (parsedCalls && parsedCalls.data && parsedCalls.data.callLogs) ? parsedCalls.data : parsedCalls;
+        if (callData && Array.isArray(callData.callLogs) && callData.callLogs.length > 0) {
+          window.gTotalCallData = callData;
+          if (typeof gTotalCallData !== 'undefined') gTotalCallData = callData;
+          try {
+            if (!localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA')) {
+              localStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', cachedCalls);
+            }
+          } catch(e) {}
+        }
+      }
+    }
+  } catch (e) {}
 
   // 1. 로컬 캐시(LocalStorage)에서 최신 Convex 동기화 데이터 즉시 복원 (새로고침 시 과거 시드 숫자가 깜빡이는 현상 원천 차단)
   try {
