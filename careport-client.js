@@ -1052,11 +1052,6 @@
         ${summarySectionHtml}
       </div>
     </div>
-
-    <!-- Footer -->
-    <div style="position: relative; z-index: 1; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 12px; margin-top: 20px; font-size: 10.5px; color: #94a3b8; font-weight: 600;">
-      본 간병일지는 리본케어(CarePort) 공식 전산을 통해 실시간 작성·인증된 법적 공인 간병기록입니다.
-    </div>
   </div>
 </body>
 </html>`;
@@ -1328,11 +1323,6 @@
     </div>
     <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; margin-bottom: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
       ${guardianNotesHtml}
-    </div>
-
-    <!-- Footer -->
-    <div style="text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 12px; margin-top: 10px; font-size: 10.5px; color: #94a3b8; font-weight: 600;">
-      본 간병일지는 리본케어(CarePort) 공식 전산을 통해 실시간 작성·인증된 법적 공인 간병기록입니다.
     </div>
   </div>
 
