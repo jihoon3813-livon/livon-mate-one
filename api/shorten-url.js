@@ -6,9 +6,10 @@ function fetchUrlText(requestUrl, timeoutMs = 2500) {
     const isHttps = requestUrl.startsWith('https:');
     const client = isHttps ? https : http;
     const req = client.get(requestUrl, { timeout: timeoutMs }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
       res.on('end', () => {
+        const data = Buffer.concat(chunks).toString('utf8');
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(data.trim());
         } else {

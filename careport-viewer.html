@@ -47,21 +47,21 @@
     }
   </style>
 </head>
-<body class="min-h-screen flex flex-col bg-slate-900 text-slate-800">
+<body class="min-h-screen flex flex-col bg-slate-100 text-slate-800">
 
   <!-- Top Fixed Control Header (Non-printable) -->
-  <header class="no-print sticky top-0 z-50 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-white px-4 sm:px-6 py-3 shadow-md flex items-center justify-between gap-3">
+  <header class="no-print sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200 text-slate-900 px-4 sm:px-6 py-2.5 shadow-xs flex items-center justify-between gap-3">
     <!-- Left: Brand & Status -->
     <div class="flex items-center gap-3 min-w-0">
-      <div class="w-8 h-8 rounded-xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400 shrink-0">
+      <div class="w-8 h-8 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600 shrink-0">
         <i data-lucide="clipboard-check" class="w-4 h-4"></i>
       </div>
       <div class="min-w-0">
         <div class="flex items-center gap-2">
-          <span class="text-xs font-black tracking-wider text-teal-400 uppercase">LIVON CAREPORT</span>
-          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">공식 공인 일지</span>
+          <span class="text-xs font-black tracking-wider text-teal-600 uppercase">LIVON CAREPORT</span>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200">공식 공인 일지</span>
         </div>
-        <h1 id="viewerTopTitle" class="text-sm sm:text-base font-black text-white truncate mt-0.5">
+        <h1 id="viewerTopTitle" class="text-sm sm:text-base font-black text-slate-900 truncate mt-0.5">
           간병일지 조회 중...
         </h1>
       </div>
@@ -71,39 +71,39 @@
     <div class="flex items-center gap-2 shrink-0">
       <!-- Legacy CarePort Admin Link -->
       <a id="btnLegacyCareportLink" href="https://careport.livon.care" target="_blank"
-        class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition-all"
+        class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-all"
         title="케어포트(careport.livon.care) 관리자 원본 새창 열기 (로그인 필요)">
-        <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+        <i data-lucide="external-link" class="w-3.5 h-3.5 text-slate-500"></i>
         <span>케어포트 관리자 링크</span>
       </a>
 
       <!-- Print Button -->
       <button type="button" onclick="window.print()" 
-        class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer">
-        <i data-lucide="printer" class="w-3.5 h-3.5 text-slate-300"></i>
+        class="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer">
+        <i data-lucide="printer" class="w-3.5 h-3.5 text-slate-500"></i>
         <span class="hidden sm:inline">프린트</span>
       </button>
 
       <!-- Save / PDF Download Button -->
       <button type="button" onclick="downloadViewerPdf()" id="btnDownloadPdf"
-        class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white text-xs font-black flex items-center gap-1.5 shadow-md shadow-teal-900/30 transition-all cursor-pointer">
+        class="px-3.5 py-1.5 rounded-xl bg-[#10bdb2] hover:bg-[#0ea59a] text-white text-xs font-black flex items-center gap-1.5 shadow-xs transition-all cursor-pointer">
         <i data-lucide="download" class="w-3.5 h-3.5"></i>
         <span>화면저장 (PDF)</span>
       </button>
 
       <!-- Close Button -->
       <button type="button" onclick="window.close()" 
-        class="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer" title="창 닫기">
+        class="p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-slate-800 border border-slate-200 transition-all cursor-pointer" title="창 닫기">
         <i data-lucide="x" class="w-4 h-4"></i>
       </button>
     </div>
   </header>
 
   <!-- Sibling Days Bar (if multi-day available) -->
-  <div id="siblingDaysContainer" class="no-print hidden bg-slate-950/80 border-b border-slate-800 px-4 sm:px-6 py-2 overflow-x-auto custom-scrollbar flex items-center gap-2">
-    <span class="text-[11px] font-bold text-slate-400 shrink-0 flex items-center gap-1">
-      <i data-lucide="calendar" class="w-3.5 h-3.5 text-teal-400"></i>
-      <span>간병 회차:</span>
+  <div id="siblingDaysContainer" class="no-print hidden bg-white border-b border-slate-200 px-4 sm:px-6 py-2 overflow-x-auto custom-scrollbar flex items-center gap-2 shadow-2xs">
+    <span class="text-[11px] font-bold text-slate-500 shrink-0 flex items-center gap-1">
+      <i data-lucide="calendar" class="w-3.5 h-3.5 text-teal-600"></i>
+      <span>일자 선택:</span>
     </span>
     <div id="siblingDaysList" class="flex items-center gap-1.5">
       <!-- Dynamic day pills -->
@@ -111,13 +111,13 @@
   </div>
 
   <!-- Main Document Container -->
-  <main class="flex-1 overflow-y-auto py-6 sm:py-8 px-2 sm:px-4 flex justify-center bg-slate-950">
+  <main class="flex-1 overflow-y-auto py-6 sm:py-8 px-2 sm:px-4 flex justify-center bg-slate-100">
     <div id="reportContainer" class="page-container w-full max-w-[830px] flex flex-col items-center">
       <!-- Loading Spinner -->
-      <div id="loadingState" class="py-24 text-center text-slate-400 flex flex-col items-center gap-3">
-        <div class="w-8 h-8 rounded-full border-2 border-teal-500/30 border-t-teal-400 animate-spin"></div>
-        <p class="text-sm font-bold text-slate-300">리본케어포트(CarePort) 공식 간병일지를 불러오는 중입니다...</p>
-        <p class="text-xs text-slate-500">실시간 전산 연동 및 데이터 검증 진행 중</p>
+      <div id="loadingState" class="py-24 text-center text-slate-500 flex flex-col items-center gap-3">
+        <div class="w-8 h-8 rounded-full border-2 border-teal-200 border-t-teal-600 animate-spin"></div>
+        <p class="text-sm font-bold text-slate-800">리본케어포트(CarePort) 공식 간병일지를 불러오는 중입니다...</p>
+        <p class="text-xs text-slate-400">실시간 전산 연동 및 데이터 검증 진행 중</p>
       </div>
     </div>
   </main>
@@ -294,7 +294,7 @@
         }
         patientMeta.trendScores = trendScores;
 
-        // 5. Render Sibling Days Selector Bar
+        // 5. Render Sibling Days Selector Bar (날짜 단독 및 요일 표기)
         if (patientLogs.length > 1) {
           const bar = document.getElementById('siblingDaysContainer');
           const list = document.getElementById('siblingDaysList');
@@ -303,23 +303,40 @@
             list.innerHTML = patientLogs.map((l, idx) => {
               const dNum = idx + 1;
               const isCur = String(l.sessionId) === cleanSid;
-              const dStr = l.consultDate ? l.consultDate.slice(5, 10).replace('-', '.') : '';
+              let pillDateStr = l.consultDate ? l.consultDate.slice(5, 10).replace('-', '.') : '';
+              if (l.consultDate) {
+                try {
+                  const pDt = new Date(l.consultDate.slice(0, 10));
+                  if (!isNaN(pDt.getTime())) {
+                    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+                    pillDateStr += ` (${dayNames[pDt.getDay()]})`;
+                  }
+                } catch (e) {}
+              }
               return `
                 <button type="button" onclick="switchDay(${l.sessionId}, ${dNum})"
-                  class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${isCur ? 'bg-teal-500 text-white shadow-xs ring-2 ring-teal-400/40' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'}">
-                  ${dNum}일차 (${dStr})
+                  class="px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${isCur ? 'bg-[#10bdb2] text-white shadow-xs ring-2 ring-[#10bdb2]/30' : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'}">
+                  ${pillDateStr || (l.consultDate ? l.consultDate.slice(0, 10) : `${idx + 1}`)}
                 </button>
               `;
             }).join('');
           }
         }
 
-        // 6. Update Top Header Title
+        // 6. Update Top Header Title (차수 미표시: 날짜 단독 표기)
         const topTitle = document.getElementById('viewerTopTitle');
         if (topTitle) {
-          topTitle.innerText = `[${patientMeta.patientName} 님] ${dayNum}일차 공식 간병일지 · ${logObj.consultDate.slice(0, 10)}`;
+          let dateStr = logObj.consultDate ? logObj.consultDate.slice(0, 10) : '';
+          try {
+            const dt = new Date(dateStr);
+            if (!isNaN(dt.getTime())) {
+              const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+              dateStr += ` (${dayNames[dt.getDay()]})`;
+            }
+          } catch (e) {}
+          topTitle.innerText = `[${patientMeta.patientName} 님] 공식 간병일지 · ${dateStr}`;
         }
-        document.title = `[공식 간병일지] ${patientMeta.patientName} 님 (${dayNum}일차)`;
+        document.title = `[공식 간병일지] ${patientMeta.patientName} 님`;
 
         // 7. Generate Full Authentic CarePort Document HTML
         if (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function') {
@@ -334,7 +351,8 @@
           if (pageEl && container) {
             container.innerHTML = '';
             container.appendChild(pageEl);
-            pageEl.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)';
+            pageEl.style.boxShadow = '0 4px 20px -2px rgba(0, 0, 0, 0.08), 0 2px 6px -2px rgba(0, 0, 0, 0.04)';
+            pageEl.style.border = '1px solid #e2e8f0';
             pageEl.style.borderRadius = '16px';
             pageEl.style.margin = '0 auto';
           } else if (container) {

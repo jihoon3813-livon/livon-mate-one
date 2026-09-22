@@ -10,11 +10,12 @@ async function fetchOnlineHospitals(query) {
     const kakaoPromise = (searchQuery) => new Promise((resolve) => {
       const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(searchQuery)}&size=15`;
       const req = https.get(url, { headers: { 'Authorization': KAKAO_REST_KEY }, timeout: 3500 }, (res) => {
-        let body = '';
-        res.on('data', c => body += c);
+        const chunks = [];
+        res.on('data', c => chunks.push(c));
         res.on('end', () => {
           if (res.statusCode === 200) {
             try {
+              const body = Buffer.concat(chunks).toString('utf8');
               const j = JSON.parse(body);
               if (Array.isArray(j.documents)) return resolve(j.documents);
             } catch(e) {}

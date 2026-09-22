@@ -38,9 +38,9 @@ module.exports = async (req, res) => {
           },
           timeout: 5000
         }, (res) => {
-          let data = '';
-          res.on('data', chunk => data += chunk);
-          res.on('end', () => resolve({ statusCode: res.statusCode, data }));
+          const chunks = [];
+          res.on('data', chunk => chunks.push(chunk));
+          res.on('end', () => resolve({ statusCode: res.statusCode, data: Buffer.concat(chunks).toString('utf8') }));
         });
         baroReq.on('error', reject);
         baroReq.on('timeout', () => { baroReq.destroy(); reject(new Error('바로빌 API 응답 시간 초과')); });

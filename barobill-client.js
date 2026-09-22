@@ -89,9 +89,9 @@ function callBarobillSoap(action, bodyXml, isTest = false) {
         'Content-Length': Buffer.byteLength(xml)
       }
     }, res => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => resolve({ status: res.statusCode, body: data }));
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
     });
     req.on('error', reject);
     req.write(xml);

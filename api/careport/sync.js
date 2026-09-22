@@ -18,9 +18,11 @@ const TARGET_ORGS = [
 function requestHttps(options, postData = null) {
   return new Promise((resolve, reject) => {
     const req = https.request(options, res => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
       res.on('end', () => {
+        const fullBuffer = Buffer.concat(chunks);
+        const data = fullBuffer.toString('utf8');
         try {
           resolve({ status: res.statusCode, headers: res.headers, data: JSON.parse(data) });
         } catch (e) {
