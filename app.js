@@ -18179,11 +18179,13 @@ function getCareProgressInfo(assign) {
 
   if (!assign.endDate || assign.endDate === '진행중' || assign.endDate === '예정') {
     const elapsedDays = Math.max(1, Math.round((todayZero - start) / oneDay) + 1);
+    const roundEstTotal = Math.max(10, Math.ceil(elapsedDays / 10) * 10);
+    const remainingInRound = Math.max(0, roundEstTotal - elapsedDays);
     return {
-      totalDays: elapsedDays,
+      totalDays: roundEstTotal,
       elapsedDays,
-      remainingDays: 0,
-      percent: 100,
+      remainingDays: remainingInRound,
+      percent: Math.min(95, Math.round((elapsedDays / roundEstTotal) * 100)),
       status: 'ongoing',
       startDate: assign.startDate,
       endDate: '진행중',
@@ -18194,11 +18196,13 @@ function getCareProgressInfo(assign) {
   const end = parseCareDate(assign.endDate);
   if (!end) {
     const elapsedDays = Math.max(1, Math.round((todayZero - start) / oneDay) + 1);
+    const roundEstTotal = Math.max(10, Math.ceil(elapsedDays / 10) * 10);
+    const remainingInRound = Math.max(0, roundEstTotal - elapsedDays);
     return {
-      totalDays: elapsedDays,
+      totalDays: roundEstTotal,
       elapsedDays,
-      remainingDays: 0,
-      percent: 100,
+      remainingDays: remainingInRound,
+      percent: Math.min(95, Math.round((elapsedDays / roundEstTotal) * 100)),
       status: 'ongoing',
       startDate: assign.startDate,
       endDate: '진행중',
@@ -18824,7 +18828,12 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
   const isCaregiverAssigned = Boolean(as && (as.startDate || as.caregiverName));
   const totalCareDays = prog ? prog.totalDays : (as && as.startDate && as.endDate ? Math.max(1, Math.round((parseCareDate(as.endDate) - parseCareDate(as.startDate)) / (24*60*60*1000)) + 1) : 0);
   const elapsedDays = prog ? prog.elapsedDays : totalCareDays;
-  const isOngoingCare = Boolean(as && (!as.endDate || as.endDate === '진행중' || as.endDate === '예정') && (!prog || prog.isOngoing));
+  const isOngoingCare = Boolean(
+    (prog && prog.isOngoing) ||
+    (as && (!as.endDate || as.endDate === '진행중' || as.endDate === '예정')) ||
+    (!app.careEndDate || app.careEndDate === '진행중' || app.careEndDate === '예정') ||
+    (app.status === '진행' || app.status === '진행중' || app.status === '간병진행중')
+  );
   const isCompleted = isOngoingCare ? false : (prog ? (prog.status === 'completed' && prog.remainingDays === 0) : Boolean(as && as.endDate && as.endDate !== '진행중' && as.endDate !== '예정'));
   const careStartDate = as ? as.startDate : null;
   const careEndDate = as ? as.endDate : null;
@@ -18906,6 +18915,9 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       const marginAmount = fullClaimAmount - fullPayoutAmount;
       const marginRate = fullClaimAmount > 0 ? ((marginAmount / fullClaimAmount) * 100).toFixed(1) : '0.0';
 
+      const isThisRoundOngoing = Boolean(isOngoingCare && (idx === sortedClaims.length - 1) && !claimForRound.claimDate && !claimForRound.depositDate);
+      const stage = isThisRoundOngoing ? 'ONGOING' : 'COMPLETED';
+
       rounds.push({
         roundNumber: roundIndex,
         label: claimForRound.round || `${roundIndex}차 (${roundDays}일간)`,
@@ -18915,9 +18927,9 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         endDayOffset,
         startDateStr: roundStartDateStr,
         endDateStr: roundEndDateStr,
-        stage: 'COMPLETED',
-        ongoingElapsed: roundDays,
-        ongoingRemaining: 0,
+        stage,
+        ongoingElapsed: isThisRoundOngoing ? Math.min(roundDays, Math.max(1, elapsedDays - startDayOffset + 1)) : roundDays,
+        ongoingRemaining: isThisRoundOngoing ? Math.max(0, roundDays - (elapsedDays - startDayOffset + 1)) : 0,
         dailyClaimPrice,
         fullClaimAmount,
         depositAmount,
@@ -18944,7 +18956,8 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         isDateCustomized: false,
         targetYear,
         targetMonth,
-        targetMonthText
+        targetMonthText,
+        isOngoingCare
       });
     });
   } else if (isCaregiverAssigned && (totalCareDays > 0 || (as && as.startDate))) {
@@ -18954,7 +18967,10 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
     const startTimeStr = (careStartDate && careStartDate.includes(':')) ? careStartDate.split(' ').slice(1).join(' ') : '09:00';
     const endTimeStr = (careEndDate && careEndDate.includes(':')) ? careEndDate.split(' ').slice(1).join(' ') : '18:00';
 
-    const effectiveTotalDays = totalCareDays > 0 ? totalCareDays : 10;
+    let effectiveTotalDays = totalCareDays > 0 ? totalCareDays : 10;
+    if (isOngoingCare) {
+      effectiveTotalDays = Math.max(10, Math.ceil(elapsedDays / 10) * 10);
+    }
     let remainingDaysToSplit = effectiveTotalDays;
     let roundIndex = 1;
     let startDayOffset = 1;
@@ -19047,18 +19063,35 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       let ongoingElapsed = 0;
       let ongoingRemaining = roundDays;
 
-      if (elapsedDays >= endDayOffset || isCompleted) {
-        stage = 'COMPLETED';
-        ongoingElapsed = roundDays;
-        ongoingRemaining = 0;
-      } else if (elapsedDays >= startDayOffset) {
-        stage = 'ONGOING';
-        ongoingElapsed = elapsedDays - startDayOffset + 1;
-        ongoingRemaining = Math.max(0, roundDays - ongoingElapsed);
+      if (isOngoingCare) {
+        // 종료일 미정 진행 건: 종료일 확정 전까지 경과일 이전 차수만 완료, 현재 활성 차수는 무조건 ONGOING
+        if (elapsedDays >= endDayOffset && endDayOffset < effectiveTotalDays) {
+          stage = 'COMPLETED';
+          ongoingElapsed = roundDays;
+          ongoingRemaining = 0;
+        } else if (elapsedDays >= startDayOffset) {
+          stage = 'ONGOING';
+          ongoingElapsed = elapsedDays - startDayOffset + 1;
+          ongoingRemaining = Math.max(0, roundDays - ongoingElapsed);
+        } else {
+          stage = 'UPCOMING';
+          ongoingElapsed = 0;
+          ongoingRemaining = roundDays;
+        }
       } else {
-        stage = 'UPCOMING';
-        ongoingElapsed = 0;
-        ongoingRemaining = roundDays;
+        if (elapsedDays >= endDayOffset || isCompleted) {
+          stage = 'COMPLETED';
+          ongoingElapsed = roundDays;
+          ongoingRemaining = 0;
+        } else if (elapsedDays >= startDayOffset) {
+          stage = 'ONGOING';
+          ongoingElapsed = elapsedDays - startDayOffset + 1;
+          ongoingRemaining = Math.max(0, roundDays - ongoingElapsed);
+        } else {
+          stage = 'UPCOMING';
+          ongoingElapsed = 0;
+          ongoingRemaining = roundDays;
+        }
       }
 
       const fullClaimAmount = roundDays * dailyClaimPrice;
@@ -19086,9 +19119,9 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       } else if (isFaxClaimSent) {
         claimStatus = 'CLAIMED_UNPAID';
       } else {
-        if (stage === 'COMPLETED' || isCompleted) {
+        if (stage === 'COMPLETED' && !isOngoingCare) {
           claimStatus = 'READY_TO_CLAIM';
-        } else if (stage === 'ONGOING') {
+        } else if (stage === 'ONGOING' || (isOngoingCare && stage === 'COMPLETED')) {
           claimStatus = 'ONGOING_WAIT';
         } else {
           claimStatus = 'UPCOMING_WAIT';
@@ -19102,9 +19135,9 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       if (payoutForRound) {
         payoutStatus = isPayoutPaid ? 'PAID' : 'READY_TO_PAY';
       } else {
-        if (stage === 'COMPLETED' || isCompleted) {
+        if (stage === 'COMPLETED' && !isOngoingCare) {
           payoutStatus = 'READY_TO_PAY';
-        } else if (stage === 'ONGOING') {
+        } else if (stage === 'ONGOING' || (isOngoingCare && stage === 'COMPLETED')) {
           payoutStatus = 'ONGOING_WAIT';
         } else {
           payoutStatus = 'UPCOMING_WAIT';
@@ -19160,7 +19193,8 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         isDateCustomized: Boolean(customDates),
         targetYear,
         targetMonth,
-        targetMonthText
+        targetMonthText,
+        isOngoingCare
       });
 
       remainingDaysToSplit -= roundDays;
@@ -21096,12 +21130,12 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
 
             const isRoundCancelled = Boolean(app.cancelledSamsungRounds && app.cancelledSamsungRounds[r.roundNumber]);
 
-            // 삼성화재 개별 발송 로그 및 월간 정기 청구서 발송 이력 확인
+            // 삼성화재 개별 발송 로그 및 청구서 발송 이력 확인 (환자 본인에게 실제 발송된 개별 메일 또는 정식 청구서만 인정)
             let samsungIndividualLog = null;
             if (isSamsung && !isRoundCancelled && Array.isArray(gSamsungEmailLogs)) {
               samsungIndividualLog = gSamsungEmailLogs.find(l => {
                 if (!l) return false;
-                const isMatchApp = String(l.appId) === String(app.id);
+                const isMatchApp = (String(l.appId) === String(app.id) || String(l.targetAppId) === String(app.id));
                 if (!isMatchApp) return false;
                 if (l.roundNumber && Number(l.roundNumber) === Number(r.roundNumber)) return true;
                 const subj = l.subject || '';
@@ -21111,36 +21145,11 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
               });
             }
 
-            let samsungMonthlyLog = null;
-            if (isSamsung && !isRoundCancelled && Array.isArray(gSamsungEmailLogs)) {
-              const padMonth = String(targetMonth).padStart(2, '0');
-              samsungMonthlyLog = gSamsungEmailLogs.find(l => {
-                if (!l) return false;
-                const isMonthly = l.type === 'MONTHLY_CLAIM' || (l.typeName && l.typeName.includes('월간'));
-                if (!isMonthly) return false;
-                const subj = l.subject || '';
-                const file = l.excelFileName || '';
-                const body = l.body || '';
-                const hasMonth = subj.includes(`${targetMonth}월`) || subj.includes(`${padMonth}월`) || file.includes(`${targetYear}${padMonth}`) || file.includes(`_${padMonth}.`) || body.includes(`${targetMonth}월분`) || body.includes(`${padMonth}월분`);
-                const hasYear = !targetYear || subj.includes(targetYear) || file.includes(targetYear) || body.includes(targetYear);
-                if (!hasMonth || !hasYear) return false;
-
-                // 해당 고객이 실제로 해당 월간 청구 대상에 포함되어 있었는지 엄격 검증
-                const pName = app.patientName || '';
-                const accNum = app.accidentNumber || '';
-                const polNum = app.policyNumber || '';
-                const isCustomerIncluded = Boolean(
-                  (pName && (body.includes(pName) || subj.includes(pName))) ||
-                  (accNum && accNum !== '-' && body.includes(accNum)) ||
-                  (polNum && polNum !== '-' && body.includes(polNum)) ||
-                  (Array.isArray(l.appIds) && l.appIds.includes(app.id))
-                );
-                return isCustomerIncluded;
-              });
-            }
-
+            // 정기 월간 청구 로그 오염 차단:
+            // 단순히 "9월 청구 로그"가 있다고 해서 환자를 청구완료 처리하지 않고,
+            // 본인에게 실제로 발송된 개별 청구 메일(samsungIndividualLog)이나 정식 청구서(r.existingClaim)가 있을 때만 청구완료로 인정
             const isCustomRoundSent = Boolean(!isRoundCancelled && app.customRoundDates && app.customRoundDates[r.roundNumber] && app.customRoundDates[r.roundNumber].sentAt);
-            const isSamsungClaimSent = Boolean(!isRoundCancelled && (samsungIndividualLog || isCustomRoundSent || samsungMonthlyLog));
+            const isSamsungClaimSent = Boolean(!isRoundCancelled && (samsungIndividualLog || isCustomRoundSent));
             const isClaimDone = isSamsung 
               ? (isSamsungClaimSent || Boolean(!isRoundCancelled && r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate)))
               : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(rawClaimDate));
@@ -21154,10 +21163,6 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                   claimDateTimeStr = formatClaimDisplayDate(app.customRoundDates[r.roundNumber].sentAt);
                 } else if (r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxSentDate)) {
                   claimDateTimeStr = formatClaimDisplayDate(r.existingClaim.claimDate || r.existingClaim.faxSentDate);
-                } else if (samsungMonthlyLog && samsungMonthlyLog.sentAt) {
-                  claimDateTimeStr = formatClaimDisplayDate(samsungMonthlyLog.sentAt);
-                } else if (app.samsungEmailSentAt) {
-                  claimDateTimeStr = formatClaimDisplayDate(app.samsungEmailSentAt);
                 } else if (rawClaimDate) {
                   claimDateTimeStr = formatClaimDisplayDate(rawClaimDate);
                 }
@@ -21200,7 +21205,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                       ${r.days}일간 (${hours}시간)
                     </span>
                     ${r.isDateCustomized ? `
-                      <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[10.5px] border border-amber-300" title="사용자가 직접 날짜를 조정한 차수입니다">
+                      <span class="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[10.5px] border border-amber-300" title="사용자가 직접 날짜를 조정한 차수입니다">
                         날짜수정됨
                       </span>
                     ` : ''}
@@ -21208,13 +21213,13 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                       <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i>
                       <span>날짜 수정</span>
                     </button>
-                    ${r.stage === 'COMPLETED' ? `
+                    ${(r.stage === 'COMPLETED' && !r.isOngoingCare) ? `
                       <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center gap-1">
                         <i data-lucide="check-circle" class="w-3 h-3 text-emerald-600"></i> 간병완료
                       </span>
-                    ` : r.stage === 'ONGOING' ? `
+                    ` : (r.stage === 'ONGOING' || r.isOngoingCare) ? `
                       <span class="px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold text-[11px] flex items-center gap-1 animate-pulse">
-                        <span class="w-1.5 h-1.5 rounded-full bg-sky-600"></span> 간병진행중 (${r.ongoingElapsed}일차)
+                        <span class="w-1.5 h-1.5 rounded-full bg-sky-600"></span> 간병진행중 (${r.ongoingElapsed || 1}일차)
                       </span>
                     ` : `
                       <span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold text-[11px]">
@@ -22701,12 +22706,12 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
                     const isRoundCancelled = Boolean(app.cancelledSamsungRounds && app.cancelledSamsungRounds[r.roundNumber]);
 
-                    // 삼성화재인 경우 개별 발송 및 해당 월분의 정기 청구서 발송 이력 확인
+                    // 삼성화재인 경우 환자 본인에게 실제 발송된 개별 메일 및 정식 청구서만 인정 (월간 청구 로그 오염 차단)
                     let samsungIndividualLog = null;
                     if (isSamsung && !isRoundCancelled && Array.isArray(gSamsungEmailLogs)) {
                       samsungIndividualLog = gSamsungEmailLogs.find(l => {
                         if (!l) return false;
-                        const isMatchApp = String(l.appId) === String(app.id);
+                        const isMatchApp = (String(l.appId) === String(app.id) || String(l.targetAppId) === String(app.id));
                         if (!isMatchApp) return false;
                         if (l.roundNumber && Number(l.roundNumber) === Number(r.roundNumber)) return true;
                         const subj = l.subject || '';
@@ -22716,29 +22721,10 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                       });
                     }
 
-                    let samsungMonthlyLog = null;
-                    if (isSamsung && !isRoundCancelled && Array.isArray(gSamsungEmailLogs)) {
-                      const dateMatch = (r.endDateStr || r.startDateStr || '').match(/(\d{4})[.-](\d{1,2})/);
-                      const targetMonth = dateMatch ? parseInt(dateMatch[2], 10) : (new Date().getMonth() + 1);
-                      const targetYear = dateMatch ? dateMatch[1] : String(new Date().getFullYear());
-                      const padMonth = String(targetMonth).padStart(2, '0');
-                      samsungMonthlyLog = gSamsungEmailLogs.find(l => {
-                        if (!l) return false;
-                        const isMonthly = l.type === 'MONTHLY_CLAIM' || (l.typeName && l.typeName.includes('월간'));
-                        if (!isMonthly) return false;
-                        const subj = l.subject || '';
-                        const file = l.excelFileName || '';
-                        const body = l.body || '';
-                        const hasMonth = subj.includes(`${targetMonth}월`) || subj.includes(`${padMonth}월`) || file.includes(`${targetYear}${padMonth}`) || file.includes(`_${padMonth}.`) || body.includes(`${targetMonth}월분`) || body.includes(`${padMonth}월분`);
-                        const hasYear = !targetYear || subj.includes(targetYear) || file.includes(targetYear) || body.includes(targetYear);
-                        return hasMonth && hasYear;
-                      });
-                    }
-
                     const isCustomRoundSent = Boolean(!isRoundCancelled && app.customRoundDates && app.customRoundDates[r.roundNumber] && app.customRoundDates[r.roundNumber].sentAt);
                     const isSending = Boolean(window.gBarobillSendingRounds && window.gBarobillSendingRounds.has(`${app.id}_${r.roundNumber}`));
                     const isClaimDone = isSamsung
-                      ? (!isRoundCancelled && (Boolean(samsungIndividualLog) || isCustomRoundSent || Boolean(samsungMonthlyLog) || Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate))))
+                      ? (!isRoundCancelled && (Boolean(samsungIndividualLog) || isCustomRoundSent || Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate))))
                       : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(faxSentDateStr));
                     const isDepositDone = isRoundDepositConfirmed(r);
 
@@ -22750,10 +22736,6 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                         timelineClaimSentTimeStr = formatClaimDisplayDate(app.customRoundDates[r.roundNumber].sentAt);
                       } else if (r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxSentDate)) {
                         timelineClaimSentTimeStr = formatClaimDisplayDate(r.existingClaim.claimDate || r.existingClaim.faxSentDate);
-                      } else if (samsungMonthlyLog && samsungMonthlyLog.sentAt) {
-                        timelineClaimSentTimeStr = formatClaimDisplayDate(samsungMonthlyLog.sentAt);
-                      } else if (app.samsungEmailSentAt) {
-                        timelineClaimSentTimeStr = formatClaimDisplayDate(app.samsungEmailSentAt);
                       }
                     }
 
@@ -23781,7 +23763,7 @@ function openPayoutDetailListModal(applyId) {
             </td>
           </tr>
         `;
-      } else if (r.stage === 'COMPLETED') {
+      } else if (r.stage === 'COMPLETED' && !r.isOngoingCare) {
         // 차수는 완료되었으나 정산 레코드가 아직 미생성된 상태
         return `
           <tr class="hover:bg-amber-50/50 transition-colors bg-amber-50/20">
@@ -23928,13 +23910,13 @@ function openClaimDetailListModal(applyId) {
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 whitespace-nowrap">
                 <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-600"></i> 미입금상태
               </span>
-            ` : isReadyToClaim ? `
+            ` : (isReadyToClaim && !r.isOngoingCare) ? `
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 whitespace-nowrap">
                 간병완료 (청구가능)
               </span>
-            ` : isOngoingWait ? `
+            ` : (isOngoingWait || r.isOngoingCare) ? `
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-sky-100 text-sky-800 whitespace-nowrap">
-                <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span> 진행중 (D-${r.ongoingRemaining}일)
+                <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span> 진행중 (D-${r.ongoingRemaining || 0}일)
               </span>
             ` : `
               <span class="px-2.5 py-0.5 rounded-full text-[10.5px] bg-slate-200 text-slate-600 whitespace-nowrap">
