@@ -1210,7 +1210,12 @@ export const saveAdmin = mutation({
       .first();
     const { _id, _creationTime, ...rest } = admin;
     if (existing) {
-      await ctx.db.replace(existing._id, rest);
+      const updateData = { ...rest };
+      // 클라이언트에는 보안상 비밀번호를 내려주지 않으므로, 새 비밀번호가 없는 경우 DB에 저장된 기존 비밀번호를 안전하게 보존
+      if (!updateData.password && existing.password) {
+        updateData.password = existing.password;
+      }
+      await ctx.db.patch(existing._id, updateData);
       return { success: true, action: "updated", id: admin.id };
     } else {
       await ctx.db.insert("admins", rest);
@@ -1234,7 +1239,12 @@ export const saveAdminsChunk = mutation({
         .first();
       const { _id, _creationTime, ...rest } = adm;
       if (existing) {
-        await ctx.db.replace(existing._id, rest);
+        const updateData = { ...rest };
+        // 클라이언트에서 보낸 데이터에 password가 없거나 빈 문자열인 경우 기존 DB의 비밀번호 영구 보존
+        if (!updateData.password && existing.password) {
+          updateData.password = existing.password;
+        }
+        await ctx.db.patch(existing._id, updateData);
       } else {
         await ctx.db.insert("admins", rest);
       }

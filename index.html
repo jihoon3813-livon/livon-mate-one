@@ -5800,7 +5800,11 @@
           <input type="text" id="editClaimAmount" required placeholder="금액 입력" inputmode="numeric" class="w-full p-3 border rounded-xl font-black text-amber-700 text-base bg-amber-50 focus:bg-white">
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">청구 일자</label>
+            <input type="text" id="editClaimDate" placeholder="YYYY.MM.DD" class="w-full p-2.5 border rounded-xl font-mono">
+          </div>
           <div>
             <label class="block font-bold text-slate-700 mb-1">청구 상태</label>
             <select id="editClaimStatus" class="w-full p-2.5 border rounded-xl bg-white font-bold">

@@ -1370,7 +1370,14 @@ async function loadConvexData(showSpinner = true) {
 
       if (Array.isArray(admins) && admins.length > 0) {
         // 클라우드 관리자 목록 + 로컬 전용 신규 관리자 병합
-        const merged = [...admins];
+        // (클라우드에서 보안상 비밀번호를 제거하고 내려주므로, 기존 로컬에 유효한 비밀번호가 있다면 증발하지 않도록 보존)
+        const localPasswordMap = new Map((localAdmins || []).filter(la => la && la.id && la.password).map(la => [la.id, la.password]));
+        const merged = admins.map(ca => {
+          if (!ca.password && localPasswordMap.has(ca.id)) {
+            return { ...ca, password: localPasswordMap.get(ca.id) };
+          }
+          return { ...ca };
+        });
         localOnlyAdmins.forEach(la => {
           merged.push(la);
         });
@@ -18132,6 +18139,44 @@ function formatStatusDateTime(rawVal, defaultTime = '10:00') {
   return str;
 }
 
+function formatClaimDisplayDate(rawVal) {
+  if (!rawVal) return '';
+  const str = String(rawVal).trim();
+  if (!str || str === '-') return '';
+
+  // ISO string (e.g. 2026-09-10T14:30:00.000Z)
+  if (str.includes('T')) {
+    try {
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        return formatCareDateTimeStr(d);
+      }
+    } catch (e) {}
+  }
+
+  // Already has time like "2026.06.18 14:30" or "2026-06-18 14:30"
+  const timeMatch = str.match(/(\d{4})[.-](\d{1,2})[.-](\d{1,2})[\sT]+(\d{1,2}):(\d{1,2})/);
+  if (timeMatch) {
+    const y = timeMatch[1];
+    const m = String(timeMatch[2]).padStart(2, '0');
+    const d = String(timeMatch[3]).padStart(2, '0');
+    const hh = String(timeMatch[4]).padStart(2, '0');
+    const min = String(timeMatch[5]).padStart(2, '0');
+    return `${y}.${m}.${d} ${hh}:${min}`;
+  }
+
+  // Date only like "2026.06.18" or "2026-09-10" (Excel data) -> return YYYY.MM.DD (no time)
+  const dateMatch = str.match(/(\d{4})[.-](\d{1,2})[.-](\d{1,2})/);
+  if (dateMatch) {
+    const y = dateMatch[1];
+    const m = String(dateMatch[2]).padStart(2, '0');
+    const d = String(dateMatch[3]).padStart(2, '0');
+    return `${y}.${m}.${d}`;
+  }
+
+  return str;
+}
+
 function getCareProgressInfo(assign) {
   if (!assign || !assign.startDate) return null;
   const start = parseCareDate(assign.startDate);
@@ -21042,21 +21087,21 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
             if (isSamsung) {
               if (!isRoundCancelled) {
                 if (samsungIndividualLog && samsungIndividualLog.sentAt) {
-                  claimDateTimeStr = samsungIndividualLog.sentAt.slice(0, 16);
+                  claimDateTimeStr = formatClaimDisplayDate(samsungIndividualLog.sentAt);
                 } else if (isCustomRoundSent) {
-                  claimDateTimeStr = app.customRoundDates[r.roundNumber].sentAt.slice(0, 16);
-                } else if (r.existingClaim && r.existingClaim.claimDate) {
-                  claimDateTimeStr = formatStatusDateTime(r.existingClaim.claimDate, '10:00');
+                  claimDateTimeStr = formatClaimDisplayDate(app.customRoundDates[r.roundNumber].sentAt);
+                } else if (r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxSentDate)) {
+                  claimDateTimeStr = formatClaimDisplayDate(r.existingClaim.claimDate || r.existingClaim.faxSentDate);
                 } else if (samsungMonthlyLog && samsungMonthlyLog.sentAt) {
-                  claimDateTimeStr = samsungMonthlyLog.sentAt.slice(0, 16);
+                  claimDateTimeStr = formatClaimDisplayDate(samsungMonthlyLog.sentAt);
                 } else if (app.samsungEmailSentAt) {
-                  claimDateTimeStr = app.samsungEmailSentAt.slice(0, 16);
+                  claimDateTimeStr = formatClaimDisplayDate(app.samsungEmailSentAt);
                 } else if (rawClaimDate) {
-                  claimDateTimeStr = formatStatusDateTime(rawClaimDate, '10:00');
+                  claimDateTimeStr = formatClaimDisplayDate(rawClaimDate);
                 }
               }
             } else {
-              claimDateTimeStr = formatStatusDateTime(rawClaimDate, '10:00');
+              claimDateTimeStr = formatClaimDisplayDate(rawClaimDate);
             }
 
             const isSending = Boolean(window.gBarobillSendingRounds && window.gBarobillSendingRounds.has(`${app.id}_${r.roundNumber}`));
@@ -21175,8 +21220,8 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                             </div>
                           ` : isClaimDone ? `
                             <div class="flex items-center gap-1.5 flex-wrap">
-                              <span class="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[11px] flex items-center gap-1" title="청구 완료">
-                                <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> 청구완료
+                              <span class="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[11px] flex items-center gap-1" title="청구 일시: ${claimDateTimeStr || '청구완료'}">
+                                <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> 청구완료${claimDateTimeStr ? ` (${claimDateTimeStr})` : ''}
                               </span>
                               ${r.existingClaim ? `<span class="text-[10.5px] font-mono text-slate-400">${r.existingClaim.id}</span>` : ''}
                             </div>
@@ -22634,13 +22679,15 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                     let timelineClaimSentTimeStr = '';
                     if (isSamsung && !isRoundCancelled) {
                       if (samsungIndividualLog && samsungIndividualLog.sentAt) {
-                        timelineClaimSentTimeStr = samsungIndividualLog.sentAt.slice(0, 16);
+                        timelineClaimSentTimeStr = formatClaimDisplayDate(samsungIndividualLog.sentAt);
                       } else if (isCustomRoundSent) {
-                        timelineClaimSentTimeStr = app.customRoundDates[r.roundNumber].sentAt.slice(0, 16);
+                        timelineClaimSentTimeStr = formatClaimDisplayDate(app.customRoundDates[r.roundNumber].sentAt);
+                      } else if (r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxSentDate)) {
+                        timelineClaimSentTimeStr = formatClaimDisplayDate(r.existingClaim.claimDate || r.existingClaim.faxSentDate);
                       } else if (samsungMonthlyLog && samsungMonthlyLog.sentAt) {
-                        timelineClaimSentTimeStr = samsungMonthlyLog.sentAt.slice(0, 16);
+                        timelineClaimSentTimeStr = formatClaimDisplayDate(samsungMonthlyLog.sentAt);
                       } else if (app.samsungEmailSentAt) {
-                        timelineClaimSentTimeStr = app.samsungEmailSentAt.slice(0, 16);
+                        timelineClaimSentTimeStr = formatClaimDisplayDate(app.samsungEmailSentAt);
                       }
                     }
 
@@ -22653,10 +22700,11 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                     const roundDepositAmt = r.existingClaim ? (r.existingClaim.depositAmount !== undefined ? r.existingClaim.depositAmount : (isRoundDepositConfirmed(r) ? r.fullClaimAmount : 0)) : (r.depositAmount || 0);
                     const isPartiallyDeposited = roundDepositAmt > 0 && roundDepositAmt < r.fullClaimAmount;
 
+                    const formattedClaimDate = timelineClaimSentTimeStr || formatClaimDisplayDate(faxSentDateStr);
                     const badgeHtml = 
                       isSending ? '<span class="px-2.5 py-0.5 rounded-full text-[10.5px] font-black bg-purple-100 text-purple-900 border border-purple-300 animate-pulse inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 shadow-2xs"><span class="w-2 h-2 rounded-full bg-purple-600 animate-ping"></span>바로빌 청구중...</span>' :
                       isDepositDone ? (isPartiallyDeposited ? `<span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-amber-100 text-amber-800 border border-amber-300 inline-flex items-center gap-1 whitespace-nowrap shrink-0"><i data-lucide="check" class="w-3 h-3 text-amber-600 shrink-0"></i> 부분입금 (${formatCurrency(roundDepositAmt)}원)</span>` : '<span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1 whitespace-nowrap shrink-0"><i data-lucide="check" class="w-3 h-3 text-emerald-600 shrink-0"></i> 입금확인됨 ✓</span>') :
-                      isClaimDone ? `<span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-amber-100 text-amber-900 border border-amber-300/80 inline-flex items-center gap-1 whitespace-nowrap shrink-0"><i data-lucide="clock" class="w-3 h-3 text-amber-600 shrink-0"></i> 미입금 (${timelineClaimSentTimeStr || faxSentDateStr || '청구완료'})</span>` :
+                      isClaimDone ? `<span class="px-2 py-0.5 rounded text-[10.5px] font-bold bg-amber-100 text-amber-900 border border-amber-300/80 inline-flex items-center gap-1 whitespace-nowrap shrink-0"><i data-lucide="clock" class="w-3 h-3 text-amber-600 shrink-0"></i> 미입금 (${formattedClaimDate || '청구완료'})</span>` :
                       '<span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-amber-200 text-amber-950 whitespace-nowrap shrink-0">청구전</span>';
 
                     const hoursCount = r.days * 24;
@@ -23789,7 +23837,7 @@ function openClaimDetailListModal(applyId) {
           </td>
           <td class="py-3 px-3.5 whitespace-nowrap">
             <div class="font-bold text-slate-900 text-xs">${app.insuranceCompany || '현대해상'}</div>
-            <div class="text-[10.5px] text-slate-500 font-medium mt-0.5">${app.adjusterName || '손사담당'} 손사 <span class="text-slate-400">(${r.existingClaim ? (formatWithTime(r.existingClaim.claimDate, '16:00') || '-') : (isOngoingWait ? '진행중' : '-')})</span></div>
+            <div class="text-[10.5px] text-slate-500 font-medium mt-0.5">${app.adjusterName || '손사담당'} 손사 <span class="text-slate-400">(${r.existingClaim ? (formatClaimDisplayDate(r.existingClaim.claimDate) || '-') : (isOngoingWait ? '진행중' : '-')})</span></div>
             ${r.existingClaim && r.existingClaim.memo ? `<div class="text-[10.5px] text-purple-800 font-semibold mt-0.5 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 inline-block" title="청구비고: ${escapeHtml(r.existingClaim.memo)}">📑 ${escapeHtml(r.existingClaim.memo)}</div>` : ''}
           </td>
           <td class="py-3 px-3.5 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
@@ -37108,6 +37156,8 @@ function openClaimEditModal(claimId) {
   document.getElementById('editClaimDailyWage').value = formatCurrency(wage);
   document.getElementById('editClaimDays').value = days;
   document.getElementById('editClaimAmount').value = formatCurrency(amount);
+  const editClaimDateEl = document.getElementById('editClaimDate');
+  if (editClaimDateEl) editClaimDateEl.value = claim.claimDate || '';
   document.getElementById('editClaimStatus').value = claim.depositStatus === '입금완료' ? '입금완료' : (claim.depositStatus === '승인' ? '승인완료' : '미청구');
   document.getElementById('editClaimMemo').value = claim.memo || '';
 
@@ -37141,6 +37191,7 @@ function handleClaimEditSubmit(e) {
   const newAmount = Number(amountRaw) || (days * wage);
   const status = document.getElementById('editClaimStatus').value;
   const memo = document.getElementById('editClaimMemo').value.trim();
+  const editClaimDate = (document.getElementById('editClaimDate')?.value || '').trim();
 
   // DIRECT IN-PLACE MODIFICATION OF EXISTING RECORD (신규등록 아님)
   const oldAmount = claim.claimAmount || claim.totalAmount || 0;
@@ -37150,6 +37201,9 @@ function handleClaimEditSubmit(e) {
   claim.claimAmount = newAmount;
   claim.totalAmount = newAmount;
   claim.memo = memo;
+  if (editClaimDate) {
+    claim.claimDate = editClaimDate;
+  }
   claim.updatedAt = new Date().toISOString();
 
   if (status === '입금완료') {
