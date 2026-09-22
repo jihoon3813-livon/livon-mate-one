@@ -111,7 +111,7 @@
   </div>
 
   <!-- Main Document Container -->
-  <main class="flex-1 overflow-y-auto py-6 sm:py-8 px-2 sm:px-4 flex justify-center bg-slate-100">
+  <main class="flex-1 overflow-y-auto py-10 sm:py-14 px-4 sm:px-8 flex justify-center bg-slate-100">
     <div id="reportContainer" class="page-container w-full max-w-[830px] flex flex-col items-center">
       <!-- Loading Spinner -->
       <div id="loadingState" class="py-24 text-center text-slate-500 flex flex-col items-center gap-3">
@@ -128,6 +128,8 @@
     const targetSessionId = urlParams.get('sessionId') || urlParams.get('id') || '1518';
     const targetPatientName = (urlParams.get('patient') || '').trim();
     const targetDayNumber = urlParams.get('day') ? parseInt(urlParams.get('day'), 10) : null;
+    const targetStartDate = (urlParams.get('start') || '').trim();
+    const targetEndDate = (urlParams.get('end') || '').trim();
 
     let gLoadedPatient = null;
     let gLoadedDetail = null;
@@ -208,6 +210,21 @@
         const birthYear = appData?.birthDate ? parseInt(appData.birthDate.slice(0, 4), 10) : null;
         const computedAge = birthYear ? String(new Date().getFullYear() - birthYear) : (detail?.age || '51');
 
+        // Resolve care dates from URL params or window.opener
+        let resolvedStartDate = targetStartDate;
+        let resolvedEndDate = targetEndDate;
+
+        if ((!resolvedStartDate || !resolvedEndDate) && window.opener && Array.isArray(window.opener.gCarePortPatientGroups)) {
+          const matchedGroup = window.opener.gCarePortPatientGroups.find(g => 
+            (g.dailyLogs && g.dailyLogs.some(l => String(l.sessionId) === cleanSid)) ||
+            (resolvedName && (g.patientName || '').trim().replace(/\s*\(\d+차\)/g, '') === resolvedName.trim().replace(/\s*\(\d+차\)/g, ''))
+          );
+          if (matchedGroup) {
+            resolvedStartDate = resolvedStartDate || matchedGroup.careStartDate || '';
+            resolvedEndDate = resolvedEndDate || matchedGroup.careEndDate || '';
+          }
+        }
+
         const patientMeta = {
           patientName: resolvedName || '윤석찬',
           age: String(computedAge).replace(/[^0-9]/g, '') || '51',
@@ -215,8 +232,8 @@
           insuranceCompany: appData?.insuranceCompany || detail?.organizationName || '삼성화재',
           caregiverName: appData?.caregiverName || detail?.consultantName || '김명옥',
           centerName: appData?.hospitalName || appData?.addressDetail || detail?.organizationName || '삼성화재',
-          careStartDate: appData?.careStartDate || appData?.desiredStartDate || '2026.09.10',
-          careEndDate: appData?.careEndDate || appData?.expectedEndDate || '2026.09.15'
+          careStartDate: resolvedStartDate || appData?.careStartDate || appData?.desiredStartDate || '',
+          careEndDate: resolvedEndDate || appData?.careEndDate || appData?.expectedEndDate || ''
         };
         gLoadedPatient = patientMeta;
 
@@ -240,6 +257,17 @@
         patientLogs.sort((a, b) => new Date(a.consultDate || 0) - new Date(b.consultDate || 0));
         gSiblingLogs = patientLogs;
 
+        // Dynamically compute precise care period from patientLogs min & max dates
+        const firstLogDate = patientLogs.length > 0 && patientLogs[0].consultDate ? patientLogs[0].consultDate.slice(0, 10).replace(/-/g, '.') : '';
+        const lastLogDate = patientLogs.length > 0 && patientLogs[patientLogs.length - 1].consultDate ? patientLogs[patientLogs.length - 1].consultDate.slice(0, 10).replace(/-/g, '.') : '';
+
+        if (!patientMeta.careStartDate || patientMeta.careStartDate.includes('예정') || patientMeta.careStartDate === '-') {
+          patientMeta.careStartDate = firstLogDate || (appData?.careStartDate || appData?.desiredStartDate || '').slice(0, 10).replace(/-/g, '.') || '2026.09.05';
+        }
+        if (!patientMeta.careEndDate || patientMeta.careEndDate.includes('예정') || patientMeta.careEndDate === '-' || (lastLogDate && lastLogDate > patientMeta.careEndDate)) {
+          patientMeta.careEndDate = lastLogDate || (appData?.careEndDate || appData?.expectedEndDate || '').slice(0, 10).replace(/-/g, '.') || lastLogDate;
+        }
+
         // Determine current log index & day number
         let curIdx = patientLogs.findIndex(l => String(l.sessionId) === cleanSid);
         let dayNum = targetDayNumber;
@@ -249,9 +277,9 @@
           else dayNum = 1;
         }
 
-        // Calculate care period string (matching Image 2: e.g. 09.10~09.15 (일))
+        // Calculate care period string (matching Image 2: e.g. 09.05~09.22 (화))
         let periodStr = '-';
-        if (patientMeta.careStartDate && patientMeta.careEndDate) {
+        if (patientMeta.careStartDate && patientMeta.careEndDate && patientMeta.careStartDate !== '-' && patientMeta.careEndDate !== '-') {
           const s = patientMeta.careStartDate.slice(5).replace('-', '.');
           const e = patientMeta.careEndDate.slice(5).replace('-', '.');
           let dayName = '';
@@ -278,13 +306,16 @@
         };
         gLoadedLog = logObj;
 
-        // 4. Build Trend Scores across days for the Trend Chart
+        // 4. Build Trend Scores across days for the Trend Chart (with real careDate for axis labels)
         const trendScores = [];
         const totalPoints = Math.max(patientLogs.length, 3);
         for (let i = 1; i <= totalPoints; i++) {
+          const pLog = patientLogs[i - 1];
+          const logDate = pLog?.consultDate ? pLog.consultDate.slice(0, 10) : '';
           // Authentic progressive recovery scores (1~5 scale)
           trendScores.push({
             dayIndex: i,
+            careDate: logDate,
             overallScore: Math.min(5, 3 + (i > 3 ? 1 : 0) + (i === totalPoints ? 1 : 0)),
             mobilityScore: Math.min(5, 2 + Math.floor(i / 2)),
             dietScore: Math.min(5, 4 + (i % 2 === 0 ? 1 : 0)),
@@ -351,10 +382,12 @@
           if (pageEl && container) {
             container.innerHTML = '';
             container.appendChild(pageEl);
-            pageEl.style.boxShadow = '0 4px 20px -2px rgba(0, 0, 0, 0.08), 0 2px 6px -2px rgba(0, 0, 0, 0.04)';
+            pageEl.style.boxShadow = '0 8px 30px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04)';
             pageEl.style.border = '1px solid #e2e8f0';
             pageEl.style.borderRadius = '16px';
-            pageEl.style.margin = '0 auto';
+            pageEl.style.margin = '20px auto 60px auto';
+            pageEl.style.padding = '36px 42px';
+            pageEl.style.transform = 'none';
           } else if (container) {
             container.innerHTML = rawHtml;
           }
@@ -382,7 +415,10 @@
 
     // Switch between sibling days
     function switchDay(sessionId, dayNum) {
-      window.location.href = `careport-viewer.html?sessionId=${sessionId}&day=${dayNum}&patient=${encodeURIComponent(targetPatientName)}`;
+      let url = `careport-viewer.html?sessionId=${sessionId}&day=${dayNum}&patient=${encodeURIComponent(targetPatientName)}`;
+      if (targetStartDate) url += `&start=${encodeURIComponent(targetStartDate)}`;
+      if (targetEndDate) url += `&end=${encodeURIComponent(targetEndDate)}`;
+      window.location.href = url;
     }
 
     window.addEventListener('DOMContentLoaded', initViewer);

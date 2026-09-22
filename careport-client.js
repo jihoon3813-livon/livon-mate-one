@@ -515,7 +515,9 @@
       const dayText = log.dayText || (dayNum ? `${dayNum}일차` : '1일차');
 
       let carePeriod = '-';
-      if (patient.careStartDate && patient.careEndDate) {
+      if (log.carePeriod && log.carePeriod !== '-') {
+        carePeriod = log.carePeriod;
+      } else if (patient.careStartDate && patient.careEndDate && patient.careStartDate !== '-' && patient.careEndDate !== '-') {
         carePeriod = `${patient.careStartDate} ~ ${patient.careEndDate}`;
       } else if (log.startDate && log.endDate) {
         carePeriod = `${log.startDate} ~ ${log.endDate}`;
@@ -776,7 +778,7 @@
         const vSvg = this.renderTrafficLightSvg(c.tone, 'vertical');
 
         return `
-          <div style="flex: 1; min-width: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px;">
+          <div style="flex: 1; min-width: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <span class="careport-badge-pill" style="height: 22px; font-size: 11px; font-weight: 800; padding: 0 8px; border-radius: 6px; ${cPillStyle}">
                 <span class="careport-dot" style="width: 5px; height: 5px; margin-right: 4px;"></span>
@@ -851,20 +853,31 @@
       max-width: 794px;
       margin: 0 auto;
       background: #ffffff;
-      padding: 16px 22px;
+      padding: 30px 36px;
       box-sizing: border-box;
       overflow: visible;
       page-break-inside: avoid;
       break-inside: avoid;
+    }
+    @media print {
+      body { background: #ffffff !important; }
+      .page {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 16px 20px !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
     }
     .sec-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
       border-bottom: 2px solid #0f172a;
-      padding-bottom: 4px;
-      margin-top: 10px;
-      margin-bottom: 8px;
+      padding-bottom: 6px;
+      margin-top: 16px;
+      margin-bottom: 10px;
     }
     .sec-title {
       font-size: 13.5px;
@@ -881,7 +894,7 @@
       line-height: 1 !important;
       text-align: center !important;
       white-space: nowrap !important;
-    }
+      }
     .careport-dot {
       display: inline-block !important;
       border-radius: 50% !important;
@@ -893,7 +906,7 @@
 <body>
   <div class="page">
     <!-- Top Header -->
-    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 10px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 14px;">
       <div>
         <div style="font-size: 11px; font-weight: 800; color: #10bdb2; letter-spacing: 0.5px; text-transform: uppercase;">보호자 안내용 · 공식 간병일지</div>
         <h1 style="font-size: 24px; font-weight: 900; color: #020617; margin: 2px 0 0 0; letter-spacing: -0.5px;">간병일지</h1>
@@ -908,7 +921,7 @@
     </div>
 
     <!-- Demographics Bar (고객명, 간병인, 간병기간) -->
-    <div style="display: flex; justify-content: space-between; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 14px; margin-bottom: 10px;">
+    <div style="display: flex; justify-content: space-between; gap: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 16px; margin-bottom: 14px;">
       <div style="flex: 1;">
         <span style="font-size: 10.5px; color: #64748b; font-weight: 700; display: block; margin-bottom: 2px;">고객명 (피보험자)</span>
         <strong style="font-size: 13.5px; font-weight: 900; color: #0f172a;">${d.patientName}</strong>
@@ -936,7 +949,7 @@
         <span style="color: #FE6FB0;">┄ 통증수준</span>
       </div>
     </div>
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; text-align: center;">
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; text-align: center;">
       ${trendChartSvg}
     </div>
 
@@ -951,7 +964,7 @@
     </div>
 
     <!-- Overall Status Verdict Banner -->
-    <div style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;">
       <div style="display: flex; align-items: center; gap: 10px;">
         <span class="careport-badge-pill" style="font-size: 11.5px; font-weight: 900; height: 24px; padding: 0 10px; border-radius: 6px; ${toneBadgeClass}">
           <span class="careport-dot" style="width: 6px; height: 6px; margin-right: 5px;"></span>
@@ -964,7 +977,7 @@
     </div>
 
     <!-- 4 Category Cards (식사, 거동, 수면, 통증) -->
-    <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+    <div style="display: flex; gap: 10px; margin-bottom: 14px;">
       ${catCardsHtml}
     </div>
 
@@ -982,7 +995,7 @@
       <span class="sec-title">금일 간병 수행 내역</span>
       <span style="font-size: 10px; color: #94a3b8;">표준 간병 프로세스 준수</span>
     </div>
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px 12px; margin-bottom: 10px;">
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 16px; margin-bottom: 14px;">
       ${careLogHtml}
     </div>
 
@@ -991,10 +1004,10 @@
       <span class="sec-title">오늘의 중요사항 및 종합 요약</span>
       <span style="font-size: 10px; font-weight: 700; color: #10bdb2;">CarePort Verified</span>
     </div>
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px;">
-      <div style="font-size: 12.5px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">${d.title}</div>
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; margin-bottom: 14px;">
+      <div style="font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 6px;">${d.title}</div>
       <div style="margin-bottom: 8px;">${keywordsPills}</div>
-      <div style="font-size: 12px; color: #334155; line-height: 1.55; font-weight: 500; background: #f8fafc; border-radius: 6px; padding: 8px 10px; border-left: 3px solid #10bdb2;">
+      <div style="font-size: 12px; color: #334155; line-height: 1.6; font-weight: 500; background: #f8fafc; border-radius: 6px; padding: 10px 12px; border-left: 3px solid #10bdb2;">
         ${d.summary}
       </div>
     </div>
@@ -1004,12 +1017,12 @@
       <span class="sec-title">보호자 전달사항</span>
       <span style="font-size: 10px; color: #94a3b8;">안심 소통 리포트</span>
     </div>
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 14px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px;">
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; margin-bottom: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
       ${guardianNotesHtml}
     </div>
 
     <!-- Footer -->
-    <div style="text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 8px; margin-top: 6px; font-size: 10.5px; color: #94a3b8; font-weight: 600;">
+    <div style="text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 12px; margin-top: 10px; font-size: 10.5px; color: #94a3b8; font-weight: 600;">
       본 간병일지는 리본케어(CarePort) 공식 전산을 통해 실시간 작성·인증된 법적 공인 간병기록입니다.
     </div>
   </div>

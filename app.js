@@ -30763,7 +30763,7 @@ function printCarePortDocument() {
   }, 1000);
 }
 
-function openCarePortExternalLink(sid, consultantRole = '', patientName = '') {
+function openCarePortExternalLink(sid, consultantRole = '', patientName = '', startDate = '', endDate = '') {
   const currentSid = sid || gCurrentCarePortSessionId;
   if (!currentSid) return;
   const cleanSid = String(currentSid).replace(/\D/g, '') || currentSid;
@@ -30787,8 +30787,25 @@ function openCarePortExternalLink(sid, consultantRole = '', patientName = '') {
     roleStr = gCurrentCarePortDetail.consultantRole || '';
   }
 
+  // Look up patient group to find precise careStartDate & careEndDate
+  let startD = startDate || '';
+  let endD = endDate || '';
+  if ((!startD || !endD) && typeof gCarePortPatientGroups !== 'undefined' && Array.isArray(gCarePortPatientGroups)) {
+    const grp = gCarePortPatientGroups.find(g => 
+      (g.dailyLogs && g.dailyLogs.some(l => String(l.sessionId) === cleanSid)) ||
+      (pName && (g.patientName || '').trim().replace(/\s*\(\d+차\)/g, '') === pName.trim().replace(/\s*\(\d+차\)/g, ''))
+    );
+    if (grp) {
+      if (!pName && grp.patientName) pName = grp.patientName.replace(/\s*\(\d+차\)/g, '').trim();
+      startD = startD || grp.careStartDate || '';
+      endD = endD || grp.careEndDate || '';
+    }
+  }
+
   // Standalone high-fidelity CarePort viewer with real data & interactive day switching
-  const viewerUrl = `careport-viewer.html?sessionId=${encodeURIComponent(targetSid)}&patient=${encodeURIComponent(pName)}&role=${encodeURIComponent(roleStr)}`;
+  let viewerUrl = `careport-viewer.html?sessionId=${encodeURIComponent(targetSid)}&patient=${encodeURIComponent(pName)}&role=${encodeURIComponent(roleStr)}`;
+  if (startD) viewerUrl += `&start=${encodeURIComponent(startD)}`;
+  if (endD) viewerUrl += `&end=${encodeURIComponent(endD)}`;
   window.open(viewerUrl, '_blank');
 }
 
