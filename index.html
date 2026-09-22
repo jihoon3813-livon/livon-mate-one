@@ -10050,10 +10050,11 @@
               <div class="text-[12px] font-bold text-slate-500 tracking-wider">보호자 안내용</div>
               <h1 class="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mt-0.5">간병일지</h1>
             </div>
-            <!-- Day Badge in Signature Teal Card (Image 2 style) -->
-            <div class="bg-[#10bdb2] text-white px-6 py-2.5 rounded-2xl text-center shadow-xs min-w-[150px]">
-              <div id="cpDayBadge" class="text-xl sm:text-2xl font-black tracking-tight leading-tight">6일차</div>
-              <div id="cpMetaDate" class="text-xs font-bold opacity-95 mt-0.5">2026-09-20 (일)</div>
+            <!-- Date Badge in Signature Teal Card (차수 미표시, 날짜 단독 표기) -->
+            <div class="bg-[#10bdb2] text-white px-5 py-2.5 rounded-2xl text-center shadow-xs min-w-[160px] flex flex-col items-center justify-center">
+              <div class="text-[11px] font-bold text-teal-100 uppercase tracking-wider mb-0.5">일지 작성일자</div>
+              <div id="cpMetaDate" class="text-base sm:text-lg font-black tracking-tight leading-snug">2026-09-20 (일)</div>
+              <div id="cpDayBadge" class="hidden"></div>
             </div>
           </div>
 

@@ -726,7 +726,7 @@
       let xLabelsSvg = '';
       list.forEach((item, idx) => {
         const x = getX(idx);
-        const label = item.dayIndex ? `${item.dayIndex}일차` : `${idx + 1}일차`;
+        const label = item.careDate ? item.careDate.slice(5, 10).replace('-', '.') : (item.dayIndex ? `${item.dayIndex}일` : `${idx + 1}`);
         xLabelsSvg += `<text x="${x}" y="${height - 4}" font-size="11" font-weight="bold" fill="#475569" text-anchor="middle" font-family="sans-serif">${label}</text>`;
       });
       
@@ -900,7 +900,7 @@
       </div>
       <div style="text-align: right;">
         <div style="display: inline-flex; align-items: center; gap: 6px;">
-          <span class="careport-badge-pill" style="background: #10bdb2; color: #ffffff; font-size: 11.5px; font-weight: 900; height: 22px; padding: 0 9px; border-radius: 6px;">${d.dayText}</span>
+          <span class="careport-badge-pill" style="background: #10bdb2; color: #ffffff; font-size: 11.5px; font-weight: 900; height: 22px; padding: 0 9px; border-radius: 6px;">공식일지</span>
           <span style="font-size: 12.5px; font-weight: 800; color: #334155; font-family: monospace; display: inline-flex; align-items: center; height: 22px; line-height: 1;">${d.consultDate}</span>
         </div>
         <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">리본케어포트(CarePort) 전산 공인 인증 일지</div>

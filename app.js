@@ -30373,7 +30373,7 @@ function renderCareLogPatientCards(groups) {
               <div class="flex items-center gap-4 text-xs text-slate-500 flex-wrap pt-0.5">
                 <span><b>간병 기간:</b> <span class="font-mono text-slate-800">${group.careStartDate || '-'} ~ ${group.careEndDate || '-'}</span></span>
                 <span><b>담당 간병인:</b> <span class="text-slate-800 font-bold">${typeof maskName === 'function' ? maskName(group.caregiverName) : group.caregiverName}</span> (${group.centerName})</span>
-                <span><b>일지 작성 현황:</b> <span class="text-purple-700 font-black">총 ${group.totalDays}일차</span> 기록됨</span>
+                <span><b>일지 작성 현황:</b> <span class="text-purple-700 font-black">총 ${dailyLogs.length}건</span> 기록됨</span>
               </div>
             </div>
           </div>
@@ -30411,7 +30411,7 @@ function renderCareLogPatientCards(groups) {
                 [${maskedName} 님] 일자별 공식 간병일지 목록
               </h5>
               <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-purple-100 text-purple-800 border border-purple-200">
-                총 ${dailyLogs.length}회차
+                총 ${dailyLogs.length}건
               </span>
             </div>
             <span class="text-[11px] text-slate-400 font-medium hidden sm:inline">CarePort 전산 실시간 연동</span>
@@ -30427,7 +30427,7 @@ function renderCareLogPatientCards(groups) {
               const org = log.organizationName || log.orgName || group.centerName || group.insuranceCompany || '삼성화재';
               const consultDate = log.consultDate ? log.consultDate.slice(0, 16) : log.dateString;
               const duration = log.duration ? `${String(log.duration).replace('s', '')}초` : '-';
-              const title = log.title || '일상 지원 및 환자 상태 점검';
+              const title = (log.title || '일상 지원 및 환자 상태 점검').replace(/^\[\d+일차\]\s*/, '');
 
               const cachedDetail = (window.CarePortClient && window.CarePortClient._detailCache)
                 ? (window.CarePortClient._detailCache[sid] || window.CarePortClient._detailCache[String(sid).replace(/\D/g, '')])
@@ -30441,10 +30441,10 @@ function renderCareLogPatientCards(groups) {
                 <div class="px-4 py-3 hover:bg-purple-50/30 transition-colors flex flex-col gap-2 text-xs">
                   <!-- Row Header: Badges, Date, Title, Consultant, Org, Duration, Buttons -->
                   <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-                    <!-- Left: Day badge, Date, Title -->
+                    <!-- Left: Care Note badge, Date, Title -->
                     <div class="flex items-center gap-3 min-w-0 flex-1">
-                      <span class="px-2 py-0.5 rounded-md font-black text-[11px] bg-purple-600 text-white shrink-0 shadow-2xs">
-                        ${log.dayText}
+                      <span class="px-2 py-0.5 rounded-md font-black text-[11px] bg-teal-600 text-white shrink-0 shadow-2xs">
+                        간병일지
                       </span>
                       <span class="font-mono text-slate-700 font-bold shrink-0 text-xs">
                         ${consultDate}
@@ -30821,7 +30821,7 @@ function renderCarePortTrendChart(trendList) {
     return new Date(a.careDate || 0) - new Date(b.careDate || 0);
   });
 
-  const labels = validTrends.map(t => (t.dayIndex != null ? `${t.dayIndex}일차` : (t.careDate ? t.careDate.slice(5).replace('-', '.') : '-')));
+  const labels = validTrends.map(t => (t.careDate ? t.careDate.slice(5, 10).replace('-', '.') : (t.dayIndex != null ? `${t.dayIndex}일` : '-')));
   
   const overallData = validTrends.map(t => (t.overallScore != null ? t.overallScore : null));
   const mobilityData = validTrends.map(t => (t.mobilityScore != null ? t.mobilityScore : null));
@@ -31303,9 +31303,12 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
       }
     } catch (e) {}
 
-    // Header Badges
+    // Header Badges (차수 미표시: 날짜 단독 표기)
     const elDayBadge = document.getElementById('cpDayBadge');
-    if (elDayBadge) elDayBadge.innerText = computedDayText;
+    if (elDayBadge) {
+      elDayBadge.innerText = '';
+      elDayBadge.classList.add('hidden');
+    }
     const elDate = document.getElementById('cpMetaDate');
     if (elDate) elDate.innerText = dateWithDay;
 
@@ -31335,7 +31338,7 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     const elDur = document.getElementById('cpMetaDuration');
     if (elDur) elDur.innerText = d.duration;
 
-    // Render interactive day pills bar at top of modal
+    // Render interactive day pills bar at top of modal (차수 미표시: 날짜 단독 표기)
     const selectorBar = document.getElementById('cpDaySelectorBar');
     const selectorContainer = document.getElementById('cpDaySelectorContainer');
     if (selectorBar) {
@@ -31344,11 +31347,20 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
           const sSid = log.sessionId || (log.id ? String(log.id).replace(/\D/g, '') : '');
           const dayNum = log.dayNumber || (idx + 1);
           const isCurrent = String(sSid) === String(cleanSid) || (targetDayNum && Number(targetDayNum) === Number(dayNum));
-          const shortD = log.consultDate ? log.consultDate.slice(5, 10).replace('-', '.') : '';
+          let pillDateStr = log.consultDate ? log.consultDate.slice(5, 10).replace('-', '.') : '';
+          if (log.consultDate) {
+            try {
+              const pDt = new Date(log.consultDate.slice(0, 10));
+              if (!isNaN(pDt.getTime())) {
+                const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+                pillDateStr += ` (${dayNames[pDt.getDay()]})`;
+              }
+            } catch (e) {}
+          }
           return `
             <button type="button" onclick="openCarePortOfficialDetail('${sSid}', ${dayNum})" 
               class="px-2.5 py-1 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer ${isCurrent ? 'bg-[#10bdb2] text-white shadow-xs ring-2 ring-[#10bdb2]/30' : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'}">
-              ${dayNum}일차 (${shortD})
+              <span>${pillDateStr || log.consultDate || (idx + 1)}</span>
             </button>
           `;
         }).join('');
