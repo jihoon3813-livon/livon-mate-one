@@ -1212,12 +1212,9 @@ async function loadConvexData(showSpinner = true) {
     renderAllLoadingStates();
   } else {
     gIsDataLoading = false;
-    if (gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') {
-      renderUnifiedCareHub();
-    }
   }
 
-  // 1. 서버 인메모리 RAM 캐시 실데이터 즉시 병렬 요청 (50ms 초고속 - 로컬 JSON 안전 fallback 포함)
+  // 1. 서버 인메모리 RAM 캐시 실데이터 요청 함수 (로컬 캐시 부재 시 비상 fallback)
   const fetchLocalRealData = async () => {
     try {
       const r1 = await fetch('/api/hub/real-data', {
@@ -1284,8 +1281,11 @@ async function loadConvexData(showSpinner = true) {
     if (gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
   };
 
-  const realDataPromise = fetchLocalRealData();
-  realDataPromise.then(applyRealJson);
+  // 로컬 캐시가 완전히 비어있는 첫 실행 시에만 1.4MB 실데이터 JSON 비동기 다운로드 (불필요한 반복 트래픽 차단)
+  if (!hasLocalData) {
+    const realDataPromise = fetchLocalRealData();
+    realDataPromise.then(applyRealJson);
+  }
 
   try {
     const res = await queryConvex('sync:bundleAll', { sessionToken: token || '' });
@@ -1300,6 +1300,7 @@ async function loadConvexData(showSpinner = true) {
 
       // 1. 고객 신청 대장: Convex 원격 DB가 단 하나의 절대적 기준(Single Source of Truth)
       if (Array.isArray(applications) && applications.length > 0) {
+        window._isSamsungExcelEnriched = false;
         gApps = filterInvalidSamsungDuplicates(applications);
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
       }
@@ -2116,11 +2117,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   initData();
   initInsuranceWorkflows();
 
-  // Convex Cloud 운영 서버 실시간 데이터 동기화
-  if (typeof loadConvexData === 'function') {
-    await loadConvexData(false);
-  }
-
   const addrQueryInput = document.getElementById('addressSearchQuery');
   if (addrQueryInput && typeof addrQueryInput.addEventListener === 'function') {
     addrQueryInput.addEventListener('keydown', function(e) {
@@ -2143,7 +2139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   clearHubInputSafely();
   window.addEventListener('pageshow', clearHubInputSafely);
 
-  // URL 쿼리스트링(?tab=...) 또는 세션스토리지에 저장된 메뉴 탭 복원 및 클린 렌더링
+  // URL 쿼리스트링(?tab=...) 또는 세션스토리지에 저장된 메뉴 탭 복원 및 초고속 0ms 즉시 렌더링
   const urlParams = new URLSearchParams(window.location.search);
   const initialTab = urlParams.get('tab') || sessionStorage.getItem('LIVON_ACTIVE_TAB') || 'carehub';
   const initialFilter = urlParams.get('filter') || sessionStorage.getItem('LIVON_ACTIVE_FILTER') || null;
@@ -2159,6 +2155,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (typeof renderMultiTabBar === 'function') renderMultiTabBar();
   }
   initIcons();
+
+  // Convex Cloud 운영 서버 실시간 데이터 동기화 (비차단 백그라운드 실행으로 화면 대기 시간 0초 실현)
+  if (typeof loadConvexData === 'function') {
+    loadConvexData(false);
+  }
 
 
   // 경량 초기화 작업만 유휴 시점에 실행 (비활성 탭은 탭 클릭 시 온디맨드 렌더링)
@@ -4788,8 +4789,12 @@ function enrichHubSamsungCustomersFromSamsungExcel(extraSamsungRecords = null) {
   const samsungApps = gApps.filter(a => a && (a.insuranceCompany || '').includes('삼성'));
   if (samsungApps.length === 0) return 0;
 
-  // 이미 모두 연동되어 상품명이 등록된 상태이고 외부 레코드 주입이 없으면 즉시 반환 (0ms 캐싱)
+  // 이미 모두 연동되어 처리 완료된 상태이고 외부 레코드 주입이 없으면 즉시 반환 (0ms 캐싱)
+  if (!extraSamsungRecords && window._isSamsungExcelEnriched) {
+    return 0;
+  }
   if (!extraSamsungRecords && samsungApps.every(a => a.isSamsungExcelEnriched && a.productName)) {
+    window._isSamsungExcelEnriched = true;
     return 0;
   }
 
@@ -4927,6 +4932,7 @@ function enrichHubSamsungCustomersFromSamsungExcel(extraSamsungRecords = null) {
   if (enrichedCount > 0) {
     try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
   }
+  window._isSamsungExcelEnriched = true;
   return enrichedCount;
 }
 window.enrichHubSamsungCustomersFromSamsungExcel = enrichHubSamsungCustomersFromSamsungExcel;
@@ -24895,7 +24901,7 @@ function renderUnifiedCareHub() {
 
   // 1. 원수사 탭 뱃지 총 건수 산출
   const hasAnyRealApp = (gApps || []).some(x => x.isRealLaunchData);
-  const activeHubApps = filterInvalidSamsungDuplicates(hasAnyRealApp ? (gApps || []).filter(x => x.isRealLaunchData) : (gApps || []));
+  const activeHubApps = hasAnyRealApp ? (gApps || []).filter(x => x.isRealLaunchData) : (gApps || []);
 
   // [CTI 중복 노출 방지]: 동일인 다중 리스트 중 가장 최근 등록건 식별 Set 갱신
   if (typeof getLatestCustomerAppIdSet === 'function') {
@@ -25735,7 +25741,11 @@ function renderUnifiedCareHub() {
 
   renderHubPagination(totalCount, totalPages);
   updateSelectedHubUI();
-  initIcons(container);
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => initIcons(container));
+  } else {
+    initIcons(container);
+  }
   if (!window.gIsRefreshingHubData) {
     document.querySelectorAll('[onclick="refreshLatestData()"] svg, [onclick="refreshLatestData()"] i, #hubRefreshBtnIcon')
       .forEach(el => el.classList.remove('animate-spin'));
