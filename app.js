@@ -30327,72 +30327,35 @@ function openCarePortExternalLink(sid, consultantRole = '', patientName = '') {
   const currentSid = sid || gCurrentCarePortSessionId;
   if (!currentSid) return;
   const cleanSid = String(currentSid).replace(/\D/g, '') || currentSid;
-  
-  // 사용자가 클릭한 해당 회차의 정확한 세션 ID로 CarePort 원본 열기
   const targetSid = cleanSid;
 
+  let pName = (patientName || '').trim();
+  if (!pName && typeof gCurrentCarePortDetail !== 'undefined' && gCurrentCarePortDetail) {
+    pName = (gCurrentCarePortDetail.username || gCurrentCarePortDetail.patientName || '').trim();
+  }
+  if (!pName && typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) {
+    const found = gCareLogs.find(l => String(l.sessionId) === cleanSid || String(l.id).replace(/\D/g, '') === cleanSid);
+    if (found) pName = (found.username || found.patientName || '').trim();
+  }
+  if (!pName && typeof gCarePortRawLogs !== 'undefined' && Array.isArray(gCarePortRawLogs)) {
+    const found = gCarePortRawLogs.find(l => String(l.sessionId) === cleanSid);
+    if (found) pName = (found.username || found.patientName || '').trim();
+  }
+
   let roleStr = String(consultantRole || '').trim();
-  if (!roleStr && gCurrentCarePortDetail) {
+  if (!roleStr && typeof gCurrentCarePortDetail !== 'undefined' && gCurrentCarePortDetail) {
     roleStr = gCurrentCarePortDetail.consultantRole || '';
   }
-  const isCaregiver = roleStr.includes('간병') || roleStr.includes('요양') || roleStr === '';
-  const route = isCaregiver ? 'consult_caregiver' : 'consult';
-  window.open(`https://careport.livon.care/#/careport/${route}/${targetSid}`, '_blank');
+
+  // Standalone high-fidelity CarePort viewer with real data & interactive day switching
+  const viewerUrl = `careport-viewer.html?sessionId=${encodeURIComponent(targetSid)}&patient=${encodeURIComponent(pName)}&role=${encodeURIComponent(roleStr)}`;
+  window.open(viewerUrl, '_blank');
 }
 
 function openCarePortModernViewer(sessionId) {
   const sid = sessionId || gCurrentCarePortSessionId;
   if (!sid) return;
-  
-  // Clone current carePortPrintArea in a standalone browser window (Image 2 style)
-  const printArea = document.getElementById('carePortPrintArea');
-  const title = (document.getElementById('cpMetaUsernameText')?.innerText || '간병일지') + ' - 공식 간병일지';
-  
-  const win = window.open('', '_blank');
-  if (!win) {
-    alert('팝업 차단을 해제해주세요.');
-    return;
-  }
-  
-  const contentHtml = printArea ? printArea.innerHTML : '<div style="padding: 40px; text-align: center;">간병일지 로딩 중...</div>';
-  const chartConfigStr = gCurrentCarePortChartConfig ? JSON.stringify(gCurrentCarePortChartConfig) : 'null';
-  
-  win.document.open();
-  win.document.write(`
-    <!DOCTYPE html>
-    <html lang="ko">
-    <head>
-      <meta charset="UTF-8">
-      <title>${title}</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <script src="https://cdn.tailwindcss.com"></script>
-      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
-      <style>
-        body { font-family: Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; background-color: #f1f5f9; margin: 0; padding: 24px; }
-        @media print {
-          body { background: #fff !important; padding: 0 !important; }
-          .no-print { display: none !important; }
-        }
-      </style>
-    </head>
-    <body class="flex flex-col items-center justify-center min-h-screen">
-      <div class="max-w-4xl w-full bg-white rounded-3xl shadow-xl border border-slate-200 p-6 sm:p-10 my-4 relative">
-        ${contentHtml}
-      </div>
-      <script>
-        const chartConfig = ${chartConfigStr};
-        if (chartConfig) {
-          const canvas = document.getElementById('cpStatusChart');
-          if (canvas) {
-            new Chart(canvas.getContext('2d'), chartConfig);
-          }
-        }
-      </script>
-    </body>
-    </html>
-  `);
-  win.document.close();
+  openCarePortExternalLink(sid);
 }
 
 function openCarePortInNewTab() {

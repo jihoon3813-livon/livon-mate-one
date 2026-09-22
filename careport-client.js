@@ -489,12 +489,41 @@
       const gender = detail.gender || log.gender || patient.gender || '여';
       const consultant = (detail.consultantName || log.consultantName || log.caregiverName || log.caregiver || patient.caregiverName || '간병사').trim();
       const org = (detail.organizationName || detail.orgName || log.organizationName || log.orgName || patient.insuranceCompany || patient.centerName || '삼성화재').trim();
-      const consultDate = (detail.consultDate || log.consultDate || log.dateString || new Date().toISOString().slice(0, 10)).slice(0, 16);
+      let rawConsultDate = (detail.consultDate || log.consultDate || log.dateString || new Date().toISOString().slice(0, 10)).slice(0, 16);
+      let consultDate = rawConsultDate;
+      try {
+        const dt = new Date(rawConsultDate.slice(0, 10));
+        if (!isNaN(dt.getTime())) {
+          const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+          consultDate = `${rawConsultDate.slice(0, 10)} (${dayNames[dt.getDay()]})`;
+        }
+      } catch (e) {}
+
       const duration = detail.duration ? `${String(detail.duration).replace('s', '')}초` : (log.duration ? `${String(log.duration).replace('s', '')}초` : '120초');
-      const dayText = log.dayText || (log.dayNumber ? `${log.dayNumber}일차` : (raw.day_index ? `${raw.day_index}일차` : (detail.dayIndex ? `${detail.dayIndex}일차` : (detail.dayNumber ? `${detail.dayNumber}일차` : '1일차'))));
-      const carePeriod = (patient.careStartDate && patient.careEndDate)
-        ? `${patient.careStartDate} ~ ${patient.careEndDate}`
-        : (log.startDate && log.endDate ? `${log.startDate} ~ ${log.endDate}` : `${consultDate.slice(0, 10)}`);
+      
+      let dayNum = log.dayNumber || (raw.day_index ? Number(raw.day_index) : (detail.dayIndex ? Number(detail.dayIndex) : (detail.dayNumber ? Number(detail.dayNumber) : null)));
+      if (!dayNum && patient.careStartDate && rawConsultDate) {
+        try {
+          const sDt = new Date(patient.careStartDate.replace(/\./g, '-').slice(0, 10));
+          const cDt = new Date(rawConsultDate.slice(0, 10));
+          if (!isNaN(sDt.getTime()) && !isNaN(cDt.getTime())) {
+            const diff = Math.floor((cDt.getTime() - sDt.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            if (diff > 0) dayNum = diff;
+          }
+        } catch (e) {}
+      }
+      const dayText = log.dayText || (dayNum ? `${dayNum}일차` : '1일차');
+
+      let carePeriod = '-';
+      if (patient.careStartDate && patient.careEndDate) {
+        carePeriod = `${patient.careStartDate} ~ ${patient.careEndDate}`;
+      } else if (log.startDate && log.endDate) {
+        carePeriod = `${log.startDate} ~ ${log.endDate}`;
+      } else if (patient.applyDate) {
+        carePeriod = `${patient.applyDate} ~ ${patient.careEndDate || rawConsultDate.slice(0, 10)}`;
+      } else {
+        carePeriod = `${rawConsultDate.slice(0, 10)}`;
+      }
 
       const title = detail.title || raw.consult_title || log.title || `${pName} 님 일상 케어 및 상태 확인`;
 
@@ -597,6 +626,9 @@
       // 7. Summary
       const summary = detail.summary || raw.consult_summary || raw.session_summary || `${pName} 환자분은 전반적인 활력징후 및 컨디션이 안정적인 상태를 유지하고 있습니다. 식사 섭취가 양호하고 특이 이상 반응 없이 일상 케어가 순조롭게 진행되었습니다.`;
 
+      // 8. Trend scores resolution
+      const trendScores = raw.trendScores || detail.trendScores || patient.trendScores || log.trendScores || null;
+
       return {
         patientName: pName,
         age,
@@ -605,9 +637,11 @@
         org,
         consultDate,
         duration,
+        dayNumber: dayNum || 1,
         dayText,
         carePeriod,
         title,
+        trendScores,
         overallStatus: { tone: overallTone, label: '전반상태', description: overallComment },
         categories,
         vitals,
