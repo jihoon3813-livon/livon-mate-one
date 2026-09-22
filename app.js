@@ -20799,9 +20799,176 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
             </div>
           </div>
 
+          <!-- ========================================================================= -->
+          <!-- 2. 배정 간병인 & 관리 센터 & 일정 프로그레스 (Caregiver, Center & Progress) -->
+          <!-- ========================================================================= -->
+          <div class="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col justify-between">
+            <div class="bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-700 p-3.5 sm:p-4 text-white flex items-center justify-between min-h-[56px] shrink-0 gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <div class="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center font-bold shrink-0">
+                  <i data-lucide="users" class="w-4 h-4 text-sky-200"></i>
+                </div>
+                <div class="min-w-0">
+                  <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5 truncate">
+                    <span>간병인 / 센터 관리</span>
+                    ${sortedAssigns.length > 1 ? `<span class="px-1.5 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-black bg-amber-400 text-amber-950 shrink-0">총 ${sortedAssigns.length}명 교체이력</span>` : ''}
+                  </h4>
+                  <span class="text-[10px] sm:text-[10.5px] text-sky-100 font-medium truncate block">간병인 프로필, 일정 및 차수별 정산</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                ${hasAssign ? `
+                  <button type="button" onclick="openNewAssignModal('${app.id}', true)" 
+                    class="px-2.5 py-1 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-xs whitespace-nowrap" title="간병인 교체">
+                    <i data-lucide="refresh-cw" class="w-3 h-3"></i> <span>간병인 교체</span>
+                  </button>
+                ` : `
+                  <button type="button" onclick="openNewAssignModal('${app.id}', false)" 
+                    class="px-2.5 py-1 rounded-xl bg-white text-sky-900 font-black text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-xs whitespace-nowrap">
+                    <i data-lucide="plus" class="w-3 h-3"></i> <span>배정</span>
+                  </button>
+                `}
+              </div>
+            </div>
+
+            <div class="p-3.5 sm:p-4 flex-1 flex flex-col justify-between space-y-3 bg-slate-50/50">
+              ${!hasAssign ? `
+                <div class="my-auto p-6 text-center bg-white rounded-2xl border-2 border-dashed border-slate-300 space-y-2">
+                  <div class="w-10 h-10 mx-auto rounded-xl bg-slate-100 shadow-xs border border-slate-200 flex items-center justify-center text-slate-400">
+                    <i data-lucide="user-x" class="w-5 h-5"></i>
+                  </div>
+                  <div class="font-bold text-slate-700 text-xs">현재 배정된 간병인이 없습니다</div>
+                  <button type="button" onclick="openNewAssignModal('${app.id}', false)" 
+                    class="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-md inline-flex items-center gap-1 transition-all">
+                    <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                    <span>간병인 배정하기</span>
+                  </button>
+                </div>
+              ` : `
+                ${sortedAssigns.length > 1 ? `
+                  <div class="bg-slate-200/80 p-1.5 rounded-2xl flex items-center gap-1.5 overflow-x-auto custom-scrollbar border border-slate-300/80">
+                    ${sortedAssigns.map((aItem, aIdx) => {
+                      const isSelected = aItem.id === as.id;
+                      const isLatest = aIdx === sortedAssigns.length - 1;
+                      const roundLabel = `${aIdx + 1}차: ${maskName(aItem.caregiverName)}`;
+                      return `
+                        <button type="button" onclick="switchCaregiverTab('${aItem.id}')"
+                          class="px-2.5 py-1 rounded-xl font-black text-[10.5px] flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${
+                            isSelected
+                              ? 'bg-sky-600 text-white shadow-sm ring-2 ring-sky-300'
+                              : 'bg-white/80 hover:bg-white text-slate-700 border border-slate-200 hover:text-sky-700'
+                          }">
+                          <span>${roundLabel}</span>
+                          ${isLatest 
+                            ? `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-amber-400 text-slate-900' : 'bg-emerald-100 text-emerald-800'}">현재★</span>`
+                            : `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-white/30 text-white' : 'bg-slate-100 text-slate-500'}">교체종료</span>`
+                          }
+                        </button>
+                      `;
+                    }).join('')}
+                  </div>
+                ` : ''}
+
+                <!-- 1. 간병인 핵심 정보 & 센터 정보 (첨부 2 상단 카드) -->
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
+                  <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                      <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-mono font-bold text-[10px]">${as.id}</span>
+                      <b class="text-sm text-slate-900">${maskName(as.caregiverName)}</b>
+                      ${(birth && birth !== '-' && birth !== 'null' && birth.trim() !== '') ? `<span class="text-slate-500 text-[11px]">(${maskBirth(birth)})</span>` : ''}
+                      ${sortedAssigns.length > 1 ? `
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${as.id === sortedAssigns[sortedAssigns.length - 1].id ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-600 border border-slate-200'}">
+                          ${as.id === sortedAssigns[sortedAssigns.length - 1].id ? '현재 투입중' : '종료(정산보존)'}
+                        </span>
+                      ` : ''}
+                    </div>
+                    <button type="button" onclick="openCareScheduleModal('${as.id}')" 
+                      class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1 cursor-pointer">
+                      <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
+                    </button>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-x-3 gap-y-2 text-[11.5px] text-slate-600">
+                    <div class="col-span-2 flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
+                      <span class="text-slate-500 font-medium">연락처:</span>
+                      <div class="flex items-center font-mono font-bold text-slate-900">
+                        <span>${maskPhone(caregiverPhone)}</span>
+                        ${renderCtiCallBtn(caregiverPhone, as.caregiverName, '간병인')}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span class="text-slate-400">담당센터:</span>
+                      <b class="text-slate-800 ml-1">${as.centerName || '영등포센터'}</b>
+                    </div>
+                    <div class="flex items-center justify-end">
+                      <span class="font-mono text-slate-800 text-[11px]">${centerPhone}</span>
+                      ${renderCtiCallBtn(centerPhone, as.centerName || '센터', '담당센터', true)}
+                    </div>
+
+                    <div>
+                      <span class="text-slate-400">정산유형:</span>
+                      <span class="font-semibold text-slate-700 ml-1">${as.settlementType || '개인'}</span>
+                    </div>
+                    <div class="text-right">
+                      <span class="text-slate-400">일급(일당):</span>
+                      <b class="text-emerald-700 font-mono ml-1">${formatCurrency(as.dailyWage)}원</b>
+                    </div>
+
+                    <div class="col-span-2 pt-1 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                      <span class="text-slate-400">지급계좌:</span>
+                      <span class="font-mono text-slate-700 truncate max-w-[220px]" title="${account}">${maskAccount(account)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 2. 간병일시 관리 및 프로그레스 바 (첨부 2 하단 카드) -->
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
+                  <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
+                    <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                      <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i>
+                      <span>간병일시 관리 ${sortedAssigns.length > 1 ? `(${maskName(as.caregiverName)})` : ''}</span>
+                    </span>
+                    <span class="font-mono font-black text-sky-700 text-xs">${prog ? prog.percent : 0}% 진행</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 text-center text-[11px] font-mono">
+                    <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <div class="text-[10px] text-slate-400 mb-0.5">간병 시작일시</div>
+                      <b class="text-slate-900">${formatWithTime(as.startDate, '09:00')}</b>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <div class="text-[10px] text-slate-400 mb-0.5">간병 종료일시</div>
+                      <b class="text-slate-900">${formatWithTime(as.endDate, '18:00')}</b>
+                    </div>
+                  </div>
+
+                  ${prog ? `
+                    <div class="space-y-1.5 pt-1">
+                      <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner flex">
+                        <div class="h-full ${prog.status === 'completed' ? 'bg-slate-400' : 'bg-gradient-to-r from-sky-500 to-emerald-500'} rounded-full transition-all duration-500" style="width: ${prog.percent}%"></div>
+                      </div>
+                      <div class="flex justify-between items-center text-[10px] sm:text-[10.5px] text-slate-500 flex-wrap gap-1">
+                        ${(prog.isOngoing || !as?.endDate || as?.endDate === '진행중') ? `
+                          <span class="whitespace-nowrap">간병시작: <b class="text-slate-800">${as?.startDate ? as.startDate.slice(5) : '-'}</b></span>
+                          <span class="whitespace-nowrap">경과: <b class="text-slate-800">${prog.elapsedDays}일 (${prog.elapsedDays * 24}시간)</b></span>
+                          <span class="whitespace-nowrap"><b class="text-emerald-700 font-bold">간병 진행중</b></span>
+                        ` : `
+                          <span class="whitespace-nowrap">총 <b>${prog.totalDays}</b>일 (${prog.totalDays * 24}시간) 근무</span>
+                          <span class="whitespace-nowrap">경과: <b class="text-slate-800">${prog.elapsedDays}일 (${prog.elapsedDays * 24}시간)</b></span>
+                          <span class="whitespace-nowrap">잔여: <b class="${prog.remainingDays === 0 ? 'text-slate-400' : 'text-amber-700 font-bold'}">${prog.remainingDays}일 (${prog.remainingDays * 24}시간)</b></span>
+                        `}
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+              `}
+            </div>
+          </div>
+
           ${!isSamsung ? `
           <!-- ========================================================================= -->
-          <!-- 2. 손사(보험사) 정보 및 청구 기준 (Adjuster & Claims Info) -->
+          <!-- 3. 손사(보험사) 정보 및 청구 기준 (Adjuster & Claims Info) -->
           <!-- ========================================================================= -->
           <div class="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col justify-between">
             <div class="bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 p-3.5 sm:p-4 text-white flex items-center justify-between min-h-[56px] shrink-0 gap-2">
@@ -20836,147 +21003,86 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
               </div>
             </div>
 
-            <div class="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-2.5">
-              <div>
-                <!-- 상단 헤더: 손사/보험사 담당자 정보 -->
-                <div class="flex items-center justify-between pb-2.5 border-b border-slate-100">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-black text-xs flex items-center justify-center flex-shrink-0 shadow-md">
-                      <i data-lucide="briefcase" class="w-4 h-4 text-white"></i>
-                    </div>
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-1.5">
-                        <span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-bold text-[10px]">${app.insuranceCompany || '손사'}</span>
-                        <b class="text-sm text-slate-900 font-black truncate">${app.adjusterName || '손사 미지정'}</b>
-                      </div>
-                      <span class="text-[10.5px] text-slate-500 font-medium truncate block">${app.adjusterFirm || '손해사정 법인/파트 미등록'}</span>
-                    </div>
+            <!-- Card Body: 3-column view와 동일한 모듈 구성 (첨부 1 참고) -->
+            <div class="p-3.5 sm:p-4 flex-1 flex flex-col justify-between space-y-3 bg-slate-50/50">
+              <!-- 1. 손사 담당자 연락처 카드 -->
+              <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold text-[10.5px]">${app.insuranceCompany || '손사'}</span>
+                    <b class="text-sm text-slate-900">${app.adjusterName || '손사 미지정'}</b>
+                    <span class="text-slate-500 text-[11px]">${app.adjusterFirm ? '(' + app.adjusterFirm + ')' : ''}</span>
                   </div>
+                  <button type="button" onclick="openAppAdjusterEditModal('${app.id}')" class="px-2 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer border border-purple-200" title="손사(보험사) 및 증권/청구 정보 수정">
+                    <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
+                  </button>
                 </div>
 
-                <!-- 손사 연락처 상세 (일반전화, 핸드폰, 팩스) -->
-                <div class="space-y-1.5 py-2 text-slate-600 text-[11px] border-b border-slate-100">
+                <div class="space-y-2 text-slate-600 text-[11.5px]">
                   <div class="flex justify-between items-center">
-                    <span class="text-slate-400 font-medium">손사 일반전화:</span>
-                    <div class="flex items-center font-mono text-slate-900 font-bold">
+                    <span class="text-slate-500 font-medium">손사 일반전화:</span>
+                    <div class="flex items-center font-mono text-slate-900 font-semibold">
                       <span>${formatPhoneNumber(adjPhone) || '<span class="text-slate-400 font-normal">유선 미등록</span>'}</span>
                       ${renderCtiCallBtn(adjPhone, app.adjusterName, '손사-일반전화')}
                     </div>
                   </div>
-                  <div class="flex justify-between items-center">
-                    <span class="text-slate-400 font-medium">손사 핸드폰:</span>
+
+                  <div class="flex justify-between items-center pt-1 border-t border-slate-100">
+                    <span class="text-slate-500 font-medium">손사 핸드폰:</span>
                     <div class="flex items-center font-mono text-purple-900 font-bold">
                       <span>${formatPhoneNumber(adjMobile) || '<span class="text-slate-400 font-normal">휴대폰 미등록</span>'}</span>
                       ${renderCtiCallBtn(adjMobile, app.adjusterName, '손사-핸드폰')}
                     </div>
                   </div>
-                  <div class="flex justify-between items-center">
-                    <span class="text-slate-400 font-medium">수신 팩스번호:</span>
+
+                  <div class="flex justify-between items-center pt-1 border-t border-slate-100">
+                    <span class="text-slate-500 font-medium">수신 팩스번호:</span>
                     <b class="text-slate-900 font-mono font-bold">${formatPhoneNumber(app.adjusterFax) || '<span class="text-slate-400 font-normal">FAX 미등록</span>'}</b>
                   </div>
                 </div>
+              </div>
 
-                <!-- 청구 기준 요약 (청구단가 & 총 산정기간) -->
-                <div class="pt-2 grid grid-cols-2 gap-2 text-[11px]">
-                  <div class="p-2.5 rounded-xl bg-purple-50/60 border border-purple-100">
-                    <div class="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
-                      <span>1일 청구단가</span>
-                      <button type="button" onclick="openCustomerClaimPriceModal('${app.id}')" class="text-purple-700 hover:underline font-bold text-[9.5px]">변경</button>
+              <!-- 2. 청구 기준 요약 (1일 청구단가 및 간병인 배정 기준 총 산정기간) -->
+              <div class="grid grid-cols-2 gap-2 text-[11.5px]">
+                <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+                  <div>
+                    <div class="flex items-center justify-between mb-0.5">
+                      <span class="text-[10.5px] text-slate-400 font-medium">청구 단가 (1일 기준)</span>
+                      <button type="button" onclick="event.stopPropagation(); openCustomerClaimPriceModal('${app.id}')" 
+                        class="px-2 py-0.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition-all flex items-center gap-1 cursor-pointer shadow-2xs" title="이 고객에게만 적용할 1일 청구단가 직접 변경">
+                        <i data-lucide="edit-3" class="w-3 h-3"></i> <span>단가변경</span>
+                      </button>
                     </div>
-                    <div class="font-mono font-black text-slate-900 text-xs">
-                      ${formatCurrency(dailyPrice)}원
-                      <span class="text-[9px] font-sans font-medium text-slate-400">${app.customDailyClaimPrice ? '(개별)' : '(약정)'}</span>
+                    <div class="font-mono font-black text-slate-900 text-sm flex items-baseline gap-1.5">
+                      <span>${formatCurrency(dailyPrice)}원</span>
+                      ${app.customDailyClaimPrice ? `
+                        <span class="text-[9.5px] font-sans font-black px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300">개별지정</span>
+                      ` : `
+                        <span class="text-[9.5px] font-sans font-medium text-slate-400">약정기본</span>
+                      `}
                     </div>
                   </div>
-                  <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                    <div class="text-[10px] text-slate-400 mb-0.5">총 간병기간 (배정)</div>
-                    <div class="font-mono font-black text-purple-900 text-xs">${totalCareDays > 0 ? `${totalCareDays}일간 (${totalCareHours}시간)` : '미배정'}</div>
+                  <div class="text-[10px] ${app.customDailyClaimPrice ? 'text-amber-800 font-semibold' : 'text-slate-400'} mt-1 flex items-center justify-between">
+                    <span>${app.insuranceCompany || '현대해상'} ${app.customDailyClaimPrice ? '개별 적용 중' : '약정단가'}</span>
+                    ${app.customDailyClaimPrice ? `
+                      <button type="button" onclick="event.stopPropagation(); resetCustomerClaimPrice('${app.id}')" class="text-rose-600 hover:underline text-[9.5px] cursor-pointer" title="기본 약정단가로 원복">원복</button>
+                    ` : ''}
                   </div>
+                </div>
+                <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+                  <div class="text-[10.5px] text-slate-400 mb-0.5">총 간병 기간 (배정 기준)</div>
+                  ${hasAssign && as && as.startDate ? `
+                    <div class="font-mono font-black text-purple-900 text-sm">${totalCareDays}일간 <span class="text-xs text-slate-500 font-bold">(${totalCareDays * 24}시간)</span></div>
+                    <div class="text-[10px] text-purple-700 font-bold mt-0.5">${formatWithTime(as.startDate, '09:00')} ~ ${formatWithTime(as.endDate, '18:00')}</div>
+                  ` : `
+                    <div class="font-mono font-black text-amber-600 text-sm">간병인 배정 대기</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">신청시 예정: ${app.expectedDays || 14}일 (${(app.expectedDays || 14) * 24}시간)</div>
+                  `}
                 </div>
               </div>
             </div>
           </div>
           ` : ''}
-
-          <!-- ========================================================================= -->
-          <!-- 3. 배정 간병인 & 관리 센터 & 일정 프로그레스 (Caregiver, Center & Progress) -->
-          <!-- ========================================================================= -->
-          <div class="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col justify-between">
-            <div class="bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-700 p-3.5 sm:p-4 text-white flex items-center justify-between min-h-[56px] shrink-0 gap-2">
-              <div class="flex items-center gap-2 min-w-0">
-                <div class="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center font-bold shrink-0">
-                  <i data-lucide="users" class="w-4 h-4 text-sky-200"></i>
-                </div>
-                <div class="min-w-0">
-                  <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5 truncate">
-                    간병인 / 센터 관리
-                  </h4>
-                  <span class="text-[10px] sm:text-[10.5px] text-sky-100 font-medium truncate block">간병인 프로필, 일정 및 차수별 정산</span>
-                </div>
-              </div>
-              <div class="flex items-center gap-1.5 shrink-0">
-                ${hasAssign ? `
-                  <button type="button" onclick="openCareScheduleModal('${as.id}')" class="px-2 sm:px-2.5 py-1 rounded-xl text-[10.5px] sm:text-[11px] font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all flex items-center gap-1 shadow-xs cursor-pointer whitespace-nowrap" title="간병인 정보 및 일정/일급 수정">
-                    <i data-lucide="edit" class="w-3 h-3"></i> <span>정보수정</span>
-                  </button>
-                  <button type="button" onclick="openNewAssignModal('${app.id}', true)" class="px-2.5 py-1 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-xs whitespace-nowrap" title="간병인 교체">
-                    <i data-lucide="refresh-cw" class="w-3 h-3"></i> <span>교체</span>
-                  </button>
-                ` : `
-                  <button type="button" onclick="openNewAssignModal('${app.id}', false)" class="px-2.5 py-1 rounded-xl bg-white text-sky-900 font-black text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-xs whitespace-nowrap">
-                    <i data-lucide="plus" class="w-3 h-3"></i> <span>배정</span>
-                  </button>
-                `}
-              </div>
-            </div>
-
-            <div class="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-2.5">
-              <div>
-                <!-- 상단 헤더: 간병인명, 배정 상태 -->
-                <div class="flex items-center justify-between pb-2.5 border-b border-slate-100">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white font-black text-xs flex items-center justify-center flex-shrink-0 shadow-md">
-                      <i data-lucide="user-check" class="w-4 h-4 text-white"></i>
-                    </div>
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-1.5">
-                        <b class="text-sm text-slate-900 font-black truncate">${as ? maskName(as.caregiverName) : '간병인 미배정'}</b>
-                        ${(birth && birth !== '-' && birth !== 'null' && birth.trim() !== '') ? `<span class="text-[10.5px] text-slate-500 font-medium">(${maskBirth(birth)})</span>` : ''}
-                      </div>
-                      <span class="text-[10.5px] text-teal-700 font-bold truncate block">${as ? (as.centerName || '영등포센터') : '센터 미지정'}</span>
-                    </div>
-                  </div>
-                </div>
-
-              <!-- 간병 일정 & 프로그레스 바 -->
-              <div class="pt-2 space-y-1.5 text-[11px]">
-                <div class="flex items-center justify-between font-mono">
-                  <span class="text-slate-400">간병기간:</span>
-                  <b class="text-slate-900">${formatWithTime(as ? as.startDate : null, '09:00')} ~ ${formatWithTime(as ? as.endDate : null, '18:00')}</b>
-                </div>
-                ${prog ? `
-                  <div class="space-y-1">
-                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden flex">
-                      <div class="h-full ${prog.status === 'completed' ? 'bg-slate-400' : 'bg-gradient-to-r from-sky-500 to-emerald-500'} rounded-full transition-all duration-500" style="width: ${prog.percent}%"></div>
-                    </div>
-                    <div class="flex justify-between items-center text-[10px] text-slate-500 flex-wrap gap-1">
-                      ${(prog.isOngoing || !as?.endDate || as?.endDate === '진행중') ? `
-                        <span class="whitespace-nowrap">간병시작: <b class="text-slate-800">${as?.startDate ? as.startDate.slice(5) : '-'}</b></span>
-                        <span class="whitespace-nowrap">경과: <b class="text-slate-800">${prog.elapsedDays}일 (${elapsedHours}시간)</b></span>
-                        <span class="whitespace-nowrap"><b class="text-emerald-700 font-bold">간병 진행중</b></span>
-                      ` : `
-                        <span class="whitespace-nowrap">진행률: <b class="text-sky-700 font-bold">${prog.percent}%</b></span>
-                        <span class="whitespace-nowrap">경과: <b class="text-slate-800">${prog.elapsedDays}일 (${elapsedHours}시간)</b></span>
-                        <span class="whitespace-nowrap">잔여: <b class="${prog.remainingDays === 0 ? 'text-slate-400' : 'text-amber-700 font-bold'}">${prog.remainingDays}일 (${remainingHours}시간)</b></span>
-                      `}
-                    </div>
-                  </div>
-                ` : `
-                  <div class="text-[10.5px] text-slate-400 text-center py-0.5">배정된 간병 일정이 없습니다.</div>
-                `}
-              </div>
-            </div>
-          </div>
 
         </div>
 
@@ -21775,8 +21881,8 @@ function switch3CardMobileSubTab(cardId) {
 
   const activeStyles = {
     card1: 'bg-emerald-600 text-white shadow-xs',
-    card2: 'bg-sky-600 text-white shadow-xs',
-    card3: 'bg-purple-600 text-white shadow-xs'
+    card2: 'bg-purple-600 text-white shadow-xs',
+    card3: 'bg-sky-600 text-white shadow-xs'
   };
   const inactiveStyle = 'text-slate-600 hover:bg-slate-100';
 
@@ -21926,16 +22032,16 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
           <span class="whitespace-nowrap">고객/접수</span>
         </button>
         <button type="button" onclick="switch3CardMobileSubTab('card2')" id="tabBtnCard2"
-          class="flex-1 py-2 px-1 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${gActive3CardMobileTab === 'card2' ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'}">
-          <i data-lucide="users" class="w-3.5 h-3.5 shrink-0"></i>
-          <span class="whitespace-nowrap">간병인/센터</span>
-          ${schedule.isCaregiverPayoutDue ? '<span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse shrink-0"></span>' : ''}
-        </button>
-        <button type="button" onclick="switch3CardMobileSubTab('card3')" id="tabBtnCard3"
-          class="flex-1 py-2 px-1 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${gActive3CardMobileTab === 'card3' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'}">
+          class="flex-1 py-2 px-1 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${gActive3CardMobileTab === 'card2' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'}">
           <i data-lucide="receipt" class="w-3.5 h-3.5 shrink-0"></i>
           <span class="whitespace-nowrap">손사/보험사</span>
           ${schedule.hasUnpaidClaim ? '<span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse shrink-0"></span>' : ''}
+        </button>
+        <button type="button" onclick="switch3CardMobileSubTab('card3')" id="tabBtnCard3"
+          class="flex-1 py-2 px-1 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${gActive3CardMobileTab === 'card3' ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'}">
+          <i data-lucide="users" class="w-3.5 h-3.5 shrink-0"></i>
+          <span class="whitespace-nowrap">간병인/센터</span>
+          ${schedule.isCaregiverPayoutDue ? '<span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse shrink-0"></span>' : ''}
         </button>
       </div>
 
@@ -22147,347 +22253,9 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
         </div>
 
         <!-- ========================================================================= -->
-        <!-- [CARD 2] 간병인 / 센터 관리 (Caregiver & Center Card) -->
+        <!-- [CARD 2] 손사(보험사) 청구 관리 (Adjuster & Claim Billing Card) -->
         <!-- ========================================================================= -->
         <div id="hubCard2" class="${gActive3CardMobileTab === 'card2' ? 'flex' : 'hidden'} lg:flex bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 flex-col h-auto lg:h-[78vh] lg:max-h-[820px] overflow-hidden transition-all duration-300 hover:shadow-xl">
-          <!-- Card Header (통일된 헤더 높이 및 배지/버튼) -->
-          <div class="bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 p-3.5 sm:p-4 text-white flex items-center justify-between min-h-[56px] sm:min-h-[64px] shrink-0 gap-2">
-            <div class="flex items-center gap-2 min-w-0">
-              <div class="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center font-bold shrink-0">
-                <i data-lucide="users" class="w-4 h-4 text-sky-200"></i>
-              </div>
-              <div class="min-w-0">
-                <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5 truncate">
-                  <span>간병인 / 센터 관리</span>
-                  ${sortedAssigns.length > 1 ? `<span class="px-1.5 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-black bg-amber-400 text-amber-950 shrink-0">총 ${sortedAssigns.length}명 교체이력</span>` : ''}
-                </h4>
-                <span class="text-[10px] sm:text-[10.5px] text-sky-100 font-medium truncate block">간병인 프로필, 일정 및 차수별 정산</span>
-              </div>
-            </div>
-            <div class="flex items-center gap-1.5 shrink-0">
-              ${schedule.isCaregiverPayoutDue ? `
-                <span class="px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-rose-500 text-white shadow-md animate-pulse flex items-center gap-1 whitespace-nowrap">
-                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">🚨</span> <span>지급대상</span>
-                </span>
-              ` : (schedule.isAllPayoutsPaid && schedule.isCarePeriodEnded ? `
-                <span class="px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-emerald-400 text-slate-900 shadow-md flex items-center gap-1 whitespace-nowrap">
-                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> <span>지급완료</span>
-                </span>
-              ` : '')}
-              ${hasAssign ? `
-                <button type="button" onclick="openNewAssignModal('${app.id}', true)" 
-                  class="px-2 sm:px-2.5 py-1 rounded-xl text-[10.5px] sm:text-[11px] font-black bg-amber-400 hover:bg-amber-300 text-amber-950 shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap" title="기존 간병인 근무 종료 및 후임 간병인 교체 등록">
-                  <i data-lucide="refresh-cw" class="w-3 h-3"></i> <span>간병인 교체</span>
-                </button>
-              ` : `
-                <button type="button" onclick="openNewAssignModal('${app.id}', false)" 
-                  class="px-2 sm:px-2.5 py-1 rounded-xl text-[10.5px] sm:text-[11px] font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all flex items-center gap-1 shadow-xs cursor-pointer whitespace-nowrap">
-                  <i data-lucide="user-plus" class="w-3 h-3"></i> <span>신규 배정</span>
-                </button>
-              `}
-            </div>
-          </div>
-
-          <!-- Card Body -->
-          <div class="p-3.5 sm:p-5 flex-1 overflow-y-visible lg:overflow-y-auto custom-scrollbar space-y-3.5 text-xs bg-slate-50/50">
-            ${!hasAssign ? `
-              <!-- 간병인 미배정 시 닫혀있는 잠금/접힘 카드 이미지 UI -->
-              <div class="my-auto p-8 text-center bg-slate-100/80 rounded-2xl border-2 border-dashed border-slate-300 space-y-3">
-                <div class="w-14 h-14 mx-auto rounded-2xl bg-white shadow-xs border border-slate-200 flex items-center justify-center text-slate-400">
-                  <i data-lucide="user-x" class="w-7 h-7"></i>
-                </div>
-                <div class="space-y-1">
-                  <h5 class="font-black text-slate-700 text-sm">현재 배정된 간병인이 없습니다</h5>
-                  <p class="text-slate-500 text-[11.5px] max-w-[240px] mx-auto leading-relaxed">
-                    간병인을 매칭하고 배정 등록을 완료하면 인적사항, 음성일지, 정산 내역이 자동으로 활성화됩니다.
-                  </p>
-                </div>
-                <div class="pt-2">
-                  <button type="button" onclick="openNewAssignModal('${app.id}', false)" 
-                    class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold text-xs shadow-md inline-flex items-center gap-1.5 transition-all">
-                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                    <span>간병인 즉시 배정하기</span>
-                  </button>
-                </div>
-              </div>
-            ` : `
-              <!-- 배정 완료 시 상세 내역 활성화 -->
-              
-              <!-- [간병인 차수별 탭 바] 교체 등으로 간병인이 여러 명일 때 상단 탭으로 즉시 전환 -->
-              ${sortedAssigns.length > 1 ? `
-                <div class="bg-slate-200/80 p-1.5 rounded-2xl flex items-center gap-1.5 overflow-x-auto custom-scrollbar border border-slate-300/80">
-                  ${sortedAssigns.map((aItem, aIdx) => {
-                    const isSelected = aItem.id === as.id;
-                    const isLatest = aIdx === sortedAssigns.length - 1;
-                    const aProg = getCareProgressInfo(aItem);
-                    const isDone = aProg && aProg.status === 'completed';
-                    const roundLabel = `${aIdx + 1}차: ${maskName(aItem.caregiverName)}`;
-                    return `
-                      <button type="button" onclick="switchCaregiverTab('${aItem.id}')"
-                        class="px-3 py-1.5 rounded-xl font-black text-[11px] flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
-                          isSelected
-                            ? 'bg-sky-600 text-white shadow-sm ring-2 ring-sky-300'
-                            : 'bg-white/80 hover:bg-white text-slate-700 border border-slate-200 hover:text-sky-700'
-                        }">
-                        <span>${roundLabel}</span>
-                        ${isLatest 
-                          ? `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-amber-400 text-slate-900' : 'bg-emerald-100 text-emerald-800'}">현재★</span>`
-                          : `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-white/30 text-white' : 'bg-slate-100 text-slate-500'}">교체종료</span>`
-                        }
-                      </button>
-                    `;
-                  }).join('')}
-                </div>
-              ` : ''}
-
-              <!-- 1. 간병인 핵심 정보 & 센터 정보 -->
-              <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
-                <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <div class="flex items-center gap-2">
-                    <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-mono font-bold text-[10px]">${as.id}</span>
-                    <b class="text-sm text-slate-900">${maskName(as.caregiverName)}</b>
-                    ${(birth && birth !== '-' && birth !== 'null' && birth.trim() !== '') ? `<span class="text-slate-500 text-[11px]">(${maskBirth(birth)})</span>` : ''}
-                    ${sortedAssigns.length > 1 ? `
-                      <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${as.id === sortedAssigns[sortedAssigns.length - 1].id ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-600 border border-slate-200'}">
-                        ${as.id === sortedAssigns[sortedAssigns.length - 1].id ? '현재 투입중' : '종료(정산보존)'}
-                      </span>
-                    ` : ''}
-                  </div>
-                  <button type="button" onclick="openCareScheduleModal('${as.id}')" 
-                    class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1">
-                    <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
-                  </button>
-                </div>
-
-                <div class="grid grid-cols-2 gap-x-3 gap-y-2 text-[11.5px] text-slate-600">
-                  <div class="col-span-2 flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
-                    <span class="text-slate-500 font-medium">연락처:</span>
-                    <div class="flex items-center font-mono font-bold text-slate-900">
-                      <span>${maskPhone(caregiverPhone)}</span>
-                      ${renderCtiCallBtn(caregiverPhone, as.caregiverName, '간병인')}
-                    </div>
-                  </div>
-
-                  <div>
-                    <span class="text-slate-400">담당센터:</span>
-                    <b class="text-slate-800 ml-1">${as.centerName || '영등포센터'}</b>
-                  </div>
-                  <div class="flex items-center justify-end">
-                    <span class="font-mono text-slate-800 text-[11px]">${centerPhone}</span>
-                    ${renderCtiCallBtn(centerPhone, as.centerName || '센터', '담당센터', true)}
-                  </div>
-
-                  <div>
-                    <span class="text-slate-400">정산유형:</span>
-                    <span class="font-semibold text-slate-700 ml-1">${as.settlementType || '개인'}</span>
-                  </div>
-                  <div class="text-right">
-                    <span class="text-slate-400">일급(일당):</span>
-                    <b class="text-emerald-700 font-mono ml-1">${formatCurrency(as.dailyWage)}원</b>
-                  </div>
-
-                  <div class="col-span-2 pt-1 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                    <span class="text-slate-400">지급계좌:</span>
-                    <span class="font-mono text-slate-700 truncate max-w-[220px]" title="${account}">${maskAccount(account)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 2. 간병일시 관리 및 프로그레스 바 -->
-              <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
-                <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
-                  <span class="font-bold text-slate-800 flex items-center gap-1.5">
-                    <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i>
-                    <span>간병일시 관리 ${sortedAssigns.length > 1 ? `(${maskName(as.caregiverName)})` : ''}</span>
-                  </span>
-                  <span class="font-mono font-black text-sky-700 text-xs">${prog ? prog.percent : 0}% 진행</span>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 text-center text-[11px] font-mono">
-                  <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
-                    <div class="text-[10px] text-slate-400 mb-0.5">간병 시작일시</div>
-                    <b class="text-slate-900">${formatWithTime(as.startDate, '09:00')}</b>
-                  </div>
-                  <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
-                    <div class="text-[10px] text-slate-400 mb-0.5">간병 종료일시</div>
-                    <b class="text-slate-900">${formatWithTime(as.endDate, '18:00')}</b>
-                  </div>
-                </div>
-
-                ${prog ? `
-                  <div class="space-y-1.5 pt-1">
-                    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner flex">
-                      <div class="h-full ${prog.status === 'completed' ? 'bg-slate-400' : 'bg-gradient-to-r from-sky-500 to-emerald-500'} rounded-full transition-all duration-500" style="width: ${prog.percent}%"></div>
-                    </div>
-                    <div class="flex justify-between items-center text-[10px] sm:text-[10.5px] text-slate-500 flex-wrap gap-1">
-                      ${(prog.isOngoing || !as?.endDate || as?.endDate === '진행중') ? `
-                        <span class="whitespace-nowrap">간병시작: <b class="text-slate-800">${as?.startDate ? as.startDate.slice(5) : '-'}</b></span>
-                        <span class="whitespace-nowrap">경과: <b class="text-slate-800">${prog.elapsedDays}일 (${prog.elapsedDays * 24}시간)</b></span>
-                        <span class="whitespace-nowrap"><b class="text-emerald-700 font-bold">간병 진행중</b></span>
-                      ` : `
-                        <span class="whitespace-nowrap">총 <b>${prog.totalDays}</b>일 (${prog.totalDays * 24}시간) 근무</span>
-                        <span class="whitespace-nowrap">경과: <b class="text-slate-800">${prog.elapsedDays}일 (${prog.elapsedDays * 24}시간)</b></span>
-                        <span class="whitespace-nowrap">잔여: <b class="${prog.remainingDays === 0 ? 'text-slate-400' : 'text-amber-700 font-bold'}">${prog.remainingDays}일 (${prog.remainingDays * 24}시간)</b></span>
-                      `}
-                    </div>
-                  </div>
-                ` : ''}
-              </div>
-
-              <!-- 3. 간병비 정산 (차수별 지급 현황 관리 - 청구관리 차수 1:1 자동 연동) -->
-              <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5 mt-auto">
-                <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
-                  <span class="font-bold text-slate-800 flex items-center gap-1.5">
-                    <i data-lucide="banknote" class="w-3.5 h-3.5 text-teal-600"></i>
-                    <span>간병비 정산 ${sortedAssigns.length > 1 ? `(${maskName(as.caregiverName)})` : ''}</span>
-                  </span>
-                  <div class="flex items-center gap-2">
-                    <span class="font-mono font-extrabold text-teal-700 text-xs">
-                      ${schedule.paidPayoutSum > 0 
-                        ? '지급완료 ' + formatCurrency(schedule.paidPayoutSum) + '원' 
-                        : (schedule.confirmedPayoutSum > 0 
-                          ? '총 대상액 ' + formatCurrency(schedule.confirmedPayoutSum) + '원' 
-                          : (schedule.totalOngoingPayoutEst > 0 
-                            ? '진행누적 ' + formatCurrency(schedule.totalOngoingPayoutEst) + '원' 
-                            : '0원'))}
-                    </span>
-                    <button type="button" onclick="event.stopPropagation(); openPayoutDetailListModal('${app.id}')" 
-                      class="px-2 py-0.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-bold text-[10.5px] flex items-center gap-1 transition-all shadow-2xs" title="차수별 정산 전체 내역을 큰 화면으로 시원하게 보기">
-                      <span>상세보기</span> <i data-lucide="external-link" class="w-3 h-3"></i>
-                    </button>
-                  </div>
-                </div>
-
-                ${schedule.isCaregiverPayoutDue ? `
-                  <div class="p-3 rounded-2xl bg-gradient-to-r from-rose-50 to-amber-50 border-2 border-rose-400 text-[11.5px] space-y-2 shadow-sm">
-                    <div class="flex items-center justify-between">
-                      <div class="font-black text-rose-950 flex items-center gap-1.5">
-                        <span class="w-2.5 h-2.5 rounded-full bg-rose-600 animate-pulse"></span>
-                        <span class="text-xs">🚨 간병비 지급대상 (근무기간 만료)</span>
-                      </div>
-                      <span class="font-mono font-black text-rose-800 text-xs">총 ${formatCurrency(schedule.confirmedPayoutSum > 0 ? schedule.confirmedPayoutSum : (prog ? prog.totalDays * (as.dailyWage || 140000) : 0))}원</span>
-                    </div>
-                    <div class="text-[11px] text-rose-800 flex items-center justify-between gap-2">
-                      <span>근무기간(${as.startDate} ~ ${as.endDate})이 종료되었습니다.</span>
-                      <button type="button" onclick="event.stopPropagation(); executeBatchCaregiverPayout('${app.id}', '${as.id}')" 
-                        class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs shadow-md transition-all cursor-pointer whitespace-nowrap">
-                        간병비 지급완료 처리 ✓
-                      </button>
-                    </div>
-                  </div>
-                ` : (schedule.isAllPayoutsPaid && schedule.isCarePeriodEnded ? `
-                  <div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold flex items-center justify-between">
-                    <span class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i> 간병비 전액 지급완료</span>
-                    <span class="font-mono font-black text-emerald-900">${formatCurrency(schedule.paidPayoutSum)}원 지급완료</span>
-                  </div>
-                ` : '')}
-
-                <!-- 청구관리 차수와 1:1 자동 연동된 정산 리스트 (마진 정보 제거) -->
-                <div class="space-y-2">
-                  ${rounds.map(r => {
-                    const isDepositDone = isRoundDepositConfirmed(r);
-                    const isPayoutDone = r.existingPayout && (r.existingPayout.payoutStatus === '지급' || r.existingPayout.payoutStatus === '지급완료');
-                    const hoursCount = r.days * 24;
-                    const dateRangeStr = (r.startDateStr && r.endDateStr) ? `${r.startDateStr} ~ ${r.endDateStr}` : `${r.startDayOffset}~${r.endDayOffset}일차`;
-
-                    const cardBorder = 
-                      isPayoutDone ? 'border-slate-300 bg-slate-100/80 text-slate-700' :
-                      'border-amber-200 bg-amber-50/70 text-amber-950';
-
-                    return `
-                      <div class="p-2.5 rounded-xl border ${cardBorder} text-[11.5px] transition-all space-y-1.5">
-                        <div class="flex items-center justify-between gap-1.5 flex-wrap">
-                          <div class="flex items-center gap-1.5 shrink-0">
-                            <span class="font-black ${isPayoutDone ? 'text-slate-900' : 'text-amber-950'} whitespace-nowrap">${r.label} 정산</span>
-                            ${isPayoutDone ? `
-                              <span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-slate-200 text-slate-700 shadow-2xs inline-flex items-center gap-1 whitespace-nowrap">
-                                <i data-lucide="check" class="w-3 h-3"></i> 지급완료 ✓
-                              </span>
-                            ` : `
-                              <span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-amber-200 text-amber-950 whitespace-nowrap">
-                                지급전
-                              </span>
-                            `}
-                          </div>
-                          <span class="text-slate-500 font-mono text-[10.5px] whitespace-nowrap shrink-0">(${dateRangeStr} · ${r.days}일 / ${hoursCount}시간)</span>
-                        </div>
-
-                        <div class="flex items-center justify-between gap-2 pt-0.5">
-                          <div class="min-w-0">
-                            <div class="font-bold text-slate-700">
-                              지급 간병인: <b class="${isPayoutDone ? 'text-slate-900' : 'text-amber-950'}">${as ? maskName(as.caregiverName) : '-'}</b>
-                            </div>
-                            <div class="text-[11px] font-mono ${isPayoutDone ? 'text-slate-700' : 'text-amber-900'}">
-                              <b>${formatCurrency(r.fullPayoutAmount)}원</b>
-                              <span class="text-[10px] text-slate-500 font-normal">(${r.days}일 × ${formatCurrency(r.cgDailyWage)}원)</span>
-                            </div>
-                          </div>
-
-                          <div class="flex items-center gap-1 shrink-0">
-                            ${isPayoutDone ? `
-                              <button type="button" onclick="event.stopPropagation(); togglePayoutStatus('${r.existingPayout.id}')" 
-                                class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-[10.5px] shadow-2xs transition-all cursor-pointer whitespace-nowrap" title="클릭 시 지급전으로 되돌리기">
-                                지급취소 (원복)
-                              </button>
-                              <button type="button" onclick="event.stopPropagation(); openPayoutEditModal('${r.existingPayout.id}')" 
-                                class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10.5px] shadow-2xs whitespace-nowrap" title="정산 직접 수정">
-                                수정
-                              </button>
-                              <button type="button" onclick="event.stopPropagation(); deleteInterimPayout('${app.id}', '${r.existingPayout.id}')" 
-                                class="px-2 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-bold text-[10.5px] shadow-2xs transition-all cursor-pointer whitespace-nowrap" title="정산 삭제">
-                                <i data-lucide="trash-2" class="w-3 h-3 inline"></i>
-                              </button>
-                            ` : `
-                              <button type="button" onclick="event.stopPropagation(); ${r.existingPayout ? `togglePayoutStatus('${r.existingPayout.id}')` : `executeImmediatePayout('${app.id}', ${r.roundNumber}, ${r.days})`}" 
-                                class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-[10.5px] shadow-xs inline-flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap">
-                                <i data-lucide="check" class="w-3 h-3"></i> <span>간병비 지급완료 처리 ✓</span>
-                              </button>
-                              ${r.existingPayout ? `
-                                <button type="button" onclick="event.stopPropagation(); openPayoutEditModal('${r.existingPayout.id}')" 
-                                  class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10.5px] shadow-2xs whitespace-nowrap" title="정산 직접 수정">
-                                  수정
-                                </button>
-                              ` : ''}
-                            `}
-                          </div>
-                        </div>
-
-                        <div class="pt-1 border-t border-slate-200/60 flex items-center justify-between text-[10.5px] text-slate-500">
-                          <span>계좌: <b class="font-mono text-slate-700">${as && as.accountInfo ? maskAccount(as.accountInfo) : '미등록'}</b></span>
-                          <span class="${isDepositDone ? 'text-slate-600 font-bold' : 'text-amber-700'}">
-                            ${isDepositDone ? '✓ 보험금 입금확인됨' : '⚠️ 보험금 미입금상태'}
-                          </span>
-                        </div>
-                      </div>
-                    `;
-                  }).join('')}
-                </div>
-              </div>
-            `}
-
-            <!-- 섹션: 지급비고 (엑셀 간병비지급 시트 비고란) -->
-            ${(() => {
-              const payoutMemos = (appPayouts || []).map(p => (p.memo || '').trim()).filter(Boolean);
-              const payoutMemoText = Array.from(new Set(payoutMemos)).join(' / ');
-              return payoutMemoText ? `
-                <div class="bg-white p-3 rounded-2xl border border-orange-200 bg-orange-50/40 shadow-2xs space-y-1 mt-auto mx-4 mb-4">
-                  <div class="flex items-center gap-1.5 text-xs pb-1 border-b border-orange-100">
-                    <span class="font-bold text-orange-800 flex items-center gap-1">
-                      <i data-lucide="message-square" class="w-3.5 h-3.5 text-orange-600"></i> 지급비고
-                    </span>
-                  </div>
-                  <p class="text-orange-900 leading-relaxed text-[11.5px] whitespace-pre-wrap font-medium">${escapeHtml(payoutMemoText)}</p>
-                </div>
-              ` : '';
-            })()}
-
-          </div>
-        </div>
-
-        <!-- ========================================================================= -->
-        <!-- [CARD 3] 손사(보험사) 청구 관리 (Adjuster & Claim Billing Card) -->
-        <!-- ========================================================================= -->
-        <div id="hubCard3" class="${gActive3CardMobileTab === 'card3' ? 'flex' : 'hidden'} lg:flex bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 flex-col h-auto lg:h-[78vh] lg:max-h-[820px] overflow-hidden transition-all duration-300 hover:shadow-xl">
           <!-- Card Header (통일된 헤더 높이 및 배지/버튼) -->
           <div class="bg-gradient-to-r ${isSamsung ? 'from-sky-700 via-indigo-700 to-sky-800' : 'from-purple-600 via-indigo-600 to-purple-700'} p-3.5 sm:p-4 text-white flex items-center justify-between min-h-[56px] sm:min-h-[64px] shrink-0 gap-2">
             <div class="flex items-center gap-2 min-w-0">
@@ -22855,11 +22623,11 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                                 value="${formatCurrency(roundDepositAmt)}" 
                                 placeholder="${formatCurrency(r.fullClaimAmount)}"
                                 oninput="formatCurrencyInputElement(this)"
-                                onkeydown="if(event.key==='Enter'){event.preventDefault();saveRoundDepositAmount('${app.id}', ${r.roundNumber}, 'card3');}"
+                                onkeydown="if(event.key==='Enter'){event.preventDefault();saveRoundDepositAmount('${app.id}', ${r.roundNumber}, 'card2');}"
                                 class="w-full text-right font-mono font-black text-xs py-1 px-1.5 pr-5 rounded-md border border-slate-300 focus:ring-2 focus:ring-purple-400 bg-slate-50/50" />
                               <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">원</span>
                             </div>
-                            <button type="button" onclick="event.stopPropagation(); saveRoundDepositAmount('${app.id}', ${r.roundNumber}, 'card3')"
+                            <button type="button" onclick="event.stopPropagation(); saveRoundDepositAmount('${app.id}', ${r.roundNumber}, 'card2')"
                               class="px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-[10.5px] shadow-xs cursor-pointer whitespace-nowrap flex items-center gap-1 transition-all" title="이 차수의 입금액 저장">
                               <i data-lucide="check" class="w-3 h-3"></i> <span>저장</span>
                             </button>
@@ -22898,6 +22666,344 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                     </span>
                   </div>
                   <p class="text-purple-900 leading-relaxed text-[11.5px] whitespace-pre-wrap font-medium">${escapeHtml(claimMemoText)}</p>
+                </div>
+              ` : '';
+            })()}
+
+          </div>
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- [CARD 3] 간병인 / 센터 관리 (Caregiver & Center Card) -->
+        <!-- ========================================================================= -->
+        <div id="hubCard3" class="${gActive3CardMobileTab === 'card3' ? 'flex' : 'hidden'} lg:flex bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 flex-col h-auto lg:h-[78vh] lg:max-h-[820px] overflow-hidden transition-all duration-300 hover:shadow-xl">
+          <!-- Card Header (통일된 헤더 높이 및 배지/버튼) -->
+          <div class="bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 p-3.5 sm:p-4 text-white flex items-center justify-between min-h-[56px] sm:min-h-[64px] shrink-0 gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center font-bold shrink-0">
+                <i data-lucide="users" class="w-4 h-4 text-sky-200"></i>
+              </div>
+              <div class="min-w-0">
+                <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5 truncate">
+                  <span>간병인 / 센터 관리</span>
+                  ${sortedAssigns.length > 1 ? `<span class="px-1.5 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-black bg-amber-400 text-amber-950 shrink-0">총 ${sortedAssigns.length}명 교체이력</span>` : ''}
+                </h4>
+                <span class="text-[10px] sm:text-[10.5px] text-sky-100 font-medium truncate block">간병인 프로필, 일정 및 차수별 정산</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              ${schedule.isCaregiverPayoutDue ? `
+                <span class="px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-rose-500 text-white shadow-md animate-pulse flex items-center gap-1 whitespace-nowrap">
+                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">🚨</span> <span>지급대상</span>
+                </span>
+              ` : (schedule.isAllPayoutsPaid && schedule.isCarePeriodEnded ? `
+                <span class="px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-emerald-400 text-slate-900 shadow-md flex items-center gap-1 whitespace-nowrap">
+                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> <span>지급완료</span>
+                </span>
+              ` : '')}
+              ${hasAssign ? `
+                <button type="button" onclick="openNewAssignModal('${app.id}', true)" 
+                  class="px-2 sm:px-2.5 py-1 rounded-xl text-[10.5px] sm:text-[11px] font-black bg-amber-400 hover:bg-amber-300 text-amber-950 shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap" title="기존 간병인 근무 종료 및 후임 간병인 교체 등록">
+                  <i data-lucide="refresh-cw" class="w-3 h-3"></i> <span>간병인 교체</span>
+                </button>
+              ` : `
+                <button type="button" onclick="openNewAssignModal('${app.id}', false)" 
+                  class="px-2 sm:px-2.5 py-1 rounded-xl text-[10.5px] sm:text-[11px] font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all flex items-center gap-1 shadow-xs cursor-pointer whitespace-nowrap">
+                  <i data-lucide="user-plus" class="w-3 h-3"></i> <span>신규 배정</span>
+                </button>
+              `}
+            </div>
+          </div>
+
+          <!-- Card Body -->
+          <div class="p-3.5 sm:p-5 flex-1 overflow-y-visible lg:overflow-y-auto custom-scrollbar space-y-3.5 text-xs bg-slate-50/50">
+            ${!hasAssign ? `
+              <!-- 간병인 미배정 시 닫혀있는 잠금/접힘 카드 이미지 UI -->
+              <div class="my-auto p-8 text-center bg-slate-100/80 rounded-2xl border-2 border-dashed border-slate-300 space-y-3">
+                <div class="w-14 h-14 mx-auto rounded-2xl bg-white shadow-xs border border-slate-200 flex items-center justify-center text-slate-400">
+                  <i data-lucide="user-x" class="w-7 h-7"></i>
+                </div>
+                <div class="space-y-1">
+                  <h5 class="font-black text-slate-700 text-sm">현재 배정된 간병인이 없습니다</h5>
+                  <p class="text-slate-500 text-[11.5px] max-w-[240px] mx-auto leading-relaxed">
+                    간병인을 매칭하고 배정 등록을 완료하면 인적사항, 음성일지, 정산 내역이 자동으로 활성화됩니다.
+                  </p>
+                </div>
+                <div class="pt-2">
+                  <button type="button" onclick="openNewAssignModal('${app.id}', false)" 
+                    class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold text-xs shadow-md inline-flex items-center gap-1.5 transition-all">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span>간병인 즉시 배정하기</span>
+                  </button>
+                </div>
+              </div>
+            ` : `
+              <!-- 배정 완료 시 상세 내역 활성화 -->
+              
+              <!-- [간병인 차수별 탭 바] 교체 등으로 간병인이 여러 명일 때 상단 탭으로 즉시 전환 -->
+              ${sortedAssigns.length > 1 ? `
+                <div class="bg-slate-200/80 p-1.5 rounded-2xl flex items-center gap-1.5 overflow-x-auto custom-scrollbar border border-slate-300/80">
+                  ${sortedAssigns.map((aItem, aIdx) => {
+                    const isSelected = aItem.id === as.id;
+                    const isLatest = aIdx === sortedAssigns.length - 1;
+                    const aProg = getCareProgressInfo(aItem);
+                    const isDone = aProg && aProg.status === 'completed';
+                    const roundLabel = `${aIdx + 1}차: ${maskName(aItem.caregiverName)}`;
+                    return `
+                      <button type="button" onclick="switchCaregiverTab('${aItem.id}')"
+                        class="px-3 py-1.5 rounded-xl font-black text-[11px] flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+                          isSelected
+                            ? 'bg-sky-600 text-white shadow-sm ring-2 ring-sky-300'
+                            : 'bg-white/80 hover:bg-white text-slate-700 border border-slate-200 hover:text-sky-700'
+                        }">
+                        <span>${roundLabel}</span>
+                        ${isLatest 
+                          ? `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-amber-400 text-slate-900' : 'bg-emerald-100 text-emerald-800'}">현재★</span>`
+                          : `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-white/30 text-white' : 'bg-slate-100 text-slate-500'}">교체종료</span>`
+                        }
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+              ` : ''}
+
+              <!-- 1. 간병인 핵심 정보 & 센터 정보 -->
+              <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-mono font-bold text-[10px]">${as.id}</span>
+                    <b class="text-sm text-slate-900">${maskName(as.caregiverName)}</b>
+                    ${(birth && birth !== '-' && birth !== 'null' && birth.trim() !== '') ? `<span class="text-slate-500 text-[11px]">(${maskBirth(birth)})</span>` : ''}
+                    ${sortedAssigns.length > 1 ? `
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${as.id === sortedAssigns[sortedAssigns.length - 1].id ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-600 border border-slate-200'}">
+                        ${as.id === sortedAssigns[sortedAssigns.length - 1].id ? '현재 투입중' : '종료(정산보존)'}
+                      </span>
+                    ` : ''}
+                  </div>
+                  <button type="button" onclick="openCareScheduleModal('${as.id}')" 
+                    class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1">
+                    <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
+                  </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-x-3 gap-y-2 text-[11.5px] text-slate-600">
+                  <div class="col-span-2 flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100">
+                    <span class="text-slate-500 font-medium">연락처:</span>
+                    <div class="flex items-center font-mono font-bold text-slate-900">
+                      <span>${maskPhone(caregiverPhone)}</span>
+                      ${renderCtiCallBtn(caregiverPhone, as.caregiverName, '간병인')}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span class="text-slate-400">담당센터:</span>
+                    <b class="text-slate-800 ml-1">${as.centerName || '영등포센터'}</b>
+                  </div>
+                  <div class="flex items-center justify-end">
+                    <span class="font-mono text-slate-800 text-[11px]">${centerPhone}</span>
+                    ${renderCtiCallBtn(centerPhone, as.centerName || '센터', '담당센터', true)}
+                  </div>
+
+                  <div>
+                    <span class="text-slate-400">정산유형:</span>
+                    <span class="font-semibold text-slate-700 ml-1">${as.settlementType || '개인'}</span>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-slate-400">일급(일당):</span>
+                    <b class="text-emerald-700 font-mono ml-1">${formatCurrency(as.dailyWage)}원</b>
+                  </div>
+
+                  <div class="col-span-2 pt-1 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-400">지급계좌:</span>
+                    <span class="font-mono text-slate-700 truncate max-w-[220px]" title="${account}">${maskAccount(account)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. 간병일시 관리 및 프로그레스 바 -->
+              <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
+                <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
+                  <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                    <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i>
+                    <span>간병일시 관리 ${sortedAssigns.length > 1 ? `(${maskName(as.caregiverName)})` : ''}</span>
+                  </span>
+                  <span class="font-mono font-black text-sky-700 text-xs">${prog ? prog.percent : 0}% 진행</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-center text-[11px] font-mono">
+                  <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                    <div class="text-[10px] text-slate-400 mb-0.5">간병 시작일시</div>
+                    <b class="text-slate-900">${formatWithTime(as.startDate, '09:00')}</b>
+                  </div>
+                  <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                    <div class="text-[10px] text-slate-400 mb-0.5">간병 종료일시</div>
+                    <b class="text-slate-900">${formatWithTime(as.endDate, '18:00')}</b>
+                  </div>
+                </div>
+
+                ${prog ? `
+                  <div class="space-y-1.5 pt-1">
+                    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner flex">
+                      <div class="h-full ${prog.status === 'completed' ? 'bg-slate-400' : 'bg-gradient-to-r from-sky-500 to-emerald-500'} rounded-full transition-all duration-500" style="width: ${prog.percent}%"></div>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] sm:text-[10.5px] text-slate-500 flex-wrap gap-1">
+                      ${(prog.isOngoing || !as?.endDate || as?.endDate === '진행중') ? `
+                        <span class="whitespace-nowrap">간병시작: <b class="text-slate-800">${as?.startDate ? as.startDate.slice(5) : '-'}</b></span>
+                        <span class="whitespace-nowrap">경과: <b class="text-slate-800">${prog.elapsedDays}일 (${prog.elapsedDays * 24}시간)</b></span>
+                        <span class="whitespace-nowrap"><b class="text-emerald-700 font-bold">간병 진행중</b></span>
+                      ` : `
+                        <span class="whitespace-nowrap">총 <b>${prog.totalDays}</b>일 (${prog.totalDays * 24}시간) 근무</span>
+                        <span class="whitespace-nowrap">경과: <b class="text-slate-800">${prog.elapsedDays}일 (${prog.elapsedDays * 24}시간)</b></span>
+                        <span class="whitespace-nowrap">잔여: <b class="${prog.remainingDays === 0 ? 'text-slate-400' : 'text-amber-700 font-bold'}">${prog.remainingDays}일 (${prog.remainingDays * 24}시간)</b></span>
+                      `}
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+
+              <!-- 3. 간병비 정산 (차수별 지급 현황 관리 - 청구관리 차수 1:1 자동 연동) -->
+              <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5 mt-auto">
+                <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
+                  <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                    <i data-lucide="banknote" class="w-3.5 h-3.5 text-teal-600"></i>
+                    <span>간병비 정산 ${sortedAssigns.length > 1 ? `(${maskName(as.caregiverName)})` : ''}</span>
+                  </span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono font-extrabold text-teal-700 text-xs">
+                      ${schedule.paidPayoutSum > 0 
+                        ? '지급완료 ' + formatCurrency(schedule.paidPayoutSum) + '원' 
+                        : (schedule.confirmedPayoutSum > 0 
+                          ? '총 대상액 ' + formatCurrency(schedule.confirmedPayoutSum) + '원' 
+                          : (schedule.totalOngoingPayoutEst > 0 
+                            ? '진행누적 ' + formatCurrency(schedule.totalOngoingPayoutEst) + '원' 
+                            : '0원'))}
+                    </span>
+                    <button type="button" onclick="event.stopPropagation(); openPayoutDetailListModal('${app.id}')" 
+                      class="px-2 py-0.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-bold text-[10.5px] flex items-center gap-1 transition-all shadow-2xs" title="차수별 정산 전체 내역을 큰 화면으로 시원하게 보기">
+                      <span>상세보기</span> <i data-lucide="external-link" class="w-3 h-3"></i>
+                    </button>
+                  </div>
+                </div>
+
+                ${schedule.isCaregiverPayoutDue ? `
+                  <div class="p-3 rounded-2xl bg-gradient-to-r from-rose-50 to-amber-50 border-2 border-rose-400 text-[11.5px] space-y-2 shadow-sm">
+                    <div class="flex items-center justify-between">
+                      <div class="font-black text-rose-950 flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-rose-600 animate-pulse"></span>
+                        <span class="text-xs">🚨 간병비 지급대상 (근무기간 만료)</span>
+                      </div>
+                      <span class="font-mono font-black text-rose-800 text-xs">총 ${formatCurrency(schedule.confirmedPayoutSum > 0 ? schedule.confirmedPayoutSum : (prog ? prog.totalDays * (as.dailyWage || 140000) : 0))}원</span>
+                    </div>
+                    <div class="text-[11px] text-rose-800 flex items-center justify-between gap-2">
+                      <span>근무기간(${as.startDate} ~ ${as.endDate})이 종료되었습니다.</span>
+                      <button type="button" onclick="event.stopPropagation(); executeBatchCaregiverPayout('${app.id}', '${as.id}')" 
+                        class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs shadow-md transition-all cursor-pointer whitespace-nowrap">
+                        간병비 지급완료 처리 ✓
+                      </button>
+                    </div>
+                  </div>
+                ` : (schedule.isAllPayoutsPaid && schedule.isCarePeriodEnded ? `
+                  <div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold flex items-center justify-between">
+                    <span class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i> 간병비 전액 지급완료</span>
+                    <span class="font-mono font-black text-emerald-900">${formatCurrency(schedule.paidPayoutSum)}원 지급완료</span>
+                  </div>
+                ` : '')}
+
+                <!-- 청구관리 차수와 1:1 자동 연동된 정산 리스트 (마진 정보 제거) -->
+                <div class="space-y-2">
+                  ${rounds.map(r => {
+                    const isDepositDone = isRoundDepositConfirmed(r);
+                    const isPayoutDone = r.existingPayout && (r.existingPayout.payoutStatus === '지급' || r.existingPayout.payoutStatus === '지급완료');
+                    const hoursCount = r.days * 24;
+                    const dateRangeStr = (r.startDateStr && r.endDateStr) ? `${r.startDateStr} ~ ${r.endDateStr}` : `${r.startDayOffset}~${r.endDayOffset}일차`;
+
+                    const cardBorder = 
+                      isPayoutDone ? 'border-slate-300 bg-slate-100/80 text-slate-700' :
+                      'border-amber-200 bg-amber-50/70 text-amber-950';
+
+                    return `
+                      <div class="p-2.5 rounded-xl border ${cardBorder} text-[11.5px] transition-all space-y-1.5">
+                        <div class="flex items-center justify-between gap-1.5 flex-wrap">
+                          <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="font-black ${isPayoutDone ? 'text-slate-900' : 'text-amber-950'} whitespace-nowrap">${r.label} 정산</span>
+                            ${isPayoutDone ? `
+                              <span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-slate-200 text-slate-700 shadow-2xs inline-flex items-center gap-1 whitespace-nowrap">
+                                <i data-lucide="check" class="w-3 h-3"></i> 지급완료 ✓
+                              </span>
+                            ` : `
+                              <span class="px-2 py-0.5 rounded text-[10.5px] font-black bg-amber-200 text-amber-950 whitespace-nowrap">
+                                지급전
+                              </span>
+                            `}
+                          </div>
+                          <span class="text-slate-500 font-mono text-[10.5px] whitespace-nowrap shrink-0">(${dateRangeStr} · ${r.days}일 / ${hoursCount}시간)</span>
+                        </div>
+
+                        <div class="flex items-center justify-between gap-2 pt-0.5">
+                          <div class="min-w-0">
+                            <div class="font-bold text-slate-700">
+                              지급 간병인: <b class="${isPayoutDone ? 'text-slate-900' : 'text-amber-950'}">${as ? maskName(as.caregiverName) : '-'}</b>
+                            </div>
+                            <div class="text-[11px] font-mono ${isPayoutDone ? 'text-slate-700' : 'text-amber-900'}">
+                              <b>${formatCurrency(r.fullPayoutAmount)}원</b>
+                              <span class="text-[10px] text-slate-500 font-normal">(${r.days}일 × ${formatCurrency(r.cgDailyWage)}원)</span>
+                            </div>
+                          </div>
+
+                          <div class="flex items-center gap-1 shrink-0">
+                            ${isPayoutDone ? `
+                              <button type="button" onclick="event.stopPropagation(); togglePayoutStatus('${r.existingPayout.id}')" 
+                                class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-[10.5px] shadow-2xs transition-all cursor-pointer whitespace-nowrap" title="클릭 시 지급전으로 되돌리기">
+                                지급취소 (원복)
+                              </button>
+                              <button type="button" onclick="event.stopPropagation(); openPayoutEditModal('${r.existingPayout.id}')" 
+                                class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10.5px] shadow-2xs whitespace-nowrap" title="정산 직접 수정">
+                                수정
+                              </button>
+                              <button type="button" onclick="event.stopPropagation(); deleteInterimPayout('${app.id}', '${r.existingPayout.id}')" 
+                                class="px-2 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-bold text-[10.5px] shadow-2xs transition-all cursor-pointer whitespace-nowrap" title="정산 삭제">
+                                <i data-lucide="trash-2" class="w-3 h-3 inline"></i>
+                              </button>
+                            ` : `
+                              <button type="button" onclick="event.stopPropagation(); ${r.existingPayout ? `togglePayoutStatus('${r.existingPayout.id}')` : `executeImmediatePayout('${app.id}', ${r.roundNumber}, ${r.days})`}" 
+                                class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-[10.5px] shadow-xs inline-flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap">
+                                <i data-lucide="check" class="w-3 h-3"></i> <span>간병비 지급완료 처리 ✓</span>
+                              </button>
+                              ${r.existingPayout ? `
+                                <button type="button" onclick="event.stopPropagation(); openPayoutEditModal('${r.existingPayout.id}')" 
+                                  class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10.5px] shadow-2xs whitespace-nowrap" title="정산 직접 수정">
+                                  수정
+                                </button>
+                              ` : ''}
+                            `}
+                          </div>
+                        </div>
+
+                        <div class="pt-1 border-t border-slate-200/60 flex items-center justify-between text-[10.5px] text-slate-500">
+                          <span>계좌: <b class="font-mono text-slate-700">${as && as.accountInfo ? maskAccount(as.accountInfo) : '미등록'}</b></span>
+                          <span class="${isDepositDone ? 'text-slate-600 font-bold' : 'text-amber-700'}">
+                            ${isDepositDone ? '✓ 보험금 입금확인됨' : '⚠️ 보험금 미입금상태'}
+                          </span>
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            `}
+
+            <!-- 섹션: 지급비고 (엑셀 간병비지급 시트 비고란) -->
+            ${(() => {
+              const payoutMemos = (appPayouts || []).map(p => (p.memo || '').trim()).filter(Boolean);
+              const payoutMemoText = Array.from(new Set(payoutMemos)).join(' / ');
+              return payoutMemoText ? `
+                <div class="bg-white p-3 rounded-2xl border border-orange-200 bg-orange-50/40 shadow-2xs space-y-1 mt-auto mx-4 mb-4">
+                  <div class="flex items-center gap-1.5 text-xs pb-1 border-b border-orange-100">
+                    <span class="font-bold text-orange-800 flex items-center gap-1">
+                      <i data-lucide="message-square" class="w-3.5 h-3.5 text-orange-600"></i> 지급비고
+                    </span>
+                  </div>
+                  <p class="text-orange-900 leading-relaxed text-[11.5px] whitespace-pre-wrap font-medium">${escapeHtml(payoutMemoText)}</p>
                 </div>
               ` : '';
             })()}
