@@ -19265,6 +19265,22 @@ async function createInterimPayout(applyId, roundNumber, targetDays) {
     if (app) syncToConvex('sync:saveApplication', { app: app });
   }
 
+  // [시스템 감사 로그 기록]
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '간병비지급',
+      actionType: 'CREATE',
+      target: `지급 [${newPayout.id}] (환자: ${app ? maskName(app.patientName) : '고객'}, 간병사: ${as.caregiverName}, ${roundNumber || 1}차)`,
+      summary: `[${as.caregiverName} 간병사] ${roundNumber || 1}차 간병비 정산 등록 (${daysToPay}일분 / ${hoursToPay}시간, ${formatCurrency(amount)}원, 미지급 등록)`,
+      changes: {
+        '정산상태': { before: '미등록', after: '미지급' },
+        '정산금액': { before: '0원', after: `${formatCurrency(amount)}원` },
+        '간병사/소속': { before: '-', after: `${as.caregiverName} (${as.centerName || '센터'})` },
+        '근무기간': { before: '-', after: `${daysToPay}일 (${newPayout.startDate || '-'} ~ ${newPayout.endDate || '-'})` }
+      }
+    });
+  }
+
   if (typeof showNotification === 'function') {
     showNotification({
       type: 'success',
@@ -19294,6 +19310,7 @@ async function executeImmediatePayout(applyId, roundNumber, targetDays) {
       const confirmed = confirm(`[${existing.caregiverName || '간병인'}] [${existing.round || `${roundNumber || 1}차`}] 간병비 ${formatCurrency(existing.payoutAmount)}원을 '지급완료'로 처리하시겠습니까?`);
       if (!confirmed) return;
 
+      const prevStatus = existing.payoutStatus || '미지급';
       existing.payoutStatus = '지급완료';
       existing.paidDate = formatCareDateTimeStr(new Date());
       existing.updatedAt = new Date().toISOString();
@@ -19302,6 +19319,21 @@ async function executeImmediatePayout(applyId, roundNumber, targetDays) {
       if (typeof syncToConvex === 'function') {
         syncToConvex('sync:savePayout', { payout: existing });
         syncToConvex('sync:saveApplication', { app: app });
+      }
+
+      // [시스템 감사 로그 기록]
+      if (typeof window.recordSystemAuditLog === 'function') {
+        window.recordSystemAuditLog({
+          category: '간병비지급',
+          actionType: 'STATUS_CHANGE',
+          target: `지급 [${existing.id}] (환자: ${maskName(app.patientName)}, 간병사: ${existing.caregiverName || '간병인'}, ${roundNumber || 1}차)`,
+          summary: `[${existing.caregiverName || '간병사'}] ${roundNumber || 1}차 간병비 (${formatCurrency(existing.payoutAmount)}원) 지급 승인 및 지급완료 처리`,
+          changes: {
+            '지급상태': { before: prevStatus, after: '지급완료' },
+            '지급금액': { before: `${formatCurrency(existing.payoutAmount)}원`, after: `${formatCurrency(existing.payoutAmount)}원` },
+            '지급일시': { before: '-', after: existing.paidDate }
+          }
+        });
       }
 
       if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
@@ -19356,6 +19388,22 @@ async function executeImmediatePayout(applyId, roundNumber, targetDays) {
       syncToConvex('sync:saveApplication', { app: app });
     }
 
+    // [시스템 감사 로그 기록]
+    if (typeof window.recordSystemAuditLog === 'function') {
+      window.recordSystemAuditLog({
+        category: '간병비지급',
+        actionType: 'STATUS_CHANGE',
+        target: `지급 [${newPayout.id}] (환자: ${maskName(app.patientName)}, 간병사: ${cgName}, ${roundNumber || 1}차)`,
+        summary: `[${cgName}] ${roundNumber || 1}차 간병비 (${formatCurrency(amount)}원, ${daysToPay}일분) 즉시 지급완료 처리`,
+        changes: {
+          '지급상태': { before: '미등록(신규)', after: '지급완료' },
+          '지급금액': { before: '0원', after: `${formatCurrency(amount)}원` },
+          '간병사/소속': { before: '-', after: `${cgName} (${ctrName})` },
+          '지급일시': { before: '-', after: newPayout.paidDate }
+        }
+      });
+    }
+
     if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
     const payoutListModal = document.getElementById('payoutDetailListModal');
     if (payoutListModal && !payoutListModal.classList.contains('hidden')) openPayoutDetailListModal(applyId);
@@ -19395,6 +19443,20 @@ async function deleteInterimPayout(applyId, payoutId) {
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:deletePayout', { payoutId: payoutId });
     if (app) syncToConvex('sync:saveApplication', { app: app });
+  }
+
+  // [시스템 감사 로그 기록]
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '간병비지급',
+      actionType: 'DELETE',
+      target: `지급 [${p.id}] (환자: ${maskName(app ? app.patientName : '고객')}, 간병사: ${p.caregiverName || '간병인'})`,
+      summary: `[${p.id}] 간병비 정산 내역 (${formatCurrency(p.payoutAmount)}원) 삭제 및 미지급 원복`,
+      changes: {
+        '정산상태': { before: p.payoutStatus || '등록', after: '삭제됨(취소)' },
+        '정산금액': { before: `${formatCurrency(p.payoutAmount)}원`, after: '0원' }
+      }
+    });
   }
 
   showToast(`[${p.id}] 정산 내역이 정상적으로 삭제되었습니다.`, 'info');
@@ -19459,6 +19521,22 @@ async function executeBatchCaregiverPayout(applyId, assignId) {
         syncToConvex('sync:savePayout', { payout: p }).catch(console.warn);
       });
       syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
+    }
+
+    // [시스템 감사 로그 기록]
+    if (typeof window.recordSystemAuditLog === 'function') {
+      window.recordSystemAuditLog({
+        category: '간병비지급',
+        actionType: 'STATUS_CHANGE',
+        target: `일괄지급 (환자: ${maskName(app.patientName)}, 간병사: ${cgName})`,
+        summary: `[${maskName(app.patientName)} 님] 간병비 전액 (${formatCurrency(totalWage)}원, ${totalDays}일분) 일괄 지급완료 처리`,
+        changes: {
+          '지급상태': { before: '미지급', after: '지급완료' },
+          '총지급액': { before: '0원', after: `${formatCurrency(totalWage)}원` },
+          '근무일수': { before: '-', after: `${totalDays}일분` },
+          '지급일시': { before: '-', after: formatCareDateTimeStr(now) }
+        }
+      });
     }
 
     if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
@@ -19544,6 +19622,22 @@ async function createInterimClaim(applyId, roundNumber, targetDays) {
     if (app) syncToConvex('sync:saveApplication', { app: app });
   }
 
+  // [시스템 감사 로그 기록]
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '보험청구',
+      actionType: 'CREATE',
+      target: `청구 [${newClaim.id}] (환자: ${maskName(app ? app.patientName : '고객')}, ${newClaim.insuranceCompany}, ${roundNumber || 1}차)`,
+      summary: `[${app ? app.patientName : '고객'} 님] ${roundNumber || 1}차 손사 정산청구서 생성 (${daysToClaim}일분, ${formatCurrency(amount)}원 미수 등록)`,
+      changes: {
+        '청구상태': { before: '미청구', after: '청구접수 (미수납)' },
+        '청구금액': { before: '0원', after: `${formatCurrency(amount)}원` },
+        '보험사': { before: '-', after: newClaim.insuranceCompany },
+        '청구일자': { before: '-', after: newClaim.claimDate }
+      }
+    });
+  }
+
   if (typeof showNotification === 'function') {
     showNotification({
       type: 'success',
@@ -19617,6 +19711,20 @@ async function deleteInterimClaim(applyId, claimId) {
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:deleteClaim', { claimId: claimId });
     if (app) syncToConvex('sync:saveApplication', { app: app });
+  }
+
+  // [시스템 감사 로그 기록]
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '보험청구',
+      actionType: 'DELETE',
+      target: `청구 [${c.id}] (환자: ${maskName(app ? app.patientName : '고객')}, [${c.round}])`,
+      summary: `[${c.id}] 손사 청구서 취소(원복) 처리 (${formatCurrency(c.claimAmount || 0)}원 미수금 차감)`,
+      changes: {
+        '청구상태': { before: c.depositStatus || '미수납', after: '청구취소(원복)' },
+        '청구금액': { before: `${formatCurrency(c.claimAmount || 0)}원`, after: '0원' }
+      }
+    });
   }
 
   if (typeof showNotification === 'function') {
@@ -20147,6 +20255,20 @@ async function cancelSamsungRoundClaim(appId, roundNumber) {
 
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+  }
+
+  // [시스템 감사 로그 기록]
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '보험청구',
+      actionType: 'STATUS_CHANGE',
+      target: `청구원복 [${app.id}] (환자: ${maskName(app.patientName)}, ${roundNumber}차)`,
+      summary: `[${maskName(app.patientName)} 님] ${roundNumber}차 보험청구 발송 취소 및 청구대기로 원복`,
+      changes: {
+        '청구상태': { before: '발송완료', after: '청구대기(원복)' },
+        '청구차수': { before: `${roundNumber}차 청구완료`, after: `${roundNumber}차 취소` }
+      }
+    });
   }
 
   if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
@@ -23005,6 +23127,22 @@ function handlePayoutEditSubmit(e) {
     if (app) syncToConvex('sync:saveApplication', { app: app });
   }
 
+  // [시스템 감사 로그 기록]
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '간병비지급',
+      actionType: 'UPDATE',
+      target: `지급 [${p.id}] (환자: ${maskName(app ? app.patientName : '고객')}, 간병사: ${p.caregiverName || '간병인'})`,
+      summary: `[${p.id}] 간병비 정산 내역 수정 (${days}일, ${formatCurrency(amount)}원, 상태: ${status})`,
+      changes: {
+        '지급상태': { before: '-', after: status },
+        '지급금액': { before: '-', after: `${formatCurrency(amount)}원` },
+        '근무일수': { before: '-', after: `${days}일` },
+        '메모': { before: '-', after: memo || '-' }
+      }
+    });
+  }
+
   if (typeof showNotification === 'function') {
     showNotification({
       type: 'success',
@@ -23023,12 +23161,27 @@ function handlePayoutEditSubmit(e) {
 async function updateCustomerField(appId, field, value) {
   const app = (gApps || []).find(a => a.id === appId);
   if (!app) return;
+  const oldValue = app[field];
   app[field] = value;
   if (field === 'claimClassification') {
     app.claimCategory = value;
   }
   app.updatedAt = new Date().toISOString();
   app.hasManualUpdate = true;
+
+  // [시스템 감사 로그 기록]
+  if (typeof window.recordSystemAuditLog === 'function') {
+    const fieldNameKo = field === 'status' ? '현재상태' : (field === 'claimClassification' ? '청구분류' : (field === 'applyType' ? '신청유형' : field));
+    window.recordSystemAuditLog({
+      category: '고객신청',
+      actionType: 'STATUS_CHANGE',
+      target: `고객 [${app.id}] (${maskName(app.patientName)})`,
+      summary: `[${app.patientName} 님] ${fieldNameKo} 설정 변경 ('${oldValue || '미지정'}' ➡️ '${value || '미지정'}')`,
+      changes: {
+        [fieldNameKo]: { before: oldValue || '미지정', after: value || '미지정' }
+      }
+    });
+  }
 
   try {
     const fieldsPayload = { [field]: value, hasManualUpdate: true };
@@ -23092,10 +23245,25 @@ async function saveDepositConfirmedAmount(appId) {
   const val = Number(String(inputEl.value || '').replace(/[^0-9]/g, '')) || 0;
   const totalClaim = Number(inputEl.getAttribute('data-total-claim')) || app.totalClaimAmount || 0;
   const unpaid = Math.max(0, totalClaim - val);
+  const oldVal = app.depositConfirmedAmount || 0;
 
   app.depositConfirmedAmount = val;
   app.estimatedUnpaid = unpaid;
   app.updatedAt = new Date().toISOString();
+
+  // [시스템 감사 로그 기록]
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '보험청구',
+      actionType: 'STATUS_CHANGE',
+      target: `고객 [${app.id}] (${maskName(app.patientName)})`,
+      summary: `[${app.patientName} 님] 입금확인금액 ${formatCurrency(val)}원 직접 저장 (잔여 미수금: ${formatCurrency(unpaid)}원)`,
+      changes: {
+        '입금확인액': { before: `${formatCurrency(oldVal)}원`, after: `${formatCurrency(val)}원` },
+        '추정미수금': { before: `${formatCurrency(app.estimatedUnpaid || 0)}원`, after: `${formatCurrency(unpaid)}원` }
+      }
+    });
+  }
 
   try {
     const res = await fetch('/api/hub/customer/update-fields', {
@@ -23160,6 +23328,9 @@ async function saveRoundDepositAmount(appId, roundNumber, source = 'card3') {
     return rNum === roundNumber || String(c.round || '').includes(`${roundNumber}차`);
   });
 
+  const prevClaimStatus = claim ? (claim.depositStatus || '미확인') : '미등록';
+  const prevClaimAmount = claim ? (claim.depositAmount || 0) : 0;
+
   if (!claim) {
     const roundDays = roundInfo ? roundInfo.days : 10;
     const dailyPrice = schedule.dailyClaimPrice || 160000;
@@ -23217,6 +23388,22 @@ async function saveRoundDepositAmount(appId, roundNumber, source = 'card3') {
   app.depositConfirmedAmount = totalDepositConfirmed;
   app.estimatedUnpaid = totalUnpaid;
   app.updatedAt = new Date().toISOString();
+
+  // [시스템 감사 로그 기록]
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '보험청구',
+      actionType: 'STATUS_CHANGE',
+      target: `청구 [${claim.id}] (환자: ${maskName(app.patientName)}, ${roundNumber}차)`,
+      summary: `[${app.patientName} 님] ${roundNumber}차 보험금 입금액 ${formatCurrency(val)}원 저장 및 입금확인 처리`,
+      changes: {
+        '입금상태': { before: prevClaimStatus, after: claim.depositStatus },
+        '차수입금액': { before: `${formatCurrency(prevClaimAmount)}원`, after: `${formatCurrency(val)}원` },
+        '누적입금합계': { before: '-', after: `${formatCurrency(totalDepositConfirmed)}원` },
+        '잔여미수금': { before: '-', after: `${formatCurrency(totalUnpaid)}원` }
+      }
+    });
+  }
 
   try {
     await fetch('/api/hub/customer/update-fields', {
@@ -29428,6 +29615,20 @@ function deleteSelectedApps() {
       });
     }
 
+    // [시스템 감사 로그 기록]
+    if (typeof window.recordSystemAuditLog === 'function') {
+      window.recordSystemAuditLog({
+        category: '고객신청',
+        actionType: 'DELETE',
+        target: `고객 일괄삭제 (${count}명)`,
+        summary: `선택 고객 ${count}명 일괄 삭제 처리 (${idsToDelete.join(', ')})`,
+        changes: {
+          '삭제건수': { before: `${count}명`, after: '삭제완료' },
+          '대상ID': { before: idsToDelete.join(', '), after: '-' }
+        }
+      });
+    }
+
     // 4. Re-render all views
     renderUnifiedCareHub();
     renderApplications();
@@ -29458,6 +29659,19 @@ function deleteSingleApp(appId) {
     // Convex Cloud 운영 DB 실시간 삭제
     if (typeof syncToConvex === 'function') {
       syncToConvex('sync:deleteApplication', { appId: appId });
+    }
+
+    // [시스템 감사 로그 기록]
+    if (typeof window.recordSystemAuditLog === 'function') {
+      window.recordSystemAuditLog({
+        category: '고객신청',
+        actionType: 'DELETE',
+        target: `고객 [${app.id}] (${maskName(app.patientName)}, ${app.insuranceCompany})`,
+        summary: `[${app.id} - ${app.patientName} 님] 고객 신청 및 연관 배정/청구/정산 데이터 삭제`,
+        changes: {
+          '삭제대상': { before: `${app.patientName} (${app.insuranceCompany})`, after: '삭제됨' }
+        }
+      });
     }
 
     renderUnifiedCareHub();
@@ -32478,6 +32692,22 @@ async function handleExecuteImportCarePortLog(event) {
   // ★ 삼성화재 일일접수보고 첨부 대상자에 자동 체크
   gSamsungDailySelectedCareLogs.add(appId);
 
+  // 감사 로그 기록: 케어포트 간병일지 등록
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '간병일지',
+      actionType: 'CREATE',
+      target: `간병일지 (${patientName}, ${caregiverName})`,
+      summary: `케어포트 간병일지 전산 등록 [${patientName}] (${startDate} ~ ${endDate}, ${files.length}건)`,
+      changes: {
+        '피보험자': { before: null, after: patientName },
+        '간병인': { before: null, after: caregiverName },
+        '간병기간': { before: null, after: `${startDate} ~ ${endDate}` },
+        '등록파일수': { before: null, after: `${files.length}개` }
+      }
+    });
+  }
+
   closeModal('carePortImportModal');
   
   if (typeof renderCareLogs === 'function') renderCareLogs();
@@ -32499,22 +32729,52 @@ async function handleExecuteImportCarePortLog(event) {
 }
 
 function deleteCarePortLog(id) {
+  const targetLog = (gCareLogs || []).find(l => String(l.id) === String(id));
   gCareLogs = gCareLogs.filter(l => String(l.id) !== String(id));
   gCareLogSelection.delete(id);
   try {
     localStorage.setItem('LIVON_CARE_LOGS', JSON.stringify(gCareLogs));
   } catch (e) {}
+
+  // 감사 로그 기록: 케어포트 간병일지 삭제
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '간병일지',
+      actionType: 'DELETE',
+      target: `간병일지 [${id}] (${targetLog ? targetLog.patientName : ''})`,
+      summary: `케어포트 간병일지 단건 삭제 [${id} - ${targetLog ? targetLog.patientName : ''}]`,
+      changes: {
+        '삭제대상': { before: `ID: ${id} (${targetLog ? targetLog.patientName : ''})`, after: '삭제완료' }
+      }
+    });
+  }
+
   renderCareLogs();
 }
 
 function deleteSelectedCareLogs() {
   if (gCareLogSelection.size === 0) return;
-  if (!confirm(`선택한 ${gCareLogSelection.size}건의 케어포트 간병일지를 삭제하시겠습니까?`)) return;
+  const count = gCareLogSelection.size;
+  if (!confirm(`선택한 ${count}건의 케어포트 간병일지를 삭제하시겠습니까?`)) return;
   gCareLogs = gCareLogs.filter(l => !gCareLogSelection.has(l.id));
   gCareLogSelection.clear();
   try {
     localStorage.setItem('LIVON_CARE_LOGS', JSON.stringify(gCareLogs));
   } catch (e) {}
+
+  // 감사 로그 기록: 케어포트 간병일지 다건 삭제
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '간병일지',
+      actionType: 'DELETE',
+      target: `간병일지 ${count}건 일괄`,
+      summary: `케어포트 간병일지 ${count}건 일괄 삭제 처리`,
+      changes: {
+        '삭제건수': { before: `${count}건`, after: '삭제완료' }
+      }
+    });
+  }
+
   renderCareLogs();
 }
 
@@ -34621,6 +34881,23 @@ async function finalizeNewAppRegistration(newApp) {
     gApps.unshift(newApp);
     try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
+    // 감사 로그 기록: 신규 접수 등록
+    if (typeof window.recordSystemAuditLog === 'function') {
+      window.recordSystemAuditLog({
+        category: '고객신청',
+        actionType: 'CREATE',
+        target: `${newApp.id} (${newApp.patientName || '신규'})`,
+        summary: `신규 고객 접수 등록 [${newApp.id} - ${newApp.patientName}] (${newApp.insuranceCompany || '원수사미지정'})`,
+        changes: {
+          '피보험자': { before: null, after: newApp.patientName },
+          '원수사': { before: null, after: newApp.insuranceCompany },
+          '연락처': { before: null, after: newApp.phone },
+          '접수상태': { before: null, after: newApp.status || '접수' },
+          '간병유형': { before: null, after: newApp.careType || '입원' }
+        }
+      });
+    }
+
     // 손해사정인 정보 디렉토리 자동반영 & 동기화
     if (newApp.adjusterName) {
       autoSyncAdjusterToDirectory({
@@ -34985,6 +35262,25 @@ function handleNewAssignSubmit(e) {
     }
   }
 
+  // 감사 로그 기록: 간병인 매칭/교체 배정
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '간병배정',
+      actionType: isReplacement ? 'STATUS_CHANGE' : 'CREATE',
+      target: `${applyId} (${app ? app.patientName : '고객'}) - ${newAssign.caregiverName}`,
+      summary: isReplacement 
+        ? `간병인 교체 배정 [${prevAssign ? prevAssign.caregiverName : ''} ➔ ${newAssign.caregiverName}] (${applyId})`
+        : `신규 간병인 매칭 배정 [${newAssign.caregiverName}] (${applyId} - ${app ? app.patientName : ''})`,
+      changes: {
+        '담당간병인': { before: prevAssign ? prevAssign.caregiverName : '미배정', after: newAssign.caregiverName },
+        '근무시작일': { before: null, after: newAssign.startDate },
+        '일당': { before: null, after: `${formatCurrency(newAssign.dailyWage)}원` },
+        '소속센터': { before: null, after: newAssign.centerName || '영등포센터' },
+        '고객상태': { before: '접수', after: '진행중' }
+      }
+    });
+  }
+
   // 간병인 및 협력센터 디렉토리 자동반영 & 동기화
   if (name) {
     autoSyncCaregiverToDirectory({
@@ -35165,6 +35461,23 @@ function handleCustomerEditSubmit(e) {
     });
   }
 
+  // 감사 로그 기록: 고객 정보 및 단가 수정
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '고객신청',
+      actionType: 'UPDATE',
+      target: `${app.id} (${app.patientName})`,
+      summary: `고객 정보 및 단가 수정 [${app.id} - ${app.patientName}]`,
+      changes: {
+        '피보험자': { before: null, after: app.patientName },
+        '연락처': { before: null, after: app.phone },
+        '소재지/병원': { before: null, after: app.roadAddress || app.hospitalName || '-' },
+        '사고번호': { before: null, after: app.accidentNumber || '-' },
+        '청구단가': { before: null, after: `${formatCurrency(app.claimUnitPrice || 160000)}원` }
+      }
+    });
+  }
+
   closeModal('customerEditModal');
   renderUnifiedCareHub();
   renderApplications();
@@ -35322,6 +35635,23 @@ function handleAppAdjusterEditSubmit(e) {
     });
   }
 
+  // 감사 로그 기록: 손해사정인 및 증권 정보 수정
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '고객신청',
+      actionType: 'UPDATE',
+      target: `${app.id} (${app.patientName})`,
+      summary: `손해사정인 및 증권/사고번호 정보 수정 [${app.id} - ${app.patientName}]`,
+      changes: {
+        '담당손사': { before: null, after: app.adjusterName || '-' },
+        '손사업체': { before: null, after: app.adjusterFirm || '-' },
+        '손사연락처': { before: null, after: app.adjusterPhone || '-' },
+        '사고번호': { before: null, after: app.accidentNumber || '-' },
+        '증권번호': { before: null, after: app.policyNumber || '-' }
+      }
+    });
+  }
+
   closeModal('appAdjusterEditModal');
   if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
   if (typeof renderApplications === 'function') renderApplications();
@@ -35466,6 +35796,23 @@ function handleCareScheduleSubmit(e) {
       name: as.centerName,
       phone: as.centerPhone,
       settlementType: as.settlementType
+    });
+  }
+
+  // 감사 로그 기록: 간병인 배정 일정 및 일급 수정
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '간병배정',
+      actionType: 'UPDATE',
+      target: `${as.id} (${as.caregiverName} / ${app ? app.patientName : '고객'})`,
+      summary: `간병인 일정/일당 정보 수정 [${as.id} - ${as.caregiverName}] (${as.startDate} ~ ${as.endDate})`,
+      changes: {
+        '간병인명': { before: null, after: as.caregiverName },
+        '근무일정': { before: null, after: `${as.startDate} ~ ${as.endDate}` },
+        '일당': { before: null, after: `${formatCurrency(as.dailyWage)}원` },
+        '협력센터': { before: null, after: as.centerName || '-' },
+        '정산방식': { before: null, after: as.settlementType || '개인' }
+      }
     });
   }
 
@@ -36696,6 +37043,23 @@ function handleNewClaimSubmit(e) {
   app.lastClaimDate = claimDateTimeStr;
   app.updatedAt = now.toISOString();
 
+  // 감사 로그 기록: 보험 청구서 신규 생성
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '보험청구',
+      actionType: 'CREATE',
+      target: `${newClaim.id} (${app.patientName} / ${newClaim.round})`,
+      summary: `보험 청구서 생성 [${newClaim.id} - ${app.patientName}] (${round}, ${formatCurrency(amount)}원)`,
+      changes: {
+        '청구차수': { before: null, after: round },
+        '청구금액': { before: null, after: `${formatCurrency(amount)}원` },
+        '청구일수': { before: null, after: `${days}일` },
+        '원수사': { before: null, after: app.insuranceCompany || '-' },
+        '수납상태': { before: null, after: '미수납' }
+      }
+    });
+  }
+
   closeModal('newClaimModal');
   if (typeof moveAppToFront === 'function') moveAppToFront(app.id);
   if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
@@ -36800,6 +37164,22 @@ function handleClaimEditSubmit(e) {
       app.estimatedUnpaid = Math.max(0, (app.estimatedUnpaid || 0) + diff);
     }
     app.updatedAt = new Date().toISOString();
+  }
+
+  // 감사 로그 기록: 보험 청구 내역 수정
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '보험청구',
+      actionType: status === '입금완료' ? 'STATUS_CHANGE' : 'UPDATE',
+      target: `${claim.id} (${claim.patientName || (app ? app.patientName : '')})`,
+      summary: `보험 청구 내역 수정 [${claim.id} - ${claim.patientName || (app ? app.patientName : '')}] (${formatCurrency(newAmount)}원, 수납상태: ${claim.depositStatus})`,
+      changes: {
+        '청구금액': { before: `${formatCurrency(oldAmount)}원`, after: `${formatCurrency(newAmount)}원` },
+        '일당단가': { before: null, after: `${formatCurrency(wage)}원` },
+        '청구일수': { before: null, after: `${days}일` },
+        '수납상태': { before: null, after: claim.depositStatus }
+      }
+    });
   }
 
   closeModal('claimEditModal');
@@ -37023,6 +37403,22 @@ function handleNewCsRecordSubmit(e) {
   app.csLatestType = type;
   app.updatedAt = new Date().toISOString();
 
+  // 감사 로그 기록: CS 상담 및 민원 등록
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '고객신청',
+      actionType: 'CREATE',
+      target: `${app.id} (${app.patientName}) CS상담`,
+      summary: `고객 CS/민원 이력 등록 [${app.id} - ${app.patientName}] (${type} · ${label})`,
+      changes: {
+        '분류': { before: null, after: `${type} (${label})` },
+        '상담자': { before: null, after: handler },
+        '인입내용': { before: null, after: content.length > 30 ? content.slice(0, 30) + '...' : content },
+        '조치결과': { before: null, after: actionTaken || '접수완료' }
+      }
+    });
+  }
+
   // Reset text inputs
   document.getElementById('csInputContent').value = '';
   document.getElementById('csInputActionTaken').value = '';
@@ -37070,6 +37466,19 @@ function deleteCsRecord(appId, recordId) {
     app.csLatestType = null;
   }
   app.updatedAt = new Date().toISOString();
+
+  // 감사 로그 기록: CS 상담 이력 삭제
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '고객신청',
+      actionType: 'DELETE',
+      target: `${app.id} (${app.patientName}) CS상담`,
+      summary: `고객 CS/민원 이력 항목 삭제 [${app.id} - ${app.patientName}]`,
+      changes: {
+        '삭제대상': { before: recordId, after: '삭제완료' }
+      }
+    });
+  }
 
   const currentBadgeEl = document.getElementById('csModalCurrentBadge');
   if (currentBadgeEl) {
