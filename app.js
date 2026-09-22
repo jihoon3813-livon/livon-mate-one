@@ -30429,91 +30429,45 @@ function renderCareLogPatientCards(groups) {
               const duration = log.duration ? `${String(log.duration).replace('s', '')}초` : '-';
               const title = (log.title || '일상 지원 및 환자 상태 점검').replace(/^\[\d+일차\]\s*/, '');
 
-              const cachedDetail = (window.CarePortClient && window.CarePortClient._detailCache)
-                ? (window.CarePortClient._detailCache[sid] || window.CarePortClient._detailCache[String(sid).replace(/\D/g, '')])
-                : null;
-              const summary = (cachedDetail && cachedDetail.summary) || log.summary || '';
-              const rawKw = (cachedDetail && (cachedDetail.keywords || cachedDetail.raw?.keywords)) || log.keywords || [];
-              const keywords = Array.isArray(rawKw) ? rawKw : (typeof rawKw === 'string' ? rawKw.split(/[,#\s]+/).filter(Boolean) : []);
-              const consultReport = (cachedDetail && cachedDetail.raw?.consult_report) || log.consultReport || null;
-
               return `
-                <div class="px-4 py-3 hover:bg-purple-50/30 transition-colors flex flex-col gap-2 text-xs">
-                  <!-- Row Header: Badges, Date, Title, Consultant, Org, Duration, Buttons -->
-                  <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-                    <!-- Left: Care Note badge, Date, Title -->
-                    <div class="flex items-center gap-3 min-w-0 flex-1">
-                      <span class="px-2 py-0.5 rounded-md font-black text-[11px] bg-teal-600 text-white shrink-0 shadow-2xs">
-                        간병일지
-                      </span>
-                      <span class="font-mono text-slate-700 font-bold shrink-0 text-xs">
-                        ${consultDate}
-                      </span>
-                      <span class="font-bold text-slate-900 truncate" title="${title}">
-                        ${title}
-                      </span>
-                    </div>
-
-                    <!-- Right: Consultant, Org, Duration, ID, Action Buttons -->
-                    <div class="flex items-center gap-3 shrink-0 flex-wrap justify-end">
-                      <div class="flex items-center gap-1.5 text-slate-500 text-[11px]">
-                        <span>상담자: <b class="text-slate-700 font-semibold">${consultant}</b></span>
-                        <span class="text-slate-300">·</span>
-                        <span class="text-slate-500 max-w-[140px] truncate" title="${org}">${org}</span>
-                        <span class="text-slate-300">·</span>
-                        <span class="font-mono text-purple-700 font-bold">${duration}</span>
-                      </div>
-                      <span class="font-mono text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-medium">#${sid}</span>
-
-                      <div class="flex items-center gap-1 shrink-0 ml-1">
-                        <button type="button" onclick="openCarePortOfficialDetail('${sid}', ${log.dayNumber || (idx + 1)})"
-                          class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
-                          <i data-lucide="file-text" class="w-3 h-3"></i>
-                          <span>원문(PDF)</span>
-                        </button>
-                        <button type="button" onclick="openCarePortExternalLink('${sid}', '${(log.consultantRole || consultant || '').replace(/'/g, "\\'")}', '${(group.patientName || '').replace(/'/g, "\\'")}')"
-                          class="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
-                          title="새 창에서 CarePort 원본 열기">
-                          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-                        </button>
-                      </div>
-                    </div>
+                <div class="px-4 py-3 hover:bg-purple-50/40 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs">
+                  <!-- Left: Care Note badge, Date, Title -->
+                  <div class="flex items-center gap-3 min-w-0 flex-1">
+                    <span class="px-2 py-0.5 rounded-md font-black text-[11px] bg-teal-600 text-white shrink-0 shadow-2xs">
+                      간병일지
+                    </span>
+                    <span class="font-mono text-slate-700 font-bold shrink-0 text-xs">
+                      ${consultDate}
+                    </span>
+                    <span class="font-bold text-slate-900 truncate" title="${title}">
+                      ${title}
+                    </span>
                   </div>
 
-                  <!-- Real Care Log Preview Snippet Box (실시간 케어포트 연동 일지 요약/키워드/주요사항) -->
-                  ${(summary || consultReport) ? `
-                    <div class="mt-0.5 p-3 bg-slate-50/90 border border-slate-200/80 rounded-xl space-y-1.5 shadow-2xs">
-                      ${summary ? `
-                        <div class="flex items-start gap-2">
-                          <span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-black shrink-0 mt-0.5">상담 요약</span>
-                          <p class="text-xs text-slate-700 font-medium leading-relaxed">${summary}</p>
-                        </div>
-                      ` : ''}
-
-                      ${keywords.length > 0 ? `
-                        <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
-                          <span class="text-[10px] text-slate-400 font-bold">주요 키워드:</span>
-                          ${keywords.slice(0, 6).map(k => `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200">#${k}</span>`).join('')}
-                        </div>
-                      ` : ''}
-
-                      ${consultReport ? `
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1.5 border-t border-slate-200/60">
-                          ${Object.entries(consultReport).slice(0, 4).map(([k, v]) => `
-                            <div class="text-[11px] leading-snug">
-                              <b class="text-slate-800">● ${k.replace(/^\d+[\.\)]\s*/, '')}:</b>
-                              <span class="text-slate-600 ml-1 line-clamp-1" title="${typeof v === 'string' ? v : JSON.stringify(v)}">${typeof v === 'string' ? v : JSON.stringify(v)}</span>
-                            </div>
-                          `).join('')}
-                        </div>
-                      ` : ''}
+                  <!-- Right: Consultant, Org, Duration, ID, Action Buttons -->
+                  <div class="flex items-center gap-3 shrink-0 flex-wrap justify-end">
+                    <div class="flex items-center gap-1.5 text-slate-500 text-[11px]">
+                      <span>상담자: <b class="text-slate-700 font-semibold">${consultant}</b></span>
+                      <span class="text-slate-300">·</span>
+                      <span class="text-slate-500 max-w-[140px] truncate" title="${org}">${org}</span>
+                      <span class="text-slate-300">·</span>
+                      <span class="font-mono text-purple-700 font-bold">${duration}</span>
                     </div>
-                  ` : `
-                    <div class="mt-0.5 text-[11px] text-slate-400 flex items-center gap-1.5 pl-1">
-                      <span class="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
-                      <span>케어포트 공인 간병일지 연동됨 (원문(PDF) 보기 클릭 시 전문 열람 가능)</span>
+                    <span class="font-mono text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-medium">#${sid}</span>
+
+                    <div class="flex items-center gap-1 shrink-0 ml-1">
+                      <button type="button" onclick="openCarePortOfficialDetail('${sid}', ${log.dayNumber || (idx + 1)})"
+                        class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
+                        <i data-lucide="file-text" class="w-3 h-3"></i>
+                        <span>원문(PDF)</span>
+                      </button>
+                      <button type="button" onclick="openCarePortExternalLink('${sid}', '${(log.consultantRole || consultant || '').replace(/'/g, "\\'")}', '${(group.patientName || '').replace(/'/g, "\\'")}')"
+                        class="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
+                        title="새 창에서 CarePort 원본 열기">
+                        <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                      </button>
                     </div>
-                  `}
+                  </div>
                 </div>
               `;
             }).join('')}
