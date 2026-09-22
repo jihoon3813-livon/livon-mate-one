@@ -38546,22 +38546,24 @@ async function initAdminSession() {
         if ((parsed.id === 'ADM001' || parsed.username === 'superadmin') && (parsed.name === '김리본' || parsed.name === '김지훈')) {
           parsed.name = '리본케어';
         }
-        // 서버 측 세션 토큰 유효성 비동기 검증 (KMS 보안 세션)
+        // 로컬 캐시 세션으로 0ms 즉시 인증 통과 (Stale-While-Revalidate 초고속 로딩)
+        validSessionAdmin = parsed;
+
+        // 서버 측 세션 토큰 유효성은 백그라운드 비동기 검증 (화면 블로킹 0초)
         if (typeof queryConvex === 'function') {
-          try {
-            const vRes = await queryConvex('sync:verifyAdminSession', { token: savedToken });
-            if (vRes && vRes.status === 'success' && vRes.value && vRes.value.valid) {
-              validSessionAdmin = { ...parsed, ...vRes.value.admin };
-            } else {
-              validSessionAdmin = null;
+          queryConvex('sync:verifyAdminSession', { token: savedToken }).then(vRes => {
+            if (vRes && vRes.status === 'success' && vRes.value) {
+              if (vRes.value.valid && vRes.value.admin) {
+                gCurrentAdmin = { ...parsed, ...vRes.value.admin };
+                try { localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(gCurrentAdmin)); } catch (e) {}
+              } else if (vRes.value.valid === false) {
+                console.warn('[Session Verify] 세션 토큰 만료됨: 로그인 화면으로 전환합니다.');
+                if (typeof logoutAdmin === 'function') logoutAdmin();
+              }
             }
-          } catch (netErr) {
-            console.warn('[Session Verify] 네트워크 일시 지연:', netErr);
-            // 네트워크 연결 실패 시 로컬 캐시 임시 세션 허용
-            validSessionAdmin = parsed;
-          }
-        } else {
-          validSessionAdmin = parsed;
+          }).catch(netErr => {
+            console.warn('[Session Verify] 백그라운드 세션 검증 지연:', netErr);
+          });
         }
       }
     } catch (e) {
