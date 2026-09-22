@@ -2171,6 +2171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setTimeout(() => {
     if (typeof loadBarobillSettingsToInputs === 'function') loadBarobillSettingsToInputs();
     if (typeof calculateRuleSplit === 'function') calculateRuleSplit();
+    if (typeof isUserOnLoginScreen === 'function' && isUserOnLoginScreen()) return;
     if (typeof checkAndTriggerOutcallAlert === 'function') checkAndTriggerOutcallAlert();
   }, 600);
 
@@ -28573,6 +28574,7 @@ function refreshTabData(tabId, filterParam = null) {
         if (typeof renderUnifiedCareHub === 'function') {
           renderUnifiedCareHub();
         }
+        if (typeof isUserOnLoginScreen === 'function' && isUserOnLoginScreen()) break;
         if (typeof checkAndTriggerOutcallAlert === 'function') {
           checkAndTriggerOutcallAlert();
         }
@@ -28731,7 +28733,9 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
     const existingToast = document.getElementById('outcallNotificationToast');
     if (existingToast) existingToast.remove();
   } else {
-    if (typeof checkAndTriggerOutcallAlert === 'function') {
+    if (typeof isUserOnLoginScreen === 'function' && isUserOnLoginScreen()) {
+      // 로그인 화면 중에는 아웃콜 알림 표시하지 않음
+    } else if (typeof checkAndTriggerOutcallAlert === 'function') {
       checkAndTriggerOutcallAlert();
     }
   }
@@ -37795,6 +37799,24 @@ var gAutoLogoutMinutes = 30;
 var gLastActivityTimestamp = Date.now();
 var gAutoLogoutTimerInterval = null;
 
+function isUserOnLoginScreen() {
+  if (typeof gCurrentAdmin === 'undefined' || !gCurrentAdmin) return true;
+  if (document.documentElement && document.documentElement.classList.contains('livon-locked')) return true;
+  const overlay = document.getElementById('adminLoginOverlay');
+  if (overlay) {
+    if (!overlay.classList.contains('hidden')) return true;
+    try {
+      const style = window.getComputedStyle(overlay);
+      if (style.display !== 'none' && style.visibility !== 'hidden') return true;
+    } catch (e) {}
+  }
+  if (localStorage.getItem('LIVON_LOGGED_OUT') === 'true' || sessionStorage.getItem('LIVON_LOGGED_OUT') === 'true') {
+    return true;
+  }
+  return false;
+}
+window.isUserOnLoginScreen = isUserOnLoginScreen;
+
 async function initAdminSession() {
   // 브라우저 캐시나 로컬스토리지에 오염된 '342' 잔여 데이터 즉시 영구 정화
   const rememberedUser = localStorage.getItem('REBORN_REMEMBERED_USERNAME');
@@ -37869,6 +37891,14 @@ async function initAdminSession() {
     sessionStorage.setItem('LIVON_LOGGED_OUT', 'true');
     document.documentElement.classList.add('livon-locked');
     if (overlay) overlay.classList.remove('hidden');
+
+    // 🚨 로그인 화면 진입 시 아웃콜 대기 모달 및 토스트 즉각 소거
+    const outcallToast = document.getElementById('outcallNotificationToast');
+    if (outcallToast) outcallToast.remove();
+    const outcallPill = document.getElementById('outcallFloatingPillBadge');
+    if (outcallPill) outcallPill.remove();
+    const outcallModal = document.getElementById('missedCallsOutcallModal');
+    if (outcallModal) outcallModal.remove();
   }
 
   updateHeaderAdminProfile();
@@ -38011,6 +38041,14 @@ function handleAdminLogout(isAuto = false) {
   if (overlay) {
     overlay.classList.remove('hidden');
   }
+
+  // 🚨 [보안] 로그인 화면 진입 시 아웃콜 대기 모달/토스트/플로팅 배지 즉시 제거
+  const outcallToast = document.getElementById('outcallNotificationToast');
+  if (outcallToast) outcallToast.remove();
+  const outcallPill = document.getElementById('outcallFloatingPillBadge');
+  if (outcallPill) outcallPill.remove();
+  const outcallModal = document.getElementById('missedCallsOutcallModal');
+  if (outcallModal) outcallModal.remove();
 
   // 9. Update session timer badge
   const badge = document.getElementById('sessionTimerBadge');

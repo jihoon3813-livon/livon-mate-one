@@ -3145,6 +3145,21 @@ function closeTotalCallSummaryModal() {
 let gMissedSearchKeyword = '';
 
 function openMissedCallsOutcallModal(filterTab = 'pending') {
+  // 로그인 화면 창이거나 로그아웃 상태인 경우: 아웃콜 관리 모달 팝업 절대 차단
+  const overlay = document.getElementById('adminLoginOverlay');
+  const isLoginScreen = (typeof window.isUserOnLoginScreen === 'function' && window.isUserOnLoginScreen()) ||
+    (typeof isUserOnLoginScreen === 'function' && isUserOnLoginScreen()) ||
+    (document.documentElement && document.documentElement.classList.contains('livon-locked')) ||
+    (overlay && (!overlay.classList.contains('hidden') || overlay.style.display === 'flex')) ||
+    (typeof gCurrentAdmin !== 'undefined' && !gCurrentAdmin) ||
+    localStorage.getItem('LIVON_LOGGED_OUT') === 'true';
+
+  if (isLoginScreen) {
+    const existing = document.getElementById('missedCallsOutcallModal');
+    if (existing) existing.remove();
+    return;
+  }
+
   window._activeOutcallTab = filterTab;
 
   let modal = document.getElementById('missedCallsOutcallModal');
@@ -4230,6 +4245,21 @@ function getDismissedOutcallIds() {
  * 미처리 아웃콜 상시 플로팅 배지 (모바일 및 PC 모든 화면에서 상시 접근 가능)
  */
 function renderOutcallFloatingPill(count) {
+  // 로그인 화면 창이거나 로그아웃 상태인 경우 플로팅 배지 절대 표시 차단
+  const overlay = document.getElementById('adminLoginOverlay');
+  const isLoginScreen = (typeof window.isUserOnLoginScreen === 'function' && window.isUserOnLoginScreen()) ||
+    (typeof isUserOnLoginScreen === 'function' && isUserOnLoginScreen()) ||
+    (document.documentElement && document.documentElement.classList.contains('livon-locked')) ||
+    (overlay && (!overlay.classList.contains('hidden') || overlay.style.display === 'flex')) ||
+    (typeof gCurrentAdmin !== 'undefined' && !gCurrentAdmin) ||
+    localStorage.getItem('LIVON_LOGGED_OUT') === 'true';
+
+  if (isLoginScreen) {
+    const pill = document.getElementById('outcallFloatingPillBadge');
+    if (pill) pill.remove();
+    return;
+  }
+
   if (typeof gActiveTab !== 'undefined' && gActiveTab === 'totalcallanalysis') {
     const pill = document.getElementById('outcallFloatingPillBadge');
     if (pill) pill.remove();
@@ -4365,6 +4395,25 @@ async function loadOutcallBackgroundData() {
  * (사용자 규칙: 종합콜분석 화면을 볼 때는 띄우지 않고, 어떤 메뉴페이지든 상관없이 발생하면 바로 표시)
  */
 async function checkAndTriggerOutcallAlert() {
+  // 🚨 [사용자 규칙]: 로그인 화면 창이거나 로그아웃 상태인 경우 아웃콜 대기 모달/토스트/배지 일체 표시 차단 및 소거
+  const overlay = document.getElementById('adminLoginOverlay');
+  const isLoginScreen = (typeof window.isUserOnLoginScreen === 'function' && window.isUserOnLoginScreen()) ||
+    (typeof isUserOnLoginScreen === 'function' && isUserOnLoginScreen()) ||
+    (document.documentElement && document.documentElement.classList.contains('livon-locked')) ||
+    (overlay && (!overlay.classList.contains('hidden') || overlay.style.display === 'flex')) ||
+    (typeof gCurrentAdmin !== 'undefined' && !gCurrentAdmin) ||
+    localStorage.getItem('LIVON_LOGGED_OUT') === 'true';
+
+  if (isLoginScreen) {
+    const existing = document.getElementById('outcallNotificationToast');
+    if (existing) existing.remove();
+    const pill = document.getElementById('outcallFloatingPillBadge');
+    if (pill) pill.remove();
+    const modal = document.getElementById('missedCallsOutcallModal');
+    if (modal) modal.remove();
+    return;
+  }
+
   // 사용자가 이미 종합콜분석 화면에 있는 경우 하단 토스트 팝업 및 플로팅 배지 숨김
   if (typeof gActiveTab !== 'undefined' && gActiveTab === 'totalcallanalysis') {
     const existing = document.getElementById('outcallNotificationToast');
@@ -4536,11 +4585,32 @@ if (typeof window !== 'undefined') {
   window.isCallDurationAnswered = isCallDurationAnswered;
 
   setTimeout(async () => {
+    const overlay = document.getElementById('adminLoginOverlay');
+    const isLoginScreen = (typeof window.isUserOnLoginScreen === 'function' && window.isUserOnLoginScreen()) ||
+      (document.documentElement && document.documentElement.classList.contains('livon-locked')) ||
+      (overlay && !overlay.classList.contains('hidden')) ||
+      localStorage.getItem('LIVON_LOGGED_OUT') === 'true';
+    if (isLoginScreen) return;
+
     await loadOutcallBackgroundData();
     checkAndTriggerOutcallAlert();
   }, 500);
 
   setInterval(async () => {
+    const overlay = document.getElementById('adminLoginOverlay');
+    const isLoginScreen = (typeof window.isUserOnLoginScreen === 'function' && window.isUserOnLoginScreen()) ||
+      (document.documentElement && document.documentElement.classList.contains('livon-locked')) ||
+      (overlay && !overlay.classList.contains('hidden')) ||
+      localStorage.getItem('LIVON_LOGGED_OUT') === 'true';
+    if (isLoginScreen) {
+      const existing = document.getElementById('outcallNotificationToast');
+      if (existing) existing.remove();
+      const pill = document.getElementById('outcallFloatingPillBadge');
+      if (pill) pill.remove();
+      const modal = document.getElementById('missedCallsOutcallModal');
+      if (modal) modal.remove();
+      return;
+    }
     checkAndTriggerOutcallAlert();
   }, 30000);
 
