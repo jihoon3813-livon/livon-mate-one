@@ -1238,8 +1238,7 @@ export const saveAdminsChunk = mutation({
       if (!adm || (!adm.id && !adm.username)) continue;
       const uname = (adm.username || "").trim().toLowerCase();
       const existing = allAdmins.find(a => 
-        (uname && (a.username || "").trim().toLowerCase() === uname) ||
-        (adm.id && a.id === adm.id)
+        uname ? ((a.username || "").trim().toLowerCase() === uname) : (adm.id && a.id === adm.id)
       );
       const { _id, _creationTime, ...rest } = adm;
       if (existing) {
@@ -1263,15 +1262,21 @@ export const saveAdminsChunk = mutation({
 export const deleteAdminDoc = mutation({
   args: {
     adminId: v.string(),
+    username: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("admins")
-      .filter((q) => q.eq(q.field("id"), args.adminId))
-      .first();
+    const uname = (args.username || "").trim().toLowerCase();
+    if (uname === "superadmin" || args.adminId === "ADM001") {
+      return { success: false, error: "최고관리자(SUPER_ADMIN) 계정은 삭제할 수 없습니다." };
+    }
+    const allAdmins = await ctx.db.query("admins").collect();
+    const existing = allAdmins.find(a => 
+      (uname && (a.username || "").trim().toLowerCase() === uname) ||
+      (args.adminId && a.id === args.adminId)
+    );
     if (existing) {
       await ctx.db.delete(existing._id);
-      return { success: true, id: args.adminId };
+      return { success: true, id: existing.id, username: existing.username };
     }
     return { success: false, error: "Not found" };
   },

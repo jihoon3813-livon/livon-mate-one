@@ -1356,7 +1356,7 @@ async function loadConvexData(showSpinner = true) {
       }
       if (Array.isArray(careLogs) && careLogs.length > 0) gCareLogs = careLogs;
 
-      // Convex DB에 저장된 관리자 계정(admins) 동기화 복원 및 로컬 신규 관리자 자동 백업
+      // Convex DB에 저장된 관리자 계정(admins) 동기화 복원 (클라우드 DB가 단일 진실의 원천)
       const { admins } = res.value;
       let localAdmins = [];
       try {
@@ -1364,31 +1364,22 @@ async function loadConvexData(showSpinner = true) {
         if (saved) localAdmins = JSON.parse(saved);
       } catch (e) {}
 
-      // 로컬에만 있고 클라우드에 아직 없는 신규 관리자 계정 식별 (다른 PC에서 로그인할 수 있도록 자동 백업)
-      const cloudAdminUsernames = new Set((admins || []).map(a => (a.username || '').toLowerCase()));
-      const localOnlyAdmins = (localAdmins || []).filter(a => a && a.username && !cloudAdminUsernames.has(a.username.toLowerCase()));
+      // 과거 더미 계정(이매칭, 박정산, 영등포센터 등) 및 삭제된 계정은 로컬에서 영구 제거
+      const DUMMY_USERNAMES = new Set(['care_counsel', 'settle_mgr', 'ydp_center', 'jjooyoung']);
+      localAdmins = (localAdmins || []).filter(a => a && a.username && !DUMMY_USERNAMES.has(a.username.toLowerCase()));
 
       if (Array.isArray(admins) && admins.length > 0) {
-        // 클라우드 관리자 목록 + 로컬 전용 신규 관리자 병합
-        // (클라우드에서 보안상 비밀번호를 제거하고 내려주므로, 기존 로컬에 유효한 비밀번호가 있다면 증발하지 않도록 보존)
-        const localPasswordMap = new Map((localAdmins || []).filter(la => la && la.id && la.password).map(la => [la.id, la.password]));
+        // 클라우드 관리자 목록 우선 반영 (클라우드에 비밀번호가 없으면 로컬 유효 비밀번호 유지)
+        const localPasswordMap = new Map((localAdmins || []).filter(la => la && la.username && la.password).map(la => [la.username.toLowerCase(), la.password]));
         const merged = admins.map(ca => {
-          if (!ca.password && localPasswordMap.has(ca.id)) {
-            return { ...ca, password: localPasswordMap.get(ca.id) };
+          const u = (ca.username || '').toLowerCase();
+          if (!ca.password && localPasswordMap.has(u)) {
+            return { ...ca, password: localPasswordMap.get(u) };
           }
           return { ...ca };
         });
-        localOnlyAdmins.forEach(la => {
-          merged.push(la);
-        });
         gAdmins = merged;
         try { localStorage.setItem('LIVON_ADMINS', JSON.stringify(gAdmins)); } catch (e) {}
-
-        // 로컬 전용 관리자가 있었다면 즉시 클라우드에 일괄 업로드하여 영구 보존
-        if (localOnlyAdmins.length > 0) {
-          console.log(`[Convex Cloud] 로컬 전용 신규 관리자 ${localOnlyAdmins.length}명을 클라우드 DB에 자동 백업합니다.`);
-          syncToConvex('sync:saveAdminsChunk', { admins: localOnlyAdmins });
-        }
         if (typeof renderAdmins === 'function') renderAdmins();
         console.log(`[Convex Cloud] 관리자 계정 동기화 완료 (총 ${gAdmins.length}명)`);
       } else if (localAdmins.length > 0) {
@@ -33387,6 +33378,14 @@ function formatAdminAllowedMenus(adm) {
   return `<span class="text-xs font-semibold text-slate-800" title="${names.join(', ')}">${preview} <span class="text-indigo-600 font-bold">외 ${names.length - 2}개</span> <span class="text-[10px] text-slate-400 font-normal">(${names.length}/${allCount})</span></span>`;
 }
 
+function isCurrentSuperAdmin() {
+  if (!gCurrentAdmin) return false;
+  const u = (gCurrentAdmin.username || '').toLowerCase();
+  const id = (gCurrentAdmin.id || '').toUpperCase();
+  return u === 'superadmin' || id === 'ADM001';
+}
+window.isCurrentSuperAdmin = isCurrentSuperAdmin;
+
 function renderAdmins() {
   const tbody = document.getElementById('adminTableBody');
   if (!tbody) return;
@@ -33403,7 +33402,50 @@ function renderAdmins() {
     }
   }
 
-  tbody.innerHTML = gAdmins.map(adm => `
+  const isSuper = isCurrentSuperAdmin();
+
+  // '신규 관리자 생성' 버튼: superadmin만 노출
+  const newAdminBtn = document.querySelector('button[onclick*="openNewAdminModal"]');
+  if (newAdminBtn) {
+    newAdminBtn.style.display = isSuper ? '' : 'none';
+  }
+
+  // superadmin이 아니면 오직 "본인 계정"만 표시
+  const displayAdmins = isSuper ? gAdmins : gAdmins.filter(adm => {
+    if (!adm || !gCurrentAdmin) return false;
+    const curUser = (gCurrentAdmin.username || '').toLowerCase();
+    const admUser = (adm.username || '').toLowerCase();
+    return (curUser && admUser && curUser === admUser) || (gCurrentAdmin.id && adm.id && gCurrentAdmin.id === adm.id);
+  });
+
+  // 비-superadmin 접속 시 안내 배너
+  let noticeHtml = '';
+  const rbacContainer = document.getElementById('adminRbacSubView');
+  const existingNotice = document.getElementById('adminSelfViewNotice');
+  if (!isSuper) {
+    if (!existingNotice && rbacContainer) {
+      const banner = document.createElement('div');
+      banner.id = 'adminSelfViewNotice';
+      banner.className = 'p-3.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 text-xs flex items-center gap-2.5 shadow-2xs mb-3';
+      banner.innerHTML = `
+        <i data-lucide="shield-alert" class="w-4 h-4 text-purple-600 shrink-0"></i>
+        <span><b>[보안 통제 안내]</b> 총괄 superadmin이 아닌 최고관리자 계정은 보안 규정에 따라 <b>본인 계정 정보만 조회 및 수정</b>할 수 있습니다. (전체 계정 조회/생성/삭제는 superadmin 전용 권한)</span>
+      `;
+      rbacContainer.insertBefore(banner, rbacContainer.firstChild);
+    }
+  } else if (existingNotice) {
+    existingNotice.remove();
+  }
+
+  tbody.innerHTML = displayAdmins.map(adm => {
+    const isTargetSuper = (adm.id === 'ADM001' || (adm.username || '').toLowerCase() === 'superadmin');
+    const roleBadge = isTargetSuper ?
+      `<span class="px-2.5 py-1 rounded-md text-xs font-bold bg-indigo-100 text-indigo-800">SUPER_ADMIN</span>` :
+      `<span class="px-2.5 py-1 rounded-md text-xs font-bold bg-purple-100 text-purple-800">최고관리자</span>`;
+
+    const canDelete = isSuper && !isTargetSuper && (adm.username !== gCurrentAdmin?.username);
+
+    return `
     <tr class="hover:bg-slate-50 transition-colors">
       <td class="p-3 pl-5 font-bold font-mono text-indigo-700">${adm.id}</td>
       <td class="p-3">
@@ -33416,12 +33458,7 @@ function renderAdmins() {
       </td>
       <td class="p-3 font-mono text-slate-700">${formatPhoneNumber(adm.phone)}</td>
       <td class="p-3">
-        <span class="px-2.5 py-1 rounded-md text-xs font-bold ${
-          adm.role === 'SUPER_ADMIN' ? 'bg-indigo-100 text-indigo-800' :
-          adm.role === 'FINANCE_ADMIN' ? 'bg-amber-100 text-amber-800' :
-          adm.role === 'COUNSEL_ADMIN' ? 'bg-blue-100 text-blue-800' :
-          adm.role === 'PARTNER_CENTER' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
-        }">${adm.role}</span>
+        ${roleBadge}
       </td>
       <td class="p-3">
         ${formatAdminAllowedMenus(adm)}
@@ -33443,14 +33480,15 @@ function renderAdmins() {
           <button onclick="openEditAdminModal('${adm.id}')" class="px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition-colors flex items-center gap-1 shadow-2xs">
             <i data-lucide="sliders" class="w-3 h-3 text-indigo-600"></i> 설정
           </button>
-          ${adm.id !== 'ADM001' ? `
-          <button onclick="deleteAdmin('${adm.id}')" class="px-2 py-1 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold text-xs transition-colors">
+          ${canDelete ? `
+          <button onclick="deleteAdmin('${adm.id}', '${adm.username}')" class="px-2 py-1 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold text-xs transition-colors">
             삭제
           </button>` : ''}
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
   initIcons();
 }
 
@@ -38706,6 +38744,11 @@ function toggleAllMenuCheckboxes(checked) {
 }
 
 function openNewAdminModal() {
+  if (typeof isCurrentSuperAdmin === 'function' && !isCurrentSuperAdmin()) {
+    alert('신규 관리자 계정 생성은 총괄 superadmin 전용 권한입니다.');
+    return;
+  }
+
   const form = document.getElementById('adminCreateForm');
   if (form) form.reset();
 
@@ -38733,23 +38776,44 @@ function openNewAdminModal() {
   const accessInfo = document.getElementById('adminModalAccessInfo');
   if (accessInfo) accessInfo.classList.add('hidden');
 
+  const uInput = document.getElementById('adminNewUsername');
+  if (uInput) uInput.readOnly = false;
+
   const roleSelect = document.getElementById('adminNewRole');
   if (roleSelect) {
+    roleSelect.disabled = false;
     roleSelect.value = 'COUNSEL_ADMIN';
     handleAdminRolePresetChange('COUNSEL_ADMIN');
   }
 
   const statusSelect = document.getElementById('adminNewStatus');
-  if (statusSelect) statusSelect.value = '활성';
+  if (statusSelect) {
+    statusSelect.disabled = false;
+    statusSelect.value = '활성';
+  }
+
+  const checkboxes = document.querySelectorAll('input[name="adminMenuCheck"]');
+  checkboxes.forEach(cb => cb.disabled = false);
 
   openModal('adminCreateModal');
   initIcons();
 }
 
 function openEditAdminModal(adminId) {
-  const adm = gAdmins.find(a => a.id === adminId);
+  const adm = gAdmins.find(a => a.id === adminId || (a.username && a.username.toLowerCase() === (adminId || '').toLowerCase()));
   if (!adm) {
     alert('해당 관리자 정보를 찾을 수 없습니다.');
+    return;
+  }
+
+  const isSuper = (typeof isCurrentSuperAdmin === 'function') ? isCurrentSuperAdmin() : false;
+  const isSelf = gCurrentAdmin && (
+    (gCurrentAdmin.username && adm.username && gCurrentAdmin.username.toLowerCase() === adm.username.toLowerCase()) ||
+    (gCurrentAdmin.id && adm.id && gCurrentAdmin.id === adm.id)
+  );
+
+  if (!isSuper && !isSelf) {
+    alert('보안 규격에 따라 본인 계정의 정보만 조회 및 수정할 수 있습니다.');
     return;
   }
 
@@ -38760,13 +38824,13 @@ function openEditAdminModal(adminId) {
   if (editIdEl) editIdEl.value = adm.id;
 
   const titleEl = document.getElementById('adminModalTitle');
-  if (titleEl) titleEl.innerText = `[${adm.name}] 관리자 계정 & 권한 설정 (RBAC)`;
+  if (titleEl) titleEl.innerText = isSuper ? `[${adm.name}] 관리자 계정 & 권한 설정 (RBAC)` : `내 계정 보안 정보 수정 (${adm.name})`;
 
   const subtitleEl = document.getElementById('adminModalSubtitle');
-  if (subtitleEl) subtitleEl.innerText = '아이디/비밀번호, 인적정보, 허용 메뉴 권한 및 활성 상태를 통합 수정합니다.';
+  if (subtitleEl) subtitleEl.innerText = isSuper ? '아이디/비밀번호, 인적정보, 허용 메뉴 권한 및 활성 상태를 통합 수정합니다.' : '비밀번호 및 연락처 등 내 계정의 보안 정보를 수정합니다.';
 
   const btnTextEl = document.getElementById('adminModalSubmitBtnText');
-  if (btnTextEl) btnTextEl.innerText = '관리자 정보 & 권한 저장';
+  if (btnTextEl) btnTextEl.innerText = '계정 정보 저장';
 
   const reqMark = document.getElementById('adminPasswordReqMark');
   if (reqMark) reqMark.classList.add('hidden');
@@ -38775,10 +38839,14 @@ function openEditAdminModal(adminId) {
   if (pwInput) {
     pwInput.required = false;
     pwInput.value = '';
+    pwInput.placeholder = '변경 시에만 새 비밀번호 입력 (미입력 시 기존 비밀번호 유지)';
   }
 
   const uInput = document.getElementById('adminNewUsername');
-  if (uInput) uInput.value = adm.username || '';
+  if (uInput) {
+    uInput.value = adm.username || '';
+    uInput.readOnly = !isSuper || adm.id === 'ADM001';
+  }
 
   const nInput = document.getElementById('adminNewName');
   if (nInput) nInput.value = adm.name || '';
@@ -38793,10 +38861,16 @@ function openEditAdminModal(adminId) {
   if (eInput) eInput.value = adm.email || '';
 
   const rSelect = document.getElementById('adminNewRole');
-  if (rSelect) rSelect.value = adm.role || 'CUSTOM';
+  if (rSelect) {
+    rSelect.value = adm.role || 'CUSTOM';
+    rSelect.disabled = !isSuper; // superadmin만 역할 변경 가능
+  }
 
   const sSelect = document.getElementById('adminNewStatus');
-  if (sSelect) sSelect.value = adm.status || '활성';
+  if (sSelect) {
+    sSelect.value = adm.status || '활성';
+    sSelect.disabled = !isSuper; // superadmin만 활성/비활성 변경 가능
+  }
 
   const lastIpEl = document.getElementById('adminLastIp');
   if (lastIpEl) lastIpEl.value = adm.lastIp || '112.170.45.12';
@@ -38813,12 +38887,13 @@ function openEditAdminModal(adminId) {
     accessInfo.classList.remove('hidden');
   }
 
-  // 체크박스 세팅
+  // 체크박스 세팅 (superadmin만 메뉴 체크 수정 가능)
   const allowed = adm.allowedMenus || ['all'];
-  const isAll = adm.role === 'SUPER_ADMIN' || allowed.includes('all') || allowed.includes('*');
+  const isAll = adm.role === 'SUPER_ADMIN' || adm.role === '최고관리자' || allowed.includes('all') || allowed.includes('*');
   const checkboxes = document.querySelectorAll('input[name="adminMenuCheck"]');
   checkboxes.forEach(cb => {
     cb.checked = isAll || allowed.includes(cb.value);
+    cb.disabled = !isSuper;
   });
 
   openModal('adminCreateModal');
@@ -38998,26 +39073,36 @@ function handleNewAdminSubmit(e) {
   handleAdminFormSubmit(e);
 }
 
-function deleteAdmin(adminId) {
-  if (adminId === 'ADM001') {
-    alert('최고관리자(SUPER_ADMIN) 계정은 삭제할 수 없습니다.');
+function deleteAdmin(adminId, username) {
+  if (typeof isCurrentSuperAdmin === 'function' && !isCurrentSuperAdmin()) {
+    alert('관리자 계정 삭제는 총괄 superadmin 전용 권한입니다.');
     return;
   }
-  if (gCurrentAdmin && gCurrentAdmin.id === adminId) {
+  const u = (username || '').toLowerCase();
+  if (adminId === 'ADM001' || u === 'superadmin') {
+    alert('총괄 최고관리자(SUPER_ADMIN) 계정은 삭제할 수 없습니다.');
+    return;
+  }
+  if (gCurrentAdmin && ((gCurrentAdmin.id && gCurrentAdmin.id === adminId) || (gCurrentAdmin.username && gCurrentAdmin.username.toLowerCase() === u))) {
     alert('현재 로그인 중인 관리자 본인 계정은 삭제할 수 없습니다.');
     return;
   }
-  const target = gAdmins.find(a => a.id === adminId);
+  const target = gAdmins.find(a => (u && (a.username || '').toLowerCase() === u) || (adminId && a.id === adminId));
   if (!target) return;
 
   if (!confirm(`정말 [${target.name} (${target.username})] 관리자 계정을 영구 삭제하시겠습니까?`)) {
     return;
   }
 
-  gAdmins = gAdmins.filter(a => a.id !== adminId);
+  // username과 id 둘 다 비교하여 단 1건만 엄격하게 삭제
+  gAdmins = gAdmins.filter(a => {
+    if (u && (a.username || '').toLowerCase() === u) return false;
+    if (adminId && a.id === adminId && (!a.username || a.username.toLowerCase() === u)) return false;
+    return true;
+  });
   saveAdminsToStorage();
   if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:deleteAdminDoc', { adminId });
+    syncToConvex('sync:deleteAdminDoc', { adminId: target.id, username: target.username });
   }
 
   // [시스템 감사 로그 기록]
@@ -39047,7 +39132,7 @@ function deleteAdmin(adminId) {
 function applyAdminMenuPermissions(admin) {
   if (!admin) return;
   const allowed = admin.allowedMenus || ['all'];
-  const isSuper = admin.role === 'SUPER_ADMIN' || allowed.includes('all') || allowed.includes('*');
+  const isSuper = admin.role === 'SUPER_ADMIN' || admin.role === '최고관리자' || (admin.username && admin.username.toLowerCase() === 'superadmin') || allowed.includes('all') || allowed.includes('*');
 
   // 사이드바 모든 탭 버튼 제어
   const navBtns = document.querySelectorAll('.nav-tab-btn[data-tab]');
@@ -42915,7 +43000,7 @@ function mapRowToApplicationRecord(
   let depositConfirmedAmount = excelDeposit;
   let estimatedUnpaid = excelUnpaid;
 
-  const cAgg = (claimAggMap && claimAggMap[rawId]) || (claimAggByName && claimAggByName[patientName]);
+  const cAgg = claimAggMap && claimAggMap[rawId];
   if (cAgg) {
     claimCount = cAgg.count;
     unconfirmedClaimCount = cAgg.unconfirmed;
