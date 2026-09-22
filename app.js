@@ -33477,6 +33477,15 @@ function renderAdmins() {
     }
   }
 
+  // 현재 로그인된 관리자 정보를 최신 gAdmins 기준(username 매칭)으로 자동 동기화
+  if (gCurrentAdmin && gCurrentAdmin.username) {
+    const canonical = (gAdmins || []).find(a => a && a.username && a.username.toLowerCase() === gCurrentAdmin.username.toLowerCase());
+    if (canonical) {
+      gCurrentAdmin = { ...gCurrentAdmin, ...canonical };
+      try { localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(gCurrentAdmin)); } catch (e) {}
+    }
+  }
+
   const isSuper = isCurrentSuperAdmin();
 
   // '신규 관리자 생성' 버튼: superadmin만 노출
@@ -33485,12 +33494,12 @@ function renderAdmins() {
     newAdminBtn.style.display = isSuper ? '' : 'none';
   }
 
-  // superadmin이 아니면 오직 "본인 계정"만 표시
+  // superadmin이 아니면 오직 "본인 계정(username 기준)"만 엄격하게 표시
+  const curUser = (gCurrentAdmin && gCurrentAdmin.username ? gCurrentAdmin.username.toLowerCase().trim() : '');
   const displayAdmins = isSuper ? gAdmins : gAdmins.filter(adm => {
-    if (!adm || !gCurrentAdmin) return false;
-    const curUser = (gCurrentAdmin.username || '').toLowerCase();
-    const admUser = (adm.username || '').toLowerCase();
-    return (curUser && admUser && curUser === admUser) || (gCurrentAdmin.id && adm.id && gCurrentAdmin.id === adm.id);
+    if (!adm || !curUser) return false;
+    const admUser = (adm.username || '').toLowerCase().trim();
+    return curUser === admUser;
   });
 
   // 비-superadmin 접속 시 안내 배너
@@ -38444,6 +38453,14 @@ async function initAdminSession() {
   }
 
   if (validSessionAdmin) {
+    // 최신 관리자 메타데이터(username 기준)와 즉시 동기화하여 이전 캐시된 ID/역할 불일치 해소
+    const adminList = (Array.isArray(gAdmins) && gAdmins.length > 0) ? gAdmins : (window.REBORN_DATA && window.REBORN_DATA.admins);
+    if (Array.isArray(adminList) && validSessionAdmin.username) {
+      const match = adminList.find(a => a && a.username && a.username.toLowerCase() === validSessionAdmin.username.toLowerCase());
+      if (match) {
+        validSessionAdmin = { ...validSessionAdmin, id: match.id, role: match.role, dept: match.dept, name: match.name, email: match.email, allowedMenus: match.allowedMenus };
+      }
+    }
     // 정상 로그인 세션 유지
     gCurrentAdmin = validSessionAdmin;
     document.documentElement.classList.remove('livon-locked');
@@ -38475,6 +38492,17 @@ async function initAdminSession() {
     if (outcallPill) outcallPill.remove();
     const outcallModal = document.getElementById('missedCallsOutcallModal');
     if (outcallModal) outcallModal.remove();
+
+    const rememberCheckbox = document.getElementById('loginRememberMe');
+    const usernameInput = document.getElementById('loginUsernameInput');
+    const validRemembered = localStorage.getItem('REBORN_REMEMBERED_USERNAME');
+    if (usernameInput && validRemembered && validRemembered !== '342') {
+      usernameInput.value = validRemembered;
+    }
+    if (rememberCheckbox) {
+      rememberCheckbox.checked = !!(validRemembered && validRemembered !== '342');
+    }
+    return false;
   }
 
   updateHeaderAdminProfile();
@@ -38538,8 +38566,12 @@ function updateHeaderAdminProfile() {
     return;
   }
   if (avatar) avatar.innerText = (gCurrentAdmin.name || '관리').slice(0, 2);
-  if (nameEl) nameEl.innerText = gCurrentAdmin.name || '김지훈 (대표)';
-  if (roleEl) roleEl.innerText = `${gCurrentAdmin.role} (${gCurrentAdmin.status || '활성'})`;
+  if (nameEl) nameEl.innerText = gCurrentAdmin.name || '관리자';
+  if (roleEl) {
+    const roleText = gCurrentAdmin.role || '최고관리자';
+    const deptText = gCurrentAdmin.dept ? ` (${gCurrentAdmin.dept})` : (gCurrentAdmin.status ? ` (${gCurrentAdmin.status})` : '');
+    roleEl.innerText = `${roleText}${deptText}`;
+  }
 }
 
 function handleAdminLogout(isAuto = false) {

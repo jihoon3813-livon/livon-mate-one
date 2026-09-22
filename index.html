@@ -832,12 +832,10 @@
 
         <!-- Admin Profile & Logout -->
         <div class="flex items-center gap-1.5 sm:gap-2 pl-1.5 sm:pl-2 border-l border-slate-200 shrink-0">
-          <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-[11px] sm:text-xs shrink-0" id="headerAdminAvatar">
-            리본
-          </div>
+          <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-[11px] sm:text-xs shrink-0" id="headerAdminAvatar"><script>(function(){try{var a=JSON.parse(localStorage.getItem('REBORN_CURRENT_ADMIN')||sessionStorage.getItem('REBORN_CURRENT_ADMIN')||'{}');document.write(a&&a.name?a.name.slice(0,2):'관리');}catch(e){document.write('관리');}})();</script></div>
           <div class="hidden xl:block text-left">
-            <div class="text-xs font-bold text-slate-800" id="headerAdminName">김리본 (대표)</div>
-            <div class="text-[10px] text-slate-500" id="headerAdminRole">최고관리자 (SUPER_ADMIN)</div>
+            <div class="text-xs font-bold text-slate-800" id="headerAdminName"><script>(function(){try{var a=JSON.parse(localStorage.getItem('REBORN_CURRENT_ADMIN')||sessionStorage.getItem('REBORN_CURRENT_ADMIN')||'{}');document.write(a&&a.name?a.name:'관리자');}catch(e){document.write('관리자');}})();</script></div>
+            <div class="text-[10px] text-slate-500" id="headerAdminRole"><script>(function(){try{var a=JSON.parse(localStorage.getItem('REBORN_CURRENT_ADMIN')||sessionStorage.getItem('REBORN_CURRENT_ADMIN')||'{}');document.write(a&&a.role?(a.role+(a.dept?' ('+a.dept+')':'')):'인증 세션');}catch(e){document.write('인증 세션');}})();</script></div>
           </div>
           <button onclick="handleAdminLogout()" class="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-slate-300 hover:bg-rose-50 hover:text-rose-700 text-slate-600 text-xs font-bold flex items-center gap-1 transition-all shrink-0 cursor-pointer" title="관리자 로그아웃">
             <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
