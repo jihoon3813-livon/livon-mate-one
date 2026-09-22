@@ -37863,11 +37863,11 @@ async function initAdminSession() {
 
   const overlay = document.getElementById('adminLoginOverlay');
 
-  // 개발 사이트(IS_DEV_ENV)인 경우: 로그인 모달 없이 최고관리자(김리본 대표이사)로 자동 프리패스 로그인
+  // 개발 사이트(IS_DEV_ENV)인 경우: 로그인 모달 없이 최고관리자(김지훈 대표이사)로 자동 프리패스 로그인
   if (IS_DEV_ENV && (!validSessionAdmin || isExplicitlyLoggedOut)) {
     const defaultSuperAdmin = (Array.isArray(gAdmins) && gAdmins.find(a => a.role === 'SUPER_ADMIN'))
       || (window.REBORN_DATA && window.REBORN_DATA.admins && window.REBORN_DATA.admins[0])
-      || { id: 'ADM001', username: 'superadmin', name: '김리본', dept: '대표이사', role: 'SUPER_ADMIN', permissions: ['all'], allowedMenus: ['all'] };
+      || { id: 'ADM001', username: 'superadmin', name: '김지훈', dept: '대표이사', role: 'SUPER_ADMIN', permissions: ['all'], allowedMenus: ['all'] };
     validSessionAdmin = defaultSuperAdmin;
   }
 
@@ -37957,8 +37957,8 @@ function updateHeaderAdminProfile() {
     if (roleEl) roleEl.innerText = '세션 만료됨';
     return;
   }
-  if (avatar) avatar.innerText = (gCurrentAdmin.name || '리본').slice(0, 2);
-  if (nameEl) nameEl.innerText = gCurrentAdmin.name || '김리본 (대표)';
+  if (avatar) avatar.innerText = (gCurrentAdmin.name || '관리').slice(0, 2);
+  if (nameEl) nameEl.innerText = gCurrentAdmin.name || '김지훈 (대표)';
   if (roleEl) roleEl.innerText = `${gCurrentAdmin.role} (${gCurrentAdmin.status || '활성'})`;
 }
 
@@ -42938,6 +42938,25 @@ async function executeApplyLaunchData(company) {
   if (typeof renderCenters === 'function') renderCenters();
   if (typeof renderAdjusters === 'function') renderAdjusters();
   if (typeof renderDashboard === 'function') renderDashboard();
+
+  // 11. 시스템 감사 로그 실시간 자동 기록
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '데이터동기화',
+      actionType: 'SYNC',
+      target: `${companyLabel} 관리대장 엑셀 업로드`,
+      summary: `${companyLabel} 실데이터 엑셀 업로드 및 동기화 (신청 ${newApps.length.toLocaleString()}건, 배정 ${newAssigns.length.toLocaleString()}건, 청구 ${newClaims.length.toLocaleString()}건, 지급 ${newPayouts.length.toLocaleString()}건, 간병인 ${gCaregivers.length}명, 센터 ${gCenters.length}개소, 손사 ${gAdjusters.length}명)`,
+      changes: {
+        '고객신청': { before: '-', after: `${newApps.length.toLocaleString()}건` },
+        '간병배정': { before: '-', after: `${newAssigns.length.toLocaleString()}건` },
+        '보험청구': { before: '-', after: `${newClaims.length.toLocaleString()}건` },
+        '간병인지급': { before: '-', after: `${newPayouts.length.toLocaleString()}건` },
+        '간병인력풀': { before: '-', after: `${gCaregivers.length}명 (실데이터)` },
+        '협력센터': { before: '-', after: `${gCenters.length}개소` },
+        '손사디렉토리': { before: '-', after: `${gAdjusters.length}명` }
+      }
+    });
+  }
 
   showToast(`🎉 [${companyLabel}] 실데이터(신청 ${newApps.length.toLocaleString()}건, 배정 ${newAssigns.length.toLocaleString()}건, 청구 ${newClaims.length.toLocaleString()}건, 지급 ${newPayouts.length.toLocaleString()}건) 및 파트너/인력 디렉토리가 성공적으로 반영되었습니다!`, 'success');
 }

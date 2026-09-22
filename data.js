@@ -11,10 +11,10 @@ const EXCEL_RAW_DATA = {
 };
 
 const INITIAL_ADMINS = [
-  { id: 'ADM001', username: 'superadmin', name: '김리본', dept: '대표이사', email: 'ceo@reborncare.co.kr', role: 'SUPER_ADMIN', phone: '010-1234-5678', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
-  { id: 'ADM002', username: 'settle_mgr', name: '박정산', dept: '재무정산팀 팀장', email: 'settle@reborncare.co.kr', role: 'FINANCE_ADMIN', phone: '010-9876-5432', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['carehub', 'samsunglist', 'samsungclaimhub', 'hyundaiclaimhub', 'claims', 'payouts', 'forms', 'faxmgmt'] },
-  { id: 'ADM003', username: 'care_counsel', name: '이매칭', dept: '고객상담팀 주임', email: 'counsel@reborncare.co.kr', role: 'COUNSEL_ADMIN', phone: '010-5555-4444', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['carehub', 'carecalendar', 'carelogs', 'directory', 'samsungcallreport', 'totalcallanalysis', 'applications', 'assignments', 'forms', 'faxmgmt'] },
-  { id: 'ADM004', username: 'ydp_center', name: '영등포센터', dept: '협력 간병센터장', email: 'ydp@partnercare.kr', role: 'PARTNER_CENTER', phone: '02-8888-9999', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['carecalendar', 'carelogs', 'directory', 'assignments'] }
+  { id: 'ADM001', username: 'superadmin', name: '김지훈', dept: '대표이사', email: 'ceo@reborncare.co.kr', role: 'SUPER_ADMIN', phone: '010-5234-9182', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
+  { id: 'ADM002', username: 'settle_mgr', name: '정산팀장', dept: '재무정산팀', email: 'settle@reborncare.co.kr', role: 'FINANCE_ADMIN', phone: '010-9876-5432', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['carehub', 'samsunglist', 'samsungclaimhub', 'hyundaiclaimhub', 'claims', 'payouts', 'forms', 'faxmgmt'] },
+  { id: 'ADM003', username: 'care_counsel', name: '상담팀장', dept: '고객상담팀', email: 'counsel@reborncare.co.kr', role: 'COUNSEL_ADMIN', phone: '010-5555-4444', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['carehub', 'carecalendar', 'carelogs', 'directory', 'samsungcallreport', 'totalcallanalysis', 'applications', 'assignments', 'forms', 'faxmgmt'] },
+  { id: 'ADM004', username: 'ydp_center', name: '케어링협력센터', dept: '협력 간병센터장', email: 'caring@partnercare.kr', role: 'PARTNER_CENTER', phone: '02-8888-9999', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['carecalendar', 'carelogs', 'directory', 'assignments'] }
 ];
 
 const INITIAL_PARTNERS = [
