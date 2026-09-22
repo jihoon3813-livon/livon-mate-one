@@ -3602,8 +3602,7 @@
                   <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">소속기관</th>
                   <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">상담일시</th>
                   <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800 text-center w-20">상담시간</th>
-                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-purple-900 text-center w-44">공식 간병일지 (CarePort 원본)</th>
-                  <th class="p-2.5 text-center w-20">관리</th>
+                  <th class="p-2.5 font-extrabold text-purple-900 text-center w-44">공식 간병일지 (CarePort 원본)</th>
                 </tr>
               </thead>
               <tbody id="careLogsTableBody" class="divide-y divide-slate-100 bg-white">
@@ -9990,13 +9989,6 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <button type="button" id="btnCarePortNewTab" onclick="openCarePortInNewTab()" 
-            class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-            title="새 창에서 공식 간병일지 열기">
-            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-            <span class="hidden md:inline">새 창 원본</span>
-          </button>
-
           <button type="button" onclick="printCarePortDocument()" 
             class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
             title="간병일지 즉시 인쇄">

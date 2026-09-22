@@ -30455,16 +30455,11 @@ function renderCareLogPatientCards(groups) {
                     </div>
                     <span class="font-mono text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-medium">#${sid}</span>
 
-                    <div class="flex items-center gap-1 shrink-0 ml-1">
+                    <div class="flex items-center shrink-0 ml-1">
                       <button type="button" onclick="openCarePortOfficialDetail('${sid}', ${log.dayNumber || (idx + 1)})"
                         class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
                         <i data-lucide="file-text" class="w-3 h-3"></i>
                         <span>원문(PDF)</span>
-                      </button>
-                      <button type="button" onclick="openCarePortExternalLink('${sid}', '${(log.consultantRole || consultant || '').replace(/'/g, "\\'")}', '${(group.patientName || '').replace(/'/g, "\\'")}')"
-                        class="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
-                        title="새 창에서 CarePort 원본 열기">
-                        <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
                       </button>
                     </div>
                   </div>
@@ -30487,7 +30482,7 @@ function renderCareLogFlatTable(filtered) {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="11" class="p-8 text-center text-slate-400">
+        <td colspan="10" class="p-8 text-center text-slate-400">
           <div class="font-bold text-slate-600">등록된 케어포트 간병일지가 없습니다.</div>
         </td>
       </tr>
@@ -30555,19 +30550,11 @@ function renderCareLogFlatTable(filtered) {
           ${duration}
         </td>
         <!-- 공식 간병일지 (CarePort 원본) -->
-        <td class="p-2.5 text-center border-r border-slate-100">
+        <td class="p-2.5 text-center">
           <button type="button" onclick="openCarePortOfficialDetail('${sid || 0}')" 
             class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer">
             <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
             <span>CarePort 원본(PDF)</span>
-          </button>
-        </td>
-        <!-- 관리 -->
-        <td class="p-2.5 text-center">
-          <button type="button" onclick="openCarePortExternalLink('${sid || 0}', '${(log.consultantRole || consultant || '').replace(/'/g, "\\'")}', '${(pName || '').replace(/'/g, "\\'")}')"
-            class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer inline-flex items-center"
-            title="CarePort 원본 새창 바로가기">
-            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
           </button>
         </td>
       </tr>
@@ -30717,61 +30704,20 @@ function printCarePortDocument() {
   }, 1000);
 }
 
-function openCarePortExternalLink(sid, consultantRole = '', patientName = '', startDate = '', endDate = '') {
+function openCarePortExternalLink(sid) {
   const currentSid = sid || gCurrentCarePortSessionId;
   if (!currentSid) return;
   const cleanSid = String(currentSid).replace(/\D/g, '') || currentSid;
-  const targetSid = cleanSid;
-
-  let pName = (patientName || '').trim();
-  if (!pName && typeof gCurrentCarePortDetail !== 'undefined' && gCurrentCarePortDetail) {
-    pName = (gCurrentCarePortDetail.username || gCurrentCarePortDetail.patientName || '').trim();
-  }
-  if (!pName && typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) {
-    const found = gCareLogs.find(l => String(l.sessionId) === cleanSid || String(l.id).replace(/\D/g, '') === cleanSid);
-    if (found) pName = (found.username || found.patientName || '').trim();
-  }
-  if (!pName && typeof gCarePortRawLogs !== 'undefined' && Array.isArray(gCarePortRawLogs)) {
-    const found = gCarePortRawLogs.find(l => String(l.sessionId) === cleanSid);
-    if (found) pName = (found.username || found.patientName || '').trim();
-  }
-
-  let roleStr = String(consultantRole || '').trim();
-  if (!roleStr && typeof gCurrentCarePortDetail !== 'undefined' && gCurrentCarePortDetail) {
-    roleStr = gCurrentCarePortDetail.consultantRole || '';
-  }
-
-  // Look up patient group to find precise careStartDate & careEndDate
-  let startD = startDate || '';
-  let endD = endDate || '';
-  if ((!startD || !endD) && typeof gCarePortPatientGroups !== 'undefined' && Array.isArray(gCarePortPatientGroups)) {
-    const grp = gCarePortPatientGroups.find(g => 
-      (g.dailyLogs && g.dailyLogs.some(l => String(l.sessionId) === cleanSid)) ||
-      (pName && (g.patientName || '').trim().replace(/\s*\(\d+차\)/g, '') === pName.trim().replace(/\s*\(\d+차\)/g, ''))
-    );
-    if (grp) {
-      if (!pName && grp.patientName) pName = grp.patientName.replace(/\s*\(\d+차\)/g, '').trim();
-      startD = startD || grp.careStartDate || '';
-      endD = endD || grp.careEndDate || '';
-    }
-  }
-
-  // Standalone high-fidelity CarePort viewer with real data & interactive day switching
-  let viewerUrl = `careport-viewer.html?sessionId=${encodeURIComponent(targetSid)}&patient=${encodeURIComponent(pName)}&role=${encodeURIComponent(roleStr)}`;
-  if (startD) viewerUrl += `&start=${encodeURIComponent(startD)}`;
-  if (endD) viewerUrl += `&end=${encodeURIComponent(endD)}`;
-  window.open(viewerUrl, '_blank');
+  return openCarePortOfficialDetail(cleanSid);
 }
 
 function openCarePortModernViewer(sessionId) {
-  const sid = sessionId || gCurrentCarePortSessionId;
-  if (!sid) return;
-  openCarePortExternalLink(sid);
+  return openCarePortOfficialDetail(sessionId || gCurrentCarePortSessionId);
 }
 
 function openCarePortInNewTab() {
   if (gCurrentCarePortSessionId) {
-    openCarePortExternalLink(gCurrentCarePortSessionId);
+    return openCarePortOfficialDetail(gCurrentCarePortSessionId);
   }
 }
 
