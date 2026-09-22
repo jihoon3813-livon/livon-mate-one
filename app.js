@@ -1985,10 +1985,17 @@ function isAppModifiedOrComplaint(app) {
   if (!app) return false;
   const c = getCustomerCtiComplaintInfo(app);
   if (c && c.hasComplaint) return true;
-  if (app.updatedAt) return true;
-  if (app.hasManualUpdate) return true;
   if (app.csLatestLabel && app.csLatestLabel !== '일반') return true;
   if (app.csRecords && app.csRecords.length > 0) return true;
+  if (app.hasManualUpdate) return true;
+  if (app.updatedAt && app.createdAt) {
+    const created = new Date(app.createdAt).getTime();
+    const updated = new Date(app.updatedAt).getTime();
+    // 신규 등록 시점 직후(생성 1분 이내 동일/유사 시각)는 수정발생으로 간주하지 않음
+    if (!isNaN(created) && !isNaN(updated) && (updated - created > 60000) && !app.importedFromExcel) {
+      return true;
+    }
+  }
   return false;
 }
 window.isAppModifiedOrComplaint = isAppModifiedOrComplaint;
@@ -23020,9 +23027,10 @@ async function updateCustomerField(appId, field, value) {
     app.claimCategory = value;
   }
   app.updatedAt = new Date().toISOString();
+  app.hasManualUpdate = true;
 
   try {
-    const fieldsPayload = { [field]: value };
+    const fieldsPayload = { [field]: value, hasManualUpdate: true };
     if (field === 'claimClassification') {
       fieldsPayload.claimCategory = value;
     }
@@ -24369,7 +24377,7 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
         </span>
       `);
     }
-  } else if (app.hasManualUpdate || (app.updatedAt && !app.importedFromExcel)) {
+  } else if (app.hasManualUpdate || (app.updatedAt && app.createdAt && (new Date(app.updatedAt).getTime() - new Date(app.createdAt).getTime() > 60000) && !app.importedFromExcel)) {
     if (!isAlertConf) {
       badges.push(`
         <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-600 text-white font-black text-[10.5px] shadow-2xs whitespace-nowrap animate-pulse">
@@ -34532,7 +34540,8 @@ function handleNewAppSubmit(e) {
       customDailyClaimPrice: Number((document.getElementById('newAppClaimUnitPrice')?.value || '').replace(/[^0-9]/g, '')) || 160000,
       memo: formattedMemo.trim(),
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: null,
+      hasManualUpdate: false
     };
 
     if ((insurance || '').includes('삼성')) {
@@ -34599,8 +34608,10 @@ async function finalizeNewAppRegistration(newApp) {
     const targetFaxRecipient = newApp.pendingFaxRecipient || '';
     const targetFaxNumber = newApp.pendingFaxNumber || '';
 
-    // 1. 신규 고객은 전산 런칭 실데이터로 영구 표출되도록 보장
+    // 1. 신규 고객은 전산 런칭 실데이터로 영구 표출되도록 보장 (신규등록 시 수정발생 플래그 제외)
     newApp.isRealLaunchData = true;
+    newApp.updatedAt = null;
+    newApp.hasManualUpdate = false;
 
     // 2. 고객 신청 대장에 최우선 즉시 등록 (팩스 성공 여부와 무관하게 100% 안전 보존)
     gApps.unshift(newApp);
