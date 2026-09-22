@@ -1112,10 +1112,6 @@ async function queryConvex(path, args = {}) {
   const timeoutId = controller ? setTimeout(() => controller.abort(), 10000) : null;
   try {
     let finalArgs = Object.assign({}, args);
-    // 개발 서버(rapid-raccoon-895)의 bundleAll은 sessionToken 파라미터를 받지 않으므로 제외
-    if (path === 'sync:bundleAll' && IS_DEV_ENV) {
-      delete finalArgs.sessionToken;
-    }
     const res = await fetch(`${CONVEX_URL}/api/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2278,7 +2274,7 @@ var gHdForm02CustomState = {
   caregiverBirth: '19680512',
   caregiverPhone: '010-7788-9900',
   firstCareStartDate: '',
-  managerName: '김리본',
+  managerName: '리본케어',
   managerPhone: '02-6959-7011',
   servicePeriods: [
     { start: '2026. 08. 21 (12)h (00)m', end: '2026. 08. 25 (19)h (20)m', days: '5일' },
@@ -14606,13 +14602,13 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
       return formatKoreanDate(app.applyDate || todayStr);
     }
     case 'hd2_managerName': {
-      return gHdForm02CustomState.managerName || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.managerName) || '김리본';
+      return gHdForm02CustomState.managerName || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.managerName) || '리본케어';
     }
     case 'hd2_managerPhone': {
       return gHdForm02CustomState.managerPhone || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.managerPhone) || '02-6959-7011';
     }
     case 'hd2_managerNamePhone': {
-      const mName = gHdForm02CustomState.managerName || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.managerName) || '김리본';
+      const mName = gHdForm02CustomState.managerName || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.managerName) || '리본케어';
       const mPhone = gHdForm02CustomState.managerPhone || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.managerPhone) || '02-6959-7011';
       return `담당자: ${mName} (${mPhone})`;
     }
@@ -14908,7 +14904,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
     const dailyWage = 144000;
     const totalAmount = totalDays * dailyWage;
 
-    const managerName = gHdForm02CustomState.managerName || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.managerName) || '김리본';
+    const managerName = gHdForm02CustomState.managerName || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.managerName) || '리본케어';
     const managerPhone = gHdForm02CustomState.managerPhone || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.managerPhone) || '02-6959-7011';
     const currentClaimType = (app && gHdForm02CustomState.customerOverrides?.[app.id]?.claimType) || gHdForm02CustomState.claimType || '신규';
     const currentAccidentContent = (app && gHdForm02CustomState.customerOverrides?.[app.id]?.accidentContent) || gHdForm02CustomState.accidentContent || (app && app.accidentType && app.accidentType.includes('상해') ? '상해' : '질병');
@@ -14977,7 +14973,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
               </div>
               <div>
                 <label class="block text-[10px] font-bold text-slate-500 mb-0.5">담당자 성명 (공통 기본값)</label>
-                <input type="text" value="${managerName}" onchange="updateHdForm02Field('managerName', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="김리본">
+                <input type="text" value="${managerName}" onchange="updateHdForm02Field('managerName', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="리본케어">
               </div>
               <div>
                 <label class="block text-[10px] font-bold text-slate-500 mb-0.5">담당자 연락처 (공통 기본값)</label>
@@ -15289,7 +15285,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                 </span>
                 <div class="flex items-center gap-1">
                   <span class="text-[11px] text-slate-500 font-bold">성명</span>
-                  <input type="text" value="${managerName}" onchange="updateHdForm02Field('managerName', this.value, false, '${app.id}')" class="w-24 px-2 py-1 border border-slate-300 rounded font-bold text-xs bg-white" placeholder="김리본">
+                  <input type="text" value="${managerName}" onchange="updateHdForm02Field('managerName', this.value, false, '${app.id}')" class="w-24 px-2 py-1 border border-slate-300 rounded font-bold text-xs bg-white" placeholder="리본케어">
                 </div>
                 <div class="flex items-center gap-1">
                   <span class="text-[11px] text-slate-500 font-bold">연락처</span>
@@ -18671,7 +18667,7 @@ function quickImportCtiTranscript(appId, scenarioIndex) {
     channel: sample.channel,
     callDuration: sample.callDuration,
     dateTime: dtStr,
-    handler: (gCurrentAdminSession && gCurrentAdminSession.name) || '김리본 (상담원)',
+    handler: (gCurrentAdminSession && gCurrentAdminSession.name) || '리본케어 (상담원)',
     caller: sample.caller || `${maskName(app.patientName)} (고객)`,
     content: sample.summary ? sample.summary.split('\n')[0].replace('• 인입 목적: ', '') : sample.category,
     rawTranscript: sample.rawTranscript,
@@ -18828,6 +18824,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
   const isCaregiverAssigned = Boolean(as && (as.startDate || as.caregiverName));
   const totalCareDays = prog ? prog.totalDays : (as && as.startDate && as.endDate ? Math.max(1, Math.round((parseCareDate(as.endDate) - parseCareDate(as.startDate)) / (24*60*60*1000)) + 1) : 0);
   const elapsedDays = prog ? prog.elapsedDays : totalCareDays;
+  const remainingDays = prog ? (prog.remainingDays || 0) : Math.max(0, totalCareDays - elapsedDays);
   const isOngoingCare = Boolean(
     (prog && prog.isOngoing) ||
     (as && (!as.endDate || as.endDate === '진행중' || as.endDate === '예정')) ||
@@ -23058,7 +23055,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                     <span class="text-slate-500 font-mono text-xs">${rec.dateTime || '-'}</span>
                     <span class="text-slate-600 text-xs font-bold">대상: ${rec.caller || maskName(app.patientName)}</span>
                     <span class="text-slate-400 text-xs">|</span>
-                    <span class="text-slate-500 text-xs">상담원: <b>${rec.handler || '김리본'}</b></span>
+                    <span class="text-slate-500 text-xs">상담원: <b>${rec.handler || '리본케어'}</b></span>
                   </div>
 
                   <div class="flex items-center gap-2 flex-shrink-0">
@@ -24824,7 +24821,7 @@ function renderUnifiedCareHub() {
   const container = document.getElementById('hubCustomerCardsList');
   if (!container) return;
 
-  if (typeof gIsDataLoading !== 'undefined' && gIsDataLoading) {
+  if (typeof gIsDataLoading !== 'undefined' && gIsDataLoading && (!Array.isArray(gApps) || gApps.length === 0)) {
     renderAllLoadingStates();
     return;
   }
@@ -25268,6 +25265,7 @@ function renderUnifiedCareHub() {
   window._gFaxLogsByAppId = faxLogsMap;
 
   container.innerHTML = displayList.map(app => {
+    try {
     const isChecked = gSelectedAppIds.has(app.id) ? 'checked' : '';
 
     const getMatchedItems = (idMap, nameMap) => {
@@ -25728,6 +25726,10 @@ function renderUnifiedCareHub() {
 
       </div>
     `;
+    } catch (cardErr) {
+      console.error('[CareHub Card Render Error]', app?.id, cardErr);
+      return '';
+    }
   }).join('');
   window._gFaxLogsByAppId = null;
 
@@ -29171,7 +29173,7 @@ async function updateDataResetStatusUI() {
 
   if (!statApps) return;
 
-  // 관리자 계정 수 안전 산출 (김리본, 박정산, 이매칭, 영등포센터 등 총 4명 기본 보존)
+  // 관리자 계정 수 안전 산출 (리본케어, 박정산, 이매칭, 영등포센터 등 총 4명 기본 보존)
   function getSafeAdminCount() {
     if (Array.isArray(gAdmins) && gAdmins.length > 0) return gAdmins.length;
     try {
@@ -37400,7 +37402,7 @@ function openCsHistoryModal(appId) {
   // Populate handler select with logged-in user and counsel admins
   const handlerSelect = document.getElementById('csInputHandler');
   if (handlerSelect) {
-    const currentName = (gCurrentAdminSession && gCurrentAdminSession.name) || '김리본 (상담원)';
+    const currentName = (gCurrentAdminSession && gCurrentAdminSession.name) || '리본케어 (상담원)';
     const counselAdmins = (gAdmins || []).filter(a => a.status === '활성' && (a.role === 'COUNSEL_ADMIN' || (a.role || '').includes('상담')));
     let opts = `<option value="${currentName}" selected>${currentName} (현재 로그인)</option>`;
     counselAdmins.forEach(adm => {
@@ -37487,7 +37489,7 @@ function renderCsModalHistoryList(app) {
             <span class="text-slate-500 font-medium text-[11px]">(${rec.channel || '유선전화'})</span>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-slate-600 font-bold text-[11px]">${rec.handler || '김리본'}</span>
+            <span class="text-slate-600 font-bold text-[11px]">${rec.handler || '리본케어'}</span>
             <button type="button" onclick="deleteCsRecord('${app.id}', '${rec.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded" title="이력 삭제">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
@@ -38385,11 +38387,23 @@ function isUserOnLoginScreen() {
 window.isUserOnLoginScreen = isUserOnLoginScreen;
 
 async function initAdminSession() {
-  // 브라우저 캐시나 로컬스토리지에 오염된 '342' 잔여 데이터 즉시 영구 정화
+  // 브라우저 캐시나 로컬스토리지에 오염된 '342' 및 구 어드민명('김리본'/'김지훈') 즉시 영구 정화
   const rememberedUser = localStorage.getItem('REBORN_REMEMBERED_USERNAME');
   if (rememberedUser === '342' || (rememberedUser && rememberedUser.trim() === '342')) {
     localStorage.removeItem('REBORN_REMEMBERED_USERNAME');
   }
+  try {
+    const rawCur = localStorage.getItem('REBORN_CURRENT_ADMIN');
+    if (rawCur && (rawCur.includes('김리본') || rawCur.includes('김지훈'))) {
+      const fixedCur = rawCur.replaceAll('김리본', '리본케어').replaceAll('김지훈', '리본케어');
+      localStorage.setItem('REBORN_CURRENT_ADMIN', fixedCur);
+    }
+    const rawAdms = localStorage.getItem('LIVON_ADMINS');
+    if (rawAdms && (rawAdms.includes('김리본') || rawAdms.includes('김지훈'))) {
+      const fixedAdms = rawAdms.replaceAll('김리본', '리본케어').replaceAll('김지훈', '리본케어');
+      localStorage.setItem('LIVON_ADMINS', fixedAdms);
+    }
+  } catch (e) {}
 
   const isExplicitlyLoggedOut = localStorage.getItem('LIVON_LOGGED_OUT') === 'true' || sessionStorage.getItem('LIVON_LOGGED_OUT') === 'true';
   const savedAdmin = localStorage.getItem('REBORN_CURRENT_ADMIN');
@@ -38401,6 +38415,9 @@ async function initAdminSession() {
     try {
       const parsed = JSON.parse(savedAdmin);
       if (parsed && parsed.id && parsed.username !== '342' && parsed.name !== '342') {
+        if ((parsed.id === 'ADM001' || parsed.username === 'superadmin') && (parsed.name === '김리본' || parsed.name === '김지훈')) {
+          parsed.name = '리본케어';
+        }
         // 서버 측 세션 토큰 유효성 비동기 검증 (KMS 보안 세션)
         if (typeof queryConvex === 'function') {
           try {
@@ -38426,11 +38443,11 @@ async function initAdminSession() {
 
   const overlay = document.getElementById('adminLoginOverlay');
 
-  // 개발 사이트(IS_DEV_ENV)인 경우: 로그인 모달 없이 최고관리자(김지훈 대표이사)로 자동 프리패스 로그인
+  // 개발 사이트(IS_DEV_ENV)인 경우: 로그인 모달 없이 최고관리자(리본케어 대표이사)로 자동 프리패스 로그인
   if (IS_DEV_ENV && (!validSessionAdmin || isExplicitlyLoggedOut)) {
     const defaultSuperAdmin = (Array.isArray(gAdmins) && gAdmins.find(a => a.role === 'SUPER_ADMIN'))
       || (window.REBORN_DATA && window.REBORN_DATA.admins && window.REBORN_DATA.admins[0])
-      || { id: 'ADM001', username: 'superadmin', name: '김지훈', dept: '대표이사', role: 'SUPER_ADMIN', permissions: ['all'], allowedMenus: ['all'] };
+      || { id: 'ADM001', username: 'superadmin', name: '리본케어', dept: '대표이사', role: 'SUPER_ADMIN', permissions: ['all'], allowedMenus: ['all'] };
     validSessionAdmin = defaultSuperAdmin;
   }
 
@@ -38440,8 +38457,21 @@ async function initAdminSession() {
     if (Array.isArray(adminList) && validSessionAdmin.username) {
       const match = adminList.find(a => a && a.username && a.username.toLowerCase() === validSessionAdmin.username.toLowerCase());
       if (match) {
+        if ((match.id === 'ADM001' || match.username === 'superadmin') && (match.name === '김리본' || match.name === '김지훈')) {
+          match.name = '리본케어';
+        }
         validSessionAdmin = { ...validSessionAdmin, id: match.id, role: match.role, dept: match.dept, name: match.name, email: match.email, allowedMenus: match.allowedMenus };
       }
+    }
+    if ((validSessionAdmin.id === 'ADM001' || validSessionAdmin.username === 'superadmin') && (validSessionAdmin.name === '김리본' || validSessionAdmin.name === '김지훈')) {
+      validSessionAdmin.name = '리본케어';
+    }
+    if (Array.isArray(gAdmins)) {
+      gAdmins.forEach(a => {
+        if (a && (a.id === 'ADM001' || a.username === 'superadmin') && (a.name === '김리본' || a.name === '김지훈')) {
+          a.name = '리본케어';
+        }
+      });
     }
     // 정상 로그인 세션 유지
     gCurrentAdmin = validSessionAdmin;
@@ -38454,6 +38484,7 @@ async function initAdminSession() {
         localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', 'dev_session_' + Date.now());
       }
     } catch(e) {}
+    updateHeaderAdminProfile();
     if (overlay) overlay.classList.add('hidden');
   } else {
     // 🚨 미인증 상태 (운영 실서버 전용): 모든 세션 토큰 및 로컬 캐시 즉시 파기 & 화면 완전 잠금

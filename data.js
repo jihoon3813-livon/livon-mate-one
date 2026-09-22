@@ -11,7 +11,7 @@ const EXCEL_RAW_DATA = {
 };
 
 const INITIAL_ADMINS = [
-  { id: 'ADM001', username: 'superadmin', name: '김리본', dept: '대표이사', email: 'ceo@reborncare.co.kr', role: 'SUPER_ADMIN', phone: '010-1234-5678', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
+  { id: 'ADM001', username: 'superadmin', name: '리본케어', dept: '대표이사', email: 'ceo@reborncare.co.kr', role: 'SUPER_ADMIN', phone: '010-1234-5678', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
   { id: 'ADM002', username: 'kyumari', name: '최규만', dept: '이사', email: 'kyumari@livon.care', role: '최고관리자', phone: '010-2222-3333', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
   { id: 'ADM003', username: 'ejchoi', name: '최은주', dept: '책임/LiVon 연구소', email: 'ejchoi@livon.care', role: '최고관리자', phone: '010-7299-2021', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
   { id: 'ADM004', username: 'ansghk8855', name: '이주연', dept: '매니저/간병파트', email: 'ansghk8855@livon.care', role: '최고관리자', phone: '010-2222-3333', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] }

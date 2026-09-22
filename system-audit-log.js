@@ -310,7 +310,7 @@
       const currentAdmin = window.gCurrentAdmin || {};
       const user = {
         username: logData.username || currentAdmin.username || 'superadmin',
-        name: logData.name || (currentAdmin.name && currentAdmin.name !== '김리본' ? currentAdmin.name : '김지훈 대표이사'),
+        name: logData.name || (currentAdmin.name && currentAdmin.name !== '김리본' ? currentAdmin.name : '리본케어'),
         dept: logData.dept || (currentAdmin.dept && currentAdmin.dept !== '김리본' ? currentAdmin.dept : '총괄관리'),
         role: logData.role || currentAdmin.role || 'SUPER_ADMIN'
       };
