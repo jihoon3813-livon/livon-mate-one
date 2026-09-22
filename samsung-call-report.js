@@ -1869,10 +1869,12 @@ function openSamsungMobileCallDetailModal(filterType, filterValue) {
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'samsungMobileCallDetailModal';
-    modal.className = 'fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4';
+    modal.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4';
     document.body.appendChild(modal);
   }
-  modal.classList.remove('hidden');
+  modal.onclick = (e) => {
+    if (e.target === modal) closeSamsungMobileCallDetailModal();
+  };
   modal.innerHTML = `
     <div class="bg-white w-full sm:max-w-2xl max-h-[85vh] rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden border border-slate-200">
       <div class="p-4 bg-gradient-to-r from-blue-700 to-indigo-800 text-white flex items-center justify-between shrink-0">
@@ -1925,12 +1927,28 @@ function openSamsungMobileCallDetailModal(filterType, filterValue) {
       </div>
     </div>
   `;
+
+  let maxZ = 2000;
+  try {
+    document.querySelectorAll('.fixed.inset-0:not(.hidden)').forEach(m => {
+      if (m !== modal && m.style.display !== 'none') {
+        const z = parseInt(window.getComputedStyle(m).zIndex, 10);
+        if (!isNaN(z) && z >= maxZ && z < 900000) maxZ = z + 10;
+      }
+    });
+  } catch (e) {}
+  modal.style.zIndex = String(maxZ);
+  modal.style.display = 'flex';
+  modal.classList.remove('hidden');
   if (typeof initIcons === 'function') initIcons(modal);
 }
 
 function closeSamsungMobileCallDetailModal() {
   const modal = document.getElementById('samsungMobileCallDetailModal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
 }
 
 function clearReportFilter(type) {

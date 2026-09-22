@@ -2487,9 +2487,12 @@ window.openSamsungPreRegisteredModal = function(appId, customerName, rawAppOpt) 
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'samsungPreRegisteredModal';
-    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs hidden';
+    modal.className = 'fixed inset-0 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs hidden';
     document.body.appendChild(modal);
   }
+  modal.onclick = (e) => {
+    if (e.target === modal) closeSamsungPreRegisteredModal();
+  };
 
   // 1. 고객 리드 데이터 탐색
   let lead = rawAppOpt || null;
@@ -2863,9 +2866,18 @@ window.openSamsungPreRegisteredModal = function(appId, customerName, rawAppOpt) 
     </div>
   `;
 
+  let maxZ = 2000;
+  try {
+    document.querySelectorAll('.fixed.inset-0:not(.hidden)').forEach(m => {
+      if (m !== modal && m.style.display !== 'none') {
+        const z = parseInt(window.getComputedStyle(m).zIndex, 10);
+        if (!isNaN(z) && z >= maxZ && z < 900000) maxZ = z + 10;
+      }
+    });
+  } catch (e) {}
+  modal.style.zIndex = String(maxZ);
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
-  modal.style.zIndex = '1000';
   initTotalIcons(modal);
 };
 
@@ -2906,9 +2918,12 @@ function openTotalCallSummaryModal(callId) {
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'totalCallSummaryModal';
-    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs';
+    modal.className = 'fixed inset-0 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs';
     document.body.appendChild(modal);
   }
+  modal.onclick = (e) => {
+    if (e.target === modal) closeTotalCallSummaryModal();
+  };
 
   const logs = (gTotalCallData && gTotalCallData.callLogs) || [];
   const call = logs.find(c => getCallUniqueId(c) === callId);
@@ -2989,13 +3004,13 @@ function openTotalCallSummaryModal(callId) {
             </button>
             ${match.isRegistered && match.appId ? `
               ${match.isInHub ? `
-                <button type="button" onclick="openHubCustomerDetailModal('${match.appId}')" 
+                <button type="button" onclick="closeTotalCallSummaryModal(); openHubCustomerDetailModal('${match.appId}')" 
                   class="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black text-xs border border-indigo-200 flex items-center gap-1 cursor-pointer">
                   <i data-lucide="layers" class="w-4 h-4"></i>
                   <span>고객업무 대시보드</span>
                 </button>
               ` : `
-                <button type="button" onclick="openSamsungPreRegisteredModal('${match.appId}', '${match.patientName || ''}')" 
+                <button type="button" onclick="closeTotalCallSummaryModal(); openSamsungPreRegisteredModal('${match.appId}', '${match.patientName || ''}')" 
                   class="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-black text-xs border border-amber-300 flex items-center gap-1 cursor-pointer">
                   <i data-lucide="file-spreadsheet" class="w-4 h-4 text-amber-600"></i>
                   <span>삼성사전명단(신청대기)</span>
@@ -3130,13 +3145,28 @@ function openTotalCallSummaryModal(callId) {
     </div>
   `;
 
+  // 다중 모달(통합허브 고객 상세 모달 등) 최상단에 뜨도록 z-index 자동 산출 (최소 2000 보장)
+  let maxZ = 2000;
+  try {
+    document.querySelectorAll('.fixed.inset-0:not(.hidden)').forEach(m => {
+      if (m !== modal && m.style.display !== 'none') {
+        const z = parseInt(window.getComputedStyle(m).zIndex, 10);
+        if (!isNaN(z) && z >= maxZ && z < 900000) maxZ = z + 10;
+      }
+    });
+  } catch (e) {}
+  modal.style.zIndex = String(maxZ);
+  modal.style.display = 'flex';
   modal.classList.remove('hidden');
   initTotalIcons(modal);
 }
 
 function closeTotalCallSummaryModal() {
   const modal = document.getElementById('totalCallSummaryModal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
 }
 
 /**
@@ -3890,9 +3920,12 @@ function openLabelSettingModal() {
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'totalCallLabelSettingModal';
-    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs';
+    modal.className = 'fixed inset-0 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs';
     document.body.appendChild(modal);
   }
+  modal.onclick = (e) => {
+    if (e.target === modal) closeLabelSettingModal();
+  };
 
   const allLabels = getAllAvailableLabels();
 
@@ -3977,13 +4010,27 @@ function openLabelSettingModal() {
     </div>
   `;
 
+  let maxZ = 2100;
+  try {
+    document.querySelectorAll('.fixed.inset-0:not(.hidden)').forEach(m => {
+      if (m !== modal && m.style.display !== 'none') {
+        const z = parseInt(window.getComputedStyle(m).zIndex, 10);
+        if (!isNaN(z) && z >= maxZ && z < 900000) maxZ = z + 10;
+      }
+    });
+  } catch (e) {}
+  modal.style.zIndex = String(maxZ);
+  modal.style.display = 'flex';
   modal.classList.remove('hidden');
   initTotalIcons(modal);
 }
 
 function closeLabelSettingModal() {
   const modal = document.getElementById('totalCallLabelSettingModal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
 }
 
 async function createCustomLabel() {
