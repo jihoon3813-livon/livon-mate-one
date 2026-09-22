@@ -30436,7 +30436,7 @@ function renderCareLogPatientCards(groups) {
                     <span class="px-2 py-0.5 rounded-md font-black text-[11px] bg-teal-600 text-white shrink-0 shadow-2xs">
                       간병일지
                     </span>
-                    <span class="font-mono text-slate-700 font-bold shrink-0 text-xs">
+                    <span class="text-slate-700 font-bold shrink-0 text-xs">
                       ${consultDate}
                     </span>
                     <span class="font-bold text-slate-900 truncate" title="${title}">
@@ -30451,7 +30451,7 @@ function renderCareLogPatientCards(groups) {
                       <span class="text-slate-300">·</span>
                       <span class="text-slate-500 max-w-[140px] truncate" title="${org}">${org}</span>
                       <span class="text-slate-300">·</span>
-                      <span class="font-mono text-purple-700 font-bold">${duration}</span>
+                      <span class="text-purple-700 font-bold">${duration}</span>
                     </div>
                     <span class="font-mono text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-medium">#${sid}</span>
 

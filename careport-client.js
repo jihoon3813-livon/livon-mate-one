@@ -1015,12 +1015,12 @@
       <div style="width: 1px; background: #e5e7eb; margin: 0 12px;"></div>
       <div style="flex: 1.7;">
         <div style="font-size: 12.5px; color: #6b7280; font-weight: 600; margin-bottom: 4px;">상담일시</div>
-        <div style="font-size: 15px; color: #111827; font-weight: 800; font-family: monospace;">${consultDate}</div>
+        <div style="font-size: 15.5px; color: #111827; font-weight: 800;">${consultDate}</div>
       </div>
       <div style="width: 1px; background: #e5e7eb; margin: 0 12px;"></div>
       <div style="flex: 0.7;">
         <div style="font-size: 12.5px; color: #6b7280; font-weight: 600; margin-bottom: 4px;">상담시간</div>
-        <div style="font-size: 15.5px; color: #111827; font-weight: 800; font-family: monospace;">${duration}</div>
+        <div style="font-size: 15.5px; color: #111827; font-weight: 800;">${duration}</div>
       </div>
     </div>
 
@@ -1218,7 +1218,7 @@
       <div style="text-align: right;">
         <div style="display: inline-flex; align-items: center; gap: 6px;">
           <span class="careport-badge-pill" style="background: #10bdb2; color: #ffffff; font-size: 11.5px; font-weight: 900; height: 22px; padding: 0 9px; border-radius: 6px;">공식일지</span>
-          <span style="font-size: 12.5px; font-weight: 800; color: #334155; font-family: monospace; display: inline-flex; align-items: center; height: 22px; line-height: 1;">${d.consultDate}</span>
+          <span style="font-size: 12.5px; font-weight: 800; color: #334155; display: inline-flex; align-items: center; height: 22px; line-height: 1;">${d.consultDate}</span>
         </div>
         <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">리본케어포트(CarePort) 전산 공인 인증 일지</div>
       </div>
@@ -1238,7 +1238,7 @@
       </div>
       <div style="flex: 1.2; border-left: 1px solid #e2e8f0; padding-left: 12px;">
         <span style="font-size: 10.5px; color: #64748b; font-weight: 700; display: block; margin-bottom: 2px;">간병 기간</span>
-        <strong style="font-size: 12.5px; font-weight: 800; color: #0f172a; font-family: monospace;">${d.carePeriod}</strong>
+        <strong style="font-size: 12.5px; font-weight: 800; color: #0f172a;">${d.carePeriod}</strong>
       </div>
     </div>
 
