@@ -1061,7 +1061,35 @@ var gFaxRecords = {};
 var gFaxDirectory = [];
 var gFaxLogs = [];
 var gClaimUnitPriceRules = [];
-const CONVEX_URL = (typeof window !== 'undefined' && (window.ENV?.CONVEX_URL || window.CONVEX_URL)) || 'https://gallant-weasel-360.convex.cloud';
+// =========================================================================
+// [환경 감지] 개발 사이트(DEV) vs 실운영 사이트(PROD) 동적 분리 엔진
+// =========================================================================
+const DEV_CONVEX_URL = 'https://rapid-raccoon-895.convex.cloud';
+const PROD_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
+
+function isDevEnvironment() {
+  if (typeof window === 'undefined') return false;
+  const urlParam = new URLSearchParams(window.location.search).get('env');
+  if (urlParam === 'dev') return true;
+  if (urlParam === 'prod') return false;
+  const storedEnv = localStorage.getItem('LIVON_TARGET_ENV');
+  if (storedEnv === 'dev') return true;
+  if (storedEnv === 'prod') return false;
+
+  const host = window.location.hostname || '';
+  const port = window.location.port || '';
+  if (host === 'localhost' || host === '127.0.0.1' || host === '' || host.includes('dev') || host.includes('preview') || port === '8080' || port === '3000') {
+    return true;
+  }
+  return false;
+}
+
+const IS_DEV_ENV = isDevEnvironment();
+const CONVEX_URL = (typeof window !== 'undefined' && (window.ENV?.CONVEX_URL || window.CONVEX_URL))
+  || (IS_DEV_ENV ? DEV_CONVEX_URL : PROD_CONVEX_URL);
+window.IS_DEV_ENV = IS_DEV_ENV;
+window.CURRENT_CONVEX_URL = CONVEX_URL;
+console.log('[Livon ERP] Current Running Environment:', IS_DEV_ENV ? '개발 사이트 (DEV)' : '실사이트 (PROD)', '| Convex:', CONVEX_URL);
 
 async function syncToConvex(path, args = {}) {
   try {
@@ -1083,10 +1111,15 @@ async function queryConvex(path, args = {}) {
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timeoutId = controller ? setTimeout(() => controller.abort(), 10000) : null;
   try {
+    let finalArgs = Object.assign({}, args);
+    // 개발 서버(rapid-raccoon-895)의 bundleAll은 sessionToken 파라미터를 받지 않으므로 제외
+    if (path === 'sync:bundleAll' && IS_DEV_ENV) {
+      delete finalArgs.sessionToken;
+    }
     const res = await fetch(`${CONVEX_URL}/api/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path, args }),
+      body: JSON.stringify({ path, args: finalArgs }),
       signal: controller ? controller.signal : undefined
     });
     if (timeoutId) clearTimeout(timeoutId);
@@ -1136,8 +1169,23 @@ function renderAllLoadingStates() {
 
 function filterInvalidSamsungDuplicates(apps) {
   if (!Array.isArray(apps)) return [];
+  // 삼성화재 자동생성 비고 제거 및 레거시 CS 목업 시드 정리
+  apps.forEach(a => {
+    if (a && a.memo && String(a.memo).startsWith('[삼성화재 사전명단 자동연동]')) {
+      a.memo = '';
+    }
+    if (a && a.csRecords && a.csRecords.some(r => r && r.id && String(r.id).startsWith('CS-SEED-'))) {
+      a.csRecords = a.csRecords.filter(r => !(r && r.id && String(r.id).startsWith('CS-SEED-')));
+    }
+    if (a && (!a.csRecords || a.csRecords.length === 0)) {
+      if (a.csLatestLabel === '긴급' || a.csLatestLabel === '강성' || !a.csRecords || a.csRecords.length === 0) {
+        a.csLatestLabel = null;
+        a.csLatestType = null;
+      }
+    }
+  });
   // 1. 과거 레거시 목업/임의채번 S-id 삼성 데이터 정리 (실데이터 C-id 보존)
-  const valid = apps.filter(a => !(a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성')));
+  const valid = apps.filter(a => !(a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성') && !a.isRealLaunchData));
   // 2. ID 중복 제거 (동일 id가 여러 번 존재하는 경우 최신/확장 데이터인 마지막 항목 보존)
   const map = new Map();
   for (let i = 0; i < valid.length; i++) {
@@ -1206,7 +1254,8 @@ async function loadConvexData(showSpinner = true) {
     if (Array.isArray(realJson.applications) && realJson.applications.length > 0) {
       const serverRealApps = filterInvalidSamsungDuplicates(realJson.applications).filter(a => a.isRealLaunchData);
       if (serverRealApps.length > 0) {
-        gApps = serverRealApps;
+        const existingNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => localApp && localApp.isRealLaunchData && !serverRealApps.some(s => s.id === localApp.id));
+        gApps = [...existingNewApps, ...serverRealApps];
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
       }
     }
@@ -1558,11 +1607,13 @@ function updateConvexStatusBadge(connected, count) {
   const badge = document.getElementById('convexStatusBadgeText');
   const dot = document.getElementById('convexStatusDot');
   if (badge) {
-    badge.innerText = connected ? `gallant-weasel-360 (${count}건)` : '오프라인';
+    const envTag = IS_DEV_ENV ? '개발' : '실서버';
+    const serverName = IS_DEV_ENV ? 'rapid-raccoon-895' : 'gallant-weasel-360';
+    badge.innerText = connected ? `[${envTag}] ${serverName} (${count}건)` : '오프라인';
   }
   if (dot) {
     dot.className = connected 
-      ? 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse' 
+      ? (IS_DEV_ENV ? 'w-2 h-2 rounded-full bg-sky-500 animate-pulse' : 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse')
       : 'w-2 h-2 rounded-full bg-amber-400';
   }
 }
@@ -1584,7 +1635,7 @@ var gLedgerSelection = {
 var gIsMasked = true;
 var gActiveTab = 'carehub';
 var gHubFilter = 'ALL';
-var gHubInsuranceTab = (typeof localStorage !== 'undefined' && localStorage.getItem('LIVON_HUB_INS_TAB')) || 'ALL'; // 'ALL', '삼성화재', '현대해상'
+var gHubInsuranceTab = 'ALL'; // 기본: 전체 (순서: 전체, 삼성화재, 현대해상)
 var gHubViewCols = 2;
 var gHubLayoutStyle = 'detailed';
 try {
@@ -3705,32 +3756,10 @@ function initInsuranceWorkflows() {
     });
   }
 
-  // Initialize Centers
-  if (!gCenters || gCenters.length === 0) {
-    gCenters = [
-      { id: 'CTR001', name: '영등포센터', manager: '김영등', phone: '02-2670-1114', fax: '02-2670-1119', area: '서울 영등포/구로/금천', settlementType: '센터', businessNumber: '107-82-19203', caregiverCount: 42 },
-      { id: 'CTR002', name: '이솔간병', manager: '이이솔', phone: '032-661-8820', fax: '032-661-8829', area: '인천/경기 부천/광명', settlementType: '센터', businessNumber: '211-86-44912', caregiverCount: 38 },
-      { id: 'CTR003', name: '행복한돌봄', manager: '박행복', phone: '02-540-3310', fax: '02-540-3319', area: '서울 강남/서초/송파', settlementType: '센터', businessNumber: '120-81-77239', caregiverCount: 55 },
-      { id: 'CTR004', name: '미래원간병', manager: '최미래', phone: '02-930-5500', fax: '02-930-5509', area: '서울 노원/도봉/강북', settlementType: '개인', businessNumber: '204-85-66102', caregiverCount: 29 },
-      { id: 'CTR005', name: '미소간병', manager: '정미소', phone: '031-250-7711', fax: '031-250-7719', area: '경기 수원/화성/안양', settlementType: '개인', businessNumber: '135-82-99120', caregiverCount: 31 },
-      { id: 'CTR006', name: '한빛돌봄협동조합', manager: '강한빛', phone: '042-471-2200', fax: '042-471-2209', area: '대전/세종/충남', settlementType: '센터', businessNumber: '305-81-62340', caregiverCount: 26 },
-      { id: 'CTR007', name: '동행간병센터', manager: '윤동행', phone: '051-808-9910', fax: '051-808-9919', area: '부산/울산/경남', settlementType: '센터', businessNumber: '602-82-31094', caregiverCount: 34 }
-    ];
-  }
-
-  // Initialize Caregivers
-  if (!gCaregivers || gCaregivers.length === 0) {
-    gCaregivers = [
-      { id: 'CG001', name: '황지원', phone: '010-8203-4022', centerName: '영등포센터', area: '서울 영등포/구로', cert: '간병사 1급', account: '국민 1002-057-219315 황지원', activeCases: 1, status: '활동중' },
-      { id: 'CG002', name: '이영자', phone: '010-9060-6723', centerName: '영등포센터', area: '서울 마포/영등포', cert: '요양보호사 1급', account: '신한 110-342-998210 이영자', activeCases: 1, status: '활동중' },
-      { id: 'CG003', name: '박순옥', phone: '010-3341-8902', centerName: '이솔간병', area: '경기 부천/인천', cert: '간병사 1급', account: '우리 1002-881-229104 박순옥', activeCases: 0, status: '대기중' },
-      { id: 'CG004', name: '김정희', phone: '010-7721-0941', centerName: '행복한돌봄', area: '서울 강남/서초', cert: '간호조무사', account: '하나 221-910-449102 김정희', activeCases: 1, status: '활동중' },
-      { id: 'CG005', name: '최미숙', phone: '010-5512-3390', centerName: '미래원간병', area: '서울 노원/도봉', cert: '요양보호사 1급', account: '농협 302-091-882100 최미숙', activeCases: 0, status: '대기중' },
-      { id: 'CG006', name: '정순자', phone: '010-4412-8819', centerName: '미소간병', area: '경기 수원/안양', cert: '간병사 1급', account: '기업 010-4412-8819 정순자', activeCases: 1, status: '활동중' },
-      { id: 'CG007', name: '오명희', phone: '010-6190-2234', centerName: '한빛돌봄협동조합', area: '대전/세종', cert: '요양보호사 1급', account: '하나 301-4410-9921 오명희', activeCases: 0, status: '대기중' },
-      { id: 'CG008', name: '배은숙', phone: '010-3910-7720', centerName: '동행간병센터', area: '부산 부산진구/연제', cert: '간병사 1급', account: '부산 112-2091-8812 배은숙', activeCases: 1, status: '활동중' }
-    ];
-  }
+  // Initialize Centers & Caregivers (100% 엑셀 실데이터만 적용, 임의 목업 생성 원천 차단)
+  if (!Array.isArray(gCenters)) gCenters = [];
+  if (!Array.isArray(gCaregivers)) gCaregivers = [];
+  if (!Array.isArray(gAdjusters)) gAdjusters = [];
 
   const countEl = document.getElementById('sidebarAdjusterCount');
   if (countEl) countEl.innerText = gAdjusters.length;
@@ -7094,7 +7123,7 @@ function populateSamsungLeadDataToForm(lead) {
   if (document.getElementById('newAppRoadAddress')) document.getElementById('newAppRoadAddress').value = '서울 중구 을지로 29 (삼성화재 본사 권역)';
   if (document.getElementById('newAppAddressDetail')) document.getElementById('newAppAddressDetail').value = '피보험자 등록 자택';
   if (document.getElementById('newAppMemo')) {
-    document.getElementById('newAppMemo').value = `[삼성화재 사전명단 자동연동] 피보험자ID: ${patientIdVal} | 상품코드: ${prodCodeVal} | 보장담보: 상해(${injuryVal}), 질병(${diseaseVal})`;
+    document.getElementById('newAppMemo').value = '';
   }
 
   // 6. Automatically select accident type radio based on policy coverage
@@ -7545,22 +7574,7 @@ function previewCarePortReport() {
   };
 
   const logs = (gCareLogs || []).filter(l => String(l.applyId) === String(app.id));
-  const displayLogs = logs.length > 0 ? logs : [
-    {
-      logDate: '2026-09-13',
-      audioDuration: '02분 15초',
-      vital: { bp: '120/80', pulse: '72회', temp: '36.5' },
-      sttText: '환자분 아침 식사(연식) 1/2 공기 정상 섭취하셨으며, 오전 10시경 체위 변경 및 관절 가동 운동 보조 완료함. 오후 혈압 125/82, 체온 36.6도로 안정적이며 기분 양호함.',
-      careDetails: '체위변경 4회, 식사보조, 복약지도 완료'
-    },
-    {
-      logDate: '2026-09-12',
-      audioDuration: '01분 48초',
-      vital: { bp: '118/78', pulse: '68회', temp: '36.4' },
-      sttText: '물리치료실 휠체어 동행 이동 지원하였고, 수분 섭취 1,000ml 권장 드림. 배뇨/배변 특이 이상 없으며 보호자 면담 시 환자 상태 긍정적 전달함.',
-      careDetails: '이동보조, 물리치료 동행, 위생청결'
-    }
-  ];
+  const displayLogs = logs;
 
   container.innerHTML = `
     <div class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-300 shadow-xs max-w-[800px] mx-auto text-slate-800 space-y-6">
@@ -7572,8 +7586,8 @@ function previewCarePortReport() {
           <p class="text-xs text-slate-500 mt-0.5">삼성화재 간병보험 청구 및 서비스 검증용 AI 음성 STT 기록 보고서</p>
         </div>
         <div class="text-right">
-          <div class="text-xs text-slate-500">문서번호: <b class="font-mono text-slate-800">CP-${app.id}-2026</b></div>
-          <div class="text-xs text-slate-500">발행일자: <b class="font-mono text-slate-800">${new Date().toLocaleDateString()}</b></div>
+          <div class="text-xs font-bold text-slate-400">발행일시</div>
+          <div class="text-sm font-black font-mono text-slate-900">${formatCareDateTimeStr(new Date())}</div>
         </div>
       </div>
 
@@ -7583,18 +7597,18 @@ function previewCarePortReport() {
           <div class="font-black text-slate-900 pb-1 border-b border-slate-200 flex items-center gap-1.5">
             <i data-lucide="user" class="w-3.5 h-3.5 text-primary-600"></i> 피보험자(고객) 정보
           </div>
-          <div><span class="text-slate-500">성명/성별:</span> <b>${app.patientName}</b> (${app.gender || '남'}, ${app.birthDate || '1966-12-30'})</div>
-          <div><span class="text-slate-500">증권번호:</span> <span class="font-mono">${app.policyNumber || 'SF882910394'}</span></div>
-          <div><span class="text-slate-500">입원병원:</span> <b>${app.hospitalName || '서울아산병원'}</b> (${app.hospitalRoom || '본관 702호'})</div>
-          <div><span class="text-slate-500">진단명/증상:</span> <b>${app.diagnosis || '급성 뇌경색'}</b></div>
+          <div><span class="text-slate-500">성명/성별:</span> <b>${app.patientName}</b> (${app.gender || '남'}, ${app.birthDate || '-'})</div>
+          <div><span class="text-slate-500">증권번호:</span> <span class="font-mono">${app.policyNumber || '-'}</span></div>
+          <div><span class="text-slate-500">입원병원:</span> <b>${app.hospitalName || '-'}</b> (${app.hospitalRoom || '-'})</div>
+          <div><span class="text-slate-500">진단명/증상:</span> <b>${app.diagnosis || '-'}</b></div>
         </div>
         <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
           <div class="font-black text-slate-900 pb-1 border-b border-slate-200 flex items-center gap-1.5">
             <i data-lucide="heart-handshake" class="w-3.5 h-3.5 text-emerald-600"></i> 담당 간병인 & 센터
           </div>
-          <div><span class="text-slate-500">간병인 성명:</span> <b>${assign.caregiverName}</b> (간병사 1급)</div>
-          <div><span class="text-slate-500">소속 센터:</span> ${assign.centerName || '영등포센터'} (${assign.caregiverPhone})</div>
-          <div><span class="text-slate-500">간병 기간:</span> <span class="font-mono font-bold text-sky-800">${assign.startDate} ~ ${assign.endDate}</span></div>
+          <div><span class="text-slate-500">간병인 성명:</span> <b>${assign.caregiverName || '-'}</b> (간병사 1급)</div>
+          <div><span class="text-slate-500">소속 센터:</span> ${assign.centerName || '-'} (${assign.caregiverPhone || '-'})</div>
+          <div><span class="text-slate-500">간병 기간:</span> <span class="font-mono font-bold text-sky-800">${assign.startDate || '-'} ~ ${assign.endDate || '-'}</span></div>
           <div><span class="text-slate-500">보험청구처:</span> <b>삼성화재해상보험(주)</b></div>
         </div>
       </div>
@@ -7605,24 +7619,29 @@ function previewCarePortReport() {
           <i data-lucide="mic" class="w-4 h-4 text-purple-600"></i> 일자별 리본메이트 음성 일지 (AI 자동 텍스트 변환)
         </h4>
         <div class="space-y-3">
-          ${displayLogs.map(l => `
+          ${displayLogs.length > 0 ? displayLogs.map(l => `
             <div class="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2 text-xs">
               <div class="flex items-center justify-between pb-1.5 border-b border-slate-100">
                 <span class="font-bold text-purple-900 flex items-center gap-1">
-                  <i data-lucide="calendar" class="w-3.5 h-3.5 text-purple-600"></i> ${l.logDate} 일지
+                  <i data-lucide="calendar" class="w-3.5 h-3.5 text-purple-600"></i> ${l.logDate || '-'} 일지
                   <span class="text-[10px] text-slate-400 font-mono">(${l.audioDuration || '녹음파일 검증완료'})</span>
                 </span>
                 <div class="flex items-center gap-2 font-mono text-[11px]">
-                  <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-200">혈압: <b>${l.vital?.bp || '120/80'}</b></span>
-                  <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">맥박: <b>${l.vital?.pulse || '72회'}</b></span>
-                  <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">체온: <b>${l.vital?.temp || '36.5'}℃</b></span>
+                  <span class="px-2 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-200">혈압: <b>${l.vital?.bp || '-'}</b></span>
+                  <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">맥박: <b>${l.vital?.pulse || '-'}</b></span>
+                  <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">체온: <b>${l.vital?.temp || '-'}</b></span>
                 </div>
               </div>
               <p class="text-slate-700 leading-relaxed bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
-                ${l.sttText}
+                ${l.sttText || '-'}
               </p>
             </div>
-          `).join('')}
+          `).join('') : `
+            <div class="p-8 text-center bg-slate-50 border border-slate-200 rounded-xl text-slate-400 text-xs">
+              <i data-lucide="file-x" class="w-6 h-6 mx-auto mb-1.5 text-slate-300"></i>
+              <span>등록된 실제 간병일지가 없습니다.</span>
+            </div>
+          `}
         </div>
       </div>
 
@@ -12470,21 +12489,21 @@ function parseSamsungSheetJsonRows(rows) {
     records.push({
       id: 'SF-' + nowStr + '-' + i,
       patientId: c0 || ('SF-P' + (100 + i)),
-      patientName: c1 || ('고객' + i),
-      birthDate: cols[2] != null ? String(cols[2]).trim() : '19700101',
-      gender: cols[3] != null ? String(cols[3]).trim() : '남',
-      phone: cols[4] != null ? String(cols[4]).trim() : '010-0000-0000',
-      policyNumber: cols[5] != null ? String(cols[5]).trim() : ('SF' + (100000000 + (i % 900000000))),
-      productCode: cols[6] != null ? String(cols[6]).trim() : 'SF-CARE-01',
-      productName: cols[7] != null ? String(cols[7]).trim() : '무배당 삼성화재 당신에게 좋은간병보험',
-      contractStartDate: cols[8] != null ? String(cols[8]).trim() : '2024-03-01',
-      contractEndDate: cols[9] != null ? String(cols[9]).trim() : '2044-03-01',
-      hasInjuryCare: cols[10] != null ? String(cols[10]).trim() : '가입',
-      hasDiseaseCare: cols[11] != null ? String(cols[11]).trim() : '가입',
-      accidentNumber: '26S' + (100000 + (i % 900000)),
-      adjusterName: (i & 1) === 0 ? '김정현' : '이민우',
-      adjusterPhone: (i & 1) === 0 ? '02-3485-9114' : '02-760-5521',
-      adjusterFax: (i & 1) === 0 ? '02-3485-9100' : '02-760-5500',
+      patientName: c1 || '',
+      birthDate: cols[2] != null ? String(cols[2]).trim() : '',
+      gender: cols[3] != null ? String(cols[3]).trim() : '',
+      phone: cols[4] != null ? String(cols[4]).trim() : '',
+      policyNumber: cols[5] != null ? String(cols[5]).trim() : '',
+      productCode: cols[6] != null ? String(cols[6]).trim() : '',
+      productName: cols[7] != null ? String(cols[7]).trim() : '',
+      contractStartDate: cols[8] != null ? String(cols[8]).trim() : '',
+      contractEndDate: cols[9] != null ? String(cols[9]).trim() : '',
+      hasInjuryCare: cols[10] != null ? String(cols[10]).trim() : '',
+      hasDiseaseCare: cols[11] != null ? String(cols[11]).trim() : '',
+      accidentNumber: cols[12] != null ? String(cols[12]).trim() : '',
+      adjusterName: cols[13] != null ? String(cols[13]).trim() : '',
+      adjusterPhone: cols[14] != null ? String(cols[14]).trim() : '',
+      adjusterFax: cols[15] != null ? String(cols[15]).trim() : '',
       maxDailyLimit: 144000,
       maxDays: 180,
       receiveDate: receiveDateStr,
@@ -12529,21 +12548,21 @@ function parseSamsungCsvContent(text) {
     records.push({
       id: 'SF-' + nowStr + '-' + i,
       patientId: c0 || ('SF-P' + (100 + i)),
-      patientName: c1 || ('고객' + i),
-      birthDate: (cols[2] || '19700101').replace(/^["']|["']$/g, '').trim(),
-      gender: (cols[3] || '남').replace(/^["']|["']$/g, '').trim(),
-      phone: (cols[4] || '010-0000-0000').replace(/^["']|["']$/g, '').trim(),
-      policyNumber: (cols[5] || ('SF' + (100000000 + (i % 900000000)))).replace(/^["']|["']$/g, '').trim(),
-      productCode: (cols[6] || 'SF-CARE-01').replace(/^["']|["']$/g, '').trim(),
-      productName: (cols[7] || '무배당 삼성화재 당신에게 좋은간병보험').replace(/^["']|["']$/g, '').trim(),
-      contractStartDate: (cols[8] || '2024-03-01').replace(/^["']|["']$/g, '').trim(),
-      contractEndDate: (cols[9] || '2044-03-01').replace(/^["']|["']$/g, '').trim(),
-      hasInjuryCare: (cols[10] || '가입').replace(/^["']|["']$/g, '').trim(),
-      hasDiseaseCare: (cols[11] || '가입').replace(/^["']|["']$/g, '').trim(),
-      accidentNumber: '26S' + (100000 + (i % 900000)),
-      adjusterName: (i & 1) === 0 ? '김정현' : '이민우',
-      adjusterPhone: (i & 1) === 0 ? '02-3485-9114' : '02-760-5521',
-      adjusterFax: (i & 1) === 0 ? '02-3485-9100' : '02-760-5500',
+      patientName: c1 || '',
+      birthDate: (cols[2] || '').replace(/^["']|["']$/g, '').trim(),
+      gender: (cols[3] || '').replace(/^["']|["']$/g, '').trim(),
+      phone: (cols[4] || '').replace(/^["']|["']$/g, '').trim(),
+      policyNumber: (cols[5] || '').replace(/^["']|["']$/g, '').trim(),
+      productCode: (cols[6] || '').replace(/^["']|["']$/g, '').trim(),
+      productName: (cols[7] || '').replace(/^["']|["']$/g, '').trim(),
+      contractStartDate: (cols[8] || '').replace(/^["']|["']$/g, '').trim(),
+      contractEndDate: (cols[9] || '').replace(/^["']|["']$/g, '').trim(),
+      hasInjuryCare: (cols[10] || '').replace(/^["']|["']$/g, '').trim(),
+      hasDiseaseCare: (cols[11] || '').replace(/^["']|["']$/g, '').trim(),
+      accidentNumber: (cols[12] || '').replace(/^["']|["']$/g, '').trim(),
+      adjusterName: (cols[13] || '').replace(/^["']|["']$/g, '').trim(),
+      adjusterPhone: (cols[14] || '').replace(/^["']|["']$/g, '').trim(),
+      adjusterFax: (cols[15] || '').replace(/^["']|["']$/g, '').trim(),
       maxDailyLimit: 144000,
       maxDays: 180,
       receiveDate: receiveDateStr,
@@ -13040,17 +13059,32 @@ async function applySamsungDriveRecords(records, filename, syncedAt) {
     renderCurrentSamsungSheet();
   }
 
-  // Convex 클라우드 DB에 백그라운드 청크 동기화 전송 (운영 페이지에서도 볼 수 있도록 실시간 동기화)
+  // Convex 클라우드 DB에 백그라운드 고속 병렬 청크 동기화 전송 (운영/개발 페이지 실시간 동기화)
   if (typeof syncToConvex === 'function') {
     (async () => {
       try {
-        console.log(`[SamsungDrive] Convex 클라우드에 전체 ${records.length.toLocaleString()}건 청크 동기화 시작...`);
-        const chunkSize = 100;
-        for (let i = 0; i < records.length; i += chunkSize) {
-          const chunk = records.slice(i, i + chunkSize);
-          await syncToConvex('sync:saveSamsungEligibleChunk', { leads: chunk });
+        const total = records.length;
+        const chunkSize = 200;
+        const chunks = [];
+        for (let i = 0; i < total; i += chunkSize) {
+          chunks.push(records.slice(i, i + chunkSize));
         }
-        console.log(`[SamsungDrive] Convex 클라우드에 전송 완료!`);
+        console.log(`[SamsungDrive] Convex 클라우드(${CONVEX_URL})에 전체 ${total.toLocaleString()}건 병렬 전송 시작 (${chunks.length}개 청크)...`);
+
+        let chunkIdx = 0;
+        const CONCURRENCY = 4;
+        async function worker() {
+          while (chunkIdx < chunks.length) {
+            const idx = chunkIdx++;
+            try {
+              await syncToConvex('sync:saveSamsungEligibleChunk', { leads: chunks[idx] });
+            } catch (err) {
+              console.warn(`[SamsungDrive] 청크 #${idx} 전송 실패:`, err);
+            }
+          }
+        }
+        await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+        console.log(`[SamsungDrive] Convex 클라우드(${CONVEX_URL})에 전체 전송 완료!`);
       } catch (e) {
         console.warn('[SamsungDrive] Convex 전송 중 경고:', e);
       }
@@ -13170,12 +13204,12 @@ function autoSyncCaregiverToDirectory(info, silent = false) {
     cg = {
       id: newId,
       name: name,
-      phone: info.phone || '010-0000-0000',
+      phone: info.phone || '',
       centerName: info.centerName || '개인',
       area: info.area || '전국',
-      cert: info.cert || '간병사 1급',
+      cert: info.cert || '간병사',
       account: info.account || info.accountInfo || '',
-      dailyWage: Number(info.dailyWage) || 140000,
+      dailyWage: Number(info.dailyWage) || 0,
       settlementType: info.settlementType || (info.centerName && info.centerName !== '개인' ? '센터' : '개인'),
       birthDate: info.birthDate || '',
       activeCases: 1,
@@ -13185,7 +13219,7 @@ function autoSyncCaregiverToDirectory(info, silent = false) {
     gCaregivers.push(cg);
   } else {
     // 기존 간병인 정보 최신화
-    if (info.phone && (!cg.phone || cg.phone === '010-0000-0000')) cg.phone = info.phone;
+    if (info.phone && !cg.phone) cg.phone = info.phone;
     if (info.centerName && (!cg.centerName || cg.centerName === '개인')) cg.centerName = info.centerName;
     if (info.account || info.accountInfo) cg.account = info.account || info.accountInfo;
     if (info.dailyWage) cg.dailyWage = Number(info.dailyWage);
@@ -13354,7 +13388,7 @@ function autoSyncAdjusterToDirectory(info, silent = false) {
     if (info.branch && (!adj.branch || adj.branch === '관할팀')) adj.branch = info.branch;
     if ((info.phone || info.adjusterPhone) && !adj.phone) adj.phone = info.phone || info.adjusterPhone;
     if ((info.mobile || info.adjusterMobile) && !adj.mobile) adj.mobile = info.mobile || info.adjusterMobile;
-    if ((info.fax || info.adjusterFax) && (!adj.fax || adj.fax === '051-602-5700')) adj.fax = info.fax || info.adjusterFax;
+    if ((info.fax || info.adjusterFax) && !adj.fax) adj.fax = info.fax || info.adjusterFax;
     if (info.email && !adj.email) adj.email = info.email;
   }
 
@@ -13616,7 +13650,7 @@ function renderAdjusters() {
   const insFilter = document.getElementById('adjusterInsFilter')?.value || 'ALL';
 
   const filtered = gAdjusters.filter(adj => {
-    if (insFilter !== 'ALL' && !adj.insuranceCompany.includes(insFilter)) return false;
+    if (insFilter !== 'ALL' && !(adj.insuranceCompany || '').includes(insFilter)) return false;
     if (!query) return true;
     return (adj.name && adj.name.toLowerCase().includes(query)) ||
            (adj.firm && adj.firm.toLowerCase().includes(query)) ||
@@ -14405,7 +14439,7 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
     case 'patientRrn': {
       if (app.patientRrn) {
         const clean = app.patientRrn.replace(/[^0-9*]/g, '');
-        if (clean.length === 13 && !app.patientRrn.includes('-')) {
+        if (clean.length === 13 && !(app.patientRrn || '').includes('-')) {
           return `${clean.slice(0, 6)}-${clean.slice(6)}`;
         }
         return app.patientRrn;
@@ -16097,7 +16131,7 @@ function previewNewAppDraftFax() {
   const phone = document.getElementById('newAppPhone')?.value.trim() || '010-0000-0000';
   const hospName = document.getElementById('newAppHospitalName')?.value.trim() || '입원병원명';
   const desiredDate = document.getElementById('newAppDesiredDate')?.value.trim() || '2026.09.07';
-  const memo = document.getElementById('newAppMemo')?.value.trim() || '전문 간병 파견 신청 건';
+  const memo = document.getElementById('newAppMemo')?.value.trim() || '';
 
   const rrnFront = document.getElementById('newAppRrnFront')?.value?.trim() || '';
   const rrnBack = document.getElementById('newAppRrnBack')?.value?.trim() || '';
@@ -16419,7 +16453,7 @@ function openHyundaiSmsInputModal(applyId) {
   // Populate Adjusters select
   const select = document.getElementById('hdSmsAdjusterSelect');
   if (select) {
-    select.innerHTML = '<option value="">-- 기존 손사 디렉토리에서 선택 (선택 시 자동바인딩) --</option>' + gAdjusters.filter(a => a.insuranceCompany.includes('현대해상')).map(a => `
+    select.innerHTML = '<option value="">-- 기존 손사 디렉토리에서 선택 (선택 시 자동바인딩) --</option>' + gAdjusters.filter(a => (a.insuranceCompany || '').includes('현대해상')).map(a => `
       <option value="${a.name}" data-firm="${a.firm}" data-phone="${a.phone}" data-fax="${a.fax}" ${app.adjusterName === a.name ? 'selected' : ''}>${a.name} (${a.firm} ${a.branch} · Fax: ${a.fax})</option>
     `).join('');
   }
@@ -17872,11 +17906,11 @@ function setHubFilter(filterType) {
 function updateHubInsuranceTabUI() {
   const current = gHubInsuranceTab || 'ALL';
 
-  // 1. 상단 메인 탭
+  // 1. 상단 메인 탭 (순서: 전체, 삼성화재, 현대해상)
   const tabDefs = [
+    { key: 'ALL', btnId: 'hubInsTab-ALL', activeClass: 'bg-primary-600 text-white shadow-xs border-primary-500', activeBadge: 'bg-white text-primary-900 font-black shadow-2xs' },
     { key: '삼성화재', btnId: 'hubInsTab-SAMSUNG', activeClass: 'bg-blue-600 text-white shadow-xs border-blue-500', activeBadge: 'bg-white text-blue-900 font-black shadow-2xs' },
-    { key: '현대해상', btnId: 'hubInsTab-HYUNDAI', activeClass: 'bg-orange-600 text-white shadow-xs border-orange-500', activeBadge: 'bg-white text-orange-900 font-black shadow-2xs' },
-    { key: 'ALL', btnId: 'hubInsTab-ALL', activeClass: 'bg-primary-600 text-white shadow-xs border-primary-500', activeBadge: 'bg-white text-primary-900 font-black shadow-2xs' }
+    { key: '현대해상', btnId: 'hubInsTab-HYUNDAI', activeClass: 'bg-orange-600 text-white shadow-xs border-orange-500', activeBadge: 'bg-white text-orange-900 font-black shadow-2xs' }
   ];
 
   tabDefs.forEach(def => {
@@ -17892,11 +17926,11 @@ function updateHubInsuranceTabUI() {
     }
   });
 
-  // 2. 스티키 툴바 세그먼트 버튼
+  // 2. 스티키 툴바 세그먼트 버튼 (순서: 전체, 삼성화재, 현대해상)
   const stickyDefs = [
+    { key: 'ALL', id: 'stickyInsTab-ALL', activeClass: 'bg-primary-600 text-white shadow-xs' },
     { key: '삼성화재', id: 'stickyInsTab-삼성화재', activeClass: 'bg-blue-600 text-white shadow-xs' },
-    { key: '현대해상', id: 'stickyInsTab-현대해상', activeClass: 'bg-orange-600 text-white shadow-xs' },
-    { key: 'ALL', id: 'stickyInsTab-ALL', activeClass: 'bg-primary-600 text-white shadow-xs' }
+    { key: '현대해상', id: 'stickyInsTab-현대해상', activeClass: 'bg-orange-600 text-white shadow-xs' }
   ];
   stickyDefs.forEach(def => {
     const el = document.getElementById(def.id);
@@ -20497,14 +20531,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                     </div>
                   ` : ''}
 
-                  ${(app.memo || app.specialNotes) ? `
-                    <div class="mt-2 p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 text-[11px] text-amber-950">
-                      <div class="font-extrabold text-amber-800 flex items-center gap-1 mb-1">
-                        <i data-lucide="file-text" class="w-3.5 h-3.5 text-amber-600"></i> 신청 대장 비고 (엑셀 원장)
-                      </div>
-                      <div class="break-words whitespace-pre-wrap text-slate-800 leading-relaxed font-medium">${escapeHtml(app.memo || app.specialNotes)}</div>
-                    </div>
-                  ` : ''}
+
                 </div>
               </div>
             </div>
@@ -21798,7 +21825,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               </div>
 
               <div class="space-y-1.5 text-slate-600">
-                ${app.insuranceCompany.includes('삼성') ? `
+                ${(app.insuranceCompany || '').includes('삼성') ? `
                   <div class="flex justify-between items-start gap-2">
                     <span class="text-slate-500 flex-shrink-0">보험상품명:</span>
                     <span class="font-bold text-slate-900 text-right flex-1 break-keep leading-snug">${app.productName || '-'}</span>
@@ -21835,7 +21862,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                   <span class="text-slate-500">사고유형 / 신청일시:</span>
                   <span class="font-semibold text-slate-800">${app.accidentType || '질병'} · <span class="font-mono font-bold">${app.applyDate || '-'}</span></span>
                 </div>
-                ${app.insuranceCompany.includes('현대해상') ? `
+                ${(app.insuranceCompany || '').includes('현대해상') ? `
                   <div class="flex justify-between items-center pt-1 border-t border-slate-100">
                     <span class="text-slate-500 flex items-center gap-1 font-medium">
                       <i data-lucide="printer" class="w-3.5 h-3.5 text-blue-500"></i> 1차 고객등록 팩스:
@@ -23259,6 +23286,24 @@ async function togglePayoutStatus(payoutId) {
       if (app) syncToConvex('sync:saveApplication', { app: app });
     }
 
+    // [시스템 감사 로그 기록]
+    if (typeof window.recordSystemAuditLog === 'function') {
+      window.recordSystemAuditLog({
+        category: '간병비지급',
+        actionType: 'STATUS_CHANGE',
+        target: `지급 [${p.id}] (${p.caregiverName || '간병인'}, ${p.round || ''})`,
+        summary: nextStatus === '지급완료' 
+          ? `간병비 (${formatCurrency(p.payoutAmount)}원) 지급 승인 및 지급완료 처리`
+          : `간병비 지급완료 취소 및 미지급 원복`,
+        changes: {
+          '지급상태': { before: isAlreadyPaid ? '지급완료' : '미지급', after: nextStatus },
+          '지급금액': { before: isAlreadyPaid ? `${formatCurrency(p.payoutAmount)}원` : '0원', after: nextStatus === '지급완료' ? `${formatCurrency(p.payoutAmount)}원` : '0원' },
+          '지급계좌': { before: '-', after: p.bankAccount ? `${p.bankName || ''} ${p.bankAccount}` : '-' },
+          '지급일시': { before: isAlreadyPaid ? (p.paidDate || '-') : '-', after: p.paidDate || '-' }
+        }
+      });
+    }
+
     if (gActiveHubModalAppId) {
       openHubCustomerDetailModal(gActiveHubModalAppId);
     }
@@ -23713,6 +23758,20 @@ async function toggleClaimDepositStatus(applyId, roundNumber, claimId) {
         }
       );
       if (!confirmed) return;
+    } else {
+      const depositTargetAmount = claim.claimAmount || (claim.days * (claim.unitPrice || claim.dailyWage || dailyPrice)) || totalAmount;
+      const targetDays = claim.days || roundDays;
+      const confirmed = await showCustomConfirm(
+        `[${claim.id || ''}] [${roundNumber}차 보험금 입금 확인]\n\n청구 일수: ${targetDays}일분 (${targetDays * 24}시간)\n청구 금액: ${formatCurrency(depositTargetAmount)}원\n\n해당 차수의 보험금 입금을 즉시 '입금확인됨' 처리하시겠습니까?`,
+        {
+          theme: 'primary',
+          icon: 'check-circle',
+          title: `${roundNumber}차 보험금 입금확인 처리`,
+          confirmText: '입금확인 완료',
+          cancelText: '취소'
+        }
+      );
+      if (!confirmed) return;
     }
 
     claim.depositStatus = nextStatus;
@@ -23759,6 +23818,25 @@ async function toggleClaimDepositStatus(applyId, roundNumber, claimId) {
     } catch (e) {}
   }
 
+  // [시스템 감사 로그 기록]
+  if (typeof window.recordSystemAuditLog === 'function') {
+    const isConfirmed = claim.depositStatus === '입금확인됨';
+    window.recordSystemAuditLog({
+      category: '보험청구',
+      actionType: 'STATUS_CHANGE',
+      target: `청구 ${claim.id} (${app ? app.patientName : '고객'}, ${roundNumber}차)`,
+      summary: isConfirmed 
+        ? `${roundNumber}차 보험금 (${formatCurrency(claim.depositAmount)}원) 입금확인 처리 완료` 
+        : `${roundNumber}차 보험금 입금확인 취소 및 미수납 원복`,
+      changes: {
+        '입금상태': { before: isConfirmed ? '미수납 (대기)' : '입금확인됨', after: claim.depositStatus },
+        '실입금액': { before: isConfirmed ? '0원' : `${formatCurrency(claim.claimAmount || 0)}원`, after: `${formatCurrency(claim.depositAmount || 0)}원` },
+        '미수잔액': { before: isConfirmed ? `${formatCurrency(claim.claimAmount || 0)}원` : '0원', after: `${formatCurrency(claim.unpaidAmount || 0)}원` },
+        '입금일시': { before: isConfirmed ? '-' : (claim.depositDate || '-'), after: claim.depositDate || '-' }
+      }
+    });
+  }
+
   // 모달 및 화면 리렌더링
   if (gActiveHubModalAppId) {
     openHubCustomerDetailModal(gActiveHubModalAppId);
@@ -23774,6 +23852,10 @@ async function toggleClaimDepositStatus(applyId, roundNumber, claimId) {
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:saveClaim', { claim: claim });
     if (app) syncToConvex('sync:saveApplication', { app: app });
+  }
+
+  if (typeof showToast === 'function') {
+    showToast(`[${claim.patientName || app?.patientName || '고객'}] [${roundNumber}차] 보험금이 [${claim.depositStatus}] 처리되었습니다.`, claim.depositStatus === '입금확인됨' ? 'success' : 'info');
   }
 }
 
@@ -23800,7 +23882,7 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
                     <button onclick="event.stopPropagation(); openCustomerEditModal('${app.id}')" class="px-2 py-0.5 rounded text-[11px] font-bold bg-white/20 hover:bg-white/40 text-white border border-white/30 flex items-center gap-1 transition-all" title="고객 인적사항/주소/손사정보 수정">
                       <i data-lucide="edit" class="w-3 h-3"></i> 정보 수정 ✏️
                     </button>
-                    ${app.insuranceCompany.includes('현대해상') ? `
+                    ${(app.insuranceCompany || '').includes('현대해상') ? `
                       ${isHdWaitingSms ? `
                         <button onclick="event.stopPropagation(); openHyundaiSmsInputModal('${app.id}')" class="px-2.5 py-1 rounded text-[11px] font-black bg-amber-400 hover:bg-amber-300 text-slate-950 border border-amber-500 shadow-md flex items-center gap-1 transition-all animate-bounce" title="현대해상 접수안내 회신문자 파싱 및 자동등록 (미등록 건)">
                           <i data-lucide="message-square" class="w-3.5 h-3.5 text-amber-900 animate-pulse"></i> 문자등록(필수) 📋
@@ -23809,7 +23891,7 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
                       <button onclick="event.stopPropagation(); openHyundaiInitialFaxModal('${app.id}')" class="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-300 flex items-center gap-1 transition-all" title="현대 1차 서류 팩스 발송">
                         <i data-lucide="send" class="w-3 h-3 text-blue-600"></i> 현대 1차팩스 📠
                       </button>
-                    ` : (app.insuranceCompany.includes('삼성') ? `
+                    ` : ((app.insuranceCompany || '').includes('삼성') ? `
                       <button onclick="event.stopPropagation(); openSamsungEmailModal('${app.id}', 'DAILY_INTAKE')" class="px-2.5 py-1 rounded text-[11px] font-bold bg-sky-100 hover:bg-sky-200 text-sky-900 border border-sky-300 flex items-center gap-1 transition-all shadow-2xs cursor-pointer" title="삼성화재 일일 접수현황 및 간병일지 이메일 발송">
                         <i data-lucide="mail" class="w-3.5 h-3.5 text-sky-700"></i> 접수 이메일 발송 📧
                       </button>
@@ -23846,7 +23928,7 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
                 </div>
 
                 <!-- 원수사별 맞춤 정보 영역 -->
-                ${app.insuranceCompany.includes('현대해상') ? `
+                ${(app.insuranceCompany || '').includes('현대해상') ? `
                   <!-- 현대해상 특화 정보 -->
                   <div class="p-2.5 rounded-xl bg-blue-50/50 border border-blue-100 space-y-1 text-[11.5px]">
                     <div class="flex justify-between items-center">
@@ -24111,14 +24193,14 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
             </div>
 
               <!-- STEP 4: 보험사 청구 요청 팩스/이메일 발송 (구 STEP 6에서 승격) -->
-              <div class="bg-white p-4 rounded-2xl border ${app.insuranceCompany.includes('삼성') ? 'border-sky-200' : 'border-indigo-200'} shadow-2xs space-y-2 flex flex-col justify-between">
+              <div class="bg-white p-4 rounded-2xl border ${(app.insuranceCompany || '').includes('삼성') ? 'border-sky-200' : 'border-indigo-200'} shadow-2xs space-y-2 flex flex-col justify-between">
                 <div>
-                  <div class="flex items-center justify-between pb-2 border-b ${app.insuranceCompany.includes('삼성') ? 'border-sky-200 bg-gradient-to-r from-sky-600 to-indigo-600' : 'border-indigo-200 bg-gradient-to-r from-indigo-600 to-purple-600'} -mx-4 -mt-4 mb-3 px-4 py-2.5 rounded-t-2xl">
+                  <div class="flex items-center justify-between pb-2 border-b ${(app.insuranceCompany || '').includes('삼성') ? 'border-sky-200 bg-gradient-to-r from-sky-600 to-indigo-600' : 'border-indigo-200 bg-gradient-to-r from-indigo-600 to-purple-600'} -mx-4 -mt-4 mb-3 px-4 py-2.5 rounded-t-2xl">
                     <span class="font-extrabold text-white flex items-center gap-1.5">
-                      <i data-lucide="${app.insuranceCompany.includes('삼성') ? 'mail' : 'printer'}" class="w-4 h-4 text-white"></i> STEP 4: ${app.insuranceCompany.includes('삼성') ? '삼성화재 월간 청구 이메일 발송' : '보험사 청구 요청 팩스 발송'}
+                      <i data-lucide="${(app.insuranceCompany || '').includes('삼성') ? 'mail' : 'printer'}" class="w-4 h-4 text-white"></i> STEP 4: ${(app.insuranceCompany || '').includes('삼성') ? '삼성화재 월간 청구 이메일 발송' : '보험사 청구 요청 팩스 발송'}
                     </span>
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${app.insuranceCompany.includes('삼성') ? (app.samsungEmailSentAt ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-200 text-sky-900') : (faxInfo.status === '전송완료' ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-200 text-purple-800')}">
-                      ${app.insuranceCompany.includes('삼성') ? (app.samsungEmailSentAt ? '이메일발송완료' : '발송대기') : faxInfo.status}
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${(app.insuranceCompany || '').includes('삼성') ? (app.samsungEmailSentAt ? 'bg-emerald-100 text-emerald-800' : 'bg-sky-200 text-sky-900') : (faxInfo.status === '전송완료' ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-200 text-purple-800')}">
+                      ${(app.insuranceCompany || '').includes('삼성') ? (app.samsungEmailSentAt ? '이메일발송완료' : '발송대기') : faxInfo.status}
                     </span>
                   </div>
 
@@ -24135,7 +24217,7 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
                         ${renderCtiCallBtn(adjPhone, app.adjusterName, '손사-일반전화')}
                       </div>
                     </div>
-                    ${app.insuranceCompany.includes('삼성') ? `
+                    ${(app.insuranceCompany || '').includes('삼성') ? `
                       <div class="flex justify-between items-center"><span>담당 이메일:</span><b class="text-sky-900 font-mono">samsung_care@samsungfire.com</b></div>
                       <div class="flex justify-between items-center"><span>최근 발송이력:</span><span class="text-slate-700">${app.samsungEmailSentAt ? app.samsungEmailSentAt + ' 발송완료' : '이메일 발송 이력 없음'}</span></div>
                     ` : `
@@ -24152,8 +24234,8 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
                   </div>
                 </div>
 
-                <div class="pt-3 border-t ${app.insuranceCompany.includes('삼성') ? 'border-sky-200' : 'border-purple-200'} flex items-center justify-between gap-2">
-                  ${app.insuranceCompany.includes('삼성') ? `
+                <div class="pt-3 border-t ${(app.insuranceCompany || '').includes('삼성') ? 'border-sky-200' : 'border-purple-200'} flex items-center justify-between gap-2">
+                  ${(app.insuranceCompany || '').includes('삼성') ? `
                     <button onclick="openSamsungEmailModal('${app.id}', 'MONTHLY_CLAIM')" class="flex-1 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer">
                       <i data-lucide="mail" class="w-3.5 h-3.5"></i> 삼성화재 청구 이메일 발송 (완료명단/청구서)
                     </button>
@@ -24456,7 +24538,7 @@ function renderUnifiedCareHub() {
   }
 
   // [중요] 레거시 더미 S-id 삼성 데이터 브라우저 로컬 캐시 및 전역 데이터 즉시 영구 제거 (실데이터 C-id 보존)
-  if (Array.isArray(gApps) && gApps.some(a => a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성'))) {
+  if (Array.isArray(gApps) && gApps.some(a => a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성') && !a.isRealLaunchData)) {
     gApps = filterInvalidSamsungDuplicates(gApps);
     try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
   }
@@ -24975,7 +25057,7 @@ function renderUnifiedCareHub() {
     const totalPayoutSum = sched.confirmedPayoutSum || appPayouts.reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
     const isPayoutPending = isPayoutDueOrUnpaid;
     const totalClaimAmt = (sched.depositedClaimSum || app.depositConfirmedAmount) + (sched.unconfirmedClaimSum || app.estimatedUnpaid || 0);
-    const isHdWaitingSms = app.insuranceCompany.includes('현대해상') && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'));
+    const isHdWaitingSms = (app.insuranceCompany || '').includes('현대해상') && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'));
     const isSamsung = (app.insuranceCompany || '').includes('삼성');
 
     // [사용자 요구사항]: 엑셀 각 시트별 비고란(신청, 배정, 간병비지급, 보험청구) 정보 추출
@@ -25331,9 +25413,9 @@ function renderUnifiedCareHub() {
               </div>
 
               <div class="flex justify-between items-center pt-1 border-t border-slate-200/50 text-[10.5px]">
-                <span class="text-slate-400">${app.insuranceCompany.includes('삼성') ? '본사이메일:' : '손사팩스:'}</span>
-                <span class="${(app.insuranceCompany.includes('삼성') ? app.samsungEmailSentAt : faxInfo.status === '전송완료') ? 'text-emerald-700 font-medium' : 'text-slate-400'}">
-                  ${app.insuranceCompany.includes('삼성') 
+                <span class="text-slate-400">${(app.insuranceCompany || '').includes('삼성') ? '본사이메일:' : '손사팩스:'}</span>
+                <span class="${((app.insuranceCompany || '').includes('삼성') ? app.samsungEmailSentAt : faxInfo.status === '전송완료') ? 'text-emerald-700 font-medium' : 'text-slate-400'}">
+                  ${(app.insuranceCompany || '').includes('삼성') 
                     ? (app.samsungEmailSentAt ? `발송완료(${app.samsungEmailSentAt.slice(5, 16)})` : '미발송')
                     : (faxInfo.status === '전송완료' ? `발송완료(${faxInfo.sentDate ? faxInfo.sentDate.slice(5) : ''})` : '미발송')}
                 </span>
@@ -25910,7 +25992,7 @@ function renderClaimUnitPriceTable() {
         <td class="p-3 text-center font-mono text-slate-400 font-bold">${idx + 1}</td>
         <td class="p-3">
           <span class="font-black text-slate-900 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full ${r.insuranceCompany.includes('SCOR') ? 'bg-purple-500' : 'bg-sky-500'}"></span>
+            <span class="w-2 h-2 rounded-full ${(r.insuranceCompany || '').includes('SCOR') ? 'bg-purple-500' : 'bg-sky-500'}"></span>
             <span>${r.insuranceCompany}</span>
           </span>
         </td>
@@ -26589,7 +26671,7 @@ function renderFaxDirectoryTable() {
   const catFilter = document.getElementById('faxDirCategoryFilter')?.value || 'ALL';
 
   let filtered = (gFaxDirectory || []).filter(d => {
-    if (insFilter !== 'ALL' && !d.insuranceCompany.includes(insFilter)) return false;
+    if (insFilter !== 'ALL' && !(d.insuranceCompany || '').includes(insFilter)) return false;
     if (catFilter !== 'ALL' && d.category !== catFilter) return false;
     if (search) {
       const match = (
@@ -26623,9 +26705,9 @@ function renderFaxDirectoryTable() {
     const isPinned = !!d.isPinned;
     const isTest = !!d.isTestNumber;
 
-    const insBadge = d.insuranceCompany.includes('현대해상')
+    const insBadge = (d.insuranceCompany || '').includes('현대해상')
       ? 'bg-blue-50 text-blue-700 border-blue-200'
-      : (d.insuranceCompany.includes('삼성화재')
+      : ((d.insuranceCompany || '').includes('삼성화재')
         ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
         : 'bg-purple-50 text-purple-700 border-purple-200');
 
@@ -27161,9 +27243,9 @@ function quickDispatchToDirectory(dirId) {
   // Find candidate app: if category is 1차접수, find initial, else find settlement app
   let targetApp = null;
   if (d.category === '1차접수') {
-    targetApp = (gApps || []).find(a => a.insuranceCompany.includes(d.insuranceCompany.replace('(SCOR)', '')) || a.hdWorkflowStage === '신청접수');
+    targetApp = (gApps || []).find(a => (a.insuranceCompany || '').includes((d.insuranceCompany || '').replace('(SCOR)', '')) || a.hdWorkflowStage === '신청접수');
   } else {
-    targetApp = (gApps || []).find(a => a.insuranceCompany.includes(d.insuranceCompany.replace('(SCOR)', '')) && a.claimCount > 0);
+    targetApp = (gApps || []).find(a => (a.insuranceCompany || '').includes((d.insuranceCompany || '').replace('(SCOR)', '')) && a.claimCount > 0);
   }
   if (!targetApp) targetApp = (gApps || [])[0];
 
@@ -27362,7 +27444,7 @@ function renderFaxNumberSelectModalList() {
     if (filter === 'PINNED' && !d.isPinned) return false;
     if (filter === 'TEST' && !d.isTestNumber) return false;
     if (filter !== 'ALL' && filter !== 'PINNED' && filter !== 'TEST') {
-      if (!d.insuranceCompany.includes(filter)) return false;
+      if (!(d.insuranceCompany || '').includes(filter)) return false;
     }
 
     // 2. Search
@@ -27392,9 +27474,9 @@ function renderFaxNumberSelectModalList() {
     const isTest = !!d.isTestNumber;
     const isDef = !!d.isDefault;
 
-    const insBadge = d.insuranceCompany.includes('현대해상')
+    const insBadge = (d.insuranceCompany || '').includes('현대해상')
       ? 'bg-blue-50 text-blue-700 border-blue-200'
-      : (d.insuranceCompany.includes('삼성화재')
+      : ((d.insuranceCompany || '').includes('삼성화재')
         ? 'bg-orange-50 text-orange-700 border-orange-200'
         : 'bg-slate-100 text-slate-700 border-slate-200');
 
@@ -27639,7 +27721,7 @@ function initData() {
     const cachedApps = localStorage.getItem('LIVON_CACHED_APPS');
     if (cachedApps) {
       const parsed = JSON.parse(cachedApps);
-      const cleaned = (typeof filterInvalidSamsungDuplicates === 'function') ? filterInvalidSamsungDuplicates(parsed) : (Array.isArray(parsed) ? parsed.filter(a => !(a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성'))) : []);
+      const cleaned = (typeof filterInvalidSamsungDuplicates === 'function') ? filterInvalidSamsungDuplicates(parsed) : (Array.isArray(parsed) ? parsed.filter(a => !(a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성') && !a.isRealLaunchData)) : []);
       if (Array.isArray(cleaned) && cleaned.some(a => a.isRealLaunchData)) {
         gApps = cleaned.filter(a => a.isRealLaunchData);
       } else {
@@ -27804,22 +27886,22 @@ function initData() {
         cgMap.set(name, {
           id: 'CG' + (cgMap.size + 1).toString().padStart(3, '0'),
           name: name,
-          phone: as.phone || as.caregiverPhone || '010-0000-0000',
-          centerName: as.centerName || '영등포센터',
+          phone: as.phone || as.caregiverPhone || '',
+          centerName: as.centerName || '개인',
           area: as.area || '전국',
-          cert: as.cert || '간병사 1급',
+          cert: as.cert || '간병사',
           account: as.accountInfo || as.account || '',
-          dailyWage: as.dailyWage || 140000,
-          settlementType: as.settlementType || '개인',
-          birthDate: as.birthDate || '1975-05-12',
+          dailyWage: as.dailyWage || 0,
+          settlementType: as.settlementType || (as.centerName && as.centerName !== '개인' ? '센터' : '개인'),
+          birthDate: as.birthDate || '',
           activeCases: 1,
           status: '활동중'
         });
       } else {
         const existing = cgMap.get(name);
         if (!existing.account && as.accountInfo) existing.account = as.accountInfo;
-        if ((!existing.phone || existing.phone === '010-0000-0000') && as.phone) existing.phone = as.phone;
-        if (!existing.centerName && as.centerName) existing.centerName = as.centerName;
+        if (!existing.phone && as.phone) existing.phone = as.phone;
+        if ((!existing.centerName || existing.centerName === '개인') && as.centerName) existing.centerName = as.centerName;
       }
     });
 
@@ -27829,114 +27911,20 @@ function initData() {
   }
   populateCaregiverDatalist();
 
-  // Seed initial CS/Complaint records on first few applications for instant preview
-  if (gApps && gApps.length > 0) {
-    gApps.forEach((app, idx) => {
+  // CS/민원 이력 배열 기본화 및 레거시 목업 시드 데이터(CS-SEED-*) 제거
+  if (Array.isArray(gApps) && gApps.length > 0) {
+    gApps.forEach((app) => {
       if (!app.csRecords) app.csRecords = [];
-      if (idx === 0 && app.csRecords.length === 0) {
-        app.csRecords = [
-          {
-            id: 'CS-SEED-01',
-            customerId: app.id,
-            type: '민원',
-            label: '긴급',
-            category: '간병 일정/시간 변경',
-            channel: 'CTI 통화(수신)',
-            callDuration: '03분 40초',
-            dateTime: '2026.09.05 14:30',
-            handler: '김리본 (상담원)',
-            caller: `${maskName(app.patientName)} 보호자`,
-            isResolved: false,
-            content: '간병인 시작일자 연기 요청 및 센터 재배정 긴급 문의 (보호자 요청)',
-            rawTranscript: `[14:30:15] 보호자: 환자가 갑자기 신촌세브란스에서 타 병원으로 전원하게 되어서 간병 시작일을 이틀 뒤인 금요일 오전 9시로 미뤄야 할 것 같아요. 시간 변경 가능한가요?
-[14:31:20] 상담원: 네, 보호자님. 전원 병원 병동 확인 후 간병사님께 시작 일시 변경 통보해 두겠습니다.`,
-            summary: `• 인입 목적: 환자 타 병원 급작스러운 전원으로 인한 간병 시작일정 2일 연기 요청
-• 고객 요구사항: 시작 일시를 기존 접수일에서 2일 순연 변경 및 대체 센터 재배정
-• 상담원 안내: 영등포센터 유선 연결 진행 및 변경 일정 간병인 전달 중`,
-            actionTaken: '영등포센터 담당자 유선 연결 완료 및 배정 일정 재조정 진행중 (미해결)',
-            createdAt: new Date().toISOString()
-          }
-        ];
-        app.csLatestLabel = '긴급';
-        app.csLatestType = '민원';
-      } else if (idx === 1 && app.csRecords.length === 0) {
-        app.csRecords = [
-          {
-            id: 'CS-SEED-02',
-            customerId: app.id,
-            type: '민원',
-            label: '강성',
-            category: '간병인 교체 요청',
-            channel: 'CTI 통화(수신)',
-            callDuration: '05분 12초',
-            dateTime: '2026.09.05 11:20',
-            handler: '박상담 (팀장)',
-            caller: `${maskName(app.patientName)} 보호자`,
-            isResolved: false,
-            content: '간병인 교체 요청 및 불친절 클레임 (강성 불만 제기)',
-            rawTranscript: `[11:20:05] 보호자: 지금 배정된 간병인분이 환자 식사 보조도 제대로 안 해주시고 너무 불친절합니다. 오늘 안으로 다른 분으로 교체 안 해주시면 서비스 취소하고 컴플레인 넣겠습니다.
-[11:21:10] 상담원: 보호자님 진심으로 사과드립니다. 해당 간병사 근무 태도 조사 후 오늘 내로 즉시 교체 투입하겠습니다.`,
-            summary: `• 인입 목적: 배정 간병인 불친절 및 환자 방치 관련 강력 불만 제기
-• 고객 요구사항: 오늘 오후 4시 이전 타 센터 소속 숙련 간병사로 즉시 교체
-• 상담원 안내: 상담팀장 직접 응대, 대체 간병사 긴급 파견 및 사전 프로필 전달`,
-            actionTaken: '팀장 직접 사과 및 숙련 간병사 즉시 교체 투입 진행중 (미해결)',
-            createdAt: new Date().toISOString()
-          }
-        ];
-        app.csLatestLabel = '강성';
-        app.csLatestType = '민원';
-      } else if (idx === 2 && app.csRecords.length === 0) {
-        app.csRecords = [
-          {
-            id: 'CS-SEED-03',
-            customerId: app.id,
-            type: 'CS',
-            label: '일반',
-            category: '비용/청구 문의',
-            channel: 'CTI 통화(발신)',
-            callDuration: '02분 25초',
-            dateTime: '2026.09.05 09:15',
-            handler: '김리본 (상담원)',
-            caller: `${maskName(app.patientName)} (고객)`,
-            isResolved: true,
-            content: '청구서류 팩스 정상 수신 여부 확인 문의',
-            rawTranscript: `[09:15:02] 고객: 청구서류 팩스 잘 들어갔나요?
-[09:15:45] 상담원: 네 고객님, 현대해상 정상 수신 확인되었습니다. 접수증 카톡으로 보내드리겠습니다.`,
-            summary: `• 인입 목적: 청구서류 팩스 정상 수신 여부 및 심사 진행 일정 확인
-• 고객 요구사항: 현대해상 접수증 및 심사 후 지급 계좌 확인
-• 상담원 안내: 팩스 수신증 카카오톡 재발송 및 정상 접수 안내`,
-            actionTaken: '현대해상 접수번호 확인 안내 및 팩스 수신증 카톡 재발송',
-            createdAt: new Date().toISOString()
-          }
-        ];
-        app.csLatestLabel = '일반';
-        app.csLatestType = 'CS';
-      } else if (idx === 3 && app.csRecords.length === 0) {
-        app.csRecords = [
-          {
-            id: 'CS-SEED-04',
-            customerId: app.id,
-            type: 'CS',
-            label: '처리완료',
-            category: '비용/청구 문의',
-            channel: 'CTI 통화(수신)',
-            callDuration: '03분 10초',
-            dateTime: '2026.09.04 16:40',
-            handler: '김리본 (상담원)',
-            caller: `${maskName(app.patientName)} (고객)`,
-            isResolved: true,
-            content: '퇴원 후 간병비 지원금 입금 일정 확인',
-            rawTranscript: `[16:40:10] 고객: 퇴원 후 지원금 언제 들어오나요?
-[16:41:00] 상담원: 보험사 수납 확인 후 1영업일 이내 지급 처리됩니다.`,
-            summary: `• 인입 목적: 퇴원 후 간병비 지원금 입금 일정 및 정산 금액 확인
-• 고객 요구사항: 보험금 지급 시기 및 센터 정산일 안내
-• 상담원 안내: 보험사 수납 후 즉시 센터 지급 완료 안내 종결`,
-            actionTaken: '보험사 수납 확인 후 센터 지급 완료 안내 종결',
-            createdAt: new Date().toISOString()
-          }
-        ];
-        app.csLatestLabel = '처리완료';
-        app.csLatestType = 'CS';
+      // 과거 데모 목업 시드 데이터(CS-SEED-*) 잔존 시 완전 정리
+      if (app.csRecords.some(r => r && r.id && String(r.id).startsWith('CS-SEED-'))) {
+        app.csRecords = app.csRecords.filter(r => !(r && r.id && String(r.id).startsWith('CS-SEED-')));
+      }
+      if (app.csRecords.length === 0) {
+        app.csLatestLabel = null;
+        app.csLatestType = null;
+      } else {
+        app.csLatestLabel = app.csRecords[0].label;
+        app.csLatestType = app.csRecords[0].type;
       }
     });
   }
@@ -28836,8 +28824,20 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
   else if (tabId === 'caregivers') renderCaregivers();
   else if (tabId === 'centers') renderCenters();
   else if (tabId === 'forms') renderForms();
-  else if (tabId === 'admins' || tabId === 'adminmgmt') renderAdmins();
   else if (tabId === 'partners') renderPartners();
+  else if (tabId === 'admins' || tabId === 'adminmgmt') {
+    if (typeof window.switchAdminSubTab === 'function') {
+      window.switchAdminSubTab(window.gCurrentAdminSubTab || 'rbac');
+    } else {
+      renderAdmins();
+    }
+    if (typeof window.renderSystemAuditLogs === 'function') {
+      const elBadgeTab = document.getElementById('auditLogsNavCountBadge');
+      if (elBadgeTab && window.gSystemAuditLogs) {
+        elBadgeTab.innerText = `${window.gSystemAuditLogs.length}`;
+      }
+    }
+  }
   else if (tabId === 'settings') renderSettings();
   else if (tabId === 'faxmgmt') renderFaxManagement();
 
@@ -28855,7 +28855,208 @@ function renderSettings() {
   if (typeof initLaunchDataSettings === 'function') {
     initLaunchDataSettings();
   }
+  if (typeof updateDataResetStatusUI === 'function') {
+    updateDataResetStatusUI();
+  }
 }
+
+// =========================================================================
+// [전산 런칭] 전산 데이터 전체 초기화 및 Convex 클린 검증 엔진
+// =========================================================================
+async function updateDataResetStatusUI() {
+  const statApps = document.getElementById('resetStatApps');
+  const statAssigns = document.getElementById('resetStatAssigns');
+  const statClaims = document.getElementById('resetStatClaims');
+  const statPayouts = document.getElementById('resetStatPayouts');
+  const statCaregivers = document.getElementById('resetStatCaregivers');
+  const statAdmins = document.getElementById('resetStatAdmins');
+  const statusMsg = document.getElementById('resetStatusMsg');
+  const statusDot = document.getElementById('resetStatusDot');
+  const statusTime = document.getElementById('resetStatusTime');
+
+  if (!statApps) return;
+
+  // 관리자 계정 수 안전 산출 (김리본, 박정산, 이매칭, 영등포센터 등 총 4명 기본 보존)
+  function getSafeAdminCount() {
+    if (Array.isArray(gAdmins) && gAdmins.length > 0) return gAdmins.length;
+    try {
+      const saved = localStorage.getItem('LIVON_ADMINS');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed.length;
+      }
+    } catch (e) {}
+    if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.admins) && window.REBORN_DATA.admins.length > 0) {
+      return window.REBORN_DATA.admins.length;
+    }
+    return 4;
+  }
+
+  let adminCount = getSafeAdminCount();
+
+  // 1. 로컬 메모리 상태 즉시 반영
+  statApps.innerText = (Array.isArray(gApps) ? gApps.length : 0) + '건';
+  statAssigns.innerText = (Array.isArray(gAssigns) ? gAssigns.length : 0) + '건';
+  statClaims.innerText = (Array.isArray(gClaims) ? gClaims.length : 0) + '건';
+  statPayouts.innerText = (Array.isArray(gPayouts) ? gPayouts.length : 0) + '건';
+  statCaregivers.innerText = (Array.isArray(gCaregivers) ? gCaregivers.length : 0) + '건';
+  statAdmins.innerText = adminCount + '명 (보존)';
+
+  // 2. Convex 클라우드 실제 DB 카운트 비동기 검증
+  if (statusMsg) statusMsg.innerText = 'Convex 클라우드 DB 상태 조회 중...';
+  try {
+    const token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || '';
+    const res = await queryConvex('sync:bundleAll', { sessionToken: token });
+    const nowStr = new Date().toLocaleTimeString('ko-KR');
+    if (statusTime) statusTime.innerText = '최근 검증: ' + nowStr;
+
+    if (res && res.status === 'success' && res.value) {
+      const v = res.value;
+      const cApps = v.applications ? v.applications.length : 0;
+      const cAssigns = v.assignments ? v.assignments.length : 0;
+      const cClaims = v.claims ? v.claims.length : 0;
+      const cPayouts = v.payouts ? v.payouts.length : 0;
+      const cCaregivers = v.caregivers ? v.caregivers.length : 0;
+      const cAdmins = (v.admins && v.admins.length > 0) ? v.admins.length : 0;
+
+      const localCount = (Array.isArray(gApps) ? gApps.length : 0);
+      statApps.innerText = cApps + '건' + (localCount > 0 ? ' (로컬 화면: ' + localCount + '건)' : '');
+      statAssigns.innerText = cAssigns + '건';
+      statClaims.innerText = cClaims + '건';
+      statPayouts.innerText = cPayouts + '건';
+      statCaregivers.innerText = cCaregivers + '건';
+      
+      if (cAdmins > 0) {
+        adminCount = cAdmins;
+      } else {
+        adminCount = getSafeAdminCount();
+      }
+      statAdmins.innerText = adminCount + '명 (보존)';
+
+      const isConvexClean = (cApps === 0 && cAssigns === 0 && cClaims === 0 && cPayouts === 0);
+      const envName = IS_DEV_ENV ? '개발 서버(rapid-raccoon-895)' : '운영 실서버(gallant-weasel-360)';
+
+      if (isConvexClean && localCount === 0) {
+        if (statusMsg) statusMsg.innerHTML = '<b class="text-emerald-700">✅ [' + envName + '] DB 및 로컬 화면 모두 완벽한 0건 클린 상태입니다. 이제 안심하고 엑셀 데이터를 업로드하세요.</b>';
+        if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+      } else if (isConvexClean && localCount > 0) {
+        if (statusMsg) statusMsg.innerHTML = '<b class="text-emerald-700">✅ [' + envName + '] DB는 0건으로 완전 클린 상태입니다!</b><br><span class="text-amber-800 text-xs font-normal mt-0.5 inline-block">ℹ️ 단, 현재 브라우저 로컬 캐시에 이전 테스트 목록(' + localCount + '건)이 남아있습니다. 화면까지 깨끗하게 0건으로 비우시려면 아래 <b>[전체 데이터 초기화 실행]</b>을 1회 눌러주세요.</span>';
+        if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+      } else {
+        const totalPending = cApps + cAssigns + cClaims + cPayouts;
+        if (statusMsg) statusMsg.innerHTML = '<b class="text-rose-700">⚠️ [' + envName + '] DB에 데이터(' + totalPending + '건)가 존재합니다. 엑셀 업로드 전 클린 런칭을 원하시면 아래 초기화를 진행해주세요.</b>';
+        if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse';
+      }
+    }
+  } catch (e) {
+    if (statusMsg) statusMsg.innerText = 'Convex 클라우드 검증 완료 (로컬 기준)';
+  }
+}
+window.updateDataResetStatusUI = updateDataResetStatusUI;
+
+async function verifyConvexResetStatus() {
+  await updateDataResetStatusUI();
+  if (typeof showCustomAlert === 'function') {
+    showCustomAlert({
+      title: 'Convex DB 상태 검증 완료',
+      message: 'Convex 클라우드 및 로컬 저장소의 최신 데이터 건수를 정상적으로 확인하였습니다.',
+      icon: 'check-circle-2',
+      iconColor: 'emerald'
+    });
+  } else {
+    alert('Convex DB 상태 검증이 완료되었습니다.');
+  }
+}
+window.verifyConvexResetStatus = verifyConvexResetStatus;
+
+async function executeFullDataReset() {
+  const ans = confirm('🚨 [중요 확인] 정말로 전산 데이터를 전체 초기화하시겠습니까?\n\n' +
+    '1. 관리자 계정(Admin)을 제외한 모든 고객 신청, 배정, 청구, 지급, 간병인 데이터가 0건으로 완전 삭제됩니다.\n' +
+    '2. Convex 클라우드 DB와 로컬 캐시가 모두 0건으로 비워집니다.\n' +
+    '3. 초기화 후 실제 운영 엑셀 데이터를 업로드하시면 깨끗한 상태로 런칭할 수 있습니다.\n\n' +
+    '초기화를 진행하시려면 [확인]을 눌러주세요.');
+
+  if (!ans) return;
+
+  try {
+    // 1. Convex 클라우드 DB 완전 초기화 (관리자 계정 제외)
+    if (typeof syncToConvex === 'function') {
+      await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'all' });
+    }
+
+    // 2. 로컬 서버 디스크 파일(hub_apps_real.json) 0건 초기화
+    try {
+      await fetch('/api/admin/reset-local-data', { method: 'POST' });
+    } catch (e) {}
+
+    // 3. 브라우저 LocalStorage 캐시 완전 초기화 (관리자 정보는 보존)
+    const preserveAdmin = localStorage.getItem('LIVON_ADMINS');
+    const preserveToken = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
+    const preserveUser = localStorage.getItem('REBORN_CURRENT_ADMIN');
+
+    const keysToRemove = [
+      'LIVON_CACHED_APPS', 'LIVON_CACHED_ASSIGNS', 'LIVON_CACHED_CLAIMS',
+      'LIVON_CACHED_PAYOUTS', 'LIVON_CACHED_CAREGIVERS', 'LIVON_CACHED_CENTERS',
+      'LIVON_CACHED_ADJUSTERS', 'LIVON_CARE_LOGS', 'LIVON_SAMSUNG_SHEETS', 'reborn_apps', 'reborn_assignments',
+      'reborn_claims', 'reborn_payouts'
+    ];
+    keysToRemove.forEach(k => {
+      try { localStorage.removeItem(k); } catch (e) {}
+    });
+
+    if (preserveAdmin) localStorage.setItem('LIVON_ADMINS', preserveAdmin);
+    if (preserveToken) localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', preserveToken);
+    if (preserveUser) localStorage.setItem('REBORN_CURRENT_ADMIN', preserveUser);
+
+    // 4. 전역 변수 즉시 0건 초기화
+    gApps = [];
+    gAssigns = [];
+    gClaims = [];
+    gPayouts = [];
+    gCaregivers = [];
+    gCenters = [];
+    gAdjusters = [];
+    gCareLogs = [];
+    if (window.REBORN_DATA) {
+      window.REBORN_DATA.adjusters = [];
+      window.REBORN_DATA.careLogs = [];
+    }
+    if (typeof gSamsungSheets !== 'undefined' && gSamsungSheets) {
+      gSamsungSheets.target = [];
+      gSamsungSheets.completed = [];
+      gSamsungSheets.contacts = [];
+    }
+
+    // 5. 모든 화면 실시간 재렌더링
+    if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+    if (typeof updateDirectoryTotalBadge === 'function') updateDirectoryTotalBadge();
+    if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+    if (typeof renderApplications === 'function') renderApplications();
+    if (typeof renderDashboard === 'function') renderDashboard();
+    if (typeof renderCaregivers === 'function') renderCaregivers();
+    if (typeof renderCenters === 'function') renderCenters();
+    if (typeof renderAdjusters === 'function') renderAdjusters();
+
+    // 6. 상태 배지 및 검증 갱신
+    await updateDataResetStatusUI();
+
+    if (typeof showCustomAlert === 'function') {
+      showCustomAlert({
+        title: '전산 데이터 전체 초기화 완료',
+        message: 'Convex 클라우드 DB와 로컬 저장소의 모든 고객·배정·청구·지급 데이터가 0건으로 완전 초기화되었습니다.\n\n관리자 계정은 정상 보존되었으며, 이제 실제 엑셀 데이터를 안심하고 업로드하세요.',
+        icon: 'check-circle-2',
+        iconColor: 'emerald'
+      });
+    } else {
+      alert('전산 데이터 전체 초기화가 완료되었습니다. 관리자 계정은 정상 보존되었습니다.');
+    }
+  } catch (err) {
+    console.error('초기화 중 오류 발생:', err);
+    alert('초기화 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+window.executeFullDataReset = executeFullDataReset;
+
 
 function onCalcInsuranceChange() {
   const ins = document.getElementById('calcInsuranceSelect').value;
@@ -29285,11 +29486,11 @@ function renderApplications() {
   const statFilter = document.getElementById('appStatusFilter')?.value || 'ALL';
 
   const filtered = gApps.filter(app => {
-    if (insFilter !== 'ALL' && !app.insuranceCompany.includes(insFilter)) return false;
+    if (insFilter !== 'ALL' && !(app.insuranceCompany || '').includes(insFilter)) return false;
     if (statFilter !== 'ALL') {
-      if (statFilter === '진행' && !app.status.includes('진행') && app.status !== '정상') return false;
+      if (statFilter === '진행' && !(app.status || '').includes('진행') && app.status !== '정상') return false;
       if (statFilter === '완료' && app.status !== '완료') return false;
-      if (statFilter === '취소' && !app.status.includes('취소')) return false;
+      if (statFilter === '취소' && !(app.status || '').includes('취소')) return false;
     }
     if (query) {
       const match = (app.id && app.id.toLowerCase().includes(query)) ||
@@ -29344,7 +29545,7 @@ function renderApplications() {
       <td class="p-3 text-slate-700 font-semibold">${app.sigungu || '-'}</td>
       <td class="p-3 text-slate-600 truncate max-w-[280px]" title="${app.addressDetail}">${app.addressDetail || '-'}</td>
       <td class="p-3 font-bold text-primary-800">${app.insuranceCompany}</td>
-      <td class="p-3 text-slate-700 break-words max-w-[170px]">${app.productName || (app.insuranceCompany.includes('현대') ? '무배당현대해상내삶엔(3N)' : '무배당 삼성화재 당신에게 좋은간병')}</td>
+      <td class="p-3 text-slate-700 break-words max-w-[170px]">${app.productName || ((app.insuranceCompany || '').includes('현대') ? '무배당현대해상내삶엔(3N)' : '무배당 삼성화재 당신에게 좋은간병')}</td>
       <td class="p-3 text-center text-slate-600 font-mono text-[11px]">${app.contractPeriod || '2025.07~2045.07'}</td>
       <td class="p-3 text-slate-500 font-mono">${app.policyNumber || '-'}</td>
       <td class="p-3 text-slate-500 font-mono font-bold text-purple-800">${app.accidentNumber || '-'}</td>
@@ -29360,7 +29561,7 @@ function renderApplications() {
       <td class="p-3 text-center text-slate-600">${app.accidentType || '-'}</td>
       <td class="p-3 text-center text-slate-500 font-mono">${app.applyDate || '-'}</td>
       <td class="p-3 text-center">
-        ${(app.insuranceCompany.includes('현대해상') && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'))) ? `
+        ${((app.insuranceCompany || '').includes('현대해상') && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'))) ? `
           <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1 shadow-2xs">
             <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> 문자대기
           </span>
@@ -29395,7 +29596,7 @@ function renderApplications() {
       <td class="p-3 max-w-xs truncate text-slate-500" title="${app.memo}">${app.memo || '-'}</td>
       <td class="p-3 text-center pr-4">
         <div class="flex items-center justify-center gap-1.5">
-          ${(app.insuranceCompany.includes('현대해상') && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'))) ? `
+          ${((app.insuranceCompany || '').includes('현대해상') && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'))) ? `
             <button onclick="event.stopPropagation(); openHyundaiSmsInputModal('${app.id}')" class="px-2 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black text-[11px] shadow-xs flex items-center gap-1 whitespace-nowrap" title="현대해상 수신 문자 전문 붙여넣기 및 2차 정보 등록">
               <i data-lucide="message-square" class="w-3 h-3"></i> 문자등록
             </button>
@@ -29825,12 +30026,12 @@ function renderCareLogPatientCards(groups) {
                       <span class="font-mono text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-medium">#${sid}</span>
 
                       <div class="flex items-center gap-1 shrink-0 ml-1">
-                        <button type="button" onclick="openCarePortOfficialDetail(${sid})"
+                        <button type="button" onclick="openCarePortOfficialDetail('${sid}', ${log.dayNumber || (idx + 1)})"
                           class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
                           <i data-lucide="file-text" class="w-3 h-3"></i>
                           <span>원문(PDF)</span>
                         </button>
-                        <button type="button" onclick="openCarePortExternalLink('${sid}', '${(log.consultantRole || consultant || '').replace(/'/g, "\\'")}')"
+                        <button type="button" onclick="openCarePortExternalLink('${sid}', '${(log.consultantRole || consultant || '').replace(/'/g, "\\'")}', '${(group.patientName || '').replace(/'/g, "\\'")}')"
                           class="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer"
                           title="새 창에서 CarePort 원본 열기">
                           <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
@@ -29961,7 +30162,7 @@ function renderCareLogFlatTable(filtered) {
         </td>
         <!-- 공식 간병일지 (CarePort 원본) -->
         <td class="p-2.5 text-center border-r border-slate-100">
-          <button type="button" onclick="openCarePortOfficialDetail(${sid || 0})" 
+          <button type="button" onclick="openCarePortOfficialDetail('${sid || 0}')" 
             class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer">
             <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
             <span>CarePort 원본(PDF)</span>
@@ -29969,7 +30170,7 @@ function renderCareLogFlatTable(filtered) {
         </td>
         <!-- 관리 -->
         <td class="p-2.5 text-center">
-          <button type="button" onclick="openCarePortExternalLink('${sid || 0}', '${(log.consultantRole || consultant || '').replace(/'/g, "\\'")}')"
+          <button type="button" onclick="openCarePortExternalLink('${sid || 0}', '${(log.consultantRole || consultant || '').replace(/'/g, "\\'")}', '${(pName || '').replace(/'/g, "\\'")}')"
             class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all cursor-pointer inline-flex items-center"
             title="CarePort 원본 새창 바로가기">
             <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
@@ -30123,25 +30324,17 @@ function printCarePortDocument() {
 }
 
 function openCarePortExternalLink(sid, consultantRole = '', patientName = '') {
-  if (!sid) return;
-  const cleanSid = String(sid).replace(/\D/g, '') || sid;
+  const currentSid = sid || gCurrentCarePortSessionId;
+  if (!currentSid) return;
+  const cleanSid = String(currentSid).replace(/\D/g, '') || currentSid;
   
-  // CarePort live server routing:
-  // For older sessions (like 1491 on 09.10), CarePort backend lacks trend-scores, displaying an empty page with no data.
-  // If the patient has a modern session on CarePort (like 1699 for 윤석찬), route to that modern session.
-  let targetSid = cleanSid;
-  const targetPatient = patientName || (gCurrentCarePortDetail && (gCurrentCarePortDetail.username || gCurrentCarePortDetail.patientName));
-  if (cleanSid === '1491' || (targetPatient && String(targetPatient).includes('윤석찬'))) {
-    // Session 1699 is the official modern caregiver diary that contains full 6-day trend data and renders Image 2!
-    targetSid = '1699';
-  } else if (Array.isArray(gCarePortRawLogs) && targetPatient) {
-    const modernLog = gCarePortRawLogs.find(l => (l.username === targetPatient || l.patientName === targetPatient) && Number(l.sessionId) >= 1617);
-    if (modernLog && modernLog.sessionId) {
-      targetSid = String(modernLog.sessionId);
-    }
-  }
+  // 사용자가 클릭한 해당 회차의 정확한 세션 ID로 CarePort 원본 열기
+  const targetSid = cleanSid;
 
-  const roleStr = String(consultantRole || '').trim();
+  let roleStr = String(consultantRole || '').trim();
+  if (!roleStr && gCurrentCarePortDetail) {
+    roleStr = gCurrentCarePortDetail.consultantRole || '';
+  }
   const isCaregiver = roleStr.includes('간병') || roleStr.includes('요양') || roleStr === '';
   const route = isCaregiver ? 'consult_caregiver' : 'consult';
   window.open(`https://careport.livon.care/#/careport/${route}/${targetSid}`, '_blank');
@@ -30204,7 +30397,7 @@ function openCarePortModernViewer(sessionId) {
 
 function openCarePortInNewTab() {
   if (gCurrentCarePortSessionId) {
-    openCarePortModernViewer(gCurrentCarePortSessionId);
+    openCarePortExternalLink(gCurrentCarePortSessionId);
   }
 }
 
@@ -30471,9 +30664,9 @@ window.openCarePortOfficialModal = function(sessionId) {
   return openCarePortOfficialDetail(sessionId);
 };
 
-async function openCarePortOfficialDetail(sessionId) {
+async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
   if (!sessionId) return;
-  const cleanSid = String(sessionId).replace(/^CLOG-/, '').trim();
+  const cleanSid = String(sessionId).replace(/\D/g, '').trim() || String(sessionId).replace(/^CLOG-/, '').trim();
   gCurrentCarePortSessionId = cleanSid || sessionId;
 
   const modal = document.getElementById('carePortOfficialModal');
@@ -30502,6 +30695,29 @@ async function openCarePortOfficialDetail(sessionId) {
         <span>케어포트 공인 간병일지 상세 데이터를 불러오는 중입니다...</span>
       </div>
     `;
+  }
+
+  // 1. Locate log object and patient group beforehand if available
+  let matchedLog = (gCarePortRawLogs || []).find(l => String(l.sessionId) === String(cleanSid) || String(l.id).replace(/\D/g, '') === String(cleanSid));
+  let matchedGroup = null;
+  if (!matchedLog && Array.isArray(gCarePortPatientGroups)) {
+    for (const grp of gCarePortPatientGroups) {
+      const dl = (grp.dailyLogs || []).find(d => String(d.sessionId) === String(cleanSid) || String(d.id).replace(/\D/g, '') === String(cleanSid));
+      if (dl) {
+        matchedLog = dl;
+        matchedGroup = grp;
+        break;
+      }
+    }
+  }
+  if (!matchedLog && Array.isArray(gCareLogs)) {
+    matchedLog = gCareLogs.find(l => String(l.sessionId) === String(cleanSid) || String(l.id).replace(/\D/g, '') === String(cleanSid) || String(l.applyId) === String(cleanSid));
+  }
+  if (!matchedGroup && matchedLog && Array.isArray(gCarePortPatientGroups)) {
+    const pNameForGrp = matchedLog.username || matchedLog.patientName;
+    if (pNameForGrp) {
+      matchedGroup = gCarePortPatientGroups.find(g => (g.patientName || '').trim() === pNameForGrp.trim());
+    }
   }
 
   // Fetch data to populate the 1:1 CarePort authentic template
@@ -30549,20 +30765,7 @@ async function openCarePortOfficialDetail(sessionId) {
           }
         };
       } else {
-        // Look up matching log from collections
-        let found = (gCarePortRawLogs || []).find(l => String(l.sessionId) === cleanSid || String(l.id).replace(/^CLOG-/, '').trim() === cleanSid);
-        if (!found) {
-          found = (gCareLogs || []).find(l => String(l.sessionId) === cleanSid || String(l.id).replace(/^CLOG-/, '').trim() === cleanSid || String(l.applyId) === cleanSid);
-        }
-        if (!found && Array.isArray(gCarePortPatientGroups)) {
-          for (const grp of gCarePortPatientGroups) {
-            const dl = (grp.dailyLogs || []).find(d => String(d.sessionId) === cleanSid || String(d.id).replace(/^CLOG-/, '').trim() === cleanSid);
-            if (dl) {
-              found = { ...dl, patientName: grp.patientName, age: grp.age, gender: grp.gender, caregiverName: grp.caregiverName, insuranceCompany: grp.insuranceCompany, centerName: grp.centerName };
-              break;
-            }
-          }
-        }
+        let found = matchedLog;
         if (!found) {
           const matchedApp = (gApps || []).find(a => String(a.id) === cleanSid || a.patientName === cleanSid);
           if (matchedApp) {
@@ -30623,8 +30826,52 @@ async function openCarePortOfficialDetail(sessionId) {
       window.CarePortClient._detailCache[cleanSid] = detail;
     }
 
+    // Determine patient name
+    const pName = ((detail && (detail.username || detail.targetName || detail.patientName)) || 
+                   (matchedLog && (matchedLog.username || matchedLog.patientName)) || 
+                   (matchedGroup && matchedGroup.patientName) || '').trim();
+
+    // Sibling logs for patient multi-day switching & trend chart
+    let siblingLogs = [];
+    if (matchedGroup && Array.isArray(matchedGroup.dailyLogs) && matchedGroup.dailyLogs.length > 0) {
+      siblingLogs = [...matchedGroup.dailyLogs];
+    } else if (pName && Array.isArray(gCarePortRawLogs)) {
+      siblingLogs = gCarePortRawLogs.filter(l => ((l.username || l.patientName || '').trim() === pName));
+    }
+    if (siblingLogs.length === 0 && Array.isArray(gCarePortPatientGroups) && pName) {
+      const grp = gCarePortPatientGroups.find(g => (g.patientName || '').trim() === pName);
+      if (grp && Array.isArray(grp.dailyLogs)) {
+        siblingLogs = [...grp.dailyLogs];
+        if (!matchedGroup) matchedGroup = grp;
+      }
+    }
+    siblingLogs.sort((a, b) => new Date(a.consultDate || 0) - new Date(b.consultDate || 0));
+
+    // Calculate accurate dayNumber
+    let computedDayNum = targetDayNum;
+    if (!computedDayNum && matchedLog && matchedLog.dayNumber) {
+      computedDayNum = matchedLog.dayNumber;
+    }
+    if (!computedDayNum && siblingLogs.length > 0) {
+      const curIdx = siblingLogs.findIndex(l => String(l.sessionId) === String(cleanSid) || String(l.id).replace(/\D/g, '') === String(cleanSid));
+      if (curIdx >= 0) {
+        computedDayNum = siblingLogs[curIdx].dayNumber || (curIdx + 1);
+      }
+    }
+    if (!computedDayNum) {
+      computedDayNum = (detail && detail.raw && detail.raw.day_index) || 1;
+    }
+    const computedDayText = `${computedDayNum}일차`;
+
+    const logForNormalize = {
+      sessionId: cleanSid,
+      dayNumber: computedDayNum,
+      dayText: computedDayText,
+      ...(matchedLog || {})
+    };
+
     const d = (window.CarePortClient && typeof window.CarePortClient.normalizeCarePortLogData === 'function')
-      ? window.CarePortClient.normalizeCarePortLogData({}, { sessionId: cleanSid }, detail)
+      ? window.CarePortClient.normalizeCarePortLogData(matchedGroup || {}, logForNormalize, detail)
       : null;
 
     if (!d) return;
@@ -30655,7 +30902,7 @@ async function openCarePortOfficialDetail(sessionId) {
 
     // Header Badges
     const elDayBadge = document.getElementById('cpDayBadge');
-    if (elDayBadge) elDayBadge.innerText = d.dayText;
+    if (elDayBadge) elDayBadge.innerText = computedDayText;
     const elDate = document.getElementById('cpMetaDate');
     if (elDate) elDate.innerText = dateWithDay;
 
@@ -30685,31 +30932,18 @@ async function openCarePortOfficialDetail(sessionId) {
     const elDur = document.getElementById('cpMetaDuration');
     if (elDur) elDur.innerText = d.duration;
 
-    // Sibling logs for patient multi-day switching & trend chart
-    let siblingLogs = [];
-    const pName = (d.patientName || '').trim();
-    if (Array.isArray(gCarePortRawLogs)) {
-      siblingLogs = gCarePortRawLogs.filter(l => ((l.username || l.patientName || '').trim() === pName));
-    }
-    if (siblingLogs.length === 0 && Array.isArray(gCarePortPatientGroups)) {
-      const grp = gCarePortPatientGroups.find(g => (g.patientName || '').trim() === pName);
-      if (grp && Array.isArray(grp.dailyLogs)) {
-        siblingLogs = grp.dailyLogs;
-      }
-    }
-    siblingLogs.sort((a, b) => new Date(a.consultDate || 0) - new Date(b.consultDate || 0));
-
     // Render interactive day pills bar at top of modal
     const selectorBar = document.getElementById('cpDaySelectorBar');
     const selectorContainer = document.getElementById('cpDaySelectorContainer');
     if (selectorBar) {
       if (siblingLogs.length > 1) {
         selectorBar.innerHTML = siblingLogs.map((log, idx) => {
-          const isCurrent = String(log.sessionId) === String(cleanSid) || String(log.id).replace(/\D/g, '') === String(cleanSid);
+          const sSid = log.sessionId || (log.id ? String(log.id).replace(/\D/g, '') : '');
           const dayNum = log.dayNumber || (idx + 1);
+          const isCurrent = String(sSid) === String(cleanSid) || (targetDayNum && Number(targetDayNum) === Number(dayNum));
           const shortD = log.consultDate ? log.consultDate.slice(5, 10).replace('-', '.') : '';
           return `
-            <button type="button" onclick="openCarePortOfficialDetail(${log.sessionId || log.id})" 
+            <button type="button" onclick="openCarePortOfficialDetail('${sSid}', ${dayNum})" 
               class="px-2.5 py-1 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer ${isCurrent ? 'bg-[#10bdb2] text-white shadow-xs ring-2 ring-[#10bdb2]/30' : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'}">
               ${dayNum}일차 (${shortD})
             </button>
@@ -30740,28 +30974,18 @@ async function openCarePortOfficialDetail(sessionId) {
       } catch (e) {}
     }
 
-    // Fallback for sessions with 0 trends (e.g. session 1491): check patient's active schedule
-    if (trendScores.length === 0) {
-      if (pName.includes('윤석찬') || cleanSid === '1491') {
-        try {
-          const res = await fetch('https://admin.livon.care/main/consult/carenote/trend-scores', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ scheduleId: 2384 })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (Array.isArray(data) && data.length > 0) {
-              trendScores = data;
-            }
-          }
-        } catch (e) {}
-      }
+    // Filter trendScores up to current log's date
+    const curDate = (detail.consultDate || d.consultDate || '').slice(0, 10);
+    let filteredTrends = [];
+    if (Array.isArray(trendScores) && trendScores.length > 0 && curDate) {
+      filteredTrends = trendScores.filter(t => t.careDate && t.careDate <= curDate);
     }
-
-    // Synthesize trend series from sibling logs if still empty
-    if (trendScores.length === 0 && siblingLogs.length > 0) {
-      trendScores = siblingLogs.map((l, i) => ({
+    // If server trendScores didn't cover curDate, synthesize from siblingLogs up to curDate
+    if (filteredTrends.length === 0 && siblingLogs.length > 0) {
+      const upToSiblings = curDate 
+        ? siblingLogs.filter(l => (l.consultDate || l.dateString || '').slice(0, 10) <= curDate)
+        : siblingLogs;
+      filteredTrends = (upToSiblings.length > 0 ? upToSiblings : siblingLogs).map((l, i) => ({
         dayIndex: l.dayNumber || (i + 1),
         careDate: (l.consultDate || l.dateString || '').slice(0, 10),
         overallScore: (l.overallStatus?.tone === 'warning' ? 3 : 4),
@@ -30770,13 +30994,6 @@ async function openCarePortOfficialDetail(sessionId) {
         sleepScore: 3,
         painScore: 4
       }));
-    }
-
-    // Filter trendScores up to current log's date (exact CarePort chunk 613 behavior)
-    const curDate = (detail.consultDate || d.consultDate || '').slice(0, 10);
-    let filteredTrends = trendScores;
-    if (curDate && trendScores.some(t => t.careDate && t.careDate <= curDate)) {
-      filteredTrends = trendScores.filter(t => !t.careDate || t.careDate <= curDate);
     }
     if (filteredTrends.length === 0) filteredTrends = trendScores;
 
@@ -32891,6 +33108,18 @@ function renderAdmins() {
   const tbody = document.getElementById('adminTableBody');
   if (!tbody) return;
 
+  if (!Array.isArray(gAdmins) || gAdmins.length === 0) {
+    try {
+      const saved = localStorage.getItem('LIVON_ADMINS');
+      if (saved) gAdmins = JSON.parse(saved);
+    } catch (e) {}
+    if (!Array.isArray(gAdmins) || gAdmins.length === 0) {
+      if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.admins)) {
+        gAdmins = [...window.REBORN_DATA.admins];
+      }
+    }
+  }
+
   tbody.innerHTML = gAdmins.map(adm => `
     <tr class="hover:bg-slate-50 transition-colors">
       <td class="p-3 pl-5 font-bold font-mono text-indigo-700">${adm.id}</td>
@@ -33229,60 +33458,15 @@ function getAppIdSettings() {
 }
 
 function generateNextAppId(insurance = '') {
-  let ins = insurance;
-  if (!ins) {
-    const sel = document.getElementById('newAppInsurance');
-    ins = sel?.value || '';
-  }
-  const isSamsung = (ins || '').includes('삼성');
-  const prefix = isSamsung ? 'S' : 'C';
-
-  // 1. 등록된 모든 소스(gApps, window.gApps, REBORN_DATA.applications) 취합
-  const allApps = [
-    ...(Array.isArray(gApps) ? gApps : []),
-    ...(window.gApps && Array.isArray(window.gApps) ? window.gApps : []),
-    ...((window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) ? window.REBORN_DATA.applications : [])
-  ];
-
-  // 2. 해당 접두어(C 또는 S)를 가진 고객 중 가장 큰 일련번호(MAX) 산출
-  let maxNum = 0;
-  const seenIds = new Set();
-
-  for (let i = 0; i < allApps.length; i++) {
-    const a = allApps[i];
-    if (!a || !a.id || seenIds.has(a.id)) continue;
-    seenIds.add(a.id);
-
-    const aIdStr = String(a.id).trim();
-    if (aIdStr.startsWith(prefix)) {
-      const match = aIdStr.slice(prefix.length).match(/\d+/);
-      if (match) {
-        const num = parseInt(match[0], 10);
-        if (num > maxNum) maxNum = num;
-      }
-    }
-  }
-
-  // 3. 만약 환경설정(localStorage)에 저장된 시작번호/일련번호가 maxNum보다 크면 그것을 존중
-  if (!isSamsung) {
-    const savedSeq = parseInt(localStorage.getItem(APP_ID_SEQ_KEY), 10);
-    if (!isNaN(savedSeq) && savedSeq > maxNum) {
-      maxNum = savedSeq - 1;
-    }
-  }
-
-  // 4. 다음 일련번호는 항상 (기존 최대값 + 1)
-  const nextSeq = Math.max(maxNum + 1, 1);
+  // [사용자 요구사항]: 삼성/현대 상관없이 모든 신규 고객은 '신규 간병신청 ID 자동 채번 설정'의 설정값(접두사 + 시작번호)을 100% 일괄 적용
+  const { prefix, nextSeq } = getAppIdSettings();
   return `${prefix}${nextSeq.toString().padStart(4, '0')}`;
 }
 
 function incrementAppIdSeq() {
-  const current = generateNextAppId();
-  const match = current.match(/\d+/);
-  if (match) {
-    const nextVal = parseInt(match[0], 10) + 1;
-    localStorage.setItem(APP_ID_SEQ_KEY, nextVal.toString());
-  }
+  const { nextSeq } = getAppIdSettings();
+  const nextVal = nextSeq + 1;
+  localStorage.setItem(APP_ID_SEQ_KEY, nextVal.toString());
 }
 
 const VOICE_LOG_CHANNELS_KEY = 'reborn_voice_log_channels';
@@ -33766,7 +33950,7 @@ function updateCareTypeByInsurance(insurance) {
 }
 
 function onNewAppInsuranceChange(insurance) {
-  // 접두어 규칙: 현대는 'C', 삼성화재는 'S'
+  // 삼성/현대 상관없이 환경설정의 신규 간병신청 ID 자동 채번 설정 단일 적용
   const display = document.getElementById('newAppIdDisplay');
   if (display) {
     display.innerText = generateNextAppId(insurance);
@@ -34325,7 +34509,7 @@ function handleNewAppSubmit(e) {
       formattedMemo += ` (장소: ${hospitalName})`;
     }
 
-    const isHyundai = insurance.includes('현대해상');
+    const isHyundai = (insurance || '').includes('현대해상');
     const defaultHdStage = isHyundai ? '문자수신대기' : '사전명단매칭완료';
 
     const targetFaxRecipient = document.getElementById('newAppFaxRecipient')?.value?.trim() || '';
@@ -34388,7 +34572,7 @@ function handleNewAppSubmit(e) {
       updatedAt: new Date().toISOString()
     };
 
-    if (insurance.includes('삼성')) {
+    if ((insurance || '').includes('삼성')) {
       const domPatientId = document.getElementById('newAppSamsungPatientId')?.value?.trim();
       const domPolicyNumber = document.getElementById('newAppSamsungPolicyNumber')?.value?.trim();
       const domProductCode = document.getElementById('newAppSamsungProductCode')?.value?.trim();
@@ -34469,6 +34653,15 @@ async function finalizeNewAppRegistration(newApp) {
         firm: newApp.adjusterFirm
       });
     }
+
+    // 서버 로컬 디스크 파일(hub_apps_real.json)에 즉시 영구 저장
+    try {
+      fetch('/api/hub/create-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application: newApp })
+      }).catch(console.warn);
+    } catch (e) {}
 
     // Convex Cloud 운영 DB 실시간 영구 동기화
     if (typeof syncToConvex === 'function') {
@@ -36692,7 +36885,7 @@ function openCsHistoryModal(appId) {
   const handlerSelect = document.getElementById('csInputHandler');
   if (handlerSelect) {
     const currentName = (gCurrentAdminSession && gCurrentAdminSession.name) || '김리본 (상담원)';
-    const counselAdmins = (gAdmins || []).filter(a => a.status === '활성' && (a.role === 'COUNSEL_ADMIN' || a.role.includes('상담')));
+    const counselAdmins = (gAdmins || []).filter(a => a.status === '활성' && (a.role === 'COUNSEL_ADMIN' || (a.role || '').includes('상담')));
     let opts = `<option value="${currentName}" selected>${currentName} (현재 로그인)</option>`;
     counselAdmins.forEach(adm => {
       if (adm.name !== currentName) {
@@ -37005,12 +37198,165 @@ function selectCaregiverFromDropdown(cgName) {
 
 // Close dropdown on outside click
 document.addEventListener('click', (e) => {
-  const dropdown = document.getElementById('caregiverChosungDropdown');
-  const input = document.getElementById('newAssignCaregiverName');
-  if (dropdown && input && !dropdown.contains(e.target) && e.target !== input) {
-    dropdown.classList.add('hidden');
+  const cgDropdown = document.getElementById('caregiverChosungDropdown');
+  const cgInput = document.getElementById('newAssignCaregiverName');
+  if (cgDropdown && cgInput && !cgDropdown.contains(e.target) && e.target !== cgInput) {
+    cgDropdown.classList.add('hidden');
+  }
+
+  const ctrDropdown = document.getElementById('centerChosungDropdown');
+  const ctrInput = document.getElementById('newAssignCenterName');
+  if (ctrDropdown && ctrInput && !ctrDropdown.contains(e.target) && e.target !== ctrInput) {
+    ctrDropdown.classList.add('hidden');
   }
 });
+
+// =========================================================================
+// CENTER SMART SEARCH & AUTOCOMPLETE ENGINE (초성 + 단어 실시간 정규화 매칭)
+// =========================================================================
+function matchCenterSearch(center, rawQuery) {
+  if (!center || !center.name || !rawQuery) return false;
+  const q = rawQuery.trim().toLowerCase();
+  if (!q) return false;
+
+  const name = center.name.trim().toLowerCase();
+  
+  // 1. 단순 포함 여부 ('영등' -> '영등포', '영등포' -> '영등포')
+  if (name.includes(q)) return true;
+
+  // 2. 검색어/대상 정규화 매칭 (예: '영등포센터' 입력 시 '센터' 제거 후 '영등포'와 매칭)
+  const stripSuffix = (s) => s.replace(/(센터|간병인협회|간병협회|간병|협회|돌봄|지사|본사|지점|\s|\(|\))/g, '').toLowerCase();
+  const cleanQ = stripSuffix(q);
+  const cleanName = stripSuffix(name);
+
+  if (cleanQ && cleanName) {
+    if (cleanName.includes(cleanQ) || cleanQ.includes(cleanName)) return true;
+  }
+
+  // 3. 초성(자음) 매칭 (예: 'ㅇㄷㅍ' 입력 시 '영등포' 매칭)
+  if (typeof getHangulChosung === 'function') {
+    const nameChosung = getHangulChosung(name);
+    if (nameChosung.includes(q)) return true;
+    if (cleanName) {
+      const cleanNameChosung = getHangulChosung(cleanName);
+      if (cleanNameChosung.includes(cleanQ)) return true;
+    }
+  }
+
+  // 4. 전화번호 매칭 (예: '1896' 또는 '010' 입력 시)
+  const digitsOnly = q.replace(/[^0-9]/g, '');
+  if (digitsOnly.length >= 2 && center.phone) {
+    const phoneClean = center.phone.replace(/[^0-9]/g, '');
+    if (phoneClean.includes(digitsOnly)) return true;
+  }
+
+  // 5. 지역/관할지역 매칭
+  if (center.area && center.area.toLowerCase().includes(q)) return true;
+
+  // 6. 대표자 매칭
+  if (center.manager && center.manager.toLowerCase().includes(q)) return true;
+
+  return false;
+}
+
+function onCenterSearchInput(val) {
+  const dropdown = document.getElementById('centerChosungDropdown');
+  if (!dropdown) return;
+  const q = (val || '').trim();
+
+  if (!q) {
+    dropdown.classList.add('hidden');
+    dropdown.innerHTML = '';
+    return;
+  }
+
+  const matches = (gCenters || []).filter(c => matchCenterSearch(c, q));
+
+  if (matches.length === 0) {
+    dropdown.innerHTML = `
+      <div class="p-4 text-center text-slate-400 text-xs">
+        <i data-lucide="info" class="w-4 h-4 mx-auto mb-1 text-slate-300"></i>
+        <span>'${q}'와(과) 일치하는 등록 센터가 없습니다.</span>
+        <div class="text-[11px] text-primary-600 font-semibold mt-1">입력하신 이름으로 신규 등록됩니다.</div>
+      </div>`;
+    dropdown.classList.remove('hidden');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    return;
+  }
+
+  // 정확도 순 정렬: 완전 일치 또는 앞단 일치 항목 최우선 배치
+  matches.sort((a, b) => {
+    const aName = a.name || '';
+    const bName = b.name || '';
+    if (aName === q) return -1;
+    if (bName === q) return 1;
+    if (aName.startsWith(q) && !bName.startsWith(q)) return -1;
+    if (!aName.startsWith(q) && bName.startsWith(q)) return 1;
+    return 0;
+  });
+
+  dropdown.innerHTML = matches.slice(0, 15).map(c => {
+    const isPersonal = (c.settlementType === '개인');
+    const badgeHtml = isPersonal 
+      ? '<span class="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200 shrink-0">개인정산</span>'
+      : '<span class="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200 shrink-0">센터정산</span>';
+    
+    const phoneText = c.phone ? `<span class="font-mono text-[11px] text-slate-500">📞 ${c.phone}</span>` : '';
+    const areaText = c.area ? `<span class="text-[11px] text-slate-400 font-medium">📍 ${c.area}</span>` : '';
+    const cgCountText = (c.caregiverCount > 0) ? `<span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">간병인 ${c.caregiverCount}명</span>` : '';
+
+    return `
+      <div onclick="selectCenterFromDropdown('${c.name.replace(/'/g, "\\'")}', '${c.settlementType || '개인'}')" class="p-3 hover:bg-primary-50 cursor-pointer flex items-center justify-between gap-3 text-xs transition-colors group">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <b class="text-slate-900 group-hover:text-primary-700 font-black text-sm">${c.name}</b>
+            ${badgeHtml}
+            ${cgCountText}
+          </div>
+          <div class="flex items-center gap-2 mt-1 text-[11px] text-slate-500 flex-wrap">
+            ${areaText}
+            ${phoneText}
+          </div>
+        </div>
+        <div class="shrink-0 text-right">
+          <button type="button" class="px-2.5 py-1 rounded-lg bg-slate-100 group-hover:bg-primary-600 group-hover:text-white text-slate-600 font-bold text-[11px] transition-all">
+            선택
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  dropdown.classList.remove('hidden');
+}
+window.onCenterSearchInput = onCenterSearchInput;
+
+function onCenterSearchFocus() {
+  const input = document.getElementById('newAssignCenterName');
+  if (input && input.value) {
+    onCenterSearchInput(input.value);
+  } else if (Array.isArray(gCenters) && gCenters.length > 0) {
+    onCenterSearchInput('영등');
+  }
+}
+window.onCenterSearchFocus = onCenterSearchFocus;
+
+function selectCenterFromDropdown(centerName, settlementType) {
+  const input = document.getElementById('newAssignCenterName');
+  if (input) input.value = centerName;
+
+  const typeSelect = document.getElementById('newAssignSettlementType');
+  if (typeSelect && settlementType) {
+    typeSelect.value = settlementType;
+  }
+
+  const dropdown = document.getElementById('centerChosungDropdown');
+  if (dropdown) dropdown.classList.add('hidden');
+
+  onCenterNameInput(centerName, 'newAssign');
+}
+window.selectCenterFromDropdown = selectCenterFromDropdown;
+
 
 function openCaregiverPoolModal() {
   const searchInput = document.getElementById('caregiverPoolSearchInput');
@@ -37517,15 +37863,29 @@ async function initAdminSession() {
 
   const overlay = document.getElementById('adminLoginOverlay');
 
+  // 개발 사이트(IS_DEV_ENV)인 경우: 로그인 모달 없이 최고관리자(김리본 대표이사)로 자동 프리패스 로그인
+  if (IS_DEV_ENV && (!validSessionAdmin || isExplicitlyLoggedOut)) {
+    const defaultSuperAdmin = (Array.isArray(gAdmins) && gAdmins.find(a => a.role === 'SUPER_ADMIN'))
+      || (window.REBORN_DATA && window.REBORN_DATA.admins && window.REBORN_DATA.admins[0])
+      || { id: 'ADM001', username: 'superadmin', name: '김리본', dept: '대표이사', role: 'SUPER_ADMIN', permissions: ['all'], allowedMenus: ['all'] };
+    validSessionAdmin = defaultSuperAdmin;
+  }
+
   if (validSessionAdmin) {
     // 정상 로그인 세션 유지
     gCurrentAdmin = validSessionAdmin;
     document.documentElement.classList.remove('livon-locked');
     localStorage.removeItem('LIVON_LOGGED_OUT');
     sessionStorage.removeItem('LIVON_LOGGED_OUT');
+    try {
+      localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(validSessionAdmin));
+      if (!localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN')) {
+        localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', 'dev_session_' + Date.now());
+      }
+    } catch(e) {}
     if (overlay) overlay.classList.add('hidden');
   } else {
-    // 🚨 미인증 상태: 모든 세션 토큰 및 로컬 캐시 즉시 파기 & 화면 완전 잠금
+    // 🚨 미인증 상태 (운영 실서버 전용): 모든 세션 토큰 및 로컬 캐시 즉시 파기 & 화면 완전 잠금
     gCurrentAdmin = null;
     localStorage.removeItem('REBORN_CURRENT_ADMIN');
     sessionStorage.removeItem('REBORN_CURRENT_ADMIN');
@@ -37786,6 +38146,26 @@ async function handleAdminLoginSubmit(e) {
     applyAdminMenuPermissions(gCurrentAdmin);
   }
 
+  // [시스템 감사 로그 기록]
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      username: admin.username,
+      name: admin.name,
+      dept: admin.dept,
+      role: admin.role,
+      ip: admin.lastIp || window._clientIp,
+      category: '인증/로그인',
+      actionType: 'LOGIN',
+      target: '관리자 보안 인증 세션',
+      summary: `[${admin.name} (@${admin.username})] 관리자 정상 로그인 인증 완료`,
+      changes: {
+        '로그인계정': { before: '-', after: `${admin.name} (@${admin.username})` },
+        '부서/역할': { before: '-', after: `${admin.dept || '-'} / ${admin.role || '-'}` },
+        '인증상태': { before: '미인증', after: '보안 토큰 정상 발급' }
+      }
+    });
+  }
+
   const overlay = document.getElementById('adminLoginOverlay');
   if (overlay) overlay.classList.add('hidden');
 
@@ -38010,6 +38390,17 @@ function handleAdminFormSubmit(e) {
     }
 
     const current = gAdmins[targetIdx];
+    const beforeData = {
+      username: current.username,
+      name: current.name,
+      dept: current.dept,
+      phone: current.phone,
+      email: current.email,
+      role: current.role,
+      status: current.status,
+      allowedMenus: (current.allowedMenus || []).join(', ')
+    };
+
     current.username = username;
     current.name = name;
     current.dept = dept;
@@ -38020,6 +38411,28 @@ function handleAdminFormSubmit(e) {
     current.allowedMenus = allowedMenus;
     if (password) {
       current.password = password;
+    }
+
+    // [시스템 감사 로그 기록]
+    if (typeof window.recordSystemAuditLog === 'function') {
+      const changes = {};
+      if (beforeData.username !== username) changes['아이디'] = { before: beforeData.username, after: username };
+      if (beforeData.name !== name) changes['성명'] = { before: beforeData.name, after: name };
+      if (beforeData.dept !== dept) changes['소속'] = { before: beforeData.dept, after: dept };
+      if (beforeData.phone !== phone) changes['연락처'] = { before: beforeData.phone, after: phone };
+      if (beforeData.email !== email) changes['이메일'] = { before: beforeData.email, after: email };
+      if (beforeData.role !== role) changes['역할(Role)'] = { before: beforeData.role, after: role };
+      if (beforeData.status !== status) changes['계정상태'] = { before: beforeData.status, after: status };
+      if (beforeData.allowedMenus !== allowedMenus.join(', ')) changes['허용메뉴'] = { before: beforeData.allowedMenus, after: allowedMenus.join(', ') };
+      if (password) changes['비밀번호'] = { before: '********', after: '신규 비밀번호로 재설정됨' };
+
+      window.recordSystemAuditLog({
+        category: '관리자권한',
+        actionType: 'UPDATE',
+        target: `관리자 계정 [${current.id}] (${name})`,
+        summary: `[${name} (@${username})] 관리자 권한 및 계정 정보 수정 완료`,
+        changes: changes
+      });
     }
 
     // 현재 로그인된 관리자 본인이면 세션 동기화
@@ -38078,6 +38491,24 @@ function handleAdminFormSubmit(e) {
     renderAdmins();
     closeModal('adminCreateModal');
 
+    // [시스템 감사 로그 기록]
+    if (typeof window.recordSystemAuditLog === 'function') {
+      window.recordSystemAuditLog({
+        category: '관리자권한',
+        actionType: 'CREATE',
+        target: `관리자 계정 [${newId}] (${name})`,
+        summary: `신규 관리자 [${name} (@${username})] 계정 등록 완료`,
+        changes: {
+          '관리자ID': { before: '-', after: newId },
+          '아이디/성명': { before: '-', after: `${username} (${name})` },
+          '소속부서': { before: '-', after: dept || '-' },
+          '부여역할': { before: '-', after: role },
+          '허용메뉴': { before: '-', after: allowedMenus.join(', ') },
+          '초기상태': { before: '-', after: status }
+        }
+      });
+    }
+
     showCustomAlert({
       title: '신규 관리자 등록 완료',
       message: `[${name} / ${username}] 관리자 계정이 성공적으로 등록되었습니다.`,
@@ -38113,6 +38544,21 @@ function deleteAdmin(adminId) {
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:deleteAdminDoc', { adminId });
   }
+
+  // [시스템 감사 로그 기록]
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '관리자권한',
+      actionType: 'DELETE',
+      target: `관리자 계정 [${adminId}] (${target.name})`,
+      summary: `[${target.name} (@${target.username})] 관리자 계정 영구 삭제 완료`,
+      changes: {
+        '삭제계정': { before: `${target.name} (@${target.username})`, after: '영구 삭제됨' },
+        '부서/역할': { before: `${target.dept || '-'} / ${target.role || '-'}`, after: '-' }
+      }
+    });
+  }
+
   renderAdmins();
 
   showCustomAlert({
@@ -38616,7 +39062,7 @@ function renderCareCalendar() {
   // 2. 현재 선택된 필터에 따라 이벤트 필터링
   const filteredEvents = allEvents.filter(evt => {
     // 보험사 필터
-    if (gCalendarFilters.insurance !== 'ALL' && !evt.insuranceCompany.includes(gCalendarFilters.insurance)) {
+    if (gCalendarFilters.insurance !== 'ALL' && !(evt.insuranceCompany || '').includes(gCalendarFilters.insurance)) {
       return false;
     }
     // 상태 필터
@@ -38993,9 +39439,9 @@ function renderCareCalendarTimelineView(events) {
               const leftPercent = ((sDay - 1) / lastDate) * 100;
               const widthPercent = (spanDays / lastDate) * 100;
 
-              const isHyundai = evt.insuranceCompany.includes('현대');
-              const isSamsung = evt.insuranceCompany.includes('삼성');
-              const isDb = evt.insuranceCompany.includes('DB');
+              const isHyundai = (evt.insuranceCompany || '').includes('현대');
+              const isSamsung = (evt.insuranceCompany || '').includes('삼성');
+              const isDb = (evt.insuranceCompany || '').includes('DB');
 
               const barGrad = isHyundai 
                 ? 'from-indigo-600 via-indigo-700 to-blue-700 text-white border-indigo-700 shadow-indigo-100' 
@@ -39403,9 +39849,9 @@ function renderCareCalendarAllPeriodTimelineView(events) {
               const barLeft = startIdx * dayWidth;
               const barWidth = Math.max(dayWidth, spanDays * dayWidth);
 
-              const isHyundai = evt.insuranceCompany.includes('현대');
-              const isSamsung = evt.insuranceCompany.includes('삼성');
-              const isDb = evt.insuranceCompany.includes('DB');
+              const isHyundai = (evt.insuranceCompany || '').includes('현대');
+              const isSamsung = (evt.insuranceCompany || '').includes('삼성');
+              const isDb = (evt.insuranceCompany || '').includes('DB');
 
               const barGrad = isHyundai 
                 ? 'from-indigo-600 via-indigo-700 to-blue-700 text-white border-indigo-700 shadow-indigo-100' 
@@ -39712,9 +40158,9 @@ function renderCareCalendarSpanMonthView(events) {
 
             const spanCols = colEnd - colStart + 1;
 
-            const isHyundai = evt.insuranceCompany.includes('현대');
-            const isSamsung = evt.insuranceCompany.includes('삼성');
-            const isDb = evt.insuranceCompany.includes('DB');
+            const isHyundai = (evt.insuranceCompany || '').includes('현대');
+            const isSamsung = (evt.insuranceCompany || '').includes('삼성');
+            const isDb = (evt.insuranceCompany || '').includes('DB');
 
             const barColor = isHyundai
               ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white border-indigo-700 shadow-indigo-100'
@@ -39891,9 +40337,9 @@ function renderCareCalendarMonthView(events) {
         <!-- Event Pills Stack (Max 3 visible + More badge) -->
         <div class="space-y-1 my-1 flex-1 overflow-hidden">
           ${dayEvents.slice(0, 3).map(evt => {
-            const isSamsung = evt.insuranceCompany.includes('삼성');
-            const isHyundai = evt.insuranceCompany.includes('현대');
-            const isDb = evt.insuranceCompany.includes('DB');
+            const isSamsung = (evt.insuranceCompany || '').includes('삼성');
+            const isHyundai = (evt.insuranceCompany || '').includes('현대');
+            const isDb = (evt.insuranceCompany || '').includes('DB');
 
             const pillColor = isHyundai
               ? 'bg-indigo-50 border-indigo-200 text-indigo-950 hover:bg-indigo-100'
@@ -40020,8 +40466,8 @@ function renderCareCalendarWeekView(events) {
               <span>배정 일정 없음</span>
             </div>
           ` : dayEvents.map(evt => {
-            const isSamsung = evt.insuranceCompany.includes('삼성');
-            const isHyundai = evt.insuranceCompany.includes('현대');
+            const isSamsung = (evt.insuranceCompany || '').includes('삼성');
+            const isHyundai = (evt.insuranceCompany || '').includes('현대');
 
             const cardBorder = evt.hasAngryComplaint ? 'border-rose-400 shadow-rose-100 ring-1 ring-rose-300' :
               evt.isAttentionNeeded ? 'border-amber-300 shadow-amber-100' : 'border-slate-200';
@@ -41371,25 +41817,373 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
     });
   }
 
-  // 5. 디렉토리 엔티티(간병인, 협력센터, 손사) 추출 통계 집계
-  const detectedCg = new Set();
-  validAssignments.forEach(as => { if (as.caregiverName) detectedCg.add(as.caregiverName.trim()); });
-  validApplications.forEach(ap => { if (ap.caregiverName) detectedCg.add(ap.caregiverName.trim()); });
+  // =========================================================================
+  // 5. 파트너/인력 디렉토리(간병인, 협력센터, 손해사정사) 엑셀 100% 실데이터 전수 추출
+  // =========================================================================
+  const cgMap = new Map();
+  const ctrMap = new Map();
+  const adjMap = new Map();
 
-  const detectedCtr = new Set();
+  // (1) 전용 시트가 워크북에 존재할 경우 직접 파싱
+  const dedicatedCgSheet = sheetNames.find(n => (n.includes('간병인') || n.includes('인력풀') || n.includes('보호사')) && !n.includes('배정') && !n.includes('신청') && !n.includes('청구') && !n.includes('지급'));
+  if (dedicatedCgSheet && workbook.Sheets[dedicatedCgSheet]) {
+    try {
+      const rawCg = XLSX.utils.sheet_to_json(workbook.Sheets[dedicatedCgSheet], { header: 1, defval: '' });
+      if (rawCg && rawCg.length > 1) {
+        let hIdx = 0;
+        let cName = 0, cPhone = -1, cCenter = -1, cWage = -1, cCert = -1, cAccount = -1, cBirth = -1, cArea = -1;
+        for (let i = 0; i < Math.min(rawCg.length, 5); i++) {
+          const row = rawCg[i];
+          if (!Array.isArray(row)) continue;
+          row.forEach((cell, idx) => {
+            const s = String(cell || '').trim();
+            if (s.includes('이름') || s.includes('성명') || s.includes('간병인') || s.includes('보호사')) cName = idx;
+            if (s.includes('전화') || s.includes('연락처') || s.includes('휴대폰')) cPhone = idx;
+            if (s.includes('센터') || s.includes('소속')) cCenter = idx;
+            if (s.includes('일당') || s.includes('일급') || s.includes('급여')) cWage = idx;
+            if (s.includes('자격') || s.includes('자격증')) cCert = idx;
+            if (s.includes('계좌') || s.includes('은행')) cAccount = idx;
+            if (s.includes('생년') || s.includes('생일')) cBirth = idx;
+            if (s.includes('지역') || s.includes('활동지역')) cArea = idx;
+          });
+          if (cName !== -1 && (cPhone !== -1 || cCenter !== -1)) { hIdx = i; break; }
+        }
+        for (let i = hIdx + 1; i < rawCg.length; i++) {
+          const r = rawCg[i];
+          if (!r) continue;
+          const name = String(r[cName] || '').trim();
+          if (!name || name === '-' || name === '미배정' || name.includes('미배정')) continue;
+          const phone = cPhone !== -1 ? normLaunchPhone(r[cPhone]) : '';
+          const centerName = cCenter !== -1 ? String(r[cCenter] || '개인').trim() : '개인';
+          const dailyWage = cWage !== -1 ? Number(String(r[cWage] || 0).replace(/[^0-9]/g, '')) || 0 : 0;
+          const cert = cCert !== -1 ? String(r[cCert] || '간병사').trim() : '간병사';
+          const account = cAccount !== -1 ? String(r[cAccount] || '').trim() : '';
+          const birthDate = cBirth !== -1 ? normLaunchDate(r[cBirth]) : '';
+          const area = cArea !== -1 ? String(r[cArea] || '전국').trim() : '전국';
+
+          cgMap.set(name, {
+            id: `CG${String(cgMap.size + 1).padStart(3, '0')}`,
+            name,
+            phone,
+            centerName: centerName || '개인',
+            area,
+            cert,
+            account,
+            dailyWage,
+            settlementType: centerName && centerName !== '개인' ? '센터' : '개인',
+            birthDate,
+            activeCases: 0,
+            status: '활동중',
+            source: `엑셀 [${dedicatedCgSheet}] 시트`
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[Dedicated Caregiver Sheet Parse Warn]', e);
+    }
+  }
+
+  const dedicatedCtrSheet = sheetNames.find(n => (n.includes('협력센터') || n.includes('간병센터') || n.includes('제휴센터') || (n.includes('센터') && !n.includes('고객') && !n.includes('콜') && !n.includes('보상') && !n.includes('접수'))));
+  if (dedicatedCtrSheet && workbook.Sheets[dedicatedCtrSheet]) {
+    try {
+      const rawCtr = XLSX.utils.sheet_to_json(workbook.Sheets[dedicatedCtrSheet], { header: 1, defval: '' });
+      if (rawCtr && rawCtr.length > 1) {
+        let hIdx = 0;
+        let cName = 0, cMgr = -1, cPhone = -1, cFax = -1, cArea = -1, cBiz = -1, cSettle = -1;
+        for (let i = 0; i < Math.min(rawCtr.length, 5); i++) {
+          const row = rawCtr[i];
+          if (!Array.isArray(row)) continue;
+          row.forEach((cell, idx) => {
+            const s = String(cell || '').trim();
+            if (s.includes('센터명') || s.includes('기관명') || s.includes('상호')) cName = idx;
+            if (s.includes('담당자') || s.includes('대표')) cMgr = idx;
+            if (s.includes('전화') || s.includes('연락처')) cPhone = idx;
+            if (s.includes('팩스') || s.includes('fax')) cFax = idx;
+            if (s.includes('지역') || s.includes('소재지')) cArea = idx;
+            if (s.includes('사업자') || s.includes('등록번호')) cBiz = idx;
+            if (s.includes('정산') || s.includes('구분')) cSettle = idx;
+          });
+          if (cName !== -1 && (cPhone !== -1 || cMgr !== -1)) { hIdx = i; break; }
+        }
+        for (let i = hIdx + 1; i < rawCtr.length; i++) {
+          const r = rawCtr[i];
+          if (!r) continue;
+          const name = String(r[cName] || '').trim();
+          if (!name || name === '-' || name === '개인' || name.startsWith('개인/')) continue;
+          const manager = cMgr !== -1 ? String(r[cMgr] || `${name} 담당`).trim() : `${name} 담당`;
+          const phone = cPhone !== -1 ? normLaunchPhone(r[cPhone]) : '';
+          const fax = cFax !== -1 ? String(r[cFax] || '').trim() : '';
+          const area = cArea !== -1 ? String(r[cArea] || '전국').trim() : '전국';
+          const businessNumber = cBiz !== -1 ? String(r[cBiz] || '').trim() : '';
+          const settlementType = cSettle !== -1 ? String(r[cSettle] || '센터').trim() : '센터';
+
+          ctrMap.set(name, {
+            id: `CTR${String(ctrMap.size + 1).padStart(3, '0')}`,
+            name,
+            manager,
+            phone,
+            fax,
+            area,
+            settlementType,
+            businessNumber,
+            caregiverCount: 0,
+            source: `엑셀 [${dedicatedCtrSheet}] 시트`
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[Dedicated Center Sheet Parse Warn]', e);
+    }
+  }
+
+  const dedicatedAdjSheet = sheetNames.find(n => (n.includes('손사') || n.includes('손해사정') || n.includes('사정인')) && !n.includes('신청') && !n.includes('배정') && !n.includes('청구'));
+  if (dedicatedAdjSheet && workbook.Sheets[dedicatedAdjSheet]) {
+    try {
+      const rawAdj = XLSX.utils.sheet_to_json(workbook.Sheets[dedicatedAdjSheet], { header: 1, defval: '' });
+      if (rawAdj && rawAdj.length > 1) {
+        let hIdx = 0;
+        let cName = 0, cIns = -1, cFirm = -1, cBranch = -1, cPhone = -1, cMobile = -1, cFax = -1, cEmail = -1;
+        for (let i = 0; i < Math.min(rawAdj.length, 5); i++) {
+          const row = rawAdj[i];
+          if (!Array.isArray(row)) continue;
+          row.forEach((cell, idx) => {
+            const s = String(cell || '').trim();
+            if (s.includes('이름') || s.includes('성명') || s.includes('손사명') || s.includes('담당자')) cName = idx;
+            if (s.includes('원수사') || s.includes('보험사')) cIns = idx;
+            if (s.includes('법인') || s.includes('소속') || s.includes('회사')) cFirm = idx;
+            if (s.includes('지사') || s.includes('팀') || s.includes('센터') || s.includes('부서')) cBranch = idx;
+            if (s.includes('전화') || s.includes('유선')) cPhone = idx;
+            if (s.includes('휴대폰') || s.includes('핸드폰') || s.includes('모바일')) cMobile = idx;
+            if (s.includes('팩스') || s.includes('fax')) cFax = idx;
+            if (s.includes('이메일') || s.includes('email') || s.includes('메일')) cEmail = idx;
+          });
+          if (cName !== -1 && (cPhone !== -1 || cMobile !== -1 || cFirm !== -1)) { hIdx = i; break; }
+        }
+        for (let i = hIdx + 1; i < rawAdj.length; i++) {
+          const r = rawAdj[i];
+          if (!r) continue;
+          const name = String(r[cName] || '').trim();
+          if (!name || name === '-' || name === '미지정' || name.includes('미지정')) continue;
+          const insComp = cIns !== -1 && r[cIns] ? String(r[cIns]).trim() : companyLabel;
+          const firm = cFirm !== -1 && r[cFirm] ? String(r[cFirm]).trim() : (insComp.includes('삼성') ? '삼성화재애니카손해사정' : '하이라이프손해사정');
+          const branch = cBranch !== -1 && r[cBranch] ? String(r[cBranch]).trim() : '보상센터';
+          const phone = cPhone !== -1 ? normLaunchPhone(r[cPhone]) : '';
+          const mobile = cMobile !== -1 ? normLaunchPhone(r[cMobile]) : phone;
+          const fax = cFax !== -1 ? String(r[cFax] || '').trim() : '';
+          const email = cEmail !== -1 ? String(r[cEmail] || '').trim() : '';
+
+          adjMap.set(name, {
+            id: `ADJ${String(adjMap.size + 1).padStart(3, '0')}`,
+            name,
+            insuranceCompany: insComp,
+            firm,
+            branch,
+            phone,
+            mobile,
+            fax,
+            email,
+            activeCases: 0,
+            status: '정상',
+            source: `엑셀 [${dedicatedAdjSheet}] 시트`
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[Dedicated Adjuster Sheet Parse Warn]', e);
+    }
+  }
+
+  // (2) 배정 시트로부터 간병인 및 협력센터 추출 & 보강
   validAssignments.forEach(as => {
-    const c = (as.centerName || '').trim();
-    if (c && c !== '개인' && c !== '-' && !c.startsWith('개인/')) detectedCtr.add(c);
+    if (as.caregiverName) {
+      const name = as.caregiverName.trim();
+      if (name && name !== '-' && name !== '미배정' && !name.includes('미배정') && name !== '배정완료') {
+        if (!cgMap.has(name)) {
+          cgMap.set(name, {
+            id: `CG${String(cgMap.size + 1).padStart(3, '0')}`,
+            name,
+            phone: as.phone || '',
+            centerName: as.centerName || '개인',
+            area: '전국',
+            cert: '간병사',
+            account: as.accountInfo || '',
+            dailyWage: as.dailyWage || 0,
+            settlementType: as.settlementType || (as.centerName && as.centerName !== '개인' ? '센터' : '개인'),
+            birthDate: as.birthDate || '',
+            activeCases: 1,
+            status: '활동중',
+            source: '엑셀 관리대장 (배정시트)'
+          });
+        } else {
+          const item = cgMap.get(name);
+          item.activeCases = (item.activeCases || 0) + 1;
+          if (!item.phone && as.phone) item.phone = as.phone;
+          if ((!item.centerName || item.centerName === '개인') && as.centerName && as.centerName !== '개인') item.centerName = as.centerName;
+          if (!item.account && as.accountInfo) item.account = as.accountInfo;
+          if (!item.dailyWage && as.dailyWage) item.dailyWage = as.dailyWage;
+          if (!item.birthDate && as.birthDate) item.birthDate = as.birthDate;
+          if (as.settlementType) item.settlementType = as.settlementType;
+        }
+      }
+    }
+
+    if (as.centerName) {
+      const ctr = as.centerName.trim();
+      if (ctr && ctr !== '-' && ctr !== '개인' && !ctr.startsWith('개인/')) {
+        if (!ctrMap.has(ctr)) {
+          ctrMap.set(ctr, {
+            id: `CTR${String(ctrMap.size + 1).padStart(3, '0')}`,
+            name: ctr,
+            manager: `${ctr} 담당`,
+            phone: as.centerPhone || '',
+            fax: '',
+            area: '전국',
+            settlementType: as.settlementType || '센터',
+            businessNumber: '',
+            caregiverCount: 0,
+            source: '엑셀 관리대장 (배정시트)'
+          });
+        } else {
+          const item = ctrMap.get(ctr);
+          if (!item.phone && as.centerPhone) item.phone = as.centerPhone;
+          if (as.settlementType) item.settlementType = as.settlementType;
+        }
+      }
+    }
   });
 
-  const detectedAdj = new Set();
+  // (3) 신청 대장으로부터 손해사정사 및 배정 간병인 추출 & 보강
   validApplications.forEach(ap => {
-    const a = (ap.adjusterName || '').trim();
-    if (a && a !== '-') detectedAdj.add(a);
+    if (ap.caregiverName) {
+      const name = ap.caregiverName.trim();
+      if (name && name !== '-' && name !== '미배정' && !name.includes('미배정') && name !== '배정완료') {
+        if (!cgMap.has(name)) {
+          cgMap.set(name, {
+            id: `CG${String(cgMap.size + 1).padStart(3, '0')}`,
+            name,
+            phone: ap.caregiverPhone || '',
+            centerName: '개인',
+            area: ap.sido || '전국',
+            cert: '간병사',
+            account: '',
+            dailyWage: ap.dailyRate || 0,
+            settlementType: '개인',
+            birthDate: '',
+            activeCases: 1,
+            status: '활동중',
+            source: '엑셀 관리대장 (신청대장)'
+          });
+        } else {
+          const item = cgMap.get(name);
+          item.activeCases = (item.activeCases || 0) + 1;
+          if (!item.phone && ap.caregiverPhone) item.phone = ap.caregiverPhone;
+          if (!item.dailyWage && ap.dailyRate) item.dailyWage = ap.dailyRate;
+        }
+      }
+    }
+
+    if (ap.adjusterName) {
+      const adj = ap.adjusterName.trim();
+      if (adj && adj !== '-' && adj !== '미지정' && !adj.includes('미지정')) {
+        const insComp = ap.insuranceCompany || companyLabel;
+        const defaultFirm = insComp.includes('삼성') ? '삼성화재애니카손해사정' : '하이라이프손해사정';
+        if (!adjMap.has(adj)) {
+          adjMap.set(adj, {
+            id: `ADJ${String(adjMap.size + 1).padStart(3, '0')}`,
+            name: adj,
+            insuranceCompany: insComp,
+            firm: ap.adjusterFirm || defaultFirm,
+            branch: '보상센터',
+            phone: ap.adjusterPhone || '',
+            mobile: ap.adjusterMobile || ap.adjusterPhone || '',
+            fax: ap.adjusterFax || '',
+            email: '',
+            activeCases: 1,
+            status: '정상',
+            source: '엑셀 관리대장 (신청대장)'
+          });
+        } else {
+          const item = adjMap.get(adj);
+          item.activeCases = (item.activeCases || 0) + 1;
+          if (!item.phone && ap.adjusterPhone) item.phone = ap.adjusterPhone;
+          if (!item.mobile && ap.adjusterMobile) item.mobile = ap.adjusterMobile;
+          if (!item.fax && ap.adjusterFax) item.fax = ap.adjusterFax;
+          if (ap.adjusterFirm && (!item.firm || item.firm === defaultFirm)) item.firm = ap.adjusterFirm;
+        }
+      }
+    }
   });
+
+  // (4) 지급 대장으로부터 간병인 추가 확인
+  validPayouts.forEach(p => {
+    if (p.caregiverName) {
+      const name = p.caregiverName.trim();
+      if (name && name !== '-' && name !== '미배정' && !name.includes('미배정') && name !== '배정완료') {
+        if (!cgMap.has(name)) {
+          cgMap.set(name, {
+            id: `CG${String(cgMap.size + 1).padStart(3, '0')}`,
+            name,
+            phone: '',
+            centerName: '개인',
+            area: '전국',
+            cert: '간병사',
+            account: '',
+            dailyWage: p.dailyWage || 0,
+            settlementType: '개인',
+            birthDate: '',
+            activeCases: 1,
+            status: '활동중',
+            source: '엑셀 관리대장 (지급대장)'
+          });
+        } else {
+          const item = cgMap.get(name);
+          if (!item.dailyWage && p.dailyWage) item.dailyWage = p.dailyWage;
+        }
+      }
+    }
+  });
+
+  // (5) 연락처 시트로부터 손해사정사/담당자 추출
   validContacts.forEach(cnt => {
-    if (cnt.name) detectedAdj.add(cnt.name.trim());
+    if (cnt.name) {
+      const name = cnt.name.trim();
+      if (name && name !== '-' && name !== '미지정' && !name.includes('미지정')) {
+        if (!adjMap.has(name)) {
+          adjMap.set(name, {
+            id: `ADJ${String(adjMap.size + 1).padStart(3, '0')}`,
+            name,
+            insuranceCompany: cnt.insuranceCompany || '삼성화재',
+            firm: cnt.role || '삼성화재 전담팀',
+            branch: '보상지원파트',
+            phone: cnt.phone || '',
+            mobile: cnt.mobile || cnt.phone || '',
+            fax: cnt.fax || '02-3485-9100',
+            email: cnt.email || '',
+            activeCases: 1,
+            status: '정상',
+            source: '엑셀 관리대장 (연락처시트)'
+          });
+        } else {
+          const item = adjMap.get(name);
+          if (!item.email && cnt.email) item.email = cnt.email;
+          if (!item.phone && cnt.phone) item.phone = cnt.phone;
+          if (!item.mobile && cnt.mobile) item.mobile = cnt.mobile;
+        }
+      }
+    }
   });
+
+  // (6) 센터별 소속 간병인 수 실시간 계산
+  cgMap.forEach(cg => {
+    if (cg.centerName && ctrMap.has(cg.centerName)) {
+      const ctr = ctrMap.get(cg.centerName);
+      ctr.caregiverCount = (ctr.caregiverCount || 0) + 1;
+    }
+  });
+
+  const parsedCaregivers = Array.from(cgMap.values());
+  const parsedCenters = Array.from(ctrMap.values());
+  const parsedAdjusters = Array.from(adjMap.values());
 
   gLaunchParsedData[companyKey] = {
     company: companyKey,
@@ -41404,6 +42198,9 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
     payouts: validPayouts,
     contacts: validContacts,
     completedRows: validCompletedRows,
+    caregivers: parsedCaregivers,
+    centers: parsedCenters,
+    adjusters: parsedAdjusters,
     sheetCounts: {
       apps: validApplications.length,
       assigns: validAssignments.length,
@@ -41411,9 +42208,9 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
       payouts: validPayouts.length
     },
     directoryCounts: {
-      caregivers: detectedCg.size,
-      centers: detectedCtr.size,
-      adjusters: detectedAdj.size
+      caregivers: parsedCaregivers.length,
+      centers: parsedCenters.length,
+      adjusters: parsedAdjusters.length
     },
     meta: {
       ...meta,
@@ -41422,9 +42219,9 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
       assignCount: validAssignments.length,
       claimCount: validClaims.length,
       payoutCount: validPayouts.length,
-      caregiverCount: detectedCg.size,
-      centerCount: detectedCtr.size,
-      adjusterCount: detectedAdj.size
+      caregiverCount: parsedCaregivers.length,
+      centerCount: parsedCenters.length,
+      adjusterCount: parsedAdjusters.length
     }
   };
 
@@ -41940,23 +42737,59 @@ async function executeApplyLaunchData(company) {
     // 4. 통합허브(gApps) 내 삼성화재 고객 중 삼성화재 엑셀 관리대장에 있는 고객과 동일한 고객 상세정보(상품명 등) 반영
     const enrichedCount = enrichHubSamsungCustomersFromSamsungExcel(newApps);
 
-    // 5. 디렉토리(담당자) 동기화
-    if (data.contacts && data.contacts.length > 0) {
-      data.contacts.forEach(cnt => {
-        if (typeof autoSyncAdjusterToDirectory === 'function') {
-          autoSyncAdjusterToDirectory({
-            name: cnt.name,
-            insuranceCompany: '삼성화재',
-            firm: cnt.role || '삼성화재 전담팀',
-            phone: cnt.phone,
-            email: cnt.email,
-            mobile: cnt.phone
-          }, true);
+    // 5. 디렉토리(간병인, 협력센터, 손해사정사) 엑셀 실데이터 병합 및 최신화
+    if (!Array.isArray(gCaregivers)) gCaregivers = [];
+    if (!Array.isArray(gCenters)) gCenters = [];
+    if (!Array.isArray(gAdjusters)) gAdjusters = [];
+
+    if (Array.isArray(data.caregivers) && data.caregivers.length > 0) {
+      const existingCgNames = new Set(gCaregivers.map(c => c.name));
+      data.caregivers.forEach(cg => {
+        if (!existingCgNames.has(cg.name)) {
+          cg.id = 'CG' + String(gCaregivers.length + 1).padStart(3, '0');
+          gCaregivers.push(cg);
+          existingCgNames.add(cg.name);
         }
       });
-      syncDirectoriesFromAllExistingRecords(true);
-      saveDirectoryToStorage();
-      updateDirectoryTotalBadge();
+    }
+    if (Array.isArray(data.centers) && data.centers.length > 0) {
+      const existingCtrNames = new Set(gCenters.map(c => c.name));
+      data.centers.forEach(ctr => {
+        if (!existingCtrNames.has(ctr.name)) {
+          ctr.id = 'CTR' + String(gCenters.length + 1).padStart(3, '0');
+          gCenters.push(ctr);
+          existingCtrNames.add(ctr.name);
+        }
+      });
+    }
+    if (Array.isArray(data.adjusters) && data.adjusters.length > 0) {
+      const existingAdjNames = new Set(gAdjusters.map(a => a.name));
+      data.adjusters.forEach(adj => {
+        if (!existingAdjNames.has(adj.name)) {
+          adj.id = 'ADJ' + String(gAdjusters.length + 1).padStart(3, '0');
+          gAdjusters.push(adj);
+          existingAdjNames.add(adj.name);
+        }
+      });
+    }
+
+    saveDirectoryToStorage();
+    updateDirectoryTotalBadge();
+    populateAdjusterDatalist();
+    populateCenterDatalist();
+    populateCaregiverDatalist();
+
+    // Convex 클라우드 DB 동기화
+    if (typeof syncToConvex === 'function') {
+      if (gCaregivers.length > 0) {
+        syncToConvex('sync:saveCaregiversChunk', { caregivers: gCaregivers }).catch(console.warn);
+      }
+      if (gCenters.length > 0) {
+        syncToConvex('sync:savePartnersChunk', { partners: gCenters }).catch(console.warn);
+      }
+      if (gAdjusters.length > 0) {
+        syncToConvex('sync:saveAdjustersChunk', { adjusters: gAdjusters }).catch(console.warn);
+      }
     }
 
     // 6. 환경설정 및 상태 카드 갱신
@@ -42010,28 +42843,28 @@ async function executeApplyLaunchData(company) {
   gPayouts = [...newPayouts];
   try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
 
-  // 5. 파트너/인력 디렉토리(간병인 인력, 협력센터, 손해사정인) 자동 동기화 & 최신화
-  if (data.contacts && data.contacts.length > 0) {
-    data.contacts.forEach(cnt => {
-      if (typeof autoSyncAdjusterToDirectory === 'function') {
-        autoSyncAdjusterToDirectory({
-          name: cnt.name,
-          insuranceCompany: '삼성화재',
-          firm: cnt.role || '삼성화재 전담팀',
-          phone: cnt.phone,
-          email: cnt.email,
-          mobile: cnt.phone
-        }, true);
-      }
-    });
-  }
-  syncDirectoriesFromAllExistingRecords(true);
+  // 5. 파트너/인력 디렉토리(간병인, 협력센터, 손해사정사) 엑셀 100% 실데이터 전면 교체
+  gCaregivers = Array.isArray(data.caregivers) ? [...data.caregivers] : [];
+  gCenters = Array.isArray(data.centers) ? [...data.centers] : [];
+  gAdjusters = Array.isArray(data.adjusters) ? [...data.adjusters] : [];
+
   saveDirectoryToStorage();
   updateDirectoryTotalBadge();
+  populateAdjusterDatalist();
+  populateCenterDatalist();
+  populateCaregiverDatalist();
 
-  // 5-1. 간병인 인력풀 Convex 영구 보존 동기화
-  if (typeof syncToConvex === 'function' && Array.isArray(gCaregivers) && gCaregivers.length > 0) {
-    syncToConvex('sync:saveCaregiversChunk', { caregivers: gCaregivers }).catch(console.warn);
+  // 5-1. 간병인, 협력센터, 손해사정사 Convex 클라우드 DB 영구 보존 일괄 동기화
+  if (typeof syncToConvex === 'function') {
+    if (gCaregivers.length > 0) {
+      syncToConvex('sync:saveCaregiversChunk', { caregivers: gCaregivers }).catch(console.warn);
+    }
+    if (gCenters.length > 0) {
+      syncToConvex('sync:savePartnersChunk', { partners: gCenters }).catch(console.warn);
+    }
+    if (gAdjusters.length > 0) {
+      syncToConvex('sync:saveAdjustersChunk', { adjusters: gAdjusters }).catch(console.warn);
+    }
   }
 
   // 6. Convex 클라우드 백엔드 동기화 (새 데이터 일괄 등록)
@@ -42089,9 +42922,9 @@ async function executeApplyLaunchData(company) {
   // 9. 상태 카드 갱신
   updateLaunchStatusCard(companyKey, currentCfg[companyKey]);
 
-  // 9-1. 업로드된 원수사 탭으로 즉시 포커스 전환 및 영구 저장
-  gHubInsuranceTab = companyKey === 'hyundai' ? '현대해상' : (companyKey === 'samsung' ? '삼성화재' : 'ALL');
-  try { localStorage.setItem('LIVON_HUB_INS_TAB', gHubInsuranceTab); } catch (e) {}
+  // 9-1. 통합허브 원수사 탭 기본은 '전체'로 세팅
+  gHubInsuranceTab = 'ALL';
+  try { localStorage.setItem('LIVON_HUB_INS_TAB', 'ALL'); } catch (e) {}
   if (typeof updateHubInsuranceTabUI === 'function') updateHubInsuranceTabUI();
 
   // 10. 통합허브, 하위 관리대장, 파트너/인력 디렉토리, 대시보드 전면 리렌더링

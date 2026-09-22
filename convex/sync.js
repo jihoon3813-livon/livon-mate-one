@@ -1305,6 +1305,36 @@ export const resetAndPurgeLaunchData = mutation({
         await ctx.db.delete(p._id);
         deletedPayouts++;
       }
+
+      // 전체 초기화 또는 종합대장 리셋 시 디렉토리(손사, 간병인, 협력센터) 및 간병일지도 100% 완전 삭제
+      if (target === 'all' || target === 'hyundai' || target.includes('종합')) {
+        const adjusters = await ctx.db.query("adjusters").collect();
+        for (const adj of adjusters) {
+          await ctx.db.delete(adj._id);
+        }
+
+        const caregivers = await ctx.db.query("caregivers").collect();
+        for (const cg of caregivers) {
+          await ctx.db.delete(cg._id);
+        }
+
+        const partners = await ctx.db.query("partners").collect();
+        for (const p of partners) {
+          await ctx.db.delete(p._id);
+        }
+
+        const logs = await ctx.db.query("careLogs").collect();
+        for (const l of logs) {
+          await ctx.db.delete(l._id);
+        }
+
+        if (target === 'all') {
+          const sheets = await ctx.db.query("samsungSheets").collect();
+          for (const s of sheets) {
+            await ctx.db.delete(s._id);
+          }
+        }
+      }
     } else if (target === 'samsung') {
       // 삼성화재 관리대장 업로드 시: samsungSheets 완전 초기화 및 삼성 접수/청구/지급 연관 데이터 삭제
       const sheets = await ctx.db.query("samsungSheets").collect();
@@ -1444,6 +1474,80 @@ export const deleteCaregiver = mutation({
       return { success: true, id: args.id };
     }
     return { success: false, error: "Not found" };
+  },
+});
+
+// 54-1. 협력센터/파트너 일괄 청크 등록 및 동기화
+export const savePartnersChunk = mutation({
+  args: {
+    partners: v.array(v.any()),
+  },
+  handler: async (ctx, args) => {
+    let count = 0;
+    for (const item of args.partners) {
+      const { _id, _creationTime, ...doc } = item;
+      if (!doc.id && !doc.name) continue;
+
+      let existing = null;
+      if (doc.id) {
+        existing = await ctx.db
+          .query("partners")
+          .filter((q) => q.eq(q.field("id"), doc.id))
+          .first();
+      }
+      if (!existing && doc.name) {
+        existing = await ctx.db
+          .query("partners")
+          .filter((q) => q.eq(q.field("name"), doc.name))
+          .first();
+      }
+
+      if (existing) {
+        await ctx.db.patch(existing._id, doc);
+      } else {
+        if (!doc.id) doc.id = "CTR_" + Date.now() + "_" + count;
+        await ctx.db.insert("partners", doc);
+      }
+      count++;
+    }
+    return { count, timestamp: new Date().toISOString() };
+  },
+});
+
+// 54-2. 손해사정사 일괄 청크 등록 및 동기화
+export const saveAdjustersChunk = mutation({
+  args: {
+    adjusters: v.array(v.any()),
+  },
+  handler: async (ctx, args) => {
+    let count = 0;
+    for (const item of args.adjusters) {
+      const { _id, _creationTime, ...doc } = item;
+      if (!doc.id && !doc.name) continue;
+
+      let existing = null;
+      if (doc.id) {
+        existing = await ctx.db
+          .query("adjusters")
+          .filter((q) => q.eq(q.field("id"), doc.id))
+          .first();
+      }
+      if (!existing && doc.name) {
+        existing = await ctx.db
+          .query("adjusters")
+          .filter((q) => q.eq(q.field("name"), doc.name))
+          .first();
+      }
+
+      if (existing) {
+        await ctx.db.patch(existing._id, doc);
+      } else {
+        if (!doc.id) doc.id = "ADJ_" + Date.now() + "_" + count;
+        await ctx.db.insert("adjusters", doc);
+      }
+      count++;
+    }
+    return { count, timestamp: new Date().toISOString() };
   },
 });
 

@@ -54,6 +54,12 @@
     // 🚨 [보안] 로그아웃 또는 미인증 상태에서 새로고침 시 즉시 잠금 화면 렌더링
     (function() {
       try {
+        var host = window.location.hostname || '';
+        var port = window.location.port || '';
+        var isDev = (host === 'localhost' || host === '127.0.0.1' || host === '' || host.includes('dev') || port === '8080' || port === '3000');
+        // 개발 환경에서는 로그인 잠금 모달 없이 즉시 전산 화면 진입
+        if (isDev) return;
+
         var token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
         var isLoggedOut = localStorage.getItem('LIVON_LOGGED_OUT') === 'true' || sessionStorage.getItem('LIVON_LOGGED_OUT') === 'true' || !localStorage.getItem('REBORN_CURRENT_ADMIN') || !token;
         if (isLoggedOut) {
@@ -1192,9 +1198,16 @@
           </div>
         </div>
 
-        <!-- NEW: 원수사 구분 메인 탭 (삼성화재 / 현대해상 / 전체) -->
+        <!-- NEW: 원수사 구분 메인 탭 (전체 / 삼성화재 / 현대해상) -->
         <div class="flex items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200 shadow-2xs mb-2.5">
           <div class="flex items-center gap-2 overflow-x-auto custom-scrollbar p-0.5" id="hubInsuranceTabBar">
+            <button type="button" onclick="setHubInsuranceTab('ALL')" id="hubInsTab-ALL" 
+              class="hub-ins-tab-btn active px-4 py-2 rounded-xl text-xs font-black bg-primary-600 text-white shadow-xs flex items-center gap-2 border border-primary-500 transition-all cursor-pointer whitespace-nowrap"
+              title="삼성화재 + 현대해상 전체 고객 조회">
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-white"></i>
+              <span>전체</span>
+              <span id="hubInsCount-ALL" class="hub-ins-badge px-2 py-0.5 rounded-full bg-white text-primary-900 font-black text-[10.5px] shadow-2xs">0건</span>
+            </button>
             <button type="button" onclick="setHubInsuranceTab('삼성화재')" id="hubInsTab-SAMSUNG" 
               class="hub-ins-tab-btn px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap"
               title="삼성화재 고객 및 통계만 조회">
@@ -1208,13 +1221,6 @@
               <span class="w-2.5 h-2.5 rounded-full bg-orange-600"></span>
               <span>현대해상</span>
               <span id="hubInsCount-HYUNDAI" class="hub-ins-badge px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold border border-slate-300/60 text-[10.5px]">0건</span>
-            </button>
-            <button type="button" onclick="setHubInsuranceTab('ALL')" id="hubInsTab-ALL" 
-              class="hub-ins-tab-btn active px-4 py-2 rounded-xl text-xs font-black bg-primary-600 text-white shadow-xs flex items-center gap-2 border border-primary-500 transition-all cursor-pointer whitespace-nowrap"
-              title="삼성화재 + 현대해상 전체 고객 조회">
-              <i data-lucide="layers" class="w-3.5 h-3.5 text-white"></i>
-              <span>전체</span>
-              <span id="hubInsCount-ALL" class="hub-ins-badge px-2 py-0.5 rounded-full bg-white text-primary-900 font-black text-[10.5px] shadow-2xs">0건</span>
             </button>
           </div>
           <div class="hidden md:flex items-center gap-2 text-xs text-slate-500 font-medium pr-2">
@@ -1288,9 +1294,9 @@
               
               <!-- Sticky quick insurance tabs (스크롤 시에도 바로 전환 가능) -->
               <div class="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200" title="원수사 구분 탭">
+                <button type="button" onclick="setHubInsuranceTab('ALL')" id="stickyInsTab-ALL" class="px-2.5 py-1 rounded-lg text-xs font-black bg-primary-600 text-white shadow-xs transition-all cursor-pointer">전체</button>
                 <button type="button" onclick="setHubInsuranceTab('삼성화재')" id="stickyInsTab-삼성화재" class="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition-all cursor-pointer">삼성화재</button>
                 <button type="button" onclick="setHubInsuranceTab('현대해상')" id="stickyInsTab-현대해상" class="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition-all cursor-pointer">현대해상</button>
-                <button type="button" onclick="setHubInsuranceTab('ALL')" id="stickyInsTab-ALL" class="px-2.5 py-1 rounded-lg text-xs font-black bg-primary-600 text-white shadow-xs transition-all cursor-pointer">전체</button>
               </div>
               <input type="hidden" id="hubInsuranceFilter" value="ALL">
 
@@ -3771,23 +3777,29 @@
 
       </section>
 
-      <!-- ==================== TAB 7: ADMIN RBAC ==================== -->
+      <!-- ==================== TAB 7: ADMIN RBAC & AUDIT LOGS ==================== -->
       <section id="tab-adminmgmt" class="tab-content hidden space-y-6">
         
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <div>
-            <h2 class="text-xl font-bold text-slate-900">리본메이트 원 관리자 권한 설정 (RBAC)</h2>
+            <h2 class="text-xl font-bold text-slate-900">리본메이트 원 관리자 권한 및 시스템 감사 로그</h2>
             <p class="text-xs text-slate-500 mt-1">
-              관리자 ID별로 접근 가능한 메뉴(고객신청, 간병배정, 보험청구/정산, 지급승인 등)의 세부 권한을 부여합니다.
+              관리자 ID별 메뉴 접근 권한(RBAC) 설정과 전 시스템 내 작업자(누가), 접속 IP(어디서), 변경 전/후 상세(어떻게)를 실시간 추적·감사합니다.
             </p>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             <div class="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200">
-              <button class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-xs shadow-xs">
+              <button id="btnSubTabRbac" onclick="switchAdminSubTab('rbac')" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-xs shadow-xs cursor-pointer transition-all">
                 관리자 권한 (RBAC)
               </button>
-              <button onclick="switchTab('settings')" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 font-semibold text-xs transition-all">
-                시스템 설정 ⚙️
+              <button id="btnSubTabAuditLogs" onclick="switchAdminSubTab('auditlogs')" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 font-semibold text-xs transition-all cursor-pointer flex items-center gap-1.5">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-indigo-500"></i>
+                <span>시스템 감사 로그 관리</span>
+                <span id="auditLogsNavCountBadge" class="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-700">0</span>
+              </button>
+              <button onclick="switchTab('settings')" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 font-semibold text-xs transition-all cursor-pointer flex items-center gap-1.5" title="시스템 환경설정 (데이터 전체 초기화 및 원수사 채번 설정)">
+                <i data-lucide="settings" class="w-3.5 h-3.5 text-amber-500"></i>
+                <span>시스템 환경설정 ⚙️</span>
               </button>
             </div>
             <button onclick="openLabelSettingModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-cyan-300 bg-cyan-50 hover:bg-cyan-100 text-cyan-900 text-xs font-bold shadow-xs transition-all">
@@ -3799,24 +3811,187 @@
           </div>
         </div>
 
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-          <table class="w-full text-left text-xs text-slate-600 border-collapse">
-            <thead class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-700 uppercase">
-              <tr>
-                <th class="p-3 pl-5">관리자 ID</th>
-                <th class="p-3">성명 (소속)</th>
-                <th class="p-3">아이디 / 이메일</th>
-                <th class="p-3">연락처</th>
-                <th class="p-3 font-bold">부여된 역할</th>
-                <th class="p-3">허용 메뉴 (권한)</th>
-                <th class="p-3">최근 접속 (IP)</th>
-                <th class="p-3">상태</th>
-                <th class="p-3 text-center pr-5">권한 수정</th>
-              </tr>
-            </thead>
-            <tbody id="adminTableBody" class="divide-y divide-slate-100">
-            </tbody>
-          </table>
+        <!-- 1. RBAC (관리자 권한) 서브 뷰 -->
+        <div id="adminRbacSubView" class="space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <table class="w-full text-left text-xs text-slate-600 border-collapse">
+              <thead class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-700 uppercase">
+                <tr>
+                  <th class="p-3 pl-5">관리자 ID</th>
+                  <th class="p-3">성명 (소속)</th>
+                  <th class="p-3">아이디 / 이메일</th>
+                  <th class="p-3">연락처</th>
+                  <th class="p-3 font-bold">부여된 역할</th>
+                  <th class="p-3">허용 메뉴 (권한)</th>
+                  <th class="p-3">최근 접속 (IP)</th>
+                  <th class="p-3">상태</th>
+                  <th class="p-3 text-center pr-5">권한 수정</th>
+                </tr>
+              </thead>
+              <tbody id="adminTableBody" class="divide-y divide-slate-100">
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 2. 시스템 감사 로그 관리 서브 뷰 -->
+        <div id="adminAuditLogsSubView" class="hidden space-y-6">
+          <!-- 4개 통계 카드 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+                <i data-lucide="file-text" class="w-5 h-5"></i>
+              </div>
+              <div class="min-w-0">
+                <div class="text-[11px] font-bold text-slate-400">누적 시스템 로그</div>
+                <div id="auditStatTotal" class="text-xl font-black text-slate-900 font-mono">0건</div>
+              </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                <i data-lucide="calendar" class="w-5 h-5"></i>
+              </div>
+              <div class="min-w-0">
+                <div class="text-[11px] font-bold text-slate-400">오늘 발생한 로그</div>
+                <div id="auditStatToday" class="text-xl font-black text-emerald-700 font-mono">0건</div>
+              </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 border border-purple-100">
+                <i data-lucide="git-commit" class="w-5 h-5"></i>
+              </div>
+              <div class="min-w-0">
+                <div class="text-[11px] font-bold text-slate-400">상태 및 데이터 변경 로그</div>
+                <div id="auditStatChanges" class="text-xl font-black text-purple-700 font-mono">0건</div>
+              </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
+                <i data-lucide="user-check" class="w-5 h-5"></i>
+              </div>
+              <div class="min-w-0 truncate">
+                <div class="text-[11px] font-bold text-slate-400">최근 활동 작업자 / IP</div>
+                <div id="auditStatRecentUser" class="text-xs font-black text-slate-900 truncate" title="-">-</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 검색 및 다차원 필터 / 액션 바 -->
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <!-- 검색창 -->
+              <div class="relative flex-1 max-w-md">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                <input type="text" id="auditLogSearchInput" oninput="renderSystemAuditLogs()"
+                  placeholder="작업자 이름, 계정, IP, 대상 항목, 변경 내역 검색..."
+                  class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+              </div>
+
+              <!-- 필터 드롭다운 및 액션 버튼들 -->
+              <div class="flex items-center gap-2 flex-wrap">
+                <!-- 업무분류 필터 -->
+                <select id="auditLogCategoryFilter" onchange="renderSystemAuditLogs()"
+                  class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="ALL">전체 업무분류</option>
+                  <option value="보험청구">보험청구</option>
+                  <option value="간병비지급">간병비지급</option>
+                  <option value="간병배정">간병배정</option>
+                  <option value="고객신청">고객신청</option>
+                  <option value="간병일지">간병일지</option>
+                  <option value="삼성명단">삼성명단</option>
+                  <option value="관리자권한">관리자권한</option>
+                  <option value="시스템설정">시스템설정</option>
+                  <option value="인증/로그인">인증/로그인</option>
+                </select>
+
+                <!-- 작업유형 필터 -->
+                <select id="auditLogActionFilter" onchange="renderSystemAuditLogs()"
+                  class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="ALL">전체 작업유형</option>
+                  <option value="STATUS_CHANGE">상태변경 (STATUS)</option>
+                  <option value="UPDATE">정보수정 (UPDATE)</option>
+                  <option value="CREATE">신규등록 (CREATE)</option>
+                  <option value="DELETE">데이터삭제 (DELETE)</option>
+                  <option value="LOGIN">로그인인증 (LOGIN)</option>
+                  <option value="EXPORT">엑셀추출 (EXPORT)</option>
+                  <option value="SYNC">동기화 (SYNC)</option>
+                </select>
+
+                <!-- 작업자 필터 -->
+                <select id="auditLogUserFilter" onchange="renderSystemAuditLogs()"
+                  class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="ALL">전체 작업자</option>
+                </select>
+
+                <!-- 기간 필터 -->
+                <select id="auditLogDateFilter" onchange="renderSystemAuditLogs()"
+                  class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="ALL">전체 기간</option>
+                  <option value="TODAY">오늘 (금일)</option>
+                  <option value="7DAYS">최근 7일</option>
+                  <option value="30DAYS">최근 30일</option>
+                </select>
+
+                <!-- 새로고침 버튼 -->
+                <button type="button" onclick="renderSystemAuditLogs()" title="새로고침"
+                  class="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-600 transition-all cursor-pointer">
+                  <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                </button>
+
+                <!-- 엑셀 다운로드 버튼 -->
+                <button type="button" onclick="exportAuditLogsToExcel()"
+                  class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer">
+                  <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-700"></i>
+                  <span>감사로그 엑셀다운</span>
+                </button>
+
+                <!-- 초기화 버튼 -->
+                <button type="button" onclick="clearAuditLogs()"
+                  class="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-xl text-xs font-bold transition-all cursor-pointer" title="로그 전체 초기화">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  <span>초기화</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 필터 결과 건수 표시 -->
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100">
+              <div class="flex items-center gap-1.5">
+                <i data-lucide="shield" class="w-3.5 h-3.5 text-indigo-500"></i>
+                <span>실시간 감사 추적 모니터링 중: 조회된 로그</span>
+                <span id="auditLogsFilteredCount" class="font-bold text-indigo-600 font-mono">0건</span>
+              </div>
+              <div class="text-[11px] text-slate-400">
+                * 사용자의 모든 상태 변경, 정보 수정, 입금/지급 확인 및 접속 IP가 안전하게 보관됩니다.
+              </div>
+            </div>
+          </div>
+
+          <!-- 감사 로그 테이블 -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs text-slate-600 border-collapse">
+                <thead class="bg-slate-50 border-b border-slate-200 font-semibold text-slate-700 uppercase">
+                  <tr>
+                    <th class="p-3 pl-4 w-12 text-slate-400">No</th>
+                    <th class="p-3 whitespace-nowrap">작업 일시</th>
+                    <th class="p-3 whitespace-nowrap">작업자 (계정 / 소속)</th>
+                    <th class="p-3 whitespace-nowrap">접속 IP</th>
+                    <th class="p-3 whitespace-nowrap">업무 분류</th>
+                    <th class="p-3 whitespace-nowrap">작업 유형</th>
+                    <th class="p-3">작업 대상</th>
+                    <th class="p-3 min-w-[200px]">작업 및 변경 상세 요약</th>
+                    <th class="p-3 text-center pr-4 whitespace-nowrap">변경 내역</th>
+                  </tr>
+                </thead>
+                <tbody id="auditLogsTableBody" class="divide-y divide-slate-100">
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
       </section>
@@ -3908,11 +4083,16 @@
           </div>
           <div class="flex items-center gap-3">
             <div class="flex items-center p-1 bg-white/10 backdrop-blur-xs rounded-xl border border-white/20">
-              <button onclick="switchTab('adminmgmt')" class="px-3.5 py-1.5 rounded-lg text-slate-300 hover:text-white font-semibold text-xs transition-all">
+              <button onclick="switchTab('adminmgmt'); if(typeof switchAdminSubTab==='function') switchAdminSubTab('rbac');" class="px-3.5 py-1.5 rounded-lg text-slate-300 hover:text-white font-semibold text-xs transition-all cursor-pointer">
                 관리자 권한 (RBAC)
               </button>
-              <button class="px-3.5 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-black text-xs shadow-xs">
-                시스템 환경설정 ⚙️
+              <button onclick="switchTab('adminmgmt'); if(typeof switchAdminSubTab==='function') switchAdminSubTab('auditlogs');" class="px-3.5 py-1.5 rounded-lg text-slate-300 hover:text-white font-semibold text-xs transition-all cursor-pointer flex items-center gap-1.5">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-indigo-400"></i>
+                <span>시스템 감사 로그 관리</span>
+              </button>
+              <button class="px-3.5 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-black text-xs shadow-xs flex items-center gap-1.5 cursor-default">
+                <i data-lucide="settings" class="w-3.5 h-3.5 text-slate-950"></i>
+                <span>시스템 환경설정 ⚙️</span>
               </button>
             </div>
             <div class="text-right text-xs text-slate-400 hidden sm:block">
@@ -3925,6 +4105,74 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          <!-- 0. [클린 런칭] 전산 데이터 전체 초기화 (데이터 리셋) -->
+          <div class="col-span-1 lg:col-span-2 bg-gradient-to-br from-rose-50 via-white to-red-50/30 rounded-3xl border-2 border-rose-300 shadow-md p-6 sm:p-8 space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-rose-100">
+              <div class="flex items-start gap-3.5">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-600 to-red-700 text-white flex items-center justify-center shadow-md shadow-rose-600/20 shrink-0">
+                  <i data-lucide="trash-2" class="w-6 h-6"></i>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h3 class="text-base sm:text-lg font-black text-slate-900 tracking-tight">전산 데이터 전체 초기화 (클린 런칭 준비)</h3>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-100 text-rose-800 border border-rose-300">실사이트 엑셀 업로드 전 필수</span>
+                  </div>
+                  <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                    실제 운영 엑셀 데이터를 업로드하기 전, 기존에 등록된 <b>고객 신청, 배정, 청구, 지급, 간병인 등 테스트/기존 데이터를 0건으로 완전 초기화</b>합니다.
+                    <br><span class="text-rose-700 font-bold">※ 관리자 계정(Admin) 및 로그인 권한은 안전하게 보존되므로 로그인 접속이 유지됩니다.</span>
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
+                <button type="button" onclick="verifyConvexResetStatus()" class="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                  <span>Convex DB 상태 검증</span>
+                </button>
+                <button type="button" onclick="executeFullDataReset()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 active:scale-95 text-white font-black text-xs shadow-md shadow-rose-600/30 flex items-center gap-2 transition-all cursor-pointer">
+                  <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                  <span>전체 데이터 초기화 실행</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 데이터 현황 요약 그리드 -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+              <div class="p-3.5 bg-white rounded-2xl border border-rose-100 shadow-2xs">
+                <span class="text-slate-400 block text-[11px] font-medium">고객 신청 대장</span>
+                <span class="text-lg font-black text-slate-800 font-mono mt-0.5 block" id="resetStatApps">0건</span>
+              </div>
+              <div class="p-3.5 bg-white rounded-2xl border border-rose-100 shadow-2xs">
+                <span class="text-slate-400 block text-[11px] font-medium">간병인 배정 대장</span>
+                <span class="text-lg font-black text-slate-800 font-mono mt-0.5 block" id="resetStatAssigns">0건</span>
+              </div>
+              <div class="p-3.5 bg-white rounded-2xl border border-rose-100 shadow-2xs">
+                <span class="text-slate-400 block text-[11px] font-medium">보험 청구 대장</span>
+                <span class="text-lg font-black text-slate-800 font-mono mt-0.5 block" id="resetStatClaims">0건</span>
+              </div>
+              <div class="p-3.5 bg-white rounded-2xl border border-rose-100 shadow-2xs">
+                <span class="text-slate-400 block text-[11px] font-medium">간병비 지급 대장</span>
+                <span class="text-lg font-black text-slate-800 font-mono mt-0.5 block" id="resetStatPayouts">0건</span>
+              </div>
+              <div class="p-3.5 bg-white rounded-2xl border border-rose-100 shadow-2xs">
+                <span class="text-slate-400 block text-[11px] font-medium">간병인 인력풀</span>
+                <span class="text-lg font-black text-slate-800 font-mono mt-0.5 block" id="resetStatCaregivers">0건</span>
+              </div>
+              <div class="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 shadow-2xs">
+                <span class="text-emerald-700 block text-[11px] font-bold">관리자 계정 (보존)</span>
+                <span class="text-lg font-black text-emerald-700 font-mono mt-0.5 block" id="resetStatAdmins">-명</span>
+              </div>
+            </div>
+
+            <!-- 상태 안내 배너 -->
+            <div id="resetStatusBanner" class="p-4 rounded-2xl bg-white border border-rose-200 flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2.5">
+                <span id="resetStatusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="resetStatusMsg" class="font-bold text-slate-800">Convex 클라우드 DB 연결 확인 중...</span>
+              </div>
+              <span id="resetStatusTime" class="text-[11px] text-slate-400 font-mono"></span>
+            </div>
+          </div>
 
           <!-- 1. 신규 간병신청 ID 자동 채번 설정 -->
           <div class="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-5">
@@ -5271,8 +5519,17 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label class="block font-bold text-slate-700 mb-1">담당센터</label>
-            <input type="text" id="newAssignCenterName" list="allCentersDataList" oninput="onCenterNameInput(this.value, 'newAssign')" placeholder="예: 영등포센터 (입력/선택 시 자동등록)" class="w-full p-2.5 border rounded-xl font-medium">
+            <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+              <span>담당센터</span>
+              <span class="text-[10px] text-primary-600 font-semibold flex items-center gap-1">
+                <i data-lucide="search" class="w-3 h-3"></i>초성/실시간 매칭
+              </span>
+            </label>
+            <div class="relative">
+              <input type="text" id="newAssignCenterName" autocomplete="off" onfocus="onCenterSearchFocus()" oninput="onCenterSearchInput(this.value)" placeholder="예: 영등포 또는 ㅇㄷㅍ (입력/선택 시 자동등록)" class="w-full p-2.5 border rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all">
+              <div id="centerChosungDropdown" class="hidden absolute left-0 top-full mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto custom-scrollbar divide-y divide-slate-100 w-full min-w-[320px]"></div>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1">* 초성(자음: ㅇㄷㅍ 등)이나 센터명 일부만 입력하셔도 자동 매칭됩니다.</p>
           </div>
           <div>
             <label class="block font-bold text-slate-700 mb-1">정산유형</label>
@@ -9063,6 +9320,120 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL: SYSTEM AUDIT LOG DETAIL ==================== -->
+  <div id="auditLogDetailModal" class="fixed inset-0 z-[100000] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden border border-slate-200 max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+      
+      <!-- Modal Header -->
+      <div class="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
+            <i data-lucide="shield-check" class="w-5 h-5 text-indigo-400"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-bold text-white">시스템 감사 로그 및 작업 변경 상세</h3>
+              <span id="auditModalLogId" class="px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 text-[11px] font-mono font-bold border border-indigo-400/40">#LOG-000000</span>
+            </div>
+            <p class="text-xs text-slate-300 mt-0.5">작업자 신원, 접속 IP, 업무 내역 및 데이터의 이전/이후 변경점을 비교합니다.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('auditLogDetailModal')" class="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto space-y-6 text-xs text-slate-700">
+        
+        <!-- 1. 작업자 & 접속 정보 그리드 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
+              <span class="text-slate-400 font-bold">작업자 (사용자)</span>
+              <span id="auditModalUserName" class="font-bold text-slate-900">-</span>
+            </div>
+            <div class="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
+              <span class="text-slate-400 font-bold">소속 부서 / 직책</span>
+              <span id="auditModalUserDept" class="font-semibold text-slate-800">-</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400 font-bold">접속 IP 주소</span>
+              <span id="auditModalIp" class="font-mono font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">-</span>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <div class="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
+              <span class="text-slate-400 font-bold">작업 발생 일시</span>
+              <span id="auditModalTimestamp" class="font-mono font-bold text-slate-900">-</span>
+            </div>
+            <div class="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
+              <span class="text-slate-400 font-bold">업무 분류 / 유형</span>
+              <div class="flex items-center gap-1.5">
+                <span id="auditModalCategory" class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold text-[11px]">-</span>
+                <span id="auditModalActionType" class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold text-[11px]">-</span>
+              </div>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400 font-bold">작업 대상 항목</span>
+              <span id="auditModalTarget" class="font-bold text-slate-900 max-w-[200px] truncate" title="-">-</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 작업 요약 설명 -->
+        <div class="bg-indigo-50/50 p-3.5 rounded-2xl border border-indigo-100">
+          <div class="text-[11px] font-bold text-indigo-600 mb-1">작업 상세 내용 (Summary)</div>
+          <div id="auditModalSummary" class="text-xs font-semibold text-slate-900 leading-relaxed">-</div>
+        </div>
+
+        <!-- 3. 변경 전 vs 변경 후 Diff 테이블 -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="font-bold text-slate-900 flex items-center gap-1.5">
+              <i data-lucide="git-compare" class="w-4 h-4 text-indigo-600"></i>
+              <span>데이터 변경 내역 비교 (Before vs After Diff)</span>
+            </div>
+            <span class="text-[11px] text-slate-400">* 수정 이전 값(빨간색)과 수정 이후 값(초록색) 비교</span>
+          </div>
+
+          <div id="auditModalDiffContainer" class="rounded-xl overflow-hidden">
+            <!-- 동적으로 생성 -->
+          </div>
+        </div>
+
+        <!-- 4. 클라이언트 환경 및 원본 JSON (아코디언 형태) -->
+        <details class="group bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+          <summary class="font-bold text-slate-700 cursor-pointer flex items-center justify-between list-none">
+            <span class="flex items-center gap-1.5 text-xs">
+              <i data-lucide="code" class="w-3.5 h-3.5 text-slate-500"></i>
+              <span>시스템 상세 메타데이터 & 원본 JSON 보기</span>
+            </span>
+            <span class="text-[11px] text-indigo-600 group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+          <div class="mt-3 space-y-2 text-xs">
+            <div class="text-[11px] text-slate-500">
+              <span class="font-bold text-slate-600">User Agent:</span>
+              <span id="auditModalUserAgent" class="font-mono text-slate-500 break-all ml-1">-</span>
+            </div>
+            <pre id="auditModalRawJson" class="text-[10.5px] font-mono p-3 bg-slate-900 text-emerald-400 rounded-xl overflow-x-auto max-h-48 overflow-y-auto leading-normal"></pre>
+          </div>
+        </details>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end">
+        <button type="button" onclick="closeModal('auditLogDetailModal')"
+          class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-xs transition-colors cursor-pointer">
+          확인 및 닫기
+        </button>
+      </div>
+
+    </div>
+  </div>
+
   <!-- ==================== OVERLAY: ENTERPRISE ADMIN LOGIN MODAL ==================== -->
   <div id="adminLoginOverlay" class="fixed inset-0 z-[99999] bg-slate-900/80 backdrop-blur-md flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200">
@@ -9754,13 +10125,15 @@
             <!-- Dynamically populated -->
           </div>
 
-          <!-- Section 2: 금일 활력징후 (7 Vital Signs) -->
-          <div class="mt-4 mb-2 flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
-            <h2 class="text-sm font-black text-slate-900">금일 활력징후</h2>
-            <span class="text-[10px] text-slate-400 font-medium">정상 범위 기준 정밀 측정</span>
-          </div>
-          <div id="cpVitalsGrid" class="grid grid-cols-3 sm:grid-cols-7 gap-1.5 mb-4">
-            <!-- Dynamically populated -->
+          <!-- Section 2: 금일 활력징후 (7 Vital Signs) - 메이트원 PDF 원문보기에서 비노출 요청 처리 -->
+          <div id="cpVitalsSection" class="hidden">
+            <div class="mt-4 mb-2 flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
+              <h2 class="text-sm font-black text-slate-900">금일 활력징후</h2>
+              <span class="text-[10px] text-slate-400 font-medium">정상 범위 기준 정밀 측정</span>
+            </div>
+            <div id="cpVitalsGrid" class="grid grid-cols-3 sm:grid-cols-7 gap-1.5 mb-4">
+              <!-- Dynamically populated -->
+            </div>
           </div>
 
           <!-- Section 3: 금일 간병 수행 내역 (5 Rows) -->
@@ -9922,6 +10295,7 @@
   <script src="careport-client.js?v=20260920_1820"></script>
   <script src="samsung-call-report.js?v=20260920_1330"></script>
   <script src="total-call-analysis.js?v=20260921_1005"></script>
+  <script src="system-audit-log.js?v=20260922_1040"></script>
   <script src="app.js?v=20260921_1005"></script>
 </body>
 </html>

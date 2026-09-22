@@ -491,7 +491,7 @@
       const org = (detail.organizationName || detail.orgName || log.organizationName || log.orgName || patient.insuranceCompany || patient.centerName || '삼성화재').trim();
       const consultDate = (detail.consultDate || log.consultDate || log.dateString || new Date().toISOString().slice(0, 10)).slice(0, 16);
       const duration = detail.duration ? `${String(detail.duration).replace('s', '')}초` : (log.duration ? `${String(log.duration).replace('s', '')}초` : '120초');
-      const dayText = log.dayText || (raw.day_index ? `${raw.day_index}일차` : (log.dayNumber ? `${log.dayNumber}일차` : '1일차'));
+      const dayText = log.dayText || (log.dayNumber ? `${log.dayNumber}일차` : (raw.day_index ? `${raw.day_index}일차` : (detail.dayIndex ? `${detail.dayIndex}일차` : (detail.dayNumber ? `${detail.dayNumber}일차` : '1일차'))));
       const carePeriod = (patient.careStartDate && patient.careEndDate)
         ? `${patient.careStartDate} ~ ${patient.careEndDate}`
         : (log.startDate && log.endDate ? `${log.startDate} ~ ${log.endDate}` : `${consultDate.slice(0, 10)}`);
@@ -934,12 +934,12 @@
       ${catCardsHtml}
     </div>
 
-    <!-- Section 2: 금일 활력징후 (7 Vital signs) -->
-    <div class="sec-head">
+    <!-- Section 2: 금일 활력징후 (7 Vital signs) - 메이트원 요청으로 비노출 -->
+    <div class="sec-head" style="display: none !important;">
       <span class="sec-title">금일 활력징후</span>
       <span style="font-size: 10px; color: #94a3b8;">정상 범위 기준 정밀 측정</span>
     </div>
-    <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+    <div style="display: none !important; gap: 6px; margin-bottom: 10px;">
       ${vitalsHtml}
     </div>
 

@@ -870,6 +870,67 @@ function saveSavedFaxConfig(cfg) {
     }
 
     // =========================================================================
+    // API Route: 통합허브 신규 고객 실시간 추가 및 영구 저장 API
+    // =========================================================================
+    // =========================================================================
+    // API Route: 전산 데이터 전체 초기화 (hub_apps_real.json 0건 클린 초기화)
+    // =========================================================================
+    if (reqPath === '/api/admin/reset-local-data' && req.method === 'POST') {
+      try {
+        const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+        const emptyData = {
+          updatedAt: new Date().toISOString(),
+          sources: {},
+          applications: [],
+          assignments: [],
+          claims: [],
+          payouts: [],
+          caregivers: [],
+          centers: [],
+          adjusters: []
+        };
+        fs.writeFileSync(realDataFile, JSON.stringify(emptyData, null, 2), 'utf-8');
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, message: '로컬 데이터가 0건으로 초기화되었습니다.' }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    }
+
+    if (reqPath === '/api/hub/create-application' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { application } = JSON.parse(body || '{}');
+          if (!application || !application.id) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '유효한 고객 신청 데이터가 필요합니다.' }));
+          }
+          const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+          let stored = { applications: [] };
+          if (fs.existsSync(realDataFile)) {
+            try { stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8')); } catch (e) {}
+          }
+          stored.applications = stored.applications || [];
+          const exists = stored.applications.some(a => a.id === application.id);
+          if (!exists) {
+            stored.applications.unshift(application);
+            stored.updatedAt = new Date().toISOString();
+            fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, count: stored.applications.length }));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    // =========================================================================
     // API Route: 통합허브 고객 개별 필드(신청유형, 청구분류, 입금확인금액, 추정미수금 등) 실시간 업데이트 API
     // =========================================================================
     if (reqPath === '/api/hub/customer/update-fields' && req.method === 'POST') {

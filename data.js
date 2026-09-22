@@ -25,11 +25,7 @@ const INITIAL_PARTNERS = [
 
 const INITIAL_CARE_LOGS = [];
 
-const INITIAL_ADJUSTERS = [
-  { id: 'ADJ001', insuranceCompany: '현대해상', firm: '다스카손해사정', branch: '대전지사', name: '황인택', phone: '042-829-1490', mobile: '010-3847-1490', fax: '042-829-1466', email: 'ithwang@daska.co.kr', activeCases: 0, status: '정상' },
-  { id: 'ADJ002', insuranceCompany: '현대해상', firm: '한국손해보험손사', branch: '수원지사', name: '박승신', phone: '031-2101-2508', mobile: '010-5291-2508', fax: '031-2101-2509', email: 'sspark@koreains.co.kr', activeCases: 0, status: '정상' },
-  { id: 'ADJ003', insuranceCompany: '현대해상(SCOR)', firm: '에이원손해사정', branch: '영등포지사', name: '곽주호', phone: '050-4023-1533', mobile: '010-7712-1533', fax: '0507-1234-8801', email: 'jhkwak@aonesonsa.com', activeCases: 0, status: '정상' }
-];
+const INITIAL_ADJUSTERS = [];
 
 const SAMSUNG_ELIGIBLE_LIST = [];
 
