@@ -1203,11 +1203,13 @@ export const saveAdmin = mutation({
   },
   handler: async (ctx, args) => {
     const admin = args.admin;
-    if (!admin || !admin.id) return { success: false, error: "Invalid admin document" };
-    const existing = await ctx.db
-      .query("admins")
-      .filter((q) => q.eq(q.field("id"), admin.id))
-      .first();
+    if (!admin || (!admin.id && !admin.username)) return { success: false, error: "Invalid admin document" };
+    const uname = (admin.username || "").trim().toLowerCase();
+    const allAdmins = await ctx.db.query("admins").collect();
+    const existing = allAdmins.find(a => 
+      (uname && (a.username || "").trim().toLowerCase() === uname) ||
+      (admin.id && a.id === admin.id)
+    );
     const { _id, _creationTime, ...rest } = admin;
     if (existing) {
       const updateData = { ...rest };
@@ -1231,12 +1233,14 @@ export const saveAdminsChunk = mutation({
   },
   handler: async (ctx, args) => {
     let count = 0;
+    const allAdmins = await ctx.db.query("admins").collect();
     for (const adm of args.admins) {
-      if (!adm || !adm.id) continue;
-      const existing = await ctx.db
-        .query("admins")
-        .filter((q) => q.eq(q.field("id"), adm.id))
-        .first();
+      if (!adm || (!adm.id && !adm.username)) continue;
+      const uname = (adm.username || "").trim().toLowerCase();
+      const existing = allAdmins.find(a => 
+        (uname && (a.username || "").trim().toLowerCase() === uname) ||
+        (adm.id && a.id === adm.id)
+      );
       const { _id, _creationTime, ...rest } = adm;
       if (existing) {
         const updateData = { ...rest };

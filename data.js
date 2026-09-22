@@ -11,10 +11,11 @@ const EXCEL_RAW_DATA = {
 };
 
 const INITIAL_ADMINS = [
-  { id: 'ADM001', username: 'superadmin', name: '김지훈', dept: '대표이사', email: 'ceo@reborncare.co.kr', role: 'SUPER_ADMIN', phone: '010-5234-9182', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
-  { id: 'ADM002', username: 'settle_mgr', name: '정산팀장', dept: '재무정산팀', email: 'settle@reborncare.co.kr', role: 'FINANCE_ADMIN', phone: '010-9876-5432', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['carehub', 'samsunglist', 'samsungclaimhub', 'hyundaiclaimhub', 'claims', 'payouts', 'forms', 'faxmgmt'] },
-  { id: 'ADM003', username: 'care_counsel', name: '상담팀장', dept: '고객상담팀', email: 'counsel@reborncare.co.kr', role: 'COUNSEL_ADMIN', phone: '010-5555-4444', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['carehub', 'carecalendar', 'carelogs', 'directory', 'samsungcallreport', 'totalcallanalysis', 'applications', 'assignments', 'forms', 'faxmgmt'] },
-  { id: 'ADM004', username: 'ydp_center', name: '케어링협력센터', dept: '협력 간병센터장', email: 'caring@partnercare.kr', role: 'PARTNER_CENTER', phone: '02-8888-9999', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['carecalendar', 'carelogs', 'directory', 'assignments'] }
+  { id: 'ADM001', username: 'superadmin', name: '김리본', dept: '대표이사', email: 'ceo@reborncare.co.kr', role: 'SUPER_ADMIN', phone: '010-1234-5678', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
+  { id: 'ADM002', username: 'jjooyoung', name: '전주영', dept: '차장/LiVon 연구소', email: 'jooyoung@livon.care', role: 'SUPER_ADMIN', phone: '010-9651-6458', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
+  { id: 'ADM003', username: 'kyumari', name: '최규만', dept: '이사', email: 'kyumari@livon.care', role: 'SUPER_ADMIN', phone: '010-2222-3333', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
+  { id: 'ADM004', username: 'ejchoi', name: '최은주', dept: '책임/LiVon 연구소', email: 'ejchoi@livon.care', role: 'SUPER_ADMIN', phone: '010-7299-2021', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
+  { id: 'ADM005', username: 'ansghk8855', name: '이주연', dept: '매니저/간병파트', email: 'ansghk8855@livon.care', role: 'SUPER_ADMIN', phone: '010-2222-3333', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] }
 ];
 
 const INITIAL_PARTNERS = [
