@@ -31098,6 +31098,12 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     openModal('carePortOfficialModal');
   }
 
+  // Cache initial pristine modern template once
+  const printAreaInit = document.getElementById('carePortPrintArea');
+  if (!window._carePortModernTemplate && printAreaInit) {
+    window._carePortModernTemplate = printAreaInit.innerHTML;
+  }
+
   // Update session badge
   const badge = document.getElementById('carePortModalSessionBadge');
   if (badge) badge.innerText = `#${cleanSid || sessionId}`;
@@ -31290,6 +31296,99 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
       ...(matchedLog || {})
     };
 
+    // Render interactive day pills bar at top of modal (차수 미표시: 날짜 단독 표기)
+    const selectorBar = document.getElementById('cpDaySelectorBar');
+    const selectorContainer = document.getElementById('cpDaySelectorContainer');
+    if (selectorBar) {
+      if (siblingLogs.length > 1) {
+        selectorBar.innerHTML = siblingLogs.map((log, idx) => {
+          const sSid = log.sessionId || (log.id ? String(log.id).replace(/\D/g, '') : '');
+          const dayNum = log.dayNumber || (idx + 1);
+          const isCurrent = String(sSid) === String(cleanSid) || (targetDayNum && Number(targetDayNum) === Number(dayNum));
+          let pillDateStr = log.consultDate ? log.consultDate.slice(5, 10).replace('-', '.') : '';
+          if (log.consultDate) {
+            try {
+              const pDt = new Date(log.consultDate.slice(0, 10));
+              if (!isNaN(pDt.getTime())) {
+                const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+                pillDateStr += ` (${dayNames[pDt.getDay()]})`;
+              }
+            } catch (e) {}
+          }
+          return `
+            <button type="button" onclick="openCarePortOfficialDetail('${sSid}', ${dayNum})" 
+              class="px-2.5 py-1 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer ${isCurrent ? 'bg-[#10bdb2] text-white shadow-xs ring-2 ring-[#10bdb2]/30' : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'}">
+              <span>${pillDateStr || log.consultDate || (idx + 1)}</span>
+            </button>
+          `;
+        }).join('');
+        if (selectorContainer) selectorContainer.classList.remove('hidden');
+      } else if (selectorContainer) {
+        selectorContainer.classList.add('hidden');
+      }
+    }
+
+    // Branching: Classic CarePort Design vs Modern Caregiver Design
+    const isClassic = window.CarePortClient && typeof window.CarePortClient.isClassicLog === 'function'
+      ? window.CarePortClient.isClassicLog(logForNormalize, detail)
+      : false;
+
+    const printArea = document.getElementById('carePortPrintArea');
+
+    if (isClassic) {
+      const pGroup = matchedGroup || {
+        patientName: pName,
+        age: detail.age,
+        gender: detail.gender,
+        caregiverName: detail.consultantName,
+        insuranceCompany: detail.organizationName,
+        dailyLogs: siblingLogs
+      };
+      const classicHtml = window.CarePortClient.generateClassicLogHtml(pGroup, logForNormalize, detail);
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(classicHtml, 'text/html');
+      const classicReport = doc.querySelector('.report-area');
+      const styleEls = doc.querySelectorAll('style');
+      let stylesHtml = '';
+      styleEls.forEach(st => { stylesHtml += st.outerHTML; });
+
+      if (printArea && classicReport) {
+        printArea.innerHTML = `
+          <!-- Top Action Buttons Inside Document -->
+          <div class="flex items-center justify-end gap-2 mb-3 no-print">
+            <button type="button" onclick="downloadCarePortDocumentPdf()" 
+              class="px-4 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-slate-800 text-xs font-bold shadow-2xs transition-all cursor-pointer">
+              다운로드
+            </button>
+            <button type="button" onclick="printCarePortDocument()" 
+              class="px-4 py-1.5 bg-[#0a192f] hover:bg-slate-900 text-white rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer">
+              프린트
+            </button>
+          </div>
+          ${stylesHtml}
+          ${classicReport.outerHTML}
+          <!-- Hidden fallback metadata for downloadCarePortDocumentPdf -->
+          <div class="hidden" style="display:none;">
+            <span id="cpMetaUsername">${detail.username || pName}</span>
+            <span id="cpMetaAge">${detail.age || ''}</span>
+            <span id="cpMetaGender">${detail.gender || ''}</span>
+            <span id="cpMetaConsultant">${detail.consultantName || ''}</span>
+            <span id="cpMetaOrg">${detail.organizationName || ''}</span>
+            <span id="cpMetaDate">${detail.consultDate || ''}</span>
+            <span id="cpMetaDuration">${detail.duration || ''}</span>
+            <span id="cpMetaCarePeriod">${(matchedGroup && matchedGroup.carePeriod) || ''}</span>
+          </div>
+        `;
+      }
+      if (typeof initIcons === 'function') initIcons('carePortOfficialModal');
+      return;
+    }
+
+    // Modern layout: restore pristine modern template if needed
+    if (window._carePortModernTemplate && printArea) {
+      printArea.innerHTML = window._carePortModernTemplate;
+    }
+
     const d = (window.CarePortClient && typeof window.CarePortClient.normalizeCarePortLogData === 'function')
       ? window.CarePortClient.normalizeCarePortLogData(matchedGroup || {}, logForNormalize, detail)
       : null;
@@ -31354,38 +31453,6 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     if (elGen) elGen.innerText = d.gender;
     const elDur = document.getElementById('cpMetaDuration');
     if (elDur) elDur.innerText = d.duration;
-
-    // Render interactive day pills bar at top of modal (차수 미표시: 날짜 단독 표기)
-    const selectorBar = document.getElementById('cpDaySelectorBar');
-    const selectorContainer = document.getElementById('cpDaySelectorContainer');
-    if (selectorBar) {
-      if (siblingLogs.length > 1) {
-        selectorBar.innerHTML = siblingLogs.map((log, idx) => {
-          const sSid = log.sessionId || (log.id ? String(log.id).replace(/\D/g, '') : '');
-          const dayNum = log.dayNumber || (idx + 1);
-          const isCurrent = String(sSid) === String(cleanSid) || (targetDayNum && Number(targetDayNum) === Number(dayNum));
-          let pillDateStr = log.consultDate ? log.consultDate.slice(5, 10).replace('-', '.') : '';
-          if (log.consultDate) {
-            try {
-              const pDt = new Date(log.consultDate.slice(0, 10));
-              if (!isNaN(pDt.getTime())) {
-                const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-                pillDateStr += ` (${dayNames[pDt.getDay()]})`;
-              }
-            } catch (e) {}
-          }
-          return `
-            <button type="button" onclick="openCarePortOfficialDetail('${sSid}', ${dayNum})" 
-              class="px-2.5 py-1 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer ${isCurrent ? 'bg-[#10bdb2] text-white shadow-xs ring-2 ring-[#10bdb2]/30' : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'}">
-              <span>${pillDateStr || log.consultDate || (idx + 1)}</span>
-            </button>
-          `;
-        }).join('');
-        if (selectorContainer) selectorContainer.classList.remove('hidden');
-      } else if (selectorContainer) {
-        selectorContainer.classList.add('hidden');
-      }
-    }
 
     // Fetch official CarePort trend scores (matching Image 2 line chart)
     let trendScores = [];
