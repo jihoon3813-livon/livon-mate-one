@@ -1064,7 +1064,7 @@ var gClaimUnitPriceRules = [];
 // =========================================================================
 // [환경 감지] 개발 사이트(DEV) vs 실운영 사이트(PROD) 동적 분리 엔진
 // =========================================================================
-const DEV_CONVEX_URL = 'https://rapid-raccoon-895.convex.cloud';
+const DEV_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
 const PROD_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
 
 function isDevEnvironment() {
@@ -1196,6 +1196,37 @@ function filterInvalidSamsungDuplicates(apps) {
 }
 window.filterInvalidSamsungDuplicates = filterInvalidSamsungDuplicates;
 
+function sortApplicationsNewestFirst(apps) {
+  if (!Array.isArray(apps)) return [];
+  const parseTime = (dateStr) => {
+    if (!dateStr) return 0;
+    const s = String(dateStr).trim().replace(/[.\/]+/g, '-');
+    const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2}))?/);
+    if (m) {
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10) - 1;
+      const day = parseInt(m[3], 10);
+      const h = m[4] !== undefined ? parseInt(m[4], 10) : 0;
+      const min = m[5] !== undefined ? parseInt(m[5], 10) : 0;
+      return new Date(y, mo, day, h, min, 0).getTime();
+    }
+    const t = Date.parse(s);
+    return isNaN(t) ? 0 : t;
+  };
+
+  return [...apps].sort((a, b) => {
+    if (a && a._isJustRegistered && !(b && b._isJustRegistered)) return -1;
+    if (!(a && a._isJustRegistered) && b && b._isJustRegistered) return 1;
+
+    const tA = a ? parseTime(a.applyDate) : 0;
+    const tB = b ? parseTime(b.applyDate) : 0;
+    if (tB !== tA) return tB - tA;
+
+    return String(b?.id || '').localeCompare(String(a?.id || ''), undefined, { numeric: true });
+  });
+}
+window.sortApplicationsNewestFirst = sortApplicationsNewestFirst;
+
 async function loadConvexData(showSpinner = true) {
   // 🚨 [보안] 미인증 세션에서는 고객 및 정산 데이터를 서버에서 절대 요청하지 않음
   const token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
@@ -1248,7 +1279,7 @@ async function loadConvexData(showSpinner = true) {
       const serverRealApps = filterInvalidSamsungDuplicates(realJson.applications).filter(a => a.isRealLaunchData);
       if (serverRealApps.length > 0) {
         const existingNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => localApp && localApp.isRealLaunchData && !serverRealApps.some(s => s.id === localApp.id));
-        gApps = [...existingNewApps, ...serverRealApps];
+        gApps = sortApplicationsNewestFirst([...existingNewApps, ...serverRealApps]);
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
       }
     }
@@ -1301,7 +1332,8 @@ async function loadConvexData(showSpinner = true) {
       // 1. 고객 신청 대장: Convex 원격 DB가 단 하나의 절대적 기준(Single Source of Truth)
       if (Array.isArray(applications) && applications.length > 0) {
         window._isSamsungExcelEnriched = false;
-        gApps = filterInvalidSamsungDuplicates(applications);
+        const validApps = filterInvalidSamsungDuplicates(applications);
+        gApps = sortApplicationsNewestFirst(validApps);
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
       }
 
@@ -25900,6 +25932,10 @@ function renderUnifiedCareHub() {
   }
 
   filtered.sort((a, b) => {
+    // [사용자 규칙]: 신규 고객 등록 시 맨 첫번째로 최우선 노출
+    if (a && a._isJustRegistered && !(b && b._isJustRegistered)) return -1;
+    if (!(a && a._isJustRegistered) && b && b._isJustRegistered) return 1;
+
     if (gHubSort === 'status_inprogress') {
       const isInProgress = (app) => (app.status && (app.status.includes('진행') || app.status === '정상' || app.status === '배정완료' || app.status === '간병중')) ? 1 : 0;
       const pA = isInProgress(a);
@@ -28179,6 +28215,9 @@ async function executeFaxEchoTest() {
 
   try {
     const cfg = getBarobillConfig();
+    const sender = cfg.sender || '02-6499-3917';
+    const baroServer = cfg.baroServer || 'prod';
+    const baroCertKey = cfg.certKey || '';
     let savedBaroPwd = cfg.baroPwd;
     if (!savedBaroPwd) {
       savedBaroPwd = await ensureBarobillPassword();
@@ -28193,15 +28232,15 @@ async function executeFaxEchoTest() {
       formName: '바로빌 팩스 회선 송출 시험 공문 (1장)',
       recipient: '시험 수신처',
       faxNumber: targetNumber,
-      senderNumber: cfg.sender,
+      senderNumber: sender,
       pages: 1,
       operator: '관리자(회선진단)',
       provider: cfg.mode,
-      baroCertKey: cfg.certKey,
+      baroCertKey: baroCertKey,
       baroCorpNum: cfg.corpNum,
       baroId: cfg.baroId,
       baroPwd: savedBaroPwd,
-      baroServer: cfg.baroServer
+      baroServer: baroServer
     };
 
     let result = null;
@@ -30637,12 +30676,13 @@ function renderApplications() {
     return true;
   });
 
+  const sorted = sortApplicationsNewestFirst(filtered);
   const countEl = document.getElementById('appFilteredCount');
-  if (countEl) countEl.innerText = filtered.length;
+  if (countEl) countEl.innerText = sorted.length;
 
   // Pagination Slice
-  let displayList = filtered;
-  const totalCount = filtered.length;
+  let displayList = sorted;
+  const totalCount = sorted.length;
   let totalPages = 1;
 
   if (gAppPageSize !== 'ALL') {
@@ -35836,10 +35876,35 @@ async function finalizeNewAppRegistration(newApp) {
     newApp.isRealLaunchData = true;
     newApp.updatedAt = null;
     newApp.hasManualUpdate = false;
+    newApp._isJustRegistered = true;
 
     // 2. 고객 신청 대장에 최우선 즉시 등록 (팩스 성공 여부와 무관하게 100% 안전 보존)
-    gApps.unshift(newApp);
+    gApps = [newApp, ...(gApps || []).filter(a => a && a.id !== newApp.id)];
     try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+
+    // [사용자 요구사항]: 통합허브 신규 고객 등록 시 맨 첫번째로 고객이 무조건 노출되도록 필터/탭/정렬 최적화
+    if (isHyundai) {
+      if (typeof gHubInsuranceTab !== 'undefined' && gHubInsuranceTab === 'SAMSUNG') {
+        gHubInsuranceTab = 'HYUNDAI';
+        const insSelect = document.getElementById('hubInsuranceFilter');
+        if (insSelect) insSelect.value = 'HYUNDAI';
+      }
+    } else if ((newApp.insuranceCompany || '').includes('삼성')) {
+      if (typeof gHubInsuranceTab !== 'undefined' && gHubInsuranceTab === 'HYUNDAI') {
+        gHubInsuranceTab = 'SAMSUNG';
+        const insSelect = document.getElementById('hubInsuranceFilter');
+        if (insSelect) insSelect.value = 'SAMSUNG';
+      }
+    }
+    if (typeof gHubFilter !== 'undefined') gHubFilter = 'ALL';
+    if (typeof gHubStatusFilter !== 'undefined') gHubStatusFilter = '';
+    if (typeof gHubSort !== 'undefined') gHubSort = 'created_desc';
+    const hubSearchInput = document.getElementById('hubSearchInput');
+    if (hubSearchInput) hubSearchInput.value = '';
+    const appStatSelect = document.getElementById('appStatusFilter');
+    if (appStatSelect) appStatSelect.value = 'ALL';
+    const appSearch = document.getElementById('appSearchInput');
+    if (appSearch) appSearch.value = '';
 
     // 감사 로그 기록: 신규 접수 등록
     if (typeof window.recordSystemAuditLog === 'function') {
