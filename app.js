@@ -10319,9 +10319,7 @@ async function generateCarePortPdfBytesForApp(appId) {
     : [];
 
   if (dailyLogsToRender.length === 0) {
-    const d1 = new Date(startDate.replace(/\./g, '-'));
-    const d2 = new Date(endDate.replace(/\./g, '-'));
-    let diffDays = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+    let diffDays = calculateCareDays24h(startDate, endDate);
     if (isNaN(diffDays) || diffDays <= 0) diffDays = 4;
     const targetDays = Math.min(Math.max(diffDays, 1), 10);
 
@@ -16781,9 +16779,7 @@ function getHyundaiClaimFeeInfo(app) {
     const startStr = formatHyundaiDate(app.careStartDate);
     const endStr = formatHyundaiDate(app.careEndDate || app.lastClaimDate);
     if (startStr !== '-' && endStr !== '-') {
-      const d1 = new Date(startStr.replace(/\./g, '-'));
-      const d2 = new Date(endStr.replace(/\./g, '-'));
-      const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+      const diff = calculateCareDays24h(app.careStartDate, app.careEndDate || app.lastClaimDate);
       if (diff > 0 && diff < 365) days = diff;
     }
   }
@@ -18174,17 +18170,53 @@ function formatWithTime(dtStr, defaultTime = '09:00') {
 
 function parseCareDateTime(dateTimeStr) {
   if (!dateTimeStr) return null;
+  if (dateTimeStr instanceof Date) return isNaN(dateTimeStr.getTime()) ? null : dateTimeStr;
   const str = String(dateTimeStr).trim().replace(/2029[.-]/g, '2026.');
-  const match = str.match(/(\d{4})[.-](\d{1,2})[.-](\d{1,2})(?:[.\sT]+(\d{1,2}):(\d{1,2}))?/);
-  if (!match) return null;
+  const match = str.match(/(\d{4})[.-](\d{1,2})[.-](\d{1,2})(?:[.\sT]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if (!match) {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
   let y = parseInt(match[1], 10);
   if (y === 2029) y = 2026;
   const m = parseInt(match[2], 10) - 1;
   const d = parseInt(match[3], 10);
   const hh = match[4] !== undefined ? parseInt(match[4], 10) : 9;
   const mm = match[5] !== undefined ? parseInt(match[5], 10) : 0;
-  return new Date(y, m, d, hh, mm);
+  const ss = match[6] !== undefined ? parseInt(match[6], 10) : 0;
+  return new Date(y, m, d, hh, mm, ss);
 }
+
+/**
+ * 24시간 기준 간병일수 계산 엔진
+ * - 기준: 24시간 = 1일
+ * - 24시간 이하는 1일
+ * - 24시간 + 1분 초과 시마다 +1일
+ *   예: 10일 09:00 ~ 11일 09:00 (24시간 00분) -> 1일
+ *   예: 10일 09:00 ~ 11일 09:01 (24시간 01분) -> 2일
+ *   예: 10일 09:00 ~ 11일 10:00 (25시간 00분) -> 2일
+ *   예: 10일 09:00 ~ 12일 09:00 (48시간 00분) -> 2일
+ *   예: 10일 09:00 ~ 12일 09:01 (48시간 01분) -> 3일
+ */
+function calculateCareDays24h(startInput, endInput) {
+  if (!startInput || !endInput) return 0;
+  const dStart = startInput instanceof Date ? startInput : parseCareDateTime(startInput);
+  const dEnd = endInput instanceof Date ? endInput : parseCareDateTime(endInput);
+  if (!dStart || !dEnd) return 0;
+
+  const diffMs = dEnd.getTime() - dStart.getTime();
+  if (diffMs <= 0) return 1;
+
+  // 1분 단위로 계산 (초/밀리초 단위 오차 방지)
+  const diffMinutes = Math.round(diffMs / 60000);
+  if (diffMinutes <= 0) return 1;
+
+  // 24시간 = 1440분
+  // 1440분 이하: 1일
+  // 1441분(24시간 1분): Math.ceil(1441/1440) = 2일
+  return Math.max(1, Math.ceil(diffMinutes / 1440));
+}
+window.calculateCareDays24h = calculateCareDays24h;
 
 function parseCareDate(dateStr) {
   if (!dateStr) return null;
@@ -18292,15 +18324,13 @@ function formatClaimDisplayDate(rawVal) {
 
 function getCareProgressInfo(assign) {
   if (!assign || !assign.startDate) return null;
-  const start = parseCareDate(assign.startDate);
+  const start = parseCareDateTime(assign.startDate);
   if (!start) return null;
 
-  const oneDay = 24 * 60 * 60 * 1000;
   const today = new Date();
-  const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
   if (!assign.endDate || assign.endDate === '진행중' || assign.endDate === '예정') {
-    const elapsedDays = Math.max(1, Math.round((todayZero - start) / oneDay) + 1);
+    const elapsedDays = calculateCareDays24h(assign.startDate, today);
     const roundEstTotal = Math.max(10, Math.ceil(elapsedDays / 10) * 10);
     const remainingInRound = Math.max(0, roundEstTotal - elapsedDays);
     return {
@@ -18315,9 +18345,9 @@ function getCareProgressInfo(assign) {
     };
   }
 
-  const end = parseCareDate(assign.endDate);
+  const end = parseCareDateTime(assign.endDate);
   if (!end) {
-    const elapsedDays = Math.max(1, Math.round((todayZero - start) / oneDay) + 1);
+    const elapsedDays = calculateCareDays24h(assign.startDate, today);
     const roundEstTotal = Math.max(10, Math.ceil(elapsedDays / 10) * 10);
     const remainingInRound = Math.max(0, roundEstTotal - elapsedDays);
     return {
@@ -18332,20 +18362,20 @@ function getCareProgressInfo(assign) {
     };
   }
 
-  const totalDays = Math.max(1, Math.round((end - start) / oneDay) + 1);
+  // 24시간 기준 간병일수 산정 (24시간까지 1일, 24시간+1분 초과 시마다 +1일)
+  const totalDays = calculateCareDays24h(assign.startDate, assign.endDate);
   let elapsedDays = 0;
   let status = 'ongoing'; // 'upcoming', 'ongoing', 'completed'
 
-  if (todayZero < start) {
+  if (today < start) {
     status = 'upcoming';
     elapsedDays = 0;
-  } else if (todayZero > end) {
+  } else if (today >= end) {
     status = 'completed';
     elapsedDays = totalDays;
   } else {
     status = 'ongoing';
-    elapsedDays = Math.round((todayZero - start) / oneDay) + 1;
-    elapsedDays = Math.max(1, Math.min(totalDays, elapsedDays));
+    elapsedDays = Math.min(totalDays, calculateCareDays24h(assign.startDate, today));
   }
 
   const remainingDays = Math.max(0, totalDays - elapsedDays);
@@ -18358,7 +18388,8 @@ function getCareProgressInfo(assign) {
     percent,
     status,
     startDate: assign.startDate,
-    endDate: assign.endDate
+    endDate: assign.endDate,
+    isOngoing: false
   };
 }
 
@@ -19047,7 +19078,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
 
   // 실제 청구 일자 및 일수 기준
   const isCaregiverAssigned = Boolean(as && (as.startDate || as.caregiverName));
-  const totalCareDays = prog ? prog.totalDays : (as && as.startDate && as.endDate ? Math.max(1, Math.round((parseCareDate(as.endDate) - parseCareDate(as.startDate)) / (24*60*60*1000)) + 1) : 0);
+  const totalCareDays = prog ? prog.totalDays : (as && as.startDate && as.endDate ? calculateCareDays24h(as.startDate, as.endDate) : 0);
   const elapsedDays = prog ? prog.elapsedDays : totalCareDays;
   const remainingDays = prog ? (prog.remainingDays || 0) : Math.max(0, totalCareDays - elapsedDays);
   const isOngoingCare = Boolean(
@@ -20423,13 +20454,10 @@ function recalcSettlementSetModalPreview(isFromDays) {
 
   let days = parseInt(daysInput?.value || '1', 10);
   if (!isFromDays && startInput?.value && endInput?.value) {
-    const dStart = new Date(startInput.value.slice(0, 10));
-    const dEnd = new Date(endInput.value.slice(0, 10));
-    if (dEnd >= dStart) {
-      days = Math.max(1, Math.round((dEnd - dStart) / (24 * 60 * 60 * 1000)) + 1);
-      if (daysInput) daysInput.value = days;
-      if (claimDaysInput) claimDaysInput.value = days;
-      if (payoutDaysInput) payoutDaysInput.value = days;
+    days = calculateCareDays24h(startInput.value, endInput.value);
+    if (daysInput) daysInput.value = days;
+    if (claimDaysInput) claimDaysInput.value = days;
+    if (payoutDaysInput) payoutDaysInput.value = days;
 
       if (document.getElementById('settlementSetModalMode')?.value === 'add' && typeof getStandardRoundByDate === 'function') {
         const stdRound = getStandardRoundByDate(startInput.value);
@@ -20442,7 +20470,6 @@ function recalcSettlementSetModalPreview(isFromDays) {
           payoutRoundInput.value = stdRound;
         }
       }
-    }
   }
 
   const claimDays = parseInt(claimDaysInput?.value || String(days), 10);
@@ -20883,10 +20910,7 @@ function recalcRoundEditPreview() {
 
   let days = 1;
   if (startVal && endVal) {
-    const dStart = new Date(startVal.slice(0, 10));
-    const dEnd = new Date(endVal.slice(0, 10));
-    const oneDay = 24 * 60 * 60 * 1000;
-    days = Math.max(1, Math.round((dEnd - dStart) / oneDay) + 1);
+    days = calculateCareDays24h(startVal, endVal);
   }
 
   const daysEl = document.getElementById('roundEditDaysPreview');
@@ -20938,8 +20962,7 @@ async function handleSaveRoundDateEdit(e) {
     return;
   }
 
-  const oneDay = 24 * 60 * 60 * 1000;
-  const days = Math.max(1, Math.round((dEnd - dStart) / oneDay) + 1);
+  const days = calculateCareDays24h(startVal, endVal);
 
   const startStr = `${startVal.slice(0, 10).replace(/-/g, '.')} ${startVal.slice(11, 16)}`;
   const endStr = `${endVal.slice(0, 10).replace(/-/g, '.')} ${endVal.slice(11, 16)}`;
@@ -30527,8 +30550,7 @@ function calculateRuleSplit() {
 
   const startDate = new Date(startStr);
   const endDate = new Date(endStr);
-  const diffTime = Math.abs(endDate - startDate);
-  const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  const totalDays = calculateCareDays24h(startStr, endStr);
 
   const splits = [];
 
@@ -33494,9 +33516,7 @@ async function handleAutoGenerateAndImportCarePortLog() {
     if (cpGroup && cpGroup.dailyLogs && cpGroup.dailyLogs.length > 0) {
       dailyLogsToRender = cpGroup.dailyLogs;
     } else {
-      const d1 = new Date(startDate.replace(/\./g, '-'));
-      const d2 = new Date(endDate.replace(/\./g, '-'));
-      let diffDays = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+      let diffDays = calculateCareDays24h(startDate, endDate);
       if (isNaN(diffDays) || diffDays <= 0) diffDays = 5;
       const targetDays = Math.min(Math.max(diffDays, 1), 10);
 
@@ -35736,13 +35756,8 @@ function onEndDateManualChange() {
   if (!startDateStr || !endDateStr || !daysInput) return;
 
   const cleanStart = startDateStr.replace(/\./g, '-');
-  const cleanEnd = endDateStr.replace(/\./g, '-');
-  const dStart = new Date(cleanStart);
-  const dEnd = new Date(cleanEnd);
-
-  if (!isNaN(dStart.getTime()) && !isNaN(dEnd.getTime()) && dEnd >= dStart) {
-    const diffTime = dEnd.getTime() - dStart.getTime();
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  const diffDays = calculateCareDays24h(startDateStr, endDateStr);
+  if (diffDays > 0) {
     daysInput.value = `${diffDays}일`;
   }
 }
@@ -38287,11 +38302,7 @@ function calcNewClaimTotal() {
 
   let days = 1;
   if (startVal && endVal) {
-    const d1 = new Date(startVal);
-    const d2 = new Date(endVal);
-    const diffTime = d2.getTime() - d1.getTime();
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    days = diffDays;
+    days = calculateCareDays24h(startVal, endVal);
   }
 
   // 절대 전체 간병 기간 및 잔여 일수를 초과할 수 없음!
@@ -40755,9 +40766,8 @@ function extractCareCalendarEvents() {
       }
     }
 
-    // 총 간병 일수 및 경과 일수 계산
-    const diffTime = parsedEnd.getTime() - parsedStart.getTime();
-    const totalDays = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1);
+    // 총 간병 일수 및 경과 일수 계산 (24시간 = 1일 기준)
+    const totalDays = calculateCareDays24h(parsedStart, parsedEnd);
 
     const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startZero = new Date(parsedStart.getFullYear(), parsedStart.getMonth(), parsedStart.getDate());
@@ -40774,7 +40784,7 @@ function extractCareCalendarEvents() {
 
     const elapsedDays = status === 'UPCOMING' ? 0 : 
       status === 'COMPLETED' ? totalDays : 
-      Math.min(totalDays, Math.max(1, Math.round((todayZero.getTime() - startZero.getTime()) / (1000 * 60 * 60 * 24)) + 1));
+      Math.min(totalDays, calculateCareDays24h(parsedStart, now));
     const remainingDays = Math.max(0, totalDays - elapsedDays);
 
     // 💡 [핵심] 고객별 주요체크사항 파싱 (환자 임상 주의점 + 진단명 + 메모 + CS/민원 이력)
@@ -40898,12 +40908,8 @@ function extractCareCalendarEvents() {
     const estEnd = new Date(parsedStart.getTime() + expDays * 24 * 60 * 60 * 1000);
     const parsedEnd = estEnd > now ? estEnd : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
 
-    const diffTime = parsedEnd.getTime() - parsedStart.getTime();
-    const totalDays = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1);
-    const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startZero = new Date(parsedStart.getFullYear(), parsedStart.getMonth(), parsedStart.getDate());
-    const endZero = new Date(parsedEnd.getFullYear(), parsedEnd.getMonth(), parsedEnd.getDate());
-    const elapsedDays = Math.max(1, Math.round((todayZero.getTime() - startZero.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+    const totalDays = calculateCareDays24h(parsedStart, parsedEnd);
+    const elapsedDays = Math.min(totalDays, calculateCareDays24h(parsedStart, now));
 
     const checkPoints = [];
     const fullNotes = `${app.diseaseName || ''} ${app.diagnosis || ''} ${app.memo || ''} ${app.specialNotes || ''}`;
