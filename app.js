@@ -36297,13 +36297,28 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
       }).catch(console.warn);
     } catch (e) {}
 
-    // Convex Cloud 운영 DB 실시간 영구 동기화 (확실한 커밋을 위해 await 처리)
-    if (typeof syncToConvex === 'function') {
+    // Convex Cloud 운영 DB 실시간 영구 동기화 (Convex 규칙: _ 접두사 필드 제외 후 전송)
+    const cleanPayload = {};
+    for (const [k, v] of Object.entries(newApp)) {
+      if (!k.startsWith('_')) cleanPayload[k] = v;
+    }
+
+    const appSyncTargets = [
+      typeof CONVEX_URL !== 'undefined' ? CONVEX_URL : null,
+      'https://rapid-raccoon-895.convex.cloud',
+      'https://gallant-weasel-360.convex.cloud'
+    ].filter((v, i, a) => v && a.indexOf(v) === i);
+
+    for (const targetUrl of appSyncTargets) {
       try {
-        await syncToConvex('sync:saveApplication', { app: newApp });
-        console.log(`[Convex Cloud] 신규 고객 ${newApp.id} (${newApp.patientName}) 서버 영구 저장 완료`);
+        await fetch(`${targetUrl}/api/mutation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: 'sync:saveApplication', args: { app: cleanPayload } })
+        });
+        console.log(`[Convex Cloud] 신규 고객 ${newApp.id} (${newApp.patientName}) -> ${targetUrl} 저장 완료`);
       } catch (cvxErr) {
-        console.warn('[Convex Cloud Sync Warning]', cvxErr);
+        console.warn(`[Convex Sync Error] ${targetUrl}:`, cvxErr);
       }
     }
 

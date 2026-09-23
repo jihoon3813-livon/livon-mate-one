@@ -112,7 +112,13 @@ export const saveApplication = mutation({
     app: v.any(),
   },
   handler: async (ctx, args) => {
-    const { _id, _creationTime, ...doc } = args.app;
+    const raw = args.app || {};
+    const doc = {};
+    for (const [k, v] of Object.entries(raw)) {
+      if (!k.startsWith('_')) {
+        doc[k] = v;
+      }
+    }
     if (!doc.id) {
       return await ctx.db.insert("applications", doc);
     }
@@ -797,7 +803,13 @@ export const saveApplicationsChunk = mutation({
       }
     }
     for (const item of args.apps) {
-      const { _id, _creationTime, ...doc } = item;
+      const raw = item || {};
+      const doc = {};
+      for (const [k, v] of Object.entries(raw)) {
+        if (!k.startsWith('_')) {
+          doc[k] = v;
+        }
+      }
       if (!doc.id) {
         await ctx.db.insert("applications", doc);
         continue;
