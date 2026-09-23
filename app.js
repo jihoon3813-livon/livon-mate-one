@@ -27576,7 +27576,6 @@ function renderUnifiedCareHub() {
     if (realSt === '진행중') {
       return false;
     }
-    if (unpaidPayoutAppIdSet.has(String(app.id))) return true;
 
     const appId = String(app.id || '').trim();
     const appPayouts = (gPayouts || []).filter(p => {
@@ -27605,21 +27604,7 @@ function renderUnifiedCareHub() {
     });
     if (hasUnpaidPayout) return true;
 
-    // [기준 3-2] 간병이 완료되었으나 아직 지급 대장에 등록되지 않은 실제 지급 대상 건 (실제 유효 배정이 있는 완료 건)
-    const appAssigns = (gAssigns || []).filter(a => {
-      if (!a) return false;
-      const aApplyId = String(a.applyId || '').trim();
-      return (appId && aApplyId && (aApplyId === appId || aApplyId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || aApplyId.replace(/^C/, 'H') === appId.replace(/^C/, 'H'))) ||
-             (!aApplyId && a.patientName && a.patientName.trim() === (app.patientName || '').trim());
-    });
-    const hasValidCg = appAssigns.some(a => a && a.caregiverName && a.caregiverName !== '-' && !a.caregiverName.includes('미배정') && !a.caregiverName.includes('배정대기')) ||
-                       (app.caregiverName && app.caregiverName !== '-' && !app.caregiverName.includes('미배정') && !app.caregiverName.includes('배정대기'));
 
-    if (hasValidCg && appPayouts.length === 0 && (Number(app.totalPayout) || 0) === 0) {
-      const claimVal = String(app.claimClassification || app.claimCategory || '').trim();
-      if (claimVal === '제외' || app.isExcluded) return false;
-      return true;
-    }
 
     return false;
   };
