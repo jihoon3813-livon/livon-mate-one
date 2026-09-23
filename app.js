@@ -1203,9 +1203,47 @@ function filterInvalidSamsungDuplicates(apps) {
 window.filterInvalidSamsungDuplicates = filterInvalidSamsungDuplicates;
 
 /**
+ * [신청ID 우선순위 및 시계열 정렬 비교기]
+ * [비즈니스 규칙]: 신청ID 순서대로 정렬 시 'D'로 시작하는 ID는 'C'로 시작하는 ID보다 무조건 앞에 위치함.
+ * - 최신순(내림차순, isDesc=true): D 그룹이 상단(내림차순), C 그룹이 하단(내림차순)
+ * - 과거순(오름차순, isDesc=false): D 그룹이 상단(오름차순), C 그룹이 하단(오름차순)
+ * @param {string} idA - 첫 번째 신청ID
+ * @param {string} idB - 두 번째 신청ID
+ * @param {boolean} [isDesc=true] - 내림차순(최신순) 여부
+ * @returns {number}
+ */
+function compareAppIds(idA, idB, isDesc = true) {
+  const strA = String(idA || '').trim();
+  const strB = String(idB || '').trim();
+  if (strA === strB) return 0;
+  if (!strA) return 1;
+  if (!strB) return -1;
+
+  const isD_A = /^d/i.test(strA);
+  const isD_B = /^d/i.test(strB);
+  const isC_A = /^c/i.test(strA);
+  const isC_B = /^c/i.test(strB);
+
+  // [핵심 요구사항]: D로 시작하는 건 C(및 기타 접두사)보다 무조건 앞에 위치
+  if (isD_A && !isD_B) return -1;
+  if (!isD_A && isD_B) return 1;
+
+  if (isC_A && !isC_B) return -1;
+  if (!isC_A && isC_B) return 1;
+
+  // 동일한 접두사 그룹 내 정렬
+  if (isDesc) {
+    return strB.localeCompare(strA, undefined, { numeric: true });
+  } else {
+    return strA.localeCompare(strB, undefined, { numeric: true });
+  }
+}
+window.compareAppIds = compareAppIds;
+
+/**
  * [신청일자 누락건 앞뒤 신청ID 기반 유추 및 보정 엔진]
  * 엑셀 관리대장에 신청일자 정보가 누락/공백인 경우,
- * 임의의 날짜(오늘 등)를 주입하지 않고 앞뒤 신청ID(C0001, C0002...) 고객들의 신청일자를 기준으로
+ * 임의의 날짜(오늘 등)를 주입하지 않고 앞뒤 신청ID(D0001, D0002... C0001, C0002...) 고객들의 신청일자를 기준으로
  * 정확한 일시 및 시계열 위치를 유추(Interpolation)하여 배치합니다.
  */
 function inferMissingApplyDates(apps) {
@@ -1232,12 +1270,8 @@ function inferMissingApplyDates(apps) {
     return datePart + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   };
 
-  // 신청ID 숫자 오름차순 기준 정렬 사본
-  const sorted = [...apps].sort((a, b) => {
-    const numA = parseInt(String(a?.id || '').replace(/\D/g, ''), 10) || 0;
-    const numB = parseInt(String(b?.id || '').replace(/\D/g, ''), 10) || 0;
-    return numA - numB;
-  });
+  // 신청ID 정렬 사본 (D 접두사 -> C 접두사 순서, 오름차순)
+  const sorted = [...apps].sort((a, b) => compareAppIds(a?.id, b?.id, false));
 
   sorted.forEach((app, idx) => {
     if (!app) return;
@@ -1248,9 +1282,12 @@ function inferMissingApplyDates(apps) {
     const hasValidDate = app.applyDate && parseDateTimeToMs(app.applyDate) !== null;
     if (hasValidDate) return;
 
-    // 앞순위(이전 ID) 탐색
+    // 앞순위(이전 ID) 탐색 (가급적 동일 접두사 그룹 우선 대조)
+    const isCurD = /^d/i.test(String(app.id || ''));
     let pIdx = -1, prevMs = null, prevHasTime = false;
     for (let i = idx - 1; i >= 0; i--) {
+      const isNeighborD = /^d/i.test(String(sorted[i]?.id || ''));
+      if (isCurD !== isNeighborD) continue;
       const ms = parseDateTimeToMs(sorted[i].applyDate);
       if (ms !== null) {
         pIdx = i;
@@ -1260,15 +1297,39 @@ function inferMissingApplyDates(apps) {
       }
     }
 
-    // 뒷순위(다음 ID) 탐색
+    // 뒷순위(다음 ID) 탐색 (가급적 동일 접두사 그룹 우선 대조)
     let nIdx = -1, nextMs = null, nextHasTime = false;
     for (let i = idx + 1; i < sorted.length; i++) {
+      const isNeighborD = /^d/i.test(String(sorted[i]?.id || ''));
+      if (isCurD !== isNeighborD) continue;
       const ms = parseDateTimeToMs(sorted[i].applyDate);
       if (ms !== null) {
         nIdx = i;
         nextMs = ms;
         nextHasTime = String(sorted[i].applyDate).includes(':') || String(sorted[i].applyDate).trim().split(' ').length > 1;
         break;
+      }
+    }
+
+    // 동일 접두사 내에서 찾지 못한 경우 전체 탐색 폴백
+    if (prevMs === null && nextMs === null) {
+      for (let i = idx - 1; i >= 0; i--) {
+        const ms = parseDateTimeToMs(sorted[i].applyDate);
+        if (ms !== null) {
+          pIdx = i;
+          prevMs = ms;
+          prevHasTime = String(sorted[i].applyDate).includes(':') || String(sorted[i].applyDate).trim().split(' ').length > 1;
+          break;
+        }
+      }
+      for (let i = idx + 1; i < sorted.length; i++) {
+        const ms = parseDateTimeToMs(sorted[i].applyDate);
+        if (ms !== null) {
+          nIdx = i;
+          nextMs = ms;
+          nextHasTime = String(sorted[i].applyDate).includes(':') || String(sorted[i].applyDate).trim().split(' ').length > 1;
+          break;
+        }
       }
     }
 
@@ -1333,10 +1394,8 @@ function sortApplicationsNewestFirst(apps) {
       if (tB !== tA) return tB - tA;
     }
 
-    // 3. [사용자 요구사항]: 기본 정렬을 신청ID 순서대로 (숫자 기반 내림차순: C0652 -> C0651...)
-    const idA = String(a?.id || '');
-    const idB = String(b?.id || '');
-    const idComp = idB.localeCompare(idA, undefined, { numeric: true });
+    // 3. [사용자 요구사항]: 기본 정렬을 신청ID 순서대로 (D로 시작하는 건 C보다 무조건 앞, 내림차순)
+    const idComp = compareAppIds(a?.id, b?.id, true);
     if (idComp !== 0) return idComp;
 
     // 동순위 시 접수일시 최신순
@@ -2035,7 +2094,7 @@ function getLatestCustomerAppIdSet(apps) {
       const tA = parseTime(a.applyDate) || (a.createdAt ? Date.parse(a.createdAt) || 0 : 0);
       const tB = parseTime(b.applyDate) || (b.createdAt ? Date.parse(b.createdAt) || 0 : 0);
       if (tB !== tA) return tB - tA;
-      return String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
+      return compareAppIds(a.id, b.id, true);
     });
     latestIdSet.add(String(cl[0].id));
   }
@@ -26636,7 +26695,7 @@ function renderUnifiedCareHub() {
       const pA = isInProgress(a);
       const pB = isInProgress(b);
       if (pA !== pB) return pB - pA;
-      return String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
+      return compareAppIds(a.id, b.id, true);
     }
     if (gHubSort === 'cs_priority') {
       const getWeight = (app) => {
@@ -26654,7 +26713,7 @@ function renderUnifiedCareHub() {
       return (a.csLatestLabel || 'zzz').localeCompare(b.csLatestLabel || 'zzz', 'ko');
     }
     if (gHubSort === 'created_desc') {
-      // [사용자 요구사항]: 기본 정렬을 신청ID순서대로 (수정건 맨 앞순위)
+      // [사용자 요구사항]: 기본 정렬을 신청ID순서대로 (수정건 맨 앞순위, D로 시작하는 건 C보다 무조건 앞)
       const modA = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(a) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a) ? 1 : 0);
       const modB = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(b) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(b) ? 1 : 0);
       if (modA !== modB) return modB - modA;
@@ -26663,20 +26722,20 @@ function renderUnifiedCareHub() {
         const evDiff = (b._latestEventTime || 0) - (a._latestEventTime || 0);
         if (evDiff !== 0) return evDiff;
       }
-      // 신청ID 순서대로 (숫자 기반 내림차순: C0652 -> C0651...)
-      const idComp = String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
+      // 신청ID 순서대로 (D가 C보다 무조건 앞, 내림차순: D... -> C0652 -> C0651...)
+      const idComp = compareAppIds(a.id, b.id, true);
       if (idComp !== 0) return idComp;
       return (b._applyTime || 0) - (a._applyTime || 0);
     }
     if (gHubSort === 'created_pure_desc') {
-      // [사용자 요구사항]: 순수 신청ID 최신순 (수정건 맨 앞순위 적용 없이 순수 신청ID 최신순 정렬)
-      const idComp = String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
+      // [사용자 요구사항]: 순수 신청ID 최신순 (수정건 맨 앞순위 적용 없이 순수 신청ID 최신순 정렬, D가 C보다 무조건 앞)
+      const idComp = compareAppIds(a.id, b.id, true);
       if (idComp !== 0) return idComp;
       return (b._applyTime || 0) - (a._applyTime || 0);
     }
     if (gHubSort === 'created_asc' || gHubSort === 'id_asc') {
-      // 신청ID 과거순 (C0001 -> C0002...)
-      const idComp = String(a.id || '').localeCompare(String(b.id || ''), undefined, { numeric: true });
+      // 신청ID 과거순 (D가 C보다 무조건 앞, 오름차순: D0001... -> C0001...)
+      const idComp = compareAppIds(a.id, b.id, false);
       if (idComp !== 0) return idComp;
       return (a._applyTime || 0) - (b._applyTime || 0);
     }
@@ -26684,13 +26743,13 @@ function renderUnifiedCareHub() {
       // 고객접수일(applyDate) 최신순
       const diff = (b._applyTime || 0) - (a._applyTime || 0);
       if (diff !== 0) return diff;
-      return String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
+      return compareAppIds(a.id, b.id, true);
     }
     if (gHubSort === 'apply_date_asc') {
       // 고객접수일(applyDate) 과거순
       const diff = (a._applyTime || 0) - (b._applyTime || 0);
       if (diff !== 0) return diff;
-      return String(a.id || '').localeCompare(String(b.id || ''), undefined, { numeric: true });
+      return compareAppIds(a.id, b.id, false);
     }
     if (gHubSort === 'updated_desc') {
       const tA = (a._latestEventTime || a._updTime || a._applyTime || 0);
@@ -26704,11 +26763,11 @@ function renderUnifiedCareHub() {
       return (b.patientName || '').localeCompare(a.patientName || '', 'ko');
     }
 
-    // 기본 폴백: 수정건 맨 앞순위 -> 신청ID 순서대로
+    // 기본 폴백: 수정건 맨 앞순위 -> 신청ID 순서대로 (D가 C보다 무조건 앞)
     const modA = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(a) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a) ? 1 : 0);
     const modB = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(b) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(b) ? 1 : 0);
     if (modA !== modB) return modB - modA;
-    return String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
+    return compareAppIds(a.id, b.id, true);
   });
 
   const countEl = document.getElementById('hubFilteredCount');
