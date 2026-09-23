@@ -1532,11 +1532,13 @@ async function loadConvexData(showSpinner = true) {
         if (targetRows.length > 0) gSamsungSheets.target = healSamsungSheetData('target', targetRows);
         if (compRows.length > 0) gSamsungSheets.completed = healSamsungSheetData('completed', compRows);
         if (contRows.length > 0) gSamsungSheets.contacts = healSamsungSheetData('contacts', contRows);
-        console.log(`[Convex Cloud] 삼성화재 스프레드시트 시트별 데이터 동기화 완료 (대상자: ${targetRows.length}건, 완료: ${compRows.length}건, 연락처: ${contRows.length}건)`);
       } else {
-        initSamsungSpreadsheet();
-        if (gSamsungSheets.contacts && gSamsungSheets.contacts.length > 0 && typeof syncToConvex === 'function') {
-          syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'contacts', rows: gSamsungSheets.contacts, replace: true }).catch(console.warn);
+        if (!gSamsungSheets) {
+          gSamsungSheets = { target: [], completed: [], eligible: [], contacts: [] };
+        } else {
+          gSamsungSheets.target = [];
+          gSamsungSheets.completed = [];
+          gSamsungSheets.contacts = [];
         }
       }
 
@@ -4693,7 +4695,7 @@ const DEFAULT_SAMSUNG_LEDGER_DATA = {
 
 function healSamsungSheetData(sheetKey, rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
-    return (DEFAULT_SAMSUNG_LEDGER_DATA[sheetKey] || []).map(r => ({ ...r }));
+    return [];
   }
   const defaultList = DEFAULT_SAMSUNG_LEDGER_DATA[sheetKey] || [];
   if (sheetKey === 'target') {
@@ -5067,10 +5069,16 @@ function initSamsungSpreadsheet() {
     }
   } catch (e) {}
 
-  // 🚨 [데이터 무결성 자동 치유 및 복원]: 엑셀에서 누락되거나 구버전 캐시의 누락/손상 필드 자동 보정
-  gSamsungSheets.target = healSamsungSheetData('target', gSamsungSheets.target);
-  gSamsungSheets.completed = healSamsungSheetData('completed', gSamsungSheets.completed);
-  gSamsungSheets.contacts = healSamsungSheetData('contacts', gSamsungSheets.contacts);
+  // 🚨 [데이터 무결성 자동 치유 및 복원]: 엑셀에서 누락되거나 구버전 캐시의 누락/손상 필드 자동 보정 (기존 데이터가 있을 때만)
+  if (Array.isArray(gSamsungSheets.target) && gSamsungSheets.target.length > 0) {
+    gSamsungSheets.target = healSamsungSheetData('target', gSamsungSheets.target);
+  }
+  if (Array.isArray(gSamsungSheets.completed) && gSamsungSheets.completed.length > 0) {
+    gSamsungSheets.completed = healSamsungSheetData('completed', gSamsungSheets.completed);
+  }
+  if (Array.isArray(gSamsungSheets.contacts) && gSamsungSheets.contacts.length > 0) {
+    gSamsungSheets.contacts = healSamsungSheetData('contacts', gSamsungSheets.contacts);
+  }
 
   try {
     localStorage.setItem('LIVON_SAMSUNG_EXCEL_LEDGER', JSON.stringify({
