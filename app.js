@@ -15022,14 +15022,16 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
           <!-- Uploaded Official Document Background -->
           <img src="${customBg}" class="w-full h-auto block pointer-events-none z-0 bg-white" alt="현대해상 01번 양식">
 
-          <!-- Mapped Customer Data Overlay Fields -->
+          <!-- Mapped Customer Data Overlay Fields (table-cell 수직 정렬로 글씨 상단 잘림 방지) -->
           ${areas.map(area => {
             const val = resolveFormFieldValue(area.mapping, app, docNo, todayStr);
             return `
-              <div class="absolute flex items-center px-1 font-bold text-slate-950 text-xs z-10 overflow-hidden whitespace-nowrap leading-tight"
-                   style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%;"
+              <div class="absolute z-10 font-bold text-slate-950 text-xs select-none"
+                   style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; display: table; table-layout: fixed;"
                    title="[${area.id}] ${area.label}: ${val}">
-                <span class="truncate">${val}</span>
+                <div style="display: table-cell; vertical-align: middle; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4;">
+                  ${val}
+                </div>
               </div>
             `;
           }).join('')}
@@ -15319,17 +15321,19 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
             </div>
           </div>
 
-          <!-- Uploaded Official Form Canvas Overlay (23개 필드 매핑) - 팩스 발송 대상 실제 서식 -->
+          <!-- Uploaded Official Form Canvas Overlay (23개 필드 매핑) - 팩스 발송 대상 실제 서식 (table-cell 수직 정렬로 글씨 상단 잘림 방지) -->
           <div id="faxCleanFormTarget" class="relative w-full bg-white rounded-xl overflow-hidden select-none border border-slate-300 shadow-sm" style="font-family:'Pretendard', -apple-system, sans-serif;">
             <img src="${customBg}" class="w-full h-auto block pointer-events-none z-0 bg-white" alt="현대해상 02번 양식">
             ${areas.map(area => {
               const val = resolveFormFieldValue(area.mapping, app, docNo, todayStr);
               const isCheckField = (area.mapping === 'hd2_claimCheck_new' || area.mapping === 'hd2_claimCheck_add');
               return `
-                <div class="absolute flex items-center ${isCheckField ? 'justify-center' : 'px-1'} font-bold text-slate-950 text-xs z-10 overflow-hidden whitespace-nowrap leading-tight"
-                     style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; ${isCheckField ? 'font-size: 16px; font-weight: 900; color: #1e3a8a;' : ''}"
+                <div class="absolute z-10 font-bold text-slate-950 text-xs select-none"
+                     style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; display: table; table-layout: fixed; ${isCheckField ? 'font-size: 16px; font-weight: 900; color: #1e3a8a;' : ''}"
                      title="[${area.id}] ${area.label}: ${val}">
-                  <span class="${isCheckField ? '' : 'truncate'}">${val}</span>
+                  <div style="display: table-cell; vertical-align: middle; ${isCheckField ? 'text-align: center;' : 'padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'} line-height: 1.4;">
+                    ${val}
+                  </div>
                 </div>
               `;
             }).join('')}
@@ -33804,13 +33808,44 @@ async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 12) 
     iframeDoc.write(htmlContent);
     iframeDoc.close();
 
-    await new Promise(res => setTimeout(res, 20));
-
     const targetEl = iframeDoc.querySelector('.page') || iframeDoc.body;
     targetEl.querySelectorAll('.no-print').forEach(el => el.remove());
 
+    // 🚨 html2canvas 글씨 상단 잘림 방지: 모든 오버레이 텍스트 박스에 대해 상단 클리핑 해제 및 table-cell 수직 중앙 정렬 보장
+    targetEl.querySelectorAll('.absolute').forEach(box => {
+      box.style.overflow = 'visible';
+      if (box.classList.contains('overflow-hidden')) {
+        box.classList.remove('overflow-hidden');
+      }
+      if (box.classList.contains('flex')) {
+        box.style.display = 'table';
+        box.style.tableLayout = 'fixed';
+        const childSpan = box.querySelector('span') || box.firstElementChild;
+        if (childSpan) {
+          childSpan.style.display = 'table-cell';
+          childSpan.style.verticalAlign = 'middle';
+          childSpan.style.lineHeight = '1.4';
+          childSpan.style.overflow = 'visible';
+        }
+      }
+    });
+
+    const imgEls = targetEl.querySelectorAll('img');
+    await Promise.all(Array.from(imgEls).map(img => {
+      if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
+      return new Promise(resolve => {
+        img.onload = resolve;
+        img.onerror = resolve;
+        setTimeout(resolve, 600);
+      });
+    }));
+    if (iframeDoc.fonts && iframeDoc.fonts.ready) {
+      try { await iframeDoc.fonts.ready; } catch (e) {}
+    }
+    await new Promise(res => setTimeout(res, 50));
+
     const canvas = await html2canvas(targetEl, {
-      scale: 1.5,
+      scale: 2.0,
       useCORS: false,
       allowTaint: false,
       backgroundColor: '#ffffff',
@@ -33902,11 +33937,44 @@ async function renderElementToSinglePageA4PdfBytes(sourceElement, customMargin =
     clone.style.boxShadow = 'none';
     clone.style.border = 'none';
 
+    // 🚨 html2canvas 글씨 상단 잘림 방지: 모든 오버레이 텍스트 박스에 대해 상단 클리핑 해제 및 table-cell 수직 중앙 정렬 보장
+    clone.querySelectorAll('.absolute').forEach(box => {
+      box.style.overflow = 'visible';
+      if (box.classList.contains('overflow-hidden')) {
+        box.classList.remove('overflow-hidden');
+      }
+      if (box.classList.contains('flex')) {
+        box.style.display = 'table';
+        box.style.tableLayout = 'fixed';
+        const childSpan = box.querySelector('span') || box.firstElementChild;
+        if (childSpan) {
+          childSpan.style.display = 'table-cell';
+          childSpan.style.verticalAlign = 'middle';
+          childSpan.style.lineHeight = '1.4';
+          childSpan.style.overflow = 'visible';
+        }
+      }
+    });
+
     iframeDoc.body.appendChild(clone);
-    await new Promise(res => setTimeout(res, 20));
+
+    // 이미지 및 웹폰트 완전 로딩 보장
+    const imgEls = clone.querySelectorAll('img');
+    await Promise.all(Array.from(imgEls).map(img => {
+      if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
+      return new Promise(resolve => {
+        img.onload = resolve;
+        img.onerror = resolve;
+        setTimeout(resolve, 600);
+      });
+    }));
+    if (iframeDoc.fonts && iframeDoc.fonts.ready) {
+      try { await iframeDoc.fonts.ready; } catch (e) {}
+    }
+    await new Promise(res => setTimeout(res, 50));
 
     const canvas = await html2canvas(clone, {
-      scale: 1.5,
+      scale: 2.0,
       useCORS: false,
       allowTaint: false,
       backgroundColor: '#ffffff',
