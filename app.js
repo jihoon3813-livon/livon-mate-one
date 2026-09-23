@@ -27229,21 +27229,17 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
     `);
   }
 
-  // 2. 간병비 미지급 체크 (만료 후 미지급 / 등록된 정산 건 미지급) -> 오렌지색!
+  // 2. 간병비 미지급 체크 (사용자 3대 기준과 1:1 완벽 일치) -> 오렌지색!
   const isRealOngoing = (determineRealCareStatus(app) === '진행중');
-  if (!isRealOngoing && sched.isCaregiverPayoutDue && sched.unpaidPayoutSum > 0) {
+  const isNeedPayout = (typeof isAppHasUnpaidPayoutHelper === 'function') ? isAppHasUnpaidPayoutHelper(app) : (!isRealOngoing && sched.isCaregiverPayoutDue && sched.unpaidPayoutSum > 0);
+  if (!isRealOngoing && isNeedPayout) {
+    const dueWage = sched.unpaidPayoutSum > 0 ? sched.unpaidPayoutSum : 0;
     badges.push(`
       <span class="px-2 py-0.5 rounded-md bg-orange-500 text-white font-black text-[10.5px] flex items-center gap-1 shadow-2xs animate-pulse whitespace-nowrap" title="간병 기간이 종료되었으나 간병비가 미지급 상태입니다.">
-        <i data-lucide="alert-triangle" class="w-3 h-3 text-white"></i> 🚨 간병비 미지급 (지급대기) (${formatCurrency(sched.unpaidPayoutSum)}원)
+        <i data-lucide="alert-triangle" class="w-3 h-3 text-white"></i> 🚨 간병비 미지급 (지급대기)${dueWage > 0 ? ` (${formatCurrency(dueWage)}원)` : ''}
       </span>
     `);
-  } else if (!isRealOngoing && sched.unpaidPayoutSum > 0) {
-    badges.push(`
-      <span class="px-2 py-0.5 rounded-md bg-orange-500 text-white font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="등록된 간병비 정산 중 미지급 건이 있습니다.">
-        <i data-lucide="alert-circle" class="w-3 h-3 text-white"></i> 🚨 간병비 미지급 (지급대기) (${formatCurrency(sched.unpaidPayoutSum)}원)
-      </span>
-    `);
-  } else if (sched.isAllPayoutsPaid && sched.paidPayoutSum > 0) {
+  } else if (!isRealOngoing && (sched.isAllPayoutsPaid || (Number(app.totalPayout) || 0) > 0) && (sched.paidPayoutSum > 0 || (Number(app.totalPayout) || 0) > 0)) {
     badges.push(`
       <span class="px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-300 font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="간병비 전액 지급 완료">
         <i data-lucide="check" class="w-3 h-3 text-teal-600"></i> ✓ 간병비 지급완료
@@ -27557,18 +27553,17 @@ function renderUnifiedCareHub() {
     return false;
   };
 
-  // [간병비 미지급(지급 대기) 정밀 판정 헬퍼]:
-  // 1. 취소/미해당/서비스불가 건은 제외
-  // 2. [사용자 요구사항]: 진행 중인 건(진행중)은 아직 간병 종료 전이므로 지급 대기 카운트에서 제외
-  // 3. gPayouts에 실제 미지급(payoutStatus !== '지급' && payoutStatus !== '지급완료') 건이 있는 경우
-  // 4. 등록된 모든 지급서가 지급완료이거나 totalPayout이 완납된 경우 완료로 제외
+  // [간병비 미지급(지급 대기) 정밀 판정 헬퍼 (사용자 3대 기준 완벽 적용)]:
+  // 1. 간병 진행 중인 고객 제외: 간병이 아직 진행 중인 건은 간병비 정산/퇴원 전이므로 '지급 대기'에서 완전히 제외
+  // 2. 지급 완료 건 엄격 제외: gPayouts에 등록된 내역이 모두 지급완료이거나, 신청서에 이미 totalPayout이 지급 완료된 건은 어떠한 가상 계산도 배제하고 정상 완료로 종결 처리
+  // 3. 실제 미지급 대상만 집계: 실제 간병비 지급 장부(gPayouts) 상에 '지급대기/미지급'으로 등록된 건이거나, 간병이 완료되었으나 아직 지급 대장에 등록되지 않은 실제 지급 대상 건만 집계
   const isAppHasUnpaidPayoutHelper = (app) => {
     if (!app) return false;
     const realSt = determineRealCareStatus(app);
     if (realSt === '취소' || realSt === '서비스 취소' || realSt === '미해당' || realSt === '당일서비스취소' || realSt.includes('서비스불가') || realSt === '제외') {
       return false;
     }
-    // [사용자 요구사항]: 진행 중인 건은 간병 종료 전이므로 지급대기 제외
+    // [기준 1] 간병 진행 중인 고객 제외
     if (realSt === '진행중') {
       return false;
     }
@@ -27582,13 +27577,7 @@ function renderUnifiedCareHub() {
              (!pApplyId && p.patientName && p.patientName.trim() === (app.patientName || '').trim());
     });
 
-    const hasUnpaidPayout = appPayouts.some(p => {
-      const st = String(p.payoutStatus || p.status || '').trim();
-      return st !== '지급' && st !== '지급완료' && st !== '선지급완료' && (p.payoutAmount || 0) > 0;
-    });
-    if (hasUnpaidPayout) return true;
-
-    // 만약 이미 등록된 모든 지급서가 지급완료라면 절대 미지급 아님!
+    // [기준 2] 등록된 모든 지급서가 지급완료이거나 totalPayout이 완납된 경우 완료 종결 (엄격 제외)
     if (appPayouts.length > 0 && appPayouts.every(p => {
       const st = String(p.payoutStatus || p.status || '').trim();
       return st === '지급' || st === '지급완료' || st === '선지급완료' || p.isPaid === true;
@@ -27598,6 +27587,29 @@ function renderUnifiedCareHub() {
 
     if ((Number(app.totalPayout) || 0) > 0) {
       return false;
+    }
+
+    // [기준 3-1] gPayouts 상에 실제 미지급/지급대기 건이 등록되어 있는 경우
+    const hasUnpaidPayout = appPayouts.some(p => {
+      const st = String(p.payoutStatus || p.status || '').trim();
+      return st !== '지급' && st !== '지급완료' && st !== '선지급완료' && (p.payoutAmount || 0) > 0;
+    });
+    if (hasUnpaidPayout) return true;
+
+    // [기준 3-2] 간병이 완료되었으나 아직 지급 대장에 등록되지 않은 실제 지급 대상 건 (실제 유효 배정이 있는 완료 건)
+    const appAssigns = (gAssigns || []).filter(a => {
+      if (!a) return false;
+      const aApplyId = String(a.applyId || '').trim();
+      return (appId && aApplyId && (aApplyId === appId || aApplyId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || aApplyId.replace(/^C/, 'H') === appId.replace(/^C/, 'H'))) ||
+             (!aApplyId && a.patientName && a.patientName.trim() === (app.patientName || '').trim());
+    });
+    const hasValidCg = appAssigns.some(a => a && a.caregiverName && a.caregiverName !== '-' && !a.caregiverName.includes('미배정') && !a.caregiverName.includes('배정대기')) ||
+                       (app.caregiverName && app.caregiverName !== '-' && !app.caregiverName.includes('미배정') && !app.caregiverName.includes('배정대기'));
+
+    if (hasValidCg && appPayouts.length === 0 && (Number(app.totalPayout) || 0) === 0) {
+      const claimVal = String(app.claimClassification || app.claimCategory || '').trim();
+      if (claimVal === '제외' || app.isExcluded) return false;
+      return true;
     }
 
     return false;
