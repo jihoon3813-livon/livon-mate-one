@@ -1062,6 +1062,12 @@ var gFaxDirectory = [];
 var gFaxLogs = [];
 var gClaimUnitPriceRules = [];
 // =========================================================================
+// [데이터 동기화 Race Condition 방지] 전역 상태 플래그
+// =========================================================================
+var gConvexDataApplied = false;       // Convex bundleAll 응답이 이미 적용되었는지 여부
+var gDataSyncSessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6); // 현재 세션 고유 ID
+var gLocalPendingChanges = [];        // Convex 동기화 대기 중인 로컬 변경사항 (방금 등록/수정한 건)
+// =========================================================================
 // [환경 감지] 개발 사이트(DEV) vs 실운영 사이트(PROD) 동적 분리 엔진
 // =========================================================================
 const DEV_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
@@ -1280,6 +1286,11 @@ async function loadConvexData(showSpinner = true) {
 
   const applyRealJson = (realJson) => {
     if (!realJson) return;
+    // [Race Condition 방지] Convex bundleAll 응답이 이미 적용된 후에는 hub_apps_real.json 데이터로 절대 덮어쓰지 않음
+    if (gConvexDataApplied) {
+      console.log('[Data Sync Guard] Convex 응답이 이미 적용되어 로컬 JSON fallback을 무시합니다.');
+      return;
+    }
     if (Array.isArray(realJson.applications) && realJson.applications.length > 0) {
       const serverRealApps = filterInvalidSamsungDuplicates(realJson.applications).filter(a => a.isRealLaunchData);
       if (serverRealApps.length > 0) {
@@ -1334,31 +1345,54 @@ async function loadConvexData(showSpinner = true) {
       }
       const { applications, assignments, claims, payouts, adjusters, partners, careLogs, caregivers, systemSettings } = res.value;
 
-      // 1. 고객 신청 대장: Convex 원격 DB가 단 하나의 절대적 기준(Single Source of Truth)
-      if (Array.isArray(applications) && applications.length > 0) {
+      // 1. 고객 신청 대장: Convex 원격 DB 기준 동기화 + 로컬 신규 등록 건 안전 보존 (Race Condition 방지)
+      if (Array.isArray(applications)) {
         window._isSamsungExcelEnriched = false;
         const validApps = filterInvalidSamsungDuplicates(applications);
-        gApps = sortApplicationsNewestFirst(validApps);
+        const serverAppIdSet = new Set(validApps.map(a => String(a.id || '')));
+
+        // 로컬에만 존재하는 신규 등록 고객 (서버에 아직 미반영된 건) 추출 및 보존
+        const localOnlyNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
+          if (!localApp || !localApp.id) return false;
+          // 신규 등록 플래그가 있거나, 서버에 없으면서 실데이터 플래그가 있는 경우 보존
+          const isNotOnServer = !serverAppIdSet.has(String(localApp.id));
+          return isNotOnServer && (localApp._isJustRegistered || localApp.isRealLaunchData);
+        });
+
+        if (localOnlyNewApps.length > 0) {
+          console.log(`[Data Sync Guard] 서버 미반영 로컬 신규 고객 ${localOnlyNewApps.length}건 보존 및 서버 재동기화 시도:`, localOnlyNewApps.map(a => `${a.id}(${a.patientName})`));
+          // 서버에 누락된 로컬 신규 건은 백그라운드로 즉시 Convex에 재전송
+          localOnlyNewApps.forEach(pendingApp => {
+            if (typeof syncToConvex === 'function') {
+              syncToConvex('sync:saveApplication', { app: pendingApp }).catch(console.warn);
+            }
+          });
+        }
+
+        gApps = sortApplicationsNewestFirst([...localOnlyNewApps, ...validApps]);
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
       }
 
-      // 2. 간병인 배정 대장
-      if (Array.isArray(assignments) && assignments.length > 0) {
+      // 2. 간병인 배정 대장 (서버 상태를 정직하게 반영 - 0건이면 0건으로 리셋)
+      if (Array.isArray(assignments)) {
         gAssigns = assignments;
         try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
       }
 
-      // 3. 보험 청구 대장
-      if (Array.isArray(claims) && claims.length > 0) {
+      // 3. 보험 청구 대장 (서버 상태를 정직하게 반영 - 0건이면 0건으로 리셋)
+      if (Array.isArray(claims)) {
         gClaims = claims;
         try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
       }
 
-      // 4. 간병비 지급 대장
-      if (Array.isArray(payouts) && payouts.length > 0) {
+      // 4. 간병비 지급 대장 (서버 상태를 정직하게 반영 - 0건이면 0건으로 리셋하여 유령 지급대기 방지)
+      if (Array.isArray(payouts)) {
         gPayouts = payouts;
         try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
       }
+
+      // Convex 서버 데이터가 성공적으로 반영됨을 기록
+      gConvexDataApplied = true;
 
       // 5. 손해사정사 디렉토리
       if (Array.isArray(adjusters) && adjusters.length > 0) {
@@ -29122,11 +29156,8 @@ function initData() {
     if (cachedApps) {
       const parsed = JSON.parse(cachedApps);
       const cleaned = (typeof filterInvalidSamsungDuplicates === 'function') ? filterInvalidSamsungDuplicates(parsed) : (Array.isArray(parsed) ? parsed.filter(a => !(a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성') && !a.isRealLaunchData)) : []);
-      if (Array.isArray(cleaned) && cleaned.some(a => a.isRealLaunchData)) {
-        gApps = cleaned.filter(a => a.isRealLaunchData);
-      } else {
-        gApps = cleaned;
-      }
+      const baseApps = (Array.isArray(cleaned) && cleaned.some(a => a.isRealLaunchData)) ? cleaned.filter(a => a.isRealLaunchData) : cleaned;
+      gApps = (typeof sortApplicationsNewestFirst === 'function') ? sortApplicationsNewestFirst(baseApps) : baseApps;
       try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
     } else if (window.REBORN_DATA && window.REBORN_DATA.applications) {
       gApps = [...window.REBORN_DATA.applications];
@@ -30385,6 +30416,10 @@ async function executeFullDataReset() {
     // 1. Convex 클라우드 DB 완전 초기화 (관리자 계정 제외)
     if (typeof syncToConvex === 'function') {
       await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'all' });
+      // 잔여 데이터 완전 삭제 보장을 위한 2차 확인 퍼지
+      try {
+        await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'all' });
+      } catch (e2) {}
     }
 
     // 2. 로컬 서버 디스크 파일(hub_apps_real.json) 0건 초기화
@@ -30400,12 +30435,16 @@ async function executeFullDataReset() {
     const keysToRemove = [
       'LIVON_CACHED_APPS', 'LIVON_CACHED_ASSIGNS', 'LIVON_CACHED_CLAIMS',
       'LIVON_CACHED_PAYOUTS', 'LIVON_CACHED_CAREGIVERS', 'LIVON_CACHED_CENTERS',
-      'LIVON_CACHED_ADJUSTERS', 'LIVON_CARE_LOGS', 'LIVON_SAMSUNG_SHEETS', 'reborn_apps', 'reborn_assignments',
-      'reborn_claims', 'reborn_payouts'
+      'LIVON_CACHED_ADJUSTERS', 'LIVON_CARE_LOGS', 'LIVON_SAMSUNG_SHEETS',
+      'LIVON_SAMSUNG_EXCEL_LEDGER', 'LIVON_SAMSUNG_SHEET_TARGET', 'LIVON_SAMSUNG_SHEET_COMPLETED',
+      'LIVON_CACHED_TOTAL_CALL_DATA', 'LIVON_LAST_LAUNCH_SYNC_TIME',
+      'reborn_apps', 'reborn_assignments', 'reborn_claims', 'reborn_payouts'
     ];
     keysToRemove.forEach(k => {
       try { localStorage.removeItem(k); } catch (e) {}
     });
+
+    gConvexDataApplied = false;
 
     if (preserveAdmin) localStorage.setItem('LIVON_ADMINS', preserveAdmin);
     if (preserveToken) localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', preserveToken);
@@ -36248,9 +36287,14 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
       }).catch(console.warn);
     } catch (e) {}
 
-    // Convex Cloud 운영 DB 실시간 영구 동기화
+    // Convex Cloud 운영 DB 실시간 영구 동기화 (확실한 커밋을 위해 await 처리)
     if (typeof syncToConvex === 'function') {
-      syncToConvex('sync:saveApplication', { app: newApp }).catch(console.warn);
+      try {
+        await syncToConvex('sync:saveApplication', { app: newApp });
+        console.log(`[Convex Cloud] 신규 고객 ${newApp.id} (${newApp.patientName}) 서버 영구 저장 완료`);
+      } catch (cvxErr) {
+        console.warn('[Convex Cloud Sync Warning]', cvxErr);
+      }
     }
 
     // Increment seq
