@@ -18862,6 +18862,105 @@ function isRoundDepositConfirmed(round) {
 }
 
 // =========================================================================
+// [사용자 규칙] 간병 차수 표준화 엔진 (1~10일: 1차, 11~20일: 2차, 21~말일: 3차)
+// =========================================================================
+function getStandardRoundByDate(dateStr) {
+  if (!dateStr) {
+    const now = new Date();
+    const m = now.getMonth() + 1;
+    const d = now.getDate();
+    const roundNum = d <= 10 ? 1 : (d <= 20 ? 2 : 3);
+    return `${m}월 ${roundNum}차`;
+  }
+  const mFull = String(dateStr).match(/(?:(\d{4})[.-])?(\d{1,2})[.-](\d{1,2})/);
+  if (mFull) {
+    const m = parseInt(mFull[2], 10);
+    const d = parseInt(mFull[3], 10);
+    const roundNum = d <= 10 ? 1 : (d <= 20 ? 2 : 3);
+    return `${m}월 ${roundNum}차`;
+  }
+  const now = new Date();
+  const m = now.getMonth() + 1;
+  const d = now.getDate();
+  const roundNum = d <= 10 ? 1 : (d <= 20 ? 2 : 3);
+  return `${m}월 ${roundNum}차`;
+}
+window.getStandardRoundByDate = getStandardRoundByDate;
+
+function getCareCutoffPeriods(startDateStr, endDateStr, isOngoing) {
+  function parseDate(s) {
+    if (!s) return null;
+    const m = String(s).match(/(\d{4})[.-](\d{1,2})[.-](\d{1,2})/);
+    if (!m) return null;
+    return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+  }
+  function formatDate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}.${m}.${day}`;
+  }
+  function lastDayOfMonth(year, month) {
+    return new Date(year, month, 0).getDate();
+  }
+
+  const start = parseDate(startDateStr);
+  if (!start) return [];
+  let end = parseDate(endDateStr);
+  if (!end || isOngoing) {
+    const today = new Date();
+    end = (!end || today > end) ? today : end;
+    if (end < start) end = start;
+  }
+
+  const periods = [];
+  let curr = new Date(start);
+
+  while (curr <= end) {
+    const y = curr.getFullYear();
+    const m = curr.getMonth() + 1;
+    const day = curr.getDate();
+    const lastDay = lastDayOfMonth(y, m);
+
+    let periodEndDay;
+    let roundNum;
+    if (day <= 10) {
+      roundNum = 1;
+      periodEndDay = 10;
+    } else if (day <= 20) {
+      roundNum = 2;
+      periodEndDay = 20;
+    } else {
+      roundNum = 3;
+      periodEndDay = lastDay;
+    }
+
+    let pEnd = new Date(y, m - 1, periodEndDay);
+    if (pEnd > end) {
+      pEnd = new Date(end);
+    }
+
+    const roundLabel = `${m}월 ${roundNum}차`;
+    const periodDays = Math.max(1, Math.round((pEnd - curr) / (24 * 60 * 60 * 1000)) + 1);
+
+    periods.push({
+      roundLabel,
+      startDate: formatDate(curr),
+      endDate: formatDate(pEnd),
+      standardDate: formatDate(pEnd),
+      days: periodDays,
+      targetYear: y,
+      targetMonth: m
+    });
+
+    curr = new Date(y, m - 1, periodEndDay + 1);
+  }
+
+  return periods;
+}
+window.getCareCutoffPeriods = getCareCutoffPeriods;
+
+// =========================================================================
 // [CORE ENGINE] 간병일수·손사청구·간병인지급 유기적 통합 정산 스케줄러
 // =========================================================================
 function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
@@ -19023,9 +19122,6 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         const claimForRound = sortedClaims[idx] || null;
         const payoutForRound = sortedPayouts[idx] || null;
 
-        const claimRoundLabel = claimForRound ? (claimForRound.round || `${setIndex}차`) : '-';
-        const payoutRoundLabel = payoutForRound ? (payoutForRound.round || `${setIndex}차`) : '-';
-
         const claimDays = claimForRound ? (Number(claimForRound.days) || 1) : (payoutForRound ? (Number(payoutForRound.days) || 1) : 1);
         const payoutDays = payoutForRound ? (Number(payoutForRound.days) || 1) : (claimForRound ? (Number(claimForRound.days) || 1) : 1);
         const setDays = Math.max(claimDays, payoutDays);
@@ -19036,6 +19132,16 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
 
         const roundStartDateStr = (claimForRound && claimForRound.startDate) || (payoutForRound && payoutForRound.startDate) || claimStandardDate || payoutStandardDate || (as ? as.startDate : '');
         const roundEndDateStr = (claimForRound && claimForRound.endDate) || (payoutForRound && payoutForRound.endDate) || claimStandardDate || payoutStandardDate || (as ? as.endDate : '');
+
+        const defaultClaimRound = getStandardRoundByDate(claimStandardDate || roundStartDateStr);
+        const defaultPayoutRound = getStandardRoundByDate(payoutStandardDate || roundStartDateStr);
+
+        const claimRoundLabel = (claimForRound && claimForRound.round && !/^[1-9]차$/.test(claimForRound.round))
+          ? claimForRound.round
+          : (claimForRound ? (claimForRound.round || defaultClaimRound) : '-');
+        const payoutRoundLabel = (payoutForRound && payoutForRound.round && !/^[1-9]차$/.test(payoutForRound.round))
+          ? payoutForRound.round
+          : (payoutForRound ? (payoutForRound.round || defaultPayoutRound) : '-');
 
         let targetYear = '';
         let targetMonth = '';
@@ -19145,79 +19251,87 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         });
       }
     } else if (isCaregiverAssigned && (totalCareDays > 0 || (as && as.startDate))) {
-      // 3) 실제 청구서/지급서가 없는 경우: 1개의 기본 세트만 생성 (인위적인 10일 주기 루프로 미래 차수를 날조하지 않음!)
-      const setDays = totalCareDays > 0 ? totalCareDays : 1;
-      const hours = setDays * 24;
-      const roundStartDateStr = careStartDate || '';
-      const roundEndDateStr = careEndDate || careStartDate || '';
+      // 3) 실제 청구서/지급서가 없는 경우 (진행중 고객 등):
+      // [사용자 요구사항]: 자동 생성시 차수를 1~10일은 해당월 1차, 11~20일은 해당월 2차, 21~말일은 해당월 3차로 설정
+      const periods = getCareCutoffPeriods(careStartDate, careEndDate, isOngoingCare);
+      const autoPeriods = (periods && periods.length > 0) ? periods : [{
+        roundLabel: getStandardRoundByDate(careStartDate),
+        startDate: careStartDate || '',
+        endDate: careEndDate || careStartDate || '',
+        standardDate: careEndDate || careStartDate || '',
+        days: totalCareDays > 0 ? totalCareDays : 1,
+        targetYear: new Date().getFullYear(),
+        targetMonth: new Date().getMonth() + 1
+      }];
 
-      let targetYear = '';
-      let targetMonth = '';
-      const rDateMatch = (roundEndDateStr || roundStartDateStr || '').match(/(\d{4})[.-](\d{1,2})/);
-      if (rDateMatch) {
-        targetYear = rDateMatch[1];
-        targetMonth = parseInt(rDateMatch[2], 10);
-      } else {
-        const now = new Date();
-        targetYear = String(now.getFullYear());
-        targetMonth = now.getMonth() + 1;
-      }
-      const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
+      autoPeriods.forEach((period, idx) => {
+        const setIndex = idx + 1;
+        const setDays = period.days || 1;
+        const hours = setDays * 24;
+        const roundStartDateStr = period.startDate || careStartDate || '';
+        const roundEndDateStr = period.endDate || careEndDate || careStartDate || '';
+        const standardDateStr = period.standardDate || roundEndDateStr || roundStartDateStr;
+        const roundLabel = period.roundLabel || getStandardRoundByDate(standardDateStr);
 
-      const fullClaimAmount = setDays * dailyClaimPrice;
-      const fullPayoutAmount = setDays * cgDailyWage;
-      const marginAmount = fullClaimAmount - fullPayoutAmount;
-      const marginRate = fullClaimAmount > 0 ? ((marginAmount / fullClaimAmount) * 100).toFixed(1) : '0.0';
+        const targetYear = String(period.targetYear || new Date().getFullYear());
+        const targetMonth = period.targetMonth || (new Date().getMonth() + 1);
+        const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
 
-      rounds.push({
-        roundNumber: 1,
-        setIndex: 1,
-        label: '1차',
-        claimRoundLabel: '1차',
-        payoutRoundLabel: '1차',
-        claimStandardDate: roundEndDateStr || roundStartDateStr,
-        payoutStandardDate: roundEndDateStr || roundStartDateStr,
-        claimDate: '',
-        payoutDate: '',
-        claimDays: setDays,
-        payoutDays: setDays,
-        days: setDays,
-        hours,
-        startDayOffset: 1,
-        endDayOffset: setDays,
-        startDateStr: roundStartDateStr,
-        endDateStr: roundEndDateStr,
-        stage: isCompleted ? 'COMPLETED' : 'ONGOING',
-        ongoingElapsed: isOngoingCare ? Math.min(setDays, Math.max(1, elapsedDays)) : setDays,
-        ongoingRemaining: isOngoingCare ? Math.max(0, setDays - elapsedDays) : 0,
-        dailyClaimPrice,
-        fullClaimAmount,
-        depositAmount: 0,
-        ongoingClaimAmount: fullClaimAmount,
-        claimId: `Q${String(app.id).replace('C', '')}.1`,
-        claimStatus: isCompleted ? 'READY_TO_CLAIM' : 'UPCOMING_WAIT',
-        existingClaim: null,
-        isClaimCreated: false,
-        isFaxClaimSent: false,
-        isClaimSent: false,
-        isClaimDeposited: false,
-        isDepositDone: false,
-        cgDailyWage,
-        fullPayoutAmount,
-        ongoingPayoutAmount: fullPayoutAmount,
-        payoutId: `P${String(app.id).replace('C', '')}.1`,
-        payoutStatus: isCompleted ? 'READY_TO_PAY' : 'UPCOMING_WAIT',
-        existingPayout: null,
-        isPayoutCreated: false,
-        isPayoutPaid: false,
-        marginAmount,
-        marginRate,
-        isSamsung,
-        isDateCustomized: false,
-        targetYear,
-        targetMonth,
-        targetMonthText,
-        isOngoingCare
+        const fullClaimAmount = setDays * dailyClaimPrice;
+        const fullPayoutAmount = setDays * cgDailyWage;
+        const marginAmount = fullClaimAmount - fullPayoutAmount;
+        const marginRate = fullClaimAmount > 0 ? ((marginAmount / fullClaimAmount) * 100).toFixed(1) : '0.0';
+
+        rounds.push({
+          roundNumber: setIndex,
+          setIndex: setIndex,
+          label: roundLabel,
+          claimRoundLabel: roundLabel,
+          payoutRoundLabel: roundLabel,
+          claimStandardDate: standardDateStr,
+          payoutStandardDate: standardDateStr,
+          claimDate: '',
+          payoutDate: '',
+          claimDays: setDays,
+          payoutDays: setDays,
+          days: setDays,
+          hours,
+          startDayOffset: (idx * 10) + 1,
+          endDayOffset: (idx * 10) + setDays,
+          startDateStr: roundStartDateStr,
+          endDateStr: roundEndDateStr,
+          stage: isCompleted ? 'COMPLETED' : 'ONGOING',
+          ongoingElapsed: isOngoingCare ? Math.min(setDays, Math.max(1, elapsedDays)) : setDays,
+          ongoingRemaining: isOngoingCare ? Math.max(0, setDays - elapsedDays) : 0,
+          dailyClaimPrice,
+          fullClaimAmount,
+          depositAmount: 0,
+          ongoingClaimAmount: fullClaimAmount,
+          claimId: `Q${String(app.id).replace('C', '')}.${setIndex}`,
+          claimStatus: isCompleted ? 'READY_TO_CLAIM' : 'UPCOMING_WAIT',
+          existingClaim: null,
+          isClaimCreated: false,
+          isFaxClaimSent: false,
+          isClaimSent: false,
+          isClaimDeposited: false,
+          isDepositDone: false,
+          cgDailyWage,
+          fullPayoutAmount,
+          ongoingPayoutAmount: fullPayoutAmount,
+          payoutId: `P${String(app.id).replace('C', '')}.${setIndex}`,
+          payoutStatus: isCompleted ? 'READY_TO_PAY' : 'UPCOMING_WAIT',
+          existingPayout: null,
+          isPayoutCreated: false,
+          isPayoutPaid: false,
+          marginAmount,
+          marginRate,
+          isSamsung,
+          isDateCustomized: false,
+          targetYear,
+          targetMonth,
+          targetMonthText,
+          isOngoingCare
+        });
       });
     }
   }
@@ -20180,9 +20294,13 @@ function openSettlementSetAddModal(appId) {
   document.getElementById('settlementSetEndInput').value = defEnd;
   document.getElementById('settlementSetDaysInput').value = 1;
 
+  const defaultRoundLabel = (typeof getStandardRoundByDate === 'function' && defStart)
+    ? getStandardRoundByDate(defStart)
+    : `${newSetIndex}차`;
+
   // Claim
   document.getElementById('settlementSetModalClaimId').value = '';
-  document.getElementById('settlementSetClaimRoundInput').value = `${newSetIndex}차`;
+  document.getElementById('settlementSetClaimRoundInput').value = defaultRoundLabel;
   document.getElementById('settlementSetClaimStandardDateInput').value = defEnd.slice(0, 10).replace(/-/g, '.');
   document.getElementById('settlementSetClaimDateInput').value = '';
   document.getElementById('settlementSetClaimDaysInput').value = 1;
@@ -20198,7 +20316,7 @@ function openSettlementSetAddModal(appId) {
 
   // Payout
   document.getElementById('settlementSetModalPayoutId').value = '';
-  document.getElementById('settlementSetPayoutRoundInput').value = `${newSetIndex}차`;
+  document.getElementById('settlementSetPayoutRoundInput').value = defaultRoundLabel;
   document.getElementById('settlementSetPayoutStandardDateInput').value = `${defEnd.slice(0, 10).replace(/-/g, '.')} 18:00`;
   document.getElementById('settlementSetPayoutDateInput').value = '';
   document.getElementById('settlementSetPayoutDaysInput').value = 1;
@@ -20234,6 +20352,18 @@ function recalcSettlementSetModalPreview(isFromDays) {
       if (daysInput) daysInput.value = days;
       if (claimDaysInput) claimDaysInput.value = days;
       if (payoutDaysInput) payoutDaysInput.value = days;
+
+      if (document.getElementById('settlementSetModalMode')?.value === 'add' && typeof getStandardRoundByDate === 'function') {
+        const stdRound = getStandardRoundByDate(startInput.value);
+        const claimRoundInput = document.getElementById('settlementSetClaimRoundInput');
+        const payoutRoundInput = document.getElementById('settlementSetPayoutRoundInput');
+        if (claimRoundInput && (!claimRoundInput.value || claimRoundInput.value.includes('차'))) {
+          claimRoundInput.value = stdRound;
+        }
+        if (payoutRoundInput && (!payoutRoundInput.value || payoutRoundInput.value.includes('차'))) {
+          payoutRoundInput.value = stdRound;
+        }
+      }
     }
   }
 
