@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-23T07:22:57.310Z",
+  "updatedAt": "2026-09-23T08:00:15.459Z",
   "sources": {
     "종합 간병(현대해상)": {
       "sourceType": "file",
@@ -16769,8 +16769,8 @@
       "accidentType": "상해",
       "careType": "입원",
       "applyType": "입원",
-      "claimClassification": "",
-      "claimCategory": "",
+      "claimClassification": "정상",
+      "claimCategory": "정상",
       "careStartDate": "2026.09.22 15:00",
       "careEndDate": "",
       "expectedDays": "7일",
@@ -16800,7 +16800,10 @@
       "csLatestType": null,
       "_applyTime": 1790056800000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "claimSetEnabledForCompleted": false,
+      "hasManualUpdate": true,
+      "updatedAt": "2026-09-23T08:00:15.459Z"
     }
   ],
   "assignments": [

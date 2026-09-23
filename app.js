@@ -19698,7 +19698,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
 
         const fullClaimAmount = claimForRound ? (Number(claimForRound.claimAmount) || (claimDays * dailyClaimPrice)) : (claimDays * dailyClaimPrice);
-        const fullPayoutAmount = payoutForRound ? (Number(payoutForRound.payoutAmount) || (payoutDays * cgDailyWage)) : (payoutDays * cgDailyWage);
+        const fullPayoutAmount = payoutForRound ? (Number(payoutForRound.payoutAmount) || (payoutDays * cgDailyWage)) : 0;
 
         let depositAmount = (claimForRound && claimForRound.depositAmount !== undefined && claimForRound.depositAmount !== null && claimForRound.depositAmount !== '')
           ? Number(claimForRound.depositAmount)
@@ -19709,7 +19709,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         }
 
         const isClaimDeposited = Boolean(depositAmount > 0 || (claimForRound && isClaimDepositConfirmed(claimForRound)));
-        const isPayoutPaid = Boolean(payoutForRound && isPayoutStatusPaid(payoutForRound.payoutStatus));
+        const isPayoutPaid = payoutForRound ? isPayoutStatusPaid(payoutForRound.payoutStatus) : true;
 
         const targetAppId = String(app ? app.id : '');
         const faxLogList = (window._gFaxLogsByAppId && window._gFaxLogsByAppId.get(targetAppId)) || window.gFaxLogs || [];
@@ -19730,11 +19730,11 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           claimStatus = isCompleted ? 'READY_TO_CLAIM' : 'UPCOMING_WAIT';
         }
 
-        let payoutStatus = 'UPCOMING_WAIT';
+        let payoutStatus = 'PAID';
         if (payoutForRound) {
           payoutStatus = isPayoutPaid ? 'PAID' : 'READY_TO_PAY';
         } else {
-          payoutStatus = isCompleted ? 'READY_TO_PAY' : 'UPCOMING_WAIT';
+          payoutStatus = 'PAID';
         }
 
         const marginAmount = fullClaimAmount - fullPayoutAmount;
@@ -19791,89 +19791,9 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           isOngoingCare
         });
       }
-    } else if (isCaregiverAssigned && (totalCareDays > 0 || (as && as.startDate))) {
-      // 3) 실제 청구서/지급서가 없는 경우 (진행중 고객 등):
-      // [사용자 요구사항]: 자동 생성시 차수를 1~10일은 해당월 1차, 11~20일은 해당월 2차, 21~말일은 해당월 3차로 설정
-      const periods = getCareCutoffPeriods(careStartDate, careEndDate, isOngoingCare);
-      const autoPeriods = (periods && periods.length > 0) ? periods : [{
-        roundLabel: getStandardRoundByDate(careStartDate),
-        startDate: careStartDate || '',
-        endDate: careEndDate || careStartDate || '',
-        standardDate: careEndDate || careStartDate || '',
-        days: totalCareDays > 0 ? totalCareDays : 1,
-        targetYear: new Date().getFullYear(),
-        targetMonth: new Date().getMonth() + 1
-      }];
-
-      autoPeriods.forEach((period, idx) => {
-        const setIndex = idx + 1;
-        const setDays = period.days || 1;
-        const hours = setDays * 24;
-        const roundStartDateStr = period.startDate || careStartDate || '';
-        const roundEndDateStr = period.endDate || careEndDate || careStartDate || '';
-        const standardDateStr = period.standardDate || roundEndDateStr || roundStartDateStr;
-        const roundLabel = period.roundLabel || getStandardRoundByDate(standardDateStr);
-
-        const targetYear = String(period.targetYear || new Date().getFullYear());
-        const targetMonth = period.targetMonth || (new Date().getMonth() + 1);
-        const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
-
-        const fullClaimAmount = setDays * dailyClaimPrice;
-        const fullPayoutAmount = setDays * cgDailyWage;
-        const marginAmount = fullClaimAmount - fullPayoutAmount;
-        const marginRate = fullClaimAmount > 0 ? ((marginAmount / fullClaimAmount) * 100).toFixed(1) : '0.0';
-
-        rounds.push({
-          roundNumber: setIndex,
-          setIndex: setIndex,
-          label: roundLabel,
-          claimRoundLabel: roundLabel,
-          payoutRoundLabel: roundLabel,
-          claimStandardDate: standardDateStr,
-          payoutStandardDate: standardDateStr,
-          claimDate: '',
-          payoutDate: '',
-          claimDays: setDays,
-          payoutDays: setDays,
-          days: setDays,
-          hours,
-          startDayOffset: (idx * 10) + 1,
-          endDayOffset: (idx * 10) + setDays,
-          startDateStr: roundStartDateStr,
-          endDateStr: roundEndDateStr,
-          stage: isCompleted ? 'COMPLETED' : 'ONGOING',
-          ongoingElapsed: isOngoingCare ? Math.min(setDays, Math.max(1, elapsedDays)) : setDays,
-          ongoingRemaining: isOngoingCare ? Math.max(0, setDays - elapsedDays) : 0,
-          dailyClaimPrice,
-          fullClaimAmount,
-          depositAmount: 0,
-          ongoingClaimAmount: fullClaimAmount,
-          claimId: `Q${String(app.id).replace('C', '')}.${setIndex}`,
-          claimStatus: isCompleted ? 'READY_TO_CLAIM' : 'UPCOMING_WAIT',
-          existingClaim: null,
-          isClaimCreated: false,
-          isFaxClaimSent: false,
-          isClaimSent: false,
-          isClaimDeposited: false,
-          isDepositDone: false,
-          cgDailyWage,
-          fullPayoutAmount,
-          ongoingPayoutAmount: fullPayoutAmount,
-          payoutId: `P${String(app.id).replace('C', '')}.${setIndex}`,
-          payoutStatus: isCompleted ? 'READY_TO_PAY' : 'UPCOMING_WAIT',
-          existingPayout: null,
-          isPayoutCreated: false,
-          isPayoutPaid: false,
-          marginAmount,
-          marginRate,
-          isSamsung,
-          isDateCustomized: false,
-          targetYear,
-          targetMonth,
-          targetMonthText,
-          isOngoingCare
-        });
-      });
+    } else {
+      // [사용자 요구사항]: 진행중인 경우 또는 엑셀/DB에 등록된 청구/지급 내역이 없는 경우에는 가상 세트를 자동 생성하지 않음!
+      // 세트 생성은 관리자가 수동으로 [+ 세트 추가] 또는 [기간선택 청구서 생성]을 통해 등록함.
     }
   }
 
@@ -19884,11 +19804,13 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
   const paidPayoutSum = (appPayouts && appPayouts.length > 0)
     ? appPayouts.filter(p => isPayoutStatusPaid(p.payoutStatus)).reduce((acc, p) => acc + (p.payoutAmount || 0), 0)
     : rounds.filter(r => r.isPayoutPaid).reduce((acc, r) => acc + r.fullPayoutAmount, 0);
-  const unpaidPayoutSum = confirmedPayoutSum - paidPayoutSum;
+  const unpaidPayoutSum = Math.max(0, confirmedPayoutSum - paidPayoutSum);
   const unpaidPayoutCount = rounds.filter(r => !r.isPayoutPaid).length;
   const isCarePeriodEnded = isCaregiverAssigned && isCompleted;
-  const isAllPayoutsPaid = rounds.length > 0 && unpaidPayoutCount === 0;
-  const isCaregiverPayoutDue = isCarePeriodEnded && (!isAllPayoutsPaid || rounds.length === 0);
+  const isAllPayoutsPaid = (appPayouts && appPayouts.length > 0)
+    ? appPayouts.every(p => isPayoutStatusPaid(p.payoutStatus))
+    : (rounds.length > 0 ? unpaidPayoutCount === 0 : true);
+  const isCaregiverPayoutDue = isCarePeriodEnded && unpaidPayoutSum > 0 && !isAllPayoutsPaid;
   const totalOngoingPayoutEst = rounds.reduce((acc, r) => acc + (r.existingPayout ? (r.existingPayout.payoutAmount || 0) : r.ongoingPayoutAmount), 0);
 
   // 손사 청구 상태 및 입금 미완료(미수) 판정
@@ -22072,9 +21994,9 @@ function checkCustomerClaimSetStatus(app, appAssigns) {
 
   const currentStatus = typeof determineRealCareStatus === 'function' ? determineRealCareStatus(app, appAssigns) : (app.status || '');
   let claimVal = '';
-  if (app.claimClassification !== undefined && app.claimClassification !== null) {
+  if (app.claimClassification !== undefined && app.claimClassification !== null && String(app.claimClassification).trim() !== '') {
     claimVal = String(app.claimClassification).trim();
-  } else if (app.claimCategory !== undefined && app.claimCategory !== null) {
+  } else if (app.claimCategory !== undefined && app.claimCategory !== null && String(app.claimCategory).trim() !== '') {
     claimVal = String(app.claimCategory).trim();
   } else {
     claimVal = '정상';
@@ -22796,6 +22718,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
 
   const cardTheme = getCustomerCardStatusTheme(app, appAssigns);
   const currentStatus = determineRealCareStatus(app, appAssigns);
+  const isOngoingCare = (currentStatus === '진행중');
   const claimVal = String(app.claimClassification || app.claimCategory || '').trim();
   const claimStatus = checkCustomerClaimSetStatus(app, appAssigns);
   const isPeekMode = Boolean(gClaimSetPeekMode[app.id]);
@@ -23511,17 +23434,22 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
         <!-- Lifecycle Rounds List (차수별 통합 행/카드) -->
         <div class="p-5 sm:p-6 bg-slate-100/60 space-y-4">
           ${rounds.length === 0 ? `
-            <div class="p-12 text-center bg-white rounded-3xl border-2 border-dashed border-slate-300 space-y-3">
-              <div class="w-14 h-14 mx-auto rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center">
-                <i data-lucide="calendar-x" class="w-7 h-7"></i>
+            <div class="p-10 text-center bg-white rounded-3xl border-2 border-dashed border-slate-300 space-y-3 shadow-2xs">
+              <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <i data-lucide="calendar" class="w-6 h-6"></i>
               </div>
-              <h5 class="text-sm font-black text-slate-700">등록된 간병 일정이 없습니다.</h5>
-              <p class="text-xs text-slate-500 max-w-sm mx-auto">
-                간병인을 배정하고 근무 일정을 등록하시면 청구와 정산이 시계열 차수별로 자동 생성됩니다.
+              <h5 class="text-sm font-black text-slate-800">
+                ${isOngoingCare ? '현재 간병 진행 중인 고객입니다 (진행 중 자동 세트 생성 없음)' : '등록된 정산·청구 세트가 없습니다.'}
+              </h5>
+              <p class="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                ${isOngoingCare 
+                  ? '간병 진행 중에는 미지급 오분류를 방지하기 위해 가상 세트가 자동 생성되지 않습니다.<br>청구 또는 정산이 필요한 시점에 우측 상단의 <b>[+ 세트 추가]</b> 또는 <b>[기간선택 청구서 생성]</b>으로 세트를 등록하실 수 있습니다.'
+                  : '엑셀에서 확인 가능한 실제 청구/지급 세트만 표시되며, 필요 시 수동으로 세트를 추가할 수 있습니다.'}
               </p>
-              <div class="pt-2">
-                <button type="button" onclick="openNewAssignModal('${app.id}', false)" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-md cursor-pointer">
-                  간병인 배정 및 일정 등록
+              <div class="pt-2 flex items-center justify-center gap-2">
+                <button type="button" onclick="openAddCustomSettlementSetModal('${app.id}')" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md cursor-pointer flex items-center gap-1.5 transition-all active:scale-95">
+                  <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                  <span>+ 정산·청구 세트 수동 추가</span>
                 </button>
               </div>
             </div>
@@ -27267,14 +27195,14 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
   }
 
   // 2. 간병비 미지급 체크 (만료 후 미지급 / 등록된 정산 건 미지급) -> 오렌지색!
-  if (sched.isCaregiverPayoutDue) {
-    const dueWage = sched.unpaidPayoutSum > 0 ? sched.unpaidPayoutSum : (careProg ? careProg.totalDays * (as?.dailyWage || 140000) : 0);
+  const isRealOngoing = (determineRealCareStatus(app) === '진행중');
+  if (!isRealOngoing && sched.isCaregiverPayoutDue && sched.unpaidPayoutSum > 0) {
     badges.push(`
       <span class="px-2 py-0.5 rounded-md bg-orange-500 text-white font-black text-[10.5px] flex items-center gap-1 shadow-2xs animate-pulse whitespace-nowrap" title="간병 기간이 종료되었으나 간병비가 미지급 상태입니다.">
-        <i data-lucide="alert-triangle" class="w-3 h-3 text-white"></i> 🚨 간병비 미지급 (지급대기)${dueWage > 0 ? ` (${formatCurrency(dueWage)}원)` : ''}
+        <i data-lucide="alert-triangle" class="w-3 h-3 text-white"></i> 🚨 간병비 미지급 (지급대기) (${formatCurrency(sched.unpaidPayoutSum)}원)
       </span>
     `);
-  } else if (sched.unpaidPayoutSum > 0) {
+  } else if (!isRealOngoing && sched.unpaidPayoutSum > 0) {
     badges.push(`
       <span class="px-2 py-0.5 rounded-md bg-orange-500 text-white font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="등록된 간병비 정산 중 미지급 건이 있습니다.">
         <i data-lucide="alert-circle" class="w-3 h-3 text-white"></i> 🚨 간병비 미지급 (지급대기) (${formatCurrency(sched.unpaidPayoutSum)}원)
@@ -27290,7 +27218,7 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
 
   // 3. 청구금 미입금 (보험사/손사 미수금) 체크 -> 빨강색!
   const unpaidClaimAmt = sched.unconfirmedClaimSum || app.estimatedUnpaid || 0;
-  if (sched.hasUnpaidClaim || unpaidClaimAmt > 0) {
+  if (!isRealOngoing && (sched.hasUnpaidClaim || unpaidClaimAmt > 0) && (app.claimCount > 0 || appClaims.length > 0)) {
     badges.push(`
       <span class="px-2 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="보험사로 청구되었으나 아직 입금 확인이 되지 않은 미수금(청구금 미입금)입니다.">
         <i data-lucide="alert-circle" class="w-3 h-3 text-white"></i> 🚨 청구금 미입금 (미수금)${unpaidClaimAmt > 0 ? ` (${formatCurrency(unpaidClaimAmt)}원)` : ''}
@@ -27571,6 +27499,11 @@ function renderUnifiedCareHub() {
   // 2. 미수금(estimatedUnpaid > 0)이 있는 경우 또는 연계 청구서(gClaims)에 미확인/미수납 잔액이 남아있는 경우만 포함
   const isAppHasUnpaidClaimHelper = (app) => {
     if (!app) return false;
+    const realSt = determineRealCareStatus(app);
+    // [사용자 요구사항]: 진행중이고 아직 실제 청구서가 작성되지 않은 건은 미수금 대사에서 제외 (진행 중 자동 세트 생성 차단 연계)
+    if (realSt === '진행중' && (app.claimCount === 0 || !app.claimCount)) {
+      return false;
+    }
     const unpaidAmt = Number(app.estimatedUnpaid) || 0;
     if (unpaidAmt <= 0) return false;
 
@@ -27586,38 +27519,27 @@ function renderUnifiedCareHub() {
     if (appClaims.length > 0) {
       return appClaims.some(c => !isClaimDepositConfirmed(c) && (Number(c.unpaidAmount) > 0 || (Number(c.claimAmount) > 0 && Number(c.depositAmount || 0) < Number(c.claimAmount))));
     }
-    return true;
+    return false;
   };
 
   // [간병비 미지급(지급 대기) 정밀 판정 헬퍼]:
   // 1. 취소/미해당/서비스불가 건은 제외
-  // 2. gPayouts에 미지급(payoutStatus !== '지급' 등) 건이 있는 경우
-  // 3. 카드에 표출되는 간병비 정산 스케줄(sched.unpaidPayoutSum > 0 또는 sched.isCaregiverPayoutDue) 상 미지급이 존재하는 경우 (노영갑 등)
+  // 2. [사용자 요구사항]: 진행 중인 건(진행중)은 아직 간병 종료 전이므로 지급 대기 카운트에서 제외
+  // 3. gPayouts에 실제 미지급(payoutStatus !== '지급' && payoutStatus !== '지급완료') 건이 있는 경우
+  // 4. 등록된 모든 지급서가 지급완료이거나 totalPayout이 완납된 경우 완료로 제외
   const isAppHasUnpaidPayoutHelper = (app) => {
     if (!app) return false;
     const realSt = determineRealCareStatus(app);
     if (realSt === '취소' || realSt === '서비스 취소' || realSt === '미해당' || realSt === '당일서비스취소' || realSt.includes('서비스불가') || realSt === '제외') {
       return false;
     }
+    // [사용자 요구사항]: 진행 중인 건은 간병 종료 전이므로 지급대기 제외
+    if (realSt === '진행중') {
+      return false;
+    }
     if (unpaidPayoutAppIdSet.has(String(app.id))) return true;
 
     const appId = String(app.id || '').trim();
-    const appAssigns = (gAssigns || []).filter(a => {
-      if (!a) return false;
-      const aApplyId = String(a.applyId || '').trim();
-      return (aApplyId && (aApplyId === appId || aApplyId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || aApplyId.replace(/^C/, 'H') === appId.replace(/^C/, 'H'))) ||
-             (!aApplyId && a.patientName && a.patientName.trim() === (app.patientName || '').trim());
-    });
-    const as = (typeof getActiveCaregiverAssignment === 'function') ? getActiveCaregiverAssignment(app, appAssigns) : appAssigns[0];
-    if (!as || (!as.caregiverName && !as.startDate)) return false;
-
-    const prog = as ? getCareProgressInfo(as) : null;
-    const appClaims = (gClaims || []).filter(c => {
-      if (!c) return false;
-      const cApplyId = String(c.applyId || '').trim();
-      return (appId && cApplyId && (cApplyId === appId || cApplyId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || cApplyId.replace(/^C/, 'H') === appId.replace(/^C/, 'H'))) ||
-             (!cApplyId && c.patientName && c.patientName.trim() === (app.patientName || '').trim());
-    });
     const appPayouts = (gPayouts || []).filter(p => {
       if (!p) return false;
       const pApplyId = String(p.applyId || '').trim();
@@ -27631,12 +27553,18 @@ function renderUnifiedCareHub() {
     });
     if (hasUnpaidPayout) return true;
 
-    if (typeof calculateCareSettlementSchedule === 'function') {
-      const sched = calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts);
-      if (sched && (sched.isCaregiverPayoutDue || sched.unpaidPayoutSum > 0)) {
-        return true;
-      }
+    // 만약 이미 등록된 모든 지급서가 지급완료라면 절대 미지급 아님!
+    if (appPayouts.length > 0 && appPayouts.every(p => {
+      const st = String(p.payoutStatus || p.status || '').trim();
+      return st === '지급' || st === '지급완료' || st === '선지급완료' || p.isPaid === true;
+    })) {
+      return false;
     }
+
+    if ((Number(app.totalPayout) || 0) > 0) {
+      return false;
+    }
+
     return false;
   };
 
