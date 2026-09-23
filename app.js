@@ -2309,8 +2309,23 @@ function isMatchCustomerRecord(app, item) {
   const clean = (s) => String(s || '').replace(/[^0-9a-zA-Z가-힣]/g, '').toLowerCase();
 
   const aId = String(app.id || app.patientId || '').trim();
-  const iApplyId = String(item.applyId || item.id || '').trim();
+  const rawItemApplyId = String(item.applyId || (item.isApplication || (item.id && (String(item.id).startsWith('C') || String(item.id).startsWith('H') || String(item.id).startsWith('D')) && !String(item.id).includes('.')) ? item.id : '') || '').trim();
+  const iApplyId = rawItemApplyId;
   const idMatch = Boolean(aId && iApplyId && (aId === iApplyId || aId.replace(/^H/, 'C') === iApplyId.replace(/^H/, 'C') || aId.replace(/^C/, 'H') === iApplyId.replace(/^C/, 'H')));
+
+  // 1) ID matches AND names are compatible (checked above)
+  if (idMatch) return true;
+
+  // IMPORTANT: If BOTH app has an id AND item has an explicit applyId, and they do NOT match:
+  if (aId && iApplyId && !idMatch) {
+    // Check if item's applyId is an Excel typo belonging to a completely different customer name
+    const foreignApp = Array.isArray(window.gApps) ? window.gApps.find(x => x && x.id === iApplyId) : null;
+    if (foreignApp && foreignApp.patientName && foreignApp.patientName.trim() !== aName) {
+      if (nameMatch && aName.length >= 2) return true;
+    }
+    // Otherwise, different applyIds for the same person (e.g. C0186 vs C0187) are distinct applications! NEVER match!
+    return false;
+  }
 
   const aPhone = clean(app.phone || app.applicantPhone);
   const iPhone = clean(item.phone || item.contact || item.applicantContact || item.applicantPhone);
@@ -2326,9 +2341,6 @@ function isMatchCustomerRecord(app, item) {
 
   const nameMatch = Boolean(aName && iName && (aName === iName || aName.includes(iName) || iName.includes(aName)));
 
-  // 1) ID matches AND names are compatible (checked above)
-  if (idMatch) return true;
-
   // 2) Name matches AND (phone OR accidentNumber OR policyNumber matches)
   if (nameMatch && (phoneMatch || accMatch || polMatch)) return true;
 
@@ -2337,14 +2349,6 @@ function isMatchCustomerRecord(app, item) {
 
   // 4) Fallback: Name matches and neither has contradictory applyId
   if (nameMatch && aName.length >= 2 && !iApplyId) return true;
-
-  // 5) Name matches AND item's applyId is an Excel typo belonging to a completely different customer name
-  if (nameMatch && aName.length >= 2 && iApplyId) {
-    const foreignApp = Array.isArray(window.gApps) ? window.gApps.find(x => x && x.id === iApplyId) : null;
-    if (foreignApp && foreignApp.patientName && foreignApp.patientName !== aName) {
-      return true;
-    }
-  }
 
   return false;
 }
@@ -21624,7 +21628,28 @@ function getActiveCaregiverAssignment(app, specificAssigns) {
   let assigns = specificAssigns;
   if (!assigns) {
     const list = (typeof gAssigns !== 'undefined' && Array.isArray(gAssigns)) ? gAssigns : (Array.isArray(window.gAssigns) ? window.gAssigns : []);
-    assigns = list.filter(a => a && (String(a.applyId) === String(app.id) || (a.patientName && a.patientName.trim() === (app.patientName || '').trim())));
+    const appId = String(app.id || app.patientId || '').trim();
+    const appName = (app.patientName || app.customerName || '').trim();
+
+    // 1) 신청 ID(applyId) 엄격 매칭 우선 (C/H 정규화 포함)
+    if (appId) {
+      assigns = list.filter(a => {
+        if (!a) return false;
+        const aApplyId = String(a.applyId || '').trim();
+        return aApplyId && (aApplyId === appId || aApplyId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || aApplyId.replace(/^C/, 'H') === appId.replace(/^C/, 'H'));
+      });
+    }
+
+    // 2) applyId로 찾지 못했고 환자명이 있는 경우, applyId가 없거나 비어있는 배정 건에 한해서만 환자명 매칭 허용!
+    // (절대 다른 신청ID를 가진 배정 건을 동일 환자명이라는 이유로 가로채지 않음!)
+    if ((!assigns || assigns.length === 0) && appName) {
+      assigns = list.filter(a => {
+        if (!a) return false;
+        const aApplyId = String(a.applyId || '').trim();
+        if (aApplyId) return false; // 다른 신청ID가 적혀있는 배정은 절대 매칭 금지
+        return a.patientName && a.patientName.trim() === appName;
+      });
+    }
   }
   if (!assigns || assigns.length === 0) return null;
 
@@ -21704,11 +21729,33 @@ function determineRealCareStatus(app, specificAssigns) {
     return rawSt;
   }
 
+  const isRawCompleted = rawSt === '완료' || rawSt === '정산완료' || rawSt.includes('완료') || rawSt.includes('종료') || rawSt.includes('종결');
+
   // 1-3. 종료일시에 취소/미해당/사망 문구가 있는 경우
   if (eTrim) {
     if (eTrim.includes('취소') || eTrim.includes('철회')) return '취소';
     if (eTrim.includes('미해당')) return '미해당';
     if (eTrim.includes('사망')) return '완료';
+  }
+
+  // 1-4. 신청서 원본 상태가 이미 '완료' 또는 '정산완료'인 경우:
+  // 배정이 아예 없거나(과거 완료건), 이 건에 대해 오늘/미래에 남은 유효 일정이 없으면 무조건 '완료'로 유지!
+  if (isRawCompleted) {
+    if (!as) return '완료';
+    if (eTrim && eTrim !== '진행중' && eTrim !== '-') {
+      const pEnd = (typeof parseCareDateTime === 'function') ? parseCareDateTime(eTrim) : (typeof parseCareDate === 'function' ? parseCareDate(eTrim) : null);
+      if (pEnd) {
+        const now = new Date();
+        const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const eZero = new Date(pEnd.getFullYear(), pEnd.getMonth(), pEnd.getDate());
+        if (eZero < todayZero || (eZero.getTime() === todayZero.getTime() && now >= pEnd)) {
+          return '완료';
+        }
+      }
+    } else {
+      // 종료일이 빈칸인 배정이라도 신청서 자체가 이미 '완료'이면 완료로 판정
+      return '완료';
+    }
   }
 
   // 2. 간병 시작일시 자체가 없거나 간병인 배정이 없는 경우
@@ -21760,8 +21807,27 @@ function reconcileAppsWithActiveAssignments(targetApps = null, targetAssigns = n
   if (!Array.isArray(apps) || apps.length === 0 || !Array.isArray(assigns) || assigns.length === 0) return;
   let updatedAny = false;
   apps.forEach(app => {
-    if (!app || !app.id) return;
-    const appAssigns = assigns.filter(a => a && (String(a.applyId) === String(app.id) || (a.patientName && a.patientName.trim() === (app.patientName || '').trim())));
+    const appId = String(app.id || app.patientId || '').trim();
+    const appName = (app.patientName || app.customerName || '').trim();
+
+    // 1) 신청 ID(applyId) 엄격 매칭
+    let appAssigns = [];
+    if (appId) {
+      appAssigns = assigns.filter(a => {
+        if (!a) return false;
+        const aApplyId = String(a.applyId || '').trim();
+        return aApplyId && (aApplyId === appId || aApplyId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || aApplyId.replace(/^C/, 'H') === appId.replace(/^C/, 'H'));
+      });
+    }
+    // 2) applyId로 못 찾았고 환자명이 있는 경우, applyId가 비어있는 배정 건만 허용
+    if (appAssigns.length === 0 && appName) {
+      appAssigns = assigns.filter(a => {
+        if (!a) return false;
+        const aApplyId = String(a.applyId || '').trim();
+        if (aApplyId) return false;
+        return a.patientName && a.patientName.trim() === appName;
+      });
+    }
     if (!appAssigns || appAssigns.length === 0) return;
 
     const activeAssign = (typeof getActiveCaregiverAssignment === 'function') ? getActiveCaregiverAssignment(app, appAssigns) : appAssigns[appAssigns.length - 1];
@@ -21791,10 +21857,15 @@ function reconcileAppsWithActiveAssignments(targetApps = null, targetAssigns = n
       }
     }
 
+    const isAlreadyCompleted = String(app.status || app.rawStatus || '').includes('완료') || String(app.status || app.rawStatus || '').includes('종료');
     const realStatus = (typeof determineRealCareStatus === 'function') ? determineRealCareStatus(app, appAssigns) : null;
     if (realStatus && app.status !== realStatus && !app.hasManualUpdate) {
-      app.status = realStatus;
-      updatedAny = true;
+      if (isAlreadyCompleted && realStatus === '진행중') {
+        // 이미 완료된 건은 진행중으로 뒤집지 않음
+      } else {
+        app.status = realStatus;
+        updatedAny = true;
+      }
     }
   });
 
@@ -26531,7 +26602,15 @@ function renderUnifiedCareHub() {
     const unpaidAmt = Number(app.estimatedUnpaid) || 0;
     if (unpaidAmt <= 0) return false;
 
-    const appClaims = (gClaims || []).filter(c => c && (String(c.applyId) === String(app.id) || (c.patientName && c.patientName.trim() === (app.patientName || '').trim())));
+    const appId = String(app.id || '').trim();
+    const appClaims = (gClaims || []).filter(c => {
+      if (!c) return false;
+      const cApplyId = String(c.applyId || '').trim();
+      if (appId && cApplyId) {
+        return cApplyId === appId || cApplyId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || cApplyId.replace(/^C/, 'H') === appId.replace(/^C/, 'H');
+      }
+      return !cApplyId && c.patientName && c.patientName.trim() === (app.patientName || '').trim();
+    });
     if (appClaims.length > 0) {
       return appClaims.some(c => !isClaimDepositConfirmed(c) && (Number(c.unpaidAmount) > 0 || (Number(c.claimAmount) > 0 && Number(c.depositAmount || 0) < Number(c.claimAmount))));
     }
