@@ -30413,23 +30413,12 @@ async function executeFullDataReset() {
   if (!ans) return;
 
   try {
-    // 1. Convex 클라우드 DB 완전 초기화 (개발 서버 rapid-raccoon-895 & 운영 실서버 gallant-weasel-360 양쪽 모두 0건 강제 동기화)
-    const purgeTargets = [
-      typeof CONVEX_URL !== 'undefined' ? CONVEX_URL : null,
-      'https://rapid-raccoon-895.convex.cloud',
-      'https://gallant-weasel-360.convex.cloud'
-    ].filter((v, i, a) => v && a.indexOf(v) === i);
-
-    for (const targetUrl of purgeTargets) {
+    // 1. Convex 클라우드 DB 완전 초기화 (현재 연결된 단 하나의 환경만 엄격하게 초기화)
+    if (typeof syncToConvex === 'function') {
+      await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'all' });
       try {
-        await fetch(`${targetUrl}/api/mutation`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: 'sync:resetAndPurgeLaunchData', args: { company: 'all' } })
-        });
-      } catch (err) {
-        console.warn(`[Reset Warning] ${targetUrl} 초기화 중 오류:`, err);
-      }
+        await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'all' });
+      } catch (e2) {}
     }
 
     // 2. 로컬 서버 디스크 파일(hub_apps_real.json) 0건 초기화
@@ -36303,22 +36292,13 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
       if (!k.startsWith('_')) cleanPayload[k] = v;
     }
 
-    const appSyncTargets = [
-      typeof CONVEX_URL !== 'undefined' ? CONVEX_URL : null,
-      'https://rapid-raccoon-895.convex.cloud',
-      'https://gallant-weasel-360.convex.cloud'
-    ].filter((v, i, a) => v && a.indexOf(v) === i);
-
-    for (const targetUrl of appSyncTargets) {
+    // Convex Cloud 실시간 동기화 (현재 연결된 단 하나의 환경에만 엄격하게 저장)
+    if (typeof syncToConvex === 'function') {
       try {
-        await fetch(`${targetUrl}/api/mutation`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: 'sync:saveApplication', args: { app: cleanPayload } })
-        });
-        console.log(`[Convex Cloud] 신규 고객 ${newApp.id} (${newApp.patientName}) -> ${targetUrl} 저장 완료`);
+        await syncToConvex('sync:saveApplication', { app: cleanPayload });
+        console.log(`[Convex Cloud] 신규 고객 ${newApp.id} (${newApp.patientName}) -> ${CONVEX_URL} 저장 완료`);
       } catch (cvxErr) {
-        console.warn(`[Convex Sync Error] ${targetUrl}:`, cvxErr);
+        console.warn(`[Convex Sync Error] ${CONVEX_URL}:`, cvxErr);
       }
     }
 
@@ -44792,23 +44772,13 @@ async function executeApplyLaunchData(company) {
 
   const isComprehensive = (companyKey === 'hyundai' || String(companyLabel).includes('종합'));
 
-  // 0. Convex 클라우드 DB 기존 전체 데이터 전면 초기화 (Reset - 개발 및 실서버 양쪽 모두 완벽 초기화)
-  showToast(`[${companyLabel}] 기존 데이터를 클라우드 서버에서 전면 초기화(삭제) 중입니다...`, 'info');
-  const launchPurgeTargets = [
-    typeof CONVEX_URL !== 'undefined' ? CONVEX_URL : null,
-    'https://rapid-raccoon-895.convex.cloud',
-    'https://gallant-weasel-360.convex.cloud'
-  ].filter((v, i, a) => v && a.indexOf(v) === i);
-
-  for (const targetUrl of launchPurgeTargets) {
+  // 0. Convex 클라우드 DB 기존 데이터 초기화 (현재 접속 환경 기준 격리)
+  if (typeof syncToConvex === 'function') {
+    showToast(`[${companyLabel}] 기존 데이터를 클라우드 서버에서 초기화(삭제) 중입니다...`, 'info');
     try {
-      await fetch(`${targetUrl}/api/mutation`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: 'sync:resetAndPurgeLaunchData', args: { company: isComprehensive ? 'all' : companyKey } })
-      });
+      await syncToConvex('sync:resetAndPurgeLaunchData', { company: isComprehensive ? 'all' : companyKey });
     } catch (err) {
-      console.warn(`[Launch Reset Warning] ${targetUrl}:`, err);
+      console.warn('[Launch Reset Warning]', err);
     }
   }
 
