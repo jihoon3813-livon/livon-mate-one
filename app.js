@@ -19573,8 +19573,8 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       const isClaimDeposited = Boolean(cSet.claimStatus === '입금완료' || cSet.claimStatus === '수납완료' || depositAmount >= fullClaimAmount);
       const isPayoutPaid = Boolean(cSet.payoutStatus === '지급완료' || cSet.payoutStatus === '지급' || isPayoutStatusPaid(cSet.payoutStatus));
 
-      const existingClaim = (appClaims || []).find(c => c.id === cSet.claimId) || (appClaims || [])[idx] || null;
-      const existingPayout = (appPayouts || []).find(p => p.id === cSet.payoutId) || (appPayouts || [])[idx] || null;
+      const existingClaim = (appClaims || []).find(c => c && c.id === cSet.claimId) || (appClaims || [])[idx] || null;
+      const existingPayout = (appPayouts || []).find(p => p && p.id === cSet.payoutId) || (appPayouts || [])[idx] || null;
 
       let claimStatus = 'UPCOMING_WAIT';
       if (isClaimDeposited) {
@@ -19923,7 +19923,7 @@ async function createInterimPayout(applyId, roundNumber, targetDays) {
   if (!confirmed) return;
 
   const now = new Date();
-  const payoutIdSuffix = `${as.id.replace('A', '')}.${roundNumber || 1}`;
+  const payoutIdSuffix = `${(as?.id || 'A000').replace('A', '')}.${roundNumber || 1}`;
   const newPayout = {
     id: `P${applyId.replace('C', '')}.${payoutIdSuffix}`,
     applyId: applyId,
@@ -22719,8 +22719,9 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
   const isHdWaitingSms = (app.insuranceCompany || '').includes('현대해상') && 
     (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') || (!app.policyNumber || app.policyNumber === '-'));
 
-  const csRecords = app.csRecords || [];
+  const csRecords = Array.isArray(app.csRecords) ? app.csRecords : [];
   const unresolvedComplaints = csRecords.filter(r => {
+    if (!r) return false;
     const isResolved = r.isResolved === true || r.label === '처리완료' || r.label === '처리불가';
     const isComplaint = r.type === '민원' || r.label === '긴급' || r.label === '강성' || r.label === '중요' || r.label === '민원';
     return !isResolved && isComplaint;
@@ -22748,15 +22749,15 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
               ${unresolvedComplaints.map(u => `
                 <div class="text-[11.5px] bg-white/95 px-3 py-2 rounded-xl border border-rose-300 text-slate-800 flex items-center justify-between gap-2 flex-wrap shadow-xs">
                   <div class="flex items-center gap-2 flex-wrap min-w-0">
-                    <span class="px-2 py-0.5 rounded font-black text-[10px] ${u.label === '강성' ? 'bg-rose-700 text-white' : 'bg-amber-500 text-white'}">[${u.label}]</span>
-                    <span class="font-bold text-slate-900">${u.category || u.type}</span>
+                    <span class="px-2 py-0.5 rounded font-black text-[10px] ${u && u.label === '강성' ? 'bg-rose-700 text-white' : 'bg-amber-500 text-white'}">[${u ? u.label : ''}]</span>
+                    <span class="font-bold text-slate-900">${(u && (u.category || u.type)) || '-'}</span>
                     <span class="text-slate-300">|</span>
-                    <span class="text-slate-500 font-mono text-[11px]">${u.dateTime || '-'}</span>
+                    <span class="text-slate-500 font-mono text-[11px]">${(u && u.dateTime) || '-'}</span>
                     <span class="text-slate-300">|</span>
-                    <span class="text-slate-700 font-medium truncate max-w-lg">${u.content || (u.summary ? u.summary.split('\n')[0] : '')}</span>
+                    <span class="text-slate-700 font-medium truncate max-w-lg">${(u && (u.content || (u.summary ? u.summary.split('\n')[0] : ''))) || '-'}</span>
                   </div>
                   <div class="flex items-center gap-1.5 flex-shrink-0">
-                    <button type="button" onclick="toggleCsRecordResolved('${app.id}', '${u.id}', '처리완료')" 
+                    <button type="button" onclick="toggleCsRecordResolved('${app.id}', '${u ? u.id : ''}', '처리완료')" 
                       class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10.5px] shadow-xs flex items-center gap-1 transition-all cursor-pointer">
                       <i data-lucide="check-circle" class="w-3 h-3"></i> 즉시 처리완료
                     </button>
@@ -23034,11 +23035,11 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                 ${sortedAssigns.length > 1 ? `
                   <div class="bg-slate-200/80 p-1.5 rounded-2xl flex items-center gap-1.5 overflow-x-auto custom-scrollbar border border-slate-300/80">
                     ${sortedAssigns.map((aItem, aIdx) => {
-                      const isSelected = aItem.id === as.id;
+                      const isSelected = Boolean(as && aItem && aItem.id === as.id);
                       const isLatest = aIdx === sortedAssigns.length - 1;
-                      const roundLabel = `${aIdx + 1}차: ${maskName(aItem.caregiverName)}`;
+                      const roundLabel = `${aIdx + 1}차: ${maskName(aItem ? aItem.caregiverName : '')}`;
                       return `
-                        <button type="button" onclick="switchCaregiverTab('${aItem.id}')"
+                        <button type="button" onclick="switchCaregiverTab('${aItem ? aItem.id : ''}')"
                           class="px-2.5 py-1 rounded-xl font-black text-[10.5px] flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${
                             isSelected
                               ? 'bg-sky-600 text-white shadow-sm ring-2 ring-sky-300'
@@ -23059,16 +23060,16 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                 <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
                   <div class="flex items-center justify-between pb-2 border-b border-slate-100">
                     <div class="flex items-center gap-2">
-                      <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-mono font-bold text-[10px]">${as.id}</span>
-                      <b class="text-sm text-slate-900">${maskName(as.caregiverName)}</b>
+                      <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-mono font-bold text-[10px]">${as ? as.id : '-'}</span>
+                      <b class="text-sm text-slate-900">${as ? maskName(as.caregiverName) : '간병인 미배정'}</b>
                       ${(birth && birth !== '-' && birth !== 'null' && birth.trim() !== '') ? `<span class="text-slate-500 text-[11px]">(${maskBirth(birth)})</span>` : ''}
                       ${sortedAssigns.length > 1 ? `
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${as.id === sortedAssigns[sortedAssigns.length - 1].id ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-600 border border-slate-200'}">
-                          ${as.id === sortedAssigns[sortedAssigns.length - 1].id ? '현재 투입중' : '종료(정산보존)'}
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${as && sortedAssigns[sortedAssigns.length - 1] && as.id === sortedAssigns[sortedAssigns.length - 1].id ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-600 border border-slate-200'}">
+                          ${as && sortedAssigns[sortedAssigns.length - 1] && as.id === sortedAssigns[sortedAssigns.length - 1].id ? '현재 투입중' : '종료(정산보존)'}
                         </span>
                       ` : ''}
                     </div>
-                    <button type="button" onclick="openCareScheduleModal('${as.id}')" 
+                    <button type="button" onclick="openCareScheduleModal('${as ? as.id : ''}')" 
                       class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1 cursor-pointer">
                       <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
                     </button>
@@ -24025,19 +24026,29 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                       <div class="pt-2 border-t ${isPayoutDone ? 'border-slate-200' : 'border-amber-200/60'}">
                         ${isPayoutDone ? `
                           <div class="flex items-center gap-1.5">
-                            <button type="button" onclick="togglePayoutStatus('${r.existingPayout.id}')" 
-                              class="flex-1 py-1.5 rounded-xl bg-white hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer" title="간병비 지급 취소하고 미지급 상태로 원복">
-                              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-                              <span>지급취소 (원복)</span>
-                            </button>
-                            <button type="button" onclick="openPayoutEditModal('${r.existingPayout.id}')" 
-                              class="px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all cursor-pointer" title="정산 내역 직접 수정">
-                              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
-                            </button>
-                            <button type="button" onclick="deleteInterimPayout('${app.id}', '${r.existingPayout.id}')" 
-                              class="px-2.5 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-600 font-bold text-xs hover:bg-rose-50 transition-all cursor-pointer" title="정산 내역 삭제">
-                              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                            </button>
+                            ${r.existingPayout ? `
+                              <button type="button" onclick="togglePayoutStatus('${r.existingPayout.id}')" 
+                                class="flex-1 py-1.5 rounded-xl bg-white hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer" title="간병비 지급 취소하고 미지급 상태로 원복">
+                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                                <span>지급취소 (원복)</span>
+                              </button>
+                              <button type="button" onclick="openPayoutEditModal('${r.existingPayout.id}')" 
+                                class="px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all cursor-pointer" title="정산 내역 직접 수정">
+                                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                              </button>
+                              <button type="button" onclick="deleteInterimPayout('${app.id}', '${r.existingPayout.id}')" 
+                                class="px-2.5 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-600 font-bold text-xs hover:bg-rose-50 transition-all cursor-pointer" title="정산 내역 삭제">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                              </button>
+                            ` : `
+                              <span class="flex-1 py-1.5 px-3 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs text-center border border-slate-200">
+                                정산완료 (지급 대기 없음)
+                              </span>
+                              <button type="button" onclick="executeImmediatePayout('${app.id}', ${r.roundNumber}, ${r.days})" 
+                                class="px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all cursor-pointer" title="정산 내역 신규 등록">
+                                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                              </button>
+                            `}
                           </div>
                         ` : `
                           <button type="button" onclick="${r.existingPayout ? `togglePayoutStatus('${r.existingPayout.id}')` : `executeImmediatePayout('${app.id}', ${r.roundNumber}, ${r.days})`}" 
@@ -24303,8 +24314,9 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
     : Math.max(0, appTotalClaim - appDepositConfirmed);
 
   // 4. 상담/CX 이력 및 미해결 민원/긴급 인입 건 추출
-  const csRecords = app.csRecords || [];
+  const csRecords = Array.isArray(app.csRecords) ? app.csRecords : [];
   const unresolvedComplaints = csRecords.filter(r => {
+    if (!r) return false;
     const isResolved = r.isResolved === true || r.label === '처리완료' || r.label === '처리불가';
     const isComplaint = r.type === '민원' || r.label === '긴급' || r.label === '강성' || r.label === '중요' || r.label === '민원';
     return !isResolved && isComplaint;
@@ -24332,15 +24344,15 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               ${unresolvedComplaints.map(u => `
                 <div class="text-[11.5px] bg-white/95 px-3 py-2 rounded-xl border border-rose-300 text-slate-800 flex items-center justify-between gap-2 flex-wrap shadow-xs">
                   <div class="flex items-center gap-2 flex-wrap min-w-0">
-                    <span class="px-2 py-0.5 rounded font-black text-[10px] ${u.label === '강성' ? 'bg-rose-700 text-white' : 'bg-amber-500 text-white'}">[${u.label}]</span>
-                    <span class="font-bold text-slate-900">${u.category || u.type}</span>
+                    <span class="px-2 py-0.5 rounded font-black text-[10px] ${u && u.label === '강성' ? 'bg-rose-700 text-white' : 'bg-amber-500 text-white'}">[${u ? u.label : ''}]</span>
+                    <span class="font-bold text-slate-900">${(u && (u.category || u.type)) || '-'}</span>
                     <span class="text-slate-300">|</span>
-                    <span class="text-slate-500 font-mono text-[11px]">${u.dateTime || '-'}</span>
+                    <span class="text-slate-500 font-mono text-[11px]">${(u && u.dateTime) || '-'}</span>
                     <span class="text-slate-300">|</span>
-                    <span class="text-slate-700 font-medium truncate max-w-lg">${u.content || (u.summary ? u.summary.split('\n')[0] : '')}</span>
+                    <span class="text-slate-700 font-medium truncate max-w-lg">${(u && (u.content || (u.summary ? u.summary.split('\n')[0] : ''))) || '-'}</span>
                   </div>
                   <div class="flex items-center gap-1.5 flex-shrink-0">
-                    <button type="button" onclick="toggleCsRecordResolved('${app.id}', '${u.id}', '처리완료')" 
+                    <button type="button" onclick="toggleCsRecordResolved('${app.id}', '${u ? u.id : ''}', '처리완료')" 
                       class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10.5px] shadow-xs flex items-center gap-1 transition-all cursor-pointer">
                       <i data-lucide="check-circle" class="w-3 h-3"></i> 즉시 처리완료
                     </button>
@@ -25161,13 +25173,13 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               ${sortedAssigns.length > 1 ? `
                 <div class="bg-slate-200/80 p-1.5 rounded-2xl flex items-center gap-1.5 overflow-x-auto custom-scrollbar border border-slate-300/80">
                   ${sortedAssigns.map((aItem, aIdx) => {
-                    const isSelected = aItem.id === as.id;
+                    const isSelected = Boolean(as && aItem && aItem.id === as.id);
                     const isLatest = aIdx === sortedAssigns.length - 1;
                     const aProg = getCareProgressInfo(aItem);
                     const isDone = aProg && aProg.status === 'completed';
-                    const roundLabel = `${aIdx + 1}차: ${maskName(aItem.caregiverName)}`;
+                    const roundLabel = `${aIdx + 1}차: ${maskName(aItem ? aItem.caregiverName : '')}`;
                     return `
-                      <button type="button" onclick="switchCaregiverTab('${aItem.id}')"
+                      <button type="button" onclick="switchCaregiverTab('${aItem ? aItem.id : ''}')"
                         class="px-3 py-1.5 rounded-xl font-black text-[11px] flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
                           isSelected
                             ? 'bg-sky-600 text-white shadow-sm ring-2 ring-sky-300'
@@ -25188,16 +25200,16 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
                 <div class="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div class="flex items-center gap-2">
-                    <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-mono font-bold text-[10px]">${as.id}</span>
-                    <b class="text-sm text-slate-900">${maskName(as.caregiverName)}</b>
+                    <span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-mono font-bold text-[10px]">${as ? as.id : '-'}</span>
+                    <b class="text-sm text-slate-900">${as ? maskName(as.caregiverName) : '간병인 미배정'}</b>
                     ${(birth && birth !== '-' && birth !== 'null' && birth.trim() !== '') ? `<span class="text-slate-500 text-[11px]">(${maskBirth(birth)})</span>` : ''}
                     ${sortedAssigns.length > 1 ? `
-                      <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${as.id === sortedAssigns[sortedAssigns.length - 1].id ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-600 border border-slate-200'}">
-                        ${as.id === sortedAssigns[sortedAssigns.length - 1].id ? '현재 투입중' : '종료(정산보존)'}
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${as && sortedAssigns[sortedAssigns.length - 1] && as.id === sortedAssigns[sortedAssigns.length - 1].id ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-600 border border-slate-200'}">
+                        ${as && sortedAssigns[sortedAssigns.length - 1] && as.id === sortedAssigns[sortedAssigns.length - 1].id ? '현재 투입중' : '종료(정산보존)'}
                       </span>
                     ` : ''}
                   </div>
-                  <button type="button" onclick="openCareScheduleModal('${as.id}')" 
+                  <button type="button" onclick="openCareScheduleModal('${as ? as.id : ''}')" 
                     class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1">
                     <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
                   </button>
@@ -25309,11 +25321,11 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                         <span class="w-2.5 h-2.5 rounded-full bg-rose-600 animate-pulse"></span>
                         <span class="text-xs">🚨 간병비 지급대상 (근무기간 만료)</span>
                       </div>
-                      <span class="font-mono font-black text-rose-800 text-xs">총 ${formatCurrency(schedule.confirmedPayoutSum > 0 ? schedule.confirmedPayoutSum : (prog ? prog.totalDays * (as.dailyWage || 140000) : 0))}원</span>
+                      <span class="font-mono font-black text-rose-800 text-xs">총 ${formatCurrency(schedule.confirmedPayoutSum > 0 ? schedule.confirmedPayoutSum : (prog ? prog.totalDays * (as ? (as.dailyWage || 140000) : 140000) : 0))}원</span>
                     </div>
                     <div class="text-[11px] text-rose-800 flex items-center justify-between gap-2">
-                      <span>근무기간(${as.startDate} ~ ${as.endDate})이 종료되었습니다.</span>
-                      <button type="button" onclick="event.stopPropagation(); executeBatchCaregiverPayout('${app.id}', '${as.id}')" 
+                      <span>근무기간(${as ? as.startDate : ''} ~ ${as ? as.endDate : ''})이 종료되었습니다.</span>
+                      <button type="button" onclick="event.stopPropagation(); executeBatchCaregiverPayout('${app.id}', '${as ? as.id : ''}')" 
                         class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs shadow-md transition-all cursor-pointer whitespace-nowrap">
                         간병비 지급완료 처리 ✓
                       </button>
@@ -25369,18 +25381,24 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
                           <div class="flex items-center gap-1 shrink-0">
                             ${isPayoutDone ? `
-                              <button type="button" onclick="event.stopPropagation(); togglePayoutStatus('${r.existingPayout.id}')" 
-                                class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-[10.5px] shadow-2xs transition-all cursor-pointer whitespace-nowrap" title="클릭 시 지급전으로 되돌리기">
-                                지급취소 (원복)
-                              </button>
-                              <button type="button" onclick="event.stopPropagation(); openPayoutEditModal('${r.existingPayout.id}')" 
-                                class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10.5px] shadow-2xs whitespace-nowrap" title="정산 직접 수정">
-                                수정
-                              </button>
-                              <button type="button" onclick="event.stopPropagation(); deleteInterimPayout('${app.id}', '${r.existingPayout.id}')" 
-                                class="px-2 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-bold text-[10.5px] shadow-2xs transition-all cursor-pointer whitespace-nowrap" title="정산 삭제">
-                                <i data-lucide="trash-2" class="w-3 h-3 inline"></i>
-                              </button>
+                              ${r.existingPayout ? `
+                                <button type="button" onclick="event.stopPropagation(); togglePayoutStatus('${r.existingPayout.id}')" 
+                                  class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-[10.5px] shadow-2xs transition-all cursor-pointer whitespace-nowrap" title="클릭 시 지급전으로 되돌리기">
+                                  지급취소 (원복)
+                                </button>
+                                <button type="button" onclick="event.stopPropagation(); openPayoutEditModal('${r.existingPayout.id}')" 
+                                  class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10.5px] shadow-2xs whitespace-nowrap" title="정산 직접 수정">
+                                  수정
+                                </button>
+                                <button type="button" onclick="event.stopPropagation(); deleteInterimPayout('${app.id}', '${r.existingPayout.id}')" 
+                                  class="px-2 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-bold text-[10.5px] shadow-2xs transition-all cursor-pointer whitespace-nowrap" title="정산 삭제">
+                                  <i data-lucide="trash-2" class="w-3 h-3 inline"></i>
+                                </button>
+                              ` : `
+                                <span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-bold text-[10.5px] border border-slate-200 whitespace-nowrap">
+                                  지급완료
+                                </span>
+                              `}
                             ` : `
                               <button type="button" onclick="event.stopPropagation(); ${r.existingPayout ? `togglePayoutStatus('${r.existingPayout.id}')` : `executeImmediatePayout('${app.id}', ${r.roundNumber}, ${r.days})`}" 
                                 class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-[10.5px] shadow-xs inline-flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap">
