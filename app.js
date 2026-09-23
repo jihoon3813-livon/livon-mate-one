@@ -22068,7 +22068,7 @@ if (typeof window !== 'undefined') {
 var gClaimSetPeekMode = {};
 
 function checkCustomerClaimSetStatus(app, appAssigns) {
-  if (!app) return { isDisabled: false, reasons: [], currentStatus: '', claimVal: '정상', isStatusInProgress: true, isClaimNormal: true };
+  if (!app) return { isDisabled: false, reasons: [], currentStatus: '', claimVal: '정상', isStatusInProgress: true, isClaimNormal: true, isUnpaidReconciliation: false };
 
   const currentStatus = typeof determineRealCareStatus === 'function' ? determineRealCareStatus(app, appAssigns) : (app.status || '');
   let claimVal = '';
@@ -22081,12 +22081,20 @@ function checkCustomerClaimSetStatus(app, appAssigns) {
   }
 
   const isStatusInProgress = (currentStatus === '진행중');
+  const isStatusCompleted = (currentStatus === '완료' || currentStatus === '정산완료');
   const isClaimNormal = (claimVal === '정상' || claimVal === '정상 ');
 
-  const isDisabled = !isStatusInProgress || !isClaimNormal;
+  // [미수금 대사 관리 모드]: 간병은 완료되었으나 보험사 미입금 대사를 위해 세트 관리를 활성화한 상태
+  const isUnpaidReconciliation = Boolean(isStatusCompleted && isClaimNormal && app.claimSetEnabledForCompleted);
+
+  // 세트 활성화 허용 조건:
+  // 1) 현재상태가 '진행중'이고 청구분류가 '정상'인 경우
+  // 2) 간병이 '완료'되었으나 미수금 대사 관리를 활성화(isUnpaidReconciliation)한 경우
+  const isAllowed = (isStatusInProgress && isClaimNormal) || isUnpaidReconciliation;
+  const isDisabled = !isAllowed;
   const reasons = [];
 
-  if (!isStatusInProgress) {
+  if (!isStatusInProgress && !isUnpaidReconciliation) {
     reasons.push(`현재상태: [${currentStatus || '미지정'}] (진행중 아님)`);
   }
   if (!isClaimNormal) {
@@ -22099,7 +22107,8 @@ function checkCustomerClaimSetStatus(app, appAssigns) {
     currentStatus,
     claimVal: claimVal || '미지정',
     isStatusInProgress,
-    isClaimNormal
+    isClaimNormal,
+    isUnpaidReconciliation
   };
 }
 window.checkCustomerClaimSetStatus = checkCustomerClaimSetStatus;
@@ -22121,6 +22130,107 @@ function toggleClaimSetOverlayPeek(appId) {
 }
 window.toggleClaimSetOverlayPeek = toggleClaimSetOverlayPeek;
 
+/**
+ * [NEW] 미수금 대사 관리 모드 활성화 (완료 상태 유지 / 청구세트 활성화)
+ * 간병은 완료되었으나 보험사로부터 입금을 받지 못해 청구·입금·지급 세트 대사가 필요한 경우 사용
+ */
+async function enableUnpaidClaimSetForCustomer(appId) {
+  const app = (gApps || []).find(a => a.id === appId);
+  if (!app) return;
+
+  // 완료 상태 유지 (완료가 아니었을 경우 완료로 확정)
+  app.status = '완료';
+  app.claimClassification = '정상';
+  app.claimCategory = '정상';
+  app.claimSetEnabledForCompleted = true;
+  app.hasManualUpdate = true;
+  app.updatedAt = new Date().toISOString();
+  gClaimSetPeekMode[appId] = false;
+
+  try {
+    await fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: appId,
+        fields: {
+          status: '완료',
+          claimClassification: '정상',
+          claimCategory: '정상',
+          claimSetEnabledForCompleted: true,
+          hasManualUpdate: true
+        }
+      })
+    });
+  } catch (e) {}
+
+  if (typeof syncToConvex === 'function') {
+    try {
+      await syncToConvex('sync:saveApplication', { app });
+    } catch (e) {}
+  }
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '미수금 대사 관리 활성화 완료',
+      message: `[${app.patientName}] '완료' 상태가 유지되며, 보험사 미입금 대사를 위한 청구세트가 정상 활성화되었습니다.`,
+      icon: 'calculator'
+    });
+  }
+
+  renderUnifiedCareHub();
+  if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId === appId) {
+    openHubCustomerDetailModal(appId);
+  }
+}
+window.enableUnpaidClaimSetForCustomer = enableUnpaidClaimSetForCustomer;
+
+/**
+ * [NEW] 미수금 대사 모드 해제 (보호 모드 복원)
+ */
+async function disableUnpaidClaimSetForCustomer(appId) {
+  const app = (gApps || []).find(a => a.id === appId);
+  if (!app) return;
+
+  app.claimSetEnabledForCompleted = false;
+  app.updatedAt = new Date().toISOString();
+
+  try {
+    await fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: appId,
+        fields: {
+          claimSetEnabledForCompleted: false
+        }
+      })
+    });
+  } catch (e) {}
+
+  if (typeof syncToConvex === 'function') {
+    try {
+      await syncToConvex('sync:saveApplication', { app });
+    } catch (e) {}
+  }
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'info',
+      title: '보호 모드 복원 완료',
+      message: `[${app.patientName}] 청구세트 보호 모드가 다시 적용되었습니다.`,
+      icon: 'lock'
+    });
+  }
+
+  renderUnifiedCareHub();
+  if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId === appId) {
+    openHubCustomerDetailModal(appId);
+  }
+}
+window.disableUnpaidClaimSetForCustomer = disableUnpaidClaimSetForCustomer;
+
 async function enableClaimSetForCustomer(appId) {
   const app = (gApps || []).find(a => a.id === appId);
   if (!app) return;
@@ -22128,6 +22238,7 @@ async function enableClaimSetForCustomer(appId) {
   app.status = '진행중';
   app.claimClassification = '정상';
   app.claimCategory = '정상';
+  app.claimSetEnabledForCompleted = false;
   app.hasManualUpdate = true;
   app.updatedAt = new Date().toISOString();
   gClaimSetPeekMode[appId] = false;
@@ -22142,6 +22253,7 @@ async function enableClaimSetForCustomer(appId) {
           status: '진행중',
           claimClassification: '정상',
           claimCategory: '정상',
+          claimSetEnabledForCompleted: false,
           hasManualUpdate: true
         }
       })
@@ -22150,16 +22262,7 @@ async function enableClaimSetForCustomer(appId) {
 
   if (typeof syncToConvex === 'function') {
     try {
-      await syncToConvex('sync:updateCustomerField', {
-        appId: appId,
-        field: 'status',
-        value: '진행중'
-      });
-      await syncToConvex('sync:updateCustomerField', {
-        appId: appId,
-        field: 'claimClassification',
-        value: '정상'
-      });
+      await syncToConvex('sync:saveApplication', { app });
     } catch (e) {}
   }
 
@@ -23256,7 +23359,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                   [${escapeHtml(app.patientName)} 님] 청구세트가 비활성화되어 있습니다
                 </h3>
                 <p class="text-xs text-slate-500 leading-relaxed">
-                  오발송 및 오지급 사고 방지를 위해 <b>청구분류가 '정상'</b>이고 <b>현재상태가 '진행중'</b>인 고객에게만 청구세트 작업이 허용됩니다.
+                  오발송 및 오지급 사고 방지를 위해 <b>청구분류가 '정상'</b>이고 <b>현재상태가 '진행중'</b>이거나 <b>'미수금 대사 관리'</b>가 활성화된 고객에게만 청구세트 작업이 허용됩니다.
                 </p>
               </div>
 
@@ -23274,22 +23377,52 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                   `).join('')}
                 </div>
                 <div class="text-[11px] text-slate-500 pt-1 border-t border-slate-200">
-                  상단 [분류 관리]에서 상태를 변경하거나 아래 전환 버튼을 클릭하여 즉시 활성화할 수 있습니다.
+                  간병 완료 후 보험사 미입금 대사를 관리하려면 <b>[미수금 관리]</b>를, 간병이 진행 중인 건은 <b>[청구 가능 상태로 전환]</b>을 클릭하세요.
                 </div>
               </div>
 
               <div class="flex flex-col sm:flex-row items-center justify-center gap-2 pt-1">
+                <button type="button" onclick="enableUnpaidClaimSetForCustomer('${app.id}')"
+                  class="w-full sm:flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                  title="간병 완료 상태를 그대로 유지하며, 보험사 미입금 대사를 위해 청구세트만 활성화합니다.">
+                  <i data-lucide="calculator" class="w-4 h-4"></i>
+                  <span>미수금 관리 (완료 유지)</span>
+                </button>
                 <button type="button" onclick="enableClaimSetForCustomer('${app.id}')"
-                  class="w-full sm:flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95">
+                  class="w-full sm:flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                  title="현재상태를 '진행중', 청구분류를 '정상'으로 변경하여 활성화합니다.">
                   <i data-lucide="unlock" class="w-4 h-4"></i>
                   <span>청구 가능 상태로 전환 (진행중 / 정상)</span>
                 </button>
                 <button type="button" onclick="toggleClaimSetOverlayPeek('${app.id}')"
-                  class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95">
+                  class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                  title="상태를 변경하지 않고 청구세트 내용을 확인합니다.">
                   <i data-lucide="eye" class="w-4 h-4 text-slate-600"></i>
                   <span>내용 보기 (읽기모드)</span>
                 </button>
               </div>
+            </div>
+          </div>
+        ` : ''}
+
+        ${(claimStatus.isUnpaidReconciliation) ? `
+          <!-- [UNPAID RECONCILIATION ACTIVE BANNER] 미수금 대사 관리 모드 (간병 완료 유지) -->
+          <div class="bg-gradient-to-r from-indigo-900 via-purple-950 to-indigo-900 text-white px-4 py-2.5 flex items-center justify-between text-xs font-bold border-b border-indigo-700 shadow-sm flex-wrap gap-2 animate-fadeIn">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-lg bg-indigo-500/30 flex items-center justify-center text-indigo-300">
+                <i data-lucide="calculator" class="w-3.5 h-3.5"></i>
+              </span>
+              <span>
+                <b class="text-indigo-200">[미수금 대사 관리 모드]</b> 
+                현재상태 <b>'완료'</b>가 유지되며, 보험사 미입금 대사 및 간병비 지급 관리를 위해 청구세트가 정상 활성화되어 있습니다.
+              </span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="disableUnpaidClaimSetForCustomer('${app.id}')" 
+                class="px-2.5 py-1 rounded-lg bg-indigo-800/80 hover:bg-rose-800/90 text-indigo-100 hover:text-white font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 border border-indigo-600/50"
+                title="미수금 대사가 끝났거나 보호 모드로 다시 잠그려면 클릭하세요.">
+                <i data-lucide="lock" class="w-3 h-3"></i> 보호 모드로 복원
+              </button>
             </div>
           </div>
         ` : ''}
@@ -23302,8 +23435,11 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
               <span>[읽기 전용 모드] 청구 기준 미달 상태로 조회만 가능합니다. (${escapeHtml(claimStatus.reasons.join(', '))})</span>
             </div>
             <div class="flex items-center gap-2 shrink-0">
+              <button type="button" onclick="enableUnpaidClaimSetForCustomer('${app.id}')" class="px-3 py-1 rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white font-black text-[11px] shadow-xs cursor-pointer flex items-center gap-1">
+                <i data-lucide="calculator" class="w-3 h-3"></i> 미수금 관리 (완료 유지)
+              </button>
               <button type="button" onclick="enableClaimSetForCustomer('${app.id}')" class="px-3 py-1 rounded-lg bg-white text-amber-900 hover:bg-amber-100 font-black text-[11px] shadow-xs cursor-pointer flex items-center gap-1">
-                <i data-lucide="unlock" class="w-3 h-3"></i> 청구 가능 상태로 전환
+                <i data-lucide="unlock" class="w-3 h-3"></i> 진행중/정상 전환
               </button>
               <button type="button" onclick="toggleClaimSetOverlayPeek('${app.id}')" class="px-2.5 py-1 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-bold text-[11px] cursor-pointer flex items-center gap-1">
                 <i data-lucide="lock" class="w-3 h-3"></i> 보호 모드 복원
@@ -24493,22 +24629,45 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                     <div class="font-bold text-slate-700 pb-0.5">비활성화 사유:</div>
                     ${claimStatus.reasons.map(r => `<div class="text-rose-600 flex items-center gap-1.5 font-bold"><i data-lucide="x-circle" class="w-3.5 h-3.5 shrink-0 text-rose-500"></i> ${escapeHtml(r)}</div>`).join('')}
                     <div class="text-[10.5px] text-slate-500 pt-1 border-t border-slate-200">
-                      청구분류 [정상] 및 현재상태 [진행중] 설정 시 청구 작업이 가능합니다.
+                      간병 완료 후 보험사 미입금 대사를 관리하려면 <b>[미수금 관리]</b>를, 간병이 진행 중인 건은 <b>[청구 가능 전환]</b>을 클릭하세요.
                     </div>
                   </div>
                 </div>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-2 pt-1">
+                  <button type="button" onclick="enableUnpaidClaimSetForCustomer('${app.id}')"
+                    class="w-full sm:flex-1 px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                    title="간병 완료 상태를 유지하며, 보험사 미입금 대사를 위해 청구 관리를 활성화합니다.">
+                    <i data-lucide="calculator" class="w-3.5 h-3.5"></i>
+                    <span>미수금 관리 (완료 유지)</span>
+                  </button>
                   <button type="button" onclick="enableClaimSetForCustomer('${app.id}')"
-                    class="w-full sm:flex-1 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer">
-                    <i data-lucide="unlock" class="w-4 h-4"></i>
-                    <span>청구 가능 상태로 전환</span>
+                    class="w-full sm:flex-1 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                    title="현재상태를 '진행중', 청구분류를 '정상'으로 변경하여 활성화합니다.">
+                    <i data-lucide="unlock" class="w-3.5 h-3.5"></i>
+                    <span>청구 가능 전환 (진행중/정상)</span>
                   </button>
                   <button type="button" onclick="toggleClaimSetOverlayPeek('${app.id}')"
-                    class="w-full sm:w-auto px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-300 flex items-center justify-center gap-1 transition-all cursor-pointer">
+                    class="w-full sm:w-auto px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-300 flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95"
+                    title="상태를 변경하지 않고 청구 관리 내용을 확인합니다.">
                     <i data-lucide="eye" class="w-3.5 h-3.5"></i>
                     <span>읽기모드</span>
                   </button>
                 </div>
+              </div>
+            </div>
+          ` : ''}
+
+          ${(claimStatus.isUnpaidReconciliation) ? `
+            <!-- [UNPAID RECONCILIATION ACTIVE BANNER] Card 2 미수금 대사 관리 모드 (간병 완료 유지) -->
+            <div class="bg-gradient-to-r from-indigo-900 via-purple-950 to-indigo-900 text-white px-3.5 py-2 flex items-center justify-between text-xs font-bold border-b border-indigo-700 shadow-xs flex-wrap gap-2 animate-fadeIn">
+              <div class="flex items-center gap-1.5">
+                <i data-lucide="calculator" class="w-3.5 h-3.5 text-indigo-300 shrink-0"></i>
+                <span class="text-[11px]"><b class="text-indigo-200">[미수금 대사 관리]</b> 간병 완료 상태가 유지되며, 보험사 미입금 대사를 위한 청구 관리가 활성화되어 있습니다.</span>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <button type="button" onclick="disableUnpaidClaimSetForCustomer('${app.id}')" class="px-2 py-0.5 rounded bg-indigo-800/80 hover:bg-rose-800/90 text-indigo-100 hover:text-white font-bold text-[10.5px] cursor-pointer transition-colors border border-indigo-600/50">
+                  <i data-lucide="lock" class="w-3 h-3 inline mr-0.5"></i>보호모드
+                </button>
               </div>
             </div>
           ` : ''}
@@ -24521,6 +24680,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 <span class="text-[11px]">[읽기모드] 조회만 가능 (${escapeHtml(claimStatus.reasons.join(', '))})</span>
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
+                <button type="button" onclick="enableUnpaidClaimSetForCustomer('${app.id}')" class="px-2 py-0.5 rounded bg-indigo-700 text-white font-black text-[10.5px] cursor-pointer">미수금관리</button>
                 <button type="button" onclick="enableClaimSetForCustomer('${app.id}')" class="px-2 py-0.5 rounded bg-white text-amber-900 font-black text-[10.5px] cursor-pointer">전환</button>
                 <button type="button" onclick="toggleClaimSetOverlayPeek('${app.id}')" class="px-2 py-0.5 rounded bg-amber-700 text-white font-bold text-[10.5px] cursor-pointer">복원</button>
               </div>
