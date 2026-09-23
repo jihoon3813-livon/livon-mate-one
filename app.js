@@ -18246,6 +18246,99 @@ function formatCareDateTimeStr(d) {
   return `${y}.${m}.${day} ${hh}:${mm}`;
 }
 
+function formatDateTimeLocalInput(dateTimeVal, defTime = '09:00') {
+  if (!dateTimeVal) return '';
+  const d = (dateTimeVal instanceof Date) ? dateTimeVal : parseCareDateTime(dateTimeVal);
+  if (!d || isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hasTime = (dateTimeVal instanceof Date) || /(\d{1,2}):(\d{1,2})/.test(String(dateTimeVal));
+  const hh = hasTime ? String(d.getHours()).padStart(2, '0') : defTime.slice(0, 2);
+  const mm = hasTime ? String(d.getMinutes()).padStart(2, '0') : defTime.slice(3, 5);
+  return `${y}-${m}-${day}T${hh}:${mm}`;
+}
+window.formatDateTimeLocalInput = formatDateTimeLocalInput;
+
+/**
+ * 세트별 간병 기간 및 청구/기준일자 산정 헬퍼
+ * - 세트표에 날짜를 계산할 때는 간병기간 정보(careStartDate)를 토대로 산정
+ * - 지급/청구 시트의 기준일시는 청구하는 날짜(차수 마감일)로 취급
+ * - 만약 엑셀에 오기입되어 날짜와 일수가 안 맞으면 일수(setDays)를 기준으로 날짜를 산정
+ *   (예: 1차의 시작은 간병시작일 9/17, 청구일 9/20, 3일 -> 9/17 ~ 9/20)
+ */
+function calculateRoundDates(roundStartStr, standardDateStr, setDays, defaultCareStart, defaultCareEnd) {
+  let startStr = String(roundStartStr || defaultCareStart || '').trim();
+  const dStart = parseCareDateTime(startStr);
+  if (!dStart) {
+    return { startDateStr: startStr, endDateStr: standardDateStr || startStr };
+  }
+
+  const safeDays = Math.max(1, Number(setDays) || 1);
+  const startHasTime = /(\d{1,2}):(\d{1,2})/.test(startStr);
+
+  // setDays(24시간 shift 단위) 기준 투영 종료 일시
+  const projectedEndMs = dStart.getTime() + (safeDays * 24 * 60 * 60 * 1000);
+  const projectedEnd = new Date(projectedEndMs);
+
+  let endStr = '';
+
+  // 기본 간병 종료일(defaultCareEnd)이 주어지고 유효한 경우 우선 검토
+  if (defaultCareEnd && defaultCareEnd !== '진행중' && defaultCareEnd !== '예정') {
+    const dCareEnd = parseCareDateTime(defaultCareEnd);
+    if (dCareEnd && dCareEnd > dStart) {
+      const careEndYMD = formatCareDateStr(dCareEnd);
+      const stdYMD = standardDateStr ? formatCareDateStr(parseCareDateTime(standardDateStr)) : '';
+      const projYMD = formatCareDateStr(projectedEnd);
+
+      if ((stdYMD && careEndYMD === stdYMD) || (!stdYMD && careEndYMD === projYMD)) {
+        if (typeof calculateCareDays24h === 'function' && calculateCareDays24h(dStart, dCareEnd) === safeDays) {
+          endStr = formatCareDateTimeStr(dCareEnd);
+        }
+      }
+    }
+  }
+
+  if (!endStr) {
+    if (standardDateStr) {
+      const dStd = parseCareDateTime(standardDateStr);
+      const stdHasTime = /(\d{1,2}):(\d{1,2})/.test(standardDateStr);
+
+      if (dStd && dStd > dStart) {
+        if (stdHasTime) {
+          // 기준일시에 명시적 시:분이 있는 경우 (예: '2026.04.10 16:00')
+          endStr = formatCareDateTimeStr(dStd);
+        } else {
+          // 기준일시에 날짜만 있는 경우 (예: '2026.09.20')
+          const stdYMD = formatCareDateStr(dStd);
+          const projYMD = formatCareDateStr(projectedEnd);
+          if (stdYMD === projYMD) {
+            // 기준일시의 YYYY.MM.DD가 일수 기반 투영 종료일자와 일치
+            endStr = startHasTime 
+              ? `${stdYMD} ${String(dStart.getHours()).padStart(2, '0')}:${String(dStart.getMinutes()).padStart(2, '0')}` 
+              : stdYMD;
+          } else {
+            // 엑셀 오기입 등으로 일수와 날짜가 불일치 시 일수(setDays) 기준으로 산정
+            endStr = startHasTime ? formatCareDateTimeStr(projectedEnd) : formatCareDateStr(projectedEnd);
+          }
+        }
+      } else {
+        // standardDate가 시작일 이전이거나 같은 경우 투영 종료일자 적용
+        endStr = startHasTime ? formatCareDateTimeStr(projectedEnd) : formatCareDateStr(projectedEnd);
+      }
+    } else {
+      endStr = startHasTime ? formatCareDateTimeStr(projectedEnd) : formatCareDateStr(projectedEnd);
+    }
+  }
+
+  return {
+    startDateStr: startHasTime ? formatCareDateTimeStr(dStart) : formatCareDateStr(dStart),
+    endDateStr: endStr
+  };
+}
+window.calculateRoundDates = calculateRoundDates;
+
+
 function formatStatusDateTime(rawVal, defaultTime = '10:00') {
   if (!rawVal) return '';
   const str = String(rawVal).trim();
@@ -19105,14 +19198,26 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
 
   // [RULE 1] 관리자가 직접 편집/추가한 커스텀 정산·청구 세트가 존재하는 경우
   if (app && app.customSettlementSets && Array.isArray(app.customSettlementSets) && app.customSettlementSets.length > 0) {
+    let currentCustomStart = careStartDate;
     app.customSettlementSets.forEach((cSet, idx) => {
       const setIndex = cSet.setIndex || (idx + 1);
       const claimDays = Number(cSet.claimDays) || Number(cSet.days) || 1;
       const payoutDays = Number(cSet.payoutDays) || Number(cSet.days) || 1;
       const setDays = Math.max(claimDays, payoutDays);
       const hours = setDays * 24;
-      const roundStartDateStr = cSet.startDateStr || cSet.claimStandardDate || cSet.payoutStandardDate || careStartDate || '';
-      const roundEndDateStr = cSet.endDateStr || cSet.claimStandardDate || cSet.payoutStandardDate || careEndDate || '';
+
+      let roundStartDateStr = cSet.startDateStr || '';
+      let roundEndDateStr = cSet.endDateStr || '';
+
+      if (!roundStartDateStr || !roundEndDateStr || roundStartDateStr === roundEndDateStr) {
+        const stdDate = cSet.claimStandardDate || cSet.payoutStandardDate || roundEndDateStr || roundStartDateStr || '';
+        const roundDates = calculateRoundDates(roundStartDateStr || currentCustomStart, stdDate, setDays, careStartDate, careEndDate);
+        roundStartDateStr = roundDates.startDateStr;
+        roundEndDateStr = roundDates.endDateStr;
+      }
+      if (roundEndDateStr) {
+        currentCustomStart = roundEndDateStr;
+      }
       
       let targetYear = '';
       let targetMonth = '';
@@ -19226,6 +19331,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       });
 
       const totalSets = Math.max(sortedClaims.length, sortedPayouts.length);
+      let currentRoundStart = careStartDate;
       for (let idx = 0; idx < totalSets; idx++) {
         const setIndex = idx + 1;
         const claimForRound = sortedClaims[idx] || null;
@@ -19239,8 +19345,25 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         const claimStandardDate = claimForRound ? (claimForRound.standardDate || claimForRound.startDate || '') : (payoutForRound ? (payoutForRound.standardDate || payoutForRound.startDate || '') : '');
         const payoutStandardDate = payoutForRound ? (payoutForRound.standardDate || payoutForRound.startDate || '') : (claimForRound ? (claimForRound.standardDate || claimForRound.startDate || '') : '');
 
-        const roundStartDateStr = (claimForRound && claimForRound.startDate) || (payoutForRound && payoutForRound.startDate) || claimStandardDate || payoutStandardDate || (as ? as.startDate : '');
-        const roundEndDateStr = (claimForRound && claimForRound.endDate) || (payoutForRound && payoutForRound.endDate) || claimStandardDate || payoutStandardDate || (as ? as.endDate : '');
+        let roundStartDateStr = '';
+        let roundEndDateStr = '';
+
+        const explicitStart = (claimForRound && claimForRound.startDate) || (payoutForRound && payoutForRound.startDate) || '';
+        const explicitEnd = (claimForRound && claimForRound.endDate) || (payoutForRound && payoutForRound.endDate) || '';
+
+        if (explicitStart && explicitEnd && explicitStart !== explicitEnd) {
+          roundStartDateStr = explicitStart;
+          roundEndDateStr = explicitEnd;
+        } else {
+          const stdDate = claimStandardDate || payoutStandardDate || explicitEnd || explicitStart || '';
+          const roundDates = calculateRoundDates(currentRoundStart, stdDate, setDays, careStartDate, careEndDate);
+          roundStartDateStr = roundDates.startDateStr;
+          roundEndDateStr = roundDates.endDateStr;
+        }
+
+        if (roundEndDateStr) {
+          currentRoundStart = roundEndDateStr;
+        }
 
         const defaultClaimRound = getStandardRoundByDate(claimStandardDate || roundStartDateStr);
         const defaultPayoutRound = getStandardRoundByDate(payoutStandardDate || roundStartDateStr);
@@ -20307,17 +20430,8 @@ function openSettlementSetEditModal(appId, setIndex) {
   const deleteBtn = document.getElementById('settlementSetDeleteBtn');
   if (deleteBtn) deleteBtn.style.display = (schedule.rounds && schedule.rounds.length > 1) ? 'flex' : 'none';
 
-  const toDtLocal = (str, defTime) => {
-    if (!str) return '';
-    const m = String(str).match(/(\d{4})[.-](\d{1,2})[.-](\d{1,2})(?:[.\sT]+(\d{1,2}):(\d{1,2}))?/);
-    if (!m) return '';
-    const hh = m[4] ? String(m[4]).padStart(2, '0') : defTime.slice(0, 2);
-    const mm = m[5] ? String(m[5]).padStart(2, '0') : defTime.slice(3, 5);
-    return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}T${hh}:${mm}`;
-  };
-
-  const startVal = r ? toDtLocal(r.startDateStr, '09:00') : '';
-  const endVal = r ? toDtLocal(r.endDateStr, '18:00') : '';
+  const startVal = r ? formatDateTimeLocalInput(r.startDateStr, '09:00') : '';
+  const endVal = r ? formatDateTimeLocalInput(r.endDateStr, '18:00') : '';
   document.getElementById('settlementSetStartInput').value = startVal;
   document.getElementById('settlementSetEndInput').value = endVal;
   document.getElementById('settlementSetDaysInput').value = r ? r.days : 1;
@@ -20381,27 +20495,39 @@ function openSettlementSetAddModal(appId) {
   const deleteBtn = document.getElementById('settlementSetDeleteBtn');
   if (deleteBtn) deleteBtn.style.display = 'none';
 
-  // Default dates: day after last round or today
+  // Default dates: connect to previous round or careStartDate
   const lastRound = schedule.rounds && schedule.rounds.length > 0 ? schedule.rounds[schedule.rounds.length - 1] : null;
   let defStart = '';
   let defEnd = '';
   if (lastRound && lastRound.endDateStr) {
-    const parsed = parseCareDate(lastRound.endDateStr);
-    if (parsed) {
-      const nextDay = new Date(parsed.getTime() + 24 * 60 * 60 * 1000);
-      defStart = `${formatCareDateStr(nextDay)}T09:00`;
-      defEnd = `${formatCareDateStr(nextDay)}T18:00`;
+    defStart = formatDateTimeLocalInput(lastRound.endDateStr, '09:00');
+    if (as && as.endDate && as.endDate !== '진행중' && as.endDate !== '예정') {
+      defEnd = formatDateTimeLocalInput(as.endDate, '18:00');
+    } else {
+      const parsed = parseCareDateTime(lastRound.endDateStr);
+      if (parsed) {
+        const nextDay = new Date(parsed.getTime() + 24 * 60 * 60 * 1000);
+        defEnd = formatDateTimeLocalInput(nextDay, '18:00');
+      }
     }
   }
   if (!defStart) {
-    const today = new Date();
-    defStart = `${formatCareDateStr(today)}T09:00`;
-    defEnd = `${formatCareDateStr(today)}T18:00`;
+    if (as && as.startDate) {
+      defStart = formatDateTimeLocalInput(as.startDate, '09:00');
+      defEnd = (as.endDate && as.endDate !== '진행중' && as.endDate !== '예정') 
+        ? formatDateTimeLocalInput(as.endDate, '18:00') 
+        : formatDateTimeLocalInput(new Date(parseCareDateTime(as.startDate).getTime() + 24 * 60 * 60 * 1000), '18:00');
+    } else {
+      const today = new Date();
+      defStart = formatDateTimeLocalInput(today, '09:00');
+      defEnd = formatDateTimeLocalInput(today, '18:00');
+    }
   }
 
   document.getElementById('settlementSetStartInput').value = defStart;
   document.getElementById('settlementSetEndInput').value = defEnd;
-  document.getElementById('settlementSetDaysInput').value = 1;
+  const initialDays = calculateCareDays24h(defStart, defEnd) || 1;
+  document.getElementById('settlementSetDaysInput').value = initialDays;
 
   const defaultRoundLabel = (typeof getStandardRoundByDate === 'function' && defStart)
     ? getStandardRoundByDate(defStart)
@@ -20412,10 +20538,10 @@ function openSettlementSetAddModal(appId) {
   document.getElementById('settlementSetClaimRoundInput').value = defaultRoundLabel;
   document.getElementById('settlementSetClaimStandardDateInput').value = defEnd.slice(0, 10).replace(/-/g, '.');
   document.getElementById('settlementSetClaimDateInput').value = '';
-  document.getElementById('settlementSetClaimDaysInput').value = 1;
+  document.getElementById('settlementSetClaimDaysInput').value = initialDays;
   const unitPrice = schedule.dailyClaimPrice || 160000;
   document.getElementById('settlementSetClaimUnitPriceInput').value = formatCurrency(unitPrice);
-  document.getElementById('settlementSetClaimAmountInput').value = formatCurrency(unitPrice);
+  document.getElementById('settlementSetClaimAmountInput').value = formatCurrency(initialDays * unitPrice);
   document.getElementById('settlementSetClaimStatusSelect').value = '청구전';
 
   // Deposit
@@ -20428,10 +20554,10 @@ function openSettlementSetAddModal(appId) {
   document.getElementById('settlementSetPayoutRoundInput').value = defaultRoundLabel;
   document.getElementById('settlementSetPayoutStandardDateInput').value = `${defEnd.slice(0, 10).replace(/-/g, '.')} 18:00`;
   document.getElementById('settlementSetPayoutDateInput').value = '';
-  document.getElementById('settlementSetPayoutDaysInput').value = 1;
+  document.getElementById('settlementSetPayoutDaysInput').value = initialDays;
   const wage = schedule.cgDailyWage || 140000;
   document.getElementById('settlementSetPayoutWageInput').value = formatCurrency(wage);
-  document.getElementById('settlementSetPayoutAmountInput').value = formatCurrency(wage);
+  document.getElementById('settlementSetPayoutAmountInput').value = formatCurrency(initialDays * wage);
   document.getElementById('settlementSetPayoutStatusSelect').value = '지급전';
 
   // Memo
@@ -20453,23 +20579,31 @@ function recalcSettlementSetModalPreview(isFromDays) {
   const payoutAmountInput = document.getElementById('settlementSetPayoutAmountInput');
 
   let days = parseInt(daysInput?.value || '1', 10);
-  if (!isFromDays && startInput?.value && endInput?.value) {
+  if (isFromDays && startInput?.value && days > 0) {
+    const dStart = parseCareDateTime(startInput.value);
+    if (dStart && !isNaN(dStart.getTime())) {
+      const dEnd = new Date(dStart.getTime() + (days * 24 * 60 * 60 * 1000));
+      if (endInput) endInput.value = formatDateTimeLocalInput(dEnd);
+      if (claimDaysInput) claimDaysInput.value = days;
+      if (payoutDaysInput) payoutDaysInput.value = days;
+    }
+  } else if (!isFromDays && startInput?.value && endInput?.value) {
     days = calculateCareDays24h(startInput.value, endInput.value);
     if (daysInput) daysInput.value = days;
     if (claimDaysInput) claimDaysInput.value = days;
     if (payoutDaysInput) payoutDaysInput.value = days;
 
-      if (document.getElementById('settlementSetModalMode')?.value === 'add' && typeof getStandardRoundByDate === 'function') {
-        const stdRound = getStandardRoundByDate(startInput.value);
-        const claimRoundInput = document.getElementById('settlementSetClaimRoundInput');
-        const payoutRoundInput = document.getElementById('settlementSetPayoutRoundInput');
-        if (claimRoundInput && (!claimRoundInput.value || claimRoundInput.value.includes('차'))) {
-          claimRoundInput.value = stdRound;
-        }
-        if (payoutRoundInput && (!payoutRoundInput.value || payoutRoundInput.value.includes('차'))) {
-          payoutRoundInput.value = stdRound;
-        }
+    if (document.getElementById('settlementSetModalMode')?.value === 'add' && typeof getStandardRoundByDate === 'function') {
+      const stdRound = getStandardRoundByDate(startInput.value);
+      const claimRoundInput = document.getElementById('settlementSetClaimRoundInput');
+      const payoutRoundInput = document.getElementById('settlementSetPayoutRoundInput');
+      if (claimRoundInput && (!claimRoundInput.value || claimRoundInput.value.includes('차'))) {
+        claimRoundInput.value = stdRound;
       }
+      if (payoutRoundInput && (!payoutRoundInput.value || payoutRoundInput.value.includes('차'))) {
+        payoutRoundInput.value = stdRound;
+      }
+    }
   }
 
   const claimDays = parseInt(claimDaysInput?.value || String(days), 10);
