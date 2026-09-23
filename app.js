@@ -42866,8 +42866,8 @@ function extractCareCalendarEvents() {
     if (!parsedStart) return;
     const now = new Date();
     // 통합허브 '간병 진행중' 기준과 1:1 완벽 일치 (determineRealCareStatus 기준)
-    const realCareSt = (typeof determineRealCareStatus === 'function') ? determineRealCareStatus(app, [as]) : '';
-    const isAppOngoing = (realCareSt === '진행중');
+    const appRealCareSt = (typeof determineRealCareStatus === 'function') ? determineRealCareStatus(app) : (app.status || '');
+    const isAppOngoing = (appRealCareSt === '진행중');
 
     const isOngoingWithoutEndDate = Boolean(isAppOngoing && (!endStr || endStr === '진행중' || endStr === '-'));
 
@@ -42889,21 +42889,30 @@ function extractCareCalendarEvents() {
 
     // 캘린더 이벤트 상태 판정 (오늘 날짜 및 실제 시작/종료일시 기준 엄격 판정)
     let status = 'COMPLETED'; // 기본: 종료
+    const hasSpecificEndTime = endStr.includes(':');
     
-    // 1. 종료일시가 오늘 날짜 이전이면 무조건 종료(COMPLETED)!
-    if (parsedEnd && !isOngoingWithoutEndDate && (endZero < todayZero || (endZero.getTime() === todayZero.getTime() && now > parsedEnd))) {
+    // 1. 종료일시가 오늘 날짜 이전이거나, 오늘 종료인데 특정 종료시간이 지난 경우 -> COMPLETED
+    if (parsedEnd && !isOngoingWithoutEndDate && (endZero < todayZero || (endZero.getTime() === todayZero.getTime() && hasSpecificEndTime && now > parsedEnd))) {
       status = 'COMPLETED';
     }
     // 2. 시작일시가 오늘 날짜 이후(미래)이면 무조건 예정(UPCOMING)!
-    else if (startZero > todayZero || (app.status || '').includes('예정') || realCareSt === '배정대기' || realCareSt === '신규') {
+    else if (startZero > todayZero || (app.status || '').includes('예정') || appRealCareSt === '배정대기' || appRealCareSt === '신규') {
       status = 'UPCOMING';
     }
     // 3. 오늘 날짜가 시작일과 종료일 사이에 걸쳐있는 경우 (또는 종료일이 진행중/미정인 경우)
     else {
-      if (realCareSt === '당일서비스취소' || realCareSt.includes('서비스불가') || realCareSt === '제외' || realCareSt.includes('취소') || realCareSt.includes('철회') || realCareSt.includes('미해당')) {
+      // 통합허브에서 '진행중'이 아니면 절대 ONGOING이 될 수 없음!
+      if (!isAppOngoing) {
         status = 'COMPLETED';
       } else {
-        status = 'ONGOING'; // 오늘 현재 실제 간병 진행중!
+        // 동일 고객의 다른 배정이 이미 ONGOING으로 등록되어 있다면 중복 방지 (활성 배정 1건만 ONGOING 카운트)
+        const targetApplyId = app.id || as.applyId;
+        const alreadyHasOngoing = events.some(e => e.applyId === targetApplyId && e.status === 'ONGOING');
+        if (alreadyHasOngoing) {
+          status = 'COMPLETED';
+        } else {
+          status = 'ONGOING'; // 오늘 현재 실제 간병 진행중!
+        }
       }
     }
 
