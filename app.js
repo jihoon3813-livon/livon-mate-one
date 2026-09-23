@@ -16020,8 +16020,18 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
     redirectNote = `\n[안전 테스트 리다이렉트 발송: 원본 수신처(${targetRecipient} ${targetNumber}) 대신 테스트 번호(${cfg.testRedirectNumber})로 안전 발송됨]`;
   }
 
-  // 상단 편집 필드 제외, 오직 공식 서식 양식 1장 본문만 정밀 추출
   const formSheetHtml = getCleanFaxTransmissionHtml(formCode);
+
+  // 📢 [발송 중 표시] 실시간 전송 모달 오버레이 표출
+  if (typeof showGlobalProgress === 'function') {
+    showGlobalProgress({
+      title: '📠 전자팩스 발송 중...',
+      subtitle: `[${app.patientName} 님] ${formName || formCode || '서식 공문'}\n수신처: ${targetRecipient || '담당처'} (${dispatchFaxNumber || targetNumber || ''})`,
+      percent: 25,
+      statusText: '서식 양식 렌더링 및 A4 PDF 암호화 바이너리 생성 중...',
+      icon: 'printer'
+    });
+  }
 
   let pdfBase64 = '';
   try {
@@ -16031,6 +16041,14 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
     }
   } catch (err) {
     console.warn('[sendElectronicFaxDirectly] PDF 생성 경고:', err);
+  }
+
+  // 📢 [발송 중 표시 2단계] 통신망 보안 회선 연결
+  if (typeof updateGlobalProgress === 'function') {
+    updateGlobalProgress({
+      percent: 60,
+      statusText: `전자팩스 통신망(${cfg.mode === 'barobill' ? 'Barobill' : 'Aligo'}) 보안 회선 연결 및 송출 중...`
+    });
   }
 
   const payload = {
@@ -16075,6 +16093,14 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
   } catch (apiErr) {
     console.warn('[FAX API Direct Route Fallback]', apiErr);
     sendErrorMsg = apiErr.message || '네트워크 연결 오류';
+  }
+
+  // 📢 [발송 중 표시 3단계] 전송 응답 확인
+  if (typeof updateGlobalProgress === 'function') {
+    updateGlobalProgress({
+      percent: 85,
+      statusText: '통신망 전송 응답 확인 및 발송 이력 저장 중...'
+    });
   }
 
   if (!resultLog) {
@@ -16236,6 +16262,23 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
     }
   }
 
+  // 📢 [발송 완료 표시] 100% 진행률 표시 및 자동 닫힘
+  if (typeof updateGlobalProgress === 'function') {
+    if (resultLog && resultLog.status === '성공') {
+      updateGlobalProgress({
+        percent: 100,
+        statusText: '✅ 팩스 정상 송신 완료! 대장에 등록되었습니다.'
+      });
+      if (typeof hideGlobalProgress === 'function') hideGlobalProgress(1200);
+    } else {
+      updateGlobalProgress({
+        percent: 100,
+        statusText: `⚠️ 팩스 발송 실패 (${resultLog ? resultLog.resultMsg : '통신 오류'})`
+      });
+      if (typeof hideGlobalProgress === 'function') hideGlobalProgress(2500);
+    }
+  }
+
   if (!silentAlert && category !== '정산청구') {
     if (resultLog.status === '성공') {
       alert(`📠 [팩스 발송 완료]\n\n발송목적: ${caseTitle}\n수신처: ${targetRecipient} (${targetNumber})\n환자명: ${app.patientName} (${app.id})\n발송서식: ${formName} (${pages}장)\n\n전자팩스 통신망을 통해 정상 송출 완료되었습니다! (Convex Cloud 대장 기록됨)`);
@@ -16293,8 +16336,25 @@ async function executeRealFaxSendFromPreview() {
       if (sendBtnText) sendBtnText.innerText = '통신망 연결 및 팩스 송출 중...';
     }
 
+    // 📢 [발송 중 표시] 1차 접수 팩스 전송 프로그레스
+    showGlobalProgress({
+      title: '📠 1차 고객등록 팩스 발송 중...',
+      subtitle: `[${pendingApp.patientName} 님] 현대해상 1차 접수\n수신처: ${recipient} (${number})`,
+      percent: 30,
+      statusText: '고객 정보 등록 및 전자팩스 통신망 송출 중...',
+      icon: 'printer'
+    });
+
     try {
       await finalizeNewAppRegistration(pendingApp, true);
+      updateGlobalProgress({
+        percent: 100,
+        statusText: '✅ 1차 접수 팩스 발송 완료!'
+      });
+      hideGlobalProgress(1200);
+    } catch (regErr) {
+      hideGlobalProgress(0);
+      throw regErr;
     } finally {
       if (sendBtn) {
         sendBtn.disabled = false;
@@ -16561,6 +16621,19 @@ function executeSendHyundaiInitialFax() {
   const app = gApps.find(a => a.id === applyId);
   if (!app) return;
 
+  const targetNumber = document.getElementById('hdFaxTargetNumber')?.value.trim() || '02-2195-5000';
+
+  // 📢 [발송 중 표시] 현대해상 1차 접수 팩스 발송 프로그레스
+  if (typeof showGlobalProgress === 'function') {
+    showGlobalProgress({
+      title: '📠 현대해상 1차 접수 팩스 발송 중...',
+      subtitle: `[${app.patientName} 님] 현대해상 1차 고객등록 및 신청 접수서\n수신처: 현대해상 보상접수센터 (${targetNumber})`,
+      percent: 45,
+      statusText: '전자팩스 통신망 보안 회선 연결 및 송출 중...',
+      icon: 'printer'
+    });
+  }
+
   app.hdWorkflowStage = '문자수신대기';
   closeModal('hyundaiInitialFaxModal');
   initInsuranceWorkflows();
@@ -16571,7 +16644,6 @@ function executeSendHyundaiInitialFax() {
 
   const now = new Date();
   const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-  const targetNumber = document.getElementById('hdFaxTargetNumber')?.value.trim() || '02-2195-5000';
   const newLog = {
     id: 'FLOG-' + Date.now().toString().slice(-6),
     sentDate: dateStr,
@@ -16595,6 +16667,14 @@ function executeSendHyundaiInitialFax() {
   try {
     syncToConvex('sync:saveFaxRecord', { record: newLog });
   } catch (e) {}
+
+  if (typeof updateGlobalProgress === 'function') {
+    updateGlobalProgress({
+      percent: 100,
+      statusText: '✅ 현대해상 1차 접수 팩스 송신 완료!'
+    });
+    if (typeof hideGlobalProgress === 'function') hideGlobalProgress(1200);
+  }
 
   alert(`📠 [현대해상 1차 접수 팩스 발송 완료]\n\n수신: 현대해상 보상접수센터 (02-2195-5000)\n환자: ${app.patientName} (${app.id})\n\n현대해상에서 콜직원 휴대폰으로 보험 가입정보 문자가 오면 [문자정보 등록] 버튼을 눌러 2차 정보를 보강해주세요!`);
 }
@@ -27919,6 +27999,17 @@ async function executeSendFaxModal() {
       redirectNote = `\n[안전 테스트 리다이렉트 발송: 원본 수신처(${targetRecipient} ${targetNumber}) 대신 테스트 번호(${cfg.testRedirectNumber})로 안전 발송됨]`;
     }
 
+    // 📢 [발송 중 표시] 실시간 전송 모달 오버레이 표출
+    if (typeof showGlobalProgress === 'function') {
+      showGlobalProgress({
+        title: '📠 전자팩스 발송 중...',
+        subtitle: `[${app.patientName} 님] ${formName}\n수신처: ${targetRecipient} (${dispatchFaxNumber})`,
+        percent: 25,
+        statusText: '서식 양식 렌더링 및 A4 PDF 바이너리 생성 중...',
+        icon: 'printer'
+      });
+    }
+
     const formSheetHtml = getCleanFaxTransmissionHtml(formCode);
 
     // 🚨 [진짜 팩스 파일 생성] 서식 및 첨부파일을 공식 A4 규격 PDF 바이너리로 실시간 렌더링
@@ -27931,6 +28022,14 @@ async function executeSendFaxModal() {
       }
     } catch (pdfErr) {
       console.warn('[FAX PDF Generation Error, falling back to HTML]', pdfErr);
+    }
+
+    // 📢 [발송 중 표시 2단계] 회선 연결 및 송출
+    if (typeof updateGlobalProgress === 'function') {
+      updateGlobalProgress({
+        percent: 60,
+        statusText: `전자팩스 통신망(${savedMode === 'barobill' ? 'Barobill' : 'Aligo'}) 보안 회선 연결 및 송출 중...`
+      });
     }
 
     const payload = {
@@ -28026,12 +28125,30 @@ async function executeSendFaxModal() {
     closeModal('faxDispatchModal');
     renderUnifiedCareHub();
 
+    // 📢 [발송 완료 표시] 100% 진행률 표시 및 자동 닫힘
+    if (typeof updateGlobalProgress === 'function') {
+      if (resultLog && resultLog.status === '성공') {
+        updateGlobalProgress({
+          percent: 100,
+          statusText: '✅ 팩스 정상 송신 완료! 대장에 등록되었습니다.'
+        });
+        if (typeof hideGlobalProgress === 'function') hideGlobalProgress(1200);
+      } else {
+        updateGlobalProgress({
+          percent: 100,
+          statusText: `⚠️ 팩스 발송 실패 (${resultLog ? resultLog.resultMsg : '통신 오류'})`
+        });
+        if (typeof hideGlobalProgress === 'function') hideGlobalProgress(2500);
+      }
+    }
+
     if (resultLog.status === '성공') {
       alert(`📠 [팩스 발송 완료]\n\n발송목적: ${caseTitle}\n수신처: ${targetRecipient} (${targetNumber})\n환자명: ${app.patientName} (${app.id})\n발송서식: ${formName} (${pages}장)\n\n전자팩스 통신망을 통해 정상 송출 완료되었습니다! (Convex Cloud 대장 기록됨)`);
     } else {
       alert(`⚠️ [팩스 발송 결과 안내]\n\n수신처: ${targetRecipient} (${targetNumber})\n상태: ${resultLog.status} (${resultLog.resultMsg})\n\n통화중 또는 응답없음으로 접수되었습니다. 대장에서 [재전송] 버튼으로 재시도할 수 있습니다.`);
     }
   } catch (err) {
+    if (typeof hideGlobalProgress === 'function') hideGlobalProgress(0);
     console.error('팩스 발송 오류:', err);
     alert('팩스 발송 처리 중 오류가 발생했습니다: ' + err.message);
   } finally {
@@ -29776,8 +29893,26 @@ async function resendFaxLog(logId) {
       savedBaroPwd = await ensureBarobillPassword();
     }
 
+    // 📢 [발송 중 표시 1단계] 모달 오버레이 오픈 및 통신망 연결 상태 표시
+    if (typeof showGlobalProgress === 'function') {
+      showGlobalProgress({
+        title: '📠 전자팩스 재발송 중...',
+        subtitle: `[${maskName(log.patientName)} 님] ${log.formName}\n수신처: ${log.recipient} (${log.faxNumber})`,
+        percent: 25,
+        statusText: `전자팩스 통신망(${cfg.mode === 'barobill' ? 'Barobill' : 'Aligo'}) 보안 회선 연결 및 재발송 중...`,
+        icon: 'printer'
+      });
+    }
+
     let resultLog = null;
     try {
+      if (typeof updateGlobalProgress === 'function') {
+        updateGlobalProgress({
+          percent: 60,
+          statusText: '팩스 데이터 패킷 전송 및 게이트웨이 인증 중...'
+        });
+      }
+
       const res = await fetch('/api/fax/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29809,6 +29944,13 @@ async function resendFaxLog(logId) {
       console.warn('[FAX Resend API Route Fallback]', err);
     }
 
+    if (typeof updateGlobalProgress === 'function') {
+      updateGlobalProgress({
+        percent: 85,
+        statusText: '통신망 전송 응답 확인 및 발송 이력 갱신 중...'
+      });
+    }
+
     if (!resultLog) {
       const now = new Date();
       const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
@@ -29834,8 +29976,26 @@ async function resendFaxLog(logId) {
     updateFaxKpis();
     renderFaxLogsTable();
 
+    // 📢 [발송 완료 표시] 100% 진행률 표시 및 자동 닫힘
+    if (typeof updateGlobalProgress === 'function') {
+      if (resultLog && resultLog.status === '성공') {
+        updateGlobalProgress({
+          percent: 100,
+          statusText: '✅ 팩스 정상 재발송 완료! 대장에 등록되었습니다.'
+        });
+        if (typeof hideGlobalProgress === 'function') hideGlobalProgress(1200);
+      } else {
+        updateGlobalProgress({
+          percent: 100,
+          statusText: `⚠️ 팩스 재발송 실패 (${resultLog ? resultLog.resultMsg : '통신 오류'})`
+        });
+        if (typeof hideGlobalProgress === 'function') hideGlobalProgress(2500);
+      }
+    }
+
     alert(`📠 [재발송 완료]\n\n수신처: ${log.recipient} (${log.faxNumber})\n서식: ${log.formName}\n성공적으로 재전송되었습니다! (Convex Cloud 대장 기록됨)`);
   } catch (err) {
+    if (typeof hideGlobalProgress === 'function') hideGlobalProgress(0);
     alert('재전송 처리 중 오류: ' + err.message);
   }
 }
@@ -33548,12 +33708,21 @@ function showGlobalProgress(opts) {
   const pctEl = document.getElementById('globalProgressPercent');
   const statusEl = document.getElementById('globalProgressStatus') || document.getElementById('globalProgressStatusText');
 
+  const iconEl = document.getElementById('globalProgressIcon');
+
   if (titleEl) titleEl.innerText = opts.title || '작업 진행 중';
   if (subEl) subEl.innerText = opts.subtitle || '';
   const p = Math.min(100, Math.max(0, opts.percent || 0));
   if (barEl) barEl.style.width = `${p}%`;
   if (pctEl) pctEl.innerText = `${p}%`;
   if (statusEl) statusEl.innerText = opts.statusText || '처리 중입니다...';
+
+  if (iconEl && opts.icon) {
+    iconEl.setAttribute('data-lucide', opts.icon);
+    if (window.lucide && typeof lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
+  }
 
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
