@@ -1070,7 +1070,7 @@ var gLocalPendingChanges = [];        // Convex 동기화 대기 중인 로컬 �
 // =========================================================================
 // [환경 감지] 개발 사이트(DEV) vs 실운영 사이트(PROD) 동적 분리 엔진
 // =========================================================================
-const DEV_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
+const DEV_CONVEX_URL = 'https://rapid-raccoon-895.convex.cloud';
 const PROD_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
 
 function isDevEnvironment() {
@@ -30413,13 +30413,23 @@ async function executeFullDataReset() {
   if (!ans) return;
 
   try {
-    // 1. Convex 클라우드 DB 완전 초기화 (관리자 계정 제외)
-    if (typeof syncToConvex === 'function') {
-      await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'all' });
-      // 잔여 데이터 완전 삭제 보장을 위한 2차 확인 퍼지
+    // 1. Convex 클라우드 DB 완전 초기화 (개발 서버 rapid-raccoon-895 & 운영 실서버 gallant-weasel-360 양쪽 모두 0건 강제 동기화)
+    const purgeTargets = [
+      typeof CONVEX_URL !== 'undefined' ? CONVEX_URL : null,
+      'https://rapid-raccoon-895.convex.cloud',
+      'https://gallant-weasel-360.convex.cloud'
+    ].filter((v, i, a) => v && a.indexOf(v) === i);
+
+    for (const targetUrl of purgeTargets) {
       try {
-        await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'all' });
-      } catch (e2) {}
+        await fetch(`${targetUrl}/api/mutation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: 'sync:resetAndPurgeLaunchData', args: { company: 'all' } })
+        });
+      } catch (err) {
+        console.warn(`[Reset Warning] ${targetUrl} 초기화 중 오류:`, err);
+      }
     }
 
     // 2. 로컬 서버 디스크 파일(hub_apps_real.json) 0건 초기화
@@ -44767,10 +44777,24 @@ async function executeApplyLaunchData(company) {
 
   const isComprehensive = (companyKey === 'hyundai' || String(companyLabel).includes('종합'));
 
-  // 0. Convex 실서버 기존 전체 데이터 전면 초기화 (Reset)
-  if (typeof syncToConvex === 'function') {
-    showToast(`[${companyLabel}] 기존 데이터를 클라우드 서버에서 전면 초기화(삭제) 중입니다...`, 'info');
-    await syncToConvex('sync:resetAndPurgeLaunchData', { company: isComprehensive ? 'all' : companyKey });
+  // 0. Convex 클라우드 DB 기존 전체 데이터 전면 초기화 (Reset - 개발 및 실서버 양쪽 모두 완벽 초기화)
+  showToast(`[${companyLabel}] 기존 데이터를 클라우드 서버에서 전면 초기화(삭제) 중입니다...`, 'info');
+  const launchPurgeTargets = [
+    typeof CONVEX_URL !== 'undefined' ? CONVEX_URL : null,
+    'https://rapid-raccoon-895.convex.cloud',
+    'https://gallant-weasel-360.convex.cloud'
+  ].filter((v, i, a) => v && a.indexOf(v) === i);
+
+  for (const targetUrl of launchPurgeTargets) {
+    try {
+      await fetch(`${targetUrl}/api/mutation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: 'sync:resetAndPurgeLaunchData', args: { company: isComprehensive ? 'all' : companyKey } })
+      });
+    } catch (err) {
+      console.warn(`[Launch Reset Warning] ${targetUrl}:`, err);
+    }
   }
 
   // 1. 통합허브(gApps) 전면 교체: 새 엑셀 데이터로 100% 리셋
