@@ -18848,8 +18848,8 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
     (app.status === '진행' || app.status === '진행중' || app.status === '간병진행중')
   );
   const isCompleted = isOngoingCare ? false : (prog ? (prog.status === 'completed' && prog.remainingDays === 0) : Boolean(as && as.endDate && as.endDate !== '진행중' && as.endDate !== '예정'));
-  const careStartDate = as ? as.startDate : null;
-  const careEndDate = as ? as.endDate : null;
+  const careStartDate = as ? as.startDate : (app ? app.careStartDate : null);
+  const careEndDate = as ? as.endDate : (app ? app.careEndDate : null);
   const isSamsung = Boolean(app && (app.insuranceCompany || '').includes('삼성'));
 
   const defaultInsPrice = typeof getDefaultClaimUnitPrice === 'function' ? getDefaultClaimUnitPrice(app.insuranceCompany) : 160000;
@@ -18863,38 +18863,261 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
 
   const rounds = [];
 
-  if (appClaims && appClaims.length > 0) {
-    // 1) 실제 청구서가 이미 등록되어 있는 경우: 실제 청구 및 지급 내역을 1:1 라운드로 구성
-    const sortedClaims = appClaims.slice().sort((a, b) => {
-      const dA = a.standardDate || a.claimDate || '';
-      const dB = b.standardDate || b.claimDate || '';
-      return dA.localeCompare(dB);
+  // [RULE 1] 관리자가 직접 편집/추가한 커스텀 정산·청구 세트가 존재하는 경우
+  if (app && app.customSettlementSets && Array.isArray(app.customSettlementSets) && app.customSettlementSets.length > 0) {
+    app.customSettlementSets.forEach((cSet, idx) => {
+      const setIndex = cSet.setIndex || (idx + 1);
+      const claimDays = Number(cSet.claimDays) || Number(cSet.days) || 1;
+      const payoutDays = Number(cSet.payoutDays) || Number(cSet.days) || 1;
+      const setDays = Math.max(claimDays, payoutDays);
+      const hours = setDays * 24;
+      const roundStartDateStr = cSet.startDateStr || cSet.claimStandardDate || cSet.payoutStandardDate || careStartDate || '';
+      const roundEndDateStr = cSet.endDateStr || cSet.claimStandardDate || cSet.payoutStandardDate || careEndDate || '';
+      
+      let targetYear = '';
+      let targetMonth = '';
+      const rDateMatch = (roundEndDateStr || roundStartDateStr || '').match(/(\d{4})[.-](\d{1,2})/);
+      if (rDateMatch) {
+        targetYear = rDateMatch[1];
+        targetMonth = parseInt(rDateMatch[2], 10);
+      } else {
+        const now = new Date();
+        targetYear = String(now.getFullYear());
+        targetMonth = now.getMonth() + 1;
+      }
+      const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
+
+      const setClaimPrice = (cSet.dailyClaimPrice && !isNaN(Number(cSet.dailyClaimPrice)) && Number(cSet.dailyClaimPrice) > 0) ? Number(cSet.dailyClaimPrice) : dailyClaimPrice;
+      const setPayoutWage = (cSet.cgDailyWage && !isNaN(Number(cSet.cgDailyWage)) && Number(cSet.cgDailyWage) > 0) ? Number(cSet.cgDailyWage) : cgDailyWage;
+      const fullClaimAmount = (cSet.claimAmount && !isNaN(Number(cSet.claimAmount))) ? Number(cSet.claimAmount) : (claimDays * setClaimPrice);
+      const fullPayoutAmount = (cSet.payoutAmount && !isNaN(Number(cSet.payoutAmount))) ? Number(cSet.payoutAmount) : (payoutDays * setPayoutWage);
+      const depositAmount = (cSet.depositAmount !== undefined && cSet.depositAmount !== null && cSet.depositAmount !== '') ? Number(cSet.depositAmount) : 0;
+
+      const isClaimDeposited = Boolean(cSet.claimStatus === '입금완료' || cSet.claimStatus === '수납완료' || depositAmount >= fullClaimAmount);
+      const isPayoutPaid = Boolean(cSet.payoutStatus === '지급완료' || cSet.payoutStatus === '지급' || isPayoutStatusPaid(cSet.payoutStatus));
+
+      const existingClaim = (appClaims || []).find(c => c.id === cSet.claimId) || (appClaims || [])[idx] || null;
+      const existingPayout = (appPayouts || []).find(p => p.id === cSet.payoutId) || (appPayouts || [])[idx] || null;
+
+      let claimStatus = 'UPCOMING_WAIT';
+      if (isClaimDeposited) {
+        claimStatus = 'DEPOSIT_DONE';
+      } else if (cSet.claimStatus === '청구완료' || cSet.claimDate || (existingClaim && existingClaim.claimDate)) {
+        claimStatus = 'CLAIMED_UNPAID';
+      } else {
+        claimStatus = isCompleted ? 'READY_TO_CLAIM' : 'UPCOMING_WAIT';
+      }
+
+      let payoutStatus = 'UPCOMING_WAIT';
+      if (isPayoutPaid) {
+        payoutStatus = 'PAID';
+      } else {
+        payoutStatus = isCompleted ? 'READY_TO_PAY' : 'UPCOMING_WAIT';
+      }
+
+      const marginAmount = fullClaimAmount - fullPayoutAmount;
+      const marginRate = fullClaimAmount > 0 ? ((marginAmount / fullClaimAmount) * 100).toFixed(1) : '0.0';
+
+      rounds.push({
+        roundNumber: setIndex,
+        setIndex: setIndex,
+        label: cSet.claimRound || cSet.payoutRound || `세트 ${setIndex}`,
+        claimRoundLabel: cSet.claimRound || '-',
+        payoutRoundLabel: cSet.payoutRound || '-',
+        claimStandardDate: cSet.claimStandardDate || '',
+        payoutStandardDate: cSet.payoutStandardDate || '',
+        claimDate: cSet.claimDate || (existingClaim ? (existingClaim.claimDate || existingClaim.faxSentDate || '') : ''),
+        payoutDate: cSet.payoutDate || (existingPayout ? (existingPayout.paidDate || existingPayout.payoutDate || '') : ''),
+        claimDays: claimDays,
+        payoutDays: payoutDays,
+        days: setDays,
+        hours: hours,
+        startDayOffset: (idx * 10) + 1,
+        endDayOffset: (idx * 10) + setDays,
+        startDateStr: roundStartDateStr,
+        endDateStr: roundEndDateStr,
+        stage: isCompleted ? 'COMPLETED' : 'ONGOING',
+        dailyClaimPrice: setClaimPrice,
+        fullClaimAmount: fullClaimAmount,
+        depositAmount: depositAmount,
+        ongoingClaimAmount: fullClaimAmount,
+        claimId: cSet.claimId || (existingClaim ? existingClaim.id : `Q${String(app.id).replace('C', '')}.${setIndex}`),
+        claimStatus: claimStatus,
+        existingClaim: existingClaim,
+        isClaimCreated: Boolean(existingClaim || cSet.claimDate),
+        isFaxClaimSent: Boolean(cSet.claimDate),
+        isClaimSent: Boolean(cSet.claimDate || claimStatus === 'CLAIMED_UNPAID' || claimStatus === 'DEPOSIT_DONE'),
+        isClaimDeposited: isClaimDeposited,
+        isDepositDone: isClaimDeposited,
+        cgDailyWage: setPayoutWage,
+        fullPayoutAmount: fullPayoutAmount,
+        ongoingPayoutAmount: fullPayoutAmount,
+        payoutId: cSet.payoutId || (existingPayout ? existingPayout.id : `P${String(app.id).replace('C', '')}.${setIndex}`),
+        payoutStatus: payoutStatus,
+        existingPayout: existingPayout,
+        isPayoutCreated: Boolean(existingPayout),
+        isPayoutPaid: isPayoutPaid,
+        marginAmount: marginAmount,
+        marginRate: marginRate,
+        isSamsung: isSamsung,
+        isDateCustomized: true,
+        isOngoingCare: isOngoingCare,
+        targetYear,
+        targetMonth,
+        targetMonthText,
+        memo: cSet.memo || ''
+      });
     });
+  } else {
+    // [RULE 2] 실제 등록된 보험청구(appClaims) 및 간병비지급(appPayouts) 내역 기반 매핑
+    const hasClaims = Boolean(appClaims && appClaims.length > 0);
+    const hasPayouts = Boolean(appPayouts && appPayouts.length > 0);
 
-    sortedClaims.forEach((claimForRound, idx) => {
-      const roundIndex = idx + 1;
-      const targetAppId = String(app ? app.id : '');
-      const faxLogList = (window._gFaxLogsByAppId && window._gFaxLogsByAppId.get(targetAppId)) || window.gFaxLogs || [];
-      const roundFaxLog = faxLogList.find(fl => 
-        String(fl.appId) === targetAppId && 
-        (fl.roundNumber === roundIndex || (fl.memo && fl.memo.includes(`${roundIndex}차`)) || (fl.category && fl.category.includes('정산') && roundIndex === 1))
-      );
-      const isFaxClaimSent = Boolean(roundFaxLog && roundFaxLog.sentDate && (roundFaxLog.status === '전송완료' || roundFaxLog.status === '발송완료' || roundFaxLog.status === '성공'));
+    if (hasClaims || hasPayouts) {
+      const sortedClaims = (appClaims || []).slice().sort((a, b) => {
+        const dA = a.standardDate || a.claimDate || a.startDate || '';
+        const dB = b.standardDate || b.claimDate || b.startDate || '';
+        return dA.localeCompare(dB);
+      });
+      const sortedPayouts = (appPayouts || []).slice().sort((a, b) => {
+        const dA = a.standardDate || a.payoutDate || a.paidDate || a.startDate || '';
+        const dB = b.standardDate || b.payoutDate || b.paidDate || b.startDate || '';
+        return dA.localeCompare(dB);
+      });
 
-      // 매칭되는 지급 내역 찾기 (회차명 일치 우선, 기준일 일치 보조, 인덱스 매칭)
-      const payoutForRound = (appPayouts || []).find(p => {
-        if (p.round && claimForRound.round && p.round.trim() === claimForRound.round.trim()) return true;
-        if (p.standardDate && claimForRound.standardDate && p.standardDate === claimForRound.standardDate) return true;
-        return false;
-      }) || (appPayouts || [])[idx];
+      const totalSets = Math.max(sortedClaims.length, sortedPayouts.length);
+      for (let idx = 0; idx < totalSets; idx++) {
+        const setIndex = idx + 1;
+        const claimForRound = sortedClaims[idx] || null;
+        const payoutForRound = sortedPayouts[idx] || null;
 
-      const roundDays = Number(claimForRound.days) || 10;
-      const hours = roundDays * 24;
-      const startDayOffset = (idx * 10) + 1;
-      const endDayOffset = startDayOffset + roundDays - 1;
+        const claimRoundLabel = claimForRound ? (claimForRound.round || `${setIndex}차`) : '-';
+        const payoutRoundLabel = payoutForRound ? (payoutForRound.round || `${setIndex}차`) : '-';
 
-      const roundStartDateStr = claimForRound.startDate || claimForRound.standardDate || (as ? as.startDate : '');
-      const roundEndDateStr = claimForRound.endDate || claimForRound.standardDate || (as ? as.endDate : '');
+        const claimDays = claimForRound ? (Number(claimForRound.days) || 1) : (payoutForRound ? (Number(payoutForRound.days) || 1) : 1);
+        const payoutDays = payoutForRound ? (Number(payoutForRound.days) || 1) : (claimForRound ? (Number(claimForRound.days) || 1) : 1);
+        const setDays = Math.max(claimDays, payoutDays);
+        const hours = setDays * 24;
+
+        const claimStandardDate = claimForRound ? (claimForRound.standardDate || claimForRound.startDate || '') : (payoutForRound ? (payoutForRound.standardDate || payoutForRound.startDate || '') : '');
+        const payoutStandardDate = payoutForRound ? (payoutForRound.standardDate || payoutForRound.startDate || '') : (claimForRound ? (claimForRound.standardDate || claimForRound.startDate || '') : '');
+
+        const roundStartDateStr = (claimForRound && claimForRound.startDate) || (payoutForRound && payoutForRound.startDate) || claimStandardDate || payoutStandardDate || (as ? as.startDate : '');
+        const roundEndDateStr = (claimForRound && claimForRound.endDate) || (payoutForRound && payoutForRound.endDate) || claimStandardDate || payoutStandardDate || (as ? as.endDate : '');
+
+        let targetYear = '';
+        let targetMonth = '';
+        const rDateMatch = (roundEndDateStr || roundStartDateStr || claimStandardDate || payoutStandardDate || '').match(/(\d{4})[.-](\d{1,2})/);
+        if (rDateMatch) {
+          targetYear = rDateMatch[1];
+          targetMonth = parseInt(rDateMatch[2], 10);
+        } else {
+          const now = new Date();
+          targetYear = String(now.getFullYear());
+          targetMonth = now.getMonth() + 1;
+        }
+        const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
+
+        const fullClaimAmount = claimForRound ? (Number(claimForRound.claimAmount) || (claimDays * dailyClaimPrice)) : (claimDays * dailyClaimPrice);
+        const fullPayoutAmount = payoutForRound ? (Number(payoutForRound.payoutAmount) || (payoutDays * cgDailyWage)) : (payoutDays * cgDailyWage);
+
+        let depositAmount = (claimForRound && claimForRound.depositAmount !== undefined && claimForRound.depositAmount !== null && claimForRound.depositAmount !== '')
+          ? Number(claimForRound.depositAmount)
+          : ((claimForRound && isClaimDepositConfirmed(claimForRound)) ? fullClaimAmount : 0);
+
+        if (!depositAmount && app && app.roundDeposits && app.roundDeposits[setIndex] !== undefined) {
+          depositAmount = Number(app.roundDeposits[setIndex]) || 0;
+        }
+
+        const isClaimDeposited = Boolean(depositAmount > 0 || (claimForRound && isClaimDepositConfirmed(claimForRound)));
+        const isPayoutPaid = Boolean(payoutForRound && isPayoutStatusPaid(payoutForRound.payoutStatus));
+
+        const targetAppId = String(app ? app.id : '');
+        const faxLogList = (window._gFaxLogsByAppId && window._gFaxLogsByAppId.get(targetAppId)) || window.gFaxLogs || [];
+        const roundFaxLog = faxLogList.find(fl => 
+          String(fl.appId) === targetAppId && 
+          (fl.roundNumber === setIndex || (fl.memo && fl.memo.includes(`${setIndex}차`)) || (fl.category && fl.category.includes('정산') && setIndex === 1))
+        );
+        const isFaxClaimSent = Boolean(roundFaxLog && roundFaxLog.sentDate && (roundFaxLog.status === '전송완료' || roundFaxLog.status === '발송완료' || roundFaxLog.status === '성공'));
+
+        let claimStatus = 'UPCOMING_WAIT';
+        if (claimForRound) {
+          claimStatus = isClaimDeposited ? 'DEPOSIT_DONE' : 'CLAIMED_UNPAID';
+        } else if (isClaimDeposited) {
+          claimStatus = 'DEPOSIT_DONE';
+        } else if (isFaxClaimSent) {
+          claimStatus = 'CLAIMED_UNPAID';
+        } else {
+          claimStatus = isCompleted ? 'READY_TO_CLAIM' : 'UPCOMING_WAIT';
+        }
+
+        let payoutStatus = 'UPCOMING_WAIT';
+        if (payoutForRound) {
+          payoutStatus = isPayoutPaid ? 'PAID' : 'READY_TO_PAY';
+        } else {
+          payoutStatus = isCompleted ? 'READY_TO_PAY' : 'UPCOMING_WAIT';
+        }
+
+        const marginAmount = fullClaimAmount - fullPayoutAmount;
+        const marginRate = fullClaimAmount > 0 ? ((marginAmount / fullClaimAmount) * 100).toFixed(1) : '0.0';
+
+        rounds.push({
+          roundNumber: setIndex,
+          setIndex: setIndex,
+          label: claimRoundLabel !== '-' ? claimRoundLabel : (payoutRoundLabel !== '-' ? payoutRoundLabel : `세트 ${setIndex}`),
+          claimRoundLabel,
+          payoutRoundLabel,
+          claimStandardDate,
+          payoutStandardDate,
+          claimDate: claimForRound ? (claimForRound.claimDate || claimForRound.faxSentDate || '') : '',
+          payoutDate: payoutForRound ? (payoutForRound.paidDate || payoutForRound.payoutDate || '') : '',
+          claimDays,
+          payoutDays,
+          days: setDays,
+          hours,
+          startDayOffset: (idx * 10) + 1,
+          endDayOffset: (idx * 10) + setDays,
+          startDateStr: roundStartDateStr,
+          endDateStr: roundEndDateStr,
+          stage: isCompleted ? 'COMPLETED' : 'ONGOING',
+          ongoingElapsed: setDays,
+          ongoingRemaining: 0,
+          dailyClaimPrice,
+          fullClaimAmount,
+          depositAmount,
+          ongoingClaimAmount: fullClaimAmount,
+          claimId: claimForRound ? claimForRound.id : `Q${String(app.id).replace('C', '')}.${setIndex}`,
+          claimStatus,
+          existingClaim: claimForRound,
+          isClaimCreated: Boolean(claimForRound),
+          isFaxClaimSent,
+          isClaimSent: isFaxClaimSent || Boolean(claimForRound),
+          isClaimDeposited,
+          isDepositDone: isClaimDeposited,
+          cgDailyWage,
+          fullPayoutAmount,
+          ongoingPayoutAmount: fullPayoutAmount,
+          payoutId: payoutForRound ? payoutForRound.id : `P${String(app.id).replace('C', '')}.${setIndex}`,
+          payoutStatus,
+          existingPayout: payoutForRound,
+          isPayoutCreated: Boolean(payoutForRound),
+          isPayoutPaid,
+          marginAmount,
+          marginRate,
+          isSamsung,
+          isDateCustomized: false,
+          targetYear,
+          targetMonth,
+          targetMonthText,
+          isOngoingCare
+        });
+      }
+    } else if (isCaregiverAssigned && (totalCareDays > 0 || (as && as.startDate))) {
+      // 3) 실제 청구서/지급서가 없는 경우: 1개의 기본 세트만 생성 (인위적인 10일 주기 루프로 미래 차수를 날조하지 않음!)
+      const setDays = totalCareDays > 0 ? totalCareDays : 1;
+      const hours = setDays * 24;
+      const roundStartDateStr = careStartDate || '';
+      const roundEndDateStr = careEndDate || careStartDate || '';
 
       let targetYear = '';
       let targetMonth = '';
@@ -18909,60 +19132,52 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       }
       const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
 
-      const fullClaimAmount = Number(claimForRound.claimAmount) || (roundDays * dailyClaimPrice);
-      const fullPayoutAmount = Number(payoutForRound ? payoutForRound.payoutAmount : 0) || (roundDays * cgDailyWage);
-
-      let depositAmount = (claimForRound.depositAmount !== undefined && claimForRound.depositAmount !== null && claimForRound.depositAmount !== '')
-        ? Number(claimForRound.depositAmount)
-        : (isClaimDepositConfirmed(claimForRound) ? fullClaimAmount : 0);
-
-      if (!depositAmount && app && app.roundDeposits && app.roundDeposits[roundIndex] !== undefined) {
-        depositAmount = Number(app.roundDeposits[roundIndex]) || 0;
-      } else if (!depositAmount && app && app.depositConfirmedAmount > 0 && sortedClaims.length === 1) {
-        depositAmount = Math.min(fullClaimAmount, Number(app.depositConfirmedAmount));
-      }
-
-      const isClaimDeposited = Boolean(depositAmount > 0 || isClaimDepositConfirmed(claimForRound));
-      const isPayoutPaid = Boolean(payoutForRound && isPayoutStatusPaid(payoutForRound.payoutStatus));
-
+      const fullClaimAmount = setDays * dailyClaimPrice;
+      const fullPayoutAmount = setDays * cgDailyWage;
       const marginAmount = fullClaimAmount - fullPayoutAmount;
       const marginRate = fullClaimAmount > 0 ? ((marginAmount / fullClaimAmount) * 100).toFixed(1) : '0.0';
 
-      const isThisRoundOngoing = Boolean(isOngoingCare && (idx === sortedClaims.length - 1) && !claimForRound.claimDate && !claimForRound.depositDate);
-      const stage = isThisRoundOngoing ? 'ONGOING' : 'COMPLETED';
-
       rounds.push({
-        roundNumber: roundIndex,
-        label: claimForRound.round || `${roundIndex}차 (${roundDays}일간)`,
-        days: roundDays,
+        roundNumber: 1,
+        setIndex: 1,
+        label: '1차',
+        claimRoundLabel: '1차',
+        payoutRoundLabel: '1차',
+        claimStandardDate: roundEndDateStr || roundStartDateStr,
+        payoutStandardDate: roundEndDateStr || roundStartDateStr,
+        claimDate: '',
+        payoutDate: '',
+        claimDays: setDays,
+        payoutDays: setDays,
+        days: setDays,
         hours,
-        startDayOffset,
-        endDayOffset,
+        startDayOffset: 1,
+        endDayOffset: setDays,
         startDateStr: roundStartDateStr,
         endDateStr: roundEndDateStr,
-        stage,
-        ongoingElapsed: isThisRoundOngoing ? Math.min(roundDays, Math.max(1, elapsedDays - startDayOffset + 1)) : roundDays,
-        ongoingRemaining: isThisRoundOngoing ? Math.max(0, roundDays - (elapsedDays - startDayOffset + 1)) : 0,
+        stage: isCompleted ? 'COMPLETED' : 'ONGOING',
+        ongoingElapsed: isOngoingCare ? Math.min(setDays, Math.max(1, elapsedDays)) : setDays,
+        ongoingRemaining: isOngoingCare ? Math.max(0, setDays - elapsedDays) : 0,
         dailyClaimPrice,
         fullClaimAmount,
-        depositAmount,
+        depositAmount: 0,
         ongoingClaimAmount: fullClaimAmount,
-        claimId: claimForRound.id || `Q${app.id.replace('C', '')}.${roundIndex}`,
-        claimStatus: isClaimDeposited ? 'DEPOSIT_DONE' : 'CLAIMED_UNPAID',
-        existingClaim: claimForRound,
-        isClaimCreated: true,
-        isFaxClaimSent,
-        isClaimSent: isFaxClaimSent || true,
-        isClaimDeposited,
-        isDepositDone: isClaimDeposited,
+        claimId: `Q${String(app.id).replace('C', '')}.1`,
+        claimStatus: isCompleted ? 'READY_TO_CLAIM' : 'UPCOMING_WAIT',
+        existingClaim: null,
+        isClaimCreated: false,
+        isFaxClaimSent: false,
+        isClaimSent: false,
+        isClaimDeposited: false,
+        isDepositDone: false,
         cgDailyWage,
         fullPayoutAmount,
         ongoingPayoutAmount: fullPayoutAmount,
-        payoutId: payoutForRound ? payoutForRound.id : `P${app.id.replace('C', '')}.${roundIndex}`,
-        payoutStatus: isPayoutPaid ? 'PAID' : 'READY_TO_PAY',
-        existingPayout: payoutForRound,
-        isPayoutCreated: Boolean(payoutForRound),
-        isPayoutPaid,
+        payoutId: `P${String(app.id).replace('C', '')}.1`,
+        payoutStatus: isCompleted ? 'READY_TO_PAY' : 'UPCOMING_WAIT',
+        existingPayout: null,
+        isPayoutCreated: false,
+        isPayoutPaid: false,
         marginAmount,
         marginRate,
         isSamsung,
@@ -18972,271 +19187,34 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         targetMonthText,
         isOngoingCare
       });
-    });
-  } else if (isCaregiverAssigned && (totalCareDays > 0 || (as && as.startDate))) {
-    // 2) 실제 청구서가 아직 없고 배정 일정이 있는 경우: 10일 주기 자동 분할
-    const baseStart = parseCareDate(careStartDate);
-    const baseEnd = parseCareDate(careEndDate) || (prog ? parseCareDate(prog.startDate) : null);
-    const startTimeStr = (careStartDate && careStartDate.includes(':')) ? careStartDate.split(' ').slice(1).join(' ') : '09:00';
-    const endTimeStr = (careEndDate && careEndDate.includes(':')) ? careEndDate.split(' ').slice(1).join(' ') : '18:00';
-
-    let effectiveTotalDays = totalCareDays > 0 ? totalCareDays : 10;
-    if (isOngoingCare) {
-      effectiveTotalDays = Math.max(10, Math.ceil(elapsedDays / 10) * 10);
-    }
-    let remainingDaysToSplit = effectiveTotalDays;
-    let roundIndex = 1;
-    let startDayOffset = 1;
-
-    while (remainingDaysToSplit > 0) {
-      // 1. 사용자 수동 지정 날짜 확인
-      const customDates = (app && app.customRoundDates && app.customRoundDates[roundIndex]);
-
-      const claimForRound = (appClaims || []).find(c => {
-        const rNum = parseInt(String(c.round || '').replace(/[^0-9]/g, ''), 10);
-        return rNum === roundIndex || String(c.round || '').includes(`${roundIndex}차`) || String(c.round || '').includes(`${roundIndex}회차`);
-      });
-
-      const payoutForRound = (appPayouts || []).find(p => {
-        const rNum = parseInt(String(p.round || '').replace(/[^0-9]/g, ''), 10);
-        return rNum === roundIndex || String(p.round || '').includes(`${roundIndex}차`) || String(p.round || '').includes(`${roundIndex}회차`);
-      });
-
-      const targetAppId = String(app ? app.id : '');
-      const faxLogList = (window._gFaxLogsByAppId && window._gFaxLogsByAppId.get(targetAppId)) || window.gFaxLogs || [];
-      const roundFaxLog = faxLogList.find(fl => 
-        String(fl.appId) === targetAppId && 
-        (fl.roundNumber === roundIndex || (fl.memo && fl.memo.includes(`${roundIndex}차`)) || (fl.category && fl.category.includes('정산') && roundIndex === 1))
-      );
-      const isFaxClaimSent = Boolean(roundFaxLog && roundFaxLog.sentDate && (roundFaxLog.status === '전송완료' || roundFaxLog.status === '발송완료' || roundFaxLog.status === '성공'));
-
-      let roundDays = 10;
-      if (customDates && customDates.days && Number(customDates.days) > 0) {
-        roundDays = Math.min(Number(customDates.days), remainingDaysToSplit);
-      } else if (claimForRound && claimForRound.days && Number(claimForRound.days) > 0) {
-        roundDays = Math.min(Number(claimForRound.days), remainingDaysToSplit);
-      } else if (payoutForRound && payoutForRound.days && Number(payoutForRound.days) > 0) {
-        roundDays = Math.min(Number(payoutForRound.days), remainingDaysToSplit);
-      } else if (isSamsung) {
-        if (baseStart && baseEnd) {
-          const rStart = new Date(baseStart.getFullYear(), baseStart.getMonth(), baseStart.getDate() + (startDayOffset - 1));
-          const isSameMonthAsEnd = (rStart.getFullYear() === baseEnd.getFullYear() && rStart.getMonth() === baseEnd.getMonth());
-          if (isSameMonthAsEnd) {
-            roundDays = remainingDaysToSplit;
-          } else {
-            const endOfMonth = new Date(rStart.getFullYear(), rStart.getMonth() + 1, 0);
-            const daysTillMonthEnd = Math.max(1, Math.round((endOfMonth - rStart) / (24 * 60 * 60 * 1000)) + 1);
-            roundDays = Math.min(daysTillMonthEnd, remainingDaysToSplit);
-          }
-        } else {
-          roundDays = remainingDaysToSplit;
-        }
-      } else {
-        roundDays = Math.min(10, remainingDaysToSplit);
-      }
-
-      const endDayOffset = startDayOffset + roundDays - 1;
-
-      let roundStartDateStr = '';
-      let roundEndDateStr = '';
-      if (baseStart) {
-        const rStart = new Date(baseStart.getFullYear(), baseStart.getMonth(), baseStart.getDate() + (startDayOffset - 1));
-        const rEnd = new Date(baseStart.getFullYear(), baseStart.getMonth(), baseStart.getDate() + (endDayOffset - 1));
-        const sTime = (startDayOffset === 1 && startTimeStr) ? startTimeStr : '09:00';
-        const eTime = (endDayOffset === effectiveTotalDays && endTimeStr) ? endTimeStr : '18:00';
-        roundStartDateStr = `${formatCareDateStr(rStart)} ${sTime}`;
-        roundEndDateStr = `${formatCareDateStr(rEnd)} ${eTime}`;
-      }
-
-      if (customDates && customDates.startDate) {
-        roundStartDateStr = formatWithTime(customDates.startDate, '09:00');
-      } else if (claimForRound && claimForRound.startDate) {
-        roundStartDateStr = formatWithTime(claimForRound.startDate, '09:00');
-      }
-      if (customDates && customDates.endDate) {
-        roundEndDateStr = formatWithTime(customDates.endDate, '18:00');
-      } else if (claimForRound && claimForRound.endDate) {
-        roundEndDateStr = formatWithTime(claimForRound.endDate, '18:00');
-      }
-
-      let targetYear = '';
-      let targetMonth = '';
-      const rDateMatch = (roundEndDateStr || roundStartDateStr).match(/(\d{4})[.-](\d{1,2})/);
-      if (rDateMatch) {
-        targetYear = rDateMatch[1];
-        targetMonth = parseInt(rDateMatch[2], 10);
-      } else {
-        const now = new Date();
-        targetYear = String(now.getFullYear());
-        targetMonth = now.getMonth() + 1;
-      }
-      const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
-
-      let stage = 'UPCOMING';
-      let ongoingElapsed = 0;
-      let ongoingRemaining = roundDays;
-
-      if (isOngoingCare) {
-        // 종료일 미정 진행 건: 종료일 확정 전까지 경과일 이전 차수만 완료, 현재 활성 차수는 무조건 ONGOING
-        if (elapsedDays >= endDayOffset && endDayOffset < effectiveTotalDays) {
-          stage = 'COMPLETED';
-          ongoingElapsed = roundDays;
-          ongoingRemaining = 0;
-        } else if (elapsedDays >= startDayOffset) {
-          stage = 'ONGOING';
-          ongoingElapsed = elapsedDays - startDayOffset + 1;
-          ongoingRemaining = Math.max(0, roundDays - ongoingElapsed);
-        } else {
-          stage = 'UPCOMING';
-          ongoingElapsed = 0;
-          ongoingRemaining = roundDays;
-        }
-      } else {
-        if (elapsedDays >= endDayOffset || isCompleted) {
-          stage = 'COMPLETED';
-          ongoingElapsed = roundDays;
-          ongoingRemaining = 0;
-        } else if (elapsedDays >= startDayOffset) {
-          stage = 'ONGOING';
-          ongoingElapsed = elapsedDays - startDayOffset + 1;
-          ongoingRemaining = Math.max(0, roundDays - ongoingElapsed);
-        } else {
-          stage = 'UPCOMING';
-          ongoingElapsed = 0;
-          ongoingRemaining = roundDays;
-        }
-      }
-
-      const fullClaimAmount = roundDays * dailyClaimPrice;
-      const ongoingClaimAmount = ongoingElapsed * dailyClaimPrice;
-
-      let depositAmount = 0;
-      if (claimForRound) {
-        depositAmount = (claimForRound.depositAmount !== undefined && claimForRound.depositAmount !== null && claimForRound.depositAmount !== '')
-          ? Number(claimForRound.depositAmount)
-          : (isClaimDepositConfirmed(claimForRound) ? fullClaimAmount : 0);
-      } else if (app && app.roundDeposits && app.roundDeposits[roundIndex] !== undefined) {
-        depositAmount = Number(app.roundDeposits[roundIndex]) || 0;
-      } else if (app && app.depositConfirmedAmount > 0 && (isFaxClaimSent || (app.claimCount > 0 && isCompleted))) {
-        depositAmount = Math.min(fullClaimAmount, Number(app.depositConfirmedAmount));
-      }
-
-      const isClaimDeposited = Boolean(depositAmount > 0 || (claimForRound && isClaimDepositConfirmed(claimForRound)));
-      const isPayoutPaid = Boolean(payoutForRound && isPayoutStatusPaid(payoutForRound.payoutStatus));
-
-      let claimStatus = 'UPCOMING_WAIT';
-      if (claimForRound) {
-        claimStatus = isClaimDeposited ? 'DEPOSIT_DONE' : 'CLAIMED_UNPAID';
-      } else if (isClaimDeposited) {
-        claimStatus = 'DEPOSIT_DONE';
-      } else if (isFaxClaimSent) {
-        claimStatus = 'CLAIMED_UNPAID';
-      } else {
-        if (stage === 'COMPLETED' && !isOngoingCare) {
-          claimStatus = 'READY_TO_CLAIM';
-        } else if (stage === 'ONGOING' || (isOngoingCare && stage === 'COMPLETED')) {
-          claimStatus = 'ONGOING_WAIT';
-        } else {
-          claimStatus = 'UPCOMING_WAIT';
-        }
-      }
-
-      let payoutStatus = 'UPCOMING_WAIT';
-      const fullPayoutAmount = roundDays * cgDailyWage;
-      const ongoingPayoutAmount = ongoingElapsed * cgDailyWage;
-
-      if (payoutForRound) {
-        payoutStatus = isPayoutPaid ? 'PAID' : 'READY_TO_PAY';
-      } else {
-        if (stage === 'COMPLETED' && !isOngoingCare) {
-          payoutStatus = 'READY_TO_PAY';
-        } else if (stage === 'ONGOING' || (isOngoingCare && stage === 'COMPLETED')) {
-          payoutStatus = 'ONGOING_WAIT';
-        } else {
-          payoutStatus = 'UPCOMING_WAIT';
-        }
-      }
-
-      const currentClaimAmt = claimForRound 
-        ? (claimForRound.depositAmount || claimForRound.claimAmount || fullClaimAmount) 
-        : (stage === 'COMPLETED' ? fullClaimAmount : ongoingClaimAmount);
-      
-      const currentPayoutAmt = payoutForRound 
-        ? (payoutForRound.payoutAmount || fullPayoutAmount) 
-        : (stage === 'COMPLETED' ? fullPayoutAmount : ongoingPayoutAmount);
-      
-      const marginAmount = currentClaimAmt - currentPayoutAmt;
-      const marginRate = currentClaimAmt > 0 ? ((marginAmount / currentClaimAmt) * 100).toFixed(1) : '0.0';
-
-      rounds.push({
-        roundNumber: roundIndex,
-        label: `${roundIndex}차 (${startDayOffset}~${endDayOffset}일)`,
-        days: roundDays,
-        hours: roundDays * 24,
-        startDayOffset,
-        endDayOffset,
-        startDateStr: roundStartDateStr,
-        endDateStr: roundEndDateStr,
-        stage,
-        ongoingElapsed,
-        ongoingRemaining,
-        dailyClaimPrice,
-        fullClaimAmount,
-        depositAmount,
-        ongoingClaimAmount,
-        claimId: claimForRound ? claimForRound.id : `Q${app.id.replace('C', '')}.${roundIndex}`,
-        claimStatus,
-        existingClaim: claimForRound,
-        isClaimCreated: !!claimForRound,
-        isFaxClaimSent: isFaxClaimSent,
-        isClaimSent: isFaxClaimSent || !!claimForRound,
-        isClaimDeposited: isClaimDeposited,
-        isDepositDone: isClaimDeposited,
-        cgDailyWage,
-        fullPayoutAmount,
-        ongoingPayoutAmount,
-        payoutId: payoutForRound ? payoutForRound.id : `P${app.id.replace('C', '')}.${roundIndex}`,
-        payoutStatus,
-        existingPayout: payoutForRound,
-        isPayoutCreated: !!payoutForRound,
-        isPayoutPaid: isPayoutPaid,
-        marginAmount,
-        marginRate,
-        isSamsung,
-        isDateCustomized: Boolean(customDates),
-        targetYear,
-        targetMonth,
-        targetMonthText,
-        isOngoingCare
-      });
-
-      remainingDaysToSplit -= roundDays;
-      startDayOffset += roundDays;
-      roundIndex++;
-    }
-
-    if (isSamsung && rounds.length === 1) {
-      rounds[0].isSingleMonthShortClaim = true;
     }
   }
 
   // 간병비 지급 상태 및 지급대상 판정
-  const confirmedPayoutSum = (appPayouts || []).reduce((acc, p) => acc + (p.payoutAmount || 0), 0);
-  const paidPayoutSum = (appPayouts || []).filter(p => isPayoutStatusPaid(p.payoutStatus)).reduce((acc, p) => acc + (p.payoutAmount || 0), 0);
+  const confirmedPayoutSum = (appPayouts && appPayouts.length > 0)
+    ? appPayouts.reduce((acc, p) => acc + (p.payoutAmount || 0), 0)
+    : rounds.reduce((acc, r) => acc + r.fullPayoutAmount, 0);
+  const paidPayoutSum = (appPayouts && appPayouts.length > 0)
+    ? appPayouts.filter(p => isPayoutStatusPaid(p.payoutStatus)).reduce((acc, p) => acc + (p.payoutAmount || 0), 0)
+    : rounds.filter(r => r.isPayoutPaid).reduce((acc, r) => acc + r.fullPayoutAmount, 0);
   const unpaidPayoutSum = confirmedPayoutSum - paidPayoutSum;
-  const unpaidPayoutCount = (appPayouts || []).filter(p => !isPayoutStatusPaid(p.payoutStatus)).length;
+  const unpaidPayoutCount = rounds.filter(r => !r.isPayoutPaid).length;
   const isCarePeriodEnded = isCaregiverAssigned && isCompleted;
-  const isAllPayoutsPaid = (appPayouts || []).length > 0 && unpaidPayoutCount === 0;
-  const isCaregiverPayoutDue = isCarePeriodEnded && (!isAllPayoutsPaid || (appPayouts || []).length === 0);
+  const isAllPayoutsPaid = rounds.length > 0 && unpaidPayoutCount === 0;
+  const isCaregiverPayoutDue = isCarePeriodEnded && (!isAllPayoutsPaid || rounds.length === 0);
   const totalOngoingPayoutEst = rounds.reduce((acc, r) => acc + (r.existingPayout ? (r.existingPayout.payoutAmount || 0) : r.ongoingPayoutAmount), 0);
 
   // 손사 청구 상태 및 입금 미완료(미수) 판정
-  const confirmedClaimSum = (appClaims || []).reduce((acc, c) => acc + (c.claimAmount || (c.days * (c.unitPrice || dailyClaimPrice))), 0);
-  const depositedClaimSum = (appClaims || []).filter(c => isClaimDepositConfirmed(c)).reduce((acc, c) => acc + (c.depositAmount || c.claimAmount || 0), 0);
-  const unpaidClaims = (appClaims || []).filter(c => !isClaimDepositConfirmed(c));
-  const unconfirmedClaimSum = unpaidClaims.reduce((acc, c) => acc + (c.unpaidAmount || c.claimAmount || 0), 0);
+  const confirmedClaimSum = (appClaims && appClaims.length > 0)
+    ? appClaims.reduce((acc, c) => acc + (c.claimAmount || (c.days * (c.unitPrice || dailyClaimPrice))), 0)
+    : rounds.reduce((acc, r) => acc + r.fullClaimAmount, 0);
+  const depositedClaimSum = (appClaims && appClaims.length > 0)
+    ? appClaims.filter(c => isClaimDepositConfirmed(c)).reduce((acc, c) => acc + (c.depositAmount || c.claimAmount || 0), 0)
+    : rounds.filter(r => r.isClaimDeposited).reduce((acc, r) => acc + (r.depositAmount || r.fullClaimAmount), 0);
+  const unpaidClaims = rounds.filter(r => !r.isClaimDeposited);
+  const unconfirmedClaimSum = Math.max(0, confirmedClaimSum - depositedClaimSum);
   const hasUnpaidClaim = unpaidClaims.length > 0;
-  const isAllClaimsDeposited = (appClaims || []).length > 0 && !hasUnpaidClaim;
+  const isAllClaimsDeposited = rounds.length > 0 && !hasUnpaidClaim;
   const totalOngoingClaimEst = rounds.reduce((acc, r) => acc + (r.existingClaim ? (r.existingClaim.claimAmount || 0) : r.ongoingClaimAmount), 0);
 
   return {
@@ -19821,8 +19799,650 @@ async function deleteInterimClaim(applyId, claimId) {
 }
 
 // =========================================================================
-// [ROUND DATE & SAMSUNG CLAIM ENGINE] 차수별 정산 날짜 수정 및 청구 관리
+// [INTEGRATED SETTLEMENT & CLAIM SET ENGINE] 청구·정산 세트 커스텀 추가/수정 엔진
 // =========================================================================
+
+function ensureSettlementSetModal() {
+  if (document.getElementById('settlementSetModal')) return;
+  const modalHtml = `
+    <div id="settlementSetModal" class="fixed inset-0 z-[65] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-3 sm:p-4 overflow-y-auto">
+      <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200 my-auto max-h-[92vh] flex flex-col">
+        <!-- Header -->
+        <div class="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 font-bold">
+              <i data-lucide="layers" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 id="settlementSetModalTitle" class="text-base font-black text-white">청구·정산 세트 관리</h3>
+              <p id="settlementSetModalSub" class="text-xs text-slate-300 font-mono">고객 정보 및 세트 상세</p>
+            </div>
+          </div>
+          <button type="button" onclick="closeModal('settlementSetModal')" class="p-2 text-slate-400 hover:text-white rounded-xl transition-all cursor-pointer">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Form Content (Scrollable) -->
+        <form id="settlementSetModalForm" onsubmit="handleSaveSettlementSet(event)" class="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
+          <input type="hidden" id="settlementSetModalAppId" value="">
+          <input type="hidden" id="settlementSetModalMode" value="edit">
+          <input type="hidden" id="settlementSetModalSetIndex" value="1">
+          <input type="hidden" id="settlementSetModalClaimId" value="">
+          <input type="hidden" id="settlementSetModalPayoutId" value="">
+
+          <!-- 기간 및 일수 안내 -->
+          <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="font-extrabold text-slate-900 flex items-center gap-1.5 text-xs">
+                <i data-lucide="calendar" class="w-4 h-4 text-indigo-600"></i>
+                간병 적용 기간 및 일수
+              </span>
+              <span class="text-[11px] text-slate-500 font-mono" id="settlementSetModalCareRange"></span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">시작 일시</label>
+                <input type="datetime-local" id="settlementSetStartInput" oninput="recalcSettlementSetModalPreview()" required
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">종료 일시</label>
+                <input type="datetime-local" id="settlementSetEndInput" oninput="recalcSettlementSetModalPreview()" required
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">세트 일수 (일)</label>
+                <input type="number" id="settlementSetDaysInput" min="1" oninput="recalcSettlementSetModalPreview(true)" required
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-black text-indigo-900 focus:ring-2 focus:ring-indigo-500">
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 1: 보험사 청구 영역 (보험청구 시트 매핑) -->
+          <div class="p-3.5 rounded-2xl bg-indigo-50/50 border border-indigo-200/80 space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-indigo-200/60">
+              <div class="flex items-center gap-1.5">
+                <span class="w-5 h-5 rounded-full bg-indigo-600 text-white font-black text-[10.5px] flex items-center justify-center shrink-0">1</span>
+                <span class="font-black text-indigo-950 text-xs">[STEP 1] 보험사 청구 (보험청구 시트)</span>
+              </div>
+              <span class="text-[11px] font-bold text-indigo-700" id="settlementSetModalInsCo">보험사</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">청구 차수명 (예: 4월 1차, 9월 1차)</label>
+                <input type="text" id="settlementSetClaimRoundInput" placeholder="예: 9월 1차"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">청구 기준일 (보험청구 기준)</label>
+                <input type="text" id="settlementSetClaimStandardDateInput" placeholder="YYYY.MM.DD"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">청구 발송일자</label>
+                <input type="text" id="settlementSetClaimDateInput" placeholder="YYYY.MM.DD"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">청구 일수 (일)</label>
+                <input type="number" id="settlementSetClaimDaysInput" min="1" oninput="recalcSettlementSetModalPreview(true)"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">1일 청구 단가 (원)</label>
+                <input type="text" id="settlementSetClaimUnitPriceInput" oninput="formatCurrencyInputElement(this); recalcSettlementSetModalPreview(true);"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-right text-slate-900 focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">청구 총금액 (원)</label>
+                <input type="text" id="settlementSetClaimAmountInput" oninput="formatCurrencyInputElement(this)"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-black text-right text-indigo-950 focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">청구 상태</label>
+                <select id="settlementSetClaimStatusSelect" class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500">
+                  <option value="청구전">청구전 (대기)</option>
+                  <option value="청구완료">청구완료</option>
+                  <option value="입금완료">입금완료 (수납완료)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 2: 입금 확인 영역 -->
+          <div class="p-3.5 rounded-2xl bg-amber-50/50 border border-amber-200/80 space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-amber-200/60">
+              <div class="flex items-center gap-1.5">
+                <span class="w-5 h-5 rounded-full bg-amber-500 text-white font-black text-[10.5px] flex items-center justify-center shrink-0">2</span>
+                <span class="font-black text-amber-950 text-xs">[STEP 2] 보험금 입금 확인</span>
+              </div>
+              <span class="text-[11px] font-bold text-amber-700">회사 계좌 수납</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">실 입금액 (원)</label>
+                <input type="text" id="settlementSetDepositAmountInput" oninput="formatCurrencyInputElement(this)"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-black text-right text-amber-950 focus:ring-2 focus:ring-amber-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">입금 일자</label>
+                <input type="text" id="settlementSetDepositDateInput" placeholder="YYYY.MM.DD"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">입금 상태</label>
+                <select id="settlementSetDepositStatusSelect" class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-500">
+                  <option value="미입금">미입금 (대기)</option>
+                  <option value="부분입금">부분입금</option>
+                  <option value="입금완료">입금완료 ✓</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 3: 간병비 지급 영역 (간병비지급 시트 매핑) -->
+          <div class="p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 space-y-3">
+            <div class="flex items-center justify-between pb-2 border-b border-emerald-200/60">
+              <div class="flex items-center gap-1.5">
+                <span class="w-5 h-5 rounded-full bg-emerald-600 text-white font-black text-[10.5px] flex items-center justify-center shrink-0">3</span>
+                <span class="font-black text-emerald-950 text-xs">[STEP 3] 간병비 지급 (간병비지급 시트)</span>
+              </div>
+              <span class="text-[11px] font-bold text-emerald-700" id="settlementSetModalCaregiverName">간병사</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">지급 차수명 (예: 4월 2차, 9월 2차)</label>
+                <input type="text" id="settlementSetPayoutRoundInput" placeholder="예: 9월 2차"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">지급 기준일시 (간병비지급 기준)</label>
+                <input type="text" id="settlementSetPayoutStandardDateInput" placeholder="YYYY.MM.DD HH:mm"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">실 지급일자</label>
+                <input type="text" id="settlementSetPayoutDateInput" placeholder="YYYY.MM.DD"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500">
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">지급 일수 (일)</label>
+                <input type="number" id="settlementSetPayoutDaysInput" min="1" oninput="recalcSettlementSetModalPreview(true)"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">간병인 1일 일당 (원)</label>
+                <input type="text" id="settlementSetPayoutWageInput" oninput="formatCurrencyInputElement(this); recalcSettlementSetModalPreview(true);"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-right text-slate-900 focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">지급 대상액 (원)</label>
+                <input type="text" id="settlementSetPayoutAmountInput" oninput="formatCurrencyInputElement(this)"
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-black text-right text-emerald-950 focus:ring-2 focus:ring-emerald-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">지급 상태</label>
+                <select id="settlementSetPayoutStatusSelect" class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500">
+                  <option value="지급전">지급전 (대기)</option>
+                  <option value="지급완료">지급완료 ✓</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 비고 / 메모 -->
+          <div>
+            <label class="block font-bold text-slate-700 text-[11px] mb-1">특이사항 / 메모</label>
+            <input type="text" id="settlementSetMemoInput" placeholder="정산 및 청구 관련 특이사항 기록"
+              class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-indigo-500">
+          </div>
+
+          <!-- Action Footer -->
+          <div class="flex items-center justify-between gap-2 pt-3 border-t border-slate-200 shrink-0">
+            <button type="button" id="settlementSetDeleteBtn" onclick="deleteCurrentSettlementSetFromModal()"
+              class="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span>세트 삭제</span>
+            </button>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="closeModal('settlementSetModal')"
+                class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all cursor-pointer">
+                취소
+              </button>
+              <button type="submit"
+                class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                <span>세트 저장</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function openSettlementSetEditModal(appId, setIndex) {
+  ensureSettlementSetModal();
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  const appAssigns = (gAssigns || []).filter(a => a.applyId === appId);
+  const as = appAssigns.length > 0 ? appAssigns[0] : null;
+  const prog = as ? getCareProgressInfo(as) : null;
+  const appClaims = (gClaims || []).filter(c => c.applyId === appId);
+  const appPayouts = (gPayouts || []).filter(p => p.applyId === appId);
+  const schedule = calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts);
+  const r = (schedule && schedule.rounds) ? (schedule.rounds.find(x => (x.setIndex || x.roundNumber) === setIndex) || schedule.rounds[setIndex - 1] || schedule.rounds[0]) : null;
+
+  document.getElementById('settlementSetModalAppId').value = appId;
+  document.getElementById('settlementSetModalMode').value = 'edit';
+  document.getElementById('settlementSetModalSetIndex').value = setIndex;
+  document.getElementById('settlementSetModalTitle').innerText = `[세트 ${setIndex}] 정산·청구 정보 수정`;
+  document.getElementById('settlementSetModalSub').innerText = `[${app.id}] ${maskName(app.patientName)} · ${app.insuranceCompany || '보험사'}`;
+  document.getElementById('settlementSetModalInsCo').innerText = app.insuranceCompany || '보험사';
+  document.getElementById('settlementSetModalCaregiverName').innerText = (as && as.caregiverName) ? `${as.caregiverName} 간병사` : '간병인 미지정';
+
+  const deleteBtn = document.getElementById('settlementSetDeleteBtn');
+  if (deleteBtn) deleteBtn.style.display = (schedule.rounds && schedule.rounds.length > 1) ? 'flex' : 'none';
+
+  const toDtLocal = (str, defTime) => {
+    if (!str) return '';
+    const m = String(str).match(/(\d{4})[.-](\d{1,2})[.-](\d{1,2})(?:[.\sT]+(\d{1,2}):(\d{1,2}))?/);
+    if (!m) return '';
+    const hh = m[4] ? String(m[4]).padStart(2, '0') : defTime.slice(0, 2);
+    const mm = m[5] ? String(m[5]).padStart(2, '0') : defTime.slice(3, 5);
+    return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}T${hh}:${mm}`;
+  };
+
+  const startVal = r ? toDtLocal(r.startDateStr, '09:00') : '';
+  const endVal = r ? toDtLocal(r.endDateStr, '18:00') : '';
+  document.getElementById('settlementSetStartInput').value = startVal;
+  document.getElementById('settlementSetEndInput').value = endVal;
+  document.getElementById('settlementSetDaysInput').value = r ? r.days : 1;
+
+  // Claim
+  document.getElementById('settlementSetModalClaimId').value = r && r.existingClaim ? r.existingClaim.id : (r ? r.claimId : '');
+  document.getElementById('settlementSetClaimRoundInput').value = r ? (r.claimRoundLabel !== '-' ? r.claimRoundLabel : (r.existingClaim ? r.existingClaim.round : '')) : '';
+  document.getElementById('settlementSetClaimStandardDateInput').value = r ? r.claimStandardDate : '';
+  document.getElementById('settlementSetClaimDateInput').value = r ? (r.claimDate || (r.existingClaim ? (r.existingClaim.claimDate || r.existingClaim.faxSentDate) : '')) : '';
+  document.getElementById('settlementSetClaimDaysInput').value = r ? (r.claimDays || r.days) : 1;
+  document.getElementById('settlementSetClaimUnitPriceInput').value = formatCurrency(r ? r.dailyClaimPrice : 160000);
+  document.getElementById('settlementSetClaimAmountInput').value = formatCurrency(r ? r.fullClaimAmount : 160000);
+  const claimStatusVal = (r && (r.claimStatus === 'DEPOSIT_DONE' || r.isClaimDeposited)) ? '입금완료' : ((r && (r.isClaimSent || r.claimStatus === 'CLAIMED_UNPAID')) ? '청구완료' : '청구전');
+  document.getElementById('settlementSetClaimStatusSelect').value = claimStatusVal;
+
+  // Deposit
+  const depositVal = r ? (r.depositAmount || (r.existingClaim ? r.existingClaim.depositAmount : 0) || 0) : 0;
+  document.getElementById('settlementSetDepositAmountInput').value = formatCurrency(depositVal);
+  document.getElementById('settlementSetDepositDateInput').value = r && r.existingClaim ? (r.existingClaim.depositDate || '') : '';
+  const depStatusVal = (depositVal >= (r ? r.fullClaimAmount : 1) && depositVal > 0) ? '입금완료' : (depositVal > 0 ? '부분입금' : '미입금');
+  document.getElementById('settlementSetDepositStatusSelect').value = depStatusVal;
+
+  // Payout
+  document.getElementById('settlementSetModalPayoutId').value = r && r.existingPayout ? r.existingPayout.id : (r ? r.payoutId : '');
+  document.getElementById('settlementSetPayoutRoundInput').value = r ? (r.payoutRoundLabel !== '-' ? r.payoutRoundLabel : (r.existingPayout ? r.existingPayout.round : '')) : '';
+  document.getElementById('settlementSetPayoutStandardDateInput').value = r ? r.payoutStandardDate : '';
+  document.getElementById('settlementSetPayoutDateInput').value = r ? (r.payoutDate || (r.existingPayout ? (r.existingPayout.paidDate || r.existingPayout.payoutDate) : '')) : '';
+  document.getElementById('settlementSetPayoutDaysInput').value = r ? (r.payoutDays || r.days) : 1;
+  document.getElementById('settlementSetPayoutWageInput').value = formatCurrency(r ? r.cgDailyWage : 140000);
+  document.getElementById('settlementSetPayoutAmountInput').value = formatCurrency(r ? r.fullPayoutAmount : 140000);
+  document.getElementById('settlementSetPayoutStatusSelect').value = (r && r.isPayoutPaid) ? '지급완료' : '지급전';
+
+  // Memo
+  document.getElementById('settlementSetMemoInput').value = (r && r.memo) ? r.memo : (r && r.existingClaim && r.existingClaim.memo ? r.existingClaim.memo : (r && r.existingPayout && r.existingPayout.memo ? r.existingPayout.memo : ''));
+
+  openModal('settlementSetModal');
+  if (typeof initIcons === 'function') initIcons(document.getElementById('settlementSetModal'));
+}
+
+function openSettlementSetAddModal(appId) {
+  ensureSettlementSetModal();
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  const appAssigns = (gAssigns || []).filter(a => a.applyId === appId);
+  const as = appAssigns.length > 0 ? appAssigns[0] : null;
+  const prog = as ? getCareProgressInfo(as) : null;
+  const appClaims = (gClaims || []).filter(c => c.applyId === appId);
+  const appPayouts = (gPayouts || []).filter(p => p.applyId === appId);
+  const schedule = calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts);
+  const newSetIndex = (schedule.rounds ? schedule.rounds.length : 0) + 1;
+
+  document.getElementById('settlementSetModalAppId').value = appId;
+  document.getElementById('settlementSetModalMode').value = 'add';
+  document.getElementById('settlementSetModalSetIndex').value = newSetIndex;
+  document.getElementById('settlementSetModalTitle').innerText = `[세트 ${newSetIndex}] 새 청구·정산 세트 추가`;
+  document.getElementById('settlementSetModalSub').innerText = `[${app.id}] ${maskName(app.patientName)} · 직접 차수 및 일정 등록`;
+  document.getElementById('settlementSetModalInsCo').innerText = app.insuranceCompany || '보험사';
+  document.getElementById('settlementSetModalCaregiverName').innerText = (as && as.caregiverName) ? `${as.caregiverName} 간병사` : '간병인 미지정';
+
+  const deleteBtn = document.getElementById('settlementSetDeleteBtn');
+  if (deleteBtn) deleteBtn.style.display = 'none';
+
+  // Default dates: day after last round or today
+  const lastRound = schedule.rounds && schedule.rounds.length > 0 ? schedule.rounds[schedule.rounds.length - 1] : null;
+  let defStart = '';
+  let defEnd = '';
+  if (lastRound && lastRound.endDateStr) {
+    const parsed = parseCareDate(lastRound.endDateStr);
+    if (parsed) {
+      const nextDay = new Date(parsed.getTime() + 24 * 60 * 60 * 1000);
+      defStart = `${formatCareDateStr(nextDay)}T09:00`;
+      defEnd = `${formatCareDateStr(nextDay)}T18:00`;
+    }
+  }
+  if (!defStart) {
+    const today = new Date();
+    defStart = `${formatCareDateStr(today)}T09:00`;
+    defEnd = `${formatCareDateStr(today)}T18:00`;
+  }
+
+  document.getElementById('settlementSetStartInput').value = defStart;
+  document.getElementById('settlementSetEndInput').value = defEnd;
+  document.getElementById('settlementSetDaysInput').value = 1;
+
+  // Claim
+  document.getElementById('settlementSetModalClaimId').value = '';
+  document.getElementById('settlementSetClaimRoundInput').value = `${newSetIndex}차`;
+  document.getElementById('settlementSetClaimStandardDateInput').value = defEnd.slice(0, 10).replace(/-/g, '.');
+  document.getElementById('settlementSetClaimDateInput').value = '';
+  document.getElementById('settlementSetClaimDaysInput').value = 1;
+  const unitPrice = schedule.dailyClaimPrice || 160000;
+  document.getElementById('settlementSetClaimUnitPriceInput').value = formatCurrency(unitPrice);
+  document.getElementById('settlementSetClaimAmountInput').value = formatCurrency(unitPrice);
+  document.getElementById('settlementSetClaimStatusSelect').value = '청구전';
+
+  // Deposit
+  document.getElementById('settlementSetDepositAmountInput').value = '0';
+  document.getElementById('settlementSetDepositDateInput').value = '';
+  document.getElementById('settlementSetDepositStatusSelect').value = '미입금';
+
+  // Payout
+  document.getElementById('settlementSetModalPayoutId').value = '';
+  document.getElementById('settlementSetPayoutRoundInput').value = `${newSetIndex}차`;
+  document.getElementById('settlementSetPayoutStandardDateInput').value = `${defEnd.slice(0, 10).replace(/-/g, '.')} 18:00`;
+  document.getElementById('settlementSetPayoutDateInput').value = '';
+  document.getElementById('settlementSetPayoutDaysInput').value = 1;
+  const wage = schedule.cgDailyWage || 140000;
+  document.getElementById('settlementSetPayoutWageInput').value = formatCurrency(wage);
+  document.getElementById('settlementSetPayoutAmountInput').value = formatCurrency(wage);
+  document.getElementById('settlementSetPayoutStatusSelect').value = '지급전';
+
+  // Memo
+  document.getElementById('settlementSetMemoInput').value = '';
+
+  openModal('settlementSetModal');
+  if (typeof initIcons === 'function') initIcons(document.getElementById('settlementSetModal'));
+}
+
+function recalcSettlementSetModalPreview(isFromDays) {
+  const startInput = document.getElementById('settlementSetStartInput');
+  const endInput = document.getElementById('settlementSetEndInput');
+  const daysInput = document.getElementById('settlementSetDaysInput');
+  const claimDaysInput = document.getElementById('settlementSetClaimDaysInput');
+  const payoutDaysInput = document.getElementById('settlementSetPayoutDaysInput');
+  const claimUnitPriceInput = document.getElementById('settlementSetClaimUnitPriceInput');
+  const claimAmountInput = document.getElementById('settlementSetClaimAmountInput');
+  const payoutWageInput = document.getElementById('settlementSetPayoutWageInput');
+  const payoutAmountInput = document.getElementById('settlementSetPayoutAmountInput');
+
+  let days = parseInt(daysInput?.value || '1', 10);
+  if (!isFromDays && startInput?.value && endInput?.value) {
+    const dStart = new Date(startInput.value.slice(0, 10));
+    const dEnd = new Date(endInput.value.slice(0, 10));
+    if (dEnd >= dStart) {
+      days = Math.max(1, Math.round((dEnd - dStart) / (24 * 60 * 60 * 1000)) + 1);
+      if (daysInput) daysInput.value = days;
+      if (claimDaysInput) claimDaysInput.value = days;
+      if (payoutDaysInput) payoutDaysInput.value = days;
+    }
+  }
+
+  const claimDays = parseInt(claimDaysInput?.value || String(days), 10);
+  const payoutDays = parseInt(payoutDaysInput?.value || String(days), 10);
+  const unitPrice = parseInt(String(claimUnitPriceInput?.value || '160000').replace(/[^0-9]/g, ''), 10) || 160000;
+  const wage = parseInt(String(payoutWageInput?.value || '140000').replace(/[^0-9]/g, ''), 10) || 140000;
+
+  if (claimAmountInput) claimAmountInput.value = formatCurrency(claimDays * unitPrice);
+  if (payoutAmountInput) payoutAmountInput.value = formatCurrency(payoutDays * wage);
+}
+
+async function handleSaveSettlementSet(e) {
+  e.preventDefault();
+  const appId = document.getElementById('settlementSetModalAppId')?.value;
+  const mode = document.getElementById('settlementSetModalMode')?.value;
+  const setIndex = parseInt(document.getElementById('settlementSetModalSetIndex')?.value || '1', 10);
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  const startVal = document.getElementById('settlementSetStartInput')?.value;
+  const endVal = document.getElementById('settlementSetEndInput')?.value;
+  const days = parseInt(document.getElementById('settlementSetDaysInput')?.value || '1', 10);
+
+  const startStr = startVal ? `${startVal.slice(0, 10).replace(/-/g, '.')} ${startVal.slice(11, 16)}` : '';
+  const endStr = endVal ? `${endVal.slice(0, 10).replace(/-/g, '.')} ${endVal.slice(11, 16)}` : '';
+
+  const claimRound = document.getElementById('settlementSetClaimRoundInput')?.value.trim() || `${setIndex}차`;
+  const claimStandardDate = document.getElementById('settlementSetClaimStandardDateInput')?.value.trim() || (endStr ? endStr.slice(0, 10) : '');
+  const claimDate = document.getElementById('settlementSetClaimDateInput')?.value.trim() || '';
+  const claimDays = parseInt(document.getElementById('settlementSetClaimDaysInput')?.value || String(days), 10);
+  const claimUnitPrice = parseInt(String(document.getElementById('settlementSetClaimUnitPriceInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 160000;
+  const claimAmount = parseInt(String(document.getElementById('settlementSetClaimAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || (claimDays * claimUnitPrice);
+  const claimStatus = document.getElementById('settlementSetClaimStatusSelect')?.value || '청구전';
+
+  const depositAmount = parseInt(String(document.getElementById('settlementSetDepositAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 0;
+  const depositDate = document.getElementById('settlementSetDepositDateInput')?.value.trim() || '';
+  const depositStatus = document.getElementById('settlementSetDepositStatusSelect')?.value || '미입금';
+
+  const payoutRound = document.getElementById('settlementSetPayoutRoundInput')?.value.trim() || `${setIndex}차`;
+  const payoutStandardDate = document.getElementById('settlementSetPayoutStandardDateInput')?.value.trim() || endStr;
+  const payoutDate = document.getElementById('settlementSetPayoutDateInput')?.value.trim() || '';
+  const payoutDays = parseInt(document.getElementById('settlementSetPayoutDaysInput')?.value || String(days), 10);
+  const cgDailyWage = parseInt(String(document.getElementById('settlementSetPayoutWageInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 140000;
+  const payoutAmount = parseInt(String(document.getElementById('settlementSetPayoutAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || (payoutDays * cgDailyWage);
+  const payoutStatus = document.getElementById('settlementSetPayoutStatusSelect')?.value || '지급전';
+
+  const memo = document.getElementById('settlementSetMemoInput')?.value.trim() || '';
+
+  const claimId = document.getElementById('settlementSetModalClaimId')?.value;
+  const payoutId = document.getElementById('settlementSetModalPayoutId')?.value;
+
+  // Initialize customSettlementSets if not present
+  if (!app.customSettlementSets || !Array.isArray(app.customSettlementSets)) {
+    const appAssigns = (gAssigns || []).filter(a => a.applyId === appId);
+    const as = appAssigns.length > 0 ? appAssigns[0] : null;
+    const prog = as ? getCareProgressInfo(as) : null;
+    const initialSchedule = calculateCareSettlementSchedule(app, as, prog, (gClaims || []).filter(c => c.applyId === appId), (gPayouts || []).filter(p => p.applyId === appId));
+    app.customSettlementSets = (initialSchedule.rounds || []).map((r, i) => ({
+      setIndex: i + 1,
+      claimRound: r.claimRoundLabel || `${i + 1}차`,
+      payoutRound: r.payoutRoundLabel || `${i + 1}차`,
+      claimStandardDate: r.claimStandardDate || '',
+      payoutStandardDate: r.payoutStandardDate || '',
+      claimDate: r.claimDate || '',
+      payoutDate: r.payoutDate || '',
+      startDateStr: r.startDateStr || '',
+      endDateStr: r.endDateStr || '',
+      days: r.days || 1,
+      claimDays: r.claimDays || r.days || 1,
+      payoutDays: r.payoutDays || r.days || 1,
+      dailyClaimPrice: r.dailyClaimPrice || 160000,
+      claimAmount: r.fullClaimAmount || 160000,
+      claimStatus: (r.claimStatus === 'DEPOSIT_DONE' || r.isClaimDeposited) ? '입금완료' : ((r.isClaimSent || r.claimStatus === 'CLAIMED_UNPAID') ? '청구완료' : '청구전'),
+      depositAmount: r.depositAmount || 0,
+      depositDate: (r.existingClaim && r.existingClaim.depositDate) || '',
+      depositStatus: r.isClaimDeposited ? '입금완료' : '미입금',
+      cgDailyWage: r.cgDailyWage || 140000,
+      payoutAmount: r.fullPayoutAmount || 140000,
+      payoutStatus: r.isPayoutPaid ? '지급완료' : '지급전',
+      claimId: r.existingClaim ? r.existingClaim.id : (r.claimId || ''),
+      payoutId: r.existingPayout ? r.existingPayout.id : (r.payoutId || ''),
+      memo: r.memo || ''
+    }));
+  }
+
+  const setData = {
+    setIndex: setIndex,
+    claimRound: claimRound,
+    payoutRound: payoutRound,
+    claimStandardDate: claimStandardDate,
+    payoutStandardDate: payoutStandardDate,
+    claimDate: claimDate,
+    payoutDate: payoutDate,
+    startDateStr: startStr,
+    endDateStr: endStr,
+    days: days,
+    claimDays: claimDays,
+    payoutDays: payoutDays,
+    dailyClaimPrice: claimUnitPrice,
+    claimAmount: claimAmount,
+    claimStatus: claimStatus,
+    depositAmount: depositAmount,
+    depositDate: depositDate,
+    depositStatus: depositStatus,
+    cgDailyWage: cgDailyWage,
+    payoutAmount: payoutAmount,
+    payoutStatus: payoutStatus,
+    claimId: claimId || `Q${String(app.id).replace('C', '')}.${setIndex}`,
+    payoutId: payoutId || `P${String(app.id).replace('C', '')}.${setIndex}`,
+    memo: memo
+  };
+
+  if (mode === 'add') {
+    setData.setIndex = app.customSettlementSets.length + 1;
+    app.customSettlementSets.push(setData);
+  } else {
+    const existingIdx = app.customSettlementSets.findIndex(s => s.setIndex === setIndex);
+    if (existingIdx >= 0) {
+      app.customSettlementSets[existingIdx] = setData;
+    } else {
+      app.customSettlementSets.push(setData);
+    }
+  }
+
+  // Sync with gClaims
+  let matchedClaim = (gClaims || []).find(c => c.id === setData.claimId || (String(c.applyId) === String(app.id) && c.round === setData.claimRound));
+  if (matchedClaim) {
+    matchedClaim.round = setData.claimRound;
+    matchedClaim.standardDate = setData.claimStandardDate;
+    matchedClaim.claimDate = setData.claimDate;
+    matchedClaim.days = setData.claimDays;
+    matchedClaim.unitPrice = setData.dailyClaimPrice;
+    matchedClaim.claimAmount = setData.claimAmount;
+    matchedClaim.depositAmount = setData.depositAmount;
+    matchedClaim.depositDate = setData.depositDate;
+    matchedClaim.status = setData.claimStatus;
+    if (typeof syncToConvex === 'function') syncToConvex('sync:saveClaim', { claim: matchedClaim }).catch(console.warn);
+  }
+
+  // Sync with gPayouts
+  let matchedPayout = (gPayouts || []).find(p => p.id === setData.payoutId || (String(p.applyId) === String(app.id) && p.round === setData.payoutRound));
+  if (matchedPayout) {
+    matchedPayout.round = setData.payoutRound;
+    matchedPayout.standardDate = setData.payoutStandardDate;
+    matchedPayout.paidDate = setData.payoutDate;
+    matchedPayout.payoutDate = setData.payoutDate;
+    matchedPayout.days = setData.payoutDays;
+    matchedPayout.dailyWage = setData.cgDailyWage;
+    matchedPayout.payoutAmount = setData.payoutAmount;
+    matchedPayout.payoutStatus = setData.payoutStatus;
+    if (typeof syncToConvex === 'function') syncToConvex('sync:savePayout', { payout: matchedPayout }).catch(console.warn);
+  }
+
+  // Save to localStorage & Convex
+  try {
+    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+    localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+  } catch (err) {
+    console.warn('localStorage save failed:', err);
+  }
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+  }
+
+  closeModal('settlementSetModal');
+  if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
+    openHubCustomerDetailModal(gActiveHubModalAppId);
+  }
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '정산·청구 세트 저장 완료',
+      message: `[${maskName(app.patientName)} 님] 세트 ${setData.setIndex} (청구: ${setData.claimRound} / 지급: ${setData.payoutRound})가 저장되었습니다.`,
+      icon: 'check-circle'
+    });
+  }
+}
+
+async function deleteSettlementSet(appId, setIndex) {
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  const confirmed = await showCustomConfirm(
+    `[${maskName(app.patientName)} 님] 세트 ${setIndex} 정산·청구 내역을 삭제하시겠습니까?\n\n삭제 시 해당 차수의 청구 및 정산 일정이 목록에서 제거됩니다.`,
+    {
+      theme: 'rose',
+      icon: 'trash-2',
+      title: `세트 ${setIndex} 삭제`,
+      confirmText: '삭제하기',
+      cancelText: '취소'
+    }
+  );
+  if (!confirmed) return;
+
+  if (app.customSettlementSets && Array.isArray(app.customSettlementSets)) {
+    app.customSettlementSets = app.customSettlementSets.filter(s => s.setIndex !== setIndex);
+    // Re-index
+    app.customSettlementSets.forEach((s, idx) => { s.setIndex = idx + 1; });
+  }
+
+  try {
+    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+  } catch (e) {}
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+  }
+
+  if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
+    openHubCustomerDetailModal(gActiveHubModalAppId);
+  }
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'info',
+      title: '세트 삭제 완료',
+      message: `[${maskName(app.patientName)} 님] 세트 ${setIndex}가 삭제되었습니다.`,
+      icon: 'trash-2'
+    });
+  }
+}
+
+function deleteCurrentSettlementSetFromModal() {
+  const appId = document.getElementById('settlementSetModalAppId')?.value;
+  const setIndex = parseInt(document.getElementById('settlementSetModalSetIndex')?.value || '1', 10);
+  closeModal('settlementSetModal');
+  if (appId && setIndex) {
+    deleteSettlementSet(appId, setIndex);
+  }
+}
+
+function openRoundDateEditModal(appId, roundNum) {
+  // Delegate directly to the comprehensive Settlement Set modal
+  return openSettlementSetEditModal(appId, roundNum);
+}
 
 function ensureRoundDateEditModal() {
   if (document.getElementById('roundDateEditModal')) return;
@@ -21199,6 +21819,11 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
               <i data-lucide="banknote" class="w-3.5 h-3.5"></i>
               <span>지급대장</span>
             </button>
+            <button type="button" onclick="openSettlementSetAddModal('${app.id}')" 
+              class="px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-95 text-white font-black text-xs shadow-md flex items-center gap-1.5 transition-all cursor-pointer" title="새로운 청구·정산 세트 추가">
+              <i data-lucide="plus-circle" class="w-4 h-4 text-white"></i>
+              <span>+ 세트 추가</span>
+            </button>
           </div>
         </div>
 
@@ -21313,9 +21938,14 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                 <!-- Round Top Bar -->
                 <div class="px-5 py-3 bg-slate-50 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
                   <div class="flex items-center gap-2.5 flex-wrap">
-                    <span class="px-3 py-1 rounded-xl bg-slate-900 text-white font-black text-xs shadow-xs">
-                      ${r.roundNumber}차 정산
-                    </span>
+                    <div class="flex items-center gap-1.5">
+                      <span class="w-7 h-7 rounded-xl bg-slate-900 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                        ${r.setIndex || r.roundNumber}
+                      </span>
+                      <span class="font-black text-xs text-slate-800">
+                        세트 ${r.setIndex || r.roundNumber}
+                      </span>
+                    </div>
                     <div class="flex items-center gap-1.5 font-mono text-xs text-slate-800 bg-white px-2.5 py-1 rounded-xl border border-slate-200">
                       <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-500"></i>
                       <b>${r.startDateStr}</b> ~ <b>${r.endDateStr}</b>
@@ -21324,14 +21954,19 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                       ${r.days}일간 (${hours}시간)
                     </span>
                     ${r.isDateCustomized ? `
-                      <span class="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[10.5px] border border-amber-300" title="사용자가 직접 날짜를 조정한 차수입니다">
-                        날짜수정됨
+                      <span class="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[10.5px] border border-amber-300" title="사용자가 직접 날짜 및 차수를 조정한 세트입니다">
+                        수정됨
                       </span>
                     ` : ''}
-                    <button type="button" onclick="openRoundDateEditModal('${app.id}', ${r.roundNumber})" class="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-xs flex items-center gap-1 shadow-2xs transition-all cursor-pointer" title="해당 차수의 시작일/종료일 및 일수 직접 수정">
-                      <i data-lucide="calendar" class="w-3.5 h-3.5 text-sky-600"></i>
-                      <span>날짜 수정</span>
+                    <button type="button" onclick="openSettlementSetEditModal('${app.id}', ${r.setIndex || r.roundNumber})" class="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-xs flex items-center gap-1 shadow-2xs transition-all cursor-pointer" title="해당 세트의 차수, 날짜, 금액 직접 수정">
+                      <i data-lucide="edit-3" class="w-3.5 h-3.5 text-indigo-600"></i>
+                      <span>세트 수정</span>
                     </button>
+                    ${rounds.length > 1 ? `
+                      <button type="button" onclick="deleteSettlementSet('${app.id}', ${r.setIndex || r.roundNumber})" class="px-2 py-1 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 font-bold text-xs flex items-center gap-1 shadow-2xs transition-all cursor-pointer" title="해당 세트 삭제">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                      </button>
+                    ` : ''}
                     ${(r.stage === 'COMPLETED' && !r.isOngoingCare) ? `
                       <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center gap-1">
                         <i data-lucide="check-circle" class="w-3 h-3 text-emerald-600"></i> 간병완료
@@ -21370,9 +22005,14 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                             <span class="w-5 h-5 rounded-full ${isClaimDone ? 'bg-slate-400 text-white' : isSending ? 'bg-purple-600 text-white animate-pulse' : 'bg-amber-500 text-white'} font-black text-[10.5px] flex items-center justify-center shrink-0">1</span>
                             <span>[STEP 1] 보험사 청구</span>
                           </span>
-                          <span class="font-mono text-[11px] font-bold ${isClaimDone ? 'text-slate-500' : isSending ? 'text-purple-800' : 'text-amber-800'}">
-                            단가: ${formatCurrency(r.dailyClaimPrice)}원/일
-                          </span>
+                          <div class="flex items-center gap-1.5">
+                            <span class="px-2 py-0.5 rounded-lg bg-indigo-100 text-indigo-900 font-black text-[11px] border border-indigo-200" title="보험청구 시트 차수">
+                              청구: ${r.claimRoundLabel && r.claimRoundLabel !== '-' ? r.claimRoundLabel : '차수 미지정'}
+                            </span>
+                            <span class="font-mono text-[11px] font-bold ${isClaimDone ? 'text-slate-500' : isSending ? 'text-purple-800' : 'text-amber-800'}">
+                              단가: ${formatCurrency(r.dailyClaimPrice)}원/일
+                            </span>
+                          </div>
                         </div>
 
                         <!-- 1행: 대상 정보 박스 -->
@@ -21386,12 +22026,18 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                           </div>
                         </div>
 
+                        <!-- 1-2행: 기준일 및 청구일 박스 -->
+                        <div class="px-2.5 py-1.5 rounded-xl bg-white/80 border border-slate-200 text-[11px] flex items-center justify-between gap-1 font-mono">
+                          <span class="text-slate-500 font-sans">기준일: <b class="text-slate-800 font-mono">${r.claimStandardDate || '-'}</b></span>
+                          <span class="text-slate-500 font-sans">청구일: <b class="text-indigo-900 font-mono">${claimDateTimeStr || r.claimDate || '-'}</b></span>
+                        </div>
+
                         <!-- 2행: 금액 정보 -->
                         <div class="flex items-baseline justify-between">
                           <span class="text-xs text-slate-500 font-medium">청구 총금액:</span>
                           <div class="text-right">
                             <b class="text-base font-black ${isClaimDone ? 'text-slate-900' : isSending ? 'text-purple-950' : 'text-amber-950'} font-mono">${formatCurrency(r.fullClaimAmount)}원</b>
-                            <div class="text-[10.5px] ${isClaimDone ? 'text-slate-500' : isSending ? 'text-purple-800' : 'text-amber-800'} font-mono">(${r.days}일 / ${hours}시간)</div>
+                            <div class="text-[10.5px] ${isClaimDone ? 'text-slate-500' : isSending ? 'text-purple-800' : 'text-amber-800'} font-mono">(${r.claimDays || r.days}일 / ${(r.claimDays || r.days) * 24}시간)</div>
                           </div>
                         </div>
 
@@ -21651,9 +22297,14 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                             <span class="w-5 h-5 rounded-full ${isPayoutDone ? 'bg-slate-400 text-white' : 'bg-amber-500 text-white'} font-black text-[10.5px] flex items-center justify-center shrink-0">3</span>
                             <span>[STEP 3] 간병비 지급</span>
                           </span>
-                          <span class="font-mono text-[11px] font-bold ${isPayoutDone ? 'text-slate-500' : 'text-amber-800'}">
-                            일당: ${formatCurrency(r.cgDailyWage)}원/일
-                          </span>
+                          <div class="flex items-center gap-1.5">
+                            <span class="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-900 font-black text-[11px] border border-emerald-200" title="간병비지급 시트 차수">
+                              지급: ${r.payoutRoundLabel && r.payoutRoundLabel !== '-' ? r.payoutRoundLabel : '차수 미지정'}
+                            </span>
+                            <span class="font-mono text-[11px] font-bold ${isPayoutDone ? 'text-slate-500' : 'text-amber-800'}">
+                              일당: ${formatCurrency(r.cgDailyWage)}원/일
+                            </span>
+                          </div>
                         </div>
 
                         <!-- 1행: 대상 정보 박스 -->
@@ -21667,12 +22318,18 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                           </div>
                         </div>
 
+                        <!-- 1-2행: 기준일시 및 지급일 박스 -->
+                        <div class="px-2.5 py-1.5 rounded-xl bg-white/80 border border-slate-200 text-[11px] flex items-center justify-between gap-1 font-mono">
+                          <span class="text-slate-500 font-sans">기준일시: <b class="text-slate-800 font-mono">${r.payoutStandardDate || '-'}</b></span>
+                          <span class="text-slate-500 font-sans">지급일: <b class="text-emerald-900 font-mono">${payoutDateTimeStr || r.payoutDate || '-'}</b></span>
+                        </div>
+
                         <!-- 2행: 금액 정보 -->
                         <div class="flex items-baseline justify-between">
                           <span class="text-xs text-slate-500 font-medium">지급 대상액:</span>
                           <div class="text-right">
                             <b class="text-base font-black ${isPayoutDone ? 'text-slate-900' : 'text-amber-950'} font-mono">${formatCurrency(r.fullPayoutAmount)}원</b>
-                            <div class="text-[10.5px] ${isPayoutDone ? 'text-slate-500' : 'text-amber-800'} font-mono">(${r.days}일 / ${hours}시간)</div>
+                            <div class="text-[10.5px] ${isPayoutDone ? 'text-slate-500' : 'text-amber-800'} font-mono">(${r.payoutDays || r.days}일 / ${(r.payoutDays || r.days) * 24}시간)</div>
                           </div>
                         </div>
 
@@ -21735,6 +22392,13 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
               </div>
             `;
           }).join('')}
+          <div class="pt-2 flex justify-center">
+            <button type="button" onclick="openSettlementSetAddModal('${app.id}')"
+              class="w-full py-3 px-4 rounded-2xl border-2 border-dashed border-indigo-300 hover:border-indigo-500 bg-white/80 hover:bg-indigo-50 text-indigo-700 font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs">
+              <i data-lucide="plus-circle" class="w-4 h-4 text-indigo-600"></i>
+              <span>+ 새로운 청구·정산 세트 추가하기 (직접 차수 및 날짜 지정)</span>
+            </button>
+          </div>
         </div>
 
         <!-- ========================================================================= -->
