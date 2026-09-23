@@ -41904,6 +41904,11 @@ function renderCareCalendarTimelineView(events) {
   // 컴팩트하게 최적화된 좌측 고객 열 너비
   const leftColWidthClass = 'w-[190px] sm:w-[220px]';
 
+  const statusLabel = gCalendarFilters.status === 'ONGOING' ? '진행중' :
+    gCalendarFilters.status === 'UPCOMING' ? '예정' :
+    gCalendarFilters.status === 'COMPLETED' ? '완료' :
+    gCalendarFilters.status === 'ATTENTION' ? '중점관리' : '진행·예정·완료';
+
   let html = `
     <!-- Top Bar Summary -->
     <div class="p-3.5 sm:p-4 bg-slate-900 text-white flex items-center justify-between flex-wrap gap-3 border-b border-slate-800">
@@ -41915,7 +41920,7 @@ function renderCareCalendarTimelineView(events) {
           <div class="font-black text-sm text-white flex items-center gap-2">
             <span>고객별 간병일정 연결 타임라인</span>
             <span class="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-primary-500/30 text-primary-300 border border-primary-500/40 font-mono">
-              총 ${monthEvents.length}명 진행/예정
+              총 ${monthEvents.length}명 ${statusLabel}
             </span>
           </div>
           <p class="text-[11px] text-slate-400 mt-0.5">
