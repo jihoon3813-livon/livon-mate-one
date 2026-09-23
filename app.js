@@ -29537,6 +29537,8 @@ function initData() {
         }
       }
     }
+  } catch (e) {}
+
   // 바로빌 팩스 연동 계정 정규화 (이메일 형태 등록 시 FTP 530 인증 오류 원천 차단)
   try {
     const curBaroId = localStorage.getItem('LIVON_BAROBILL_ID');
@@ -41361,8 +41363,9 @@ function extractCareCalendarEvents() {
     // 날짜가 없는 배정 건은 스킵하되, 시작일이 있고 진행중인 건은 정상적으로 포함
     if (!parsedStart) return;
     const now = new Date();
-    // 통합허브 '간병 진행중' 기준과 1:1 완벽 일치 (status가 '진행' 포함, '정상', '배정완료')
-    const isAppOngoing = (app.status || '').includes('진행') || app.status === '정상' || app.status === '배정완료';
+    // 통합허브 '간병 진행중' 기준과 1:1 완벽 일치 (determineRealCareStatus 기준)
+    const realCareSt = (typeof determineRealCareStatus === 'function') ? determineRealCareStatus(app, [as]) : '';
+    const isAppOngoing = (realCareSt === '진행중');
 
     if (!parsedEnd) {
       if (isAppOngoing) {
@@ -41384,7 +41387,7 @@ function extractCareCalendarEvents() {
     let status = 'COMPLETED'; // 기본
     if (isAppOngoing) {
       status = 'ONGOING'; // 통합허브 기준 진행중
-    } else if (todayZero < startZero || (app.status || '').includes('예정')) {
+    } else if (todayZero < startZero || (app.status || '').includes('예정') || realCareSt === '배정대기' || realCareSt === '신규') {
       status = 'UPCOMING'; // 예정
     } else {
       status = 'COMPLETED'; // 완료/종료
@@ -41505,7 +41508,8 @@ function extractCareCalendarEvents() {
   const processedAppIds = new Set(events.map(e => e.applyId));
   apps.forEach((app, aIdx) => {
     if (!app || processedAppIds.has(app.id)) return;
-    if (!(app.status || '').includes('진행')) return;
+    const realCareSt = (typeof determineRealCareStatus === 'function') ? determineRealCareStatus(app) : (app.status || '');
+    if (realCareSt !== '진행중') return;
 
     const startStr = (app.careStartDate || app.desiredStartDate || app.applyDate || '').trim();
     let parsedStart = parseCareDate(startStr);
@@ -41701,7 +41705,8 @@ function updateCareCalendarKpis(events) {
   const inProgressHubApps = activeHubApps.filter(a => {
     if (!a) return false;
     if (gCalendarFilters.insurance !== 'ALL' && !(a.insuranceCompany || '').includes(gCalendarFilters.insurance)) return false;
-    return (a.status && (a.status.includes('진행') || a.status === '정상' || a.status === '배정완료'));
+    const realSt = (typeof determineRealCareStatus === 'function') ? determineRealCareStatus(a) : (a.status || '');
+    return realSt === '진행중';
   });
   const activeCount = inProgressHubApps.length;
   const attentionCount = events.filter(e => e.isAttentionNeeded).length;
