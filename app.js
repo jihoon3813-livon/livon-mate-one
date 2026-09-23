@@ -18286,6 +18286,10 @@ const hubFilterConfig = {
 };
 
 function setHubFilter(filterType) {
+  // 이미 활성화된 필터 버튼을 다시 누른 경우 전체(ALL)로 토글 해제
+  if (gHubFilter === filterType && filterType !== 'ALL') {
+    filterType = 'ALL';
+  }
   gHubFilter = filterType;
 
   // 1. Reset all buttons to original crisp colors
@@ -27249,10 +27253,15 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
 
   // 3. 청구금 미입금 (보험사/손사 미수금) 체크 -> 빨강색!
   const unpaidClaimAmt = sched.unconfirmedClaimSum || app.estimatedUnpaid || 0;
-  if (!isRealOngoing && (sched.hasUnpaidClaim || unpaidClaimAmt > 0) && (app.claimCount > 0 || appClaims.length > 0)) {
+  const isUnpaidClaim = (typeof window.isAppHasUnpaidClaimHelper === 'function')
+    ? window.isAppHasUnpaidClaimHelper(app)
+    : ((typeof isAppHasUnpaidClaimHelper === 'function') ? isAppHasUnpaidClaimHelper(app) : ((sched.hasUnpaidClaim || unpaidClaimAmt > 0) && (app.claimCount > 0 || appClaims.length > 0)));
+
+  if (isUnpaidClaim) {
+    const displayUnpaidAmt = sched.unconfirmedClaimSum || app.estimatedUnpaid || unpaidClaimAmt || 0;
     badges.push(`
       <span class="px-2 py-0.5 rounded-md bg-rose-600 text-white font-black text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="보험사로 청구되었으나 아직 입금 확인이 되지 않은 미수금(청구금 미입금)입니다.">
-        <i data-lucide="alert-circle" class="w-3 h-3 text-white"></i> 🚨 청구금 미입금 (미수금)${unpaidClaimAmt > 0 ? ` (${formatCurrency(unpaidClaimAmt)}원)` : ''}
+        <i data-lucide="alert-circle" class="w-3 h-3 text-white"></i> 🚨 청구금 미입금 (미수금)${displayUnpaidAmt > 0 ? ` (${formatCurrency(displayUnpaidAmt)}원)` : ''}
       </span>
     `);
   } else if (sched.isAllClaimsDeposited && (sched.depositedClaimSum || app.depositConfirmedAmount || 0) > 0) {
@@ -27614,6 +27623,9 @@ function renderUnifiedCareHub() {
 
     return false;
   };
+
+  window.isAppHasUnpaidClaimHelper = isAppHasUnpaidClaimHelper;
+  window.isAppHasUnpaidPayoutHelper = isAppHasUnpaidPayoutHelper;
 
   const isInProgressHelper = (app) => {
     if (!app) return false;
