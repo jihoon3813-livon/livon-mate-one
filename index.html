@@ -1319,6 +1319,15 @@
                 <span id="hubModifiedCountBadge" class="px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-800 text-[10px] font-extrabold">0</span>
               </button>
 
+              <!-- 모달 비활성화(청구제외/보호모드) 고객 모아보기 토글 버튼 -->
+              <button type="button" id="btnHubDisabledToggle" onclick="toggleHubDisabledFilter()" 
+                class="px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 border transition-all cursor-pointer bg-white text-amber-700 border-amber-300 hover:bg-amber-50 shadow-2xs whitespace-nowrap" 
+                title="모달 내 청구세트가 비활성화(보호모드/제외)된 고객만 모아보기 토글">
+                <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-600"></i>
+                <span>모달 비활성화</span>
+                <span id="hubDisabledCountBadge" class="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold">0</span>
+              </button>
+
               <!-- VIEW COLUMN SELECTOR (1열 / 2열(기본) / 3열 보기 토글) -->
               <div class="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200">
                 <button id="viewCols1Btn" onclick="setHubViewCols(1)" class="px-2 py-1 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition-all">1열</button>
@@ -1368,6 +1377,10 @@
                 <span class="text-slate-300">|</span>
                 <button type="button" onclick="toggleHubStatusFilter('취소')" id="hubStatusLegend-취소" class="flex items-center gap-1 font-bold text-slate-900 hover:opacity-80 transition-all cursor-pointer">
                   <span class="w-2 h-2 rounded-full bg-slate-900"></span>취소 / 미해당
+                </button>
+                <span class="text-slate-300">|</span>
+                <button type="button" onclick="toggleHubStatusFilter('비활성')" id="hubStatusLegend-비활성" class="flex items-center gap-1 font-bold text-amber-700 hover:opacity-80 transition-all cursor-pointer" title="모달 내 청구세트 비활성화(보호모드/제외) 고객 필터">
+                  <span class="w-2 h-2 rounded-full bg-amber-500"></span>모달 비활성
                 </button>
               </div>
 
@@ -3354,6 +3367,7 @@
                 <option value="완료">완료</option>
                 <option value="진행">진행중</option>
                 <option value="취소">서비스 취소</option>
+                <option value="비활성">모달 비활성화 (보호모드/제외)</option>
               </select>
               <select id="appPageSizeSelect" onchange="changeAppPageSize(this.value)" class="py-2 px-3 text-xs border border-slate-300 rounded-xl bg-white font-bold text-primary-700 focus:ring-2 focus:ring-primary-500">
                 <option value="20">20명씩 보기</option>
@@ -10327,10 +10341,10 @@
   <!-- SCRIPTS (Moved to bottom of body for full DOM availability) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="data.js?v=20260920_1835"></script>
-  <script src="careport-client.js?v=20260920_1820"></script>
+  <script src="careport-client.js?v=20260923_1600"></script>
   <script src="samsung-call-report.js?v=20260920_1330"></script>
   <script src="total-call-analysis.js?v=20260921_1005"></script>
   <script src="system-audit-log.js?v=20260922_1040"></script>
-  <script src="app.js?v=20260923_1510"></script>
+  <script src="app.js?v=20260923_1630"></script>
 </body>
 </html>

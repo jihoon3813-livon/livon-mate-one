@@ -20720,6 +20720,17 @@ function openSettlementSetEditModal(appId, setIndex) {
   const app = (gApps || []).find(a => String(a.id) === String(appId));
   if (!app) return;
 
+  const claimCheck = checkCustomerClaimSetStatus(app);
+  if (claimCheck.isDisabled) {
+    showCustomAlert({
+      title: '청구세트 수정 불가 안내',
+      message: `[${app.patientName} 님]\n${claimCheck.reasons.join('\n')}\n\n청구분류가 '정상'이고 현재상태가 '진행중'인 경우에만 청구세트를 수정할 수 있습니다.\n\n사용하시려면 상단 [분류 관리]에서 상태를 변경해주세요.`,
+      icon: 'shield-alert',
+      confirmText: '확인'
+    });
+    return;
+  }
+
   const appAssigns = (gAssigns || []).filter(a => a.applyId === appId);
   const as = appAssigns.length > 0 ? appAssigns[0] : null;
   const prog = as ? getCareProgressInfo(as) : null;
@@ -20784,6 +20795,17 @@ function openSettlementSetAddModal(appId) {
   ensureSettlementSetModal();
   const app = (gApps || []).find(a => String(a.id) === String(appId));
   if (!app) return;
+
+  const claimCheck = checkCustomerClaimSetStatus(app);
+  if (claimCheck.isDisabled) {
+    showCustomAlert({
+      title: '청구세트 추가 불가 안내',
+      message: `[${app.patientName} 님]\n${claimCheck.reasons.join('\n')}\n\n청구분류가 '정상'이고 현재상태가 '진행중'인 경우에만 청구세트를 추가할 수 있습니다.\n\n사용하시려면 상단 [분류 관리]에서 상태를 변경해주세요.`,
+      icon: 'shield-alert',
+      confirmText: '확인'
+    });
+    return;
+  }
 
   const appAssigns = (gAssigns || []).filter(a => a.applyId === appId);
   const as = appAssigns.length > 0 ? appAssigns[0] : null;
@@ -21809,6 +21831,14 @@ function determineRealCareStatus(app, specificAssigns) {
   if (rawSt === '서비스 취소' || rawSt === '취소' || rawSt === '미해당' || rawSt === '당일서비스취소' || rawSt.includes('서비스불가') || rawSt === '제외') {
     return rawSt.includes('서비스불가') ? '서비스불가 안내' : (rawSt === '서비스 취소' ? '취소' : rawSt);
   }
+
+  // 1-2-1. 청구분류가 '제외'이거나 비활성화(보호모드)된 고객(최명자 등): 별도 수동 활성화(hasManualUpdate && 정상)하지 않는 한 '제외'로 확정하여 간병진행중에서 엄격히 배제
+  const claimClassVal = String(app.claimClassification !== undefined && app.claimClassification !== null ? app.claimClassification : (app.claimCategory || '')).trim();
+  const isDeactivatedOrExcluded = (claimClassVal === '제외' || app.isExcluded === true || app.isDeactivated === true);
+  if (isDeactivatedOrExcluded && !(app.hasManualUpdate && claimClassVal === '정상')) {
+    return '제외';
+  }
+
   if (app.hasManualUpdate && rawSt) {
     return rawSt;
   }
@@ -21840,6 +21870,12 @@ function determineRealCareStatus(app, specificAssigns) {
       // 종료일이 빈칸인 배정이라도 신청서 자체가 이미 '완료'이면 완료로 판정
       return '완료';
     }
+  }
+
+  // 1-5. 비고에 '퇴원/청구완료', '청구완료', '사망'이 명시되어 있고 배정된 간병인이 없는 경우 무조건 '완료'
+  const appMemo = String(app.memo || '').trim();
+  if ((appMemo.includes('퇴원/청구완료') || appMemo.includes('청구완료') || appMemo.includes('사망')) && !as && !app.caregiverName) {
+    return '완료';
   }
 
   // 2. 간병 시작일시 자체가 없거나 간병인 배정이 없는 경우
@@ -22025,6 +22061,530 @@ if (typeof window !== 'undefined') {
   window.getCustomerCardStatusTheme = getCustomerCardStatusTheme;
 }
 
+// =========================================================================
+// 청구세트 활성화/비활성화 판정 및 오버레이 관리 엔진
+// (규칙: 청구분류가 '정상'이고 현재상태가 '진행중'인 경우에만 활성화, 그 외에는 비활성화)
+// =========================================================================
+var gClaimSetPeekMode = {};
+
+function checkCustomerClaimSetStatus(app, appAssigns) {
+  if (!app) return { isDisabled: false, reasons: [], currentStatus: '', claimVal: '정상', isStatusInProgress: true, isClaimNormal: true };
+
+  const currentStatus = typeof determineRealCareStatus === 'function' ? determineRealCareStatus(app, appAssigns) : (app.status || '');
+  let claimVal = '';
+  if (app.claimClassification !== undefined && app.claimClassification !== null) {
+    claimVal = String(app.claimClassification).trim();
+  } else if (app.claimCategory !== undefined && app.claimCategory !== null) {
+    claimVal = String(app.claimCategory).trim();
+  } else {
+    claimVal = '정상';
+  }
+
+  const isStatusInProgress = (currentStatus === '진행중');
+  const isClaimNormal = (claimVal === '정상' || claimVal === '정상 ');
+
+  const isDisabled = !isStatusInProgress || !isClaimNormal;
+  const reasons = [];
+
+  if (!isStatusInProgress) {
+    reasons.push(`현재상태: [${currentStatus || '미지정'}] (진행중 아님)`);
+  }
+  if (!isClaimNormal) {
+    reasons.push(`청구분류: [${claimVal || '미지정'}] (정상 아님)`);
+  }
+
+  return {
+    isDisabled,
+    reasons,
+    currentStatus,
+    claimVal: claimVal || '미지정',
+    isStatusInProgress,
+    isClaimNormal
+  };
+}
+window.checkCustomerClaimSetStatus = checkCustomerClaimSetStatus;
+
+function isCustomerModalDisabled(app, appAssigns) {
+  if (!app) return false;
+  const claimStatus = checkCustomerClaimSetStatus(app, appAssigns);
+  const claimVal = String(app.claimClassification !== undefined && app.claimClassification !== null ? app.claimClassification : (app.claimCategory || '')).trim();
+  const isExplicitlyExcluded = (claimVal === '제외' || app.status === '제외' || app.isExcluded === true || app.isDeactivated === true);
+  return Boolean(claimStatus && claimStatus.isDisabled && (isExplicitlyExcluded || !claimStatus.isClaimNormal));
+}
+window.isCustomerModalDisabled = isCustomerModalDisabled;
+
+function toggleClaimSetOverlayPeek(appId) {
+  gClaimSetPeekMode[appId] = !gClaimSetPeekMode[appId];
+  if (gActiveHubModalAppId === appId) {
+    openHubCustomerDetailModal(appId);
+  }
+}
+window.toggleClaimSetOverlayPeek = toggleClaimSetOverlayPeek;
+
+async function enableClaimSetForCustomer(appId) {
+  const app = (gApps || []).find(a => a.id === appId);
+  if (!app) return;
+
+  app.status = '진행중';
+  app.claimClassification = '정상';
+  app.claimCategory = '정상';
+  app.hasManualUpdate = true;
+  app.updatedAt = new Date().toISOString();
+  gClaimSetPeekMode[appId] = false;
+
+  try {
+    await fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: appId,
+        fields: {
+          status: '진행중',
+          claimClassification: '정상',
+          claimCategory: '정상',
+          hasManualUpdate: true
+        }
+      })
+    });
+  } catch (e) {}
+
+  if (typeof syncToConvex === 'function') {
+    try {
+      await syncToConvex('sync:updateCustomerField', {
+        appId: appId,
+        field: 'status',
+        value: '진행중'
+      });
+      await syncToConvex('sync:updateCustomerField', {
+        appId: appId,
+        field: 'claimClassification',
+        value: '정상'
+      });
+    } catch (e) {}
+  }
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '청구세트 활성화 완료',
+      message: `[${app.patientName}] 현재상태가 '진행중', 청구분류가 '정상'으로 변경되어 청구세트가 정상 활성화되었습니다.`,
+      icon: 'unlock'
+    });
+  }
+
+  renderUnifiedCareHub();
+  if (gActiveHubModalAppId === appId) {
+    openHubCustomerDetailModal(appId);
+  }
+}
+window.enableClaimSetForCustomer = enableClaimSetForCustomer;
+
+// =========================================================================
+// [NEW] 정산·청구 세트 스텝별(청구, 입금, 지급) 다중 비고 및 히스토리 관리 엔진
+// =========================================================================
+
+function getStepMemoList(app, roundNumber, stepType, existingObj) {
+  if (!app) return [];
+  if (!app.settlementStepMemos) app.settlementStepMemos = {};
+  if (!app.settlementStepMemos[roundNumber]) {
+    app.settlementStepMemos[roundNumber] = { claim: [], deposit: [], payout: [] };
+  }
+  if (!Array.isArray(app.settlementStepMemos[roundNumber][stepType])) {
+    app.settlementStepMemos[roundNumber][stepType] = [];
+  }
+
+  const stepList = app.settlementStepMemos[roundNumber][stepType];
+
+  // 1. 객체에 저장된 memoHistory 연동
+  const objHistory = stepType === 'deposit' 
+    ? (existingObj && (existingObj.depositMemoHistory || existingObj.memoHistory))
+    : (existingObj && existingObj.memoHistory);
+
+  if (Array.isArray(objHistory) && objHistory.length > 0) {
+    objHistory.forEach(item => {
+      if (item && item.text && !stepList.some(l => l.id === item.id || (l.text === item.text && l.dateStr === item.dateStr))) {
+        stepList.push(item);
+      }
+    });
+  }
+
+  // 2. 이력이 하나도 없을 때 기존 단일 비고(memo)를 첫 번째 히스토리로 마이그레이션
+  if (stepList.length === 0) {
+    let legacyText = '';
+    let legacyDate = '';
+    if (stepType === 'claim' && existingObj && existingObj.memo) {
+      legacyText = String(existingObj.memo).trim();
+      legacyDate = existingObj.claimDate || '';
+    } else if (stepType === 'deposit' && existingObj && (existingObj.depositMemo || (existingObj.depositAmount > 0 && existingObj.memo && existingObj.memo.includes('입금')))) {
+      if (existingObj.depositMemo) {
+        legacyText = String(existingObj.depositMemo).trim();
+      }
+      legacyDate = existingObj.depositDate || '';
+    } else if (stepType === 'payout' && existingObj && existingObj.memo) {
+      legacyText = String(existingObj.memo).trim();
+      legacyDate = existingObj.paidDate || existingObj.payoutDate || '';
+    }
+
+    if (legacyText) {
+      const legacyItem = {
+        id: `legacy_${stepType}_${roundNumber}`,
+        text: legacyText,
+        dateStr: legacyDate || '기존 기록',
+        author: '운영센터',
+        timestamp: new Date().toISOString()
+      };
+      stepList.push(legacyItem);
+    }
+  }
+
+  return stepList;
+}
+window.getStepMemoList = getStepMemoList;
+
+function renderStepMemoHistoryHtml(appId, roundNumber, stepType, memos, themeColor) {
+  const isClaim = stepType === 'claim';
+  const isDeposit = stepType === 'deposit';
+  const isPayout = stepType === 'payout';
+
+  const stepLabel = isClaim ? '청구 비고' : isDeposit ? '입금 비고' : '지급 비고';
+  const iconName = isClaim ? 'file-text' : isDeposit ? 'arrow-down-circle' : 'message-square';
+
+  let badgeClasses = 'bg-purple-100 text-purple-900 border-purple-200';
+  let dotColor = 'bg-purple-500';
+  let btnClasses = 'bg-purple-600 hover:bg-purple-700 text-white';
+  let focusRing = 'focus:ring-purple-400 focus:border-purple-400';
+  let iconColor = 'text-purple-600';
+
+  if (isDeposit) {
+    badgeClasses = 'bg-emerald-100 text-emerald-900 border-emerald-200';
+    dotColor = 'bg-emerald-500';
+    btnClasses = 'bg-emerald-600 hover:bg-emerald-700 text-white';
+    focusRing = 'focus:ring-emerald-400 focus:border-emerald-400';
+    iconColor = 'text-emerald-600';
+  } else if (isPayout) {
+    badgeClasses = 'bg-amber-100 text-amber-900 border-amber-200';
+    dotColor = 'bg-amber-500';
+    btnClasses = 'bg-amber-600 hover:bg-amber-700 text-white';
+    focusRing = 'focus:ring-amber-400 focus:border-amber-400';
+    iconColor = 'text-amber-600';
+  }
+
+  const memoCount = Array.isArray(memos) ? memos.length : 0;
+
+  return `
+    <div class="mt-2 pt-2 border-t border-slate-200/80 space-y-1.5">
+      <div class="flex items-center justify-between text-[11px]">
+        <span class="font-bold text-slate-700 flex items-center gap-1">
+          <i data-lucide="${iconName}" class="w-3.5 h-3.5 ${iconColor} shrink-0"></i>
+          <span>${stepLabel}</span>
+          ${memoCount > 0 ? `
+            <span class="px-1.5 py-0.2 rounded-full font-mono text-[10px] font-bold ${badgeClasses} border">
+              ${memoCount}
+            </span>
+          ` : ''}
+        </span>
+        <span class="text-[10px] text-slate-400 font-medium">히스토리 관리</span>
+      </div>
+
+      ${memoCount > 0 ? `
+        <div class="space-y-1 max-h-28 overflow-y-auto pr-1 text-[11px] custom-scrollbar">
+          ${memos.map((m, idx) => {
+            const dateStr = m.dateStr || (m.timestamp ? formatCareDateTimeStr(new Date(m.timestamp)) : '');
+            const author = m.author || '운영자';
+            const mId = m.id || `memo_${idx}`;
+            return `
+              <div class="p-1.5 px-2 rounded-xl bg-white border border-slate-200 shadow-2xs group relative hover:border-slate-300 transition-all">
+                <div class="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                  <div class="flex items-center gap-1 font-mono">
+                    <span class="w-1.5 h-1.5 rounded-full ${dotColor} shrink-0"></span>
+                    <b class="text-slate-600 font-sans font-bold">${escapeHtml(author)}</b>
+                    <span>·</span>
+                    <span class="text-slate-500">${dateStr}</span>
+                  </div>
+                  <button type="button" 
+                    onclick="event.stopPropagation(); deleteSettlementStepMemo('${appId}', ${roundNumber}, '${stepType}', '${mId}')"
+                    class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 p-0.5 rounded transition-opacity cursor-pointer" 
+                    title="이 비고 항목 삭제">
+                    <i data-lucide="trash-2" class="w-3 h-3"></i>
+                  </button>
+                </div>
+                <div class="text-slate-800 font-medium break-words leading-snug whitespace-pre-wrap pl-2.5 border-l-2 border-slate-200/80">
+                  ${escapeHtml(m.text || '')}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : `
+        <div class="py-1 px-2 rounded-lg bg-slate-50/60 border border-dashed border-slate-200 text-center text-[10px] text-slate-400">
+          등록된 비고 이력이 없습니다.
+        </div>
+      `}
+
+      <div class="flex items-center gap-1 pt-0.5">
+        <input type="text" 
+          id="stepMemoInput_${appId}_${roundNumber}_${stepType}"
+          placeholder="${stepLabel} 추가... (Enter)"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addSettlementStepMemo('${appId}', ${roundNumber}, '${stepType}');}"
+          class="flex-1 text-[11px] py-1 px-2 rounded-lg border border-slate-300 bg-white placeholder-slate-400 text-slate-800 focus:outline-none focus:ring-1.5 ${focusRing} transition-all shadow-2xs" />
+        <button type="button" 
+          onclick="event.stopPropagation(); addSettlementStepMemo('${appId}', ${roundNumber}, '${stepType}');"
+          class="px-2 py-1 rounded-lg ${btnClasses} font-bold text-[10.5px] shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center gap-0.5 shrink-0" 
+          title="새 비고 추가">
+          <i data-lucide="plus" class="w-3 h-3"></i>
+          <span>추가</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+window.renderStepMemoHistoryHtml = renderStepMemoHistoryHtml;
+
+async function addSettlementStepMemo(appId, roundNumber, stepType) {
+  const app = (gApps || []).find(a => a.id === appId);
+  if (!app) return;
+
+  const inputId = `stepMemoInput_${appId}_${roundNumber}_${stepType}`;
+  const inputEl = document.getElementById(inputId);
+  if (!inputEl) return;
+
+  const text = (inputEl.value || '').trim();
+  if (!text) {
+    inputEl.focus();
+    return;
+  }
+
+  const author = (typeof gCurrentAdmin !== 'undefined' && gCurrentAdmin && (gCurrentAdmin.name || gCurrentAdmin.username)) 
+    ? (gCurrentAdmin.name || gCurrentAdmin.username) 
+    : '운영자';
+  const now = new Date();
+  const dateStr = typeof formatCareDateTimeStr === 'function' ? formatCareDateTimeStr(now) : now.toISOString().slice(0, 16).replace('T', ' ');
+
+  const newMemoItem = {
+    id: `memo_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    text: text,
+    dateStr: dateStr,
+    author: author,
+    timestamp: now.toISOString()
+  };
+
+  // 1. app.settlementStepMemos 갱신
+  if (!app.settlementStepMemos) app.settlementStepMemos = {};
+  if (!app.settlementStepMemos[roundNumber]) {
+    app.settlementStepMemos[roundNumber] = { claim: [], deposit: [], payout: [] };
+  }
+  if (!Array.isArray(app.settlementStepMemos[roundNumber][stepType])) {
+    app.settlementStepMemos[roundNumber][stepType] = [];
+  }
+  app.settlementStepMemos[roundNumber][stepType].push(newMemoItem);
+
+  // 2. claim / payout 연동 갱신
+  let targetClaim = null;
+  let targetPayout = null;
+
+  if (stepType === 'claim' || stepType === 'deposit') {
+    targetClaim = (gClaims || []).find(c => {
+      if (c.applyId !== appId) return false;
+      const rNum = parseInt(String(c.round || '').replace(/[^0-9]/g, ''), 10);
+      return rNum === roundNumber || String(c.round || '').includes(`${roundNumber}차`);
+    });
+    if (targetClaim) {
+      if (stepType === 'claim') {
+        if (!Array.isArray(targetClaim.memoHistory)) targetClaim.memoHistory = [];
+        targetClaim.memoHistory.push(newMemoItem);
+        targetClaim.memo = text;
+      } else {
+        if (!Array.isArray(targetClaim.depositMemoHistory)) targetClaim.depositMemoHistory = [];
+        targetClaim.depositMemoHistory.push(newMemoItem);
+        targetClaim.depositMemo = text;
+      }
+      targetClaim.updatedAt = now.toISOString();
+    }
+  }
+
+  if (stepType === 'payout') {
+    targetPayout = (gPayouts || []).find(p => {
+      if (p.applyId !== appId) return false;
+      const rNum = parseInt(String(p.round || '').replace(/[^0-9]/g, ''), 10);
+      return rNum === roundNumber || String(p.round || '').includes(`${roundNumber}차`);
+    });
+    if (targetPayout) {
+      if (!Array.isArray(targetPayout.memoHistory)) targetPayout.memoHistory = [];
+      targetPayout.memoHistory.push(newMemoItem);
+      targetPayout.memo = text;
+      targetPayout.updatedAt = now.toISOString();
+    }
+  }
+
+  // 3. customSettlementSets 갱신
+  if (app.customSettlementSets && Array.isArray(app.customSettlementSets)) {
+    const cSet = app.customSettlementSets.find(cs => (cs.setIndex || cs.roundNumber) === roundNumber);
+    if (cSet) {
+      if (!cSet.stepMemos) cSet.stepMemos = {};
+      if (!Array.isArray(cSet.stepMemos[stepType])) cSet.stepMemos[stepType] = [];
+      cSet.stepMemos[stepType].push(newMemoItem);
+      if (stepType === 'claim' || stepType === 'payout') {
+        cSet.memo = text;
+      }
+    }
+  }
+
+  app.updatedAt = now.toISOString();
+
+  // 4. 로컬 스토리지 즉시 동기화
+  try {
+    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    if (targetClaim) localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+    if (targetPayout) localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+  } catch (err) {
+    console.warn('localStorage save warning:', err);
+  }
+
+  // 5. 서버 및 Convex 동기화
+  try {
+    await fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: appId,
+        fields: {
+          settlementStepMemos: app.settlementStepMemos,
+          customSettlementSets: app.customSettlementSets,
+          claim: targetClaim,
+          payout: targetPayout
+        }
+      })
+    });
+  } catch (err) {
+    console.warn('Update step memo server error:', err);
+  }
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+    if (targetClaim) syncToConvex('sync:saveClaim', { claim: targetClaim }).catch(console.warn);
+    if (targetPayout) syncToConvex('sync:savePayout', { payout: targetPayout }).catch(console.warn);
+  }
+
+  const stepKorean = stepType === 'claim' ? '청구(Step 1)' : stepType === 'deposit' ? '입금(Step 2)' : '지급(Step 3)';
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '정산관리',
+      actionType: 'MEMO_ADD',
+      target: `고객 [${app.patientName || appId}] 세트 ${roundNumber} ${stepKorean}`,
+      summary: `[${app.patientName || appId}] 세트 ${roundNumber} ${stepKorean} 비고 추가: ${text.slice(0, 30)}`,
+      changes: {
+        '비고작성자': { before: '-', after: author },
+        '비고내용': { before: '-', after: text }
+      }
+    });
+  }
+
+  if (typeof showToast === 'function') {
+    showToast(`세트 ${roundNumber} ${stepKorean} 비고가 등록되었습니다.`, 'success');
+  }
+
+  if (gActiveHubModalAppId === appId) {
+    openHubCustomerDetailModal(appId);
+  }
+}
+window.addSettlementStepMemo = addSettlementStepMemo;
+
+async function deleteSettlementStepMemo(appId, roundNumber, stepType, memoId) {
+  if (!confirm('해당 비고 항목을 삭제하시겠습니까?')) return;
+
+  const app = (gApps || []).find(a => a.id === appId);
+  if (!app) return;
+
+  const filterOut = (arr) => {
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((item, idx) => item && item.id !== memoId && String(idx) !== String(memoId));
+  };
+
+  if (app.settlementStepMemos && app.settlementStepMemos[roundNumber] && app.settlementStepMemos[roundNumber][stepType]) {
+    app.settlementStepMemos[roundNumber][stepType] = filterOut(app.settlementStepMemos[roundNumber][stepType]);
+  }
+
+  let targetClaim = null;
+  let targetPayout = null;
+
+  if (stepType === 'claim' || stepType === 'deposit') {
+    targetClaim = (gClaims || []).find(c => {
+      if (c.applyId !== appId) return false;
+      const rNum = parseInt(String(c.round || '').replace(/[^0-9]/g, ''), 10);
+      return rNum === roundNumber || String(c.round || '').includes(`${roundNumber}차`);
+    });
+    if (targetClaim) {
+      if (stepType === 'claim') {
+        if (targetClaim.memoHistory) targetClaim.memoHistory = filterOut(targetClaim.memoHistory);
+        targetClaim.memo = (targetClaim.memoHistory && targetClaim.memoHistory.length > 0) ? targetClaim.memoHistory[targetClaim.memoHistory.length - 1].text : '';
+      } else {
+        if (targetClaim.depositMemoHistory) targetClaim.depositMemoHistory = filterOut(targetClaim.depositMemoHistory);
+        targetClaim.depositMemo = (targetClaim.depositMemoHistory && targetClaim.depositMemoHistory.length > 0) ? targetClaim.depositMemoHistory[targetClaim.depositMemoHistory.length - 1].text : '';
+      }
+      targetClaim.updatedAt = new Date().toISOString();
+    }
+  }
+
+  if (stepType === 'payout') {
+    targetPayout = (gPayouts || []).find(p => {
+      if (p.applyId !== appId) return false;
+      const rNum = parseInt(String(p.round || '').replace(/[^0-9]/g, ''), 10);
+      return rNum === roundNumber || String(p.round || '').includes(`${roundNumber}차`);
+    });
+    if (targetPayout) {
+      if (targetPayout.memoHistory) targetPayout.memoHistory = filterOut(targetPayout.memoHistory);
+      targetPayout.memo = (targetPayout.memoHistory && targetPayout.memoHistory.length > 0) ? targetPayout.memoHistory[targetPayout.memoHistory.length - 1].text : '';
+      targetPayout.updatedAt = new Date().toISOString();
+    }
+  }
+
+  if (app.customSettlementSets && Array.isArray(app.customSettlementSets)) {
+    const cSet = app.customSettlementSets.find(cs => (cs.setIndex || cs.roundNumber) === roundNumber);
+    if (cSet && cSet.stepMemos && cSet.stepMemos[stepType]) {
+      cSet.stepMemos[stepType] = filterOut(cSet.stepMemos[stepType]);
+    }
+  }
+
+  app.updatedAt = new Date().toISOString();
+
+  try {
+    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    if (targetClaim) localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+    if (targetPayout) localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+  } catch (err) {
+    console.warn('localStorage save warning:', err);
+  }
+
+  try {
+    await fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: appId,
+        fields: {
+          settlementStepMemos: app.settlementStepMemos,
+          customSettlementSets: app.customSettlementSets,
+          claim: targetClaim,
+          payout: targetPayout
+        }
+      })
+    });
+  } catch (err) {
+    console.warn('Delete step memo server error:', err);
+  }
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+    if (targetClaim) syncToConvex('sync:saveClaim', { claim: targetClaim }).catch(console.warn);
+    if (targetPayout) syncToConvex('sync:savePayout', { payout: targetPayout }).catch(console.warn);
+  }
+
+  if (gActiveHubModalAppId === appId) {
+    openHubCustomerDetailModal(appId);
+  }
+}
+window.deleteSettlementStepMemo = deleteSettlementStepMemo;
+
 /**
  * [NEW] 시계열 정산·청구 라이프사이클 연동 원스탑 워크스페이스 렌더러
  * 시계열 순서: 간병제공 ➡️ 보험금 청구 ➡️ 입금 확인 ➡️ 간병비 지급
@@ -22134,6 +22694,8 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
   const cardTheme = getCustomerCardStatusTheme(app, appAssigns);
   const currentStatus = determineRealCareStatus(app, appAssigns);
   const claimVal = String(app.claimClassification || app.claimCategory || '').trim();
+  const claimStatus = checkCustomerClaimSetStatus(app, appAssigns);
+  const isPeekMode = Boolean(gClaimSetPeekMode[app.id]);
 
   return `
     <div class="space-y-4 w-full">
@@ -22676,8 +23238,81 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
       <!-- ========================================================================= -->
       <!-- [MAIN WORKSPACE] 시계열 정산·청구 라이프사이클 1:1 연동 관리 테이블 -->
       <!-- ========================================================================= -->
-      <div class="bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 overflow-hidden">
-        
+      <div id="claimSetWorkspaceContainer_${app.id}" class="bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 overflow-hidden relative">
+        ${(claimStatus.isDisabled && !isPeekMode) ? `
+          <!-- [OVERLAY MODAL] 청구세트 비활성화 불투명 오버레이 모달 -->
+          <div class="absolute inset-0 z-30 bg-slate-950/70 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center select-none animate-fadeIn">
+            <div class="max-w-lg w-full bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 sm:p-7 space-y-4">
+              <div class="w-16 h-16 mx-auto rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shadow-inner">
+                <i data-lucide="lock" class="w-8 h-8"></i>
+              </div>
+              
+              <div class="space-y-2">
+                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-black">
+                  <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
+                  <span>청구세트 보호 모드 (비활성화)</span>
+                </div>
+                <h3 class="text-base sm:text-lg font-black text-slate-900">
+                  [${escapeHtml(app.patientName)} 님] 청구세트가 비활성화되어 있습니다
+                </h3>
+                <p class="text-xs text-slate-500 leading-relaxed">
+                  오발송 및 오지급 사고 방지를 위해 <b>청구분류가 '정상'</b>이고 <b>현재상태가 '진행중'</b>인 고객에게만 청구세트 작업이 허용됩니다.
+                </p>
+              </div>
+
+              <div class="text-left bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-xs">
+                <div class="font-bold text-slate-700 flex items-center gap-1.5 pb-1 border-b border-slate-200">
+                  <i data-lucide="info" class="w-3.5 h-3.5 text-slate-500"></i>
+                  <span>현재 비활성화 사유</span>
+                </div>
+                <div class="space-y-1.5">
+                  ${claimStatus.reasons.map(r => `
+                    <div class="flex items-center gap-2 text-rose-600 font-black">
+                      <i data-lucide="x-circle" class="w-4 h-4 shrink-0 text-rose-500"></i>
+                      <span>${escapeHtml(r)}</span>
+                    </div>
+                  `).join('')}
+                </div>
+                <div class="text-[11px] text-slate-500 pt-1 border-t border-slate-200">
+                  상단 [분류 관리]에서 상태를 변경하거나 아래 전환 버튼을 클릭하여 즉시 활성화할 수 있습니다.
+                </div>
+              </div>
+
+              <div class="flex flex-col sm:flex-row items-center justify-center gap-2 pt-1">
+                <button type="button" onclick="enableClaimSetForCustomer('${app.id}')"
+                  class="w-full sm:flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95">
+                  <i data-lucide="unlock" class="w-4 h-4"></i>
+                  <span>청구 가능 상태로 전환 (진행중 / 정상)</span>
+                </button>
+                <button type="button" onclick="toggleClaimSetOverlayPeek('${app.id}')"
+                  class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95">
+                  <i data-lucide="eye" class="w-4 h-4 text-slate-600"></i>
+                  <span>내용 보기 (읽기모드)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+
+        ${(claimStatus.isDisabled && isPeekMode) ? `
+          <!-- [PEEK MODE BANNER] 청구세트 읽기모드 안내 배너 -->
+          <div class="bg-amber-500 text-white px-4 py-2.5 flex items-center justify-between text-xs font-bold border-b border-amber-600 shadow-xs flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <i data-lucide="eye" class="w-4 h-4 text-amber-100 shrink-0"></i>
+              <span>[읽기 전용 모드] 청구 기준 미달 상태로 조회만 가능합니다. (${escapeHtml(claimStatus.reasons.join(', '))})</span>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button type="button" onclick="enableClaimSetForCustomer('${app.id}')" class="px-3 py-1 rounded-lg bg-white text-amber-900 hover:bg-amber-100 font-black text-[11px] shadow-xs cursor-pointer flex items-center gap-1">
+                <i data-lucide="unlock" class="w-3 h-3"></i> 청구 가능 상태로 전환
+              </button>
+              <button type="button" onclick="toggleClaimSetOverlayPeek('${app.id}')" class="px-2.5 py-1 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-bold text-[11px] cursor-pointer flex items-center gap-1">
+                <i data-lucide="lock" class="w-3 h-3"></i> 보호 모드 복원
+              </button>
+            </div>
+          </div>
+        ` : ''}
+
+        <div class="${claimStatus.isDisabled && !isPeekMode ? 'pointer-events-none opacity-40 select-none' : ''}">
         <!-- Workflow Top Action & Principle Header -->
         <div class="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div class="space-y-1.5">
@@ -22836,6 +23471,10 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
             const rawPayoutDate = r.existingPayout ? (r.existingPayout.paidDate || r.existingPayout.payoutDate || r.existingPayout.createdAt) : null;
             const payoutDateTimeStr = formatStatusDateTime(rawPayoutDate, '16:00');
 
+            const claimMemos = getStepMemoList(app, r.roundNumber, 'claim', r.existingClaim);
+            const depositMemos = getStepMemoList(app, r.roundNumber, 'deposit', r.existingClaim);
+            const payoutMemos = getStepMemoList(app, r.roundNumber, 'payout', r.existingPayout);
+
             const step1CardStyle = isSending
               ? 'bg-purple-50/70 border-purple-300 text-purple-950 ring-2 ring-purple-400/40'
               : isClaimDone
@@ -22974,12 +23613,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                           `}
                         </div>
 
-                        ${r.existingClaim && r.existingClaim.memo ? `
-                          <div class="mt-1.5 p-2 rounded-xl bg-purple-50/90 border border-purple-200 text-purple-950 text-[11px] flex items-start gap-1 shadow-2xs">
-                            <span class="font-extrabold text-purple-800 shrink-0 flex items-center gap-0.5"><i data-lucide="file-text" class="w-3 h-3 text-purple-600"></i> 청구비고:</span>
-                            <span class="break-words font-medium text-purple-900 leading-snug">${escapeHtml(r.existingClaim.memo)}</span>
-                          </div>
-                        ` : ''}
+                        ${renderStepMemoHistoryHtml(app.id, r.roundNumber, 'claim', claimMemos, 'purple')}
                       </div>
 
                       <!-- 하단 버튼/정보 영역 (삼성화재 고객별 청구 요청 및 청구완료 일시 정보 표기) -->
@@ -23162,6 +23796,8 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                                 <i data-lucide="check" class="w-3.5 h-3.5"></i> <span>저장</span>
                               </button>
                             </div>
+
+                            ${renderStepMemoHistoryHtml(app.id, r.roundNumber, 'deposit', depositMemos, 'emerald')}
                           `;
                         })()}
                       </div>
@@ -23260,12 +23896,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                           `}
                         </div>
 
-                        ${r.existingPayout && r.existingPayout.memo ? `
-                          <div class="mt-1.5 p-2 rounded-xl bg-orange-50/90 border border-orange-200 text-orange-950 text-[11px] flex items-start gap-1 shadow-2xs">
-                            <span class="font-extrabold text-orange-800 shrink-0 flex items-center gap-0.5"><i data-lucide="message-square" class="w-3 h-3 text-orange-600"></i> 지급비고:</span>
-                            <span class="break-words font-medium text-orange-900 leading-snug">${escapeHtml(r.existingPayout.memo)}</span>
-                          </div>
-                        ` : ''}
+                        ${renderStepMemoHistoryHtml(app.id, r.roundNumber, 'payout', payoutMemos, 'orange')}
                       </div>
 
                       <!-- 하단 버튼 영역 -->
@@ -23350,6 +23981,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
           </div>
         </div>
 
+        </div>
       </div>
 
       <!-- ========================================================================= -->
@@ -23603,6 +24235,8 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
   const cardTheme = getCustomerCardStatusTheme(app, appAssigns);
   const currentStatus = determineRealCareStatus(app, appAssigns);
   const claimVal = String(app.claimClassification || app.claimCategory || '').trim();
+  const claimStatus = checkCustomerClaimSetStatus(app, appAssigns);
+  const isPeekMode = Boolean(gClaimSetPeekMode[app.id]);
 
   return `
     <div class="p-1 sm:p-2">
@@ -23839,7 +24473,60 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
         <!-- ========================================================================= -->
         <!-- [CARD 2] 손사(보험사) 청구 관리 (Adjuster & Claim Billing Card) -->
         <!-- ========================================================================= -->
-        <div id="hubCard2" class="${gActive3CardMobileTab === 'card2' ? 'flex' : 'hidden'} lg:flex bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 flex-col h-auto lg:h-[78vh] lg:max-h-[820px] overflow-hidden transition-all duration-300 hover:shadow-xl">
+        <div id="hubCard2" class="${gActive3CardMobileTab === 'card2' ? 'flex' : 'hidden'} lg:flex bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/50 flex-col h-auto lg:h-[78vh] lg:max-h-[820px] overflow-hidden transition-all duration-300 hover:shadow-xl relative">
+          ${(claimStatus.isDisabled && !isPeekMode) ? `
+            <!-- [OVERLAY MODAL] Card 2 청구세트 비활성화 불투명 오버레이 모달 -->
+            <div class="absolute inset-0 z-30 bg-slate-950/70 backdrop-blur-xs rounded-3xl flex flex-col items-center justify-center p-6 text-center select-none animate-fadeIn">
+              <div class="max-w-md w-full bg-white rounded-3xl shadow-2xl border border-slate-200 p-5 sm:p-6 space-y-3.5">
+                <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shadow-inner">
+                  <i data-lucide="lock" class="w-7 h-7"></i>
+                </div>
+                <div class="space-y-1.5">
+                  <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-black">
+                    <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
+                    <span>손사 청구 비활성화 (보호 모드)</span>
+                  </div>
+                  <h4 class="text-base font-black text-slate-900">
+                    [${escapeHtml(app.patientName)} 님] 청구 관리가 잠겨있습니다
+                  </h4>
+                  <div class="text-left bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5 text-xs font-medium">
+                    <div class="font-bold text-slate-700 pb-0.5">비활성화 사유:</div>
+                    ${claimStatus.reasons.map(r => `<div class="text-rose-600 flex items-center gap-1.5 font-bold"><i data-lucide="x-circle" class="w-3.5 h-3.5 shrink-0 text-rose-500"></i> ${escapeHtml(r)}</div>`).join('')}
+                    <div class="text-[10.5px] text-slate-500 pt-1 border-t border-slate-200">
+                      청구분류 [정상] 및 현재상태 [진행중] 설정 시 청구 작업이 가능합니다.
+                    </div>
+                  </div>
+                </div>
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-2 pt-1">
+                  <button type="button" onclick="enableClaimSetForCustomer('${app.id}')"
+                    class="w-full sm:flex-1 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer">
+                    <i data-lucide="unlock" class="w-4 h-4"></i>
+                    <span>청구 가능 상태로 전환</span>
+                  </button>
+                  <button type="button" onclick="toggleClaimSetOverlayPeek('${app.id}')"
+                    class="w-full sm:w-auto px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-300 flex items-center justify-center gap-1 transition-all cursor-pointer">
+                    <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                    <span>읽기모드</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ` : ''}
+
+          ${(claimStatus.isDisabled && isPeekMode) ? `
+            <!-- [PEEK MODE BANNER] Card 2 청구세트 읽기모드 안내 배너 -->
+            <div class="bg-amber-500 text-white px-3.5 py-2 flex items-center justify-between text-xs font-bold border-b border-amber-600 shadow-xs flex-wrap gap-2">
+              <div class="flex items-center gap-1.5">
+                <i data-lucide="eye" class="w-4 h-4 text-amber-100 shrink-0"></i>
+                <span class="text-[11px]">[읽기모드] 조회만 가능 (${escapeHtml(claimStatus.reasons.join(', '))})</span>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button type="button" onclick="enableClaimSetForCustomer('${app.id}')" class="px-2 py-0.5 rounded bg-white text-amber-900 font-black text-[10.5px] cursor-pointer">전환</button>
+                <button type="button" onclick="toggleClaimSetOverlayPeek('${app.id}')" class="px-2 py-0.5 rounded bg-amber-700 text-white font-bold text-[10.5px] cursor-pointer">복원</button>
+              </div>
+            </div>
+          ` : ''}
+
           <!-- Card Header (통일된 헤더 높이 및 배지/버튼) -->
           <div class="bg-gradient-to-r ${isSamsung ? 'from-sky-700 via-indigo-700 to-sky-800' : 'from-purple-600 via-indigo-600 to-purple-700'} p-3.5 sm:p-4 text-white flex items-center justify-between min-h-[56px] sm:min-h-[64px] shrink-0 gap-2">
             <div class="flex items-center gap-2 min-w-0">
@@ -24987,6 +25674,15 @@ async function updateCustomerField(appId, field, value) {
     });
     const result = await res.json();
     if (result.success) {
+      if (typeof syncToConvex === 'function') {
+        try {
+          await syncToConvex('sync:updateCustomerField', {
+            appId: appId,
+            field: field,
+            value: value
+          });
+        } catch (e) {}
+      }
       if (typeof showNotification === 'function') {
         const fieldNameKo = field === 'status' ? '현재상태' : (field === 'claimClassification' ? '청구분류' : (field === 'applyType' ? '신청유형' : field));
         showNotification({
@@ -24997,6 +25693,20 @@ async function updateCustomerField(appId, field, value) {
         });
       }
       renderUnifiedCareHub();
+      if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId === appId) {
+        openHubCustomerDetailModal(appId);
+      }
+      if (field === 'status' || field === 'claimClassification') {
+        const claimCheck = checkCustomerClaimSetStatus(app);
+        if (claimCheck.isDisabled) {
+          showCustomAlert({
+            title: '청구세트 비활성화 안내',
+            message: `[${app.patientName} 님]\n${claimCheck.reasons.join('\n')}\n\n청구분류가 '정상'이 아니거나 현재상태가 '진행중'이 아니므로 청구세트 영역이 비활성화(보호 모드) 처리되었습니다.`,
+            icon: 'shield-alert',
+            confirmText: '확인'
+          });
+        }
+      }
     }
   } catch (err) {
     console.error('Failed to update customer field:', err);
@@ -26479,6 +27189,16 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
     `);
   }
 
+  // 7. 모달 비활성화(청구제외/보호모드) 체크
+  if (typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app)) {
+    const claimVal = String(app.claimClassification || app.claimCategory || '제외').trim();
+    badges.push(`
+      <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 border border-amber-300 font-extrabold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="모달 내 청구세트가 비활성화(보호모드)된 상태입니다.">
+        <i data-lucide="lock" class="w-3 h-3 text-amber-700"></i> 🔒 모달 비활성 (${claimVal})
+      </span>
+    `);
+  }
+
   // 모든 체크 항목이 완료되었거나 이상 없는 경우
   if (badges.length === 0) {
     if (sched.isAllPayoutsPaid && sched.isAllClaimsDeposited) {
@@ -26499,7 +27219,15 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
   return badges.join('');
 }
 
-let gHubStatusFilter = null; // null or '신규' | '진행중' | '완료' | '취소' | '예정'
+let gHubStatusFilter = null; // null or '신규' | '진행중' | '완료' | '취소' | '예정' | '비활성'
+var gHubOnlyDisabled = false;
+
+function toggleHubDisabledFilter() {
+  gHubOnlyDisabled = !gHubOnlyDisabled;
+  if (typeof gHubCurrentPage !== 'undefined') gHubCurrentPage = 1;
+  renderUnifiedCareHub();
+}
+window.toggleHubDisabledFilter = toggleHubDisabledFilter;
 
 function toggleHubStatusFilter(status) {
   if (gHubStatusFilter === status) {
@@ -26513,7 +27241,7 @@ function toggleHubStatusFilter(status) {
 }
 
 function updateHubStatusLegendUI() {
-  const statuses = ['신규', '대기', '진행중', '완료', '취소', '예정'];
+  const statuses = ['신규', '대기', '진행중', '완료', '취소', '예정', '비활성'];
   statuses.forEach(st => {
     const el = document.getElementById(`hubStatusLegend-${st}`);
     if (!el) return;
@@ -26701,8 +27429,56 @@ function renderUnifiedCareHub() {
     return true;
   };
 
-  // [Phase 2 제거됨]: 스케줄 기반 간병비 도래 계산은 엑셀 원장 기준과 불일치하여 제거
-  // 지급대기 카운트는 오직 gPayouts의 payoutStatus가 명시적으로 '미지급'인 건만 반영
+  // [간병비 미지급(지급 대기) 정밀 판정 헬퍼]:
+  // 1. 취소/미해당/서비스불가 건은 제외
+  // 2. gPayouts에 미지급(payoutStatus !== '지급' 등) 건이 있는 경우
+  // 3. 카드에 표출되는 간병비 정산 스케줄(sched.unpaidPayoutSum > 0 또는 sched.isCaregiverPayoutDue) 상 미지급이 존재하는 경우 (노영갑 등)
+  const isAppHasUnpaidPayoutHelper = (app) => {
+    if (!app) return false;
+    const realSt = determineRealCareStatus(app);
+    if (realSt === '취소' || realSt === '서비스 취소' || realSt === '미해당' || realSt === '당일서비스취소' || realSt.includes('서비스불가') || realSt === '제외') {
+      return false;
+    }
+    if (unpaidPayoutAppIdSet.has(String(app.id))) return true;
+
+    const appId = String(app.id || '').trim();
+    const appAssigns = (gAssigns || []).filter(a => {
+      if (!a) return false;
+      const aApplyId = String(a.applyId || '').trim();
+      return (aApplyId && (aApplyId === appId || aApplyId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || aApplyId.replace(/^C/, 'H') === appId.replace(/^C/, 'H'))) ||
+             (!aApplyId && a.patientName && a.patientName.trim() === (app.patientName || '').trim());
+    });
+    const as = (typeof getActiveCaregiverAssignment === 'function') ? getActiveCaregiverAssignment(app, appAssigns) : appAssigns[0];
+    if (!as || (!as.caregiverName && !as.startDate)) return false;
+
+    const prog = as ? getCareProgressInfo(as) : null;
+    const appClaims = (gClaims || []).filter(c => {
+      if (!c) return false;
+      const cApplyId = String(c.applyId || '').trim();
+      return (appId && cApplyId && (cApplyId === appId || cApplyId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || cApplyId.replace(/^C/, 'H') === appId.replace(/^C/, 'H'))) ||
+             (!cApplyId && c.patientName && c.patientName.trim() === (app.patientName || '').trim());
+    });
+    const appPayouts = (gPayouts || []).filter(p => {
+      if (!p) return false;
+      const pApplyId = String(p.applyId || '').trim();
+      return (appId && pApplyId && (pApplyId === appId || pApplyId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || pApplyId.replace(/^C/, 'H') === appId.replace(/^C/, 'H'))) ||
+             (!pApplyId && p.patientName && p.patientName.trim() === (app.patientName || '').trim());
+    });
+
+    const hasUnpaidPayout = appPayouts.some(p => {
+      const st = String(p.payoutStatus || p.status || '').trim();
+      return st !== '지급' && st !== '지급완료' && st !== '선지급완료' && (p.payoutAmount || 0) > 0;
+    });
+    if (hasUnpaidPayout) return true;
+
+    if (typeof calculateCareSettlementSchedule === 'function') {
+      const sched = calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts);
+      if (sched && (sched.isCaregiverPayoutDue || sched.unpaidPayoutSum > 0)) {
+        return true;
+      }
+    }
+    return false;
+  };
 
   for (let i = 0; i < activeHubApps.length; i++) {
     const a = activeHubApps[i];
@@ -26716,7 +27492,7 @@ function renderUnifiedCareHub() {
     if (isNeedAssignHelper(a)) needAssignCount++;
     if (aRealSt === '진행중') inProgressCount++;
     if (isAppHasUnpaidClaimHelper(a)) unpaidClaimCount++;
-    if (unpaidPayoutAppIdSet.has(String(a.id))) needPayoutCount++;
+    if (isAppHasUnpaidPayoutHelper(a)) needPayoutCount++;
     if (!aIns.includes('삼성') && a.claimCount > 0 && !isClaimFaxSentHelper(a.id)) needFaxCount++;
   }
 
@@ -26757,6 +27533,30 @@ function renderUnifiedCareHub() {
     }
   }
 
+  // 3-2. 모달 비활성화 (청구제외/보호모드) 고객 건수 카운트 & 토글 버튼 UI 갱신
+  let disabledTotal = 0;
+  for (let i = 0; i < activeHubApps.length; i++) {
+    const a = activeHubApps[i];
+    const aIns = a.insuranceCompany || '';
+    if (insFilter !== 'ALL' && !aIns.includes(insFilter)) continue;
+    if (typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(a)) {
+      disabledTotal++;
+    }
+  }
+
+  const disBadge = document.getElementById('hubDisabledCountBadge');
+  if (disBadge) disBadge.innerText = disabledTotal;
+  const disBtn = document.getElementById('btnHubDisabledToggle');
+  if (disBtn) {
+    if (gHubOnlyDisabled) {
+      disBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 border transition-all cursor-pointer bg-amber-600 text-white border-amber-700 shadow-md whitespace-nowrap";
+      if (disBadge) disBadge.className = "px-1.5 py-0.2 rounded-full bg-white text-amber-800 text-[10px] font-black";
+    } else {
+      disBtn.className = "px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 border transition-all cursor-pointer bg-white text-amber-700 border-amber-300 hover:bg-amber-50 shadow-2xs whitespace-nowrap";
+      if (disBadge) disBadge.className = "px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold";
+    }
+  }
+
   // Pre-index caregiver names if searching
   const cgNamesByAppId = new Map();
   const digitsQuery = query ? query.replace(/[^0-9]/g, '') : '';
@@ -26782,11 +27582,16 @@ function renderUnifiedCareHub() {
       if (!isMod) return false;
     }
 
+    // [모달 비활성화 고객 모아보기 토글 필터]
+    if (gHubOnlyDisabled) {
+      if (typeof isCustomerModalDisabled === 'function' && !isCustomerModalDisabled(app)) return false;
+    }
+
     if (gHubFilter === 'COMPLETED' && !isCompletedHelper(app)) return false;
     if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
     if (gHubFilter === 'IN_PROGRESS' && determineRealCareStatus(app) !== '진행중') return false;
     if (gHubFilter === 'UNPAID_CLAIM' && !isAppHasUnpaidClaimHelper(app)) return false;
-    if (gHubFilter === 'NEED_PAYOUT' && !unpaidPayoutAppIdSet.has(String(app.id))) return false;
+    if (gHubFilter === 'NEED_PAYOUT' && !isAppHasUnpaidPayoutHelper(app)) return false;
     if (gHubFilter === 'NEED_FAX') {
       if (appIns.includes('삼성')) return false;
       const isSent = isClaimFaxSentHelper(app.id);
@@ -26801,6 +27606,7 @@ function renderUnifiedCareHub() {
       else if (gHubStatusFilter === '완료' && theme.type === 'completed') match = true;
       else if (gHubStatusFilter === '취소' && (theme.type === 'cancelled' || theme.type === 'not_applicable' || theme.statusText === '당일서비스취소' || theme.statusText.includes('서비스불가') || theme.statusText === '제외' || app.status === '미해당' || (app.status && app.status.includes('취소')))) match = true;
       else if (gHubStatusFilter === '예정' && theme.type === 'upcoming') match = true;
+      else if (gHubStatusFilter === '비활성' && typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app)) match = true;
       if (!match) return false;
     }
 
@@ -27170,6 +27976,11 @@ function renderUnifiedCareHub() {
             <span class="text-[11px] font-bold px-2 py-0.5 rounded-md ${app.isPreRegistered ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-blue-50 text-blue-800 border border-blue-200'}">${app.insuranceCompany}${app.isPreRegistered ? ' (사전등록)' : ''}</span>
             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ${cardTheme.badgeClass}" title="현재상태 (실제 간병기간 기준)">${cardTheme.statusText}</span>
             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200" title="청구분류 (AG열)">${app.claimClassification || app.claimCategory || '정상'}</span>
+            ${(typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app)) ? `
+              <span class="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs whitespace-nowrap" title="모달 내 청구세트가 비활성화(보호모드)된 고객입니다">
+                <i data-lucide="lock" class="w-3 h-3 text-amber-700"></i>모달 비활성
+              </span>
+            ` : ''}
             ${app.applyDate ? `
               <span class="text-[10.5px] font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-300 shadow-2xs flex items-center gap-1 shrink-0" title="신청일시: ${app.applyDate}">
                 <i data-lucide="clock" class="w-3 h-3 text-slate-400"></i> ${app.applyDate}
@@ -27229,6 +28040,11 @@ function renderUnifiedCareHub() {
             <span class="text-[11px] font-bold px-2 py-0.5 rounded-md ${app.isPreRegistered ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-white text-blue-800 border border-blue-200'}">${app.insuranceCompany}${app.isPreRegistered ? ' (사전등록)' : ''}</span>
             <span class="text-[10.5px] font-bold px-1.5 py-0.5 rounded-md ${cardTheme.badgeClass}" title="현재상태 (실제 간병기간 기준)">${cardTheme.statusText}</span>
             <span class="text-[10.5px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200" title="청구분류 (AG열)">${app.claimClassification || app.claimCategory || '정상'}</span>
+            ${(typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app)) ? `
+              <span class="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs whitespace-nowrap" title="모달 내 청구세트가 비활성화(보호모드)된 고객입니다">
+                <i data-lucide="lock" class="w-3 h-3 text-amber-700"></i>모달 비활성
+              </span>
+            ` : ''}
           </div>
 
           <div class="flex items-center gap-1.5 flex-wrap justify-end">
@@ -32110,6 +32926,7 @@ function renderApplications() {
       if (statFilter === '진행' && !(app.status || '').includes('진행') && app.status !== '정상') return false;
       if (statFilter === '완료' && app.status !== '완료') return false;
       if (statFilter === '취소' && !(app.status || '').includes('취소')) return false;
+      if (statFilter === '비활성' && typeof isCustomerModalDisabled === 'function' && !isCustomerModalDisabled(app)) return false;
     }
     if (query) {
       const match = (app.id && app.id.toLowerCase().includes(query)) ||
@@ -33830,6 +34647,34 @@ async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 12) 
       }
     });
 
+    // Pretendard 웹폰트 보장
+    if (!iframeDoc.querySelector('link[href*="pretendard"]')) {
+      const pLink = iframeDoc.createElement('link');
+      pLink.rel = 'stylesheet';
+      pLink.crossOrigin = 'anonymous';
+      pLink.href = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css';
+      iframeDoc.head.appendChild(pLink);
+    }
+
+    // 🚨 html2canvas 간병일지 토글/배지 글자 하단 쏠림 완벽 보정 (상하 수직 중앙 정렬)
+    targetEl.querySelectorAll('.careport-badge-pill, [id^="cpOverallToneBadge"], #cpCategoryCardsContainer span.inline-flex').forEach(pill => {
+      pill.style.display = 'inline-flex';
+      pill.style.alignItems = 'center';
+      pill.style.justifyContent = 'center';
+      Array.from(pill.childNodes).forEach(node => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          node.style.position = 'relative';
+          node.style.top = '-1.5px';
+        } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+          const wrap = iframeDoc.createElement('span');
+          wrap.style.position = 'relative';
+          wrap.style.top = '-1.5px';
+          wrap.textContent = node.textContent;
+          pill.replaceChild(wrap, node);
+        }
+      });
+    });
+
     const imgEls = targetEl.querySelectorAll('img');
     await Promise.all(Array.from(imgEls).map(img => {
       if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
@@ -33954,6 +34799,34 @@ async function renderElementToSinglePageA4PdfBytes(sourceElement, customMargin =
           childSpan.style.overflow = 'visible';
         }
       }
+    });
+
+    // Pretendard 웹폰트 보장
+    if (!iframeDoc.querySelector('link[href*="pretendard"]')) {
+      const pLink = iframeDoc.createElement('link');
+      pLink.rel = 'stylesheet';
+      pLink.crossOrigin = 'anonymous';
+      pLink.href = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css';
+      iframeDoc.head.appendChild(pLink);
+    }
+
+    // 🚨 html2canvas 간병일지 토글/배지 글자 하단 쏠림 완벽 보정 (상하 수직 중앙 정렬)
+    clone.querySelectorAll('.careport-badge-pill, [id^="cpOverallToneBadge"], #cpCategoryCardsContainer span.inline-flex').forEach(pill => {
+      pill.style.display = 'inline-flex';
+      pill.style.alignItems = 'center';
+      pill.style.justifyContent = 'center';
+      Array.from(pill.childNodes).forEach(node => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          node.style.position = 'relative';
+          node.style.top = '-1.5px';
+        } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+          const wrap = iframeDoc.createElement('span');
+          wrap.style.position = 'relative';
+          wrap.style.top = '-1.5px';
+          wrap.textContent = node.textContent;
+          pill.replaceChild(wrap, node);
+        }
+      });
     });
 
     iframeDoc.body.appendChild(clone);
@@ -39324,6 +40197,17 @@ function openNewClaimModal(appId) {
   const app = gApps.find(a => a.id === appId);
   if (!app) return;
 
+  const claimCheck = checkCustomerClaimSetStatus(app);
+  if (claimCheck.isDisabled) {
+    showCustomAlert({
+      title: '청구서 생성 불가 안내',
+      message: `[${app.patientName} 님]\n${claimCheck.reasons.join('\n')}\n\n청구분류가 '정상'이고 현재상태가 '진행중'인 경우에만 청구서를 생성할 수 있습니다.\n\n사용하시려면 상단 [분류 관리]에서 상태를 변경해주세요.`,
+      icon: 'shield-alert',
+      confirmText: '확인'
+    });
+    return;
+  }
+
   const appAssigns = (gAssigns || []).filter(as => as.applyId === appId);
   const as = appAssigns.length > 0 ? appAssigns[0] : null;
 
@@ -40820,8 +41704,12 @@ function openHubCustomerDetailModal(applyId) {
         }
       }
 
+      const prevScrollTop = bodyEl ? bodyEl.scrollTop : 0;
       bodyEl.innerHTML = mainWorkspaceHtml + ctiSectionHtml;
       initIcons(bodyEl);
+      if (prevScrollTop > 0 && bodyEl) {
+        bodyEl.scrollTop = prevScrollTop;
+      }
     } catch (err) {
       console.error('Error rendering detail modal workspace:', err);
       bodyEl.innerHTML = `<div class="p-8 text-center bg-rose-50 rounded-2xl border border-rose-200 text-rose-700 font-bold">
@@ -45720,6 +46608,9 @@ function mapRowToApplicationRecord(
   // 신청대장의 W열(rawStatus)을 맹신하지 않고, 간병인배정 시트의 간병시작일시/종료일시 정보를 최우선 기준으로 판정
   let status = '신규';
   const rawStatus = String(getVal('status') || '').trim();
+  const rawMemo = String(rowObj['비고'] || rowObj['비고란'] || getVal('memo') || '').trim();
+  const isRawCompleted = rawStatus.includes('완료') || rawStatus.includes('종결') || rawStatus.includes('종료') || rawStatus.includes('정산');
+  const isMemoCompleted = rawMemo.includes('퇴원/청구완료') || rawMemo.includes('청구완료') || rawMemo.includes('사망');
 
   // (1) 간병종료일시에 특수 문구가 있는 경우 (당일서비스취소, 서비스불가 안내, 제외 등)
   if (careEndRaw.includes('당일서비스취소') || careEndRaw.includes('당일취소')) {
@@ -45739,9 +46630,18 @@ function mapRowToApplicationRecord(
   } else if (rawStatus.includes('미해당')) {
     status = '미해당';
   }
-  // (3) 간병 시작일시가 있고, 간병종료일시 값이 없거나 '진행중'인 경우 -> 무조건 '진행중'
+  // (2-2) 원본 상태가 이미 완료/정산완료이거나 비고에 퇴원/청구완료가 명시되어 있고 현재 배정 간병인이 없는 경우 -> '완료' 최우선 존중
+  else if ((isRawCompleted || isMemoCompleted) && (!assignmentMap || !assignmentMap[rawId] || !assignmentMap[rawId].caregiverName)) {
+    status = '완료';
+  }
+  // (3) 간병 시작일시가 있고, 간병종료일시 값이 없거나 '진행중'인 경우
   else if (careStartDate && (!careEndRaw || careEndRaw === '진행중' || careEndRaw === '예정' || careEndRaw === '-')) {
-    status = '진행중';
+    // 단, 엑셀 원본 상태가 명시적으로 '완료'인 경우는 완료 우선 존중
+    if (isRawCompleted) {
+      status = '완료';
+    } else {
+      status = '진행중';
+    }
   }
   // (4) 간병 시작일시와 간병종료일시 값이 모두 유효하게 존재하는 경우 -> '완료'
   else if (careStartDate && careEndDate) {

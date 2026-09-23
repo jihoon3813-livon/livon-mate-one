@@ -1109,7 +1109,7 @@
 
       const careLogHtml = d.careLogRows.map(r => `
         <div style="display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #f1f5f9;">
-          <strong class="careport-badge-pill" style="min-width: 86px; max-width: 115px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; height: 24px; padding: 0 8px;">${r.label}</strong>
+          <strong class="careport-badge-pill" style="min-width: 86px; max-width: 115px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; height: 24px; padding: 0 8px;"><span>${r.label}</span></strong>
           <span style="flex: 1; font-size: 11.5px; color: #334155; line-height: 1.45; font-weight: 500;">${r.value}</span>
         </div>
       `).join('');
@@ -1124,7 +1124,7 @@
       `).join('');
 
       const keywordsPills = d.keywords.map(k => `
-        <span class="careport-badge-pill" style="font-size: 11px; font-weight: 700; color: #079f98; background: #eafaf8; border: 1px solid #a7f3d0; border-radius: 12px; height: 22px; padding: 0 9px; margin-right: 4px; margin-bottom: 4px;">#${k}</span>
+        <span class="careport-badge-pill" style="font-size: 11px; font-weight: 700; color: #079f98; background: #eafaf8; border: 1px solid #a7f3d0; border-radius: 12px; height: 22px; padding: 0 9px; margin-right: 4px; margin-bottom: 4px;"><span>#${k}</span></span>
       `).join('');
 
       const trendChartSvg = this.generateTrendChartSvg(d.trendScores || patient.trendScores || [
@@ -1138,6 +1138,8 @@
 <head>
   <meta charset="UTF-8">
   <title>간병일지_${d.patientName}_${d.consultDate.replace(/[: ]/g, '_')}</title>
+  <!-- Pretendard Web Font CDN -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <style>
     @page { size: A4 portrait; margin: 5mm 7mm; }
     * { box-sizing: border-box; }
@@ -1198,12 +1200,23 @@
       line-height: 1 !important;
       text-align: center !important;
       white-space: nowrap !important;
-      }
+    }
+    .careport-badge-pill > span,
+    .careport-badge-pill > strong {
+      display: inline-flex !important;
+      align-items: center !important;
+      line-height: 1 !important;
+      position: relative !important;
+      top: -1.5px !important;
+    }
     .careport-dot {
       display: inline-block !important;
       border-radius: 50% !important;
       background: currentColor !important;
       flex-shrink: 0 !important;
+      vertical-align: middle !important;
+      position: relative !important;
+      top: -1.5px !important;
     }
   </style>
 </head>
@@ -1217,7 +1230,7 @@
       </div>
       <div style="text-align: right;">
         <div style="display: inline-flex; align-items: center; gap: 6px;">
-          <span class="careport-badge-pill" style="background: #10bdb2; color: #ffffff; font-size: 11.5px; font-weight: 900; height: 22px; padding: 0 9px; border-radius: 6px;">공식일지</span>
+          <span class="careport-badge-pill" style="background: #10bdb2; color: #ffffff; font-size: 11.5px; font-weight: 900; height: 22px; padding: 0 9px; border-radius: 6px;"><span>공식일지</span></span>
           <span style="font-size: 12.5px; font-weight: 800; color: #334155; display: inline-flex; align-items: center; height: 22px; line-height: 1;">${d.consultDate}</span>
         </div>
         <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">리본케어포트(CarePort) 전산 공인 인증 일지</div>
@@ -1277,7 +1290,7 @@
         ${overallLightSvg}
         <span style="font-size: 12px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; height: 24px; line-height: 1.3;">${d.overallStatus.description}</span>
       </div>
-      <span class="careport-badge-pill" style="font-size: 11px; font-weight: 800; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; height: 24px; padding: 0 9px; border-radius: 5px;">종합 판정</span>
+      <span class="careport-badge-pill" style="font-size: 11px; font-weight: 800; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; height: 24px; padding: 0 9px; border-radius: 5px;"><span>종합 판정</span></span>
     </div>
 
     <!-- 4 Category Cards (식사, 거동, 수면, 통증) -->

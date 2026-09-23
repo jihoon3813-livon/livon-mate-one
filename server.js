@@ -965,7 +965,7 @@ function saveSavedFaxConfig(cfg) {
             return false;
           });
           if (idx !== -1) {
-            const { claim, ...appFields } = fields;
+            const { claim, payout, ...appFields } = fields;
             stored.applications[idx] = {
               ...stored.applications[idx],
               ...appFields,
@@ -978,6 +978,15 @@ function saveSavedFaxConfig(cfg) {
                 stored.claims[cIdx] = { ...stored.claims[cIdx], ...claim, updatedAt: new Date().toISOString() };
               } else {
                 stored.claims.unshift(claim);
+              }
+            }
+            if (payout && payout.id) {
+              stored.payouts = stored.payouts || [];
+              const pIdx = stored.payouts.findIndex(p => p.id === payout.id);
+              if (pIdx !== -1) {
+                stored.payouts[pIdx] = { ...stored.payouts[pIdx], ...payout, updatedAt: new Date().toISOString() };
+              } else {
+                stored.payouts.unshift(payout);
               }
             }
             stored.updatedAt = new Date().toISOString();
