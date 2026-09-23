@@ -21709,7 +21709,8 @@ function getActiveCaregiverAssignment(app, specificAssigns) {
       const hasSpecificTime = e.includes(':');
       if (eZero > todayZero) return true;
       if (eZero.getTime() === todayZero.getTime()) {
-        return !hasSpecificTime || now <= pEnd;
+        // [간병인 교체 당일 / 오늘 종료 배정]: 오늘 자정까지는 당일 유효 배정으로 인정하여 교체 당일 누락 방지
+        return true;
       }
       return false;
     }
@@ -21811,11 +21812,30 @@ function determineRealCareStatus(app, specificAssigns) {
   const now = new Date();
   const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  // 3. 간병 시작일시가 오늘 이후(미래)인 경우 -> '예정'
+  // 3. 간병 시작일시가 오늘 이후(미래)인 경우 -> '예정' (단, 이전 배정에서 교체 진행 중인 건은 '진행중')
   const pStart = (typeof parseCareDateTime === 'function') ? parseCareDateTime(sDate) : (typeof parseCareDate === 'function' ? parseCareDate(sDate) : null);
   if (pStart) {
     const sZero = new Date(pStart.getFullYear(), pStart.getMonth(), pStart.getDate());
-    if (sZero > todayZero) return '예정';
+    if (sZero > todayZero) {
+      // [간병인 교체 당일/연속 배정 보정]: 이전 배정이 오늘 종료되었거나 최근 종료(2일 이내)되어 후속 배정으로 교체 진행 중인 경우,
+      // 단순 신규 '예정'이 아니라 입원 간병이 계속되고 있는 '진행중' 상태임!
+      const list = specificAssigns || (typeof gAssigns !== 'undefined' ? gAssigns.filter(a => a && (a.applyId === app.id || (a.patientName && a.patientName === app.patientName))) : []);
+      const hasRecentPrecedingAssign = (list || []).some(otherAs => {
+        if (!otherAs || otherAs === as) return false;
+        const oEnd = String(otherAs.endDate || '').trim();
+        if (!oEnd || oEnd.includes('취소') || oEnd.includes('제외') || oEnd.includes('미해당')) return false;
+        const pOEnd = (typeof parseCareDateTime === 'function') ? parseCareDateTime(oEnd) : (typeof parseCareDate === 'function' ? parseCareDate(oEnd) : null);
+        if (!pOEnd) return false;
+        const oZero = new Date(pOEnd.getFullYear(), pOEnd.getMonth(), pOEnd.getDate());
+        const daysFromToday = Math.round((todayZero.getTime() - oZero.getTime()) / (1000 * 60 * 60 * 24));
+        const diffDays = Math.round((sZero.getTime() - oZero.getTime()) / (1000 * 60 * 60 * 24));
+        return daysFromToday >= 0 && daysFromToday <= 2 && diffDays <= 3;
+      });
+      if (hasRecentPrecedingAssign) {
+        return '진행중';
+      }
+      return '예정';
+    }
   }
 
   // 4. 간병 시작일시가 있고, 간병종료일시 값이 없거나 '진행중'인 경우 -> '진행중'
@@ -21829,6 +21849,21 @@ function determineRealCareStatus(app, specificAssigns) {
     const eZero = new Date(pEnd.getFullYear(), pEnd.getMonth(), pEnd.getDate());
     const hasSpecificTime = eTrim.includes(':');
     if (eZero < todayZero || (eZero.getTime() === todayZero.getTime() && hasSpecificTime && now > pEnd)) {
+      // [간병인 교체/연속 배정 보정]: 오늘 또는 1~2일 이내에 시작하는 후속 배정(교체 배정)이 이미 등록되어 있다면 '완료'가 아니라 '진행중'!
+      const list = specificAssigns || (typeof gAssigns !== 'undefined' ? gAssigns.filter(a => a && (a.applyId === app.id || (a.patientName && a.patientName === app.patientName))) : []);
+      const hasUpcomingSuccessor = (list || []).some(nextAs => {
+        if (!nextAs || nextAs === as) return false;
+        const nStart = String(nextAs.startDate || '').trim();
+        if (!nStart || nStart.includes('취소') || nStart.includes('제외') || nStart.includes('미해당')) return false;
+        const pNStart = (typeof parseCareDateTime === 'function') ? parseCareDateTime(nStart) : (typeof parseCareDate === 'function' ? parseCareDate(nStart) : null);
+        if (!pNStart) return false;
+        const nZero = new Date(pNStart.getFullYear(), pNStart.getMonth(), pNStart.getDate());
+        const daysFromToday = Math.round((nZero.getTime() - todayZero.getTime()) / (1000 * 60 * 60 * 24));
+        return daysFromToday >= 0 && daysFromToday <= 2;
+      });
+      if (hasUpcomingSuccessor) {
+        return '진행중';
+      }
       return '완료'; // 오늘 날짜 이전이거나 오늘의 지정 시간을 경과한 경우 완료!
     }
     return '진행중'; // 오늘 날짜 이후까지 일정이 남아있거나 오늘 진행중이면 진행중!
@@ -27568,20 +27603,32 @@ function renderUnifiedCareHub() {
     return false;
   };
 
+  const isInProgressHelper = (app) => {
+    if (!app) return false;
+    return determineRealCareStatus(app) === '진행중';
+  };
+
+  const isNeedFaxHelper = (app) => {
+    if (!app) return false;
+    const aIns = app.insuranceCompany || '';
+    if (aIns.includes('삼성')) return false;
+    const isSent = isClaimFaxSentHelper(app.id);
+    return app.claimCount > 0 && !isSent;
+  };
+
   for (let i = 0; i < activeHubApps.length; i++) {
     const a = activeHubApps[i];
     const aIns = a.insuranceCompany || '';
-    const aRealSt = determineRealCareStatus(a);
     if (insFilter !== 'ALL' && !aIns.includes(insFilter)) {
       continue;
     }
     scopedTotal++;
     if (isCompletedHelper(a)) completedCount++;
     if (isNeedAssignHelper(a)) needAssignCount++;
-    if (aRealSt === '진행중') inProgressCount++;
+    if (isInProgressHelper(a)) inProgressCount++;
     if (isAppHasUnpaidClaimHelper(a)) unpaidClaimCount++;
     if (isAppHasUnpaidPayoutHelper(a)) needPayoutCount++;
-    if (!aIns.includes('삼성') && a.claimCount > 0 && !isClaimFaxSentHelper(a.id)) needFaxCount++;
+    if (isNeedFaxHelper(a)) needFaxCount++;
   }
 
   const countAllEl = document.getElementById('hubCount-ALL');
@@ -27677,14 +27724,10 @@ function renderUnifiedCareHub() {
 
     if (gHubFilter === 'COMPLETED' && !isCompletedHelper(app)) return false;
     if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
-    if (gHubFilter === 'IN_PROGRESS' && determineRealCareStatus(app) !== '진행중') return false;
+    if (gHubFilter === 'IN_PROGRESS' && !isInProgressHelper(app)) return false;
     if (gHubFilter === 'UNPAID_CLAIM' && !isAppHasUnpaidClaimHelper(app)) return false;
     if (gHubFilter === 'NEED_PAYOUT' && !isAppHasUnpaidPayoutHelper(app)) return false;
-    if (gHubFilter === 'NEED_FAX') {
-      if (appIns.includes('삼성')) return false;
-      const isSent = isClaimFaxSentHelper(app.id);
-      if (app.claimCount === 0 || isSent) return false;
-    }
+    if (gHubFilter === 'NEED_FAX' && !isNeedFaxHelper(app)) return false;
 
     if (gHubStatusFilter) {
       const theme = getCustomerCardStatusTheme(app);
@@ -27829,6 +27872,25 @@ function renderUnifiedCareHub() {
 
   const countEl = document.getElementById('hubFilteredCount');
   if (countEl) countEl.innerText = filtered.length;
+
+  // [사용자 절대 원칙]: 카운팅은 화면에 보여지는 숫자를 카운팅한다 (보여주는 로직과 카운팅 로직 100% 일치)
+  // 현재 활성화된 필터 탭(gHubFilter)의 상단 KPI 배지 숫자를 화면에 실제 표시되는 건수(filtered.length)와 완벽히 1:1 일치하도록 동기화!
+  const currentTabKpiMap = {
+    'ALL': 'hubCount-ALL',
+    'COMPLETED': 'hubCount-COMPLETED',
+    'NEED_ASSIGN': 'hubCount-NEED_ASSIGN',
+    'IN_PROGRESS': 'hubCount-IN_PROGRESS',
+    'UNPAID_CLAIM': 'hubCount-UNPAID_CLAIM',
+    'NEED_PAYOUT': 'hubCount-NEED_PAYOUT',
+    'NEED_FAX': 'hubCount-NEED_FAX'
+  };
+  const activeKpiId = currentTabKpiMap[gHubFilter];
+  if (activeKpiId) {
+    const activeKpiEl = document.getElementById(activeKpiId);
+    if (activeKpiEl) {
+      activeKpiEl.innerText = filtered.length + '건';
+    }
+  }
 
   // Pagination
   let displayList = filtered;
