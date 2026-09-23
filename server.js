@@ -486,7 +486,7 @@ function saveSavedFaxConfig(cfg) {
     // =========================================================================
     // API Route: Email Dispatch Engine (실제 이메일 발송)
     // =========================================================================
-    if (reqPath === '/api/email/send' && req.method === 'POST') {
+    if ((reqPath === '/api/email/send' || reqPath === '/api/send-email') && req.method === 'POST') {
       let body = '';
       req.on('data', chunk => body += chunk);
       req.on('end', async () => {

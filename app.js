@@ -9489,15 +9489,34 @@ async function handleDispatchSamsungEmail(e) {
       attachments
     };
 
-    const resp = await fetch('/api/send-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    let resp;
+    try {
+      resp = await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (resp.status === 404) {
+        resp = await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+    } catch (netErr) {
+      throw new Error('이메일 서버 연결 실패: ' + netErr.message);
+    }
 
-    const result = await resp.json();
-    if (!result.success) {
-      throw new Error(result.error || '이메일 발송에 실패하였습니다.');
+    const resText = await resp.text();
+    let result = null;
+    try {
+      result = JSON.parse(resText);
+    } catch (pErr) {
+      throw new Error(`이메일 서버 응답 형식 오류 (HTTP ${resp.status}): ${resText ? resText.slice(0, 150) : resp.statusText}`);
+    }
+
+    if (!result || !result.success) {
+      throw new Error((result && result.error) || `이메일 발송에 실패하였습니다. (HTTP ${resp.status})`);
     }
 
     // 발송 로그 기록
