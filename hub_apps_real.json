@@ -6167,8 +6167,8 @@
       "accidentNumber": "2605505725",
       "accidentNo": "2605505725",
       "accidentType": "",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.05.22",
+      "createdAt": "2026.05.22",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "완료",
@@ -6195,7 +6195,8 @@
       "payoutCount": 1,
       "memo": "",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0136",
@@ -6263,8 +6264,8 @@
       "accidentNumber": "2605519345",
       "accidentNo": "2605519345",
       "accidentType": "",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.05.15",
+      "createdAt": "2026.05.15",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "완료",
@@ -6291,7 +6292,8 @@
       "payoutCount": 2,
       "memo": "",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0139",
@@ -6311,8 +6313,8 @@
       "accidentNumber": "2605519345",
       "accidentNo": "2605519345",
       "accidentType": "",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.05.16",
+      "createdAt": "2026.05.16",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "완료",
@@ -6339,7 +6341,8 @@
       "payoutCount": 2,
       "memo": "",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0140",
@@ -6359,8 +6362,8 @@
       "accidentNumber": "2605519345",
       "accidentNo": "2605519345",
       "accidentType": "",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.05.17",
+      "createdAt": "2026.05.17",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "완료",
@@ -6387,7 +6390,8 @@
       "payoutCount": 1,
       "memo": "",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0141",
@@ -6407,8 +6411,8 @@
       "accidentNumber": "2605519345",
       "accidentNo": "2605519345",
       "accidentType": "",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.05.18",
+      "createdAt": "2026.05.18",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "완료",
@@ -6435,7 +6439,8 @@
       "payoutCount": 3,
       "memo": "",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0143",
@@ -6935,7 +6940,7 @@
       "accidentNumber": "2606034546",
       "accidentNo": "2606034546",
       "accidentType": "",
-      "applyDate": "2026.05..29",
+      "applyDate": "2026.05.29",
       "createdAt": "2026.05..29",
       "applyType": "재택",
       "expectedDays": 0,
@@ -7175,8 +7180,8 @@
       "accidentNumber": "2606077176",
       "accidentNo": "2606077176",
       "accidentType": "",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.06.02",
+      "createdAt": "2026.06.02",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "완료",
@@ -7203,7 +7208,8 @@
       "payoutCount": 2,
       "memo": "",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0161",
@@ -9527,8 +9533,8 @@
       "accidentNumber": "2607661943",
       "accidentNo": "2607661943",
       "accidentType": "",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.07.17",
+      "createdAt": "2026.07.17",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "서비스 취소",
@@ -9555,7 +9561,8 @@
       "payoutCount": 0,
       "memo": "썩션 및 콧줄 등 의료행위=> 사용일당 지원하겠음",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0217",
@@ -9575,8 +9582,8 @@
       "accidentNumber": "2607763413",
       "accidentNo": "2607763413",
       "accidentType": "",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.07.19",
+      "createdAt": "2026.07.19",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "완료",
@@ -9603,7 +9610,8 @@
       "payoutCount": 1,
       "memo": "",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0218",
@@ -9767,7 +9775,7 @@
       "accidentNumber": "2604192301",
       "accidentNo": "2604192301",
       "accidentType": "",
-      "applyDate": "2026..07.23",
+      "applyDate": "2026.07.23",
       "createdAt": "2026..07.23",
       "applyType": "입원",
       "expectedDays": 0,
@@ -9815,8 +9823,8 @@
       "accidentNumber": "",
       "accidentNo": "",
       "accidentType": "",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.07.23",
+      "createdAt": "2026.07.23",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "완료",
@@ -9843,7 +9851,8 @@
       "payoutCount": 1,
       "memo": "",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0224",
@@ -11255,8 +11264,8 @@
       "accidentNumber": "2608785016",
       "accidentNo": "2608785016",
       "accidentType": "질병",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.08.27 09:55",
+      "createdAt": "2026.08.27 09:55",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "완료",
@@ -11283,7 +11292,8 @@
       "payoutCount": 1,
       "memo": "",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0256",
@@ -11495,8 +11505,8 @@
       "accidentNumber": "",
       "accidentNo": "",
       "accidentType": "질병",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.08.10 12:23",
+      "createdAt": "2026.08.10 12:23",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "서비스 취소",
@@ -11523,7 +11533,8 @@
       "payoutCount": 0,
       "memo": "간병일자 고객 본인이 아이를 간병하려면? 방법 알려드림",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0261",
@@ -11543,8 +11554,8 @@
       "accidentNumber": "",
       "accidentNo": "",
       "accidentType": "질병",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.08.21 13:46",
+      "createdAt": "2026.08.21 13:46",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "서비스 취소",
@@ -11571,7 +11582,8 @@
       "payoutCount": 0,
       "memo": "간병인은 지원했으나 간병일수보험가입자로 서비스취소",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0262",
@@ -12071,8 +12083,8 @@
       "accidentNumber": "",
       "accidentNo": "",
       "accidentType": "질병",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.09.09 13:40",
+      "createdAt": "2026.09.09 13:40",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "서비스 취소",
@@ -12099,7 +12111,8 @@
       "payoutCount": 0,
       "memo": "사용일당보험",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0273",
@@ -12119,8 +12132,8 @@
       "accidentNumber": "",
       "accidentNo": "",
       "accidentType": "질병",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.09.11 13:50",
+      "createdAt": "2026.09.11 13:50",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "서비스 취소",
@@ -12147,7 +12160,8 @@
       "payoutCount": 0,
       "memo": "사용일당보험",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0274",
@@ -12263,8 +12277,8 @@
       "accidentNumber": "",
       "accidentNo": "",
       "accidentType": "질병",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.09.10 11:46",
+      "createdAt": "2026.09.10 11:46",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "서비스 취소",
@@ -12291,7 +12305,8 @@
       "payoutCount": 0,
       "memo": "사용일당보험",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0277",
@@ -12503,8 +12518,8 @@
       "accidentNumber": "당일취소",
       "accidentNo": "당일취소",
       "accidentType": "질병",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.09.13 12:45",
+      "createdAt": "2026.09.13 12:45",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "서비스 취소",
@@ -12531,7 +12546,8 @@
       "payoutCount": 0,
       "memo": "서비스취소 당일",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0282",
@@ -12743,8 +12759,8 @@
       "accidentNumber": "2609664575",
       "accidentNo": "2609664575",
       "accidentType": "질병",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.09.14 15:05",
+      "createdAt": "2026.09.14 15:05",
       "applyType": "재택",
       "expectedDays": 45,
       "status": "진행중",
@@ -12771,7 +12787,8 @@
       "payoutCount": 0,
       "memo": "",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0287",
@@ -12887,8 +12904,8 @@
       "accidentNumber": "",
       "accidentNo": "",
       "accidentType": "질병",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.09.15 15:20",
+      "createdAt": "2026.09.15 15:20",
       "applyType": "입원",
       "expectedDays": 7,
       "status": "완료",
@@ -12915,7 +12932,8 @@
       "payoutCount": 1,
       "memo": "",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0290",
@@ -13031,8 +13049,8 @@
       "accidentNumber": "2609840145",
       "accidentNo": "2609840145",
       "accidentType": "질병",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.09.16 12:40",
+      "createdAt": "2026.09.16 12:40",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "진행중",
@@ -13059,7 +13077,8 @@
       "payoutCount": 1,
       "memo": "",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0293",
@@ -13079,8 +13098,8 @@
       "accidentNumber": "",
       "accidentNo": "",
       "accidentType": "질병",
-      "applyDate": "",
-      "createdAt": "",
+      "applyDate": "2026.09.16 16:20",
+      "createdAt": "2026.09.16 16:20",
       "applyType": "입원",
       "expectedDays": 0,
       "status": "서비스 취소",
@@ -13107,7 +13126,8 @@
       "payoutCount": 0,
       "memo": "사용일수",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T02:25:47.577Z"
+      "importedAt": "2026-09-23T02:25:47.577Z",
+      "isApplyDateInferred": true
     },
     {
       "id": "C0294",

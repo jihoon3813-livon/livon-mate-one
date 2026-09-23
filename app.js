@@ -1202,8 +1202,106 @@ function filterInvalidSamsungDuplicates(apps) {
 }
 window.filterInvalidSamsungDuplicates = filterInvalidSamsungDuplicates;
 
+/**
+ * [신청일자 누락건 앞뒤 신청ID 기반 유추 및 보정 엔진]
+ * 엑셀 관리대장에 신청일자 정보가 누락/공백인 경우,
+ * 임의의 날짜(오늘 등)를 주입하지 않고 앞뒤 신청ID(C0001, C0002...) 고객들의 신청일자를 기준으로
+ * 정확한 일시 및 시계열 위치를 유추(Interpolation)하여 배치합니다.
+ */
+function inferMissingApplyDates(apps) {
+  if (!Array.isArray(apps) || apps.length === 0) return apps;
+
+  const parseDateTimeToMs = (str) => {
+    if (!str) return null;
+    const s = String(str).trim().replace(/\s+/g, ' ').replace(/\.{2,}/g, '.');
+    const m = s.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})(?:\s+(\d{1,2}):?(\d{2}))?/);
+    if (!m) return null;
+    const y = parseInt(m[1], 10);
+    const mo = parseInt(m[2], 10) - 1;
+    const d = parseInt(m[3], 10);
+    const h = m[4] !== undefined ? parseInt(m[4], 10) : 12;
+    const mi = m[5] !== undefined ? parseInt(m[5], 10) : 0;
+    return new Date(y, mo, d, h, mi).getTime();
+  };
+
+  const formatMsToDateTime = (ms, includeTime = true) => {
+    const d = new Date(ms);
+    const pad = n => String(n).padStart(2, '0');
+    const datePart = d.getFullYear() + '.' + pad(d.getMonth() + 1) + '.' + pad(d.getDate());
+    if (!includeTime) return datePart;
+    return datePart + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  };
+
+  // 신청ID 숫자 오름차순 기준 정렬 사본
+  const sorted = [...apps].sort((a, b) => {
+    const numA = parseInt(String(a?.id || '').replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt(String(b?.id || '').replace(/\D/g, ''), 10) || 0;
+    return numA - numB;
+  });
+
+  sorted.forEach((app, idx) => {
+    if (!app) return;
+    if (app.applyDate && app.applyDate.includes('..')) {
+      app.applyDate = app.applyDate.replace(/\.{2,}/g, '.');
+    }
+
+    const hasValidDate = app.applyDate && parseDateTimeToMs(app.applyDate) !== null;
+    if (hasValidDate) return;
+
+    // 앞순위(이전 ID) 탐색
+    let pIdx = -1, prevMs = null, prevHasTime = false;
+    for (let i = idx - 1; i >= 0; i--) {
+      const ms = parseDateTimeToMs(sorted[i].applyDate);
+      if (ms !== null) {
+        pIdx = i;
+        prevMs = ms;
+        prevHasTime = String(sorted[i].applyDate).includes(':') || String(sorted[i].applyDate).trim().split(' ').length > 1;
+        break;
+      }
+    }
+
+    // 뒷순위(다음 ID) 탐색
+    let nIdx = -1, nextMs = null, nextHasTime = false;
+    for (let i = idx + 1; i < sorted.length; i++) {
+      const ms = parseDateTimeToMs(sorted[i].applyDate);
+      if (ms !== null) {
+        nIdx = i;
+        nextMs = ms;
+        nextHasTime = String(sorted[i].applyDate).includes(':') || String(sorted[i].applyDate).trim().split(' ').length > 1;
+        break;
+      }
+    }
+
+    let inferredMs = null;
+    let hasTime = false;
+
+    if (prevMs !== null && nextMs !== null) {
+      const ratio = (idx - pIdx) / (nIdx - pIdx);
+      inferredMs = Math.round(prevMs + (nextMs - prevMs) * ratio);
+      hasTime = prevHasTime && nextHasTime;
+    } else if (prevMs !== null) {
+      inferredMs = prevMs;
+      hasTime = prevHasTime;
+    } else if (nextMs !== null) {
+      inferredMs = nextMs;
+      hasTime = nextHasTime;
+    }
+
+    if (inferredMs !== null) {
+      const inferredStr = formatMsToDateTime(inferredMs, hasTime);
+      app.applyDate = inferredStr;
+      app.isApplyDateInferred = true;
+      if (!app.createdAt) app.createdAt = inferredStr;
+    }
+  });
+
+  return apps;
+}
+window.inferMissingApplyDates = inferMissingApplyDates;
+
 function sortApplicationsNewestFirst(apps) {
   if (!Array.isArray(apps)) return [];
+  inferMissingApplyDates(apps);
   const parseTime = (dateStr) => {
     if (!dateStr) return 0;
     const s = String(dateStr).trim().replace(/[.\/]+/g, '-');
@@ -35878,9 +35976,9 @@ function getCurrentTimeHHmm() {
 }
 
 function formatApplyDateTime(raw) {
-  if (!raw) return getCurrentDateTimeString();
+  if (!raw) return '';
   const trimmed = String(raw).trim();
-  if (!trimmed) return getCurrentDateTimeString();
+  if (!trimmed) return '';
 
   const parts = trimmed.split(/[\sT]+/);
   let datePart = parts[0] || '';
@@ -37578,7 +37676,7 @@ function handleCustomerEditSubmit(e) {
   app.accidentType = document.getElementById('custEditAccidentType').value;
   app.accidentDate = document.getElementById('custEditAccidentDate').value.trim();
   const rawEditApply = document.getElementById('custEditApplyDate')?.value?.trim();
-  app.applyDate = rawEditApply ? formatApplyDateTime(rawEditApply) : (app.applyDate || getCurrentDateTimeString());
+  app.applyDate = rawEditApply ? formatApplyDateTime(rawEditApply) : (app.applyDate || '');
   document.getElementById('custEditApplyDate').value = app.applyDate;
   app.diagnosis = document.getElementById('custEditDiagnosis').value.trim();
   app.memo = document.getElementById('custEditMemo').value.trim();
