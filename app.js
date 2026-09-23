@@ -43296,9 +43296,10 @@ function normLaunchDateTime(raw) {
 function normLaunchPhone(raw) {
   if (!raw) return '';
   const clean = String(raw).replace(/[^0-9]/g, '');
+  if (!clean || clean.length < 4) return '';
   if (clean.length === 11) return `${clean.slice(0, 3)}-${clean.slice(3, 7)}-${clean.slice(7, 11)}`;
   if (clean.length === 10) return `${clean.slice(0, 3)}-${clean.slice(3, 6)}-${clean.slice(6, 10)}`;
-  return String(raw).trim();
+  return clean;
 }
 
 /**
@@ -43703,7 +43704,10 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
       claimAggByName
     );
 
-    if (app && (app.patientName || app.phone || app.accidentNumber)) {
+    const hasValidPhone = app.phone && app.phone.replace(/[^0-9]/g, '').length >= 7;
+    const hasValidName = app.patientName && app.patientName.replace(/[-_\s]/g, '').length > 0;
+    const hasValidAccident = app.accidentNumber && app.accidentNumber.replace(/[-_\s]/g, '').length > 0;
+    if (app && (hasValidName || hasValidPhone || hasValidAccident)) {
       validApplications.push(app);
       existingIds.add(app.id);
     }
