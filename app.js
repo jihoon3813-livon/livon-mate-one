@@ -1340,6 +1340,9 @@ async function loadConvexData(showSpinner = true) {
       gAdjusters = realJson.adjusters;
       try { localStorage.setItem('LIVON_CACHED_ADJUSTERS', JSON.stringify(gAdjusters)); } catch (e) {}
     }
+    if (typeof reconcileAppsWithActiveAssignments === 'function') {
+      reconcileAppsWithActiveAssignments();
+    }
     gIsDataLoading = false;
     if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
     if (gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
@@ -1601,6 +1604,11 @@ async function loadConvexData(showSpinner = true) {
       // 삼성화재 관리대장 상품명 등 통합허브 고객 상세정보 자동 연동
       if (typeof enrichHubSamsungCustomersFromSamsungExcel === 'function') {
         enrichHubSamsungCustomersFromSamsungExcel();
+      }
+
+      // 배정 대장 기반 고객 신청서 간병인 교체/스케줄/실시간 상태 전수 자동 동기화
+      if (typeof reconcileAppsWithActiveAssignments === 'function') {
+        reconcileAppsWithActiveAssignments();
       }
 
       // 고객 및 배정 정보에 신규 입력된 간병인/협력센터/손사 디렉토리 자동 실시간 동기화
@@ -18211,10 +18219,14 @@ function updateHubLayoutStyleUI() {
 // -------------------------------------------------------------------------
 // CARE PROGRESS CALCULATION HELPER (간병 기간 및 일차 진행 경과 계산)
 // -------------------------------------------------------------------------
-function formatWithTime(dtStr, defaultTime = '09:00') {
+function formatWithTime(dtStr, defaultTime = '') {
   if (!dtStr) return '-';
-  const s = String(dtStr).trim();
+  const s = String(dtStr).trim().replace(/\s+/g, ' ');
+  if (!s || s === '-') return '-';
   if (s.includes(':')) {
+    return s.replace(/-/g, '.');
+  }
+  if (!defaultTime) {
     return s.replace(/-/g, '.');
   }
   return `${s.replace(/-/g, '.')} ${defaultTime}`;
@@ -21445,41 +21457,101 @@ async function cancelSamsungRoundClaim(appId, roundNumber) {
  * - 예정: 보라색
  */
 /**
+ * [간병인 교체/배정 활성 스케줄 판정 헬퍼]
+ * 간병인이 변경/교체되어 여러 배정 건이 존재하는 경우:
+ * 1) 현재 진행중인 배정(종료일시가 없거나 '진행중'이거나 종료일시가 오늘 이후인 건)을 최우선 기준으로 선택
+ * 2) 만약 모두 종료되었거나 예정인 경우, 가장 최신의 배정(시작일시 오름차순 정렬 후 마지막 항목)을 선택
+ */
+function getActiveCaregiverAssignment(app, specificAssigns) {
+  if (!app) return null;
+  let assigns = specificAssigns;
+  if (!assigns) {
+    const list = (typeof gAssigns !== 'undefined' && Array.isArray(gAssigns)) ? gAssigns : (Array.isArray(window.gAssigns) ? window.gAssigns : []);
+    assigns = list.filter(a => a && (String(a.applyId) === String(app.id) || (a.patientName && a.patientName.trim() === (app.patientName || '').trim())));
+  }
+  if (!assigns || assigns.length === 0) return null;
+
+  const now = new Date();
+  const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // 유효한 간병 배정 건 필터링 (취소, 사용일당안내 등 비정상 텍스트 제외)
+  const valid = assigns.filter(a => {
+    if (!a) return false;
+    const s = String(a.startDate || '').trim();
+    if (s.includes('취소') || s.includes('안내') || s.includes('제외') || s.includes('미해당')) return false;
+    return a.caregiverName || s || a.endDate;
+  });
+  if (valid.length === 0) return assigns[assigns.length - 1];
+
+  // 1. 현재 진행중인 배정 탐색 (종료일시가 없거나 '진행중'이거나 종료일시가 오늘 이후인 건)
+  const ongoing = valid.find(a => {
+    const e = String(a.endDate || '').trim();
+    if (e === '당일서비스취소' || e.includes('서비스불가') || e.includes('제외') || e.includes('취소') || e.includes('미해당') || e.includes('사망')) return false;
+    if (!e || e === '진행중' || e === '-') {
+      const pStart = (typeof parseCareDateTime === 'function') ? parseCareDateTime(a.startDate) : null;
+      if (!pStart) return true;
+      const sZero = new Date(pStart.getFullYear(), pStart.getMonth(), pStart.getDate());
+      return sZero <= todayZero;
+    }
+    const pEnd = (typeof parseCareDateTime === 'function') ? parseCareDateTime(e) : null;
+    if (pEnd) {
+      const eZero = new Date(pEnd.getFullYear(), pEnd.getMonth(), pEnd.getDate());
+      const hasSpecificTime = e.includes(':');
+      if (eZero > todayZero) return true;
+      if (eZero.getTime() === todayZero.getTime()) {
+        return !hasSpecificTime || now <= pEnd;
+      }
+      return false;
+    }
+    return false;
+  });
+  if (ongoing) return ongoing;
+
+  // 2. 진행중인 배정이 없다면 가장 최신 배정 (시작일시 오름차순 정렬 후 마지막 항목)
+  const sorted = valid.slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+  return sorted[sorted.length - 1];
+}
+window.getActiveCaregiverAssignment = getActiveCaregiverAssignment;
+
+/**
  * [실제 간병기간 및 특수 종료문구 기반 현재상태 판정 엔진]
  * 신청대장 W열을 맹신하지 않고, 간병인배정 시트의 시작일시와 종료일시 정보를 최우선 기준으로 판정
  * - 종료일시에 '당일서비스취소', '서비스불가 안내', '제외' 등의 문구가 있으면 -> 해당 특수 상태 반영
+ * - 간병인이 변경/교체된 경우 변경된 간병인의 시작/종료일시를 엄격히 기준으로 적용
  * - 시작일시가 있고 종료일시 값이 없으면 -> 무조건 '진행중'
- * - 시작일시와 종료일시 값이 모두 있고 유효한 날짜이면 -> '완료'
+ * - 시작일시와 종료일시 값이 모두 있고 유효한 날짜이면 -> 오늘 날짜 이전이면 '완료'
  */
 function determineRealCareStatus(app, specificAssigns) {
   if (!app) return '신규';
 
-  let assigns = specificAssigns;
-  if (!assigns && Array.isArray(window.gAssigns)) {
-    assigns = window.gAssigns.filter(a => a && String(a.applyId) === String(app.id));
-  }
-  const as = (assigns && assigns.length > 0) ? assigns[assigns.length - 1] : null;
+  const as = getActiveCaregiverAssignment(app, specificAssigns);
 
-  const sDate = (as && as.startDate) || app.careStartDate || '';
-  const eDate = (as && as.endDate) || app.careEndDate || '';
+  // as가 존재하는 경우 as의 시작/종료일시를 엄격히 적용. 특히 as.endDate가 빈 문자열이면 진행중을 뜻하므로 app.careEndDate(이전 간병인의 종료일)로 fallback 금지!
+  const sDate = as ? (as.startDate || '') : (app.careStartDate || '');
+  const eDate = as ? (as.endDate !== undefined && as.endDate !== null ? as.endDate : '') : (app.careEndDate || '');
   const eTrim = String(eDate).trim();
 
-  // 1. 간병종료일시에 특수 문구가 있는 경우 (당일서비스취소, 서비스불가 안내, 제외, 취소 등)
+  // 1. 특수 취소/제외/서비스불가 문구가 있는 경우 (종료일시 기준)
   if (eTrim) {
     if (eTrim.includes('당일서비스취소') || eTrim.includes('당일취소')) return '당일서비스취소';
     if (eTrim.includes('서비스불가') || eTrim.includes('서비스 불가')) return '서비스불가 안내';
     if (eTrim.includes('제외')) return '제외';
-    if (eTrim.includes('취소') || eTrim.includes('철회')) return '취소';
-    if (eTrim.includes('미해당')) return '미해당';
   }
 
-  // 1-2. 특수 상태가 수동으로 설정되었거나 수동 갱신된 상태가 있는 경우 존중
-  const rawSt = String(app.status || '').trim();
-  if (rawSt === '당일서비스취소' || rawSt.includes('서비스불가') || rawSt === '제외') {
-    return rawSt.includes('서비스불가') ? '서비스불가 안내' : rawSt;
+  // 1-2. 신청서 원본 상태가 취소/미해당/서비스불가/제외인 경우 최우선 존중
+  const rawSt = String(app.status || app.rawStatus || '').trim();
+  if (rawSt === '서비스 취소' || rawSt === '취소' || rawSt === '미해당' || rawSt === '당일서비스취소' || rawSt.includes('서비스불가') || rawSt === '제외') {
+    return rawSt.includes('서비스불가') ? '서비스불가 안내' : (rawSt === '서비스 취소' ? '취소' : rawSt);
   }
   if (app.hasManualUpdate && rawSt) {
     return rawSt;
+  }
+
+  // 1-3. 종료일시에 취소/미해당/사망 문구가 있는 경우
+  if (eTrim) {
+    if (eTrim.includes('취소') || eTrim.includes('철회')) return '취소';
+    if (eTrim.includes('미해당')) return '미해당';
+    if (eTrim.includes('사망')) return '완료';
   }
 
   // 2. 간병 시작일시 자체가 없거나 간병인 배정이 없는 경우
@@ -21509,15 +21581,73 @@ function determineRealCareStatus(app, specificAssigns) {
   const pEnd = (typeof parseCareDateTime === 'function') ? parseCareDateTime(eTrim) : (typeof parseCareDate === 'function' ? parseCareDate(eTrim) : null);
   if (pEnd) {
     const eZero = new Date(pEnd.getFullYear(), pEnd.getMonth(), pEnd.getDate());
-    if (eZero < todayZero || (eZero.getTime() === todayZero.getTime() && now > pEnd)) {
-      return '완료'; // 오늘 날짜 이전이면 이미 끝난 건이므로 완료!
+    const hasSpecificTime = eTrim.includes(':');
+    if (eZero < todayZero || (eZero.getTime() === todayZero.getTime() && hasSpecificTime && now > pEnd)) {
+      return '완료'; // 오늘 날짜 이전이거나 오늘의 지정 시간을 경과한 경우 완료!
     }
-    return '진행중'; // 오늘 날짜 이후까지 일정이 남아있으면 진행중!
+    return '진행중'; // 오늘 날짜 이후까지 일정이 남아있거나 오늘 진행중이면 진행중!
   }
 
   return '완료';
 }
 window.determineRealCareStatus = determineRealCareStatus;
+
+/**
+ * [배정 대장 기반 고객 신청서 자동 동기화 헬퍼]
+ * 교체된 간병인(최신/활성 배정)의 성명, 연락처, 소속센터, 시작/종료일시 및 실시간 상태를
+ * 신청서 객체(gApps)에 자동으로 동기화하여 화면 전반의 일관성을 보장합니다.
+ */
+function reconcileAppsWithActiveAssignments(targetApps = null, targetAssigns = null) {
+  const apps = targetApps || (typeof gApps !== 'undefined' ? gApps : null);
+  const assigns = targetAssigns || (typeof gAssigns !== 'undefined' ? gAssigns : null);
+  if (!Array.isArray(apps) || apps.length === 0 || !Array.isArray(assigns) || assigns.length === 0) return;
+  let updatedAny = false;
+  apps.forEach(app => {
+    if (!app || !app.id) return;
+    const appAssigns = assigns.filter(a => a && (String(a.applyId) === String(app.id) || (a.patientName && a.patientName.trim() === (app.patientName || '').trim())));
+    if (!appAssigns || appAssigns.length === 0) return;
+
+    const activeAssign = (typeof getActiveCaregiverAssignment === 'function') ? getActiveCaregiverAssignment(app, appAssigns) : appAssigns[appAssigns.length - 1];
+    if (activeAssign) {
+      if (activeAssign.caregiverName && activeAssign.caregiverName !== '-' && app.caregiverName !== activeAssign.caregiverName) {
+        app.caregiverName = activeAssign.caregiverName;
+        updatedAny = true;
+      }
+      const cgPhone = activeAssign.phone || activeAssign.caregiverPhone || '';
+      if (cgPhone && app.caregiverPhone !== cgPhone) {
+        app.caregiverPhone = cgPhone;
+        updatedAny = true;
+      }
+      const cgCenter = activeAssign.centerName || activeAssign.center || '';
+      if (cgCenter && app.caregiverCenter !== cgCenter) {
+        app.caregiverCenter = cgCenter;
+        updatedAny = true;
+      }
+      if (activeAssign.startDate && app.careStartDate !== activeAssign.startDate) {
+        app.careStartDate = activeAssign.startDate;
+        updatedAny = true;
+      }
+      const targetEndDate = (activeAssign.endDate !== undefined && activeAssign.endDate !== null) ? activeAssign.endDate : '';
+      if (app.careEndDate !== targetEndDate) {
+        app.careEndDate = targetEndDate;
+        updatedAny = true;
+      }
+    }
+
+    const realStatus = (typeof determineRealCareStatus === 'function') ? determineRealCareStatus(app, appAssigns) : null;
+    if (realStatus && app.status !== realStatus && !app.hasManualUpdate) {
+      app.status = realStatus;
+      updatedAny = true;
+    }
+  });
+
+  if (updatedAny && !targetApps) {
+    try {
+      localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    } catch (e) {}
+  }
+}
+window.reconcileAppsWithActiveAssignments = reconcileAppsWithActiveAssignments;
 
 /**
  * 고객 카드 및 모달 상태 테마 산출 (실제 간병기간 및 특수 종료문구 기반)
@@ -21605,8 +21735,8 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
       as = sortedAssigns.find(a => a.id === gActiveCaregiverTabAssignId);
     }
     if (!as) {
-      as = sortedAssigns[sortedAssigns.length - 1];
-      gActiveCaregiverTabAssignId = as.id;
+      as = (typeof getActiveCaregiverAssignment === 'function' ? getActiveCaregiverAssignment(app, sortedAssigns) : null) || sortedAssigns[sortedAssigns.length - 1];
+      gActiveCaregiverTabAssignId = as ? as.id : null;
     }
   }
 
@@ -22033,11 +22163,11 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                   <div class="grid grid-cols-2 gap-2 text-center text-[11px] font-mono">
                     <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
                       <div class="text-[10px] text-slate-400 mb-0.5">간병 시작일시</div>
-                      <b class="text-slate-900">${formatWithTime(as.startDate, '09:00')}</b>
+                      <b class="text-slate-900">${formatWithTime(as.startDate, '')}</b>
                     </div>
                     <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
                       <div class="text-[10px] text-slate-400 mb-0.5">간병 종료일시</div>
-                      <b class="text-slate-900">${formatWithTime(as.endDate, '18:00')}</b>
+                      <b class="text-slate-900">${as.endDate ? formatWithTime(as.endDate, '') : '<span class="text-emerald-600 font-bold">진행중</span>'}</b>
                     </div>
                   </div>
 
@@ -22171,7 +22301,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                   <div class="text-[10.5px] text-slate-400 mb-0.5">총 간병 기간 (배정 기준)</div>
                   ${hasAssign && as && as.startDate ? `
                     <div class="font-mono font-black text-purple-900 text-sm">${totalCareDays}일간 <span class="text-xs text-slate-500 font-bold">(${totalCareDays * 24}시간)</span></div>
-                    <div class="text-[10px] text-purple-700 font-bold mt-0.5">${formatWithTime(as.startDate, '09:00')} ~ ${formatWithTime(as.endDate, '18:00')}</div>
+                    <div class="text-[10px] text-purple-700 font-bold mt-0.5">${formatWithTime(as.startDate, '')} ~ ${as.endDate ? formatWithTime(as.endDate, '') : '진행중'}</div>
                   ` : `
                     <div class="font-mono font-black text-amber-600 text-sm">간병인 배정 대기</div>
                     <div class="text-[10px] text-slate-400 mt-0.5">신청시 예정: ${app.expectedDays || 14}일 (${(app.expectedDays || 14) * 24}시간)</div>
@@ -23070,8 +23200,8 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
       as = sortedAssigns.find(a => a.id === gActiveCaregiverTabAssignId);
     }
     if (!as) {
-      as = sortedAssigns[sortedAssigns.length - 1]; // 기본은 가장 최근/현재 배정 간병사
-      gActiveCaregiverTabAssignId = as.id;
+      as = (typeof getActiveCaregiverAssignment === 'function' ? getActiveCaregiverAssignment(app, sortedAssigns) : null) || sortedAssigns[sortedAssigns.length - 1]; // 기본은 현재 진행중이거나 가장 최신 배정 간병사
+      gActiveCaregiverTabAssignId = as ? as.id : null;
     }
   }
 
@@ -23530,7 +23660,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 <div class="text-[10.5px] text-slate-400 mb-0.5">총 간병 기간 (배정 기준)</div>
                 ${hasAssign && as && as.startDate ? `
                   <div class="font-mono font-black text-purple-900 text-sm">${totalCareDays}일간 <span class="text-xs text-slate-500 font-bold">(${totalCareDays * 24}시간)</span></div>
-                  <div class="text-[10px] text-purple-700 font-bold mt-0.5">${formatWithTime(as.startDate, '09:00')} ~ ${formatWithTime(as.endDate, '18:00')}</div>
+                  <div class="text-[10px] text-purple-700 font-bold mt-0.5">${formatWithTime(as.startDate, '')} ~ ${as.endDate ? formatWithTime(as.endDate, '') : '진행중'}</div>
                 ` : `
                   <div class="font-mono font-black text-amber-600 text-sm">간병인 배정 대기</div>
                   <div class="text-[10px] text-slate-400 mt-0.5">신청시 예정: ${app.expectedDays || 14}일 (${(app.expectedDays || 14) * 24}시간)</div>
@@ -23975,11 +24105,11 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 <div class="grid grid-cols-2 gap-2 text-center text-[11px] font-mono">
                   <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
                     <div class="text-[10px] text-slate-400 mb-0.5">간병 시작일시</div>
-                    <b class="text-slate-900">${formatWithTime(as.startDate, '09:00')}</b>
+                    <b class="text-slate-900">${formatWithTime(as.startDate, '')}</b>
                   </div>
                   <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
                     <div class="text-[10px] text-slate-400 mb-0.5">간병 종료일시</div>
-                    <b class="text-slate-900">${formatWithTime(as.endDate, '18:00')}</b>
+                    <b class="text-slate-900">${as.endDate ? formatWithTime(as.endDate, '') : '<span class="text-emerald-600 font-bold">진행중</span>'}</b>
                   </div>
                 </div>
 
@@ -26589,7 +26719,9 @@ function renderUnifiedCareHub() {
     const isClaimFax = rawFax && rawFax.status === '전송완료' && rawFax.caseType !== '현대해상 고객등록/조회' && rawFax.formType !== 'HD_FORM_01';
     const faxInfo = isClaimFax ? rawFax : { status: '미전송', sentDate: null, faxNumber: app.adjusterFax || '0507-XXX-XXXX' };
 
-    let as = appAssigns.length > 0 ? appAssigns[0] : null;
+    let as = (typeof getActiveCaregiverAssignment === 'function')
+      ? getActiveCaregiverAssignment(app, appAssigns)
+      : (appAssigns.length > 0 ? appAssigns[appAssigns.length - 1] : null);
     if (!as && app.caregiverName && app.caregiverName !== '-' && !app.caregiverName.includes('미배정') && !app.caregiverName.includes('배정대기')) {
       as = {
         applyId: app.id,
@@ -29809,6 +29941,11 @@ function initData() {
     });
   }
 
+  // 배정 대장 기반 고객 신청서 간병인 교체/스케줄/실시간 상태 전수 자동 동기화
+  if (typeof reconcileAppsWithActiveAssignments === 'function') {
+    reconcileAppsWithActiveAssignments();
+  }
+
   // 통합허브 전체 데이터로부터 손사/간병인/협력센터 전수 자동 동기화 & 디렉토리 갱신
   if (typeof syncDirectoriesFromAllExistingRecords === 'function') {
     syncDirectoriesFromAllExistingRecords();
@@ -30955,7 +31092,9 @@ async function executeFullDataReset() {
 window.executeFullDataReset = executeFullDataReset;
 
 /**
- * [환경설정] 삼성화재 간병 관리대장 단독 Convex 초기화 엔진
+ * [환경설정] 삼성화재 접수/청구관리 시트 데이터 단독 Convex 초기화 엔진
+ * - [삼성화재 접수/청구관리] 탭의 웹 스프레드시트 시트 데이터(samsungSheets)만 단독으로 0건 초기화합니다.
+ * - 🛡️ 종합관리대장(통합허브)에 등록된 삼성화재 고객(신청/배정/청구/지급)은 절대 삭제하지 않고 안전하게 보존합니다.
  * - 개발 서버(DEV)와 운영 실서버(PROD)를 명확히 판별하여 현재 접속된 서버만 안전하고 독립적으로 0건 초기화
  * - 반대편 서버(운영/개발)에는 절대 영향을 주지 않음
  */
@@ -30965,36 +31104,37 @@ async function executeResetSamsungCareLedger() {
   const envConvexUrl = isDev ? DEV_CONVEX_URL : PROD_CONVEX_URL;
 
   const confirmed = confirm(
-    `🚨 [삼성화재 간병 관리대장 Convex 초기화 확인]\n\n` +
+    `🚨 [삼성화재 접수/청구관리 시트 Convex 초기화 확인]\n\n` +
     `현재 접속 환경: 【 ${envName} 】\n` +
     `연결 Convex: ${envConvexUrl}\n\n` +
-    `1. 현재 접속된 [${envName}]의 삼성화재 간병 관리대장(samsungSheets: 대상자, 완료, 연락처 등)이 0건으로 완전 초기화됩니다.\n` +
-    `2. 통합허브 내 삼성화재 관련 신청/배정/청구/지급 및 브라우저 로컬 캐시가 함께 0건으로 리셋됩니다.\n` +
+    `1. 현재 접속된 [${envName}]의 [삼성화재 접수/청구관리] 시트 데이터(samsungSheets: 대상자, 완료, 연락처 등)가 0건으로 완전 초기화됩니다.\n` +
+    `2. 🛡️ 【통합허브 고객 보존】 종합관리대장(통합허브)에 등록된 삼성화재 고객 신청, 배정, 청구, 지급 내역은 절대 삭제되지 않고 100% 안전하게 보존됩니다.\n` +
     `3. ⚠️ 개발서버와 운영서버는 완벽히 분리되어 운영되므로, 반대편 서버(${isDev ? '운영 실서버' : '개발 서버'}) 데이터에는 일체 영향을 주지 않습니다.\n\n` +
-    `정말로 [${envName}] 삼성화재 간병 관리대장 정보를 초기화하시겠습니까?`
+    `정말로 [${envName}] 삼성화재 접수/청구관리 시트 데이터를 초기화하시겠습니까?`
   );
 
   if (!confirmed) return;
 
   try {
     if (typeof showToast === 'function') {
-      showToast(`[${envName}] 삼성화재 간병 관리대장 Convex DB 초기화 중...`, 'info');
+      showToast(`[${envName}] 삼성화재 접수/청구관리 시트 데이터 초기화 중...`, 'info');
     }
 
-    // 1. Convex 클라우드 DB 초기화 (현재 접속된 단 하나의 환경만 엄격하게 초기화)
+    // 1. Convex 클라우드 DB 초기화 (samsungSheets 테이블만 초기화, 통합허브 고객 데이터 절대 보존)
     if (typeof syncToConvex === 'function') {
       try {
-        await syncToConvex('sync:resetSamsungCareLedger', { purgeAssociatedHubApps: true });
+        await syncToConvex('sync:resetSamsungCareLedger', { purgeAssociatedHubApps: false });
       } catch (e) {
         await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'samsung' });
       }
     }
 
-    // 2. 브라우저 LocalStorage 삼성화재 캐시 정리
+    // 2. 브라우저 LocalStorage 삼성화재 관리대장 시트 캐시 정리
     const samsungKeys = [
       'LIVON_SAMSUNG_EXCEL_LEDGER',
       'LIVON_SAMSUNG_SHEET_TARGET',
-      'LIVON_SAMSUNG_SHEET_COMPLETED'
+      'LIVON_SAMSUNG_SHEET_COMPLETED',
+      'LIVON_SAMSUNG_SHEET_CONTACTS'
     ];
     samsungKeys.forEach(k => {
       try { localStorage.removeItem(k); } catch (e) {}
@@ -31010,7 +31150,7 @@ async function executeResetSamsungCareLedger() {
     };
     saveLaunchConfig(currentCfg);
 
-    // 4. 전역 변수 초기화
+    // 4. 전역 변수 초기화 (시트 데이터만 초기화, gApps/gAssigns/gClaims/gPayouts는 보존!)
     if (typeof gSamsungSheets !== 'undefined' && gSamsungSheets) {
       gSamsungSheets.target = [];
       gSamsungSheets.completed = [];
@@ -31018,24 +31158,6 @@ async function executeResetSamsungCareLedger() {
     }
     if (typeof gLaunchParsedData !== 'undefined' && gLaunchParsedData) {
       delete gLaunchParsedData['samsung'];
-    }
-
-    // 통합허브 내 삼성화재 신청, 배정, 청구, 지급 메모리 데이터 제거 및 캐시 갱신
-    if (Array.isArray(gApps)) {
-      gApps = gApps.filter(a => !(a.insuranceCompany || '').includes('삼성') && !(a.id && String(a.id).startsWith('S')));
-      try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
-    }
-    if (Array.isArray(gAssigns)) {
-      gAssigns = gAssigns.filter(as => !(as.insuranceCompany || '').includes('삼성') && !(as.applyId && String(as.applyId).startsWith('S')));
-      try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
-    }
-    if (Array.isArray(gClaims)) {
-      gClaims = gClaims.filter(c => !(c.insuranceCompany || '').includes('삼성') && !(c.applyId && String(c.applyId).startsWith('S')));
-      try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
-    }
-    if (Array.isArray(gPayouts)) {
-      gPayouts = gPayouts.filter(p => !(p.insuranceCompany || '').includes('삼성') && !(p.applyId && String(p.applyId).startsWith('S')));
-      try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
     }
 
     // 5. UI 초기화
@@ -31068,17 +31190,17 @@ async function executeResetSamsungCareLedger() {
 
     if (typeof showCustomAlert === 'function') {
       showCustomAlert({
-        title: '삼성화재 간병 관리대장 초기화 완료',
-        message: `【 ${envName} 】\nConvex 클라우드 DB 및 로컬의 삼성화재 간병 관리대장 정보가 0건으로 완전 초기화되었습니다.\n\n※ 다른 서버(${isDev ? '운영 실서버' : '개발 서버'})에는 전혀 영향을 주지 않았습니다.`,
+        title: '삼성화재 접수/청구관리 시트 초기화 완료',
+        message: `【 ${envName} 】\n[삼성화재 접수/청구관리]의 시트 데이터가 0건으로 완전 초기화되었습니다.\n\n🛡️ 통합허브에 등록된 고객 정보는 안전하게 보존되었습니다.`,
         icon: 'check-circle-2',
         iconColor: 'emerald'
       });
     } else {
-      alert(`[${envName}] 삼성화재 간병 관리대장 Convex 초기화가 완료되었습니다.`);
+      alert(`[${envName}] [삼성화재 접수/청구관리] 시트 데이터 초기화가 완료되었습니다. (통합허브 고객 보존)`);
     }
   } catch (err) {
     console.error('[Samsung Care Ledger Reset Error]', err);
-    alert(`삼성화재 간병 관리대장 초기화 중 오류가 발생했습니다: ${err.message}`);
+    alert(`삼성화재 접수/청구관리 시트 데이터 초기화 중 오류가 발생했습니다: ${err.message}`);
   }
 }
 window.executeResetSamsungCareLedger = executeResetSamsungCareLedger;
@@ -38840,7 +38962,7 @@ function updateNewClaimSplitPreview(app, as, totalCareDays, alreadyClaimedDays, 
       <div class="grid grid-cols-2 gap-2 text-[11px]">
         <div>
           <span class="text-slate-500 font-medium">전체 간병 기간:</span>
-          <b class="text-purple-950 font-mono ml-1">${formatWithTime(as.startDate, '09:00')} ~ ${formatWithTime(as.endDate, '18:00')}</b>
+          <b class="text-purple-950 font-mono ml-1">${formatWithTime(as.startDate, '')} ~ ${as.endDate ? formatWithTime(as.endDate, '') : '진행중'}</b>
           <span class="text-purple-800 font-bold block sm:inline sm:ml-1">(${totalCareDays}일 / ${totalCareDays * 24}시간)</span>
         </div>
         <div class="text-right">
@@ -45323,7 +45445,7 @@ async function executeApplyLaunchData(company) {
   const newPayouts = data.payouts || [];
 
   if (companyKey === 'samsung') {
-    const confirmed = confirm(`🚨 [삼성화재 관리대장 반영 확인]\n\n삼성화재 관리대장 엑셀 총 ${newApps.length.toLocaleString()}건을 [삼성화재 접수/청구관리] 대장에 반영하시겠습니까?\n\n- 기존 실서버(Convex) 및 로컬의 삼성화재 관련 등록 데이터는 모두 초기화(삭제)되고 새로 등록하는 엑셀 데이터를 기준으로 다시 세팅됩니다.\n- [종합관리대장 > 통합허브] 내 동일 고객의 상품명, 계약정보가 실시간 보강됩니다.`);
+    const confirmed = confirm(`🚨 [삼성화재 관리대장 시트 반영 확인]\n\n삼성화재 관리대장 엑셀 총 ${newApps.length.toLocaleString()}건을 [삼성화재 접수/청구관리] 시트에 반영하시겠습니까?\n\n- 기존 실서버(Convex) 및 로컬의 [삼성화재 접수/청구관리] 시트 데이터가 새로 등록하는 엑셀 데이터를 기준으로 새로 세팅됩니다.\n- 🛡️ [종합관리대장 > 통합허브] 내 등록 고객은 삭제되지 않고 안전하게 보존되며, 동일 고객의 상품명 및 계약정보가 실시간 연동/보강됩니다.`);
     if (!confirmed) return;
 
     // 0. Convex 실서버 기존 삼성화재 데이터 전면 초기화 (Reset)

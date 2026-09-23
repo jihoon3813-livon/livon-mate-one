@@ -1371,43 +1371,11 @@ export const resetAndPurgeLaunchData = mutation({
         }
       }
     } else if (target === 'samsung') {
-      // 삼성화재 관리대장 업로드 시: samsungSheets 완전 초기화 및 삼성 접수/청구/지급 연관 데이터 삭제
+      // 삼성화재 관리대장 시트 업로드 시: samsungSheets 시트 레코드만 완전 초기화 (통합허브 고객 데이터는 절대 보존)
       const sheets = await ctx.db.query("samsungSheets").collect();
       for (const s of sheets) {
         await ctx.db.delete(s._id);
         deletedSheets++;
-      }
-
-      const apps = await ctx.db.query("applications").collect();
-      for (const a of apps) {
-        if ((a.insuranceCompany || '').includes('삼성') || (a.id && String(a.id).startsWith('S'))) {
-          await ctx.db.delete(a._id);
-          deletedApps++;
-        }
-      }
-
-      const assigns = await ctx.db.query("assignments").collect();
-      for (const as of assigns) {
-        if ((as.insuranceCompany || '').includes('삼성') || (as.applyId && String(as.applyId).startsWith('S'))) {
-          await ctx.db.delete(as._id);
-          deletedAssigns++;
-        }
-      }
-
-      const claims = await ctx.db.query("claims").collect();
-      for (const c of claims) {
-        if ((c.insuranceCompany || '').includes('삼성') || (c.applyId && String(c.applyId).startsWith('S'))) {
-          await ctx.db.delete(c._id);
-          deletedClaims++;
-        }
-      }
-
-      const payouts = await ctx.db.query("payouts").collect();
-      for (const p of payouts) {
-        if ((p.insuranceCompany || '').includes('삼성') || (p.applyId && String(p.applyId).startsWith('S'))) {
-          await ctx.db.delete(p._id);
-          deletedPayouts++;
-        }
       }
     }
 
@@ -1423,62 +1391,24 @@ export const resetAndPurgeLaunchData = mutation({
   },
 });
 
-// 51-2. 삼성화재 간병 관리대장 단독 초기화 (samsungSheets 및 삼성 대장 연동 정보 0건 리셋)
+// 51-2. 삼성화재 간병 관리대장 시트 단독 초기화 (samsungSheets 시트 레코드만 0건 리셋, 통합허브 고객 데이터 절대 보존)
 export const resetSamsungCareLedger = mutation({
   args: {
     purgeAssociatedHubApps: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     let deletedSheets = 0;
-    let deletedApps = 0;
-    let deletedAssigns = 0;
-    let deletedClaims = 0;
-    let deletedPayouts = 0;
 
-    // 1. samsungSheets 테이블 완전 삭제
+    // 1. samsungSheets 테이블 완전 삭제 (접수/청구관리 시트 데이터만 초기화)
     const sheets = await ctx.db.query("samsungSheets").collect();
     for (const s of sheets) {
       await ctx.db.delete(s._id);
       deletedSheets++;
     }
 
-    // 2. 통합허브 내 삼성화재 신청/배정/청구/지급 데이터 삭제 (옵션, 기본 true)
-    const purgeHub = args.purgeAssociatedHubApps !== false;
-    if (purgeHub) {
-      const apps = await ctx.db.query("applications").collect();
-      for (const a of apps) {
-        if ((a.insuranceCompany || '').includes('삼성') || (a.id && String(a.id).startsWith('S'))) {
-          await ctx.db.delete(a._id);
-          deletedApps++;
-        }
-      }
+    // 🛡️ 통합허브(applications, assignments, claims, payouts)에 등록된 삼성화재 고객은 삭제하지 않고 100% 안전하게 보존합니다.
 
-      const assigns = await ctx.db.query("assignments").collect();
-      for (const as of assigns) {
-        if ((as.insuranceCompany || '').includes('삼성') || (as.applyId && String(as.applyId).startsWith('S'))) {
-          await ctx.db.delete(as._id);
-          deletedAssigns++;
-        }
-      }
-
-      const claims = await ctx.db.query("claims").collect();
-      for (const c of claims) {
-        if ((c.insuranceCompany || '').includes('삼성') || (c.applyId && String(c.applyId).startsWith('S'))) {
-          await ctx.db.delete(c._id);
-          deletedClaims++;
-        }
-      }
-
-      const payouts = await ctx.db.query("payouts").collect();
-      for (const p of payouts) {
-        if ((p.insuranceCompany || '').includes('삼성') || (p.applyId && String(p.applyId).startsWith('S'))) {
-          await ctx.db.delete(p._id);
-          deletedPayouts++;
-        }
-      }
-    }
-
-    // 3. systemSettings 내 LIVON_LAUNCH_CONFIG의 samsung 설정 초기화
+    // 2. systemSettings 내 LIVON_LAUNCH_CONFIG의 samsung 설정 초기화
     const launchSettings = await ctx.db
       .query("systemSettings")
       .filter((q) => q.eq(q.field("key"), "LIVON_LAUNCH_CONFIG"))
