@@ -5349,8 +5349,22 @@
             * [신청 접수 완료] 클릭 시 간병신청대장 및 통합 간병 운영 허브에 즉시 동기화됩니다.
           </div>
           <div class="flex items-center justify-end gap-2 flex-shrink-0">
-            <button type="button" onclick="closeModal('newAppModal')" class="px-5 py-2.5 border border-slate-300 rounded-xl hover:bg-slate-100 text-slate-700 font-bold transition-all whitespace-nowrap flex-shrink-0">취소</button>
-            <button type="submit" id="newAppSubmitBtn" class="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-xl shadow-md shadow-primary-600/20 transition-all text-xs flex items-center gap-1.5 whitespace-nowrap flex-shrink-0">
+            <button type="button" onclick="closeModal('newAppModal')" class="px-4 py-2.5 border border-slate-300 rounded-xl hover:bg-slate-100 text-slate-700 font-bold transition-all text-xs whitespace-nowrap flex-shrink-0 cursor-pointer">취소</button>
+            
+            <!-- 현대해상 / 현대해상(SCOR) 등록 옵션 분리 (일단 등록만 vs 등록 및 팩스 즉시 발송) -->
+            <div id="newAppHyundaiActionBtns" class="flex items-center gap-2">
+              <button type="button" onclick="submitNewAppWithMode('save_only')" id="btnNewAppSaveOnly" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-black rounded-xl shadow-md transition-all text-xs flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 cursor-pointer" title="팩스를 즉시 발송하지 않고 대장에 신규 접수로만 등록합니다 (대장 리스트에서 언제든 접수팩스 발송 가능)">
+                <i data-lucide="file-plus" class="w-4 h-4 flex-shrink-0"></i>
+                <span>일단 등록만 하기 (팩스 제외)</span>
+              </button>
+              <button type="button" onclick="submitNewAppWithMode('save_and_fax')" id="btnNewAppSaveAndFax" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-md shadow-blue-600/20 transition-all text-xs flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 cursor-pointer" title="신규 고객 등록과 동시에 1차 고객등록 접수 팩스를 확인 후 즉시 송출합니다">
+                <i data-lucide="send" class="w-4 h-4 flex-shrink-0"></i>
+                <span>등록 및 접수팩스 즉시 발송 📠</span>
+              </button>
+            </div>
+
+            <!-- 삼성화재 등 타 원수사일 때 기본 등록 버튼 -->
+            <button type="submit" id="newAppSubmitBtn" class="hidden px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-xl shadow-md shadow-primary-600/20 transition-all text-xs flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 cursor-pointer">
               <i data-lucide="check" class="w-4 h-4 flex-shrink-0"></i>
               <span id="newAppSubmitBtnText" class="whitespace-nowrap">신청 접수 완료 (STEP 1 등록)</span>
             </button>
@@ -10284,6 +10298,6 @@
   <script src="samsung-call-report.js?v=20260920_1330"></script>
   <script src="total-call-analysis.js?v=20260921_1005"></script>
   <script src="system-audit-log.js?v=20260922_1040"></script>
-  <script src="app.js?v=20260923_1015"></script>
+  <script src="app.js?v=20260923_1020"></script>
 </body>
 </html>

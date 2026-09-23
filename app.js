@@ -1218,6 +1218,11 @@ function sortApplicationsNewestFirst(apps) {
     if (a && a._isJustRegistered && !(b && b._isJustRegistered)) return -1;
     if (!(a && a._isJustRegistered) && b && b._isJustRegistered) return 1;
 
+    // [사용자 요구사항]: 신규는 무조건 맨 처음 (접수, 신규, 신청 상태 고객 최상단 고정)
+    const isNewA = (a && (a.status === '접수' || a.status === '신규' || a.status === '신청' || a.status === '간병신청')) ? 1 : 0;
+    const isNewB = (b && (b.status === '접수' || b.status === '신규' || b.status === '신청' || b.status === '간병신청')) ? 1 : 0;
+    if (isNewA !== isNewB) return isNewB - isNewA;
+
     const tA = a ? parseTime(a.applyDate) : 0;
     const tB = b ? parseTime(b.applyDate) : 0;
     if (tB !== tA) return tB - tA;
@@ -15865,6 +15870,36 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
     console.warn('[FAX Convex Sync Error]', convexErr);
   }
 
+  // 1차 접수 팩스(HD_FORM_01) 성공 시: initialFaxSent = true, hdWorkflowStage = '문자수신대기' 갱신 및 Convex/로컬스토리지 저장
+  if (resultLog.status === '성공' && (formCode === 'HD_FORM_01' || category === '1차접수')) {
+    try {
+      app.initialFaxSent = true;
+      app.initialFaxDate = resultLog.sentDate;
+      app.initialFaxSentAt = new Date().toISOString();
+      if ((app.insuranceCompany || '').includes('현대해상')) {
+        app.hdWorkflowStage = '문자수신대기';
+      }
+      app.updatedAt = new Date().toISOString();
+
+      if (!window.gInitialFaxRecords) window.gInitialFaxRecords = {};
+      window.gInitialFaxRecords[app.id] = {
+        sentDate: resultLog.sentDate,
+        recipient: targetRecipient,
+        faxNumber: targetNumber
+      };
+      try {
+        localStorage.setItem('LIVON_HD_INITIAL_FAX_RECORDS', JSON.stringify(window.gInitialFaxRecords));
+      } catch (e) {}
+
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:saveApplication', { app: app });
+      }
+      console.log(`[HD_FORM_01 1차 접수팩스 성공] ${app.patientName} (${app.id}) initialFaxSent 상태 갱신 완료`);
+    } catch (hdFaxErr) {
+      console.warn('[HD_FORM_01 Fax State Update Error]', hdFaxErr);
+    }
+  }
+
   // 정산청구 팩스 성공 시: 청구서 생성 대기 없이 곧바로 '청구완료' 등록 및 발송시각 동기화
   if (resultLog.status === '성공' && (category === '정산청구' || formCode === 'HD_FORM_02' || formCode === 'HD_FORM_03' || formCode === 'SF_FORM_01')) {
     try {
@@ -15993,6 +16028,10 @@ async function executeRealFaxSendFromPreview() {
     pendingApp.pendingFaxRecipient = recipient;
     pendingApp.pendingFaxNumber = number;
 
+    pendingApp.initialFaxSent = true;
+    pendingApp.initialFaxDate = new Date().toISOString().split('T')[0].replace(/-/g, '.');
+    pendingApp.hdWorkflowStage = '문자수신대기';
+
     const sendBtn = document.getElementById('btnConfirmRealFaxSend');
     const sendBtnText = document.getElementById('btnConfirmRealFaxSendText');
     const origHtml = sendBtn ? sendBtn.innerHTML : '';
@@ -16002,7 +16041,7 @@ async function executeRealFaxSendFromPreview() {
     }
 
     try {
-      await finalizeNewAppRegistration(pendingApp);
+      await finalizeNewAppRegistration(pendingApp, true);
     } finally {
       if (sendBtn) {
         sendBtn.disabled = false;
@@ -16040,8 +16079,9 @@ async function executeRealFaxSendFromPreview() {
   const isInitial = formCode === 'HD_FORM_01';
   const category = isInitial ? '1차접수' : '정산청구';
 
+  const modalTitle = isInitial ? '1차 고객등록 접수 팩스 발송 확인' : '최종 청구 팩스 발송 확인';
   const confirmed = await showCustomConfirm(
-    `[최종 청구 팩스 발송 확인]\n\n` +
+    `[${modalTitle}]\n\n` +
     `피보험자: ${app.patientName} 님 (${app.id})\n` +
     `보험사: ${app.insuranceCompany}\n` +
     `발송양식: ${formName} [${formCode}]\n` +
@@ -16052,7 +16092,7 @@ async function executeRealFaxSendFromPreview() {
     {
       theme: 'fax',
       icon: 'printer',
-      title: '최종 청구 팩스 발송 확인',
+      title: modalTitle,
       confirmText: '진짜 발송하기 📠',
       cancelText: '취소'
     }
@@ -16063,7 +16103,9 @@ async function executeRealFaxSendFromPreview() {
   const key = `${app.id}_${targetRoundNum}`;
   if (!window.gBarobillSendingRounds) window.gBarobillSendingRounds = new Set();
   window.gBarobillSendingRounds.add(key);
-  showBarobillClaimProgress(app.id, targetRoundNum, targetRecipient, targetNumber);
+  if (!isInitial) {
+    showBarobillClaimProgress(app.id, targetRoundNum, targetRecipient, targetNumber);
+  }
 
   // Close preview modal immediately so user sees the progress toggle in the main detail workspace
   closeModal('formPreviewModal');
@@ -16085,7 +16127,9 @@ async function executeRealFaxSendFromPreview() {
 
   let resultLog = null;
   try {
-    const memo = `${app.insuranceCompany} ${targetRecipient} 앞, [${app.id} ${app.patientName} 님] 간병비 정산 청구 공문 송부드립니다. 빠른 지급 결재 부탁드립니다.`;
+    const memo = isInitial
+      ? `${app.insuranceCompany} ${targetRecipient} 앞, [${app.id} ${app.patientName} 님] 현대해상 1차 고객등록 및 간병신청 접수 공문 송부드립니다.`
+      : `${app.insuranceCompany} ${targetRecipient} 앞, [${app.id} ${app.patientName} 님] 간병비 정산 청구 공문 송부드립니다. 빠른 지급 결재 부탁드립니다.`;
     resultLog = await sendElectronicFaxDirectly({
       appId: app.id,
       formCode,
@@ -16094,7 +16138,7 @@ async function executeRealFaxSendFromPreview() {
       targetNumber,
       memoText: memo,
       category,
-      silentAlert: true
+      silentAlert: false
     });
   } catch (err) {
     console.error('청구 팩스 발송 에러:', err);
@@ -25578,7 +25622,7 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
   `;
 }
 
-function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayouts, sched, faxInfo, isHdWaitingSms) {
+function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayouts, sched, faxInfo, isHdWaitingSms, isHdNeedInitialFax = false) {
   const badges = [];
 
   // 0. CTI 민원 / CS 민원 / 고객정보 수정 체크
@@ -25706,8 +25750,14 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
     }
   }
 
-  // 6. 현대해상 문자대기 체크
-  if (isHdWaitingSms) {
+  // 6. 현대해상 접수팩스 미발송 / 문자대기 체크
+  if (isHdNeedInitialFax) {
+    badges.push(`
+      <span class="px-2 py-0.5 rounded-md bg-blue-100 text-blue-950 border border-blue-400 font-bold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="현대해상 1차 고객등록 접수 팩스가 아직 발송되지 않았습니다.">
+        <i data-lucide="printer" class="w-3 h-3 text-blue-700"></i> ⚠️ 접수팩스 미발송
+      </span>
+    `);
+  } else if (isHdWaitingSms) {
     badges.push(`
       <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 border border-amber-400 font-black text-[10.5px] flex items-center gap-1 shadow-2xs animate-pulse whitespace-nowrap" title="현대해상 회신 문자(사고번호/증권번호) 등록 대기 중입니다.">
         <i data-lucide="message-square" class="w-3 h-3 text-amber-700"></i> 📱 현대 문자대기
@@ -26062,9 +26112,21 @@ function renderUnifiedCareHub() {
   }
 
   filtered.sort((a, b) => {
-    // [사용자 규칙]: 신규 고객 등록 시 맨 첫번째로 최우선 노출
+    // [사용자 규칙 1]: 방금 등록된 고객(_isJustRegistered)은 무조건 맨 처음(최상단)
     if (a && a._isJustRegistered && !(b && b._isJustRegistered)) return -1;
     if (!(a && a._isJustRegistered) && b && b._isJustRegistered) return 1;
+
+    // [사용자 규칙 2]: 신규(status === '접수' || status === '신규' || status === '신청') 고객은 무조건 맨 처음(최상단) 고정!
+    const isNewA = (a && (a.status === '접수' || a.status === '신규' || a.status === '신청' || a.status === '간병신청')) ? 1 : 0;
+    const isNewB = (b && (b.status === '접수' || b.status === '신규' || b.status === '신청' || b.status === '간병신청')) ? 1 : 0;
+    if (isNewA !== isNewB) {
+      return isNewB - isNewA;
+    }
+    if (isNewA === 1 && isNewB === 1) {
+      const diff = (b._applyTime || 0) - (a._applyTime || 0);
+      if (diff !== 0) return diff;
+      return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
+    }
 
     if (gHubSort === 'status_inprogress') {
       const isInProgress = (app) => (app.status && (app.status.includes('진행') || app.status === '정상' || app.status === '배정완료' || app.status === '간병중')) ? 1 : 0;
@@ -26299,7 +26361,10 @@ function renderUnifiedCareHub() {
     const totalPayoutSum = sched.confirmedPayoutSum || appPayouts.reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
     const isPayoutPending = isPayoutDueOrUnpaid;
     const totalClaimAmt = (sched.depositedClaimSum || app.depositConfirmedAmount) + (sched.unconfirmedClaimSum || app.estimatedUnpaid || 0);
-    const isHdWaitingSms = (app.insuranceCompany || '').includes('현대해상') && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'));
+    const isHyundaiApp = (app.insuranceCompany || '').includes('현대해상');
+    const isHdInitialSent = isHyundaiApp && (typeof isHyundaiInitialFaxSent === 'function' ? isHyundaiInitialFaxSent(app) : Boolean(app.initialFaxSent));
+    const isHdNeedInitialFax = isHyundaiApp && !isHdInitialSent && app.status !== '완료' && app.status !== '서비스 취소' && app.status !== '취소' && app.status !== '미해당';
+    const isHdWaitingSms = isHyundaiApp && isHdInitialSent && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'));
     const isSamsung = (app.insuranceCompany || '').includes('삼성');
 
     // [사용자 요구사항]: 엑셀 각 시트별 비고란(신청, 배정, 간병비지급, 보험청구) 정보 추출
@@ -26311,7 +26376,7 @@ function renderUnifiedCareHub() {
     const claimMemoText = Array.from(new Set(claimMemos)).join(' / ');
 
     // 담당자가 체크해야 할 주요체크사항 라벨(간병비 미지급, 청구금 미입금, 청구서 미발행, 팩스 미전송 등)
-    const checklistBadgesHtml = getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayouts, sched, faxInfo, isHdWaitingSms);
+    const checklistBadgesHtml = getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayouts, sched, faxInfo, isHdWaitingSms, isHdNeedInitialFax);
 
     // [사용자 요구사항]: 간병중일 때는 '간병중 4일/4일' 대신 '간병시작일 / 경과일'로 표시
     const rawStart = as?.startDate || careProg?.startDate || '';
@@ -26527,14 +26592,23 @@ function renderUnifiedCareHub() {
                 </div>
               `}
 
-              ${isHdWaitingSms ? `
+              ${isHdNeedInitialFax ? `
+                <div class="mt-1.5 p-1.5 rounded-lg bg-blue-50 border border-blue-300 text-blue-950 text-[10.5px] flex items-center justify-between shadow-2xs">
+                  <span class="flex items-center gap-1 font-extrabold text-blue-900">
+                    <i data-lucide="printer" class="w-3 h-3 text-blue-600"></i> 접수팩스 미발송
+                  </span>
+                  <button type="button" onclick="event.stopPropagation(); openHyundaiRegistrationFaxModal('${app.id}')" class="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] shadow-2xs flex items-center gap-1 cursor-pointer">
+                    <i data-lucide="send" class="w-3 h-3"></i> 접수팩스 발송하기
+                  </button>
+                </div>
+              ` : (isHdWaitingSms ? `
                 <div class="mt-1.5 p-1.5 rounded-lg bg-amber-100/80 border border-amber-300 text-amber-950 text-[10.5px] flex items-center justify-between shadow-2xs">
                   <span class="flex items-center gap-1 font-extrabold"><i data-lucide="clock" class="w-3 h-3 text-amber-700"></i> 1차팩스 완료 (문자대기)</span>
                   <button type="button" onclick="event.stopPropagation(); openHyundaiSmsInputModal('${app.id}')" class="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-700 text-white font-black text-[10px] shadow-2xs">
                     문자등록 ⚡
                   </button>
                 </div>
-              ` : ''}
+              ` : '')}
 
               ${app.isPreRegistered ? `
                 <div class="mt-1.5 p-1.5 rounded-lg bg-amber-50/90 border border-amber-300 text-amber-950 text-[10.5px] flex items-center justify-between shadow-2xs">
@@ -26788,9 +26862,62 @@ function updateSelectedHubUI() {
 // ELECTRONIC FAX DISPATCH CONTROLLER
 // =========================================================================
 
-// =========================================================================
-// SIMPLIFIED 2-CASE FAX DISPATCH CONTROLLER
-// =========================================================================
+function isHyundaiInitialFaxSent(app) {
+  if (!app) return false;
+  if (app.initialFaxSent) return true;
+  if (typeof window.gInitialFaxRecords !== 'undefined' && window.gInitialFaxRecords[app.id]) return true;
+  if (typeof gInitialFaxRecords !== 'undefined' && gInitialFaxRecords[app.id]) return true;
+  if (Array.isArray(window.gFaxLogs) && window.gFaxLogs.some(l => 
+    String(l.appId) === String(app.id) && 
+    (l.category === '1차접수' || l.formCode === 'HD_FORM_01' || (l.formName && l.formName.includes('고객등록')) || (l.memo && l.memo.includes('1차 고객등록'))) && 
+    (l.status === '성공' || l.status === '전송완료')
+  )) {
+    return true;
+  }
+  return false;
+}
+window.isHyundaiInitialFaxSent = isHyundaiInitialFaxSent;
+
+function openHyundaiRegistrationFaxModal(applyId) {
+  const app = (gApps || []).find(a => String(a.id) === String(applyId));
+  if (!app) {
+    alert('고객 정보를 찾을 수 없습니다.');
+    return;
+  }
+
+  // 기본 수신처 및 팩스번호 설정
+  let targetRecipient = app.adjusterName ? `${app.adjusterName} 손해사정사` : '현대해상 보상지원센터';
+  let targetNumber = app.adjusterFax || '';
+
+  if (!targetNumber && Array.isArray(gFaxDirectory)) {
+    const matchedDir = gFaxDirectory.find(d => 
+      d.insuranceCompany && (d.insuranceCompany.includes('현대해상') || (app.insuranceCompany && d.insuranceCompany.includes(app.insuranceCompany.replace('(SCOR)', '').trim())))
+    );
+    if (matchedDir) {
+      if (!app.adjusterName) {
+        targetRecipient = `${matchedDir.firm} ${matchedDir.department || ''} ${matchedDir.contactPerson ? '(' + matchedDir.contactPerson + ')' : ''}`.trim() || targetRecipient;
+      }
+      targetNumber = matchedDir.faxNumber || targetNumber;
+    }
+  }
+
+  if (!targetNumber) {
+    targetNumber = '02-2195-5000';
+  }
+
+  // 1차 접수 서식 확인 컨텍스트 세팅
+  window.gPendingNewApp = null;
+  window.gPendingFaxDispatchParams = {
+    appId: app.id,
+    formCode: 'HD_FORM_01',
+    category: '1차접수',
+    roundNumber: 1
+  };
+
+  // 공식 HD_FORM_01 서식 미리보기 창 띄우기 (발송 확인 푸터 포함)
+  previewFormForCustomer('HD_FORM_01', app, true, targetRecipient, targetNumber);
+}
+window.openHyundaiRegistrationFaxModal = openHyundaiRegistrationFaxModal;
 
 gCurrentFaxCase = 1;
 
@@ -30865,7 +30992,11 @@ function renderApplications() {
       <td class="p-3 text-center text-slate-600">${app.accidentType || '-'}</td>
       <td class="p-3 text-center text-slate-500 font-mono">${app.applyDate || '-'}</td>
       <td class="p-3 text-center">
-        ${((app.insuranceCompany || '').includes('현대해상') && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'))) ? `
+        ${((app.insuranceCompany || '').includes('현대해상') && !isHyundaiInitialFaxSent(app) && app.status !== '완료' && app.status !== '서비스 취소' && app.status !== '취소' && app.status !== '미해당') ? `
+          <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-blue-100 text-blue-900 border border-blue-300 inline-flex items-center gap-1 shadow-2xs">
+            <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span> 팩스미발송
+          </span>
+        ` : (((app.insuranceCompany || '').includes('현대해상') && isHyundaiInitialFaxSent(app) && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'))) ? `
           <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1 shadow-2xs">
             <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> 문자대기
           </span>
@@ -30874,7 +31005,7 @@ function renderApplications() {
             app.status === '완료' ? 'bg-emerald-100 text-emerald-800' :
             app.status === '서비스 취소' ? 'bg-slate-100 text-slate-500' : 'bg-sky-100 text-sky-800'
           }">${app.status}</span>
-        `}
+        `)}
       </td>
       <td class="p-3 text-center">
         ${app.csLatestLabel ? `
@@ -30900,11 +31031,15 @@ function renderApplications() {
       <td class="p-3 max-w-xs truncate text-slate-500" title="${app.memo}">${app.memo || '-'}</td>
       <td class="p-3 text-center pr-4">
         <div class="flex items-center justify-center gap-1.5">
-          ${((app.insuranceCompany || '').includes('현대해상') && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'))) ? `
+          ${((app.insuranceCompany || '').includes('현대해상') && !isHyundaiInitialFaxSent(app) && app.status !== '완료' && app.status !== '서비스 취소' && app.status !== '취소' && app.status !== '미해당') ? `
+            <button onclick="event.stopPropagation(); openHyundaiRegistrationFaxModal('${app.id}')" class="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black text-[11px] shadow-xs flex items-center gap-1 whitespace-nowrap cursor-pointer" title="현대해상 1차 고객등록 접수 팩스 발송하기">
+              <i data-lucide="send" class="w-3 h-3"></i> 접수팩스
+            </button>
+          ` : (((app.insuranceCompany || '').includes('현대해상') && isHyundaiInitialFaxSent(app) && (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') && (!app.policyNumber || app.policyNumber === '-'))) ? `
             <button onclick="event.stopPropagation(); openHyundaiSmsInputModal('${app.id}')" class="px-2 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black text-[11px] shadow-xs flex items-center gap-1 whitespace-nowrap" title="현대해상 수신 문자 전문 붙여넣기 및 2차 정보 등록">
               <i data-lucide="message-square" class="w-3 h-3"></i> 문자등록
             </button>
-          ` : ''}
+          ` : '')}
           <button onclick="openCareCycleModal('${app.id}')" class="px-2.5 py-1 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-bold text-[11px] shadow-xs transition-all">
             관리
           </button>
@@ -35314,6 +35449,19 @@ function updateCareTypeByInsurance(insurance) {
   }
 }
 
+function submitNewAppWithMode(mode) {
+  window._gNewAppSubmitMode = mode; // 'save_only' or 'save_and_fax'
+  const form = document.getElementById('newAppForm');
+  if (form) {
+    if (typeof form.requestSubmit === 'function') {
+      form.requestSubmit();
+    } else {
+      handleNewAppSubmit();
+    }
+  }
+}
+window.submitNewAppWithMode = submitNewAppWithMode;
+
 function onNewAppInsuranceChange(insurance) {
   // 삼성/현대 상관없이 환경설정의 신규 간병신청 ID 자동 채번 설정 단일 적용
   const display = document.getElementById('newAppIdDisplay');
@@ -35329,6 +35477,8 @@ function onNewAppInsuranceChange(insurance) {
   const samsungCheckArea = document.getElementById('samsungEligibleCheckArea');
   const hyundaiWorkflowArea = document.getElementById('hyundaiWorkflowArea');
   const newAppHyundaiBanner = document.getElementById('newAppHyundaiBanner');
+  const hyundaiActionBtns = document.getElementById('newAppHyundaiActionBtns');
+  const submitBtn = document.getElementById('newAppSubmitBtn');
   const submitBtnText = document.getElementById('newAppSubmitBtnText');
   const footerNotice = document.getElementById('newAppFooterNotice');
 
@@ -35341,6 +35491,8 @@ function onNewAppInsuranceChange(insurance) {
     if (samsungExcelCard) samsungExcelCard.classList.remove('hidden');
     if (hyundaiWorkflowArea) hyundaiWorkflowArea.classList.add('hidden');
     if (newAppHyundaiBanner) newAppHyundaiBanner.classList.add('hidden');
+    if (hyundaiActionBtns) hyundaiActionBtns.classList.add('hidden');
+    if (submitBtn) submitBtn.classList.remove('hidden');
     if (submitBtnText) submitBtnText.innerText = '신청 접수 완료 (STEP 1 등록)';
     if (footerNotice) footerNotice.innerHTML = '* [신청 접수 완료] 클릭 시 간병신청대장 및 통합 간병 운영 허브에 즉시 동기화됩니다.';
   } else {
@@ -35351,11 +35503,16 @@ function onNewAppInsuranceChange(insurance) {
     if (samsungExcelCard) samsungExcelCard.classList.add('hidden');
     if (hyundaiWorkflowArea) hyundaiWorkflowArea.classList.remove('hidden');
     if (newAppHyundaiBanner) newAppHyundaiBanner.classList.remove('hidden');
-    if (submitBtnText) submitBtnText.innerText = '1차 접수 저장 & 팩스 발송 확인 📠';
-    if (footerNotice) footerNotice.innerHTML = '* 발송 수신처/팩스번호가 지정된 경우 1차 접수 팩스가 발송되며, 미지정 시 일반 접수로 등록됩니다.';
+    if (hyundaiActionBtns) {
+      hyundaiActionBtns.classList.remove('hidden');
+      hyundaiActionBtns.classList.add('flex');
+    }
+    if (submitBtn) submitBtn.classList.add('hidden');
+    if (footerNotice) footerNotice.innerHTML = '* <b>[일단 등록만 하기]</b>: 팩스 발송 없이 즉시 접수 등록 (대장 리스트에서 언제든 접수팩스 발송 가능)<br>* <b>[등록 및 접수팩스 즉시 발송]</b>: 1차 신청서 서식 확인 후 전자팩스로 즉시 전송';
   }
   initIcons();
 }
+window.onNewAppInsuranceChange = onNewAppInsuranceChange;
 
 function autoHyphenPhone(input) {
   if (!input) return;
@@ -35972,30 +36129,48 @@ function handleNewAppSubmit(e) {
       gPendingSamsungLeadData = null;
     }
 
-    if (isHyundai && targetFaxNumber) {
-      // 1차 고객등록 및 신청 팩스는 수신 팩스번호가 지정된 경우에만 미리보기 및 발송 진행
+    const submitMode = window._gNewAppSubmitMode || 'save_only';
+
+    if (isHyundai && submitMode === 'save_and_fax') {
+      if (!targetFaxNumber) {
+        alert('접수 팩스를 즉시 발송하려면 수신 팩스번호를 입력하거나 손사/지사를 검색해 선택해주세요.\n\n(팩스 없이 우선 등록하시려면 [일단 등록만 하기 (팩스 제외)]를 선택하세요.)');
+        const faxInput = document.getElementById('newAppFaxNumber');
+        if (faxInput) faxInput.focus();
+        return;
+      }
+      // 1차 고객등록 및 신청 팩스를 미리보기 후 즉시 발송
       newApp.initialFaxSent = true;
       newApp.initialFaxDate = new Date().toISOString().split('T')[0].replace(/-/g, '.');
+      newApp.hdWorkflowStage = '문자수신대기';
       newApp.pendingFaxRecipient = targetFaxRecipient || '현대해상 보상지원센터';
       newApp.pendingFaxNumber = targetFaxNumber;
 
-      // 현대해상인 경우 바로 저장/발송하지 않고, 서식 미리보기 창을 띄워 확인 후 최종 발송을 진행
       window.gPendingNewApp = newApp;
+      window.gPendingFaxDispatchParams = {
+        appId: newApp.id,
+        formCode: 'HD_FORM_01',
+        category: '1차접수',
+        roundNumber: 1
+      };
       previewFormForCustomer('HD_FORM_01', newApp, true, newApp.pendingFaxRecipient, targetFaxNumber);
       return;
     }
 
-    // 팩스번호 미지정 또는 타 보험사인 경우 즉시 접수 등록
+    // [일단 등록만 하기 (팩스 제외)] 또는 타 보험사
+    if (isHyundai) {
+      newApp.initialFaxSent = false;
+      newApp.hdWorkflowStage = '팩스미발송';
+    }
     newApp.pendingFaxRecipient = targetFaxRecipient;
     newApp.pendingFaxNumber = targetFaxNumber;
-    finalizeNewAppRegistration(newApp);
+    finalizeNewAppRegistration(newApp, false);
   } catch (err) {
     console.error('신규 접수 저장 중 오류 발생:', err);
     alert('신규 신청 저장 중 오류가 발생했습니다: ' + err.message);
   }
 }
 
-async function finalizeNewAppRegistration(newApp) {
+async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
   try {
     const isHyundai = (newApp.insuranceCompany || '').includes('현대해상');
     const newId = newApp.id;
@@ -36086,11 +36261,11 @@ async function finalizeNewAppRegistration(newApp) {
     if (typeof renderApplications === 'function') renderApplications();
     if (typeof renderDashboard === 'function') renderDashboard();
 
-    // 3. 팩스 발송 (팩스번호가 지정된 경우 별도 비동기 처리)
+    // 3. 팩스 발송 (shouldSendFax가 true이고 targetFaxNumber가 있으며 initialFaxSent가 취소되지 않은 경우에만 비동기 발송)
     let faxSentSuccess = false;
     let faxSentErrorMsg = '';
 
-    if (targetFaxNumber) {
+    if (shouldSendFax && targetFaxNumber && newApp.initialFaxSent !== false) {
       try {
         if (isHyundai) {
           if (typeof window.gInitialFaxRecords === 'undefined') {
@@ -36252,6 +36427,19 @@ async function finalizeNewAppRegistration(newApp) {
           `발송 팩스: [HD_FORM_01] 간병인지원 신청/고객등록 요청서 (수신: ${targetFaxNumber})`,
           `수신처: ${targetFaxRecipient}`,
           `진행 단계: [문자수신대기] (회신 문자 수신 시 [📱 현대 문자 등록]으로 1초 완료)`
+        ]
+      });
+    } else if (isHyundai && !isHyundaiInitialFaxSent(newApp)) {
+      showCustomAlert({
+        title: '현대해상 간병신청 접수 등록 완료 (팩스 미발송)',
+        message: `[${newId} - ${newApp.patientName} 님]의 현대해상 접수가 성공적으로 등록되었습니다.\n\n* 접수 팩스는 발송되지 않은 상태이며, 통합허브 카드 및 간병신청대장 리스트의 [접수팩스 발송하기] 버튼을 통해 언제든 1차 팩스를 송출하실 수 있습니다.`,
+        icon: 'check-circle-2',
+        iconColor: 'blue',
+        details: [
+          `접수번호: ${newId}`,
+          `피보험자: ${newApp.patientName} (${newApp.gender} · ${newApp.phone})`,
+          `원수사: ${newApp.insuranceCompany}`,
+          `진행 상태: [접수팩스 미발송] (리스트에서 [접수팩스 발송하기] 클릭 시 팩스 송출 가능)`
         ]
       });
     } else {
