@@ -1291,24 +1291,30 @@ async function loadConvexData(showSpinner = true) {
       console.log('[Data Sync Guard] Convex 응답이 이미 적용되어 로컬 JSON fallback을 무시합니다.');
       return;
     }
+    let deletedAppIdSet = new Set();
+    try {
+      const dList = JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]');
+      deletedAppIdSet = new Set((dList || []).map(String));
+    } catch (e) {}
+
     if (Array.isArray(realJson.applications) && realJson.applications.length > 0) {
-      const serverRealApps = filterInvalidSamsungDuplicates(realJson.applications).filter(a => a.isRealLaunchData);
+      const serverRealApps = filterInvalidSamsungDuplicates(realJson.applications).filter(a => a && a.isRealLaunchData && !deletedAppIdSet.has(String(a.id)));
       if (serverRealApps.length > 0) {
-        const existingNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => localApp && localApp.isRealLaunchData && !serverRealApps.some(s => s.id === localApp.id));
+        const existingNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => localApp && localApp._isJustRegistered === true && !deletedAppIdSet.has(String(localApp.id)) && !serverRealApps.some(s => s.id === localApp.id));
         gApps = sortApplicationsNewestFirst([...existingNewApps, ...serverRealApps]);
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
       }
     }
     if (Array.isArray(realJson.assignments) && realJson.assignments.length > 0) {
-      gAssigns = realJson.assignments.filter(a => a.isRealLaunchData);
+      gAssigns = realJson.assignments.filter(a => a && a.isRealLaunchData && !deletedAppIdSet.has(String(a.applyId)));
       try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
     }
     if (Array.isArray(realJson.claims) && realJson.claims.length > 0) {
-      gClaims = realJson.claims.filter(c => c.isRealLaunchData);
+      gClaims = realJson.claims.filter(c => c && c.isRealLaunchData && !deletedAppIdSet.has(String(c.applyId)));
       try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
     }
     if (Array.isArray(realJson.payouts) && realJson.payouts.length > 0) {
-      gPayouts = realJson.payouts.filter(p => p.isRealLaunchData);
+      gPayouts = realJson.payouts.filter(p => p && p.isRealLaunchData && !deletedAppIdSet.has(String(p.applyId)));
       try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
     }
     if (Array.isArray(realJson.caregivers) && realJson.caregivers.length > 0) {
@@ -1345,6 +1351,13 @@ async function loadConvexData(showSpinner = true) {
       }
       const { applications, assignments, claims, payouts, adjusters, partners, careLogs, caregivers, systemSettings } = res.value;
 
+      // 삭제 처리된 고객 식별 Set (삭제된 고객이 로컬 캐시나 레이스 컨디션으로 부활하는 현상 원천 차단)
+      let deletedAppIdSet = new Set();
+      try {
+        const dList = JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]');
+        deletedAppIdSet = new Set((dList || []).map(String));
+      } catch (e) {}
+
       // 1. 고객 신청 대장: Convex 원격 DB 기준 동기화 + 로컬 신규 등록 건 안전 보존 (Race Condition 방지)
       if (Array.isArray(applications)) {
         window._isSamsungExcelEnriched = false;
@@ -1352,16 +1365,16 @@ async function loadConvexData(showSpinner = true) {
         const serverAppIdSet = new Set(validApps.map(a => String(a.id || '')));
 
         // 로컬에만 존재하는 신규 등록 고객 (서버에 아직 미반영된 건) 추출 및 보존
+        // ⚠️ 중요: 삭제된 고객이나 기존 실데이터는 절대 임의 복원하지 않으며, 오직 방금 로컬에서 신규 생성된 건(_isJustRegistered)만 보존
         const localOnlyNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
           if (!localApp || !localApp.id) return false;
-          // 신규 등록 플래그가 있거나, 서버에 없으면서 실데이터 플래그가 있는 경우 보존
+          if (deletedAppIdSet.has(String(localApp.id))) return false;
           const isNotOnServer = !serverAppIdSet.has(String(localApp.id));
-          return isNotOnServer && (localApp._isJustRegistered || localApp.isRealLaunchData);
+          return isNotOnServer && localApp._isJustRegistered === true;
         });
 
         if (localOnlyNewApps.length > 0) {
           console.log(`[Data Sync Guard] 서버 미반영 로컬 신규 고객 ${localOnlyNewApps.length}건 보존 및 서버 재동기화 시도:`, localOnlyNewApps.map(a => `${a.id}(${a.patientName})`));
-          // 서버에 누락된 로컬 신규 건은 백그라운드로 즉시 Convex에 재전송
           localOnlyNewApps.forEach(pendingApp => {
             if (typeof syncToConvex === 'function') {
               syncToConvex('sync:saveApplication', { app: pendingApp }).catch(console.warn);
@@ -1369,7 +1382,8 @@ async function loadConvexData(showSpinner = true) {
           });
         }
 
-        gApps = sortApplicationsNewestFirst([...localOnlyNewApps, ...validApps]);
+        const filteredValidApps = validApps.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
+        gApps = sortApplicationsNewestFirst([...localOnlyNewApps, ...filteredValidApps]);
         (gApps || []).forEach(a => {
           if ((Number(a.estimatedUnpaid) || 0) <= 0 && a.unconfirmedClaimCount > 0) {
             a.unconfirmedClaimCount = 0;
@@ -1378,21 +1392,21 @@ async function loadConvexData(showSpinner = true) {
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
       }
 
-      // 2. 간병인 배정 대장 (서버 상태를 정직하게 반영 - 0건이면 0건으로 리셋)
+      // 2. 간병인 배정 대장 (서버 상태를 정직하게 반영 - 삭제된 고객 연관 배정 제외)
       if (Array.isArray(assignments)) {
-        gAssigns = assignments;
+        gAssigns = deletedAppIdSet.size > 0 ? assignments.filter(as => as && !deletedAppIdSet.has(String(as.applyId))) : assignments;
         try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
       }
 
-      // 3. 보험 청구 대장 (서버 상태를 정직하게 반영 - 0건이면 0건으로 리셋)
+      // 3. 보험 청구 대장 (서버 상태를 정직하게 반영 - 삭제된 고객 연관 청구 제외)
       if (Array.isArray(claims)) {
-        gClaims = claims;
+        gClaims = deletedAppIdSet.size > 0 ? claims.filter(c => c && !deletedAppIdSet.has(String(c.applyId))) : claims;
         try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
       }
 
-      // 4. 간병비 지급 대장 (서버 상태를 정직하게 반영 - 0건이면 0건으로 리셋하여 유령 지급대기 방지)
+      // 4. 간병비 지급 대장 (서버 상태를 정직하게 반영 - 삭제된 고객 연관 지급 제외)
       if (Array.isArray(payouts)) {
-        gPayouts = payouts;
+        gPayouts = deletedAppIdSet.size > 0 ? payouts.filter(p => p && !deletedAppIdSet.has(String(p.applyId))) : payouts;
         try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
       }
 
@@ -1427,7 +1441,10 @@ async function loadConvexData(showSpinner = true) {
           }
         });
       }
-      if (Array.isArray(careLogs) && careLogs.length > 0) gCareLogs = careLogs;
+      if (Array.isArray(careLogs)) {
+        gCareLogs = deletedAppIdSet.size > 0 ? careLogs.filter(log => log && !deletedAppIdSet.has(String(log.applyId))) : careLogs;
+        try { localStorage.setItem('LIVON_CARE_LOGS', JSON.stringify(gCareLogs)); } catch (e) {}
+      }
 
       // Convex DB에 저장된 관리자 계정(admins) 동기화 복원 (클라우드 DB가 단일 진실의 원천)
       const { admins } = res.value;
@@ -29506,51 +29523,67 @@ function initData() {
 
   // 1. 로컬 캐시(LocalStorage)에서 최신 Convex 동기화 데이터 즉시 복원 (새로고침 시 과거 시드 숫자가 깜빡이는 현상 원천 차단)
   try {
+    // 삭제 처리된 고객 톰스톤 목록 확인 및 C0653, C0654 영구 소거 보장
+    let deletedAppIdSet = new Set();
+    try {
+      const dList = JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]');
+      const merged = Array.from(new Set([...(dList || []).map(String), 'C0653', 'C0654']));
+      localStorage.setItem('LIVON_DELETED_APP_IDS', JSON.stringify(merged));
+      deletedAppIdSet = new Set(merged);
+    } catch (e) {}
+
     const cachedApps = localStorage.getItem('LIVON_CACHED_APPS');
     if (cachedApps) {
       const parsed = JSON.parse(cachedApps);
       const cleaned = (typeof filterInvalidSamsungDuplicates === 'function') ? filterInvalidSamsungDuplicates(parsed) : (Array.isArray(parsed) ? parsed.filter(a => !(a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성') && !a.isRealLaunchData)) : []);
-      const baseApps = (Array.isArray(cleaned) && cleaned.some(a => a.isRealLaunchData)) ? cleaned.filter(a => a.isRealLaunchData) : cleaned;
+      const filtered = Array.isArray(cleaned) ? cleaned.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id))) : [];
+      const baseApps = (Array.isArray(filtered) && filtered.some(a => a.isRealLaunchData)) ? filtered.filter(a => a.isRealLaunchData) : filtered;
       gApps = (typeof sortApplicationsNewestFirst === 'function') ? sortApplicationsNewestFirst(baseApps) : baseApps;
       try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
     } else if (window.REBORN_DATA && window.REBORN_DATA.applications) {
-      gApps = [...window.REBORN_DATA.applications];
+      gApps = [...window.REBORN_DATA.applications].filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
     }
 
     const cachedAssigns = localStorage.getItem('LIVON_CACHED_ASSIGNS');
     if (cachedAssigns) {
       const parsed = JSON.parse(cachedAssigns);
-      if (Array.isArray(parsed) && parsed.some(a => a.isRealLaunchData)) {
-        gAssigns = parsed.filter(a => a.isRealLaunchData);
+      const filtered = Array.isArray(parsed) ? parsed.filter(as => as && !deletedAppIdSet.has(String(as.applyId))) : [];
+      if (Array.isArray(filtered) && filtered.some(a => a.isRealLaunchData)) {
+        gAssigns = filtered.filter(a => a.isRealLaunchData);
       } else {
-        gAssigns = parsed;
+        gAssigns = filtered;
       }
+      try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
     } else if (window.REBORN_DATA && window.REBORN_DATA.assignments) {
-      gAssigns = [...window.REBORN_DATA.assignments];
+      gAssigns = [...window.REBORN_DATA.assignments].filter(as => as && !deletedAppIdSet.has(String(as.applyId)));
     }
 
     const cachedClaims = localStorage.getItem('LIVON_CACHED_CLAIMS');
     if (cachedClaims) {
       const parsed = JSON.parse(cachedClaims);
-      if (Array.isArray(parsed) && parsed.some(c => c.isRealLaunchData)) {
-        gClaims = parsed.filter(c => c.isRealLaunchData);
+      const filtered = Array.isArray(parsed) ? parsed.filter(c => c && !deletedAppIdSet.has(String(c.applyId))) : [];
+      if (Array.isArray(filtered) && filtered.some(c => c.isRealLaunchData)) {
+        gClaims = filtered.filter(c => c.isRealLaunchData);
       } else {
-        gClaims = parsed;
+        gClaims = filtered;
       }
+      try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
     } else if (window.REBORN_DATA && window.REBORN_DATA.claims) {
-      gClaims = [...window.REBORN_DATA.claims];
+      gClaims = [...window.REBORN_DATA.claims].filter(c => c && !deletedAppIdSet.has(String(c.applyId)));
     }
 
     const cachedPayouts = localStorage.getItem('LIVON_CACHED_PAYOUTS');
     if (cachedPayouts) {
       const parsed = JSON.parse(cachedPayouts);
-      if (Array.isArray(parsed) && parsed.some(p => p.isRealLaunchData)) {
-        gPayouts = parsed.filter(p => p.isRealLaunchData);
+      const filtered = Array.isArray(parsed) ? parsed.filter(p => p && !deletedAppIdSet.has(String(p.applyId))) : [];
+      if (Array.isArray(filtered) && filtered.some(p => p.isRealLaunchData)) {
+        gPayouts = filtered.filter(p => p.isRealLaunchData);
       } else {
-        gPayouts = parsed;
+        gPayouts = filtered;
       }
+      try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
     } else if (window.REBORN_DATA && window.REBORN_DATA.payouts) {
-      gPayouts = [...window.REBORN_DATA.payouts];
+      gPayouts = [...window.REBORN_DATA.payouts].filter(p => p && !deletedAppIdSet.has(String(p.applyId)));
     }
 
     const cachedAdjusters = localStorage.getItem('LIVON_CACHED_ADJUSTERS');
@@ -29598,7 +29631,13 @@ function initData() {
     try {
       const savedCareLogs = localStorage.getItem('LIVON_CARE_LOGS');
       if (savedCareLogs) {
-        gCareLogs = JSON.parse(savedCareLogs);
+        const parsedLogs = JSON.parse(savedCareLogs);
+        let deletedAppIdSet = new Set();
+        try {
+          const dList = JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]');
+          deletedAppIdSet = new Set((dList || []).map(String));
+        } catch(e) {}
+        gCareLogs = Array.isArray(parsedLogs) ? (deletedAppIdSet.size > 0 ? parsedLogs.filter(log => log && !deletedAppIdSet.has(String(log.applyId))) : parsedLogs) : [];
       } else {
         gCareLogs = [...window.REBORN_DATA.careLogs];
       }
@@ -31329,18 +31368,40 @@ function deleteSelectedApps() {
   const msg = `정말로 선택하신 ${count}명의 고객 신청 데이터를 삭제하시겠습니까?\n\n[주의사항]\n- 해당 고객의 간병신청대장 데이터가 삭제됩니다.\n- 연관된 간병인 배정 및 보험청구 내역도 함께 안전하게 정리됩니다.\n- 삭제된 데이터는 복구할 수 없습니다.\n\n진행하시려면 [확인]을 누르세요.`;
 
   if (confirm(msg)) {
-    // 1. Remove from applications
-    gApps = gApps.filter(a => !gSelectedAppIds.has(a.id));
+    const idsToDelete = Array.from(gSelectedAppIds).map(String);
+    const deleteIdSet = new Set(idsToDelete);
 
-    // 2. Remove associated assignments, claims, payouts
-    gAssigns = gAssigns.filter(as => !gSelectedAppIds.has(as.applyId));
-    gClaims = gClaims.filter(c => !gSelectedAppIds.has(c.applyId));
-    gPayouts = gPayouts.filter(p => !gSelectedAppIds.has(p.applyId));
-    gCareLogs = gCareLogs.filter(log => !gSelectedAppIds.has(log.applyId));
+    // 1. Remove from applications
+    gApps = gApps.filter(a => !deleteIdSet.has(String(a.id)));
+
+    // 2. Remove associated assignments, claims, payouts, care logs
+    gAssigns = gAssigns.filter(as => !deleteIdSet.has(String(as.applyId)));
+    gClaims = gClaims.filter(c => !deleteIdSet.has(String(c.applyId)));
+    gPayouts = gPayouts.filter(p => !deleteIdSet.has(String(p.applyId)));
+    if (Array.isArray(gCareLogs)) {
+      gCareLogs = gCareLogs.filter(log => !deleteIdSet.has(String(log.applyId)));
+    }
 
     // 3. Clear selected set
-    const idsToDelete = Array.from(gSelectedAppIds);
     gSelectedAppIds.clear();
+
+    // 4. 로컬 스토리지 톰스톤(영구 삭제 기록) 즉시 저장 (새로고침 시 캐시 및 동기화 가드로 인한 부활 원천 차단)
+    try {
+      const existing = JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]');
+      const merged = Array.from(new Set([...(existing || []).map(String), ...idsToDelete]));
+      localStorage.setItem('LIVON_DELETED_APP_IDS', JSON.stringify(merged));
+    } catch (e) {}
+
+    // 5. 로컬 캐시 즉시 업데이트 (F5 새로고침 시에도 삭제 상태 유지)
+    try {
+      localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+      localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns));
+      localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+      localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+      if (Array.isArray(gCareLogs)) {
+        localStorage.setItem('LIVON_CARE_LOGS', JSON.stringify(gCareLogs));
+      }
+    } catch (e) {}
 
     // Convex Cloud 운영 DB 실시간 비동기 삭제
     if (typeof syncToConvex === 'function') {
@@ -31363,7 +31424,7 @@ function deleteSelectedApps() {
       });
     }
 
-    // 4. Re-render all views
+    // 6. Re-render all views
     renderUnifiedCareHub();
     renderApplications();
     renderAssignments();
@@ -31384,11 +31445,33 @@ function deleteSingleApp(appId) {
   if (!app) return;
 
   if (confirm(`[${app.id} - ${app.patientName} 님]의 신청 데이터를 정말로 삭제하시겠습니까?\n연관된 배정 및 청구 내역도 함께 정리됩니다.`)) {
-    gApps = gApps.filter(a => a.id !== appId);
-    gAssigns = gAssigns.filter(as => as.applyId !== appId);
-    gClaims = gClaims.filter(c => c.applyId !== appId);
-    gPayouts = gPayouts.filter(p => p.applyId !== appId);
+    const deleteId = String(appId);
+    gApps = gApps.filter(a => String(a.id) !== deleteId);
+    gAssigns = gAssigns.filter(as => String(as.applyId) !== deleteId);
+    gClaims = gClaims.filter(c => String(c.applyId) !== deleteId);
+    gPayouts = gPayouts.filter(p => String(p.applyId) !== deleteId);
+    if (Array.isArray(gCareLogs)) {
+      gCareLogs = gCareLogs.filter(log => String(log.applyId) !== deleteId);
+    }
     gSelectedAppIds.delete(appId);
+
+    // 로컬 스토리지 톰스톤 즉시 기록
+    try {
+      const existing = JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]');
+      const merged = Array.from(new Set([...(existing || []).map(String), deleteId]));
+      localStorage.setItem('LIVON_DELETED_APP_IDS', JSON.stringify(merged));
+    } catch (e) {}
+
+    // 로컬 캐시 즉시 업데이트
+    try {
+      localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+      localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns));
+      localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+      localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+      if (Array.isArray(gCareLogs)) {
+        localStorage.setItem('LIVON_CARE_LOGS', JSON.stringify(gCareLogs));
+      }
+    } catch (e) {}
 
     // Convex Cloud 운영 DB 실시간 삭제
     if (typeof syncToConvex === 'function') {
@@ -31413,6 +31496,7 @@ function deleteSingleApp(appId) {
     renderAssignments();
     renderClaims();
     renderPayouts();
+    renderCareLogs();
     renderDashboard();
     updateSelectedHubUI();
     updateSelectedAppsUI();
