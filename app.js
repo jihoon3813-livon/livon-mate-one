@@ -1370,6 +1370,11 @@ async function loadConvexData(showSpinner = true) {
         }
 
         gApps = sortApplicationsNewestFirst([...localOnlyNewApps, ...validApps]);
+        (gApps || []).forEach(a => {
+          if ((Number(a.estimatedUnpaid) || 0) <= 0 && a.unconfirmedClaimCount > 0) {
+            a.unconfirmedClaimCount = 0;
+          }
+        });
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
       }
 
@@ -24682,6 +24687,10 @@ async function saveRoundDepositAmount(appId, roundNumber, source = 'card3') {
 
   app.depositConfirmedAmount = totalDepositConfirmed;
   app.estimatedUnpaid = totalUnpaid;
+  const unconfirmedClaims = currentAppClaims.filter(c => {
+    return !isClaimDepositConfirmed(c) && (Number(c.unpaidAmount) > 0 || (Number(c.claimAmount) > 0 && Number(c.depositAmount || 0) < Number(c.claimAmount)));
+  });
+  app.unconfirmedClaimCount = (totalUnpaid > 0) ? Math.max(1, unconfirmedClaims.length) : 0;
   app.updatedAt = new Date().toISOString();
 
   // [시스템 감사 로그 기록]
@@ -24709,6 +24718,7 @@ async function saveRoundDepositAmount(appId, roundNumber, source = 'card3') {
         fields: {
           depositConfirmedAmount: totalDepositConfirmed,
           estimatedUnpaid: totalUnpaid,
+          unconfirmedClaimCount: app.unconfirmedClaimCount,
           roundDeposits: app.roundDeposits,
           claim: claim
         }
@@ -25290,6 +25300,10 @@ async function toggleClaimDepositStatus(applyId, roundNumber, claimId) {
     const appTotalClaim = currentAppClaims.reduce((s, c) => s + (Number(c.claimAmount) || 0), 0);
     app.depositConfirmedAmount = totalDeposit;
     app.estimatedUnpaid = Math.max(0, appTotalClaim - totalDeposit);
+    const unconfirmedClaims = currentAppClaims.filter(c => {
+      return !isClaimDepositConfirmed(c) && (Number(c.unpaidAmount) > 0 || (Number(c.claimAmount) > 0 && Number(c.depositAmount || 0) < Number(c.claimAmount)));
+    });
+    app.unconfirmedClaimCount = (app.estimatedUnpaid > 0) ? Math.max(1, unconfirmedClaims.length) : 0;
     app.updatedAt = new Date().toISOString();
 
     try {
@@ -25301,6 +25315,7 @@ async function toggleClaimDepositStatus(applyId, roundNumber, claimId) {
           fields: {
             depositConfirmedAmount: totalDeposit,
             estimatedUnpaid: app.estimatedUnpaid,
+            unconfirmedClaimCount: app.unconfirmedClaimCount,
             roundDeposits: app.roundDeposits,
             claim: claim
           }
@@ -26174,6 +26189,21 @@ function renderUnifiedCareHub() {
     return true;
   };
 
+  // [미수금 대사(청구금 미입금) 정밀 판정 헬퍼]:
+  // 1. 미수금이 0원 이하(완납 또는 미수 없음)인 경우 무조건 미수금 대상에서 완전 제외
+  // 2. 미수금(estimatedUnpaid > 0)이 있는 경우 또는 연계 청구서(gClaims)에 미확인/미수납 잔액이 남아있는 경우만 포함
+  const isAppHasUnpaidClaimHelper = (app) => {
+    if (!app) return false;
+    const unpaidAmt = Number(app.estimatedUnpaid) || 0;
+    if (unpaidAmt <= 0) return false;
+
+    const appClaims = (gClaims || []).filter(c => c && (String(c.applyId) === String(app.id) || (c.patientName && c.patientName.trim() === (app.patientName || '').trim())));
+    if (appClaims.length > 0) {
+      return appClaims.some(c => !isClaimDepositConfirmed(c) && (Number(c.unpaidAmount) > 0 || (Number(c.claimAmount) > 0 && Number(c.depositAmount || 0) < Number(c.claimAmount))));
+    }
+    return true;
+  };
+
   // [Phase 2 제거됨]: 스케줄 기반 간병비 도래 계산은 엑셀 원장 기준과 불일치하여 제거
   // 지급대기 카운트는 오직 gPayouts의 payoutStatus가 명시적으로 '미지급'인 건만 반영
 
@@ -26188,7 +26218,7 @@ function renderUnifiedCareHub() {
     if (isCompletedHelper(a)) completedCount++;
     if (isNeedAssignHelper(a)) needAssignCount++;
     if (aRealSt === '진행중') inProgressCount++;
-    if (a.unconfirmedClaimCount > 0 || a.estimatedUnpaid > 0) unpaidClaimCount++;
+    if (isAppHasUnpaidClaimHelper(a)) unpaidClaimCount++;
     if (unpaidPayoutAppIdSet.has(String(a.id))) needPayoutCount++;
     if (!aIns.includes('삼성') && a.claimCount > 0 && !isClaimFaxSentHelper(a.id)) needFaxCount++;
   }
@@ -26258,7 +26288,7 @@ function renderUnifiedCareHub() {
     if (gHubFilter === 'COMPLETED' && !isCompletedHelper(app)) return false;
     if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
     if (gHubFilter === 'IN_PROGRESS' && determineRealCareStatus(app) !== '진행중') return false;
-    if (gHubFilter === 'UNPAID_CLAIM' && app.unconfirmedClaimCount === 0 && app.estimatedUnpaid === 0) return false;
+    if (gHubFilter === 'UNPAID_CLAIM' && !isAppHasUnpaidClaimHelper(app)) return false;
     if (gHubFilter === 'NEED_PAYOUT' && !unpaidPayoutAppIdSet.has(String(app.id))) return false;
     if (gHubFilter === 'NEED_FAX') {
       if (appIns.includes('삼성')) return false;
@@ -26538,9 +26568,9 @@ function renderUnifiedCareHub() {
         ? { label: '일지 연동 (' + appLogs[0].logDate + ')', color: 'purple' }
         : { label: '일지 대기', color: 'slate' });
 
-    const s4_claim = app.unconfirmedClaimCount > 0
+    const s4_claim = isAppHasUnpaidClaimHelper(app)
       ? { label: '청구금 미입금 (' + formatCurrency(app.estimatedUnpaid) + '원)', color: 'rose' }
-      : (app.claimCount > 0 ? { label: '수납완료 (' + formatCurrency(app.depositConfirmedAmount) + '원)', color: 'emerald' } : { label: '미청구', color: 'slate' });
+      : (app.claimCount > 0 || (app.depositConfirmedAmount || 0) > 0 ? { label: '수납완료 (' + formatCurrency(app.depositConfirmedAmount) + '원)', color: 'emerald' } : { label: '미청구', color: 'slate' });
 
     // 간병 기간 진행 경과 계산 (STEP 2 및 카드 헤더용)
     const careProg = as ? getCareProgressInfo(as) : (appAssigns.length > 0 ? getCareProgressInfo(appAssigns[0]) : null);
@@ -29547,6 +29577,9 @@ function initData() {
     (gApps || []).forEach(a => {
       if (!a.claimClassification && a.claimCategory) a.claimClassification = a.claimCategory;
       if (!a.claimCategory && a.claimClassification) a.claimCategory = a.claimClassification;
+      if ((Number(a.estimatedUnpaid) || 0) <= 0 && a.unconfirmedClaimCount > 0) {
+        a.unconfirmedClaimCount = 0;
+      }
     });
     if (!gAssigns || gAssigns.length === 0) gAssigns = [...window.REBORN_DATA.assignments];
     if (!gClaims || gClaims.length === 0) gClaims = [...window.REBORN_DATA.claims];
@@ -39012,14 +39045,25 @@ function handleClaimEditSubmit(e) {
   if (status === '입금완료') {
     claim.depositStatus = '입금완료';
     claim.depositAmount = newAmount;
+    claim.unpaidAmount = 0;
+    claim.adjusterStatus = '입금완료';
+  } else if (status === '미청구') {
+    claim.depositStatus = '미확인';
+    claim.unpaidAmount = Math.max(0, newAmount - (claim.depositAmount || 0));
+    claim.adjusterStatus = '청구접수';
   }
 
   const app = gApps.find(a => a.id === claim.applyId);
   if (app) {
-    const diff = newAmount - oldAmount;
-    if (claim.depositStatus === '미확인') {
-      app.estimatedUnpaid = Math.max(0, (app.estimatedUnpaid || 0) + diff);
-    }
+    const currentAppClaims = (gClaims || []).filter(c => c.applyId === app.id);
+    const totalDeposit = currentAppClaims.reduce((s, c) => s + (Number(c.depositAmount) || 0), 0);
+    const appTotalClaim = currentAppClaims.reduce((s, c) => s + (Number(c.claimAmount) || 0), 0);
+    app.depositConfirmedAmount = totalDeposit;
+    app.estimatedUnpaid = Math.max(0, appTotalClaim - totalDeposit);
+    const unconfirmedClaims = currentAppClaims.filter(c => {
+      return !isClaimDepositConfirmed(c) && (Number(c.unpaidAmount) > 0 || (Number(c.claimAmount) > 0 && Number(c.depositAmount || 0) < Number(c.claimAmount)));
+    });
+    app.unconfirmedClaimCount = (app.estimatedUnpaid > 0) ? Math.max(1, unconfirmedClaims.length) : 0;
     app.updatedAt = new Date().toISOString();
   }
 
