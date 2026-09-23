@@ -404,7 +404,7 @@ function saveSavedFaxConfig(cfg) {
     // =========================================================================
     // API Route: Email SMTP Config (이메일 발송 설정 저장 및 불러오기)
     // =========================================================================
-    if (reqPath === '/api/email/config') {
+    if (reqPath === '/api/email/config' || reqPath === '/api/email-config') {
       if (req.method === 'GET') {
         const cfg = getEmailConfig();
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -437,7 +437,7 @@ function saveSavedFaxConfig(cfg) {
     // =========================================================================
     // API Route: Email SMTP Connection Test (SMTP 연결 및 테스트 메일 발송)
     // =========================================================================
-    if (reqPath === '/api/email/test' && req.method === 'POST') {
+    if ((reqPath === '/api/email/test' || reqPath === '/api/test-email' || reqPath === '/api/email-test') && req.method === 'POST') {
       let body = '';
       req.on('data', chunk => body += chunk);
       req.on('end', async () => {

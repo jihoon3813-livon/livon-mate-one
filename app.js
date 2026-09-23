@@ -8068,12 +8068,19 @@ async function getEmailConfig() {
   } catch (e) {}
 
   try {
-    const res = await fetch('/api/email/config');
-    const data = await res.json();
-    if (data && data.config) {
-      gEmailConfigCache = data.config;
-      localStorage.setItem('LIVON_EMAIL_CONFIG', JSON.stringify(data.config));
-      return data.config;
+    let res = await fetch('/api/email/config');
+    if (!res.ok && res.status === 404) {
+      res = await fetch('/api/email-config');
+    }
+    if (res.ok) {
+      const rawText = await res.text();
+      let data = null;
+      try { data = JSON.parse(rawText); } catch (e) {}
+      if (data && data.config) {
+        gEmailConfigCache = data.config;
+        localStorage.setItem('LIVON_EMAIL_CONFIG', JSON.stringify(data.config));
+        return data.config;
+      }
     }
   } catch (e) {}
 
@@ -8192,12 +8199,27 @@ async function handleSaveEmailConfig(e) {
   const payload = { host, port, secure, user, pass, senderEmail, senderName };
 
   try {
-    const res = await fetch('/api/email/config', {
+    let res = await fetch('/api/email/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    if (!res.ok && res.status === 404) {
+      res = await fetch('/api/email-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    const rawText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      throw new Error(`서버 응답 파싱 실패 (HTTP ${res.status}): ${rawText.slice(0, 100)}`);
+    }
+
     if (data.success) {
       gEmailConfigCache = data.config;
       localStorage.setItem('LIVON_EMAIL_CONFIG', JSON.stringify(data.config));
@@ -8258,12 +8280,26 @@ async function runEmailSmtpTest() {
   }
 
   try {
-    const res = await fetch('/api/email/test', {
+    let res = await fetch('/api/email/test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ host, port, secure, user, pass, senderName, testTo })
     });
-    const data = await res.json();
+    if (!res.ok && res.status === 404) {
+      res = await fetch('/api/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host, port, secure, user, pass, senderName, testTo })
+      });
+    }
+
+    const rawText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      throw new Error(`서버 응답 파싱 실패 (HTTP ${res.status}): ${rawText.slice(0, 100)}`);
+    }
 
     if (data.success) {
       if (resultArea) {
@@ -8514,21 +8550,37 @@ async function handleSamsungEmailSubmit(e) {
   `;
 
   try {
-    const res = await fetch('/api/email/send', {
+    const emailPayload = {
+      to,
+      cc,
+      subject,
+      text: rawBody,
+      html: formattedHtml,
+      appId,
+      emailType,
+      attachments
+    };
+
+    let res = await fetch('/api/email/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to,
-        cc,
-        subject,
-        text: rawBody,
-        html: formattedHtml,
-        appId,
-        emailType,
-        attachments
-      })
+      body: JSON.stringify(emailPayload)
     });
-    const data = await res.json();
+    if (!res.ok && res.status === 404) {
+      res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emailPayload)
+      });
+    }
+
+    const rawText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      throw new Error(`서버 응답 파싱 실패 (HTTP ${res.status}): ${rawText.slice(0, 100)}`);
+    }
 
     if (!data.success) {
       if (btnSubmit) {
@@ -12101,22 +12153,37 @@ async function handleSendSamsungDailyReport(e) {
     `;
 
     // 6. 백엔드 SMTP 서버에 실제 전송 요청
-    const res = await fetch('/api/email/send', {
+    const emailPayload = {
+      to,
+      cc,
+      from: resolvedFrom,
+      subject,
+      text: body,
+      html: formattedHtml,
+      emailType: 'DAILY_INTAKE',
+      attachments
+    };
+
+    let res = await fetch('/api/email/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to,
-        cc,
-        from: resolvedFrom,
-        subject,
-        text: body,
-        html: formattedHtml,
-        emailType: 'DAILY_INTAKE',
-        attachments
-      })
+      body: JSON.stringify(emailPayload)
     });
+    if (!res.ok && res.status === 404) {
+      res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emailPayload)
+      });
+    }
 
-    const data = await res.json();
+    const rawText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      data = { success: false, error: `서버 응답 파싱 실패 (HTTP ${res.status}): ${rawText.slice(0, 100)}` };
+    }
 
     if (!res.ok || !data.success) {
       if (btnSubmit) {
@@ -12414,22 +12481,37 @@ async function handleSendSamsungMonthlyClaim(e) {
     `;
 
     // 4. 백엔드 SMTP 서버에 실제 전송 요청
-    const res = await fetch('/api/email/send', {
+    const emailPayload = {
+      to,
+      cc,
+      from: resolvedFrom,
+      subject,
+      text: body,
+      html: formattedHtml,
+      emailType: 'MONTHLY_CLAIM',
+      attachments
+    };
+
+    let res = await fetch('/api/email/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to,
-        cc,
-        from: resolvedFrom,
-        subject,
-        text: body,
-        html: formattedHtml,
-        emailType: 'MONTHLY_CLAIM',
-        attachments
-      })
+      body: JSON.stringify(emailPayload)
     });
+    if (!res.ok && res.status === 404) {
+      res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(emailPayload)
+      });
+    }
 
-    const data = await res.json();
+    const rawText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      data = { success: false, error: `서버 응답 파싱 실패 (HTTP ${res.status}): ${rawText.slice(0, 100)}` };
+    }
 
     if (!res.ok || !data.success) {
       if (btnSubmit) {
