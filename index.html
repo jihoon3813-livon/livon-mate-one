@@ -1299,9 +1299,11 @@
               <input type="hidden" id="hubInsuranceFilter" value="ALL">
 
               <select id="careHubSortSelect" onchange="changeHubSort(this.value)" class="py-1.5 px-2.5 text-xs border border-slate-300 rounded-xl bg-white font-bold text-slate-700">
-                <option value="created_desc" selected>정렬: 신청일 최신순 (수정건 맨 앞순위)</option>
-                <option value="created_pure_desc">정렬: 신청일 최신순</option>
-                <option value="created_asc">정렬: 신청일 과거순</option>
+                <option value="created_desc" selected>정렬: 신청ID 순서대로 (수정건 맨 앞순위)</option>
+                <option value="created_pure_desc">정렬: 신청ID 최신순</option>
+                <option value="created_asc">정렬: 신청ID 과거순</option>
+                <option value="apply_date_desc">정렬: 신청일 최신순</option>
+                <option value="apply_date_asc">정렬: 신청일 과거순</option>
                 <option value="cs_priority">정렬: CS/민원 우선</option>
                 <option value="cs_label">정렬: CS/민원 라벨순</option>
                 <option value="updated_desc">정렬: 최근 수정순</option>
@@ -10316,6 +10318,6 @@
   <script src="samsung-call-report.js?v=20260920_1330"></script>
   <script src="total-call-analysis.js?v=20260921_1005"></script>
   <script src="system-audit-log.js?v=20260922_1040"></script>
-  <script src="app.js?v=20260923_1320"></script>
+  <script src="app.js?v=20260923_1330"></script>
 </body>
 </html>

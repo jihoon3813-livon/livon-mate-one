@@ -1221,19 +1221,30 @@ function sortApplicationsNewestFirst(apps) {
   };
 
   return [...apps].sort((a, b) => {
+    // 1. 방금 등록된 고객(_isJustRegistered)은 무조건 맨 처음(최상단)
     if (a && a._isJustRegistered && !(b && b._isJustRegistered)) return -1;
     if (!(a && a._isJustRegistered) && b && b._isJustRegistered) return 1;
 
-    // [사용자 요구사항]: 신규는 무조건 맨 처음 (접수, 신규, 신청 상태 고객 최상단 고정)
-    const isNewA = (a && (a.status === '접수' || a.status === '신규' || a.status === '신청' || a.status === '간병신청')) ? 1 : 0;
-    const isNewB = (b && (b.status === '접수' || b.status === '신규' || b.status === '신청' || b.status === '간병신청')) ? 1 : 0;
-    if (isNewA !== isNewB) return isNewB - isNewA;
+    // 2. [사용자 요구사항]: 수정건 맨 앞순위 (미확인 수정/민원 발생건 최상단 노출)
+    const modA = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(a) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a) ? 1 : 0);
+    const modB = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(b) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(b) ? 1 : 0);
+    if (modA !== modB) return modB - modA;
+    if (modA === 1 && modB === 1) {
+      const tA = typeof getAppLatestEventTime === 'function' ? getAppLatestEventTime(a) : 0;
+      const tB = typeof getAppLatestEventTime === 'function' ? getAppLatestEventTime(b) : 0;
+      if (tB !== tA) return tB - tA;
+    }
 
+    // 3. [사용자 요구사항]: 기본 정렬을 신청ID 순서대로 (숫자 기반 내림차순: C0652 -> C0651...)
+    const idA = String(a?.id || '');
+    const idB = String(b?.id || '');
+    const idComp = idB.localeCompare(idA, undefined, { numeric: true });
+    if (idComp !== 0) return idComp;
+
+    // 동순위 시 접수일시 최신순
     const tA = a ? parseTime(a.applyDate) : 0;
     const tB = b ? parseTime(b.applyDate) : 0;
-    if (tB !== tA) return tB - tA;
-
-    return String(b?.id || '').localeCompare(String(a?.id || ''), undefined, { numeric: true });
+    return tB - tA;
   });
 }
 window.sortApplicationsNewestFirst = sortApplicationsNewestFirst;
@@ -26369,28 +26380,16 @@ function renderUnifiedCareHub() {
   }
 
   filtered.sort((a, b) => {
-    // [사용자 규칙 1]: 방금 등록된 고객(_isJustRegistered)은 무조건 맨 처음(최상단)
+    // 1. 방금 등록된 고객(_isJustRegistered)은 무조건 맨 처음(최상단)
     if (a && a._isJustRegistered && !(b && b._isJustRegistered)) return -1;
     if (!(a && a._isJustRegistered) && b && b._isJustRegistered) return 1;
-
-    // [사용자 규칙 2]: 신규(status === '접수' || status === '신규' || status === '신청') 고객은 무조건 맨 처음(최상단) 고정!
-    const isNewA = (a && (a.status === '접수' || a.status === '신규' || a.status === '신청' || a.status === '간병신청')) ? 1 : 0;
-    const isNewB = (b && (b.status === '접수' || b.status === '신규' || b.status === '신청' || b.status === '간병신청')) ? 1 : 0;
-    if (isNewA !== isNewB) {
-      return isNewB - isNewA;
-    }
-    if (isNewA === 1 && isNewB === 1) {
-      const diff = (b._applyTime || 0) - (a._applyTime || 0);
-      if (diff !== 0) return diff;
-      return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
-    }
 
     if (gHubSort === 'status_inprogress') {
       const isInProgress = (app) => (app.status && (app.status.includes('진행') || app.status === '정상' || app.status === '배정완료' || app.status === '간병중')) ? 1 : 0;
       const pA = isInProgress(a);
       const pB = isInProgress(b);
       if (pA !== pB) return pB - pA;
-      return (b._applyTime || 0) - (a._applyTime || 0);
+      return String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
     }
     if (gHubSort === 'cs_priority') {
       const getWeight = (app) => {
@@ -26408,8 +26407,7 @@ function renderUnifiedCareHub() {
       return (a.csLatestLabel || 'zzz').localeCompare(b.csLatestLabel || 'zzz', 'ko');
     }
     if (gHubSort === 'created_desc') {
-      // [사용자 요구사항]: 기본 정렬은 신청일 최신순이지만, 고객정보 수정(민원발생 등) 미확인건이 발생하면 맨 앞순위로 최상단 노출
-      // 확인(확인 버튼 클릭) 시 원래 신청일 순서로 자동 복귀
+      // [사용자 요구사항]: 기본 정렬을 신청ID순서대로 (수정건 맨 앞순위)
       const modA = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(a) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a) ? 1 : 0);
       const modB = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(b) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(b) ? 1 : 0);
       if (modA !== modB) return modB - modA;
@@ -26418,22 +26416,34 @@ function renderUnifiedCareHub() {
         const evDiff = (b._latestEventTime || 0) - (a._latestEventTime || 0);
         if (evDiff !== 0) return evDiff;
       }
-      // 등록순 최신 = 고객접수일(applyDate) 최신순
-      const diff = (b._applyTime || 0) - (a._applyTime || 0);
-      if (diff !== 0) return diff;
-      return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
+      // 신청ID 순서대로 (숫자 기반 내림차순: C0652 -> C0651...)
+      const idComp = String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
+      if (idComp !== 0) return idComp;
+      return (b._applyTime || 0) - (a._applyTime || 0);
     }
     if (gHubSort === 'created_pure_desc') {
-      // [사용자 요구사항]: 정렬 : 신청일 최신순 (수정건 맨 앞순위 적용 없이 순수 신청일 최신순 정렬)
+      // [사용자 요구사항]: 순수 신청ID 최신순 (수정건 맨 앞순위 적용 없이 순수 신청ID 최신순 정렬)
+      const idComp = String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
+      if (idComp !== 0) return idComp;
+      return (b._applyTime || 0) - (a._applyTime || 0);
+    }
+    if (gHubSort === 'created_asc' || gHubSort === 'id_asc') {
+      // 신청ID 과거순 (C0001 -> C0002...)
+      const idComp = String(a.id || '').localeCompare(String(b.id || ''), undefined, { numeric: true });
+      if (idComp !== 0) return idComp;
+      return (a._applyTime || 0) - (b._applyTime || 0);
+    }
+    if (gHubSort === 'apply_date_desc') {
+      // 고객접수일(applyDate) 최신순
       const diff = (b._applyTime || 0) - (a._applyTime || 0);
       if (diff !== 0) return diff;
-      return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
+      return String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
     }
-    if (gHubSort === 'created_asc') {
-      // 등록순 과거 = 고객접수일(applyDate) 과거순
+    if (gHubSort === 'apply_date_asc') {
+      // 고객접수일(applyDate) 과거순
       const diff = (a._applyTime || 0) - (b._applyTime || 0);
       if (diff !== 0) return diff;
-      return (a.id || '').localeCompare(b.id || '', undefined, { numeric: true });
+      return String(a.id || '').localeCompare(String(b.id || ''), undefined, { numeric: true });
     }
     if (gHubSort === 'updated_desc') {
       const tA = (a._latestEventTime || a._updTime || a._applyTime || 0);
@@ -26446,7 +26456,12 @@ function renderUnifiedCareHub() {
     if (gHubSort === 'name_desc') {
       return (b.patientName || '').localeCompare(a.patientName || '', 'ko');
     }
-    return 0;
+
+    // 기본 폴백: 수정건 맨 앞순위 -> 신청ID 순서대로
+    const modA = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(a) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a) ? 1 : 0);
+    const modB = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(b) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(b) ? 1 : 0);
+    if (modA !== modB) return modB - modA;
+    return String(b.id || '').localeCompare(String(a.id || ''), undefined, { numeric: true });
   });
 
   const countEl = document.getElementById('hubFilteredCount');
@@ -31564,7 +31579,7 @@ function renderApplications() {
 
     const start = (gAppCurrentPage - 1) * pageSize;
     const end = start + pageSize;
-    displayList = filtered.slice(start, end);
+    displayList = sorted.slice(start, end);
   }
 
   tbody.innerHTML = displayList.map(app => {
