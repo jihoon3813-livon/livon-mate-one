@@ -41744,11 +41744,12 @@ function extractCareCalendarEvents() {
     const realCareSt = (typeof determineRealCareStatus === 'function') ? determineRealCareStatus(app, [as]) : '';
     const isAppOngoing = (realCareSt === '진행중');
 
+    const isOngoingWithoutEndDate = Boolean(isAppOngoing && (!endStr || endStr === '진행중' || endStr === '-'));
+
     if (!parsedEnd) {
       if (isAppOngoing) {
-        const expDays = parseInt(String(app.expectedDays || '').replace(/[^0-9]/g, ''), 10) || 10;
-        const estEnd = new Date(parsedStart.getTime() + expDays * 24 * 60 * 60 * 1000);
-        parsedEnd = estEnd > now ? estEnd : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+        // 진행중인 건: 임의의 미래 날짜(10일/14일 등)를 만들어내지 않고, 현재(오늘 23:59:59)까지로 설정하여 타임라인이 오늘까지 표시되도록 함
+        parsedEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
       } else {
         return;
       }
@@ -41765,7 +41766,7 @@ function extractCareCalendarEvents() {
     let status = 'COMPLETED'; // 기본: 종료
     
     // 1. 종료일시가 오늘 날짜 이전이면 무조건 종료(COMPLETED)!
-    if (parsedEnd && (endZero < todayZero || (endZero.getTime() === todayZero.getTime() && now > parsedEnd))) {
+    if (parsedEnd && !isOngoingWithoutEndDate && (endZero < todayZero || (endZero.getTime() === todayZero.getTime() && now > parsedEnd))) {
       status = 'COMPLETED';
     }
     // 2. 시작일시가 오늘 날짜 이후(미래)이면 무조건 예정(UPCOMING)!
@@ -41783,7 +41784,7 @@ function extractCareCalendarEvents() {
 
     const elapsedDays = status === 'UPCOMING' ? 0 : 
       status === 'COMPLETED' ? totalDays : 
-      Math.min(totalDays, calculateCareDays24h(parsedStart, now));
+      Math.max(1, Math.round((todayZero - startZero) / (24 * 60 * 60 * 1000)) + 1);
     const remainingDays = Math.max(0, totalDays - elapsedDays);
 
     // 💡 [핵심] 고객별 주요체크사항 파싱 (환자 임상 주의점 + 진단명 + 메모 + CS/민원 이력)
@@ -41881,6 +41882,7 @@ function extractCareCalendarEvents() {
       elapsedDays,
       remainingDays,
       status, // 'ONGOING' | 'UPCOMING' | 'COMPLETED'
+      isOngoingWithoutEndDate,
       // 주요체크사항 & CS
       checkPoints,
       csRecords,
@@ -41904,14 +41906,16 @@ function extractCareCalendarEvents() {
     const now = new Date();
     if (!parsedStart) parsedStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
 
-    const expDays = parseInt(String(app.expectedDays || '').replace(/[^0-9]/g, ''), 10) || 10;
-    const estEnd = new Date(parsedStart.getTime() + expDays * 24 * 60 * 60 * 1000);
-    const parsedEnd = estEnd > now ? estEnd : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+    const isOngoingWithoutEndDate = (!app.careEndDate || app.careEndDate === '진행중' || app.careEndDate === '-');
+    const parsedEnd = (app.careEndDate && parseCareDate(app.careEndDate))
+      ? parseCareDate(app.careEndDate)
+      : new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
     const totalDays = calculateCareDays24h(parsedStart, parsedEnd);
-    const elapsedDays = Math.min(totalDays, calculateCareDays24h(parsedStart, now));
-
     const startZero = new Date(parsedStart.getFullYear(), parsedStart.getMonth(), parsedStart.getDate());
+    const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const elapsedDays = Math.max(1, Math.round((todayZero - startZero) / (24 * 60 * 60 * 1000)) + 1);
+
     const endZero = new Date(parsedEnd.getFullYear(), parsedEnd.getMonth(), parsedEnd.getDate());
 
     const checkPoints = [];
@@ -41934,27 +41938,27 @@ function extractCareCalendarEvents() {
       phone: app.phone || '',
       age: app.age || '',
       gender: app.gender || '',
-      hospitalName: app.hospitalName || app.addressDetail || '병원 미지정',
+      hospitalName: app.hospitalName || '병원 미지정',
       roomNumber: app.roomNumber || '',
       diseaseName: app.diseaseName || '일반케어',
       sido: app.sido || '',
       sigungu: app.sigungu || '',
       specialNotes: app.specialNotes || app.memo || '',
       insuranceCompany: app.insuranceCompany || '현대해상',
-      policyNumber: app.policyNumber || app.accidentNumber || '-',
+      policyNumber: app.policyNumber || '-',
       adjusterName: app.adjusterName || '-',
       adjusterPhone: app.adjusterPhone || '',
       adjusterFax: app.adjusterFax || '',
       adjusterFirm: app.adjusterFirm || '',
-      caregiverName: app.caregiverName || '간병인 배정 대기',
-      caregiverPhone: '',
-      centerName: '배정 진행중',
+      caregiverName: app.caregiverName || '간병인 배정대기',
+      caregiverPhone: app.caregiverPhone || '',
+      centerName: app.caregiverCenter || '협력센터',
       centerPhone: '',
-      dailyWage: 140000,
-      settlementType: '센터',
-      caregiverCert: '간병사',
+      dailyWage: app.dailyWage || 140000,
+      settlementType: '개인',
+      caregiverCert: '간병사 1급',
       startDate: startStr,
-      endDate: (app.careEndDate || (parsedEnd ? `${parsedEnd.getFullYear()}.${String(parsedEnd.getMonth()+1).padStart(2, '0')}.${String(parsedEnd.getDate()).padStart(2, '0')}` : '')),
+      endDate: app.careEndDate || '',
       parsedStart,
       parsedEnd,
       startZero,
@@ -41963,6 +41967,7 @@ function extractCareCalendarEvents() {
       elapsedDays,
       remainingDays: Math.max(0, totalDays - elapsedDays),
       status: 'ONGOING',
+      isOngoingWithoutEndDate,
       checkPoints,
       csRecords: app.csRecords || [],
       isAttentionNeeded: checkPoints.length > 0,
@@ -42567,7 +42572,7 @@ function renderCareCalendarTimelineView(events) {
                     <div onclick="openCalendarEventDetail('${evt.applyId}', '${evt.assignId}')"
                       class="absolute z-10 h-9 rounded-xl bg-gradient-to-r ${barGrad} border shadow-xs ${spanDays === 1 ? 'px-1 justify-center' : 'px-2.5 justify-between'} flex items-center gap-1 cursor-pointer hover:shadow-md hover:scale-[1.006] transition-all overflow-hidden select-none"
                       style="left: calc(${leftPercent}% + 2px); width: calc(${widthPercent}% - 4px); ${spanDays === 1 ? 'min-width: 44px;' : ''}"
-                      title="[${evt.insuranceCompany}] ${maskName(evt.patientName)} (${evt.startDate} ~ ${evt.endDate}, 총 ${evt.totalDays}일) | 간병인: ${maskName(evt.caregiverName)} (${(evt.dailyWage || 0).toLocaleString()}원)">
+                      title="[${evt.insuranceCompany}] ${maskName(evt.patientName)} (${evt.isOngoingWithoutEndDate ? `${evt.startDate} ~ 진행중 (${evt.elapsedDays}일차)` : `${evt.startDate} ~ ${evt.endDate}, 총 ${evt.totalDays}일`}) | 간병인: ${maskName(evt.caregiverName)} (${(evt.dailyWage || 0).toLocaleString()}원)">
                       
                       ${spanDays === 1 ? `
                         <!-- 1일 일정: 고객 이름 100% 최우선 표출 (글자 잘림 및 뱃지 가림 방지) -->
@@ -42588,12 +42593,12 @@ function renderCareCalendarTimelineView(events) {
                           <div class="flex items-center gap-0.5 shrink-0">
                             ${evt.isAttentionNeeded ? `<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>` : ''}
                             ${evt.status === 'ONGOING' 
-                              ? `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>` 
-                              : `<span class="text-[8.5px] font-mono text-white/70">2일</span>`}
+                              ? `<span class="text-[8.5px] font-mono font-bold text-emerald-200">${evt.elapsedDays}일차</span>` 
+                              : `<span class="text-[8.5px] font-mono text-white/70">${spanDays}일</span>`}
                           </div>
                         </div>
                       ` : `
-                        <!-- 3일 이상 일정: 고객명 + 간병인 + 총일수 + 상세 뱃지 -->
+                        <!-- 3일 이상 일정: 고객명 + 간병인 + 일수 + 상세 뱃지 -->
                         <div class="flex items-center gap-1.5 truncate min-w-0">
                           ${hasPrevOverflow ? `<span class="text-[9px] font-black text-amber-200 animate-pulse shrink-0">◀</span>` : ''}
                           <div class="font-black text-xs truncate flex items-center gap-1">
@@ -42601,7 +42606,9 @@ function renderCareCalendarTimelineView(events) {
                             <span class="text-[11px] font-normal text-white/80 truncate">(${maskName(evt.caregiverName)})</span>
                           </div>
                           <span class="text-[10px] font-mono font-medium text-white/90 shrink-0 hidden md:inline">
-                            · ${spanDays}일간 (${evt.startDate.slice(5)} ~ ${evt.endDate.slice(5)})
+                            ${evt.isOngoingWithoutEndDate
+                              ? `· ${evt.elapsedDays}일차 (${evt.startDate.slice(5)} ~ 진행중)`
+                              : `· ${spanDays}일간 (${evt.startDate.slice(5)} ~ ${evt.endDate.slice(5)})`}
                           </span>
                         </div>
 
@@ -42976,7 +42983,7 @@ function renderCareCalendarAllPeriodTimelineView(events) {
                     <div onclick="openCalendarEventDetail('${evt.applyId}', '${evt.assignId}')"
                       class="absolute z-10 h-9 rounded-xl bg-gradient-to-r ${barGrad} border shadow-xs ${spanDays === 1 ? 'px-1 justify-center' : 'px-2.5 justify-between'} flex items-center gap-1 cursor-pointer hover:shadow-md hover:scale-[1.006] transition-all overflow-hidden select-none"
                       style="left: ${barLeft + 2}px; width: ${barWidth - 4}px; ${spanDays === 1 ? 'min-width: 28px;' : ''}"
-                      title="[${evt.insuranceCompany}] ${maskName(evt.patientName)} (${evt.startDate} ~ ${evt.endDate}, 총 ${evt.totalDays}일) | 간병인: ${maskName(evt.caregiverName)} (${(evt.dailyWage || 0).toLocaleString()}원)">
+                      title="[${evt.insuranceCompany}] ${maskName(evt.patientName)} (${evt.isOngoingWithoutEndDate ? `${evt.startDate} ~ 진행중 (${evt.elapsedDays}일차)` : `${evt.startDate} ~ ${evt.endDate}, 총 ${evt.totalDays}일`}) | 간병인: ${maskName(evt.caregiverName)} (${(evt.dailyWage || 0).toLocaleString()}원)">
                       
                       ${spanDays <= 2 ? `
                         <!-- 1~2일 일정 -->
@@ -42994,7 +43001,9 @@ function renderCareCalendarAllPeriodTimelineView(events) {
                             <span class="text-[11px] font-normal text-white/80 truncate">(${maskName(evt.caregiverName)})</span>
                           </div>
                           <span class="text-[10px] font-mono font-medium text-white/90 shrink-0 hidden md:inline">
-                            · ${evt.totalDays}일간 (${evt.startDate.slice(5)} ~ ${evt.endDate.slice(5)})
+                            ${evt.isOngoingWithoutEndDate
+                              ? `· ${evt.elapsedDays}일차 (${evt.startDate.slice(5)} ~ 진행중)`
+                              : `· ${evt.totalDays}일간 (${evt.startDate.slice(5)} ~ ${evt.endDate.slice(5)})`}
                           </span>
                         </div>
 
@@ -43228,7 +43237,7 @@ function renderCareCalendarSpanMonthView(events) {
                         </span>
                       ` : ''}
                       <span class="text-[10px] font-mono bg-white/20 px-1 py-0.2 rounded font-bold">
-                        ${evt.totalDays}일간
+                        ${evt.isOngoingWithoutEndDate ? `${evt.elapsedDays}일차` : `${evt.totalDays}일간`}
                       </span>
                       ${hasRightCont ? `<span class="text-[10px] font-black text-amber-200">▶</span>` : ''}
                     </div>
@@ -43525,7 +43534,7 @@ function renderCareCalendarWeekView(events) {
                       ${maskName(evt.patientName)}
                       <span class="text-[11px] font-normal text-slate-500 font-mono">(${evt.gender ? evt.gender + '/' : ''}${evt.age ? evt.age + '세' : ''})</span>
                     </b>
-                    <span class="text-[10px] text-slate-400 font-mono">${evt.totalDays}일간</span>
+                    <span class="text-[10px] text-slate-400 font-mono">${evt.isOngoingWithoutEndDate ? `${evt.elapsedDays}일차` : `${evt.totalDays}일간`}</span>
                   </div>
                   <div class="text-[11px] text-slate-600 font-medium mt-0.5 truncate flex items-center gap-1">
                     <i data-lucide="building" class="w-3 h-3 text-slate-400 shrink-0"></i>
@@ -43763,7 +43772,11 @@ function openCalendarEventDetail(applyId, assignId) {
         <div>
           <span class="text-slate-400 block text-[11px]">간병 기간:</span>
           <span class="font-mono text-slate-800 font-bold block">${evt.startDate}</span>
-          <span class="font-mono text-slate-500 text-[10.5px]">~ ${evt.endDate} (${evt.totalDays}일)</span>
+          <span class="font-mono text-slate-500 text-[10.5px]">
+            ${evt.isOngoingWithoutEndDate 
+              ? `~ 진행중 (${evt.elapsedDays}일차)` 
+              : `~ ${evt.endDate} (총 ${evt.totalDays}일)`}
+          </span>
         </div>
       </div>
     </div>
