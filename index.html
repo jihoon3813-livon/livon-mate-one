@@ -1428,26 +1428,32 @@
         <!-- KPI 4 Cards -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
           <!-- Card 1: 당월 총 일정 -->
-          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+          <div id="calKpiCardTotal" onclick="setCareCalendarKpiFilter('ALL')" 
+            class="cal-kpi-card bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:border-sky-300 hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-between cursor-pointer select-none active:scale-[0.98]"
+            title="클릭 시 전체 일정 표시 (필터 해제)">
             <div>
-              <div class="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+              <div class="text-[11px] font-bold text-slate-500 flex items-center gap-1.5">
                 <i data-lucide="calendar-check-2" class="w-3.5 h-3.5 text-sky-500"></i>
                 <span id="calKpiTotalMonthLabel">당월 전체 간병일정</span>
+                <span id="calKpiBadgeTotal" class="hidden px-1.5 py-0.2 rounded-full text-[9px] font-black bg-sky-100 text-sky-700 border border-sky-300">전체보기</span>
               </div>
               <div class="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1" id="calKpiTotalCount">0건</div>
               <div class="text-[10.5px] text-slate-400 mt-0.5" id="calKpiTotalDays">당월 진행·예정·완료 전체</div>
             </div>
-            <div class="w-11 h-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100">
+            <div class="w-11 h-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100 shadow-2xs">
               <i data-lucide="calendar-range" class="w-5 h-5"></i>
             </div>
           </div>
 
           <!-- Card 2: 현재 간병 진행중 -->
-          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+          <div id="calKpiCardActive" onclick="setCareCalendarKpiFilter('ONGOING')" 
+            class="cal-kpi-card bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:border-sky-300 hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-between cursor-pointer select-none active:scale-[0.98]"
+            title="클릭 시 '현재 간병 진행중' 일정만 필터링 (다시 클릭하면 해제)">
             <div>
-              <div class="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+              <div class="text-[11px] font-bold text-slate-500 flex items-center gap-1.5">
                 <i data-lucide="activity" class="w-3.5 h-3.5 text-sky-600"></i>
                 <span class="text-sky-800 font-bold">현재 간병 진행중</span>
+                <span id="calKpiBadgeActive" class="hidden px-1.5 py-0.2 rounded-full text-[9px] font-black bg-sky-600 text-white shadow-2xs">필터적용</span>
               </div>
               <div class="text-xl sm:text-2xl font-black text-sky-600 font-mono mt-1" id="calKpiActiveCount">0건</div>
               <div class="text-[10.5px] text-sky-600 font-medium mt-0.5 flex items-center gap-1">
@@ -1455,37 +1461,43 @@
                 <span id="calKpiActiveDetail">실시간 간병 진행중 (통합허브 동기화)</span>
               </div>
             </div>
-            <div class="w-11 h-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100">
+            <div class="w-11 h-11 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100 shadow-2xs">
               <i data-lucide="user-check" class="w-5 h-5"></i>
             </div>
           </div>
 
           <!-- Card 3: 금주 시작/종료 예정 -->
-          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+          <div id="calKpiCardWeek" onclick="setCareCalendarKpiFilter('WEEK_SCHEDULE')" 
+            class="cal-kpi-card bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs hover:border-indigo-300 hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-between cursor-pointer select-none active:scale-[0.98]"
+            title="클릭 시 '금주 시작/종료 예정' 일정만 필터링 (다시 클릭하면 해제)">
             <div>
-              <div class="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+              <div class="text-[11px] font-bold text-slate-500 flex items-center gap-1.5">
                 <i data-lucide="arrow-left-right" class="w-3.5 h-3.5 text-indigo-500"></i>
                 <span>금주 시작 / 종료 예정</span>
+                <span id="calKpiBadgeWeek" class="hidden px-1.5 py-0.2 rounded-full text-[9px] font-black bg-indigo-600 text-white shadow-2xs">필터적용</span>
               </div>
               <div class="text-xl sm:text-2xl font-black text-indigo-900 font-mono mt-1" id="calKpiWeekSchedule">0 / 0건</div>
               <div class="text-[10.5px] text-slate-500 mt-0.5" id="calKpiWeekScheduleDetail">시작 0건 · 종료 0건</div>
             </div>
-            <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+            <div class="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100 shadow-2xs">
               <i data-lucide="clock" class="w-5 h-5"></i>
             </div>
           </div>
 
           <!-- Card 4: 중점 관리 (주의/민원 대상자) -->
-          <div class="bg-white p-4 rounded-2xl border border-amber-200 bg-amber-50/30 shadow-2xs hover:shadow-md transition-all flex items-center justify-between">
+          <div id="calKpiCardAttention" onclick="setCareCalendarKpiFilter('ATTENTION')" 
+            class="cal-kpi-card bg-white p-4 rounded-2xl border border-amber-200 bg-amber-50/30 shadow-2xs hover:border-amber-400 hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-between cursor-pointer select-none active:scale-[0.98]"
+            title="클릭 시 '중점관리(주의·민원)' 대상자만 필터링 (다시 클릭하면 해제)">
             <div>
-              <div class="text-[11px] font-bold text-amber-800 flex items-center gap-1">
+              <div class="text-[11px] font-bold text-amber-800 flex items-center gap-1.5">
                 <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600"></i>
                 <span>중점관리 (주의·민원)</span>
+                <span id="calKpiBadgeAttention" class="hidden px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-600 text-white shadow-2xs">필터적용</span>
               </div>
               <div class="text-xl sm:text-2xl font-black text-amber-900 font-mono mt-1" id="calKpiAttentionCount">0명</div>
               <div class="text-[10.5px] text-amber-700 font-medium mt-0.5" id="calKpiAttentionDetail">치매·낙상주의·강성CS 등</div>
             </div>
-            <div class="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200">
+            <div class="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200 shadow-2xs">
               <i data-lucide="shield-alert" class="w-5 h-5"></i>
             </div>
           </div>
@@ -1585,6 +1597,7 @@
               <select id="calFilterStatus" onchange="onCareCalendarFilterChange()" class="w-full p-2 border border-slate-200 rounded-xl bg-white font-bold text-slate-800">
                 <option value="ALL">전체 상태</option>
                 <option value="ONGOING">간병진행중 (활동)</option>
+                <option value="WEEK_SCHEDULE">금주 시작·종료 예정</option>
                 <option value="UPCOMING">간병예정</option>
                 <option value="COMPLETED">간병종료</option>
                 <option value="ATTENTION">⚠️ 중점관리 (주의·민원만)</option>
@@ -10318,6 +10331,6 @@
   <script src="samsung-call-report.js?v=20260920_1330"></script>
   <script src="total-call-analysis.js?v=20260921_1005"></script>
   <script src="system-audit-log.js?v=20260922_1040"></script>
-  <script src="app.js?v=20260923_1425"></script>
+  <script src="app.js?v=20260923_1430"></script>
 </body>
 </html>

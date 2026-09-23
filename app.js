@@ -41911,14 +41911,23 @@ function renderCareCalendar() {
     populateCalendarCenterFilter(allEvents);
 
     // 2. 현재 선택된 필터에 따라 이벤트 필터링
+    const now = new Date();
+    const curDay = now.getDay() || 7;
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - curDay + 1);
+    const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - curDay + 7, 23, 59, 59);
+
     const filteredEvents = allEvents.filter(evt => {
       // 보험사 필터
       if (gCalendarFilters.insurance !== 'ALL' && !(evt.insuranceCompany || '').includes(gCalendarFilters.insurance)) {
         return false;
       }
-      // 상태 필터
+      // 상태 필터 (상단 4대 숫자카드 클릭 연동)
       if (gCalendarFilters.status === 'ATTENTION') {
         if (!evt.isAttentionNeeded) return false;
+      } else if (gCalendarFilters.status === 'WEEK_SCHEDULE') {
+        const isStartThisWeek = evt.parsedStart >= weekStart && evt.parsedStart <= weekEnd;
+        const isEndThisWeek = evt.parsedEnd >= weekStart && evt.parsedEnd <= weekEnd;
+        if (!isStartThisWeek && !isEndThisWeek) return false;
       } else if (gCalendarFilters.status !== 'ALL' && evt.status !== gCalendarFilters.status) {
         return false;
       }
@@ -41942,6 +41951,9 @@ function renderCareCalendar() {
 
     // 3. 상단 4대 KPI 요약 집계
     updateCareCalendarKpis(allEvents);
+
+    // 3-1. 상단 4대 숫자카드 선택 비주얼 하이라이트 동기화
+    updateCalendarKpiCardStyles();
 
     // 4. 헤더 날짜 레이블 및 뷰 모드 토글 스타일 갱신
     updateCareCalendarHeaderDisplay();
@@ -42056,6 +42068,65 @@ function updateCareCalendarKpis(events) {
   const elAttentionDetail = document.getElementById('calKpiAttentionDetail');
   if (elAttentionDetail) elAttentionDetail.innerText = `석션·중환자실·골절·교체 등 ${attentionCount}명`;
 }
+
+/**
+ * 상단 4대 숫자카드 클릭 시 캘린더 자동 필터링 및 토글
+ * @param {'ALL' | 'ONGOING' | 'WEEK_SCHEDULE' | 'ATTENTION'} targetStatus
+ */
+function setCareCalendarKpiFilter(targetStatus) {
+  // 이미 활성화된 상태를 다시 클릭하면 'ALL'(전체)로 토글 해제 (단, ALL을 누르면 항상 ALL 유지)
+  if (gCalendarFilters.status === targetStatus && targetStatus !== 'ALL') {
+    gCalendarFilters.status = 'ALL';
+  } else {
+    gCalendarFilters.status = targetStatus;
+  }
+
+  // 필터 셀렉트 드롭다운 동기화
+  const statusSelect = document.getElementById('calFilterStatus');
+  if (statusSelect) {
+    statusSelect.value = gCalendarFilters.status;
+  }
+
+  // 캘린더 리렌더링 (카드 스타일 동기화 포함)
+  renderCareCalendar();
+}
+window.setCareCalendarKpiFilter = setCareCalendarKpiFilter;
+
+/**
+ * 상단 4대 KPI 숫자카드의 활성(선택) 상태 비주얼 스타일 갱신
+ */
+function updateCalendarKpiCardStyles() {
+  const current = gCalendarFilters.status || 'ALL';
+
+  const cards = [
+    { id: 'calKpiCardTotal', status: 'ALL', activeClass: 'border-sky-400 ring-2 ring-sky-300/60 bg-sky-50/40 shadow-sm', badgeId: 'calKpiBadgeTotal' },
+    { id: 'calKpiCardActive', status: 'ONGOING', activeClass: 'border-sky-500 ring-2 ring-sky-400/60 bg-sky-50/60 shadow-sm', badgeId: 'calKpiBadgeActive' },
+    { id: 'calKpiCardWeek', status: 'WEEK_SCHEDULE', activeClass: 'border-indigo-500 ring-2 ring-indigo-400/60 bg-indigo-50/70 shadow-sm', badgeId: 'calKpiBadgeWeek' },
+    { id: 'calKpiCardAttention', status: 'ATTENTION', activeClass: 'border-amber-500 ring-2 ring-amber-400/70 bg-amber-100/70 shadow-sm', badgeId: 'calKpiBadgeAttention' }
+  ];
+
+  cards.forEach(c => {
+    const el = document.getElementById(c.id);
+    if (!el) return;
+    const isActive = (current === c.status);
+    const badgeEl = document.getElementById(c.badgeId);
+
+    const base = 'cal-kpi-card p-4 rounded-2xl transition-all flex items-center justify-between cursor-pointer select-none active:scale-[0.98]';
+
+    if (isActive) {
+      el.className = `${base} ${c.activeClass}`;
+      if (badgeEl) badgeEl.classList.remove('hidden');
+    } else {
+      if (c.status === 'ATTENTION') {
+        el.className = `${base} bg-white border border-amber-200 bg-amber-50/30 shadow-2xs hover:border-amber-400 hover:shadow-md hover:-translate-y-0.5`;
+      } else {
+        el.className = `${base} bg-white border border-slate-200 shadow-2xs hover:border-sky-300 hover:shadow-md hover:-translate-y-0.5`;
+      }
+      if (badgeEl) badgeEl.classList.add('hidden');
+    }
+  });
+}
+window.updateCalendarKpiCardStyles = updateCalendarKpiCardStyles;
 
 /**
  * 캘린더 네비게이션 헤더 및 토글 버튼 스타일 동기화
@@ -42216,6 +42287,7 @@ function renderCareCalendarTimelineView(events) {
   const statusLabel = gCalendarFilters.status === 'ONGOING' ? '진행중' :
     gCalendarFilters.status === 'UPCOMING' ? '예정' :
     gCalendarFilters.status === 'COMPLETED' ? '완료' :
+    gCalendarFilters.status === 'WEEK_SCHEDULE' ? '금주 시작·종료' :
     gCalendarFilters.status === 'ATTENTION' ? '중점관리' : '진행·예정·완료';
 
   let html = `
