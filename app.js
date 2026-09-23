@@ -42086,62 +42086,91 @@ function renderCareCalendar() {
 }
 
 /**
- * 상단 4개 실시간 KPI 요약 집계
+ * 상단 4개 실시간 KPI 요약 집계 (캘린더 리스트 데이터와 1:1 완벽 동기화)
  */
 function updateCareCalendarKpis(events) {
   const curY = gCalendarCurrentDate.getFullYear();
   const curM = gCalendarCurrentDate.getMonth();
 
-  // 당월에 걸쳐있는 이벤트 (전체보기일 경우 전체 이벤트 대상)
-  const targetEvents = gCalendarIsAllPeriod ? events : events.filter(e => {
-    const s = e.parsedStart;
-    const end = e.parsedEnd;
-    const monthStart = new Date(curY, curM, 1);
-    const monthEnd = new Date(curY, curM + 1, 0);
-    return s <= monthEnd && end >= monthStart;
+  // 1. 현재 선택된 검색 및 분류 필터(보험사, 센터, 검색어) 적용
+  let scopeEvents = Array.isArray(events) ? events : [];
+  if (gCalendarFilters.insurance && gCalendarFilters.insurance !== 'ALL') {
+    scopeEvents = scopeEvents.filter(e => (e.insuranceCompany || '').includes(gCalendarFilters.insurance));
+  }
+  if (gCalendarFilters.center && gCalendarFilters.center !== 'ALL') {
+    scopeEvents = scopeEvents.filter(e => e.centerName === gCalendarFilters.center);
+  }
+  if (gCalendarFilters.keyword) {
+    const kw = gCalendarFilters.keyword.toLowerCase();
+    scopeEvents = scopeEvents.filter(evt => {
+      return (evt.patientName || '').toLowerCase().includes(kw) ||
+             (evt.caregiverName || '').toLowerCase().includes(kw) ||
+             (evt.hospitalName || '').toLowerCase().includes(kw) ||
+             (evt.adjusterName || '').toLowerCase().includes(kw) ||
+             (evt.insuranceCompany || '').toLowerCase().includes(kw) ||
+             (evt.diseaseName || '').toLowerCase().includes(kw);
+    });
+  }
+
+  // 2. 당월 대상 이벤트 (전체보기일 경우 전체 이벤트 대상)
+  const lastDate = new Date(curY, curM + 1, 0).getDate();
+  const monthStart = new Date(curY, curM, 1);
+  const monthEnd = new Date(curY, curM, lastDate, 23, 59, 59);
+
+  const targetEvents = gCalendarIsAllPeriod ? scopeEvents : scopeEvents.filter(e => {
+    return e.parsedStart <= monthEnd && e.parsedEnd >= monthStart;
   });
 
-  const totalDaysSum = targetEvents.reduce((acc, cur) => acc + cur.totalDays, 0);
+  // 3. 상태별 건수 (아래 캘린더 리스트의 항목들과 1:1 완벽 일치 및 합계 일치)
+  const ongoingEvents = targetEvents.filter(e => e.status === 'ONGOING');
+  const upcomingEvents = targetEvents.filter(e => e.status === 'UPCOMING');
+  const completedEvents = targetEvents.filter(e => e.status === 'COMPLETED');
 
-  // 통합허브 '간병 진행중' 기준과 1:1 완벽 동기화 (원수사 필터 반영)
-  const activeHubApps = (typeof filterInvalidSamsungDuplicates === 'function')
-    ? filterInvalidSamsungDuplicates((gApps || []).some(x => x.isRealLaunchData) ? (gApps || []).filter(x => x.isRealLaunchData) : (gApps || []))
-    : (gApps || []);
-  const inProgressHubApps = activeHubApps.filter(a => {
-    if (!a) return false;
-    if (gCalendarFilters.insurance !== 'ALL' && !(a.insuranceCompany || '').includes(gCalendarFilters.insurance)) return false;
-    const realSt = (typeof determineRealCareStatus === 'function') ? determineRealCareStatus(a) : (a.status || '');
-    return realSt === '진행중';
-  });
-  const activeCount = inProgressHubApps.length;
-  const attentionCount = events.filter(e => e.isAttentionNeeded).length;
+  const ongoingCount = ongoingEvents.length;
+  const upcomingCount = upcomingEvents.length;
+  const completedCount = completedEvents.length;
+  const totalCount = targetEvents.length; // ongoingCount + upcomingCount + completedCount === totalCount
 
-  // 금주(월~일) 시작/종료 건수
+  const totalDaysSum = targetEvents.reduce((acc, cur) => acc + (cur.totalDays || 0), 0);
+
+  // 4. 금주(월~일) 시작/종료 건수 및 고유 일정 건수
   const now = new Date();
-  const day = now.getDay() || 7;
-  const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1);
-  const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 7, 23, 59, 59);
+  const curDay = now.getDay() || 7;
+  const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - curDay + 1);
+  const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - curDay + 7, 23, 59, 59);
 
-  const weekStarts = events.filter(e => e.parsedStart >= weekStart && e.parsedStart <= weekEnd).length;
-  const weekEnds = events.filter(e => e.parsedEnd >= weekStart && e.parsedEnd <= weekEnd).length;
+  const weekUniqueEvents = targetEvents.filter(e => {
+    const isStart = e.parsedStart >= weekStart && e.parsedStart <= weekEnd;
+    const isEnd = e.parsedEnd >= weekStart && e.parsedEnd <= weekEnd;
+    return isStart || isEnd;
+  });
+  const weekStarts = targetEvents.filter(e => e.parsedStart >= weekStart && e.parsedStart <= weekEnd).length;
+  const weekEnds = targetEvents.filter(e => e.parsedEnd >= weekStart && e.parsedEnd <= weekEnd).length;
 
+  // 5. 중점관리 (주의·민원 대상자)
+  const attentionEvents = targetEvents.filter(e => e.isAttentionNeeded);
+  const attentionCount = attentionEvents.length;
+
+  // 6. DOM 요소 바인딩
   const elMonthLabel = document.getElementById('calKpiTotalMonthLabel');
   if (elMonthLabel) elMonthLabel.innerText = gCalendarIsAllPeriod ? '전체 간병일정' : `${curM + 1}월 전체 간병일정`;
 
   const elTotalCount = document.getElementById('calKpiTotalCount');
-  if (elTotalCount) elTotalCount.innerText = `${targetEvents.length}건`;
+  if (elTotalCount) elTotalCount.innerText = `${totalCount}건`;
 
   const elTotalDays = document.getElementById('calKpiTotalDays');
-  if (elTotalDays) elTotalDays.innerText = `당월 진행·예정·완료 (총 ${totalDaysSum.toLocaleString()}일)`;
+  if (elTotalDays) {
+    elTotalDays.innerText = `진행 ${ongoingCount} · 예정 ${upcomingCount} · 완료 ${completedCount} (총 ${totalDaysSum.toLocaleString()}일)`;
+  }
 
   const elActiveCount = document.getElementById('calKpiActiveCount');
-  if (elActiveCount) elActiveCount.innerText = `${activeCount}건`;
+  if (elActiveCount) elActiveCount.innerText = `${ongoingCount}건`;
 
   const elActiveDetail = document.getElementById('calKpiActiveDetail');
-  if (elActiveDetail) elActiveDetail.innerText = `실시간 간병 진행중 ${activeCount}건 (통합허브 동기화)`;
+  if (elActiveDetail) elActiveDetail.innerText = `실시간 간병 진행중 ${ongoingCount}건`;
 
   const elWeekSchedule = document.getElementById('calKpiWeekSchedule');
-  if (elWeekSchedule) elWeekSchedule.innerText = `${weekStarts} / ${weekEnds}건`;
+  if (elWeekSchedule) elWeekSchedule.innerText = `${weekUniqueEvents.length}건`;
 
   const elWeekDetail = document.getElementById('calKpiWeekScheduleDetail');
   if (elWeekDetail) elWeekDetail.innerText = `이번 주 시작 ${weekStarts}건 · 종료 ${weekEnds}건`;
@@ -42150,7 +42179,7 @@ function updateCareCalendarKpis(events) {
   if (elAttentionCount) elAttentionCount.innerText = `${attentionCount}명`;
 
   const elAttentionDetail = document.getElementById('calKpiAttentionDetail');
-  if (elAttentionDetail) elAttentionDetail.innerText = `석션·중환자실·골절·교체 등 ${attentionCount}명`;
+  if (elAttentionDetail) elAttentionDetail.innerText = `석션·중환자실·골절·CS 등 ${attentionCount}명`;
 }
 
 /**
