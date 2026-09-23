@@ -354,7 +354,11 @@ function getSavedFaxConfig() {
 function saveSavedFaxConfig(cfg) {
   try {
     const existing = getSavedFaxConfig();
-    const merged = { ...existing, ...cfg, updatedAt: new Date().toISOString() };
+    const cleanCfg = { ...cfg };
+    if (cleanCfg.baroId && (cleanCfg.baroId.includes('@') || cleanCfg.baroId === 'jihoon3813@gmail.com' || cleanCfg.baroId === 'jihoon3813@livon.care')) {
+      cleanCfg.baroId = 'livoncare';
+    }
+    const merged = { ...existing, ...cleanCfg, updatedAt: new Date().toISOString() };
     fs.writeFileSync(FAX_CONFIG_PATH, JSON.stringify(merged, null, 2), 'utf-8');
     console.log('[Fax Config Saved]', Object.keys(merged));
     return merged;
@@ -1264,12 +1268,15 @@ function saveSavedFaxConfig(cfg) {
             const serverLabel = isProd ? '운영' : '테스트';
             const certKey = payload.baroCertKey || savedCfg.baroCertKey || (isProd ? 'A1496EC3-E606-44C0-B126-F03B9AF88588' : 'CF89EE38-7B80-4955-960E-D86A866498ED');
             const corpNum = (payload.baroCorpNum || savedCfg.baroCorpNum || '1058621696').replace(/[^0-9]/g, '');
-            const baroId = payload.baroId || savedCfg.baroId || 'livoncare';
-            const baroPwd = payload.baroPwd || savedCfg.baroPwd || '';
+            let baroId = (payload.baroId || savedCfg.baroId || 'livoncare').trim();
+            if (!baroId || baroId.includes('@') || baroId === 'jihoon3813@gmail.com' || baroId === 'jihoon3813@livon.care') {
+              baroId = 'livoncare';
+            }
+            const baroPwd = (payload.baroPwd || savedCfg.baroPwd || '@flqhszpdj').trim();
 
             // 발송 시 전달된 비밀번호나 계정이 있으면 서버 설정에도 자동 저장하여 영구 동기화
-            if (payload.baroPwd && payload.baroPwd !== savedCfg.baroPwd) {
-              saveSavedFaxConfig({ baroPwd: payload.baroPwd, baroId, baroCertKey: certKey, baroCorpNum: corpNum, baroServer: isProd ? 'prod' : 'test' });
+            if (baroPwd && baroPwd !== savedCfg.baroPwd) {
+              saveSavedFaxConfig({ baroPwd, baroId, baroCertKey: certKey, baroCorpNum: corpNum, baroServer: isProd ? 'prod' : 'test' });
             }
 
             activeProvider = `Barobill (${serverLabel}: ${certKey.slice(0, 8)}...)`;

@@ -28690,12 +28690,12 @@ function getBarobillConfig() {
     localStorage.setItem('LIVON_BAROBILL_CORPNUM', corpNum);
   }
   let baroId = localStorage.getItem('LIVON_BAROBILL_ID');
-  if (!baroId || baroId === 'jihoon3813@gmail.com') {
-    baroId = 'jihoon3813@livon.care';
+  if (!baroId || baroId.includes('@') || baroId === 'jihoon3813@gmail.com' || baroId === 'jihoon3813@livon.care') {
+    baroId = 'livoncare';
     localStorage.setItem('LIVON_BAROBILL_ID', baroId);
   }
-  const baroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'test';
-  const baroPwd = localStorage.getItem('LIVON_BAROBILL_PWD') || '';
+  const baroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'prod';
+  const baroPwd = localStorage.getItem('LIVON_BAROBILL_PWD') || '@flqhszpdj';
   const aligoUser = localStorage.getItem('LIVON_FAX_ALIGO_USER') || '';
   const aligoKey = localStorage.getItem('LIVON_FAX_ALIGO_KEY') || '';
   const isTestRedirect = localStorage.getItem('LIVON_FAX_TEST_REDIRECT') === 'true';
@@ -28728,29 +28728,29 @@ async function ensureBarobillPassword() {
       }
     } catch (e) {}
   }
+  if (!pwd) pwd = '@flqhszpdj';
   return pwd;
 }
 
 async function loadBarobillSettingsToInputs() {
   const cfg = getBarobillConfig();
 
-  // If local password is empty, attempt to fetch from server
-  if (!cfg.baroPwd) {
-    try {
-      const res = await fetch('/api/fax/config');
-      const data = await res.json();
-      if (data && data.config) {
-        if (data.config.baroPwd) {
-          localStorage.setItem('LIVON_BAROBILL_PWD', data.config.baroPwd);
-          cfg.baroPwd = data.config.baroPwd;
-        }
-        if (data.config.baroId && !localStorage.getItem('LIVON_BAROBILL_ID')) {
-          localStorage.setItem('LIVON_BAROBILL_ID', data.config.baroId);
-          cfg.baroId = data.config.baroId;
-        }
+  // If local password is empty or ID contains email, attempt to fetch from server
+  try {
+    const res = await fetch('/api/fax/config');
+    const data = await res.json();
+    if (data && data.config) {
+      if (data.config.baroPwd) {
+        localStorage.setItem('LIVON_BAROBILL_PWD', data.config.baroPwd);
+        cfg.baroPwd = data.config.baroPwd;
       }
-    } catch (e) {}
-  }
+      if (data.config.baroId) {
+        const cleanId = data.config.baroId.includes('@') ? 'livoncare' : data.config.baroId;
+        localStorage.setItem('LIVON_BAROBILL_ID', cleanId);
+        cfg.baroId = cleanId;
+      }
+    }
+  } catch (e) {}
 
   // Populate Fax Settings Modal inputs
   const fId = document.getElementById('faxBarobillId');
@@ -28815,9 +28815,12 @@ async function saveFaxSettings() {
   // Barobill inputs
   const baroCertKey = document.getElementById('faxBarobillCertKey')?.value.trim() || 'CF89EE38-7B80-4955-960E-D86A866498ED';
   const baroCorpNum = document.getElementById('faxBarobillCorpNum')?.value.trim() || '105-86-21696';
-  const baroId = document.getElementById('faxBarobillId')?.value.trim() || 'livoncare';
-  const baroPwd = document.getElementById('faxBarobillPwd')?.value.trim() || '';
-  const baroServer = document.getElementById('faxBarobillServer')?.value || 'test';
+  let baroId = document.getElementById('faxBarobillId')?.value.trim() || 'livoncare';
+  if (baroId.includes('@') || baroId === 'jihoon3813@gmail.com' || baroId === 'jihoon3813@livon.care') {
+    baroId = 'livoncare';
+  }
+  const baroPwd = document.getElementById('faxBarobillPwd')?.value.trim() || '@flqhszpdj';
+  const baroServer = document.getElementById('faxBarobillServer')?.value || 'prod';
 
   try {
     localStorage.setItem('LIVON_FAX_MODE', 'barobill');
@@ -29533,6 +29536,20 @@ function initData() {
           } catch(e) {}
         }
       }
+    }
+  // 바로빌 팩스 연동 계정 정규화 (이메일 형태 등록 시 FTP 530 인증 오류 원천 차단)
+  try {
+    const curBaroId = localStorage.getItem('LIVON_BAROBILL_ID');
+    if (!curBaroId || curBaroId.includes('@') || curBaroId === 'jihoon3813@gmail.com' || curBaroId === 'jihoon3813@livon.care') {
+      localStorage.setItem('LIVON_BAROBILL_ID', 'livoncare');
+    }
+    const curBaroPwd = localStorage.getItem('LIVON_BAROBILL_PWD');
+    if (!curBaroPwd) {
+      localStorage.setItem('LIVON_BAROBILL_PWD', '@flqhszpdj');
+    }
+    const curBaroServer = localStorage.getItem('LIVON_BAROBILL_SERVER');
+    if (!curBaroServer) {
+      localStorage.setItem('LIVON_BAROBILL_SERVER', 'prod');
     }
   } catch (e) {}
 
