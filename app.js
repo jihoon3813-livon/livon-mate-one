@@ -21490,12 +21490,31 @@ function determineRealCareStatus(app, specificAssigns) {
     return rawSt || '신규';
   }
 
-  // 3. 간병 시작일시가 있고, 간병종료일시 값이 없거나 '진행중'인 경우 -> 무조건 '진행중'
+  const now = new Date();
+  const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // 3. 간병 시작일시가 오늘 이후(미래)인 경우 -> '예정'
+  const pStart = (typeof parseCareDateTime === 'function') ? parseCareDateTime(sDate) : (typeof parseCareDate === 'function' ? parseCareDate(sDate) : null);
+  if (pStart) {
+    const sZero = new Date(pStart.getFullYear(), pStart.getMonth(), pStart.getDate());
+    if (sZero > todayZero) return '예정';
+  }
+
+  // 4. 간병 시작일시가 있고, 간병종료일시 값이 없거나 '진행중'인 경우 -> '진행중'
   if (!eTrim || eTrim === '진행중' || eTrim === '예정' || eTrim === '-') {
     return '진행중';
   }
 
-  // 4. 간병종료일시 값이 실제 날짜로 존재하는 경우 -> '완료'
+  // 5. 간병종료일시 값이 실제 날짜로 존재하는 경우: 오늘 날짜 기준 비교
+  const pEnd = (typeof parseCareDateTime === 'function') ? parseCareDateTime(eTrim) : (typeof parseCareDate === 'function' ? parseCareDate(eTrim) : null);
+  if (pEnd) {
+    const eZero = new Date(pEnd.getFullYear(), pEnd.getMonth(), pEnd.getDate());
+    if (eZero < todayZero || (eZero.getTime() === todayZero.getTime() && now > pEnd)) {
+      return '완료'; // 오늘 날짜 이전이면 이미 끝난 건이므로 완료!
+    }
+    return '진행중'; // 오늘 날짜 이후까지 일정이 남아있으면 진행중!
+  }
+
   return '완료';
 }
 window.determineRealCareStatus = determineRealCareStatus;
@@ -41384,13 +41403,24 @@ function extractCareCalendarEvents() {
     const startZero = new Date(parsedStart.getFullYear(), parsedStart.getMonth(), parsedStart.getDate());
     const endZero = new Date(parsedEnd.getFullYear(), parsedEnd.getMonth(), parsedEnd.getDate());
 
-    let status = 'COMPLETED'; // 기본
-    if (isAppOngoing) {
-      status = 'ONGOING'; // 통합허브 기준 진행중
-    } else if (todayZero < startZero || (app.status || '').includes('예정') || realCareSt === '배정대기' || realCareSt === '신규') {
-      status = 'UPCOMING'; // 예정
-    } else {
-      status = 'COMPLETED'; // 완료/종료
+    // 캘린더 이벤트 상태 판정 (오늘 날짜 및 실제 시작/종료일시 기준 엄격 판정)
+    let status = 'COMPLETED'; // 기본: 종료
+    
+    // 1. 종료일시가 오늘 날짜 이전이면 무조건 종료(COMPLETED)!
+    if (parsedEnd && (endZero < todayZero || (endZero.getTime() === todayZero.getTime() && now > parsedEnd))) {
+      status = 'COMPLETED';
+    }
+    // 2. 시작일시가 오늘 날짜 이후(미래)이면 무조건 예정(UPCOMING)!
+    else if (startZero > todayZero || (app.status || '').includes('예정') || realCareSt === '배정대기' || realCareSt === '신규') {
+      status = 'UPCOMING';
+    }
+    // 3. 오늘 날짜가 시작일과 종료일 사이에 걸쳐있는 경우 (또는 종료일이 진행중/미정인 경우)
+    else {
+      if (realCareSt === '당일서비스취소' || realCareSt.includes('서비스불가') || realCareSt === '제외' || realCareSt.includes('취소') || realCareSt.includes('철회') || realCareSt.includes('미해당')) {
+        status = 'COMPLETED';
+      } else {
+        status = 'ONGOING'; // 오늘 현재 실제 간병 진행중!
+      }
     }
 
     const elapsedDays = status === 'UPCOMING' ? 0 : 
