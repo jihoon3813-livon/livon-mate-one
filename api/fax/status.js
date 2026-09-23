@@ -13,9 +13,17 @@ module.exports = async (req, res) => {
 
     const cleanCorpNum = (corpNum || '1058621696').replace(/[^0-9]/g, '');
     const activeCertKey = certKey || (serverType === 'prod' ? 'A1496EC3-E606-44C0-B126-F03B9AF88588' : 'CF89EE38-7B80-4955-960E-D86A866498ED');
-    const serverHost = serverType === 'prod' ? 'ws.baroservice.com' : 'testws.baroservice.com';
+    if (action === 'checkSendKey' && payload.sendKey) {
+      try {
+        const { getBarobillFaxStatus } = require('../../barobill-client');
+        const statusRes = await getBarobillFaxStatus(activeCertKey, cleanCorpNum, payload.sendKey, serverType !== 'prod');
+        return res.status(200).json(statusRes);
+      } catch (stErr) {
+        return res.status(500).json({ success: false, error: stErr.message });
+      }
+    }
 
-    // 바로빌 실시간 SOAP API 통신 (GetBalanceCostAmountEx: 회원사 보유 잔액 확인)
+    const serverHost = serverType === 'prod' ? 'ws.baroservice.com' : 'testws.baroservice.com';
     const https = require('https');
     const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">

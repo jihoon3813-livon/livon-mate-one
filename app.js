@@ -15821,6 +15821,16 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
   // 상단 편집 필드 제외, 오직 공식 서식 양식 1장 본문만 정밀 추출
   const formSheetHtml = getCleanFaxTransmissionHtml(formCode);
 
+  let pdfBase64 = '';
+  try {
+    const pdfBytes = await generateFaxDocumentPdfBytes(formCode, app, null);
+    if (pdfBytes && pdfBytes.length > 0) {
+      pdfBase64 = uint8ArrayToBase64(pdfBytes);
+    }
+  } catch (err) {
+    console.warn('[sendElectronicFaxDirectly] PDF 생성 경고:', err);
+  }
+
   const payload = {
     appId: app.id,
     patientName: app.patientName,
@@ -15834,6 +15844,7 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
     memo: (memoText || '') + redirectNote,
     pages,
     formHtml: formSheetHtml,
+    pdfBase64: pdfBase64 || undefined,
     operator: '관리자(원스탑)',
     provider: cfg.mode,
     baroCertKey: cfg.certKey,
@@ -27130,6 +27141,9 @@ function openFaxModal(applyId, defaultCase = 1) {
 
   gActiveFaxTargetAppId = applyId;
   gCurrentFaxCase = defaultCase;
+  window.gFaxCustomAttachedFile = null;
+  const customFileInput = document.getElementById('faxCustomFileInput');
+  if (customFileInput) customFileInput.value = '';
 
   document.getElementById('faxModalSubtitle').innerText = '고객명: ' + app.patientName + ' 님 (' + app.id + ') · ' + app.insuranceCompany;
   
@@ -27149,6 +27163,9 @@ function openFaxModal(applyId, defaultCase = 1) {
 
 function switchFaxCase(caseNum) {
   gCurrentFaxCase = caseNum;
+  window.gFaxCustomAttachedFile = null;
+  const customFileInput = document.getElementById('faxCustomFileInput');
+  if (customFileInput) customFileInput.value = '';
   const app = gApps.find(a => a.id === gActiveFaxTargetAppId) || gApps[0];
 
   const l1 = document.getElementById('faxCase1Label');
@@ -27229,13 +27246,142 @@ function previewCurrentFaxForm() {
   previewFormForCustomer(code, app.id);
 }
 
+window.gFaxCustomAttachedFile = null;
+
 function handleFaxCustomFileUpload(e) {
-  const file = e.target.files[0];
+  const file = e.target.files && e.target.files[0];
   if (file) {
-    document.getElementById('faxAttachedFileName').innerText = file.name;
-    document.getElementById('faxAttachedFileSize').innerText = '사용자 직접 첨부 파일 (' + Math.round(file.size / 1024) + ' KB)';
-    alert('[' + file.name + '] 파일이 팩스 첨부문서로 교체되었습니다.');
+    window.gFaxCustomAttachedFile = file;
+    const nameEl = document.getElementById('faxAttachedFileName');
+    const sizeEl = document.getElementById('faxAttachedFileSize');
+    if (nameEl) nameEl.innerText = file.name;
+    if (sizeEl) sizeEl.innerText = '사용자 직접 첨부 파일 (' + Math.round(file.size / 1024) + ' KB)';
+    alert('[' + file.name + '] 파일이 팩스 송신 문서로 등록되었습니다.');
   }
+}
+
+function uint8ArrayToBase64(bytes) {
+  if (!bytes) return '';
+  let binary = '';
+  const len = bytes.byteLength;
+  const chunkSize = 16384;
+  for (let i = 0; i < len; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, len));
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  return btoa(binary);
+}
+
+/**
+ * 팩스 발송 시 송신처로 전송될 실물 A4 PDF 파일(바이너리 바이트) 생성기
+ * - 사용자 직접 첨부 파일이 있는 경우 해당 파일(PDF/이미지) 우선 처리
+ * - 공식 서식(HD_FORM_01, 02, 03)을 고해상도 A4 규격 PDF로 실시간 렌더링
+ * - 케어포트 간병일지가 선택 첨부된 경우 1페이지(청구서) + 2페이지(간병일지) 자동 결합
+ */
+async function generateFaxDocumentPdfBytes(formCode, app, attachedCareLog = null) {
+  // 1. 사용자 직접 첨부 파일 우선 처리
+  if (window.gFaxCustomAttachedFile) {
+    try {
+      const arrayBuf = await window.gFaxCustomAttachedFile.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuf);
+      // PDF 파일 매직 바이트 (%PDF-) 확인
+      if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+        return bytes;
+      }
+      // 이미지 파일인 경우 A4 PDF 페이지에 임베드
+      if (typeof PDFLib !== 'undefined' && PDFLib.PDFDocument) {
+        const pdfDoc = await PDFLib.PDFDocument.create();
+        let embeddedImg = null;
+        if ((window.gFaxCustomAttachedFile.type || '').includes('png')) {
+          embeddedImg = await pdfDoc.embedPng(bytes);
+        } else {
+          embeddedImg = await pdfDoc.embedJpg(bytes);
+        }
+        if (embeddedImg) {
+          const page = pdfDoc.addPage([595.28, 841.89]);
+          const { width, height } = embeddedImg.scaleToFit(555, 801);
+          page.drawImage(embeddedImg, { x: 20, y: 841.89 - height - 20, width, height });
+          return await pdfDoc.save();
+        }
+      }
+    } catch (fErr) {
+      console.warn('[FAX Custom File Process Error]', fErr);
+    }
+  }
+
+  // 2. 고객 및 서식 최신 렌더링 보장
+  if (typeof previewFormForCustomer === 'function' && app) {
+    try {
+      previewFormForCustomer(formCode, app, false);
+    } catch (prevErr) {
+      console.warn('[FAX previewFormForCustomer Error]', prevErr);
+    }
+  }
+
+  // 3. 서식 시트 요소에서 고품질 A4 PDF 바이트 생성
+  const sheet = document.getElementById('formPreviewSheet');
+  const targetEl = sheet ? (sheet.querySelector('#faxCleanFormTarget') || sheet) : null;
+  let formPdfBytes = null;
+
+  if (targetEl && typeof renderElementToSinglePageA4PdfBytes === 'function') {
+    try {
+      formPdfBytes = await renderElementToSinglePageA4PdfBytes(targetEl, 10);
+    } catch (elErr) {
+      console.warn('[FAX Element PDF Render Error]', elErr);
+    }
+  }
+
+  if (!formPdfBytes && sheet && typeof renderHtmlToSinglePageA4PdfBytes === 'function') {
+    try {
+      const html = typeof getCleanFaxTransmissionHtml === 'function' ? getCleanFaxTransmissionHtml(formCode) : sheet.innerHTML;
+      if (html) {
+        formPdfBytes = await renderHtmlToSinglePageA4PdfBytes(html, 10);
+      }
+    } catch (hErr) {
+      console.warn('[FAX HTML PDF Render Error]', hErr);
+    }
+  }
+
+  // 4. 간병일지가 선택 첨부된 경우 간병일지 PDF 생성 후 2페이지로 병합!
+  if (attachedCareLog && formPdfBytes && typeof PDFLib !== 'undefined' && PDFLib.PDFDocument) {
+    try {
+      let careLogPdfBytes = null;
+      if (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function') {
+        const patient = {
+          patientName: app.patientName,
+          age: app.age || '',
+          gender: app.gender || '',
+          insuranceCompany: app.insuranceCompany || '',
+          caregiverName: app.caregiverName || ''
+        };
+        const log = {
+          username: app.patientName,
+          consultDate: attachedCareLog.startDate || '',
+          duration: attachedCareLog.duration || '',
+          sessionId: attachedCareLog.id
+        };
+        const logHtml = window.CarePortClient.generateDailyLogHtml(patient, log, attachedCareLog);
+        if (typeof renderHtmlToSinglePageA4PdfBytes === 'function') {
+          careLogPdfBytes = await renderHtmlToSinglePageA4PdfBytes(logHtml, 12);
+        }
+      }
+
+      if (careLogPdfBytes) {
+        const mergedDoc = await PDFLib.PDFDocument.create();
+        const formDoc = await PDFLib.PDFDocument.load(formPdfBytes);
+        const logDoc = await PDFLib.PDFDocument.load(careLogPdfBytes);
+        const p1 = await mergedDoc.copyPages(formDoc, formDoc.getPageIndices());
+        p1.forEach(p => mergedDoc.addPage(p));
+        const p2 = await mergedDoc.copyPages(logDoc, logDoc.getPageIndices());
+        p2.forEach(p => mergedDoc.addPage(p));
+        return await mergedDoc.save();
+      }
+    } catch (mergeErr) {
+      console.warn('[FAX PDF Merge Warning]', mergeErr);
+    }
+  }
+
+  return formPdfBytes;
 }
 
 async function executeSendFaxModal() {
@@ -27326,6 +27472,18 @@ async function executeSendFaxModal() {
 
     const formSheetHtml = getCleanFaxTransmissionHtml(formCode);
 
+    // 🚨 [진짜 팩스 파일 생성] 서식 및 첨부파일을 공식 A4 규격 PDF 바이너리로 실시간 렌더링
+    let pdfBase64 = '';
+    try {
+      const pdfBytes = await generateFaxDocumentPdfBytes(formCode, app, attachedCareLog);
+      if (pdfBytes && pdfBytes.length > 0) {
+        pdfBase64 = uint8ArrayToBase64(pdfBytes);
+        console.log(`[FAX PDF] 고품질 A4 서식 PDF 파일 생성 완료 (${pdfBytes.length} bytes, base64: ${pdfBase64.length} chars)`);
+      }
+    } catch (pdfErr) {
+      console.warn('[FAX PDF Generation Error, falling back to HTML]', pdfErr);
+    }
+
     const payload = {
       appId: app.id,
       patientName: app.patientName,
@@ -27339,6 +27497,7 @@ async function executeSendFaxModal() {
       memo: memoText + redirectNote,
       pages,
       formHtml: formSheetHtml,
+      pdfBase64,
       operator: '관리자(원스탑)',
       provider: cfg.mode,
       baroCertKey: cfg.certKey,
@@ -36672,6 +36831,16 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
         }
 
         const previewHtml = getCleanFaxTransmissionHtml('HD_FORM_01');
+        let pdfBase64 = '';
+        try {
+          const pdfBytes = await generateFaxDocumentPdfBytes('HD_FORM_01', newApp, null);
+          if (pdfBytes && pdfBytes.length > 0) {
+            pdfBase64 = uint8ArrayToBase64(pdfBytes);
+          }
+        } catch (err) {
+          console.warn('[finalizeNewAppRegistration] PDF 생성 경고:', err);
+        }
+
         const faxPayload = {
           appId: newApp.id,
           patientName: newApp.patientName,
@@ -36685,6 +36854,7 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
           memo: (newApp.memo || '현대해상 1차 고객등록 및 신청 접수 건 송부') + redirectNote,
           pages: 1,
           formHtml: previewHtml,
+          pdfBase64: pdfBase64 || undefined,
           operator: '접수담당자',
           provider: cfg.mode,
           baroCertKey: cfg.certKey,
