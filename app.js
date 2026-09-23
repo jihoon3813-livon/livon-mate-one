@@ -9449,8 +9449,8 @@ try {
 
 async function loadSamsungSentCareLogsFromConvex() {
   try {
-    if (typeof syncToConvex === 'function') {
-      const records = await syncToConvex('sync:getSamsungSentCareLogs', {});
+    if (typeof queryConvex === 'function') {
+      const records = await queryConvex('sync:getSamsungSentCareLogs', {});
       if (Array.isArray(records) && records.length > 0) {
         const existingIds = new Set(gSamsungSentCareLogsHistory.map(r => r.id));
         let added = false;
@@ -41181,6 +41181,9 @@ function extractCareCalendarEvents() {
     const totalDays = calculateCareDays24h(parsedStart, parsedEnd);
     const elapsedDays = Math.min(totalDays, calculateCareDays24h(parsedStart, now));
 
+    const startZero = new Date(parsedStart.getFullYear(), parsedStart.getMonth(), parsedStart.getDate());
+    const endZero = new Date(parsedEnd.getFullYear(), parsedEnd.getMonth(), parsedEnd.getDate());
+
     const checkPoints = [];
     const fullNotes = `${app.diseaseName || ''} ${app.diagnosis || ''} ${app.memo || ''} ${app.specialNotes || ''}`;
     if (/치매|알츠하이머/i.test(fullNotes)) checkPoints.push({ tag: '치매주의', icon: 'brain', color: 'purple', level: 'warn', desc: '인지장애 및 배회 가능성 주의' });
@@ -41221,7 +41224,7 @@ function extractCareCalendarEvents() {
       settlementType: '센터',
       caregiverCert: '간병사',
       startDate: startStr,
-      endDate: '',
+      endDate: (app.careEndDate || (parsedEnd ? `${parsedEnd.getFullYear()}.${String(parsedEnd.getMonth()+1).padStart(2, '0')}.${String(parsedEnd.getDate()).padStart(2, '0')}` : '')),
       parsedStart,
       parsedEnd,
       startZero,
@@ -41250,67 +41253,89 @@ function renderCareCalendar() {
   const container = document.getElementById('careCalendarMainGrid');
   if (!container) return;
 
-  const allEvents = extractCareCalendarEvents();
+  try {
+    const allEvents = extractCareCalendarEvents();
 
-  // 1. 센터 필터 옵션 동적 갱신
-  populateCalendarCenterFilter(allEvents);
+    // 1. 센터 필터 옵션 동적 갱신
+    populateCalendarCenterFilter(allEvents);
 
-  // 2. 현재 선택된 필터에 따라 이벤트 필터링
-  const filteredEvents = allEvents.filter(evt => {
-    // 보험사 필터
-    if (gCalendarFilters.insurance !== 'ALL' && !(evt.insuranceCompany || '').includes(gCalendarFilters.insurance)) {
-      return false;
+    // 2. 현재 선택된 필터에 따라 이벤트 필터링
+    const filteredEvents = allEvents.filter(evt => {
+      // 보험사 필터
+      if (gCalendarFilters.insurance !== 'ALL' && !(evt.insuranceCompany || '').includes(gCalendarFilters.insurance)) {
+        return false;
+      }
+      // 상태 필터
+      if (gCalendarFilters.status === 'ATTENTION') {
+        if (!evt.isAttentionNeeded) return false;
+      } else if (gCalendarFilters.status !== 'ALL' && evt.status !== gCalendarFilters.status) {
+        return false;
+      }
+      // 센터 필터
+      if (gCalendarFilters.center !== 'ALL' && evt.centerName !== gCalendarFilters.center) {
+        return false;
+      }
+      // 검색어 필터
+      if (gCalendarFilters.keyword) {
+        const kw = gCalendarFilters.keyword.toLowerCase();
+        const match = evt.patientName.toLowerCase().includes(kw) ||
+                      evt.caregiverName.toLowerCase().includes(kw) ||
+                      evt.hospitalName.toLowerCase().includes(kw) ||
+                      evt.adjusterName.toLowerCase().includes(kw) ||
+                      evt.insuranceCompany.toLowerCase().includes(kw) ||
+                      evt.diseaseName.toLowerCase().includes(kw);
+        if (!match) return false;
+      }
+      return true;
+    });
+
+    // 3. 상단 4대 KPI 요약 집계
+    updateCareCalendarKpis(allEvents);
+
+    // 4. 헤더 날짜 레이블 및 뷰 모드 토글 스타일 갱신
+    updateCareCalendarHeaderDisplay();
+
+    // 5. 모드에 맞게 뷰 렌더러 호출 (연결 타임라인 / 연속 바 달력 / 기존 월별 카드 / 기존 주별 보기)
+    if (gCalendarViewMode === 'timeline') {
+      renderCareCalendarTimelineView(filteredEvents);
+    } else if (gCalendarViewMode === 'spanmonth') {
+      renderCareCalendarSpanMonthView(filteredEvents);
+    } else if (gCalendarViewMode === 'week') {
+      renderCareCalendarWeekView(filteredEvents);
+    } else {
+      renderCareCalendarMonthView(filteredEvents);
     }
-    // 상태 필터
-    if (gCalendarFilters.status === 'ATTENTION') {
-      if (!evt.isAttentionNeeded) return false;
-    } else if (gCalendarFilters.status !== 'ALL' && evt.status !== gCalendarFilters.status) {
-      return false;
-    }
-    // 센터 필터
-    if (gCalendarFilters.center !== 'ALL' && evt.centerName !== gCalendarFilters.center) {
-      return false;
-    }
-    // 검색어 필터
-    if (gCalendarFilters.keyword) {
-      const kw = gCalendarFilters.keyword.toLowerCase();
-      const match = evt.patientName.toLowerCase().includes(kw) ||
-                    evt.caregiverName.toLowerCase().includes(kw) ||
-                    evt.hospitalName.toLowerCase().includes(kw) ||
-                    evt.adjusterName.toLowerCase().includes(kw) ||
-                    evt.insuranceCompany.toLowerCase().includes(kw) ||
-                    evt.diseaseName.toLowerCase().includes(kw);
-      if (!match) return false;
-    }
-    return true;
-  });
 
-  // 3. 상단 4대 KPI 요약 집계
-  updateCareCalendarKpis(allEvents);
+    // 6. 전체화면 클래스 상태 동기화
+    if (gCalendarIsFullscreen) {
+      container.classList.add('calendar-fullscreen-mode');
+    } else {
+      container.classList.remove('calendar-fullscreen-mode');
+    }
 
-  // 4. 헤더 날짜 레이블 및 뷰 모드 토글 스타일 갱신
-  updateCareCalendarHeaderDisplay();
-
-  // 5. 모드에 맞게 뷰 렌더러 호출 (연결 타임라인 / 연속 바 달력 / 기존 월별 카드 / 기존 주별 보기)
-  if (gCalendarViewMode === 'timeline') {
-    renderCareCalendarTimelineView(filteredEvents);
-  } else if (gCalendarViewMode === 'spanmonth') {
-    renderCareCalendarSpanMonthView(filteredEvents);
-  } else if (gCalendarViewMode === 'week') {
-    renderCareCalendarWeekView(filteredEvents);
-  } else {
-    renderCareCalendarMonthView(filteredEvents);
+    // Lucide 아이콘 리프레시
+    initIcons(container);
+  } catch (err) {
+    console.error('[CareCalendar] renderCareCalendar error:', err);
+    container.innerHTML = `
+      <div class="p-16 text-center text-slate-500 space-y-4">
+        <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+          <i data-lucide="alert-triangle" class="w-7 h-7"></i>
+        </div>
+        <div class="text-base font-black text-slate-800">간병 캘린더를 표시하는 중 오류가 발생했습니다.</div>
+        <p class="text-xs text-slate-500 max-w-md mx-auto font-mono bg-slate-50 p-2.5 rounded-lg border border-slate-200">${err.message || err}</p>
+        <div class="flex items-center justify-center gap-2 pt-2">
+          <button type="button" onclick="renderCareCalendar()" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>다시 시도</span>
+          </button>
+        </div>
+      </div>
+    `;
+    if (window.lucide && typeof lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
   }
-
-  // 6. 전체화면 클래스 상태 동기화
-  if (gCalendarIsFullscreen) {
-    container.classList.add('calendar-fullscreen-mode');
-  } else {
-    container.classList.remove('calendar-fullscreen-mode');
-  }
-
-  // Lucide 아이콘 리프레시
-  initIcons(container);
 }
 
 /**
