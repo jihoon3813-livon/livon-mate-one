@@ -2308,6 +2308,20 @@ function isMatchCustomerRecord(app, item) {
 
   const clean = (s) => String(s || '').replace(/[^0-9a-zA-Z가-힣]/g, '').toLowerCase();
 
+  const aPhone = clean(app.phone || app.applicantPhone);
+  const iPhone = clean(item.phone || item.contact || item.applicantContact || item.applicantPhone);
+  const phoneMatch = Boolean(aPhone && iPhone && (aPhone === iPhone || (aPhone.length >= 8 && iPhone.includes(aPhone)) || (iPhone.length >= 8 && aPhone.includes(iPhone))));
+
+  const aAcc = clean(app.accidentNumber);
+  const iAcc = clean(item.accidentNumber);
+  const accMatch = Boolean(aAcc && iAcc && aAcc === iAcc);
+
+  const aPol = clean(app.policyNumber);
+  const iPol = clean(item.policyNumber);
+  const polMatch = Boolean(aPol && iPol && aPol === iPol);
+
+  const nameMatch = Boolean(aName && iName && (aName === iName || aName.includes(iName) || iName.includes(aName)));
+
   const aId = String(app.id || app.patientId || '').trim();
   const rawItemApplyId = String(item.applyId || (item.isApplication || (item.id && (String(item.id).startsWith('C') || String(item.id).startsWith('H') || String(item.id).startsWith('D')) && !String(item.id).includes('.')) ? item.id : '') || '').trim();
   const iApplyId = rawItemApplyId;
@@ -2326,20 +2340,6 @@ function isMatchCustomerRecord(app, item) {
     // Otherwise, different applyIds for the same person (e.g. C0186 vs C0187) are distinct applications! NEVER match!
     return false;
   }
-
-  const aPhone = clean(app.phone || app.applicantPhone);
-  const iPhone = clean(item.phone || item.contact || item.applicantContact || item.applicantPhone);
-  const phoneMatch = Boolean(aPhone && iPhone && (aPhone === iPhone || (aPhone.length >= 8 && iPhone.includes(aPhone)) || (iPhone.length >= 8 && aPhone.includes(iPhone))));
-
-  const aAcc = clean(app.accidentNumber);
-  const iAcc = clean(item.accidentNumber);
-  const accMatch = Boolean(aAcc && iAcc && aAcc === iAcc);
-
-  const aPol = clean(app.policyNumber);
-  const iPol = clean(item.policyNumber);
-  const polMatch = Boolean(aPol && iPol && aPol === iPol);
-
-  const nameMatch = Boolean(aName && iName && (aName === iName || aName.includes(iName) || iName.includes(aName)));
 
   // 2) Name matches AND (phone OR accidentNumber OR policyNumber matches)
   if (nameMatch && (phoneMatch || accMatch || polMatch)) return true;
