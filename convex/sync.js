@@ -1423,6 +1423,85 @@ export const resetAndPurgeLaunchData = mutation({
   },
 });
 
+// 51-2. 삼성화재 간병 관리대장 단독 초기화 (samsungSheets 및 삼성 대장 연동 정보 0건 리셋)
+export const resetSamsungCareLedger = mutation({
+  args: {
+    purgeAssociatedHubApps: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    let deletedSheets = 0;
+    let deletedApps = 0;
+    let deletedAssigns = 0;
+    let deletedClaims = 0;
+    let deletedPayouts = 0;
+
+    // 1. samsungSheets 테이블 완전 삭제
+    const sheets = await ctx.db.query("samsungSheets").collect();
+    for (const s of sheets) {
+      await ctx.db.delete(s._id);
+      deletedSheets++;
+    }
+
+    // 2. 통합허브 내 삼성화재 신청/배정/청구/지급 데이터 삭제 (옵션, 기본 true)
+    const purgeHub = args.purgeAssociatedHubApps !== false;
+    if (purgeHub) {
+      const apps = await ctx.db.query("applications").collect();
+      for (const a of apps) {
+        if ((a.insuranceCompany || '').includes('삼성') || (a.id && String(a.id).startsWith('S'))) {
+          await ctx.db.delete(a._id);
+          deletedApps++;
+        }
+      }
+
+      const assigns = await ctx.db.query("assignments").collect();
+      for (const as of assigns) {
+        if ((as.insuranceCompany || '').includes('삼성') || (as.applyId && String(as.applyId).startsWith('S'))) {
+          await ctx.db.delete(as._id);
+          deletedAssigns++;
+        }
+      }
+
+      const claims = await ctx.db.query("claims").collect();
+      for (const c of claims) {
+        if ((c.insuranceCompany || '').includes('삼성') || (c.applyId && String(c.applyId).startsWith('S'))) {
+          await ctx.db.delete(c._id);
+          deletedClaims++;
+        }
+      }
+
+      const payouts = await ctx.db.query("payouts").collect();
+      for (const p of payouts) {
+        if ((p.insuranceCompany || '').includes('삼성') || (p.applyId && String(p.applyId).startsWith('S'))) {
+          await ctx.db.delete(p._id);
+          deletedPayouts++;
+        }
+      }
+    }
+
+    // 3. systemSettings 내 LIVON_LAUNCH_CONFIG의 samsung 설정 초기화
+    const launchSettings = await ctx.db
+      .query("systemSettings")
+      .filter((q) => q.eq(q.field("key"), "LIVON_LAUNCH_CONFIG"))
+      .collect();
+    for (const ls of launchSettings) {
+      if (ls.value && typeof ls.value === 'object') {
+        const val = { ...ls.value, samsung: { appliedAt: null, count: 0, lastMode: 'file', sheetUrl: '' } };
+        await ctx.db.patch(ls._id, { value: val });
+      }
+    }
+
+    return {
+      success: true,
+      deletedSheets,
+      deletedApps,
+      deletedAssigns,
+      deletedClaims,
+      deletedPayouts,
+      timestamp: new Date().toISOString(),
+    };
+  },
+});
+
 // 52. 간병인 인력 단일 등록 및 수정 (Upsert by id or name)
 export const saveCaregiver = mutation({
   args: {

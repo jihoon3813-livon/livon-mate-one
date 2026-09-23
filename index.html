@@ -4126,6 +4126,10 @@
                   <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
                   <span>Convex DB 상태 검증</span>
                 </button>
+                <button type="button" onclick="executeResetSamsungCareLedger()" class="px-4 py-2.5 rounded-xl bg-white hover:bg-sky-50 border border-sky-300 text-sky-800 font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer" title="현재 접속 환경의 삼성화재 간병 관리대장(samsungSheets)만 단독 Convex 초기화">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5 text-sky-600"></i>
+                  <span>삼성화재 대장 Convex 초기화</span>
+                </button>
                 <button type="button" onclick="executeFullDataReset()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 active:scale-95 text-white font-black text-xs shadow-md shadow-rose-600/30 flex items-center gap-2 transition-all cursor-pointer">
                   <i data-lucide="alert-triangle" class="w-4 h-4"></i>
                   <span>전체 데이터 초기화 실행</span>
@@ -4134,7 +4138,7 @@
             </div>
 
             <!-- 데이터 현황 요약 그리드 -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-xs">
               <div class="p-3.5 bg-white rounded-2xl border border-rose-100 shadow-2xs">
                 <span class="text-slate-400 block text-[11px] font-medium">고객 신청 대장</span>
                 <span class="text-lg font-black text-slate-800 font-mono mt-0.5 block" id="resetStatApps">0건</span>
@@ -4154,6 +4158,10 @@
               <div class="p-3.5 bg-white rounded-2xl border border-rose-100 shadow-2xs">
                 <span class="text-slate-400 block text-[11px] font-medium">간병인 인력풀</span>
                 <span class="text-lg font-black text-slate-800 font-mono mt-0.5 block" id="resetStatCaregivers">0건</span>
+              </div>
+              <div class="p-3.5 bg-sky-50 rounded-2xl border border-sky-200 shadow-2xs">
+                <span class="text-sky-700 block text-[11px] font-bold">삼성화재 대장</span>
+                <span class="text-lg font-black text-sky-800 font-mono mt-0.5 block" id="resetStatSamsungSheets">0건</span>
               </div>
               <div class="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 shadow-2xs">
                 <span class="text-emerald-700 block text-[11px] font-bold">관리자 계정 (보존)</span>
@@ -4461,7 +4469,13 @@
                     <span class="w-3 h-3 rounded-full bg-sky-500"></span>
                     <h4 class="text-sm font-black text-slate-900">삼성화재 간병 관리대장</h4>
                   </div>
-                  <span class="text-[11px] px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 font-bold border border-sky-200">삼성화재 전용</span>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="executeResetSamsungCareLedger()" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px] border border-rose-200 transition-all cursor-pointer flex items-center gap-1 shadow-2xs" title="현재 접속 환경의 삼성화재 간병 관리대장(samsungSheets) Convex DB 0건 초기화">
+                      <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
+                      <span>Convex 초기화</span>
+                    </button>
+                    <span class="text-[11px] px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 font-bold border border-sky-200">삼성화재 전용</span>
+                  </div>
                 </div>
                 <p class="text-[11px] text-slate-500 -mt-2">※ 본 엑셀을 기준으로 [삼성화재 접수/청구관리]가 작성되며, [종합관리대장 &gt; 통합허브]의 삼성화재 고객 상품명 등 상세 정보가 자동 연동됩니다.</p>
 
@@ -4522,8 +4536,12 @@
                   </div>
                 </div>
 
-                <!-- 미리보기 & 최종 반영 버튼 -->
-                <div class="pt-1 flex gap-2">
+                <!-- 미리보기 & 최종 반영 및 초기화 버튼 -->
+                <div class="pt-1 flex flex-col sm:flex-row gap-2">
+                  <button type="button" onclick="executeResetSamsungCareLedger()" class="py-2.5 px-3.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0" title="현재 접속 환경의 삼성화재 간병 관리대장(samsungSheets) Convex DB 0건 초기화">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-600"></i>
+                    <span>삼성 대장 Convex 초기화</span>
+                  </button>
                   <button type="button" onclick="openLaunchPreviewModal('samsung')" id="btnPreview_samsung" disabled class="flex-1 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-400 font-bold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
                     데이터 미리보기 🔍
                   </button>
@@ -10298,6 +10316,6 @@
   <script src="samsung-call-report.js?v=20260920_1330"></script>
   <script src="total-call-analysis.js?v=20260921_1005"></script>
   <script src="system-audit-log.js?v=20260922_1040"></script>
-  <script src="app.js?v=20260923_1133"></script>
+  <script src="app.js?v=20260923_1140"></script>
 </body>
 </html>

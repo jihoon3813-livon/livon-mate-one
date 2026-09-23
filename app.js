@@ -30460,6 +30460,7 @@ async function updateDataResetStatusUI() {
   const statClaims = document.getElementById('resetStatClaims');
   const statPayouts = document.getElementById('resetStatPayouts');
   const statCaregivers = document.getElementById('resetStatCaregivers');
+  const statSamsungSheets = document.getElementById('resetStatSamsungSheets');
   const statAdmins = document.getElementById('resetStatAdmins');
   const statusMsg = document.getElementById('resetStatusMsg');
   const statusDot = document.getElementById('resetStatusDot');
@@ -30491,6 +30492,10 @@ async function updateDataResetStatusUI() {
   statClaims.innerText = (Array.isArray(gClaims) ? gClaims.length : 0) + '건';
   statPayouts.innerText = (Array.isArray(gPayouts) ? gPayouts.length : 0) + '건';
   statCaregivers.innerText = (Array.isArray(gCaregivers) ? gCaregivers.length : 0) + '건';
+  if (statSamsungSheets) {
+    const sLocalCount = (typeof gSamsungSheets !== 'undefined' && Array.isArray(gSamsungSheets.target)) ? gSamsungSheets.target.length : 0;
+    statSamsungSheets.innerText = sLocalCount + '건';
+  }
   statAdmins.innerText = adminCount + '명 (보존)';
 
   // 2. Convex 클라우드 실제 DB 카운트 비동기 검증
@@ -30508,6 +30513,7 @@ async function updateDataResetStatusUI() {
       const cClaims = v.claims ? v.claims.length : 0;
       const cPayouts = v.payouts ? v.payouts.length : 0;
       const cCaregivers = v.caregivers ? v.caregivers.length : 0;
+      const cSamsungSheets = v.samsungSheets ? v.samsungSheets.length : 0;
       const cAdmins = (v.admins && v.admins.length > 0) ? v.admins.length : 0;
 
       const localCount = (Array.isArray(gApps) ? gApps.length : 0);
@@ -30516,6 +30522,7 @@ async function updateDataResetStatusUI() {
       statClaims.innerText = cClaims + '건';
       statPayouts.innerText = cPayouts + '건';
       statCaregivers.innerText = cCaregivers + '건';
+      if (statSamsungSheets) statSamsungSheets.innerText = cSamsungSheets + '건';
       
       if (cAdmins > 0) {
         adminCount = cAdmins;
@@ -30524,7 +30531,7 @@ async function updateDataResetStatusUI() {
       }
       statAdmins.innerText = adminCount + '명 (보존)';
 
-      const isConvexClean = (cApps === 0 && cAssigns === 0 && cClaims === 0 && cPayouts === 0);
+      const isConvexClean = (cApps === 0 && cAssigns === 0 && cClaims === 0 && cPayouts === 0 && cSamsungSheets === 0);
       const envName = IS_DEV_ENV ? '개발 서버(rapid-raccoon-895)' : '운영 실서버(gallant-weasel-360)';
 
       if (isConvexClean && localCount === 0) {
@@ -30534,7 +30541,7 @@ async function updateDataResetStatusUI() {
         if (statusMsg) statusMsg.innerHTML = '<b class="text-emerald-700">✅ [' + envName + '] DB는 0건으로 완전 클린 상태입니다!</b><br><span class="text-amber-800 text-xs font-normal mt-0.5 inline-block">ℹ️ 단, 현재 브라우저 로컬 캐시에 이전 테스트 목록(' + localCount + '건)이 남아있습니다. 화면까지 깨끗하게 0건으로 비우시려면 아래 <b>[전체 데이터 초기화 실행]</b>을 1회 눌러주세요.</span>';
         if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
       } else {
-        const totalPending = cApps + cAssigns + cClaims + cPayouts;
+        const totalPending = cApps + cAssigns + cClaims + cPayouts + cSamsungSheets;
         if (statusMsg) statusMsg.innerHTML = '<b class="text-rose-700">⚠️ [' + envName + '] DB에 데이터(' + totalPending + '건)가 존재합니다. 엑셀 업로드 전 클린 런칭을 원하시면 아래 초기화를 진행해주세요.</b>';
         if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse';
       }
@@ -30654,6 +30661,135 @@ async function executeFullDataReset() {
   }
 }
 window.executeFullDataReset = executeFullDataReset;
+
+/**
+ * [환경설정] 삼성화재 간병 관리대장 단독 Convex 초기화 엔진
+ * - 개발 서버(DEV)와 운영 실서버(PROD)를 명확히 판별하여 현재 접속된 서버만 안전하고 독립적으로 0건 초기화
+ * - 반대편 서버(운영/개발)에는 절대 영향을 주지 않음
+ */
+async function executeResetSamsungCareLedger() {
+  const isDev = isDevEnvironment();
+  const envName = isDev ? '개발 사이트 (DEV)' : '실운영 사이트 (PROD)';
+  const envConvexUrl = isDev ? DEV_CONVEX_URL : PROD_CONVEX_URL;
+
+  const confirmed = confirm(
+    `🚨 [삼성화재 간병 관리대장 Convex 초기화 확인]\n\n` +
+    `현재 접속 환경: 【 ${envName} 】\n` +
+    `연결 Convex: ${envConvexUrl}\n\n` +
+    `1. 현재 접속된 [${envName}]의 삼성화재 간병 관리대장(samsungSheets: 대상자, 완료, 연락처 등)이 0건으로 완전 초기화됩니다.\n` +
+    `2. 통합허브 내 삼성화재 관련 신청/배정/청구/지급 및 브라우저 로컬 캐시가 함께 0건으로 리셋됩니다.\n` +
+    `3. ⚠️ 개발서버와 운영서버는 완벽히 분리되어 운영되므로, 반대편 서버(${isDev ? '운영 실서버' : '개발 서버'}) 데이터에는 일체 영향을 주지 않습니다.\n\n` +
+    `정말로 [${envName}] 삼성화재 간병 관리대장 정보를 초기화하시겠습니까?`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    if (typeof showToast === 'function') {
+      showToast(`[${envName}] 삼성화재 간병 관리대장 Convex DB 초기화 중...`, 'info');
+    }
+
+    // 1. Convex 클라우드 DB 초기화 (현재 접속된 단 하나의 환경만 엄격하게 초기화)
+    if (typeof syncToConvex === 'function') {
+      try {
+        await syncToConvex('sync:resetSamsungCareLedger', { purgeAssociatedHubApps: true });
+      } catch (e) {
+        await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'samsung' });
+      }
+    }
+
+    // 2. 브라우저 LocalStorage 삼성화재 캐시 정리
+    const samsungKeys = [
+      'LIVON_SAMSUNG_EXCEL_LEDGER',
+      'LIVON_SAMSUNG_SHEET_TARGET',
+      'LIVON_SAMSUNG_SHEET_COMPLETED'
+    ];
+    samsungKeys.forEach(k => {
+      try { localStorage.removeItem(k); } catch (e) {}
+    });
+
+    // 3. 런칭 설정 초기화
+    const currentCfg = getLaunchConfig();
+    currentCfg.samsung = {
+      appliedAt: null,
+      count: 0,
+      lastMode: 'file',
+      sheetUrl: ''
+    };
+    saveLaunchConfig(currentCfg);
+
+    // 4. 전역 변수 초기화
+    if (typeof gSamsungSheets !== 'undefined' && gSamsungSheets) {
+      gSamsungSheets.target = [];
+      gSamsungSheets.completed = [];
+      gSamsungSheets.contacts = [];
+    }
+    if (typeof gLaunchParsedData !== 'undefined' && gLaunchParsedData) {
+      delete gLaunchParsedData['samsung'];
+    }
+
+    // 통합허브 내 삼성화재 신청, 배정, 청구, 지급 메모리 데이터 제거 및 캐시 갱신
+    if (Array.isArray(gApps)) {
+      gApps = gApps.filter(a => !(a.insuranceCompany || '').includes('삼성') && !(a.id && String(a.id).startsWith('S')));
+      try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+    }
+    if (Array.isArray(gAssigns)) {
+      gAssigns = gAssigns.filter(as => !(as.insuranceCompany || '').includes('삼성') && !(as.applyId && String(as.applyId).startsWith('S')));
+      try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
+    }
+    if (Array.isArray(gClaims)) {
+      gClaims = gClaims.filter(c => !(c.insuranceCompany || '').includes('삼성') && !(c.applyId && String(c.applyId).startsWith('S')));
+      try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
+    }
+    if (Array.isArray(gPayouts)) {
+      gPayouts = gPayouts.filter(p => !(p.insuranceCompany || '').includes('삼성') && !(p.applyId && String(p.applyId).startsWith('S')));
+      try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
+    }
+
+    // 5. UI 초기화
+    const fileInput = document.getElementById('fileLaunch_samsung');
+    if (fileInput) fileInput.value = '';
+    const fileInfo = document.getElementById('fileInfo_samsung');
+    if (fileInfo) fileInfo.classList.add('hidden');
+    const sheetSelectGroup = document.getElementById('sheetSelectGroup_samsung');
+    if (sheetSelectGroup) sheetSelectGroup.classList.add('hidden');
+    const btnPreview = document.getElementById('btnPreview_samsung');
+    if (btnPreview) {
+      btnPreview.disabled = true;
+      btnPreview.classList.add('disabled:opacity-50', 'disabled:cursor-not-allowed');
+    }
+    const btnApply = document.getElementById('btnApply_samsung');
+    if (btnApply) {
+      btnApply.disabled = true;
+      btnApply.classList.add('disabled:opacity-50', 'disabled:cursor-not-allowed');
+    }
+
+    updateLaunchStatusCard('samsung', currentCfg.samsung);
+    if (typeof updateSamsungSheetBadges === 'function') updateSamsungSheetBadges();
+    if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+    if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+    if (typeof renderApplications === 'function') renderApplications();
+    if (typeof renderCurrentSamsungSheet === 'function' && (gActiveTab === 'samsungclaimhub' || gActiveTab === 'samsungfire')) {
+      renderCurrentSamsungSheet();
+    }
+    await updateDataResetStatusUI();
+
+    if (typeof showCustomAlert === 'function') {
+      showCustomAlert({
+        title: '삼성화재 간병 관리대장 초기화 완료',
+        message: `【 ${envName} 】\nConvex 클라우드 DB 및 로컬의 삼성화재 간병 관리대장 정보가 0건으로 완전 초기화되었습니다.\n\n※ 다른 서버(${isDev ? '운영 실서버' : '개발 서버'})에는 전혀 영향을 주지 않았습니다.`,
+        icon: 'check-circle-2',
+        iconColor: 'emerald'
+      });
+    } else {
+      alert(`[${envName}] 삼성화재 간병 관리대장 Convex 초기화가 완료되었습니다.`);
+    }
+  } catch (err) {
+    console.error('[Samsung Care Ledger Reset Error]', err);
+    alert(`삼성화재 간병 관리대장 초기화 중 오류가 발생했습니다: ${err.message}`);
+  }
+}
+window.executeResetSamsungCareLedger = executeResetSamsungCareLedger;
 
 
 function onCalcInsuranceChange() {
