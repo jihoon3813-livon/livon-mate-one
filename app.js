@@ -2562,6 +2562,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupInputFormatters();
   setupGlobalDatePickerTriggers();
 
+  // 삼성화재 청구허브/시트 검색창 브라우저 자동완성 캐시 초기화
+  const samsungSearchInit = document.getElementById('samsungClaimHubSearchInput');
+  if (samsungSearchInit) samsungSearchInit.value = '';
+  const samsungSheetInit = document.getElementById('samsungSheetSearchInput');
+  if (samsungSheetInit) samsungSheetInit.value = '';
+  if (typeof gLastSamsungSearchQuery !== 'undefined') gLastSamsungSearchQuery = '';
+
   // 1. 🚨 [보안] 관리자 서버 인증 세션 상태 우선 검증 (단순 CSS 가림 탈피)
   let isAuthenticated = false;
   if (typeof initAdminSession === 'function') {
@@ -2646,6 +2653,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 경량 초기화 작업만 유휴 시점에 실행 (비활성 탭은 탭 클릭 시 온디맨드 렌더링)
   setTimeout(() => {
+    if (typeof clearSamsungClaimHubSearch === 'function') clearSamsungClaimHubSearch();
     if (typeof loadBarobillSettingsToInputs === 'function') loadBarobillSettingsToInputs();
     if (typeof calculateRuleSplit === 'function') calculateRuleSplit();
     if (typeof isUserOnLoginScreen === 'function' && isUserOnLoginScreen()) return;
@@ -5681,6 +5689,24 @@ function registerSamsungAppFromLeadRow(realIdx) {
   });
 }
 
+function clearSamsungClaimHubSearch() {
+  const input = document.getElementById('samsungClaimHubSearchInput');
+  if (input) input.value = '';
+  const sheetInput = document.getElementById('samsungSheetSearchInput');
+  if (sheetInput) sheetInput.value = '';
+  gLastSamsungSearchQuery = '';
+  const btnClear = document.getElementById('btnClearSamsungSearch');
+  if (btnClear) btnClear.classList.add('hidden');
+  renderCurrentSamsungSheet();
+}
+window.clearSamsungClaimHubSearch = clearSamsungClaimHubSearch;
+
+function handleCareLogAttachButtonClick(targetId) {
+  // 간병일지 첨부 클릭 시 실물 미리보기를 먼저 오픈하여 확인 후 첨부하도록 안내
+  previewCustomerCareLogPdf(targetId);
+}
+window.handleCareLogAttachButtonClick = handleCareLogAttachButtonClick;
+
 function renderCurrentSamsungSheet() {
   const isClaimHub = (gActiveTab === 'samsungclaimhub');
   const container = document.getElementById(isClaimHub ? 'samsungClaimHubSpreadsheetContainer' : 'samsungSpreadsheetContainer');
@@ -5690,7 +5716,18 @@ function renderCurrentSamsungSheet() {
   const schema = SAMSUNG_SHEET_SCHEMAS[gActiveSamsungSheet] || SAMSUNG_SHEET_SCHEMAS.target;
   const rawRows = gSamsungSheets[gActiveSamsungSheet] || [];
   const searchInputId = isClaimHub ? 'samsungClaimHubSearchInput' : 'samsungSheetSearchInput';
-  const query = (document.getElementById(searchInputId)?.value || '').trim().toLowerCase();
+  const searchInputEl = document.getElementById(searchInputId);
+  const query = (searchInputEl?.value || '').trim().toLowerCase();
+
+  // 검색창 초기화(X) 버튼 가시성 제어
+  const btnClear = document.getElementById('btnClearSamsungSearch');
+  if (btnClear) {
+    if (query) {
+      btnClear.classList.remove('hidden');
+    } else {
+      btnClear.classList.add('hidden');
+    }
+  }
 
   // 검색어가 바뀌면 1페이지로 리셋
   if (query !== gLastSamsungSearchQuery) {
@@ -5944,14 +5981,14 @@ function renderCurrentSamsungSheet() {
                       <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                       <span>일지보유</span>
                     </span>
-                    <button type="button" onclick="toggleSamsungTargetLogAttachment('${targetId}', ${!isAttached})" 
-                      class="px-2 py-0.5 rounded-lg font-black text-[10.5px] transition-all cursor-pointer shadow-2xs ${isAttached ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-300 hover:border-purple-300'}"
-                      title="${isAttached ? '클릭 시 이메일 발송 첨부 해제' : '클릭 시 이메일 발송에 이 일지 첨부'}">
+                    <button type="button" onclick="${isAttached ? `toggleSamsungTargetLogAttachment('${targetId}', false)` : `handleCareLogAttachButtonClick('${targetId}')`}" 
+                      class="px-2 py-0.5 rounded-lg font-black text-[10.5px] transition-all cursor-pointer shadow-2xs ${isAttached ? 'bg-purple-600 text-white hover:bg-rose-600' : 'bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-300 hover:border-purple-300'}"
+                      title="${isAttached ? '클릭 시 첨부 해제' : '클릭 시 간병일지 미리보기 확인 후 첨부'}">
                       ${isAttached ? '✓ 첨부됨' : '+ 첨부'}
                     </button>
                     <button type="button" onclick="previewCustomerCareLogPdf('${targetId}')" 
                       class="p-1 text-slate-400 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-all cursor-pointer"
-                      title="간병일지 PDF 미리보기">
+                      title="간병일지 실물 미리보기">
                       <i data-lucide="eye" class="w-3.5 h-3.5"></i>
                     </button>
                   </div>
@@ -9334,8 +9371,47 @@ function toggleSamsungTargetLogAttachment(targetId, attach) {
   renderDispatchAttachedCareLogs();
   renderCurrentSamsungSheet();
   if (typeof updateSamsungDailyEmailBodyText === 'function') updateSamsungDailyEmailBodyText();
+  if (window._currentPreviewAppId) updateSamsungMergedPreviewAttachBtnState(window._currentPreviewAppId);
 }
 window.toggleSamsungTargetLogAttachment = toggleSamsungTargetLogAttachment;
+
+function updateSamsungMergedPreviewAttachBtnState(appId) {
+  const btn = document.getElementById('samsungMergedPreviewAttachBtn');
+  const btnText = document.getElementById('samsungMergedPreviewAttachBtnText');
+  const footerBtn = document.getElementById('samsungMergedPreviewAttachBtnFooter');
+  const footerBtnText = document.getElementById('samsungMergedPreviewAttachBtnFooterText');
+  
+  const isAttached = (window.gSamsungDispatchAttachedCareLogs || []).some(a => String(a.id) === String(appId));
+  
+  if (btn && btnText) {
+    if (isAttached) {
+      btn.className = 'px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs';
+      btnText.innerText = '✕ 첨부 해제하기';
+    } else {
+      btn.className = 'px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs';
+      btnText.innerText = '✓ 이 일지 첨부하기';
+    }
+  }
+
+  if (footerBtn && footerBtnText) {
+    if (isAttached) {
+      footerBtn.className = 'px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md';
+      footerBtnText.innerText = '✕ 일일보고 첨부 해제';
+    } else {
+      footerBtn.className = 'px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md';
+      footerBtnText.innerText = '✓ 일일보고에 이 간병일지 첨부';
+    }
+  }
+}
+window.updateSamsungMergedPreviewAttachBtnState = updateSamsungMergedPreviewAttachBtnState;
+
+function toggleCurrentPreviewedCareLogAttachment() {
+  if (!window._currentPreviewAppId) return;
+  const isAttached = (window.gSamsungDispatchAttachedCareLogs || []).some(a => String(a.id) === String(window._currentPreviewAppId));
+  toggleSamsungTargetLogAttachment(window._currentPreviewAppId, !isAttached);
+  updateSamsungMergedPreviewAttachBtnState(window._currentPreviewAppId);
+}
+window.toggleCurrentPreviewedCareLogAttachment = toggleCurrentPreviewedCareLogAttachment;
 
 function renderSamsungDailyAvailableLogsSelector() {
   const container = document.getElementById('samsungDailyAvailableLogsContainer');
@@ -10623,11 +10699,20 @@ async function buildSamsungMergedCareLogPdfBytes() {
   let totalAddedPages = 0;
   let patientCount = 0;
 
-  // 1. 선택된 고객들의 간병일지 파일 수집
+  // 1. 선택 및 테이블에서 첨부된 모든 대상 고객 ID 집합 수집
+  const allAppIds = new Set();
   if (gSamsungDailySelectedCareLogs && gSamsungDailySelectedCareLogs.size > 0) {
-    for (const appId of gSamsungDailySelectedCareLogs) {
+    gSamsungDailySelectedCareLogs.forEach(id => allAppIds.add(String(id)));
+  }
+  if (window.gSamsungDispatchAttachedCareLogs && window.gSamsungDispatchAttachedCareLogs.length > 0) {
+    window.gSamsungDispatchAttachedCareLogs.forEach(item => allAppIds.add(String(item.id)));
+  }
+
+  if (allAppIds.size > 0) {
+    for (const appId of allAppIds) {
       const app = (gApps || []).find(a => String(a.id) === String(appId));
-      const patientName = app ? app.patientName : '고객';
+      const targetRow = ((gSamsungSheets && gSamsungSheets.target) || []).find(r => String(r.patientId || r.id) === String(appId));
+      const patientName = app ? app.patientName : (targetRow ? (targetRow.patientName || targetRow.name) : '고객');
       const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[appId]) || [];
 
       if (custFiles.length > 0) {
@@ -10648,9 +10733,7 @@ async function buildSamsungMergedCareLogPdfBytes() {
         const cLog = (gCareLogs || []).find(l => String(l.applyId) === String(appId) || (app && l.patientName === app.patientName));
         if (cLog && cLog.pdfBase64) {
           try {
-            const bin = atob(cLog.pdfBase64);
-            const bytes = new Uint8Array(bin.length);
-            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            const bytes = convertBase64ToUint8Array(cLog.pdfBase64);
             const srcDoc = await PDFLib.PDFDocument.load(bytes, { ignoreEncryption: true });
             const pageIndices = srcDoc.getPageIndices();
             const copiedPages = await mergedDoc.copyPages(srcDoc, pageIndices);
@@ -10661,27 +10744,19 @@ async function buildSamsungMergedCareLogPdfBytes() {
             console.warn('[PDF 결합] base64 로드 실패:', b64Err);
           }
         } else {
-          // 전산 일지 양식 생성하여 첨부
-          const syntheticPdfStr = generateCompliantCareLogPdfString(cLog || {
-            patientName,
-            applyId: appId,
-            startDate: app?.careStartDate || app?.startDate,
-            endDate: app?.careEndDate || app?.endDate,
-            caregiverName: app?.caregiverName,
-            centerName: '영등포센터',
-            organizationName: '삼성화재'
-          });
+          // 한글 깨짐 없는 케어포트 공인 일지 PDF 생성 결합 (깨지는 문자열 기반 generateCompliantCareLogPdfString 배제)
           try {
-            const enc = new TextEncoder();
-            const synthBytes = enc.encode(syntheticPdfStr);
-            const srcDoc = await PDFLib.PDFDocument.load(synthBytes, { ignoreEncryption: true });
-            const pageIndices = srcDoc.getPageIndices();
-            const copiedPages = await mergedDoc.copyPages(srcDoc, pageIndices);
-            copiedPages.forEach(p => mergedDoc.addPage(p));
-            totalAddedPages += pageIndices.length;
-            patientCount++;
+            const generated = await generateCarePortPdfBytesForApp(appId);
+            if (generated && generated.bytes) {
+              const srcDoc = await PDFLib.PDFDocument.load(generated.bytes, { ignoreEncryption: true });
+              const pageIndices = srcDoc.getPageIndices();
+              const copiedPages = await mergedDoc.copyPages(srcDoc, pageIndices);
+              copiedPages.forEach(p => mergedDoc.addPage(p));
+              totalAddedPages += pageIndices.length;
+              patientCount++;
+            }
           } catch (synthErr) {
-            console.warn('[PDF 결합] 전산 표준 일지 생성 실패:', synthErr);
+            console.warn('[PDF 결합] 케어포트 일지 PDF 자동 결합 실패:', synthErr);
           }
         }
       }
@@ -10823,16 +10898,17 @@ function convertBase64ToUint8Array(base64) {
 }
 
 async function generateCarePortPdfBytesForApp(appId) {
-  const app = (gApps || []).find(a => String(a.id) === String(appId));
-  if (!app) return null;
+  let app = (gApps || []).find(a => String(a.id) === String(appId));
+  const targetRow = ((gSamsungSheets && gSamsungSheets.target) || []).find(r => String(r.patientId || r.id) === String(appId));
+  if (!app && !targetRow) return null;
 
-  const patientName = app.patientName || '고객';
-  const insuranceCompany = app.insuranceCompany || '현대해상';
+  const patientName = app ? app.patientName : (targetRow ? (targetRow.patientName || targetRow.name) : '고객');
+  const insuranceCompany = (app && app.insuranceCompany) ? app.insuranceCompany : '삼성화재';
   const as = (gAssigns || []).find(a => String(a.applyId) === String(appId));
-  const caregiverName = as ? as.caregiverName : (app.caregiverName || app.assignedCaregiverName || '안연희');
-  const centerName = as ? (as.centerName || '영등포센터') : (app.centerName || '영등포센터');
-  const startDate = app.careStartDate || app.startDate || '2026-09-01';
-  const endDate = app.careEndDate || app.endDate || '2026-09-10';
+  const caregiverName = as ? as.caregiverName : (app?.caregiverName || app?.assignedCaregiverName || targetRow?.caregiverName || '안연희');
+  const centerName = as ? (as.centerName || '영등포센터') : (app?.centerName || '영등포센터');
+  const startDate = app?.careStartDate || app?.startDate || targetRow?.desiredStartDate || targetRow?.contractStartDate || '2026-09-01';
+  const endDate = app?.careEndDate || app?.endDate || targetRow?.expectedEndDate || targetRow?.contractEndDate || '2026-09-10';
 
   const cpGroup = (typeof gCarePortPatientGroups !== 'undefined' && Array.isArray(gCarePortPatientGroups))
     ? gCarePortPatientGroups.find(g => (g.applyId && String(g.applyId) === String(appId)) || g.patientName === patientName || g.id === appId || g.id === `APP_${appId}`)
@@ -10846,6 +10922,7 @@ async function generateCarePortPdfBytesForApp(appId) {
     let diffDays = calculateCareDays24h(startDate, endDate);
     if (isNaN(diffDays) || diffDays <= 0) diffDays = 4;
     const targetDays = Math.min(Math.max(diffDays, 1), 10);
+    const d1 = new Date(startDate && !isNaN(new Date(startDate)) ? startDate : '2026-09-01');
 
     const dailyScenarios = [
       {
@@ -10971,8 +11048,8 @@ async function generateCarePortPdfBytesForApp(appId) {
           detailData = {
             sessionId: log.sessionId,
             username: patientName,
-            age: app.age || '74',
-            gender: app.gender || '여',
+            age: app?.age || targetRow?.age || '74',
+            gender: app?.gender || targetRow?.gender || '여',
             consultantName: caregiverName,
             organizationName: `${insuranceCompany} (${centerName})`,
             consultDate: log.consultDate || `${curDate} 09:30`,
@@ -11059,8 +11136,10 @@ async function generateCarePortPdfBytesForApp(appId) {
 }
 
 async function previewCustomerCareLogPdf(appId) {
+  window._currentPreviewAppId = String(appId);
   const app = (gApps || []).find(a => String(a.id) === String(appId));
-  const patientName = app ? app.patientName : '고객';
+  const targetRow = ((gSamsungSheets && gSamsungSheets.target) || []).find(r => String(r.patientId || r.id) === String(appId));
+  const patientName = app ? app.patientName : (targetRow ? (targetRow.patientName || targetRow.name) : '고객');
 
   window.gSamsungCustomerCareLogFiles = window.gSamsungCustomerCareLogFiles || {};
   let custFiles = window.gSamsungCustomerCareLogFiles[appId] || [];
@@ -11108,6 +11187,7 @@ async function previewCustomerCareLogPdf(appId) {
 
   // 4. 공식 실물 PDF 뷰어(samsungMergedCareLogPreviewModal) 오픈 (가짜 시뮬레이션 카드 모달 완전 배제!)
   openModal('samsungMergedCareLogPreviewModal');
+  updateSamsungMergedPreviewAttachBtnState(appId);
   const loadingEl = document.getElementById('samsungMergedPreviewLoading');
   const iframe = document.getElementById('samsungMergedCareLogPreviewIframe');
   const titleEl = document.getElementById('samsungMergedPreviewTitle');
@@ -12280,16 +12360,17 @@ async function handleSendSamsungDailyReport(e) {
     }
 
     // 4. 간병일지 첨부 패키징: 여러 일지가 있을 경우 하나의 단일 통합 PDF로 결합하여 첨부
-    const hasSelectedLogs = gSamsungDailySelectedCareLogs && gSamsungDailySelectedCareLogs.size > 0;
-    const hasExtraCareFiles = extraCareFiles && extraCareFiles.length > 0;
+    const hasSelectedLogs = Boolean(gSamsungDailySelectedCareLogs && gSamsungDailySelectedCareLogs.size > 0);
+    const hasAttachedLogs = Boolean(window.gSamsungDispatchAttachedCareLogs && window.gSamsungDispatchAttachedCareLogs.length > 0);
+    const hasExtraCareFiles = Boolean(extraCareFiles && extraCareFiles.length > 0);
 
-    if (hasSelectedLogs || hasExtraCareFiles) {
+    if (hasSelectedLogs || hasAttachedLogs || hasExtraCareFiles) {
       try {
         const mergedResult = await buildSamsungMergedCareLogPdfBytes();
         if (mergedResult && mergedResult.bytes) {
           const now = new Date();
           const todayClean = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
-          const unifiedPdfName = `삼성화재_간병일지_통합_${todayClean}.pdf`;
+          const unifiedPdfName = `[삼성화재_간병지원]_간병일지_통합_${todayClean}.pdf`;
           
           let binary = '';
           const bytes = mergedResult.bytes;
@@ -12309,24 +12390,32 @@ async function handleSendSamsungDailyReport(e) {
         }
       } catch (mergeErr) {
         console.warn('[삼성화재 일일보고] 간병일지 통합 결합 실패, 개별 첨부 폴백:', mergeErr);
-        if (gSamsungDailySelectedCareLogs && gSamsungDailySelectedCareLogs.size > 0) {
-          for (const appId of gSamsungDailySelectedCareLogs) {
-            const targetApp = (gApps || []).find(a => String(a.id) === String(appId));
-            const cLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs))
-              ? gCareLogs.find(l => String(l.applyId) === String(appId) || (targetApp && l.patientName === targetApp.patientName))
-              : null;
-            const patientName = targetApp ? targetApp.patientName : '고객';
-            const pdfName = cLog && cLog.pdfFileName ? cLog.pdfFileName : `[${appId}_${patientName}]_간병일지.pdf`;
-            const validPdf = generateCompliantCareLogPdfString(cLog || { patientName, applyId: appId, startDate: targetApp?.startDate, endDate: targetApp?.careEndDate, pdfFileName: pdfName });
-            const pdfBase64 = btoa(validPdf);
-            attachments.push({
-              filename: pdfName,
-              content: pdfBase64,
-              encoding: 'base64',
-              contentType: 'application/pdf'
-            });
+        const allFallbackIds = new Set();
+        if (gSamsungDailySelectedCareLogs) gSamsungDailySelectedCareLogs.forEach(id => allFallbackIds.add(String(id)));
+        if (window.gSamsungDispatchAttachedCareLogs) window.gSamsungDispatchAttachedCareLogs.forEach(a => allFallbackIds.add(String(a.id)));
+
+        for (const appId of allFallbackIds) {
+          const targetApp = (gApps || []).find(a => String(a.id) === String(appId));
+          const targetRow = ((gSamsungSheets && gSamsungSheets.target) || []).find(r => String(r.patientId || r.id) === String(appId));
+          const patientName = targetApp ? targetApp.patientName : (targetRow ? (targetRow.patientName || targetRow.name) : '고객');
+          const pdfName = `[${appId}_${patientName}]_간병일지.pdf`;
+          try {
+            const gen = await generateCarePortPdfBytesForApp(appId);
+            if (gen && gen.bytes) {
+              let bin = '';
+              for (let i = 0; i < gen.bytes.byteLength; i++) bin += String.fromCharCode(gen.bytes[i]);
+              attachments.push({
+                filename: pdfName,
+                content: btoa(bin),
+                encoding: 'base64',
+                contentType: 'application/pdf'
+              });
+            }
+          } catch (e) {
+            console.warn('개별 일지 생성 실패:', e);
           }
         }
+      }
         for (let i = 0; i < extraCareFiles.length; i++) {
           const f = extraCareFiles[i];
           const b64 = await fileToBase64(f);
@@ -12338,7 +12427,6 @@ async function handleSendSamsungDailyReport(e) {
           });
         }
       }
-    }
 
     for (let i = 0; i < otherFiles.length; i++) {
       const f = otherFiles[i];
@@ -29484,11 +29572,13 @@ function saveFaxLogs() {
 // 원수사/보험사별 기본 약정 청구단가 및 고객별 개별 단가 관리 엔진
 // =========================================================================
 const gDefaultClaimUnitPriceRules = [
-  { id: 'RULE-HD-01', insuranceCompany: '현대해상', category: '표준/일반', unitPrice: 142000, memo: '현대해상 표준 약정 청구단가', updatedAt: '2026.09.10' },
-  { id: 'RULE-HD-02', insuranceCompany: '현대해상(SCOR)', category: 'SCOR 재보험', unitPrice: 144000, memo: '현대해상 SCOR 연계 전용 약정단가', updatedAt: '2026.09.10' },
-  { id: 'RULE-SF-01', insuranceCompany: '삼성화재', category: '표준/일반', unitPrice: 147000, memo: '삼성화재 보상과 표준 약정단가 (추정기본 147,000원)', updatedAt: '2026.09.10' },
-  { id: 'RULE-DB-01', insuranceCompany: 'DB손해보험', category: '표준/일반', unitPrice: 150000, memo: 'DB손해보험 표준 약정단가', updatedAt: '2026.09.10' },
-  { id: 'RULE-KB-01', insuranceCompany: 'KB손해보험', category: '표준/일반', unitPrice: 150000, memo: 'KB손해보험 표준 약정단가', updatedAt: '2026.09.10' }
+  { id: 'RULE-SF-01', insuranceCompany: '삼성화재', category: '표준/일반', unitPrice: 160000, memo: '삼성화재 보상과 표준 약정단가', updatedAt: '2026.09.28' },
+  { id: 'RULE-HD-01', insuranceCompany: '현대해상', category: '표준/일반', unitPrice: 142000, memo: '현대해상 표준 약정 청구단가', updatedAt: '2026.09.28' },
+  { id: 'RULE-HD-02', insuranceCompany: '현대해상(SCOR)', category: 'SCOR 재보험', unitPrice: 144000, memo: '현대해상 SCOR 연계 전용 약정단가', updatedAt: '2026.09.28' },
+  { id: 'RULE-DB-01', insuranceCompany: 'DB손해보험', category: '표준/일반', unitPrice: 150000, memo: 'DB손해보험 표준 약정단가', updatedAt: '2026.09.28' },
+  { id: 'RULE-KB-01', insuranceCompany: 'KB손해보험', category: '표준/일반', unitPrice: 150000, memo: 'KB손해보험 표준 약정단가', updatedAt: '2026.09.28' },
+  { id: 'RULE-MR-01', insuranceCompany: '메리츠화재', category: '표준/일반', unitPrice: 150000, memo: '메리츠화재 표준 약정단가', updatedAt: '2026.09.28' },
+  { id: 'RULE-ETC-01', insuranceCompany: '기타보험사', category: '기타/일반', unitPrice: 160000, memo: '기타 보험사 기본 청구단가', updatedAt: '2026.09.28' }
 ];
 
 function loadClaimUnitPriceRules() {
@@ -29496,6 +29586,12 @@ function loadClaimUnitPriceRules() {
     const saved = localStorage.getItem('LIVON_CLAIM_UNIT_PRICE_RULES');
     if (saved) {
       gClaimUnitPriceRules = JSON.parse(saved);
+      // 누락된 기본 보험사가 있으면 목록에 자동 보충
+      gDefaultClaimUnitPriceRules.forEach(def => {
+        if (!gClaimUnitPriceRules.some(r => r.insuranceCompany === def.insuranceCompany)) {
+          gClaimUnitPriceRules.push({ ...def });
+        }
+      });
     } else {
       gClaimUnitPriceRules = JSON.parse(JSON.stringify(gDefaultClaimUnitPriceRules));
     }
@@ -29516,28 +29612,39 @@ function saveClaimUnitPriceRules() {
 }
 
 function getDefaultClaimUnitPrice(appOrCompany) {
-  if (!appOrCompany) return 147000;
+  if (!appOrCompany) return 160000;
   if (typeof appOrCompany === 'object') return getAppClaimUnitPrice(appOrCompany);
-  const company = String(appOrCompany || '');
-  if (company.includes('삼성')) return 147000;
+  const company = String(appOrCompany || '').trim();
+  
+  if (Array.isArray(gClaimUnitPriceRules) && gClaimUnitPriceRules.length > 0) {
+    const exact = gClaimUnitPriceRules.find(r => r.insuranceCompany === company);
+    if (exact && exact.unitPrice && !isNaN(Number(exact.unitPrice))) return Number(exact.unitPrice);
+    const partial = gClaimUnitPriceRules.find(r => company.includes(r.insuranceCompany) || (r.insuranceCompany && r.insuranceCompany.includes(company)));
+    if (partial && partial.unitPrice && !isNaN(Number(partial.unitPrice))) return Number(partial.unitPrice);
+  }
+  
+  // fallback defaults
+  if (company.includes('삼성')) return 160000;
   if (company.includes('SCOR')) return 144000;
   if (company.includes('현대')) return 142000;
-  return 147000;
+  if (company.includes('DB')) return 150000;
+  if (company.includes('KB')) return 150000;
+  if (company.includes('메리츠')) return 150000;
+  return 160000;
 }
 
 function getAppClaimUnitPrice(app) {
-  if (!app) return 147000;
+  if (!app) return 160000;
   if (app.claimUnitPrice && !isNaN(Number(app.claimUnitPrice)) && Number(app.claimUnitPrice) > 0) {
     return Number(app.claimUnitPrice);
   }
   if (app.customDailyClaimPrice && !isNaN(Number(app.customDailyClaimPrice)) && Number(app.customDailyClaimPrice) > 0) {
     return Number(app.customDailyClaimPrice);
   }
-  const company = String(app.insuranceCompany || '');
-  if (company.includes('삼성')) return 147000;
-  if (company.includes('SCOR')) return 144000;
-  if (company.includes('현대')) return 142000;
-  return 147000;
+  if (app.dailyClaimPrice && !isNaN(Number(app.dailyClaimPrice)) && Number(app.dailyClaimPrice) > 0) {
+    return Number(app.dailyClaimPrice);
+  }
+  return getDefaultClaimUnitPrice(app.insuranceCompany);
 }
 
 function switchFaxSubTab(subTab) {
@@ -29581,7 +29688,7 @@ function renderClaimUnitPriceTable() {
     tbody.innerHTML = `
       <tr>
         <td colspan="7" class="p-8 text-center text-slate-400 font-bold">
-          등록된 보험사 청구 단가 기준이 없습니다. [+ 새 청구 단가 기준 등록] 버튼을 눌러 등록하세요.
+          등록된 보험사 청구 단가 기준이 없습니다. [+ 새 보험사 단가 등록] 버튼을 눌러 등록하세요.
         </td>
       </tr>
     `;
@@ -29589,83 +29696,108 @@ function renderClaimUnitPriceTable() {
   }
 
   tbody.innerHTML = rules.map((r, idx) => {
+    const compName = r.insuranceCompany || '';
+    const appCount = (gApps || []).filter(a => {
+      const comp = String(a.insuranceCompany || '');
+      return comp === compName || comp.includes(compName) || (compName && compName.includes(comp));
+    }).length;
+
     return `
       <tr class="hover:bg-purple-50/40 transition-colors">
         <td class="p-3 text-center font-mono text-slate-400 font-bold">${idx + 1}</td>
         <td class="p-3">
-          <span class="font-black text-slate-900 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full ${(r.insuranceCompany || '').includes('SCOR') ? 'bg-purple-500' : 'bg-sky-500'}"></span>
-            <span>${r.insuranceCompany}</span>
-          </span>
+          <div class="font-black text-slate-900 flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full ${
+              compName.includes('삼성') ? 'bg-sky-500' :
+              compName.includes('SCOR') ? 'bg-purple-500' :
+              compName.includes('현대') ? 'bg-blue-600' : 'bg-emerald-500'
+            }"></span>
+            <span class="text-xs font-black">${compName}</span>
+          </div>
+          <span class="text-[10.5px] text-slate-400 mt-0.5 block font-medium">기존 등록 건수: <b class="text-purple-700 font-mono">${appCount}건</b></span>
         </td>
         <td class="p-3">
           <span class="px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-bold text-[11px] border border-slate-200">
             ${r.category || '표준/일반'}
           </span>
         </td>
-        <td class="p-3 text-right font-mono font-black text-purple-900 text-sm">
-          ${formatCurrency(r.unitPrice)}원
-          <span class="text-[10px] text-slate-400 font-normal font-sans">/일</span>
+        <td class="p-3 text-right">
+          <div class="font-mono font-black text-purple-900 text-sm">
+            ${formatCurrency(r.unitPrice)}원
+          </div>
+          <span class="text-[10px] text-slate-400 font-normal font-sans">1일 기준</span>
         </td>
-        <td class="p-3 text-slate-600 text-[11.5px] max-w-xs truncate">
+        <td class="p-3 text-slate-600 text-xs">
           ${r.memo || '-'}
         </td>
         <td class="p-3 text-center font-mono text-[11px] text-slate-400">
-          ${r.updatedAt || '2026.09.10'}
+          ${r.updatedAt || '2026.09.28'}
         </td>
         <td class="p-3 text-center">
-          <div class="flex items-center justify-center gap-1.5">
+          <div class="flex items-center justify-center gap-1.5 flex-wrap">
             <button type="button" onclick="openClaimUnitPriceModal('${r.id}')" 
-              class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-[11px] shadow-2xs transition-all cursor-pointer">
-              수정
+              class="px-2.5 py-1 rounded-lg bg-white border border-purple-200 hover:bg-purple-50 text-purple-700 font-bold text-[11px] shadow-2xs transition-all cursor-pointer flex items-center gap-1">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> 수정
+            </button>
+            <button type="button" onclick="promptBatchApplyInsuranceUnitPrice('${r.insuranceCompany}', ${r.unitPrice})" 
+              class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] shadow-2xs transition-all cursor-pointer flex items-center gap-1"
+              title="${compName}의 기존 등록 고객(${appCount}건) 단가를 ${formatCurrency(r.unitPrice)}원으로 일괄 변경">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> 기존건 일괄적용 (${appCount}건)
             </button>
             <button type="button" onclick="deleteClaimUnitPriceRule('${r.id}')" 
-              class="px-2.5 py-1 rounded-lg bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 font-bold text-[11px] shadow-2xs transition-all cursor-pointer">
-              삭제
+              class="p-1 rounded-lg bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 font-bold text-[11px] shadow-2xs transition-all cursor-pointer"
+              title="삭제">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
           </div>
         </td>
       </tr>
     `;
   }).join('');
+  if (typeof initIcons === 'function') initIcons(tbody);
 }
 
 function openClaimUnitPriceModal(editId = null) {
   const titleEl = document.getElementById('claimUnitPriceModalTitle');
   const form = document.getElementById('claimUnitPriceForm');
   const editIdEl = document.getElementById('claimUnitPriceRuleEditId');
-  if (!form) return;
+  const chkExisting = document.getElementById('chkApplyRuleToExistingApps');
+  if (chkExisting) chkExisting.checked = false;
 
+  if (!form) return;
   form.reset();
 
   if (editId) {
     const item = (gClaimUnitPriceRules || []).find(r => r.id === editId);
     if (!item) return;
-    if (titleEl) titleEl.innerText = '보험사 청구 단가 기준 수정';
+    if (titleEl) titleEl.innerText = `${item.insuranceCompany} 청구 단가 기준 수정`;
     if (editIdEl) editIdEl.value = item.id;
     document.getElementById('claimUnitPriceRuleInsurance').value = item.insuranceCompany || '';
     document.getElementById('claimUnitPriceRuleCategory').value = item.category || '표준/일반';
-    document.getElementById('claimUnitPriceRuleAmount').value = item.unitPrice || 160000;
+    document.getElementById('claimUnitPriceRuleAmount').value = formatNumber(item.unitPrice || 160000);
     document.getElementById('claimUnitPriceRuleMemo').value = item.memo || '';
   } else {
+    // 신규 등록 시 현재 열려있는 신규접수창의 원수사가 있으면 기본 제안
+    const activeAppIns = document.getElementById('newAppInsurance')?.value || '';
     if (titleEl) titleEl.innerText = '보험사 청구 단가 기준 등록';
     if (editIdEl) editIdEl.value = '';
-    document.getElementById('claimUnitPriceRuleInsurance').value = '';
+    document.getElementById('claimUnitPriceRuleInsurance').value = activeAppIns || '';
     document.getElementById('claimUnitPriceRuleCategory').value = '표준/일반';
-    document.getElementById('claimUnitPriceRuleAmount').value = 160000;
+    document.getElementById('claimUnitPriceRuleAmount').value = '160,000';
     document.getElementById('claimUnitPriceRuleMemo').value = '';
   }
 
   openModal('claimUnitPriceModal');
 }
 
-function handleSaveClaimUnitPriceRule(e) {
+async function handleSaveClaimUnitPriceRule(e) {
   e.preventDefault();
   const editId = document.getElementById('claimUnitPriceRuleEditId')?.value;
   const insuranceCompany = document.getElementById('claimUnitPriceRuleInsurance')?.value.trim() || '';
   const category = document.getElementById('claimUnitPriceRuleCategory')?.value.trim() || '표준/일반';
   const amountVal = document.getElementById('claimUnitPriceRuleAmount')?.value;
   const memo = document.getElementById('claimUnitPriceRuleMemo')?.value.trim() || '';
+  const shouldApplyExisting = document.getElementById('chkApplyRuleToExistingApps')?.checked || false;
 
   const unitPrice = parseInt(String(amountVal).replace(/[^0-9]/g, ''), 10);
   if (!insuranceCompany || !unitPrice || isNaN(unitPrice)) {
@@ -29690,30 +29822,154 @@ function handleSaveClaimUnitPriceRule(e) {
       };
     }
   } else {
-    const newRule = {
-      id: 'RULE-' + Date.now().toString().slice(-6),
-      insuranceCompany,
-      category,
-      unitPrice,
-      memo,
-      updatedAt: todayStr
-    };
-    gClaimUnitPriceRules.push(newRule);
+    const existingRule = gClaimUnitPriceRules.find(r => r.insuranceCompany === insuranceCompany);
+    if (existingRule) {
+      existingRule.category = category;
+      existingRule.unitPrice = unitPrice;
+      existingRule.memo = memo;
+      existingRule.updatedAt = todayStr;
+    } else {
+      const newRule = {
+        id: 'RULE-' + Date.now().toString().slice(-6),
+        insuranceCompany,
+        category,
+        unitPrice,
+        memo,
+        updatedAt: todayStr
+      };
+      gClaimUnitPriceRules.push(newRule);
+    }
   }
 
   saveClaimUnitPriceRules();
   renderClaimUnitPriceTable();
+
+  // 신규 접수창이 열려있고 해당 보험사가 선택되어 있다면 즉시 단가 반영
+  const curNewAppInsurance = document.getElementById('newAppInsurance')?.value;
+  if (curNewAppInsurance && (curNewAppInsurance === insuranceCompany || insuranceCompany.includes(curNewAppInsurance))) {
+    const claimPriceInput = document.getElementById('newAppClaimUnitPrice');
+    if (claimPriceInput) claimPriceInput.value = formatNumber(unitPrice);
+  }
+
+  // 기존 접수건 일괄 갱신 옵션 체크 시
+  let batchMsg = '';
+  if (shouldApplyExisting) {
+    const res = await batchApplyInsuranceClaimUnitPrice(insuranceCompany, unitPrice);
+    if (res && res.updatedAppCount > 0) {
+      batchMsg = ` 또한 기존 등록 고객 ${res.updatedAppCount}건의 단가도 일괄 갱신되었습니다.`;
+    }
+  }
+
   closeModal('claimUnitPriceModal');
 
   if (typeof showNotification === 'function') {
     showNotification({
       type: 'success',
       title: '청구 단가 기준 저장 완료',
-      message: `[${insuranceCompany}] 1일 청구 단가(${formatCurrency(unitPrice)}원)가 성공적으로 저장되었습니다.`
+      message: `[${insuranceCompany}] 1일 청구 단가(${formatCurrency(unitPrice)}원)가 성공적으로 저장되었습니다.${batchMsg}`
     });
   } else {
-    alert(`[${insuranceCompany}] 1일 청구 단가가 성공적으로 저장되었습니다.`);
+    alert(`[${insuranceCompany}] 1일 청구 단가가 성공적으로 저장되었습니다.${batchMsg}`);
   }
+}
+
+async function batchApplyInsuranceClaimUnitPrice(insuranceCompany, newPrice) {
+  if (!insuranceCompany || !newPrice || isNaN(newPrice)) return { updatedAppCount: 0, updatedClaimCount: 0 };
+
+  const targetApps = (gApps || []).filter(a => {
+    const comp = String(a.insuranceCompany || '');
+    return comp === insuranceCompany || comp.includes(insuranceCompany) || (insuranceCompany && insuranceCompany.includes(comp));
+  });
+
+  if (targetApps.length === 0) {
+    return { updatedAppCount: 0, updatedClaimCount: 0 };
+  }
+
+  let updatedAppCount = 0;
+  let updatedClaimCount = 0;
+
+  targetApps.forEach(app => {
+    app.claimUnitPrice = Number(newPrice);
+    app.customDailyClaimPrice = Number(newPrice);
+    app.dailyClaimPrice = Number(newPrice);
+    app.updatedAt = new Date().toISOString();
+    updatedAppCount++;
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveApplication', { app: app });
+    }
+
+    // 미입금 청구서 단가 및 청구금액 동기화
+    (gClaims || []).filter(c => String(c.applyId) === String(app.id) && c.depositStatus !== '입금완료' && c.depositStatus !== '수납완료').forEach(c => {
+      c.unitPrice = Number(newPrice);
+      c.dailyWage = Number(newPrice);
+      c.claimAmount = (c.days || 1) * Number(newPrice);
+      c.unpaidAmount = (c.days || 1) * Number(newPrice) - (c.depositAmount || 0);
+      c.updatedAt = new Date().toISOString();
+      updatedClaimCount++;
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:saveClaim', { claim: c });
+      }
+    });
+  });
+
+  if (typeof saveApplications === 'function') saveApplications();
+  try {
+    localStorage.setItem('LIVON_CLAIMS', JSON.stringify(gClaims));
+  } catch (e) {}
+
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  if (typeof renderClaims === 'function') renderClaims();
+  if (typeof renderApplications === 'function') renderApplications();
+
+  return { updatedAppCount, updatedClaimCount };
+}
+
+async function promptBatchApplyInsuranceUnitPrice(insuranceCompany, unitPrice) {
+  const targetApps = (gApps || []).filter(a => {
+    const comp = String(a.insuranceCompany || '');
+    return comp === insuranceCompany || comp.includes(insuranceCompany) || (insuranceCompany && insuranceCompany.includes(comp));
+  });
+
+  if (targetApps.length === 0) {
+    if (typeof showNotification === 'function') {
+      showNotification({
+        type: 'info',
+        title: '대상 데이터 없음',
+        message: `현재 시스템에 [${insuranceCompany}] 원수사로 등록된 고객 건이 없습니다.`
+      });
+    } else {
+      alert(`현재 시스템에 [${insuranceCompany}] 원수사로 등록된 고객 건이 없습니다.`);
+    }
+    return;
+  }
+
+  const confirmed = await showCustomConfirm(
+    `[${insuranceCompany} 1일 청구단가 일괄 갱신]\n\n` +
+    `• 대상 원수사: ${insuranceCompany}\n` +
+    `• 적용할 1일 청구단가: ${formatCurrency(unitPrice)}원\n` +
+    `• 대상 고객 대장 건수: 총 ${targetApps.length}건\n\n` +
+    `현재 등록된 ${insuranceCompany} 고객 대장 및 미입금 청구서의 단가를\n` +
+    `${formatCurrency(unitPrice)}원으로 일괄 변경하시겠습니까?`,
+    {
+      title: `${insuranceCompany} 단가 일괄 적용`,
+      confirmText: '일괄 변경 실행',
+      cancelText: '취소'
+    }
+  );
+
+  if (!confirmed) return;
+
+  const result = await batchApplyInsuranceClaimUnitPrice(insuranceCompany, unitPrice);
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '단가 일괄 갱신 완료',
+      message: `[${insuranceCompany}] 고객 ${result.updatedAppCount}건 및 미입금 청구서 ${result.updatedClaimCount}건의 1일 청구단가가 ${formatCurrency(unitPrice)}원으로 일괄 변경되었습니다.`
+    });
+  } else {
+    alert(`[${insuranceCompany}] 고객 ${result.updatedAppCount}건의 1일 청구단가가 ${formatCurrency(unitPrice)}원으로 일괄 변경되었습니다.`);
+  }
+  renderClaimUnitPriceTable();
 }
 
 async function deleteClaimUnitPriceRule(ruleId) {
@@ -32506,6 +32762,9 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
     }
   }
   else if (tabId === 'samsungclaimhub') {
+    if (!filterParam && typeof clearSamsungClaimHubSearch === 'function') {
+      clearSamsungClaimHubSearch();
+    }
     if (typeof renderSamsungClaimHub === 'function') {
       renderSamsungClaimHub(filterParam);
     }
@@ -37813,7 +38072,10 @@ function openNewAppModal() {
     faxBadge.innerText = '';
   }
   const claimPriceInput = document.getElementById('newAppClaimUnitPrice');
-  if (claimPriceInput) claimPriceInput.value = '160,000';
+  if (claimPriceInput) {
+    const defaultUnitPrice = typeof getDefaultClaimUnitPrice === 'function' ? getDefaultClaimUnitPrice(initInsurance) : 160000;
+    claimPriceInput.value = formatNumber(defaultUnitPrice);
+  }
 
   // 삼성화재 12대 항목 입력 필드 초기화
   const samsungFieldIds = [
@@ -38085,6 +38347,13 @@ function onNewAppInsuranceChange(insurance) {
 
   // 1. 현대해상(SCOR)일 경우 간병장소 등록을 재택 우선으로, 그냥 현대해상이면 입원 유지
   updateCareTypeByInsurance(insurance);
+
+  // 2. 선택된 원수사(보험사)의 기본 1일 청구단가 자동 반영
+  const claimPriceInput = document.getElementById('newAppClaimUnitPrice');
+  if (claimPriceInput) {
+    const defaultUnitPrice = typeof getDefaultClaimUnitPrice === 'function' ? getDefaultClaimUnitPrice(insurance) : 160000;
+    claimPriceInput.value = formatNumber(defaultUnitPrice);
+  }
 
   const bannerHyundai = document.getElementById('bannerHyundaiProtocol');
   const bannerSamsung = document.getElementById('bannerSamsungProtocol');
@@ -40511,6 +40780,16 @@ function clearHubSearch() {
 // SYSTEM SETTINGS CONTROLLERS (전용 탭 & 로컬스토리지 영구 동기화)
 // =========================================================================
 function renderSettings() {
+  if (typeof initLaunchDataSettings === 'function') {
+    initLaunchDataSettings();
+  }
+  if (typeof updateDataResetStatusUI === 'function') {
+    updateDataResetStatusUI();
+  }
+  if (typeof renderClaimUnitPriceTable === 'function') {
+    renderClaimUnitPriceTable();
+  }
+
   const { prefix, nextSeq } = getAppIdSettings();
   const prefixInput = document.getElementById('settingAppIdPrefix');
   const startNumInput = document.getElementById('settingAppIdStartNum');

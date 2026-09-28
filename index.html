@@ -2010,7 +2010,7 @@
           <div class="flex items-center gap-2 flex-wrap">
             <div class="relative">
               <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
-              <input type="text" id="samsungSheetSearchInput" oninput="renderCurrentSamsungSheet()" placeholder="시트 내 검색 (고객명, 증권번호, 병원명 등)..." 
+              <input type="text" id="samsungSheetSearchInput" autocomplete="off" value="" oninput="renderCurrentSamsungSheet()" placeholder="시트 내 검색 (고객명, 증권번호, 병원명 등)..." 
                 class="pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-sky-500 w-64 transition-all">
             </div>
           </div>
@@ -2216,8 +2216,12 @@
             <div class="flex items-center gap-2 flex-1 max-w-sm min-w-[220px]">
               <div class="relative w-full">
                 <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
-                <input type="text" id="samsungClaimHubSearchInput" oninput="renderCurrentSamsungSheet()" placeholder="시트 내 검색 (고객명, 증권번호, 병원명 등)..." 
-                  class="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 transition-all">
+                <input type="text" id="samsungClaimHubSearchInput" autocomplete="off" value="" oninput="renderCurrentSamsungSheet()" placeholder="시트 내 검색 (고객명, 증권번호, 병원명 등)..." 
+                  class="w-full pl-9 pr-8 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 transition-all">
+                <button type="button" id="btnClearSamsungSearch" onclick="clearSamsungClaimHubSearch()" 
+                  class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 transition-colors hidden cursor-pointer" title="검색어 지우기">
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
               </div>
             </div>
 
@@ -4345,6 +4349,49 @@
             </form>
           </div>
 
+          <!-- 3. 원수사(보험사)별 1일 청구단가 관리 및 일괄 적용 -->
+          <div class="col-span-1 lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-black text-slate-900 flex items-center gap-2">
+                    <i data-lucide="calculator" class="w-4 h-4 text-purple-600"></i>
+                    원수사(보험사)별 1일 청구단가 관리 및 일괄 적용
+                  </h3>
+                  <span class="text-xs px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 font-bold border border-purple-200">청구단가 기준 엔진</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                  신규 접수 시 원수사별로 기본 적용될 1일 청구단가를 설정합니다. 단가 수정 후 <b>[기존건 일괄적용]</b> 버튼을 누르면 해당 보험사의 기존 대장 데이터도 즉시 일괄 업데이트할 수 있습니다.
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="openClaimUnitPriceModal()" class="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="plus" class="w-4 h-4"></i> 새 보험사 단가 등록
+                </button>
+              </div>
+            </div>
+
+            <!-- 단가 테이블 -->
+            <div class="overflow-x-auto rounded-xl border border-slate-200">
+              <table class="w-full text-xs text-left">
+                <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase">
+                  <tr>
+                    <th class="p-3 text-center w-12">#</th>
+                    <th class="p-3">원수사(보험사)</th>
+                    <th class="p-3">구분</th>
+                    <th class="p-3 text-right">1일 청구단가</th>
+                    <th class="p-3">비고 / 약정 메모</th>
+                    <th class="p-3 text-center">최종 수정일</th>
+                    <th class="p-3 text-center w-56">단가 수정 및 기존건 일괄적용</th>
+                  </tr>
+                </thead>
+                <tbody id="claimUnitPriceTableBody" class="divide-y divide-slate-100">
+                  <!-- JS로 동적 렌더링 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <!-- 4. CTI 종합 상담 콜 라벨 관리 설정 -->
           <div class="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-5">
             <div class="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -5190,7 +5237,12 @@
             <div>
               <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
                 <span class="hl-pen-yellow">1일 청구단가 *</span>
-                <span class="text-[10px] text-purple-700 font-bold bg-purple-50 px-1 py-0.2 rounded border border-purple-200">고객 개별단가</span>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[10px] text-purple-700 font-bold bg-purple-50 px-1 py-0.2 rounded border border-purple-200">고객 개별단가</span>
+                  <button type="button" onclick="openClaimUnitPriceModal()" class="text-[10.5px] text-indigo-700 hover:text-indigo-950 font-bold bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-lg border border-indigo-200 shadow-2xs transition-all cursor-pointer flex items-center gap-1" title="보험사별 기본 청구단가 설정 및 일괄수정 팝업 열기">
+                    <i data-lucide="sliders-horizontal" class="w-3 h-3 text-indigo-600"></i> 보험사별 단가설정
+                  </button>
+                </div>
               </label>
               <div class="relative">
                 <input type="text" id="newAppClaimUnitPrice" required placeholder="160,000" value="160,000" inputmode="numeric" oninput="formatNumberInput(this)" class="w-full p-2.5 border-2 border-purple-400 rounded-xl font-mono font-black text-purple-900 bg-purple-50/20 focus:ring-2 focus:ring-purple-500">
@@ -6407,6 +6459,90 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL: INSURANCE COMPANY CLAIM UNIT PRICE RULE EDIT (보험사별 1일 청구단가 기준 등록/수정 모달) -->
+  <div id="claimUnitPriceModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200">
+      <div class="p-5 bg-gradient-to-r from-purple-800 to-indigo-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-white/20 text-white flex items-center justify-center border border-white/20">
+            <i data-lucide="calculator" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black" id="claimUnitPriceModalTitle">보험사 청구 단가 기준 설정</h3>
+            <p class="text-xs text-purple-200 mt-0.5">신규 접수 시 자동 적용될 1일 청구단가를 설정합니다.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('claimUnitPriceModal')" class="p-2 text-purple-200 hover:text-white rounded-lg cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="claimUnitPriceForm" onsubmit="handleSaveClaimUnitPriceRule(event)" class="p-5 space-y-4 text-xs">
+        <input type="hidden" id="claimUnitPriceRuleEditId" value="">
+
+        <div>
+          <label class="block font-bold text-slate-800 mb-1">원수사(보험사) 명칭 *</label>
+          <input type="text" id="claimUnitPriceRuleInsurance" required placeholder="예: 삼성화재, 현대해상, DB손해보험 등" 
+            class="w-full p-2.5 border rounded-xl font-bold text-slate-900 bg-white focus:ring-2 focus:ring-purple-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-800 mb-1">단가 분류 구분</label>
+            <select id="claimUnitPriceRuleCategory" class="w-full p-2.5 border rounded-xl bg-white font-semibold text-slate-800">
+              <option value="표준/일반">표준/일반</option>
+              <option value="SCOR 재보험">SCOR 재보험</option>
+              <option value="중증/집중간병">중증/집중간병</option>
+              <option value="특약/기타">특약/기타</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-800 mb-1">1일 청구단가 (원) *</label>
+            <div class="relative">
+              <input type="text" id="claimUnitPriceRuleAmount" required placeholder="160,000" inputmode="numeric" oninput="formatNumberInput(this)"
+                class="w-full pl-3 pr-8 py-2.5 font-mono font-black text-purple-900 border-2 border-purple-400 rounded-xl bg-purple-50/20 focus:ring-2 focus:ring-purple-500">
+              <span class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">원</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 단가 빠른 선택 버튼 -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <button type="button" onclick="document.getElementById('claimUnitPriceRuleAmount').value = '142,000'" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-purple-100 hover:text-purple-900 text-slate-700 font-mono font-bold text-[10.5px] transition-all cursor-pointer">142,000원</button>
+          <button type="button" onclick="document.getElementById('claimUnitPriceRuleAmount').value = '144,000'" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-purple-100 hover:text-purple-900 text-slate-700 font-mono font-bold text-[10.5px] transition-all cursor-pointer">144,000원</button>
+          <button type="button" onclick="document.getElementById('claimUnitPriceRuleAmount').value = '150,000'" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-purple-100 hover:text-purple-900 text-slate-700 font-mono font-bold text-[10.5px] transition-all cursor-pointer">150,000원</button>
+          <button type="button" onclick="document.getElementById('claimUnitPriceRuleAmount').value = '160,000'" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-purple-100 hover:text-purple-900 text-slate-700 font-mono font-bold text-[10.5px] transition-all cursor-pointer">160,000원</button>
+          <button type="button" onclick="document.getElementById('claimUnitPriceRuleAmount').value = '170,000'" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-purple-100 hover:text-purple-900 text-slate-700 font-mono font-bold text-[10.5px] transition-all cursor-pointer">170,000원</button>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-800 mb-1">비고 / 약정 메모</label>
+          <input type="text" id="claimUnitPriceRuleMemo" placeholder="예: 2026 보상과 약정단가" class="w-full p-2.5 border rounded-xl text-slate-800">
+        </div>
+
+        <!-- 옵션: 기존 미정산 접수건 일괄 적용 체크박스 -->
+        <div class="p-3.5 bg-purple-50/70 border border-purple-200 rounded-2xl space-y-2">
+          <label class="flex items-start gap-2.5 cursor-pointer">
+            <input type="checkbox" id="chkApplyRuleToExistingApps" class="w-4 h-4 mt-0.5 rounded text-purple-600 focus:ring-purple-500 cursor-pointer">
+            <div>
+              <span class="font-bold text-purple-950 text-xs">기존 접수건(미정산건) 단가도 새 단가로 즉시 일괄 갱신</span>
+              <p class="text-[11px] text-purple-700/80 mt-0.5 leading-relaxed">
+                체크 후 저장 시 현재 시스템에 등록된 이 보험사의 기존 고객 대장 및 미입금 청구서의 1일 단가도 새 금액으로 일괄 자동 재계산됩니다.
+              </p>
+            </div>
+          </label>
+        </div>
+
+        <div class="pt-2 border-t border-slate-200 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeModal('claimUnitPriceModal')" class="px-4 py-2 border rounded-xl font-semibold bg-white cursor-pointer hover:bg-slate-100">취소</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-xs cursor-pointer">
+            단가 기준 저장
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -10253,8 +10389,13 @@
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <button type="button" id="samsungMergedPreviewAttachBtn" onclick="toggleCurrentPreviewedCareLogAttachment()" 
+            class="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+            title="이 간병일지를 일일접수보고 이메일 첨부 목록에 추가합니다">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i> <span id="samsungMergedPreviewAttachBtnText">이 일지 첨부하기</span>
+          </button>
           <button type="button" onclick="downloadSamsungMergedCareLogPdf()" 
-            class="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+            class="px-3.5 py-1.5 rounded-xl bg-purple-900/60 hover:bg-purple-900 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-purple-400/40 shadow-xs"
             title="통합된 간병일지 PDF를 내 PC에 다운로드합니다">
             <i data-lucide="download" class="w-4 h-4"></i> <span>다운로드</span>
           </button>
@@ -10287,10 +10428,16 @@
           <span class="text-slate-300">|</span>
           <span class="text-[11px] text-slate-500">※ 이 통합 PDF 파일이 삼성화재 일일보고 메일 발송 시 단일 첨부파일로 전송됩니다.</span>
         </div>
-        <button type="button" onclick="closeModal('samsungMergedCareLogPreviewModal')" 
-          class="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 text-xs transition-all cursor-pointer">
-          닫기
-        </button>
+        <div class="flex items-center gap-2">
+          <button type="button" id="samsungMergedPreviewAttachBtnFooter" onclick="toggleCurrentPreviewedCareLogAttachment()" 
+            class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i> <span id="samsungMergedPreviewAttachBtnFooterText">✓ 일일보고에 이 간병일지 첨부</span>
+          </button>
+          <button type="button" onclick="closeModal('samsungMergedCareLogPreviewModal')" 
+            class="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 text-xs transition-all cursor-pointer">
+            닫기
+          </button>
+        </div>
       </div>
     </div>
   </div>
