@@ -4,9 +4,27 @@
 (function (window) {
   'use strict';
 
+  // Reroute relative /api/ endpoints to localhost:8080 when opened via file:// or other local dev ports
+  if (typeof window !== 'undefined' && typeof window.fetch === 'function' && !window.__livonApiProxyInstalled) {
+    window.__livonApiProxyInstalled = true;
+    const _origFetch = window.fetch;
+    window.fetch = function (input, init) {
+      if (typeof input === 'string' && input.startsWith('/api/')) {
+        if (window.location.protocol === 'file:' || (window.location.port && window.location.port !== '8080' && window.location.port !== '')) {
+          input = 'http://localhost:8080' + input;
+        }
+      }
+      return _origFetch.call(this, input, init);
+    };
+  }
+
   const CarePortClient = {
-    // Configuration & Endpoints
-    apiBase: '/api/careport',
+    get apiBase() {
+      if (typeof window !== 'undefined' && (window.location.protocol === 'file:' || (window.location.port && window.location.port !== '8080' && window.location.port !== ''))) {
+        return 'http://localhost:8080/api/careport';
+      }
+      return '/api/careport';
+    },
     directBase: 'https://admin.livon.care',
     defaultCredentials: null,
     targetOrgs: [
