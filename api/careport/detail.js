@@ -3,8 +3,8 @@
 
 const https = require('https');
 
-const CAREPORT_ID = process.env.CAREPORT_ID || '';
-const CAREPORT_PW = process.env.CAREPORT_PW || '';
+const CAREPORT_ID = process.env.CAREPORT_ID || 'jihoon3813';
+const CAREPORT_PW = process.env.CAREPORT_PW || 'livon3813!@#';
 
 function requestHttps(options, postData = null) {
   return new Promise((resolve, reject) => {
@@ -36,9 +36,11 @@ async function getAccessToken() {
     return cachedToken;
   }
 
+  const id = process.env.CAREPORT_ID || CAREPORT_ID || 'jihoon3813';
+  const pw = process.env.CAREPORT_PW || CAREPORT_PW || 'livon3813!@#';
   const params = new URLSearchParams();
-  params.append('id', CAREPORT_ID);
-  params.append('password', CAREPORT_PW);
+  params.append('id', id);
+  params.append('password', pw);
   const postData = params.toString();
 
   const res = await requestHttps({

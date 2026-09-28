@@ -26,7 +26,10 @@
       return '/api/careport';
     },
     directBase: 'https://admin.livon.care',
-    defaultCredentials: null,
+    defaultCredentials: {
+      id: 'jihoon3813',
+      pw: 'livon3813!@#'
+    },
     targetOrgs: [
       { id: 161580188, name: '현대해상(본사)', company: '현대해상' },
       { id: 161580191, name: '현대해상(영등포센터)', company: '현대해상' },

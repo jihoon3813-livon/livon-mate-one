@@ -21,13 +21,15 @@ try {
           if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
             val = val.slice(1, -1);
           }
-          if (typeof process.env[key] === 'undefined') {
+          if (!process.env[key]) {
             process.env[key] = val;
           }
         }
       });
     }
   }
+  process.env.CAREPORT_ID = process.env.CAREPORT_ID || 'jihoon3813';
+  process.env.CAREPORT_PW = process.env.CAREPORT_PW || 'livon3813!@#';
 } catch (e) {
   console.warn('[EnvLoader] Error loading local env file:', e.message);
 }
