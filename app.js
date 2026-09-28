@@ -2630,7 +2630,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // URL 쿼리스트링(?tab=...) 또는 세션스토리지에 저장된 메뉴 탭 복원 및 초고속 0ms 즉시 렌더링
   const urlParams = new URLSearchParams(window.location.search);
-  const initialTab = urlParams.get('tab') || sessionStorage.getItem('LIVON_ACTIVE_TAB') || 'carehub';
+  let initialTab = urlParams.get('tab') || sessionStorage.getItem('LIVON_ACTIVE_TAB') || 'carehub';
+  if (initialTab === 'dashboard') initialTab = 'carehub';
   const initialFilter = urlParams.get('filter') || sessionStorage.getItem('LIVON_ACTIVE_FILTER') || null;
 
   // 상단 멀티 탭 및 데스크톱 사이드바 상태 초기화
@@ -32351,7 +32352,7 @@ window.addEventListener('keydown', (e) => {
 // ==========================================
 const APP_TAB_META = {
   carehub: { name: '통합허브', icon: 'layers', color: 'text-amber-500' },
-  dashboard: { name: '대시보드', icon: 'layout-dashboard', color: 'text-sky-500' },
+  // dashboard: { name: '대시보드', icon: 'layout-dashboard', color: 'text-sky-500' }, // 임시 숨김 처리
   carecalendar: { name: '간병캘린더', icon: 'calendar-days', color: 'text-sky-500' },
   carelogs: { name: '간병일지 (케어포트)', icon: 'clipboard-list', color: 'text-purple-500' },
   directory: { name: '파트너/인력 디렉토리', icon: 'contact-2', color: 'text-emerald-500' },
@@ -32379,7 +32380,7 @@ function initOpenAppTabs() {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        gOpenAppTabs = parsed.filter(t => APP_TAB_META[t]);
+        gOpenAppTabs = parsed.filter(t => t !== 'dashboard' && APP_TAB_META[t]);
       }
     }
   } catch (e) {}
@@ -32387,6 +32388,7 @@ function initOpenAppTabs() {
   if (!gOpenAppTabs || gOpenAppTabs.length === 0) {
     gOpenAppTabs = ['carehub'];
   }
+  saveOpenAppTabs();
 }
 
 function saveOpenAppTabs() {
@@ -32459,6 +32461,7 @@ window.switchMultiTab = switchMultiTab;
  * [사용자 요구사항]: 모든 좌측메뉴는 클릭하면 항상 최신 데이터를 불러옴 (탭은 기존화면 그대로, 좌측메뉴는 최신데이터)
  */
 function handleLeftMenuClick(tabId, filterParam = null) {
+  if (tabId === 'dashboard') tabId = 'carehub';
   if (gCurrentAdmin && gCurrentAdmin.role !== 'SUPER_ADMIN') {
     const allowed = gCurrentAdmin.allowedMenus || ['all'];
     if (!allowed.includes('all') && !allowed.includes('*') && !allowed.includes(tabId)) {
@@ -32633,6 +32636,7 @@ function closeAllMultiTabs() {
 window.closeAllMultiTabs = closeAllMultiTabs;
 
 function switchTab(tabId, filterParam = null, triggerReload = false) {
+  if (tabId === 'dashboard') tabId = 'carehub';
   // 모바일 사이드바 드로어가 열려있는 경우 메뉴 선택 시 자동 닫기
   if (typeof toggleMobileSidebar === 'function' && window.innerWidth < 1024) {
     toggleMobileSidebar(false);
@@ -33296,6 +33300,8 @@ function applyCalculatedClaims() {
 }
 
 function renderDashboard() {
+  // [대시보드 임시 비활성화]: 차트 및 통계 연산/렌더링 생략
+  return;
   const tbody = document.getElementById('dashRecentBody');
   if (!tbody) return;
   

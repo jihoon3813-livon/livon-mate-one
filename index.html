@@ -878,8 +878,8 @@
 
       <div class="py-4 px-3.5 space-y-1.5 flex-1 overflow-y-auto custom-scrollbar">
         
-        <!-- 1. 대시보드 -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="dashboard" onclick="handleLeftMenuClick('dashboard')">
+        <!-- 1. 대시보드 (임시 숨김 처리) -->
+        <button class="nav-tab-btn hidden w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="dashboard" onclick="handleLeftMenuClick('dashboard')" style="display: none !important;">
           <div class="flex items-center space-x-3">
             <i data-lucide="layout-dashboard" class="w-4 h-4 flex-shrink-0 text-sky-400"></i>
             <span class="tracking-tight font-semibold">대시보드</span>
@@ -1686,7 +1686,7 @@
         </div>
       </div>
 
-      <section id="tab-dashboard" class="tab-content hidden space-y-6" class="tab-content space-y-6">
+      <section id="tab-dashboard" class="tab-content hidden space-y-6" style="display: none !important;">
         
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <div>
