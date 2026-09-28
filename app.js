@@ -31995,9 +31995,15 @@ function formatBusinessNumber(value) {
 }
 
 function formatCurrency(num) {
-  if (num === null || num === undefined || isNaN(num)) return '0';
-  return Math.round(num).toLocaleString('ko-KR');
+  if (num === null || num === undefined || isNaN(Number(num))) return '0';
+  return Math.round(Number(num)).toLocaleString('ko-KR');
 }
+window.formatCurrency = formatCurrency;
+
+function formatNumber(num) {
+  return formatCurrency(num);
+}
+window.formatNumber = formatNumber;
 
 function formatCurrencyInputElement(el) {
   if (!el) return;
@@ -32016,6 +32022,11 @@ function formatCurrencyInputElement(el) {
   }
 }
 window.formatCurrencyInputElement = formatCurrencyInputElement;
+
+function formatNumberInput(el) {
+  return formatCurrencyInputElement(el);
+}
+window.formatNumberInput = formatNumberInput;
 
 function maskName(name) {
   if (!name || !gIsMasked) return name || '';
@@ -38018,92 +38029,111 @@ function setApplyDateNow(inputElId) {
 
 function openNewAppModal() {
   const modal = document.getElementById('newAppModal');
-  if (!modal) return;
-
-  const form = document.getElementById('newAppForm');
-  if (form) form.reset();
-
-  const display = document.getElementById('newAppIdDisplay');
-  if (display) {
-    display.innerText = generateNextAppId();
+  if (!modal) {
+    console.warn('[openNewAppModal] #newAppModal not found');
+    return;
   }
 
-  const rrnBack = document.getElementById('newAppRrnBack');
-  const eyeIcon = document.getElementById('iconRrnEye');
-  if (rrnBack) rrnBack.type = 'text';
-  if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye-off');
+  try {
+    const form = document.getElementById('newAppForm');
+    if (form) form.reset();
 
-  const nowStr = getCurrentDateTimeString();
-  const today = nowStr.slice(0, 10).replace(/\./g, '-');
+    const display = document.getElementById('newAppIdDisplay');
+    if (display && typeof generateNextAppId === 'function') {
+      display.innerText = generateNextAppId();
+    }
 
-  const applyTxt = document.getElementById('newAppApplyDate');
-  const applyPicker = document.getElementById('newAppApplyDate_picker');
-  if (applyTxt) applyTxt.value = nowStr;
-  if (applyPicker) applyPicker.value = today;
+    const rrnBack = document.getElementById('newAppRrnBack');
+    const eyeIcon = document.getElementById('iconRrnEye');
+    if (rrnBack) rrnBack.type = 'text';
+    if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye-off');
 
-  ['newAppDesiredDate', 'newAppAccidentDate'].forEach(id => {
-    const txt = document.getElementById(id);
-    const picker = document.getElementById(id + '_picker');
-    if (txt) txt.value = today;
-    if (picker) picker.value = today;
-  });
+    const nowStr = typeof getCurrentDateTimeString === 'function' ? getCurrentDateTimeString() : new Date().toISOString();
+    const today = nowStr.slice(0, 10).replace(/\./g, '-');
 
-  const expectedDaysInput = document.getElementById('newAppExpectedDays');
-  if (expectedDaysInput) {
-    if (!expectedDaysInput.value) expectedDaysInput.value = '30일';
+    const applyTxt = document.getElementById('newAppApplyDate');
+    const applyPicker = document.getElementById('newAppApplyDate_picker');
+    if (applyTxt) applyTxt.value = nowStr;
+    if (applyPicker) applyPicker.value = today;
+
+    ['newAppDesiredDate', 'newAppAccidentDate'].forEach(id => {
+      const txt = document.getElementById(id);
+      const picker = document.getElementById(id + '_picker');
+      if (txt) txt.value = today;
+      if (picker) picker.value = today;
+    });
+
+    const expectedDaysInput = document.getElementById('newAppExpectedDays');
+    if (expectedDaysInput) {
+      if (!expectedDaysInput.value) expectedDaysInput.value = '30일';
+    }
+    if (typeof calculateAndSetEndDate === 'function') {
+      calculateAndSetEndDate();
+    }
+
+    const insuranceSelect = document.getElementById('newAppInsurance');
+    const initInsurance = insuranceSelect?.value || '현대해상(SCOR)';
+    if (insuranceSelect) {
+      insuranceSelect.value = initInsurance;
+      if (typeof onNewAppInsuranceChange === 'function') {
+        onNewAppInsuranceChange(initInsurance);
+      }
+    }
+
+    const chkSame = document.getElementById('chkApplicantSameAsPatient');
+    if (chkSame) chkSame.checked = false;
+
+    // 현대해상(SCOR)일 경우 간병장소 등록을 재택 우선으로, 그냥 현대해상이면 입원 유지
+    if (typeof updateCareTypeByInsurance === 'function') {
+      updateCareTypeByInsurance(initInsurance);
+    }
+
+    // 기본적으로 팩스 수신처와 수신번호는 빈 상태(미지정)로 초기화
+    const faxRecInput = document.getElementById('newAppFaxRecipient');
+    const faxNumInput = document.getElementById('newAppFaxNumber');
+    const faxBadge = document.getElementById('newAppFaxBadge');
+    if (faxRecInput) faxRecInput.value = '';
+    if (faxNumInput) faxNumInput.value = '';
+    if (faxBadge) {
+      faxBadge.classList.add('hidden');
+      faxBadge.innerText = '';
+    }
+    const claimPriceInput = document.getElementById('newAppClaimUnitPrice');
+    if (claimPriceInput) {
+      const defaultUnitPrice = typeof getDefaultClaimUnitPrice === 'function' ? getDefaultClaimUnitPrice(initInsurance) : 160000;
+      claimPriceInput.value = typeof formatCurrency === 'function' ? formatCurrency(defaultUnitPrice) : Number(defaultUnitPrice).toLocaleString('ko-KR');
+    }
+
+    // 삼성화재 12대 항목 입력 필드 초기화
+    const samsungFieldIds = [
+      'newAppSamsungPatientId', 'newAppSamsungPolicyNumber', 'newAppSamsungProductCode',
+      'newAppSamsungProductName', 'newAppSamsungContractStartDate', 'newAppSamsungContractEndDate',
+      'newAppSamsungHasInjuryCare', 'newAppSamsungHasDiseaseCare', 'newAppSamsungAdjuster',
+      'newAppSamsungAdjusterPhone', 'newAppSamsungAdjusterFax', 'newAppSamsungAccidentNumber'
+    ];
+    samsungFieldIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    gPendingSamsungLeadData = null;
+  } catch (err) {
+    console.error('[openNewAppModal setup error]', err);
   }
-  calculateAndSetEndDate();
-
-  const insuranceSelect = document.getElementById('newAppInsurance');
-  const initInsurance = insuranceSelect?.value || '현대해상(SCOR)';
-  if (insuranceSelect) {
-    insuranceSelect.value = initInsurance;
-    onNewAppInsuranceChange(initInsurance);
-  }
-
-  const chkSame = document.getElementById('chkApplicantSameAsPatient');
-  if (chkSame) chkSame.checked = false;
-
-  // 현대해상(SCOR)일 경우 간병장소 등록을 재택 우선으로, 그냥 현대해상이면 입원 유지
-  updateCareTypeByInsurance(initInsurance);
-
-  // 기본적으로 팩스 수신처와 수신번호는 빈 상태(미지정)로 초기화
-  const faxRecInput = document.getElementById('newAppFaxRecipient');
-  const faxNumInput = document.getElementById('newAppFaxNumber');
-  const faxBadge = document.getElementById('newAppFaxBadge');
-  if (faxRecInput) faxRecInput.value = '';
-  if (faxNumInput) faxNumInput.value = '';
-  if (faxBadge) {
-    faxBadge.classList.add('hidden');
-    faxBadge.innerText = '';
-  }
-  const claimPriceInput = document.getElementById('newAppClaimUnitPrice');
-  if (claimPriceInput) {
-    const defaultUnitPrice = typeof getDefaultClaimUnitPrice === 'function' ? getDefaultClaimUnitPrice(initInsurance) : 160000;
-    claimPriceInput.value = formatNumber(defaultUnitPrice);
-  }
-
-  // 삼성화재 12대 항목 입력 필드 초기화
-  const samsungFieldIds = [
-    'newAppSamsungPatientId', 'newAppSamsungPolicyNumber', 'newAppSamsungProductCode',
-    'newAppSamsungProductName', 'newAppSamsungContractStartDate', 'newAppSamsungContractEndDate',
-    'newAppSamsungHasInjuryCare', 'newAppSamsungHasDiseaseCare', 'newAppSamsungAdjuster',
-    'newAppSamsungAdjusterPhone', 'newAppSamsungAdjusterFax', 'newAppSamsungAccidentNumber'
-  ];
-  samsungFieldIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  gPendingSamsungLeadData = null;
 
   openModal('newAppModal');
-  if (form) {
-    form.scrollTop = 0;
+  try {
+    const form = document.getElementById('newAppForm');
+    if (form) {
+      form.scrollTop = 0;
+    }
+    if (typeof initIcons === 'function') initIcons(modal);
+    if (typeof setupNewAppValidationListeners === 'function') setupNewAppValidationListeners();
+    if (typeof updateNewAppValidationHighlight === 'function') updateNewAppValidationHighlight(false);
+  } catch (err) {
+    console.warn('[openNewAppModal post-open error]', err);
   }
-  initIcons(modal);
-  setupNewAppValidationListeners();
-  updateNewAppValidationHighlight(false);
 }
+window.openNewAppModal = openNewAppModal;
 
 // =========================================================================
 // [신규] 신규 접수창 필수 입력 항목 실시간 유효성 검사 및 빨간색 테두리 강조 엔진
@@ -38358,7 +38388,7 @@ function onNewAppInsuranceChange(insurance) {
   const claimPriceInput = document.getElementById('newAppClaimUnitPrice');
   if (claimPriceInput) {
     const defaultUnitPrice = typeof getDefaultClaimUnitPrice === 'function' ? getDefaultClaimUnitPrice(insurance) : 160000;
-    claimPriceInput.value = formatNumber(defaultUnitPrice);
+    claimPriceInput.value = typeof formatCurrency === 'function' ? formatCurrency(defaultUnitPrice) : Number(defaultUnitPrice).toLocaleString('ko-KR');
   }
 
   const bannerHyundai = document.getElementById('bannerHyundaiProtocol');
