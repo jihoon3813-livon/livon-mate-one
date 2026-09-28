@@ -208,7 +208,7 @@ index.html의 20개 탭 섹션(index.html:1167-4487)을 근거로 다음이 실�
 | 폰트 | Pretendard (jsDelivr CDN) | index.html:11 | — | — |
 | 아이콘 | Lucide (unpkg CDN) | index.html:34 | — | — |
 | 차트 | Chart.js (jsDelivr CDN) | index.html:35, app.js (gInsuranceChart 등, app.js:1949-1950) | — | — |
-| 지도/주소 | Kakao Maps SDK, Daum Postcode | index.html:36-37 | API 키가 URL에 노출 (`appkey=47ea97d95fd01f8ab035bf064a186efb`) | 키 노출 위험도 평가 |
+| 지도/주소 | Kakao Maps SDK, Daum Postcode | index.html:36-37 | API 키가 URL 쿼리파라미터에 그대로 노출됨(`appkey=...`, 값은 보안상 본 문서에 재기재하지 않음) | 키 노출 위험도 평가(도메인 제한 설정 여부) |
 | PDF 처리 | PDF.js, pdf-lib, html2canvas, html2pdf.bundle | index.html:38,41-44, app.js:35822-38386 | 로컬 vendored + CDN 폴백(index.html:45-52) | — |
 | Excel 처리 | SheetJS(xlsx), ExcelJS | index.html:40-41, app.js 전역 `XLSX.*` 249회 | — | — |
 | 압축 | JSZip | index.html:11181, careport-client.js:1551-1557 | — | — |

@@ -25,7 +25,7 @@ User(로그인 폼 입력)
 3. **Controller / Handler**: 별도 HTTP 라우트 없이 `syncToConvex('sync:loginAdmin', {username, password})` — app.js:43466 — 가 Convex 함수를 직접 호출. Convex 측에서는 `loginAdmin` mutation(convex/sync.js:1045) 자체가 Controller 겸 Service 역할
 4. **Service**: `loginAdmin` — sync.js:1045-1105 — 사용자명 대소문자 무시 조회, 상태(`≠"비활성"`) 확인, 비밀번호 검증, 세션 토큰 발급, `lastLogin` 갱신
 5. **핵심 비즈니스 로직**:
-   - 비밀번호 검증 시 `admin.password`뿐 아니라 **하드코딩된 마스터 비밀번호 2종**(`"reborn!@#$"`, `"livon2026!"`)도 허용 — sync.js:1064
+   - 비밀번호 검증 시 `admin.password`뿐 아니라 **하드코딩된 마스터 비밀번호 2종**(코드에 리터럴로 박혀있음, 값은 보안상 본 문서에 재기재하지 않음)도 허용 — sync.js:1064
    - `admin.password`가 비어있으면 기본값 `"12345678"`으로 간주 — sync.js:1063
    - 비활성(`status==="비활성"`) 계정은 로그인 차단 (정확한 조건식은 sync.js:1045-1105 범위 내, 확인 필요: 상태값 enum 전체 목록)
 6. **DB 접근**: `admins` 테이블 조회(username index 여부 불명, 확인 필요 — schema.js:27에 인덱스 미정의) → `adminSessions` 테이블에 세션 insert(schema.js:63-65 `by_token`/`by_adminId` 인덱스 존재)

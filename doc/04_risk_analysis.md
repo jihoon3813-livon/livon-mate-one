@@ -41,17 +41,18 @@ if (IS_DEV_ENV && (!validSessionAdmin || isExplicitlyLoggedOut)) {
 ### C-2. 관리자 로그인 마스터 비밀번호 2종이 소스코드에 하드코딩되어 모든 계정에 통용됨
 
 **[위험도]** Critical
-**[문제]** 각 관리자 계정의 개별 비밀번호와 무관하게, `"reborn!@#$"` 또는 `"livon2026!"` 두 문자열 중 하나만 입력하면 **어떤 계정으로도** 로그인이 성공한다.
+**[문제]** 각 관리자 계정의 개별 비밀번호와 무관하게, 코드에 리터럴로 박혀있는 마스터 비밀번호 2개(값은 보안상 본 문서에 재기재하지 않음, sync.js:1064 참고) 중 하나만 입력하면 **어떤 계정으로도** 로그인이 성공한다.
 **[발생 조건]** 로그인 폼에서 임의의 등록된 사용자명 + 위 두 마스터 비밀번호 중 하나를 입력.
 **[영향]** 계정별 비밀번호 통제가 사실상 무의미해짐. 계정 하나만 탈취(사용자명 노출)되어도 마스터 비밀번호로 전체 시스템 접근 가능.
 **[관련 코드]**
 ```js
 // convex/sync.js:1063-1066
 const validPass = admin.password || "12345678";
-if (args.password !== validPass && args.password !== "reborn!@#$" && args.password !== "livon2026!") {
+if (args.password !== validPass && args.password !== "[REDACTED-MASTER-PW-1]" && args.password !== "[REDACTED-MASTER-PW-2]") {
   return { success: false, error: "비밀번호가 일치하지 않습니다. 다시 확인해주세요." };
 }
 ```
+*(실제 리터럴 값은 sync.js:1064를 직접 확인할 것 — 보안상 본 문서에는 재기재하지 않음)*
 **[왜 문제가 되는지]** 인증 로직이 "계정 고유 비밀번호 OR 전역 마스터 비밀번호" 구조로 설계되어 있어, 개별 계정 비밀번호 변경/폐기와 무관하게 마스터 비밀번호가 유출되는 순간 전 계정이 뚫린다. 소스코드가 저장소에 커밋되어 있으므로 저장소 접근 권한을 가진 사람은 이미 이 값을 알고 있다.
 **[현재 코드에서 확인된 근거]** sync.js:1064 (조건문에 두 문자열 리터럴 직접 비교).
 **[개선 방향]** 마스터 비밀번호 백도어를 즉시 제거. 필요하다면 감사 로그가 남는 별도의 "긴급 관리자 복구" 절차(예: 시간제한 원타임 토큰, 별도 알림)로 대체.
@@ -118,19 +119,20 @@ return { valid: true, admin: { ...session 필드... } };  // admin이 undefined�
 **[관련 코드]**
 ```js
 // server.js:31-32
-process.env.CAREPORT_ID = process.env.CAREPORT_ID || 'jihoon3813';
-process.env.CAREPORT_PW = process.env.CAREPORT_PW || 'livon3813!@#';
+process.env.CAREPORT_ID = process.env.CAREPORT_ID || '[REDACTED-CAREPORT-ID]';
+process.env.CAREPORT_PW = process.env.CAREPORT_PW || '[REDACTED-CAREPORT-PW]';
 ```
 ```js
 // server.js:1582-1588 (Barobill 팩스 발송 기본값)
-const certKey = payload.baroCertKey || savedCfg.baroCertKey || (isProd ? 'A1496EC3-E606-44C0-B126-F03B9AF88588' : 'CF89EE38-7B80-4955-960E-D86A866498ED');
-const corpNum = (payload.baroCorpNum || savedCfg.baroCorpNum || '1058621696')...
-const baroPwd = (payload.baroPwd || savedCfg.baroPwd || '@flqhszpdj').trim();
+const certKey = payload.baroCertKey || savedCfg.baroCertKey || (isProd ? '[REDACTED-CERTKEY-PROD]' : '[REDACTED-CERTKEY-TEST]');
+const corpNum = (payload.baroCorpNum || savedCfg.baroCorpNum || '[REDACTED-CORPNUM]')...
+const baroPwd = (payload.baroPwd || savedCfg.baroPwd || '[REDACTED-BAROPWD]').trim();
 ```
 ```js
 // careport-client.js:29-32 — 브라우저로 전달되는 파일에도 동일 계열 자격증명 하드코딩
 // api/search-hospital.js:3 — Kakao REST 키 하드코딩 폴백
 ```
+*(실제 리터럴 값은 해당 파일:라인을 직접 확인할 것 — 보안상 본 문서에는 재기재하지 않음)*
 **[왜 문제가 되는지]** `.env.example`(및 `.env.local`)로 환경변수 주입 체계를 갖추고 있음에도, 실제 코드는 환경변수가 없을 때 "안전하게 실패"하지 않고 **실 운영 자격증명 기본값으로 계속 동작**하도록 설계되어 있다. 특히 `careport-client.js`는 **브라우저에 전달되는 파일**이라 웹 개발자도구만 열어도 CarePort 자격증명이 노출된다.
 **[현재 코드에서 확인된 근거]** server.js:31-32, 1582-1588, 1711-1713(중복), careport-client.js:29-32, api/fax/send.js:54-57, api/search-hospital.js:3.
 **[개선 방향]** 모든 하드코딩된 자격증명 즉시 폐기·재발급(로테이션) 및 소스에서 제거, 환경변수 부재 시에는 해당 기능을 비활성화하고 명시적 오류를 반환하도록 변경. `careport-client.js`처럼 브라우저에 배포되는 파일에는 어떤 형태로도 자격증명을 두지 않고 서버 프록시만 거치도록 강제.
