@@ -1268,6 +1268,70 @@ function saveSavedFaxConfig(cfg) {
       }
     }
 
+    if (reqPath === '/mate/survey' || reqPath === '/mate-survey.html' || reqPath === '/mate-survey') {
+      const mateSurveyHtmlPath = path.join(BASE_DIR, 'mate-survey.html');
+      if (fs.existsSync(mateSurveyHtmlPath)) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        fs.createReadStream(mateSurveyHtmlPath).pipe(res);
+        return;
+      }
+    }
+
+    // 통합허브 연동 대상 후보군 목록
+    if (reqPath === '/api/survey/candidates' && req.method === 'GET') {
+      const candidates = gSurveyService.getHubCandidates();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      return res.end(JSON.stringify({ success: true, count: candidates.length, items: candidates }));
+    }
+
+    // 설문 문항 조회 및 수정 API
+    if (reqPath === '/api/survey/schema' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      return res.end(JSON.stringify({ success: true, schema: gSurveyService.getSchema() }));
+    }
+
+    if (reqPath === '/api/survey/schema' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const result = gSurveyService.updateSchema(payload.schema, payload.actor || 'ADMIN');
+          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    // 만족도 조사 안내 문자(SMS) 발송 API (본사 메이트원 & 간병인 앱)
+    if (reqPath === '/api/survey/send-sms' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const protocol = req.headers['x-forwarded-proto'] || 'http';
+          const host = req.headers['host'] || 'localhost:3000';
+          const baseUrl = `${protocol}://${host}`;
+          const result = gSurveyService.sendSurveySms(
+            payload.targetId,
+            { phone: payload.phone, customMessage: payload.customMessage, baseUrl },
+            payload.actor || 'HQ'
+          );
+          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
     if (reqPath === '/api/survey/summary' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       return res.end(JSON.stringify({ success: true, data: gSurveyService.getSummaryMetrics() }));

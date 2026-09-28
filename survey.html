@@ -113,7 +113,7 @@
       <div id="step1" class="step-panel space-y-6">
         <!-- Q1 -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
-          <label class="block text-sm font-black text-slate-900 leading-snug">
+          <label id="q1Title" class="block text-sm font-black text-slate-900 leading-snug">
             <span class="text-sky-600 mr-1">Q1.</span>설문에 응답하시는 분은 누구인가요? <span class="text-rose-500">*</span>
           </label>
           <div class="grid grid-cols-3 gap-2">
@@ -135,7 +135,7 @@
 
         <!-- Q2 -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
-          <label class="block text-sm font-black text-slate-900 leading-snug">
+          <label id="q2Title" class="block text-sm font-black text-slate-900 leading-snug">
             <span class="text-sky-600 mr-1">Q2.</span>이번 간병 서비스에 전반적으로 얼마나 만족하셨나요? <span class="text-rose-500">*</span>
           </label>
           <div class="space-y-2">
@@ -168,7 +168,7 @@
       <div id="step2" class="step-panel hidden space-y-6">
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
           <div>
-            <label class="block text-sm font-black text-slate-900 leading-snug">
+            <label id="q3Title" class="block text-sm font-black text-slate-900 leading-snug">
               <span class="text-sky-600 mr-1">Q3.</span>담당 간병인의 친절함과 환자를 대하는 태도는 어떠셨나요? <span class="text-rose-500">*</span>
             </label>
             <p class="text-xs text-slate-500 mt-1">따뜻한 말씨, 환자 존중 및 정서적 지지 정도를 평가해 주세요.</p>
@@ -210,7 +210,7 @@
       <div id="step3" class="step-panel hidden space-y-6">
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
           <div>
-            <label class="block text-sm font-black text-slate-900 leading-snug">
+            <label id="q4Title" class="block text-sm font-black text-slate-900 leading-snug">
               <span class="text-sky-600 mr-1">Q4.</span>담당 간병인이 제공한 돌봄은 어떠셨나요? <span class="text-rose-500">*</span>
             </label>
             <p class="text-xs text-slate-500 mt-1">식사 보조, 위생 및 체위 변경, 환자 안전 관리 능력을 평가해 주세요.</p>
@@ -252,7 +252,7 @@
       <div id="step4" class="step-panel hidden space-y-6">
         <!-- Q5 -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
-          <label class="block text-sm font-black text-slate-900 leading-snug">
+          <label id="q5Title" class="block text-sm font-black text-slate-900 leading-snug">
             <span class="text-sky-600 mr-1">Q5.</span>좋았던 점이나 개선이 필요한 점을 남겨주세요. <span class="text-slate-400 text-xs font-normal">(선택)</span>
           </label>
           <textarea id="ansQ5" rows="4" maxlength="1000" placeholder="환자 질병명이나 주민번호 등 민감한 개인정보는 적지 말아주세요." class="w-full p-3 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent placeholder-slate-400 transition-all"></textarea>
@@ -263,7 +263,7 @@
 
         <!-- Q6 -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
-          <label class="block text-sm font-black text-slate-900 leading-snug">
+          <label id="q6Title" class="block text-sm font-black text-slate-900 leading-snug">
             <span class="text-sky-600 mr-1">Q6.</span>남겨주신 의견에 대해 담당자의 유선 연락을 원하시나요? <span class="text-rose-500">*</span>
           </label>
           <div class="grid grid-cols-2 gap-3">
@@ -366,6 +366,9 @@
 
         surveyData = data;
         renderServiceSummary(data.serviceInfo);
+        if (data.schema) {
+          applySchemaToForm(data.schema);
+        }
         if (data.csPhone) {
           document.getElementById('errorCsPhone').innerText = data.csPhone;
           document.getElementById('completeCsPhone').innerText = data.csPhone;
@@ -388,6 +391,15 @@
       if (!info) return;
       const box = document.getElementById('serviceSummaryBox');
       box.innerHTML = `
+        ${info.patientName ? `
+          <div class="w-full bg-white p-2.5 rounded-xl border border-sky-200 mb-1 flex items-center justify-between shadow-2xs">
+            <span class="text-slate-600 font-bold text-xs flex items-center gap-1">
+              <i data-lucide="user" class="w-3.5 h-3.5 text-sky-600"></i>
+              <span>환자 정보 확인:</span>
+            </span>
+            <span class="text-xs font-black text-sky-900 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">${info.patientName} 님</span>
+          </div>
+        ` : ''}
         <span class="inline-flex items-center gap-1 font-semibold text-slate-700">
           <i data-lucide="user-check" class="w-3.5 h-3.5 text-sky-600"></i>
           <span>담당 간병인: <b class="text-slate-900">${info.caregiverName || '지정 담당자'}</b></span>
@@ -405,6 +417,36 @@
           </span>
         ` : ''}
       `;
+    }
+
+    function applySchemaToForm(schema) {
+      if (!Array.isArray(schema)) return;
+      schema.forEach(q => {
+        if (q.id === 'Q1' && q.title) {
+          const el = document.getElementById('q1Title');
+          if (el) el.innerHTML = `<span class="text-sky-600 mr-1">Q1.</span>${q.title} <span class="text-rose-500">*</span>`;
+        }
+        if (q.id === 'Q2' && q.title) {
+          const el = document.getElementById('q2Title');
+          if (el) el.innerHTML = `<span class="text-sky-600 mr-1">Q2.</span>${q.title} <span class="text-rose-500">*</span>`;
+        }
+        if (q.id === 'Q3' && q.title) {
+          const el = document.getElementById('q3Title');
+          if (el) el.innerHTML = `<span class="text-sky-600 mr-1">Q3.</span>${q.title} <span class="text-rose-500">*</span>`;
+        }
+        if (q.id === 'Q4' && q.title) {
+          const el = document.getElementById('q4Title');
+          if (el) el.innerHTML = `<span class="text-sky-600 mr-1">Q4.</span>${q.title} <span class="text-rose-500">*</span>`;
+        }
+        if (q.id === 'Q5' && q.title) {
+          const el = document.getElementById('q5Title');
+          if (el) el.innerHTML = `<span class="text-sky-600 mr-1">Q5.</span>${q.title} <span class="text-slate-400 text-xs font-normal">${q.required ? '<span class="text-rose-500">*</span>' : '(선택)'}</span>`;
+        }
+        if (q.id === 'Q6' && q.title) {
+          const el = document.getElementById('q6Title');
+          if (el) el.innerHTML = `<span class="text-sky-600 mr-1">Q6.</span>${q.title} <span class="text-rose-500">*</span>`;
+        }
+      });
     }
 
     function showError(title, msg) {

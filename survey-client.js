@@ -246,11 +246,23 @@ function renderSurveyTargetsTable(list) {
         </td>
         <td class="p-3 text-center whitespace-nowrap">
           <div class="inline-flex items-center gap-1.5 justify-center">
+            <button type="button" onclick="sendDirectSurveySms('${target.id}')" 
+              class="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs" 
+              title="환자에게 만족도 조사 링크 문자(SMS) 즉시 발송">
+              <i data-lucide="send" class="w-3 h-3 text-sky-600"></i>
+              <span>문자</span>
+            </button>
+            <a href="/mate/survey?targetId=${target.id}" target="_blank" 
+              class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs" 
+              title="리본메이트 간병인 앱 만족도 조사 화면 열기">
+              <i data-lucide="smartphone" class="w-3 h-3 text-emerald-600"></i>
+              <span>앱뷰</span>
+            </a>
             <button type="button" onclick="openSurveyQrModal('${target.id}')" 
-              class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer" 
+              class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer" 
               title="QR코드 보기 및 설문 링크 안내">
-              <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
-              <span>QR/안내</span>
+              <i data-lucide="qr-code" class="w-3 h-3"></i>
+              <span>QR</span>
             </button>
             <button type="button" onclick="openSurveyDetailModal('${target.id}')" 
               class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all cursor-pointer" 
@@ -479,6 +491,16 @@ function renderSurveyRewards() {
 // =========================================================================
 // 6. 서브탭 4: 설정 (A04)
 // =========================================================================
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function renderSurveySettings() {
   const cfg = gSurveyState.settings || {};
   const setVal = (id, val) => {
@@ -492,6 +514,113 @@ function renderSurveySettings() {
   setVal('setPointsMonth', cfg.pointsMonthBonus || 30);
   setVal('setCsPhone', cfg.csPhone || '1544-7119');
   setVal('setCsHours', cfg.csOperatingHours || '평일 09:00 ~ 18:00 (주말/공휴일 휴무)');
+
+  renderSurveySchemaEditor();
+}
+
+function renderSurveySchemaEditor() {
+  const container = document.getElementById('surveySchemaEditorContainer');
+  if (!container) return;
+
+  const schema = gSurveyState.schema || [];
+  if (schema.length === 0) {
+    container.innerHTML = '<div class="p-4 text-center text-slate-400 bg-slate-50 rounded-xl">등록된 설문 문항이 없습니다. [+ 문항 추가]를 눌러보세요.</div>';
+    return;
+  }
+
+  container.innerHTML = schema.map((q, idx) => {
+    return `
+      <div class="p-3.5 bg-slate-50 hover:bg-slate-100/80 transition-all rounded-2xl border border-slate-200 space-y-2 text-xs">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5 flex-1 min-w-0">
+            <span class="px-2 py-0.5 rounded font-black font-mono text-[11px] ${q.required ? 'bg-sky-100 text-sky-800 border border-sky-300' : 'bg-slate-200 text-slate-700'}">
+              ${q.id || `Q${idx + 1}`}
+            </span>
+            <input type="text" value="${escapeHtml(q.title || '')}" 
+              oninput="updateQuestionField(${idx}, 'title', this.value)"
+              class="flex-1 font-bold text-slate-900 bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs focus:ring-2 focus:ring-purple-500">
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <label class="flex items-center gap-1 text-[11px] text-slate-600 font-bold cursor-pointer">
+              <input type="checkbox" ${q.required ? 'checked' : ''} onchange="updateQuestionField(${idx}, 'required', this.checked)" class="rounded text-purple-600">
+              <span>필수</span>
+            </label>
+            <button type="button" onclick="deleteSurveyQuestion(${idx})" class="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer" title="문항 삭제">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 text-[11px] flex-wrap">
+          <span class="text-slate-500 font-medium">유형:</span>
+          <select onchange="updateQuestionField(${idx}, 'type', this.value)" class="bg-white border border-slate-200 rounded-md px-2 py-0.5 text-xs font-semibold text-slate-700">
+            <option value="single_choice" ${q.type === 'single_choice' ? 'selected' : ''}>단일 선택 (라디오/버튼)</option>
+            <option value="rating_5" ${q.type === 'rating_5' ? 'selected' : ''}>5점 만족도 척도</option>
+            <option value="rating_5_with_unknown" ${q.type === 'rating_5_with_unknown' ? 'selected' : ''}>5점 만족도 + 모름 옵션</option>
+            <option value="text" ${q.type === 'text' ? 'selected' : ''}>주관식 서술형</option>
+            <option value="boolean_callback" ${q.type === 'boolean_callback' ? 'selected' : ''}>유선 전화 연락 요청</option>
+          </select>
+          ${q.type === 'single_choice' && Array.isArray(q.options) ? `
+            <span class="text-slate-500 font-mono text-[10.5px]">선택지: ${q.options.map(o => o.label).join(', ')}</span>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function updateQuestionField(idx, field, value) {
+  if (!gSurveyState.schema || !gSurveyState.schema[idx]) return;
+  gSurveyState.schema[idx][field] = value;
+}
+
+function addSurveyQuestion() {
+  if (!Array.isArray(gSurveyState.schema)) gSurveyState.schema = [];
+  const nextNum = gSurveyState.schema.length + 1;
+  const newQ = {
+    id: 'Q' + nextNum,
+    title: '새로운 설문 문항 내용을 입력해 주세요.',
+    type: 'rating_5',
+    required: true,
+    options: [
+      { score: 5, label: '매우 만족' },
+      { score: 4, label: '만족' },
+      { score: 3, label: '보통' },
+      { score: 2, label: '불만족' },
+      { score: 1, label: '매우 불만족' }
+    ]
+  };
+  gSurveyState.schema.push(newQ);
+  renderSurveySchemaEditor();
+  if (typeof showToast === 'function') showToast(`새 문항(Q${nextNum})이 추가되었습니다. 문항 수정 후 [문항 저장]을 눌러주세요.`, 'info');
+}
+
+function deleteSurveyQuestion(idx) {
+  if (!confirm('해당 설문 문항을 삭제하시겠습니까?')) return;
+  gSurveyState.schema.splice(idx, 1);
+  renderSurveySchemaEditor();
+  if (typeof showToast === 'function') showToast('문항이 삭제되었습니다. [문항 저장]을 눌러 서버에 반영하세요.', 'info');
+}
+
+async function saveSurveySchema() {
+  try {
+    const res = await fetch('/api/survey/schema', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schema: gSurveyState.schema, actor: 'ADMIN' })
+    });
+    const result = await res.json();
+    if (result.success) {
+      if (typeof showToast === 'function') showToast('설문 문항 구성이 성공적으로 저장되었습니다.', 'success');
+      loadSurveyMgmtData(false);
+    } else {
+      if (typeof showToast === 'function') showToast('문항 저장 실패: ' + (result.message || '오류 발생'), 'error');
+    }
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('문항 저장 중 오류가 발생했습니다.', 'error');
+  }
 }
 
 async function handleSaveSurveySettings(event) {
@@ -538,6 +667,11 @@ function openSurveyQrModal(targetId) {
   document.getElementById('surveyQrTestLink').href = surveyUrl;
   document.getElementById('surveyQrImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(surveyUrl)}`;
 
+  const smsInput = document.getElementById('surveyQrSmsPhone');
+  if (smsInput) {
+    smsInput.value = target.patientPhone || '';
+  }
+
   document.getElementById('guidanceDeclineBox').classList.add('hidden');
   document.getElementById('surveyQrModal').classList.remove('hidden');
   if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -548,6 +682,82 @@ function copySurveyUrl() {
   input.select();
   navigator.clipboard.writeText(input.value);
   if (typeof showToast === 'function') showToast('고객 설문 링크가 클립보드에 복사되었습니다.', 'info');
+}
+
+// 본사 메이트원 또는 모달에서 환자에게 문자(SMS) 즉시 발송
+async function sendDirectSurveySms(targetId) {
+  const target = gSurveyState.targets.find(t => t.id === targetId || t.serviceId === targetId);
+  if (!target) return;
+
+  const phone = target.patientPhone;
+  if (!phone) {
+    if (typeof showToast === 'function') showToast('환자 연락처가 등록되어 있지 않습니다.', 'error');
+    return;
+  }
+
+  const confirmMsg = `[본사 직발송]\n${target.patientName} 고객님 (${phone})께 만족도 조사 링크 문자를 발송하시겠습니까?`;
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    const res = await fetch('/api/survey/send-sms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        targetId: target.id,
+        phone: phone,
+        actor: 'HQ'
+      })
+    });
+    const result = await res.json();
+    if (result.success) {
+      if (typeof showToast === 'function') showToast(`${target.patientName} 고객님께 설문 링크 문자가 성공적으로 발송되었습니다.`, 'success');
+      loadSurveyMgmtData(false);
+    } else {
+      if (typeof showToast === 'function') showToast('문자 발송 실패: ' + (result.message || '오류 발생'), 'error');
+    }
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('문자 발송 중 네트워크 오류가 발생했습니다.', 'error');
+  }
+}
+
+async function sendDirectSurveySmsFromQrModal() {
+  if (!gSurveyState.activeTarget) return;
+  const target = gSurveyState.activeTarget;
+  const phone = document.getElementById('surveyQrSmsPhone').value.trim();
+  if (!phone) {
+    alert('문자를 받으실 환자/보호자 휴대폰 번호를 입력해 주세요.');
+    return;
+  }
+
+  const btn = document.getElementById('btnQrModalSms');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="animate-spin">⏳</span> 발송 중...`;
+
+  try {
+    const res = await fetch('/api/survey/send-sms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        targetId: target.id,
+        phone: phone,
+        actor: 'HQ'
+      })
+    });
+    const result = await res.json();
+    if (result.success) {
+      if (typeof showToast === 'function') showToast('만족도 조사 링크 문자가 환자분께 성공적으로 발송되었습니다.', 'success');
+      closeSurveyModal('surveyQrModal');
+      loadSurveyMgmtData(false);
+    } else {
+      alert('발송 실패: ' + (result.message || '다시 시도해 주세요.'));
+    }
+  } catch (err) {
+    alert('발송 중 통신 오류가 발생했습니다.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<i data-lucide="mail" class="w-3.5 h-3.5"></i> <span>문자 즉시 발송</span>`;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
 }
 
 async function recordGuidanceFromResult(result) {
@@ -763,21 +973,148 @@ async function saveFollowupCase() {
   }
 }
 
-function openNewSurveyTargetModal() {
+let gHubCandidates = [];
+
+async function loadHubCandidates(forceRefresh = false) {
+  if (gHubCandidates.length > 0 && !forceRefresh) return gHubCandidates;
+  try {
+    const res = await fetch('/api/survey/candidates');
+    const data = await res.json();
+    if (Array.isArray(data.items)) {
+      gHubCandidates = data.items;
+      return gHubCandidates;
+    }
+  } catch (e) {
+    console.warn('loadHubCandidates error:', e);
+  }
+  return [];
+}
+
+async function handleHubCandidateSearch(query) {
+  const dropdown = document.getElementById('newTargetHubDropdown');
+  if (!dropdown) return;
+
+  const q = (query || '').trim().toLowerCase();
+  if (!q) {
+    dropdown.classList.add('hidden');
+    dropdown.innerHTML = '';
+    return;
+  }
+
+  const list = await loadHubCandidates();
+  const matched = list.filter(item => 
+    (item.patientName && item.patientName.toLowerCase().includes(q)) ||
+    (item.phone && item.phone.includes(q)) ||
+    (item.hospitalName && item.hospitalName.toLowerCase().includes(q)) ||
+    (item.caregiverName && item.caregiverName.toLowerCase().includes(q)) ||
+    (item.id && item.id.toLowerCase().includes(q))
+  ).slice(0, 10);
+
+  if (matched.length === 0) {
+    dropdown.innerHTML = `
+      <div class="p-3.5 text-center text-slate-400 text-xs">
+        일치하는 통합허브 고객이 없습니다.
+      </div>
+    `;
+    dropdown.classList.remove('hidden');
+    return;
+  }
+
+  dropdown.innerHTML = matched.map(m => `
+    <div onclick="selectHubCandidate('${m.id}')" class="p-3 hover:bg-sky-50 transition-colors cursor-pointer space-y-1">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="font-black text-slate-900 text-xs">${m.patientName}</span>
+          <span class="font-mono text-[11px] text-slate-600 font-bold">${m.phone || '연락처 없음'}</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold">${m.insuranceCompany || '일반'}</span>
+        </div>
+        ${m.isAlreadySurveyTarget ? `
+          <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold border border-amber-200">기등록 고객</span>
+        ` : `
+          <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">선택</span>
+        `}
+      </div>
+      <div class="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
+        <span>병원: <b>${m.hospitalName || '-'}</b></span>
+        <span>간병인: <b>${m.caregiverName || '-'}</b></span>
+        <span class="font-mono text-[10.5px]">기간: ${m.careStartDate || '-'} ~ ${m.careEndDate || '진행'}</span>
+      </div>
+    </div>
+  `).join('');
+  dropdown.classList.remove('hidden');
+}
+
+function selectHubCandidate(appId) {
+  const candidate = gHubCandidates.find(c => c.id === appId);
+  if (!candidate) return;
+
+  // 인풋 값 자동 완성
+  document.getElementById('newTargetPatientName').value = candidate.patientName || '';
+  document.getElementById('newTargetPhone').value = candidate.phone || '';
+  document.getElementById('newTargetCaregiverName').value = candidate.caregiverName || '';
+  document.getElementById('newTargetHospital').value = candidate.hospitalName || '';
+  document.getElementById('newTargetStartDate').value = (candidate.careStartDate || '').slice(0, 10);
+  document.getElementById('newTargetEndDate').value = (candidate.careEndDate || '').slice(0, 10);
+
+  // 숨김 메타데이터 저장
+  document.getElementById('newTargetServiceId').value = candidate.id || '';
+  document.getElementById('newTargetInsuranceCompany').value = candidate.insuranceCompany || '';
+  document.getElementById('newTargetCaregiverPhone').value = candidate.caregiverPhone || '';
+
+  // 선택 뱃지 표시
+  const badge = document.getElementById('selectedHubCustomerBadge');
+  if (badge) {
+    document.getElementById('selPatientName').innerText = candidate.patientName;
+    document.getElementById('selServiceId').innerText = candidate.id;
+    document.getElementById('selInsurance').innerText = candidate.insuranceCompany || '';
+    document.getElementById('selDetails').innerText = `${candidate.hospitalName || '병원 미지정'} · 간병인: ${candidate.caregiverName || '미지정'} (${candidate.careStartDate || ''} ~ ${candidate.careEndDate || ''})`;
+    badge.classList.remove('hidden');
+  }
+
+  // 드롭다운 숨기기
+  const dropdown = document.getElementById('newTargetHubDropdown');
+  if (dropdown) dropdown.classList.add('hidden');
+
+  if (candidate.isAlreadySurveyTarget && typeof showToast === 'function') {
+    showToast('해당 고객은 이미 만족도 조사 대상에 등록되어 있습니다. 등록 시 새 토큰으로 갱신됩니다.', 'warning');
+  }
+}
+
+function clearSelectedHubCandidate() {
+  const searchInput = document.getElementById('newTargetHubSearchInput');
+  if (searchInput) searchInput.value = '';
+  const badge = document.getElementById('selectedHubCustomerBadge');
+  if (badge) badge.classList.add('hidden');
   document.getElementById('newSurveyTargetForm').reset();
+  document.getElementById('newTargetServiceId').value = '';
+  document.getElementById('newTargetInsuranceCompany').value = '';
+  document.getElementById('newTargetCaregiverPhone').value = '';
+}
+
+function openNewSurveyTargetModal() {
+  clearSelectedHubCandidate();
+  const dropdown = document.getElementById('newTargetHubDropdown');
+  if (dropdown) {
+    dropdown.classList.add('hidden');
+    dropdown.innerHTML = '';
+  }
   document.getElementById('surveyNewTargetModal').classList.remove('hidden');
+  loadHubCandidates(false);
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 async function handleCreateSurveyTarget(event) {
   event.preventDefault();
   const payload = {
+    serviceId: document.getElementById('newTargetServiceId').value.trim() || undefined,
     patientName: document.getElementById('newTargetPatientName').value.trim(),
     phone: document.getElementById('newTargetPhone').value.trim(),
     caregiverName: document.getElementById('newTargetCaregiverName').value.trim(),
+    caregiverPhone: document.getElementById('newTargetCaregiverPhone').value.trim() || undefined,
     careStartDate: document.getElementById('newTargetStartDate').value,
     careEndDate: document.getElementById('newTargetEndDate').value,
-    hospitalName: document.getElementById('newTargetHospital').value.trim()
+    hospitalName: document.getElementById('newTargetHospital').value.trim(),
+    insuranceCompany: document.getElementById('newTargetInsuranceCompany').value.trim() || undefined
   };
 
   try {
@@ -947,4 +1284,15 @@ if (typeof window !== 'undefined') {
   window.approveSurveyReward = approveSurveyReward;
   window.reverseSurveyReward = reverseSurveyReward;
   window.handleSaveSurveySettings = handleSaveSurveySettings;
+  window.sendDirectSurveySms = sendDirectSurveySms;
+  window.sendDirectSurveySmsFromQrModal = sendDirectSurveySmsFromQrModal;
+  window.addSurveyQuestion = addSurveyQuestion;
+  window.deleteSurveyQuestion = deleteSurveyQuestion;
+  window.saveSurveySchema = saveSurveySchema;
+  window.updateQuestionField = updateQuestionField;
+  window.renderSurveySchemaEditor = renderSurveySchemaEditor;
+  window.loadHubCandidates = loadHubCandidates;
+  window.handleHubCandidateSearch = handleHubCandidateSearch;
+  window.selectHubCandidate = selectHubCandidate;
+  window.clearSelectedHubCandidate = clearSelectedHubCandidate;
 }

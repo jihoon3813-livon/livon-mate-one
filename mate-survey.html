@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>리본메이트 - 만족도 조사 안내</title>
+  <!-- Tailwind CSS & Lucide Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fdf2f8',
+              100: '#fce7f3',
+              500: '#ec4899',
+              600: '#db2777',
+              700: '#be185d'
+            },
+            primary: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard Variable", Pretendard, Roboto, "Segoe UI", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 min-h-screen flex flex-col justify-between selection:bg-emerald-200">
+
+  <!-- 헤더 바 -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+    <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 flex items-center justify-center text-white shadow-xs">
+          <i data-lucide="heart-handshake" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="font-black text-slate-900 tracking-tight text-base">리본메이트</span>
+            <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">간병인용</span>
+          </div>
+          <p class="text-[10.5px] text-slate-500 font-medium">고객 만족도 조사 안내</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+          <span>안내 시 10P</span>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 메인 모바일 뷰 컨테이너 -->
+  <main class="max-w-md w-full mx-auto px-4 py-5 flex-1 flex flex-col space-y-4">
+
+    <!-- 0. 로딩 인디케이터 -->
+    <div id="loadingBox" class="py-16 text-center space-y-3">
+      <div class="w-9 h-9 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto"></div>
+      <p class="text-xs font-bold text-slate-600">간병 환자 정보를 불러오고 있습니다...</p>
+    </div>
+
+    <!-- 1. 간병인 및 대상 환자 정보 카드 -->
+    <div id="patientInfoCard" class="hidden bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
+      
+      <!-- 간병인 프로필 스트립 -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 text-xs">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-black">
+            <i data-lucide="user-check" class="w-4 h-4 text-emerald-600"></i>
+          </div>
+          <div>
+            <div class="font-black text-slate-900 flex items-center gap-1.5">
+              <span id="cgNameDisplay">간병인</span>
+              <span class="text-[10px] text-emerald-600 bg-emerald-50 px-1 rounded font-bold">담당 간병사</span>
+            </div>
+            <div class="text-[11px] text-slate-500 font-mono" id="cgPhoneDisplay">-</div>
+          </div>
+        </div>
+        <span class="text-[11px] text-slate-400 font-medium">리본케어 공식</span>
+      </div>
+
+      <!-- STEP 1 안내 뱃지 -->
+      <div class="flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-2 rounded-2xl border border-emerald-200/80">
+        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+        <span>STEP 1. 현재 간병 중인 환자 정보를 확인해 주세요</span>
+      </div>
+
+      <!-- 환자 상세 박스 -->
+      <div class="bg-gradient-to-br from-slate-50 to-slate-100/60 rounded-2xl p-4 border border-slate-200/80 space-y-2.5 text-xs">
+        <div class="flex items-center justify-between">
+          <span class="text-slate-500 font-medium">환자 성함</span>
+          <span class="text-sm font-black text-slate-900 tracking-tight" id="patientNameDisplay">확인 중...</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-slate-500 font-medium">입원 병원</span>
+          <span class="font-bold text-slate-800" id="hospitalNameDisplay">확인 중...</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-slate-500 font-medium">간병 기간</span>
+          <span class="font-bold text-slate-700 font-mono text-[11.5px]" id="carePeriodDisplay">-</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-slate-500 font-medium">환자/보호자 연락처</span>
+          <span class="font-mono font-bold text-slate-800" id="patientPhoneDisplay">-</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-slate-500 font-medium">신청 접수번호</span>
+          <span class="font-mono text-slate-500 text-[11px]" id="serviceIdDisplay">-</span>
+        </div>
+      </div>
+
+      <!-- 정보 일치 확인 버튼 / 체크 -->
+      <div id="patientConfirmArea" class="pt-1">
+        <button type="button" id="btnConfirmPatient" onclick="confirmPatientInfo()"
+          class="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-700/20 transition-all cursor-pointer">
+          <i data-lucide="user-check" class="w-4 h-4"></i>
+          <span>위 환자 정보가 맞습니다 (확인)</span>
+        </button>
+      </div>
+
+      <!-- 환자 정보 확인 완료 뱃지 -->
+      <div id="patientConfirmedBadge" class="hidden bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-2xl p-3 text-xs font-bold flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="badge-check" class="w-4 h-4 text-emerald-700"></i>
+          <span>환자 정보 확인 완료</span>
+        </div>
+        <button type="button" onclick="cancelConfirm()" class="text-[11px] text-emerald-700 underline font-medium">다시 선택</button>
+      </div>
+    </div>
+
+    <!-- 2. 만족도 조사 진행 방식 선택 (확인 완료 후 활성화) -->
+    <div id="actionSelectCard" class="hidden space-y-3">
+      
+      <div class="flex items-center gap-1.5 text-xs font-bold text-slate-800 px-1">
+        <i data-lucide="sparkles" class="w-4 h-4 text-amber-500"></i>
+        <span>STEP 2. 만족도 조사 참여 방식을 선택하세요</span>
+      </div>
+
+      <!-- 방식 A: 간병인 폰에서 바로 진행하기 -->
+      <div class="bg-white rounded-3xl p-5 border-2 border-emerald-500 shadow-sm space-y-3 transition-all">
+        <div class="flex items-start justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+              <i data-lucide="smartphone" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-[10px] font-black uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">추천 · 즉시 완료</span>
+              <h3 class="text-base font-black text-slate-900 mt-0.5">간병인 휴대폰에서 바로 설문하기</h3>
+            </div>
+          </div>
+        </div>
+        <p class="text-xs text-slate-600 leading-relaxed">
+          환자분 또는 보호자분께 휴대폰을 건네드려 <b>지금 그 자리에서 약 1분</b> 동안 설문에 응답하도록 안내합니다.
+        </p>
+        <button type="button" onclick="startSurveyOnDevice()"
+          class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] text-white font-black text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-700/20 transition-all cursor-pointer">
+          <i data-lucide="play" class="w-4 h-4 fill-white"></i>
+          <span>지금 이 폰에서 설문 시작하기</span>
+        </button>
+      </div>
+
+      <!-- 방식 B: 환자 휴대폰으로 링크 문자(SMS) 보내기 -->
+      <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
+        <div class="flex items-start justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+              <i data-lucide="message-square" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-[10px] font-black uppercase text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">편리한 링크 전송</span>
+              <h3 class="text-base font-black text-slate-900 mt-0.5">환자분께 설문 링크 문자(SMS) 보내기</h3>
+            </div>
+          </div>
+        </div>
+        <p class="text-xs text-slate-600 leading-relaxed">
+          환자분의 휴대폰으로 만족도 조사 링크 문자를 전송합니다. 환자분은 <b>별도 본인인증 없이</b> 문자의 링크를 누르면 곧바로 설문 작성이 가능합니다.
+        </p>
+
+        <!-- 수신 휴대폰 번호 확인/수정 -->
+        <div class="space-y-1 pt-1">
+          <label class="block text-[11px] font-bold text-slate-600">문자 수신 번호</label>
+          <div class="flex items-center gap-2">
+            <input type="tel" id="smsTargetPhoneInput" placeholder="010-0000-0000"
+              class="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-sky-500">
+            <button type="button" onclick="sendSmsFromCaregiverApp()" id="btnSendSms"
+              class="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer whitespace-nowrap active:scale-95">
+              <i data-lucide="send" class="w-3.5 h-3.5"></i>
+              <span>문자 발송</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 간병인 폰 기본 문자앱 직접 열기 옵션 -->
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <span class="text-slate-500">내 폰 문자 앱으로 직접 보내기</span>
+          <button type="button" onclick="openNativeSmsApp()" class="text-sky-600 hover:text-sky-800 font-bold underline flex items-center gap-1">
+            <i data-lucide="external-link" class="w-3 h-3"></i>
+            <span>문자앱 열기</span>
+          </button>
+        </div>
+
+        <!-- 문자 발송 완료 안내 알림 -->
+        <div id="smsSuccessBox" class="hidden bg-sky-50 border border-sky-200 rounded-2xl p-3 text-xs text-sky-900 space-y-1">
+          <div class="flex items-center gap-1.5 font-bold text-sky-800">
+            <i data-lucide="check-circle" class="w-4 h-4 text-sky-600"></i>
+            <span>설문 안내 문자가 성공적으로 발송되었습니다!</span>
+          </div>
+          <p class="text-[11px] text-sky-700 leading-relaxed">
+            환자분께서 문자의 파란색 링크를 누르시면 본인확인 없이 1분 만에 응답하실 수 있습니다. 간병인님의 달란트 안내 포인트(+10P)가 적립 대기되었습니다.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 3. 환자/대상자 선택이 안 된 경우 (후보군 선택 박스) -->
+    <div id="patientSelectorBox" class="hidden bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
+      <div class="flex items-center gap-2">
+        <i data-lucide="list-filter" class="w-4 h-4 text-emerald-600"></i>
+        <h3 class="text-sm font-black text-slate-900">간병 대상 환자 선택</h3>
+      </div>
+      <p class="text-xs text-slate-500">
+        만족도 조사를 안내할 환자분을 선택해 주세요.
+      </p>
+      <div id="candidateListContainer" class="space-y-2 max-h-80 overflow-y-auto pr-1">
+        <!-- 동적 렌더링 -->
+      </div>
+    </div>
+
+    <!-- 4. 유의사항 및 고객센터 안내 -->
+    <div class="bg-white/80 rounded-2xl p-4 border border-slate-200/80 text-[11px] text-slate-500 space-y-1 leading-relaxed">
+      <div class="flex items-center gap-1 text-slate-700 font-bold">
+        <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+        <span>간병사 개인정보 및 평가 보호 안내</span>
+      </div>
+      <p>
+        고객이 작성한 개별 답변 내용과 점수는 담당 간병인에게 일절 공개되지 않으며, 익명으로 안전하게 처리됩니다.
+      </p>
+      <p class="pt-1 text-slate-400">
+        문의사항: 리본케어 고객지원팀 (1544-7119)
+      </p>
+    </div>
+
+  </main>
+
+  <footer class="text-center py-4 text-[11px] text-slate-400 border-t border-slate-200 bg-white">
+    © Livon Care Corp. 리본메이트 고객만족도 조사 시스템
+  </footer>
+
+  <script>
+    const gState = {
+      target: null,
+      targetId: '',
+      caregiverName: '',
+      isConfirmed: false,
+      candidates: []
+    };
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const params = new URLSearchParams(window.location.search);
+      gState.targetId = params.get('targetId') || params.get('id') || '';
+      gState.caregiverName = params.get('caregiver') || params.get('caregiverName') || '';
+
+      await loadTargetOrCandidates();
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    });
+
+    async function loadTargetOrCandidates() {
+      const loadingBox = document.getElementById('loadingBox');
+      const patientInfoCard = document.getElementById('patientInfoCard');
+      const patientSelectorBox = document.getElementById('patientSelectorBox');
+
+      try {
+        // 1. 특정 Target ID가 전달된 경우
+        if (gState.targetId) {
+          const res = await fetch(`/api/survey/targets?search=${encodeURIComponent(gState.targetId)}`);
+          const data = await res.json();
+          if (data.items && data.items.length > 0) {
+            const found = data.items.find(t => t.id === gState.targetId || t.serviceId === gState.targetId) || data.items[0];
+            gState.target = found;
+            renderPatientInfo(found);
+            loadingBox.classList.add('hidden');
+            patientInfoCard.classList.remove('hidden');
+            return;
+          }
+        }
+
+        // 2. Target ID가 없거나 검색되지 않은 경우, 전체 대상자 및 후보군 조회
+        const [targetsRes, candidatesRes] = await Promise.all([
+          fetch('/api/survey/targets').then(r => r.json()).catch(() => ({ items: [] })),
+          fetch('/api/survey/candidates').then(r => r.json()).catch(() => ({ items: [] }))
+        ]);
+
+        const targets = targetsRes.items || [];
+        const candidates = candidatesRes.items || [];
+
+        // 간병인 이름으로 필터링
+        let matched = null;
+        if (gState.caregiverName) {
+          matched = targets.find(t => t.caregiverName && t.caregiverName.includes(gState.caregiverName));
+        }
+
+        if (matched) {
+          gState.target = matched;
+          renderPatientInfo(matched);
+          loadingBox.classList.add('hidden');
+          patientInfoCard.classList.remove('hidden');
+        } else if (targets.length > 0) {
+          // 첫 번째 최근 대상을 기본 표시하되 변경 가능하도록 후보 목록 제공
+          gState.target = targets[0];
+          renderPatientInfo(targets[0]);
+          loadingBox.classList.add('hidden');
+          patientInfoCard.classList.remove('hidden');
+        } else {
+          // 대상자가 전혀 없으면 안내
+          loadingBox.innerHTML = `
+            <div class="p-6 bg-white rounded-3xl border border-slate-200 text-center space-y-2">
+              <i data-lucide="alert-circle" class="w-8 h-8 text-amber-500 mx-auto"></i>
+              <div class="font-bold text-slate-800 text-sm">연계된 간병 환자 정보가 없습니다.</div>
+              <p class="text-xs text-slate-500">본사 메이트원 또는 관리자에게 문의해 주세요.</p>
+            </div>
+          `;
+          if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+      } catch (err) {
+        console.error(err);
+        loadingBox.innerHTML = `<div class="text-xs text-rose-500 font-bold">환자 정보를 불러오지 못했습니다. 다시 시도해 주세요.</div>`;
+      }
+    }
+
+    function renderPatientInfo(t) {
+      document.getElementById('cgNameDisplay').innerText = t.caregiverName || gState.caregiverName || '배정 간병인';
+      document.getElementById('cgPhoneDisplay').innerText = t.caregiverPhone || '연락처 등록됨';
+      document.getElementById('patientNameDisplay').innerText = t.patientName || '환자';
+      document.getElementById('hospitalNameDisplay').innerText = t.hospitalName || '지정 병원';
+      document.getElementById('carePeriodDisplay').innerText = `${t.careStartDate || '-'} ~ ${t.careEndDate || '진행 중'}`;
+      document.getElementById('patientPhoneDisplay').innerText = t.patientPhone ? t.patientPhone.replace(/[^0-9]/g, '').replace(/(\d{3})(\d{3,4})(\d{4})/, '$1-$2-$3') : '-';
+      document.getElementById('serviceIdDisplay').innerText = t.serviceId || t.id || '-';
+      document.getElementById('smsTargetPhoneInput').value = t.patientPhone || '';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function confirmPatientInfo() {
+      gState.isConfirmed = true;
+      document.getElementById('btnConfirmPatient').classList.add('hidden');
+      document.getElementById('patientConfirmedBadge').classList.remove('hidden');
+      document.getElementById('actionSelectCard').classList.remove('hidden');
+      
+      // 스크롤 이동
+      document.getElementById('actionSelectCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function cancelConfirm() {
+      gState.isConfirmed = false;
+      document.getElementById('btnConfirmPatient').classList.remove('hidden');
+      document.getElementById('patientConfirmedBadge').classList.add('hidden');
+      document.getElementById('actionSelectCard').classList.add('hidden');
+    }
+
+    // 옵션 A: 간병인 폰에서 지금 바로 설문 시작
+    async function startSurveyOnDevice() {
+      if (!gState.target || !gState.target.token) {
+        alert('설문 대상을 확인할 수 없습니다.');
+        return;
+      }
+
+      // 안내 기록(DEVICE_HANDOVER) 서버 전송
+      try {
+        await fetch('/api/survey/guidance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetId: gState.target.id,
+            guidanceData: {
+              method: 'DEVICE_HANDOVER',
+              result: 'GUIDED',
+              reasonCode: '',
+              reasonDetail: '간병인 모바일 단말기 현장 즉시 응답'
+            },
+            actor: 'CAREGIVER'
+          })
+        });
+      } catch (e) {
+        console.warn('Guidance record failed:', e);
+      }
+
+      // 설문 화면으로 이동
+      window.location.href = `/survey.html?token=${gState.target.token}&channel=DEVICE_HANDOVER`;
+    }
+
+    // 옵션 B: 환자 휴대폰으로 문자(SMS) 발송
+    async function sendSmsFromCaregiverApp() {
+      if (!gState.target) {
+        alert('환자 정보를 확인할 수 없습니다.');
+        return;
+      }
+      const phone = document.getElementById('smsTargetPhoneInput').value.trim();
+      if (!phone) {
+        alert('문자를 받으실 환자/보호자 휴대폰 번호를 입력해 주세요.');
+        return;
+      }
+
+      const btn = document.getElementById('btnSendSms');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="animate-spin">⏳</span> 발송 중`;
+
+      try {
+        const res = await fetch('/api/survey/send-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetId: gState.target.id,
+            phone: phone,
+            actor: 'CAREGIVER'
+          })
+        });
+        const result = await res.json();
+        if (result.success) {
+          document.getElementById('smsSuccessBox').classList.remove('hidden');
+          document.getElementById('smsSuccessBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (typeof lucide !== 'undefined') lucide.createIcons();
+        } else {
+          alert('문자 발송 실패: ' + (result.message || '다시 시도해 주세요.'));
+        }
+      } catch (err) {
+        alert('발송 중 통신 오류가 발생했습니다.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="send" class="w-3.5 h-3.5"></i> <span>문자 발송</span>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+    }
+
+    // 옵션 B-보조: 간병인 스마트폰 기본 문자앱 열기 (sms: URI scheme)
+    function openNativeSmsApp() {
+      if (!gState.target || !gState.target.token) return;
+      const phone = document.getElementById('smsTargetPhoneInput').value.trim() || gState.target.patientPhone || '';
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const surveyUrl = `${window.location.origin}/survey.html?token=${gState.target.token}`;
+      const msg = `[리본케어] ${gState.target.patientName} 고객님, 간병 서비스 만족도 조사 안내입니다. 아래 링크를 눌러 간편하게 참여해 주세요.\n${surveyUrl}`;
+      
+      const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const sep = isIos ? '&' : '?';
+      window.location.href = `sms:${cleanPhone}${sep}body=${encodeURIComponent(msg)}`;
+    }
+  </script>
+</body>
+</html>

@@ -104,6 +104,7 @@ class SurveyService {
   constructor() {
     this.data = {
       settings: { ...DEFAULT_SETTINGS },
+      schema: JSON.parse(JSON.stringify(SURVEY_SCHEMA_V1)),
       targets: [],
       responses: [],
       followups: [],
@@ -121,6 +122,9 @@ class SurveyService {
         const parsed = JSON.parse(raw);
         this.data = {
           settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
+          schema: Array.isArray(parsed.schema) && parsed.schema.length > 0 
+            ? parsed.schema 
+            : JSON.parse(JSON.stringify(SURVEY_SCHEMA_V1)),
           targets: Array.isArray(parsed.targets) ? parsed.targets : [],
           responses: Array.isArray(parsed.responses) ? parsed.responses : [],
           followups: Array.isArray(parsed.followups) ? parsed.followups : [],
@@ -327,6 +331,121 @@ class SurveyService {
     return { success: true, token: newToken, target };
   }
 
+  // 통합허브(hub_apps_real.json) 고객 목록 조회 (만족도 조사 수동 등록 시 연동)
+  getHubCandidates() {
+    try {
+      const appsPath = path.join(__dirname, 'hub_apps_real.json');
+      if (fs.existsSync(appsPath)) {
+        const hubData = JSON.parse(fs.readFileSync(appsPath, 'utf8'));
+        const apps = hubData.applications || [];
+        return apps.map(app => {
+          const matchedTarget = this.data.targets.find(t => t.serviceId === app.id && t.targetStatus !== 'CANCELLED');
+          return {
+            id: app.id,
+            patientName: app.patientName || '',
+            phone: app.phone || app.contact || '',
+            hospitalName: app.hospitalName || '',
+            caregiverName: app.caregiverName || '',
+            caregiverPhone: app.caregiverPhone || '',
+            careStartDate: app.careStartDate || app.applyDate || '',
+            careEndDate: app.careEndDate || app.expectedEndDate || '',
+            insuranceCompany: app.insuranceCompany || '',
+            status: app.status || '',
+            isAlreadySurveyTarget: Boolean(matchedTarget),
+            surveyTargetId: matchedTarget ? matchedTarget.id : null,
+            responseStatus: matchedTarget ? matchedTarget.responseStatus : null,
+            token: matchedTarget ? matchedTarget.token : null
+          };
+        });
+      }
+    } catch (e) {
+      console.warn('[SurveyService] getHubCandidates error:', e.message);
+    }
+    return [];
+  }
+
+  // 본사 메이트원 또는 리본메이트 간병인 앱 만족도 조사 안내 문자(SMS) 발송
+  sendSurveySms(targetId, options = {}, actor = 'HQ') {
+    const target = this.data.targets.find(t => t.id === targetId || t.serviceId === targetId);
+    if (!target) return { success: false, message: '설문 대상을 찾을 수 없습니다.' };
+
+    const recipientPhone = options.phone || target.patientPhone;
+    if (!recipientPhone) {
+      return { success: false, message: '환자 연락처가 등록되어 있지 않습니다.' };
+    }
+
+    const host = options.baseUrl || 'https://admin.livon.care';
+    const surveyUrl = `${host}/survey.html?token=${target.token}`;
+
+    const message = options.customMessage || 
+      `[리본케어] 고객만족도 조사 안내\n` +
+      `${target.patientName} 고객님, 리본케어 간병 서비스는 만족스러우셨나요?\n` +
+      `담당 간병인(${target.caregiverName || '배정 간병인'}) 서비스 품질 향상을 위해 소중한 의견을 들려주세요.\n` +
+      `별도의 본인인증 절차 없이 아래 링크를 누르면 곧바로 설문 참여가 가능합니다.\n\n` +
+      `▶ 설문 참여 링크:\n${surveyUrl}\n\n` +
+      `※ 문의전화: ${this.data.settings.csPhone || '1544-7119'}`;
+
+    if (!Array.isArray(target.smsSentHistory)) {
+      target.smsSentHistory = [];
+    }
+
+    const smsRecord = {
+      id: 'SMS-' + Date.now().toString().slice(-6),
+      recipient: recipientPhone,
+      senderType: actor, // 'HQ' (본사 메이트원) or 'CAREGIVER' (리본메이트 간병인 앱)
+      message: message,
+      surveyUrl: surveyUrl,
+      status: 'SENT',
+      sentAt: new Date().toISOString()
+    };
+
+    target.smsSentHistory.unshift(smsRecord);
+    target.lastSmsSentAt = smsRecord.sentAt;
+
+    // 미안내 상태인 경우 문자가 성공적으로 발송되었으므로 GUIDED(LINK)로 자동 전환
+    if (target.guidanceStatus === 'NOT_STARTED') {
+      target.guidanceStatus = 'GUIDED';
+      target.guidanceRecord = {
+        method: 'LINK',
+        result: 'GUIDED',
+        reasonCode: 'SMS_SENT',
+        reasonDetail: `${actor === 'HQ' ? '본사 메이트원' : '간병인 앱'} 만족도 조사 링크 문자(SMS) 발송`,
+        occurredAt: smsRecord.sentAt
+      };
+      
+      // 간병인 안내 달란트 보상 대기 생성
+      const existingReward = this.data.rewards.find(r => r.targetId === target.id && r.ruleCode === 'GUIDE');
+      if (!existingReward && target.caregiverName) {
+        const rewardId = 'RW-' + Date.now().toString().slice(-6) + '-' + Math.floor(100 + Math.random() * 900);
+        const points = this.data.settings.pointsGuide || 10;
+        this.data.rewards.unshift({
+          id: rewardId,
+          targetId: target.id,
+          serviceId: target.serviceId,
+          caregiverName: target.caregiverName,
+          caregiverPhone: target.caregiverPhone,
+          ruleCode: 'GUIDE',
+          points: points,
+          state: 'PENDING',
+          reason: '고객 설문 링크 문자 안내 완료',
+          createdAt: new Date().toISOString()
+        });
+        target.rewardStatus = 'PENDING';
+      }
+    }
+
+    this.recordAudit(actor, 'SEND_SMS', 'surveyTargets', target.id, { recipientPhone, message }, '설문 문자 발송');
+    this.saveData();
+
+    return {
+      success: true,
+      message: '만족도 조사 안내 문자가 정상 발송되었습니다.',
+      smsRecord,
+      surveyUrl,
+      target
+    };
+  }
+
   // =========================================================================
   // 2. 간병인 모바일 안내 기록 API (C01, C02)
   // =========================================================================
@@ -393,16 +512,17 @@ class SurveyService {
       return { valid: false, message: '설문 참여 기간이 종료되었습니다.' };
     }
 
-    // 고객에게 노출할 최소 정보 (환자 질병명, 전체 개인정보는 배제)
+    // 고객에게 노출할 정보 (환자 정보 간단 확인 및 담당 간병인)
     return {
       valid: true,
       serviceInfo: {
+        patientName: target.patientName,
         caregiverName: target.caregiverName,
         careStartDate: target.careStartDate,
         careEndDate: target.careEndDate,
         hospitalName: target.hospitalName
       },
-      schema: SURVEY_SCHEMA_V1,
+      schema: this.data.schema || SURVEY_SCHEMA_V1,
       privacyNotice: this.data.settings.privacyNotice,
       csPhone: this.data.settings.csPhone,
       csOperatingHours: this.data.settings.csOperatingHours
@@ -447,6 +567,7 @@ class SurveyService {
       callbackRequested: q6Callback,
       callbackPhone: (answers.callbackPhone || target.patientPhone || '').trim(),
       channel: clientInfo.channel || 'QR',
+      answers: answers,
       submittedAt: new Date().toISOString()
     };
 
@@ -455,8 +576,12 @@ class SurveyService {
     target.responseId = responseId;
     target.revision = (target.revision || 1) + 1;
 
-    // 1) 후속 조치 자동 티켓 발행 (기획서 05절: 1~2점 낮은 평가 또는 연락 요청 발생 시)
-    const isLowScore = (Number(answers.q2) <= 2) || (q3 !== null && q3 <= 2) || (q4 !== null && q4 <= 2);
+    // 1) 후속 조치 자동 티켓 발행 (1~2점 낮은 평가 또는 연락 요청 발생 시)
+    const anyLowRating = Object.keys(answers).some(k => {
+      const v = answers[k];
+      return typeof v === 'number' && v >= 1 && v <= 2;
+    });
+    const isLowScore = (Number(answers.q2) <= 2) || (q3 !== null && q3 <= 2) || (q4 !== null && q4 <= 2) || anyLowRating;
     const triggers = [];
     if (isLowScore) triggers.push('LOW_SCORE');
     if (q6Callback) triggers.push('CALLBACK_REQUESTED');
@@ -625,11 +750,30 @@ class SurveyService {
   getSettings() {
     return {
       settings: this.data.settings,
-      schema: SURVEY_SCHEMA_V1
+      schema: this.data.schema || SURVEY_SCHEMA_V1
     };
   }
 
+  getSchema() {
+    return this.data.schema || SURVEY_SCHEMA_V1;
+  }
+
+  updateSchema(newSchema, actor = 'ADMIN') {
+    if (!Array.isArray(newSchema) || newSchema.length === 0) {
+      return { success: false, message: '유효한 문항 목록이 아닙니다.' };
+    }
+    const before = this.data.schema || SURVEY_SCHEMA_V1;
+    this.data.schema = newSchema;
+    this.recordAudit(actor, 'UPDATE_SCHEMA', 'surveySchema', 'GLOBAL', { before, after: newSchema }, '설문 문항 변경');
+    this.saveData();
+    return { success: true, schema: this.data.schema };
+  }
+
   updateSettings(newSettings = {}, actor = 'ADMIN') {
+    if (newSettings.schema && Array.isArray(newSettings.schema)) {
+      this.data.schema = newSettings.schema;
+      delete newSettings.schema;
+    }
     this.data.settings = {
       ...this.data.settings,
       ...newSettings,
@@ -637,7 +781,7 @@ class SurveyService {
     };
     this.recordAudit(actor, 'UPDATE_SETTINGS', 'surveySettings', 'GLOBAL', newSettings, '설문 정책 설정 변경');
     this.saveData();
-    return { success: true, settings: this.data.settings };
+    return { success: true, settings: this.data.settings, schema: this.data.schema };
   }
 
   recordAudit(actor, action, entity, entityId, beforeAfter, reason) {

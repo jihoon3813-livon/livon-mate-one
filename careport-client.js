@@ -49,10 +49,11 @@
      * Fetch CarePort daily logs (via Serverless API with direct fallback)
      */
     async fetchDailyLogs() {
-      // 1. Try Vercel Serverless API with fast 3s timeout
+      let serverErrorMsg = null;
+      // 1. Try Server / Serverless API with robust 20s timeout
       try {
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-        const timeoutId = controller ? setTimeout(() => controller.abort(), 3000) : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 20000) : null;
         const res = await fetch(`${this.apiBase}/sync`, { 
           method: 'GET',
           signal: controller ? controller.signal : undefined 
@@ -62,40 +63,59 @@
           const json = await res.json();
           if (json.success && Array.isArray(json.logs)) {
             return json.logs;
+          } else if (json && json.message) {
+            serverErrorMsg = json.message;
+          }
+        } else {
+          try {
+            const errJson = await res.json();
+            serverErrorMsg = errJson?.message || `서버 오류 (HTTP ${res.status})`;
+          } catch (_) {
+            serverErrorMsg = `서버 응답 코드: ${res.status}`;
           }
         }
       } catch (e) {
-        console.warn('CarePort Serverless API 호출 불가, 다이렉트 통신으로 전환합니다:', e.message);
+        console.warn('CarePort Server API 호출 중 오류/지연:', e.message);
+        serverErrorMsg = e.name === 'AbortError' ? '동기화 통신 시간 초과 (20초)' : e.message;
       }
 
-      // 2. Direct fallback
-      const token = await this.directLogin();
-      const promises = this.targetOrgs.map(async org => {
+      // 2. Direct fallback (브라우저 직접 로그인 자격증명이 정의된 경우에만 시도)
+      const creds = this.defaultCredentials || (typeof window !== 'undefined' && window.CAREPORT_CREDENTIALS);
+      if (creds && creds.id && creds.pw) {
         try {
-          const url = `${this.directBase}/main/consult/carenote/list?page=1&length=500&order=DESC&organization=${org.id}`;
-          const res = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` }
+          const token = await this.directLogin();
+          const promises = this.targetOrgs.map(async org => {
+            try {
+              const url = `${this.directBase}/main/consult/carenote/list?page=1&length=500&order=DESC&organization=${org.id}`;
+              const res = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+              const json = await res.json();
+              const items = (json.data && Array.isArray(json.data.result)) ? json.data.result : [];
+              return items.map(item => ({
+                ...item,
+                orgId: org.id,
+                orgName: org.name,
+                organizationName: item.organizationName || org.name,
+                insuranceCompany: org.company,
+                duration: item.duration ? String(item.duration) : '-'
+              }));
+            } catch (err) {
+              console.error(`Org ${org.name} 조회 실패:`, err);
+              return [];
+            }
           });
-          const json = await res.json();
-          const items = (json.data && Array.isArray(json.data.result)) ? json.data.result : [];
-          return items.map(item => ({
-            ...item,
-            orgId: org.id,
-            orgName: org.name,
-            organizationName: item.organizationName || org.name,
-            insuranceCompany: org.company,
-            duration: item.duration ? String(item.duration) : '-'
-          }));
-        } catch (err) {
-          console.error(`Org ${org.name} 조회 실패:`, err);
-          return [];
-        }
-      });
 
-      const results = await Promise.all(promises);
-      const flattened = results.flat();
-      flattened.sort((a, b) => new Date(b.consultDate || 0) - new Date(a.consultDate || 0));
-      return flattened;
+          const results = await Promise.all(promises);
+          const flattened = results.flat();
+          flattened.sort((a, b) => new Date(b.consultDate || 0) - new Date(a.consultDate || 0));
+          return flattened;
+        } catch (directErr) {
+          console.warn('CarePort 다이렉트 통신 실패:', directErr.message);
+        }
+      }
+
+      throw new Error(serverErrorMsg || '케어포트 전산 서버와 통신할 수 없습니다. 잠시 후 다시 시도해주세요.');
     },
 
     /**
@@ -113,7 +133,7 @@
       // 1. Try Serverless API with timeout
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
         const res = await fetch(`${this.apiBase}/detail?sessionId=${sessionId}`, { signal: controller.signal });
         clearTimeout(timeoutId);
         if (res.ok) {
@@ -126,12 +146,13 @@
         // Fallback silently
       }
 
-      // 2. Direct fallback
-      if (!data) {
+      // 2. Direct fallback (브라우저 직접 자격증명이 있는 경우에만 시도)
+      const creds = this.defaultCredentials || (typeof window !== 'undefined' && window.CAREPORT_CREDENTIALS);
+      if (!data && creds && creds.id && creds.pw) {
         try {
           const token = await this.directLogin();
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3500);
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
           const res = await fetch(`${this.directBase}/main/consult/carenote/${sessionId}`, {
             headers: { 'Authorization': `Bearer ${token}` },
             signal: controller.signal
