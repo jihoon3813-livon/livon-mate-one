@@ -32896,6 +32896,7 @@ const APP_TAB_META = {
   // dashboard: { name: '대시보드', icon: 'layout-dashboard', color: 'text-sky-500' }, // 임시 숨김 처리
   carecalendar: { name: '간병캘린더', icon: 'calendar-days', color: 'text-sky-500' },
   carelogs: { name: '간병일지 (케어포트)', icon: 'clipboard-list', color: 'text-purple-500' },
+  surveymgmt: { name: '만족도조사 관리', icon: 'star', color: 'text-amber-500' },
   directory: { name: '파트너/인력 디렉토리', icon: 'contact-2', color: 'text-emerald-500' },
   samsunglist: { name: '삼성화재 명단관리', icon: 'file-spreadsheet', color: 'text-sky-500' },
   samsungclaimhub: { name: '삼성화재 접수/청구', icon: 'mail-check', color: 'text-emerald-500' },
@@ -33028,6 +33029,13 @@ function refreshTabData(tabId, filterParam = null) {
       case 'totalcallanalysis':
         if (typeof renderTotalCallAnalysisTab === 'function') {
           renderTotalCallAnalysisTab();
+        }
+        break;
+
+      // 1-2. 고객만족도 조사 관리
+      case 'surveymgmt':
+        if (typeof renderSurveyMgmtTab === 'function') {
+          renderSurveyMgmtTab();
         }
         break;
 

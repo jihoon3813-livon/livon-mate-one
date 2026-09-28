@@ -8,6 +8,7 @@ const { uploadToBarobillFTP, callBarobillSoap, getBarobillErrorMessage, getBarob
 const { getEmailConfig, saveEmailConfig, sendSmtpMail, testSmtpConnection } = require('./smtp-client');
 const { getCtiConfig, saveCtiConfig, makeOutboundCall, getRecentCallLogs, fetchCtiLogsByDateRange, fetchCtiDetailView, classifySamsungCall } = require('./cti-client');
 const { getSamsungDriveConfig, saveSamsungDriveConfig, findLatestSamsungFile, decryptAndParseSamsungExcel } = require('./samsung-drive-helper');
+const { gSurveyService } = require('./survey-service');
 
 let PORT = parseInt(process.env.PORT, 10) || 8080;
 const BASE_DIR = __dirname;
@@ -1221,6 +1222,214 @@ function saveSavedFaxConfig(cfg) {
           console.error('[Samsung Call Report Email Error]', err);
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    // =========================================================================
+    // API Route: Customer Satisfaction Survey System (고객만족도 조사 관리 & 공개 설문)
+    // =========================================================================
+    if (reqPath === '/survey' || reqPath === '/survey.html') {
+      const surveyHtmlPath = path.join(BASE_DIR, 'survey.html');
+      if (fs.existsSync(surveyHtmlPath)) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        fs.createReadStream(surveyHtmlPath).pipe(res);
+        return;
+      }
+    }
+
+    if (reqPath === '/api/survey/summary' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      return res.end(JSON.stringify({ success: true, data: gSurveyService.getSummaryMetrics() }));
+    }
+
+    if (reqPath === '/api/survey/targets' && req.method === 'GET') {
+      const query = parsedUrl.query || {};
+      const list = gSurveyService.getTargets(query);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      return res.end(JSON.stringify({ success: true, count: list.length, items: list }));
+    }
+
+    if (reqPath === '/api/survey/targets' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          if (payload.action === 'auto_seed') {
+            gSurveyService.ensureInitialData();
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true, message: '종료 고객 대상자가 생성되었습니다.', items: gSurveyService.getTargets() }));
+          }
+          const target = gSurveyService.createTargetFromApp(payload);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, target }));
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/survey/targets/update' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const result = gSurveyService.updateTarget(payload.id, payload.updates, payload.actor);
+          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/survey/targets/reissue' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const result = gSurveyService.reissueToken(payload.id, payload.reason, payload.actor);
+          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/survey/guidance' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const result = gSurveyService.recordGuidance(payload.targetId, payload.guidanceData, payload.actor);
+          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/survey/followups' && req.method === 'GET') {
+      const list = gSurveyService.getFollowups(parsedUrl.query || {});
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      return res.end(JSON.stringify({ success: true, count: list.length, items: list }));
+    }
+
+    if (reqPath === '/api/survey/followups/update' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const result = gSurveyService.updateFollowup(payload.id, payload.updates, payload.actor);
+          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/survey/rewards' && req.method === 'GET') {
+      const list = gSurveyService.getRewards(parsedUrl.query || {});
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      return res.end(JSON.stringify({ success: true, count: list.length, items: list }));
+    }
+
+    if (reqPath === '/api/survey/rewards/approve' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const result = gSurveyService.approveReward(payload.id, payload.actor);
+          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/survey/rewards/reverse' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const result = gSurveyService.reverseReward(payload.id, payload.reason, payload.actor);
+          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/survey/settings' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      return res.end(JSON.stringify({ success: true, data: gSurveyService.getSettings() }));
+    }
+
+    if (reqPath === '/api/survey/settings' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const result = gSurveyService.updateSettings(payload.settings, payload.actor);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/public/survey/form' && req.method === 'GET') {
+      const token = parsedUrl.query.token || parsedUrl.query.t || '';
+      const formData = gSurveyService.getFormByToken(token);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      return res.end(JSON.stringify(formData));
+    }
+
+    if (reqPath === '/api/public/survey/submit' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const result = gSurveyService.submitResponse(payload.token, payload.answers, {
+            channel: payload.channel || 'QR'
+          });
+          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
         }
       });
       return;

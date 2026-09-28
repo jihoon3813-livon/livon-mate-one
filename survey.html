@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>리본케어 고객만족도 조사</title>
+  <!-- Tailwind CSS & Lucide Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fdf2f8',
+              100: '#fce7f3',
+              500: '#ec4899',
+              600: '#db2777',
+              700: '#be185d'
+            },
+            primary: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard Variable", Pretendard, Roboto, "Segoe UI", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rating-btn.active {
+      border-color: #0284c7;
+      background-color: #f0f9ff;
+      color: #0369a1;
+      font-weight: 700;
+      transform: scale(1.02);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col justify-between selection:bg-sky-200">
+
+  <!-- 상단 네비게이션 헤더 -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+    <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white shadow-xs">
+          <i data-lucide="heart" class="w-4 h-4 fill-white"></i>
+        </div>
+        <div>
+          <span class="font-black text-slate-900 tracking-tight text-base">리본케어</span>
+          <span class="text-[11px] font-bold text-sky-600 ml-1 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">만족도조사</span>
+        </div>
+      </div>
+      <div id="stepCounter" class="text-xs font-bold text-slate-500">
+        <!-- 1/4 단계 -->
+      </div>
+    </div>
+    <!-- 진행률 게이지 바 -->
+    <div class="w-full bg-slate-100 h-1">
+      <div id="progressBar" class="bg-sky-600 h-1 transition-all duration-300 ease-out" style="width: 25%;"></div>
+    </div>
+  </header>
+
+  <!-- 메인 컨테이너 (최대 너비 480px, 360px 모바일 화면 완벽 대응) -->
+  <main class="max-w-md w-full mx-auto px-4 py-6 flex-1 flex flex-col justify-between">
+
+    <!-- 0. 로딩 상태 화면 -->
+    <div id="loadingView" class="flex flex-col items-center justify-center py-20 text-center space-y-4">
+      <div class="w-10 h-10 border-4 border-sky-200 border-t-sky-600 rounded-full animate-spin"></div>
+      <p class="text-sm font-bold text-slate-600">설문 정보를 안전하게 불러오는 중입니다...</p>
+    </div>
+
+    <!-- 0-B. 에러 및 마감 안내 화면 -->
+    <div id="errorView" class="hidden bg-white rounded-3xl p-6 border border-slate-200 text-center shadow-xs space-y-4 my-auto">
+      <div class="w-14 h-14 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto">
+        <i data-lucide="alert-circle" class="w-7 h-7"></i>
+      </div>
+      <h2 id="errorTitle" class="text-lg font-black text-slate-900">설문 안내</h2>
+      <p id="errorMessage" class="text-sm text-slate-600 leading-relaxed"></p>
+      <div class="pt-4 border-t border-slate-100 text-xs text-slate-500 space-y-1">
+        <p>문의사항이 있으시면 고객센터로 연락해 주세요.</p>
+        <p class="font-bold text-slate-700">고객센터: <span id="errorCsPhone">1544-7119</span></p>
+      </div>
+    </div>
+
+    <!-- 1. 설문 단계 컨테이너 (P01 & P02) -->
+    <form id="surveyForm" class="hidden flex-1 flex flex-col justify-between space-y-6">
+
+      <!-- P01: 도입 요약 카드 -->
+      <div class="bg-gradient-to-br from-sky-50 to-indigo-50/40 rounded-2xl p-4 border border-sky-100 text-xs text-slate-700 space-y-1.5 shadow-2xs">
+        <div class="flex items-center gap-1.5 text-sky-800 font-bold">
+          <i data-lucide="info" class="w-4 h-4 text-sky-600"></i>
+          <span>간병 서비스 만족도 조사 안내</span>
+        </div>
+        <p class="text-slate-600 leading-relaxed">
+          이번 간병 서비스는 어떠셨나요? 약 1분 동안 솔직한 생각을 알려주세요.<br>
+          <span class="font-bold text-slate-800">개별 답변은 담당 간병인에게 일절 공개되지 않으며</span>, 서비스 개선을 위해서만 활용됩니다.
+        </p>
+        <div id="serviceSummaryBox" class="mt-2 pt-2 border-t border-sky-200/60 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
+          <!-- 담당 간병인 및 기간 렌더링 -->
+        </div>
+      </div>
+
+      <!-- 1단계: Q1(응답자 구분) & Q2(전반적 만족도) -->
+      <div id="step1" class="step-panel space-y-6">
+        <!-- Q1 -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+          <label class="block text-sm font-black text-slate-900 leading-snug">
+            <span class="text-sky-600 mr-1">Q1.</span>설문에 응답하시는 분은 누구인가요? <span class="text-rose-500">*</span>
+          </label>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" onclick="selectRespondent('PATIENT')" class="respondent-btn p-3 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all text-center flex flex-col items-center gap-1.5 min-h-[48px] justify-center cursor-pointer">
+              <i data-lucide="user" class="w-5 h-5 text-slate-500"></i>
+              <span>환자 본인</span>
+            </button>
+            <button type="button" onclick="selectRespondent('GUARDIAN')" class="respondent-btn p-3 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all text-center flex flex-col items-center gap-1.5 min-h-[48px] justify-center cursor-pointer">
+              <i data-lucide="users" class="w-5 h-5 text-slate-500"></i>
+              <span>가족/보호자</span>
+            </button>
+            <button type="button" onclick="selectRespondent('OTHER')" class="respondent-btn p-3 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all text-center flex flex-col items-center gap-1.5 min-h-[48px] justify-center cursor-pointer">
+              <i data-lucide="help-circle" class="w-5 h-5 text-slate-500"></i>
+              <span>기타</span>
+            </button>
+          </div>
+          <input type="hidden" id="ansQ1" name="q1" required>
+        </div>
+
+        <!-- Q2 -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+          <label class="block text-sm font-black text-slate-900 leading-snug">
+            <span class="text-sky-600 mr-1">Q2.</span>이번 간병 서비스에 전반적으로 얼마나 만족하셨나요? <span class="text-rose-500">*</span>
+          </label>
+          <div class="space-y-2">
+            <button type="button" onclick="selectScore('q2', 5)" class="q2-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span class="flex items-center gap-2">😍 <span>매우 만족</span></span>
+              <span class="text-xs text-amber-500 font-bold">5점</span>
+            </button>
+            <button type="button" onclick="selectScore('q2', 4)" class="q2-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span class="flex items-center gap-2">🙂 <span>만족</span></span>
+              <span class="text-xs text-amber-500 font-bold">4점</span>
+            </button>
+            <button type="button" onclick="selectScore('q2', 3)" class="q2-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span class="flex items-center gap-2">😐 <span>보통</span></span>
+              <span class="text-xs text-amber-500 font-bold">3점</span>
+            </button>
+            <button type="button" onclick="selectScore('q2', 2)" class="q2-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span class="flex items-center gap-2">🙁 <span>불만족</span></span>
+              <span class="text-xs text-slate-400 font-bold">2점</span>
+            </button>
+            <button type="button" onclick="selectScore('q2', 1)" class="q2-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span class="flex items-center gap-2">😡 <span>매우 불만족</span></span>
+              <span class="text-xs text-slate-400 font-bold">1점</span>
+            </button>
+          </div>
+          <input type="hidden" id="ansQ2" name="q2" required>
+        </div>
+      </div>
+
+      <!-- 2단계: Q3(간병인의 친절함과 태도) -->
+      <div id="step2" class="step-panel hidden space-y-6">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+          <div>
+            <label class="block text-sm font-black text-slate-900 leading-snug">
+              <span class="text-sky-600 mr-1">Q3.</span>담당 간병인의 친절함과 환자를 대하는 태도는 어떠셨나요? <span class="text-rose-500">*</span>
+            </label>
+            <p class="text-xs text-slate-500 mt-1">따뜻한 말씨, 환자 존중 및 정서적 지지 정도를 평가해 주세요.</p>
+          </div>
+          <div class="space-y-2">
+            <button type="button" onclick="selectScore('q3', 5)" class="q3-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span>매우 친절함</span>
+              <span class="text-xs text-amber-500 font-bold">5점</span>
+            </button>
+            <button type="button" onclick="selectScore('q3', 4)" class="q3-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span>친절함</span>
+              <span class="text-xs text-amber-500 font-bold">4점</span>
+            </button>
+            <button type="button" onclick="selectScore('q3', 3)" class="q3-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span>보통</span>
+              <span class="text-xs text-amber-500 font-bold">3점</span>
+            </button>
+            <button type="button" onclick="selectScore('q3', 2)" class="q3-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span>약간 불친절함</span>
+              <span class="text-xs text-slate-400 font-bold">2점</span>
+            </button>
+            <button type="button" onclick="selectScore('q3', 1)" class="q3-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span>매우 불친절함</span>
+              <span class="text-xs text-slate-400 font-bold">1점</span>
+            </button>
+          </div>
+          <div class="pt-2 border-t border-slate-100">
+            <button type="button" onclick="selectUnknown('q3')" class="q3-btn w-full p-3 border border-dashed border-slate-300 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 min-h-[44px] cursor-pointer">
+              <i data-lucide="help-circle" class="w-4 h-4"></i>
+              <span>잘 모르겠음 (직접 보지 못했거나 판단 어려움)</span>
+            </button>
+          </div>
+          <input type="hidden" id="ansQ3" name="q3">
+          <input type="hidden" id="ansQ3Unknown" name="q3Unknown" value="false">
+        </div>
+      </div>
+
+      <!-- 3단계: Q4(돌봄 전문성/품질) -->
+      <div id="step3" class="step-panel hidden space-y-6">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+          <div>
+            <label class="block text-sm font-black text-slate-900 leading-snug">
+              <span class="text-sky-600 mr-1">Q4.</span>담당 간병인이 제공한 돌봄은 어떠셨나요? <span class="text-rose-500">*</span>
+            </label>
+            <p class="text-xs text-slate-500 mt-1">식사 보조, 위생 및 체위 변경, 환자 안전 관리 능력을 평가해 주세요.</p>
+          </div>
+          <div class="space-y-2">
+            <button type="button" onclick="selectScore('q4', 5)" class="q4-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span>매우 꼼꼼하고 능숙함</span>
+              <span class="text-xs text-amber-500 font-bold">5점</span>
+            </button>
+            <button type="button" onclick="selectScore('q4', 4)" class="q4-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span>원활하고 양호함</span>
+              <span class="text-xs text-amber-500 font-bold">4점</span>
+            </button>
+            <button type="button" onclick="selectScore('q4', 3)" class="q4-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span>보통</span>
+              <span class="text-xs text-amber-500 font-bold">3점</span>
+            </button>
+            <button type="button" onclick="selectScore('q4', 2)" class="q4-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span>다소 미흡함</span>
+              <span class="text-xs text-slate-400 font-bold">2점</span>
+            </button>
+            <button type="button" onclick="selectScore('q4', 1)" class="q4-btn w-full p-3.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center justify-between transition-all min-h-[48px] cursor-pointer">
+              <span>매우 미흡함</span>
+              <span class="text-xs text-slate-400 font-bold">1점</span>
+            </button>
+          </div>
+          <div class="pt-2 border-t border-slate-100">
+            <button type="button" onclick="selectUnknown('q4')" class="q4-btn w-full p-3 border border-dashed border-slate-300 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 min-h-[44px] cursor-pointer">
+              <i data-lucide="help-circle" class="w-4 h-4"></i>
+              <span>잘 모르겠음 (직접 보지 못했거나 판단 어려움)</span>
+            </button>
+          </div>
+          <input type="hidden" id="ansQ4" name="q4">
+          <input type="hidden" id="ansQ4Unknown" name="q4Unknown" value="false">
+        </div>
+      </div>
+
+      <!-- 4단계: Q5(자유의견) & Q6(후속 연락 요청) -->
+      <div id="step4" class="step-panel hidden space-y-6">
+        <!-- Q5 -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+          <label class="block text-sm font-black text-slate-900 leading-snug">
+            <span class="text-sky-600 mr-1">Q5.</span>좋았던 점이나 개선이 필요한 점을 남겨주세요. <span class="text-slate-400 text-xs font-normal">(선택)</span>
+          </label>
+          <textarea id="ansQ5" rows="4" maxlength="1000" placeholder="환자 질병명이나 주민번호 등 민감한 개인정보는 적지 말아주세요." class="w-full p-3 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent placeholder-slate-400 transition-all"></textarea>
+          <div class="text-right text-[11px] text-slate-400">
+            <span id="charCount">0</span>/1000자
+          </div>
+        </div>
+
+        <!-- Q6 -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+          <label class="block text-sm font-black text-slate-900 leading-snug">
+            <span class="text-sky-600 mr-1">Q6.</span>남겨주신 의견에 대해 담당자의 유선 연락을 원하시나요? <span class="text-rose-500">*</span>
+          </label>
+          <div class="grid grid-cols-2 gap-3">
+            <button type="button" onclick="selectCallback(true)" class="callback-btn p-3.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all text-center min-h-[48px] flex items-center justify-center gap-1.5 cursor-pointer">
+              <i data-lucide="phone-call" class="w-4 h-4 text-sky-600"></i>
+              <span>예, 연락 희망</span>
+            </button>
+            <button type="button" onclick="selectCallback(false)" class="callback-btn p-3.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all text-center min-h-[48px] flex items-center justify-center gap-1.5 cursor-pointer">
+              <i data-lucide="phone-off" class="w-4 h-4 text-slate-400"></i>
+              <span>아니요, 불필요</span>
+            </button>
+          </div>
+          
+          <!-- 연락 희망 시 안내 및 추가 연락처 입력란 -->
+          <div id="callbackContactBox" class="hidden mt-3 p-3.5 bg-sky-50 rounded-xl border border-sky-200 text-xs text-slate-700 space-y-2">
+            <div class="flex items-center gap-1.5 text-sky-800 font-bold">
+              <i data-lucide="check-circle" class="w-4 h-4 text-sky-600 shrink-0"></i>
+              <span>서비스 신청 시 등록된 연락처로 상담사가 연락드립니다.</span>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-600 mb-1">다른 번호로 연락을 받으시려면 입력해 주세요:</label>
+              <input type="tel" id="altPhone" placeholder="010-0000-0000 (선택)" class="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+            </div>
+          </div>
+          <input type="hidden" id="ansQ6" name="q6">
+        </div>
+      </div>
+
+      <!-- 하단 네비게이션 버튼 (이전 / 다음 / 제출) -->
+      <div class="pt-4 flex items-center gap-3">
+        <button type="button" id="prevBtn" onclick="prevStep()" class="hidden px-5 py-3.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-sm hover:bg-slate-50 min-h-[48px] transition-all cursor-pointer">
+          이전
+        </button>
+        <button type="button" id="nextBtn" onclick="nextStep()" class="flex-1 py-3.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm shadow-md shadow-sky-600/20 min-h-[48px] transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+          <span>다음</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+        <button type="button" id="submitBtn" onclick="submitSurvey()" class="hidden flex-1 py-3.5 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white font-black text-sm shadow-md shadow-sky-600/30 min-h-[48px] transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>설문 제출하기</span>
+        </button>
+      </div>
+    </form>
+
+    <!-- 2. 제출 완료 화면 (P03) -->
+    <div id="completeView" class="hidden bg-white rounded-3xl p-6 border border-slate-200 text-center shadow-xs space-y-5 my-auto">
+      <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+        <i data-lucide="check-check" class="w-8 h-8"></i>
+      </div>
+      <div>
+        <h2 class="text-xl font-black text-slate-900 tracking-tight">소중한 의견 감사합니다!</h2>
+        <p class="text-xs text-slate-500 mt-1">응답이 성공적으로 등록되었습니다.</p>
+      </div>
+      <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs text-slate-600 leading-relaxed text-left space-y-1">
+        <p>• 보내주신 의견은 리본케어 서비스 개선 및 전문 돌봄 품질을 높이는 데 큰 힘이 됩니다.</p>
+        <p>• 유선 연락을 요청하신 경우, 담당 매니저가 확인 후 등록된 연락처로 안내해 드립니다.</p>
+      </div>
+      <div class="pt-4 border-t border-slate-100 text-xs text-slate-500 space-y-1">
+        <p class="font-bold text-slate-700">고객센터 문의 안내</p>
+        <p class="text-sky-600 font-extrabold text-sm" id="completeCsPhone">1544-7119</p>
+        <p class="text-[11px] text-slate-400" id="completeCsHours">평일 09:00 ~ 18:00 (주말/공휴일 제외)</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- 푸터 -->
+  <footer class="py-4 text-center text-[11px] text-slate-400 border-t border-slate-200 bg-white">
+    <p>© 리본케어 (LivonCare) 고객경험 서비스품질팀</p>
+  </footer>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 4;
+    let surveyToken = '';
+    let surveyData = null;
+
+    // URL 파라미터에서 토큰 추출
+    function getTokenFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('t') || params.get('token') || '';
+    }
+
+    // 1. 초기 폼 정보 로드
+    async function initSurvey() {
+      surveyToken = getTokenFromUrl();
+      if (!surveyToken) {
+        showError('유효하지 않은 링크', '설문 참여 링크를 확인할 수 없습니다. 전달받으신 링크를 다시 확인해 주세요.');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/public/survey/form?token=${encodeURIComponent(surveyToken)}`);
+        const data = await res.json();
+
+        if (!data.valid) {
+          showError(data.submitted ? '참여 완료 안내' : '접속 안내', data.message || '설문을 불러올 수 없습니다.');
+          return;
+        }
+
+        surveyData = data;
+        renderServiceSummary(data.serviceInfo);
+        if (data.csPhone) {
+          document.getElementById('errorCsPhone').innerText = data.csPhone;
+          document.getElementById('completeCsPhone').innerText = data.csPhone;
+        }
+        if (data.csOperatingHours) {
+          document.getElementById('completeCsHours').innerText = data.csOperatingHours;
+        }
+
+        // 로딩 해제 및 폼 표시
+        document.getElementById('loadingView').classList.add('hidden');
+        document.getElementById('surveyForm').classList.remove('hidden');
+        updateStepUI();
+        lucide.createIcons();
+      } catch (err) {
+        showError('네트워크 오류', '설문 서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+      }
+    }
+
+    function renderServiceSummary(info) {
+      if (!info) return;
+      const box = document.getElementById('serviceSummaryBox');
+      box.innerHTML = `
+        <span class="inline-flex items-center gap-1 font-semibold text-slate-700">
+          <i data-lucide="user-check" class="w-3.5 h-3.5 text-sky-600"></i>
+          <span>담당 간병인: <b class="text-slate-900">${info.caregiverName || '지정 담당자'}</b></span>
+        </span>
+        ${info.careStartDate ? `
+          <span class="inline-flex items-center gap-1 text-slate-500">
+            <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span>서비스 기간: ${info.careStartDate} ~ ${info.careEndDate || '종료'}</span>
+          </span>
+        ` : ''}
+        ${info.hospitalName ? `
+          <span class="inline-flex items-center gap-1 text-slate-500">
+            <i data-lucide="building-2" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span>${info.hospitalName}</span>
+          </span>
+        ` : ''}
+      `;
+    }
+
+    function showError(title, msg) {
+      document.getElementById('loadingView').classList.add('hidden');
+      document.getElementById('surveyForm').classList.add('hidden');
+      document.getElementById('completeView').classList.add('hidden');
+      document.getElementById('errorView').classList.remove('hidden');
+      document.getElementById('errorTitle').innerText = title;
+      document.getElementById('errorMessage').innerText = msg;
+      lucide.createIcons();
+    }
+
+    // 2. 항목 선택 핸들러
+    function selectRespondent(type) {
+      document.getElementById('ansQ1').value = type;
+      document.querySelectorAll('.respondent-btn').forEach(btn => {
+        btn.classList.remove('active', 'border-sky-500', 'bg-sky-50', 'text-sky-900', 'ring-2', 'ring-sky-500/20');
+      });
+      event.currentTarget.classList.add('active', 'border-sky-500', 'bg-sky-50', 'text-sky-900', 'ring-2', 'ring-sky-500/20');
+    }
+
+    function selectScore(qKey, score) {
+      document.getElementById('ans' + qKey.toUpperCase()).value = score;
+      if (qKey === 'q3' || qKey === 'q4') {
+        document.getElementById('ans' + qKey.toUpperCase() + 'Unknown').value = 'false';
+      }
+      document.querySelectorAll(`.${qKey}-btn`).forEach(btn => {
+        btn.classList.remove('active', 'border-sky-500', 'bg-sky-50', 'text-sky-900', 'ring-2', 'ring-sky-500/20');
+      });
+      event.currentTarget.classList.add('active', 'border-sky-500', 'bg-sky-50', 'text-sky-900', 'ring-2', 'ring-sky-500/20');
+    }
+
+    function selectUnknown(qKey) {
+      document.getElementById('ans' + qKey.toUpperCase()).value = '';
+      document.getElementById('ans' + qKey.toUpperCase() + 'Unknown').value = 'true';
+      document.querySelectorAll(`.${qKey}-btn`).forEach(btn => {
+        btn.classList.remove('active', 'border-sky-500', 'bg-sky-50', 'text-sky-900', 'ring-2', 'ring-sky-500/20');
+      });
+      event.currentTarget.classList.add('active', 'border-sky-500', 'bg-sky-50', 'text-sky-900', 'ring-2', 'ring-sky-500/20');
+    }
+
+    function selectCallback(val) {
+      document.getElementById('ansQ6').value = val ? 'true' : 'false';
+      document.querySelectorAll('.callback-btn').forEach(btn => {
+        btn.classList.remove('active', 'border-sky-500', 'bg-sky-50', 'text-sky-900', 'ring-2', 'ring-sky-500/20');
+      });
+      event.currentTarget.classList.add('active', 'border-sky-500', 'bg-sky-50', 'text-sky-900', 'ring-2', 'ring-sky-500/20');
+
+      const contactBox = document.getElementById('callbackContactBox');
+      if (val) contactBox.classList.remove('hidden');
+      else contactBox.classList.add('hidden');
+      lucide.createIcons();
+    }
+
+    // 텍스트 글자수 카운트
+    document.getElementById('ansQ5').addEventListener('input', function() {
+      document.getElementById('charCount').innerText = this.value.length;
+    });
+
+    // 3. 단계 제어 (Step Wizard)
+    function validateStep(step) {
+      if (step === 1) {
+        const q1 = document.getElementById('ansQ1').value;
+        if (!q1) {
+          alert('Q1. 응답하시는 분(환자 본인, 가족/보호자 등)을 선택해 주세요.');
+          return false;
+        }
+        const q2 = document.getElementById('ansQ2').value;
+        if (!q2) {
+          alert('Q2. 전반적인 만족도 평가 점수를 선택해 주세요.');
+          return false;
+        }
+      } else if (step === 2) {
+        const q3 = document.getElementById('ansQ3').value;
+        const q3Unk = document.getElementById('ansQ3Unknown').value === 'true';
+        if (!q3 && !q3Unk) {
+          alert('Q3. 간병인의 친절함 평가 또는 "잘 모르겠음"을 선택해 주세요.');
+          return false;
+        }
+      } else if (step === 3) {
+        const q4 = document.getElementById('ansQ4').value;
+        const q4Unk = document.getElementById('ansQ4Unknown').value === 'true';
+        if (!q4 && !q4Unk) {
+          alert('Q4. 간병인의 돌봄 전문성 평가 또는 "잘 모르겠음"을 선택해 주세요.');
+          return false;
+        }
+      } else if (step === 4) {
+        const q6 = document.getElementById('ansQ6').value;
+        if (!q6) {
+          alert('Q6. 담당자 유선 연락 희망 여부를 선택해 주세요.');
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function nextStep() {
+      if (!validateStep(currentStep)) return;
+      if (currentStep < totalSteps) {
+        currentStep++;
+        updateStepUI();
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 1) {
+        currentStep--;
+        updateStepUI();
+      }
+    }
+
+    function updateStepUI() {
+      // 단계 패널 토글
+      for (let s = 1; s <= totalSteps; s++) {
+        const panel = document.getElementById('step' + s);
+        if (s === currentStep) panel.classList.remove('hidden');
+        else panel.classList.add('hidden');
+      }
+
+      // 게이지 바 & 스텝 카운터
+      document.getElementById('stepCounter').innerText = `${currentStep}/${totalSteps} 단계`;
+      document.getElementById('progressBar').style.width = `${(currentStep / totalSteps) * 100}%`;
+
+      // 이전 / 다음 / 제출 버튼
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const submitBtn = document.getElementById('submitBtn');
+
+      if (currentStep === 1) prevBtn.classList.add('hidden');
+      else prevBtn.classList.remove('hidden');
+
+      if (currentStep === totalSteps) {
+        nextBtn.classList.add('hidden');
+        submitBtn.classList.remove('hidden');
+      } else {
+        nextBtn.classList.remove('hidden');
+        submitBtn.classList.add('hidden');
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // 4. 설문 최종 제출
+    async function submitSurvey() {
+      if (!validateStep(4)) return;
+
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div><span>제출 처리 중...</span>';
+
+      const payload = {
+        token: surveyToken,
+        answers: {
+          q1: document.getElementById('ansQ1').value,
+          q2: Number(document.getElementById('ansQ2').value),
+          q3: document.getElementById('ansQ3').value,
+          q3Unknown: document.getElementById('ansQ3Unknown').value === 'true',
+          q4: document.getElementById('ansQ4').value,
+          q4Unknown: document.getElementById('ansQ4Unknown').value === 'true',
+          q5: document.getElementById('ansQ5').value.trim(),
+          q6: document.getElementById('ansQ6').value === 'true',
+          callbackPhone: document.getElementById('altPhone').value.trim()
+        }
+      };
+
+      try {
+        const res = await fetch('/api/public/survey/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+
+        if (result.success) {
+          document.getElementById('surveyForm').classList.add('hidden');
+          document.getElementById('completeView').classList.remove('hidden');
+          document.getElementById('stepCounter').innerText = '응답 완료';
+          document.getElementById('progressBar').style.width = '100%';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          alert(result.message || '설문 제출 중 오류가 발생했습니다.');
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i><span>설문 제출하기</span>';
+          lucide.createIcons();
+        }
+      } catch (err) {
+        alert('서버와의 통신 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i><span>설문 제출하기</span>';
+        lucide.createIcons();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', initSurvey);
+  </script>
+</body>
+</html>

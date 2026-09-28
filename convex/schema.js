@@ -63,5 +63,32 @@ export default defineSchema({
   adminSessions: defineTable(v.any())
     .index("by_token", ["token"])
     .index("by_adminId", ["adminId"]),
+
+  // 고객만족도 조사 대상자 (Survey Targets)
+  surveyTargets: defineTable(v.any())
+    .index("by_serviceId", ["serviceId"])
+    .index("by_targetStatus", ["targetStatus"])
+    .index("by_dueAt", ["dueAt"])
+    .index("by_caregiver", ["caregiverName"]),
+
+  // 고객만족도 응답 원문 (Survey Responses)
+  surveyResponses: defineTable(v.any())
+    .index("by_targetId", ["targetId"])
+    .index("by_submittedAt", ["submittedAt"]),
+
+  // 고객만족도 불만/연락요청 후속 조치 케이스 (Survey Followups)
+  surveyFollowups: defineTable(v.any())
+    .index("by_targetId", ["targetId"])
+    .index("by_status", ["status"]),
+
+  // 간병인 달란트 보상 원장 (Survey Reward Ledger)
+  surveyRewards: defineTable(v.any())
+    .index("by_caregiver", ["caregiverName"])
+    .index("by_targetId", ["targetId"])
+    .index("by_state", ["state"]),
+
+  // 고객만족도 설문 정책 및 문항 설정 (Survey Settings & Schema)
+  surveySettings: defineTable(v.any())
+    .index("by_key", ["key"]),
 });
 
