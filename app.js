@@ -20980,6 +20980,9 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       if (cSet.claimId) {
         existingClaim = (appClaims || []).find(c => c && c.id === cSet.claimId) || null;
       }
+      if (!existingClaim && cSet.claimRound) {
+        existingClaim = (appClaims || []).find(c => c && String(c.round || '').trim() === String(cSet.claimRound).trim()) || null;
+      }
       if (!existingClaim) {
         existingClaim = (appClaims || []).find(c => {
           const str = String(c.round || '').trim();
@@ -20998,6 +21001,9 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       let existingPayout = null;
       if (cSet.payoutId) {
         existingPayout = (appPayouts || []).find(p => p && p.id === cSet.payoutId) || null;
+      }
+      if (!existingPayout && cSet.payoutRound) {
+        existingPayout = (appPayouts || []).find(p => p && String(p.round || '').trim() === String(cSet.payoutRound).trim()) || null;
       }
       if (!existingPayout) {
         existingPayout = (appPayouts || []).find(p => {
@@ -22668,178 +22674,202 @@ function recalcSettlementSetModalPreview(isFromDays) {
 }
 
 async function handleSaveSettlementSet(e) {
-  e.preventDefault();
-  const appId = document.getElementById('settlementSetModalAppId')?.value;
-  const mode = document.getElementById('settlementSetModalMode')?.value;
-  const setIndex = parseInt(document.getElementById('settlementSetModalSetIndex')?.value || '1', 10);
-  const app = (gApps || []).find(a => String(a.id) === String(appId));
-  if (!app) return;
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  try {
+    const appId = document.getElementById('settlementSetModalAppId')?.value;
+    const mode = document.getElementById('settlementSetModalMode')?.value;
+    const setIndex = parseInt(document.getElementById('settlementSetModalSetIndex')?.value || '1', 10);
+    const app = (gApps || []).find(a => String(a.id) === String(appId));
+    if (!app) {
+      console.error('[SettlementSet] App not found:', appId);
+      return;
+    }
 
-  const startVal = document.getElementById('settlementSetStartInput')?.value;
-  const endVal = document.getElementById('settlementSetEndInput')?.value;
-  const days = parseInt(document.getElementById('settlementSetDaysInput')?.value || '1', 10);
-
-  const startStr = startVal ? `${startVal.slice(0, 10).replace(/-/g, '.')} ${startVal.slice(11, 16)}` : '';
-  const endStr = endVal ? `${endVal.slice(0, 10).replace(/-/g, '.')} ${endVal.slice(11, 16)}` : '';
-
-  const claimRound = document.getElementById('settlementSetClaimRoundInput')?.value.trim() || `${setIndex}차`;
-  const claimStandardDate = document.getElementById('settlementSetClaimStandardDateInput')?.value.trim() || (endStr ? endStr.slice(0, 10) : '');
-  const claimDate = document.getElementById('settlementSetClaimDateInput')?.value.trim() || '';
-  const claimDays = parseInt(document.getElementById('settlementSetClaimDaysInput')?.value || String(days), 10);
-  const claimUnitPrice = parseInt(String(document.getElementById('settlementSetClaimUnitPriceInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 160000;
-  const claimAmount = parseInt(String(document.getElementById('settlementSetClaimAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || (claimDays * claimUnitPrice);
-  const claimStatus = document.getElementById('settlementSetClaimStatusSelect')?.value || '청구전';
-
-  const depositAmount = parseInt(String(document.getElementById('settlementSetDepositAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 0;
-  const depositDate = document.getElementById('settlementSetDepositDateInput')?.value.trim() || '';
-  const depositStatus = document.getElementById('settlementSetDepositStatusSelect')?.value || '미입금';
-
-  const payoutRound = document.getElementById('settlementSetPayoutRoundInput')?.value.trim() || `${setIndex}차`;
-  const payoutStandardDate = document.getElementById('settlementSetPayoutStandardDateInput')?.value.trim() || endStr;
-  const payoutDate = document.getElementById('settlementSetPayoutDateInput')?.value.trim() || '';
-  const payoutDays = parseInt(document.getElementById('settlementSetPayoutDaysInput')?.value || String(days), 10);
-  const cgDailyWage = parseInt(String(document.getElementById('settlementSetPayoutWageInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 140000;
-  const payoutAmount = parseInt(String(document.getElementById('settlementSetPayoutAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || (payoutDays * cgDailyWage);
-  const payoutStatus = document.getElementById('settlementSetPayoutStatusSelect')?.value || '지급전';
-
-  const memo = document.getElementById('settlementSetMemoInput')?.value.trim() || '';
-
-  const claimId = document.getElementById('settlementSetModalClaimId')?.value;
-  const payoutId = document.getElementById('settlementSetModalPayoutId')?.value;
-
-  // Initialize customSettlementSets if not present
-  if (!app.customSettlementSets || !Array.isArray(app.customSettlementSets)) {
     const appAssigns = (gAssigns || []).filter(a => a.applyId === appId);
     const as = appAssigns.length > 0 ? appAssigns[0] : null;
-    const prog = as ? getCareProgressInfo(as) : null;
-    const initialSchedule = calculateCareSettlementSchedule(app, as, prog, (gClaims || []).filter(c => c.applyId === appId), (gPayouts || []).filter(p => p.applyId === appId));
-    app.customSettlementSets = (initialSchedule.rounds || []).map((r, i) => ({
-      setIndex: i + 1,
-      claimRound: r.claimRoundLabel || `${i + 1}차`,
-      payoutRound: r.payoutRoundLabel || `${i + 1}차`,
-      claimStandardDate: r.claimStandardDate || '',
-      payoutStandardDate: r.payoutStandardDate || '',
-      claimDate: r.claimDate || '',
-      payoutDate: r.payoutDate || '',
-      startDateStr: r.startDateStr || '',
-      endDateStr: r.endDateStr || '',
-      days: r.days || 1,
-      claimDays: r.claimDays || r.days || 1,
-      payoutDays: r.payoutDays || r.days || 1,
-      dailyClaimPrice: r.dailyClaimPrice || 160000,
-      claimAmount: r.fullClaimAmount || 160000,
-      claimStatus: (r.claimStatus === 'DEPOSIT_DONE' || r.isClaimDeposited) ? '입금완료' : ((r.isClaimSent || r.claimStatus === 'CLAIMED_UNPAID') ? '청구완료' : '청구전'),
-      depositAmount: r.depositAmount || 0,
-      depositDate: (r.existingClaim && r.existingClaim.depositDate) || '',
-      depositStatus: r.isClaimDeposited ? '입금완료' : '미입금',
-      cgDailyWage: r.cgDailyWage || 140000,
-      payoutAmount: r.fullPayoutAmount || 140000,
-      payoutStatus: r.isPayoutPaid ? '지급완료' : '지급전',
-      claimId: r.existingClaim ? r.existingClaim.id : (r.claimId || ''),
-      payoutId: r.existingPayout ? r.existingPayout.id : (r.payoutId || ''),
-      caregiverName: r.caregiverName || '',
-      memo: r.memo || ''
-    }));
-  }
 
-  const existingSet = (app.customSettlementSets || []).find(s => s.setIndex === setIndex);
-  const resolvedCgName = (matchedPayout && matchedPayout.caregiverName) || (existingSet && existingSet.caregiverName) || (as ? as.caregiverName : '');
+    const startVal = document.getElementById('settlementSetStartInput')?.value;
+    const endVal = document.getElementById('settlementSetEndInput')?.value;
+    const days = parseInt(document.getElementById('settlementSetDaysInput')?.value || '1', 10);
 
-  const setData = {
-    setIndex: setIndex,
-    claimRound: claimRound,
-    payoutRound: payoutRound,
-    claimStandardDate: claimStandardDate,
-    payoutStandardDate: payoutStandardDate,
-    claimDate: claimDate,
-    payoutDate: payoutDate,
-    startDateStr: startStr,
-    endDateStr: endStr,
-    days: days,
-    claimDays: claimDays,
-    payoutDays: payoutDays,
-    dailyClaimPrice: claimUnitPrice,
-    claimAmount: claimAmount,
-    claimStatus: claimStatus,
-    depositAmount: depositAmount,
-    depositDate: depositDate,
-    depositStatus: depositStatus,
-    caregiverName: resolvedCgName,
-    cgDailyWage: cgDailyWage,
-    payoutAmount: payoutAmount,
-    payoutStatus: payoutStatus,
-    claimId: claimId || `Q${String(app.id).replace('C', '')}.${setIndex}`,
-    payoutId: payoutId || `P${String(app.id).replace('C', '')}.${setIndex}`,
-    memo: memo
-  };
+    const startStr = startVal ? `${startVal.slice(0, 10).replace(/-/g, '.')} ${startVal.slice(11, 16)}` : '';
+    const endStr = endVal ? `${endVal.slice(0, 10).replace(/-/g, '.')} ${endVal.slice(11, 16)}` : '';
 
-  if (mode === 'add') {
-    setData.setIndex = app.customSettlementSets.length + 1;
-    app.customSettlementSets.push(setData);
-  } else {
-    const existingIdx = app.customSettlementSets.findIndex(s => s.setIndex === setIndex);
-    if (existingIdx >= 0) {
-      app.customSettlementSets[existingIdx] = setData;
-    } else {
-      app.customSettlementSets.push(setData);
+    const claimRound = document.getElementById('settlementSetClaimRoundInput')?.value.trim() || `${setIndex}차`;
+    const claimStandardDate = document.getElementById('settlementSetClaimStandardDateInput')?.value.trim() || (endStr ? endStr.slice(0, 10) : '');
+    const claimDate = document.getElementById('settlementSetClaimDateInput')?.value.trim() || '';
+    const claimDays = parseInt(document.getElementById('settlementSetClaimDaysInput')?.value || String(days), 10);
+    const claimUnitPrice = parseInt(String(document.getElementById('settlementSetClaimUnitPriceInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 160000;
+    const claimAmount = parseInt(String(document.getElementById('settlementSetClaimAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || (claimDays * claimUnitPrice);
+    const claimStatus = document.getElementById('settlementSetClaimStatusSelect')?.value || '청구전';
+
+    const depositAmount = parseInt(String(document.getElementById('settlementSetDepositAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 0;
+    const depositDate = document.getElementById('settlementSetDepositDateInput')?.value.trim() || '';
+    const depositStatus = document.getElementById('settlementSetDepositStatusSelect')?.value || '미입금';
+
+    const payoutRound = document.getElementById('settlementSetPayoutRoundInput')?.value.trim() || `${setIndex}차`;
+    const payoutStandardDate = document.getElementById('settlementSetPayoutStandardDateInput')?.value.trim() || endStr;
+    const payoutDate = document.getElementById('settlementSetPayoutDateInput')?.value.trim() || '';
+    const payoutDays = parseInt(document.getElementById('settlementSetPayoutDaysInput')?.value || String(days), 10);
+    const cgDailyWage = parseInt(String(document.getElementById('settlementSetPayoutWageInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 140000;
+    const payoutAmount = parseInt(String(document.getElementById('settlementSetPayoutAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || (payoutDays * cgDailyWage);
+    const payoutStatus = document.getElementById('settlementSetPayoutStatusSelect')?.value || '지급전';
+
+    const memo = document.getElementById('settlementSetMemoInput')?.value.trim() || '';
+
+    const claimId = document.getElementById('settlementSetModalClaimId')?.value;
+    const payoutId = document.getElementById('settlementSetModalPayoutId')?.value;
+
+    // Initialize customSettlementSets if not present
+    if (!app.customSettlementSets || !Array.isArray(app.customSettlementSets)) {
+      const prog = as ? getCareProgressInfo(as) : null;
+      const initialSchedule = calculateCareSettlementSchedule(app, as, prog, (gClaims || []).filter(c => c.applyId === appId), (gPayouts || []).filter(p => p.applyId === appId));
+      app.customSettlementSets = (initialSchedule.rounds || []).map((r, i) => ({
+        setIndex: i + 1,
+        claimRound: r.claimRoundLabel || `${i + 1}차`,
+        payoutRound: r.payoutRoundLabel || `${i + 1}차`,
+        claimStandardDate: r.claimStandardDate || '',
+        payoutStandardDate: r.payoutStandardDate || '',
+        claimDate: r.claimDate || '',
+        payoutDate: r.payoutDate || '',
+        startDateStr: r.startDateStr || '',
+        endDateStr: r.endDateStr || '',
+        days: r.days || 1,
+        claimDays: r.claimDays || r.days || 1,
+        payoutDays: r.payoutDays || r.days || 1,
+        dailyClaimPrice: r.dailyClaimPrice || 160000,
+        claimAmount: r.fullClaimAmount || 160000,
+        claimStatus: (r.claimStatus === 'DEPOSIT_DONE' || r.isClaimDeposited) ? '입금완료' : ((r.isClaimSent || r.claimStatus === 'CLAIMED_UNPAID') ? '청구완료' : '청구전'),
+        depositAmount: r.depositAmount || 0,
+        depositDate: (r.existingClaim && r.existingClaim.depositDate) || '',
+        depositStatus: r.isClaimDeposited ? '입금완료' : '미입금',
+        cgDailyWage: r.cgDailyWage || 140000,
+        payoutAmount: r.fullPayoutAmount || 140000,
+        payoutStatus: r.isPayoutPaid ? '지급완료' : '지급전',
+        claimId: r.existingClaim ? r.existingClaim.id : (r.claimId || ''),
+        payoutId: r.existingPayout ? r.existingPayout.id : (r.payoutId || ''),
+        caregiverName: r.caregiverName || '',
+        memo: r.memo || ''
+      }));
     }
-  }
 
-  // Sync with gClaims
-  let matchedClaim = (gClaims || []).find(c => c.id === setData.claimId || (String(c.applyId) === String(app.id) && c.round === setData.claimRound));
-  if (matchedClaim) {
-    matchedClaim.round = setData.claimRound;
-    matchedClaim.standardDate = setData.claimStandardDate;
-    matchedClaim.claimDate = setData.claimDate;
-    matchedClaim.days = setData.claimDays;
-    matchedClaim.unitPrice = setData.dailyClaimPrice;
-    matchedClaim.claimAmount = setData.claimAmount;
-    matchedClaim.depositAmount = setData.depositAmount;
-    matchedClaim.depositDate = setData.depositDate;
-    matchedClaim.status = setData.claimStatus;
-    if (typeof syncToConvex === 'function') syncToConvex('sync:saveClaim', { claim: matchedClaim }).catch(console.warn);
-  }
+    // Match existing claim & payout safely before resolvedCgName
+    let matchedClaim = (gClaims || []).find(c => (claimId && c.id === claimId) || (String(c.applyId) === String(app.id) && (c.round === claimRound || (setIndex === 1 && !c.round))));
+    let matchedPayout = (gPayouts || []).find(p => (payoutId && p.id === payoutId) || (String(p.applyId) === String(app.id) && (p.round === payoutRound || (setIndex === 1 && !p.round))));
 
-  // Sync with gPayouts
-  let matchedPayout = (gPayouts || []).find(p => p.id === setData.payoutId || (String(p.applyId) === String(app.id) && p.round === setData.payoutRound));
-  if (matchedPayout) {
-    matchedPayout.round = setData.payoutRound;
-    matchedPayout.standardDate = setData.payoutStandardDate;
-    matchedPayout.paidDate = setData.payoutDate;
-    matchedPayout.payoutDate = setData.payoutDate;
-    matchedPayout.days = setData.payoutDays;
-    matchedPayout.dailyWage = setData.cgDailyWage;
-    matchedPayout.payoutAmount = setData.payoutAmount;
-    matchedPayout.payoutStatus = setData.payoutStatus;
-    if (typeof syncToConvex === 'function') syncToConvex('sync:savePayout', { payout: matchedPayout }).catch(console.warn);
-  }
+    const existingSet = (app.customSettlementSets || []).find(s => s.setIndex === setIndex);
+    const resolvedCgName = (matchedPayout && matchedPayout.caregiverName) || (existingSet && existingSet.caregiverName) || (as ? as.caregiverName : '');
 
-  // Save to localStorage & Convex
-  try {
-    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
-    localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
-    localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+    const finalClaimId = claimId || (matchedClaim ? matchedClaim.id : `Q${String(app.id).replace('C', '')}.${setIndex}`);
+    const finalPayoutId = payoutId || (matchedPayout ? matchedPayout.id : `P${String(app.id).replace('C', '')}.${setIndex}`);
+
+    const setData = {
+      setIndex: setIndex,
+      claimRound: claimRound,
+      payoutRound: payoutRound,
+      claimStandardDate: claimStandardDate,
+      payoutStandardDate: payoutStandardDate,
+      claimDate: claimDate,
+      payoutDate: payoutDate,
+      startDateStr: startStr,
+      endDateStr: endStr,
+      days: days,
+      claimDays: claimDays,
+      payoutDays: payoutDays,
+      dailyClaimPrice: claimUnitPrice,
+      claimAmount: claimAmount,
+      claimStatus: claimStatus,
+      depositAmount: depositAmount,
+      depositDate: depositDate,
+      depositStatus: depositStatus,
+      caregiverName: resolvedCgName,
+      cgDailyWage: cgDailyWage,
+      payoutAmount: payoutAmount,
+      payoutStatus: payoutStatus,
+      claimId: finalClaimId,
+      payoutId: finalPayoutId,
+      memo: memo
+    };
+
+    if (mode === 'add') {
+      setData.setIndex = app.customSettlementSets.length + 1;
+      app.customSettlementSets.push(setData);
+    } else {
+      const existingIdx = app.customSettlementSets.findIndex(s => s.setIndex === setIndex);
+      if (existingIdx >= 0) {
+        app.customSettlementSets[existingIdx] = setData;
+      } else {
+        app.customSettlementSets.push(setData);
+      }
+    }
+
+    // Sync with gClaims
+    if (matchedClaim) {
+      matchedClaim.round = setData.claimRound;
+      matchedClaim.standardDate = setData.claimStandardDate;
+      matchedClaim.claimDate = setData.claimDate;
+      matchedClaim.days = setData.claimDays;
+      matchedClaim.unitPrice = setData.dailyClaimPrice;
+      matchedClaim.claimAmount = setData.claimAmount;
+      matchedClaim.depositAmount = setData.depositAmount;
+      matchedClaim.depositDate = setData.depositDate;
+      matchedClaim.status = setData.claimStatus;
+      matchedClaim.memo = setData.memo;
+      if (typeof syncToConvex === 'function') syncToConvex('sync:saveClaim', { claim: matchedClaim }).catch(console.warn);
+    }
+
+    // Sync with gPayouts
+    if (matchedPayout) {
+      matchedPayout.round = setData.payoutRound;
+      matchedPayout.standardDate = setData.payoutStandardDate;
+      matchedPayout.paidDate = setData.payoutDate;
+      matchedPayout.payoutDate = setData.payoutDate;
+      matchedPayout.days = setData.payoutDays;
+      matchedPayout.dailyWage = setData.cgDailyWage;
+      matchedPayout.payoutAmount = setData.payoutAmount;
+      matchedPayout.payoutStatus = setData.payoutStatus;
+      matchedPayout.caregiverName = resolvedCgName;
+      matchedPayout.memo = setData.memo;
+      if (typeof syncToConvex === 'function') syncToConvex('sync:savePayout', { payout: matchedPayout }).catch(console.warn);
+    }
+
+    // Save to localStorage & Convex
+    try {
+      localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+      localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+      localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+    } catch (err) {
+      console.warn('localStorage save failed:', err);
+    }
+
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+    }
+
+    closeModal('settlementSetModal');
+    if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
+      openHubCustomerDetailModal(gActiveHubModalAppId);
+    }
+    if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+
+    if (typeof showNotification === 'function') {
+      showNotification({
+        type: 'success',
+        title: '정산·청구 세트 저장 완료',
+        message: `[${maskName(app.patientName)} 님] 세트 ${setData.setIndex} (청구: ${setData.claimRound} / 지급: ${setData.payoutRound})가 저장되었습니다.`,
+        icon: 'check-circle'
+      });
+    }
   } catch (err) {
-    console.warn('localStorage save failed:', err);
-  }
-
-  if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:saveApplication', { app }).catch(console.warn);
-  }
-
-  closeModal('settlementSetModal');
-  if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
-    openHubCustomerDetailModal(gActiveHubModalAppId);
-  }
-  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
-
-  if (typeof showNotification === 'function') {
-    showNotification({
-      type: 'success',
-      title: '정산·청구 세트 저장 완료',
-      message: `[${maskName(app.patientName)} 님] 세트 ${setData.setIndex} (청구: ${setData.claimRound} / 지급: ${setData.payoutRound})가 저장되었습니다.`,
-      icon: 'check-circle'
-    });
+    console.error('[handleSaveSettlementSet] Error:', err);
+    if (typeof showNotification === 'function') {
+      showNotification({
+        type: 'error',
+        title: '세트 저장 실패',
+        message: err.message || '저장 중 오류가 발생했습니다.',
+        icon: 'alert-circle'
+      });
+    }
   }
 }
 
@@ -37671,8 +37701,8 @@ async function downloadPatientCareLogsPdfs(groupId) {
         const styleMatches = sampleHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/gi) || [];
         const extractedStyles = styleMatches.join('\n');
 
-        // 최대 8페이지 단위로 청크 배치 처리 (브라우저 최대 캔버스 높이 65,535px 한계 완벽 준수)
-        const BATCH_SIZE = 8;
+        // 고해상도 2x 레티나 화질 (192 DPI) + 4페이지 단위 청크 배치 처리 (모바일/PC 메모리 한계 완벽 준수 및 초고화질 보장)
+        const BATCH_SIZE = 4;
         const totalBatches = Math.ceil(sortedLogs.length / BATCH_SIZE);
 
         for (let b = 0; b < totalBatches; b++) {
@@ -37683,7 +37713,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
 
           updateGlobalProgress({
             percent: 50 + Math.round(((b + 1) / totalBatches) * 40),
-            statusText: `[${startIdx + 1}~${endIdx}일차 / 총 ${sortedLogs.length}일차] 초고속 일괄 렌더링 중...`
+            statusText: `[${startIdx + 1}~${endIdx}일차 / 총 ${sortedLogs.length}일차] 고화질 일괄 렌더링 중...`
           });
           await new Promise(r => setTimeout(r, 10));
 
@@ -37750,8 +37780,9 @@ async function downloadPatientCareLogsPdfs(groupId) {
           }
 
           const targetEl = batchContainer || iframeDoc.body;
+          const scaleFactor = 2.0; // 2x 고선명 Retina 화질
           const canvas = await html2canvas(targetEl, {
-            scale: 1.0,
+            scale: scaleFactor,
             useCORS: true,
             allowTaint: true,
             backgroundColor: '#ffffff',
@@ -37760,8 +37791,8 @@ async function downloadPatientCareLogsPdfs(groupId) {
             imageTimeout: 1500
           });
 
-          const unitHeight = 1122;
-          const unitWidth = 794;
+          const unitHeight = Math.round(1122 * scaleFactor);
+          const unitWidth = Math.round(794 * scaleFactor);
           const sliceCanvas = document.createElement('canvas');
           sliceCanvas.width = unitWidth;
           sliceCanvas.height = unitHeight;
@@ -37772,7 +37803,8 @@ async function downloadPatientCareLogsPdfs(groupId) {
             sliceCtx.fillRect(0, 0, unitWidth, unitHeight);
             sliceCtx.drawImage(canvas, 0, j * unitHeight, unitWidth, unitHeight, 0, 0, unitWidth, unitHeight);
 
-            const dataUrl = sliceCanvas.toDataURL('image/jpeg', 0.85);
+            // 고선명 95% JPEG (텍스트/도표 번짐 없는 고화질 압축)
+            const dataUrl = sliceCanvas.toDataURL('image/jpeg', 0.95);
             const base64Data = dataUrl.split(',')[1];
             const binaryStr = atob(base64Data);
             const jpgBytes = new Uint8Array(binaryStr.length);

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-28T08:40:14.352Z",
+  "updatedAt": "2026-09-28T09:48:14.114Z",
   "confirmedAlertAppIds": [
     "C0010",
     "C0096",
@@ -65,7 +65,9 @@
     "C0301",
     "C0302",
     "C0303",
-    "C0304"
+    "C0304",
+    "C0524",
+    "C0534"
   ],
   "confirmedDisabledAppIds": []
 }
