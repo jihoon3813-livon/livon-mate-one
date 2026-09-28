@@ -9620,39 +9620,42 @@ function toggleSamsungTargetLogAttachment(targetId, attach) {
   }
 
   renderDispatchAttachedCareLogs();
-  renderCurrentSamsungSheet();
-  if (typeof updateSamsungDailyEmailBodyText === 'function') updateSamsungDailyEmailBodyText();
+  setTimeout(() => {
+    renderCurrentSamsungSheet();
+    if (typeof updateSamsungDailyEmailBodyText === 'function') updateSamsungDailyEmailBodyText();
+  }, 0);
   if (window._currentPreviewAppId) updateSamsungMergedPreviewAttachBtnState(window._currentPreviewAppId);
 }
 window.toggleSamsungTargetLogAttachment = toggleSamsungTargetLogAttachment;
 
 function updateSamsungMergedPreviewAttachBtnState(appId) {
   const btn = document.getElementById('samsungMergedPreviewAttachBtn');
-  const btnText = document.getElementById('samsungMergedPreviewAttachBtnText');
   const footerBtn = document.getElementById('samsungMergedPreviewAttachBtnFooter');
-  const footerBtnText = document.getElementById('samsungMergedPreviewAttachBtnFooterText');
   
   const isAttached = (window.gSamsungDispatchAttachedCareLogs || []).some(a => String(a.id) === String(appId));
   
-  if (btn && btnText) {
+  if (btn) {
     if (isAttached) {
-      btn.className = 'px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs';
-      btnText.innerText = '✕ 첨부 해제하기';
+      btn.className = 'px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs border border-emerald-400';
+      btn.innerHTML = `<i data-lucide="check" class="w-4 h-4 text-emerald-200"></i> <span id="samsungMergedPreviewAttachBtnText">첨부 완료 (클릭 시 해제)</span>`;
     } else {
       btn.className = 'px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs';
-      btnText.innerText = '✓ 이 일지 첨부하기';
+      btn.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4"></i> <span id="samsungMergedPreviewAttachBtnText">✓ 이 일지 첨부하기</span>`;
     }
   }
 
-  if (footerBtn && footerBtnText) {
+  if (footerBtn) {
     if (isAttached) {
-      footerBtn.className = 'px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md';
-      footerBtnText.innerText = '✕ 일일보고 첨부 해제';
+      footerBtn.className = 'px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md border border-emerald-400';
+      footerBtn.innerHTML = `<i data-lucide="check" class="w-4 h-4 text-emerald-200"></i> <span id="samsungMergedPreviewAttachBtnFooterText">일일보고 첨부완료 ✓ (클릭 시 취소)</span>`;
     } else {
       footerBtn.className = 'px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md';
-      footerBtnText.innerText = '✓ 일일보고에 이 간병일지 첨부';
+      footerBtn.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4"></i> <span id="samsungMergedPreviewAttachBtnFooterText">✓ 일일보고에 이 간병일지 첨부</span>`;
     }
   }
+
+  const modalEl = document.getElementById('samsungMergedCareLogPreviewModal');
+  if (modalEl && typeof initIcons === 'function') initIcons(modalEl);
 }
 window.updateSamsungMergedPreviewAttachBtnState = updateSamsungMergedPreviewAttachBtnState;
 
@@ -11104,36 +11107,99 @@ async function previewSamsungMergedCareLogPdf() {
   }
 }
 
-function downloadSamsungMergedCareLogPdf() {
-  if (!gLastSamsungMergedPdfBytes) {
-    alert('다운로드할 통합 PDF 데이터가 없습니다. 먼저 미리보기를 실행해주세요.');
-    return;
-  }
+async function downloadSamsungMergedCareLogPdf() {
+  const appId = window._currentPreviewAppId;
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  const targetRow = ((gSamsungSheets && gSamsungSheets.target) || []).find(r => String(r.patientId || r.id) === String(appId));
+  const patientName = app ? app.patientName : (targetRow ? (targetRow.patientName || targetRow.name) : '고객');
   const now = new Date();
   const todayStr = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
-  const fileName = `삼성화재_간병일지_통합_${todayStr}.pdf`;
+  const fileName = `[케어포트_공식간병일지]_${patientName}_${todayStr}.pdf`;
 
+  if (gLastSamsungMergedPdfBytes) {
+    showGlobalProgress({
+      title: '간병일지 PDF 다운로드',
+      subtitle: `${patientName} 환자의 간병일지 PDF 파일을 다운로드합니다.`,
+      percent: 100,
+      statusText: '✨ 다운로드가 완료되었습니다!',
+      icon: 'check-circle-2'
+    });
+    triggerDirectPdfDownload(gLastSamsungMergedPdfBytes, fileName);
+    hideGlobalProgress(1000);
+    return;
+  }
+
+  // 아직 PDF 바이트가 생성되지 않은 경우: 사용자가 다운로드를 눌렀을 때 비로소 온디맨드로 생성
   showGlobalProgress({
-    title: '통합 간병일지 PDF 다운로드',
-    subtitle: '미리보기된 통합 간병일지 PDF 파일을 다운로드합니다.',
-    percent: 100,
-    statusText: '✨ 다운로드가 완료되었습니다!',
-    icon: 'check-circle-2'
+    title: '간병일지 PDF 생성 중',
+    subtitle: `${patientName} 환자의 공식 간병일지 PDF를 생성하고 있습니다.`,
+    percent: 60,
+    statusText: '문서 변환 중...',
+    icon: 'file-text'
   });
-  triggerDirectPdfDownload(gLastSamsungMergedPdfBytes, fileName);
-  hideGlobalProgress(1000);
+
+  try {
+    const gen = await generateCarePortPdfBytesForApp(appId, { maxDays: 1 });
+    if (gen && gen.bytes) {
+      gLastSamsungMergedPdfBytes = gen.bytes;
+      updateGlobalProgress({ percent: 100, statusText: '✨ 생성이 완료되어 다운로드를 시작합니다.' });
+      triggerDirectPdfDownload(gen.bytes, fileName);
+    } else {
+      // 대체 수단: iframe 인쇄 다이얼로그 호출 (PDF로 즉시 저장 가능)
+      const iframe = document.getElementById('samsungMergedCareLogPreviewIframe');
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      }
+    }
+  } catch (err) {
+    console.error('PDF 온디맨드 다운로드 실패:', err);
+    // 대체 수단: iframe 인쇄
+    const iframe = document.getElementById('samsungMergedCareLogPreviewIframe');
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } else {
+      alert('PDF 생성 중 오류가 발생했습니다: ' + err.message);
+    }
+  } finally {
+    hideGlobalProgress(800);
+  }
 }
 
 function openSamsungMergedCareLogPdfNewTab() {
-  if (!gLastSamsungMergedBlobUrl && gLastSamsungMergedPdfBytes) {
-    const blob = new Blob([gLastSamsungMergedPdfBytes], { type: 'application/pdf' });
-    gLastSamsungMergedBlobUrl = URL.createObjectURL(blob);
-  }
   if (gLastSamsungMergedBlobUrl) {
     window.open(gLastSamsungMergedBlobUrl, '_blank');
-  } else {
-    alert('열람할 통합 PDF 데이터가 없습니다.');
+    return;
   }
+  if (window._lastCareLogHtml) {
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>케어포트 공식 간병일지</title>
+          <meta charset="utf-8">
+          <style>
+            body { margin: 0; padding: 20px; background: #525659; display: flex; justify-content: center; }
+            .page-container { background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+            @media print {
+              body { background: white; padding: 0; }
+              .page-container { box-shadow: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="page-container">${window._lastCareLogHtml}</div>
+        </body>
+        </html>
+      `);
+      win.document.close();
+      return;
+    }
+  }
+  alert('열람할 간병일지 데이터가 없습니다.');
 }
 
 function convertBase64ToUint8Array(base64) {
@@ -11519,6 +11585,7 @@ async function previewCustomerCareLogPdf(appId) {
 
   if (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function') {
     const directHtml = window.CarePortClient.generateDailyLogHtml(patientMeta, dummyLog, dummyDetail);
+    window._lastCareLogHtml = directHtml;
     if (iframe) {
       iframe.srcdoc = `
         <!DOCTYPE html>
@@ -11536,29 +11603,11 @@ async function previewCustomerCareLogPdf(appId) {
         </html>
       `;
     }
-    // 즉시 로딩 스피너 숨김! 0.01초 내 표출
-    if (loadingEl) loadingEl.classList.add('hidden');
   }
 
-  // 백그라운드 비동기로 PDF 바이트 준비 (다운로드나 메일 첨부 시 즉시 사용 가능하도록)
-  try {
-    const generated = await generateCarePortPdfBytesForApp(appId, { maxDays: 1 });
-    if (generated && generated.bytes) {
-      custFiles = [{
-        name: generated.fileName,
-        bytes: generated.bytes,
-        size: generated.bytes.byteLength,
-        date: new Date().toISOString()
-      }];
-      window.gSamsungCustomerCareLogFiles[appId] = custFiles;
-      gLastSamsungMergedPdfBytes = generated.bytes;
-    }
-  } catch (err) {
-    console.warn('Background PDF generation finished with note:', err);
-  } finally {
-    if (loadingEl) loadingEl.classList.add('hidden');
-    if (typeof initIcons === 'function') initIcons(document.getElementById('samsungMergedCareLogPreviewModal'));
-  }
+  // 모달 렌더링 즉시 완료: 로딩 숨김 및 아이콘 초기화 (절대 메인 스레드를 블로킹하는 무거운 html2canvas를 돌리지 않음!)
+  if (loadingEl) loadingEl.classList.add('hidden');
+  if (typeof initIcons === 'function') initIcons(document.getElementById('samsungMergedCareLogPreviewModal'));
 }
 
 function updateSamsungClaimLiveSummary() {
