@@ -5982,15 +5982,11 @@ function renderCurrentSamsungSheet() {
                       <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                       <span>일지보유</span>
                     </span>
-                    <button type="button" onclick="${isAttached ? `toggleSamsungTargetLogAttachment('${targetId}', false)` : `handleCareLogAttachButtonClick('${targetId}')`}" 
-                      class="px-2 py-0.5 rounded-lg font-black text-[10.5px] transition-all cursor-pointer shadow-2xs ${isAttached ? 'bg-purple-600 text-white hover:bg-rose-600' : 'bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-300 hover:border-purple-300'}"
-                      title="${isAttached ? '클릭 시 첨부 해제' : '클릭 시 간병일지 미리보기 확인 후 첨부'}">
-                      ${isAttached ? '✓ 첨부됨' : '+ 첨부'}
-                    </button>
-                    <button type="button" onclick="previewCustomerCareLogPdf('${targetId}')" 
-                      class="p-1 text-slate-400 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-all cursor-pointer"
-                      title="간병일지 실물 미리보기">
-                      <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                    <button type="button" onclick="handleCareLogAttachButtonClick('${targetId}')" 
+                      class="px-2.5 py-1 rounded-lg font-black text-[11px] transition-all cursor-pointer shadow-2xs flex items-center gap-1 ${isAttached ? 'bg-purple-600 text-white hover:bg-purple-700 border border-purple-600' : 'bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-300 hover:border-purple-300'}"
+                      title="${isAttached ? '클릭 시 첨부된 간병일지 실물 확인 및 관리' : '클릭 시 간병일지 실물 확인 후 첨부'}">
+                      <i data-lucide="${isAttached ? 'check' : 'plus'}" class="w-3.5 h-3.5"></i>
+                      <span>${isAttached ? '첨부됨' : '첨부'}</span>
                     </button>
                   </div>
                 ` : `
@@ -9364,9 +9360,15 @@ function toggleSamsungTargetLogAttachment(targetId, attach) {
         source: custFiles.length > 0 ? 'local' : 'careport',
         file: custFiles.length > 0 ? custFiles[0] : null
       });
+      if (typeof showToast === 'function') {
+        showToast(`✓ [${patientName}] 간병일지가 일일보고 첨부목록에 추가되었습니다.`, 'success');
+      }
     }
   } else {
     window.gSamsungDispatchAttachedCareLogs = window.gSamsungDispatchAttachedCareLogs.filter(a => String(a.id) !== tid);
+    if (typeof showToast === 'function') {
+      showToast(`[${patientName}] 간병일지 첨부가 해제되었습니다.`, 'info');
+    }
   }
 
   renderDispatchAttachedCareLogs();
@@ -11142,6 +11144,22 @@ async function previewCustomerCareLogPdf(appId) {
   const targetRow = ((gSamsungSheets && gSamsungSheets.target) || []).find(r => String(r.patientId || r.id) === String(appId));
   const patientName = app ? app.patientName : (targetRow ? (targetRow.patientName || targetRow.name) : '고객');
 
+  // 첨부 클릭 즉시 실물 미리보기 모달을 띄워 로딩 상태를 직관적으로 제공 (딜레이 체감 제로화)
+  openModal('samsungMergedCareLogPreviewModal');
+  updateSamsungMergedPreviewAttachBtnState(appId);
+  const loadingEl = document.getElementById('samsungMergedPreviewLoading');
+  const iframe = document.getElementById('samsungMergedCareLogPreviewIframe');
+  const titleEl = document.getElementById('samsungMergedPreviewTitle');
+  const subEl = document.getElementById('samsungMergedPreviewSubtitle');
+  const metaEl = document.getElementById('samsungMergedPreviewMetaInfo');
+
+  if (titleEl) titleEl.innerText = `[${patientName}] 케어포트 공식 간병일지 실물 확인`;
+  if (subEl) subEl.innerText = `간병일지를 불러오는 중입니다... 전체 페이지를 확인 후 첨부하세요.`;
+  if (metaEl) metaEl.innerText = `환자명: ${patientName} (${appId}) | 실물 PDF 로딩 중...`;
+  if (iframe) iframe.src = 'about:blank';
+  if (loadingEl) loadingEl.classList.remove('hidden');
+  if (typeof initIcons === 'function') initIcons(document.getElementById('samsungMergedCareLogPreviewModal'));
+
   window.gSamsungCustomerCareLogFiles = window.gSamsungCustomerCareLogFiles || {};
   let custFiles = window.gSamsungCustomerCareLogFiles[appId] || [];
 
@@ -11180,22 +11198,13 @@ async function previewCustomerCareLogPdf(appId) {
     }
   }
 
-  // 3. 일지 데이터가 전혀 없는 경우 안내
+  // 3. 일지 데이터가 전혀 없는 경우 안내 및 모달 닫기
   if (custFiles.length === 0) {
+    if (loadingEl) loadingEl.classList.add('hidden');
+    closeModal('samsungMergedCareLogPreviewModal');
     alert(`[${patientName}] 님의 등록된 간병일지가 없습니다.`);
     return;
   }
-
-  // 4. 공식 실물 PDF 뷰어(samsungMergedCareLogPreviewModal) 오픈 (가짜 시뮬레이션 카드 모달 완전 배제!)
-  openModal('samsungMergedCareLogPreviewModal');
-  updateSamsungMergedPreviewAttachBtnState(appId);
-  const loadingEl = document.getElementById('samsungMergedPreviewLoading');
-  const iframe = document.getElementById('samsungMergedCareLogPreviewIframe');
-  const titleEl = document.getElementById('samsungMergedPreviewTitle');
-  const subEl = document.getElementById('samsungMergedPreviewSubtitle');
-  const metaEl = document.getElementById('samsungMergedPreviewMetaInfo');
-
-  if (loadingEl) loadingEl.classList.remove('hidden');
 
   try {
     const mergedDoc = await PDFLib.PDFDocument.create();
@@ -11212,8 +11221,8 @@ async function previewCustomerCareLogPdf(appId) {
     gLastSamsungMergedBlobUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
 
     if (iframe) iframe.src = gLastSamsungMergedBlobUrl;
-    if (titleEl) titleEl.innerText = `[${patientName}] 케어포트 간병일지 PDF 미리보기`;
-    if (subEl) subEl.innerText = `${custFiles[0].name} ${custFiles.length > 1 ? `외 ${custFiles.length - 1}건` : ''} (총 ${totalPages}페이지)`;
+    if (titleEl) titleEl.innerText = `[${patientName}] 케어포트 간병일지 PDF 실물 확인`;
+    if (subEl) subEl.innerText = `${custFiles[0].name} ${custFiles.length > 1 ? `외 ${custFiles.length - 1}건` : ''} (총 ${totalPages}페이지) - 내용을 꼼꼼히 확인 후 첨부 버튼을 눌러주세요.`;
     if (metaEl) {
       metaEl.innerText = `환자명: ${patientName} (${appId}) | 케어포트 공식 간병일지 | 총 ${totalPages} 페이지`;
     }
