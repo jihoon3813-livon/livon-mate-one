@@ -26,3 +26,4 @@ check_excel.js
 test_care_dates.js
 sync_*.js
 scratch/
+.tmp_fax/

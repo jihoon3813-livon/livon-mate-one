@@ -105,12 +105,86 @@ module.exports = async (req, res) => {
       }
     }
 
+    // Ensure accurate care date: if rawContent has care_date, use it as the ground-truth care date
+    if (parsedRaw && parsedRaw.care_date) {
+      result.careDate = parsedRaw.care_date;
+      result.callRecordedAt = result.consultDate;
+      result.consultDate = parsedRaw.care_date;
+    }
+
+    // Sanitize any mistaken references to consultant as the patient
+    const patientName = (result.username || result.patientName || (parsedRaw && parsedRaw.username) || '').trim();
+    const consultantName = (result.consultantName || result.caregiverName || (parsedRaw && parsedRaw.consultantName) || '').trim();
+
+    if (patientName && consultantName && patientName !== consultantName) {
+      function fixText(str) {
+        if (!str || typeof str !== 'string') return str;
+        let out = str;
+        out = out.split(consultantName + '님 간병일지').join('간병일지');
+        out = out.split(consultantName + ' 님 간병일지').join('간병일지');
+        out = out.split(consultantName + ' 여사님').join(patientName + ' 님');
+        out = out.split(consultantName + '여사님').join(patientName + ' 님');
+        out = out.split(consultantName + ' 환자').join(patientName + ' 환자');
+        out = out.split(consultantName + '님의').join(patientName + ' 님의');
+        out = out.split(consultantName + ' 님의').join(patientName + ' 님의');
+        out = out.split(consultantName + '님이').join(patientName + ' 님이');
+        out = out.split(consultantName + ' 님이').join(patientName + ' 님이');
+        out = out.split(consultantName + '님은').join(patientName + ' 님은');
+        out = out.split(consultantName + ' 님은').join(patientName + ' 님은');
+        out = out.split(consultantName + '님을').join(patientName + ' 님을');
+        out = out.split(consultantName + ' 님을').join(patientName + ' 님을');
+        out = out.split(consultantName + '님과').join(patientName + ' 님과');
+        out = out.split(consultantName + ' 님과').join(patientName + ' 님과');
+        out = out.split(consultantName + '님').join(patientName + ' 님');
+        out = out.split(consultantName + ' 님').join(patientName + ' 님');
+        return out;
+      }
+
+      if (result.title) result.title = fixText(result.title);
+      if (result.summary) result.summary = fixText(result.summary);
+      if (parsedRaw) {
+        if (parsedRaw.title) parsedRaw.title = fixText(parsedRaw.title);
+        if (parsedRaw.summary) parsedRaw.summary = fixText(parsedRaw.summary);
+        if (parsedRaw.consult_title) parsedRaw.consult_title = fixText(parsedRaw.consult_title);
+        if (parsedRaw.consult_summary) parsedRaw.consult_summary = fixText(parsedRaw.consult_summary);
+      }
+    }
+
+    // Fetch official trend scores if schedule_id is present
+    const schedId = parsedRaw?.schedule_id || result.scheduleId || result.schedule_id;
+    let trendScores = [];
+    if (schedId) {
+      try {
+        const trendResp = await requestHttps({
+          hostname: 'admin.livon.care',
+          port: 443,
+          path: '/main/consult/carenote/trend-scores',
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 LivonMateOne/1.0'
+          }
+        }, JSON.stringify({ scheduleId: schedId }));
+
+        if (Array.isArray(trendResp.data)) {
+          trendScores = trendResp.data;
+        }
+      } catch (e) {
+        console.warn('CarePort trend-scores fetch failed for scheduleId', schedId, e.message);
+      }
+    }
+
     return res.status(200).json({
       success: true,
       sessionId,
       data: {
         ...result,
-        raw: parsedRaw || {}
+        trendScores,
+        raw: {
+          ...(parsedRaw || {}),
+          trendScores
+        }
       }
     });
   } catch (error) {

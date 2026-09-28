@@ -333,7 +333,7 @@
         if (matchedApp && matchedApp.id) {
           log.applyId = matchedApp.id;
         }
-        const name = (log.username || log.targetName || '무명').trim();
+        const name = ((matchedApp && matchedApp.patientName) || log.username || log.targetName || '무명').trim();
         const age = log.age || (matchedApp ? (matchedApp.age || matchedApp.patientAge) : '-');
         const gender = log.gender || (matchedApp ? matchedApp.gender : '-');
 
@@ -350,13 +350,13 @@
           patientGroups.set(groupKey, {
             id: groupKey,
             applyId: matchedApp ? matchedApp.id : null,
-            patientName: name,
+            patientName: (matchedApp && matchedApp.patientName) || name,
             age: age,
             gender: gender,
             birth: log.birth || (matchedApp ? (matchedApp.birthDate || matchedApp.birth) : (latestAssign ? latestAssign.birthDate : '-')),
             insuranceCompany: (matchedApp && matchedApp.insuranceCompany) || log.insuranceCompany || (latestAssign && latestAssign.insuranceCompany) || '삼성화재',
             centerName: (latestAssign && latestAssign.centerName) || log.orgName || (matchedApp && matchedApp.centerName) || '영등포센터',
-            caregiverName: log.consultantName || (latestAssign && latestAssign.caregiverName) || (matchedApp && matchedApp.caregiverName) || '-',
+            caregiverName: (latestAssign && latestAssign.caregiverName) || (matchedApp && matchedApp.caregiverName) || log.consultantName || '-',
             matchedApp: matchedApp,
             matchedAssigns: matchedAssigns,
             rawLogs: []
@@ -400,13 +400,38 @@
           const dailyLogs = clusterLogs.map((log, idx) => {
             const dayNum = idx + 1;
             const dateStr = this.normalizeDate(log.consultDate);
+            const consultant = log.consultantName || group.caregiverName || '';
+            const patientName = group.patientName || '';
+
+            let cleanTitle = (log.title || '일상 지원 및 환자 상태 점검').replace(/^\[\d+일차\]\s*/, '');
+            if (consultant && patientName && consultant !== patientName) {
+              cleanTitle = cleanTitle.split(consultant + '님 간병일지').join('간병일지');
+              cleanTitle = cleanTitle.split(consultant + ' 님 간병일지').join('간병일지');
+              cleanTitle = cleanTitle.split(consultant + ' 여사님').join(patientName + ' 님');
+              cleanTitle = cleanTitle.split(consultant + '여사님').join(patientName + ' 님');
+              cleanTitle = cleanTitle.split(consultant + ' 환자').join(patientName + ' 환자');
+              cleanTitle = cleanTitle.split(consultant + '님의').join(patientName + ' 님의');
+              cleanTitle = cleanTitle.split(consultant + ' 님의').join(patientName + ' 님의');
+              cleanTitle = cleanTitle.split(consultant + '님이').join(patientName + ' 님이');
+              cleanTitle = cleanTitle.split(consultant + ' 님이').join(patientName + ' 님이');
+              cleanTitle = cleanTitle.split(consultant + '님은').join(patientName + ' 님은');
+              cleanTitle = cleanTitle.split(consultant + ' 님은').join(patientName + ' 님은');
+              cleanTitle = cleanTitle.split(consultant + '님을').join(patientName + ' 님을');
+              cleanTitle = cleanTitle.split(consultant + ' 님을').join(patientName + ' 님을');
+              cleanTitle = cleanTitle.split(consultant + '님과').join(patientName + ' 님과');
+              cleanTitle = cleanTitle.split(consultant + ' 님과').join(patientName + ' 님과');
+              cleanTitle = cleanTitle.split(consultant + '님').join(patientName + ' 님');
+              cleanTitle = cleanTitle.split(consultant + ' 님').join(patientName + ' 님');
+            }
+
             return {
               ...log,
+              title: cleanTitle,
               dayNumber: dayNum,
               dayText: `${dayNum}일차`,
               dateString: dateStr,
-              durationMinutes: log.duration ? `${log.duration}분` : '-',
-              caregiver: log.consultantName || group.caregiverName
+              durationMinutes: log.duration ? `${String(log.duration).replace('s', '')}초` : '-',
+              caregiver: consultant
             };
           });
 
@@ -417,6 +442,27 @@
           }
           subGroup.dailyLogs = dailyLogs;
           subGroup.totalDays = dailyLogs.length;
+
+          // Compute cluster trend scores across daily logs
+          const clusterTrends = dailyLogs.map((dl, idx) => {
+            const rawObj = dl.raw || {};
+            const ts = rawObj.trend_scores || rawObj.trendScores || dl.trendScores || {};
+            const dateStr = dl.dateString || (dl.consultDate ? dl.consultDate.slice(0, 10) : '');
+            return {
+              dayIndex: dl.dayNumber || (idx + 1),
+              careDate: dateStr,
+              overallScore: ts.overallScore || ts.overall || (dl.overallStatus?.tone === 'warning' ? 3 : 4),
+              mobilityScore: ts.mobilityScore || ts.mobility || 4,
+              dietScore: ts.dietScore || ts.diet || 4,
+              sleepScore: ts.sleepScore || ts.sleep || 4,
+              painScore: ts.painScore || ts.pain || 4
+            };
+          });
+          subGroup.trendScores = clusterTrends;
+          dailyLogs.forEach(dl => {
+            const curDate = dl.dateString || (dl.consultDate ? dl.consultDate.slice(0, 10) : '');
+            dl.trendScores = curDate ? clusterTrends.filter(t => t.careDate && t.careDate <= curDate) : clusterTrends;
+          });
 
           // Resolve careStartDate and careEndDate accurately
           const firstLogDot = dailyLogs.length > 0 ? this.formatDotDate(dailyLogs[0].dateString) : '';
@@ -532,19 +578,22 @@
       const gender = detail.gender || log.gender || patient.gender || '여';
       const consultant = (detail.consultantName || log.consultantName || log.caregiverName || log.caregiver || patient.caregiverName || '간병사').trim();
       const org = (detail.organizationName || detail.orgName || log.organizationName || log.orgName || patient.insuranceCompany || patient.centerName || '삼성화재').trim();
-      let rawConsultDate = (detail.consultDate || log.consultDate || log.dateString || new Date().toISOString().slice(0, 10)).slice(0, 16);
+      // Resolve accurate care date: prioritize raw.care_date, log.dateString, log.consultDate (sync care date)
+      let rawCareDate = raw.care_date || raw.careDate || log.dateString || (log.consultDate && log.consultDate.slice(0, 10)) || detail.careDate || (detail.consultDate && detail.consultDate.slice(0, 10)) || new Date().toISOString().slice(0, 10);
+      rawCareDate = String(rawCareDate).slice(0, 10).replace(/\./g, '-');
+      let rawConsultDate = rawCareDate;
       let consultDate = rawConsultDate;
       try {
-        const dt = new Date(rawConsultDate.slice(0, 10));
+        const dt = new Date(rawConsultDate);
         if (!isNaN(dt.getTime())) {
           const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-          consultDate = `${rawConsultDate.slice(0, 10)} (${dayNames[dt.getDay()]})`;
+          consultDate = `${rawConsultDate} (${dayNames[dt.getDay()]})`;
         }
       } catch (e) {}
 
       const duration = detail.duration ? `${String(detail.duration).replace('s', '')}초` : (log.duration ? `${String(log.duration).replace('s', '')}초` : '120초');
       
-      let dayNum = log.dayNumber || (raw.day_index ? Number(raw.day_index) : (detail.dayIndex ? Number(detail.dayIndex) : (detail.dayNumber ? Number(detail.dayNumber) : null)));
+      let dayNum = (raw.day_index ? Number(raw.day_index) : (log.dayNumber || (detail.dayIndex ? Number(detail.dayIndex) : (detail.dayNumber ? Number(detail.dayNumber) : null))));
       if (!dayNum && patient.careStartDate && rawConsultDate) {
         try {
           const sDt = new Date(patient.careStartDate.replace(/\./g, '-').slice(0, 10));
@@ -570,7 +619,7 @@
         carePeriod = `${rawConsultDate.slice(0, 10)}`;
       }
 
-      const title = detail.title || raw.consult_title || log.title || `${pName} 님 일상 케어 및 상태 확인`;
+      let title = detail.title || raw.consult_title || log.title || `${pName} 님 일상 케어 및 상태 확인`;
 
       // 1. Overall Status
       let overallTone = 'good';
@@ -669,10 +718,56 @@
       }
 
       // 7. Summary
-      const summary = detail.summary || raw.consult_summary || raw.session_summary || `${pName} 환자분은 전반적인 활력징후 및 컨디션이 안정적인 상태를 유지하고 있습니다. 식사 섭취가 양호하고 특이 이상 반응 없이 일상 케어가 순조롭게 진행되었습니다.`;
+      let summary = detail.summary || raw.consult_summary || raw.session_summary || `${pName} 환자분은 전반적인 활력징후 및 컨디션이 안정적인 상태를 유지하고 있습니다. 식사 섭취가 양호하고 특이 이상 반응 없이 일상 케어가 순조롭게 진행되었습니다.`;
+
+      if (consultant && pName && consultant !== pName) {
+        const fixText = (str) => {
+          if (!str || typeof str !== 'string') return str;
+          let out = str;
+          out = out.split(consultant + '님 간병일지').join('간병일지');
+          out = out.split(consultant + ' 님 간병일지').join('간병일지');
+          out = out.split(consultant + ' 여사님').join(pName + ' 님');
+          out = out.split(consultant + '여사님').join(pName + ' 님');
+          out = out.split(consultant + ' 환자').join(pName + ' 환자');
+          out = out.split(consultant + '님의').join(pName + ' 님의');
+          out = out.split(consultant + ' 님의').join(pName + ' 님의');
+          out = out.split(consultant + '님이').join(pName + ' 님이');
+          out = out.split(consultant + ' 님이').join(pName + ' 님이');
+          out = out.split(consultant + '님은').join(pName + ' 님은');
+          out = out.split(consultant + ' 님은').join(pName + ' 님은');
+          out = out.split(consultant + '님을').join(pName + ' 님을');
+          out = out.split(consultant + ' 님을').join(pName + ' 님을');
+          out = out.split(consultant + '님과').join(pName + ' 님과');
+          out = out.split(consultant + ' 님과').join(pName + ' 님과');
+          out = out.split(consultant + '님').join(pName + ' 님');
+          out = out.split(consultant + ' 님').join(pName + ' 님');
+          return out;
+        };
+
+        title = fixText(title);
+        summary = fixText(summary);
+      }
 
       // 8. Trend scores resolution
-      const trendScores = raw.trendScores || detail.trendScores || patient.trendScores || log.trendScores || null;
+      let trendScores = raw.trendScores || detail.trendScores || patient.trendScores || log.trendScores || null;
+      if ((!trendScores || (Array.isArray(trendScores) && trendScores.length === 0)) && patient && Array.isArray(patient.dailyLogs) && patient.dailyLogs.length > 0) {
+        const curDate = (consultDate || '').slice(0, 10);
+        const upToLogs = curDate ? patient.dailyLogs.filter(l => (l.consultDate || l.dateString || '').slice(0, 10) <= curDate) : patient.dailyLogs;
+        const targetLogs = upToLogs.length > 0 ? upToLogs : patient.dailyLogs;
+        trendScores = targetLogs.map((l, idx) => {
+          const lRaw = l.raw || l;
+          const s = lRaw.trend_scores || lRaw.trendScores || l.trendScores || {};
+          return {
+            dayIndex: l.dayNumber || (idx + 1),
+            careDate: (l.consultDate || l.dateString || '').slice(0, 10),
+            overallScore: s.overallScore || s.overall || (l.overallStatus?.tone === 'warning' ? 3 : 4),
+            mobilityScore: s.mobilityScore || s.mobility || 4,
+            dietScore: s.dietScore || s.diet || 4,
+            sleepScore: s.sleepScore || s.sleep || 4,
+            painScore: s.painScore || s.pain || 4
+          };
+        });
+      }
 
       return {
         patientName: pName,
@@ -787,7 +882,9 @@
       lines.forEach(line => {
         let pts = [];
         list.forEach((item, idx) => {
-          const val = (line.key === 'painScore' && item.painScore != null && item.painScore > 3) ? (6 - item.painScore) : (item[line.key] || 3);
+          const shortKey = line.key.replace('Score', '');
+          const rawVal = item[line.key] != null ? item[line.key] : (item[shortKey] != null ? item[shortKey] : 3);
+          const val = (line.key === 'painScore' && rawVal > 3) ? (6 - rawVal) : rawVal;
           pts.push(`${getX(idx)},${getY(val)}`);
         });
         linesSvg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${line.color}" stroke-width="2.5" ${line.dash}/>`;
@@ -802,26 +899,10 @@
 
     /**
      * Check if a log should be rendered using the Classic CarePort Design (Chunk 7803 / 1153)
+     * 모든 케어포트 간병일지는 100% 최신 공식 서식(보호자 안내용 모던 간병일지)으로만 렌더링되도록 통일
      */
     isClassicLog(dailyLog, detailData = null) {
-      const raw = detailData?.raw || dailyLog?.raw || (detailData && detailData.rawContent ? (typeof detailData.rawContent === 'string' ? JSON.parse(detailData.rawContent) : detailData.rawContent) : {}) || {};
-      
-      // 1. Explicit CarePort logic from Chunk 7803:
-      // ("care_date" in t && "day_index" in t && "total_days" in t) -> Modern Caregiver (ReportCaregiverLink)
-      // Otherwise -> Classic Report (ReportLink)
-      if (raw.care_date && raw.day_index && raw.total_days) {
-        return false;
-      }
-      if (raw.categories && raw.overall_status) {
-        return false;
-      }
-      if (Array.isArray(raw.checkboxes) && raw.checkboxes.length > 0) {
-        return true;
-      }
-      if (raw.consult_report || raw.chats || raw.consult_toc) {
-        return true;
-      }
-      return !raw.categories;
+      return false;
     },
 
     /**
@@ -908,7 +989,36 @@
       }).join('');
 
       // 2. Build Consult Summary & Detailed Report (Image 2 right side)
-      const consultTitle = raw.consult_title || detailData?.title || dailyLog?.title || '환자 상태 개선 상담';
+      let consultTitle = raw.consult_title || detailData?.title || dailyLog?.title || '환자 상태 개선 상담';
+      let summaryText = raw.consult_summary || raw.session_summary || detailData?.summary || dailyLog?.summary || '';
+
+      if (consultant && username && consultant !== username) {
+        const fixText = (str) => {
+          if (!str || typeof str !== 'string') return str;
+          let out = str;
+          out = out.split(consultant + '님 간병일지').join('간병일지');
+          out = out.split(consultant + ' 님 간병일지').join('간병일지');
+          out = out.split(consultant + ' 여사님').join(username + ' 님');
+          out = out.split(consultant + '여사님').join(username + ' 님');
+          out = out.split(consultant + ' 환자').join(username + ' 환자');
+          out = out.split(consultant + '님의').join(username + ' 님의');
+          out = out.split(consultant + ' 님의').join(username + ' 님의');
+          out = out.split(consultant + '님이').join(username + ' 님이');
+          out = out.split(consultant + ' 님이').join(username + ' 님이');
+          out = out.split(consultant + '님은').join(username + ' 님은');
+          out = out.split(consultant + ' 님은').join(username + ' 님은');
+          out = out.split(consultant + '님을').join(username + ' 님을');
+          out = out.split(consultant + ' 님을').join(username + ' 님을');
+          out = out.split(consultant + '님과').join(username + ' 님과');
+          out = out.split(consultant + ' 님과').join(username + ' 님과');
+          out = out.split(consultant + '님').join(username + ' 님');
+          out = out.split(consultant + ' 님').join(username + ' 님');
+          return out;
+        };
+
+        consultTitle = fixText(consultTitle);
+        summaryText = fixText(summaryText);
+      }
       
       let keywordsArr = [];
       if (typeof raw.keywords === 'string') {
@@ -944,8 +1054,6 @@
           `;
         }
       }
-
-      const summaryText = raw.consult_summary || raw.session_summary || detailData?.summary || dailyLog?.summary || '';
       const summarySectionHtml = summaryText ? `
         <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
           <div style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">[요약]</div>
@@ -1171,11 +1279,13 @@
       `).join('');
 
       let trendChartHtml = '';
-      if (d.chartImage) {
+      const trendList = (d.trendScores && d.trendScores.length > 0) ? d.trendScores : (patient.trendScores || []);
+      if (trendList && trendList.length > 0) {
+        trendChartHtml = this.generateTrendChartSvg(trendList);
+      } else if (d.chartImage) {
         trendChartHtml = `<img src="${d.chartImage}" alt="간병 일자별 환자 상태 변화" style="width: 100%; height: auto; max-height: 200px; object-fit: contain; display: block; margin: 0 auto;" />`;
       } else {
-        const trendList = (d.trendScores && d.trendScores.length > 0) ? d.trendScores : (patient.trendScores || []);
-        trendChartHtml = this.generateTrendChartSvg(trendList);
+        trendChartHtml = this.generateTrendChartSvg([]);
       }
 
       return `<!DOCTYPE html>

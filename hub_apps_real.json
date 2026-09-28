@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-23T08:00:15.459Z",
+  "updatedAt": "2026-09-28T07:23:45.052Z",
   "sources": {
     "종합 간병(현대해상)": {
       "sourceType": "file",
@@ -6667,12 +6667,12 @@
       "adjusterName": "이광호",
       "adjusterPhone": "022-181-2510",
       "adjusterFax": "",
-      "status": "완료",
+      "status": "진행중",
       "assignedCaregiverCount": 1,
       "claimCount": 5,
-      "unconfirmedClaimCount": 3,
-      "depositConfirmedAmount": 2736000,
-      "estimatedUnpaid": 4708000,
+      "unconfirmedClaimCount": 0,
+      "depositConfirmedAmount": 4156000,
+      "estimatedUnpaid": 0,
       "totalPayout": 7280000,
       "diagnosis": "",
       "memo": "",
@@ -6682,7 +6682,13 @@
       "csLatestType": null,
       "_applyTime": 1777302000000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "claimSetEnabledForCompleted": false,
+      "hasManualUpdate": true,
+      "updatedAt": "2026-09-28T07:23:45.052Z",
+      "roundDeposits": {
+        "4": 1420000
+      }
     },
     {
       "id": "C0118",
@@ -10918,9 +10924,9 @@
       "status": "진행중",
       "assignedCaregiverCount": 1,
       "claimCount": 8,
-      "unconfirmedClaimCount": 4,
-      "depositConfirmedAmount": 5460000,
-      "estimatedUnpaid": 5916000,
+      "unconfirmedClaimCount": 0,
+      "depositConfirmedAmount": 8820000,
+      "estimatedUnpaid": 0,
       "totalPayout": 8970000,
       "diagnosis": "",
       "memo": "",
@@ -10930,7 +10936,12 @@
       "csLatestType": null,
       "_applyTime": 1783522800000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "roundDeposits": {
+        "5": 1540000,
+        "6": 1820000
+      },
+      "updatedAt": "2026-09-28T07:21:50.381Z"
     },
     {
       "id": "C0202",
@@ -16485,9 +16496,9 @@
       "status": "진행중",
       "assignedCaregiverCount": 1,
       "claimCount": 1,
-      "unconfirmedClaimCount": 1,
-      "depositConfirmedAmount": 0,
-      "estimatedUnpaid": 294000,
+      "unconfirmedClaimCount": 0,
+      "depositConfirmedAmount": 100000,
+      "estimatedUnpaid": 0,
       "totalPayout": 260000,
       "diagnosis": "담낭염",
       "memo": "",
@@ -16498,7 +16509,11 @@
       "csLatestType": null,
       "_applyTime": 1789782660000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "roundDeposits": {
+        "1": 100000
+      },
+      "updatedAt": "2026-09-28T07:19:15.950Z"
     },
     {
       "id": "C0300",
@@ -30050,16 +30065,19 @@
       "claimDate": "2026.08.31",
       "days": 11,
       "unitPrice": 140000,
-      "depositAmount": 0,
-      "depositStatus": "미확인",
-      "depositDate": "2026.08.31",
+      "depositAmount": 1540000,
+      "depositStatus": "입금확인됨",
+      "depositDate": "2026.09.28 16:21",
       "depositTime": "2026.08.31",
-      "unpaidAmount": 1540000,
-      "adjusterStatus": "",
+      "unpaidAmount": 0,
+      "adjusterStatus": "입금완료",
       "memo": "",
       "insuranceCompany": "종합 간병(현대해상)",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T06:20:17.247Z"
+      "importedAt": "2026-09-23T06:20:17.247Z",
+      "_creationTime": 1790144459165.3372,
+      "_id": "js7fsvbd6yc1prg176xab4efzs8ezf4t",
+      "updatedAt": "2026-09-28T07:21:33.624Z"
     },
     {
       "id": "Q0418",
@@ -30330,16 +30348,19 @@
       "claimDate": "2026.09.02",
       "days": 13,
       "unitPrice": 140000,
-      "depositAmount": 0,
-      "depositStatus": "미확인",
-      "depositDate": "2026.09.02",
+      "depositAmount": 1820000,
+      "depositStatus": "입금확인됨",
+      "depositDate": "2026.09.28 16:21",
       "depositTime": "2026.09.02",
-      "unpaidAmount": 1820000,
-      "adjusterStatus": "",
+      "unpaidAmount": 0,
+      "adjusterStatus": "입금완료",
       "memo": "통합청구 13일함",
       "insuranceCompany": "종합 간병(현대해상)",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T06:20:17.247Z"
+      "importedAt": "2026-09-23T06:20:17.247Z",
+      "_creationTime": 1790144459655.1426,
+      "_id": "js77xjrd8vdb1ec8y7nhbba3ex8ezrk1",
+      "updatedAt": "2026-09-28T07:21:50.381Z"
     },
     {
       "id": "Q0432",
@@ -30590,16 +30611,19 @@
       "claimDate": "2026.09.10",
       "days": 10,
       "unitPrice": 142000,
-      "depositAmount": 0,
-      "depositStatus": "미확인",
-      "depositDate": "2026.09.10",
+      "depositAmount": 1420000,
+      "depositStatus": "입금확인됨",
+      "depositDate": "2026.09.28 16:23",
       "depositTime": "2026.09.10",
-      "unpaidAmount": 1420000,
-      "adjusterStatus": "",
+      "unpaidAmount": 0,
+      "adjusterStatus": "입금완료",
       "memo": "",
       "insuranceCompany": "종합 간병(현대해상)",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T06:20:17.247Z"
+      "importedAt": "2026-09-23T06:20:17.247Z",
+      "_creationTime": 1790144459986.349,
+      "_id": "js77jf9tm7kmhre9cwwffx7rd58eyy7n",
+      "updatedAt": "2026-09-28T07:23:45.052Z"
     },
     {
       "id": "Q0445",
@@ -31410,16 +31434,19 @@
       "claimDate": "2026.09.20",
       "days": 2,
       "unitPrice": 147000,
-      "depositAmount": 0,
-      "depositStatus": "미확인",
+      "depositAmount": 100000,
+      "depositStatus": "부분입금",
       "depositDate": "2026.09.20",
       "depositTime": "2026.09.20",
-      "unpaidAmount": 294000,
-      "adjusterStatus": "",
+      "unpaidAmount": 194000,
+      "adjusterStatus": "입금완료",
       "memo": "삼성화재",
       "insuranceCompany": "종합 간병(현대해상)",
       "isRealLaunchData": true,
-      "importedAt": "2026-09-23T06:20:17.247Z"
+      "importedAt": "2026-09-23T06:20:17.247Z",
+      "_creationTime": 1790144460805.843,
+      "_id": "js70g42kbnn0x7kw2z15qzp90n8eyzb7",
+      "updatedAt": "2026-09-28T07:19:15.950Z"
     },
     {
       "id": "Q0486",
