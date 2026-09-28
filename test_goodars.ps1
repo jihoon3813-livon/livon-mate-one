@@ -6,8 +6,8 @@ $client = New-Object System.Net.Http.HttpClient($handler)
 # 1. Login
 $loginUrl = "https://crm.goodars.co.kr/indexApp.asp?cp=hidea"
 $content = New-Object System.Net.Http.FormUrlEncodedContent(([System.Collections.Generic.KeyValuePair[string,string]][]@(
-    [System.Collections.Generic.KeyValuePair[string,string]]::new("m_id", "jga2413"),
-    [System.Collections.Generic.KeyValuePair[string,string]]::new("m_pass", "jga2413#")
+    [System.Collections.Generic.KeyValuePair[string,string]]::new("m_id", $env:CTI_ID),
+    [System.Collections.Generic.KeyValuePair[string,string]]::new("m_pass", $env:CTI_PASS)
 )))
 $res = $client.PostAsync($loginUrl, $content).Result
 Write-Output "Login status: $($res.StatusCode)"

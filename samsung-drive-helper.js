@@ -17,7 +17,7 @@ const DEFAULT_CANDIDATE_PATHS = [
 
 function getSamsungDriveConfig() {
   let cfg = {
-    password: '202609',
+    password: process.env.SAMSUNG_EXCEL_PASSWORD || '',
     folderPath: '',
     lastSyncedFile: null,
     lastSyncedAt: null,

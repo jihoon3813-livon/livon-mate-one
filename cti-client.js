@@ -21,10 +21,10 @@ function getCtiConfig() {
     console.warn('[CTI Config Load Error]', err.message);
   }
   return {
-    baseUrl: 'https://crm.goodars.co.kr',
-    id: 'jga2413',
-    pass: 'jga2413#',
-    defaultCallerId: '16007835',
+    baseUrl: process.env.CTI_BASE_URL || 'https://crm.goodars.co.kr',
+    id: process.env.CTI_ID || '',
+    pass: process.env.CTI_PASS || '',
+    defaultCallerId: process.env.CTI_CALLER_ID || '16007835',
     callerOptions: [
       { id: '16007835', name: '리본케어 대표번호 (1600-7835)', org: '리본케어' },
       { id: '15337436', name: '현대해상 전용번호 (1533-7436)', org: '현대해상' }
@@ -86,8 +86,8 @@ async function ensureCtiSession(forceRefresh = false) {
   }
 
   const cfg = getCtiConfig();
-  const id = cfg.id || 'jga2413';
-  const pass = cfg.pass || 'jga2413#';
+  const id = cfg.id || process.env.CTI_ID || '';
+  const pass = cfg.pass || process.env.CTI_PASS || '';
 
   try {
     // 1. 초기 세션 쿠키 획득

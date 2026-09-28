@@ -3,6 +3,35 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const { exec } = require('child_process');
+
+// Native .env.local / .env loader (No external dependencies required)
+try {
+  const envFiles = ['.env.local', '.env'];
+  for (const envFile of envFiles) {
+    const envPath = path.join(__dirname, envFile);
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
+      content.split(/\r?\n/).forEach(line => {
+        line = line.trim();
+        if (!line || line.startsWith('#')) return;
+        const eqIdx = line.indexOf('=');
+        if (eqIdx !== -1) {
+          const key = line.slice(0, eqIdx).trim();
+          let val = line.slice(eqIdx + 1).trim();
+          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1);
+          }
+          if (typeof process.env[key] === 'undefined') {
+            process.env[key] = val;
+          }
+        }
+      });
+    }
+  }
+} catch (e) {
+  console.warn('[EnvLoader] Error loading local env file:', e.message);
+}
+
 const { createDocumentPdfBuffer, createTestPdfBuffer } = require('./pdf-helper');
 const { uploadToBarobillFTP, callBarobillSoap, getBarobillErrorMessage, getBarobillFaxStatus } = require('./barobill-client');
 const { getEmailConfig, saveEmailConfig, sendSmtpMail, testSmtpConnection } = require('./smtp-client');
@@ -27,7 +56,7 @@ const MIME_TYPES = {
 const https = require('https');
 const urlModule = require('url');
 
-const KAKAO_REST_KEY = 'KakaoAK 6d1fa1d735dbf6e1e8beb4ed7de2e3b4';
+const KAKAO_REST_KEY = process.env.KAKAO_REST_KEY || '';
 
 // Search hospital across Kakao Local API & Live Web
 async function fetchOnlineHospitals(query) {

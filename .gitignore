@@ -12,6 +12,9 @@ desktop.ini
 fax_config.json
 email_config.json
 cti_config.json
+samsung_drive_config.json
+samsung_drive_latest.json
+survey_data.json
 
 .vercel
 .env*

@@ -3,8 +3,8 @@
 
 const https = require('https');
 
-const CAREPORT_ID = process.env.CAREPORT_ID || 'jihoon3813';
-const CAREPORT_PW = process.env.CAREPORT_PW || 'livon3813!@#';
+const CAREPORT_ID = process.env.CAREPORT_ID || '';
+const CAREPORT_PW = process.env.CAREPORT_PW || '';
 
 function requestHttps(options, postData = null) {
   return new Promise((resolve, reject) => {

@@ -8,10 +8,7 @@
     // Configuration & Endpoints
     apiBase: '/api/careport',
     directBase: 'https://admin.livon.care',
-    defaultCredentials: {
-      id: 'jihoon3813',
-      pw: 'livon3813!@#'
-    },
+    defaultCredentials: null,
     targetOrgs: [
       { id: 161580188, name: '현대해상(본사)', company: '현대해상' },
       { id: 161580191, name: '현대해상(영등포센터)', company: '현대해상' },
@@ -27,9 +24,13 @@
      */
     async directLogin() {
       if (this.directToken) return this.directToken;
+      const creds = this.defaultCredentials || (typeof window !== 'undefined' && window.CAREPORT_CREDENTIALS);
+      if (!creds || !creds.id || !creds.pw) {
+        throw new Error('CarePort 직접 로그인 자격증명이 설정되지 않았습니다. 서버 API(/api/careport/sync)를 이용하세요.');
+      }
       const params = new URLSearchParams();
-      params.append('id', this.defaultCredentials.id);
-      params.append('password', this.defaultCredentials.pw);
+      params.append('id', creds.id);
+      params.append('password', creds.pw);
 
       const res = await fetch(`${this.directBase}/v4/auth/login`, {
         method: 'POST',
