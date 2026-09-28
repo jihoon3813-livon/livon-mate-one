@@ -380,6 +380,7 @@ function sendSmtpMail(options) {
 
 function buildMimeMessage({ senderName, senderEmail, toList, ccList, subject, text, html, attachments }) {
   const boundaryMixed = '----=_Part_Mixed_' + Date.now().toString(36) + Math.random().toString(36).substring(2);
+  const boundaryAlt = '----=_Part_Alt_' + Date.now().toString(36) + Math.random().toString(36).substring(2);
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const now = new Date();
