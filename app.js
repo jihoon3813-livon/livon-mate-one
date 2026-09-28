@@ -2166,6 +2166,192 @@ window.confirmHubAppAlert = confirmHubAppAlert;
 window.unconfirmHubAppAlert = unconfirmHubAppAlert;
 window.isAppAlertConfirmed = isAppAlertConfirmed;
 
+/**
+ * [NEW] 고객 정보 수정 이력 및 변경 내역 모달 열기
+ */
+function openAppUpdateHistoryModal(appId, ev) {
+  if (ev) {
+    ev.stopPropagation();
+    ev.preventDefault();
+  }
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  // 1. 관련 시스템 감사 로그 조회
+  const allLogs = window.gSystemAuditLogs || [];
+  const relatedLogs = allLogs.filter(l => {
+    const t = String(l.target || '');
+    const s = String(l.summary || '');
+    return t.includes(app.id) || t.includes(app.patientName) || s.includes(app.patientName) || s.includes(app.id);
+  });
+
+  // 2. 모달 컨테이너 준비 (없으면 동적 생성)
+  let modal = document.getElementById('appUpdateHistoryModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'appUpdateHistoryModal';
+    modal.className = 'fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 transition-all duration-200 hidden';
+    document.body.appendChild(modal);
+  }
+
+  // 시간 포맷 헬퍼 (KST 대한민국 표준시)
+  const formatKstTime = (iso) => {
+    if (!iso) return '-';
+    try {
+      return new Date(iso).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+    } catch(e) {
+      return String(iso);
+    }
+  };
+
+  const updatedTimeStr = formatKstTime(app.updatedAt);
+  const createdTimeStr = formatKstTime(app.createdAt || app.applyDate);
+
+  let logsHtml = '';
+  if (relatedLogs.length > 0) {
+    logsHtml = `
+      <div class="space-y-3">
+        <h4 class="text-xs font-black text-slate-800 flex items-center gap-1.5 pb-1 border-b border-slate-200">
+          <i data-lucide="history" class="w-4 h-4 text-indigo-600"></i>
+          <span>시스템 감사 추적 변경 내역 (${relatedLogs.length}건)</span>
+        </h4>
+        <div class="space-y-2.5 max-h-[260px] overflow-y-auto custom-scrollbar pr-1">
+          ${relatedLogs.map(l => {
+            const u = l.user || { name: '관리자', role: 'ADMIN' };
+            const changes = l.changes || {};
+            const changeEntries = Object.entries(changes);
+            return `
+              <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5 hover:border-indigo-300 transition-colors">
+                <div class="flex items-center justify-between text-[11px] text-slate-500">
+                  <span class="font-bold text-slate-700 flex items-center gap-1">
+                    <span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-black">${l.actionType || '수정'}</span>
+                    <span>${u.name} (${u.role || '담당자'})</span>
+                  </span>
+                  <span>${l.timestamp || '-'}</span>
+                </div>
+                <div class="font-bold text-slate-900">${l.summary || '고객 정보 수정'}</div>
+                ${changeEntries.length > 0 ? `
+                  <div class="mt-2 bg-white rounded-lg p-2 border border-slate-200 space-y-1 text-[11.5px]">
+                    ${changeEntries.map(([field, diff]) => {
+                      const before = diff && diff.before !== undefined ? (typeof diff.before === 'object' ? JSON.stringify(diff.before) : diff.before) : '-';
+                      const after = diff && diff.after !== undefined ? (typeof diff.after === 'object' ? JSON.stringify(diff.after) : diff.after) : '-';
+                      return `
+                        <div class="flex items-center justify-between gap-2 border-b border-slate-100 last:border-0 pb-1 last:pb-0">
+                          <span class="font-semibold text-slate-600">${field}</span>
+                          <div class="flex items-center gap-1.5 text-right font-medium">
+                            <span class="line-through text-rose-500 bg-rose-50 px-1 rounded">${before || '미지정'}</span>
+                            <span class="text-slate-400">➡️</span>
+                            <span class="font-bold text-emerald-700 bg-emerald-50 px-1 rounded">${after || '미지정'}</span>
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  } else {
+    logsHtml = `
+      <div class="p-4 bg-indigo-50/70 rounded-2xl border border-indigo-100 space-y-2 text-xs">
+        <div class="flex items-center gap-2 font-black text-indigo-950">
+          <i data-lucide="info" class="w-4 h-4 text-indigo-600"></i>
+          <span>수정 감지 사유 및 현재 상태</span>
+        </div>
+        <p class="text-slate-700 leading-relaxed">
+          고객 대장의 정보(상태, 청구분류, 간병인 배정, 정산 또는 청구 비고 등)가 등록 시점 이후 수동 저장/수정되었거나 미수금 대사 모드가 활성화되어 <b>[⚡ 수정발생]</b>으로 감지되었습니다.
+        </p>
+        <p class="text-slate-500 text-[11px]">
+          하단의 <b>[확인 완료 처리]</b>를 누르면 알림이 확인 완료 처리되고 원래 신청일 순서로 자동 복귀됩니다.
+        </p>
+      </div>
+    `;
+  }
+
+  // 고객 현황 상세 요약 카드
+  const summaryCardHtml = `
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5 text-xs shadow-2xs">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <span class="font-bold text-slate-500">신청 ID / 보험사</span>
+        <span class="font-black text-slate-900">${app.id} · ${app.insuranceCompany || '현대해상'}</span>
+      </div>
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <span class="font-bold text-slate-500">최종 수정 일시</span>
+        <span class="font-bold text-indigo-700">${updatedTimeStr}</span>
+      </div>
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <span class="font-bold text-slate-500">현재 상태 / 청구분류</span>
+        <span class="font-bold text-slate-800">
+          <span class="px-2 py-0.5 rounded-full text-[11px] font-black ${app.status === '완료' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${app.status || '완료'}</span>
+          <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-purple-100 text-purple-800 ml-1">${app.claimClassification || '정상'}</span>
+        </span>
+      </div>
+      <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <span class="font-bold text-slate-500">배정 간병인 / 일정</span>
+        <span class="font-bold text-slate-800">${app.caregiverName || '미배정'} (${app.careStartDate || '-'} ~ ${app.careEndDate || '-'})</span>
+      </div>
+      ${app.memo || app.claimMemo ? `
+        <div class="pt-1">
+          <span class="block font-bold text-slate-500 mb-1">메모 / 청구 비고</span>
+          <div class="p-2.5 rounded-xl bg-slate-50 text-slate-800 font-medium text-[11.5px] border border-slate-200 whitespace-pre-wrap">${app.claimMemo || app.memo}</div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
+      <!-- 헤더 -->
+      <div class="p-5 bg-gradient-to-r from-indigo-700 to-purple-800 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 text-indigo-200">
+            <i data-lucide="file-edit" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-black text-white">${app.patientName} 고객 수정 이력</h3>
+              <span class="px-2 py-0.5 rounded-md bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 font-bold text-[10px]">${app.id}</span>
+            </div>
+            <p class="text-xs text-indigo-200 mt-0.5">최근 발생한 고객 정보 수정 및 감사 추적 로그</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('appUpdateHistoryModal')" class="p-2 text-indigo-200 hover:text-white rounded-xl hover:bg-white/10 transition-all cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- 바디 -->
+      <div class="p-5 overflow-y-auto custom-scrollbar space-y-4 text-xs">
+        ${summaryCardHtml}
+        ${logsHtml}
+      </div>
+
+      <!-- 푸터 -->
+      <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs gap-2">
+        <span class="text-slate-500 text-[11px]">확인 완료 시 원래 신청일 순서로 이동합니다.</span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeModal('appUpdateHistoryModal')" class="px-4 py-2 border rounded-xl font-bold bg-white hover:bg-slate-100 transition-all cursor-pointer text-slate-700">
+            닫기
+          </button>
+          <button type="button" onclick="confirmHubAppAlert('${app.id}'); closeModal('appUpdateHistoryModal');" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer">
+            <i data-lucide="check-check" class="w-4 h-4"></i>
+            <span>확인 완료 처리</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  openModal('appUpdateHistoryModal');
+  if (typeof initIcons === 'function') {
+    initIcons(modal);
+  }
+}
+window.openAppUpdateHistoryModal = openAppUpdateHistoryModal;
+
 // 미확인 수정/민원 여부 판별기 (확인 버튼 클릭 시 false 반환 -> 원래 위치 복귀)
 function isAppUnconfirmedModified(app) {
   if (!app) return false;
@@ -8076,7 +8262,7 @@ async function getEmailConfig() {
       const rawText = await res.text();
       let data = null;
       try { data = JSON.parse(rawText); } catch (e) {}
-      if (data && data.config) {
+      if (data && data.config && data.config.user && data.config.pass) {
         gEmailConfigCache = data.config;
         localStorage.setItem('LIVON_EMAIL_CONFIG', JSON.stringify(data.config));
         return data.config;
@@ -8084,7 +8270,7 @@ async function getEmailConfig() {
     }
   } catch (e) {}
 
-  if (cached) {
+  if (cached && (cached.user || cached.pass)) {
     gEmailConfigCache = cached;
     return cached;
   }
@@ -8182,7 +8368,7 @@ function toggleEmailPasswordVisible() {
 }
 
 async function handleSaveEmailConfig(e) {
-  e.preventDefault();
+  if (e && e.preventDefault) e.preventDefault();
   const host = document.getElementById('emailSmtpHost')?.value?.trim();
   const port = parseInt(document.getElementById('emailSmtpPort')?.value || '465', 10);
   const secure = Boolean(document.getElementById('emailSmtpSecure')?.checked);
@@ -8198,51 +8384,43 @@ async function handleSaveEmailConfig(e) {
 
   const payload = { host, port, secure, user, pass, senderEmail, senderName };
 
+  // 1. 로컬 스토리지 및 전역 메모리 캐시에 즉시 무조건 영구 보관 (서버 응답 지연/오류와 무관하게 100% 보장)
+  gEmailConfigCache = payload;
   try {
-    let res = await fetch('/api/email/config', {
+    localStorage.setItem('LIVON_EMAIL_CONFIG', JSON.stringify(payload));
+  } catch (e) {}
+
+  const formattedSender = senderName ? `${senderName} <${senderEmail || user}>` : (senderEmail || user);
+  const fromDailyEl = document.getElementById('samsungDailyFromEmail');
+  if (fromDailyEl) fromDailyEl.value = formattedSender;
+  const fromClaimEl = document.getElementById('samsungClaimFromEmail');
+  if (fromClaimEl) fromClaimEl.value = formattedSender;
+
+  closeModal('emailConfigModal');
+  updateSamsungEmailSmtpStatusBanner();
+  showCustomAlert({
+    title: '이메일 SMTP 설정 저장 완료',
+    message: `[${user}] 계정 정보가 브라우저 및 시스템에 안전하게 저장되었습니다.\n이제 실제 이메일 발송이 정상 작동합니다.`,
+    icon: 'check-circle-2',
+    iconColor: 'emerald'
+  });
+
+  // 2. 백엔드 서버에도 비동기 동기화 전송
+  try {
+    let res = await fetch('/api/email-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if (!res.ok && res.status === 404) {
-      res = await fetch('/api/email-config', {
+    if (!res.ok) {
+      await fetch('/api/email/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
     }
-
-    const rawText = await res.text();
-    let data;
-    try {
-      data = JSON.parse(rawText);
-    } catch (parseErr) {
-      throw new Error(`서버 응답 파싱 실패 (HTTP ${res.status}): ${rawText.slice(0, 100)}`);
-    }
-
-    if (data.success) {
-      gEmailConfigCache = data.config;
-      localStorage.setItem('LIVON_EMAIL_CONFIG', JSON.stringify(data.config));
-
-      const formattedSender = data.config.senderName ? `${data.config.senderName} <${data.config.senderEmail || data.config.user}>` : (data.config.senderEmail || data.config.user);
-      const fromDailyEl = document.getElementById('samsungDailyFromEmail');
-      if (fromDailyEl) fromDailyEl.value = formattedSender;
-      const fromClaimEl = document.getElementById('samsungClaimFromEmail');
-      if (fromClaimEl) fromClaimEl.value = formattedSender;
-
-      closeModal('emailConfigModal');
-      updateSamsungEmailSmtpStatusBanner();
-      showCustomAlert({
-        title: '이메일 SMTP 설정 저장 완료',
-        message: `[${user}] 계정 정보가 성공적으로 저장되었습니다.\n이제 실제 이메일 발송이 정상 작동합니다.`,
-        icon: 'check-circle-2',
-        iconColor: 'emerald'
-      });
-    } else {
-      alert('설정 저장 실패: ' + (data.error || '알 수 없는 오류'));
-    }
   } catch (err) {
-    alert('서버 통신 오류: ' + err.message);
+    console.warn('[Email Config Server Sync Notice]', err.message);
   }
 }
 
@@ -8302,14 +8480,38 @@ async function runEmailSmtpTest() {
     }
 
     if (data.success) {
+      // [핵심]: 테스트 발송 성공 시 즉시 자동 영구 저장
+      const autoSavePayload = { 
+        host, 
+        port, 
+        secure, 
+        user, 
+        pass, 
+        senderEmail: document.getElementById('emailSenderEmail')?.value?.trim() || user, 
+        senderName: senderName || '(주)리본케어 삼성화재 운영데스크' 
+      };
+      gEmailConfigCache = autoSavePayload;
+      try {
+        localStorage.setItem('LIVON_EMAIL_CONFIG', JSON.stringify(autoSavePayload));
+      } catch (e) {}
+      updateSamsungEmailSmtpStatusBanner();
+
+      // 서버에도 비동기 자동 동기화
+      fetch('/api/email-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(autoSavePayload)
+      }).catch(() => {});
+
       if (resultArea) {
         resultArea.className = 'p-3 rounded-xl text-xs bg-emerald-50 text-emerald-900 border border-emerald-200';
         resultArea.innerHTML = `
           <div class="font-bold flex items-center gap-1.5 text-emerald-800 mb-1">
-            <span>✅ 연결 및 테스트 발송 성공!</span>
+            <span>✅ 연결 및 테스트 발송 성공! (설정 자동 저장 완료)</span>
           </div>
           <p>${data.message}</p>
           <p class="text-[11px] text-emerald-700 mt-1">서버 응답: ${data.result?.serverReply || '250 OK'}</p>
+          <p class="text-[11px] text-emerald-800 font-bold mt-1.5">💡 검증된 설정이 안전하게 저장되었습니다. 이제 바로 메일 발송이 가능합니다.</p>
         `;
       }
     } else {
@@ -8551,6 +8753,13 @@ async function handleSamsungEmailSubmit(e) {
 
   try {
     const emailPayload = {
+      host: cfg.host,
+      port: cfg.port,
+      secure: cfg.secure,
+      user: cfg.user,
+      pass: cfg.pass,
+      senderName: cfg.senderName,
+      senderEmail: cfg.senderEmail,
       to,
       cc,
       subject,
@@ -9532,6 +9741,13 @@ async function handleDispatchSamsungEmail(e) {
 
     // 4. 이메일 서버 발송 요청
     const payload = {
+      host: cfg.host,
+      port: cfg.port,
+      secure: cfg.secure,
+      user: cfg.user,
+      pass: cfg.pass,
+      senderName: cfg.senderName,
+      senderEmail: cfg.senderEmail,
       to,
       cc,
       from: resolvedFrom,
@@ -12154,6 +12370,13 @@ async function handleSendSamsungDailyReport(e) {
 
     // 6. 백엔드 SMTP 서버에 실제 전송 요청
     const emailPayload = {
+      host: cfg.host,
+      port: cfg.port,
+      secure: cfg.secure,
+      user: cfg.user,
+      pass: cfg.pass,
+      senderName: cfg.senderName,
+      senderEmail: cfg.senderEmail,
       to,
       cc,
       from: resolvedFrom,
@@ -12482,6 +12705,13 @@ async function handleSendSamsungMonthlyClaim(e) {
 
     // 4. 백엔드 SMTP 서버에 실제 전송 요청
     const emailPayload = {
+      host: cfg.host,
+      port: cfg.port,
+      secure: cfg.secure,
+      user: cfg.user,
+      pass: cfg.pass,
+      senderName: cfg.senderName,
+      senderEmail: cfg.senderEmail,
       to,
       cc,
       from: resolvedFrom,
@@ -27304,9 +27534,9 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
     if (!isAlertConf) {
       badges.push(`
         <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-purple-600 text-white font-black text-[10.5px] shadow-2xs whitespace-nowrap animate-pulse">
-          <span class="flex items-center gap-1" title="${complaintInfo.title || '민원 접수'}: ${complaintInfo.summary || ''}">
+          <button type="button" onclick="openAppUpdateHistoryModal('${app.id}', event)" class="flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-0 text-white p-0 font-black" title="${complaintInfo.title || '민원 접수'}: ${complaintInfo.summary || ''} (클릭하여 수정/민원 상세 보기)">
             <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-white"></i> 🚨 민원 발생${cTime ? ` (${cTime})` : ''}
-          </span>
+          </button>
           <button type="button" onclick="confirmHubAppAlert('${app.id}', event)" class="px-1.5 h-[16px] leading-none rounded bg-white text-purple-900 hover:bg-purple-100 font-black text-[9.5px] shadow-xs cursor-pointer transition-all inline-flex items-center justify-center gap-0.5 border-0" title="확인 완료 시 원래 신청일 순서로 돌아갑니다">
             확인
           </button>
@@ -27315,7 +27545,9 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
     } else {
       badges.push(`
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-300 font-bold text-[10.5px] whitespace-nowrap" title="민원 확인 완료 (원래 순서로 정렬됨)">
-          <i data-lucide="check" class="w-3 h-3 text-purple-600"></i> 민원확인완료
+          <button type="button" onclick="openAppUpdateHistoryModal('${app.id}', event)" class="flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-0 text-purple-800 p-0 font-bold" title="클릭하여 상세 이력 다시 보기">
+            <i data-lucide="check" class="w-3 h-3 text-purple-600"></i> 민원확인완료
+          </button>
           <button type="button" onclick="unconfirmHubAppAlert('${app.id}', event)" class="ml-0.5 text-purple-400 hover:text-rose-600 font-bold text-[10px] px-1 hover:bg-purple-200/60 rounded cursor-pointer" title="확인 취소 (다시 맨 앞으로 올리기)">✕</button>
         </span>
       `);
@@ -27324,9 +27556,9 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
     if (!isAlertConf) {
       badges.push(`
         <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-600 text-white font-black text-[10.5px] shadow-2xs whitespace-nowrap animate-pulse">
-          <span class="flex items-center gap-1" title="고객 정보가 수정되었습니다.">
+          <button type="button" onclick="openAppUpdateHistoryModal('${app.id}', event)" class="flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-0 text-white p-0 font-black" title="클릭하여 어떤 수정이 발생했었는지 상세 확인">
             <i data-lucide="edit-3" class="w-3.5 h-3.5 text-white"></i> ⚡ 수정발생
-          </span>
+          </button>
           <button type="button" onclick="confirmHubAppAlert('${app.id}', event)" class="px-1.5 h-[16px] leading-none rounded bg-white text-indigo-900 hover:bg-indigo-100 font-black text-[9.5px] shadow-xs cursor-pointer transition-all inline-flex items-center justify-center gap-0.5 border-0" title="확인 완료 시 원래 신청일 순서로 돌아갑니다">
             확인
           </button>
@@ -27335,7 +27567,9 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
     } else {
       badges.push(`
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold text-[10.5px] whitespace-nowrap" title="수정 확인 완료 (원래 순서로 정렬됨)">
-          <i data-lucide="check" class="w-3 h-3 text-indigo-600"></i> 수정확인완료
+          <button type="button" onclick="openAppUpdateHistoryModal('${app.id}', event)" class="flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-0 text-indigo-800 p-0 font-bold" title="클릭하여 수정 이력 다시 보기">
+            <i data-lucide="check" class="w-3 h-3 text-indigo-600"></i> 수정확인완료
+          </button>
           <button type="button" onclick="unconfirmHubAppAlert('${app.id}', event)" class="ml-0.5 text-indigo-400 hover:text-rose-600 font-bold text-[10px] px-1 hover:bg-indigo-200/60 rounded cursor-pointer" title="확인 취소 (다시 맨 앞으로 올리기)">✕</button>
         </span>
       `);

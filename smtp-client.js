@@ -380,8 +380,11 @@ function sendSmtpMail(options) {
 
 function buildMimeMessage({ senderName, senderEmail, toList, ccList, subject, text, html, attachments }) {
   const boundaryMixed = '----=_Part_Mixed_' + Date.now().toString(36) + Math.random().toString(36).substring(2);
-  const boundaryAlt = '----=_Part_Alt_' + Date.now().toString(36) + Math.random().toString(36).substring(2);
-  const nowStr = new Date().toUTCString();
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const nowStr = `${days[kst.getUTCDay()]}, ${String(kst.getUTCDate()).padStart(2, '0')} ${months[kst.getUTCMonth()]} ${kst.getUTCFullYear()} ${String(kst.getUTCHours()).padStart(2, '0')}:${String(kst.getUTCMinutes()).padStart(2, '0')}:${String(kst.getUTCSeconds()).padStart(2, '0')} +0900`;
 
   const formattedFrom = (senderName && senderName !== senderEmail)
     ? `${encodeMimeHeader(senderName)} <${senderEmail}>`
@@ -473,7 +476,7 @@ async function testSmtpConnection(options) {
   const { host, port, secure, user, pass, testTo } = options;
   const targetEmail = testTo || user;
 
-  const testSubject = `[리본케어] SMTP 이메일 발송 연동 테스트 (${new Date().toLocaleTimeString('ko-KR')})`;
+  const testSubject = `[리본케어] SMTP 이메일 발송 연동 테스트 (${new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' })})`;
   const testHtml = `
     <div style="font-family: 'Pretendard', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
       <div style="background: linear-gradient(135deg, #0284c7 0%, #1e40af 100%); padding: 20px; border-radius: 12px; color: #ffffff; text-align: center;">
@@ -497,7 +500,7 @@ async function testSmtpConnection(options) {
           </tr>
           <tr>
             <td style="padding: 10px; font-weight: bold; color: #475569;">테스트 일시</td>
-            <td style="padding: 10px; color: #0f172a;">${new Date().toLocaleString('ko-KR')}</td>
+            <td style="padding: 10px; color: #0f172a;">${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} (한국 표준시)</td>
           </tr>
         </table>
         <div style="margin-top: 20px; padding: 12px 16px; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; color: #166534; font-size: 13px;">
