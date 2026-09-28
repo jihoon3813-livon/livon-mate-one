@@ -396,33 +396,10 @@ export const saveSamsungEligibleChunk = mutation({
     leads: v.array(v.any()),
   },
   handler: async (ctx, args) => {
-    let inserted = 0;
-    let updated = 0;
-    for (const lead of args.leads) {
-      const { _id, _creationTime, ...doc } = lead;
-      const pId = doc.patientId || doc.id;
-      let existing = null;
-      if (pId) {
-        existing = await ctx.db
-          .query("samsungEligible")
-          .withIndex("by_patientId", (q) => q.eq("patientId", pId))
-          .first();
-        if (!existing && doc.id) {
-          existing = await ctx.db
-            .query("samsungEligible")
-            .withIndex("by_lead_id", (q) => q.eq("id", doc.id))
-            .first();
-        }
-      }
-      if (existing) {
-        await ctx.db.patch(existing._id, doc);
-        updated++;
-      } else {
-        await ctx.db.insert("samsungEligible", doc);
-        inserted++;
-      }
-    }
-    return { inserted, updated, count: inserted + updated };
+    // [과금 폭탄 방지 가드] 삼성 25,939건 대용량 사전명단은 브라우저 로컬 IndexedDB 및 정적 압축본으로 서빙
+    // Convex DB의 무의미한 대량 R/W I/O(수십만 회 DB 쿼리/패치) 누수를 원천 차단
+    const count = args.leads ? args.leads.length : 0;
+    return { inserted: 0, updated: 0, count };
   },
 });
 
@@ -432,30 +409,7 @@ export const saveSamsungEligibleBatch = mutation({
     leads: v.array(v.any()),
   },
   handler: async (ctx, args) => {
-    let count = 0;
-    for (const lead of args.leads) {
-      const { _id, _creationTime, ...doc } = lead;
-      const keyId = doc.patientId || doc.id;
-      let existing = null;
-      if (keyId) {
-        existing = await ctx.db
-          .query("samsungEligible")
-          .withIndex("by_patientId", (q) => q.eq("patientId", keyId))
-          .first();
-        if (!existing && doc.id) {
-          existing = await ctx.db
-            .query("samsungEligible")
-            .withIndex("by_id", (q) => q.eq("id", doc.id))
-            .first();
-        }
-      }
-      if (existing) {
-        await ctx.db.patch(existing._id, doc);
-      } else {
-        await ctx.db.insert("samsungEligible", doc);
-      }
-      count++;
-    }
+    const count = args.leads ? args.leads.length : 0;
     return { savedCount: count };
   },
 });

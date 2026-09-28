@@ -1050,6 +1050,13 @@ var gSamsungList = [];
 var gSamsungAddressBook = [];
 var gSamsungSenders = [];
 var gSamsungEmailLogs = [];
+try {
+  const savedEmailLogs = localStorage.getItem('LIVON_SAMSUNG_EMAIL_LOGS');
+  if (savedEmailLogs) {
+    const parsed = JSON.parse(savedEmailLogs);
+    if (Array.isArray(parsed)) gSamsungEmailLogs = parsed;
+  }
+} catch (e) {}
 var gSamsungClaimHubActiveSubTab = 'daily';
 var gSamsungDailySelectedCareLogs = new Set();
 var gSamsungCustomerCareLogFiles = {}; // appId -> Array of { name, size, bytes: Uint8Array, date }
@@ -1710,10 +1717,7 @@ async function loadConvexData(showSpinner = true) {
         }
         console.log(`[Convex Cloud] 삼성화재 사전명단 동기화 상태 확인 (클라우드 표본: ${samsungEligible.length}건, 현재 명단: ${gSamsungList ? gSamsungList.length.toLocaleString() : 0}건)`);
       } else {
-        // 클라우드에 아직 사전명단이 없고 로컬에 10건 미만의 초기 기본 명단만 있을 때만 시딩
-        if (gSamsungList && gSamsungList.length > 0 && gSamsungList.length <= 10 && typeof syncToConvex === 'function') {
-          syncToConvex('sync:saveSamsungEligibleChunk', { leads: gSamsungList }).catch(console.warn);
-        }
+        // [비용 최적화]: 25,939건 대용량 명단은 로컬 IndexedDB에서 관리되므로 Convex 클라우드 시딩 불필요
       }
 
       if (Array.isArray(samsungSheets) && samsungSheets.length > 0) {
@@ -1748,8 +1752,15 @@ async function loadConvexData(showSpinner = true) {
         seedDefaultSamsungAddressBook();
       }
 
-      if (Array.isArray(samsungEmailLogs) && samsungEmailLogs.length > 0) {
-        gSamsungEmailLogs = samsungEmailLogs;
+      if (Array.isArray(samsungEmailLogs)) {
+        const mergedMap = new Map();
+        (gSamsungEmailLogs || []).forEach(l => { if (l && l.id) mergedMap.set(l.id, l); });
+        samsungEmailLogs.forEach(l => { if (l && l.id) mergedMap.set(l.id, l); });
+        gSamsungEmailLogs = Array.from(mergedMap.values());
+        gSamsungEmailLogs.sort((a, b) => (b.sentAt || '').localeCompare(a.sentAt || ''));
+        try {
+          localStorage.setItem('LIVON_SAMSUNG_EMAIL_LOGS', JSON.stringify(gSamsungEmailLogs));
+        } catch (e) {}
       }
 
       if (typeof renderSamsungClaimHub === 'function' && gActiveTab === 'samsungclaimhub') {
@@ -9793,33 +9804,49 @@ async function handleDispatchSamsungEmail(e) {
     const logRecord = {
       id: 'SLOG_' + Date.now(),
       type: type === 'daily' ? 'DAILY_INTAKE' : 'MONTHLY_CLAIM',
+      typeName: type === 'daily' ? '일일접수 보고' : '월간 정기청구',
+      to: to,
       recipient: to,
-      cc,
+      cc: cc || '',
       from: resolvedFrom,
-      subject,
-      body,
-      sentAt: sentAtStr,
-      status: '발송완료',
+      subject: subject,
+      body: body,
+      excelFileName: isExcelAttached ? fileName : '(미첨부)',
       attachmentCount: attachments.length,
-      attachmentsSummary: attachments.map(a => a.filename).join(', ')
+      attachmentsSummary: attachments.map(a => a.filename).join(', '),
+      sentAt: sentAtStr,
+      status: '전송완료'
     };
 
-    if (!window.gSamsungEmailLogs) window.gSamsungEmailLogs = [];
-    window.gSamsungEmailLogs.unshift(logRecord);
+    if (!Array.isArray(gSamsungEmailLogs)) gSamsungEmailLogs = [];
+    gSamsungEmailLogs.unshift(logRecord);
+    window.gSamsungEmailLogs = gSamsungEmailLogs;
+
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveSamsungEmailLog', { log: logRecord }).catch(console.warn);
+    }
+
     try {
-      localStorage.setItem('LIVON_SAMSUNG_EMAIL_LOGS', JSON.stringify(window.gSamsungEmailLogs));
+      localStorage.setItem('LIVON_SAMSUNG_EMAIL_LOGS', JSON.stringify(gSamsungEmailLogs));
     } catch (e) {}
 
     closeSamsungEmailDispatchModal();
 
+    if (typeof applySamsungPostSendSuccess === 'function') {
+      applySamsungPostSendSuccess(logRecord, type);
+    }
+
+    switchSamsungClaimHubSubTab('history');
+    if (typeof renderSamsungEmailHistoryTable === 'function') {
+      renderSamsungEmailHistoryTable();
+    }
+
     showCustomAlert({
-      title: type === 'daily' ? '일일접수 보고 발송 완료' : '월간 정기청구 발송 완료',
-      message: `${to} 수신자에게 총 ${attachments.length}개의 첨부파일과 함께 메일이 성공적으로 전송되었습니다.`,
+      title: type === 'daily' ? '일일접수 보고 발송 완료 🚀' : '월간 정기청구 발송 완료 🚀',
+      message: `[수신처: ${to}]\n총 ${attachments.length}개의 첨부파일과 함께 메일이 서버를 통해 성공적으로 전송 완료되었습니다.\n\n발송일시: ${sentAtStr}\n첨부파일: ${isExcelAttached ? fileName : '(미첨부)'} 외 ${Math.max(0, attachments.length - 1)}건`,
       icon: 'mail-check',
       iconColor: 'emerald'
     });
-
-    switchSamsungClaimHubSubTab('history');
 
   } catch (err) {
     console.error('[Samsung Dispatch Email Error]', err);
@@ -12885,11 +12912,11 @@ function renderSamsungEmailHistoryTable() {
             ${log.typeName || (isDaily ? '일일접수' : '월간청구')}
           </span>
         </td>
-        <td class="p-3 font-mono text-slate-700 font-medium">${log.to || '-'}</td>
+        <td class="p-3 font-mono text-slate-700 font-medium">${log.to || log.recipient || '-'}</td>
         <td class="p-3 font-bold text-slate-900 max-w-sm truncate" title="${log.subject || ''}">
           ${isRecentlySent ? '<span class="inline-block mr-1.5 text-[10.5px] font-black text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300">방금 발송 완료 🚀</span>' : ''}${log.subject || '-'}
         </td>
-        <td class="p-3 font-mono text-emerald-800 font-bold">${log.excelFileName || '-'}</td>
+        <td class="p-3 font-mono text-emerald-800 font-bold">${log.excelFileName || log.attachmentsSummary || '-'}</td>
         <td class="p-3 text-center">
           ${isRecentlySent 
             ? `<span class="px-2.5 py-1 rounded-full text-[10.5px] font-black bg-emerald-600 text-white shadow-md flex items-center justify-center gap-1 w-24 mx-auto ring-2 ring-emerald-300 animate-pulse">
@@ -13300,38 +13327,10 @@ async function confirmSamsungExcelUpload() {
     chunks.push(gSamsungUploadedExcelRecords.slice(i, i + CHUNK_SIZE));
   }
 
-  let uploaded = 0;
-  const CONCURRENCY = 6; // 6개 동시 병렬 파이프라인 전송 (대기 시간 85% 단축)
-
-  if (typeof syncToConvex === 'function' && chunks.length > 0) {
-    let nextChunkIdx = 0;
-
-    async function uploadWorker() {
-      while (nextChunkIdx < chunks.length) {
-        const idx = nextChunkIdx++;
-        const chunk = chunks[idx];
-        try {
-          await syncToConvex('sync:saveSamsungEligibleChunk', { leads: chunk });
-        } catch (err) {
-          console.warn(`[Convex Cloud] 청크 #${idx} 업로드 실패:`, err);
-        }
-
-        uploaded = Math.min(uploaded + chunk.length, total);
-        const pct = Math.min(100, Math.round((uploaded / total) * 100));
-
-        if (progressBar) progressBar.style.width = pct + '%';
-        if (percentBadge) percentBadge.innerText = pct + '%';
-        if (countDetail) countDetail.innerText = `${uploaded.toLocaleString()} / ${total.toLocaleString()}건 완료 (${pct}%)`;
-      }
-    }
-
-    const workers = Array.from({ length: Math.min(CONCURRENCY, chunks.length) }, () => uploadWorker());
-    await Promise.all(workers);
-  } else {
-    if (progressBar) progressBar.style.width = '100%';
-    if (percentBadge) percentBadge.innerText = '100%';
-    if (countDetail) countDetail.innerText = `${total.toLocaleString()} / ${total.toLocaleString()}건 완료 (100%)`;
-  }
+  // [Convex 과금 방지] 25,939건 대용량 사전명단은 Convex 대신 브라우저 IndexedDB에 초고속 로컬 저장
+  if (progressBar) progressBar.style.width = '100%';
+  if (percentBadge) percentBadge.innerText = '100%';
+  if (countDetail) countDetail.innerText = `${total.toLocaleString()} / ${total.toLocaleString()}건 로컬 캐시 완료 (100%)`;
 
   // IndexedDB 저장 완료 대기
   await idbSavePromise;
@@ -13687,37 +13686,7 @@ async function applySamsungDriveRecords(records, filename, syncedAt) {
     renderCurrentSamsungSheet();
   }
 
-  // Convex 클라우드 DB에 백그라운드 고속 병렬 청크 동기화 전송 (운영/개발 페이지 실시간 동기화)
-  if (typeof syncToConvex === 'function') {
-    (async () => {
-      try {
-        const total = records.length;
-        const chunkSize = 200;
-        const chunks = [];
-        for (let i = 0; i < total; i += chunkSize) {
-          chunks.push(records.slice(i, i + chunkSize));
-        }
-        console.log(`[SamsungDrive] Convex 클라우드(${CONVEX_URL})에 전체 ${total.toLocaleString()}건 병렬 전송 시작 (${chunks.length}개 청크)...`);
-
-        let chunkIdx = 0;
-        const CONCURRENCY = 4;
-        async function worker() {
-          while (chunkIdx < chunks.length) {
-            const idx = chunkIdx++;
-            try {
-              await syncToConvex('sync:saveSamsungEligibleChunk', { leads: chunks[idx] });
-            } catch (err) {
-              console.warn(`[SamsungDrive] 청크 #${idx} 전송 실패:`, err);
-            }
-          }
-        }
-        await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
-        console.log(`[SamsungDrive] Convex 클라우드(${CONVEX_URL})에 전체 전송 완료!`);
-      } catch (e) {
-        console.warn('[SamsungDrive] Convex 전송 중 경고:', e);
-      }
-    })();
-  }
+  // [Convex 과금 방지] 25,939건 대용량 사전명단은 IndexedDB 및 로컬 정적 JSON으로 완벽 서빙되므로 Convex 전송 불필요
 }
 
 // =========================================================================
@@ -13865,7 +13834,7 @@ function autoSyncCaregiverToDirectory(info, silent = false) {
     }, true);
   }
 
-  if (typeof syncToConvex === 'function') {
+  if (!silent && typeof syncToConvex === 'function') {
     syncToConvex('sync:saveCaregiver', { caregiver: cg }).catch(console.warn);
   }
 
