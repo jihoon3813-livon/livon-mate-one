@@ -1076,6 +1076,60 @@ function saveSavedFaxConfig(cfg) {
       return detailHandler(req, res);
     }
 
+    if (reqPath === '/api/careport/trend-scores') {
+      const trendHandler = require('./api/careport/trend-scores');
+      const parsedUrl = urlModule.parse(req.url, true);
+      req.query = parsedUrl.query;
+      res.status = (code) => ({
+        json: (data) => {
+          res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(data));
+        },
+        end: () => res.end()
+      });
+      res.json = (data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      };
+
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try { req.body = JSON.parse(body); } catch(e) { req.body = body; }
+          return trendHandler(req, res);
+        });
+        return;
+      }
+      return trendHandler(req, res);
+    }
+
+    if (reqPath === '/api/careport/generate-pdf') {
+      const pdfHandler = require('./api/careport/generate-pdf');
+      res.status = (code) => ({
+        json: (data) => {
+          res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(data));
+        },
+        end: () => res.end()
+      });
+      res.json = (data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      };
+
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try { req.body = JSON.parse(body); } catch(e) { req.body = body; }
+          return pdfHandler(req, res);
+        });
+        return;
+      }
+      return pdfHandler(req, res);
+    }
+
     if (reqPath === '/api/samsung/call-report/data') {
       const parsedUrl = urlModule.parse(req.url, true);
       const reqChannel = parsedUrl.query.channel || '삼성화재';

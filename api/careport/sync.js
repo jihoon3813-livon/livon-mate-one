@@ -105,7 +105,41 @@ module.exports = async (req, res) => {
         ? resp.data.data.result
         : [];
 
-      return list.map(item => ({
+      function sanitizeCareNoteItem(item) {
+        if (!item) return item;
+        const patientName = (item.username || item.patientName || '').trim();
+        const consultantName = (item.consultantName || item.caregiverName || '').trim();
+        if (!patientName || !consultantName || patientName === consultantName) return item;
+
+        function fix(str) {
+          if (!str || typeof str !== 'string') return str;
+          let out = str;
+          out = out.split(consultantName + '님 간병일지').join('간병일지');
+          out = out.split(consultantName + ' 님 간병일지').join('간병일지');
+          out = out.split(consultantName + ' 여사님').join(patientName + ' 님');
+          out = out.split(consultantName + '여사님').join(patientName + ' 님');
+          out = out.split(consultantName + ' 환자').join(patientName + ' 환자');
+          out = out.split(consultantName + '님의').join(patientName + ' 님의');
+          out = out.split(consultantName + ' 님의').join(patientName + ' 님의');
+          out = out.split(consultantName + '님이').join(patientName + ' 님이');
+          out = out.split(consultantName + ' 님이').join(patientName + ' 님이');
+          out = out.split(consultantName + '님은').join(patientName + ' 님은');
+          out = out.split(consultantName + ' 님은').join(patientName + ' 님은');
+          out = out.split(consultantName + '님을').join(patientName + ' 님을');
+          out = out.split(consultantName + ' 님을').join(patientName + ' 님을');
+          out = out.split(consultantName + '님과').join(patientName + ' 님과');
+          out = out.split(consultantName + ' 님과').join(patientName + ' 님과');
+          out = out.split(consultantName + '님').join(patientName + ' 님');
+          out = out.split(consultantName + ' 님').join(patientName + ' 님');
+          return out;
+        }
+
+        if (item.title) item.title = fix(item.title);
+        if (item.summary) item.summary = fix(item.summary);
+        return item;
+      }
+
+      return list.map(item => sanitizeCareNoteItem({
         ...item,
         orgId: org.id,
         orgName: org.name,
