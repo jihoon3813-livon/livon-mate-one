@@ -6966,7 +6966,12 @@ async function buildSamsungExcelWorkbookBuffer(type = 'daily') {
   const now = new Date();
   const year2 = String(now.getFullYear()).slice(2);
   const monthStr = String(now.getMonth() + 1).padStart(2, '0');
-  const titleText = `※ '${year2}.${monthStr}월 간병인지원 대상자 리스트`;
+
+  // 발송 위치에 따른 처음 보는 시트(activeTab) 설정:
+  // 월간청구관리(monthly, MONTHLY_CLAIM, claims) -> 1 ('완료' 시트)
+  // 일일접수보고(daily, DAILY_INTAKE, target 등) -> 0 ('일일접수보고' 시트)
+  const isMonthly = (type === 'monthly' || type === 'MONTHLY_CLAIM' || type === 'claims');
+  const activeTabIndex = isMonthly ? 1 : 0;
 
   if (typeof ExcelJS !== 'undefined') {
     const wb = new ExcelJS.Workbook();
@@ -6975,14 +6980,34 @@ async function buildSamsungExcelWorkbookBuffer(type = 'daily') {
     wb.created = now;
     wb.modified = now;
 
+    // 엑셀 오픈 시 최초 활성 탭 설정
+    wb.views = [
+      {
+        x: 0,
+        y: 0,
+        width: 10000,
+        height: 20000,
+        firstSheet: 0,
+        activeTab: activeTabIndex,
+        visibility: 'visible'
+      }
+    ];
+
     // 헬퍼: 워크시트 생성 및 스타일링
-    function buildStyledSheet(sheetName, schema, rowsData, isTargetSheet = false) {
+    function buildStyledSheet(sheetName, schema, rowsData, isTargetSheet = false, sheetIndex = 0) {
+      const isTabActive = (sheetIndex === activeTabIndex);
       const ws = wb.addWorksheet(sheetName, {
-        views: [{ state: 'frozen', xSplit: 0, ySplit: 2 }]
+        views: [{ state: 'frozen', xSplit: 0, ySplit: 2, active: isTabActive }]
       });
 
       // 1행: 제목 행
-      const titleRow = ws.addRow([titleText]);
+      const sheetTitle = (sheetName === '완료')
+        ? `※ '${year2}.${monthStr}월 간병인지원 완료 및 정산 리스트`
+        : (sheetName === '연락처'
+            ? `※ '${year2}.${monthStr}월 삼성화재 담당자 연락처 리스트`
+            : `※ '${year2}.${monthStr}월 간병인지원 일일접수보고 리스트`);
+
+      const titleRow = ws.addRow([sheetTitle]);
       titleRow.height = 28;
       titleRow.font = { name: '맑은 고딕', size: 12, bold: true, color: { argb: 'FF1E293B' } };
       titleRow.alignment = { vertical: 'middle', horizontal: 'left' };
@@ -7067,16 +7092,15 @@ async function buildSamsungExcelWorkbookBuffer(type = 'daily') {
       }
     }
 
-    // 1. [대상자] 시트
-    buildStyledSheet('대상자', SAMSUNG_SHEET_SCHEMAS.target, gSamsungSheets.target || [], true);
+    // 일일접수보고 / 월간청구관리 메일 발송 모두 동일하게 [일일접수보고], [완료], [연락처] 3개 시트 포함
+    // 1. [일일접수보고] 시트 (index 0)
+    buildStyledSheet('일일접수보고', SAMSUNG_SHEET_SCHEMAS.target, gSamsungSheets.target || [], true, 0);
 
-    // 2. [완료] 시트
-    if (type === 'all' || type === 'monthly' || type === 'MONTHLY_CLAIM' || type === 'CARE_LOG') {
-      buildStyledSheet('완료', SAMSUNG_SHEET_SCHEMAS.completed, gSamsungSheets.completed || [], false);
-    }
+    // 2. [완료] 시트 (index 1) - 항상 포함
+    buildStyledSheet('완료', SAMSUNG_SHEET_SCHEMAS.completed, gSamsungSheets.completed || [], false, 1);
 
-    // 3. [연락처] 시트
-    buildStyledSheet('연락처', SAMSUNG_SHEET_SCHEMAS.contacts, gSamsungSheets.contacts || [], false);
+    // 3. [연락처] 시트 (index 2) - 항상 포함
+    buildStyledSheet('연락처', SAMSUNG_SHEET_SCHEMAS.contacts, gSamsungSheets.contacts || [], false, 2);
 
     const buffer = await wb.xlsx.writeBuffer();
     return buffer;
@@ -7085,6 +7109,8 @@ async function buildSamsungExcelWorkbookBuffer(type = 'daily') {
   // Fallback: SheetJS (XLSX)
   if (typeof XLSX !== 'undefined') {
     const wb = XLSX.utils.book_new();
+    wb.Workbook = { Views: [{ activeTab: activeTabIndex }] };
+
     const targetHeaders = SAMSUNG_SHEET_SCHEMAS.target.map(c => c.label);
     const targetRows = (gSamsungSheets.target || []).map(row => SAMSUNG_SHEET_SCHEMAS.target.map(c => {
       let val = row[c.key] !== undefined && row[c.key] !== null ? row[c.key] : '';
@@ -7093,9 +7119,40 @@ async function buildSamsungExcelWorkbookBuffer(type = 'daily') {
       if (c.key === 'applyDateTime') return formatSamsungDateTime(val);
       return val;
     }));
-    const wsTarget = XLSX.utils.aoa_to_sheet([[titleText], targetHeaders, ...targetRows]);
+    const wsTarget = XLSX.utils.aoa_to_sheet([[`※ '${year2}.${monthStr}월 간병인지원 일일접수보고 리스트`], targetHeaders, ...targetRows]);
     wsTarget['!cols'] = calcSamsungSheetAutoWidth(targetHeaders, targetRows);
-    XLSX.utils.book_append_sheet(wb, wsTarget, '대상자');
+    if (wsTarget['!ref']) {
+      const range = XLSX.utils.decode_range(wsTarget['!ref']);
+      wsTarget['!autofilter'] = { ref: XLSX.utils.encode_range({ r: 1, c: 0 }, { r: range.e.r, c: range.e.c }) };
+    }
+    XLSX.utils.book_append_sheet(wb, wsTarget, '일일접수보고');
+
+    const compHeaders = SAMSUNG_SHEET_SCHEMAS.completed.map(c => c.label);
+    const compRows = (gSamsungSheets.completed || []).map(row => SAMSUNG_SHEET_SCHEMAS.completed.map(c => {
+      let val = row[c.key] !== undefined && row[c.key] !== null ? row[c.key] : '';
+      if (c.key === 'birthDate') return formatSamsungBirthDate(val);
+      if (isSamsungDateColumn(c.key)) return formatSamsungDate(val);
+      if (c.key === 'applyDateTime') return formatSamsungDateTime(val);
+      return val;
+    }));
+    const wsComp = XLSX.utils.aoa_to_sheet([[`※ '${year2}.${monthStr}월 간병인지원 완료 및 정산 리스트`], compHeaders, ...compRows]);
+    wsComp['!cols'] = calcSamsungSheetAutoWidth(compHeaders, compRows);
+    if (wsComp['!ref']) {
+      const range = XLSX.utils.decode_range(wsComp['!ref']);
+      wsComp['!autofilter'] = { ref: XLSX.utils.encode_range({ r: 1, c: 0 }, { r: range.e.r, c: range.e.c }) };
+    }
+    XLSX.utils.book_append_sheet(wb, wsComp, '완료');
+
+    const contHeaders = SAMSUNG_SHEET_SCHEMAS.contacts.map(c => c.label);
+    const contRows = (gSamsungSheets.contacts || []).map(row => SAMSUNG_SHEET_SCHEMAS.contacts.map(c => row[c.key] !== undefined && row[c.key] !== null ? row[c.key] : ''));
+    const wsCont = XLSX.utils.aoa_to_sheet([[`※ '${year2}.${monthStr}월 삼성화재 담당자 연락처 리스트`], contHeaders, ...contRows]);
+    wsCont['!cols'] = calcSamsungSheetAutoWidth(contHeaders, contRows);
+    if (wsCont['!ref']) {
+      const range = XLSX.utils.decode_range(wsCont['!ref']);
+      wsCont['!autofilter'] = { ref: XLSX.utils.encode_range({ r: 1, c: 0 }, { r: range.e.r, c: range.e.c }) };
+    }
+    XLSX.utils.book_append_sheet(wb, wsCont, '연락처');
+
     return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   }
 
@@ -7110,9 +7167,12 @@ function buildSamsungExcelWorkbook(type = 'daily') {
   const now = new Date();
   const year2 = String(now.getFullYear()).slice(2);
   const monthStr = String(now.getMonth() + 1).padStart(2, '0');
-  const titleText = `※ '${year2}.${monthStr}월 간병인지원 대상자 리스트`;
 
-  // 1. [대상자] 시트 (누적 전체 명단 포함)
+  const isMonthly = (type === 'monthly' || type === 'MONTHLY_CLAIM' || type === 'claims');
+  const activeTabIndex = isMonthly ? 1 : 0;
+  wb.Workbook = { Views: [{ activeTab: activeTabIndex }] };
+
+  // 1. [일일접수보고] 시트 (누적 전체 명단 포함)
   const targetHeaders = SAMSUNG_SHEET_SCHEMAS.target.map(c => c.label);
   const targetRows = (gSamsungSheets.target || []).map(row => SAMSUNG_SHEET_SCHEMAS.target.map(c => {
     let val = row[c.key] !== undefined && row[c.key] !== null ? row[c.key] : '';
@@ -7121,16 +7181,15 @@ function buildSamsungExcelWorkbook(type = 'daily') {
     if (c.key === 'applyDateTime') return formatSamsungDateTime(val);
     return val;
   }));
-  const wsTarget = XLSX.utils.aoa_to_sheet([[titleText], targetHeaders, ...targetRows]);
+  const wsTarget = XLSX.utils.aoa_to_sheet([[`※ '${year2}.${monthStr}월 간병인지원 일일접수보고 리스트`], targetHeaders, ...targetRows]);
   wsTarget['!cols'] = calcSamsungSheetAutoWidth(targetHeaders, targetRows);
   if (wsTarget['!ref']) {
     const range = XLSX.utils.decode_range(wsTarget['!ref']);
     wsTarget['!autofilter'] = { ref: XLSX.utils.encode_range({ r: 1, c: 0 }, { r: range.e.r, c: range.e.c }) };
   }
-  XLSX.utils.book_append_sheet(wb, wsTarget, '대상자');
+  XLSX.utils.book_append_sheet(wb, wsTarget, '일일접수보고');
 
-  // 2. [완료] 시트
-  if (type === 'all' || type === 'monthly' || type === 'MONTHLY_CLAIM' || type === 'CARE_LOG') {
+  // 2. [완료] 시트 (index 1) - 항상 포함
     const compHeaders = SAMSUNG_SHEET_SCHEMAS.completed.map(c => c.label);
     const compRows = (gSamsungSheets.completed || []).map(row => SAMSUNG_SHEET_SCHEMAS.completed.map(c => {
       let val = row[c.key] !== undefined && row[c.key] !== null ? row[c.key] : '';
@@ -7138,19 +7197,18 @@ function buildSamsungExcelWorkbook(type = 'daily') {
       if (isSamsungDateColumn(c.key)) return formatSamsungDate(val);
       return val;
     }));
-    const wsComp = XLSX.utils.aoa_to_sheet([[titleText], compHeaders, ...compRows]);
+    const wsComp = XLSX.utils.aoa_to_sheet([[`※ '${year2}.${monthStr}월 간병인지원 완료 및 정산 리스트`], compHeaders, ...compRows]);
     wsComp['!cols'] = calcSamsungSheetAutoWidth(compHeaders, compRows);
     if (wsComp['!ref']) {
       const range = XLSX.utils.decode_range(wsComp['!ref']);
       wsComp['!autofilter'] = { ref: XLSX.utils.encode_range({ r: 1, c: 0 }, { r: range.e.r, c: range.e.c }) };
     }
     XLSX.utils.book_append_sheet(wb, wsComp, '완료');
-  }
 
-  // 3. [연락처] 시트
+  // 3. [연락처] 시트 (index 2) - 항상 포함
   const contHeaders = SAMSUNG_SHEET_SCHEMAS.contacts.map(c => c.label);
   const contRows = (gSamsungSheets.contacts || []).map(row => SAMSUNG_SHEET_SCHEMAS.contacts.map(c => row[c.key] !== undefined && row[c.key] !== null ? row[c.key] : ''));
-  const wsCont = XLSX.utils.aoa_to_sheet([[titleText], contHeaders, ...contRows]);
+  const wsCont = XLSX.utils.aoa_to_sheet([[`※ '${year2}.${monthStr}월 삼성화재 담당자 연락처 리스트`], contHeaders, ...contRows]);
   wsCont['!cols'] = calcSamsungSheetAutoWidth(contHeaders, contRows);
   if (wsCont['!ref']) {
     const range = XLSX.utils.decode_range(wsCont['!ref']);
@@ -9058,10 +9116,29 @@ function updateSamsungClaimHubTabsUI() {
   });
 }
 
+function triggerSamsungCareLogAutoSync() {
+  if (typeof syncCarePortLogs !== 'function') return;
+  const isLogsEmpty = (!gCareLogs || gCareLogs.length === 0);
+  const lastSyncTime = window._lastSamsungCareLogAutoSyncTime || 0;
+  const isStale = (Date.now() - lastSyncTime > 30000); // 30초 이상 경과 시 또는 일지가 비어있을 때
+  if (isLogsEmpty || isStale) {
+    window._lastSamsungCareLogAutoSyncTime = Date.now();
+    syncCarePortLogs(false).then(() => {
+      console.log('[Samsung AutoSync] CarePort care logs synchronized automatically.');
+    }).catch(err => {
+      console.warn('[Samsung AutoSync] CarePort auto-sync warning:', err);
+    });
+  }
+}
+window.triggerSamsungCareLogAutoSync = triggerSamsungCareLogAutoSync;
+
 function switchSamsungClaimHubSubTab(subTab) {
   gSamsungClaimHubActiveSubTab = subTab || 'daily';
   updateSamsungClaimHubTabsUI();
   renderSamsungClaimHub();
+  if (gSamsungClaimHubActiveSubTab === 'daily') {
+    triggerSamsungCareLogAutoSync();
+  }
 }
 
 function renderSamsungClaimHub(subTabParam = null) {
@@ -9070,6 +9147,9 @@ function renderSamsungClaimHub(subTabParam = null) {
   }
   if (typeof initSamsungSpreadsheet === 'function') {
     initSamsungSpreadsheet();
+  }
+  if (gSamsungClaimHubActiveSubTab === 'daily') {
+    triggerSamsungCareLogAutoSync();
   }
 
   // 1. 배지 카운트 업데이트
@@ -11388,14 +11468,14 @@ async function previewSamsungExcelAttachment(type) {
   if (countCont) countCont.innerText = (gSamsungSheets.contacts?.length || 0).toLocaleString();
 
   if (type === 'daily') {
-    if (modalSubTitle) modalSubTitle.innerText = '일일접수보고 첨부 엑셀: [대상자] 및 [연락처] 시트 데이터 실시간 검토';
+    if (modalSubTitle) modalSubTitle.innerText = '일일접수보고 첨부 엑셀: [일일접수보고], [완료], [연락처] 3개 시트 실시간 검토 (일일접수보고 우선 표시)';
     if (btnTarget) btnTarget.classList.remove('hidden');
-    if (btnCompleted) btnCompleted.classList.add('hidden');
+    if (btnCompleted) btnCompleted.classList.remove('hidden');
     if (btnContacts) btnContacts.classList.remove('hidden');
     switchExcelPreviewSheet('target');
   } else {
     // claims (monthly)
-    if (modalSubTitle) modalSubTitle.innerText = '월간 청구관리 첨부 엑셀: [대상자], [완료], [연락처] 시트 데이터 실시간 검토';
+    if (modalSubTitle) modalSubTitle.innerText = '월간 청구관리 첨부 엑셀: [일일접수보고], [완료], [연락처] 3개 시트 실시간 검토 (완료 시트 우선 표시)';
     if (btnTarget) btnTarget.classList.remove('hidden');
     if (btnCompleted) btnCompleted.classList.remove('hidden');
     if (btnContacts) btnContacts.classList.remove('hidden');
@@ -32784,6 +32864,9 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
     if (typeof checkSamsungDriveStatus === 'function') {
       checkSamsungDriveStatus();
     }
+    if (typeof triggerSamsungCareLogAutoSync === 'function') {
+      triggerSamsungCareLogAutoSync();
+    }
   }
   else if (tabId === 'samsungclaimhub') {
     if (!filterParam && typeof clearSamsungClaimHubSearch === 'function') {
@@ -32791,6 +32874,9 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
     }
     if (typeof renderSamsungClaimHub === 'function') {
       renderSamsungClaimHub(filterParam);
+    }
+    if (typeof triggerSamsungCareLogAutoSync === 'function') {
+      triggerSamsungCareLogAutoSync();
     }
   }
   else if (tabId === 'hyundaiclaimhub') {
@@ -34436,6 +34522,15 @@ async function syncCarePortLogs(isManual = false) {
     }
 
     renderCareLogs();
+    if (typeof renderCurrentSamsungSheet === 'function' && (gActiveTab === 'samsungclaimhub' || gActiveTab === 'samsunglist' || gActiveTab === 'samsungleads' || gActiveTab === 'samsung')) {
+      renderCurrentSamsungSheet();
+    }
+    if (typeof renderSamsungDailyAvailableLogsSelector === 'function') {
+      renderSamsungDailyAvailableLogsSelector();
+    }
+    if (typeof updateSamsungDailyCareLogCountBadge === 'function') {
+      updateSamsungDailyCareLogCountBadge();
+    }
 
     if (isManual) {
       alert(`✅ 리본케어포트 전산 실시간 동기화 완료!\n\n- 수신된 공식 간병일지: 총 ${logs.length}건\n- 관리 환자(피보험자): 총 ${groups.length}명\n- 원수사: 현대해상(본사/영등포/케어링/대전), 삼성화재\n\n동일 환자의 매일 생성된 일지가 실시간 분류되었습니다.`);
