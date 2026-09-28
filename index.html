@@ -10384,10 +10384,10 @@
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h3 class="text-base font-black tracking-tight" id="samsungMergedPreviewTitle">삼성화재 간병일지 통합 미리보기</h3>
-              <span id="samsungMergedPreviewBadge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/30">통합 PDF</span>
+              <h3 class="text-base font-black tracking-tight" id="samsungMergedPreviewTitle">케어포트 공식 간병일지 실물 확인</h3>
+              <span id="samsungMergedPreviewBadge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/30">공식 간병일지</span>
             </div>
-            <p class="text-xs text-purple-200/80 mt-0.5" id="samsungMergedPreviewSubtitle">선택된 간병일지를 하나의 단일 PDF 파일로 결합한 미리보기입니다.</p>
+            <p class="text-xs text-purple-200/80 mt-0.5" id="samsungMergedPreviewSubtitle">환자의 케어포트 공식 간병일지 실물 확인 및 메일 첨부 관리 화면입니다.</p>
           </div>
         </div>
         <div class="flex items-center gap-2">
@@ -10398,7 +10398,7 @@
           </button>
           <button type="button" onclick="downloadSamsungMergedCareLogPdf()" 
             class="px-3.5 py-1.5 rounded-xl bg-purple-900/60 hover:bg-purple-900 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-purple-400/40 shadow-xs"
-            title="통합된 간병일지 PDF를 내 PC에 다운로드합니다">
+            title="간병일지 PDF를 내 PC에 다운로드합니다">
             <i data-lucide="download" class="w-4 h-4"></i> <span>다운로드</span>
           </button>
           <button type="button" onclick="openSamsungMergedCareLogPdfNewTab()" 
@@ -10417,8 +10417,8 @@
       <div class="flex-1 w-full bg-slate-100 relative p-2 sm:p-3 overflow-hidden flex flex-col">
         <div id="samsungMergedPreviewLoading" class="absolute inset-0 bg-slate-100/90 backdrop-blur-xs flex flex-col items-center justify-center z-10 hidden">
           <i data-lucide="loader-2" class="w-8 h-8 text-purple-600 animate-spin mb-2"></i>
-          <p class="font-bold text-slate-700 text-sm">간병일지 PDF 통합 생성 중...</p>
-          <p class="text-xs text-slate-500 mt-1">여러 고객의 간병일지를 단일 PDF로 결합하고 있습니다.</p>
+          <p class="font-bold text-slate-700 text-sm">간병일지 불러오는 중...</p>
+          <p class="text-xs text-slate-500 mt-1">케어포트 공식 간병일지 실물 문서를 불러오고 있습니다.</p>
         </div>
         <iframe id="samsungMergedCareLogPreviewIframe" class="w-full h-full rounded-2xl border border-slate-300 shadow-inner bg-white" src="about:blank"></iframe>
       </div>
@@ -10426,9 +10426,9 @@
       <!-- Modal Footer -->
       <div class="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-between shrink-0">
         <div class="text-xs text-slate-600 flex items-center gap-3 flex-wrap font-medium">
-          <span id="samsungMergedPreviewMetaInfo">총 0명 / 0페이지</span>
+          <span id="samsungMergedPreviewMetaInfo">환자별 간병일지</span>
           <span class="text-slate-300">|</span>
-          <span class="text-[11px] text-slate-500">※ 이 통합 PDF 파일이 삼성화재 일일보고 메일 발송 시 단일 첨부파일로 전송됩니다.</span>
+          <span class="text-[11px] text-slate-500">※ 고객별 공식 간병일지 PDF 파일이 메일 발송 시 개별 첨부파일로 전송됩니다.</span>
         </div>
         <div class="flex items-center gap-2">
           <button type="button" id="samsungMergedPreviewAttachBtnFooter" onclick="toggleCurrentPreviewedCareLogAttachment()" 
