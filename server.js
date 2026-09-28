@@ -229,6 +229,55 @@ function invalidateRealDataCache() {
   gCachedRealDataMtime = 0;
 }
 
+function getConfirmedAlertsData() {
+  const confirmedFile = path.join(BASE_DIR, 'hub_confirmed_alerts.json');
+  let data = {
+    updatedAt: new Date().toISOString(),
+    confirmedAlertAppIds: [],
+    confirmedDisabledAppIds: []
+  };
+  if (fs.existsSync(confirmedFile)) {
+    try {
+      data = JSON.parse(fs.readFileSync(confirmedFile, 'utf-8'));
+    } catch(e) {}
+  }
+  if (!Array.isArray(data.confirmedAlertAppIds)) data.confirmedAlertAppIds = [];
+  if (!Array.isArray(data.confirmedDisabledAppIds)) data.confirmedDisabledAppIds = [];
+  return data;
+}
+
+function saveConfirmedAlertsData(newData) {
+  const confirmedFile = path.join(BASE_DIR, 'hub_confirmed_alerts.json');
+  const current = getConfirmedAlertsData();
+  const alertSet = new Set(current.confirmedAlertAppIds.map(String));
+  const disabledSet = new Set(current.confirmedDisabledAppIds.map(String));
+
+  if (Array.isArray(newData.confirmedAlertAppIds)) {
+    newData.confirmedAlertAppIds.forEach(id => { if (id) alertSet.add(String(id)); });
+  }
+  if (Array.isArray(newData.confirmedDisabledAppIds)) {
+    newData.confirmedDisabledAppIds.forEach(id => { if (id) disabledSet.add(String(id)); });
+  }
+  if (Array.isArray(newData.removeAlertAppIds)) {
+    newData.removeAlertAppIds.forEach(id => { if (id) alertSet.delete(String(id)); });
+  }
+  if (Array.isArray(newData.removeDisabledAppIds)) {
+    newData.removeDisabledAppIds.forEach(id => { if (id) disabledSet.delete(String(id)); });
+  }
+
+  const result = {
+    updatedAt: new Date().toISOString(),
+    confirmedAlertAppIds: Array.from(alertSet),
+    confirmedDisabledAppIds: Array.from(disabledSet)
+  };
+  try {
+    fs.writeFileSync(confirmedFile, JSON.stringify(result, null, 2), 'utf-8');
+  } catch(e) {
+    console.error('[Confirmed Alerts Save Error]', e.message);
+  }
+  return result;
+}
+
 function startServer(port) {
   const server = http.createServer(async (req, res) => {
     const parsedUrl = urlModule.parse(req.url, true);
@@ -1038,6 +1087,92 @@ function saveSavedFaxConfig(cfg) {
     }
 
     // =========================================================================
+    // API Route: 통합허브 수정발생 & 모달 비활성화 확인(Acknowledge) 전 PC/사용자 공통 동기화 API
+    // =========================================================================
+    if (reqPath === '/api/hub/confirmed-alerts') {
+      if (req.method === 'GET') {
+        const data = getConfirmedAlertsData();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, ...data }));
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const saved = saveConfirmedAlertsData(payload);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true, ...saved }));
+          } catch(err) {
+            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: err.message }));
+          }
+        });
+        return;
+      }
+    }
+
+    if (reqPath === '/api/hub/confirm-alert' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { appId, type = 'alert', confirmed = true, appIds } = JSON.parse(body || '{}');
+          const targetIds = Array.isArray(appIds) ? appIds : (appId ? [appId] : []);
+          const patchData = {};
+          if (type === 'disabled') {
+            if (confirmed) {
+              patchData.confirmedDisabledAppIds = targetIds;
+            } else {
+              patchData.removeDisabledAppIds = targetIds;
+            }
+          } else {
+            if (confirmed) {
+              patchData.confirmedAlertAppIds = targetIds;
+            } else {
+              patchData.removeAlertAppIds = targetIds;
+            }
+          }
+          const saved = saveConfirmedAlertsData(patchData);
+
+          // Update flag on realDataFile applications if exists
+          try {
+            const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+            if (fs.existsSync(realDataFile)) {
+              const stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8'));
+              if (Array.isArray(stored.applications)) {
+                let updatedAny = false;
+                stored.applications.forEach(a => {
+                  if (targetIds.includes(String(a.id))) {
+                    if (type === 'disabled') {
+                      a.isModalDisabledConfirmed = Boolean(confirmed);
+                    } else {
+                      a.isAlertConfirmed = Boolean(confirmed);
+                    }
+                    updatedAny = true;
+                  }
+                });
+                if (updatedAny) {
+                  stored.updatedAt = new Date().toISOString();
+                  fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+                  invalidateRealDataCache();
+                }
+              }
+            }
+          } catch(e) {}
+
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, ...saved }));
+        } catch(err) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    // =========================================================================
     // API Route: CarePort Care Notes (리본케어포트 간병일지 동기화 및 상세조회)
     // =========================================================================
     if (reqPath === '/api/careport/sync') {
@@ -1105,6 +1240,7 @@ function saveSavedFaxConfig(cfg) {
     }
 
     if (reqPath === '/api/careport/generate-pdf') {
+      try { delete require.cache[require.resolve('./api/careport/generate-pdf')]; } catch(e) {}
       const pdfHandler = require('./api/careport/generate-pdf');
       res.status = (code) => ({
         json: (data) => {

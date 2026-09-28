@@ -605,7 +605,8 @@
       "csLatestType": null,
       "_applyTime": 1773932400000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0011",
@@ -5502,7 +5503,8 @@
       "csLatestType": null,
       "_applyTime": 1776351600000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0097",
@@ -6688,7 +6690,8 @@
       "updatedAt": "2026-09-28T07:23:45.052Z",
       "roundDeposits": {
         "4": 1420000
-      }
+      },
+      "isAlertConfirmed": true
     },
     {
       "id": "C0118",
@@ -6806,7 +6809,8 @@
       "csLatestType": null,
       "_applyTime": 1777993200000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0121",
@@ -10110,7 +10114,8 @@
       "csLatestType": null,
       "_applyTime": 1785769200000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0186",
@@ -11236,7 +11241,8 @@
       "csLatestType": null,
       "_applyTime": 1783868400000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0207",
@@ -11295,7 +11301,8 @@
       "csLatestType": null,
       "_applyTime": 1783954800000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0208",
@@ -11472,7 +11479,8 @@
       "csLatestType": null,
       "_applyTime": 1784041200000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0211",
@@ -11708,7 +11716,8 @@
       "csLatestType": null,
       "_applyTime": 1784041200000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0216",
@@ -12003,7 +12012,8 @@
       "csLatestType": null,
       "_applyTime": 1784646000000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0221",
@@ -12357,7 +12367,8 @@
       "csLatestType": null,
       "_applyTime": 1785423600000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0229",
@@ -12475,7 +12486,8 @@
       "csLatestType": null,
       "_applyTime": 1785855600000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0231",
@@ -12534,7 +12546,8 @@
       "csLatestType": null,
       "_applyTime": 1783263600000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0232",
@@ -12652,7 +12665,8 @@
       "csLatestType": null,
       "_applyTime": 1785942000000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0234",
@@ -12711,7 +12725,8 @@
       "csLatestType": null,
       "_applyTime": 1785942000000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0235",
@@ -12829,7 +12844,8 @@
       "csLatestType": null,
       "_applyTime": 1786028400000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0238",
@@ -12947,7 +12963,8 @@
       "csLatestType": null,
       "_applyTime": 1786374000000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0240",
@@ -13006,7 +13023,8 @@
       "csLatestType": null,
       "_applyTime": 1786374000000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0241",
@@ -13065,7 +13083,8 @@
       "csLatestType": null,
       "_applyTime": 1786460400000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0242",
@@ -13183,7 +13202,8 @@
       "csLatestType": null,
       "_applyTime": 1786633200000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0244",
@@ -13242,7 +13262,8 @@
       "csLatestType": null,
       "_applyTime": 1786633200000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0245",
@@ -13360,7 +13381,8 @@
       "csLatestType": null,
       "_applyTime": 1787151600000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0247",
@@ -13478,7 +13500,8 @@
       "csLatestType": null,
       "_applyTime": 1787877600000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0249",
@@ -13537,7 +13560,8 @@
       "csLatestType": null,
       "_applyTime": 1787112600000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0250",
@@ -13596,7 +13620,8 @@
       "csLatestType": null,
       "_applyTime": 1787211600000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0251",
@@ -13655,7 +13680,8 @@
       "csLatestType": null,
       "_applyTime": 1787583600000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0252",
@@ -13714,7 +13740,8 @@
       "csLatestType": null,
       "_applyTime": 1787636400000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0253",
@@ -13773,7 +13800,8 @@
       "csLatestType": null,
       "_applyTime": 1787637000000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0254",
@@ -13832,7 +13860,8 @@
       "csLatestType": null,
       "_applyTime": 1787706600000,
       "_updTime": 0,
-      "_latestEventTime": 1789691700000
+      "_latestEventTime": 1789691700000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0255",
@@ -13950,7 +13979,8 @@
       "csLatestType": null,
       "_applyTime": 1787877600000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0257",
@@ -14009,7 +14039,8 @@
       "csLatestType": null,
       "_applyTime": 1788138000000,
       "_updTime": 0,
-      "_latestEventTime": 1788153000000
+      "_latestEventTime": 1788153000000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0258",
@@ -14245,7 +14276,8 @@
       "csLatestType": null,
       "_applyTime": 1790089200000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0262",
@@ -14304,7 +14336,8 @@
       "csLatestType": null,
       "_applyTime": 1788243000000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0263",
@@ -14363,7 +14396,8 @@
       "csLatestType": null,
       "_applyTime": 1788400200000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0264",
@@ -14423,7 +14457,8 @@
       "csLatestType": null,
       "_applyTime": 1788411900000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0265",
@@ -14483,7 +14518,8 @@
       "csLatestType": null,
       "_applyTime": 1788393900000,
       "_updTime": 0,
-      "_latestEventTime": 1788410880000
+      "_latestEventTime": 1788410880000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0266",
@@ -14543,7 +14579,8 @@
       "csLatestType": null,
       "_applyTime": 1788419220000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0267",
@@ -14722,7 +14759,8 @@
       "csLatestType": null,
       "_applyTime": 1788751800000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0270",
@@ -14782,7 +14820,8 @@
       "csLatestType": null,
       "_applyTime": 1788841800000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0271",
@@ -14841,7 +14880,8 @@
       "csLatestType": null,
       "_applyTime": 1788755460000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0272",
@@ -14900,7 +14940,8 @@
       "csLatestType": null,
       "_applyTime": 1790089200000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0273",
@@ -15018,7 +15059,8 @@
       "csLatestType": null,
       "_applyTime": 1789275600000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0275",
@@ -15078,7 +15120,8 @@
       "csLatestType": null,
       "_applyTime": 1788966000000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0276",
@@ -15137,7 +15180,8 @@
       "csLatestType": null,
       "_applyTime": 1790089200000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0277",
@@ -15256,7 +15300,8 @@
       "csLatestType": null,
       "_applyTime": 1789084860000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0279",
@@ -15315,7 +15360,8 @@
       "csLatestType": null,
       "_applyTime": 1789102860000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0280",
@@ -15375,7 +15421,8 @@
       "csLatestType": null,
       "_applyTime": 1789192800000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0281",
@@ -15674,7 +15721,8 @@
       "csLatestType": null,
       "_applyTime": 1789366200000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0286",
@@ -15733,7 +15781,8 @@
       "csLatestType": null,
       "_applyTime": 1759244340000,
       "_updTime": 0,
-      "_latestEventTime": 1789536180000
+      "_latestEventTime": 1789536180000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0287",
@@ -15792,7 +15841,8 @@
       "csLatestType": null,
       "_applyTime": 1789365600000,
       "_updTime": 0,
-      "_latestEventTime": 1789958640000
+      "_latestEventTime": 1789958640000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0288",
@@ -15852,7 +15902,8 @@
       "csLatestType": null,
       "_applyTime": 1789447800000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0289",
@@ -15912,7 +15963,8 @@
       "csLatestType": null,
       "_applyTime": 1788447600000,
       "_updTime": 0,
-      "_latestEventTime": 1789518540000
+      "_latestEventTime": 1789518540000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0290",
@@ -16032,7 +16084,8 @@
       "csLatestType": null,
       "_applyTime": 1789516800000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0292",
@@ -16091,7 +16144,8 @@
       "csLatestType": null,
       "_applyTime": 1789693200000,
       "_updTime": 0,
-      "_latestEventTime": 1789612500000
+      "_latestEventTime": 1789612500000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0293",
@@ -16150,7 +16204,8 @@
       "csLatestType": null,
       "_applyTime": 1790089200000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0294",
@@ -16210,7 +16265,8 @@
       "csLatestType": null,
       "_applyTime": 1789556400000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0295",
@@ -16270,7 +16326,8 @@
       "csLatestType": null,
       "_applyTime": 1789686000000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0296",
@@ -16389,7 +16446,8 @@
       "csLatestType": null,
       "_applyTime": 1789717860000,
       "_updTime": 0,
-      "_latestEventTime": 1789706820000
+      "_latestEventTime": 1789706820000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0298",
@@ -16449,7 +16507,8 @@
       "csLatestType": null,
       "_applyTime": 1789707120000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0299",
@@ -16513,7 +16572,8 @@
       "roundDeposits": {
         "1": 100000
       },
-      "updatedAt": "2026-09-28T07:19:15.950Z"
+      "updatedAt": "2026-09-28T07:19:15.950Z",
+      "isAlertConfirmed": true
     },
     {
       "id": "C0300",
@@ -16574,7 +16634,8 @@
       "_updTime": 0,
       "_latestEventTime": 0,
       "hasManualUpdate": true,
-      "updatedAt": "2026-09-23T07:22:57.310Z"
+      "updatedAt": "2026-09-23T07:22:57.310Z",
+      "isAlertConfirmed": true
     },
     {
       "id": "C0301",
@@ -16636,7 +16697,8 @@
       "_updTime": 0,
       "_latestEventTime": 0,
       "hasManualUpdate": true,
-      "updatedAt": "2026-09-23T07:22:17.988Z"
+      "updatedAt": "2026-09-23T07:22:17.988Z",
+      "isAlertConfirmed": true
     },
     {
       "id": "C0302",
@@ -16696,7 +16758,8 @@
       "csLatestType": null,
       "_applyTime": 1790002800000,
       "_updTime": 0,
-      "_latestEventTime": 0
+      "_latestEventTime": 0,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0303",
@@ -16756,7 +16819,8 @@
       "csLatestType": null,
       "_applyTime": 1789950720000,
       "_updTime": 0,
-      "_latestEventTime": 1790036820000
+      "_latestEventTime": 1790036820000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0304",
@@ -16818,7 +16882,8 @@
       "_latestEventTime": 0,
       "claimSetEnabledForCompleted": false,
       "hasManualUpdate": true,
-      "updatedAt": "2026-09-23T08:00:15.459Z"
+      "updatedAt": "2026-09-23T08:00:15.459Z",
+      "isAlertConfirmed": true
     }
   ],
   "assignments": [

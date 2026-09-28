@@ -1,38 +1,68 @@
 // api/careport/generate-pdf.js
-// Ultra-fast server-side PDF generator using headless Edge/Chrome
+// Ultra-fast server-side PDF generator using headless Chrome/Edge with isolated profile
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execFile } = require('child_process');
 
-const EDGE_PATHS = [
+// Prefer Google Chrome for fastest startup (< 2s), followed by Microsoft Edge
+const BROWSER_CANDIDATES = [
+  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+  path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
   'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
+  path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe')
 ];
 
-function getEdgeExecutable() {
-  for (const p of EDGE_PATHS) {
-    if (fs.existsSync(p)) return p;
+let gCachedBrowserExe = null;
+
+function getBrowserExecutable() {
+  if (gCachedBrowserExe && fs.existsSync(gCachedBrowserExe)) {
+    return gCachedBrowserExe;
+  }
+  for (const p of BROWSER_CANDIDATES) {
+    if (p && fs.existsSync(p)) {
+      gCachedBrowserExe = p;
+      return p;
+    }
   }
   return null;
 }
 
 module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With');
+  // CORS configuration
+  const reqOrigin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', reqOrigin);
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With, Authorization');
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    if (typeof res.status === 'function') {
+      return res.status(200).end();
+    }
+    res.writeHead(200);
+    return res.end();
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Method Not Allowed' });
+    const errPayload = { success: false, message: 'Method Not Allowed' };
+    if (typeof res.status === 'function') {
+      return res.status(405).json(errPayload);
+    }
+    res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
+    return res.end(JSON.stringify(errPayload));
   }
 
-  const edgeExe = getEdgeExecutable();
-  if (!edgeExe) {
-    return res.status(501).json({ success: false, error: 'Edge executable not found on server' });
+  const browserExe = getBrowserExecutable();
+  if (!browserExe) {
+    console.error('[CarePort PDF] Chrome or Edge browser executable not found');
+    const errPayload = { success: false, error: '서버에 Chrome 또는 Edge 브라우저를 찾을 수 없습니다.' };
+    if (typeof res.status === 'function') {
+      return res.status(501).json(errPayload);
+    }
+    res.writeHead(501, { 'Content-Type': 'application/json; charset=utf-8' });
+    return res.end(JSON.stringify(errPayload));
   }
 
   const payload = req.body || {};
@@ -40,43 +70,68 @@ module.exports = async (req, res) => {
   const filename = payload.filename || '케어포트_간병일지.pdf';
 
   if (!htmlContent || htmlContent.length < 50) {
-    return res.status(400).json({ success: false, error: 'HTML 내용이 비어있습니다.' });
+    const errPayload = { success: false, error: 'HTML 내용이 비어있습니다.' };
+    if (typeof res.status === 'function') {
+      return res.status(400).json(errPayload);
+    }
+    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+    return res.end(JSON.stringify(errPayload));
   }
 
-  const tmpDir = path.join(__dirname, '..', '..', '.tmp_fax');
-  if (!fs.existsSync(tmpDir)) {
-    try { fs.mkdirSync(tmpDir, { recursive: true }); } catch (e) {}
-  }
-
-  const filePrefix = 'PDF_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-  const tmpHtml = path.join(tmpDir, `${filePrefix}.html`);
-  const tmpPdf = path.join(tmpDir, `${filePrefix}.pdf`);
+  const startTime = Date.now();
+  const filePrefix = 'PDF_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+  const tmpDir = path.join(os.tmpdir(), 'livon_pdf_' + filePrefix);
+  const userDir = path.join(tmpDir, 'profile');
+  const tmpHtml = path.join(tmpDir, 'doc.html');
+  const tmpPdf = path.join(tmpDir, 'out.pdf');
 
   try {
+    fs.mkdirSync(userDir, { recursive: true });
     fs.writeFileSync(tmpHtml, htmlContent, 'utf8');
 
+    const fileUrl = 'file:///' + tmpHtml.replace(/\\/g, '/');
+
+    // Super-optimized Chromium flags:
+    // 1. --headless=new: Modern headless engine with full rendering fidelity
+    // 2. --user-data-dir: Isolated scratch profile prevents lock contention with active user browser session (< 2s generation)
+    // 3. --no-first-run, --disable-extensions, etc.: Skip all background tasks and update checks
+    const flags = [
+      '--headless=new',
+      '--disable-gpu',
+      '--no-pdf-header-footer',
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-sync',
+      '--disable-default-apps',
+      '--disable-component-update',
+      '--hide-scrollbars',
+      '--mute-audio',
+      `--user-data-dir=${userDir}`,
+      `--print-to-pdf=${tmpPdf}`,
+      fileUrl
+    ];
+
     await new Promise((resolve, reject) => {
-      execFile(edgeExe, [
-        '--headless',
-        '--disable-gpu',
-        '--no-pdf-header-footer',
-        `--print-to-pdf=${tmpPdf}`,
-        tmpHtml
-      ], { timeout: 20000 }, (err) => {
+      execFile(browserExe, flags, { timeout: 35000 }, (err) => {
         if (err) return reject(err);
         resolve();
       });
     });
 
     if (!fs.existsSync(tmpPdf)) {
-      throw new Error('PDF 파일 생성 실패 (Edge 출력 없음)');
+      throw new Error('PDF 파일 생성 실패 (브라우저 출력 파일 없음)');
     }
 
     const pdfBuffer = fs.readFileSync(tmpPdf);
+    const duration = Date.now() - startTime;
+    console.log(`[CarePort PDF] Successfully generated ${filename} (${pdfBuffer.length} bytes) in ${duration}ms using ${path.basename(browserExe)}`);
 
-    // Clean up temp files
-    try { fs.unlinkSync(tmpHtml); } catch (e) {}
-    try { fs.unlinkSync(tmpPdf); } catch (e) {}
+    // Clean up temporary files in background to prevent I/O blocking response
+    setTimeout(() => {
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) {}
+    }, 1000);
 
     const encodedFilename = encodeURIComponent(filename).replace(/['()]/g, escape).replace(/\*/g, '%2A');
     res.writeHead(200, {
@@ -86,13 +141,19 @@ module.exports = async (req, res) => {
     });
     return res.end(pdfBuffer);
   } catch (err) {
-    console.error('[CarePort PDF Batch Edge Error]:', err.message);
-    try { if (fs.existsSync(tmpHtml)) fs.unlinkSync(tmpHtml); } catch (e) {}
-    try { if (fs.existsSync(tmpPdf)) fs.unlinkSync(tmpPdf); } catch (e) {}
+    console.error('[CarePort PDF Generation Error]:', err.message);
+    setTimeout(() => {
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) {}
+    }, 500);
 
-    return res.status(500).json({
+    const errPayload = {
       success: false,
       error: 'PDF 렌더링 중 오류가 발생했습니다: ' + err.message
-    });
+    };
+    if (typeof res.status === 'function') {
+      return res.status(500).json(errPayload);
+    }
+    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+    return res.end(JSON.stringify(errPayload));
   }
 };

@@ -977,12 +977,56 @@ let gHubCandidates = [];
 
 async function loadHubCandidates(forceRefresh = false) {
   if (gHubCandidates.length > 0 && !forceRefresh) return gHubCandidates;
+
+  const targetServiceIds = new Set((window.gSurveyState && Array.isArray(window.gSurveyState.targets))
+    ? window.gSurveyState.targets.map(t => String(t.serviceId || '')).filter(Boolean)
+    : []);
+
+  // 1. 통합허브(Care Hub) 실시간 인메모리 데이터 (window.gApps) 우선 연동
+  const apps = (Array.isArray(window.gApps) && window.gApps.length > 0) ? window.gApps : [];
+  if (apps.length > 0) {
+    gHubCandidates = apps.map(app => {
+      if (!app) return null;
+      const id = String(app.id || '');
+      const rawPhone = String(app.phone || app.applicantContact || app.patientPhone || app.contact || '').trim();
+      const formattedPhone = typeof formatPhoneNumber === 'function' ? formatPhoneNumber(rawPhone) : rawPhone;
+      const isAlready = targetServiceIds.has(id);
+      return {
+        id: id,
+        patientName: String(app.patientName || '').trim(),
+        phone: formattedPhone,
+        rawPhone: rawPhone.replace(/[^0-9]/g, ''),
+        hospitalName: String(app.hospitalName || '').trim(),
+        caregiverName: String(app.caregiverName || '').trim(),
+        caregiverPhone: typeof formatPhoneNumber === 'function' ? formatPhoneNumber(app.caregiverPhone || '') : (app.caregiverPhone || ''),
+        careStartDate: (app.careStartDate || app.applyDate || '').slice(0, 10),
+        careEndDate: (app.careEndDate || app.expectedEndDate || '').slice(0, 10),
+        insuranceCompany: app.insuranceCompany || '',
+        status: app.status || '',
+        isAlreadySurveyTarget: isAlready
+      };
+    }).filter(Boolean);
+
+    return gHubCandidates;
+  }
+
+  // 2. Fallback: Node 서버 API (/api/survey/candidates) 조회
   try {
     const res = await fetch('/api/survey/candidates');
-    const data = await res.json();
-    if (Array.isArray(data.items)) {
-      gHubCandidates = data.items;
-      return gHubCandidates;
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.items)) {
+        gHubCandidates = data.items.map(m => {
+          const rawPhone = String(m.phone || '').trim();
+          return {
+            ...m,
+            id: String(m.id || ''),
+            phone: typeof formatPhoneNumber === 'function' ? formatPhoneNumber(rawPhone) : rawPhone,
+            rawPhone: rawPhone.replace(/[^0-9]/g, '')
+          };
+        });
+        return gHubCandidates;
+      }
     }
   } catch (e) {
     console.warn('loadHubCandidates error:', e);
@@ -990,67 +1034,102 @@ async function loadHubCandidates(forceRefresh = false) {
   return [];
 }
 
+async function refreshHubCandidatesAndDropdown() {
+  const list = await loadHubCandidates(true);
+  if (typeof showToast === 'function') {
+    showToast(`통합허브 고객 ${list.length}명 목록이 실시간 동기화되었습니다.`, 'success');
+  }
+  const input = document.getElementById('newTargetHubSearchInput');
+  handleHubCandidateSearch(input ? input.value : '');
+}
+
 async function handleHubCandidateSearch(query) {
   const dropdown = document.getElementById('newTargetHubDropdown');
   if (!dropdown) return;
 
-  const q = (query || '').trim().toLowerCase();
-  if (!q) {
-    dropdown.classList.add('hidden');
-    dropdown.innerHTML = '';
-    return;
-  }
-
   const list = await loadHubCandidates();
-  const matched = list.filter(item => 
-    (item.patientName && item.patientName.toLowerCase().includes(q)) ||
-    (item.phone && item.phone.includes(q)) ||
-    (item.hospitalName && item.hospitalName.toLowerCase().includes(q)) ||
-    (item.caregiverName && item.caregiverName.toLowerCase().includes(q)) ||
-    (item.id && item.id.toLowerCase().includes(q))
-  ).slice(0, 10);
+  const q = (query || '').trim().toLowerCase();
+  const qDigits = q.replace(/[^0-9]/g, '');
+
+  let matched = [];
+  let isRecentList = false;
+
+  if (!q) {
+    // 검색어가 비어있을 때는 최신 통합허브 고객 10명을 기본 표출하여 즉시 선택 가능하도록 지원
+    matched = list.slice(0, 12);
+    isRecentList = true;
+  } else {
+    matched = list.filter(item => {
+      if (item.patientName && item.patientName.toLowerCase().includes(q)) return true;
+      if (item.id && item.id.toLowerCase().includes(q)) return true;
+      if (item.hospitalName && item.hospitalName.toLowerCase().includes(q)) return true;
+      if (item.caregiverName && item.caregiverName.toLowerCase().includes(q)) return true;
+      if (item.insuranceCompany && item.insuranceCompany.toLowerCase().includes(q)) return true;
+      if (item.phone && item.phone.includes(q)) return true;
+      if (qDigits && qDigits.length >= 2 && item.rawPhone && item.rawPhone.includes(qDigits)) return true;
+      return false;
+    }).slice(0, 15);
+  }
 
   if (matched.length === 0) {
     dropdown.innerHTML = `
-      <div class="p-3.5 text-center text-slate-400 text-xs">
-        일치하는 통합허브 고객이 없습니다.
+      <div class="p-4 text-center text-slate-400 text-xs">
+        <i data-lucide="alert-circle" class="w-4 h-4 mx-auto mb-1 text-slate-300"></i>
+        일치하는 통합허브 고객이 없습니다. (이름, 연락처 뒷자리, 병원명 등으로 검색해 보세요)
       </div>
     `;
     dropdown.classList.remove('hidden');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
     return;
   }
 
-  dropdown.innerHTML = matched.map(m => `
-    <div onclick="selectHubCandidate('${m.id}')" class="p-3 hover:bg-sky-50 transition-colors cursor-pointer space-y-1">
+  const headerHtml = isRecentList ? `
+    <div class="p-2.5 px-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-500">
+      <span class="flex items-center gap-1"><i data-lucide="sparkles" class="w-3.5 h-3.5 text-sky-500"></i> 최근 통합허브 고객 목록 (클릭 시 자동입력)</span>
+      <span class="text-emerald-600 font-extrabold text-[10.5px]">실시간 연동 (${list.length}명)</span>
+    </div>
+  ` : `
+    <div class="p-2 px-3 bg-sky-50/50 border-b border-sky-100 flex items-center justify-between text-[11px] font-bold text-sky-800">
+      <span>검색 결과: ${matched.length}건</span>
+      <span class="text-slate-400 text-[10px] font-normal">통합허브 ${list.length}명 중</span>
+    </div>
+  `;
+
+  dropdown.innerHTML = headerHtml + matched.map(m => `
+    <div onclick="selectHubCandidate('${m.id}')" class="p-3 hover:bg-sky-50/70 transition-colors cursor-pointer space-y-1 group border-b border-slate-50 last:border-b-0">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="font-black text-slate-900 text-xs">${m.patientName}</span>
-          <span class="font-mono text-[11px] text-slate-600 font-bold">${m.phone || '연락처 없음'}</span>
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold">${m.insuranceCompany || '일반'}</span>
+          <span class="font-black text-slate-900 text-xs group-hover:text-sky-700 transition-colors">${m.patientName}</span>
+          <span class="font-mono text-[11px] text-slate-600 font-bold bg-slate-100 px-1.5 py-0.5 rounded">${m.phone || '연락처 미등록'}</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 font-bold border border-sky-200">${m.insuranceCompany || '일반'}</span>
+          <span class="text-[10px] text-slate-400 font-mono">${m.id}</span>
         </div>
         ${m.isAlreadySurveyTarget ? `
           <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold border border-amber-200">기등록 고객</span>
         ` : `
-          <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">선택</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 group-hover:bg-emerald-600 group-hover:text-white transition-all">선택 ✓</span>
         `}
       </div>
       <div class="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
-        <span>병원: <b>${m.hospitalName || '-'}</b></span>
-        <span>간병인: <b>${m.caregiverName || '-'}</b></span>
-        <span class="font-mono text-[10.5px]">기간: ${m.careStartDate || '-'} ~ ${m.careEndDate || '진행'}</span>
+        <span>병원: <b class="text-slate-700">${m.hospitalName || '-'}</b></span>
+        <span>간병인: <b class="text-slate-700">${m.caregiverName || '-'}</b></span>
+        <span class="font-mono text-[10.5px] text-slate-400">기간: ${m.careStartDate || '-'} ~ ${m.careEndDate || '진행중'}</span>
       </div>
     </div>
   `).join('');
   dropdown.classList.remove('hidden');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function selectHubCandidate(appId) {
   const candidate = gHubCandidates.find(c => c.id === appId);
   if (!candidate) return;
 
+  const formattedPhone = typeof formatPhoneNumber === 'function' ? formatPhoneNumber(candidate.phone || candidate.rawPhone || '') : (candidate.phone || '');
+
   // 인풋 값 자동 완성
   document.getElementById('newTargetPatientName').value = candidate.patientName || '';
-  document.getElementById('newTargetPhone').value = candidate.phone || '';
+  document.getElementById('newTargetPhone').value = formattedPhone;
   document.getElementById('newTargetCaregiverName').value = candidate.caregiverName || '';
   document.getElementById('newTargetHospital').value = candidate.hospitalName || '';
   document.getElementById('newTargetStartDate').value = (candidate.careStartDate || '').slice(0, 10);
@@ -1099,7 +1178,9 @@ function openNewSurveyTargetModal() {
     dropdown.innerHTML = '';
   }
   document.getElementById('surveyNewTargetModal').classList.remove('hidden');
-  loadHubCandidates(false);
+  loadHubCandidates(true).then(() => {
+    handleHubCandidateSearch('');
+  });
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
@@ -1293,6 +1374,29 @@ if (typeof window !== 'undefined') {
   window.renderSurveySchemaEditor = renderSurveySchemaEditor;
   window.loadHubCandidates = loadHubCandidates;
   window.handleHubCandidateSearch = handleHubCandidateSearch;
+  window.refreshHubCandidatesAndDropdown = refreshHubCandidatesAndDropdown;
   window.selectHubCandidate = selectHubCandidate;
   window.clearSelectedHubCandidate = clearSelectedHubCandidate;
+
+  // 바깥 클릭 시 드롭다운 자동 닫기 및 연락처 자동 하이픈 이벤트 등록
+  document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('newTargetHubDropdown');
+    const searchInput = document.getElementById('newTargetHubSearchInput');
+    if (dropdown && !dropdown.classList.contains('hidden')) {
+      if (searchInput && !searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.add('hidden');
+      }
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const pInput = document.getElementById('newTargetPhone');
+    if (pInput) {
+      pInput.addEventListener('input', (e) => {
+        if (typeof formatPhoneNumber === 'function') {
+          e.target.value = formatPhoneNumber(e.target.value);
+        }
+      });
+    }
+  });
 }

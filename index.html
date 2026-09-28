@@ -1319,23 +1319,39 @@
                 <option value="name_asc">정렬: 가나다순</option>
               </select>
 
-              <!-- 수정·민원 발생 모아보기 토글 버튼 -->
-              <button type="button" id="btnHubModifiedToggle" onclick="toggleHubModifiedFilter()" 
-                class="px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 border transition-all cursor-pointer bg-white text-purple-700 border-purple-300 hover:bg-purple-50 shadow-2xs whitespace-nowrap" 
-                title="수정 또는 민원이 발생한 고객만 모아보기 토글">
-                <i data-lucide="zap" class="w-3.5 h-3.5 text-purple-600"></i>
-                <span>수정발생</span>
-                <span id="hubModifiedCountBadge" class="px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-800 text-[10px] font-extrabold">0</span>
-              </button>
+              <!-- 수정·민원 발생 모아보기 토글 버튼 및 일괄 확인 -->
+              <div class="flex items-center gap-1">
+                <button type="button" id="btnHubModifiedToggle" onclick="toggleHubModifiedFilter()" 
+                  oncontextmenu="confirmAllHubAlerts(); return false;"
+                  class="px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 border transition-all cursor-pointer bg-white text-purple-700 border-purple-300 hover:bg-purple-50 shadow-2xs whitespace-nowrap" 
+                  title="수정 또는 민원이 발생한 고객만 모아보기 토글 (우클릭: 전체 일괄 확인)">
+                  <i data-lucide="zap" class="w-3.5 h-3.5 text-purple-600"></i>
+                  <span>수정발생</span>
+                  <span id="hubModifiedCountBadge" class="px-1.5 py-0.2 rounded-full bg-purple-100 text-purple-800 text-[10px] font-extrabold">0</span>
+                </button>
+                <button type="button" onclick="confirmAllHubAlerts()" 
+                  class="p-1.5 rounded-xl border border-purple-200 bg-white text-purple-600 hover:bg-purple-100 hover:border-purple-400 transition-all cursor-pointer shadow-2xs" 
+                  title="수정/민원 발생 전체 일괄 확인 (모든 PC 공통 0건 적용)">
+                  <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
 
-              <!-- 모달 비활성화(청구제외/보호모드) 고객 모아보기 토글 버튼 -->
-              <button type="button" id="btnHubDisabledToggle" onclick="toggleHubDisabledFilter()" 
-                class="px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 border transition-all cursor-pointer bg-white text-amber-700 border-amber-300 hover:bg-amber-50 shadow-2xs whitespace-nowrap" 
-                title="모달 내 청구세트가 비활성화(보호모드/제외)된 고객만 모아보기 토글">
-                <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-600"></i>
-                <span>모달 비활성화</span>
-                <span id="hubDisabledCountBadge" class="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold">0</span>
-              </button>
+              <!-- 모달 비활성화(청구제외/보호모드) 고객 모아보기 토글 버튼 및 일괄 확인 -->
+              <div class="flex items-center gap-1">
+                <button type="button" id="btnHubDisabledToggle" onclick="toggleHubDisabledFilter()" 
+                  oncontextmenu="confirmAllHubDisabled(); return false;"
+                  class="px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 border transition-all cursor-pointer bg-white text-amber-700 border-amber-300 hover:bg-amber-50 shadow-2xs whitespace-nowrap" 
+                  title="모달 내 청구세트가 비활성화(보호모드/제외)된 고객만 모아보기 토글 (우클릭: 전체 일괄 확인)">
+                  <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-600"></i>
+                  <span>모달 비활성화</span>
+                  <span id="hubDisabledCountBadge" class="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold">0</span>
+                </button>
+                <button type="button" onclick="confirmAllHubDisabled()" 
+                  class="p-1.5 rounded-xl border border-amber-200 bg-white text-amber-600 hover:bg-amber-100 hover:border-amber-400 transition-all cursor-pointer shadow-2xs" 
+                  title="모달 비활성화 고객 전체 일괄 확인 (모든 PC 공통 0건 적용)">
+                  <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
 
               <!-- VIEW COLUMN SELECTOR (1열 / 2열(기본) / 3열 보기 토글) -->
               <div class="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200">
@@ -1716,7 +1732,7 @@
               <i data-lucide="user-plus" class="w-4 h-4 text-emerald-600"></i>
               <span>간병인 배정</span>
             </button>
-            <button onclick="openRuleClaimCalcModal()" class="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md shadow-amber-600/20 transition-all" title="등록된 청구서의 일당 및 청구금액 직접 수정">
+            <button onclick="handleToolbarClaimEdit()" class="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md shadow-amber-600/20 transition-all cursor-pointer" title="등록된 청구서의 일당 및 청구금액 직접 수정">
               <i data-lucide="edit-3" class="w-4 h-4"></i>
               <span>청구금액 수정 ✏️</span>
             </button>
@@ -4044,7 +4060,7 @@
             </div>
             <div>
               <div class="text-xs text-slate-500 font-semibold">총 청구건수</div>
-              <div class="text-2xl font-black text-slate-900 mt-0.5">432건</div>
+              <div class="text-2xl font-black text-slate-900 mt-0.5" id="claimTotalCountHeader">-건</div>
             </div>
           </div>
           <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
@@ -4083,7 +4099,7 @@
             </div>
 
             <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
-              <button onclick="openRuleClaimCalcModal()" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs">
+              <button onclick="handleToolbarClaimEdit()" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs cursor-pointer" title="선택된 청구건 또는 청구 내역의 일당/금액 수정">
                 <i data-lucide="edit-3" class="w-3.5 h-3.5 shrink-0"></i> <span class="truncate">청구금액 수정 ✏️</span>
               </button>
               <button id="btnDeleteSelected-claims" onclick="deleteSelectedLedgerRows('claims')" disabled class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-400 font-bold text-xs transition-all cursor-not-allowed border border-slate-200">
@@ -5264,9 +5280,13 @@
           </div>
           <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-            <input type="text" id="newTargetHubSearchInput" oninput="handleHubCandidateSearch(this.value)" placeholder="고객명, 연락처, 병원명, 간병인명을 입력하세요..."
+            <input type="text" id="newTargetHubSearchInput" 
+              oninput="handleHubCandidateSearch(this.value)" 
+              onfocus="handleHubCandidateSearch(this.value)" 
+              onclick="handleHubCandidateSearch(this.value)" 
+              placeholder="고객명, 연락처, 병원명, 간병인명을 입력하세요..."
               class="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:bg-white focus:ring-2 focus:ring-sky-500 transition-all">
-            <button type="button" onclick="loadHubCandidates(true)" class="absolute right-2 top-2 p-1 text-slate-400 hover:text-slate-600" title="고객 목록 새로고침">
+            <button type="button" onclick="refreshHubCandidatesAndDropdown()" class="absolute right-2 top-2 p-1 text-slate-400 hover:text-slate-600 cursor-pointer" title="통합허브 실시간 고객 새로고침">
               <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -5302,7 +5322,7 @@
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">환자/보호자 연락처 <span class="text-rose-500">*</span></label>
-              <input type="tel" id="newTargetPhone" placeholder="010-0000-0000" required class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white font-mono font-bold">
+              <input type="tel" id="newTargetPhone" placeholder="010-0000-0000" required oninput="if(typeof formatPhoneNumber==='function') this.value=formatPhoneNumber(this.value);" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white font-mono font-bold">
             </div>
           </div>
 
@@ -6622,10 +6642,10 @@
           <div>
             <label class="block font-bold text-slate-700 mb-1">청구 상태</label>
             <select id="editClaimStatus" class="w-full p-2.5 border rounded-xl bg-white font-bold">
-              <option value="미청구">미청구</option>
-              <option value="청구완료">청구완료</option>
-              <option value="승인완료">승인완료</option>
-              <option value="입금완료">입금완료</option>
+              <option value="미확인">미확인 (미수금 집중 관리)</option>
+              <option value="입금확인">입금확인 (수납 완료)</option>
+              <option value="입금예정">입금예정</option>
+              <option value="부분입금">부분입금</option>
             </select>
           </div>
           <div>
