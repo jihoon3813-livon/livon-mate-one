@@ -35709,7 +35709,9 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
         painScore: 4
       }));
     }
-    if (filteredTrends.length === 0) filteredTrends = trendScores;
+    window._currentTrendScores = filteredTrends;
+    if (detail) detail.trendScores = filteredTrends;
+    if (gCurrentCarePortDetail) gCurrentCarePortDetail.trendScores = filteredTrends;
 
     renderCarePortTrendChart(filteredTrends);
 
@@ -36239,18 +36241,35 @@ async function downloadCarePortDocumentPdf() {
 
     let pdfBytes = null;
     if (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function') {
+      const chartCanvas = document.getElementById('cpStatusChart');
+      let chartImage = null;
+      if (chartCanvas) {
+        try {
+          chartImage = chartCanvas.toDataURL('image/png');
+        } catch (e) {
+          console.warn('Canvas toDataURL failed:', e);
+        }
+      }
+      const curTrends = window._currentTrendScores || detail.trendScores || (gCurrentCarePortDetail && gCurrentCarePortDetail.trendScores) || [];
+      detail.chartImage = chartImage;
+      detail.trendScores = curTrends;
+
       const patient = {
         patientName: username,
         age: document.getElementById('cpMetaAge')?.innerText || detail.age || '',
         gender: document.getElementById('cpMetaGender')?.innerText || detail.gender || '',
         insuranceCompany: document.getElementById('cpMetaOrg')?.innerText || detail.organizationName || '삼성화재',
-        caregiverName: document.getElementById('cpMetaConsultant')?.innerText || detail.consultantName || ''
+        caregiverName: document.getElementById('cpMetaConsultant')?.innerText || detail.consultantName || '',
+        chartImage: chartImage,
+        trendScores: curTrends
       };
       const log = {
         username: username,
         consultDate: consultDate,
         duration: document.getElementById('cpMetaDuration')?.innerText || detail.duration || '',
-        sessionId: gCurrentCarePortSessionId
+        sessionId: gCurrentCarePortSessionId,
+        chartImage: chartImage,
+        trendScores: curTrends
       };
       const html = window.CarePortClient.generateDailyLogHtml(patient, log, detail);
       pdfBytes = await renderHtmlToSinglePageA4PdfBytes(html, 12);

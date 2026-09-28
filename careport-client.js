@@ -684,6 +684,7 @@
         carePeriod,
         title,
         trendScores,
+        chartImage: detail.chartImage || log.chartImage || patient.chartImage || null,
         overallStatus: { tone: overallTone, label: '전반상태', description: overallComment },
         categories,
         vitals,
@@ -740,11 +741,10 @@
      * Generate authentic SVG line chart for CarePort trend scores (matching Image 2)
      */
     generateTrendChartSvg(trendList) {
-      const list = (trendList && trendList.length > 0) ? trendList : [
-        { dayIndex: 4, overallScore: 4, mobilityScore: 3, dietScore: 5, sleepScore: 5, painScore: 1 },
-        { dayIndex: 5, overallScore: 3, mobilityScore: 2, dietScore: 4, sleepScore: 3, painScore: 2 },
-        { dayIndex: 6, overallScore: 3, mobilityScore: 3, dietScore: 3, sleepScore: 2, painScore: 3 }
-      ];
+      const list = (trendList && Array.isArray(trendList) && trendList.length > 0) ? trendList : [];
+      if (list.length === 0) {
+        return '<div style="color: #94a3b8; font-size: 11px; padding: 14px; text-align: center; font-weight: 600;">일자별 상태 변화 기록이 없습니다.</div>';
+      }
       const width = 740;
       const height = 135;
       const paddingX = 55;
@@ -1167,11 +1167,13 @@
         <span class="careport-badge-pill" style="font-size: 11px; font-weight: 700; color: #079f98; background: #eafaf8; border: 1px solid #a7f3d0; border-radius: 12px; height: 22px; padding: 0 9px; margin-right: 4px; margin-bottom: 4px;"><span>#${k}</span></span>
       `).join('');
 
-      const trendChartSvg = this.generateTrendChartSvg(d.trendScores || patient.trendScores || [
-        { dayIndex: 4, overallScore: 4, mobilityScore: 3, dietScore: 5, sleepScore: 5, painScore: 1 },
-        { dayIndex: 5, overallScore: 3, mobilityScore: 2, dietScore: 4, sleepScore: 3, painScore: 2 },
-        { dayIndex: 6, overallScore: 3, mobilityScore: 3, dietScore: 3, sleepScore: 2, painScore: 3 }
-      ]);
+      let trendChartHtml = '';
+      if (d.chartImage) {
+        trendChartHtml = `<img src="${d.chartImage}" alt="간병 일자별 환자 상태 변화" style="width: 100%; height: auto; max-height: 200px; object-fit: contain; display: block; margin: 0 auto;" />`;
+      } else {
+        const trendList = (d.trendScores && d.trendScores.length > 0) ? d.trendScores : (patient.trendScores || []);
+        trendChartHtml = this.generateTrendChartSvg(trendList);
+      }
 
       return `<!DOCTYPE html>
 <html lang="ko">
@@ -1307,7 +1309,7 @@
       </div>
     </div>
     <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; text-align: center;">
-      ${trendChartSvg}
+      ${trendChartHtml}
     </div>
 
     <!-- Section 1: 금일 환자 상태 체크 (신호등 & 세부 상태) -->
@@ -1354,19 +1356,6 @@
     </div>
     <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 16px; margin-bottom: 14px;">
       ${careLogHtml}
-    </div>
-
-    <!-- Section 4: 오늘의 중요사항 & 상담 요약 -->
-    <div class="sec-head">
-      <span class="sec-title">오늘의 중요사항 및 종합 요약</span>
-      <span style="font-size: 10px; font-weight: 700; color: #10bdb2;">CarePort Verified</span>
-    </div>
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; margin-bottom: 14px;">
-      <div style="font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 6px;">${d.title}</div>
-      <div style="margin-bottom: 8px;">${keywordsPills}</div>
-      <div style="font-size: 12px; color: #334155; line-height: 1.6; font-weight: 500; background: #f8fafc; border-radius: 6px; padding: 10px 12px; border-left: 3px solid #10bdb2;">
-        ${d.summary}
-      </div>
     </div>
 
     <!-- Section 5: 보호자 전달사항 (6 Guardian Note rows) -->
