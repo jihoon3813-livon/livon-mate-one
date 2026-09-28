@@ -2313,6 +2313,34 @@ function openAppUpdateHistoryModal(appId, ev) {
     </div>
   `;
 
+  const ctiInfo = typeof getCustomerCtiComplaintInfo === 'function' ? getCustomerCtiComplaintInfo(app) : null;
+  let ctiNoticeHtml = '';
+  if (ctiInfo && (ctiInfo.hasComplaint || ctiInfo.hasInquiry)) {
+    const isComp = ctiInfo.type === '민원';
+    ctiNoticeHtml = `
+      <div class="p-4 ${isComp ? 'bg-purple-50/90 border-purple-200' : 'bg-cyan-50/90 border-cyan-200'} rounded-2xl border space-y-2 text-xs">
+        <div class="flex items-center justify-between">
+          <span class="px-2 py-0.5 rounded-full ${isComp ? 'bg-purple-600' : 'bg-cyan-700'} text-white font-black text-[10.5px] flex items-center gap-1 shadow-2xs">
+            <i data-lucide="${isComp ? 'shield-alert' : 'phone-incoming'}" class="w-3.5 h-3.5"></i>
+            <span>${isComp ? '🚨 CTI 민원 인입' : '💬 CTI 상담/문의 콜 인입'}</span>
+          </span>
+          <span class="text-slate-500 font-mono text-[11px]">${ctiInfo.callTime || '-'}</span>
+        </div>
+        <div class="font-black text-slate-900 text-sm">${ctiInfo.title || '상담 콜'}</div>
+        <p class="text-slate-700 leading-relaxed bg-white/80 p-2.5 rounded-xl border ${isComp ? 'border-purple-100' : 'border-cyan-100'}">
+          ${ctiInfo.summary || '(요약 없음)'}
+        </p>
+        <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+          <span>상담원: <b>${ctiInfo.operator || '시스템'}</b></span>
+          <button type="button" onclick="closeModal('appUpdateHistoryModal'); openHubCustomerDetailModal('${app.id}');" class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer transition-all inline-flex items-center gap-1 shadow-xs">
+            <span>고객 상세 모달에서 녹취/이력 보기</span>
+            <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
   modal.innerHTML = `
     <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
       <!-- 헤더 -->
@@ -2336,6 +2364,7 @@ function openAppUpdateHistoryModal(appId, ev) {
 
       <!-- 바디 -->
       <div class="p-5 overflow-y-auto custom-scrollbar space-y-4 text-xs">
+        ${ctiNoticeHtml}
         ${summaryCardHtml}
         ${logsHtml}
       </div>
@@ -2371,7 +2400,148 @@ function isAppUnconfirmedModified(app) {
 }
 window.isAppUnconfirmedModified = isAppUnconfirmedModified;
 
-// CTI 상담콜 및 CS 기록 기반 고객 민원/불만 감지 엔진
+// CTI 상담콜 불만/민원 판별기 (사고 단어 단독 매칭 제거하여 자전거/교통사고 등 일반 상해 접수건 오감지 방지)
+function isCallComplaint(c) {
+  if (!c) return false;
+  if (c.category === '불만·민원·긴급지원') return true;
+  const full = `${c.title || ''} ${c.summary || ''} ${c.keywords || ''} ${c.arsMenu || ''}`.toLowerCase();
+  return full.includes('불만') || full.includes('항의') || full.includes('컴플레인') || 
+         full.includes('태도') || full.includes('불친절') || full.includes('교체') || 
+         full.includes('소통 오류') || full.includes('소통오류') || full.includes('낙상') || 
+         full.includes('폭언') || full.includes('욕설') || full.includes('거부') || 
+         full.includes('간병사고') || full.includes('배상') || full.includes('손해');
+}
+window.isCallComplaint = isCallComplaint;
+
+// CTI 상담콜 로그에서 해당 고객에게 인입된 전체 통화 추출기 (성명, 전화번호, 보호자번호, 본문번호 전수 매칭)
+function findCustomerMatchedCallLogs(app) {
+  if (!app) return [];
+  let callLogs = (window.gTotalCallData && Array.isArray(window.gTotalCallData.callLogs)) 
+    ? window.gTotalCallData.callLogs 
+    : ((typeof gTotalCallData !== 'undefined' && gTotalCallData && Array.isArray(gTotalCallData.callLogs)) ? gTotalCallData.callLogs : null);
+
+  if (!callLogs) {
+    try {
+      const cached = localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA') || sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const d = (parsed && parsed.data && parsed.data.callLogs) ? parsed.data : parsed;
+        if (d && Array.isArray(d.callLogs)) {
+          callLogs = d.callLogs;
+          window.gTotalCallData = d;
+          if (typeof gTotalCallData !== 'undefined') gTotalCallData = d;
+        }
+      }
+    } catch (e) {}
+  }
+
+  if (!callLogs || callLogs.length === 0) return [];
+
+  const cleanDigits = (p) => String(p || '').replace(/[^0-9]/g, '');
+  const cleanKorean = (s) => String(s || '').replace(/(님|환자|고객|보호자|어르신|\s)/g, '').trim();
+
+  const appPhones = [
+    cleanDigits(app.phone),
+    cleanDigits(app.guardianPhone),
+    cleanDigits(app.contactPhone),
+    cleanDigits(app.subPhone),
+    cleanDigits(app.tel),
+    cleanDigits(app.applicantPhone)
+  ].filter(p => p && p.length >= 8);
+
+  const appPatientName = cleanKorean(app.patientName || app.customerName);
+
+  const matched = callLogs.filter(c => {
+    if (!c) return false;
+    const cPhone = cleanDigits(c.phone || c.rawPhone);
+    const cMemberName = cleanKorean(c.memberName);
+    const cTitle = String(c.title || '');
+    const cSummary = String(c.summary || '');
+
+    // 1. 전화번호 매칭 (전체 일치 또는 뒤 8자리 일치)
+    if (cPhone && cPhone.length >= 8) {
+      for (const p of appPhones) {
+        if (p === cPhone || (p.length >= 8 && cPhone.endsWith(p.slice(-8))) || (cPhone.length >= 8 && p.endsWith(cPhone.slice(-8)))) {
+          return true;
+        }
+      }
+    }
+
+    // 2. 고객 성명 매칭 (2글자 이상 유효 고객명)
+    if (appPatientName && appPatientName.length >= 2) {
+      const isPlaceholder = !cMemberName || cMemberName === '비회원' || cMemberName.includes('미등록');
+      if (!isPlaceholder && (cMemberName === appPatientName || cMemberName.includes(appPatientName) || appPatientName.includes(cMemberName))) {
+        return true;
+      }
+      // 통화 제목 및 요약에서 환자명 직접 언급 매칭 (예: "노영갑님의 병원 이전 문의", "김성곤 환자의 보호자와의 통화")
+      if (cTitle.includes(appPatientName) || cSummary.includes(appPatientName + ' 환자') || cSummary.includes(appPatientName + '님') || cSummary.includes(appPatientName + '의') || cSummary.includes(appPatientName + '씨')) {
+        return true;
+      }
+    }
+
+    // 3. 상담요약 본문 내 전화번호 매칭 (예: "보호자의 전화번호는 2863-2370이며")
+    for (const p of appPhones) {
+      const last8 = p.slice(-8);
+      const mid4 = last8.slice(0, 4);
+      const last4 = last8.slice(-4);
+      if (cSummary.includes(`${mid4}-${last4}`) || cSummary.includes(last8)) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+
+  // 최신 일시 순 정렬
+  return matched.sort((a, b) => {
+    const ta = Date.parse(String(a.callTime || '').replace(/[.\/]+/g, '-')) || 0;
+    const tb = Date.parse(String(b.callTime || '').replace(/[.\/]+/g, '-')) || 0;
+    return tb - ta;
+  });
+}
+window.findCustomerMatchedCallLogs = findCustomerMatchedCallLogs;
+
+// CTI 상담콜과 고객 대장 내 CS 기록 통합 헬퍼 (모달 상단 및 업무화면에 통화 내역 즉시 표출)
+function getAppCombinedCsRecords(app) {
+  if (!app) return [];
+  const rawCsRecords = Array.isArray(app.csRecords) ? app.csRecords : [];
+  const matchedCtiLogs = (typeof findCustomerMatchedCallLogs === 'function') ? findCustomerMatchedCallLogs(app) : [];
+  
+  const ctiAsCsRecords = matchedCtiLogs.map(c => {
+    const isComp = typeof isCallComplaint === 'function' && isCallComplaint(c);
+    return {
+      id: c.id || `CTI-${c.callTime}`,
+      label: isComp ? '긴급' : '일반',
+      type: isComp ? '민원' : '상담',
+      category: c.category || c.arsMenu || (isComp ? '긴급민원' : '상담문의'),
+      dateTime: c.callTime || '-',
+      channel: c.channel || 'CTI',
+      summary: c.summary || c.title || '(상담 요약 없음)',
+      content: c.summary || c.title || '',
+      isResolved: false,
+      operator: c.operator || '상담원',
+      isAutoCti: true,
+      rawLog: c
+    };
+  });
+
+  const existingIds = new Set(rawCsRecords.map(r => String(r.id)));
+  const csRecords = [...rawCsRecords];
+  ctiAsCsRecords.forEach(cr => {
+    if (!existingIds.has(String(cr.id))) {
+      csRecords.push(cr);
+    }
+  });
+
+  return csRecords.sort((a, b) => {
+    const ta = Date.parse(String(a.dateTime || '').replace(/[.\/]+/g, '-')) || 0;
+    const tb = Date.parse(String(b.dateTime || '').replace(/[.\/]+/g, '-')) || 0;
+    return tb - ta;
+  });
+}
+window.getAppCombinedCsRecords = getAppCombinedCsRecords;
+
+// CTI 상담콜 및 CS 기록 기반 고객 민원/문의 감지 엔진
 function getCustomerCtiComplaintInfo(app) {
   if (!app) return null;
 
@@ -2384,6 +2554,8 @@ function getCustomerCtiComplaintInfo(app) {
   if (app.csLatestLabel === '민원' || app.csLatestLabel === '긴급' || app.csLatestLabel === '강성') {
     return {
       hasComplaint: true,
+      hasInquiry: false,
+      type: '민원',
       label: app.csLatestLabel,
       callTime: app.updatedAt ? app.updatedAt.slice(0, 16).replace('T', ' ') : '',
       title: app.csLatestMemo || `${app.csLatestLabel} 접수`,
@@ -2391,74 +2563,70 @@ function getCustomerCtiComplaintInfo(app) {
     };
   }
 
-  // 2. CTI 상담콜 로그에서 민원/불만/긴급/교체 상담 탐색
-  const clean = (p) => String(p || '').replace(/[^0-9]/g, '');
-  const appPhone = clean(app.phone);
-  const appName = (app.patientName || '').trim();
+  // 2. CTI 상담콜 로그에서 탐색 (종합콜 연동)
+  const matchedLogs = findCustomerMatchedCallLogs(app);
 
-  let callLogs = (window.gTotalCallData && Array.isArray(window.gTotalCallData.callLogs)) 
-    ? window.gTotalCallData.callLogs 
-    : null;
+  if (matchedLogs && matchedLogs.length > 0) {
+    // 2-1. 불만/민원/긴급 인입 확인
+    const complaintCall = matchedLogs.find(c => isCallComplaint(c));
+    if (complaintCall) {
+      return {
+        hasComplaint: true,
+        hasInquiry: false,
+        type: '민원',
+        label: '민원',
+        callTime: complaintCall.callTime || '',
+        title: complaintCall.title || '민원 상담',
+        summary: complaintCall.summary || '',
+        keywords: complaintCall.keywords || '',
+        operator: complaintCall.operator || '',
+        category: complaintCall.category || '민원',
+        callId: complaintCall.id
+      };
+    }
 
-  if (!callLogs) {
-    try {
-      const cached = localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA') || sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        const d = (parsed && parsed.data && parsed.data.callLogs) ? parsed.data : parsed;
-        if (d && Array.isArray(d.callLogs)) {
-          callLogs = d.callLogs;
-          window.gTotalCallData = d;
-          if (typeof gTotalCallData !== 'undefined') gTotalCallData = d;
-          try {
-            if (!localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA')) {
-              localStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', cached);
-            }
-          } catch (e) {}
-        }
-      }
-    } catch (e) {}
+    // 2-2. [사용자 요구사항]: 종합콜에 콜이 들어온 건은 민원발생/문의발생 등으로 무조건 노티를 띄워
+    const latestCall = matchedLogs[0];
+    if (latestCall) {
+      return {
+        hasComplaint: false,
+        hasInquiry: true,
+        type: '문의',
+        label: '문의',
+        callTime: latestCall.callTime || '',
+        title: latestCall.title || '상담/문의 콜',
+        summary: latestCall.summary || '',
+        keywords: latestCall.keywords || '',
+        operator: latestCall.operator || '',
+        category: latestCall.category || latestCall.arsMenu || '문의',
+        callId: latestCall.id
+      };
+    }
   }
 
-  if (callLogs && callLogs.length > 0) {
-    for (let i = 0; i < callLogs.length; i++) {
-      const c = callLogs[i];
-      const cPhone = clean(c.phone || c.rawPhone);
-      const cName = (c.memberName || '').trim();
-
-      const phoneMatch = appPhone && cPhone && (appPhone === cPhone || (appPhone.length >= 10 && cPhone.includes(appPhone)) || (cPhone.length >= 10 && appPhone.includes(cPhone)));
-      const nameMatch = appName && cName && (cName.includes(appName) || appName.includes(cName));
-
-      if (phoneMatch || nameMatch) {
-        const full = `${c.title || ''} ${c.summary || ''} ${c.keywords || ''} ${c.arsMenu || ''}`.toLowerCase();
-        const isComp = full.includes('불만') || full.includes('항의') || full.includes('태도') || 
-                       full.includes('교체') || full.includes('소통 오류') || full.includes('컴플레인') || 
-                       full.includes('사고') || full.includes('낙상') || c.category === '불만·민원·긴급지원';
-        if (isComp) {
-          return {
-            hasComplaint: true,
-            label: '민원',
-            callTime: c.callTime || '',
-            title: c.title || '민원 상담',
-            summary: c.summary || '',
-            keywords: c.keywords || '',
-            operator: c.operator || ''
-          };
-        }
-      }
-    }
+  // 3. 고객 대장에 등록된 일반 CS 이력이 있는 경우
+  if (app.csLatestLabel && app.csLatestLabel !== '처리완료' && app.csLatestLabel !== '처리불가') {
+    return {
+      hasComplaint: false,
+      hasInquiry: true,
+      type: '문의',
+      label: app.csLatestLabel,
+      callTime: app.updatedAt ? app.updatedAt.slice(0, 16).replace('T', ' ') : '',
+      title: app.csLatestMemo || `${app.csLatestLabel} 상담`,
+      summary: app.csLatestMemo || ''
+    };
   }
 
   return null;
 }
 window.getCustomerCtiComplaintInfo = getCustomerCtiComplaintInfo;
 
-// 수정/민원 발생 여부 판별기
+// 수정/민원/문의 발생 여부 판별기
 function isAppModifiedOrComplaint(app) {
   if (!app) return false;
   const c = getCustomerCtiComplaintInfo(app);
-  if (c && c.hasComplaint) return true;
-  if (app.csLatestLabel && app.csLatestLabel !== '일반') return true;
+  if (c && (c.hasComplaint || c.hasInquiry)) return true;
+  if (app.csLatestLabel && app.csLatestLabel !== '일반' && app.csLatestLabel !== '처리완료' && app.csLatestLabel !== '처리불가') return true;
   if (app.csRecords && app.csRecords.length > 0) return true;
   if (app.hasManualUpdate) return true;
   if (app.updatedAt && app.createdAt) {
@@ -23178,7 +23346,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
   const isHdWaitingSms = (app.insuranceCompany || '').includes('현대해상') && 
     (app.hdWorkflowStage === '문자수신대기' || (!app.accidentNumber || app.accidentNumber === '-') || (!app.policyNumber || app.policyNumber === '-'));
 
-  const csRecords = Array.isArray(app.csRecords) ? app.csRecords : [];
+  const csRecords = (typeof getAppCombinedCsRecords === 'function') ? getAppCombinedCsRecords(app) : (Array.isArray(app.csRecords) ? app.csRecords : []);
   const unresolvedComplaints = csRecords.filter(r => {
     if (!r) return false;
     const isResolved = r.isResolved === true || r.label === '처리완료' || r.label === '처리불가';
@@ -24773,7 +24941,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
     : Math.max(0, appTotalClaim - appDepositConfirmed);
 
   // 4. 상담/CX 이력 및 미해결 민원/긴급 인입 건 추출
-  const csRecords = Array.isArray(app.csRecords) ? app.csRecords : [];
+  const csRecords = (typeof getAppCombinedCsRecords === 'function') ? getAppCombinedCsRecords(app) : (Array.isArray(app.csRecords) ? app.csRecords : []);
   const unresolvedComplaints = csRecords.filter(r => {
     if (!r) return false;
     const isResolved = r.isResolved === true || r.label === '처리완료' || r.label === '처리불가';
@@ -27676,28 +27844,54 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
   const complaintInfo = typeof getCustomerCtiComplaintInfo === 'function' ? getCustomerCtiComplaintInfo(app) : null;
   const isAlertConf = typeof isAppAlertConfirmed === 'function' && isAppAlertConfirmed(app.id);
 
-  if (complaintInfo && complaintInfo.hasComplaint) {
+  if (complaintInfo && (complaintInfo.hasComplaint || complaintInfo.hasInquiry)) {
+    const isComplaint = complaintInfo.type === '민원';
     const cTime = complaintInfo.callTime ? complaintInfo.callTime.slice(5, 16) : '';
-    if (!isAlertConf) {
-      badges.push(`
-        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-purple-600 text-white font-black text-[10.5px] shadow-2xs whitespace-nowrap animate-pulse">
-          <button type="button" onclick="openAppUpdateHistoryModal('${app.id}', event)" class="flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-0 text-white p-0 font-black" title="${complaintInfo.title || '민원 접수'}: ${complaintInfo.summary || ''} (클릭하여 수정/민원 상세 보기)">
-            <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-white"></i> 🚨 민원 발생${cTime ? ` (${cTime})` : ''}
-          </button>
-          <button type="button" onclick="confirmHubAppAlert('${app.id}', event)" class="px-1.5 h-[16px] leading-none rounded bg-white text-purple-900 hover:bg-purple-100 font-black text-[9.5px] shadow-xs cursor-pointer transition-all inline-flex items-center justify-center gap-0.5 border-0" title="확인 완료 시 원래 신청일 순서로 돌아갑니다">
-            확인
-          </button>
-        </span>
-      `);
+    if (isComplaint) {
+      if (!isAlertConf) {
+        badges.push(`
+          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-purple-600 text-white font-black text-[10.5px] shadow-2xs whitespace-nowrap animate-pulse">
+            <button type="button" onclick="openAppUpdateHistoryModal('${app.id}', event)" class="flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-0 text-white p-0 font-black" title="${complaintInfo.title || '민원 접수'}: ${complaintInfo.summary || ''} (클릭하여 수정/민원 상세 보기)">
+              <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-white"></i> 🚨 민원 발생${cTime ? ` (${cTime})` : ''}
+            </button>
+            <button type="button" onclick="confirmHubAppAlert('${app.id}', event)" class="px-1.5 h-[16px] leading-none rounded bg-white text-purple-900 hover:bg-purple-100 font-black text-[9.5px] shadow-xs cursor-pointer transition-all inline-flex items-center justify-center gap-0.5 border-0" title="확인 완료 시 원래 신청일 순서로 돌아갑니다">
+              확인
+            </button>
+          </span>
+        `);
+      } else {
+        badges.push(`
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-300 font-bold text-[10.5px] whitespace-nowrap" title="민원 확인 완료 (원래 순서로 정렬됨)">
+            <button type="button" onclick="openAppUpdateHistoryModal('${app.id}', event)" class="flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-0 text-purple-800 p-0 font-bold" title="클릭하여 상세 이력 다시 보기">
+              <i data-lucide="check" class="w-3 h-3 text-purple-600"></i> 민원확인완료
+            </button>
+            <button type="button" onclick="unconfirmHubAppAlert('${app.id}', event)" class="ml-0.5 text-purple-400 hover:text-rose-600 font-bold text-[10px] px-1 hover:bg-purple-200/60 rounded cursor-pointer" title="확인 취소 (다시 맨 앞으로 올리기)">✕</button>
+          </span>
+        `);
+      }
     } else {
-      badges.push(`
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-300 font-bold text-[10.5px] whitespace-nowrap" title="민원 확인 완료 (원래 순서로 정렬됨)">
-          <button type="button" onclick="openAppUpdateHistoryModal('${app.id}', event)" class="flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-0 text-purple-800 p-0 font-bold" title="클릭하여 상세 이력 다시 보기">
-            <i data-lucide="check" class="w-3 h-3 text-purple-600"></i> 민원확인완료
-          </button>
-          <button type="button" onclick="unconfirmHubAppAlert('${app.id}', event)" class="ml-0.5 text-purple-400 hover:text-rose-600 font-bold text-[10px] px-1 hover:bg-purple-200/60 rounded cursor-pointer" title="확인 취소 (다시 맨 앞으로 올리기)">✕</button>
-        </span>
-      `);
+      // 문의발생 (일반·단순문의, 병원 이전 문의, 간병 일정 문의 등 CTI 상담 콜 인입)
+      if (!isAlertConf) {
+        badges.push(`
+          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-cyan-700 text-white font-black text-[10.5px] shadow-2xs whitespace-nowrap animate-pulse">
+            <button type="button" onclick="openAppUpdateHistoryModal('${app.id}', event)" class="flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-0 text-white p-0 font-black" title="${complaintInfo.title || '상담/문의 콜'}: ${complaintInfo.summary || ''} (클릭하여 상세 보기)">
+              <i data-lucide="phone-incoming" class="w-3.5 h-3.5 text-white"></i> 💬 문의 발생${cTime ? ` (${cTime})` : ''}
+            </button>
+            <button type="button" onclick="confirmHubAppAlert('${app.id}', event)" class="px-1.5 h-[16px] leading-none rounded bg-white text-cyan-900 hover:bg-cyan-100 font-black text-[9.5px] shadow-xs cursor-pointer transition-all inline-flex items-center justify-center gap-0.5 border-0" title="확인 완료 시 원래 신청일 순서로 돌아갑니다">
+              확인
+            </button>
+          </span>
+        `);
+      } else {
+        badges.push(`
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-800 border border-cyan-300 font-bold text-[10.5px] whitespace-nowrap" title="문의 확인 완료 (원래 순서로 정렬됨)">
+            <button type="button" onclick="openAppUpdateHistoryModal('${app.id}', event)" class="flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-0 text-cyan-800 p-0 font-bold" title="클릭하여 상세 이력 다시 보기">
+              <i data-lucide="check" class="w-3 h-3 text-cyan-600"></i> 문의확인완료
+            </button>
+            <button type="button" onclick="unconfirmHubAppAlert('${app.id}', event)" class="ml-0.5 text-cyan-400 hover:text-rose-600 font-bold text-[10px] px-1 hover:bg-cyan-200/60 rounded cursor-pointer" title="확인 취소 (다시 맨 앞으로 올리기)">✕</button>
+          </span>
+        `);
+      }
     }
   } else if (app.hasManualUpdate || (app.updatedAt && app.createdAt && (new Date(app.updatedAt).getTime() - new Date(app.createdAt).getTime() > 60000) && !app.importedFromExcel)) {
     if (!isAlertConf) {
@@ -41621,8 +41815,8 @@ function getCsLabelBadge(app) {
   let type = app.csLatestType || 'CS';
   
   const cInfo = typeof getCustomerCtiComplaintInfo === 'function' ? getCustomerCtiComplaintInfo(app) : null;
-  if (!label && cInfo && cInfo.hasComplaint) {
-    label = cInfo.label || '민원';
+  if (!label && cInfo && (cInfo.hasComplaint || cInfo.hasInquiry)) {
+    label = cInfo.label || (cInfo.hasComplaint ? '민원' : '문의');
     type = 'CTI';
   }
   if (!label) return '';
@@ -41640,6 +41834,13 @@ function getCsLabelBadge(app) {
         return `<span class="inline-flex items-center gap-1 px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-black bg-purple-600 text-white border border-purple-700 shadow-2xs animate-pulse align-middle" title="${cInfo ? (cInfo.title + ': ' + cInfo.summary) : '민원 접수건'}"><span class="w-1.5 h-1.5 rounded-full bg-white animate-ping shrink-0"></span><span>[${type}:민원]</span><button type="button" onclick="confirmHubAppAlert('${app.id}', event)" class="ml-0.5 px-1 h-[14px] leading-none rounded bg-white text-purple-900 hover:bg-purple-100 font-black text-[9px] cursor-pointer shadow-2xs border-0 inline-flex items-center justify-center shrink-0" title="확인 완료 시 원래 신청일 순서로 이동합니다">확인</button></span>`;
       }
       return `<span class="inline-flex items-center gap-1 px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300 align-middle" title="민원 확인 완료됨"><span>[${type}:민원확인]</span></span>`;
+    }
+    case '문의': {
+      const isConf = typeof isAppAlertConfirmed === 'function' && isAppAlertConfirmed(app.id);
+      if (!isConf) {
+        return `<span class="inline-flex items-center gap-1 px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-black bg-cyan-700 text-white border border-cyan-800 shadow-2xs animate-pulse align-middle" title="${cInfo ? (cInfo.title + ': ' + cInfo.summary) : '상담/문의 콜 접수건'}"><span class="w-1.5 h-1.5 rounded-full bg-white animate-ping shrink-0"></span><span>[${type}:문의]</span><button type="button" onclick="confirmHubAppAlert('${app.id}', event)" class="ml-0.5 px-1 h-[14px] leading-none rounded bg-white text-cyan-900 hover:bg-cyan-100 font-black text-[9px] cursor-pointer shadow-2xs border-0 inline-flex items-center justify-center shrink-0" title="확인 완료 시 원래 신청일 순서로 이동합니다">확인</button></span>`;
+      }
+      return `<span class="inline-flex items-center gap-1 px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-bold bg-cyan-50 text-cyan-800 border border-cyan-300 align-middle" title="문의 확인 완료됨"><span>[${type}:문의확인]</span></span>`;
     }
     case '일반':
       return `<span class="inline-flex items-center px-1.5 h-[19px] max-h-[19px] leading-none rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300 align-middle">[${type}:일반]</span>`;

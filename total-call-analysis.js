@@ -654,7 +654,12 @@ function matchCustomerToMateOne(arg1, ctiMemberName = '', channel = '', title = 
       }
     }
     if (detectedName) {
-      const foundByName = appList.find(a => a.patientName === detectedName || a.applicantName === detectedName);
+      const cleanDet = detectedName.replace(/(님|환자|고객|보호자|\s)/g, '').trim();
+      const foundByName = appList.find(a => {
+        const pN = (a.patientName || '').replace(/(님|환자|고객|보호자|\s)/g, '').trim();
+        const apN = (a.applicantName || '').replace(/(님|환자|고객|보호자|\s)/g, '').trim();
+        return (cleanDet.length >= 2) && (pN === cleanDet || apN === cleanDet || (pN && pN.includes(cleanDet)) || (cleanDet && cleanDet.includes(pN)));
+      });
       if (foundByName) {
         const isHyundai = (foundByName.insuranceCompany || '').includes('현대');
         return {
@@ -4210,9 +4215,15 @@ function renderHubCustomerCtiSectionHtml(app) {
   if (!app) return '';
   const clean = cleanPhoneDigits(app.phone);
 
-  // CTI 로그 중 해당 고객의 번호와 매칭되는 통화 추출
+  // CTI 로그 중 해당 고객(전화번호, 성명, 보호자번호, 본문번호 등)과 매칭되는 통화 추출
   const logs = (gTotalCallData && gTotalCallData.callLogs) || [];
-  const matchedCalls = logs.filter(c => cleanPhoneDigits(c.phone || c.rawPhone) === clean);
+  const matchedCalls = (typeof findCustomerMatchedCallLogs === 'function')
+    ? findCustomerMatchedCallLogs(app)
+    : ((typeof window !== 'undefined' && typeof window.findCustomerMatchedCallLogs === 'function')
+      ? window.findCustomerMatchedCallLogs(app)
+      : logs.filter(c => cleanPhoneDigits(c.phone || c.rawPhone) === clean));
+
+  const displayName = (typeof maskName === 'function' ? maskName(app.patientName) : app.patientName) || '고객';
 
   return `
     <!-- [통합허브 CTI 실데이터 연동 섹션] -->
@@ -4231,7 +4242,7 @@ function renderHubCustomerCtiSectionHtml(app) {
                 실데이터 1:1 연동
               </span>
               <span class="text-xs text-slate-300 font-mono">
-                전화번호: <b>${formatPhoneDisplay(app.phone)}</b>
+                고객: <b>${displayName}</b> · 대표번호: <b>${formatPhoneDisplay(app.phone)}</b>
               </span>
             </div>
             <p class="text-[11px] text-slate-400 mt-0.5">
@@ -4260,7 +4271,7 @@ function renderHubCustomerCtiSectionHtml(app) {
               <i data-lucide="phone-off" class="w-5 h-5"></i>
             </div>
             <div class="text-xs font-bold text-slate-600">
-              고객의 전화번호(<b>${formatPhoneDisplay(app.phone)}</b>)로 인입된 CTI 통화 내역이 없습니다.
+              고객 정보(성명: <b>${app.patientName || displayName}</b>, 전화번호: <b>${formatPhoneDisplay(app.phone)}</b>)로 인입된 CTI 통화 내역이 없습니다.
             </div>
             <p class="text-[11px] text-slate-400">
               최근 CTI 동기화가 필요하거나 다른 전화번호로 인입되었을 수 있습니다.
