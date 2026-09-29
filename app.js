@@ -1576,25 +1576,21 @@ async function loadConvexData(showSpinner = true) {
             a.unconfirmedClaimCount = 0;
           }
         });
-        try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
       }
 
       // 2. 간병인 배정 대장 (서버 상태를 정직하게 반영 - 삭제된 고객 연관 배정 제외)
       if (Array.isArray(assignments)) {
         gAssigns = deletedAppIdSet.size > 0 ? assignments.filter(as => as && !deletedAppIdSet.has(String(as.applyId))) : assignments;
-        try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
       }
 
       // 3. 보험 청구 대장 (서버 상태를 정직하게 반영 - 삭제된 고객 연관 청구 제외)
       if (Array.isArray(claims)) {
         gClaims = deletedAppIdSet.size > 0 ? claims.filter(c => c && !deletedAppIdSet.has(String(c.applyId))) : claims;
-        try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
       }
 
       // 4. 간병비 지급 대장 (서버 상태를 정직하게 반영 - 삭제된 고객 연관 지급 제외)
       if (Array.isArray(payouts)) {
         gPayouts = deletedAppIdSet.size > 0 ? payouts.filter(p => p && !deletedAppIdSet.has(String(p.applyId))) : payouts;
-        try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
       }
 
       // Convex 서버 데이터가 성공적으로 반영됨을 기록
@@ -1603,20 +1599,32 @@ async function loadConvexData(showSpinner = true) {
       // 5. 손해사정사 디렉토리
       if (Array.isArray(adjusters) && adjusters.length > 0) {
         gAdjusters = adjusters;
-        try { localStorage.setItem('LIVON_CACHED_ADJUSTERS', JSON.stringify(adjusters)); } catch (e) {}
       }
 
       // 6. 협력 센터 / 파트너
       if (Array.isArray(partners) && partners.length > 0) {
         gCenters = partners;
-        try { localStorage.setItem('LIVON_CACHED_CENTERS', JSON.stringify(partners)); } catch (e) {}
       }
 
       // 7. 인력 (간병인 풀) 디렉토리
       if (Array.isArray(caregivers) && caregivers.length > 0) {
         gCaregivers = caregivers;
-        try { localStorage.setItem('LIVON_CACHED_CAREGIVERS', JSON.stringify(caregivers)); } catch (e) {}
       }
+
+      // 🚀 [초고속 렌더링 최적화]: 수 메가바이트의 로컬 캐시 저장을 비동기 백그라운드로 지연 분리 (화면 프리징 제로화)
+      setTimeout(() => {
+        try {
+          if (Array.isArray(gApps)) localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+          if (Array.isArray(gAssigns)) localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns));
+          if (Array.isArray(gClaims)) localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+          if (Array.isArray(gPayouts)) localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+          if (Array.isArray(gAdjusters)) localStorage.setItem('LIVON_CACHED_ADJUSTERS', JSON.stringify(gAdjusters));
+          if (Array.isArray(gCenters)) localStorage.setItem('LIVON_CACHED_CENTERS', JSON.stringify(gCenters));
+          if (Array.isArray(gCaregivers)) localStorage.setItem('LIVON_CACHED_CAREGIVERS', JSON.stringify(gCaregivers));
+        } catch (storageErr) {
+          console.warn('[Cache Save Warn]', storageErr);
+        }
+      }, 100);
 
       // 8. 시스템 환경설정 및 런칭 연동 메타데이터 복원
       if (Array.isArray(systemSettings) && systemSettings.length > 0) {
@@ -1959,6 +1967,10 @@ var gHubPageSize = (function() {
     if (s === 'ALL') return 'ALL';
     if (s && !isNaN(parseInt(s, 10))) return parseInt(s, 10);
   } catch (e) {}
+  // 🚀 모바일 기기(화면 폭 < 768px 또는 모바일 브라우저)는 기본 15개로 초경량/초고속 렌더링
+  if (typeof window !== 'undefined' && (window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || ''))) {
+    return 15;
+  }
   return 50;
 })();
 var gHubCurrentPage = 1;
@@ -30427,7 +30439,16 @@ function renderHubPagination(totalCount, totalPages) {
   const bar = document.getElementById('hubPaginationBar');
   if (!bar) return;
 
-  const pageSizeSelector = `
+  const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || ''));
+  const pageSizeSelector = isMobile ? `
+    <div class="flex items-center gap-1 text-xs">
+      <span class="text-slate-400 font-medium mr-1 hidden sm:inline">보기:</span>
+      <button type="button" onclick="changeHubPageSize(15)" class="px-2 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${gHubPageSize === 15 ? 'bg-purple-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'}">15개</button>
+      <button type="button" onclick="changeHubPageSize(30)" class="px-2 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${gHubPageSize === 30 ? 'bg-purple-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'}">30개</button>
+      <button type="button" onclick="changeHubPageSize(50)" class="px-2 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${gHubPageSize === 50 ? 'bg-purple-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'}">50개</button>
+      <button type="button" onclick="changeHubPageSize('ALL')" class="px-2 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${gHubPageSize === 'ALL' ? 'bg-purple-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'}">전체</button>
+    </div>
+  ` : `
     <div class="flex items-center gap-1 text-xs">
       <span class="text-slate-400 font-medium mr-1 hidden sm:inline">보기:</span>
       <button type="button" onclick="changeHubPageSize(50)" class="px-2 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${gHubPageSize === 50 ? 'bg-purple-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'}">50개</button>
@@ -33477,15 +33498,25 @@ function updateSidebarCounts() {
   }
 }
 
+var _lucideGlobalDebounceTimer = null;
 function initIcons(root = null) {
   try {
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      if (root && (root.nodeType === 1 || (typeof Element !== 'undefined' && root instanceof Element))) {
-        window.lucide.createIcons({ root: root });
-      } else {
-        window.lucide.createIcons();
-      }
+    if (!window.lucide || typeof window.lucide.createIcons !== 'function') return;
+
+    // 1. 특정 엘리먼트/컨테이너가 주어졌을 때는 해당 영역만 가볍게 즉시 치환 (O(1) 성능)
+    if (root && (root.nodeType === 1 || (typeof Element !== 'undefined' && root instanceof Element))) {
+      window.lucide.createIcons({ root: root });
+      return;
     }
+
+    // 2. 전체 스캔 호출은 프레임 단위로 디바운스하여 모바일 CPU 과부하 및 프리징 원천 방지
+    if (_lucideGlobalDebounceTimer) cancelAnimationFrame(_lucideGlobalDebounceTimer);
+    _lucideGlobalDebounceTimer = requestAnimationFrame(() => {
+      try {
+        window.lucide.createIcons();
+      } catch (err) {}
+      _lucideGlobalDebounceTimer = null;
+    });
   } catch (e) {
     console.warn('Lucide icon error:', e);
   }

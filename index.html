@@ -35,21 +35,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
   <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" defer></script>
   <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=47ea97d95fd01f8ab035bf064a186efb&libraries=services" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
-  <!-- SheetJS & ExcelJS for advanced styling (shrinkToFit, colors, fonts, freeze panes) -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-  <script src="./exceljs.min.js" defer></script>
-  <script src="./html2pdf.bundle.min.js" defer></script>
-  <script src="./html2canvas.min.js" defer></script>
-  <script src="./pdf-lib.min.js" defer></script>
-  <script>
-    if (typeof html2canvas === 'undefined') {
-      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer><\/script>');
-    }
-    if (typeof PDFLib === 'undefined') {
-      document.write('<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js" defer><\/script>');
-    }
-  </script>
+
   <script>
     // 🚨 [보안] 로그아웃 또는 미인증 상태에서 새로고침 시 즉시 잠금 화면 렌더링
     (function() {
@@ -111,6 +97,27 @@
     }
     .hub-customer-card.border-l-blue-500:hover {
       border-left-color: #3b82f6 !important;
+    }
+
+    /* 🚀 모바일 GPU 가속 & 60fps 스크롤 성능 극대화 */
+    @media (max-width: 768px) {
+      body {
+        -webkit-overflow-scrolling: touch;
+      }
+      .hub-customer-card {
+        contain: content;
+        content-visibility: auto;
+        contain-intrinsic-size: 1px 220px;
+      }
+      /* 모바일에서 치명적인 프레임 드랍을 유발하는 backdrop-filter 블러 연산 제거 */
+      .backdrop-blur-md, .backdrop-blur-sm, .backdrop-blur-xs, [class*="backdrop-blur"] {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+      /* 과도한 그림자 연산을 가벼운 테두리/단순 그림자로 경량화 */
+      .shadow-xl, .shadow-2xl, .shadow-lg {
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+      }
     }
     tbody tr {
       contain: layout style;
@@ -11205,6 +11212,13 @@
   <script src="total-call-analysis.js?v=20260921_1005"></script>
   <script src="system-audit-log.js?v=20260922_1040"></script>
   <script src="survey-client.js?v=20260928_1553"></script>
-  <script src="app.js?v=20260929_0935"></script>
+  <script src="app.js?v=20260929_1008"></script>
+  <!-- 🚀 초고속 렌더링 최적화: 대용량 PDF & Excel 라이브러리는 첫 화면 렌더링 이후 비동기 지연 로드 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  <script src="./exceljs.min.js" defer></script>
+  <script src="./html2pdf.bundle.min.js" defer></script>
+  <script src="./html2canvas.min.js" defer></script>
+  <script src="./pdf-lib.min.js" defer></script>
 </body>
 </html>
