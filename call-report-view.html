@@ -932,7 +932,8 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         catList,
         actorList,
         channel: targetCh,
-        logs
+        logs,
+        dateFilteredAllLogs
       };
     }
 
@@ -1163,11 +1164,19 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
     }
 
     function getFilteredDailyTrends(stats) {
-      const logs = (stats && stats.logs) || [];
-      const s = gFilter.startDate;
-      const e = gFilter.endDate;
+      const logs = (stats && stats.dateFilteredAllLogs) || (stats && stats.logs) || [];
+      const normDate = d => (d || '').slice(0, 10).replace(/[./]/g, '-');
+      const s = normDate(gFilter.startDate);
+      const e = normDate(gFilter.endDate);
       const dailyMap = {};
       const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
+
+      const knownNotes = {};
+      if (gReportData && Array.isArray(gReportData.dailyTrends)) {
+        gReportData.dailyTrends.forEach(t => {
+          if (t.note) knownNotes[normDate(t.date)] = t.note;
+        });
+      }
 
       if (s && e) {
         const cur = new Date(s + 'T00:00:00');
@@ -1176,20 +1185,23 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         const fmtLocal = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
         while (cur <= end) {
           const ds = fmtLocal(cur);
+          const dow = daysOfWeek[cur.getDay()];
           dailyMap[ds] = {
             date: ds,
-            dayOfWeek: daysOfWeek[cur.getDay()],
+            dayOfWeek: dow,
             callCount: 0,
-            note: cur.getDay() === 0 || cur.getDay() === 6 ? '주말' : ''
+            note: knownNotes[ds] || (cur.getDay() === 0 || cur.getDay() === 6 ? '주말' : '')
           };
           cur.setDate(cur.getDate() + 1);
         }
       }
 
       logs.forEach(c => {
-        const dRaw = (c.callTime || c.date || c.startedAt || '').slice(0, 10);
-        const d = dRaw.replace(/[./]/g, '-');
+        const d = normDate(c.callTime || c.date || c.startedAt);
         if (d) {
+          if (s && d < s) return;
+          if (e && d > e) return;
+
           if (!dailyMap[d]) {
             const parsedD = new Date(d + 'T00:00:00');
             const dow = daysOfWeek[parsedD.getDay()] || '';
@@ -1197,14 +1209,20 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
               date: d,
               dayOfWeek: dow,
               callCount: 0,
-              note: dow === '토' || dow === '일' ? '주말' : ''
+              note: knownNotes[d] || (dow === '토' || dow === '일' ? '주말' : '')
             };
           }
           dailyMap[d].callCount++;
         }
       });
 
-      return Object.keys(dailyMap).sort().map(d => dailyMap[d]);
+      const sortedList = Object.keys(dailyMap).sort().map(d => dailyMap[d]);
+      const totalCalls = sortedList.reduce((sum, item) => sum + (item.callCount || 0), 0) || 1;
+      sortedList.forEach(item => {
+        item.share = (item.callCount || 0) / totalCalls;
+      });
+
+      return sortedList;
     }
 
     function renderDailySheet(stats) {
@@ -2026,7 +2044,10 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       // Subtitle / Period
       ws1.mergeCells('B4:G4');
       const subCell = ws1.getCell('B4');
-      subCell.value = `분석기간 ${gReportData.reportInfo.period || ''}   ·   인입경로: ${gReportData.reportInfo.channelLabel || gFilter.channel || '삼성화재'}   ·   작성: ${gReportData.reportInfo.author || '리본케어'}   ·   보고일 ${gReportData.reportInfo.reportDate || ''}`;
+      const sDate = gFilter.startDate || (gReportData.reportInfo && gReportData.reportInfo.startDate) || '';
+      const eDate = gFilter.endDate || (gReportData.reportInfo && gReportData.reportInfo.endDate) || '';
+      const periodText = (sDate && eDate) ? `${sDate} ~ ${eDate}` : (gReportData.reportInfo.period || '');
+      subCell.value = `분석기간: ${periodText}   ·   인입경로: ${gReportData.reportInfo.channelLabel || gFilter.channel || '삼성화재'}   ·   작성: ${gReportData.reportInfo.author || '리본케어'}   ·   보고일 ${gReportData.reportInfo.reportDate || ''}`;
       subCell.font = { name: '맑은 고딕', size: 9, color: { argb: 'FF475569' } };
       subCell.alignment = { vertical: 'middle', horizontal: 'center' };
 
@@ -2182,7 +2203,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       // =========================================================================
       // [시트 2] 일자별 인입현황 + 첫행 합계 + 상단 틀고정 (3행 고정)
       // =========================================================================
-      const dailyTrends = gReportData.dailyTrends || [];
+      const dailyTrends = getFilteredDailyTrends(stats);
       const totalDailyCallsExcel = dailyTrends.reduce((sum, t) => sum + (t.callCount || 0), 0) || stats.totalCalls || 0;
 
       const ws2 = wb.addWorksheet('일자별 인입현황', {
@@ -2192,7 +2213,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 
       ws2.mergeCells('A1:D1');
       const dailyTitle = ws2.getCell('A1');
-      dailyTitle.value = `일자별 인입 현황 (인바운드 전체 ${totalDailyCallsExcel.toLocaleString()}건 · ${gReportData.reportInfo.period || ''})`;
+      dailyTitle.value = `일자별 인입 현황 (인바운드 전체 ${totalDailyCallsExcel.toLocaleString()}건 · ${periodText})`;
       dailyTitle.font = { name: '맑은 고딕', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
       dailyTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
       dailyTitle.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -2267,12 +2288,14 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         c.alignment = { horizontal: 'center', vertical: 'middle' };
       });
 
-      (gReportData.callLogs || []).forEach((c, idx) => {
+      const exportLogs = [...(stats.dateFilteredAllLogs || gReportData.callLogs || [])];
+      exportLogs.sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
+      exportLogs.forEach((c, idx) => {
         const formattedPhone = formatPhoneNumber(c.phone || c.rawPhone);
         const resolvedName = resolveMemberName(c.phone || c.rawPhone, c.memberName, c.title, c.summary);
         const r = ws3.addRow({
           type: c.type || 'IN',
-          channel: c.channel || '삼성화재',
+          channel: c.channel || (gReportData.reportInfo && gReportData.reportInfo.channelLabel) || gFilter.channel || '삼성화재',
           callTime: c.callTime || '',
           memberName: resolvedName,
           phone: formattedPhone,
@@ -2332,7 +2355,8 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       const a = document.createElement('a');
       a.href = url;
       const chLabel = gReportData.reportInfo.channelLabel || gFilter.channel || '삼성화재';
-      a.download = `${chLabel}_간병콜분석_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+      const dateSuffix = (sDate && eDate) ? `_${sDate.replace(/-/g, '')}_${eDate.replace(/-/g, '')}` : `_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+      a.download = `${chLabel}_간병콜분석${dateSuffix}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

@@ -1048,12 +1048,23 @@ function saveSavedFaxConfig(cfg) {
             return false;
           });
           if (idx !== -1) {
-            const { claim, payout, ...appFields } = fields;
+            const { claim, payout, deleteClaimIds, deleteClaimId, deletePayoutIds, deletePayoutId, ...appFields } = fields;
             stored.applications[idx] = {
               ...stored.applications[idx],
               ...appFields,
               updatedAt: new Date().toISOString()
             };
+
+            const delClaimIdList = Array.isArray(deleteClaimIds) ? deleteClaimIds : (deleteClaimId ? [deleteClaimId] : []);
+            if (delClaimIdList.length > 0) {
+              stored.claims = (stored.claims || []).filter(c => !delClaimIdList.includes(c.id));
+            }
+
+            const delPayoutIdList = Array.isArray(deletePayoutIds) ? deletePayoutIds : (deletePayoutId ? [deletePayoutId] : []);
+            if (delPayoutIdList.length > 0) {
+              stored.payouts = (stored.payouts || []).filter(p => !delPayoutIdList.includes(p.id));
+            }
+
             if (claim && claim.id) {
               stored.claims = stored.claims || [];
               const cIdx = stored.claims.findIndex(c => c.id === claim.id);
@@ -1074,6 +1085,9 @@ function saveSavedFaxConfig(cfg) {
             }
             stored.updatedAt = new Date().toISOString();
             fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+            if (typeof invalidateRealDataCache === 'function') {
+              try { invalidateRealDataCache(); } catch (e) {}
+            }
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify({ success: true, updatedApp: stored.applications[idx] }));
           } else {

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-29T03:00:00.730Z",
+  "updatedAt": "2026-09-29T23:48:42.519Z",
   "sources": {
     "종합 간병(현대해상)": {
       "sourceType": "file",
@@ -17479,7 +17479,8 @@
       "sigungu": "양양군",
       "status": "완료",
       "totalPayout": 320000,
-      "unconfirmedClaimCount": 1
+      "unconfirmedClaimCount": 1,
+      "updatedAt": "2026-09-29T23:48:42.519Z"
     },
     {
       "accidentDate": "",
@@ -17502,7 +17503,7 @@
       "caregiverPhone": "",
       "claimCategory": "정상",
       "claimClassification": "정상",
-      "claimCount": 2,
+      "claimCount": 1,
       "claimUnitPrice": 144000,
       "contractEndDate": "",
       "contractStartDate": "2025.10.17",
@@ -17513,7 +17514,7 @@
       "depositConfirmedAmount": 0,
       "desiredStartDate": "",
       "diagnosis": "",
-      "estimatedUnpaid": 6912000,
+      "estimatedUnpaid": 5472000,
       "expectedDays": "20일",
       "expectedEndDate": "",
       "gender": "남",
@@ -17535,7 +17536,38 @@
       "sigungu": "양양군",
       "status": "완료",
       "totalPayout": 0,
-      "unconfirmedClaimCount": 2
+      "unconfirmedClaimCount": 1,
+      "hasManualUpdate": true,
+      "customSettlementSets": [
+        {
+          "setIndex": 1,
+          "claimRound": "7월 2차",
+          "payoutRound": "7월 2차",
+          "claimStandardDate": "2026.07.20",
+          "payoutStandardDate": "2026.07.20",
+          "claimDate": "2026.07.15",
+          "payoutDate": "",
+          "startDateStr": "2026.03.13",
+          "endDateStr": "2026.04.20",
+          "days": 38,
+          "claimDays": 38,
+          "payoutDays": 38,
+          "dailyClaimPrice": 144000,
+          "claimAmount": 5472000,
+          "claimStatus": "청구완료",
+          "depositAmount": 0,
+          "depositDate": "",
+          "depositStatus": "미입금",
+          "cgDailyWage": 140000,
+          "payoutAmount": 0,
+          "payoutStatus": "지급완료",
+          "claimId": "Q0002",
+          "payoutId": "",
+          "caregiverName": "",
+          "memo": "8월 25일 곽주호손해사정인 통화 -> 입금 못했다고 인정, 확인 후 입금하겠다고 함"
+        }
+      ],
+      "updatedAt": "2026-09-29T23:48:21.550Z"
     },
     {
       "accidentDate": "",
@@ -22983,26 +23015,6 @@
     }
   ],
   "claims": [
-    {
-      "adjusterStatus": "입금예정",
-      "applyId": "C0005",
-      "claimDate": "2026.07.15",
-      "days": 10,
-      "depositAmount": 0,
-      "depositDate": "2026.03.13",
-      "depositStatus": "미확인",
-      "depositTime": "2026.03.13",
-      "id": "Q0001",
-      "importedAt": "2026-09-28T08:14:19.940Z",
-      "insuranceCompany": "종합 간병(현대해상)",
-      "isRealLaunchData": true,
-      "memo": "8월 25일 곽주호손해사정인 통화-> 입금 못했다고 인정, 확인 후 입금하겠다고 함",
-      "patientName": "엄정현",
-      "round": "4월 1차",
-      "standardDate": "2026.03.13",
-      "unitPrice": 144000,
-      "unpaidAmount": 1440000
-    },
     {
       "adjusterStatus": "입금예정",
       "applyId": "C0005",

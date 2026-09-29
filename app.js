@@ -22952,7 +22952,7 @@ async function deleteSettlementSet(appId, setIndex) {
   if (!app) return;
 
   const confirmed = await showCustomConfirm(
-    `[${maskName(app.patientName)} 님] 세트 ${setIndex} 정산·청구 내역을 삭제하시겠습니까?\n\n삭제 시 해당 차수의 청구 및 정산 일정이 목록에서 제거됩니다.`,
+    `[${maskName(app.patientName)} 님] 세트 ${setIndex} 정산·청구 내역을 삭제하시겠습니까?\n\n삭제 시 해당 차수의 청구 및 정산 일정이 목록에서 완전히 제거됩니다.`,
     {
       theme: 'rose',
       icon: 'trash-2',
@@ -22963,30 +22963,182 @@ async function deleteSettlementSet(appId, setIndex) {
   );
   if (!confirmed) return;
 
-  if (app.customSettlementSets && Array.isArray(app.customSettlementSets)) {
-    app.customSettlementSets = app.customSettlementSets.filter(s => s.setIndex !== setIndex);
-    // Re-index
-    app.customSettlementSets.forEach((s, idx) => { s.setIndex = idx + 1; });
+  // 1. Gather context data
+  const appAssigns = (gAssigns || []).filter(a => String(a.applyId) === String(appId));
+  const as = appAssigns.length > 0 ? (typeof getActiveCaregiverAssignment === 'function' ? getActiveCaregiverAssignment(app, appAssigns) : appAssigns[0]) || appAssigns[0] : null;
+  const prog = as ? (typeof getCareProgressInfo === 'function' ? getCareProgressInfo(as) : null) : null;
+  const appClaims = (gClaims || []).filter(c => String(c.applyId) === String(appId));
+  const appPayouts = (gPayouts || []).filter(p => String(p.applyId) === String(appId));
+
+  // 2. Obtain current schedule rounds
+  const schedule = calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts);
+  const currentRounds = (schedule && schedule.rounds) ? schedule.rounds : [];
+
+  // 3. Initialize customSettlementSets if not present or empty
+  if (!app.customSettlementSets || !Array.isArray(app.customSettlementSets) || app.customSettlementSets.length === 0) {
+    app.customSettlementSets = currentRounds.map((r, i) => ({
+      setIndex: i + 1,
+      claimRound: r.claimRoundLabel && r.claimRoundLabel !== '-' ? r.claimRoundLabel : (r.existingClaim ? r.existingClaim.round : `${i + 1}차`),
+      payoutRound: r.payoutRoundLabel && r.payoutRoundLabel !== '-' ? r.payoutRoundLabel : (r.existingPayout ? r.existingPayout.round : `${i + 1}차`),
+      claimStandardDate: r.claimStandardDate || '',
+      payoutStandardDate: r.payoutStandardDate || '',
+      claimDate: r.claimDate || (r.existingClaim ? (r.existingClaim.claimDate || r.existingClaim.faxSentDate || '') : ''),
+      payoutDate: r.payoutDate || (r.existingPayout ? (r.existingPayout.paidDate || r.existingPayout.payoutDate || '') : ''),
+      startDateStr: r.startDateStr || '',
+      endDateStr: r.endDateStr || '',
+      days: r.days || 1,
+      claimDays: r.claimDays || r.days || 1,
+      payoutDays: r.payoutDays || r.days || 1,
+      dailyClaimPrice: r.dailyClaimPrice || 160000,
+      claimAmount: r.fullClaimAmount || ((r.claimDays || r.days || 1) * (r.dailyClaimPrice || 160000)),
+      claimStatus: (r.claimStatus === 'DEPOSIT_DONE' || r.isClaimDeposited) ? '입금완료' : ((r.isClaimSent || r.claimStatus === 'CLAIMED_UNPAID') ? '청구완료' : '청구전'),
+      depositAmount: r.depositAmount || 0,
+      depositDate: (r.existingClaim && r.existingClaim.depositDate) || '',
+      depositStatus: r.isClaimDeposited ? '입금완료' : (r.depositAmount > 0 ? '부분입금' : '미입금'),
+      cgDailyWage: r.cgDailyWage || 140000,
+      payoutAmount: r.fullPayoutAmount || 0,
+      payoutStatus: r.isPayoutPaid ? '지급완료' : '지급전',
+      claimId: r.existingClaim ? r.existingClaim.id : (r.claimId || ''),
+      payoutId: r.existingPayout ? r.existingPayout.id : (r.payoutId || ''),
+      caregiverName: r.caregiverName || '',
+      memo: r.memo || (r.existingClaim ? r.existingClaim.memo : '') || (r.existingPayout ? r.existingPayout.memo : '') || ''
+    }));
   }
 
+  // 4. Find the target set to be deleted
+  const targetSet = app.customSettlementSets.find(s => Number(s.setIndex) === Number(setIndex)) || app.customSettlementSets[Number(setIndex) - 1];
+
+  // 5. Identify and remove any associated claim(s) and payout(s)
+  const targetClaimId = targetSet ? (targetSet.claimId || '') : '';
+  const targetClaimRound = targetSet ? (targetSet.claimRound || '') : '';
+  const targetPayoutId = targetSet ? (targetSet.payoutId || '') : '';
+  const targetPayoutRound = targetSet ? (targetSet.payoutRound || '') : '';
+
+  const claimsToDelete = (gClaims || []).filter(c => {
+    if (String(c.applyId) !== String(app.id)) return false;
+    if (targetClaimId && c.id === targetClaimId) return true;
+    if (targetClaimRound && targetClaimRound !== '-' && c.round === targetClaimRound) return true;
+    return false;
+  });
+
+  const payoutsToDelete = (gPayouts || []).filter(p => {
+    if (String(p.applyId) !== String(app.id)) return false;
+    if (targetPayoutId && p.id === targetPayoutId) return true;
+    if (targetPayoutRound && targetPayoutRound !== '-' && p.round === targetPayoutRound) return true;
+    return false;
+  });
+
+  const deletedClaimIds = claimsToDelete.map(c => c.id);
+  const deletedPayoutIds = payoutsToDelete.map(p => p.id);
+
+  if (deletedClaimIds.length > 0) {
+    gClaims = (gClaims || []).filter(c => !deletedClaimIds.includes(c.id));
+    deletedClaimIds.forEach(cId => {
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:deleteClaim', { claimId: cId }).catch(console.warn);
+      }
+    });
+  }
+
+  if (deletedPayoutIds.length > 0) {
+    gPayouts = (gPayouts || []).filter(p => !deletedPayoutIds.includes(p.id));
+    deletedPayoutIds.forEach(pId => {
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:deletePayout', { payoutId: pId }).catch(console.warn);
+      }
+    });
+  }
+
+  // 6. Remove target set from customSettlementSets & re-index remaining sets
+  app.customSettlementSets = app.customSettlementSets.filter(s => Number(s.setIndex) !== Number(setIndex));
+  app.customSettlementSets.forEach((s, idx) => {
+    s.setIndex = idx + 1;
+  });
+
+  // 7. Update customer statistics
+  const remainingAppClaims = (gClaims || []).filter(c => String(c.applyId) === String(app.id));
+  app.claimCount = remainingAppClaims.length;
+  app.unconfirmedClaimCount = remainingAppClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').length;
+  app.estimatedUnpaid = remainingAppClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').reduce((sum, c) => sum + (c.unpaidAmount || c.claimAmount || 0), 0);
+
+  const remainingAppPayouts = (gPayouts || []).filter(p => String(p.applyId) === String(app.id));
+  app.totalPayout = remainingAppPayouts.filter(p => p.payoutStatus === '지급완료' || p.payoutStatus === '지급').reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
+
+  app.hasManualUpdate = true;
+  app.updatedAt = new Date().toISOString();
+
+  const appIdx = (gApps || []).findIndex(a => String(a.id) === String(app.id));
+  if (appIdx !== -1) {
+    gApps[appIdx] = app;
+  }
+
+  // 8. Persist to localStorage
   try {
     localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
-  } catch (e) {}
+    localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+    localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+  } catch (e) {
+    console.warn('localStorage save warning:', e);
+  }
 
+  // 9. Persist to backend server (/api/hub/customer/update-fields)
+  try {
+    await fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: app.id,
+        fields: {
+          customSettlementSets: app.customSettlementSets,
+          claimCount: app.claimCount,
+          unconfirmedClaimCount: app.unconfirmedClaimCount,
+          estimatedUnpaid: app.estimatedUnpaid,
+          totalPayout: app.totalPayout,
+          hasManualUpdate: true,
+          deleteClaimIds: deletedClaimIds,
+          deletePayoutIds: deletedPayoutIds
+        }
+      })
+    });
+  } catch (e) {
+    console.warn('[deleteSettlementSet] update-fields error:', e);
+  }
+
+  // 10. Persist to Convex Cloud
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:saveApplication', { app }).catch(console.warn);
   }
 
+  // 11. System audit log
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '정산청구세트',
+      actionType: 'DELETE',
+      target: `[${app.id}] ${maskName(app.patientName)} 세트 ${setIndex}`,
+      summary: `세트 ${setIndex} 삭제 완료 (연동 청구 ${deletedClaimIds.length}건, 지급 ${deletedPayoutIds.length}건 정리)`,
+      changes: {
+        '세트수': { before: `${app.customSettlementSets.length + 1}개`, after: `${app.customSettlementSets.length}개` },
+        '미수금': { after: `${formatCurrency(app.estimatedUnpaid)}원` }
+      }
+    });
+  }
+
+  // 12. Refresh UI immediately
   if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
     openHubCustomerDetailModal(gActiveHubModalAppId);
   }
   if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  const claimListModal = document.getElementById('claimDetailListModal');
+  if (claimListModal && !claimListModal.classList.contains('hidden')) openClaimDetailListModal(app.id);
+  const payoutListModal = document.getElementById('payoutDetailListModal');
+  if (payoutListModal && !payoutListModal.classList.contains('hidden')) openPayoutDetailListModal(app.id);
 
+  // 13. Toast / Notification
   if (typeof showNotification === 'function') {
     showNotification({
       type: 'info',
       title: '세트 삭제 완료',
-      message: `[${maskName(app.patientName)} 님] 세트 ${setIndex}가 삭제되었습니다.`,
+      message: `[${maskName(app.patientName)} 님] 세트 ${setIndex}가 정상적으로 삭제되었습니다.`,
       icon: 'trash-2'
     });
   }
