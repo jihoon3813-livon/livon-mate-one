@@ -1082,6 +1082,14 @@ const PROD_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
 
 function isDevEnvironment() {
   if (typeof window === 'undefined') return false;
+  const host = window.location.hostname || '';
+  const port = window.location.port || '';
+
+  // 1. 공식 운영 도메인(livon-mate-one.vercel.app)은 레거시 로컬스토리지와 무관하게 항상 PROD 보장
+  if (host === 'livon-mate-one.vercel.app') {
+    return false;
+  }
+
   const urlParam = new URLSearchParams(window.location.search).get('env');
   if (urlParam === 'dev') return true;
   if (urlParam === 'prod') return false;
@@ -1089,8 +1097,6 @@ function isDevEnvironment() {
   if (storedEnv === 'dev') return true;
   if (storedEnv === 'prod') return false;
 
-  const host = window.location.hostname || '';
-  const port = window.location.port || '';
   if (host === 'localhost' || host === '127.0.0.1' || host === '' || host.includes('dev') || host.includes('preview') || port === '8080' || port === '3000') {
     return true;
   }
