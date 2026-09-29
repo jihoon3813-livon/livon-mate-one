@@ -914,9 +914,56 @@
 
     /**
      * Check if a log should be rendered using the Classic CarePort Design (Chunk 7803 / 1153)
-     * 모든 케어포트 간병일지는 100% 최신 공식 서식(보호자 안내용 모던 간병일지)으로만 렌더링되도록 통일
+     * 과거 양식: checkboxes 배열 또는 consult_report / consult_summary가 존재하고 최신 서식(categories/overall_status 등)이 없는 경우
      */
     isClassicLog(dailyLog, detailData = null) {
+      if (dailyLog?.isClassic === true || detailData?.isClassic === true) return true;
+      if (dailyLog?.isModern === true || detailData?.isModern === true) return false;
+
+      const sessionId = dailyLog?.sessionId || (dailyLog?.id ? String(dailyLog.id).replace(/\D/g, '') : null);
+      const cached = (sessionId && typeof window !== 'undefined' && window.CarePortClient?._detailCache)
+        ? window.CarePortClient._detailCache[sessionId]
+        : null;
+
+      const detail = detailData || cached;
+
+      // Extract raw data from detailData or dailyLog
+      let raw = detail?.raw || dailyLog?.raw || null;
+      if (!raw) {
+        const rawStr = detail?.rawContent || dailyLog?.rawContent;
+        if (typeof rawStr === 'string' && rawStr.trim().startsWith('{')) {
+          try {
+            raw = JSON.parse(rawStr);
+          } catch (e) {
+            raw = null;
+          }
+        }
+      }
+
+      if (raw) {
+        // Modern CarePort format has explicit categories or overall_status or guardian_notes
+        if (raw.categories || raw.overall_status || raw.guardian_notes || raw.today_highlights || raw.care_log) {
+          return false;
+        }
+
+        // Classic CarePort format has checkboxes
+        if (Array.isArray(raw.checkboxes) && raw.checkboxes.length > 0) {
+          return true;
+        }
+
+        // Classic CarePort format has consult_report or consult_summary without modern fields
+        if (raw.consult_report || raw.consult_summary || raw.session_summary) {
+          return true;
+        }
+      }
+
+      // Check direct fields on detail or dailyLog
+      if (detail?.categories || dailyLog?.categories) return false;
+      if (detail?.overallStatus || dailyLog?.overallStatus) return false;
+      if (Array.isArray(detail?.checkboxes) && detail.checkboxes.length > 0) return true;
+      if (Array.isArray(dailyLog?.checkboxes) && dailyLog.checkboxes.length > 0) return true;
+      if (detail?.consult_report || dailyLog?.consult_report) return true;
+
       return false;
     },
 
@@ -924,12 +971,25 @@
      * Generate 100% authentic Classic CarePort Document HTML (Image right side / Component 1153)
      */
     generateClassicLogHtml(patient, dailyLog, detailData = null) {
-      const raw = detailData?.raw || dailyLog?.raw || {};
+      let raw = detailData?.raw || dailyLog?.raw || null;
+      if (!raw) {
+        const rawStr = detailData?.rawContent || dailyLog?.rawContent;
+        if (typeof rawStr === 'string' && rawStr.trim().startsWith('{')) {
+          try {
+            raw = JSON.parse(rawStr);
+          } catch (e) {
+            raw = {};
+          }
+        } else {
+          raw = {};
+        }
+      }
+
       const username = (detailData?.username || dailyLog?.username || patient?.patientName || '고객').trim();
-      const age = String(detailData?.age || dailyLog?.age || patient?.age || '51').replace(/[^0-9]/g, '');
-      const gender = (detailData?.gender || dailyLog?.gender || patient?.gender || '남').trim();
-      const consultant = (detailData?.consultantName || dailyLog?.consultantName || dailyLog?.caregiver || patient?.caregiverName || '김명옥').trim();
-      const org = (detailData?.organizationName || dailyLog?.orgName || dailyLog?.org || patient?.insuranceCompany || '삼성화재').trim();
+      const age = String(detailData?.age || dailyLog?.age || patient?.age || '74').replace(/[^0-9]/g, '');
+      const gender = (detailData?.gender || dailyLog?.gender || patient?.gender || '여').trim();
+      const consultant = (detailData?.consultantName || dailyLog?.consultantName || dailyLog?.caregiver || patient?.caregiverName || '삼성화재대표계정').trim();
+      const org = (detailData?.organizationName || dailyLog?.orgName || dailyLog?.org || patient?.insuranceCompany || '삼성화재(본사)').trim();
       
       const rawDate = detailData?.consultDate || dailyLog?.consultDate || '';
       const consultDate = rawDate ? rawDate.slice(0, 16).replace('T', ' ') : '-';
@@ -1033,6 +1093,14 @@
 
         consultTitle = fixText(consultTitle);
         summaryText = fixText(summaryText);
+
+        if (raw.consult_report && typeof raw.consult_report === 'object') {
+          const fixedReport = {};
+          for (const [k, v] of Object.entries(raw.consult_report)) {
+            fixedReport[fixText(k)] = typeof v === 'string' ? fixText(v) : v;
+          }
+          raw.consult_report = fixedReport;
+        }
       }
       
       let keywordsArr = [];
@@ -1143,7 +1211,7 @@
   </style>
 </head>
 <body>
-  <div class="report-area">
+  <div class="report-area page">
     <!-- Watermark: LivOn -->
     <div class="water-mark">LivOn</div>
 
