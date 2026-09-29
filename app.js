@@ -12006,17 +12006,26 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
     return {
       dayIndex: day,
       careDate: (l.consultDate || l.dateString || '').slice(0, 10),
-      overallScore: s.overallScore || s.overall || (day === 1 ? 3 : (day === 2 ? 4 : (day >= 4 ? 5 : 4))),
-      mobilityScore: s.mobilityScore || s.mobility || (day === 1 ? 3 : (day <= 3 ? 4 : 4)),
-      dietScore: s.dietScore || s.diet || (day === 1 ? 3 : (day === 2 ? 4 : 5)),
-      sleepScore: s.sleepScore || s.sleep || (day === 1 ? 3 : 4),
-      painScore: s.painScore || s.pain || (day === 1 ? 3 : (day === 2 ? 2 : 1))
+      overallScore: s.overallScore != null ? s.overallScore : (s.overall != null ? s.overall : 3),
+      mobilityScore: s.mobilityScore != null ? s.mobilityScore : (s.mobility != null ? s.mobility : 3),
+      dietScore: s.dietScore != null ? s.dietScore : (s.diet != null ? s.diet : 3),
+      sleepScore: s.sleepScore != null ? s.sleepScore : (s.sleep != null ? s.sleep : 3),
+      painScore: s.painScore != null ? s.painScore : (s.pain != null ? s.pain : 3)
     };
   });
 
   try {
     for (let i = 0; i < totalDays; i++) {
       const log = dailyLogsToRender[i];
+      const logCareDate = (log.consultDate || log.dateString || '').slice(0, 10);
+      const logDayNum = log.dayNumber || (i + 1);
+      const currentDayTrends = clusterTrendScores.filter((t, tIdx) => {
+        const tDate = (t.careDate || t.date || '').slice(0, 10);
+        if (tDate && logCareDate) return tDate <= logCareDate;
+        if (t.dayIndex != null && logDayNum != null) return Number(t.dayIndex) <= Number(logDayNum);
+        return tIdx <= i;
+      });
+
       const patientMeta = {
         patientName: patientName,
         age: app?.age || targetRow?.age || '74',
@@ -12026,13 +12035,20 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
         insuranceCompany: insuranceCompany,
         applyId: appId,
         dailyLogs: dailyLogsToRender,
-        trendScores: clusterTrendScores
+        trendScores: currentDayTrends
       };
 
       const realDetail = detailDataMap[log.sessionId] || (window.CarePortClient && window.CarePortClient._detailCache && window.CarePortClient._detailCache[log.sessionId]) || null;
-      const detailData = realDetail || buildCareLogDetailData(patientMeta, log, caregiverName, insuranceCompany, centerName);
-      if (detailData && (!detailData.trendScores || detailData.trendScores.length === 0)) {
-        detailData.trendScores = clusterTrendScores;
+      let detailData = realDetail ? { ...realDetail } : buildCareLogDetailData(patientMeta, log, caregiverName, insuranceCompany, centerName);
+      if (detailData && Array.isArray(detailData.trendScores) && detailData.trendScores.length > 0) {
+        detailData.trendScores = detailData.trendScores.filter((t, tIdx) => {
+          const tDate = (t.careDate || t.date || '').slice(0, 10);
+          if (tDate && logCareDate) return tDate <= logCareDate;
+          if (t.dayIndex != null && logDayNum != null) return Number(t.dayIndex) <= Number(logDayNum);
+          return tIdx <= i;
+        });
+      } else if (detailData) {
+        detailData.trendScores = currentDayTrends;
       }
 
       const dayHtml = (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function')
@@ -12168,11 +12184,11 @@ async function previewCustomerCareLogPdf(appId) {
     return {
       dayIndex: day,
       careDate: (l.consultDate || l.dateString || '').slice(0, 10),
-      overallScore: s.overallScore || s.overall || (day === 1 ? 3 : (day === 2 ? 4 : (day >= 4 ? 5 : 4))),
-      mobilityScore: s.mobilityScore || s.mobility || (day === 1 ? 3 : (day <= 3 ? 4 : 4)),
-      dietScore: s.dietScore || s.diet || (day === 1 ? 3 : (day === 2 ? 4 : 5)),
-      sleepScore: s.sleepScore || s.sleep || (day === 1 ? 3 : 4),
-      painScore: s.painScore || s.pain || (day === 1 ? 3 : (day === 2 ? 2 : 1))
+      overallScore: s.overallScore != null ? s.overallScore : (s.overall != null ? s.overall : 3),
+      mobilityScore: s.mobilityScore != null ? s.mobilityScore : (s.mobility != null ? s.mobility : 3),
+      dietScore: s.dietScore != null ? s.dietScore : (s.diet != null ? s.diet : 3),
+      sleepScore: s.sleepScore != null ? s.sleepScore : (s.sleep != null ? s.sleep : 3),
+      painScore: s.painScore != null ? s.painScore : (s.pain != null ? s.pain : 3)
     };
   });
 
@@ -12180,6 +12196,15 @@ async function previewCustomerCareLogPdf(appId) {
     let allPagesHtml = '';
     for (let i = 0; i < totalDays; i++) {
       const log = dailyLogs[i];
+      const logCareDate = (log.consultDate || log.dateString || '').slice(0, 10);
+      const logDayNum = log.dayNumber || (i + 1);
+      const currentDayTrends = clusterTrendScores.filter((t, tIdx) => {
+        const tDate = (t.careDate || t.date || '').slice(0, 10);
+        if (tDate && logCareDate) return tDate <= logCareDate;
+        if (t.dayIndex != null && logDayNum != null) return Number(t.dayIndex) <= Number(logDayNum);
+        return tIdx <= i;
+      });
+
       const curPatientMeta = {
         patientName: log.username || log.patientName || patientName,
         age: log.age || app?.age || targetRow?.age || '68',
@@ -12189,13 +12214,20 @@ async function previewCustomerCareLogPdf(appId) {
         insuranceCompany: insuranceCompany,
         applyId: appId,
         dailyLogs: dailyLogs,
-        trendScores: clusterTrendScores
+        trendScores: currentDayTrends
       };
 
-      let detailData = (window.CarePortClient && window.CarePortClient._detailCache && window.CarePortClient._detailCache[log.sessionId])
-        || buildCareLogDetailData(curPatientMeta, log, curPatientMeta.caregiverName, insuranceCompany, curPatientMeta.centerName);
-      if (detailData && (!detailData.trendScores || detailData.trendScores.length === 0)) {
-        detailData.trendScores = clusterTrendScores;
+      const realDetail = (window.CarePortClient && window.CarePortClient._detailCache && window.CarePortClient._detailCache[log.sessionId]) || null;
+      let detailData = realDetail ? { ...realDetail } : buildCareLogDetailData(curPatientMeta, log, curPatientMeta.caregiverName, insuranceCompany, curPatientMeta.centerName);
+      if (detailData && Array.isArray(detailData.trendScores) && detailData.trendScores.length > 0) {
+        detailData.trendScores = detailData.trendScores.filter((t, tIdx) => {
+          const tDate = (t.careDate || t.date || '').slice(0, 10);
+          if (tDate && logCareDate) return tDate <= logCareDate;
+          if (t.dayIndex != null && logDayNum != null) return Number(t.dayIndex) <= Number(logDayNum);
+          return tIdx <= i;
+        });
+      } else if (detailData) {
+        detailData.trendScores = currentDayTrends;
       }
 
       const dayHtml = (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function')
@@ -36819,31 +36851,42 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     const curDayIndex = detail.raw?.day_index ? Number(detail.raw.day_index) : (d && d.dayNumber ? Number(d.dayNumber) : null);
     let filteredTrends = [];
     if (Array.isArray(trendScores) && trendScores.length > 0) {
-      if (curDayIndex) {
-        filteredTrends = trendScores.filter(t => (t.dayIndex != null ? t.dayIndex <= curDayIndex : (t.careDate && curDate && t.careDate <= curDate)));
-      } else if (curDate) {
-        filteredTrends = trendScores.filter(t => t.careDate && t.careDate <= curDate);
-      }
+      filteredTrends = trendScores.filter((t, idx) => {
+        const tDate = (t.careDate || t.date || '').slice(0, 10);
+        if (tDate && curDate) return tDate <= curDate;
+        if (t.dayIndex != null && curDayIndex != null) return Number(t.dayIndex) <= Number(curDayIndex);
+        if (curDayIndex != null) return (idx + 1) <= Number(curDayIndex);
+        return true;
+      });
     }
-    // If server trendScores didn't cover curDate, synthesize from siblingLogs
+    // If server trendScores didn't cover curDate, synthesize from siblingLogs up to current day
     if (filteredTrends.length === 0 && siblingLogs.length > 0) {
-      filteredTrends = siblingLogs.map((l, i) => {
+      const logsUpToNow = siblingLogs.filter((l, i) => {
+        const lDate = (l.consultDate || l.dateString || '').slice(0, 10);
+        const day = l.dayNumber || (i + 1);
+        if (curDate && lDate) return lDate <= curDate;
+        if (curDayIndex != null) return day <= curDayIndex;
+        return true;
+      });
+      filteredTrends = logsUpToNow.map((l, i) => {
+        const lRaw = l.raw || l;
+        const s = lRaw.trend_scores || lRaw.trendScores || l.trendScores || {};
         const day = l.dayNumber || (i + 1);
         return {
           dayIndex: day,
           careDate: (l.consultDate || l.dateString || '').slice(0, 10),
-          overallScore: (l.overallStatus?.tone === 'warning' ? 3 : (day === 1 ? 3 : (day === 2 ? 4 : (day >= 4 ? 5 : 4)))),
-          mobilityScore: (day === 1 ? 3 : (day <= 3 ? 4 : 4)),
-          dietScore: (day === 1 ? 3 : (day === 2 ? 4 : 5)),
-          sleepScore: (day === 1 ? 3 : 4),
-          painScore: (day === 1 ? 3 : (day === 2 ? 2 : 1))
+          overallScore: s.overallScore != null ? s.overallScore : (s.overall != null ? s.overall : (l.overallStatus?.tone === 'warning' ? 3 : 4)),
+          mobilityScore: s.mobilityScore != null ? s.mobilityScore : (s.mobility != null ? s.mobility : 3),
+          dietScore: s.dietScore != null ? s.dietScore : (s.diet != null ? s.diet : 3),
+          sleepScore: s.sleepScore != null ? s.sleepScore : (s.sleep != null ? s.sleep : 3),
+          painScore: s.painScore != null ? s.painScore : (s.pain != null ? s.pain : 3)
         };
       });
     }
     if (filteredTrends.length === 0) {
       const cDate = curDate || new Date().toISOString().slice(0, 10);
       filteredTrends = [
-        { dayIndex: 1, careDate: cDate, overallScore: 4, mobilityScore: 4, dietScore: 4, sleepScore: 4, painScore: 2 }
+        { dayIndex: curDayIndex || 1, careDate: cDate, overallScore: 4, mobilityScore: 4, dietScore: 4, sleepScore: 4, painScore: 3 }
       ];
     }
     window._currentTrendScores = filteredTrends;
@@ -38390,11 +38433,11 @@ async function handleAutoGenerateAndImportCarePortLog() {
       return {
         dayIndex: day,
         careDate: (l.consultDate || l.dateString || '').slice(0, 10),
-        overallScore: s.overallScore || s.overall || (day === 1 ? 3 : (day === 2 ? 4 : (day >= 4 ? 5 : 4))),
-        mobilityScore: s.mobilityScore || s.mobility || (day === 1 ? 3 : (day <= 3 ? 4 : 4)),
-        dietScore: s.dietScore || s.diet || (day === 1 ? 3 : (day === 2 ? 4 : 5)),
-        sleepScore: s.sleepScore || s.sleep || (day === 1 ? 3 : 4),
-        painScore: s.painScore || s.pain || (day === 1 ? 3 : (day === 2 ? 2 : 1))
+        overallScore: s.overallScore != null ? s.overallScore : (s.overall != null ? s.overall : 3),
+        mobilityScore: s.mobilityScore != null ? s.mobilityScore : (s.mobility != null ? s.mobility : 3),
+        dietScore: s.dietScore != null ? s.dietScore : (s.diet != null ? s.diet : 3),
+        sleepScore: s.sleepScore != null ? s.sleepScore : (s.sleep != null ? s.sleep : 3),
+        painScore: s.painScore != null ? s.painScore : (s.pain != null ? s.pain : 3)
       };
     });
 
@@ -38437,6 +38480,13 @@ async function handleAutoGenerateAndImportCarePortLog() {
           const log = dailyLogsToRender[i];
           const dayNum = log.dayNumber || (i + 1);
           const curDate = log.dateString || (log.consultDate ? log.consultDate.slice(0, 10) : startDate);
+          const logCareDate = (log.consultDate || log.dateString || '').slice(0, 10);
+          const currentDayTrends = clusterTrendScores.filter((t, tIdx) => {
+            const tDate = (t.careDate || t.date || '').slice(0, 10);
+            if (tDate && logCareDate) return tDate <= logCareDate;
+            if (t.dayIndex != null && dayNum != null) return Number(t.dayIndex) <= Number(dayNum);
+            return tIdx <= i;
+          });
 
           const patientMeta = {
             patientName: patientName,
@@ -38447,14 +38497,21 @@ async function handleAutoGenerateAndImportCarePortLog() {
             insuranceCompany: insuranceCompany,
             applyId: appId,
             dailyLogs: dailyLogsToRender,
-            trendScores: clusterTrendScores
+            trendScores: currentDayTrends
           };
 
           const realDetail = detailDataMap[log.sessionId] || (window.CarePortClient && window.CarePortClient._detailCache && window.CarePortClient._detailCache[log.sessionId]) || null;
 
-          let detailData = realDetail || buildCareLogDetailData(patientMeta, log, caregiverName, insuranceCompany, centerName);
-          if (detailData && (!detailData.trendScores || detailData.trendScores.length === 0)) {
-            detailData.trendScores = clusterTrendScores;
+          let detailData = realDetail ? { ...realDetail } : buildCareLogDetailData(patientMeta, log, caregiverName, insuranceCompany, centerName);
+          if (detailData && Array.isArray(detailData.trendScores) && detailData.trendScores.length > 0) {
+            detailData.trendScores = detailData.trendScores.filter((t, tIdx) => {
+              const tDate = (t.careDate || t.date || '').slice(0, 10);
+              if (tDate && logCareDate) return tDate <= logCareDate;
+              if (t.dayIndex != null && dayNum != null) return Number(t.dayIndex) <= Number(dayNum);
+              return tIdx <= i;
+            });
+          } else if (detailData) {
+            detailData.trendScores = currentDayTrends;
           }
 
           const dayHtml = (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function')

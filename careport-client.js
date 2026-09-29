@@ -748,35 +748,86 @@
         summary = fixText(summary);
       }
 
-      // 8. Trend scores resolution (Multi-day authentic trend curve, never empty)
+      // Current care date and dayIndex of this daily log
+      const curCareDate = (raw.care_date || detail.careDate || log.consultDate || detail.consultDate || '').slice(0, 10);
+      const curDayIndex = (raw.day_index != null ? Number(raw.day_index) : (log.dayNumber != null ? Number(log.dayNumber) : null));
+
+      // 8. Trend scores resolution (Multi-day authentic trend curve, filtered up to current day as CarePort Chunk 399)
       let trendScores = (detail.trendScores && detail.trendScores.length > 0)
         ? detail.trendScores
-        : ((patient && patient.trendScores && patient.trendScores.length > 0)
-          ? patient.trendScores
-          : ((raw.trendScores && raw.trendScores.length > 0) ? raw.trendScores : ((log && log.trendScores && log.trendScores.length > 0) ? log.trendScores : null)));
+        : ((raw.trendScores && raw.trendScores.length > 0)
+          ? raw.trendScores
+          : ((patient && patient.trendScores && patient.trendScores.length > 0)
+            ? patient.trendScores
+            : ((log && log.trendScores && log.trendScores.length > 0) ? log.trendScores : null)));
+
+      if (trendScores && !Array.isArray(trendScores) && typeof trendScores === 'object') {
+        const s = trendScores;
+        trendScores = [{
+          dayIndex: curDayIndex || 1,
+          careDate: curCareDate,
+          overallScore: s.overallScore || s.overall || 3,
+          mobilityScore: s.mobilityScore || s.mobility || 3,
+          dietScore: s.dietScore || s.diet || 3,
+          sleepScore: s.sleepScore || s.sleep || 3,
+          painScore: s.painScore || s.pain || 3
+        }];
+      }
+
+      // Filter trendScores UP TO current care date / dayIndex (exact CarePort behavior)
+      if (Array.isArray(trendScores) && trendScores.length > 0) {
+        if (curCareDate) {
+          const filtered = trendScores.filter(t => {
+            const tDate = (t.careDate || t.date || '').slice(0, 10);
+            if (tDate) return tDate <= curCareDate;
+            if (t.dayIndex != null && curDayIndex != null) return t.dayIndex <= curDayIndex;
+            return true;
+          });
+          if (filtered.length > 0) trendScores = filtered;
+        } else if (curDayIndex != null) {
+          const filtered = trendScores.filter(t => (t.dayIndex != null ? t.dayIndex <= curDayIndex : true));
+          if (filtered.length > 0) trendScores = filtered;
+        }
+      }
 
       if (!trendScores || (Array.isArray(trendScores) && trendScores.length === 0)) {
-        if (patient && Array.isArray(patient.dailyLogs) && patient.dailyLogs.length > 0) {
-          // 전체 일차 목록 기반으로 일자별 변화 추이 100% 산출
-          trendScores = patient.dailyLogs.map((l, idx) => {
+        if (raw.trend_scores && typeof raw.trend_scores === 'object') {
+          const s = raw.trend_scores;
+          trendScores = [{
+            dayIndex: curDayIndex || 1,
+            careDate: curCareDate,
+            overallScore: s.overallScore || s.overall || 3,
+            mobilityScore: s.mobilityScore || s.mobility || 3,
+            dietScore: s.dietScore || s.diet || 3,
+            sleepScore: s.sleepScore || s.sleep || 3,
+            painScore: s.painScore || s.pain || 3
+          }];
+        } else if (patient && Array.isArray(patient.dailyLogs) && patient.dailyLogs.length > 0) {
+          const logsUpToNow = patient.dailyLogs.filter((l, idx) => {
+            const lDate = (l.consultDate || l.dateString || '').slice(0, 10);
+            const lDay = l.dayNumber || (idx + 1);
+            if (lDate && curCareDate) return lDate <= curCareDate;
+            if (curDayIndex != null) return lDay <= curDayIndex;
+            return true;
+          });
+          trendScores = logsUpToNow.map((l, idx) => {
             const lRaw = l.raw || l;
             const s = lRaw.trend_scores || lRaw.trendScores || l.trendScores || {};
             const day = l.dayNumber || (idx + 1);
             return {
               dayIndex: day,
               careDate: (l.consultDate || l.dateString || '').slice(0, 10),
-              overallScore: s.overallScore || s.overall || (day === 1 ? 3 : (day === 2 ? 4 : (day >= 4 ? 5 : 4))),
-              mobilityScore: s.mobilityScore || s.mobility || (day === 1 ? 3 : (day <= 3 ? 4 : 4)),
-              dietScore: s.dietScore || s.diet || (day === 1 ? 3 : (day === 2 ? 4 : 5)),
-              sleepScore: s.sleepScore || s.sleep || (day === 1 ? 3 : 4),
-              painScore: s.painScore || s.pain || (day === 1 ? 3 : (day === 2 ? 2 : 1))
+              overallScore: s.overallScore || s.overall || 3,
+              mobilityScore: s.mobilityScore || s.mobility || 3,
+              dietScore: s.dietScore || s.diet || 3,
+              sleepScore: s.sleepScore || s.sleep || 3,
+              painScore: s.painScore || s.pain || 3
             };
           });
         } else {
-          // 단일 일자 또는 일지 목록 부재 시 기본 추이 생성 (공백 차트/문구 방지)
           const cDate = (consultDate || '').slice(0, 10) || new Date().toISOString().slice(0, 10);
           trendScores = [
-            { dayIndex: 1, careDate: cDate, overallScore: 4, mobilityScore: 4, dietScore: 4, sleepScore: 4, painScore: 2 }
+            { dayIndex: curDayIndex || 1, careDate: cDate, overallScore: 3, mobilityScore: 3, dietScore: 3, sleepScore: 3, painScore: 3 }
           ];
         }
       }
@@ -899,7 +950,7 @@
         list.forEach((item, idx) => {
           const shortKey = line.key.replace('Score', '');
           const rawVal = item[line.key] != null ? item[line.key] : (item[shortKey] != null ? item[shortKey] : 3);
-          const val = (line.key === 'painScore' && rawVal > 3) ? (6 - rawVal) : rawVal;
+          const val = line.key === 'painScore' ? (rawVal != null ? (6 - rawVal) : 3) : rawVal;
           pts.push(`${getX(idx)},${getY(val)}`);
         });
         linesSvg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${line.color}" stroke-width="2.5" ${line.dash}/>`;
