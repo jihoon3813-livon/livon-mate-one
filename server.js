@@ -30,6 +30,8 @@ try {
   }
   process.env.CAREPORT_ID = process.env.CAREPORT_ID || 'jihoon3813';
   process.env.CAREPORT_PW = process.env.CAREPORT_PW || 'livon3813!@#';
+  process.env.CTI_ID = process.env.CTI_ID || 'jga2413';
+  process.env.CTI_PASS = process.env.CTI_PASS || 'jga2413#';
 } catch (e) {
   console.warn('[EnvLoader] Error loading local env file:', e.message);
 }

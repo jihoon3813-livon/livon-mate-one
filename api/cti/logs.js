@@ -1,4 +1,4 @@
-﻿const { getRecentCallLogs } = require('../../cti-client');
+const { getRecentCallLogs } = require('../../cti-client');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,12 +12,13 @@ module.exports = async function handler(req, res) {
   try {
     const queryDate = (req.query && req.query.date) || new Date().toISOString().slice(0, 10);
     const logData = await getRecentCallLogs(queryDate);
+    const logsList = Array.isArray(logData) ? logData : (logData.logs || []);
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.status(200).json({
       success: true,
       queryDate,
-      count: logData.length,
-      logs: logData
+      count: logsList.length,
+      logs: logsList
     });
   } catch (err) {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');

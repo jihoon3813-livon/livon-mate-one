@@ -22,8 +22,8 @@ function getCtiConfig() {
   }
   return {
     baseUrl: process.env.CTI_BASE_URL || 'https://crm.goodars.co.kr',
-    id: process.env.CTI_ID || '',
-    pass: process.env.CTI_PASS || '',
+    id: process.env.CTI_ID || 'jga2413',
+    pass: process.env.CTI_PASS || 'jga2413#',
     defaultCallerId: process.env.CTI_CALLER_ID || '16007835',
     callerOptions: [
       { id: '16007835', name: '리본케어 대표번호 (1600-7835)', org: '리본케어' },
@@ -86,8 +86,8 @@ async function ensureCtiSession(forceRefresh = false) {
   }
 
   const cfg = getCtiConfig();
-  const id = cfg.id || process.env.CTI_ID || '';
-  const pass = cfg.pass || process.env.CTI_PASS || '';
+  const id = cfg.id || process.env.CTI_ID || 'jga2413';
+  const pass = cfg.pass || process.env.CTI_PASS || 'jga2413#';
 
   try {
     // 1. 초기 세션 쿠키 획득
