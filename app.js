@@ -1093,12 +1093,33 @@ function isDevEnvironment() {
   return false;
 }
 
+function isDevScreen() {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname || '';
+  const port = window.location.port || '';
+  if (host === 'localhost' || host === '127.0.0.1' || host === '' || host.includes('dev') || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:') {
+    return true;
+  }
+  const urlParam = new URLSearchParams(window.location.search).get('env');
+  if (urlParam === 'dev') return true;
+  if (localStorage.getItem('LIVON_TARGET_ENV') === 'dev') return true;
+  if (typeof IS_DEV_ENV !== 'undefined' && IS_DEV_ENV) return true;
+  return false;
+}
+window.isDevScreen = isDevScreen;
+
+if (typeof document !== 'undefined' && isDevScreen()) {
+  try {
+    document.documentElement.classList.add('livon-dev-mode');
+  } catch (e) {}
+}
+
 const IS_DEV_ENV = isDevEnvironment();
 const CONVEX_URL = (typeof window !== 'undefined' && (window.ENV?.CONVEX_URL || window.CONVEX_URL))
   || (IS_DEV_ENV ? DEV_CONVEX_URL : PROD_CONVEX_URL);
 window.IS_DEV_ENV = IS_DEV_ENV;
 window.CURRENT_CONVEX_URL = CONVEX_URL;
-console.log('[Livon ERP] Current Running Environment:', IS_DEV_ENV ? '개발 사이트 (DEV)' : '실사이트 (PROD)', '| Convex:', CONVEX_URL);
+console.log('[Livon ERP] Current Running Environment:', IS_DEV_ENV ? '개발 사이트 (DEV)' : '실사이트 (PROD)', '| Convex:', CONVEX_URL, '| DevScreen:', isDevScreen());
 
 async function syncToConvex(path, args = {}) {
   try {
@@ -45733,11 +45754,23 @@ async function initAdminSession() {
     const rememberCheckbox = document.getElementById('loginRememberMe');
     const usernameInput = document.getElementById('loginUsernameInput');
     const validRemembered = localStorage.getItem('REBORN_REMEMBERED_USERNAME');
-    if (usernameInput && validRemembered && validRemembered !== '342') {
-      usernameInput.value = validRemembered;
-    }
-    if (rememberCheckbox) {
-      rememberCheckbox.checked = !!(validRemembered && validRemembered !== '342');
+    if (isDevScreen()) {
+      try { document.documentElement.classList.add('livon-dev-mode'); } catch (e) {}
+      if (usernameInput) {
+        usernameInput.value = 'superadmin';
+        usernameInput.removeAttribute('required');
+      }
+      if (rememberCheckbox) rememberCheckbox.checked = false;
+      setTimeout(() => {
+        document.getElementById('loginPasswordInput')?.focus();
+      }, 50);
+    } else {
+      if (usernameInput && validRemembered && validRemembered !== '342') {
+        usernameInput.value = validRemembered;
+      }
+      if (rememberCheckbox) {
+        rememberCheckbox.checked = !!(validRemembered && validRemembered !== '342');
+      }
     }
     return false;
   }
@@ -45765,7 +45798,15 @@ async function initAdminSession() {
   }
 
   if (usernameInput) {
-    if (validRemembered && validRemembered !== '342') {
+    if (isDevScreen()) {
+      try { document.documentElement.classList.add('livon-dev-mode'); } catch (e) {}
+      usernameInput.value = 'superadmin';
+      usernameInput.removeAttribute('required');
+      if (rememberCheckbox) rememberCheckbox.checked = false;
+      setTimeout(() => {
+        passwordInput?.focus();
+      }, 50);
+    } else if (validRemembered && validRemembered !== '342') {
       usernameInput.value = validRemembered;
     } else {
       usernameInput.value = '';
@@ -45909,15 +45950,25 @@ function handleAdminLogout(isAuto = false) {
     if (pInput) {
       pInput.value = '';
     }
-    if (uInput) {
-      if (savedUser && savedUser !== '342') {
-        uInput.value = savedUser;
-      } else if (uInput.value === '342' || uInput.value.trim() === '342' || !savedUser) {
-        uInput.value = '';
+    if (isDevScreen()) {
+      try { document.documentElement.classList.add('livon-dev-mode'); } catch (e) {}
+      if (uInput) {
+        uInput.value = 'superadmin';
+        uInput.removeAttribute('required');
       }
-    }
-    if (rememberCheckbox) {
-      rememberCheckbox.checked = !!(savedUser && savedUser !== '342');
+      if (rememberCheckbox) rememberCheckbox.checked = false;
+      setTimeout(() => { pInput?.focus(); }, 50);
+    } else {
+      if (uInput) {
+        if (savedUser && savedUser !== '342') {
+          uInput.value = savedUser;
+        } else if (uInput.value === '342' || uInput.value.trim() === '342' || !savedUser) {
+          uInput.value = '';
+        }
+      }
+      if (rememberCheckbox) {
+        rememberCheckbox.checked = !!(savedUser && savedUser !== '342');
+      }
     }
   };
 
@@ -45937,11 +45988,17 @@ function handleAdminLogout(isAuto = false) {
 
 async function handleAdminLoginSubmit(e) {
   if (e && e.preventDefault) e.preventDefault();
-  const username = document.getElementById('loginUsernameInput')?.value.trim();
+  let username = document.getElementById('loginUsernameInput')?.value.trim();
   const password = document.getElementById('loginPasswordInput')?.value.trim();
 
-  if (!username || !password) {
-    alert('아이디와 비밀번호를 모두 입력해주세요.');
+  if (isDevScreen()) {
+    if (!username) username = 'superadmin';
+  } else if (!username) {
+    username = 'superadmin';
+  }
+
+  if (!password) {
+    alert('비밀번호를 입력해주세요.');
     return;
   }
 
