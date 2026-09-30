@@ -33,6 +33,105 @@ const gSurveyState = {
 };
 
 // =========================================================================
+// 0. 공통 유틸 및 헬퍼 함수
+// =========================================================================
+function formatSurveyDate(d) {
+  if (!d) return '-';
+  const str = String(d).trim();
+  const m = str.match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
+  if (m) {
+    const y = m[1];
+    const mo = m[2].padStart(2, '0');
+    const day = m[3].padStart(2, '0');
+    return `${y}.${mo}.${day}`;
+  }
+  return str.slice(0, 10);
+}
+
+function cleanSurveyHospitalName(name, target) {
+  let hName = (name || '').replace(/[\uFFFD]+/g, '').trim();
+  if (hName.includes('KS병원')) return 'KS병원 (광주광역시)';
+  if (hName.includes('도농로')) return '남양주시 도농로 34, 304동 403호';
+  if (hName.includes('상무힐링')) return '상무힐링요양병원';
+
+  if (!hName || hName.length < 2) {
+    if (typeof gApps !== 'undefined' && Array.isArray(gApps)) {
+      const match = gApps.find(a => (target && target.serviceId && a.id === target.serviceId) || (target && target.patientName && a.patientName === target.patientName));
+      if (match && match.hospitalName) {
+        return match.hospitalName.replace(/[\uFFFD]+/g, '').trim();
+      }
+    }
+  }
+  return hName || '병원 미지정';
+}
+
+function isTargetRecentlyAdded(target) {
+  if (!target) return false;
+  if (target.isRecentlyAdded === true) return true;
+  if (target.createdAt) {
+    const createdTime = new Date(target.createdAt).getTime();
+    if (!isNaN(createdTime) && (Date.now() - createdTime < 24 * 3600 * 1000)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function showSurveyLoading(show, message = '종료 고객 최신 명단을 자동 조회 및 동기화 중입니다...') {
+  const el = document.getElementById('surveyLoadingIndicator');
+  if (!el) return;
+  if (show) {
+    const titleEl = document.getElementById('surveyLoadingTitle');
+    if (titleEl) titleEl.innerText = message;
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
+let gSurveyQuickFilter = 'ALL';
+
+function setSurveyQuickFilter(filterType) {
+  gSurveyQuickFilter = filterType;
+  document.querySelectorAll('.survey-quick-chip').forEach(btn => {
+    const q = btn.getAttribute('data-quick');
+    if (q === filterType) {
+      btn.className = 'survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-sky-600 text-white shadow-2xs flex items-center gap-1.5 cursor-pointer';
+    } else {
+      btn.className = 'survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer';
+    }
+  });
+  applySurveyFilters();
+}
+
+function resetSurveyFilters() {
+  const searchInput = document.getElementById('surveySearchInput');
+  const guidanceSelect = document.getElementById('surveyFilterGuidance');
+  const responseSelect = document.getElementById('surveyFilterResponse');
+  const insuranceSelect = document.getElementById('surveyFilterInsurance');
+  const sortSelect = document.getElementById('surveyFilterSort');
+  if (searchInput) searchInput.value = '';
+  if (guidanceSelect) guidanceSelect.value = 'ALL';
+  if (responseSelect) responseSelect.value = 'ALL';
+  if (insuranceSelect) insuranceSelect.value = 'ALL';
+  if (sortSelect) sortSelect.value = 'RECENT_FIRST';
+  setSurveyQuickFilter('ALL');
+}
+
+function updateSurveyChipCounts() {
+  const targets = gSurveyState.targets || [];
+  const setEl = (id, count) => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = count;
+  };
+  setEl('surveyChipCountAll', targets.length);
+  setEl('surveyChipCountRecent', targets.filter(t => isTargetRecentlyAdded(t)).length);
+  setEl('surveyChipCountUnnotified', targets.filter(t => t.guidanceStatus === 'NOT_STARTED').length);
+  setEl('surveyChipCountCompleted', targets.filter(t => t.responseStatus === 'SUBMITTED').length);
+  setEl('surveyChipCountFollowup', targets.filter(t => t.followupStatus && t.followupStatus !== 'NONE').length);
+}
+
+// =========================================================================
 // 1. 데이터 로드 및 초기화
 // =========================================================================
 async function loadSurveyMgmtData(showToastAlert = false) {
@@ -82,7 +181,25 @@ async function loadSurveyMgmtData(showToastAlert = false) {
       cvxTargets.forEach(t => { if (t && t.id) targetMap.set(String(t.id), t); });
     }
 
-    gSurveyState.targets = Array.from(targetMap.values());
+    // 데이터 정제 (글자 깨짐 방지 및 날짜 표준화)
+    gSurveyState.targets = Array.from(targetMap.values()).map(t => {
+      if (!t) return t;
+      t.hospitalName = cleanSurveyHospitalName(t.hospitalName, t);
+      t.careStartDate = formatSurveyDate(t.careStartDate);
+      t.careEndDate = formatSurveyDate(t.careEndDate);
+      return t;
+    });
+
+    // 기본 정렬: 최근 등록순(최신순) 맨 위에 배치
+    gSurveyState.targets.sort((a, b) => {
+      const aRecent = isTargetRecentlyAdded(a);
+      const bRecent = isTargetRecentlyAdded(b);
+      if (aRecent && !bRecent) return -1;
+      if (!aRecent && bRecent) return 1;
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
 
     // 로컬스토리지 영구 보존
     try {
@@ -112,6 +229,9 @@ async function loadSurveyMgmtData(showToastAlert = false) {
       gSurveyState.settings = settingsRes.data.settings || {};
       gSurveyState.schema = settingsRes.data.schema || [];
     }
+
+    // 칩 카운트 갱신
+    updateSurveyChipCounts();
 
     // 사이드바 뱃지 업데이트 (후속 확인 대기 건수)
     updateSidebarSurveyBadge();
@@ -147,10 +267,21 @@ function updateSidebarSurveyBadge() {
 }
 
 // =========================================================================
-// 2. 전체 탭 렌더링
+// 2. 전체 탭 렌더링 (만족도 조사 메뉴 클릭 시 자동 조회 및 로딩 표시)
 // =========================================================================
-function renderSurveyMgmtTab() {
-  loadSurveyMgmtData(false);
+async function renderSurveyMgmtTab() {
+  showSurveyLoading(true, '종료 고객 명단 자동 조회 및 동기화 중...');
+  try {
+    // 1차: 기존 저장된 데이터 우선 신속 렌더링
+    await loadSurveyMgmtData(false);
+
+    // 2차: 백그라운드 자동 종료 고객 추출 및 Convex 동기화
+    await autoSeedSurveyTargets({ isSilent: true, isAuto: true });
+  } catch (e) {
+    console.warn('[SurveyClient] renderSurveyMgmtTab auto-sync error:', e);
+  } finally {
+    showSurveyLoading(false);
+  }
 }
 
 function renderSurveyKpis() {
@@ -229,23 +360,69 @@ function applySurveyFilters() {
   const search = (document.getElementById('surveySearchInput')?.value || '').trim().toLowerCase();
   const filterGuidance = document.getElementById('surveyFilterGuidance')?.value || 'ALL';
   const filterResponse = document.getElementById('surveyFilterResponse')?.value || 'ALL';
+  const filterInsurance = document.getElementById('surveyFilterInsurance')?.value || 'ALL';
+  const filterSort = document.getElementById('surveyFilterSort')?.value || 'RECENT_FIRST';
 
-  let filtered = gSurveyState.targets.slice();
+  let filtered = (gSurveyState.targets || []).slice();
 
+  // 1. 빠른 상태 필터 칩 적용
+  if (gSurveyQuickFilter === 'RECENT') {
+    filtered = filtered.filter(t => isTargetRecentlyAdded(t));
+  } else if (gSurveyQuickFilter === 'UNNOTIFIED') {
+    filtered = filtered.filter(t => t.guidanceStatus === 'NOT_STARTED');
+  } else if (gSurveyQuickFilter === 'COMPLETED') {
+    filtered = filtered.filter(t => t.responseStatus === 'SUBMITTED');
+  } else if (gSurveyQuickFilter === 'FOLLOWUP') {
+    filtered = filtered.filter(t => t.followupStatus && t.followupStatus !== 'NONE');
+  }
+
+  // 2. 드롭다운 필터 적용
   if (filterGuidance !== 'ALL') {
     filtered = filtered.filter(t => t.guidanceStatus === filterGuidance);
   }
   if (filterResponse !== 'ALL') {
     filtered = filtered.filter(t => t.responseStatus === filterResponse);
   }
+  if (filterInsurance !== 'ALL') {
+    if (filterInsurance === 'OTHER') {
+      filtered = filtered.filter(t => t.insuranceCompany !== '삼성화재' && t.insuranceCompany !== '현대해상');
+    } else {
+      filtered = filtered.filter(t => (t.insuranceCompany || '').includes(filterInsurance));
+    }
+  }
+
+  // 3. 검색어 필터
   if (search) {
     filtered = filtered.filter(t => 
       (t.patientName && t.patientName.toLowerCase().includes(search)) ||
       (t.serviceId && t.serviceId.toLowerCase().includes(search)) ||
       (t.caregiverName && t.caregiverName.toLowerCase().includes(search)) ||
-      (t.hospitalName && t.hospitalName.toLowerCase().includes(search))
+      (t.hospitalName && t.hospitalName.toLowerCase().includes(search)) ||
+      (t.patientPhone && t.patientPhone.replace(/[^0-9]/g, '').includes(search.replace(/[^0-9]/g, '')))
     );
   }
+
+  // 4. 정렬 (최근 등록완료건 맨 위 정렬)
+  filtered.sort((a, b) => {
+    if (filterSort === 'RECENT_FIRST') {
+      const aRecent = isTargetRecentlyAdded(a);
+      const bRecent = isTargetRecentlyAdded(b);
+      if (aRecent && !bRecent) return -1;
+      if (!aRecent && bRecent) return 1;
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    } else if (filterSort === 'DUE_ASC') {
+      const ta = a.dueAt ? new Date(a.dueAt).getTime() : Infinity;
+      const tb = b.dueAt ? new Date(b.dueAt).getTime() : Infinity;
+      return ta - tb;
+    } else if (filterSort === 'NAME_ASC') {
+      return (a.patientName || '').localeCompare(b.patientName || '', 'ko');
+    } else if (filterSort === 'END_DATE_DESC') {
+      return String(b.careEndDate || '').localeCompare(String(a.careEndDate || ''));
+    }
+    return 0;
+  });
 
   const countEl = document.getElementById('surveyTargetFilterCount');
   if (countEl) countEl.innerText = filtered.length;
@@ -276,22 +453,37 @@ function renderSurveyTargetsTable(list) {
     const responseBadge = getResponseStatusBadge(target.responseStatus);
     const followupBadge = getFollowupStatusBadge(target.followupStatus);
     const isExpired = target.dueAt && new Date(target.dueAt).getTime() < Date.now();
-    const dueFormatted = target.dueAt ? target.dueAt.slice(0, 10) : '-';
+    const dueFormatted = target.dueAt ? formatSurveyDate(target.dueAt) : '-';
     const displayAppId = (target.serviceId && !target.serviceId.startsWith('ST-')) 
       ? target.serviceId 
       : ((typeof gApps !== 'undefined' && Array.isArray(gApps) && gApps.find(a => a.patientName && a.patientName.trim() === (target.patientName || '').trim())?.id) || target.serviceId || target.id);
 
+    const isRecent = isTargetRecentlyAdded(target);
+    const recentBadge = isRecent 
+      ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-2xs animate-pulse tracking-tight shrink-0"><i data-lucide="sparkles" class="w-2.5 h-2.5"></i>최근등록</span>`
+      : '';
+    const rowClass = isRecent 
+      ? 'bg-amber-50/70 hover:bg-amber-100/70 border-l-4 border-l-amber-500 transition-colors' 
+      : 'hover:bg-sky-50/50 transition-colors';
+
+    const cleanHospital = cleanSurveyHospitalName(target.hospitalName, target);
+    const startDateClean = formatSurveyDate(target.careStartDate);
+    const endDateClean = formatSurveyDate(target.careEndDate);
+
     return `
-      <tr class="hover:bg-sky-50/50 transition-colors">
+      <tr class="${rowClass}">
         <td class="p-3 text-center font-mono text-slate-400 text-[11px]">${idx + 1}</td>
         <td class="p-3 font-mono font-bold text-sky-700 whitespace-nowrap">${displayAppId}</td>
         <td class="p-3 font-bold text-slate-900 whitespace-nowrap">
-          <span>${maskedName}</span>
-          ${target.patientPhone ? `<span class="block text-[10.5px] text-slate-400 font-normal">${maskPhone(target.patientPhone)}</span>` : ''}
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span>${maskedName}</span>
+            ${recentBadge}
+          </div>
+          ${target.patientPhone ? `<span class="block text-[10.5px] text-slate-400 font-normal font-mono">${maskPhone(target.patientPhone)}</span>` : ''}
         </td>
         <td class="p-3 text-slate-600 whitespace-nowrap">
-          <div class="font-semibold text-slate-800">${target.hospitalName || '병원 미지정'}</div>
-          <div class="text-[10.5px] text-slate-400">${target.careStartDate || '-'} ~ ${target.careEndDate || '종료'}</div>
+          <div class="font-semibold text-slate-800">${cleanHospital}</div>
+          <div class="text-[10.5px] text-slate-500 font-mono">${startDateClean || '-'} ~ ${endDateClean || '종료'}</div>
         </td>
         <td class="p-3 whitespace-nowrap">
           <span class="font-bold text-slate-800">${target.caregiverName || '지정 안 됨'}</span>
@@ -299,7 +491,7 @@ function renderSurveyTargetsTable(list) {
         <td class="p-3 text-center whitespace-nowrap">${guidanceBadge}</td>
         <td class="p-3 text-center whitespace-nowrap">${responseBadge}</td>
         <td class="p-3 text-center whitespace-nowrap">${followupBadge}</td>
-        <td class="p-3 text-slate-600 whitespace-nowrap">
+        <td class="p-3 text-slate-600 whitespace-nowrap font-mono">
           <span class="${isExpired && target.responseStatus !== 'SUBMITTED' ? 'text-rose-600 font-bold' : ''}">
             ${dueFormatted}
           </span>
@@ -436,6 +628,9 @@ function renderSurveyResponses() {
       const rDoc = gSurveyState.responses.find(r => r.targetId === t.id) || {
         id: t.responseId || ('SR-' + t.id),
         serviceId: t.serviceId,
+        targetId: t.id,
+        patientName: t.patientName,
+        patientPhone: t.patientPhone,
         respondentType: 'PATIENT',
         q2: 5,
         q3: 5,
@@ -453,7 +648,7 @@ function renderSurveyResponses() {
   if (responses.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="9" class="p-6 text-center text-slate-400">
+        <td colspan="10" class="p-6 text-center text-slate-400">
           <p class="font-medium text-xs">아직 제출된 고객 만족도 설문 응답이 없습니다.</p>
         </td>
       </tr>
@@ -466,10 +661,19 @@ function renderSurveyResponses() {
     const q3Display = r.q3Unknown ? '<span class="text-slate-400">잘모름</span>' : (r.q3 ? `${r.q3}점` : '-');
     const q4Display = r.q4Unknown ? '<span class="text-slate-400">잘모름</span>' : (r.q4 ? `${r.q4}점` : '-');
 
+    // 고객(환자명) 확인
+    const targetObj = gSurveyState.targets.find(t => t.id === r.targetId || t.serviceId === r.serviceId);
+    const patientName = r.patientName || (targetObj && targetObj.patientName) || ((typeof gApps !== 'undefined' && Array.isArray(gApps) && gApps.find(a => a.id === r.serviceId)?.patientName)) || '-';
+    const patientPhone = r.patientPhone || (targetObj && targetObj.patientPhone) || '';
+
     return `
       <tr class="hover:bg-slate-50 transition-colors">
         <td class="p-3 font-mono font-bold text-slate-700 whitespace-nowrap">${r.id}</td>
-        <td class="p-3 font-mono text-sky-700 whitespace-nowrap">${r.serviceId}</td>
+        <td class="p-3 font-mono font-bold text-sky-700 whitespace-nowrap">${r.serviceId || '-'}</td>
+        <td class="p-3 font-bold text-slate-900 whitespace-nowrap">
+          <span>${maskPatientName(patientName)}</span>
+          ${patientPhone ? `<span class="block text-[10.5px] text-slate-400 font-normal font-mono">${maskPhone(patientPhone)}</span>` : ''}
+        </td>
         <td class="p-3 whitespace-nowrap font-medium text-slate-800">${respTypes[r.respondentType] || r.respondentType}</td>
         <td class="p-3 text-center font-bold whitespace-nowrap text-amber-600">${r.q2 || '-'}점</td>
         <td class="p-3 text-center whitespace-nowrap font-semibold">${q3Display}</td>
@@ -480,7 +684,7 @@ function renderSurveyResponses() {
             ? '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold border border-rose-300">연락 희망</span>' 
             : '<span class="text-slate-400">불필요</span>'}
         </td>
-        <td class="p-3 text-slate-500 whitespace-nowrap">${r.submittedAt ? r.submittedAt.slice(0, 16).replace('T', ' ') : '-'}</td>
+        <td class="p-3 text-slate-500 whitespace-nowrap font-mono">${r.submittedAt ? r.submittedAt.slice(0, 16).replace('T', ' ') : '-'}</td>
       </tr>
     `;
   }).join('');
@@ -1342,11 +1546,13 @@ async function handleCreateSurveyTarget(event) {
   }
 }
 
-async function autoSeedSurveyTargets() {
+async function autoSeedSurveyTargets(options = {}) {
+  const { isSilent = false, isAuto = false } = (typeof options === 'object' && options !== null) ? options : {};
   try {
     const apps = (typeof gApps !== 'undefined' && Array.isArray(gApps) && gApps.length > 0) ? gApps : null;
     let extractedItems = [];
     let msg = '';
+    let newlyAddedCount = 0;
 
     // 1. 로컬 Node 백엔드(/api/survey/targets)가 있는 경우 1차 추출 시도
     try {
@@ -1359,6 +1565,7 @@ async function autoSeedSurveyTargets() {
       if (result.success && Array.isArray(result.items)) {
         extractedItems = result.items;
         msg = result.message;
+        newlyAddedCount = result.addedCount || 0;
       }
     } catch (e) {
       console.log('[Survey] Local API not available, extracting from client gApps directly.');
@@ -1386,15 +1593,18 @@ async function autoSeedSurveyTargets() {
               rawToken = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('');
             }
           } catch (e) {}
+
+          const cleanHosp = cleanSurveyHospitalName(app.hospitalName || app.addressDetail, app);
+
           const newTarget = {
             id: targetId,
             serviceId: app.id || targetId,
-            patientName: app.patientName || '고객',
+            patientName: (app.patientName || '고객').replace(/[\uFFFD]+/g, '').trim(),
             patientPhone: app.phone || '',
-            hospitalName: app.hospitalName || '',
-            careStartDate: app.careStartDate || app.applyDate || '',
-            careEndDate: app.careEndDate || app.expectedEndDate || '',
-            caregiverName: app.caregiverName || '담당간병인',
+            hospitalName: cleanHosp,
+            careStartDate: formatSurveyDate(app.careStartDate || app.applyDate),
+            careEndDate: formatSurveyDate(app.careEndDate || app.expectedEndDate),
+            caregiverName: (app.caregiverName || '담당간병인').replace(/[\uFFFD]+/g, '').trim(),
             caregiverPhone: app.caregiverPhone || '',
             insuranceCompany: app.insuranceCompany || '',
             dueAt: new Date(Date.now() + 7 * 86400000).toISOString(),
@@ -1408,9 +1618,11 @@ async function autoSeedSurveyTargets() {
             guidanceRecord: null,
             responseId: null,
             revision: 1,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            isRecentlyAdded: true
           };
           existingMap.set(appId, newTarget);
+          newlyAddedCount++;
         }
       });
       extractedItems = Array.from(existingMap.values());
@@ -1442,16 +1654,24 @@ async function autoSeedSurveyTargets() {
       } catch (e) {}
     }
 
-    if (typeof showToast === 'function') {
-      showToast(msg || '종료 고객 대상자가 추출되어 안전하게 저장되었습니다.', 'success');
-    } else {
-      alert(msg || '종료 고객 대상자가 추출되어 안전하게 저장되었습니다.');
+    if (!isSilent) {
+      if (typeof showToast === 'function') {
+        showToast(msg || '종료 고객 대상자가 추출되어 안전하게 저장되었습니다.', 'success');
+      } else {
+        alert(msg || '종료 고객 대상자가 추출되어 안전하게 저장되었습니다.');
+      }
+    } else if (isAuto && newlyAddedCount > 0) {
+      if (typeof showToast === 'function') {
+        showToast(`종료 고객 명단 조회 완료 (신규 종료건 ${newlyAddedCount}건 자동 추가)`, 'info');
+      }
     }
 
     await loadSurveyMgmtData(false);
   } catch (e) {
     console.error('[Survey AutoSeed Error]', e);
-    if (typeof showToast === 'function') showToast('자동 추출 중 오류가 발생했습니다.', 'error');
+    if (!isSilent && typeof showToast === 'function') {
+      showToast('자동 추출 중 오류가 발생했습니다.', 'error');
+    }
   }
 }
 

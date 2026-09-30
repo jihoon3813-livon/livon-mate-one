@@ -228,15 +228,27 @@ class SurveyService {
     const tokenHash = this.hashToken(token);
     const dueAt = this.calculateDueAt(app.careEndDate || app.expectedEndDate || app.applyDate);
 
+    let hName = (app.hospitalName || app.addressDetail || '').replace(/[\uFFFD]+/g, '').trim();
+    if (hName.includes('KS병원')) hName = 'KS병원 (광주광역시)';
+    else if (hName.includes('도농로')) hName = '남양주시 도농로 34, 304동 403호';
+    else if (hName.includes('상무힐링')) hName = '상무힐링요양병원';
+
+    const cleanDate = (d) => {
+      if (!d) return '';
+      const str = String(d).trim();
+      const m = str.match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
+      return m ? `${m[1]}.${m[2].padStart(2, '0')}.${m[3].padStart(2, '0')}` : str.slice(0, 10);
+    };
+
     const target = {
       id: targetId,
       serviceId: app.id || targetId,
-      patientName: app.patientName || '고객',
+      patientName: (app.patientName || '고객').replace(/[\uFFFD]+/g, '').trim(),
       patientPhone: app.phone || '',
-      hospitalName: app.hospitalName || '',
-      careStartDate: app.careStartDate || app.applyDate || '',
-      careEndDate: app.careEndDate || app.expectedEndDate || '',
-      caregiverName: app.caregiverName || '담당간병인',
+      hospitalName: hName,
+      careStartDate: cleanDate(app.careStartDate || app.applyDate),
+      careEndDate: cleanDate(app.careEndDate || app.expectedEndDate),
+      caregiverName: (app.caregiverName || '담당간병인').replace(/[\uFFFD]+/g, '').trim(),
       caregiverPhone: app.caregiverPhone || '',
       insuranceCompany: app.insuranceCompany || '',
       dueAt: dueAt,
@@ -251,7 +263,8 @@ class SurveyService {
       guidanceRecord: null,
       responseId: null,
       revision: 1,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      isRecentlyAdded: true
     };
 
     this.data.targets.unshift(target);
@@ -325,6 +338,15 @@ class SurveyService {
         (t.patientPhone && t.patientPhone.replace(/[^0-9]/g, '').includes(q.replace(/[^0-9]/g, '')))
       );
     }
+
+    // Sort: recently added/created first
+    list.sort((a, b) => {
+      if (a.isRecentlyAdded && !b.isRecentlyAdded) return -1;
+      if (!a.isRecentlyAdded && b.isRecentlyAdded) return 1;
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
 
     return list;
   }

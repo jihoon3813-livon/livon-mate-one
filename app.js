@@ -35547,10 +35547,10 @@ function rerenderActiveTabForMasking() {
   } else if (tab === 'forms') {
     if (typeof renderForms === 'function') renderForms();
   } else if (tab === 'surveymgmt') {
-    if (typeof renderActiveSurveySubTab === 'function') {
-      renderActiveSurveySubTab();
-    } else if (typeof renderSurveyMgmtTab === 'function') {
+    if (typeof renderSurveyMgmtTab === 'function') {
       renderSurveyMgmtTab();
+    } else if (typeof renderActiveSurveySubTab === 'function') {
+      renderActiveSurveySubTab();
     }
   }
 }
