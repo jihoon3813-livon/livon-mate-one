@@ -1,8 +1,55 @@
+process.env.TZ = 'Asia/Seoul';
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const { exec } = require('child_process');
+
+function getKoreaDateParts(d) {
+  if (!d) return null;
+  const dateObj = (d instanceof Date) ? d : new Date(d);
+  if (!dateObj || isNaN(dateObj.getTime())) return null;
+  try {
+    const parts = new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(dateObj);
+    const get = (type) => (parts.find(p => p.type === type) || {}).value || '00';
+    let hour = get('hour');
+    if (hour === '24') hour = '00';
+    return {
+      year: get('year'),
+      month: get('month'),
+      day: get('day'),
+      hour: hour,
+      minute: get('minute')
+    };
+  } catch (e) {
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    const hh = String(dateObj.getHours()).padStart(2, '0');
+    const mm = String(dateObj.getMinutes()).padStart(2, '0');
+    return { year: String(y), month: m, day: day, hour: hh, minute: mm };
+  }
+}
+
+function getKoreaDateStr(d = new Date()) {
+  const parts = getKoreaDateParts(d);
+  if (!parts) return '';
+  return `${parts.year}.${parts.month}.${parts.day}`;
+}
+
+function getKoreaDateTimeStr(d = new Date()) {
+  const parts = getKoreaDateParts(d);
+  if (!parts) return '';
+  return `${parts.year}.${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`;
+}
 
 // Native .env.local / .env loader (No external dependencies required)
 try {
@@ -30,6 +77,8 @@ try {
   }
   process.env.CAREPORT_ID = process.env.CAREPORT_ID || 'jihoon3813';
   process.env.CAREPORT_PW = process.env.CAREPORT_PW || 'livon3813!@#';
+  process.env.CTI_ID = process.env.CTI_ID || 'jga2413';
+  process.env.CTI_PASS = process.env.CTI_PASS || 'jga2413#';
 } catch (e) {
   console.warn('[EnvLoader] Error loading local env file:', e.message);
 }
@@ -227,6 +276,115 @@ function invalidateRealDataCache() {
   gCachedRealDataBuf = null;
   gCachedRealDataGzip = null;
   gCachedRealDataMtime = 0;
+}
+
+const CONVEX_PROD_URL = 'https://gallant-weasel-360.convex.cloud';
+
+async function syncConvexMutation(pathStr, args) {
+  try {
+    const res = await fetch(`${CONVEX_PROD_URL}/api/mutation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: pathStr, args })
+    });
+    return await res.json();
+  } catch (e) {
+    console.warn(`[Server Convex Mutation Warn] ${pathStr}:`, e.message);
+    return null;
+  }
+}
+
+async function syncWithConvexCloudOnStartup() {
+  try {
+    const res = await fetch(`${CONVEX_PROD_URL}/api/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: 'sync:bundleAll', args: { sessionToken: 'dev_session_1' } })
+    });
+    const data = await res.json();
+    if (data && data.value && Array.isArray(data.value.applications)) {
+      const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+      let stored = { applications: [] };
+      if (fs.existsSync(realDataFile)) {
+        try { stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8')); } catch (e) {}
+      }
+      stored.applications = stored.applications || [];
+      const storedMap = new Map(stored.applications.map(a => [String(a.id), a]));
+      let added = 0;
+      data.value.applications.forEach(cvxApp => {
+        if (!cvxApp || !cvxApp.id) return;
+        const existing = storedMap.get(String(cvxApp.id));
+        const { _id, _creationTime, ...cleanDoc } = cvxApp;
+        if (!existing) {
+          stored.applications.unshift(cleanDoc);
+          storedMap.set(String(cvxApp.id), cleanDoc);
+          added++;
+        } else {
+          if (Array.isArray(cleanDoc.customSettlementSets) && cleanDoc.customSettlementSets.length > 0) {
+            existing.customSettlementSets = cleanDoc.customSettlementSets;
+          }
+        }
+      });
+      if (added > 0) {
+        stored.updatedAt = new Date().toISOString();
+        fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+        invalidateRealDataCache();
+        console.log(`[Convex Cloud Sync] Merged ${added} new application(s) from Convex into hub_apps_real.json. Total: ${stored.applications.length}`);
+      }
+    }
+  } catch (err) {
+    console.warn('[Convex Cloud Sync Warn]', err.message);
+  }
+}
+syncWithConvexCloudOnStartup().catch(() => {});
+
+function getConfirmedAlertsData() {
+  const confirmedFile = path.join(BASE_DIR, 'hub_confirmed_alerts.json');
+  let data = {
+    updatedAt: new Date().toISOString(),
+    confirmedAlertAppIds: [],
+    confirmedDisabledAppIds: []
+  };
+  if (fs.existsSync(confirmedFile)) {
+    try {
+      data = JSON.parse(fs.readFileSync(confirmedFile, 'utf-8'));
+    } catch(e) {}
+  }
+  if (!Array.isArray(data.confirmedAlertAppIds)) data.confirmedAlertAppIds = [];
+  if (!Array.isArray(data.confirmedDisabledAppIds)) data.confirmedDisabledAppIds = [];
+  return data;
+}
+
+function saveConfirmedAlertsData(newData) {
+  const confirmedFile = path.join(BASE_DIR, 'hub_confirmed_alerts.json');
+  const current = getConfirmedAlertsData();
+  const alertSet = new Set(current.confirmedAlertAppIds.map(String));
+  const disabledSet = new Set(current.confirmedDisabledAppIds.map(String));
+
+  if (Array.isArray(newData.confirmedAlertAppIds)) {
+    newData.confirmedAlertAppIds.forEach(id => { if (id) alertSet.add(String(id)); });
+  }
+  if (Array.isArray(newData.confirmedDisabledAppIds)) {
+    newData.confirmedDisabledAppIds.forEach(id => { if (id) disabledSet.add(String(id)); });
+  }
+  if (Array.isArray(newData.removeAlertAppIds)) {
+    newData.removeAlertAppIds.forEach(id => { if (id) alertSet.delete(String(id)); });
+  }
+  if (Array.isArray(newData.removeDisabledAppIds)) {
+    newData.removeDisabledAppIds.forEach(id => { if (id) disabledSet.delete(String(id)); });
+  }
+
+  const result = {
+    updatedAt: new Date().toISOString(),
+    confirmedAlertAppIds: Array.from(alertSet),
+    confirmedDisabledAppIds: Array.from(disabledSet)
+  };
+  try {
+    fs.writeFileSync(confirmedFile, JSON.stringify(result, null, 2), 'utf-8');
+  } catch(e) {
+    console.error('[Confirmed Alerts Save Error]', e.message);
+  }
+  return result;
 }
 
 function startServer(port) {
@@ -951,15 +1109,18 @@ function saveSavedFaxConfig(cfg) {
           if (fs.existsSync(realDataFile)) {
             try { stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8')); } catch (e) {}
           }
-          stored.applications = stored.applications || [];
-          const exists = stored.applications.some(a => a.id === application.id);
-          if (!exists) {
+          const existingIdx = stored.applications.findIndex(a => a.id === application.id);
+          if (existingIdx >= 0) {
+            stored.applications[existingIdx] = { ...stored.applications[existingIdx], ...application, updatedAt: new Date().toISOString() };
+          } else {
             stored.applications.unshift(application);
-            stored.updatedAt = new Date().toISOString();
-            fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
           }
+          stored.updatedAt = new Date().toISOString();
+          fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+          invalidateRealDataCache();
+          syncConvexMutation('sync:saveApplication', { app: application }).catch(console.warn);
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-          return res.end(JSON.stringify({ success: true, count: stored.applications.length }));
+          return res.end(JSON.stringify({ success: true, count: stored.applications.length, appId: application.id }));
         } catch (err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: false, error: err.message }));
@@ -997,12 +1158,23 @@ function saveSavedFaxConfig(cfg) {
             return false;
           });
           if (idx !== -1) {
-            const { claim, payout, ...appFields } = fields;
+            const { claim, payout, deleteClaimIds, deleteClaimId, deletePayoutIds, deletePayoutId, ...appFields } = fields;
             stored.applications[idx] = {
               ...stored.applications[idx],
               ...appFields,
               updatedAt: new Date().toISOString()
             };
+
+            const delClaimIdList = Array.isArray(deleteClaimIds) ? deleteClaimIds : (deleteClaimId ? [deleteClaimId] : []);
+            if (delClaimIdList.length > 0) {
+              stored.claims = (stored.claims || []).filter(c => !delClaimIdList.includes(c.id));
+            }
+
+            const delPayoutIdList = Array.isArray(deletePayoutIds) ? deletePayoutIds : (deletePayoutId ? [deletePayoutId] : []);
+            if (delPayoutIdList.length > 0) {
+              stored.payouts = (stored.payouts || []).filter(p => !delPayoutIdList.includes(p.id));
+            }
+
             if (claim && claim.id) {
               stored.claims = stored.claims || [];
               const cIdx = stored.claims.findIndex(c => c.id === claim.id);
@@ -1023,6 +1195,16 @@ function saveSavedFaxConfig(cfg) {
             }
             stored.updatedAt = new Date().toISOString();
             fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+            if (typeof invalidateRealDataCache === 'function') {
+              try { invalidateRealDataCache(); } catch (e) {}
+            }
+            syncConvexMutation('sync:saveApplication', { app: stored.applications[idx] }).catch(console.warn);
+            if (fields.claim && fields.claim.id) {
+              syncConvexMutation('sync:saveClaim', { claim: fields.claim }).catch(console.warn);
+            }
+            if (fields.payout && fields.payout.id) {
+              syncConvexMutation('sync:savePayout', { payout: fields.payout }).catch(console.warn);
+            }
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify({ success: true, updatedApp: stored.applications[idx] }));
           } else {
@@ -1030,6 +1212,92 @@ function saveSavedFaxConfig(cfg) {
             return res.end(JSON.stringify({ success: false, error: '해당 고객을 찾을 수 없습니다.' }));
           }
         } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    // =========================================================================
+    // API Route: 통합허브 수정발생 & 모달 비활성화 확인(Acknowledge) 전 PC/사용자 공통 동기화 API
+    // =========================================================================
+    if (reqPath === '/api/hub/confirmed-alerts') {
+      if (req.method === 'GET') {
+        const data = getConfirmedAlertsData();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, ...data }));
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const saved = saveConfirmedAlertsData(payload);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true, ...saved }));
+          } catch(err) {
+            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: err.message }));
+          }
+        });
+        return;
+      }
+    }
+
+    if (reqPath === '/api/hub/confirm-alert' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { appId, type = 'alert', confirmed = true, appIds } = JSON.parse(body || '{}');
+          const targetIds = Array.isArray(appIds) ? appIds : (appId ? [appId] : []);
+          const patchData = {};
+          if (type === 'disabled') {
+            if (confirmed) {
+              patchData.confirmedDisabledAppIds = targetIds;
+            } else {
+              patchData.removeDisabledAppIds = targetIds;
+            }
+          } else {
+            if (confirmed) {
+              patchData.confirmedAlertAppIds = targetIds;
+            } else {
+              patchData.removeAlertAppIds = targetIds;
+            }
+          }
+          const saved = saveConfirmedAlertsData(patchData);
+
+          // Update flag on realDataFile applications if exists
+          try {
+            const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+            if (fs.existsSync(realDataFile)) {
+              const stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8'));
+              if (Array.isArray(stored.applications)) {
+                let updatedAny = false;
+                stored.applications.forEach(a => {
+                  if (targetIds.includes(String(a.id))) {
+                    if (type === 'disabled') {
+                      a.isModalDisabledConfirmed = Boolean(confirmed);
+                    } else {
+                      a.isAlertConfirmed = Boolean(confirmed);
+                    }
+                    updatedAny = true;
+                  }
+                });
+                if (updatedAny) {
+                  stored.updatedAt = new Date().toISOString();
+                  fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+                  invalidateRealDataCache();
+                }
+              }
+            }
+          } catch(e) {}
+
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, ...saved }));
+        } catch(err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: false, error: err.message }));
         }
@@ -1105,6 +1373,7 @@ function saveSavedFaxConfig(cfg) {
     }
 
     if (reqPath === '/api/careport/generate-pdf') {
+      try { delete require.cache[require.resolve('./api/careport/generate-pdf')]; } catch(e) {}
       const pdfHandler = require('./api/careport/generate-pdf');
       res.status = (code) => ({
         json: (data) => {
@@ -1605,6 +1874,8 @@ function saveSavedFaxConfig(cfg) {
             recipient = '보상접수센터',
             faxNumber = '',
             senderNumber = payload.senderNumber || savedCfg.senderNumber || process.env.FAX_SENDER_NUMBER || '02-6499-3917',
+            roundNumber = payload.roundNumber || 1,
+            memo = payload.memo || '',
             pages = 1,
             operator = '관리자(원스탑)',
             provider = 'auto'
@@ -1621,8 +1892,7 @@ function saveSavedFaxConfig(cfg) {
             return res.end(JSON.stringify({ success: false, error: '유효한 팩스번호 형식이 아닙니다 (8자리 이상).' }));
           }
 
-          const now = new Date();
-          const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+          const dateStr = getKoreaDateTimeStr();
           const faxId = 'FLOG-' + Date.now().toString().slice(-6);
 
           // 1. 바로빌 (Barobill) 실 발송 연동
@@ -1720,6 +1990,8 @@ function saveSavedFaxConfig(cfg) {
             id: realBaroReceiptNum || faxId,
             sentDate: dateStr,
             appId,
+            roundNumber: Number(roundNumber) || 1,
+            memo,
             patientName,
             insuranceCompany,
             category,
@@ -1734,6 +2006,30 @@ function saveSavedFaxConfig(cfg) {
             resultMsg,
             provider: activeProvider
           };
+
+          if (status === '성공' && (category === '정산청구' || formCode === 'HD_FORM_02' || formCode === 'HD_FORM_03' || formCode === 'SF_FORM_01')) {
+            try {
+              const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+              if (fs.existsSync(realDataFile)) {
+                const stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8'));
+                if (stored && Array.isArray(stored.applications)) {
+                  const targetApp = stored.applications.find(a => a.id === appId || (appId && a.id === appId.replace(/^H/, 'C')) || (appId && a.id === appId.replace(/^C/, 'H')));
+                  if (targetApp && Array.isArray(targetApp.customSettlementSets)) {
+                    const rNum = Number(roundNumber) || 1;
+                    const cSet = targetApp.customSettlementSets.find(s => Number(s.setIndex) === rNum) || targetApp.customSettlementSets[rNum - 1];
+                    if (cSet) {
+                      cSet.claimDate = dateStr;
+                      cSet.claimStatus = '청구완료';
+                      fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+                      console.log(`[FAX Auto-Sync] Updated customSettlementSets for ${appId} round ${rNum} claimDate: ${dateStr}`);
+                    }
+                  }
+                }
+              }
+            } catch (syncErr) {
+              console.warn('[FAX Auto-Sync Error]', syncErr);
+            }
+          }
 
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({
@@ -1892,9 +2188,7 @@ function saveSavedFaxConfig(cfg) {
         console.log(`[SamsungDrive] Decrypting and syncing latest file: ${latest.filename}...`);
         const records = await decryptAndParseSamsungExcel(latest.fullPath, cfg.password);
 
-        const now = new Date();
-        const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-        const syncedAt = kstDate.toISOString().replace('T', ' ').slice(0, 19);
+        const syncedAt = getKoreaDateTimeStr();
 
         saveSamsungDriveConfig({
           lastSyncedFile: latest.filename,

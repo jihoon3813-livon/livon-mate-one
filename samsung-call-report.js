@@ -879,11 +879,20 @@ function switchReportSubTab(tabName) {
 let gTabDailyChartInstance = null;
 
 function getTabFilteredDailyTrends(logs) {
-  const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
-  const s = curFilter.startDate;
-  const e = curFilter.endDate;
+  const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || (typeof gSamsungReportFilter !== 'undefined' && gSamsungReportFilter) || {};
+  const normDate = d => (d || '').slice(0, 10).replace(/[./]/g, '-');
+  const s = normDate(curFilter.startDate);
+  const e = normDate(curFilter.endDate);
   const dailyMap = {};
   const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
+
+  // 마스터/기존 데이터의 비고(공휴일 명칭 등) 맵핑
+  const knownNotes = {};
+  if (gSamsungReportData && Array.isArray(gSamsungReportData.dailyTrends)) {
+    gSamsungReportData.dailyTrends.forEach(t => {
+      if (t.note) knownNotes[normDate(t.date)] = t.note;
+    });
+  }
 
   if (s && e) {
     const cur = new Date(s + 'T00:00:00');
@@ -892,21 +901,25 @@ function getTabFilteredDailyTrends(logs) {
     const fmtLocal = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     while (cur <= end) {
       const ds = fmtLocal(cur);
+      const dow = daysOfWeek[cur.getDay()];
       dailyMap[ds] = {
         date: ds,
-        dayOfWeek: daysOfWeek[cur.getDay()],
+        dayOfWeek: dow,
         callCount: 0,
-        note: cur.getDay() === 0 || cur.getDay() === 6 ? '주말' : ''
+        note: knownNotes[ds] || (cur.getDay() === 0 || cur.getDay() === 6 ? '주말' : '')
       };
       cur.setDate(cur.getDate() + 1);
     }
   }
 
-  const callList = logs || getSamsungCallLogs();
+  const callList = logs || getSamsungCallLogs(true);
   callList.forEach(c => {
-    const dRaw = (c.callTime || c.date || c.startedAt || '').slice(0, 10);
-    const d = dRaw.replace(/[./]/g, '-');
+    const d = normDate(c.callTime || c.date || c.startedAt);
     if (d) {
+      // 기간 필터가 지정된 경우 기간 외 콜은 일자별 통계에서 완전 배제
+      if (s && d < s) return;
+      if (e && d > e) return;
+
       if (!dailyMap[d]) {
         const parsedD = new Date(d + 'T00:00:00');
         const dow = daysOfWeek[parsedD.getDay()] || '';
@@ -914,14 +927,20 @@ function getTabFilteredDailyTrends(logs) {
           date: d,
           dayOfWeek: dow,
           callCount: 0,
-          note: dow === '토' || dow === '일' ? '주말' : ''
+          note: knownNotes[d] || (dow === '토' || dow === '일' ? '주말' : '')
         };
       }
       dailyMap[d].callCount++;
     }
   });
 
-  return Object.keys(dailyMap).sort().map(d => dailyMap[d]);
+  const sortedList = Object.keys(dailyMap).sort().map(d => dailyMap[d]);
+  const totalCalls = sortedList.reduce((sum, item) => sum + (item.callCount || 0), 0) || 1;
+  sortedList.forEach(item => {
+    item.share = (item.callCount || 0) / totalCalls;
+  });
+
+  return sortedList;
 }
 
 function renderTabDailyTrendChart() {
@@ -2038,6 +2057,13 @@ async function exportSamsungCallReportExcel() {
 
   const stats = calculateReportStats();
   const info = gSamsungReportData.reportInfo || {};
+  const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || (typeof gSamsungReportFilter !== 'undefined' && gSamsungReportFilter) || {};
+  const sDate = curFilter.startDate || info.startDate || '';
+  const eDate = curFilter.endDate || info.endDate || '';
+  const periodText = (sDate && eDate) ? `${sDate} ~ ${eDate}` : (info.period || '');
+  const reportDateText = info.reportDate || new Date().toISOString().slice(0, 10);
+  const targetChannel = curFilter.channel || info.channelLabel || info.channel || '삼성화재';
+  const allFilteredLogs = getSamsungCallLogs(true);
 
   // -------------------------------------------------------------
   // -------------------------------------------------------------
@@ -2060,7 +2086,7 @@ async function exportSamsungCallReportExcel() {
   // Header Title
   sSummary.mergeCells('B2:G3');
   const titleCell = sSummary.getCell('B2');
-  titleCell.value = '삼성화재 간병(리본케어) 서비스  |  인바운드 문의 분석 보고';
+  titleCell.value = `${targetChannel} 간병(리본케어) 서비스  |  인바운드 문의 분석 보고`;
   titleCell.font = { name: '맑은 고딕', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
   titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -2068,12 +2094,12 @@ async function exportSamsungCallReportExcel() {
   // Subtitle / Period
   sSummary.mergeCells('B4:G4');
   const subCell = sSummary.getCell('B4');
-  subCell.value = `분석기간 ${info.period || '2026-08-18 ~ 09-13 (약 4주)'}   ·   대상: ${info.target || '삼성화재 간병서비스 관련 인바운드 콜'}   ·   작성: ${info.author || '리본케어'}   ·   보고일 ${info.reportDate || '2026-09-15'}`;
+  subCell.value = `분석기간: ${periodText}   ·   대상: ${info.target || `${targetChannel} 간병서비스 관련 인바운드 콜`}   ·   작성: ${info.author || '리본케어'}   ·   보고일: ${reportDateText}`;
   subCell.font = { name: '맑은 고딕', size: 9, color: { argb: 'FF475569' } };
   subCell.alignment = { vertical: 'middle', horizontal: 'center' };
 
   // KPI Row
-  sSummary.getRow(6).values = ['', '총 인입콜 (전체콜)', '총 인입콜 (전체콜)', `상담연결 요청 (${info.channelLabel || '삼성화재'})`, `상담연결 요청 (${info.channelLabel || '삼성화재'})`, '실제 상담(분석대상)', '일평균 인입'];
+  sSummary.getRow(6).values = ['', '총 인입콜 (전체콜)', '총 인입콜 (전체콜)', `상담연결 요청 (${targetChannel})`, `상담연결 요청 (${targetChannel})`, '실제 상담(분석대상)', '일평균 인입'];
   sSummary.getRow(7).values = ['', `${stats.totalCalls}건`, `${stats.totalCalls}건`, `${stats.connectReqCalls}건`, `${stats.connectReqCalls}건`, `${stats.consultedCount}건`, `${stats.dailyAvg}건`];
   sSummary.getRow(8).values = ['', '전체 인바운드 접수', '전체 인바운드 접수', `인입 대비 ${stats.connectRate}%`, `인입 대비 ${stats.connectRate}%`, '상담요약 확보건', `운영일 ${stats.opDays}일 기준`];
 
@@ -2109,7 +2135,7 @@ async function exportSamsungCallReportExcel() {
   const topActor1 = stats.actorList[0];
 
   const takeaways = [
-    `1.  인입 및 연결 현황: 조회기간 내 CTI 총 인입(전체콜) ${stats.totalCalls}건 중 ${info.channelLabel || '삼성화재'} 상담사 연결요청은 ${stats.connectReqCalls}건(인입 대비 ${stats.connectRate}%), 실제 상담이 진행되어 요약이 확보된 건은 ${stats.consultedCount}건입니다. 본 분석은 실제 상담 ${stats.consultedCount}건의 내용을 ${stats.catList.length}개 문의유형 및 ${stats.actorList.length}개 주체별로 전수 분석한 결과입니다.`,
+    `1.  인입 및 연결 현황: 조회기간 내 CTI 총 인입(전체콜) ${stats.totalCalls}건 중 ${targetChannel} 상담사 연결요청은 ${stats.connectReqCalls}건(인입 대비 ${stats.connectRate}%), 실제 상담이 진행되어 요약이 확보된 건은 ${stats.consultedCount}건입니다. 본 분석은 실제 상담 ${stats.consultedCount}건의 내용을 ${stats.catList.length}개 문의유형 및 ${stats.actorList.length}개 주체별로 전수 분석한 결과입니다.`,
     `2.  최다 문의 유형 및 주요 주체: ${topCat1 ? `가장 많이 유입된 문의는 '${topCat1.name}'(${topCat1.count}건, ${topCat1.pct}%)이며, ` : ''}${topActor1 ? `주요 문의 주체는 '${topActor1.name}'(${topActor1.count}건, ${topActor1.pct}%) 비중이 가장 높습니다.` : ''}${topCat2 ? ` 그 외 '${topCat2.name}'(${topCat2.count}건, ${topCat2.pct}%) 순으로 확인됩니다.` : ''}`,
     `3.  상위 문의 항목 특이사항: ${stats.catList.slice(0, 2).map((c, i) => `[${i + 1}] ${c.name}(${c.count}건, ${c.pct}%): ${c.description || '세부 기준 안내'}`).join('  |  ') || '조회 기간 내 특이 문의사항 없음'}`,
     `4.  문의 주체별 대응 현황: ${stats.actorList.slice(0, 2).map((a, i) => `[${i + 1}] ${a.name}(${a.count}건, ${a.pct}%): ${a.description || '표준 안내'}`).join('  |  ') || '조회 기간 내 문의 주체 정보 없음'}`
@@ -2225,7 +2251,7 @@ async function exportSamsungCallReportExcel() {
   // -------------------------------------------------------------
   // Sheet 2: 일자별 인입현황 + 첫행 합계 + 상단 틀고정 (3행 고정)
   // -------------------------------------------------------------
-  const dailyTrends = gSamsungReportData.dailyTrends || [];
+  const dailyTrends = getTabFilteredDailyTrends(allFilteredLogs);
   const totalDailyCallsExcel = dailyTrends.reduce((sum, t) => sum + (t.callCount || 0), 0) || stats.totalCalls || 0;
 
   const sDaily = wb.addWorksheet('일자별 인입현황', {
@@ -2235,7 +2261,7 @@ async function exportSamsungCallReportExcel() {
 
   sDaily.mergeCells('A1:D1');
   const dailyTitle = sDaily.getCell('A1');
-  dailyTitle.value = `일자별 인입 현황 (인바운드 전체 ${totalDailyCallsExcel.toLocaleString()}건 · ${info.period || ''})`;
+  dailyTitle.value = `일자별 인입 현황 (인바운드 전체 ${totalDailyCallsExcel.toLocaleString()}건 · ${periodText})`;
   dailyTitle.font = { name: '맑은 고딕', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
   dailyTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
   dailyTitle.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -2318,13 +2344,14 @@ async function exportSamsungCallReportExcel() {
     right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
   };
 
-  const logs = gSamsungReportData.callLogs || [];
+  // 현재 조회 조건(기간/채널)에 맞춰 필터링된 전체 통화로그(원본) 적용 (최신순 정렬)
+  const logs = [...allFilteredLogs].sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
   logs.forEach((c, idx) => {
     const formattedPhone = formatPhoneNumber(c.phone || c.rawPhone);
     const resolvedName = resolveMemberName(c.phone || c.rawPhone, c.memberName, c.title, c.summary);
     const row = sLogs.addRow({
       type: c.type || 'IN',
-      channel: c.channel || '삼성화재',
+      channel: c.channel || targetChannel,
       callTime: c.callTime || '',
       memberName: resolvedName,
       phone: formattedPhone,
@@ -2384,7 +2411,8 @@ async function exportSamsungCallReportExcel() {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  const fileName = `삼성화재_간병서비스_콜분석_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.xlsx`;
+  const dateSuffix = (sDate && eDate) ? `_${sDate.replace(/-/g, '')}_${eDate.replace(/-/g, '')}` : `_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+  const fileName = `${targetChannel}_간병서비스_콜분석${dateSuffix}.xlsx`;
   a.download = fileName;
   document.body.appendChild(a);
   a.click();
@@ -2392,7 +2420,7 @@ async function exportSamsungCallReportExcel() {
   window.URL.revokeObjectURL(url);
 
   if (typeof showToast === 'function') {
-    showToast(`[${fileName}] 3-시트 정밀 엑셀 파일이 성공적으로 다운로드되었습니다.`, 'success');
+    showToast(`[${fileName}] (${logs.length}건) 3-시트 정밀 엑셀 파일이 성공적으로 다운로드되었습니다.`, 'success');
   }
 }
 
@@ -2401,13 +2429,20 @@ function generateCallReportPdfHtml() {
   if (!gSamsungReportData) return '';
   const stats = calculateReportStats();
   const info = gSamsungReportData.reportInfo || {};
-  const trends = gSamsungReportData.dailyTrends || [];
-  const consulted = (gSamsungReportData.callLogs || []).filter(c => c.title || c.summary);
+  const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || (typeof gSamsungReportFilter !== 'undefined' && gSamsungReportFilter) || {};
+  const sDate = curFilter.startDate || info.startDate || '';
+  const eDate = curFilter.endDate || info.endDate || '';
+  const periodText = (sDate && eDate) ? `${sDate} ~ ${eDate}` : (info.period || '');
+  const targetChannel = curFilter.channel || info.channelLabel || info.channel || '삼성화재';
+
+  const allFilteredLogs = getSamsungCallLogs(true);
+  const trends = getTabFilteredDailyTrends(allFilteredLogs);
+  const consulted = allFilteredLogs.filter(c => (c.title && c.title.trim()) || (c.summary && c.summary.trim()) || (c.category && c.category.trim()));
+  consulted.sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
 
   // 제목에서 날짜(기간) 분리
-  const rawTitle = info.title || '삼성화재 간병(리본케어) 서비스 인바운드 문의 분석 보고';
+  const rawTitle = info.title || `${targetChannel} 간병(리본케어) 서비스 인바운드 문의 분석 보고`;
   const mainTitle = rawTitle.replace(/\s*\([\d\-~.\s]+\)\s*$/, '').trim();
-  const periodText = info.period || (rawTitle.match(/\(([\d\-~.\s]+)\)/) ? rawTitle.match(/\(([\d\-~.\s]+)\)/)[1] : '');
 
   return `
     <div style="font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; font-size: 9pt; color: #1e293b; line-height: 1.4; max-width: 900px; margin: 0 auto; background: white; padding: 24px;">
@@ -2673,7 +2708,12 @@ async function downloadCallReportPdf() {
     await new Promise(r => setTimeout(r, 200));
 
     setPdfProgress('3/4 고화질 PDF 생성 및 렌더링 중...', 80);
-    const reportTitle = `삼성화재_간병서비스_콜분석_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+    const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || (typeof gSamsungReportFilter !== 'undefined' && gSamsungReportFilter) || {};
+    const sDate = curFilter.startDate || '';
+    const eDate = curFilter.endDate || '';
+    const dateSuffix = (sDate && eDate) ? `_${sDate.replace(/-/g, '')}_${eDate.replace(/-/g, '')}` : `_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+    const targetChannel = curFilter.channel || '삼성화재';
+    const reportTitle = `${targetChannel}_간병서비스_콜분석${dateSuffix}`;
 
     let serverPdfSuccess = false;
     try {
@@ -2776,8 +2816,12 @@ function printSamsungCallReportModal() {
   const html = generateCallReportPdfHtml();
   if (!html) return;
   const info = (gSamsungReportData && gSamsungReportData.reportInfo) || {};
-  const periodText = info.period || '';
-  const reportTitle = `삼성화재_간병서비스_콜분석_${periodText || new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+  const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || (typeof gSamsungReportFilter !== 'undefined' && gSamsungReportFilter) || {};
+  const sDate = curFilter.startDate || info.startDate || '';
+  const eDate = curFilter.endDate || info.endDate || '';
+  const dateSuffix = (sDate && eDate) ? `_${sDate.replace(/-/g, '')}_${eDate.replace(/-/g, '')}` : `_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+  const targetChannel = curFilter.channel || info.channelLabel || info.channel || '삼성화재';
+  const reportTitle = `${targetChannel}_간병서비스_콜분석${dateSuffix}`;
   triggerSamsungCallReportPrintPdf(html, reportTitle);
 }
 
@@ -2871,29 +2915,39 @@ function openSamsungCallReportEmailModal() {
 
   const info = (gSamsungReportData && gSamsungReportData.reportInfo) || {};
   const stats = calculateReportStats();
+  const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || (typeof gSamsungReportFilter !== 'undefined' && gSamsungReportFilter) || {};
+  const sDate = curFilter.startDate || info.startDate || '';
+  const eDate = curFilter.endDate || info.endDate || '';
+  const periodText = (sDate && eDate) ? `${sDate} ~ ${eDate}` : (info.period || '');
+  const targetChannel = curFilter.channel || info.channelLabel || info.channel || '삼성화재';
 
   const toInput = document.getElementById('reportEmailTo');
   const subjectInput = document.getElementById('reportEmailSubject');
   const bodyPreview = document.getElementById('reportEmailBodyPreview');
 
+  const topCat = stats.catList[0];
+  const topActor = stats.actorList[0];
+  const topCatText = topCat ? `${topCat.name} ${topCat.count}건(${topCat.pct}%)` : '특이사항 없음';
+  const topActorText = topActor ? `${topActor.name} ${topActor.count}건(${topActor.pct}%)` : '특이사항 없음';
+
   if (toInput) toInput.value = 'dasom.han@samsung.com';
   if (subjectInput) {
-    subjectInput.value = `[리본케어] 삼성화재 간병서비스 인바운드 콜분석 보고서 (${info.period || '2026-08-18 ~ 09-13'})`;
+    subjectInput.value = `[리본케어] ${targetChannel} 간병서비스 인바운드 콜분석 보고서 (${periodText})`;
   }
 
   if (bodyPreview) {
     bodyPreview.innerHTML = `
       <div class="space-y-2 text-xs text-slate-700">
-        <p>안녕하세요, 삼성화재 상품마케팅TF 담당자님.</p>
+        <p>안녕하세요, ${targetChannel} 담당자님.</p>
         <p>리본케어 간병서비스 지원센터입니다.</p>
-        <p>요청해주신 <b>'통화로그(원본) 내 문의 대분류 및 문의 주체 컬럼 1:1 연동'</b>을 완료하여, 최신 인바운드 콜분석 보고서를 공유해 드립니다.</p>
+        <p>요청해주신 <b>'통화로그(원본) 내 문의 대분류 및 문의 주체 컬럼 1:1 연동'</b>을 반영하여, 최신 인바운드 콜분석 보고서를 공유해 드립니다.</p>
         
         <div class="my-3 p-3 bg-blue-50/80 rounded-xl border border-blue-200">
           <b>📊 주요 현황 요약</b><br>
-          - 분석 기간: ${info.period || '2026-08-18 ~ 09-13'}<br>
+          - 분석 기간: ${periodText}<br>
           - 총 인입콜: <b>${stats.totalCalls}건</b> (일평균 ${stats.dailyAvg}건)<br>
           - 실제 상담(분석대상): <b>${stats.consultedCount}건</b> (전수 분류 완료)<br>
-          - 최다 문의: <b>간병 신청·접수·배정 35건(39%)</b>, 실사용 고객 문의 <b>71건(79%)</b>
+          - 최다 문의: <b>${topCatText}</b>, 주요 주체: <b>${topActorText}</b>
         </div>
 
         <p>첨부파일로 <b>3-시트 정밀 엑셀 파일(.xlsx)</b> 및 <b>공식 A4 PDF 보고서</b>를 첨부해 드립니다.</p>

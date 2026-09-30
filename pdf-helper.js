@@ -40,7 +40,14 @@ async function createDocumentPdfBuffer(htmlContent, fallbackTitle = '리본케�
     table { border-collapse: collapse; width: 100%; }
     th, td { border: 1px solid #cbd5e1; }
     .no-print { display: none !important; }
-    #faxCleanFormTarget { margin: 0 auto; width: 100% !important; max-width: 100% !important; border: none !important; box-shadow: none !important; }
+    #faxCleanFormTarget { position: relative !important; margin: 0 auto; width: 100% !important; max-width: 100% !important; border: none !important; box-shadow: none !important; }
+    .relative { position: relative !important; }
+    .absolute { position: absolute !important; }
+    .w-full { width: 100% !important; }
+    .h-auto { height: auto !important; }
+    .block { display: block !important; }
+    .font-bold { font-weight: 700 !important; }
+    .text-xs { font-size: 11.5px !important; }
   </style>
 </head>
 <body class="p-0 m-0">

@@ -91,6 +91,9 @@ function safeMaskName(name) {
 }
 
 let isTotalSyncing = false;
+if (typeof window !== 'undefined') {
+  window.isTotalSyncing = false;
+}
 
 // ==========================================
 // CTI 실시간 동기화 진행상황 상태 및 렌더러
@@ -1023,6 +1026,7 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
   try {
     if (forceSync) {
       isTotalSyncing = true;
+      if (typeof window !== 'undefined') window.isTotalSyncing = true;
       let progressTimer = null;
 
       let step2Timer = null;
@@ -1204,10 +1208,12 @@ async function loadTotalCallData(forceSync = false, isBackground = false) {
     console.error('Total Call Report Load Error:', err);
   } finally {
     isTotalSyncing = false;
+    if (typeof window !== 'undefined') window.isTotalSyncing = false;
     closeTotalSyncProgressModal();
     renderTotalCallAnalysisTab();
   }
 }
+window.loadTotalCallData = loadTotalCallData;
 
 function getTotalCallLogs() {
   const source = gTotalCallData || window.gTotalCallData;

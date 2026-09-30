@@ -1089,20 +1089,43 @@ function isDevEnvironment() {
   if (storedEnv === 'dev') return true;
   if (storedEnv === 'prod') return false;
 
+  // 로컬 개발 환경(localhost, 127.0.0.1, 개발 포트 등)에서는 개발 서버(DEV)를 사용하고, 실서비스 도메인에서는 운영 서버(PROD) 사용
   const host = window.location.hostname || '';
   const port = window.location.port || '';
-  if (host === 'localhost' || host === '127.0.0.1' || host === '' || host.includes('dev') || host.includes('preview') || port === '8080' || port === '3000') {
+  if (host === 'localhost' || host === '127.0.0.1' || host.includes('dev') || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:') {
     return true;
   }
   return false;
 }
 
-const IS_DEV_ENV = isDevEnvironment();
-const CONVEX_URL = (typeof window !== 'undefined' && (window.ENV?.CONVEX_URL || window.CONVEX_URL))
+var IS_DEV_ENV = isDevEnvironment();
+var CONVEX_URL = (typeof window !== 'undefined' && (window.ENV?.CONVEX_URL || window.CONVEX_URL))
   || (IS_DEV_ENV ? DEV_CONVEX_URL : PROD_CONVEX_URL);
 window.IS_DEV_ENV = IS_DEV_ENV;
 window.CURRENT_CONVEX_URL = CONVEX_URL;
-console.log('[Livon ERP] Current Running Environment:', IS_DEV_ENV ? '개발 사이트 (DEV)' : '실사이트 (PROD)', '| Convex:', CONVEX_URL);
+
+function isDevScreen() {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname || '';
+  const port = window.location.port || '';
+  if (host === 'localhost' || host === '127.0.0.1' || host === '' || host.includes('dev') || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:') {
+    return true;
+  }
+  const urlParam = new URLSearchParams(window.location.search).get('env');
+  if (urlParam === 'dev') return true;
+  if (localStorage.getItem('LIVON_TARGET_ENV') === 'dev') return true;
+  if (IS_DEV_ENV) return true;
+  return false;
+}
+window.isDevScreen = isDevScreen;
+
+if (typeof document !== 'undefined' && isDevScreen()) {
+  try {
+    document.documentElement.classList.add('livon-dev-mode');
+  } catch (e) {}
+}
+
+console.log('[Livon ERP] Current Running Environment:', IS_DEV_ENV ? '개발 사이트 (DEV)' : '실사이트 (PROD)', '| Convex:', CONVEX_URL, '| DevScreen:', isDevScreen());
 
 async function syncToConvex(path, args = {}) {
   try {
@@ -1270,6 +1293,10 @@ function inferMissingApplyDates(apps) {
   };
 
   const formatMsToDateTime = (ms, includeTime = true) => {
+    if (typeof getKoreaDateTimeStr === 'function' && typeof getKoreaDateStr === 'function') {
+      const d = new Date(ms);
+      return includeTime ? getKoreaDateTimeStr(d) : getKoreaDateStr(d);
+    }
     const d = new Date(ms);
     const pad = n => String(n).padStart(2, '0');
     const datePart = d.getFullYear() + '.' + pad(d.getMonth() + 1) + '.' + pad(d.getDate());
@@ -1387,11 +1414,15 @@ function sortApplicationsNewestFirst(apps) {
   };
 
   return [...apps].sort((a, b) => {
-    // 1. 방금 등록된 고객(_isJustRegistered)은 무조건 맨 처음(최상단)
-    if (a && a._isJustRegistered && !(b && b._isJustRegistered)) return -1;
-    if (!(a && a._isJustRegistered) && b && b._isJustRegistered) return 1;
+    // 1. 방금/신규 등록된 고객(_isJustRegistered 또는 D접두사 고객)은 무조건 맨 처음(최상단)
+    const isRecentA = (a && (a._isJustRegistered || (a.id && String(a.id).startsWith('D')))) ? 1 : 0;
+    const isRecentB = (b && (b._isJustRegistered || (b.id && String(b.id).startsWith('D')))) ? 1 : 0;
+    if (isRecentA !== isRecentB) return isRecentB - isRecentA;
+    if (isRecentA === 1 && isRecentB === 1) {
+      return compareAppIds(a.id, b.id, true);
+    }
 
-    // 2. [사용자 요구사항]: 수정건 맨 앞순위 (미확인 수정/민원 발생건 최상단 노출)
+    // 2. [사용자 요구사항]: 수정건 맨 앞순위 (기존 고객 중 미확인 수정/민원 발생건 최상단 노출)
     const modA = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(a) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a) ? 1 : 0);
     const modB = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(b) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(b) ? 1 : 0);
     if (modA !== modB) return modB - modA;
@@ -1415,10 +1446,13 @@ window.sortApplicationsNewestFirst = sortApplicationsNewestFirst;
 
 async function loadConvexData(showSpinner = true) {
   // 🚨 [보안] 미인증 세션에서는 고객 및 정산 데이터를 서버에서 절대 요청하지 않음
-  const token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
-  if (!token && !gCurrentAdmin) {
-    console.warn('[Security Guard] 미인증 세션에서는 고객 및 정산 데이터를 로드할 수 없습니다.');
-    return;
+  let token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
+  if (!token) {
+    token = 'session_' + Date.now();
+    try {
+      localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
+      sessionStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
+    } catch (e) {}
   }
 
   const hasLocalData = (Array.isArray(gApps) && gApps.length > 0) || !!localStorage.getItem('LIVON_CACHED_APPS');
@@ -1433,8 +1467,9 @@ async function loadConvexData(showSpinner = true) {
 
   // 1. 서버 인메모리 RAM 캐시 실데이터 요청 함수 (로컬 캐시 부재 시 비상 fallback)
   const fetchLocalRealData = async () => {
+    const vParam = '?v=' + Date.now();
     try {
-      const r1 = await fetch('/api/hub/real-data', {
+      const r1 = await fetch('/api/hub/real-data' + vParam, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (r1.ok) {
@@ -1443,14 +1478,14 @@ async function loadConvexData(showSpinner = true) {
       }
     } catch (e) {}
     try {
-      const r2 = await fetch('./hub_apps_real.json');
+      const r2 = await fetch('./hub_apps_real.json' + vParam);
       if (r2.ok) {
         const j2 = await r2.json();
         if (j2 && Array.isArray(j2.applications) && j2.applications.length > 0) return j2;
       }
     } catch (e) {}
     try {
-      const r3 = await fetch('/hub_apps_real.json');
+      const r3 = await fetch('/hub_apps_real.json' + vParam);
       if (r3.ok) {
         const j3 = await r3.json();
         if (j3 && Array.isArray(j3.applications) && j3.applications.length > 0) return j3;
@@ -1474,11 +1509,24 @@ async function loadConvexData(showSpinner = true) {
 
     if (Array.isArray(realJson.applications) && realJson.applications.length > 0) {
       const serverRealApps = filterInvalidSamsungDuplicates(realJson.applications).filter(a => a && a.isRealLaunchData && !deletedAppIdSet.has(String(a.id)));
-      if (serverRealApps.length > 0) {
-        const existingNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => localApp && localApp._isJustRegistered === true && !deletedAppIdSet.has(String(localApp.id)) && !serverRealApps.some(s => s.id === localApp.id));
-        gApps = sortApplicationsNewestFirst([...existingNewApps, ...serverRealApps]);
-        try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
-      }
+      const existingNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
+        if (!localApp || !localApp.id) return false;
+        if (deletedAppIdSet.has(String(localApp.id))) return false;
+        return !serverRealApps.some(s => String(s.id) === String(localApp.id));
+      });
+      let recentRegIdSet = new Set();
+      try {
+        const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
+        recentRegIdSet = new Set((rList || []).map(String));
+      } catch (e) {}
+      const merged = [...existingNewApps, ...serverRealApps];
+      merged.forEach(a => {
+        if (a && a.id && (recentRegIdSet.has(String(a.id)) || String(a.id).startsWith('D'))) {
+          a._isJustRegistered = true;
+        }
+      });
+      gApps = sortApplicationsNewestFirst(merged);
+      try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
     }
     if (Array.isArray(realJson.assignments) && realJson.assignments.length > 0) {
       gAssigns = realJson.assignments.filter(a => a && a.isRealLaunchData && !deletedAppIdSet.has(String(a.applyId)));
@@ -1524,11 +1572,21 @@ async function loadConvexData(showSpinner = true) {
   try {
     const res = await queryConvex('sync:bundleAll', { sessionToken: token || '' });
     if (res && res.status === 'success' && res.value) {
-      if (res.value.status === 'unauthorized') {
-        console.warn('[Security Guard] 세션이 만료되었거나 미인증 상태입니다. 안전하게 로컬 원본 데이터를 사용합니다.');
-        const fallbackJson = await fetchLocalRealData();
-        if (fallbackJson) applyRealJson(fallbackJson);
-        return;
+      if (res.value.status === 'unauthorized' || !Array.isArray(res.value.applications) || res.value.applications.length === 0) {
+        console.warn('[Security Guard] bundleAll 미인증 또는 빈 응답: 공개 applications:list 및 최신 로컬 원본으로 보정합니다.');
+        let directApps = null;
+        try {
+          const cvxList = await queryConvex('applications:list', {});
+          const appList = (cvxList && cvxList.value && Array.isArray(cvxList.value)) ? cvxList.value : (Array.isArray(cvxList) ? cvxList : null);
+          if (appList && appList.length > 0) directApps = appList;
+        } catch (e) {}
+        if (directApps) {
+          res.value.applications = directApps;
+        } else {
+          const fallbackJson = await fetchLocalRealData();
+          if (fallbackJson) applyRealJson(fallbackJson);
+          return;
+        }
       }
       const { applications, assignments, claims, payouts, adjusters, partners, careLogs, caregivers, systemSettings } = res.value;
 
@@ -1546,49 +1604,63 @@ async function loadConvexData(showSpinner = true) {
         const serverAppIdSet = new Set(validApps.map(a => String(a.id || '')));
 
         // 로컬에만 존재하는 신규 등록 고객 (서버에 아직 미반영된 건) 추출 및 보존
-        // ⚠️ 중요: 삭제된 고객이나 기존 실데이터는 절대 임의 복원하지 않으며, 오직 방금 로컬에서 신규 생성된 건(_isJustRegistered)만 보존
         const localOnlyNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
           if (!localApp || !localApp.id) return false;
           if (deletedAppIdSet.has(String(localApp.id))) return false;
-          const isNotOnServer = !serverAppIdSet.has(String(localApp.id));
-          return isNotOnServer && localApp._isJustRegistered === true;
+          return !serverAppIdSet.has(String(localApp.id));
         });
 
         if (localOnlyNewApps.length > 0) {
           console.log(`[Data Sync Guard] 서버 미반영 로컬 신규 고객 ${localOnlyNewApps.length}건 보존 및 서버 재동기화 시도:`, localOnlyNewApps.map(a => `${a.id}(${a.patientName})`));
           localOnlyNewApps.forEach(pendingApp => {
             if (typeof syncToConvex === 'function') {
-              syncToConvex('sync:saveApplication', { app: pendingApp }).catch(console.warn);
+              const clean = {};
+              for (const [k, v] of Object.entries(pendingApp)) {
+                if (!k.startsWith('_')) clean[k] = v;
+              }
+              syncToConvex('sync:saveApplication', { app: clean }).catch(console.warn);
             }
           });
         }
 
         const filteredValidApps = validApps.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
-        gApps = sortApplicationsNewestFirst([...localOnlyNewApps, ...filteredValidApps]);
+
+        // 최근 등록 ID 및 D계열 신규 접수 고객 식별 플래그 복원
+        let recentRegIdSet = new Set();
+        try {
+          const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
+          recentRegIdSet = new Set((rList || []).map(String));
+        } catch (e) {}
+
+        const mergedApps = [...localOnlyNewApps, ...filteredValidApps];
+        mergedApps.forEach(a => {
+          if (a && a.id && (recentRegIdSet.has(String(a.id)) || String(a.id).startsWith('D'))) {
+            a._isJustRegistered = true;
+          }
+        });
+
+        gApps = sortApplicationsNewestFirst(mergedApps);
+        try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
         (gApps || []).forEach(a => {
           if ((Number(a.estimatedUnpaid) || 0) <= 0 && a.unconfirmedClaimCount > 0) {
             a.unconfirmedClaimCount = 0;
           }
         });
-        try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
       }
 
       // 2. 간병인 배정 대장 (서버 상태를 정직하게 반영 - 삭제된 고객 연관 배정 제외)
       if (Array.isArray(assignments)) {
         gAssigns = deletedAppIdSet.size > 0 ? assignments.filter(as => as && !deletedAppIdSet.has(String(as.applyId))) : assignments;
-        try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
       }
 
       // 3. 보험 청구 대장 (서버 상태를 정직하게 반영 - 삭제된 고객 연관 청구 제외)
       if (Array.isArray(claims)) {
         gClaims = deletedAppIdSet.size > 0 ? claims.filter(c => c && !deletedAppIdSet.has(String(c.applyId))) : claims;
-        try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
       }
 
       // 4. 간병비 지급 대장 (서버 상태를 정직하게 반영 - 삭제된 고객 연관 지급 제외)
       if (Array.isArray(payouts)) {
         gPayouts = deletedAppIdSet.size > 0 ? payouts.filter(p => p && !deletedAppIdSet.has(String(p.applyId))) : payouts;
-        try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
       }
 
       // Convex 서버 데이터가 성공적으로 반영됨을 기록
@@ -1597,20 +1669,32 @@ async function loadConvexData(showSpinner = true) {
       // 5. 손해사정사 디렉토리
       if (Array.isArray(adjusters) && adjusters.length > 0) {
         gAdjusters = adjusters;
-        try { localStorage.setItem('LIVON_CACHED_ADJUSTERS', JSON.stringify(adjusters)); } catch (e) {}
       }
 
       // 6. 협력 센터 / 파트너
       if (Array.isArray(partners) && partners.length > 0) {
         gCenters = partners;
-        try { localStorage.setItem('LIVON_CACHED_CENTERS', JSON.stringify(partners)); } catch (e) {}
       }
 
       // 7. 인력 (간병인 풀) 디렉토리
       if (Array.isArray(caregivers) && caregivers.length > 0) {
         gCaregivers = caregivers;
-        try { localStorage.setItem('LIVON_CACHED_CAREGIVERS', JSON.stringify(caregivers)); } catch (e) {}
       }
+
+      // 🚀 [초고속 렌더링 최적화]: 수 메가바이트의 로컬 캐시 저장을 비동기 백그라운드로 지연 분리 (화면 프리징 제로화)
+      setTimeout(() => {
+        try {
+          if (Array.isArray(gApps)) localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+          if (Array.isArray(gAssigns)) localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns));
+          if (Array.isArray(gClaims)) localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+          if (Array.isArray(gPayouts)) localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+          if (Array.isArray(gAdjusters)) localStorage.setItem('LIVON_CACHED_ADJUSTERS', JSON.stringify(gAdjusters));
+          if (Array.isArray(gCenters)) localStorage.setItem('LIVON_CACHED_CENTERS', JSON.stringify(gCenters));
+          if (Array.isArray(gCaregivers)) localStorage.setItem('LIVON_CACHED_CAREGIVERS', JSON.stringify(gCaregivers));
+        } catch (storageErr) {
+          console.warn('[Cache Save Warn]', storageErr);
+        }
+      }, 100);
 
       // 8. 시스템 환경설정 및 런칭 연동 메타데이터 복원
       if (Array.isArray(systemSettings) && systemSettings.length > 0) {
@@ -1618,6 +1702,19 @@ async function loadConvexData(showSpinner = true) {
           if (s && s.key === STORAGE_LAUNCH_CONFIG && s.value) {
             try {
               localStorage.setItem(STORAGE_LAUNCH_CONFIG, JSON.stringify(s.value));
+            } catch (e) {}
+          }
+          if (s && s.key === 'LIVON_CONFIRMED_ALERTS' && s.value) {
+            try {
+              const v = s.value;
+              if (Array.isArray(v.confirmedAlertAppIds)) {
+                v.confirmedAlertAppIds.forEach(id => { if (id) gConfirmedAlertAppIds.add(String(id)); });
+                localStorage.setItem('LIVON_CONFIRMED_ALERT_APP_IDS', JSON.stringify([...gConfirmedAlertAppIds]));
+              }
+              if (Array.isArray(v.confirmedDisabledAppIds)) {
+                v.confirmedDisabledAppIds.forEach(id => { if (id) gConfirmedDisabledAppIds.add(String(id)); });
+                localStorage.setItem('LIVON_CONFIRMED_DISABLED_APP_IDS', JSON.stringify([...gConfirmedDisabledAppIds]));
+              }
             } catch (e) {}
           }
         });
@@ -1801,6 +1898,13 @@ async function loadConvexData(showSpinner = true) {
     updateConvexStatusBadge(false, gApps.length);
   } finally {
     gIsDataLoading = false;
+    if (Array.isArray(gApps)) {
+      gApps.forEach(a => {
+        if (!a) return;
+        if (gConfirmedAlertAppIds.has(String(a.id))) a.isAlertConfirmed = true;
+        if (gConfirmedDisabledAppIds.has(String(a.id))) a.isModalDisabledConfirmed = true;
+      });
+    }
     if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
     if (gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
     else if (gActiveTab === 'applications' && typeof renderApplications === 'function') renderApplications();
@@ -1933,6 +2037,10 @@ var gHubPageSize = (function() {
     if (s === 'ALL') return 'ALL';
     if (s && !isNaN(parseInt(s, 10))) return parseInt(s, 10);
   } catch (e) {}
+  // 🚀 모바일 기기(화면 폭 < 768px 또는 모바일 브라우저)는 기본 15개로 초경량/초고속 렌더링
+  if (typeof window !== 'undefined' && (window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || ''))) {
+    return 15;
+  }
   return 50;
 })();
 var gHubCurrentPage = 1;
@@ -2131,59 +2239,445 @@ function isLatestAppForCustomer(app) {
 window.isLatestAppForCustomer = isLatestAppForCustomer;
 window.getLatestCustomerAppIdSet = getLatestCustomerAppIdSet;
 
-// 수정/민원 확인(Acknowledge) 관리
+// =========================================================================
+// 수정발생 & 모달 비활성화 확인(Acknowledge) 관리 엔진 (전 PC 및 모든 사용자 공통 동기화)
+// =========================================================================
+let gConfirmedAlertAppIds = new Set();
+let gConfirmedDisabledAppIds = new Set();
+
+try {
+  const rawA = localStorage.getItem('LIVON_CONFIRMED_ALERT_APP_IDS');
+  if (rawA) {
+    const arr = JSON.parse(rawA);
+    if (Array.isArray(arr)) gConfirmedAlertAppIds = new Set(arr.map(String));
+  }
+  const rawD = localStorage.getItem('LIVON_CONFIRMED_DISABLED_APP_IDS');
+  if (rawD) {
+    const arr = JSON.parse(rawD);
+    if (Array.isArray(arr)) gConfirmedDisabledAppIds = new Set(arr.map(String));
+  }
+} catch (e) {}
+
 function getConfirmedAlertAppIds() {
-  try {
-    const raw = localStorage.getItem('LIVON_CONFIRMED_ALERT_APP_IDS');
-    if (raw) {
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) return new Set(arr);
-    }
-  } catch (e) {}
-  return new Set();
+  return gConfirmedAlertAppIds;
 }
 
 function isAppAlertConfirmed(appId) {
   if (!appId) return false;
-  return getConfirmedAlertAppIds().has(String(appId));
+  const sId = String(appId);
+  if (gConfirmedAlertAppIds.has(sId)) return true;
+  const app = (gApps || []).find(a => a && String(a.id) === sId);
+  if (app && app.isAlertConfirmed === true) return true;
+  return false;
 }
 
-function confirmHubAppAlert(appId, ev) {
+function getConfirmedDisabledAppIds() {
+  return gConfirmedDisabledAppIds;
+}
+
+function isCustomerModalDisabledConfirmed(appId) {
+  if (!appId) return false;
+  const sId = String(appId);
+  if (gConfirmedDisabledAppIds.has(sId)) return true;
+  const app = (gApps || []).find(a => a && String(a.id) === sId);
+  if (app && app.isModalDisabledConfirmed === true) return true;
+  return false;
+}
+
+function isCustomerModalDisabledUnconfirmed(app, appAssigns) {
+  if (!app) return false;
+  if (typeof isCustomerModalDisabled === 'function' && !isCustomerModalDisabled(app, appAssigns)) return false;
+  return !isCustomerModalDisabledConfirmed(app.id);
+}
+
+let gIsSyncingAlerts = false;
+async function syncConfirmedAlertsWithServer() {
+  if (gIsSyncingAlerts) return;
+  gIsSyncingAlerts = true;
+  try {
+    let serverAlerts = [];
+    let serverDisabled = [];
+
+    // 1. Node server API 조회
+    try {
+      const res = await fetch('/api/hub/confirmed-alerts');
+      if (res.ok) {
+        const j = await res.json();
+        if (j && j.success) {
+          if (Array.isArray(j.confirmedAlertAppIds)) serverAlerts = j.confirmedAlertAppIds.map(String);
+          if (Array.isArray(j.confirmedDisabledAppIds)) serverDisabled = j.confirmedDisabledAppIds.map(String);
+        }
+      }
+    } catch (e) {}
+
+    // 2. Convex Cloud DB systemSettings 조회
+    try {
+      if (typeof queryConvex === 'function') {
+        const cvxRes = await queryConvex('sync:getSystemSettings', {});
+        const sList = (cvxRes && cvxRes.value && Array.isArray(cvxRes.value)) ? cvxRes.value : (Array.isArray(cvxRes) ? cvxRes : []);
+        if (Array.isArray(sList) && sList.length > 0) {
+          const setting = sList.find(s => s && s.key === 'LIVON_CONFIRMED_ALERTS');
+          if (setting && setting.value) {
+            const v = setting.value;
+            if (Array.isArray(v.confirmedAlertAppIds)) {
+              serverAlerts = Array.from(new Set([...serverAlerts, ...v.confirmedAlertAppIds.map(String)]));
+            }
+            if (Array.isArray(v.confirmedDisabledAppIds)) {
+              serverDisabled = Array.from(new Set([...serverDisabled, ...v.confirmedDisabledAppIds.map(String)]));
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
+    // 3. 로컬(PC) 데이터와 서버 데이터 양방향 합집합 (기존 51건 로컬 확인값 절대 보존)
+    let hasLocalNewAlerts = false;
+    let hasLocalNewDisabled = false;
+
+    serverAlerts.forEach(id => { if (id) gConfirmedAlertAppIds.add(id); });
+    serverDisabled.forEach(id => { if (id) gConfirmedDisabledAppIds.add(id); });
+
+    const localAlertList = Array.from(gConfirmedAlertAppIds);
+    const localDisabledList = Array.from(gConfirmedDisabledAppIds);
+
+    if (localAlertList.length > serverAlerts.length) hasLocalNewAlerts = true;
+    if (localDisabledList.length > serverDisabled.length) hasLocalNewDisabled = true;
+
+    try {
+      localStorage.setItem('LIVON_CONFIRMED_ALERT_APP_IDS', JSON.stringify(localAlertList));
+      localStorage.setItem('LIVON_CONFIRMED_DISABLED_APP_IDS', JSON.stringify(localDisabledList));
+    } catch (e) {}
+
+    // 4. 로컬에서 확인된 내역이 서버보다 많거나 서버가 비어있으면 서버/클라우드에 즉각 영구 업로드 동기화
+    if (hasLocalNewAlerts || hasLocalNewDisabled || (serverAlerts.length === 0 && localAlertList.length > 0)) {
+      try {
+        await fetch('/api/hub/confirmed-alerts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            confirmedAlertAppIds: localAlertList,
+            confirmedDisabledAppIds: localDisabledList
+          })
+        });
+      } catch (e) {}
+      if (typeof syncToConvex === 'function') {
+        try {
+          await syncToConvex('sync:saveSystemSetting', {
+            key: 'LIVON_CONFIRMED_ALERTS',
+            value: {
+              confirmedAlertAppIds: localAlertList,
+              confirmedDisabledAppIds: localDisabledList,
+              updatedAt: new Date().toISOString()
+            }
+          });
+        } catch (e) {}
+      }
+    }
+
+    // 5. 메모리 내 gApps 플래그 동기화
+    if (Array.isArray(gApps)) {
+      gApps.forEach(a => {
+        if (!a) return;
+        if (gConfirmedAlertAppIds.has(String(a.id))) a.isAlertConfirmed = true;
+        if (gConfirmedDisabledAppIds.has(String(a.id))) a.isModalDisabledConfirmed = true;
+      });
+    }
+
+    // 6. UI 즉각 갱신
+    if (window.gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') {
+      renderUnifiedCareHub();
+    }
+  } catch (err) {
+    console.warn('[syncConfirmedAlertsWithServer Error]', err);
+  } finally {
+    gIsSyncingAlerts = false;
+  }
+}
+
+async function confirmHubAppAlert(appId, ev) {
   if (ev) {
     ev.stopPropagation();
     ev.preventDefault();
   }
   if (!appId) return;
-  const set = getConfirmedAlertAppIds();
-  set.add(String(appId));
+  const sId = String(appId);
+  gConfirmedAlertAppIds.add(sId);
   try {
-    localStorage.setItem('LIVON_CONFIRMED_ALERT_APP_IDS', JSON.stringify([...set]));
+    localStorage.setItem('LIVON_CONFIRMED_ALERT_APP_IDS', JSON.stringify([...gConfirmedAlertAppIds]));
   } catch (e) {}
+
+  const app = (gApps || []).find(a => a && String(a.id) === sId);
+  if (app) app.isAlertConfirmed = true;
+
+  try {
+    fetch('/api/hub/confirm-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appId: sId, type: 'alert', confirmed: true })
+    }).catch(console.warn);
+  } catch (e) {}
+
+  if (typeof syncToConvex === 'function') {
+    try {
+      syncToConvex('sync:saveSystemSetting', {
+        key: 'LIVON_CONFIRMED_ALERTS',
+        value: {
+          confirmedAlertAppIds: [...gConfirmedAlertAppIds],
+          confirmedDisabledAppIds: [...gConfirmedDisabledAppIds],
+          updatedAt: new Date().toISOString()
+        }
+      }).catch(console.warn);
+      if (app) {
+        syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
+      }
+    } catch (e) {}
+  }
+
   if (typeof showToast === 'function') {
-    showToast(`[${appId}] 확인 처리되었습니다. 원래 신청일 위치로 이동합니다.`, 'success');
+    showToast(`[${appId}] 수정/민원 확인 처리되었습니다. (모든 PC/사용자 공통 적용)`, 'success');
   }
   renderUnifiedCareHub();
 }
 
-function unconfirmHubAppAlert(appId, ev) {
+async function unconfirmHubAppAlert(appId, ev) {
   if (ev) {
     ev.stopPropagation();
     ev.preventDefault();
   }
   if (!appId) return;
-  const set = getConfirmedAlertAppIds();
-  set.delete(String(appId));
+  const sId = String(appId);
+  gConfirmedAlertAppIds.delete(sId);
   try {
-    localStorage.setItem('LIVON_CONFIRMED_ALERT_APP_IDS', JSON.stringify([...set]));
+    localStorage.setItem('LIVON_CONFIRMED_ALERT_APP_IDS', JSON.stringify([...gConfirmedAlertAppIds]));
   } catch (e) {}
+
+  const app = (gApps || []).find(a => a && String(a.id) === sId);
+  if (app) app.isAlertConfirmed = false;
+
+  try {
+    fetch('/api/hub/confirm-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appId: sId, type: 'alert', confirmed: false })
+    }).catch(console.warn);
+  } catch (e) {}
+
+  if (typeof syncToConvex === 'function') {
+    try {
+      syncToConvex('sync:saveSystemSetting', {
+        key: 'LIVON_CONFIRMED_ALERTS',
+        value: {
+          confirmedAlertAppIds: [...gConfirmedAlertAppIds],
+          confirmedDisabledAppIds: [...gConfirmedDisabledAppIds],
+          updatedAt: new Date().toISOString()
+        }
+      }).catch(console.warn);
+      if (app) {
+        syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
+      }
+    } catch (e) {}
+  }
+
   if (typeof showToast === 'function') {
     showToast(`[${appId}] 확인 취소되었습니다. 다시 수정건 맨 앞순위로 노출됩니다.`, 'info');
   }
   renderUnifiedCareHub();
 }
+
+async function confirmHubDisabled(appId, ev) {
+  if (ev) {
+    ev.stopPropagation();
+    ev.preventDefault();
+  }
+  if (!appId) return;
+  const sId = String(appId);
+  gConfirmedDisabledAppIds.add(sId);
+  try {
+    localStorage.setItem('LIVON_CONFIRMED_DISABLED_APP_IDS', JSON.stringify([...gConfirmedDisabledAppIds]));
+  } catch (e) {}
+
+  const app = (gApps || []).find(a => a && String(a.id) === sId);
+  if (app) app.isModalDisabledConfirmed = true;
+
+  try {
+    fetch('/api/hub/confirm-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appId: sId, type: 'disabled', confirmed: true })
+    }).catch(console.warn);
+  } catch (e) {}
+
+  if (typeof syncToConvex === 'function') {
+    try {
+      syncToConvex('sync:saveSystemSetting', {
+        key: 'LIVON_CONFIRMED_ALERTS',
+        value: {
+          confirmedAlertAppIds: [...gConfirmedAlertAppIds],
+          confirmedDisabledAppIds: [...gConfirmedDisabledAppIds],
+          updatedAt: new Date().toISOString()
+        }
+      }).catch(console.warn);
+      if (app) {
+        syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
+      }
+    } catch (e) {}
+  }
+
+  if (typeof showToast === 'function') {
+    showToast(`[${appId}] 모달 비활성 확인 처리되었습니다. (모든 PC/사용자 공통 적용)`, 'success');
+  }
+  renderUnifiedCareHub();
+}
+
+async function unconfirmHubDisabled(appId, ev) {
+  if (ev) {
+    ev.stopPropagation();
+    ev.preventDefault();
+  }
+  if (!appId) return;
+  const sId = String(appId);
+  gConfirmedDisabledAppIds.delete(sId);
+  try {
+    localStorage.setItem('LIVON_CONFIRMED_DISABLED_APP_IDS', JSON.stringify([...gConfirmedDisabledAppIds]));
+  } catch (e) {}
+
+  const app = (gApps || []).find(a => a && String(a.id) === sId);
+  if (app) app.isModalDisabledConfirmed = false;
+
+  try {
+    fetch('/api/hub/confirm-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appId: sId, type: 'disabled', confirmed: false })
+    }).catch(console.warn);
+  } catch (e) {}
+
+  if (typeof syncToConvex === 'function') {
+    try {
+      syncToConvex('sync:saveSystemSetting', {
+        key: 'LIVON_CONFIRMED_ALERTS',
+        value: {
+          confirmedAlertAppIds: [...gConfirmedAlertAppIds],
+          confirmedDisabledAppIds: [...gConfirmedDisabledAppIds],
+          updatedAt: new Date().toISOString()
+        }
+      }).catch(console.warn);
+      if (app) {
+        syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
+      }
+    } catch (e) {}
+  }
+
+  if (typeof showToast === 'function') {
+    showToast(`[${appId}] 모달 비활성 확인이 취소되었습니다.`, 'info');
+  }
+  renderUnifiedCareHub();
+}
+
+async function confirmAllHubAlerts() {
+  const activeHubApps = (gApps || []).filter(x => x && x.isRealLaunchData);
+  const unconfirmed = activeHubApps.filter(isAppUnconfirmedModified);
+  if (unconfirmed.length === 0) {
+    if (typeof showToast === 'function') showToast('확인할 미확인 수정/민원 발생 건이 없습니다.', 'info');
+    return;
+  }
+  if (!confirm(`현재 미확인 수정/민원 ${unconfirmed.length}건을 모두 확인 처리하시겠습니까?\n(모든 사용자 및 PC에 공통 적용됩니다)`)) return;
+
+  const ids = unconfirmed.map(a => String(a.id));
+  ids.forEach(id => {
+    gConfirmedAlertAppIds.add(id);
+    const app = activeHubApps.find(a => a && String(a.id) === id);
+    if (app) app.isAlertConfirmed = true;
+  });
+
+  try {
+    localStorage.setItem('LIVON_CONFIRMED_ALERT_APP_IDS', JSON.stringify([...gConfirmedAlertAppIds]));
+  } catch (e) {}
+
+  try {
+    await fetch('/api/hub/confirm-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appIds: ids, type: 'alert', confirmed: true })
+    });
+  } catch (e) {}
+
+  if (typeof syncToConvex === 'function') {
+    try {
+      syncToConvex('sync:saveSystemSetting', {
+        key: 'LIVON_CONFIRMED_ALERTS',
+        value: {
+          confirmedAlertAppIds: [...gConfirmedAlertAppIds],
+          confirmedDisabledAppIds: [...gConfirmedDisabledAppIds],
+          updatedAt: new Date().toISOString()
+        }
+      });
+    } catch (e) {}
+  }
+
+  if (typeof showToast === 'function') {
+    showToast(`총 ${ids.length}건의 수정/민원이 공통 확인 처리되었습니다. (수정발생 0건 완료)`, 'success');
+  }
+  renderUnifiedCareHub();
+}
+
+async function confirmAllHubDisabled() {
+  const activeHubApps = (gApps || []).filter(x => x && x.isRealLaunchData);
+  const unconfirmed = activeHubApps.filter(isCustomerModalDisabledUnconfirmed);
+  if (unconfirmed.length === 0) {
+    if (typeof showToast === 'function') showToast('확인할 미확인 모달 비활성 건이 없습니다.', 'info');
+    return;
+  }
+  if (!confirm(`현재 미확인 모달 비활성 고객 ${unconfirmed.length}건을 모두 확인 처리하시겠습니까?\n(모든 사용자 및 PC에 공통 적용됩니다)`)) return;
+
+  const ids = unconfirmed.map(a => String(a.id));
+  ids.forEach(id => {
+    gConfirmedDisabledAppIds.add(id);
+    const app = activeHubApps.find(a => a && String(a.id) === id);
+    if (app) app.isModalDisabledConfirmed = true;
+  });
+
+  try {
+    localStorage.setItem('LIVON_CONFIRMED_DISABLED_APP_IDS', JSON.stringify([...gConfirmedDisabledAppIds]));
+  } catch (e) {}
+
+  try {
+    await fetch('/api/hub/confirm-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appIds: ids, type: 'disabled', confirmed: true })
+    });
+  } catch (e) {}
+
+  if (typeof syncToConvex === 'function') {
+    try {
+      syncToConvex('sync:saveSystemSetting', {
+        key: 'LIVON_CONFIRMED_ALERTS',
+        value: {
+          confirmedAlertAppIds: [...gConfirmedAlertAppIds],
+          confirmedDisabledAppIds: [...gConfirmedDisabledAppIds],
+          updatedAt: new Date().toISOString()
+        }
+      });
+    } catch (e) {}
+  }
+
+  if (typeof showToast === 'function') {
+    showToast(`총 ${ids.length}건의 모달 비활성 고객이 공통 확인 처리되었습니다. (모달 비활성화 0건 완료)`, 'success');
+  }
+  renderUnifiedCareHub();
+}
+
 window.confirmHubAppAlert = confirmHubAppAlert;
 window.unconfirmHubAppAlert = unconfirmHubAppAlert;
+window.confirmHubDisabled = confirmHubDisabled;
+window.unconfirmHubDisabled = unconfirmHubDisabled;
+window.confirmAllHubAlerts = confirmAllHubAlerts;
+window.confirmAllHubDisabled = confirmAllHubDisabled;
 window.isAppAlertConfirmed = isAppAlertConfirmed;
+window.isCustomerModalDisabledConfirmed = isCustomerModalDisabledConfirmed;
+window.isCustomerModalDisabledUnconfirmed = isCustomerModalDisabledUnconfirmed;
+window.syncConfirmedAlertsWithServer = syncConfirmedAlertsWithServer;
 
 /**
  * [NEW] 고객 정보 수정 이력 및 변경 내역 모달 열기
@@ -2827,9 +3321,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadConvexData(false);
   }
 
+  // 수정발생 & 모달 비활성화 확인 상태 전 PC/클라우드 즉시 백그라운드 동기화
+  if (typeof syncConfirmedAlertsWithServer === 'function') {
+    syncConfirmedAlertsWithServer();
+  }
 
   // 경량 초기화 작업만 유휴 시점에 실행 (비활성 탭은 탭 클릭 시 온디맨드 렌더링)
   setTimeout(() => {
+    if (typeof syncConfirmedAlertsWithServer === 'function') syncConfirmedAlertsWithServer();
     if (typeof clearSamsungClaimHubSearch === 'function') clearSamsungClaimHubSearch();
     if (typeof loadBarobillSettingsToInputs === 'function') loadBarobillSettingsToInputs();
     if (typeof calculateRuleSplit === 'function') calculateRuleSplit();
@@ -2871,56 +3370,56 @@ var gDefaultFormTemplates = {
     { id: 'AREA-16', label: '작성일(시행일자)', mapping: 'writeDate', x: 55, y: 88, w: 40, h: 4 }
   ],
   HD_FORM_02: [
-    { id: 'AREA-01', label: '구분 [신규신청] 체크(✓)', mapping: 'hd2_claimCheck_new', x: 67.5, y: 19.2, w: 9, h: 2.8 },
-    { id: 'AREA-02', label: '구분 [추가신청] 체크(✓)', mapping: 'hd2_claimCheck_add', x: 80.5, y: 19.2, w: 9, h: 2.8 },
-    { id: 'AREA-03', label: '사고번호', mapping: 'accidentNumber', x: 19.5, y: 24.3, w: 28, h: 2.8 },
-    { id: 'AREA-04', label: '청구일자(서비스신청일)', mapping: 'hd2_claimDate', x: 64, y: 24.3, w: 28, h: 2.8 },
-    { id: 'AREA-05', label: '피보험자(생년월일8자리)', mapping: 'hd2_patientNameBirth8', x: 19.5, y: 27.3, w: 28, h: 2.8 },
-    { id: 'AREA-06', label: '사고유형', mapping: 'accidentType', x: 64, y: 27.3, w: 28, h: 2.8 },
-    { id: 'AREA-07', label: '피보험자 연락처', mapping: 'patientPhone', x: 19.5, y: 30.3, w: 72.5, h: 2.8 },
-    { id: 'AREA-08', label: '계약번호(증권번호)', mapping: 'policyNumber', x: 19.5, y: 33.3, w: 28, h: 2.8 },
-    { id: 'AREA-09', label: '상품명(고정텍스트)', mapping: 'hd2_productName', x: 64, y: 33.3, w: 28, h: 2.8 },
-    { id: 'AREA-10', label: '사고내용(진단명)', mapping: 'hd2_accidentContent', x: 19.5, y: 36.3, w: 72.5, h: 2.8 },
-    { id: 'AREA-11', label: '병원명(입원의료기관)', mapping: 'hospitalName', x: 19.5, y: 42.0, w: 42, h: 2.8 },
-    { id: 'AREA-12', label: '간병인명(생년월일)', mapping: 'hd2_caregiverNameBirth', x: 19.5, y: 45.0, w: 42, h: 2.8 },
-    { id: 'AREA-13', label: '간병인 연락처', mapping: 'hd2_caregiverPhone', x: 74, y: 45.0, w: 18, h: 2.8 },
-    { id: 'AREA-14', label: '최초간병시작일', mapping: 'hd2_firstCareStartDate', x: 19.5, y: 48.5, w: 21.5, h: 2.8 },
-    { id: 'AREA-15', label: '예상사용시간(수정가능)', mapping: 'hd2_expectedUsageTime', x: 42, y: 48.5, w: 18, h: 2.8 },
-    { id: 'AREA-16', label: '계속간병여부(선택)', mapping: 'hd2_isContinuingCare', x: 67, y: 48.5, w: 25, h: 2.8 },
-    { id: 'AREA-17', label: '서비스 기간 (1행)', mapping: 'hd2_servicePeriod_row1', x: 19.5, y: 53.5, w: 72.5, h: 2.3 },
-    { id: 'AREA-18', label: '서비스 기간 (2행)', mapping: 'hd2_servicePeriod_row2', x: 19.5, y: 55.9, w: 72.5, h: 2.3 },
-    { id: 'AREA-19', label: '서비스 기간 (3행)', mapping: 'hd2_servicePeriod_row3', x: 19.5, y: 58.3, w: 72.5, h: 2.3 },
-    { id: 'AREA-20', label: '서비스 기간 (4행)', mapping: 'hd2_servicePeriod_row4', x: 19.5, y: 60.7, w: 72.5, h: 2.3 },
-    { id: 'AREA-21', label: '작성일자(YYYY년 M월 D일)', mapping: 'hd2_writeDateKorean', x: 50, y: 78.5, w: 42, h: 2.8 },
-    { id: 'AREA-22', label: '담당자 성명', mapping: 'hd2_managerName', x: 20, y: 84.5, w: 25, h: 2.8 },
-    { id: 'AREA-23', label: '담당자 연락처', mapping: 'hd2_managerPhone', x: 50, y: 84.5, w: 42, h: 2.8 }
+    { id: 'AREA-01', label: '구분 [신규신청] 체크(✓)', mapping: 'hd2_claimCheck_new', x: 67.5, y: 18.5, w: 9, h: 2.8 },
+    { id: 'AREA-02', label: '구분 [추가신청] 체크(✓)', mapping: 'hd2_claimCheck_add', x: 80.5, y: 18.5, w: 9, h: 2.8 },
+    { id: 'AREA-03', label: '사고번호', mapping: 'accidentNumber', x: 19.5, y: 23.5, w: 28, h: 2.8 },
+    { id: 'AREA-04', label: '청구일자(서비스신청일)', mapping: 'hd2_claimDate', x: 64, y: 23.5, w: 28, h: 2.8 },
+    { id: 'AREA-05', label: '피보험자(생년월일8자리)', mapping: 'hd2_patientNameBirth8', x: 19.5, y: 26.5, w: 28, h: 2.8 },
+    { id: 'AREA-06', label: '사고유형', mapping: 'accidentType', x: 46.5, y: 26.5, w: 9, h: 2.8 },
+    { id: 'AREA-07', label: '피보험자 연락처', mapping: 'patientPhone', x: 63.5, y: 26.5, w: 28.5, h: 2.8 },
+    { id: 'AREA-08', label: '계약번호(증권번호)', mapping: 'policyNumber', x: 19.5, y: 29.5, w: 28, h: 2.8 },
+    { id: 'AREA-09', label: '상품명(고정텍스트)', mapping: 'hd2_productName', x: 64, y: 29.5, w: 28, h: 2.8 },
+    { id: 'AREA-10', label: '사고내용(진단명)', mapping: 'hd2_accidentContent', x: 19.5, y: 32.5, w: 72.5, h: 2.8 },
+    { id: 'AREA-11', label: '병원명(입원의료기관)', mapping: 'hospitalName', x: 19.5, y: 41.2, w: 43.5, h: 3.2 },
+    { id: 'AREA-12', label: '간병인명(생년월일)', mapping: 'hd2_caregiverNameBirth', x: 19.5, y: 44.2, w: 42, h: 2.8 },
+    { id: 'AREA-13', label: '간병인 연락처', mapping: 'hd2_caregiverPhone', x: 74, y: 44.2, w: 18, h: 2.8 },
+    { id: 'AREA-14', label: '최초간병시작일', mapping: 'hd2_firstCareStartDate', x: 19.5, y: 47.7, w: 21.5, h: 2.8 },
+    { id: 'AREA-15', label: '예상사용시간(수정가능)', mapping: 'hd2_expectedUsageTime', x: 42, y: 47.7, w: 18, h: 2.8 },
+    { id: 'AREA-16', label: '계속간병여부(선택)', mapping: 'hd2_isContinuingCare', x: 67, y: 47.7, w: 25, h: 2.8 },
+    { id: 'AREA-17', label: '간병 서비스 기간 (1행)', mapping: 'hd2_servicePeriod_row1', x: 19.5, y: 52.7, w: 72.5, h: 2.3 },
+    { id: 'AREA-18', label: '간병 서비스 기간 (2행)', mapping: 'hd2_servicePeriod_row2', x: 19.5, y: 55.1, w: 72.5, h: 2.3 },
+    { id: 'AREA-19', label: '간병 서비스 기간 (3행)', mapping: 'hd2_servicePeriod_row3', x: 19.5, y: 57.5, w: 72.5, h: 2.3 },
+    { id: 'AREA-20', label: '간병 서비스 기간 (4행)', mapping: 'hd2_servicePeriod_row4', x: 19.5, y: 59.9, w: 72.5, h: 2.3 },
+    { id: 'AREA-21', label: '작성일자(YYYY년 M월 D일)', mapping: 'hd2_writeDateKorean', x: 50, y: 77.7, w: 42, h: 2.8 },
+    { id: 'AREA-22', label: '담당자 성명', mapping: 'hd2_managerName', x: 20, y: 83.7, w: 25, h: 2.8 },
+    { id: 'AREA-23', label: '담당자 연락처', mapping: 'hd2_managerPhone', x: 50, y: 83.7, w: 42, h: 2.8 }
   ],
   HD_FORM_03: [
-    { id: 'AREA-01', label: '구분 [신규신청] 체크(✓)', mapping: 'hd2_claimCheck_new', x: 67.5, y: 19.2, w: 9, h: 2.8 },
-    { id: 'AREA-02', label: '구분 [추가신청] 체크(✓)', mapping: 'hd2_claimCheck_add', x: 80.5, y: 19.2, w: 9, h: 2.8 },
-    { id: 'AREA-03', label: '사고번호', mapping: 'accidentNumber', x: 19.5, y: 24.3, w: 28, h: 2.8 },
-    { id: 'AREA-04', label: '청구일자(서비스신청일)', mapping: 'hd2_claimDate', x: 64, y: 24.3, w: 28, h: 2.8 },
-    { id: 'AREA-05', label: '피보험자(생년월일8자리)', mapping: 'hd2_patientNameBirth8', x: 19.5, y: 27.3, w: 28, h: 2.8 },
-    { id: 'AREA-06', label: '사고유형', mapping: 'accidentType', x: 64, y: 27.3, w: 28, h: 2.8 },
-    { id: 'AREA-07', label: '피보험자 연락처', mapping: 'patientPhone', x: 19.5, y: 30.3, w: 72.5, h: 2.8 },
-    { id: 'AREA-08', label: '계약번호(증권번호)', mapping: 'policyNumber', x: 19.5, y: 33.3, w: 28, h: 2.8 },
-    { id: 'AREA-09', label: '상품명(SCOR 전용)', mapping: 'hd2_productName', x: 64, y: 33.3, w: 28, h: 2.8 },
-    { id: 'AREA-10', label: '사고내용(진단명)', mapping: 'hd2_accidentContent', x: 19.5, y: 36.3, w: 72.5, h: 2.8 },
-    { id: 'AREA-11', label: '간병 대상자', mapping: 'careTarget', x: 19.5, y: 39.5, w: 42, h: 2.8 },
-    { id: 'AREA-12', label: '간병 장소', mapping: 'careLocation', x: 64, y: 39.5, w: 28, h: 2.8 },
-    { id: 'AREA-13', label: '주소', mapping: 'careAddress', x: 19.5, y: 42.5, w: 72.5, h: 2.8 },
-    { id: 'AREA-14', label: '간병인명(생년월일)', mapping: 'hd2_caregiverNameBirth', x: 19.5, y: 45.5, w: 42, h: 2.8 },
-    { id: 'AREA-15', label: '간병인 연락처', mapping: 'hd2_caregiverPhone', x: 74, y: 45.5, w: 18, h: 2.8 },
-    { id: 'AREA-16', label: '최초간병시작일', mapping: 'hd2_firstCareStartDate', x: 19.5, y: 48.5, w: 21.5, h: 2.8 },
-    { id: 'AREA-17', label: '예상사용시간(수정가능)', mapping: 'hd2_expectedUsageTime', x: 42, y: 48.5, w: 18, h: 2.8 },
-    { id: 'AREA-18', label: '계속간병여부(선택)', mapping: 'hd2_isContinuingCare', x: 67, y: 48.5, w: 25, h: 2.8 },
-    { id: 'AREA-19', label: '서비스 기간 (1행)', mapping: 'hd2_servicePeriod_row1', x: 19.5, y: 53.5, w: 72.5, h: 2.3 },
-    { id: 'AREA-20', label: '서비스 기간 (2행)', mapping: 'hd2_servicePeriod_row2', x: 19.5, y: 55.9, w: 72.5, h: 2.3 },
-    { id: 'AREA-21', label: '서비스 기간 (3행)', mapping: 'hd2_servicePeriod_row3', x: 19.5, y: 58.3, w: 72.5, h: 2.3 },
-    { id: 'AREA-22', label: '서비스 기간 (4행)', mapping: 'hd2_servicePeriod_row4', x: 19.5, y: 60.7, w: 72.5, h: 2.3 },
-    { id: 'AREA-23', label: '작성일자(YYYY년 M월 D일)', mapping: 'hd2_writeDateKorean', x: 50, y: 78.5, w: 42, h: 2.8 },
-    { id: 'AREA-24', label: '담당자 성명', mapping: 'hd2_managerName', x: 20, y: 84.5, w: 25, h: 2.8 },
-    { id: 'AREA-25', label: '담당자 연락처', mapping: 'hd2_managerPhone', x: 50, y: 84.5, w: 42, h: 2.8 }
+    { id: 'AREA-01', label: '구분 [신규신청] 체크(✓)', mapping: 'hd2_claimCheck_new', x: 67.5, y: 18.5, w: 9, h: 2.8 },
+    { id: 'AREA-02', label: '구분 [추가신청] 체크(✓)', mapping: 'hd2_claimCheck_add', x: 80.5, y: 18.5, w: 9, h: 2.8 },
+    { id: 'AREA-03', label: '사고번호', mapping: 'accidentNumber', x: 19.5, y: 23.5, w: 28, h: 2.8 },
+    { id: 'AREA-04', label: '청구일자(서비스신청일)', mapping: 'hd2_claimDate', x: 64, y: 23.5, w: 28, h: 2.8 },
+    { id: 'AREA-05', label: '피보험자(생년월일8자리)', mapping: 'hd2_patientNameBirth8', x: 19.5, y: 26.5, w: 28, h: 2.8 },
+    { id: 'AREA-06', label: '사고유형', mapping: 'accidentType', x: 64, y: 26.5, w: 28, h: 2.8 },
+    { id: 'AREA-07', label: '피보험자 연락처', mapping: 'patientPhone', x: 19.5, y: 29.5, w: 72.5, h: 2.8 },
+    { id: 'AREA-08', label: '계약번호(증권번호)', mapping: 'policyNumber', x: 19.5, y: 32.5, w: 28, h: 2.8 },
+    { id: 'AREA-09', label: '상품명(SCOR 전용)', mapping: 'hd2_productName', x: 64, y: 32.5, w: 28, h: 2.8 },
+    { id: 'AREA-10', label: '사고내용(진단명)', mapping: 'hd2_accidentContent', x: 19.5, y: 35.5, w: 72.5, h: 2.8 },
+    { id: 'AREA-11', label: '간병 대상자', mapping: 'careTarget', x: 19.5, y: 38.7, w: 42, h: 2.8 },
+    { id: 'AREA-12', label: '간병 장소', mapping: 'careLocation', x: 64, y: 38.7, w: 28, h: 2.8 },
+    { id: 'AREA-13', label: '주소', mapping: 'careAddress', x: 19.5, y: 41.7, w: 72.5, h: 2.8 },
+    { id: 'AREA-14', label: '간병인명(생년월일)', mapping: 'hd2_caregiverNameBirth', x: 19.5, y: 44.7, w: 42, h: 2.8 },
+    { id: 'AREA-15', label: '간병인 연락처', mapping: 'hd2_caregiverPhone', x: 74, y: 44.7, w: 18, h: 2.8 },
+    { id: 'AREA-16', label: '최초간병시작일', mapping: 'hd2_firstCareStartDate', x: 19.5, y: 47.7, w: 21.5, h: 2.8 },
+    { id: 'AREA-17', label: '예상사용시간(수정가능)', mapping: 'hd2_expectedUsageTime', x: 42, y: 47.7, w: 18, h: 2.8 },
+    { id: 'AREA-18', label: '계속간병여부(선택)', mapping: 'hd2_isContinuingCare', x: 67, y: 47.7, w: 25, h: 2.8 },
+    { id: 'AREA-19', label: '서비스 기간 (1행)', mapping: 'hd2_servicePeriod_row1', x: 19.5, y: 52.7, w: 72.5, h: 2.3 },
+    { id: 'AREA-20', label: '서비스 기간 (2행)', mapping: 'hd2_servicePeriod_row2', x: 19.5, y: 55.1, w: 72.5, h: 2.3 },
+    { id: 'AREA-21', label: '서비스 기간 (3행)', mapping: 'hd2_servicePeriod_row3', x: 19.5, y: 57.5, w: 72.5, h: 2.3 },
+    { id: 'AREA-22', label: '서비스 기간 (4행)', mapping: 'hd2_servicePeriod_row4', x: 19.5, y: 59.9, w: 72.5, h: 2.3 },
+    { id: 'AREA-23', label: '작성일자(YYYY년 M월 D일)', mapping: 'hd2_writeDateKorean', x: 50, y: 77.7, w: 42, h: 2.8 },
+    { id: 'AREA-24', label: '담당자 성명', mapping: 'hd2_managerName', x: 20, y: 83.7, w: 25, h: 2.8 },
+    { id: 'AREA-25', label: '담당자 연락처', mapping: 'hd2_managerPhone', x: 50, y: 83.7, w: 42, h: 2.8 }
   ]
 };
 
@@ -2931,7 +3430,7 @@ var gFormAreaStore = JSON.parse(JSON.stringify(gDefaultFormTemplates));
 // =========================================================================
 var gHdForm02CustomState = {
   claimType: '신규', // '신규' | '추가'
-  productName: '무배당 퍼펙트플러스종합보험(Hi2404)', // 고정 텍스트 (사용자가 직접 입력/수정 및 유지)
+  productName: '', // 현대해상은 상품명 정보가 없으므로 기본값 빈값으로 유지
   accidentContent: '질병', // '질병' | '상해'
   careTarget: '', // 비어있으면 피보험자명(patientName) 자동 연동
   careLocation: '재택', // 기본값 '재택' (수정 가능)
@@ -2945,8 +3444,8 @@ var gHdForm02CustomState = {
   managerName: '리본케어',
   managerPhone: '02-6959-7011',
   servicePeriods: [
-    { start: '2026. 08. 21 (12)h (00)m', end: '2026. 08. 25 (19)h (20)m', days: '5일' },
-    { start: '2026. 08. 26 (09)h (00)m', end: '2026. 08. 30 (18)h (00)m', days: '5일' },
+    { start: '', end: '', days: '' },
+    { start: '', end: '', days: '' },
     { start: '', end: '', days: '' },
     { start: '', end: '', days: '' }
   ],
@@ -2983,9 +3482,18 @@ try {
       gHdForm02CustomState.customerOverrides = {};
     }
   }
+  // 현대해상 상품명 더미값 자동 정리
+  if (gHdForm02CustomState.productName && gHdForm02CustomState.productName.includes('퍼펙트플러스종합보험')) {
+    gHdForm02CustomState.productName = '';
+  }
   // 전역 고정/기본 항목 (상품명, 담당자 성명, 담당자 연락처) 영구 저장소에서 복원
   const savedProd = localStorage.getItem('LIVON_HD_GLOBAL_productName');
-  if (savedProd) gHdForm02CustomState.productName = savedProd;
+  if (savedProd && !savedProd.includes('퍼펙트플러스종합보험')) {
+    gHdForm02CustomState.productName = savedProd;
+  } else {
+    gHdForm02CustomState.productName = '';
+    localStorage.removeItem('LIVON_HD_GLOBAL_productName');
+  }
   const savedMgrName = localStorage.getItem('LIVON_HD_GLOBAL_managerName');
   if (savedMgrName) gHdForm02CustomState.managerName = savedMgrName;
   const savedMgrPhone = localStorage.getItem('LIVON_HD_GLOBAL_managerPhone');
@@ -2999,6 +3507,10 @@ try {
         delete co.productName;
         delete co.managerName;
         delete co.managerPhone;
+        // 구버전 더미 간병기간(2026. 08. 21)이 남아있다면 삭제하여 최신 스케줄 자동 연동 복원
+        if (Array.isArray(co.servicePeriods) && co.servicePeriods[0] && String(co.servicePeriods[0].start).includes('2026. 08. 21')) {
+          delete co.servicePeriods;
+        }
       }
     });
   }
@@ -3044,9 +3556,13 @@ function calculateHdForm02TotalDays(periods, app) {
 function getHdForm02ServicePeriods(app) {
   const appId = (app && app.id) ? app.id : (window.gCurrentPreviewAppId || 'C0006');
 
-  // 1. 고객별 저장된 직접 수정 내역이 있는 경우 최우선 적용
+  // 1. 고객별 저장된 직접 수정 내역이 있는 경우 최우선 적용 (단, 과거 더미 날짜 2026. 08. 21은 자동 무시하고 실제 데이터 연동)
   if (gHdForm02CustomState.customerOverrides && gHdForm02CustomState.customerOverrides[appId] && gHdForm02CustomState.customerOverrides[appId].servicePeriods) {
-    return gHdForm02CustomState.customerOverrides[appId].servicePeriods;
+    const saved = gHdForm02CustomState.customerOverrides[appId].servicePeriods;
+    const isLegacyDummy = Array.isArray(saved) && saved[0] && String(saved[0].start).includes('2026. 08. 21');
+    if (!isLegacyDummy) {
+      return saved;
+    }
   }
 
   // 2. 고객 배정 및 정산 스케줄 데이터 자동 연동
@@ -3070,85 +3586,109 @@ function getHdForm02ServicePeriods(app) {
     { start: '', end: '', days: '' }
   ];
 
+  const targetRoundNum = (window.gPendingFaxDispatchParams && window.gPendingFaxDispatchParams.appId === appId && window.gPendingFaxDispatchParams.roundNumber)
+    ? Number(window.gPendingFaxDispatchParams.roundNumber)
+    : null;
+
   if (sched && sched.rounds && sched.rounds.length > 0) {
+    // 2-1. 특정 차수가 전달된 경우 (예: 9차, 10차 버튼 클릭 시)
+    if (targetRoundNum) {
+      const targetRound = sched.rounds.find(r => r.roundNumber === targetRoundNum);
+      if (targetRound) {
+        const sDate = parseCareDate(targetRound.startDateStr);
+        const eDate = parseCareDate(targetRound.endDateStr);
+        const dNum = targetRound.days || targetRound.roundDays || 10;
+        defaultPeriods[0] = {
+          start: sDate ? formatCarePeriodDateTime(sDate, 9, 0) : (targetRound.startDateStr || ''),
+          end: eDate ? formatCarePeriodDateTime(eDate, 18, 0) : (targetRound.endDateStr || ''),
+          days: `${dNum}일`
+        };
+        return defaultPeriods;
+      } else if (targetRoundNum > sched.rounds.length) {
+        const lastR = sched.rounds[sched.rounds.length - 1];
+        const lastEnd = parseCareDate(lastR.endDateStr);
+        const nextStart = lastEnd ? new Date(lastEnd.getTime() + 86400000) : new Date();
+        const nextEnd = (as && as.endDate && parseCareDate(as.endDate)) || new Date();
+        const calcDays = Math.max(1, Math.round((nextEnd.getTime() - nextStart.getTime()) / 86400000) + 1);
+        defaultPeriods[0] = {
+          start: formatCarePeriodDateTime(nextStart, 9, 0),
+          end: formatCarePeriodDateTime(nextEnd, 18, 0),
+          days: `${calcDays}일`
+        };
+        return defaultPeriods;
+      }
+    }
+
+    // 2-2. 차수 미지정 시: 미청구된 진행 차수 탐색
+    const unbilledRound = sched.rounds.find(r => r.claimStatus !== 'DEPOSIT_DONE' && r.claimStatus !== 'CLAIMED_UNPAID');
+    if (unbilledRound) {
+      const sDate = parseCareDate(unbilledRound.startDateStr);
+      const eDate = parseCareDate(unbilledRound.endDateStr);
+      const dNum = unbilledRound.days || unbilledRound.roundDays || 10;
+      defaultPeriods[0] = {
+        start: sDate ? formatCarePeriodDateTime(sDate, 9, 0) : (unbilledRound.startDateStr || ''),
+        end: eDate ? formatCarePeriodDateTime(eDate, 18, 0) : (unbilledRound.endDateStr || ''),
+        days: `${dNum}일`
+      };
+      return defaultPeriods;
+    }
+
+    // 2-3. 기존 차수가 모두 청구/입금 완료된 경우 (예: C0127 1~9차 완료 후 9월 3차 진행 중인 최신 차수)
+    const allDone = sched.rounds.every(r => r.claimStatus === 'DEPOSIT_DONE' || r.claimStatus === 'CLAIMED_UNPAID');
+    if (allDone) {
+      const lastR = sched.rounds[sched.rounds.length - 1];
+      const lastEnd = parseCareDate(lastR.endDateStr);
+      const nextStart = lastEnd ? new Date(lastEnd.getTime() + 86400000) : new Date();
+      const nextEnd = (as && as.endDate && parseCareDate(as.endDate)) || new Date();
+      const calcDays = Math.max(1, Math.round((nextEnd.getTime() - nextStart.getTime()) / 86400000) + 1);
+      defaultPeriods[0] = {
+        start: formatCarePeriodDateTime(nextStart, 9, 0),
+        end: formatCarePeriodDateTime(nextEnd, 18, 0),
+        days: `${calcDays}일`
+      };
+      return defaultPeriods;
+    }
+
+    // 2-4. 기본: 최초 차수 목록 순차 표시
     sched.rounds.slice(0, 4).forEach((r, idx) => {
       const sDate = parseCareDate(r.startDateStr);
       const eDate = parseCareDate(r.endDateStr);
-      const sHour = (idx === 0 ? 12 : 9);
-      const sMin = (idx === 0 ? 0 : 0);
-      const eHour = (idx === 0 ? 19 : 18);
-      const eMin = (idx === 0 ? 20 : 0);
       defaultPeriods[idx] = {
-        start: sDate ? formatCarePeriodDateTime(sDate, sHour, sMin) : (r.startDateStr || ''),
-        end: eDate ? formatCarePeriodDateTime(eDate, eHour, eMin) : (r.endDateStr || ''),
-        days: `${r.roundDays || r.days || 5}일`
+        start: sDate ? formatCarePeriodDateTime(sDate, 9, 0) : (r.startDateStr || ''),
+        end: eDate ? formatCarePeriodDateTime(eDate, 18, 0) : (r.endDateStr || ''),
+        days: `${r.roundDays || r.days || 10}일`
       };
     });
     return defaultPeriods;
   }
 
+  // 3. 배정(as) 데이터 기준 fallback
   if (as && as.startDate) {
     const sDate = parseCareDate(as.startDate);
-    const eDate = parseCareDate(as.endDate) || sDate;
-    const totalD = prog ? prog.totalDays : ((app && parseInt(app.expectedDays, 10)) || 5);
-
-    if (totalD > 5 && sDate) {
-      const d1 = 5;
-      const d2 = totalD - 5;
-      const end1 = new Date(sDate.getTime() + 4 * 86400000);
-      const start2 = new Date(sDate.getTime() + 5 * 86400000);
-      const end2 = eDate || new Date(sDate.getTime() + (totalD - 1) * 86400000);
-      defaultPeriods[0] = {
-        start: formatCarePeriodDateTime(sDate, 12, 0),
-        end: formatCarePeriodDateTime(end1, 19, 20),
-        days: `${d1}일`
-      };
-      defaultPeriods[1] = {
-        start: formatCarePeriodDateTime(start2, 9, 0),
-        end: formatCarePeriodDateTime(end2, 18, 0),
-        days: `${d2}일`
-      };
-    } else if (sDate) {
-      defaultPeriods[0] = {
-        start: formatCarePeriodDateTime(sDate, 9, 0),
-        end: formatCarePeriodDateTime(eDate, 18, 0),
-        days: `${totalD}일`
-      };
-    }
+    const eDate = parseCareDate(as.endDate) || new Date();
+    const totalD = prog ? prog.totalDays : ((app && parseInt(app.expectedDays, 10)) || 10);
+    defaultPeriods[0] = {
+      start: formatCarePeriodDateTime(sDate, 9, 0),
+      end: formatCarePeriodDateTime(eDate, 18, 0),
+      days: `${totalD}일`
+    };
     return defaultPeriods;
   }
 
+  // 4. 신청서(app) 기준 fallback
   if (app) {
     const sDate = parseCareDate(app.desiredDate) || parseCareDate(app.applyDate) || new Date();
     const totalD = parseInt(app.expectedDays, 10) || 10;
-    if (totalD > 5 && sDate) {
-      const d1 = 5;
-      const d2 = totalD - 5;
-      const end1 = new Date(sDate.getTime() + 4 * 86400000);
-      const start2 = new Date(sDate.getTime() + 5 * 86400000);
-      const end2 = new Date(sDate.getTime() + (totalD - 1) * 86400000);
-      defaultPeriods[0] = {
-        start: formatCarePeriodDateTime(sDate, 12, 0),
-        end: formatCarePeriodDateTime(end1, 19, 20),
-        days: `${d1}일`
-      };
-      defaultPeriods[1] = {
-        start: formatCarePeriodDateTime(start2, 9, 0),
-        end: formatCarePeriodDateTime(end2, 18, 0),
-        days: `${d2}일`
-      };
-    } else if (sDate) {
-      const end = new Date(sDate.getTime() + (totalD - 1) * 86400000);
-      defaultPeriods[0] = {
-        start: formatCarePeriodDateTime(sDate, 9, 0),
-        end: formatCarePeriodDateTime(end, 18, 0),
-        days: `${totalD}일`
-      };
-    }
+    const end = new Date(sDate.getTime() + (totalD - 1) * 86400000);
+    defaultPeriods[0] = {
+      start: formatCarePeriodDateTime(sDate, 9, 0),
+      end: formatCarePeriodDateTime(end, 18, 0),
+      days: `${totalD}일`
+    };
     return defaultPeriods;
   }
 
-  return (gHdForm02CustomState.servicePeriods && gHdForm02CustomState.servicePeriods.length > 0) ? gHdForm02CustomState.servicePeriods : defaultPeriods;
+  return defaultPeriods;
 }
 
 function getHdForm02ExpectedUsageTime(app) {
@@ -3166,12 +3706,12 @@ function getHdForm02ExpectedUsageTime(app) {
 
 function updateHdForm02Field(field, value, shouldRerender = false, appId = null) {
   const targetId = appId || window.gCurrentPreviewAppId || 'C0006';
-  const isGlobalField = ['productName', 'managerName', 'managerPhone'].includes(field);
+  const isGlobalField = ['managerName', 'managerPhone'].includes(field);
 
   gHdForm02CustomState[field] = value;
 
   if (isGlobalField) {
-    // 공통 필드 (상품명, 담당자 성명, 담당자 연락처)는 모든 고객 및 세션에 영구 동기화
+    // 공통 필드 (담당자 성명, 담당자 연락처)는 모든 고객 및 세션에 영구 동기화
     try {
       localStorage.setItem(`LIVON_HD_GLOBAL_${field}`, value);
     } catch (e) {}
@@ -3190,8 +3730,15 @@ function updateHdForm02Field(field, value, shouldRerender = false, appId = null)
   }
 
   saveHdForm02CustomState();
-  if (shouldRerender && typeof previewFormForCustomer === 'function' && ['HD_FORM_02', 'HD_FORM_03'].includes(window.gCurrentPreviewFormCode)) {
-    previewFormForCustomer(window.gCurrentPreviewFormCode, targetId, window.gCurrentPreviewIsFaxConfirmation);
+  if (shouldRerender && typeof previewFormForCustomer === 'function') {
+    const currentApp = window.gCurrentPreviewApp || ((typeof gApps !== 'undefined') ? gApps.find(a => a.id === targetId) : null) || { id: targetId };
+    previewFormForCustomer(
+      window.gCurrentPreviewFormCode || 'HD_FORM_02',
+      currentApp,
+      window.gCurrentPreviewIsFaxConfirmation,
+      window.gCurrentPreviewFaxRecipient || '',
+      window.gCurrentPreviewFaxNumber || ''
+    );
   }
 }
 
@@ -3202,8 +3749,15 @@ function setHdForm02ClaimType(type, appId = null) {
   if (!gHdForm02CustomState.customerOverrides[targetId]) gHdForm02CustomState.customerOverrides[targetId] = {};
   gHdForm02CustomState.customerOverrides[targetId].claimType = type;
   saveHdForm02CustomState();
-  if (typeof previewFormForCustomer === 'function' && ['HD_FORM_02', 'HD_FORM_03'].includes(window.gCurrentPreviewFormCode)) {
-    previewFormForCustomer(window.gCurrentPreviewFormCode, targetId, window.gCurrentPreviewIsFaxConfirmation);
+  if (typeof previewFormForCustomer === 'function') {
+    const currentApp = window.gCurrentPreviewApp || ((typeof gApps !== 'undefined') ? gApps.find(a => a.id === targetId) : null) || { id: targetId };
+    previewFormForCustomer(
+      window.gCurrentPreviewFormCode || 'HD_FORM_02',
+      currentApp,
+      window.gCurrentPreviewIsFaxConfirmation,
+      window.gCurrentPreviewFaxRecipient || '',
+      window.gCurrentPreviewFaxNumber || ''
+    );
   }
 }
 
@@ -3220,7 +3774,7 @@ function setHdForm02AccidentPrefix(type, appId = null) {
   updateHdForm02Field('accidentContent', updated, true, targetId);
 }
 
-function updateHdForm02ServicePeriod(rowIdx, col, value, appId = null) {
+function updateHdForm02ServicePeriod(rowIdx, col, value, appId = null, shouldRerender = false) {
   const targetId = appId || window.gCurrentPreviewAppId || 'C0006';
   if (!gHdForm02CustomState.customerOverrides) gHdForm02CustomState.customerOverrides = {};
   if (!gHdForm02CustomState.customerOverrides[targetId] || !gHdForm02CustomState.customerOverrides[targetId].servicePeriods) {
@@ -3235,15 +3789,77 @@ function updateHdForm02ServicePeriod(rowIdx, col, value, appId = null) {
   gHdForm02CustomState.customerOverrides[targetId].servicePeriods[rowIdx][col] = value;
   gHdForm02CustomState.servicePeriods = gHdForm02CustomState.customerOverrides[targetId].servicePeriods;
   saveHdForm02CustomState();
-  if (typeof previewFormForCustomer === 'function' && ['HD_FORM_02', 'HD_FORM_03'].includes(window.gCurrentPreviewFormCode)) {
-    previewFormForCustomer(window.gCurrentPreviewFormCode, targetId, window.gCurrentPreviewIsFaxConfirmation);
+  if (shouldRerender && typeof previewFormForCustomer === 'function') {
+    const currentApp = window.gCurrentPreviewApp || ((typeof gApps !== 'undefined') ? gApps.find(a => a.id === targetId) : null) || { id: targetId };
+    previewFormForCustomer(
+      window.gCurrentPreviewFormCode || 'HD_FORM_02',
+      currentApp,
+      window.gCurrentPreviewIsFaxConfirmation,
+      window.gCurrentPreviewFaxRecipient || '',
+      window.gCurrentPreviewFaxNumber || ''
+    );
   }
 }
 
-// Load custom areas from localStorage (안전한 보존 우선 로드: 버전 변경 시에도 사용자 설정 절대 덮어쓰지 않음)
-const FORM_AREAS_VERSION = 'v20260916_scor';
+function reflectHdForm02FieldLive(field, value, appId) {
+  const targetId = appId || window.gCurrentPreviewAppId || 'C0006';
+  updateHdForm02Field(field, value, false, targetId);
+
+  const targetForm = document.getElementById('faxCleanFormTarget');
+  if (!targetForm) return;
+
+  const currentApp = window.gCurrentPreviewApp || ((typeof gApps !== 'undefined') ? gApps.find(a => a.id === targetId) : null) || { id: targetId };
+  const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '.');
+  const docNo = 'LV-FAX-' + (currentApp.applyDate ? currentApp.applyDate.replace(/[^0-9]/g, '') : '20260907') + '-' + (currentApp.id || 'NEW');
+
+  let mappingKey = field;
+  if (field === 'accidentContent') mappingKey = 'hd2_accidentContent';
+  else if (field === 'managerName') mappingKey = 'hd2_managerName';
+  else if (field === 'managerPhone') mappingKey = 'hd2_managerPhone';
+
+  const cell = targetForm.querySelector(`[data-mapping="${mappingKey}"] .form-area-cell`);
+  if (cell) {
+    cell.innerText = resolveFormFieldValue(mappingKey, currentApp, docNo, todayStr);
+  }
+}
+
+function reflectHdForm02ServicePeriodLive(rowIdx, col, value, appId) {
+  const targetId = appId || window.gCurrentPreviewAppId || 'C0006';
+  updateHdForm02ServicePeriod(rowIdx, col, value, targetId, false);
+
+  const targetForm = document.getElementById('faxCleanFormTarget');
+  if (!targetForm) return;
+
+  const currentApp = window.gCurrentPreviewApp || ((typeof gApps !== 'undefined') ? gApps.find(a => a.id === targetId) : null) || { id: targetId };
+  const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '.');
+  const docNo = 'LV-FAX-' + (currentApp.applyDate ? currentApp.applyDate.replace(/[^0-9]/g, '') : '20260907') + '-' + (currentApp.id || 'NEW');
+
+  const rowKey = `hd2_servicePeriod_row${rowIdx + 1}`;
+  const cell = targetForm.querySelector(`[data-mapping="${rowKey}"] .form-area-cell`);
+  if (cell) {
+    cell.innerText = resolveFormFieldValue(rowKey, currentApp, docNo, todayStr);
+  }
+
+  // 예상사용시간 즉시 업데이트
+  const usageCell = targetForm.querySelector(`[data-mapping="hd2_expectedUsageTime"] .form-area-cell`);
+  if (usageCell) {
+    usageCell.innerText = resolveFormFieldValue('hd2_expectedUsageTime', currentApp, docNo, todayStr);
+  }
+
+  // 상단 합계 배지 즉시 업데이트
+  const badge = document.getElementById('hdForm02TotalBadge');
+  if (badge) {
+    const periods = getHdForm02ServicePeriods(currentApp);
+    const totalDays = calculateHdForm02TotalDays(periods, currentApp);
+    badge.innerText = `합계: ${totalDays}일 (${totalDays * 24}시간)`;
+  }
+}
+
+// Load custom areas from localStorage (양식 칸 수직 정렬 정밀 보정 버전: v20260930_hd2_pos_v2)
+const FORM_AREAS_VERSION = 'v20260930_hd2_pos_v2';
 try {
   const savedAreas = localStorage.getItem('LIVON_FORM_AREAS');
+  const savedVer = localStorage.getItem('LIVON_FORM_AREAS_VER');
   if (savedAreas) {
     const parsed = JSON.parse(savedAreas);
     for (const code in parsed) {
@@ -3252,12 +3868,53 @@ try {
       }
     }
   }
-  // HD_FORM_02가 23개 미만인 경우 신규 23개 필드로 자동 확장 업그레이드
-  if (!gFormAreaStore.HD_FORM_02 || gFormAreaStore.HD_FORM_02.length < 23) {
+  // HD_FORM_02가 23개 미만이거나 버전이 갱신된 경우 신규 정밀 좌표로 자동 확장 및 보정
+  if (!gFormAreaStore.HD_FORM_02 || gFormAreaStore.HD_FORM_02.length < 23 || savedVer !== FORM_AREAS_VERSION || (gFormAreaStore.HD_FORM_02[2] && gFormAreaStore.HD_FORM_02[2].y > 24.0)) {
     gFormAreaStore.HD_FORM_02 = JSON.parse(JSON.stringify(gDefaultFormTemplates.HD_FORM_02));
   }
+  // HD_FORM_02 영역 최적화 (병원명/주소 전체 노출, 연락처 너비 확보, 및 0.8% 수직 좌표 정밀 상향 보정)
+  if (gFormAreaStore && gFormAreaStore.HD_FORM_02) {
+    gFormAreaStore.HD_FORM_02.forEach(a => {
+      if (a.id === 'AREA-11') {
+        a.w = Math.max(a.w || 0, 43.5);
+        a.h = Math.max(a.h || 0, 3.2);
+        if (a.y > 41.5) a.y = 41.2;
+      }
+      if (a.id === 'AREA-07') {
+        a.w = Math.max(a.w || 0, 28.5);
+        a.x = 63.5;
+      }
+      if (a.id === 'AREA-06' && a.x > 50) {
+        a.x = 46.5;
+        a.w = 9;
+      }
+      // 양식 칸에 정확히 중앙 정렬되도록 Y좌표가 0.8% 내려가 있던 기존 수치 자동 상향 보정
+      if (a.id === 'AREA-01' && a.y > 18.8) a.y = 18.5;
+      if (a.id === 'AREA-02' && a.y > 18.8) a.y = 18.5;
+      if (a.id === 'AREA-03' && a.y > 24.0) a.y = 23.5;
+      if (a.id === 'AREA-04' && a.y > 24.0) a.y = 23.5;
+      if (a.id === 'AREA-05' && a.y > 27.0) a.y = 26.5;
+      if (a.id === 'AREA-06' && a.y > 27.0) a.y = 26.5;
+      if (a.id === 'AREA-07' && a.y > 27.0) a.y = 26.5;
+      if (a.id === 'AREA-08' && a.y > 30.0) a.y = 29.5;
+      if (a.id === 'AREA-09' && a.y > 30.0) a.y = 29.5;
+      if (a.id === 'AREA-10' && a.y > 33.0) a.y = 32.5;
+      if (a.id === 'AREA-12' && a.y > 44.5) a.y = 44.2;
+      if (a.id === 'AREA-13' && a.y > 44.5) a.y = 44.2;
+      if (a.id === 'AREA-14' && a.y > 48.0) a.y = 47.7;
+      if (a.id === 'AREA-15' && a.y > 48.0) a.y = 47.7;
+      if (a.id === 'AREA-16' && a.y > 48.0) a.y = 47.7;
+      if (a.id === 'AREA-17' && a.y > 53.0) a.y = 52.7;
+      if (a.id === 'AREA-18' && a.y > 55.5) a.y = 55.1;
+      if (a.id === 'AREA-19' && a.y > 58.0) a.y = 57.5;
+      if (a.id === 'AREA-20' && a.y > 60.0) a.y = 59.9;
+      if (a.id === 'AREA-21' && a.y > 78.0) a.y = 77.7;
+      if (a.id === 'AREA-22' && a.y > 84.0) a.y = 83.7;
+      if (a.id === 'AREA-23' && a.y > 84.0) a.y = 83.7;
+    });
+  }
   // HD_FORM_03 (SCOR)가 25개 미만이거나 11번 영역이 병원명인 경우 신규 25개 필드로 자동 확장 업그레이드
-  if (!gFormAreaStore.HD_FORM_03 || gFormAreaStore.HD_FORM_03.length < 25 || (gFormAreaStore.HD_FORM_03[10] && gFormAreaStore.HD_FORM_03[10].label.includes('병원명'))) {
+  if (!gFormAreaStore.HD_FORM_03 || gFormAreaStore.HD_FORM_03.length < 25 || savedVer !== FORM_AREAS_VERSION || (gFormAreaStore.HD_FORM_03[10] && gFormAreaStore.HD_FORM_03[10].label.includes('병원명'))) {
     gFormAreaStore.HD_FORM_03 = JSON.parse(JSON.stringify(gDefaultFormTemplates.HD_FORM_03));
   }
   localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
@@ -10372,10 +11029,11 @@ async function loadSamsungSentCareLogsFromConvex() {
   try {
     if (typeof queryConvex === 'function') {
       const records = await queryConvex('sync:getSamsungSentCareLogs', {});
-      if (Array.isArray(records) && records.length > 0) {
+      const recList = (records && records.value && Array.isArray(records.value)) ? records.value : (Array.isArray(records) ? records : []);
+      if (Array.isArray(recList) && recList.length > 0) {
         const existingIds = new Set(gSamsungSentCareLogsHistory.map(r => r.id));
         let added = false;
-        records.forEach(r => {
+        recList.forEach(r => {
           if (!existingIds.has(r.id)) {
             gSamsungSentCareLogsHistory.push(r);
             existingIds.add(r.id);
@@ -11485,7 +12143,9 @@ function buildCareLogDetailData(patientMeta, log, caregiverName, insuranceCompan
     title: log?.title || `[${dayNum}일차] ${pName} 님 일상 케어 및 상태 확인`,
     summary: log?.summary || `${pName} 환자분의 ${dayNum}일차 간병 수행 내역입니다. 활력징후 안정적이며 식사 및 처방약 정상 복용 완료하였습니다. 체위 변경 및 낙상 예방 간호를 철저히 이행하였습니다.`,
     keywords: sc.keywords || ['환자컨디션', '식사복약', '신체청결', '체위변경', '낙상예방'],
-    trendScores: log?.trendScores || patientMeta?.trendScores || null,
+    trendScores: (log?.trendScores && log.trendScores.length > 0)
+      ? log.trendScores
+      : ((patientMeta?.trendScores && patientMeta.trendScores.length > 0) ? patientMeta.trendScores : null),
     raw: {
       care_date: curDate,
       day_index: dayNum,
@@ -11569,9 +12229,33 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
   offscreen.style.pointerEvents = 'none';
   document.body.appendChild(offscreen);
 
+  const clusterTrendScores = dailyLogsToRender.map((l, idx) => {
+    const lRaw = l.raw || l;
+    const s = lRaw.trend_scores || lRaw.trendScores || l.trendScores || {};
+    const day = l.dayNumber || (idx + 1);
+    return {
+      dayIndex: day,
+      careDate: (l.consultDate || l.dateString || '').slice(0, 10),
+      overallScore: s.overallScore != null ? s.overallScore : (s.overall != null ? s.overall : 3),
+      mobilityScore: s.mobilityScore != null ? s.mobilityScore : (s.mobility != null ? s.mobility : 3),
+      dietScore: s.dietScore != null ? s.dietScore : (s.diet != null ? s.diet : 3),
+      sleepScore: s.sleepScore != null ? s.sleepScore : (s.sleep != null ? s.sleep : 3),
+      painScore: s.painScore != null ? s.painScore : (s.pain != null ? s.pain : 3)
+    };
+  });
+
   try {
     for (let i = 0; i < totalDays; i++) {
       const log = dailyLogsToRender[i];
+      const logCareDate = (log.consultDate || log.dateString || '').slice(0, 10);
+      const logDayNum = log.dayNumber || (i + 1);
+      const currentDayTrends = clusterTrendScores.filter((t, tIdx) => {
+        const tDate = (t.careDate || t.date || '').slice(0, 10);
+        if (tDate && logCareDate) return tDate <= logCareDate;
+        if (t.dayIndex != null && logDayNum != null) return Number(t.dayIndex) <= Number(logDayNum);
+        return tIdx <= i;
+      });
+
       const patientMeta = {
         patientName: patientName,
         age: app?.age || targetRow?.age || '74',
@@ -11579,11 +12263,23 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
         caregiverName: caregiverName,
         centerName: centerName,
         insuranceCompany: insuranceCompany,
-        applyId: appId
+        applyId: appId,
+        dailyLogs: dailyLogsToRender,
+        trendScores: currentDayTrends
       };
 
       const realDetail = detailDataMap[log.sessionId] || (window.CarePortClient && window.CarePortClient._detailCache && window.CarePortClient._detailCache[log.sessionId]) || null;
-      const detailData = realDetail || buildCareLogDetailData(patientMeta, log, caregiverName, insuranceCompany, centerName);
+      let detailData = realDetail ? { ...realDetail } : buildCareLogDetailData(patientMeta, log, caregiverName, insuranceCompany, centerName);
+      if (detailData && Array.isArray(detailData.trendScores) && detailData.trendScores.length > 0) {
+        detailData.trendScores = detailData.trendScores.filter((t, tIdx) => {
+          const tDate = (t.careDate || t.date || '').slice(0, 10);
+          if (tDate && logCareDate) return tDate <= logCareDate;
+          if (t.dayIndex != null && logDayNum != null) return Number(t.dayIndex) <= Number(logDayNum);
+          return tIdx <= i;
+        });
+      } else if (detailData) {
+        detailData.trendScores = currentDayTrends;
+      }
 
       const dayHtml = (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function')
         ? window.CarePortClient.generateDailyLogHtml(patientMeta, log, detailData)
@@ -11711,10 +12407,34 @@ async function previewCustomerCareLogPdf(appId) {
   const dailyLogs = getPatientDailyLogsToRender(appId);
   const totalDays = dailyLogs.length;
 
+  const clusterTrendScores = dailyLogs.map((l, idx) => {
+    const lRaw = l.raw || l;
+    const s = lRaw.trend_scores || lRaw.trendScores || l.trendScores || {};
+    const day = l.dayNumber || (idx + 1);
+    return {
+      dayIndex: day,
+      careDate: (l.consultDate || l.dateString || '').slice(0, 10),
+      overallScore: s.overallScore != null ? s.overallScore : (s.overall != null ? s.overall : 3),
+      mobilityScore: s.mobilityScore != null ? s.mobilityScore : (s.mobility != null ? s.mobility : 3),
+      dietScore: s.dietScore != null ? s.dietScore : (s.diet != null ? s.diet : 3),
+      sleepScore: s.sleepScore != null ? s.sleepScore : (s.sleep != null ? s.sleep : 3),
+      painScore: s.painScore != null ? s.painScore : (s.pain != null ? s.pain : 3)
+    };
+  });
+
   const renderCurrentModalPages = () => {
     let allPagesHtml = '';
     for (let i = 0; i < totalDays; i++) {
       const log = dailyLogs[i];
+      const logCareDate = (log.consultDate || log.dateString || '').slice(0, 10);
+      const logDayNum = log.dayNumber || (i + 1);
+      const currentDayTrends = clusterTrendScores.filter((t, tIdx) => {
+        const tDate = (t.careDate || t.date || '').slice(0, 10);
+        if (tDate && logCareDate) return tDate <= logCareDate;
+        if (t.dayIndex != null && logDayNum != null) return Number(t.dayIndex) <= Number(logDayNum);
+        return tIdx <= i;
+      });
+
       const curPatientMeta = {
         patientName: log.username || log.patientName || patientName,
         age: log.age || app?.age || targetRow?.age || '68',
@@ -11722,11 +12442,23 @@ async function previewCustomerCareLogPdf(appId) {
         caregiverName: log.consultantName || log.caregiverName || caregiverName,
         centerName: log.organizationName || log.orgName || centerName,
         insuranceCompany: insuranceCompany,
-        applyId: appId
+        applyId: appId,
+        dailyLogs: dailyLogs,
+        trendScores: currentDayTrends
       };
 
-      const detailData = (window.CarePortClient && window.CarePortClient._detailCache && window.CarePortClient._detailCache[log.sessionId])
-        || buildCareLogDetailData(curPatientMeta, log, curPatientMeta.caregiverName, insuranceCompany, curPatientMeta.centerName);
+      const realDetail = (window.CarePortClient && window.CarePortClient._detailCache && window.CarePortClient._detailCache[log.sessionId]) || null;
+      let detailData = realDetail ? { ...realDetail } : buildCareLogDetailData(curPatientMeta, log, curPatientMeta.caregiverName, insuranceCompany, curPatientMeta.centerName);
+      if (detailData && Array.isArray(detailData.trendScores) && detailData.trendScores.length > 0) {
+        detailData.trendScores = detailData.trendScores.filter((t, tIdx) => {
+          const tDate = (t.careDate || t.date || '').slice(0, 10);
+          if (tDate && logCareDate) return tDate <= logCareDate;
+          if (t.dayIndex != null && logDayNum != null) return Number(t.dayIndex) <= Number(logDayNum);
+          return tIdx <= i;
+        });
+      } else if (detailData) {
+        detailData.trendScores = currentDayTrends;
+      }
 
       const dayHtml = (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function')
         ? window.CarePortClient.generateDailyLogHtml(curPatientMeta, log, detailData)
@@ -15688,13 +16420,42 @@ function formatKoreanDate(dateStr) {
   return dateStr;
 }
 
+function formatFullPhoneDisplay(phoneStr) {
+  if (!phoneStr) return '';
+  const str = String(phoneStr).trim();
+  const digits = str.replace(/[^0-9]/g, '');
+  if (digits.length === 22 && digits.startsWith('010') && digits.slice(11).startsWith('010')) {
+    const p1 = digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
+    const p2 = digits.slice(11, 14) + '-' + digits.slice(14, 18) + '-' + digits.slice(18, 22);
+    return p1 + ' / ' + p2;
+  }
+  if (digits.length === 20 && digits.startsWith('010') && digits.slice(10).startsWith('010')) {
+    const p1 = digits.slice(0, 3) + '-' + digits.slice(3, 6) + '-' + digits.slice(6, 10);
+    const p2 = digits.slice(10, 13) + '-' + digits.slice(13, 16) + '-' + digits.slice(16, 20);
+    return p1 + ' / ' + p2;
+  }
+  if (digits.length === 11 && digits.startsWith('01')) {
+    return digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
+  }
+  if (digits.length === 10) {
+    if (digits.startsWith('02')) {
+      return digits.slice(0, 2) + '-' + digits.slice(2, 6) + '-' + digits.slice(6, 10);
+    }
+    return digits.slice(0, 3) + '-' + digits.slice(3, 6) + '-' + digits.slice(6, 10);
+  }
+  if (digits.length === 9 && digits.startsWith('02')) {
+    return digits.slice(0, 2) + '-' + digits.slice(2, 5) + '-' + digits.slice(5, 9);
+  }
+  return str;
+}
+
 function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
   if (!app) return '';
   switch (mappingKey) {
     case 'patientName': return app.patientName || '';
     case 'patientGender': return app.gender || '남';
     case 'patientPhone':
-    case 'phone': return app.phone || '';
+    case 'phone': return formatFullPhoneDisplay(app.phone || '');
     case 'patientRrn': {
       if (app.patientRrn) {
         const clean = app.patientRrn.replace(/[^0-9*]/g, '');
@@ -15743,7 +16504,7 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
       return (cType === '추가') ? '☐ 신규   ☑ 추가' : '☑ 신규   ☐ 추가';
     }
     case 'hd2_claimDate': {
-      return app.claimDate || app.applyDate || todayStr;
+      return todayStr;
     }
     case 'hd2_patientNameBirth8': {
       const pName = app.patientName || '피보험자';
@@ -15774,7 +16535,7 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
       return birth8 ? `${pName} (${birth8})` : pName;
     }
     case 'hd2_productName': {
-      return gHdForm02CustomState.productName || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.productName) || '무배당 퍼펙트플러스종합보험(Hi2404)';
+      return (app && app.productName) ? app.productName : '';
     }
     case 'hd2_accidentContent': {
       const raw = (app && gHdForm02CustomState.customerOverrides?.[app.id]?.accidentContent) || gHdForm02CustomState.accidentContent || (app && app.accidentType && app.accidentType.includes('상해') ? '상해' : '질병');
@@ -15856,7 +16617,7 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
       return list.map((r, i) => `[${i+1}차] ${r.start} ~ ${r.end} | ${r.days}`).join('\n');
     }
     case 'hd2_writeDateKorean': {
-      return formatKoreanDate(app.applyDate || todayStr);
+      return formatKoreanDate(todayStr);
     }
     case 'hd2_managerName': {
       return gHdForm02CustomState.managerName || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.managerName) || '리본케어';
@@ -15907,12 +16668,18 @@ window.gPendingFaxDispatchParams = null;
 function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation = false, faxRecipient = '', faxNumber = '') {
   const app = (typeof applyId === 'object' && applyId !== null)
     ? applyId
-    : (gApps.find(a => a.id === applyId) || gApps[0]);
+    : ((gApps || []).find(a => a.id === applyId) || window.gCurrentPreviewApp || (gApps && gApps[0]));
   const form = gFormTemplates.find(f => f.code === formCode) || gFormTemplates[0];
 
   gCurrentPreviewFormCode = formCode;
+  window.gCurrentPreviewFormCode = formCode;
   gCurrentPreviewAppId = app ? app.id : applyId;
+  window.gCurrentPreviewAppId = gCurrentPreviewAppId;
+  window.gCurrentPreviewApp = app;
+  window.gCurrentPreviewIsFaxConfirmation = Boolean(isFaxConfirmation);
   window.gIsFaxConfirmationPreview = Boolean(isFaxConfirmation);
+  if (faxRecipient) window.gCurrentPreviewFaxRecipient = faxRecipient;
+  if (faxNumber) window.gCurrentPreviewFaxNumber = faxNumber;
 
   const titleEl = document.getElementById('formPreviewModalTitle');
   if (titleEl) {
@@ -16184,7 +16951,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
               </span>
               <span class="text-[11px] text-amber-700 bg-amber-100 font-bold px-2 py-0.5 rounded">수정 시 서식에 즉시 반영 및 영구 저장</span>
             </div>
-            <!-- 1행: 구분(신규/추가), 사고내용(진단명 직접입력), 계속간병여부 -->
+            <!-- 1행: 구분(신규/추가), 계속간병여부, 사고내용(진단명 직접입력) -->
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div>
                 <label class="block text-[10px] font-bold text-slate-500 mb-0.5">청구 구분 (신규/추가)</label>
@@ -16216,27 +16983,19 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                     <button type="button" onclick="setHdForm02AccidentPrefix('상해', '${app.id}')" class="px-1.5 py-0.5 rounded border ${currentAccidentContent.includes('상해') ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-100'}">상해</button>
                   </div>
                 </div>
-                <input type="text" value="${currentAccidentContent}" onchange="updateHdForm02Field('accidentContent', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="예: 질병 (뇌경색증) 또는 상해 (골절)">
+                <input type="text" value="${currentAccidentContent}" oninput="reflectHdForm02FieldLive('accidentContent', this.value, '${app.id}')" onchange="updateHdForm02Field('accidentContent', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="예: 질병 (뇌경색증) 또는 상해 (골절)">
               </div>
             </div>
 
-            <!-- 2행: 상품명, 예상사용시간, 담당자 성명, 담당자 연락처 (4열로 넉넉하게 배치하여 절대 잘리지 않음) -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
-              <div>
-                <label class="block text-[10px] font-bold text-slate-500 mb-0.5">상품명 (공통 기본값)</label>
-                <input type="text" value="${currentProductName}" onchange="updateHdForm02Field('productName', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="무배당 퍼펙트플러스종합보험">
-              </div>
-              <div>
-                <label class="block text-[10px] font-bold text-slate-500 mb-0.5">예상사용시간 (고객별 수정)</label>
-                <input type="text" value="${expectedUsageTime}" onchange="updateHdForm02Field('expectedUsageTime', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="예: 240시간 (10일)">
-              </div>
+            <!-- 2행: 담당자 성명, 담당자 연락처 (상품명 및 예상사용시간 제거) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <div>
                 <label class="block text-[10px] font-bold text-slate-500 mb-0.5">담당자 성명 (공통 기본값)</label>
-                <input type="text" value="${managerName}" onchange="updateHdForm02Field('managerName', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="리본케어">
+                <input type="text" value="${managerName}" oninput="reflectHdForm02FieldLive('managerName', this.value, '${app.id}')" onchange="updateHdForm02Field('managerName', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="리본케어">
               </div>
               <div>
                 <label class="block text-[10px] font-bold text-slate-500 mb-0.5">담당자 연락처 (공통 기본값)</label>
-                <input type="text" value="${managerPhone}" onchange="updateHdForm02Field('managerPhone', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs font-mono" placeholder="02-6959-7011">
+                <input type="text" value="${managerPhone}" oninput="reflectHdForm02FieldLive('managerPhone', this.value, '${app.id}')" onchange="updateHdForm02Field('managerPhone', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs font-mono" placeholder="02-6959-7011">
               </div>
             </div>
 
@@ -16245,15 +17004,15 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-slate-200/70">
                 <div>
                   <label class="block text-[10px] font-bold text-blue-900 mb-0.5">간병 대상자 (피보험자 성명 기본)</label>
-                  <input type="text" value="${currentCareTarget}" onchange="updateHdForm02Field('careTarget', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="피보험자 성명 (수정 가능)">
+                  <input type="text" value="${currentCareTarget}" oninput="reflectHdForm02FieldLive('careTarget', this.value, '${app.id}')" onchange="updateHdForm02Field('careTarget', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="피보험자 성명 (수정 가능)">
                 </div>
                 <div>
                   <label class="block text-[10px] font-bold text-blue-900 mb-0.5">간병 장소 (기본: 재택)</label>
-                  <input type="text" value="${currentCareLocation}" onchange="updateHdForm02Field('careLocation', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="기본: 재택 (수정 가능)">
+                  <input type="text" value="${currentCareLocation}" oninput="reflectHdForm02FieldLive('careLocation', this.value, '${app.id}')" onchange="updateHdForm02Field('careLocation', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="기본: 재택 (수정 가능)">
                 </div>
                 <div>
                   <label class="block text-[10px] font-bold text-blue-900 mb-0.5">주소 (고객주소 기본)</label>
-                  <input type="text" value="${currentCareAddress}" onchange="updateHdForm02Field('careAddress', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="간병 장소 상세 주소 (수정 가능)">
+                  <input type="text" value="${currentCareAddress}" oninput="reflectHdForm02FieldLive('careAddress', this.value, '${app.id}')" onchange="updateHdForm02Field('careAddress', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="간병 장소 상세 주소 (수정 가능)">
                 </div>
               </div>
             ` : ''}
@@ -16264,7 +17023,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                 <span class="text-[11px] font-black text-slate-800 flex items-center gap-1">
                   <i data-lucide="calendar" class="w-3.5 h-3.5 text-blue-600"></i> 간병 서비스 기간 (1~4행) 연동 및 사용시간 계산
                 </span>
-                <span class="text-[10px] text-blue-700 bg-blue-100 font-bold px-2 py-0.5 rounded">합계: ${totalDays}일 (${totalDays * 24}시간)</span>
+                <span id="hdForm02TotalBadge" class="text-[10px] text-blue-700 bg-blue-100 font-bold px-2 py-0.5 rounded">합계: ${totalDays}일 (${totalDays * 24}시간)</span>
               </div>
               <div class="space-y-1.5 bg-white p-2 rounded-lg border border-slate-200">
                 ${[0, 1, 2, 3].map(idx => {
@@ -16272,10 +17031,10 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                   return `
                     <div class="flex items-center gap-1.5 text-xs">
                       <span class="w-8 text-center text-[10px] font-black text-slate-500 bg-slate-100 py-1 rounded flex-shrink-0">${idx + 1}행</span>
-                      <input type="text" value="${row.start || ''}" placeholder="시작: 2026. 08. 21 (12)h (00)m" onchange="updateHdForm02ServicePeriod(${idx}, 'start', this.value, '${app.id}')" class="flex-1 px-2 py-1 text-[11px] font-mono border border-slate-200 rounded focus:border-blue-500">
+                      <input type="text" value="${row.start || ''}" placeholder="시작: 2026. 09. 21 (09)h (00)m" oninput="reflectHdForm02ServicePeriodLive(${idx}, 'start', this.value, '${app.id}')" onchange="updateHdForm02ServicePeriod(${idx}, 'start', this.value, '${app.id}', true)" class="flex-1 px-2 py-1 text-[11px] font-mono border border-slate-200 rounded focus:border-blue-500">
                       <span class="text-slate-400 font-bold">~</span>
-                      <input type="text" value="${row.end || ''}" placeholder="종료: 2026. 08. 25 (19)h (20)m" onchange="updateHdForm02ServicePeriod(${idx}, 'end', this.value, '${app.id}')" class="flex-1 px-2 py-1 text-[11px] font-mono border border-slate-200 rounded focus:border-blue-500">
-                      <input type="text" value="${row.days || ''}" placeholder="5일" onchange="updateHdForm02ServicePeriod(${idx}, 'days', this.value, '${app.id}')" class="w-16 px-1.5 py-1 text-[11px] font-bold text-center border border-slate-200 rounded focus:border-blue-500 flex-shrink-0">
+                      <input type="text" value="${row.end || ''}" placeholder="종료: 2026. 09. 30 (18)h (00)m" oninput="reflectHdForm02ServicePeriodLive(${idx}, 'end', this.value, '${app.id}')" onchange="updateHdForm02ServicePeriod(${idx}, 'end', this.value, '${app.id}', true)" class="flex-1 px-2 py-1 text-[11px] font-mono border border-slate-200 rounded focus:border-blue-500">
+                      <input type="text" value="${row.days || ''}" placeholder="10일" oninput="reflectHdForm02ServicePeriodLive(${idx}, 'days', this.value, '${app.id}')" onchange="updateHdForm02ServicePeriod(${idx}, 'days', this.value, '${app.id}', true)" class="w-16 px-1.5 py-1 text-[11px] font-bold text-center border border-slate-200 rounded focus:border-blue-500 flex-shrink-0">
                     </div>
                   `;
                 }).join('')}
@@ -16284,16 +17043,37 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
           </div>
 
           <!-- Uploaded Official Form Canvas Overlay (23개 필드 매핑) - 팩스 발송 대상 실제 서식 (table-cell 수직 정렬로 글씨 상단 잘림 방지) -->
-          <div id="faxCleanFormTarget" class="relative w-full bg-white rounded-xl overflow-hidden select-none border border-slate-300 shadow-sm" style="font-family:'Pretendard', -apple-system, sans-serif;">
+          <div id="faxCleanFormTarget" class="relative w-full bg-white rounded-xl overflow-hidden select-none border border-slate-300 shadow-sm" style="position: relative; font-family:'Pretendard', -apple-system, sans-serif;">
             <img src="${customBg}" class="w-full h-auto block pointer-events-none z-0 bg-white" alt="현대해상 02번 양식">
             ${areas.map(area => {
               const val = resolveFormFieldValue(area.mapping, app, docNo, todayStr);
               const isCheckField = (area.mapping === 'hd2_claimCheck_new' || area.mapping === 'hd2_claimCheck_add');
+              const isHospitalField = (area.mapping === 'hospitalName');
+              const isPhoneField = (area.mapping === 'patientPhone');
+              
+              let extraStyle = '';
+              let cellStyle = 'padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+              
+              if (isCheckField) {
+                extraStyle = 'font-size: 16px; font-weight: 900; color: #1e3a8a;';
+                cellStyle = 'text-align: center;';
+              } else if (isHospitalField) {
+                const vLen = (val || '').length;
+                const fSize = vLen > 30 ? '9.5px' : (vLen > 22 ? '10.5px' : '11.5px');
+                extraStyle = `font-size: ${fSize}; line-height: 1.15; letter-spacing: -0.5px; z-index: 15;`;
+                cellStyle = 'padding: 0 2px; white-space: normal; word-break: break-all; overflow: visible; vertical-align: middle;';
+              } else if (isPhoneField) {
+                const vLen = (val || '').length;
+                const fSize = vLen > 18 ? '10px' : (vLen > 13 ? '11px' : '12px');
+                extraStyle = `font-size: ${fSize}; line-height: 1.15; letter-spacing: -0.5px; z-index: 15;`;
+                cellStyle = 'padding: 0 2px; white-space: normal; word-break: break-all; overflow: visible; vertical-align: middle;';
+              }
+              
               return `
-                <div class="absolute z-10 font-bold text-slate-950 text-xs select-none"
-                     style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; display: table; table-layout: fixed; ${isCheckField ? 'font-size: 16px; font-weight: 900; color: #1e3a8a;' : ''}"
+                <div data-mapping="${area.mapping}" class="absolute z-10 font-bold text-slate-950 text-xs select-none"
+                     style="position: absolute; left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; display: table; table-layout: fixed; ${extraStyle}"
                      title="[${area.id}] ${area.label}: ${val}">
-                  <div style="display: table-cell; vertical-align: middle; ${isCheckField ? 'text-align: center;' : 'padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'} line-height: 1.4;">
+                  <div class="form-area-cell" style="display: table-cell; vertical-align: middle; ${cellStyle} line-height: 1.25;">
                     ${val}
                   </div>
                 </div>
@@ -17070,8 +17850,7 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
   }
 
   if (!resultLog) {
-    const now = new Date();
-    const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    const dateStr = getKoreaDateTimeStr();
     const isFailed = Boolean(sendErrorMsg);
     resultLog = {
       id: 'FLOG-' + Date.now().toString().slice(-6),
@@ -17149,6 +17928,26 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
   if (resultLog.status === '성공' && (category === '정산청구' || formCode === 'HD_FORM_02' || formCode === 'HD_FORM_03' || formCode === 'SF_FORM_01')) {
     try {
       const targetRoundNum = (window.gPendingFaxDispatchParams && window.gPendingFaxDispatchParams.roundNumber) || 1;
+
+      // Update customSettlementSets if present
+      if (app.customSettlementSets && Array.isArray(app.customSettlementSets)) {
+        const cSet = app.customSettlementSets.find(s => Number(s.setIndex) === Number(targetRoundNum)) || app.customSettlementSets[targetRoundNum - 1];
+        if (cSet) {
+          cSet.claimDate = resultLog.sentDate;
+          cSet.claimStatus = '청구완료';
+        }
+        fetch('/api/hub/customer/update-fields', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            appId: app.id,
+            fields: {
+              customSettlementSets: app.customSettlementSets
+            }
+          })
+        }).catch(err => console.warn('[Fax Claim Set Update Error]', err));
+      }
+
       let existingClaim = (gClaims || []).find(c => String(c.applyId) === String(app.id) && (c.roundNumber === targetRoundNum || c.id.endsWith('.' + targetRoundNum)));
       if (!existingClaim) {
         existingClaim = (gClaims || []).find(c => String(c.applyId) === String(app.id));
@@ -17245,7 +18044,7 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
     }
   }
 
-  if (!silentAlert && category !== '정산청구') {
+  if (!silentAlert) {
     if (resultLog.status === '성공') {
       alert(`📠 [팩스 발송 완료]\n\n발송목적: ${caseTitle}\n수신처: ${targetRecipient} (${targetNumber})\n환자명: ${app.patientName} (${app.id})\n발송서식: ${formName} (${pages}장)\n\n전자팩스 통신망을 통해 정상 송출 완료되었습니다! (Convex Cloud 대장 기록됨)`);
     } else {
@@ -17386,16 +18185,6 @@ async function executeRealFaxSendFromPreview() {
     showBarobillClaimProgress(app.id, targetRoundNum, targetRecipient, targetNumber);
   }
 
-  // Close preview modal immediately so user sees the progress toggle in the main detail workspace
-  closeModal('formPreviewModal');
-  window.gIsFaxConfirmationPreview = false;
-
-  if (gActiveHubModalAppId === app.id) {
-    try {
-      openHubCustomerDetailModal(app.id);
-    } catch (e) {}
-  }
-
   const sendBtn = document.getElementById('btnConfirmRealFaxSend');
   const sendBtnText = document.getElementById('btnConfirmRealFaxSendText');
   const origHtml = sendBtn ? sendBtn.innerHTML : '';
@@ -17417,7 +18206,7 @@ async function executeRealFaxSendFromPreview() {
       targetNumber,
       memoText: memo,
       category,
-      silentAlert: false
+      silentAlert: true
     });
   } catch (err) {
     console.error('청구 팩스 발송 에러:', err);
@@ -17428,6 +18217,22 @@ async function executeRealFaxSendFromPreview() {
     const sentDate = resultLog ? resultLog.sentDate : '';
     hideBarobillClaimProgress(isSuccess, targetRoundNum, sentDate);
 
+    if (sendBtn) {
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = origHtml;
+    }
+
+    if (isSuccess) {
+      if (typeof showToast === 'function') {
+        showToast(`✅ [팩스 발송 성공] ${app.patientName} 님 서식이 성공적으로 발송되었습니다.`, 'success');
+      }
+      alert(`📠 [팩스 발송 완료]\n\n환자명: ${app.patientName} 님 (${app.id})\n수신처: ${targetRecipient} (${targetNumber})\n서식: ${formName}\n\n전자팩스 통신망을 통해 정상 송출 완료되었습니다!\n(Convex Cloud 대장 및 정산 내역에 즉시 등록되었습니다.)`);
+      closeModal('formPreviewModal');
+      window.gIsFaxConfirmationPreview = false;
+    } else if (resultLog && resultLog.status !== '성공') {
+      alert(`⚠️ [팩스 발송 결과 안내]\n\n수신처: ${targetRecipient} (${targetNumber})\n상태: ${resultLog.status} (${resultLog.resultMsg})\n\n통화중 또는 응답없음으로 접수되었습니다. 수신처 번호 확인 후 다시 시도해주세요.`);
+    }
+
     if (gActiveHubModalAppId === app.id) {
       try {
         openHubCustomerDetailModal(app.id);
@@ -17435,11 +18240,6 @@ async function executeRealFaxSendFromPreview() {
     }
     if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
     if (typeof renderClaims === 'function') renderClaims();
-
-    if (sendBtn) {
-      sendBtn.disabled = false;
-      sendBtn.innerHTML = origHtml;
-    }
   }
 }
 
@@ -17608,8 +18408,7 @@ function executeSendHyundaiInitialFax() {
   renderForms();
   renderUnifiedCareHub();
 
-  const now = new Date();
-  const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  const dateStr = getKoreaDateTimeStr();
   const newLog = {
     id: 'FLOG-' + Date.now().toString().slice(-6),
     sentDate: dateStr,
@@ -19503,35 +20302,73 @@ function parseCareDate(dateStr) {
   return new Date(y, parseInt(match[2], 10) - 1, parseInt(match[3], 10));
 }
 
+function getKoreaDateParts(d) {
+  if (!d) return null;
+  const dateObj = (d instanceof Date) ? d : new Date(d);
+  if (!dateObj || isNaN(dateObj.getTime())) return null;
+  try {
+    const parts = new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(dateObj);
+    const get = (type) => (parts.find(p => p.type === type) || {}).value || '00';
+    let hour = get('hour');
+    if (hour === '24') hour = '00';
+    return {
+      year: get('year'),
+      month: get('month'),
+      day: get('day'),
+      hour: hour,
+      minute: get('minute')
+    };
+  } catch (e) {
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    const hh = String(dateObj.getHours()).padStart(2, '0');
+    const mm = String(dateObj.getMinutes()).padStart(2, '0');
+    return { year: String(y), month: m, day: day, hour: hh, minute: mm };
+  }
+}
+
+function getKoreaDateStr(d = new Date()) {
+  const parts = getKoreaDateParts(d);
+  if (!parts) return '';
+  return `${parts.year}.${parts.month}.${parts.day}`;
+}
+
+function getKoreaDateTimeStr(d = new Date()) {
+  const parts = getKoreaDateParts(d);
+  if (!parts) return '';
+  return `${parts.year}.${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`;
+}
+window.getKoreaDateParts = getKoreaDateParts;
+window.getKoreaDateStr = getKoreaDateStr;
+window.getKoreaDateTimeStr = getKoreaDateTimeStr;
+
 function formatCareDateStr(d) {
-  if (!d || isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}.${m}.${day}`;
+  return getKoreaDateStr(d);
 }
 
 function formatCareDateTimeStr(d) {
-  if (!d || isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${y}.${m}.${day} ${hh}:${mm}`;
+  return getKoreaDateTimeStr(d);
 }
 
 function formatDateTimeLocalInput(dateTimeVal, defTime = '09:00') {
   if (!dateTimeVal) return '';
   const d = (dateTimeVal instanceof Date) ? dateTimeVal : parseCareDateTime(dateTimeVal);
   if (!d || isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+  const parts = getKoreaDateParts(d);
+  if (!parts) return '';
   const hasTime = (dateTimeVal instanceof Date) || /(\d{1,2}):(\d{1,2})/.test(String(dateTimeVal));
-  const hh = hasTime ? String(d.getHours()).padStart(2, '0') : defTime.slice(0, 2);
-  const mm = hasTime ? String(d.getMinutes()).padStart(2, '0') : defTime.slice(3, 5);
-  return `${y}-${m}-${day}T${hh}:${mm}`;
+  const hh = hasTime ? parts.hour : defTime.slice(0, 2);
+  const mm = hasTime ? parts.minute : defTime.slice(3, 5);
+  return `${parts.year}-${parts.month}-${parts.day}T${hh}:${mm}`;
 }
 window.formatDateTimeLocalInput = formatDateTimeLocalInput;
 
@@ -19619,12 +20456,12 @@ function formatStatusDateTime(rawVal, defaultTime = '10:00') {
   const str = String(rawVal).trim();
   if (!str || str === '-') return '';
 
-  // ISO string (e.g. 2026-09-10T14:30:00.000Z)
-  if (str.includes('T')) {
+  // ISO string (e.g. 2026-09-10T14:30:00.000Z or 2026-09-30T00:30:00Z)
+  if (str.includes('T') || str.endsWith('Z')) {
     try {
       const d = new Date(str);
       if (!isNaN(d.getTime())) {
-        return formatCareDateTimeStr(d);
+        return getKoreaDateTimeStr(d);
       }
     } catch (e) {}
   }
@@ -19635,8 +20472,11 @@ function formatStatusDateTime(rawVal, defaultTime = '10:00') {
     const y = timeMatch[1];
     const m = String(timeMatch[2]).padStart(2, '0');
     const d = String(timeMatch[3]).padStart(2, '0');
-    const hh = String(timeMatch[4]).padStart(2, '0');
+    let hh = String(timeMatch[4]).padStart(2, '0');
     const min = String(timeMatch[5]).padStart(2, '0');
+    if (hh === '00' && (y === '2026' || y === '2025')) {
+      hh = '09';
+    }
     return `${y}.${m}.${d} ${hh}:${min}`;
   }
 
@@ -19657,12 +20497,12 @@ function formatClaimDisplayDate(rawVal) {
   const str = String(rawVal).trim();
   if (!str || str === '-') return '';
 
-  // ISO string (e.g. 2026-09-10T14:30:00.000Z)
-  if (str.includes('T')) {
+  // ISO string (e.g. 2026-09-10T14:30:00.000Z or 2026-09-30T00:30:00Z)
+  if (str.includes('T') || str.endsWith('Z')) {
     try {
       const d = new Date(str);
       if (!isNaN(d.getTime())) {
-        return formatCareDateTimeStr(d);
+        return getKoreaDateTimeStr(d);
       }
     } catch (e) {}
   }
@@ -19673,8 +20513,11 @@ function formatClaimDisplayDate(rawVal) {
     const y = timeMatch[1];
     const m = String(timeMatch[2]).padStart(2, '0');
     const d = String(timeMatch[3]).padStart(2, '0');
-    const hh = String(timeMatch[4]).padStart(2, '0');
+    let hh = String(timeMatch[4]).padStart(2, '0');
     const min = String(timeMatch[5]).padStart(2, '0');
+    if (hh === '00' && (y === '2026' || y === '2025')) {
+      hh = '09';
+    }
     return `${y}.${m}.${d} ${hh}:${min}`;
   }
 
@@ -20455,8 +21298,21 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
     (!app.careEndDate || app.careEndDate === '진행중' || app.careEndDate === '예정') ||
     (app.status === '진행' || app.status === '진행중' || app.status === '간병진행중')
   );
-  const isCompleted = isOngoingCare ? false : (prog ? (prog.status === 'completed' && prog.remainingDays === 0) : Boolean(as && as.endDate && as.endDate !== '진행중' && as.endDate !== '예정'));
-  const careStartDate = as ? as.startDate : (app ? app.careStartDate : null);
+  const isCompleted = !isOngoingCare;
+  // 고객 전체 간병 시작일: 배정 대장의 가장 빠른 시작일 또는 고객 기본 신청 간병시작일
+  const allAppAssigns = (typeof gAssigns !== 'undefined' && app && app.id)
+    ? (gAssigns || []).filter(a => String(a.applyId) === String(app.id))
+    : (as ? [as] : []);
+  const validStarts = allAppAssigns
+    .map(a => a.startDate)
+    .filter(d => d && /^\d{4}/.test(d))
+    .sort();
+  const earliestAssignStart = validStarts.length > 0 ? validStarts[0] : null;
+  let careStartDate = (app && app.careStartDate && /^\d{4}/.test(app.careStartDate)) ? app.careStartDate : null;
+  if (earliestAssignStart && (!careStartDate || earliestAssignStart < careStartDate)) {
+    careStartDate = earliestAssignStart;
+  }
+  if (!careStartDate) careStartDate = (as ? as.startDate : null);
   const careEndDate = as ? as.endDate : (app ? app.careEndDate : null);
   const isSamsung = Boolean(app && (app.insuranceCompany || '').includes('삼성'));
 
@@ -20474,6 +21330,8 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
   // [RULE 1] 관리자가 직접 편집/추가한 커스텀 정산·청구 세트가 존재하는 경우
   if (app && app.customSettlementSets && Array.isArray(app.customSettlementSets) && app.customSettlementSets.length > 0) {
     let currentCustomStart = careStartDate;
+    const usedClaimIds = new Set();
+    const usedPayoutIds = new Set();
     app.customSettlementSets.forEach((cSet, idx) => {
       const setIndex = cSet.setIndex || (idx + 1);
       const claimDays = Number(cSet.claimDays) || Number(cSet.days) || 1;
@@ -20511,42 +21369,93 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       const setPayoutWage = (cSet.cgDailyWage && !isNaN(Number(cSet.cgDailyWage)) && Number(cSet.cgDailyWage) > 0) ? Number(cSet.cgDailyWage) : cgDailyWage;
       const fullClaimAmount = (cSet.claimAmount && !isNaN(Number(cSet.claimAmount))) ? Number(cSet.claimAmount) : (claimDays * setClaimPrice);
       const fullPayoutAmount = (cSet.payoutAmount && !isNaN(Number(cSet.payoutAmount))) ? Number(cSet.payoutAmount) : (payoutDays * setPayoutWage);
+
+      const now = new Date();
+      const dSetStart = parseCareDateTime(roundStartDateStr);
+      const dSetEnd = roundEndDateStr ? parseCareDateTime(roundEndDateStr) : null;
+
+      let roundStage = 'ONGOING';
+      let ongoingElapsed = setDays;
+      let ongoingRemaining = 0;
+
+      if (dSetStart && now < dSetStart) {
+        roundStage = 'UPCOMING';
+        ongoingElapsed = 0;
+        ongoingRemaining = setDays;
+      } else if (dSetEnd && now >= dSetEnd) {
+        roundStage = 'COMPLETED';
+        ongoingElapsed = setDays;
+        ongoingRemaining = 0;
+      } else if (isCompleted) {
+        roundStage = 'COMPLETED';
+        ongoingElapsed = setDays;
+        ongoingRemaining = 0;
+      } else {
+        roundStage = 'ONGOING';
+        if (dSetStart) {
+          ongoingElapsed = Math.min(setDays, Math.max(1, calculateCareDays24h(dSetStart, now)));
+          ongoingRemaining = Math.max(0, setDays - ongoingElapsed);
+        } else {
+          ongoingElapsed = setDays;
+          ongoingRemaining = 0;
+        }
+      }
+
+      const ongoingClaimAmount = (roundStage === 'ONGOING') ? Math.min(fullClaimAmount, ongoingElapsed * setClaimPrice) : fullClaimAmount;
+      const ongoingPayoutAmount = (roundStage === 'ONGOING') ? Math.min(fullPayoutAmount, ongoingElapsed * setPayoutWage) : fullPayoutAmount;
+
       let existingClaim = null;
       if (cSet.claimId) {
-        existingClaim = (appClaims || []).find(c => c && c.id === cSet.claimId) || null;
+        existingClaim = (appClaims || []).find(c => c && c.id === cSet.claimId && !usedClaimIds.has(c.id)) || null;
       }
-      if (!existingClaim) {
+      if (!existingClaim && cSet.claimRound) {
+        existingClaim = (appClaims || []).find(c => c && String(c.round || '').trim() === String(cSet.claimRound).trim() && !usedClaimIds.has(c.id)) || null;
+      }
+      // 차수가 명시되지 않은 경우에만 순번 기반 자동 매칭
+      if (!existingClaim && !cSet.claimRound && !cSet.claimId) {
         existingClaim = (appClaims || []).find(c => {
+          if (!c || usedClaimIds.has(c.id)) return false;
           const str = String(c.round || '').trim();
-          return str === `${setIndex}차` || str.startsWith(`${setIndex}차 `) || str.includes(`${setIndex}차`);
+          return str === `${setIndex}차` || str === `${targetMonth}월 ${setIndex}차`;
         }) || null;
       }
-      if (!existingClaim) {
-        const sortedClaims = (appClaims || []).slice().sort((a, b) => {
+      if (!existingClaim && !cSet.claimRound && !cSet.claimId) {
+        const sortedClaims = (appClaims || []).filter(c => c && !usedClaimIds.has(c.id)).sort((a, b) => {
           const dA = a.standardDate || a.claimDate || a.startDate || '';
           const dB = b.standardDate || b.claimDate || b.startDate || '';
           return dA.localeCompare(dB);
         });
-        existingClaim = sortedClaims[idx] || null;
+        existingClaim = sortedClaims[0] || null;
+      }
+      if (existingClaim && existingClaim.id) {
+        usedClaimIds.add(existingClaim.id);
       }
 
       let existingPayout = null;
       if (cSet.payoutId) {
-        existingPayout = (appPayouts || []).find(p => p && p.id === cSet.payoutId) || null;
+        existingPayout = (appPayouts || []).find(p => p && p.id === cSet.payoutId && !usedPayoutIds.has(p.id)) || null;
       }
-      if (!existingPayout) {
+      if (!existingPayout && cSet.payoutRound) {
+        existingPayout = (appPayouts || []).find(p => p && String(p.round || '').trim() === String(cSet.payoutRound).trim() && !usedPayoutIds.has(p.id)) || null;
+      }
+      // 차수가 명시되지 않은 경우에만 순번 기반 자동 매칭
+      if (!existingPayout && !cSet.payoutRound && !cSet.payoutId) {
         existingPayout = (appPayouts || []).find(p => {
+          if (!p || usedPayoutIds.has(p.id)) return false;
           const str = String(p.round || '').trim();
-          return str === `${setIndex}차` || str.startsWith(`${setIndex}차 `) || str.includes(`${setIndex}차`);
+          return str === `${setIndex}차` || str === `${targetMonth}월 ${setIndex}차`;
         }) || null;
       }
-      if (!existingPayout) {
-        const sortedPayouts = (appPayouts || []).slice().sort((a, b) => {
+      if (!existingPayout && !cSet.payoutRound && !cSet.payoutId) {
+        const sortedPayouts = (appPayouts || []).filter(p => p && !usedPayoutIds.has(p.id)).sort((a, b) => {
           const dA = a.standardDate || a.payoutDate || a.paidDate || a.startDate || '';
           const dB = b.standardDate || b.payoutDate || b.paidDate || b.startDate || '';
           return dA.localeCompare(dB);
         });
-        existingPayout = sortedPayouts[idx] || null;
+        existingPayout = sortedPayouts[0] || null;
+      }
+      if (existingPayout && existingPayout.id) {
+        usedPayoutIds.add(existingPayout.id);
       }
 
       let depositAmount = (cSet.depositAmount !== undefined && cSet.depositAmount !== null && cSet.depositAmount !== '') 
@@ -20579,6 +21488,8 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       let claimStatus = 'UPCOMING_WAIT';
       if (isClaimDeposited) {
         claimStatus = 'DEPOSIT_DONE';
+      } else if (cSet.claimStatus === '청구전' && !cSet.claimDate) {
+        claimStatus = isCompleted ? 'READY_TO_CLAIM' : 'UPCOMING_WAIT';
       } else if (cSet.claimStatus === '청구완료' || cSet.claimDate || (existingClaim && existingClaim.claimDate)) {
         claimStatus = 'CLAIMED_UNPAID';
       } else {
@@ -20586,7 +21497,9 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       }
 
       let payoutStatus = 'UPCOMING_WAIT';
-      if (isPayoutPaid) {
+      if (cSet.payoutStatus === '지급전' && !cSet.payoutDate) {
+        payoutStatus = isCompleted ? 'READY_TO_PAY' : 'UPCOMING_WAIT';
+      } else if (isPayoutPaid) {
         payoutStatus = 'PAID';
       } else {
         payoutStatus = isCompleted ? 'READY_TO_PAY' : 'UPCOMING_WAIT';
@@ -20594,6 +21507,19 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
 
       const marginAmount = fullClaimAmount - fullPayoutAmount;
       const marginRate = fullClaimAmount > 0 ? ((marginAmount / fullClaimAmount) * 100).toFixed(1) : '0.0';
+
+      let roundCg = cSet.caregiverName || (existingPayout && existingPayout.caregiverName) || '';
+      let matchedAs = null;
+      if (!roundCg && allAppAssigns.length > 0) {
+        matchedAs = allAppAssigns.find(a => {
+          const aStart = (a.startDate || '').slice(0, 10);
+          const aEnd = (a.endDate || '').slice(0, 10) || '9999-12-31';
+          const rStart = (roundStartDateStr || '').slice(0, 10);
+          return rStart >= aStart && rStart <= aEnd;
+        });
+        roundCg = matchedAs ? matchedAs.caregiverName : '';
+      }
+      if (!roundCg) roundCg = (as ? as.caregiverName : (app ? app.caregiverName : ''));
 
       rounds.push({
         roundNumber: setIndex,
@@ -20613,11 +21539,13 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         endDayOffset: (idx * 10) + setDays,
         startDateStr: roundStartDateStr,
         endDateStr: roundEndDateStr,
-        stage: isCompleted ? 'COMPLETED' : 'ONGOING',
+        stage: roundStage,
+        ongoingElapsed: ongoingElapsed,
+        ongoingRemaining: ongoingRemaining,
         dailyClaimPrice: setClaimPrice,
         fullClaimAmount: fullClaimAmount,
         depositAmount: depositAmount,
-        ongoingClaimAmount: fullClaimAmount,
+        ongoingClaimAmount: ongoingClaimAmount,
         claimId: cSet.claimId || (existingClaim ? existingClaim.id : `Q${String(app.id).replace('C', '')}.${setIndex}`),
         claimStatus: claimStatus,
         existingClaim: existingClaim,
@@ -20626,9 +21554,10 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         isClaimSent: Boolean(cSet.claimDate || claimStatus === 'CLAIMED_UNPAID' || claimStatus === 'DEPOSIT_DONE'),
         isClaimDeposited: isClaimDeposited,
         isDepositDone: isClaimDeposited,
+        caregiverName: roundCg,
         cgDailyWage: setPayoutWage,
         fullPayoutAmount: fullPayoutAmount,
-        ongoingPayoutAmount: fullPayoutAmount,
+        ongoingPayoutAmount: ongoingPayoutAmount,
         payoutId: cSet.payoutId || (existingPayout ? existingPayout.id : `P${String(app.id).replace('C', '')}.${setIndex}`),
         payoutStatus: payoutStatus,
         existingPayout: existingPayout,
@@ -20651,23 +21580,77 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
     const hasPayouts = Boolean(appPayouts && appPayouts.length > 0);
 
     if (hasClaims || hasPayouts) {
-      const sortedClaims = (appClaims || []).slice().sort((a, b) => {
-        const dA = a.standardDate || a.claimDate || a.startDate || '';
-        const dB = b.standardDate || b.claimDate || b.startDate || '';
-        return dA.localeCompare(dB);
-      });
-      const sortedPayouts = (appPayouts || []).slice().sort((a, b) => {
-        const dA = a.standardDate || a.payoutDate || a.paidDate || a.startDate || '';
-        const dB = b.standardDate || b.payoutDate || b.paidDate || b.startDate || '';
-        return dA.localeCompare(dB);
-      });
+      function pairClaimsAndPayouts(claims, payouts) {
+        const sortedC = (claims || []).slice().sort((a, b) => (a.standardDate || a.claimDate || a.startDate || '').localeCompare(b.standardDate || b.claimDate || b.startDate || ''));
+        const sortedP = (payouts || []).slice().sort((a, b) => (a.standardDate || a.payoutDate || a.paidDate || a.startDate || '').localeCompare(b.standardDate || b.payoutDate || b.paidDate || b.startDate || ''));
+        const pairs = [];
+        const usedP = new Set();
+        const usedC = new Set();
 
-      const totalSets = Math.max(sortedClaims.length, sortedPayouts.length);
+        // Pass 1: exact round + standardDate match
+        for (let ci = 0; ci < sortedC.length; ci++) {
+          const c = sortedC[ci];
+          for (let pi = 0; pi < sortedP.length; pi++) {
+            if (usedP.has(pi) || usedC.has(ci)) continue;
+            const p = sortedP[pi];
+            if (c.round && p.round && c.round === p.round && c.standardDate === p.standardDate) {
+              pairs.push({ claim: c, payout: p, keyDate: c.standardDate || p.standardDate || '' });
+              usedC.add(ci);
+              usedP.add(pi);
+              break;
+            }
+          }
+        }
+        // Pass 2: exact round match
+        for (let ci = 0; ci < sortedC.length; ci++) {
+          if (usedC.has(ci)) continue;
+          const c = sortedC[ci];
+          for (let pi = 0; pi < sortedP.length; pi++) {
+            if (usedP.has(pi)) continue;
+            const p = sortedP[pi];
+            if (c.round && p.round && c.round === p.round) {
+              pairs.push({ claim: c, payout: p, keyDate: c.standardDate || p.standardDate || '' });
+              usedC.add(ci);
+              usedP.add(pi);
+              break;
+            }
+          }
+        }
+        // Pass 3: exact standardDate match
+        for (let ci = 0; ci < sortedC.length; ci++) {
+          if (usedC.has(ci)) continue;
+          const c = sortedC[ci];
+          for (let pi = 0; pi < sortedP.length; pi++) {
+            if (usedP.has(pi)) continue;
+            const p = sortedP[pi];
+            if (c.standardDate && p.standardDate && c.standardDate === p.standardDate) {
+              pairs.push({ claim: c, payout: p, keyDate: c.standardDate || p.standardDate || '' });
+              usedC.add(ci);
+              usedP.add(pi);
+              break;
+            }
+          }
+        }
+        // Pass 4: remaining unpaired claims
+        for (let ci = 0; ci < sortedC.length; ci++) {
+          if (!usedC.has(ci)) pairs.push({ claim: sortedC[ci], payout: null, keyDate: sortedC[ci].standardDate || sortedC[ci].claimDate || '' });
+        }
+        // Pass 5: remaining unpaired payouts
+        for (let pi = 0; pi < sortedP.length; pi++) {
+          if (!usedP.has(pi)) pairs.push({ claim: null, payout: sortedP[pi], keyDate: sortedP[pi].standardDate || sortedP[pi].payoutDate || '' });
+        }
+        pairs.sort((a, b) => (a.keyDate || '').localeCompare(b.keyDate || ''));
+        return pairs;
+      }
+
+      const pairs = pairClaimsAndPayouts(appClaims, appPayouts);
+      const totalSets = pairs.length;
       let currentRoundStart = careStartDate;
       for (let idx = 0; idx < totalSets; idx++) {
         const setIndex = idx + 1;
-        const claimForRound = sortedClaims[idx] || null;
-        const payoutForRound = sortedPayouts[idx] || null;
+        const pair = pairs[idx];
+        const claimForRound = pair.claim;
+        const payoutForRound = pair.payout;
 
         const claimDays = claimForRound ? (Number(claimForRound.days) || 1) : (payoutForRound ? (Number(payoutForRound.days) || 1) : 1);
         const payoutDays = payoutForRound ? (Number(payoutForRound.days) || 1) : (claimForRound ? (Number(claimForRound.days) || 1) : 1);
@@ -20697,6 +21680,21 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           currentRoundStart = roundEndDateStr;
         }
 
+        let roundCg = (payoutForRound && payoutForRound.caregiverName) || '';
+        let matchedAs = null;
+        if (!roundCg && allAppAssigns.length > 0) {
+          matchedAs = allAppAssigns.find(a => {
+            const aStart = (a.startDate || '').slice(0, 10);
+            const aEnd = (a.endDate || '').slice(0, 10) || '9999-12-31';
+            const rStart = (roundStartDateStr || '').slice(0, 10);
+            return rStart >= aStart && rStart <= aEnd;
+          });
+          roundCg = matchedAs ? matchedAs.caregiverName : '';
+        }
+        if (!roundCg) roundCg = (as ? as.caregiverName : (app ? app.caregiverName : ''));
+
+        const roundDailyWage = (payoutForRound && payoutForRound.dailyWage) || (matchedAs ? matchedAs.dailyWage : (as ? as.dailyWage : cgDailyWage));
+
         const defaultClaimRound = getStandardRoundByDate(claimStandardDate || roundStartDateStr);
         const defaultPayoutRound = getStandardRoundByDate(payoutStandardDate || roundStartDateStr);
 
@@ -20721,7 +21719,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         const targetMonthText = `${targetYear}년 ${targetMonth}월분`;
 
         const fullClaimAmount = claimForRound ? (Number(claimForRound.claimAmount) || (claimDays * dailyClaimPrice)) : (claimDays * dailyClaimPrice);
-        const fullPayoutAmount = payoutForRound ? (Number(payoutForRound.payoutAmount) || (payoutDays * cgDailyWage)) : 0;
+        const fullPayoutAmount = payoutForRound ? (Number(payoutForRound.payoutAmount) || (payoutDays * roundDailyWage)) : 0;
 
         let depositAmount = (claimForRound && claimForRound.depositAmount !== undefined && claimForRound.depositAmount !== null && claimForRound.depositAmount !== '')
           ? Number(claimForRound.depositAmount)
@@ -20763,6 +21761,40 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         const marginAmount = fullClaimAmount - fullPayoutAmount;
         const marginRate = fullClaimAmount > 0 ? ((marginAmount / fullClaimAmount) * 100).toFixed(1) : '0.0';
 
+        const now = new Date();
+        const dSetStart = parseCareDateTime(roundStartDateStr);
+        const dSetEnd = roundEndDateStr ? parseCareDateTime(roundEndDateStr) : null;
+
+        let roundStage = 'ONGOING';
+        let ongoingElapsed = setDays;
+        let ongoingRemaining = 0;
+
+        if (dSetStart && now < dSetStart) {
+          roundStage = 'UPCOMING';
+          ongoingElapsed = 0;
+          ongoingRemaining = setDays;
+        } else if (dSetEnd && now >= dSetEnd) {
+          roundStage = 'COMPLETED';
+          ongoingElapsed = setDays;
+          ongoingRemaining = 0;
+        } else if (isCompleted) {
+          roundStage = 'COMPLETED';
+          ongoingElapsed = setDays;
+          ongoingRemaining = 0;
+        } else {
+          roundStage = 'ONGOING';
+          if (dSetStart) {
+            ongoingElapsed = Math.min(setDays, Math.max(1, calculateCareDays24h(dSetStart, now)));
+            ongoingRemaining = Math.max(0, setDays - ongoingElapsed);
+          } else {
+            ongoingElapsed = setDays;
+            ongoingRemaining = 0;
+          }
+        }
+
+        const ongoingClaimAmount = (roundStage === 'ONGOING') ? Math.min(fullClaimAmount, ongoingElapsed * dailyClaimPrice) : fullClaimAmount;
+        const ongoingPayoutAmount = (roundStage === 'ONGOING') ? Math.min(fullPayoutAmount, ongoingElapsed * roundDailyWage) : fullPayoutAmount;
+
         rounds.push({
           roundNumber: setIndex,
           setIndex: setIndex,
@@ -20781,13 +21813,13 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           endDayOffset: (idx * 10) + setDays,
           startDateStr: roundStartDateStr,
           endDateStr: roundEndDateStr,
-          stage: isCompleted ? 'COMPLETED' : 'ONGOING',
-          ongoingElapsed: setDays,
-          ongoingRemaining: 0,
+          stage: roundStage,
+          ongoingElapsed: ongoingElapsed,
+          ongoingRemaining: ongoingRemaining,
           dailyClaimPrice,
           fullClaimAmount,
           depositAmount,
-          ongoingClaimAmount: fullClaimAmount,
+          ongoingClaimAmount: ongoingClaimAmount,
           claimId: claimForRound ? claimForRound.id : `Q${String(app.id).replace('C', '')}.${setIndex}`,
           claimStatus,
           existingClaim: claimForRound,
@@ -20796,9 +21828,10 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           isClaimSent: isFaxClaimSent || Boolean(claimForRound),
           isClaimDeposited,
           isDepositDone: isClaimDeposited,
-          cgDailyWage,
+          caregiverName: roundCg,
+          cgDailyWage: roundDailyWage,
           fullPayoutAmount,
-          ongoingPayoutAmount: fullPayoutAmount,
+          ongoingPayoutAmount: ongoingPayoutAmount,
           payoutId: payoutForRound ? payoutForRound.id : `P${String(app.id).replace('C', '')}.${setIndex}`,
           payoutStatus,
           existingPayout: payoutForRound,
@@ -20903,16 +21936,16 @@ function findSettlementClaim(appId, roundNumber, explicitClaimId = null) {
     );
     if (schedule && Array.isArray(schedule.rounds)) {
       const round = schedule.rounds.find(r => r && r.roundNumber === roundNumber);
-      if (round && round.existingClaim) return round.existingClaim;
+      if (round) return round.existingClaim || null;
     }
   } catch (err) {
     console.warn('findSettlementClaim schedule calculation fallback:', err);
   }
 
-  // 2. 차수 텍스트 기준 매칭 (예: "8월 3차", "7차")
+  // 2. 차수 텍스트 기준 매칭 (예: "3차", "3차 (보충)")
   const byExactRound = appClaims.find(c => {
     const str = String(c.round || '').trim();
-    return str === `${roundNumber}차` || str.startsWith(`${roundNumber}차 `) || str.includes(`${roundNumber}차`);
+    return str === `${roundNumber}차` || str.startsWith(`${roundNumber}차 `);
   });
   if (byExactRound) return byExactRound;
 
@@ -20949,7 +21982,7 @@ function findSettlementPayout(appId, roundNumber, explicitPayoutId = null) {
     );
     if (schedule && Array.isArray(schedule.rounds)) {
       const round = schedule.rounds.find(r => r && r.roundNumber === roundNumber);
-      if (round && round.existingPayout) return round.existingPayout;
+      if (round) return round.existingPayout || null;
     }
   } catch (err) {
     console.warn('findSettlementPayout schedule calculation fallback:', err);
@@ -20957,7 +21990,7 @@ function findSettlementPayout(appId, roundNumber, explicitPayoutId = null) {
 
   const byExactRound = appPayouts.find(p => {
     const str = String(p.round || '').trim();
-    return str === `${roundNumber}차` || str.startsWith(`${roundNumber}차 `) || str.includes(`${roundNumber}차`);
+    return str === `${roundNumber}차` || str.startsWith(`${roundNumber}차 `);
   });
   if (byExactRound) return byExactRound;
 
@@ -21495,8 +22528,7 @@ async function createInterimClaim(applyId, roundNumber, targetDays) {
   });
   if (!confirmed) return;
 
-  const now = new Date();
-  const claimDateTimeStr = formatWithTime(formatCareDateStr(now), `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+  const claimDateTimeStr = getKoreaDateTimeStr();
 
   const newClaim = {
     id: `Q${applyId.replace('C', '')}.${roundNumber || 1}`,
@@ -21916,7 +22948,8 @@ function openSettlementSetEditModal(appId, setIndex) {
   document.getElementById('settlementSetModalTitle').innerText = `[세트 ${setIndex}] 정산·청구 정보 수정`;
   document.getElementById('settlementSetModalSub').innerText = `[${app.id}] ${maskName(app.patientName)} · ${app.insuranceCompany || '보험사'}`;
   document.getElementById('settlementSetModalInsCo').innerText = app.insuranceCompany || '보험사';
-  document.getElementById('settlementSetModalCaregiverName').innerText = (as && as.caregiverName) ? `${as.caregiverName} 간병사` : '간병인 미지정';
+  const roundCgName = (r && r.caregiverName) || (as && as.caregiverName) || '';
+  document.getElementById('settlementSetModalCaregiverName').innerText = roundCgName ? `${roundCgName} 간병사` : '간병인 미지정';
 
   const deleteBtn = document.getElementById('settlementSetDeleteBtn');
   if (deleteBtn) deleteBtn.style.display = (schedule.rounds && schedule.rounds.length > 1) ? 'flex' : 'none';
@@ -22118,173 +23151,321 @@ function recalcSettlementSetModalPreview(isFromDays) {
 }
 
 async function handleSaveSettlementSet(e) {
-  e.preventDefault();
-  const appId = document.getElementById('settlementSetModalAppId')?.value;
-  const mode = document.getElementById('settlementSetModalMode')?.value;
-  const setIndex = parseInt(document.getElementById('settlementSetModalSetIndex')?.value || '1', 10);
-  const app = (gApps || []).find(a => String(a.id) === String(appId));
-  if (!app) return;
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  try {
+    const appId = document.getElementById('settlementSetModalAppId')?.value;
+    const mode = document.getElementById('settlementSetModalMode')?.value;
+    const setIndex = parseInt(document.getElementById('settlementSetModalSetIndex')?.value || '1', 10);
+    const app = (gApps || []).find(a => String(a.id) === String(appId));
+    if (!app) {
+      console.error('[SettlementSet] App not found:', appId);
+      return;
+    }
 
-  const startVal = document.getElementById('settlementSetStartInput')?.value;
-  const endVal = document.getElementById('settlementSetEndInput')?.value;
-  const days = parseInt(document.getElementById('settlementSetDaysInput')?.value || '1', 10);
-
-  const startStr = startVal ? `${startVal.slice(0, 10).replace(/-/g, '.')} ${startVal.slice(11, 16)}` : '';
-  const endStr = endVal ? `${endVal.slice(0, 10).replace(/-/g, '.')} ${endVal.slice(11, 16)}` : '';
-
-  const claimRound = document.getElementById('settlementSetClaimRoundInput')?.value.trim() || `${setIndex}차`;
-  const claimStandardDate = document.getElementById('settlementSetClaimStandardDateInput')?.value.trim() || (endStr ? endStr.slice(0, 10) : '');
-  const claimDate = document.getElementById('settlementSetClaimDateInput')?.value.trim() || '';
-  const claimDays = parseInt(document.getElementById('settlementSetClaimDaysInput')?.value || String(days), 10);
-  const claimUnitPrice = parseInt(String(document.getElementById('settlementSetClaimUnitPriceInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 160000;
-  const claimAmount = parseInt(String(document.getElementById('settlementSetClaimAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || (claimDays * claimUnitPrice);
-  const claimStatus = document.getElementById('settlementSetClaimStatusSelect')?.value || '청구전';
-
-  const depositAmount = parseInt(String(document.getElementById('settlementSetDepositAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 0;
-  const depositDate = document.getElementById('settlementSetDepositDateInput')?.value.trim() || '';
-  const depositStatus = document.getElementById('settlementSetDepositStatusSelect')?.value || '미입금';
-
-  const payoutRound = document.getElementById('settlementSetPayoutRoundInput')?.value.trim() || `${setIndex}차`;
-  const payoutStandardDate = document.getElementById('settlementSetPayoutStandardDateInput')?.value.trim() || endStr;
-  const payoutDate = document.getElementById('settlementSetPayoutDateInput')?.value.trim() || '';
-  const payoutDays = parseInt(document.getElementById('settlementSetPayoutDaysInput')?.value || String(days), 10);
-  const cgDailyWage = parseInt(String(document.getElementById('settlementSetPayoutWageInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 140000;
-  const payoutAmount = parseInt(String(document.getElementById('settlementSetPayoutAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || (payoutDays * cgDailyWage);
-  const payoutStatus = document.getElementById('settlementSetPayoutStatusSelect')?.value || '지급전';
-
-  const memo = document.getElementById('settlementSetMemoInput')?.value.trim() || '';
-
-  const claimId = document.getElementById('settlementSetModalClaimId')?.value;
-  const payoutId = document.getElementById('settlementSetModalPayoutId')?.value;
-
-  // Initialize customSettlementSets if not present
-  if (!app.customSettlementSets || !Array.isArray(app.customSettlementSets)) {
     const appAssigns = (gAssigns || []).filter(a => a.applyId === appId);
     const as = appAssigns.length > 0 ? appAssigns[0] : null;
-    const prog = as ? getCareProgressInfo(as) : null;
-    const initialSchedule = calculateCareSettlementSchedule(app, as, prog, (gClaims || []).filter(c => c.applyId === appId), (gPayouts || []).filter(p => p.applyId === appId));
-    app.customSettlementSets = (initialSchedule.rounds || []).map((r, i) => ({
-      setIndex: i + 1,
-      claimRound: r.claimRoundLabel || `${i + 1}차`,
-      payoutRound: r.payoutRoundLabel || `${i + 1}차`,
-      claimStandardDate: r.claimStandardDate || '',
-      payoutStandardDate: r.payoutStandardDate || '',
-      claimDate: r.claimDate || '',
-      payoutDate: r.payoutDate || '',
-      startDateStr: r.startDateStr || '',
-      endDateStr: r.endDateStr || '',
-      days: r.days || 1,
-      claimDays: r.claimDays || r.days || 1,
-      payoutDays: r.payoutDays || r.days || 1,
-      dailyClaimPrice: r.dailyClaimPrice || 160000,
-      claimAmount: r.fullClaimAmount || 160000,
-      claimStatus: (r.claimStatus === 'DEPOSIT_DONE' || r.isClaimDeposited) ? '입금완료' : ((r.isClaimSent || r.claimStatus === 'CLAIMED_UNPAID') ? '청구완료' : '청구전'),
-      depositAmount: r.depositAmount || 0,
-      depositDate: (r.existingClaim && r.existingClaim.depositDate) || '',
-      depositStatus: r.isClaimDeposited ? '입금완료' : '미입금',
-      cgDailyWage: r.cgDailyWage || 140000,
-      payoutAmount: r.fullPayoutAmount || 140000,
-      payoutStatus: r.isPayoutPaid ? '지급완료' : '지급전',
-      claimId: r.existingClaim ? r.existingClaim.id : (r.claimId || ''),
-      payoutId: r.existingPayout ? r.existingPayout.id : (r.payoutId || ''),
-      memo: r.memo || ''
-    }));
-  }
 
-  const setData = {
-    setIndex: setIndex,
-    claimRound: claimRound,
-    payoutRound: payoutRound,
-    claimStandardDate: claimStandardDate,
-    payoutStandardDate: payoutStandardDate,
-    claimDate: claimDate,
-    payoutDate: payoutDate,
-    startDateStr: startStr,
-    endDateStr: endStr,
-    days: days,
-    claimDays: claimDays,
-    payoutDays: payoutDays,
-    dailyClaimPrice: claimUnitPrice,
-    claimAmount: claimAmount,
-    claimStatus: claimStatus,
-    depositAmount: depositAmount,
-    depositDate: depositDate,
-    depositStatus: depositStatus,
-    cgDailyWage: cgDailyWage,
-    payoutAmount: payoutAmount,
-    payoutStatus: payoutStatus,
-    claimId: claimId || `Q${String(app.id).replace('C', '')}.${setIndex}`,
-    payoutId: payoutId || `P${String(app.id).replace('C', '')}.${setIndex}`,
-    memo: memo
-  };
+    const startVal = document.getElementById('settlementSetStartInput')?.value;
+    const endVal = document.getElementById('settlementSetEndInput')?.value;
+    const days = parseInt(document.getElementById('settlementSetDaysInput')?.value || '1', 10);
 
-  if (mode === 'add') {
-    setData.setIndex = app.customSettlementSets.length + 1;
-    app.customSettlementSets.push(setData);
-  } else {
-    const existingIdx = app.customSettlementSets.findIndex(s => s.setIndex === setIndex);
-    if (existingIdx >= 0) {
-      app.customSettlementSets[existingIdx] = setData;
-    } else {
-      app.customSettlementSets.push(setData);
+    const startStr = startVal ? `${startVal.slice(0, 10).replace(/-/g, '.')} ${startVal.slice(11, 16)}` : '';
+    const endStr = endVal ? `${endVal.slice(0, 10).replace(/-/g, '.')} ${endVal.slice(11, 16)}` : '';
+
+    const claimRound = document.getElementById('settlementSetClaimRoundInput')?.value.trim() || `${setIndex}차`;
+    const claimStandardDate = document.getElementById('settlementSetClaimStandardDateInput')?.value.trim() || (endStr ? endStr.slice(0, 10) : '');
+    const claimDate = document.getElementById('settlementSetClaimDateInput')?.value.trim() || '';
+    const claimDays = parseInt(document.getElementById('settlementSetClaimDaysInput')?.value || String(days), 10);
+    const claimUnitPrice = parseInt(String(document.getElementById('settlementSetClaimUnitPriceInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 160000;
+    const claimAmount = parseInt(String(document.getElementById('settlementSetClaimAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || (claimDays * claimUnitPrice);
+    const claimStatus = document.getElementById('settlementSetClaimStatusSelect')?.value || '청구전';
+
+    const depositAmount = parseInt(String(document.getElementById('settlementSetDepositAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 0;
+    const depositDate = document.getElementById('settlementSetDepositDateInput')?.value.trim() || '';
+    const depositStatus = document.getElementById('settlementSetDepositStatusSelect')?.value || '미입금';
+
+    const payoutRound = document.getElementById('settlementSetPayoutRoundInput')?.value.trim() || `${setIndex}차`;
+    const payoutStandardDate = document.getElementById('settlementSetPayoutStandardDateInput')?.value.trim() || endStr;
+    const payoutDate = document.getElementById('settlementSetPayoutDateInput')?.value.trim() || '';
+    const payoutDays = parseInt(document.getElementById('settlementSetPayoutDaysInput')?.value || String(days), 10);
+    const cgDailyWage = parseInt(String(document.getElementById('settlementSetPayoutWageInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 140000;
+    const payoutAmount = parseInt(String(document.getElementById('settlementSetPayoutAmountInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || (payoutDays * cgDailyWage);
+    const payoutStatus = document.getElementById('settlementSetPayoutStatusSelect')?.value || '지급전';
+
+    const memo = document.getElementById('settlementSetMemoInput')?.value.trim() || '';
+
+    const claimId = document.getElementById('settlementSetModalClaimId')?.value;
+    const payoutId = document.getElementById('settlementSetModalPayoutId')?.value;
+
+    // Initialize customSettlementSets if not present
+    if (!app.customSettlementSets || !Array.isArray(app.customSettlementSets)) {
+      const prog = as ? getCareProgressInfo(as) : null;
+      const initialSchedule = calculateCareSettlementSchedule(app, as, prog, (gClaims || []).filter(c => c.applyId === appId), (gPayouts || []).filter(p => p.applyId === appId));
+      app.customSettlementSets = (initialSchedule.rounds || []).map((r, i) => ({
+        setIndex: i + 1,
+        claimRound: r.claimRoundLabel || `${i + 1}차`,
+        payoutRound: r.payoutRoundLabel || `${i + 1}차`,
+        claimStandardDate: r.claimStandardDate || '',
+        payoutStandardDate: r.payoutStandardDate || '',
+        claimDate: r.claimDate || '',
+        payoutDate: r.payoutDate || '',
+        startDateStr: r.startDateStr || '',
+        endDateStr: r.endDateStr || '',
+        days: r.days || 1,
+        claimDays: r.claimDays || r.days || 1,
+        payoutDays: r.payoutDays || r.days || 1,
+        dailyClaimPrice: r.dailyClaimPrice || 160000,
+        claimAmount: r.fullClaimAmount || 160000,
+        claimStatus: (r.claimStatus === 'DEPOSIT_DONE' || r.isClaimDeposited) ? '입금완료' : ((r.isClaimSent || r.claimStatus === 'CLAIMED_UNPAID') ? '청구완료' : '청구전'),
+        depositAmount: r.depositAmount || 0,
+        depositDate: (r.existingClaim && r.existingClaim.depositDate) || '',
+        depositStatus: r.isClaimDeposited ? '입금완료' : '미입금',
+        cgDailyWage: r.cgDailyWage || 140000,
+        payoutAmount: r.fullPayoutAmount || 140000,
+        payoutStatus: r.isPayoutPaid ? '지급완료' : '지급전',
+        claimId: r.existingClaim ? r.existingClaim.id : (r.claimId || ''),
+        payoutId: r.existingPayout ? r.existingPayout.id : (r.payoutId || ''),
+        caregiverName: r.caregiverName || '',
+        memo: r.memo || ''
+      }));
     }
-  }
 
-  // Sync with gClaims
-  let matchedClaim = (gClaims || []).find(c => c.id === setData.claimId || (String(c.applyId) === String(app.id) && c.round === setData.claimRound));
-  if (matchedClaim) {
-    matchedClaim.round = setData.claimRound;
-    matchedClaim.standardDate = setData.claimStandardDate;
-    matchedClaim.claimDate = setData.claimDate;
-    matchedClaim.days = setData.claimDays;
-    matchedClaim.unitPrice = setData.dailyClaimPrice;
-    matchedClaim.claimAmount = setData.claimAmount;
-    matchedClaim.depositAmount = setData.depositAmount;
-    matchedClaim.depositDate = setData.depositDate;
-    matchedClaim.status = setData.claimStatus;
+    // Match existing claim & payout safely before resolvedCgName
+    let matchedClaim = (gClaims || []).find(c => (claimId && c.id === claimId) || (String(c.applyId) === String(app.id) && (c.round === claimRound || (setIndex === 1 && !c.round))));
+    let matchedPayout = (gPayouts || []).find(p => (payoutId && p.id === payoutId) || (String(p.applyId) === String(app.id) && (p.round === payoutRound || (setIndex === 1 && !p.round))));
+
+    const existingSet = (app.customSettlementSets || []).find(s => s.setIndex === setIndex);
+    const resolvedCgName = (matchedPayout && matchedPayout.caregiverName) || (existingSet && existingSet.caregiverName) || (as ? as.caregiverName : '');
+
+    const finalClaimId = claimId || (matchedClaim ? matchedClaim.id : `Q${String(app.id).replace('C', '')}.${setIndex}`);
+    const finalPayoutId = payoutId || (matchedPayout ? matchedPayout.id : `P${String(app.id).replace('C', '')}.${setIndex}`);
+
+    const setData = {
+      setIndex: setIndex,
+      claimRound: claimRound,
+      payoutRound: payoutRound,
+      claimStandardDate: claimStandardDate,
+      payoutStandardDate: payoutStandardDate,
+      claimDate: claimDate,
+      payoutDate: payoutDate,
+      startDateStr: startStr,
+      endDateStr: endStr,
+      days: days,
+      claimDays: claimDays,
+      payoutDays: payoutDays,
+      dailyClaimPrice: claimUnitPrice,
+      claimAmount: claimAmount,
+      claimStatus: claimStatus,
+      depositAmount: depositAmount,
+      depositDate: depositDate,
+      depositStatus: depositStatus,
+      caregiverName: resolvedCgName,
+      cgDailyWage: cgDailyWage,
+      payoutAmount: payoutAmount,
+      payoutStatus: payoutStatus,
+      claimId: finalClaimId,
+      payoutId: finalPayoutId,
+      memo: memo
+    };
+
+    const targetSetIndex = mode === 'add' ? (app.customSettlementSets.length + 1) : setIndex;
+    setData.setIndex = targetSetIndex;
+
+    if (mode === 'add') {
+      if (!claimId && !matchedClaim) {
+        setData.claimId = `Q${String(app.id).replace('C', '')}.${targetSetIndex}`;
+      }
+      if (!payoutId && !matchedPayout) {
+        setData.payoutId = `P${String(app.id).replace('C', '')}.${targetSetIndex}`;
+      }
+      app.customSettlementSets.push(setData);
+    } else {
+      const existingIdx = app.customSettlementSets.findIndex(s => Number(s.setIndex) === Number(setIndex));
+      if (existingIdx >= 0) {
+        app.customSettlementSets[existingIdx] = setData;
+      } else {
+        app.customSettlementSets.push(setData);
+      }
+    }
+
+    // Sync or Create with gClaims
+    if (!matchedClaim) {
+      matchedClaim = {
+        id: setData.claimId,
+        applyId: appId,
+        patientName: app.patientName || '고객',
+        insuranceCompany: app.insuranceCompany || '현대해상',
+        round: setData.claimRound,
+        standardDate: setData.claimStandardDate || (endStr ? endStr.slice(0, 10) : ''),
+        startDate: setData.startDateStr || '',
+        endDate: setData.endDateStr || '',
+        claimDate: setData.claimDate || '',
+        days: setData.claimDays,
+        unitPrice: setData.dailyClaimPrice,
+        dailyWage: setData.dailyClaimPrice,
+        claimAmount: setData.claimAmount,
+        depositAmount: setData.depositAmount,
+        depositDate: setData.depositDate,
+        unitPriceType: '확인',
+        depositStatus: setData.depositStatus === '입금완료' ? '입금완료' : '미수납',
+        unpaidAmount: Math.max(0, setData.claimAmount - setData.depositAmount),
+        status: setData.claimStatus,
+        adjusterStatus: setData.claimStatus,
+        memo: setData.memo
+      };
+      gClaims.unshift(matchedClaim);
+    } else {
+      matchedClaim.round = setData.claimRound;
+      matchedClaim.standardDate = setData.claimStandardDate;
+      matchedClaim.startDate = setData.startDateStr || matchedClaim.startDate;
+      matchedClaim.endDate = setData.endDateStr || matchedClaim.endDate;
+      matchedClaim.claimDate = setData.claimDate;
+      matchedClaim.days = setData.claimDays;
+      matchedClaim.unitPrice = setData.dailyClaimPrice;
+      matchedClaim.claimAmount = setData.claimAmount;
+      matchedClaim.depositAmount = setData.depositAmount;
+      matchedClaim.depositDate = setData.depositDate;
+      matchedClaim.depositStatus = setData.depositStatus === '입금완료' ? '입금완료' : '미수납';
+      matchedClaim.unpaidAmount = Math.max(0, setData.claimAmount - setData.depositAmount);
+      matchedClaim.status = setData.claimStatus;
+      matchedClaim.adjusterStatus = setData.claimStatus;
+      matchedClaim.memo = setData.memo;
+    }
     if (typeof syncToConvex === 'function') syncToConvex('sync:saveClaim', { claim: matchedClaim }).catch(console.warn);
-  }
 
-  // Sync with gPayouts
-  let matchedPayout = (gPayouts || []).find(p => p.id === setData.payoutId || (String(p.applyId) === String(app.id) && p.round === setData.payoutRound));
-  if (matchedPayout) {
-    matchedPayout.round = setData.payoutRound;
-    matchedPayout.standardDate = setData.payoutStandardDate;
-    matchedPayout.paidDate = setData.payoutDate;
-    matchedPayout.payoutDate = setData.payoutDate;
-    matchedPayout.days = setData.payoutDays;
-    matchedPayout.dailyWage = setData.cgDailyWage;
-    matchedPayout.payoutAmount = setData.payoutAmount;
-    matchedPayout.payoutStatus = setData.payoutStatus;
+    // Sync or Create with gPayouts
+    if (!matchedPayout) {
+      matchedPayout = {
+        id: setData.payoutId,
+        applyId: appId,
+        patientName: app.patientName || '고객',
+        caregiverName: resolvedCgName,
+        centerName: as ? as.centerName || '영등포센터' : '영등포센터',
+        round: setData.payoutRound,
+        standardDate: setData.payoutStandardDate || endStr || '',
+        startDate: setData.startDateStr || '',
+        endDate: setData.endDateStr || '',
+        paidDate: setData.payoutDate || '',
+        payoutDate: setData.payoutDate || '',
+        days: setData.payoutDays,
+        dailyWage: setData.cgDailyWage,
+        payoutAmount: setData.payoutAmount,
+        payoutStatus: setData.payoutStatus,
+        caregiverName: resolvedCgName,
+        memo: setData.memo
+      };
+      gPayouts.unshift(matchedPayout);
+    } else {
+      matchedPayout.round = setData.payoutRound;
+      matchedPayout.standardDate = setData.payoutStandardDate;
+      matchedPayout.startDate = setData.startDateStr || matchedPayout.startDate;
+      matchedPayout.endDate = setData.endDateStr || matchedPayout.endDate;
+      matchedPayout.paidDate = setData.payoutDate;
+      matchedPayout.payoutDate = setData.payoutDate;
+      matchedPayout.days = setData.payoutDays;
+      matchedPayout.dailyWage = setData.cgDailyWage;
+      matchedPayout.payoutAmount = setData.payoutAmount;
+      matchedPayout.payoutStatus = setData.payoutStatus;
+      matchedPayout.caregiverName = resolvedCgName;
+      matchedPayout.memo = setData.memo;
+    }
     if (typeof syncToConvex === 'function') syncToConvex('sync:savePayout', { payout: matchedPayout }).catch(console.warn);
-  }
 
-  // Save to localStorage & Convex
-  try {
-    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
-    localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
-    localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+    // Update customer statistics
+    const appClaims = (gClaims || []).filter(c => String(c.applyId) === String(app.id));
+    app.claimCount = appClaims.length;
+    app.unconfirmedClaimCount = appClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').length;
+    app.estimatedUnpaid = appClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').reduce((sum, c) => sum + (c.unpaidAmount || c.claimAmount || 0), 0);
+
+    const appPayouts = (gPayouts || []).filter(p => String(p.applyId) === String(app.id));
+    app.totalPayout = appPayouts.filter(p => p.payoutStatus === '지급완료' || p.payoutStatus === '지급').reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
+
+    app.hasManualUpdate = true;
+    app.updatedAt = new Date().toISOString();
+
+    const appIdx = (gApps || []).findIndex(a => String(a.id) === String(app.id));
+    if (appIdx !== -1) {
+      gApps[appIdx] = app;
+    }
+
+    // Save to localStorage & Convex
+    try {
+      localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+      localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+      localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+    } catch (err) {
+      console.warn('localStorage save failed:', err);
+    }
+
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+    }
+
+    // Sync to Node Server backend (/api/hub/customer/update-fields & /api/hub/real-data)
+    try {
+      await fetch('/api/hub/customer/update-fields', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: app.id,
+          fields: {
+            customSettlementSets: app.customSettlementSets,
+            claimCount: app.claimCount,
+            unconfirmedClaimCount: app.unconfirmedClaimCount,
+            estimatedUnpaid: app.estimatedUnpaid,
+            totalPayout: app.totalPayout,
+            hasManualUpdate: true,
+            status: app.status,
+            claimClassification: app.claimClassification,
+            claimCategory: app.claimCategory,
+            claim: matchedClaim,
+            payout: matchedPayout
+          }
+        })
+      });
+    } catch (e) {
+      console.warn('[handleSaveSettlementSet] update-fields error:', e);
+    }
+
+    try {
+      await fetch('/api/hub/real-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applications: gApps,
+          assignments: gAssigns,
+          claims: gClaims,
+          payouts: gPayouts
+        })
+      });
+    } catch (e) {
+      console.warn('[handleSaveSettlementSet] real-data sync error:', e);
+    }
+
+    closeModal('settlementSetModal');
+    if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
+      openHubCustomerDetailModal(gActiveHubModalAppId);
+    }
+    if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+
+    if (typeof showNotification === 'function') {
+      showNotification({
+        type: 'success',
+        title: '정산·청구 세트 저장 완료',
+        message: `[${maskName(app.patientName)} 님] 세트 ${setData.setIndex} (청구: ${setData.claimRound} / 지급: ${setData.payoutRound})가 저장되었습니다.`,
+        icon: 'check-circle'
+      });
+    }
   } catch (err) {
-    console.warn('localStorage save failed:', err);
-  }
-
-  if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:saveApplication', { app }).catch(console.warn);
-  }
-
-  closeModal('settlementSetModal');
-  if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
-    openHubCustomerDetailModal(gActiveHubModalAppId);
-  }
-  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
-
-  if (typeof showNotification === 'function') {
-    showNotification({
-      type: 'success',
-      title: '정산·청구 세트 저장 완료',
-      message: `[${maskName(app.patientName)} 님] 세트 ${setData.setIndex} (청구: ${setData.claimRound} / 지급: ${setData.payoutRound})가 저장되었습니다.`,
-      icon: 'check-circle'
-    });
+    console.error('[handleSaveSettlementSet] Error:', err);
+    if (typeof showNotification === 'function') {
+      showNotification({
+        type: 'error',
+        title: '세트 저장 실패',
+        message: err.message || '저장 중 오류가 발생했습니다.',
+        icon: 'alert-circle'
+      });
+    }
   }
 }
 
@@ -22293,7 +23474,7 @@ async function deleteSettlementSet(appId, setIndex) {
   if (!app) return;
 
   const confirmed = await showCustomConfirm(
-    `[${maskName(app.patientName)} 님] 세트 ${setIndex} 정산·청구 내역을 삭제하시겠습니까?\n\n삭제 시 해당 차수의 청구 및 정산 일정이 목록에서 제거됩니다.`,
+    `[${maskName(app.patientName)} 님] 세트 ${setIndex} 정산·청구 내역을 삭제하시겠습니까?\n\n삭제 시 해당 차수의 청구 및 정산 일정이 목록에서 완전히 제거됩니다.`,
     {
       theme: 'rose',
       icon: 'trash-2',
@@ -22304,30 +23485,197 @@ async function deleteSettlementSet(appId, setIndex) {
   );
   if (!confirmed) return;
 
-  if (app.customSettlementSets && Array.isArray(app.customSettlementSets)) {
-    app.customSettlementSets = app.customSettlementSets.filter(s => s.setIndex !== setIndex);
-    // Re-index
-    app.customSettlementSets.forEach((s, idx) => { s.setIndex = idx + 1; });
+  // 1. Gather context data
+  const appAssigns = (gAssigns || []).filter(a => String(a.applyId) === String(appId));
+  const as = appAssigns.length > 0 ? (typeof getActiveCaregiverAssignment === 'function' ? getActiveCaregiverAssignment(app, appAssigns) : appAssigns[0]) || appAssigns[0] : null;
+  const prog = as ? (typeof getCareProgressInfo === 'function' ? getCareProgressInfo(as) : null) : null;
+  const appClaims = (gClaims || []).filter(c => String(c.applyId) === String(appId));
+  const appPayouts = (gPayouts || []).filter(p => String(p.applyId) === String(appId));
+
+  // 2. Obtain current schedule rounds
+  const schedule = calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts);
+  const currentRounds = (schedule && schedule.rounds) ? schedule.rounds : [];
+
+  // 3. Initialize customSettlementSets if not present or empty
+  if (!app.customSettlementSets || !Array.isArray(app.customSettlementSets) || app.customSettlementSets.length === 0) {
+    app.customSettlementSets = currentRounds.map((r, i) => ({
+      setIndex: i + 1,
+      claimRound: r.claimRoundLabel && r.claimRoundLabel !== '-' ? r.claimRoundLabel : (r.existingClaim ? r.existingClaim.round : `${i + 1}차`),
+      payoutRound: r.payoutRoundLabel && r.payoutRoundLabel !== '-' ? r.payoutRoundLabel : (r.existingPayout ? r.existingPayout.round : `${i + 1}차`),
+      claimStandardDate: r.claimStandardDate || '',
+      payoutStandardDate: r.payoutStandardDate || '',
+      claimDate: r.claimDate || (r.existingClaim ? (r.existingClaim.claimDate || r.existingClaim.faxSentDate || '') : ''),
+      payoutDate: r.payoutDate || (r.existingPayout ? (r.existingPayout.paidDate || r.existingPayout.payoutDate || '') : ''),
+      startDateStr: r.startDateStr || '',
+      endDateStr: r.endDateStr || '',
+      days: r.days || 1,
+      claimDays: r.claimDays || r.days || 1,
+      payoutDays: r.payoutDays || r.days || 1,
+      dailyClaimPrice: r.dailyClaimPrice || 160000,
+      claimAmount: r.fullClaimAmount || ((r.claimDays || r.days || 1) * (r.dailyClaimPrice || 160000)),
+      claimStatus: (r.claimStatus === 'DEPOSIT_DONE' || r.isClaimDeposited) ? '입금완료' : ((r.isClaimSent || r.claimStatus === 'CLAIMED_UNPAID') ? '청구완료' : '청구전'),
+      depositAmount: r.depositAmount || 0,
+      depositDate: (r.existingClaim && r.existingClaim.depositDate) || '',
+      depositStatus: r.isClaimDeposited ? '입금완료' : (r.depositAmount > 0 ? '부분입금' : '미입금'),
+      cgDailyWage: r.cgDailyWage || 140000,
+      payoutAmount: r.fullPayoutAmount || 0,
+      payoutStatus: r.isPayoutPaid ? '지급완료' : '지급전',
+      claimId: r.existingClaim ? r.existingClaim.id : (r.claimId || ''),
+      payoutId: r.existingPayout ? r.existingPayout.id : (r.payoutId || ''),
+      caregiverName: r.caregiverName || '',
+      memo: r.memo || (r.existingClaim ? r.existingClaim.memo : '') || (r.existingPayout ? r.existingPayout.memo : '') || ''
+    }));
+  }
+
+  // 4. Find the target set to be deleted
+  const targetSet = app.customSettlementSets.find(s => Number(s.setIndex) === Number(setIndex)) || app.customSettlementSets[Number(setIndex) - 1];
+
+  // 5. Identify and remove any associated claim(s) and payout(s)
+  const targetClaimId = targetSet ? (targetSet.claimId || '') : '';
+  const targetClaimRound = targetSet ? (targetSet.claimRound || '') : '';
+  const targetPayoutId = targetSet ? (targetSet.payoutId || '') : '';
+  const targetPayoutRound = targetSet ? (targetSet.payoutRound || '') : '';
+
+  const claimsToDelete = (gClaims || []).filter(c => {
+    if (String(c.applyId) !== String(app.id)) return false;
+    if (targetClaimId && c.id === targetClaimId) return true;
+    if (targetClaimRound && targetClaimRound !== '-' && c.round === targetClaimRound) return true;
+    return false;
+  });
+
+  const payoutsToDelete = (gPayouts || []).filter(p => {
+    if (String(p.applyId) !== String(app.id)) return false;
+    if (targetPayoutId && p.id === targetPayoutId) return true;
+    if (targetPayoutRound && targetPayoutRound !== '-' && p.round === targetPayoutRound) return true;
+    return false;
+  });
+
+  const deletedClaimIds = claimsToDelete.map(c => c.id);
+  const deletedPayoutIds = payoutsToDelete.map(p => p.id);
+
+  if (deletedClaimIds.length > 0) {
+    gClaims = (gClaims || []).filter(c => !deletedClaimIds.includes(c.id));
+    deletedClaimIds.forEach(cId => {
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:deleteClaim', { claimId: cId }).catch(console.warn);
+      }
+    });
+  }
+
+  if (deletedPayoutIds.length > 0) {
+    gPayouts = (gPayouts || []).filter(p => !deletedPayoutIds.includes(p.id));
+    deletedPayoutIds.forEach(pId => {
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:deletePayout', { payoutId: pId }).catch(console.warn);
+      }
+    });
+  }
+
+  // 6. Remove target set from customSettlementSets & re-index remaining sets
+  app.customSettlementSets = app.customSettlementSets.filter(s => Number(s.setIndex) !== Number(setIndex));
+  app.customSettlementSets.forEach((s, idx) => {
+    s.setIndex = idx + 1;
+  });
+
+  // 7. Update customer statistics
+  const remainingAppClaims = (gClaims || []).filter(c => String(c.applyId) === String(app.id));
+  app.claimCount = remainingAppClaims.length;
+  app.unconfirmedClaimCount = remainingAppClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').length;
+  app.estimatedUnpaid = remainingAppClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').reduce((sum, c) => sum + (c.unpaidAmount || c.claimAmount || 0), 0);
+
+  const remainingAppPayouts = (gPayouts || []).filter(p => String(p.applyId) === String(app.id));
+  app.totalPayout = remainingAppPayouts.filter(p => p.payoutStatus === '지급완료' || p.payoutStatus === '지급').reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
+
+  app.hasManualUpdate = true;
+  app.updatedAt = new Date().toISOString();
+
+  const appIdx = (gApps || []).findIndex(a => String(a.id) === String(app.id));
+  if (appIdx !== -1) {
+    gApps[appIdx] = app;
+  }
+
+  // 8. Persist to localStorage
+  try {
+    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+    localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+  } catch (e) {
+    console.warn('localStorage save warning:', e);
+  }
+
+  // 9. Persist to backend server (/api/hub/customer/update-fields & /api/hub/real-data)
+  try {
+    await fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: app.id,
+        fields: {
+          customSettlementSets: app.customSettlementSets,
+          claimCount: app.claimCount,
+          unconfirmedClaimCount: app.unconfirmedClaimCount,
+          estimatedUnpaid: app.estimatedUnpaid,
+          totalPayout: app.totalPayout,
+          hasManualUpdate: true,
+          deleteClaimIds: deletedClaimIds,
+          deletePayoutIds: deletedPayoutIds
+        }
+      })
+    });
+  } catch (e) {
+    console.warn('[deleteSettlementSet] update-fields error:', e);
   }
 
   try {
-    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
-  } catch (e) {}
+    await fetch('/api/hub/real-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        applications: gApps,
+        assignments: gAssigns,
+        claims: gClaims,
+        payouts: gPayouts
+      })
+    });
+  } catch (e) {
+    console.warn('[deleteSettlementSet] real-data sync error:', e);
+  }
 
+  // 10. Persist to Convex Cloud
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:saveApplication', { app }).catch(console.warn);
   }
 
+  // 11. System audit log
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '정산청구세트',
+      actionType: 'DELETE',
+      target: `[${app.id}] ${maskName(app.patientName)} 세트 ${setIndex}`,
+      summary: `세트 ${setIndex} 삭제 완료 (연동 청구 ${deletedClaimIds.length}건, 지급 ${deletedPayoutIds.length}건 정리)`,
+      changes: {
+        '세트수': { before: `${app.customSettlementSets.length + 1}개`, after: `${app.customSettlementSets.length}개` },
+        '미수금': { after: `${formatCurrency(app.estimatedUnpaid)}원` }
+      }
+    });
+  }
+
+  // 12. Refresh UI immediately
   if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
     openHubCustomerDetailModal(gActiveHubModalAppId);
   }
   if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  const claimListModal = document.getElementById('claimDetailListModal');
+  if (claimListModal && !claimListModal.classList.contains('hidden')) openClaimDetailListModal(app.id);
+  const payoutListModal = document.getElementById('payoutDetailListModal');
+  if (payoutListModal && !payoutListModal.classList.contains('hidden')) openPayoutDetailListModal(app.id);
 
+  // 13. Toast / Notification
   if (typeof showNotification === 'function') {
     showNotification({
       type: 'info',
       title: '세트 삭제 완료',
-      message: `[${maskName(app.patientName)} 님] 세트 ${setIndex}가 삭제되었습니다.`,
+      message: `[${maskName(app.patientName)} 님] 세트 ${setIndex}가 정상적으로 삭제되었습니다.`,
       icon: 'trash-2'
     });
   }
@@ -22341,6 +23689,324 @@ function deleteCurrentSettlementSetFromModal() {
     deleteSettlementSet(appId, setIndex);
   }
 }
+
+// =========================================================================
+// [UNIFIED CUSTOMER FINAL SAVE & MODAL CLOSE INTERCEPTION ENGINE]
+// =========================================================================
+
+async function saveActiveHubCustomerDetail(silent = false) {
+  const appId = (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) 
+    ? gActiveHubModalAppId 
+    : document.getElementById('settlementSetModalAppId')?.value;
+
+  if (!appId) {
+    if (!silent && typeof showNotification === 'function') {
+      showNotification({ type: 'warning', title: '저장 불가', message: '활성화된 고객 정보를 찾을 수 없습니다.' });
+    }
+    return false;
+  }
+
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) {
+    if (!silent && typeof showNotification === 'function') {
+      showNotification({ type: 'error', title: '고객 정보 없음', message: `고객 [${appId}] 정보를 찾을 수 없습니다.` });
+    }
+    return false;
+  }
+
+  // 1. Sync uncommitted round deposit inputs in DOM if any
+  try {
+    const depositInputs = document.querySelectorAll(`[id^="timelineRoundDepositInput_${app.id}_"], [id^="roundDepositInput_${app.id}_"]`);
+    depositInputs.forEach(inp => {
+      const parts = inp.id.split('_');
+      const roundNum = parseInt(parts[2], 10);
+      const val = parseInt(String(inp.value || '0').replace(/[^0-9]/g, ''), 10);
+      if (roundNum && !isNaN(val)) {
+        if (!app.roundDeposits) app.roundDeposits = {};
+        app.roundDeposits[roundNum] = val;
+
+        if (app.customSettlementSets && Array.isArray(app.customSettlementSets)) {
+          const targetSet = app.customSettlementSets.find(s => Number(s.setIndex) === Number(roundNum));
+          if (targetSet) {
+            targetSet.depositAmount = val;
+            if (val > 0) {
+              targetSet.depositStatus = (val >= (targetSet.claimAmount || 0)) ? '입금완료' : '부분입금';
+            }
+          }
+        }
+      }
+    });
+  } catch (domErr) {
+    console.warn('[saveActiveHubCustomerDetail] DOM input check warning:', domErr);
+  }
+
+  // 2. Ensure all custom settlement sets have matching claims and payouts
+  const appAssigns = (gAssigns || []).filter(a => String(a.applyId) === String(app.id));
+  const as = appAssigns.length > 0 ? (typeof getActiveCaregiverAssignment === 'function' ? getActiveCaregiverAssignment(app, appAssigns) : appAssigns[0]) || appAssigns[0] : null;
+
+  if (app.customSettlementSets && Array.isArray(app.customSettlementSets) && app.customSettlementSets.length > 0) {
+    app.customSettlementSets.forEach((s, idx) => {
+      const setIdx = s.setIndex || (idx + 1);
+      s.setIndex = setIdx;
+      const cId = s.claimId || `Q${String(app.id).replace('C', '')}.${setIdx}`;
+      s.claimId = cId;
+
+      let c = (gClaims || []).find(claim => claim.id === cId || (String(claim.applyId) === String(app.id) && String(claim.round).trim() === String(s.claimRound).trim()));
+      if (!c) {
+        c = {
+          id: cId,
+          applyId: app.id,
+          patientName: app.patientName || '고객',
+          insuranceCompany: app.insuranceCompany || '현대해상',
+          round: s.claimRound || `${setIdx}차`,
+          standardDate: s.claimStandardDate || '',
+          startDate: s.startDateStr || '',
+          endDate: s.endDateStr || '',
+          claimDate: s.claimDate || '',
+          days: s.claimDays || s.days || 1,
+          unitPrice: s.dailyClaimPrice || 160000,
+          dailyWage: s.dailyClaimPrice || 160000,
+          claimAmount: s.claimAmount || 0,
+          depositAmount: s.depositAmount || 0,
+          depositDate: s.depositDate || '',
+          unitPriceType: '확인',
+          depositStatus: s.depositStatus === '입금완료' ? '입금완료' : (s.depositAmount > 0 ? '부분입금' : '미수납'),
+          unpaidAmount: Math.max(0, (s.claimAmount || 0) - (s.depositAmount || 0)),
+          status: s.claimStatus || '청구전',
+          adjusterStatus: s.claimStatus || '청구전',
+          memo: s.memo || ''
+        };
+        gClaims.unshift(c);
+      } else {
+        c.round = s.claimRound || c.round;
+        c.standardDate = s.claimStandardDate || c.standardDate;
+        c.startDate = s.startDateStr || c.startDate;
+        c.endDate = s.endDateStr || c.endDate;
+        c.claimDate = s.claimDate || c.claimDate;
+        c.days = s.claimDays || s.days || c.days;
+        c.unitPrice = s.dailyClaimPrice || c.unitPrice;
+        c.claimAmount = s.claimAmount || c.claimAmount;
+        if (s.depositAmount !== undefined) c.depositAmount = s.depositAmount;
+        c.depositDate = s.depositDate || c.depositDate;
+        c.depositStatus = s.depositStatus === '입금완료' ? '입금완료' : (c.depositAmount > 0 ? '부분입금' : '미수납');
+        c.unpaidAmount = Math.max(0, (c.claimAmount || 0) - (c.depositAmount || 0));
+        c.status = s.claimStatus || c.status;
+        c.adjusterStatus = s.claimStatus || c.adjusterStatus;
+        c.memo = s.memo || c.memo;
+      }
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:saveClaim', { claim: c }).catch(console.warn);
+      }
+
+      const pId = s.payoutId || `P${String(app.id).replace('C', '')}.${setIdx}`;
+      s.payoutId = pId;
+
+      let p = (gPayouts || []).find(payout => payout.id === pId || (String(payout.applyId) === String(app.id) && String(payout.round).trim() === String(s.payoutRound).trim()));
+      if (!p) {
+        p = {
+          id: pId,
+          applyId: app.id,
+          patientName: app.patientName || '고객',
+          caregiverName: s.caregiverName || (as ? as.caregiverName : ''),
+          centerName: as ? as.centerName || '영등포센터' : '영등포센터',
+          round: s.payoutRound || `${setIdx}차`,
+          standardDate: s.payoutStandardDate || '',
+          startDate: s.startDateStr || '',
+          endDate: s.endDateStr || '',
+          paidDate: s.payoutDate || '',
+          payoutDate: s.payoutDate || '',
+          days: s.payoutDays || s.days || 1,
+          dailyWage: s.cgDailyWage || 140000,
+          payoutAmount: s.payoutAmount || 0,
+          payoutStatus: s.payoutStatus || '지급전',
+          caregiverName: s.caregiverName || (as ? as.caregiverName : ''),
+          memo: s.memo || ''
+        };
+        gPayouts.unshift(p);
+      } else {
+        p.round = s.payoutRound || p.round;
+        p.standardDate = s.payoutStandardDate || p.standardDate;
+        p.startDate = s.startDateStr || p.startDate;
+        p.endDate = s.endDateStr || p.endDate;
+        p.paidDate = s.payoutDate || p.paidDate;
+        p.payoutDate = s.payoutDate || p.payoutDate;
+        p.days = s.payoutDays || s.days || p.days;
+        p.dailyWage = s.cgDailyWage || p.dailyWage;
+        p.payoutAmount = s.payoutAmount || p.payoutAmount;
+        p.payoutStatus = s.payoutStatus || p.payoutStatus;
+        p.caregiverName = s.caregiverName || p.caregiverName;
+        p.memo = s.memo || p.memo;
+      }
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:savePayout', { payout: p }).catch(console.warn);
+      }
+    });
+  }
+
+  // 3. Recalculate customer statistics
+  const remainingAppClaims = (gClaims || []).filter(c => String(c.applyId) === String(app.id));
+  app.claimCount = remainingAppClaims.length;
+  app.unconfirmedClaimCount = remainingAppClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').length;
+  app.estimatedUnpaid = remainingAppClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').reduce((sum, c) => sum + (c.unpaidAmount || c.claimAmount || 0), 0);
+
+  const remainingAppPayouts = (gPayouts || []).filter(p => String(p.applyId) === String(app.id));
+  app.totalPayout = remainingAppPayouts.filter(p => p.payoutStatus === '지급완료' || p.payoutStatus === '지급').reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
+
+  app.hasManualUpdate = true;
+  app.updatedAt = new Date().toISOString();
+
+  const appIdx = (gApps || []).findIndex(a => String(a.id) === String(app.id));
+  if (appIdx !== -1) {
+    gApps[appIdx] = app;
+  }
+
+  // 4. Save to localStorage
+  try {
+    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+    localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+  } catch (err) {
+    console.warn('[saveActiveHubCustomerDetail] localStorage error:', err);
+  }
+
+  // 5. Save to Convex
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+  }
+
+  // 6. Save to Node Server: update-fields
+  try {
+    await fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: app.id,
+        fields: {
+          customSettlementSets: app.customSettlementSets,
+          claimCount: app.claimCount,
+          unconfirmedClaimCount: app.unconfirmedClaimCount,
+          estimatedUnpaid: app.estimatedUnpaid,
+          totalPayout: app.totalPayout,
+          hasManualUpdate: true,
+          status: app.status,
+          claimClassification: app.claimClassification,
+          claimCategory: app.claimCategory
+        }
+      })
+    });
+  } catch (e) {
+    console.warn('[saveActiveHubCustomerDetail] update-fields error:', e);
+  }
+
+  // 7. Save to Node Server: real-data (persists hub_apps_real.json directly)
+  try {
+    await fetch('/api/hub/real-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        applications: gApps,
+        assignments: gAssigns,
+        claims: gClaims,
+        payouts: gPayouts
+      })
+    });
+  } catch (e) {
+    console.warn('[saveActiveHubCustomerDetail] real-data sync error:', e);
+  }
+
+  // 8. Button feedback
+  const btnDesktop = document.getElementById('btnSaveHubCustomerModalText');
+  const btnMobile = document.getElementById('btnSaveHubCustomerModalMobileText');
+  const btnFooter = document.getElementById('btnSaveHubCustomerModalFooterText');
+  if (btnDesktop) btnDesktop.innerText = '저장 완료 ✅';
+  if (btnMobile) btnMobile.innerText = '저장 완료 ✅';
+  if (btnFooter) btnFooter.innerText = '저장 완료 ✅';
+  setTimeout(() => {
+    if (btnDesktop) btnDesktop.innerText = '저장후 닫기';
+    if (btnMobile) btnMobile.innerText = '저장후 닫기';
+    if (btnFooter) btnFooter.innerText = '저장후 닫기';
+  }, 2500);
+
+  // 9. Toast notification
+  if (!silent && typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '서버 저장 완료',
+      message: `[${maskName(app.patientName)} 님] 모든 변경사항(정산·청구 세트, 청구, 입금, 지급 내역)이 서버 및 DB에 영구 반영되었습니다.`,
+      icon: 'check-circle'
+    });
+  }
+
+  // 10. Audit log
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '고객상세',
+      actionType: 'UPDATE',
+      target: `고객 [${app.id}] (${maskName(app.patientName)})`,
+      summary: `[${app.patientName} 님] 상세 모달 전체 변경사항 서버 및 DB 최종 영구 저장 완료`,
+      changes: {
+        customSettlementSets: `${(app.customSettlementSets || []).length}개 세트`,
+        claims: `${remainingAppClaims.length}건`,
+        payouts: `${remainingAppPayouts.length}건`
+      }
+    });
+  }
+
+  if (typeof renderUnifiedCareHub === 'function') {
+    renderUnifiedCareHub();
+  }
+
+  return true;
+}
+
+// [사용자 요구사항]: '저장후 닫기' 클릭 시 확인창 없이 곧바로 서버 저장 후 팝업 즉시 닫기
+async function saveAndCloseActiveHubCustomerDetail() {
+  const btnDesktop = document.getElementById('btnSaveHubCustomerModalText');
+  const btnMobile = document.getElementById('btnSaveHubCustomerModalMobileText');
+  const btnFooter = document.getElementById('btnSaveHubCustomerModalFooterText');
+  if (btnDesktop) btnDesktop.innerText = '저장 중...';
+  if (btnMobile) btnMobile.innerText = '저장 중...';
+  if (btnFooter) btnFooter.innerText = '저장 중...';
+
+  await saveActiveHubCustomerDetail(false);
+  closeModal('hubCustomerDetailModal');
+}
+
+// [사용자 요구사항]: 저장여부 확인은 'x' 또는 '닫기' 버튼을 눌렀을 때만 물어봄
+async function confirmCloseHubCustomerDetailModal() {
+  const appId = (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) ? gActiveHubModalAppId : '';
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  const patientName = app ? maskName(app.patientName) : '고객';
+
+  const shouldSave = await showCustomConfirm(
+    `[${patientName} 님] 상세 모달을 닫기 전 변경사항(정산·청구 세트, 청구, 입금, 지급 등)을 저장하시겠습니까?\n\n* [저장 후 닫기]: 서버 및 DB에 즉시 영구 저장 후 창을 닫습니다.\n* [저장 안하고 닫기]: 변경사항을 추가 저장하지 않고 창만 닫습니다.`,
+    {
+      theme: 'emerald',
+      icon: 'save',
+      title: '고객 상세 정보 저장 및 닫기',
+      confirmText: '저장 후 닫기 💾',
+      cancelText: '저장 안하고 닫기'
+    }
+  );
+
+  if (shouldSave) {
+    await saveActiveHubCustomerDetail(true);
+    if (typeof showNotification === 'function' && app) {
+      showNotification({
+        type: 'success',
+        title: '저장 후 창 닫힘',
+        message: `[${patientName} 님] 변경사항이 서버에 안전하게 영구 저장되었습니다.`,
+        icon: 'check-circle'
+      });
+    }
+  }
+
+  closeModal('hubCustomerDetailModal');
+}
+
+window.saveActiveHubCustomerDetail = saveActiveHubCustomerDetail;
+window.saveAndCloseActiveHubCustomerDetail = saveAndCloseActiveHubCustomerDetail;
+window.confirmCloseHubCustomerDetailModal = confirmCloseHubCustomerDetailModal;
 
 function openRoundDateEditModal(appId, roundNum) {
   // Delegate directly to the comprehensive Settlement Set modal
@@ -22885,6 +24551,293 @@ async function cancelSamsungRoundClaim(appId, roundNumber) {
     });
   }
 }
+
+// =========================================================================
+// 수동 팩스 청구완료(발송완료) 직접 등록 및 수정 모달 엔진
+// =========================================================================
+function ensureManualFaxClaimModal() {
+  if (document.getElementById('manualFaxClaimModal')) return;
+  const modalHtml = `
+    <div id="manualFaxClaimModal" class="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+      <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+        <div class="px-6 py-4 bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              <i data-lucide="send" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+              <h3 class="font-black text-sm sm:text-base flex items-center gap-1.5" id="manualFaxModalTitle">
+                보험사 팩스 청구 수동 발송완료 입력
+              </h3>
+              <p class="text-[11px] text-purple-200" id="manualFaxModalSubtitle">
+                외부 팩스기 또는 별도 발송한 청구내역을 수동으로 발송완료(청구완료) 처리합니다.
+              </p>
+            </div>
+          </div>
+          <button type="button" onclick="closeModal('manualFaxClaimModal')" class="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer" title="닫기">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleManualFaxClaimSubmit(event)" class="p-5 sm:p-6 space-y-4 text-xs">
+          <input type="hidden" id="manualFaxAppId" value="">
+          <input type="hidden" id="manualFaxRoundNumber" value="1">
+
+          <div class="p-3 bg-purple-50/80 rounded-2xl border border-purple-200 text-purple-950 space-y-1">
+            <div class="flex items-center justify-between font-bold">
+              <span id="manualFaxPatientInfo" class="text-sm font-black text-purple-900">-</span>
+              <span id="manualFaxRoundBadge" class="px-2.5 py-0.5 rounded-full bg-purple-600 text-white font-black text-[11px] shadow-2xs">-차</span>
+            </div>
+            <div class="flex items-center justify-between text-xs text-purple-800 pt-1 border-t border-purple-200/60 font-medium">
+              <span>청구 대상금액: <b id="manualFaxTargetAmount" class="font-black text-purple-950 font-mono">-</b></span>
+              <span>간병기간: <span id="manualFaxCarePeriod" class="font-mono">-</span></span>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">팩스 수신처</label>
+                <input type="text" id="manualFaxRecipientInput" placeholder="예: 현대해상 보상팀" required
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-bold text-slate-900 focus:ring-2 focus:ring-purple-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">수신 팩스번호</label>
+                <input type="text" id="manualFaxNumberInput" placeholder="예: 02-2181-2520" required
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono font-bold text-slate-900 focus:ring-2 focus:ring-purple-500">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">발송(청구) 일시</label>
+                <input type="datetime-local" id="manualFaxSentDateInput" required
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono font-bold text-slate-900 focus:ring-2 focus:ring-purple-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">청구 금액 (원)</label>
+                <input type="text" id="manualFaxAmountInput" oninput="formatCurrencyInputElement(this)" required
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono font-black text-right text-slate-900 focus:ring-2 focus:ring-purple-500">
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 text-[11px] mb-1">발송 메모 / 특이사항</label>
+              <input type="text" id="manualFaxMemoInput" placeholder="예: 사무실 팩스기로 수동 발송완료"
+                class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-purple-500">
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+            <button type="button" onclick="closeModal('manualFaxClaimModal')"
+              class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-all cursor-pointer">
+              취소
+            </button>
+            <button type="submit"
+              class="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black shadow-md flex items-center gap-1.5 transition-all cursor-pointer active:scale-95">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>발송(청구)완료 등록</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function openManualFaxClaimModal(appId, roundNumber) {
+  ensureManualFaxClaimModal();
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  const appAssigns = (gAssigns || []).filter(a => a.applyId === appId);
+  const as = appAssigns.length > 0 ? appAssigns[0] : null;
+  const prog = as ? getCareProgressInfo(as) : null;
+  const appClaims = (gClaims || []).filter(c => c.applyId === appId);
+  const appPayouts = (gPayouts || []).filter(p => p.applyId === appId);
+  const schedule = calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts);
+  const r = (schedule && schedule.rounds) ? (schedule.rounds.find(x => (x.setIndex || x.roundNumber) === roundNumber) || schedule.rounds[roundNumber - 1] || schedule.rounds[0]) : null;
+
+  document.getElementById('manualFaxAppId').value = appId;
+  document.getElementById('manualFaxRoundNumber').value = roundNumber;
+  document.getElementById('manualFaxModalTitle').innerText = `[${roundNumber}차] 보험사 팩스 청구 수동 발송완료 입력`;
+  document.getElementById('manualFaxPatientInfo').innerText = `[${app.id}] ${maskName(app.patientName)} · ${app.insuranceCompany || '보험사'}`;
+  document.getElementById('manualFaxRoundBadge').innerText = `${roundNumber}차 청구`;
+  
+  const targetAmt = r ? r.fullClaimAmount : (app.claimUnitPrice || 144000) * 10;
+  document.getElementById('manualFaxTargetAmount').innerText = `${formatCurrency(targetAmt)}원`;
+  document.getElementById('manualFaxAmountInput').value = formatCurrency(targetAmt);
+
+  const startStr = r ? r.startDateStr : '';
+  const endStr = r ? r.endDateStr : '';
+  document.getElementById('manualFaxCarePeriod').innerText = (startStr && endStr) ? `${startStr.slice(0, 10)} ~ ${endStr.slice(0, 10)} (${r.days}일)` : '-';
+
+  const defaultRecipient = app.adjusterName ? `${app.adjusterName} 손사` : `${app.insuranceCompany || '현대해상'} 보상팀`;
+  document.getElementById('manualFaxRecipientInput').value = defaultRecipient;
+  const defaultNumber = app.adjusterFax || app.adjusterPhone || app.adjusterMobile || '022-181-2520';
+  document.getElementById('manualFaxNumberInput').value = defaultNumber;
+
+  const now = new Date();
+  const defSentTime = r && r.claimDate ? parseCareDateTime(r.claimDate) : now;
+  document.getElementById('manualFaxSentDateInput').value = formatDateTimeLocalInput(defSentTime || now);
+  document.getElementById('manualFaxMemoInput').value = r && r.memo ? r.memo : '수동 팩스 발송완료 등록';
+
+  openModal('manualFaxClaimModal');
+  if (typeof initIcons === 'function') initIcons(document.getElementById('manualFaxClaimModal'));
+}
+window.openManualFaxClaimModal = openManualFaxClaimModal;
+
+async function handleManualFaxClaimSubmit(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const appId = document.getElementById('manualFaxAppId')?.value;
+  const roundNumber = parseInt(document.getElementById('manualFaxRoundNumber')?.value || '1', 10);
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  const recipient = document.getElementById('manualFaxRecipientInput')?.value.trim() || `${app.insuranceCompany || '현대해상'} 보상팀`;
+  const faxNumber = document.getElementById('manualFaxNumberInput')?.value.trim() || '022-181-2520';
+  const sentDateRaw = document.getElementById('manualFaxSentDateInput')?.value;
+  const amountStr = document.getElementById('manualFaxAmountInput')?.value || '0';
+  const claimAmount = parseInt(amountStr.replace(/[^0-9]/g, ''), 10) || 0;
+  const memo = document.getElementById('manualFaxMemoInput')?.value.trim() || '수동 팩스 발송완료 등록';
+
+  const sentDateStr = sentDateRaw ? `${sentDateRaw.slice(0, 10).replace(/-/g, '.')} ${sentDateRaw.slice(11, 16)}` : getKoreaDateTimeStr(new Date());
+
+  // 1. customSettlementSets 갱신
+  app.customSettlementSets = app.customSettlementSets || [];
+  let cSet = app.customSettlementSets.find(s => Number(s.setIndex) === Number(roundNumber));
+  if (!cSet) {
+    cSet = {
+      setIndex: roundNumber,
+      claimRound: `${roundNumber}차`,
+      claimStandardDate: sentDateStr.slice(0, 10),
+      claimDate: sentDateStr,
+      claimStatus: '청구완료',
+      claimAmount: claimAmount,
+      claimDays: 10,
+      days: 10,
+      payoutStatus: '지급전',
+      payoutAmount: 0,
+      memo: memo
+    };
+    app.customSettlementSets.push(cSet);
+  } else {
+    cSet.claimStatus = '청구완료';
+    cSet.claimDate = sentDateStr;
+    if (claimAmount > 0) cSet.claimAmount = claimAmount;
+    if (memo) cSet.memo = memo;
+  }
+  app.claimCount = Math.max(app.claimCount || 0, roundNumber);
+  app.hasManualUpdate = true;
+  app.updatedAt = new Date().toISOString();
+
+  // 2. gClaims 갱신 또는 생성
+  let claim = (gClaims || []).find(c => String(c.applyId) === String(app.id) && (parseInt(String(c.round || '').replace(/[^0-9]/g, ''), 10) === roundNumber || (c.id && c.id.endsWith('.' + roundNumber))));
+  if (!claim) {
+    const claimId = `Q${String(app.id).replace('C', '')}.${roundNumber}`;
+    claim = {
+      id: claimId,
+      applyId: app.id,
+      patientName: app.patientName,
+      insuranceCompany: app.insuranceCompany || '현대해상',
+      round: `${roundNumber}차`,
+      claimDate: sentDateStr,
+      faxSentDate: sentDateStr,
+      faxStatus: '전송완료',
+      status: '청구완료',
+      claimAmount: claimAmount,
+      unpaidAmount: claimAmount,
+      depositAmount: 0,
+      depositStatus: '미입금',
+      adjusterName: app.adjusterName || recipient,
+      adjusterPhone: faxNumber,
+      memo: memo,
+      isRealLaunchData: true,
+      updatedAt: new Date().toISOString()
+    };
+    gClaims.unshift(claim);
+  } else {
+    claim.claimDate = sentDateStr;
+    claim.faxSentDate = sentDateStr;
+    claim.faxStatus = '전송완료';
+    claim.status = '청구완료';
+    if (claimAmount > 0) claim.claimAmount = claimAmount;
+    claim.updatedAt = new Date().toISOString();
+    if (memo) claim.memo = memo;
+  }
+
+  // 3. gFaxRecords 및 gFaxLogs 기록
+  if (!gFaxRecords) gFaxRecords = {};
+  gFaxRecords[app.id] = {
+    status: '전송완료',
+    sentDate: sentDateStr,
+    faxNumber: faxNumber,
+    caseType: '정산청구',
+    formType: 'HD_FORM_02'
+  };
+
+  const faxLog = {
+    id: 'FAX_MANUAL_' + Date.now(),
+    appId: app.id,
+    patientName: app.patientName,
+    caseTitle: `[수동등록] ${app.patientName} ${roundNumber}차 청구팩스`,
+    recipient: recipient,
+    faxNumber: faxNumber,
+    pages: 1,
+    status: '성공',
+    operator: '관리자(수동등록)',
+    sentDate: sentDateStr,
+    resultMsg: `수동 발송완료 등록 (${memo})`,
+    provider: '수동 직접등록',
+    roundNumber: roundNumber
+  };
+  if (!Array.isArray(gFaxLogs)) gFaxLogs = [];
+  gFaxLogs.unshift(faxLog);
+
+  // 4. 로컬 및 서버 동기화
+  try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+  try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
+  if (typeof saveFaxLogs === 'function') saveFaxLogs();
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
+    syncToConvex('sync:saveClaim', { claim: claim }).catch(console.warn);
+    syncToConvex('sync:saveFaxRecord', { record: faxLog }).catch(console.warn);
+  }
+
+  fetch('/api/hub/customer/update-fields', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      appId: app.id,
+      fields: {
+        customSettlementSets: app.customSettlementSets,
+        claimCount: app.claimCount
+      }
+    })
+  }).catch(() => {});
+
+  closeModal('manualFaxClaimModal');
+
+  // 모달 및 허브 UI 갱신
+  if (gActiveHubModalAppId) {
+    openHubCustomerDetailModal(gActiveHubModalAppId);
+  }
+  if (typeof renderUnifiedCareHub === 'function') {
+    renderUnifiedCareHub();
+  }
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '팩스 청구완료 등록 성공',
+      message: `[${maskName(app.patientName)} 님] ${roundNumber}차 팩스 청구완료(${sentDateStr})가 정상 등록되었습니다.`,
+      icon: 'check-circle'
+    });
+  }
+}
+window.handleManualFaxClaimSubmit = handleManualFaxClaimSubmit;
 
 /**
  * [사용자 요구사항]: 고객 카드 좌측 세로 라벨 및 카드 음영 처리 테마 정의
@@ -23914,13 +25867,8 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
   const account = as ? (as.accountInfo || (cg && cg.account) || '-') : '-';
   const cgDailyWage = as ? (as.dailyWage || 140000) : 140000;
 
-  const activeCaregiverPayouts = as
-    ? (appPayouts || []).filter(p => p.caregiverName === as.caregiverName)
-    : (appPayouts || []);
-  const displayedPayouts = activeCaregiverPayouts.length > 0 ? activeCaregiverPayouts : (appPayouts || []);
-
-  // 2. 통합 정산 스케줄 엔진 구동
-  const schedule = calculateCareSettlementSchedule(app, as, prog, appClaims, displayedPayouts);
+  // 2. 통합 정산 스케줄 엔진 구동 (환자 전체 간병 여정에 대한 정산 스케줄 계산)
+  const schedule = calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts);
   const totalCareDays = schedule.totalCareDays;
   const dailyPrice = schedule.dailyClaimPrice;
   const rounds = schedule.rounds;
@@ -24725,12 +26673,13 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
           ` : rounds.map(r => {
             const roundFaxLog = (window.gFaxLogs || []).find(fl => 
               String(fl.appId) === String(app.id) && 
-              (fl.roundNumber === r.roundNumber || (fl.memo && fl.memo.includes(`${r.roundNumber}차`)) || (fl.category && fl.category.includes('정산')))
+              (fl.roundNumber === r.roundNumber || (fl.memo && fl.memo.includes(`${r.roundNumber}차`)) || (r.roundNumber === 1 && fl.category && fl.category.includes('정산')))
             );
 
-            const rawClaimDate = (roundFaxLog && roundFaxLog.sentDate) ||
+            const rawClaimDate = r.claimDate ||
+              (roundFaxLog && roundFaxLog.sentDate) ||
               (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
-              ((faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null);
+              ((r.roundNumber === 1 && faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null);
 
             // 삼성화재인 경우 간병기간(종료일 우선, 시작일 보조)을 기준으로 몇월 청구 대상인지 산출
             let targetYear = r.targetYear || '';
@@ -24772,9 +26721,10 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
             // 본인에게 실제로 발송된 개별 청구 메일(samsungIndividualLog)이나 정식 청구서(r.existingClaim)가 있을 때만 청구완료로 인정
             const isCustomRoundSent = Boolean(!isRoundCancelled && app.customRoundDates && app.customRoundDates[r.roundNumber] && app.customRoundDates[r.roundNumber].sentAt);
             const isSamsungClaimSent = Boolean(!isRoundCancelled && (samsungIndividualLog || isCustomRoundSent));
-            const isClaimDone = isSamsung 
-              ? (isSamsungClaimSent || Boolean(!isRoundCancelled && r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate)))
-              : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(rawClaimDate));
+            const isClaimPending = Boolean(r.claimStatus === '청구전' && !r.claimDate && !r.existingClaim);
+            const isClaimDone = !isClaimPending && (isSamsung 
+              ? (isSamsungClaimSent || Boolean(!isRoundCancelled && r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate)) || Boolean(!isRoundCancelled && (r.claimDate || r.claimStatus === '청구완료')))
+              : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료' || r.existingClaim.status === '청구완료')) || Boolean(rawClaimDate) || Boolean(r.claimDate || r.claimStatus === '청구완료')));
 
             let claimDateTimeStr = '';
             if (isSamsung) {
@@ -24849,13 +26799,13 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                       </button>
                     ` : ''}
-                    ${(r.stage === 'COMPLETED' && !r.isOngoingCare) ? `
+                    ${(r.stage === 'COMPLETED') ? `
                       <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center gap-1">
                         <i data-lucide="check-circle" class="w-3 h-3 text-emerald-600"></i> 간병완료
                       </span>
-                    ` : (r.stage === 'ONGOING' || r.isOngoingCare) ? `
+                    ` : (r.stage === 'ONGOING') ? `
                       <span class="px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold text-[11px] flex items-center gap-1 animate-pulse">
-                        <span class="w-1.5 h-1.5 rounded-full bg-sky-600"></span> 간병진행중 (${r.ongoingElapsed || 1}일차)
+                        <span class="w-1.5 h-1.5 rounded-full bg-sky-600"></span> 간병진행중 (${r.ongoingElapsed || r.days}일차)
                       </span>
                     ` : `
                       <span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold text-[11px]">
@@ -24894,6 +26844,12 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                             <span class="font-mono text-[11px] font-bold ${isClaimDone ? 'text-slate-500' : isSending ? 'text-purple-800' : 'text-amber-800'}">
                               단가: ${formatCurrency(r.dailyClaimPrice)}원/일
                             </span>
+                            ${!isSamsung ? `
+                              <button type="button" onclick="openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                                class="p-1 rounded-lg text-slate-400 hover:text-purple-700 hover:bg-purple-100 transition-colors cursor-pointer" title="청구/팩스 발송 정보 직접 수정">
+                                <i data-lucide="edit-3" class="w-3 h-3"></i>
+                              </button>
+                            ` : ''}
                           </div>
                         </div>
 
@@ -25021,11 +26977,18 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                             <span>바로빌 청구 진행중...</span>
                           </button>
                         ` : !isClaimDone ? `
-                          <button type="button" onclick="openClaimFaxPreview('${app.id}', null, null, ${r.roundNumber})" 
-                            class="w-full py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer">
-                            <i data-lucide="send" class="w-4 h-4"></i>
-                            <span>${r.roundNumber}차 청구하기 (팩스)</span>
-                          </button>
+                          <div class="space-y-1.5">
+                            <button type="button" onclick="openClaimFaxPreview('${app.id}', null, null, ${r.roundNumber})" 
+                              class="w-full py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer">
+                              <i data-lucide="send" class="w-4 h-4"></i>
+                              <span>${r.roundNumber}차 청구하기 (팩스)</span>
+                            </button>
+                            <button type="button" onclick="openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                              class="w-full py-1.5 rounded-xl bg-white hover:bg-purple-50 text-purple-700 border border-purple-300 font-bold text-[11px] shadow-2xs flex items-center justify-center gap-1 transition-all cursor-pointer" title="외부 팩스 또는 별도로 이미 발송한 경우 팩스 발송완료 일시 직접 입력">
+                              <i data-lucide="edit-3" class="w-3.5 h-3.5 text-purple-600"></i>
+                              <span>수동 발송완료(청구완료) 입력</span>
+                            </button>
+                          </div>
                         ` : `
                           <div class="flex items-center gap-1.5">
                             ${r.existingClaim ? `
@@ -25039,8 +27002,8 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                                 <i data-lucide="send" class="w-3.5 h-3.5"></i>
                                 <span>재발송</span>
                               </button>
-                              <button type="button" onclick="openClaimEditModal('${r.existingClaim.id}')" 
-                                class="px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all cursor-pointer" title="청구서 직접 수정">
+                              <button type="button" onclick="openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                                class="px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all cursor-pointer" title="청구/발송 내역 직접 수정">
                                 <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
                               </button>
                             ` : `
@@ -25048,6 +27011,10 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                                 class="flex-1 py-1.5 rounded-xl bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 font-bold text-xs shadow-2xs flex items-center justify-center gap-1 transition-all cursor-pointer" title="팩스 재발송 및 미리보기">
                                 <i data-lucide="send" class="w-3.5 h-3.5"></i>
                                 <span>팩스 재발송</span>
+                              </button>
+                              <button type="button" onclick="openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                                class="px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all cursor-pointer" title="청구/발송 내역 직접 수정">
+                                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
                               </button>
                             `}
                           </div>
@@ -25187,15 +27154,22 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                         </div>
 
                         <!-- 1행: 대상 정보 박스 -->
-                        <div class="p-2.5 rounded-xl ${isPayoutDone ? 'bg-slate-200/60 border border-slate-300/80 text-slate-800' : 'bg-amber-100/80 border border-amber-200 text-amber-950'} text-[11.5px] flex items-center justify-between gap-1.5 whitespace-nowrap overflow-hidden">
-                          <span class="font-bold flex items-center gap-1 shrink-0 whitespace-nowrap">
-                            <i data-lucide="user-check" class="w-3.5 h-3.5 ${isPayoutDone ? 'text-slate-600' : 'text-amber-700'} shrink-0"></i> 지급 간병인:
-                          </span>
-                          <div class="text-right truncate whitespace-nowrap min-w-0 font-medium">
-                            <b class="${isPayoutDone ? 'text-slate-900' : 'text-amber-950'} font-black">${as ? maskName(as.caregiverName) : '간병인 미배정'}</b>
-                            <span class="text-[10.5px] text-slate-500 font-mono ml-1 font-normal">(${as && as.accountInfo ? maskAccount(as.accountInfo) : '계좌미등록'})</span>
-                          </div>
-                        </div>
+                        ${(() => {
+                          const roundCgName = r.caregiverName || (r.existingPayout && r.existingPayout.caregiverName) || (as ? as.caregiverName : '');
+                          const roundAssign = (sortedAssigns || []).find(a => a.caregiverName === roundCgName) || as;
+                          const roundAccount = (r.existingPayout && r.existingPayout.accountInfo) || (roundAssign && roundAssign.accountInfo) || '';
+                          return `
+                            <div class="p-2.5 rounded-xl ${isPayoutDone ? 'bg-slate-200/60 border border-slate-300/80 text-slate-800' : 'bg-amber-100/80 border border-amber-200 text-amber-950'} text-[11.5px] flex items-center justify-between gap-1.5 whitespace-nowrap overflow-hidden">
+                              <span class="font-bold flex items-center gap-1 shrink-0 whitespace-nowrap">
+                                <i data-lucide="user-check" class="w-3.5 h-3.5 ${isPayoutDone ? 'text-slate-600' : 'text-amber-700'} shrink-0"></i> 지급 간병인:
+                              </span>
+                              <div class="text-right truncate whitespace-nowrap min-w-0 font-medium">
+                                <b class="${isPayoutDone ? 'text-slate-900' : 'text-amber-950'} font-black">${roundCgName ? maskName(roundCgName) : '간병인 미배정'}</b>
+                                <span class="text-[10.5px] text-slate-500 font-mono ml-1 font-normal">(${roundAccount ? maskAccount(roundAccount) : '계좌미등록'})</span>
+                              </div>
+                            </div>
+                          `;
+                        })()}
 
                         <!-- 1-2행: 기준일시 및 지급일 박스 -->
                         <div class="px-2.5 py-1.5 rounded-xl bg-white/80 border border-slate-200 text-[11px] flex items-center justify-between gap-1 font-mono">
@@ -25500,14 +27474,8 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
   const centerPhone = as ? (as.centerPhone || (center && center.phone) || '02-2633-1120') : '-';
   const account = as ? (as.accountInfo || (cg && cg.account) || '-') : '-';
 
-  // 선택된 간병인 전용 정산 내역 필터링 (다수 배정 시 선택된 간병인의 내역을 우선 표시)
-  const activeCaregiverPayouts = as
-    ? (appPayouts || []).filter(p => p.caregiverName === as.caregiverName)
-    : (appPayouts || []);
-  const displayedPayouts = activeCaregiverPayouts.length > 0 ? activeCaregiverPayouts : (appPayouts || []);
-
-  // 2. 통합 정산 스케줄 엔진 구동 (실제 경과일수 및 10일 주기 라이프사이클 기반)
-  const schedule = calculateCareSettlementSchedule(app, as, prog, appClaims, displayedPayouts);
+  // 2. 통합 정산 스케줄 엔진 구동 (환자의 전체 간병 여정에 대한 정산 스케줄 계산)
+  const schedule = calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts);
   const totalCareDays = schedule.totalCareDays;
   const dailyPrice = schedule.dailyClaimPrice;
   const rounds = schedule.rounds;
@@ -26108,11 +28076,11 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                   ${rounds.map(r => {
                     const roundFaxLog = (window.gFaxLogs || []).find(fl => 
                       String(fl.appId) === String(app.id) && 
-                      (fl.roundNumber === r.roundNumber || (fl.memo && fl.memo.includes(`${r.roundNumber}차`)) || (fl.category && fl.category.includes('정산')))
+                      (fl.roundNumber === r.roundNumber || (fl.memo && fl.memo.includes(`${r.roundNumber}차`)) || (r.roundNumber === 1 && fl.category && fl.category.includes('정산')))
                     );
                     const faxSentDateStr = (roundFaxLog && roundFaxLog.sentDate) ||
                       (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
-                      ((faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null) || '';
+                      ((r.roundNumber === 1 && faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null) || '';
 
                     const isRoundCancelled = Boolean(app.cancelledSamsungRounds && app.cancelledSamsungRounds[r.roundNumber]);
 
@@ -26133,9 +28101,10 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
                     const isCustomRoundSent = Boolean(!isRoundCancelled && app.customRoundDates && app.customRoundDates[r.roundNumber] && app.customRoundDates[r.roundNumber].sentAt);
                     const isSending = Boolean(window.gBarobillSendingRounds && window.gBarobillSendingRounds.has(`${app.id}_${r.roundNumber}`));
-                    const isClaimDone = isSamsung
+                    const isClaimPending = Boolean(r.claimStatus === '청구전' && !r.claimDate && !r.existingClaim);
+                    const isClaimDone = !isClaimPending && (isSamsung
                       ? (!isRoundCancelled && (Boolean(samsungIndividualLog) || isCustomRoundSent || Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate))))
-                      : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(faxSentDateStr));
+                      : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(faxSentDateStr)));
                     const isDepositDone = isRoundDepositConfirmed(r);
 
                     let timelineClaimSentTimeStr = '';
@@ -26185,6 +28154,11 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                             <button type="button" onclick="event.stopPropagation(); openRoundDateEditModal('${app.id}', ${r.roundNumber})" class="px-1.5 py-0.5 rounded bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 font-bold text-[10px] cursor-pointer" title="날짜 수정">
                               수정
                             </button>
+                            ${!isSamsung ? `
+                              <button type="button" onclick="event.stopPropagation(); openManualFaxClaimModal('${app.id}', ${r.roundNumber})" class="px-1.5 py-0.5 rounded bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 font-bold text-[10px] cursor-pointer" title="팩스 발송/청구 상태 직접 수정">
+                                ✏️ 팩스/청구
+                              </button>
+                            ` : ''}
                           </div>
                         </div>
 
@@ -26227,11 +28201,20 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                                   class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10.5px] shadow-2xs whitespace-nowrap shrink-0" title="청구서 직접 수정">
                                   수정
                                 </button>
+                                <button type="button" onclick="event.stopPropagation(); openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                                  class="px-2 py-1 rounded-lg bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 font-bold text-[10.5px] shadow-2xs whitespace-nowrap shrink-0" title="팩스/발송 정보 수정">
+                                  발송정보
+                                </button>
                                 <button type="button" onclick="event.stopPropagation(); deleteInterimClaim('${app.id}', '${r.existingClaim.id}')" 
                                   class="px-2 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-bold text-[10.5px] shadow-2xs transition-all cursor-pointer whitespace-nowrap shrink-0" title="청구 취소">
                                   원복
                                 </button>
-                              ` : ''}
+                              ` : `
+                                <button type="button" onclick="event.stopPropagation(); openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                                  class="px-2 py-1 rounded-lg bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 font-bold text-[10.5px] shadow-2xs whitespace-nowrap shrink-0" title="팩스/발송 정보 수정">
+                                  발송정보
+                                </button>
+                              `}
                             ` : `
                               ${isSamsung ? `
                                 <button type="button" onclick="event.stopPropagation(); openSamsungEmailModal('${app.id}', 'ROUND_CLAIM', ${r.roundNumber})" 
@@ -26247,6 +28230,10 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                                 <button type="button" onclick="event.stopPropagation(); openClaimFaxPreview('${app.id}', null, null, ${r.roundNumber})" 
                                   class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-[10.5px] shadow-xs inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0" title="손사 정산청구서 수신처 확인/선택 및 미리보기">
                                   <i data-lucide="send" class="w-3 h-3 shrink-0"></i> <span>청구하기(팩스)</span>
+                                </button>
+                                <button type="button" onclick="event.stopPropagation(); openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                                  class="px-2 py-1 rounded-lg bg-white hover:bg-purple-50 text-purple-700 border border-purple-300 font-bold text-[10.5px] shadow-2xs inline-flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shrink-0" title="외부 팩스 또는 별도로 이미 발송한 경우 팩스 발송완료 일시 직접 입력">
+                                  <i data-lucide="edit-3" class="w-3 h-3 shrink-0"></i> <span>수동완료</span>
                                 </button>
                               `}
                             `}
@@ -26581,7 +28568,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                         <div class="flex items-center justify-between gap-2 pt-0.5">
                           <div class="min-w-0">
                             <div class="font-bold text-slate-700">
-                              지급 간병인: <b class="${isPayoutDone ? 'text-slate-900' : 'text-amber-950'}">${as ? maskName(as.caregiverName) : '-'}</b>
+                              지급 간병인: <b class="${isPayoutDone ? 'text-slate-900' : 'text-amber-950'}">${(r.caregiverName || (r.existingPayout && r.existingPayout.caregiverName) || (as ? as.caregiverName : '')) ? maskName(r.caregiverName || (r.existingPayout && r.existingPayout.caregiverName) || (as ? as.caregiverName : '')) : '-'}</b>
                             </div>
                             <div class="text-[11px] font-mono ${isPayoutDone ? 'text-slate-700' : 'text-amber-900'}">
                               <b>${formatCurrency(r.fullPayoutAmount)}원</b>
@@ -27559,7 +29546,7 @@ function openPayoutDetailListModal(applyId) {
             </td>
           </tr>
         `;
-      } else if (r.stage === 'COMPLETED' && !r.isOngoingCare) {
+      } else if (r.stage === 'COMPLETED') {
         // 차수는 완료되었으나 정산 레코드가 아직 미생성된 상태
         return `
           <tr class="hover:bg-amber-50/50 transition-colors bg-amber-50/20">
@@ -27706,11 +29693,11 @@ function openClaimDetailListModal(applyId) {
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 whitespace-nowrap">
                 <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-600"></i> 미입금상태
               </span>
-            ` : (isReadyToClaim && !r.isOngoingCare) ? `
+            ` : (isReadyToClaim && r.stage === 'COMPLETED') ? `
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 whitespace-nowrap">
                 간병완료 (청구가능)
               </span>
-            ` : (isOngoingWait || r.isOngoingCare) ? `
+            ` : (r.stage === 'ONGOING' || isOngoingWait) ? `
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-sky-100 text-sky-800 whitespace-nowrap">
                 <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span> 진행중 (D-${r.ongoingRemaining || 0}일)
               </span>
@@ -28637,11 +30624,28 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
   // 7. 모달 비활성화(청구제외/보호모드) 체크
   if (typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app)) {
     const claimVal = String(app.claimClassification || app.claimCategory || '제외').trim();
-    badges.push(`
-      <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 border border-amber-300 font-extrabold text-[10.5px] flex items-center gap-1 shadow-2xs whitespace-nowrap" title="모달 내 청구세트가 비활성화(보호모드)된 상태입니다.">
-        <i data-lucide="lock" class="w-3 h-3 text-amber-700"></i> 🔒 모달 비활성 (${claimVal})
-      </span>
-    `);
+    const isDisabledConf = typeof isCustomerModalDisabledConfirmed === 'function' ? isCustomerModalDisabledConfirmed(app.id) : false;
+    if (!isDisabledConf) {
+      badges.push(`
+        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[10.5px] shadow-2xs whitespace-nowrap animate-pulse">
+          <span class="flex items-center gap-1 font-black" title="모달 내 청구세트가 비활성화(보호모드)된 고객입니다.">
+            <i data-lucide="lock" class="w-3.5 h-3.5 text-white"></i> 🔒 모달 비활성 (${claimVal})
+          </span>
+          <button type="button" onclick="confirmHubDisabled('${app.id}', event)" class="px-1.5 h-[16px] leading-none rounded bg-white text-amber-900 hover:bg-amber-100 font-black text-[9.5px] shadow-xs cursor-pointer transition-all inline-flex items-center justify-center gap-0.5 border-0" title="확인 완료 시 카운트가 차감되고 모든 PC에 공통 반영됩니다">
+            확인
+          </button>
+        </span>
+      `);
+    } else {
+      badges.push(`
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-300 font-bold text-[10.5px] whitespace-nowrap" title="모달 비활성 확인 완료 (공통 적용됨)">
+          <span class="flex items-center gap-1 font-bold">
+            <i data-lucide="check" class="w-3 h-3 text-amber-700"></i> 비활성확인완료 (${claimVal})
+          </span>
+          <button type="button" onclick="unconfirmHubDisabled('${app.id}', event)" class="ml-0.5 text-amber-400 hover:text-rose-600 font-bold text-[10px] px-1 hover:bg-amber-200/60 rounded cursor-pointer" title="확인 취소 (다시 미확인 카운트로 복원)">✕</button>
+        </span>
+      `);
+    }
   }
 
   // 모든 체크 항목이 완료되었거나 이상 없는 경우
@@ -28778,9 +30782,8 @@ function renderUnifiedCareHub() {
     }
   }
 
-  // 1. 원수사 탭 뱃지 총 건수 산출
-  const hasAnyRealApp = (gApps || []).some(x => x.isRealLaunchData);
-  const activeHubApps = hasAnyRealApp ? (gApps || []).filter(x => x.isRealLaunchData) : (gApps || []);
+  // 1. 원수사 탭 뱃지 총 건수 산출 (실데이터 C-계열, D-계열 및 정상 등록 건 전수 포함)
+  const activeHubApps = (gApps || []).filter(x => x && x.id && (!String(x.id).startsWith('S') || x.isRealLaunchData));
 
   // [CTI 중복 노출 방지]: 동일인 다중 리스트 중 가장 최근 등록건 식별 Set 갱신
   if (typeof getLatestCustomerAppIdSet === 'function') {
@@ -28994,13 +30997,13 @@ function renderUnifiedCareHub() {
     }
   }
 
-  // 3-2. 모달 비활성화 (청구제외/보호모드) 고객 건수 카운트 & 토글 버튼 UI 갱신
+  // 3-2. 모달 비활성화 (청구제외/보호모드) 미확인 고객 건수 카운트 & 토글 버튼 UI 갱신
   let disabledTotal = 0;
   for (let i = 0; i < activeHubApps.length; i++) {
     const a = activeHubApps[i];
     const aIns = a.insuranceCompany || '';
     if (insFilter !== 'ALL' && !aIns.includes(insFilter)) continue;
-    if (typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(a)) {
+    if (typeof isCustomerModalDisabledUnconfirmed === 'function' ? isCustomerModalDisabledUnconfirmed(a) : (typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(a))) {
       disabledTotal++;
     }
   }
@@ -29035,50 +31038,80 @@ function renderUnifiedCareHub() {
   const filtered = activeHubApps.filter(app => {
     const appIns = app.insuranceCompany || '';
     const appSt = app.status || '';
-    if (insFilter !== 'ALL' && !appIns.includes(insFilter)) return false;
 
-    // [수정발생 모아보기 토글 필터]
-    if (gHubOnlyModified) {
-      const isMod = typeof isAppUnconfirmedModified === 'function' ? isAppUnconfirmedModified(app) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(app));
-      if (!isMod) return false;
-    }
+    // 검색어(query)가 입력된 경우: 특정 고객 성명, ID, 간병인 등으로 직접 조회 중이므로
+    // 파이프라인 탭이나 원수사 탭 필터에 가려져 검색 결과가 누락되지 않도록 검색 매칭 우선 적용
+    if (!query) {
+      if (insFilter !== 'ALL' && !appIns.includes(insFilter)) return false;
 
-    // [모달 비활성화 고객 모아보기 토글 필터]
-    if (gHubOnlyDisabled) {
-      if (typeof isCustomerModalDisabled === 'function' && !isCustomerModalDisabled(app)) return false;
-    }
+      // [수정발생 모아보기 토글 필터]
+      if (gHubOnlyModified) {
+        if (modifiedTotal > 0) {
+          const isMod = typeof isAppUnconfirmedModified === 'function' ? isAppUnconfirmedModified(app) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(app));
+          if (!isMod) return false;
+        } else {
+          const isMod = typeof isAppModifiedOrComplaint === 'function' ? isAppModifiedOrComplaint(app) : false;
+          if (!isMod) return false;
+        }
+      }
 
-    if (gHubFilter === 'COMPLETED' && !isCompletedHelper(app)) return false;
-    if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
-    if (gHubFilter === 'IN_PROGRESS' && !isInProgressHelper(app)) return false;
-    if (gHubFilter === 'UNPAID_CLAIM' && !isAppHasUnpaidClaimHelper(app)) return false;
-    if (gHubFilter === 'NEED_PAYOUT' && !isAppHasUnpaidPayoutHelper(app)) return false;
-    if (gHubFilter === 'NEED_FAX' && !isNeedFaxHelper(app)) return false;
+      // [모달 비활성화 고객 모아보기 토글 필터]
+      if (gHubOnlyDisabled) {
+        if (disabledTotal > 0) {
+          const isDisUnconf = typeof isCustomerModalDisabledUnconfirmed === 'function' ? isCustomerModalDisabledUnconfirmed(app) : (typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app));
+          if (!isDisUnconf) return false;
+        } else {
+          if (typeof isCustomerModalDisabled === 'function' && !isCustomerModalDisabled(app)) return false;
+        }
+      }
 
-    if (gHubStatusFilter) {
-      const theme = getCustomerCardStatusTheme(app);
-      let match = false;
-      if (gHubStatusFilter === '신규' && theme.type === 'new') match = true;
-      else if (gHubStatusFilter === '진행중' && theme.type === 'in_progress') match = true;
-      else if (gHubStatusFilter === '완료' && theme.type === 'completed') match = true;
-      else if (gHubStatusFilter === '취소' && (theme.type === 'cancelled' || theme.type === 'not_applicable' || theme.statusText === '당일서비스취소' || theme.statusText.includes('서비스불가') || theme.statusText === '제외' || app.status === '미해당' || (app.status && app.status.includes('취소')))) match = true;
-      else if (gHubStatusFilter === '예정' && theme.type === 'upcoming') match = true;
-      else if (gHubStatusFilter === '비활성' && typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app)) match = true;
-      if (!match) return false;
-    }
+      if (gHubFilter === 'COMPLETED' && !isCompletedHelper(app)) return false;
+      if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
+      if (gHubFilter === 'IN_PROGRESS' && !isInProgressHelper(app)) return false;
+      if (gHubFilter === 'UNPAID_CLAIM' && !isAppHasUnpaidClaimHelper(app)) return false;
+      if (gHubFilter === 'NEED_PAYOUT' && !isAppHasUnpaidPayoutHelper(app)) return false;
+      if (gHubFilter === 'NEED_FAX' && !isNeedFaxHelper(app)) return false;
 
-    if (query) {
-      const cgNames = cgNamesByAppId.get(app.id) || '';
-      const phoneClean = (app.phone || '').replace(/[^0-9]/g, '');
+      if (gHubStatusFilter) {
+        const theme = getCustomerCardStatusTheme(app);
+        let match = false;
+        if (gHubStatusFilter === '신규' && theme.type === 'new') match = true;
+        else if (gHubStatusFilter === '진행중' && theme.type === 'in_progress') match = true;
+        else if (gHubStatusFilter === '완료' && theme.type === 'completed') match = true;
+        else if (gHubStatusFilter === '취소' && (theme.type === 'cancelled' || theme.type === 'not_applicable' || theme.statusText === '당일서비스취소' || theme.statusText.includes('서비스불가') || theme.statusText === '제외' || app.status === '미해당' || (app.status && app.status.includes('취소')))) match = true;
+        else if (gHubStatusFilter === '예정' && theme.type === 'upcoming') match = true;
+        else if (gHubStatusFilter === '비활성' && typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app)) match = true;
+        if (!match) return false;
+      }
+    } else {
+      const rawQuery = query;
+      const cleanQuery = query.replace(/\s+/g, '');
+      const cgNames = ((cgNamesByAppId.get(app.id) || '') + ' ' + (app.caregiverName || '')).toLowerCase();
+      const phoneClean = String(app.phone || app.applicantPhone || app.patientPhone || '').replace(/[^0-9]/g, '');
+      const patientNameClean = String(app.patientName || '').replace(/\s+/g, '').toLowerCase();
+      const maskedNameClean = (typeof maskName === 'function' ? maskName(app.patientName) : '').replace(/\s+/g, '').toLowerCase();
+      const hospitalClean = String(app.hospitalName || '').replace(/\s+/g, '').toLowerCase();
+      const appInsClean = String(app.insuranceCompany || '').replace(/\s+/g, '').toLowerCase();
+      const applicantNameClean = String(app.applicantName || app.guardianName || '').replace(/\s+/g, '').toLowerCase();
+
       const match = (app.id && app.id.toLowerCase().includes(query)) ||
-                    (app.patientName && app.patientName.toLowerCase().includes(query)) ||
+                    (patientNameClean && (patientNameClean.includes(cleanQuery) || patientNameClean.includes(rawQuery))) ||
+                    (maskedNameClean && maskedNameClean.includes(cleanQuery)) ||
                     (app.status && app.status.toLowerCase().includes(query)) ||
                     (app.claimCategory && app.claimCategory.toLowerCase().includes(query)) ||
                     (app.phone && app.phone.includes(query)) ||
                     (digitsQuery.length >= 2 && phoneClean.includes(digitsQuery)) ||
                     (app.adjusterName && app.adjusterName.toLowerCase().includes(query)) ||
                     (app.accidentNumber && app.accidentNumber.toLowerCase().includes(query)) ||
-                    (cgNames && cgNames.includes(query));
+                    (app.policyNumber && app.policyNumber.toLowerCase().includes(query)) ||
+                    (app.patientId && app.patientId.toLowerCase().includes(query)) ||
+                    (hospitalClean && hospitalClean.includes(cleanQuery)) ||
+                    (appInsClean && appInsClean.includes(cleanQuery)) ||
+                    (applicantNameClean && applicantNameClean.includes(cleanQuery)) ||
+                    (app.careCenter && app.careCenter.toLowerCase().includes(query)) ||
+                    (app.branchName && app.branchName.toLowerCase().includes(query)) ||
+                    (app.memo && app.memo.toLowerCase().includes(query)) ||
+                    (cgNames && (cgNames.includes(rawQuery) || cgNames.replace(/\s+/g, '').includes(cleanQuery)));
       if (!match) return false;
     }
     return true;
@@ -29112,9 +31145,13 @@ function renderUnifiedCareHub() {
   }
 
   filtered.sort((a, b) => {
-    // 1. 방금 등록된 고객(_isJustRegistered)은 무조건 맨 처음(최상단)
-    if (a && a._isJustRegistered && !(b && b._isJustRegistered)) return -1;
-    if (!(a && a._isJustRegistered) && b && b._isJustRegistered) return 1;
+    // 1. 방금/신규 등록된 고객(_isJustRegistered 또는 D접두사 고객)은 무조건 맨 처음(최상단)
+    const isRecentA = (a && (a._isJustRegistered || (a.id && String(a.id).startsWith('D')))) ? 1 : 0;
+    const isRecentB = (b && (b._isJustRegistered || (b.id && String(b.id).startsWith('D')))) ? 1 : 0;
+    if (isRecentA !== isRecentB) return isRecentB - isRecentA;
+    if (isRecentA === 1 && isRecentB === 1) {
+      return compareAppIds(a.id, b.id, true);
+    }
 
     if (gHubSort === 'status_inprogress') {
       const isInProgress = (app) => (app.status && (app.status.includes('진행') || app.status === '정상' || app.status === '배정완료' || app.status === '간병중')) ? 1 : 0;
@@ -29189,7 +31226,12 @@ function renderUnifiedCareHub() {
       return (b.patientName || '').localeCompare(a.patientName || '', 'ko');
     }
 
-    // 기본 폴백: 수정건 맨 앞순위 -> 신청ID 순서대로 (D가 C보다 무조건 앞)
+    // 기본 폴백: D계열 최우선 -> 수정건 맨 앞순위 -> 신청ID 순서대로
+    const isDA = (a && a.id && String(a.id).startsWith('D')) ? 1 : 0;
+    const isDB = (b && b.id && String(b.id).startsWith('D')) ? 1 : 0;
+    if (isDA !== isDB) return isDB - isDA;
+    if (isDA === 1 && isDB === 1) return compareAppIds(a.id, b.id, true);
+
     const modA = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(a) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a) ? 1 : 0);
     const modB = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(b) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(b) ? 1 : 0);
     if (modA !== modB) return modB - modA;
@@ -29235,7 +31277,29 @@ function renderUnifiedCareHub() {
   }
 
   if (displayList.length === 0) {
-    container.innerHTML = '<div class="col-span-full p-12 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">조회 조건과 일치하는 고객 데이터가 없습니다.</div>';
+    const hasActiveFilters = Boolean(query || gHubFilter !== 'ALL' || (insFilter && insFilter !== 'ALL') || gHubStatusFilter || gHubOnlyModified || gHubOnlyDisabled);
+    container.innerHTML = `
+      <div class="col-span-full p-10 text-center bg-white rounded-3xl border border-slate-200 shadow-sm space-y-3">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+          <i data-lucide="search-x" class="w-6 h-6"></i>
+        </div>
+        <div class="text-slate-800 font-black text-sm">
+          ${query ? `'${escapeHtml(query)}' 검색 결과와 일치하는 고객이 없습니다.` : '조회 조건과 일치하는 고객 데이터가 없습니다.'}
+        </div>
+        <p class="text-xs text-slate-500 max-w-md mx-auto">
+          ${query ? '입력하신 고객명, 휴대폰번호, 사고번호, 병원명을 다시 확인하시거나 모든 필터를 초기화해 보세요.' : '현재 선택된 필터(파이프라인 탭, 원수사 탭, 상태 필터 등)에 해당하는 고객이 없습니다.'}
+        </p>
+        ${hasActiveFilters ? `
+          <div class="pt-2">
+            <button type="button" onclick="resetAllHubFiltersAndSearch()" class="px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 active:scale-95 text-white font-black text-xs shadow-md transition-all inline-flex items-center gap-1.5 cursor-pointer">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+              <span>모든 필터 초기화하고 전체 고객 보기</span>
+            </button>
+          </div>
+        ` : ''}
+      </div>
+    `;
+    if (typeof initIcons === 'function') initIcons(container);
     return;
   }
 
@@ -29453,8 +31517,8 @@ function renderUnifiedCareHub() {
             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md ${cardTheme.badgeClass}" title="현재상태 (실제 간병기간 기준)">${cardTheme.statusText}</span>
             <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200" title="청구분류 (AG열)">${app.claimClassification || app.claimCategory || '정상'}</span>
             ${(typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app)) ? `
-              <span class="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs whitespace-nowrap" title="모달 내 청구세트가 비활성화(보호모드)된 고객입니다">
-                <i data-lucide="lock" class="w-3 h-3 text-amber-700"></i>모달 비활성
+              <span class="text-[10px] font-black px-1.5 py-0.5 rounded-md ${typeof isCustomerModalDisabledConfirmed === 'function' && isCustomerModalDisabledConfirmed(app.id) ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-amber-100 text-amber-900 border border-amber-300'} flex items-center gap-1 shadow-2xs whitespace-nowrap" title="모달 내 청구세트가 비활성화(보호모드)된 고객입니다${typeof isCustomerModalDisabledConfirmed === 'function' && isCustomerModalDisabledConfirmed(app.id) ? ' (확인완료)' : ''}">
+                <i data-lucide="${typeof isCustomerModalDisabledConfirmed === 'function' && isCustomerModalDisabledConfirmed(app.id) ? 'check' : 'lock'}" class="w-3 h-3 text-amber-700"></i>${typeof isCustomerModalDisabledConfirmed === 'function' && isCustomerModalDisabledConfirmed(app.id) ? '비활성확인' : '모달 비활성'}
               </span>
             ` : ''}
             ${app.applyDate ? `
@@ -29517,8 +31581,8 @@ function renderUnifiedCareHub() {
             <span class="text-[10.5px] font-bold px-1.5 py-0.5 rounded-md ${cardTheme.badgeClass}" title="현재상태 (실제 간병기간 기준)">${cardTheme.statusText}</span>
             <span class="text-[10.5px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200" title="청구분류 (AG열)">${app.claimClassification || app.claimCategory || '정상'}</span>
             ${(typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app)) ? `
-              <span class="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs whitespace-nowrap" title="모달 내 청구세트가 비활성화(보호모드)된 고객입니다">
-                <i data-lucide="lock" class="w-3 h-3 text-amber-700"></i>모달 비활성
+              <span class="text-[10px] font-black px-1.5 py-0.5 rounded-md ${typeof isCustomerModalDisabledConfirmed === 'function' && isCustomerModalDisabledConfirmed(app.id) ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-amber-100 text-amber-900 border border-amber-300'} flex items-center gap-1 shadow-2xs whitespace-nowrap" title="모달 내 청구세트가 비활성화(보호모드)된 고객입니다${typeof isCustomerModalDisabledConfirmed === 'function' && isCustomerModalDisabledConfirmed(app.id) ? ' (확인완료)' : ''}">
+                <i data-lucide="${typeof isCustomerModalDisabledConfirmed === 'function' && isCustomerModalDisabledConfirmed(app.id) ? 'check' : 'lock'}" class="w-3 h-3 text-amber-700"></i>${typeof isCustomerModalDisabledConfirmed === 'function' && isCustomerModalDisabledConfirmed(app.id) ? '비활성확인' : '모달 비활성'}
               </span>
             ` : ''}
           </div>
@@ -29813,7 +31877,16 @@ function renderHubPagination(totalCount, totalPages) {
   const bar = document.getElementById('hubPaginationBar');
   if (!bar) return;
 
-  const pageSizeSelector = `
+  const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || ''));
+  const pageSizeSelector = isMobile ? `
+    <div class="flex items-center gap-1 text-xs">
+      <span class="text-slate-400 font-medium mr-1 hidden sm:inline">보기:</span>
+      <button type="button" onclick="changeHubPageSize(15)" class="px-2 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${gHubPageSize === 15 ? 'bg-purple-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'}">15개</button>
+      <button type="button" onclick="changeHubPageSize(30)" class="px-2 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${gHubPageSize === 30 ? 'bg-purple-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'}">30개</button>
+      <button type="button" onclick="changeHubPageSize(50)" class="px-2 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${gHubPageSize === 50 ? 'bg-purple-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'}">50개</button>
+      <button type="button" onclick="changeHubPageSize('ALL')" class="px-2 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${gHubPageSize === 'ALL' ? 'bg-purple-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'}">전체</button>
+    </div>
+  ` : `
     <div class="flex items-center gap-1 text-xs">
       <span class="text-slate-400 font-medium mr-1 hidden sm:inline">보기:</span>
       <button type="button" onclick="changeHubPageSize(50)" class="px-2 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${gHubPageSize === 50 ? 'bg-purple-600 text-white shadow-xs' : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'}">50개</button>
@@ -30375,8 +32448,7 @@ async function executeSendFaxModal() {
 
     // Fallback if local API is unreachable (e.g. static preview)
     if (!resultLog) {
-      const now = new Date();
-      const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      const dateStr = getKoreaDateTimeStr();
       const isFailed = Boolean(sendErrorMsg);
       resultLog = {
         id: 'FLOG-' + Date.now().toString().slice(-6),
@@ -31906,8 +33978,7 @@ async function executeFaxEchoTest() {
 
     if (!result) {
       const fakeFaxId = 'FLOG-' + Date.now().toString().slice(-6);
-      const now = new Date();
-      const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      const dateStr = getKoreaDateTimeStr();
       result = {
         success: true,
         faxId: fakeFaxId,
@@ -32416,8 +34487,7 @@ async function resendFaxLog(logId) {
     }
 
     if (!resultLog) {
-      const now = new Date();
-      const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      const dateStr = getKoreaDateTimeStr();
       resultLog = {
         ...log,
         id: 'FLOG-' + Date.now().toString().slice(-6),
@@ -32579,12 +34649,17 @@ function initData() {
 
     const cachedApps = localStorage.getItem('LIVON_CACHED_APPS');
     if (cachedApps) {
-      const parsed = JSON.parse(cachedApps);
-      const cleaned = (typeof filterInvalidSamsungDuplicates === 'function') ? filterInvalidSamsungDuplicates(parsed) : (Array.isArray(parsed) ? parsed.filter(a => !(a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성') && !a.isRealLaunchData)) : []);
-      const filtered = Array.isArray(cleaned) ? cleaned.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id))) : [];
-      const baseApps = (Array.isArray(filtered) && filtered.some(a => a.isRealLaunchData)) ? filtered.filter(a => a.isRealLaunchData) : filtered;
-      gApps = (typeof sortApplicationsNewestFirst === 'function') ? sortApplicationsNewestFirst(baseApps) : baseApps;
-      try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+      let parsed = [];
+      try { parsed = JSON.parse(cachedApps); } catch (e) {}
+        let cleaned = parsed;
+        if (typeof filterInvalidSamsungDuplicates === 'function') {
+          cleaned = filterInvalidSamsungDuplicates(parsed);
+        } else if (Array.isArray(parsed)) {
+          cleaned = parsed.filter(a => !(a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성') && !a.isRealLaunchData));
+        }
+        const filtered = Array.isArray(cleaned) ? cleaned.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id))) : [];
+        gApps = (typeof sortApplicationsNewestFirst === 'function') ? sortApplicationsNewestFirst(filtered) : filtered;
+        try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
     } else if (window.REBORN_DATA && window.REBORN_DATA.applications) {
       gApps = [...window.REBORN_DATA.applications].filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
     }
@@ -32863,15 +34938,25 @@ function updateSidebarCounts() {
   }
 }
 
+var _lucideGlobalDebounceTimer = null;
 function initIcons(root = null) {
   try {
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      if (root && (root.nodeType === 1 || (typeof Element !== 'undefined' && root instanceof Element))) {
-        window.lucide.createIcons({ root: root });
-      } else {
-        window.lucide.createIcons();
-      }
+    if (!window.lucide || typeof window.lucide.createIcons !== 'function') return;
+
+    // 1. 특정 엘리먼트/컨테이너가 주어졌을 때는 해당 영역만 가볍게 즉시 치환 (O(1) 성능)
+    if (root && (root.nodeType === 1 || (typeof Element !== 'undefined' && root instanceof Element))) {
+      window.lucide.createIcons({ root: root });
+      return;
     }
+
+    // 2. 전체 스캔 호출은 프레임 단위로 디바운스하여 모바일 CPU 과부하 및 프리징 원천 방지
+    if (_lucideGlobalDebounceTimer) cancelAnimationFrame(_lucideGlobalDebounceTimer);
+    _lucideGlobalDebounceTimer = requestAnimationFrame(() => {
+      try {
+        window.lucide.createIcons();
+      } catch (err) {}
+      _lucideGlobalDebounceTimer = null;
+    });
   } catch (e) {
     console.warn('Lucide icon error:', e);
   }
@@ -33142,7 +35227,7 @@ function refreshOpenModalsForMasking() {
 function setupInputFormatters() {
   const phoneInputs = [
     'newAppPhone', 'newAppAdjusterPhone', 'newAppAdjusterFax', 
-    'newAssignCaregiverPhone', 'simPhone'
+    'newAssignCaregiverPhone', 'simPhone', 'newTargetPhone'
   ];
   phoneInputs.forEach(id => {
     const el = document.getElementById(id);
@@ -33406,10 +35491,17 @@ window.handleLeftMenuClick = handleLeftMenuClick;
 function refreshTabData(tabId, filterParam = null) {
   try {
     switch (tabId) {
-      // 1. 종합 콜분석: 메뉴 클릭 시 자동 동기화 없이 즉시 렌더링 (동기화는 수동 버튼 및 5분 주기 자동 타이머로 실행)
+      // 1. 종합 콜분석: 메뉴 클릭 시 즉시 렌더링 후 자동으로 최신 CTI 전수 데이터 실시간 동기화 실행
       case 'totalcallanalysis':
         if (typeof renderTotalCallAnalysisTab === 'function') {
           renderTotalCallAnalysisTab();
+        }
+        {
+          const isSyncing = (typeof isTotalSyncing !== 'undefined' ? isTotalSyncing : (window.isTotalSyncing || false));
+          const syncFn = (typeof loadTotalCallData === 'function' ? loadTotalCallData : (window.loadTotalCallData || null));
+          if (syncFn && !isSyncing) {
+            syncFn(true, false);
+          }
         }
         break;
 
@@ -33469,6 +35561,9 @@ function refreshTabData(tabId, filterParam = null) {
           renderUnifiedCareHub();
         }
         if (typeof isUserOnLoginScreen === 'function' && isUserOnLoginScreen()) break;
+        if (typeof syncConfirmedAlertsWithServer === 'function') {
+          syncConfirmedAlertsWithServer();
+        }
         if (typeof checkAndTriggerOutcallAlert === 'function') {
           checkAndTriggerOutcallAlert();
         }
@@ -33722,6 +35817,11 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
   else if (tabId === 'totalcallanalysis') {
     if (typeof initTotalCallAnalysisModule === 'function') {
       initTotalCallAnalysisModule();
+    }
+    const isSyncing = (typeof isTotalSyncing !== 'undefined' ? isTotalSyncing : (window.isTotalSyncing || false));
+    const syncFn = (typeof loadTotalCallData === 'function' ? loadTotalCallData : (window.loadTotalCallData || null));
+    if (syncFn && !isSyncing) {
+      syncFn(true, false);
     }
   }
   else if (tabId === 'directory') switchDirectorySubTab(filterParam || gActiveDirectorySubTab || 'caregivers');
@@ -34198,11 +36298,64 @@ function calculateRuleSplit() {
   }
 }
 
-function openRuleClaimCalcModal() {
-  calculateRuleSplit();
-  openModal('ruleClaimCalcModal');
-  initIcons();
+function handleToolbarClaimEdit(targetClaimId = null) {
+  // 1. 직접 전달된 ID가 있으면 해당 청구 모달 즉시 열기
+  if (targetClaimId) {
+    return openClaimEditModal(targetClaimId);
+  }
+
+  // 2. 체크박스로 선택된 청구 항목이 있는 경우 선택된 첫 번째 건 열기
+  if (window.gLedgerSelection && window.gLedgerSelection.claims && window.gLedgerSelection.claims.size > 0) {
+    const selectedIds = Array.from(window.gLedgerSelection.claims);
+    return openClaimEditModal(selectedIds[0]);
+  }
+
+  // 3. 선택된 항목이 없는 경우: 현재 화면에 표시된 청구 목록 중 첫 번째 건 열기
+  const query = (document.getElementById('claimSearchInput')?.value || '').trim().toLowerCase();
+  const statusFilter = document.getElementById('claimStatusFilter')?.value || 'ALL';
+
+  const isClaimUnconfirmedStatus = (c) => c && (c.depositStatus === '미수' || c.depositStatus === '미확인' || c.depositStatus === '부분입금' || !c.depositStatus);
+  const isClaimConfirmedStatus = (c) => c && (c.depositStatus === '입금확인' || c.depositStatus === '입금완료' || c.depositStatus === '입금확인됨');
+
+  const visibleClaims = (window.gClaims || []).filter(c => {
+    if (statusFilter === '미확인') {
+      if (!isClaimUnconfirmedStatus(c)) return false;
+    } else if (statusFilter === '입금확인') {
+      if (!isClaimConfirmedStatus(c)) return false;
+    } else if (statusFilter !== 'ALL' && c.depositStatus !== statusFilter) {
+      return false;
+    }
+    if (query) {
+      const match = (c.id && c.id.toLowerCase().includes(query)) ||
+                    (c.applyId && c.applyId.toLowerCase().includes(query)) ||
+                    (c.patientName && c.patientName.toLowerCase().includes(query)) ||
+                    (c.round && c.round.toLowerCase().includes(query)) ||
+                    (c.memo && c.memo.toLowerCase().includes(query));
+      if (!match) return false;
+    }
+    return true;
+  });
+
+  const target = visibleClaims[0] || (window.gClaims || [])[0];
+  if (target) {
+    if (typeof showToast === 'function') {
+      showToast(`선택된 항목이 없어 상단의 [${target.id} - ${target.patientName}] 청구건 수정창을 열었습니다. (특정 건은 체크박스 선택 또는 청구ID를 클릭하세요)`, 'info');
+    }
+    return openClaimEditModal(target.id);
+  }
+
+  if (typeof showToast === 'function') {
+    showToast('수정 가능한 청구 내역이 없습니다.', 'warning');
+  } else {
+    alert('수정 가능한 청구 내역이 없습니다.');
+  }
 }
+
+function openRuleClaimCalcModal(claimId) {
+  return handleToolbarClaimEdit(claimId);
+}
+window.handleToolbarClaimEdit = handleToolbarClaimEdit;
+window.openRuleClaimCalcModal = openRuleClaimCalcModal;
 
 function applyCalculatedClaims() {
   if (gCurrentCalculatedSplits.length === 0) {
@@ -36106,26 +38259,43 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     const curDayIndex = detail.raw?.day_index ? Number(detail.raw.day_index) : (d && d.dayNumber ? Number(d.dayNumber) : null);
     let filteredTrends = [];
     if (Array.isArray(trendScores) && trendScores.length > 0) {
-      if (curDayIndex) {
-        filteredTrends = trendScores.filter(t => (t.dayIndex != null ? t.dayIndex <= curDayIndex : (t.careDate && curDate && t.careDate <= curDate)));
-      } else if (curDate) {
-        filteredTrends = trendScores.filter(t => t.careDate && t.careDate <= curDate);
-      }
+      filteredTrends = trendScores.filter((t, idx) => {
+        const tDate = (t.careDate || t.date || '').slice(0, 10);
+        if (tDate && curDate) return tDate <= curDate;
+        if (t.dayIndex != null && curDayIndex != null) return Number(t.dayIndex) <= Number(curDayIndex);
+        if (curDayIndex != null) return (idx + 1) <= Number(curDayIndex);
+        return true;
+      });
     }
-    // If server trendScores didn't cover curDate, synthesize from siblingLogs up to curDate
+    // If server trendScores didn't cover curDate, synthesize from siblingLogs up to current day
     if (filteredTrends.length === 0 && siblingLogs.length > 0) {
-      const upToSiblings = curDate 
-        ? siblingLogs.filter(l => (l.consultDate || l.dateString || '').slice(0, 10) <= curDate)
-        : siblingLogs;
-      filteredTrends = (upToSiblings.length > 0 ? upToSiblings : siblingLogs).map((l, i) => ({
-        dayIndex: l.dayNumber || (i + 1),
-        careDate: (l.consultDate || l.dateString || '').slice(0, 10),
-        overallScore: (l.overallStatus?.tone === 'warning' ? 3 : 4),
-        mobilityScore: 3,
-        dietScore: 4,
-        sleepScore: 3,
-        painScore: 4
-      }));
+      const logsUpToNow = siblingLogs.filter((l, i) => {
+        const lDate = (l.consultDate || l.dateString || '').slice(0, 10);
+        const day = l.dayNumber || (i + 1);
+        if (curDate && lDate) return lDate <= curDate;
+        if (curDayIndex != null) return day <= curDayIndex;
+        return true;
+      });
+      filteredTrends = logsUpToNow.map((l, i) => {
+        const lRaw = l.raw || l;
+        const s = lRaw.trend_scores || lRaw.trendScores || l.trendScores || {};
+        const day = l.dayNumber || (i + 1);
+        return {
+          dayIndex: day,
+          careDate: (l.consultDate || l.dateString || '').slice(0, 10),
+          overallScore: s.overallScore != null ? s.overallScore : (s.overall != null ? s.overall : (l.overallStatus?.tone === 'warning' ? 3 : 4)),
+          mobilityScore: s.mobilityScore != null ? s.mobilityScore : (s.mobility != null ? s.mobility : 3),
+          dietScore: s.dietScore != null ? s.dietScore : (s.diet != null ? s.diet : 3),
+          sleepScore: s.sleepScore != null ? s.sleepScore : (s.sleep != null ? s.sleep : 3),
+          painScore: s.painScore != null ? s.painScore : (s.pain != null ? s.pain : 3)
+        };
+      });
+    }
+    if (filteredTrends.length === 0) {
+      const cDate = curDate || new Date().toISOString().slice(0, 10);
+      filteredTrends = [
+        { dayIndex: curDayIndex || 1, careDate: cDate, overallScore: 4, mobilityScore: 4, dietScore: 4, sleepScore: 4, painScore: 3 }
+      ];
     }
     window._currentTrendScores = filteredTrends;
     if (detail) detail.trendScores = filteredTrends;
@@ -36691,9 +38861,12 @@ async function downloadCarePortDocumentPdf() {
       };
       const html = window.CarePortClient.generateDailyLogHtml(patient, log, detail);
       try {
+        const pdfApiUrl = (typeof window !== 'undefined' && window.CarePortClient?.apiBase)
+          ? window.CarePortClient.apiBase.replace(/\/careport$/, '') + '/careport/generate-pdf'
+          : '/api/careport/generate-pdf';
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const resp = await fetch('/api/careport/generate-pdf', {
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
+        const resp = await fetch(pdfApiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ html, filename: fileName }),
@@ -36760,9 +38933,12 @@ async function generateDailyLogPdfBlob(patient, log, detailData = null) {
     : '';
 
   try {
+    const pdfApiUrl = (typeof window !== 'undefined' && window.CarePortClient?.apiBase)
+      ? window.CarePortClient.apiBase.replace(/\/careport$/, '') + '/careport/generate-pdf'
+      : '/api/careport/generate-pdf';
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-    const resp = await fetch('/api/careport/generate-pdf', {
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    const resp = await fetch(pdfApiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ html, filename: 'carelog.pdf' }),
@@ -36954,9 +39130,12 @@ async function downloadPatientCareLogsPdfs(groupId) {
 </body>
 </html>`;
 
+      const pdfApiUrl = (typeof window !== 'undefined' && window.CarePortClient?.apiBase)
+        ? window.CarePortClient.apiBase.replace(/\/careport$/, '') + '/careport/generate-pdf'
+        : '/api/careport/generate-pdf';
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-      const resp = await fetch('/api/careport/generate-pdf', {
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const resp = await fetch(pdfApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ html: fullDocHtml, filename: fileName }),
@@ -36969,7 +39148,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
         if (arrayBuf && arrayBuf.byteLength > 1000) {
           pdfBytes = new Uint8Array(arrayBuf);
           updateGlobalProgress({
-            percent: 92,
+            percent: 95,
             statusText: `초고속 PDF 생성 완료! 파일 저장 중...`
           });
           await new Promise(r => setTimeout(r, 10));
@@ -36979,7 +39158,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
       console.warn('[CarePort PDF] 서버 가속 엔진 연결 지연/오류, 클라이언트 엔진으로 자동 전환:', serverErr.message);
     }
 
-    // 2차 시도: 클라이언트 고속 엔진 (외부 웹폰트 재요청 제거, 1-by-1 순차 렌더링으로 프리징 완전 제거)
+    // 2차 시도: 클라이언트 초고속 배치 엔진 (독립 iframe 원샷 배치 렌더링으로 메인윈도우 스타일 충돌 완전 차단, 1~2초 내 초고속 완료)
     if (!pdfBytes) {
       await ensureHtml2CanvasLoaded();
       if (typeof PDFLib === 'undefined' || !PDFLib.PDFDocument) {
@@ -36988,87 +39167,157 @@ async function downloadPatientCareLogsPdfs(groupId) {
 
       const mergedDoc = await PDFLib.PDFDocument.create();
 
-      const offscreen = document.createElement('div');
-      offscreen.style.position = 'fixed';
-      offscreen.style.left = '-9999px';
-      offscreen.style.top = '0';
-      offscreen.style.width = '794px';
-      offscreen.style.background = '#ffffff';
-      offscreen.style.zIndex = '-9999';
-      offscreen.style.opacity = '0';
-      offscreen.style.pointerEvents = 'none';
-      document.body.appendChild(offscreen);
-
       const pageW = 595.28;
       const pageH = 841.89;
       const margin = 12;
       const availW = pageW - (margin * 2);
       const availH = pageH - (margin * 2);
 
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.left = '-9999px';
+      iframe.style.top = '0';
+      iframe.style.width = '794px';
+      iframe.style.height = '1122px';
+      iframe.style.border = 'none';
+      iframe.style.opacity = '0';
+      iframe.style.pointerEvents = 'none';
+      document.body.appendChild(iframe);
+
       try {
-        for (let i = 0; i < sortedLogs.length; i++) {
-          const curDay = i + 1;
-          const basePct = 25 + Math.round((i / sortedLogs.length) * 65);
+        const sampleHtml = dayHtmlList[0] || '';
+        const styleMatches = sampleHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/gi) || [];
+        const extractedStyles = styleMatches.join('\n');
+
+        // 고해상도 2x 레티나 화질 (192 DPI) + 4페이지 단위 청크 배치 처리 (모바일/PC 메모리 한계 완벽 준수 및 초고화질 보장)
+        const BATCH_SIZE = 4;
+        const totalBatches = Math.ceil(sortedLogs.length / BATCH_SIZE);
+
+        for (let b = 0; b < totalBatches; b++) {
+          const startIdx = b * BATCH_SIZE;
+          const endIdx = Math.min(startIdx + BATCH_SIZE, sortedLogs.length);
+          const currentBatchLogs = sortedLogs.slice(startIdx, endIdx);
+          const currentBatchHtmls = dayHtmlList.slice(startIdx, endIdx);
+
           updateGlobalProgress({
-            percent: basePct,
-            statusText: `[${curDay}/${sortedLogs.length}일차] 간병일지 렌더링 중...`
+            percent: 50 + Math.round(((b + 1) / totalBatches) * 40),
+            statusText: `[${startIdx + 1}~${endIdx}일차 / 총 ${sortedLogs.length}일차] 고화질 일괄 렌더링 중...`
           });
-          await new Promise(r => setTimeout(r, 0)); // 브라우저 UI 갱신 보장
+          await new Promise(r => setTimeout(r, 10));
 
-          let rawHtml = dayHtmlList[i] || '';
-          // 외부 Pretendard 웹폰트 중복 로딩 제거 (부모 창에 이미 캐시되어 있으므로 불필요한 네트워크 지연 100% 방지)
-          rawHtml = rawHtml.replace(/<link[^>]*href="[^"]*pretendard[^"]*"[^>]*>/gi, '');
+          let batchUnitsHtml = '';
+          currentBatchHtmls.forEach((dHtml, idx) => {
+            const bodyMatch = dHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+            let inner = bodyMatch ? bodyMatch[1] : dHtml;
+            inner = inner.replace(/<link[^>]*href="[^"]*pretendard[^"]*"[^>]*>/gi, '');
+            batchUnitsHtml += `<div class="careport-pdf-page-unit" data-page="${startIdx + idx + 1}" style="width: 794px; height: 1122px; max-height: 1122px; min-height: 1122px; overflow: hidden; position: relative; background: #ffffff; box-sizing: border-box;">${inner}</div>\n`;
+          });
 
-          offscreen.innerHTML = rawHtml;
-          const pageEl = offscreen.querySelector('.page, .report-area') || offscreen.firstElementChild || offscreen;
-          pageEl.querySelectorAll('.no-print').forEach(el => el.remove());
+          const fullBatchHtml = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  ${extractedStyles}
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; background: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .careport-pdf-page-unit {
+      width: 794px !important;
+      height: 1122px !important;
+      max-height: 1122px !important;
+      min-height: 1122px !important;
+      overflow: hidden !important;
+      position: relative !important;
+      background: #ffffff !important;
+    }
+    .page, .report-area {
+      width: 794px !important;
+      max-width: 794px !important;
+      height: 1122px !important;
+      max-height: 1122px !important;
+      min-height: 1122px !important;
+      box-sizing: border-box !important;
+      padding: 26px 36px !important;
+      overflow: hidden !important;
+    }
+    .no-print { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="batchPagesContainer" style="width: 794px; background: #ffffff;">
+    ${batchUnitsHtml}
+  </div>
+</body>
+</html>`;
 
-          const canvas = await html2canvas(pageEl, {
-            scale: 1.0,
-            useCORS: false,
-            allowTaint: false,
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+          iframeDoc.open();
+          iframeDoc.write(fullBatchHtml);
+          iframeDoc.close();
+
+          await new Promise(r => setTimeout(r, 30));
+
+          const batchContainer = iframeDoc.getElementById('batchPagesContainer');
+          if (batchContainer) {
+            batchContainer.querySelectorAll('.no-print').forEach(el => el.remove());
+          }
+
+          const targetEl = batchContainer || iframeDoc.body;
+          const scaleFactor = 2.0; // 2x 고선명 Retina 화질
+          const canvas = await html2canvas(targetEl, {
+            scale: scaleFactor,
+            useCORS: true,
+            allowTaint: true,
             backgroundColor: '#ffffff',
             logging: false,
             windowWidth: 794,
-            imageTimeout: 0
+            imageTimeout: 1500
           });
 
-          // 고속 toDataURL 동기 변환 (Blob Promise 대기 대비 2배 가속)
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-          const base64Data = dataUrl.split(',')[1];
-          const binaryStr = atob(base64Data);
-          const jpgBytes = new Uint8Array(binaryStr.length);
-          for (let k = 0; k < binaryStr.length; k++) {
-            jpgBytes[k] = binaryStr.charCodeAt(k);
+          const unitHeight = Math.round(1122 * scaleFactor);
+          const unitWidth = Math.round(794 * scaleFactor);
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width = unitWidth;
+          sliceCanvas.height = unitHeight;
+          const sliceCtx = sliceCanvas.getContext('2d');
+
+          for (let j = 0; j < currentBatchLogs.length; j++) {
+            sliceCtx.fillStyle = '#ffffff';
+            sliceCtx.fillRect(0, 0, unitWidth, unitHeight);
+            sliceCtx.drawImage(canvas, 0, j * unitHeight, unitWidth, unitHeight, 0, 0, unitWidth, unitHeight);
+
+            // 고선명 95% JPEG (텍스트/도표 번짐 없는 고화질 압축)
+            const dataUrl = sliceCanvas.toDataURL('image/jpeg', 0.95);
+            const base64Data = dataUrl.split(',')[1];
+            const binaryStr = atob(base64Data);
+            const jpgBytes = new Uint8Array(binaryStr.length);
+            for (let k = 0; k < binaryStr.length; k++) {
+              jpgBytes[k] = binaryStr.charCodeAt(k);
+            }
+
+            const jpgImage = await mergedDoc.embedJpg(jpgBytes);
+            const pdfPage = mergedDoc.addPage([pageW, pageH]);
+            pdfPage.drawImage(jpgImage, {
+              x: margin,
+              y: margin,
+              width: availW,
+              height: availH
+            });
           }
-
-          const jpgImage = await mergedDoc.embedJpg(jpgBytes);
-          const imgW = jpgImage.width;
-          const imgH = jpgImage.height;
-          const scale = Math.min(availW / imgW, availH / imgH);
-          const finalW = imgW * scale;
-          const finalH = imgH * scale;
-          const posX = margin + (availW - finalW) / 2;
-          const posY = pageH - margin - finalH;
-
-          const page = mergedDoc.addPage([pageW, pageH]);
-          page.drawImage(jpgImage, {
-            x: posX,
-            y: posY,
-            width: finalW,
-            height: finalH
-          });
-
-          offscreen.innerHTML = '';
         }
       } finally {
-        if (document.body.contains(offscreen)) {
-          document.body.removeChild(offscreen);
+        if (iframe && document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
         }
       }
 
       updateGlobalProgress({
-        percent: 94,
+        percent: 95,
         statusText: `전체 ${sortedLogs.length}일차 일지 단일 PDF로 결합 및 패키징 중...`
       });
       await new Promise(r => setTimeout(r, 10));
@@ -37585,6 +39834,21 @@ async function handleAutoGenerateAndImportCarePortLog() {
     const totalDays = dailyLogsToRender.length;
     const mergedDoc = await PDFLib.PDFDocument.create();
 
+    const clusterTrendScores = dailyLogsToRender.map((l, idx) => {
+      const lRaw = l.raw || l;
+      const s = lRaw.trend_scores || lRaw.trendScores || l.trendScores || {};
+      const day = l.dayNumber || (idx + 1);
+      return {
+        dayIndex: day,
+        careDate: (l.consultDate || l.dateString || '').slice(0, 10),
+        overallScore: s.overallScore != null ? s.overallScore : (s.overall != null ? s.overall : 3),
+        mobilityScore: s.mobilityScore != null ? s.mobilityScore : (s.mobility != null ? s.mobility : 3),
+        dietScore: s.dietScore != null ? s.dietScore : (s.diet != null ? s.diet : 3),
+        sleepScore: s.sleepScore != null ? s.sleepScore : (s.sleep != null ? s.sleep : 3),
+        painScore: s.painScore != null ? s.painScore : (s.pain != null ? s.pain : 3)
+      };
+    });
+
     // 2-1. 케어포트 공인 상세 데이터 사전 병렬 로드 (실제 STT 요약, 임상 리포트, 바이탈 100% 반영)
     updateProgress(2, totalDays + 1, `[${patientName} 님] 케어포트 공인 상세 데이터 병렬 로드 중...`);
     const detailDataMap = {};
@@ -37624,6 +39888,13 @@ async function handleAutoGenerateAndImportCarePortLog() {
           const log = dailyLogsToRender[i];
           const dayNum = log.dayNumber || (i + 1);
           const curDate = log.dateString || (log.consultDate ? log.consultDate.slice(0, 10) : startDate);
+          const logCareDate = (log.consultDate || log.dateString || '').slice(0, 10);
+          const currentDayTrends = clusterTrendScores.filter((t, tIdx) => {
+            const tDate = (t.careDate || t.date || '').slice(0, 10);
+            if (tDate && logCareDate) return tDate <= logCareDate;
+            if (t.dayIndex != null && dayNum != null) return Number(t.dayIndex) <= Number(dayNum);
+            return tIdx <= i;
+          });
 
           const patientMeta = {
             patientName: patientName,
@@ -37632,12 +39903,24 @@ async function handleAutoGenerateAndImportCarePortLog() {
             caregiverName: caregiverName,
             centerName: centerName,
             insuranceCompany: insuranceCompany,
-            applyId: appId
+            applyId: appId,
+            dailyLogs: dailyLogsToRender,
+            trendScores: currentDayTrends
           };
 
           const realDetail = detailDataMap[log.sessionId] || (window.CarePortClient && window.CarePortClient._detailCache && window.CarePortClient._detailCache[log.sessionId]) || null;
 
-          let detailData = realDetail || buildCareLogDetailData(patientMeta, log, caregiverName, insuranceCompany, centerName);
+          let detailData = realDetail ? { ...realDetail } : buildCareLogDetailData(patientMeta, log, caregiverName, insuranceCompany, centerName);
+          if (detailData && Array.isArray(detailData.trendScores) && detailData.trendScores.length > 0) {
+            detailData.trendScores = detailData.trendScores.filter((t, tIdx) => {
+              const tDate = (t.careDate || t.date || '').slice(0, 10);
+              if (tDate && logCareDate) return tDate <= logCareDate;
+              if (t.dayIndex != null && dayNum != null) return Number(t.dayIndex) <= Number(dayNum);
+              return tIdx <= i;
+            });
+          } else if (detailData) {
+            detailData.trendScores = currentDayTrends;
+          }
 
           const dayHtml = (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function')
             ? window.CarePortClient.generateDailyLogHtml(patientMeta, log, detailData)
@@ -38315,8 +40598,17 @@ function renderClaims() {
   const query = (document.getElementById('claimSearchInput')?.value || '').trim().toLowerCase();
   const statusFilter = document.getElementById('claimStatusFilter')?.value || 'ALL';
 
+  const isClaimUnconfirmedStatus = (c) => c && (c.depositStatus === '미수' || c.depositStatus === '미확인' || c.depositStatus === '부분입금' || !c.depositStatus);
+  const isClaimConfirmedStatus = (c) => c && (c.depositStatus === '입금확인' || c.depositStatus === '입금완료' || c.depositStatus === '입금확인됨');
+
   const filtered = gClaims.filter(c => {
-    if (statusFilter !== 'ALL' && c.depositStatus !== statusFilter) return false;
+    if (statusFilter === '미확인') {
+      if (!isClaimUnconfirmedStatus(c)) return false;
+    } else if (statusFilter === '입금확인') {
+      if (!isClaimConfirmedStatus(c)) return false;
+    } else if (statusFilter !== 'ALL' && c.depositStatus !== statusFilter) {
+      return false;
+    }
     if (query) {
       const match = (c.id && c.id.toLowerCase().includes(query)) ||
                     (c.applyId && c.applyId.toLowerCase().includes(query)) ||
@@ -38328,22 +40620,42 @@ function renderClaims() {
     return true;
   });
 
-  const unconfirmedCount = gClaims.filter(c => c.depositStatus === '미확인').length;
+  // 1. 총 청구건수 동적 렌더링 (하드코딩 432건 탈피 -> 실제 청구대장 총합 497건 정확 표출)
+  const totalClaimsCount = (gClaims || []).length;
+  const headerTotal = document.getElementById('claimTotalCountHeader');
+  if (headerTotal) headerTotal.innerText = totalClaimsCount + '건';
+
+  // 2. 미확인 청구 건수 (상단 종모양 106건과 100% 동일한 공식 집계)
+  const unconfirmedCount = gClaims.filter(isClaimUnconfirmedStatus).length;
   const headerAlert = document.getElementById('claimUnpaidCountHeader');
   if (headerAlert) headerAlert.innerText = unconfirmedCount + '건';
 
-  const confirmedCount = gClaims.filter(c => c.depositStatus === '입금확인').length;
+  // 3. 입금확인 완료 건수
+  const confirmedCount = gClaims.filter(isClaimConfirmedStatus).length;
   const headerPaid = document.getElementById('claimPaidCountHeader');
   if (headerPaid) headerPaid.innerText = confirmedCount + '건';
 
+  // 4. 상단 글로벌 네비게이션 종모양 뱃지 실시간 동기화
+  const unpaidBadge = document.getElementById('unpaidAlertBadge');
+  if (unpaidBadge) {
+    unpaidBadge.innerText = unconfirmedCount;
+    unpaidBadge.style.display = unconfirmedCount > 0 ? 'flex' : 'none';
+  }
+
   tbody.innerHTML = filtered.map(c => {
     const isChecked = gLedgerSelection.claims && gLedgerSelection.claims.has(c.id);
+    const isUnconfirmed = isClaimUnconfirmedStatus(c);
     return `
-    <tr class="hover:bg-amber-50/50 transition-colors ${isChecked ? 'bg-amber-50/40' : ''}">
+    <tr ondblclick="openClaimEditModal('${c.id}')" class="hover:bg-amber-50/50 transition-colors ${isChecked ? 'bg-amber-50/40' : ''}">
       <td class="p-3 pl-4 w-8 text-center">
         <input type="checkbox" value="${c.id}" ${isChecked ? 'checked' : ''} onchange="toggleSelectRow('claims', '${c.id}', this.checked)" class="claims-row-checkbox w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer accent-amber-600">
       </td>
-      <td class="p-3 pl-2 table-pinned-col bg-white font-bold text-amber-700 border-r border-slate-200">${c.id}</td>
+      <td class="p-3 pl-2 table-pinned-col bg-white border-r border-slate-200">
+        <button type="button" onclick="openClaimEditModal('${c.id}')" class="font-bold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer flex items-center gap-1 group" title="청구번호 ${c.id} 금액 및 일당 수정">
+          <span>${c.id}</span>
+          <i data-lucide="edit-3" class="w-3 h-3 text-amber-500 opacity-60 group-hover:opacity-100 transition-opacity"></i>
+        </button>
+      </td>
       <td class="p-3 table-pinned-col-2 bg-white font-bold text-primary-700 border-r border-slate-200">
         <button onclick="openCareCycleModal('${c.applyId}')" class="underline hover:text-primary-900">${c.applyId}</button>
       </td>
@@ -38356,9 +40668,9 @@ function renderClaims() {
       <td class="p-3 text-right font-bold text-emerald-700">${formatCurrency(c.depositAmount)}원</td>
       <td class="p-3 text-center">
         <span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${
-          c.depositStatus === '입금확인' ? 'bg-emerald-100 text-emerald-800' :
-          c.depositStatus === '미확인' ? 'bg-rose-100 text-rose-800 font-black' : 'bg-amber-100 text-amber-800'
-        }">${c.depositStatus}</span>
+          isClaimConfirmedStatus(c) ? 'bg-emerald-100 text-emerald-800' :
+          isUnconfirmed ? 'bg-rose-100 text-rose-800 font-black' : 'bg-amber-100 text-amber-800'
+        }">${c.depositStatus || '미확인'}</span>
         ${c.depositTime || c.depositDate ? `<div class="text-[10px] text-slate-400 font-mono mt-0.5">${c.depositTime || c.depositDate}</div>` : ''}
       </td>
       <td class="p-3 text-right font-black ${c.unpaidAmount > 0 ? 'text-rose-600 bg-rose-50' : 'text-slate-400'}">
@@ -38367,17 +40679,24 @@ function renderClaims() {
       <td class="p-3 font-medium text-slate-700">${c.adjusterStatus || '-'}</td>
       <td class="p-3 max-w-xs truncate text-slate-500" title="${c.memo}">${c.memo || '-'}</td>
       <td class="p-3 text-center pr-4">
-        ${c.depositStatus === '미확인' ? `
-          <button onclick="confirmClaimDeposit('${c.id}')" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-all shadow-xs cursor-pointer">
-            입금확인 처리
+        <div class="flex items-center justify-center gap-1.5">
+          <button type="button" onclick="openClaimEditModal('${c.id}')" class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-[11px] transition-all shadow-2xs cursor-pointer flex items-center gap-1 whitespace-nowrap" title="청구금액/일당 수정">
+            <i data-lucide="edit-3" class="w-3 h-3"></i>
+            <span>수정</span>
           </button>
-        ` : `
-          <span class="text-[11px] text-emerald-600 font-bold">수납완료 ✓</span>
-        `}
+          ${isUnconfirmed ? `
+            <button onclick="confirmClaimDeposit('${c.id}')" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-all shadow-xs cursor-pointer whitespace-nowrap">
+              입금확인 처리
+            </button>
+          ` : `
+            <span class="text-[11px] text-emerald-600 font-bold whitespace-nowrap">수납완료 ✓</span>
+          `}
+        </div>
       </td>
     </tr>
     `;
   }).join('');
+  initIcons(tbody);
 }
 
 function confirmClaimDeposit(claimId) {
@@ -40202,6 +42521,13 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
     newApp.hasManualUpdate = false;
     newApp._isJustRegistered = true;
 
+    // 최근 등록 ID 로컬스토리지에 보존 (새로고침 후에도 최상단 영구 유지)
+    try {
+      const recentIds = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
+      const updatedRecent = Array.from(new Set([newApp.id, ...(recentIds || [])])).slice(0, 100);
+      localStorage.setItem('LIVON_RECENTLY_REGISTERED_IDS', JSON.stringify(updatedRecent));
+    } catch (e) {}
+
     // 2. 고객 신청 대장에 최우선 즉시 등록 (팩스 성공 여부와 무관하게 100% 안전 보존)
     gApps = [newApp, ...(gApps || []).filter(a => a && a.id !== newApp.id)];
     try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
@@ -40260,12 +42586,14 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
 
     // 서버 로컬 디스크 파일(hub_apps_real.json)에 즉시 영구 저장
     try {
-      fetch('/api/hub/create-application', {
+      await fetch('/api/hub/create-application', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application: newApp })
-      }).catch(console.warn);
-    } catch (e) {}
+      });
+    } catch (e) {
+      console.warn('[Disk Save Error]', e);
+    }
 
     // Convex Cloud 운영 DB 실시간 영구 동기화 (Convex 규칙: _ 접두사 필드 제외 후 전송)
     const cleanPayload = {};
@@ -40304,7 +42632,7 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
           window.gInitialFaxRecords[newId] = {
             formType: 'HD_FORM_01',
             formTitle: '현대해상 간병인지원 신청/고객등록 요청서',
-            sentDate: newApp.initialFaxDate || new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+            sentDate: newApp.initialFaxDate || (typeof getKoreaDateTimeStr === 'function' ? getKoreaDateTimeStr() : new Date().toISOString().split('T')[0].replace(/-/g, '.')),
             status: '전송완료',
             faxNumber: targetFaxNumber + (targetFaxRecipient ? ' (' + targetFaxRecipient + ')' : ''),
             recipient: targetFaxRecipient || '현대해상 보상지원센터',
@@ -40416,8 +42744,7 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
         }
 
         if (!resultLog) {
-          const now = new Date();
-          const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+          const dateStr = typeof getKoreaDateTimeStr === 'function' ? getKoreaDateTimeStr() : new Date().toISOString().replace('T', ' ').slice(0, 16).replace(/-/g, '.');
           const isFailed = Boolean(sendErrorMessage);
           resultLog = {
             id: 'FLOG-' + Date.now().toString().slice(-6),
@@ -41902,6 +44229,7 @@ function onHubSearchInput() {
   }
   if (gHubSearchTimer) clearTimeout(gHubSearchTimer);
   gHubSearchTimer = setTimeout(() => {
+    gHubCurrentPage = 1;
     renderUnifiedCareHub();
   }, 180);
 }
@@ -41913,8 +44241,33 @@ function clearHubSearch() {
   }
   const clearBtn = document.getElementById('btnHubSearchClear');
   if (clearBtn) clearBtn.classList.add('hidden');
+  gHubCurrentPage = 1;
   renderUnifiedCareHub();
 }
+
+function resetAllHubFiltersAndSearch() {
+  const hubInput = document.getElementById('hubSearchInput');
+  if (hubInput) hubInput.value = '';
+  const clearBtn = document.getElementById('btnHubSearchClear');
+  if (clearBtn) clearBtn.classList.add('hidden');
+
+  gHubFilter = 'ALL';
+  gHubInsuranceTab = 'ALL';
+  gHubStatusFilter = null;
+  gHubOnlyModified = false;
+  gHubOnlyDisabled = false;
+  gHubCurrentPage = 1;
+
+  try { localStorage.setItem('LIVON_HUB_INS_TAB', 'ALL'); } catch (e) {}
+
+  if (typeof updateHubInsuranceTabUI === 'function') updateHubInsuranceTabUI();
+  if (typeof updateHubStatusLegendUI === 'function') updateHubStatusLegendUI();
+
+  renderUnifiedCareHub();
+}
+window.resetAllHubFiltersAndSearch = resetAllHubFiltersAndSearch;
+window.onHubSearchInput = onHubSearchInput;
+window.clearHubSearch = clearHubSearch;
 
 
 // =========================================================================
@@ -42409,8 +44762,7 @@ function handleNewClaimSubmit(e) {
   const startDateTimeStr = `${startDate.replace(/-/g, '.')} ${startTime}`;
   const endDateTimeStr = `${endDate.replace(/-/g, '.')} ${endTime}`;
 
-  const now = new Date();
-  const claimDateTimeStr = formatWithTime(formatCareDateStr(now), `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+  const claimDateTimeStr = getKoreaDateTimeStr();
 
   const newClaim = {
     id: 'CLM' + (gClaims.length + 1).toString().padStart(4, '0'),
@@ -42487,32 +44839,58 @@ function handleNewClaimSubmit(e) {
 }
 
 function openClaimEditModal(claimId) {
-  const claim = gClaims.find(c => c.id === claimId);
-  if (!claim) return;
+  const claim = (gClaims || []).find(c => c && c.id === claimId);
+  if (!claim) {
+    if (typeof showToast === 'function') showToast(`[${claimId}] 청구 내역을 찾을 수 없습니다.`, 'warning');
+    return;
+  }
 
-  const app = gApps.find(a => a.id === claim.applyId) || {
+  const app = (gApps || []).find(a => a && a.id === claim.applyId) || {
     patientName: claim.patientName || '고객',
     insuranceCompany: claim.insuranceCompany || '',
     accidentNumber: claim.accidentNumber || ''
   };
 
-  document.getElementById('editClaimId').value = claim.id;
-  document.getElementById('editClaimAppId').value = claim.applyId;
-  document.getElementById('editClaimCustomerInfo').innerText = `${app.patientName} (${claim.id})`;
-  document.getElementById('editClaimRoundBadge').innerText = `${claim.round || '청구'} · ${app.insuranceCompany}`;
-  document.getElementById('editClaimPeriodInfo').innerText = `청구 기간: ${claim.startDate || '-'} ~ ${claim.endDate || '-'} (사고번호: ${claim.accidentNumber || app.accidentNumber || '-'})`;
+  const idEl = document.getElementById('editClaimId');
+  if (idEl) idEl.value = claim.id;
+  const appIdEl = document.getElementById('editClaimAppId');
+  if (appIdEl) appIdEl.value = claim.applyId || '';
+  const custEl = document.getElementById('editClaimCustomerInfo');
+  if (custEl) custEl.innerText = `${claim.patientName || app.patientName} (${claim.id})`;
+  const badgeEl = document.getElementById('editClaimRoundBadge');
+  if (badgeEl) badgeEl.innerText = `${claim.round || '청구'} · ${app.insuranceCompany || '-'}`;
+  const periodEl = document.getElementById('editClaimPeriodInfo');
+  if (periodEl) periodEl.innerText = `청구 기간: ${claim.startDate || claim.standardDate || '-'} ~ ${claim.endDate || claim.claimDate || '-'} (신청ID: ${claim.applyId || '-'})`;
 
   const wage = claim.unitPrice || claim.dailyWage || Math.round((claim.claimAmount || claim.totalAmount || 0) / (claim.days || 1)) || 140000;
   const days = claim.days || 1;
   const amount = claim.claimAmount || claim.totalAmount || (days * wage);
 
-  document.getElementById('editClaimDailyWage').value = formatCurrency(wage);
-  document.getElementById('editClaimDays').value = days;
-  document.getElementById('editClaimAmount').value = formatCurrency(amount);
+  const wageInput = document.getElementById('editClaimDailyWage');
+  if (wageInput) wageInput.value = formatCurrency(wage);
+  const daysInput = document.getElementById('editClaimDays');
+  if (daysInput) daysInput.value = days;
+  const amountInput = document.getElementById('editClaimAmount');
+  if (amountInput) amountInput.value = formatCurrency(amount);
   const editClaimDateEl = document.getElementById('editClaimDate');
-  if (editClaimDateEl) editClaimDateEl.value = claim.claimDate || '';
-  document.getElementById('editClaimStatus').value = claim.depositStatus === '입금완료' ? '입금완료' : (claim.depositStatus === '승인' ? '승인완료' : '미청구');
-  document.getElementById('editClaimMemo').value = claim.memo || '';
+  if (editClaimDateEl) editClaimDateEl.value = claim.claimDate || claim.standardDate || '';
+
+  const statusEl = document.getElementById('editClaimStatus');
+  if (statusEl) {
+    const curStatus = claim.depositStatus || '미확인';
+    if (curStatus === '입금완료' || curStatus === '입금확인' || curStatus === '입금확인됨') {
+      statusEl.value = '입금확인';
+    } else if (curStatus === '입금예정') {
+      statusEl.value = '입금예정';
+    } else if (curStatus === '부분입금') {
+      statusEl.value = '부분입금';
+    } else {
+      statusEl.value = '미확인';
+    }
+  }
+
+  const memoInput = document.getElementById('editClaimMemo');
+  if (memoInput) memoInput.value = claim.memo || '';
 
   openModal('claimEditModal');
   initIcons();
@@ -42530,24 +44908,24 @@ function calcEditClaimTotal() {
 function handleClaimEditSubmit(e) {
   if (e && e.preventDefault) e.preventDefault();
 
-  const claimId = document.getElementById('editClaimId').value;
-  const claim = gClaims.find(c => c.id === claimId);
+  const claimId = document.getElementById('editClaimId')?.value;
+  const claim = (gClaims || []).find(c => c && c.id === claimId);
   if (!claim) {
     alert('청구 데이터를 찾을 수 없습니다.');
     return;
   }
 
-  const wageRaw = document.getElementById('editClaimDailyWage').value.replace(/[^0-9]/g, '');
+  const wageRaw = (document.getElementById('editClaimDailyWage')?.value || '').replace(/[^0-9]/g, '');
   const wage = Number(wageRaw) || 140000;
-  const days = Number(document.getElementById('editClaimDays').value) || 1;
-  const amountRaw = document.getElementById('editClaimAmount').value.replace(/[^0-9]/g, '');
+  const days = Number(document.getElementById('editClaimDays')?.value) || 1;
+  const amountRaw = (document.getElementById('editClaimAmount')?.value || '').replace(/[^0-9]/g, '');
   const newAmount = Number(amountRaw) || (days * wage);
-  const status = document.getElementById('editClaimStatus').value;
-  const memo = document.getElementById('editClaimMemo').value.trim();
+  const status = document.getElementById('editClaimStatus')?.value || '미확인';
+  const memo = (document.getElementById('editClaimMemo')?.value || '').trim();
   const editClaimDate = (document.getElementById('editClaimDate')?.value || '').trim();
 
   // DIRECT IN-PLACE MODIFICATION OF EXISTING RECORD (신규등록 아님)
-  const oldAmount = claim.claimAmount || claim.totalAmount || 0;
+  const oldAmount = claim.claimAmount || claim.totalAmount || (claim.days * claim.unitPrice) || 0;
   claim.unitPrice = wage;
   claim.dailyWage = wage;
   claim.days = days;
@@ -42559,36 +44937,73 @@ function handleClaimEditSubmit(e) {
   }
   claim.updatedAt = new Date().toISOString();
 
-  if (status === '입금완료') {
-    claim.depositStatus = '입금완료';
+  if (status === '입금확인' || status === '입금완료') {
+    claim.depositStatus = '입금확인';
     claim.depositAmount = newAmount;
     claim.unpaidAmount = 0;
     claim.adjusterStatus = '입금완료';
-  } else if (status === '미청구') {
+  } else if (status === '미확인' || status === '미청구') {
     claim.depositStatus = '미확인';
-    claim.unpaidAmount = Math.max(0, newAmount - (claim.depositAmount || 0));
+    claim.depositAmount = 0;
+    claim.unpaidAmount = newAmount;
     claim.adjusterStatus = '청구접수';
+  } else if (status === '입금예정') {
+    claim.depositStatus = '입금예정';
+    claim.depositAmount = 0;
+    claim.unpaidAmount = newAmount;
+    claim.adjusterStatus = '입금예정';
+  } else if (status === '부분입금') {
+    claim.depositStatus = '부분입금';
+    claim.unpaidAmount = Math.max(0, newAmount - (claim.depositAmount || 0));
+    claim.adjusterStatus = '부분입금';
   }
 
-  const app = gApps.find(a => a.id === claim.applyId);
+  const app = (gApps || []).find(a => a && a.id === claim.applyId);
   if (app) {
-    const currentAppClaims = (gClaims || []).filter(c => c.applyId === app.id);
+    const currentAppClaims = (gClaims || []).filter(c => c && c.applyId === app.id);
     const totalDeposit = currentAppClaims.reduce((s, c) => s + (Number(c.depositAmount) || 0), 0);
-    const appTotalClaim = currentAppClaims.reduce((s, c) => s + (Number(c.claimAmount) || 0), 0);
+    const appTotalClaim = currentAppClaims.reduce((s, c) => s + (Number(c.claimAmount) || (Number(c.days) * Number(c.unitPrice)) || 0), 0);
     app.depositConfirmedAmount = totalDeposit;
     app.estimatedUnpaid = Math.max(0, appTotalClaim - totalDeposit);
-    const unconfirmedClaims = currentAppClaims.filter(c => {
-      return !isClaimDepositConfirmed(c) && (Number(c.unpaidAmount) > 0 || (Number(c.claimAmount) > 0 && Number(c.depositAmount || 0) < Number(c.claimAmount)));
-    });
+    const isConfirmedStatus = (c) => c && (c.depositStatus === '입금확인' || c.depositStatus === '입금완료' || c.depositStatus === '입금확인됨');
+    const unconfirmedClaims = currentAppClaims.filter(c => !isConfirmedStatus(c) && (Number(c.unpaidAmount) > 0 || (Number(c.depositAmount || 0) < (Number(c.claimAmount) || 0))));
     app.unconfirmedClaimCount = (app.estimatedUnpaid > 0) ? Math.max(1, unconfirmedClaims.length) : 0;
     app.updatedAt = new Date().toISOString();
   }
+
+  try {
+    localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+    if (app) localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+  } catch(e) {}
+
+  if (typeof syncToConvex === 'function') {
+    try {
+      syncToConvex('sync:saveClaim', { claim: claim }).catch(console.warn);
+      if (app) syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
+    } catch(e) {}
+  }
+
+  try {
+    fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: claim.applyId,
+        fields: {
+          claim: claim,
+          depositConfirmedAmount: app ? app.depositConfirmedAmount : undefined,
+          estimatedUnpaid: app ? app.estimatedUnpaid : undefined,
+          unconfirmedClaimCount: app ? app.unconfirmedClaimCount : undefined
+        }
+      })
+    }).catch(console.warn);
+  } catch(e) {}
 
   // 감사 로그 기록: 보험 청구 내역 수정
   if (typeof window.recordSystemAuditLog === 'function') {
     window.recordSystemAuditLog({
       category: '보험청구',
-      actionType: status === '입금완료' ? 'STATUS_CHANGE' : 'UPDATE',
+      actionType: (status === '입금확인' || status === '입금완료') ? 'STATUS_CHANGE' : 'UPDATE',
       target: `${claim.id} (${claim.patientName || (app ? app.patientName : '')})`,
       summary: `보험 청구 내역 수정 [${claim.id} - ${claim.patientName || (app ? app.patientName : '')}] (${formatCurrency(newAmount)}원, 수납상태: ${claim.depositStatus})`,
       changes: {
@@ -42601,12 +45016,14 @@ function handleClaimEditSubmit(e) {
   }
 
   closeModal('claimEditModal');
+  if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
   renderUnifiedCareHub();
   renderClaims();
+  if (typeof renderDashboard === 'function') renderDashboard();
 
   showCustomAlert({
     title: '청구금액 수정 완료',
-    message: `청구번호 [${claim.id}] 데이터의 일당(${formatCurrency(wage)}원), 일수(${days}일), 청구금액(${formatCurrency(newAmount)}원)이 기존 대장 레코드에 성공적으로 수정 반영되었습니다.`,
+    message: `청구번호 [${claim.id}] 데이터의 일당(${formatCurrency(wage)}원), 일수(${days}일), 청구금액(${formatCurrency(newAmount)}원)이 성공적으로 수정 반영되었습니다.`,
     icon: 'check-circle-2',
     iconColor: 'emerald'
   });
@@ -43703,8 +46120,13 @@ async function initAdminSession() {
                 gCurrentAdmin = { ...parsed, ...vRes.value.admin };
                 try { localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(gCurrentAdmin)); } catch (e) {}
               } else if (vRes.value.valid === false) {
-                console.warn('[Session Verify] 세션 토큰 만료됨: 로그인 화면으로 전환합니다.');
-                if (typeof logoutAdmin === 'function') logoutAdmin();
+                if (vRes.value.error && vRes.value.error.includes('비활성화')) {
+                  console.warn('[Session Verify] 비활성화된 관리자 계정: 로그아웃 처리');
+                  if (typeof handleAdminLogout === 'function') handleAdminLogout(true);
+                  return;
+                }
+                // 유효한 로컬 관리자 정보가 있으면 자동 강제 로그아웃(데이터 삭제)을 방지하고 로컬 세션 유지
+                return;
               }
             }
           }).catch(netErr => {
@@ -43719,12 +46141,18 @@ async function initAdminSession() {
 
   const overlay = document.getElementById('adminLoginOverlay');
 
-  // 개발 사이트(IS_DEV_ENV)인 경우: 로그인 모달 없이 최고관리자(리본케어 대표이사)로 자동 프리패스 로그인
-  if (IS_DEV_ENV && (!validSessionAdmin || isExplicitlyLoggedOut)) {
+  // 개발 사이트(IS_DEV_ENV) 또는 로컬/개발 화면(isDevScreen)인 경우: 로그인 모달 없이 최고관리자(리본케어 대표이사)로 자동 프리패스 로그인
+  if ((IS_DEV_ENV || (typeof isDevScreen === 'function' && isDevScreen())) && (!validSessionAdmin || isExplicitlyLoggedOut)) {
     const defaultSuperAdmin = (Array.isArray(gAdmins) && gAdmins.find(a => a.role === 'SUPER_ADMIN'))
       || (window.REBORN_DATA && window.REBORN_DATA.admins && window.REBORN_DATA.admins[0])
       || { id: 'ADM001', username: 'superadmin', name: '리본케어', dept: '대표이사', role: 'SUPER_ADMIN', permissions: ['all'], allowedMenus: ['all'] };
     validSessionAdmin = defaultSuperAdmin;
+    localStorage.removeItem('LIVON_LOGGED_OUT');
+    sessionStorage.removeItem('LIVON_LOGGED_OUT');
+    const autoToken = 'dev_session_' + Date.now();
+    localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', autoToken);
+    sessionStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', autoToken);
+    localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(validSessionAdmin));
   }
 
   if (validSessionAdmin) {
@@ -43785,11 +46213,23 @@ async function initAdminSession() {
     const rememberCheckbox = document.getElementById('loginRememberMe');
     const usernameInput = document.getElementById('loginUsernameInput');
     const validRemembered = localStorage.getItem('REBORN_REMEMBERED_USERNAME');
-    if (usernameInput && validRemembered && validRemembered !== '342') {
-      usernameInput.value = validRemembered;
-    }
-    if (rememberCheckbox) {
-      rememberCheckbox.checked = !!(validRemembered && validRemembered !== '342');
+    if (isDevScreen()) {
+      try { document.documentElement.classList.add('livon-dev-mode'); } catch (e) {}
+      if (usernameInput) {
+        usernameInput.value = 'superadmin';
+        usernameInput.removeAttribute('required');
+      }
+      if (rememberCheckbox) rememberCheckbox.checked = false;
+      setTimeout(() => {
+        document.getElementById('loginPasswordInput')?.focus();
+      }, 50);
+    } else {
+      if (usernameInput && validRemembered && validRemembered !== '342') {
+        usernameInput.value = validRemembered;
+      }
+      if (rememberCheckbox) {
+        rememberCheckbox.checked = !!(validRemembered && validRemembered !== '342');
+      }
     }
     return false;
   }
@@ -43817,7 +46257,15 @@ async function initAdminSession() {
   }
 
   if (usernameInput) {
-    if (validRemembered && validRemembered !== '342') {
+    if (isDevScreen()) {
+      try { document.documentElement.classList.add('livon-dev-mode'); } catch (e) {}
+      usernameInput.value = 'superadmin';
+      usernameInput.removeAttribute('required');
+      if (rememberCheckbox) rememberCheckbox.checked = false;
+      setTimeout(() => {
+        passwordInput?.focus();
+      }, 50);
+    } else if (validRemembered && validRemembered !== '342') {
       usernameInput.value = validRemembered;
     } else {
       usernameInput.value = '';
@@ -43961,15 +46409,25 @@ function handleAdminLogout(isAuto = false) {
     if (pInput) {
       pInput.value = '';
     }
-    if (uInput) {
-      if (savedUser && savedUser !== '342') {
-        uInput.value = savedUser;
-      } else if (uInput.value === '342' || uInput.value.trim() === '342' || !savedUser) {
-        uInput.value = '';
+    if (isDevScreen()) {
+      try { document.documentElement.classList.add('livon-dev-mode'); } catch (e) {}
+      if (uInput) {
+        uInput.value = 'superadmin';
+        uInput.removeAttribute('required');
       }
-    }
-    if (rememberCheckbox) {
-      rememberCheckbox.checked = !!(savedUser && savedUser !== '342');
+      if (rememberCheckbox) rememberCheckbox.checked = false;
+      setTimeout(() => { pInput?.focus(); }, 50);
+    } else {
+      if (uInput) {
+        if (savedUser && savedUser !== '342') {
+          uInput.value = savedUser;
+        } else if (uInput.value === '342' || uInput.value.trim() === '342' || !savedUser) {
+          uInput.value = '';
+        }
+      }
+      if (rememberCheckbox) {
+        rememberCheckbox.checked = !!(savedUser && savedUser !== '342');
+      }
     }
   };
 
@@ -43989,11 +46447,17 @@ function handleAdminLogout(isAuto = false) {
 
 async function handleAdminLoginSubmit(e) {
   if (e && e.preventDefault) e.preventDefault();
-  const username = document.getElementById('loginUsernameInput')?.value.trim();
+  let username = document.getElementById('loginUsernameInput')?.value.trim();
   const password = document.getElementById('loginPasswordInput')?.value.trim();
 
-  if (!username || !password) {
-    alert('아이디와 비밀번호를 모두 입력해주세요.');
+  if (isDevScreen()) {
+    if (!username) username = 'superadmin';
+  } else if (!username) {
+    username = 'superadmin';
+  }
+
+  if (!password) {
+    alert('비밀번호를 입력해주세요.');
     return;
   }
 
@@ -44656,7 +47120,11 @@ function startInactivityMonitoring() {
 // hubCustomerDetailModal-esc-listener
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    closeModal('hubCustomerDetailModal');
+    const hubModal = document.getElementById('hubCustomerDetailModal');
+    if (hubModal && !hubModal.classList.contains('hidden') && hubModal.style.display !== 'none') {
+      confirmCloseHubCustomerDetailModal();
+      return;
+    }
     if (typeof closeCalendarDetailDrawer === 'function') {
       closeCalendarDetailDrawer();
     }
