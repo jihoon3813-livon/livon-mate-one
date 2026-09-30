@@ -3323,56 +3323,56 @@ var gDefaultFormTemplates = {
     { id: 'AREA-16', label: '작성일(시행일자)', mapping: 'writeDate', x: 55, y: 88, w: 40, h: 4 }
   ],
   HD_FORM_02: [
-    { id: 'AREA-01', label: '구분 [신규신청] 체크(✓)', mapping: 'hd2_claimCheck_new', x: 67.5, y: 19.2, w: 9, h: 2.8 },
-    { id: 'AREA-02', label: '구분 [추가신청] 체크(✓)', mapping: 'hd2_claimCheck_add', x: 80.5, y: 19.2, w: 9, h: 2.8 },
-    { id: 'AREA-03', label: '사고번호', mapping: 'accidentNumber', x: 19.5, y: 24.3, w: 28, h: 2.8 },
-    { id: 'AREA-04', label: '청구일자(서비스신청일)', mapping: 'hd2_claimDate', x: 64, y: 24.3, w: 28, h: 2.8 },
-    { id: 'AREA-05', label: '피보험자(생년월일8자리)', mapping: 'hd2_patientNameBirth8', x: 19.5, y: 27.3, w: 28, h: 2.8 },
-    { id: 'AREA-06', label: '사고유형', mapping: 'accidentType', x: 46.5, y: 27.3, w: 9, h: 2.8 },
-    { id: 'AREA-07', label: '피보험자 연락처', mapping: 'patientPhone', x: 63.5, y: 27.3, w: 28.5, h: 2.8 },
-    { id: 'AREA-08', label: '계약번호(증권번호)', mapping: 'policyNumber', x: 19.5, y: 30.3, w: 28, h: 2.8 },
-    { id: 'AREA-09', label: '상품명(고정텍스트)', mapping: 'hd2_productName', x: 64, y: 30.3, w: 28, h: 2.8 },
-    { id: 'AREA-10', label: '사고내용(진단명)', mapping: 'hd2_accidentContent', x: 19.5, y: 33.3, w: 72.5, h: 2.8 },
-    { id: 'AREA-11', label: '병원명(입원의료기관)', mapping: 'hospitalName', x: 19.5, y: 42.0, w: 43.5, h: 3.2 },
-    { id: 'AREA-12', label: '간병인명(생년월일)', mapping: 'hd2_caregiverNameBirth', x: 19.5, y: 45.0, w: 42, h: 2.8 },
-    { id: 'AREA-13', label: '간병인 연락처', mapping: 'hd2_caregiverPhone', x: 74, y: 45.0, w: 18, h: 2.8 },
-    { id: 'AREA-14', label: '최초간병시작일', mapping: 'hd2_firstCareStartDate', x: 19.5, y: 48.5, w: 21.5, h: 2.8 },
-    { id: 'AREA-15', label: '예상사용시간(수정가능)', mapping: 'hd2_expectedUsageTime', x: 42, y: 48.5, w: 18, h: 2.8 },
-    { id: 'AREA-16', label: '계속간병여부(선택)', mapping: 'hd2_isContinuingCare', x: 67, y: 48.5, w: 25, h: 2.8 },
-    { id: 'AREA-17', label: '서비스 기간 (1행)', mapping: 'hd2_servicePeriod_row1', x: 19.5, y: 53.5, w: 72.5, h: 2.3 },
-    { id: 'AREA-18', label: '서비스 기간 (2행)', mapping: 'hd2_servicePeriod_row2', x: 19.5, y: 55.9, w: 72.5, h: 2.3 },
-    { id: 'AREA-19', label: '서비스 기간 (3행)', mapping: 'hd2_servicePeriod_row3', x: 19.5, y: 58.3, w: 72.5, h: 2.3 },
-    { id: 'AREA-20', label: '서비스 기간 (4행)', mapping: 'hd2_servicePeriod_row4', x: 19.5, y: 60.7, w: 72.5, h: 2.3 },
-    { id: 'AREA-21', label: '작성일자(YYYY년 M월 D일)', mapping: 'hd2_writeDateKorean', x: 50, y: 78.5, w: 42, h: 2.8 },
-    { id: 'AREA-22', label: '담당자 성명', mapping: 'hd2_managerName', x: 20, y: 84.5, w: 25, h: 2.8 },
-    { id: 'AREA-23', label: '담당자 연락처', mapping: 'hd2_managerPhone', x: 50, y: 84.5, w: 42, h: 2.8 }
+    { id: 'AREA-01', label: '구분 [신규신청] 체크(✓)', mapping: 'hd2_claimCheck_new', x: 67.5, y: 18.5, w: 9, h: 2.8 },
+    { id: 'AREA-02', label: '구분 [추가신청] 체크(✓)', mapping: 'hd2_claimCheck_add', x: 80.5, y: 18.5, w: 9, h: 2.8 },
+    { id: 'AREA-03', label: '사고번호', mapping: 'accidentNumber', x: 19.5, y: 23.5, w: 28, h: 2.8 },
+    { id: 'AREA-04', label: '청구일자(서비스신청일)', mapping: 'hd2_claimDate', x: 64, y: 23.5, w: 28, h: 2.8 },
+    { id: 'AREA-05', label: '피보험자(생년월일8자리)', mapping: 'hd2_patientNameBirth8', x: 19.5, y: 26.5, w: 28, h: 2.8 },
+    { id: 'AREA-06', label: '사고유형', mapping: 'accidentType', x: 46.5, y: 26.5, w: 9, h: 2.8 },
+    { id: 'AREA-07', label: '피보험자 연락처', mapping: 'patientPhone', x: 63.5, y: 26.5, w: 28.5, h: 2.8 },
+    { id: 'AREA-08', label: '계약번호(증권번호)', mapping: 'policyNumber', x: 19.5, y: 29.5, w: 28, h: 2.8 },
+    { id: 'AREA-09', label: '상품명(고정텍스트)', mapping: 'hd2_productName', x: 64, y: 29.5, w: 28, h: 2.8 },
+    { id: 'AREA-10', label: '사고내용(진단명)', mapping: 'hd2_accidentContent', x: 19.5, y: 32.5, w: 72.5, h: 2.8 },
+    { id: 'AREA-11', label: '병원명(입원의료기관)', mapping: 'hospitalName', x: 19.5, y: 41.2, w: 43.5, h: 3.2 },
+    { id: 'AREA-12', label: '간병인명(생년월일)', mapping: 'hd2_caregiverNameBirth', x: 19.5, y: 44.2, w: 42, h: 2.8 },
+    { id: 'AREA-13', label: '간병인 연락처', mapping: 'hd2_caregiverPhone', x: 74, y: 44.2, w: 18, h: 2.8 },
+    { id: 'AREA-14', label: '최초간병시작일', mapping: 'hd2_firstCareStartDate', x: 19.5, y: 47.7, w: 21.5, h: 2.8 },
+    { id: 'AREA-15', label: '예상사용시간(수정가능)', mapping: 'hd2_expectedUsageTime', x: 42, y: 47.7, w: 18, h: 2.8 },
+    { id: 'AREA-16', label: '계속간병여부(선택)', mapping: 'hd2_isContinuingCare', x: 67, y: 47.7, w: 25, h: 2.8 },
+    { id: 'AREA-17', label: '간병 서비스 기간 (1행)', mapping: 'hd2_servicePeriod_row1', x: 19.5, y: 52.7, w: 72.5, h: 2.3 },
+    { id: 'AREA-18', label: '간병 서비스 기간 (2행)', mapping: 'hd2_servicePeriod_row2', x: 19.5, y: 55.1, w: 72.5, h: 2.3 },
+    { id: 'AREA-19', label: '간병 서비스 기간 (3행)', mapping: 'hd2_servicePeriod_row3', x: 19.5, y: 57.5, w: 72.5, h: 2.3 },
+    { id: 'AREA-20', label: '간병 서비스 기간 (4행)', mapping: 'hd2_servicePeriod_row4', x: 19.5, y: 59.9, w: 72.5, h: 2.3 },
+    { id: 'AREA-21', label: '작성일자(YYYY년 M월 D일)', mapping: 'hd2_writeDateKorean', x: 50, y: 77.7, w: 42, h: 2.8 },
+    { id: 'AREA-22', label: '담당자 성명', mapping: 'hd2_managerName', x: 20, y: 83.7, w: 25, h: 2.8 },
+    { id: 'AREA-23', label: '담당자 연락처', mapping: 'hd2_managerPhone', x: 50, y: 83.7, w: 42, h: 2.8 }
   ],
   HD_FORM_03: [
-    { id: 'AREA-01', label: '구분 [신규신청] 체크(✓)', mapping: 'hd2_claimCheck_new', x: 67.5, y: 19.2, w: 9, h: 2.8 },
-    { id: 'AREA-02', label: '구분 [추가신청] 체크(✓)', mapping: 'hd2_claimCheck_add', x: 80.5, y: 19.2, w: 9, h: 2.8 },
-    { id: 'AREA-03', label: '사고번호', mapping: 'accidentNumber', x: 19.5, y: 24.3, w: 28, h: 2.8 },
-    { id: 'AREA-04', label: '청구일자(서비스신청일)', mapping: 'hd2_claimDate', x: 64, y: 24.3, w: 28, h: 2.8 },
-    { id: 'AREA-05', label: '피보험자(생년월일8자리)', mapping: 'hd2_patientNameBirth8', x: 19.5, y: 27.3, w: 28, h: 2.8 },
-    { id: 'AREA-06', label: '사고유형', mapping: 'accidentType', x: 64, y: 27.3, w: 28, h: 2.8 },
-    { id: 'AREA-07', label: '피보험자 연락처', mapping: 'patientPhone', x: 19.5, y: 30.3, w: 72.5, h: 2.8 },
-    { id: 'AREA-08', label: '계약번호(증권번호)', mapping: 'policyNumber', x: 19.5, y: 33.3, w: 28, h: 2.8 },
-    { id: 'AREA-09', label: '상품명(SCOR 전용)', mapping: 'hd2_productName', x: 64, y: 33.3, w: 28, h: 2.8 },
-    { id: 'AREA-10', label: '사고내용(진단명)', mapping: 'hd2_accidentContent', x: 19.5, y: 36.3, w: 72.5, h: 2.8 },
-    { id: 'AREA-11', label: '간병 대상자', mapping: 'careTarget', x: 19.5, y: 39.5, w: 42, h: 2.8 },
-    { id: 'AREA-12', label: '간병 장소', mapping: 'careLocation', x: 64, y: 39.5, w: 28, h: 2.8 },
-    { id: 'AREA-13', label: '주소', mapping: 'careAddress', x: 19.5, y: 42.5, w: 72.5, h: 2.8 },
-    { id: 'AREA-14', label: '간병인명(생년월일)', mapping: 'hd2_caregiverNameBirth', x: 19.5, y: 45.5, w: 42, h: 2.8 },
-    { id: 'AREA-15', label: '간병인 연락처', mapping: 'hd2_caregiverPhone', x: 74, y: 45.5, w: 18, h: 2.8 },
-    { id: 'AREA-16', label: '최초간병시작일', mapping: 'hd2_firstCareStartDate', x: 19.5, y: 48.5, w: 21.5, h: 2.8 },
-    { id: 'AREA-17', label: '예상사용시간(수정가능)', mapping: 'hd2_expectedUsageTime', x: 42, y: 48.5, w: 18, h: 2.8 },
-    { id: 'AREA-18', label: '계속간병여부(선택)', mapping: 'hd2_isContinuingCare', x: 67, y: 48.5, w: 25, h: 2.8 },
-    { id: 'AREA-19', label: '서비스 기간 (1행)', mapping: 'hd2_servicePeriod_row1', x: 19.5, y: 53.5, w: 72.5, h: 2.3 },
-    { id: 'AREA-20', label: '서비스 기간 (2행)', mapping: 'hd2_servicePeriod_row2', x: 19.5, y: 55.9, w: 72.5, h: 2.3 },
-    { id: 'AREA-21', label: '서비스 기간 (3행)', mapping: 'hd2_servicePeriod_row3', x: 19.5, y: 58.3, w: 72.5, h: 2.3 },
-    { id: 'AREA-22', label: '서비스 기간 (4행)', mapping: 'hd2_servicePeriod_row4', x: 19.5, y: 60.7, w: 72.5, h: 2.3 },
-    { id: 'AREA-23', label: '작성일자(YYYY년 M월 D일)', mapping: 'hd2_writeDateKorean', x: 50, y: 78.5, w: 42, h: 2.8 },
-    { id: 'AREA-24', label: '담당자 성명', mapping: 'hd2_managerName', x: 20, y: 84.5, w: 25, h: 2.8 },
-    { id: 'AREA-25', label: '담당자 연락처', mapping: 'hd2_managerPhone', x: 50, y: 84.5, w: 42, h: 2.8 }
+    { id: 'AREA-01', label: '구분 [신규신청] 체크(✓)', mapping: 'hd2_claimCheck_new', x: 67.5, y: 18.5, w: 9, h: 2.8 },
+    { id: 'AREA-02', label: '구분 [추가신청] 체크(✓)', mapping: 'hd2_claimCheck_add', x: 80.5, y: 18.5, w: 9, h: 2.8 },
+    { id: 'AREA-03', label: '사고번호', mapping: 'accidentNumber', x: 19.5, y: 23.5, w: 28, h: 2.8 },
+    { id: 'AREA-04', label: '청구일자(서비스신청일)', mapping: 'hd2_claimDate', x: 64, y: 23.5, w: 28, h: 2.8 },
+    { id: 'AREA-05', label: '피보험자(생년월일8자리)', mapping: 'hd2_patientNameBirth8', x: 19.5, y: 26.5, w: 28, h: 2.8 },
+    { id: 'AREA-06', label: '사고유형', mapping: 'accidentType', x: 64, y: 26.5, w: 28, h: 2.8 },
+    { id: 'AREA-07', label: '피보험자 연락처', mapping: 'patientPhone', x: 19.5, y: 29.5, w: 72.5, h: 2.8 },
+    { id: 'AREA-08', label: '계약번호(증권번호)', mapping: 'policyNumber', x: 19.5, y: 32.5, w: 28, h: 2.8 },
+    { id: 'AREA-09', label: '상품명(SCOR 전용)', mapping: 'hd2_productName', x: 64, y: 32.5, w: 28, h: 2.8 },
+    { id: 'AREA-10', label: '사고내용(진단명)', mapping: 'hd2_accidentContent', x: 19.5, y: 35.5, w: 72.5, h: 2.8 },
+    { id: 'AREA-11', label: '간병 대상자', mapping: 'careTarget', x: 19.5, y: 38.7, w: 42, h: 2.8 },
+    { id: 'AREA-12', label: '간병 장소', mapping: 'careLocation', x: 64, y: 38.7, w: 28, h: 2.8 },
+    { id: 'AREA-13', label: '주소', mapping: 'careAddress', x: 19.5, y: 41.7, w: 72.5, h: 2.8 },
+    { id: 'AREA-14', label: '간병인명(생년월일)', mapping: 'hd2_caregiverNameBirth', x: 19.5, y: 44.7, w: 42, h: 2.8 },
+    { id: 'AREA-15', label: '간병인 연락처', mapping: 'hd2_caregiverPhone', x: 74, y: 44.7, w: 18, h: 2.8 },
+    { id: 'AREA-16', label: '최초간병시작일', mapping: 'hd2_firstCareStartDate', x: 19.5, y: 47.7, w: 21.5, h: 2.8 },
+    { id: 'AREA-17', label: '예상사용시간(수정가능)', mapping: 'hd2_expectedUsageTime', x: 42, y: 47.7, w: 18, h: 2.8 },
+    { id: 'AREA-18', label: '계속간병여부(선택)', mapping: 'hd2_isContinuingCare', x: 67, y: 47.7, w: 25, h: 2.8 },
+    { id: 'AREA-19', label: '서비스 기간 (1행)', mapping: 'hd2_servicePeriod_row1', x: 19.5, y: 52.7, w: 72.5, h: 2.3 },
+    { id: 'AREA-20', label: '서비스 기간 (2행)', mapping: 'hd2_servicePeriod_row2', x: 19.5, y: 55.1, w: 72.5, h: 2.3 },
+    { id: 'AREA-21', label: '서비스 기간 (3행)', mapping: 'hd2_servicePeriod_row3', x: 19.5, y: 57.5, w: 72.5, h: 2.3 },
+    { id: 'AREA-22', label: '서비스 기간 (4행)', mapping: 'hd2_servicePeriod_row4', x: 19.5, y: 59.9, w: 72.5, h: 2.3 },
+    { id: 'AREA-23', label: '작성일자(YYYY년 M월 D일)', mapping: 'hd2_writeDateKorean', x: 50, y: 77.7, w: 42, h: 2.8 },
+    { id: 'AREA-24', label: '담당자 성명', mapping: 'hd2_managerName', x: 20, y: 83.7, w: 25, h: 2.8 },
+    { id: 'AREA-25', label: '담당자 연락처', mapping: 'hd2_managerPhone', x: 50, y: 83.7, w: 42, h: 2.8 }
   ]
 };
 
@@ -3808,10 +3808,11 @@ function reflectHdForm02ServicePeriodLive(rowIdx, col, value, appId) {
   }
 }
 
-// Load custom areas from localStorage (안전한 보존 우선 로드: 버전 변경 시에도 사용자 설정 절대 덮어쓰지 않음)
-const FORM_AREAS_VERSION = 'v20260930_hd2_fix';
+// Load custom areas from localStorage (양식 칸 수직 정렬 정밀 보정 버전: v20260930_hd2_pos_v2)
+const FORM_AREAS_VERSION = 'v20260930_hd2_pos_v2';
 try {
   const savedAreas = localStorage.getItem('LIVON_FORM_AREAS');
+  const savedVer = localStorage.getItem('LIVON_FORM_AREAS_VER');
   if (savedAreas) {
     const parsed = JSON.parse(savedAreas);
     for (const code in parsed) {
@@ -3820,16 +3821,17 @@ try {
       }
     }
   }
-  // HD_FORM_02가 23개 미만인 경우 신규 23개 필드로 자동 확장 업그레이드
-  if (!gFormAreaStore.HD_FORM_02 || gFormAreaStore.HD_FORM_02.length < 23) {
+  // HD_FORM_02가 23개 미만이거나 버전이 갱신된 경우 신규 정밀 좌표로 자동 확장 및 보정
+  if (!gFormAreaStore.HD_FORM_02 || gFormAreaStore.HD_FORM_02.length < 23 || savedVer !== FORM_AREAS_VERSION || (gFormAreaStore.HD_FORM_02[2] && gFormAreaStore.HD_FORM_02[2].y > 24.0)) {
     gFormAreaStore.HD_FORM_02 = JSON.parse(JSON.stringify(gDefaultFormTemplates.HD_FORM_02));
   }
-  // HD_FORM_02 영역 최적화 (병원명/주소 전체 노출 및 연락처 너비 확보)
+  // HD_FORM_02 영역 최적화 (병원명/주소 전체 노출, 연락처 너비 확보, 및 0.8% 수직 좌표 정밀 상향 보정)
   if (gFormAreaStore && gFormAreaStore.HD_FORM_02) {
     gFormAreaStore.HD_FORM_02.forEach(a => {
       if (a.id === 'AREA-11') {
         a.w = Math.max(a.w || 0, 43.5);
         a.h = Math.max(a.h || 0, 3.2);
+        if (a.y > 41.5) a.y = 41.2;
       }
       if (a.id === 'AREA-07') {
         a.w = Math.max(a.w || 0, 28.5);
@@ -3839,10 +3841,33 @@ try {
         a.x = 46.5;
         a.w = 9;
       }
+      // 양식 칸에 정확히 중앙 정렬되도록 Y좌표가 0.8% 내려가 있던 기존 수치 자동 상향 보정
+      if (a.id === 'AREA-01' && a.y > 18.8) a.y = 18.5;
+      if (a.id === 'AREA-02' && a.y > 18.8) a.y = 18.5;
+      if (a.id === 'AREA-03' && a.y > 24.0) a.y = 23.5;
+      if (a.id === 'AREA-04' && a.y > 24.0) a.y = 23.5;
+      if (a.id === 'AREA-05' && a.y > 27.0) a.y = 26.5;
+      if (a.id === 'AREA-06' && a.y > 27.0) a.y = 26.5;
+      if (a.id === 'AREA-07' && a.y > 27.0) a.y = 26.5;
+      if (a.id === 'AREA-08' && a.y > 30.0) a.y = 29.5;
+      if (a.id === 'AREA-09' && a.y > 30.0) a.y = 29.5;
+      if (a.id === 'AREA-10' && a.y > 33.0) a.y = 32.5;
+      if (a.id === 'AREA-12' && a.y > 44.5) a.y = 44.2;
+      if (a.id === 'AREA-13' && a.y > 44.5) a.y = 44.2;
+      if (a.id === 'AREA-14' && a.y > 48.0) a.y = 47.7;
+      if (a.id === 'AREA-15' && a.y > 48.0) a.y = 47.7;
+      if (a.id === 'AREA-16' && a.y > 48.0) a.y = 47.7;
+      if (a.id === 'AREA-17' && a.y > 53.0) a.y = 52.7;
+      if (a.id === 'AREA-18' && a.y > 55.5) a.y = 55.1;
+      if (a.id === 'AREA-19' && a.y > 58.0) a.y = 57.5;
+      if (a.id === 'AREA-20' && a.y > 60.0) a.y = 59.9;
+      if (a.id === 'AREA-21' && a.y > 78.0) a.y = 77.7;
+      if (a.id === 'AREA-22' && a.y > 84.0) a.y = 83.7;
+      if (a.id === 'AREA-23' && a.y > 84.0) a.y = 83.7;
     });
   }
   // HD_FORM_03 (SCOR)가 25개 미만이거나 11번 영역이 병원명인 경우 신규 25개 필드로 자동 확장 업그레이드
-  if (!gFormAreaStore.HD_FORM_03 || gFormAreaStore.HD_FORM_03.length < 25 || (gFormAreaStore.HD_FORM_03[10] && gFormAreaStore.HD_FORM_03[10].label.includes('병원명'))) {
+  if (!gFormAreaStore.HD_FORM_03 || gFormAreaStore.HD_FORM_03.length < 25 || savedVer !== FORM_AREAS_VERSION || (gFormAreaStore.HD_FORM_03[10] && gFormAreaStore.HD_FORM_03[10].label.includes('병원명'))) {
     gFormAreaStore.HD_FORM_03 = JSON.parse(JSON.stringify(gDefaultFormTemplates.HD_FORM_03));
   }
   localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
@@ -16970,7 +16995,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
           </div>
 
           <!-- Uploaded Official Form Canvas Overlay (23개 필드 매핑) - 팩스 발송 대상 실제 서식 (table-cell 수직 정렬로 글씨 상단 잘림 방지) -->
-          <div id="faxCleanFormTarget" class="relative w-full bg-white rounded-xl overflow-hidden select-none border border-slate-300 shadow-sm" style="font-family:'Pretendard', -apple-system, sans-serif;">
+          <div id="faxCleanFormTarget" class="relative w-full bg-white rounded-xl overflow-hidden select-none border border-slate-300 shadow-sm" style="position: relative; font-family:'Pretendard', -apple-system, sans-serif;">
             <img src="${customBg}" class="w-full h-auto block pointer-events-none z-0 bg-white" alt="현대해상 02번 양식">
             ${areas.map(area => {
               const val = resolveFormFieldValue(area.mapping, app, docNo, todayStr);
@@ -16998,9 +17023,9 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
               
               return `
                 <div data-mapping="${area.mapping}" class="absolute z-10 font-bold text-slate-950 text-xs select-none"
-                     style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; display: table; table-layout: fixed; ${extraStyle}"
+                     style="position: absolute; left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; display: table; table-layout: fixed; ${extraStyle}"
                      title="[${area.id}] ${area.label}: ${val}">
-                  <div class="form-area-cell" style="display: table-cell; vertical-align: middle; ${cellStyle} line-height: 1.3;">
+                  <div class="form-area-cell" style="display: table-cell; vertical-align: middle; ${cellStyle} line-height: 1.25;">
                     ${val}
                   </div>
                 </div>
