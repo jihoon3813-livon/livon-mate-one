@@ -1082,14 +1082,6 @@ const PROD_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
 
 function isDevEnvironment() {
   if (typeof window === 'undefined') return false;
-  const host = window.location.hostname || '';
-  const port = window.location.port || '';
-
-  // 1. 공식 운영 도메인(livon-mate-one.vercel.app)은 레거시 로컬스토리지와 무관하게 항상 PROD 보장
-  if (host === 'livon-mate-one.vercel.app') {
-    return false;
-  }
-
   const urlParam = new URLSearchParams(window.location.search).get('env');
   if (urlParam === 'dev') return true;
   if (urlParam === 'prod') return false;
@@ -1097,9 +1089,7 @@ function isDevEnvironment() {
   if (storedEnv === 'dev') return true;
   if (storedEnv === 'prod') return false;
 
-  if (host === 'localhost' || host === '127.0.0.1' || host === '' || host.includes('dev') || host.includes('preview') || port === '8080' || port === '3000') {
-    return true;
-  }
+  // [핵심]: PC 변경(사무실/자택/노트북)이나 로컬(localhost:8080) 접속 여부와 무관하게 모든 사용자가 100% 동일한 실운영 DB(PROD)를 실시간 공유
   return false;
 }
 
@@ -1276,6 +1266,10 @@ function inferMissingApplyDates(apps) {
   };
 
   const formatMsToDateTime = (ms, includeTime = true) => {
+    if (typeof getKoreaDateTimeStr === 'function' && typeof getKoreaDateStr === 'function') {
+      const d = new Date(ms);
+      return includeTime ? getKoreaDateTimeStr(d) : getKoreaDateStr(d);
+    }
     const d = new Date(ms);
     const pad = n => String(n).padStart(2, '0');
     const datePart = d.getFullYear() + '.' + pad(d.getMonth() + 1) + '.' + pad(d.getDate());
@@ -1495,11 +1489,13 @@ async function loadConvexData(showSpinner = true) {
 
     if (Array.isArray(realJson.applications) && realJson.applications.length > 0) {
       const serverRealApps = filterInvalidSamsungDuplicates(realJson.applications).filter(a => a && a.isRealLaunchData && !deletedAppIdSet.has(String(a.id)));
-      if (serverRealApps.length > 0) {
-        const existingNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => localApp && localApp._isJustRegistered === true && !deletedAppIdSet.has(String(localApp.id)) && !serverRealApps.some(s => s.id === localApp.id));
+        const existingNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
+          if (!localApp || !localApp.id) return false;
+          if (deletedAppIdSet.has(String(localApp.id))) return false;
+          return !serverRealApps.some(s => String(s.id) === String(localApp.id));
+        });
         gApps = sortApplicationsNewestFirst([...existingNewApps, ...serverRealApps]);
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
-      }
     }
     if (Array.isArray(realJson.assignments) && realJson.assignments.length > 0) {
       gAssigns = realJson.assignments.filter(a => a && a.isRealLaunchData && !deletedAppIdSet.has(String(a.applyId)));
@@ -1576,25 +1572,28 @@ async function loadConvexData(showSpinner = true) {
         const serverAppIdSet = new Set(validApps.map(a => String(a.id || '')));
 
         // 로컬에만 존재하는 신규 등록 고객 (서버에 아직 미반영된 건) 추출 및 보존
-        // ⚠️ 중요: 삭제된 고객이나 기존 실데이터는 절대 임의 복원하지 않으며, 오직 방금 로컬에서 신규 생성된 건(_isJustRegistered)만 보존
         const localOnlyNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
           if (!localApp || !localApp.id) return false;
           if (deletedAppIdSet.has(String(localApp.id))) return false;
-          const isNotOnServer = !serverAppIdSet.has(String(localApp.id));
-          return isNotOnServer && localApp._isJustRegistered === true;
+          return !serverAppIdSet.has(String(localApp.id));
         });
 
         if (localOnlyNewApps.length > 0) {
           console.log(`[Data Sync Guard] 서버 미반영 로컬 신규 고객 ${localOnlyNewApps.length}건 보존 및 서버 재동기화 시도:`, localOnlyNewApps.map(a => `${a.id}(${a.patientName})`));
           localOnlyNewApps.forEach(pendingApp => {
             if (typeof syncToConvex === 'function') {
-              syncToConvex('sync:saveApplication', { app: pendingApp }).catch(console.warn);
+              const clean = {};
+              for (const [k, v] of Object.entries(pendingApp)) {
+                if (!k.startsWith('_')) clean[k] = v;
+              }
+              syncToConvex('sync:saveApplication', { app: clean }).catch(console.warn);
             }
           });
         }
 
         const filteredValidApps = validApps.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
         gApps = sortApplicationsNewestFirst([...localOnlyNewApps, ...filteredValidApps]);
+        try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
         (gApps || []).forEach(a => {
           if ((Number(a.estimatedUnpaid) || 0) <= 0 && a.unconfirmedClaimCount > 0) {
             a.unconfirmedClaimCount = 0;
@@ -17802,8 +17801,7 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
   }
 
   if (!resultLog) {
-    const now = new Date();
-    const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    const dateStr = getKoreaDateTimeStr();
     const isFailed = Boolean(sendErrorMsg);
     resultLog = {
       id: 'FLOG-' + Date.now().toString().slice(-6),
@@ -17881,6 +17879,26 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
   if (resultLog.status === '성공' && (category === '정산청구' || formCode === 'HD_FORM_02' || formCode === 'HD_FORM_03' || formCode === 'SF_FORM_01')) {
     try {
       const targetRoundNum = (window.gPendingFaxDispatchParams && window.gPendingFaxDispatchParams.roundNumber) || 1;
+
+      // Update customSettlementSets if present
+      if (app.customSettlementSets && Array.isArray(app.customSettlementSets)) {
+        const cSet = app.customSettlementSets.find(s => Number(s.setIndex) === Number(targetRoundNum)) || app.customSettlementSets[targetRoundNum - 1];
+        if (cSet) {
+          cSet.claimDate = resultLog.sentDate;
+          cSet.claimStatus = '청구완료';
+        }
+        fetch('/api/hub/customer/update-fields', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            appId: app.id,
+            fields: {
+              customSettlementSets: app.customSettlementSets
+            }
+          })
+        }).catch(err => console.warn('[Fax Claim Set Update Error]', err));
+      }
+
       let existingClaim = (gClaims || []).find(c => String(c.applyId) === String(app.id) && (c.roundNumber === targetRoundNum || c.id.endsWith('.' + targetRoundNum)));
       if (!existingClaim) {
         existingClaim = (gClaims || []).find(c => String(c.applyId) === String(app.id));
@@ -18341,8 +18359,7 @@ function executeSendHyundaiInitialFax() {
   renderForms();
   renderUnifiedCareHub();
 
-  const now = new Date();
-  const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  const dateStr = getKoreaDateTimeStr();
   const newLog = {
     id: 'FLOG-' + Date.now().toString().slice(-6),
     sentDate: dateStr,
@@ -20236,35 +20253,73 @@ function parseCareDate(dateStr) {
   return new Date(y, parseInt(match[2], 10) - 1, parseInt(match[3], 10));
 }
 
+function getKoreaDateParts(d) {
+  if (!d) return null;
+  const dateObj = (d instanceof Date) ? d : new Date(d);
+  if (!dateObj || isNaN(dateObj.getTime())) return null;
+  try {
+    const parts = new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(dateObj);
+    const get = (type) => (parts.find(p => p.type === type) || {}).value || '00';
+    let hour = get('hour');
+    if (hour === '24') hour = '00';
+    return {
+      year: get('year'),
+      month: get('month'),
+      day: get('day'),
+      hour: hour,
+      minute: get('minute')
+    };
+  } catch (e) {
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    const hh = String(dateObj.getHours()).padStart(2, '0');
+    const mm = String(dateObj.getMinutes()).padStart(2, '0');
+    return { year: String(y), month: m, day: day, hour: hh, minute: mm };
+  }
+}
+
+function getKoreaDateStr(d = new Date()) {
+  const parts = getKoreaDateParts(d);
+  if (!parts) return '';
+  return `${parts.year}.${parts.month}.${parts.day}`;
+}
+
+function getKoreaDateTimeStr(d = new Date()) {
+  const parts = getKoreaDateParts(d);
+  if (!parts) return '';
+  return `${parts.year}.${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`;
+}
+window.getKoreaDateParts = getKoreaDateParts;
+window.getKoreaDateStr = getKoreaDateStr;
+window.getKoreaDateTimeStr = getKoreaDateTimeStr;
+
 function formatCareDateStr(d) {
-  if (!d || isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}.${m}.${day}`;
+  return getKoreaDateStr(d);
 }
 
 function formatCareDateTimeStr(d) {
-  if (!d || isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${y}.${m}.${day} ${hh}:${mm}`;
+  return getKoreaDateTimeStr(d);
 }
 
 function formatDateTimeLocalInput(dateTimeVal, defTime = '09:00') {
   if (!dateTimeVal) return '';
   const d = (dateTimeVal instanceof Date) ? dateTimeVal : parseCareDateTime(dateTimeVal);
   if (!d || isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+  const parts = getKoreaDateParts(d);
+  if (!parts) return '';
   const hasTime = (dateTimeVal instanceof Date) || /(\d{1,2}):(\d{1,2})/.test(String(dateTimeVal));
-  const hh = hasTime ? String(d.getHours()).padStart(2, '0') : defTime.slice(0, 2);
-  const mm = hasTime ? String(d.getMinutes()).padStart(2, '0') : defTime.slice(3, 5);
-  return `${y}-${m}-${day}T${hh}:${mm}`;
+  const hh = hasTime ? parts.hour : defTime.slice(0, 2);
+  const mm = hasTime ? parts.minute : defTime.slice(3, 5);
+  return `${parts.year}-${parts.month}-${parts.day}T${hh}:${mm}`;
 }
 window.formatDateTimeLocalInput = formatDateTimeLocalInput;
 
@@ -20352,12 +20407,12 @@ function formatStatusDateTime(rawVal, defaultTime = '10:00') {
   const str = String(rawVal).trim();
   if (!str || str === '-') return '';
 
-  // ISO string (e.g. 2026-09-10T14:30:00.000Z)
-  if (str.includes('T')) {
+  // ISO string (e.g. 2026-09-10T14:30:00.000Z or 2026-09-30T00:30:00Z)
+  if (str.includes('T') || str.endsWith('Z')) {
     try {
       const d = new Date(str);
       if (!isNaN(d.getTime())) {
-        return formatCareDateTimeStr(d);
+        return getKoreaDateTimeStr(d);
       }
     } catch (e) {}
   }
@@ -20368,8 +20423,11 @@ function formatStatusDateTime(rawVal, defaultTime = '10:00') {
     const y = timeMatch[1];
     const m = String(timeMatch[2]).padStart(2, '0');
     const d = String(timeMatch[3]).padStart(2, '0');
-    const hh = String(timeMatch[4]).padStart(2, '0');
+    let hh = String(timeMatch[4]).padStart(2, '0');
     const min = String(timeMatch[5]).padStart(2, '0');
+    if (hh === '00' && (y === '2026' || y === '2025')) {
+      hh = '09';
+    }
     return `${y}.${m}.${d} ${hh}:${min}`;
   }
 
@@ -20390,12 +20448,12 @@ function formatClaimDisplayDate(rawVal) {
   const str = String(rawVal).trim();
   if (!str || str === '-') return '';
 
-  // ISO string (e.g. 2026-09-10T14:30:00.000Z)
-  if (str.includes('T')) {
+  // ISO string (e.g. 2026-09-10T14:30:00.000Z or 2026-09-30T00:30:00Z)
+  if (str.includes('T') || str.endsWith('Z')) {
     try {
       const d = new Date(str);
       if (!isNaN(d.getTime())) {
-        return formatCareDateTimeStr(d);
+        return getKoreaDateTimeStr(d);
       }
     } catch (e) {}
   }
@@ -20406,8 +20464,11 @@ function formatClaimDisplayDate(rawVal) {
     const y = timeMatch[1];
     const m = String(timeMatch[2]).padStart(2, '0');
     const d = String(timeMatch[3]).padStart(2, '0');
-    const hh = String(timeMatch[4]).padStart(2, '0');
+    let hh = String(timeMatch[4]).padStart(2, '0');
     const min = String(timeMatch[5]).padStart(2, '0');
+    if (hh === '00' && (y === '2026' || y === '2025')) {
+      hh = '09';
+    }
     return `${y}.${m}.${d} ${hh}:${min}`;
   }
 
@@ -21220,6 +21281,8 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
   // [RULE 1] 관리자가 직접 편집/추가한 커스텀 정산·청구 세트가 존재하는 경우
   if (app && app.customSettlementSets && Array.isArray(app.customSettlementSets) && app.customSettlementSets.length > 0) {
     let currentCustomStart = careStartDate;
+    const usedClaimIds = new Set();
+    const usedPayoutIds = new Set();
     app.customSettlementSets.forEach((cSet, idx) => {
       const setIndex = cSet.setIndex || (idx + 1);
       const claimDays = Number(cSet.claimDays) || Number(cSet.days) || 1;
@@ -21257,48 +21320,93 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       const setPayoutWage = (cSet.cgDailyWage && !isNaN(Number(cSet.cgDailyWage)) && Number(cSet.cgDailyWage) > 0) ? Number(cSet.cgDailyWage) : cgDailyWage;
       const fullClaimAmount = (cSet.claimAmount && !isNaN(Number(cSet.claimAmount))) ? Number(cSet.claimAmount) : (claimDays * setClaimPrice);
       const fullPayoutAmount = (cSet.payoutAmount && !isNaN(Number(cSet.payoutAmount))) ? Number(cSet.payoutAmount) : (payoutDays * setPayoutWage);
+
+      const now = new Date();
+      const dSetStart = parseCareDateTime(roundStartDateStr);
+      const dSetEnd = roundEndDateStr ? parseCareDateTime(roundEndDateStr) : null;
+
+      let roundStage = 'ONGOING';
+      let ongoingElapsed = setDays;
+      let ongoingRemaining = 0;
+
+      if (dSetStart && now < dSetStart) {
+        roundStage = 'UPCOMING';
+        ongoingElapsed = 0;
+        ongoingRemaining = setDays;
+      } else if (dSetEnd && now >= dSetEnd) {
+        roundStage = 'COMPLETED';
+        ongoingElapsed = setDays;
+        ongoingRemaining = 0;
+      } else if (isCompleted) {
+        roundStage = 'COMPLETED';
+        ongoingElapsed = setDays;
+        ongoingRemaining = 0;
+      } else {
+        roundStage = 'ONGOING';
+        if (dSetStart) {
+          ongoingElapsed = Math.min(setDays, Math.max(1, calculateCareDays24h(dSetStart, now)));
+          ongoingRemaining = Math.max(0, setDays - ongoingElapsed);
+        } else {
+          ongoingElapsed = setDays;
+          ongoingRemaining = 0;
+        }
+      }
+
+      const ongoingClaimAmount = (roundStage === 'ONGOING') ? Math.min(fullClaimAmount, ongoingElapsed * setClaimPrice) : fullClaimAmount;
+      const ongoingPayoutAmount = (roundStage === 'ONGOING') ? Math.min(fullPayoutAmount, ongoingElapsed * setPayoutWage) : fullPayoutAmount;
+
       let existingClaim = null;
       if (cSet.claimId) {
-        existingClaim = (appClaims || []).find(c => c && c.id === cSet.claimId) || null;
+        existingClaim = (appClaims || []).find(c => c && c.id === cSet.claimId && !usedClaimIds.has(c.id)) || null;
       }
       if (!existingClaim && cSet.claimRound) {
-        existingClaim = (appClaims || []).find(c => c && String(c.round || '').trim() === String(cSet.claimRound).trim()) || null;
+        existingClaim = (appClaims || []).find(c => c && String(c.round || '').trim() === String(cSet.claimRound).trim() && !usedClaimIds.has(c.id)) || null;
       }
-      if (!existingClaim) {
+      // 차수가 명시되지 않은 경우에만 순번 기반 자동 매칭
+      if (!existingClaim && !cSet.claimRound && !cSet.claimId) {
         existingClaim = (appClaims || []).find(c => {
+          if (!c || usedClaimIds.has(c.id)) return false;
           const str = String(c.round || '').trim();
-          return str === `${setIndex}차` || str.startsWith(`${setIndex}차 `) || str.includes(`${setIndex}차`);
+          return str === `${setIndex}차` || str === `${targetMonth}월 ${setIndex}차`;
         }) || null;
       }
-      if (!existingClaim) {
-        const sortedClaims = (appClaims || []).slice().sort((a, b) => {
+      if (!existingClaim && !cSet.claimRound && !cSet.claimId) {
+        const sortedClaims = (appClaims || []).filter(c => c && !usedClaimIds.has(c.id)).sort((a, b) => {
           const dA = a.standardDate || a.claimDate || a.startDate || '';
           const dB = b.standardDate || b.claimDate || b.startDate || '';
           return dA.localeCompare(dB);
         });
-        existingClaim = sortedClaims[idx] || null;
+        existingClaim = sortedClaims[0] || null;
+      }
+      if (existingClaim && existingClaim.id) {
+        usedClaimIds.add(existingClaim.id);
       }
 
       let existingPayout = null;
       if (cSet.payoutId) {
-        existingPayout = (appPayouts || []).find(p => p && p.id === cSet.payoutId) || null;
+        existingPayout = (appPayouts || []).find(p => p && p.id === cSet.payoutId && !usedPayoutIds.has(p.id)) || null;
       }
       if (!existingPayout && cSet.payoutRound) {
-        existingPayout = (appPayouts || []).find(p => p && String(p.round || '').trim() === String(cSet.payoutRound).trim()) || null;
+        existingPayout = (appPayouts || []).find(p => p && String(p.round || '').trim() === String(cSet.payoutRound).trim() && !usedPayoutIds.has(p.id)) || null;
       }
-      if (!existingPayout) {
+      // 차수가 명시되지 않은 경우에만 순번 기반 자동 매칭
+      if (!existingPayout && !cSet.payoutRound && !cSet.payoutId) {
         existingPayout = (appPayouts || []).find(p => {
+          if (!p || usedPayoutIds.has(p.id)) return false;
           const str = String(p.round || '').trim();
-          return str === `${setIndex}차` || str.startsWith(`${setIndex}차 `) || str.includes(`${setIndex}차`);
+          return str === `${setIndex}차` || str === `${targetMonth}월 ${setIndex}차`;
         }) || null;
       }
-      if (!existingPayout) {
-        const sortedPayouts = (appPayouts || []).slice().sort((a, b) => {
+      if (!existingPayout && !cSet.payoutRound && !cSet.payoutId) {
+        const sortedPayouts = (appPayouts || []).filter(p => p && !usedPayoutIds.has(p.id)).sort((a, b) => {
           const dA = a.standardDate || a.payoutDate || a.paidDate || a.startDate || '';
           const dB = b.standardDate || b.payoutDate || b.paidDate || b.startDate || '';
           return dA.localeCompare(dB);
         });
-        existingPayout = sortedPayouts[idx] || null;
+        existingPayout = sortedPayouts[0] || null;
+      }
+      if (existingPayout && existingPayout.id) {
+        usedPayoutIds.add(existingPayout.id);
       }
 
       let depositAmount = (cSet.depositAmount !== undefined && cSet.depositAmount !== null && cSet.depositAmount !== '') 
@@ -21331,6 +21439,8 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       let claimStatus = 'UPCOMING_WAIT';
       if (isClaimDeposited) {
         claimStatus = 'DEPOSIT_DONE';
+      } else if (cSet.claimStatus === '청구전' && !cSet.claimDate) {
+        claimStatus = isCompleted ? 'READY_TO_CLAIM' : 'UPCOMING_WAIT';
       } else if (cSet.claimStatus === '청구완료' || cSet.claimDate || (existingClaim && existingClaim.claimDate)) {
         claimStatus = 'CLAIMED_UNPAID';
       } else {
@@ -21338,7 +21448,9 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       }
 
       let payoutStatus = 'UPCOMING_WAIT';
-      if (isPayoutPaid) {
+      if (cSet.payoutStatus === '지급전' && !cSet.payoutDate) {
+        payoutStatus = isCompleted ? 'READY_TO_PAY' : 'UPCOMING_WAIT';
+      } else if (isPayoutPaid) {
         payoutStatus = 'PAID';
       } else {
         payoutStatus = isCompleted ? 'READY_TO_PAY' : 'UPCOMING_WAIT';
@@ -21378,11 +21490,13 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         endDayOffset: (idx * 10) + setDays,
         startDateStr: roundStartDateStr,
         endDateStr: roundEndDateStr,
-        stage: isCompleted ? 'COMPLETED' : 'ONGOING',
+        stage: roundStage,
+        ongoingElapsed: ongoingElapsed,
+        ongoingRemaining: ongoingRemaining,
         dailyClaimPrice: setClaimPrice,
         fullClaimAmount: fullClaimAmount,
         depositAmount: depositAmount,
-        ongoingClaimAmount: fullClaimAmount,
+        ongoingClaimAmount: ongoingClaimAmount,
         claimId: cSet.claimId || (existingClaim ? existingClaim.id : `Q${String(app.id).replace('C', '')}.${setIndex}`),
         claimStatus: claimStatus,
         existingClaim: existingClaim,
@@ -21394,7 +21508,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         caregiverName: roundCg,
         cgDailyWage: setPayoutWage,
         fullPayoutAmount: fullPayoutAmount,
-        ongoingPayoutAmount: fullPayoutAmount,
+        ongoingPayoutAmount: ongoingPayoutAmount,
         payoutId: cSet.payoutId || (existingPayout ? existingPayout.id : `P${String(app.id).replace('C', '')}.${setIndex}`),
         payoutStatus: payoutStatus,
         existingPayout: existingPayout,
@@ -21598,6 +21712,40 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         const marginAmount = fullClaimAmount - fullPayoutAmount;
         const marginRate = fullClaimAmount > 0 ? ((marginAmount / fullClaimAmount) * 100).toFixed(1) : '0.0';
 
+        const now = new Date();
+        const dSetStart = parseCareDateTime(roundStartDateStr);
+        const dSetEnd = roundEndDateStr ? parseCareDateTime(roundEndDateStr) : null;
+
+        let roundStage = 'ONGOING';
+        let ongoingElapsed = setDays;
+        let ongoingRemaining = 0;
+
+        if (dSetStart && now < dSetStart) {
+          roundStage = 'UPCOMING';
+          ongoingElapsed = 0;
+          ongoingRemaining = setDays;
+        } else if (dSetEnd && now >= dSetEnd) {
+          roundStage = 'COMPLETED';
+          ongoingElapsed = setDays;
+          ongoingRemaining = 0;
+        } else if (isCompleted) {
+          roundStage = 'COMPLETED';
+          ongoingElapsed = setDays;
+          ongoingRemaining = 0;
+        } else {
+          roundStage = 'ONGOING';
+          if (dSetStart) {
+            ongoingElapsed = Math.min(setDays, Math.max(1, calculateCareDays24h(dSetStart, now)));
+            ongoingRemaining = Math.max(0, setDays - ongoingElapsed);
+          } else {
+            ongoingElapsed = setDays;
+            ongoingRemaining = 0;
+          }
+        }
+
+        const ongoingClaimAmount = (roundStage === 'ONGOING') ? Math.min(fullClaimAmount, ongoingElapsed * dailyClaimPrice) : fullClaimAmount;
+        const ongoingPayoutAmount = (roundStage === 'ONGOING') ? Math.min(fullPayoutAmount, ongoingElapsed * roundDailyWage) : fullPayoutAmount;
+
         rounds.push({
           roundNumber: setIndex,
           setIndex: setIndex,
@@ -21616,13 +21764,13 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           endDayOffset: (idx * 10) + setDays,
           startDateStr: roundStartDateStr,
           endDateStr: roundEndDateStr,
-          stage: isCompleted ? 'COMPLETED' : 'ONGOING',
-          ongoingElapsed: setDays,
-          ongoingRemaining: 0,
+          stage: roundStage,
+          ongoingElapsed: ongoingElapsed,
+          ongoingRemaining: ongoingRemaining,
           dailyClaimPrice,
           fullClaimAmount,
           depositAmount,
-          ongoingClaimAmount: fullClaimAmount,
+          ongoingClaimAmount: ongoingClaimAmount,
           claimId: claimForRound ? claimForRound.id : `Q${String(app.id).replace('C', '')}.${setIndex}`,
           claimStatus,
           existingClaim: claimForRound,
@@ -21634,7 +21782,7 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
           caregiverName: roundCg,
           cgDailyWage: roundDailyWage,
           fullPayoutAmount,
-          ongoingPayoutAmount: fullPayoutAmount,
+          ongoingPayoutAmount: ongoingPayoutAmount,
           payoutId: payoutForRound ? payoutForRound.id : `P${String(app.id).replace('C', '')}.${setIndex}`,
           payoutStatus,
           existingPayout: payoutForRound,
@@ -21739,16 +21887,16 @@ function findSettlementClaim(appId, roundNumber, explicitClaimId = null) {
     );
     if (schedule && Array.isArray(schedule.rounds)) {
       const round = schedule.rounds.find(r => r && r.roundNumber === roundNumber);
-      if (round && round.existingClaim) return round.existingClaim;
+      if (round) return round.existingClaim || null;
     }
   } catch (err) {
     console.warn('findSettlementClaim schedule calculation fallback:', err);
   }
 
-  // 2. 차수 텍스트 기준 매칭 (예: "8월 3차", "7차")
+  // 2. 차수 텍스트 기준 매칭 (예: "3차", "3차 (보충)")
   const byExactRound = appClaims.find(c => {
     const str = String(c.round || '').trim();
-    return str === `${roundNumber}차` || str.startsWith(`${roundNumber}차 `) || str.includes(`${roundNumber}차`);
+    return str === `${roundNumber}차` || str.startsWith(`${roundNumber}차 `);
   });
   if (byExactRound) return byExactRound;
 
@@ -21785,7 +21933,7 @@ function findSettlementPayout(appId, roundNumber, explicitPayoutId = null) {
     );
     if (schedule && Array.isArray(schedule.rounds)) {
       const round = schedule.rounds.find(r => r && r.roundNumber === roundNumber);
-      if (round && round.existingPayout) return round.existingPayout;
+      if (round) return round.existingPayout || null;
     }
   } catch (err) {
     console.warn('findSettlementPayout schedule calculation fallback:', err);
@@ -21793,7 +21941,7 @@ function findSettlementPayout(appId, roundNumber, explicitPayoutId = null) {
 
   const byExactRound = appPayouts.find(p => {
     const str = String(p.round || '').trim();
-    return str === `${roundNumber}차` || str.startsWith(`${roundNumber}차 `) || str.includes(`${roundNumber}차`);
+    return str === `${roundNumber}차` || str.startsWith(`${roundNumber}차 `);
   });
   if (byExactRound) return byExactRound;
 
@@ -22331,8 +22479,7 @@ async function createInterimClaim(applyId, roundNumber, targetDays) {
   });
   if (!confirmed) return;
 
-  const now = new Date();
-  const claimDateTimeStr = formatWithTime(formatCareDateStr(now), `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+  const claimDateTimeStr = getKoreaDateTimeStr();
 
   const newClaim = {
     id: `Q${applyId.replace('C', '')}.${roundNumber || 1}`,
@@ -26175,12 +26322,13 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
           ` : rounds.map(r => {
             const roundFaxLog = (window.gFaxLogs || []).find(fl => 
               String(fl.appId) === String(app.id) && 
-              (fl.roundNumber === r.roundNumber || (fl.memo && fl.memo.includes(`${r.roundNumber}차`)) || (fl.category && fl.category.includes('정산')))
+              (fl.roundNumber === r.roundNumber || (fl.memo && fl.memo.includes(`${r.roundNumber}차`)) || (r.roundNumber === 1 && fl.category && fl.category.includes('정산')))
             );
 
-            const rawClaimDate = (roundFaxLog && roundFaxLog.sentDate) ||
+            const rawClaimDate = r.claimDate ||
+              (roundFaxLog && roundFaxLog.sentDate) ||
               (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
-              ((faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null);
+              ((r.roundNumber === 1 && faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null);
 
             // 삼성화재인 경우 간병기간(종료일 우선, 시작일 보조)을 기준으로 몇월 청구 대상인지 산출
             let targetYear = r.targetYear || '';
@@ -26222,9 +26370,10 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
             // 본인에게 실제로 발송된 개별 청구 메일(samsungIndividualLog)이나 정식 청구서(r.existingClaim)가 있을 때만 청구완료로 인정
             const isCustomRoundSent = Boolean(!isRoundCancelled && app.customRoundDates && app.customRoundDates[r.roundNumber] && app.customRoundDates[r.roundNumber].sentAt);
             const isSamsungClaimSent = Boolean(!isRoundCancelled && (samsungIndividualLog || isCustomRoundSent));
-            const isClaimDone = isSamsung 
-              ? (isSamsungClaimSent || Boolean(!isRoundCancelled && r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate)))
-              : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(rawClaimDate));
+            const isClaimPending = Boolean(r.claimStatus === '청구전' && !r.claimDate && !r.existingClaim);
+            const isClaimDone = !isClaimPending && (isSamsung 
+              ? (isSamsungClaimSent || Boolean(!isRoundCancelled && r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate)) || Boolean(!isRoundCancelled && (r.claimDate || r.claimStatus === '청구완료')))
+              : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료' || r.existingClaim.status === '청구완료')) || Boolean(rawClaimDate) || Boolean(r.claimDate || r.claimStatus === '청구완료')));
 
             let claimDateTimeStr = '';
             if (isSamsung) {
@@ -26299,13 +26448,13 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                       </button>
                     ` : ''}
-                    ${(r.stage === 'COMPLETED' && !r.isOngoingCare) ? `
+                    ${(r.stage === 'COMPLETED') ? `
                       <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center gap-1">
                         <i data-lucide="check-circle" class="w-3 h-3 text-emerald-600"></i> 간병완료
                       </span>
-                    ` : (r.stage === 'ONGOING' || r.isOngoingCare) ? `
+                    ` : (r.stage === 'ONGOING') ? `
                       <span class="px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold text-[11px] flex items-center gap-1 animate-pulse">
-                        <span class="w-1.5 h-1.5 rounded-full bg-sky-600"></span> 간병진행중 (${r.ongoingElapsed || 1}일차)
+                        <span class="w-1.5 h-1.5 rounded-full bg-sky-600"></span> 간병진행중 (${r.ongoingElapsed || r.days}일차)
                       </span>
                     ` : `
                       <span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold text-[11px]">
@@ -27559,11 +27708,11 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                   ${rounds.map(r => {
                     const roundFaxLog = (window.gFaxLogs || []).find(fl => 
                       String(fl.appId) === String(app.id) && 
-                      (fl.roundNumber === r.roundNumber || (fl.memo && fl.memo.includes(`${r.roundNumber}차`)) || (fl.category && fl.category.includes('정산')))
+                      (fl.roundNumber === r.roundNumber || (fl.memo && fl.memo.includes(`${r.roundNumber}차`)) || (r.roundNumber === 1 && fl.category && fl.category.includes('정산')))
                     );
                     const faxSentDateStr = (roundFaxLog && roundFaxLog.sentDate) ||
                       (r.existingClaim && (r.existingClaim.faxSentDate || r.existingClaim.claimDate)) || 
-                      ((faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null) || '';
+                      ((r.roundNumber === 1 && faxInfo && faxInfo.status === '전송완료' && faxInfo.caseType !== '현대해상 고객등록/조회' && faxInfo.formType !== 'HD_FORM_01') ? faxInfo.sentDate : null) || '';
 
                     const isRoundCancelled = Boolean(app.cancelledSamsungRounds && app.cancelledSamsungRounds[r.roundNumber]);
 
@@ -27584,9 +27733,10 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
                     const isCustomRoundSent = Boolean(!isRoundCancelled && app.customRoundDates && app.customRoundDates[r.roundNumber] && app.customRoundDates[r.roundNumber].sentAt);
                     const isSending = Boolean(window.gBarobillSendingRounds && window.gBarobillSendingRounds.has(`${app.id}_${r.roundNumber}`));
-                    const isClaimDone = isSamsung
+                    const isClaimPending = Boolean(r.claimStatus === '청구전' && !r.claimDate && !r.existingClaim);
+                    const isClaimDone = !isClaimPending && (isSamsung
                       ? (!isRoundCancelled && (Boolean(samsungIndividualLog) || isCustomRoundSent || Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.status === '청구완료' || r.existingClaim.depositDate))))
-                      : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(faxSentDateStr));
+                      : (Boolean(r.existingClaim && (r.existingClaim.claimDate || r.existingClaim.faxStatus === '전송완료')) || Boolean(faxSentDateStr)));
                     const isDepositDone = isRoundDepositConfirmed(r);
 
                     let timelineClaimSentTimeStr = '';
@@ -29010,7 +29160,7 @@ function openPayoutDetailListModal(applyId) {
             </td>
           </tr>
         `;
-      } else if (r.stage === 'COMPLETED' && !r.isOngoingCare) {
+      } else if (r.stage === 'COMPLETED') {
         // 차수는 완료되었으나 정산 레코드가 아직 미생성된 상태
         return `
           <tr class="hover:bg-amber-50/50 transition-colors bg-amber-50/20">
@@ -29157,11 +29307,11 @@ function openClaimDetailListModal(applyId) {
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 whitespace-nowrap">
                 <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-600"></i> 미입금상태
               </span>
-            ` : (isReadyToClaim && !r.isOngoingCare) ? `
+            ` : (isReadyToClaim && r.stage === 'COMPLETED') ? `
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 whitespace-nowrap">
                 간병완료 (청구가능)
               </span>
-            ` : (isOngoingWait || r.isOngoingCare) ? `
+            ` : (r.stage === 'ONGOING' || isOngoingWait) ? `
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold bg-sky-100 text-sky-800 whitespace-nowrap">
                 <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span> 진행중 (D-${r.ongoingRemaining || 0}일)
               </span>
@@ -31862,8 +32012,7 @@ async function executeSendFaxModal() {
 
     // Fallback if local API is unreachable (e.g. static preview)
     if (!resultLog) {
-      const now = new Date();
-      const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      const dateStr = getKoreaDateTimeStr();
       const isFailed = Boolean(sendErrorMsg);
       resultLog = {
         id: 'FLOG-' + Date.now().toString().slice(-6),
@@ -33393,8 +33542,7 @@ async function executeFaxEchoTest() {
 
     if (!result) {
       const fakeFaxId = 'FLOG-' + Date.now().toString().slice(-6);
-      const now = new Date();
-      const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      const dateStr = getKoreaDateTimeStr();
       result = {
         success: true,
         faxId: fakeFaxId,
@@ -33903,8 +34051,7 @@ async function resendFaxLog(logId) {
     }
 
     if (!resultLog) {
-      const now = new Date();
-      const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      const dateStr = getKoreaDateTimeStr();
       resultLog = {
         ...log,
         id: 'FLOG-' + Date.now().toString().slice(-6),
@@ -34068,19 +34215,15 @@ function initData() {
     if (cachedApps) {
       let parsed = [];
       try { parsed = JSON.parse(cachedApps); } catch (e) {}
-      // 구버전 캐시(284건 이하) 감지 시 최신 296건 DB 반영을 위해 로컬 캐시 자동 무효화
-      if (Array.isArray(parsed) && parsed.length > 0 && parsed.length <= 284) {
-        console.log('[Cache Guard] 구버전(284건 이하) 로컬 캐시 무효화 -> 296건 최신 DB로 자동 갱신');
-        try { localStorage.removeItem('LIVON_CACHED_APPS'); } catch (e) {}
-        parsed = [];
-      }
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const cleaned = (typeof filterInvalidSamsungDuplicates === 'function') ? filterInvalidSamsungDuplicates(parsed) : (Array.isArray(parsed) ? parsed.filter(a => !(a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성') && !a.isRealLaunchData)) : []);
+        let cleaned = parsed;
+        if (typeof filterInvalidSamsungDuplicates === 'function') {
+          cleaned = filterInvalidSamsungDuplicates(parsed);
+        } else if (Array.isArray(parsed)) {
+          cleaned = parsed.filter(a => !(a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성') && !a.isRealLaunchData));
+        }
         const filtered = Array.isArray(cleaned) ? cleaned.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id))) : [];
-        const baseApps = (Array.isArray(filtered) && filtered.some(a => a.isRealLaunchData)) ? filtered.filter(a => a.isRealLaunchData) : filtered;
-        gApps = (typeof sortApplicationsNewestFirst === 'function') ? sortApplicationsNewestFirst(baseApps) : baseApps;
+        gApps = (typeof sortApplicationsNewestFirst === 'function') ? sortApplicationsNewestFirst(filtered) : filtered;
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
-      }
     } else if (window.REBORN_DATA && window.REBORN_DATA.applications) {
       gApps = [...window.REBORN_DATA.applications].filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
     }
@@ -42000,12 +42143,14 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
 
     // 서버 로컬 디스크 파일(hub_apps_real.json)에 즉시 영구 저장
     try {
-      fetch('/api/hub/create-application', {
+      await fetch('/api/hub/create-application', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application: newApp })
-      }).catch(console.warn);
-    } catch (e) {}
+      });
+    } catch (e) {
+      console.warn('[Disk Save Error]', e);
+    }
 
     // Convex Cloud 운영 DB 실시간 영구 동기화 (Convex 규칙: _ 접두사 필드 제외 후 전송)
     const cleanPayload = {};
@@ -42044,7 +42189,7 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
           window.gInitialFaxRecords[newId] = {
             formType: 'HD_FORM_01',
             formTitle: '현대해상 간병인지원 신청/고객등록 요청서',
-            sentDate: newApp.initialFaxDate || new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+            sentDate: newApp.initialFaxDate || (typeof getKoreaDateTimeStr === 'function' ? getKoreaDateTimeStr() : new Date().toISOString().split('T')[0].replace(/-/g, '.')),
             status: '전송완료',
             faxNumber: targetFaxNumber + (targetFaxRecipient ? ' (' + targetFaxRecipient + ')' : ''),
             recipient: targetFaxRecipient || '현대해상 보상지원센터',
@@ -42156,8 +42301,7 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
         }
 
         if (!resultLog) {
-          const now = new Date();
-          const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+          const dateStr = typeof getKoreaDateTimeStr === 'function' ? getKoreaDateTimeStr() : new Date().toISOString().replace('T', ' ').slice(0, 16).replace(/-/g, '.');
           const isFailed = Boolean(sendErrorMessage);
           resultLog = {
             id: 'FLOG-' + Date.now().toString().slice(-6),
@@ -44149,8 +44293,7 @@ function handleNewClaimSubmit(e) {
   const startDateTimeStr = `${startDate.replace(/-/g, '.')} ${startTime}`;
   const endDateTimeStr = `${endDate.replace(/-/g, '.')} ${endTime}`;
 
-  const now = new Date();
-  const claimDateTimeStr = formatWithTime(formatCareDateStr(now), `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+  const claimDateTimeStr = getKoreaDateTimeStr();
 
   const newClaim = {
     id: 'CLM' + (gClaims.length + 1).toString().padStart(4, '0'),
