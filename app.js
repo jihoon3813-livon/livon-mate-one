@@ -1089,7 +1089,13 @@ function isDevEnvironment() {
   if (storedEnv === 'dev') return true;
   if (storedEnv === 'prod') return false;
 
-  // [핵심 원칙]: 사용자의 실제 운영 데이터 단일 진실의 원천(PROD: gallant-weasel-360)을 모든 환경에서 기본 연동
+  // 로컬 개발 환경(localhost, 127.0.0.1, 개발 포트 등)에서는 개발 서버(DEV: rapid-raccoon-895)를 사용하고,
+  // 실서비스 도메인(Vercel 등)에서는 운영 서버(PROD: gallant-weasel-360) 사용
+  const host = window.location.hostname || '';
+  const port = window.location.port || '';
+  if (host === 'localhost' || host === '127.0.0.1' || host.includes('dev') || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:') {
+    return true;
+  }
   return false;
 }
 
