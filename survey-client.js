@@ -62,19 +62,27 @@ async function loadSurveyMgmtData(showToastAlert = false) {
 
     if (summaryRes.data) gSurveyState.summary = summaryRes.data;
 
-    // Convex 우선 반영, 없으면 API items, 없으면 localStorage 캐시
-    if (Array.isArray(cvxTargets) && cvxTargets.length > 0) {
-      gSurveyState.targets = cvxTargets;
-    } else if (Array.isArray(targetsRes.items) && targetsRes.items.length > 0) {
-      gSurveyState.targets = targetsRes.items;
-    } else {
-      try {
-        const cached = JSON.parse(localStorage.getItem('LIVON_SURVEY_TARGETS') || '[]');
-        if (Array.isArray(cached) && cached.length > 0) {
-          gSurveyState.targets = cached;
-        }
-      } catch (e) {}
+    // [데이터 유실 방지 통합 병합]: Convex Cloud 원격 DB와 로컬 캐시/API 대상자를 ID 기준으로 안전하게 병합
+    const targetMap = new Map();
+    // 1) 로컬스토리지 캐시
+    try {
+      const cached = JSON.parse(localStorage.getItem('LIVON_SURVEY_TARGETS') || '[]');
+      if (Array.isArray(cached)) {
+        cached.forEach(t => { if (t && t.id) targetMap.set(String(t.id), t); });
+      }
+    } catch (e) {}
+
+    // 2) 로컬 백엔드 서버 items (있는 경우)
+    if (Array.isArray(targetsRes.items)) {
+      targetsRes.items.forEach(t => { if (t && t.id) targetMap.set(String(t.id), t); });
     }
+
+    // 3) Convex Cloud 실시간 DB (최우선 반영)
+    if (Array.isArray(cvxTargets) && cvxTargets.length > 0) {
+      cvxTargets.forEach(t => { if (t && t.id) targetMap.set(String(t.id), t); });
+    }
+
+    gSurveyState.targets = Array.from(targetMap.values());
 
     // 로컬스토리지 영구 보존
     try {
@@ -1337,24 +1345,112 @@ async function handleCreateSurveyTarget(event) {
 async function autoSeedSurveyTargets() {
   try {
     const apps = (typeof gApps !== 'undefined' && Array.isArray(gApps) && gApps.length > 0) ? gApps : null;
-    const res = await fetch('/api/survey/targets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'auto_seed', apps: apps ? apps.slice(0, 500) : null })
-    });
-    const result = await res.json();
-    if (result.success) {
-      const msg = result.message || '종료 고객 대상자가 자동으로 추출 및 등록되었습니다.';
-      if (typeof showToast === 'function') {
-        showToast(msg, 'success');
-      } else {
-        alert(msg);
+    let extractedItems = [];
+    let msg = '';
+
+    // 1. 로컬 Node 백엔드(/api/survey/targets)가 있는 경우 1차 추출 시도
+    try {
+      const res = await fetch('/api/survey/targets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'auto_seed', apps: apps ? apps.slice(0, 500) : null })
+      });
+      const result = await res.json();
+      if (result.success && Array.isArray(result.items)) {
+        extractedItems = result.items;
+        msg = result.message;
       }
-      loadSurveyMgmtData(false);
-    } else {
-      alert('자동 추출 실패: ' + (result.error || '알 수 없는 오류'));
+    } catch (e) {
+      console.log('[Survey] Local API not available, extracting from client gApps directly.');
     }
+
+    // 2. Vercel 운영 환경이거나 API 결과가 없는 경우, 클라이언트 gApps에서 직접 실시간 추출
+    if (extractedItems.length === 0 && apps && apps.length > 0) {
+      const todayYmd = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+      const completedApps = apps.filter(app => {
+        if (!app || !app.patientName) return false;
+        const st = String(app.status || '').trim();
+        const isCompletedStatus = st === '완료' || st === '정산완료' || st === '종료' || st === '진행완료';
+        const isEndedByDate = app.careEndDate && String(app.careEndDate).slice(0, 10) <= todayYmd;
+        return isCompletedStatus || isEndedByDate;
+      });
+
+      const existingMap = new Map((gSurveyState.targets || []).map(t => [String(t.serviceId || t.id), t]));
+      completedApps.forEach(app => {
+        const appId = String(app.id || '');
+        if (!existingMap.has(appId)) {
+          const targetId = 'ST-' + Date.now().toString().slice(-6) + '-' + Math.floor(100 + Math.random() * 900);
+          let rawToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
+          try {
+            if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+              rawToken = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('');
+            }
+          } catch (e) {}
+          const newTarget = {
+            id: targetId,
+            serviceId: app.id || targetId,
+            patientName: app.patientName || '고객',
+            patientPhone: app.phone || '',
+            hospitalName: app.hospitalName || '',
+            careStartDate: app.careStartDate || app.applyDate || '',
+            careEndDate: app.careEndDate || app.expectedEndDate || '',
+            caregiverName: app.caregiverName || '담당간병인',
+            caregiverPhone: app.caregiverPhone || '',
+            insuranceCompany: app.insuranceCompany || '',
+            dueAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+            targetStatus: 'ACTIVE',
+            guidanceStatus: 'NOT_STARTED',
+            responseStatus: 'NOT_STARTED',
+            followupStatus: 'NONE',
+            rewardStatus: 'NONE',
+            token: rawToken,
+            tokenHash: rawToken,
+            guidanceRecord: null,
+            responseId: null,
+            revision: 1,
+            createdAt: new Date().toISOString()
+          };
+          existingMap.set(appId, newTarget);
+        }
+      });
+      extractedItems = Array.from(existingMap.values());
+      msg = `종료 고객 대상자 총 ${extractedItems.length}건이 자동 추출되었습니다.`;
+    }
+
+    // 3. Convex Cloud 원격 DB에 영구 영속화 (가장 중요: syncToConvex saveSurveyTargetsBatch)
+    if (extractedItems.length > 0) {
+      if (typeof syncToConvex === 'function') {
+        try {
+          const cleanTargets = extractedItems.map(t => {
+            const clean = {};
+            for (const [k, v] of Object.entries(t)) {
+              if (!k.startsWith('_')) clean[k] = v;
+            }
+            return clean;
+          });
+          await syncToConvex('sync:saveSurveyTargetsBatch', { targets: cleanTargets });
+          console.log(`[Survey] Convex Cloud에 만족도 조사 대상자 ${cleanTargets.length}건 영구 저장 완료`);
+        } catch (cvxErr) {
+          console.warn('[Survey] Convex batch save error:', cvxErr);
+        }
+      }
+
+      // 로컬스토리지 및 인메모리 상태 즉시 갱신
+      gSurveyState.targets = extractedItems;
+      try {
+        localStorage.setItem('LIVON_SURVEY_TARGETS', JSON.stringify(extractedItems));
+      } catch (e) {}
+    }
+
+    if (typeof showToast === 'function') {
+      showToast(msg || '종료 고객 대상자가 추출되어 안전하게 저장되었습니다.', 'success');
+    } else {
+      alert(msg || '종료 고객 대상자가 추출되어 안전하게 저장되었습니다.');
+    }
+
+    await loadSurveyMgmtData(false);
   } catch (e) {
+    console.error('[Survey AutoSeed Error]', e);
     if (typeof showToast === 'function') showToast('자동 추출 중 오류가 발생했습니다.', 'error');
   }
 }

@@ -1922,7 +1922,7 @@ async function loadConvexData(showSpinner = true) {
     else if (gActiveTab === 'caregiverDirectory' && typeof renderCaregivers === 'function') renderCaregivers();
     else if (gActiveTab === 'centerDirectory' && typeof renderCenters === 'function') renderCenters();
     else if (gActiveTab === 'samsungclaimhub' && typeof renderSamsungClaimHub === 'function') renderSamsungClaimHub();
-    if (gActiveTab === 'survey' && typeof loadSurveyMgmtData === 'function') loadSurveyMgmtData(false);
+    if ((gActiveTab === 'surveymgmt' || gActiveTab === 'survey') && typeof loadSurveyMgmtData === 'function') loadSurveyMgmtData(false);
 
     if (!gConvexLiveSyncTimer) {
       startConvexLiveSync();
