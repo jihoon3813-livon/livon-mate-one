@@ -2045,8 +2045,8 @@ async function runConvexLiveSync() {
 
 function startConvexLiveSync() {
   if (gConvexLiveSyncTimer) return;
-  // 3초마다 백그라운드에서 실시간 변경 감지 및 화면 갱신
-  gConvexLiveSyncTimer = setInterval(runConvexLiveSync, 3000);
+  // 10초마다 백그라운드에서 실시간 변경 감지 및 화면 갱신 (Convex rate limit 보호)
+  gConvexLiveSyncTimer = setInterval(runConvexLiveSync, 10000);
 
   // 사용자가 Convex 대시보드나 다른 창에서 작업 후 브라우저 탭으로 복귀했을 때 즉시 0초 동기화
   window.addEventListener('focus', () => {
@@ -2057,7 +2057,7 @@ function startConvexLiveSync() {
       runConvexLiveSync();
     }
   });
-  console.log('[LiveSync] Convex 실시간 양방향 자동 동기화 엔진이 가동되었습니다. (3초 주기/창 전환 감지)');
+  console.log('[LiveSync] Convex 실시간 양방향 자동 동기화 엔진이 가동되었습니다. (10초 주기/창 전환 감지)');
 }
 window.startConvexLiveSync = startConvexLiveSync;
 window.runConvexLiveSync = runConvexLiveSync;
