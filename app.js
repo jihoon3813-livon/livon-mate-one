@@ -1152,7 +1152,8 @@ async function syncToConvex(path, args = {}) {
 
 async function queryConvex(path, args = {}) {
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timeoutId = controller ? setTimeout(() => controller.abort(), 10000) : null;
+  // [대용량 번들 데이터 보호] 2.5MB 이상 번들 쿼리 안전 수신을 위해 타임아웃을 30초로 넉넉하게 보장
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 30000) : null;
   try {
     let finalArgs = Object.assign({}, args);
     const res = await fetch(`${CONVEX_URL}/api/query`, {
@@ -1628,6 +1629,21 @@ async function loadConvexData(showSpinner = true) {
               syncToConvex('sync:saveApplication', { app: clean }).catch(console.warn);
             }
           });
+        }
+
+        // [서버 단일 진실의 원천(SSOT) 절대 보장]: Convex 원격 DB에 존재하는 데이터는 로컬의 과거 삭제 톰스톤으로 절대 은폐하지 않음
+        // 과거 로컬 삭제 목록에 존재하더라도 서버 DB에 실존한다면 재등록/복원된 고객이므로 삭제 목록에서 즉시 완전 제거
+        if (deletedAppIdSet.size > 0 && serverAppIdSet.size > 0) {
+          let cleanedDeletedList = [];
+          deletedAppIdSet.forEach(delId => {
+            if (!serverAppIdSet.has(String(delId))) {
+              cleanedDeletedList.push(delId);
+            }
+          });
+          deletedAppIdSet = new Set(cleanedDeletedList);
+          try {
+            localStorage.setItem('LIVON_DELETED_APP_IDS', JSON.stringify(cleanedDeletedList));
+          } catch (e) {}
         }
 
         const filteredValidApps = validApps.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
