@@ -1082,21 +1082,27 @@ const PROD_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
 
 function isDevEnvironment() {
   if (typeof window === 'undefined') return false;
-  const urlParam = new URLSearchParams(window.location.search).get('env');
-  if (urlParam === 'dev') return true;
-  if (urlParam === 'prod') return false;
-  const storedEnv = localStorage.getItem('LIVON_TARGET_ENV');
-  if (storedEnv === 'dev') return true;
-  if (storedEnv === 'prod') return false;
-
-  // 로컬 개발 환경(localhost, 127.0.0.1, 개발 포트 등)에서는 개발 서버(DEV: rapid-raccoon-895)를 사용하고,
-  // 실서비스 도메인(Vercel 등)에서는 운영 서버(PROD: gallant-weasel-360) 사용
   const host = window.location.hostname || '';
   const port = window.location.port || '';
-  if (host === 'localhost' || host === '127.0.0.1' || host.includes('dev') || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:') {
-    return true;
+
+  // 1. 공식 운영 도메인(livon-mate-one.vercel.app, vercel 배포 도메인, 외부 실운영 도메인)은 항상 PROD(gallant-weasel-360) 무조건 보장
+  // (로컬스토리지의 과거 잔존 dev 플래그에 의해 운영 사이트가 개발 DB로 잘못 연결되는 현상 원천 차단)
+  const isLocalHost = (host === 'localhost' || host === '127.0.0.1' || host === '' || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:');
+  if (!isLocalHost) {
+    const urlParam = new URLSearchParams(window.location.search).get('env');
+    if (urlParam === 'dev') return true;
+    return false;
   }
-  return false;
+
+  // 2. 로컬 개발 환경(localhost, 127.0.0.1 등)에서는 ?env=prod 또는 LIVON_TARGET_ENV=prod 명시 시에만 PROD 연결, 기본은 DEV
+  const urlParam = new URLSearchParams(window.location.search).get('env');
+  if (urlParam === 'prod') return false;
+  if (urlParam === 'dev') return true;
+  const storedEnv = localStorage.getItem('LIVON_TARGET_ENV');
+  if (storedEnv === 'prod') return false;
+  if (storedEnv === 'dev') return true;
+
+  return true;
 }
 
 var IS_DEV_ENV = isDevEnvironment();
@@ -1919,6 +1925,12 @@ async function loadConvexData(showSpinner = true) {
     else if (gActiveTab === 'adjusterDirectory' && typeof renderAdjusters === 'function') renderAdjusters();
     else if (gActiveTab === 'caregiverDirectory' && typeof renderCaregivers === 'function') renderCaregivers();
     else if (gActiveTab === 'centerDirectory' && typeof renderCenters === 'function') renderCenters();
+    else if (gActiveTab === 'samsungclaimhub' && typeof renderSamsungClaimHub === 'function') renderSamsungClaimHub();
+    if (gActiveTab === 'survey' && typeof loadSurveyMgmtData === 'function') loadSurveyMgmtData(false);
+
+    if (!gConvexLiveSyncTimer) {
+      startConvexLiveSync();
+    }
   }
 }
 
@@ -2007,6 +2019,48 @@ function updateConvexStatusBadge(connected, count) {
       : 'w-2 h-2 rounded-full bg-amber-400';
   }
 }
+
+// =========================================================================
+// [실시간 동기화 엔진] Convex Cloud DB 백그라운드 주기적 폴링 및 화면 실시간 갱신
+// =========================================================================
+var gConvexLiveSyncTimer = null;
+var gIsLiveSyncing = false;
+
+async function runConvexLiveSync() {
+  if (gIsLiveSyncing) return;
+  // 사용자가 입력 필드(검색창 제외)를 타이핑 중이거나 모달에서 데이터 작성 중일 때는 작업 보호
+  const activeEl = document.activeElement;
+  const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && !activeEl.id?.includes('Search');
+  if (isTyping) return;
+
+  gIsLiveSyncing = true;
+  try {
+    await loadConvexData(false);
+  } catch (e) {
+    console.warn('[LiveSync Warning]', e);
+  } finally {
+    gIsLiveSyncing = false;
+  }
+}
+
+function startConvexLiveSync() {
+  if (gConvexLiveSyncTimer) return;
+  // 3초마다 백그라운드에서 실시간 변경 감지 및 화면 갱신
+  gConvexLiveSyncTimer = setInterval(runConvexLiveSync, 3000);
+
+  // 사용자가 Convex 대시보드나 다른 창에서 작업 후 브라우저 탭으로 복귀했을 때 즉시 0초 동기화
+  window.addEventListener('focus', () => {
+    runConvexLiveSync();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      runConvexLiveSync();
+    }
+  });
+  console.log('[LiveSync] Convex 실시간 양방향 자동 동기화 엔진이 가동되었습니다. (3초 주기/창 전환 감지)');
+}
+window.startConvexLiveSync = startConvexLiveSync;
+window.runConvexLiveSync = runConvexLiveSync;
 
 var gExpandedCustomerIds = new Set();
 var gSelectedAppIds = new Set();
@@ -31773,6 +31827,11 @@ function renderUnifiedCareHub() {
       }
     }
 
+    const pName = (app.patientName || '').trim();
+    const aName = (app.applicantName || '').trim();
+    const displayPatientName = pName || aName || '-';
+    const applicantSubHtml = (aName && aName !== pName) ? `<span class="text-xs font-semibold text-slate-500 font-normal shrink-0" title="신청인: ${escapeHtml(aName)}">(${maskName(aName)})</span>` : '';
+
     // [모드 1] 간략히 보기 모드 (전화번호/주소 정보는 배제하고 핵심 이름 및 보험 청구금액 표시)
     if (gHubLayoutStyle === 'compact') {
       let safeCenter = '';
@@ -31794,7 +31853,8 @@ function renderUnifiedCareHub() {
             <input type="checkbox" value="${app.id}" ${isChecked} onclick="event.stopPropagation();" onchange="toggleSelectApp('${app.id}', this.checked)" class="app-row-checkbox w-4 h-4 rounded text-primary-600 focus:ring-primary-500 cursor-pointer accent-primary-600 flex-shrink-0">
             <span class="px-2 py-0.5 rounded-md bg-slate-200 text-slate-800 font-mono font-bold text-xs border border-slate-300">${app.id}</span>
             <h3 class="text-sm sm:text-base font-black text-slate-900 flex items-center gap-1.5 flex-wrap">
-              ${maskName(app.patientName)}
+              ${maskName(displayPatientName)}
+              ${applicantSubHtml}
               ${getCsLabelBadge(app)}
             </h3>
             <span class="text-xs text-slate-400 font-normal">(${app.gender || '-'}·${maskBirth(app.birthDate)})</span>
@@ -31858,7 +31918,8 @@ function renderUnifiedCareHub() {
             <input type="checkbox" value="${app.id}" ${isChecked} onclick="event.stopPropagation();" onchange="toggleSelectApp('${app.id}', this.checked)" class="app-row-checkbox w-4 h-4 rounded text-primary-600 focus:ring-primary-500 cursor-pointer accent-primary-600">
             <span class="px-2 py-0.5 rounded-md bg-white text-slate-800 border border-slate-300 font-mono font-bold text-xs">${app.id}</span>
             <h3 class="text-sm sm:text-base font-black text-slate-900 flex items-center gap-1.5 flex-wrap">
-              ${maskName(app.patientName)}
+              ${maskName(displayPatientName)}
+              ${applicantSubHtml}
               ${getCsLabelBadge(app)}
             </h3>
             <span class="text-xs text-slate-500 font-medium">(${app.gender || '-'}·${maskBirth(app.birthDate)})</span>
@@ -37129,7 +37190,10 @@ function renderApplications() {
       <td class="p-3 pl-2 table-pinned-col text-center font-bold text-primary-700">
         <button onclick="openCareCycleModal('${app.id}')" class="underline hover:text-primary-900">${app.id}</button>
       </td>
-      <td class="p-3 table-pinned-col-2 text-center font-bold text-slate-900">${maskName(app.patientName)}</td>
+      <td class="p-3 table-pinned-col-2 text-center font-bold text-slate-900">
+        <div>${maskName(app.patientName || app.applicantName || '-')}</div>
+        ${(app.applicantName && app.applicantName !== app.patientName) ? `<div class="text-[10px] text-slate-400 font-normal">(${maskName(app.applicantName)})</div>` : ''}
+      </td>
       <td class="p-3 text-center text-slate-600 font-medium">${app.gender || '-'}</td>
       <td class="p-3 text-center text-slate-500 font-mono">${maskBirth(app.birthDate)}</td>
       <td class="p-3 text-center font-semibold text-slate-800 font-mono whitespace-nowrap">
