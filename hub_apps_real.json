@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-29T23:48:42.519Z",
+  "updatedAt": "2026-09-30T00:38:09.129Z",
   "sources": {
     "종합 간병(현대해상)": {
       "sourceType": "file",
@@ -10704,7 +10704,8 @@
       "status": "진행중",
       "totalPayout": 12600000,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-09-29T01:01:52.955Z"
+      "updatedAt": "2026-09-30T00:38:09.129Z",
+      "hasManualUpdate": true
     },
     {
       "accidentDate": "",

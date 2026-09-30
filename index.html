@@ -10431,9 +10431,16 @@
               </p>
             </div>
           </div>
-          <button onclick="closeModal('hubCustomerDetailModal')" class="p-1 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0 sm:hidden">
-            <i data-lucide="x" class="w-5 h-5"></i>
-          </button>
+          <div class="flex items-center gap-1.5 sm:hidden shrink-0">
+            <button id="btnSaveHubCustomerModalMobile" type="button" onclick="saveActiveHubCustomerDetail(false)" 
+                    class="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs shadow-md shadow-emerald-600/30 flex items-center gap-1 cursor-pointer border border-emerald-400/40">
+              <i data-lucide="save" class="w-3.5 h-3.5"></i>
+              <span id="btnSaveHubCustomerModalMobileText">최종 저장</span>
+            </button>
+            <button onclick="confirmCloseHubCustomerDetailModal()" class="p-1 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0">
+              <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+          </div>
         </div>
 
         <!-- Bottom row on mobile (Right side on desktop): View Mode Switchers -->
@@ -10453,7 +10460,12 @@
             <i data-lucide="mail" class="w-3.5 h-3.5"></i>
             <span>삼성 접수/청구</span>
           </button>
-          <button onclick="closeModal('hubCustomerDetailModal')" class="hidden sm:block p-2 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0">
+          <button id="btnSaveHubCustomerModal" type="button" onclick="saveActiveHubCustomerDetail(false)" 
+                  class="hidden sm:flex px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-600/30 items-center gap-1.5 whitespace-nowrap shrink-0 transition-all cursor-pointer border border-emerald-400/40">
+            <i data-lucide="save" class="w-4 h-4"></i>
+            <span id="btnSaveHubCustomerModalText">최종 저장</span>
+          </button>
+          <button onclick="confirmCloseHubCustomerDetailModal()" class="hidden sm:block p-2 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0">
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>
         </div>
@@ -10466,7 +10478,12 @@
       <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-xs">
         <span class="text-slate-500" id="hubDetailModalFooterNote">✨ 고객/접수, 간병인/센터, 손사/보험사 3대 주체별 정보 조회 및 데이터 수정이 지원됩니다.</span>
         <div class="flex items-center gap-2">
-          <button type="button" onclick="closeModal('hubCustomerDetailModal')" class="px-5 py-2 border rounded-xl font-bold bg-white hover:bg-slate-100 text-slate-700 shadow-2xs">닫기</button>
+          <button id="btnSaveHubCustomerModalFooter" type="button" onclick="saveActiveHubCustomerDetail(false)" 
+                  class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95">
+            <i data-lucide="save" class="w-4 h-4"></i>
+            <span id="btnSaveHubCustomerModalFooterText">최종 저장</span>
+          </button>
+          <button type="button" onclick="confirmCloseHubCustomerDetailModal()" class="px-5 py-2 border rounded-xl font-bold bg-white hover:bg-slate-100 text-slate-700 shadow-2xs cursor-pointer">닫기</button>
         </div>
       </div>
     </div>

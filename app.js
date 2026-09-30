@@ -23072,11 +23072,19 @@ async function handleSaveSettlementSet(e) {
       memo: memo
     };
 
+    const targetSetIndex = mode === 'add' ? (app.customSettlementSets.length + 1) : setIndex;
+    setData.setIndex = targetSetIndex;
+
     if (mode === 'add') {
-      setData.setIndex = app.customSettlementSets.length + 1;
+      if (!claimId && !matchedClaim) {
+        setData.claimId = `Q${String(app.id).replace('C', '')}.${targetSetIndex}`;
+      }
+      if (!payoutId && !matchedPayout) {
+        setData.payoutId = `P${String(app.id).replace('C', '')}.${targetSetIndex}`;
+      }
       app.customSettlementSets.push(setData);
     } else {
-      const existingIdx = app.customSettlementSets.findIndex(s => s.setIndex === setIndex);
+      const existingIdx = app.customSettlementSets.findIndex(s => Number(s.setIndex) === Number(setIndex));
       if (existingIdx >= 0) {
         app.customSettlementSets[existingIdx] = setData;
       } else {
@@ -23084,25 +23092,78 @@ async function handleSaveSettlementSet(e) {
       }
     }
 
-    // Sync with gClaims
-    if (matchedClaim) {
+    // Sync or Create with gClaims
+    if (!matchedClaim) {
+      matchedClaim = {
+        id: setData.claimId,
+        applyId: appId,
+        patientName: app.patientName || '고객',
+        insuranceCompany: app.insuranceCompany || '현대해상',
+        round: setData.claimRound,
+        standardDate: setData.claimStandardDate || (endStr ? endStr.slice(0, 10) : ''),
+        startDate: setData.startDateStr || '',
+        endDate: setData.endDateStr || '',
+        claimDate: setData.claimDate || '',
+        days: setData.claimDays,
+        unitPrice: setData.dailyClaimPrice,
+        dailyWage: setData.dailyClaimPrice,
+        claimAmount: setData.claimAmount,
+        depositAmount: setData.depositAmount,
+        depositDate: setData.depositDate,
+        unitPriceType: '확인',
+        depositStatus: setData.depositStatus === '입금완료' ? '입금완료' : '미수납',
+        unpaidAmount: Math.max(0, setData.claimAmount - setData.depositAmount),
+        status: setData.claimStatus,
+        adjusterStatus: setData.claimStatus,
+        memo: setData.memo
+      };
+      gClaims.unshift(matchedClaim);
+    } else {
       matchedClaim.round = setData.claimRound;
       matchedClaim.standardDate = setData.claimStandardDate;
+      matchedClaim.startDate = setData.startDateStr || matchedClaim.startDate;
+      matchedClaim.endDate = setData.endDateStr || matchedClaim.endDate;
       matchedClaim.claimDate = setData.claimDate;
       matchedClaim.days = setData.claimDays;
       matchedClaim.unitPrice = setData.dailyClaimPrice;
       matchedClaim.claimAmount = setData.claimAmount;
       matchedClaim.depositAmount = setData.depositAmount;
       matchedClaim.depositDate = setData.depositDate;
+      matchedClaim.depositStatus = setData.depositStatus === '입금완료' ? '입금완료' : '미수납';
+      matchedClaim.unpaidAmount = Math.max(0, setData.claimAmount - setData.depositAmount);
       matchedClaim.status = setData.claimStatus;
+      matchedClaim.adjusterStatus = setData.claimStatus;
       matchedClaim.memo = setData.memo;
-      if (typeof syncToConvex === 'function') syncToConvex('sync:saveClaim', { claim: matchedClaim }).catch(console.warn);
     }
+    if (typeof syncToConvex === 'function') syncToConvex('sync:saveClaim', { claim: matchedClaim }).catch(console.warn);
 
-    // Sync with gPayouts
-    if (matchedPayout) {
+    // Sync or Create with gPayouts
+    if (!matchedPayout) {
+      matchedPayout = {
+        id: setData.payoutId,
+        applyId: appId,
+        patientName: app.patientName || '고객',
+        caregiverName: resolvedCgName,
+        centerName: as ? as.centerName || '영등포센터' : '영등포센터',
+        round: setData.payoutRound,
+        standardDate: setData.payoutStandardDate || endStr || '',
+        startDate: setData.startDateStr || '',
+        endDate: setData.endDateStr || '',
+        paidDate: setData.payoutDate || '',
+        payoutDate: setData.payoutDate || '',
+        days: setData.payoutDays,
+        dailyWage: setData.cgDailyWage,
+        payoutAmount: setData.payoutAmount,
+        payoutStatus: setData.payoutStatus,
+        caregiverName: resolvedCgName,
+        memo: setData.memo
+      };
+      gPayouts.unshift(matchedPayout);
+    } else {
       matchedPayout.round = setData.payoutRound;
       matchedPayout.standardDate = setData.payoutStandardDate;
+      matchedPayout.startDate = setData.startDateStr || matchedPayout.startDate;
+      matchedPayout.endDate = setData.endDateStr || matchedPayout.endDate;
       matchedPayout.paidDate = setData.payoutDate;
       matchedPayout.payoutDate = setData.payoutDate;
       matchedPayout.days = setData.payoutDays;
@@ -23111,7 +23172,24 @@ async function handleSaveSettlementSet(e) {
       matchedPayout.payoutStatus = setData.payoutStatus;
       matchedPayout.caregiverName = resolvedCgName;
       matchedPayout.memo = setData.memo;
-      if (typeof syncToConvex === 'function') syncToConvex('sync:savePayout', { payout: matchedPayout }).catch(console.warn);
+    }
+    if (typeof syncToConvex === 'function') syncToConvex('sync:savePayout', { payout: matchedPayout }).catch(console.warn);
+
+    // Update customer statistics
+    const appClaims = (gClaims || []).filter(c => String(c.applyId) === String(app.id));
+    app.claimCount = appClaims.length;
+    app.unconfirmedClaimCount = appClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').length;
+    app.estimatedUnpaid = appClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').reduce((sum, c) => sum + (c.unpaidAmount || c.claimAmount || 0), 0);
+
+    const appPayouts = (gPayouts || []).filter(p => String(p.applyId) === String(app.id));
+    app.totalPayout = appPayouts.filter(p => p.payoutStatus === '지급완료' || p.payoutStatus === '지급').reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
+
+    app.hasManualUpdate = true;
+    app.updatedAt = new Date().toISOString();
+
+    const appIdx = (gApps || []).findIndex(a => String(a.id) === String(app.id));
+    if (appIdx !== -1) {
+      gApps[appIdx] = app;
     }
 
     // Save to localStorage & Convex
@@ -23125,6 +23203,47 @@ async function handleSaveSettlementSet(e) {
 
     if (typeof syncToConvex === 'function') {
       syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+    }
+
+    // Sync to Node Server backend (/api/hub/customer/update-fields & /api/hub/real-data)
+    try {
+      await fetch('/api/hub/customer/update-fields', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: app.id,
+          fields: {
+            customSettlementSets: app.customSettlementSets,
+            claimCount: app.claimCount,
+            unconfirmedClaimCount: app.unconfirmedClaimCount,
+            estimatedUnpaid: app.estimatedUnpaid,
+            totalPayout: app.totalPayout,
+            hasManualUpdate: true,
+            status: app.status,
+            claimClassification: app.claimClassification,
+            claimCategory: app.claimCategory,
+            claim: matchedClaim,
+            payout: matchedPayout
+          }
+        })
+      });
+    } catch (e) {
+      console.warn('[handleSaveSettlementSet] update-fields error:', e);
+    }
+
+    try {
+      await fetch('/api/hub/real-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applications: gApps,
+          assignments: gAssigns,
+          claims: gClaims,
+          payouts: gPayouts
+        })
+      });
+    } catch (e) {
+      console.warn('[handleSaveSettlementSet] real-data sync error:', e);
     }
 
     closeModal('settlementSetModal');
@@ -23288,7 +23407,7 @@ async function deleteSettlementSet(appId, setIndex) {
     console.warn('localStorage save warning:', e);
   }
 
-  // 9. Persist to backend server (/api/hub/customer/update-fields)
+  // 9. Persist to backend server (/api/hub/customer/update-fields & /api/hub/real-data)
   try {
     await fetch('/api/hub/customer/update-fields', {
       method: 'POST',
@@ -23309,6 +23428,21 @@ async function deleteSettlementSet(appId, setIndex) {
     });
   } catch (e) {
     console.warn('[deleteSettlementSet] update-fields error:', e);
+  }
+
+  try {
+    await fetch('/api/hub/real-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        applications: gApps,
+        assignments: gAssigns,
+        claims: gClaims,
+        payouts: gPayouts
+      })
+    });
+  } catch (e) {
+    console.warn('[deleteSettlementSet] real-data sync error:', e);
   }
 
   // 10. Persist to Convex Cloud
@@ -23359,6 +23493,309 @@ function deleteCurrentSettlementSetFromModal() {
     deleteSettlementSet(appId, setIndex);
   }
 }
+
+// =========================================================================
+// [UNIFIED CUSTOMER FINAL SAVE & MODAL CLOSE INTERCEPTION ENGINE]
+// =========================================================================
+
+async function saveActiveHubCustomerDetail(silent = false) {
+  const appId = (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) 
+    ? gActiveHubModalAppId 
+    : document.getElementById('settlementSetModalAppId')?.value;
+
+  if (!appId) {
+    if (!silent && typeof showNotification === 'function') {
+      showNotification({ type: 'warning', title: '저장 불가', message: '활성화된 고객 정보를 찾을 수 없습니다.' });
+    }
+    return false;
+  }
+
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) {
+    if (!silent && typeof showNotification === 'function') {
+      showNotification({ type: 'error', title: '고객 정보 없음', message: `고객 [${appId}] 정보를 찾을 수 없습니다.` });
+    }
+    return false;
+  }
+
+  // 1. Sync uncommitted round deposit inputs in DOM if any
+  try {
+    const depositInputs = document.querySelectorAll(`[id^="timelineRoundDepositInput_${app.id}_"], [id^="roundDepositInput_${app.id}_"]`);
+    depositInputs.forEach(inp => {
+      const parts = inp.id.split('_');
+      const roundNum = parseInt(parts[2], 10);
+      const val = parseInt(String(inp.value || '0').replace(/[^0-9]/g, ''), 10);
+      if (roundNum && !isNaN(val)) {
+        if (!app.roundDeposits) app.roundDeposits = {};
+        app.roundDeposits[roundNum] = val;
+
+        if (app.customSettlementSets && Array.isArray(app.customSettlementSets)) {
+          const targetSet = app.customSettlementSets.find(s => Number(s.setIndex) === Number(roundNum));
+          if (targetSet) {
+            targetSet.depositAmount = val;
+            if (val > 0) {
+              targetSet.depositStatus = (val >= (targetSet.claimAmount || 0)) ? '입금완료' : '부분입금';
+            }
+          }
+        }
+      }
+    });
+  } catch (domErr) {
+    console.warn('[saveActiveHubCustomerDetail] DOM input check warning:', domErr);
+  }
+
+  // 2. Ensure all custom settlement sets have matching claims and payouts
+  const appAssigns = (gAssigns || []).filter(a => String(a.applyId) === String(app.id));
+  const as = appAssigns.length > 0 ? (typeof getActiveCaregiverAssignment === 'function' ? getActiveCaregiverAssignment(app, appAssigns) : appAssigns[0]) || appAssigns[0] : null;
+
+  if (app.customSettlementSets && Array.isArray(app.customSettlementSets) && app.customSettlementSets.length > 0) {
+    app.customSettlementSets.forEach((s, idx) => {
+      const setIdx = s.setIndex || (idx + 1);
+      s.setIndex = setIdx;
+      const cId = s.claimId || `Q${String(app.id).replace('C', '')}.${setIdx}`;
+      s.claimId = cId;
+
+      let c = (gClaims || []).find(claim => claim.id === cId || (String(claim.applyId) === String(app.id) && String(claim.round).trim() === String(s.claimRound).trim()));
+      if (!c) {
+        c = {
+          id: cId,
+          applyId: app.id,
+          patientName: app.patientName || '고객',
+          insuranceCompany: app.insuranceCompany || '현대해상',
+          round: s.claimRound || `${setIdx}차`,
+          standardDate: s.claimStandardDate || '',
+          startDate: s.startDateStr || '',
+          endDate: s.endDateStr || '',
+          claimDate: s.claimDate || '',
+          days: s.claimDays || s.days || 1,
+          unitPrice: s.dailyClaimPrice || 160000,
+          dailyWage: s.dailyClaimPrice || 160000,
+          claimAmount: s.claimAmount || 0,
+          depositAmount: s.depositAmount || 0,
+          depositDate: s.depositDate || '',
+          unitPriceType: '확인',
+          depositStatus: s.depositStatus === '입금완료' ? '입금완료' : (s.depositAmount > 0 ? '부분입금' : '미수납'),
+          unpaidAmount: Math.max(0, (s.claimAmount || 0) - (s.depositAmount || 0)),
+          status: s.claimStatus || '청구전',
+          adjusterStatus: s.claimStatus || '청구전',
+          memo: s.memo || ''
+        };
+        gClaims.unshift(c);
+      } else {
+        c.round = s.claimRound || c.round;
+        c.standardDate = s.claimStandardDate || c.standardDate;
+        c.startDate = s.startDateStr || c.startDate;
+        c.endDate = s.endDateStr || c.endDate;
+        c.claimDate = s.claimDate || c.claimDate;
+        c.days = s.claimDays || s.days || c.days;
+        c.unitPrice = s.dailyClaimPrice || c.unitPrice;
+        c.claimAmount = s.claimAmount || c.claimAmount;
+        if (s.depositAmount !== undefined) c.depositAmount = s.depositAmount;
+        c.depositDate = s.depositDate || c.depositDate;
+        c.depositStatus = s.depositStatus === '입금완료' ? '입금완료' : (c.depositAmount > 0 ? '부분입금' : '미수납');
+        c.unpaidAmount = Math.max(0, (c.claimAmount || 0) - (c.depositAmount || 0));
+        c.status = s.claimStatus || c.status;
+        c.adjusterStatus = s.claimStatus || c.adjusterStatus;
+        c.memo = s.memo || c.memo;
+      }
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:saveClaim', { claim: c }).catch(console.warn);
+      }
+
+      const pId = s.payoutId || `P${String(app.id).replace('C', '')}.${setIdx}`;
+      s.payoutId = pId;
+
+      let p = (gPayouts || []).find(payout => payout.id === pId || (String(payout.applyId) === String(app.id) && String(payout.round).trim() === String(s.payoutRound).trim()));
+      if (!p) {
+        p = {
+          id: pId,
+          applyId: app.id,
+          patientName: app.patientName || '고객',
+          caregiverName: s.caregiverName || (as ? as.caregiverName : ''),
+          centerName: as ? as.centerName || '영등포센터' : '영등포센터',
+          round: s.payoutRound || `${setIdx}차`,
+          standardDate: s.payoutStandardDate || '',
+          startDate: s.startDateStr || '',
+          endDate: s.endDateStr || '',
+          paidDate: s.payoutDate || '',
+          payoutDate: s.payoutDate || '',
+          days: s.payoutDays || s.days || 1,
+          dailyWage: s.cgDailyWage || 140000,
+          payoutAmount: s.payoutAmount || 0,
+          payoutStatus: s.payoutStatus || '지급전',
+          caregiverName: s.caregiverName || (as ? as.caregiverName : ''),
+          memo: s.memo || ''
+        };
+        gPayouts.unshift(p);
+      } else {
+        p.round = s.payoutRound || p.round;
+        p.standardDate = s.payoutStandardDate || p.standardDate;
+        p.startDate = s.startDateStr || p.startDate;
+        p.endDate = s.endDateStr || p.endDate;
+        p.paidDate = s.payoutDate || p.paidDate;
+        p.payoutDate = s.payoutDate || p.payoutDate;
+        p.days = s.payoutDays || s.days || p.days;
+        p.dailyWage = s.cgDailyWage || p.dailyWage;
+        p.payoutAmount = s.payoutAmount || p.payoutAmount;
+        p.payoutStatus = s.payoutStatus || p.payoutStatus;
+        p.caregiverName = s.caregiverName || p.caregiverName;
+        p.memo = s.memo || p.memo;
+      }
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:savePayout', { payout: p }).catch(console.warn);
+      }
+    });
+  }
+
+  // 3. Recalculate customer statistics
+  const remainingAppClaims = (gClaims || []).filter(c => String(c.applyId) === String(app.id));
+  app.claimCount = remainingAppClaims.length;
+  app.unconfirmedClaimCount = remainingAppClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').length;
+  app.estimatedUnpaid = remainingAppClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').reduce((sum, c) => sum + (c.unpaidAmount || c.claimAmount || 0), 0);
+
+  const remainingAppPayouts = (gPayouts || []).filter(p => String(p.applyId) === String(app.id));
+  app.totalPayout = remainingAppPayouts.filter(p => p.payoutStatus === '지급완료' || p.payoutStatus === '지급').reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
+
+  app.hasManualUpdate = true;
+  app.updatedAt = new Date().toISOString();
+
+  const appIdx = (gApps || []).findIndex(a => String(a.id) === String(app.id));
+  if (appIdx !== -1) {
+    gApps[appIdx] = app;
+  }
+
+  // 4. Save to localStorage
+  try {
+    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
+    localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
+  } catch (err) {
+    console.warn('[saveActiveHubCustomerDetail] localStorage error:', err);
+  }
+
+  // 5. Save to Convex
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+  }
+
+  // 6. Save to Node Server: update-fields
+  try {
+    await fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: app.id,
+        fields: {
+          customSettlementSets: app.customSettlementSets,
+          claimCount: app.claimCount,
+          unconfirmedClaimCount: app.unconfirmedClaimCount,
+          estimatedUnpaid: app.estimatedUnpaid,
+          totalPayout: app.totalPayout,
+          hasManualUpdate: true,
+          status: app.status,
+          claimClassification: app.claimClassification,
+          claimCategory: app.claimCategory
+        }
+      })
+    });
+  } catch (e) {
+    console.warn('[saveActiveHubCustomerDetail] update-fields error:', e);
+  }
+
+  // 7. Save to Node Server: real-data (persists hub_apps_real.json directly)
+  try {
+    await fetch('/api/hub/real-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        applications: gApps,
+        assignments: gAssigns,
+        claims: gClaims,
+        payouts: gPayouts
+      })
+    });
+  } catch (e) {
+    console.warn('[saveActiveHubCustomerDetail] real-data sync error:', e);
+  }
+
+  // 8. Button feedback
+  const btnDesktop = document.getElementById('btnSaveHubCustomerModalText');
+  const btnMobile = document.getElementById('btnSaveHubCustomerModalMobileText');
+  const btnFooter = document.getElementById('btnSaveHubCustomerModalFooterText');
+  if (btnDesktop) btnDesktop.innerText = '저장 완료 ✅';
+  if (btnMobile) btnMobile.innerText = '저장 완료 ✅';
+  if (btnFooter) btnFooter.innerText = '저장 완료 ✅';
+  setTimeout(() => {
+    if (btnDesktop) btnDesktop.innerText = '최종 저장';
+    if (btnMobile) btnMobile.innerText = '최종 저장';
+    if (btnFooter) btnFooter.innerText = '최종 저장';
+  }, 2500);
+
+  // 9. Toast notification
+  if (!silent && typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '서버 최종 저장 완료',
+      message: `[${maskName(app.patientName)} 님] 모든 변경사항(정산·청구 세트, 청구, 입금, 지급 내역)이 서버 및 DB에 영구 반영되었습니다.`,
+      icon: 'check-circle'
+    });
+  }
+
+  // 10. Audit log
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '고객상세',
+      actionType: 'UPDATE',
+      target: `고객 [${app.id}] (${maskName(app.patientName)})`,
+      summary: `[${app.patientName} 님] 상세 모달 전체 변경사항 서버 및 DB 최종 영구 저장 완료`,
+      changes: {
+        customSettlementSets: `${(app.customSettlementSets || []).length}개 세트`,
+        claims: `${remainingAppClaims.length}건`,
+        payouts: `${remainingAppPayouts.length}건`
+      }
+    });
+  }
+
+  if (typeof renderUnifiedCareHub === 'function') {
+    renderUnifiedCareHub();
+  }
+
+  return true;
+}
+
+async function confirmCloseHubCustomerDetailModal() {
+  const appId = (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) ? gActiveHubModalAppId : '';
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  const patientName = app ? maskName(app.patientName) : '고객';
+
+  const shouldSave = await showCustomConfirm(
+    `[${patientName} 님] 상세 모달을 닫기 전 변경사항(정산·청구 세트, 청구, 입금, 지급 등)을 서버에 최종 저장하시겠습니까?\n\n* [저장 후 닫기]: 서버 및 DB에 즉시 영구 저장 후 모달을 닫습니다.\n* [저장 안하고 닫기]: 변경사항을 추가 저장하지 않고 모달만 닫습니다.`,
+    {
+      theme: 'emerald',
+      icon: 'save',
+      title: '고객 상세 정보 저장 및 닫기',
+      confirmText: '저장 후 닫기 💾',
+      cancelText: '저장 안하고 닫기'
+    }
+  );
+
+  if (shouldSave) {
+    await saveActiveHubCustomerDetail(true);
+    if (typeof showNotification === 'function' && app) {
+      showNotification({
+        type: 'success',
+        title: '저장 후 모달 닫힘',
+        message: `[${patientName} 님] 변경사항이 서버에 안전하게 영구 저장되었습니다.`,
+        icon: 'check-circle'
+      });
+    }
+  }
+
+  closeModal('hubCustomerDetailModal');
+}
+
+window.saveActiveHubCustomerDetail = saveActiveHubCustomerDetail;
+window.confirmCloseHubCustomerDetailModal = confirmCloseHubCustomerDetailModal;
 
 function openRoundDateEditModal(appId, roundNum) {
   // Delegate directly to the comprehensive Settlement Set modal
@@ -46024,7 +46461,11 @@ function startInactivityMonitoring() {
 // hubCustomerDetailModal-esc-listener
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    closeModal('hubCustomerDetailModal');
+    const hubModal = document.getElementById('hubCustomerDetailModal');
+    if (hubModal && !hubModal.classList.contains('hidden') && hubModal.style.display !== 'none') {
+      confirmCloseHubCustomerDetailModal();
+      return;
+    }
     if (typeof closeCalendarDetailDrawer === 'function') {
       closeCalendarDetailDrawer();
     }
