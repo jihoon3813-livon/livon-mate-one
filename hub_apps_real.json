@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-30T01:19:05.941Z",
+  "updatedAt": "2026-09-30T01:48:16.328Z",
   "sources": {
     "종합 간병(현대해상)": {
       "sourceType": "file",
@@ -24,11 +24,80 @@
   },
   "applications": [
     {
+      "_creationTime": 1790731624408.63,
+      "_id": "jd7a45pn2d5drnkr29967we6c18fd6de",
+      "accidentDate": "2026-09-30",
+      "accidentDetail": "",
+      "accidentNumber": "26S303275",
+      "accidentType": "상해",
+      "addressDetail": "전북특별자치도 익산시 금마면 고도길 82 백제1번지부동산ㅇ 234",
+      "adjusterFax": "02-3485-9100",
+      "adjusterFirm": "삼성화재 간병지원파트",
+      "adjusterMobile": "-",
+      "adjusterName": "김정현",
+      "adjusterPhone": "02-3485-9114",
+      "applicantBirth": "19551016",
+      "applicantName": "김성대",
+      "applicantPhone": "010-3887-3253",
+      "applicantRelation": "본인",
+      "applyDate": "2026.09.30 10:26",
+      "assignedCaregiverCount": 0,
+      "birthDate": "19551016",
+      "careEndDate": "2026-10-29",
+      "careType": "입원",
+      "claimCount": 0,
+      "claimUnitPrice": 142000,
+      "contractDate": "-",
+      "contractEndDate": "2046-08-21",
+      "contractPeriod": "2026-08-21 ~ 2046-08-21",
+      "contractStartDate": "2026-08-21",
+      "createdAt": "2026-09-30T01:27:00.995Z",
+      "customDailyClaimPrice": 142000,
+      "depositConfirmedAmount": 0,
+      "desiredDate": "2026-09-30",
+      "docAttached": "아니오",
+      "estimatedUnpaid": 0,
+      "expectedDays": "30일",
+      "gender": "남",
+      "hasDiseaseCare": "가입",
+      "hasInjuryCare": "가입",
+      "hasManualUpdate": false,
+      "hdWorkflowStage": "사전명단매칭완료",
+      "hospitalName": "백제1번지부동산ㅇ",
+      "hospitalRoadAddress": "전북특별자치도 익산시 금마면 고도길 82",
+      "hospitalRoom": "234",
+      "id": "D0005",
+      "insuranceCompany": "삼성화재",
+      "isApplicantSame": true,
+      "isRealLaunchData": true,
+      "memo": "(장소: 백제1번지부동산ㅇ 234)",
+      "mobility": "미선택",
+      "patientId": "BA04908876",
+      "patientName": "김성대",
+      "patientRrn": "551016-1785310",
+      "pendingFaxNumber": "",
+      "pendingFaxRecipient": "",
+      "phone": "010-3887-3253",
+      "policyNumber": "00052621739830000",
+      "productCode": "ZPB396070",
+      "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
+      "rrnBack": "1785310",
+      "rrnFront": "551016",
+      "sido": "전북특별자치도",
+      "sigungu": "익산시",
+      "status": "접수",
+      "totalPayout": 0,
+      "unconfirmedClaimCount": 0,
+      "updatedAt": null
+    },
+    {
+      "_creationTime": 1790730664284.6733,
+      "_id": "jd7frg8hgeq17mbhcv0g5qjdj58fdr0t",
       "accidentDate": "2026-09-30",
       "accidentDetail": "",
       "accidentNumber": "26S933674",
       "accidentType": "상해",
-      "addressDetail": "전북특별자치도 전주시 덕진구 안덕원로 235 (인후동1가) 더세움병원 3",
+      "addressDetail": "전북특별자치도 전주시 덕진구 안덕원로 235 (인후동1가) ��세움병원 3",
       "adjusterFax": "02-760-5500",
       "adjusterFirm": "삼성화재 간병지원파트",
       "adjusterMobile": "-",
@@ -89,66 +158,8 @@
       "updatedAt": null
     },
     {
-      "accidentDate": "2026-09-29",
-      "accidentDetail": "질병",
-      "accidentNumber": "-",
-      "accidentType": "상해",
-      "addressDetail": "전남광주통합특별시 동구 제봉로 42 전남대학교병원 12",
-      "adjusterFax": "",
-      "adjusterFirm": "하이라이프.부산손사4팀",
-      "adjusterMobile": "-",
-      "adjusterName": "-",
-      "adjusterPhone": "-",
-      "applicantBirth": "19500804",
-      "applicantName": "황향난",
-      "applicantPhone": "010-4180-9786",
-      "applicantRelation": "본인",
-      "applyDate": "2026.09.29 14:06",
-      "assignedCaregiverCount": 0,
-      "birthDate": "19500804",
-      "careEndDate": "2026-10-29",
-      "careType": "입원",
-      "claimCount": 0,
-      "claimUnitPrice": 142000,
-      "contractDate": "-",
-      "contractPeriod": "2025-07-17 ~ 2045-07-17",
-      "createdAt": "2026-09-29T05:11:10.546Z",
-      "customDailyClaimPrice": 142000,
-      "depositConfirmedAmount": 0,
-      "desiredDate": "2026-09-30 16시",
-      "docAttached": "아니오",
-      "estimatedUnpaid": 0,
-      "expectedDays": "30일",
-      "gender": "여",
-      "hasManualUpdate": false,
-      "hdWorkflowStage": "팩스미발송",
-      "hospitalName": "전남대학교병원",
-      "hospitalRoadAddress": "전남광주통합특별시 동구 제봉로 42",
-      "hospitalRoom": "12",
-      "id": "C0656",
-      "initialFaxSent": false,
-      "insuranceCompany": "현대해상",
-      "isApplicantSame": true,
-      "isRealLaunchData": true,
-      "memo": "[진단명: 숨이찬다/심장]  (장소: 전남대학교병원 12)",
-      "mobility": "가능",
-      "patientName": "황향난",
-      "patientRrn": "500804-2659712",
-      "pendingFaxNumber": "",
-      "pendingFaxRecipient": "",
-      "phone": "010-4180-9786",
-      "policyNumber": "-",
-      "productName": "무배당현대해상내삶엔(3N)맞춤간편건강보험",
-      "rrnBack": "2659712",
-      "rrnFront": "500804",
-      "sido": "전남광주통합특별시",
-      "sigungu": "동구",
-      "status": "접수",
-      "totalPayout": 0,
-      "unconfirmedClaimCount": 0,
-      "updatedAt": null
-    },
-    {
+      "_creationTime": 1790729421657.987,
+      "_id": "jd78cj0maht5k6rfcfr3pdm61s8fcb20",
       "accidentDate": "2026-09-30",
       "accidentDetail": "",
       "accidentNumber": "26S802578",
@@ -214,6 +225,70 @@
       "updatedAt": "2026-09-30T01:07:13.576Z"
     },
     {
+      "_creationTime": 1790658671651.3074,
+      "_id": "jd73pn1er2gjsz62170bjhq5dx8fajhg",
+      "accidentDate": "2026-09-29",
+      "accidentDetail": "질병",
+      "accidentNumber": "-",
+      "accidentType": "상해",
+      "addressDetail": "전남광주통합특별시 동구 제봉로 42 전남대학교병원 12",
+      "adjusterFax": "",
+      "adjusterFirm": "하이��이프.부산손사4팀",
+      "adjusterMobile": "-",
+      "adjusterName": "-",
+      "adjusterPhone": "-",
+      "applicantBirth": "19500804",
+      "applicantName": "황향난",
+      "applicantPhone": "010-4180-9786",
+      "applicantRelation": "본인",
+      "applyDate": "2026.09.29 14:06",
+      "assignedCaregiverCount": 0,
+      "birthDate": "19500804",
+      "careEndDate": "2026-10-29",
+      "careType": "입원",
+      "claimCount": 0,
+      "claimUnitPrice": 142000,
+      "contractDate": "-",
+      "contractPeriod": "2025-07-17 ~ 2045-07-17",
+      "createdAt": "2026-09-29T05:11:10.546Z",
+      "customDailyClaimPrice": 142000,
+      "depositConfirmedAmount": 0,
+      "desiredDate": "2026-09-30 16시",
+      "docAttached": "아니오",
+      "estimatedUnpaid": 0,
+      "expectedDays": "30일",
+      "gender": "여",
+      "hasManualUpdate": false,
+      "hdWorkflowStage": "팩스미발송",
+      "hospitalName": "전남대학교병원",
+      "hospitalRoadAddress": "전남광주통합특별시 동구 제봉로 42",
+      "hospitalRoom": "12",
+      "id": "C0656",
+      "initialFaxSent": false,
+      "insuranceCompany": "현대해상",
+      "isApplicantSame": true,
+      "isRealLaunchData": true,
+      "memo": "[진단명: 숨이찬다/심장]  (장소: 전남대학교병원 12)",
+      "mobility": "가능",
+      "patientName": "황향난",
+      "patientRrn": "500804-2659712",
+      "pendingFaxNumber": "",
+      "pendingFaxRecipient": "",
+      "phone": "010-4180-9786",
+      "policyNumber": "-",
+      "productName": "무배당현대해상내삶엔(3N)맞춤간편건강보험",
+      "rrnBack": "2659712",
+      "rrnFront": "500804",
+      "sido": "전남광주통합특별시",
+      "sigungu": "동구",
+      "status": "접수",
+      "totalPayout": 0,
+      "unconfirmedClaimCount": 0,
+      "updatedAt": null
+    },
+    {
+      "_creationTime": 1790642063134.1138,
+      "_id": "jd7cgqavy66yg0be81fddt8s8d8fad0f",
       "accidentDate": "",
       "accidentNumber": "2609A40332",
       "accidentType": "상해",
@@ -281,6 +356,8 @@
       "updatedAt": "2026-09-23T08:00:15.400Z"
     },
     {
+      "_creationTime": 1790642063134.1135,
+      "_id": "jd73a15jrrp5g4eqsypqj9e2en8fb559",
       "accidentDate": "",
       "accidentNumber": "26S112468",
       "accidentType": "상해",
@@ -338,6 +415,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790642063134.1133,
+      "_id": "jd7f0ta217absp1djv1z5gm5y58fbrnw",
       "accidentDate": "",
       "accidentNumber": "26S103492",
       "accidentType": "질병",
@@ -395,6 +474,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790642063134.113,
+      "_id": "jd7b5fszh653v3w65vsgkhaj4s8fb8gj",
       "accidentDate": "",
       "accidentNumber": "26S104659",
       "accidentType": "질병",
@@ -479,6 +560,8 @@
       "updatedAt": "2026-09-29T01:07:06.432Z"
     },
     {
+      "_creationTime": 1790583274305.495,
+      "_id": "jd71c2wm6wn7b8jq4x5dtg61858f8een",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -537,6 +620,8 @@
       "updatedAt": "2026-09-28T08:28:15.233Z"
     },
     {
+      "_creationTime": 1790583274305.4949,
+      "_id": "jd7av8m73kzmx1j35822fy0qw98f8wt9",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -593,6 +678,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583274305.4946,
+      "_id": "jd7e37nx1a48g248kcy0c2s2xx8f815y",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -649,6 +736,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583274305.4944,
+      "_id": "jd7c8x0d1v794dpyyy100w07ax8f8czz",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -705,6 +794,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583274305.4941,
+      "_id": "jd771cejbv4g7c4408h3sw78k98f8j2e",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "상해",
@@ -761,6 +852,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583274305.494,
+      "_id": "jd79zh8pyzetwvw4jhpd4wmtm98f951a",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "상해",
@@ -817,6 +910,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583274305.4937,
+      "_id": "jd71tnagktfeq1phc5krjdg2es8f8s76",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "상해",
@@ -873,6 +968,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583274305.4934,
+      "_id": "jd7a909b10etjgq9s2jg53y3z18f89wv",
       "accidentDate": "",
       "accidentNumber": "2607939473",
       "accidentType": "질병",
@@ -913,7 +1010,7 @@
       "hospitalName": "청주의료원",
       "id": "C0305",
       "importedAt": "2026-09-28T08:14:19.952Z",
-      "insuranceCompany": "현대해상",
+      "insuranceCompany": "현대해���",
       "isRealLaunchData": true,
       "memo": "격리병동바이러스균",
       "patientId": "",
@@ -929,6 +1026,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583274305.4932,
+      "_id": "jd70vde7t6s60bc0sd9dw9gajn8f9zhb",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "상해",
@@ -985,6 +1084,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583274305.493,
+      "_id": "jd7a5hbbtvz5gj5fngdmfxrvw98f876e",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -1043,6 +1144,8 @@
       "updatedAt": "2026-09-29T00:21:18.901Z"
     },
     {
+      "_creationTime": 1790583274305.4927,
+      "_id": "jd7cj1rp89ykypcjt2ma3e5sex8f9xcb",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -1102,6 +1205,8 @@
       "updatedAt": "2026-09-29T01:06:52.948Z"
     },
     {
+      "_creationTime": 1790583274305.4924,
+      "_id": "jd70zr0xvrpagwtjgaw7xr9jjh8f81x1",
       "accidentDate": "",
       "accidentNumber": "26S116099",
       "accidentType": "질병",
@@ -1162,6 +1267,8 @@
       "updatedAt": "2026-09-29T01:07:19.627Z"
     },
     {
+      "_creationTime": 1790583273960.5586,
+      "_id": "jd7frvbm2atm4j8v2y4nynz08n8f9tjf",
       "accidentDate": "",
       "accidentNumber": "2605519345",
       "accidentType": "질병",
@@ -1218,6 +1325,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273960.5583,
+      "_id": "jd78e7bcv2swebzarsfdw7x64d8f92ne",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "상해",
@@ -1316,6 +1425,8 @@
       "updatedAt": "2026-09-29T00:06:31.202Z"
     },
     {
+      "_creationTime": 1790583273960.558,
+      "_id": "jd72hzrwezz6z271myhmcqtkyx8f9vjz",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "상해",
@@ -1372,6 +1483,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273960.5579,
+      "_id": "jd770hj7ezq19r2y3m6py5xscx8f9act",
       "accidentDate": "",
       "accidentNumber": "2609918702",
       "accidentType": "상해",
@@ -1386,8 +1499,9 @@
       "assignedCaregiverCount": 1,
       "birthDate": "1966.05.07",
       "careEndDate": "",
-      "careStartDate": "2026.09.18 13:51",
+      "careStartDate": "2026.09.18",
       "careType": "입원",
+      "caregiverCenter": "개인",
       "caregiverName": "최이순",
       "caregiverPhone": "010-3290-3323",
       "claimCategory": "",
@@ -1399,33 +1513,6 @@
       "csLatestLabel": null,
       "csLatestType": null,
       "customDailyClaimPrice": 142000,
-      "dailyRate": "140000",
-      "depositConfirmedAmount": 0,
-      "desiredStartDate": "2026.09.18 13:51",
-      "diagnosis": "다리골절",
-      "estimatedUnpaid": 426000,
-      "expectedDays": "7",
-      "expectedEndDate": "",
-      "gender": "여",
-      "hasDiseaseCare": "Y",
-      "hasInjuryCare": "Y",
-      "hospitalName": "익산제일병원",
-      "id": "C0297",
-      "importedAt": "2026-09-28T08:14:19.952Z",
-      "insuranceCompany": "현대해상",
-      "isRealLaunchData": true,
-      "memo": "",
-      "patientId": "",
-      "patientName": "이혜숙",
-      "phone": "010-7629-1155",
-      "policyNumber": "L02108793640",
-      "productCode": "",
-      "productName": "",
-      "sido": "전라북도",
-      "sigungu": "익산시",
-      "status": "진행중",
-      "totalPayout": 420000,
-      "unconfirmedClaimCount": 1,
       "customSettlementSets": [
         {
           "caregiverName": "최이순",
@@ -1481,9 +1568,46 @@
           "setIndex": 2,
           "startDateStr": "2026.09.21 09:00"
         }
-      ]
+      ],
+      "dailyRate": "140000",
+      "depositConfirmedAmount": 0,
+      "desiredStartDate": "2026.09.18 13:51",
+      "diagnosis": "다리골절",
+      "estimatedUnpaid": 426000,
+      "expectedDays": "7",
+      "expectedEndDate": "",
+      "gender": "여",
+      "hasDiseaseCare": "Y",
+      "hasInjuryCare": "Y",
+      "hospitalName": "익산제일병원",
+      "id": "C0297",
+      "importedAt": "2026-09-28T08:14:19.952Z",
+      "insuranceCompany": "현대해상",
+      "isAlertConfirmed": true,
+      "isRealLaunchData": true,
+      "memo": "",
+      "patientId": "",
+      "patientName": "이혜숙",
+      "phone": "010-7629-1155",
+      "policyNumber": "L02108793640",
+      "productCode": "",
+      "productName": "",
+      "settlementStepMemos": {
+        "1": {
+          "claim": [],
+          "deposit": [],
+          "payout": []
+        }
+      },
+      "sido": "전라북도",
+      "sigungu": "익산시",
+      "status": "진행중",
+      "totalPayout": 420000,
+      "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273960.5576,
+      "_id": "jd73rg29tew4k8kkmdtrrcj4b58f8hgq",
       "accidentDate": "",
       "accidentNumber": "26S121380",
       "accidentType": "상해",
@@ -1581,6 +1705,8 @@
       "updatedAt": "2026-09-29T00:04:51.932Z"
     },
     {
+      "_creationTime": 1790583273960.5574,
+      "_id": "jd7ck0mzyj4crqfy8129f41ayh8f8yya",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "상해",
@@ -1637,6 +1763,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273960.5571,
+      "_id": "jd7bg2dxj5hha7pzya1qa91pf18f8s9q",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -1693,6 +1821,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273960.557,
+      "_id": "jd753sx2n3mb094cm4k49pvhe58f9dz1",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -1749,6 +1879,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273960.5566,
+      "_id": "jd7905h09njdqqavx7sbwa02px8f8aa8",
       "accidentDate": "",
       "accidentNumber": "2609840145",
       "accidentType": "질병",
@@ -1837,6 +1969,8 @@
       "updatedAt": "2026-09-29T00:07:00.468Z"
     },
     {
+      "_creationTime": 1790583273960.5564,
+      "_id": "jd7f9wt63y9wwynmvz7apqnr3n8f92vv",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -1893,6 +2027,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273960.5562,
+      "_id": "jd7e0vwe5n3hvntxznqsksjebs8f8qhv",
       "accidentDate": "",
       "accidentNumber": "서비스취소",
       "accidentType": "질병",
@@ -1949,6 +2085,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273960.556,
+      "_id": "jd750pmkq11f20a7wv6g15459d8f9b30",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -2005,6 +2143,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273960.5557,
+      "_id": "jd79bqy51qss72zbddhkk2367n8f96d8",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -2061,6 +2201,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273960.5554,
+      "_id": "jd7fqfxggs6gz8j69szehhzh9n8f84jj",
       "accidentDate": "",
       "accidentNumber": "2609683222",
       "accidentType": "질병",
@@ -2077,7 +2219,7 @@
       "careEndDate": "2026.09.27",
       "careStartDate": "2026.09.20",
       "careType": "입원",
-      "caregiverCenter": "경남성심간병",
+      "caregiverCenter": "경남성��간병",
       "caregiverName": "최혜영",
       "caregiverPhone": "010-2775-5214",
       "claimCategory": "정상",
@@ -2142,6 +2284,8 @@
       "updatedAt": "2026-09-29T00:05:16.217Z"
     },
     {
+      "_creationTime": 1790583273960.5552,
+      "_id": "jd7dr3ccjngxhg2aafjpbk7jpn8f90py",
       "accidentDate": "",
       "accidentNumber": "2609664575",
       "accidentType": "질병",
@@ -2198,6 +2342,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273960.555,
+      "_id": "jd795fpgj3exgmc9j0xwwwyvjd8f9qqy",
       "accidentDate": "",
       "accidentNumber": "2604303152",
       "accidentType": "질병",
@@ -2249,11 +2395,13 @@
       "productName": "",
       "sido": "울산광역시",
       "sigungu": "울주군",
-      "status": "서비스불가 안내",
+      "status": "서비���불가 안내",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273960.5547,
+      "_id": "jd7aj62b6ncfpsp5r3gax7wqx58f8m8k",
       "accidentDate": "",
       "accidentNumber": "당일취소",
       "accidentType": "질병",
@@ -2310,6 +2458,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273960.5544,
+      "_id": "jd77ne47wq8j6x9mz7vzt35ks58f9n8g",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -2366,6 +2516,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273960.5542,
+      "_id": "jd78yavweekrg46ay4aswcdcch8f9f1j",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -2422,6 +2574,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273960.554,
+      "_id": "jd77cc1jygk382k50b649krxyh8f9b7m",
       "accidentDate": "",
       "accidentNumber": "당일취소",
       "accidentType": "질병",
@@ -2478,6 +2632,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273606.896,
+      "_id": "jd7bcv5jtyhcawzszj6e4g170d8f8xx6",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -2534,6 +2690,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273606.8958,
+      "_id": "jd756bsvk8xzqswfvj45szfp0h8f9qt4",
       "accidentDate": "",
       "accidentNumber": "2609621830",
       "accidentType": "질병",
@@ -2590,6 +2748,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273606.8955,
+      "_id": "jd78ahp4vhqs52qgajry7zzc9h8f8agc",
       "accidentDate": "",
       "accidentNumber": "2609621603",
       "accidentType": "질병",
@@ -2646,6 +2806,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273606.8953,
+      "_id": "jd79y1kznzv4fcjj29evsxe93s8f8g3c",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -2702,6 +2864,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273606.895,
+      "_id": "jd7704pz6m5f4pgqqkm1jj524n8f9x37",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -2758,6 +2922,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273606.8948,
+      "_id": "jd79qknf7fbztfa0wmhrs8fhsh8f9exj",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -2814,6 +2980,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273606.8945,
+      "_id": "jd77gbjgwxda3sh4hedj7kt6d18f9kca",
       "accidentDate": "",
       "accidentNumber": "2609495158",
       "accidentType": "질병",
@@ -2828,13 +2996,15 @@
       "assignedCaregiverCount": 1,
       "birthDate": "1959.06.15",
       "careEndDate": "2026.09.15",
-      "careStartDate": "2026.09.13 14:00",
+      "careStartDate": "2026.09.13",
       "careType": "입원",
+      "caregiverCenter": "글로벌간병협회",
       "caregiverName": "강기종",
       "caregiverPhone": "010-5219-8326",
       "claimCategory": "정상",
       "claimClassification": "정상",
       "claimCount": 0,
+      "claimSetEnabledForCompleted": true,
       "claimUnitPrice": 142000,
       "contractEndDate": "",
       "contractStartDate": "2021.06.08",
@@ -2842,7 +3012,7 @@
       "csLatestType": null,
       "customDailyClaimPrice": 142000,
       "dailyRate": "140000",
-      "depositConfirmedAmount": 0,
+      "depositConfirmedAmount": 432000,
       "desiredStartDate": "2026.09.13 14:00",
       "diagnosis": "",
       "estimatedUnpaid": 0,
@@ -2851,10 +3021,12 @@
       "gender": "남",
       "hasDiseaseCare": "Y",
       "hasInjuryCare": "Y",
+      "hasManualUpdate": true,
       "hospitalName": "서울대학병원",
       "id": "C0274",
       "importedAt": "2026-09-28T08:14:19.952Z",
       "insuranceCompany": "현대해상",
+      "isAlertConfirmed": true,
       "isRealLaunchData": true,
       "memo": "",
       "patientId": "",
@@ -2863,13 +3035,26 @@
       "policyNumber": "L02130747773",
       "productCode": "",
       "productName": "",
+      "roundDeposits": {
+        "1": 432000
+      },
+      "settlementStepMemos": {
+        "1": {
+          "claim": [],
+          "deposit": [],
+          "payout": []
+        }
+      },
       "sido": "서울특별시",
       "sigungu": "동대문구",
       "status": "완료",
       "totalPayout": 420000,
-      "unconfirmedClaimCount": 0
+      "unconfirmedClaimCount": 0,
+      "updatedAt": "2026-09-29T04:26:35.302Z"
     },
     {
+      "_creationTime": 1790583273606.8943,
+      "_id": "jd7b5s9sq1gw9g405878t5n8fh8f84ck",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -2926,6 +3111,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273606.894,
+      "_id": "jd759b2fmak7td4jqcndeec3vs8f8n8m",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -2982,6 +3169,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273606.8938,
+      "_id": "jd771w7yfs73z65h01avx13vyh8f9q8v",
       "accidentDate": "",
       "accidentNumber": "2609444234",
       "accidentType": "질병",
@@ -3038,6 +3227,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273606.8936,
+      "_id": "jd7bpvqbzv23af4thxmxvmebfn8f9x3g",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -3094,6 +3285,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273606.8933,
+      "_id": "jd78yh7pgahq1wp3cj3mw342x98f9tbw",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "상해",
@@ -3150,6 +3343,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583273606.893,
+      "_id": "jd7e2161m1q51e8948q894r73s8f8xzm",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -3206,6 +3401,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273606.8928,
+      "_id": "jd7fb6cdt7te1hjbd58ssrs0g18f9kxq",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -3262,6 +3459,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273606.8926,
+      "_id": "jd7a4ges8b2g1hdgn211sen8s58f9kkg",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -3318,6 +3517,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273606.8923,
+      "_id": "jd7a0avqfzrsva12a19t1vgmw98f8sc0",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -3374,6 +3575,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583273606.892,
+      "_id": "jd7e6nsfn4xtva5vj3481py9qn8f9evr",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -3430,6 +3633,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583273606.8918,
+      "_id": "jd72mmgg152rysqj3gtv9bj04h8f9z8q",
       "accidentDate": "",
       "accidentNumber": "2609449429",
       "accidentType": "질병",
@@ -3532,6 +3737,8 @@
       "updatedAt": "2026-09-29T01:40:04.759Z"
     },
     {
+      "_creationTime": 1790583273606.8916,
+      "_id": "jd79445wyv0wvk3yntxh4en4xn8f95x1",
       "accidentDate": "",
       "accidentNumber": "2609121636",
       "accidentType": "질병",
@@ -3588,6 +3795,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273606.8914,
+      "_id": "jd705431kzrh8y0kk5edhyw0ys8f91dh",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -3644,6 +3853,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273254.3533,
+      "_id": "jd768eq44xmq5xx3mbtbc9ws858f942e",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -3700,6 +3911,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273254.353,
+      "_id": "jd737jn9r8hycr7d714dphs54s8f9m0m",
       "accidentDate": "",
       "accidentNumber": "2607A65343",
       "accidentType": "질병",
@@ -3756,6 +3969,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273254.3528,
+      "_id": "jd78cp3fccwd0434ppdpckne698f8dca",
       "accidentDate": "",
       "accidentNumber": "2608A65362",
       "accidentType": "질병",
@@ -3812,6 +4027,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273254.3525,
+      "_id": "jd785snp04hvjbcfetvc54t8hh8f8cfc",
       "accidentDate": "",
       "accidentNumber": "2609033837",
       "accidentType": "질병",
@@ -3893,6 +4110,8 @@
       "updatedAt": "2026-09-29T01:46:33.862Z"
     },
     {
+      "_creationTime": 1790583273254.3523,
+      "_id": "jd71w8kaw8h7m1bnxcpemepaq18f916v",
       "accidentDate": "",
       "accidentNumber": "2608A65027",
       "accidentType": "질병",
@@ -3927,10 +4146,10 @@
       "customDailyClaimPrice": 142000,
       "dailyClaimPrice": 142000,
       "dailyRate": "139000",
-      "depositConfirmedAmount": 495000,
+      "depositConfirmedAmount": 825000,
       "desiredStartDate": "2026.08.28",
       "diagnosis": "",
-      "estimatedUnpaid": 710000,
+      "estimatedUnpaid": 0,
       "expectedDays": "2일",
       "expectedEndDate": "2026.09.01",
       "gender": "여",
@@ -3950,6 +4169,9 @@
       "policyNumber": "L02546009685",
       "productCode": "",
       "productName": "",
+      "roundDeposits": {
+        "1": 825000
+      },
       "settlementStepMemos": {
         "1": {
           "claim": [
@@ -3985,10 +4207,12 @@
       "sigungu": "구리시",
       "status": "완료",
       "totalPayout": 650000,
-      "unconfirmedClaimCount": 1,
-      "updatedAt": "2026-09-29T01:33:22.282Z"
+      "unconfirmedClaimCount": 0,
+      "updatedAt": "2026-09-29T23:56:24.074Z"
     },
     {
+      "_creationTime": 1790583273254.352,
+      "_id": "jd74mtxs2kk2qdsrj4cmxbxza18f8qa0",
       "accidentDate": "",
       "accidentNumber": "2608785016",
       "accidentType": "질병",
@@ -4045,6 +4269,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273254.3518,
+      "_id": "jd76a0fg92dbhwzxc751rdradn8f9ykt",
       "accidentDate": "",
       "accidentNumber": "2608A01453",
       "accidentType": "질병",
@@ -4101,6 +4327,8 @@
       "unconfirmedClaimCount": 4
     },
     {
+      "_creationTime": 1790583273254.3516,
+      "_id": "jd7e0rz1nb8dqhjt3wvphd3e058f97rc",
       "accidentDate": "",
       "accidentNumber": "2608969204",
       "accidentType": "질병",
@@ -4157,6 +4385,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273254.3513,
+      "_id": "jd77sfzggr2sny6gayj3vdwvwd8f9agv",
       "accidentDate": "",
       "accidentNumber": "2608969069",
       "accidentType": "질병",
@@ -4213,6 +4443,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273254.351,
+      "_id": "jd70rs5mbwbt8hkwwr70x2dzex8f9smb",
       "accidentDate": "",
       "accidentNumber": "2608968880",
       "accidentType": "질병",
@@ -4269,6 +4501,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583273254.3508,
+      "_id": "jd71xxc937krpa3tc8vskzm48s8f9t5w",
       "accidentDate": "",
       "accidentNumber": "2608785107",
       "accidentType": "질병",
@@ -4325,6 +4559,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273254.3506,
+      "_id": "jd760sw823s18kwrgcssxqz9kh8f8a87",
       "accidentDate": "",
       "accidentNumber": "2608785016",
       "accidentType": "질병",
@@ -4381,6 +4617,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583273254.3503,
+      "_id": "jd7cd6d4dyvdz1qvn6e9mq7j8d8f87dv",
       "accidentDate": "",
       "accidentNumber": "2608A66174",
       "accidentType": "질병",
@@ -4437,6 +4675,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273254.35,
+      "_id": "jd7dfw0rvz3jnewemttgyxwws58f8rt4",
       "accidentDate": "",
       "accidentNumber": "2608737160",
       "accidentType": "질병",
@@ -4493,6 +4733,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273254.3499,
+      "_id": "jd77rtks1ry8s4306g1mk7q2b58f98ta",
       "accidentDate": "",
       "accidentNumber": "2608784922",
       "accidentType": "질병",
@@ -4549,6 +4791,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583273254.3496,
+      "_id": "jd7cvrrcfc0k4twstbsa4yqsf58f9sc8",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -4605,6 +4849,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273254.3494,
+      "_id": "jd78n2q6bs8kx9tw8t15nnc2658f9efy",
       "accidentDate": "",
       "accidentNumber": "2608634071",
       "accidentType": "질병",
@@ -4661,6 +4907,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273254.349,
+      "_id": "jd706cpwmvrdgfxd7wt0r34cyn8f975p",
       "accidentDate": "",
       "accidentNumber": "2608633926",
       "accidentType": "질병",
@@ -4677,7 +4925,7 @@
       "careEndDate": "2026.08.21",
       "careStartDate": "2026.08.18",
       "careType": "입원",
-      "caregiverName": "서동화",
+      "caregiverName": "서동���",
       "caregiverPhone": "010-8564-1819",
       "claimCategory": "정상",
       "claimClassification": "정상",
@@ -4717,6 +4965,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583273254.3489,
+      "_id": "jd7ahk0d3d15jwxdr902sq228n8f838t",
       "accidentDate": "",
       "accidentNumber": "2606077176",
       "accidentType": "질병",
@@ -4773,6 +5023,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583273254.3486,
+      "_id": "jd7084yp61vqx2ce583dwe1zg58f8n1m",
       "accidentDate": "",
       "accidentNumber": "2608500493",
       "accidentType": "질병",
@@ -4829,6 +5081,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583272881.0427,
+      "_id": "jd78vvw00a7kd5ess4x7q0ct518f85x1",
       "accidentDate": "",
       "accidentNumber": "2608453742",
       "accidentType": "질병",
@@ -4885,6 +5139,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583272881.0425,
+      "_id": "jd71ysprms1dk2b0aph1545gc98f9nwx",
       "accidentDate": "",
       "accidentNumber": "2608453564",
       "accidentType": "질병",
@@ -4941,6 +5197,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583272881.0422,
+      "_id": "jd76vasrrjw1gk8q2bkpntt3dh8f8tne",
       "accidentDate": "",
       "accidentNumber": "2608417681",
       "accidentType": "질병",
@@ -5005,7 +5263,7 @@
               "author": "운영센터",
               "dateStr": "2026.08.24",
               "id": "legacy_claim_1",
-              "text": "8월31일 김정하 담당 통화-> 아직 입금 못했는데 빨리 처리하겠다고 서류미비건010-9158-4782 현장조사 과정 \r\n09.23 : 확인 중(7일 중 약관상 처리 안되는 일자가 있음), 금주 중 입금 예정",
+              "text": "8월31일 김정하 담당 통화-> 아직 입금 못했는데 빨리 처리���겠다고 서류미비건010-9158-4782 현장조사 과정 \r\n09.23 : 확인 중(7일 중 약관상 처리 안되는 일자가 있음), 금주 중 입금 예정",
               "timestamp": "2026-09-23T09:05:30.715Z"
             }
           ],
@@ -5021,6 +5279,8 @@
       "updatedAt": "2026-09-29T00:10:40.070Z"
     },
     {
+      "_creationTime": 1790583272881.042,
+      "_id": "jd78aq0s695knne3c1m6k41n6s8f96kq",
       "accidentDate": "",
       "accidentNumber": "2608361110",
       "accidentType": "질병",
@@ -5077,6 +5337,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.0417,
+      "_id": "jd760x1zvrt94esqqv74rmg8h58f829y",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -5133,6 +5395,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.0415,
+      "_id": "jd71fzwt7z2a5fkttecwcz8q4n8f97cv",
       "accidentDate": "",
       "accidentNumber": "2608291933",
       "accidentType": "질병",
@@ -5189,6 +5453,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583272881.0413,
+      "_id": "jd79d712qf4t6n0mvd8sgmwvn98f8s08",
       "accidentDate": "",
       "accidentNumber": "2608291849",
       "accidentType": "질병",
@@ -5245,6 +5511,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.041,
+      "_id": "jd78h32be1xpqh8ja0kb7wbmg58f9g0b",
       "accidentDate": "",
       "accidentNumber": "2608291774",
       "accidentType": "상해",
@@ -5303,6 +5571,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.0408,
+      "_id": "jd74y09sd4qwwhq6py26td5tvx8f9den",
       "accidentDate": "",
       "accidentNumber": "2608291774",
       "accidentType": "상해",
@@ -5359,6 +5629,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.0405,
+      "_id": "jd7cvwven8ss6d8q8a6dtaxp7d8f9npk",
       "accidentDate": "",
       "accidentNumber": "2608244703",
       "accidentType": "상해",
@@ -5415,6 +5687,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.0403,
+      "_id": "jd7f18fgyn6x2z5bg35672qd1n8f84ff",
       "accidentDate": "",
       "accidentNumber": "2607B25894",
       "accidentType": "상해",
@@ -5471,6 +5745,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.04,
+      "_id": "jd7dxb1a0btfws1bfaht9st8w18f8b4q",
       "accidentDate": "",
       "accidentNumber": "2607B23277",
       "accidentType": "상해",
@@ -5527,6 +5803,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.0398,
+      "_id": "jd7d71qcsfkjhm55a87n1pvfbx8f84yb",
       "accidentDate": "",
       "accidentNumber": "2607A65343",
       "accidentType": "질병",
@@ -5583,6 +5861,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.0396,
+      "_id": "jd7f1tk9xxw4fwfvrdzdjmew0n8f8kjd",
       "accidentDate": "",
       "accidentNumber": "2607A65502",
       "accidentType": "상해",
@@ -5639,6 +5919,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.0393,
+      "_id": "jd7es1a7vx9538zf0hcyd1wzdx8f9jaf",
       "accidentDate": "",
       "accidentNumber": "2607939473",
       "accidentType": "상해",
@@ -5695,6 +5977,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.039,
+      "_id": "jd75vykxptybs4dbwfeectahhh8f8kn8",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "상해",
@@ -5751,6 +6035,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.0388,
+      "_id": "jd7d9n488tk2qtcddh33chxjhd8f8kpc",
       "accidentDate": "",
       "accidentNumber": "2604192301",
       "accidentType": "상해",
@@ -5807,6 +6093,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.0386,
+      "_id": "jd7530tgzsr5ncxhpndkn9x2a18f8p5c",
       "accidentDate": "",
       "accidentNumber": "2607763413",
       "accidentType": "질병",
@@ -5863,6 +6151,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.0383,
+      "_id": "jd7769wq8e2ed57np0t27pqed18f9gx1",
       "accidentDate": "",
       "accidentNumber": "2607799789",
       "accidentType": "상해",
@@ -5919,6 +6209,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272881.038,
+      "_id": "jd7fqedq82cn9hvxzdhp0yrj258f8qc3",
       "accidentDate": "",
       "accidentNumber": "2607763508",
       "accidentType": "상해",
@@ -5975,6 +6267,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272547.7773,
+      "_id": "jd7ee4kn4fvtd20yda3s6nxa158f91y0",
       "accidentDate": "",
       "accidentNumber": "2607763413",
       "accidentType": "상해",
@@ -6031,6 +6325,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272547.777,
+      "_id": "jd780daed9z6h6ca4bw9m74qdx8f8wdp",
       "accidentDate": "",
       "accidentNumber": "2607661943",
       "accidentType": "상해",
@@ -6087,6 +6383,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272547.7769,
+      "_id": "jd73kjvd4te4rzzq5dqgwen8c98f81j7",
       "accidentDate": "",
       "accidentNumber": "2607630471",
       "accidentType": "질병",
@@ -6143,6 +6441,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272547.7766,
+      "_id": "jd7e8je40e59jmy7dyssys159x8f9vtj",
       "accidentDate": "",
       "accidentNumber": "2607630298",
       "accidentType": "질병",
@@ -6199,6 +6499,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272547.7764,
+      "_id": "jd700dpmymey35xjcdpzaab8wh8f99b4",
       "accidentDate": "",
       "accidentNumber": "2607630298",
       "accidentType": "질병",
@@ -6255,6 +6557,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272547.7761,
+      "_id": "jd72t5x568ae58kq6bgz5ytgch8f80xg",
       "accidentDate": "",
       "accidentNumber": "2607630146",
       "accidentType": "상해",
@@ -6313,6 +6617,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583272547.776,
+      "_id": "jd7dc08tfcey1cb0p103mnts2h8f93b7",
       "accidentDate": "",
       "accidentNumber": "2607630146",
       "accidentType": "상해",
@@ -6369,6 +6675,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272547.7756,
+      "_id": "jd7fpd06zfna7ge0yj8jjsxkns8f9pcg",
       "accidentDate": "",
       "accidentNumber": "2607573881",
       "accidentType": "질병",
@@ -6425,6 +6733,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272547.7754,
+      "_id": "jd79asjw1nrhv2ft8hcj0br29d8f9mz5",
       "accidentDate": "",
       "accidentNumber": "2607572965",
       "accidentType": "상해",
@@ -6481,6 +6791,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583272547.7751,
+      "_id": "jd72cx36yqk944v336ztkwb70s8f9sza",
       "accidentDate": "",
       "accidentNumber": "2607572187",
       "accidentType": "상해",
@@ -6537,6 +6849,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583272547.775,
+      "_id": "jd7e7vf0anjkdqem1wt3xj44358f8q3v",
       "accidentDate": "",
       "accidentNumber": "2607571559",
       "accidentType": "상해",
@@ -6593,6 +6907,8 @@
       "unconfirmedClaimCount": 3
     },
     {
+      "_creationTime": 1790583272547.7747,
+      "_id": "jd7amh4x6d92jxc9x70jqxynv58f9nh2",
       "accidentDate": "",
       "accidentNumber": "2607570983",
       "accidentType": "상해",
@@ -6649,6 +6965,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272547.7744,
+      "_id": "jd7cyszzr8rhyjghhx83ppnch98f8w8n",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "질병",
@@ -6705,6 +7023,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272547.7742,
+      "_id": "jd71vrea0yxq1ae5jc3wg5s9f58f9a4m",
       "accidentDate": "",
       "accidentNumber": "2607486916",
       "accidentType": "질병",
@@ -6761,6 +7081,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583272547.774,
+      "_id": "jd79vqzg53h08j6hzx08y0fvrd8f8hat",
       "accidentDate": "",
       "accidentNumber": "2507B11753",
       "accidentType": "질병",
@@ -6817,6 +7139,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272547.7737,
+      "_id": "jd71vf6fyyz43jbsxw3jf6w4ch8f99bd",
       "accidentDate": "",
       "accidentNumber": "2507451576",
       "accidentType": "질병",
@@ -7186,6 +7510,8 @@
       "updatedAt": "2026-09-28T09:39:28.758Z"
     },
     {
+      "_creationTime": 1790583272547.7734,
+      "_id": "jd7csgw0xh4zwfh1xvxazegv098f8d50",
       "accidentDate": "",
       "accidentNumber": "2607421253",
       "accidentType": "질병",
@@ -7242,6 +7568,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272547.7732,
+      "_id": "jd796a00ssgq092xjb7vjrgw3d8f9cts",
       "accidentDate": "",
       "accidentNumber": "2607160546",
       "accidentType": "질병",
@@ -7298,6 +7626,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583272547.773,
+      "_id": "jd7crj339es4jdfdb7ha2br18d8f8mwz",
       "accidentDate": "",
       "accidentNumber": "2607030118",
       "accidentType": "질병",
@@ -7354,6 +7684,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272547.7727,
+      "_id": "jd76adyptee974fhs8eyrty0ks8f9dv4",
       "accidentDate": "",
       "accidentNumber": "2607029823",
       "accidentType": "질병",
@@ -7410,6 +7742,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.532,
+      "_id": "jd75kqkmd7s1v045t81t5ktmph8f96w3",
       "accidentDate": "",
       "accidentNumber": "2607029823",
       "accidentType": "질병",
@@ -7466,6 +7800,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5317,
+      "_id": "jd74a8dxc1yda8jf92gncqt6h18f9npn",
       "accidentDate": "",
       "accidentNumber": "2607029823",
       "accidentType": "질병",
@@ -7522,6 +7858,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5315,
+      "_id": "jd7850zt8gz92z5sx2dxc78pwh8f9q4q",
       "accidentDate": "",
       "accidentNumber": "2606947117",
       "accidentType": "질병",
@@ -7578,6 +7916,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5312,
+      "_id": "jd7fmmxt6m5hjc06etnkm4jrfn8f9z89",
       "accidentDate": "",
       "accidentNumber": "2606913728",
       "accidentType": "질병",
@@ -7634,6 +7974,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.531,
+      "_id": "jd71y1e3dxx71xcd0gxbt4v7qd8f85zz",
       "accidentDate": "",
       "accidentNumber": "2606913728",
       "accidentType": "질병",
@@ -7690,6 +8032,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5308,
+      "_id": "jd71tc683zkqx9gpte8w0mxq0s8f9bjq",
       "accidentDate": "",
       "accidentNumber": "2606913728",
       "accidentType": "질병",
@@ -7746,6 +8090,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5305,
+      "_id": "jd7408xk4m1ycysfx0ed092pd58f9akp",
       "accidentDate": "",
       "accidentNumber": "2606913728",
       "accidentType": "질병",
@@ -7802,6 +8148,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5303,
+      "_id": "jd7a5tgmpbrn51cezgmhywz4rs8f8bqc",
       "accidentDate": "",
       "accidentNumber": "2606865509",
       "accidentType": "질병",
@@ -7858,6 +8206,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583272222.53,
+      "_id": "jd75v1yavxaty08naxgp1z0kmd8f95hr",
       "accidentDate": "",
       "accidentNumber": "2606865509",
       "accidentType": "질병",
@@ -7914,6 +8264,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5298,
+      "_id": "jd77evzknydtrbx9p8nb1265g98f89xx",
       "accidentDate": "",
       "accidentNumber": "2606813032",
       "accidentType": "질병",
@@ -7970,6 +8322,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583272222.5295,
+      "_id": "jd74rx579fv3re6ncch7pse92x8f8px8",
       "accidentDate": "",
       "accidentNumber": "2606813032",
       "accidentType": "질병",
@@ -8026,6 +8380,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5293,
+      "_id": "jd7cmbcstnmrgj66yfj5vw1ycn8f8m7d",
       "accidentDate": "",
       "accidentNumber": "2604548471",
       "accidentType": "질병",
@@ -8082,6 +8438,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.529,
+      "_id": "jd7a3jk3d1yqbajnph87hafszn8f8szw",
       "accidentDate": "",
       "accidentNumber": "2606748497",
       "accidentType": "질병",
@@ -8138,6 +8496,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5288,
+      "_id": "jd76p6bgm0r00qk8wphrcdkb9d8f9abf",
       "accidentDate": "",
       "accidentNumber": "2606748497",
       "accidentType": "질병",
@@ -8172,7 +8532,7 @@
       "estimatedUnpaid": 0,
       "expectedDays": "2일",
       "expectedEndDate": "2026.06.20",
-      "gender": "여",
+      "gender": "��",
       "hasDiseaseCare": "Y",
       "hasInjuryCare": "Y",
       "hospitalName": "북구 양산제로 30, 한국아델리움 201동 1301호",
@@ -8194,6 +8554,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5286,
+      "_id": "jd76v7v5tn572n16w2dv34nekd8f99t7",
       "accidentDate": "",
       "accidentNumber": "2606613322",
       "accidentType": "질병",
@@ -8250,6 +8612,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5283,
+      "_id": "jd7as6abpzmftgqafhqdw7c8gd8f8v8h",
       "accidentDate": "",
       "accidentNumber": "2606661167",
       "accidentType": "질병",
@@ -8306,6 +8670,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.528,
+      "_id": "jd781m4fj97phygcchm5xpyms58f9xfy",
       "accidentDate": "",
       "accidentNumber": "2606661167",
       "accidentType": "질병",
@@ -8362,6 +8728,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5278,
+      "_id": "jd772kjrcw0g7qttyjwx1fw6rx8f8tc9",
       "accidentDate": "",
       "accidentNumber": "2606560523",
       "accidentType": "상해",
@@ -8418,6 +8786,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5276,
+      "_id": "jd71kc2vwk8skak0p09dh2ss318f85yt",
       "accidentDate": "",
       "accidentNumber": "2606560239",
       "accidentType": "질병",
@@ -8474,6 +8844,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583272222.5273,
+      "_id": "jd75kmdmpe2006b9fes71x7srd8f82fr",
       "accidentDate": "",
       "accidentNumber": "2606834097",
       "accidentType": "질병",
@@ -8530,6 +8902,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.6902,
+      "_id": "jd73zeaadpjxrkm55cqcv23gfs8f9h57",
       "accidentDate": "",
       "accidentNumber": "2606495230",
       "accidentType": "상해",
@@ -8586,6 +8960,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.69,
+      "_id": "jd70qvfjr10akjewyxx1v2tjpd8f8ytm",
       "accidentDate": "",
       "accidentNumber": "2606495121",
       "accidentType": "상해",
@@ -8642,6 +9018,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583271871.6897,
+      "_id": "jd76e794c0ah8nfe8rbnzcgcvx8f9wqd",
       "accidentDate": "",
       "accidentNumber": "2605075407",
       "accidentType": "상해",
@@ -8698,6 +9076,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.6895,
+      "_id": "jd74e2vqam5nx5qe550k8a0rrd8f9mc0",
       "accidentDate": "",
       "accidentNumber": "2605075407",
       "accidentType": "상해",
@@ -8754,6 +9134,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583271871.6892,
+      "_id": "jd771tzc4n5dptan81hnymz2218f9ez4",
       "accidentDate": "",
       "accidentNumber": "2606451229",
       "accidentType": "상해",
@@ -8810,6 +9192,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.689,
+      "_id": "jd749fvh092r939m9ewfmg2j4h8f9p1z",
       "accidentDate": "",
       "accidentNumber": "2606451061",
       "accidentType": "상해",
@@ -8866,6 +9250,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.6887,
+      "_id": "jd7cwsjzw330hj9yhnde9hhxf58f9d4z",
       "accidentDate": "",
       "accidentNumber": "2606407042",
       "accidentType": "질병",
@@ -8896,6 +9282,7 @@
       "csLatestType": null,
       "customDailyClaimPrice": 144000,
       "dailyRate": "130000",
+      "dailyWage": 139000,
       "depositConfirmedAmount": 11952000,
       "desiredStartDate": "2026.06.08",
       "diagnosis": "",
@@ -8910,6 +9297,7 @@
       "id": "C0166",
       "importedAt": "2026-09-28T08:14:19.951Z",
       "insuranceCompany": "현대해상",
+      "isAlertConfirmed": true,
       "isRealLaunchData": true,
       "memo": "(기존 간병인 계속 지원 요청)8월20일 입금확인요함/입금확인됨",
       "patientId": "",
@@ -8918,6 +9306,11 @@
       "policyNumber": "L02122928111",
       "productCode": "",
       "productName": "",
+      "roundDeposits": {
+        "1": 432000,
+        "9": 1584000,
+        "11": 1440000
+      },
       "settlementStepMemos": {
         "1": {
           "claim": [],
@@ -9027,6 +9420,8 @@
       "updatedAt": "2026-09-29T00:06:04.210Z"
     },
     {
+      "_creationTime": 1790583271871.6885,
+      "_id": "jd70we938mjhph6g4fpkvrxg8h8f8k4k",
       "accidentDate": "",
       "accidentNumber": "2606244002",
       "accidentType": "상해",
@@ -9083,6 +9478,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.6882,
+      "_id": "jd7d6jxrz625fz2jd20ejmtfnx8f8fs7",
       "accidentDate": "",
       "accidentNumber": "2606243852",
       "accidentType": "상해",
@@ -9139,6 +9536,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.688,
+      "_id": "jd779an000cmjcsmvkqvsqwdb98f9ycx",
       "accidentDate": "",
       "accidentNumber": "2606197580",
       "accidentType": "상해",
@@ -9195,6 +9594,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.6877,
+      "_id": "jd79rwdkhd0xwtct5he59wyd8s8f8x0b",
       "accidentDate": "",
       "accidentNumber": "2606077176",
       "accidentType": "상해",
@@ -9251,6 +9652,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.6875,
+      "_id": "jd79dqgeqb9eg2ska4gdf3b99x8f9skx",
       "accidentDate": "",
       "accidentNumber": "2606077176",
       "accidentType": "상해",
@@ -9307,6 +9710,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.6873,
+      "_id": "jd75jqzcnfehvhkjsd4we2x39x8f8zpt",
       "accidentDate": "",
       "accidentNumber": "2606077176",
       "accidentType": "상해",
@@ -9363,6 +9768,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.687,
+      "_id": "jd771yq4ssfxgwd8d1h01a7nx58f9rbz",
       "accidentDate": "",
       "accidentNumber": "2606076497",
       "accidentType": "상해",
@@ -9419,6 +9826,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.6868,
+      "_id": "jd77ppabwy9qbtgkfhhv0y0t4s8f8xvn",
       "accidentDate": "",
       "accidentNumber": "2606075600",
       "accidentType": "상해",
@@ -9475,6 +9884,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.6865,
+      "_id": "jd713wja78j8gkhwxxeg55ebe98f80ky",
       "accidentDate": "",
       "accidentNumber": "2606034546",
       "accidentType": "상해",
@@ -9531,6 +9942,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.6863,
+      "_id": "jd75c2tqsmt40xebwapyfrxq7d8f9aay",
       "accidentDate": "",
       "accidentNumber": "2605985084",
       "accidentType": "상해",
@@ -9587,6 +10000,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.686,
+      "_id": "jd7958x97qcxzzz4z82tyerzmx8f92kw",
       "accidentDate": "",
       "accidentNumber": "2606034138",
       "accidentType": "상해",
@@ -9643,6 +10058,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271871.6858,
+      "_id": "jd7bd1d9w8rs37fgtygdgh26h58f9723",
       "accidentDate": "",
       "accidentNumber": "2605984996",
       "accidentType": "상해",
@@ -9699,6 +10116,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583271871.6855,
+      "_id": "jd71q6wcxq9qznm83vr332kr4n8f8tnj",
       "accidentDate": "",
       "accidentNumber": "2605911601",
       "accidentType": "상해",
@@ -9755,6 +10174,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.3625,
+      "_id": "jd7bzvg64bgjpmbkb38vjcv1mn8f9sf1",
       "accidentDate": "",
       "accidentNumber": "2605911601",
       "accidentType": "상해",
@@ -9811,6 +10232,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.3623,
+      "_id": "jd7ec2rcx9v1a82s58aakn8wqx8f99rz",
       "accidentDate": "",
       "accidentNumber": "2605911545",
       "accidentType": "상해",
@@ -9867,6 +10290,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.362,
+      "_id": "jd72zfamdywbh5w95fc7wj959d8f97nb",
       "accidentDate": "",
       "accidentNumber": "2605801939\r\n2605911477",
       "accidentType": "상해",
@@ -9923,6 +10348,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583271535.3618,
+      "_id": "jd70yt1x8tq0674t15mnwzd6bx8f9p2g",
       "accidentDate": "",
       "accidentNumber": "2605851052",
       "accidentType": "상해",
@@ -9979,6 +10406,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.3616,
+      "_id": "jd7fsf4g7g7sfgs185q5g985h98f9vj5",
       "accidentDate": "",
       "accidentNumber": "2605851531",
       "accidentType": "상해",
@@ -10035,6 +10464,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.3613,
+      "_id": "jd7cz4btg44ja2nzy7931r3nzd8f9ek9",
       "accidentDate": "",
       "accidentNumber": "2605633985",
       "accidentType": "상해",
@@ -10091,6 +10522,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.361,
+      "_id": "jd72bq7xbcbfh07z5g1bq2fzp98f8bqq",
       "accidentDate": "",
       "accidentNumber": "2605519345",
       "accidentType": "상해",
@@ -10147,6 +10580,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583271535.3608,
+      "_id": "jd7c4vy1ere0bq0mjfn6mvsjtd8f9yfy",
       "accidentDate": "",
       "accidentNumber": "2605519345",
       "accidentType": "상해",
@@ -10203,6 +10638,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.3606,
+      "_id": "jd7fb71yqxb5pf32290sw5vgsd8f8hfx",
       "accidentDate": "",
       "accidentNumber": "2605519345",
       "accidentType": "상해",
@@ -10259,6 +10696,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.3604,
+      "_id": "jd7702z2cfwgjmj7zpg8sxvtgd8f97dp",
       "accidentDate": "",
       "accidentNumber": "2605519345",
       "accidentType": "상해",
@@ -10315,6 +10754,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.36,
+      "_id": "jd7aegs1e3ax01w5tvdpybsbt58f8713",
       "accidentDate": "",
       "accidentNumber": "2605519345",
       "accidentType": "상해",
@@ -10371,6 +10812,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.3599,
+      "_id": "jd7db9rc33q4tank4g4af4zbh98f9e72",
       "accidentDate": "",
       "accidentNumber": "2605505725",
       "accidentType": "상해",
@@ -10427,6 +10870,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.3596,
+      "_id": "jd74jb4rv481rkc0thjhpdkp418f892j",
       "accidentDate": "",
       "accidentNumber": "2605505725",
       "accidentType": "상해",
@@ -10483,6 +10928,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.3594,
+      "_id": "jd73ww8ee2styv8xrjdk6rv8xn8f9210",
       "accidentDate": "",
       "accidentNumber": "2605505725",
       "accidentType": "상해",
@@ -10539,6 +10986,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.3591,
+      "_id": "jd77sgh0etwkw8km753dah1h218f8qxa",
       "accidentDate": "",
       "accidentNumber": "2605505725",
       "accidentType": "상해",
@@ -10595,6 +11044,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.359,
+      "_id": "jd7bbyabydk1ckmt4r5c2yzkw18f9d3f",
       "accidentDate": "",
       "accidentNumber": "2605505725",
       "accidentType": "상해",
@@ -10651,6 +11102,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.3586,
+      "_id": "jd7ck94ww0mfrjc5b1t0k5hgnn8f8j1y",
       "accidentDate": "",
       "accidentNumber": "2605473968",
       "accidentType": "상해",
@@ -10707,6 +11160,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.3584,
+      "_id": "jd7da50qtn2tfk771542ezh1gd8f8cym",
       "accidentDate": "",
       "accidentNumber": "2605380805",
       "accidentType": "상해",
@@ -10763,6 +11218,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.3582,
+      "_id": "jd74yfmb5373jpsqar8cbye9d18f8myv",
       "accidentDate": "",
       "accidentNumber": "2605380361",
       "accidentType": "상해",
@@ -10819,11 +11276,14 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271535.358,
+      "_id": "jd7cs8zghhyybyjnch96s6jrvd8f9c7e",
       "accidentDate": "",
       "accidentNumber": "2605380189",
       "accidentType": "상해",
       "addressDetail": "당진종합병원",
       "adjusterFax": "",
+      "adjusterMobile": "022-181-2520",
       "adjusterName": "최보배",
       "adjusterPhone": "022-181-2520",
       "applicantContact": "0104164840001057164799",
@@ -10840,118 +11300,14 @@
       "caregiverPhone": "010-8623-1991",
       "claimCategory": "정상",
       "claimClassification": "정상",
-      "claimCount": 9,
+      "claimCount": 10,
       "claimUnitPrice": 144000,
       "contractEndDate": "",
+      "contractPeriod": "2022.05.27~",
       "contractStartDate": "2022.05.27",
       "csLatestLabel": null,
       "csLatestType": null,
       "customDailyClaimPrice": 144000,
-      "dailyRate": "140000",
-      "depositConfirmedAmount": 13248000,
-      "desiredStartDate": "2026.05.11",
-      "diagnosis": "",
-      "estimatedUnpaid": 0,
-      "expectedDays": "장기예상",
-      "expectedEndDate": "",
-      "gender": "남",
-      "hasDiseaseCare": "Y",
-      "hasInjuryCare": "Y",
-      "hospitalName": "당진종합병원",
-      "id": "C0127",
-      "importedAt": "2026-09-28T08:14:19.951Z",
-      "insuranceCompany": "현대해상",
-      "isRealLaunchData": true,
-      "memo": "",
-      "patientId": "",
-      "patientName": "이재철",
-      "phone": "0104164840001057164799",
-      "policyNumber": "L02224017230",
-      "productCode": "",
-      "productName": "",
-      "roundDeposits": {
-        "7": 1584000,
-        "8": 1440000,
-        "9": 1440000
-      },
-      "settlementStepMemos": {
-        "1": {
-          "claim": [],
-          "deposit": [],
-          "payout": []
-        },
-        "2": {
-          "claim": [],
-          "deposit": [],
-          "payout": []
-        },
-        "3": {
-          "claim": [],
-          "deposit": [],
-          "payout": []
-        },
-        "4": {
-          "claim": [],
-          "deposit": [],
-          "payout": []
-        },
-        "5": {
-          "claim": [
-            {
-              "author": "운영센터",
-              "dateStr": "2026.08.10",
-              "id": "legacy_claim_5",
-              "text": "8월27일 최보배 담당자 통화 전액 입금 확인 144,000원/일",
-              "timestamp": "2026-09-29T01:01:16.859Z"
-            }
-          ],
-          "deposit": [],
-          "payout": []
-        },
-        "6": {
-          "claim": [
-            {
-              "author": "운영센터",
-              "dateStr": "2026.08.24",
-              "id": "legacy_claim_6",
-              "text": "8월31일 최보배 담당자 통화-> 8월14일 3,024,000원 입금 완료",
-              "timestamp": "2026-09-29T01:01:16.859Z"
-            }
-          ],
-          "deposit": [],
-          "payout": []
-        },
-        "7": {
-          "claim": [
-            {
-              "author": "운영센터",
-              "dateStr": "2026.09.04",
-              "id": "legacy_claim_7",
-              "text": "9월4일 청구함",
-              "timestamp": "2026-09-29T01:01:16.859Z"
-            }
-          ],
-          "deposit": [],
-          "payout": []
-        },
-        "8": {
-          "claim": [],
-          "deposit": [],
-          "payout": []
-        },
-        "9": {
-          "claim": [],
-          "deposit": [],
-          "payout": []
-        }
-      },
-      "sido": "충청남도",
-      "sigungu": "당진시",
-      "status": "진행중",
-      "totalPayout": 12600000,
-      "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-09-30T00:38:09.129Z",
-      "hasManualUpdate": true,
       "customSettlementSets": [
         {
           "caregiverName": "고영만",
@@ -11200,12 +11556,12 @@
           "caregiverName": "고영만",
           "cgDailyWage": 140000,
           "claimAmount": 1440000,
-          "claimDate": "",
+          "claimDate": "2026.09.23 18:00",
           "claimDays": 10,
           "claimId": "Q0127.10",
           "claimRound": "9월 3차",
           "claimStandardDate": "2026.09.23",
-          "claimStatus": "청구전",
+          "claimStatus": "청구완료",
           "dailyClaimPrice": 144000,
           "days": 10,
           "depositAmount": 0,
@@ -11223,9 +11579,118 @@
           "setIndex": 10,
           "startDateStr": "2026.09.21 09:00"
         }
-      ]
+      ],
+      "dailyRate": "140000",
+      "depositConfirmedAmount": 13248000,
+      "desiredStartDate": "2026.05.11",
+      "diagnosis": "",
+      "estimatedUnpaid": 1440000,
+      "expectedDays": "장기예상",
+      "expectedEndDate": "",
+      "gender": "남",
+      "hasDiseaseCare": "Y",
+      "hasInjuryCare": "Y",
+      "hasManualUpdate": true,
+      "hospitalName": "당진종합병원",
+      "id": "C0127",
+      "importedAt": "2026-09-28T08:14:19.951Z",
+      "insuranceCompany": "현대해상",
+      "isRealLaunchData": true,
+      "memo": "",
+      "patientId": "",
+      "patientName": "이재철",
+      "phone": "0104164840001057164799",
+      "policyNumber": "L02224017230",
+      "productCode": "",
+      "productName": "",
+      "roadAddress": "충청남도 당진시",
+      "roundDeposits": {
+        "7": 1584000,
+        "8": 1440000,
+        "9": 1440000
+      },
+      "rrn": "",
+      "settlementStepMemos": {
+        "1": {
+          "claim": [],
+          "deposit": [],
+          "payout": []
+        },
+        "2": {
+          "claim": [],
+          "deposit": [],
+          "payout": []
+        },
+        "3": {
+          "claim": [],
+          "deposit": [],
+          "payout": []
+        },
+        "4": {
+          "claim": [],
+          "deposit": [],
+          "payout": []
+        },
+        "5": {
+          "claim": [
+            {
+              "author": "운영센터",
+              "dateStr": "2026.08.10",
+              "id": "legacy_claim_5",
+              "text": "8월27일 최보배 담당자 통화 전액 입금 확인 144,000원/일",
+              "timestamp": "2026-09-29T01:01:16.859Z"
+            }
+          ],
+          "deposit": [],
+          "payout": []
+        },
+        "6": {
+          "claim": [
+            {
+              "author": "운영센터",
+              "dateStr": "2026.08.24",
+              "id": "legacy_claim_6",
+              "text": "8월31일 최보배 담당자 통화-> 8월14일 3,024,000원 입금 완료",
+              "timestamp": "2026-09-29T01:01:16.859Z"
+            }
+          ],
+          "deposit": [],
+          "payout": []
+        },
+        "7": {
+          "claim": [
+            {
+              "author": "운영센터",
+              "dateStr": "2026.09.04",
+              "id": "legacy_claim_7",
+              "text": "9월4일 청구함",
+              "timestamp": "2026-09-29T01:01:16.859Z"
+            }
+          ],
+          "deposit": [],
+          "payout": []
+        },
+        "8": {
+          "claim": [],
+          "deposit": [],
+          "payout": []
+        },
+        "9": {
+          "claim": [],
+          "deposit": [],
+          "payout": []
+        }
+      },
+      "sido": "충청남도",
+      "sigungu": "당진시",
+      "status": "진행중",
+      "totalPayout": 12600000,
+      "unconfirmedClaimCount": 1,
+      "updatedAt": "2026-09-30T01:31:43.940Z"
     },
     {
+      "_creationTime": 1790583271203.2607,
+      "_id": "jd79vr9bhwet6jfc227574wtpn8f89fh",
       "accidentDate": "",
       "accidentNumber": "2605380189",
       "accidentType": "상해",
@@ -11282,6 +11747,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.2605,
+      "_id": "jd7a8vzf81yjfnmqptq454sfq58f9693",
       "accidentDate": "",
       "accidentNumber": "2605324229",
       "accidentType": "상해",
@@ -11338,6 +11805,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.2603,
+      "_id": "jd7azv22knr2vz38q0gs5afs718f9s8c",
       "accidentDate": "",
       "accidentNumber": "2605198023",
       "accidentType": "상해",
@@ -11394,6 +11863,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.26,
+      "_id": "jd767crh0q8z23a6prj47t7t7n8f98kr",
       "accidentDate": "",
       "accidentNumber": "2605198023",
       "accidentType": "상해",
@@ -11450,6 +11921,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.2598,
+      "_id": "jd7e6ycjm95rdxpkrh78jvtxh18f8fmh",
       "accidentDate": "",
       "accidentNumber": "2605198023",
       "accidentType": "상해",
@@ -11506,6 +11979,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.2595,
+      "_id": "jd782szxqv6qmbdbkq53wcgsg18f8nrc",
       "accidentDate": "",
       "accidentNumber": "2605197935",
       "accidentType": "상해",
@@ -11562,6 +12037,8 @@
       "unconfirmedClaimCount": 7
     },
     {
+      "_creationTime": 1790583271203.2593,
+      "_id": "jd7cr13bg80w4k7terz6x864qs8f8brc",
       "accidentDate": "",
       "accidentNumber": "2605075115",
       "accidentType": "상해",
@@ -11618,6 +12095,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.259,
+      "_id": "jd7ajhx0p12tbbzsdsf1gc4ht58f8vd4",
       "accidentDate": "",
       "accidentNumber": "2604B48087",
       "accidentType": "상해",
@@ -11674,6 +12153,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583271203.2588,
+      "_id": "jd76k2ddsbbyn8f2ssnq3kjm218f9bje",
       "accidentDate": "",
       "accidentNumber": "2604B48087",
       "accidentType": "상해",
@@ -11730,6 +12211,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.2585,
+      "_id": "jd7chnptqw5gz12gzfjvc2m55h8f96rb",
       "accidentDate": "",
       "accidentNumber": "2604B48087",
       "accidentType": "상해",
@@ -11786,6 +12269,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.2583,
+      "_id": "jd775nxef0h7b582rnb30s1yah8f80vt",
       "accidentDate": "",
       "accidentNumber": "2604B48087",
       "accidentType": "상해",
@@ -11842,6 +12327,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.258,
+      "_id": "jd7cdndhg2q0qzn050sqj2fcb18f8tde",
       "accidentDate": "",
       "accidentNumber": "2402328951",
       "accidentType": "상해",
@@ -11898,6 +12385,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.2578,
+      "_id": "jd71n8jfp4w67gdq3b6q2s72dn8f9zsk",
       "accidentDate": "",
       "accidentNumber": "2604A75783",
       "accidentType": "상해",
@@ -11954,6 +12443,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.2576,
+      "_id": "jd7cwwq68wnn0ctct44b61tew18f8kf0",
       "accidentDate": "",
       "accidentNumber": "2604A75375",
       "accidentType": "상해",
@@ -12010,6 +12501,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.2573,
+      "_id": "jd7fjdfd0ad4xb04ndqe36dqs18f9v0j",
       "accidentDate": "",
       "accidentNumber": "2604A75375",
       "accidentType": "상해",
@@ -12047,7 +12540,7 @@
       "gender": "여",
       "hasDiseaseCare": "Y",
       "hasInjuryCare": "Y",
-      "hospitalName": "상무힐링요양병원",
+      "hospitalName": "상무힐링���양병원",
       "id": "C0109",
       "importedAt": "2026-09-28T08:14:19.951Z",
       "insuranceCompany": "현대해상",
@@ -12066,6 +12559,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.257,
+      "_id": "jd7342ca02p4kpz4y7tc4kx54x8f8r34",
       "accidentDate": "",
       "accidentNumber": "2604A74372",
       "accidentType": "상해",
@@ -12122,6 +12617,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.2568,
+      "_id": "jd7d433ey8kb63szh9mh4cjm4n8f8epm",
       "accidentDate": "",
       "accidentNumber": "2604A72463",
       "accidentType": "상해",
@@ -12178,6 +12675,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.2566,
+      "_id": "jd71h67hstmnj2a1m1vg9ctvah8f8qe6",
       "accidentDate": "",
       "accidentNumber": "2604A72463",
       "accidentType": "상해",
@@ -12234,6 +12733,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.2563,
+      "_id": "jd7ea5mpj0terz8e4fvfr2rfts8f9xps",
       "accidentDate": "",
       "accidentNumber": "2604956148",
       "accidentType": "상해",
@@ -12290,6 +12791,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583271203.256,
+      "_id": "jd705fxajz0drj1e3neeakwrfs8f9z3h",
       "accidentDate": "",
       "accidentNumber": "2604956148",
       "accidentType": "상해",
@@ -12346,6 +12849,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.3145,
+      "_id": "jd77d5fa6vyatzzpxs6b8hevj98f83pf",
       "accidentDate": "",
       "accidentNumber": "2604955772",
       "accidentType": "상해",
@@ -12402,6 +12907,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.3142,
+      "_id": "jd799bzjj0byzwf7pmcjqncvnd8f9q7p",
       "accidentDate": "",
       "accidentNumber": "2604955772",
       "accidentType": "상해",
@@ -12458,6 +12965,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.314,
+      "_id": "jd71sc1n9z68vb5rq3fq0vm2d58f94p2",
       "accidentDate": "",
       "accidentNumber": "2604955772",
       "accidentType": "상해",
@@ -12514,6 +13023,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.3137,
+      "_id": "jd7a510bs7703047zy9mghg5sx8f9te1",
       "accidentDate": "",
       "accidentNumber": "2604925911",
       "accidentType": "상해",
@@ -12570,6 +13081,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.3135,
+      "_id": "jd78e9evaztfrj06jh8vg14pfn8f9xbc",
       "accidentDate": "",
       "accidentNumber": "2604969062",
       "accidentType": "상해",
@@ -12626,6 +13139,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.3132,
+      "_id": "jd76t19q8xkbdf2gg85ssg6eqn8f9ce6",
       "accidentDate": "",
       "accidentNumber": "2604851116",
       "accidentType": "상해",
@@ -12682,6 +13197,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.313,
+      "_id": "jd7aknsk2m2p9eh7952fn59jj58f85nb",
       "accidentDate": "",
       "accidentNumber": "2604832649",
       "accidentType": "상해",
@@ -12738,6 +13255,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.3127,
+      "_id": "jd7crqbdnzt8tjc6derw7qf5z58f8n64",
       "accidentDate": "",
       "accidentNumber": "2604779589",
       "accidentType": "상해",
@@ -12794,6 +13313,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.3125,
+      "_id": "jd7e3z9e4q1nc5gkvfwt7tqfpx8f97x9",
       "accidentDate": "",
       "accidentNumber": "2604714970",
       "accidentType": "상해",
@@ -12850,6 +13371,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.3123,
+      "_id": "jd733wx3sgh9xdz9sx51zxycgn8f961e",
       "accidentDate": "",
       "accidentNumber": "2604714799",
       "accidentType": "상해",
@@ -12906,6 +13429,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.312,
+      "_id": "jd7a4aps6wfp4zqhckjm1qrrfs8f9vvy",
       "accidentDate": "",
       "accidentNumber": "2604671558",
       "accidentType": "질병",
@@ -12962,6 +13487,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.3118,
+      "_id": "jd71qfznnk2asmqmszh1qyqrq58f8kdc",
       "accidentDate": "",
       "accidentNumber": "2604671400",
       "accidentType": "질병",
@@ -13018,6 +13545,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.3115,
+      "_id": "jd74v6859j227p053p148za10d8f916v",
       "accidentDate": "",
       "accidentNumber": "2605075553\r\n2604544391",
       "accidentType": "질병",
@@ -13074,6 +13603,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.3113,
+      "_id": "jd7c7scgb4aq26rwzqsa5yg1xh8f9tzn",
       "accidentDate": "",
       "accidentNumber": "2604478964",
       "accidentType": "질병",
@@ -13130,6 +13661,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.311,
+      "_id": "jd7cs4ekge2ebxnsj57kx8myxn8f8est",
       "accidentDate": "",
       "accidentNumber": "2604401986",
       "accidentType": "질병",
@@ -13186,6 +13719,8 @@
       "unconfirmedClaimCount": 2
     },
     {
+      "_creationTime": 1790583270897.3108,
+      "_id": "jd7bschb6zqq6vmm0agyw4h9n58f9kgm",
       "accidentDate": "",
       "accidentNumber": "2604401986",
       "accidentType": "질병",
@@ -13242,6 +13777,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583270897.3105,
+      "_id": "jd7ctkks1er8q90266sm5me6ah8f9dkw",
       "accidentDate": "",
       "accidentNumber": "2604403048",
       "accidentType": "질병",
@@ -13298,6 +13835,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.3103,
+      "_id": "jd74hhyq0wjh66x0v2a58jby358f998d",
       "accidentDate": "",
       "accidentNumber": "2604402850",
       "accidentType": "질병",
@@ -13356,6 +13895,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.31,
+      "_id": "jd7fxmfmcytjpe3dsy7jrfht5h8f80hf",
       "accidentDate": "",
       "accidentNumber": "2604303152",
       "accidentType": "질병",
@@ -13412,6 +13953,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270897.3098,
+      "_id": "jd76gqgkz1ack5nmfyjz6m3e898f8x5t",
       "accidentDate": "",
       "accidentNumber": "2604302680",
       "accidentType": "질병",
@@ -13800,6 +14343,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583270593.5337,
+      "_id": "jd7d9azr5fswgzv4cf8ad14y218f8w3t",
       "accidentDate": "",
       "accidentNumber": "2604302680",
       "accidentType": "질병",
@@ -13856,6 +14401,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5334,
+      "_id": "jd78fctzb4nmq7sdjt1tbfx74x8f995k",
       "accidentDate": "",
       "accidentNumber": "2604302680",
       "accidentType": "질병",
@@ -13912,6 +14459,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5332,
+      "_id": "jd7408bc1d40ztd51qhewg21gs8f9hka",
       "accidentDate": "",
       "accidentNumber": "2604302680",
       "accidentType": "질병",
@@ -13968,6 +14517,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.533,
+      "_id": "jd7f9swaamhw05gyxsc22dwmg98f9agk",
       "accidentDate": "",
       "accidentNumber": "2604302680",
       "accidentType": "질병",
@@ -14024,6 +14575,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5327,
+      "_id": "jd71e4qpjcphbkx1yxwr8bbxb18f8zsz",
       "accidentDate": "",
       "accidentNumber": "2604302680",
       "accidentType": "질병",
@@ -14080,6 +14633,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5325,
+      "_id": "jd7egjajq8k7jacqyzkqfh48r18f88nr",
       "accidentDate": "",
       "accidentNumber": "2604302425",
       "accidentType": "질병",
@@ -14136,6 +14691,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5322,
+      "_id": "jd71nnrgbdp2m8srk64k3f80ex8f9ye7",
       "accidentDate": "",
       "accidentNumber": "2604192460",
       "accidentType": "질병",
@@ -14192,6 +14749,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.532,
+      "_id": "jd72qa07m6cmvny2r245x6xny58f81kw",
       "accidentDate": "",
       "accidentNumber": "2604192301",
       "accidentType": "질병",
@@ -14248,6 +14807,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5317,
+      "_id": "jd77628ypdbxphgv6b3j5t1ww18f894v",
       "accidentDate": "",
       "accidentNumber": "2604048314",
       "accidentType": "질병",
@@ -14304,6 +14865,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5315,
+      "_id": "jd70fnf87cgz5z9ybw30s5dj918f8wn7",
       "accidentDate": "",
       "accidentNumber": "2604048314",
       "accidentType": "질병",
@@ -14360,6 +14923,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5312,
+      "_id": "jd7ambct902k5jjmaz7wrvsnes8f8fsk",
       "accidentDate": "",
       "accidentNumber": "2604048314",
       "accidentType": "질병",
@@ -14416,6 +14981,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.531,
+      "_id": "jd7cqxz5vahpjwwspjawhn2ben8f8rzh",
       "accidentDate": "",
       "accidentNumber": "2604048314",
       "accidentType": "질병",
@@ -14472,6 +15039,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5308,
+      "_id": "jd71nyb4jhny464dycg9paeabd8f87ga",
       "accidentDate": "",
       "accidentNumber": "2021.06.15",
       "accidentType": "질병",
@@ -14528,6 +15097,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5305,
+      "_id": "jd7cjnq66v3verrgqa8kkv8y9n8f8be0",
       "accidentDate": "",
       "accidentNumber": "2604146669",
       "accidentType": "상해",
@@ -14584,6 +15155,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5303,
+      "_id": "jd729tekrh46wgaymxn3ynzc8h8f9x9p",
       "accidentDate": "",
       "accidentNumber": "2412566361",
       "accidentType": "상해",
@@ -14640,6 +15213,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.53,
+      "_id": "jd74wy8dcscefm1s8x8v4zxtrn8f9vve",
       "accidentDate": "",
       "accidentNumber": "2412566361",
       "accidentType": "상해",
@@ -14696,6 +15271,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5298,
+      "_id": "jd73y9m4h76qy9qcxnj88dzqdh8f8s5q",
       "accidentDate": "",
       "accidentNumber": "2412566361",
       "accidentType": "상해",
@@ -14752,6 +15329,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5295,
+      "_id": "jd7898yk2pr4vdn4d2am73jy1n8f9h1s",
       "accidentDate": "",
       "accidentNumber": "2412566361",
       "accidentType": "상해",
@@ -14808,6 +15387,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.5293,
+      "_id": "jd7bbc3z8jceh4q6949xavhsax8f8x6t",
       "accidentDate": "",
       "accidentNumber": "2604146392",
       "accidentType": "상해",
@@ -14864,6 +15445,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270593.529,
+      "_id": "jd7d1m09tq5zw9d97q4vt27dg98f8x4z",
       "accidentDate": "",
       "accidentNumber": "2604146392",
       "accidentType": "상해",
@@ -14920,6 +15503,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3826,
+      "_id": "jd7dg151g5batqfztrs9c12eas8f9j0z",
       "accidentDate": "",
       "accidentNumber": "2604034845",
       "accidentType": "질병",
@@ -14976,6 +15561,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3823,
+      "_id": "jd7acwa5crfw883wtd63mkd3h98f8e9t",
       "accidentDate": "",
       "accidentNumber": "2604035637",
       "accidentType": "상해",
@@ -15032,6 +15619,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.382,
+      "_id": "jd74vx08rs8g9fd2xfnt4es6758f9yns",
       "accidentDate": "",
       "accidentNumber": "2603B40482",
       "accidentType": "상해",
@@ -15088,6 +15677,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3818,
+      "_id": "jd7bnmshqdjg9vv79p8rdyway58f8dw4",
       "accidentDate": "",
       "accidentNumber": "2603B31804",
       "accidentType": "상해",
@@ -15144,6 +15735,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3816,
+      "_id": "jd7cc1ak109cqzffeb6vy373nh8f9b80",
       "accidentDate": "",
       "accidentNumber": "2603B16919",
       "accidentType": "상해",
@@ -15200,6 +15793,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3813,
+      "_id": "jd7ff6kvn01mn20z15ab4eawkd8f8357",
       "accidentDate": "",
       "accidentNumber": "2603A21448",
       "accidentType": "상해",
@@ -15256,6 +15851,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.381,
+      "_id": "jd77vm8map9t1fhz2dnz3fvbr58f8spc",
       "accidentDate": "",
       "accidentNumber": "2603A21448",
       "accidentType": "상해",
@@ -15312,6 +15909,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3809,
+      "_id": "jd79aecgsg9me2ben4njqwe5kh8f8w9r",
       "accidentDate": "",
       "accidentNumber": "2603A21448",
       "accidentType": "상해",
@@ -15368,6 +15967,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3806,
+      "_id": "jd77dxbe889dgw1rtq2vvc1x958f8qv1",
       "accidentDate": "",
       "accidentNumber": "2603A21448",
       "accidentType": "상해",
@@ -15424,6 +16025,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3804,
+      "_id": "jd73n490k1q7qezc6mvsrkpr8x8f9ba6",
       "accidentDate": "",
       "accidentNumber": "2603A21448",
       "accidentType": "상해",
@@ -15480,6 +16083,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3801,
+      "_id": "jd7frf4hjebx15fawwdb9z199n8f93ke",
       "accidentDate": "",
       "accidentNumber": "2603A21448",
       "accidentType": "상해",
@@ -15536,6 +16141,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.38,
+      "_id": "jd77hc7rszcphazdpzhxkgsvx98f8j0y",
       "accidentDate": "",
       "accidentNumber": "2603794472",
       "accidentType": "질병",
@@ -15592,6 +16199,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3796,
+      "_id": "jd7334tknt2n6dge1vwrbpxnhs8f9c5e",
       "accidentDate": "",
       "accidentNumber": "2603935010",
       "accidentType": "상해",
@@ -15648,6 +16257,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3794,
+      "_id": "jd7495j6bp6fkq15v2sna9pyws8f9wk2",
       "accidentDate": "",
       "accidentNumber": "2601610431",
       "accidentType": "질병",
@@ -15704,6 +16315,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3792,
+      "_id": "jd735yzamcsfgw728n9xr1bxw58f8cmq",
       "accidentDate": "",
       "accidentNumber": "2603936388",
       "accidentType": "상해",
@@ -15760,6 +16373,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.379,
+      "_id": "jd750vfds8h8hqjsf9mawge6vx8f9w56",
       "accidentDate": "",
       "accidentNumber": "2603937295",
       "accidentType": "상해",
@@ -15816,6 +16431,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3787,
+      "_id": "jd7bd63ydxvejbhjcs6dz33a7x8f9scz",
       "accidentDate": "",
       "accidentNumber": "2603840765",
       "accidentType": "상해",
@@ -15872,6 +16489,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3784,
+      "_id": "jd7bpjaw88md9wrbtshcg01add8f8nj5",
       "accidentDate": "",
       "accidentNumber": "2603840487",
       "accidentType": "상해",
@@ -15928,6 +16547,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.3782,
+      "_id": "jd7cxes13x8n99gac3n93b4rjd8f9xed",
       "accidentDate": "",
       "accidentNumber": "2603840487",
       "accidentType": "상해",
@@ -15984,6 +16605,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583270291.378,
+      "_id": "jd7aktkmeq3610ykfy1m22zs6x8f96vb",
       "accidentDate": "",
       "accidentNumber": "2603642834",
       "accidentType": "상해",
@@ -16040,6 +16663,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6248,
+      "_id": "jd75tffebw8pqt1wqr3t2bjfes8f81ae",
       "accidentDate": "",
       "accidentNumber": "2603508567",
       "accidentType": "상해",
@@ -16096,6 +16721,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6245,
+      "_id": "jd700av1z63z318mbz6xpc37hx8f9t0k",
       "accidentDate": "",
       "accidentNumber": "2603508567",
       "accidentType": "상해",
@@ -16152,6 +16779,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6243,
+      "_id": "jd7brm4jxz49y5ezb0t79sdfb58f9yn9",
       "accidentDate": "",
       "accidentNumber": "2603370234",
       "accidentType": "질병",
@@ -16208,6 +16837,8 @@
       "unconfirmedClaimCount": 4
     },
     {
+      "_creationTime": 1790583269992.624,
+      "_id": "jd736xvt63gv91xkjpw4x9cktx8f9wp4",
       "accidentDate": "",
       "accidentNumber": "2603370234",
       "accidentType": "질병",
@@ -16264,6 +16895,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6238,
+      "_id": "jd7b3nzk6qd3epwnrk8pk3xfcx8f8y95",
       "accidentDate": "",
       "accidentNumber": "2603370234",
       "accidentType": "질병",
@@ -16320,6 +16953,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6235,
+      "_id": "jd7fybe6vwnvefhy73g08htax98f9twe",
       "accidentDate": "",
       "accidentNumber": "2603224746",
       "accidentType": "질병",
@@ -16376,6 +17011,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6233,
+      "_id": "jd741mmg15dvmktjr7e4br6trx8f9tdw",
       "accidentDate": "",
       "accidentNumber": "2606033391",
       "accidentType": "질병",
@@ -16432,6 +17069,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.623,
+      "_id": "jd74d47dzyhhv7gmz6j34zgvvs8f97w0",
       "accidentDate": "",
       "accidentNumber": "2606033391",
       "accidentType": "질병",
@@ -16488,6 +17127,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6228,
+      "_id": "jd78a4we70ttchyd7phfmsygj18f84pz",
       "accidentDate": "",
       "accidentNumber": "2606033391",
       "accidentType": "질병",
@@ -16544,6 +17185,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6226,
+      "_id": "jd7aptyhwayt89q7nxmr96p9ed8f9kk6",
       "accidentDate": "",
       "accidentNumber": "2606033391",
       "accidentType": "질병",
@@ -16600,6 +17243,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6223,
+      "_id": "jd784m8qvp1pf5rap702h13z7h8f8ksz",
       "accidentDate": "",
       "accidentNumber": "2606033391",
       "accidentType": "질병",
@@ -16656,6 +17301,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.622,
+      "_id": "jd75astn0207vx15r5yzm9b77n8f8kd6",
       "accidentDate": "",
       "accidentNumber": "2606033391",
       "accidentType": "질병",
@@ -16712,6 +17359,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6218,
+      "_id": "jd769w1hksdz83797pr50phz918f9ank",
       "accidentDate": "",
       "accidentNumber": "2606033391",
       "accidentType": "질병",
@@ -16768,6 +17417,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6216,
+      "_id": "jd7faznydrp0t5chmbra2g49318f9dv0",
       "accidentDate": "",
       "accidentNumber": "2606033391",
       "accidentType": "질병",
@@ -16824,6 +17475,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6213,
+      "_id": "jd722se3q57xeayt99fc7mbrfh8f90j8",
       "accidentDate": "",
       "accidentNumber": "2603142073",
       "accidentType": "상해",
@@ -16880,6 +17533,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.621,
+      "_id": "jd7fjrb64y4xsny9dhb7xn234s8f93md",
       "accidentDate": "",
       "accidentNumber": "2603224746",
       "accidentType": "질병",
@@ -16936,6 +17591,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6208,
+      "_id": "jd7ckjwnp4a9ysf4bb4rbjxvk58f9gm6",
       "accidentDate": "",
       "accidentNumber": "2603142073",
       "accidentType": "상해",
@@ -16992,6 +17649,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6206,
+      "_id": "jd7cma98zff0mntyzxdjqvpqbh8f8zh5",
       "accidentDate": "",
       "accidentNumber": "2603142073",
       "accidentType": "상해",
@@ -17048,6 +17707,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.6204,
+      "_id": "jd7273ftqcft47jsmn9gfebvrh8f9ees",
       "accidentDate": "",
       "accidentNumber": "2603142073",
       "accidentType": "상해",
@@ -17104,6 +17765,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269992.62,
+      "_id": "jd7549w51s1dek5zs0szpp93rx8f93n6",
       "accidentDate": "",
       "accidentNumber": "2603142073",
       "accidentType": "상해",
@@ -17160,6 +17823,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.5479,
+      "_id": "jd7182kgtrtdreg045mfspfs7x8f8tdt",
       "accidentDate": "",
       "accidentNumber": "2603142073",
       "accidentType": "상해",
@@ -17216,6 +17881,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.5476,
+      "_id": "jd7917nzwrry3nxydfp1d4wps58f9zk7",
       "accidentDate": "",
       "accidentNumber": "2603142073",
       "accidentType": "상해",
@@ -17272,6 +17939,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.5474,
+      "_id": "jd72394djm383thnv687jv37y18f8nzn",
       "accidentDate": "",
       "accidentNumber": "2603142073",
       "accidentType": "상해",
@@ -17328,6 +17997,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.547,
+      "_id": "jd77z304cnne5bbyxqdyfq3qj98f9910",
       "accidentDate": "",
       "accidentNumber": "2602874418",
       "accidentType": "질병",
@@ -17384,6 +18055,8 @@
       "unconfirmedClaimCount": 1
     },
     {
+      "_creationTime": 1790583269730.5469,
+      "_id": "jd787v01372st6gdbwmp6kd48s8f8p9f",
       "accidentDate": "",
       "accidentNumber": "2602691264",
       "accidentType": "질병",
@@ -17440,6 +18113,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.5466,
+      "_id": "jd72j4p4axjjb635hf4zkx9gv58f8kba",
       "accidentDate": "",
       "accidentNumber": "2512947460",
       "accidentType": "상해",
@@ -17496,6 +18171,8 @@
       "unconfirmedClaimCount": 7
     },
     {
+      "_creationTime": 1790583269730.5464,
+      "_id": "jd71d8y14zbx7342egy9dpe5xd8f8kcq",
       "accidentDate": "",
       "accidentNumber": "2511845962",
       "accidentType": "질병",
@@ -17552,6 +18229,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.5461,
+      "_id": "jd784by18c5xjcdxr535zk7g3h8f9tmg",
       "accidentDate": "",
       "accidentNumber": "2511844861",
       "accidentType": "질병",
@@ -17608,6 +18287,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.546,
+      "_id": "jd7cbywmne1z1mrz2anfdt3jth8f8tbk",
       "accidentDate": "",
       "accidentNumber": "2509387828",
       "accidentType": "질병",
@@ -17664,6 +18345,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.5457,
+      "_id": "jd70yx0jd2882607g0kz0hzvyh8f87ve",
       "accidentDate": "",
       "accidentNumber": "2603869925",
       "accidentType": "질병",
@@ -17721,6 +18404,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.5454,
+      "_id": "jd76ptb49kb2zvw3va4m4rvg718f9m5k",
       "accidentDate": "",
       "accidentNumber": "2603869925",
       "accidentType": "질병",
@@ -17777,6 +18462,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.5452,
+      "_id": "jd74wt22dvvw3zfyhejt7nk5qx8f82wx",
       "accidentDate": "",
       "accidentNumber": "2601B77874",
       "accidentType": "상해",
@@ -17833,6 +18520,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.545,
+      "_id": "jd77dxqg57atb5hwjdpmja6g018f8dvk",
       "accidentDate": "",
       "accidentNumber": "2601B77640",
       "accidentType": "상해",
@@ -17889,6 +18578,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.5447,
+      "_id": "jd7bw7jr1x4by6vnpvd8raj0jd8f8646",
       "accidentDate": "",
       "accidentNumber": "2601965806",
       "accidentType": "질병",
@@ -17945,6 +18636,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790730038186.3318,
+      "_id": "jd7ecf320t605vjbt9nqnrgw1d8fce4h",
       "accidentDate": "",
       "accidentNumber": "2601723805",
       "accidentType": "상해",
@@ -18002,6 +18695,8 @@
       "updatedAt": "2026-09-29T23:48:42.519Z"
     },
     {
+      "_creationTime": 1790583269730.5442,
+      "_id": "jd72z27cvatd18466m4rzqvzwh8f8pwm",
       "accidentDate": "",
       "accidentNumber": "2601723805",
       "accidentType": "상해",
@@ -18022,7 +18717,8 @@
       "caregiverPhone": "",
       "claimCategory": "정상",
       "claimClassification": "정상",
-      "claimCount": 1,
+      "claimCount": 2,
+      "claimSetEnabledForCompleted": true,
       "claimUnitPrice": 144000,
       "contractEndDate": "",
       "contractStartDate": "2025.10.17",
@@ -18033,12 +18729,13 @@
       "depositConfirmedAmount": 0,
       "desiredStartDate": "",
       "diagnosis": "",
-      "estimatedUnpaid": 5472000,
+      "estimatedUnpaid": 6912000,
       "expectedDays": "20일",
       "expectedEndDate": "",
       "gender": "남",
       "hasDiseaseCare": "Y",
       "hasInjuryCare": "Y",
+      "hasManualUpdate": true,
       "hospitalName": "구룡령로 1103-29",
       "id": "C0005",
       "importedAt": "2026-09-28T08:14:19.950Z",
@@ -18051,44 +18748,44 @@
       "policyNumber": "L02525539304",
       "productCode": "",
       "productName": "",
+      "settlementStepMemos": {
+        "1": {
+          "claim": [
+            {
+              "author": "운영센터",
+              "dateStr": "2026.07.15",
+              "id": "legacy_claim_1",
+              "text": "8월 25일 곽주호손해사정인 통화-> 입금 못했다고 인정, 확인 후 입금하겠다고 함",
+              "timestamp": "2026-09-29T05:11:50.552Z"
+            }
+          ],
+          "deposit": [],
+          "payout": []
+        },
+        "2": {
+          "claim": [
+            {
+              "author": "운영센터",
+              "dateStr": "2026.07.15",
+              "id": "legacy_claim_2",
+              "text": "8월 25일 곽주호손해사정인 통화-> 입금 못했다고 인정, 확인 후 입금하겠다고 함",
+              "timestamp": "2026-09-29T05:11:50.552Z"
+            }
+          ],
+          "deposit": [],
+          "payout": []
+        }
+      },
       "sido": "강원특별자치도",
       "sigungu": "양양군",
       "status": "완료",
       "totalPayout": 0,
-      "unconfirmedClaimCount": 1,
-      "hasManualUpdate": true,
-      "customSettlementSets": [
-        {
-          "setIndex": 1,
-          "claimRound": "7월 2차",
-          "payoutRound": "7월 2차",
-          "claimStandardDate": "2026.07.20",
-          "payoutStandardDate": "2026.07.20",
-          "claimDate": "2026.07.15",
-          "payoutDate": "",
-          "startDateStr": "2026.03.13",
-          "endDateStr": "2026.04.20",
-          "days": 38,
-          "claimDays": 38,
-          "payoutDays": 38,
-          "dailyClaimPrice": 144000,
-          "claimAmount": 5472000,
-          "claimStatus": "청구완료",
-          "depositAmount": 0,
-          "depositDate": "",
-          "depositStatus": "미입금",
-          "cgDailyWage": 140000,
-          "payoutAmount": 0,
-          "payoutStatus": "지급완료",
-          "claimId": "Q0002",
-          "payoutId": "",
-          "caregiverName": "",
-          "memo": "8월 25일 곽주호손해사정인 통화 -> 입금 못했다고 인정, 확인 후 입금하겠다고 함"
-        }
-      ],
-      "updatedAt": "2026-09-29T23:48:21.550Z"
+      "unconfirmedClaimCount": 2,
+      "updatedAt": "2026-09-29T05:12:32.196Z"
     },
     {
+      "_creationTime": 1790583269730.544,
+      "_id": "jd716as4dqdq6ew6zs758d9snn8f9fm5",
       "accidentDate": "",
       "accidentNumber": "2601359403",
       "accidentType": "상해",
@@ -18145,6 +18842,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.5437,
+      "_id": "jd7bqpg2tf1518tdpa1353m8r58f9kkf",
       "accidentDate": "",
       "accidentNumber": "",
       "accidentType": "상해",
@@ -18201,6 +18900,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.5435,
+      "_id": "jd751gr2erjdq1ad12e1d7pw2h8f9jb9",
       "accidentDate": "",
       "accidentNumber": "2512948000",
       "accidentType": "상해",
@@ -18257,6 +18958,8 @@
       "unconfirmedClaimCount": 0
     },
     {
+      "_creationTime": 1790583269730.5432,
+      "_id": "jd7d8gwcjk026t34tk810vcj758f9xta",
       "accidentDate": "",
       "accidentNumber": "2511201552",
       "accidentType": "질병",
@@ -33524,6 +34227,25 @@
       "standardDate": "2026.09.29",
       "unitPrice": 144000,
       "unpaidAmount": 1296000
+    },
+    {
+      "id": "Q0127.10",
+      "applyId": "C0127",
+      "patientName": "이재철",
+      "insuranceCompany": "현대해상",
+      "round": "9월 3차",
+      "claimDate": "2026.09.23 18:00",
+      "faxSentDate": "2026.09.23 18:00",
+      "faxStatus": "전송완료",
+      "status": "청구완료",
+      "claimAmount": 1440000,
+      "unpaidAmount": 1440000,
+      "depositAmount": 0,
+      "depositStatus": "미입금",
+      "adjusterName": "최보배",
+      "adjusterPhone": "022-181-2520",
+      "memo": "10차 팩스 청구완료 (2026.09.23 18:00)",
+      "isRealLaunchData": true
     }
   ],
   "payouts": [

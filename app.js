@@ -1408,11 +1408,15 @@ function sortApplicationsNewestFirst(apps) {
   };
 
   return [...apps].sort((a, b) => {
-    // 1. 방금 등록된 고객(_isJustRegistered)은 무조건 맨 처음(최상단)
-    if (a && a._isJustRegistered && !(b && b._isJustRegistered)) return -1;
-    if (!(a && a._isJustRegistered) && b && b._isJustRegistered) return 1;
+    // 1. 방금/신규 등록된 고객(_isJustRegistered 또는 D접두사 고객)은 무조건 맨 처음(최상단)
+    const isRecentA = (a && (a._isJustRegistered || (a.id && String(a.id).startsWith('D')))) ? 1 : 0;
+    const isRecentB = (b && (b._isJustRegistered || (b.id && String(b.id).startsWith('D')))) ? 1 : 0;
+    if (isRecentA !== isRecentB) return isRecentB - isRecentA;
+    if (isRecentA === 1 && isRecentB === 1) {
+      return compareAppIds(a.id, b.id, true);
+    }
 
-    // 2. [사용자 요구사항]: 수정건 맨 앞순위 (미확인 수정/민원 발생건 최상단 노출)
+    // 2. [사용자 요구사항]: 수정건 맨 앞순위 (기존 고객 중 미확인 수정/민원 발생건 최상단 노출)
     const modA = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(a) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a) ? 1 : 0);
     const modB = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(b) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(b) ? 1 : 0);
     if (modA !== modB) return modB - modA;
@@ -1437,21 +1441,25 @@ window.sortApplicationsNewestFirst = sortApplicationsNewestFirst;
 async function loadConvexData(showSpinner = true) {
   // 🚨 [보안] 미인증 세션에서는 고객 및 정산 데이터를 서버에서 절대 요청하지 않음
   let token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
-  if (!token && gCurrentAdmin) {
-    token = 'dev_session_' + Date.now();
-    try {
-      localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
-      sessionStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
-    } catch (e) {}
+  if (!token) {
+    if (gCurrentAdmin || (typeof isDevScreen === 'function' && isDevScreen())) {
+      token = 'dev_session_' + Date.now();
+      try {
+        localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
+        sessionStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
+      } catch (e) {}
+    }
   }
   if (!token && !gCurrentAdmin) {
-    if (typeof isUserOnLoginScreen === 'function' && !isUserOnLoginScreen()) {
+    if ((typeof isDevScreen === 'function' && isDevScreen()) || (typeof isUserOnLoginScreen === 'function' && !isUserOnLoginScreen())) {
       token = 'dev_session_' + Date.now();
       try {
         localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
       } catch (e) {}
     } else {
-      console.warn('[Security Guard] 미인증 세션에서는 고객 및 정산 데이터를 로드할 수 없습니다.');
+      console.warn('[Security Guard] 세션 토큰 없음: 로컬 데이터 우선 로드');
+      const fallbackJson = await fetchLocalRealData();
+      if (fallbackJson) applyRealJson(fallbackJson);
       return;
     }
   }
@@ -1510,13 +1518,24 @@ async function loadConvexData(showSpinner = true) {
 
     if (Array.isArray(realJson.applications) && realJson.applications.length > 0) {
       const serverRealApps = filterInvalidSamsungDuplicates(realJson.applications).filter(a => a && a.isRealLaunchData && !deletedAppIdSet.has(String(a.id)));
-        const existingNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
-          if (!localApp || !localApp.id) return false;
-          if (deletedAppIdSet.has(String(localApp.id))) return false;
-          return !serverRealApps.some(s => String(s.id) === String(localApp.id));
-        });
-        gApps = sortApplicationsNewestFirst([...existingNewApps, ...serverRealApps]);
-        try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+      const existingNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
+        if (!localApp || !localApp.id) return false;
+        if (deletedAppIdSet.has(String(localApp.id))) return false;
+        return !serverRealApps.some(s => String(s.id) === String(localApp.id));
+      });
+      let recentRegIdSet = new Set();
+      try {
+        const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
+        recentRegIdSet = new Set((rList || []).map(String));
+      } catch (e) {}
+      const merged = [...existingNewApps, ...serverRealApps];
+      merged.forEach(a => {
+        if (a && a.id && (recentRegIdSet.has(String(a.id)) || String(a.id).startsWith('D'))) {
+          a._isJustRegistered = true;
+        }
+      });
+      gApps = sortApplicationsNewestFirst(merged);
+      try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
     }
     if (Array.isArray(realJson.assignments) && realJson.assignments.length > 0) {
       gAssigns = realJson.assignments.filter(a => a && a.isRealLaunchData && !deletedAppIdSet.has(String(a.applyId)));
@@ -1562,12 +1581,13 @@ async function loadConvexData(showSpinner = true) {
   try {
     const res = await queryConvex('sync:bundleAll', { sessionToken: token || '' });
     if (res && res.status === 'success' && res.value) {
-      if (res.value.status === 'unauthorized') {
-        console.warn('[Security Guard] bundleAll 미인증 응답: 공개 applications:list 및 최신 로컬 원본으로 보정합니다.');
+      if (res.value.status === 'unauthorized' || !Array.isArray(res.value.applications) || res.value.applications.length === 0) {
+        console.warn('[Security Guard] bundleAll 미인증 또는 빈 응답: 공개 applications:list 및 최신 로컬 원본으로 보정합니다.');
         let directApps = null;
         try {
           const cvxList = await queryConvex('applications:list', {});
-          if (Array.isArray(cvxList) && cvxList.length > 0) directApps = cvxList;
+          const appList = (cvxList && cvxList.value && Array.isArray(cvxList.value)) ? cvxList.value : (Array.isArray(cvxList) ? cvxList : null);
+          if (appList && appList.length > 0) directApps = appList;
         } catch (e) {}
         if (directApps) {
           res.value.applications = directApps;
@@ -1613,7 +1633,22 @@ async function loadConvexData(showSpinner = true) {
         }
 
         const filteredValidApps = validApps.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
-        gApps = sortApplicationsNewestFirst([...localOnlyNewApps, ...filteredValidApps]);
+
+        // 최근 등록 ID 및 D계열 신규 접수 고객 식별 플래그 복원
+        let recentRegIdSet = new Set();
+        try {
+          const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
+          recentRegIdSet = new Set((rList || []).map(String));
+        } catch (e) {}
+
+        const mergedApps = [...localOnlyNewApps, ...filteredValidApps];
+        mergedApps.forEach(a => {
+          if (a && a.id && (recentRegIdSet.has(String(a.id)) || String(a.id).startsWith('D'))) {
+            a._isJustRegistered = true;
+          }
+        });
+
+        gApps = sortApplicationsNewestFirst(mergedApps);
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
         (gApps || []).forEach(a => {
           if ((Number(a.estimatedUnpaid) || 0) <= 0 && a.unconfirmedClaimCount > 0) {
@@ -2288,8 +2323,9 @@ async function syncConfirmedAlertsWithServer() {
     try {
       if (typeof queryConvex === 'function') {
         const cvxRes = await queryConvex('sync:getSystemSettings', {});
-        if (Array.isArray(cvxRes)) {
-          const setting = cvxRes.find(s => s && s.key === 'LIVON_CONFIRMED_ALERTS');
+        const sList = (cvxRes && cvxRes.value && Array.isArray(cvxRes.value)) ? cvxRes.value : (Array.isArray(cvxRes) ? cvxRes : []);
+        if (Array.isArray(sList) && sList.length > 0) {
+          const setting = sList.find(s => s && s.key === 'LIVON_CONFIRMED_ALERTS');
           if (setting && setting.value) {
             const v = setting.value;
             if (Array.isArray(v.confirmedAlertAppIds)) {
@@ -11002,10 +11038,11 @@ async function loadSamsungSentCareLogsFromConvex() {
   try {
     if (typeof queryConvex === 'function') {
       const records = await queryConvex('sync:getSamsungSentCareLogs', {});
-      if (Array.isArray(records) && records.length > 0) {
+      const recList = (records && records.value && Array.isArray(records.value)) ? records.value : (Array.isArray(records) ? records : []);
+      if (Array.isArray(recList) && recList.length > 0) {
         const existingIds = new Set(gSamsungSentCareLogsHistory.map(r => r.id));
         let added = false;
-        records.forEach(r => {
+        recList.forEach(r => {
           if (!existingIds.has(r.id)) {
             gSamsungSentCareLogsHistory.push(r);
             existingIds.add(r.id);
@@ -23894,16 +23931,16 @@ async function saveActiveHubCustomerDetail(silent = false) {
   if (btnMobile) btnMobile.innerText = '저장 완료 ✅';
   if (btnFooter) btnFooter.innerText = '저장 완료 ✅';
   setTimeout(() => {
-    if (btnDesktop) btnDesktop.innerText = '최종 저장';
-    if (btnMobile) btnMobile.innerText = '최종 저장';
-    if (btnFooter) btnFooter.innerText = '최종 저장';
+    if (btnDesktop) btnDesktop.innerText = '저장후 닫기';
+    if (btnMobile) btnMobile.innerText = '저장후 닫기';
+    if (btnFooter) btnFooter.innerText = '저장후 닫기';
   }, 2500);
 
   // 9. Toast notification
   if (!silent && typeof showNotification === 'function') {
     showNotification({
       type: 'success',
-      title: '서버 최종 저장 완료',
+      title: '서버 저장 완료',
       message: `[${maskName(app.patientName)} 님] 모든 변경사항(정산·청구 세트, 청구, 입금, 지급 내역)이 서버 및 DB에 영구 반영되었습니다.`,
       icon: 'check-circle'
     });
@@ -23931,13 +23968,27 @@ async function saveActiveHubCustomerDetail(silent = false) {
   return true;
 }
 
+// [사용자 요구사항]: '저장후 닫기' 클릭 시 확인창 없이 곧바로 서버 저장 후 팝업 즉시 닫기
+async function saveAndCloseActiveHubCustomerDetail() {
+  const btnDesktop = document.getElementById('btnSaveHubCustomerModalText');
+  const btnMobile = document.getElementById('btnSaveHubCustomerModalMobileText');
+  const btnFooter = document.getElementById('btnSaveHubCustomerModalFooterText');
+  if (btnDesktop) btnDesktop.innerText = '저장 중...';
+  if (btnMobile) btnMobile.innerText = '저장 중...';
+  if (btnFooter) btnFooter.innerText = '저장 중...';
+
+  await saveActiveHubCustomerDetail(false);
+  closeModal('hubCustomerDetailModal');
+}
+
+// [사용자 요구사항]: 저장여부 확인은 'x' 또는 '닫기' 버튼을 눌렀을 때만 물어봄
 async function confirmCloseHubCustomerDetailModal() {
   const appId = (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) ? gActiveHubModalAppId : '';
   const app = (gApps || []).find(a => String(a.id) === String(appId));
   const patientName = app ? maskName(app.patientName) : '고객';
 
   const shouldSave = await showCustomConfirm(
-    `[${patientName} 님] 상세 모달을 닫기 전 변경사항(정산·청구 세트, 청구, 입금, 지급 등)을 서버에 최종 저장하시겠습니까?\n\n* [저장 후 닫기]: 서버 및 DB에 즉시 영구 저장 후 모달을 닫습니다.\n* [저장 안하고 닫기]: 변경사항을 추가 저장하지 않고 모달만 닫습니다.`,
+    `[${patientName} 님] 상세 모달을 닫기 전 변경사항(정산·청구 세트, 청구, 입금, 지급 등)을 저장하시겠습니까?\n\n* [저장 후 닫기]: 서버 및 DB에 즉시 영구 저장 후 창을 닫습니다.\n* [저장 안하고 닫기]: 변경사항을 추가 저장하지 않고 창만 닫습니다.`,
     {
       theme: 'emerald',
       icon: 'save',
@@ -23952,7 +24003,7 @@ async function confirmCloseHubCustomerDetailModal() {
     if (typeof showNotification === 'function' && app) {
       showNotification({
         type: 'success',
-        title: '저장 후 모달 닫힘',
+        title: '저장 후 창 닫힘',
         message: `[${patientName} 님] 변경사항이 서버에 안전하게 영구 저장되었습니다.`,
         icon: 'check-circle'
       });
@@ -23963,6 +24014,7 @@ async function confirmCloseHubCustomerDetailModal() {
 }
 
 window.saveActiveHubCustomerDetail = saveActiveHubCustomerDetail;
+window.saveAndCloseActiveHubCustomerDetail = saveAndCloseActiveHubCustomerDetail;
 window.confirmCloseHubCustomerDetailModal = confirmCloseHubCustomerDetailModal;
 
 function openRoundDateEditModal(appId, roundNum) {
@@ -24508,6 +24560,293 @@ async function cancelSamsungRoundClaim(appId, roundNumber) {
     });
   }
 }
+
+// =========================================================================
+// 수동 팩스 청구완료(발송완료) 직접 등록 및 수정 모달 엔진
+// =========================================================================
+function ensureManualFaxClaimModal() {
+  if (document.getElementById('manualFaxClaimModal')) return;
+  const modalHtml = `
+    <div id="manualFaxClaimModal" class="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+      <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+        <div class="px-6 py-4 bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              <i data-lucide="send" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+              <h3 class="font-black text-sm sm:text-base flex items-center gap-1.5" id="manualFaxModalTitle">
+                보험사 팩스 청구 수동 발송완료 입력
+              </h3>
+              <p class="text-[11px] text-purple-200" id="manualFaxModalSubtitle">
+                외부 팩스기 또는 별도 발송한 청구내역을 수동으로 발송완료(청구완료) 처리합니다.
+              </p>
+            </div>
+          </div>
+          <button type="button" onclick="closeModal('manualFaxClaimModal')" class="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer" title="닫기">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleManualFaxClaimSubmit(event)" class="p-5 sm:p-6 space-y-4 text-xs">
+          <input type="hidden" id="manualFaxAppId" value="">
+          <input type="hidden" id="manualFaxRoundNumber" value="1">
+
+          <div class="p-3 bg-purple-50/80 rounded-2xl border border-purple-200 text-purple-950 space-y-1">
+            <div class="flex items-center justify-between font-bold">
+              <span id="manualFaxPatientInfo" class="text-sm font-black text-purple-900">-</span>
+              <span id="manualFaxRoundBadge" class="px-2.5 py-0.5 rounded-full bg-purple-600 text-white font-black text-[11px] shadow-2xs">-차</span>
+            </div>
+            <div class="flex items-center justify-between text-xs text-purple-800 pt-1 border-t border-purple-200/60 font-medium">
+              <span>청구 대상금액: <b id="manualFaxTargetAmount" class="font-black text-purple-950 font-mono">-</b></span>
+              <span>간병기간: <span id="manualFaxCarePeriod" class="font-mono">-</span></span>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">팩스 수신처</label>
+                <input type="text" id="manualFaxRecipientInput" placeholder="예: 현대해상 보상팀" required
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-bold text-slate-900 focus:ring-2 focus:ring-purple-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">수신 팩스번호</label>
+                <input type="text" id="manualFaxNumberInput" placeholder="예: 02-2181-2520" required
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono font-bold text-slate-900 focus:ring-2 focus:ring-purple-500">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">발송(청구) 일시</label>
+                <input type="datetime-local" id="manualFaxSentDateInput" required
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono font-bold text-slate-900 focus:ring-2 focus:ring-purple-500">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 text-[11px] mb-1">청구 금액 (원)</label>
+                <input type="text" id="manualFaxAmountInput" oninput="formatCurrencyInputElement(this)" required
+                  class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono font-black text-right text-slate-900 focus:ring-2 focus:ring-purple-500">
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 text-[11px] mb-1">발송 메모 / 특이사항</label>
+              <input type="text" id="manualFaxMemoInput" placeholder="예: 사무실 팩스기로 수동 발송완료"
+                class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 focus:ring-2 focus:ring-purple-500">
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+            <button type="button" onclick="closeModal('manualFaxClaimModal')"
+              class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-all cursor-pointer">
+              취소
+            </button>
+            <button type="submit"
+              class="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black shadow-md flex items-center gap-1.5 transition-all cursor-pointer active:scale-95">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>발송(청구)완료 등록</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function openManualFaxClaimModal(appId, roundNumber) {
+  ensureManualFaxClaimModal();
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  const appAssigns = (gAssigns || []).filter(a => a.applyId === appId);
+  const as = appAssigns.length > 0 ? appAssigns[0] : null;
+  const prog = as ? getCareProgressInfo(as) : null;
+  const appClaims = (gClaims || []).filter(c => c.applyId === appId);
+  const appPayouts = (gPayouts || []).filter(p => p.applyId === appId);
+  const schedule = calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts);
+  const r = (schedule && schedule.rounds) ? (schedule.rounds.find(x => (x.setIndex || x.roundNumber) === roundNumber) || schedule.rounds[roundNumber - 1] || schedule.rounds[0]) : null;
+
+  document.getElementById('manualFaxAppId').value = appId;
+  document.getElementById('manualFaxRoundNumber').value = roundNumber;
+  document.getElementById('manualFaxModalTitle').innerText = `[${roundNumber}차] 보험사 팩스 청구 수동 발송완료 입력`;
+  document.getElementById('manualFaxPatientInfo').innerText = `[${app.id}] ${maskName(app.patientName)} · ${app.insuranceCompany || '보험사'}`;
+  document.getElementById('manualFaxRoundBadge').innerText = `${roundNumber}차 청구`;
+  
+  const targetAmt = r ? r.fullClaimAmount : (app.claimUnitPrice || 144000) * 10;
+  document.getElementById('manualFaxTargetAmount').innerText = `${formatCurrency(targetAmt)}원`;
+  document.getElementById('manualFaxAmountInput').value = formatCurrency(targetAmt);
+
+  const startStr = r ? r.startDateStr : '';
+  const endStr = r ? r.endDateStr : '';
+  document.getElementById('manualFaxCarePeriod').innerText = (startStr && endStr) ? `${startStr.slice(0, 10)} ~ ${endStr.slice(0, 10)} (${r.days}일)` : '-';
+
+  const defaultRecipient = app.adjusterName ? `${app.adjusterName} 손사` : `${app.insuranceCompany || '현대해상'} 보상팀`;
+  document.getElementById('manualFaxRecipientInput').value = defaultRecipient;
+  const defaultNumber = app.adjusterFax || app.adjusterPhone || app.adjusterMobile || '022-181-2520';
+  document.getElementById('manualFaxNumberInput').value = defaultNumber;
+
+  const now = new Date();
+  const defSentTime = r && r.claimDate ? parseCareDateTime(r.claimDate) : now;
+  document.getElementById('manualFaxSentDateInput').value = formatDateTimeLocalInput(defSentTime || now);
+  document.getElementById('manualFaxMemoInput').value = r && r.memo ? r.memo : '수동 팩스 발송완료 등록';
+
+  openModal('manualFaxClaimModal');
+  if (typeof initIcons === 'function') initIcons(document.getElementById('manualFaxClaimModal'));
+}
+window.openManualFaxClaimModal = openManualFaxClaimModal;
+
+async function handleManualFaxClaimSubmit(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const appId = document.getElementById('manualFaxAppId')?.value;
+  const roundNumber = parseInt(document.getElementById('manualFaxRoundNumber')?.value || '1', 10);
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  const recipient = document.getElementById('manualFaxRecipientInput')?.value.trim() || `${app.insuranceCompany || '현대해상'} 보상팀`;
+  const faxNumber = document.getElementById('manualFaxNumberInput')?.value.trim() || '022-181-2520';
+  const sentDateRaw = document.getElementById('manualFaxSentDateInput')?.value;
+  const amountStr = document.getElementById('manualFaxAmountInput')?.value || '0';
+  const claimAmount = parseInt(amountStr.replace(/[^0-9]/g, ''), 10) || 0;
+  const memo = document.getElementById('manualFaxMemoInput')?.value.trim() || '수동 팩스 발송완료 등록';
+
+  const sentDateStr = sentDateRaw ? `${sentDateRaw.slice(0, 10).replace(/-/g, '.')} ${sentDateRaw.slice(11, 16)}` : getKoreaDateTimeStr(new Date());
+
+  // 1. customSettlementSets 갱신
+  app.customSettlementSets = app.customSettlementSets || [];
+  let cSet = app.customSettlementSets.find(s => Number(s.setIndex) === Number(roundNumber));
+  if (!cSet) {
+    cSet = {
+      setIndex: roundNumber,
+      claimRound: `${roundNumber}차`,
+      claimStandardDate: sentDateStr.slice(0, 10),
+      claimDate: sentDateStr,
+      claimStatus: '청구완료',
+      claimAmount: claimAmount,
+      claimDays: 10,
+      days: 10,
+      payoutStatus: '지급전',
+      payoutAmount: 0,
+      memo: memo
+    };
+    app.customSettlementSets.push(cSet);
+  } else {
+    cSet.claimStatus = '청구완료';
+    cSet.claimDate = sentDateStr;
+    if (claimAmount > 0) cSet.claimAmount = claimAmount;
+    if (memo) cSet.memo = memo;
+  }
+  app.claimCount = Math.max(app.claimCount || 0, roundNumber);
+  app.hasManualUpdate = true;
+  app.updatedAt = new Date().toISOString();
+
+  // 2. gClaims 갱신 또는 생성
+  let claim = (gClaims || []).find(c => String(c.applyId) === String(app.id) && (parseInt(String(c.round || '').replace(/[^0-9]/g, ''), 10) === roundNumber || (c.id && c.id.endsWith('.' + roundNumber))));
+  if (!claim) {
+    const claimId = `Q${String(app.id).replace('C', '')}.${roundNumber}`;
+    claim = {
+      id: claimId,
+      applyId: app.id,
+      patientName: app.patientName,
+      insuranceCompany: app.insuranceCompany || '현대해상',
+      round: `${roundNumber}차`,
+      claimDate: sentDateStr,
+      faxSentDate: sentDateStr,
+      faxStatus: '전송완료',
+      status: '청구완료',
+      claimAmount: claimAmount,
+      unpaidAmount: claimAmount,
+      depositAmount: 0,
+      depositStatus: '미입금',
+      adjusterName: app.adjusterName || recipient,
+      adjusterPhone: faxNumber,
+      memo: memo,
+      isRealLaunchData: true,
+      updatedAt: new Date().toISOString()
+    };
+    gClaims.unshift(claim);
+  } else {
+    claim.claimDate = sentDateStr;
+    claim.faxSentDate = sentDateStr;
+    claim.faxStatus = '전송완료';
+    claim.status = '청구완료';
+    if (claimAmount > 0) claim.claimAmount = claimAmount;
+    claim.updatedAt = new Date().toISOString();
+    if (memo) claim.memo = memo;
+  }
+
+  // 3. gFaxRecords 및 gFaxLogs 기록
+  if (!gFaxRecords) gFaxRecords = {};
+  gFaxRecords[app.id] = {
+    status: '전송완료',
+    sentDate: sentDateStr,
+    faxNumber: faxNumber,
+    caseType: '정산청구',
+    formType: 'HD_FORM_02'
+  };
+
+  const faxLog = {
+    id: 'FAX_MANUAL_' + Date.now(),
+    appId: app.id,
+    patientName: app.patientName,
+    caseTitle: `[수동등록] ${app.patientName} ${roundNumber}차 청구팩스`,
+    recipient: recipient,
+    faxNumber: faxNumber,
+    pages: 1,
+    status: '성공',
+    operator: '관리자(수동등록)',
+    sentDate: sentDateStr,
+    resultMsg: `수동 발송완료 등록 (${memo})`,
+    provider: '수동 직접등록',
+    roundNumber: roundNumber
+  };
+  if (!Array.isArray(gFaxLogs)) gFaxLogs = [];
+  gFaxLogs.unshift(faxLog);
+
+  // 4. 로컬 및 서버 동기화
+  try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+  try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
+  if (typeof saveFaxLogs === 'function') saveFaxLogs();
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
+    syncToConvex('sync:saveClaim', { claim: claim }).catch(console.warn);
+    syncToConvex('sync:saveFaxRecord', { record: faxLog }).catch(console.warn);
+  }
+
+  fetch('/api/hub/customer/update-fields', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      appId: app.id,
+      fields: {
+        customSettlementSets: app.customSettlementSets,
+        claimCount: app.claimCount
+      }
+    })
+  }).catch(() => {});
+
+  closeModal('manualFaxClaimModal');
+
+  // 모달 및 허브 UI 갱신
+  if (gActiveHubModalAppId) {
+    openHubCustomerDetailModal(gActiveHubModalAppId);
+  }
+  if (typeof renderUnifiedCareHub === 'function') {
+    renderUnifiedCareHub();
+  }
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: '팩스 청구완료 등록 성공',
+      message: `[${maskName(app.patientName)} 님] ${roundNumber}차 팩스 청구완료(${sentDateStr})가 정상 등록되었습니다.`,
+      icon: 'check-circle'
+    });
+  }
+}
+window.handleManualFaxClaimSubmit = handleManualFaxClaimSubmit;
 
 /**
  * [사용자 요구사항]: 고객 카드 좌측 세로 라벨 및 카드 음영 처리 테마 정의
@@ -26514,6 +26853,12 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                             <span class="font-mono text-[11px] font-bold ${isClaimDone ? 'text-slate-500' : isSending ? 'text-purple-800' : 'text-amber-800'}">
                               단가: ${formatCurrency(r.dailyClaimPrice)}원/일
                             </span>
+                            ${!isSamsung ? `
+                              <button type="button" onclick="openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                                class="p-1 rounded-lg text-slate-400 hover:text-purple-700 hover:bg-purple-100 transition-colors cursor-pointer" title="청구/팩스 발송 정보 직접 수정">
+                                <i data-lucide="edit-3" class="w-3 h-3"></i>
+                              </button>
+                            ` : ''}
                           </div>
                         </div>
 
@@ -26641,11 +26986,18 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                             <span>바로빌 청구 진행중...</span>
                           </button>
                         ` : !isClaimDone ? `
-                          <button type="button" onclick="openClaimFaxPreview('${app.id}', null, null, ${r.roundNumber})" 
-                            class="w-full py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer">
-                            <i data-lucide="send" class="w-4 h-4"></i>
-                            <span>${r.roundNumber}차 청구하기 (팩스)</span>
-                          </button>
+                          <div class="space-y-1.5">
+                            <button type="button" onclick="openClaimFaxPreview('${app.id}', null, null, ${r.roundNumber})" 
+                              class="w-full py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer">
+                              <i data-lucide="send" class="w-4 h-4"></i>
+                              <span>${r.roundNumber}차 청구하기 (팩스)</span>
+                            </button>
+                            <button type="button" onclick="openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                              class="w-full py-1.5 rounded-xl bg-white hover:bg-purple-50 text-purple-700 border border-purple-300 font-bold text-[11px] shadow-2xs flex items-center justify-center gap-1 transition-all cursor-pointer" title="외부 팩스 또는 별도로 이미 발송한 경우 팩스 발송완료 일시 직접 입력">
+                              <i data-lucide="edit-3" class="w-3.5 h-3.5 text-purple-600"></i>
+                              <span>수동 발송완료(청구완료) 입력</span>
+                            </button>
+                          </div>
                         ` : `
                           <div class="flex items-center gap-1.5">
                             ${r.existingClaim ? `
@@ -26659,8 +27011,8 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                                 <i data-lucide="send" class="w-3.5 h-3.5"></i>
                                 <span>재발송</span>
                               </button>
-                              <button type="button" onclick="openClaimEditModal('${r.existingClaim.id}')" 
-                                class="px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all cursor-pointer" title="청구서 직접 수정">
+                              <button type="button" onclick="openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                                class="px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all cursor-pointer" title="청구/발송 내역 직접 수정">
                                 <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
                               </button>
                             ` : `
@@ -26668,6 +27020,10 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                                 class="flex-1 py-1.5 rounded-xl bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 font-bold text-xs shadow-2xs flex items-center justify-center gap-1 transition-all cursor-pointer" title="팩스 재발송 및 미리보기">
                                 <i data-lucide="send" class="w-3.5 h-3.5"></i>
                                 <span>팩스 재발송</span>
+                              </button>
+                              <button type="button" onclick="openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                                class="px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all cursor-pointer" title="청구/발송 내역 직접 수정">
+                                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
                               </button>
                             `}
                           </div>
@@ -27807,6 +28163,11 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                             <button type="button" onclick="event.stopPropagation(); openRoundDateEditModal('${app.id}', ${r.roundNumber})" class="px-1.5 py-0.5 rounded bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 font-bold text-[10px] cursor-pointer" title="날짜 수정">
                               수정
                             </button>
+                            ${!isSamsung ? `
+                              <button type="button" onclick="event.stopPropagation(); openManualFaxClaimModal('${app.id}', ${r.roundNumber})" class="px-1.5 py-0.5 rounded bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 font-bold text-[10px] cursor-pointer" title="팩스 발송/청구 상태 직접 수정">
+                                ✏️ 팩스/청구
+                              </button>
+                            ` : ''}
                           </div>
                         </div>
 
@@ -27849,11 +28210,20 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                                   class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10.5px] shadow-2xs whitespace-nowrap shrink-0" title="청구서 직접 수정">
                                   수정
                                 </button>
+                                <button type="button" onclick="event.stopPropagation(); openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                                  class="px-2 py-1 rounded-lg bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 font-bold text-[10.5px] shadow-2xs whitespace-nowrap shrink-0" title="팩스/발송 정보 수정">
+                                  발송정보
+                                </button>
                                 <button type="button" onclick="event.stopPropagation(); deleteInterimClaim('${app.id}', '${r.existingClaim.id}')" 
                                   class="px-2 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-bold text-[10.5px] shadow-2xs transition-all cursor-pointer whitespace-nowrap shrink-0" title="청구 취소">
                                   원복
                                 </button>
-                              ` : ''}
+                              ` : `
+                                <button type="button" onclick="event.stopPropagation(); openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                                  class="px-2 py-1 rounded-lg bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 font-bold text-[10.5px] shadow-2xs whitespace-nowrap shrink-0" title="팩스/발송 정보 수정">
+                                  발송정보
+                                </button>
+                              `}
                             ` : `
                               ${isSamsung ? `
                                 <button type="button" onclick="event.stopPropagation(); openSamsungEmailModal('${app.id}', 'ROUND_CLAIM', ${r.roundNumber})" 
@@ -27869,6 +28239,10 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                                 <button type="button" onclick="event.stopPropagation(); openClaimFaxPreview('${app.id}', null, null, ${r.roundNumber})" 
                                   class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-[10.5px] shadow-xs inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0" title="손사 정산청구서 수신처 확인/선택 및 미리보기">
                                   <i data-lucide="send" class="w-3 h-3 shrink-0"></i> <span>청구하기(팩스)</span>
+                                </button>
+                                <button type="button" onclick="event.stopPropagation(); openManualFaxClaimModal('${app.id}', ${r.roundNumber})" 
+                                  class="px-2 py-1 rounded-lg bg-white hover:bg-purple-50 text-purple-700 border border-purple-300 font-bold text-[10.5px] shadow-2xs inline-flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shrink-0" title="외부 팩스 또는 별도로 이미 발송한 경우 팩스 발송완료 일시 직접 입력">
+                                  <i data-lucide="edit-3" class="w-3 h-3 shrink-0"></i> <span>수동완료</span>
                                 </button>
                               `}
                             `}
@@ -30417,9 +30791,8 @@ function renderUnifiedCareHub() {
     }
   }
 
-  // 1. 원수사 탭 뱃지 총 건수 산출
-  const hasAnyRealApp = (gApps || []).some(x => x.isRealLaunchData);
-  const activeHubApps = hasAnyRealApp ? (gApps || []).filter(x => x.isRealLaunchData) : (gApps || []);
+  // 1. 원수사 탭 뱃지 총 건수 산출 (실데이터 C-계열, D-계열 및 정상 등록 건 전수 포함)
+  const activeHubApps = (gApps || []).filter(x => x && x.id && (!String(x.id).startsWith('S') || x.isRealLaunchData));
 
   // [CTI 중복 노출 방지]: 동일인 다중 리스트 중 가장 최근 등록건 식별 Set 갱신
   if (typeof getLatestCustomerAppIdSet === 'function') {
@@ -30674,64 +31047,153 @@ function renderUnifiedCareHub() {
   const filtered = activeHubApps.filter(app => {
     const appIns = app.insuranceCompany || '';
     const appSt = app.status || '';
-    if (insFilter !== 'ALL' && !appIns.includes(insFilter)) return false;
 
-    // [수정발생 모아보기 토글 필터]
-    if (gHubOnlyModified) {
-      if (modifiedTotal > 0) {
-        const isMod = typeof isAppUnconfirmedModified === 'function' ? isAppUnconfirmedModified(app) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(app));
-        if (!isMod) return false;
-      } else {
-        const isMod = typeof isAppModifiedOrComplaint === 'function' ? isAppModifiedOrComplaint(app) : false;
-        if (!isMod) return false;
+    // 검색어(query)가 입력된 경우: 특정 고객 성명, ID, 간병인 등으로 직접 조회 중이므로
+    // 파이프라인 탭이나 원수사 탭 필터에 가려져 검색 결과가 누락되지 않도록 검색 매칭 우선 적용
+    if (!query) {
+      if (insFilter !== 'ALL' && !appIns.includes(insFilter)) return false;
+
+      // [수정발생 모아보기 토글 필터]
+      if (gHubOnlyModified) {
+        if (modifiedTotal > 0) {
+          const isMod = typeof isAppUnconfirmedModified === 'function' ? isAppUnconfirmedModified(app) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(app));
+          if (!isMod) return false;
+        } else {
+          const isMod = typeof isAppModifiedOrComplaint === 'function' ? isAppModifiedOrComplaint(app) : false;
+          if (!isMod) return false;
+        }
       }
-    }
 
-    // [모달 비활성화 고객 모아보기 토글 필터]
-    if (gHubOnlyDisabled) {
-      if (disabledTotal > 0) {
-        const isDisUnconf = typeof isCustomerModalDisabledUnconfirmed === 'function' ? isCustomerModalDisabledUnconfirmed(app) : (typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app));
-        if (!isDisUnconf) return false;
-      } else {
-        if (typeof isCustomerModalDisabled === 'function' && !isCustomerModalDisabled(app)) return false;
+      // [모달 비활성화 고객 모아보기 토글 필터]
+      if (gHubOnlyDisabled) {
+        if (disabledTotal > 0) {
+          const isDisUnconf = typeof isCustomerModalDisabledUnconfirmed === 'function' ? isCustomerModalDisabledUnconfirmed(app) : (typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app));
+          if (!isDisUnconf) return false;
+        } else {
+          if (typeof isCustomerModalDisabled === 'function' && !isCustomerModalDisabled(app)) return false;
+        }
       }
-    }
 
-    if (gHubFilter === 'COMPLETED' && !isCompletedHelper(app)) return false;
-    if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
-    if (gHubFilter === 'IN_PROGRESS' && !isInProgressHelper(app)) return false;
-    if (gHubFilter === 'UNPAID_CLAIM' && !isAppHasUnpaidClaimHelper(app)) return false;
-    if (gHubFilter === 'NEED_PAYOUT' && !isAppHasUnpaidPayoutHelper(app)) return false;
-    if (gHubFilter === 'NEED_FAX' && !isNeedFaxHelper(app)) return false;
+      if (gHubFilter === 'COMPLETED' && !isCompletedHelper(app)) return false;
+      if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
+      if (gHubFilter === 'IN_PROGRESS' && !isInProgressHelper(app)) return false;
+      if (gHubFilter === 'UNPAID_CLAIM' && !isAppHasUnpaidClaimHelper(app)) return false;
+      if (gHubFilter === 'NEED_PAYOUT' && !isAppHasUnpaidPayoutHelper(app)) return false;
+      if (gHubFilter === 'NEED_FAX' && !isNeedFaxHelper(app)) return false;
 
-    if (gHubStatusFilter) {
-      const theme = getCustomerCardStatusTheme(app);
-      let match = false;
-      if (gHubStatusFilter === '신규' && theme.type === 'new') match = true;
-      else if (gHubStatusFilter === '진행중' && theme.type === 'in_progress') match = true;
-      else if (gHubStatusFilter === '완료' && theme.type === 'completed') match = true;
-      else if (gHubStatusFilter === '취소' && (theme.type === 'cancelled' || theme.type === 'not_applicable' || theme.statusText === '당일서비스취소' || theme.statusText.includes('서비스불가') || theme.statusText === '제외' || app.status === '미해당' || (app.status && app.status.includes('취소')))) match = true;
-      else if (gHubStatusFilter === '예정' && theme.type === 'upcoming') match = true;
-      else if (gHubStatusFilter === '비활성' && typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app)) match = true;
-      if (!match) return false;
-    }
+      if (gHubStatusFilter) {
+        const theme = getCustomerCardStatusTheme(app);
+        let match = false;
+        if (gHubStatusFilter === '신규' && theme.type === 'new') match = true;
+        else if (gHubStatusFilter === '진행중' && theme.type === 'in_progress') match = true;
+        else if (gHubStatusFilter === '완료' && theme.type === 'completed') match = true;
+        else if (gHubStatusFilter === '취소' && (theme.type === 'cancelled' || theme.type === 'not_applicable' || theme.statusText === '당일서비스취소' || theme.statusText.includes('서비스불가') || theme.statusText === '제외' || app.status === '미해당' || (app.status && app.status.includes('취소')))) match = true;
+        else if (gHubStatusFilter === '예정' && theme.type === 'upcoming') match = true;
+        else if (gHubStatusFilter === '비활성' && typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app)) match = true;
+        if (!match) return false;
+      }
+    } else {
+      const rawQuery = query;
+      const cleanQuery = query.replace(/\s+/g, '');
+      const cgNames = ((cgNamesByAppId.get(app.id) || '') + ' ' + (app.caregiverName || '')).toLowerCase();
+      const phoneClean = String(app.phone || app.applicantPhone || app.patientPhone || '').replace(/[^0-9]/g, '');
+      const patientNameClean = String(app.patientName || '').replace(/\s+/g, '').toLowerCase();
+      const maskedNameClean = (typeof maskName === 'function' ? maskName(app.patientName) : '').replace(/\s+/g, '').toLowerCase();
+      const hospitalClean = String(app.hospitalName || '').replace(/\s+/g, '').toLowerCase();
+      const appInsClean = String(app.insuranceCompany || '').replace(/\s+/g, '').toLowerCase();
+      const applicantNameClean = String(app.applicantName || app.guardianName || '').replace(/\s+/g, '').toLowerCase();
 
-    if (query) {
-      const cgNames = cgNamesByAppId.get(app.id) || '';
-      const phoneClean = (app.phone || '').replace(/[^0-9]/g, '');
       const match = (app.id && app.id.toLowerCase().includes(query)) ||
-                    (app.patientName && app.patientName.toLowerCase().includes(query)) ||
+                    (patientNameClean && (patientNameClean.includes(cleanQuery) || patientNameClean.includes(rawQuery))) ||
+                    (maskedNameClean && maskedNameClean.includes(cleanQuery)) ||
                     (app.status && app.status.toLowerCase().includes(query)) ||
                     (app.claimCategory && app.claimCategory.toLowerCase().includes(query)) ||
                     (app.phone && app.phone.includes(query)) ||
                     (digitsQuery.length >= 2 && phoneClean.includes(digitsQuery)) ||
                     (app.adjusterName && app.adjusterName.toLowerCase().includes(query)) ||
                     (app.accidentNumber && app.accidentNumber.toLowerCase().includes(query)) ||
-                    (cgNames && cgNames.includes(query));
+                    (app.policyNumber && app.policyNumber.toLowerCase().includes(query)) ||
+                    (app.patientId && app.patientId.toLowerCase().includes(query)) ||
+                    (hospitalClean && hospitalClean.includes(cleanQuery)) ||
+                    (appInsClean && appInsClean.includes(cleanQuery)) ||
+                    (applicantNameClean && applicantNameClean.includes(cleanQuery)) ||
+                    (app.careCenter && app.careCenter.toLowerCase().includes(query)) ||
+                    (app.branchName && app.branchName.toLowerCase().includes(query)) ||
+                    (app.memo && app.memo.toLowerCase().includes(query)) ||
+                    (cgNames && (cgNames.includes(rawQuery) || cgNames.replace(/\s+/g, '').includes(cleanQuery)));
       if (!match) return false;
     }
     return true;
   });
+
+  // [삼성화재 사전명단/시트 연계 검색]: 검색어가 2글자 이상인 경우, gSamsungSheets 및 gSamsungList 사전등록 고객도 자동 포함
+  if (query && query.length >= 2) {
+    const existingAppIds = new Set(filtered.map(a => String(a.id || '')));
+    const matchedSamsungApps = [];
+    const pool = [
+      ...(Array.isArray(window.gSamsungList) ? window.gSamsungList : []),
+      ...(window.gSamsungSheets ? [...(window.gSamsungSheets.target || []), ...(window.gSamsungSheets.completed || []), ...(window.gSamsungSheets.eligible || [])] : [])
+    ];
+
+    const cleanQuery = query.replace(/\s+/g, '');
+    for (let i = 0; i < pool.length; i++) {
+      const s = pool[i];
+      if (!s) continue;
+      const sId = String(s.id || s.patientId || s.askSn || '');
+      if (sId && existingAppIds.has(sId)) continue;
+
+      const sPhoneClean = String(s.phone || s.applicantContact || s.contact || '').replace(/[^0-9]/g, '');
+      const sName = String(s.patientName || s.customerName || '').replace(/\s+/g, '').toLowerCase();
+      const sAccident = String(s.accidentNumber || '').toLowerCase();
+      const sPolicy = String(s.policyNumber || '').toLowerCase();
+      const sAdjuster = String(s.adjusterName || '').toLowerCase();
+
+      const match = (sId && sId.toLowerCase().includes(query)) ||
+                    (sName && (sName.includes(query) || sName.includes(cleanQuery))) ||
+                    (digitsQuery.length >= 2 && sPhoneClean.includes(digitsQuery)) ||
+                    (sAccident && sAccident.includes(query)) ||
+                    (sPolicy && sPolicy.includes(query)) ||
+                    (sAdjuster && sAdjuster.includes(query));
+
+      if (match) {
+        if (sId) existingAppIds.add(sId);
+        matchedSamsungApps.push({
+          id: sId || `SAM_PRE_${i + 1}`,
+          patientId: s.patientId || sId,
+          patientName: s.patientName || s.customerName || '고객',
+          birthDate: s.birthDate || '-',
+          gender: s.gender || '-',
+          phone: s.phone || s.applicantContact || '',
+          insuranceCompany: '삼성화재',
+          status: s.matchStatus || s.status || '사전등록(신청대기)',
+          accidentNumber: s.accidentNumber || '-',
+          policyNumber: s.policyNumber || '-',
+          productName: s.productName || '삼성화재 간병지원',
+          productCode: s.productCode || '',
+          adjusterName: s.adjusterName || '-',
+          adjusterPhone: s.adjusterPhone || '-',
+          adjusterFax: s.adjusterFax || '-',
+          applyDate: s.receiveDate || (s.contractStartDate || '-'),
+          createdAt: s.receiveDate || new Date().toISOString(),
+          assignedCaregiverCount: 0,
+          claimCount: 0,
+          unconfirmedClaimCount: 0,
+          estimatedUnpaid: 0,
+          depositConfirmedAmount: 0,
+          totalPayout: 0,
+          isPreRegistered: true,
+          notes: s.notes || [],
+          logs: s.logs || []
+        });
+
+        if (matchedSamsungApps.length >= 30) break;
+      }
+    }
+
+    if (matchedSamsungApps.length > 0) {
+      filtered.push(...matchedSamsungApps);
+    }
+  }
 
 
 
@@ -30761,9 +31223,13 @@ function renderUnifiedCareHub() {
   }
 
   filtered.sort((a, b) => {
-    // 1. 방금 등록된 고객(_isJustRegistered)은 무조건 맨 처음(최상단)
-    if (a && a._isJustRegistered && !(b && b._isJustRegistered)) return -1;
-    if (!(a && a._isJustRegistered) && b && b._isJustRegistered) return 1;
+    // 1. 방금/신규 등록된 고객(_isJustRegistered 또는 D접두사 고객)은 무조건 맨 처음(최상단)
+    const isRecentA = (a && (a._isJustRegistered || (a.id && String(a.id).startsWith('D')))) ? 1 : 0;
+    const isRecentB = (b && (b._isJustRegistered || (b.id && String(b.id).startsWith('D')))) ? 1 : 0;
+    if (isRecentA !== isRecentB) return isRecentB - isRecentA;
+    if (isRecentA === 1 && isRecentB === 1) {
+      return compareAppIds(a.id, b.id, true);
+    }
 
     if (gHubSort === 'status_inprogress') {
       const isInProgress = (app) => (app.status && (app.status.includes('진행') || app.status === '정상' || app.status === '배정완료' || app.status === '간병중')) ? 1 : 0;
@@ -30838,7 +31304,12 @@ function renderUnifiedCareHub() {
       return (b.patientName || '').localeCompare(a.patientName || '', 'ko');
     }
 
-    // 기본 폴백: 수정건 맨 앞순위 -> 신청ID 순서대로 (D가 C보다 무조건 앞)
+    // 기본 폴백: D계열 최우선 -> 수정건 맨 앞순위 -> 신청ID 순서대로
+    const isDA = (a && a.id && String(a.id).startsWith('D')) ? 1 : 0;
+    const isDB = (b && b.id && String(b.id).startsWith('D')) ? 1 : 0;
+    if (isDA !== isDB) return isDB - isDA;
+    if (isDA === 1 && isDB === 1) return compareAppIds(a.id, b.id, true);
+
     const modA = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(a) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a) ? 1 : 0);
     const modB = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(b) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(b) ? 1 : 0);
     if (modA !== modB) return modB - modA;
@@ -30884,7 +31355,29 @@ function renderUnifiedCareHub() {
   }
 
   if (displayList.length === 0) {
-    container.innerHTML = '<div class="col-span-full p-12 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">조회 조건과 일치하는 고객 데이터가 없습니다.</div>';
+    const hasActiveFilters = Boolean(query || gHubFilter !== 'ALL' || (insFilter && insFilter !== 'ALL') || gHubStatusFilter || gHubOnlyModified || gHubOnlyDisabled);
+    container.innerHTML = `
+      <div class="col-span-full p-10 text-center bg-white rounded-3xl border border-slate-200 shadow-sm space-y-3">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+          <i data-lucide="search-x" class="w-6 h-6"></i>
+        </div>
+        <div class="text-slate-800 font-black text-sm">
+          ${query ? `'${escapeHtml(query)}' 검색 결과와 일치하는 고객이 없습니다.` : '조회 조건과 일치하는 고객 데이터가 없습니다.'}
+        </div>
+        <p class="text-xs text-slate-500 max-w-md mx-auto">
+          ${query ? '입력하신 고객명, 휴대폰번호, 사고번호, 병원명을 다시 확인하시거나 모든 필터를 초기화해 보세요.' : '현재 선택된 필터(파이프라인 탭, 원수사 탭, 상태 필터 등)에 해당하는 고객이 없습니다.'}
+        </p>
+        ${hasActiveFilters ? `
+          <div class="pt-2">
+            <button type="button" onclick="resetAllHubFiltersAndSearch()" class="px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 active:scale-95 text-white font-black text-xs shadow-md transition-all inline-flex items-center gap-1.5 cursor-pointer">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+              <span>모든 필터 초기화하고 전체 고객 보기</span>
+            </button>
+          </div>
+        ` : ''}
+      </div>
+    `;
+    if (typeof initIcons === 'function') initIcons(container);
     return;
   }
 
@@ -42106,6 +42599,13 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
     newApp.hasManualUpdate = false;
     newApp._isJustRegistered = true;
 
+    // 최근 등록 ID 로컬스토리지에 보존 (새로고침 후에도 최상단 영구 유지)
+    try {
+      const recentIds = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
+      const updatedRecent = Array.from(new Set([newApp.id, ...(recentIds || [])])).slice(0, 100);
+      localStorage.setItem('LIVON_RECENTLY_REGISTERED_IDS', JSON.stringify(updatedRecent));
+    } catch (e) {}
+
     // 2. 고객 신청 대장에 최우선 즉시 등록 (팩스 성공 여부와 무관하게 100% 안전 보존)
     gApps = [newApp, ...(gApps || []).filter(a => a && a.id !== newApp.id)];
     try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
@@ -43807,6 +44307,7 @@ function onHubSearchInput() {
   }
   if (gHubSearchTimer) clearTimeout(gHubSearchTimer);
   gHubSearchTimer = setTimeout(() => {
+    gHubCurrentPage = 1;
     renderUnifiedCareHub();
   }, 180);
 }
@@ -43818,8 +44319,33 @@ function clearHubSearch() {
   }
   const clearBtn = document.getElementById('btnHubSearchClear');
   if (clearBtn) clearBtn.classList.add('hidden');
+  gHubCurrentPage = 1;
   renderUnifiedCareHub();
 }
+
+function resetAllHubFiltersAndSearch() {
+  const hubInput = document.getElementById('hubSearchInput');
+  if (hubInput) hubInput.value = '';
+  const clearBtn = document.getElementById('btnHubSearchClear');
+  if (clearBtn) clearBtn.classList.add('hidden');
+
+  gHubFilter = 'ALL';
+  gHubInsuranceTab = 'ALL';
+  gHubStatusFilter = null;
+  gHubOnlyModified = false;
+  gHubOnlyDisabled = false;
+  gHubCurrentPage = 1;
+
+  try { localStorage.setItem('LIVON_HUB_INS_TAB', 'ALL'); } catch (e) {}
+
+  if (typeof updateHubInsuranceTabUI === 'function') updateHubInsuranceTabUI();
+  if (typeof updateHubStatusLegendUI === 'function') updateHubStatusLegendUI();
+
+  renderUnifiedCareHub();
+}
+window.resetAllHubFiltersAndSearch = resetAllHubFiltersAndSearch;
+window.onHubSearchInput = onHubSearchInput;
+window.clearHubSearch = clearHubSearch;
 
 
 // =========================================================================
@@ -45672,8 +46198,13 @@ async function initAdminSession() {
                 gCurrentAdmin = { ...parsed, ...vRes.value.admin };
                 try { localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(gCurrentAdmin)); } catch (e) {}
               } else if (vRes.value.valid === false) {
-                console.warn('[Session Verify] 세션 토큰 만료됨: 로그인 화면으로 전환합니다.');
-                if (typeof logoutAdmin === 'function') logoutAdmin();
+                if (vRes.value.error && vRes.value.error.includes('비활성화')) {
+                  console.warn('[Session Verify] 비활성화된 관리자 계정: 로그아웃 처리');
+                  if (typeof handleAdminLogout === 'function') handleAdminLogout(true);
+                  return;
+                }
+                // 유효한 로컬 관리자 정보가 있으면 자동 강제 로그아웃(데이터 삭제)을 방지하고 로컬 세션 유지
+                return;
               }
             }
           }).catch(netErr => {
@@ -45688,12 +46219,18 @@ async function initAdminSession() {
 
   const overlay = document.getElementById('adminLoginOverlay');
 
-  // 개발 사이트(IS_DEV_ENV)인 경우: 로그인 모달 없이 최고관리자(리본케어 대표이사)로 자동 프리패스 로그인
-  if (IS_DEV_ENV && (!validSessionAdmin || isExplicitlyLoggedOut)) {
+  // 개발 사이트(IS_DEV_ENV) 또는 로컬/개발 화면(isDevScreen)인 경우: 로그인 모달 없이 최고관리자(리본케어 대표이사)로 자동 프리패스 로그인
+  if ((IS_DEV_ENV || (typeof isDevScreen === 'function' && isDevScreen())) && (!validSessionAdmin || isExplicitlyLoggedOut)) {
     const defaultSuperAdmin = (Array.isArray(gAdmins) && gAdmins.find(a => a.role === 'SUPER_ADMIN'))
       || (window.REBORN_DATA && window.REBORN_DATA.admins && window.REBORN_DATA.admins[0])
       || { id: 'ADM001', username: 'superadmin', name: '리본케어', dept: '대표이사', role: 'SUPER_ADMIN', permissions: ['all'], allowedMenus: ['all'] };
     validSessionAdmin = defaultSuperAdmin;
+    localStorage.removeItem('LIVON_LOGGED_OUT');
+    sessionStorage.removeItem('LIVON_LOGGED_OUT');
+    const autoToken = 'dev_session_' + Date.now();
+    localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', autoToken);
+    sessionStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', autoToken);
+    localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(validSessionAdmin));
   }
 
   if (validSessionAdmin) {

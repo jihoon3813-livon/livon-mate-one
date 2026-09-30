@@ -16,11 +16,8 @@ export const bundleAll = query({
           .query("adminSessions")
           .withIndex("by_token", (q) => q.eq("token", args.sessionToken))
           .first();
-        if (session && session._id) {
-          // 세션 유효 기간 자동 연장 (30일 유효)
-          await ctx.db.patch(session._id, {
-            expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
-          });
+        if (session && session.expiresAt && session.expiresAt < Date.now()) {
+          isAuthenticated = false;
         }
       } catch (e) {}
     }

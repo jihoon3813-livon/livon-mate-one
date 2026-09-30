@@ -1311,7 +1311,7 @@
             <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
               <div class="relative w-36 sm:w-56">
                 <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
-                <input type="search" id="hubSearchInput" name="carehub_search_unique" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly onfocus="this.removeAttribute('readonly');" onblur="this.setAttribute('readonly', true);" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-form-type="other" aria-autocomplete="none" role="searchbox" value="" oninput="onHubSearchInput()" placeholder="고객명, 간병인, 사고번호..." class="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:outline-none bg-slate-50 focus:bg-white font-medium">
+                <input type="search" id="hubSearchInput" name="carehub_search_unique" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-form-type="other" aria-autocomplete="none" role="searchbox" value="" oninput="onHubSearchInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();if(window.gHubSearchTimer)clearTimeout(window.gHubSearchTimer);if(typeof gHubCurrentPage!=='undefined')gHubCurrentPage=1;renderUnifiedCareHub();}" onsearch="onHubSearchInput()" placeholder="고객명, 간병인, 사고번호, 병원..." class="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:outline-none bg-slate-50 focus:bg-white font-medium">
                 <button type="button" id="btnHubSearchClear" onclick="clearHubSearch()" class="hidden absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 cursor-pointer" title="검색어 지우기">
                   <i data-lucide="x" class="w-3.5 h-3.5"></i>
                 </button>
@@ -10443,12 +10443,12 @@
             </div>
           </div>
           <div class="flex items-center gap-1.5 sm:hidden shrink-0">
-            <button id="btnSaveHubCustomerModalMobile" type="button" onclick="saveActiveHubCustomerDetail(false)" 
-                    class="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs shadow-md shadow-emerald-600/30 flex items-center gap-1 cursor-pointer border border-emerald-400/40">
+            <button id="btnSaveHubCustomerModalMobile" type="button" onclick="saveAndCloseActiveHubCustomerDetail()" 
+                    class="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs shadow-md shadow-emerald-600/30 flex items-center gap-1 cursor-pointer border border-emerald-400/40" title="변경사항 저장 후 곧바로 닫기">
               <i data-lucide="save" class="w-3.5 h-3.5"></i>
-              <span id="btnSaveHubCustomerModalMobileText">최종 저장</span>
+              <span id="btnSaveHubCustomerModalMobileText">저장후 닫기</span>
             </button>
-            <button onclick="confirmCloseHubCustomerDetailModal()" class="p-1 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0">
+            <button onclick="confirmCloseHubCustomerDetailModal()" class="p-1 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0" title="창 닫기 (저장여부 확인)">
               <i data-lucide="x" class="w-5 h-5"></i>
             </button>
           </div>
@@ -10471,12 +10471,12 @@
             <i data-lucide="mail" class="w-3.5 h-3.5"></i>
             <span>삼성 접수/청구</span>
           </button>
-          <button id="btnSaveHubCustomerModal" type="button" onclick="saveActiveHubCustomerDetail(false)" 
-                  class="hidden sm:flex px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-600/30 items-center gap-1.5 whitespace-nowrap shrink-0 transition-all cursor-pointer border border-emerald-400/40">
+          <button id="btnSaveHubCustomerModal" type="button" onclick="saveAndCloseActiveHubCustomerDetail()" 
+                  class="hidden sm:flex px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-600/30 items-center gap-1.5 whitespace-nowrap shrink-0 transition-all cursor-pointer border border-emerald-400/40" title="변경사항 저장 후 곧바로 닫기">
             <i data-lucide="save" class="w-4 h-4"></i>
-            <span id="btnSaveHubCustomerModalText">최종 저장</span>
+            <span id="btnSaveHubCustomerModalText">저장후 닫기</span>
           </button>
-          <button onclick="confirmCloseHubCustomerDetailModal()" class="hidden sm:block p-2 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0">
+          <button onclick="confirmCloseHubCustomerDetailModal()" class="hidden sm:block p-2 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0" title="창 닫기 (저장여부 확인)">
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>
         </div>
@@ -10489,12 +10489,12 @@
       <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-xs">
         <span class="text-slate-500" id="hubDetailModalFooterNote">✨ 고객/접수, 간병인/센터, 손사/보험사 3대 주체별 정보 조회 및 데이터 수정이 지원됩니다.</span>
         <div class="flex items-center gap-2">
-          <button id="btnSaveHubCustomerModalFooter" type="button" onclick="saveActiveHubCustomerDetail(false)" 
-                  class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95">
+          <button id="btnSaveHubCustomerModalFooter" type="button" onclick="saveAndCloseActiveHubCustomerDetail()" 
+                  class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95" title="변경사항 저장 후 곧바로 닫기">
             <i data-lucide="save" class="w-4 h-4"></i>
-            <span id="btnSaveHubCustomerModalFooterText">최종 저장</span>
+            <span id="btnSaveHubCustomerModalFooterText">저장후 닫기</span>
           </button>
-          <button type="button" onclick="confirmCloseHubCustomerDetailModal()" class="px-5 py-2 border rounded-xl font-bold bg-white hover:bg-slate-100 text-slate-700 shadow-2xs cursor-pointer">닫기</button>
+          <button type="button" onclick="confirmCloseHubCustomerDetailModal()" class="px-5 py-2 border rounded-xl font-bold bg-white hover:bg-slate-100 text-slate-700 shadow-2xs cursor-pointer" title="창 닫기 (저장여부 확인)">닫기</button>
         </div>
       </div>
     </div>
