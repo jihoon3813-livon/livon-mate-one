@@ -1089,9 +1089,20 @@ function isDevEnvironment() {
   if (storedEnv === 'dev') return true;
   if (storedEnv === 'prod') return false;
 
-  // [핵심]: PC 변경(사무실/자택/노트북)이나 로컬(localhost:8080) 접속 여부와 무관하게 모든 사용자가 100% 동일한 실운영 DB(PROD)를 실시간 공유
+  // 로컬 개발 환경(localhost, 127.0.0.1, 개발 포트 등)에서는 개발 서버(DEV)를 사용하고, 실서비스 도메인에서는 운영 서버(PROD) 사용
+  const host = window.location.hostname || '';
+  const port = window.location.port || '';
+  if (host === 'localhost' || host === '127.0.0.1' || host.includes('dev') || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:') {
+    return true;
+  }
   return false;
 }
+
+var IS_DEV_ENV = isDevEnvironment();
+var CONVEX_URL = (typeof window !== 'undefined' && (window.ENV?.CONVEX_URL || window.CONVEX_URL))
+  || (IS_DEV_ENV ? DEV_CONVEX_URL : PROD_CONVEX_URL);
+window.IS_DEV_ENV = IS_DEV_ENV;
+window.CURRENT_CONVEX_URL = CONVEX_URL;
 
 function isDevScreen() {
   if (typeof window === 'undefined') return false;
@@ -1103,7 +1114,7 @@ function isDevScreen() {
   const urlParam = new URLSearchParams(window.location.search).get('env');
   if (urlParam === 'dev') return true;
   if (localStorage.getItem('LIVON_TARGET_ENV') === 'dev') return true;
-  if (typeof IS_DEV_ENV !== 'undefined' && IS_DEV_ENV) return true;
+  if (IS_DEV_ENV) return true;
   return false;
 }
 window.isDevScreen = isDevScreen;
@@ -1114,11 +1125,6 @@ if (typeof document !== 'undefined' && isDevScreen()) {
   } catch (e) {}
 }
 
-const IS_DEV_ENV = isDevEnvironment();
-const CONVEX_URL = (typeof window !== 'undefined' && (window.ENV?.CONVEX_URL || window.CONVEX_URL))
-  || (IS_DEV_ENV ? DEV_CONVEX_URL : PROD_CONVEX_URL);
-window.IS_DEV_ENV = IS_DEV_ENV;
-window.CURRENT_CONVEX_URL = CONVEX_URL;
 console.log('[Livon ERP] Current Running Environment:', IS_DEV_ENV ? '개발 사이트 (DEV)' : '실사이트 (PROD)', '| Convex:', CONVEX_URL, '| DevScreen:', isDevScreen());
 
 async function syncToConvex(path, args = {}) {
