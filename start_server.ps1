@@ -148,14 +148,45 @@ while ($listener.IsListening) {
 
         # Handle API /api/fax/status
         if ($urlPath -eq "api/fax/status") {
-            $jsonRes = @{
-                success = $true
-                status = "verified"
-                serverType = "test"
-                serverHost = "testws.baroservice.com"
-                balance = 10000
-                message = "바로빌 테스트 서버 연결 성공 (잔액: 10,000원)"
-            } | ConvertTo-Json -Depth 3 -Compress
+            $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+            $rawBody = $reader.ReadToEnd()
+            $payload = @{}
+            if ($rawBody) {
+                try { $payload = $rawBody | ConvertFrom-Json } catch {}
+            }
+
+            if ($payload.sendKeyList) {
+                $resultsObj = @{}
+                foreach ($k in $payload.sendKeyList) {
+                    $resultsObj[$k] = @{
+                        success = $true
+                        status = "성공"
+                        statusLabel = "전송성공"
+                        resultMsg = "수신처 전송 성공 (1/1장 완료)"
+                    }
+                }
+                $jsonRes = @{
+                    success = $true
+                    results = $resultsObj
+                } | ConvertTo-Json -Depth 4 -Compress
+            } elseif ($payload.sendKey) {
+                $jsonRes = @{
+                    success = $true
+                    sendKey = $payload.sendKey
+                    status = "성공"
+                    statusLabel = "전송성공"
+                    resultMsg = "수신처 전송 성공 (1/1장 완료)"
+                } | ConvertTo-Json -Depth 3 -Compress
+            } else {
+                $jsonRes = @{
+                    success = $true
+                    status = "verified"
+                    serverType = "test"
+                    serverHost = "testws.baroservice.com"
+                    balance = 10000
+                    message = "바로빌 테스트 서버 연결 성공 (잔액: 10,000원)"
+                } | ConvertTo-Json -Depth 3 -Compress
+            }
 
             $bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonRes)
             $response.ContentType = "application/json; charset=utf-8"

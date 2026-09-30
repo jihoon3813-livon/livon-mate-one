@@ -38,6 +38,20 @@ const gSurveyState = {
 async function loadSurveyMgmtData(showToastAlert = false) {
   gSurveyState.isLoading = true;
   try {
+    // 1. Convex 클라우드 DB에서 실시간 만족도 조사 대상 조회 (단일 진실의 원천)
+    let cvxTargets = null;
+    if (typeof queryConvex === 'function') {
+      try {
+        const cvxRes = await queryConvex('sync:getSurveyTargets', {});
+        const list = (cvxRes && cvxRes.value && Array.isArray(cvxRes.value)) ? cvxRes.value : (Array.isArray(cvxRes) ? cvxRes : null);
+        if (list && list.length > 0) {
+          cvxTargets = list;
+        }
+      } catch (cvxErr) {
+        console.warn('[SurveyClient] Convex targets query error:', cvxErr);
+      }
+    }
+
     const [summaryRes, targetsRes, followupsRes, rewardsRes, settingsRes] = await Promise.all([
       fetch('/api/survey/summary').then(r => r.json()).catch(() => ({ data: {} })),
       fetch('/api/survey/targets').then(r => r.json()).catch(() => ({ items: [] })),
@@ -47,7 +61,43 @@ async function loadSurveyMgmtData(showToastAlert = false) {
     ]);
 
     if (summaryRes.data) gSurveyState.summary = summaryRes.data;
-    if (Array.isArray(targetsRes.items)) gSurveyState.targets = targetsRes.items;
+
+    // Convex 우선 반영, 없으면 API items, 없으면 localStorage 캐시
+    if (Array.isArray(cvxTargets) && cvxTargets.length > 0) {
+      gSurveyState.targets = cvxTargets;
+    } else if (Array.isArray(targetsRes.items) && targetsRes.items.length > 0) {
+      gSurveyState.targets = targetsRes.items;
+    } else {
+      try {
+        const cached = JSON.parse(localStorage.getItem('LIVON_SURVEY_TARGETS') || '[]');
+        if (Array.isArray(cached) && cached.length > 0) {
+          gSurveyState.targets = cached;
+        }
+      } catch (e) {}
+    }
+
+    // 로컬스토리지 영구 보존
+    try {
+      if (Array.isArray(gSurveyState.targets) && gSurveyState.targets.length > 0) {
+        localStorage.setItem('LIVON_SURVEY_TARGETS', JSON.stringify(gSurveyState.targets));
+      }
+    } catch (e) {}
+
+    // summary가 비어있는 경우 클라이언트 기준 실시간 자동 재집계
+    if (!gSurveyState.summary.totalTargets && gSurveyState.targets.length > 0) {
+      const activeTargets = gSurveyState.targets.filter(t => t.targetStatus !== 'CANCELLED');
+      const submitted = activeTargets.filter(t => t.responseStatus === 'SUBMITTED');
+      gSurveyState.summary = {
+        totalTargets: activeTargets.length,
+        submittedCount: submitted.length,
+        responseRate: activeTargets.length > 0 ? Math.round((submitted.length / activeTargets.length) * 100) : 0,
+        unguidedCount: activeTargets.filter(t => t.guidanceStatus === 'NOT_STARTED').length,
+        urgentFollowups: gSurveyState.followups.filter(f => f.status === 'NEW' || f.status === 'CONTACTING').length,
+        avgScore: '0.0',
+        responseCount: submitted.length
+      };
+    }
+
     if (Array.isArray(followupsRes.items)) gSurveyState.followups = followupsRes.items;
     if (Array.isArray(rewardsRes.items)) gSurveyState.rewards = rewardsRes.items;
     if (settingsRes.data) {
@@ -219,11 +269,14 @@ function renderSurveyTargetsTable(list) {
     const followupBadge = getFollowupStatusBadge(target.followupStatus);
     const isExpired = target.dueAt && new Date(target.dueAt).getTime() < Date.now();
     const dueFormatted = target.dueAt ? target.dueAt.slice(0, 10) : '-';
+    const displayAppId = (target.serviceId && !target.serviceId.startsWith('ST-')) 
+      ? target.serviceId 
+      : ((typeof gApps !== 'undefined' && Array.isArray(gApps) && gApps.find(a => a.patientName && a.patientName.trim() === (target.patientName || '').trim())?.id) || target.serviceId || target.id);
 
     return `
       <tr class="hover:bg-sky-50/50 transition-colors">
         <td class="p-3 text-center font-mono text-slate-400 text-[11px]">${idx + 1}</td>
-        <td class="p-3 font-mono font-bold text-sky-700 whitespace-nowrap">${target.serviceId || target.id}</td>
+        <td class="p-3 font-mono font-bold text-sky-700 whitespace-nowrap">${displayAppId}</td>
         <td class="p-3 font-bold text-slate-900 whitespace-nowrap">
           <span>${maskedName}</span>
           ${target.patientPhone ? `<span class="block text-[10.5px] text-slate-400 font-normal">${maskPhone(target.patientPhone)}</span>` : ''}
@@ -252,12 +305,12 @@ function renderSurveyTargetsTable(list) {
               <i data-lucide="send" class="w-3 h-3 text-sky-600"></i>
               <span>문자</span>
             </button>
-            <a href="/mate/survey?targetId=${target.id}" target="_blank" 
+            <button type="button" onclick="openSurveyAppModal('${target.id}')" 
               class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs" 
               title="리본메이트 간병인 앱 만족도 조사 화면 열기">
               <i data-lucide="smartphone" class="w-3 h-3 text-emerald-600"></i>
               <span>앱뷰</span>
-            </a>
+            </button>
             <button type="button" onclick="openSurveyQrModal('${target.id}')" 
               class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer" 
               title="QR코드 보기 및 설문 링크 안내">
@@ -267,7 +320,19 @@ function renderSurveyTargetsTable(list) {
             <button type="button" onclick="openSurveyDetailModal('${target.id}')" 
               class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all cursor-pointer" 
               title="상세 정보 및 감사 이력">
-              상세
+              <span>상세</span>
+            </button>
+            <button type="button" onclick="openEditSurveyTargetModal('${target.id}')" 
+              class="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs" 
+              title="대상 고객 및 간병 정보 수정">
+              <i data-lucide="edit-3" class="w-3 h-3 text-indigo-600"></i>
+              <span>수정</span>
+            </button>
+            <button type="button" onclick="deleteSurveyTarget('${target.id}')" 
+              class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs" 
+              title="만족도 조사 대상 목록에서 삭제">
+              <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
+              <span>삭제</span>
             </button>
           </div>
         </td>
@@ -327,8 +392,8 @@ function renderSurveyFollowups() {
       <tr class="hover:bg-rose-50/30 transition-colors">
         <td class="p-3 font-mono font-bold text-slate-800 whitespace-nowrap">${f.id}</td>
         <td class="p-3 whitespace-nowrap">
-          <div class="font-bold text-slate-900">${f.patientName}</div>
-          <div class="text-[10.5px] text-slate-500 font-mono">${f.phone || '-'}</div>
+          <div class="font-bold text-slate-900">${maskPatientName(f.patientName)}</div>
+          <div class="text-[10.5px] text-slate-500 font-mono">${maskPhone(f.phone || '-')}</div>
         </td>
         <td class="p-3 font-medium text-slate-800 whitespace-nowrap">${f.caregiverName || '-'}</td>
         <td class="p-3 whitespace-nowrap">${triggersDesc}</td>
@@ -653,12 +718,47 @@ async function handleSaveSurveySettings(event) {
 // =========================================================================
 // 7. 모달 액션 & 비즈니스 로직
 // =========================================================================
+function openSurveyAppModal(targetId) {
+  const target = gSurveyState.targets.find(t => t.id === targetId || t.serviceId === targetId);
+  const modal = document.getElementById('surveyAppViewModal');
+  const iframe = document.getElementById('surveyAppIframe');
+  const subEl = document.getElementById('surveyAppModalSub');
+
+  const paramId = target ? target.id : targetId;
+  const appUrl = `/mate/survey?targetId=${encodeURIComponent(paramId)}`;
+
+  gSurveyState.currentAppViewTargetId = paramId;
+
+  if (subEl) {
+    const pName = target ? maskPatientName(target.patientName) : '환자';
+    const sId = target ? (target.serviceId || target.id) : paramId;
+    const cg = target ? (target.caregiverName || '미지정') : '';
+    subEl.innerText = `${pName} (${sId}) · 담당: ${cg}`;
+  }
+
+  if (iframe) {
+    iframe.src = appUrl;
+  }
+
+  if (modal) {
+    modal.classList.remove('hidden');
+  }
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function openSurveyAppNewTab() {
+  const targetId = gSurveyState.currentAppViewTargetId || '';
+  const appUrl = `/mate/survey?targetId=${encodeURIComponent(targetId)}`;
+  window.open(appUrl, '_blank');
+}
+
 function openSurveyQrModal(targetId) {
   const target = gSurveyState.targets.find(t => t.id === targetId);
   if (!target) return;
 
   gSurveyState.activeTarget = target;
-  document.getElementById('surveyQrModalPatient').innerText = `${target.patientName} (${target.serviceId}) - 담당: ${target.caregiverName}`;
+  document.getElementById('surveyQrModalPatient').innerText = `${maskPatientName(target.patientName)} (${target.serviceId}) - 담당: ${target.caregiverName}`;
 
   const origin = window.location.origin;
   const surveyUrl = `${origin}/survey.html?t=${target.token}`;
@@ -819,11 +919,11 @@ function openSurveyDetailModal(targetId) {
   if (!target) return;
 
   gSurveyState.activeTarget = target;
-  document.getElementById('surveyDetailModalTitle').innerText = `${target.patientName} (${target.serviceId}) 상세`;
+  document.getElementById('surveyDetailModalTitle').innerText = `${maskPatientName(target.patientName)} (${target.serviceId}) 상세`;
   document.getElementById('surveyDetailModalSub').innerText = `등록일시: ${target.createdAt ? target.createdAt.slice(0, 16).replace('T', ' ') : '-'}`;
 
-  document.getElementById('detailPatientName').innerText = target.patientName;
-  document.getElementById('detailPatientPhone').innerText = target.patientPhone || '-';
+  document.getElementById('detailPatientName').innerText = maskPatientName(target.patientName);
+  document.getElementById('detailPatientPhone').innerText = target.patientPhone ? maskPhone(target.patientPhone) : '-';
   document.getElementById('detailCaregiverName').innerText = target.caregiverName || '-';
   document.getElementById('detailCarePeriod').innerText = `${target.careStartDate || '-'} ~ ${target.careEndDate || '종료'}`;
   document.getElementById('detailDueAt').innerText = target.dueAt ? target.dueAt.slice(0, 10) : '-';
@@ -921,9 +1021,9 @@ function openSurveyFollowupModal(followupId) {
   if (!f) return;
 
   gSurveyState.activeFollowup = f;
-  document.getElementById('followupModalTargetName').innerText = `${f.patientName} (${f.serviceId}) - 티켓 #${f.id}`;
+  document.getElementById('followupModalTargetName').innerText = `${maskPatientName(f.patientName)} (${f.serviceId}) - 티켓 #${f.id}`;
   document.getElementById('followupModalReason').innerText = `발생 사유: ${(f.triggers || []).join(', ')}`;
-  document.getElementById('followupModalContact').innerText = `고객 연락처: ${f.phone || '(등록 번호 없음)'}`;
+  document.getElementById('followupModalContact').innerText = `고객 연락처: ${f.phone ? maskPhone(f.phone) : '(등록 번호 없음)'}`;
   document.getElementById('followupChangeStatus').value = f.status || 'NEW';
   document.getElementById('followupContactNote').value = '';
 
@@ -1099,8 +1199,8 @@ async function handleHubCandidateSearch(query) {
     <div onclick="selectHubCandidate('${m.id}')" class="p-3 hover:bg-sky-50/70 transition-colors cursor-pointer space-y-1 group border-b border-slate-50 last:border-b-0">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="font-black text-slate-900 text-xs group-hover:text-sky-700 transition-colors">${m.patientName}</span>
-          <span class="font-mono text-[11px] text-slate-600 font-bold bg-slate-100 px-1.5 py-0.5 rounded">${m.phone || '연락처 미등록'}</span>
+          <span class="font-black text-slate-900 text-xs group-hover:text-sky-700 transition-colors">${maskPatientName(m.patientName)}</span>
+          <span class="font-mono text-[11px] text-slate-600 font-bold bg-slate-100 px-1.5 py-0.5 rounded">${m.phone ? maskPhone(m.phone) : '연락처 미등록'}</span>
           <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 font-bold border border-sky-200">${m.insuranceCompany || '일반'}</span>
           <span class="text-[10px] text-slate-400 font-mono">${m.id}</span>
         </div>
@@ -1143,7 +1243,7 @@ function selectHubCandidate(appId) {
   // 선택 뱃지 표시
   const badge = document.getElementById('selectedHubCustomerBadge');
   if (badge) {
-    document.getElementById('selPatientName').innerText = candidate.patientName;
+    document.getElementById('selPatientName').innerText = maskPatientName(candidate.patientName);
     document.getElementById('selServiceId').innerText = candidate.id;
     document.getElementById('selInsurance').innerText = candidate.insuranceCompany || '';
     document.getElementById('selDetails').innerText = `${candidate.hospitalName || '병원 미지정'} · 간병인: ${candidate.caregiverName || '미지정'} (${candidate.careStartDate || ''} ~ ${candidate.careEndDate || ''})`;
@@ -1186,10 +1286,29 @@ function openNewSurveyTargetModal() {
 
 async function handleCreateSurveyTarget(event) {
   event.preventDefault();
+  let serviceId = document.getElementById('newTargetServiceId').value.trim();
+  const patientName = document.getElementById('newTargetPatientName').value.trim();
+  const phone = document.getElementById('newTargetPhone').value.trim();
+
+  // 신청ID 미입력 시 통합 고객 목록(gApps)에서 환자명/연락처로 자동 매칭
+  if (!serviceId && typeof gApps !== 'undefined' && Array.isArray(gApps)) {
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const matchedApp = gApps.find(a => {
+      const aName = (a.patientName || a.patient_name || '').trim();
+      const aPhone = String(a.patientPhone || a.patient_phone || a.contact || '').replace(/[^0-9]/g, '');
+      if (cleanPhone && aPhone && cleanPhone === aPhone) return true;
+      if (aName && aName === patientName) return true;
+      return false;
+    });
+    if (matchedApp && matchedApp.id) {
+      serviceId = matchedApp.id;
+    }
+  }
+
   const payload = {
-    serviceId: document.getElementById('newTargetServiceId').value.trim() || undefined,
-    patientName: document.getElementById('newTargetPatientName').value.trim(),
-    phone: document.getElementById('newTargetPhone').value.trim(),
+    serviceId: serviceId || undefined,
+    patientName,
+    phone,
     caregiverName: document.getElementById('newTargetCaregiverName').value.trim(),
     caregiverPhone: document.getElementById('newTargetCaregiverPhone').value.trim() || undefined,
     careStartDate: document.getElementById('newTargetStartDate').value,
@@ -1217,15 +1336,23 @@ async function handleCreateSurveyTarget(event) {
 
 async function autoSeedSurveyTargets() {
   try {
+    const apps = (typeof gApps !== 'undefined' && Array.isArray(gApps) && gApps.length > 0) ? gApps : null;
     const res = await fetch('/api/survey/targets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'auto_seed' })
+      body: JSON.stringify({ action: 'auto_seed', apps: apps ? apps.slice(0, 500) : null })
     });
     const result = await res.json();
     if (result.success) {
-      if (typeof showToast === 'function') showToast('종료 고객 대상자가 자동으로 추출 및 등록되었습니다.', 'success');
+      const msg = result.message || '종료 고객 대상자가 자동으로 추출 및 등록되었습니다.';
+      if (typeof showToast === 'function') {
+        showToast(msg, 'success');
+      } else {
+        alert(msg);
+      }
       loadSurveyMgmtData(false);
+    } else {
+      alert('자동 추출 실패: ' + (result.error || '알 수 없는 오류'));
     }
   } catch (e) {
     if (typeof showToast === 'function') showToast('자동 추출 중 오류가 발생했습니다.', 'error');
@@ -1272,7 +1399,13 @@ async function reverseSurveyReward(id) {
 
 function closeSurveyModal(modalId) {
   const modal = document.getElementById(modalId);
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    if (modalId === 'surveyAppViewModal') {
+      const iframe = document.getElementById('surveyAppIframe');
+      if (iframe) iframe.src = 'about:blank';
+    }
+  }
 }
 
 // =========================================================================
@@ -1280,6 +1413,13 @@ function closeSurveyModal(modalId) {
 // =========================================================================
 function maskPatientName(name) {
   if (!name) return '-';
+  // 개인정보 마스킹 해제 상태(gIsMasked === false)인 경우 실명 원본 표출
+  if (typeof gIsMasked !== 'undefined' && !gIsMasked) {
+    return String(name).trim() || '-';
+  }
+  if (typeof maskName === 'function') {
+    return maskName(name) || '-';
+  }
   const str = String(name).trim();
   if (str.length <= 1) return str;
   if (str.length === 2) return str[0] + '*';
@@ -1288,11 +1428,27 @@ function maskPatientName(name) {
 
 function maskPhone(phone) {
   if (!phone) return '';
-  const clean = phone.replace(/[^0-9]/g, '');
+  // 개인정보 마스킹 해제 상태(gIsMasked === false)인 경우 실번호 원본 표출
+  if (typeof gIsMasked !== 'undefined' && !gIsMasked) {
+    return String(phone).trim();
+  }
+  const str = String(phone).trim();
+  const clean = str.replace(/[^0-9]/g, '');
   if (clean.length === 11) {
     return clean.slice(0, 3) + '-****-' + clean.slice(7);
+  } else if (clean.length === 10) {
+    if (clean.startsWith('02')) {
+      return clean.slice(0, 2) + '-****-' + clean.slice(6);
+    }
+    return clean.slice(0, 3) + '-***-' + clean.slice(6);
+  } else if (clean.length === 9 && clean.startsWith('02')) {
+    return clean.slice(0, 2) + '-***-' + clean.slice(5);
   }
-  return phone;
+  const parts = str.split('-');
+  if (parts.length === 3) {
+    return parts[0] + '-****-' + parts[2];
+  }
+  return str;
 }
 
 function getGuidanceStatusBadge(status) {
@@ -1347,6 +1503,8 @@ if (typeof window !== 'undefined') {
   window.applySurveyFilters = applySurveyFilters;
   window.renderSurveyFollowups = renderSurveyFollowups;
   window.renderSurveyRewards = renderSurveyRewards;
+  window.openSurveyAppModal = openSurveyAppModal;
+  window.openSurveyAppNewTab = openSurveyAppNewTab;
   window.openSurveyQrModal = openSurveyQrModal;
   window.closeSurveyModal = closeSurveyModal;
   window.copySurveyUrl = copySurveyUrl;
@@ -1356,6 +1514,9 @@ if (typeof window !== 'undefined') {
   window.openSurveyDetailModal = openSurveyDetailModal;
   window.openSurveyFollowupModal = openSurveyFollowupModal;
   window.saveFollowupCase = saveFollowupCase;
+  window.openEditSurveyTargetModal = openEditSurveyTargetModal;
+  window.submitSurveyTargetEdit = submitSurveyTargetEdit;
+  window.deleteSurveyTarget = deleteSurveyTarget;
   window.openNewSurveyTargetModal = openNewSurveyTargetModal;
   window.handleCreateSurveyTarget = handleCreateSurveyTarget;
   window.autoSeedSurveyTargets = autoSeedSurveyTargets;
@@ -1377,6 +1538,176 @@ if (typeof window !== 'undefined') {
   window.refreshHubCandidatesAndDropdown = refreshHubCandidatesAndDropdown;
   window.selectHubCandidate = selectHubCandidate;
   window.clearSelectedHubCandidate = clearSelectedHubCandidate;
+
+// =========================================================================
+// 만족도 조사 대상 단건 수정 (Edit Target)
+// =========================================================================
+function openEditSurveyTargetModal(targetId) {
+  const target = (gSurveyState.targets || []).find(t => t.id === targetId || t.serviceId === targetId);
+  if (!target) {
+    alert('해당 대상을 찾을 수 없습니다.');
+    return;
+  }
+
+  const modal = document.getElementById('surveyEditTargetModal');
+  if (!modal) return;
+
+  const displayAppId = (target.serviceId && !target.serviceId.startsWith('ST-')) 
+    ? target.serviceId 
+    : (typeof gApps !== 'undefined' && Array.isArray(gApps) 
+        ? (gApps.find(a => {
+            const aName = (a.patientName || a.patient_name || '').trim();
+            const tName = (target.patientName || '').trim();
+            const aPhone = String(a.patientPhone || a.patient_phone || a.contact || '').replace(/[^0-9]/g, '');
+            const tPhone = String(target.patientPhone || target.phone || '').replace(/[^0-9]/g, '');
+            return (aPhone && tPhone && aPhone === tPhone) || (aName && aName === tName);
+          })?.id || target.serviceId || target.id)
+        : target.serviceId || target.id);
+
+  document.getElementById('editTargetId').value = target.id;
+  const serviceIdInput = document.getElementById('editTargetServiceId');
+  if (serviceIdInput) serviceIdInput.value = displayAppId || '';
+  document.getElementById('editTargetPatientName').value = target.patientName || '';
+  document.getElementById('editTargetPhone').value = target.patientPhone || '';
+  document.getElementById('editTargetHospital').value = target.hospitalName || '';
+  document.getElementById('editTargetCaregiverName').value = target.caregiverName || '';
+  document.getElementById('editTargetStartDate').value = target.careStartDate || '';
+  document.getElementById('editTargetEndDate').value = target.careEndDate || '';
+  document.getElementById('editTargetDueAt').value = target.dueAt ? target.dueAt.slice(0, 10) : '';
+  document.getElementById('editTargetGuidanceStatus').value = target.guidanceStatus || 'NOT_STARTED';
+  document.getElementById('editTargetResponseStatus').value = target.responseStatus || 'NOT_STARTED';
+
+  modal.classList.remove('hidden');
+  if (typeof initIcons === 'function') initIcons(modal);
+}
+
+async function submitSurveyTargetEdit(event) {
+  if (event) event.preventDefault();
+
+  const id = document.getElementById('editTargetId').value;
+  if (!id) return;
+
+  const target = (gSurveyState.targets || []).find(t => t.id === id);
+  if (!target) return;
+
+  const serviceIdInput = document.getElementById('editTargetServiceId');
+  const serviceId = serviceIdInput ? serviceIdInput.value.trim() : undefined;
+  const patientName = document.getElementById('editTargetPatientName').value.trim();
+  const patientPhone = document.getElementById('editTargetPhone').value.trim();
+  const hospitalName = document.getElementById('editTargetHospital').value.trim();
+  const caregiverName = document.getElementById('editTargetCaregiverName').value.trim();
+  const careStartDate = document.getElementById('editTargetStartDate').value.trim();
+  const careEndDate = document.getElementById('editTargetEndDate').value.trim();
+  const rawDueAt = document.getElementById('editTargetDueAt').value;
+  const dueAt = rawDueAt ? new Date(rawDueAt + 'T23:59:59').toISOString() : target.dueAt;
+  const guidanceStatus = document.getElementById('editTargetGuidanceStatus').value;
+  const responseStatus = document.getElementById('editTargetResponseStatus').value;
+
+  const updates = {
+    serviceId: serviceId || target.serviceId,
+    patientName,
+    patientPhone,
+    hospitalName,
+    caregiverName,
+    careStartDate,
+    careEndDate,
+    dueAt,
+    guidanceStatus,
+    responseStatus
+  };
+
+  // 1. 로컬 상태 즉시 갱신
+  Object.assign(target, updates);
+  target.revision = (target.revision || 1) + 1;
+  target.updatedAt = new Date().toISOString();
+
+  // 2. localStorage 영구 보존
+  try {
+    localStorage.setItem('LIVON_SURVEY_TARGETS', JSON.stringify(gSurveyState.targets));
+  } catch (e) {}
+
+  // 3. Convex 클라우드 DB 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:updateSurveyTarget', { id, updates }).catch(err => console.warn('[Convex Update Error]', err));
+  }
+
+  // 4. 로컬 Node 백엔드 동기화
+  try {
+    fetch('/api/survey/targets/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, updates, actor: 'ADMIN' })
+    }).catch(() => {});
+  } catch (e) {}
+
+  closeSurveyModal('surveyEditTargetModal');
+  applySurveyFilters();
+  renderSurveyKpis();
+
+  if (typeof showToast === 'function') {
+    showToast(`[${patientName}] 고객의 만족도 조사 정보가 성공적으로 수정되었습니다.`, 'success');
+  } else {
+    alert(`[${patientName}] 고객의 만족도 조사 정보가 수정되었습니다.`);
+  }
+}
+
+// =========================================================================
+// 만족도 조사 대상 단건 삭제 (Delete Target)
+// =========================================================================
+async function deleteSurveyTarget(targetId) {
+  const target = (gSurveyState.targets || []).find(t => t.id === targetId || t.serviceId === targetId);
+  if (!target) {
+    alert('해당 대상을 찾을 수 없습니다.');
+    return;
+  }
+
+  if (!confirm(`[${target.patientName}] (${target.serviceId || target.id}) 고객을 만족도 조사 대상 목록에서 완전히 삭제하시겠습니까?\n\n삭제 시 대장에서 영구 제외됩니다.`)) {
+    return;
+  }
+
+  // 1. 로컬 상태에서 즉시 제거
+  const idx = gSurveyState.targets.findIndex(t => t.id === target.id);
+  if (idx !== -1) {
+    gSurveyState.targets.splice(idx, 1);
+  }
+
+  // 2. localStorage 영구 보존
+  try {
+    localStorage.setItem('LIVON_SURVEY_TARGETS', JSON.stringify(gSurveyState.targets));
+  } catch (e) {}
+
+  // 3. Convex 클라우드 DB에서 삭제
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:deleteSurveyTarget', { id: target.id }).catch(err => console.warn('[Convex Delete Error]', err));
+  }
+
+  // 4. 로컬 Node 백엔드에서 삭제
+  try {
+    fetch('/api/survey/targets/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: target.id, actor: 'ADMIN' })
+    }).catch(() => {});
+  } catch (e) {}
+
+  // 5. KPI 재계산 및 뷰 갱신
+  const activeTargets = gSurveyState.targets.filter(t => t.targetStatus !== 'CANCELLED');
+  const submitted = activeTargets.filter(t => t.responseStatus === 'SUBMITTED');
+  gSurveyState.summary.totalTargets = activeTargets.length;
+  gSurveyState.summary.submittedCount = submitted.length;
+  gSurveyState.summary.responseRate = activeTargets.length > 0 ? Math.round((submitted.length / activeTargets.length) * 100) : 0;
+  gSurveyState.summary.unguidedCount = activeTargets.filter(t => t.guidanceStatus === 'NOT_STARTED').length;
+
+  applySurveyFilters();
+  renderSurveyKpis();
+  updateSidebarSurveyBadge();
+
+  if (typeof showToast === 'function') {
+    showToast(`[${target.patientName}] 고객이 만족도 조사 대상 목록에서 삭제되었습니다.`, 'info');
+  } else {
+    alert(`[${target.patientName}] 고객이 삭제되었습니다.`);
+  }
+}
 
   // 바깥 클릭 시 드롭다운 자동 닫기 및 연락처 자동 하이픈 이벤트 등록
   document.addEventListener('click', (e) => {

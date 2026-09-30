@@ -1676,9 +1676,16 @@ function saveSavedFaxConfig(cfg) {
         try {
           const payload = JSON.parse(body || '{}');
           if (payload.action === 'auto_seed') {
-            gSurveyService.ensureInitialData();
+            const result = gSurveyService.extractCompletedTargets(payload.apps);
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            return res.end(JSON.stringify({ success: true, message: '종료 고객 대상자가 생성되었습니다.', items: gSurveyService.getTargets() }));
+            return res.end(JSON.stringify({ 
+              success: true, 
+              message: result.addedCount > 0 
+                ? `실제 종료 고객 대상자가 추출되었습니다. (신규 ${result.addedCount}건 추가, 전체 ${result.totalTargets}건)` 
+                : `현재 등록 가능한 신규 종료 고객이 없습니다. (이미 전체 ${result.totalTargets}건 등록 완료)`,
+              ...result,
+              items: gSurveyService.getTargets() 
+            }));
           }
           const target = gSurveyService.createTargetFromApp(payload);
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1698,6 +1705,23 @@ function saveSavedFaxConfig(cfg) {
         try {
           const payload = JSON.parse(body || '{}');
           const result = gSurveyService.updateTarget(payload.id, payload.updates, payload.actor);
+          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/survey/targets/delete' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const result = gSurveyService.deleteTarget(payload.id, payload.actor);
           res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify(result));
         } catch (e) {
@@ -2072,7 +2096,7 @@ function saveSavedFaxConfig(cfg) {
               if (Array.isArray(sendKeyList) && sendKeyList.length > 0) {
                 const results = {};
                 for (const key of sendKeyList) {
-                  if (!key || typeof key !== 'string' || !key.startsWith('IBB_')) continue;
+                  if (!key || typeof key !== 'string' || key.startsWith('FLOG-')) continue;
                   try {
                     const st = await getBarobillFaxStatus(certKey, corpNum, key, isTest);
                     results[key] = st;

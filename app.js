@@ -1089,12 +1089,7 @@ function isDevEnvironment() {
   if (storedEnv === 'dev') return true;
   if (storedEnv === 'prod') return false;
 
-  // 로컬 개발 환경(localhost, 127.0.0.1, 개발 포트 등)에서는 개발 서버(DEV)를 사용하고, 실서비스 도메인에서는 운영 서버(PROD) 사용
-  const host = window.location.hostname || '';
-  const port = window.location.port || '';
-  if (host === 'localhost' || host === '127.0.0.1' || host.includes('dev') || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:') {
-    return true;
-  }
+  // [핵심 원칙]: 사용자의 실제 운영 데이터 단일 진실의 원천(PROD: gallant-weasel-360)을 모든 환경에서 기본 연동
   return false;
 }
 
@@ -3527,14 +3522,59 @@ function saveHdForm02CustomState() {
   } catch (e) {}
 }
 
-function formatCarePeriodDateTime(d, hour = 9, min = 0) {
-  if (!d || isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hh = String(hour).padStart(2, '0');
-  const mm = String(min).padStart(2, '0');
-  return `${y}. ${m}. ${day} (${hh})h (${mm})m`;
+function formatCarePeriodDateTime(dateInput, defaultHour = 9, defaultMin = 0) {
+  if (!dateInput) return '';
+
+  let y, m, day;
+  let hh = null;
+  let mm = null;
+
+  if (typeof dateInput === 'string') {
+    const raw = String(dateInput).trim();
+    if (!raw) return '';
+
+    // 1) (10)h (00)m or (10)h
+    const koreanHMatch = raw.match(/\((\d{1,2})\)h(?:\s*\((\d{1,2})\)m)?/i);
+    // 2) 10시 30분 or 10시
+    const koreanHourMatch = raw.match(/(\d{1,2})시(?:\s*(\d{1,2})분)?/);
+    // 3) HH:mm or HH:mm:ss, including "2026.09.30 10:00" or "2026-09-30T10:00"
+    const timeMatch = raw.match(/(?:[T\s]+)(\d{1,2}):(\d{1,2})/);
+
+    if (koreanHMatch) {
+      hh = parseInt(koreanHMatch[1], 10);
+      mm = koreanHMatch[2] ? parseInt(koreanHMatch[2], 10) : 0;
+    } else if (koreanHourMatch) {
+      hh = parseInt(koreanHourMatch[1], 10);
+      mm = koreanHourMatch[2] ? parseInt(koreanHourMatch[2], 10) : 0;
+    } else if (timeMatch) {
+      hh = parseInt(timeMatch[1], 10);
+      mm = parseInt(timeMatch[2], 10);
+    }
+
+    const parsed = parseCareDate(raw) || parseCareDateTime(raw);
+    if (!parsed || isNaN(parsed.getTime())) return raw;
+    y = parsed.getFullYear();
+    m = String(parsed.getMonth() + 1).padStart(2, '0');
+    day = String(parsed.getDate()).padStart(2, '0');
+  } else if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
+    y = dateInput.getFullYear();
+    m = String(dateInput.getMonth() + 1).padStart(2, '0');
+    day = String(dateInput.getDate()).padStart(2, '0');
+    if (dateInput.getHours() !== 0 || dateInput.getMinutes() !== 0) {
+      hh = dateInput.getHours();
+      mm = dateInput.getMinutes();
+    }
+  } else {
+    return '';
+  }
+
+  // Fallback to defaultHour / defaultMin if no time was found in the input
+  if (hh === null || isNaN(hh)) hh = (defaultHour !== undefined && defaultHour !== null) ? defaultHour : 9;
+  if (mm === null || isNaN(mm)) mm = (defaultMin !== undefined && defaultMin !== null) ? defaultMin : 0;
+
+  const hourStr = String(hh).padStart(2, '0');
+  const minStr = String(mm).padStart(2, '0');
+  return `${y}. ${m}. ${day} (${hourStr})h (${minStr})m`;
 }
 
 function calculateHdForm02TotalDays(periods, app) {
@@ -3556,16 +3596,7 @@ function calculateHdForm02TotalDays(periods, app) {
 function getHdForm02ServicePeriods(app) {
   const appId = (app && app.id) ? app.id : (window.gCurrentPreviewAppId || 'C0006');
 
-  // 1. 고객별 저장된 직접 수정 내역이 있는 경우 최우선 적용 (단, 과거 더미 날짜 2026. 08. 21은 자동 무시하고 실제 데이터 연동)
-  if (gHdForm02CustomState.customerOverrides && gHdForm02CustomState.customerOverrides[appId] && gHdForm02CustomState.customerOverrides[appId].servicePeriods) {
-    const saved = gHdForm02CustomState.customerOverrides[appId].servicePeriods;
-    const isLegacyDummy = Array.isArray(saved) && saved[0] && String(saved[0].start).includes('2026. 08. 21');
-    if (!isLegacyDummy) {
-      return saved;
-    }
-  }
-
-  // 2. 고객 배정 및 정산 스케줄 데이터 자동 연동
+  // 1. 고객 배정 및 정산 스케줄 데이터 준비
   const appAssigns = (typeof gAssigns !== 'undefined' && Array.isArray(gAssigns)) ? gAssigns.filter(a => a.applyId === appId) : [];
   const as = appAssigns.length > 0 ? appAssigns[0] : null;
   const prog = (as && typeof getCareProgressInfo === 'function') ? getCareProgressInfo(as) : null;
@@ -3579,6 +3610,33 @@ function getHdForm02ServicePeriods(app) {
     } catch (e) {}
   }
 
+  const targetRoundNum = (window.gPendingFaxDispatchParams && window.gPendingFaxDispatchParams.appId === appId && window.gPendingFaxDispatchParams.roundNumber)
+    ? Number(window.gPendingFaxDispatchParams.roundNumber)
+    : null;
+
+  // 2. 고객별 저장된 직접 수정 내역이 있는 경우 (단, 최신 차수 일시와 불일치 시 실시간 동기화)
+  if (gHdForm02CustomState.customerOverrides && gHdForm02CustomState.customerOverrides[appId] && gHdForm02CustomState.customerOverrides[appId].servicePeriods) {
+    const saved = gHdForm02CustomState.customerOverrides[appId].servicePeriods;
+    const isLegacyDummy = Array.isArray(saved) && saved[0] && String(saved[0].start).includes('2026. 08. 21');
+    if (!isLegacyDummy) {
+      if (sched && sched.rounds && sched.rounds.length > 0) {
+        const curRound = targetRoundNum
+          ? sched.rounds.find(r => r.roundNumber === targetRoundNum)
+          : (sched.rounds.find(r => r.claimStatus !== 'DEPOSIT_DONE' && r.claimStatus !== 'CLAIMED_UNPAID') || sched.rounds[0]);
+        if (curRound && curRound.endDateStr) {
+          const freshEnd = formatCarePeriodDateTime(curRound.endDateStr, 18, 0);
+          const freshStart = formatCarePeriodDateTime(curRound.startDateStr, 9, 0);
+          if (saved[0] && saved[0].end !== freshEnd) {
+            saved[0].start = freshStart;
+            saved[0].end = freshEnd;
+            if (curRound.days) saved[0].days = `${curRound.days}일`;
+          }
+        }
+      }
+      return saved;
+    }
+  }
+
   const defaultPeriods = [
     { start: '', end: '', days: '' },
     { start: '', end: '', days: '' },
@@ -3586,96 +3644,84 @@ function getHdForm02ServicePeriods(app) {
     { start: '', end: '', days: '' }
   ];
 
-  const targetRoundNum = (window.gPendingFaxDispatchParams && window.gPendingFaxDispatchParams.appId === appId && window.gPendingFaxDispatchParams.roundNumber)
-    ? Number(window.gPendingFaxDispatchParams.roundNumber)
-    : null;
-
   if (sched && sched.rounds && sched.rounds.length > 0) {
-    // 2-1. 특정 차수가 전달된 경우 (예: 9차, 10차 버튼 클릭 시)
+    // 3-1. 특정 차수가 전달된 경우 (예: 9차, 10차 버튼 클릭 시)
     if (targetRoundNum) {
       const targetRound = sched.rounds.find(r => r.roundNumber === targetRoundNum);
       if (targetRound) {
-        const sDate = parseCareDate(targetRound.startDateStr);
-        const eDate = parseCareDate(targetRound.endDateStr);
         const dNum = targetRound.days || targetRound.roundDays || 10;
         defaultPeriods[0] = {
-          start: sDate ? formatCarePeriodDateTime(sDate, 9, 0) : (targetRound.startDateStr || ''),
-          end: eDate ? formatCarePeriodDateTime(eDate, 18, 0) : (targetRound.endDateStr || ''),
+          start: formatCarePeriodDateTime(targetRound.startDateStr, 9, 0),
+          end: formatCarePeriodDateTime(targetRound.endDateStr, 18, 0),
           days: `${dNum}일`
         };
         return defaultPeriods;
       } else if (targetRoundNum > sched.rounds.length) {
         const lastR = sched.rounds[sched.rounds.length - 1];
-        const lastEnd = parseCareDate(lastR.endDateStr);
+        const lastEnd = parseCareDateTime(lastR.endDateStr) || parseCareDate(lastR.endDateStr);
         const nextStart = lastEnd ? new Date(lastEnd.getTime() + 86400000) : new Date();
-        const nextEnd = (as && as.endDate && parseCareDate(as.endDate)) || new Date();
+        const nextEnd = (as && as.endDate && (parseCareDateTime(as.endDate) || parseCareDate(as.endDate))) || new Date();
         const calcDays = Math.max(1, Math.round((nextEnd.getTime() - nextStart.getTime()) / 86400000) + 1);
         defaultPeriods[0] = {
           start: formatCarePeriodDateTime(nextStart, 9, 0),
-          end: formatCarePeriodDateTime(nextEnd, 18, 0),
+          end: formatCarePeriodDateTime((as && as.endDate) ? as.endDate : nextEnd, 18, 0),
           days: `${calcDays}일`
         };
         return defaultPeriods;
       }
     }
 
-    // 2-2. 차수 미지정 시: 미청구된 진행 차수 탐색
+    // 3-2. 차수 미지정 시: 미청구된 진행 차수 탐색
     const unbilledRound = sched.rounds.find(r => r.claimStatus !== 'DEPOSIT_DONE' && r.claimStatus !== 'CLAIMED_UNPAID');
     if (unbilledRound) {
-      const sDate = parseCareDate(unbilledRound.startDateStr);
-      const eDate = parseCareDate(unbilledRound.endDateStr);
       const dNum = unbilledRound.days || unbilledRound.roundDays || 10;
       defaultPeriods[0] = {
-        start: sDate ? formatCarePeriodDateTime(sDate, 9, 0) : (unbilledRound.startDateStr || ''),
-        end: eDate ? formatCarePeriodDateTime(eDate, 18, 0) : (unbilledRound.endDateStr || ''),
+        start: formatCarePeriodDateTime(unbilledRound.startDateStr, 9, 0),
+        end: formatCarePeriodDateTime(unbilledRound.endDateStr, 18, 0),
         days: `${dNum}일`
       };
       return defaultPeriods;
     }
 
-    // 2-3. 기존 차수가 모두 청구/입금 완료된 경우 (예: C0127 1~9차 완료 후 9월 3차 진행 중인 최신 차수)
+    // 3-3. 기존 차수가 모두 청구/입금 완료된 경우 (예: C0127 1~9차 완료 후 9월 3차 진행 중인 최신 차수)
     const allDone = sched.rounds.every(r => r.claimStatus === 'DEPOSIT_DONE' || r.claimStatus === 'CLAIMED_UNPAID');
     if (allDone) {
       const lastR = sched.rounds[sched.rounds.length - 1];
-      const lastEnd = parseCareDate(lastR.endDateStr);
+      const lastEnd = parseCareDateTime(lastR.endDateStr) || parseCareDate(lastR.endDateStr);
       const nextStart = lastEnd ? new Date(lastEnd.getTime() + 86400000) : new Date();
-      const nextEnd = (as && as.endDate && parseCareDate(as.endDate)) || new Date();
+      const nextEnd = (as && as.endDate && (parseCareDateTime(as.endDate) || parseCareDate(as.endDate))) || new Date();
       const calcDays = Math.max(1, Math.round((nextEnd.getTime() - nextStart.getTime()) / 86400000) + 1);
       defaultPeriods[0] = {
         start: formatCarePeriodDateTime(nextStart, 9, 0),
-        end: formatCarePeriodDateTime(nextEnd, 18, 0),
+        end: formatCarePeriodDateTime((as && as.endDate) ? as.endDate : nextEnd, 18, 0),
         days: `${calcDays}일`
       };
       return defaultPeriods;
     }
 
-    // 2-4. 기본: 최초 차수 목록 순차 표시
+    // 3-4. 기본: 최초 차수 목록 순차 표시
     sched.rounds.slice(0, 4).forEach((r, idx) => {
-      const sDate = parseCareDate(r.startDateStr);
-      const eDate = parseCareDate(r.endDateStr);
       defaultPeriods[idx] = {
-        start: sDate ? formatCarePeriodDateTime(sDate, 9, 0) : (r.startDateStr || ''),
-        end: eDate ? formatCarePeriodDateTime(eDate, 18, 0) : (r.endDateStr || ''),
+        start: formatCarePeriodDateTime(r.startDateStr, 9, 0),
+        end: formatCarePeriodDateTime(r.endDateStr, 18, 0),
         days: `${r.roundDays || r.days || 10}일`
       };
     });
     return defaultPeriods;
   }
 
-  // 3. 배정(as) 데이터 기준 fallback
+  // 4. 배정(as) 데이터 기준 fallback
   if (as && as.startDate) {
-    const sDate = parseCareDate(as.startDate);
-    const eDate = parseCareDate(as.endDate) || new Date();
     const totalD = prog ? prog.totalDays : ((app && parseInt(app.expectedDays, 10)) || 10);
     defaultPeriods[0] = {
-      start: formatCarePeriodDateTime(sDate, 9, 0),
-      end: formatCarePeriodDateTime(eDate, 18, 0),
+      start: formatCarePeriodDateTime(as.startDate, 9, 0),
+      end: formatCarePeriodDateTime(as.endDate, 18, 0),
       days: `${totalD}일`
     };
     return defaultPeriods;
   }
 
-  // 4. 신청서(app) 기준 fallback
+  // 5. 신청서(app) 기준 fallback
   if (app) {
     const sDate = parseCareDate(app.desiredDate) || parseCareDate(app.applyDate) || new Date();
     const totalD = parseInt(app.expectedDays, 10) || 10;
@@ -8112,9 +8158,9 @@ function buildSamsungExcelWorkbook(type = 'daily') {
 }
 
 /**
- * 이메일 첨부용 Base64 엑셀 파일 데이터 객체 생성 (ExcelJS 비동기 버퍼 기반 완벽 지원)
+ * 이메일 첨부용 Base64 엑셀 파일 데이터 객체 생성 (ExcelJS 비동기 버퍼 + XlsxPopulate 표준 암호화 완벽 지원)
  */
-async function buildSamsungExcelAttachment(type = 'daily') {
+async function buildSamsungExcelAttachment(type = 'daily', password = '') {
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -8136,10 +8182,37 @@ async function buildSamsungExcelAttachment(type = 'daily') {
     filename = elFilename;
   }
 
+  // 모달 인풋에서 비밀번호 체크 및 취득
+  let effectivePassword = (password || '').trim();
+  if (!effectivePassword) {
+    const isProtectChecked = document.getElementById('samsungExcelProtectCheckbox')?.checked;
+    if (isProtectChecked) {
+      effectivePassword = (document.getElementById('samsungExcelPasswordInput')?.value || '').trim();
+    }
+  }
+
   let base64Data = '';
   try {
-    const buffer = await buildSamsungExcelWorkbookBuffer(type);
+    let buffer = await buildSamsungExcelWorkbookBuffer(type);
     if (buffer) {
+      // 🔒 비밀번호가 설정된 경우 XlsxPopulate를 사용하여 MS Office ECMA-376 표준 암호화 적용
+      if (effectivePassword) {
+        if (typeof XlsxPopulate !== 'undefined') {
+          try {
+            const rawArrayBuf = buffer instanceof ArrayBuffer ? buffer : (buffer.buffer || buffer);
+            const wbToEncrypt = await XlsxPopulate.fromDataAsync(rawArrayBuf);
+            const encBlob = await wbToEncrypt.outputAsync({ password: effectivePassword });
+            buffer = await encBlob.arrayBuffer();
+            console.log(`[Excel Encryption] 엑셀 파일 암호화 완료 (암호: ${effectivePassword.replace(/./g, '*')}, 크기: ${buffer.byteLength} bytes)`);
+          } catch (encErr) {
+            console.error('[Excel Encryption Error]', encErr);
+            alert('엑셀 비밀번호 암호화 중 오류가 발생했습니다: ' + encErr.message);
+          }
+        } else {
+          console.warn('[Excel Encryption] XlsxPopulate 라이브러리가 로드되지 않아 암호화되지 않은 원본으로 진행합니다.');
+        }
+      }
+
       if (typeof Buffer !== 'undefined') {
         base64Data = Buffer.from(buffer).toString('base64');
       } else {
@@ -8166,7 +8239,9 @@ async function buildSamsungExcelAttachment(type = 'daily') {
     filename: filename,
     content: base64Data,
     encoding: 'base64',
-    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    isEncrypted: Boolean(effectivePassword),
+    password: effectivePassword
   };
 }
 
@@ -8737,6 +8812,14 @@ function openSamsungEmailModal(applyId, stepType = 'DAILY_INTAKE', roundNumber =
   const dateEnd = document.getElementById('samsungCarePortDateEnd');
   if (dateEnd) dateEnd.value = app.careEndDate || today;
 
+  // Reset excel password protection
+  const protectCb = document.getElementById('samsungExcelProtectCheckbox');
+  if (protectCb) protectCb.checked = false;
+  const pwBox = document.getElementById('samsungExcelPasswordBox');
+  if (pwBox) pwBox.classList.add('hidden');
+  const pwInput = document.getElementById('samsungExcelPasswordInput');
+  if (pwInput) pwInput.value = '';
+
   onSamsungEmailTypeChange(stepType);
   updateSamsungEmailSmtpStatusBanner();
   openModal('samsungEmailModal');
@@ -8865,6 +8948,101 @@ function onSamsungCustomExcelSelected(input) {
   if (cb) cb.checked = true;
   updateSamsungModalAttachBadges();
 }
+
+function toggleSamsungExcelPasswordUI() {
+  const cb = document.getElementById('samsungExcelProtectCheckbox');
+  const box = document.getElementById('samsungExcelPasswordBox');
+  const input = document.getElementById('samsungExcelPasswordInput');
+  const attachExcelCb = document.getElementById('attachSamsungExcelCheckbox');
+
+  if (cb && cb.checked) {
+    if (box) box.classList.remove('hidden');
+    // 비밀번호 설정 체크 시 첨부 엑셀 체크박스도 자동으로 활성화
+    if (attachExcelCb && !attachExcelCb.checked) {
+      attachExcelCb.checked = true;
+      updateSamsungModalAttachBadges();
+    }
+    // 기본 비밀번호가 비어있다면 오늘 날짜 6자리(YYMMDD)를 기본값으로 제안
+    if (input && !input.value.trim()) {
+      setPresetSamsungPassword('today');
+    } else {
+      updateSamsungExcelPasswordStatus();
+    }
+  } else {
+    if (box) box.classList.add('hidden');
+  }
+  if (typeof initIcons === 'function') initIcons(box);
+}
+
+function toggleSamsungExcelPasswordVisibility() {
+  const input = document.getElementById('samsungExcelPasswordInput');
+  const eyeIcon = document.getElementById('samsungExcelPasswordEyeIcon');
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye-off');
+  } else {
+    input.type = 'password';
+    if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye');
+  }
+  if (typeof initIcons === 'function') initIcons();
+}
+
+function setPresetSamsungPassword(type) {
+  const input = document.getElementById('samsungExcelPasswordInput');
+  const protectCb = document.getElementById('samsungExcelProtectCheckbox');
+  const box = document.getElementById('samsungExcelPasswordBox');
+  if (!input) return;
+
+  if (protectCb && !protectCb.checked) {
+    protectCb.checked = true;
+    if (box) box.classList.remove('hidden');
+  }
+
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+
+  if (type === 'today') {
+    input.value = `${yy}${mm}${dd}`;
+  } else if (type === 'patient') {
+    const appId = document.getElementById('samsungEmailTargetAppId')?.value;
+    const app = (gApps || []).find(a => String(a.id) === String(appId)) || (gApps && gApps[0]);
+    let pBirth = app ? (app.birthDate || app.patientBirth || app.birth || '') : '';
+    const cleanBirth = String(pBirth).replace(/[^0-9]/g, '');
+    if (cleanBirth.length >= 6) {
+      input.value = cleanBirth.slice(0, 6);
+    } else {
+      input.value = `${yy}${mm}${dd}`;
+      if (typeof showToast === 'function') showToast('고객 생년월일이 없어 오늘 날짜로 자동 입력되었습니다.', 'info');
+    }
+  } else if (type === 'samsung') {
+    input.value = 'sf1234!';
+  }
+
+  updateSamsungExcelPasswordStatus();
+  if (typeof initIcons === 'function') initIcons(box);
+}
+
+function updateSamsungExcelPasswordStatus() {
+  const input = document.getElementById('samsungExcelPasswordInput');
+  const badge = document.getElementById('samsungExcelPasswordStatusBadge');
+  if (!badge) return;
+  const val = (input?.value || '').trim();
+  if (val) {
+    badge.className = 'px-2 py-1 rounded-md text-[10.5px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300';
+    badge.innerText = `🔒 암호 [${val}] 적용됨`;
+  } else {
+    badge.className = 'px-2 py-1 rounded-md text-[10.5px] font-bold bg-amber-100 text-amber-800 border border-amber-300';
+    badge.innerText = '⚠️ 암호 미입력 (암호화 해제)';
+  }
+}
+
+window.toggleSamsungExcelPasswordUI = toggleSamsungExcelPasswordUI;
+window.toggleSamsungExcelPasswordVisibility = toggleSamsungExcelPasswordVisibility;
+window.setPresetSamsungPassword = setPresetSamsungPassword;
+window.updateSamsungExcelPasswordStatus = updateSamsungExcelPasswordStatus;
 
 var gCurrentExcelPreviewType = 'daily';
 
@@ -9587,6 +9765,17 @@ async function handleSamsungEmailSubmit(e) {
             : '월간 청구 보고'));
   const attachExcel = document.getElementById('attachSamsungExcelCheckbox')?.checked;
   const attachPdf = document.getElementById('attachCarePortPdfCheckbox')?.checked;
+  const isProtectChecked = document.getElementById('samsungExcelProtectCheckbox')?.checked;
+  const excelPassword = isProtectChecked ? (document.getElementById('samsungExcelPasswordInput')?.value || '').trim() : '';
+  const isAutoNotice = document.getElementById('samsungExcelAutoNoticeCheckbox')?.checked;
+
+  // 본문에 암호 안내 자동 추가
+  if (attachExcel && excelPassword && isAutoNotice) {
+    const notice = `\n\n[보안 안내]\n※ 첨부된 엑셀 보고서 파일은 개인정보보호를 위해 암호(비밀번호: ${excelPassword})가 설정되어 있습니다.`;
+    if (!rawBody.includes('암호(비밀번호:')) {
+      rawBody += notice;
+    }
+  }
 
   // 3. 첨부파일 패키징 (엑셀 누적 명단 자동생성 & 케어포트 간병일지)
   const attachments = [];
@@ -9596,25 +9785,45 @@ async function handleSamsungEmailSubmit(e) {
     const customFileInput = document.getElementById('samsungAttachCustomExcelInput');
     if (customFileInput && customFileInput.files && customFileInput.files[0]) {
       const file = customFileInput.files[0];
-      const base64Content = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const res = reader.result;
-          const b64 = typeof res === 'string' ? res.split(',')[1] : '';
-          resolve(b64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      let base64Content = '';
+      if (excelPassword && typeof XlsxPopulate !== 'undefined') {
+        try {
+          const arrBuf = await file.arrayBuffer();
+          const wb = await XlsxPopulate.fromDataAsync(arrBuf);
+          const encBlob = await wb.outputAsync({ password: excelPassword });
+          const encBuf = await encBlob.arrayBuffer();
+          const bytes = new Uint8Array(encBuf);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+          base64Content = btoa(binary);
+          console.log(`[Custom Excel Encrypted] 직접선택 엑셀 암호화 완료 (${excelPassword})`);
+        } catch(e) {
+          console.warn('Custom excel encryption error:', e);
+        }
+      }
+      if (!base64Content) {
+        base64Content = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const res = reader.result;
+            const b64 = typeof res === 'string' ? res.split(',')[1] : '';
+            resolve(b64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
       attachedExcelName = file.name;
       attachments.push({
         filename: file.name,
         content: base64Content,
         encoding: 'base64',
-        contentType: file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        contentType: file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        isEncrypted: Boolean(excelPassword),
+        password: excelPassword
       });
     } else {
-      const excelAttachObj = await buildSamsungExcelAttachment(emailType);
+      const excelAttachObj = await buildSamsungExcelAttachment(emailType, excelPassword);
       if (excelAttachObj) {
         attachedExcelName = excelAttachObj.filename;
         attachments.push(excelAttachObj);
@@ -9731,7 +9940,7 @@ async function handleSamsungEmailSubmit(e) {
           <tr>
             <td style="padding: 10px; font-weight: bold; color: #475569;">첨부 내역</td>
             <td style="padding: 10px; color: #0f172a;">
-              ${attachExcel ? `📊 ${excelFileName} (누적 전체 명단 자동 첨부)<br>` : ''}
+              ${attachExcel ? `📊 ${excelFileName} (누적 전체 명단 자동 첨부${excelPassword ? ` · 🔒 암호화 보호 적용` : ''})<br>` : ''}
               ${attachPdf ? `📋 케어포트(CarePort) 간병일지 리포트 (총 ${attachments.filter(a => a.contentType === 'application/pdf').length}건 개별 PDF 첨부)<br>` + attachments.filter(a => a.contentType === 'application/pdf').map(a => `<span style="font-size: 11px; color: #64748b; margin-left: 8px;">· 📄 ${a.filename}</span><br>`).join('') : ''}
               ${!attachExcel && !attachPdf ? `(첨부 없음)` : ''}
             </td>
@@ -9874,6 +10083,8 @@ async function handleSamsungEmailSubmit(e) {
       subject,
       excelFileName: excelFileName || '-',
       hasCarePortPdf: attachPdf,
+      hasExcelPassword: Boolean(excelPassword),
+      excelPasswordHint: excelPassword || '',
       status: '전송완료',
       appId: appId || '',
       roundNumber: targetRoundNum
@@ -9906,6 +10117,7 @@ async function handleSamsungEmailSubmit(e) {
         `수신자 (To): ${to}`,
         `참조 (Cc): ${cc || '(없음)'}`,
         `첨부 파일: ${attachments.length > 0 ? attachments.map(a => a.filename).join(', ') : '(첨부 없음)'}`,
+        excelPassword ? `엑셀 암호화: 🔒 암호 설정 완료 (${excelPassword})` : `엑셀 암호화: 🔓 미설정 (일반 첨부)`,
         `서버 응답: ${data.serverReply || '250 OK Message accepted'}`,
         `발송 일시: ${timeStr} (전산 상태값 자동 영구 저장)`
       ]
@@ -14310,7 +14522,10 @@ function renderSamsungEmailHistoryTable() {
         <td class="p-3 font-bold text-slate-900 max-w-sm truncate" title="${log.subject || ''}">
           ${isRecentlySent ? '<span class="inline-block mr-1.5 text-[10.5px] font-black text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300">방금 발송 완료 🚀</span>' : ''}${log.subject || '-'}
         </td>
-        <td class="p-3 font-mono text-emerald-800 font-bold">${log.excelFileName || log.attachmentsSummary || '-'}</td>
+        <td class="p-3 font-mono text-emerald-800 font-bold">
+          ${log.excelFileName || log.attachmentsSummary || '-'}
+          ${log.hasExcelPassword ? `<span class="inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300 ml-1.5 font-sans" title="암호 설정됨 (${log.excelPasswordHint || '보안'})"><i data-lucide="lock" class="w-2.5 h-2.5"></i> 암호설정</span>` : ''}
+        </td>
         <td class="p-3 text-center">
           ${isRecentlySent 
             ? `<span class="px-2.5 py-1 rounded-full text-[10.5px] font-black bg-emerald-600 text-white shadow-md flex items-center justify-center gap-1 w-24 mx-auto ring-2 ring-emerald-300 animate-pulse">
@@ -21521,14 +21736,18 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
       }
       if (!roundCg) roundCg = (as ? as.caregiverName : (app ? app.caregiverName : ''));
 
+      const effectiveEndDateStr = roundEndDateStr || cSet.endDateStr || '';
+      const derivedStandardDate = effectiveEndDateStr ? effectiveEndDateStr.slice(0, 10).replace(/-/g, '.') : (cSet.claimStandardDate || '');
+      const payoutTimeStr = (cSet.payoutStandardDate && cSet.payoutStandardDate.includes(' ')) ? cSet.payoutStandardDate.split(' ')[1] : (effectiveEndDateStr.slice(11, 16) || '18:00');
+
       rounds.push({
         roundNumber: setIndex,
         setIndex: setIndex,
         label: cSet.claimRound || cSet.payoutRound || `세트 ${setIndex}`,
         claimRoundLabel: cSet.claimRound || '-',
         payoutRoundLabel: cSet.payoutRound || '-',
-        claimStandardDate: cSet.claimStandardDate || '',
-        payoutStandardDate: cSet.payoutStandardDate || '',
+        claimStandardDate: derivedStandardDate,
+        payoutStandardDate: derivedStandardDate ? `${derivedStandardDate} ${payoutTimeStr}` : (cSet.payoutStandardDate || ''),
         claimDate: cSet.claimDate || (existingClaim ? (existingClaim.claimDate || existingClaim.faxSentDate || '') : ''),
         payoutDate: cSet.payoutDate || (existingPayout ? (existingPayout.paidDate || existingPayout.payoutDate || '') : ''),
         claimDays: claimDays,
@@ -21657,8 +21876,8 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         const setDays = Math.max(claimDays, payoutDays);
         const hours = setDays * 24;
 
-        const claimStandardDate = claimForRound ? (claimForRound.standardDate || claimForRound.startDate || '') : (payoutForRound ? (payoutForRound.standardDate || payoutForRound.startDate || '') : '');
-        const payoutStandardDate = payoutForRound ? (payoutForRound.standardDate || payoutForRound.startDate || '') : (claimForRound ? (claimForRound.standardDate || claimForRound.startDate || '') : '');
+        const claimStandardDate = claimForRound ? (claimForRound.standardDate || (claimForRound.endDate ? claimForRound.endDate.slice(0, 10).replace(/-/g, '.') : '') || claimForRound.startDate || '') : (payoutForRound ? (payoutForRound.standardDate || (payoutForRound.endDate ? payoutForRound.endDate.slice(0, 10).replace(/-/g, '.') : '') || payoutForRound.startDate || '') : '');
+        const payoutStandardDate = payoutForRound ? (payoutForRound.standardDate || (payoutForRound.endDate ? payoutForRound.endDate.slice(0, 10).replace(/-/g, '.') : '') || payoutForRound.startDate || '') : (claimForRound ? (claimForRound.standardDate || (claimForRound.endDate ? claimForRound.endDate.slice(0, 10).replace(/-/g, '.') : '') || claimForRound.startDate || '') : '');
 
         let roundStartDateStr = '';
         let roundEndDateStr = '';
@@ -21795,14 +22014,17 @@ function calculateCareSettlementSchedule(app, as, prog, appClaims, appPayouts) {
         const ongoingClaimAmount = (roundStage === 'ONGOING') ? Math.min(fullClaimAmount, ongoingElapsed * dailyClaimPrice) : fullClaimAmount;
         const ongoingPayoutAmount = (roundStage === 'ONGOING') ? Math.min(fullPayoutAmount, ongoingElapsed * roundDailyWage) : fullPayoutAmount;
 
+        const roundEndStdDate = (roundEndDateStr ? roundEndDateStr.slice(0, 10).replace(/-/g, '.') : '') || claimStandardDate || (payoutStandardDate ? payoutStandardDate.slice(0, 10) : '');
+        const roundEndTime = (roundEndDateStr && roundEndDateStr.slice(11, 16)) || ((payoutStandardDate && payoutStandardDate.includes(' ')) ? payoutStandardDate.split(' ')[1] : '18:00');
+
         rounds.push({
           roundNumber: setIndex,
           setIndex: setIndex,
           label: claimRoundLabel !== '-' ? claimRoundLabel : (payoutRoundLabel !== '-' ? payoutRoundLabel : `세트 ${setIndex}`),
           claimRoundLabel,
           payoutRoundLabel,
-          claimStandardDate,
-          payoutStandardDate,
+          claimStandardDate: roundEndStdDate,
+          payoutStandardDate: roundEndStdDate ? `${roundEndStdDate} ${roundEndTime}` : payoutStandardDate,
           claimDate: claimForRound ? (claimForRound.claimDate || claimForRound.faxSentDate || '') : '',
           payoutDate: payoutForRound ? (payoutForRound.paidDate || payoutForRound.payoutDate || '') : '',
           claimDays,
@@ -22206,7 +22428,7 @@ async function createInterimPayout(applyId, roundNumber, targetDays) {
     app.updatedAt = now.toISOString();
   }
 
-  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId, roundNumber || 1);
   const payoutListModal = document.getElementById('payoutDetailListModal');
   if (payoutListModal && !payoutListModal.classList.contains('hidden')) openPayoutDetailListModal(applyId);
   renderUnifiedCareHub();
@@ -22288,7 +22510,7 @@ async function executeImmediatePayout(applyId, roundNumber, targetDays) {
         });
       }
 
-      if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+      if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId, roundNumber || 1);
       renderUnifiedCareHub();
       renderCaregiverPayouts();
       showToast(`[${existing.caregiverName || '간병사'}] ${roundNumber || 1}차 간병비가 정상적으로 지급완료 처리되었습니다.`, 'success');
@@ -22356,7 +22578,7 @@ async function executeImmediatePayout(applyId, roundNumber, targetDays) {
       });
     }
 
-    if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+    if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId, roundNumber || 1);
     const payoutListModal = document.getElementById('payoutDetailListModal');
     if (payoutListModal && !payoutListModal.classList.contains('hidden')) openPayoutDetailListModal(applyId);
     renderUnifiedCareHub();
@@ -22386,7 +22608,8 @@ async function deleteInterimPayout(applyId, payoutId) {
   try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
   try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
-  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+  const pRoundNum = parseInt(String((p && p.round) || '').replace(/[^0-9]/g, ''), 10) || null;
+  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId, pRoundNum);
   const payoutListModal = document.getElementById('payoutDetailListModal');
   if (payoutListModal && !payoutListModal.classList.contains('hidden')) openPayoutDetailListModal(applyId);
   renderUnifiedCareHub();
@@ -22561,7 +22784,7 @@ async function createInterimClaim(applyId, roundNumber, targetDays) {
     app.updatedAt = new Date().toISOString();
   }
 
-  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId, roundNumber || 1);
   const claimListModal = document.getElementById('claimDetailListModal');
   if (claimListModal && !claimListModal.classList.contains('hidden')) openClaimDetailListModal(applyId);
   renderUnifiedCareHub();
@@ -22652,7 +22875,8 @@ async function deleteInterimClaim(applyId, claimId) {
     app.updatedAt = new Date().toISOString();
   }
 
-  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+  const claimRoundNumber = parseInt(String((c && c.round) || '').replace(/[^0-9]/g, ''), 10) || 1;
+  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId, claimRoundNumber);
   const claimListModal = document.getElementById('claimDetailListModal');
   if (claimListModal && !claimListModal.classList.contains('hidden')) openClaimDetailListModal(applyId);
   renderUnifiedCareHub();
@@ -22733,17 +22957,17 @@ function ensureSettlementSetModal() {
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label class="block font-bold text-slate-700 text-[11px] mb-1">시작 일시</label>
-                <input type="datetime-local" id="settlementSetStartInput" oninput="recalcSettlementSetModalPreview()" required
+                <input type="datetime-local" id="settlementSetStartInput" oninput="recalcSettlementSetModalPreview()" onchange="recalcSettlementSetModalPreview()" required
                   class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500">
               </div>
               <div>
                 <label class="block font-bold text-slate-700 text-[11px] mb-1">종료 일시</label>
-                <input type="datetime-local" id="settlementSetEndInput" oninput="recalcSettlementSetModalPreview()" required
+                <input type="datetime-local" id="settlementSetEndInput" oninput="recalcSettlementSetModalPreview()" onchange="recalcSettlementSetModalPreview()" required
                   class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500">
               </div>
               <div>
                 <label class="block font-bold text-slate-700 text-[11px] mb-1">세트 일수 (일)</label>
-                <input type="number" id="settlementSetDaysInput" min="1" oninput="recalcSettlementSetModalPreview(true)" required
+                <input type="number" id="settlementSetDaysInput" min="1" oninput="recalcSettlementSetModalPreview(true)" onchange="recalcSettlementSetModalPreview(true)" required
                   class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-black text-indigo-900 focus:ring-2 focus:ring-indigo-500">
               </div>
             </div>
@@ -22767,6 +22991,7 @@ function ensureSettlementSetModal() {
               <div>
                 <label class="block font-bold text-slate-700 text-[11px] mb-1">청구 기준일 (보험청구 기준)</label>
                 <input type="text" id="settlementSetClaimStandardDateInput" placeholder="YYYY.MM.DD"
+                  oninput="syncPayoutStandardDateWithClaimStandardDate()" onchange="syncPayoutStandardDateWithClaimStandardDate()"
                   class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500">
               </div>
               <div>
@@ -22963,7 +23188,9 @@ function openSettlementSetEditModal(appId, setIndex) {
   // Claim
   document.getElementById('settlementSetModalClaimId').value = r && r.existingClaim ? r.existingClaim.id : (r ? r.claimId : '');
   document.getElementById('settlementSetClaimRoundInput').value = r ? (r.claimRoundLabel !== '-' ? r.claimRoundLabel : (r.existingClaim ? r.existingClaim.round : '')) : '';
-  document.getElementById('settlementSetClaimStandardDateInput').value = r ? r.claimStandardDate : '';
+  const endValDate = endVal ? endVal.slice(0, 10).replace(/-/g, '.') : (r && r.endDateStr ? r.endDateStr.slice(0, 10).replace(/-/g, '.') : '');
+  const claimStdDate = endValDate || (r ? r.claimStandardDate : '');
+  document.getElementById('settlementSetClaimStandardDateInput').value = claimStdDate;
   document.getElementById('settlementSetClaimDateInput').value = r ? (r.claimDate || (r.existingClaim ? (r.existingClaim.claimDate || r.existingClaim.faxSentDate) : '')) : '';
   document.getElementById('settlementSetClaimDaysInput').value = r ? (r.claimDays || r.days) : 1;
   document.getElementById('settlementSetClaimUnitPriceInput').value = formatCurrency(r ? r.dailyClaimPrice : 160000);
@@ -22981,7 +23208,8 @@ function openSettlementSetEditModal(appId, setIndex) {
   // Payout
   document.getElementById('settlementSetModalPayoutId').value = r && r.existingPayout ? r.existingPayout.id : (r ? r.payoutId : '');
   document.getElementById('settlementSetPayoutRoundInput').value = r ? (r.payoutRoundLabel !== '-' ? r.payoutRoundLabel : (r.existingPayout ? r.existingPayout.round : '')) : '';
-  document.getElementById('settlementSetPayoutStandardDateInput').value = r ? r.payoutStandardDate : '';
+  const endValTime = (endVal ? endVal.slice(11, 16) : '') || ((r && r.payoutStandardDate && r.payoutStandardDate.includes(' ')) ? r.payoutStandardDate.split(' ')[1] : '18:00');
+  document.getElementById('settlementSetPayoutStandardDateInput').value = claimStdDate ? `${claimStdDate} ${endValTime}` : (r ? r.payoutStandardDate : '');
   document.getElementById('settlementSetPayoutDateInput').value = r ? (r.payoutDate || (r.existingPayout ? (r.existingPayout.paidDate || r.existingPayout.payoutDate) : '')) : '';
   document.getElementById('settlementSetPayoutDaysInput').value = r ? (r.payoutDays || r.days) : 1;
   document.getElementById('settlementSetPayoutWageInput').value = formatCurrency(r ? r.cgDailyWage : 140000);
@@ -23102,6 +23330,25 @@ function openSettlementSetAddModal(appId) {
   if (typeof initIcons === 'function') initIcons(document.getElementById('settlementSetModal'));
 }
 
+function syncPayoutStandardDateWithClaimStandardDate() {
+  const claimStdInput = document.getElementById('settlementSetClaimStandardDateInput');
+  const payoutStdInput = document.getElementById('settlementSetPayoutStandardDateInput');
+  const endInput = document.getElementById('settlementSetEndInput');
+  if (claimStdInput && payoutStdInput) {
+    const claimDate = claimStdInput.value.trim();
+    if (claimDate) {
+      let timePart = '18:00';
+      if (payoutStdInput.value && payoutStdInput.value.includes(' ')) {
+        timePart = payoutStdInput.value.split(' ')[1] || '18:00';
+      } else if (endInput && endInput.value && endInput.value.slice(11, 16)) {
+        timePart = endInput.value.slice(11, 16);
+      }
+      payoutStdInput.value = `${claimDate} ${timePart}`;
+    }
+  }
+}
+window.syncPayoutStandardDateWithClaimStandardDate = syncPayoutStandardDateWithClaimStandardDate;
+
 function recalcSettlementSetModalPreview(isFromDays) {
   const startInput = document.getElementById('settlementSetStartInput');
   const endInput = document.getElementById('settlementSetEndInput');
@@ -23138,6 +23385,20 @@ function recalcSettlementSetModalPreview(isFromDays) {
       if (payoutRoundInput && (!payoutRoundInput.value || payoutRoundInput.value.includes('차'))) {
         payoutRoundInput.value = stdRound;
       }
+    }
+  }
+
+  // [청구 기준일 & 지급 기준일시 종료일자와 자동 동기화]
+  if (endInput && endInput.value) {
+    const endFormattedDate = endInput.value.slice(0, 10).replace(/-/g, '.');
+    const claimStdInput = document.getElementById('settlementSetClaimStandardDateInput');
+    if (claimStdInput) {
+      claimStdInput.value = endFormattedDate;
+    }
+    const payoutStdInput = document.getElementById('settlementSetPayoutStandardDateInput');
+    if (payoutStdInput) {
+      const timePart = endInput.value.slice(11, 16) || '18:00';
+      payoutStdInput.value = `${endFormattedDate} ${timePart}`;
     }
   }
 
@@ -23185,7 +23446,7 @@ async function handleSaveSettlementSet(e) {
     const depositStatus = document.getElementById('settlementSetDepositStatusSelect')?.value || '미입금';
 
     const payoutRound = document.getElementById('settlementSetPayoutRoundInput')?.value.trim() || `${setIndex}차`;
-    const payoutStandardDate = document.getElementById('settlementSetPayoutStandardDateInput')?.value.trim() || endStr;
+    const payoutStandardDate = document.getElementById('settlementSetPayoutStandardDateInput')?.value.trim() || (claimStandardDate ? `${claimStandardDate} 18:00` : endStr);
     const payoutDate = document.getElementById('settlementSetPayoutDateInput')?.value.trim() || '';
     const payoutDays = parseInt(document.getElementById('settlementSetPayoutDaysInput')?.value || String(days), 10);
     const cgDailyWage = parseInt(String(document.getElementById('settlementSetPayoutWageInput')?.value || '0').replace(/[^0-9]/g, ''), 10) || 140000;
@@ -23442,9 +23703,14 @@ async function handleSaveSettlementSet(e) {
       console.warn('[handleSaveSettlementSet] real-data sync error:', e);
     }
 
+    if (typeof gHdForm02CustomState !== 'undefined' && gHdForm02CustomState.customerOverrides && gHdForm02CustomState.customerOverrides[appId]) {
+      delete gHdForm02CustomState.customerOverrides[appId].servicePeriods;
+      if (typeof saveHdForm02CustomState === 'function') saveHdForm02CustomState();
+    }
+
     closeModal('settlementSetModal');
     if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
-      openHubCustomerDetailModal(gActiveHubModalAppId);
+      openHubCustomerDetailModal(gActiveHubModalAppId, setData.setIndex);
     }
     if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
 
@@ -23662,7 +23928,8 @@ async function deleteSettlementSet(appId, setIndex) {
 
   // 12. Refresh UI immediately
   if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
-    openHubCustomerDetailModal(gActiveHubModalAppId);
+    const remainTargetIndex = Math.max(1, setIndex - 1);
+    openHubCustomerDetailModal(gActiveHubModalAppId, remainTargetIndex);
   }
   if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
   const claimListModal = document.getElementById('claimDetailListModal');
@@ -24311,9 +24578,14 @@ async function handleSaveRoundDateEdit(e) {
     syncToConvex('sync:saveApplication', { app }).catch(console.warn);
   }
 
+  if (typeof gHdForm02CustomState !== 'undefined' && gHdForm02CustomState.customerOverrides && gHdForm02CustomState.customerOverrides[appId]) {
+    delete gHdForm02CustomState.customerOverrides[appId].servicePeriods;
+    if (typeof saveHdForm02CustomState === 'function') saveHdForm02CustomState();
+  }
+
   closeModal('roundDateEditModal');
   if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
-    openHubCustomerDetailModal(gActiveHubModalAppId);
+    openHubCustomerDetailModal(gActiveHubModalAppId, roundNum);
   }
   if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
 
@@ -24340,9 +24612,14 @@ async function resetRoundDateEditToDefault() {
     }
   }
 
+  if (typeof gHdForm02CustomState !== 'undefined' && gHdForm02CustomState.customerOverrides && gHdForm02CustomState.customerOverrides[appId]) {
+    delete gHdForm02CustomState.customerOverrides[appId].servicePeriods;
+    if (typeof saveHdForm02CustomState === 'function') saveHdForm02CustomState();
+  }
+
   closeModal('roundDateEditModal');
   if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) {
-    openHubCustomerDetailModal(gActiveHubModalAppId);
+    openHubCustomerDetailModal(gActiveHubModalAppId, roundNum);
   }
   if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
 
@@ -24445,7 +24722,7 @@ async function confirmSamsungRoundClaimDirect(appId, roundNumber) {
     localStorage.setItem('LIVON_SAMSUNG_EMAIL_LOGS', JSON.stringify(gSamsungEmailLogs));
   } catch (e) {}
 
-  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId, roundNumber);
   if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
 
   if (typeof showNotification === 'function') {
@@ -24539,7 +24816,7 @@ async function cancelSamsungRoundClaim(appId, roundNumber) {
     });
   }
 
-  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId);
+  if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId, roundNumber);
   if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
   if (typeof renderClaims === 'function') renderClaims();
 
@@ -24822,7 +25099,7 @@ async function handleManualFaxClaimSubmit(e) {
 
   // 모달 및 허브 UI 갱신
   if (gActiveHubModalAppId) {
-    openHubCustomerDetailModal(gActiveHubModalAppId);
+    openHubCustomerDetailModal(gActiveHubModalAppId, roundNumber);
   }
   if (typeof renderUnifiedCareHub === 'function') {
     renderUnifiedCareHub();
@@ -25738,7 +26015,7 @@ async function addSettlementStepMemo(appId, roundNumber, stepType) {
   }
 
   if (gActiveHubModalAppId === appId) {
-    openHubCustomerDetailModal(appId);
+    openHubCustomerDetailModal(appId, roundNumber);
   }
 }
 window.addSettlementStepMemo = addSettlementStepMemo;
@@ -25826,7 +26103,7 @@ async function deleteSettlementStepMemo(appId, roundNumber, stepType, memoId) {
   }
 
   if (gActiveHubModalAppId === appId) {
-    openHubCustomerDetailModal(appId);
+    openHubCustomerDetailModal(appId, roundNumber);
   }
 }
 window.deleteSettlementStepMemo = deleteSettlementStepMemo;
@@ -26765,7 +27042,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                 : 'bg-amber-50/70 border-amber-200/90 text-amber-950';
 
             return `
-              <div class="bg-white rounded-3xl border border-slate-200 shadow-xs hover:shadow-md transition-all overflow-hidden">
+              <div id="settlementSetCard-${r.setIndex || r.roundNumber}" data-set-index="${r.setIndex || r.roundNumber}" class="bg-white rounded-3xl border border-slate-200 shadow-xs hover:shadow-md transition-all overflow-hidden scroll-mt-6">
                 
                 <!-- Round Top Bar -->
                 <div class="px-5 py-3 bg-slate-50 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
@@ -28142,7 +28419,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                       `<span class="text-amber-950 font-extrabold font-mono">${formatCurrency(r.fullClaimAmount)}원</span> <span class="text-[10px] text-amber-800">(${r.days}일 / ${hoursCount}시간)</span>`;
 
                     return `
-                      <div class="p-2.5 rounded-xl border ${cardBorder} text-[11.5px] transition-all space-y-2">
+                      <div id="settlementSetCard-${r.roundNumber}" data-set-index="${r.roundNumber}" class="scroll-mt-6 p-2.5 rounded-xl border ${cardBorder} text-[11.5px] transition-all space-y-2">
                         <div class="flex items-center justify-between gap-1.5 flex-wrap">
                           <div class="flex items-center gap-1.5 shrink-0">
                             <span class="font-black ${isClaimDone ? 'text-slate-900' : isSending ? 'text-purple-950' : 'text-amber-950'} whitespace-nowrap">${r.label}</span>
@@ -28949,7 +29226,8 @@ function handlePayoutEditSubmit(e) {
 
   closeModal('payoutEditModal');
   if (gActiveHubModalAppId) {
-    openHubCustomerDetailModal(gActiveHubModalAppId);
+    const pRoundNum = parseInt(String(p?.round || '').replace(/[^0-9]/g, ''), 10) || null;
+    openHubCustomerDetailModal(gActiveHubModalAppId, pRoundNum);
   }
   const payoutListModal = document.getElementById('payoutDetailListModal');
   if (payoutListModal && !payoutListModal.classList.contains('hidden') && p.applyId) {
@@ -29319,7 +29597,7 @@ async function saveRoundDepositAmount(appId, roundNumber, source = 'card3', expl
   renderUnifiedCareHub();
   renderClaims();
   if (gActiveHubModalAppId === appId) {
-    openHubCustomerDetailModal(appId);
+    openHubCustomerDetailModal(appId, roundNumber);
   }
 }
 window.saveRoundDepositAmount = saveRoundDepositAmount;
@@ -29380,7 +29658,8 @@ async function togglePayoutStatus(payoutId) {
     }
 
     if (gActiveHubModalAppId) {
-      openHubCustomerDetailModal(gActiveHubModalAppId);
+      const pRoundNum = parseInt(String((p && p.round) || '').replace(/[^0-9]/g, ''), 10) || null;
+      openHubCustomerDetailModal(gActiveHubModalAppId, pRoundNum);
     }
     const payoutListModal = document.getElementById('payoutDetailListModal');
     if (payoutListModal && !payoutListModal.classList.contains('hidden') && p.applyId) {
@@ -29945,7 +30224,7 @@ async function toggleClaimDepositStatus(applyId, roundNumber, claimId) {
 
   // 모달 및 화면 리렌더링
   if (gActiveHubModalAppId) {
-    openHubCustomerDetailModal(gActiveHubModalAppId);
+    openHubCustomerDetailModal(gActiveHubModalAppId, roundNumber);
   }
   const claimListModal = document.getElementById('claimDetailListModal');
   if (claimListModal && !claimListModal.classList.contains('hidden')) {
@@ -33283,20 +33562,31 @@ function renderFaxLogsTable() {
   initIcons(tbody);
 }
 
+// 바로빌 팩스 로그에서 실제 접수번호(SendKey) 안전 추출
+function getFaxLogSendKey(l) {
+  if (!l) return null;
+  if (l.sendKey && String(l.sendKey).startsWith('IBB_')) return String(l.sendKey);
+  if (l.id && String(l.id).startsWith('IBB_')) return String(l.id);
+  if (l.baroReceiptNum && String(l.baroReceiptNum).startsWith('IBB_')) return String(l.baroReceiptNum);
+  if (l.sendKey && !String(l.sendKey).startsWith('FLOG-')) return String(l.sendKey);
+  if (l.id && !String(l.id).startsWith('FLOG-') && (l.provider || '').includes('Barobill')) return String(l.id);
+  return null;
+}
+
 // 바로빌 팩스 전송상태 실시간 조회 및 동기화
 async function refreshBarobillFaxStatuses(isSilent = false) {
   const btn = document.getElementById('btnRefreshBaroStatus');
   const btnText = document.getElementById('btnRefreshBaroStatusText');
   const origHtml = btnText ? btnText.innerText : '바로빌 결과 실시간 동기화';
 
-  // 바로빌 접수건(IBB_*) 추출
-  const baroLogs = (gFaxLogs || []).filter(l => l && l.id && l.id.startsWith('IBB_'));
+  // 실제 바로빌 접수번호를 가진 발송건 추출
+  const baroLogs = (gFaxLogs || []).filter(l => Boolean(getFaxLogSendKey(l)));
   if (baroLogs.length === 0) {
-    if (!isSilent) alert('조회할 바로빌 팩스 발송 건이 없습니다.');
+    if (!isSilent) alert('조회할 바로빌 팩스 발송 건이 없습니다.\n(모의 시험 발송이 아닌 실제 바로빌 접수번호가 부여된 건만 실시간 조회가 가능합니다.)');
     return;
   }
 
-  const sendKeyList = baroLogs.map(l => l.id);
+  const sendKeyList = [...new Set(baroLogs.map(l => getFaxLogSendKey(l)).filter(Boolean))];
   const certKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY') || 'A1496EC3-E606-44C0-B126-F03B9AF88588';
   const corpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM') || '105-86-21696';
   const serverType = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'prod';
@@ -33323,18 +33613,18 @@ async function refreshBarobillFaxStatuses(isSilent = false) {
     if (data && data.success && data.results) {
       let updatedCount = 0;
       for (const [sendKey, st] of Object.entries(data.results)) {
-        if (!st || !st.success) continue;
-        const targetLog = gFaxLogs.find(l => l.id === sendKey);
+        if (!st) continue;
+        const targetLog = gFaxLogs.find(l => getFaxLogSendKey(l) === sendKey || l.id === sendKey || l.sendKey === sendKey);
         if (targetLog) {
           const prevStatus = targetLog.status;
-          if (st && st.success) {
+          if (st.success) {
             targetLog.status = st.status; // '성공' | '실패' | '전송중'
             targetLog.resultMsg = st.resultMsg || targetLog.resultMsg;
             if (st.endDT) targetLog.completedDate = st.endDT;
             if (st.fileUrl) targetLog.baroFileUrl = st.fileUrl;
-          } else {
+          } else if (st.sendState !== undefined && st.sendState < 0) {
             targetLog.status = '실패';
-            targetLog.resultMsg = st?.error || '바로빌 전송내역 없음 (실패)';
+            targetLog.resultMsg = st.resultMsg || st.error || '바로빌 전송 오류';
           }
 
           if (prevStatus !== targetLog.status) {
@@ -33352,7 +33642,7 @@ async function refreshBarobillFaxStatuses(isSilent = false) {
       renderFaxLogsTable();
 
       if (!isSilent) {
-        alert(`📠 [바로빌 전송결과 동기화 완료]\n\n조회 건수: ${baroLogs.length}건\n상태 변경: ${updatedCount}건 갱신\n\n대장에서 최신 전송 상태가 반영되었습니다.`);
+        alert(`📠 [바로빌 전송결과 동기화 완료]\n\n조회 건수: ${sendKeyList.length}건\n상태 변경: ${updatedCount}건 갱신\n\n대장에서 최신 전송 상태가 반영되었습니다.`);
       }
     } else {
       if (!isSilent) alert('바로빌 서버 응답을 확인하지 못했습니다: ' + (data?.error || '통신 오류'));
@@ -33370,9 +33660,15 @@ async function refreshBarobillFaxStatuses(isSilent = false) {
 }
 
 // 개별 바로빌 건 상세 상태 확인
-async function checkSingleBarobillStatus(sendKey) {
-  const log = (gFaxLogs || []).find(l => l.id === sendKey);
+async function checkSingleBarobillStatus(targetIdOrKey) {
+  const log = (gFaxLogs || []).find(l => l.id === targetIdOrKey || l.sendKey === targetIdOrKey || getFaxLogSendKey(l) === targetIdOrKey);
   if (!log) return;
+
+  const realSendKey = getFaxLogSendKey(log);
+  if (!realSendKey) {
+    alert('⚠️ 해당 발송 건은 모의/가상 발송(FLOG)이거나 바로빌 접수번호(SendKey)가 없는 내역입니다.\n실제 바로빌을 통해 발송된 건만 결과 조회가 가능합니다.');
+    return;
+  }
 
   const certKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY') || 'A1496EC3-E606-44C0-B126-F03B9AF88588';
   const corpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM') || '105-86-21696';
@@ -33386,13 +33682,13 @@ async function checkSingleBarobillStatus(sendKey) {
         action: 'query_barobill_status',
         certKey,
         corpNum,
-        sendKey,
+        sendKey: realSendKey,
         serverType
       })
     });
     const st = await res.json();
 
-    if (st && st.success) {
+    if (st && st.success && st.status !== 'verified') {
       log.status = st.status;
       log.resultMsg = st.resultMsg;
       if (st.endDT) log.completedDate = st.endDT;
@@ -33406,11 +33702,11 @@ async function checkSingleBarobillStatus(sendKey) {
         syncToConvex('sync:saveFaxRecord', { record: log }).catch(console.warn);
       }
 
-      alert(`📠 [바로빌 전송결과 상세]\n\n접수번호: ${sendKey}\n수신처: ${log.recipient} (${log.faxNumber})\n고객명: ${log.patientName}\n\n상태: ${st.statusLabel || st.status}\n상세내용: ${st.resultMsg}\n전송매수: ${st.successPageCount || 1}/${st.sendPageCount || 1}장\n${st.endDT ? '완료일시: ' + st.endDT : ''}`);
+      alert(`📠 [바로빌 전송결과 상세]\n\n접수번호: ${realSendKey}\n수신처: ${log.recipient} (${log.faxNumber})\n고객명: ${log.patientName}\n\n상태: ${st.statusLabel || st.status}\n상세내용: ${st.resultMsg}\n전송매수: ${st.successPageCount || 1}/${st.sendPageCount || 1}장\n${st.endDT ? '완료일시: ' + st.endDT : ''}`);
     } else {
-      // 바로빌에서 오류(예: '해당 발송정보가 없습니다')를 반환한 경우, 대장 상태도 '실패'로 갱신
+      const errDetail = st?.error || st?.resultMsg || '알 수 없는 응답';
       log.status = '실패';
-      log.resultMsg = st?.error || '바로빌 전송내역 없음 (실패)';
+      log.resultMsg = st?.resultMsg || st?.error || '바로빌 전송내역 없음 (실패)';
       saveFaxLogs();
       updateFaxKpis();
       renderFaxLogsTable();
@@ -33419,7 +33715,7 @@ async function checkSingleBarobillStatus(sendKey) {
         syncToConvex('sync:saveFaxRecord', { record: log }).catch(console.warn);
       }
 
-      alert(`⚠️ [바로빌 전송 조회 오류]\n\n상태: 전송실패 처리됨\n사유: ${st?.error || '알 수 없는 응답'}\n\n대장의 전송상태가 [전송실패]로 갱신되었습니다.`);
+      alert(`⚠️ [바로빌 전송 조회 결과]\n\n접수번호: ${realSendKey}\n상태: 전송실패\n사유: ${errDetail}\n\n대장의 전송상태가 [전송실패]로 갱신되었습니다.`);
     }
   } catch (err) {
     alert(`조회 중 오류가 발생했습니다: ${err.message}`);
@@ -35138,6 +35434,7 @@ function toggleMasking() {
   try { if (typeof renderCenters === 'function') renderCenters(); } catch (e) {}
   try { if (typeof renderTotalCallAnalysisTab === 'function') renderTotalCallAnalysisTab(); } catch (e) {}
   try { if (typeof renderSamsungCallReportTab === 'function') renderSamsungCallReportTab(); } catch (e) {}
+  try { if (typeof renderActiveSurveySubTab === 'function') renderActiveSurveySubTab(); } catch (e) {}
 
   // 3. 열려있는 모달/드로어 실시간 리프레시
   refreshOpenModalsForMasking();
@@ -35186,6 +35483,12 @@ function rerenderActiveTabForMasking() {
     if (typeof renderFaxManagement === 'function') renderFaxManagement();
   } else if (tab === 'forms') {
     if (typeof renderForms === 'function') renderForms();
+  } else if (tab === 'surveymgmt') {
+    if (typeof renderActiveSurveySubTab === 'function') {
+      renderActiveSurveySubTab();
+    } else if (typeof renderSurveyMgmtTab === 'function') {
+      renderSurveyMgmtTab();
+    }
   }
 }
 
@@ -35220,6 +35523,22 @@ function refreshOpenModalsForMasking() {
   if (csModal && !csModal.classList.contains('hidden') && typeof gActiveCsAppId !== 'undefined' && gActiveCsAppId) {
     if (typeof openCsHistoryModal === 'function') {
       openCsHistoryModal(gActiveCsAppId);
+    }
+  }
+
+  // 5. 만족도 조사 상세 모달
+  const surveyDetail = document.getElementById('surveyDetailModal');
+  if (surveyDetail && !surveyDetail.classList.contains('hidden') && typeof gSurveyState !== 'undefined' && gSurveyState.activeTarget) {
+    if (typeof openSurveyDetailModal === 'function') {
+      openSurveyDetailModal(gSurveyState.activeTarget.id);
+    }
+  }
+
+  // 6. 만족도 조사 후속조치 모달
+  const surveyFollowup = document.getElementById('surveyFollowupModal');
+  if (surveyFollowup && !surveyFollowup.classList.contains('hidden') && typeof gSurveyState !== 'undefined' && gSurveyState.activeFollowup) {
+    if (typeof openSurveyFollowupModal === 'function') {
+      openSurveyFollowupModal(gSurveyState.activeFollowup.id);
     }
   }
 }
@@ -45782,7 +46101,7 @@ function closeAllCareCardExpands() {
   updateCardDimBackdrop();
 }
 
-function openHubCustomerDetailModal(applyId) {
+function openHubCustomerDetailModal(applyId, targetSetIndex = null) {
   const modalEl = document.getElementById('hubCustomerDetailModal');
   if (!modalEl) {
     console.error('hubCustomerDetailModal element not found!');
@@ -46037,8 +46356,36 @@ function openHubCustomerDetailModal(applyId) {
       const prevScrollTop = bodyEl ? bodyEl.scrollTop : 0;
       bodyEl.innerHTML = mainWorkspaceHtml + ctiSectionHtml;
       initIcons(bodyEl);
-      if (prevScrollTop > 0 && bodyEl) {
+
+      // [정산/청구 세트 포커스 및 스크롤 위치 보존]
+      if (targetSetIndex !== null && targetSetIndex !== undefined) {
+        const cleanIdx = String(targetSetIndex).replace(/[^0-9]/g, '');
+        const targetEl = bodyEl ? (
+          bodyEl.querySelector(`#settlementSetCard-${targetSetIndex}`) ||
+          (cleanIdx ? bodyEl.querySelector(`#settlementSetCard-${cleanIdx}`) : null) ||
+          bodyEl.querySelector(`[data-set-index="${targetSetIndex}"]`) ||
+          (cleanIdx ? bodyEl.querySelector(`[data-set-index="${cleanIdx}"]`) : null)
+        ) : null;
+
+        if (targetEl) {
+          setTimeout(() => {
+            try {
+              targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              targetEl.classList.add('ring-4', 'ring-indigo-400', 'ring-offset-2', 'transition-all', 'duration-500');
+              setTimeout(() => {
+                targetEl.classList.remove('ring-4', 'ring-indigo-400', 'ring-offset-2');
+              }, 2000);
+            } catch (scrollErr) {
+              console.warn('Scroll to targetSetIndex error:', scrollErr);
+            }
+          }, 60);
+        } else if (prevScrollTop > 0 && bodyEl) {
+          bodyEl.scrollTop = prevScrollTop;
+          requestAnimationFrame(() => { if (bodyEl && prevScrollTop > 0) bodyEl.scrollTop = prevScrollTop; });
+        }
+      } else if (prevScrollTop > 0 && bodyEl) {
         bodyEl.scrollTop = prevScrollTop;
+        requestAnimationFrame(() => { if (bodyEl && prevScrollTop > 0) bodyEl.scrollTop = prevScrollTop; });
       }
     } catch (err) {
       console.error('Error rendering detail modal workspace:', err);

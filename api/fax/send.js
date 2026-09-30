@@ -113,7 +113,7 @@ module.exports = async (req, res) => {
     const faxId = 'FLOG-' + Date.now().toString().slice(-6);
 
     const faxLog = {
-      id: faxId,
+      id: matchRes || faxId,
       sendKey: matchRes || '',
       sentDate: dateStr,
       appId,

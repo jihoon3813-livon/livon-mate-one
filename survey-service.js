@@ -173,23 +173,50 @@ class SurveyService {
   // 초기 샘플 대상자 자동 생성 (hub_apps_real.json 활용)
   ensureInitialData() {
     if (this.data.targets.length > 0) return;
+    this.extractCompletedTargets();
+  }
 
-    try {
-      const appsPath = path.join(__dirname, 'hub_apps_real.json');
-      if (fs.existsSync(appsPath)) {
-        const hubData = JSON.parse(fs.readFileSync(appsPath, 'utf8'));
-        const apps = hubData.applications || [];
-        // 최근 완료/진행 건 8~10건 추출하여 대상 생성
-        const candidates = apps.slice(0, 15);
-        for (const app of candidates) {
-          if (!app.patientName) continue;
-          this.createTargetFromApp(app, false);
+  // 실제 종료 고객 자동 추출 (완료/정산완료/종료 상태 고객 전체 누락 없이 추출)
+  extractCompletedTargets(customApps = null) {
+    let sourceApps = [];
+    if (Array.isArray(customApps) && customApps.length > 0) {
+      sourceApps = customApps;
+    } else {
+      try {
+        const appsPath = path.join(__dirname, 'hub_apps_real.json');
+        if (fs.existsSync(appsPath)) {
+          const hubData = JSON.parse(fs.readFileSync(appsPath, 'utf8'));
+          sourceApps = hubData.applications || [];
         }
-        this.saveData();
+      } catch (e) {
+        console.warn('[SurveyService] Failed to load apps from hub_apps_real.json:', e.message);
       }
-    } catch (e) {
-      console.warn('[SurveyService] Initial data seed skipped:', e.message);
     }
+
+    const todayYmd = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+
+    // 실제 종료/완료 대상자 필터링 (상태값 완료/정산완료/종료/진행완료 또는 종료일 경과 건)
+    const completedApps = sourceApps.filter(app => {
+      if (!app || !app.patientName) return false;
+      const st = String(app.status || '').trim();
+      const isCompletedStatus = st === '완료' || st === '정산완료' || st === '종료' || st === '진행완료';
+      const isEndedByDate = app.careEndDate && app.careEndDate.slice(0, 10) <= todayYmd;
+      return isCompletedStatus || isEndedByDate;
+    });
+
+    let addedCount = 0;
+    for (const app of completedApps) {
+      const existing = this.data.targets.find(t => (t.serviceId === app.id || (t.patientName === app.patientName && t.hospitalName === app.hospitalName)) && t.targetStatus !== 'CANCELLED');
+      if (!existing) {
+        this.createTargetFromApp(app, false);
+        addedCount++;
+      }
+    }
+
+    if (addedCount > 0) {
+      this.saveData();
+    }
+    return { addedCount, totalCompleted: completedApps.length, totalTargets: this.data.targets.length };
   }
 
   createTargetFromApp(app, doSave = true) {
@@ -274,6 +301,10 @@ class SurveyService {
   getTargets(filter = {}) {
     let list = this.data.targets.slice();
 
+    if (filter.id || filter.targetId) {
+      const searchId = (filter.id || filter.targetId).trim();
+      list = list.filter(t => t.id === searchId || t.serviceId === searchId);
+    }
     if (filter.targetStatus && filter.targetStatus !== 'ALL') {
       list = list.filter(t => t.targetStatus === filter.targetStatus);
     }
@@ -286,10 +317,12 @@ class SurveyService {
     if (filter.search && filter.search.trim()) {
       const q = filter.search.trim().toLowerCase();
       list = list.filter(t => 
+        (t.id && t.id.toLowerCase().includes(q)) ||
         (t.patientName && t.patientName.toLowerCase().includes(q)) ||
         (t.serviceId && t.serviceId.toLowerCase().includes(q)) ||
         (t.caregiverName && t.caregiverName.toLowerCase().includes(q)) ||
-        (t.hospitalName && t.hospitalName.toLowerCase().includes(q))
+        (t.hospitalName && t.hospitalName.toLowerCase().includes(q)) ||
+        (t.patientPhone && t.patientPhone.replace(/[^0-9]/g, '').includes(q.replace(/[^0-9]/g, '')))
       );
     }
 
@@ -305,15 +338,31 @@ class SurveyService {
     if (!target) return { success: false, message: '대상을 찾을 수 없습니다.' };
 
     const before = { ...target };
-    if (updates.dueAt) target.dueAt = updates.dueAt;
-    if (updates.targetStatus) target.targetStatus = updates.targetStatus;
-    if (updates.caregiverName) target.caregiverName = updates.caregiverName;
+    const editableFields = [
+      'patientName', 'patientPhone', 'hospitalName', 'caregiverName', 
+      'caregiverPhone', 'careStartDate', 'careEndDate', 'dueAt', 
+      'targetStatus', 'guidanceStatus', 'responseStatus'
+    ];
+    editableFields.forEach(f => {
+      if (updates[f] !== undefined) target[f] = updates[f];
+    });
+
     target.revision = (target.revision || 1) + 1;
     target.updatedAt = new Date().toISOString();
 
     this.recordAudit(actor, 'UPDATE_TARGET', 'surveyTargets', target.id, { before, after: target }, updates.reason || '관리자 수정');
     this.saveData();
     return { success: true, target };
+  }
+
+  deleteTarget(id, actor = 'ADMIN') {
+    const idx = this.data.targets.findIndex(t => t.id === id);
+    if (idx === -1) return { success: false, message: '대상을 찾을 수 없습니다.' };
+
+    const removed = this.data.targets.splice(idx, 1)[0];
+    this.recordAudit(actor, 'DELETE_TARGET', 'surveyTargets', id, { removed }, '관리자 삭제');
+    this.saveData();
+    return { success: true, id, removed };
   }
 
   reissueToken(id, reason = '관리자 재발급', actor = 'ADMIN') {

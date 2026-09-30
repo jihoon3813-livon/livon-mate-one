@@ -3828,7 +3828,7 @@
               <div class="relative flex-1 min-w-[200px] max-w-sm">
                 <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
                 <input type="text" id="surveySearchInput" oninput="applySurveyFilters()" 
-                  placeholder="환자명, 서비스번호, 간병인명, 병원 검색..." 
+                  placeholder="환자명, 신청ID, 간병인명, 병원 검색..." 
                   class="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all">
               </div>
               <select id="surveyFilterGuidance" onchange="applySurveyFilters()" class="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 font-semibold focus:outline-none">
@@ -3857,7 +3857,7 @@
                 <thead>
                   <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold select-none">
                     <th class="p-3 text-center w-12">#</th>
-                    <th class="p-3 whitespace-nowrap">서비스번호</th>
+                    <th class="p-3 whitespace-nowrap">신청ID</th>
                     <th class="p-3 whitespace-nowrap">환자명</th>
                     <th class="p-3 whitespace-nowrap">병원 / 서비스기간</th>
                     <th class="p-3 whitespace-nowrap">담당 간병인</th>
@@ -3930,7 +3930,7 @@
                 <thead>
                   <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
                     <th class="p-3 whitespace-nowrap">응답 ID</th>
-                    <th class="p-3 whitespace-nowrap">서비스번호</th>
+                    <th class="p-3 whitespace-nowrap">신청ID</th>
                     <th class="p-3 whitespace-nowrap">응답자 구분</th>
                     <th class="p-3 text-center whitespace-nowrap">Q2. 전반 만족도</th>
                     <th class="p-3 text-center whitespace-nowrap">Q3. 친절함</th>
@@ -3977,7 +3977,7 @@
                   <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
                     <th class="p-3 whitespace-nowrap">원장 ID</th>
                     <th class="p-3 whitespace-nowrap">간병인명</th>
-                    <th class="p-3 whitespace-nowrap">서비스번호</th>
+                    <th class="p-3 whitespace-nowrap">신청ID</th>
                     <th class="p-3 whitespace-nowrap">보상 항목</th>
                     <th class="p-3 text-right whitespace-nowrap">적립 포인트</th>
                     <th class="p-3 text-center whitespace-nowrap">상태</th>
@@ -5063,6 +5063,44 @@
   </div><!-- End of BODY WRAPPER -->
 
   <!-- ==================== MODALS: SURVEY MANAGEMENT (만족도조사 관리 모달) ==================== -->
+  <!-- 0. 간병인 모바일 앱 뷰 (앱 시뮬레이터) 모달 -->
+  <div id="surveyAppViewModal" class="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-slate-900 rounded-3xl w-full max-w-[420px] shadow-2xl overflow-hidden border border-slate-700 flex flex-col max-h-[92vh]">
+      <!-- 모달 헤더 -->
+      <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-950/80 text-white shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+            <i data-lucide="smartphone" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <h3 class="text-xs font-black text-white">리본메이트 간병인 앱 뷰</h3>
+              <span class="text-[9.5px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">모바일 프리뷰</span>
+            </div>
+            <p class="text-[10.5px] text-slate-400 font-medium truncate max-w-[200px]" id="surveyAppModalSub">-</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button type="button" id="btnSurveyAppOpenNewTab" onclick="openSurveyAppNewTab()" 
+            class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+            title="새 탭(새 창)으로 열기">
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+            <span class="text-[11px]">새 창</span>
+          </button>
+          <button type="button" onclick="closeSurveyModal('surveyAppViewModal')" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+      <!-- 스마트폰 프레임 본문 (iframe) -->
+      <div class="p-3 bg-slate-950 flex-1 flex items-center justify-center overflow-hidden">
+        <div class="w-full h-[680px] max-h-[75vh] bg-slate-100 rounded-2xl overflow-hidden shadow-inner border border-slate-700 relative">
+          <iframe id="surveyAppIframe" src="about:blank" class="w-full h-full border-0"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 1. QR코드 및 고객 설문 링크 안내 모달 -->
   <div id="surveyQrModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200">
@@ -5373,6 +5411,103 @@
             <button type="submit" class="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95 transition-all">
               <i data-lucide="check" class="w-4 h-4"></i>
               <span>만족도 조사 대상 등록</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 만족도 조사 대상 정보 수정 모달 (Edit Target Modal) -->
+  <div id="surveyEditTargetModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200">
+      <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+            <i data-lucide="edit-3" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-black text-slate-900">만족도 조사 대상 정보 수정</h3>
+            <p class="text-[11px] text-slate-500">환자명, 병원, 간병인, 마감일 및 진행 상태를 수정합니다.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeSurveyModal('surveyEditTargetModal')" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 text-xs">
+        <form id="surveyEditTargetForm" onsubmit="submitSurveyTargetEdit(event)" class="space-y-3">
+          <input type="hidden" id="editTargetId">
+
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">신청ID</label>
+              <input type="text" id="editTargetServiceId" placeholder="예: D0008" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white font-mono font-bold text-xs focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">환자 성함 <span class="text-rose-500">*</span></label>
+              <input type="text" id="editTargetPatientName" required class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white font-bold text-xs focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">환자/보호자 연락처 <span class="text-rose-500">*</span></label>
+              <input type="tel" id="editTargetPhone" placeholder="010-0000-0000" required oninput="if(typeof formatPhoneNumber==='function') this.value=formatPhoneNumber(this.value);" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white font-mono font-bold text-xs focus:ring-2 focus:ring-indigo-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">입원 병원명</label>
+              <input type="text" id="editTargetHospital" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white font-bold text-xs">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">담당 간병인명 <span class="text-rose-500">*</span></label>
+              <input type="text" id="editTargetCaregiverName" required class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white font-bold text-xs focus:ring-2 focus:ring-indigo-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">서비스 시작일</label>
+              <input type="text" id="editTargetStartDate" placeholder="YYYY.MM.DD" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white font-mono text-[11px]">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">서비스 종료일</label>
+              <input type="text" id="editTargetEndDate" placeholder="YYYY.MM.DD" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white font-mono text-[11px]">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">설문 마감일</label>
+              <input type="date" id="editTargetDueAt" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white font-mono text-[11px]">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">안내 상태</label>
+              <select id="editTargetGuidanceStatus" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white font-bold text-xs">
+                <option value="NOT_STARTED">안내 미처리</option>
+                <option value="GUIDED">안내 완료</option>
+                <option value="DECLINED">고객 거절</option>
+                <option value="UNAVAILABLE">참여 불가</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">응답 상태</label>
+              <select id="editTargetResponseStatus" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white font-bold text-xs">
+                <option value="NOT_STARTED">미응답</option>
+                <option value="SUBMITTED">응답 완료</option>
+                <option value="EXPIRED">기간 만료</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+            <button type="button" onclick="closeSurveyModal('surveyEditTargetModal')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer">
+              취소
+            </button>
+            <button type="submit" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95 transition-all">
+              <i data-lucide="save" class="w-4 h-4"></i>
+              <span>수정사항 저장</span>
             </button>
           </div>
         </form>
@@ -8726,6 +8861,53 @@
             <p class="text-[11px] text-slate-500 pl-6 leading-relaxed">
               * <b>[원클릭 누적 자동첨부]</b> 수동 다운로드/업로드 필요 없이, <b>전체 누적 대상자(오늘 신규 추가건 포함)</b>가 입력된 공식 엑셀 파일이 자동 첨부되어 메일로 발송됩니다.
             </p>
+
+            <!-- 엑셀 비밀번호 암호화 설정 박스 -->
+            <div class="ml-6 p-3 bg-amber-50/90 rounded-xl border border-amber-200/90 space-y-2">
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <label class="flex items-center gap-2 font-black text-amber-950 text-xs cursor-pointer select-none">
+                  <input type="checkbox" id="samsungExcelProtectCheckbox" onchange="toggleSamsungExcelPasswordUI()" class="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer">
+                  <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-700"></i>
+                  <span>첨부 엑셀 파일 비밀번호(암호) 설정</span>
+                </label>
+                <div class="flex items-center gap-1">
+                  <span class="text-[10px] text-amber-700 font-bold mr-1">간편입력:</span>
+                  <button type="button" onclick="setPresetSamsungPassword('today')" class="px-2 py-0.5 rounded bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 text-[10.5px] font-bold shadow-2xs transition-all cursor-pointer" title="오늘 날짜(YYMMDD 6자리)로 자동 입력">
+                    오늘날짜
+                  </button>
+                  <button type="button" onclick="setPresetSamsungPassword('patient')" class="px-2 py-0.5 rounded bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 text-[10.5px] font-bold shadow-2xs transition-all cursor-pointer" title="환자 생년월일(6자리)로 자동 입력">
+                    환자생년월일
+                  </button>
+                  <button type="button" onclick="setPresetSamsungPassword('samsung')" class="px-2 py-0.5 rounded bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 text-[10.5px] font-bold shadow-2xs transition-all cursor-pointer" title="삼성화재 기본 약정코드(sf1234!)로 자동 입력">
+                    약정코드
+                  </button>
+                </div>
+              </div>
+
+              <!-- 비밀번호 입력 인풋 및 옵션 (체크 시 표시) -->
+              <div id="samsungExcelPasswordBox" class="hidden space-y-2 pt-1 border-t border-amber-200/60">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="relative flex-1 min-w-[220px] max-w-sm">
+                    <input type="password" id="samsungExcelPasswordInput" oninput="updateSamsungExcelPasswordStatus()" placeholder="엑셀 열기 암호 (예: 260930)" 
+                      class="w-full pl-8 pr-9 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-mono font-black text-amber-950 placeholder-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <i data-lucide="key-round" class="w-3.5 h-3.5 text-amber-500 absolute left-2.5 top-2.5"></i>
+                    <button type="button" onclick="toggleSamsungExcelPasswordVisibility()" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-700 cursor-pointer" title="비밀번호 보기/숨기기">
+                      <i id="samsungExcelPasswordEyeIcon" data-lucide="eye" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </div>
+                  <span id="samsungExcelPasswordStatusBadge" class="px-2 py-1 rounded-md text-[10.5px] font-bold bg-amber-200/70 text-amber-900 border border-amber-300">
+                    🔒 암호 미입력 시 암호화 해제
+                  </span>
+                </div>
+                <div class="flex items-center justify-between text-[11px] text-amber-800 flex-wrap gap-2">
+                  <label class="flex items-center gap-1.5 cursor-pointer font-medium select-none">
+                    <input type="checkbox" id="samsungExcelAutoNoticeCheckbox" checked class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer">
+                    <span>메일 본문 하단에 암호 안내 문구 자동 추가</span>
+                  </label>
+                  <span class="text-slate-500 text-[10.5px]">※ MS Excel 표준 암호화(ECMA-376)가 적용되어 암호 입력 시에만 열립니다.</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- 첨부 2: 케어포트(CarePort) 간병일지 (PDF) - 완료 대상자 수동 첨부 -->
@@ -11239,8 +11421,9 @@
   <script src="samsung-call-report.js?v=20260920_1330"></script>
   <script src="total-call-analysis.js?v=20260921_1005"></script>
   <script src="system-audit-log.js?v=20260922_1040"></script>
-  <script src="survey-client.js?v=20260928_1553"></script>
-  <script src="app.js?v=20260930_1148"></script>
+  <script src="survey-client.js?v=20260930_1505"></script>
+  <script src="./xlsx-populate.min.js"></script>
+  <script src="app.js?v=20260930_1505"></script>
   <!-- 🚀 초고속 렌더링 최적화: 대용량 PDF & Excel 라이브러리는 첫 화면 렌더링 이후 비동기 지연 로드 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>

@@ -287,7 +287,7 @@
       try {
         // 1. 특정 Target ID가 전달된 경우
         if (gState.targetId) {
-          const res = await fetch(`/api/survey/targets?search=${encodeURIComponent(gState.targetId)}`);
+          const res = await fetch(`/api/survey/targets?targetId=${encodeURIComponent(gState.targetId)}&search=${encodeURIComponent(gState.targetId)}`);
           const data = await res.json();
           if (data.items && data.items.length > 0) {
             const found = data.items.find(t => t.id === gState.targetId || t.serviceId === gState.targetId) || data.items[0];
