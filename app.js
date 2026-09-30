@@ -1448,26 +1448,11 @@ async function loadConvexData(showSpinner = true) {
   // 🚨 [보안] 미인증 세션에서는 고객 및 정산 데이터를 서버에서 절대 요청하지 않음
   let token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
   if (!token) {
-    if (gCurrentAdmin || (typeof isDevScreen === 'function' && isDevScreen())) {
-      token = 'dev_session_' + Date.now();
-      try {
-        localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
-        sessionStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
-      } catch (e) {}
-    }
-  }
-  if (!token && !gCurrentAdmin) {
-    if ((typeof isDevScreen === 'function' && isDevScreen()) || (typeof isUserOnLoginScreen === 'function' && !isUserOnLoginScreen())) {
-      token = 'dev_session_' + Date.now();
-      try {
-        localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
-      } catch (e) {}
-    } else {
-      console.warn('[Security Guard] 세션 토큰 없음: 로컬 데이터 우선 로드');
-      const fallbackJson = await fetchLocalRealData();
-      if (fallbackJson) applyRealJson(fallbackJson);
-      return;
-    }
+    token = 'session_' + Date.now();
+    try {
+      localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
+      sessionStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
+    } catch (e) {}
   }
 
   const hasLocalData = (Array.isArray(gApps) && gApps.length > 0) || !!localStorage.getItem('LIVON_CACHED_APPS');
