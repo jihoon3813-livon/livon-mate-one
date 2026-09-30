@@ -278,11 +278,12 @@ function invalidateRealDataCache() {
   gCachedRealDataMtime = 0;
 }
 
-const CONVEX_PROD_URL = 'https://gallant-weasel-360.convex.cloud';
+// [환경 격리]: 로컬 Node 개발 서버는 오직 개발용 Convex DB(rapid-raccoon-895)와만 통신 (운영 DB 절대 침범 금지)
+const CONVEX_TARGET_URL = process.env.CONVEX_URL || 'https://rapid-raccoon-895.convex.cloud';
 
 async function syncConvexMutation(pathStr, args) {
   try {
-    const res = await fetch(`${CONVEX_PROD_URL}/api/mutation`, {
+    const res = await fetch(`${CONVEX_TARGET_URL}/api/mutation`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: pathStr, args })
@@ -296,7 +297,7 @@ async function syncConvexMutation(pathStr, args) {
 
 async function syncWithConvexCloudOnStartup() {
   try {
-    const res = await fetch(`${CONVEX_PROD_URL}/api/query`, {
+    const res = await fetch(`${CONVEX_TARGET_URL}/api/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: 'sync:bundleAll', args: { sessionToken: 'dev_session_1' } })
@@ -1121,6 +1122,61 @@ function saveSavedFaxConfig(cfg) {
           syncConvexMutation('sync:saveApplication', { app: application }).catch(console.warn);
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: true, count: stored.applications.length, appId: application.id }));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    // =========================================================================
+    // API Route: 통합허브 고객 영구 삭제 API (디스크 파일 및 Convex DB 실시간 연동)
+    // =========================================================================
+    if (reqPath === '/api/hub/delete-application' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { appId, appIds } = JSON.parse(body || '{}');
+          const targetIds = new Set();
+          if (appId) targetIds.add(String(appId));
+          if (Array.isArray(appIds)) appIds.forEach(id => { if (id) targetIds.add(String(id)); });
+
+          if (targetIds.size === 0) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '삭제할 appId가 필요합니다.' }));
+          }
+
+          const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+          let stored = { applications: [] };
+          if (fs.existsSync(realDataFile)) {
+            try { stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8')); } catch (e) {}
+          }
+
+          const beforeCount = (stored.applications || []).length;
+          stored.applications = (stored.applications || []).filter(a => a && a.id && !targetIds.has(String(a.id)));
+          if (Array.isArray(stored.assignments)) {
+            stored.assignments = stored.assignments.filter(as => as && as.applyId && !targetIds.has(String(as.applyId)));
+          }
+          if (Array.isArray(stored.claims)) {
+            stored.claims = stored.claims.filter(c => c && c.applyId && !targetIds.has(String(c.applyId)));
+          }
+          if (Array.isArray(stored.payouts)) {
+            stored.payouts = stored.payouts.filter(p => p && p.applyId && !targetIds.has(String(p.applyId)));
+          }
+          stored.updatedAt = new Date().toISOString();
+          fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+          invalidateRealDataCache();
+
+          // Convex 개발 DB에서도 즉시 비동기 삭제
+          targetIds.forEach(id => {
+            syncConvexMutation('sync:deleteApplication', { appId: id }).catch(console.warn);
+          });
+
+          console.log(`[Disk & Convex Delete] 고객 ${targetIds.size}건 영구 삭제 완료 (이전: ${beforeCount}명 -> 현재: ${stored.applications.length}명)`);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, deletedCount: beforeCount - stored.applications.length, remainingCount: stored.applications.length }));
         } catch (err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: false, error: err.message }));

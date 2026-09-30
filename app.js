@@ -1085,8 +1085,7 @@ function isDevEnvironment() {
   const host = window.location.hostname || '';
   const port = window.location.port || '';
 
-  // 1. 공식 운영 도메인(livon-mate-one.vercel.app, vercel 배포 도메인, 외부 실운영 도메인)은 항상 PROD(gallant-weasel-360) 무조건 보장
-  // (로컬스토리지의 과거 잔존 dev 플래그에 의해 운영 사이트가 개발 DB로 잘못 연결되는 현상 원천 차단)
+  // 1. 공식 운영 도메인(livon-mate-one.vercel.app, vercel 배포 도메인 등)은 항상 PROD(gallant-weasel-360) 무조건 100% 보장
   const isLocalHost = (host === 'localhost' || host === '127.0.0.1' || host === '' || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:');
   if (!isLocalHost) {
     const urlParam = new URLSearchParams(window.location.search).get('env');
@@ -1094,20 +1093,17 @@ function isDevEnvironment() {
     return false;
   }
 
-  // 2. 로컬 개발 환경(localhost, 127.0.0.1 등)에서는 ?env=prod 또는 LIVON_TARGET_ENV=prod 명시 시에만 PROD 연결, 기본은 DEV
+  // 2. 로컬 개발 환경(localhost:8080 등)은 무조건 100% DEV(rapid-raccoon-895) 보장
+  // (로컬스토리지의 과거 잔여값으로 인한 운영 DB 침범 완전 차단, ?env=prod 명시 시에만 예외 허용)
   const urlParam = new URLSearchParams(window.location.search).get('env');
   if (urlParam === 'prod') return false;
-  if (urlParam === 'dev') return true;
-  const storedEnv = localStorage.getItem('LIVON_TARGET_ENV');
-  if (storedEnv === 'prod') return false;
-  if (storedEnv === 'dev') return true;
 
   return true;
 }
 
 var IS_DEV_ENV = isDevEnvironment();
-var CONVEX_URL = (typeof window !== 'undefined' && (window.ENV?.CONVEX_URL || window.CONVEX_URL))
-  || (IS_DEV_ENV ? DEV_CONVEX_URL : PROD_CONVEX_URL);
+// 환경 변수 오염 원천 차단: IS_DEV_ENV에 따라 단일 DB URL 엄격 바인딩
+var CONVEX_URL = IS_DEV_ENV ? DEV_CONVEX_URL : PROD_CONVEX_URL;
 window.IS_DEV_ENV = IS_DEV_ENV;
 window.CURRENT_CONVEX_URL = CONVEX_URL;
 
@@ -1611,25 +1607,9 @@ async function loadConvexData(showSpinner = true) {
         const validApps = filterInvalidSamsungDuplicates(applications);
         const serverAppIdSet = new Set(validApps.map(a => String(a.id || '')));
 
-        // 로컬에만 존재하는 신규 등록 고객 (서버에 아직 미반영된 건) 추출 및 보존
-        const localOnlyNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
-          if (!localApp || !localApp.id) return false;
-          if (deletedAppIdSet.has(String(localApp.id))) return false;
-          return !serverAppIdSet.has(String(localApp.id));
-        });
-
-        if (localOnlyNewApps.length > 0) {
-          console.log(`[Data Sync Guard] 서버 미반영 로컬 신규 고객 ${localOnlyNewApps.length}건 보존 및 서버 재동기화 시도:`, localOnlyNewApps.map(a => `${a.id}(${a.patientName})`));
-          localOnlyNewApps.forEach(pendingApp => {
-            if (typeof syncToConvex === 'function') {
-              const clean = {};
-              for (const [k, v] of Object.entries(pendingApp)) {
-                if (!k.startsWith('_')) clean[k] = v;
-              }
-              syncToConvex('sync:saveApplication', { app: clean }).catch(console.warn);
-            }
-          });
-        }
+        // [삭제 건 좀비 부활 방지]: 서버에 없는 로컬 객체를 서버로 자동 역동기화(saveApplication)하지 않음
+        // 신규 등록은 오직 finalizeNewAppRegistration() 사용자 명시 등록 시에만 단 1회 수행됨
+        // 서버 DB(validApps)가 단일 진실의 원천(SSOT)이며, 사용자가 서버에서 삭제한 건이 로컬에 의해 재등록되는 현상 완전 박멸
 
         // [서버 단일 진실의 원천(SSOT) 절대 보장]: Convex 원격 DB에 존재하는 데이터는 로컬의 과거 삭제 톰스톤으로 절대 은폐하지 않음
         // 과거 로컬 삭제 목록에 존재하더라도 서버 DB에 실존한다면 재등록/복원된 고객이므로 삭제 목록에서 즉시 완전 제거
@@ -1655,7 +1635,7 @@ async function loadConvexData(showSpinner = true) {
           recentRegIdSet = new Set((rList || []).map(String));
         } catch (e) {}
 
-        const mergedApps = [...localOnlyNewApps, ...filteredValidApps];
+        const mergedApps = filteredValidApps;
         mergedApps.forEach(a => {
           if (a && a.id && (recentRegIdSet.has(String(a.id)) || String(a.id).startsWith('D'))) {
             a._isJustRegistered = true;
@@ -37031,7 +37011,16 @@ function deleteSelectedApps() {
       }
     } catch (e) {}
 
-    // Convex Cloud 운영 DB 실시간 비동기 삭제
+    // 로컬 Node 서버 디스크 파일(hub_apps_real.json)에서도 즉시 영구 삭제 (재부활 원천 차단)
+    try {
+      fetch('/api/hub/delete-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appIds: idsToDelete })
+      }).catch(() => {});
+    } catch (e) {}
+
+    // Convex Cloud 실시간 비동기 삭제 (현재 연결된 단일 DB)
     if (typeof syncToConvex === 'function') {
       idsToDelete.forEach(id => {
         syncToConvex('sync:deleteApplication', { appId: id });
@@ -37101,7 +37090,16 @@ function deleteSingleApp(appId) {
       }
     } catch (e) {}
 
-    // Convex Cloud 운영 DB 실시간 삭제
+    // 로컬 Node 서버 디스크 파일(hub_apps_real.json)에서도 즉시 영구 삭제 (재부활 원천 차단)
+    try {
+      fetch('/api/hub/delete-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appId: appId })
+      }).catch(() => {});
+    } catch (e) {}
+
+    // Convex Cloud 실시간 삭제 (현재 연결된 단일 DB)
     if (typeof syncToConvex === 'function') {
       syncToConvex('sync:deleteApplication', { appId: appId });
     }
