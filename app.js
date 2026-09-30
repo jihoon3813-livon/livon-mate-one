@@ -3328,12 +3328,12 @@ var gDefaultFormTemplates = {
     { id: 'AREA-03', label: '사고번호', mapping: 'accidentNumber', x: 19.5, y: 24.3, w: 28, h: 2.8 },
     { id: 'AREA-04', label: '청구일자(서비스신청일)', mapping: 'hd2_claimDate', x: 64, y: 24.3, w: 28, h: 2.8 },
     { id: 'AREA-05', label: '피보험자(생년월일8자리)', mapping: 'hd2_patientNameBirth8', x: 19.5, y: 27.3, w: 28, h: 2.8 },
-    { id: 'AREA-06', label: '사고유형', mapping: 'accidentType', x: 64, y: 27.3, w: 28, h: 2.8 },
-    { id: 'AREA-07', label: '피보험자 연락처', mapping: 'patientPhone', x: 19.5, y: 30.3, w: 72.5, h: 2.8 },
-    { id: 'AREA-08', label: '계약번호(증권번호)', mapping: 'policyNumber', x: 19.5, y: 33.3, w: 28, h: 2.8 },
-    { id: 'AREA-09', label: '상품명(고정텍스트)', mapping: 'hd2_productName', x: 64, y: 33.3, w: 28, h: 2.8 },
-    { id: 'AREA-10', label: '사고내용(진단명)', mapping: 'hd2_accidentContent', x: 19.5, y: 36.3, w: 72.5, h: 2.8 },
-    { id: 'AREA-11', label: '병원명(입원의료기관)', mapping: 'hospitalName', x: 19.5, y: 42.0, w: 42, h: 2.8 },
+    { id: 'AREA-06', label: '사고유형', mapping: 'accidentType', x: 46.5, y: 27.3, w: 9, h: 2.8 },
+    { id: 'AREA-07', label: '피보험자 연락처', mapping: 'patientPhone', x: 63.5, y: 27.3, w: 28.5, h: 2.8 },
+    { id: 'AREA-08', label: '계약번호(증권번호)', mapping: 'policyNumber', x: 19.5, y: 30.3, w: 28, h: 2.8 },
+    { id: 'AREA-09', label: '상품명(고정텍스트)', mapping: 'hd2_productName', x: 64, y: 30.3, w: 28, h: 2.8 },
+    { id: 'AREA-10', label: '사고내용(진단명)', mapping: 'hd2_accidentContent', x: 19.5, y: 33.3, w: 72.5, h: 2.8 },
+    { id: 'AREA-11', label: '병원명(입원의료기관)', mapping: 'hospitalName', x: 19.5, y: 42.0, w: 43.5, h: 3.2 },
     { id: 'AREA-12', label: '간병인명(생년월일)', mapping: 'hd2_caregiverNameBirth', x: 19.5, y: 45.0, w: 42, h: 2.8 },
     { id: 'AREA-13', label: '간병인 연락처', mapping: 'hd2_caregiverPhone', x: 74, y: 45.0, w: 18, h: 2.8 },
     { id: 'AREA-14', label: '최초간병시작일', mapping: 'hd2_firstCareStartDate', x: 19.5, y: 48.5, w: 21.5, h: 2.8 },
@@ -3383,7 +3383,7 @@ var gFormAreaStore = JSON.parse(JSON.stringify(gDefaultFormTemplates));
 // =========================================================================
 var gHdForm02CustomState = {
   claimType: '신규', // '신규' | '추가'
-  productName: '무배당 퍼펙트플러스종합보험(Hi2404)', // 고정 텍스트 (사용자가 직접 입력/수정 및 유지)
+  productName: '', // 현대해상은 상품명 정보가 없으므로 기본값 빈값으로 유지
   accidentContent: '질병', // '질병' | '상해'
   careTarget: '', // 비어있으면 피보험자명(patientName) 자동 연동
   careLocation: '재택', // 기본값 '재택' (수정 가능)
@@ -3397,8 +3397,8 @@ var gHdForm02CustomState = {
   managerName: '리본케어',
   managerPhone: '02-6959-7011',
   servicePeriods: [
-    { start: '2026. 08. 21 (12)h (00)m', end: '2026. 08. 25 (19)h (20)m', days: '5일' },
-    { start: '2026. 08. 26 (09)h (00)m', end: '2026. 08. 30 (18)h (00)m', days: '5일' },
+    { start: '', end: '', days: '' },
+    { start: '', end: '', days: '' },
     { start: '', end: '', days: '' },
     { start: '', end: '', days: '' }
   ],
@@ -3435,9 +3435,18 @@ try {
       gHdForm02CustomState.customerOverrides = {};
     }
   }
+  // 현대해상 상품명 더미값 자동 정리
+  if (gHdForm02CustomState.productName && gHdForm02CustomState.productName.includes('퍼펙트플러스종합보험')) {
+    gHdForm02CustomState.productName = '';
+  }
   // 전역 고정/기본 항목 (상품명, 담당자 성명, 담당자 연락처) 영구 저장소에서 복원
   const savedProd = localStorage.getItem('LIVON_HD_GLOBAL_productName');
-  if (savedProd) gHdForm02CustomState.productName = savedProd;
+  if (savedProd && !savedProd.includes('퍼펙트플러스종합보험')) {
+    gHdForm02CustomState.productName = savedProd;
+  } else {
+    gHdForm02CustomState.productName = '';
+    localStorage.removeItem('LIVON_HD_GLOBAL_productName');
+  }
   const savedMgrName = localStorage.getItem('LIVON_HD_GLOBAL_managerName');
   if (savedMgrName) gHdForm02CustomState.managerName = savedMgrName;
   const savedMgrPhone = localStorage.getItem('LIVON_HD_GLOBAL_managerPhone');
@@ -3451,6 +3460,10 @@ try {
         delete co.productName;
         delete co.managerName;
         delete co.managerPhone;
+        // 구버전 더미 간병기간(2026. 08. 21)이 남아있다면 삭제하여 최신 스케줄 자동 연동 복원
+        if (Array.isArray(co.servicePeriods) && co.servicePeriods[0] && String(co.servicePeriods[0].start).includes('2026. 08. 21')) {
+          delete co.servicePeriods;
+        }
       }
     });
   }
@@ -3496,9 +3509,13 @@ function calculateHdForm02TotalDays(periods, app) {
 function getHdForm02ServicePeriods(app) {
   const appId = (app && app.id) ? app.id : (window.gCurrentPreviewAppId || 'C0006');
 
-  // 1. 고객별 저장된 직접 수정 내역이 있는 경우 최우선 적용
+  // 1. 고객별 저장된 직접 수정 내역이 있는 경우 최우선 적용 (단, 과거 더미 날짜 2026. 08. 21은 자동 무시하고 실제 데이터 연동)
   if (gHdForm02CustomState.customerOverrides && gHdForm02CustomState.customerOverrides[appId] && gHdForm02CustomState.customerOverrides[appId].servicePeriods) {
-    return gHdForm02CustomState.customerOverrides[appId].servicePeriods;
+    const saved = gHdForm02CustomState.customerOverrides[appId].servicePeriods;
+    const isLegacyDummy = Array.isArray(saved) && saved[0] && String(saved[0].start).includes('2026. 08. 21');
+    if (!isLegacyDummy) {
+      return saved;
+    }
   }
 
   // 2. 고객 배정 및 정산 스케줄 데이터 자동 연동
@@ -3522,85 +3539,109 @@ function getHdForm02ServicePeriods(app) {
     { start: '', end: '', days: '' }
   ];
 
+  const targetRoundNum = (window.gPendingFaxDispatchParams && window.gPendingFaxDispatchParams.appId === appId && window.gPendingFaxDispatchParams.roundNumber)
+    ? Number(window.gPendingFaxDispatchParams.roundNumber)
+    : null;
+
   if (sched && sched.rounds && sched.rounds.length > 0) {
+    // 2-1. 특정 차수가 전달된 경우 (예: 9차, 10차 버튼 클릭 시)
+    if (targetRoundNum) {
+      const targetRound = sched.rounds.find(r => r.roundNumber === targetRoundNum);
+      if (targetRound) {
+        const sDate = parseCareDate(targetRound.startDateStr);
+        const eDate = parseCareDate(targetRound.endDateStr);
+        const dNum = targetRound.days || targetRound.roundDays || 10;
+        defaultPeriods[0] = {
+          start: sDate ? formatCarePeriodDateTime(sDate, 9, 0) : (targetRound.startDateStr || ''),
+          end: eDate ? formatCarePeriodDateTime(eDate, 18, 0) : (targetRound.endDateStr || ''),
+          days: `${dNum}일`
+        };
+        return defaultPeriods;
+      } else if (targetRoundNum > sched.rounds.length) {
+        const lastR = sched.rounds[sched.rounds.length - 1];
+        const lastEnd = parseCareDate(lastR.endDateStr);
+        const nextStart = lastEnd ? new Date(lastEnd.getTime() + 86400000) : new Date();
+        const nextEnd = (as && as.endDate && parseCareDate(as.endDate)) || new Date();
+        const calcDays = Math.max(1, Math.round((nextEnd.getTime() - nextStart.getTime()) / 86400000) + 1);
+        defaultPeriods[0] = {
+          start: formatCarePeriodDateTime(nextStart, 9, 0),
+          end: formatCarePeriodDateTime(nextEnd, 18, 0),
+          days: `${calcDays}일`
+        };
+        return defaultPeriods;
+      }
+    }
+
+    // 2-2. 차수 미지정 시: 미청구된 진행 차수 탐색
+    const unbilledRound = sched.rounds.find(r => r.claimStatus !== 'DEPOSIT_DONE' && r.claimStatus !== 'CLAIMED_UNPAID');
+    if (unbilledRound) {
+      const sDate = parseCareDate(unbilledRound.startDateStr);
+      const eDate = parseCareDate(unbilledRound.endDateStr);
+      const dNum = unbilledRound.days || unbilledRound.roundDays || 10;
+      defaultPeriods[0] = {
+        start: sDate ? formatCarePeriodDateTime(sDate, 9, 0) : (unbilledRound.startDateStr || ''),
+        end: eDate ? formatCarePeriodDateTime(eDate, 18, 0) : (unbilledRound.endDateStr || ''),
+        days: `${dNum}일`
+      };
+      return defaultPeriods;
+    }
+
+    // 2-3. 기존 차수가 모두 청구/입금 완료된 경우 (예: C0127 1~9차 완료 후 9월 3차 진행 중인 최신 차수)
+    const allDone = sched.rounds.every(r => r.claimStatus === 'DEPOSIT_DONE' || r.claimStatus === 'CLAIMED_UNPAID');
+    if (allDone) {
+      const lastR = sched.rounds[sched.rounds.length - 1];
+      const lastEnd = parseCareDate(lastR.endDateStr);
+      const nextStart = lastEnd ? new Date(lastEnd.getTime() + 86400000) : new Date();
+      const nextEnd = (as && as.endDate && parseCareDate(as.endDate)) || new Date();
+      const calcDays = Math.max(1, Math.round((nextEnd.getTime() - nextStart.getTime()) / 86400000) + 1);
+      defaultPeriods[0] = {
+        start: formatCarePeriodDateTime(nextStart, 9, 0),
+        end: formatCarePeriodDateTime(nextEnd, 18, 0),
+        days: `${calcDays}일`
+      };
+      return defaultPeriods;
+    }
+
+    // 2-4. 기본: 최초 차수 목록 순차 표시
     sched.rounds.slice(0, 4).forEach((r, idx) => {
       const sDate = parseCareDate(r.startDateStr);
       const eDate = parseCareDate(r.endDateStr);
-      const sHour = (idx === 0 ? 12 : 9);
-      const sMin = (idx === 0 ? 0 : 0);
-      const eHour = (idx === 0 ? 19 : 18);
-      const eMin = (idx === 0 ? 20 : 0);
       defaultPeriods[idx] = {
-        start: sDate ? formatCarePeriodDateTime(sDate, sHour, sMin) : (r.startDateStr || ''),
-        end: eDate ? formatCarePeriodDateTime(eDate, eHour, eMin) : (r.endDateStr || ''),
-        days: `${r.roundDays || r.days || 5}일`
+        start: sDate ? formatCarePeriodDateTime(sDate, 9, 0) : (r.startDateStr || ''),
+        end: eDate ? formatCarePeriodDateTime(eDate, 18, 0) : (r.endDateStr || ''),
+        days: `${r.roundDays || r.days || 10}일`
       };
     });
     return defaultPeriods;
   }
 
+  // 3. 배정(as) 데이터 기준 fallback
   if (as && as.startDate) {
     const sDate = parseCareDate(as.startDate);
-    const eDate = parseCareDate(as.endDate) || sDate;
-    const totalD = prog ? prog.totalDays : ((app && parseInt(app.expectedDays, 10)) || 5);
-
-    if (totalD > 5 && sDate) {
-      const d1 = 5;
-      const d2 = totalD - 5;
-      const end1 = new Date(sDate.getTime() + 4 * 86400000);
-      const start2 = new Date(sDate.getTime() + 5 * 86400000);
-      const end2 = eDate || new Date(sDate.getTime() + (totalD - 1) * 86400000);
-      defaultPeriods[0] = {
-        start: formatCarePeriodDateTime(sDate, 12, 0),
-        end: formatCarePeriodDateTime(end1, 19, 20),
-        days: `${d1}일`
-      };
-      defaultPeriods[1] = {
-        start: formatCarePeriodDateTime(start2, 9, 0),
-        end: formatCarePeriodDateTime(end2, 18, 0),
-        days: `${d2}일`
-      };
-    } else if (sDate) {
-      defaultPeriods[0] = {
-        start: formatCarePeriodDateTime(sDate, 9, 0),
-        end: formatCarePeriodDateTime(eDate, 18, 0),
-        days: `${totalD}일`
-      };
-    }
+    const eDate = parseCareDate(as.endDate) || new Date();
+    const totalD = prog ? prog.totalDays : ((app && parseInt(app.expectedDays, 10)) || 10);
+    defaultPeriods[0] = {
+      start: formatCarePeriodDateTime(sDate, 9, 0),
+      end: formatCarePeriodDateTime(eDate, 18, 0),
+      days: `${totalD}일`
+    };
     return defaultPeriods;
   }
 
+  // 4. 신청서(app) 기준 fallback
   if (app) {
     const sDate = parseCareDate(app.desiredDate) || parseCareDate(app.applyDate) || new Date();
     const totalD = parseInt(app.expectedDays, 10) || 10;
-    if (totalD > 5 && sDate) {
-      const d1 = 5;
-      const d2 = totalD - 5;
-      const end1 = new Date(sDate.getTime() + 4 * 86400000);
-      const start2 = new Date(sDate.getTime() + 5 * 86400000);
-      const end2 = new Date(sDate.getTime() + (totalD - 1) * 86400000);
-      defaultPeriods[0] = {
-        start: formatCarePeriodDateTime(sDate, 12, 0),
-        end: formatCarePeriodDateTime(end1, 19, 20),
-        days: `${d1}일`
-      };
-      defaultPeriods[1] = {
-        start: formatCarePeriodDateTime(start2, 9, 0),
-        end: formatCarePeriodDateTime(end2, 18, 0),
-        days: `${d2}일`
-      };
-    } else if (sDate) {
-      const end = new Date(sDate.getTime() + (totalD - 1) * 86400000);
-      defaultPeriods[0] = {
-        start: formatCarePeriodDateTime(sDate, 9, 0),
-        end: formatCarePeriodDateTime(end, 18, 0),
-        days: `${totalD}일`
-      };
-    }
+    const end = new Date(sDate.getTime() + (totalD - 1) * 86400000);
+    defaultPeriods[0] = {
+      start: formatCarePeriodDateTime(sDate, 9, 0),
+      end: formatCarePeriodDateTime(end, 18, 0),
+      days: `${totalD}일`
+    };
     return defaultPeriods;
   }
 
-  return (gHdForm02CustomState.servicePeriods && gHdForm02CustomState.servicePeriods.length > 0) ? gHdForm02CustomState.servicePeriods : defaultPeriods;
+  return defaultPeriods;
 }
 
 function getHdForm02ExpectedUsageTime(app) {
@@ -3618,12 +3659,12 @@ function getHdForm02ExpectedUsageTime(app) {
 
 function updateHdForm02Field(field, value, shouldRerender = false, appId = null) {
   const targetId = appId || window.gCurrentPreviewAppId || 'C0006';
-  const isGlobalField = ['productName', 'managerName', 'managerPhone'].includes(field);
+  const isGlobalField = ['managerName', 'managerPhone'].includes(field);
 
   gHdForm02CustomState[field] = value;
 
   if (isGlobalField) {
-    // 공통 필드 (상품명, 담당자 성명, 담당자 연락처)는 모든 고객 및 세션에 영구 동기화
+    // 공통 필드 (담당자 성명, 담당자 연락처)는 모든 고객 및 세션에 영구 동기화
     try {
       localStorage.setItem(`LIVON_HD_GLOBAL_${field}`, value);
     } catch (e) {}
@@ -3642,8 +3683,15 @@ function updateHdForm02Field(field, value, shouldRerender = false, appId = null)
   }
 
   saveHdForm02CustomState();
-  if (shouldRerender && typeof previewFormForCustomer === 'function' && ['HD_FORM_02', 'HD_FORM_03'].includes(window.gCurrentPreviewFormCode)) {
-    previewFormForCustomer(window.gCurrentPreviewFormCode, targetId, window.gCurrentPreviewIsFaxConfirmation);
+  if (shouldRerender && typeof previewFormForCustomer === 'function') {
+    const currentApp = window.gCurrentPreviewApp || ((typeof gApps !== 'undefined') ? gApps.find(a => a.id === targetId) : null) || { id: targetId };
+    previewFormForCustomer(
+      window.gCurrentPreviewFormCode || 'HD_FORM_02',
+      currentApp,
+      window.gCurrentPreviewIsFaxConfirmation,
+      window.gCurrentPreviewFaxRecipient || '',
+      window.gCurrentPreviewFaxNumber || ''
+    );
   }
 }
 
@@ -3654,8 +3702,15 @@ function setHdForm02ClaimType(type, appId = null) {
   if (!gHdForm02CustomState.customerOverrides[targetId]) gHdForm02CustomState.customerOverrides[targetId] = {};
   gHdForm02CustomState.customerOverrides[targetId].claimType = type;
   saveHdForm02CustomState();
-  if (typeof previewFormForCustomer === 'function' && ['HD_FORM_02', 'HD_FORM_03'].includes(window.gCurrentPreviewFormCode)) {
-    previewFormForCustomer(window.gCurrentPreviewFormCode, targetId, window.gCurrentPreviewIsFaxConfirmation);
+  if (typeof previewFormForCustomer === 'function') {
+    const currentApp = window.gCurrentPreviewApp || ((typeof gApps !== 'undefined') ? gApps.find(a => a.id === targetId) : null) || { id: targetId };
+    previewFormForCustomer(
+      window.gCurrentPreviewFormCode || 'HD_FORM_02',
+      currentApp,
+      window.gCurrentPreviewIsFaxConfirmation,
+      window.gCurrentPreviewFaxRecipient || '',
+      window.gCurrentPreviewFaxNumber || ''
+    );
   }
 }
 
@@ -3672,7 +3727,7 @@ function setHdForm02AccidentPrefix(type, appId = null) {
   updateHdForm02Field('accidentContent', updated, true, targetId);
 }
 
-function updateHdForm02ServicePeriod(rowIdx, col, value, appId = null) {
+function updateHdForm02ServicePeriod(rowIdx, col, value, appId = null, shouldRerender = false) {
   const targetId = appId || window.gCurrentPreviewAppId || 'C0006';
   if (!gHdForm02CustomState.customerOverrides) gHdForm02CustomState.customerOverrides = {};
   if (!gHdForm02CustomState.customerOverrides[targetId] || !gHdForm02CustomState.customerOverrides[targetId].servicePeriods) {
@@ -3687,13 +3742,74 @@ function updateHdForm02ServicePeriod(rowIdx, col, value, appId = null) {
   gHdForm02CustomState.customerOverrides[targetId].servicePeriods[rowIdx][col] = value;
   gHdForm02CustomState.servicePeriods = gHdForm02CustomState.customerOverrides[targetId].servicePeriods;
   saveHdForm02CustomState();
-  if (typeof previewFormForCustomer === 'function' && ['HD_FORM_02', 'HD_FORM_03'].includes(window.gCurrentPreviewFormCode)) {
-    previewFormForCustomer(window.gCurrentPreviewFormCode, targetId, window.gCurrentPreviewIsFaxConfirmation);
+  if (shouldRerender && typeof previewFormForCustomer === 'function') {
+    const currentApp = window.gCurrentPreviewApp || ((typeof gApps !== 'undefined') ? gApps.find(a => a.id === targetId) : null) || { id: targetId };
+    previewFormForCustomer(
+      window.gCurrentPreviewFormCode || 'HD_FORM_02',
+      currentApp,
+      window.gCurrentPreviewIsFaxConfirmation,
+      window.gCurrentPreviewFaxRecipient || '',
+      window.gCurrentPreviewFaxNumber || ''
+    );
+  }
+}
+
+function reflectHdForm02FieldLive(field, value, appId) {
+  const targetId = appId || window.gCurrentPreviewAppId || 'C0006';
+  updateHdForm02Field(field, value, false, targetId);
+
+  const targetForm = document.getElementById('faxCleanFormTarget');
+  if (!targetForm) return;
+
+  const currentApp = window.gCurrentPreviewApp || ((typeof gApps !== 'undefined') ? gApps.find(a => a.id === targetId) : null) || { id: targetId };
+  const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '.');
+  const docNo = 'LV-FAX-' + (currentApp.applyDate ? currentApp.applyDate.replace(/[^0-9]/g, '') : '20260907') + '-' + (currentApp.id || 'NEW');
+
+  let mappingKey = field;
+  if (field === 'accidentContent') mappingKey = 'hd2_accidentContent';
+  else if (field === 'managerName') mappingKey = 'hd2_managerName';
+  else if (field === 'managerPhone') mappingKey = 'hd2_managerPhone';
+
+  const cell = targetForm.querySelector(`[data-mapping="${mappingKey}"] .form-area-cell`);
+  if (cell) {
+    cell.innerText = resolveFormFieldValue(mappingKey, currentApp, docNo, todayStr);
+  }
+}
+
+function reflectHdForm02ServicePeriodLive(rowIdx, col, value, appId) {
+  const targetId = appId || window.gCurrentPreviewAppId || 'C0006';
+  updateHdForm02ServicePeriod(rowIdx, col, value, targetId, false);
+
+  const targetForm = document.getElementById('faxCleanFormTarget');
+  if (!targetForm) return;
+
+  const currentApp = window.gCurrentPreviewApp || ((typeof gApps !== 'undefined') ? gApps.find(a => a.id === targetId) : null) || { id: targetId };
+  const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '.');
+  const docNo = 'LV-FAX-' + (currentApp.applyDate ? currentApp.applyDate.replace(/[^0-9]/g, '') : '20260907') + '-' + (currentApp.id || 'NEW');
+
+  const rowKey = `hd2_servicePeriod_row${rowIdx + 1}`;
+  const cell = targetForm.querySelector(`[data-mapping="${rowKey}"] .form-area-cell`);
+  if (cell) {
+    cell.innerText = resolveFormFieldValue(rowKey, currentApp, docNo, todayStr);
+  }
+
+  // 예상사용시간 즉시 업데이트
+  const usageCell = targetForm.querySelector(`[data-mapping="hd2_expectedUsageTime"] .form-area-cell`);
+  if (usageCell) {
+    usageCell.innerText = resolveFormFieldValue('hd2_expectedUsageTime', currentApp, docNo, todayStr);
+  }
+
+  // 상단 합계 배지 즉시 업데이트
+  const badge = document.getElementById('hdForm02TotalBadge');
+  if (badge) {
+    const periods = getHdForm02ServicePeriods(currentApp);
+    const totalDays = calculateHdForm02TotalDays(periods, currentApp);
+    badge.innerText = `합계: ${totalDays}일 (${totalDays * 24}시간)`;
   }
 }
 
 // Load custom areas from localStorage (안전한 보존 우선 로드: 버전 변경 시에도 사용자 설정 절대 덮어쓰지 않음)
-const FORM_AREAS_VERSION = 'v20260916_scor';
+const FORM_AREAS_VERSION = 'v20260930_hd2_fix';
 try {
   const savedAreas = localStorage.getItem('LIVON_FORM_AREAS');
   if (savedAreas) {
@@ -3707,6 +3823,23 @@ try {
   // HD_FORM_02가 23개 미만인 경우 신규 23개 필드로 자동 확장 업그레이드
   if (!gFormAreaStore.HD_FORM_02 || gFormAreaStore.HD_FORM_02.length < 23) {
     gFormAreaStore.HD_FORM_02 = JSON.parse(JSON.stringify(gDefaultFormTemplates.HD_FORM_02));
+  }
+  // HD_FORM_02 영역 최적화 (병원명/주소 전체 노출 및 연락처 너비 확보)
+  if (gFormAreaStore && gFormAreaStore.HD_FORM_02) {
+    gFormAreaStore.HD_FORM_02.forEach(a => {
+      if (a.id === 'AREA-11') {
+        a.w = Math.max(a.w || 0, 43.5);
+        a.h = Math.max(a.h || 0, 3.2);
+      }
+      if (a.id === 'AREA-07') {
+        a.w = Math.max(a.w || 0, 28.5);
+        a.x = 63.5;
+      }
+      if (a.id === 'AREA-06' && a.x > 50) {
+        a.x = 46.5;
+        a.w = 9;
+      }
+    });
   }
   // HD_FORM_03 (SCOR)가 25개 미만이거나 11번 영역이 병원명인 경우 신규 25개 필드로 자동 확장 업그레이드
   if (!gFormAreaStore.HD_FORM_03 || gFormAreaStore.HD_FORM_03.length < 25 || (gFormAreaStore.HD_FORM_03[10] && gFormAreaStore.HD_FORM_03[10].label.includes('병원명'))) {
@@ -16214,13 +16347,42 @@ function formatKoreanDate(dateStr) {
   return dateStr;
 }
 
+function formatFullPhoneDisplay(phoneStr) {
+  if (!phoneStr) return '';
+  const str = String(phoneStr).trim();
+  const digits = str.replace(/[^0-9]/g, '');
+  if (digits.length === 22 && digits.startsWith('010') && digits.slice(11).startsWith('010')) {
+    const p1 = digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
+    const p2 = digits.slice(11, 14) + '-' + digits.slice(14, 18) + '-' + digits.slice(18, 22);
+    return p1 + ' / ' + p2;
+  }
+  if (digits.length === 20 && digits.startsWith('010') && digits.slice(10).startsWith('010')) {
+    const p1 = digits.slice(0, 3) + '-' + digits.slice(3, 6) + '-' + digits.slice(6, 10);
+    const p2 = digits.slice(10, 13) + '-' + digits.slice(13, 16) + '-' + digits.slice(16, 20);
+    return p1 + ' / ' + p2;
+  }
+  if (digits.length === 11 && digits.startsWith('01')) {
+    return digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
+  }
+  if (digits.length === 10) {
+    if (digits.startsWith('02')) {
+      return digits.slice(0, 2) + '-' + digits.slice(2, 6) + '-' + digits.slice(6, 10);
+    }
+    return digits.slice(0, 3) + '-' + digits.slice(3, 6) + '-' + digits.slice(6, 10);
+  }
+  if (digits.length === 9 && digits.startsWith('02')) {
+    return digits.slice(0, 2) + '-' + digits.slice(2, 5) + '-' + digits.slice(5, 9);
+  }
+  return str;
+}
+
 function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
   if (!app) return '';
   switch (mappingKey) {
     case 'patientName': return app.patientName || '';
     case 'patientGender': return app.gender || '남';
     case 'patientPhone':
-    case 'phone': return app.phone || '';
+    case 'phone': return formatFullPhoneDisplay(app.phone || '');
     case 'patientRrn': {
       if (app.patientRrn) {
         const clean = app.patientRrn.replace(/[^0-9*]/g, '');
@@ -16269,7 +16431,7 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
       return (cType === '추가') ? '☐ 신규   ☑ 추가' : '☑ 신규   ☐ 추가';
     }
     case 'hd2_claimDate': {
-      return app.claimDate || app.applyDate || todayStr;
+      return todayStr;
     }
     case 'hd2_patientNameBirth8': {
       const pName = app.patientName || '피보험자';
@@ -16300,7 +16462,7 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
       return birth8 ? `${pName} (${birth8})` : pName;
     }
     case 'hd2_productName': {
-      return gHdForm02CustomState.productName || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.productName) || '무배당 퍼펙트플러스종합보험(Hi2404)';
+      return (app && app.productName) ? app.productName : '';
     }
     case 'hd2_accidentContent': {
       const raw = (app && gHdForm02CustomState.customerOverrides?.[app.id]?.accidentContent) || gHdForm02CustomState.accidentContent || (app && app.accidentType && app.accidentType.includes('상해') ? '상해' : '질병');
@@ -16382,7 +16544,7 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
       return list.map((r, i) => `[${i+1}차] ${r.start} ~ ${r.end} | ${r.days}`).join('\n');
     }
     case 'hd2_writeDateKorean': {
-      return formatKoreanDate(app.applyDate || todayStr);
+      return formatKoreanDate(todayStr);
     }
     case 'hd2_managerName': {
       return gHdForm02CustomState.managerName || (app && gHdForm02CustomState.customerOverrides?.[app.id]?.managerName) || '리본케어';
@@ -16433,12 +16595,18 @@ window.gPendingFaxDispatchParams = null;
 function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation = false, faxRecipient = '', faxNumber = '') {
   const app = (typeof applyId === 'object' && applyId !== null)
     ? applyId
-    : (gApps.find(a => a.id === applyId) || gApps[0]);
+    : ((gApps || []).find(a => a.id === applyId) || window.gCurrentPreviewApp || (gApps && gApps[0]));
   const form = gFormTemplates.find(f => f.code === formCode) || gFormTemplates[0];
 
   gCurrentPreviewFormCode = formCode;
+  window.gCurrentPreviewFormCode = formCode;
   gCurrentPreviewAppId = app ? app.id : applyId;
+  window.gCurrentPreviewAppId = gCurrentPreviewAppId;
+  window.gCurrentPreviewApp = app;
+  window.gCurrentPreviewIsFaxConfirmation = Boolean(isFaxConfirmation);
   window.gIsFaxConfirmationPreview = Boolean(isFaxConfirmation);
+  if (faxRecipient) window.gCurrentPreviewFaxRecipient = faxRecipient;
+  if (faxNumber) window.gCurrentPreviewFaxNumber = faxNumber;
 
   const titleEl = document.getElementById('formPreviewModalTitle');
   if (titleEl) {
@@ -16710,7 +16878,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
               </span>
               <span class="text-[11px] text-amber-700 bg-amber-100 font-bold px-2 py-0.5 rounded">수정 시 서식에 즉시 반영 및 영구 저장</span>
             </div>
-            <!-- 1행: 구분(신규/추가), 사고내용(진단명 직접입력), 계속간병여부 -->
+            <!-- 1행: 구분(신규/추가), 계속간병여부, 사고내용(진단명 직접입력) -->
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div>
                 <label class="block text-[10px] font-bold text-slate-500 mb-0.5">청구 구분 (신규/추가)</label>
@@ -16742,27 +16910,19 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                     <button type="button" onclick="setHdForm02AccidentPrefix('상해', '${app.id}')" class="px-1.5 py-0.5 rounded border ${currentAccidentContent.includes('상해') ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-100'}">상해</button>
                   </div>
                 </div>
-                <input type="text" value="${currentAccidentContent}" onchange="updateHdForm02Field('accidentContent', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="예: 질병 (뇌경색증) 또는 상해 (골절)">
+                <input type="text" value="${currentAccidentContent}" oninput="reflectHdForm02FieldLive('accidentContent', this.value, '${app.id}')" onchange="updateHdForm02Field('accidentContent', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="예: 질병 (뇌경색증) 또는 상해 (골절)">
               </div>
             </div>
 
-            <!-- 2행: 상품명, 예상사용시간, 담당자 성명, 담당자 연락처 (4열로 넉넉하게 배치하여 절대 잘리지 않음) -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
-              <div>
-                <label class="block text-[10px] font-bold text-slate-500 mb-0.5">상품명 (공통 기본값)</label>
-                <input type="text" value="${currentProductName}" onchange="updateHdForm02Field('productName', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="무배당 퍼펙트플러스종합보험">
-              </div>
-              <div>
-                <label class="block text-[10px] font-bold text-slate-500 mb-0.5">예상사용시간 (고객별 수정)</label>
-                <input type="text" value="${expectedUsageTime}" onchange="updateHdForm02Field('expectedUsageTime', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="예: 240시간 (10일)">
-              </div>
+            <!-- 2행: 담당자 성명, 담당자 연락처 (상품명 및 예상사용시간 제거) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <div>
                 <label class="block text-[10px] font-bold text-slate-500 mb-0.5">담당자 성명 (공통 기본값)</label>
-                <input type="text" value="${managerName}" onchange="updateHdForm02Field('managerName', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="리본케어">
+                <input type="text" value="${managerName}" oninput="reflectHdForm02FieldLive('managerName', this.value, '${app.id}')" onchange="updateHdForm02Field('managerName', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs" placeholder="리본케어">
               </div>
               <div>
                 <label class="block text-[10px] font-bold text-slate-500 mb-0.5">담당자 연락처 (공통 기본값)</label>
-                <input type="text" value="${managerPhone}" onchange="updateHdForm02Field('managerPhone', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs font-mono" placeholder="02-6959-7011">
+                <input type="text" value="${managerPhone}" oninput="reflectHdForm02FieldLive('managerPhone', this.value, '${app.id}')" onchange="updateHdForm02Field('managerPhone', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs font-mono" placeholder="02-6959-7011">
               </div>
             </div>
 
@@ -16771,15 +16931,15 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-slate-200/70">
                 <div>
                   <label class="block text-[10px] font-bold text-blue-900 mb-0.5">간병 대상자 (피보험자 성명 기본)</label>
-                  <input type="text" value="${currentCareTarget}" onchange="updateHdForm02Field('careTarget', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="피보험자 성명 (수정 가능)">
+                  <input type="text" value="${currentCareTarget}" oninput="reflectHdForm02FieldLive('careTarget', this.value, '${app.id}')" onchange="updateHdForm02Field('careTarget', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="피보험자 성명 (수정 가능)">
                 </div>
                 <div>
                   <label class="block text-[10px] font-bold text-blue-900 mb-0.5">간병 장소 (기본: 재택)</label>
-                  <input type="text" value="${currentCareLocation}" onchange="updateHdForm02Field('careLocation', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="기본: 재택 (수정 가능)">
+                  <input type="text" value="${currentCareLocation}" oninput="reflectHdForm02FieldLive('careLocation', this.value, '${app.id}')" onchange="updateHdForm02Field('careLocation', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="기본: 재택 (수정 가능)">
                 </div>
                 <div>
                   <label class="block text-[10px] font-bold text-blue-900 mb-0.5">주소 (고객주소 기본)</label>
-                  <input type="text" value="${currentCareAddress}" onchange="updateHdForm02Field('careAddress', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="간병 장소 상세 주소 (수정 가능)">
+                  <input type="text" value="${currentCareAddress}" oninput="reflectHdForm02FieldLive('careAddress', this.value, '${app.id}')" onchange="updateHdForm02Field('careAddress', this.value, true, '${app.id}')" class="w-full px-2.5 py-1 bg-white border border-blue-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500" placeholder="간병 장소 상세 주소 (수정 가능)">
                 </div>
               </div>
             ` : ''}
@@ -16790,7 +16950,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                 <span class="text-[11px] font-black text-slate-800 flex items-center gap-1">
                   <i data-lucide="calendar" class="w-3.5 h-3.5 text-blue-600"></i> 간병 서비스 기간 (1~4행) 연동 및 사용시간 계산
                 </span>
-                <span class="text-[10px] text-blue-700 bg-blue-100 font-bold px-2 py-0.5 rounded">합계: ${totalDays}일 (${totalDays * 24}시간)</span>
+                <span id="hdForm02TotalBadge" class="text-[10px] text-blue-700 bg-blue-100 font-bold px-2 py-0.5 rounded">합계: ${totalDays}일 (${totalDays * 24}시간)</span>
               </div>
               <div class="space-y-1.5 bg-white p-2 rounded-lg border border-slate-200">
                 ${[0, 1, 2, 3].map(idx => {
@@ -16798,10 +16958,10 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                   return `
                     <div class="flex items-center gap-1.5 text-xs">
                       <span class="w-8 text-center text-[10px] font-black text-slate-500 bg-slate-100 py-1 rounded flex-shrink-0">${idx + 1}행</span>
-                      <input type="text" value="${row.start || ''}" placeholder="시작: 2026. 08. 21 (12)h (00)m" onchange="updateHdForm02ServicePeriod(${idx}, 'start', this.value, '${app.id}')" class="flex-1 px-2 py-1 text-[11px] font-mono border border-slate-200 rounded focus:border-blue-500">
+                      <input type="text" value="${row.start || ''}" placeholder="시작: 2026. 09. 21 (09)h (00)m" oninput="reflectHdForm02ServicePeriodLive(${idx}, 'start', this.value, '${app.id}')" onchange="updateHdForm02ServicePeriod(${idx}, 'start', this.value, '${app.id}', true)" class="flex-1 px-2 py-1 text-[11px] font-mono border border-slate-200 rounded focus:border-blue-500">
                       <span class="text-slate-400 font-bold">~</span>
-                      <input type="text" value="${row.end || ''}" placeholder="종료: 2026. 08. 25 (19)h (20)m" onchange="updateHdForm02ServicePeriod(${idx}, 'end', this.value, '${app.id}')" class="flex-1 px-2 py-1 text-[11px] font-mono border border-slate-200 rounded focus:border-blue-500">
-                      <input type="text" value="${row.days || ''}" placeholder="5일" onchange="updateHdForm02ServicePeriod(${idx}, 'days', this.value, '${app.id}')" class="w-16 px-1.5 py-1 text-[11px] font-bold text-center border border-slate-200 rounded focus:border-blue-500 flex-shrink-0">
+                      <input type="text" value="${row.end || ''}" placeholder="종료: 2026. 09. 30 (18)h (00)m" oninput="reflectHdForm02ServicePeriodLive(${idx}, 'end', this.value, '${app.id}')" onchange="updateHdForm02ServicePeriod(${idx}, 'end', this.value, '${app.id}', true)" class="flex-1 px-2 py-1 text-[11px] font-mono border border-slate-200 rounded focus:border-blue-500">
+                      <input type="text" value="${row.days || ''}" placeholder="10일" oninput="reflectHdForm02ServicePeriodLive(${idx}, 'days', this.value, '${app.id}')" onchange="updateHdForm02ServicePeriod(${idx}, 'days', this.value, '${app.id}', true)" class="w-16 px-1.5 py-1 text-[11px] font-bold text-center border border-slate-200 rounded focus:border-blue-500 flex-shrink-0">
                     </div>
                   `;
                 }).join('')}
@@ -16815,11 +16975,32 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
             ${areas.map(area => {
               const val = resolveFormFieldValue(area.mapping, app, docNo, todayStr);
               const isCheckField = (area.mapping === 'hd2_claimCheck_new' || area.mapping === 'hd2_claimCheck_add');
+              const isHospitalField = (area.mapping === 'hospitalName');
+              const isPhoneField = (area.mapping === 'patientPhone');
+              
+              let extraStyle = '';
+              let cellStyle = 'padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+              
+              if (isCheckField) {
+                extraStyle = 'font-size: 16px; font-weight: 900; color: #1e3a8a;';
+                cellStyle = 'text-align: center;';
+              } else if (isHospitalField) {
+                const vLen = (val || '').length;
+                const fSize = vLen > 30 ? '9.5px' : (vLen > 22 ? '10.5px' : '11.5px');
+                extraStyle = `font-size: ${fSize}; line-height: 1.15; letter-spacing: -0.5px; z-index: 15;`;
+                cellStyle = 'padding: 0 2px; white-space: normal; word-break: break-all; overflow: visible; vertical-align: middle;';
+              } else if (isPhoneField) {
+                const vLen = (val || '').length;
+                const fSize = vLen > 18 ? '10px' : (vLen > 13 ? '11px' : '12px');
+                extraStyle = `font-size: ${fSize}; line-height: 1.15; letter-spacing: -0.5px; z-index: 15;`;
+                cellStyle = 'padding: 0 2px; white-space: normal; word-break: break-all; overflow: visible; vertical-align: middle;';
+              }
+              
               return `
-                <div class="absolute z-10 font-bold text-slate-950 text-xs select-none"
-                     style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; display: table; table-layout: fixed; ${isCheckField ? 'font-size: 16px; font-weight: 900; color: #1e3a8a;' : ''}"
+                <div data-mapping="${area.mapping}" class="absolute z-10 font-bold text-slate-950 text-xs select-none"
+                     style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; display: table; table-layout: fixed; ${extraStyle}"
                      title="[${area.id}] ${area.label}: ${val}">
-                  <div style="display: table-cell; vertical-align: middle; ${isCheckField ? 'text-align: center;' : 'padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'} line-height: 1.4;">
+                  <div class="form-area-cell" style="display: table-cell; vertical-align: middle; ${cellStyle} line-height: 1.3;">
                     ${val}
                   </div>
                 </div>
@@ -17771,7 +17952,7 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
     }
   }
 
-  if (!silentAlert && category !== '정산청구') {
+  if (!silentAlert) {
     if (resultLog.status === '성공') {
       alert(`📠 [팩스 발송 완료]\n\n발송목적: ${caseTitle}\n수신처: ${targetRecipient} (${targetNumber})\n환자명: ${app.patientName} (${app.id})\n발송서식: ${formName} (${pages}장)\n\n전자팩스 통신망을 통해 정상 송출 완료되었습니다! (Convex Cloud 대장 기록됨)`);
     } else {
@@ -17912,16 +18093,6 @@ async function executeRealFaxSendFromPreview() {
     showBarobillClaimProgress(app.id, targetRoundNum, targetRecipient, targetNumber);
   }
 
-  // Close preview modal immediately so user sees the progress toggle in the main detail workspace
-  closeModal('formPreviewModal');
-  window.gIsFaxConfirmationPreview = false;
-
-  if (gActiveHubModalAppId === app.id) {
-    try {
-      openHubCustomerDetailModal(app.id);
-    } catch (e) {}
-  }
-
   const sendBtn = document.getElementById('btnConfirmRealFaxSend');
   const sendBtnText = document.getElementById('btnConfirmRealFaxSendText');
   const origHtml = sendBtn ? sendBtn.innerHTML : '';
@@ -17943,7 +18114,7 @@ async function executeRealFaxSendFromPreview() {
       targetNumber,
       memoText: memo,
       category,
-      silentAlert: false
+      silentAlert: true
     });
   } catch (err) {
     console.error('청구 팩스 발송 에러:', err);
@@ -17954,6 +18125,22 @@ async function executeRealFaxSendFromPreview() {
     const sentDate = resultLog ? resultLog.sentDate : '';
     hideBarobillClaimProgress(isSuccess, targetRoundNum, sentDate);
 
+    if (sendBtn) {
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = origHtml;
+    }
+
+    if (isSuccess) {
+      if (typeof showToast === 'function') {
+        showToast(`✅ [팩스 발송 성공] ${app.patientName} 님 서식이 성공적으로 발송되었습니다.`, 'success');
+      }
+      alert(`📠 [팩스 발송 완료]\n\n환자명: ${app.patientName} 님 (${app.id})\n수신처: ${targetRecipient} (${targetNumber})\n서식: ${formName}\n\n전자팩스 통신망을 통해 정상 송출 완료되었습니다!\n(Convex Cloud 대장 및 정산 내역에 즉시 등록되었습니다.)`);
+      closeModal('formPreviewModal');
+      window.gIsFaxConfirmationPreview = false;
+    } else if (resultLog && resultLog.status !== '성공') {
+      alert(`⚠️ [팩스 발송 결과 안내]\n\n수신처: ${targetRecipient} (${targetNumber})\n상태: ${resultLog.status} (${resultLog.resultMsg})\n\n통화중 또는 응답없음으로 접수되었습니다. 수신처 번호 확인 후 다시 시도해주세요.`);
+    }
+
     if (gActiveHubModalAppId === app.id) {
       try {
         openHubCustomerDetailModal(app.id);
@@ -17961,11 +18148,6 @@ async function executeRealFaxSendFromPreview() {
     }
     if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
     if (typeof renderClaims === 'function') renderClaims();
-
-    if (sendBtn) {
-      sendBtn.disabled = false;
-      sendBtn.innerHTML = origHtml;
-    }
   }
 }
 
