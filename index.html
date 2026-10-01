@@ -2053,7 +2053,7 @@
           <div class="flex items-center gap-2 flex-wrap">
             <div class="relative">
               <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
-              <input type="text" id="samsungSheetSearchInput" autocomplete="off" value="" oninput="renderCurrentSamsungSheet()" placeholder="시트 내 검색 (고객명, 증권번호, 병원명 등)..." 
+              <input type="search" id="samsungSheetSearchInput" name="samsung_sheet_search_unique" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-form-type="other" aria-autocomplete="none" role="searchbox" readonly onfocus="this.removeAttribute('readonly');" value="" oninput="renderCurrentSamsungSheet()" placeholder="시트 내 검색 (고객명, 증권번호, 병원명 등)..." 
                 class="pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-sky-500 w-64 transition-all">
             </div>
           </div>
@@ -2259,7 +2259,7 @@
             <div class="flex items-center gap-2 flex-1 max-w-sm min-w-[220px]">
               <div class="relative w-full">
                 <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
-                <input type="text" id="samsungClaimHubSearchInput" autocomplete="off" value="" oninput="renderCurrentSamsungSheet()" placeholder="시트 내 검색 (고객명, 증권번호, 병원명 등)..." 
+                <input type="search" id="samsungClaimHubSearchInput" name="samsung_claim_hub_search_unique" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-form-type="other" aria-autocomplete="none" role="searchbox" readonly onfocus="this.removeAttribute('readonly');" value="" oninput="renderCurrentSamsungSheet()" placeholder="시트 내 검색 (고객명, 증권번호, 병원명 등)..." 
                   class="w-full pl-9 pr-8 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 transition-all">
                 <button type="button" id="btnClearSamsungSearch" onclick="clearSamsungClaimHubSearch()" 
                   class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 transition-colors hidden cursor-pointer" title="검색어 지우기">
@@ -2410,7 +2410,7 @@
           <div class="p-5 flex-1 overflow-y-auto custom-scrollbar space-y-3">
             <div class="relative w-full">
               <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
-              <input type="text" id="samsungDailyCareLogModalSearchInput" oninput="renderSamsungDailyCareLogModalContent()" placeholder="환자명, 증권번호, 병원명으로 검색..." 
+              <input type="search" id="samsungDailyCareLogModalSearchInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" oninput="renderSamsungDailyCareLogModalContent()" placeholder="환자명, 증권번호, 병원명으로 검색..." 
                 class="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 transition-all">
             </div>
 
@@ -2524,8 +2524,20 @@
               </div>
 
               <div>
-                <label class="block font-bold text-slate-700 mb-1">보고 및 청구 본문 내용</label>
-                <textarea id="samsungDispatchBody" rows="4" class="w-full p-3 border rounded-xl leading-relaxed font-sans bg-white focus:ring-2 focus:ring-emerald-500"></textarea>
+                <div class="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                  <div class="flex items-center gap-2">
+                    <label class="font-bold text-slate-700 text-xs">보고 및 청구 본문 내용</label>
+                    <span id="samsungDispatchBodySaveBadge" class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10.5px] font-bold hidden items-center gap-1">
+                      <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i>
+                      <span>수정 내용 고정 저장됨</span>
+                    </span>
+                  </div>
+                  <button type="button" onclick="resetSamsungDispatchBodyToDefault()" class="text-[11px] text-slate-400 hover:text-slate-700 hover:underline cursor-pointer flex items-center gap-1 transition-colors">
+                    <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                    <span>기본 양식으로 초기화</span>
+                  </button>
+                </div>
+                <textarea id="samsungDispatchBody" oninput="handleSamsungDispatchBodyInput(this.value)" rows="4" placeholder="메일 본문 내용을 입력하세요." class="w-full p-3 border rounded-xl leading-relaxed font-sans bg-white focus:ring-2 focus:ring-emerald-500 text-xs text-slate-800"></textarea>
               </div>
             </div>
 
@@ -2555,6 +2567,50 @@
                 </div>
                 <span id="samsungDispatchExcelSheetCountBadge" class="text-[11px] text-emerald-800 font-medium">대상자 시트 연동</span>
               </div>
+
+              <!-- 엑셀 비밀번호 암호화 설정 박스 -->
+              <div class="p-3 bg-amber-50/90 rounded-xl border border-amber-200/90 space-y-2">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <label class="flex items-center gap-2 font-black text-amber-950 text-xs cursor-pointer select-none">
+                    <input type="checkbox" id="samsungDispatchExcelProtectCheckbox" onchange="toggleSamsungDispatchExcelPasswordUI()" class="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer">
+                    <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-700"></i>
+                    <span>첨부 엑셀 파일 비밀번호(암호) 설정</span>
+                  </label>
+                  <div class="flex items-center gap-1">
+                    <span class="text-[10px] text-amber-700 font-bold mr-1">간편입력:</span>
+                    <button type="button" onclick="setPresetSamsungDispatchPassword('today')" class="px-2 py-0.5 rounded bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 text-[10.5px] font-bold shadow-2xs transition-all cursor-pointer" title="오늘 날짜(YYMMDD 6자리)로 자동 입력">
+                      오늘날짜
+                    </button>
+                    <button type="button" onclick="setPresetSamsungDispatchPassword('samsung')" class="px-2 py-0.5 rounded bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 text-[10.5px] font-bold shadow-2xs transition-all cursor-pointer" title="삼성화재 기본 약정코드(sf1234!)로 자동 입력">
+                      약정코드
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 비밀번호 입력 인풋 및 옵션 (체크 시 표시) -->
+                <div id="samsungDispatchExcelPasswordBox" class="hidden space-y-2 pt-1 border-t border-amber-200/60">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <div class="relative flex-1 min-w-[220px] max-w-sm">
+                      <input type="password" id="samsungDispatchExcelPasswordInput" oninput="updateSamsungDispatchExcelPasswordStatus()" placeholder="엑셀 열기 암호 (예: 260930)" 
+                        class="w-full pl-8 pr-9 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-mono font-black text-amber-950 placeholder-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                      <i data-lucide="key-round" class="w-3.5 h-3.5 text-amber-500 absolute left-2.5 top-2.5"></i>
+                      <button type="button" onclick="toggleSamsungDispatchExcelPasswordVisibility()" class="absolute right-2.5 top-2 text-slate-400 hover:text-slate-700 cursor-pointer" title="비밀번호 보기/숨기기">
+                        <i id="samsungDispatchExcelPasswordEyeIcon" data-lucide="eye" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                    <span id="samsungDispatchExcelPasswordStatusBadge" class="px-2 py-1 rounded-md text-[10.5px] font-bold bg-amber-200/70 text-amber-900 border border-amber-300">
+                      🔒 암호 미입력 시 암호화 해제
+                    </span>
+                  </div>
+                  <div class="flex items-center justify-between text-[11px] text-amber-800 flex-wrap gap-2">
+                    <label class="flex items-center gap-1.5 cursor-pointer font-medium select-none">
+                      <input type="checkbox" id="samsungDispatchExcelAutoNoticeCheckbox" checked onchange="saveSamsungExcelPasswordConfigFromUI('dispatch')" class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer">
+                      <span>메일 본문 하단에 암호 안내 문구 자동 추가</span>
+                    </label>
+                    <span class="text-slate-500 text-[10.5px]">※ MS Excel 표준 암호화(ECMA-376)가 적용되어 암호 입력 시에만 열립니다.</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- 3. 간병일지 첨부 관리 (기본 미첨부 / 관리자 선택형 첨부) -->
@@ -2578,7 +2634,7 @@
               <!-- 검색 인풋 -->
               <div class="relative">
                 <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
-                <input type="text" id="samsungCareLogSearchInput" oninput="searchSamsungCareLogsForAttachment(this.value)" placeholder="추가 환자명 또는 관리번호, 증권번호로 일지 검색..." 
+                <input type="search" id="samsungCareLogSearchInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" oninput="searchSamsungCareLogsForAttachment(this.value)" placeholder="추가 환자명 또는 관리번호, 증권번호로 일지 검색..." 
                   class="w-full pl-9 pr-4 py-2.5 border border-purple-200 focus:border-purple-500 rounded-xl bg-purple-50/20 focus:bg-white text-xs font-medium focus:ring-2 focus:ring-purple-400 transition-all">
               </div>
 
@@ -6393,8 +6449,17 @@
 
         <!-- Modal Footer Actions -->
         <div class="p-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 rounded-2xl">
-          <div class="text-[11px] text-slate-500 whitespace-nowrap" id="newAppFooterNotice">
-            * [신청 접수 완료] 클릭 시 간병신청대장 및 통합 간병 운영 허브에 즉시 동기화됩니다.
+          <div class="flex flex-wrap items-center gap-3">
+            <label class="inline-flex items-center gap-1.5 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-blue-200 shadow-2xs hover:bg-blue-50/50 transition-all select-none">
+              <input type="checkbox" id="chkAutoCarePortSubmit" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer">
+              <span class="text-xs font-bold text-blue-900 flex items-center gap-1">
+                <i data-lucide="cloud" class="w-3.5 h-3.5 text-blue-600"></i>
+                케어포트(방문관리) 전산 모의 등록 (Mocking/로깅)
+              </span>
+            </label>
+            <div class="text-[11px] text-slate-500 whitespace-nowrap" id="newAppFooterNotice">
+              * 운영 서버 DB 및 슬랙 발송을 방지하기 위해 요청 데이터 검증 및 Mocking/로깅 모드로 안전하게 처리됩니다.
+            </div>
           </div>
           <div class="flex items-center justify-end gap-2 flex-shrink-0">
             <button type="button" onclick="closeModal('newAppModal')" class="px-4 py-2.5 border border-slate-300 rounded-xl hover:bg-slate-100 text-slate-700 font-bold transition-all text-xs whitespace-nowrap flex-shrink-0 cursor-pointer">취소</button>
@@ -8973,7 +9038,7 @@
                 </div>
                 <div class="flex items-center justify-between text-[11px] text-amber-800 flex-wrap gap-2">
                   <label class="flex items-center gap-1.5 cursor-pointer font-medium select-none">
-                    <input type="checkbox" id="samsungExcelAutoNoticeCheckbox" checked class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer">
+                    <input type="checkbox" id="samsungExcelAutoNoticeCheckbox" checked onchange="saveSamsungExcelPasswordConfigFromUI('single')" class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer">
                     <span>메일 본문 하단에 암호 안내 문구 자동 추가</span>
                   </label>
                   <span class="text-slate-500 text-[10.5px]">※ MS Excel 표준 암호화(ECMA-376)가 적용되어 암호 입력 시에만 열립니다.</span>
@@ -9950,7 +10015,7 @@
         <div class="flex items-center gap-2">
           <div class="relative flex-1">
             <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
-            <input type="text" id="samsungLeadSearchInput" oninput="onSamsungLeadSearchInput(this.value)" placeholder="고객 성명, 생년월일, 연락처, 증권번호로 사전명단 검색..." 
+            <input type="search" id="samsungLeadSearchInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" oninput="onSamsungLeadSearchInput(this.value)" placeholder="고객 성명, 생년월일, 연락처, 증권번호로 사전명단 검색..." 
               class="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-xl font-medium bg-slate-50 focus:bg-white focus:ring-2 focus:ring-sky-500 transition-all text-xs">
             <button type="button" onclick="clearSamsungLeadSearchInput()" id="btnSamsungLeadSearchClear" class="hidden absolute right-3 top-2.5 p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer">
               <i data-lucide="x" class="w-3.5 h-3.5"></i>
@@ -10721,6 +10786,10 @@
               <span>3-Column 주체별 뷰</span>
             </button>
           </div>
+          <button id="btnHubCarePortSubmit" type="button" onclick="submitActiveHubCustomerToCarePort()" class="px-2.5 sm:px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-indigo-600 hover:bg-indigo-500 text-white shadow-md cursor-pointer" title="케어포트(리본) 방문관리 서비스 신청서로 전송/등록합니다">
+            <i data-lucide="cloud-upload" class="w-3.5 h-3.5"></i>
+            <span id="btnHubCarePortSubmitText">케어포트 방문관리 등록</span>
+          </button>
           <button id="btnHubSamsungEmail" type="button" onclick="closeModal('hubCustomerDetailModal'); switchTab('samsungclaimhub', 'claims');" class="hidden px-2.5 sm:px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-sky-600 hover:bg-sky-500 text-white shadow-md cursor-pointer" title="삼성화재 월간 청구관리 및 이메일 발송 화면으로 이동">
             <i data-lucide="mail" class="w-3.5 h-3.5"></i>
             <span>삼성 접수/청구</span>
@@ -10743,6 +10812,10 @@
       <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-xs">
         <span class="text-slate-500" id="hubDetailModalFooterNote">✨ 고객/접수, 간병인/센터, 손사/보험사 3대 주체별 정보 조회 및 데이터 수정이 지원됩니다.</span>
         <div class="flex items-center gap-2">
+          <button id="btnHubCarePortSubmitFooter" type="button" onclick="submitActiveHubCustomerToCarePort()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95" title="케어포트(리본) 방문관리 서비스 신청서로 전송/등록합니다">
+            <i data-lucide="cloud-upload" class="w-4 h-4"></i>
+            <span id="btnHubCarePortSubmitFooterText">케어포트 등록</span>
+          </button>
           <button id="btnSaveHubCustomerModalFooter" type="button" onclick="saveAndCloseActiveHubCustomerDetail()" 
                   class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95" title="변경사항 저장 후 곧바로 닫기">
             <i data-lucide="save" class="w-4 h-4"></i>

@@ -150,11 +150,16 @@
       if (this._detailCache[cleanId]) return this._detailCache[cleanId];
       if (this._detailCache[sessionId]) return this._detailCache[sessionId];
 
+      // 인공/로컬 생성 세션 ID인 경우 원격 조회 스킵
+      if (cleanId.length < 3 || /^\d{10,}$/.test(cleanId) && !cleanId.startsWith('202')) {
+        // 로컬 mock session id 패턴
+      }
+
       let data = null;
-      // 1. Try Serverless API with timeout
+      // 1. Try Serverless API with timeout (2초로 단축하여 불필요한 대기 방지)
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
         const res = await fetch(`${this.apiBase}/detail?sessionId=${sessionId}`, { signal: controller.signal });
         clearTimeout(timeoutId);
         if (res.ok) {
@@ -173,7 +178,7 @@
         try {
           const token = await this.directLogin();
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000);
+          const timeoutId = setTimeout(() => controller.abort(), 2000);
           const res = await fetch(`${this.directBase}/main/consult/carenote/${sessionId}`, {
             headers: { 'Authorization': `Bearer ${token}` },
             signal: controller.signal

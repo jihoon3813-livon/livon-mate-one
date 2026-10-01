@@ -3283,11 +3283,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupInputFormatters();
   setupGlobalDatePickerTriggers();
 
-  // 삼성화재 청구허브/시트 검색창 브라우저 자동완성 캐시 초기화
-  const samsungSearchInit = document.getElementById('samsungClaimHubSearchInput');
-  if (samsungSearchInit) samsungSearchInit.value = '';
-  const samsungSheetInit = document.getElementById('samsungSheetSearchInput');
-  if (samsungSheetInit) samsungSheetInit.value = '';
+  // 삼성화재 청구허브/시트 검색창 브라우저 자동완성 캐시 초기화 및 완벽 차단
+  ['samsungClaimHubSearchInput', 'samsungSheetSearchInput'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.value = '';
+      el.setAttribute('autocomplete', 'off');
+      el.setAttribute('autocorrect', 'off');
+      el.setAttribute('autocapitalize', 'off');
+      el.setAttribute('spellcheck', 'false');
+      el.setAttribute('aria-autocomplete', 'none');
+      el.addEventListener('focus', function() {
+        this.removeAttribute('readonly');
+      }, { once: true });
+    }
+  });
   if (typeof gLastSamsungSearchQuery !== 'undefined') gLastSamsungSearchQuery = '';
 
   // 1. 🚨 [보안] 관리자 서버 인증 세션 상태 우선 검증 (단순 CSS 가림 탈피)
@@ -7672,6 +7682,20 @@ async function autoFetchCarePortLogForTargetPatient(targetId) {
       date: new Date().toISOString()
     }];
 
+    let genBase64 = null;
+    try {
+      const bBlob = new Blob([generated.bytes], { type: 'application/pdf' });
+      genBase64 = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => {
+          const r = fr.result;
+          res(typeof r === 'string' ? r.split(',')[1] : '');
+        };
+        fr.onerror = rej;
+        fr.readAsDataURL(bBlob);
+      });
+    } catch(e) {}
+
     const newLogId = 'CLOG-' + String(Date.now()).slice(-4);
     const now = new Date();
     const importedAt = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
@@ -7686,6 +7710,7 @@ async function autoFetchCarePortLogForTargetPatient(targetId) {
       endDate: tr?.expectedEndDate || tr?.contractEndDate || '2026-09-10',
       pdfFileName: generated.fileName || `[케어포트_공식간병일지]_${patientName}.pdf`,
       pdfFileSize: `${(generated.bytes.byteLength / 1024).toFixed(0)} KB`,
+      pdfBase64: genBase64,
       fileCount: 1,
       source: '케어포트 전산',
       importedAt: importedAt
@@ -8241,9 +8266,11 @@ async function buildSamsungExcelAttachment(type = 'daily', password = '') {
   // 모달 인풋에서 비밀번호 체크 및 취득
   let effectivePassword = (password || '').trim();
   if (!effectivePassword) {
-    const isProtectChecked = document.getElementById('samsungExcelProtectCheckbox')?.checked;
+    const isProtectChecked = document.getElementById('samsungExcelProtectCheckbox')?.checked ||
+                             document.getElementById('samsungDispatchExcelProtectCheckbox')?.checked;
     if (isProtectChecked) {
-      effectivePassword = (document.getElementById('samsungExcelPasswordInput')?.value || '').trim();
+      effectivePassword = (document.getElementById('samsungExcelPasswordInput')?.value ||
+                           document.getElementById('samsungDispatchExcelPasswordInput')?.value || '').trim();
     }
   }
 
@@ -8868,13 +8895,10 @@ function openSamsungEmailModal(applyId, stepType = 'DAILY_INTAKE', roundNumber =
   const dateEnd = document.getElementById('samsungCarePortDateEnd');
   if (dateEnd) dateEnd.value = app.careEndDate || today;
 
-  // Reset excel password protection
-  const protectCb = document.getElementById('samsungExcelProtectCheckbox');
-  if (protectCb) protectCb.checked = false;
-  const pwBox = document.getElementById('samsungExcelPasswordBox');
-  if (pwBox) pwBox.classList.add('hidden');
-  const pwInput = document.getElementById('samsungExcelPasswordInput');
-  if (pwInput) pwInput.value = '';
+  // Restore excel password protection configuration
+  if (typeof restoreSamsungExcelPasswordConfigToUI === 'function') {
+    restoreSamsungExcelPasswordConfigToUI('single');
+  }
 
   onSamsungEmailTypeChange(stepType);
   updateSamsungEmailSmtpStatusBanner();
@@ -9005,6 +9029,115 @@ function onSamsungCustomExcelSelected(input) {
   updateSamsungModalAttachBadges();
 }
 
+// -------------------------------------------------------------------------
+// SAMSUNG EXCEL PASSWORD PERSISTENCE ENGINE (localStorage)
+// -------------------------------------------------------------------------
+const LIVON_SAMSUNG_EXCEL_PW_STORAGE_KEY = 'LIVON_SAMSUNG_EXCEL_PW_CONFIG';
+
+function getSamsungExcelPasswordConfig() {
+  try {
+    const raw = localStorage.getItem(LIVON_SAMSUNG_EXCEL_PW_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {
+    enabled: false,
+    password: '',
+    presetType: '',
+    autoNotice: true
+  };
+}
+window.getSamsungExcelPasswordConfig = getSamsungExcelPasswordConfig;
+
+function saveSamsungExcelPasswordConfig(partial = {}) {
+  try {
+    const curr = getSamsungExcelPasswordConfig();
+    const updated = { ...curr, ...partial };
+    localStorage.setItem(LIVON_SAMSUNG_EXCEL_PW_STORAGE_KEY, JSON.stringify(updated));
+    return updated;
+  } catch (e) {
+    return null;
+  }
+}
+window.saveSamsungExcelPasswordConfig = saveSamsungExcelPasswordConfig;
+
+function saveSamsungExcelPasswordConfigFromUI(prefix = 'dispatch') {
+  const isDispatch = prefix === 'dispatch';
+  const protectCb = document.getElementById(isDispatch ? 'samsungDispatchExcelProtectCheckbox' : 'samsungExcelProtectCheckbox');
+  const pwInput = document.getElementById(isDispatch ? 'samsungDispatchExcelPasswordInput' : 'samsungExcelPasswordInput');
+  const autoNoticeCb = document.getElementById(isDispatch ? 'samsungDispatchExcelAutoNoticeCheckbox' : 'samsungExcelAutoNoticeCheckbox');
+
+  const curr = getSamsungExcelPasswordConfig();
+  const isEnabled = Boolean(protectCb?.checked);
+  const password = (pwInput?.value || '').trim();
+  const autoNotice = autoNoticeCb ? Boolean(autoNoticeCb.checked) : (curr.autoNotice !== false);
+
+  let presetType = curr.presetType || '';
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${yy}${mm}${dd}`;
+
+  if (password === todayStr && presetType === 'today') {
+    // keep today
+  } else if (password === 'sf1234!') {
+    presetType = 'samsung';
+  } else if (!password) {
+    presetType = '';
+  } else if (presetType !== 'today') {
+    presetType = 'custom';
+  }
+
+  saveSamsungExcelPasswordConfig({
+    enabled: isEnabled,
+    password: password,
+    presetType: presetType,
+    autoNotice: autoNotice
+  });
+}
+window.saveSamsungExcelPasswordConfigFromUI = saveSamsungExcelPasswordConfigFromUI;
+
+function restoreSamsungExcelPasswordConfigToUI(prefix = 'dispatch') {
+  const isDispatch = prefix === 'dispatch';
+  const protectCb = document.getElementById(isDispatch ? 'samsungDispatchExcelProtectCheckbox' : 'samsungExcelProtectCheckbox');
+  const pwBox = document.getElementById(isDispatch ? 'samsungDispatchExcelPasswordBox' : 'samsungExcelPasswordBox');
+  const pwInput = document.getElementById(isDispatch ? 'samsungDispatchExcelPasswordInput' : 'samsungExcelPasswordInput');
+  const autoNoticeCb = document.getElementById(isDispatch ? 'samsungDispatchExcelAutoNoticeCheckbox' : 'samsungExcelAutoNoticeCheckbox');
+
+  const cfg = getSamsungExcelPasswordConfig();
+
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${yy}${mm}${dd}`;
+
+  const resolvedPassword = cfg.presetType === 'today' ? todayStr : (cfg.password || '');
+
+  if (cfg && cfg.enabled) {
+    if (protectCb) protectCb.checked = true;
+    if (pwBox) pwBox.classList.remove('hidden');
+    if (pwInput) pwInput.value = resolvedPassword;
+    if (autoNoticeCb) autoNoticeCb.checked = (cfg.autoNotice !== false);
+  } else {
+    if (protectCb) protectCb.checked = false;
+    if (pwBox) pwBox.classList.add('hidden');
+    if (pwInput && resolvedPassword) pwInput.value = resolvedPassword;
+    if (autoNoticeCb && cfg.autoNotice !== undefined) autoNoticeCb.checked = (cfg.autoNotice !== false);
+  }
+
+  if (isDispatch) {
+    if (typeof updateSamsungDispatchExcelPasswordStatus === 'function') {
+      updateSamsungDispatchExcelPasswordStatus();
+    }
+  } else {
+    if (typeof updateSamsungExcelPasswordStatus === 'function') {
+      updateSamsungExcelPasswordStatus();
+    }
+  }
+}
+window.restoreSamsungExcelPasswordConfigToUI = restoreSamsungExcelPasswordConfigToUI;
+
 function toggleSamsungExcelPasswordUI() {
   const cb = document.getElementById('samsungExcelProtectCheckbox');
   const box = document.getElementById('samsungExcelPasswordBox');
@@ -9018,14 +9151,19 @@ function toggleSamsungExcelPasswordUI() {
       attachExcelCb.checked = true;
       updateSamsungModalAttachBadges();
     }
-    // 기본 비밀번호가 비어있다면 오늘 날짜 6자리(YYMMDD)를 기본값으로 제안
+    const currCfg = getSamsungExcelPasswordConfig();
     if (input && !input.value.trim()) {
-      setPresetSamsungPassword('today');
-    } else {
-      updateSamsungExcelPasswordStatus();
+      if (currCfg.password) {
+        input.value = currCfg.password;
+      } else {
+        setPresetSamsungPassword('today');
+      }
     }
+    saveSamsungExcelPasswordConfigFromUI('single');
+    updateSamsungExcelPasswordStatus();
   } else {
     if (box) box.classList.add('hidden');
+    saveSamsungExcelPasswordConfigFromUI('single');
   }
   if (typeof initIcons === 'function') initIcons(box);
 }
@@ -9060,9 +9198,11 @@ function setPresetSamsungPassword(type) {
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const dd = String(now.getDate()).padStart(2, '0');
 
+  let targetPreset = type;
   if (type === 'today') {
     input.value = `${yy}${mm}${dd}`;
   } else if (type === 'patient') {
+    targetPreset = 'custom';
     const appId = document.getElementById('samsungEmailTargetAppId')?.value;
     const app = (gApps || []).find(a => String(a.id) === String(appId)) || (gApps && gApps[0]);
     let pBirth = app ? (app.birthDate || app.patientBirth || app.birth || '') : '';
@@ -9077,6 +9217,12 @@ function setPresetSamsungPassword(type) {
     input.value = 'sf1234!';
   }
 
+  saveSamsungExcelPasswordConfig({
+    enabled: true,
+    password: input.value,
+    presetType: targetPreset
+  });
+
   updateSamsungExcelPasswordStatus();
   if (typeof initIcons === 'function') initIcons(box);
 }
@@ -9084,6 +9230,7 @@ function setPresetSamsungPassword(type) {
 function updateSamsungExcelPasswordStatus() {
   const input = document.getElementById('samsungExcelPasswordInput');
   const badge = document.getElementById('samsungExcelPasswordStatusBadge');
+  saveSamsungExcelPasswordConfigFromUI('single');
   if (!badge) return;
   const val = (input?.value || '').trim();
   if (val) {
@@ -9930,14 +10077,61 @@ async function handleSamsungEmailSubmit(e) {
         });
       }
     } else {
-      // 2. 해당 완료 대상자의 기등록된 케어포트 일지 확인
-      const cLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) 
-        ? gCareLogs.find(l => String(l.applyId) === String(targetAppId) || l.patientName === targetApp.patientName)
-        : null;
-      if (cLog && cLog.pdfFileName) {
-        const pdfFileName = cLog.pdfFileName;
-        const validPdf = generateCompliantCareLogPdfString(cLog);
-        const pdfBase64 = btoa(validPdf);
+      // 2. 해당 완료 대상자의 기등록된 케어포트 일지 확인 및 고해상도 PDF 정식 생성
+      let pdfBase64 = null;
+      let pdfFileName = `[${targetAppId}_${targetApp.patientName}]_케어포트_공식간병일지.pdf`;
+
+      const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[targetAppId]) || [];
+      if (custFiles.length > 0 && custFiles[0].bytes) {
+        const blob = new Blob([custFiles[0].bytes], { type: 'application/pdf' });
+        pdfBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const res = reader.result;
+            resolve(typeof res === 'string' ? res.split(',')[1] : '');
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        if (custFiles[0].name) pdfFileName = custFiles[0].name;
+      }
+
+      if (!pdfBase64) {
+        const cLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) 
+          ? gCareLogs.find(l => String(l.applyId) === String(targetAppId) || l.patientName === targetApp.patientName)
+          : null;
+        if (cLog && cLog.pdfBase64) {
+          pdfBase64 = cLog.pdfBase64;
+          if (cLog.pdfFileName) pdfFileName = cLog.pdfFileName;
+        }
+      }
+
+      if (!pdfBase64) {
+        try {
+          if (btnSubmit) {
+            btnSubmit.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>간병일지 PDF 변환 중...</span>`;
+            if (typeof initIcons === 'function') initIcons(btnSubmit);
+          }
+          const gen = await generateCarePortPdfBytesForApp(targetAppId, { patientName: targetApp.patientName });
+          if (gen && gen.bytes) {
+            const blob = new Blob([gen.bytes], { type: 'application/pdf' });
+            pdfBase64 = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const res = reader.result;
+                resolve(typeof res === 'string' ? res.split(',')[1] : '');
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+            if (gen.fileName) pdfFileName = gen.fileName;
+          }
+        } catch (e) {
+          console.warn('[이메일 발송] 간병일지 생성 실패:', e);
+        }
+      }
+
+      if (pdfBase64) {
         attachments.push({
           filename: pdfFileName,
           content: pdfBase64,
@@ -10774,7 +10968,6 @@ function toggleSamsungDispatchCareLog(targetId, isChecked) {
 
   renderDispatchAttachedCareLogs();
   renderSamsungDailyAvailableLogsSelector();
-  renderCurrentSamsungSheet();
   updateSamsungDailyEmailBodyText();
 }
 window.toggleSamsungDispatchCareLog = toggleSamsungDispatchCareLog;
@@ -10812,12 +11005,55 @@ function toggleAllSamsungDailyCareLogs(selectAll) {
 
   renderDispatchAttachedCareLogs();
   renderSamsungDailyAvailableLogsSelector();
-  renderCurrentSamsungSheet();
   updateSamsungDailyEmailBodyText();
 }
 window.toggleAllSamsungDailyCareLogs = toggleAllSamsungDailyCareLogs;
 
-function updateSamsungDailyEmailBodyText() {
+function handleSamsungDispatchBodyInput(val) {
+  const type = gSamsungClaimHubActiveSubTab || 'daily';
+  const key = `LIVON_SAMSUNG_DISPATCH_BODY_CUSTOM_${type.toUpperCase()}`;
+  try {
+    localStorage.setItem(key, val);
+    const badge = document.getElementById('samsungDispatchBodySaveBadge');
+    if (badge) {
+      badge.classList.remove('hidden');
+      badge.classList.add('inline-flex');
+      if (typeof initIcons === 'function') initIcons(badge);
+    }
+  } catch (e) {
+    console.warn('Failed to save dispatch body:', e);
+  }
+}
+window.handleSamsungDispatchBodyInput = handleSamsungDispatchBodyInput;
+
+function resetSamsungDispatchBodyToDefault() {
+  const type = gSamsungClaimHubActiveSubTab || 'daily';
+  const key = `LIVON_SAMSUNG_DISPATCH_BODY_CUSTOM_${type.toUpperCase()}`;
+  try {
+    localStorage.removeItem(key);
+  } catch (e) {}
+
+  const badge = document.getElementById('samsungDispatchBodySaveBadge');
+  if (badge) {
+    badge.classList.add('hidden');
+    badge.classList.remove('inline-flex');
+  }
+
+  if (type === 'daily') {
+    updateSamsungDailyEmailBodyText(true);
+  } else {
+    const bodyEl = document.getElementById('samsungDispatchBody');
+    const now = new Date();
+    const currYearMonthFormatted = `${now.getFullYear()}년 ${String(now.getMonth() + 1).padStart(2, '0')}월`;
+    const compRows = (gSamsungSheets && gSamsungSheets.completed) || [];
+    if (bodyEl) {
+      bodyEl.value = `안녕하세요. 삼성화재 간병지원 정산/보상 담당자님,\n리본케어 정산지원팀입니다.\n\n${currYearMonthFormatted}분 간병서비스가 정상 완료된 대상자의 정기 청구서 및 정산 명세를 첨부 파일로 송부드립니다.\n\n[청구 요약]\n- 청구 대상자: 총 ${compRows.length}명\n- 상세 내역: 첨부 엑셀 [완료] 시트 및 간병일지 참조\n\n청구 내역 검토 후 이상이 있으시면 회신 부탁드리며, 정산 일정에 맞추어 입금 진행 부탁드립니다.\n감사합니다.\n\n리본케어 정산지원팀 드림 (02-2633-1120)`;
+    }
+  }
+}
+window.resetSamsungDispatchBodyToDefault = resetSamsungDispatchBodyToDefault;
+
+function updateSamsungDailyEmailBodyText(forceReset = false) {
   const bodyEl = document.getElementById('samsungDispatchBody');
   if (!bodyEl) return;
   const now = new Date();
@@ -10825,6 +11061,32 @@ function updateSamsungDailyEmailBodyText() {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const date = String(now.getDate()).padStart(2, '0');
   const todayFormatted = `${year}년 ${month}월 ${date}일`;
+
+  const badge = document.getElementById('samsungDispatchBodySaveBadge');
+
+  if (!forceReset) {
+    let customBody = null;
+    try {
+      customBody = localStorage.getItem('LIVON_SAMSUNG_DISPATCH_BODY_CUSTOM_DAILY');
+    } catch (e) {}
+
+    if (customBody != null && customBody.trim() !== '') {
+      // 사용자가 직접 입력/수정한 고정 본문 유지 (날짜 표기 포함 시 오늘 날짜로 자동 동기화)
+      const syncedBody = customBody.replace(/\d{4}년\s*\d{1,2}월\s*\d{1,2}일/g, todayFormatted);
+      bodyEl.value = syncedBody;
+      if (badge) {
+        badge.classList.remove('hidden');
+        badge.classList.add('inline-flex');
+        if (typeof initIcons === 'function') initIcons(badge);
+      }
+      return;
+    }
+  }
+
+  if (badge) {
+    badge.classList.add('hidden');
+    badge.classList.remove('inline-flex');
+  }
 
   const targetRows = (gSamsungSheets && gSamsungSheets.target) || [];
   const attachedLogs = window.gSamsungDispatchAttachedCareLogs || [];
@@ -10911,9 +11173,31 @@ function openSamsungEmailDispatchModal(type = 'daily') {
 
     if (toEmailEl) toEmailEl.value = ''; // 월간 청구 수신자는 기본 공란
     if (subjectEl) subjectEl.value = `[삼성화재 간병비 청구] ${currYearMonthFormatted}분 간병완료 대상자 정기 청구서 및 정산내역 송부`;
-    if (bodyEl) {
-      bodyEl.value = `안녕하세요. 삼성화재 간병지원 정산/보상 담당자님,\n리본케어 정산지원팀입니다.\n\n${currYearMonthFormatted}분 간병서비스가 정상 완료된 대상자의 정기 청구서 및 정산 명세를 첨부 파일로 송부드립니다.\n\n[청구 요약]\n- 청구 대상자: 총 ${compRows.length}명\n- 상세 내역: 첨부 엑셀 [완료] 시트 및 간병일지 참조\n\n청구 내역 검토 후 이상이 있으시면 회신 부탁드리며, 정산 일정에 맞추어 입금 진행 부탁드립니다.\n감사합니다.\n\n리본케어 정산지원팀 드림 (02-2633-1120)`;
+
+    let customMonthlyBody = null;
+    try {
+      customMonthlyBody = localStorage.getItem('LIVON_SAMSUNG_DISPATCH_BODY_CUSTOM_MONTHLY');
+    } catch (e) {}
+
+    const badge = document.getElementById('samsungDispatchBodySaveBadge');
+    if (customMonthlyBody != null && customMonthlyBody.trim() !== '') {
+      const syncedBody = customMonthlyBody.replace(/\d{4}년\s*\d{1,2}월/g, currYearMonthFormatted);
+      if (bodyEl) bodyEl.value = syncedBody;
+      if (badge) {
+        badge.classList.remove('hidden');
+        badge.classList.add('inline-flex');
+        if (typeof initIcons === 'function') initIcons(badge);
+      }
+    } else {
+      if (badge) {
+        badge.classList.add('hidden');
+        badge.classList.remove('inline-flex');
+      }
+      if (bodyEl) {
+        bodyEl.value = `안녕하세요. 삼성화재 간병지원 정산/보상 담당자님,\n리본케어 정산지원팀입니다.\n\n${currYearMonthFormatted}분 간병서비스가 정상 완료된 대상자의 정기 청구서 및 정산 명세를 첨부 파일로 송부드립니다.\n\n[청구 요약]\n- 청구 대상자: 총 ${compRows.length}명\n- 상세 내역: 첨부 엑셀 [완료] 시트 및 간병일지 참조\n\n청구 내역 검토 후 이상이 있으시면 회신 부탁드리며, 정산 일정에 맞추어 입금 진행 부탁드립니다.\n감사합니다.\n\n리본케어 정산지원팀 드림 (02-2633-1120)`;
+      }
     }
+
     if (submitBtn) {
       submitBtn.className = 'px-8 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs shadow-md flex items-center gap-2 transition-all cursor-pointer';
     }
@@ -10929,6 +11213,11 @@ function openSamsungEmailDispatchModal(type = 'daily') {
   }
 
   renderDispatchAttachedCareLogs();
+
+  // Restore excel password protection configuration
+  if (typeof restoreSamsungExcelPasswordConfigToUI === 'function') {
+    restoreSamsungExcelPasswordConfigToUI('dispatch');
+  }
 
   modal.classList.remove('hidden');
   initIcons(modal);
@@ -10967,7 +11256,12 @@ async function handleDispatchSamsungEmail(e) {
   const cc = document.getElementById('samsungDispatchCcEmail')?.value?.trim() || '';
   const from = document.getElementById('samsungDispatchFromEmail')?.value?.trim() || '';
   const subject = document.getElementById('samsungDispatchSubject')?.value?.trim();
-  const body = document.getElementById('samsungDispatchBody')?.value?.trim() || '';
+  let body = document.getElementById('samsungDispatchBody')?.value?.trim() || '';
+  if (body) {
+    try {
+      localStorage.setItem(`LIVON_SAMSUNG_DISPATCH_BODY_CUSTOM_${(gSamsungClaimHubActiveSubTab || 'daily').toUpperCase()}`, document.getElementById('samsungDispatchBody')?.value || body);
+    } catch (e) {}
+  }
 
   if (!to || !subject) {
     alert('수신자(To)와 메일 제목을 반드시 입력해주세요.');
@@ -11000,6 +11294,18 @@ async function handleDispatchSamsungEmail(e) {
   }
 
   const isExcelAttached = Boolean(document.getElementById('samsungDispatchAttachExcel')?.checked);
+  const isProtectChecked = Boolean(document.getElementById('samsungDispatchExcelProtectCheckbox')?.checked);
+  const excelPassword = isProtectChecked ? (document.getElementById('samsungDispatchExcelPasswordInput')?.value || '').trim() : '';
+  const isAutoNotice = Boolean(document.getElementById('samsungDispatchExcelAutoNoticeCheckbox')?.checked);
+
+  // 본문에 암호 안내 자동 추가
+  if (isExcelAttached && excelPassword && isAutoNotice) {
+    const notice = `\n\n[보안 안내]\n※ 첨부된 엑셀 보고서 파일은 개인정보보호를 위해 암호(비밀번호: ${excelPassword})가 설정되어 있습니다.`;
+    if (!body.includes('암호(비밀번호:')) {
+      body += notice;
+    }
+  }
+
   const type = gSamsungClaimHubActiveSubTab || 'daily';
   const fileName = document.getElementById('samsungDispatchExcelFilename')?.innerText?.trim() || (type === 'daily' ? '삼성화재_간병지원_일일보고.xlsx' : '삼성화재_간병비정기청구.xlsx');
 
@@ -11019,42 +11325,110 @@ async function handleDispatchSamsungEmail(e) {
   try {
     // 1. 엑셀 첨부
     if (isExcelAttached) {
-      const excelObj = await buildSamsungExcelAttachment(type === 'daily' ? 'daily' : 'monthly');
+      const excelObj = await buildSamsungExcelAttachment(type === 'daily' ? 'daily' : 'monthly', excelPassword);
       if (excelObj) {
         if (fileName) excelObj.filename = fileName;
         attachments.push(excelObj);
       }
     }
 
-    // 2. 간병일지 첨부 (검색 후 추가된 일지 목록)
+    // 2. 간병일지 첨부 (병렬 고속 처리 및 캐시 즉시 활용)
     const attachedLogs = window.gSamsungDispatchAttachedCareLogs || [];
     if (attachedLogs.length > 0) {
-      for (const logItem of attachedLogs) {
+      if (submitBtn) {
+        submitBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>간병일지 PDF 준비 및 메일 전송 중...</span>`;
+        if (typeof initIcons === 'function') initIcons(submitBtn);
+      }
+
+      const logAttachmentResults = await Promise.all(attachedLogs.map(async (logItem) => {
         if (logItem.source === 'local' && logItem.file) {
           const b64 = await fileToBase64(logItem.file);
-          attachments.push({
+          return {
             filename: logItem.filename,
             content: b64,
             encoding: 'base64',
             contentType: logItem.file.type || 'application/pdf'
-          });
-        } else {
-          const targetApp = (gApps || []).find(a => String(a.id) === String(logItem.id));
+          };
+        }
+
+        const targetApp = (gApps || []).find(a => String(a.id) === String(logItem.id));
+        const patientName = targetApp ? targetApp.patientName : (logItem.patientName || '고객');
+        let pdfName = logItem.filename || `[${logItem.id}_${patientName}]_케어포트_공식간병일지.pdf`;
+        let pdfBase64 = null;
+
+        // 1) 메모리 캐시에 이미 생성/보유된 파일이 있는 경우 (gSamsungCustomerCareLogFiles)
+        const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[logItem.id]) || [];
+        if (custFiles.length > 0 && custFiles[0].bytes) {
+          const blob = new Blob([custFiles[0].bytes], { type: 'application/pdf' });
+          pdfBase64 = await fileToBase64(blob);
+          if (!logItem.filename && custFiles[0].name) pdfName = custFiles[0].name;
+        }
+
+        // 2) _customerCareLogPdfCache 확인 (사전 변환 캐시 즉시 히트)
+        if (!pdfBase64 && window._customerCareLogPdfCache) {
+          const cacheKeyDaily = `${logItem.id}_max1`;
+          const cacheKeyGeneral = String(logItem.id);
+          const cached = (type === 'daily' ? window._customerCareLogPdfCache[cacheKeyDaily] : null) || window._customerCareLogPdfCache[cacheKeyGeneral];
+          if (cached && cached.bytes) {
+            const blob = new Blob([cached.bytes], { type: 'application/pdf' });
+            pdfBase64 = await fileToBase64(blob);
+            if (!logItem.filename && cached.fileName) pdfName = cached.fileName;
+          }
+        }
+
+        // 3) gCareLogs 내 Base64 데이터가 존재하는 경우
+        if (!pdfBase64) {
           const cLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs))
-            ? gCareLogs.find(l => String(l.applyId) === String(logItem.id) || (targetApp && l.patientName === targetApp.patientName))
+            ? gCareLogs.find(l => String(l.applyId) === String(logItem.id) || (patientName && l.patientName === patientName))
             : null;
-          const patientName = targetApp ? targetApp.patientName : logItem.patientName;
-          const pdfName = logItem.filename || (cLog && cLog.pdfFileName ? cLog.pdfFileName : `[${logItem.id}_${patientName}]_간병일지.pdf`);
-          const validPdf = generateCompliantCareLogPdfString(cLog || { patientName, applyId: logItem.id, startDate: targetApp?.startDate, endDate: targetApp?.careEndDate, pdfFileName: pdfName });
-          const pdfBase64 = btoa(validPdf);
-          attachments.push({
+          if (cLog && cLog.pdfBase64) {
+            pdfBase64 = cLog.pdfBase64;
+            if (!logItem.filename && cLog.pdfFileName) pdfName = cLog.pdfFileName;
+          }
+        }
+
+        // 4) 케어포트 공인 일지 PDF 생성기로 정식 A4 PDF 생성 (간병일지 메뉴와 100% 동일한 전체 일차 문서 생성)
+        if (!pdfBase64) {
+          try {
+            const gen = await generateCarePortPdfBytesForApp(logItem.id, {
+              patientName
+            });
+            if (gen && gen.bytes) {
+              const blob = new Blob([gen.bytes], { type: 'application/pdf' });
+              pdfBase64 = await fileToBase64(blob);
+              if (!logItem.filename && gen.fileName) pdfName = gen.fileName;
+
+              // 차후 재사용을 위해 메모리 캐시 동기화
+              window.gSamsungCustomerCareLogFiles = window.gSamsungCustomerCareLogFiles || {};
+              window.gSamsungCustomerCareLogFiles[logItem.id] = [{
+                name: pdfName,
+                bytes: gen.bytes,
+                size: gen.bytes.byteLength,
+                date: new Date().toISOString()
+              }];
+            }
+          } catch (genErr) {
+            console.warn(`[삼성화재 메일 발송] 간병일지 생성 실패 (${patientName}):`, genErr);
+          }
+        }
+
+        if (pdfBase64) {
+          console.log(`[삼성화재 메일 첨부 완료] ${pdfName} (정식 PDF Base64 첨부)`);
+          return {
             filename: pdfName,
             content: pdfBase64,
             encoding: 'base64',
             contentType: 'application/pdf'
-          });
+          };
+        } else {
+          console.warn(`[삼성화재 메일 첨부 누락] ${patientName}(${logItem.id}) 일지 데이터 생성 불가`);
+          return null;
         }
-      }
+      }));
+
+      logAttachmentResults.forEach(item => {
+        if (item) attachments.push(item);
+      });
     }
 
     // 3. 기타 추가 첨부 파일
@@ -11197,6 +11571,101 @@ function downloadCurrentSamsungDispatchExcel() {
 function previewCurrentSamsungDispatchExcel() {
   previewSamsungExcelAttachment(gSamsungClaimHubActiveSubTab === 'claims' ? 'claims' : 'daily');
 }
+
+function toggleSamsungDispatchExcelPasswordUI() {
+  const cb = document.getElementById('samsungDispatchExcelProtectCheckbox');
+  const box = document.getElementById('samsungDispatchExcelPasswordBox');
+  const input = document.getElementById('samsungDispatchExcelPasswordInput');
+  const attachExcelCb = document.getElementById('samsungDispatchAttachExcel');
+
+  if (cb && cb.checked) {
+    if (box) box.classList.remove('hidden');
+    if (attachExcelCb && !attachExcelCb.checked) {
+      attachExcelCb.checked = true;
+    }
+    const currCfg = getSamsungExcelPasswordConfig();
+    if (input && !input.value.trim()) {
+      if (currCfg.password) {
+        input.value = currCfg.password;
+      } else {
+        setPresetSamsungDispatchPassword('today');
+      }
+    }
+    saveSamsungExcelPasswordConfigFromUI('dispatch');
+    updateSamsungDispatchExcelPasswordStatus();
+  } else {
+    if (box) box.classList.add('hidden');
+    saveSamsungExcelPasswordConfigFromUI('dispatch');
+  }
+  if (typeof initIcons === 'function' && box) initIcons(box);
+}
+window.toggleSamsungDispatchExcelPasswordUI = toggleSamsungDispatchExcelPasswordUI;
+
+function toggleSamsungDispatchExcelPasswordVisibility() {
+  const input = document.getElementById('samsungDispatchExcelPasswordInput');
+  const eyeIcon = document.getElementById('samsungDispatchExcelPasswordEyeIcon');
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye-off');
+  } else {
+    input.type = 'password';
+    if (eyeIcon) eyeIcon.setAttribute('data-lucide', 'eye');
+  }
+  if (typeof initIcons === 'function') initIcons();
+}
+window.toggleSamsungDispatchExcelPasswordVisibility = toggleSamsungDispatchExcelPasswordVisibility;
+
+function setPresetSamsungDispatchPassword(type) {
+  const input = document.getElementById('samsungDispatchExcelPasswordInput');
+  const protectCb = document.getElementById('samsungDispatchExcelProtectCheckbox');
+  const box = document.getElementById('samsungDispatchExcelPasswordBox');
+  if (!input) return;
+
+  if (protectCb && !protectCb.checked) {
+    protectCb.checked = true;
+    if (box) box.classList.remove('hidden');
+  }
+
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+
+  let targetPreset = type;
+  if (type === 'today') {
+    input.value = `${yy}${mm}${dd}`;
+  } else if (type === 'samsung') {
+    input.value = 'sf1234!';
+  }
+
+  saveSamsungExcelPasswordConfig({
+    enabled: true,
+    password: input.value,
+    presetType: targetPreset
+  });
+
+  updateSamsungDispatchExcelPasswordStatus();
+  if (typeof initIcons === 'function' && box) initIcons(box);
+}
+window.setPresetSamsungDispatchPassword = setPresetSamsungDispatchPassword;
+
+function updateSamsungDispatchExcelPasswordStatus() {
+  const input = document.getElementById('samsungDispatchExcelPasswordInput');
+  const badge = document.getElementById('samsungDispatchExcelPasswordStatusBadge');
+  saveSamsungExcelPasswordConfigFromUI('dispatch');
+  if (!badge) return;
+  const pw = (input?.value || '').trim();
+  if (pw) {
+    badge.className = 'px-2 py-1 rounded-md text-[10.5px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300';
+    badge.innerHTML = `🔒 암호화 적용됨 (${pw.replace(/./g, '*')})`;
+  } else {
+    badge.className = 'px-2 py-1 rounded-md text-[10.5px] font-bold bg-amber-200/70 text-amber-900 border border-amber-300';
+    badge.innerHTML = '🔒 암호 미입력 시 암호화 해제';
+  }
+}
+window.updateSamsungDispatchExcelPasswordStatus = updateSamsungDispatchExcelPasswordStatus;
+
 
 function renderSamsungAddressChips() {
   const containerDaily = document.getElementById('samsungDailyAddressChipsContainer');
@@ -12132,7 +12601,7 @@ async function downloadSamsungMergedCareLogPdf() {
   });
 
   try {
-    const gen = await generateCarePortPdfBytesForApp(appId, { maxDays: 1 });
+    const gen = await generateCarePortPdfBytesForApp(appId, { patientName });
     if (gen && gen.bytes) {
       gLastSamsungMergedPdfBytes = gen.bytes;
       updateGlobalProgress({ percent: 100, statusText: '✨ 생성이 완료되어 다운로드를 시작합니다.' });
@@ -12209,16 +12678,24 @@ function convertBase64ToUint8Array(base64) {
 
 window._customerCareLogPdfCache = window._customerCareLogPdfCache || {};
 
-function getPatientDailyLogsToRender(appId) {
-  let app = (gApps || []).find(a => String(a.id) === String(appId));
-  const targetRow = ((gSamsungSheets && gSamsungSheets.target) || []).find(r => String(r.patientId || r.id) === String(appId));
-  if (!app && !targetRow) return [];
+function getPatientDailyLogsToRender(appId, fallbackPatientName = '') {
+  let app = (gApps || []).find(a => String(a.id) === String(appId) || (fallbackPatientName && a.patientName === fallbackPatientName));
+  const findRow = (arr) => (arr || []).find(r => String(r.patientId || r.id || r.policyNumber) === String(appId) || (fallbackPatientName && (r.patientName === fallbackPatientName || r.name === fallbackPatientName)));
+  const targetRow = findRow(gSamsungSheets?.target) || findRow(gSamsungSheets?.completed) || findRow(gSamsungSheets?.eligible);
+  const cpGroup = (typeof gCarePortPatientGroups !== 'undefined' && Array.isArray(gCarePortPatientGroups))
+    ? gCarePortPatientGroups.find(g => (g.applyId && String(g.applyId) === String(appId)) || (fallbackPatientName && g.patientName === fallbackPatientName) || g.id === appId || g.id === `APP_${appId}`)
+    : null;
+  const cLog = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs))
+    ? gCareLogs.find(l => String(l.applyId) === String(appId) || (fallbackPatientName && l.patientName === fallbackPatientName))
+    : null;
 
-  const patientName = app ? app.patientName : (targetRow ? (targetRow.patientName || targetRow.name) : '고객');
+  if (!app && !targetRow && !cpGroup && !cLog && !fallbackPatientName) return [];
+
+  const patientName = fallbackPatientName || (app ? app.patientName : (targetRow ? (targetRow.patientName || targetRow.name) : (cpGroup?.patientName || cLog?.patientName || '고객')));
   const insuranceCompany = (app && app.insuranceCompany) ? app.insuranceCompany : '삼성화재';
   const as = (gAssigns || []).find(a => String(a.applyId) === String(appId));
-  const caregiverName = as ? as.caregiverName : (app?.caregiverName || app?.assignedCaregiverName || targetRow?.caregiverName || '안연희');
-  const centerName = as ? (as.centerName || '영등포센터') : (app?.centerName || '영등포센터');
+  const caregiverName = as ? as.caregiverName : (app?.caregiverName || app?.assignedCaregiverName || targetRow?.caregiverName || cpGroup?.caregiverName || '안연희');
+  const centerName = as ? (as.centerName || '영등포센터') : (app?.centerName || cpGroup?.centerName || '영등포센터');
   const startDateRaw = app?.careStartDate || app?.startDate || targetRow?.desiredStartDate || targetRow?.contractStartDate || '2026-09-01';
   const endDateRaw = app?.careEndDate || app?.endDate || targetRow?.expectedEndDate || targetRow?.contractEndDate || '2026-09-04';
 
@@ -12231,9 +12708,6 @@ function getPatientDailyLogsToRender(appId) {
   const endDate = cleanDateStr(endDateRaw);
 
   let targetLogs = [];
-  const cpGroup = (typeof gCarePortPatientGroups !== 'undefined' && Array.isArray(gCarePortPatientGroups))
-    ? gCarePortPatientGroups.find(g => (g.applyId && String(g.applyId) === String(appId)) || g.patientName === patientName || g.id === appId || g.id === `APP_${appId}`)
-    : null;
 
   if (cpGroup && Array.isArray(cpGroup.dailyLogs) && cpGroup.dailyLogs.length > 0) {
     targetLogs = cpGroup.dailyLogs;
@@ -12429,178 +12903,376 @@ function buildCareLogDetailData(patientMeta, log, caregiverName, insuranceCompan
   };
 }
 
+async function ensurePdfLibLoaded() {
+  if (typeof PDFLib !== 'undefined' && PDFLib.PDFDocument) return true;
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = './pdf-lib.min.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => {
+      const cdnScript = document.createElement('script');
+      cdnScript.src = 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+      cdnScript.onload = () => resolve(true);
+      cdnScript.onerror = () => reject(new Error('pdf-lib 라이브러리를 로드하지 못했습니다.'));
+      document.head.appendChild(cdnScript);
+    };
+    document.head.appendChild(script);
+  });
+}
+
 window._customerCareLogPdfCache = window._customerCareLogPdfCache || {};
 
 async function generateCarePortPdfBytesForApp(appId, options = {}) {
-  const cacheKey = String(appId);
+  const cacheKey = String(appId) + (options.maxDays ? `_max${options.maxDays}` : '');
   if (!options.forceRefresh && window._customerCareLogPdfCache[cacheKey]) {
     return window._customerCareLogPdfCache[cacheKey];
   }
 
-  let app = (gApps || []).find(a => String(a.id) === String(appId));
-  const targetRow = ((gSamsungSheets && gSamsungSheets.target) || []).find(r => String(r.patientId || r.id) === String(appId));
-  if (!app && !targetRow) return null;
+  // 1. 메모리 캐시 확인 (gSamsungCustomerCareLogFiles)
+  const custFiles = (window.gSamsungCustomerCareLogFiles && window.gSamsungCustomerCareLogFiles[appId]) || [];
+  if (!options.forceRefresh && custFiles.length > 0 && custFiles[0].bytes) {
+    const res = {
+      bytes: custFiles[0].bytes,
+      fileName: custFiles[0].name,
+      totalDays: 1
+    };
+    window._customerCareLogPdfCache[cacheKey] = res;
+    return res;
+  }
 
-  const patientName = app ? app.patientName : (targetRow ? (targetRow.patientName || targetRow.name) : '고객');
-  const insuranceCompany = (app && app.insuranceCompany) ? app.insuranceCompany : '삼성화재';
-  const as = (gAssigns || []).find(a => String(a.applyId) === String(appId));
-  const caregiverName = as ? as.caregiverName : (app?.caregiverName || app?.assignedCaregiverName || targetRow?.caregiverName || '안연희');
-  const centerName = as ? (as.centerName || '영등포센터') : (app?.centerName || '영등포센터');
-  const startDate = app?.careStartDate || app?.startDate || targetRow?.desiredStartDate || targetRow?.contractStartDate || '2026-09-01';
+  let app = (gApps || []).find(a => String(a.id) === String(appId) || (options.patientName && a.patientName === options.patientName));
+  const findRow = (arr) => (arr || []).find(r => String(r.patientId || r.id || r.policyNumber) === String(appId) || (options.patientName && (r.patientName === options.patientName || r.name === options.patientName)));
+  const targetRow = findRow(gSamsungSheets?.target) || findRow(gSamsungSheets?.completed) || findRow(gSamsungSheets?.eligible);
+  const patientName = options.patientName || (app ? app.patientName : (targetRow ? (targetRow.patientName || targetRow.name) : '고객'));
 
-  // 1. 이미 등록된 gCareLogs 내 Base64가 있다면 즉시 반환 (0ms)
-  const cLog = (gCareLogs || []).find(l => String(l.applyId) === String(appId) || (app && l.patientName === app.patientName));
-  if (cLog && cLog.pdfBase64) {
+  // 2. 케어포트 동기화 데이터가 비어있다면 자동 1회 조회 (황인홍 등 원격 전산 일지 즉시 매칭)
+  if ((!window.gCarePortRawLogs || window.gCarePortRawLogs.length === 0) &&
+      (!window.gCarePortPatientGroups || window.gCarePortPatientGroups.length === 0)) {
     try {
-      const bytes = convertBase64ToUint8Array(cLog.pdfBase64);
-      if (bytes.length > 0) {
-        const res = {
-          bytes: bytes,
-          fileName: cLog.pdfFileName || `[케어포트_공식간병일지]_${patientName}.pdf`,
-          totalDays: 1
-        };
-        window._customerCareLogPdfCache[cacheKey] = res;
-        return res;
+      const syncResp = await fetch('/api/careport/sync');
+      if (syncResp.ok) {
+        const syncJson = await syncResp.json();
+        if (syncJson.success && Array.isArray(syncJson.logs)) {
+          window.gCarePortRawLogs = syncJson.logs;
+          if (window.CarePortClient && typeof window.CarePortClient.groupLogsByPatient === 'function') {
+            window.gCarePortPatientGroups = window.CarePortClient.groupLogsByPatient(syncJson.logs, window.gApps || [], window.gAssigns || []);
+          }
+        }
       }
-    } catch (e) {
-      console.warn('pdfBase64 decoding failed in generateCarePortPdfBytesForApp:', e);
+    } catch(e) {}
+  }
+
+  // 3. 간병일지(케어포트) 메뉴의 환자 그룹과 100% 동일하게 매칭
+  let patientGroup = (window.gCarePortPatientGroups || []).find(g =>
+    (g.applyId && String(g.applyId) === String(appId)) ||
+    (g.id && String(g.id) === String(appId)) ||
+    (g.id && String(g.id) === `APP_${appId}`) ||
+    (patientName && (g.patientName === patientName || g.username === patientName))
+  );
+
+  if (!patientGroup && window.CarePortClient && typeof window.CarePortClient.groupLogsByPatient === 'function') {
+    const raw = (window.gCarePortRawLogs && window.gCarePortRawLogs.length > 0) ? window.gCarePortRawLogs : (window.gCareLogs || []);
+    if (raw.length > 0) {
+      const groups = window.CarePortClient.groupLogsByPatient(raw, window.gApps || [], window.gAssigns || []);
+      patientGroup = groups.find(g =>
+        (g.applyId && String(g.applyId) === String(appId)) ||
+        (g.id && String(g.id) === String(appId)) ||
+        (g.id && String(g.id) === `APP_${appId}`) ||
+        (patientName && (g.patientName === patientName || g.username === patientName))
+      );
+      if (patientGroup && (!window.gCarePortPatientGroups || window.gCarePortPatientGroups.length === 0)) {
+        window.gCarePortPatientGroups = groups;
+      }
     }
   }
 
-  // 전체 일차 목록 수집 (황인홍의 경우 4일치 등 전 기간)
-  const dailyLogsToRender = getPatientDailyLogsToRender(appId);
-  const totalDays = dailyLogsToRender.length;
-  await ensureHtml2CanvasLoaded();
-  const mergedDoc = await PDFLib.PDFDocument.create();
+  // 일지 목록 준비 (전체 일차 모두 유지)
+  let dailyLogsToRender = [];
+  if (patientGroup && Array.isArray(patientGroup.dailyLogs) && patientGroup.dailyLogs.length > 0) {
+    dailyLogsToRender = [...patientGroup.dailyLogs];
+  } else {
+    dailyLogsToRender = getPatientDailyLogsToRender(appId, patientName);
+  }
 
-  // 케어포트 공인 상세 데이터 조회
+  if (options.maxDays && options.maxDays > 0) {
+    dailyLogsToRender = dailyLogsToRender.slice(0, options.maxDays);
+  }
+
+  // 날짜순 오름차순 정렬 (Day 1 -> Day N)
+  dailyLogsToRender.sort((a, b) => {
+    const dayA = a.dayNumber || 0;
+    const dayB = b.dayNumber || 0;
+    if (dayA !== dayB && dayA > 0 && dayB > 0) return dayA - dayB;
+    const dateA = a.dateString || a.consultDate || a.startDate || '';
+    const dateB = b.dateString || b.consultDate || b.startDate || '';
+    return dateA.localeCompare(dateB);
+  });
+
+  const totalDays = dailyLogsToRender.length;
+  if (totalDays === 0) return null;
+
+  const patientMeta = patientGroup || {
+    patientName: patientName,
+    age: app?.age || targetRow?.age || '74',
+    gender: app?.gender || targetRow?.gender || '여',
+    caregiverName: app?.caregiverName || targetRow?.caregiverName || '안연희',
+    centerName: app?.centerName || '영등포센터',
+    insuranceCompany: app?.insuranceCompany || '삼성화재',
+    applyId: appId,
+    dailyLogs: dailyLogsToRender
+  };
+
+  // 4. 케어포트 공인 상세 데이터 병렬 조회 (원격 세션이 있을 경우)
   const detailDataMap = {};
   if (window.CarePortClient && typeof window.CarePortClient.fetchLogDetail === 'function') {
     const fetchPromises = dailyLogsToRender.map(async (log) => {
-      if (!log.sessionId) return;
+      if (!log.sessionId || log.sc) return;
+      const cleanSid = String(log.sessionId).replace(/^CLOG-/, '').trim();
+      if (window.CarePortClient._detailCache && (window.CarePortClient._detailCache[cleanSid] || window.CarePortClient._detailCache[log.sessionId])) {
+        detailDataMap[log.sessionId] = window.CarePortClient._detailCache[cleanSid] || window.CarePortClient._detailCache[log.sessionId];
+        return;
+      }
       try {
-        const d = await window.CarePortClient.fetchLogDetail(log.sessionId);
+        const d = await Promise.race([
+          window.CarePortClient.fetchLogDetail(log.sessionId),
+          new Promise(r => setTimeout(() => r(null), 2000))
+        ]);
         if (d) detailDataMap[log.sessionId] = d;
       } catch (e) {}
     });
     await Promise.all(fetchPromises);
   }
 
-  const offscreen = document.createElement('div');
-  offscreen.style.position = 'fixed';
-  offscreen.style.left = '-9999px';
-  offscreen.style.top = '0';
-  offscreen.style.width = '794px';
-  offscreen.style.background = '#ffffff';
-  offscreen.style.zIndex = '-9999';
-  offscreen.style.opacity = '0';
-  offscreen.style.pointerEvents = 'none';
-  document.body.appendChild(offscreen);
-
-  const clusterTrendScores = dailyLogsToRender.map((l, idx) => {
-    const lRaw = l.raw || l;
-    const s = lRaw.trend_scores || lRaw.trendScores || l.trendScores || {};
-    const day = l.dayNumber || (idx + 1);
-    return {
-      dayIndex: day,
-      careDate: (l.consultDate || l.dateString || '').slice(0, 10),
-      overallScore: s.overallScore != null ? s.overallScore : (s.overall != null ? s.overall : 3),
-      mobilityScore: s.mobilityScore != null ? s.mobilityScore : (s.mobility != null ? s.mobility : 3),
-      dietScore: s.dietScore != null ? s.dietScore : (s.diet != null ? s.diet : 3),
-      sleepScore: s.sleepScore != null ? s.sleepScore : (s.sleep != null ? s.sleep : 3),
-      painScore: s.painScore != null ? s.painScore : (s.pain != null ? s.pain : 3)
-    };
-  });
-
-  try {
-    for (let i = 0; i < totalDays; i++) {
-      const log = dailyLogsToRender[i];
-      const logCareDate = (log.consultDate || log.dateString || '').slice(0, 10);
-      const logDayNum = log.dayNumber || (i + 1);
-      const currentDayTrends = clusterTrendScores.filter((t, tIdx) => {
-        const tDate = (t.careDate || t.date || '').slice(0, 10);
-        if (tDate && logCareDate) return tDate <= logCareDate;
-        if (t.dayIndex != null && logDayNum != null) return Number(t.dayIndex) <= Number(logDayNum);
-        return tIdx <= i;
-      });
-
-      const patientMeta = {
-        patientName: patientName,
-        age: app?.age || targetRow?.age || '74',
-        gender: app?.gender || targetRow?.gender || '여',
-        caregiverName: caregiverName,
-        centerName: centerName,
-        insuranceCompany: insuranceCompany,
-        applyId: appId,
-        dailyLogs: dailyLogsToRender,
-        trendScores: currentDayTrends
-      };
-
-      const realDetail = detailDataMap[log.sessionId] || (window.CarePortClient && window.CarePortClient._detailCache && window.CarePortClient._detailCache[log.sessionId]) || null;
-      let detailData = realDetail ? { ...realDetail } : buildCareLogDetailData(patientMeta, log, caregiverName, insuranceCompany, centerName);
-      if (detailData && Array.isArray(detailData.trendScores) && detailData.trendScores.length > 0) {
-        detailData.trendScores = detailData.trendScores.filter((t, tIdx) => {
-          const tDate = (t.careDate || t.date || '').slice(0, 10);
-          if (tDate && logCareDate) return tDate <= logCareDate;
-          if (t.dayIndex != null && logDayNum != null) return Number(t.dayIndex) <= Number(logDayNum);
-          return tIdx <= i;
-        });
-      } else if (detailData) {
-        detailData.trendScores = currentDayTrends;
-      }
-
-      const dayHtml = (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function')
-        ? window.CarePortClient.generateDailyLogHtml(patientMeta, log, detailData)
-        : '';
-
-      const itemWrap = document.createElement('div');
-      itemWrap.style.width = '794px';
-      itemWrap.innerHTML = dayHtml;
-      offscreen.appendChild(itemWrap);
-      const pageEl = itemWrap.querySelector('.page') || itemWrap;
-
-      const canvas = await html2canvas(pageEl, {
-        scale: 1.0,
-        useCORS: false,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        logging: false,
-        windowWidth: 794,
-        imageTimeout: 0
-      });
-      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.88));
-      const jpgBytes = new Uint8Array(await blob.arrayBuffer());
-
-      offscreen.innerHTML = '';
-
-      const pageW = 595.28;
-      const pageH = 841.89;
-      const margin = 10;
-      const availW = pageW - (margin * 2);
-      const availH = pageH - (margin * 2);
-
-      const jpgImage = await mergedDoc.embedJpg(jpgBytes);
-      const pdfPage = mergedDoc.addPage([pageW, pageH]);
-      const scale = Math.min(availW / jpgImage.width, availH / jpgImage.height);
-      const drawW = jpgImage.width * scale;
-      const drawH = jpgImage.height * scale;
-      const x = margin + (availW - drawW) / 2;
-      const y = pageH - margin - drawH;
-      pdfPage.drawImage(jpgImage, { x, y, width: drawW, height: drawH });
-    }
-  } finally {
-    if (document.body.contains(offscreen)) {
-      document.body.removeChild(offscreen);
-    }
+  // 5. 각 일차별 일지 HTML 생성 (간병일지 메뉴와 100% 동일한 로직, Classic/Modern 자동 지원)
+  const dayHtmlList = [];
+  for (let i = 0; i < totalDays; i++) {
+    const log = dailyLogsToRender[i];
+    const detailData = detailDataMap[log.sessionId] || (window.CarePortClient && window.CarePortClient._detailCache && window.CarePortClient._detailCache[log.sessionId]) || log.detail || null;
+    const html = (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function')
+      ? window.CarePortClient.generateDailyLogHtml(patientMeta, log, detailData)
+      : '';
+    dayHtmlList.push(html);
   }
 
-  const finalPdfBytes = await mergedDoc.save();
+  const startDate = (patientMeta.careStartDate || app?.careStartDate || '').replace(/[^0-9]/g, '');
+  const endDate = (patientMeta.careEndDate || app?.careEndDate || '').replace(/[^0-9]/g, '');
+  const dateRangeStr = (startDate && endDate) ? `_${startDate}-${endDate}` : '';
+  const fileName = `[케어포트_공식간병일지]_${patientName}_전체(${totalDays}일차)${dateRangeStr}.pdf`;
+
+  let pdfBytes = null;
+
+  // 6. 1차 시도: 고성능 네이티브 가속 엔진 (/api/careport/generate-pdf) -> 1~2초 내 초고속 단일 벡터 PDF 생성
+  try {
+    let combinedPagesHtml = '';
+    dayHtmlList.forEach((dHtml) => {
+      const bodyMatch = dHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+      const inner = bodyMatch ? bodyMatch[1] : dHtml;
+      combinedPagesHtml += `
+        <div class="cp-pdf-page" style="page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; width: 794px; min-height: 1122px; max-height: 1122px; margin: 0 auto; overflow: hidden; position: relative; background: #ffffff;">
+          ${inner}
+        </div>
+      `;
+    });
+
+    const fullDocHtml = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>${fileName}</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <style>
+    @page { size: A4 portrait; margin: 0; }
+    * { box-sizing: border-box; }
+    html, body {
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
+      background: #ffffff;
+      color: #0f172a;
+      padding: 0;
+      margin: 0;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .cp-pdf-page {
+      page-break-after: always !important;
+      break-after: page !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      width: 794px !important;
+      min-height: 1122px !important;
+      max-height: 1122px !important;
+      margin: 0 auto !important;
+      overflow: hidden !important;
+      position: relative !important;
+      background: #ffffff !important;
+    }
+    .cp-pdf-page:last-child {
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+    }
+    .page, .report-area {
+      width: 794px !important;
+      max-width: 794px !important;
+      min-height: 1122px !important;
+      max-height: 1122px !important;
+      box-sizing: border-box !important;
+      padding: 26px 36px !important;
+      overflow: hidden !important;
+    }
+    .careport-badge-pill {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      vertical-align: middle !important;
+      box-sizing: border-box !important;
+      line-height: 1 !important;
+      text-align: center !important;
+      white-space: nowrap !important;
+    }
+    .careport-badge-pill > span,
+    .careport-badge-pill > strong {
+      display: inline-flex !important;
+      align-items: center !important;
+      line-height: 1 !important;
+      position: relative !important;
+      top: -1.5px !important;
+    }
+    .careport-dot {
+      display: inline-block !important;
+      border-radius: 50% !important;
+      background: currentColor !important;
+      flex-shrink: 0 !important;
+      vertical-align: middle !important;
+      position: relative !important;
+      top: -1.5px !important;
+    }
+    .no-print { display: none !important; }
+  </style>
+</head>
+<body>
+  ${combinedPagesHtml}
+</body>
+</html>`;
+
+    const pdfApiUrl = (typeof window !== 'undefined' && window.CarePortClient?.apiBase)
+      ? window.CarePortClient.apiBase.replace(/\/careport$/, '') + '/careport/generate-pdf'
+      : '/api/careport/generate-pdf';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const resp = await fetch(pdfApiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html: fullDocHtml, filename: fileName }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (resp.ok && resp.headers.get('content-type')?.includes('application/pdf')) {
+      const arrayBuf = await resp.arrayBuffer();
+      if (arrayBuf && arrayBuf.byteLength > 1000) {
+        pdfBytes = new Uint8Array(arrayBuf);
+      }
+    }
+  } catch (serverErr) {
+    console.warn('[CarePort PDF] 서버 가속 엔진 연결 지연/오류, 클라이언트 엔진으로 자동 전환:', serverErr.message);
+  }
+
+  // 7. 2차 시도: 클라이언트 배치 엔진 fallback (PDFLib + iframe)
+  if (!pdfBytes) {
+    await ensurePdfLibLoaded();
+    await ensureHtml2CanvasLoaded();
+    const mergedDoc = await PDFLib.PDFDocument.create();
+
+    const pageW = 595.28;
+    const pageH = 841.89;
+    const margin = 12;
+    const availW = pageW - (margin * 2);
+    const availH = pageH - (margin * 2);
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.left = '-9999px';
+    iframe.style.top = '0';
+    iframe.style.width = '794px';
+    iframe.style.height = '1122px';
+    iframe.style.border = 'none';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    document.body.appendChild(iframe);
+
+    try {
+      const sampleHtml = dayHtmlList[0] || '';
+      const styleMatches = sampleHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/gi) || [];
+      const extractedStyles = styleMatches.join('\n');
+
+      for (let i = 0; i < totalDays; i++) {
+        const dHtml = dayHtmlList[i];
+        const bodyMatch = dHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+        let inner = bodyMatch ? bodyMatch[1] : dHtml;
+        inner = inner.replace(/<link[^>]*href="[^"]*pretendard[^"]*"[^>]*>/gi, '');
+
+        const unitHtml = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  ${extractedStyles}
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+    .page, .report-area { width: 794px !important; min-height: 1122px !important; box-sizing: border-box !important; padding: 26px 36px !important; }
+  </style>
+</head>
+<body>
+  <div style="width: 794px; min-height: 1122px; background: #ffffff;">${inner}</div>
+</body>
+</html>`;
+
+        await new Promise((res) => {
+          iframe.onload = () => res(true);
+          iframe.srcdoc = unitHtml;
+          setTimeout(res, 60);
+        });
+
+        const targetEl = iframe.contentDocument?.body?.firstElementChild || iframe.contentDocument?.body;
+        const canvas = await html2canvas(targetEl, {
+          scale: 1.5,
+          useCORS: false,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          logging: false,
+          windowWidth: 794,
+          imageTimeout: 0
+        });
+
+        const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.90));
+        const jpgBytes = new Uint8Array(await blob.arrayBuffer());
+        const jpgImage = await mergedDoc.embedJpg(jpgBytes);
+        const pdfPage = mergedDoc.addPage([pageW, pageH]);
+        pdfPage.drawImage(jpgImage, { x: margin, y: margin, width: availW, height: availH });
+      }
+    } finally {
+      if (iframe && document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
+    }
+    pdfBytes = await mergedDoc.save();
+  }
+
   const resultObj = {
-    bytes: finalPdfBytes,
-    fileName: `[케어포트_공식간병일지]_${patientName}_전체(${totalDays}일차).pdf`,
+    bytes: pdfBytes,
+    fileName: fileName,
     totalDays: totalDays
   };
+
+  // 메모리 및 캐시 저장
+  window.gSamsungCustomerCareLogFiles = window.gSamsungCustomerCareLogFiles || {};
+  window.gSamsungCustomerCareLogFiles[String(appId)] = [{
+    name: fileName,
+    bytes: pdfBytes,
+    size: pdfBytes.byteLength,
+    date: new Date().toISOString()
+  }];
   window._customerCareLogPdfCache[cacheKey] = resultObj;
+
   return resultObj;
 }
 
@@ -13955,10 +14627,10 @@ async function handleSendSamsungDailyReport(e) {
           }
         }
 
-        // 2) 여전히 파일이 없을 경우 초고속 생성 (메모리 캐시 우선, 1일치 렌더링)
+        // 2) 여전히 파일이 없을 경우 초고속 생성 (메모리 캐시 우선, 전체 일차 렌더링)
         if (custFiles.length === 0) {
           try {
-            const gen = await generateCarePortPdfBytesForApp(appId, { maxDays: 1 });
+            const gen = await generateCarePortPdfBytesForApp(appId, { patientName });
             if (gen && gen.bytes) {
               custFiles = [{
                 name: gen.fileName || `[케어포트_공식간병일지]_${patientName}.pdf`,
@@ -31852,6 +32524,7 @@ function renderUnifiedCareHub() {
               ${maskName(displayPatientName)}
               ${applicantSubHtml}
               ${getCsLabelBadge(app)}
+              ${app.careportAppNo ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200" title="케어포트 방문관리 서비스신청 접수 (#${app.careportAppNo})"><i data-lucide="cloud-check" class="w-3 h-3 text-indigo-600"></i>#${app.careportAppNo}</span>` : ''}
             </h3>
             <span class="text-xs text-slate-400 font-normal">(${app.gender || '-'}·${maskBirth(app.birthDate)})</span>
             <span class="text-[11px] font-bold px-2 py-0.5 rounded-md ${app.isPreRegistered ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-blue-50 text-blue-800 border border-blue-200'}">${app.insuranceCompany}${app.isPreRegistered ? ' (사전등록)' : ''}</span>
@@ -31917,6 +32590,7 @@ function renderUnifiedCareHub() {
               ${maskName(displayPatientName)}
               ${applicantSubHtml}
               ${getCsLabelBadge(app)}
+              ${app.careportAppNo ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200" title="케어포트 방문관리 서비스신청 접수 (#${app.careportAppNo})"><i data-lucide="cloud-check" class="w-3 h-3 text-indigo-600"></i>#${app.careportAppNo}</span>` : ''}
             </h3>
             <span class="text-xs text-slate-500 font-medium">(${app.gender || '-'}·${maskBirth(app.birthDate)})</span>
             <span class="text-[11px] font-bold px-2 py-0.5 rounded-md ${app.isPreRegistered ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-white text-blue-800 border border-blue-200'}">${app.insuranceCompany}${app.isPreRegistered ? ' (사전등록)' : ''}</span>
@@ -40971,8 +41645,20 @@ async function downloadCarePortPdfLog(id) {
     }
   }
 
-  // 2. Fallback: 100% Valid Compliant Binary PDF
-  updateGlobalProgress({ percent: 85, statusText: `표준 바이너리 PDF 생성 중...` });
+  // 2. Fallback: 케어포트 정식 A4 PDF 생성기 호출 (한글 물음표 깨짐 원천 방지)
+  updateGlobalProgress({ percent: 85, statusText: `표준 케어포트 PDF 생성 중...` });
+  try {
+    const gen = await generateCarePortPdfBytesForApp(log.applyId || log.id, { patientName: log.patientName });
+    if (gen && gen.bytes) {
+      triggerDirectPdfDownload(gen.bytes, fileName);
+      updateGlobalProgress({ percent: 100, statusText: `✨ 다운로드 완료!` });
+      hideGlobalProgress(900);
+      return;
+    }
+  } catch (errFallback) {
+    console.warn('[downloadCarePortPdfLog] 정식 PDF 생성 fallback 실패, 바이너리 생성:', errFallback);
+  }
+
   const blob = generateCompliantCareLogPdfBlob(log);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -43022,6 +43708,15 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
     if (typeof renderApplications === 'function') renderApplications();
     if (typeof renderDashboard === 'function') renderDashboard();
 
+    // [케어포트 전산 연동]: 신규 고객 등록 시 케어포트(방문관리) 전산 자동 등록 (사용자 체크 시에만 실행)
+    const chkCarePort = document.getElementById('chkAutoCarePortSubmit');
+    const autoCareport = chkCarePort ? chkCarePort.checked : false;
+    if (autoCareport) {
+      if (typeof submitAppToCarePort === 'function') {
+        submitAppToCarePort(newApp, false).catch(err => console.warn('[Auto CarePort Warning]', err));
+      }
+    }
+
     // 3. 팩스 발송 (shouldSendFax가 true이고 targetFaxNumber가 있으며 initialFaxSent가 취소되지 않은 경우에만 비동기 발송)
     let faxSentSuccess = false;
     let faxSentErrorMsg = '';
@@ -43234,6 +43929,163 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
   } catch (err) {
     console.error('신규 접수 저장 중 오류 발생:', err);
     alert('신규 신청 저장 중 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// =========================================================================
+// CAREPORT (리본케어포트) 방문관리 > 서비스신청 자동 및 수동 연동
+// =========================================================================
+
+async function submitAppToCarePort(app, isManual = false) {
+  if (!app) return;
+  try {
+    const pName = app.patientName || '고객';
+    if (isManual && typeof showToast === 'function') {
+      showToast(`[케어포트 전송 중] ${pName}님의 정보를 케어포트 방문관리 서비스 신청서로 전송하고 있습니다...`, 'info');
+    }
+
+    const res = await fetch('/api/careport/submit-service', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ application: app })
+    });
+    const result = await res.json();
+
+    if (result && result.success) {
+      const appNo = result.appNo || '완료';
+      app.careportAppNo = appNo;
+      app.careportRegisteredAt = new Date().toISOString();
+      app.careportStatus = 'REGISTERED';
+      app.careportInsurance = result.insuranceCompany || app.insuranceCompany;
+
+      // Local storage update
+      try {
+        localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+      } catch (e) {}
+
+      // Save to disk
+      try {
+        fetch('/api/hub/update-application', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            appId: app.id,
+            updates: {
+              careportAppNo: appNo,
+              careportRegisteredAt: app.careportRegisteredAt,
+              careportStatus: 'REGISTERED',
+              careportInsurance: app.careportInsurance
+            }
+          })
+        }).catch(console.warn);
+      } catch (e) {}
+
+      // Sync to Convex
+      if (typeof syncToConvex === 'function') {
+        const cleanPayload = {};
+        for (const [k, v] of Object.entries(app)) {
+          if (!k.startsWith('_')) cleanPayload[k] = v;
+        }
+        syncToConvex('sync:saveApplication', { app: cleanPayload }).catch(console.warn);
+      }
+
+      // 감사 로그 기록
+      if (typeof window.recordSystemAuditLog === 'function') {
+        window.recordSystemAuditLog({
+          category: '케어포트연동',
+          actionType: 'UPDATE',
+          target: `${app.id} (${pName})`,
+          summary: result.isMock 
+            ? `케어포트 방문관리 서비스신청 모의 등록 및 데이터 검증 완료 [모의접수: #${appNo}] (운영서버 미발송)`
+            : `케어포트 방문관리 서비스신청 접수 성공 [접수번호: #${appNo}] (${app.careportInsurance})`
+        });
+      }
+
+      updateCarePortSubmitButtonUI(app);
+
+      if (typeof showToast === 'function') {
+        if (result.isMock) {
+          showToast(`[케어포트 모의 등록] ${pName}님의 데이터 검증 및 로깅이 완료되었습니다. (운영 서버/슬랙 발송 차단: #${appNo})`, 'info');
+        } else {
+          showToast(`[케어포트 등록 성공] ${pName}님의 서비스 신청서가 케어포트 방문관리(접수번호: #${appNo})에 정상 등록되었습니다.`, 'success');
+        }
+      } else {
+        if (result.isMock) {
+          alert(`[케어포트 모의 등록 완료]\n${pName}님의 서비스 신청서가 모의 등록(로깅)되었습니다.\n(운영 DB 및 슬랙 발송 차단: #${appNo})`);
+        } else {
+          alert(`[케어포트 등록 성공]\n${pName}님의 서비스 신청서가 케어포트 방문관리(접수번호: #${appNo})에 정상 등록되었습니다.`);
+        }
+      }
+
+      if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+      if (typeof renderApplications === 'function') renderApplications();
+      return result;
+    } else {
+      const errMsg = result?.message || '알 수 없는 오류가 발생했습니다.';
+      console.warn('[CarePort Submit Error]', errMsg);
+      if (isManual) {
+        alert(`[케어포트 연동 실패]\n${errMsg}`);
+      } else if (typeof showToast === 'function') {
+        showToast(`[케어포트 연동 실패] ${errMsg}`, 'error');
+      }
+    }
+  } catch (err) {
+    console.error('[CarePort Submit Network Error]', err);
+    if (isManual) {
+      alert(`[케어포트 통신 오류]\n서버 통신에 실패했습니다: ${err.message}`);
+    }
+  }
+}
+
+function updateCarePortSubmitButtonUI(app) {
+  const btn = document.getElementById('btnHubCarePortSubmit');
+  const txt = document.getElementById('btnHubCarePortSubmitText');
+  const btnFooter = document.getElementById('btnHubCarePortSubmitFooter');
+  const txtFooter = document.getElementById('btnHubCarePortSubmitFooterText');
+
+  if (app && app.careportAppNo) {
+    if (txt) txt.textContent = `케어포트 #${app.careportAppNo} (재전송)`;
+    if (btn) {
+      btn.className = 'px-2.5 sm:px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-md cursor-pointer';
+      btn.title = `케어포트 방문관리에 이미 접수됨 (접수번호 #${app.careportAppNo})`;
+    }
+    if (txtFooter) txtFooter.textContent = `케어포트 #${app.careportAppNo} (재전송)`;
+    if (btnFooter) {
+      btnFooter.className = 'px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95';
+    }
+  } else {
+    if (txt) txt.textContent = '케어포트 방문관리 등록';
+    if (btn) {
+      btn.className = 'px-2.5 sm:px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-indigo-600 hover:bg-indigo-500 text-white shadow-md cursor-pointer';
+      btn.title = '케어포트(리본) 방문관리 서비스 신청서로 전송/등록합니다';
+    }
+    if (txtFooter) txtFooter.textContent = '케어포트 등록';
+    if (btnFooter) {
+      btnFooter.className = 'px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95';
+    }
+  }
+}
+
+async function submitActiveHubCustomerToCarePort() {
+  const targetId = window.gActiveHubModalAppId;
+  if (!targetId) {
+    alert('선택된 고객이 없습니다.');
+    return;
+  }
+  const app = (gApps || []).find(a => a && (String(a.id) === String(targetId) || String(a.patientId) === String(targetId)));
+  if (!app) {
+    alert(`고객 정보(${targetId})를 찾을 수 없습니다.`);
+    return;
+  }
+
+  const pName = app.patientName || '고객';
+  const ins = app.insuranceCompany || '원수사';
+  const confirmMsg = app.careportAppNo
+    ? `[${pName} 님 - ${ins}]\n이미 케어포트에 접수된 내역(접수번호: #${app.careportAppNo})이 있습니다.\n\n케어포트 방문관리 서비스 신청서 검증 및 모의 등록(Mocking/로깅)을 다시 진행하시겠습니까?\n\n* 운영진 요청사항 반영: 운영 DB 및 슬랙 발송을 방지하기 위해 Mocking/로깅 모드로 안전하게 처리됩니다.`
+    : `[${pName} 님 - ${ins}]\n고객 정보를 케어포트(방문관리 > 서비스신청) 모의 등록 및 검증을 진행하시겠습니까?\n\n* [운영 서버 보호 모드]: 운영 DB 오염 및 슬랙 발송 방지를 위해 API 요청 Mocking 및 데이터 검증/로깅 모드로 안전하게 처리됩니다.\n* 필수 정보(피보험자, 주민번호/생년월일, 연락처, 주소, 병원명, 진단명, 간병일정 등) 정합성이 모두 검증됩니다.`;
+
+  if (confirm(confirmMsg)) {
+    await submitAppToCarePort(app, true);
   }
 }
 
@@ -46324,6 +47176,11 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null) {
     const preRegBadge = app.isPreRegistered ? ' [사전등록]' : '';
     const applyDateText = app.applyDate ? ` · 신청일: ${app.applyDate}` : '';
     titleEl.innerText = `${maskName(app.patientName)} (${app.id})${preRegBadge}${applyDateText} - 고객 상세 업무 원스탑 모달`;
+  }
+
+  // [케어포트 연동 버튼 상태 동기화]
+  if (typeof updateCarePortSubmitButtonUI === 'function') {
+    updateCarePortSubmitButtonUI(app);
   }
 
   const btnSamsungEmail = document.getElementById('btnHubSamsungEmail');
