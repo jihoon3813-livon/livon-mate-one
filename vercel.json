@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "cleanUrls": true,
   "functions": {
     "api/**/*.js": {
       "maxDuration": 30,
@@ -8,10 +7,6 @@
     }
   },
   "rewrites": [
-    {
-      "source": "/",
-      "destination": "/index.html"
-    },
     {
       "source": "/mate/survey",
       "destination": "/mate-survey.html"
