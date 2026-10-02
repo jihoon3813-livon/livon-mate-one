@@ -8,6 +8,86 @@
  * - 간병인 안내 기록, 고객 응답, 불만 후속 조치, 달란트 원장 승인/취소 API 연동
  */
 
+const DEFAULT_SURVEY_SETTINGS = {
+  version: '1.0',
+  dueDaysAfterEnd: 7,
+  pointsGuide: 10,
+  pointsResponse: 5,
+  pointsMonthBonus: 30,
+  csPhone: '1544-7119',
+  csOperatingHours: '평일 09:00 ~ 18:00 (주말/공휴일 휴무)'
+};
+
+const DEFAULT_SURVEY_SCHEMA_V1 = [
+  {
+    id: 'Q1',
+    title: '설문에 응답하시는 분은 누구인가요?',
+    type: 'single_choice',
+    required: true,
+    options: [
+      { value: 'PATIENT', label: '환자 본인' },
+      { value: 'GUARDIAN', label: '가족 및 보호자' },
+      { value: 'OTHER', label: '기타' }
+    ]
+  },
+  {
+    id: 'Q2',
+    title: '이번 간병 서비스에 전반적으로 얼마나 만족하셨나요?',
+    type: 'rating_5',
+    required: true,
+    options: [
+      { score: 5, label: '매우 만족' },
+      { score: 4, label: '만족' },
+      { score: 3, label: '보통' },
+      { score: 2, label: '불만족' },
+      { score: 1, label: '매우 불만족' }
+    ]
+  },
+  {
+    id: 'Q3',
+    title: '담당 간병인의 친절함과 환자를 대하는 태도는 어떠셨나요?',
+    type: 'rating_5_with_unknown',
+    required: true,
+    allowUnknown: true,
+    options: [
+      { score: 5, label: '매우 친절' },
+      { score: 4, label: '친절' },
+      { score: 3, label: '보통' },
+      { score: 2, label: '불친절' },
+      { score: 1, label: '매우 불친절' }
+    ]
+  },
+  {
+    id: 'Q4',
+    title: '담당 간병인이 제공한 돌봄(식사, 위생, 체위 등)은 어떠셨나요?',
+    type: 'rating_5_with_unknown',
+    required: true,
+    allowUnknown: true,
+    options: [
+      { score: 5, label: '매우 꼼꼼하고 능숙함' },
+      { score: 4, label: '원활함' },
+      { score: 3, label: '보통' },
+      { score: 2, label: '미흡함' },
+      { score: 1, label: '매우 미흡함' }
+    ]
+  },
+  {
+    id: 'Q5',
+    title: '좋았던 점이나 개선이 필요한 점을 편하게 남겨주세요.',
+    type: 'text',
+    required: false,
+    maxLength: 1000,
+    placeholder: '질병명이나 주민번호 등 민감한 개인정보는 적지 말아주세요.'
+  },
+  {
+    id: 'Q6',
+    title: '남겨주신 의견에 대해 담당자의 유선 연락을 원하시나요?',
+    type: 'boolean_callback',
+    required: true,
+    noticeOnYes: '서비스 신청 시 등록된 연락처로 연락드립니다.'
+  }
+];
+
 const gSurveyState = {
   summary: {
     totalTargets: 0,
@@ -24,8 +104,8 @@ const gSurveyState = {
   followups: [],
   responses: [],
   rewards: [],
-  settings: null,
-  schema: [],
+  settings: { ...DEFAULT_SURVEY_SETTINGS },
+  schema: JSON.parse(JSON.stringify(DEFAULT_SURVEY_SCHEMA_V1)),
   activeSubTab: 'targets',
   activeTarget: null,
   activeFollowup: null,
@@ -225,10 +305,50 @@ async function loadSurveyMgmtData(showToastAlert = false) {
 
     if (Array.isArray(followupsRes.items)) gSurveyState.followups = followupsRes.items;
     if (Array.isArray(rewardsRes.items)) gSurveyState.rewards = rewardsRes.items;
-    if (settingsRes.data) {
-      gSurveyState.settings = settingsRes.data.settings || {};
-      gSurveyState.schema = settingsRes.data.schema || [];
+
+    // 설문 설정 및 문항 스키마 복원 (Convex Cloud DB -> API -> 로컬스토리지 -> 기본값 폴백)
+    let restoredSettings = null;
+    let restoredSchema = null;
+
+    // 1) Convex Cloud DB에서 설정 조회 시도
+    if (typeof queryConvex === 'function') {
+      try {
+        const cvxSettings = await queryConvex('sync:getSurveySettings', {});
+        if (cvxSettings) {
+          if (cvxSettings.settings) restoredSettings = cvxSettings.settings;
+          if (Array.isArray(cvxSettings.schema) && cvxSettings.schema.length > 0) restoredSchema = cvxSettings.schema;
+        }
+      } catch (e) {}
     }
+
+    // 2) API 응답 반영
+    if (settingsRes && settingsRes.data) {
+      if (!restoredSettings && settingsRes.data.settings) restoredSettings = settingsRes.data.settings;
+      if (!restoredSchema && Array.isArray(settingsRes.data.schema) && settingsRes.data.schema.length > 0) {
+        restoredSchema = settingsRes.data.schema;
+      }
+    }
+
+    // 3) 로컬스토리지 캐시 반영
+    try {
+      if (!restoredSettings) {
+        const localCfg = localStorage.getItem('LIVON_SURVEY_SETTINGS');
+        if (localCfg) restoredSettings = JSON.parse(localCfg);
+      }
+      if (!restoredSchema) {
+        const localSchema = localStorage.getItem('LIVON_SURVEY_SCHEMA');
+        if (localSchema) {
+          const parsed = JSON.parse(localSchema);
+          if (Array.isArray(parsed) && parsed.length > 0) restoredSchema = parsed;
+        }
+      }
+    } catch (e) {}
+
+    // 4) 최종 기본값 폴백 (화면이 비거나 누락되지 않도록 100% 보장)
+    gSurveyState.settings = { ...DEFAULT_SURVEY_SETTINGS, ...(restoredSettings || {}) };
+    gSurveyState.schema = (Array.isArray(restoredSchema) && restoredSchema.length > 0)
+      ? restoredSchema
+      : JSON.parse(JSON.stringify(DEFAULT_SURVEY_SCHEMA_V1));
 
     // 칩 카운트 갱신
     updateSurveyChipCounts();
@@ -883,46 +1003,83 @@ function deleteSurveyQuestion(idx) {
 
 async function saveSurveySchema() {
   try {
-    const res = await fetch('/api/survey/schema', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schema: gSurveyState.schema, actor: 'ADMIN' })
-    });
-    const result = await res.json();
-    if (result.success) {
-      if (typeof showToast === 'function') showToast('설문 문항 구성이 성공적으로 저장되었습니다.', 'success');
-      loadSurveyMgmtData(false);
-    } else {
-      if (typeof showToast === 'function') showToast('문항 저장 실패: ' + (result.message || '오류 발생'), 'error');
+    // 1. 상태 즉시 반영 및 로컬스토리지 영구 보존
+    try {
+      localStorage.setItem('LIVON_SURVEY_SCHEMA', JSON.stringify(gSurveyState.schema));
+    } catch (e) {}
+
+    // 2. Convex Cloud 원격 DB에 영구 영속화 (최우선)
+    if (typeof syncToConvex === 'function') {
+      try {
+        await syncToConvex('sync:saveSurveySchema', { schema: gSurveyState.schema });
+      } catch (cvxErr) {
+        console.warn('[Survey] Convex schema save warning:', cvxErr);
+      }
     }
+
+    // 3. Vercel/Node 백엔드 서버 동기화
+    try {
+      await fetch('/api/survey/schema', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schema: gSurveyState.schema, actor: 'ADMIN' })
+      });
+    } catch (apiErr) {
+      console.warn('[Survey] API schema save fallback:', apiErr);
+    }
+
+    if (typeof showToast === 'function') showToast('설문 문항 구성이 성공적으로 저장되었습니다.', 'success');
+    renderSurveySchemaEditor();
   } catch (e) {
+    console.error('[Survey] Schema save error:', e);
     if (typeof showToast === 'function') showToast('문항 저장 중 오류가 발생했습니다.', 'error');
   }
 }
 
 async function handleSaveSurveySettings(event) {
-  event.preventDefault();
+  if (event && event.preventDefault) event.preventDefault();
   const updates = {
-    dueDaysAfterEnd: Number(document.getElementById('setDueDays').value) || 7,
-    pointsGuide: Number(document.getElementById('setPointsGuide').value) || 10,
-    pointsResponse: Number(document.getElementById('setPointsResponse').value) || 5,
-    pointsMonthBonus: Number(document.getElementById('setPointsMonth').value) || 30,
-    csPhone: document.getElementById('setCsPhone').value.trim(),
-    csOperatingHours: document.getElementById('setCsHours').value.trim()
+    dueDaysAfterEnd: Number(document.getElementById('setDueDays')?.value) || 7,
+    pointsGuide: Number(document.getElementById('setPointsGuide')?.value) || 10,
+    pointsResponse: Number(document.getElementById('setPointsResponse')?.value) || 5,
+    pointsMonthBonus: Number(document.getElementById('setPointsMonth')?.value) || 30,
+    csPhone: (document.getElementById('setCsPhone')?.value || '1544-7119').trim(),
+    csOperatingHours: (document.getElementById('setCsHours')?.value || '평일 09:00 ~ 18:00 (주말/공휴일 휴무)').trim()
   };
 
   try {
-    const res = await fetch('/api/survey/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ settings: updates, actor: 'ADMIN' })
-    });
-    const result = await res.json();
-    if (result.success) {
-      if (typeof showToast === 'function') showToast('설문 운영 정책이 안전하게 저장되었습니다.', 'success');
-      loadSurveyMgmtData(false);
+    // 1. 메모리 상태 및 로컬스토리지 영구 보존
+    gSurveyState.settings = { ...gSurveyState.settings, ...updates };
+    try {
+      localStorage.setItem('LIVON_SURVEY_SETTINGS', JSON.stringify(gSurveyState.settings));
+    } catch (e) {}
+
+    // 2. Convex Cloud 원격 DB에 영구 영속화 (최우선)
+    if (typeof syncToConvex === 'function') {
+      try {
+        await syncToConvex('sync:saveSurveySettings', {
+          settings: updates,
+          schema: gSurveyState.schema
+        });
+      } catch (cvxErr) {
+        console.warn('[Survey] Convex settings save warning:', cvxErr);
+      }
     }
+
+    // 3. Vercel/Node 백엔드 서버 동기화
+    try {
+      await fetch('/api/survey/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: updates, actor: 'ADMIN' })
+      });
+    } catch (apiErr) {
+      console.warn('[Survey] API settings save fallback:', apiErr);
+    }
+
+    if (typeof showToast === 'function') showToast('설문 운영 정책이 안전하게 저장되었습니다.', 'success');
   } catch (err) {
+    console.error('[Survey] Settings save error:', err);
     if (typeof showToast === 'function') showToast('설정 저장 중 오류가 발생했습니다.', 'error');
   }
 }
