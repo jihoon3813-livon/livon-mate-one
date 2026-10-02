@@ -5112,6 +5112,12 @@ function initInsuranceWorkflows() {
       if (typeof enrichHubSamsungCustomersFromSamsungExcel === 'function') {
         enrichHubSamsungCustomersFromSamsungExcel();
       }
+      if (typeof refreshSamsungSheetPatientIdsFromEligible === 'function') {
+        refreshSamsungSheetPatientIdsFromEligible();
+      }
+      if (typeof syncSamsungTargetSheetWithHubApps === 'function') {
+        syncSamsungTargetSheetWithHubApps(true);
+      }
       if (typeof gActiveTab !== 'undefined' && gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') {
         renderUnifiedCareHub();
       }
@@ -5136,6 +5142,12 @@ function initInsuranceWorkflows() {
               }
               if (typeof enrichHubSamsungCustomersFromSamsungExcel === 'function') {
                 enrichHubSamsungCustomersFromSamsungExcel();
+              }
+              if (typeof refreshSamsungSheetPatientIdsFromEligible === 'function') {
+                refreshSamsungSheetPatientIdsFromEligible();
+              }
+              if (typeof syncSamsungTargetSheetWithHubApps === 'function') {
+                syncSamsungTargetSheetWithHubApps(true);
               }
               if (typeof gActiveTab !== 'undefined' && gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') {
                 renderUnifiedCareHub();
@@ -6441,13 +6453,159 @@ function handleSamsungSheetSortOptionChange(val) {
 window.handleSamsungSheetSortOptionChange = handleSamsungSheetSortOptionChange;
 
 /**
+ * 삼성화재 사전명단(누적 가입자DB: gSamsungSheets.eligible / gSamsungList)에서 해당 고객 레코드 검색
+ */
+let _gSamsungEligibleIndexMap = null;
+let _gSamsungEligibleSourceRef = null;
+
+function buildSamsungEligibleLookupMap() {
+  const eligiblePool = (window.gSamsungSheets && Array.isArray(gSamsungSheets.eligible) && gSamsungSheets.eligible.length > 0)
+    ? gSamsungSheets.eligible
+    : ((Array.isArray(window.gSamsungList) && window.gSamsungList.length > 0)
+        ? window.gSamsungList
+        : (Array.isArray(window._gSamsungDriveCache) ? window._gSamsungDriveCache : []));
+
+  if (!eligiblePool || eligiblePool.length === 0) return null;
+
+  if (_gSamsungEligibleIndexMap && _gSamsungEligibleSourceRef === eligiblePool && _gSamsungEligibleIndexMap.byPolicy && _gSamsungEligibleIndexMap.byPolicy.size > 0) {
+    return _gSamsungEligibleIndexMap;
+  }
+
+  _gSamsungEligibleSourceRef = eligiblePool;
+  const map = {
+    byPolicy: new Map(),
+    byPolicySuffix: new Map(),
+    byNameBirth: new Map(),
+    byNamePhone: new Map(),
+    byPid: new Map(),
+    byName: new Map()
+  };
+
+  eligiblePool.forEach(rec => {
+    if (!rec) return;
+    const pol = String(rec.policyNumber || '').replace(/[^0-9]/g, '');
+    if (pol.length >= 6) {
+      if (!map.byPolicy.has(pol)) map.byPolicy.set(pol, rec);
+      const suff = pol.slice(-8);
+      if (!map.byPolicySuffix.has(suff)) map.byPolicySuffix.set(suff, rec);
+    }
+    const name = String(rec.patientName || rec.name || '').trim();
+    const birth = String(rec.birthDate || '').replace(/[^0-9]/g, '');
+    const phone = String(rec.phone || '').replace(/[^0-9]/g, '');
+    const pid = String(rec.patientId || rec.id || '').trim();
+
+    if (name && birth.length >= 6) {
+      const k = `${name}_${birth.slice(-6)}`;
+      if (!map.byNameBirth.has(k)) map.byNameBirth.set(k, rec);
+    }
+    if (name && phone.length >= 7) {
+      const k = `${name}_${phone.slice(-8)}`;
+      if (!map.byNamePhone.has(k)) map.byNamePhone.set(k, rec);
+    }
+    if (pid && !map.byPid.has(pid)) {
+      map.byPid.set(pid, rec);
+    }
+    if (name && !map.byName.has(name)) {
+      map.byName.set(name, rec);
+    }
+  });
+
+  _gSamsungEligibleIndexMap = map;
+  return map;
+}
+window.buildSamsungEligibleLookupMap = buildSamsungEligibleLookupMap;
+
+function findSamsungEligibleRecord(appOrRow) {
+  if (!appOrRow) return null;
+  const index = buildSamsungEligibleLookupMap();
+  if (!index) return null;
+
+  const pol = String(appOrRow.policyNumber || '').replace(/[^0-9]/g, '');
+  const polSuffix = pol.length >= 6 ? pol.slice(-8) : '';
+  const pName = (appOrRow.patientName || appOrRow.name || appOrRow.customerName || '').trim();
+  const phone = String(appOrRow.phone || appOrRow.applicantContact || '').replace(/[^0-9]/g, '');
+  const phoneSuffix = phone.length >= 7 ? phone.slice(-8) : '';
+  const birth = String(appOrRow.birthDate || '').replace(/[^0-9]/g, '');
+  const pid = String(appOrRow.patientId || appOrRow.id || '').trim();
+
+  // 1. 증권번호 정확 일치
+  if (pol.length >= 6 && index.byPolicy.has(pol)) {
+    return index.byPolicy.get(pol);
+  }
+  // 1-2. 증권번호 뒷자리(8자리) 일치
+  if (polSuffix && index.byPolicySuffix.has(polSuffix)) {
+    return index.byPolicySuffix.get(polSuffix);
+  }
+  // 2. 성명 + 생년월일(뒷6자리) 일치
+  if (pName && birth.length >= 6) {
+    const k = `${pName}_${birth.slice(-6)}`;
+    if (index.byNameBirth.has(k)) return index.byNameBirth.get(k);
+  }
+  // 3. 성명 + 전화번호(뒷8자리) 일치
+  if (pName && phoneSuffix) {
+    const k = `${pName}_${phoneSuffix}`;
+    if (index.byNamePhone.has(k)) return index.byNamePhone.get(k);
+  }
+  // 4. 피보험자ID 직접 일치
+  if (pid && !pid.startsWith('C0') && !pid.startsWith('D0') && !pid.startsWith('SF-P') && index.byPid.has(pid)) {
+    return index.byPid.get(pid);
+  }
+  // 5. 성명 단독 일치
+  if (pName && index.byName.has(pName)) {
+    return index.byName.get(pName);
+  }
+  return null;
+}
+window.findSamsungEligibleRecord = findSamsungEligibleRecord;
+
+function findSamsungEligiblePatientId(appOrRow) {
+  const rec = findSamsungEligibleRecord(appOrRow);
+  if (rec && rec.patientId) return String(rec.patientId).trim();
+  if (appOrRow) {
+    const curPid = String(appOrRow.patientId || '').trim();
+    if (curPid && !curPid.startsWith('C0') && !curPid.startsWith('D0') && !curPid.startsWith('SF-P')) {
+      return curPid;
+    }
+  }
+  return '';
+}
+window.findSamsungEligiblePatientId = findSamsungEligiblePatientId;
+
+function refreshSamsungSheetPatientIdsFromEligible() {
+  if (!window.gSamsungSheets) return;
+  _gSamsungEligibleIndexMap = null; // 인덱스 캐시 갱신
+  let changed = false;
+  ['target', 'completed'].forEach(sheetKey => {
+    const list = gSamsungSheets[sheetKey];
+    if (Array.isArray(list)) {
+      list.forEach(row => {
+        if (!row) return;
+        const eligiblePid = findSamsungEligiblePatientId(row);
+        if (eligiblePid && row.patientId !== eligiblePid && !row._editedCols?.patientId) {
+          row.patientId = eligiblePid;
+          changed = true;
+        }
+      });
+      if (changed) {
+        try { localStorage.setItem('LIVON_SAMSUNG_SHEET_' + sheetKey.toUpperCase(), JSON.stringify(list)); } catch (e) {}
+      }
+    }
+  });
+  if (changed && typeof renderCurrentSamsungSheet === 'function') {
+    renderCurrentSamsungSheet();
+  }
+}
+window.refreshSamsungSheetPatientIdsFromEligible = refreshSamsungSheetPatientIdsFromEligible;
+
+/**
  * 통합허브 고객(app) 객체를 삼성화재 대상자(target) 시트 행 객체로 변환
- * 피보험자 아이디(patientId)는 신청ID(app.id: C0xxx)를 우선 적용
+ * 피보험자 아이디(patientId)는 사전명단(누적 가입자DB)의 피보험자 ID값을 우선 적용
  */
 function convertHubAppToSamsungTargetRow(app) {
   if (!app) return null;
   const appId = String(app.id || '').trim();
-  const pId = appId || String(app.patientId || '').trim();
+  const eligiblePid = findSamsungEligiblePatientId(app);
+  const pId = eligiblePid || (app.patientId && !String(app.patientId).startsWith('C0') ? String(app.patientId).trim() : (eligiblePid || appId));
   const pName = (app.patientName || app.name || '').trim();
   const contact = app.applicantPhone 
     ? `${app.applicantName || '보호자'}(${app.applicantPhone})` 
@@ -6455,9 +6613,9 @@ function convertHubAppToSamsungTargetRow(app) {
 
   return {
     sheetKey: 'target',
-    id: pId,
+    id: appId || pId,
     appId: appId,
-    patientId: pId, // 피보험자ID는 신청ID (C0xxx)
+    patientId: eligiblePid || pId, // 피보험자ID는 사전명단(누적 가입자DB)의 피보험자ID값 적용
     patientName: pName,
     birthDate: app.birthDate || '',
     gender: app.gender || '',
@@ -6562,11 +6720,14 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
       const existing = gSamsungSheets.target[matchedIdx];
       let changed = false;
 
-      // 피보험자ID는 신청ID(appId)로 항상 최신화
-      if (appId && existing.patientId !== appId) {
-        existing.patientId = appId;
+      // 피보험자ID는 사전명단(누적 가입자DB)의 피보험자ID 우선 적용
+      const eligiblePid = findSamsungEligiblePatientId(app) || findSamsungEligiblePatientId(existing);
+      if (eligiblePid && existing.patientId !== eligiblePid && !edited.patientId) {
+        existing.patientId = eligiblePid;
+        changed = true;
+      }
+      if (appId && existing.appId !== appId) {
         existing.appId = appId;
-        existing.id = appId;
         changed = true;
       }
 
@@ -6649,11 +6810,12 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
                    (pName && completedMap.has(`name_${pName}`));
     if (!exists) {
       const as = (gAssigns || []).find(a => String(a.applyId) === String(app.id));
+      const eligiblePid = findSamsungEligiblePatientId(app);
       newCompletedRows.push({
         sheetKey: 'completed',
-        id: appId || pId || app.id,
+        id: appId || eligiblePid || app.id,
         appId: appId || '',
-        patientId: appId || pId || app.id,
+        patientId: eligiblePid || (app.patientId && !String(app.patientId).startsWith('C0') ? app.patientId : (eligiblePid || appId)),
         patientName: pName,
         isMatched: as ? 'Y' : 'N',
         assignedRegion: as?.region || app.sido || '경기도',
@@ -6679,8 +6841,23 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
     gSamsungSheets.completed = [...gSamsungSheets.completed, ...newCompletedRows];
   }
 
-  if (addedTargetCount > 0 || updatedTargetCount > 0 || purgedCount > 0 || newCompletedRows.length > 0) {
-    console.log(`[Samsung Sheet Sync] 통합허브 실시간 연동: 신규 추가 ${addedTargetCount}건, 정보 갱신 ${updatedTargetCount}건, 취소건 제외 ${purgedCount}건 (대상자 총 ${gSamsungSheets.target.length}건, 완료 총 ${gSamsungSheets.completed.length}건)`);
+  // 대상자 및 완료 시트의 피보험자ID를 사전명단 피보험자ID로 일괄 보정
+  let eligiblePidFixedCount = 0;
+  ['target', 'completed'].forEach(sKey => {
+    if (Array.isArray(gSamsungSheets[sKey])) {
+      gSamsungSheets[sKey].forEach(row => {
+        if (!row || row._editedCols?.patientId) return;
+        const elPid = findSamsungEligiblePatientId(row);
+        if (elPid && row.patientId !== elPid) {
+          row.patientId = elPid;
+          eligiblePidFixedCount++;
+        }
+      });
+    }
+  });
+
+  if (addedTargetCount > 0 || updatedTargetCount > 0 || purgedCount > 0 || newCompletedRows.length > 0 || eligiblePidFixedCount > 0) {
+    console.log(`[Samsung Sheet Sync] 통합허브 실시간 연동: 신규 추가 ${addedTargetCount}건, 정보 갱신 ${updatedTargetCount}건, 사전명단 피보험자ID 보정 ${eligiblePidFixedCount}건, 취소건 제외 ${purgedCount}건 (대상자 총 ${gSamsungSheets.target.length}건, 완료 총 ${gSamsungSheets.completed.length}건)`);
     updateSamsungSheetBadges();
     try {
       localStorage.setItem('LIVON_SAMSUNG_SHEET_TARGET', JSON.stringify(gSamsungSheets.target));
@@ -7272,7 +7449,13 @@ function renderCurrentSamsungSheet() {
             ${displayIdx + 1}
           </td>
           ${schema.map(col => {
-            const origVal = row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : '';
+            let origVal = row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : '';
+            if (col.key === 'patientId') {
+              const eligiblePid = findSamsungEligiblePatientId(row);
+              if (eligiblePid && !row._editedCols?.patientId) {
+                origVal = eligiblePid;
+              }
+            }
             const changeKey = `${gActiveSamsungSheet}_${realIdx}_${col.key}`;
             const hasPending = gSamsungPendingChanges.has(changeKey);
             let rawVal = hasPending ? gSamsungPendingChanges.get(changeKey).newVal : origVal;
@@ -7287,7 +7470,8 @@ function renderCurrentSamsungSheet() {
 
             let displayVal = rawVal;
             if (col.key === 'patientId') {
-              displayVal = row.appId || rawVal;
+              const eligiblePid = findSamsungEligiblePatientId(row);
+              displayVal = eligiblePid || row.patientId || row.appId || rawVal;
             } else if (col.key === 'patientName') {
               displayVal = maskName(rawVal);
             } else if (col.key === 'phone') {
