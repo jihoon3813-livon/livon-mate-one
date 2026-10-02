@@ -8,10 +8,14 @@ const querystring = require('querystring');
 
 const CONFIG_FILE = path.join(process.cwd(), 'carecall_twilio_config.json');
 
+let gMemoryTwilioConfig = null;
+
 /**
  * Twilio 설정 불러오기 (.env.local 및 carecall_twilio_config.json 우선 탐색)
  */
 function getTwilioConfig() {
+  if (gMemoryTwilioConfig) return gMemoryTwilioConfig;
+
   let cfg = {
     accountSid: process.env.TWILIO_ACCOUNT_SID || '',
     authToken: process.env.TWILIO_AUTH_TOKEN || '',
@@ -19,12 +23,16 @@ function getTwilioConfig() {
     publicBaseUrl: process.env.PUBLIC_BASE_URL || ''
   };
 
-  // 1. carecall_twilio_config.json 파일 확인
-  if (fs.existsSync(CONFIG_FILE)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-      cfg = { ...cfg, ...data };
-    } catch (_) {}
+  // 1. carecall_twilio_config.json 파일 또는 /tmp 확인
+  const candidateFiles = [CONFIG_FILE, path.join('/tmp', 'carecall_twilio_config.json')];
+  for (const cFile of candidateFiles) {
+    if (fs.existsSync(cFile)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(cFile, 'utf8'));
+        cfg = { ...cfg, ...data };
+        break;
+      } catch (_) {}
+    }
   }
 
   // 2. .env.local 파일 탐색
@@ -60,7 +68,14 @@ function getTwilioConfig() {
 function saveTwilioConfig(newCfg) {
   const existing = getTwilioConfig();
   const merged = { ...existing, ...newCfg, updatedAt: new Date().toISOString() };
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2), 'utf8');
+  gMemoryTwilioConfig = merged;
+  try {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2), 'utf8');
+  } catch (err) {
+    try {
+      fs.writeFileSync(path.join('/tmp', 'carecall_twilio_config.json'), JSON.stringify(merged, null, 2), 'utf8');
+    } catch (_) {}
+  }
   return merged;
 }
 

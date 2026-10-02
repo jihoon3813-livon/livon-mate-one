@@ -74,27 +74,43 @@ module.exports = async function handler(req, res) {
           requestedAt: new Date().toISOString()
         });
       } catch (twErr) {
-        console.error('[Twilio Call Error]', twErr.message);
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        return res.status(500).json({
-          success: false,
-          error: `Twilio 통화 발신 오류: ${twErr.message}`,
-          requiresTwilioCheck: true
-        });
+        console.warn('[Twilio Call Fallback]', twErr.message);
       }
     }
 
-    // 2. Twilio 미설정 시 안내
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    return res.status(200).json({
-      success: false,
-      requiresTwilioConfig: true,
-      error: '간병사 휴대전화(010)로 실제 전화를 걸기 위한 Twilio 통신망 설정이 필요합니다.',
-      message: '현재 시스템에 실제 010 전화로 벨을 울려줄 Twilio 음성 API 키(Account SID, Auth Token, 발신번호)가 등록되어 있지 않습니다.\n설정창에 계정 정보를 등록하시면 즉시 실제 전화가 발신됩니다.',
-      patientName,
-      caregiverName,
-      phone: cleanPhone
-    });
+    // 2. Twilio 미설정 시: 기존 CTI 전화 발신망(GoodARS CTI) 연동
+    // (담당자 전화기로 먼저 벨이 울리고 수화기를 들면 간병인 전화로 연결되는 브릿지 방식)
+    const callerId = (insuranceCompany && insuranceCompany.includes('현대')) ? '15337436' : '16007835';
+
+    try {
+      const ctiResult = await makeOutboundCall({
+        phone: cleanPhone,
+        callerId,
+        askSn: scheduleId || '',
+        recipientName: caregiverName || patientName || ''
+      });
+
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.status(200).json({
+        success: true,
+        mode: 'cti_bridge',
+        message: `[${caregiverName || cleanPhone}] 간병사님 번호로 CTI 전화 발신이 정상 접수되었습니다.\n\n📞 담당자 휴대폰(또는 내선 전화기)으로 먼저 벨이 울립니다.\n수화기를 들고 전화를 받으시면 간병사 휴대전화(${cleanPhone})로 바로 연결됩니다.`,
+        patientName,
+        caregiverName,
+        phone: cleanPhone,
+        callerId,
+        ctiResult,
+        requestedAt: new Date().toISOString()
+      });
+    } catch (ctiErr) {
+      console.error('[CTI Outbound Error]', ctiErr.message);
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.status(500).json({
+        success: false,
+        error: `CTI 통화 발신 오류: ${ctiErr.message}`,
+        details: ctiErr.message
+      });
+    }
   } catch (err) {
     console.error('[CareCall Outbound Error]', err);
     res.setHeader('Content-Type', 'application/json; charset=utf-8');

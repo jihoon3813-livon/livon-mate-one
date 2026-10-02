@@ -3850,6 +3850,22 @@
                 <i data-lucide="phone" class="w-3.5 h-3.5 text-purple-600"></i>
                 <span>전화망(Twilio) 설정</span>
               </button>
+
+              <!-- CTI 전화 발신 테스트 버튼 -->
+              <button type="button" onclick="openCareCallTestModal()" 
+                class="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-300 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+                title="담당자 휴대폰(010-4322-3813 등)으로 CTI 전화 발신 바로 테스트">
+                <i data-lucide="phone-outgoing" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span>🧪 CTI 전화 발신 테스트</span>
+              </button>
+
+              <!-- 발신 스케줄 & 사전 안내문자 설정 버튼 -->
+              <button type="button" onclick="openCareCallGlobalScheduleModal()" 
+                class="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-300 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+                title="환자별 3차 발신 시간 설정 및 2분 전 사전 안내문자 템플릿 관리">
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-600"></i>
+                <span>⏰ 발신 스케줄 &amp; 사전 문자</span>
+              </button>
             </div>
           </div>
 
@@ -3963,7 +3979,7 @@
                     <th class="p-3 text-center w-12 border-r border-slate-200 font-mono text-slate-500">No</th>
                     <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800">대상 환자명</th>
                     <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 text-center w-24">원수사</th>
-                    <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 text-center w-28">진행 구분</th>
+                    <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 text-center w-32 whitespace-nowrap">진행 구분</th>
                     <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800">병원 / 병실</th>
                     <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800">담당 간병사</th>
                     <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 font-mono">간병사 연락처</th>
@@ -9087,6 +9103,225 @@
       <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
         <button type="button" onclick="closeTwilioConfigModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">취소</button>
         <button type="button" onclick="saveTwilioConfigFromModal()" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-md cursor-pointer">설정 저장 및 연동</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: 환자별 3차 AI간병통화 발신 시간 및 사전 안내문자 설정 ==================== -->
+  <div id="careCallPatientScheduleModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh]">
+      <div class="p-5 bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shadow-inner">
+            <i data-lucide="calendar-clock" class="w-5 h-5 text-white"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              <span>환자별 AI 간병통화 발신 시간 설정</span>
+            </h3>
+            <p class="text-xs text-purple-200 mt-0.5">최대 3차 발신 시각 및 2분 전 사전 안내문자 설정</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeCareCallPatientScheduleModal()" class="p-2 text-purple-200 hover:text-white cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="p-6 space-y-4 overflow-y-auto custom-scrollbar text-xs">
+        <input type="hidden" id="patientScheduleTargetKey" value="">
+        <input type="hidden" id="patientScheduleCaregiverName" value="">
+        <input type="hidden" id="patientScheduleCaregiverPhone" value="">
+
+        <!-- 대상 환자 & 간병사 정보 카드 -->
+        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-400 font-medium text-[11px]">대상 환자</span>
+            <span id="patientScheduleInsBadge" class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">삼성화재</span>
+          </div>
+          <div class="flex items-baseline justify-between">
+            <span id="patientSchedulePatientName" class="text-base font-black text-slate-900">-</span>
+            <span class="text-xs text-slate-600 font-medium">간병사: <b id="patientScheduleCaregiverDisplay" class="text-slate-900">-</b> (<span id="patientSchedulePhoneDisplay" class="font-mono text-slate-700">-</span>)</span>
+          </div>
+        </div>
+
+        <!-- 💡 1회 등록 시 이후 차수 자동 차단 핵심 배너 -->
+        <div class="p-3.5 bg-indigo-50/80 rounded-2xl border border-indigo-200 flex items-start gap-2.5">
+          <i data-lucide="shield-check" class="w-4 h-4 text-indigo-700 shrink-0 mt-0.5"></i>
+          <div class="space-y-1">
+            <div class="font-black text-indigo-950 text-xs">스마트 중복 발신 방지 규칙</div>
+            <p class="text-[11px] text-indigo-900 leading-relaxed">
+              1차/2차/3차 시간 중 <b>한 번이라도 통화가 연결되어 일지/녹취가 등록되면 당일 이후 차수는 자동으로 전화가 발신되지 않습니다.</b>
+            </p>
+          </div>
+        </div>
+
+        <!-- 3단계 발신 시간 입력 슬롯 -->
+        <div class="space-y-2.5">
+          <label class="block font-bold text-slate-800 flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 text-purple-600"></i> 단계별 발신 시각 (최대 3개)</span>
+            <span class="text-[11px] text-slate-400 font-normal">비워둘 시 해당 차수는 건너뜁니다</span>
+          </label>
+          
+          <div class="grid grid-cols-3 gap-2.5">
+            <div class="p-3 bg-purple-50/50 rounded-2xl border border-purple-200">
+              <span class="block font-bold text-purple-900 text-[11px] mb-1">1차 발신 시각 <span class="text-rose-500">*</span></span>
+              <input type="time" id="patientScheduleSlot1" class="w-full p-2 border border-purple-300 rounded-xl bg-white font-mono font-bold text-sm text-center text-purple-950 focus:ring-2 focus:ring-purple-500">
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200">
+              <span class="block font-bold text-slate-700 text-[11px] mb-1">2차 발신 (재시도)</span>
+              <input type="time" id="patientScheduleSlot2" class="w-full p-2 border border-slate-300 rounded-xl bg-white font-mono font-bold text-sm text-center text-slate-900 focus:ring-2 focus:ring-purple-500">
+            </div>
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200">
+              <span class="block font-bold text-slate-700 text-[11px] mb-1">3차 발신 (최종)</span>
+              <input type="time" id="patientScheduleSlot3" class="w-full p-2 border border-slate-300 rounded-xl bg-white font-mono font-bold text-sm text-center text-slate-900 focus:ring-2 focus:ring-purple-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- 2분 전 사전 안내 문자 설정 -->
+        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-800">
+              <input type="checkbox" id="patientScheduleSmsNotice" checked class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500">
+              <span>발신 2분 전 사전 안내 문자 자동 발송</span>
+            </label>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">2분 전 알림</span>
+          </div>
+
+          <div id="patientScheduleSmsCustomArea" class="space-y-1.5 pt-1 border-t border-slate-200">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] text-slate-500 font-bold">안내 문자 내용:</span>
+              <button type="button" onclick="resetPatientSmsToDefault()" class="text-[10.5px] text-purple-700 hover:underline font-bold cursor-pointer">기본 템플릿 적용</button>
+            </div>
+            <textarea id="patientScheduleCustomSmsText" rows="3" 
+              placeholder="비워두시면 전체 기본 템플릿이 자동으로 적용됩니다."
+              class="w-full p-2.5 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-purple-500 leading-relaxed custom-scrollbar"></textarea>
+            <p class="text-[10px] text-slate-400">지원 치환자: <code class="text-purple-700 font-mono">{간병사}</code>, <code class="text-purple-700 font-mono">{환자}</code>, <code class="text-purple-700 font-mono">{발신시각}</code></p>
+          </div>
+        </div>
+
+        <!-- 활성화 토글 -->
+        <div class="flex items-center justify-between px-1">
+          <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
+            <input type="checkbox" id="patientScheduleEnabled" checked class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500">
+            <span>이 환자의 자동 예약 발신 활성화</span>
+          </label>
+          <button type="button" onclick="deletePatientCareCallSchedule()" class="text-rose-600 hover:text-rose-800 text-[11px] font-bold cursor-pointer">설정 초기화</button>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeCareCallPatientScheduleModal()" class="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-300 cursor-pointer">취소</button>
+        <button type="button" onclick="savePatientCareCallSchedule()" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-md cursor-pointer flex items-center gap-1.5">
+          <i data-lucide="check" class="w-3.5 h-3.5"></i>
+          <span>발신 시간 저장</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: 전체 기본 발신 스케줄 & 사전 문자 템플릿 관리 ==================== -->
+  <div id="careCallGlobalScheduleModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh]">
+      <div class="p-5 bg-gradient-to-r from-indigo-700 via-purple-700 to-indigo-800 text-white flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shadow-inner">
+            <i data-lucide="message-square" class="w-5 h-5 text-white"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              <span>AI 간병통화 스케줄 &amp; 사전 안내문자 관리</span>
+            </h3>
+            <p class="text-xs text-indigo-200 mt-0.5">전체 기본 3차 발신 시각 및 2분 전 사전 문자 템플릿 설정</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeCareCallGlobalScheduleModal()" class="p-2 text-indigo-200 hover:text-white cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="p-6 space-y-4 overflow-y-auto custom-scrollbar text-xs">
+        <!-- 기본 3단계 슬롯 설정 -->
+        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+          <label class="block font-bold text-slate-800 flex items-center justify-between">
+            <span>신규 환자 기본 3차 발신 시각</span>
+            <span class="text-[11px] text-slate-400 font-normal">환자별 개별 설정 시 개별 시간 우선 적용</span>
+          </label>
+          <div class="grid grid-cols-3 gap-2.5">
+            <div>
+              <span class="block text-[11px] font-bold text-slate-600 mb-1">기본 1차 시각</span>
+              <input type="time" id="globalScheduleSlot1" value="18:00" class="w-full p-2 border border-slate-300 rounded-xl bg-white font-mono font-bold text-sm text-center">
+            </div>
+            <div>
+              <span class="block text-[11px] font-bold text-slate-600 mb-1">기본 2차 시각</span>
+              <input type="time" id="globalScheduleSlot2" value="19:00" class="w-full p-2 border border-slate-300 rounded-xl bg-white font-mono font-bold text-sm text-center">
+            </div>
+            <div>
+              <span class="block text-[11px] font-bold text-slate-600 mb-1">기본 3차 시각</span>
+              <input type="time" id="globalScheduleSlot3" value="20:00" class="w-full p-2 border border-slate-300 rounded-xl bg-white font-mono font-bold text-sm text-center">
+            </div>
+          </div>
+        </div>
+
+        <!-- 발신 사전 안내 설정 -->
+        <div class="p-3.5 bg-purple-50/60 rounded-2xl border border-purple-200 space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 cursor-pointer font-bold text-purple-950">
+              <input type="checkbox" id="globalScheduleEnableSms" checked class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500">
+              <span>사전 안내 문자 자동 발송 기능 사용</span>
+            </label>
+            <div class="flex items-center gap-1.5">
+              <span class="text-slate-600 font-bold text-[11px]">발신</span>
+              <select id="globalScheduleAdvanceMinutes" class="px-2 py-1 rounded-lg border border-purple-300 bg-white font-bold text-xs">
+                <option value="1">1분 전</option>
+                <option value="2" selected>2분 전 (추천)</option>
+                <option value="3">3분 전</option>
+                <option value="5">5분 전</option>
+                <option value="10">10분 전</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 템플릿 편집기 -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-purple-900 text-xs">사전 안내 문자 기본 템플릿:</span>
+              <div class="flex items-center gap-1">
+                <span class="text-[10px] text-slate-500">치환자 삽입:</span>
+                <button type="button" onclick="insertSmsTag('{간병사}')" class="px-1.5 py-0.5 rounded bg-purple-100 hover:bg-purple-200 text-purple-800 font-mono font-bold text-[10px] cursor-pointer">{간병사}</button>
+                <button type="button" onclick="insertSmsTag('{환자}')" class="px-1.5 py-0.5 rounded bg-purple-100 hover:bg-purple-200 text-purple-800 font-mono font-bold text-[10px] cursor-pointer">{환자}</button>
+                <button type="button" onclick="insertSmsTag('{발신시각}')" class="px-1.5 py-0.5 rounded bg-purple-100 hover:bg-purple-200 text-purple-800 font-mono font-bold text-[10px] cursor-pointer">{발신시각}</button>
+              </div>
+            </div>
+
+            <textarea id="globalScheduleSmsTemplate" rows="4" oninput="updateSmsPreview()"
+              class="w-full p-3 border border-purple-300 rounded-2xl text-xs bg-white focus:ring-2 focus:ring-purple-500 leading-relaxed font-sans custom-scrollbar"></textarea>
+          </div>
+
+          <!-- 실시간 미리보기 -->
+          <div class="p-3 bg-white rounded-xl border border-purple-200 space-y-1">
+            <div class="flex items-center justify-between text-[11px] text-slate-500">
+              <span class="font-bold flex items-center gap-1"><i data-lucide="smartphone" class="w-3.5 h-3.5 text-purple-600"></i> 수신 화면 미리보기</span>
+              <span id="smsLengthCounter" class="font-mono text-[10px] text-purple-700 font-bold">0자 (SMS)</span>
+            </div>
+            <div id="smsPreviewBox" class="p-2.5 bg-slate-50 rounded-lg text-slate-800 text-[11px] leading-relaxed whitespace-pre-wrap"></div>
+          </div>
+        </div>
+
+        <!-- 최근 발송 이력 (로그) -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-700 flex items-center gap-1"><i data-lucide="history" class="w-3.5 h-3.5 text-slate-500"></i> 당일 발송 및 예약 이력</span>
+            <button type="button" onclick="refreshScheduleLogs()" class="text-[11px] text-indigo-700 hover:underline font-bold cursor-pointer">새로고침</button>
+          </div>
+          <div id="scheduleRecentLogsList" class="h-28 overflow-y-auto custom-scrollbar p-2.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5 text-[11px]">
+            <p class="text-slate-400 italic text-center py-4">최근 발송 이력이 없습니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeCareCallGlobalScheduleModal()" class="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-300 cursor-pointer">닫기</button>
+        <button type="button" onclick="saveGlobalCareCallSchedule()" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-md cursor-pointer flex items-center gap-1.5">
+          <i data-lucide="check" class="w-3.5 h-3.5"></i>
+          <span>전체 설정 저장</span>
+        </button>
       </div>
     </div>
   </div>

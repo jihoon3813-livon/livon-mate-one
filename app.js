@@ -39324,6 +39324,12 @@ function renderCareCallTargets() {
       ? 'border-l-4 border-l-rose-500 bg-rose-50/25'
       : (isExpanded ? 'bg-purple-50/30' : 'hover:bg-purple-50/40');
 
+    // 발신 스케줄 확인
+    const sched = (window.gCareCallScheduleConfig?.schedules && (window.gCareCallScheduleConfig.schedules[t.id] || window.gCareCallScheduleConfig.schedules[t.patientName])) || null;
+    const slots = sched ? [sched.slot1, sched.slot2, sched.slot3].filter(Boolean) : [];
+    const hasSchedule = slots.length > 0;
+    const scheduleLabel = hasSchedule ? `⏰ ${slots.join(' · ')}` : '⏰ 발신시간 설정';
+
     return `
       <!-- Main Patient Row -->
       <tr class="${rowAlertClass} transition-colors border-b border-slate-100">
@@ -39346,20 +39352,20 @@ function renderCareCallTargets() {
         </td>
 
         <!-- 진행 구분 (APP진행 vs AI통화 전환 토글 버튼) -->
-        <td class="p-3 text-center">
+        <td class="p-3 text-center whitespace-nowrap">
           ${t.operationMode === 'APP' ? `
             <button type="button" onclick="toggleCareCallOperationMode('${t.id}', 'CALL')" 
-              class="px-2.5 py-1 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-800 font-extrabold text-[11px] border border-sky-300 shadow-2xs flex items-center justify-center gap-1 mx-auto transition-all cursor-pointer"
+              class="px-2.5 py-1 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-800 font-extrabold text-[11px] border border-sky-300 shadow-2xs inline-flex items-center justify-center gap-1 mx-auto whitespace-nowrap transition-all cursor-pointer"
               title="클릭 시 [AI 통화 대상]으로 변경">
-              <i data-lucide="smartphone" class="w-3 h-3 text-sky-600"></i>
-              <span>APP 진행</span>
+              <i data-lucide="smartphone" class="w-3.5 h-3.5 text-sky-600 shrink-0"></i>
+              <span class="whitespace-nowrap">APP 진행</span>
             </button>
           ` : `
             <button type="button" onclick="toggleCareCallOperationMode('${t.id}', 'APP')" 
-              class="px-2.5 py-1 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-800 font-extrabold text-[11px] border border-purple-300 shadow-2xs flex items-center justify-center gap-1 mx-auto transition-all cursor-pointer"
+              class="px-2.5 py-1 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-800 font-extrabold text-[11px] border border-purple-300 shadow-2xs inline-flex items-center justify-center gap-1 mx-auto whitespace-nowrap transition-all cursor-pointer"
               title="클릭 시 [APP 진행]으로 변경">
-              <i data-lucide="bot" class="w-3 h-3 text-purple-600"></i>
-              <span>AI 통화 대상</span>
+              <i data-lucide="bot" class="w-3.5 h-3.5 text-purple-600 shrink-0"></i>
+              <span class="whitespace-nowrap">AI 통화 대상</span>
             </button>
           `}
         </td>
@@ -39413,18 +39419,27 @@ function renderCareCallTargets() {
 
         <!-- 통화 발신 관리 액션 -->
         <td class="p-3 text-center">
-          <div id="careCallActions-${t.patientName}" class="flex items-center justify-center gap-1">
+          <div id="careCallActions-${t.patientName}" class="flex flex-col items-center justify-center gap-1.5 min-w-[130px]">
             ${t.operationMode === 'APP' ? `
               <span class="text-slate-400 text-xs font-medium">앱 직접 작성 대상</span>
             ` : `
               <button type="button" 
                 onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${t.careDays[t.careDays.length - 1]?.date || t.careEndDate}', '${t.workTime}', '${t.id}', '${t.insuranceCompany}')"
-                class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center justify-center gap-1 transition-all cursor-pointer"
-                title="간병사(${maskedCaregiver}) 휴대전화(${maskedPhone})로 오늘 일자 AI 간병통화 발신">
+                class="w-full px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center justify-center gap-1 transition-all cursor-pointer"
+                title="간병사(${maskedCaregiver}) 휴대전화(${maskedPhone})로 오늘 일자 AI 간병통화 즉시 발신">
                 <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
-                <span>전화 발신</span>
+                <span>즉시 발신</span>
               </button>
             `}
+
+            <!-- 환자별 발신 시간 설정 뱃지 버튼 -->
+            <button type="button" 
+              onclick="openCareCallPatientScheduleModal('${t.id}', '${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${t.insuranceCompany}')"
+              class="w-full px-2 py-1 rounded-xl ${hasSchedule ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200'} text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs"
+              title="환자별 1차·2차·3차 발신 시각 및 2분 전 사전 안내문자 설정">
+              <i data-lucide="clock" class="w-3 h-3 text-indigo-600"></i>
+              <span>${scheduleLabel}</span>
+            </button>
           </div>
         </td>
       </tr>
@@ -39546,13 +39561,23 @@ function renderCareCallTargets() {
 }
 
 async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPhone, workDate, workTime, scheduleId, insuranceCompany) {
-  if (!caregiverPhone || caregiverPhone === '-' || caregiverPhone.startsWith('010-0000')) {
-    alert(`[${caregiverName || patientName}] 간병사의 유효한 휴대전화번호가 등록되어 있지 않습니다.\n고객 상세정보 또는 배정 정보에서 연락처를 확인해주세요.`);
+  let targetPhone = (caregiverPhone && caregiverPhone !== '-' && caregiverPhone !== 'undefined' && !caregiverPhone.startsWith('010-0000'))
+    ? caregiverPhone
+    : '';
+
+  const promptMsg = targetPhone
+    ? `[📞 AI 간병통화 발신 안내]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 간병일자: ${workDate || '오늘'}\n\n전화를 수신할 휴대전화 번호를 확인하세요.\n(테스트를 위해 본인 휴대폰 번호로 변경하여 발신 테스트를 진행할 수 있습니다):`
+    : `[📞 AI 간병통화 발신 안내]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 간병일자: ${workDate || '오늘'}\n\n등록된 간병사 연락처가 없습니다.\n발신 테스트를 위해 전화를 수신할 휴대전화 번호(010...)를 입력해 주세요:`;
+
+  const inputPhone = prompt(promptMsg, targetPhone || '010-');
+  if (!inputPhone) return;
+
+  targetPhone = inputPhone.trim();
+  const cleanDigits = targetPhone.replace(/[^0-9]/g, '');
+  if (cleanDigits.length < 8) {
+    alert('유효한 전화번호 자릿수(최소 8자리 이상)를 입력해 주세요.');
     return;
   }
-
-  const ok = confirm(`[📞 간병통화 발신 안내]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 간병사 번호: ${caregiverPhone}\n\n전화를 발신하시겠습니까?\n※ 담당자 휴대폰(또는 내선 전화기)으로 먼저 벨이 울리고, 수화기를 받으시면 간병사 휴대전화로 자동 연결됩니다.`);
-  if (!ok) return;
 
   const elStatus = document.getElementById(`careCallStatus-${patientName}`);
   if (elStatus) {
@@ -39566,7 +39591,7 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
       body: JSON.stringify({
         patientName,
         caregiverName,
-        caregiverPhone,
+        caregiverPhone: targetPhone,
         workDate: workDate || new Date().toISOString().slice(0, 10),
         workTime: workTime || '24시간',
         scheduleId: scheduleId || '',
@@ -39579,14 +39604,14 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
     const data = await res.json();
     if (data.success) {
       if (elStatus) {
-        elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> ' + (data.mode === 'cti_bridge' ? 'CTI 연결 대기' : '통화 대기중') + '</span>';
+        elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> ' + (data.mode === 'cti_bridge' ? 'CTI 연결 접수' : 'AI 통화 연결중') + '</span>';
       }
       alert(`📞 [전화 발신 접수 완료]\n\n${data.message || ''}`);
     } else if (data.requiresTwilioConfig) {
       if (elStatus) {
         elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs">전화망 설정 필요</span>';
       }
-      const openModal = confirm(`[📞 실제 010 전화 발신 안내]\n\n간병사 휴대전화(${caregiverPhone})로 진짜 전화가 걸려와 벨이 울리도록 하려면 Twilio Voice 통신망 설정(Account SID / Auth Token / 발신번호)이 필요합니다.\n\n지금 전화망 설정창을 여시겠습니까?`);
+      const openModal = confirm(`[📞 실제 010 전화 발신 안내]\n\n간병사 휴대전화(${targetPhone})로 진짜 전화가 걸려와 벨이 울리도록 하려면 Twilio Voice 통신망 설정(Account SID / Auth Token / 발신번호)이 필요합니다.\n\n지금 전화망 설정창을 여시겠습니까?`);
       if (openModal) {
         openTwilioConfigModal();
       }
@@ -39753,10 +39778,310 @@ window.setCareCallInsuranceFilter = setCareCallInsuranceFilter;
 window.openTwilioConfigModal = openTwilioConfigModal;
 window.closeTwilioConfigModal = closeTwilioConfigModal;
 window.saveTwilioConfigFromModal = saveTwilioConfigFromModal;
+function openCareCallTestModal() {
+  if (typeof openCtiCallModal === 'function') {
+    openCtiCallModal({
+      phone: '010-4322-3813',
+      name: '담당자 테스트',
+      role: '테스트',
+      insurance: '삼성화재'
+    });
+  } else {
+    alert('CTI 발신 모달을 불러올 수 없습니다. 페이지를 새로고침(F5) 해주세요.');
+  }
+}
+
+window.openCareCallTestModal = openCareCallTestModal;
 window.setCareCallQuickFilter = setCareCallQuickFilter;
 window.handleCareCallFilterChange = handleCareCallFilterChange;
 window.toggleCareCallPatientAccordion = toggleCareCallPatientAccordion;
 window.toggleCareCallOperationMode = toggleCareCallOperationMode;
+
+// =========================================================================
+// AI 간병통화 환자별 3차 발신 시간 & 2분 전 사전 안내문자 제어 모듈
+// =========================================================================
+window.gCareCallScheduleConfig = null;
+
+async function loadCareCallScheduleConfig() {
+  try {
+    const res = await fetch('/api/carecall/schedule-config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.config) {
+        window.gCareCallScheduleConfig = data.config;
+      }
+    }
+  } catch (err) {
+    console.warn('[Schedule Config Load Fallback]', err.message);
+  }
+}
+
+// 초기화 시 비동기 로드
+if (typeof window !== 'undefined') {
+  loadCareCallScheduleConfig();
+}
+
+function openCareCallPatientScheduleModal(targetKey, patientName, caregiverName, caregiverPhone, insuranceCompany) {
+  const modal = document.getElementById('careCallPatientScheduleModal');
+  if (!modal) return;
+
+  const cfg = window.gCareCallScheduleConfig || {};
+  const schedules = cfg.schedules || {};
+  const currentSched = schedules[targetKey] || schedules[patientName] || {};
+  const defaultSlots = cfg.defaultSlots || { slot1: '18:00', slot2: '19:00', slot3: '20:00' };
+
+  document.getElementById('patientScheduleTargetKey').value = targetKey;
+  document.getElementById('patientSchedulePatientName').innerText = patientName || '-';
+  document.getElementById('patientScheduleCaregiverDisplay').innerText = caregiverName || '-';
+  document.getElementById('patientSchedulePhoneDisplay').innerText = caregiverPhone || '-';
+  document.getElementById('patientScheduleCaregiverName').value = caregiverName || '';
+  document.getElementById('patientScheduleCaregiverPhone').value = caregiverPhone || '';
+  document.getElementById('patientScheduleInsBadge').innerText = insuranceCompany || '삼성화재';
+
+  document.getElementById('patientScheduleSlot1').value = currentSched.slot1 || defaultSlots.slot1 || '18:00';
+  document.getElementById('patientScheduleSlot2').value = currentSched.slot2 || defaultSlots.slot2 || '';
+  document.getElementById('patientScheduleSlot3').value = currentSched.slot3 || defaultSlots.slot3 || '';
+  document.getElementById('patientScheduleSmsNotice').checked = currentSched.smsNotice !== false;
+  document.getElementById('patientScheduleCustomSmsText').value = currentSched.customSmsText || '';
+  document.getElementById('patientScheduleEnabled').checked = currentSched.enabled !== false;
+
+  modal.classList.remove('hidden');
+  if (typeof initIcons === 'function') initIcons(modal);
+}
+
+function closeCareCallPatientScheduleModal() {
+  const modal = document.getElementById('careCallPatientScheduleModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function resetPatientSmsToDefault() {
+  const cfg = window.gCareCallScheduleConfig || {};
+  const defaultTpl = cfg.defaultSmsTemplate || '[리본케어] {간병사} 간병사님, 잠시 후 {발신시각}에 {환자} 환자님의 AI 간병일지 작성을 위한 안내 전화가 발신됩니다. 통화 연결 시 오늘 간병 내용을 편안하게 말씀해 주시면 일지가 자동 작성됩니다.';
+  const textarea = document.getElementById('patientScheduleCustomSmsText');
+  if (textarea) textarea.value = defaultTpl;
+}
+
+async function savePatientCareCallSchedule() {
+  const targetKey = document.getElementById('patientScheduleTargetKey').value;
+  const patientName = document.getElementById('patientSchedulePatientName').innerText;
+  const caregiverName = document.getElementById('patientScheduleCaregiverName').value;
+  const caregiverPhone = document.getElementById('patientScheduleCaregiverPhone').value;
+
+  const slot1 = document.getElementById('patientScheduleSlot1').value;
+  const slot2 = document.getElementById('patientScheduleSlot2').value;
+  const slot3 = document.getElementById('patientScheduleSlot3').value;
+  const smsNotice = document.getElementById('patientScheduleSmsNotice').checked;
+  const customSmsText = document.getElementById('patientScheduleCustomSmsText').value.trim();
+  const enabled = document.getElementById('patientScheduleEnabled').checked;
+
+  if (!slot1) {
+    alert('최소 1차 발신 시각은 필수로 지정해 주세요.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/carecall/schedule-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'save_patient',
+        targetKey,
+        patientName,
+        caregiverName,
+        caregiverPhone,
+        slot1,
+        slot2,
+        slot3,
+        smsNotice,
+        customSmsText,
+        enabled
+      })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      if (data.config) window.gCareCallScheduleConfig = data.config;
+      closeCareCallPatientScheduleModal();
+      renderCareCallTargets();
+      alert(`[${patientName}] 환자의 발신 스케줄이 성공적으로 저장되었습니다.\n\n• 1차: ${slot1}${slot2 ? ' / 2차: ' + slot2 : ''}${slot3 ? ' / 3차: ' + slot3 : ''}\n• 2분 전 사전 문자: ${smsNotice ? '발송' : '미발송'}\n\n※ 1회 등록 완료 시 이후 차수 전화는 자동으로 차단됩니다.`);
+    } else {
+      alert('스케줄 저장 실패: ' + (data.error || '오류 발생'));
+    }
+  } catch (err) {
+    alert('네트워크 오류: ' + err.message);
+  }
+}
+
+async function deletePatientCareCallSchedule() {
+  const targetKey = document.getElementById('patientScheduleTargetKey').value;
+  const patientName = document.getElementById('patientSchedulePatientName').innerText;
+
+  if (!confirm(`[${patientName}] 환자의 개별 발신 시간 설정을 초기화하시겠습니까?`)) return;
+
+  try {
+    const res = await fetch('/api/carecall/schedule-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete_patient', targetKey })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (data.config) window.gCareCallScheduleConfig = data.config;
+      closeCareCallPatientScheduleModal();
+      renderCareCallTargets();
+      alert('개별 발신 스케줄이 초기화되었습니다.');
+    }
+  } catch (err) {
+    alert('초기화 오류: ' + err.message);
+  }
+}
+
+async function openCareCallGlobalScheduleModal() {
+  const modal = document.getElementById('careCallGlobalScheduleModal');
+  if (!modal) return;
+
+  await loadCareCallScheduleConfig();
+  const cfg = window.gCareCallScheduleConfig || {};
+  const defaultSlots = cfg.defaultSlots || { slot1: '18:00', slot2: '19:00', slot3: '20:00' };
+
+  document.getElementById('globalScheduleSlot1').value = defaultSlots.slot1 || '18:00';
+  document.getElementById('globalScheduleSlot2').value = defaultSlots.slot2 || '19:00';
+  document.getElementById('globalScheduleSlot3').value = defaultSlots.slot3 || '20:00';
+  document.getElementById('globalScheduleEnableSms').checked = cfg.enableSmsNotice !== false;
+  document.getElementById('globalScheduleAdvanceMinutes').value = String(cfg.advanceMinutes || 2);
+  document.getElementById('globalScheduleSmsTemplate').value = cfg.defaultSmsTemplate || '[리본케어] {간병사} 간병사님, 잠시 후 {발신시각}에 {환자} 환자님의 AI 간병일지 작성을 위한 안내 전화가 발신됩니다. 통화 연결 시 오늘 간병 내용을 편안하게 말씀해 주시면 일지가 자동 작성됩니다.';
+
+  updateSmsPreview();
+  refreshScheduleLogs();
+
+  modal.classList.remove('hidden');
+  if (typeof initIcons === 'function') initIcons(modal);
+}
+
+function closeCareCallGlobalScheduleModal() {
+  const modal = document.getElementById('careCallGlobalScheduleModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function insertSmsTag(tag) {
+  const textarea = document.getElementById('globalScheduleSmsTemplate');
+  if (!textarea) return;
+  const start = textarea.selectionStart || textarea.value.length;
+  const end = textarea.selectionEnd || textarea.value.length;
+  const text = textarea.value;
+  textarea.value = text.slice(0, start) + tag + text.slice(end);
+  textarea.selectionStart = textarea.selectionEnd = start + tag.length;
+  textarea.focus();
+  updateSmsPreview();
+}
+
+function updateSmsPreview() {
+  const tpl = document.getElementById('globalScheduleSmsTemplate')?.value || '';
+  const rendered = tpl
+    .replace(/\{간병사\}/g, '박금옥')
+    .replace(/\{환자\}/g, '이선주')
+    .replace(/\{발신시각\}/g, '18:00');
+
+  const previewBox = document.getElementById('smsPreviewBox');
+  if (previewBox) previewBox.innerText = rendered;
+
+  const counter = document.getElementById('smsLengthCounter');
+  if (counter) {
+    const len = rendered.length;
+    const type = len > 90 ? 'LMS (장문)' : 'SMS (단문)';
+    counter.innerText = `${len}자 (${type})`;
+  }
+}
+
+async function saveGlobalCareCallSchedule() {
+  const slot1 = document.getElementById('globalScheduleSlot1').value;
+  const slot2 = document.getElementById('globalScheduleSlot2').value;
+  const slot3 = document.getElementById('globalScheduleSlot3').value;
+  const enableSmsNotice = document.getElementById('globalScheduleEnableSms').checked;
+  const advanceMinutes = parseInt(document.getElementById('globalScheduleAdvanceMinutes').value, 10) || 2;
+  const defaultSmsTemplate = document.getElementById('globalScheduleSmsTemplate').value.trim();
+
+  if (!slot1) {
+    alert('기본 1차 발신 시각을 입력해 주세요.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/carecall/schedule-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'save_global',
+        defaultSlots: { slot1, slot2, slot3 },
+        enableSmsNotice,
+        advanceMinutes,
+        defaultSmsTemplate
+      })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      if (data.config) window.gCareCallScheduleConfig = data.config;
+      closeCareCallGlobalScheduleModal();
+      renderCareCallTargets();
+      alert('기본 발신 스케줄 및 사전 문자 템플릿 설정이 성공적으로 저장되었습니다!');
+    } else {
+      alert('저장 실패: ' + (data.error || '오류 발생'));
+    }
+  } catch (err) {
+    alert('네트워크 오류: ' + err.message);
+  }
+}
+
+async function refreshScheduleLogs() {
+  const listEl = document.getElementById('scheduleRecentLogsList');
+  if (!listEl) return;
+  listEl.innerHTML = '<p class="text-slate-400 italic text-center py-4">로그 로딩 중...</p>';
+
+  try {
+    const res = await fetch('/api/carecall/schedule-config');
+    if (res.ok) {
+      const data = await res.json();
+      const logs = data.logs || [];
+      if (logs.length === 0) {
+        listEl.innerHTML = '<p class="text-slate-400 italic text-center py-4">오늘 발송 및 예약 실행 이력이 없습니다.</p>';
+        return;
+      }
+
+      listEl.innerHTML = logs.slice(-15).reverse().map(l => {
+        const time = (l.createdAt || '').slice(11, 16);
+        const isSms = l.type === 'SMS_NOTICE';
+        return `
+          <div class="p-2 rounded-xl bg-white border border-slate-200 flex items-center justify-between text-[11px]">
+            <div class="flex items-center gap-1.5">
+              <span class="px-1.5 py-0.5 rounded font-mono font-bold text-[10px] ${isSms ? 'bg-amber-100 text-amber-800' : 'bg-purple-100 text-purple-800'}">
+                ${isSms ? '문자알림' : '전화발신'}
+              </span>
+              <b class="text-slate-800">${l.patientName}</b>
+              <span class="text-slate-500">(${l.caregiverName} ${l.slotNumber}차 ${l.slotTime})</span>
+            </div>
+            <span class="text-slate-400 font-mono text-[10px]">${time}</span>
+          </div>
+        `;
+      }).join('');
+    }
+  } catch (e) {
+    listEl.innerHTML = '<p class="text-rose-400 text-center py-4">로그 로드 실패</p>';
+  }
+}
+
+window.openCareCallPatientScheduleModal = openCareCallPatientScheduleModal;
+window.closeCareCallPatientScheduleModal = closeCareCallPatientScheduleModal;
+window.savePatientCareCallSchedule = savePatientCareCallSchedule;
+window.deletePatientCareCallSchedule = deletePatientCareCallSchedule;
+window.resetPatientSmsToDefault = resetPatientSmsToDefault;
+window.openCareCallGlobalScheduleModal = openCareCallGlobalScheduleModal;
+window.closeCareCallGlobalScheduleModal = closeCareCallGlobalScheduleModal;
+window.saveGlobalCareCallSchedule = saveGlobalCareCallSchedule;
+window.insertSmsTag = insertSmsTag;
+window.updateSmsPreview = updateSmsPreview;
+window.refreshScheduleLogs = refreshScheduleLogs;
+
 
 function toggleCarePortPatientAccordion(groupId) {
   if (gCarePortExpandedPatients.has(groupId)) {

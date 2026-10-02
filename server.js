@@ -2510,6 +2510,14 @@ function saveSavedFaxConfig(cfg) {
     console.log(`로컬 접속 주소: ${url}`);
     console.log('================================================================');
 
+    // AI 간병통화 예약 발신 및 2분 전 사전 문자 스케줄러 가동
+    try {
+      const { initScheduler } = require('./api/carecall/scheduler-daemon');
+      initScheduler();
+    } catch (schedErr) {
+      console.warn('[CareCall Scheduler Init Warning]', schedErr.message);
+    }
+
     // Open default browser
     const startCmd = process.platform === 'win32' ? 'start' : (process.platform === 'darwin' ? 'open' : 'xdg-open');
     exec(`${startCmd} ${url}`);

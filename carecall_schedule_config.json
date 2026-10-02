@@ -1,0 +1,26 @@
+{
+  "updatedAt": "2026-10-02T14:22:00.000Z",
+  "advanceMinutes": 2,
+  "enableSmsNotice": true,
+  "defaultSlots": {
+    "slot1": "18:00",
+    "slot2": "19:00",
+    "slot3": "20:00"
+  },
+  "defaultSmsTemplate": "[리본케어] {간병사} 간병사님, 잠시 후 {발신시각}에 {환자} 환자님의 AI 간병일지 작성을 위한 안내 전화가 발신됩니다. 통화 연결 시 오늘 간병 내용을 편안하게 말씀해 주시면 일지가 자동 작성됩니다.",
+  "schedules": {
+    "C0269": {
+      "targetKey": "C0269",
+      "patientName": "이선주",
+      "caregiverName": "박금옥",
+      "caregiverPhone": "010-5950-1875",
+      "slot1": "18:00",
+      "slot2": "19:00",
+      "slot3": "20:00",
+      "enabled": true,
+      "smsNotice": true,
+      "customSmsText": "",
+      "updatedAt": "2026-10-02T14:22:00.000Z"
+    }
+  }
+}
