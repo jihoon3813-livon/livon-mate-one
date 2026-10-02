@@ -1,6 +1,7 @@
 // api/carecall/make-call.js
-// Outbound AI Call Trigger for Caregiver
+// Outbound AI Call Trigger for Caregiver (Twilio Voice API / CTI Fallback)
 
+const { getTwilioConfig, placeTwilioCall } = require('./twilio-service');
 const { makeOutboundCall } = require('../../cti-client');
 
 module.exports = async function handler(req, res) {
@@ -32,7 +33,8 @@ module.exports = async function handler(req, res) {
       workTime,
       insuranceCompany = '삼성화재',
       voice = 'alloy',
-      scheduleId
+      scheduleId,
+      forceCti = false
     } = body;
 
     if (!caregiverPhone) {
@@ -42,39 +44,56 @@ module.exports = async function handler(req, res) {
 
     const cleanPhone = String(caregiverPhone).replace(/[^0-9]/g, '');
 
-    // 1. 발신 번호 결정 (삼성화재/리본케어/현대해상)
-    let callerId = '16007835'; // 리본케어 대표번호
-    if (insuranceCompany && insuranceCompany.includes('현대')) {
-      callerId = '15337436'; // 현대해상 전용번호
+    // 1. Twilio 실제 전화망 연동 상태 확인
+    const twilioCfg = getTwilioConfig();
+    const hasTwilio = !!(twilioCfg.accountSid && twilioCfg.authToken && twilioCfg.phoneNumber);
+
+    if (hasTwilio && !forceCti) {
+      try {
+        const twilioResult = await placeTwilioCall({
+          phone: cleanPhone,
+          patientName,
+          caregiverName,
+          workDate,
+          workTime,
+          scheduleId,
+          voice
+        });
+
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        return res.status(200).json({
+          success: true,
+          mode: 'twilio_voice',
+          message: `[${caregiverName || '간병사'}] (${cleanPhone}) 님의 휴대전화로 실제 AI 음성 전화가 발신되었습니다.\n잠시 후 휴대폰 벨이 울리면 전화를 받아주세요.`,
+          patientName,
+          caregiverName,
+          phone: cleanPhone,
+          workDate,
+          voice,
+          twilioResult,
+          requestedAt: new Date().toISOString()
+        });
+      } catch (twErr) {
+        console.error('[Twilio Call Error]', twErr.message);
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        return res.status(500).json({
+          success: false,
+          error: `Twilio 통화 발신 오류: ${twErr.message}`,
+          requiresTwilioCheck: true
+        });
+      }
     }
 
-    // 2. 실제 CTI 통화 발신 실행
-    let ctiResult = null;
-    try {
-      ctiResult = await makeOutboundCall({
-        phone: cleanPhone,
-        callerId: callerId,
-        askSn: scheduleId || `CARE_${Date.now()}`,
-        recipientName: `${caregiverName || '간병사'}(${patientName || ''} 간병)`
-      });
-    } catch (ctiErr) {
-      console.warn('[CareCall CTI Call Warning]', ctiErr.message);
-      throw new Error(`CTI 발신 게이트웨이 오류: ${ctiErr.message}`);
-    }
-
+    // 2. Twilio 미설정 시 안내
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.status(200).json({
-      success: true,
-      mode: 'cti_outbound',
-      message: `[${caregiverName || '간병사'}] (${cleanPhone}) 님에게 CTI 전화 발신이 연결되었습니다.`,
+      success: false,
+      requiresTwilioConfig: true,
+      error: '간병사 휴대전화(010)로 실제 전화를 걸기 위한 Twilio 통신망 설정이 필요합니다.',
+      message: '현재 시스템에 실제 010 전화로 벨을 울려줄 Twilio 음성 API 키(Account SID, Auth Token, 발신번호)가 등록되어 있지 않습니다.\n설정창에 계정 정보를 등록하시면 즉시 실제 전화가 발신됩니다.',
       patientName,
       caregiverName,
-      phone: cleanPhone,
-      callerId,
-      workDate,
-      voice,
-      ctiResult,
-      requestedAt: new Date().toISOString()
+      phone: cleanPhone
     });
   } catch (err) {
     console.error('[CareCall Outbound Error]', err);
@@ -82,4 +101,3 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ success: false, error: err.message });
   }
 };
-

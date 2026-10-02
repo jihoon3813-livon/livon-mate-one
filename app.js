@@ -39179,7 +39179,15 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
       if (elStatus) {
         elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> 통화 대기중</span>';
       }
-      alert(`📞 [전화 발신 접수 완료]\n\n${caregiverName}(${caregiverPhone}) 님에게 전화 발신을 전송했습니다.\n${data.message || ''}`);
+      alert(`📞 [전화 발신 접수 완료]\n\n${caregiverName}(${caregiverPhone}) 님에게 실제 전화 발신을 전송했습니다.\n${data.message || ''}`);
+    } else if (data.requiresTwilioConfig) {
+      if (elStatus) {
+        elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs">전화망 설정 필요</span>';
+      }
+      const openModal = confirm(`[📞 실제 010 전화 발신 안내]\n\n간병사 휴대전화(${caregiverPhone})로 진짜 전화가 걸려와 벨이 울리도록 하려면 Twilio Voice 통신망 설정(Account SID / Auth Token / 발신번호)이 필요합니다.\n\n지금 전화망 설정창을 여시겠습니까?`);
+      if (openModal) {
+        openTwilioConfigModal();
+      }
     } else {
       if (elStatus) {
         elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold text-xs">발신 실패</span>';
@@ -39191,6 +39199,62 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
       elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold text-xs">오류</span>';
     }
     alert('전화 발신 네트워크 오류: ' + e.message);
+  }
+}
+
+async function openTwilioConfigModal() {
+  const modal = document.getElementById('careCallTwilioModal');
+  if (!modal) return;
+  try {
+    const res = await fetch('/api/carecall/twilio-config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.config) {
+        const sidEl = document.getElementById('twilioAccountSidInput');
+        const phoneEl = document.getElementById('twilioPhoneInput');
+        const urlEl = document.getElementById('twilioPublicUrlInput');
+        if (sidEl && data.config.accountSid) sidEl.value = data.config.accountSid;
+        if (phoneEl && data.config.phoneNumber) phoneEl.value = data.config.phoneNumber;
+        if (urlEl && data.config.publicBaseUrl) urlEl.value = data.config.publicBaseUrl;
+      }
+    }
+  } catch (e) {
+    console.warn('Twilio config load error:', e);
+  }
+  modal.classList.remove('hidden');
+}
+
+function closeTwilioConfigModal() {
+  const modal = document.getElementById('careCallTwilioModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function saveTwilioConfigFromModal() {
+  const accountSid = (document.getElementById('twilioAccountSidInput')?.value || '').trim();
+  const authToken = (document.getElementById('twilioAuthTokenInput')?.value || '').trim();
+  const phoneNumber = (document.getElementById('twilioPhoneInput')?.value || '').trim();
+  const publicBaseUrl = (document.getElementById('twilioPublicUrlInput')?.value || '').trim();
+
+  if (!accountSid || !authToken || !phoneNumber) {
+    alert('Twilio Account SID, Auth Token, 발신 전화번호를 모두 입력해주세요.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/carecall/twilio-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountSid, authToken, phoneNumber, publicBaseUrl })
+    });
+    const data = await res.json();
+    if (data.success) {
+      closeTwilioConfigModal();
+      alert('📞 Twilio 전화망 설정이 성공적으로 저장되었습니다!\n이제 [전화 발신] 버튼을 누르면 해당 번호로 실제 전화가 걸려옵니다.');
+    } else {
+      alert('설정 저장 실패: ' + (data.error || '알 수 없는 오류'));
+    }
+  } catch (err) {
+    alert('설정 저장 네트워크 오류: ' + err.message);
   }
 }
 
@@ -39284,6 +39348,9 @@ window.closeCareCallDriveModal = closeCareCallDriveModal;
 window.handleSaveCareCallDriveConfig = handleSaveCareCallDriveConfig;
 window.handleCareCallSearchInput = handleCareCallSearchInput;
 window.setCareCallInsuranceFilter = setCareCallInsuranceFilter;
+window.openTwilioConfigModal = openTwilioConfigModal;
+window.closeTwilioConfigModal = closeTwilioConfigModal;
+window.saveTwilioConfigFromModal = saveTwilioConfigFromModal;
 
 function toggleCarePortPatientAccordion(groupId) {
   if (gCarePortExpandedPatients.has(groupId)) {

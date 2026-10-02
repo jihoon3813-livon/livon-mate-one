@@ -2474,6 +2474,26 @@ function saveSavedFaxConfig(cfg) {
     });
   });
 
+  // Twilio Media Stream WebSocket Server 연동
+  try {
+    const WebSocket = require('ws');
+    const wss = new WebSocket.Server({ noServer: true });
+    const { handleTwilioStream } = require('./api/carecall/stream');
+
+    server.on('upgrade', (request, socket, head) => {
+      const parsed = urlModule.parse(request.url);
+      if (parsed.pathname === '/api/carecall/stream') {
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          handleTwilioStream(ws, request);
+        });
+      } else {
+        socket.destroy();
+      }
+    });
+  } catch (wsErr) {
+    console.warn('[Twilio WebSocket Init Warning]', wsErr.message);
+  }
+
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.warn(`[?뚮┝] ?ы듃 ${port}踰덉씠 ?대? ?ъ슜 以묒엯?덈떎. ?ㅼ쓬 ?ы듃(${port + 1})濡??먮룞 ?꾪솚?⑸땲??..`);

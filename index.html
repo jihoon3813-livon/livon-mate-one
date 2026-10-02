@@ -3842,6 +3842,14 @@
                   <i data-lucide="settings" class="w-4 h-4"></i>
                 </button>
               </div>
+
+              <!-- 실제 전화망 (Twilio) 설정 버튼 -->
+              <button type="button" onclick="openTwilioConfigModal()" 
+                class="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-300 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+                title="간병사 휴대폰(010) 실제 전화 발신망(Twilio) 설정">
+                <i data-lucide="phone" class="w-3.5 h-3.5 text-purple-600"></i>
+                <span>전화망(Twilio) 설정</span>
+              </button>
             </div>
           </div>
 
@@ -8939,6 +8947,71 @@
       <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
         <button type="button" onclick="closeCareCallDriveModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">취소</button>
         <button type="button" onclick="handleSaveCareCallDriveConfig()" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-md cursor-pointer">저장하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: TWILIO REAL PHONE CONFIG ==================== -->
+  <div id="careCallTwilioModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 hidden">
+    <div class="bg-white rounded-3xl p-6 max-w-lg w-full border border-slate-200 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+            <i data-lucide="phone-outgoing" class="w-5 h-5 text-purple-600"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black text-slate-900">실제 전화망 (Twilio Voice) 연동 설정</h3>
+            <p class="text-xs text-slate-500">간병사 010 휴대전화로 실제 전화가 걸리도록 하는 통신망 설정</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeTwilioConfigModal()" class="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="bg-amber-50 p-3 rounded-2xl border border-amber-200 text-xs text-amber-800 space-y-1">
+        <div class="font-bold flex items-center gap-1.5">
+          <i data-lucide="info" class="w-4 h-4 text-amber-600"></i>
+          <span>실제 010 전화 발신 안내</span>
+        </div>
+        <p class="text-[11px] leading-relaxed">
+          Twilio 계정을 연결하시면 메이트원에서 [전화 발신] 클릭 시 <b>간병사 실제 휴대전화로 벨이 울리며</b>, 전화를 받으면 <b>AI가 음성으로 질문하고 답변을 받아 구글 드라이브에 녹취파일(.m4a)로 자동 저장</b>합니다.
+        </p>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Twilio Account SID <span class="text-rose-500">*</span></label>
+          <input type="text" id="twilioAccountSidInput" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
+          <p class="text-[11px] text-slate-400 mt-0.5">Twilio Console 대시보드 메인에 표시된 Account SID</p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Twilio Auth Token <span class="text-rose-500">*</span></label>
+          <input type="password" id="twilioAuthTokenInput" placeholder="32자리 인증 토큰 입력"
+            class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
+          <p class="text-[11px] text-slate-400 mt-0.5">Twilio Console 대시보드의 Auth Token</p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Twilio 발신 전화번호 (Phone Number) <span class="text-rose-500">*</span></label>
+          <input type="text" id="twilioPhoneInput" placeholder="+1234567890 또는 Twilio 발신번호"
+            class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
+          <p class="text-[11px] text-slate-400 mt-0.5">Twilio에서 구매한 발신 번호 (E.164 국제 규격: +1... 등)</p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">공개 웹훅 서버 URL (Public Webhook URL)</label>
+          <input type="text" id="twilioPublicUrlInput" placeholder="https://your-domain.com 또는 ngrok 주소"
+            class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
+          <p class="text-[11px] text-slate-400 mt-0.5">전화 연결 시 실시간 음성 스트림(WebSocket)을 수신할 공개 URL (로컬 테스트 시 ngrok 주소 입력)</p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+        <button type="button" onclick="closeTwilioConfigModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">취소</button>
+        <button type="button" onclick="saveTwilioConfigFromModal()" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-md cursor-pointer">설정 저장 및 연동</button>
       </div>
     </div>
   </div>
