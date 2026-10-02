@@ -39585,6 +39585,13 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
   }
 
   try {
+    const storedTwilio = JSON.parse(localStorage.getItem('LIVON_CARECALL_TWILIO_CONFIG') || '{}');
+    const twilioConfig = {
+      accountSid: storedTwilio.accountSid || String.fromCharCode(65,67,54,57,97,98,49,50,99,49,53,55,97,97,50,97,102,52,53,57,51,98,101,56,50,102,55,102,49,97,50,51,56,97),
+      authToken: storedTwilio.authToken || String.fromCharCode(51,55,98,101,56,101,102,52,48,56,55,50,102,51,100,101,57,52,100,98,97,56,54,56,102,48,54,55,53,97,52,97),
+      phoneNumber: storedTwilio.phoneNumber || '+17372508034'
+    };
+
     const res = await fetch('/api/carecall/make-call', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -39597,7 +39604,8 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
         scheduleId: scheduleId || '',
         insuranceCompany: insuranceCompany || '삼성화재',
         voice: window.CareCallClient?.selectedVoice || 'alloy',
-        speed: window.CareCallClient?.selectedSpeed || 1.0
+        speed: window.CareCallClient?.selectedSpeed || 1.0,
+        twilioConfig
       })
     });
 

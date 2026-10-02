@@ -44,9 +44,13 @@ module.exports = async function handler(req, res) {
 
     const cleanPhone = String(caregiverPhone).replace(/[^0-9]/g, '');
 
-    // 1. Twilio 실제 전화망 연동 상태 확인
-    const twilioCfg = getTwilioConfig();
+    // 1. Twilio 실제 전화망 연동 상태 확인 (서버 설정 + 클라이언트 전달 설정 병합)
+    let twilioCfg = getTwilioConfig();
+    if (body.twilioConfig && typeof body.twilioConfig === 'object') {
+      twilioCfg = { ...twilioCfg, ...body.twilioConfig };
+    }
     const hasTwilio = !!(twilioCfg.accountSid && twilioCfg.authToken && twilioCfg.phoneNumber);
+    let twilioNotice = '';
 
     if (hasTwilio && !forceCti) {
       try {
@@ -79,11 +83,17 @@ module.exports = async function handler(req, res) {
           requestedAt: new Date().toISOString()
         });
       } catch (twErr) {
-        console.warn('[Twilio Call Fallback]', twErr.message);
+        console.warn('[Twilio Call Error, falling back to CTI]', twErr.message);
+        const isTrialErr = twErr.message.includes('verified recipient') || twErr.message.includes('trial') || twErr.message.includes('573002');
+        if (isTrialErr) {
+          twilioNotice = `\n\n※ [Twilio 트라이얼 안내] 수신 번호(${cleanPhone})가 Twilio 콘솔(Verified Caller IDs)에 미등록되어, 사내 CTI 전화망으로 자동 전환하여 발신되었습니다.`;
+        } else {
+          twilioNotice = `\n\n※ Twilio 발신 장애(${twErr.message.slice(0, 40)}...)로 인해 사내 CTI 전화망으로 자동 전환하여 발신되었습니다.`;
+        }
       }
     }
 
-    // 2. Twilio 미설정 시: 기존 CTI 전화 발신망(GoodARS CTI) 연동
+    // 2. Twilio 미설정 또는 트라이얼 실패 시: 기존 CTI 전화 발신망(GoodARS CTI) 연동
     // (담당자 전화기로 먼저 벨이 울리고 수화기를 들면 간병인 전화로 연결되는 브릿지 방식)
     const callerId = (insuranceCompany && insuranceCompany.includes('현대')) ? '15337436' : '16007835';
 
@@ -99,7 +109,7 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({
         success: true,
         mode: 'cti_bridge',
-        message: `[${caregiverName || cleanPhone}] 간병사님 번호로 CTI 전화 발신이 정상 접수되었습니다.\n\n📞 담당자 휴대폰(또는 내선 전화기)으로 먼저 벨이 울립니다.\n수화기를 들고 전화를 받으시면 간병사 휴대전화(${cleanPhone})로 바로 연결됩니다.`,
+        message: `[${caregiverName || cleanPhone}] 간병사님 번호로 CTI 전화 발신이 정상 접수되었습니다.${twilioNotice}\n\n📞 담당자 휴대폰(또는 내선 전화기)으로 먼저 벨이 울립니다.\n수화기를 들고 전화를 받으시면 간병사 휴대전화(${cleanPhone})로 바로 연결됩니다.`,
         patientName,
         caregiverName,
         phone: cleanPhone,
