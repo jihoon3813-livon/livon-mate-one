@@ -3838,14 +3838,15 @@
                   <i data-lucide="mic" class="w-3.5 h-3.5 text-purple-600"></i>
                   <span class="font-bold text-slate-500 text-[11px]">AI 목소리:</span>
                   <select id="selectCareCallVoice" onchange="handleCareCallVoiceChange(this.value)" class="font-bold text-purple-900 bg-transparent border-0 focus:outline-hidden cursor-pointer text-xs">
-                    <option value="alloy" selected>Alloy (기본 - 표준 여성 톤)</option>
+                    <option value="marin" selected>Marin (현재 리본메이트 앱 기본 - 생생한 여성 톤)</option>
+                    <option value="alloy">Alloy (표준 여성/중성 톤)</option>
                     <option value="shimmer">Shimmer (부드럽고 따뜻한 여성 톤)</option>
                     <option value="coral">Coral (밝고 상냥한 여성 톤)</option>
                     <option value="sage">Sage (차분하고 전문적인 여성 톤)</option>
-                    <option value="nova">Nova (생생하고 또렷한 여성 톤)</option>
+                    <option value="ballad">Ballad (편안하고 차분한 남성/중성 톤)</option>
+                    <option value="verse">Verse (안정적이고 다정한 톤)</option>
                     <option value="echo">Echo (신뢰감 있는 명확한 남성 톤)</option>
                     <option value="ash">Ash (차분하고 부드러운 남성 톤)</option>
-                    <option value="onyx">Onyx (깊고 중후한 남성 톤)</option>
                   </select>
                   <button type="button" onclick="handleCareCallPreviewVoice()" class="p-1 hover:bg-purple-100 rounded-md text-purple-700 transition-all cursor-pointer" title="선택한 목소리 짧게 미리듣기">
                     <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>

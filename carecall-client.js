@@ -6,7 +6,7 @@
   'use strict';
 
   const CareCallClient = {
-    selectedVoice: localStorage.getItem('LIVON_CARECALL_VOICE') || 'alloy',
+    selectedVoice: localStorage.getItem('LIVON_CARECALL_VOICE') || 'marin',
     selectedSpeed: parseFloat(localStorage.getItem('LIVON_CARECALL_SPEED') || '1.0'),
     activeSession: null,
     peerConnection: null,
@@ -23,9 +23,9 @@
     },
 
     voices: [
-      { id: 'alloy', name: 'Alloy (기본값)', desc: '명확하고 신뢰감 있는 대표 톤 (리본메이트 기본값)', gender: '여성/중성' },
+      { id: 'marin', name: 'Marin (리본메이트 앱 기본)', desc: '자연스럽고 생생한 대화형 여성 톤 (현재 리본메이트 앱 기본값)', gender: '여성' },
+      { id: 'alloy', name: 'Alloy (표준)', desc: '명확하고 신뢰감 있는 대표 톤', gender: '여성/중성' },
       { id: 'shimmer', name: 'Shimmer (돌봄추천)', desc: '따뜻하고 친절하며 부드러운 여성 톤', gender: '여성' },
-      { id: 'marin', name: 'Marin (최신 톤)', desc: '차분하고 자연스러운 최신 대화형 톤', gender: '여성' },
       { id: 'coral', name: 'Coral (활기찬 톤)', desc: '밝고 생기 넘치는 친근한 여성 톤', gender: '여성' },
       { id: 'ballad', name: 'Ballad (차분한 톤)', desc: '조용하고 편안한 대화형 톤', gender: '남성/중성' },
       { id: 'sage', name: 'Sage (전문가 톤)', desc: '또렷하고 똑 부러지는 전문적인 톤', gender: '여성' },
@@ -35,12 +35,14 @@
     ],
 
     async init() {
-      const savedVoice = localStorage.getItem('LIVON_CARECALL_VOICE');
-      if (savedVoice) {
-        this.selectedVoice = savedVoice;
-        const selVoice = document.getElementById('selectCareCallVoice');
-        if (selVoice) selVoice.value = savedVoice;
+      let savedVoice = localStorage.getItem('LIVON_CARECALL_VOICE');
+      if (!savedVoice || savedVoice === 'alloy') {
+        savedVoice = 'marin';
+        localStorage.setItem('LIVON_CARECALL_VOICE', 'marin');
       }
+      this.selectedVoice = savedVoice;
+      const selVoice = document.getElementById('selectCareCallVoice');
+      if (selVoice) selVoice.value = savedVoice;
       const savedSpeed = localStorage.getItem('LIVON_CARECALL_SPEED');
       if (savedSpeed) {
         this.selectedSpeed = parseFloat(savedSpeed) || 1.0;
@@ -309,7 +311,7 @@
         await pc.setLocalDescription(offer);
 
         const baseUrl = 'https://api.openai.com/v1/realtime';
-        const model = 'gpt-realtime-2.1';
+        const model = 'gpt-realtime';
         const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
           method: 'POST',
           body: offer.sdp,

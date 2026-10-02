@@ -100,7 +100,7 @@ module.exports = async function handler(req, res) {
       workDate,
       workTime,
       recentHistory,
-      voice = 'alloy',
+      voice = 'marin',
       speed = 1.0,
       scheduleId
     } = body;
@@ -126,7 +126,7 @@ module.exports = async function handler(req, res) {
     const payload = {
       session: {
         type: 'realtime',
-        model: 'gpt-realtime-2.1',
+        model: 'gpt-realtime',
         instructions: instructions,
         audio: {
           input: {
@@ -143,7 +143,7 @@ module.exports = async function handler(req, res) {
           },
           output: {
             format: { type: 'audio/pcm', rate: 24000 },
-            voice: voice || 'alloy',
+            voice: voice || 'marin',
             speed: Number(speed) || 1.0
           }
         }
@@ -163,7 +163,7 @@ module.exports = async function handler(req, res) {
         clientSecret: openaiRes.data.value,
         expiresAt: openaiRes.data.expires_at,
         sessionId: openaiRes.data.session?.id,
-        voice: voice || 'alloy',
+        voice: voice || 'marin',
         speed: speed || 1.0,
         instructions: instructions,
         scheduleId: scheduleId || null,

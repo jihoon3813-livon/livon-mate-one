@@ -42,7 +42,7 @@ function handleTwilioStream(ws, req) {
   const recordedUlawChunks = [];
 
   // 1. OpenAI Realtime WebSocket 연결
-  const openaiUrl = 'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17';
+  const openaiUrl = 'wss://api.openai.com/v1/realtime?model=gpt-realtime';
   openaiWs = new WebSocket(openaiUrl, {
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -66,7 +66,7 @@ function handleTwilioStream(ws, req) {
       session: {
         modalities: ['audio', 'text'],
         instructions: prompt,
-        voice: customParams.voice || 'alloy',
+        voice: customParams.voice || 'marin',
         input_audio_format: 'g711_ulaw',
         output_audio_format: 'g711_ulaw',
         input_audio_transcription: {
