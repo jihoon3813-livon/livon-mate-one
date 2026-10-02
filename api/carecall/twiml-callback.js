@@ -98,7 +98,7 @@ module.exports = async function handler(req, res) {
   // TwiML 통화 종료 안내
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say language="ko-KR">소중한 간병 내용이 정상 접수되었습니다. 수고 많으셨습니다. 감사합니다.</Say>
+  <Say language="ko-KR" voice="Polly.Seoyeon">소중한 간병 내용이 정상 접수되었습니다. 수고 많으셨습니다. 감사합니다.</Say>
   <Hangup />
 </Response>`;
 
