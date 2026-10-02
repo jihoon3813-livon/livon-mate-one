@@ -97,7 +97,7 @@ function formatE164(phone) {
 /**
  * Twilio Outbound Voice Call 발신 실행
  */
-async function placeTwilioCall({ phone, patientName, caregiverName, workDate, workTime, scheduleId, voice }) {
+async function placeTwilioCall({ phone, patientName, caregiverName, workDate, workTime, scheduleId, voice, baseUrl: customBaseUrl }) {
   const cfg = getTwilioConfig();
 
   if (!cfg.accountSid || !cfg.authToken) {
@@ -113,8 +113,15 @@ async function placeTwilioCall({ phone, patientName, caregiverName, workDate, wo
     throw new Error(`유효하지 않은 수신 전화번호입니다: ${phone}`);
   }
 
-  // TwiML Webhook URL 결정
-  const baseUrl = cfg.publicBaseUrl || `http://localhost:8080`;
+  // TwiML Webhook URL 결정 (전달된 baseUrl -> Vercel 환경변수 -> 설정값 -> localhost 순)
+  let baseUrl = customBaseUrl || cfg.publicBaseUrl;
+  if (!baseUrl && process.env.VERCEL_URL) {
+    baseUrl = `https://${process.env.VERCEL_URL}`;
+  }
+  if (!baseUrl) {
+    baseUrl = `http://localhost:8080`;
+  }
+
   const params = querystring.stringify({
     patientName: patientName || '',
     caregiverName: caregiverName || '',

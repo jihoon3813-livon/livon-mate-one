@@ -50,6 +50,10 @@ module.exports = async function handler(req, res) {
 
     if (hasTwilio && !forceCti) {
       try {
+        const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
+        const reqProto = req.headers['x-forwarded-proto'] || (reqHost && reqHost.includes('localhost') ? 'http' : 'https');
+        const autoBaseUrl = reqHost ? `${reqProto}://${reqHost}` : null;
+
         const twilioResult = await placeTwilioCall({
           phone: cleanPhone,
           patientName,
@@ -57,7 +61,8 @@ module.exports = async function handler(req, res) {
           workDate,
           workTime,
           scheduleId,
-          voice
+          voice,
+          baseUrl: autoBaseUrl
         });
 
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
