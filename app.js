@@ -38904,6 +38904,12 @@ function handleCareCallSearchInput(val) {
 // =========================================================================
 
 let gCareCallSavedRecordings = [];
+let gCareCallActiveMonitoring = {};
+try {
+  gCareCallSavedRecordings = JSON.parse(localStorage.getItem('LIVON_CARECALL_SAVED_RECORDINGS') || '[]');
+} catch (_) {
+  gCareCallSavedRecordings = [];
+}
 let gCareCallExpandedTargets = new Set();
 let gCareCallOperationModes = {};
 try {
@@ -38912,14 +38918,21 @@ try {
   gCareCallOperationModes = {};
 }
 
-// 초기 음성파일 목록 로드
+// 초기 음성파일 목록 로드 (로컬 + 서버 동기화)
 (async function initCareCallRecordings() {
   try {
     const res = await fetch('/api/carecall/save-recording');
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.recordings)) {
-        gCareCallSavedRecordings = data.recordings;
+        data.recordings.forEach(rec => {
+          if (!gCareCallSavedRecordings.some(x => x.filename === rec.filename || (x.recordingSid && x.recordingSid === rec.recordingSid))) {
+            gCareCallSavedRecordings.push(rec);
+          }
+        });
+        try {
+          localStorage.setItem('LIVON_CARECALL_SAVED_RECORDINGS', JSON.stringify(gCareCallSavedRecordings));
+        } catch (_) {}
         if (typeof renderCareCallTargets === 'function' && gCareLogViewMode === 'call') {
           renderCareCallTargets();
         }
@@ -39158,6 +39171,10 @@ function getCareCallTargetList() {
       });
       const hasVoiceFile = !!(voiceRec || log?.audioUrl || log?.hasVoice);
       const voiceFilename = voiceRec?.filename || (log?.audioUrl ? '케어포트_음성파일.m4a' : '');
+      const downloadUrl = voiceRec?.downloadUrl || (voiceRec?.recordingUrl ? `/api/carecall/recording-proxy?url=${encodeURIComponent(voiceRec.recordingUrl)}&filename=${encodeURIComponent(voiceFilename)}` : '');
+      const audioUrl = voiceRec?.recordingUrl || downloadUrl || (voiceFilename ? `/recordings/carecalls/${voiceFilename}` : '');
+      const duration = voiceRec?.duration || 0;
+      const isCurrentlyMonitoring = !!(gCareCallActiveMonitoring && gCareCallActiveMonitoring[`${t.patientName}_${d}`]);
 
       const isRegistered = hasCarePortLog || hasVoiceFile;
       const isMissingPast = isPast && !isRegistered;
@@ -39172,6 +39189,10 @@ function getCareCallTargetList() {
         logTitle,
         hasVoiceFile,
         voiceFilename,
+        downloadUrl,
+        audioUrl,
+        duration,
+        isCurrentlyMonitoring,
         isRegistered,
         isMissingPast
       };
@@ -39454,6 +39475,15 @@ function renderCareCallTargets() {
             ${t.operationMode === 'APP' ? `
               <span class="text-slate-400 text-xs font-medium">앱 직접 작성 대상</span>
             ` : (() => {
+              const isAnyMonitoring = Object.keys(gCareCallActiveMonitoring || {}).some(k => k.startsWith(t.patientName + '_'));
+              if (isAnyMonitoring) {
+                return `
+                  <button disabled class="w-full px-2 py-1.5 rounded-xl bg-amber-500 text-white font-black text-xs shadow-xs flex items-center justify-center gap-1 cursor-wait animate-pulse whitespace-nowrap">
+                    <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+                    <span>통화/녹음 대기중...</span>
+                  </button>
+                `;
+              }
               if (t.hasMissingPast && t.missingPastDates && t.missingPastDates.length > 0) {
                 const targetMissingDate = t.missingPastDates[t.missingPastDates.length - 1];
                 return `
@@ -39574,24 +39604,36 @@ function renderCareCallTargets() {
                             `)}
                           </td>
                           <td class="p-2.5 text-center">
-                            ${day.hasVoiceFile ? `
-                              <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 font-bold text-[11px] border border-emerald-200">
+                            ${day.isCurrentlyMonitoring ? `
+                              <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 font-bold text-[11px] border border-amber-300 animate-pulse">
+                                <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+                                <span>통화/녹취 대기중...</span>
+                              </div>
+                            ` : (day.hasVoiceFile ? `
+                              <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-bold text-[11px] border border-emerald-200">
                                 <i data-lucide="mic" class="w-3 h-3 text-emerald-600"></i>
-                                <span>생성 완료</span>
-                                ${day.voiceFilename ? `
-                                  <a href="/recordings/carecalls/${day.voiceFilename}" target="_blank" download="${day.voiceFilename}"
-                                    class="text-purple-700 hover:text-purple-900 ml-1" title="녹취파일 다운로드">
-                                    <i data-lucide="download" class="w-3 h-3"></i>
-                                  </a>
+                                <span>생성 완료${day.duration ? ` (${day.duration}초)` : ''}</span>
+                                ${day.audioUrl ? `
+                                  <button type="button" onclick="playCareCallRecordingAudio('${day.audioUrl}', '${t.patientName} (${day.date})')" class="text-purple-700 hover:text-purple-900 ml-1 p-0.5 hover:bg-purple-100 rounded cursor-pointer" title="녹취 음성 바로 듣기">
+                                    <i data-lucide="play" class="w-3 h-3"></i>
+                                  </button>
                                 ` : ''}
+                                <a href="${day.downloadUrl || day.audioUrl || `/recordings/carecalls/${day.voiceFilename}`}" target="_blank" download="${day.voiceFilename || '간병녹취음성.m4a'}" class="text-indigo-700 hover:text-indigo-900 ml-0.5 p-0.5 hover:bg-indigo-100 rounded cursor-pointer" title="녹취파일 다운로드">
+                                  <i data-lucide="download" class="w-3 h-3"></i>
+                                </a>
                               </div>
                             ` : `
                               <span class="text-slate-400 font-medium text-[11px]">음성파일 미생성</span>
-                            `}
+                            `)}
                           </td>
                           <td class="p-2.5 text-center">
                             ${t.operationMode === 'APP' ? `
                               <span class="text-slate-400 text-[11px]">앱 직접 작성</span>
+                            ` : (day.isCurrentlyMonitoring ? `
+                              <button disabled type="button" class="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 text-[11px] font-bold border border-amber-300 flex items-center justify-center gap-1 mx-auto cursor-wait opacity-90">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                                <span>통화/녹음 대기중</span>
+                              </button>
                             ` : `
                               <button type="button" 
                                 onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${day.date}', '${t.workTime}', '${t.id}', '${t.insuranceCompany}')"
@@ -39599,7 +39641,7 @@ function renderCareCallTargets() {
                                 <span>${isAlertDay ? '🚨' : '📞'}</span>
                                 <span>${day.date.slice(5)}${isAlertDay ? '(누락) 발신' : (day.isToday ? '(오늘) 발신' : ' 통화 발신')}</span>
                               </button>
-                            `}
+                            `)}
                           </td>
                         </tr>
                       `;
@@ -39668,10 +39710,19 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
 
     const data = await res.json();
     if (data.success) {
+      const callSid = data.twilioResult?.callSid || data.callSid || '';
+      startCareCallRecordingMonitor({
+        callSid,
+        patientName,
+        caregiverPhone: targetPhone,
+        workDate: workDate || new Date().toISOString().slice(0, 10),
+        scheduleId,
+        insuranceCompany
+      });
       if (elStatus) {
         elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> ' + (data.mode === 'cti_bridge' ? 'CTI 연결 접수' : 'AI 통화 연결중') + '</span>';
       }
-      alert(`📞 [전화 발신 접수 완료]\n\n${data.message || ''}`);
+      alert(`📞 [전화 발신 접수 완료]\n\n${data.message || ''}\n\n💡 간병사 통화 및 삐소리 후 답변이 완료되면 음성 녹음 파일이 자동으로 추출되어 시스템에 자동 저장됩니다!`);
     } else if (data.requiresTwilioConfig) {
       if (elStatus) {
         elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs">전화망 설정 필요</span>';
@@ -39691,6 +39742,115 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
       elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold text-xs">오류</span>';
     }
     alert('전화 발신 네트워크 오류: ' + e.message);
+  }
+}
+
+// =========================================================================
+// AI 통화 실시간 상태 모니터링 & 음성파일 자동 저장 (Auto-Save Recording)
+// =========================================================================
+function startCareCallRecordingMonitor({ callSid, patientName, caregiverPhone, workDate }) {
+  const cleanDate = (workDate || new Date().toISOString().slice(0, 10)).replace(/[^0-9]/g, '').slice(0, 8);
+  const monitorKey = `${patientName}_${workDate}`;
+  const monitorKeyShort = `${patientName}_${cleanDate}`;
+  
+  window.gCareCallActiveMonitoring = window.gCareCallActiveMonitoring || {};
+  window.gCareCallActiveMonitoring[monitorKey] = { callSid, startedAt: Date.now() };
+  window.gCareCallActiveMonitoring[monitorKeyShort] = { callSid, startedAt: Date.now() };
+  
+  if (typeof renderCareCallTargets === 'function') {
+    renderCareCallTargets();
+  }
+
+  const elStatus = document.getElementById(`careCallStatus-${patientName}`);
+  if (elStatus) {
+    elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-bold text-xs"><span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span> 통화/녹취 자동수신 대기중...</span>';
+  }
+
+  let attempts = 0;
+  const maxAttempts = 60; // 약 3.5분 동안 폴링
+  const pollIntervalMs = 3500;
+
+  const timerId = setInterval(async () => {
+    attempts++;
+    try {
+      const url = `/api/carecall/call-status?callSid=${encodeURIComponent(callSid || '')}&patientName=${encodeURIComponent(patientName || '')}&workDate=${encodeURIComponent(workDate || '')}&phone=${encodeURIComponent(caregiverPhone || '')}`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+
+      const data = await res.json();
+      if (data.success && data.hasRecording && data.recording) {
+        clearInterval(timerId);
+        delete window.gCareCallActiveMonitoring[monitorKey];
+        delete window.gCareCallActiveMonitoring[monitorKeyShort];
+
+        const rec = data.recording;
+        window.gCareCallSavedRecordings = window.gCareCallSavedRecordings || [];
+        const exists = window.gCareCallSavedRecordings.some(x => 
+          (x.recordingSid && x.recordingSid === rec.recordingSid) ||
+          (x.filename && x.filename === rec.filename) ||
+          (x.callSid && rec.callSid && x.callSid === rec.callSid)
+        );
+        if (!exists) {
+          window.gCareCallSavedRecordings.unshift(rec);
+        }
+        localStorage.setItem('LIVON_CARECALL_SAVED_RECORDINGS', JSON.stringify(window.gCareCallSavedRecordings));
+
+        if (elStatus) {
+          elStatus.innerHTML = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">✓ 녹음 자동저장 완료 (${rec.duration || 0}초)</span>`;
+        }
+
+        if (typeof renderCareCallTargets === 'function') {
+          renderCareCallTargets();
+        }
+
+        console.log('[CareCall Auto-Save]', 'Voice recording successfully saved:', rec);
+        alert(`🎙️ [간병 음성파일 자동 저장 완료!]\n\n• 환자: ${patientName}\n• 간병일자: ${workDate}\n• 녹음시간: ${rec.duration || 0}초\n• 파일명: ${rec.filename}\n\n통화 녹취 파일이 시스템에 자동으로 안전하게 저장되었습니다.\n해당 간병일자의 [▶ 듣기] 또는 [💾 다운로드] 버튼으로 바로 확인하실 수 있습니다.`);
+        return;
+      }
+
+      if (attempts >= maxAttempts) {
+        clearInterval(timerId);
+        delete window.gCareCallActiveMonitoring[monitorKey];
+        delete window.gCareCallActiveMonitoring[monitorKeyShort];
+        if (typeof renderCareCallTargets === 'function') {
+          renderCareCallTargets();
+        }
+      }
+    } catch (err) {
+      console.warn('[CareCall Monitor Polling Warning]', err);
+    }
+  }, pollIntervalMs);
+}
+
+// 음성 파일 인라인 즉시 재생 플레이어
+let gActiveCareCallAudio = null;
+function playCareCallRecordingAudio(audioUrl, title) {
+  if (!audioUrl) {
+    alert('재생할 음성 파일 경로가 유효하지 않습니다.');
+    return;
+  }
+
+  if (gActiveCareCallAudio) {
+    gActiveCareCallAudio.pause();
+    gActiveCareCallAudio = null;
+  }
+
+  try {
+    const audio = new Audio(audioUrl);
+    gActiveCareCallAudio = audio;
+    audio.play().then(() => {
+      console.log('[CareCall Audio Playing]', title, audioUrl);
+    }).catch(err => {
+      console.warn('Direct audio play blocked or failed:', err);
+      window.open(audioUrl, '_blank');
+    });
+
+    audio.onended = () => {
+      gActiveCareCallAudio = null;
+    };
+  } catch (err) {
+    console.error('Audio play error:', err);
+    window.open(audioUrl, '_blank');
   }
 }
 
@@ -40150,6 +40310,8 @@ window.setCareCallQuickFilter = setCareCallQuickFilter;
 window.handleCareCallFilterChange = handleCareCallFilterChange;
 window.toggleCareCallPatientAccordion = toggleCareCallPatientAccordion;
 window.toggleCareCallOperationMode = toggleCareCallOperationMode;
+window.playCareCallRecordingAudio = playCareCallRecordingAudio;
+window.startCareCallRecordingMonitor = startCareCallRecordingMonitor;
 
 // =========================================================================
 // AI 간병통화 환자별 3차 발신 시간 & 2분 전 사전 안내문자 제어 모듈

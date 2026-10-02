@@ -66,24 +66,40 @@ module.exports = async function handler(req, res) {
               fs.writeFileSync(targetPath, buf);
               console.log(`[Twilio Recording Saved] 로컬 저장 성공: ${targetPath} (${buf.length} bytes)`);
 
-              // 로그 기록
-              let logs = [];
-              if (fs.existsSync(LOG_FILE)) {
-                try { logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8')); } catch (_) {}
-              }
-              logs.push({
+              // 로그 객체 생성
+              const recItem = {
                 id: 'REC_' + Date.now(),
                 filename: targetFilename,
-                fileSize: buf.length,
+                fileSize: buf ? buf.length : 0,
                 duration: recordingDuration,
                 patientName,
                 caregiverPhone,
                 workDate: cleanWorkDate,
                 createdDate: cleanCreateDate,
                 savedAt: new Date().toISOString(),
-                recordingUrl: audioDownloadUrl
-              });
-              fs.writeFileSync(LOG_FILE, JSON.stringify(logs.slice(-200), null, 2), 'utf8');
+                recordingUrl: audioDownloadUrl,
+                downloadUrl: `/api/carecall/recording-proxy?url=${encodeURIComponent(audioDownloadUrl)}&filename=${encodeURIComponent(targetFilename)}`
+              };
+
+              // 글로벌 메모리 저장
+              global.__CARECALL_RECORDINGS__ = global.__CARECALL_RECORDINGS__ || [];
+              global.__CARECALL_RECORDINGS__.unshift(recItem);
+
+              // 로그 파일 기록 (/tmp 및 로컬)
+              const candidateLogFiles = [
+                path.join('/tmp', 'carecall_recordings_log.json'),
+                LOG_FILE
+              ];
+              for (const targetLogFile of candidateLogFiles) {
+                try {
+                  let logs = [];
+                  if (fs.existsSync(targetLogFile)) {
+                    try { logs = JSON.parse(fs.readFileSync(targetLogFile, 'utf8')); } catch (_) {}
+                  }
+                  logs.unshift(recItem);
+                  fs.writeFileSync(targetLogFile, JSON.stringify(logs.slice(-200), null, 2), 'utf8');
+                } catch (_) {}
+              }
             } catch (saveErr) {
               console.warn('[Twilio Recording Save Error]', saveErr.message);
             }

@@ -40,11 +40,24 @@ module.exports = async function handler(req, res) {
 
   // GET: List recent saved recordings
   if (req.method === 'GET') {
-    let logs = [];
-    if (fs.existsSync(LOG_FILE)) {
-      try {
-        logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
-      } catch (_) {}
+    let logs = Array.isArray(global.__CARECALL_RECORDINGS__) ? [...global.__CARECALL_RECORDINGS__] : [];
+    const candidateLogFiles = [
+      LOG_FILE,
+      path.join('/tmp', 'carecall_recordings_log.json')
+    ];
+    for (const lf of candidateLogFiles) {
+      if (fs.existsSync(lf)) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(lf, 'utf8'));
+          if (Array.isArray(parsed)) {
+            parsed.forEach(item => {
+              if (!logs.some(l => l.filename === item.filename || (l.recordingSid && l.recordingSid === item.recordingSid))) {
+                logs.push(item);
+              }
+            });
+          }
+        } catch (_) {}
+      }
     }
 
     // Also scan physical files in LOCAL_RECORDINGS_DIR
