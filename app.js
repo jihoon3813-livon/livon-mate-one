@@ -39453,15 +39453,41 @@ function renderCareCallTargets() {
           <div id="careCallActions-${t.patientName}" class="flex flex-col items-center justify-center gap-1.5 min-w-[130px] whitespace-nowrap">
             ${t.operationMode === 'APP' ? `
               <span class="text-slate-400 text-xs font-medium">앱 직접 작성 대상</span>
-            ` : `
-              <button type="button" 
-                onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${t.careDays[t.careDays.length - 1]?.date || t.careEndDate}', '${t.workTime}', '${t.id}', '${t.insuranceCompany}')"
-                class="w-full px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center justify-center gap-1 transition-all cursor-pointer"
-                title="간병사(${maskedCaregiver}) 휴대전화(${maskedPhone})로 오늘 일자 AI 간병통화 즉시 발신">
-                <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
-                <span>즉시 발신</span>
-              </button>
-            `}
+            ` : (() => {
+              if (t.hasMissingPast && t.missingPastDates && t.missingPastDates.length > 0) {
+                const targetMissingDate = t.missingPastDates[t.missingPastDates.length - 1];
+                return `
+                  <button type="button" 
+                    onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${targetMissingDate}', '${t.workTime}', '${t.id}', '${t.insuranceCompany}')"
+                    class="w-full px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center justify-center gap-1 transition-all cursor-pointer"
+                    title="${targetMissingDate} 누락된 간병일지 작성을 위한 AI 간병통화 발신">
+                    <i data-lucide="phone-outgoing" class="w-3.5 h-3.5"></i>
+                    <span>⚠️ ${targetMissingDate.slice(5)} 누락 발신</span>
+                  </button>
+                `;
+              }
+              const todayRow = t.careDays.find(d => d.isToday);
+              if (todayRow) {
+                return `
+                  <button type="button" 
+                    onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${todayRow.date}', '${t.workTime}', '${t.id}', '${t.insuranceCompany}')"
+                    class="w-full px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center justify-center gap-1 transition-all cursor-pointer"
+                    title="${todayRow.date} 오늘 일자 AI 간병통화 발신">
+                    <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
+                    <span>📞 ${todayRow.date.slice(5)} 오늘 발신</span>
+                  </button>
+                `;
+              }
+              return `
+                <button type="button" 
+                  onclick="toggleCareCallPatientAccordion('${t.id}')"
+                  class="w-full px-2 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-800 border border-emerald-200 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs"
+                  title="세부 일자별 작성 현황 및 발신 버튼 열기">
+                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+                  <span>일자별 발신 목록</span>
+                </button>
+              `;
+            })()}
 
             <!-- 환자별 발신 시간 설정 뱃지 버튼 -->
             <button type="button" 
@@ -39858,10 +39884,14 @@ function handleModalVoiceChange(voiceId) {
     window.CareCallClient.setVoice(voiceId);
   }
   updateModalVoiceLabel(voiceId);
+  const vObj = window.CareCallClient?.voices?.find(item => item.id === voiceId);
+  const vName = vObj ? vObj.name : voiceId;
   const statusTxt = document.getElementById('previewAudioStatusText');
   if (statusTxt) {
-    statusTxt.innerText = `선택된 음성 [${voiceId}] - 재생 버튼을 누르시면 이 목소리로 질문이 나옵니다.`;
+    statusTxt.innerText = `🔊 [${vName}] 목소리로 전환되었습니다. 질문 낭독을 시작합니다...`;
   }
+  // 목소리 선택 즉시 해당 목소리로 1번 또는 현재 질문 재생 시작!
+  playCareCallQuestions(gCareCallPreviewIndex >= 0 ? gCareCallPreviewIndex : 0);
 }
 
 async function handleSaveCareCallVoiceFromModal() {
@@ -39886,7 +39916,7 @@ async function handleSaveCareCallVoiceFromModal() {
 
   const vObj = window.CareCallClient?.voices?.find(item => item.id === voice);
   const voiceTitle = vObj ? vObj.name : voice;
-  alert(`📞 [AI 발신 목소리 저장 완료]\n\n• 저장된 목소리: ${voiceTitle}\n• 발화 속도: ${speed}x\n\n이제 메이트원에서 [즉시 발신]을 누르시거나 자동 스케줄 발신 시, 선택하신 [${voiceTitle}] 목소리로 간병사에게 전화가 걸려옵니다.`);
+  alert(`📞 [AI 발신 목소리 저장 완료]\n\n• 저장된 목소리: ${voiceTitle}\n• 발화 속도: ${speed}x\n\n이제 간병사에게 전화가 발신될 때, 선택하신 [${voiceTitle}] 목소리로 자연스럽게 안내 질문이 재생됩니다.`);
 }
 
 function handlePlayCareCallQuestionPreview() {
@@ -39934,10 +39964,10 @@ function updateCareCallQuestionUI(activeIndex) {
     const el = document.getElementById(q.id);
     if (!el) return;
     if (idx === activeIndex) {
-      el.className = 'p-3.5 rounded-2xl border-2 border-purple-500 bg-purple-50/90 shadow-sm transition-all transform scale-[1.01]';
+      el.className = 'p-3.5 rounded-2xl border-2 border-purple-500 bg-purple-50/90 shadow-sm transition-all transform scale-[1.01] cursor-pointer';
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } else {
-      el.className = 'p-3 rounded-2xl border border-slate-200 bg-white opacity-80 hover:opacity-100 transition-all';
+      el.className = 'p-3 rounded-2xl border border-slate-200 bg-white opacity-80 hover:opacity-100 hover:border-purple-300 transition-all cursor-pointer';
     }
   });
 
@@ -39950,7 +39980,7 @@ function updateCareCallQuestionUI(activeIndex) {
     if (ping) ping.classList.remove('hidden');
     if (dot) dot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-600';
     if (statusTxt && activeIndex >= 0 && activeIndex < CARECALL_PREVIEW_QUESTIONS.length) {
-      statusTxt.innerText = `🔊 [${CARECALL_PREVIEW_QUESTIONS[activeIndex].label}] 낭독 중...`;
+      statusTxt.innerText = `🔊 [${CARECALL_PREVIEW_QUESTIONS[activeIndex].label}] 낭독 중... (카드를 클릭하면 바로 들을 수 있습니다)`;
     }
     if (playTxt) playTxt.innerText = '다시 듣기';
   } else if (gCareCallPreviewIsPaused) {
@@ -39960,7 +39990,7 @@ function updateCareCallQuestionUI(activeIndex) {
   } else {
     if (ping) ping.classList.add('hidden');
     if (dot) dot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-slate-300';
-    if (statusTxt) statusTxt.innerText = '⏹ 재생 종료 (다시 듣기를 누르면 재생됩니다)';
+    if (statusTxt) statusTxt.innerText = '⏹ 재생 종료 (카드를 누르거나 [처음부터 듣기]를 누르세요)';
     if (playTxt) playTxt.innerText = '처음부터 듣기';
   }
 }
@@ -39975,95 +40005,61 @@ function playCareCallQuestions(startIndex = 0) {
   gCareCallPreviewIsPlaying = true;
   gCareCallPreviewIsPaused = false;
 
-  // 1. Marin 음성일 경우: 고음질 Realtime 실제 오디오 우선 재생
-  if (selectedVoice === 'marin') {
-    try {
-      const audio = new Audio('/audio/preview_marin.wav');
-      audio.playbackRate = gCareCallPreviewSpeed || 1.0;
-      gCareCallPreviewAudioObj = audio;
-
-      // 시간별 질문 카드 하이라이트 동기화
-      audio.ontimeupdate = () => {
-        if (!gCareCallPreviewIsPlaying) return;
-        const cur = audio.currentTime;
-        let cardIdx = 0;
-        if (cur < 4.0) cardIdx = 0;       // 도입
-        else if (cur < 8.5) cardIdx = 1;  // 질문 1
-        else if (cur < 13.0) cardIdx = 2; // 질문 2
-        else if (cur < 17.5) cardIdx = 3; // 질문 3
-        else if (cur < 22.0) cardIdx = 4; // 질문 4
-        else cardIdx = 5;                 // 마무리
-
-        if (cardIdx !== gCareCallPreviewIndex) {
-          gCareCallPreviewIndex = cardIdx;
-          updateCareCallQuestionUI(cardIdx);
-        }
-      };
-
-      audio.onended = () => {
-        stopCareCallQuestions();
-      };
-
-      audio.onerror = () => {
-        console.warn('[CareCall Preview Audio File Fallback to TTS API]');
-        playQuestionsViaTTS(startIndex, selectedVoice);
-      };
-
-      updateCareCallQuestionUI(0);
-      audio.play().catch(() => playQuestionsViaTTS(startIndex, selectedVoice));
-      return;
-    } catch (_) {
-      playQuestionsViaTTS(startIndex, selectedVoice);
-      return;
-    }
-  }
-
-  // 2. 다른 음성일 경우: TTS API 또는 Web Speech로 재생
-  playQuestionsViaTTS(startIndex, selectedVoice);
-}
-
-function playQuestionsViaTTS(startIndex, selectedVoice) {
-  const speakNext = () => {
+  const playCardAudio = (idx) => {
     if (!gCareCallPreviewIsPlaying || gCareCallPreviewIsPaused) return;
-    if (gCareCallPreviewIndex >= CARECALL_PREVIEW_QUESTIONS.length) {
+    if (idx >= CARECALL_PREVIEW_QUESTIONS.length) {
       stopCareCallQuestions();
+      const statusTxt = document.getElementById('previewAudioStatusText');
+      if (statusTxt) statusTxt.innerText = '✅ 모든 질문 안내가 완료되었습니다.';
       return;
     }
 
-    const item = CARECALL_PREVIEW_QUESTIONS[gCareCallPreviewIndex];
-    updateCareCallQuestionUI(gCareCallPreviewIndex);
+    gCareCallPreviewIndex = idx;
+    updateCareCallQuestionUI(idx);
 
-    // TTS API 시도
+    const item = CARECALL_PREVIEW_QUESTIONS[idx];
+    const speed = gCareCallPreviewSpeed || 1.0;
+
+    let audioUrl = '';
+    if (selectedVoice === 'marin') {
+      audioUrl = `/audio/marin_q${idx}.wav?v=20261002_1800`;
+    } else {
+      audioUrl = `/api/carecall/tts?voice=${encodeURIComponent(selectedVoice)}&index=${idx}&speed=${speed}&text=${encodeURIComponent(item.text)}`;
+    }
+
     try {
-      const ttsUrl = `/api/carecall/tts?voice=${encodeURIComponent(selectedVoice)}&speed=${gCareCallPreviewSpeed || 1.0}&text=${encodeURIComponent(item.text)}`;
-      const audio = new Audio(ttsUrl);
+      const audio = new Audio(audioUrl);
+      audio.playbackRate = speed;
       gCareCallPreviewAudioObj = audio;
+
       audio.onended = () => {
         if (!gCareCallPreviewIsPlaying || gCareCallPreviewIsPaused) return;
-        gCareCallPreviewIndex++;
-        gCareCallPreviewTimer = setTimeout(speakNext, 450);
+        gCareCallPreviewTimer = setTimeout(() => {
+          playCardAudio(idx + 1);
+        }, 450);
       };
-      audio.onerror = () => {
+
+      audio.onerror = (e) => {
+        console.warn(`[Audio Play Error on Card ${idx}, voice: ${selectedVoice}]`, e);
         speakViaWebSpeech(item.text, selectedVoice, () => {
-          gCareCallPreviewIndex++;
-          gCareCallPreviewTimer = setTimeout(speakNext, 450);
+          if (!gCareCallPreviewIsPlaying || gCareCallPreviewIsPaused) return;
+          gCareCallPreviewTimer = setTimeout(() => playCardAudio(idx + 1), 450);
         });
       };
-      audio.play().catch(() => {
+
+      audio.play().catch((err) => {
+        console.warn('[Audio Play Promise Rejected]', err);
         speakViaWebSpeech(item.text, selectedVoice, () => {
-          gCareCallPreviewIndex++;
-          gCareCallPreviewTimer = setTimeout(speakNext, 450);
+          if (!gCareCallPreviewIsPlaying || gCareCallPreviewIsPaused) return;
+          gCareCallPreviewTimer = setTimeout(() => playCardAudio(idx + 1), 450);
         });
       });
-    } catch (_) {
-      speakViaWebSpeech(item.text, selectedVoice, () => {
-        gCareCallPreviewIndex++;
-        gCareCallPreviewTimer = setTimeout(speakNext, 450);
-      });
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  speakNext();
+  playCardAudio(startIndex);
 }
 
 function speakViaWebSpeech(text, voiceId, onEndCallback) {

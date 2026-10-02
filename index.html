@@ -9235,10 +9235,15 @@
       <!-- Question Cards List -->
       <div class="space-y-2.5 overflow-y-auto custom-scrollbar flex-1 pr-1 text-xs">
         <!-- Intro -->
-        <div id="qCard-intro" class="p-3 rounded-2xl border border-slate-200 bg-white transition-all">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 font-bold text-[10px]">도입 인사</span>
-            <span class="font-bold text-slate-800">간병사 및 환자 호명 & 목적 안내</span>
+        <div id="qCard-intro" onclick="playCareCallQuestions(0)" class="p-3 rounded-2xl border border-slate-200 bg-white hover:border-purple-300 hover:shadow-xs transition-all cursor-pointer group">
+          <div class="flex items-center justify-between mb-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 font-bold text-[10px]">도입 인사</span>
+              <span class="font-bold text-slate-800">간병사 및 환자 호명 & 목적 안내</span>
+            </div>
+            <span class="text-[10px] text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 font-bold">
+              <i data-lucide="play" class="w-3 h-3"></i> 클릭 시 이 문항 듣기
+            </span>
           </div>
           <p class="text-slate-600 leading-relaxed pl-1">
             "안녕하세요, 리본케어 AI 간병일지 도우미입니다. 간병사님, 환자님의 오늘 간병일지 작성을 위해 확인 질문을 드리겠습니다."
@@ -9246,10 +9251,15 @@
         </div>
 
         <!-- Question 1 -->
-        <div id="qCard-1" class="p-3 rounded-2xl border border-slate-200 bg-white transition-all">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">질문 1</span>
-            <span class="font-bold text-slate-800">환자 전반 컨디션 및 식사 섭취</span>
+        <div id="qCard-1" onclick="playCareCallQuestions(1)" class="p-3 rounded-2xl border border-slate-200 bg-white hover:border-purple-300 hover:shadow-xs transition-all cursor-pointer group">
+          <div class="flex items-center justify-between mb-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">질문 1</span>
+              <span class="font-bold text-slate-800">환자 전반 컨디션 및 식사 섭취</span>
+            </div>
+            <span class="text-[10px] text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 font-bold">
+              <i data-lucide="play" class="w-3 h-3"></i> 클릭 시 이 문항 듣기
+            </span>
           </div>
           <p class="text-slate-700 font-medium leading-relaxed pl-1">
             "첫째, 오늘 환자분의 전반적인 컨디션과 식사는 어떠셨나요?"
@@ -9257,10 +9267,15 @@
         </div>
 
         <!-- Question 2 -->
-        <div id="qCard-2" class="p-3 rounded-2xl border border-slate-200 bg-white transition-all">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-bold text-[10px]">질문 2</span>
-            <span class="font-bold text-slate-800">대소변 배변 활동 및 투약 특이사항</span>
+        <div id="qCard-2" onclick="playCareCallQuestions(2)" class="p-3 rounded-2xl border border-slate-200 bg-white hover:border-purple-300 hover:shadow-xs transition-all cursor-pointer group">
+          <div class="flex items-center justify-between mb-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-bold text-[10px]">질문 2</span>
+              <span class="font-bold text-slate-800">대소변 배변 활동 및 투약 특이사항</span>
+            </div>
+            <span class="text-[10px] text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 font-bold">
+              <i data-lucide="play" class="w-3 h-3"></i> 클릭 시 이 문항 듣기
+            </span>
           </div>
           <p class="text-slate-700 font-medium leading-relaxed pl-1">
             "둘째, 소변과 대변, 배변 활동이나 투약에 특이사항은 없으셨나요?"
@@ -9268,10 +9283,15 @@
         </div>
 
         <!-- Question 3 -->
-        <div id="qCard-3" class="p-3 rounded-2xl border border-slate-200 bg-white transition-all">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[10px]">질문 3</span>
-            <span class="font-bold text-slate-800">거동 상태 및 침상 체위 변경</span>
+        <div id="qCard-3" onclick="playCareCallQuestions(3)" class="p-3 rounded-2xl border border-slate-200 bg-white hover:border-purple-300 hover:shadow-xs transition-all cursor-pointer group">
+          <div class="flex items-center justify-between mb-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[10px]">질문 3</span>
+              <span class="font-bold text-slate-800">거동 상태 및 침상 체위 변경</span>
+            </div>
+            <span class="text-[10px] text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 font-bold">
+              <i data-lucide="play" class="w-3 h-3"></i> 클릭 시 이 문항 듣기
+            </span>
           </div>
           <p class="text-slate-700 font-medium leading-relaxed pl-1">
             "셋째, 거동이나 침상 체위 변경 시 평소와 다른 점은 없으셨나요?"
@@ -9279,10 +9299,15 @@
         </div>
 
         <!-- Question 4 -->
-        <div id="qCard-4" class="p-3 rounded-2xl border border-slate-200 bg-white transition-all">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 font-bold text-[10px]">질문 4</span>
-            <span class="font-bold text-slate-800">바이탈 측정 수치 (혈압/체온/혈당)</span>
+        <div id="qCard-4" onclick="playCareCallQuestions(4)" class="p-3 rounded-2xl border border-slate-200 bg-white hover:border-purple-300 hover:shadow-xs transition-all cursor-pointer group">
+          <div class="flex items-center justify-between mb-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 font-bold text-[10px]">질문 4</span>
+              <span class="font-bold text-slate-800">바이탈 측정 수치 (혈압/체온/혈당)</span>
+            </div>
+            <span class="text-[10px] text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 font-bold">
+              <i data-lucide="play" class="w-3 h-3"></i> 클릭 시 이 문항 듣기
+            </span>
           </div>
           <p class="text-slate-700 font-medium leading-relaxed pl-1">
             "넷째, 오늘 혈압이나 체온, 혈당 등 따로 측정해 두신 수치가 있으신가요?"
@@ -9290,10 +9315,15 @@
         </div>
 
         <!-- Outro -->
-        <div id="qCard-outro" class="p-3 rounded-2xl border border-slate-200 bg-white transition-all">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px]">마무리 안내</span>
-            <span class="font-bold text-slate-800">음성 녹취 및 자동 일지 생성 시작</span>
+        <div id="qCard-outro" onclick="playCareCallQuestions(5)" class="p-3 rounded-2xl border border-slate-200 bg-white hover:border-purple-300 hover:shadow-xs transition-all cursor-pointer group">
+          <div class="flex items-center justify-between mb-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px]">마무리 안내</span>
+              <span class="font-bold text-slate-800">음성 녹취 및 자동 일지 생성 시작</span>
+            </div>
+            <span class="text-[10px] text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 font-bold">
+              <i data-lucide="play" class="w-3 h-3"></i> 클릭 시 이 문항 듣기
+            </span>
           </div>
           <p class="text-slate-600 leading-relaxed pl-1">
             "위 내용들을 삐 소리 후 편안하게 말씀해 주시면 일지가 자동 작성됩니다. 말씀이 끝나시면 우물정자를 누르시거나 전화를 끊으시면 됩니다."
@@ -12351,13 +12381,13 @@
   <script src="hub_real_data.js?v=20261002_1235"></script>
   <script src="data.js?v=20261002_1235"></script>
   <script src="careport-client.js?v=20260929_1205"></script>
-  <script src="carecall-client.js?v=20261002_1125"></script>
+  <script src="carecall-client.js?v=20261002_1800"></script>
   <script src="samsung-call-report.js?v=20260920_1330"></script>
   <script src="total-call-analysis.js?v=20260921_1005"></script>
   <script src="system-audit-log.js?v=20260922_1040"></script>
   <script src="survey-client.js?v=20261002_1600"></script>
   <script src="./xlsx-populate.min.js"></script>
-  <script src="app.js?v=20261002_1235"></script>
+  <script src="app.js?v=20261002_1800"></script>
   <!-- 🚀 초고속 렌더링 최적화: 대용량 PDF & Excel 라이브러리는 첫 화면 렌더링 이후 비동기 지연 로드 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>

@@ -48,17 +48,40 @@ module.exports = async function handler(req, res) {
 
   const parsedUrl = urlModule.parse(req.url, true);
   const query = { ...(req.query || {}), ...(parsedUrl.query || {}) };
-
   const rawVoice = (query.voice || 'marin').toLowerCase().trim();
 
-  // If real Realtime marin voice is requested, serve genuine gpt-realtime audio file
+  // 1. Determine question card index (0 to 5) if provided or matched by text
+  let qIdx = -1;
+  if (query.index !== undefined && query.index !== '') {
+    const parsedIdx = parseInt(query.index, 10);
+    if (!isNaN(parsedIdx) && parsedIdx >= 0 && parsedIdx <= 5) {
+      qIdx = parsedIdx;
+    }
+  } else if (query.text) {
+    const t = query.text;
+    if (t.includes('첫째') || t.includes('컨디션과 식사')) qIdx = 1;
+    else if (t.includes('둘째') || t.includes('배변')) qIdx = 2;
+    else if (t.includes('셋째') || t.includes('거동이나 침상')) qIdx = 3;
+    else if (t.includes('넷째') || t.includes('혈압이나 체온')) qIdx = 4;
+    else if (t.includes('삐 소리') || t.includes('우물정자')) qIdx = 5;
+    else if (t.includes('간병일지 도우미') || t.includes('확인 질문')) qIdx = 0;
+  }
+
+  // 2. Marin 음성 서빙 (고음질 OpenAI Realtime Marin)
   if (rawVoice === 'marin') {
-    const candidatePaths = [
-      path.join(__dirname, '../../audio/preview_marin.wav'),
-      path.join(process.cwd(), 'audio/preview_marin.wav'),
-      path.join(__dirname, 'preview_marin.wav')
-    ];
-    for (const p of candidatePaths) {
+    let candidateFiles = [];
+    if (qIdx >= 0) {
+      candidateFiles = [
+        path.join(__dirname, `../../audio/marin_q${qIdx}.wav`),
+        path.join(process.cwd(), `audio/marin_q${qIdx}.wav`)
+      ];
+    } else {
+      candidateFiles = [
+        path.join(__dirname, '../../audio/preview_marin.wav'),
+        path.join(process.cwd(), 'audio/preview_marin.wav')
+      ];
+    }
+    for (const p of candidateFiles) {
       if (fs.existsSync(p)) {
         res.writeHead(200, {
           'Content-Type': 'audio/wav',
@@ -72,14 +95,32 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // Map aliases to valid OpenAI TTS voices
+  // 3. 다른 음성 별칭 매핑
   let voice = rawVoice;
-  if (rawVoice === 'marin') voice = 'alloy';
   if (rawVoice === 'ballad') voice = 'echo';
   if (rawVoice === 'verse') voice = 'ash';
-
   if (!VALID_VOICES.includes(voice)) {
     voice = 'alloy';
+  }
+
+  // 4. 사전문항(q0~q5) 사전 생성 캐시 파일 서빙
+  if (qIdx >= 0) {
+    const cacheCandidates = [
+      path.join(__dirname, `../../audio/cache_${voice}_q${qIdx}.mp3`),
+      path.join(process.cwd(), `audio/cache_${voice}_q${qIdx}.mp3`)
+    ];
+    for (const cp of cacheCandidates) {
+      if (fs.existsSync(cp)) {
+        res.writeHead(200, {
+          'Content-Type': 'audio/mpeg',
+          'Cache-Control': 'public, max-age=86400',
+          'X-Selected-Voice': voice
+        });
+        const readStream = fs.createReadStream(cp);
+        readStream.pipe(res);
+        return;
+      }
+    }
   }
 
   const speed = Math.max(0.7, Math.min(1.5, parseFloat(query.speed) || 1.0));

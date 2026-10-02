@@ -30,4 +30,5 @@ scratch/
 recordings/
 carecall_recordings_log.json
 carecall_twilio_config.json
+carecall_dispatch_log.json
 # carecall_*_config.json

@@ -245,7 +245,7 @@ function generateTwiML({ patientName, caregiverName, workDate, workTime, schedul
   const recordActionUrl = `${baseUrl}/api/carecall/twiml-callback?${params}`;
   const effectiveVoice = (voice || 'marin').toLowerCase().trim();
 
-  // 1. 마린(Marin) 음성일 때: OpenAI Realtime 고음질 실제 음원(WAV)을 통화에서 직접 재생 (기계음 완전 제거!)
+  // 1. 마린(Marin) 음성일 때: OpenAI Realtime 고음질 실제 음원(WAV)을 통화에서 직접 재생
   if (effectiveVoice === 'marin') {
     return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -256,12 +256,19 @@ function generateTwiML({ patientName, caregiverName, workDate, workTime, schedul
 </Response>`;
   }
 
-  // 2. 다른 음성일 때: TTS API 스트림 엔드포인트를 Play하여 실시간 OpenAI 음성으로 통화 진행
-  const ttsAudioUrl = `${baseUrl}/api/carecall/tts?voice=${encodeURIComponent(effectiveVoice)}`;
+  // 2. 다른 음성일 때: 해당 선택 음성의 사전 렌더링된 고음질 음원(MP3)을 통화에서 직접 재생
+  const candidateVoices = ['shimmer', 'coral', 'alloy', 'echo', 'ash', 'sage'];
+  let voiceAudioName = effectiveVoice;
+  if (effectiveVoice === 'ballad') voiceAudioName = 'echo';
+  if (effectiveVoice === 'verse') voiceAudioName = 'ash';
+  if (!candidateVoices.includes(voiceAudioName)) voiceAudioName = 'shimmer';
+
+  const questionAudioFile = `${baseUrl}/audio/questions_${voiceAudioName}.mp3`;
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Pause length="1" />
-  <Play>${ttsAudioUrl}</Play>
+  <Play>${questionAudioFile}</Play>
   <Record action="${escapeXml(recordActionUrl)}" maxLength="300" playBeep="true" trim="trim-silence" finishOnKey="#" />
   <Play>${baseUrl}/audio/outro_marin.wav</Play>
 </Response>`;
