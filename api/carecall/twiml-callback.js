@@ -95,10 +95,14 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // TwiML 통화 종료 안내
+  // TwiML 통화 종료 안내 (기계음 Polly 제거 -> 실제 Marin 고음질 음원 재생)
+  const reqHost = req.headers['x-forwarded-host'] || req.headers.host || 'livon-mate-one.vercel.app';
+  const reqProto = req.headers['x-forwarded-proto'] || 'https';
+  const baseUrl = `${reqProto}://${reqHost}`;
+
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say language="ko-KR" voice="Polly.Seoyeon">소중한 간병 내용이 정상 접수되었습니다. 수고 많으셨습니다. 감사합니다.</Say>
+  <Play>${baseUrl}/audio/outro_marin.wav</Play>
   <Hangup />
 </Response>`;
 

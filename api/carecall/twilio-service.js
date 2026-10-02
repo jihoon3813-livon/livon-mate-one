@@ -243,23 +243,27 @@ function generateTwiML({ patientName, caregiverName, workDate, workTime, schedul
   });
 
   const recordActionUrl = `${baseUrl}/api/carecall/twiml-callback?${params}`;
+  const effectiveVoice = (voice || 'marin').toLowerCase().trim();
 
-  const speechText = `안녕하세요, 리본케어 AI 간병일지 도우미입니다. ${caregiverName ? caregiverName + ' 간병사님, ' : ''}${patientName || ''} 환자님의 오늘 간병일지 작성을 위해 확인 질문을 드리겠습니다.
-첫째, 오늘 환자분의 전반적인 컨디션과 식사는 어떠셨나요?
-둘째, 소변과 대변, 배변 활동이나 투약에 특이사항은 없으셨나요?
-셋째, 거동이나 침상 체위 변경 시 평소와 다른 점은 없으셨나요?
-넷째, 오늘 혈압이나 체온, 혈당 등 따로 측정해 두신 수치가 있으신가요?
-위 내용들을 삐 소리 후 편안하게 말씀해 주시면 일지가 자동 작성됩니다. 말씀이 끝나시면 우물정자를 누르시거나 전화를 끊으시면 됩니다.`;
+  // 1. 마린(Marin) 음성일 때: OpenAI Realtime 고음질 실제 음원(WAV)을 통화에서 직접 재생 (기계음 완전 제거!)
+  if (effectiveVoice === 'marin') {
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Pause length="1" />
+  <Play>${baseUrl}/audio/preview_marin.wav</Play>
+  <Record action="${escapeXml(recordActionUrl)}" maxLength="300" playBeep="true" trim="trim-silence" finishOnKey="#" />
+  <Play>${baseUrl}/audio/outro_marin.wav</Play>
+</Response>`;
+  }
 
-  const isMale = ['ash', 'echo', 'onyx'].includes(String(voice || '').toLowerCase());
-  const pollyVoice = isMale ? 'Polly.InJoon' : 'Polly.Seoyeon';
-
+  // 2. 다른 음성일 때: TTS API 스트림 엔드포인트를 Play하여 실시간 OpenAI 음성으로 통화 진행
+  const ttsAudioUrl = `${baseUrl}/api/carecall/tts?voice=${encodeURIComponent(effectiveVoice)}`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Pause length="1" />
-  <Say language="ko-KR" voice="${pollyVoice}">${escapeXml(speechText)}</Say>
+  <Play>${ttsAudioUrl}</Play>
   <Record action="${escapeXml(recordActionUrl)}" maxLength="300" playBeep="true" trim="trim-silence" finishOnKey="#" />
-  <Say language="ko-KR" voice="${pollyVoice}">소중한 간병 내용이 정상 등록되었습니다. 수고 많으셨습니다. 감사합니다.</Say>
+  <Play>${baseUrl}/audio/outro_marin.wav</Play>
 </Response>`;
 }
 
