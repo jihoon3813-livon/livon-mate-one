@@ -39459,10 +39459,10 @@ function renderCareCallTargets() {
                 return `
                   <button type="button" 
                     onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${targetMissingDate}', '${t.workTime}', '${t.id}', '${t.insuranceCompany}')"
-                    class="w-full px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center justify-center gap-1 transition-all cursor-pointer"
+                    class="w-full px-2 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center justify-center gap-1 transition-all cursor-pointer whitespace-nowrap"
                     title="${targetMissingDate} 누락된 간병일지 작성을 위한 AI 간병통화 발신">
-                    <i data-lucide="phone-outgoing" class="w-3.5 h-3.5"></i>
-                    <span>⚠️ ${targetMissingDate.slice(5)} 누락 발신</span>
+                    <span>🚨</span>
+                    <span>${targetMissingDate.slice(5)}(어제 누락) 발신</span>
                   </button>
                 `;
               }
@@ -39471,20 +39471,20 @@ function renderCareCallTargets() {
                 return `
                   <button type="button" 
                     onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${todayRow.date}', '${t.workTime}', '${t.id}', '${t.insuranceCompany}')"
-                    class="w-full px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center justify-center gap-1 transition-all cursor-pointer"
+                    class="w-full px-2 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center justify-center gap-1 transition-all cursor-pointer whitespace-nowrap"
                     title="${todayRow.date} 오늘 일자 AI 간병통화 발신">
-                    <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
-                    <span>📞 ${todayRow.date.slice(5)} 오늘 발신</span>
+                    <span>📞</span>
+                    <span>${todayRow.date.slice(5)}(오늘) 발신</span>
                   </button>
                 `;
               }
               return `
                 <button type="button" 
                   onclick="toggleCareCallPatientAccordion('${t.id}')"
-                  class="w-full px-2 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-800 border border-emerald-200 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs"
+                  class="w-full px-2 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-800 border border-emerald-200 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                   title="세부 일자별 작성 현황 및 발신 버튼 열기">
                   <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
-                  <span>일자별 발신 목록</span>
+                  <span>전 일자 작성완료</span>
                 </button>
               `;
             })()}
@@ -39595,9 +39595,9 @@ function renderCareCallTargets() {
                             ` : `
                               <button type="button" 
                                 onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${day.date}', '${t.workTime}', '${t.id}', '${t.insuranceCompany}')"
-                                class="px-2.5 py-1 rounded-lg ${isAlertDay ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-white hover:bg-purple-50 text-purple-700 border border-purple-300'} font-bold text-[11px] shadow-2xs flex items-center justify-center gap-1 mx-auto transition-all cursor-pointer">
-                                <i data-lucide="phone-outgoing" class="w-3 h-3"></i>
-                                <span>${day.date.slice(5)} 통화 발신</span>
+                                class="px-2.5 py-1 rounded-lg ${isAlertDay ? 'bg-rose-600 hover:bg-rose-700 text-white font-black' : (day.isToday ? 'bg-purple-600 hover:bg-purple-700 text-white font-black' : 'bg-white hover:bg-purple-50 text-purple-700 border border-purple-300 font-bold')} text-[11px] shadow-2xs flex items-center justify-center gap-1 mx-auto transition-all cursor-pointer">
+                                <span>${isAlertDay ? '🚨' : '📞'}</span>
+                                <span>${day.date.slice(5)}${isAlertDay ? '(누락) 발신' : (day.isToday ? '(오늘) 발신' : ' 통화 발신')}</span>
                               </button>
                             `}
                           </td>
