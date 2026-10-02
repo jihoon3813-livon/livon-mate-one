@@ -171,18 +171,22 @@ const INITIAL_FAX_DIRECTORY = [
 
 const INITIAL_FAX_LOGS = [];
 
+const seedData = (typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA) ? window.REBORN_REAL_SEED_DATA : {};
+
 window.REBORN_DATA = {
   faxRecords: {},
-  applications: [],
-  assignments: [],
-  claims: [],
-  payouts: [],
+  applications: Array.isArray(seedData.applications) ? seedData.applications : [],
+  assignments: Array.isArray(seedData.assignments) ? seedData.assignments : [],
+  claims: Array.isArray(seedData.claims) ? seedData.claims : [],
+  payouts: Array.isArray(seedData.payouts) ? seedData.payouts : [],
   admins: INITIAL_ADMINS,
-  partners: INITIAL_PARTNERS,
+  partners: (Array.isArray(seedData.centers) && seedData.centers.length > 0) ? seedData.centers : INITIAL_PARTNERS,
   careLogs: [],
-  adjusters: INITIAL_ADJUSTERS,
+  adjusters: (Array.isArray(seedData.adjusters) && seedData.adjusters.length > 0) ? seedData.adjusters : INITIAL_ADJUSTERS,
+  caregivers: (Array.isArray(seedData.caregivers) && seedData.caregivers.length > 0) ? seedData.caregivers : [],
   samsungEligibleList: [],
   formTemplates: FORM_TEMPLATES,
   faxDirectory: INITIAL_FAX_DIRECTORY,
   faxLogs: []
 };
+

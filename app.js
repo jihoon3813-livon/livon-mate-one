@@ -1050,6 +1050,18 @@ var gSamsungList = [];
 var gSamsungAddressBook = [];
 var gSamsungSenders = [];
 var gSamsungEmailLogs = [];
+var VOICE_LOG_CHANNELS_KEY = 'reborn_voice_log_channels';
+var DEFAULT_VOICE_LOG_CHANNELS = {
+  '현대해상(SCOR)': true,
+  '삼성화재': true,
+  '현대해상': false
+};
+var STORAGE_LAUNCH_CONFIG = 'LIVON_LAUNCH_DATA_CONFIG';
+var MASKING_STORAGE_KEY = 'REBORN_PRIVACY_MASKING_STATE';
+var THEME_STORAGE_KEY = 'REBORN_ACTIVE_THEME';
+var CARD_OPEN_MODE_KEY = 'REBORN_HUB_CARD_OPEN_MODE';
+var APP_ID_PREFIX_KEY = 'reborn_app_id_prefix';
+var APP_ID_SEQ_KEY = 'reborn_app_id_seq';
 try {
   const savedEmailLogs = localStorage.getItem('LIVON_SAMSUNG_EMAIL_LOGS');
   if (savedEmailLogs) {
@@ -1085,20 +1097,19 @@ function isDevEnvironment() {
   const host = window.location.hostname || '';
   const port = window.location.port || '';
 
-  // 1. 공식 운영 도메인(livon-mate-one.vercel.app, vercel 배포 도메인 등)은 항상 PROD(gallant-weasel-360) 무조건 100% 보장
-  const isLocalHost = (host === 'localhost' || host === '127.0.0.1' || host === '' || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:');
-  if (!isLocalHost) {
-    const urlParam = new URLSearchParams(window.location.search).get('env');
-    if (urlParam === 'dev') return true;
-    return false;
-  }
-
-  // 2. 로컬 개발 환경(localhost:8080 등)은 무조건 100% DEV(rapid-raccoon-895) 보장
-  // (로컬스토리지의 과거 잔여값으로 인한 운영 DB 침범 완전 차단, ?env=prod 명시 시에만 예외 허용)
-  const urlParam = new URLSearchParams(window.location.search).get('env');
+  const urlParam = (typeof URLSearchParams !== 'undefined') ? new URLSearchParams(window.location.search).get('env') : null;
+  if (urlParam === 'dev') return true;
   if (urlParam === 'prod') return false;
 
-  return true;
+  const storedEnv = (typeof localStorage !== 'undefined' && localStorage.getItem('LIVON_TARGET_ENV')) || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('LIVON_TARGET_ENV'));
+  if (storedEnv === 'dev') return true;
+  if (storedEnv === 'prod') return false;
+
+  // 로컬 개발 환경(localhost, 127.0.0.1, 개발 포트 등) 및 dev 서브도메인은 DEV(rapid-raccoon-895) 보장
+  const isLocalHost = (host === 'localhost' || host === '127.0.0.1' || host === '' || host.includes('dev') || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:');
+  if (isLocalHost) return true;
+
+  return false;
 }
 
 var IS_DEV_ENV = isDevEnvironment();
@@ -1116,7 +1127,8 @@ function isDevScreen() {
   }
   const urlParam = new URLSearchParams(window.location.search).get('env');
   if (urlParam === 'dev') return true;
-  if (localStorage.getItem('LIVON_TARGET_ENV') === 'dev') return true;
+  if (urlParam === 'prod') return false;
+  if (localStorage.getItem('LIVON_TARGET_ENV') === 'dev' || sessionStorage.getItem('LIVON_TARGET_ENV') === 'dev') return true;
   if (IS_DEV_ENV) return true;
   return false;
 }
@@ -1471,6 +1483,12 @@ async function loadConvexData(showSpinner = true) {
 
   // 1. 서버 인메모리 RAM 캐시 실데이터 요청 함수 (로컬 캐시 부재 시 비상 fallback)
   const fetchLocalRealData = async () => {
+    if (typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0) {
+      return window.REBORN_REAL_SEED_DATA;
+    }
+    if (typeof window !== 'undefined' && window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications) && window.REBORN_DATA.applications.length > 0) {
+      return window.REBORN_DATA;
+    }
     const vParam = '?v=' + Date.now();
     try {
       const r1 = await fetch('/api/hub/real-data' + vParam, {
@@ -36312,11 +36330,20 @@ function exportFaxLogsToCSV() {
 }
 
 function initData() {
-  // 🚨 [보안] 미인증 세션에서는 데이터를 로컬 메모리에 적재하지 않음
-  const token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
+  // 🚨 [보안] 미인증 세션에서는 데이터를 로컬 메모리에 적재하지 않음 (단, 개발 환경 및 복구 세션 허용)
+  let token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
+  const isDev = (typeof isDevEnvironment === 'function' && isDevEnvironment()) || (typeof isDevScreen === 'function' && isDevScreen());
   if (!token && !gCurrentAdmin) {
-    console.warn('[Security Guard] 미인증 세션: initData 실행이 거부되었습니다.');
-    return;
+    if (isDev) {
+      token = 'dev_session_' + Date.now();
+      try {
+        localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
+        sessionStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);
+      } catch (e) {}
+    } else {
+      console.warn('[Security Guard] 미인증 세션: initData 실행이 거부되었습니다.');
+      return;
+    }
   }
 
   // 0. CTI 종합콜분석 로컬/세션 캐시 즉시 동기식 복원 (통합허브 첫 렌더링 시 민원건 최상단 노출 및 화면 깜빡임/순서 점프 원천 차단)
@@ -36444,19 +36471,30 @@ function initData() {
     }
   }
 
-  if (window.REBORN_DATA) {
-    if (!gApps || gApps.length === 0) gApps = [...window.REBORN_DATA.applications];
-    (gApps || []).forEach(a => {
-      if (!a.claimClassification && a.claimCategory) a.claimClassification = a.claimCategory;
-      if (!a.claimCategory && a.claimClassification) a.claimCategory = a.claimClassification;
-      if ((Number(a.estimatedUnpaid) || 0) <= 0 && a.unconfirmedClaimCount > 0) {
-        a.unconfirmedClaimCount = 0;
-      }
-    });
-    if (!gAssigns || gAssigns.length === 0) gAssigns = [...window.REBORN_DATA.assignments];
-    if (!gClaims || gClaims.length === 0) gClaims = [...window.REBORN_DATA.claims];
-    if (!gPayouts || gPayouts.length === 0) gPayouts = [...window.REBORN_DATA.payouts];
-    try {
+  const fallbackSource = (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications) && window.REBORN_DATA.applications.length > 0)
+    ? window.REBORN_DATA
+    : (typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA ? window.REBORN_REAL_SEED_DATA : null);
+
+  if (fallbackSource) {
+    if (!gApps || gApps.length === 0) gApps = [...(fallbackSource.applications || [])];
+    if (!gAssigns || gAssigns.length === 0) gAssigns = [...(fallbackSource.assignments || [])];
+    if (!gClaims || gClaims.length === 0) gClaims = [...(fallbackSource.claims || [])];
+    if (!gPayouts || gPayouts.length === 0) gPayouts = [...(fallbackSource.payouts || [])];
+    if (!gAdjusters || gAdjusters.length === 0) gAdjusters = [...(fallbackSource.adjusters || [])];
+    if (!gCenters || gCenters.length === 0) gCenters = [...(fallbackSource.centers || fallbackSource.partners || [])];
+    if (!gCaregivers || gCaregivers.length === 0) gCaregivers = [...(fallbackSource.caregivers || [])];
+  }
+
+  (gApps || []).forEach(a => {
+    if (!a) return;
+    if (!a.claimClassification && a.claimCategory) a.claimClassification = a.claimCategory;
+    if (!a.claimCategory && a.claimClassification) a.claimCategory = a.claimClassification;
+    if ((Number(a.estimatedUnpaid) || 0) <= 0 && a.unconfirmedClaimCount > 0) {
+      a.unconfirmedClaimCount = 0;
+    }
+  });
+
+  try {
       const savedAdmins = localStorage.getItem('LIVON_ADMINS');
       if (savedAdmins) {
         gAdmins = JSON.parse(savedAdmins);
@@ -36537,7 +36575,6 @@ function initData() {
     } catch (e) {
       gFaxLogs = (window.REBORN_DATA && window.REBORN_DATA.faxLogs) ? [...window.REBORN_DATA.faxLogs] : [];
     }
-  }
 
   loadClaimUnitPriceRules();
 
@@ -37102,7 +37139,7 @@ window.addEventListener('keydown', (e) => {
 // ==========================================
 // 상단 멀티 탭 시스템 (브라우저/IDE 형태 탭)
 // ==========================================
-const APP_TAB_META = {
+var APP_TAB_META = {
   carehub: { name: '통합허브', icon: 'layers', color: 'text-amber-500' },
   // dashboard: { name: '대시보드', icon: 'layout-dashboard', color: 'text-sky-500' }, // 임시 숨김 처리
   carecalendar: { name: '간병캘린더', icon: 'calendar-days', color: 'text-sky-500' },
@@ -37125,7 +37162,7 @@ const APP_TAB_META = {
   settings: { name: '환경설정', icon: 'settings', color: 'text-slate-500' }
 };
 
-let gOpenAppTabs = ['carehub'];
+var gOpenAppTabs = ['carehub'];
 
 function initOpenAppTabs() {
   try {
@@ -39236,7 +39273,7 @@ async function handleSaveCareCallDriveConfig() {
 // Global window exposure
 window.setCareLogViewMode = setCareLogViewMode;
 window.renderCareCallTargets = renderCareCallTargets;
-window.startCareCallWebBrowser = startCareCallWebBrowser;
+if (typeof startCareCallWebBrowser !== 'undefined') window.startCareCallWebBrowser = startCareCallWebBrowser;
 window.triggerOutboundPhoneCall = triggerOutboundPhoneCall;
 window.handleCareCallVoiceChange = handleCareCallVoiceChange;
 window.handleCareCallSpeedChange = handleCareCallSpeedChange;
@@ -43060,7 +43097,7 @@ function executePayoutItem(payoutId) {
   });
 }
 
-const ADMIN_MENU_NAME_MAP = {
+var ADMIN_MENU_NAME_MAP = {
   dashboard: '대시보드',
   carehub: '통합허브',
   carecalendar: '간병캘린더',
@@ -43475,8 +43512,8 @@ function switchModalSubtab(subtabId) {
 // SYSTEM SETTINGS & APP ID SEQUENCE MANAGER
 // =========================================================================
 
-const APP_ID_PREFIX_KEY = 'reborn_app_id_prefix';
-const APP_ID_SEQ_KEY = 'reborn_app_id_seq';
+var APP_ID_PREFIX_KEY = (typeof APP_ID_PREFIX_KEY !== 'undefined') ? APP_ID_PREFIX_KEY : 'reborn_app_id_prefix';
+var APP_ID_SEQ_KEY = (typeof APP_ID_SEQ_KEY !== 'undefined') ? APP_ID_SEQ_KEY : 'reborn_app_id_seq';
 
 function getAppIdSettings() {
   const prefix = localStorage.getItem(APP_ID_PREFIX_KEY) || 'C';
@@ -43519,25 +43556,31 @@ function incrementAppIdSeq() {
   localStorage.setItem(APP_ID_SEQ_KEY, nextVal.toString());
 }
 
-const VOICE_LOG_CHANNELS_KEY = 'reborn_voice_log_channels';
+var VOICE_LOG_CHANNELS_KEY = (typeof VOICE_LOG_CHANNELS_KEY !== 'undefined') ? VOICE_LOG_CHANNELS_KEY : 'reborn_voice_log_channels';
 
 // 원수사별 음성일지 기본 설정: 현대해상(SCOR), 삼성화재는 기본 ON, 일반 현대해상은 기본 OFF
-const DEFAULT_VOICE_LOG_CHANNELS = {
+var DEFAULT_VOICE_LOG_CHANNELS = (typeof DEFAULT_VOICE_LOG_CHANNELS !== 'undefined' && DEFAULT_VOICE_LOG_CHANNELS) ? DEFAULT_VOICE_LOG_CHANNELS : {
   '현대해상(SCOR)': true,
   '삼성화재': true,
   '현대해상': false
 };
 
 function getVoiceLogChannelSettings() {
+  const fallback = (typeof DEFAULT_VOICE_LOG_CHANNELS !== 'undefined' && DEFAULT_VOICE_LOG_CHANNELS) || {
+    '현대해상(SCOR)': true,
+    '삼성화재': true,
+    '현대해상': false
+  };
   try {
-    const saved = localStorage.getItem(VOICE_LOG_CHANNELS_KEY);
+    const key = (typeof VOICE_LOG_CHANNELS_KEY !== 'undefined') ? VOICE_LOG_CHANNELS_KEY : 'reborn_voice_log_channels';
+    const saved = localStorage.getItem(key);
     if (saved) {
-      return { ...DEFAULT_VOICE_LOG_CHANNELS, ...JSON.parse(saved) };
+      return { ...fallback, ...JSON.parse(saved) };
     }
   } catch (e) {
     console.error('Failed to parse voice log channels', e);
   }
-  return { ...DEFAULT_VOICE_LOG_CHANNELS };
+  return { ...fallback };
 }
 
 function isVoiceLogEnabledFor(insuranceCompany) {
@@ -47766,7 +47809,7 @@ function deleteCsRecord(appId, recordId) {
 // =========================================================================
 // HANGUL CHOSUNG (초성/자음) SEARCH ENGINE
 // =========================================================================
-const HANGUL_CHOSUNG_LIST = [
+var HANGUL_CHOSUNG_LIST = [
   'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 
   'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
 ];
@@ -48125,8 +48168,8 @@ function populateCombinedDateTime(baseId, fullString) {
 // =========================================================================
 // THEME & PRIVACY MASKING PERSISTENCE CONTROLLERS
 // =========================================================================
-const MASKING_STORAGE_KEY = 'REBORN_PRIVACY_MASKING_STATE';
-const THEME_STORAGE_KEY = 'REBORN_ACTIVE_THEME';
+var MASKING_STORAGE_KEY = (typeof MASKING_STORAGE_KEY !== 'undefined') ? MASKING_STORAGE_KEY : 'REBORN_PRIVACY_MASKING_STATE';
+var THEME_STORAGE_KEY = (typeof THEME_STORAGE_KEY !== 'undefined') ? THEME_STORAGE_KEY : 'REBORN_ACTIVE_THEME';
 
 function initThemeAndMasking() {
   // 1. Masking persistence
@@ -48178,7 +48221,7 @@ function setAppTheme(themeName, persist = true) {
 // =========================================================================
 // CARE HUB CARD OPEN MODE & BACKDROP DIM FOCUS ENGINE
 // =========================================================================
-const CARD_OPEN_MODE_KEY = 'REBORN_HUB_CARD_OPEN_MODE';
+var CARD_OPEN_MODE_KEY = (typeof CARD_OPEN_MODE_KEY !== 'undefined') ? CARD_OPEN_MODE_KEY : 'REBORN_HUB_CARD_OPEN_MODE';
 var gHubCardOpenMode = 'POPUP'; // Always POPUP mode as requested
 
 function setHubCardOpenMode(mode) {
@@ -48736,7 +48779,13 @@ async function initAdminSession() {
 
   startInactivityMonitoring();
   if (typeof initSamsungDriveAutoSync === 'function') {
-    initSamsungDriveAutoSync();
+    setTimeout(() => {
+      try {
+        initSamsungDriveAutoSync();
+      } catch (e) {
+        console.warn('Samsung drive auto-sync deferred start failed:', e);
+      }
+    }, 3000);
   }
 
   return !!validSessionAdmin;
@@ -51989,7 +52038,7 @@ function openCalendarDayEventsModal(dateStr, eventIds) {
 // [전산 런칭] 현대해상 · 삼성화재 실데이터 관리대장(엑셀 / 구글시트) 연동 및 통합허브 반영 엔진
 // =============================================================================
 
-const STORAGE_LAUNCH_CONFIG = 'LIVON_LAUNCH_DATA_CONFIG';
+var STORAGE_LAUNCH_CONFIG = (typeof STORAGE_LAUNCH_CONFIG !== 'undefined') ? STORAGE_LAUNCH_CONFIG : 'LIVON_LAUNCH_DATA_CONFIG';
 let gLaunchParsedData = {
   hyundai: null,
   samsung: null

@@ -388,6 +388,8 @@ function saveConfirmedAlertsData(newData) {
   return result;
 }
 
+let gIsSamsungSyncing = false;
+
 function startServer(port) {
   const server = http.createServer(async (req, res) => {
     const parsedUrl = urlModule.parse(req.url, true);
@@ -408,6 +410,7 @@ function startServer(port) {
     // API Route: Live Hospital Search (네이버/카카오 실시간 전국 병원 검색 프록시)
     // =========================================================================
     if (reqPath === '/api/search-hospital') {
+
       const query = parsedUrl.query.q || parsedUrl.query.query || '';
       try {
         const list = await fetchOnlineHospitals(query);
@@ -452,23 +455,47 @@ function startServer(port) {
       try {
         const cfg = getSamsungDriveConfig();
         const latest = findLatestSamsungFile(cfg.folderPath);
-        let records = [];
-        let filename = '';
+        const latestJsonPath = path.join(BASE_DIR, 'samsung_drive_latest.json');
 
-        if (latest && fs.existsSync(latest.fullPath)) {
-          console.log(`[SamsungDrive Server] 최신 파일 [${latest.filename}] 복호화 시작...`);
-          records = await decryptAndParseSamsungExcel(latest.fullPath, cfg.password || '202609');
-          filename = latest.filename;
-        } else {
-          // 로컬 경로 파일이 없을 경우 저장된 최신 JSON 파일 로드
-          const latestJsonPath = path.join(BASE_DIR, 'samsung_drive_latest.json');
+        // 1. 이미 동일한 파일이 복호화 완료되어 있으면 재복호화 없이 즉시 고속 응답 (서버 CPU/메모리 부하 및 OOM 완전 차단)
+        if (latest && cfg.lastSyncedFile === latest.filename && fs.existsSync(latestJsonPath)) {
+          const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(raw));
+        }
+
+        // 2. 동시 복호화 경쟁(Race Condition) 방지 락
+        if (gIsSamsungSyncing) {
           if (fs.existsSync(latestJsonPath)) {
             const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify(raw));
           }
-          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-          return res.end(JSON.stringify({ success: false, error: '구글 드라이브 폴더에서 최신 파일을 찾을 수 없습니다.' }));
+          res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: '동기화가 현재 진행 중입니다.' }));
+        }
+
+        gIsSamsungSyncing = true;
+        let records = [];
+        let filename = '';
+
+        try {
+          if (latest && fs.existsSync(latest.fullPath)) {
+            console.log(`[SamsungDrive Server] 최신 파일 [${latest.filename}] 복호화 시작...`);
+            records = await decryptAndParseSamsungExcel(latest.fullPath, cfg.password || '202609');
+            filename = latest.filename;
+          } else {
+            // 로컬 경로 파일이 없을 경우 저장된 최신 JSON 파일 로드
+            if (fs.existsSync(latestJsonPath)) {
+              const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
+              res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+              return res.end(JSON.stringify(raw));
+            }
+            res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '구글 드라이브 폴더에서 최신 파일을 찾을 수 없습니다.' }));
+          }
+        } finally {
+          gIsSamsungSyncing = false;
         }
 
         const syncedAt = new Date().toLocaleString('ko-KR', { hour12: false });
