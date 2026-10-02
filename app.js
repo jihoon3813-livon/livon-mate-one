@@ -6379,11 +6379,75 @@ function enrichHubSamsungCustomersFromSamsungExcel(extraSamsungRecords = null) {
 window.enrichHubSamsungCustomersFromSamsungExcel = enrichHubSamsungCustomersFromSamsungExcel;
 
 /**
+ * 삼성화재 증권번호 취소 및 미해당/취소 상태 여부 판별
+ */
+function isSamsungCustomerCancelled(appOrRow) {
+  if (!appOrRow) return false;
+  const pol = String(appOrRow.policyNumber || '').trim();
+  const stat = String(appOrRow.status || '').trim();
+  return pol.includes('취소') || stat.includes('취소') || stat === '미해당' || stat.includes('미해당') || stat === '당일서비스취소';
+}
+window.isSamsungCustomerCancelled = isSamsungCustomerCancelled;
+
+/**
+ * 웹에서 삭제된 행 추적 (영구 유지)
+ */
+function getSamsungDeletedRowIds() {
+  try {
+    const raw = localStorage.getItem('LIVON_SAMSUNG_DELETED_ROW_IDS');
+    if (raw) return new Set(JSON.parse(raw));
+  } catch (e) {}
+  return new Set();
+}
+window.getSamsungDeletedRowIds = getSamsungDeletedRowIds;
+
+function recordSamsungDeletedRow(row) {
+  if (!row) return;
+  const set = getSamsungDeletedRowIds();
+  const keys = [row.appId, row.patientId, row.id, row.patientName].filter(Boolean);
+  keys.forEach(k => set.add(String(k).trim()));
+  if (row.policyNumber && String(row.policyNumber).length > 5) {
+    set.add(String(row.policyNumber).trim().slice(-8));
+  }
+  try {
+    localStorage.setItem('LIVON_SAMSUNG_DELETED_ROW_IDS', JSON.stringify(Array.from(set)));
+  } catch (e) {}
+}
+window.recordSamsungDeletedRow = recordSamsungDeletedRow;
+
+/**
+ * 간병접수일시 등 일자 정렬 비교용 정규화 문자열 (12자리 숫자)
+ */
+function getSamsungSortComparableDate(val) {
+  if (!val) return '000000000000';
+  const digits = String(val).replace(/[^0-9]/g, '');
+  if (digits.length >= 12) return digits.slice(0, 12);
+  if (digits.length === 8) return digits + '0000';
+  return digits.padEnd(12, '0');
+}
+window.getSamsungSortComparableDate = getSamsungSortComparableDate;
+
+var gSamsungActiveSortOption = (typeof localStorage !== 'undefined' ? localStorage.getItem('LIVON_SAMSUNG_SHEET_SORT_OPTION') : null) || 'apply_desc';
+
+function handleSamsungSheetSortOptionChange(val) {
+  gSamsungActiveSortOption = val || 'apply_desc';
+  gSamsungSortCol = null;
+  gSamsungSortDirection = null;
+  try {
+    localStorage.setItem('LIVON_SAMSUNG_SHEET_SORT_OPTION', gSamsungActiveSortOption);
+  } catch (e) {}
+  renderCurrentSamsungSheet();
+}
+window.handleSamsungSheetSortOptionChange = handleSamsungSheetSortOptionChange;
+
+/**
  * 통합허브 고객(app) 객체를 삼성화재 대상자(target) 시트 행 객체로 변환
+ * 피보험자 아이디(patientId)는 신청ID(app.id: C0xxx)를 우선 적용
  */
 function convertHubAppToSamsungTargetRow(app) {
   if (!app) return null;
-  const pId = app.patientId || app.id || '';
+  const appId = String(app.id || '').trim();
+  const pId = appId || String(app.patientId || '').trim();
   const pName = (app.patientName || app.name || '').trim();
   const contact = app.applicantPhone 
     ? `${app.applicantName || '보호자'}(${app.applicantPhone})` 
@@ -6392,8 +6456,8 @@ function convertHubAppToSamsungTargetRow(app) {
   return {
     sheetKey: 'target',
     id: pId,
-    appId: app.id || '',
-    patientId: pId,
+    appId: appId,
+    patientId: pId, // 피보험자ID는 신청ID (C0xxx)
     patientName: pName,
     birthDate: app.birthDate || '',
     gender: app.gender || '',
@@ -6420,6 +6484,7 @@ function convertHubAppToSamsungTargetRow(app) {
     applicantContact: contact,
     status: app.status || '접수',
     insuranceCompany: '삼성화재',
+    importedAt: app.importedAt || (app._creationTime ? new Date(app._creationTime).toISOString() : new Date().toISOString()),
     isRealLaunchData: true
   };
 }
@@ -6427,6 +6492,11 @@ window.convertHubAppToSamsungTargetRow = convertHubAppToSamsungTargetRow;
 
 /**
  * [실시간 동기화 엔진]: 통합허브(gApps)의 최신 삼성화재 고객들을 삼성화재 접수/청구관리 시트(gSamsungSheets)에 즉시 자동 연동
+ * - 증권번호 취소 및 미해당/취소 고객 제외
+ * - 웹에서 삭제한 고객은 재추가하지 않고 보존
+ * - 웹에서 수정한 셀 데이터 영구 보존
+ * - 신규 추가 건은 밑으로 추가로 쭉 붙임
+ * - 피보험자 아이디는 신청ID(C0xxx) 반영
  */
 function syncSamsungTargetSheetWithHubApps(silent = true) {
   if (!Array.isArray(gApps) || gApps.length === 0) return 0;
@@ -6436,8 +6506,19 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
   if (!Array.isArray(gSamsungSheets.target)) gSamsungSheets.target = [];
   if (!Array.isArray(gSamsungSheets.completed)) gSamsungSheets.completed = [];
 
-  const samsungApps = gApps.filter(a => a && (a.insuranceCompany || '').includes('삼성'));
+  // 1. 증권번호에 취소되었거나 취소/미해당 상태인 고객은 제외
+  const samsungApps = gApps.filter(a => a && (a.insuranceCompany || '').includes('삼성') && !isSamsungCustomerCancelled(a));
+
+  // 기존 시트에서도 취소된 행이 있다면 자동 제외/정리
+  const prevTargetCount = gSamsungSheets.target.length;
+  gSamsungSheets.target = gSamsungSheets.target.filter(r => !isSamsungCustomerCancelled(r));
+  gSamsungSheets.completed = gSamsungSheets.completed.filter(r => !isSamsungCustomerCancelled(r));
+  const purgedCount = prevTargetCount - gSamsungSheets.target.length;
+
   if (samsungApps.length === 0) return 0;
+
+  // 2. 웹에서 삭제된 고객 목록 확인 (삭제된 고객은 다시 불러오지 않음)
+  const deletedSet = getSamsungDeletedRowIds();
 
   let addedTargetCount = 0;
   let updatedTargetCount = 0;
@@ -6462,8 +6543,14 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
     const pol = String(app.policyNumber || '').trim();
     const polSuffix = pol.length > 5 ? pol.slice(-8) : '';
 
+    // 웹에서 삭제한 고객은 제외
+    if (deletedSet.has(appId) || (pId && deletedSet.has(pId)) || (pName && deletedSet.has(pName)) || (polSuffix && deletedSet.has(polSuffix))) {
+      return;
+    }
+
     let matchedIdx = -1;
     if (appId && targetMap.has(`aid_${appId}`)) matchedIdx = targetMap.get(`aid_${appId}`);
+    else if (appId && targetMap.has(`pid_${appId}`)) matchedIdx = targetMap.get(`pid_${appId}`);
     else if (pId && targetMap.has(`pid_${pId}`)) matchedIdx = targetMap.get(`pid_${pId}`);
     else if (appId && targetMap.has(`id_${appId}`)) matchedIdx = targetMap.get(`id_${appId}`);
     else if (pId && targetMap.has(`id_${pId}`)) matchedIdx = targetMap.get(`id_${pId}`);
@@ -6471,34 +6558,42 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
     else if (pName && targetMap.has(`name_${pName}`)) matchedIdx = targetMap.get(`name_${pName}`);
 
     if (matchedIdx >= 0) {
-      // 기존 행 업데이트: 통합허브의 최신 실시간 정보 동기화
+      // 기존 행 업데이트: 웹에서 수정한 내용은 유지하고 신청ID 및 최신 정보 동기화
       const existing = gSamsungSheets.target[matchedIdx];
       let changed = false;
-      if (app.id && !existing.appId) {
-        existing.appId = app.id;
+
+      // 피보험자ID는 신청ID(appId)로 항상 최신화
+      if (appId && existing.patientId !== appId) {
+        existing.patientId = appId;
+        existing.appId = appId;
+        existing.id = appId;
         changed = true;
       }
-      if (app.status && existing.status !== app.status) {
+
+      const edited = existing._editedCols || {};
+
+      // 수동 수정하지 않은 필드만 동기화
+      if (!edited.status && app.status && existing.status !== app.status) {
         existing.status = app.status;
         changed = true;
       }
-      if (app.hospitalName && (!existing.hospitalName || existing.hospitalName === '-')) {
+      if (!edited.hospitalName && app.hospitalName && (!existing.hospitalName || existing.hospitalName === '-')) {
         existing.hospitalName = app.hospitalName;
         changed = true;
       }
-      if (app.phone && !existing.phone) {
+      if (!edited.phone && app.phone && !existing.phone) {
         existing.phone = app.phone;
         changed = true;
       }
-      if (app.accidentNumber && (!existing.accidentNumber || existing.accidentNumber === '-')) {
+      if (!edited.accidentNumber && app.accidentNumber && (!existing.accidentNumber || existing.accidentNumber === '-')) {
         existing.accidentNumber = app.accidentNumber;
         changed = true;
       }
-      if (app.careStartDate && (!existing.desiredStartDate || existing.desiredStartDate === '-')) {
+      if (!edited.desiredStartDate && app.careStartDate && (!existing.desiredStartDate || existing.desiredStartDate === '-')) {
         existing.desiredStartDate = app.careStartDate;
         changed = true;
       }
-      if (app.careEndDate && (!existing.expectedEndDate || existing.expectedEndDate === '-')) {
+      if (!edited.expectedEndDate && app.careEndDate && (!existing.expectedEndDate || existing.expectedEndDate === '-')) {
         existing.expectedEndDate = app.careEndDate;
         changed = true;
       }
@@ -6509,24 +6604,23 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
       if (newTargetRow) {
         newTargetRows.push(newTargetRow);
         if (pName) targetMap.set(`name_${pName}`, 99999);
-        if (pId) {
-          targetMap.set(`pid_${pId}`, 99999);
-          targetMap.set(`id_${pId}`, 99999);
-        }
+        if (pId) targetMap.set(`pid_${pId}`, 99999);
         if (appId) {
           targetMap.set(`aid_${appId}`, 99999);
           targetMap.set(`id_${appId}`, 99999);
+          targetMap.set(`pid_${appId}`, 99999);
         }
         addedTargetCount++;
       }
     }
   });
 
+  // 추가된 건은 밑으로 추가로 쭉 붙임
   if (newTargetRows.length > 0) {
-    gSamsungSheets.target = [...newTargetRows, ...gSamsungSheets.target];
+    gSamsungSheets.target = [...gSamsungSheets.target, ...newTargetRows];
   }
 
-  // 완료(completed) 시트에도 완료 건 실시간 동기화
+  // 완료(completed) 시트에도 동일 규칙 동기화
   const completedMap = new Map();
   gSamsungSheets.completed.forEach((row, idx) => {
     if (row.patientName) completedMap.set(`name_${row.patientName.trim()}`, idx);
@@ -6542,17 +6636,24 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
     const pName = (app.patientName || app.name || '').trim();
     const pId = String(app.patientId || '').trim();
     const appId = String(app.id || '').trim();
+    const pol = String(app.policyNumber || '').trim();
+    const polSuffix = pol.length > 5 ? pol.slice(-8) : '';
+
+    if (deletedSet.has(appId) || (pId && deletedSet.has(pId)) || (pName && deletedSet.has(pName)) || (polSuffix && deletedSet.has(polSuffix))) {
+      return;
+    }
 
     const exists = (appId && completedMap.has(`aid_${appId}`)) ||
+                   (appId && completedMap.has(`pid_${appId}`)) ||
                    (pId && completedMap.has(`pid_${pId}`)) ||
                    (pName && completedMap.has(`name_${pName}`));
     if (!exists) {
       const as = (gAssigns || []).find(a => String(a.applyId) === String(app.id));
       newCompletedRows.push({
         sheetKey: 'completed',
-        id: pId || app.id,
-        appId: app.id || '',
-        patientId: pId || app.id,
+        id: appId || pId || app.id,
+        appId: appId || '',
+        patientId: appId || pId || app.id,
         patientName: pName,
         isMatched: as ? 'Y' : 'N',
         assignedRegion: as?.region || app.sido || '경기도',
@@ -6564,7 +6665,8 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
         satisfactionScore: '만족',
         accidentNumber: app.accidentNumber || '-',
         actualCareStartDate: app.careStartDate || app.startDate || '',
-        actualCareEndDate: app.careEndDate || app.endDate || ''
+        actualCareEndDate: app.careEndDate || app.endDate || '',
+        importedAt: app.importedAt || new Date().toISOString()
       });
       if (pName) completedMap.set(`name_${pName}`, 99999);
       if (pId) completedMap.set(`pid_${pId}`, 99999);
@@ -6572,12 +6674,13 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
     }
   });
 
+  // 추가된 완료 건도 밑으로 추가
   if (newCompletedRows.length > 0) {
-    gSamsungSheets.completed = [...newCompletedRows, ...gSamsungSheets.completed];
+    gSamsungSheets.completed = [...gSamsungSheets.completed, ...newCompletedRows];
   }
 
-  if (addedTargetCount > 0 || updatedTargetCount > 0 || newCompletedRows.length > 0) {
-    console.log(`[Samsung Sheet Sync] 통합허브 실시간 연동 완료: 신규 추가 ${addedTargetCount}건, 정보 갱신 ${updatedTargetCount}건 (대상자 총 ${gSamsungSheets.target.length}건, 완료 총 ${gSamsungSheets.completed.length}건)`);
+  if (addedTargetCount > 0 || updatedTargetCount > 0 || purgedCount > 0 || newCompletedRows.length > 0) {
+    console.log(`[Samsung Sheet Sync] 통합허브 실시간 연동: 신규 추가 ${addedTargetCount}건, 정보 갱신 ${updatedTargetCount}건, 취소건 제외 ${purgedCount}건 (대상자 총 ${gSamsungSheets.target.length}건, 완료 총 ${gSamsungSheets.completed.length}건)`);
     updateSamsungSheetBadges();
     try {
       localStorage.setItem('LIVON_SAMSUNG_SHEET_TARGET', JSON.stringify(gSamsungSheets.target));
@@ -6593,7 +6696,7 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
     // Convex Cloud DB 비동기 일괄 동기화
     if (typeof syncToConvex === 'function') {
       syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'target', rows: gSamsungSheets.target, replace: true }).catch(console.warn);
-      if (newCompletedRows.length > 0) {
+      if (newCompletedRows.length > 0 || purgedCount > 0) {
         syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'completed', rows: gSamsungSheets.completed, replace: true }).catch(console.warn);
       }
     }
@@ -6924,7 +7027,7 @@ function renderCurrentSamsungSheet() {
     return Object.values(row).some(val => val && String(val).toLowerCase().includes(query));
   });
 
-  // Apply column sorting
+  // Apply column sorting or default sort mode
   if (gSamsungSortCol && gSamsungSortDirection) {
     filteredRows.sort((a, b) => {
       let valA = a.row[gSamsungSortCol];
@@ -6964,7 +7067,41 @@ function renderCurrentSamsungSheet() {
 
       return gSamsungSortDirection === 'asc' ? res : -res;
     });
+  } else {
+    // 툴바 정렬 옵션 적용 (기본: 간병접수일시 최신순)
+    const sortMode = gSamsungActiveSortOption || 'apply_desc';
+    filteredRows.sort((a, b) => {
+      const rowA = a.row;
+      const rowB = b.row;
+
+      if (sortMode === 'apply_desc' || sortMode === 'apply_asc') {
+        const dateA = getSamsungSortComparableDate(rowA.applyDateTime || rowA.applyDate);
+        const dateB = getSamsungSortComparableDate(rowB.applyDateTime || rowB.applyDate);
+        let cmp = dateB.localeCompare(dateA);
+        if (cmp === 0) {
+          cmp = String(rowB.patientId || rowB.appId || '').localeCompare(String(rowA.patientId || rowA.appId || ''));
+        }
+        return sortMode === 'apply_desc' ? cmp : -cmp;
+      }
+
+      if (sortMode === 'import_desc' || sortMode === 'import_asc') {
+        const impA = String(rowA.importedAt || rowA._creationTime || rowA.appId || rowA.id || '');
+        const impB = String(rowB.importedAt || rowB._creationTime || rowB.appId || rowB.id || '');
+        let cmp = impB.localeCompare(impA);
+        if (cmp === 0) {
+          cmp = String(rowB.patientId || rowB.appId || '').localeCompare(String(rowA.patientId || rowA.appId || ''));
+        }
+        return sortMode === 'import_desc' ? cmp : -cmp;
+      }
+
+      return 0;
+    });
   }
+
+  // 툴바 정렬 드롭다운 선택값 동기화
+  document.querySelectorAll('.samsung-sheet-sort-select, #samsungSheetSortSelect, #samsungSheetSortSelectList').forEach(el => {
+    el.value = gSamsungActiveSortOption || 'apply_desc';
+  });
 
   const rowCountEl = document.getElementById(isClaimHub ? 'samsungClaimHubRowCount' : 'samsungSheetRowCount');
   if (rowCountEl) rowCountEl.innerText = filteredRows.length.toLocaleString();
@@ -7149,7 +7286,9 @@ function renderCurrentSamsungSheet() {
             }
 
             let displayVal = rawVal;
-            if (col.key === 'patientName') {
+            if (col.key === 'patientId') {
+              displayVal = row.appId || rawVal;
+            } else if (col.key === 'patientName') {
               displayVal = maskName(rawVal);
             } else if (col.key === 'phone') {
               displayVal = maskPhone(rawVal);
@@ -7492,12 +7631,19 @@ function saveSamsungSheetPendingChanges() {
   for (const [key, item] of gSamsungPendingChanges.entries()) {
     const { sheetKey, rowIdx, colKey, newVal } = item;
     if (gSamsungSheets[sheetKey] && gSamsungSheets[sheetKey][rowIdx]) {
-      gSamsungSheets[sheetKey][rowIdx][colKey] = newVal;
+      const row = gSamsungSheets[sheetKey][rowIdx];
+      row[colKey] = newVal;
+      row._isManuallyEdited = true;
+      if (!row._editedCols) row._editedCols = {};
+      row._editedCols[colKey] = true;
       affectedSheets.add(sheetKey);
 
       if (sheetKey === 'eligible') {
         if (gSamsungList && gSamsungList[rowIdx]) {
           gSamsungList[rowIdx][colKey] = newVal;
+          gSamsungList[rowIdx]._isManuallyEdited = true;
+          if (!gSamsungList[rowIdx]._editedCols) gSamsungList[rowIdx]._editedCols = {};
+          gSamsungList[rowIdx]._editedCols[colKey] = true;
         }
         modifiedEligibleIndices.add(rowIdx);
       }
@@ -7692,6 +7838,9 @@ function deleteSamsungSpreadsheetSelectedRows(skipConfirm = false) {
 
   const currentRows = gSamsungSheets[gActiveSamsungSheet] || [];
   const toDelete = currentRows.filter((_, idx) => gSamsungSelectedRows.has(idx));
+  if (typeof recordSamsungDeletedRow === 'function') {
+    toDelete.forEach(recordSamsungDeletedRow);
+  }
   gSamsungSheets[gActiveSamsungSheet] = currentRows.filter((_, idx) => !gSamsungSelectedRows.has(idx));
   
   try {

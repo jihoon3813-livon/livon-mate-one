@@ -2090,8 +2090,19 @@
             </div>
           </div>
 
-          <!-- 우측 상단: 보기 개수(20/50/100/200/전체) 및 페이징 컨트롤 -->
+          <!-- 우측 상단: 정렬 기준, 보기 개수 및 페이징 컨트롤 -->
           <div class="flex items-center gap-2.5 shrink-0 ml-auto flex-wrap sm:flex-nowrap">
+            <div class="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl px-2.5 py-1 shadow-2xs text-xs transition-all">
+              <i data-lucide="arrow-up-down" class="w-3.5 h-3.5 text-slate-500"></i>
+              <span class="text-slate-500 text-[11px] font-bold whitespace-nowrap">정렬:</span>
+              <select id="samsungSheetSortSelectList" onchange="handleSamsungSheetSortOptionChange(this.value)" class="text-xs bg-transparent border-0 font-bold text-slate-700 focus:outline-hidden cursor-pointer samsung-sheet-sort-select">
+                <option value="apply_desc" selected>간병접수일시 최신순 (기본)</option>
+                <option value="apply_asc">간병접수일시 과거순</option>
+                <option value="import_desc">불러온 날짜 최신순</option>
+                <option value="import_asc">불러온 날짜 과거순</option>
+              </select>
+            </div>
+
             <div class="flex items-center gap-1.5 text-slate-600 text-[11px]">
               <span class="font-bold">보기:</span>
               <select id="samsungSheetPageSizeSelect" onchange="changeSamsungSheetPageSize(this.value)" 
@@ -2253,6 +2264,17 @@
                 <span>간병일지 첨부</span>
                 <span id="samsungDailyCareLogCountBadge" class="px-1.5 py-0.2 rounded-full bg-purple-200 text-purple-900 text-[10px] font-black">0건</span>
               </button>
+              <!-- 정렬 기준 드롭다운 (간병접수일시 / 불러온 날짜) -->
+              <div class="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl px-2.5 py-1.5 shadow-2xs text-xs transition-all">
+                <i data-lucide="arrow-up-down" class="w-3.5 h-3.5 text-slate-500"></i>
+                <span class="text-slate-500 text-[11px] font-bold whitespace-nowrap">정렬:</span>
+                <select id="samsungSheetSortSelect" onchange="handleSamsungSheetSortOptionChange(this.value)" class="text-xs bg-transparent border-0 font-bold text-slate-700 focus:outline-hidden cursor-pointer samsung-sheet-sort-select">
+                  <option value="apply_desc" selected>간병접수일시 최신순 (기본)</option>
+                  <option value="apply_asc">간병접수일시 과거순</option>
+                  <option value="import_desc">불러온 날짜 최신순</option>
+                  <option value="import_asc">불러온 날짜 과거순</option>
+                </select>
+              </div>
             </div>
 
             <!-- 중앙: 시트 내 검색 -->
