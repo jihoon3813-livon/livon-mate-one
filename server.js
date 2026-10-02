@@ -842,6 +842,63 @@ function saveSavedFaxConfig(cfg) {
     }
 
     // =========================================================================
+    // API Route: AI CareCall Engine (아웃바운드 전화발신, 실시간 세션, 녹음 저장 등)
+    // =========================================================================
+    if (reqPath.startsWith('/api/carecall/')) {
+      const endpoint = reqPath.replace('/api/carecall/', '').split('?')[0];
+      const handlerFile = path.join(BASE_DIR, 'api', 'carecall', `${endpoint}.js`);
+      if (fs.existsSync(handlerFile)) {
+        try { delete require.cache[require.resolve(handlerFile)]; } catch(e) {}
+        const careHandler = require(handlerFile);
+        const parsedUrl = urlModule.parse(req.url, true);
+        req.query = parsedUrl.query;
+        res.status = (code) => ({
+          json: (data) => {
+            res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(data));
+          },
+          end: () => res.end()
+        });
+        res.json = (data) => {
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(data));
+        };
+
+        const executeHandler = () => {
+          try {
+            const result = careHandler(req, res);
+            if (result && typeof result.catch === 'function') {
+              result.catch(err => {
+                console.error(`[CareCall API Error: ${endpoint}]`, err);
+                if (!res.writableEnded) {
+                  res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                  res.end(JSON.stringify({ success: false, error: err.message }));
+                }
+              });
+            }
+          } catch (err) {
+            console.error(`[CareCall API Error: ${endpoint}]`, err);
+            if (!res.writableEnded) {
+              res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+              res.end(JSON.stringify({ success: false, error: err.message }));
+            }
+          }
+        };
+
+        if (req.method === 'POST' || req.method === 'PUT') {
+          let body = '';
+          req.on('data', chunk => body += chunk);
+          req.on('end', () => {
+            try { req.body = JSON.parse(body); } catch(e) { req.body = body; }
+            executeHandler();
+          });
+          return;
+        }
+        return executeHandler();
+      }
+    }
+
+    // =========================================================================
     // API Route: URL Shortening Service (웹보고서 공유용 단축 URL 생성 엔진)
     // =========================================================================
     if (reqPath === '/api/shorten-url') {

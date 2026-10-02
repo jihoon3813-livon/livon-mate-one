@@ -39089,18 +39089,13 @@ function renderCareCallTargets() {
           </span>
         </td>
         <td class="p-3 text-center">
-          <div id="careCallActions-${t.patientName}" class="flex items-center justify-center gap-1.5 flex-wrap">
+          <div id="careCallActions-${t.patientName}" class="flex items-center justify-center">
             <button type="button" 
-              onclick="startCareCallWebBrowser('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${t.workDate}', '${t.workTime}', '${t.id}')"
-              class="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-xs flex items-center gap-1 transition-all cursor-pointer hover:shadow-md"
-              title="브라우저 마이크를 통해 AI 간병 통화 시작 (간병인 문답 녹음 및 .m4a 파일 자동생성)">
-              <i data-lucide="mic" class="w-3.5 h-3.5"></i> AI 통화 시작
-            </button>
-            <button type="button" 
-              onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${t.workDate}', '${t.workTime}', '${t.id}')"
-              class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-purple-50 text-purple-700 font-bold text-xs border border-purple-300 shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
-              title="간병사 전화번호(${t.caregiverPhone})로 전화 발신">
-              <i data-lucide="phone-outgoing" class="w-3.5 h-3.5"></i> 전화 발신
+              onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${t.workDate}', '${t.workTime}', '${t.id}', '${t.insuranceCompany}')"
+              class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              title="간병사(${maskedCaregiver}) 휴대전화(${maskedPhone})로 AI 간병통화 발신">
+              <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
+              <span>전화 발신</span>
             </button>
           </div>
         </td>
@@ -39111,29 +39106,19 @@ function renderCareCallTargets() {
   if (typeof initIcons === 'function') initIcons(tbody);
 }
 
-function startCareCallWebBrowser(patientName, caregiverName, caregiverPhone, workDate, workTime, scheduleId) {
-  if (!window.CareCallClient) {
-    alert('AI 간병통화 모듈(CareCallClient)이 로드되지 않았습니다.');
-    return;
-  }
-  window.CareCallClient.startWebCall({
-    patientName,
-    caregiverName,
-    caregiverPhone,
-    workDate,
-    workTime,
-    scheduleId
-  });
-}
-
-async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPhone, workDate, workTime, scheduleId) {
-  if (!caregiverPhone || caregiverPhone.startsWith('010-0000')) {
-    alert('등록된 간병사 연락처가 올바르지 않습니다.');
+async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPhone, workDate, workTime, scheduleId, insuranceCompany) {
+  if (!caregiverPhone || caregiverPhone === '-' || caregiverPhone.startsWith('010-0000')) {
+    alert(`[${caregiverName || patientName}] 간병사의 유효한 휴대전화번호가 등록되어 있지 않습니다.\n고객 상세정보 또는 배정 정보에서 연락처를 확인해주세요.`);
     return;
   }
 
-  const ok = confirm(`간병사(${caregiverName}, ${caregiverPhone})님께 AI 간병통화를 발신하시겠습니까?\n\n(참고: 외부 전화망 연동 발신 시 통신사 CTI가 호출되며, 브라우저에서 직접 AI와 대화 및 녹취를 테스트하시려면 [AI 통화 시작] 버튼을 누르시면 됩니다.)`);
+  const ok = confirm(`[📞 AI 간병통화 발신]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 발신 전화번호: ${caregiverPhone}\n\n위 간병사 휴대전화로 실제 AI 간병통화를 발신하시겠습니까?\n(통화 연결 시 AI가 질문을 시작하며 녹취가 진행됩니다.)`);
   if (!ok) return;
+
+  const elStatus = document.getElementById(`careCallStatus-${patientName}`);
+  if (elStatus) {
+    elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-bold text-xs"><span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> 전화 발신 중...</span>';
+  }
 
   try {
     const res = await fetch('/api/carecall/make-call', {
@@ -39143,18 +39128,31 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
         patientName,
         caregiverName,
         caregiverPhone,
-        workDate,
-        workTime,
-        scheduleId
+        workDate: workDate || new Date().toISOString().slice(0, 10),
+        workTime: workTime || '24시간',
+        scheduleId: scheduleId || '',
+        insuranceCompany: insuranceCompany || '삼성화재',
+        voice: window.CareCallClient?.selectedVoice || 'alloy',
+        speed: window.CareCallClient?.selectedSpeed || 1.0
       })
     });
+
     const data = await res.json();
     if (data.success) {
-      alert(`간병사(${caregiverName})님께 전화 발신을 요청했습니다. (Call SID: ${data.callSid || 'SUCCESS'})`);
+      if (elStatus) {
+        elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> 통화 대기중</span>';
+      }
+      alert(`📞 [전화 발신 접수 완료]\n\n${caregiverName}(${caregiverPhone}) 님에게 전화 발신을 전송했습니다.\n${data.message || ''}`);
     } else {
-      alert('전화 발신 안내: ' + (data.error || 'CTI 게이트웨이 응답 확인 필요') + '\n\n브라우저 마이크를 통한 [AI 통화 시작] 버튼으로도 동일한 실시간 음성대화, 녹취(.m4a) 생성 및 구글 드라이브 자동 저장이 가능합니다.');
+      if (elStatus) {
+        elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold text-xs">발신 실패</span>';
+      }
+      alert(`전화 발신 실패:\n${data.error || '통화 게이트웨이 응답 확인 필요'}`);
     }
   } catch (e) {
+    if (elStatus) {
+      elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold text-xs">오류</span>';
+    }
     alert('전화 발신 네트워크 오류: ' + e.message);
   }
 }

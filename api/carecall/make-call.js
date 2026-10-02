@@ -1,9 +1,7 @@
 // api/carecall/make-call.js
 // Outbound AI Call Trigger for Caregiver
 
-const { makeOutboundCall } = require('../cti/call');
-const fs = require('fs');
-const path = require('path');
+const { makeOutboundCall } = require('../../cti-client');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -32,7 +30,9 @@ module.exports = async function handler(req, res) {
       caregiverPhone,
       workDate,
       workTime,
-      voice = 'alloy'
+      insuranceCompany = '삼성화재',
+      voice = 'alloy',
+      scheduleId
     } = body;
 
     if (!caregiverPhone) {
@@ -42,17 +42,38 @@ module.exports = async function handler(req, res) {
 
     const cleanPhone = String(caregiverPhone).replace(/[^0-9]/g, '');
 
-    // Return call instruction payload for client & telephony gateway
+    // 1. 발신 번호 결정 (삼성화재/리본케어/현대해상)
+    let callerId = '16007835'; // 리본케어 대표번호
+    if (insuranceCompany && insuranceCompany.includes('현대')) {
+      callerId = '15337436'; // 현대해상 전용번호
+    }
+
+    // 2. 실제 CTI 통화 발신 실행
+    let ctiResult = null;
+    try {
+      ctiResult = await makeOutboundCall({
+        phone: cleanPhone,
+        callerId: callerId,
+        askSn: scheduleId || `CARE_${Date.now()}`,
+        recipientName: `${caregiverName || '간병사'}(${patientName || ''} 간병)`
+      });
+    } catch (ctiErr) {
+      console.warn('[CareCall CTI Call Warning]', ctiErr.message);
+      throw new Error(`CTI 발신 게이트웨이 오류: ${ctiErr.message}`);
+    }
+
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.status(200).json({
       success: true,
-      mode: 'realtime_ai',
-      message: `[${caregiverName || '간병사'}] (${cleanPhone}) 님에게 AI 간병통화 발신 세션이 준비되었습니다.`,
+      mode: 'cti_outbound',
+      message: `[${caregiverName || '간병사'}] (${cleanPhone}) 님에게 CTI 전화 발신이 연결되었습니다.`,
       patientName,
       caregiverName,
       phone: cleanPhone,
+      callerId,
       workDate,
       voice,
+      ctiResult,
       requestedAt: new Date().toISOString()
     });
   } catch (err) {
@@ -61,3 +82,4 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ success: false, error: err.message });
   }
 };
+
