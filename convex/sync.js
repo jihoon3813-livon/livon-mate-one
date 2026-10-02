@@ -32,7 +32,6 @@ export const bundleAll = query({
       careLogs,
       formConfigs,
       faxRecords,
-      samsungEligible,
       samsungSheets,
       samsungAddressBook,
       samsungEmailLogs,
@@ -50,7 +49,6 @@ export const bundleAll = query({
       ctx.db.query("careLogs").collect(),
       ctx.db.query("formConfigs").collect(),
       ctx.db.query("faxRecords").order("desc").collect(),
-      ctx.db.query("samsungEligible").order("desc").take(100),
       ctx.db.query("samsungSheets").collect(),
       ctx.db.query("samsungAddressBook").collect(),
       ctx.db.query("samsungEmailLogs").order("desc").collect(),
@@ -70,7 +68,7 @@ export const bundleAll = query({
       careLogs,
       formConfigs,
       faxRecords,
-      samsungEligible,
+      samsungEligible: [],
       samsungSheets,
       samsungAddressBook,
       samsungEmailLogs,
@@ -480,7 +478,7 @@ export const saveSamsungSheetBatch = mutation({
     if (args.replace) {
       const existingRows = await ctx.db
         .query("samsungSheets")
-        .filter((q) => q.eq(q.field("sheetKey"), args.sheetKey))
+        .withIndex("by_sheetKey", (q) => q.eq("sheetKey", args.sheetKey))
         .collect();
       for (const r of existingRows) {
         await ctx.db.delete(r._id);
