@@ -78,21 +78,35 @@
      * Preview sample voice greeting using OpenAI TTS endpoint with browser fallback
      */
     async previewVoice(voiceId) {
-      const v = (voiceId || this.selectedVoice || 'alloy').toLowerCase();
+      const v = (voiceId || this.selectedVoice || 'marin').toLowerCase();
       const speed = this.selectedSpeed || 1.0;
       const sampleText = "안녕하세요, 리본케어 AI 간병일지 도우미입니다. 오늘 간병하시느라 정말 고생 많으셨습니다.";
 
-      // 1. Try OpenAI TTS API endpoint (Real distinct voices: Alloy, Shimmer, Echo, Ash, Coral, etc.)
-      try {
-        if (window._gCareCallAudioPreview) {
-          window._gCareCallAudioPreview.pause();
-          window._gCareCallAudioPreview.currentTime = 0;
-          window._gCareCallAudioPreview = null;
-        }
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel();
-        }
+      if (window._gCareCallAudioPreview) {
+        window._gCareCallAudioPreview.pause();
+        window._gCareCallAudioPreview.currentTime = 0;
+        window._gCareCallAudioPreview = null;
+      }
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
 
+      // 1. If marin, play real gpt-realtime generated voice audio directly
+      if (v === 'marin') {
+        const audioUrls = ['/public/audio/preview_marin.wav', '/api/carecall/tts?voice=marin'];
+        for (const url of audioUrls) {
+          try {
+            const audio = new Audio(url);
+            window._gCareCallAudioPreview = audio;
+            await audio.play();
+            return;
+          } catch (e) {
+            console.warn('[CareCall] Trying next marin preview URL:', e);
+          }
+        }
+      }
+      // 2. Try OpenAI TTS API endpoint (Real distinct voices: Alloy, Shimmer, Echo, Ash, Coral, etc.)
+      try {
         const audioUrl = `/api/carecall/tts?voice=${encodeURIComponent(v)}&speed=${speed}&text=${encodeURIComponent(sampleText)}`;
         const audio = new Audio(audioUrl);
         window._gCareCallAudioPreview = audio;

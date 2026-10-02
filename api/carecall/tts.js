@@ -49,10 +49,32 @@ module.exports = async function handler(req, res) {
   const parsedUrl = urlModule.parse(req.url, true);
   const query = { ...(req.query || {}), ...(parsedUrl.query || {}) };
 
-  const rawVoice = (query.voice || 'alloy').toLowerCase().trim();
+  const rawVoice = (query.voice || 'marin').toLowerCase().trim();
+
+  // If real Realtime marin voice is requested, serve genuine gpt-realtime audio file
+  if (rawVoice === 'marin') {
+    const candidatePaths = [
+      path.join(__dirname, '../../public/audio/preview_marin.wav'),
+      path.join(process.cwd(), 'public/audio/preview_marin.wav'),
+      path.join(__dirname, 'preview_marin.wav')
+    ];
+    for (const p of candidatePaths) {
+      if (fs.existsSync(p)) {
+        res.writeHead(200, {
+          'Content-Type': 'audio/wav',
+          'Cache-Control': 'public, max-age=86400',
+          'X-Selected-Voice': 'marin-realtime'
+        });
+        const readStream = fs.createReadStream(p);
+        readStream.pipe(res);
+        return;
+      }
+    }
+  }
+
   // Map aliases to valid OpenAI TTS voices
   let voice = rawVoice;
-  if (rawVoice === 'marin') voice = 'nova';
+  if (rawVoice === 'marin') voice = 'alloy';
   if (rawVoice === 'ballad') voice = 'echo';
   if (rawVoice === 'verse') voice = 'ash';
 
