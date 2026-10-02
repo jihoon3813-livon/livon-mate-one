@@ -1842,6 +1842,11 @@ async function loadConvexData(showSpinner = true) {
         }
       }
 
+      // 통합허브(gApps)의 삼성화재 고객들을 실시간으로 대상자 시트에 자동 병합/동기화
+      if (typeof syncSamsungTargetSheetWithHubApps === 'function') {
+        syncSamsungTargetSheetWithHubApps(true);
+      }
+
       updateSamsungSheetBadges();
       if (typeof renderCurrentSamsungSheet === 'function' && (gActiveTab === 'samsungclaimhub' || gActiveTab === 'samsungfire')) {
         renderCurrentSamsungSheet();
@@ -6373,6 +6378,231 @@ function enrichHubSamsungCustomersFromSamsungExcel(extraSamsungRecords = null) {
 }
 window.enrichHubSamsungCustomersFromSamsungExcel = enrichHubSamsungCustomersFromSamsungExcel;
 
+/**
+ * 통합허브 고객(app) 객체를 삼성화재 대상자(target) 시트 행 객체로 변환
+ */
+function convertHubAppToSamsungTargetRow(app) {
+  if (!app) return null;
+  const pId = app.patientId || app.id || '';
+  const pName = (app.patientName || app.name || '').trim();
+  const contact = app.applicantPhone 
+    ? `${app.applicantName || '보호자'}(${app.applicantPhone})` 
+    : (app.applicantContact || app.phone || '');
+
+  return {
+    sheetKey: 'target',
+    id: pId,
+    appId: app.id || '',
+    patientId: pId,
+    patientName: pName,
+    birthDate: app.birthDate || '',
+    gender: app.gender || '',
+    phone: app.phone || '',
+    policyNumber: app.policyNumber || '',
+    productCode: app.productCode || '',
+    productName: app.productName || '무배당 삼성화재 간편보험 마이핏1680(2608.9)',
+    contractStartDate: app.contractStartDate || '',
+    contractEndDate: app.contractEndDate || '',
+    hasInjuryCare: app.hasInjuryCare || 'Y',
+    hasDiseaseCare: app.hasDiseaseCare || 'Y',
+    applyDateTime: app.applyDateTime || app.applyDate || '',
+    applyDate: app.applyDate || app.applyDateTime || '',
+    accidentType: app.accidentType || '질병',
+    accidentDate: app.accidentDate || '',
+    accidentNumber: app.accidentNumber || '',
+    diagnosis: app.diagnosis || app.diseaseName || '',
+    hospitalName: app.hospitalName || '',
+    addressDetail: app.addressDetail || app.hospitalName || '',
+    desiredStartDate: app.desiredStartDate || app.desiredDate || app.careStartDate || app.startDate || '',
+    careStartDate: app.careStartDate || app.desiredStartDate || app.startDate || '',
+    expectedEndDate: app.expectedEndDate || app.careEndDate || app.endDate || '',
+    careEndDate: app.careEndDate || app.expectedEndDate || app.endDate || '',
+    applicantContact: contact,
+    status: app.status || '접수',
+    insuranceCompany: '삼성화재',
+    isRealLaunchData: true
+  };
+}
+window.convertHubAppToSamsungTargetRow = convertHubAppToSamsungTargetRow;
+
+/**
+ * [실시간 동기화 엔진]: 통합허브(gApps)의 최신 삼성화재 고객들을 삼성화재 접수/청구관리 시트(gSamsungSheets)에 즉시 자동 연동
+ */
+function syncSamsungTargetSheetWithHubApps(silent = true) {
+  if (!Array.isArray(gApps) || gApps.length === 0) return 0;
+  if (!gSamsungSheets) {
+    gSamsungSheets = { target: [], completed: [], eligible: [], contacts: [] };
+  }
+  if (!Array.isArray(gSamsungSheets.target)) gSamsungSheets.target = [];
+  if (!Array.isArray(gSamsungSheets.completed)) gSamsungSheets.completed = [];
+
+  const samsungApps = gApps.filter(a => a && (a.insuranceCompany || '').includes('삼성'));
+  if (samsungApps.length === 0) return 0;
+
+  let addedTargetCount = 0;
+  let updatedTargetCount = 0;
+
+  // 기존 대상자(target) 시트 검색 매핑
+  const targetMap = new Map();
+  gSamsungSheets.target.forEach((row, idx) => {
+    if (row.patientName) targetMap.set(`name_${row.patientName.trim()}`, idx);
+    if (row.patientId) targetMap.set(`pid_${String(row.patientId).trim()}`, idx);
+    if (row.id) targetMap.set(`id_${String(row.id).trim()}`, idx);
+    if (row.appId) targetMap.set(`aid_${String(row.appId).trim()}`, idx);
+    if (row.policyNumber && String(row.policyNumber).length > 5) {
+      targetMap.set(`pol_${String(row.policyNumber).trim().slice(-8)}`, idx);
+    }
+  });
+
+  const newTargetRows = [];
+  samsungApps.forEach(app => {
+    const pName = (app.patientName || app.name || '').trim();
+    const pId = String(app.patientId || '').trim();
+    const appId = String(app.id || '').trim();
+    const pol = String(app.policyNumber || '').trim();
+    const polSuffix = pol.length > 5 ? pol.slice(-8) : '';
+
+    let matchedIdx = -1;
+    if (appId && targetMap.has(`aid_${appId}`)) matchedIdx = targetMap.get(`aid_${appId}`);
+    else if (pId && targetMap.has(`pid_${pId}`)) matchedIdx = targetMap.get(`pid_${pId}`);
+    else if (appId && targetMap.has(`id_${appId}`)) matchedIdx = targetMap.get(`id_${appId}`);
+    else if (pId && targetMap.has(`id_${pId}`)) matchedIdx = targetMap.get(`id_${pId}`);
+    else if (polSuffix && targetMap.has(`pol_${polSuffix}`)) matchedIdx = targetMap.get(`pol_${polSuffix}`);
+    else if (pName && targetMap.has(`name_${pName}`)) matchedIdx = targetMap.get(`name_${pName}`);
+
+    if (matchedIdx >= 0) {
+      // 기존 행 업데이트: 통합허브의 최신 실시간 정보 동기화
+      const existing = gSamsungSheets.target[matchedIdx];
+      let changed = false;
+      if (app.id && !existing.appId) {
+        existing.appId = app.id;
+        changed = true;
+      }
+      if (app.status && existing.status !== app.status) {
+        existing.status = app.status;
+        changed = true;
+      }
+      if (app.hospitalName && (!existing.hospitalName || existing.hospitalName === '-')) {
+        existing.hospitalName = app.hospitalName;
+        changed = true;
+      }
+      if (app.phone && !existing.phone) {
+        existing.phone = app.phone;
+        changed = true;
+      }
+      if (app.accidentNumber && (!existing.accidentNumber || existing.accidentNumber === '-')) {
+        existing.accidentNumber = app.accidentNumber;
+        changed = true;
+      }
+      if (app.careStartDate && (!existing.desiredStartDate || existing.desiredStartDate === '-')) {
+        existing.desiredStartDate = app.careStartDate;
+        changed = true;
+      }
+      if (app.careEndDate && (!existing.expectedEndDate || existing.expectedEndDate === '-')) {
+        existing.expectedEndDate = app.careEndDate;
+        changed = true;
+      }
+      if (changed) updatedTargetCount++;
+    } else {
+      // 신규 행 추가: 대상자 시트에 없는 통합허브 고객 자동 추가!
+      const newTargetRow = convertHubAppToSamsungTargetRow(app);
+      if (newTargetRow) {
+        newTargetRows.push(newTargetRow);
+        if (pName) targetMap.set(`name_${pName}`, 99999);
+        if (pId) {
+          targetMap.set(`pid_${pId}`, 99999);
+          targetMap.set(`id_${pId}`, 99999);
+        }
+        if (appId) {
+          targetMap.set(`aid_${appId}`, 99999);
+          targetMap.set(`id_${appId}`, 99999);
+        }
+        addedTargetCount++;
+      }
+    }
+  });
+
+  if (newTargetRows.length > 0) {
+    gSamsungSheets.target = [...newTargetRows, ...gSamsungSheets.target];
+  }
+
+  // 완료(completed) 시트에도 완료 건 실시간 동기화
+  const completedMap = new Map();
+  gSamsungSheets.completed.forEach((row, idx) => {
+    if (row.patientName) completedMap.set(`name_${row.patientName.trim()}`, idx);
+    if (row.patientId) completedMap.set(`pid_${String(row.patientId).trim()}`, idx);
+    if (row.appId) completedMap.set(`aid_${String(row.appId).trim()}`, idx);
+  });
+
+  const newCompletedRows = [];
+  samsungApps.forEach(app => {
+    const isCompleted = (app.status === '완료' || app.status === '정산완료' || app.status === '종료');
+    if (!isCompleted) return;
+
+    const pName = (app.patientName || app.name || '').trim();
+    const pId = String(app.patientId || '').trim();
+    const appId = String(app.id || '').trim();
+
+    const exists = (appId && completedMap.has(`aid_${appId}`)) ||
+                   (pId && completedMap.has(`pid_${pId}`)) ||
+                   (pName && completedMap.has(`name_${pName}`));
+    if (!exists) {
+      const as = (gAssigns || []).find(a => String(a.applyId) === String(app.id));
+      newCompletedRows.push({
+        sheetKey: 'completed',
+        id: pId || app.id,
+        appId: app.id || '',
+        patientId: pId || app.id,
+        patientName: pName,
+        isMatched: as ? 'Y' : 'N',
+        assignedRegion: as?.region || app.sido || '경기도',
+        matchingDuration: '당일배정',
+        delayHours: '0',
+        caregiverChange: '없음',
+        gpsAnomaly: '없음',
+        vocTransferSamsung: '없음',
+        satisfactionScore: '만족',
+        accidentNumber: app.accidentNumber || '-',
+        actualCareStartDate: app.careStartDate || app.startDate || '',
+        actualCareEndDate: app.careEndDate || app.endDate || ''
+      });
+      if (pName) completedMap.set(`name_${pName}`, 99999);
+      if (pId) completedMap.set(`pid_${pId}`, 99999);
+      if (appId) completedMap.set(`aid_${appId}`, 99999);
+    }
+  });
+
+  if (newCompletedRows.length > 0) {
+    gSamsungSheets.completed = [...newCompletedRows, ...gSamsungSheets.completed];
+  }
+
+  if (addedTargetCount > 0 || updatedTargetCount > 0 || newCompletedRows.length > 0) {
+    console.log(`[Samsung Sheet Sync] 통합허브 실시간 연동 완료: 신규 추가 ${addedTargetCount}건, 정보 갱신 ${updatedTargetCount}건 (대상자 총 ${gSamsungSheets.target.length}건, 완료 총 ${gSamsungSheets.completed.length}건)`);
+    updateSamsungSheetBadges();
+    try {
+      localStorage.setItem('LIVON_SAMSUNG_SHEET_TARGET', JSON.stringify(gSamsungSheets.target));
+      localStorage.setItem('LIVON_SAMSUNG_SHEET_COMPLETED', JSON.stringify(gSamsungSheets.completed));
+      localStorage.setItem('LIVON_SAMSUNG_EXCEL_LEDGER', JSON.stringify({
+        target: gSamsungSheets.target,
+        completed: gSamsungSheets.completed,
+        contacts: gSamsungSheets.contacts,
+        eligible: gSamsungSheets.eligible
+      }));
+    } catch (e) {}
+
+    // Convex Cloud DB 비동기 일괄 동기화
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'target', rows: gSamsungSheets.target, replace: true }).catch(console.warn);
+      if (newCompletedRows.length > 0) {
+        syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'completed', rows: gSamsungSheets.completed, replace: true }).catch(console.warn);
+      }
+    }
+  }
+
+  return addedTargetCount;
+}
+window.syncSamsungTargetSheetWithHubApps = syncSamsungTargetSheetWithHubApps;
+
 function initSamsungSpreadsheet() {
   if (!gSamsungSheets) {
     gSamsungSheets = { target: [], completed: [], eligible: [], contacts: [] };
@@ -6433,6 +6663,11 @@ function initSamsungSpreadsheet() {
     gSamsungSheets.contacts = healSamsungSheetData('contacts', gSamsungSheets.contacts);
   }
 
+  // 🚨 [통합허브 삼성화재 고객 실시간 자동 연동]
+  if (typeof syncSamsungTargetSheetWithHubApps === 'function' && Array.isArray(gApps) && gApps.length > 0) {
+    syncSamsungTargetSheetWithHubApps(true);
+  }
+
   try {
     localStorage.setItem('LIVON_SAMSUNG_EXCEL_LEDGER', JSON.stringify({
       target: gSamsungSheets.target,
@@ -6465,10 +6700,13 @@ function syncSamsungSpreadsheetData(silent = false) {
     gSamsungSheets.eligible = gSamsungList;
   }
 
-  // 2. 🚨 [사용자 지침 준수]: 삼성화재 접수/청구관리 데이터는 환경설정의 삼성화재 관리대장 엑셀을 기준으로 유지하며,
-  // 종합관리대장(gApps) 정보를 가져오지 않습니다.
-  // 대신, 종합관리대장 > 통합허브 내 삼성화재 고객 중 삼성화재 엑셀 관리대장과 동일한 고객이 있다면
-  // 상품명 등 추가 정보를 가져와서 통합허브에 자동 반영합니다.
+  // 2. 통합허브(gApps) 삼성화재 고객 실시간 연동
+  let addedHubCount = 0;
+  if (typeof syncSamsungTargetSheetWithHubApps === 'function') {
+    addedHubCount = syncSamsungTargetSheetWithHubApps(true);
+  }
+
+  // 3. 삼성화재 관리대장 엑셀 기반 상품명 등 상세 정보 통합허브 보강
   const enrichedCount = enrichHubSamsungCustomersFromSamsungExcel();
 
   // Convex Cloud에 스프레드시트 데이터 실시간 일괄 동기화 및 영구 저장
@@ -6495,8 +6733,8 @@ function syncSamsungSpreadsheetData(silent = false) {
 
   if (!silent && typeof showCustomAlert === 'function') {
     showCustomAlert({
-      title: '삼성화재 관리대장 동기화 완료',
-      message: `삼성화재 접수/청구관리 대장 데이터가 정상 유지되었으며, 통합허브 삼성화재 고객 ${enrichedCount}건의 상품명 등 상세 정보가 연동되었습니다.`,
+      title: '삼성화재 관리대장 실시간 동기화 완료',
+      message: `통합허브 삼성화재 고객 ${gSamsungSheets.target.length}건이 대상자 시트에 실시간 연동되었으며 (신규 추가: ${addedHubCount}건), ${enrichedCount}건의 상세 정보가 보강되었습니다.`,
       icon: 'refresh-cw',
       iconColor: 'indigo'
     });
@@ -10501,6 +10739,9 @@ function renderSamsungClaimHub(subTabParam = null) {
   }
   if (typeof initSamsungSpreadsheet === 'function') {
     initSamsungSpreadsheet();
+  }
+  if (typeof syncSamsungTargetSheetWithHubApps === 'function') {
+    syncSamsungTargetSheetWithHubApps(true);
   }
   if (gSamsungClaimHubActiveSubTab === 'daily') {
     triggerSamsungCareLogAutoSync();
@@ -43671,6 +43912,9 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
         const insSelect = document.getElementById('hubInsuranceFilter');
         if (insSelect) insSelect.value = 'SAMSUNG';
       }
+      if (typeof syncSamsungTargetSheetWithHubApps === 'function') {
+        syncSamsungTargetSheetWithHubApps(true);
+      }
     }
     if (typeof gHubFilter !== 'undefined') gHubFilter = 'ALL';
     if (typeof gHubStatusFilter !== 'undefined') gHubStatusFilter = '';
@@ -44495,6 +44739,10 @@ function handleCustomerEditSubmit(e) {
   // Convex Cloud 운영 DB 실시간 동기화
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:saveApplication', { app: app });
+  }
+
+  if ((app.insuranceCompany || '').includes('삼성') && typeof syncSamsungTargetSheetWithHubApps === 'function') {
+    syncSamsungTargetSheetWithHubApps(true);
   }
 
   showCustomAlert({
