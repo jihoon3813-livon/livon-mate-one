@@ -39364,26 +39364,26 @@ function renderCareCallTargets() {
     return `
       <!-- Main Patient Row -->
       <tr class="${rowAlertClass} transition-colors border-b border-slate-100">
-        <td class="p-3 text-center font-mono text-slate-400 text-xs">${idx + 1}</td>
+        <td class="p-3 text-center font-mono text-slate-400 text-xs whitespace-nowrap">${idx + 1}</td>
         
         <!-- 대상 환자명 -->
-        <td class="p-3 font-bold text-slate-900">
-          <div class="flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full ${t.hasMissingPast ? 'bg-rose-500 animate-ping' : (t.insuranceCompany.includes('삼성') ? 'bg-sky-500' : 'bg-blue-500')}"></span>
-            <span class="text-sm font-black text-slate-900">${maskedPatient}</span>
-            <span class="text-[10px] text-slate-400 font-mono">(${t.id})</span>
+        <td class="p-3 font-bold text-slate-900 whitespace-nowrap min-w-[130px]">
+          <div class="flex items-center gap-1.5 whitespace-nowrap">
+            <span class="w-2 h-2 rounded-full shrink-0 ${t.hasMissingPast ? 'bg-rose-500 animate-ping' : (t.insuranceCompany.includes('삼성') ? 'bg-sky-500' : 'bg-blue-500')}"></span>
+            <span class="text-sm font-black text-slate-900 whitespace-nowrap">${maskedPatient}</span>
+            <span class="text-[10px] text-slate-400 font-mono whitespace-nowrap">(${t.id})</span>
           </div>
         </td>
 
         <!-- 원수사 -->
-        <td class="p-3 text-center">
-          <span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${insBadgeClass}">
+        <td class="p-3 text-center whitespace-nowrap min-w-[90px]">
+          <span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border whitespace-nowrap ${insBadgeClass}">
             ${t.insuranceCompany || '삼성화재'}
           </span>
         </td>
 
         <!-- 진행 구분 (APP진행 vs AI통화 전환 토글 버튼) -->
-        <td class="p-3 text-center whitespace-nowrap">
+        <td class="p-3 text-center whitespace-nowrap min-w-[120px]">
           ${t.operationMode === 'APP' ? `
             <button type="button" onclick="toggleCareCallOperationMode('${t.id}', 'CALL')" 
               class="px-2.5 py-1 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-800 font-extrabold text-[11px] border border-sky-300 shadow-2xs inline-flex items-center justify-center gap-1 mx-auto whitespace-nowrap transition-all cursor-pointer"
@@ -39402,55 +39402,55 @@ function renderCareCallTargets() {
         </td>
 
         <!-- 병원 / 병실 -->
-        <td class="p-3 text-slate-600 max-w-xs truncate" title="${t.hospital}">${t.hospital}</td>
+        <td class="p-3 text-slate-600 whitespace-nowrap min-w-[140px] max-w-[220px] truncate" title="${t.hospital}">${t.hospital}</td>
 
         <!-- 담당 간병사 -->
-        <td class="p-3 font-bold text-slate-800">${maskedCaregiver}</td>
+        <td class="p-3 font-bold text-slate-800 text-center whitespace-nowrap min-w-[90px]">${maskedCaregiver}</td>
 
         <!-- 간병사 연락처 -->
-        <td class="p-3 font-mono text-slate-700 font-semibold">${maskedPhone}</td>
+        <td class="p-3 font-mono text-slate-700 font-semibold text-center whitespace-nowrap min-w-[130px]">${maskedPhone}</td>
 
         <!-- 간병 기간 -->
-        <td class="p-3 text-center">
-          <div class="font-mono text-slate-800 font-bold text-xs">${t.careStartDate} ~ ${t.careEndDate}</div>
-          <span class="text-[11px] text-slate-500 font-medium">총 ${t.totalDays}일간 (${t.workTime})</span>
+        <td class="p-3 text-center whitespace-nowrap min-w-[170px]">
+          <div class="font-mono text-slate-800 font-bold text-xs whitespace-nowrap">${t.careStartDate} ~ ${t.careEndDate}</div>
+          <span class="text-[11px] text-slate-500 font-medium whitespace-nowrap">총 ${t.totalDays}일간 (${t.workTime})</span>
         </td>
 
         <!-- 어제까지 등록 현황 -->
-        <td class="p-3 text-center">
+        <td class="p-3 text-center whitespace-nowrap min-w-[180px]">
           ${t.operationMode === 'APP' ? `
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200">
-              <i data-lucide="smartphone" class="w-3 h-3 text-slate-500"></i> 앱 직접 작성
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 whitespace-nowrap">
+              <i data-lucide="smartphone" class="w-3 h-3 text-slate-500 shrink-0"></i> 앱 직접 작성
             </span>
           ` : (t.hasMissingPast ? `
             <div class="space-y-1">
-              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-black text-xs border border-rose-300 shadow-2xs animate-pulse"
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-black text-xs border border-rose-300 shadow-2xs whitespace-nowrap"
                 title="어제까지 간병일자 중 미작성된 일지가 ${t.missingPastDaysCount}건 있습니다.">
-                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-600"></i> 어제까지 미등록 (${t.missingPastDaysCount}일 누락)
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-600 shrink-0"></i> 어제까지 미등록 (${t.missingPastDaysCount}일 누락)
               </span>
-              <span class="block text-[10px] text-rose-600 font-mono font-bold">
+              <span class="block text-[10px] text-rose-600 font-mono font-bold whitespace-nowrap">
                 누락일자: ${t.missingPastDates.slice(-3).map(d => d.slice(5)).join(', ')}${t.missingPastDates.length > 3 ? ' 외' : ''}
               </span>
             </div>
           ` : `
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200">
-              <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> 어제까지 완료
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200 whitespace-nowrap">
+              <i data-lucide="check" class="w-3 h-3 text-emerald-600 shrink-0"></i> 어제까지 완료
             </span>
           `)}
         </td>
 
         <!-- 세부 간병일자 & 음성파일 현황 (아코디언 토글 버튼) -->
-        <td class="p-3 text-center">
+        <td class="p-3 text-center whitespace-nowrap min-w-[160px]">
           <button type="button" onclick="toggleCareCallPatientAccordion('${t.id}')"
-            class="px-3.5 py-1.5 rounded-xl ${isExpanded ? 'bg-purple-600 text-white font-black' : 'bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold border border-purple-200'} text-xs shadow-2xs flex items-center justify-center gap-1.5 mx-auto transition-all cursor-pointer">
-            <span>세부일자 (${t.careDays.length}일 / 음성 ${t.voiceCount}건)</span>
-            <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-3.5 h-3.5"></i>
+            class="px-3.5 py-1.5 rounded-xl ${isExpanded ? 'bg-purple-600 text-white font-black' : 'bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold border border-purple-200'} text-xs shadow-2xs flex items-center justify-center gap-1.5 mx-auto whitespace-nowrap transition-all cursor-pointer">
+            <span class="whitespace-nowrap">세부일자 (${t.careDays.length}일 / 음성 ${t.voiceCount}건)</span>
+            <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-3.5 h-3.5 shrink-0"></i>
           </button>
         </td>
 
         <!-- 통화 발신 관리 액션 -->
-        <td class="p-3 text-center">
-          <div id="careCallActions-${t.patientName}" class="flex flex-col items-center justify-center gap-1.5 min-w-[130px]">
+        <td class="p-3 text-center whitespace-nowrap min-w-[140px]">
+          <div id="careCallActions-${t.patientName}" class="flex flex-col items-center justify-center gap-1.5 min-w-[130px] whitespace-nowrap">
             ${t.operationMode === 'APP' ? `
               <span class="text-slate-400 text-xs font-medium">앱 직접 작성 대상</span>
             ` : `
