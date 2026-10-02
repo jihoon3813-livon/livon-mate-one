@@ -9930,14 +9930,14 @@
       "applyDate": "2026.06.08",
       "applyDateTime": "2026.06.08",
       "applyType": "입원",
-      "assignedCaregiverCount": 1,
+      "assignedCaregiverCount": 2,
       "birthDate": "1942.01.09",
-      "careEndDate": "2026.09.29",
+      "careEndDate": "2026.12.31",
       "careStartDate": "2026.06.08",
       "careType": "입원",
-      "caregiverCenter": "개인(환자요청)",
-      "caregiverName": "장금매",
-      "caregiverPhone": "010-8577-8176",
+      "caregiverCenter": "온누리간병",
+      "caregiverName": "이진숙",
+      "caregiverPhone": "010-6216-8885",
       "claimCategory": "정상",
       "claimClassification": "정상",
       "claimCount": 11,
@@ -22333,7 +22333,7 @@
       "centerName": "개인(환자요청)",
       "centerPhone": "",
       "dailyWage": 130000,
-      "endDate": "2026.09.29",
+      "endDate": "2026.09.29 13:00",
       "id": "A0146",
       "importedAt": "2026-09-28T08:14:19.935Z",
       "insuranceCompany": "종합 간병(현대해상)",
@@ -22341,7 +22341,7 @@
       "patientName": "유수분",
       "phone": "010-8577-8176",
       "settlementType": "개인",
-      "startDate": "2026.06.08"
+      "startDate": "2026.06.08 13:00"
     },
     {
       "accountInfo": "농협은행 조명임(센터) 356-11-96-2339-63",
@@ -24950,6 +24950,24 @@
       "phone": "010-9926-7001",
       "settlementType": "개인",
       "startDate": "2026.09.24"
+    },
+    {
+      "id": "A0293",
+      "applyId": "C0166",
+      "patientName": "유수분",
+      "caregiverName": "이진숙",
+      "birthDate": "",
+      "phone": "010-6216-8885",
+      "centerName": "온누리간병",
+      "centerPhone": "010-5131-7549",
+      "settlementType": "센터",
+      "dailyWage": 139000,
+      "accountInfo": "새마을금고 9002163454271  이진숙",
+      "startDate": "2026.09.29 13:00",
+      "endDate": "2026.12.31 09:00",
+      "assignedDate": "2026-09-29",
+      "insuranceCompany": "종합 간병(현대해상)",
+      "isRealLaunchData": true
     }
   ],
   "claims": [

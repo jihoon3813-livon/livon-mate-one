@@ -6887,11 +6887,23 @@ function initSamsungSpreadsheet() {
     gSamsungSheets = { target: [], completed: [], eligible: [], contacts: [] };
   }
 
-  // 로컬스토리지에 저장된 삼성화재 관리대장 엑셀 데이터 복원
+  // 로컬스토리지에 저장된 삼성화재 관리대장 엑셀 데이터 복원 및 대용량 캐시 오염 자동 정화
   try {
     const rawLedger = localStorage.getItem('LIVON_SAMSUNG_EXCEL_LEDGER');
     if (rawLedger) {
-      const parsedLedger = JSON.parse(rawLedger);
+      // 1MB 초과 시 비정상적으로 누적된 eligible 데이터로 간주하여 로컬스토리지 즉시 정화
+      if (rawLedger.length > 500000) {
+        try {
+          const parsedHuge = JSON.parse(rawLedger);
+          if (parsedHuge && parsedHuge.eligible && parsedHuge.eligible.length > 100) {
+            parsedHuge.eligible = [];
+            localStorage.setItem('LIVON_SAMSUNG_EXCEL_LEDGER', JSON.stringify(parsedHuge));
+          }
+        } catch(e) {
+          localStorage.removeItem('LIVON_SAMSUNG_EXCEL_LEDGER');
+        }
+      }
+      const parsedLedger = JSON.parse(localStorage.getItem('LIVON_SAMSUNG_EXCEL_LEDGER') || '{}');
       if (parsedLedger) {
         if (Array.isArray(parsedLedger.target) && parsedLedger.target.length > 0 && (!gSamsungSheets.target || gSamsungSheets.target.length === 0)) {
           gSamsungSheets.target = parsedLedger.target;
@@ -6902,7 +6914,7 @@ function initSamsungSpreadsheet() {
         if (Array.isArray(parsedLedger.contacts) && parsedLedger.contacts.length > 0 && (!gSamsungSheets.contacts || gSamsungSheets.contacts.length === 0)) {
           gSamsungSheets.contacts = parsedLedger.contacts;
         }
-        if (Array.isArray(parsedLedger.eligible) && parsedLedger.eligible.length > 0 && (!gSamsungSheets.eligible || gSamsungSheets.eligible.length === 0)) {
+        if (Array.isArray(parsedLedger.eligible) && parsedLedger.eligible.length > 0 && parsedLedger.eligible.length <= 100 && (!gSamsungSheets.eligible || gSamsungSheets.eligible.length === 0)) {
           gSamsungSheets.eligible = parsedLedger.eligible;
         }
       }
@@ -6922,11 +6934,15 @@ function initSamsungSpreadsheet() {
         if (Array.isArray(parsed) && parsed.length > 0) gSamsungSheets.completed = parsed;
       }
     }
-    if (!gSamsungSheets.eligible || gSamsungSheets.eligible.length === 0) {
-      const cachedElig = localStorage.getItem('LIVON_SAMSUNG_SHEET_ELIGIBLE');
-      if (cachedElig) {
+    const cachedElig = localStorage.getItem('LIVON_SAMSUNG_SHEET_ELIGIBLE');
+    if (cachedElig) {
+      if (cachedElig.length > 50000) {
+        localStorage.removeItem('LIVON_SAMSUNG_SHEET_ELIGIBLE');
+      } else {
         const parsed = JSON.parse(cachedElig);
-        if (Array.isArray(parsed) && parsed.length > 0) gSamsungSheets.eligible = parsed;
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.length <= 100 && (!gSamsungSheets.eligible || gSamsungSheets.eligible.length === 0)) {
+          gSamsungSheets.eligible = parsed;
+        }
       }
     }
   } catch (e) {}
@@ -21980,13 +21996,16 @@ function calculateRoundDates(roundStartStr, standardDateStr, setDays, defaultCar
           // 기준일시에 날짜만 있는 경우 (예: '2026.09.20')
           const stdYMD = formatCareDateStr(dStd);
           const projYMD = formatCareDateStr(projectedEnd);
-          if (stdYMD === projYMD) {
-            // 기준일시의 YYYY.MM.DD가 일수 기반 투영 종료일자와 일치
+          const dStdOnly = parseCareDateTime(stdYMD);
+          const dProjOnly = parseCareDateTime(projYMD);
+          const diffDays = (dStdOnly && dProjOnly) ? Math.abs((dStdOnly.getTime() - dProjOnly.getTime()) / (24 * 60 * 60 * 1000)) : 999;
+          if (stdYMD === projYMD || diffDays <= 4) {
+            // 기준일시(10일/20일/말일 마감)가 투영일자와 근접한 경우(달력 역월 차이 등) 공식 마감일자를 우선 적용
             endStr = startHasTime 
               ? `${stdYMD} ${String(dStart.getHours()).padStart(2, '0')}:${String(dStart.getMinutes()).padStart(2, '0')}` 
               : stdYMD;
           } else {
-            // 엑셀 오기입 등으로 일수와 날짜가 불일치 시 일수(setDays) 기준으로 산정
+            // 차이가 크게 나는 비정상 오기입 시에만 투영 종료일자 적용
             endStr = startHasTime ? formatCareDateTimeStr(projectedEnd) : formatCareDateStr(projectedEnd);
           }
         }
@@ -32330,10 +32349,16 @@ function renderUnifiedCareHub() {
   const container = document.getElementById('hubCustomerCardsList');
   if (!container) return;
 
-  if (typeof gIsDataLoading !== 'undefined' && gIsDataLoading && (!Array.isArray(gApps) || gApps.length === 0)) {
+  if (!Array.isArray(gApps) || gApps.length === 0) {
+    if (typeof loadConvexData === 'function' && !window._isConvexLoadingTriggered) {
+      window._isConvexLoadingTriggered = true;
+      loadConvexData(false);
+    }
     renderAllLoadingStates();
     return;
   }
+
+  try {
 
   // [중요] 레거시 더미 S-id 삼성 데이터 브라우저 로컬 캐시 및 전역 데이터 즉시 영구 제거 (실데이터 C-id 보존)
   if (Array.isArray(gApps) && gApps.some(a => a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성') && !a.isRealLaunchData)) {
@@ -33499,6 +33524,20 @@ function renderUnifiedCareHub() {
       .forEach(el => el.classList.remove('animate-spin'));
     document.querySelectorAll('[onclick="refreshLatestData()"]')
       .forEach(btn => btn.classList.remove('pointer-events-none', 'opacity-75'));
+  }
+  } catch (hubErr) {
+    console.error('[CareHub Render Error]', hubErr);
+    if (container) {
+      container.innerHTML = `
+        <div class="col-span-full p-8 text-center bg-rose-50 rounded-2xl border border-rose-200">
+          <div class="text-rose-700 font-bold mb-2">통합허브 화면 구성 중 일시적 오류가 발생했습니다.</div>
+          <div class="text-xs text-rose-500 mb-4 font-mono">${typeof escapeHtml === 'function' ? escapeHtml(hubErr.message || String(hubErr)) : (hubErr.message || String(hubErr))}</div>
+          <button onclick="refreshLatestData()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer">
+            최신자료 다시 불러오기
+          </button>
+        </div>
+      `;
+    }
   }
 }
 
@@ -38767,6 +38806,10 @@ function setCareLogViewMode(mode) {
       btnCall.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer font-black border border-purple-200';
     }
     if (callContainer) callContainer.classList.remove('hidden');
+    // Ensure search input sync
+    const topInput = document.getElementById('careLogSearchInput');
+    const callInput = document.getElementById('careCallSearchInput');
+    if (topInput && callInput && topInput.value) callInput.value = topInput.value;
     renderCareCallTargets();
   } else {
     // flat
@@ -38782,8 +38825,25 @@ function setCareLogViewMode(mode) {
 // AI 간병통화 (AI Care Call & Audio Recording) CONTROLLER
 // =========================================================================
 
+function handleCareCallSearchInput(val) {
+  const topInput = document.getElementById('careLogSearchInput');
+  if (topInput && topInput.value !== val) topInput.value = val;
+  renderCareCallTargets();
+}
+
+function setCareCallInsuranceFilter(ins) {
+  const sel = document.getElementById('careLogInsuranceFilter');
+  if (sel) {
+    sel.value = ins;
+    renderCareLogs();
+  }
+}
+
 function getCareCallTargetList() {
-  const query = (document.getElementById('careCallSearchInput')?.value || '').trim().toLowerCase();
+  const topInput = document.getElementById('careLogSearchInput');
+  const callInput = document.getElementById('careCallSearchInput');
+  const query = (topInput?.value || callInput?.value || '').trim().toLowerCase();
+  const insFilter = document.getElementById('careLogInsuranceFilter')?.value || '삼성화재';
   const todayStr = new Date().toISOString().slice(0, 10);
   const targets = [];
   const seenKeys = new Set();
@@ -38792,15 +38852,24 @@ function getCareCallTargetList() {
   if (Array.isArray(gAssigns) && gAssigns.length > 0) {
     gAssigns.forEach(as => {
       if (!as || !as.patientName) return;
-      const app = Array.isArray(gApps) ? gApps.find(a => String(a.id) === String(as.applyId)) : null;
+      const app = Array.isArray(gApps) 
+        ? (gApps.find(a => String(a.id) === String(as.applyId)) || gApps.find(a => a.patientName === as.patientName))
+        : null;
       
-      const caregiverName = (as.caregiverName || app?.caregiverName || '').trim();
-      if (!caregiverName || caregiverName === '-' || caregiverName === '미배정' || caregiverName.includes('미배정')) return;
-
-      const key = `${as.patientName}_${caregiverName}`;
+      const key = `${as.applyId || as.id}_${as.patientName}`;
       if (seenKeys.has(key)) return;
       seenKeys.add(key);
 
+      // Determine accurate insurance company
+      let insCompany = (app && app.insuranceCompany) ? app.insuranceCompany : '';
+      if (!insCompany) {
+        if (as.insuranceCompany && as.insuranceCompany.includes('현대')) insCompany = '현대해상';
+        else if (as.insuranceCompany && as.insuranceCompany.includes('삼성')) insCompany = '삼성화재';
+        else if (String(as.applyId || '').startsWith('D')) insCompany = '삼성화재';
+        else insCompany = '현대해상';
+      }
+
+      const caregiverName = (as.caregiverName || app?.caregiverName || '').trim() || '(간병사 미지정)';
       const caregiverPhone = (as.phone && as.phone !== '-') 
         ? as.phone 
         : ((Array.isArray(gCaregivers) && gCaregivers.find(c => c.name === caregiverName)?.phone) || app?.caregiverPhone || app?.phone || '010-0000-0000');
@@ -38812,6 +38881,7 @@ function getCareCallTargetList() {
       targets.push({
         id: as.applyId || as.id,
         patientName: as.patientName,
+        insuranceCompany: insCompany,
         caregiverName,
         caregiverPhone,
         hospital,
@@ -38822,28 +38892,37 @@ function getCareCallTargetList() {
     });
   }
 
-  // 2. Also check gApps for active caregivers not in gAssigns
+  // 2. Also check gApps for any applications not yet matched in gAssigns
   if (Array.isArray(gApps) && gApps.length > 0) {
     gApps.forEach(app => {
       if (!app || !app.patientName) return;
-      const caregiverName = (app.caregiverName || '').trim();
-      if (!caregiverName || caregiverName === '-' || caregiverName === '미배정' || caregiverName.includes('미배정')) return;
-
-      const key = `${app.patientName}_${caregiverName}`;
+      const key = `${app.id}_${app.patientName}`;
       if (seenKeys.has(key)) return;
       seenKeys.add(key);
 
+      let insCompany = app.insuranceCompany || '';
+      if (!insCompany) {
+        if (String(app.id || '').startsWith('D') || (app.productName && app.productName.includes('삼성화재'))) insCompany = '삼성화재';
+        else insCompany = '현대해상';
+      }
+
+      const as = Array.isArray(gAssigns)
+        ? (gAssigns.find(a => String(a.applyId) === String(app.id)) || gAssigns.find(a => a.patientName === app.patientName))
+        : null;
+
+      const caregiverName = (app.caregiverName || as?.caregiverName || '').trim() || (app.applicantName ? `${app.applicantName}(신청자)` : '(간병사 미지정)');
       const caregiverPhone = (app.caregiverPhone && app.caregiverPhone !== '-')
         ? app.caregiverPhone
-        : ((Array.isArray(gCaregivers) && gCaregivers.find(c => c.name === caregiverName)?.phone) || app.phone || '010-0000-0000');
+        : (as?.phone || app.phone || app.applicantContact || app.applicantPhone || '010-0000-0000');
 
-      const hospital = (app.hospitalName ? `${app.hospitalName} ${app.hospitalRoom || ''}`.trim() : '') || app.hospital || '병원 정보 없음';
+      const hospital = (app.hospitalName ? `${app.hospitalName} ${app.hospitalRoom || ''}`.trim() : '') || app.hospital || as?.centerName || '병원 정보 없음';
       const workDate = app.careStartDate || todayStr;
       const workTime = app.careType || '24시간';
 
       targets.push({
         id: app.id,
         patientName: app.patientName,
+        insuranceCompany: insCompany,
         caregiverName,
         caregiverPhone,
         hospital,
@@ -38854,14 +38933,62 @@ function getCareCallTargetList() {
     });
   }
 
-  if (!query) return targets;
-  return targets.filter(t => 
-    t.patientName.toLowerCase().includes(query) ||
-    t.caregiverName.toLowerCase().includes(query) ||
-    t.caregiverPhone.toLowerCase().includes(query) ||
-    t.hospital.toLowerCase().includes(query) ||
-    t.id.toLowerCase().includes(query)
-  );
+  // Helper matching function
+  const matchTarget = (t, q) => {
+    return (
+      (t.patientName && t.patientName.toLowerCase().includes(q)) ||
+      (t.caregiverName && t.caregiverName.toLowerCase().includes(q)) ||
+      (t.caregiverPhone && t.caregiverPhone.toLowerCase().includes(q)) ||
+      (t.hospital && t.hospital.toLowerCase().includes(q)) ||
+      (t.id && t.id.toLowerCase().includes(q)) ||
+      (t.insuranceCompany && t.insuranceCompany.toLowerCase().includes(q))
+    );
+  };
+
+  // 3. Filtering by Insurance and Search Query
+  const noticeEl = document.getElementById('careCallSearchNotice');
+  if (noticeEl) noticeEl.classList.add('hidden');
+
+  let filtered = targets;
+
+  if (query) {
+    if (insFilter !== 'ALL') {
+      const insMatches = targets.filter(t => (t.insuranceCompany || '').includes(insFilter) && matchTarget(t, query));
+      if (insMatches.length > 0) {
+        filtered = insMatches;
+      } else {
+        // No match in current insurance, but check across ALL insurances!
+        const crossMatches = targets.filter(t => matchTarget(t, query));
+        if (crossMatches.length > 0) {
+          filtered = crossMatches;
+          if (noticeEl) {
+            noticeEl.innerHTML = `
+              <div class="flex items-center gap-2">
+                <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0"></i>
+                <span>현재 선택된 원수사(<b>${insFilter}</b>)에는 '<b>${query}</b>' 결과가 없어, <b>전체 원수사 검색 결과 (${crossMatches.length}건)</b>를 자동으로 표시합니다.</span>
+              </div>
+              <button type="button" onclick="setCareCallInsuranceFilter('ALL')" class="px-2.5 py-1 rounded-lg bg-amber-200 hover:bg-amber-300 font-bold text-amber-900 text-[11px] cursor-pointer shrink-0">
+                원수사 전체로 변경
+              </button>
+            `;
+            noticeEl.classList.remove('hidden');
+            if (typeof initIcons === 'function') initIcons(noticeEl);
+          }
+        } else {
+          filtered = [];
+        }
+      }
+    } else {
+      filtered = targets.filter(t => matchTarget(t, query));
+    }
+  } else {
+    // No query: strict filter by insFilter (default: '삼성화재')
+    if (insFilter && insFilter !== 'ALL') {
+      filtered = targets.filter(t => (t.insuranceCompany || '').includes(insFilter));
+    }
+  }
+
+  return filtered;
 }
 
 function getPatientRecentLogCount(patientName) {
@@ -38879,7 +39006,19 @@ function getPatientRecentLogCount(patientName) {
 function renderCareCallTargets() {
   const tbody = document.getElementById('careCallTargetsTableBody');
   const badgeCount = document.getElementById('careCallTargetCountBadge');
+  const insBadge = document.getElementById('careCallInsCurrentBadge');
   if (!tbody) return;
+
+  const insFilter = document.getElementById('careLogInsuranceFilter')?.value || '삼성화재';
+  if (insBadge) {
+    insBadge.innerText = `원수사: ${insFilter === 'ALL' ? '전체' : insFilter}`;
+    insBadge.className = `px-2.5 py-0.5 rounded-full font-extrabold text-[11px] border ${
+      insFilter.includes('삼성') ? 'bg-sky-100 text-sky-800 border-sky-300' :
+      insFilter.includes('SCOR') ? 'bg-purple-100 text-purple-800 border-purple-300' :
+      insFilter.includes('현대') ? 'bg-blue-100 text-blue-800 border-blue-300' :
+      'bg-slate-100 text-slate-700 border-slate-300'
+    }`;
+  }
 
   const targets = getCareCallTargetList();
   if (badgeCount) badgeCount.innerText = `${targets.length}명`;
@@ -38887,11 +39026,11 @@ function renderCareCallTargets() {
   if (targets.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="10" class="p-8 text-center text-slate-400">
+        <td colspan="11" class="p-8 text-center text-slate-400">
           <div class="flex flex-col items-center justify-center gap-2">
             <i data-lucide="phone-off" class="w-8 h-8 text-slate-300"></i>
             <p class="font-bold text-slate-500">배정된 AI 간병통화 대상자가 없습니다.</p>
-            <p class="text-xs text-slate-400">간병 스케줄 배정 완료 후 다시 확인해 주세요.</p>
+            <p class="text-xs text-slate-400">원수사 필터(${insFilter}) 또는 검색어를 확인해 주세요.</p>
           </div>
         </td>
       </tr>
@@ -38906,15 +39045,26 @@ function renderCareCallTargets() {
     const maskedPatient = typeof maskName === 'function' ? maskName(t.patientName) : t.patientName;
     const maskedCaregiver = typeof maskName === 'function' ? maskName(t.caregiverName) : t.caregiverName;
 
+    const insBadgeClass = (t.insuranceCompany || '').includes('삼성')
+      ? 'bg-sky-50 text-sky-700 border-sky-200'
+      : ((t.insuranceCompany || '').includes('SCOR')
+        ? 'bg-purple-50 text-purple-700 border-purple-200'
+        : 'bg-blue-50 text-blue-700 border-blue-200');
+
     return `
       <tr class="hover:bg-purple-50/40 transition-colors border-b border-slate-100">
         <td class="p-3 text-center font-mono text-slate-400 text-xs">${idx + 1}</td>
         <td class="p-3 font-bold text-slate-900">
           <div class="flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+            <span class="w-2 h-2 rounded-full ${t.insuranceCompany.includes('삼성') ? 'bg-sky-500' : 'bg-blue-500'}"></span>
             <span>${maskedPatient}</span>
             <span class="text-[10px] text-slate-400 font-mono">(${t.id})</span>
           </div>
+        </td>
+        <td class="p-3 text-center">
+          <span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${insBadgeClass}">
+            ${t.insuranceCompany || '삼성화재'}
+          </span>
         </td>
         <td class="p-3 text-slate-600 max-w-xs truncate" title="${t.hospital}">${t.hospital}</td>
         <td class="p-3 font-bold text-slate-800">${maskedCaregiver}</td>
@@ -39097,6 +39247,8 @@ window.openCareCallDriveFolder = openCareCallDriveFolder;
 window.openCareCallDriveModal = openCareCallDriveModal;
 window.closeCareCallDriveModal = closeCareCallDriveModal;
 window.handleSaveCareCallDriveConfig = handleSaveCareCallDriveConfig;
+window.handleCareCallSearchInput = handleCareCallSearchInput;
+window.setCareCallInsuranceFilter = setCareCallInsuranceFilter;
 
 function toggleCarePortPatientAccordion(groupId) {
   if (gCarePortExpandedPatients.has(groupId)) {
@@ -39138,12 +39290,17 @@ function toggleCarePortPatientSelect(groupId, checked) {
 }
 
 function renderCareLogs() {
+  const topInput = document.getElementById('careLogSearchInput');
+  const callInput = document.getElementById('careCallSearchInput');
   if (gCareLogViewMode === 'call') {
+    if (topInput && callInput && document.activeElement === topInput) {
+      callInput.value = topInput.value;
+    }
     renderCareCallTargets();
     return;
   }
-  const query = (document.getElementById('careLogSearchInput')?.value || '').trim().toLowerCase();
-  const insFilter = document.getElementById('careLogInsuranceFilter')?.value || 'ALL';
+  const query = (topInput?.value || '').trim().toLowerCase();
+  const insFilter = document.getElementById('careLogInsuranceFilter')?.value || '삼성화재';
 
   // Always build fresh patient groups so accurate dates and statuses are immediately reflected
   if (window.CarePortClient && typeof window.CarePortClient.groupLogsByPatient === 'function') {
@@ -45734,14 +45891,23 @@ function handleCareScheduleSubmit(e) {
   }
   as.updatedAt = new Date().toISOString();
 
-  // Sync to customer application record
+  // Sync to customer application record safely preserving earliest start date
   const app = (gApps || []).find(a => a.id === as.applyId);
   if (app) {
-    app.careStartDate = as.startDate;
-    app.careEndDate = as.endDate;
-    app.caregiverName = as.caregiverName;
-    app.caregiverPhone = as.phone || as.caregiverPhone;
-    app.dailyWage = as.dailyWage;
+    const allAppAssigns = (gAssigns || []).filter(a => a && a.applyId === as.applyId);
+    const allStarts = allAppAssigns.map(a => a.startDate).filter(d => d && /^\d{4}/.test(d)).sort();
+    if (allStarts.length > 0 && allStarts[0]) {
+      app.careStartDate = allStarts[0].slice(0, 10);
+    } else {
+      app.careStartDate = as.startDate;
+    }
+    const isLatestAssign = allAppAssigns.length <= 1 || (allAppAssigns[allAppAssigns.length - 1] && allAppAssigns[allAppAssigns.length - 1].id === as.id);
+    if (isLatestAssign) {
+      app.careEndDate = as.endDate;
+      app.caregiverName = as.caregiverName;
+      app.caregiverPhone = as.phone || as.caregiverPhone;
+      app.dailyWage = as.dailyWage;
+    }
     app.updatedAt = new Date().toISOString();
   }
 
