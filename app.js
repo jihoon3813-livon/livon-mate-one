@@ -33555,8 +33555,40 @@ function saveFaxDirectory() {
   }
 }
 
+function parseFaxDateToTime(dateStr) {
+  if (!dateStr) return 0;
+  if (typeof dateStr === 'number') return dateStr;
+  const s = String(dateStr).trim().replace(/[.\/]+/g, '-');
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if (m) {
+    const y = parseInt(m[1], 10);
+    const mo = parseInt(m[2], 10) - 1;
+    const day = parseInt(m[3], 10);
+    const h = m[4] !== undefined ? parseInt(m[4], 10) : 0;
+    const min = m[5] !== undefined ? parseInt(m[5], 10) : 0;
+    const sec = m[6] !== undefined ? parseInt(m[6], 10) : 0;
+    return new Date(y, mo, day, h, min, sec).getTime();
+  }
+  const t = Date.parse(s);
+  return isNaN(t) ? 0 : t;
+}
+
+function sortFaxLogsNewestFirst(logs) {
+  if (!Array.isArray(logs)) return [];
+  return [...logs].sort((a, b) => {
+    const tA = parseFaxDateToTime(a?.sentDate || a?.createdAt || a?.timestamp);
+    const tB = parseFaxDateToTime(b?.sentDate || b?.createdAt || b?.timestamp);
+    if (tB !== tA) return tB - tA;
+    return String(b?.id || '').localeCompare(String(a?.id || ''));
+  });
+}
+window.sortFaxLogsNewestFirst = sortFaxLogsNewestFirst;
+
 function saveFaxLogs() {
   try {
+    if (Array.isArray(gFaxLogs)) {
+      gFaxLogs = sortFaxLogsNewestFirst(gFaxLogs);
+    }
     localStorage.setItem('LIVON_FAX_LOGS', JSON.stringify(gFaxLogs));
   } catch (e) {
     console.warn('saveFaxLogs error:', e);
@@ -34177,6 +34209,8 @@ function renderFaxLogsTable() {
     }
     return true;
   });
+
+  filtered = sortFaxLogsNewestFirst(filtered);
 
   const countEl = document.getElementById('faxLogCountText');
   if (countEl) countEl.innerText = `총 ${filtered.length}건 조회됨`;
@@ -35844,6 +35878,9 @@ function initData() {
         gFaxLogs = [...window.REBORN_DATA.faxLogs];
       } else {
         gFaxLogs = [];
+      }
+      if (typeof sortFaxLogsNewestFirst === 'function') {
+        gFaxLogs = sortFaxLogsNewestFirst(gFaxLogs);
       }
     } catch (e) {
       gFaxLogs = (window.REBORN_DATA && window.REBORN_DATA.faxLogs) ? [...window.REBORN_DATA.faxLogs] : [];
