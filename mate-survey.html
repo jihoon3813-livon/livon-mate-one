@@ -279,34 +279,82 @@
       if (typeof lucide !== 'undefined') lucide.createIcons();
     });
 
+    function getFallbackTargets() {
+      try {
+        if (window.parent && window.parent.gSurveyState && Array.isArray(window.parent.gSurveyState.targets) && window.parent.gSurveyState.targets.length > 0) {
+          return window.parent.gSurveyState.targets;
+        }
+      } catch (e) {}
+      try {
+        if (window.opener && window.opener.gSurveyState && Array.isArray(window.opener.gSurveyState.targets) && window.opener.gSurveyState.targets.length > 0) {
+          return window.opener.gSurveyState.targets;
+        }
+      } catch (e) {}
+      try {
+        const raw = localStorage.getItem('LIVON_SURVEY_TARGETS');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+      return [];
+    }
+
     async function loadTargetOrCandidates() {
       const loadingBox = document.getElementById('loadingBox');
       const patientInfoCard = document.getElementById('patientInfoCard');
       const patientSelectorBox = document.getElementById('patientSelectorBox');
 
+      const fallbackTargets = getFallbackTargets();
+
+      // 우선 로컬/부모 창 캐시에서 대상자가 발견되면 즉시 UI 렌더링 (속도 극대화 & 오프라인/정적호스팅 지원)
+      if (gState.targetId && fallbackTargets.length > 0) {
+        const cached = fallbackTargets.find(t => t.id === gState.targetId || t.serviceId === gState.targetId);
+        if (cached) {
+          gState.target = cached;
+          renderPatientInfo(cached);
+          loadingBox.classList.add('hidden');
+          patientInfoCard.classList.remove('hidden');
+        }
+      }
+
       try {
-        // 1. 특정 Target ID가 전달된 경우
+        // 1. 특정 Target ID가 전달된 경우 서버 조회
         if (gState.targetId) {
-          const res = await fetch(`/api/survey/targets?targetId=${encodeURIComponent(gState.targetId)}&search=${encodeURIComponent(gState.targetId)}`);
-          const data = await res.json();
-          if (data.items && data.items.length > 0) {
-            const found = data.items.find(t => t.id === gState.targetId || t.serviceId === gState.targetId) || data.items[0];
-            gState.target = found;
-            renderPatientInfo(found);
-            loadingBox.classList.add('hidden');
-            patientInfoCard.classList.remove('hidden');
-            return;
+          try {
+            const res = await fetch(`/api/survey/targets?targetId=${encodeURIComponent(gState.targetId)}&search=${encodeURIComponent(gState.targetId)}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.items && data.items.length > 0) {
+                const found = data.items.find(t => t.id === gState.targetId || t.serviceId === gState.targetId) || data.items[0];
+                gState.target = found;
+                renderPatientInfo(found);
+                loadingBox.classList.add('hidden');
+                patientInfoCard.classList.remove('hidden');
+                return;
+              }
+            }
+          } catch (fetchErr) {
+            console.warn('[MateSurvey] API fetch failed, relying on cache/fallback:', fetchErr);
           }
+          if (gState.target) return; // 캐시에서 이미 렌더링 완료됨
         }
 
         // 2. Target ID가 없거나 검색되지 않은 경우, 전체 대상자 및 후보군 조회
-        const [targetsRes, candidatesRes] = await Promise.all([
-          fetch('/api/survey/targets').then(r => r.json()).catch(() => ({ items: [] })),
-          fetch('/api/survey/candidates').then(r => r.json()).catch(() => ({ items: [] }))
-        ]);
+        let targets = [];
+        let candidates = [];
+        try {
+          const [targetsRes, candidatesRes] = await Promise.all([
+            fetch('/api/survey/targets').then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] })),
+            fetch('/api/survey/candidates').then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] }))
+          ]);
+          targets = targetsRes.items || [];
+          candidates = candidatesRes.items || [];
+        } catch (e) {}
 
-        const targets = targetsRes.items || [];
-        const candidates = candidatesRes.items || [];
+        if (targets.length === 0 && fallbackTargets.length > 0) {
+          targets = fallbackTargets;
+        }
 
         // 간병인 이름으로 필터링
         let matched = null;
@@ -338,7 +386,9 @@
         }
       } catch (err) {
         console.error(err);
-        loadingBox.innerHTML = `<div class="text-xs text-rose-500 font-bold">환자 정보를 불러오지 못했습니다. 다시 시도해 주세요.</div>`;
+        if (!gState.target) {
+          loadingBox.innerHTML = `<div class="text-xs text-rose-500 font-bold">환자 정보를 불러오지 못했습니다. 다시 시도해 주세요.</div>`;
+        }
       }
     }
 

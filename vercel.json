@@ -7,6 +7,20 @@
       "includeFiles": "*.json"
     }
   },
+  "rewrites": [
+    {
+      "source": "/mate/survey",
+      "destination": "/mate-survey.html"
+    },
+    {
+      "source": "/mate-survey",
+      "destination": "/mate-survey.html"
+    },
+    {
+      "source": "/survey",
+      "destination": "/survey.html"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

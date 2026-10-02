@@ -29,3 +29,5 @@ scratch/
 .tmp_fax/
 recordings/
 carecall_recordings_log.json
+carecall_twilio_config.json
+carecall_*_config.json

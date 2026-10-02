@@ -937,7 +937,7 @@ function openSurveyAppModal(targetId) {
   const subEl = document.getElementById('surveyAppModalSub');
 
   const paramId = target ? target.id : targetId;
-  const appUrl = `/mate/survey?targetId=${encodeURIComponent(paramId)}`;
+  const appUrl = `/mate-survey.html?targetId=${encodeURIComponent(paramId)}`;
 
   gSurveyState.currentAppViewTargetId = paramId;
 
@@ -961,7 +961,7 @@ function openSurveyAppModal(targetId) {
 
 function openSurveyAppNewTab() {
   const targetId = gSurveyState.currentAppViewTargetId || '';
-  const appUrl = `/mate/survey?targetId=${encodeURIComponent(targetId)}`;
+  const appUrl = `/mate-survey.html?targetId=${encodeURIComponent(targetId)}`;
   window.open(appUrl, '_blank');
 }
 
