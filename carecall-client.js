@@ -93,7 +93,7 @@
 
       // 1. If marin, play real gpt-realtime generated voice audio directly
       if (v === 'marin') {
-        const audioUrls = ['/public/audio/preview_marin.wav', '/api/carecall/tts?voice=marin'];
+        const audioUrls = ['/audio/preview_marin.wav', '/api/carecall/tts?voice=marin'];
         for (const url of audioUrls) {
           try {
             const audio = new Audio(url);

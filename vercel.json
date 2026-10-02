@@ -9,6 +9,10 @@
   },
   "rewrites": [
     {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
       "source": "/mate/survey",
       "destination": "/mate-survey.html"
     },
