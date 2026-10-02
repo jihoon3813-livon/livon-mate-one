@@ -235,12 +235,19 @@ function generateTwiML({ patientName, caregiverName, workDate, workTime, schedul
 
   const recordActionUrl = `${baseUrl}/api/carecall/twiml-callback?${params}`;
 
+  const speechText = `안녕하세요, 리본케어 AI 간병일지 도우미입니다. ${caregiverName ? caregiverName + ' 간병사님, ' : ''}${patientName || ''} 환자님의 오늘 간병일지 작성을 위해 확인 질문을 드리겠습니다.
+첫째, 오늘 환자분의 전반적인 컨디션과 식사는 어떠셨나요?
+둘째, 소변과 대변, 배변 활동이나 투약에 특이사항은 없으셨나요?
+셋째, 거동이나 침상 체위 변경 시 평소와 다른 점은 없으셨나요?
+넷째, 오늘 혈압이나 체온, 혈당 등 따로 측정해 두신 수치가 있으신가요?
+위 내용들을 삐 소리 후 편안하게 말씀해 주시면 일지가 자동 작성됩니다. 말씀이 끝나시면 우물정자를 누르시거나 전화를 끊으시면 됩니다.`;
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Pause length="1" />
-  <Say language="ko-KR" voice="Polly.Seoyeon">안녕하세요, 리본케어 AI 간병일지 도우미입니다. ${escapeXml(caregiverName ? caregiverName + ' 간병사님, ' : '')}${escapeXml(patientName || '')} 환자님의 오늘 간병 내용을 삐 소리 후 편안하게 말씀해 주세요. 말씀이 끝나시면 우물정(#)자를 누르시거나 전화를 끊으시면 됩니다.</Say>
+  <Say language="ko-KR" voice="Polly.Seoyeon">${escapeXml(speechText)}</Say>
   <Record action="${escapeXml(recordActionUrl)}" maxLength="300" playBeep="true" trim="trim-silence" finishOnKey="#" />
-  <Say language="ko-KR" voice="Polly.Seoyeon">간병 내용이 성공적으로 녹음되었습니다. 감사합니다.</Say>
+  <Say language="ko-KR" voice="Polly.Seoyeon">소중한 간병 내용이 정상 등록되었습니다. 수고 많으셨습니다. 감사합니다.</Say>
 </Response>`;
 }
 

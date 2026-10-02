@@ -39786,6 +39786,181 @@ window.setCareCallInsuranceFilter = setCareCallInsuranceFilter;
 window.openTwilioConfigModal = openTwilioConfigModal;
 window.closeTwilioConfigModal = closeTwilioConfigModal;
 window.saveTwilioConfigFromModal = saveTwilioConfigFromModal;
+
+// =========================================================================
+// AI Care Call Question Voice Preview (TTS & Interactive Script Guide)
+// =========================================================================
+
+let gCareCallPreviewSpeed = 1.0;
+let gCareCallPreviewIndex = 0;
+let gCareCallPreviewIsPlaying = false;
+let gCareCallPreviewIsPaused = false;
+let gCareCallPreviewTimer = null;
+
+const CARECALL_PREVIEW_QUESTIONS = [
+  { id: 'qCard-intro', label: '도입 인사', text: '안녕하세요, 리본케어 AI 간병일지 도우미입니다. 간병사님, 환자님의 오늘 간병일지 작성을 위해 확인 질문을 드리겠습니다.' },
+  { id: 'qCard-1', label: '질문 1 (식사 및 컨디션)', text: '첫째, 오늘 환자분의 전반적인 컨디션과 식사는 어떠셨나요?' },
+  { id: 'qCard-2', label: '질문 2 (배변 및 투약)', text: '둘째, 소변과 대변, 배변 활동이나 투약에 특이사항은 없으셨나요?' },
+  { id: 'qCard-3', label: '질문 3 (거동 및 체위)', text: '셋째, 거동이나 침상 체위 변경 시 평소와 다른 점은 없으셨나요?' },
+  { id: 'qCard-4', label: '질문 4 (바이탈 수치)', text: '넷째, 오늘 혈압이나 체온, 혈당 등 따로 측정해 두신 수치가 있으신가요?' },
+  { id: 'qCard-outro', label: '녹음 안내', text: '위 내용들을 삐 소리 후 편안하게 말씀해 주시면 일지가 자동 작성됩니다. 말씀이 끝나시면 우물정자를 누르시거나 전화를 끊으시면 됩니다.' }
+];
+
+function handlePlayCareCallQuestionPreview() {
+  const modal = document.getElementById('careCallQuestionPreviewModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+  playCareCallQuestions(0);
+}
+
+function closeCareCallQuestionPreviewModal() {
+  stopCareCallQuestions();
+  const modal = document.getElementById('careCallQuestionPreviewModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function setCareCallPreviewSpeed(speed) {
+  gCareCallPreviewSpeed = speed;
+  ['09', '10', '115'].forEach(k => {
+    const btn = document.getElementById(`btnSpeed${k}`);
+    if (btn) {
+      btn.className = 'px-2 py-0.5 rounded-lg text-slate-600 hover:bg-purple-50 transition-colors';
+    }
+  });
+  const activeKey = speed === 0.9 ? '09' : speed === 1.15 ? '115' : '10';
+  const activeBtn = document.getElementById(`btnSpeed${activeKey}`);
+  if (activeBtn) {
+    activeBtn.className = 'px-2 py-0.5 rounded-lg bg-purple-600 text-white transition-colors';
+  }
+  if (gCareCallPreviewIsPlaying && !gCareCallPreviewIsPaused) {
+    playCareCallQuestions(gCareCallPreviewIndex);
+  }
+}
+
+function updateCareCallQuestionUI(activeIndex) {
+  CARECALL_PREVIEW_QUESTIONS.forEach((q, idx) => {
+    const el = document.getElementById(q.id);
+    if (!el) return;
+    if (idx === activeIndex) {
+      el.className = 'p-3.5 rounded-2xl border-2 border-purple-500 bg-purple-50/90 shadow-sm transition-all transform scale-[1.01]';
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      el.className = 'p-3 rounded-2xl border border-slate-200 bg-white opacity-80 hover:opacity-100 transition-all';
+    }
+  });
+
+  const ping = document.getElementById('previewAudioPing');
+  const dot = document.getElementById('previewAudioDot');
+  const statusTxt = document.getElementById('previewAudioStatusText');
+  const playTxt = document.getElementById('textPreviewPlay');
+
+  if (gCareCallPreviewIsPlaying && !gCareCallPreviewIsPaused) {
+    if (ping) ping.classList.remove('hidden');
+    if (dot) dot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-600';
+    if (statusTxt && activeIndex >= 0 && activeIndex < CARECALL_PREVIEW_QUESTIONS.length) {
+      statusTxt.innerText = `🔊 [${CARECALL_PREVIEW_QUESTIONS[activeIndex].label}] 낭독 중...`;
+    }
+    if (playTxt) playTxt.innerText = '다시 듣기';
+  } else if (gCareCallPreviewIsPaused) {
+    if (ping) ping.classList.add('hidden');
+    if (dot) dot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500';
+    if (statusTxt) statusTxt.innerText = '⏸ 일시 정지됨';
+  } else {
+    if (ping) ping.classList.add('hidden');
+    if (dot) dot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-slate-300';
+    if (statusTxt) statusTxt.innerText = '⏹ 재생 종료 (다시 듣기를 누르면 재생됩니다)';
+    if (playTxt) playTxt.innerText = '처음부터 듣기';
+  }
+}
+
+function playCareCallQuestions(startIndex = 0) {
+  if (!('speechSynthesis' in window)) {
+    alert('현재 사용 중인 브라우저가 음성 합성(SpeechSynthesis)을 지원하지 않습니다. 화면에 표시된 질문 스크립트를 확인해 주세요.');
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+  if (gCareCallPreviewTimer) clearTimeout(gCareCallPreviewTimer);
+
+  gCareCallPreviewIndex = startIndex;
+  gCareCallPreviewIsPlaying = true;
+  gCareCallPreviewIsPaused = false;
+
+  const speakNext = () => {
+    if (!gCareCallPreviewIsPlaying || gCareCallPreviewIsPaused) return;
+    if (gCareCallPreviewIndex >= CARECALL_PREVIEW_QUESTIONS.length) {
+      gCareCallPreviewIsPlaying = false;
+      updateCareCallQuestionUI(-1);
+      return;
+    }
+
+    const item = CARECALL_PREVIEW_QUESTIONS[gCareCallPreviewIndex];
+    updateCareCallQuestionUI(gCareCallPreviewIndex);
+
+    const utter = new SpeechSynthesisUtterance(item.text);
+    utter.lang = 'ko-KR';
+    utter.rate = gCareCallPreviewSpeed || 1.0;
+    utter.pitch = 1.05;
+
+    const voices = window.speechSynthesis.getVoices();
+    const koVoice = voices.find(v => v.lang === 'ko-KR' || v.lang.includes('ko') || v.name.includes('Korean'));
+    if (koVoice) utter.voice = koVoice;
+
+    utter.onend = () => {
+      if (!gCareCallPreviewIsPlaying || gCareCallPreviewIsPaused) return;
+      gCareCallPreviewIndex++;
+      gCareCallPreviewTimer = setTimeout(speakNext, 550);
+    };
+
+    utter.onerror = (e) => {
+      console.warn('[CareCall Preview Speech Error]', e);
+      gCareCallPreviewIndex++;
+      if (gCareCallPreviewIndex < CARECALL_PREVIEW_QUESTIONS.length) {
+        gCareCallPreviewTimer = setTimeout(speakNext, 400);
+      } else {
+        stopCareCallQuestions();
+      }
+    };
+
+    window.speechSynthesis.speak(utter);
+  };
+
+  speakNext();
+}
+
+function togglePauseCareCallQuestions() {
+  if (!('speechSynthesis' in window)) return;
+  if (!gCareCallPreviewIsPlaying) return;
+
+  const pauseBtnText = document.getElementById('textPreviewPause');
+
+  if (gCareCallPreviewIsPaused) {
+    gCareCallPreviewIsPaused = false;
+    if (pauseBtnText) pauseBtnText.innerText = '일시정지';
+    window.speechSynthesis.resume();
+    updateCareCallQuestionUI(gCareCallPreviewIndex);
+  } else {
+    gCareCallPreviewIsPaused = true;
+    if (pauseBtnText) pauseBtnText.innerText = '이어듣기';
+    window.speechSynthesis.pause();
+    updateCareCallQuestionUI(gCareCallPreviewIndex);
+  }
+}
+
+function stopCareCallQuestions() {
+  gCareCallPreviewIsPlaying = false;
+  gCareCallPreviewIsPaused = false;
+  if (gCareCallPreviewTimer) clearTimeout(gCareCallPreviewTimer);
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+  const pauseBtnText = document.getElementById('textPreviewPause');
+  if (pauseBtnText) pauseBtnText.innerText = '일시정지';
+  updateCareCallQuestionUI(-1);
+}
+
 function openCareCallTestModal() {
   if (typeof openCtiCallModal === 'function') {
     openCtiCallModal({
@@ -39799,6 +39974,12 @@ function openCareCallTestModal() {
   }
 }
 
+window.handlePlayCareCallQuestionPreview = handlePlayCareCallQuestionPreview;
+window.closeCareCallQuestionPreviewModal = closeCareCallQuestionPreviewModal;
+window.playCareCallQuestions = playCareCallQuestions;
+window.togglePauseCareCallQuestions = togglePauseCareCallQuestions;
+window.stopCareCallQuestions = stopCareCallQuestions;
+window.setCareCallPreviewSpeed = setCareCallPreviewSpeed;
 window.openCareCallTestModal = openCareCallTestModal;
 window.setCareCallQuickFilter = setCareCallQuickFilter;
 window.handleCareCallFilterChange = handleCareCallFilterChange;
