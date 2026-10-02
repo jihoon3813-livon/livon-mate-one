@@ -8,10 +8,12 @@ const CONFIG_FILE = path.join(process.cwd(), 'carecall_drive_config.json');
 const LOG_FILE = path.join(process.cwd(), 'carecall_recordings_log.json');
 const LOCAL_RECORDINGS_DIR = path.join(process.cwd(), 'recordings', 'carecalls');
 
-// Ensure local recordings dir exists
-if (!fs.existsSync(LOCAL_RECORDINGS_DIR)) {
-  fs.mkdirSync(LOCAL_RECORDINGS_DIR, { recursive: true });
-}
+// Ensure local recordings dir exists (safe for read-only environments like Vercel)
+try {
+  if (!fs.existsSync(LOCAL_RECORDINGS_DIR)) {
+    fs.mkdirSync(LOCAL_RECORDINGS_DIR, { recursive: true });
+  }
+} catch (_) {}
 
 function getDriveConfig() {
   let cfg = {
