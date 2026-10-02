@@ -39566,8 +39566,8 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
     : '';
 
   const promptMsg = targetPhone
-    ? `[📞 AI 간병통화 발신 안내]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 간병일자: ${workDate || '오늘'}\n\n전화를 수신할 휴대전화 번호를 확인하세요.\n(테스트를 위해 본인 휴대폰 번호로 변경하여 발신 테스트를 진행할 수 있습니다):`
-    : `[📞 AI 간병통화 발신 안내]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 간병일자: ${workDate || '오늘'}\n\n등록된 간병사 연락처가 없습니다.\n발신 테스트를 위해 전화를 수신할 휴대전화 번호(010...)를 입력해 주세요:`;
+    ? `[📞 AI 간병통화 발신 안내]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 간병일자: ${workDate || '오늘'}\n\n전화를 수신할 휴대전화 번호를 확인하세요.\n(테스트를 위해 본인 휴대폰 번호로 변경할 수 있습니다):\n\n※ [필독] 현재 Twilio 무료 체험 계정 연동 중입니다.\n전화를 받으신 즉시 키패드를 열고 5초 이내에 아무 숫자(1번)를 누르셔야 한국어 AI 음성으로 연결됩니다! (누르지 않으면 자동 종료)`
+    : `[📞 AI 간병통화 발신 안내]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 간병일자: ${workDate || '오늘'}\n\n등록된 간병사 연락처가 없습니다.\n발신 테스트를 위해 전화를 수신할 휴대전화 번호(010...)를 입력해 주세요:\n\n※ [필독] 전화를 받으신 즉시 키패드를 열고 아무 숫자(1번)를 누르셔야 연결됩니다.`;
 
   const inputPhone = prompt(promptMsg, targetPhone || '010-');
   if (!inputPhone) return;
