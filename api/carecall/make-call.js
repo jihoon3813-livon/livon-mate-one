@@ -3,6 +3,7 @@
 
 const { getTwilioConfig, placeTwilioCall } = require('./twilio-service');
 const { makeOutboundCall } = require('../../cti-client');
+const { getVoiceConfig } = require('./voice-config');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -25,6 +26,8 @@ module.exports = async function handler(req, res) {
     }
     body = body || {};
 
+    const savedVoiceCfg = getVoiceConfig();
+
     const {
       patientName,
       caregiverName,
@@ -32,7 +35,7 @@ module.exports = async function handler(req, res) {
       workDate,
       workTime,
       insuranceCompany = '삼성화재',
-      voice = 'marin',
+      voice = savedVoiceCfg.voice || 'marin',
       scheduleId,
       forceCti = false
     } = body;

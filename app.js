@@ -39841,10 +39841,62 @@ const CARECALL_PREVIEW_QUESTIONS = [
   { id: 'qCard-outro', label: '녹음 안내', text: '위 내용들을 삐 소리 후 편안하게 말씀해 주시면 일지가 자동 작성됩니다. 말씀이 끝나시면 우물정자를 누르시거나 전화를 끊으시면 됩니다.' }
 ];
 
+let gCareCallPreviewAudioObj = null;
+
+function updateModalVoiceLabel(voiceId) {
+  const v = voiceId || window.CareCallClient?.selectedVoice || 'marin';
+  const labelEl = document.getElementById('currentActiveVoiceDisplay');
+  if (labelEl) {
+    const vObj = window.CareCallClient?.voices?.find(item => item.id === v);
+    labelEl.innerText = vObj ? vObj.name : v;
+  }
+}
+
+function handleModalVoiceChange(voiceId) {
+  stopCareCallQuestions();
+  if (window.CareCallClient) {
+    window.CareCallClient.setVoice(voiceId);
+  }
+  updateModalVoiceLabel(voiceId);
+  const statusTxt = document.getElementById('previewAudioStatusText');
+  if (statusTxt) {
+    statusTxt.innerText = `선택된 음성 [${voiceId}] - 재생 버튼을 누르시면 이 목소리로 질문이 나옵니다.`;
+  }
+}
+
+async function handleSaveCareCallVoiceFromModal() {
+  const sel = document.getElementById('modalCareCallVoiceSelect');
+  const voice = sel ? sel.value : (window.CareCallClient?.selectedVoice || 'marin');
+  const speed = gCareCallPreviewSpeed || 1.0;
+
+  if (window.CareCallClient) {
+    await window.CareCallClient.saveVoice(voice, speed);
+  }
+
+  updateModalVoiceLabel(voice);
+
+  const saveMsg = document.getElementById('modalVoiceSaveMsg');
+  if (saveMsg) {
+    saveMsg.classList.remove('hidden');
+    saveMsg.innerText = `✅ [${voice.toUpperCase()}] 목소리가 AI 기본 발신음으로 저장되었습니다!`;
+    setTimeout(() => {
+      saveMsg.classList.add('hidden');
+    }, 4000);
+  }
+
+  const vObj = window.CareCallClient?.voices?.find(item => item.id === voice);
+  const voiceTitle = vObj ? vObj.name : voice;
+  alert(`📞 [AI 발신 목소리 저장 완료]\n\n• 저장된 목소리: ${voiceTitle}\n• 발화 속도: ${speed}x\n\n이제 메이트원에서 [즉시 발신]을 누르시거나 자동 스케줄 발신 시, 선택하신 [${voiceTitle}] 목소리로 간병사에게 전화가 걸려옵니다.`);
+}
+
 function handlePlayCareCallQuestionPreview() {
   const modal = document.getElementById('careCallQuestionPreviewModal');
   if (modal) {
     modal.classList.remove('hidden');
+    if (window.CareCallClient) {
+      window.CareCallClient.syncVoiceUI();
+    }
+    updateModalVoiceLabel(window.CareCallClient?.selectedVoice || 'marin');
     if (window.lucide) lucide.createIcons();
   }
   playCareCallQuestions(0);
@@ -39869,8 +39921,11 @@ function setCareCallPreviewSpeed(speed) {
   if (activeBtn) {
     activeBtn.className = 'px-2 py-0.5 rounded-lg bg-purple-600 text-white transition-colors';
   }
-  if (gCareCallPreviewIsPlaying && !gCareCallPreviewIsPaused) {
-    playCareCallQuestions(gCareCallPreviewIndex);
+  if (window.CareCallClient) {
+    window.CareCallClient.setSpeed(speed);
+  }
+  if (gCareCallPreviewAudioObj) {
+    gCareCallPreviewAudioObj.playbackRate = speed;
   }
 }
 
@@ -39911,75 +39966,145 @@ function updateCareCallQuestionUI(activeIndex) {
 }
 
 function playCareCallQuestions(startIndex = 0) {
-  if (!('speechSynthesis' in window)) {
-    alert('현재 사용 중인 브라우저가 음성 합성(SpeechSynthesis)을 지원하지 않습니다. 화면에 표시된 질문 스크립트를 확인해 주세요.');
-    return;
-  }
+  stopCareCallQuestions();
 
-  window.speechSynthesis.cancel();
-  if (gCareCallPreviewTimer) clearTimeout(gCareCallPreviewTimer);
+  const selectedVoice = (window.CareCallClient?.selectedVoice || 'marin').toLowerCase();
+  updateModalVoiceLabel(selectedVoice);
 
   gCareCallPreviewIndex = startIndex;
   gCareCallPreviewIsPlaying = true;
   gCareCallPreviewIsPaused = false;
 
+  // 1. Marin 음성일 경우: 고음질 Realtime 실제 오디오 우선 재생
+  if (selectedVoice === 'marin') {
+    try {
+      const audio = new Audio('/audio/preview_marin.wav');
+      audio.playbackRate = gCareCallPreviewSpeed || 1.0;
+      gCareCallPreviewAudioObj = audio;
+
+      // 시간별 질문 카드 하이라이트 동기화
+      audio.ontimeupdate = () => {
+        if (!gCareCallPreviewIsPlaying) return;
+        const cur = audio.currentTime;
+        let cardIdx = 0;
+        if (cur < 4.0) cardIdx = 0;       // 도입
+        else if (cur < 8.5) cardIdx = 1;  // 질문 1
+        else if (cur < 13.0) cardIdx = 2; // 질문 2
+        else if (cur < 17.5) cardIdx = 3; // 질문 3
+        else if (cur < 22.0) cardIdx = 4; // 질문 4
+        else cardIdx = 5;                 // 마무리
+
+        if (cardIdx !== gCareCallPreviewIndex) {
+          gCareCallPreviewIndex = cardIdx;
+          updateCareCallQuestionUI(cardIdx);
+        }
+      };
+
+      audio.onended = () => {
+        stopCareCallQuestions();
+      };
+
+      audio.onerror = () => {
+        console.warn('[CareCall Preview Audio File Fallback to TTS API]');
+        playQuestionsViaTTS(startIndex, selectedVoice);
+      };
+
+      updateCareCallQuestionUI(0);
+      audio.play().catch(() => playQuestionsViaTTS(startIndex, selectedVoice));
+      return;
+    } catch (_) {
+      playQuestionsViaTTS(startIndex, selectedVoice);
+      return;
+    }
+  }
+
+  // 2. 다른 음성일 경우: TTS API 또는 Web Speech로 재생
+  playQuestionsViaTTS(startIndex, selectedVoice);
+}
+
+function playQuestionsViaTTS(startIndex, selectedVoice) {
   const speakNext = () => {
     if (!gCareCallPreviewIsPlaying || gCareCallPreviewIsPaused) return;
     if (gCareCallPreviewIndex >= CARECALL_PREVIEW_QUESTIONS.length) {
-      gCareCallPreviewIsPlaying = false;
-      updateCareCallQuestionUI(-1);
+      stopCareCallQuestions();
       return;
     }
 
     const item = CARECALL_PREVIEW_QUESTIONS[gCareCallPreviewIndex];
     updateCareCallQuestionUI(gCareCallPreviewIndex);
 
-    const utter = new SpeechSynthesisUtterance(item.text);
-    utter.lang = 'ko-KR';
-    utter.rate = gCareCallPreviewSpeed || 1.0;
-    utter.pitch = 1.05;
-
-    const voices = window.speechSynthesis.getVoices();
-    const koVoice = voices.find(v => v.lang === 'ko-KR' || v.lang.includes('ko') || v.name.includes('Korean'));
-    if (koVoice) utter.voice = koVoice;
-
-    utter.onend = () => {
-      if (!gCareCallPreviewIsPlaying || gCareCallPreviewIsPaused) return;
-      gCareCallPreviewIndex++;
-      gCareCallPreviewTimer = setTimeout(speakNext, 550);
-    };
-
-    utter.onerror = (e) => {
-      console.warn('[CareCall Preview Speech Error]', e);
-      gCareCallPreviewIndex++;
-      if (gCareCallPreviewIndex < CARECALL_PREVIEW_QUESTIONS.length) {
-        gCareCallPreviewTimer = setTimeout(speakNext, 400);
-      } else {
-        stopCareCallQuestions();
-      }
-    };
-
-    window.speechSynthesis.speak(utter);
+    // TTS API 시도
+    try {
+      const ttsUrl = `/api/carecall/tts?voice=${encodeURIComponent(selectedVoice)}&speed=${gCareCallPreviewSpeed || 1.0}&text=${encodeURIComponent(item.text)}`;
+      const audio = new Audio(ttsUrl);
+      gCareCallPreviewAudioObj = audio;
+      audio.onended = () => {
+        if (!gCareCallPreviewIsPlaying || gCareCallPreviewIsPaused) return;
+        gCareCallPreviewIndex++;
+        gCareCallPreviewTimer = setTimeout(speakNext, 450);
+      };
+      audio.onerror = () => {
+        speakViaWebSpeech(item.text, selectedVoice, () => {
+          gCareCallPreviewIndex++;
+          gCareCallPreviewTimer = setTimeout(speakNext, 450);
+        });
+      };
+      audio.play().catch(() => {
+        speakViaWebSpeech(item.text, selectedVoice, () => {
+          gCareCallPreviewIndex++;
+          gCareCallPreviewTimer = setTimeout(speakNext, 450);
+        });
+      });
+    } catch (_) {
+      speakViaWebSpeech(item.text, selectedVoice, () => {
+        gCareCallPreviewIndex++;
+        gCareCallPreviewTimer = setTimeout(speakNext, 450);
+      });
+    }
   };
 
   speakNext();
 }
 
-function togglePauseCareCallQuestions() {
-  if (!('speechSynthesis' in window)) return;
-  if (!gCareCallPreviewIsPlaying) return;
+function speakViaWebSpeech(text, voiceId, onEndCallback) {
+  if (!('speechSynthesis' in window)) {
+    if (onEndCallback) onEndCallback();
+    return;
+  }
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'ko-KR';
+  utter.rate = gCareCallPreviewSpeed || 1.0;
+  const isMale = ['ash', 'echo', 'onyx'].includes(voiceId);
+  utter.pitch = isMale ? 0.75 : 1.15;
+  const voices = window.speechSynthesis.getVoices();
+  const koVoice = voices.find(v => v.lang === 'ko-KR' || v.lang.includes('ko') || v.name.includes('Korean'));
+  if (koVoice) utter.voice = koVoice;
+  utter.onend = () => { if (onEndCallback) onEndCallback(); };
+  utter.onerror = () => { if (onEndCallback) onEndCallback(); };
+  window.speechSynthesis.speak(utter);
+}
 
+function togglePauseCareCallQuestions() {
+  if (!gCareCallPreviewIsPlaying) return;
   const pauseBtnText = document.getElementById('textPreviewPause');
 
   if (gCareCallPreviewIsPaused) {
     gCareCallPreviewIsPaused = false;
     if (pauseBtnText) pauseBtnText.innerText = '일시정지';
-    window.speechSynthesis.resume();
+    if (gCareCallPreviewAudioObj) {
+      gCareCallPreviewAudioObj.play().catch(() => {});
+    } else if ('speechSynthesis' in window) {
+      window.speechSynthesis.resume();
+    }
     updateCareCallQuestionUI(gCareCallPreviewIndex);
   } else {
     gCareCallPreviewIsPaused = true;
     if (pauseBtnText) pauseBtnText.innerText = '이어듣기';
-    window.speechSynthesis.pause();
+    if (gCareCallPreviewAudioObj) {
+      gCareCallPreviewAudioObj.pause();
+    } else if ('speechSynthesis' in window) {
+      window.speechSynthesis.pause();
+    }
     updateCareCallQuestionUI(gCareCallPreviewIndex);
   }
 }
@@ -39988,6 +40113,13 @@ function stopCareCallQuestions() {
   gCareCallPreviewIsPlaying = false;
   gCareCallPreviewIsPaused = false;
   if (gCareCallPreviewTimer) clearTimeout(gCareCallPreviewTimer);
+  if (gCareCallPreviewAudioObj) {
+    try {
+      gCareCallPreviewAudioObj.pause();
+      gCareCallPreviewAudioObj.currentTime = 0;
+      gCareCallPreviewAudioObj = null;
+    } catch (_) {}
+  }
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
   }
@@ -40016,6 +40148,8 @@ window.togglePauseCareCallQuestions = togglePauseCareCallQuestions;
 window.stopCareCallQuestions = stopCareCallQuestions;
 window.setCareCallPreviewSpeed = setCareCallPreviewSpeed;
 window.openCareCallTestModal = openCareCallTestModal;
+window.handleModalVoiceChange = handleModalVoiceChange;
+window.handleSaveCareCallVoiceFromModal = handleSaveCareCallVoiceFromModal;
 window.setCareCallQuickFilter = setCareCallQuickFilter;
 window.handleCareCallFilterChange = handleCareCallFilterChange;
 window.toggleCareCallPatientAccordion = toggleCareCallPatientAccordion;

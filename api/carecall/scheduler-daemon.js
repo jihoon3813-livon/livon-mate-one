@@ -236,7 +236,7 @@ async function runSchedulerTick() {
                 patientName,
                 caregiverName,
                 workDate: dateStr,
-                voice: 'marin'
+                voice: (require('./voice-config').getVoiceConfig) ? require('./voice-config').getVoiceConfig().voice : 'marin'
               });
               console.log(`[CareCall Auto Dispatch] Twilio AI 직발신 성공 (${patientName})`);
             } catch (err) {

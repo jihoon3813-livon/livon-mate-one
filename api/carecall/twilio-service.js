@@ -105,6 +105,15 @@ function formatE164(phone) {
 async function placeTwilioCall({ phone, patientName, caregiverName, workDate, workTime, scheduleId, voice, baseUrl: customBaseUrl }) {
   const cfg = getTwilioConfig();
 
+  let effectiveVoice = voice;
+  if (!effectiveVoice) {
+    try {
+      const { getVoiceConfig } = require('./voice-config');
+      effectiveVoice = getVoiceConfig().voice;
+    } catch (_) {}
+  }
+  effectiveVoice = effectiveVoice || 'marin';
+
   if (!cfg.accountSid || !cfg.authToken) {
     throw new Error('Twilio 계정 정보(Account SID / Auth Token)가 등록되어 있지 않습니다. 설정창에서 등록해주세요.');
   }
@@ -130,7 +139,7 @@ async function placeTwilioCall({ phone, patientName, caregiverName, workDate, wo
     workDate: workDate || '',
     workTime: workTime || '',
     scheduleId: scheduleId || '',
-    voice: voice || 'marin'
+    voice: effectiveVoice
   });
   const twimlUrl = `${baseUrl}/api/carecall/twiml?${params}`;
 

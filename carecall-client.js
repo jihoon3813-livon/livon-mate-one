@@ -35,43 +35,90 @@
     ],
 
     async init() {
-      let savedVoice = localStorage.getItem('LIVON_CARECALL_VOICE');
-      if (!savedVoice || savedVoice === 'alloy') {
-        savedVoice = 'marin';
-        localStorage.setItem('LIVON_CARECALL_VOICE', 'marin');
-      }
-      this.selectedVoice = savedVoice;
-      const selVoice = document.getElementById('selectCareCallVoice');
-      if (selVoice) selVoice.value = savedVoice;
-      const savedSpeed = localStorage.getItem('LIVON_CARECALL_SPEED');
-      if (savedSpeed) {
-        this.selectedSpeed = parseFloat(savedSpeed) || 1.0;
-        const selSpeed = document.getElementById('selectCareCallSpeed');
-        if (selSpeed) selSpeed.value = String(this.selectedSpeed);
-      }
+      await this.loadVoiceConfig();
       await this.loadDriveConfig();
     },
 
-    async loadDriveConfig() {
+    async loadVoiceConfig() {
+      let savedVoice = localStorage.getItem('LIVON_CARECALL_VOICE');
+      let savedSpeed = parseFloat(localStorage.getItem('LIVON_CARECALL_SPEED') || '1.0');
+
       try {
-        const res = await fetch('/api/carecall/drive-config');
+        const res = await fetch('/api/carecall/voice-config');
         if (res.ok) {
           const json = await res.json();
-          if (json.config) this.driveConfig = json.config;
+          if (json.config && json.config.voice) {
+            savedVoice = json.config.voice;
+            savedSpeed = json.config.speed || savedSpeed;
+          }
         }
-      } catch (e) {
-        console.warn('[CareCall] Drive config load fallback:', e);
+      } catch (_) {}
+
+      if (!savedVoice || savedVoice === 'alloy') {
+        savedVoice = 'marin';
+      }
+
+      this.selectedVoice = savedVoice;
+      this.selectedSpeed = savedSpeed;
+      localStorage.setItem('LIVON_CARECALL_VOICE', savedVoice);
+      localStorage.setItem('LIVON_CARECALL_SPEED', String(savedSpeed));
+      this.syncVoiceUI();
+    },
+
+    syncVoiceUI() {
+      const v = this.selectedVoice || 'marin';
+      const s = String(this.selectedSpeed || 1.0);
+
+      const mainSelect = document.getElementById('selectCareCallVoice');
+      if (mainSelect) mainSelect.value = v;
+
+      const mainSpeed = document.getElementById('selectCareCallSpeed');
+      if (mainSpeed) mainSpeed.value = s;
+
+      const modalSelect = document.getElementById('modalCareCallVoiceSelect');
+      if (modalSelect) modalSelect.value = v;
+
+      const badgeName = this.voices.find(item => item.id === v)?.name || v;
+      const statusBadges = document.querySelectorAll('.active-carecall-voice-badge');
+      statusBadges.forEach(b => {
+        b.innerText = badgeName;
+      });
+    },
+
+    async saveVoice(voiceId, speedVal) {
+      const v = (voiceId || this.selectedVoice || 'marin').toLowerCase();
+      const s = speedVal !== undefined ? parseFloat(speedVal) : (this.selectedSpeed || 1.0);
+
+      this.selectedVoice = v;
+      this.selectedSpeed = s;
+      localStorage.setItem('LIVON_CARECALL_VOICE', v);
+      localStorage.setItem('LIVON_CARECALL_SPEED', String(s));
+      this.syncVoiceUI();
+
+      try {
+        const res = await fetch('/api/carecall/voice-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ voice: v, speed: s })
+        });
+        const json = await res.json();
+        return json.success ? json : { success: true };
+      } catch (err) {
+        console.warn('[CareCall] Server voice save warning:', err);
+        return { success: true, localOnly: true };
       }
     },
 
     setVoice(voiceId) {
       this.selectedVoice = voiceId;
       localStorage.setItem('LIVON_CARECALL_VOICE', voiceId);
+      this.syncVoiceUI();
     },
 
     setSpeed(speedVal) {
       this.selectedSpeed = parseFloat(speedVal) || 1.0;
       localStorage.setItem('LIVON_CARECALL_SPEED', String(this.selectedSpeed));
+      this.syncVoiceUI();
     },
 
     /**
