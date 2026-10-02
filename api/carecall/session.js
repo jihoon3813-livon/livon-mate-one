@@ -2,7 +2,35 @@
 // OpenAI Realtime Client Secret Token Generator for AI Care Call
 
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
 const { buildCareCallPrompt } = require('./prompt');
+
+function getApiKey() {
+  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
+  const envCandidates = [
+    path.join(__dirname, '../../.env.local'),
+    path.join(__dirname, '../.env.local'),
+    path.join(process.cwd(), '.env.local'),
+    path.join(process.cwd(), '.env')
+  ];
+  for (const p of envCandidates) {
+    if (fs.existsSync(p)) {
+      try {
+        const text = fs.readFileSync(p, 'utf8');
+        const m = text.match(/^\s*OPENAI_API_KEY\s*=\s*(.+)$/m);
+        if (m && m[1]) {
+          const key = m[1].trim().replace(/^["']|["']$/g, '');
+          if (key) {
+            process.env.OPENAI_API_KEY = key;
+            return key;
+          }
+        }
+      } catch (_) {}
+    }
+  }
+  return null;
+}
 
 function postJson(urlStr, headers, data) {
   return new Promise((resolve, reject) => {
@@ -77,7 +105,7 @@ module.exports = async function handler(req, res) {
       scheduleId
     } = body;
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = getApiKey();
     if (!apiKey) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       return res.status(500).json({
