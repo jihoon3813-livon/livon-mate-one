@@ -54,8 +54,8 @@ module.exports = async function handler(req, res) {
   // If real Realtime marin voice is requested, serve genuine gpt-realtime audio file
   if (rawVoice === 'marin') {
     const candidatePaths = [
-      path.join(__dirname, '../../public/audio/preview_marin.wav'),
-      path.join(process.cwd(), 'public/audio/preview_marin.wav'),
+      path.join(__dirname, '../../audio/preview_marin.wav'),
+      path.join(process.cwd(), 'audio/preview_marin.wav'),
       path.join(__dirname, 'preview_marin.wav')
     ];
     for (const p of candidatePaths) {
