@@ -2064,8 +2064,8 @@ async function runConvexLiveSync() {
 
 function startConvexLiveSync() {
   if (gConvexLiveSyncTimer) return;
-  // 10초마다 백그라운드에서 실시간 변경 감지 및 화면 갱신 (Convex rate limit 보호)
-  gConvexLiveSyncTimer = setInterval(runConvexLiveSync, 10000);
+  // 60초마다 백그라운드에서 실시간 변경 감지 및 화면 갱신 (서버 트래픽 및 과금 85% 대폭 절감)
+  gConvexLiveSyncTimer = setInterval(runConvexLiveSync, 60000);
 
   // 사용자가 Convex 대시보드나 다른 창에서 작업 후 브라우저 탭으로 복귀했을 때 즉시 0초 동기화
   window.addEventListener('focus', () => {
@@ -2076,7 +2076,7 @@ function startConvexLiveSync() {
       runConvexLiveSync();
     }
   });
-  console.log('[LiveSync] Convex 실시간 양방향 자동 동기화 엔진이 가동되었습니다. (10초 주기/창 전환 감지)');
+  console.log('[LiveSync] Convex 실시간 양방향 자동 동기화 엔진이 가동되었습니다. (60초 주기/창 전환 감지)');
 }
 window.startConvexLiveSync = startConvexLiveSync;
 window.runConvexLiveSync = runConvexLiveSync;
@@ -7025,8 +7025,8 @@ function syncSamsungSpreadsheetData(silent = false) {
   // 3. 삼성화재 관리대장 엑셀 기반 상품명 등 상세 정보 통합허브 보강
   const enrichedCount = enrichHubSamsungCustomersFromSamsungExcel();
 
-  // Convex Cloud에 스프레드시트 데이터 실시간 일괄 동기화 및 영구 저장
-  if (typeof syncToConvex === 'function') {
+  // Convex Cloud에 스프레드시트 데이터 실시간 일괄 동기화 (실제 변경 건이 있거나 수동 동기화 요청 시에만 실행)
+  if (typeof syncToConvex === 'function' && (!silent || addedHubCount > 0 || enrichedCount > 0)) {
     if (gSamsungSheets.target && gSamsungSheets.target.length > 0) {
       syncToConvex('sync:saveSamsungSheetBatch', { sheetKey: 'target', rows: gSamsungSheets.target, replace: true }).catch(console.warn);
     }
@@ -16349,13 +16349,33 @@ var gSamsungDriveLastSyncedFile = localStorage.getItem('LIVON_SAMSUNG_DRIVE_SYNC
 
 async function initSamsungDriveAutoSync() {
   await loadSamsungDriveConfig();
-  await checkSamsungDriveStatus();
 
-  // 10분 주기 자동 백그라운드 체크 (새 파일 감지 시 자동 업데이트)
+  // [일일 1회 최적화]: 삼성화재 사전 명단은 하루에 한 번만 자동 동기화 체크
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const lastSyncDate = localStorage.getItem('LIVON_SAMSUNG_DRIVE_LAST_SYNC_DATE');
+  const needsDailySync = (lastSyncDate !== todayStr);
+
+  if (needsDailySync) {
+    console.log(`[SamsungDrive] 금일(${todayStr}) 최초 1회 사전명단 동기화 상태를 확인합니다.`);
+    await checkSamsungDriveStatus();
+    localStorage.setItem('LIVON_SAMSUNG_DRIVE_LAST_SYNC_DATE', todayStr);
+  } else {
+    console.log(`[SamsungDrive] 금일(${todayStr}) 사전명단 동기화가 이미 완료되었습니다. (1일 1회 정책 적용)`);
+    if (gSamsungDriveLastSyncedAt) {
+      updateSamsungDriveSyncUI(gSamsungDriveLastSyncedAt, gSamsungDriveLastSyncedFile, Number(localStorage.getItem('LIVON_SAMSUNG_COUNT')) || 25939);
+    }
+  }
+
+  // 1시간 주기로 날짜 변경 여부만 가볍게 확인 (자정이 지나 날짜가 바뀌면 1일 1회 자동 실행)
   if (gSamsungDriveSyncInterval) clearInterval(gSamsungDriveSyncInterval);
   gSamsungDriveSyncInterval = setInterval(() => {
-    checkSamsungDriveStatus();
-  }, 10 * 60 * 1000);
+    const currentDay = new Date().toISOString().slice(0, 10);
+    if (localStorage.getItem('LIVON_SAMSUNG_DRIVE_LAST_SYNC_DATE') !== currentDay) {
+      console.log(`[SamsungDrive] 새로운 날짜(${currentDay}) 도달. 일일 1회 사전명단 자동 동기화를 시작합니다.`);
+      checkSamsungDriveStatus();
+      localStorage.setItem('LIVON_SAMSUNG_DRIVE_LAST_SYNC_DATE', currentDay);
+    }
+  }, 60 * 60 * 1000);
 }
 
 async function loadSamsungDriveConfig() {
@@ -16589,6 +16609,7 @@ async function triggerSamsungDriveSync(isAuto = false) {
     gSamsungDriveLastSyncedFile = filename;
     localStorage.setItem('LIVON_SAMSUNG_DRIVE_SYNCED_AT', syncedAt);
     localStorage.setItem('LIVON_SAMSUNG_DRIVE_SYNCED_FILE', filename);
+    localStorage.setItem('LIVON_SAMSUNG_DRIVE_LAST_SYNC_DATE', new Date().toISOString().slice(0, 10));
 
     updateSamsungDriveSyncUI(syncedAt, filename, count);
     if (alertEl) alertEl.classList.add('hidden');
@@ -39706,12 +39727,16 @@ async function saveTwilioConfigFromModal() {
 function handleCareCallVoiceChange(val) {
   if (window.CareCallClient) {
     window.CareCallClient.setVoice(val);
+    window.CareCallClient.previewVoice(val);
   }
 }
 
 function handleCareCallSpeedChange(val) {
   if (window.CareCallClient) {
     window.CareCallClient.setSpeed(val);
+    const sel = document.getElementById('selectCareCallVoice');
+    const v = sel ? sel.value : (window.CareCallClient.selectedVoice || 'alloy');
+    window.CareCallClient.previewVoice(v);
   }
 }
 

@@ -35,6 +35,18 @@
     ],
 
     async init() {
+      const savedVoice = localStorage.getItem('LIVON_CARECALL_VOICE');
+      if (savedVoice) {
+        this.selectedVoice = savedVoice;
+        const selVoice = document.getElementById('selectCareCallVoice');
+        if (selVoice) selVoice.value = savedVoice;
+      }
+      const savedSpeed = localStorage.getItem('LIVON_CARECALL_SPEED');
+      if (savedSpeed) {
+        this.selectedSpeed = parseFloat(savedSpeed) || 1.0;
+        const selSpeed = document.getElementById('selectCareCallSpeed');
+        if (selSpeed) selSpeed.value = String(this.selectedSpeed);
+      }
       await this.loadDriveConfig();
     },
 
@@ -61,18 +73,44 @@
     },
 
     /**
-     * Preview sample voice greeting using Web Audio or Speech
+     * Preview sample voice greeting using OpenAI TTS endpoint with browser fallback
      */
     async previewVoice(voiceId) {
+      const v = (voiceId || this.selectedVoice || 'alloy').toLowerCase();
+      const speed = this.selectedSpeed || 1.0;
       const sampleText = "안녕하세요, 리본케어 AI 간병일지 도우미입니다. 오늘 간병하시느라 정말 고생 많으셨습니다.";
-      // Try Web Speech API fallback or server sample
+
+      // 1. Try OpenAI TTS API endpoint (Real distinct voices: Alloy, Shimmer, Echo, Ash, Coral, etc.)
+      try {
+        if (window._gCareCallAudioPreview) {
+          window._gCareCallAudioPreview.pause();
+          window._gCareCallAudioPreview.currentTime = 0;
+          window._gCareCallAudioPreview = null;
+        }
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+        }
+
+        const audioUrl = `/api/carecall/tts?voice=${encodeURIComponent(v)}&speed=${speed}&text=${encodeURIComponent(sampleText)}`;
+        const audio = new Audio(audioUrl);
+        window._gCareCallAudioPreview = audio;
+        await audio.play();
+        return;
+      } catch (err) {
+        console.warn('[CareCall] OpenAI TTS endpoint fallback to Web Speech:', err);
+      }
+
+      // 2. Fallback to Web Speech API with audible pitch distinction (Male vs Female)
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(sampleText);
         utter.lang = 'ko-KR';
-        utter.rate = this.selectedSpeed || 1.0;
+        utter.rate = speed;
+        const isMale = ['ash', 'echo', 'onyx'].includes(v);
+        utter.pitch = isMale ? 0.75 : 1.15;
+
         const voices = window.speechSynthesis.getVoices();
-        const koVoice = voices.find(v => v.lang.includes('ko') || v.name.includes('Korean'));
+        const koVoice = voices.find(voice => voice.lang.includes('ko') || voice.name.includes('Korean'));
         if (koVoice) utter.voice = koVoice;
         window.speechSynthesis.speak(utter);
       }

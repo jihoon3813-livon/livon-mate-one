@@ -242,12 +242,15 @@ function generateTwiML({ patientName, caregiverName, workDate, workTime, schedul
 넷째, 오늘 혈압이나 체온, 혈당 등 따로 측정해 두신 수치가 있으신가요?
 위 내용들을 삐 소리 후 편안하게 말씀해 주시면 일지가 자동 작성됩니다. 말씀이 끝나시면 우물정자를 누르시거나 전화를 끊으시면 됩니다.`;
 
+  const isMale = ['ash', 'echo', 'onyx'].includes(String(voice || '').toLowerCase());
+  const pollyVoice = isMale ? 'Polly.InJoon' : 'Polly.Seoyeon';
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Pause length="1" />
-  <Say language="ko-KR" voice="Polly.Seoyeon">${escapeXml(speechText)}</Say>
+  <Say language="ko-KR" voice="${pollyVoice}">${escapeXml(speechText)}</Say>
   <Record action="${escapeXml(recordActionUrl)}" maxLength="300" playBeep="true" trim="trim-silence" finishOnKey="#" />
-  <Say language="ko-KR" voice="Polly.Seoyeon">소중한 간병 내용이 정상 등록되었습니다. 수고 많으셨습니다. 감사합니다.</Say>
+  <Say language="ko-KR" voice="${pollyVoice}">소중한 간병 내용이 정상 등록되었습니다. 수고 많으셨습니다. 감사합니다.</Say>
 </Response>`;
 }
 
