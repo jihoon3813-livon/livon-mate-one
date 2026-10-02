@@ -32,7 +32,7 @@ module.exports = async function handler(req, res) {
       workDate,
       workTime,
       insuranceCompany = '삼성화재',
-      voice = 'alloy',
+      voice = 'marin',
       scheduleId,
       forceCti = false
     } = body;

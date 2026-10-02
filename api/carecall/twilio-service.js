@@ -130,7 +130,7 @@ async function placeTwilioCall({ phone, patientName, caregiverName, workDate, wo
     workDate: workDate || '',
     workTime: workTime || '',
     scheduleId: scheduleId || '',
-    voice: voice || 'alloy'
+    voice: voice || 'marin'
   });
   const twimlUrl = `${baseUrl}/api/carecall/twiml?${params}`;
 

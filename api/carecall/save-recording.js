@@ -161,7 +161,7 @@ module.exports = async function handler(req, res) {
       createdDate: cleanCreateDate,
       duration: duration || 0,
       transcript: transcript || '',
-      voice: voice || 'alloy',
+      voice: voice || 'marin',
       savedInDrive,
       driveUrl: cfg.folderUrl,
       localFilePath,

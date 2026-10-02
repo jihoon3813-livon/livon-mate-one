@@ -39634,7 +39634,7 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
         workTime: workTime || '24시간',
         scheduleId: scheduleId || '',
         insuranceCompany: insuranceCompany || '삼성화재',
-        voice: window.CareCallClient?.selectedVoice || 'alloy',
+        voice: window.CareCallClient?.selectedVoice || 'marin',
         speed: window.CareCallClient?.selectedSpeed || 1.0,
         twilioConfig
       })
