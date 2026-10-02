@@ -219,26 +219,30 @@ async function placeTwilioCall({ phone, patientName, caregiverName, workDate, wo
 }
 
 /**
- * TwiML 응답 생성: 통화 연결 시 OpenAI Realtime WebSocket Media Stream으로 브릿지
+ * TwiML 응답 생성: 통화 연결 시 한국어 음성 안내 및 간병 내용 녹음
  */
 function generateTwiML({ patientName, caregiverName, workDate, workTime, scheduleId, voice }) {
   const cfg = getTwilioConfig();
-  let wsUrl = cfg.publicBaseUrl ? cfg.publicBaseUrl.replace(/^http/, 'ws') : 'ws://localhost:8080';
-  wsUrl = `${wsUrl}/api/carecall/stream`;
+  let baseUrl = cfg.publicBaseUrl || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://livon-mate-one.vercel.app');
+  if (baseUrl.includes('localhost')) {
+    baseUrl = 'https://livon-mate-one.vercel.app';
+  }
+
+  const params = querystring.stringify({
+    patientName: patientName || '',
+    caregiverName: caregiverName || '',
+    workDate: workDate || '',
+    workTime: workTime || '24시간',
+    scheduleId: scheduleId || ''
+  });
+
+  const recordActionUrl = `${baseUrl}/api/carecall/twiml-callback?${params}`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say language="ko-KR">안녕하세요, 리본케어 AI 간병일지 도우미입니다. 통화가 연결되었습니다.</Say>
-  <Connect>
-    <Stream url="${wsUrl}">
-      <Parameter name="patientName" value="${escapeXml(patientName || '')}" />
-      <Parameter name="caregiverName" value="${escapeXml(caregiverName || '')}" />
-      <Parameter name="workDate" value="${escapeXml(workDate || '')}" />
-      <Parameter name="workTime" value="${escapeXml(workTime || '24시간')}" />
-      <Parameter name="scheduleId" value="${escapeXml(scheduleId || '')}" />
-      <Parameter name="voice" value="${escapeXml(voice || 'alloy')}" />
-    </Stream>
-  </Connect>
+  <Say language="ko-KR">안녕하세요, 리본케어 AI 간병일지 도우미입니다. ${escapeXml(caregiverName ? caregiverName + ' 간병사님, ' : '')}${escapeXml(patientName || '')} 환자님의 오늘 간병 내용을 삐 소리 후 편안하게 말씀해 주세요. 말씀이 끝나시면 우물정(#)자를 누르시거나 전화를 끊으시면 됩니다.</Say>
+  <Record action="${recordActionUrl}" maxLength="300" playBeep="true" trim="trim-silence" finishOnKey="#" />
+  <Say language="ko-KR">간병 내용이 성공적으로 녹음되었습니다. 감사합니다.</Say>
 </Response>`;
 }
 
