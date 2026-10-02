@@ -6963,11 +6963,14 @@ window.initSamsungSpreadsheet = initSamsungSpreadsheet;
 
 function updateSamsungSheetBadges() {
   const bTarget = document.getElementById('badgeSheetCount-target');
-  if (bTarget) bTarget.innerText = (gSamsungSheets.target?.length || 0) + '건';
+  if (bTarget) bTarget.innerText = (gSamsungSheets.target?.length || 0).toLocaleString() + '건';
   const bCompleted = document.getElementById('badgeSheetCount-completed');
-  if (bCompleted) bCompleted.innerText = (gSamsungSheets.completed?.length || 0) + '건';
+  if (bCompleted) bCompleted.innerText = (gSamsungSheets.completed?.length || 0).toLocaleString() + '건';
   const bEligible = document.getElementById('badgeSheetCount-eligible');
-  if (bEligible) bEligible.innerText = (gSamsungSheets.eligible?.length || 0) + '건';
+  if (bEligible) {
+    const count = (gSamsungSheets.eligible?.length || (Array.isArray(gSamsungList) ? gSamsungList.length : 0));
+    bEligible.innerText = count.toLocaleString() + '건';
+  }
   if (typeof updateSamsungSheetTabsUI === 'function') updateSamsungSheetTabsUI();
 }
 
@@ -7175,6 +7178,11 @@ function renderCurrentSamsungSheet() {
   const isClaimHub = (gActiveTab === 'samsungclaimhub');
   const container = document.getElementById(isClaimHub ? 'samsungClaimHubSpreadsheetContainer' : 'samsungSpreadsheetContainer');
   if (!container) return;
+
+  // 삼성화재 명단관리(samsunglist) 탭인 경우 청구관리(target/completed) 시트가 남아있지 않도록 사전명단(eligible) 강제 보장
+  if (!isClaimHub && gActiveSamsungSheet !== 'eligible') {
+    gActiveSamsungSheet = 'eligible';
+  }
 
   initSamsungSpreadsheet();
   const schema = SAMSUNG_SHEET_SCHEMAS[gActiveSamsungSheet] || SAMSUNG_SHEET_SCHEMAS.target;
@@ -15851,8 +15859,40 @@ function renderSamsungEmailHistoryTable() {
 // -------------------------------------------------------------------------
 // EXCEL UPLOAD MODAL CONTROLLER (엑셀 업로드 및 파싱)
 // -------------------------------------------------------------------------
-function renderSamsungList() {
+function renderSamsungList(sheetKey = 'eligible') {
   initSamsungSpreadsheet();
+
+  // 삼성화재 명단관리는 누적 가입자DB인 사전명단(eligible) 시트를 기본으로 활성화
+  gActiveSamsungSheet = sheetKey || 'eligible';
+  gSamsungSelectedRows.clear();
+  gSamsungActiveCell = null;
+  gSamsungSortCol = null;
+  gSamsungSortDirection = null;
+  gSamsungSheetPage = 1;
+
+  // 사전명단 데이터 상호 보장 (gSamsungSheets.eligible <-> gSamsungList)
+  if ((!gSamsungSheets.eligible || gSamsungSheets.eligible.length === 0) && Array.isArray(gSamsungList) && gSamsungList.length > 0) {
+    gSamsungSheets.eligible = gSamsungList;
+  }
+  if ((!gSamsungList || gSamsungList.length === 0) && Array.isArray(gSamsungSheets.eligible) && gSamsungSheets.eligible.length > 0) {
+    gSamsungList = gSamsungSheets.eligible;
+  }
+
+  // 검색창 초기화 및 검색어 상태 동기화
+  const searchInputEl = document.getElementById('samsungSheetSearchInput');
+  if (searchInputEl) {
+    gLastSamsungSearchQuery = (searchInputEl.value || '').trim().toLowerCase();
+  } else {
+    gLastSamsungSearchQuery = '';
+  }
+
+  const descEl = document.getElementById('samsungSheetDescriptionText');
+  if (descEl) {
+    descEl.innerHTML = '💡 <b>사전명단</b>: 삼성화재 가입자 마스터 DB입니다. 셀 1회 클릭 시 선택, 더블클릭 시 수정할 수 있으며 좌측 상단 [수정사항 저장]을 눌러야 최종 저장됩니다.';
+  }
+
+  updateSamsungSheetBadges();
+  updateSamsungSheetTabsUI();
   renderCurrentSamsungSheet();
 }
 
@@ -37190,13 +37230,16 @@ function refreshTabData(tabId, filterParam = null) {
       case 'samsunglist':
       case 'samsungleads':
       case 'samsung':
+        gActiveSamsungSheet = 'eligible';
         if (typeof checkSamsungDriveStatus === 'function') {
           checkSamsungDriveStatus();
         }
         if (typeof syncSamsungSpreadsheetData === 'function') {
           syncSamsungSpreadsheetData(true);
         }
-        if (typeof renderCurrentSamsungSheet === 'function') {
+        if (typeof renderSamsungList === 'function') {
+          renderSamsungList('eligible');
+        } else if (typeof renderCurrentSamsungSheet === 'function') {
           renderCurrentSamsungSheet();
         }
         break;
@@ -37334,9 +37377,11 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
     toggleMobileSidebar(false);
   }
 
-  // 명단관리(samsungleads)에서 다른 메뉴로 이동 시 저장되지 않은 수정사항 확인
-  if (gActiveTab === 'samsungleads' && tabId !== 'samsungleads' && typeof gSamsungPendingChanges !== 'undefined' && gSamsungPendingChanges && gSamsungPendingChanges.size > 0) {
-    const ans = confirm(`⚠️ 명단관리에 저장되지 않은 셀 수정사항이 ${gSamsungPendingChanges.size}건 있습니다.\n\n수정사항을 저장하지 않고 다른 메뉴로 이동하시겠습니까?\n(취소를 누르면 현재 명단관리 화면에 머무릅니다)`);
+  // 삼성화재 시트(명단관리/접수청구관리)에서 다른 메뉴로 이동 시 저장되지 않은 수정사항 확인
+  const isLeavingSamsungTab = (gActiveTab === 'samsunglist' || gActiveTab === 'samsungclaimhub' || gActiveTab === 'samsungleads' || gActiveTab === 'samsung') &&
+                              (tabId !== 'samsunglist' && tabId !== 'samsungclaimhub' && tabId !== 'samsungleads' && tabId !== 'samsung');
+  if (isLeavingSamsungTab && typeof gSamsungPendingChanges !== 'undefined' && gSamsungPendingChanges && gSamsungPendingChanges.size > 0) {
+    const ans = confirm(`⚠️ 삼성화재 관리에 저장되지 않은 셀 수정사항이 ${gSamsungPendingChanges.size}건 있습니다.\n\n수정사항을 저장하지 않고 다른 메뉴로 이동하시겠습니까?\n(취소를 누르면 현재 화면에 머무릅니다)`);
     if (!ans) return;
     cancelSamsungSheetPendingChanges(true);
   }
@@ -37452,7 +37497,10 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
     if (typeof renderCareCalendar === 'function') renderCareCalendar();
   }
   else if (tabId === 'samsung' || tabId === 'samsunglist' || tabId === 'samsungleads') {
-    renderSamsungList();
+    gActiveSamsungSheet = 'eligible';
+    if (typeof renderSamsungList === 'function') {
+      renderSamsungList('eligible');
+    }
     if (typeof checkSamsungDriveStatus === 'function') {
       checkSamsungDriveStatus();
     }
