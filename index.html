@@ -3853,23 +3853,98 @@
             </div>
           </div>
 
-          <!-- 당일 간병인 통화 대상 리스트 테이블 바 -->
+          <!-- 통계 요약 뱃지 바 -->
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+            <button type="button" onclick="setCareCallQuickFilter('ALL')" 
+              class="p-3 rounded-2xl bg-white border border-slate-200 shadow-2xs hover:border-purple-300 transition-all text-left cursor-pointer">
+              <span class="text-slate-500 font-bold block text-[11px]">전체 대상자</span>
+              <span class="text-lg font-black text-slate-800" id="kpiCareCallTotalCount">0명</span>
+            </button>
+            <button type="button" onclick="setCareCallQuickFilter('CALL')" 
+              class="p-3 rounded-2xl bg-purple-50/60 border border-purple-200 shadow-2xs hover:border-purple-400 transition-all text-left cursor-pointer">
+              <span class="text-purple-700 font-bold block text-[11px] flex items-center gap-1">
+                <i data-lucide="bot" class="w-3.5 h-3.5"></i> AI 통화 대상
+              </span>
+              <span class="text-lg font-black text-purple-900" id="kpiCareCallAiCount">0명</span>
+            </button>
+            <button type="button" onclick="setCareCallQuickFilter('APP')" 
+              class="p-3 rounded-2xl bg-sky-50/60 border border-sky-200 shadow-2xs hover:border-sky-400 transition-all text-left cursor-pointer">
+              <span class="text-sky-700 font-bold block text-[11px] flex items-center gap-1">
+                <i data-lucide="smartphone" class="w-3.5 h-3.5"></i> APP 진행
+              </span>
+              <span class="text-lg font-black text-sky-900" id="kpiCareCallAppCount">0명</span>
+            </button>
+            <button type="button" onclick="setCareCallQuickFilter('MISSING_PAST')" 
+              class="p-3 rounded-2xl bg-rose-50/80 border border-rose-300 shadow-2xs hover:border-rose-500 transition-all text-left cursor-pointer ring-1 ring-rose-400/20">
+              <span class="text-rose-700 font-bold block text-[11px] flex items-center gap-1">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-600"></i> ⚠️ 어제까지 미등록
+              </span>
+              <span class="text-lg font-black text-rose-800" id="kpiCareCallMissingPastCount">0명</span>
+            </button>
+            <div class="p-3 rounded-2xl bg-emerald-50/60 border border-emerald-200 shadow-2xs text-left">
+              <span class="text-emerald-700 font-bold block text-[11px] flex items-center gap-1">
+                <i data-lucide="mic" class="w-3.5 h-3.5 text-emerald-600"></i> 음성파일 생성완료
+              </span>
+              <span class="text-lg font-black text-emerald-900" id="kpiCareCallVoiceCount">0건</span>
+            </div>
+          </div>
+
+          <!-- 필터 및 정렬 컨트롤 바 -->
           <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
             <div class="flex items-center gap-2.5 flex-wrap">
-              <span class="font-black text-slate-800 flex items-center gap-1.5">
-                <i data-lucide="phone-call" class="w-4 h-4 text-purple-600"></i>
-                <span>오늘의 AI 간병통화 대상자</span>
-              </span>
-              <span class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold text-[11px]" id="careCallTargetCountBadge">0명</span>
-              <span id="careCallInsCurrentBadge" class="px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800 font-extrabold text-[11px] border border-sky-300">원수사: 삼성화재</span>
-              <span class="text-slate-400 text-[11px] border-l border-slate-200 pl-2.5">
-                통합허브 당일 배정·간병 스케줄 자동 연동
-              </span>
+              <!-- 원수사 필터 -->
+              <div class="flex items-center gap-1.5">
+                <span class="font-bold text-slate-600">원수사:</span>
+                <select id="careCallInsFilterSelect" onchange="handleCareCallFilterChange()"
+                  class="px-2.5 py-1.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs focus:ring-2 focus:ring-purple-500 cursor-pointer">
+                  <option value="삼성화재" selected>삼성화재</option>
+                  <option value="현대해상">현대해상</option>
+                  <option value="현대해상(SCOR)">현대해상(SCOR)</option>
+                  <option value="ALL">전체 원수사</option>
+                </select>
+              </div>
+
+              <!-- 진행 구분 필터 -->
+              <div class="flex items-center gap-1.5">
+                <span class="font-bold text-slate-600">진행구분:</span>
+                <select id="careCallModeFilterSelect" onchange="handleCareCallFilterChange()"
+                  class="px-2.5 py-1.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs focus:ring-2 focus:ring-purple-500 cursor-pointer">
+                  <option value="ALL" selected>전체 구분</option>
+                  <option value="CALL">🤖 AI 통화 대상</option>
+                  <option value="APP">📱 APP 진행</option>
+                </select>
+              </div>
+
+              <!-- 등록 현황 필터 -->
+              <div class="flex items-center gap-1.5">
+                <span class="font-bold text-slate-600">일지/녹취현황:</span>
+                <select id="careCallStatusFilterSelect" onchange="handleCareCallFilterChange()"
+                  class="px-2.5 py-1.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs focus:ring-2 focus:ring-purple-500 cursor-pointer">
+                  <option value="ALL" selected>전체 상태</option>
+                  <option value="MISSING_PAST">⚠️ 어제까지 미등록 건 (조치필요)</option>
+                  <option value="TODAY_PENDING">오늘 발신 대상 (당일 미등록)</option>
+                  <option value="ALL_COMPLETED">전체 등록 완료 (누락 없음)</option>
+                </select>
+              </div>
+
+              <!-- 정렬 기준 -->
+              <div class="flex items-center gap-1.5">
+                <span class="font-bold text-slate-600">정렬:</span>
+                <select id="careCallSortSelect" onchange="handleCareCallFilterChange()"
+                  class="px-2.5 py-1.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-xs focus:ring-2 focus:ring-purple-500 cursor-pointer">
+                  <option value="MISSING_DESC" selected>⚠️ 미등록 많은순</option>
+                  <option value="START_DATE_DESC">간병 시작일 최신순</option>
+                  <option value="START_DATE_ASC">간병 시작일 오래된순</option>
+                  <option value="PATIENT_NAME_ASC">환자명 가나다순</option>
+                  <option value="DAYS_DESC">총 간병 기간 긴순</option>
+                  <option value="DAYS_ASC">총 간병 기간 짧은순</option>
+                </select>
+              </div>
             </div>
 
             <div class="flex items-center gap-2">
-              <input type="text" id="careCallSearchInput" oninput="handleCareCallSearchInput(this.value)" placeholder="환자명, 간병인명, 연락처, 원수사 검색..." 
-                class="pl-3 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 w-64 transition-all">
+              <input type="text" id="careCallSearchInput" oninput="handleCareCallSearchInput(this.value)" placeholder="환자명, 간병인명, 병원, 연락처 검색..." 
+                class="pl-3 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 w-60 transition-all">
               <button type="button" onclick="renderCareCallTargets()" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer">
                 <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-600"></i> <span>새로고침</span>
               </button>
@@ -3882,20 +3957,20 @@
           <!-- 테이블 그리드 -->
           <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             <div class="overflow-x-auto custom-scrollbar">
-              <table class="w-full text-left text-xs border-collapse min-w-[1100px]">
+              <table class="w-full text-left text-xs border-collapse min-w-[1250px]">
                 <thead class="bg-slate-100 text-slate-700 font-bold border-b select-none">
                   <tr>
                     <th class="p-3 text-center w-12 border-r border-slate-200 font-mono text-slate-500">No</th>
                     <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800">대상 환자명</th>
-                    <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 text-center w-28">원수사</th>
+                    <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 text-center w-24">원수사</th>
+                    <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 text-center w-28">진행 구분</th>
                     <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800">병원 / 병실</th>
                     <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800">담당 간병사</th>
                     <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 font-mono">간병사 연락처</th>
-                    <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 text-center">근무 일자</th>
-                    <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 text-center">근무 형태</th>
-                    <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 text-center">최근 7일 일지</th>
-                    <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 text-center w-28">진행 상태</th>
-                    <th class="p-3 font-extrabold text-purple-900 text-center w-64">AI 통화 발신 &amp; 녹취 관리</th>
+                    <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 text-center">간병 기간</th>
+                    <th class="p-3 border-r border-slate-200 font-extrabold text-slate-800 text-center">어제까지 등록 현황</th>
+                    <th class="p-3 border-r border-slate-200 font-extrabold text-purple-900 text-center">세부 간병일자 &amp; 음성파일</th>
+                    <th class="p-3 font-extrabold text-purple-900 text-center w-40">통화 발신 관리</th>
                   </tr>
                 </thead>
                 <tbody id="careCallTargetsTableBody" class="divide-y divide-slate-100 bg-white">

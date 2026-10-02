@@ -38868,24 +38868,139 @@ function handleCareCallSearchInput(val) {
   renderCareCallTargets();
 }
 
+// =========================================================================
+// AI Care Call Engine: Target List, Daily Drilldown, Voice File Check & Filters
+// =========================================================================
+
+let gCareCallSavedRecordings = [];
+let gCareCallExpandedTargets = new Set();
+let gCareCallOperationModes = {};
+try {
+  gCareCallOperationModes = JSON.parse(localStorage.getItem('LIVON_CARECALL_OPERATION_MODES') || '{}');
+} catch (_) {
+  gCareCallOperationModes = {};
+}
+
+// 초기 음성파일 목록 로드
+(async function initCareCallRecordings() {
+  try {
+    const res = await fetch('/api/carecall/save-recording');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.recordings)) {
+        gCareCallSavedRecordings = data.recordings;
+        if (typeof renderCareCallTargets === 'function' && gCareLogViewMode === 'call') {
+          renderCareCallTargets();
+        }
+      }
+    }
+  } catch (_) {}
+})();
+
+function formatYMD(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function parseYMD(str) {
+  if (!str) return null;
+  const clean = String(str).replace(/[^0-9]/g, '').slice(0, 8);
+  if (clean.length < 8) return null;
+  const y = parseInt(clean.slice(0, 4), 10);
+  const m = parseInt(clean.slice(4, 6), 10) - 1;
+  const d = parseInt(clean.slice(6, 8), 10);
+  const dt = new Date(y, m, d);
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+function generateDateList(startStr, endStr) {
+  const s = parseYMD(startStr);
+  const e = parseYMD(endStr) || s;
+  if (!s) return [];
+  const list = [];
+  const cur = new Date(s.getTime());
+  let count = 0;
+  while (cur <= e && count < 180) {
+    list.push(formatYMD(cur));
+    cur.setDate(cur.getDate() + 1);
+    count++;
+  }
+  return list;
+}
+
 function setCareCallInsuranceFilter(ins) {
-  const sel = document.getElementById('careLogInsuranceFilter');
+  const sel = document.getElementById('careCallInsFilterSelect');
   if (sel) {
     sel.value = ins;
-    renderCareLogs();
   }
+  const topSel = document.getElementById('careLogInsuranceFilter');
+  if (topSel) {
+    topSel.value = ins;
+  }
+  renderCareCallTargets();
+}
+
+function handleCareCallFilterChange() {
+  renderCareCallTargets();
+}
+
+function setCareCallQuickFilter(type) {
+  const modeSel = document.getElementById('careCallModeFilterSelect');
+  const statusSel = document.getElementById('careCallStatusFilterSelect');
+
+  if (type === 'ALL') {
+    if (modeSel) modeSel.value = 'ALL';
+    if (statusSel) statusSel.value = 'ALL';
+  } else if (type === 'CALL') {
+    if (modeSel) modeSel.value = 'CALL';
+    if (statusSel) statusSel.value = 'ALL';
+  } else if (type === 'APP') {
+    if (modeSel) modeSel.value = 'APP';
+    if (statusSel) statusSel.value = 'ALL';
+  } else if (type === 'MISSING_PAST') {
+    if (statusSel) statusSel.value = 'MISSING_PAST';
+  }
+  renderCareCallTargets();
+}
+
+function toggleCareCallPatientAccordion(targetId) {
+  if (gCareCallExpandedTargets.has(targetId)) {
+    gCareCallExpandedTargets.delete(targetId);
+  } else {
+    gCareCallExpandedTargets.add(targetId);
+  }
+  renderCareCallTargets();
+}
+
+function toggleCareCallOperationMode(targetId, newMode) {
+  gCareCallOperationModes[targetId] = newMode;
+  try {
+    localStorage.setItem('LIVON_CARECALL_OPERATION_MODES', JSON.stringify(gCareCallOperationModes));
+  } catch (_) {}
+  renderCareCallTargets();
 }
 
 function getCareCallTargetList() {
   const topInput = document.getElementById('careLogSearchInput');
   const callInput = document.getElementById('careCallSearchInput');
   const query = (topInput?.value || callInput?.value || '').trim().toLowerCase();
-  const insFilter = document.getElementById('careLogInsuranceFilter')?.value || '삼성화재';
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const targets = [];
+  
+  const insFilter = document.getElementById('careCallInsFilterSelect')?.value || document.getElementById('careLogInsuranceFilter')?.value || '삼성화재';
+  const modeFilter = document.getElementById('careCallModeFilterSelect')?.value || 'ALL';
+  const statusFilter = document.getElementById('careCallStatusFilterSelect')?.value || 'ALL';
+  const sortCriteria = document.getElementById('careCallSortSelect')?.value || 'MISSING_DESC';
+
+  const todayStr = formatYMD(new Date());
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayStr = formatYMD(yesterdayDate);
+
+  const rawTargets = [];
   const seenKeys = new Set();
 
-  // 1. First traverse gAssigns (배정대장)
+  // 1. 배정대장(gAssigns) 순회
   if (Array.isArray(gAssigns) && gAssigns.length > 0) {
     gAssigns.forEach(as => {
       if (!as || !as.patientName) return;
@@ -38897,7 +39012,6 @@ function getCareCallTargetList() {
       if (seenKeys.has(key)) return;
       seenKeys.add(key);
 
-      // Determine accurate insurance company
       let insCompany = (app && app.insuranceCompany) ? app.insuranceCompany : '';
       if (!insCompany) {
         if (as.insuranceCompany && as.insuranceCompany.includes('현대')) insCompany = '현대해상';
@@ -38912,24 +39026,25 @@ function getCareCallTargetList() {
         : ((Array.isArray(gCaregivers) && gCaregivers.find(c => c.name === caregiverName)?.phone) || app?.caregiverPhone || app?.phone || '010-0000-0000');
 
       const hospital = (app?.hospitalName ? `${app.hospitalName} ${app.hospitalRoom || ''}`.trim() : '') || (app?.hospital || '') || as.centerName || '병원 정보 없음';
-      const workDate = as.startDate || app?.careStartDate || todayStr;
-      const workTime = app?.careType || '24시간';
+      const careStartDate = as.startDate || app?.careStartDate || todayStr;
+      const careEndDate = as.endDate || app?.careEndDate || (app?.status === '진행중' ? todayStr : careStartDate);
 
-      targets.push({
+      rawTargets.push({
         id: as.applyId || as.id,
         patientName: as.patientName,
         insuranceCompany: insCompany,
         caregiverName,
         caregiverPhone,
         hospital,
-        workDate,
-        workTime,
+        careStartDate,
+        careEndDate,
+        workTime: app?.careType || '24시간',
         status: app?.status || '진행중'
       });
     });
   }
 
-  // 2. Also check gApps for any applications not yet matched in gAssigns
+  // 2. 통합신청서(gApps) 추가 순회
   if (Array.isArray(gApps) && gApps.length > 0) {
     gApps.forEach(app => {
       if (!app || !app.patientName) return;
@@ -38953,25 +39068,112 @@ function getCareCallTargetList() {
         : (as?.phone || app.phone || app.applicantContact || app.applicantPhone || '010-0000-0000');
 
       const hospital = (app.hospitalName ? `${app.hospitalName} ${app.hospitalRoom || ''}`.trim() : '') || app.hospital || as?.centerName || '병원 정보 없음';
-      const workDate = app.careStartDate || todayStr;
-      const workTime = app.careType || '24시간';
+      const careStartDate = app.careStartDate || as?.startDate || todayStr;
+      const careEndDate = app.careEndDate || as?.endDate || (app.status === '진행중' ? todayStr : careStartDate);
 
-      targets.push({
+      rawTargets.push({
         id: app.id,
         patientName: app.patientName,
         insuranceCompany: insCompany,
         caregiverName,
         caregiverPhone,
         hospital,
-        workDate,
-        workTime,
+        careStartDate,
+        careEndDate,
+        workTime: app.careType || '24시간',
         status: app.status || '진행중'
       });
     });
   }
 
-  // Helper matching function
-  const matchTarget = (t, q) => {
+  // 3. 대상자별 세부 간병일자(careDays) 및 일지/음성 생성 여부 매칭
+  const targets = rawTargets.map(t => {
+    const cleanPatient = (t.patientName || '').trim();
+    const cleanPhoneDigits = String(t.caregiverPhone || '').replace(/[^0-9]/g, '');
+    const operationMode = gCareCallOperationModes[t.id] || 'CALL'; // 기본값: AI 통화 대상
+
+    // CarePort 일지 그룹 매칭
+    const group = (window.gCarePortPatientGroups || []).find(g => 
+      (g.patientName && g.patientName.trim() === cleanPatient) || 
+      (g.username && g.username.trim() === cleanPatient) ||
+      g.id === t.id
+    );
+    const dailyLogs = group?.dailyLogs || [];
+
+    // 간병 시작일 ~ 종료일 날짜 리스트 생성
+    let dateList = generateDateList(t.careStartDate, t.careEndDate);
+    if (dateList.length === 0) dateList = [todayStr];
+
+    const careDays = dateList.map((d, index) => {
+      const cleanDateStr = d.replace(/-/g, '');
+      const dayNumber = index + 1;
+      const isPast = d < todayStr;
+      const isToday = d === todayStr;
+      const isFuture = d > todayStr;
+
+      // 1) CarePort 일지 작성 여부
+      const log = dailyLogs.find(l => {
+        const cDate = (l.consultDate || l.dateString || '').slice(0, 10);
+        return cDate === d;
+      });
+      const hasCarePortLog = !!log;
+      const logTitle = log?.title || log?.summary || '';
+
+      // 2) 음성녹취 파일(.m4a) 생성 여부
+      const voiceRec = gCareCallSavedRecordings.find(r => {
+        const matchName = (r.patientName && r.patientName.trim() === cleanPatient) || (r.filename && r.filename.includes(cleanPatient));
+        const matchDate = r.workDate === cleanDateStr || r.workDate === d || (r.filename && r.filename.includes(cleanDateStr));
+        return matchName && matchDate;
+      });
+      const hasVoiceFile = !!(voiceRec || log?.audioUrl || log?.hasVoice);
+      const voiceFilename = voiceRec?.filename || (log?.audioUrl ? '케어포트_음성파일.m4a' : '');
+
+      const isRegistered = hasCarePortLog || hasVoiceFile;
+      const isMissingPast = isPast && !isRegistered;
+
+      return {
+        dayNumber,
+        date: d,
+        isPast,
+        isToday,
+        isFuture,
+        hasCarePortLog,
+        logTitle,
+        hasVoiceFile,
+        voiceFilename,
+        isRegistered,
+        isMissingPast
+      };
+    });
+
+    const totalDays = careDays.length;
+    const voiceCount = careDays.filter(day => day.hasVoiceFile).length;
+    const registeredCount = careDays.filter(day => day.isRegistered).length;
+    
+    // 어제까지 미등록된 날짜 계산 (오늘자 기준 어제까지: date < todayStr)
+    const missingPastDates = careDays.filter(day => day.isMissingPast).map(day => day.date);
+    const missingPastDaysCount = missingPastDates.length;
+    const hasMissingPast = missingPastDaysCount > 0 && operationMode !== 'APP'; // APP진행이 아닌데 어제까지 누락
+
+    const needsTodayCall = careDays.some(day => day.isToday && !day.isRegistered) && operationMode !== 'APP';
+
+    return {
+      ...t,
+      operationMode,
+      careDays,
+      totalDays,
+      voiceCount,
+      registeredCount,
+      missingPastDates,
+      missingPastDaysCount,
+      hasMissingPast,
+      needsTodayCall,
+      carePeriodText: `${t.careStartDate} ~ ${t.careEndDate} (총 ${totalDays}일)`
+    };
+  });
+
+  // 4. 필터링 (원수사, 진행방식, 등록현황, 검색어)
+  const matchQuery = (t, q) => {
     return (
       (t.patientName && t.patientName.toLowerCase().includes(q)) ||
       (t.caregiverName && t.caregiverName.toLowerCase().includes(q)) ||
@@ -38982,92 +39184,119 @@ function getCareCallTargetList() {
     );
   };
 
-  // 3. Filtering by Insurance and Search Query
   const noticeEl = document.getElementById('careCallSearchNotice');
   if (noticeEl) noticeEl.classList.add('hidden');
 
   let filtered = targets;
 
+  // 원수사 필터
+  if (insFilter && insFilter !== 'ALL') {
+    filtered = filtered.filter(t => (t.insuranceCompany || '').includes(insFilter));
+  }
+
+  // 진행 방식 필터
+  if (modeFilter && modeFilter !== 'ALL') {
+    filtered = filtered.filter(t => t.operationMode === modeFilter);
+  }
+
+  // 일지/녹취 등록 현황 필터
+  if (statusFilter === 'MISSING_PAST') {
+    filtered = filtered.filter(t => t.hasMissingPast);
+  } else if (statusFilter === 'TODAY_PENDING') {
+    filtered = filtered.filter(t => t.needsTodayCall);
+  } else if (statusFilter === 'ALL_COMPLETED') {
+    filtered = filtered.filter(t => t.missingPastDaysCount === 0);
+  }
+
+  // 검색어 필터
   if (query) {
-    if (insFilter !== 'ALL') {
-      const insMatches = targets.filter(t => (t.insuranceCompany || '').includes(insFilter) && matchTarget(t, query));
-      if (insMatches.length > 0) {
-        filtered = insMatches;
-      } else {
-        // No match in current insurance, but check across ALL insurances!
-        const crossMatches = targets.filter(t => matchTarget(t, query));
-        if (crossMatches.length > 0) {
-          filtered = crossMatches;
-          if (noticeEl) {
-            noticeEl.innerHTML = `
-              <div class="flex items-center gap-2">
-                <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0"></i>
-                <span>현재 선택된 원수사(<b>${insFilter}</b>)에는 '<b>${query}</b>' 결과가 없어, <b>전체 원수사 검색 결과 (${crossMatches.length}건)</b>를 자동으로 표시합니다.</span>
-              </div>
-              <button type="button" onclick="setCareCallInsuranceFilter('ALL')" class="px-2.5 py-1 rounded-lg bg-amber-200 hover:bg-amber-300 font-bold text-amber-900 text-[11px] cursor-pointer shrink-0">
-                원수사 전체로 변경
-              </button>
-            `;
-            noticeEl.classList.remove('hidden');
-            if (typeof initIcons === 'function') initIcons(noticeEl);
-          }
-        } else {
-          filtered = [];
-        }
-      }
+    const queryMatches = filtered.filter(t => matchQuery(t, query));
+    if (queryMatches.length > 0) {
+      filtered = queryMatches;
     } else {
-      filtered = targets.filter(t => matchTarget(t, query));
-    }
-  } else {
-    // No query: strict filter by insFilter (default: '삼성화재')
-    if (insFilter && insFilter !== 'ALL') {
-      filtered = targets.filter(t => (t.insuranceCompany || '').includes(insFilter));
+      // 현재 필터에서 결과가 없으나 전체 대상자 중 검색 일치 확인
+      const crossMatches = targets.filter(t => matchQuery(t, query));
+      if (crossMatches.length > 0) {
+        filtered = crossMatches;
+        if (noticeEl) {
+          noticeEl.innerHTML = `
+            <div class="flex items-center gap-2">
+              <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0"></i>
+              <span>현재 필터 조건에는 '<b>${query}</b>' 결과가 없어, <b>전체 검색 결과 (${crossMatches.length}건)</b>를 자동으로 표시합니다.</span>
+            </div>
+            <button type="button" onclick="setCareCallQuickFilter('ALL')" class="px-2.5 py-1 rounded-lg bg-amber-200 hover:bg-amber-300 font-bold text-amber-900 text-[11px] cursor-pointer shrink-0">
+              필터 초기화
+            </button>
+          `;
+          noticeEl.classList.remove('hidden');
+          if (typeof initIcons === 'function') initIcons(noticeEl);
+        }
+      } else {
+        filtered = [];
+      }
     }
   }
 
-  return filtered;
-}
-
-function getPatientRecentLogCount(patientName) {
-  if (!patientName) return 0;
-  const cleanName = patientName.trim();
-  if (Array.isArray(window.gCarePortPatientGroups)) {
-    const grp = window.gCarePortPatientGroups.find(g => (g.username === cleanName || g.targetName === cleanName));
-    if (grp && Array.isArray(grp.dailyLogs)) {
-      return grp.dailyLogs.length;
+  // 5. 다채로운 정렬 처리
+  filtered.sort((a, b) => {
+    switch (sortCriteria) {
+      case 'MISSING_DESC':
+        // ⚠️ 어제까지 미등록 많은 순 우선 배치
+        if (b.missingPastDaysCount !== a.missingPastDaysCount) {
+          return b.missingPastDaysCount - a.missingPastDaysCount;
+        }
+        return (b.careStartDate || '').localeCompare(a.careStartDate || '');
+      case 'START_DATE_DESC':
+        return (b.careStartDate || '').localeCompare(a.careStartDate || '');
+      case 'START_DATE_ASC':
+        return (a.careStartDate || '').localeCompare(b.careStartDate || '');
+      case 'PATIENT_NAME_ASC':
+        return (a.patientName || '').localeCompare(b.patientName || '');
+      case 'DAYS_DESC':
+        return b.totalDays - a.totalDays;
+      case 'DAYS_ASC':
+        return a.totalDays - b.totalDays;
+      default:
+        return 0;
     }
-  }
-  return 0;
+  });
+
+  return { filtered, allTargets: targets };
 }
 
 function renderCareCallTargets() {
   const tbody = document.getElementById('careCallTargetsTableBody');
-  const badgeCount = document.getElementById('careCallTargetCountBadge');
-  const insBadge = document.getElementById('careCallInsCurrentBadge');
   if (!tbody) return;
 
-  const insFilter = document.getElementById('careLogInsuranceFilter')?.value || '삼성화재';
-  if (insBadge) {
-    insBadge.innerText = `원수사: ${insFilter === 'ALL' ? '전체' : insFilter}`;
-    insBadge.className = `px-2.5 py-0.5 rounded-full font-extrabold text-[11px] border ${
-      insFilter.includes('삼성') ? 'bg-sky-100 text-sky-800 border-sky-300' :
-      insFilter.includes('SCOR') ? 'bg-purple-100 text-purple-800 border-purple-300' :
-      insFilter.includes('현대') ? 'bg-blue-100 text-blue-800 border-blue-300' :
-      'bg-slate-100 text-slate-700 border-slate-300'
-    }`;
-  }
+  const { filtered, allTargets } = getCareCallTargetList();
 
-  const targets = getCareCallTargetList();
-  if (badgeCount) badgeCount.innerText = `${targets.length}명`;
+  // 1. KPI 통계 카드 업데이트
+  const totalCount = allTargets.length;
+  const aiCount = allTargets.filter(t => t.operationMode === 'CALL').length;
+  const appCount = allTargets.filter(t => t.operationMode === 'APP').length;
+  const missingPastCount = allTargets.filter(t => t.hasMissingPast).length;
+  const totalVoiceCount = allTargets.reduce((sum, t) => sum + (t.voiceCount || 0), 0);
 
-  if (targets.length === 0) {
+  const elTotal = document.getElementById('kpiCareCallTotalCount');
+  const elAi = document.getElementById('kpiCareCallAiCount');
+  const elApp = document.getElementById('kpiCareCallAppCount');
+  const elMissing = document.getElementById('kpiCareCallMissingPastCount');
+  const elVoice = document.getElementById('kpiCareCallVoiceCount');
+
+  if (elTotal) elTotal.innerText = `${totalCount}명`;
+  if (elAi) elAi.innerText = `${aiCount}명`;
+  if (elApp) elApp.innerText = `${appCount}명`;
+  if (elMissing) elMissing.innerText = `${missingPastCount}명`;
+  if (elVoice) elVoice.innerText = `${totalVoiceCount}건`;
+
+  if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="11" class="p-8 text-center text-slate-400">
+        <td colspan="11" class="p-12 text-center text-slate-400">
           <div class="flex flex-col items-center justify-center gap-2">
-            <i data-lucide="phone-off" class="w-8 h-8 text-slate-300"></i>
-            <p class="font-bold text-slate-500">배정된 AI 간병통화 대상자가 없습니다.</p>
-            <p class="text-xs text-slate-400">원수사 필터(${insFilter}) 또는 검색어를 확인해 주세요.</p>
+            <i data-lucide="folder-search" class="w-8 h-8 text-slate-300"></i>
+            <p class="font-bold text-slate-600 text-sm">조건에 일치하는 간병통화 관리 대상자가 없습니다.</p>
+            <p class="text-xs text-slate-400">선택된 원수사, 진행 구분, 등록 상태 필터를 확인해주세요.</p>
           </div>
         </td>
       </tr>
@@ -39076,8 +39305,10 @@ function renderCareCallTargets() {
     return;
   }
 
-  tbody.innerHTML = targets.map((t, idx) => {
-    const logCount = getPatientRecentLogCount(t.patientName);
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+
+  tbody.innerHTML = filtered.map((t, idx) => {
+    const isExpanded = gCareCallExpandedTargets.has(t.id);
     const maskedPhone = typeof maskPhone === 'function' ? maskPhone(t.caregiverPhone) : t.caregiverPhone;
     const maskedPatient = typeof maskName === 'function' ? maskName(t.patientName) : t.patientName;
     const maskedCaregiver = typeof maskName === 'function' ? maskName(t.caregiverName) : t.caregiverName;
@@ -39088,55 +39319,226 @@ function renderCareCallTargets() {
         ? 'bg-purple-50 text-purple-700 border-purple-200'
         : 'bg-blue-50 text-blue-700 border-blue-200');
 
+    // 어제까지 미등록 경고 하이라이트 (앱진행이 아닌데 어제까지 누락)
+    const rowAlertClass = t.hasMissingPast
+      ? 'border-l-4 border-l-rose-500 bg-rose-50/25'
+      : (isExpanded ? 'bg-purple-50/30' : 'hover:bg-purple-50/40');
+
     return `
-      <tr class="hover:bg-purple-50/40 transition-colors border-b border-slate-100">
+      <!-- Main Patient Row -->
+      <tr class="${rowAlertClass} transition-colors border-b border-slate-100">
         <td class="p-3 text-center font-mono text-slate-400 text-xs">${idx + 1}</td>
+        
+        <!-- 대상 환자명 -->
         <td class="p-3 font-bold text-slate-900">
           <div class="flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full ${t.insuranceCompany.includes('삼성') ? 'bg-sky-500' : 'bg-blue-500'}"></span>
-            <span>${maskedPatient}</span>
+            <span class="w-2 h-2 rounded-full ${t.hasMissingPast ? 'bg-rose-500 animate-ping' : (t.insuranceCompany.includes('삼성') ? 'bg-sky-500' : 'bg-blue-500')}"></span>
+            <span class="text-sm font-black text-slate-900">${maskedPatient}</span>
             <span class="text-[10px] text-slate-400 font-mono">(${t.id})</span>
           </div>
         </td>
+
+        <!-- 원수사 -->
         <td class="p-3 text-center">
           <span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${insBadgeClass}">
             ${t.insuranceCompany || '삼성화재'}
           </span>
         </td>
-        <td class="p-3 text-slate-600 max-w-xs truncate" title="${t.hospital}">${t.hospital}</td>
-        <td class="p-3 font-bold text-slate-800">${maskedCaregiver}</td>
-        <td class="p-3 font-mono text-slate-700 font-semibold">${maskedPhone}</td>
-        <td class="p-3 text-center text-slate-600 font-medium">${t.workDate}</td>
+
+        <!-- 진행 구분 (APP진행 vs AI통화 전환 토글 버튼) -->
         <td class="p-3 text-center">
-          <span class="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-bold text-[11px] border border-purple-200">
-            ${t.workTime}
-          </span>
-        </td>
-        <td class="p-3 text-center">
-          ${logCount > 0 
-            ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px] border border-emerald-200" title="CarePort 최근 ${logCount}일 간병일지 연동됨">
-                 <i data-lucide="file-check" class="w-3 h-3 text-emerald-600"></i> ${logCount}일 보유
-               </span>`
-            : `<span class="text-slate-400 text-[11px]">이전기록 없음</span>`
-          }
-        </td>
-        <td class="p-3 text-center" id="careCallStatus-${t.patientName}">
-          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-bold text-xs">
-            대기
-          </span>
-        </td>
-        <td class="p-3 text-center">
-          <div id="careCallActions-${t.patientName}" class="flex items-center justify-center">
-            <button type="button" 
-              onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${t.workDate}', '${t.workTime}', '${t.id}', '${t.insuranceCompany}')"
-              class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              title="간병사(${maskedCaregiver}) 휴대전화(${maskedPhone})로 AI 간병통화 발신">
-              <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
-              <span>전화 발신</span>
+          ${t.operationMode === 'APP' ? `
+            <button type="button" onclick="toggleCareCallOperationMode('${t.id}', 'CALL')" 
+              class="px-2.5 py-1 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-800 font-extrabold text-[11px] border border-sky-300 shadow-2xs flex items-center justify-center gap-1 mx-auto transition-all cursor-pointer"
+              title="클릭 시 [AI 통화 대상]으로 변경">
+              <i data-lucide="smartphone" class="w-3 h-3 text-sky-600"></i>
+              <span>APP 진행</span>
             </button>
+          ` : `
+            <button type="button" onclick="toggleCareCallOperationMode('${t.id}', 'APP')" 
+              class="px-2.5 py-1 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-800 font-extrabold text-[11px] border border-purple-300 shadow-2xs flex items-center justify-center gap-1 mx-auto transition-all cursor-pointer"
+              title="클릭 시 [APP 진행]으로 변경">
+              <i data-lucide="bot" class="w-3 h-3 text-purple-600"></i>
+              <span>AI 통화 대상</span>
+            </button>
+          `}
+        </td>
+
+        <!-- 병원 / 병실 -->
+        <td class="p-3 text-slate-600 max-w-xs truncate" title="${t.hospital}">${t.hospital}</td>
+
+        <!-- 담당 간병사 -->
+        <td class="p-3 font-bold text-slate-800">${maskedCaregiver}</td>
+
+        <!-- 간병사 연락처 -->
+        <td class="p-3 font-mono text-slate-700 font-semibold">${maskedPhone}</td>
+
+        <!-- 간병 기간 -->
+        <td class="p-3 text-center">
+          <div class="font-mono text-slate-800 font-bold text-xs">${t.careStartDate} ~ ${t.careEndDate}</div>
+          <span class="text-[11px] text-slate-500 font-medium">총 ${t.totalDays}일간 (${t.workTime})</span>
+        </td>
+
+        <!-- 어제까지 등록 현황 -->
+        <td class="p-3 text-center">
+          ${t.operationMode === 'APP' ? `
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200">
+              <i data-lucide="smartphone" class="w-3 h-3 text-slate-500"></i> 앱 직접 작성
+            </span>
+          ` : (t.hasMissingPast ? `
+            <div class="space-y-1">
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-black text-xs border border-rose-300 shadow-2xs animate-pulse"
+                title="어제까지 간병일자 중 미작성된 일지가 ${t.missingPastDaysCount}건 있습니다.">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-600"></i> 어제까지 미등록 (${t.missingPastDaysCount}일 누락)
+              </span>
+              <span class="block text-[10px] text-rose-600 font-mono font-bold">
+                누락일자: ${t.missingPastDates.slice(-3).map(d => d.slice(5)).join(', ')}${t.missingPastDates.length > 3 ? ' 외' : ''}
+              </span>
+            </div>
+          ` : `
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200">
+              <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> 어제까지 완료
+            </span>
+          `)}
+        </td>
+
+        <!-- 세부 간병일자 & 음성파일 현황 (아코디언 토글 버튼) -->
+        <td class="p-3 text-center">
+          <button type="button" onclick="toggleCareCallPatientAccordion('${t.id}')"
+            class="px-3.5 py-1.5 rounded-xl ${isExpanded ? 'bg-purple-600 text-white font-black' : 'bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold border border-purple-200'} text-xs shadow-2xs flex items-center justify-center gap-1.5 mx-auto transition-all cursor-pointer">
+            <span>세부일자 (${t.careDays.length}일 / 음성 ${t.voiceCount}건)</span>
+            <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-3.5 h-3.5"></i>
+          </button>
+        </td>
+
+        <!-- 통화 발신 관리 액션 -->
+        <td class="p-3 text-center">
+          <div id="careCallActions-${t.patientName}" class="flex items-center justify-center gap-1">
+            ${t.operationMode === 'APP' ? `
+              <span class="text-slate-400 text-xs font-medium">앱 직접 작성 대상</span>
+            ` : `
+              <button type="button" 
+                onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${t.careDays[t.careDays.length - 1]?.date || t.careEndDate}', '${t.workTime}', '${t.id}', '${t.insuranceCompany}')"
+                class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center justify-center gap-1 transition-all cursor-pointer"
+                title="간병사(${maskedCaregiver}) 휴대전화(${maskedPhone})로 오늘 일자 AI 간병통화 발신">
+                <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
+                <span>전화 발신</span>
+              </button>
+            `}
           </div>
         </td>
       </tr>
+
+      <!-- Accordion Drilldown Row: 세부 간병일자별 목록 (간병일지 다운받는 화면처럼) -->
+      ${isExpanded ? `
+        <tr class="bg-purple-50/20 border-b-2 border-purple-200">
+          <td colspan="11" class="p-4 sm:p-5">
+            <div class="bg-white rounded-2xl border border-purple-200 shadow-sm p-4 space-y-3">
+              <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div class="flex items-center gap-2">
+                  <span class="w-6 h-6 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs">
+                    <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                  </span>
+                  <h4 class="font-black text-slate-900 text-xs">
+                    [${maskedPatient} 님] 세부 간병일자별 일지 및 음성파일 현황
+                  </h4>
+                  <span class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-extrabold text-[11px]">
+                    총 ${t.totalDays}일 중 일지 ${t.registeredCount}건 / 음성파일 ${t.voiceCount}건
+                  </span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-[11px] text-slate-400">간병 기간: ${t.careStartDate} ~ ${t.careEndDate}</span>
+                  <button type="button" onclick="toggleCareCallPatientAccordion('${t.id}')" class="text-xs text-purple-700 font-bold hover:underline">
+                    접기 ✕
+                  </button>
+                </div>
+              </div>
+
+              <!-- 일자별 세부 테이블 -->
+              <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left border-collapse">
+                  <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                    <tr>
+                      <th class="p-2.5 text-center w-16">일차</th>
+                      <th class="p-2.5 w-36">간병 일자</th>
+                      <th class="p-2.5">간병일지 작성 상태</th>
+                      <th class="p-2.5 text-center w-48">음성파일 (.m4a) 생성 여부</th>
+                      <th class="p-2.5 text-center w-36">통화 발신 관리</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    ${t.careDays.map(day => {
+                      let dtObj = null;
+                      try { dtObj = new Date(day.date); } catch (_) {}
+                      const dayOfWeek = dtObj && !isNaN(dtObj.getTime()) ? `(${dayNames[dtObj.getDay()]})` : '';
+
+                      // 일자별 미등록 경고 표시
+                      const isAlertDay = day.isMissingPast && t.operationMode !== 'APP';
+
+                      return `
+                        <tr class="${isAlertDay ? 'bg-rose-50/40' : (day.isToday ? 'bg-amber-50/30' : 'hover:bg-slate-50/60')} transition-colors">
+                          <td class="p-2.5 text-center font-mono font-bold text-slate-500">${day.dayNumber}일차</td>
+                          <td class="p-2.5 font-bold ${isAlertDay ? 'text-rose-700' : 'text-slate-800'}">
+                            <span>${day.date} ${dayOfWeek}</span>
+                            ${day.isToday ? '<span class="ml-1 px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">오늘</span>' : ''}
+                          </td>
+                          <td class="p-2.5">
+                            ${day.hasCarePortLog ? `
+                              <div class="flex items-center gap-1.5">
+                                <span class="px-2 py-0.5 rounded-md font-bold text-[11px] bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                                  ✓ 일지 등록됨
+                                </span>
+                                <span class="text-slate-700 font-medium truncate" title="${day.logTitle}">${day.logTitle || '일상 지원 및 환자 상태 점검'}</span>
+                              </div>
+                            ` : (isAlertDay ? `
+                              <div class="flex items-center gap-1.5">
+                                <span class="px-2 py-0.5 rounded-md font-black text-[11px] bg-rose-100 text-rose-800 border border-rose-300 shrink-0">
+                                  ⚠️ 어제까지 미등록 (누락)
+                                </span>
+                                <span class="text-rose-600 font-medium text-[11px]">해당 간병일자 일지가 작성되지 않았습니다. 전화 발신이 필요합니다.</span>
+                              </div>
+                            ` : `
+                              <span class="text-slate-400 text-[11px] font-medium">일지 미등록 (작성 대기)</span>
+                            `)}
+                          </td>
+                          <td class="p-2.5 text-center">
+                            ${day.hasVoiceFile ? `
+                              <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 font-bold text-[11px] border border-emerald-200">
+                                <i data-lucide="mic" class="w-3 h-3 text-emerald-600"></i>
+                                <span>생성 완료</span>
+                                ${day.voiceFilename ? `
+                                  <a href="/recordings/carecalls/${day.voiceFilename}" target="_blank" download="${day.voiceFilename}"
+                                    class="text-purple-700 hover:text-purple-900 ml-1" title="녹취파일 다운로드">
+                                    <i data-lucide="download" class="w-3 h-3"></i>
+                                  </a>
+                                ` : ''}
+                              </div>
+                            ` : `
+                              <span class="text-slate-400 font-medium text-[11px]">음성파일 미생성</span>
+                            `}
+                          </td>
+                          <td class="p-2.5 text-center">
+                            ${t.operationMode === 'APP' ? `
+                              <span class="text-slate-400 text-[11px]">앱 직접 작성</span>
+                            ` : `
+                              <button type="button" 
+                                onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${day.date}', '${t.workTime}', '${t.id}', '${t.insuranceCompany}')"
+                                class="px-2.5 py-1 rounded-lg ${isAlertDay ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-white hover:bg-purple-50 text-purple-700 border border-purple-300'} font-bold text-[11px] shadow-2xs flex items-center justify-center gap-1 mx-auto transition-all cursor-pointer">
+                                <i data-lucide="phone-outgoing" class="w-3 h-3"></i>
+                                <span>${day.date.slice(5)} 통화 발신</span>
+                              </button>
+                            `}
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </td>
+        </tr>
+      ` : ''}
     `;
   }).join('');
 
@@ -39149,7 +39551,7 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
     return;
   }
 
-  const ok = confirm(`[📞 AI 간병통화 발신]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 발신 전화번호: ${caregiverPhone}\n\n위 간병사 휴대전화로 실제 AI 간병통화를 발신하시겠습니까?\n(통화 연결 시 AI가 질문을 시작하며 녹취가 진행됩니다.)`);
+  const ok = confirm(`[📞 간병통화 발신 안내]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 간병사 번호: ${caregiverPhone}\n\n전화를 발신하시겠습니까?\n※ 담당자 휴대폰(또는 내선 전화기)으로 먼저 벨이 울리고, 수화기를 받으시면 간병사 휴대전화로 자동 연결됩니다.`);
   if (!ok) return;
 
   const elStatus = document.getElementById(`careCallStatus-${patientName}`);
@@ -39177,9 +39579,9 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
     const data = await res.json();
     if (data.success) {
       if (elStatus) {
-        elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> 통화 대기중</span>';
+        elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> ' + (data.mode === 'cti_bridge' ? 'CTI 연결 대기' : '통화 대기중') + '</span>';
       }
-      alert(`📞 [전화 발신 접수 완료]\n\n${caregiverName}(${caregiverPhone}) 님에게 실제 전화 발신을 전송했습니다.\n${data.message || ''}`);
+      alert(`📞 [전화 발신 접수 완료]\n\n${data.message || ''}`);
     } else if (data.requiresTwilioConfig) {
       if (elStatus) {
         elStatus.innerHTML = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs">전화망 설정 필요</span>';
@@ -39351,6 +39753,10 @@ window.setCareCallInsuranceFilter = setCareCallInsuranceFilter;
 window.openTwilioConfigModal = openTwilioConfigModal;
 window.closeTwilioConfigModal = closeTwilioConfigModal;
 window.saveTwilioConfigFromModal = saveTwilioConfigFromModal;
+window.setCareCallQuickFilter = setCareCallQuickFilter;
+window.handleCareCallFilterChange = handleCareCallFilterChange;
+window.toggleCareCallPatientAccordion = toggleCareCallPatientAccordion;
+window.toggleCareCallOperationMode = toggleCareCallOperationMode;
 
 function toggleCarePortPatientAccordion(groupId) {
   if (gCarePortExpandedPatients.has(groupId)) {

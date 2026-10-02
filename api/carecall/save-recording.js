@@ -46,6 +46,28 @@ module.exports = async function handler(req, res) {
         logs = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8'));
       } catch (_) {}
     }
+
+    // Also scan physical files in LOCAL_RECORDINGS_DIR
+    try {
+      if (fs.existsSync(LOCAL_RECORDINGS_DIR)) {
+        const files = fs.readdirSync(LOCAL_RECORDINGS_DIR).filter(f => f.endsWith('.m4a'));
+        files.forEach(f => {
+          if (!logs.some(l => l.filename === f)) {
+            const parts = f.replace('.m4a', '').split('_');
+            logs.push({
+              filename: f,
+              patientName: parts[0] || '',
+              caregiverPhone: parts[1] || '',
+              workDate: parts[2] || '',
+              createdDate: parts[3] || '',
+              savedInLocal: true,
+              localPath: path.join(LOCAL_RECORDINGS_DIR, f)
+            });
+          }
+        });
+      }
+    } catch (_) {}
+
     const cfg = getDriveConfig();
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.status(200).json({ success: true, recordings: logs, driveConfig: cfg });
