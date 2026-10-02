@@ -27,3 +27,5 @@ test_care_dates.js
 sync_*.js
 scratch/
 .tmp_fax/
+recordings/
+carecall_recordings_log.json

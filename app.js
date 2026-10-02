@@ -6719,6 +6719,7 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
       // 기존 행 업데이트: 웹에서 수정한 내용은 유지하고 신청ID 및 최신 정보 동기화
       const existing = gSamsungSheets.target[matchedIdx];
       let changed = false;
+      const edited = (existing && existing._editedCols) || {};
 
       // 피보험자ID는 사전명단(누적 가입자DB)의 피보험자ID 우선 적용
       const eligiblePid = findSamsungEligiblePatientId(app) || findSamsungEligiblePatientId(existing);
@@ -6730,8 +6731,6 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
         existing.appId = appId;
         changed = true;
       }
-
-      const edited = existing._editedCols || {};
 
       // 수동 수정하지 않은 필드만 동기화
       if (!edited.status && app.status && existing.status !== app.status) {
@@ -6866,7 +6865,7 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
         target: gSamsungSheets.target,
         completed: gSamsungSheets.completed,
         contacts: gSamsungSheets.contacts,
-        eligible: gSamsungSheets.eligible
+        eligible: (Array.isArray(gSamsungSheets.eligible) && gSamsungSheets.eligible.length <= 100) ? gSamsungSheets.eligible : []
       }));
     } catch (e) {}
 
@@ -6953,7 +6952,7 @@ function initSamsungSpreadsheet() {
       target: gSamsungSheets.target,
       completed: gSamsungSheets.completed,
       contacts: gSamsungSheets.contacts,
-      eligible: gSamsungSheets.eligible
+      eligible: (Array.isArray(gSamsungSheets.eligible) && gSamsungSheets.eligible.length <= 100) ? gSamsungSheets.eligible : []
     }));
     localStorage.setItem('LIVON_SAMSUNG_SHEET_TARGET', JSON.stringify(gSamsungSheets.target));
     localStorage.setItem('LIVON_SAMSUNG_SHEET_COMPLETED', JSON.stringify(gSamsungSheets.completed));
@@ -38743,31 +38742,361 @@ function setCareLogViewMode(mode) {
   gCareLogViewMode = mode;
   const btnPatient = document.getElementById('btnViewModePatient');
   const btnFlat = document.getElementById('btnViewModeFlat');
+  const btnCall = document.getElementById('btnViewModeCall');
   const patientContainer = document.getElementById('careLogPatientCardsContainer');
   const flatContainer = document.getElementById('careLogTableContainer');
+  const callContainer = document.getElementById('careLogCallContainer');
+
+  const inactiveBtnClass = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 cursor-pointer';
+  if (btnPatient) btnPatient.className = inactiveBtnClass;
+  if (btnFlat) btnFlat.className = inactiveBtnClass;
+  if (btnCall) btnCall.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all text-purple-700 hover:text-purple-900 hover:bg-purple-50 cursor-pointer font-bold';
+
+  if (patientContainer) patientContainer.classList.add('hidden');
+  if (flatContainer) flatContainer.classList.add('hidden');
+  if (callContainer) callContainer.classList.add('hidden');
 
   if (mode === 'patient') {
     if (btnPatient) {
-      btnPatient.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer';
-    }
-    if (btnFlat) {
-      btnFlat.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 cursor-pointer';
+      btnPatient.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer font-black';
     }
     if (patientContainer) patientContainer.classList.remove('hidden');
-    if (flatContainer) flatContainer.classList.add('hidden');
+    renderCareLogs();
+  } else if (mode === 'call') {
+    if (btnCall) {
+      btnCall.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer font-black border border-purple-200';
+    }
+    if (callContainer) callContainer.classList.remove('hidden');
+    renderCareCallTargets();
   } else {
-    if (btnPatient) {
-      btnPatient.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 cursor-pointer';
-    }
+    // flat
     if (btnFlat) {
-      btnFlat.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer';
+      btnFlat.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer font-black';
     }
-    if (patientContainer) patientContainer.classList.add('hidden');
     if (flatContainer) flatContainer.classList.remove('hidden');
+    renderCareLogs();
+  }
+}
+
+// =========================================================================
+// AI 간병통화 (AI Care Call & Audio Recording) CONTROLLER
+// =========================================================================
+
+function getCareCallTargetList() {
+  const query = (document.getElementById('careCallSearchInput')?.value || '').trim().toLowerCase();
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const targets = [];
+  const seenKeys = new Set();
+
+  // 1. First traverse gAssigns (배정대장)
+  if (Array.isArray(gAssigns) && gAssigns.length > 0) {
+    gAssigns.forEach(as => {
+      if (!as || !as.patientName) return;
+      const app = Array.isArray(gApps) ? gApps.find(a => String(a.id) === String(as.applyId)) : null;
+      
+      const caregiverName = (as.caregiverName || app?.caregiverName || '').trim();
+      if (!caregiverName || caregiverName === '-' || caregiverName === '미배정' || caregiverName.includes('미배정')) return;
+
+      const key = `${as.patientName}_${caregiverName}`;
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+
+      const caregiverPhone = (as.phone && as.phone !== '-') 
+        ? as.phone 
+        : ((Array.isArray(gCaregivers) && gCaregivers.find(c => c.name === caregiverName)?.phone) || app?.caregiverPhone || app?.phone || '010-0000-0000');
+
+      const hospital = (app?.hospitalName ? `${app.hospitalName} ${app.hospitalRoom || ''}`.trim() : '') || (app?.hospital || '') || as.centerName || '병원 정보 없음';
+      const workDate = as.startDate || app?.careStartDate || todayStr;
+      const workTime = app?.careType || '24시간';
+
+      targets.push({
+        id: as.applyId || as.id,
+        patientName: as.patientName,
+        caregiverName,
+        caregiverPhone,
+        hospital,
+        workDate,
+        workTime,
+        status: app?.status || '진행중'
+      });
+    });
   }
 
-  renderCareLogs();
+  // 2. Also check gApps for active caregivers not in gAssigns
+  if (Array.isArray(gApps) && gApps.length > 0) {
+    gApps.forEach(app => {
+      if (!app || !app.patientName) return;
+      const caregiverName = (app.caregiverName || '').trim();
+      if (!caregiverName || caregiverName === '-' || caregiverName === '미배정' || caregiverName.includes('미배정')) return;
+
+      const key = `${app.patientName}_${caregiverName}`;
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+
+      const caregiverPhone = (app.caregiverPhone && app.caregiverPhone !== '-')
+        ? app.caregiverPhone
+        : ((Array.isArray(gCaregivers) && gCaregivers.find(c => c.name === caregiverName)?.phone) || app.phone || '010-0000-0000');
+
+      const hospital = (app.hospitalName ? `${app.hospitalName} ${app.hospitalRoom || ''}`.trim() : '') || app.hospital || '병원 정보 없음';
+      const workDate = app.careStartDate || todayStr;
+      const workTime = app.careType || '24시간';
+
+      targets.push({
+        id: app.id,
+        patientName: app.patientName,
+        caregiverName,
+        caregiverPhone,
+        hospital,
+        workDate,
+        workTime,
+        status: app.status || '진행중'
+      });
+    });
+  }
+
+  if (!query) return targets;
+  return targets.filter(t => 
+    t.patientName.toLowerCase().includes(query) ||
+    t.caregiverName.toLowerCase().includes(query) ||
+    t.caregiverPhone.toLowerCase().includes(query) ||
+    t.hospital.toLowerCase().includes(query) ||
+    t.id.toLowerCase().includes(query)
+  );
 }
+
+function getPatientRecentLogCount(patientName) {
+  if (!patientName) return 0;
+  const cleanName = patientName.trim();
+  if (Array.isArray(window.gCarePortPatientGroups)) {
+    const grp = window.gCarePortPatientGroups.find(g => (g.username === cleanName || g.targetName === cleanName));
+    if (grp && Array.isArray(grp.dailyLogs)) {
+      return grp.dailyLogs.length;
+    }
+  }
+  return 0;
+}
+
+function renderCareCallTargets() {
+  const tbody = document.getElementById('careCallTargetsTableBody');
+  const badgeCount = document.getElementById('careCallTargetCountBadge');
+  if (!tbody) return;
+
+  const targets = getCareCallTargetList();
+  if (badgeCount) badgeCount.innerText = `${targets.length}명`;
+
+  if (targets.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="10" class="p-8 text-center text-slate-400">
+          <div class="flex flex-col items-center justify-center gap-2">
+            <i data-lucide="phone-off" class="w-8 h-8 text-slate-300"></i>
+            <p class="font-bold text-slate-500">배정된 AI 간병통화 대상자가 없습니다.</p>
+            <p class="text-xs text-slate-400">간병 스케줄 배정 완료 후 다시 확인해 주세요.</p>
+          </div>
+        </td>
+      </tr>
+    `;
+    if (typeof initIcons === 'function') initIcons(tbody);
+    return;
+  }
+
+  tbody.innerHTML = targets.map((t, idx) => {
+    const logCount = getPatientRecentLogCount(t.patientName);
+    const maskedPhone = typeof maskPhone === 'function' ? maskPhone(t.caregiverPhone) : t.caregiverPhone;
+    const maskedPatient = typeof maskName === 'function' ? maskName(t.patientName) : t.patientName;
+    const maskedCaregiver = typeof maskName === 'function' ? maskName(t.caregiverName) : t.caregiverName;
+
+    return `
+      <tr class="hover:bg-purple-50/40 transition-colors border-b border-slate-100">
+        <td class="p-3 text-center font-mono text-slate-400 text-xs">${idx + 1}</td>
+        <td class="p-3 font-bold text-slate-900">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+            <span>${maskedPatient}</span>
+            <span class="text-[10px] text-slate-400 font-mono">(${t.id})</span>
+          </div>
+        </td>
+        <td class="p-3 text-slate-600 max-w-xs truncate" title="${t.hospital}">${t.hospital}</td>
+        <td class="p-3 font-bold text-slate-800">${maskedCaregiver}</td>
+        <td class="p-3 font-mono text-slate-700 font-semibold">${maskedPhone}</td>
+        <td class="p-3 text-center text-slate-600 font-medium">${t.workDate}</td>
+        <td class="p-3 text-center">
+          <span class="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-bold text-[11px] border border-purple-200">
+            ${t.workTime}
+          </span>
+        </td>
+        <td class="p-3 text-center">
+          ${logCount > 0 
+            ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px] border border-emerald-200" title="CarePort 최근 ${logCount}일 간병일지 연동됨">
+                 <i data-lucide="file-check" class="w-3 h-3 text-emerald-600"></i> ${logCount}일 보유
+               </span>`
+            : `<span class="text-slate-400 text-[11px]">이전기록 없음</span>`
+          }
+        </td>
+        <td class="p-3 text-center" id="careCallStatus-${t.patientName}">
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-bold text-xs">
+            대기
+          </span>
+        </td>
+        <td class="p-3 text-center">
+          <div id="careCallActions-${t.patientName}" class="flex items-center justify-center gap-1.5 flex-wrap">
+            <button type="button" 
+              onclick="startCareCallWebBrowser('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${t.workDate}', '${t.workTime}', '${t.id}')"
+              class="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-xs flex items-center gap-1 transition-all cursor-pointer hover:shadow-md"
+              title="브라우저 마이크를 통해 AI 간병 통화 시작 (간병인 문답 녹음 및 .m4a 파일 자동생성)">
+              <i data-lucide="mic" class="w-3.5 h-3.5"></i> AI 통화 시작
+            </button>
+            <button type="button" 
+              onclick="triggerOutboundPhoneCall('${t.patientName}', '${t.caregiverName}', '${t.caregiverPhone}', '${t.workDate}', '${t.workTime}', '${t.id}')"
+              class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-purple-50 text-purple-700 font-bold text-xs border border-purple-300 shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+              title="간병사 전화번호(${t.caregiverPhone})로 전화 발신">
+              <i data-lucide="phone-outgoing" class="w-3.5 h-3.5"></i> 전화 발신
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  if (typeof initIcons === 'function') initIcons(tbody);
+}
+
+function startCareCallWebBrowser(patientName, caregiverName, caregiverPhone, workDate, workTime, scheduleId) {
+  if (!window.CareCallClient) {
+    alert('AI 간병통화 모듈(CareCallClient)이 로드되지 않았습니다.');
+    return;
+  }
+  window.CareCallClient.startWebCall({
+    patientName,
+    caregiverName,
+    caregiverPhone,
+    workDate,
+    workTime,
+    scheduleId
+  });
+}
+
+async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPhone, workDate, workTime, scheduleId) {
+  if (!caregiverPhone || caregiverPhone.startsWith('010-0000')) {
+    alert('등록된 간병사 연락처가 올바르지 않습니다.');
+    return;
+  }
+
+  const ok = confirm(`간병사(${caregiverName}, ${caregiverPhone})님께 AI 간병통화를 발신하시겠습니까?\n\n(참고: 외부 전화망 연동 발신 시 통신사 CTI가 호출되며, 브라우저에서 직접 AI와 대화 및 녹취를 테스트하시려면 [AI 통화 시작] 버튼을 누르시면 됩니다.)`);
+  if (!ok) return;
+
+  try {
+    const res = await fetch('/api/carecall/make-call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        patientName,
+        caregiverName,
+        caregiverPhone,
+        workDate,
+        workTime,
+        scheduleId
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(`간병사(${caregiverName})님께 전화 발신을 요청했습니다. (Call SID: ${data.callSid || 'SUCCESS'})`);
+    } else {
+      alert('전화 발신 안내: ' + (data.error || 'CTI 게이트웨이 응답 확인 필요') + '\n\n브라우저 마이크를 통한 [AI 통화 시작] 버튼으로도 동일한 실시간 음성대화, 녹취(.m4a) 생성 및 구글 드라이브 자동 저장이 가능합니다.');
+    }
+  } catch (e) {
+    alert('전화 발신 네트워크 오류: ' + e.message);
+  }
+}
+
+function handleCareCallVoiceChange(val) {
+  if (window.CareCallClient) {
+    window.CareCallClient.setVoice(val);
+  }
+}
+
+function handleCareCallSpeedChange(val) {
+  if (window.CareCallClient) {
+    window.CareCallClient.setSpeed(val);
+  }
+}
+
+function handleCareCallPreviewVoice() {
+  if (window.CareCallClient) {
+    const sel = document.getElementById('selectCareCallVoice');
+    const v = sel ? sel.value : (window.CareCallClient.selectedVoice || 'alloy');
+    window.CareCallClient.previewVoice(v);
+  }
+}
+
+function openCareCallDriveFolder() {
+  const url = window.CareCallClient?.driveConfig?.folderUrl || 'https://drive.google.com/drive/folders/1Jt1zhHybV2E0KKRp1udc37RcifY-8ZJU';
+  window.open(url, '_blank');
+}
+
+function openCareCallDriveModal() {
+  const modal = document.getElementById('careCallDriveModal');
+  if (!modal) return;
+  const cfg = window.CareCallClient?.driveConfig || {};
+  const urlEl = document.getElementById('inputCareCallDriveUrl');
+  const idEl = document.getElementById('inputCareCallDriveFolderId');
+  const nameEl = document.getElementById('inputCareCallDriveFolderName');
+  if (urlEl) urlEl.value = cfg.folderUrl || 'https://drive.google.com/drive/folders/1Jt1zhHybV2E0KKRp1udc37RcifY-8ZJU';
+  if (idEl) idEl.value = cfg.folderId || '1Jt1zhHybV2E0KKRp1udc37RcifY-8ZJU';
+  if (nameEl) nameEl.value = cfg.folderName || 'AI간병 음성파일(메이트원)';
+  modal.classList.remove('hidden');
+}
+
+function closeCareCallDriveModal() {
+  const modal = document.getElementById('careCallDriveModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function handleSaveCareCallDriveConfig() {
+  const folderUrl = (document.getElementById('inputCareCallDriveUrl')?.value || '').trim();
+  const folderId = (document.getElementById('inputCareCallDriveFolderId')?.value || '').trim();
+  const folderName = (document.getElementById('inputCareCallDriveFolderName')?.value || '').trim();
+
+  if (!folderUrl || !folderId) {
+    alert('구글 드라이브 URL과 폴더 ID를 입력해주세요.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/carecall/drive-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderId, folderUrl, folderName })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (window.CareCallClient) {
+        window.CareCallClient.driveConfig = { folderId, folderUrl, folderName };
+      }
+      const badge = document.getElementById('careCallDriveFolderNameBadge');
+      if (badge && folderName) badge.innerText = folderName;
+      closeCareCallDriveModal();
+      alert('구글 드라이브 저장 폴더 설정이 저장되었습니다.');
+    } else {
+      alert('저장 실패: ' + (data.error || '알 수 없는 오류'));
+    }
+  } catch (err) {
+    alert('저장 중 네트워크 오류가 발생했습니다: ' + err.message);
+  }
+}
+
+// Global window exposure
+window.setCareLogViewMode = setCareLogViewMode;
+window.renderCareCallTargets = renderCareCallTargets;
+window.startCareCallWebBrowser = startCareCallWebBrowser;
+window.triggerOutboundPhoneCall = triggerOutboundPhoneCall;
+window.handleCareCallVoiceChange = handleCareCallVoiceChange;
+window.handleCareCallSpeedChange = handleCareCallSpeedChange;
+window.handleCareCallPreviewVoice = handleCareCallPreviewVoice;
+window.openCareCallDriveFolder = openCareCallDriveFolder;
+window.openCareCallDriveModal = openCareCallDriveModal;
+window.closeCareCallDriveModal = closeCareCallDriveModal;
+window.handleSaveCareCallDriveConfig = handleSaveCareCallDriveConfig;
 
 function toggleCarePortPatientAccordion(groupId) {
   if (gCarePortExpandedPatients.has(groupId)) {
@@ -38809,6 +39138,10 @@ function toggleCarePortPatientSelect(groupId, checked) {
 }
 
 function renderCareLogs() {
+  if (gCareLogViewMode === 'call') {
+    renderCareCallTargets();
+    return;
+  }
   const query = (document.getElementById('careLogSearchInput')?.value || '').trim().toLowerCase();
   const insFilter = document.getElementById('careLogInsuranceFilter')?.value || 'ALL';
 
@@ -53305,7 +53638,7 @@ async function executeApplyLaunchData(company) {
         target: gSamsungSheets.target,
         completed: gSamsungSheets.completed,
         contacts: gSamsungSheets.contacts,
-        eligible: gSamsungSheets.eligible
+        eligible: (Array.isArray(gSamsungSheets.eligible) && gSamsungSheets.eligible.length <= 100) ? gSamsungSheets.eligible : []
       }));
       localStorage.setItem('LIVON_SAMSUNG_SHEET_TARGET', JSON.stringify(gSamsungSheets.target));
       localStorage.setItem('LIVON_SAMSUNG_SHEET_COMPLETED', JSON.stringify(gSamsungSheets.completed));
