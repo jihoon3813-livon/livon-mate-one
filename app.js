@@ -38832,6 +38832,16 @@ function setCareLogViewMode(mode) {
   if (flatContainer) flatContainer.classList.add('hidden');
   if (callContainer) callContainer.classList.add('hidden');
 
+  const defaultFilters = document.getElementById('careLogDefaultFilters');
+  const defaultActions = document.getElementById('careLogDefaultActions');
+  if (mode === 'call') {
+    if (defaultFilters) defaultFilters.classList.add('hidden');
+    if (defaultActions) defaultActions.classList.add('hidden');
+  } else {
+    if (defaultFilters) defaultFilters.classList.remove('hidden');
+    if (defaultActions) defaultActions.classList.remove('hidden');
+  }
+
   if (mode === 'patient') {
     if (btnPatient) {
       btnPatient.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer font-black';
