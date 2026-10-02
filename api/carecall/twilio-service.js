@@ -239,7 +239,7 @@ function generateTwiML({ patientName, caregiverName, workDate, workTime, schedul
 <Response>
   <Pause length="1" />
   <Say language="ko-KR" voice="Polly.Seoyeon">안녕하세요, 리본케어 AI 간병일지 도우미입니다. ${escapeXml(caregiverName ? caregiverName + ' 간병사님, ' : '')}${escapeXml(patientName || '')} 환자님의 오늘 간병 내용을 삐 소리 후 편안하게 말씀해 주세요. 말씀이 끝나시면 우물정(#)자를 누르시거나 전화를 끊으시면 됩니다.</Say>
-  <Record action="${recordActionUrl}" maxLength="300" playBeep="true" trim="trim-silence" finishOnKey="#" />
+  <Record action="${escapeXml(recordActionUrl)}" maxLength="300" playBeep="true" trim="trim-silence" finishOnKey="#" />
   <Say language="ko-KR" voice="Polly.Seoyeon">간병 내용이 성공적으로 녹음되었습니다. 감사합니다.</Say>
 </Response>`;
 }
