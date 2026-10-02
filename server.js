@@ -83,6 +83,13 @@ try {
   console.warn('[EnvLoader] Error loading local env file:', e.message);
 }
 
+process.on('uncaughtException', (err) => {
+  console.error('[Process UncaughtException]', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Process UnhandledRejection]', reason);
+});
+
 const { createDocumentPdfBuffer, createTestPdfBuffer } = require('./pdf-helper');
 const { uploadToBarobillFTP, callBarobillSoap, getBarobillErrorMessage, getBarobillFaxStatus } = require('./barobill-client');
 const { getEmailConfig, saveEmailConfig, sendSmtpMail, testSmtpConnection } = require('./smtp-client');
@@ -482,8 +489,29 @@ function startServer(port) {
         try {
           if (latest && fs.existsSync(latest.fullPath)) {
             console.log(`[SamsungDrive Server] 최신 파일 [${latest.filename}] 복호화 시작...`);
-            records = await decryptAndParseSamsungExcel(latest.fullPath, cfg.password || '202609');
-            filename = latest.filename;
+            const now = new Date();
+            const ymNow = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const ymPrev = `${now.getFullYear()}${String(now.getMonth() || 12).padStart(2, '0')}`;
+            const candidatePasswords = Array.from(new Set([cfg.password, ymNow, ymPrev, '202610', '202609'])).filter(Boolean);
+            let decryptError = null;
+            for (const pw of candidatePasswords) {
+              try {
+                records = await decryptAndParseSamsungExcel(latest.fullPath, pw);
+                if (records && records.length > 0) {
+                  filename = latest.filename;
+                  if (cfg.password !== pw) {
+                    saveSamsungDriveConfig({ ...cfg, password: pw });
+                  }
+                  decryptError = null;
+                  break;
+                }
+              } catch (e) {
+                decryptError = e;
+              }
+            }
+            if (decryptError && (!records || records.length === 0)) {
+              throw decryptError;
+            }
           } else {
             // 로컬 경로 파일이 없을 경우 저장된 최신 JSON 파일 로드
             if (fs.existsSync(latestJsonPath)) {
