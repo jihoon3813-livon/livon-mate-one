@@ -118,13 +118,10 @@ async function placeTwilioCall({ phone, patientName, caregiverName, workDate, wo
     throw new Error(`유효하지 않은 수신 전화번호입니다: ${phone}`);
   }
 
-  // TwiML Webhook URL 결정 (전달된 baseUrl -> Vercel 환경변수 -> 설정값 -> localhost 순)
-  let baseUrl = customBaseUrl || cfg.publicBaseUrl;
-  if (!baseUrl && process.env.VERCEL_URL) {
-    baseUrl = `https://${process.env.VERCEL_URL}`;
-  }
-  if (!baseUrl) {
-    baseUrl = `http://localhost:8080`;
+  // TwiML Webhook URL 결정 (설정값 -> 상용 도메인)
+  let baseUrl = cfg.publicBaseUrl || 'https://livon-mate-one.vercel.app';
+  if (!baseUrl || baseUrl.includes('localhost')) {
+    baseUrl = 'https://livon-mate-one.vercel.app';
   }
 
   const params = querystring.stringify({
@@ -223,7 +220,7 @@ async function placeTwilioCall({ phone, patientName, caregiverName, workDate, wo
  */
 function generateTwiML({ patientName, caregiverName, workDate, workTime, scheduleId, voice }) {
   const cfg = getTwilioConfig();
-  let baseUrl = cfg.publicBaseUrl || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://livon-mate-one.vercel.app');
+  let baseUrl = cfg.publicBaseUrl || 'https://livon-mate-one.vercel.app';
   if (baseUrl.includes('localhost')) {
     baseUrl = 'https://livon-mate-one.vercel.app';
   }
