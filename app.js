@@ -16,6 +16,33 @@ if (typeof window !== 'undefined') {
 }
 
 // =========================================================================
+// SAFE LOCAL STORAGE UTILITY (QuotaExceededError 및 브라우저 스토리지 크래시 원천 방지)
+// =========================================================================
+function safeSetLocalStorage(key, val) {
+  try {
+    localStorage.setItem(key, val);
+  } catch (err) {
+    if (err && (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014)) {
+      console.warn('[LocalStorage Quota Exceeded] 불필요한 대용량 캐시를 자동 정리합니다:', key);
+      try {
+        localStorage.removeItem('LIVON_CARE_LOGS');
+        localStorage.removeItem('LIVON_CAREPORT_RAW_LOGS');
+        localStorage.removeItem('LIVON_SAMSUNG_EMAIL_LOGS');
+        localStorage.removeItem('LIVON_CACHED_TOTAL_CALL_DATA');
+        localStorage.setItem(key, val);
+      } catch (e2) {
+        console.warn('[LocalStorage Retry Failed]', e2);
+      }
+    } else {
+      console.warn('[LocalStorage Write Error]', key, err);
+    }
+  }
+}
+if (typeof window !== 'undefined') {
+  window.safeSetLocalStorage = safeSetLocalStorage;
+}
+
+// =========================================================================
 // GLOBAL BEAUTIFUL CUSTOM ALERT & DIALOG SYSTEM (프리미엄 시스템 알럿 대체 시스템)
 // =========================================================================
 window._livonAlertQueue = [];
