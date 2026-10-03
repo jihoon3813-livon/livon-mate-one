@@ -141,6 +141,7 @@ async function placeVonageCall({ phone, patientName, caregiverName, workDate, wo
     scheduleId: scheduleId || ''
   });
 
+  const effectiveVoice = (voice || 'marin').toLowerCase().trim();
   const turnAnswerUrl = `${baseUrl}/api/carecall/vonage-turn?action=answer&${queryParams}&voice=${effectiveVoice}`;
   const eventUrl = `${baseUrl}/api/carecall/vonage-event?${queryParams}`;
 

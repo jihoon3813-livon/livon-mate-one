@@ -84,8 +84,12 @@ module.exports = async function handler(req, res) {
           requestedAt: new Date().toISOString()
         });
       } catch (vonageErr) {
-        console.warn('[Vonage Call Error]', vonageErr.detail || vonageErr.message || vonageErr);
-        // Vonage 오류 시 아래의 Twilio나 CTI로 순차 폴백 진행
+        console.error('[Vonage Call Error]', vonageErr.detail || vonageErr.message || vonageErr);
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        return res.status(500).json({
+          success: false,
+          error: `Vonage AI 음성 전화 발신 실패: ${vonageErr.message || vonageErr.detail || '전화망 오류'}`
+        });
       }
     }
 

@@ -6,8 +6,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { buildCareCallPrompt } = require('./prompt');
-const { storeTurnAudio } = require('./turn-audio');
-
+const { storeTurnAudio, synthesizeTts } = require('./turn-audio');
 const { getOpenAiApiKey } = require('./openai-key');
 
 const gVonageSessions = new Map();
@@ -70,56 +69,27 @@ async function callGpt(messages) {
   });
 }
 
-/**
- * OpenAI TTS 음성 합성 (리본메이트 지정 보이스: shimmer / marin)
- */
-async function synthesizeTts(text, voice = 'shimmer') {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error('OPENAI_API_KEY가 설정되지 않았습니다.');
+function saveSessionState(sessionId, sessionObj) {
+  gVonageSessions.set(sessionId, sessionObj);
+  try {
+    const tmpFile = path.join('/tmp', `sess_${sessionId}.json`);
+    fs.writeFileSync(tmpFile, JSON.stringify(sessionObj));
+  } catch (_) {}
+}
 
-  let targetVoice = voice.toLowerCase();
-  if (targetVoice === 'marin') targetVoice = 'shimmer'; // 리본메이트 다정한 30대 여성 간호사 톤
-  const validVoices = ['shimmer', 'nova', 'alloy', 'echo', 'coral', 'sage', 'ash'];
-  if (!validVoices.includes(targetVoice)) targetVoice = 'shimmer';
-
-  const postData = JSON.stringify({
-    model: 'tts-1',
-    input: text,
-    voice: targetVoice,
-    speed: 1.05
-  });
-
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: 'api.openai.com',
-      port: 443,
-      path: '/v1/audio/speech',
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData)
-      }
-    }, res => {
-      const chunks = [];
-      res.on('data', c => chunks.push(c));
-      res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(Buffer.concat(chunks));
-        } else {
-          reject(new Error(`TTS 생성 실패 (Status: ${res.statusCode})`));
-        }
-      });
-    });
-
-    req.on('error', reject);
-    req.setTimeout(8000, () => {
-      req.destroy();
-      reject(new Error('TTS 호출 시간 초과 (8초)'));
-    });
-    req.write(postData);
-    req.end();
-  });
+function loadSessionState(sessionId) {
+  if (gVonageSessions.has(sessionId)) {
+    return gVonageSessions.get(sessionId);
+  }
+  try {
+    const tmpFile = path.join('/tmp', `sess_${sessionId}.json`);
+    if (fs.existsSync(tmpFile)) {
+      const data = JSON.parse(fs.readFileSync(tmpFile, 'utf8'));
+      gVonageSessions.set(sessionId, data);
+      return data;
+    }
+  } catch (_) {}
+  return null;
 }
 
 module.exports = async function handler(req, res) {
@@ -148,12 +118,12 @@ module.exports = async function handler(req, res) {
     // =========================================================================
     // 1. TURN 0: 통화 연결 시 첫 질문 발화 (Opening)
     // =========================================================================
-    if (action === 'answer' || !gVonageSessions.has(sessionId)) {
+    if (action === 'answer' || (!gVonageSessions.has(sessionId) && !loadSessionState(sessionId))) {
       const patientName = query.patientName || body.patientName || '환자';
       const caregiverName = query.caregiverName || body.caregiverName || '간병사';
       const workDate = query.workDate || body.workDate || new Date().toISOString().slice(0, 10);
       const workTime = query.workTime || body.workTime || '24시간 상주';
-      const voice = query.voice || body.voice || 'shimmer';
+      const voice = query.voice || body.voice || 'marin';
 
       // 회사 100% 동일 공식 프롬프트 로드
       const systemPrompt = buildCareCallPrompt({
@@ -182,8 +152,6 @@ module.exports = async function handler(req, res) {
         transcripts: []
       };
 
-      gVonageSessions.set(sessionId, sessionObj);
-
       // GPT 첫 질문 생성
       let aiOpeningText = await callGpt(sessionObj.messages);
       if (!aiOpeningText) {
@@ -193,6 +161,7 @@ module.exports = async function handler(req, res) {
       sessionObj.lastAiText = aiOpeningText;
       sessionObj.messages.push({ role: 'assistant', content: aiOpeningText });
       sessionObj.transcripts.push({ speaker: 'ai', text: aiOpeningText, time: new Date().toISOString() });
+      saveSessionState(sessionId, sessionObj);
 
       console.log(`[Vonage Interactive AI Call] Session ${sessionId} Started. Opening: "${aiOpeningText}"`);
 
@@ -202,10 +171,13 @@ module.exports = async function handler(req, res) {
       storeTurnAudio(audioId, audioBuffer);
 
       // NCCO 반환: OpenAI 음성 재생 -> 간병사 음성 청취(ASR)
+      const streamAudioUrl = `${baseUrl}/api/carecall/turn-audio?id=${audioId}&voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(aiOpeningText)}`;
+      const nextTurnUrl = `${baseUrl}/api/carecall/vonage-turn?action=turn&sessionId=${sessionId}&patientName=${encodeURIComponent(patientName)}&caregiverName=${encodeURIComponent(caregiverName)}&voice=${encodeURIComponent(voice)}&turnCount=0`;
+
       const ncco = [
         {
           action: 'stream',
-          streamUrl: [`${baseUrl}/api/carecall/turn-audio?id=${audioId}`],
+          streamUrl: [streamAudioUrl],
           bargeIn: false
         },
         {
@@ -217,7 +189,7 @@ module.exports = async function handler(req, res) {
             maxDuration: 50,
             startTimeout: 10
           },
-          eventUrl: [`${baseUrl}/api/carecall/vonage-turn?action=turn&sessionId=${sessionId}`]
+          eventUrl: [nextTurnUrl]
         }
       ];
 
@@ -228,19 +200,26 @@ module.exports = async function handler(req, res) {
     // =========================================================================
     // 2. TURN 1~N: 간병사 답변 청취 후 맞장구(리액션) + 다음 질문
     // =========================================================================
-    const session = gVonageSessions.get(sessionId);
+    let session = loadSessionState(sessionId);
     if (!session) {
-      // 세션 유실 시 기본 감사 멘트로 안전 종료
-      const endNcco = [
-        {
-          action: 'talk',
-          text: '말씀해 주셔서 감사합니다. 오늘 간병하시느라 정말 고생 많으셨습니다.',
-          language: 'ko-KR',
-          bargeIn: false
-        }
-      ];
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      return res.status(200).json(endNcco);
+      // 복원 불가 시 쿼리 파라미터 기반 재구성
+      const patientName = query.patientName || '환자';
+      const caregiverName = query.caregiverName || '간병사';
+      const voice = query.voice || 'marin';
+      session = {
+        sessionId,
+        patientName,
+        caregiverName,
+        workDate: new Date().toISOString().slice(0, 10),
+        workTime: '24시간 상주',
+        voice,
+        turnCount: parseInt(query.turnCount || '0', 10),
+        messages: [
+          { role: 'system', content: buildCareCallPrompt({ name: patientName, date: new Date().toISOString().slice(0, 10), time: '24시간 상주' }) }
+        ],
+        lastAiText: '',
+        transcripts: []
+      };
     }
 
     session.turnCount++;
@@ -258,14 +237,13 @@ module.exports = async function handler(req, res) {
       session.transcripts.push({ speaker: 'caregiver', text: userSpeech, time: new Date().toISOString() });
       session.messages.push({ role: 'user', content: userSpeech });
     } else {
-      // 사용자가 말을 하지 않았거나 인식 실패 시 재촉 유도
       session.messages.push({
         role: 'user',
         content: `(음성이 잠시 비어있거나 주변 소음으로 들리지 않았습니다. 간병사님이 부담 갖지 않으시도록 따뜻하게 격려하고, 편하게 말씀해 주시도록 자연스럽게 다시 물어봐주세요)`
       });
     }
 
-    // 대화 종료 판단 (4턴 이상 진행되었거나 바이탈/측정 데이터까지 수집 완료된 경우)
+    // 대화 종료 판단 (4턴 이상 진행되었거나 수집 완료)
     const isReadyToFinish = session.turnCount >= 4;
 
     if (isReadyToFinish) {
@@ -286,6 +264,7 @@ module.exports = async function handler(req, res) {
     session.lastAiText = aiResponseText;
     session.messages.push({ role: 'assistant', content: aiResponseText });
     session.transcripts.push({ speaker: 'ai', text: aiResponseText, time: new Date().toISOString() });
+    saveSessionState(sessionId, session);
 
     console.log(`[Vonage Turn ${session.turnCount}] AI Response: "${aiResponseText}"`);
 
@@ -293,6 +272,8 @@ module.exports = async function handler(req, res) {
     const audioBuffer = await synthesizeTts(aiResponseText, session.voice);
     const audioId = `${sessionId}_turn${session.turnCount}`;
     storeTurnAudio(audioId, audioBuffer);
+
+    const streamAudioUrl = `${baseUrl}/api/carecall/turn-audio?id=${audioId}&voice=${encodeURIComponent(session.voice)}&text=${encodeURIComponent(aiResponseText)}`;
 
     // =========================================================================
     // 3. 종료 또는 다음 턴 진행 NCCO 분기
@@ -322,11 +303,10 @@ module.exports = async function handler(req, res) {
         fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2), 'utf8');
       } catch (_) {}
 
-      // 다음 input 없이 stream만 반환하면 통화가 자연스럽게 종료됩니다.
       const finishNcco = [
         {
           action: 'stream',
-          streamUrl: [`${baseUrl}/api/carecall/turn-audio?id=${audioId}`],
+          streamUrl: [streamAudioUrl],
           bargeIn: false
         }
       ];
@@ -337,10 +317,12 @@ module.exports = async function handler(req, res) {
     }
 
     // 중간 턴: 다음 질문 재생 후 간병사 음성 청취 대기
+    const nextTurnUrl = `${baseUrl}/api/carecall/vonage-turn?action=turn&sessionId=${sessionId}&patientName=${encodeURIComponent(session.patientName)}&caregiverName=${encodeURIComponent(session.caregiverName)}&voice=${encodeURIComponent(session.voice)}&turnCount=${session.turnCount}`;
+
     const nextNcco = [
       {
         action: 'stream',
-        streamUrl: [`${baseUrl}/api/carecall/turn-audio?id=${audioId}`],
+        streamUrl: [streamAudioUrl],
         bargeIn: false
       },
       {
@@ -352,7 +334,7 @@ module.exports = async function handler(req, res) {
           maxDuration: 50,
           startTimeout: 10
         },
-        eventUrl: [`${baseUrl}/api/carecall/vonage-turn?action=turn&sessionId=${sessionId}`]
+        eventUrl: [nextTurnUrl]
       }
     ];
 
@@ -361,11 +343,10 @@ module.exports = async function handler(req, res) {
 
   } catch (err) {
     console.error('[Vonage Turn Error]', err);
-    // 오류 발생 시에도 전화가 뚝 끊기지 않고 따뜻한 마무리 음성 재생
     const fallbackNcco = [
       {
         action: 'talk',
-        text: '말씀해 주셔서 감사합니다. 통화 내용이 안전하게 저장되었습니다. 오늘 간병하시느라 정말 고생 많으셨습니다.',
+        text: '말씀해 주셔서 감사합니다. 오늘 간병하시느라 정말 고생 많으셨습니다.',
         language: 'ko-KR',
         bargeIn: false
       }
