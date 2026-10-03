@@ -40128,7 +40128,7 @@ window.playCareCallRecordingAudio = playCareCallRecordingAudio;
 window.handleCareCallDownloadFile = handleCareCallDownloadFile;
 window.handleCareCallModalDownloadClick = handleCareCallModalDownloadClick;
 
-let gActiveCareCallProvider = 'twilio';
+let gActiveCareCallProvider = 'vonage';
 
 function switchCareCallProviderTab(provider) {
   gActiveCareCallProvider = provider;

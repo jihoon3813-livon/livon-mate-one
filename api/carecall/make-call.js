@@ -38,7 +38,7 @@ module.exports = async function handler(req, res) {
       insuranceCompany = '삼성화재',
       voice = savedVoiceCfg.voice || 'marin',
       scheduleId,
-      provider = 'twilio', // 기본 통신망: 검증된 Twilio 번호(+18604535627) 우선 사용
+      provider = 'vonage', // 기본 통신망: Vonage 우선 발신
       forceCti = false
     } = body;
 
@@ -53,12 +53,11 @@ module.exports = async function handler(req, res) {
     const reqProto = req.headers['x-forwarded-proto'] || (reqHost && reqHost.includes('localhost') ? 'http' : 'https');
     const autoBaseUrl = reqHost ? `${reqProto}://${reqHost}` : null;
 
-    // 1. Vonage 통화 발신 시도 (유효한 정식 발신번호가 등록되어 있고 vonage 선택 시)
+    // 1. Vonage 통화 발신 (우선 순위: Vonage 음성망)
     const vonageCfg = getVonageConfig();
-    const isVonageNumberValid = vonageCfg.phoneNumber && !vonageCfg.phoneNumber.includes('12345678901') && vonageCfg.phoneNumber.length >= 10;
-    const hasVonage = !!(vonageCfg.applicationId && vonageCfg.apiKey && isVonageNumberValid);
+    const hasVonage = !!(vonageCfg.applicationId && vonageCfg.apiKey);
 
-    if (hasVonage && provider === 'vonage' && !forceCti) {
+    if (hasVonage && provider !== 'twilio' && !forceCti) {
       try {
         const vonageResult = await placeVonageCall({
           phone: cleanPhone,
