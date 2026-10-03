@@ -1,6 +1,6 @@
 // api/carecall/turn-audio.js
 // Serves dynamically synthesized OpenAI TTS audio for phone call turns
-// Resilient for both local server and Vercel serverless multi-instance environments
+// Ultra-resilient across local server and Vercel serverless multi-instance environments
 
 const https = require('https');
 const fs = require('fs');
@@ -35,14 +35,14 @@ function getTurnAudio(id) {
 }
 
 /**
- * OpenAI TTS 실시간 합성 함수 (어떤 람다 인스턴스에서도 즉시 합성 스트리밍 가능)
+ * OpenAI TTS 실시간 합성 함수 (리본메이트 Marin 음색: tts-1 / shimmer)
  */
 async function synthesizeTts(text, voice = 'shimmer') {
   const apiKey = getOpenAiApiKey();
   if (!apiKey) throw new Error('OPENAI_API_KEY가 설정되지 않았습니다.');
 
   let targetVoice = (voice || 'shimmer').toLowerCase().trim();
-  if (targetVoice === 'marin') targetVoice = 'shimmer'; // 리본메이트 다정한 30대 여성 간호사 톤
+  if (targetVoice === 'marin') targetVoice = 'shimmer'; // 리본메이트 30대 다정한 여성 간호사 톤
   const validVoices = ['shimmer', 'nova', 'alloy', 'echo', 'coral', 'sage', 'ash'];
   if (!validVoices.includes(targetVoice)) targetVoice = 'shimmer';
 
@@ -77,9 +77,9 @@ async function synthesizeTts(text, voice = 'shimmer') {
     });
 
     req.on('error', reject);
-    req.setTimeout(9000, () => {
+    req.setTimeout(8000, () => {
       req.destroy();
-      reject(new Error('TTS 호출 시간 초과 (9초)'));
+      reject(new Error('TTS 호출 시간 초과 (8초)'));
     });
     req.write(postData);
     req.end();
@@ -96,22 +96,40 @@ module.exports = async function handler(req, res) {
 
   const query = req.query || {};
   const id = query.id;
-  const text = query.text;
-  const voice = query.voice || 'shimmer';
+  let text = query.text;
+  const encoded = query.encoded;
+  const voice = query.voice || 'marin';
 
-  let buffer = getTurnAudio(id);
-
-  // 캐시 부재 시 실시간 합성 (Vercel Cold-start 대비)
-  if (!buffer && text) {
+  // Base64URL 디코딩 지원 (/audio/stream/:encoded.mp3)
+  if (!text && encoded) {
     try {
-      console.log(`[turn-audio] On-the-fly synthesis for id=${id}`);
-      buffer = await synthesizeTts(text, voice);
-      if (id && buffer) storeTurnAudio(id, buffer);
-    } catch (e) {
-      console.error('[turn-audio] On-the-fly synthesis failed:', e.message);
+      text = Buffer.from(encoded, 'base64url').toString('utf8');
+    } catch (_) {
+      try {
+        text = Buffer.from(encoded, 'base64').toString('utf8');
+      } catch (_) {}
     }
   }
 
+  // 캐시 키 결정 (ID가 있으면 ID 우선, 없으면 텍스트 해시)
+  const cacheKey = id || (text ? 'hash_' + Buffer.from(text).toString('hex').slice(0, 32) : null);
+
+  let buffer = getTurnAudio(cacheKey);
+
+  // 캐시 미스 시 실시간 TTS 합성
+  if (!buffer && text) {
+    try {
+      console.log(`[turn-audio] Generating TTS for text: "${text.slice(0, 30)}..."`);
+      buffer = await synthesizeTts(text, voice);
+      if (cacheKey && buffer) {
+        storeTurnAudio(cacheKey, buffer);
+      }
+    } catch (e) {
+      console.error('[turn-audio] Synthesis error:', e.message);
+    }
+  }
+
+  // 최후의 수단: 사전 캐시 파일 폴백
   if (!buffer) {
     const fallbackPath = path.join(process.cwd(), 'audio', 'questions_marin.mp3');
     if (fs.existsSync(fallbackPath)) {
@@ -124,7 +142,7 @@ module.exports = async function handler(req, res) {
 
   res.writeHead(200, {
     'Content-Type': 'audio/mpeg',
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': 'public, max-age=86400',
     'Content-Length': buffer.length
   });
   return res.end(buffer);

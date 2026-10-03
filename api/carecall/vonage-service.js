@@ -145,6 +145,25 @@ async function placeVonageCall({ phone, patientName, caregiverName, workDate, wo
   const turnAnswerUrl = `${baseUrl}/api/carecall/vonage-turn?action=answer&${queryParams}&voice=${effectiveVoice}`;
   const eventUrl = `${baseUrl}/api/carecall/vonage-event?${queryParams}`;
 
+  // 리본메이트 앱 100% 동일 첫 멘트 사전 합성 (전화벨 울리는 동안 캐싱 완료)
+  try {
+    const formattedDate = (function(d) {
+      if (!d) return '오늘';
+      const parts = d.split('-');
+      return parts.length === 3 ? `${parseInt(parts[1], 10)}월 ${parseInt(parts[2], 10)}일` : d;
+    })(workDate);
+    const shortName = (patientName && patientName.length === 3) ? patientName.slice(1) : (patientName || '어르신');
+    const openingText = caregiverName
+      ? `안녕하세요, ${caregiverName} 간병사님! ${patientName} 님 간병일지 작성을 도와드릴게요. 오늘 근무하신 ${formattedDate} 하루 동안 ${shortName} 님 모시면서 특별히 신경 쓰인 부분이나 달라진 점이 있었을까요?`
+      : `안녕하세요, ${patientName} 님 간병일지 작성을 도와드릴게요. 오늘 근무하신 ${formattedDate} 하루 동안 ${shortName} 님 모시면서 특별히 신경 쓰인 부분이나 달라진 점이 있었을까요?`;
+
+    const { synthesizeTts, storeTurnAudio } = require('./turn-audio');
+    synthesizeTts(openingText, effectiveVoice).then(buf => {
+      const cacheKey = 'hash_' + Buffer.from(openingText).toString('hex').slice(0, 32);
+      storeTurnAudio(cacheKey, buf);
+    }).catch(() => {});
+  } catch (_) {}
+
   // 리본메이트 공식 양방향 1문1답 AI 대화형 엔진 연동 (OpenAI GPT + OpenAI Voice)
   const postPayload = {
     to: [{ type: 'phone', number: toFormatted }],

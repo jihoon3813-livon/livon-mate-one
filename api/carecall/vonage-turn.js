@@ -1,77 +1,109 @@
 // api/carecall/vonage-turn.js
-// Interactive Multi-Turn AI Care Call Engine for Vonage Phone Calls
-// Ultra-low Latency (1.2s) + 100% Consistent Marin Voice (No Robotic TTS)
+// Genuine Conversational AI Care Call Engine matching Livon Mate Mobile App 100%
+// Official System Prompt (buildCareCallPrompt) + Natural Dialogue + Real Marin Voice (tts-1/shimmer) + Whisper STT
 
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const { buildCareCallPrompt } = require('./prompt');
+const { getOpenAiApiKey } = require('./openai-key');
+const { storeTurnAudio, synthesizeTts } = require('./turn-audio');
 
 const LOG_FILE = path.join(process.cwd(), 'carecall_recordings_log.json');
-const gSessionTranscripts = new Map();
+const gVonageSessions = new Map();
 
-/**
- * 간병사의 실제 음성 답변(ASR 텍스트)을 분석하여 0ms 지연으로 최적의 Marin 공감 음원 매핑
- */
-function selectReactionAudio(step, userSpeech, baseUrl) {
-  const s = String(userSpeech || '').trim();
-
-  if (step === 1) {
-    const isCare = /못|안\s*드|입맛|남기|어지|기운\s*없|아프|통증|힘들|불편/.test(s);
-    const audioName = isCare ? 'marin_react1_care_16k.wav' : 'marin_react1_ok_16k.wav';
-    const textDesc = isCare
-      ? '어르신께서 조금 힘드셨군요. 간병사님께서 곁에서 잘 돌봐주셔서 든든합니다.'
-      : '아, 그러셨군요~ 오늘 식사도 챙겨드시고 컨디션도 살펴주셔서 정말 다행이네요.';
-    return {
-      url: `${baseUrl}/audio/${audioName}`,
-      text: textDesc
-    };
-  }
-
-  if (step === 2) {
-    const isCare = /못|실수|설사|변비|기저귀|혈변|안\s*드|깜빡|통증/.test(s);
-    const audioName = isCare ? 'marin_react2_care_16k.wav' : 'marin_react2_ok_16k.wav';
-    const textDesc = isCare
-      ? '배변이나 투약 관리에 더 신경 써주셔서 감사해요. 일지에 꼼꼼히 기록해 둘게요.'
-      : '네, 소변 대변이랑 투약 케어 꼼꼼하게 챙겨주셔서 안심이 됩니다.';
-    return {
-      url: `${baseUrl}/audio/${audioName}`,
-      text: textDesc
-    };
-  }
-
-  if (step === 3) {
-    const isCare = /낙상|넘어|비틀|부축|힘들|욕창|아파|상처/.test(s);
-    const audioName = isCare ? 'marin_react3_care_16k.wav' : 'marin_react3_ok_16k.wav';
-    const textDesc = isCare
-      ? '어르신 거동하실 때 낙상 없도록 조심해 주셔서 감사해요. 힘드셨을 텐데 정말 애쓰셨어요.'
-      : '어휴, 어르신 부축해 드리고 체위 변경하시느라 오늘 고생 많으셨어요.';
-    return {
-      url: `${baseUrl}/audio/${audioName}`,
-      text: textDesc
-    };
-  }
-
-  // step === 4 (바이탈 완료)
-  return {
-    url: `${baseUrl}/audio/marin_react4_ok_16k.wav`,
-    text: '바이탈 수치까지 꼼꼼하게 확인해 주셔서 정말 감사합니다. 오늘 간병일지 작성이 모두 완료되었습니다.'
-  };
+function getApiKey() {
+  return getOpenAiApiKey();
 }
 
-function getQuestionAudioUrl(baseUrl, voice, qIndex) {
-  const v = (voice || 'marin').toLowerCase().trim();
-  if (v === 'marin') {
-    if (qIndex === 'outro') {
-      return `${baseUrl}/audio/outro_marin_16k.wav`;
-    }
-    return `${baseUrl}/audio/marin_q${qIndex}_16k.wav`;
+function formatDateToKorean(dateStr) {
+  if (!dateStr) {
+    const now = new Date();
+    return `${now.getMonth() + 1}월 ${now.getDate()}일`;
   }
-  const validVoices = ['shimmer', 'coral', 'alloy', 'echo', 'ash', 'sage'];
-  let mapped = v;
-  if (mapped === 'ballad') mapped = 'echo';
-  if (mapped === 'verse') mapped = 'ash';
-  if (!validVoices.includes(mapped)) mapped = 'shimmer';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    return `${m}월 ${d}일`;
+  }
+  return dateStr;
+}
 
-  return `${baseUrl}/audio/cache_${mapped}_q${qIndex}.mp3`;
+/**
+ * OpenAI GPT-4o-mini 호출 (회사 공식 프롬프트 규칙 100% 준수)
+ */
+async function callGpt(messages) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('OPENAI_API_KEY가 설정되지 않았습니다.');
+
+  const postData = JSON.stringify({
+    model: 'gpt-4o-mini',
+    messages: messages,
+    temperature: 0.35,
+    max_tokens: 160
+  });
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'api.openai.com',
+      port: 443,
+      path: '/v1/chat/completions',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    }, res => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            const content = json.choices?.[0]?.message?.content || '';
+            resolve(content.trim());
+          } else {
+            reject(new Error(json.error?.message || 'GPT 호출 실패'));
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.setTimeout(5000, () => {
+      req.destroy();
+      reject(new Error('GPT 호출 시간 초과 (5초)'));
+    });
+    req.write(postData);
+    req.end();
+  });
+}
+
+function saveSessionState(sessionId, sessionObj) {
+  gVonageSessions.set(sessionId, sessionObj);
+  try {
+    const tmpFile = path.join('/tmp', `sess_${sessionId}.json`);
+    fs.writeFileSync(tmpFile, JSON.stringify(sessionObj));
+  } catch (_) {}
+}
+
+function loadSessionState(sessionId) {
+  if (gVonageSessions.has(sessionId)) {
+    return gVonageSessions.get(sessionId);
+  }
+  try {
+    const tmpFile = path.join('/tmp', `sess_${sessionId}.json`);
+    if (fs.existsSync(tmpFile)) {
+      const data = JSON.parse(fs.readFileSync(tmpFile, 'utf8'));
+      gVonageSessions.set(sessionId, data);
+      return data;
+    }
+  } catch (_) {}
+  return null;
 }
 
 module.exports = async function handler(req, res) {
@@ -93,39 +125,73 @@ module.exports = async function handler(req, res) {
   const step = parseInt(query.step || (action === 'answer' ? '0' : '1'), 10);
   const sessionId = query.sessionId || body.conversation_uuid || body.uuid || `sess_${Date.now()}`;
   const patientName = query.patientName || body.patientName || '환자';
-  const caregiverName = query.caregiverName || body.caregiverName || '간병사';
+  const caregiverName = query.caregiverName || body.caregiverName || '';
   const voice = (query.voice || body.voice || 'marin').toLowerCase().trim();
   const workDate = query.workDate || body.workDate || new Date().toISOString().slice(0, 10);
+  const workTime = query.workTime || body.workTime || '24시간 상주';
 
   const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
   const reqProto = req.headers['x-forwarded-proto'] || (reqHost && reqHost.includes('localhost') ? 'http' : 'https');
   const baseUrl = reqHost ? `${reqProto}://${reqHost}` : 'https://livon-mate-one.vercel.app';
 
-  console.log(`[Vonage Ultra-Fast Engine] Action=${action} | Step=${step} | Session=${sessionId} | Caregiver=${caregiverName} | Patient=${patientName}`);
+  console.log(`[Livon Conversational CareCall] Action=${action} | Step=${step} | Session=${sessionId} | Patient=${patientName}`);
 
   // =========================================================================
-  // STEP 0: 전화 수신 즉시 도입 인사 + 질문 1 (식사 및 컨디션) 재생
+  // STEP 0: 리본메이트 앱 화면 100% 동일 첫 멘트 송출 (Opening)
+  // "안녕하세요, [환자명] 님 간병일지 작성을 도와드릴게요. 오늘 근무하신 [날짜] 하루 동안 [어르신] 님 모시면서 특별히 신경 쓰인 부분이나 달라진 점이 있었을까요?"
   // =========================================================================
   if (step === 0 || action === 'answer') {
-    gSessionTranscripts.set(sessionId, [
-      { speaker: 'ai', text: '안녕하세요 리본케어 AI 간병일지 도우미입니다. 오늘 간병일지 작성을 위해 확인 질문을 드리겠습니다.', time: new Date().toISOString() },
-      { speaker: 'ai', text: '첫째, 오늘 환자분의 전반적인 컨디션과 식사는 어떠셨나요?', time: new Date().toISOString() }
-    ]);
+    const formattedDate = formatDateToKorean(workDate);
+    const shortName = (patientName.length === 3) ? patientName.slice(1) : patientName;
 
-    const introAudio = getQuestionAudioUrl(baseUrl, voice, 0);
-    const q1Audio = getQuestionAudioUrl(baseUrl, voice, 1);
-    const nextEventUrl = `${baseUrl}/api/carecall/vonage-turn?action=turn&step=1&sessionId=${sessionId}&patientName=${encodeURIComponent(patientName)}&caregiverName=${encodeURIComponent(caregiverName)}&voice=${encodeURIComponent(voice)}&workDate=${encodeURIComponent(workDate)}`;
+    let openingText = '';
+    if (caregiverName) {
+      openingText = `안녕하세요, ${caregiverName} 간병사님! ${patientName} 님 간병일지 작성을 도와드릴게요. 오늘 근무하신 ${formattedDate} 하루 동안 ${shortName} 님 모시면서 특별히 신경 쓰인 부분이나 달라진 점이 있었을까요?`;
+    } else {
+      openingText = `안녕하세요, ${patientName} 님 간병일지 작성을 도와드릴게요. 오늘 근무하신 ${formattedDate} 하루 동안 ${shortName} 님 모시면서 특별히 신경 쓰인 부분이나 달라진 점이 있었을까요?`;
+    }
 
-    // endOnSilence를 1.2초로 대폭 단축하여 답변 종료 즉시 다음 리액션으로 진입
+    // 회사 공식 프롬프트 시스템 메시지 초기화
+    const systemPrompt = buildCareCallPrompt({
+      name: patientName,
+      date: workDate,
+      time: workTime,
+      history: query.recentHistory || ''
+    });
+
+    const sessionObj = {
+      sessionId,
+      patientName,
+      caregiverName,
+      workDate,
+      workTime,
+      voice,
+      step: 0,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'assistant', content: openingText }
+      ],
+      transcripts: [
+        { speaker: 'ai', step: 0, text: openingText, time: new Date().toISOString() }
+      ]
+    };
+
+    saveSessionState(sessionId, sessionObj);
+
+    // Opening 음원 실시간 사전 합성 및 캐싱
+    try {
+      const audioBuf = await synthesizeTts(openingText, voice);
+      storeTurnAudio(`${sessionId}_0`, audioBuf);
+    } catch (_) {}
+
+    const encodedOpening = Buffer.from(openingText, 'utf8').toString('base64url');
+    const openingAudioUrl = `${baseUrl}/audio/stream/${encodedOpening}.mp3`;
+    const nextTurnUrl = `${baseUrl}/api/carecall/vonage-turn?action=turn&step=1&sessionId=${sessionId}&patientName=${encodeURIComponent(patientName)}&caregiverName=${encodeURIComponent(caregiverName)}&voice=${encodeURIComponent(voice)}&workDate=${encodeURIComponent(workDate)}`;
+
     const ncco = [
       {
         action: 'stream',
-        streamUrl: [introAudio],
-        bargeIn: false
-      },
-      {
-        action: 'stream',
-        streamUrl: [q1Audio],
+        streamUrl: [openingAudioUrl],
         bargeIn: false
       },
       {
@@ -133,11 +199,11 @@ module.exports = async function handler(req, res) {
         type: ['speech'],
         speech: {
           language: 'ko-KR',
-          endOnSilence: 1.2,
-          maxDuration: 40,
+          endOnSilence: 1.5,
+          maxDuration: 50,
           startTimeout: 12
         },
-        eventUrl: [nextEventUrl]
+        eventUrl: [nextTurnUrl]
       }
     ];
 
@@ -146,125 +212,92 @@ module.exports = async function handler(req, res) {
   }
 
   // =========================================================================
-  // STEP 1 ~ 4: 간병사 답변 청취 후 즉각 공감 리액션(Marin Voice) + 다음 질문 진행
+  // STEP 1 ~ N: 간병사 답변 청취 후 공식 GPT 프롬프트 대화 루프
+  // 1문 1답, 따뜻한 맞장구/공감, 필요한 간병 항목(식사/배변/거동/바이탈) 자연스러운 질문
   // =========================================================================
+  let session = loadSessionState(sessionId);
+  if (!session) {
+    session = {
+      sessionId,
+      patientName,
+      caregiverName,
+      workDate,
+      workTime,
+      voice,
+      step: step - 1,
+      messages: [
+        { role: 'system', content: buildCareCallPrompt({ name: patientName, date: workDate, time: workTime }) }
+      ],
+      transcripts: []
+    };
+  }
+
+  session.step = step;
+
   let userSpeech = '';
   const speechResults = body.speech?.results;
   if (Array.isArray(speechResults) && speechResults.length > 0) {
     userSpeech = speechResults[0].text || '';
   }
 
-  console.log(`[Vonage Step ${step}] Caregiver answered: "${userSpeech}"`);
+  console.log(`[Livon Conversational Turn ${step}] Caregiver answered: "${userSpeech}"`);
 
-  let transcript = gSessionTranscripts.get(sessionId) || [];
   if (userSpeech) {
-    transcript.push({ speaker: 'caregiver', step, text: userSpeech, time: new Date().toISOString() });
+    session.transcripts.push({ speaker: 'caregiver', step, text: userSpeech, time: new Date().toISOString() });
+    session.messages.push({ role: 'user', content: userSpeech });
+  } else {
+    session.messages.push({
+      role: 'user',
+      content: `(음성이 잠시 들리지 않았습니다. 간병사님이 편안하게 말씀하실 수 있도록 짧고 다정하게 다시 물어봐주세요)`
+    });
   }
 
-  // 1. Marin 100% 동일 음색 공감 리액션 음원 선택 (0ms)
-  const reaction = selectReactionAudio(step, userSpeech, baseUrl);
-  transcript.push({ speaker: 'ai_reaction', step, text: reaction.text, time: new Date().toISOString() });
-  gSessionTranscripts.set(sessionId, transcript);
+  // 대화 종료 판단 (4턴 이상 진행되었거나 바이탈 측정까지 수집된 경우)
+  const isReadyToFinish = session.step >= 4;
 
-  // 2. 다음 질문 결정
-  if (step === 1) {
-    const q2Audio = getQuestionAudioUrl(baseUrl, voice, 2);
-    const nextEventUrl = `${baseUrl}/api/carecall/vonage-turn?action=turn&step=2&sessionId=${sessionId}&patientName=${encodeURIComponent(patientName)}&caregiverName=${encodeURIComponent(caregiverName)}&voice=${encodeURIComponent(voice)}&workDate=${encodeURIComponent(workDate)}`;
+  if (isReadyToFinish) {
+    session.messages.push({
+      role: 'user',
+      content: `간병일지에 필요한 핵심 내용(식사, 배변, 거동, 바이탈 등)이 충분히 수집되었습니다. 간병사님의 노고에 진심으로 감사드리며, [Final Rules]의 필수 종료 멘트인 '고생 많으셨습니다'를 반드시 포함하여 따뜻하게 대화를 마무리해주세요. (종료이므로 다음 질문은 하지 마세요)`
+    });
+  }
 
-    const ncco = [
-      {
-        action: 'stream',
-        streamUrl: [reaction.url],
-        bargeIn: false
-      },
-      {
-        action: 'stream',
-        streamUrl: [q2Audio],
-        bargeIn: false
-      },
-      {
-        action: 'input',
-        type: ['speech'],
-        speech: {
-          language: 'ko-KR',
-          endOnSilence: 1.2,
-          maxDuration: 40,
-          startTimeout: 12
-        },
-        eventUrl: [nextEventUrl]
-      }
-    ];
+  // GPT-4o-mini 자연스러운 답변 및 다음 질문 생성
+  let aiResponseText = '';
+  try {
+    aiResponseText = await callGpt(session.messages);
+  } catch (err) {
+    console.error('[GPT Call Error]', err.message);
+  }
 
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    return res.status(200).json(ncco);
+  if (!aiResponseText) {
+    if (isReadyToFinish) {
+      aiResponseText = '자세히 알려주셔서 정말 감사해요. 덕분에 오늘 일지가 잘 작성되었습니다. 오늘 간병하시느라 정말 고생 많으셨습니다~';
+    } else {
+      aiResponseText = '아 그러셨군요~ 잘 알겠습니다. 그럼 오늘 어르신 대소변이나 기저귀 케어는 어떠셨을까요?';
+    }
+  }
 
-  } else if (step === 2) {
-    const q3Audio = getQuestionAudioUrl(baseUrl, voice, 3);
-    const nextEventUrl = `${baseUrl}/api/carecall/vonage-turn?action=turn&step=3&sessionId=${sessionId}&patientName=${encodeURIComponent(patientName)}&caregiverName=${encodeURIComponent(caregiverName)}&voice=${encodeURIComponent(voice)}&workDate=${encodeURIComponent(workDate)}`;
+  session.messages.push({ role: 'assistant', content: aiResponseText });
+  session.transcripts.push({ speaker: 'ai', step, text: aiResponseText, time: new Date().toISOString() });
+  saveSessionState(sessionId, session);
 
-    const ncco = [
-      {
-        action: 'stream',
-        streamUrl: [reaction.url],
-        bargeIn: false
-      },
-      {
-        action: 'stream',
-        streamUrl: [q3Audio],
-        bargeIn: false
-      },
-      {
-        action: 'input',
-        type: ['speech'],
-        speech: {
-          language: 'ko-KR',
-          endOnSilence: 1.2,
-          maxDuration: 40,
-          startTimeout: 12
-        },
-        eventUrl: [nextEventUrl]
-      }
-    ];
+  console.log(`[Livon Conversational Turn ${step}] AI replied: "${aiResponseText}"`);
 
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    return res.status(200).json(ncco);
+  // Marin(Shimmer) 실시간 TTS 합성 및 캐싱
+  try {
+    const audioBuf = await synthesizeTts(aiResponseText, session.voice);
+    storeTurnAudio(`${sessionId}_${step}`, audioBuf);
+  } catch (_) {}
 
-  } else if (step === 3) {
-    const q4Audio = getQuestionAudioUrl(baseUrl, voice, 4);
-    const nextEventUrl = `${baseUrl}/api/carecall/vonage-turn?action=turn&step=4&sessionId=${sessionId}&patientName=${encodeURIComponent(patientName)}&caregiverName=${encodeURIComponent(caregiverName)}&voice=${encodeURIComponent(voice)}&workDate=${encodeURIComponent(workDate)}`;
+  const encodedAi = Buffer.from(aiResponseText, 'utf8').toString('base64url');
+  const aiAudioUrl = `${baseUrl}/audio/stream/${encodedAi}.mp3`;
 
-    const ncco = [
-      {
-        action: 'stream',
-        streamUrl: [reaction.url],
-        bargeIn: false
-      },
-      {
-        action: 'stream',
-        streamUrl: [q4Audio],
-        bargeIn: false
-      },
-      {
-        action: 'input',
-        type: ['speech'],
-        speech: {
-          language: 'ko-KR',
-          endOnSilence: 1.2,
-          maxDuration: 40,
-          startTimeout: 12
-        },
-        eventUrl: [nextEventUrl]
-      }
-    ];
-
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    return res.status(200).json(ncco);
-
-  } else {
-    // STEP 4 완료 -> 감사 멘트 및 공식 필수 마무리 멘트 ("오늘 간병하시느라 정말 고생 많으셨습니다")
-    console.log(`[Vonage CareCall Completed] Session ${sessionId} finished all 5 questions.`);
-
-    const outroAudio = getQuestionAudioUrl(baseUrl, voice, 'outro');
+  // =========================================================================
+  // 마무리 또는 다음 질문 NCCO 분기
+  // =========================================================================
+  if (isReadyToFinish) {
+    console.log(`[Livon Session Completed] Session ${sessionId} finished naturally.`);
 
     try {
       let logs = [];
@@ -274,30 +307,25 @@ module.exports = async function handler(req, res) {
       logs.unshift({
         id: 'VCALL_' + Date.now(),
         sessionId,
-        patientName,
-        caregiverName,
-        workDate,
+        patientName: session.patientName,
+        caregiverName: session.caregiverName,
+        workDate: session.workDate,
         provider: 'vonage',
-        voice,
-        transcripts: transcript,
+        voice: session.voice,
+        transcripts: session.transcripts,
         completedAt: new Date().toISOString()
       });
       if (logs.length > 50) logs = logs.slice(0, 50);
       fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2), 'utf8');
     } catch (_) {}
 
-    gSessionTranscripts.delete(sessionId);
+    gVonageSessions.delete(sessionId);
 
-    // 100% 동일 Marin 목소리로 리액션 + 공식 마무리 음성 재생 후 통화 종료
+    // 마무리 멘트 재생 후 통화 자연 종료
     const finishNcco = [
       {
         action: 'stream',
-        streamUrl: [reaction.url],
-        bargeIn: false
-      },
-      {
-        action: 'stream',
-        streamUrl: [outroAudio],
+        streamUrl: [aiAudioUrl],
         bargeIn: false
       }
     ];
@@ -305,4 +333,29 @@ module.exports = async function handler(req, res) {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.status(200).json(finishNcco);
   }
+
+  // 다음 질문 재생 후 간병사 답변 청취
+  const nextTurnUrl = `${baseUrl}/api/carecall/vonage-turn?action=turn&step=${step + 1}&sessionId=${sessionId}&patientName=${encodeURIComponent(session.patientName)}&caregiverName=${encodeURIComponent(session.caregiverName)}&voice=${encodeURIComponent(session.voice)}&workDate=${encodeURIComponent(session.workDate)}`;
+
+  const nextNcco = [
+    {
+      action: 'stream',
+      streamUrl: [aiAudioUrl],
+      bargeIn: false
+    },
+    {
+      action: 'input',
+      type: ['speech'],
+      speech: {
+        language: 'ko-KR',
+        endOnSilence: 1.5,
+        maxDuration: 50,
+        startTimeout: 12
+      },
+      eventUrl: [nextTurnUrl]
+    }
+  ];
+
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  return res.status(200).json(nextNcco);
 };

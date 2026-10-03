@@ -8,6 +8,10 @@
   },
   "rewrites": [
     {
+      "source": "/audio/stream/:encoded.mp3",
+      "destination": "/api/carecall/turn-audio?encoded=:encoded"
+    },
+    {
       "source": "/mate/survey",
       "destination": "/mate-survey.html"
     },

@@ -900,6 +900,17 @@ function saveSavedFaxConfig(cfg) {
     }
 
     // =========================================================================
+    // Dynamic Stream Audio Endpoint for Telephony Voice Streaming
+    // =========================================================================
+    if (reqPath.startsWith('/audio/stream/')) {
+      const encoded = reqPath.replace('/audio/stream/', '').replace(/\.mp3$/, '');
+      const parsedUrl = urlModule.parse(req.url, true);
+      req.query = { ...parsedUrl.query, encoded };
+      const turnAudioHandler = require(path.join(BASE_DIR, 'api', 'carecall', 'turn-audio.js'));
+      return turnAudioHandler(req, res);
+    }
+
+    // =========================================================================
     // API Route: AI CareCall Engine (아웃바운드 전화발신, 실시간 세션, 녹음 저장 등)
     // =========================================================================
     if (reqPath.startsWith('/api/carecall/')) {
