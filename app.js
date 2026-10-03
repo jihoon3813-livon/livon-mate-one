@@ -3361,8 +3361,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 만약 미인증 판정이더라도 명시적 로그아웃이 아닌 경우 긴급 세션 자동 복원 (실운영 화면 먹통 원천 방지)
-  if (!isAuthenticated && localStorage.getItem('LIVON_LOGGED_OUT') !== 'true') {
+  const isDevMode = (typeof isDevScreen === 'function' && isDevScreen()) || (typeof isDevEnvironment === 'function' && isDevEnvironment());
+
+  // 만약 미인증 판정이더라도 명시적 로그아웃이 아닌 경우 (또는 개발 환경인 경우) 긴급 세션 자동 복원 (화면 먹통 원천 방지)
+  if (!isAuthenticated && (localStorage.getItem('LIVON_LOGGED_OUT') !== 'true' || isDevMode)) {
     try {
       const defaultSuperAdmin = (Array.isArray(gAdmins) && gAdmins.find(a => a.role === 'SUPER_ADMIN'))
         || (window.REBORN_DATA && window.REBORN_DATA.admins && window.REBORN_DATA.admins[0])
@@ -3372,6 +3374,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', autoToken);
       sessionStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', autoToken);
       localStorage.setItem('REBORN_CURRENT_ADMIN', JSON.stringify(gCurrentAdmin));
+      localStorage.removeItem('LIVON_LOGGED_OUT');
+      sessionStorage.removeItem('LIVON_LOGGED_OUT');
       isAuthenticated = true;
       document.documentElement.classList.remove('livon-locked');
       const overlay = document.getElementById('adminLoginOverlay');
@@ -3380,8 +3384,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (e) {}
   }
 
-  // 2. 🚨 [보안] 미인증(로그아웃) 상태: 고객·정산 민감 데이터의 메모리/DOM 적재를 원천 차단
-  if (!isAuthenticated) {
+  // 2. 🚨 [보안] 미인증(로그아웃) 상태: 고객·정산 민감 데이터의 메모리/DOM 적재를 원천 차단 (단, 개발 환경은 항상 안전하게 접근 허용)
+  if (!isAuthenticated && !isDevMode) {
     console.warn('[Security Guard] 미인증 상태: 고객 및 정산 민감 데이터의 메모리 및 DOM 적재를 원천 차단합니다.');
     gApps = [];
     gAssigns = [];
@@ -50333,7 +50337,18 @@ async function initAdminSession() {
     }
   } catch (e) {}
 
-  const isExplicitlyLoggedOut = localStorage.getItem('LIVON_LOGGED_OUT') === 'true' || sessionStorage.getItem('LIVON_LOGGED_OUT') === 'true';
+  let validSessionAdmin = null;
+  const isDev = isDevScreen();
+
+  // 개발 환경(localhost / dev)에서는 Ctrl+F5 강력 새로고침 시에도 무조건 0초 즉시 관리자 권한 활성화 (화면 멈춤 원천 차단)
+  if (isDev) {
+    try {
+      localStorage.removeItem('LIVON_LOGGED_OUT');
+      sessionStorage.removeItem('LIVON_LOGGED_OUT');
+    } catch (e) {}
+  }
+
+  const isExplicitlyLoggedOut = !isDev && (localStorage.getItem('LIVON_LOGGED_OUT') === 'true' || sessionStorage.getItem('LIVON_LOGGED_OUT') === 'true');
   const savedAdmin = localStorage.getItem('REBORN_CURRENT_ADMIN');
   const savedToken = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
 
@@ -50385,7 +50400,7 @@ async function initAdminSession() {
   const overlay = document.getElementById('adminLoginOverlay');
 
   // 관리자 세션이 비어있는 경우 (개발 사이트 또는 첫 접속): 최고관리자(리본케어 대표이사)로 자동 안전 세션 발급하여 화면 중단 원천 차단
-  if (!validSessionAdmin && !isExplicitlyLoggedOut) {
+  if (!validSessionAdmin && (!isExplicitlyLoggedOut || isDev)) {
     const defaultSuperAdmin = (Array.isArray(gAdmins) && gAdmins.find(a => a.role === 'SUPER_ADMIN'))
       || (window.REBORN_DATA && window.REBORN_DATA.admins && window.REBORN_DATA.admins[0])
       || { id: 'ADM001', username: 'superadmin', name: '리본케어', dept: '대표이사', role: 'SUPER_ADMIN', permissions: ['all'], allowedMenus: ['all'] };
