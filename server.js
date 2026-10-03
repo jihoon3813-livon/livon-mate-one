@@ -906,7 +906,13 @@ function saveSavedFaxConfig(cfg) {
       const endpoint = reqPath.replace('/api/carecall/', '').split('?')[0];
       const handlerFile = path.join(BASE_DIR, 'api', 'carecall', `${endpoint}.js`);
       if (fs.existsSync(handlerFile)) {
-        try { delete require.cache[require.resolve(handlerFile)]; } catch(e) {}
+        try {
+          Object.keys(require.cache).forEach(k => {
+            if (k.includes('api\\carecall') || k.includes('api/carecall')) {
+              delete require.cache[k];
+            }
+          });
+        } catch(e) {}
         const careHandler = require(handlerFile);
         const parsedUrl = urlModule.parse(req.url, true);
         req.query = parsedUrl.query;
@@ -915,11 +921,19 @@ function saveSavedFaxConfig(cfg) {
             res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify(data));
           },
+          send: (data) => {
+            if (!res.headersSent) res.writeHead(code);
+            res.end(data);
+          },
           end: () => res.end()
         });
         res.json = (data) => {
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify(data));
+        };
+        res.send = (data) => {
+          if (!res.headersSent) res.writeHead(200);
+          res.end(data);
         };
 
         const executeHandler = () => {

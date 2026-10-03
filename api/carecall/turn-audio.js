@@ -43,25 +43,27 @@ module.exports = async function handler(req, res) {
   const id = query.id;
 
   if (!id) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.status(400).send('Audio ID missing');
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    return res.end('Audio ID missing');
   }
 
   const buffer = getTurnAudio(id);
   if (!buffer) {
-    // If not found in cache, check if static questions_marin.mp3 exists as fallback
     const fallbackPath = path.join(process.cwd(), 'audio', 'questions_marin.mp3');
     if (fs.existsSync(fallbackPath)) {
-      res.setHeader('Content-Type', 'audio/mpeg');
-      return res.status(200).send(fs.readFileSync(fallbackPath));
+      res.writeHead(200, { 'Content-Type': 'audio/mpeg' });
+      return res.end(fs.readFileSync(fallbackPath));
     }
-    return res.status(404).send('Audio not found');
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    return res.end('Audio not found');
   }
 
-  res.setHeader('Content-Type', 'audio/mpeg');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.setHeader('Content-Length', buffer.length);
-  return res.status(200).send(buffer);
+  res.writeHead(200, {
+    'Content-Type': 'audio/mpeg',
+    'Cache-Control': 'public, max-age=3600',
+    'Content-Length': buffer.length
+  });
+  return res.end(buffer);
 };
 
 module.exports.storeTurnAudio = storeTurnAudio;
