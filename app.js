@@ -39793,8 +39793,8 @@ async function triggerOutboundPhoneCall(patientName, caregiverName, caregiverPho
     : '';
 
   const promptMsg = targetPhone
-    ? `[📞 AI 간병통화 실제 전화 발신]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 간병일자: ${workDate || '오늘'}\n• 발신 번호: +1 860 453 5627 (Twilio 전용 전화망)\n\n전화를 수신할 휴대전화 번호를 확인해 주세요.\n(테스트를 위해 본인 휴대폰 번호로 변경 가능합니다):`
-    : `[📞 AI 간병통화 실제 전화 발신]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 간병일자: ${workDate || '오늘'}\n• 발신 번호: +1 860 453 5627 (Twilio 전용 전화망)\n\n등록된 간병사 연락처가 없습니다.\n발신 테스트를 위해 전화를 수신할 휴대전화 번호(010...)를 입력해 주세요:`;
+    ? `[📞 AI 간병통화 실제 전화 발신]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 간병일자: ${workDate || '오늘'}\n• 발신 통신망: Vonage 실제 AI 양방향 음성통화\n• 음성 모델: 리본메이트 공식 AI 페르소나 (1문1답 대화형)\n\n전화를 수신할 휴대전화 번호를 확인해 주세요.\n(테스트를 위해 본인 휴대폰 번호로 변경 가능합니다):`
+    : `[📞 AI 간병통화 실제 전화 발신]\n\n• 대상 환자: ${patientName} (${insuranceCompany || '삼성화재'})\n• 담당 간병사: ${caregiverName}\n• 간병일자: ${workDate || '오늘'}\n• 발신 통신망: Vonage 실제 AI 양방향 음성통화\n• 음성 모델: 리본메이트 공식 AI 페르소나 (1문1답 대화형)\n\n등록된 간병사 연락처가 없습니다.\n발신 테스트를 위해 전화를 수신할 휴대전화 번호(010...)를 입력해 주세요:`;
 
   const inputPhone = prompt(promptMsg, targetPhone || '010-');
   if (!inputPhone) return;

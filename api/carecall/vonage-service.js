@@ -141,60 +141,14 @@ async function placeVonageCall({ phone, patientName, caregiverName, workDate, wo
     scheduleId: scheduleId || ''
   });
 
-  const recordCallbackUrl = `${baseUrl}/api/carecall/vonage-record-callback?${queryParams}`;
+  const turnAnswerUrl = `${baseUrl}/api/carecall/vonage-turn?action=answer&${queryParams}&voice=${effectiveVoice}`;
   const eventUrl = `${baseUrl}/api/carecall/vonage-event?${queryParams}`;
 
-  const effectiveVoice = (voice || 'marin').toLowerCase().trim();
-
-  // 모든 음성을 통신망 표준 고음질 MP3 파일로 매핑하여 스트리밍 재생
-  let questionAudioFile = `${baseUrl}/audio/questions_marin.mp3`;
-  if (effectiveVoice !== 'marin') {
-    const candidateVoices = ['shimmer', 'coral', 'alloy', 'echo', 'ash', 'sage'];
-    let voiceAudioName = effectiveVoice;
-    if (effectiveVoice === 'ballad') voiceAudioName = 'echo';
-    if (effectiveVoice === 'verse') voiceAudioName = 'ash';
-    if (!candidateVoices.includes(voiceAudioName)) voiceAudioName = 'shimmer';
-    questionAudioFile = `${baseUrl}/audio/questions_${voiceAudioName}.mp3`;
-  }
-
-  // 1. 한국 통신사 "국제전화입니다" 법정 멘트와 자연스럽게 연결되는 AI 인사말 재생
-  // 2. 5대 표준 질문 MP3 스트리밍 재생 (bargeIn=false로 외부 소음/통신사 멘트 충돌 방지)
-  // 3. 간병사 답변 녹음 (최대 300초, 침묵 8초 감지 or #)
-  // 4. 고음질 마무리 인사말
-  const inlineNcco = [
-    {
-      action: 'talk',
-      text: '안녕하세요. 리본케어 AI 간병일지 도우미입니다. 오늘 간병하시느라 정말 고생 많으셨습니다.',
-      language: 'ko-KR',
-      style: 0,
-      bargeIn: false
-    },
-    {
-      action: 'stream',
-      streamUrl: [questionAudioFile],
-      bargeIn: false
-    },
-    {
-      action: 'record',
-      eventUrl: [recordCallbackUrl],
-      endOnSilence: 8,
-      endOnKey: '#',
-      beepStart: true,
-      timeOut: 300
-    },
-    {
-      action: 'talk',
-      text: '간병하시느라 수고 많으셨습니다. 통화 내용이 안전하게 저장되었습니다. 감사합니다.',
-      language: 'ko-KR',
-      style: 0,
-      bargeIn: false
-    }
-  ];
-
+  // 리본메이트 공식 양방향 1문1답 AI 대화형 엔진 연동 (OpenAI GPT + OpenAI Voice)
   const postPayload = {
     to: [{ type: 'phone', number: toFormatted }],
     from: { type: 'phone', number: cfg.phoneNumber || '12345678901' },
-    ncco: inlineNcco,
+    answer_url: [turnAnswerUrl],
     event_url: [eventUrl],
     event_method: 'POST'
   };
