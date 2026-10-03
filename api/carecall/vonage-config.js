@@ -1,7 +1,7 @@
-// api/carecall/twilio-config.js
-// Endpoint to GET / POST Twilio credentials (Account SID, Auth Token, Phone Number, Public URL)
+// api/carecall/vonage-config.js
+// Endpoint to GET / POST Vonage credentials (API Key, Secret, App ID, Phone, Base URL)
 
-const { getTwilioConfig, saveTwilioConfig } = require('./twilio-service');
+const { getVonageConfig, saveVonageConfig } = require('./vonage-service');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,13 +13,14 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    const cfg = getTwilioConfig();
+    const cfg = getVonageConfig();
     const configData = {
-      accountSid: cfg.accountSid || '',
-      authToken: cfg.authToken || '',
-      isConfigured: !!(cfg.accountSid && cfg.authToken && cfg.phoneNumber),
-      phoneNumber: cfg.phoneNumber || '+18604535627',
-      publicBaseUrl: cfg.publicBaseUrl || 'https://livon-mate-one.vercel.app'
+      apiKey: cfg.apiKey || '',
+      apiSecret: cfg.apiSecret ? '********' : '',
+      applicationId: cfg.applicationId || '',
+      phoneNumber: cfg.phoneNumber || '12345678901',
+      publicBaseUrl: cfg.publicBaseUrl || 'https://livon-mate-one.vercel.app',
+      isConfigured: !!(cfg.apiKey && cfg.apiSecret && cfg.applicationId)
     };
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.status(200).json({ success: true, config: configData });
@@ -33,20 +34,21 @@ module.exports = async function handler(req, res) {
       }
       body = body || {};
 
-      const { accountSid, authToken, phoneNumber, publicBaseUrl } = body;
+      const { apiKey, apiSecret, applicationId, phoneNumber, publicBaseUrl } = body;
       const updateData = {};
-      if (accountSid) updateData.accountSid = accountSid.trim();
-      if (authToken) updateData.authToken = authToken.trim();
+      if (apiKey) updateData.apiKey = apiKey.trim();
+      if (apiSecret && !apiSecret.includes('****')) updateData.apiSecret = apiSecret.trim();
+      if (applicationId) updateData.applicationId = applicationId.trim();
       if (phoneNumber) updateData.phoneNumber = phoneNumber.trim();
       if (publicBaseUrl !== undefined) updateData.publicBaseUrl = publicBaseUrl.trim();
 
-      const saved = saveTwilioConfig(updateData);
+      const saved = saveVonageConfig(updateData);
 
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       return res.status(200).json({
         success: true,
-        message: 'Twilio 통신 설정이 안전하게 저장되었습니다.',
-        isConfigured: !!(saved.accountSid && saved.authToken && saved.phoneNumber)
+        message: 'Vonage 통신망 설정이 안전하게 저장되었습니다.',
+        isConfigured: !!(saved.apiKey && saved.apiSecret && saved.applicationId)
       });
     } catch (err) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');

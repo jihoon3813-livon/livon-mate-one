@@ -15,12 +15,61 @@ try {
   }
 } catch (_) {}
 
+function resolveActualDrivePath(cfg) {
+  const folderName = cfg.folderName || 'AI간병 음성파일(메이트원)';
+  if (cfg.localPath && fs.existsSync(cfg.localPath)) {
+    return cfg.localPath;
+  }
+  const cwdDrive = process.cwd().slice(0, 2);
+  const cwdCandidates = [
+    path.join(cwdDrive, '내 드라이브', folderName),
+    path.join(cwdDrive, folderName)
+  ];
+  for (const c of cwdCandidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  const letters = ['H', 'G', 'D', 'C'];
+  for (const l of letters) {
+    const p1 = `${l}:\\내 드라이브\\${folderName}`;
+    if (fs.existsSync(p1)) return p1;
+    const p2 = `${l}:\\My Drive\\${folderName}`;
+    if (fs.existsSync(p2)) return p2;
+  }
+  const defaultTarget = path.join(cwdDrive, '내 드라이브', folderName);
+  try {
+    const parent = path.join(cwdDrive, '내 드라이브');
+    if (fs.existsSync(parent)) {
+      if (!fs.existsSync(defaultTarget)) fs.mkdirSync(defaultTarget, { recursive: true });
+      return defaultTarget;
+    }
+  } catch (_) {}
+  return cfg.localPath || defaultTarget;
+}
+
+function syncRecordingsToDrive(actualDriveDir) {
+  if (!actualDriveDir || !fs.existsSync(actualDriveDir) || !fs.existsSync(LOCAL_RECORDINGS_DIR)) return;
+  try {
+    const localFiles = fs.readdirSync(LOCAL_RECORDINGS_DIR).filter(f => f.endsWith('.m4a'));
+    localFiles.forEach(f => {
+      const src = path.join(LOCAL_RECORDINGS_DIR, f);
+      const dest = path.join(actualDriveDir, f);
+      if (!fs.existsSync(dest)) {
+        try {
+          fs.copyFileSync(src, dest);
+          console.log(`[Auto-Sync to Google Drive] Copied ${f} -> ${dest}`);
+        } catch (_) {}
+      }
+    });
+  } catch (_) {}
+}
+
 function getDriveConfig() {
+  const cwdDrive = process.cwd().slice(0, 2);
   let cfg = {
     folderId: '1Jt1zhHybV2E0KKRp1udc37RcifY-8ZJU',
     folderUrl: 'https://drive.google.com/drive/folders/1Jt1zhHybV2E0KKRp1udc37RcifY-8ZJU',
-    folderName: 'AI 간병통화 녹음파일',
-    localPath: 'G:\\.shortcut-targets-by-id\\1Jt1zhHybV2E0KKRp1udc37RcifY-8ZJU'
+    folderName: 'AI간병 음성파일(메이트원)',
+    localPath: `${cwdDrive}\\내 드라이브\\AI간병 음성파일(메이트원)`
   };
   if (fs.existsSync(CONFIG_FILE)) {
     try {
@@ -28,6 +77,7 @@ function getDriveConfig() {
       cfg = { ...cfg, ...data };
     } catch (_) {}
   }
+  cfg.localPath = resolveActualDrivePath(cfg);
   return cfg;
 }
 
@@ -84,6 +134,7 @@ module.exports = async function handler(req, res) {
     } catch (_) {}
 
     const cfg = getDriveConfig();
+    syncRecordingsToDrive(cfg.localPath);
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.status(200).json({ success: true, recordings: logs, driveConfig: cfg });
   }
@@ -137,27 +188,21 @@ module.exports = async function handler(req, res) {
     const localFilePath = path.join(LOCAL_RECORDINGS_DIR, targetFilename);
     fs.writeFileSync(localFilePath, buffer);
 
-    // 2. 구글 드라이브 동기화 폴더 저장 시도
+    // 2. 구글 드라이브 동기화 폴더 저장
     const cfg = getDriveConfig();
     let savedInDrive = false;
     let driveFilePath = null;
 
     if (cfg.localPath) {
       try {
-        if (fs.existsSync(cfg.localPath) && fs.statSync(cfg.localPath).isDirectory()) {
+        if (!fs.existsSync(cfg.localPath)) {
+          fs.mkdirSync(cfg.localPath, { recursive: true });
+        }
+        if (fs.existsSync(cfg.localPath)) {
           driveFilePath = path.join(cfg.localPath, targetFilename);
           fs.writeFileSync(driveFilePath, buffer);
           savedInDrive = true;
           console.log(`[CareCall Drive Sync] 구글 드라이브 동기화 폴더 저장 성공: ${driveFilePath}`);
-        } else {
-          // Check if custom local Google Drive folder path is configured or exists
-          const customDriveDir = path.join(process.cwd(), 'drive_sync', cfg.folderId);
-          if (!fs.existsSync(customDriveDir)) {
-            fs.mkdirSync(customDriveDir, { recursive: true });
-          }
-          driveFilePath = path.join(customDriveDir, targetFilename);
-          fs.writeFileSync(driveFilePath, buffer);
-          // If local G-Drive shortcut gets mounted, it will also sync
         }
       } catch (driveErr) {
         console.warn(`[CareCall Drive Sync] 구글 드라이브 동기화 경로 접근 실패: ${driveErr.message}`);
@@ -213,3 +258,7 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ success: false, error: err.message });
   }
 };
+
+module.exports.getDriveConfig = getDriveConfig;
+module.exports.resolveActualDrivePath = resolveActualDrivePath;
+module.exports.syncRecordingsToDrive = syncRecordingsToDrive;

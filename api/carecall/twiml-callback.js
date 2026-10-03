@@ -66,6 +66,31 @@ module.exports = async function handler(req, res) {
               fs.writeFileSync(targetPath, buf);
               console.log(`[Twilio Recording Saved] 로컬 저장 성공: ${targetPath} (${buf.length} bytes)`);
 
+              // 구글 드라이브 지정 폴더에도 즉시 동기화 저장
+              try {
+                const configFile = path.join(process.cwd(), 'carecall_drive_config.json');
+                const cwdDrive = process.cwd().slice(0, 2);
+                let driveFolder = `${cwdDrive}\\내 드라이브\\AI간병 음성파일(메이트원)`;
+                if (fs.existsSync(configFile)) {
+                  try {
+                    const cData = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+                    if (cData.localPath && fs.existsSync(cData.localPath)) driveFolder = cData.localPath;
+                  } catch (_) {}
+                }
+                if (!fs.existsSync(driveFolder)) {
+                  const candidates = [`H:\\내 드라이브\\AI간병 음성파일(메이트원)`, `G:\\내 드라이브\\AI간병 음성파일(메이트원)`];
+                  for (const c of candidates) {
+                    if (fs.existsSync(c)) { driveFolder = c; break; }
+                  }
+                }
+                if (fs.existsSync(driveFolder)) {
+                  fs.writeFileSync(path.join(driveFolder, targetFilename), buf);
+                  console.log(`[Twilio Recording Google Drive Sync] 구글 드라이브 동기화 성공: ${path.join(driveFolder, targetFilename)}`);
+                }
+              } catch (driveErr) {
+                console.warn('[Twilio Recording Drive Save Error]', driveErr.message);
+              }
+
               // 로그 객체 생성
               const recItem = {
                 id: 'REC_' + Date.now(),

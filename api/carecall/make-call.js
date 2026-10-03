@@ -1,6 +1,7 @@
 // api/carecall/make-call.js
-// Outbound AI Call Trigger for Caregiver (Twilio Voice API / CTI Fallback)
+// Outbound AI Call Trigger for Caregiver (Vonage Voice API / Twilio Voice API / CTI Fallback)
 
+const { getVonageConfig, placeVonageCall } = require('./vonage-service');
 const { getTwilioConfig, placeTwilioCall } = require('./twilio-service');
 const { makeOutboundCall } = require('../../cti-client');
 const { getVoiceConfig } = require('./voice-config');
@@ -37,6 +38,7 @@ module.exports = async function handler(req, res) {
       insuranceCompany = '삼성화재',
       voice = savedVoiceCfg.voice || 'marin',
       scheduleId,
+      provider = 'vonage', // 기본 통신망: vonage (Twilio보다 즉시 발신 안정)
       forceCti = false
     } = body;
 
@@ -47,10 +49,55 @@ module.exports = async function handler(req, res) {
 
     const cleanPhone = String(caregiverPhone).replace(/[^0-9]/g, '');
 
-    // 1. Twilio 실제 전화망 연동 상태 확인 (서버 설정 + 클라이언트 전달 설정 병합)
+    const reqHost = req.headers['x-forwarded-host'] || req.headers.host;
+    const reqProto = req.headers['x-forwarded-proto'] || (reqHost && reqHost.includes('localhost') ? 'http' : 'https');
+    const autoBaseUrl = reqHost ? `${reqProto}://${reqHost}` : null;
+
+    // 1. Vonage 통화 발신 시도 (우선 순위 또는 명시적 선택 시)
+    const vonageCfg = getVonageConfig();
+    const hasVonage = !!(vonageCfg.applicationId && vonageCfg.apiKey);
+
+    if (hasVonage && provider !== 'twilio' && !forceCti) {
+      try {
+        const vonageResult = await placeVonageCall({
+          phone: cleanPhone,
+          patientName,
+          caregiverName,
+          workDate,
+          workTime,
+          scheduleId,
+          voice,
+          baseUrl: autoBaseUrl
+        });
+
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        return res.status(200).json({
+          success: true,
+          mode: 'vonage_voice',
+          message: `[${caregiverName || '간병사'}] (${cleanPhone}) 님의 휴대전화로 Vonage 실제 AI 음성 전화가 발신되었습니다.\n잠시 후 휴대폰 벨이 울리면 전화를 받아주세요.`,
+          patientName,
+          caregiverName,
+          phone: cleanPhone,
+          workDate,
+          voice,
+          vonageResult,
+          requestedAt: new Date().toISOString()
+        });
+      } catch (vonageErr) {
+        console.warn('[Vonage Call Error]', vonageErr.detail || vonageErr.message || vonageErr);
+        // Vonage 오류 시 아래의 Twilio나 CTI로 순차 폴백 진행
+      }
+    }
+
+    // 2. Twilio 실제 전화망 연동 상태 확인 (서버 설정 + 클라이언트 전달 설정 병합)
     let twilioCfg = getTwilioConfig();
     if (body.twilioConfig && typeof body.twilioConfig === 'object') {
-      twilioCfg = { ...twilioCfg, ...body.twilioConfig };
+      const c = body.twilioConfig;
+      if (c.accountSid) twilioCfg.accountSid = c.accountSid;
+      if (c.authToken) twilioCfg.authToken = c.authToken;
+      if (c.phoneNumber && !c.phoneNumber.includes('7372508034') && !c.phoneNumber.includes('01026660883')) {
+        twilioCfg.phoneNumber = c.phoneNumber;
+      }
     }
     const hasTwilio = !!(twilioCfg.accountSid && twilioCfg.authToken && twilioCfg.phoneNumber);
     let twilioNotice = '';
@@ -86,7 +133,16 @@ module.exports = async function handler(req, res) {
           requestedAt: new Date().toISOString()
         });
       } catch (twErr) {
-        console.warn('[Twilio Call Error, falling back to CTI]', twErr.message);
+        console.warn('[Twilio Call Error]', twErr.message);
+        if (twErr.message.includes('compliance profile') || twErr.message.includes('Trust Hub') || twErr.message.includes('KYC')) {
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          return res.status(400).json({
+            success: false,
+            error: `Twilio 해외 통화 본인인증(Trust Hub KYC Profile) 승인이 필요합니다.\n\n• 작성 중인 프로필(My First Twilio Account)이 'Draft' 상태입니다.\n• Twilio 콘솔의 Trust Hub(Customer Profiles)에서 기본 정보(이름, 영문주소)를 마저 입력하고 제출(Submit)하시면 승인 후 즉시 실제 전화가 발신됩니다.\n\n💡 지금 바로 AI 간병통화 및 일지 생성을 테스트하시려면 목록의 [🎙️ 웹통화] 버튼을 누르시면 PC 마이크로 100% 동일하게 통화 및 녹음 테스트를 진행하실 수 있습니다.`,
+            detail: twErr.message,
+            trustHubUrl: 'https://console.twilio.com/us1/account/trust-hub/customer-profiles'
+          });
+        }
         const isTrialErr = twErr.message.includes('verified recipient') || twErr.message.includes('trial') || twErr.message.includes('573002');
         if (isTrialErr) {
           twilioNotice = `\n\n※ [Twilio 트라이얼 안내] 수신 번호(${cleanPhone})가 Twilio 콘솔(Verified Caller IDs)에 미등록되어, 사내 CTI 전화망으로 자동 전환하여 발신되었습니다.`;

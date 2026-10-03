@@ -820,9 +820,9 @@
         </div>
 
         <!-- 개인정보 마스킹 토글 (모바일에서는 간소화) -->
-        <button id="toggleMaskingBtn" onclick="toggleMasking()" class="flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg border text-xs font-semibold transition-all bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 shrink-0 cursor-pointer">
-          <i data-lucide="eye-off" class="w-3.5 h-3.5"></i>
-          <span id="maskingStatusText" class="hidden xs:inline sm:inline">마스킹 ON</span>
+        <button id="toggleMaskingBtn" onclick="toggleMasking()" class="flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg border text-xs font-semibold transition-all bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100 shrink-0 cursor-pointer" title="개인정보 마스킹 토글">
+          <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+          <span id="maskingStatusText" class="hidden xs:inline sm:inline">개인정보 마스킹 OFF</span>
         </button>
 
         <button onclick="switchTab('claims', '미확인')" class="relative p-1.5 sm:p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg shrink-0 cursor-pointer" title="미확인 청구건 바로가기">
@@ -3803,7 +3803,15 @@
 
               <!-- 대표 기능 액션 버튼군 -->
               <div class="flex items-center gap-2 shrink-0 flex-wrap">
-                <!-- 실제 AI 간병일지 질문 음성 미리듣기 버튼 (가장 강조) -->
+                <!-- 🌟 AI 실시간 간병통화 실전 테스트 버튼 (PC 마이크 & 스피커) 🌟 -->
+                <button type="button" onclick="openCareCallWebSimulator()" 
+                  class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center gap-1.5 transition-all cursor-pointer animate-pulse"
+                  title="PC 마이크와 스피커를 사용하여 실제 AI 간병통화(질문-답변-녹음-일지생성)를 즉시 실전 테스트합니다">
+                  <i data-lucide="mic" class="w-4 h-4 text-white"></i>
+                  <span>🎙️ AI 간병통화 실전 테스트 (웹 마이크)</span>
+                </button>
+
+                <!-- 실제 AI 간병일지 질문 음성 미리듣기 버튼 -->
                 <button type="button" onclick="handlePlayCareCallQuestionPreview()" 
                   class="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center gap-1.5 transition-all cursor-pointer"
                   title="AI가 실제로 간병사에게 전화하여 묻는 표준 질문 음성을 컴퓨터 스피커로 바로 들어봅니다">
@@ -3985,8 +3993,8 @@
             <div class="flex items-center gap-2">
               <input type="text" id="careCallSearchInput" oninput="handleCareCallSearchInput(this.value)" placeholder="환자명, 간병인명, 병원, 연락처 검색..." 
                 class="pl-3 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 w-60 transition-all">
-              <button type="button" onclick="renderCareCallTargets()" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer">
-                <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-600"></i> <span>새로고침</span>
+              <button type="button" id="btnCareCallHeaderRefresh" onclick="refreshCareCallData()" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer active:scale-95" title="서버 최신 녹취 파일 동기화 및 화면 새로고침">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-600 transition-transform"></i> <span>새로고침</span>
               </button>
             </div>
           </div>
@@ -9066,17 +9074,17 @@
     </div>
   </div>
 
-  <!-- ==================== MODAL: TWILIO REAL PHONE CONFIG ==================== -->
+  <!-- ==================== MODAL: REAL PHONE CONFIG (VONAGE & TWILIO) ==================== -->
   <div id="careCallTwilioModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 hidden">
-    <div class="bg-white rounded-3xl p-6 max-w-lg w-full border border-slate-200 shadow-2xl space-y-4">
+    <div class="bg-white rounded-3xl p-6 max-w-xl w-full border border-slate-200 shadow-2xl space-y-4 max-h-[94vh] flex flex-col">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div class="flex items-center gap-2.5">
           <div class="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
             <i data-lucide="phone-outgoing" class="w-5 h-5 text-purple-600"></i>
           </div>
           <div>
-            <h3 class="text-base font-black text-slate-900">실제 전화망 (Twilio Voice) 연동 설정</h3>
-            <p class="text-xs text-slate-500">간병사 010 휴대전화로 실제 전화가 걸리도록 하는 통신망 설정</p>
+            <h3 class="text-base font-black text-slate-900">실제 전화망 연동 설정 (Vonage / Twilio)</h3>
+            <p class="text-xs text-slate-500">간병사 010 휴대전화로 실제 전화가 걸리도록 하는 통신사 설정</p>
           </div>
         </div>
         <button type="button" onclick="closeTwilioConfigModal()" class="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
@@ -9084,49 +9092,111 @@
         </button>
       </div>
 
-      <div class="bg-amber-50 p-3 rounded-2xl border border-amber-200 text-xs text-amber-800 space-y-1">
-        <div class="font-bold flex items-center gap-1.5">
-          <i data-lucide="info" class="w-4 h-4 text-amber-600"></i>
-          <span>실제 010 전화 발신 안내</span>
-        </div>
-        <p class="text-[11px] leading-relaxed">
-          Twilio 계정을 연결하시면 메이트원에서 [전화 발신] 클릭 시 <b>간병사 실제 휴대전화로 벨이 울리며</b>, 전화를 받으면 <b>AI가 음성으로 질문하고 답변을 받아 구글 드라이브에 녹취파일(.m4a)로 자동 저장</b>합니다.
-        </p>
+      <!-- Provider Tabs -->
+      <div class="flex border-b border-slate-200 gap-2">
+        <button type="button" id="tabBtnVonage" onclick="switchCareCallProviderTab('vonage')"
+          class="pb-2.5 px-3 text-xs font-black border-b-2 border-purple-600 text-purple-700 flex items-center gap-1.5 cursor-pointer">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span>Vonage (추천 · 즉시 발신)</span>
+        </button>
+        <button type="button" id="tabBtnTwilio" onclick="switchCareCallProviderTab('twilio')"
+          class="pb-2.5 px-3 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-600 flex items-center gap-1.5 cursor-pointer">
+          <span>Twilio (트윌리오)</span>
+        </button>
       </div>
 
-      <div class="space-y-3 text-xs">
-        <div>
-          <label class="block font-bold text-slate-700 mb-1">Twilio Account SID <span class="text-rose-500">*</span></label>
-          <input type="text" id="twilioAccountSidInput" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-            class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
-          <p class="text-[11px] text-slate-400 mt-0.5">Twilio Console 대시보드 메인에 표시된 Account SID</p>
+      <!-- Tab Content: Vonage -->
+      <div id="tabContentVonage" class="space-y-3 text-xs overflow-y-auto pr-1">
+        <div class="bg-emerald-50 p-3 rounded-2xl border border-emerald-200 text-xs text-emerald-800 space-y-1">
+          <div class="font-bold flex items-center gap-1.5">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>
+            <span>Vonage Voice API 연동 완료 (권장)</span>
+          </div>
+          <p class="text-[11px] leading-relaxed">
+            복잡한 해외 본인인증(KYC) 심사 대기 없이, [전화 발신] 클릭 시 <b>간병사 실제 휴대폰(010)으로 즉시 전화가 발신</b>됩니다.
+          </p>
         </div>
 
         <div>
-          <label class="block font-bold text-slate-700 mb-1">Twilio Auth Token <span class="text-rose-500">*</span></label>
-          <input type="password" id="twilioAuthTokenInput" placeholder="32자리 인증 토큰 입력"
+          <label class="block font-bold text-slate-700 mb-1">Vonage Application ID <span class="text-rose-500">*</span></label>
+          <input type="text" id="vonageApplicationIdInput" placeholder="5fae20dd-651a-4942-8390-d6ff77283601"
             class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
-          <p class="text-[11px] text-slate-400 mt-0.5">Twilio Console 대시보드의 Auth Token</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">Vonage Applications &gt; Livon-CareCall 애플리케이션 ID</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">API Key <span class="text-rose-500">*</span></label>
+            <input type="text" id="vonageApiKeyInput" placeholder="5c5b4ab6"
+              class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">API Secret <span class="text-rose-500">*</span></label>
+            <input type="password" id="vonageApiSecretInput" placeholder="API Secret"
+              class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
+          </div>
         </div>
 
         <div>
-          <label class="block font-bold text-slate-700 mb-1">Twilio 발신 전화번호 (Phone Number) <span class="text-rose-500">*</span></label>
-          <input type="text" id="twilioPhoneInput" placeholder="+1234567890 또는 Twilio 발신번호"
+          <label class="block font-bold text-slate-700 mb-1">발신자 표시 번호 (Caller ID)</label>
+          <input type="text" id="vonagePhoneInput" placeholder="12345678901 또는 발신번호"
             class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
-          <p class="text-[11px] text-slate-400 mt-0.5">Twilio에서 구매한 발신 번호 (E.164 국제 규격: +1... 등)</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">테스트 기본값: 12345678901 (가상 번호 구매 시 해당 번호 입력)</p>
         </div>
 
         <div>
           <label class="block font-bold text-slate-700 mb-1">공개 웹훅 서버 URL (Public Webhook URL)</label>
-          <input type="text" id="twilioPublicUrlInput" placeholder="https://your-domain.com 또는 ngrok 주소"
+          <input type="text" id="vonagePublicUrlInput" placeholder="https://livon-mate-one.vercel.app"
             class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
-          <p class="text-[11px] text-slate-400 mt-0.5">전화 연결 시 실시간 음성 스트림(WebSocket)을 수신할 공개 URL (로컬 테스트 시 ngrok 주소 입력)</p>
         </div>
       </div>
 
-      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-        <button type="button" onclick="closeTwilioConfigModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">취소</button>
-        <button type="button" onclick="saveTwilioConfigFromModal()" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-md cursor-pointer">설정 저장 및 연동</button>
+      <!-- Tab Content: Twilio -->
+      <div id="tabContentTwilio" class="space-y-3 text-xs overflow-y-auto pr-1 hidden">
+        <div class="bg-amber-50 p-3 rounded-2xl border border-amber-200 text-xs text-amber-800 space-y-1">
+          <div class="font-bold flex items-center gap-1.5">
+            <i data-lucide="info" class="w-4 h-4 text-amber-600"></i>
+            <span>Twilio 통신망 안내</span>
+          </div>
+          <p class="text-[11px] leading-relaxed">
+            Twilio를 통한 한국 번호 발신은 Twilio 콘솔의 Trust Hub(KYC) 해외 규제 승인이 완료된 후 사용하실 수 있습니다.
+          </p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Twilio Account SID</label>
+          <input type="text" id="twilioAccountSidInput" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Twilio Auth Token</label>
+          <input type="password" id="twilioAuthTokenInput" placeholder="32자리 인증 토큰 입력"
+            class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Twilio 발신 전화번호</label>
+          <input type="text" id="twilioPhoneInput" placeholder="+1234567890"
+            class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">공개 웹훅 서버 URL</label>
+          <input type="text" id="twilioPublicUrlInput" placeholder="https://livon-mate-one.vercel.app"
+            class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500 bg-slate-50 focus:bg-white">
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+        <button type="button" onclick="testVonageOutboundCall()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer flex items-center gap-1.5">
+          <i data-lucide="phone-call" class="w-3.5 h-3.5 text-purple-600"></i>
+          <span>내 번호로 테스트 발신</span>
+        </button>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeTwilioConfigModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">닫기</button>
+          <button type="button" onclick="saveActiveCareCallConfig()" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-md cursor-pointer">설정 저장 및 연동</button>
+        </div>
       </div>
     </div>
   </div>
@@ -9343,6 +9413,110 @@
         <button type="button" onclick="closeCareCallQuestionPreviewModal()" 
           class="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors">
           창 닫기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: AI 간병통화 음성녹취 (.m4a) 청취 플레이어 ==================== -->
+  <div id="careCallAudioPlayerModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 hidden" onclick="if(event.target === this) closeCareCallAudioPlayerModal()">
+    <div class="bg-white rounded-3xl p-6 max-w-xl w-full border border-slate-200 shadow-2xl space-y-4 max-h-[92vh] flex flex-col" onclick="event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md">
+            <i data-lucide="headphones" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-black text-slate-900" id="careCallModalAudioTitle">AI 간병통화 녹취 청취</h3>
+              <span id="careCallModalAudioBadge" class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">녹취 파일 확인</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5" id="careCallModalAudioMeta">환자: - | 간병일자: - | 담당 간병사: -</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeCareCallAudioPlayerModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- File Details Banner -->
+      <div class="bg-purple-50/70 p-3.5 rounded-2xl border border-purple-200 flex items-center justify-between text-xs">
+        <div class="space-y-0.5 min-w-0">
+          <div class="font-bold text-purple-950 flex items-center gap-1.5">
+            <i data-lucide="file-audio" class="w-4 h-4 text-purple-600 shrink-0"></i>
+            <span class="truncate font-mono" id="careCallModalFilename">-</span>
+          </div>
+          <div class="text-[11px] text-purple-700 flex items-center gap-2">
+            <span>통화 시간: <b id="careCallModalDuration" class="font-mono">0초</b></span>
+            <span>•</span>
+            <span id="careCallModalInsurance">삼성화재</span>
+          </div>
+        </div>
+        <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-md shrink-0">
+          ✅ 음성 보관 완료
+        </span>
+      </div>
+
+      <!-- HTML5 Audio Element & Controls -->
+      <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+        <audio id="careCallModalAudioTag" controls preload="auto" class="w-full h-10 rounded-lg"></audio>
+
+        <!-- Speed & Skip Controls -->
+        <div class="flex items-center justify-between text-xs pt-1 flex-wrap gap-2">
+          <div class="flex items-center gap-1">
+            <span class="text-[11px] text-slate-500 font-bold">재생 배속:</span>
+            <button type="button" onclick="setCareCallAudioModalSpeed(0.8)" id="btnCareCallSpeed08" class="px-2 py-0.5 rounded-lg text-slate-600 hover:bg-purple-100 text-xs font-bold cursor-pointer transition-colors">0.8x</button>
+            <button type="button" onclick="setCareCallAudioModalSpeed(1.0)" id="btnCareCallSpeed10" class="px-2 py-0.5 rounded-lg bg-purple-600 text-white text-xs font-black cursor-pointer transition-colors">1.0x</button>
+            <button type="button" onclick="setCareCallAudioModalSpeed(1.2)" id="btnCareCallSpeed12" class="px-2 py-0.5 rounded-lg text-slate-600 hover:bg-purple-100 text-xs font-bold cursor-pointer transition-colors">1.2x</button>
+            <button type="button" onclick="setCareCallAudioModalSpeed(1.5)" id="btnCareCallSpeed15" class="px-2 py-0.5 rounded-lg text-slate-600 hover:bg-purple-100 text-xs font-bold cursor-pointer transition-colors">1.5x</button>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button type="button" onclick="skipCareCallAudioModal(-10)" class="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200 flex items-center gap-1 cursor-pointer transition-colors" title="10초 뒤로">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> <span>-10초</span>
+            </button>
+            <button type="button" onclick="skipCareCallAudioModal(10)" class="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200 flex items-center gap-1 cursor-pointer transition-colors" title="10초 앞으로">
+              <span>+10초</span> <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5대 간병 표준 항목 안내 카드 -->
+      <div class="p-3 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-1.5 text-xs">
+        <div class="flex items-center justify-between text-indigo-950 font-bold">
+          <span class="flex items-center gap-1">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-indigo-600"></i>
+            <span>AI 간병통화 표준 질의 5개 영역</span>
+          </span>
+          <span class="text-[10px] text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded">보험금 청구 필수항목</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-[11px] text-slate-600 pt-1">
+          <div class="p-1.5 bg-white rounded-xl border border-indigo-100 text-center font-bold text-slate-700">1. 식사 및 복약</div>
+          <div class="p-1.5 bg-white rounded-xl border border-indigo-100 text-center font-bold text-slate-700">2. 거동 및 체위</div>
+          <div class="p-1.5 bg-white rounded-xl border border-indigo-100 text-center font-bold text-slate-700">3. 대소변 배설</div>
+          <div class="p-1.5 bg-white rounded-xl border border-indigo-100 text-center font-bold text-slate-700">4. 바이탈/체온</div>
+          <div class="p-1.5 bg-white rounded-xl border border-indigo-100 text-center font-bold text-slate-700">5. 특이사항</div>
+        </div>
+      </div>
+
+      <!-- Action Footer -->
+      <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+        <div class="flex items-center gap-2">
+          <a id="btnCareCallModalDownload" href="#" download="" target="_blank" onclick="handleCareCallModalDownloadClick()"
+            class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-black text-xs shadow-xs hover:shadow-md flex items-center gap-1.5 transition-all cursor-pointer">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>.m4a 다운로드</span>
+          </a>
+          <button type="button" onclick="openCareCallDriveFolderFromModal()" id="btnCareCallModalDrive"
+            class="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-300 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer">
+            <i data-lucide="folder-symlink" class="w-4 h-4 text-sky-600"></i>
+            <span>구글 드라이브</span>
+          </button>
+        </div>
+        <button type="button" onclick="closeCareCallAudioPlayerModal()"
+          class="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors">
+          닫기
         </button>
       </div>
     </div>
@@ -12381,13 +12555,13 @@
   <script src="hub_real_data.js?v=20261002_1235"></script>
   <script src="data.js?v=20261002_1235"></script>
   <script src="careport-client.js?v=20260929_1205"></script>
-  <script src="carecall-client.js?v=20261002_1800"></script>
+  <script src="carecall-client.js?v=20261003_0950"></script>
   <script src="samsung-call-report.js?v=20260920_1330"></script>
   <script src="total-call-analysis.js?v=20260921_1005"></script>
   <script src="system-audit-log.js?v=20260922_1040"></script>
   <script src="survey-client.js?v=20261002_1600"></script>
   <script src="./xlsx-populate.min.js"></script>
-  <script src="app.js?v=20261002_1800"></script>
+  <script src="app.js?v=20261003_0950"></script>
   <!-- 🚀 초고속 렌더링 최적화: 대용량 PDF & Excel 라이브러리는 첫 화면 렌더링 이후 비동기 지연 로드 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>

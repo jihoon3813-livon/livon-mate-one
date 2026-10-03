@@ -15,11 +15,12 @@ module.exports = async function handler(req, res) {
     return res.status(204).end();
   }
 
+  const cwdDrive = process.cwd().slice(0, 2);
   let cfg = {
     folderId: '1Jt1zhHybV2E0KKRp1udc37RcifY-8ZJU',
     folderUrl: 'https://drive.google.com/drive/folders/1Jt1zhHybV2E0KKRp1udc37RcifY-8ZJU',
-    folderName: 'AI 간병통화 녹음파일',
-    localPath: 'G:\\.shortcut-targets-by-id\\1Jt1zhHybV2E0KKRp1udc37RcifY-8ZJU'
+    folderName: 'AI간병 음성파일(메이트원)',
+    localPath: `${cwdDrive}\\내 드라이브\\AI간병 음성파일(메이트원)`
   };
 
   if (fs.existsSync(CONFIG_FILE)) {
@@ -27,6 +28,21 @@ module.exports = async function handler(req, res) {
       const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
       cfg = { ...cfg, ...data };
     } catch (_) {}
+  }
+
+  // Ensure localPath points to existing drive
+  if (!fs.existsSync(cfg.localPath)) {
+    const candidates = [
+      `H:\\내 드라이브\\${cfg.folderName}`,
+      `G:\\내 드라이브\\${cfg.folderName}`,
+      `${cwdDrive}\\내 드라이브\\${cfg.folderName}`
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) {
+        cfg.localPath = c;
+        break;
+      }
+    }
   }
 
   if (req.method === 'GET') {
@@ -59,8 +75,8 @@ module.exports = async function handler(req, res) {
       if (folderUrl) cfg.folderUrl = folderUrl.trim();
       if (folderName) cfg.folderName = folderName.trim();
       if (localPath) cfg.localPath = localPath.trim();
-      else if (folderId) {
-        cfg.localPath = `G:\\.shortcut-targets-by-id\\${cfg.folderId}`;
+      else {
+        cfg.localPath = `H:\\내 드라이브\\${cfg.folderName}`;
       }
 
       cfg.updatedAt = new Date().toISOString();

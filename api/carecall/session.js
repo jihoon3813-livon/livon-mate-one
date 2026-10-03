@@ -131,14 +131,18 @@ module.exports = async function handler(req, res) {
         audio: {
           input: {
             format: { type: 'audio/pcm', rate: 24000 },
-            transcription: { model: 'whisper-1' },
+            transcription: {
+              model: 'whisper-1',
+              language: 'ko',
+              prompt: '한국어 요양 간병 대화, 식사, 대소변, 혈압, 체온, 투약'
+            },
             turn_detection: {
               type: 'server_vad',
-              threshold: 0.5,
+              threshold: 0.85,
               prefix_padding_ms: 300,
-              silence_duration_ms: 700,
+              silence_duration_ms: 900,
               create_response: true,
-              interrupt_response: true
+              interrupt_response: false
             }
           },
           output: {
