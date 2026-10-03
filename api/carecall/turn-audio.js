@@ -34,30 +34,47 @@ function getTurnAudio(id) {
   return null;
 }
 
+function getSystemVoice() {
+  try {
+    const cfgFile = path.join(process.cwd(), 'carecall_voice_config.json');
+    if (fs.existsSync(cfgFile)) {
+      const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
+      if (cfg && cfg.voice) return cfg.voice.toLowerCase().trim();
+    }
+  } catch (_) {}
+  return 'coral';
+}
+
 /**
- * OpenAI TTS 실시간 합성 함수 (리본메이트 정품 Marin 음성: gpt-4o-mini-tts)
+ * OpenAI TTS 실시간 합성 함수 (한국어 최고 품질: coral / marin / sage)
  */
-async function synthesizeTts(text, voice = 'marin') {
+async function synthesizeTts(text, voice) {
   const apiKey = getOpenAiApiKey();
   if (!apiKey) throw new Error('OPENAI_API_KEY가 설정되지 않았습니다.');
 
-  let targetVoice = (voice || 'marin').toLowerCase().trim();
-  
-  // 리본메이트 정품 음성: OpenAI 최신 gpt-4o-mini-tts의 'marin' 네이티브 음성 사용
-  let targetModel = 'gpt-4o-mini-tts';
+  const trimmedText = (text || '').trim();
+  const cacheKey = 'tts_' + Buffer.from(trimmedText).toString('hex').slice(0, 32);
+  const existing = getTurnAudio(cacheKey);
+  if (existing) return existing;
+
+  let targetVoice = (voice || getSystemVoice()).toLowerCase().trim();
+  let targetModel = 'tts-1';
+
   if (targetVoice === 'marin') {
     targetModel = 'gpt-4o-mini-tts';
     targetVoice = 'marin';
+  } else if (targetVoice === 'coral' || targetVoice === 'sage' || targetVoice === 'nova' || targetVoice === 'shimmer' || targetVoice === 'alloy') {
+    targetModel = 'tts-1';
   } else {
-    const validVoices = ['shimmer', 'nova', 'alloy', 'echo', 'coral', 'sage', 'ash'];
-    if (!validVoices.includes(targetVoice)) targetVoice = 'marin';
+    targetVoice = 'coral';
+    targetModel = 'tts-1';
   }
 
   const postData = JSON.stringify({
     model: targetModel,
-    input: text,
+    input: trimmedText,
     voice: targetVoice,
-    speed: 1.02
+    speed: 1.0
   });
 
   return new Promise((resolve, reject) => {
@@ -76,7 +93,9 @@ async function synthesizeTts(text, voice = 'marin') {
       res.on('data', c => chunks.push(c));
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(Buffer.concat(chunks));
+          const buf = Buffer.concat(chunks);
+          storeTurnAudio(cacheKey, buf);
+          resolve(buf);
         } else {
           reject(new Error(`TTS 생성 실패 (Status: ${res.statusCode})`));
         }

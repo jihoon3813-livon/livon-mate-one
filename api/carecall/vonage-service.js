@@ -141,7 +141,17 @@ async function placeVonageCall({ phone, patientName, caregiverName, workDate, wo
     scheduleId: scheduleId || ''
   });
 
-  const effectiveVoice = (voice || 'marin').toLowerCase().trim();
+  const systemVoice = (function() {
+    try {
+      const cfgFile = path.join(process.cwd(), 'carecall_voice_config.json');
+      if (fs.existsSync(cfgFile)) {
+        const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
+        if (cfg && cfg.voice) return cfg.voice.toLowerCase().trim();
+      }
+    } catch (_) {}
+    return 'coral';
+  })();
+  const effectiveVoice = (voice || systemVoice).toLowerCase().trim();
   const turnAnswerUrl = `${baseUrl}/api/carecall/vonage-turn?action=answer&${queryParams}&voice=${effectiveVoice}`;
   const eventUrl = `${baseUrl}/api/carecall/vonage-event?${queryParams}`;
 
