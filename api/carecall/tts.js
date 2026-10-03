@@ -112,10 +112,17 @@ module.exports = async function handler(req, res) {
     return res.end(JSON.stringify({ error: 'OPENAI_API_KEY not configured' }));
   }
 
+  let ttsModel = 'tts-1';
+  let ttsVoice = voice;
+  if (rawVoice === 'marin') {
+    ttsModel = 'gpt-4o-mini-tts';
+    ttsVoice = 'marin';
+  }
+
   const postData = JSON.stringify({
-    model: 'tts-1',
+    model: ttsModel,
     input: text,
-    voice: voice,
+    voice: ttsVoice,
     speed: speed
   });
 

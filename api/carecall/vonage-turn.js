@@ -40,8 +40,8 @@ async function callGpt(messages) {
   const postData = JSON.stringify({
     model: 'gpt-4o-mini',
     messages: messages,
-    temperature: 0.35,
-    max_tokens: 160
+    temperature: 0.25,
+    max_tokens: 75
   });
 
   return new Promise((resolve, reject) => {
@@ -137,18 +137,19 @@ module.exports = async function handler(req, res) {
   console.log(`[Livon Conversational CareCall] Action=${action} | Step=${step} | Session=${sessionId} | Patient=${patientName}`);
 
   // =========================================================================
-  // STEP 0: 리본메이트 앱 화면 100% 동일 첫 멘트 송출 (Opening)
-  // "안녕하세요, [환자명] 님 간병일지 작성을 도와드릴게요. 오늘 근무하신 [날짜] 하루 동안 [어르신] 님 모시면서 특별히 신경 쓰인 부분이나 달라진 점이 있었을까요?"
+  // =========================================================================
+  // STEP 0: 리본메이트 공식 앱 실제 녹취 100% 동일 첫 멘트 송출 (Opening)
+  // "어 안녕하세요 오늘 [지훈]님 돌봐 드리신 거 맞죠? 그날 전반적으로 어떤 모습이셨는지부터 편하게 얘기해 주실 수 있을까요? 그러니까 [지훈]님이 그날 기운이 좀 어떠셨는지 특별히 불편해 보이신 점은 없었는지 그냥 느낌대로 말씀해 주시면 돼요."
   // =========================================================================
   if (step === 0 || action === 'answer') {
-    const formattedDate = formatDateToKorean(workDate);
     const shortName = (patientName.length === 3) ? patientName.slice(1) : patientName;
+    const targetName = shortName + '님';
 
     let openingText = '';
     if (caregiverName) {
-      openingText = `안녕하세요, ${caregiverName} 간병사님! ${patientName} 님 간병일지 작성을 도와드릴게요. 오늘 근무하신 ${formattedDate} 하루 동안 ${shortName} 님 모시면서 특별히 신경 쓰인 부분이나 달라진 점이 있었을까요?`;
+      openingText = `어 안녕하세요 ${caregiverName} 간병사님, 오늘 ${targetName} 돌봐 드리신 거 맞죠? 그날 전반적으로 어떤 모습이셨는지부터 편하게 얘기해 주실 수 있을까요? 그러니까 ${targetName}이 그날 기운이 좀 어떠셨는지 특별히 불편해 보이신 점은 없었는지 그냥 느낌대로 말씀해 주시면 돼요.`;
     } else {
-      openingText = `안녕하세요, ${patientName} 님 간병일지 작성을 도와드릴게요. 오늘 근무하신 ${formattedDate} 하루 동안 ${shortName} 님 모시면서 특별히 신경 쓰인 부분이나 달라진 점이 있었을까요?`;
+      openingText = `어 안녕하세요 오늘 ${targetName} 돌봐 드리신 거 맞죠? 그날 전반적으로 어떤 모습이셨는지부터 편하게 얘기해 주실 수 있을까요? 그러니까 ${targetName}이 그날 기운이 좀 어떠셨는지 특별히 불편해 보이신 점은 없었는지 그냥 느낌대로 말씀해 주시면 돼요.`;
     }
 
     // 회사 공식 프롬프트 시스템 메시지 초기화
@@ -165,7 +166,7 @@ module.exports = async function handler(req, res) {
       caregiverName,
       workDate,
       workTime,
-      voice,
+      voice: 'marin',
       step: 0,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -178,15 +179,15 @@ module.exports = async function handler(req, res) {
 
     saveSessionState(sessionId, sessionObj);
 
-    // Opening 음원 실시간 사전 합성 및 캐싱
+    // Opening 음원 실시간 사전 합성 및 캐싱 (정품 Marin)
     try {
-      const audioBuf = await synthesizeTts(openingText, voice);
+      const audioBuf = await synthesizeTts(openingText, 'marin');
       storeTurnAudio(`${sessionId}_0`, audioBuf);
     } catch (_) {}
 
     const encodedOpening = Buffer.from(openingText, 'utf8').toString('base64url');
     const openingAudioUrl = `${baseUrl}/audio/stream/${encodedOpening}.mp3`;
-    const nextTurnUrl = `${baseUrl}/api/carecall/vonage-turn?action=turn&step=1&sessionId=${sessionId}&patientName=${encodeURIComponent(patientName)}&caregiverName=${encodeURIComponent(caregiverName)}&voice=${encodeURIComponent(voice)}&workDate=${encodeURIComponent(workDate)}`;
+    const nextTurnUrl = `${baseUrl}/api/carecall/vonage-turn?action=turn&step=1&sessionId=${sessionId}&patientName=${encodeURIComponent(patientName)}&caregiverName=${encodeURIComponent(caregiverName)}&voice=marin&workDate=${encodeURIComponent(workDate)}`;
 
     const ncco = [
       {
@@ -199,9 +200,9 @@ module.exports = async function handler(req, res) {
         type: ['speech'],
         speech: {
           language: 'ko-KR',
-          endOnSilence: 1.5,
-          maxDuration: 50,
-          startTimeout: 12
+          endOnSilence: 0.8,
+          maxDuration: 40,
+          startTimeout: 8
         },
         eventUrl: [nextTurnUrl]
       }
@@ -252,17 +253,35 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  // 대화 종료 판단 (4턴 이상 진행되었거나 바이탈 측정까지 수집된 경우)
-  const isReadyToFinish = session.step >= 4;
+  const shortName = (session.patientName.length === 3) ? session.patientName.slice(1) : session.patientName;
+  const isReadyToFinish = session.step >= 7;
 
   if (isReadyToFinish) {
     session.messages.push({
       role: 'user',
-      content: `간병일지에 필요한 핵심 내용(식사, 배변, 거동, 바이탈 등)이 충분히 수집되었습니다. 간병사님의 노고에 진심으로 감사드리며, [Final Rules]의 필수 종료 멘트인 '고생 많으셨습니다'를 반드시 포함하여 따뜻하게 대화를 마무리해주세요. (종료이므로 다음 질문은 하지 마세요)`
+      content: `[Final Step] 바이탈/기록까지 확인 완료되었습니다. '네 오늘 상황 잘 말씀해 주셔서 감사합니다. 자세히 알려주셔서 정말 감사해요. 간병하시느라 정말 고생 많으셨습니다~'와 같이 따뜻하게 인사를 건네며 대화를 완벽히 마무리해주세요.`
+    });
+  } else {
+    // 실제 리본메이트 앱 표준 대화 시나리오 힌트
+    const scriptHints = [
+      '', // 0
+      `[다음 질문: 식사] 간병사 답변에 짧게 맞장구치고, "네 혹시 그날 식사는 어떻게 하셨는지 좀 말씀해 주실 수 있을까요?" 취지로 자연스럽고 다정하게 물어보세요.`,
+      `[다음 질문: 수분] "아 혹시 물도 자주 드셨어요? ${shortName}님 물은 자주 드셨을까요?" 취지로 물어보세요.`,
+      `[다음 질문: 대소변/배변] "네 혹시 그날 대소변도 문제없이 잘 보셨을까요?" 취지로 물어보세요.`,
+      `[다음 질문: 이동/거동] "그럼 혹시 ${shortName}님께서 움직임이나 이동하시는 데는 불편함 없으셨나요?" 취지로 물어보세요.`,
+      `[다음 질문: 위생/케어] "네 잘 움직이셨다니 다행이네요. 그럼 혹시 세수나 양치, 옷 갈아입기 같은 위생 관련해서 특별히 어려운 점은 없으셨을까요?" 취지로 물어보세요.`,
+      `[다음 질문: 기분/정서] "네 잘 챙겨드리신 거 같네요. 그럼 기분이나 정서적으로는 별다른 변화 없으셨을까요?" 취지로 물어보세요.`,
+      `[다음 질문: 바이탈/측정] "아 혹시 그날 혈압이나 체온 같은 측정해 두신 기록이 있을까요?" 취지로 물어보세요.`
+    ];
+
+    const currentHint = scriptHints[session.step] || `간병일지에 필요한 남은 항목을 짧고 다정하게 질문해주세요.`;
+    session.messages.push({
+      role: 'system',
+      content: `${currentHint} (반드시 1~2문장으로 짧게 구어체로 발화하세요)`
     });
   }
 
-  // GPT-4o-mini 자연스러운 답변 및 다음 질문 생성
+  // GPT-4o-mini 자연스러운 답변 및 다음 질문 초고속 생성
   let aiResponseText = '';
   try {
     aiResponseText = await callGpt(session.messages);
@@ -271,10 +290,20 @@ module.exports = async function handler(req, res) {
   }
 
   if (!aiResponseText) {
+    const defaultResponses = [
+      '',
+      '네, 혹시 그날 식사는 어떻게 하셨는지 좀 말씀해 주실 수 있을까요?',
+      `아 혹시 물도 자주 드셨어요? ${shortName}님 물은 자주 드셨을까요?`,
+      '네, 혹시 그날 대소변도 문제없이 잘 보셨을까요?',
+      `그럼 혹시 ${shortName}님께서 움직임이나 이동하시는 데는 불편함 없으셨나요?`,
+      '네 잘 움직이셨다니 다행이네요. 그럼 혹시 세수나 양치, 옷 갈아입기 같은 위생 관련해서 특별히 어려운 점은 없으셨을까요?',
+      '네 잘 챙겨드리신 거 같네요. 그럼 기분이나 정서적으로는 별다른 변화 없으셨을까요?',
+      '아 혹시 그날 혈압이나 체온 같은 측정해 두신 기록이 있을까요?'
+    ];
     if (isReadyToFinish) {
-      aiResponseText = '자세히 알려주셔서 정말 감사해요. 덕분에 오늘 일지가 잘 작성되었습니다. 오늘 간병하시느라 정말 고생 많으셨습니다~';
+      aiResponseText = '네 오늘 상황 잘 말씀해 주셔서 감사합니다. 자세히 알려주셔서 정말 감사해요. 간병하시느라 정말 고생 많으셨습니다~';
     } else {
-      aiResponseText = '아 그러셨군요~ 잘 알겠습니다. 그럼 오늘 어르신 대소변이나 기저귀 케어는 어떠셨을까요?';
+      aiResponseText = defaultResponses[session.step] || '네, 잘 알겠습니다. 그럼 다른 특이사항은 없으셨을까요?';
     }
   }
 
@@ -284,9 +313,9 @@ module.exports = async function handler(req, res) {
 
   console.log(`[Livon Conversational Turn ${step}] AI replied: "${aiResponseText}"`);
 
-  // Marin(Shimmer) 실시간 TTS 합성 및 캐싱
+  // 정품 Marin (gpt-4o-mini-tts) 실시간 TTS 합성 및 캐싱
   try {
-    const audioBuf = await synthesizeTts(aiResponseText, session.voice);
+    const audioBuf = await synthesizeTts(aiResponseText, 'marin');
     storeTurnAudio(`${sessionId}_${step}`, audioBuf);
   } catch (_) {}
 
@@ -311,7 +340,7 @@ module.exports = async function handler(req, res) {
         caregiverName: session.caregiverName,
         workDate: session.workDate,
         provider: 'vonage',
-        voice: session.voice,
+        voice: 'marin',
         transcripts: session.transcripts,
         completedAt: new Date().toISOString()
       });
@@ -334,8 +363,8 @@ module.exports = async function handler(req, res) {
     return res.status(200).json(finishNcco);
   }
 
-  // 다음 질문 재생 후 간병사 답변 청취
-  const nextTurnUrl = `${baseUrl}/api/carecall/vonage-turn?action=turn&step=${step + 1}&sessionId=${sessionId}&patientName=${encodeURIComponent(session.patientName)}&caregiverName=${encodeURIComponent(session.caregiverName)}&voice=${encodeURIComponent(session.voice)}&workDate=${encodeURIComponent(session.workDate)}`;
+  // 다음 질문 재생 후 간병사 답변 청취 (침묵 감지 0.8초로 쾌속 전환)
+  const nextTurnUrl = `${baseUrl}/api/carecall/vonage-turn?action=turn&step=${step + 1}&sessionId=${sessionId}&patientName=${encodeURIComponent(session.patientName)}&caregiverName=${encodeURIComponent(session.caregiverName)}&voice=marin&workDate=${encodeURIComponent(session.workDate)}`;
 
   const nextNcco = [
     {
@@ -348,9 +377,9 @@ module.exports = async function handler(req, res) {
       type: ['speech'],
       speech: {
         language: 'ko-KR',
-        endOnSilence: 1.5,
-        maxDuration: 50,
-        startTimeout: 12
+        endOnSilence: 0.8,
+        maxDuration: 40,
+        startTimeout: 8
       },
       eventUrl: [nextTurnUrl]
     }

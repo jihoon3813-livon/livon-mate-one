@@ -35,22 +35,29 @@ function getTurnAudio(id) {
 }
 
 /**
- * OpenAI TTS 실시간 합성 함수 (리본메이트 Marin 음색: tts-1 / shimmer)
+ * OpenAI TTS 실시간 합성 함수 (리본메이트 정품 Marin 음성: gpt-4o-mini-tts)
  */
-async function synthesizeTts(text, voice = 'shimmer') {
+async function synthesizeTts(text, voice = 'marin') {
   const apiKey = getOpenAiApiKey();
   if (!apiKey) throw new Error('OPENAI_API_KEY가 설정되지 않았습니다.');
 
-  let targetVoice = (voice || 'shimmer').toLowerCase().trim();
-  if (targetVoice === 'marin') targetVoice = 'shimmer'; // 리본메이트 30대 다정한 여성 간호사 톤
-  const validVoices = ['shimmer', 'nova', 'alloy', 'echo', 'coral', 'sage', 'ash'];
-  if (!validVoices.includes(targetVoice)) targetVoice = 'shimmer';
+  let targetVoice = (voice || 'marin').toLowerCase().trim();
+  
+  // 리본메이트 정품 음성: OpenAI 최신 gpt-4o-mini-tts의 'marin' 네이티브 음성 사용
+  let targetModel = 'gpt-4o-mini-tts';
+  if (targetVoice === 'marin') {
+    targetModel = 'gpt-4o-mini-tts';
+    targetVoice = 'marin';
+  } else {
+    const validVoices = ['shimmer', 'nova', 'alloy', 'echo', 'coral', 'sage', 'ash'];
+    if (!validVoices.includes(targetVoice)) targetVoice = 'marin';
+  }
 
   const postData = JSON.stringify({
-    model: 'tts-1',
+    model: targetModel,
     input: text,
     voice: targetVoice,
-    speed: 1.05
+    speed: 1.02
   });
 
   return new Promise((resolve, reject) => {

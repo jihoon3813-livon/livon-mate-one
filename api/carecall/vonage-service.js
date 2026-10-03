@@ -153,9 +153,10 @@ async function placeVonageCall({ phone, patientName, caregiverName, workDate, wo
       return parts.length === 3 ? `${parseInt(parts[1], 10)}월 ${parseInt(parts[2], 10)}일` : d;
     })(workDate);
     const shortName = (patientName && patientName.length === 3) ? patientName.slice(1) : (patientName || '어르신');
+    const targetName = shortName + '님';
     const openingText = caregiverName
-      ? `안녕하세요, ${caregiverName} 간병사님! ${patientName} 님 간병일지 작성을 도와드릴게요. 오늘 근무하신 ${formattedDate} 하루 동안 ${shortName} 님 모시면서 특별히 신경 쓰인 부분이나 달라진 점이 있었을까요?`
-      : `안녕하세요, ${patientName} 님 간병일지 작성을 도와드릴게요. 오늘 근무하신 ${formattedDate} 하루 동안 ${shortName} 님 모시면서 특별히 신경 쓰인 부분이나 달라진 점이 있었을까요?`;
+      ? `어 안녕하세요 ${caregiverName} 간병사님, 오늘 ${targetName} 돌봐 드리신 거 맞죠? 그날 전반적으로 어떤 모습이셨는지부터 편하게 얘기해 주실 수 있을까요? 그러니까 ${targetName}이 그날 기운이 좀 어떠셨는지 특별히 불편해 보이신 점은 없었는지 그냥 느낌대로 말씀해 주시면 돼요.`
+      : `어 안녕하세요, 오늘 ${targetName} 돌봐 드리신 거 맞죠? 그날 전반적으로 어떤 모습이셨는지부터 편하게 얘기해 주실 수 있을까요? 그러니까 ${targetName}이 그날 기운이 좀 어떠셨는지 특별히 불편해 보이신 점은 없었는지 그냥 느낌대로 말씀해 주시면 돼요.`;
 
     const { synthesizeTts, storeTurnAudio } = require('./turn-audio');
     synthesizeTts(openingText, effectiveVoice).then(buf => {
