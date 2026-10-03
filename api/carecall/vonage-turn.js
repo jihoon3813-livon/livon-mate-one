@@ -8,33 +8,13 @@ const path = require('path');
 const { buildCareCallPrompt } = require('./prompt');
 const { storeTurnAudio } = require('./turn-audio');
 
+const { getOpenAiApiKey } = require('./openai-key');
+
 const gVonageSessions = new Map();
 const LOG_FILE = path.join(process.cwd(), 'carecall_recordings_log.json');
 
 function getApiKey() {
-  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
-  const envCandidates = [
-    path.join(__dirname, '../../.env.local'),
-    path.join(__dirname, '../.env.local'),
-    path.join(process.cwd(), '.env.local'),
-    path.join(process.cwd(), '.env')
-  ];
-  for (const p of envCandidates) {
-    if (fs.existsSync(p)) {
-      try {
-        const text = fs.readFileSync(p, 'utf8');
-        const m = text.match(/^\s*OPENAI_API_KEY\s*=\s*(.+)$/m);
-        if (m && m[1]) {
-          const key = m[1].trim().replace(/^["']|["']$/g, '');
-          if (key) {
-            process.env.OPENAI_API_KEY = key;
-            return key;
-          }
-        }
-      } catch (_) {}
-    }
-  }
-  return null;
+  return getOpenAiApiKey();
 }
 
 /**
