@@ -245,13 +245,14 @@ function generateTwiML({ patientName, caregiverName, workDate, workTime, schedul
   const recordActionUrl = `${baseUrl}/api/carecall/twiml-callback?${params}`;
   const effectiveVoice = (voice || 'marin').toLowerCase().trim();
 
-  // 1. 마린(Marin) 음성일 때: OpenAI Realtime 고음질 실제 음원(WAV)을 통화에서 직접 재생
+  // 1. 마린(Marin) 음성일 때: OpenAI Realtime 고음질 실제 음원(WAV 16kHz)을 통화에서 직접 재생
+  // 한국 통신사(SKT/KT/LGU+) 국제전화 안내멘트("국제전화입니다") 대기 4초 부여
   if (effectiveVoice === 'marin') {
     return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Pause length="1" />
+  <Pause length="4" />
   <Play>${baseUrl}/audio/preview_marin.wav</Play>
-  <Record action="${escapeXml(recordActionUrl)}" maxLength="300" playBeep="true" trim="trim-silence" finishOnKey="#" />
+  <Record action="${escapeXml(recordActionUrl)}" maxLength="300" timeout="10" playBeep="true" trim="trim-silence" finishOnKey="#" />
   <Play>${baseUrl}/audio/outro_marin.wav</Play>
 </Response>`;
   }
@@ -267,9 +268,9 @@ function generateTwiML({ patientName, caregiverName, workDate, workTime, schedul
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Pause length="1" />
+  <Pause length="4" />
   <Play>${questionAudioFile}</Play>
-  <Record action="${escapeXml(recordActionUrl)}" maxLength="300" playBeep="true" trim="trim-silence" finishOnKey="#" />
+  <Record action="${escapeXml(recordActionUrl)}" maxLength="300" timeout="10" playBeep="true" trim="trim-silence" finishOnKey="#" />
   <Play>${baseUrl}/audio/outro_marin.wav</Play>
 </Response>`;
 }

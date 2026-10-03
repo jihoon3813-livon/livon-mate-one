@@ -158,27 +158,30 @@ async function placeVonageCall({ phone, patientName, caregiverName, workDate, wo
   }
   const outroAudioFile = `${baseUrl}/audio/outro_marin.wav`;
 
-  // 회사 기존 Twilio 통화 시나리오(generateTwiML)와 100% 동일한 NCCO 파이프라인
-  // 1. 고음질 GPT 질문 음원 스트리밍 재생 (Marin / 선택된 음성)
-  // 2. 간병사 답변 녹음 (최대 300초, 침묵 감지 or #)
-  // 3. 고음질 마무리 멘트 재생 ("간병하시느라 정말 고생 많으셨습니다")
+  // 한국 통신사 "국제전화입니다" 법정 안내멘트(약 3.5초) 대기 및 바지인(Barge-in) 오작동 방지
   const inlineNcco = [
+    {
+      action: 'talk',
+      text: '<speak><break time="3500ms"/></speak>',
+      bargeIn: false
+    },
     {
       action: 'stream',
       streamUrl: [questionAudioFile],
-      bargeIn: true
+      bargeIn: false
     },
     {
       action: 'record',
       eventUrl: [recordCallbackUrl],
-      endOnSilence: 5,
+      endOnSilence: 8,
       endOnKey: '#',
       beepStart: true,
       timeOut: 300
     },
     {
       action: 'stream',
-      streamUrl: [outroAudioFile]
+      streamUrl: [outroAudioFile],
+      bargeIn: false
     }
   ];
 

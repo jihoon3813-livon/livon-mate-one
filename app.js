@@ -40128,7 +40128,7 @@ window.playCareCallRecordingAudio = playCareCallRecordingAudio;
 window.handleCareCallDownloadFile = handleCareCallDownloadFile;
 window.handleCareCallModalDownloadClick = handleCareCallModalDownloadClick;
 
-let gActiveCareCallProvider = 'vonage';
+let gActiveCareCallProvider = 'twilio';
 
 function switchCareCallProviderTab(provider) {
   gActiveCareCallProvider = provider;
@@ -40201,7 +40201,7 @@ async function openTwilioConfigModal() {
     console.warn('Twilio config load error:', e);
   }
 
-  switchCareCallProviderTab('vonage');
+  switchCareCallProviderTab(gActiveCareCallProvider || 'twilio');
   modal.classList.remove('hidden');
 }
 
