@@ -1372,7 +1372,7 @@
         const vSvg = this.renderTrafficLightSvg(c.tone, 'vertical');
 
         return `
-          <div style="flex: 1; min-width: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px;">
+          <div style="flex: 1; min-width: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; min-height: 98px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <span class="careport-badge-pill" style="height: 22px; font-size: 11px; font-weight: 800; padding: 0 8px; border-radius: 6px; ${cPillStyle}">
                 <span class="careport-dot" style="width: 5px; height: 5px; margin-right: 4px;"></span>
@@ -1380,7 +1380,7 @@
               </span>
               ${vSvg}
             </div>
-            <div style="font-size: 11.5px; color: #334155; line-height: 1.45; font-weight: 500;">
+            <div style="font-size: 11.5px; color: #334155; line-height: 1.45; font-weight: 500; min-height: 32px; display: flex; align-items: center;">
               ${c.description}
             </div>
           </div>
@@ -1398,18 +1398,18 @@
       `).join('');
 
       const careLogHtml = d.careLogRows.map(r => `
-        <div style="display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #f1f5f9;">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; min-height: 34px;">
           <strong class="careport-badge-pill" style="min-width: 86px; max-width: 115px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; height: 24px; padding: 0 8px;"><span>${r.label}</span></strong>
-          <span style="flex: 1; font-size: 11.5px; color: #334155; line-height: 1.45; font-weight: 500;">${r.value}</span>
+          <span style="flex: 1; font-size: 11.5px; color: #334155; line-height: 1.4; display: inline-flex; align-items: center; min-height: 24px; font-weight: 500;">${r.value}</span>
         </div>
       `).join('');
 
       const guardianNotesHtml = d.guardianNotes.map(g => `
-        <div style="display: flex; align-items: baseline; gap: 8px; font-size: 11.5px; line-height: 1.5;">
-          <span style="display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: #10bdb2; margin-top: 6px; flex-shrink: 0;"></span>
-          <span style="font-weight: 800; color: #0f172a; min-width: 52px; flex-shrink: 0;">${g.label}</span>
-          <span style="color: #94a3b8; font-weight: bold;">·</span>
-          <span style="color: #334155; font-weight: 500;">${g.value}</span>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 11.5px; line-height: 1.45; min-height: 24px;">
+          <span style="display: inline-block; width: 4.5px; height: 4.5px; border-radius: 50%; background: #10bdb2; flex-shrink: 0;"></span>
+          <span style="font-weight: 800; color: #0f172a; min-width: 52px; flex-shrink: 0; display: inline-flex; align-items: center;">${g.label}</span>
+          <span style="color: #94a3b8; font-weight: bold; flex-shrink: 0;">·</span>
+          <span style="color: #334155; font-weight: 500; flex: 1; display: inline-flex; align-items: center;">${g.value}</span>
         </div>
       `).join('');
 
@@ -1443,6 +1443,8 @@
     * { box-sizing: border-box; }
     html, body {
       font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
       background: #ffffff;
       color: #0f172a;
       padding: 0;
@@ -1488,6 +1490,8 @@
       font-weight: 900;
       color: #0f172a;
       letter-spacing: -0.3px;
+      display: inline-flex;
+      align-items: center;
     }
     .careport-badge-pill {
       display: inline-flex !important;
@@ -1503,9 +1507,10 @@
     .careport-badge-pill > strong {
       display: inline-flex !important;
       align-items: center !important;
+      justify-content: center !important;
       line-height: 1 !important;
       position: relative !important;
-      top: -1.5px !important;
+      top: 0 !important;
     }
     .careport-dot {
       display: inline-block !important;
@@ -1514,7 +1519,7 @@
       flex-shrink: 0 !important;
       vertical-align: middle !important;
       position: relative !important;
-      top: -1.5px !important;
+      top: 0 !important;
     }
   </style>
 </head>
@@ -1539,24 +1544,28 @@
     <div style="display: flex; justify-content: space-between; gap: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 16px; margin-bottom: 14px;">
       <div style="flex: 1;">
         <span style="font-size: 10.5px; color: #64748b; font-weight: 700; display: block; margin-bottom: 2px;">고객명 (피보험자)</span>
-        <strong style="font-size: 13.5px; font-weight: 900; color: #0f172a;">${d.patientName}</strong>
-        <span style="font-size: 11.5px; font-weight: 700; color: #475569; margin-left: 4px;">(${d.age}세·${d.gender})</span>
+        <div style="display: inline-flex; align-items: baseline; gap: 4px;">
+          <strong style="font-size: 13.5px; font-weight: 900; color: #0f172a;">${d.patientName}</strong>
+          <span style="font-size: 11.5px; font-weight: 700; color: #475569;">(${d.age}세·${d.gender})</span>
+        </div>
       </div>
       <div style="flex: 1; border-left: 1px solid #e2e8f0; padding-left: 12px;">
         <span style="font-size: 10.5px; color: #64748b; font-weight: 700; display: block; margin-bottom: 2px;">담당 간병인 (소속)</span>
-        <strong style="font-size: 13px; font-weight: 800; color: #0f172a;">${d.caregiver}</strong>
-        <span style="font-size: 11px; color: #64748b; margin-left: 2px;">(${d.org})</span>
+        <div style="display: inline-flex; align-items: baseline; gap: 4px;">
+          <strong style="font-size: 13px; font-weight: 800; color: #0f172a;">${d.caregiver}</strong>
+          <span style="font-size: 11px; color: #64748b;">(${d.org})</span>
+        </div>
       </div>
       <div style="flex: 1.2; border-left: 1px solid #e2e8f0; padding-left: 12px;">
         <span style="font-size: 10.5px; color: #64748b; font-weight: 700; display: block; margin-bottom: 2px;">간병 기간</span>
-        <strong style="font-size: 12.5px; font-weight: 800; color: #0f172a;">${d.carePeriod}</strong>
+        <strong style="font-size: 12.5px; font-weight: 800; color: #0f172a; display: block; line-height: 1.35;">${d.carePeriod}</strong>
       </div>
     </div>
 
     <!-- Section: 간병 일자별 환자 상태 변화 (Image 2 style) -->
     <div class="sec-head" style="border-bottom: 2px solid #10bdb2;">
       <span class="sec-title">간병 일자별 환자 상태 변화</span>
-      <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; gap: 8px;">
+      <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; align-items: center; gap: 8px;">
         <span style="color: #06C8BB;">― 총합상태</span>
         <span style="color: #2BBB77;">― 거동능력</span>
         <span style="color: #F4A61E;">― 식사상태</span>
@@ -1571,22 +1580,24 @@
     <!-- Section 1: 금일 환자 상태 체크 (신호등 & 세부 상태) -->
     <div class="sec-head">
       <span class="sec-title">금일 환자 상태 체크</span>
-      <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; gap: 8px;">
-        <span><b style="color: #20b86a;">●</b> 양호·안정</span>
-        <span><b style="color: #f5aa18;">●</b> 주의·부분보조</span>
-        <span><b style="color: #eb5c60;">●</b> 악화·주의필요</span>
+      <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; align-items: center; gap: 8px;">
+        <span style="display: inline-flex; align-items: center; gap: 3px;"><b style="color: #20b86a; font-size: 11px;">●</b> 양호·안정</span>
+        <span style="display: inline-flex; align-items: center; gap: 3px;"><b style="color: #f5aa18; font-size: 11px;">●</b> 주의·부분보조</span>
+        <span style="display: inline-flex; align-items: center; gap: 3px;"><b style="color: #eb5c60; font-size: 11px;">●</b> 악화·주의필요</span>
       </div>
     </div>
 
     <!-- Overall Status Verdict Banner -->
-    <div style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; min-height: 46px;">
       <div style="display: flex; align-items: center; gap: 10px;">
         <span class="careport-badge-pill" style="font-size: 11.5px; font-weight: 900; height: 24px; padding: 0 10px; border-radius: 6px; ${toneBadgeClass}">
           <span class="careport-dot" style="width: 6px; height: 6px; margin-right: 5px;"></span>
           <span>${d.overallStatus.label}</span>
         </span>
-        ${overallLightSvg}
-        <span style="font-size: 12px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; height: 24px; line-height: 1.3;">${d.overallStatus.description}</span>
+        <div style="display: inline-flex; align-items: center;">
+          ${overallLightSvg}
+        </div>
+        <span style="font-size: 12px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; height: 24px; line-height: 1;">${d.overallStatus.description}</span>
       </div>
       <span class="careport-badge-pill" style="font-size: 11px; font-weight: 800; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; height: 24px; padding: 0 9px; border-radius: 5px;"><span>종합 판정</span></span>
     </div>

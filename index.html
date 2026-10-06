@@ -931,7 +931,16 @@
           <span class="h-5 px-2 rounded-md bg-purple-950 text-purple-300 font-bold text-[10px] flex items-center justify-center border border-purple-800">CarePort</span>
         </button>
 
-        <!-- 3-2. 만족도조사 관리 (고객만족도 조사 & 후속조치 & 달란트원장) -->
+        <!-- 3-2. AI간병통화 관리 (독립 메뉴) -->
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="carecall" onclick="handleLeftMenuClick('carecall')">
+          <div class="flex items-center space-x-3">
+            <i data-lucide="bot" class="w-4 h-4 flex-shrink-0 text-purple-400"></i>
+            <span class="tracking-tight font-semibold">AI간병통화 관리</span>
+          </div>
+          <span class="h-5 px-2 rounded-md bg-purple-950 text-purple-300 font-bold text-[10px] flex items-center justify-center border border-purple-800" id="sidebarCareCallBadge">AI콜</span>
+        </button>
+
+        <!-- 3-3. 만족도조사 관리 (고객만족도 조사 & 후속조치 & 달란트원장) -->
         <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="surveymgmt" onclick="handleLeftMenuClick('surveymgmt')">
           <div class="flex items-center space-x-3">
             <i data-lucide="star" class="w-4 h-4 flex-shrink-0 text-amber-400"></i>
@@ -3681,10 +3690,10 @@
               <i data-lucide="file-up" class="w-3.5 h-3.5 text-purple-300"></i>
               <span>수동 일지 등록</span>
             </button>
-            <button type="button" onclick="setCareLogViewMode('call')" 
-              class="px-3.5 py-2.5 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-bold text-xs flex items-center gap-1.5 border border-purple-400 shadow-md transition-all cursor-pointer whitespace-nowrap active:scale-95"
-              title="리본메이트 앱 없이 AI가 간병인에게 전화하여 간병일지 녹취(.m4a)를 생성합니다">
-              <i data-lucide="phone-call" class="w-3.5 h-3.5 text-white"></i>
+            <button type="button" onclick="switchTab('carecall')" 
+              class="px-3.5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 border border-purple-500 shadow-md transition-all cursor-pointer whitespace-nowrap active:scale-95"
+              title="독립된 AI 간병통화 관리 메뉴로 이동합니다">
+              <i data-lucide="bot" class="w-3.5 h-3.5 text-white"></i>
               <span>AI 간병통화 관리</span>
             </button>
           </div>
@@ -3694,7 +3703,7 @@
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
           <div class="flex items-center gap-2.5 flex-wrap">
             <!-- 뷰 모드 전환 버튼 -->
-            <div class="inline-flex rounded-xl p-1 bg-slate-100 border border-slate-200 font-bold">
+            <div class="inline-flex rounded-xl p-1 bg-slate-100 border border-slate-200 font-bold items-center">
               <button type="button" id="btnViewModePatient" onclick="setCareLogViewMode('patient')" 
                 class="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer">
                 <i data-lucide="users" class="w-3.5 h-3.5"></i>
@@ -3705,11 +3714,12 @@
                 <i data-lucide="list" class="w-3.5 h-3.5"></i>
                 <span>일자별 전체 목록</span>
               </button>
-              <button type="button" id="btnViewModeCall" onclick="setCareLogViewMode('call')" 
-                class="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all text-purple-700 hover:text-purple-900 hover:bg-purple-50 cursor-pointer font-bold">
-                <i data-lucide="phone-call" class="w-3.5 h-3.5 text-purple-600"></i>
+              <button type="button" onclick="switchTab('carecall')" 
+                class="px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition-all text-purple-700 hover:text-purple-900 hover:bg-purple-50 cursor-pointer font-bold border border-purple-200/80 ml-0.5 bg-white shadow-2xs"
+                title="독립된 AI 간병통화 관리 전용 메뉴로 이동">
+                <i data-lucide="bot" class="w-3.5 h-3.5 text-purple-600"></i>
                 <span>AI 간병통화</span>
-                <span class="px-1.5 py-0.2 rounded-full bg-purple-600 text-white font-black text-[10px] animate-pulse">AI콜</span>
+                <i data-lucide="arrow-right" class="w-3 h-3 text-purple-500"></i>
               </button>
             </div>
 
@@ -3781,9 +3791,70 @@
             </table>
           </div>
         </div>
+      </section>
+
+      <!-- ==================== TAB: AI CARE CALL MANAGEMENT (AI 간병통화 관리 - 독립 메뉴) ==================== -->
+      <section id="tab-carecall" class="tab-content hidden space-y-5">
+        
+        <!-- 상단 헤더 & 컨트롤 바 -->
+        <div class="bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="space-y-1.5 min-w-0">
+            <div class="flex items-center gap-2 text-xs font-bold tracking-wider text-purple-300 flex-wrap">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/40 text-[11px] font-bold">
+                <i data-lucide="bot" class="w-3.5 h-3.5 text-purple-300"></i>
+                OpenAI Realtime &middot; Vonage / Twilio CTI
+              </span>
+              <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-[10px] font-bold">
+                간병일지 녹취 자동 생성 (.m4a)
+              </span>
+              <span class="px-2 py-0.5 rounded bg-indigo-500/30 text-indigo-200 border border-indigo-400/40 text-[10px]">
+                구글 드라이브 클라우드 동기화
+              </span>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+              <i data-lucide="phone-call" class="w-6 h-6 text-purple-400"></i>
+              <span>AI 간병통화 관리</span>
+              <span class="text-xs font-normal text-purple-200/80 bg-white/10 px-2.5 py-0.5 rounded-lg">독립 전용 시스템</span>
+            </h2>
+            <p class="text-xs text-purple-200/90 leading-relaxed max-w-3xl">
+              간병인 스마트폰 앱 조작 없이 메이트원에서 전화를 발신하여 AI가 간병 내용을 질문하고 녹취 파일(<b class="text-purple-300 font-bold">.m4a</b>)을 자동 생성합니다. 완료된 파일은 구글 드라이브에 자동 저장되며 케어포트에 즉시 업로드할 수 있습니다.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+            <!-- 🌟 AI 실시간 간병통화 실전 테스트 버튼 (PC 마이크 & 스피커) 🌟 -->
+            <button type="button" onclick="openCareCallWebSimulator()" 
+              class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs shadow-md hover:shadow-lg flex items-center gap-1.5 transition-all cursor-pointer animate-pulse whitespace-nowrap"
+              title="PC 마이크와 스피커를 사용하여 실제 AI 간병통화(질문-답변-녹음-일지생성)를 즉시 실전 테스트합니다">
+              <i data-lucide="mic" class="w-4 h-4 text-white"></i>
+              <span>🎙️ 실전 테스트 (웹 마이크)</span>
+            </button>
+            <!-- 실제 AI 간병일지 질문 음성 미리듣기 버튼 -->
+            <button type="button" onclick="handlePlayCareCallQuestionPreview()" 
+              class="px-3.5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 border border-purple-400 shadow-md transition-all cursor-pointer whitespace-nowrap"
+              title="AI가 실제로 간병사에게 전화하여 묻는 표준 질문 음성을 컴퓨터 스피커로 바로 들어봅니다">
+              <i data-lucide="volume-2" class="w-3.5 h-3.5 text-white"></i>
+              <span>질문 미리듣기</span>
+            </button>
+            <!-- 케어포트 원본 간병일지 바로가기 버튼 -->
+            <button type="button" onclick="switchTab('carelogs')" 
+              class="px-3.5 py-2.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-purple-200 hover:text-white font-bold text-xs flex items-center gap-1.5 border border-purple-700/60 transition-all cursor-pointer whitespace-nowrap active:scale-95"
+              title="케어포트 원본 간병일지(PDF 다운로드 및 환자별 묶음 뷰)로 바로 이동합니다">
+              <i data-lucide="clipboard-list" class="w-3.5 h-3.5 text-purple-300"></i>
+              <span>간병일지 (케어포트)</span>
+            </button>
+            <!-- 새로고침 버튼 -->
+            <button type="button" onclick="refreshCareCallData()" 
+              class="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 border border-white/20 transition-all cursor-pointer whitespace-nowrap active:scale-95"
+              title="서버 최신 녹취 파일 동기화 및 화면 새로고침">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-purple-300"></i>
+              <span>동기화 새로고침</span>
+            </button>
+          </div>
+        </div>
 
         <!-- 3. AI 간병통화 관리 뷰 (AI Care Call & Audio Recording Container) -->
-        <div id="careLogCallContainer" class="hidden space-y-4">
+        <div id="careLogCallContainer" class="space-y-4">
           <!-- 상단 AI 보이스 & 구글 드라이브 설정 컨트롤 카드 (자연스러운 2단 뷰) -->
           <div class="bg-gradient-to-r from-purple-50 via-indigo-50/40 to-white p-5 rounded-3xl border border-purple-200/90 shadow-xs space-y-4">
             <!-- 1단: 타이틀 & 주요 액션 버튼 (항상 넓고 안정적으로 표시) -->
@@ -11458,6 +11529,14 @@
                 <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200/80 hover:border-indigo-300 cursor-pointer text-slate-700 text-xs shadow-2xs">
                   <input type="checkbox" name="adminMenuCheck" value="carelogs" class="rounded text-indigo-600 focus:ring-indigo-500">
                   <span class="font-medium">간병일지 (케어포트)</span>
+                </label>
+                <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200/80 hover:border-indigo-300 cursor-pointer text-slate-700 text-xs shadow-2xs">
+                  <input type="checkbox" name="adminMenuCheck" value="carecall" class="rounded text-indigo-600 focus:ring-indigo-500">
+                  <span class="font-medium">AI간병통화 관리</span>
+                </label>
+                <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200/80 hover:border-indigo-300 cursor-pointer text-slate-700 text-xs shadow-2xs">
+                  <input type="checkbox" name="adminMenuCheck" value="surveymgmt" class="rounded text-indigo-600 focus:ring-indigo-500">
+                  <span class="font-medium">만족도조사 관리</span>
                 </label>
                 <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200/80 hover:border-indigo-300 cursor-pointer text-slate-700 text-xs shadow-2xs">
                   <input type="checkbox" name="adminMenuCheck" value="directory" class="rounded text-indigo-600 focus:ring-indigo-500">

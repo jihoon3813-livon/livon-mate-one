@@ -13797,9 +13797,10 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
     .careport-badge-pill > strong {
       display: inline-flex !important;
       align-items: center !important;
+      justify-content: center !important;
       line-height: 1 !important;
       position: relative !important;
-      top: -1.5px !important;
+      top: 0 !important;
     }
     .careport-dot {
       display: inline-block !important;
@@ -13808,7 +13809,7 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
       flex-shrink: 0 !important;
       vertical-align: middle !important;
       position: relative !important;
-      top: -1.5px !important;
+      top: 0 !important;
     }
     .no-print { display: none !important; }
   </style>
@@ -37215,6 +37216,7 @@ var APP_TAB_META = {
   // dashboard: { name: '대시보드', icon: 'layout-dashboard', color: 'text-sky-500' }, // 임시 숨김 처리
   carecalendar: { name: '간병캘린더', icon: 'calendar-days', color: 'text-sky-500' },
   carelogs: { name: '간병일지 (케어포트)', icon: 'clipboard-list', color: 'text-purple-500' },
+  carecall: { name: 'AI간병통화 관리', icon: 'bot', color: 'text-purple-600' },
   surveymgmt: { name: '만족도조사 관리', icon: 'star', color: 'text-amber-500' },
   directory: { name: '파트너/인력 디렉토리', icon: 'contact-2', color: 'text-emerald-500' },
   samsunglist: { name: '삼성화재 명단관리', icon: 'file-spreadsheet', color: 'text-sky-500' },
@@ -37362,6 +37364,15 @@ function refreshTabData(tabId, filterParam = null) {
       case 'surveymgmt':
         if (typeof renderSurveyMgmtTab === 'function') {
           renderSurveyMgmtTab();
+        }
+        break;
+
+      // 1-3. AI간병통화 관리: 최신 음성/녹취 및 대상자 현황 갱신
+      case 'carecall':
+        if (typeof refreshCareCallData === 'function') {
+          refreshCareCallData();
+        } else if (typeof renderCareCallTargets === 'function') {
+          renderCareCallTargets();
         }
         break;
 
@@ -37696,6 +37707,11 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
     }
     if (!gCarePortPatientGroups || gCarePortPatientGroups.length === 0) {
       syncCarePortLogs(false);
+    }
+  }
+  else if (tabId === 'carecall') {
+    if (typeof renderCareCallTargets === 'function') {
+      renderCareCallTargets();
     }
   }
   else if (tabId === 'claims') renderClaims();
@@ -38891,42 +38907,38 @@ window.gCarePortSelectedPatients = gCarePortSelectedPatients;
 window.gCarePortExpandedPatients = gCarePortExpandedPatients;
 var gCareLogViewMode = (function() {
   try {
-    return localStorage.getItem('LIVON_CARELOG_VIEW_MODE') || 'patient';
+    const saved = localStorage.getItem('LIVON_CARELOG_VIEW_MODE') || 'patient';
+    return saved === 'call' ? 'patient' : saved;
   } catch (_) {
     return 'patient';
   }
 })();
 
 function setCareLogViewMode(mode) {
+  if (mode === 'call') {
+    switchTab('carecall');
+    return;
+  }
   gCareLogViewMode = mode;
   try {
     localStorage.setItem('LIVON_CARELOG_VIEW_MODE', mode);
   } catch (_) {}
   const btnPatient = document.getElementById('btnViewModePatient');
   const btnFlat = document.getElementById('btnViewModeFlat');
-  const btnCall = document.getElementById('btnViewModeCall');
   const patientContainer = document.getElementById('careLogPatientCardsContainer');
   const flatContainer = document.getElementById('careLogTableContainer');
-  const callContainer = document.getElementById('careLogCallContainer');
 
   const inactiveBtnClass = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 cursor-pointer';
   if (btnPatient) btnPatient.className = inactiveBtnClass;
   if (btnFlat) btnFlat.className = inactiveBtnClass;
-  if (btnCall) btnCall.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all text-purple-700 hover:text-purple-900 hover:bg-purple-50 cursor-pointer font-bold';
 
   if (patientContainer) patientContainer.classList.add('hidden');
   if (flatContainer) flatContainer.classList.add('hidden');
-  if (callContainer) callContainer.classList.add('hidden');
 
   const defaultFilters = document.getElementById('careLogDefaultFilters');
   const defaultActions = document.getElementById('careLogDefaultActions');
-  if (mode === 'call') {
-    if (defaultFilters) defaultFilters.classList.add('hidden');
-    if (defaultActions) defaultActions.classList.add('hidden');
-  } else {
-    if (defaultFilters) defaultFilters.classList.remove('hidden');
-    if (defaultActions) defaultActions.classList.remove('hidden');
-  }
+  if (defaultFilters) defaultFilters.classList.remove('hidden');
+  if (defaultActions) defaultActions.classList.remove('hidden');
 
   if (mode === 'patient') {
     if (btnPatient) {
@@ -38934,16 +38946,6 @@ function setCareLogViewMode(mode) {
     }
     if (patientContainer) patientContainer.classList.remove('hidden');
     renderCareLogs();
-  } else if (mode === 'call') {
-    if (btnCall) {
-      btnCall.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer font-black border border-purple-200';
-    }
-    if (callContainer) callContainer.classList.remove('hidden');
-    // Ensure search input sync
-    const topInput = document.getElementById('careLogSearchInput');
-    const callInput = document.getElementById('careCallSearchInput');
-    if (topInput && callInput && topInput.value) callInput.value = topInput.value;
-    renderCareCallTargets();
   } else {
     // flat
     if (btnFlat) {
@@ -38959,8 +38961,6 @@ function setCareLogViewMode(mode) {
 // =========================================================================
 
 function handleCareCallSearchInput(val) {
-  const topInput = document.getElementById('careLogSearchInput');
-  if (topInput && topInput.value !== val) topInput.value = val;
   renderCareCallTargets();
 }
 
@@ -38998,7 +38998,7 @@ try {
         try {
           localStorage.setItem('LIVON_CARECALL_SAVED_RECORDINGS', JSON.stringify(gCareCallSavedRecordings));
         } catch (_) {}
-        if (typeof renderCareCallTargets === 'function' && gCareLogViewMode === 'call') {
+        if (typeof renderCareCallTargets === 'function' && (gActiveTab === 'carecall' || gCareLogViewMode === 'call')) {
           renderCareCallTargets();
         }
       }
@@ -41048,13 +41048,8 @@ function renderCareLogs() {
     window.gCarePortExpandedPatients = new Set();
   }
   const topInput = document.getElementById('careLogSearchInput');
-  const callInput = document.getElementById('careCallSearchInput');
   if (gCareLogViewMode === 'call') {
-    if (topInput && callInput && document.activeElement === topInput) {
-      callInput.value = topInput.value;
-    }
-    renderCareCallTargets();
-    return;
+    gCareLogViewMode = 'patient';
   }
   const query = (topInput?.value || '').trim().toLowerCase();
   const insFilter = document.getElementById('careLogInsuranceFilter')?.value || '삼성화재';
@@ -42347,13 +42342,13 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     const careLogList = document.getElementById('cpCareLogList');
     if (careLogList) {
       careLogList.innerHTML = d.careLogRows.map(r => `
-        <div class="flex items-start gap-3 py-2.5 px-2 border-b border-slate-100 last:border-0">
-          <span class="min-w-[85px] max-w-[115px] px-2 text-center text-xs font-black text-slate-800 bg-slate-100 py-1 rounded-md shrink-0 leading-tight">
+        <div class="flex items-center gap-3 py-2 px-2 border-b border-slate-100 last:border-0 min-h-[36px]">
+          <span class="min-w-[85px] max-w-[115px] px-2 text-center text-xs font-black text-slate-800 bg-slate-100 h-6 flex items-center justify-center rounded-md shrink-0 leading-none">
             ${r.label}
           </span>
-          <p class="text-xs text-slate-700 font-medium leading-relaxed flex-1 pt-0.5">
+          <div class="text-xs text-slate-700 font-medium leading-relaxed flex-1 flex items-center min-h-[24px]">
             ${r.value}
-          </p>
+          </div>
         </div>
       `).join('');
     }
@@ -42378,11 +42373,11 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     const guardianNotesGrid = document.getElementById('cpGuardianNotesGrid');
     if (guardianNotesGrid) {
       guardianNotesGrid.innerHTML = d.guardianNotes.map(g => `
-        <div class="flex items-baseline gap-2 text-xs leading-relaxed">
-          <span class="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0 mt-1"></span>
-          <span class="font-extrabold text-slate-900 w-14 shrink-0">${g.label}</span>
-          <span class="text-slate-300 font-bold">·</span>
-          <span class="text-slate-700 font-medium flex-1">${g.value}</span>
+        <div class="flex items-center gap-2 text-xs leading-relaxed min-h-[24px]">
+          <span class="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0"></span>
+          <span class="font-extrabold text-slate-900 w-14 shrink-0 flex items-center">${g.label}</span>
+          <span class="text-slate-300 font-bold shrink-0">·</span>
+          <span class="text-slate-700 font-medium flex-1 flex items-center">${g.value}</span>
         </div>
       `).join('');
     }
@@ -42544,7 +42539,7 @@ async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 12) 
       iframeDoc.head.appendChild(pLink);
     }
 
-    // 🚨 html2canvas 간병일지 토글/배지 글자 하단 쏠림 완벽 보정 (상하 수직 중앙 정렬)
+    // 🚨 html2canvas 간병일지 토글/배지 상하 수직 중앙 정렬 정규화
     targetEl.querySelectorAll('.careport-badge-pill, [id^="cpOverallToneBadge"], #cpCategoryCardsContainer span.inline-flex').forEach(pill => {
       pill.style.display = 'inline-flex';
       pill.style.alignItems = 'center';
@@ -42552,11 +42547,11 @@ async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 12) 
       Array.from(pill.childNodes).forEach(node => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           node.style.position = 'relative';
-          node.style.top = '-1.5px';
+          node.style.top = '0px';
         } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
           const wrap = iframeDoc.createElement('span');
           wrap.style.position = 'relative';
-          wrap.style.top = '-1.5px';
+          wrap.style.top = '0px';
           wrap.textContent = node.textContent;
           pill.replaceChild(wrap, node);
         }
@@ -42698,7 +42693,7 @@ async function renderElementToSinglePageA4PdfBytes(sourceElement, customMargin =
       iframeDoc.head.appendChild(pLink);
     }
 
-    // 🚨 html2canvas 간병일지 토글/배지 글자 하단 쏠림 완벽 보정 (상하 수직 중앙 정렬)
+    // 🚨 html2canvas 간병일지 토글/배지 상하 수직 중앙 정렬 정규화
     clone.querySelectorAll('.careport-badge-pill, [id^="cpOverallToneBadge"], #cpCategoryCardsContainer span.inline-flex').forEach(pill => {
       pill.style.display = 'inline-flex';
       pill.style.alignItems = 'center';
@@ -42706,11 +42701,11 @@ async function renderElementToSinglePageA4PdfBytes(sourceElement, customMargin =
       Array.from(pill.childNodes).forEach(node => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           node.style.position = 'relative';
-          node.style.top = '-1.5px';
+          node.style.top = '0px';
         } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
           const wrap = iframeDoc.createElement('span');
           wrap.style.position = 'relative';
-          wrap.style.top = '-1.5px';
+          wrap.style.top = '0px';
           wrap.textContent = node.textContent;
           pill.replaceChild(wrap, node);
         }
@@ -43097,9 +43092,10 @@ async function downloadPatientCareLogsPdfs(groupId) {
     .careport-badge-pill > strong {
       display: inline-flex !important;
       align-items: center !important;
+      justify-content: center !important;
       line-height: 1 !important;
       position: relative !important;
-      top: -1.5px !important;
+      top: 0 !important;
     }
     .careport-dot {
       display: inline-block !important;
@@ -43108,7 +43104,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
       flex-shrink: 0 !important;
       vertical-align: middle !important;
       position: relative !important;
-      top: -1.5px !important;
+      top: 0 !important;
     }
     .no-print { display: none !important; }
   </style>
@@ -44836,6 +44832,8 @@ var ADMIN_MENU_NAME_MAP = {
   carehub: '통합허브',
   carecalendar: '간병캘린더',
   carelogs: '간병일지(케어포트)',
+  carecall: 'AI간병통화',
+  surveymgmt: '만족도조사',
   directory: '인력/파트너',
   samsunglist: '삼성명단',
   samsungclaimhub: '삼성접수/청구',
