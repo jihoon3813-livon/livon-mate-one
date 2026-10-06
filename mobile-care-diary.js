@@ -546,6 +546,18 @@ function showSideMoreSheet() {
         </button>
       </div>
 
+      <div class="pdf-export-box" style="margin-top: 14px; background: #fdf4ff; border: 1px solid #f0abfc; border-radius: 14px; padding: 12px;">
+        <div style="font-size: 13px; font-weight: 700; color: #86198f; margin-bottom: 4px;">
+          📄 공식 간병 리포트 (A4 2장 규격)
+        </div>
+        <p style="font-size: 11px; color: var(--muted); margin: 0 0 8px;">
+          공식 문서 양식으로 완성된 A4 2페이지 리포트를 PDF로 내려받습니다.
+        </p>
+        <button type="button" class="btn-sms-copy" onclick="downloadCurrent2PagePdf()" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; border: none; box-shadow: 0 4px 10px rgba(124, 58, 237, 0.25);">
+          📥 2P 공식 PDF 다운로드
+        </button>
+      </div>
+
       <div class="side-foot" style="margin-top: 24px; text-align: center;">
         리본케어 · 케어포트<br>
         <span>회원 및 보호자 안심 모바일 케어 리포트</span>
@@ -618,6 +630,18 @@ function copyCurrentReportLink() {
     prompt('아래 링크를 복사하여 문자로 전송하세요:', url);
   });
 }
+
+/**
+ * 신규 표준 A4 2페이지 공식 간병 리포트 PDF 다운로드
+ */
+function downloadCurrent2PagePdf() {
+  const pName = (gPatientInfo && gPatientInfo.name) ? gPatientInfo.name : '고연분';
+  const rec = (Array.isArray(careRecords) && careRecords[selected]) ? careRecords[selected] : null;
+  const dayNum = rec ? (rec.dayIndex || (selected + 1)) : (selected + 1);
+  const url = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}&day=${encodeURIComponent(dayNum)}`;
+  window.open(url, '_blank');
+}
+window.downloadCurrent2PagePdf = downloadCurrent2PagePdf;
 
 function calendar() {
   const half = Math.min(14, careRecords.length);

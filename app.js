@@ -41528,6 +41528,12 @@ function renderCareLogPatientCards(groups) {
               <i data-lucide="smartphone" class="w-4 h-4 text-pink-600"></i>
               <span>모바일 일지</span>
             </button>
+            <button type="button" onclick="downloadCareReport2PagePdf('${group.id}')"
+              class="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+              title="신규 표준 A4 2페이지 공식 간병 리포트 PDF 다운로드">
+              <i data-lucide="file-check-2" class="w-4 h-4 text-indigo-600"></i>
+              <span>공식 리포트(2P)</span>
+            </button>
             <button type="button" onclick="openMobileCareDiarySmsModal('${group.id}')"
               class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
               title="회원/보호자에게 실제 이동통신사 문자(SMS/LMS) 즉시 발송">
@@ -41654,6 +41660,12 @@ function renderCareLogPatientCards(groups) {
                         <i data-lucide="smartphone" class="w-3 h-3 text-pink-600"></i>
                         <span>모바일</span>
                       </button>
+                      <button type="button" onclick="downloadCareReport2PagePdf('${group.id}', ${log.dayNumber || (idx + 1)})"
+                        class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+                        title="해당 일차 기준 신규 2P 공식 간병 리포트 PDF 다운로드">
+                        <i data-lucide="file-check-2" class="w-3 h-3 text-indigo-600"></i>
+                        <span>공식(2P)</span>
+                      </button>
                       <button type="button" onclick="openCarePortOfficialDetail('${sid}', ${log.dayNumber || (idx + 1)})"
                         class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
                         <i data-lucide="file-text" class="w-3 h-3"></i>
@@ -41765,6 +41777,12 @@ function renderCareLogFlatTable(filtered) {
               title="모바일 간병일지 열기">
               <i data-lucide="smartphone" class="w-3.5 h-3.5 text-pink-600"></i>
               <span>모바일</span>
+            </button>
+            <button type="button" onclick="downloadCareReport2PagePdf('${patientName}', ${log.dayNumber || 1})" 
+              class="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
+              title="신규 표준 A4 2페이지 공식 간병 리포트 PDF 다운로드">
+              <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-indigo-600"></i>
+              <span>공식(2P)</span>
             </button>
             <button type="button" onclick="openCarePortOfficialDetail('${sid || 0}')" 
               class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer">
@@ -42064,6 +42082,25 @@ function openMobileDiaryExternalTab() {
   const src = iframe?.getAttribute('src') || 'mobile-care-diary.html';
   window.open(src, '_blank');
 }
+
+/**
+ * 신규 표준 A4 2페이지 공식 간병 리포트 PDF 다운로드
+ * (hoon 폴더 고연분_모바일간병리포트_2페이지 디자인 완벽 1:1 반영 규격)
+ */
+function downloadCareReport2PagePdf(patientNameOrGroupId, dayNum = null) {
+  let pName = patientNameOrGroupId;
+  if (Array.isArray(gCarePortPatientGroups)) {
+    const group = gCarePortPatientGroups.find(g => g && (g.id === patientNameOrGroupId || g.patientName === patientNameOrGroupId));
+    if (group && group.patientName) pName = group.patientName;
+  }
+  if (!pName) pName = (typeof gCurrentMobileDiaryPatient !== 'undefined' && gCurrentMobileDiaryPatient) ? gCurrentMobileDiaryPatient : '고연분';
+  
+  const dayParam = dayNum ? `&day=${encodeURIComponent(dayNum)}` : '';
+  const url = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}${dayParam}`;
+  window.open(url, '_blank');
+}
+window.downloadCareReport2PagePdf = downloadCareReport2PagePdf;
+
 
 // =========================================================================
 // 모바일 간병일지 실제 문자(SMS/LMS) 발송 제어

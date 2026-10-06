@@ -38,3 +38,5 @@ vonage_private.key
 # carecall_*_config.json
 slack_config.json
 sms_dispatch_log.json
+generated_pdfs/
+

@@ -1600,6 +1600,39 @@ function saveSavedFaxConfig(cfg) {
       return mobileReportHandler(req, res);
     }
 
+    if (reqPath === '/api/careport/care-report-pdf') {
+      const parsedUrl = urlModule.parse(req.url, true);
+      const patientName = parsedUrl.query?.patient || parsedUrl.query?.name;
+      const dayParam = parsedUrl.query?.day;
+
+      const { fetchPatientMobileReport } = require('./api/careport/mobile-report');
+      const { generate2PageCareReportHtml } = require('./care-report-2page-pdf');
+      const generatePdf = require('./api/careport/generate-pdf');
+
+      (async () => {
+        try {
+          const report = await fetchPatientMobileReport(patientName);
+          if (!report) {
+            res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, message: '환자 간병일지 데이터를 찾을 수 없습니다.' }));
+          }
+
+          const selDay = dayParam ? parseInt(dayParam, 10) - 1 : null;
+          const html = generate2PageCareReportHtml(report.patientInfo, report.records, selDay);
+          const filename = `[케어포트_공식간병일지]_${report.patientInfo.name}_2페이지.pdf`;
+
+          req.method = 'POST';
+          req.body = { html, filename };
+          return generatePdf(req, res);
+        } catch (err) {
+          console.error('[Care Report PDF Error]', err);
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, message: err.message }));
+        }
+      })();
+      return;
+    }
+
     if (reqPath === '/api/careport/generate-pdf') {
       try { delete require.cache[require.resolve('./api/careport/generate-pdf')]; } catch(e) {}
       const pdfHandler = require('./api/careport/generate-pdf');

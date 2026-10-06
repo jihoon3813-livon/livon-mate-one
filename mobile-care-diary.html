@@ -51,6 +51,15 @@
         </button>
       </div>
 
+      <div class="pdf-export-box" style="margin-top: 14px; background: #fdf4ff; border: 1px solid #f0abfc; border-radius: 14px; padding: 12px;">
+        <div style="font-size: 12px; font-weight: 700; color: #86198f; margin-bottom: 6px;">
+          📄 공식 간병 리포트 (A4 2장)
+        </div>
+        <button type="button" class="btn-sms-copy" onclick="downloadCurrent2PagePdf()" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; border: none; box-shadow: 0 4px 10px rgba(124, 58, 237, 0.25); margin-bottom: 0;">
+          📥 2P 공식 PDF 다운로드
+        </button>
+      </div>
+
       <div class="side-foot">
         리본케어 · 케어포트<br>
         <span>기존 간병일지 기반 리디자인</span>
@@ -66,6 +75,10 @@
           <button class="mobile-more-btn" id="btn-side-more" aria-label="환자 정보 및 더보기" title="환자 정보 및 리포트 안내 더보기">
             <span data-icon="menu"></span>
             <span>더보기</span>
+          </button>
+          <button class="presentation" onclick="downloadCurrent2PagePdf()" title="A4 2페이지 공식 PDF 다운로드" style="background: #fdf4ff; border-color: #f0abfc; color: #86198f;">
+            <span data-icon="document"></span>
+            <span>2P PDF</span>
           </button>
           <button class="presentation" id="presentation" aria-pressed="false">
             <span data-icon="shield"></span>
