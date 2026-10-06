@@ -81,19 +81,82 @@ const classifications = [
   ['통증 없음', '관리 필요', '통증 호소']
 ];
 
+/**
+ * 안전한 단축 토큰 디코딩 (환자명 및 메타데이터 복원)
+ */
+function decodeSecureDiaryToken(tokenStr) {
+  if (!tokenStr) return null;
+  try {
+    let base64 = tokenStr.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) base64 += '=';
+    const decoded = decodeURIComponent(escape(atob(base64)));
+    if (decoded.startsWith('{') && decoded.endsWith('}')) {
+      const obj = JSON.parse(decoded);
+      return {
+        patient: obj.p || obj.patient || '',
+        carer: obj.c || obj.carer || '',
+        age: obj.a || obj.age || '',
+        gender: obj.g || obj.gender || '',
+        day: obj.d || obj.day || null
+      };
+    }
+    return { patient: decoded };
+  } catch (e) {
+    return null;
+  }
+}
+
 async function initFromQueryParams() {
   const params = new URLSearchParams(window.location.search);
-  const pName = params.get('patient') || params.get('name');
-  const carer = params.get('carer') || params.get('caregiver');
-  const age = params.get('age');
-  const gender = params.get('gender');
-  const dayParam = params.get('day');
+  let pName = params.get('patient') || params.get('name');
+  let carer = params.get('carer') || params.get('caregiver');
+  let age = params.get('age');
+  let gender = params.get('gender');
+  let dayParam = params.get('day');
+
+  // 단축 토큰(t, token, key) 또는 /d/:token 경로 확인
+  let token = params.get('t') || params.get('token') || params.get('k');
+  if (!token) {
+    const segments = window.location.pathname.split('/').filter(Boolean);
+    const dIdx = segments.indexOf('d');
+    if (dIdx !== -1 && segments[dIdx + 1]) {
+      token = segments[dIdx + 1];
+    }
+  }
+
+  if (token) {
+    const tokenData = decodeSecureDiaryToken(token);
+    if (tokenData) {
+      if (tokenData.patient) pName = tokenData.patient;
+      if (tokenData.carer) carer = tokenData.carer;
+      if (tokenData.age) age = tokenData.age;
+      if (tokenData.gender) gender = tokenData.gender;
+      if (tokenData.day) dayParam = tokenData.day;
+    }
+  }
 
   if (pName) {
     gPatientInfo.name = pName;
     if (carer) gPatientInfo.carerName = carer;
     if (age) gPatientInfo.age = age;
     if (gender) gPatientInfo.gender = gender;
+  }
+
+  // =========================================================================
+  // 모바일 브라우저 주소창 노출 완전 은닉 (Clean URL 마스킹)
+  // 접속 즉시 환자명 파라미터(?patient=...)를 지우고 깨끗한 /care-diary 로 치환
+  // =========================================================================
+  try {
+    if (window.history && window.history.replaceState) {
+      // iframe 내부가 아닐 때만 주소창 치환 수행 (iframe 내부에서 호출해도 안전)
+      window.history.replaceState(
+        { patient: pName || '고연분', masked: true },
+        document.title,
+        '/care-diary'
+      );
+    }
+  } catch (e) {
+    // cross-origin 또는 일부 환경 대비 무시
   }
 
   let loaded = false;

@@ -1936,6 +1936,10 @@ function saveSavedFaxConfig(cfg) {
           const message = payload.message || payload.text || payload.customMessage || '';
           const senderNumber = payload.senderNumber || payload.fromPhone || '16007835';
           const provider = payload.provider || 'barobill';
+          const channel = payload.channel || 'sms'; // 'sms' | 'kakao'
+          const buttonUrl = payload.buttonUrl || '';
+          const buttonTitle = payload.buttonTitle || '모바일 간병일지 열람하기';
+          const templateName = payload.templateName || '';
           const subject = payload.subject || '[리본케어] 모바일 간병일지 안내';
           const patientName = payload.patientName || '';
           const category = payload.category || 'CARE_DIARY_MOBILE';
@@ -1945,18 +1949,22 @@ function saveSavedFaxConfig(cfg) {
             return res.end(JSON.stringify({ success: false, error: '수신처 휴대폰 번호를 입력해주세요.' }));
           }
 
-          if (!message) {
+          if (!message && channel !== 'kakao') {
             res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify({ success: false, error: '발송할 메시지 내용을 입력해주세요.' }));
           }
 
-          console.log(`[SMS Send Request] Provider: ${provider}, To: ${toName}(${toPhone}), From: ${senderNumber}`);
+          console.log(`[Message Send Request] Channel: ${channel}, Provider: ${provider}, To: ${toName}(${toPhone}), From: ${senderNumber}`);
           const result = await dispatchSms({
             toPhone,
             toName,
             message,
             senderNumber,
             provider,
+            channel,
+            buttonUrl,
+            buttonTitle,
+            templateName,
             subject,
             patientName,
             category
@@ -1971,6 +1979,18 @@ function saveSavedFaxConfig(cfg) {
         }
       });
       return;
+    }
+
+    if (reqPath === '/api/kakao/channels' && req.method === 'GET') {
+      try {
+        const { getBarobillKakaoChannels } = require('./sms-service');
+        const data = await getBarobillKakaoChannels();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify(data));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: e.message }));
+      }
     }
 
     if (reqPath === '/api/sms/balance' && req.method === 'GET') {
@@ -2684,6 +2704,9 @@ function saveSavedFaxConfig(cfg) {
     }
 
     if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
+    if (reqPath === '/care-diary' || reqPath === '/report' || reqPath.startsWith('/d/')) {
+      reqPath = '/mobile-care-diary.html';
+    }
 
     const filePath = path.join(BASE_DIR, decodeURIComponent(reqPath));
 

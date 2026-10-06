@@ -41528,12 +41528,6 @@ function renderCareLogPatientCards(groups) {
               <i data-lucide="smartphone" class="w-4 h-4 text-pink-600"></i>
               <span>모바일 일지</span>
             </button>
-            <button type="button" onclick="downloadCareReport2PagePdf('${group.id}')"
-              class="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
-              title="신규 표준 A4 2페이지 공식 간병 리포트 PDF 다운로드">
-              <i data-lucide="file-check-2" class="w-4 h-4 text-indigo-600"></i>
-              <span>공식 리포트(2P)</span>
-            </button>
             <button type="button" onclick="openMobileCareDiarySmsModal('${group.id}')"
               class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
               title="회원/보호자에게 실제 이동통신사 문자(SMS/LMS) 즉시 발송">
@@ -41551,9 +41545,9 @@ function renderCareLogPatientCards(groups) {
               <span>${isExpanded ? '일지 접기' : `일자별 일지 펼치기 (${group.totalDays}건)`}</span>
             </button>
             <button type="button" onclick="downloadPatientCareLogsPdfs('${group.id}')"
-              class="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
-              title="해당 환자의 전체 일지를 1개의 통합 PDF 문서로 날짜별 연결하여 다운로드">
-              <i data-lucide="file-down" class="w-4 h-4 text-purple-600"></i>
+              class="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+              title="해당 환자의 공식 A4 2페이지 간병 리포트 PDF 다운로드">
+              <i data-lucide="file-check-2" class="w-4 h-4 text-indigo-600"></i>
               <span>전체 일지 PDF 다운로드</span>
             </button>
             <button type="button" onclick="attachCarePortLogsAndOpenEmail('${group.id}')"
@@ -41662,14 +41656,9 @@ function renderCareLogPatientCards(groups) {
                       </button>
                       <button type="button" onclick="downloadCareReport2PagePdf('${group.id}', ${log.dayNumber || (idx + 1)})"
                         class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
-                        title="해당 일차 기준 신규 2P 공식 간병 리포트 PDF 다운로드">
+                        title="해당 일차 기준 공식 2P 간병 리포트 PDF 다운로드">
                         <i data-lucide="file-check-2" class="w-3 h-3 text-indigo-600"></i>
                         <span>공식(2P)</span>
-                      </button>
-                      <button type="button" onclick="openCarePortOfficialDetail('${sid}', ${log.dayNumber || (idx + 1)})"
-                        class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
-                        <i data-lucide="file-text" class="w-3 h-3"></i>
-                        <span>원문(PDF)</span>
                       </button>
                     </div>
                   </div>
@@ -41780,14 +41769,9 @@ function renderCareLogFlatTable(filtered) {
             </button>
             <button type="button" onclick="downloadCareReport2PagePdf('${patientName}', ${log.dayNumber || 1})" 
               class="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
-              title="신규 표준 A4 2페이지 공식 간병 리포트 PDF 다운로드">
+              title="공식 A4 2페이지 간병 리포트 PDF 다운로드">
               <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-indigo-600"></i>
               <span>공식(2P)</span>
-            </button>
-            <button type="button" onclick="openCarePortOfficialDetail('${sid || 0}')" 
-              class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer">
-              <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
-              <span>CarePort 원본(PDF)</span>
             </button>
           </div>
         </td>
@@ -42050,28 +42034,51 @@ function toggleMobileDiaryFrameSize() {
   }
 }
 
+/**
+ * 환자명 및 파라미터 은닉용 안전한 Base64URL 단축 토큰 생성
+ */
+function generateSecureDiaryToken(patientName, extra = {}) {
+  try {
+    const payload = { p: patientName, ...extra, ts: Date.now() };
+    const jsonStr = JSON.stringify(payload);
+    return btoa(unescape(encodeURIComponent(jsonStr)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  } catch (e) {
+    return encodeURIComponent(patientName);
+  }
+}
+
+/**
+ * URL 주소창 및 문자 노출 방지용 깔끔한 안심 단축 링크 생성
+ */
+function getMobileCareDiaryCleanLink(patientName) {
+  const origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
+  const token = generateSecureDiaryToken(patientName);
+  return `${origin}/d/${token}`;
+}
+
 function copyCurrentMobileDiarySmsLink() {
   const pName = gCurrentMobileDiaryPatient || '고연분';
-  const origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
-  const link = `${origin}/mobile-care-diary.html?patient=${encodeURIComponent(pName)}`;
-  const smsText = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 돌봄 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 리포트 바로보기:\n${link}`;
+  const link = getMobileCareDiaryCleanLink(pName);
+  const smsText = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 돌봄 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 간병일지 열람:\n${link}`;
 
   navigator.clipboard.writeText(smsText).then(() => {
-    alert(`✅ [${pName} 님] 모바일 간병일지 문자 발송 문구가 복사되었습니다!\n\n${smsText}`);
+    alert(`✅ [${pName} 님] 보안 안심 단축 링크가 포함된 간병일지 문자 문구가 복사되었습니다!\n(환자 이름 및 파라미터가 URL에 노출되지 않습니다)\n\n${smsText}`);
   }).catch(() => {
-    prompt('아래 문자 발송용 링크를 복사하세요:', link);
+    prompt('아래 문자 발송용 안심 링크를 복사하세요:', link);
   });
 }
 
 function copyMobileCareDiarySms(groupId) {
   const patient = (gCarePortPatientGroups || []).find(g => g.id === groupId);
   const pName = patient ? patient.patientName : '고연분';
-  const origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
-  const link = `${origin}/mobile-care-diary.html?patient=${encodeURIComponent(pName)}`;
-  const smsText = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 돌봄 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 리포트 바로보기:\n${link}`;
+  const link = getMobileCareDiaryCleanLink(pName);
+  const smsText = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 돌봄 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 간병일지 열람:\n${link}`;
 
   navigator.clipboard.writeText(smsText).then(() => {
-    alert(`✅ [${pName} 님] 모바일 간병일지 문자 발송 문구가 클립보드에 복사되었습니다!\n보호자 알림톡 또는 SMS에 그대로 붙여넣기 하실 수 있습니다.`);
+    alert(`✅ [${pName} 님] 모바일 간병일지 문자 발송 문구가 클립보드에 복사되었습니다!\n보안 단축 링크가 적용되어 환자 정보가 URL에 노출되지 않습니다.`);
   }).catch(() => {
     prompt('아래 링크를 복사하여 문자로 전송하세요:', link);
   });
@@ -42103,9 +42110,86 @@ window.downloadCareReport2PagePdf = downloadCareReport2PagePdf;
 
 
 // =========================================================================
-// 모바일 간병일지 실제 문자(SMS/LMS) 발송 제어
+// 모바일 간병일지 실제 발송 제어 (카카오 알림톡 & 바로빌 문자)
 // =========================================================================
 let gCurrentSmsTargetGroup = null;
+
+function switchDiarySendChannel(channel) {
+  const channelInput = document.getElementById('smsSendChannel');
+  const tabKakao = document.getElementById('tabChannelKakao');
+  const tabSms = document.getElementById('tabChannelSms');
+  const previewSection = document.getElementById('kakaoPreviewSection');
+  const msgLabel = document.getElementById('smsMessageLabel');
+  const typeBadge = document.getElementById('smsTypeBadge');
+  const helpText = document.getElementById('smsByteHelpText');
+  const submitBtn = document.getElementById('btnSubmitRealSms');
+  const submitTxt = document.getElementById('txtSubmitRealSms');
+  const icon = document.getElementById('iconSubmitRealSms');
+  const messageInput = document.getElementById('smsMessageContent');
+  const nameInput = document.getElementById('smsTargetPatientName');
+
+  const pName = nameInput?.value?.replace(' 님', '')?.trim() || (gCurrentMobileDiaryPatient || '고연분');
+  const cleanLink = getMobileCareDiaryCleanLink(pName);
+
+  if (channelInput) channelInput.value = channel;
+
+  if (channel === 'kakao') {
+    // 카카오 알림톡 모드
+    if (tabKakao) {
+      tabKakao.className = 'py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all bg-[#FEE500] text-[#191919] shadow-sm';
+    }
+    if (tabSms) {
+      tabSms.className = 'py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-slate-600 hover:text-slate-900';
+    }
+    if (previewSection) previewSection.classList.remove('hidden');
+    if (msgLabel) msgLabel.innerText = '알림톡 본문 내용';
+    if (typeBadge) {
+      typeBadge.innerText = '카카오 알림톡';
+      typeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900';
+    }
+    if (helpText) {
+      helpText.innerText = '※ 알림톡 발송 시 URL 주소 없이 카카오톡 공식 링크 버튼으로 안전하게 전달됩니다.';
+    }
+    if (submitBtn) {
+      submitBtn.className = 'px-5 py-2.5 rounded-xl bg-[#FEE500] hover:bg-[#FDD800] text-[#191919] font-black text-xs flex items-center gap-1.5 shadow-md transition-all cursor-pointer active:scale-95';
+    }
+    if (submitTxt) submitTxt.innerText = '카카오 알림톡 즉시 발송';
+
+    // 카카오톡 본문: URL 텍스트 없이 버튼으로 열람하도록 안내
+    if (messageInput) {
+      messageInput.value = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 전문 돌봄 기록과 상태 변화를 확인해 보세요.\n\n아래 [모바일 간병일지 열람하기] 버튼을 누르시면 안전하게 간병일지를 확인하실 수 있습니다.`;
+    }
+  } else {
+    // 일반 안심 문자 모드
+    if (tabKakao) {
+      tabKakao.className = 'py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-slate-600 hover:text-slate-900';
+    }
+    if (tabSms) {
+      tabSms.className = 'py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all bg-rose-600 text-white shadow-sm';
+    }
+    if (previewSection) previewSection.classList.add('hidden');
+    if (msgLabel) msgLabel.innerText = '문자 발송 내용';
+    if (typeBadge) {
+      typeBadge.innerText = '안심 문자 (LMS)';
+      typeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800';
+    }
+    if (helpText) {
+      helpText.innerHTML = '※ 90 Byte 이하는 <b>단문(SMS)</b>, 91~2,000 Byte는 <b>장문(LMS)</b>으로 자동 변환되어 전송됩니다.';
+    }
+    if (submitBtn) {
+      submitBtn.className = 'px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-rose-900/30 transition-all cursor-pointer active:scale-95';
+    }
+    if (submitTxt) submitTxt.innerText = '안심 문자 즉시 발송';
+
+    // 문자 본문: 환자명이 드러나지 않는 보안 단축 안심 링크 삽입
+    if (messageInput) {
+      messageInput.value = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 돌봄 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 간병일지 열람:\n${cleanLink}`;
+    }
+  }
+  updateSmsByteCountDisplay();
+  if (typeof initIcons === 'function') initIcons();
+}
+window.switchDiarySendChannel = switchDiarySendChannel;
 
 async function openMobileCareDiarySmsModal(groupId) {
   const modal = document.getElementById('mobileCareDiarySmsModal');
@@ -42132,7 +42216,6 @@ async function openMobileCareDiarySmsModal(groupId) {
   const nameInput = document.getElementById('smsTargetPatientName');
   const recipientInput = document.getElementById('smsRecipientName');
   const phoneInput = document.getElementById('smsRecipientPhone');
-  const messageInput = document.getElementById('smsMessageContent');
   const statusBox = document.getElementById('smsSendStatusBox');
 
   if (nameInput) nameInput.value = `${pName} 님`;
@@ -42140,14 +42223,8 @@ async function openMobileCareDiarySmsModal(groupId) {
   if (phoneInput) phoneInput.value = formatPhoneNumberStr(phone);
   if (statusBox) statusBox.classList.add('hidden');
 
-  const origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
-  const reportLink = `${origin}/mobile-care-diary.html?patient=${encodeURIComponent(pName)}`;
-  const defaultText = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 돌봄 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 리포트 바로보기:\n${reportLink}`;
-
-  if (messageInput) {
-    messageInput.value = defaultText;
-    updateSmsByteCountDisplay();
-  }
+  // 기본 채널을 카카오 알림톡으로 세팅
+  switchDiarySendChannel('kakao');
 
   // 잔여 포인트 실시간 확인
   fetch('/api/sms/balance')
@@ -42201,19 +42278,28 @@ function updateSmsByteCountDisplay() {
   const textarea = document.getElementById('smsMessageContent');
   const countBadge = document.getElementById('smsByteCountBadge');
   const typeBadge = document.getElementById('smsTypeBadge');
+  const channel = document.getElementById('smsSendChannel')?.value || 'kakao';
   if (!textarea || !countBadge) return;
 
   const bytes = calcKoreanByteLength(textarea.value || '');
   const isLms = bytes > 90;
 
-  countBadge.innerText = `${bytes} / ${isLms ? '2,000' : '90'} Byte`;
-  if (typeBadge) {
-    if (isLms) {
-      typeBadge.innerText = '장문 (LMS)';
-      typeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800';
-    } else {
-      typeBadge.innerText = '단문 (SMS)';
-      typeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800';
+  if (channel === 'kakao') {
+    countBadge.innerText = `${bytes} Byte`;
+    if (typeBadge) {
+      typeBadge.innerText = '카카오 알림톡';
+      typeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900';
+    }
+  } else {
+    countBadge.innerText = `${bytes} / ${isLms ? '2,000' : '90'} Byte`;
+    if (typeBadge) {
+      if (isLms) {
+        typeBadge.innerText = '장문 (LMS)';
+        typeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800';
+      } else {
+        typeBadge.innerText = '단문 (SMS)';
+        typeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800';
+      }
     }
   }
 }
@@ -42228,6 +42314,7 @@ async function handleRealSmsSubmit(e) {
   const providerSelect = document.getElementById('smsProviderSelect');
   const messageInput = document.getElementById('smsMessageContent');
   const statusBox = document.getElementById('smsSendStatusBox');
+  const channel = document.getElementById('smsSendChannel')?.value || 'kakao';
   const submitBtn = document.getElementById('btnSubmitRealSms');
   const submitTxt = document.getElementById('txtSubmitRealSms');
   const submitIcon = document.getElementById('iconSubmitRealSms');
@@ -42238,6 +42325,9 @@ async function handleRealSmsSubmit(e) {
   const senderNumber = senderSelect?.value || '16007835';
   const provider = providerSelect?.value || 'barobill';
   const message = messageInput?.value?.trim();
+
+  // 안전 단축 URL 생성 (환자 이름 및 파라미터 은닉)
+  const cleanLink = getMobileCareDiaryCleanLink(patientName);
 
   if (!toPhone || toPhone.replace(/\D/g, '').length < 10) {
     alert('수신처 휴대폰 번호(010-0000-0000)를 정확히 입력해 주세요.');
@@ -42253,11 +42343,11 @@ async function handleRealSmsSubmit(e) {
 
   // 발송 진행 UI
   if (submitBtn) submitBtn.disabled = true;
-  if (submitTxt) submitTxt.innerText = '통신망 발송 전송 중...';
+  if (submitTxt) submitTxt.innerText = channel === 'kakao' ? '카카오 알림톡 발송 중...' : '통신망 발송 전송 중...';
   if (submitIcon) submitIcon.classList.add('animate-spin');
   if (statusBox) {
-    statusBox.className = 'p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2';
-    statusBox.innerHTML = '<span class="w-3 h-3 rounded-full bg-rose-500 animate-pulse"></span> 통신사 회선으로 문자 메시지를 전송하고 있습니다. 잠시만 기다려주세요...';
+    statusBox.className = 'p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs flex items-center gap-2';
+    statusBox.innerHTML = `<span class="w-3 h-3 rounded-full ${channel === 'kakao' ? 'bg-amber-500' : 'bg-rose-500'} animate-pulse"></span> 바로빌 통신망을 통해 ${channel === 'kakao' ? '카카오 알림톡' : '문자 메시지'}를 전송하고 있습니다...`;
     statusBox.classList.remove('hidden');
   }
 
@@ -42271,6 +42361,9 @@ async function handleRealSmsSubmit(e) {
         patientName,
         senderNumber,
         provider,
+        channel,
+        buttonUrl: cleanLink,
+        buttonTitle: '모바일 간병일지 열람하기',
         message,
         category: 'CARE_DIARY_MOBILE'
       })
@@ -42280,25 +42373,32 @@ async function handleRealSmsSubmit(e) {
     if (data.success) {
       if (statusBox) {
         statusBox.className = 'p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs';
-        statusBox.innerHTML = `✅ <b>문자 발송 성공!</b> (접수번호: ${data.receiptNum}, 회선: ${data.provider.toUpperCase()}, 유형: ${data.sendType})`;
+        const typeLabel = data.sendType === 'KAKAO_ALIMTALK' ? '카카오 알림톡' : (data.sendType?.includes('FALLBACK') ? '안심 문자(대체 발송)' : data.sendType);
+        statusBox.innerHTML = `✅ <b>발송 성공!</b> (접수번호: ${data.receiptNum}, 채널: ${typeLabel})`;
       }
-      alert(`🎉 [${patientName || toName} 님] 모바일 간병일지 문자가 실제 발송되었습니다!\n\n• 수신번호: ${toPhone}\n• 발송회선: ${data.provider === 'barobill' ? '바로빌 국내 3사 직결' : 'Twilio SMS'}\n• 전송유형: ${data.sendType} (${data.byteLength || 0} Byte)\n• 접수번호: ${data.receiptNum}`);
+      
+      let noticeMsg = '';
+      if (data.fallbackUsed && data.notice) {
+        noticeMsg = `\n\n📌 안내: ${data.notice}`;
+      }
+
+      alert(`🎉 [${patientName || toName} 님] 모바일 간병일지가 성공적으로 발송되었습니다!\n\n• 수신번호: ${toPhone}\n• 발송방식: ${data.sendType === 'KAKAO_ALIMTALK' ? '💬 카카오 알림톡 (URL 노출 없는 공식 버튼)' : '📱 바로빌 안심 문자 (단축 보안 링크)'}\n• 접수번호: ${data.receiptNum}${noticeMsg}`);
       setTimeout(() => {
         closeMobileCareDiarySmsModal();
       }, 700);
     } else {
-      throw new Error(data.error || '문자 발송 처리에 실패했습니다.');
+      throw new Error(data.error || '메시지 발송 처리에 실패했습니다.');
     }
   } catch (err) {
-    console.error('[SMS Dispatch Error]', err);
+    console.error('[Dispatch Error]', err);
     if (statusBox) {
       statusBox.className = 'p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs';
       statusBox.innerHTML = `❌ <b>발송 실패:</b> ${err.message}`;
     }
-    alert(`❌ 문자 발송 실패\n${err.message}`);
+    alert(`❌ 발송 실패\n${err.message}`);
   } finally {
     if (submitBtn) submitBtn.disabled = false;
-    if (submitTxt) submitTxt.innerText = '실제 문자 즉시 발송';
+    if (submitTxt) submitTxt.innerText = channel === 'kakao' ? '카카오 알림톡 즉시 발송' : '안심 문자 즉시 발송';
     if (submitIcon) submitIcon.classList.remove('animate-spin');
   }
 }
@@ -43745,6 +43845,74 @@ async function generateDailyLogPdfBlob(patient, log, detailData = null) {
  * (2차 fallback: 외부 폰트 중복 로딩 제거 & 1-by-1 비동기 렌더링으로 브라우저 프리징 완전 제거)
  */
 async function downloadPatientCareLogsPdfs(groupId) {
+  let patient = (gCarePortPatientGroups || []).find(g => g && (g.id === groupId || g.patientName === groupId));
+  const pName = patient ? patient.patientName : groupId;
+  if (!pName) {
+    alert('환자 정보를 찾을 수 없습니다.');
+    return;
+  }
+
+  showGlobalProgress({
+    title: `[${pName} 님] 공식 간병일지(A4 2P) PDF 다운로드`,
+    subtitle: `표준 A4 2페이지 공식 간병 리포트 생성 중...`,
+    percent: 30,
+    statusText: `공식 2P PDF 실시간 생성 요청 중...`,
+    icon: 'file-check-2'
+  });
+
+  try {
+    const url = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}`;
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      throw new Error(`PDF 생성 서버 오류 (HTTP ${resp.status})`);
+    }
+
+    updateGlobalProgress({
+      percent: 75,
+      statusText: `PDF 파일 스트리밍 완료! 다운로드 준비 중...`
+    });
+
+    const blob = await resp.blob();
+    const fileName = `[케어포트_공식간병일지]_${pName}_2페이지.pdf`;
+
+    // 시스템 내 고객별 일지 저장소(청구/이메일 연계)에 공식 2P PDF 자동 보관
+    const targetApplyId = patient?.applyId || (gApps && gApps.find(a => a.patientName === pName)?.id);
+    if (targetApplyId) {
+      const arrayBuffer = await blob.arrayBuffer();
+      window.gSamsungCustomerCareLogFiles = window.gSamsungCustomerCareLogFiles || {};
+      window.gSamsungCustomerCareLogFiles[targetApplyId] = [{
+        name: fileName,
+        size: blob.size,
+        bytes: new Uint8Array(arrayBuffer),
+        date: new Date().toISOString()
+      }];
+    }
+
+    updateGlobalProgress({
+      percent: 100,
+      statusText: `✨ 공식 간병 리포트(2P) 다운로드 완료!`
+    });
+
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    hideGlobalProgress(350);
+    return;
+  } catch (err) {
+    console.error('공식 2P 일지 PDF 다운로드 실패:', err);
+    hideGlobalProgress();
+    // Fallback: 새 탭에서 즉시 열기
+    window.open(`/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}`, '_blank');
+    return;
+  }
+}
+
+async function legacyDownloadPatientCareLogsPdfs(groupId) {
   const patient = (gCarePortPatientGroups || []).find(g => g.id === groupId);
   if (!patient) return;
 

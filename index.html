@@ -4016,9 +4016,9 @@
           <div id="careLogDefaultActions" class="flex items-center gap-2">
             <button type="button" onclick="batchDownloadSelectedPatientPdfs()" id="btnBatchDownloadZips" disabled 
               class="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
-              title="선택된 환자들의 전체 간병일지를 환자별 1개의 통합 PDF 문서로 다운로드합니다">
+              title="선택된 환자들의 공식 A4 2페이지 간병 리포트 PDF를 다운로드합니다">
               <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
-              <span>선택 환자 일지 PDF 다운로드</span>
+              <span>선택 환자 일지 PDF(2P) 다운로드</span>
             </button>
             <button type="button" onclick="exportLedgerToExcel('carelogs', 'ALL')" 
               class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer">
@@ -4049,7 +4049,7 @@
                   <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">소속기관</th>
                   <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">상담일시</th>
                   <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800 text-center w-20">상담시간</th>
-                  <th class="p-2.5 font-extrabold text-purple-900 text-center w-44">공식 간병일지 (CarePort 원본)</th>
+                  <th class="p-2.5 font-extrabold text-purple-900 text-center w-36">공식 간병일지 (2P PDF)</th>
                 </tr>
               </thead>
               <tbody id="careLogsTableBody" class="divide-y divide-slate-100 bg-white">
@@ -4149,9 +4149,9 @@
           <div id="careLogDefaultActions_new" class="flex items-center gap-2">
             <button type="button" onclick="batchDownloadSelectedPatientPdfs()" id="btnBatchDownloadZips_new" disabled 
               class="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
-              title="선택된 환자들의 전체 간병일지를 환자별 1개의 통합 PDF 문서로 다운로드합니다">
+              title="선택된 환자들의 공식 A4 2페이지 간병 리포트 PDF를 다운로드합니다">
               <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
-              <span>선택 환자 일지 PDF 다운로드</span>
+              <span>선택 환자 일지 PDF(2P) 다운로드</span>
             </button>
             <button type="button" onclick="exportLedgerToExcel('carelogs', 'ALL')" 
               class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer">
@@ -4182,7 +4182,7 @@
                   <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">소속기관</th>
                   <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">상담일시</th>
                   <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800 text-center w-20">상담시간</th>
-                  <th class="p-2.5 font-extrabold text-purple-900 text-center w-44">공식 간병일지 (CarePort 원본)</th>
+                  <th class="p-2.5 font-extrabold text-purple-900 text-center w-36">공식 간병일지 (2P PDF)</th>
                 </tr>
               </thead>
               <tbody id="careLogsTableBody_new" class="divide-y divide-slate-100 bg-white">
@@ -12775,21 +12775,21 @@
   <div id="mobileCareDiarySmsModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 hidden">
     <div class="bg-white rounded-3xl max-w-lg w-full max-h-[96vh] flex flex-col shadow-2xl border border-slate-300 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
       <!-- Header -->
-      <div class="px-5 py-4 bg-gradient-to-r from-rose-900 via-pink-900 to-slate-900 text-white flex items-center justify-between border-b border-rose-800/40 shrink-0">
+      <div class="px-5 py-4 bg-gradient-to-r from-amber-900 via-rose-950 to-slate-900 text-white flex items-center justify-between border-b border-rose-800/40 shrink-0">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-rose-600 flex items-center justify-center text-white font-black shadow-md shrink-0">
-            <i data-lucide="send" class="w-5 h-5"></i>
+          <div id="smsModalHeaderIcon" class="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-md shrink-0">
+            <i data-lucide="message-square" class="w-5 h-5"></i>
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-rose-500/30 text-rose-200 border border-rose-400/30">
-                Real SMS Dispatch
+              <span id="smsModalTypeBadge" class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-400/30 text-amber-200 border border-amber-400/30">
+                Barobill Messaging
               </span>
               <span id="smsModalBalanceBadge" class="text-xs font-bold text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-500/30">
                 바로빌 잔여: 조회중
               </span>
             </div>
-            <h3 class="text-base font-black text-white">모바일 간병일지 실제 문자 발송</h3>
+            <h3 id="smsModalTitle" class="text-base font-black text-white">모바일 간병일지 발송 (알림톡 & 안심 문자)</h3>
           </div>
         </div>
         <button type="button" onclick="closeMobileCareDiarySmsModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer">
@@ -12799,6 +12799,22 @@
 
       <!-- Form Body -->
       <form id="mobileDiarySmsForm" onsubmit="handleRealSmsSubmit(event)" class="p-5 overflow-y-auto space-y-4 text-xs">
+        
+        <!-- 발송 채널 선택 탭 (카카오 알림톡 vs 일반 문자) -->
+        <div>
+          <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200">
+            <button type="button" id="tabChannelKakao" onclick="switchDiarySendChannel('kakao')" class="py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all bg-[#FEE500] text-[#191919] shadow-sm">
+              <span class="w-2 h-2 rounded-full bg-amber-600"></span>
+              💬 카카오 알림톡 (URL 완전 은닉)
+            </button>
+            <button type="button" id="tabChannelSms" onclick="switchDiarySendChannel('sms')" class="py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-slate-600 hover:text-slate-900">
+              <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+              📱 일반 안심 문자 (단축 링크)
+            </button>
+          </div>
+          <input type="hidden" id="smsSendChannel" value="kakao">
+        </div>
+
         <!-- 환자 및 수신자 정보 -->
         <div class="grid grid-cols-2 gap-3">
           <div>
@@ -12838,19 +12854,49 @@
           </div>
         </div>
 
+        <!-- 카카오 알림톡 모드 안내 및 버튼 링크 프리뷰 -->
+        <div id="kakaoPreviewSection" class="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-2xl space-y-2.5">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-1.5 font-bold text-amber-900">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-amber-600 shrink-0"></i>
+              <span>URL 노출 없는 카카오 공식 버튼 전송</span>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 bg-amber-200/80 text-amber-800 rounded-full">안심 보안</span>
+          </div>
+          <p class="text-[11px] text-amber-800 leading-relaxed">
+            문자 본문에 지저분한 URL이 전혀 노출되지 않으며, 카카오 공식 <b>[모바일 간병일지 열람하기]</b> 버튼이 첨부되어 스팸 오인을 원천 차단합니다.
+          </p>
+          <div class="bg-white p-3 rounded-xl border border-amber-200/70 flex items-center justify-between text-[11px]">
+            <span class="text-slate-600 font-bold">첨부 버튼 명칭:</span>
+            <span class="font-bold text-amber-900 bg-amber-100/70 px-2.5 py-1 rounded-lg">모바일 간병일지 열람하기 ↗</span>
+          </div>
+          <div class="flex items-center gap-2 pt-0.5">
+            <input type="checkbox" id="kakaoFallbackSmsCheckbox" checked class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 border-slate-300">
+            <label for="kakaoFallbackSmsCheckbox" class="text-[11px] text-slate-600 font-medium cursor-pointer">
+              카카오톡 미수신 시 바로빌 안심 문자로 자동 대체 발송 (Fallback)
+            </label>
+          </div>
+        </div>
+
         <!-- 메시지 본문 -->
         <div>
           <div class="flex items-center justify-between mb-1">
-            <label class="font-bold text-slate-700">발송 메시지 내용</label>
+            <label class="font-bold text-slate-700" id="smsMessageLabel">알림톡 본문 내용</label>
             <div class="flex items-center gap-2 text-[11px]">
               <span id="smsByteCountBadge" class="font-mono font-bold text-slate-600">0 Byte</span>
-              <span id="smsTypeBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">단문 (SMS)</span>
+              <span id="smsTypeBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900">알림톡 (Alimtalk)</span>
             </div>
           </div>
-          <textarea id="smsMessageContent" required rows="6" oninput="updateSmsByteCountDisplay()" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-2xl font-sans text-xs text-slate-800 leading-relaxed focus:bg-white focus:ring-2 focus:ring-rose-500 focus:outline-none"></textarea>
-          <p class="text-[11px] text-slate-400 mt-1">
-            ※ 90 Byte 이하는 <b>단문(SMS)</b>, 91~2,000 Byte는 <b>장문(LMS)</b>으로 자동 변환되어 전송됩니다.
+          <textarea id="smsMessageContent" required rows="5" oninput="updateSmsByteCountDisplay()" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-2xl font-sans text-xs text-slate-800 leading-relaxed focus:bg-white focus:ring-2 focus:ring-rose-500 focus:outline-none"></textarea>
+          <p id="smsByteHelpText" class="text-[11px] text-slate-400 mt-1">
+            ※ 알림톡 발송 시 URL 주소 없이 카카오톡 공식 링크 버튼으로 안전하게 전달됩니다.
           </p>
+        </div>
+
+        <!-- 주소창 마스킹 안심 보장 뱃지 -->
+        <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70 flex items-center gap-2 text-[11px] text-slate-600">
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+          <span><b>주소창 개인정보 보호:</b> 열람 시 브라우저 상단 주소창에서 환자 이름 및 파라미터가 즉시 자동 은닉됩니다.</span>
         </div>
 
         <!-- 발송 상태 안내 박스 -->
@@ -12867,9 +12913,9 @@
             <button type="button" onclick="closeMobileCareDiarySmsModal()" class="px-4 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition-all cursor-pointer">
               취소
             </button>
-            <button type="submit" id="btnSubmitRealSms" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-rose-900/30 transition-all cursor-pointer active:scale-95">
-              <i data-lucide="send" id="iconSubmitRealSms" class="w-4 h-4"></i>
-              <span id="txtSubmitRealSms">실제 문자 즉시 발송</span>
+            <button type="submit" id="btnSubmitRealSms" class="px-5 py-2.5 rounded-xl bg-[#FEE500] hover:bg-[#FDD800] text-[#191919] font-black text-xs flex items-center gap-1.5 shadow-md transition-all cursor-pointer active:scale-95">
+              <i data-lucide="send" id="iconSubmitRealSms" class="w-4 h-4 text-[#191919]"></i>
+              <span id="txtSubmitRealSms">카카오 알림톡 즉시 발송</span>
             </button>
           </div>
         </div>

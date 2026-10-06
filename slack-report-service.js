@@ -14,7 +14,7 @@ function getSlackConfig() {
   const defaultConfig = {
     webhookUrl: process.env.SLACK_WEBHOOK_URL || '',
     channelName: '#수행_2024_livon_careport_device-alert',
-    enabled: true,
+    enabled: false,
     schedules: ['09:00', '18:00'],
     lastSentAt: null,
     dashboardUrl: 'http://localhost:8080'

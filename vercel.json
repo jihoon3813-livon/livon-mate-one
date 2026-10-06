@@ -12,6 +12,18 @@
       "destination": "/api/carecall/turn-audio?encoded=:encoded"
     },
     {
+      "source": "/care-diary",
+      "destination": "/mobile-care-diary.html"
+    },
+    {
+      "source": "/d/:token",
+      "destination": "/mobile-care-diary.html"
+    },
+    {
+      "source": "/report",
+      "destination": "/mobile-care-diary.html"
+    },
+    {
       "source": "/mate/survey",
       "destination": "/mate-survey.html"
     },
