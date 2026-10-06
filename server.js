@@ -1606,6 +1606,7 @@ function saveSavedFaxConfig(cfg) {
       const dayParam = parsedUrl.query?.day;
 
       const { fetchPatientMobileReport } = require('./api/careport/mobile-report');
+      try { delete require.cache[require.resolve('./care-report-2page-pdf')]; } catch(e) {}
       const { generate2PageCareReportHtml } = require('./care-report-2page-pdf');
       const generatePdf = require('./api/careport/generate-pdf');
 
