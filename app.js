@@ -41654,6 +41654,12 @@ function renderCareLogPatientCards(groups) {
                         <i data-lucide="smartphone" class="w-3 h-3 text-pink-600"></i>
                         <span>모바일</span>
                       </button>
+                      <button type="button" onclick="openCareReport2PageModal('${group.id}', ${log.dayNumber || (idx + 1)})"
+                        class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+                        title="공식 A4 2페이지 간병 리포트 미리보기 모달 열기">
+                        <i data-lucide="file-check-2" class="w-3 h-3 text-indigo-600"></i>
+                        <span>공식(2P)</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -41752,14 +41758,20 @@ function renderCareLogFlatTable(filtered) {
         <td class="p-2.5 text-center font-mono text-purple-700 font-bold border-r border-slate-100">
           ${duration}
         </td>
-        <!-- 모바일 간병일지 열람 -->
+        <!-- 간병일지 열람 (모바일 및 공식 2P 미리보기) -->
         <td class="p-2.5 text-center">
           <div class="inline-flex items-center gap-1.5 justify-center flex-wrap">
             <button type="button" onclick="openMobileCareDiaryPreview('${patientName}', ${log.dayNumber || 1})" 
               class="px-2.5 py-1.5 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
               title="모바일 간병일지 열기">
               <i data-lucide="smartphone" class="w-3.5 h-3.5 text-pink-600"></i>
-              <span>모바일 일지</span>
+              <span>모바일</span>
+            </button>
+            <button type="button" onclick="openCareReport2PageModal('${patientName}', ${log.dayNumber || 1})" 
+              class="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
+              title="공식 A4 2페이지 간병 리포트 미리보기 모달 열기">
+              <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-indigo-600"></i>
+              <span>공식(2P)</span>
             </button>
           </div>
         </td>
@@ -42095,6 +42107,102 @@ function downloadCareReport2PagePdf(patientNameOrGroupId, dayNum = null) {
   window.open(url, '_blank');
 }
 window.downloadCareReport2PagePdf = downloadCareReport2PagePdf;
+
+/**
+ * 신규 표준 A4 2페이지 공식 간병 리포트 미리보기 모달 열기
+ * (원문 PDF 모달처럼 화면에 직접 팝업 띄워 1~2P 검토, 인쇄, PDF 다운로드 제공)
+ */
+function openCareReport2PageModal(patientNameOrGroupId, dayNum = null) {
+  let pName = patientNameOrGroupId;
+  let targetGroup = null;
+  if (Array.isArray(gCarePortPatientGroups)) {
+    targetGroup = gCarePortPatientGroups.find(g => g && (g.id === patientNameOrGroupId || g.patientName === patientNameOrGroupId));
+    if (targetGroup && targetGroup.patientName) pName = targetGroup.patientName;
+  }
+  if (!pName) pName = (typeof gCurrentMobileDiaryPatient !== 'undefined' && gCurrentMobileDiaryPatient) ? gCurrentMobileDiaryPatient : '고연분';
+
+  window._current2PageModalPatient = pName;
+  window._current2PageModalGroupId = targetGroup?.id || patientNameOrGroupId;
+  window._current2PageModalDayNum = dayNum;
+
+  const modal = document.getElementById('careReport2PageModal');
+  if (!modal) {
+    // Fallback: 새 창에서 열기
+    return downloadCareReport2PagePdf(pName, dayNum);
+  }
+
+  const titleEl = document.getElementById('careReport2PageModalTitle');
+  if (titleEl) {
+    const maskedName = typeof maskName === 'function' ? maskName(pName) : pName;
+    const dayLabel = dayNum ? ` · ${dayNum}일차` : '';
+    titleEl.innerText = `[${maskedName} 님] 공식 2페이지 간병 리포트 미리보기${dayLabel}`;
+  }
+
+  const badgeEl = document.getElementById('careReport2PageSessionBadge');
+  if (badgeEl) {
+    badgeEl.innerText = targetGroup?.id ? `#${targetGroup.id}` : '#A4-2Page';
+  }
+
+  const dayParam = dayNum ? `&day=${encodeURIComponent(dayNum)}` : '';
+  const pdfUrl = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}${dayParam}`;
+  window._current2PageModalPdfUrl = pdfUrl;
+
+  const loadingEl = document.getElementById('careReport2PageLoading');
+  if (loadingEl) loadingEl.classList.remove('hidden');
+
+  const iframe = document.getElementById('careReport2PagePreviewFrame');
+  if (iframe) {
+    iframe.src = 'about:blank';
+    setTimeout(() => {
+      iframe.src = `${pdfUrl}#toolbar=0&view=FitH`;
+      iframe.onload = () => {
+        if (loadingEl) loadingEl.classList.add('hidden');
+      };
+    }, 50);
+  }
+
+  openModal('careReport2PageModal');
+  if (typeof initIcons === 'function') initIcons(modal);
+}
+window.openCareReport2PageModal = openCareReport2PageModal;
+
+function printCareReport2PageModal() {
+  const iframe = document.getElementById('careReport2PagePreviewFrame');
+  if (iframe && iframe.contentWindow) {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      return;
+    } catch (e) {
+      console.warn('iframe print failed, falling back to window.open:', e);
+    }
+  }
+  if (window._current2PageModalPdfUrl) {
+    const w = window.open(window._current2PageModalPdfUrl, '_blank');
+    if (w) {
+      w.onload = () => w.print();
+    }
+  }
+}
+window.printCareReport2PageModal = printCareReport2PageModal;
+
+function downloadCareReport2PageModalPdf() {
+  const pName = window._current2PageModalPatient || '고연분';
+  const gId = window._current2PageModalGroupId || pName;
+  if (typeof downloadPatientCareLogsPdfs === 'function') {
+    downloadPatientCareLogsPdfs(gId);
+  } else {
+    window.open(`/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}`, '_blank');
+  }
+}
+window.downloadCareReport2PageModalPdf = downloadCareReport2PageModalPdf;
+
+function openCareReport2PageNewTab() {
+  if (window._current2PageModalPdfUrl) {
+    window.open(window._current2PageModalPdfUrl, '_blank');
+  }
+}
+window.openCareReport2PageNewTab = openCareReport2PageNewTab;
 
 
 // =========================================================================
