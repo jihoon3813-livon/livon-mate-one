@@ -41654,12 +41654,6 @@ function renderCareLogPatientCards(groups) {
                         <i data-lucide="smartphone" class="w-3 h-3 text-pink-600"></i>
                         <span>모바일</span>
                       </button>
-                      <button type="button" onclick="downloadCareReport2PagePdf('${group.id}', ${log.dayNumber || (idx + 1)})"
-                        class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
-                        title="해당 일차 기준 공식 2P 간병 리포트 PDF 다운로드">
-                        <i data-lucide="file-check-2" class="w-3 h-3 text-indigo-600"></i>
-                        <span>공식(2P)</span>
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -41758,20 +41752,14 @@ function renderCareLogFlatTable(filtered) {
         <td class="p-2.5 text-center font-mono text-purple-700 font-bold border-r border-slate-100">
           ${duration}
         </td>
-        <!-- 공식 간병일지 (모바일 및 PDF) -->
+        <!-- 모바일 간병일지 열람 -->
         <td class="p-2.5 text-center">
           <div class="inline-flex items-center gap-1.5 justify-center flex-wrap">
             <button type="button" onclick="openMobileCareDiaryPreview('${patientName}', ${log.dayNumber || 1})" 
               class="px-2.5 py-1.5 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
               title="모바일 간병일지 열기">
               <i data-lucide="smartphone" class="w-3.5 h-3.5 text-pink-600"></i>
-              <span>모바일</span>
-            </button>
-            <button type="button" onclick="downloadCareReport2PagePdf('${patientName}', ${log.dayNumber || 1})" 
-              class="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
-              title="공식 A4 2페이지 간병 리포트 PDF 다운로드">
-              <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-indigo-600"></i>
-              <span>공식(2P)</span>
+              <span>모바일 일지</span>
             </button>
           </div>
         </td>
