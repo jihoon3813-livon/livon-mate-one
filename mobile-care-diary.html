@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#f47db8">
+  <title>케어 리포트 · LivOn</title>
+  <meta name="description" content="매일의 기록에서 돌봄의 변화를 읽는 모바일 간병 리포트">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='10' fill='%23f47db8'/%3E%3Cpath d='M10 8v16h13' stroke='white' fill='none' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="mobile-care-diary.css?v=20261006_1615">
+</head>
+<body>
+  <div class="layout">
+    <!-- Desktop Left Sidebar (데스크톱에서는 좌측 고정 표시, 모바일에서는 상단 '더보기' 버튼으로 바텀시트 호출) -->
+    <aside class="desktop-side">
+      <a class="logo" href="#overview">Liv<span>On</span><i></i></a>
+      <div class="side-label">PERSONAL CARE REPORT</div>
+      <h1>매일의 기록,<br>이어지는 돌봄.</h1>
+      <p class="side-desc">작은 변화까지 놓치지 않도록<br>하루의 돌봄을 함께 살펴보세요.</p>
+      
+      <div class="side-patient">
+        <span class="initial patient-initial">고</span>
+        <div>
+          <b class="patient-name">고연분 님</b>
+          <small class="patient-meta-text">66세 · 여성</small>
+        </div>
+      </div>
+      
+      <dl class="side-info">
+        <div><dt>간병 기간</dt><dd class="side-care-period">09.17 — 10.02</dd></div>
+        <div><dt>기록 일수</dt><dd class="side-care-days">16일</dd></div>
+        <div><dt>담당 간병인</dt><dd class="carer-name">권은지</dd></div>
+      </dl>
+      
+      <nav class="side-nav">
+        <a href="#overview">01 <span>오늘의 케어</span></a>
+        <a href="#trends">02 <span>상태 변화</span></a>
+        <a href="#record">03 <span>돌봄·관찰 기록</span></a>
+        <a href="#nextcare">04 <span>다음 확인사항</span></a>
+      </nav>
+
+      <div class="sms-share-box" style="margin-top: 28px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--rose);">
+          📱 가족/보호자 안심 문자
+        </div>
+        <button type="button" class="btn-sms-copy" onclick="sendRealSmsPrompt()" style="margin-bottom: 6px;">
+          🚀 실제 문자로 발송하기
+        </button>
+        <button type="button" class="btn-sms-copy" onclick="copyCurrentReportLink()" style="background: #fff; color: var(--rose); border: 1px solid #e8b0cd; box-shadow: none;">
+          문자 링크 복사
+        </button>
+      </div>
+
+      <div class="side-foot">
+        리본케어 · 케어포트<br>
+        <span>기존 간병일지 기반 리디자인</span>
+      </div>
+    </aside>
+
+    <!-- Right Mobile App Card / Mobile Screen Container -->
+    <div class="mobile-app">
+      <header class="topbar">
+        <a class="logo" href="#overview" aria-label="LivOn 케어 리포트">Liv<span>On</span><i></i></a>
+        <div class="top-actions">
+          <!-- 🔥 모바일 전용 "더보기" 버튼 (좌측 사이드바 환자정보 및 메뉴 바텀시트 열기) 🔥 -->
+          <button class="mobile-more-btn" id="btn-side-more" aria-label="환자 정보 및 더보기" title="환자 정보 및 리포트 안내 더보기">
+            <span data-icon="menu"></span>
+            <span>더보기</span>
+          </button>
+          <button class="presentation" id="presentation" aria-pressed="false">
+            <span data-icon="shield"></span>
+            <span id="presentation-label">이름 가리기</span>
+          </button>
+          <button class="icon-button" id="info" aria-label="기록과 화면 구성 안내">
+            <span data-icon="info"></span>
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <!-- 01. Intro Section -->
+        <div class="intro" id="overview">
+          <p class="eyebrow">DAILY CARE REPORT</p>
+          <div class="title-row">
+            <h1><span class="patient-name">고연분 님</span>의<br>하루를 전해드려요.</h1>
+            <div class="day-seal">
+              <b id="day-count">16</b>
+              <span>일째 돌봄</span>
+            </div>
+          </div>
+          <div class="person-meta">
+            <span class="patient-meta-text">66세 · 여성</span>
+            <span>담당 <b class="carer-name">권은지</b></span>
+            <span><span class="side-care-period">09.17</span>부터</span>
+          </div>
+        </div>
+
+        <!-- Date Selector & Strip -->
+        <div class="date-box">
+          <button class="icon-button" id="prev" aria-label="이전 일지"><span data-icon="left"></span></button>
+          <button class="date-button" id="calendar">
+            <span data-icon="calendar"></span>
+            <b id="selected-date"></b>
+            <span data-icon="down"></span>
+          </button>
+          <button class="icon-button" id="next" aria-label="다음 일지"><span data-icon="right"></span></button>
+        </div>
+        <div class="date-strip" id="date-strip" aria-label="날짜별 간병일지"></div>
+
+        <!-- Daily Briefing & Status Grid -->
+        <div id="daily-content" aria-live="polite">
+          <section class="summary-panel">
+            <div class="summary-top">
+              <span class="badge">오늘의 케어 브리핑</span>
+              <span id="summary-date"></span>
+            </div>
+            <h2 id="summary-title"></h2>
+            <p id="summary-text"></p>
+            <div class="focus-line">
+              <span data-icon="eye"></span>
+              <div>
+                <small>이어서 살펴볼 부분</small>
+                <b id="focus-text"></b>
+              </div>
+            </div>
+          </section>
+
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">TODAY AT A GLANCE</p>
+              <h2>생활과 건강, 한눈에</h2>
+            </div>
+            <span class="caption">서술 기록 기준</span>
+          </div>
+          <div class="status-grid" id="status-grid"></div>
+        </div>
+
+        <!-- 02. Trends Section (식사, 거동, 수면, 통증) -->
+        <section id="trends" class="trend-section">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">CARE INSIGHT</p>
+              <h2>하루씩 이어지는 변화</h2>
+            </div>
+            <button class="text-button" id="chart-info" aria-label="추이 분류 기준">
+              분류 기준 <span data-icon="info"></span>
+            </button>
+          </div>
+
+          <div class="trend-card">
+            <div class="period-row">
+              <span id="chart-period"></span>
+              <div class="segmented" aria-label="그래프 조회 기간">
+                <button data-range="7" aria-pressed="true">7일</button>
+                <button data-range="16" aria-pressed="false">전체</button>
+              </div>
+            </div>
+
+            <div class="metric-tabs" role="tablist" aria-label="추이 항목" id="metric-tabs"></div>
+
+            <div id="metric-panel" role="tabpanel">
+              <div class="metric-head">
+                <div>
+                  <span id="chart-label"></span>
+                  <h3 id="chart-value"></h3>
+                </div>
+                <span class="metric-tag" id="chart-tag"></span>
+              </div>
+              <div class="chart-wrap">
+                <svg id="chart" viewBox="0 0 380 190" role="img"></svg>
+              </div>
+              <div class="chart-selected" id="chart-selected"></div>
+              <p class="micro-note">서술 내용의 분류이며, 의학적 점수나 측정값이 아닙니다.</p>
+            </div>
+          </div>
+
+          <div class="insight-strip">
+            <span data-icon="spark"></span>
+            <p id="insight-text"></p>
+          </div>
+        </section>
+
+        <!-- 03. Care Notes Record List -->
+        <section id="record">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">DAILY CARE NOTES</p>
+              <h2>돌봄과 관찰의 기록</h2>
+            </div>
+            <button class="text-button" id="source">
+              원문 대조 <span data-icon="document"></span>
+            </button>
+          </div>
+          <div class="record-list" id="record-list"></div>
+        </section>
+
+        <!-- Family Section -->
+        <section class="family-section">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">FOR YOUR FAMILY</p>
+              <h2>보호자에게 전하는 하루</h2>
+            </div>
+            <span class="round-icon" data-icon="message"></span>
+          </div>
+          <div class="letter">
+            <span class="quote">“</span>
+            <p id="family-message"></p>
+            <div class="letter-sign">
+              <span class="mini-avatar patient-initial">권</span>
+              <span>
+                담당 간병인 <b class="carer-name">권은지</b>
+                <small>보호자 전달사항을 바탕으로 재구성</small>
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 04. Next Care Continuity -->
+        <section id="nextcare">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">CONTINUITY OF CARE</p>
+              <h2>다음 돌봄을 위한 확인</h2>
+            </div>
+            <span class="soft-tag">제안 항목</span>
+          </div>
+          <p class="section-description">
+            오늘의 기록에서 도출한 확인사항입니다.<br>
+            실제 수행·확인 완료를 의미하지 않습니다.
+          </p>
+          <div class="follow-list" id="follow-list"></div>
+        </section>
+
+        <!-- Care Journey Milestones -->
+        <section class="journey-section">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">CARE JOURNEY</p>
+              <h2>주요 돌봄 기록 여정</h2>
+            </div>
+          </div>
+          <div class="journey" id="journey"></div>
+        </section>
+
+        <!-- Record Footer -->
+        <div class="record-footer">
+          <span data-icon="document"></span>
+          <div>
+            <b>기록을 근거로, 돌봄을 더 선명하게.</b>
+            <p>케어포트 통합간병일지 · 2026.09.17~10.02</p>
+            <p>원본 서술을 재구성한 화면입니다. 미기록은 미확인으로 구분합니다.</p>
+          </div>
+        </div>
+
+        <footer>
+          <span class="logo">Liv<span>On</span><i></i></span>
+          <p>리본케어 · 모바일 케어 리포트</p>
+        </footer>
+      </main>
+
+      <!-- Bottom Navigation Bar -->
+      <nav class="bottom-nav" aria-label="리포트 메뉴">
+        <a href="#overview" class="active"><span data-icon="heart"></span>오늘의 케어</a>
+        <a href="#trends"><span data-icon="chart"></span>상태 변화</a>
+        <a href="#record"><span data-icon="document"></span>돌봄 기록</a>
+        <a href="#nextcare"><span data-icon="check"></span>다음 확인</a>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Modal / Bottom Sheet Dialog -->
+  <dialog id="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h2 id="sheet-title"></h2>
+      <button class="icon-button" id="close-sheet" aria-label="닫기">
+        <span data-icon="close"></span>
+      </button>
+    </div>
+    <div id="sheet-content"></div>
+  </dialog>
+
+  <script src="mobile-care-diary.js?v=20261006_1615"></script>
+</body>
+</html>

@@ -632,6 +632,9 @@
       if (raw.overall_status) {
         overallTone = this.normalizeStatus(raw.overall_status.level);
         overallComment = raw.overall_status.comment || (overallTone === 'good' ? '전반적으로 안정적' : '주의 관찰 필요');
+      } else if (detail.overallStatus && (detail.overallStatus.label || detail.overallStatus.description)) {
+        overallTone = this.normalizeStatus(detail.overallStatus.tone || 'good');
+        overallComment = detail.overallStatus.description || '전반적으로 안정적';
       } else if (raw.consult_report) {
         const reportStr = JSON.stringify(raw.consult_report);
         if (reportStr.includes('악화') || reportStr.includes('통증 심함')) {
@@ -653,17 +656,27 @@
         return null;
       };
 
-      const mealDesc = cats.diet?.comment || raw.care_log?.diet_nutrition || findInReport(['식사', '복약', '섭취', '영양']) || '식사와 수분 섭취 양호, 처방약 복용 완료';
-      const mobilityDesc = cats.mobility?.comment || raw.care_log?.mobility_activity || findInReport(['거동', '활동', '보행', '낙상']) || '이동 및 보행 안정적, 낙상 예방 밀착 보조';
-      const sleepDesc = cats.sleep?.comment || raw.guardian_notes?.sleep || findInReport(['수면', '휴식']) || '야간 수면 양호, 특이 불면 호소 없음';
-      const painDesc = cats.pain?.comment || raw.guardian_notes?.pain || findInReport(['통증', '불편']) || '경미한 통증 관리 중, 특이 악화 소견 없음';
+      let categories = [];
+      if (Array.isArray(detail.categories) && detail.categories.length > 0) {
+        categories = detail.categories.map(c => ({
+          key: c.key || c.label,
+          label: c.label,
+          tone: this.normalizeStatus(c.tone),
+          description: c.description || c.value || ''
+        }));
+      } else {
+        const mealDesc = cats.diet?.comment || raw.care_log?.diet_nutrition || findInReport(['식사', '복약', '섭취', '영양']) || '식사와 수분 섭취 양호, 처방약 복용 완료';
+        const mobilityDesc = cats.mobility?.comment || raw.care_log?.mobility_activity || findInReport(['거동', '활동', '보행', '낙상']) || '이동 및 보행 안정적, 낙상 예방 밀착 보조';
+        const sleepDesc = cats.sleep?.comment || raw.guardian_notes?.sleep || findInReport(['수면', '휴식']) || '야간 수면 양호, 특이 불면 호소 없음';
+        const painDesc = cats.pain?.comment || raw.guardian_notes?.pain || findInReport(['통증', '불편']) || '경미한 통증 관리 중, 특이 악화 소견 없음';
 
-      const categories = [
-        { key: 'meal', label: '식사', tone: this.normalizeStatus(cats.diet?.level || (mealDesc.includes('불량') ? 'warning' : 'good')), description: mealDesc },
-        { key: 'mobility', label: '거동', tone: this.normalizeStatus(cats.mobility?.level || (mobilityDesc.includes('어려움') ? 'warning' : 'good')), description: mobilityDesc },
-        { key: 'sleep', label: '수면', tone: this.normalizeStatus(cats.sleep?.level || (sleepDesc.includes('불면') ? 'warning' : 'good')), description: sleepDesc },
-        { key: 'pain', label: '통증', tone: this.normalizeStatus(cats.pain?.level || (painDesc.includes('통증 호소') ? 'warning' : 'good')), description: painDesc }
-      ];
+        categories = [
+          { key: 'meal', label: '식사', tone: this.normalizeStatus(cats.diet?.level || (mealDesc.includes('불량') ? 'warning' : 'good')), description: mealDesc },
+          { key: 'mobility', label: '거동', tone: this.normalizeStatus(cats.mobility?.level || (mobilityDesc.includes('어려움') ? 'warning' : 'good')), description: mobilityDesc },
+          { key: 'sleep', label: '수면', tone: this.normalizeStatus(cats.sleep?.level || (sleepDesc.includes('불면') ? 'warning' : 'good')), description: sleepDesc },
+          { key: 'pain', label: '통증', tone: this.normalizeStatus(cats.pain?.level || (painDesc.includes('통증 호소') ? 'warning' : 'good')), description: painDesc }
+        ];
+      }
 
       // 3. Vitals
       const vit = raw.vitals || {};
@@ -682,7 +695,13 @@
 
       // 4. Care Log Rows (Use 100% authentic consult_report items if available, fallback to 5 standard rows)
       let careLogRows = [];
-      if (raw.consult_report && typeof raw.consult_report === 'object' && Object.keys(raw.consult_report).length > 0) {
+      if (Array.isArray(detail.careLogRows) && detail.careLogRows.length > 0) {
+        careLogRows = detail.careLogRows.map(r => ({
+          key: r.key || r.label,
+          label: r.label,
+          value: r.value
+        }));
+      } else if (raw.consult_report && typeof raw.consult_report === 'object' && Object.keys(raw.consult_report).length > 0) {
         careLogRows = Object.entries(raw.consult_report).map(([label, value], idx) => ({
           key: `report_${idx}`,
           label: label.replace(/^\d+[\.\)]\s*/, '').trim(),
@@ -700,15 +719,24 @@
       }
 
       // 5. Guardian Notes (6 items)
-      const gNotes = raw.guardian_notes || {};
-      const guardianNotes = [
-        { key: 'diet', label: '식사', value: gNotes.diet || findInReport(['식사', '섭취', '영양']) || '식사와 수분 섭취는 모두 원활하게 잘 이루어졌습니다.' },
-        { key: 'pain', label: '통증', value: gNotes.pain || findInReport(['통증', '불편']) || '특이 통증이나 극심한 불편을 호소하지 않고 안정적입니다.' },
-        { key: 'sleep', label: '수면', value: gNotes.sleep || findInReport(['수면', '휴식']) || '밤 사이 편안하게 휴식을 취하셨습니다.' },
-        { key: 'excretion', label: '배변·배뇨', value: gNotes.excretion || findInReport(['배변', '대변', '소변', '기저귀']) || '배변 및 배뇨 상태를 확인하였으며 특이사항 없습니다.' },
-        { key: 'activity', label: '활동', value: gNotes.activity || findInReport(['거동', '활동', '보행', '물리치료', '휠체어']) || '이동이나 활동 시 부축을 받아 무리 없이 진행되었습니다.' },
-        { key: 'emotional', label: '정서', value: gNotes.emotional || findInReport(['정서', '교육', '보호자', '안정', '계획']) || '심리적으로 평온하고 안정된 상태를 유지하셨습니다.' }
-      ];
+      let guardianNotes = [];
+      if (Array.isArray(detail.guardianNotes) && detail.guardianNotes.length > 0) {
+        guardianNotes = detail.guardianNotes.map(g => ({
+          key: g.key || g.label,
+          label: g.label,
+          value: g.value
+        }));
+      } else {
+        const gNotes = raw.guardian_notes || {};
+        guardianNotes = [
+          { key: 'diet', label: '식사', value: gNotes.diet || findInReport(['식사', '섭취', '영양']) || '식사와 수분 섭취는 모두 원활하게 잘 이루어졌습니다.' },
+          { key: 'pain', label: '통증', value: gNotes.pain || findInReport(['통증', '불편']) || '특이 통증이나 극심한 불편을 호소하지 않고 안정적입니다.' },
+          { key: 'sleep', label: '수면', value: gNotes.sleep || findInReport(['수면', '휴식']) || '밤 사이 편안하게 휴식을 취하셨습니다.' },
+          { key: 'excretion', label: '배변·배뇨', value: gNotes.excretion || findInReport(['배변', '대변', '소변', '기저귀']) || '배변 및 배뇨 상태를 확인하였으며 특이사항 없습니다.' },
+          { key: 'activity', label: '활동', value: gNotes.activity || findInReport(['거동', '활동', '보행', '물리치료', '휠체어']) || '이동이나 활동 시 부축을 받아 무리 없이 진행되었습니다.' },
+          { key: 'emotional', label: '정서', value: gNotes.emotional || findInReport(['정서', '교육', '보호자', '안정', '계획']) || '심리적으로 평온하고 안정된 상태를 유지하셨습니다.' }
+        ];
+      }
 
       // 6. Keywords
       let keywords = [];
@@ -1372,15 +1400,15 @@
         const vSvg = this.renderTrafficLightSvg(c.tone, 'vertical');
 
         return `
-          <div style="flex: 1; min-width: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; min-height: 98px;">
+          <div style="flex: 1; min-width: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-height: 84px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <span class="careport-badge-pill" style="height: 22px; font-size: 11px; font-weight: 800; padding: 0 8px; border-radius: 6px; ${cPillStyle}">
                 <span class="careport-dot" style="width: 5px; height: 5px; margin-right: 4px;"></span>
-                <span>${c.label}</span>
+                <span class="pill-text">${c.label}</span>
               </span>
               ${vSvg}
             </div>
-            <div style="font-size: 11.5px; color: #334155; line-height: 1.45; font-weight: 500; min-height: 32px; display: flex; align-items: center;">
+            <div style="font-size: 11.5px; color: #334155; line-height: 1.4; font-weight: 500;">
               ${c.description}
             </div>
           </div>
@@ -1398,23 +1426,23 @@
       `).join('');
 
       const careLogHtml = d.careLogRows.map(r => `
-        <div style="display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; min-height: 34px;">
-          <strong class="careport-badge-pill" style="min-width: 86px; max-width: 115px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; height: 24px; padding: 0 8px;"><span>${r.label}</span></strong>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; min-height: 32px;">
+          <strong class="careport-badge-pill" style="min-width: 86px; max-width: 110px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; height: 24px; padding: 0 8px;"><span class="pill-text">${r.label}</span></strong>
           <span style="flex: 1; font-size: 11.5px; color: #334155; line-height: 1.4; display: inline-flex; align-items: center; min-height: 24px; font-weight: 500;">${r.value}</span>
         </div>
       `).join('');
 
       const guardianNotesHtml = d.guardianNotes.map(g => `
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 11.5px; line-height: 1.45; min-height: 24px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 11.5px; line-height: 1.4; min-height: 22px;">
           <span style="display: inline-block; width: 4.5px; height: 4.5px; border-radius: 50%; background: #10bdb2; flex-shrink: 0;"></span>
-          <span style="font-weight: 800; color: #0f172a; min-width: 52px; flex-shrink: 0; display: inline-flex; align-items: center;">${g.label}</span>
-          <span style="color: #94a3b8; font-weight: bold; flex-shrink: 0;">·</span>
-          <span style="color: #334155; font-weight: 500; flex: 1; display: inline-flex; align-items: center;">${g.value}</span>
+          <span style="font-weight: 800; color: #0f172a; min-width: 50px; flex-shrink: 0; position: relative; top: -0.5px;">${g.label}</span>
+          <span style="color: #cbd5e1; font-weight: bold; flex-shrink: 0;">·</span>
+          <span style="color: #334155; font-weight: 500; flex: 1; position: relative; top: -0.5px;">${g.value}</span>
         </div>
       `).join('');
 
       const keywordsPills = d.keywords.map(k => `
-        <span class="careport-badge-pill" style="font-size: 11px; font-weight: 700; color: #079f98; background: #eafaf8; border: 1px solid #a7f3d0; border-radius: 12px; height: 22px; padding: 0 9px; margin-right: 4px; margin-bottom: 4px;"><span>#${k}</span></span>
+        <span class="careport-badge-pill" style="font-size: 11px; font-weight: 700; color: #079f98; background: #eafaf8; border: 1px solid #a7f3d0; border-radius: 12px; height: 22px; padding: 0 9px; margin-right: 4px; margin-bottom: 4px;"><span class="pill-text">#${k}</span></span>
       `).join('');
 
       let trendChartHtml = '';
@@ -1439,7 +1467,7 @@
   <!-- Pretendard Web Font CDN -->
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <style>
-    @page { size: A4 portrait; margin: 5mm 7mm; }
+    @page { size: A4 portrait; margin: 0; }
     * { box-sizing: border-box; }
     html, body {
       font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
@@ -1457,41 +1485,55 @@
     .page {
       width: 794px;
       max-width: 794px;
+      min-height: 1122px;
+      max-height: 1122px;
       margin: 0 auto;
       background: #ffffff;
-      padding: 30px 36px;
+      padding: 0 36px;
       box-sizing: border-box;
-      overflow: visible;
+      overflow: hidden;
       page-break-inside: avoid;
       break-inside: avoid;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
     @media print {
       body { background: #ffffff !important; }
       .page {
-        width: 100% !important;
-        max-width: 100% !important;
-        margin: 0 !important;
-        padding: 16px 20px !important;
+        width: 794px !important;
+        max-width: 794px !important;
+        min-height: 1122px !important;
+        max-height: 1122px !important;
+        margin: 0 auto !important;
+        padding: 0 36px !important;
         box-shadow: none !important;
         border: none !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
       }
     }
     .sec-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 2px solid #0f172a;
-      padding-bottom: 6px;
-      margin-top: 16px;
-      margin-bottom: 10px;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      border-bottom: 2px solid #0f172a !important;
+      padding-bottom: 5px !important;
+      margin-top: 18px !important;
+      margin-bottom: 12px !important;
+    }
+    .sec-head.sec-head-teal {
+      border-bottom: 2px solid #00897b !important;
     }
     .sec-title {
-      font-size: 13.5px;
-      font-weight: 900;
-      color: #0f172a;
-      letter-spacing: -0.3px;
-      display: inline-flex;
-      align-items: center;
+      font-size: 14.5px !important;
+      font-weight: 900 !important;
+      color: #0f172a !important;
+      letter-spacing: -0.3px !important;
+      display: inline-flex !important;
+      align-items: center !important;
     }
     .careport-badge-pill {
       display: inline-flex !important;
@@ -1503,14 +1545,15 @@
       text-align: center !important;
       white-space: nowrap !important;
     }
-    .careport-badge-pill > span,
+    .careport-badge-pill .pill-text,
+    .careport-badge-pill > span:not(.careport-dot),
     .careport-badge-pill > strong {
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
       line-height: 1 !important;
       position: relative !important;
-      top: 0 !important;
+      top: -1px !important;
     }
     .careport-dot {
       display: inline-block !important;
@@ -1519,29 +1562,29 @@
       flex-shrink: 0 !important;
       vertical-align: middle !important;
       position: relative !important;
-      top: 0 !important;
+      top: 0px !important;
     }
   </style>
 </head>
 <body>
   <div class="page">
-    <!-- Top Header -->
-    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 14px;">
+    <!-- Top Header (Image 1 style) -->
+    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px;">
       <div>
         <div style="font-size: 11px; font-weight: 800; color: #10bdb2; letter-spacing: 0.5px; text-transform: uppercase;">보호자 안내용 · 공식 간병일지</div>
         <h1 style="font-size: 24px; font-weight: 900; color: #020617; margin: 2px 0 0 0; letter-spacing: -0.5px;">간병일지</h1>
       </div>
       <div style="text-align: right;">
         <div style="display: inline-flex; align-items: center; gap: 6px;">
-          <span class="careport-badge-pill" style="background: #10bdb2; color: #ffffff; font-size: 11.5px; font-weight: 900; height: 22px; padding: 0 9px; border-radius: 6px;"><span>공식일지</span></span>
-          <span style="font-size: 12.5px; font-weight: 800; color: #334155; display: inline-flex; align-items: center; height: 22px; line-height: 1;">${d.consultDate}</span>
+          <span class="careport-badge-pill" style="background: #10bdb2; color: #ffffff; font-size: 11px; font-weight: 900; height: 22px; padding: 0 8px; border-radius: 6px;"><span class="pill-text">공식일지</span></span>
+          <span style="font-size: 13px; font-weight: 800; color: #334155; display: inline-flex; align-items: center; height: 22px;">${d.consultDate}</span>
         </div>
         <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">리본케어포트(CarePort) 전산 공인 인증 일지</div>
       </div>
     </div>
 
-    <!-- Demographics Bar (고객명, 간병인, 간병기간) -->
-    <div style="display: flex; justify-content: space-between; gap: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 16px; margin-bottom: 14px;">
+    <!-- Demographics Bar (Image 1 style: 고객명 (피보험자), 담당 간병인 (소속), 간병 기간) -->
+    <div style="display: flex; justify-content: space-between; gap: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; margin-bottom: 16px;">
       <div style="flex: 1;">
         <span style="font-size: 10.5px; color: #64748b; font-weight: 700; display: block; margin-bottom: 2px;">고객명 (피보험자)</span>
         <div style="display: inline-flex; align-items: baseline; gap: 4px;">
@@ -1562,10 +1605,10 @@
       </div>
     </div>
 
-    <!-- Section: 간병 일자별 환자 상태 변화 (Image 2 style) -->
-    <div class="sec-head" style="border-bottom: 2px solid #10bdb2;">
-      <span class="sec-title">간병 일자별 환자 상태 변화</span>
-      <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; align-items: center; gap: 8px;">
+    <!-- Section: 간병 일자별 환자 상태 변화 (Image 1 style) -->
+    <div class="sec-head sec-head-teal" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #00897b; margin-top: 18px; margin-bottom: 12px; padding-bottom: 5px;">
+      <span class="sec-title" style="font-size: 14.5px; font-weight: 900; color: #0f172a;">간병 일자별 환자 상태 변화</span>
+      <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; gap: 8px;">
         <span style="color: #06C8BB;">― 총합상태</span>
         <span style="color: #2BBB77;">― 거동능력</span>
         <span style="color: #F4A61E;">― 식사상태</span>
@@ -1578,9 +1621,9 @@
     </div>
 
     <!-- Section 1: 금일 환자 상태 체크 (신호등 & 세부 상태) -->
-    <div class="sec-head">
-      <span class="sec-title">금일 환자 상태 체크</span>
-      <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; align-items: center; gap: 8px;">
+    <div class="sec-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f172a; margin-top: 18px; margin-bottom: 12px; padding-bottom: 5px;">
+      <span class="sec-title" style="font-size: 14.5px; font-weight: 900; color: #0f172a;">금일 환자 상태 체크</span>
+      <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; gap: 8px;">
         <span style="display: inline-flex; align-items: center; gap: 3px;"><b style="color: #20b86a; font-size: 11px;">●</b> 양호·안정</span>
         <span style="display: inline-flex; align-items: center; gap: 3px;"><b style="color: #f5aa18; font-size: 11px;">●</b> 주의·부분보조</span>
         <span style="display: inline-flex; align-items: center; gap: 3px;"><b style="color: #eb5c60; font-size: 11px;">●</b> 악화·주의필요</span>
@@ -1588,22 +1631,22 @@
     </div>
 
     <!-- Overall Status Verdict Banner -->
-    <div style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; min-height: 46px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; min-height: 44px;">
       <div style="display: flex; align-items: center; gap: 10px;">
         <span class="careport-badge-pill" style="font-size: 11.5px; font-weight: 900; height: 24px; padding: 0 10px; border-radius: 6px; ${toneBadgeClass}">
-          <span class="careport-dot" style="width: 6px; height: 6px; margin-right: 5px;"></span>
-          <span>${d.overallStatus.label}</span>
+          <span class="careport-dot" style="width: 5px; height: 5px; margin-right: 5px;"></span>
+          <span class="pill-text">${d.overallStatus.label}</span>
         </span>
         <div style="display: inline-flex; align-items: center;">
           ${overallLightSvg}
         </div>
-        <span style="font-size: 12px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; height: 24px; line-height: 1;">${d.overallStatus.description}</span>
+        <span style="font-size: 12px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; height: 24px;">${d.overallStatus.description}</span>
       </div>
-      <span class="careport-badge-pill" style="font-size: 11px; font-weight: 800; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; height: 24px; padding: 0 9px; border-radius: 5px;"><span>종합 판정</span></span>
+      <span class="careport-badge-pill" style="font-size: 11px; font-weight: 800; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; height: 24px; padding: 0 9px; border-radius: 5px;"><span class="pill-text">종합 판정</span></span>
     </div>
 
     <!-- 4 Category Cards (식사, 거동, 수면, 통증) -->
-    <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
       ${catCardsHtml}
     </div>
 
@@ -1617,20 +1660,20 @@
     </div>
 
     <!-- Section 3: 금일 간병 수행 내역 (5 Detailed rows) -->
-    <div class="sec-head">
-      <span class="sec-title">금일 간병 수행 내역</span>
+    <div class="sec-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f172a; margin-top: 18px; margin-bottom: 12px; padding-bottom: 5px;">
+      <span class="sec-title" style="font-size: 14.5px; font-weight: 900; color: #0f172a;">금일 간병 수행 내역</span>
       <span style="font-size: 10px; color: #94a3b8;">표준 간병 프로세스 준수</span>
     </div>
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 16px; margin-bottom: 14px;">
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 16px; margin-bottom: 12px;">
       ${careLogHtml}
     </div>
 
     <!-- Section 5: 보호자 전달사항 (6 Guardian Note rows) -->
-    <div class="sec-head">
-      <span class="sec-title">보호자 전달사항</span>
+    <div class="sec-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f172a; margin-top: 18px; margin-bottom: 12px; padding-bottom: 5px;">
+      <span class="sec-title" style="font-size: 14.5px; font-weight: 900; color: #0f172a;">보호자 전달사항</span>
       <span style="font-size: 10px; color: #94a3b8;">안심 소통 리포트</span>
     </div>
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; margin-bottom: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; margin-bottom: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
       ${guardianNotesHtml}
     </div>
   </div>

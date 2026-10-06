@@ -1185,6 +1185,9 @@ function saveSavedFaxConfig(cfg) {
             if (Array.isArray(payload.adjusters)) {
               stored.adjusters = payload.adjusters;
             }
+            if (payload.dashboardStats !== undefined) {
+              stored.dashboardStats = payload.dashboardStats;
+            }
 
             stored.updatedAt = new Date().toISOString();
             fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
@@ -1224,7 +1227,8 @@ function saveSavedFaxConfig(cfg) {
           payouts: [],
           caregivers: [],
           centers: [],
-          adjusters: []
+          adjusters: [],
+          dashboardStats: null
         };
         fs.writeFileSync(realDataFile, JSON.stringify(emptyData, null, 2), 'utf-8');
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1565,7 +1569,35 @@ function saveSavedFaxConfig(cfg) {
         });
         return;
       }
-      return trendHandler(req, res);
+    }
+
+    if (reqPath === '/api/careport/mobile-report') {
+      try { delete require.cache[require.resolve('./api/careport/mobile-report')]; } catch(e) {}
+      const mobileReportHandler = require('./api/careport/mobile-report');
+      const parsedUrl = urlModule.parse(req.url, true);
+      req.query = parsedUrl.query;
+      res.status = (code) => ({
+        json: (data) => {
+          res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(data));
+        },
+        end: () => res.end()
+      });
+      res.json = (data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      };
+
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try { req.body = JSON.parse(body); } catch(e) { req.body = body; }
+          return mobileReportHandler(req, res);
+        });
+        return;
+      }
+      return mobileReportHandler(req, res);
     }
 
     if (reqPath === '/api/careport/generate-pdf') {
@@ -1855,29 +1887,80 @@ function saveSavedFaxConfig(cfg) {
       return;
     }
 
-    // 만족도 조사 안내 문자(SMS) 발송 API (본사 메이트원 & 간병인 앱)
-    if (reqPath === '/api/survey/send-sms' && req.method === 'POST') {
+    // =========================================================================
+    // 실제 문자(SMS/LMS) 발송 API (모바일 간병일지 및 안내 문자)
+    // =========================================================================
+    if (reqPath === '/api/sms/send' && req.method === 'POST') {
       let body = '';
       req.on('data', chunk => body += chunk);
-      req.on('end', () => {
+      req.on('end', async () => {
         try {
+          const { dispatchSms } = require('./sms-service');
           const payload = JSON.parse(body || '{}');
-          const protocol = req.headers['x-forwarded-proto'] || 'http';
-          const host = req.headers['host'] || 'localhost:3000';
-          const baseUrl = `${protocol}://${host}`;
-          const result = gSurveyService.sendSurveySms(
-            payload.targetId,
-            { phone: payload.phone, customMessage: payload.customMessage, baseUrl },
-            payload.actor || 'HQ'
-          );
-          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
-          return res.end(JSON.stringify(result));
+
+          const toPhone = payload.toPhone || payload.phone || payload.recipient;
+          const toName = payload.toName || payload.name || '';
+          const message = payload.message || payload.text || payload.customMessage || '';
+          const senderNumber = payload.senderNumber || payload.fromPhone || '16007835';
+          const provider = payload.provider || 'barobill';
+          const subject = payload.subject || '[리본케어] 모바일 간병일지 안내';
+          const patientName = payload.patientName || '';
+          const category = payload.category || 'CARE_DIARY_MOBILE';
+
+          if (!toPhone) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '수신처 휴대폰 번호를 입력해주세요.' }));
+          }
+
+          if (!message) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '발송할 메시지 내용을 입력해주세요.' }));
+          }
+
+          console.log(`[SMS Send Request] Provider: ${provider}, To: ${toName}(${toPhone}), From: ${senderNumber}`);
+          const result = await dispatchSms({
+            toPhone,
+            toName,
+            message,
+            senderNumber,
+            provider,
+            subject,
+            patientName,
+            category
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, ...result }));
         } catch (e) {
-          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          console.error('[SMS Send Error]', e.message);
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: false, error: e.message }));
         }
       });
       return;
+    }
+
+    if (reqPath === '/api/sms/balance' && req.method === 'GET') {
+      try {
+        const { getBarobillSmsBalance } = require('./sms-service');
+        const balanceInfo = await getBarobillSmsBalance();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify(balanceInfo));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    }
+
+    if (reqPath === '/api/sms/logs' && req.method === 'GET') {
+      try {
+        const { getSmsDispatchLogs } = require('./sms-service');
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, logs: getSmsDispatchLogs() }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: e.message }));
+      }
     }
 
     if (reqPath === '/api/survey/summary' && req.method === 'GET') {
@@ -2505,6 +2588,68 @@ function saveSavedFaxConfig(cfg) {
       return;
     }
 
+    // =========================================================================
+    // API Route: Slack 일일 운영보고 자동 발송 & 웹훅 연동 API
+    // =========================================================================
+    if (reqPath === '/api/slack/config') {
+      const slackService = require('./slack-report-service');
+      if (req.method === 'GET') {
+        const cfg = slackService.getSlackConfig();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, config: cfg }));
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const patch = JSON.parse(body || '{}');
+            const current = slackService.getSlackConfig();
+            const updated = { ...current, ...patch };
+            slackService.saveSlackConfig(updated);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true, config: updated }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+    }
+
+    if (reqPath === '/api/slack/send-now' && req.method === 'POST') {
+      const slackService = require('./slack-report-service');
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const customTitle = payload.customTitle || null;
+          const result = await slackService.sendDailyReport(customTitle);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, result }));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/slack/preview' && req.method === 'GET') {
+      const slackService = require('./slack-report-service');
+      try {
+        const stats = slackService.generateReportData();
+        const previewText = slackService.buildSlackMessage(stats);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, stats, previewText }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    }
+
     if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
 
     const filePath = path.join(BASE_DIR, decodeURIComponent(reqPath));
@@ -2552,7 +2697,7 @@ function saveSavedFaxConfig(cfg) {
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.warn(`[?뚮┝] ?ы듃 ${port}踰덉씠 ?대? ?ъ슜 以묒엯?덈떎. ?ㅼ쓬 ?ы듃(${port + 1})濡??먮룞 ?꾪솚?⑸땲??..`);
+      console.warn(`[알림] 포트 ${port}번이 이미 사용 중입니다. 다음 포트(${port + 1})로 자동 전환합니다...`);
       startServer(port + 1);
     } else {
       console.error('서버 오류 발생:', err);
@@ -2572,6 +2717,14 @@ function saveSavedFaxConfig(cfg) {
       initScheduler();
     } catch (schedErr) {
       console.warn('[CareCall Scheduler Init Warning]', schedErr.message);
+    }
+
+    // 슬랙 통합간병허브 일일 운영보고 자동 발송 스케줄러 가동
+    try {
+      const slackReportService = require('./slack-report-service');
+      slackReportService.initSlackScheduler();
+    } catch (slackSchedErr) {
+      console.warn('[Slack Report Scheduler Init Warning]', slackSchedErr.message);
     }
 
     // Open default browser

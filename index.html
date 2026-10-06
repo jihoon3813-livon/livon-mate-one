@@ -758,6 +758,35 @@
         display: none !important;
       }
     }
+    .careport-badge-pill {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      vertical-align: middle !important;
+      box-sizing: border-box !important;
+      line-height: 1 !important;
+      text-align: center !important;
+      white-space: nowrap !important;
+    }
+    .careport-badge-pill .pill-text,
+    .careport-badge-pill > span:not(.careport-dot),
+    .careport-badge-pill > strong {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      line-height: 1 !important;
+      position: relative !important;
+      top: -1px !important;
+    }
+    .careport-dot {
+      display: inline-block !important;
+      border-radius: 50% !important;
+      background: currentColor !important;
+      flex-shrink: 0 !important;
+      vertical-align: middle !important;
+      position: relative !important;
+      top: 0px !important;
+    }
   </style>
   <!-- Instant Theme Pre-Initializer (Prevents FOUC / Color Flash on Page Load and Tab Reload) -->
   <script>
@@ -848,6 +877,15 @@
           </select>
         </div>
 
+        <!-- Slack Daily Report Modal Button -->
+        <button type="button" onclick="openSlackReportModal()" 
+          class="px-2.5 py-1.5 rounded-lg border border-purple-200 bg-purple-50/80 hover:bg-purple-100 text-purple-700 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs shrink-0 cursor-pointer"
+          title="슬랙 일일 운영보고 자동 발송 관리 및 즉시 발송">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <i data-lucide="send" class="w-3.5 h-3.5 text-purple-600"></i>
+          <span class="hidden sm:inline">슬랙 일일보고</span>
+        </button>
+
         <!-- Admin Profile & Logout -->
         <div class="flex items-center gap-1.5 sm:gap-2 pl-1.5 sm:pl-2 border-l border-slate-200 shrink-0">
           <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-[11px] sm:text-xs shrink-0" id="headerAdminAvatar"><script>(function(){try{var a=JSON.parse(localStorage.getItem('REBORN_CURRENT_ADMIN')||sessionStorage.getItem('REBORN_CURRENT_ADMIN')||'{}');var n=a&&a.name?(a.name==='김리본'||a.name==='김지훈'?'리본케어':a.name):'리본케어';document.write(n.slice(0,2));}catch(e){document.write('리본');}})();</script></div>
@@ -929,6 +967,15 @@
             <span class="tracking-tight">간병일지 (케어포트)</span>
           </div>
           <span class="h-5 px-2 rounded-md bg-purple-950 text-purple-300 font-bold text-[10px] flex items-center justify-center border border-purple-800">CarePort</span>
+        </button>
+
+        <!-- 3-1. 간병일지(new) -->
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="carelogs_new" onclick="handleLeftMenuClick('carelogs_new')">
+          <div class="flex items-center space-x-3">
+            <i data-lucide="clipboard-check" class="w-4 h-4 flex-shrink-0 text-indigo-400"></i>
+            <span class="tracking-tight font-semibold">간병일지(new)</span>
+          </div>
+          <span class="h-5 px-2 rounded-md bg-indigo-950 text-indigo-300 font-bold text-[10px] flex items-center justify-center border border-indigo-800">NEW</span>
         </button>
 
         <!-- 3-2. AI간병통화 관리 (독립 메뉴) -->
@@ -1262,54 +1309,274 @@
           </div>
         </div>
 
-        <!-- 7-Stage Pipeline Quick Filter Tabs -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-2.5 mb-2 relative z-10">
-          <button onclick="setHubFilter('ALL')" id="hubFilterBtn-ALL" class="hub-filter-btn active p-2.5 sm:p-3 rounded-xl border transition-all text-left bg-primary-600 text-white border-primary-600 shadow-sm">
-            <div class="text-[11px] font-semibold text-primary-100" id="hubCount-ALL-label">전체 고객</div>
-            <div class="text-lg sm:text-xl font-black mt-0.5" id="hubCount-ALL">-건</div>
-          </button>
-          <button onclick="setHubFilter('COMPLETED')" id="hubFilterBtn-COMPLETED" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-emerald-200 shadow-2xs">
-            <div class="text-[11px] font-bold text-emerald-700 flex items-center justify-between">
-              <span>간병 완료</span>
-              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        <!-- ==================== EXCEL SERVICE DASHBOARD (간병서비스 현황 대시보드 - 컴팩트 & 자세히 보기) ==================== -->
+        <div id="hubServiceDashboardWrapper" class="mb-3 relative z-10 transition-all">
+          
+          <!-- 1. 기본 컴팩트 뷰 (작게 숫자만 깔끔하게 보기) -->
+          <div id="hubDashCompactBar" class="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-2.5 sm:p-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              
+              <!-- 좌측: 핵심 KPI 스탯 알약 뱃지 모음 -->
+              <div class="flex items-center flex-wrap gap-1.5 sm:gap-2 text-xs">
+                <!-- 총 신청 -->
+                <button type="button" onclick="setHubFilter('ALL')" id="hubFilterBtn-ALL" class="hub-filter-btn active px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800 text-white font-bold flex items-center gap-1.5 shadow-2xs hover:bg-slate-900 transition-all cursor-pointer" title="전체 신청 건 조회">
+                  <span class="text-[11px] text-slate-300 font-medium">총 신청</span>
+                  <strong class="text-sm font-black tracking-tight" id="hubDash-totalApps">308</strong><span class="text-[10px] text-slate-300">건</span>
+                </button>
+                
+                <!-- 완료 -->
+                <button type="button" onclick="setHubFilter('COMPLETED')" id="hubFilterBtn-COMPLETED" class="hub-filter-btn px-2.5 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 text-emerald-800 font-bold flex items-center gap-1 hover:bg-emerald-100 transition-all cursor-pointer" title="완료 건 조회">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                  <span class="text-[11px] text-emerald-700 font-medium">완료</span>
+                  <strong class="text-sm font-black text-emerald-700" id="hubDash-completed">-</strong><span class="text-[10px] text-emerald-600">건</span>
+                </button>
+
+                <!-- 진행중 -->
+                <button type="button" onclick="setHubFilter('IN_PROGRESS')" id="hubFilterBtn-IN_PROGRESS" class="hub-filter-btn px-2.5 py-1.5 rounded-xl border border-sky-200 bg-sky-50/80 text-sky-800 font-bold flex items-center gap-1 hover:bg-sky-100 transition-all cursor-pointer" title="진행중 건 조회">
+                  <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
+                  <span class="text-[11px] text-sky-700 font-medium">진행중</span>
+                  <strong class="text-sm font-black text-sky-700" id="hubDash-inProgress">-</strong><span class="text-[10px] text-sky-600">건</span>
+                </button>
+
+                <!-- 예정 -->
+                <button type="button" onclick="setHubFilter('SCHEDULED')" id="hubFilterBtn-SCHEDULED" class="hub-filter-btn px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 font-bold flex items-center gap-1 hover:bg-slate-100 transition-all cursor-pointer" title="예정 건 조회">
+                  <span class="text-[11px] text-slate-500 font-medium">예정</span>
+                  <strong class="text-sm font-black text-slate-700" id="hubDash-scheduled">-</strong><span class="text-[10px] text-slate-500">건</span>
+                </button>
+
+                <!-- 취소 -->
+                <button type="button" onclick="setHubFilter('CANCELLED')" id="hubFilterBtn-CANCELLED" class="hub-filter-btn px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 font-bold flex items-center gap-1 hover:bg-slate-100 transition-all cursor-pointer" title="취소 건 조회">
+                  <span class="text-[11px] text-slate-500 font-medium">취소</span>
+                  <strong class="text-sm font-black text-slate-600" id="hubDash-cancelled">-</strong><span class="text-[10px] text-slate-400">건</span>
+                </button>
+
+                <div class="h-4 w-px bg-slate-200 mx-0.5 hidden sm:block"></div>
+
+                <!-- 배정 간병인 -->
+                <div class="px-2.5 py-1.5 rounded-xl border border-purple-200/80 bg-purple-50/60 text-purple-800 flex items-center gap-1 font-bold">
+                  <span class="text-[11px] text-purple-700 font-medium">배정 간병인</span>
+                  <strong class="text-sm font-black text-purple-800" id="hubDash-assignedCaregivers">-</strong><span class="text-[10px] text-purple-600">명</span>
+                  <span class="text-[10px] text-purple-600 bg-white/80 px-1 py-0.2 rounded border border-purple-200 ml-0.5 font-medium">(변경 <b id="hubDash-caregiverChanges">-</b>)</span>
+                </div>
+
+                <!-- 미수금 -->
+                <button type="button" onclick="setHubFilter('UNPAID_CLAIM')" id="hubFilterBtn-UNPAID_CLAIM" class="hub-filter-btn px-2.5 py-1.5 rounded-xl border border-rose-300 bg-rose-50/90 text-rose-800 font-bold flex items-center gap-1 hover:bg-rose-100 transition-all cursor-pointer" title="미확인 미수금 대사 조회">
+                  <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
+                  <span class="text-[11px] text-rose-700 font-medium">추정 미수금</span>
+                  <strong class="text-sm font-black text-rose-700" id="hubDash-estimatedUnpaid">-</strong><span class="text-[10px] text-rose-600 font-medium">원</span>
+                  <span class="text-[10px] text-rose-600 bg-white px-1 py-0.2 rounded border border-rose-200 ml-0.5 font-medium">(<b id="hubDash-unconfirmedClaims">-</b>건)</span>
+                </button>
+
+                <!-- 미청구 -->
+                <div class="px-2.5 py-1.5 rounded-xl border border-amber-300 bg-amber-50/80 text-amber-900 flex items-center gap-1 font-bold">
+                  <span class="text-[11px] text-amber-700 font-medium">미청구</span>
+                  <strong class="text-sm font-black text-amber-800" id="hubDash-unclaimedTotal">-</strong><span class="text-[10px] text-amber-600">건</span>
+                </div>
+              </div>
+
+              <!-- 우측: 원수사 스탯 요약 & [자세히 보기 ▾] 토글 버튼 -->
+              <div class="flex items-center gap-2">
+                <div class="hidden xl:flex items-center gap-1.5 text-[11px] text-slate-500 font-medium bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200">
+                  <span>원수사:</span>
+                  <span class="font-bold text-slate-700">현대 <b class="text-orange-600 font-black" id="hubDash-hyundai">-</b></span>
+                  <span class="text-slate-300">&middot;</span>
+                  <span class="font-bold text-slate-700">SCOR <b class="text-slate-800 font-black" id="hubDash-scor">-</b></span>
+                  <span class="text-slate-300">&middot;</span>
+                  <span class="font-bold text-slate-700">삼성 <b class="text-blue-600 font-black" id="hubDash-samsung">-</b></span>
+                </div>
+
+                <!-- 자세히 보기 토글 버튼 -->
+                <button type="button" onclick="toggleHubDashboardDetail()" id="btnToggleHubDashDetail" 
+                  class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-slate-700 to-indigo-800 hover:from-slate-800 hover:to-indigo-900 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap active:scale-95"
+                  title="관리대장 엑셀 요약 대시보드를 원본 표 형태로 크게 펼쳐봅니다">
+                  <i data-lucide="layout-grid" class="w-3.5 h-3.5 text-indigo-200"></i>
+                  <span id="btnToggleHubDashDetailText">자세히 보기</span>
+                  <i data-lucide="chevron-down" id="iconToggleHubDashDetail" class="w-3.5 h-3.5 text-indigo-300 transition-transform duration-200"></i>
+                </button>
+              </div>
+
             </div>
-            <div class="text-lg sm:text-xl font-black text-emerald-600 mt-0.5" id="hubCount-COMPLETED">-건</div>
-          </button>
-          <button onclick="setHubFilter('NEED_ASSIGN')" id="hubFilterBtn-NEED_ASSIGN" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200 shadow-2xs">
-            <div class="text-[11px] font-bold text-slate-600 flex items-center justify-between">
-              <span>① 배정 대기</span>
-              <span class="text-[10px] text-slate-400 font-semibold">(미배정)</span>
-              <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+          </div>
+
+          <!-- 2. 자세히 보기 모드 (엑셀 현황 대시보드와 100% 동일한 상세 표 뷰 - 기본 숨김) -->
+          <div id="hubDashDetailedContainer" class="hidden mt-2.5 bg-white rounded-2xl border-2 border-indigo-200/90 shadow-lg p-4 sm:p-5 transition-all animate-fadeIn">
+            
+            <!-- 상단 타이틀 바 & 닫기 버튼 -->
+            <div class="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-200">
+              <div class="flex items-center gap-2.5">
+                <span class="w-3 h-6 bg-[#1f4e78] rounded-xs"></span>
+                <h3 class="text-lg sm:text-xl font-black text-[#1f4e78] tracking-tight flex items-center gap-2">
+                  <span>간 병 서 비 스 &nbsp; 현 황 &nbsp; 대 시 보 드</span>
+                </h3>
+                <span class="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-md border border-slate-200">관리대장 엑셀 원본 동기화</span>
+              </div>
+              <button type="button" onclick="toggleHubDashboardDetail(false)" 
+                class="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 flex items-center gap-1 transition-all cursor-pointer">
+                <span>간략히 보기</span>
+                <i data-lucide="chevron-up" class="w-3.5 h-3.5 text-slate-500"></i>
+              </button>
             </div>
-            <div class="text-lg sm:text-xl font-black text-slate-600 mt-0.5" id="hubCount-NEED_ASSIGN">-건</div>
-          </button>
-          <button onclick="setHubFilter('IN_PROGRESS')" id="hubFilterBtn-IN_PROGRESS" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-amber-200 shadow-2xs">
-            <div class="text-[11px] font-bold text-amber-700 flex items-center justify-between">
-              <span>② 간병 진행중</span>
-              <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+
+            <!-- 2단 엑셀 테이블 그리드 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+              
+              <!-- [좌측 컬럼]: 신청 현황 / 간병인 배정 / 원수사별 신청 건수 -->
+              <div class="space-y-4">
+                
+                <!-- 1. ■ 신청 현황 (건) -->
+                <div class="border border-slate-300 rounded-lg overflow-hidden shadow-2xs">
+                  <div class="bg-[#1f4e78] text-white font-extrabold text-xs px-3 py-1.5 flex items-center justify-between">
+                    <span>■ 신청 현황 (건)</span>
+                    <span class="text-[10px] text-blue-200 font-normal">건수</span>
+                  </div>
+                  <table class="w-full text-xs border-collapse">
+                    <tbody>
+                      <tr class="border-b border-slate-200 hover:bg-slate-50/80 transition-colors">
+                        <td class="px-3 py-1.5 font-bold text-slate-800 bg-slate-50/60 w-1/2">총 신청건수</td>
+                        <td class="px-3 py-1.5 font-black text-right text-slate-900 text-sm" id="detailDash-totalApps">308</td>
+                      </tr>
+                      <tr class="border-b border-slate-200 hover:bg-emerald-50/40 transition-colors cursor-pointer" onclick="setHubFilter('COMPLETED')" title="완료 고객 필터링">
+                        <td class="px-3 py-1.5 font-semibold text-slate-700">완료</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-emerald-700" id="detailDash-completed">235</td>
+                      </tr>
+                      <tr class="border-b border-slate-200 hover:bg-sky-50/40 transition-colors cursor-pointer" onclick="setHubFilter('IN_PROGRESS')" title="진행중 고객 필터링">
+                        <td class="px-3 py-1.5 font-semibold text-slate-700">진행중</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-sky-700" id="detailDash-inProgress">28</td>
+                      </tr>
+                      <tr class="border-b border-slate-200 hover:bg-slate-50/80 transition-colors cursor-pointer" onclick="setHubFilter('SCHEDULED')" title="예정 고객 필터링">
+                        <td class="px-3 py-1.5 font-semibold text-slate-700">예정</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-slate-700" id="detailDash-scheduled">7</td>
+                      </tr>
+                      <tr class="hover:bg-slate-50/80 transition-colors cursor-pointer" onclick="setHubFilter('CANCELLED')" title="취소 고객 필터링">
+                        <td class="px-3 py-1.5 font-semibold text-slate-700">취소</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-slate-500" id="detailDash-cancelled">27</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- 2. ■ 간병인 배정 -->
+                <div class="border border-slate-300 rounded-lg overflow-hidden shadow-2xs">
+                  <div class="bg-[#1f4e78] text-white font-extrabold text-xs px-3 py-1.5">
+                    ■ 간병인 배정
+                  </div>
+                  <table class="w-full text-xs border-collapse">
+                    <tbody>
+                      <tr class="border-b border-slate-200 hover:bg-slate-50/80 transition-colors">
+                        <td class="px-3 py-1.5 font-bold text-slate-800 bg-slate-50/60 w-1/2">총 배정 간병인</td>
+                        <td class="px-3 py-1.5 font-black text-right text-purple-900 text-sm" id="detailDash-assignedCaregivers">303</td>
+                      </tr>
+                      <tr class="hover:bg-slate-50/80 transition-colors">
+                        <td class="px-3 py-1.5 font-semibold text-slate-700">간병인 변경 건(2명+)</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-purple-700" id="detailDash-caregiverChanges">6</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- 3. ■ 원수사별 신청 건수 -->
+                <div class="border border-slate-300 rounded-lg overflow-hidden shadow-2xs">
+                  <div class="bg-[#1f4e78] text-white font-extrabold text-xs px-3 py-1.5">
+                    ■ 원수사별 신청 건수
+                  </div>
+                  <table class="w-full text-xs border-collapse">
+                    <thead>
+                      <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 text-[11px]">
+                        <th class="px-3 py-1 text-left font-bold w-1/2">원수사</th>
+                        <th class="px-3 py-1 text-right font-bold">건수</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="border-b border-slate-200 hover:bg-orange-50/40 transition-colors cursor-pointer" onclick="setHubInsuranceTab('현대해상')" title="현대해상 필터">
+                        <td class="px-3 py-1.5 font-bold text-slate-800 flex items-center gap-1.5">
+                          <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+                          <span>현대해상</span>
+                        </td>
+                        <td class="px-3 py-1.5 font-black text-right text-orange-700 text-sm" id="detailDash-hyundai">266</td>
+                      </tr>
+                      <tr class="border-b border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer" onclick="setHubInsuranceTab('현대해상')" title="현대해상(SCOR) 필터">
+                        <td class="px-3 py-1.5 font-medium text-slate-700 pl-6">현대해상(SCOR)</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-slate-800" id="detailDash-scor">34</td>
+                      </tr>
+                      <tr class="hover:bg-blue-50/40 transition-colors cursor-pointer" onclick="setHubInsuranceTab('삼성화재')" title="삼성화재 필터">
+                        <td class="px-3 py-1.5 font-bold text-slate-800 flex items-center gap-1.5">
+                          <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                          <span>삼성화재</span>
+                        </td>
+                        <td class="px-3 py-1.5 font-black text-right text-blue-700 text-sm" id="detailDash-samsung">42</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+              </div>
+
+              <!-- [우측 컬럼]: 미수금 현황 (원) / 미청구 현황 (건) -->
+              <div class="space-y-4">
+                
+                <!-- 4. ■ 미수금 현황 (원) -->
+                <div class="border border-slate-300 rounded-lg overflow-hidden shadow-2xs">
+                  <div class="bg-[#1f4e78] text-white font-extrabold text-xs px-3 py-1.5 flex items-center justify-between">
+                    <span>■ 미수금 현황 (원)</span>
+                    <span class="text-[10px] text-blue-200 font-normal">금액</span>
+                  </div>
+                  <table class="w-full text-xs border-collapse">
+                    <tbody>
+                      <tr class="border-b border-slate-200 hover:bg-slate-50/80 transition-colors">
+                        <td class="px-3 py-2 font-bold text-slate-800 bg-slate-50/60 w-1/2">입금확인 금액</td>
+                        <td class="px-3 py-2 font-black text-right text-slate-900 text-sm" id="detailDash-depositConfirmed">448,075,000</td>
+                      </tr>
+                      <tr class="border-b border-slate-200 hover:bg-slate-50/80 transition-colors">
+                        <td class="px-3 py-2 font-bold text-slate-800 bg-slate-50/60">미확인 청구건수</td>
+                        <td class="px-3 py-2 font-black text-right text-slate-900 text-sm" id="detailDash-unconfirmedClaims">98</td>
+                      </tr>
+                      <tr class="border-b border-slate-200 bg-rose-50/30 hover:bg-rose-50/60 transition-colors cursor-pointer" onclick="setHubFilter('UNPAID_CLAIM')" title="미수금 대사 필터">
+                        <td class="px-3 py-2 font-extrabold text-rose-700">
+                          추정 미수금 <span class="text-[10.5px] font-normal text-rose-500">(단가 142,000 기본)</span>
+                        </td>
+                        <td class="px-3 py-2 font-black text-right text-red-600 text-base" id="detailDash-estimatedUnpaid">99,898,000</td>
+                      </tr>
+                      <tr class="hover:bg-slate-50/80 transition-colors">
+                        <td class="px-3 py-2 font-bold text-slate-800 bg-slate-50/60">총 간병비 지급액</td>
+                        <td class="px-3 py-2 font-black text-right text-slate-900 text-sm" id="detailDash-totalPayout">551,230,917</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- 5. ■ 미청구 현황 (건) -->
+                <div class="border border-slate-300 rounded-lg overflow-hidden shadow-2xs">
+                  <div class="bg-[#1f4e78] text-white font-extrabold text-xs px-3 py-1.5">
+                    ■ 미청구 현황 (건)
+                  </div>
+                  <table class="w-full text-xs border-collapse">
+                    <tbody>
+                      <tr class="border-b border-slate-200 hover:bg-rose-50/30 transition-colors">
+                        <td class="px-3 py-1.5 font-semibold text-slate-800 w-2/3">미청구(완료·무청구)</td>
+                        <td class="px-3 py-1.5 font-black text-right text-red-600 text-sm" id="detailDash-unclaimedCompleted">9</td>
+                      </tr>
+                      <tr class="border-b border-slate-200 hover:bg-rose-50/30 transition-colors">
+                        <td class="px-3 py-1.5 font-semibold text-slate-800">미청구(청구지연·진행중)</td>
+                        <td class="px-3 py-1.5 font-black text-right text-red-600 text-sm" id="detailDash-unclaimedDelayed">1</td>
+                      </tr>
+                      <tr class="border-b border-slate-200 hover:bg-slate-50 transition-colors">
+                        <td class="px-3 py-1.5 font-semibold text-slate-700">미청구(청구시작안됨)</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-slate-700" id="detailDash-unclaimedNotStarted">7</td>
+                      </tr>
+                      <tr class="bg-amber-50/40 hover:bg-amber-50/70 transition-colors">
+                        <td class="px-3 py-2 font-extrabold text-amber-900">미청구 합계</td>
+                        <td class="px-3 py-2 font-black text-right text-red-600 text-base" id="detailDash-unclaimedTotal">17</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+              </div>
+
             </div>
-            <div class="text-lg sm:text-xl font-black text-amber-600 mt-0.5" id="hubCount-IN_PROGRESS">-건</div>
-          </button>
-          <button onclick="setHubFilter('UNPAID_CLAIM')" id="hubFilterBtn-UNPAID_CLAIM" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-rose-200">
-            <div class="text-[11px] font-bold text-rose-600 flex items-center justify-between">
-              <span>④ 미수금 대사</span>
-              <span class="text-[10px] text-rose-500 font-semibold">(청구금 미입금)</span>
-              <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-            </div>
-            <div class="text-lg sm:text-xl font-black text-rose-600 mt-0.5" id="hubCount-UNPAID_CLAIM">-건</div>
-          </button>
-          <button onclick="setHubFilter('NEED_PAYOUT')" id="hubFilterBtn-NEED_PAYOUT" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-orange-200">
-            <div class="text-[11px] font-bold text-orange-600 flex items-center justify-between">
-              <span>⑤ 지급 대기</span>
-              <span class="text-[10px] text-orange-500 font-semibold">(간병비 미지급)</span>
-              <span class="w-2 h-2 rounded-full bg-orange-500"></span>
-            </div>
-            <div class="text-lg sm:text-xl font-black text-orange-600 mt-0.5" id="hubCount-NEED_PAYOUT">-건</div>
-          </button>
-          <button onclick="setHubFilter('NEED_FAX')" id="hubFilterBtn-NEED_FAX" class="hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left border-slate-200">
-            <div class="text-[11px] font-semibold text-slate-500">⑥ 팩스 전송대기</div>
-            <div class="text-lg sm:text-xl font-black text-purple-600 mt-0.5" id="hubCount-NEED_FAX">-건</div>
-          </button>
+
+          </div>
+
         </div>
 
         <!-- STICKY FILTER & SEARCH CONTROLS BAR (세로 스크롤 시 상단 완전 불투명 고정 및 슬림 1행 디자인) -->
@@ -3786,6 +4053,139 @@
                 </tr>
               </thead>
               <tbody id="careLogsTableBody" class="divide-y divide-slate-100 bg-white">
+                <!-- Dynamically rendered by renderCareLogs() in app.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB: CARE LOGS NEW (간병일지 new) ==================== -->
+      <section id="tab-carelogs_new" class="tab-content hidden space-y-5">
+        <!-- 상단 헤더 & 컨트롤 바 -->
+        <div class="bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="space-y-1.5 min-w-0">
+            <div class="flex items-center gap-2 text-xs font-bold tracking-wider text-purple-300 flex-wrap">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-[11px] font-bold">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                케어포트 전산 실시간 연결됨
+              </span>
+              <span class="px-2 py-0.5 rounded-full bg-pink-500/25 text-pink-300 border border-pink-400/40 text-[11px] font-bold flex items-center gap-1">
+                <i data-lucide="smartphone" class="w-3 h-3 text-pink-400"></i>
+                모바일 간병일지(문자 발송) &amp; PDF 일지 지원
+              </span>
+              <span class="px-2 py-0.5 rounded bg-purple-500/30 text-purple-200 border border-purple-400/40 text-[10px] font-bold">
+                그룹1: B2C / 그룹2: 현대·삼성 / 그룹3,4: 전체
+              </span>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+              <span>고객별 간병일지 관리 (NEW)</span>
+              <span id="carePortSyncTimeBadge_new" class="text-xs font-normal text-purple-200/80 bg-white/10 px-2.5 py-0.5 rounded-lg">최근 동기화: 확인 중</span>
+            </h2>
+            <p class="text-xs text-purple-200/90 leading-relaxed max-w-3xl">
+              회원/가족에게 안심 문자로 전송하는 <b>모바일 케어 리포트</b>와 공인 제출용 <b>PDF 간병일지</b>를 환자별로 자동 생성 및 관리합니다.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+            <button type="button" onclick="openMobileCareDiaryPreview()" 
+              class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-pink-900/40 transition-all cursor-pointer whitespace-nowrap active:scale-95">
+              <i data-lucide="smartphone" class="w-4 h-4 text-white"></i>
+              <span>모바일 간병일지 뷰어</span>
+            </button>
+            <button type="button" onclick="syncCarePortLogs(true)" id="btnSyncCarePort_new"
+              class="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-purple-900/40 transition-all cursor-pointer whitespace-nowrap active:scale-95">
+              <i data-lucide="refresh-cw" id="carePortSyncIcon_new" class="w-4 h-4 text-white"></i>
+              <span>전산 동기화</span>
+            </button>
+            <button type="button" onclick="openImportCarePortLogModal()" 
+              class="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 border border-white/20 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="file-up" class="w-3.5 h-3.5 text-purple-300"></i>
+              <span>수동 일지 등록</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 검색 & 뷰 모드 토글 & 필터 바 -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <!-- 뷰 모드 전환 버튼 -->
+            <div class="inline-flex rounded-xl p-1 bg-slate-100 border border-slate-200 font-bold items-center">
+              <button type="button" id="btnViewModePatient_new" onclick="setCareLogViewMode('patient')" 
+                class="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer">
+                <i data-lucide="users" class="w-3.5 h-3.5"></i>
+                <span>환자별 묶음 뷰</span>
+              </button>
+              <button type="button" id="btnViewModeFlat_new" onclick="setCareLogViewMode('flat')" 
+                class="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 cursor-pointer">
+                <i data-lucide="list" class="w-3.5 h-3.5"></i>
+                <span>일자별 전체 목록</span>
+              </button>
+            </div>
+
+            <!-- PDF 일지 전용 검색 & 원수사 필터 -->
+            <div id="careLogDefaultFilters_new" class="flex items-center gap-2.5 flex-wrap">
+              <div class="relative w-64">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+                <input type="text" id="careLogSearchInput_new" oninput="renderCareLogs()" placeholder="환자명, 연령, 간병인명, 접수번호 검색..." 
+                  class="pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-purple-500 w-full transition-all">
+              </div>
+
+              <select id="careLogInsuranceFilter_new" onchange="renderCareLogs()" class="py-1.5 px-3 border border-slate-300 rounded-xl bg-white font-bold text-slate-700 cursor-pointer">
+                <option value="삼성화재" selected>삼성화재</option>
+                <option value="현대해상">현대해상</option>
+                <option value="현대해상(SCOR)">현대해상(SCOR)</option>
+                <option value="ALL">원수사: 전체</option>
+              </select>
+
+              <span class="text-slate-500 text-[11px] border-l border-slate-200 pl-3">
+                관리 환자: <b id="careLogPatientCountBadge_new" class="text-purple-700 font-bold">0</b>명
+                (총 일지 <b id="careLogCountBadge_new" class="text-purple-700 font-bold">0</b>건)
+              </span>
+            </div>
+          </div>
+
+          <!-- PDF 일지 다운로드 & 엑셀 액션 -->
+          <div id="careLogDefaultActions_new" class="flex items-center gap-2">
+            <button type="button" onclick="batchDownloadSelectedPatientPdfs()" id="btnBatchDownloadZips_new" disabled 
+              class="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
+              title="선택된 환자들의 전체 간병일지를 환자별 1개의 통합 PDF 문서로 다운로드합니다">
+              <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
+              <span>선택 환자 일지 PDF 다운로드</span>
+            </button>
+            <button type="button" onclick="exportLedgerToExcel('carelogs', 'ALL')" 
+              class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer">
+              <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> <span>목록 엑셀 다운로드</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 1. 환자별 묶음 뷰 (Patient Group Container) -->
+        <div id="careLogPatientCardsContainer_new" class="space-y-4">
+          <!-- Dynamically populated by renderCareLogs() -->
+        </div>
+
+        <!-- 2. 일자별 전체 목록 테이블 (Flat List View - Hidden by default or toggled) -->
+        <div id="careLogTableContainer_new" class="hidden bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left text-xs border-collapse min-w-[1100px]">
+              <thead class="bg-slate-100 text-slate-700 font-bold border-b select-none">
+                <tr>
+                  <th class="p-2.5 text-center w-10 border-r border-slate-200">
+                    <input type="checkbox" onchange="toggleCareLogSelectAll(this.checked)" id="checkAllCareLogs_new" class="w-3.5 h-3.5 rounded text-purple-600 focus:ring-purple-500 cursor-pointer">
+                  </th>
+                  <th class="p-2.5 text-center w-12 border-r border-slate-200 font-mono text-slate-500">No</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">대상자명</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800 text-center w-16">연령</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800 text-center w-14">성별</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">상담자</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">소속기관</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800">상담일시</th>
+                  <th class="p-2.5 border-r border-slate-200 font-extrabold text-slate-800 text-center w-20">상담시간</th>
+                  <th class="p-2.5 font-extrabold text-purple-900 text-center w-44">공식 간병일지 (CarePort 원본)</th>
+                </tr>
+              </thead>
+              <tbody id="careLogsTableBody_new" class="divide-y divide-slate-100 bg-white">
                 <!-- Dynamically rendered by renderCareLogs() in app.js -->
               </tbody>
             </table>
@@ -12318,6 +12718,165 @@
     </div>
   </div>
 
+  <!-- ==================== MOBILE CARE DIARY PREVIEW MODAL (신규 모바일 간병일지 뷰어) ==================== -->
+  <div id="mobileCareDiaryModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 hidden">
+    <div id="mobileDiaryDialogCard" class="bg-white rounded-3xl max-w-4xl w-full max-h-[96vh] h-[92vh] flex flex-col shadow-2xl border border-slate-300 overflow-hidden animate-in fade-in zoom-in-95 duration-150 transition-all">
+      <!-- Modal Top Navigation Bar -->
+      <div class="px-5 py-3 bg-gradient-to-r from-pink-950 via-rose-950 to-slate-900 text-white flex items-center justify-between border-b border-pink-900/50 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-pink-600 flex items-center justify-center text-white font-black shadow-md shrink-0">
+            <i data-lucide="smartphone" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-pink-500/30 text-pink-200 border border-pink-400/30">
+                Mobile Care Diary
+              </span>
+              <span id="mobileDiaryPatientBadge" class="text-xs font-bold text-pink-200">고연분 님 (16일차)</span>
+            </div>
+            <h3 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <span>리본케어 모바일 간병일지 미리보기</span>
+              <span class="text-xs text-pink-200/80 font-normal hidden sm:inline">(회원/가족 문자 전송용)</span>
+            </h3>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- 뷰어 모드 토글: 모바일 폰 뷰 (375px) vs 와이드 뷰 -->
+          <button type="button" onclick="toggleMobileDiaryFrameSize()" id="btnToggleDiaryFrame"
+            class="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1.5 border border-white/20 transition-all cursor-pointer">
+            <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+            <span id="txtToggleDiaryFrame">모바일 폰 뷰</span>
+          </button>
+          <button type="button" onclick="copyCurrentMobileDiarySmsLink()" 
+            class="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer">
+            <i data-lucide="message-square-share" class="w-3.5 h-3.5"></i>
+            <span>문자 링크 복사</span>
+          </button>
+          <button type="button" onclick="openMobileDiaryExternalTab()" 
+            class="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1.5 border border-white/20 transition-all cursor-pointer" title="새 탭으로 열기">
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          </button>
+          <button type="button" onclick="closeMobileCareDiaryModal()" 
+            class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer ml-1">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body (Iframe) -->
+      <div id="mobileDiaryFrameWrapper" class="flex-1 bg-slate-900/90 flex items-center justify-center p-0 overflow-hidden relative transition-all">
+        <iframe id="mobileDiaryIframe" src="mobile-care-diary.html" class="w-full h-full border-0 transition-all bg-white"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== REAL SMS DISPATCH MODAL (모바일 간병일지 실제 문자 발송 모달) ==================== -->
+  <div id="mobileCareDiarySmsModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-lg w-full max-h-[96vh] flex flex-col shadow-2xl border border-slate-300 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <!-- Header -->
+      <div class="px-5 py-4 bg-gradient-to-r from-rose-900 via-pink-900 to-slate-900 text-white flex items-center justify-between border-b border-rose-800/40 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-rose-600 flex items-center justify-center text-white font-black shadow-md shrink-0">
+            <i data-lucide="send" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-rose-500/30 text-rose-200 border border-rose-400/30">
+                Real SMS Dispatch
+              </span>
+              <span id="smsModalBalanceBadge" class="text-xs font-bold text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                바로빌 잔여: 조회중
+              </span>
+            </div>
+            <h3 class="text-base font-black text-white">모바일 간병일지 실제 문자 발송</h3>
+          </div>
+        </div>
+        <button type="button" onclick="closeMobileCareDiarySmsModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Form Body -->
+      <form id="mobileDiarySmsForm" onsubmit="handleRealSmsSubmit(event)" class="p-5 overflow-y-auto space-y-4 text-xs">
+        <!-- 환자 및 수신자 정보 -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">대상 환자명</label>
+            <input type="text" id="smsTargetPatientName" readonly class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-800">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">수신자명 (보호자/환자)</label>
+            <input type="text" id="smsRecipientName" placeholder="예: 보호자" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-semibold text-slate-900 focus:ring-2 focus:ring-rose-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+            <span>수신 휴대폰 번호 <span class="text-rose-600">*</span></span>
+            <span class="text-[11px] text-slate-400 font-normal">숫자만 입력 가능 (- 자동)</span>
+          </label>
+          <input type="tel" id="smsRecipientPhone" required placeholder="010-0000-0000" oninput="formatPhoneInput(this)" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-mono font-bold text-slate-900 text-sm focus:ring-2 focus:ring-rose-500">
+        </div>
+
+        <!-- 발신 번호 및 통신사 회선 -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">발신 전화번호</label>
+            <select id="smsSenderNumber" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500">
+              <option value="16007835" selected>1600-7835 (리본케어 공식)</option>
+              <option value="15337436">1533-7436 (현대해상 전용)</option>
+              <option value="15447119">1544-7119 (리본 고객센터)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">전송 통신망 (회선)</label>
+            <select id="smsProviderSelect" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500">
+              <option value="barobill" selected>바로빌 통신망 (국내 통신 3사)</option>
+              <option value="twilio">Twilio SMS (글로벌 망)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 메시지 본문 -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="font-bold text-slate-700">발송 메시지 내용</label>
+            <div class="flex items-center gap-2 text-[11px]">
+              <span id="smsByteCountBadge" class="font-mono font-bold text-slate-600">0 Byte</span>
+              <span id="smsTypeBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">단문 (SMS)</span>
+            </div>
+          </div>
+          <textarea id="smsMessageContent" required rows="6" oninput="updateSmsByteCountDisplay()" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-2xl font-sans text-xs text-slate-800 leading-relaxed focus:bg-white focus:ring-2 focus:ring-rose-500 focus:outline-none"></textarea>
+          <p class="text-[11px] text-slate-400 mt-1">
+            ※ 90 Byte 이하는 <b>단문(SMS)</b>, 91~2,000 Byte는 <b>장문(LMS)</b>으로 자동 변환되어 전송됩니다.
+          </p>
+        </div>
+
+        <!-- 발송 상태 안내 박스 -->
+        <div id="smsSendStatusBox" class="p-3 bg-slate-100 rounded-xl text-slate-600 text-xs hidden"></div>
+
+        <!-- Action Buttons -->
+        <div class="pt-2 flex items-center justify-between gap-2">
+          <button type="button" onclick="openDeviceNativeSmsApp()" class="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer" title="모바일 기기의 기본 문자 앱으로 열기">
+            <i data-lucide="smartphone" class="w-4 h-4 text-slate-600"></i>
+            <span class="hidden sm:inline">문자앱 직접열기</span>
+          </button>
+
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="closeMobileCareDiarySmsModal()" class="px-4 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition-all cursor-pointer">
+              취소
+            </button>
+            <button type="submit" id="btnSubmitRealSms" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-rose-900/30 transition-all cursor-pointer active:scale-95">
+              <i data-lucide="send" id="iconSubmitRealSms" class="w-4 h-4"></i>
+              <span id="txtSubmitRealSms">실제 문자 즉시 발송</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ==================== CAREPORT OFFICIAL CARE LOG DETAIL MODAL ==================== -->
   <div id="carePortOfficialModal" class="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 hidden">
     <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[96vh] flex flex-col shadow-2xl border border-slate-300 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
@@ -12389,87 +12948,97 @@
             </button>
           </div>
 
-          <!-- Top Header -->
-          <div class="flex items-center justify-between pb-4 border-b border-slate-200">
+          <!-- Top Header (Image 1 style) -->
+          <div class="flex items-center justify-between pb-3 border-b border-slate-200 mb-3">
             <div>
-              <div class="text-[12px] font-bold text-slate-500 tracking-wider">보호자 안내용</div>
-              <h1 class="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mt-0.5">간병일지</h1>
+              <div class="text-[11px] font-extrabold text-[#10bdb2] uppercase tracking-wider">보호자 안내용 · 공식 간병일지</div>
+              <h1 class="text-2xl font-black text-slate-950 tracking-tight mt-0.5">간병일지</h1>
             </div>
-            <!-- Date Badge in Signature Teal Card (차수 미표시, 날짜 단독 표기) -->
-            <div class="bg-[#10bdb2] text-white px-5 py-2.5 rounded-2xl text-center shadow-xs min-w-[160px] flex flex-col items-center justify-center">
-              <div class="text-[11px] font-bold text-teal-100 uppercase tracking-wider mb-0.5">일지 작성일자</div>
-              <div id="cpMetaDate" class="text-base sm:text-lg font-black tracking-tight leading-snug">2026-09-20 (일)</div>
-              <div id="cpDayBadge" class="hidden"></div>
+            <div class="text-right">
+              <div class="inline-flex items-center gap-1.5">
+                <span class="careport-badge-pill bg-[#10bdb2] text-white text-[11px] font-black h-[22px] px-2 rounded-md"><span class="pill-text">공식일지</span></span>
+                <span id="cpMetaDate" class="text-[13px] font-extrabold text-slate-700 inline-flex items-center h-[22px]">2026-09-20 (일)</span>
+                <div id="cpDayBadge" class="hidden"></div>
+              </div>
+              <div class="text-[10px] text-slate-400 mt-0.5">리본케어포트(CarePort) 전산 공인 인증 일지</div>
             </div>
           </div>
 
-          <!-- Demographics Strip (고객명, 간병인, 간병기간) - Image 2 style -->
-          <div class="my-5 p-4 bg-[#f8fafc] border border-slate-200/80 rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div class="bg-white sm:bg-transparent p-2.5 sm:p-0 rounded-xl">
-              <div class="text-[11px] text-slate-400 font-bold mb-1">고객명</div>
-              <div class="text-sm sm:text-base font-black text-slate-900 flex items-center gap-1.5">
+          <!-- Demographics Strip (Image 1 style: 고객명 (피보험자), 담당 간병인 (소속), 간병 기간) -->
+          <div class="mb-3 p-3 bg-[#f8fafc] border border-slate-200/80 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <span class="text-[10.5px] text-slate-500 font-bold block mb-0.5">고객명 (피보험자)</span>
+              <div class="text-sm font-black text-slate-900 inline-flex items-baseline gap-1">
                 <span id="cpMetaUsernameText">윤석찬 (51세·남)</span>
                 <!-- hidden backward-compat span -->
                 <span id="cpMetaUsername" class="hidden">윤석찬</span>
                 <span id="cpMetaAgeGender" class="hidden">(51세·남)</span>
+                <span id="cpMetaAge" class="hidden">51</span>
+                <span id="cpMetaGender" class="hidden">남</span>
               </div>
             </div>
-            <div class="bg-white sm:bg-transparent p-2.5 sm:p-0 rounded-xl sm:border-l sm:border-slate-200 sm:pl-5">
-              <div class="text-[11px] text-slate-400 font-bold mb-1">간병인</div>
-              <div class="text-sm sm:text-base font-black text-slate-900 flex items-center gap-1">
-                <span id="cpMetaCaregiverText">이명선</span>
+            <div class="sm:border-l sm:border-slate-200 sm:pl-3">
+              <span class="text-[10.5px] text-slate-500 font-bold block mb-0.5">담당 간병인 (소속)</span>
+              <div class="text-[13px] font-extrabold text-slate-900 inline-flex items-baseline gap-1">
+                <span id="cpMetaCaregiverText">이명선 (삼성화재)</span>
                 <!-- hidden backward-compat span -->
                 <span id="cpMetaConsultant" class="hidden">이명선</span>
-                <span id="cpMetaOrg" class="hidden">(삼성화재)</span>
+                <span id="cpMetaOrg" class="hidden">삼성화재</span>
               </div>
             </div>
-            <div class="bg-white sm:bg-transparent p-2.5 sm:p-0 rounded-xl sm:border-l sm:border-slate-200 sm:pl-5">
-              <div class="text-[11px] text-slate-400 font-bold mb-1">간병기간</div>
-              <div class="text-sm sm:text-base font-black text-slate-900 font-mono" id="cpMetaCarePeriodText">09.15~09.20 (일)</div>
+            <div class="sm:border-l sm:border-slate-200 sm:pl-3">
+              <span class="text-[10.5px] text-slate-500 font-bold block mb-0.5">간병 기간</span>
+              <div class="text-[12.5px] font-extrabold text-slate-900 block" id="cpMetaCarePeriodText">09.15 ~ 09.20 (일)</div>
               <!-- hidden backward-compat span -->
-              <span id="cpMetaCarePeriod" class="hidden">09.15~09.20 (일)</span>
+              <span id="cpMetaCarePeriod" class="hidden">09.15 ~ 09.20 (일)</span>
+              <span id="cpMetaDuration" class="hidden"></span>
             </div>
           </div>
 
-          <!-- Section: 간병 일자별 환자 상태 변화 (첨부 2번 이미지 꺾은선 차트) -->
-          <div class="mt-6 mb-6" id="cpChartSection">
-            <div class="flex items-center justify-between mb-1.5">
-              <h2 class="text-base font-black text-slate-900">간병 일자별 환자 상태 변화</h2>
-              <span class="text-xs text-slate-400 font-medium" id="cpChartDaysCount">상태 변화 추이 (1~5점)</span>
+          <!-- Section: 간병 일자별 환자 상태 변화 (Image 1 style) -->
+          <div class="mt-4 mb-3" id="cpChartSection">
+            <div class="flex items-center justify-between border-b-2 border-[#10bdb2] pb-1.5 mb-2.5">
+              <h2 class="text-[14.5px] font-black text-slate-900 tracking-tight">간병 일자별 환자 상태 변화</h2>
+              <div class="text-[10px] font-bold text-slate-500 flex gap-2" id="cpChartLegend">
+                <span class="text-[#06C8BB]">― 총합상태</span>
+                <span class="text-[#2BBB77]">― 거동능력</span>
+                <span class="text-[#F4A61E]">― 식사상태</span>
+                <span class="text-[#6366f1]">― 수면상태</span>
+                <span class="text-[#FE6FB0]">┄ 통증수준</span>
+              </div>
             </div>
-            <div class="h-[2px] bg-[#10bdb2] w-full mb-3"></div>
-            <div class="bg-white border border-slate-200/80 rounded-2xl p-3 sm:p-4 shadow-2xs">
-              <div class="relative w-full h-[230px]">
+            <div class="bg-white border border-slate-200 rounded-xl p-2.5 text-center">
+              <div class="relative w-full h-[180px]">
                 <canvas id="cpStatusChart"></canvas>
               </div>
             </div>
           </div>
 
           <!-- Section 1: 금일 환자 상태 체크 (신호등 & 세부 상태) -->
-          <div class="mt-5 mb-2 flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
-            <h2 class="text-sm font-black text-slate-900">금일 환자 상태 체크</h2>
-            <div class="text-[10px] font-bold text-slate-500 flex items-center gap-2.5">
-              <span><b class="text-emerald-500">●</b> 양호·안정</span>
-              <span><b class="text-amber-500">●</b> 주의·부분보조</span>
-              <span><b class="text-rose-500">●</b> 악화·주의필요</span>
+          <div class="mt-4 mb-3 flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
+            <h2 class="text-[14.5px] font-black text-slate-900 tracking-tight">금일 환자 상태 체크</h2>
+            <div class="text-[10px] font-bold text-slate-500 flex items-center gap-2">
+              <span class="inline-flex items-center gap-1"><b class="text-[#20b86a] text-[11px]">●</b> 양호·안정</span>
+              <span class="inline-flex items-center gap-1"><b class="text-[#f5aa18] text-[11px]">●</b> 주의·부분보조</span>
+              <span class="inline-flex items-center gap-1"><b class="text-[#eb5c60] text-[11px]">●</b> 악화·주의필요</span>
             </div>
           </div>
 
           <!-- Overall Status Verdict Card -->
-          <div id="cpOverallVerdictBox" class="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between mb-3 shadow-2xs">
-            <div class="flex items-center gap-3">
-              <span id="cpOverallToneBadge" class="inline-flex items-center justify-center h-6 px-2.5 rounded-md text-xs font-black leading-none bg-emerald-50 text-emerald-700 border border-emerald-300">
-                <span class="inline-block w-1.5 h-1.5 rounded-full bg-current mr-1.5 shrink-0"></span>
-                <span>전반상태</span>
+          <div id="cpOverallVerdictBox" class="p-2.5 bg-white border border-slate-200 rounded-xl flex items-center justify-between mb-2.5 min-h-[44px]">
+            <div class="flex items-center gap-2.5">
+              <span id="cpOverallToneBadge" class="careport-badge-pill text-[11.5px] font-black h-6 px-2.5 rounded-md">
+                <span class="careport-dot w-[5px] h-[5px] mr-1.5"></span>
+                <span class="pill-text">전반상태</span>
               </span>
-              <div id="cpOverallTrafficSvg"></div>
-              <span id="cpOverallDesc" class="text-xs font-bold text-slate-800">전반적으로 안정적</span>
+              <div id="cpOverallTrafficSvg" class="inline-flex items-center"></div>
+              <span id="cpOverallDesc" class="text-xs font-bold text-slate-800 flex items-center h-6">전반적으로 안정적</span>
             </div>
-            <span class="inline-flex items-center justify-center h-6 px-2 rounded bg-slate-100 text-slate-600 font-bold text-[11px] leading-none">종합 판정</span>
+            <span class="careport-badge-pill text-[11px] font-extrabold text-slate-600 bg-slate-100 border border-slate-200 h-6 px-2 rounded"><span class="pill-text">종합 판정</span></span>
           </div>
 
           <!-- 4 Category Status Cards (식사, 거동, 수면, 통증) -->
-          <div id="cpCategoryCardsContainer" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+          <div id="cpCategoryCardsContainer" class="flex gap-2 mb-3">
             <!-- Dynamically populated -->
           </div>
 
@@ -12485,21 +13054,21 @@
           </div>
 
           <!-- Section 3: 금일 간병 수행 내역 (5 Rows) -->
-          <div class="mt-4 mb-2 flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
-            <h2 class="text-sm font-black text-slate-900">금일 간병 수행 내역</h2>
+          <div class="mt-4 mb-3 flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
+            <h2 class="text-[14.5px] font-black text-slate-900 tracking-tight">금일 간병 수행 내역</h2>
             <span class="text-[10px] text-slate-400 font-medium">표준 간병 프로세스 준수</span>
           </div>
-          <div id="cpCareLogList" class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 p-2 mb-4">
+          <div id="cpCareLogList" class="bg-white border border-slate-200 rounded-xl p-2.5 mb-3">
             <!-- Dynamically populated -->
           </div>
 
-
-          <!-- Section 5: 보호자 전달사항 (6 Items) -->
-          <div class="mt-4 mb-2 flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
-            <h2 class="text-sm font-black text-slate-900">보호자 전달사항</h2>
+          <!-- Section 4: 보호자 전달사항 (6 Items) -->
+          <div class="mt-4 mb-3 flex items-center justify-between border-b-2 border-slate-900 pb-1.5">
+            <h2 class="text-[14.5px] font-black text-slate-900 tracking-tight">보호자 전달사항</h2>
             <span class="text-[10px] text-slate-400 font-medium">안심 소통 리포트</span>
           </div>
-          <div id="cpGuardianNotesGrid" class="bg-white border border-slate-200 rounded-xl p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+          <div id="cpGuardianNotesGrid" class="bg-white border border-slate-200 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+            <!-- Dynamically populated -->
           </div>
         </div>
       </div>
@@ -12639,6 +13208,7 @@
   <script src="total-call-analysis.js?v=20260921_1005"></script>
   <script src="system-audit-log.js?v=20260922_1040"></script>
   <script src="survey-client.js?v=20261002_1600"></script>
+  <script src="slack-report-client.js?v=20261006_1510"></script>
   <script src="./xlsx-populate.min.js"></script>
   <script src="app.js?v=20261003_1120"></script>
   <!-- 🚀 초고속 렌더링 최적화: 대용량 PDF & Excel 라이브러리는 첫 화면 렌더링 이후 비동기 지연 로드 -->

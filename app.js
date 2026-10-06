@@ -1261,12 +1261,27 @@ function filterInvalidSamsungDuplicates(apps) {
   });
   // 1. 과거 레거시 목업/임의채번 S-id 삼성 데이터 정리 (실데이터 C-id 보존)
   const valid = apps.filter(a => !(a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성') && !a.isRealLaunchData));
-  // 2. ID 중복 제거 (동일 id가 여러 번 존재하는 경우 최신/확장 데이터인 마지막 항목 보존)
+  // 2. ID 중복 제거 (단, 신청일자/진단명이 다른 별개의 신청 건은 둘 다 보존하여 308건 온전 유지)
   const map = new Map();
   for (let i = 0; i < valid.length; i++) {
     const item = valid[i];
     if (item && item.id) {
-      map.set(String(item.id), item);
+      const idKey = String(item.id);
+      if (map.has(idKey)) {
+        const existing = map.get(idKey);
+        // 신청일자나 환자명, 진단명이 서로 다른 별개의 신청건인 경우 고유 서브키 부여하여 둘 다 보존
+        if (existing && (existing.applyDate !== item.applyDate || existing.diagnosis !== item.diagnosis || existing.accidentNumber !== item.accidentNumber)) {
+          const distinctKey = idKey + '_dup_' + i;
+          item._origId = item.id;
+          item.id = distinctKey;
+          map.set(distinctKey, item);
+        } else {
+          // 완전히 동일한 중복 객체인 경우 최신 확장 데이터로 갱신
+          map.set(idKey, item);
+        }
+      } else {
+        map.set(idKey, item);
+      }
     } else {
       map.set(Symbol(), item);
     }
@@ -1600,6 +1615,10 @@ async function loadConvexData(showSpinner = true) {
     if (Array.isArray(realJson.adjusters) && realJson.adjusters.length > 0) {
       gAdjusters = realJson.adjusters;
       try { localStorage.setItem('LIVON_CACHED_ADJUSTERS', JSON.stringify(gAdjusters)); } catch (e) {}
+    }
+    if (realJson.dashboardStats) {
+      window.gOfficialDashboardStats = realJson.dashboardStats;
+      try { localStorage.setItem('LIVON_OFFICIAL_DASH_STATS', JSON.stringify(realJson.dashboardStats)); } catch (e) {}
     }
     if (typeof reconcileAppsWithActiveAssignments === 'function') {
       reconcileAppsWithActiveAssignments();
@@ -13780,8 +13799,31 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
       min-height: 1122px !important;
       max-height: 1122px !important;
       box-sizing: border-box !important;
-      padding: 26px 36px !important;
+      padding: 0 36px !important;
       overflow: hidden !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: center !important;
+    }
+    .sec-head {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      border-bottom: 2px solid #0f172a !important;
+      padding-bottom: 5px !important;
+      margin-top: 18px !important;
+      margin-bottom: 12px !important;
+    }
+    .sec-head.sec-head-teal {
+      border-bottom: 2px solid #00897b !important;
+    }
+    .sec-title {
+      font-size: 14.5px !important;
+      font-weight: 900 !important;
+      color: #0f172a !important;
+      letter-spacing: -0.3px !important;
+      display: inline-flex !important;
+      align-items: center !important;
     }
     .careport-badge-pill {
       display: inline-flex !important;
@@ -13793,14 +13835,15 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
       text-align: center !important;
       white-space: nowrap !important;
     }
-    .careport-badge-pill > span,
+    .careport-badge-pill .pill-text,
+    .careport-badge-pill > span:not(.careport-dot),
     .careport-badge-pill > strong {
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
       line-height: 1 !important;
       position: relative !important;
-      top: 0 !important;
+      top: -1px !important;
     }
     .careport-dot {
       display: inline-block !important;
@@ -13809,7 +13852,7 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
       flex-shrink: 0 !important;
       vertical-align: middle !important;
       position: relative !important;
-      top: 0 !important;
+      top: 0px !important;
     }
     .no-print { display: none !important; }
   </style>
@@ -21708,6 +21751,26 @@ const hubFilterConfig = {
   }
 };
 
+function toggleHubDashboardDetail(forceState) {
+  const container = document.getElementById('hubDashDetailedContainer');
+  const btnText = document.getElementById('btnToggleHubDashDetailText');
+  const btnIcon = document.getElementById('iconToggleHubDashDetail');
+  if (!container) return;
+
+  const isHidden = container.classList.contains('hidden');
+  const willShow = forceState !== undefined ? forceState : isHidden;
+  if (willShow) {
+    container.classList.remove('hidden');
+    if (btnText) btnText.innerText = '간략히 보기';
+    if (btnIcon) btnIcon.style.transform = 'rotate(180deg)';
+  } else {
+    container.classList.add('hidden');
+    if (btnText) btnText.innerText = '자세히 보기';
+    if (btnIcon) btnIcon.style.transform = 'rotate(0deg)';
+  }
+}
+window.toggleHubDashboardDetail = toggleHubDashboardDetail;
+
 function setHubFilter(filterType) {
   // 이미 활성화된 필터 버튼을 다시 누른 경우 전체(ALL)로 토글 해제
   if (gHubFilter === filterType && filterType !== 'ALL') {
@@ -21716,40 +21779,14 @@ function setHubFilter(filterType) {
   gHubFilter = filterType;
 
   // 1. Reset all buttons to original crisp colors
-  Object.keys(hubFilterConfig).forEach(type => {
-    const btn = document.getElementById('hubFilterBtn-' + type);
-    if (btn) {
-      let borderClass = 'border-slate-200';
-      if (type === 'COMPLETED') borderClass = 'border-emerald-200';
-      else if (type === 'UNPAID_CLAIM') borderClass = 'border-rose-200';
-      else if (type === 'NEED_PAYOUT') borderClass = 'border-orange-200';
-      else if (type === 'IN_PROGRESS') borderClass = 'border-amber-200';
-      else if (type === 'NEED_ASSIGN') borderClass = 'border-slate-200';
-
-      btn.className = `hub-filter-btn p-2.5 sm:p-3 rounded-xl border bg-white hover:bg-slate-50 transition-all text-left ${borderClass} shadow-2xs`;
-      const subTitle = btn.querySelector('div:first-child');
-      if (subTitle) {
-        if (type === 'COMPLETED') subTitle.className = 'text-[11px] font-bold text-emerald-700 flex items-center justify-between';
-        else if (type === 'IN_PROGRESS') subTitle.className = 'text-[11px] font-bold text-amber-700 flex items-center justify-between';
-        else if (type === 'NEED_ASSIGN') subTitle.className = 'text-[11px] font-bold text-slate-600 flex items-center justify-between';
-        else if (type === 'UNPAID_CLAIM') subTitle.className = 'text-[11px] font-bold text-rose-600 flex items-center justify-between';
-        else if (type === 'NEED_PAYOUT') subTitle.className = 'text-[11px] font-bold text-orange-600 flex items-center justify-between';
-        else subTitle.className = 'text-[11px] font-semibold text-slate-500';
-      }
-      const countDiv = btn.querySelector('[id^="hubCount-"]');
-      if (countDiv) countDiv.className = 'text-lg sm:text-xl font-black mt-0.5 ' + hubFilterConfig[type].countColor;
-    }
+  const allBtns = document.querySelectorAll('.hub-filter-btn');
+  allBtns.forEach(btn => {
+    btn.classList.remove('active', 'ring-2', 'ring-indigo-600', 'ring-offset-1');
   });
 
-  // 2. Set active button with its distinct theme color
-  const targetBtn = document.getElementById('hubFilterBtn-' + filterType);
-  if (targetBtn) {
-    const cfg = hubFilterConfig[filterType] || hubFilterConfig['ALL'];
-    targetBtn.className = 'hub-filter-btn active p-2.5 sm:p-3 rounded-xl border transition-all text-left ' + cfg.activeClass;
-    const subTitle = targetBtn.querySelector('div:first-child');
-    if (subTitle) subTitle.className = 'text-[11px] font-bold ' + cfg.activeSubTitle + ' flex items-center justify-between';
-    const countDiv = targetBtn.querySelector('[id^="hubCount-"]');
-    if (countDiv) countDiv.className = 'text-lg sm:text-xl font-black mt-0.5 ' + cfg.activeCount;
+  const activeBtn = document.getElementById('hubFilterBtn-' + filterType);
+  if (activeBtn) {
+    activeBtn.classList.add('active', 'ring-2', 'ring-indigo-600', 'ring-offset-1');
   }
 
   gHubCurrentPage = 1;
@@ -32680,6 +32717,22 @@ function renderUnifiedCareHub() {
     return app.claimCount > 0 && !isSent;
   };
 
+  const isScheduledHelper = (app) => {
+    if (!app) return false;
+    const theme = typeof getCustomerCardStatusTheme === 'function' ? getCustomerCardStatusTheme(app) : {};
+    if (theme.type === 'upcoming') return true;
+    const st = String(app.status || app.rawStatus || '').trim();
+    return st === '예정' || st === '배정예정';
+  };
+
+  const isCancelledHelper = (app) => {
+    if (!app) return false;
+    const theme = typeof getCustomerCardStatusTheme === 'function' ? getCustomerCardStatusTheme(app) : {};
+    if (theme.type === 'cancelled' || theme.type === 'not_applicable' || theme.statusText === '당일서비스취소' || (theme.statusText && theme.statusText.includes('서비스불가')) || theme.statusText === '제외') return true;
+    const st = String(app.status || app.rawStatus || '').trim();
+    return st === '취소' || st === '서비스 취소' || st === '당일서비스취소' || st === '미해당' || st.includes('취소') || st.includes('불가') || st.includes('제외');
+  };
+
   for (let i = 0; i < activeHubApps.length; i++) {
     const a = activeHubApps[i];
     const aIns = a.insuranceCompany || '';
@@ -32700,12 +32753,243 @@ function renderUnifiedCareHub() {
     countAllEl.innerText = scopedTotal + '건';
     const countCompEl = document.getElementById('hubCount-COMPLETED');
     if (countCompEl) countCompEl.innerText = completedCount + '건';
-    document.getElementById('hubCount-NEED_ASSIGN').innerText = needAssignCount + '건';
-    document.getElementById('hubCount-IN_PROGRESS').innerText = inProgressCount + '건';
-    document.getElementById('hubCount-UNPAID_CLAIM').innerText = unpaidClaimCount + '건';
-    document.getElementById('hubCount-NEED_PAYOUT').innerText = needPayoutCount + '건';
-    document.getElementById('hubCount-NEED_FAX').innerText = needFaxCount + '건';
+    const cNeedAssign = document.getElementById('hubCount-NEED_ASSIGN');
+    if (cNeedAssign) cNeedAssign.innerText = needAssignCount + '건';
+    const cInProg = document.getElementById('hubCount-IN_PROGRESS');
+    if (cInProg) cInProg.innerText = inProgressCount + '건';
+    const cUnpaid = document.getElementById('hubCount-UNPAID_CLAIM');
+    if (cUnpaid) cUnpaid.innerText = unpaidClaimCount + '건';
+    const cPayout = document.getElementById('hubCount-NEED_PAYOUT');
+    if (cPayout) cPayout.innerText = needPayoutCount + '건';
+    const cFax = document.getElementById('hubCount-NEED_FAX');
+    if (cFax) cFax.innerText = needFaxCount + '건';
     if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+  }
+
+  // ==================== [통합허브 실데이터 기반 동적 써머리 계산 엔진] ====================
+  const updateDashEl = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = (typeof val === 'number') ? val.toLocaleString('ko-KR') : (val !== undefined && val !== null ? val : '0');
+  };
+
+  // 1. 현재 필터(전체 / 현대해상 / 삼성화재)에 해당하는 고객군 스코프 확정
+  const scopedApps = (activeHubApps || []).filter(a => {
+    if (!a) return false;
+    const comp = a.insuranceCompany || '';
+    if (insFilter === '삼성' && !comp.includes('삼성')) return false;
+    if (insFilter === '현대' && !comp.includes('현대')) return false;
+    return true;
+  });
+
+  const scopedAppIdSet = new Set(scopedApps.map(a => String(a.id || '').trim()));
+  const scopedPatientNameSet = new Set(scopedApps.map(a => String(a.patientName || '').trim()));
+
+  // 2. 신청 현황 및 미청구 현황 동적 집계
+  let dashTotalApps = scopedApps.length;
+  let dashCompleted = 0;
+  let dashInProgress = 0;
+  let dashScheduled = 0;
+  let dashCancelled = 0;
+
+  let dashUnclaimedCompleted = 0;
+  let dashUnclaimedDelayed = 0;
+  let dashUnclaimedNotStarted = 0;
+
+  let dashHyundai = 0;
+  let dashScor = 0;
+  let dashSamsung = 0;
+
+  for (let i = 0; i < scopedApps.length; i++) {
+    const a = scopedApps[i];
+    const comp = a.insuranceCompany || '';
+    if (comp.includes('SCOR') || comp.includes('scor')) {
+      dashScor++;
+      dashHyundai++;
+    } else if (comp.includes('현대')) {
+      dashHyundai++;
+    } else if (comp.includes('삼성')) {
+      dashSamsung++;
+    }
+
+    // 상태 집계
+    const st = String(a.status || a.rawStatus || '').trim();
+    if (st.includes('완료') || st.startsWith('완') || st.includes('종결') || st.includes('정산완료')) {
+      dashCompleted++;
+    } else if (st.includes('진행')) {
+      dashInProgress++;
+    } else if (st.includes('예정')) {
+      dashScheduled++;
+    } else if (st.includes('취소') || st.includes('미해당') || st.includes('제외') || st.includes('불가') || st.includes('철회')) {
+      dashCancelled++;
+    } else {
+      dashScheduled++;
+    }
+
+    // 미청구 분류 집계
+    const cc = String(a.claimClassification || a.claimCategory || '').trim();
+    if (cc.includes('완료') || cc.includes('무청구')) {
+      dashUnclaimedCompleted++;
+    } else if (cc.includes('청구지연')) {
+      dashUnclaimedDelayed++;
+    } else if (cc.includes('청구시작안됨')) {
+      dashUnclaimedNotStarted++;
+    }
+  }
+
+  let dashUnclaimedTotal = dashUnclaimedCompleted + dashUnclaimedDelayed + dashUnclaimedNotStarted;
+
+  // 3. 간병인 배정 현황 동적 집계 (gAssigns 기반)
+  const scopedAssigns = (gAssigns || []).filter(as => {
+    if (!as) return false;
+    if (insFilter === 'ALL') return true;
+    if (as.applyId && scopedAppIdSet.has(String(as.applyId).trim())) return true;
+    if (as.patientName && scopedPatientNameSet.has(String(as.patientName).trim())) return true;
+    const asComp = as.insuranceCompany || '';
+    if (insFilter === '삼성' && asComp.includes('삼성')) return true;
+    if (insFilter === '현대' && asComp.includes('현대')) return true;
+    return false;
+  });
+
+  let dashAssignedCaregivers = 0;
+  const cgCountPerApp = {};
+  for (let i = 0; i < scopedAssigns.length; i++) {
+    const as = scopedAssigns[i];
+    const cgName = String(as.caregiverName || '').trim();
+    if (cgName && cgName !== '-' && !cgName.includes('미배정')) {
+      dashAssignedCaregivers++;
+      const k = String(as.applyId || as.patientName || '').trim();
+      if (k) cgCountPerApp[k] = (cgCountPerApp[k] || 0) + 1;
+    }
+  }
+
+  let dashCaregiverChanges = 0;
+  for (let i = 0; i < scopedApps.length; i++) {
+    const a = scopedApps[i];
+    const k = String(a.id || a.patientName || '').trim();
+    const cFromAssign = cgCountPerApp[k] || 0;
+    const cFromApp = Number(a.assignedCaregiverCount) || 0;
+    if (cFromAssign > 1 || cFromApp > 1) {
+      dashCaregiverChanges++;
+    }
+  }
+
+  // 4. 보험 청구 및 미수금 현황 동적 집계 (gClaims 기반)
+  const scopedClaims = (gClaims || []).filter(c => {
+    if (!c) return false;
+    if (insFilter === 'ALL') return true;
+    if (c.applyId && scopedAppIdSet.has(String(c.applyId).trim())) return true;
+    if (c.patientName && scopedPatientNameSet.has(String(c.patientName).trim())) return true;
+    const cComp = c.insuranceCompany || '';
+    if (insFilter === '삼성' && cComp.includes('삼성')) return true;
+    if (insFilter === '현대' && cComp.includes('현대')) return true;
+    return false;
+  });
+
+  let dashDepositConfirmed = 0;
+  let dashUnconfirmedClaims = 0;
+  let dashEstimatedUnpaid = 0;
+
+  for (let i = 0; i < scopedClaims.length; i++) {
+    const c = scopedClaims[i];
+    const depAmt = Number(c.depositAmount) || 0;
+    const unpAmt = Number(c.unpaidAmount) || 0;
+    const st = String(c.depositStatus || '').trim();
+    dashDepositConfirmed += depAmt;
+    if (st.includes('미확인') || st === '미확인' || (!st.includes('확인') && unpAmt > 0)) {
+      dashUnconfirmedClaims++;
+    }
+    dashEstimatedUnpaid += unpAmt;
+  }
+
+  // 5. 간병비 지급 현황 동적 집계 (gPayouts 기반)
+  const scopedPayouts = (gPayouts || []).filter(p => {
+    if (!p) return false;
+    if (insFilter === 'ALL') return true;
+    if (p.applyId && scopedAppIdSet.has(String(p.applyId).trim())) return true;
+    if (p.patientName && scopedPatientNameSet.has(String(p.patientName).trim())) return true;
+    const pComp = p.insuranceCompany || '';
+    if (insFilter === '삼성' && pComp.includes('삼성')) return true;
+    if (insFilter === '현대' && pComp.includes('현대')) return true;
+    return false;
+  });
+
+  let dashTotalPayout = 0;
+  for (let i = 0; i < scopedPayouts.length; i++) {
+    dashTotalPayout += Number(scopedPayouts[i].payoutAmount) || 0;
+  }
+
+  // 데이터 0건(전체 초기화)인 경우 가드
+  if (activeHubApps.length === 0) {
+    dashTotalApps = 0;
+    dashCompleted = 0;
+    dashInProgress = 0;
+    dashScheduled = 0;
+    dashCancelled = 0;
+    dashAssignedCaregivers = 0;
+    dashCaregiverChanges = 0;
+    dashHyundai = 0;
+    dashScor = 0;
+    dashSamsung = 0;
+    dashEstimatedUnpaid = 0;
+    dashUnconfirmedClaims = 0;
+    dashDepositConfirmed = 0;
+    dashTotalPayout = 0;
+    dashUnclaimedCompleted = 0;
+    dashUnclaimedDelayed = 0;
+    dashUnclaimedNotStarted = 0;
+    dashUnclaimedTotal = 0;
+  }
+
+  // 1. 신청 현황 (컴팩트 & 상세)
+  updateDashEl('hubDash-totalApps', dashTotalApps);
+  updateDashEl('hubDash-completed', dashCompleted);
+  updateDashEl('hubDash-inProgress', dashInProgress);
+  updateDashEl('hubDash-scheduled', dashScheduled);
+  updateDashEl('hubDash-cancelled', dashCancelled);
+
+  updateDashEl('detailDash-totalApps', dashTotalApps);
+  updateDashEl('detailDash-completed', dashCompleted);
+  updateDashEl('detailDash-inProgress', dashInProgress);
+  updateDashEl('detailDash-scheduled', dashScheduled);
+  updateDashEl('detailDash-cancelled', dashCancelled);
+
+  // 2. 간병인 배정
+  updateDashEl('hubDash-assignedCaregivers', dashAssignedCaregivers);
+  updateDashEl('hubDash-caregiverChanges', dashCaregiverChanges);
+  updateDashEl('detailDash-assignedCaregivers', dashAssignedCaregivers);
+  updateDashEl('detailDash-caregiverChanges', dashCaregiverChanges);
+
+  // 3. 원수사별 건수
+  updateDashEl('hubDash-hyundai', dashHyundai);
+  updateDashEl('hubDash-scor', dashScor);
+  updateDashEl('hubDash-samsung', dashSamsung);
+  updateDashEl('detailDash-hyundai', dashHyundai);
+  updateDashEl('detailDash-scor', dashScor);
+  updateDashEl('detailDash-samsung', dashSamsung);
+
+  // 4. 미수금 현황
+  updateDashEl('hubDash-estimatedUnpaid', (dashEstimatedUnpaid).toLocaleString('ko-KR'));
+  updateDashEl('hubDash-unconfirmedClaims', dashUnconfirmedClaims);
+  updateDashEl('detailDash-depositConfirmed', (dashDepositConfirmed).toLocaleString('ko-KR'));
+  updateDashEl('detailDash-unconfirmedClaims', dashUnconfirmedClaims);
+  updateDashEl('detailDash-estimatedUnpaid', (dashEstimatedUnpaid).toLocaleString('ko-KR'));
+  updateDashEl('detailDash-totalPayout', (dashTotalPayout).toLocaleString('ko-KR'));
+
+  // 5. 미청구 현황
+  updateDashEl('hubDash-unclaimedTotal', dashUnclaimedTotal);
+  updateDashEl('detailDash-unclaimedCompleted', dashUnclaimedCompleted);
+  updateDashEl('detailDash-unclaimedDelayed', dashUnclaimedDelayed);
+  updateDashEl('detailDash-unclaimedNotStarted', dashUnclaimedNotStarted);
+  updateDashEl('detailDash-unclaimedTotal', dashUnclaimedTotal);
+
+  // 활성 필터 뱃지 시각 스타일 동기화
+  const allFilterBtns = document.querySelectorAll('.hub-filter-btn');
+  allFilterBtns.forEach(btn => {
+    btn.classList.remove('active', 'ring-2', 'ring-indigo-600', 'ring-offset-1');
+  });
+  const currentActiveFilterBtn = document.getElementById('hubFilterBtn-' + gHubFilter);
+  if (currentActiveFilterBtn) {
+    currentActiveFilterBtn.classList.add('active', 'ring-2', 'ring-indigo-600', 'ring-offset-1');
   }
 
   // 3. 수정발생 (또는 CTI 민원발생) 미확인 건수 카운트 & 토글 버튼 UI 갱신
@@ -32803,6 +33087,8 @@ function renderUnifiedCareHub() {
       if (gHubFilter === 'COMPLETED' && !isCompletedHelper(app)) return false;
       if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
       if (gHubFilter === 'IN_PROGRESS' && !isInProgressHelper(app)) return false;
+      if (gHubFilter === 'SCHEDULED' && !isScheduledHelper(app)) return false;
+      if (gHubFilter === 'CANCELLED' && !isCancelledHelper(app)) return false;
       if (gHubFilter === 'UNPAID_CLAIM' && !isAppHasUnpaidClaimHelper(app)) return false;
       if (gHubFilter === 'NEED_PAYOUT' && !isAppHasUnpaidPayoutHelper(app)) return false;
       if (gHubFilter === 'NEED_FAX' && !isNeedFaxHelper(app)) return false;
@@ -37216,6 +37502,7 @@ var APP_TAB_META = {
   // dashboard: { name: '대시보드', icon: 'layout-dashboard', color: 'text-sky-500' }, // 임시 숨김 처리
   carecalendar: { name: '간병캘린더', icon: 'calendar-days', color: 'text-sky-500' },
   carelogs: { name: '간병일지 (케어포트)', icon: 'clipboard-list', color: 'text-purple-500' },
+  carelogs_new: { name: '간병일지(new)', icon: 'clipboard-check', color: 'text-indigo-500' },
   carecall: { name: 'AI간병통화 관리', icon: 'bot', color: 'text-purple-600' },
   surveymgmt: { name: '만족도조사 관리', icon: 'star', color: 'text-amber-500' },
   directory: { name: '파트너/인력 디렉토리', icon: 'contact-2', color: 'text-emerald-500' },
@@ -37699,7 +37986,7 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
   else if (tabId === 'directory') switchDirectorySubTab(filterParam || gActiveDirectorySubTab || 'caregivers');
   else if (tabId === 'applications') renderApplications();
   else if (tabId === 'assignments') renderAssignments();
-  else if (tabId === 'carelogs') {
+  else if (tabId === 'carelogs' || tabId === 'carelogs_new') {
     if (typeof setCareLogViewMode === 'function') {
       setCareLogViewMode(gCareLogViewMode || 'patient');
     } else {
@@ -37906,7 +38193,7 @@ async function executeFullDataReset() {
       'LIVON_CACHED_PAYOUTS', 'LIVON_CACHED_CAREGIVERS', 'LIVON_CACHED_CENTERS',
       'LIVON_CACHED_ADJUSTERS', 'LIVON_CARE_LOGS', 'LIVON_SAMSUNG_SHEETS',
       'LIVON_SAMSUNG_EXCEL_LEDGER', 'LIVON_SAMSUNG_SHEET_TARGET', 'LIVON_SAMSUNG_SHEET_COMPLETED',
-      'LIVON_CACHED_TOTAL_CALL_DATA', 'LIVON_LAST_LAUNCH_SYNC_TIME',
+      'LIVON_CACHED_TOTAL_CALL_DATA', 'LIVON_LAST_LAUNCH_SYNC_TIME', 'LIVON_OFFICIAL_DASH_STATS',
       'reborn_apps', 'reborn_assignments', 'reborn_claims', 'reborn_payouts'
     ];
     keysToRemove.forEach(k => {
@@ -37914,6 +38201,7 @@ async function executeFullDataReset() {
     });
 
     gConvexDataApplied = false;
+    window.gOfficialDashboardStats = null;
 
     if (preserveAdmin) localStorage.setItem('LIVON_ADMINS', preserveAdmin);
     if (preserveToken) localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', preserveToken);
@@ -38924,34 +39212,49 @@ function setCareLogViewMode(mode) {
     localStorage.setItem('LIVON_CARELOG_VIEW_MODE', mode);
   } catch (_) {}
   const btnPatient = document.getElementById('btnViewModePatient');
+  const btnPatientNew = document.getElementById('btnViewModePatient_new');
   const btnFlat = document.getElementById('btnViewModeFlat');
+  const btnFlatNew = document.getElementById('btnViewModeFlat_new');
   const patientContainer = document.getElementById('careLogPatientCardsContainer');
+  const patientContainerNew = document.getElementById('careLogPatientCardsContainer_new');
   const flatContainer = document.getElementById('careLogTableContainer');
+  const flatContainerNew = document.getElementById('careLogTableContainer_new');
 
   const inactiveBtnClass = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 cursor-pointer';
   if (btnPatient) btnPatient.className = inactiveBtnClass;
+  if (btnPatientNew) btnPatientNew.className = inactiveBtnClass;
   if (btnFlat) btnFlat.className = inactiveBtnClass;
+  if (btnFlatNew) btnFlatNew.className = inactiveBtnClass;
 
   if (patientContainer) patientContainer.classList.add('hidden');
+  if (patientContainerNew) patientContainerNew.classList.add('hidden');
   if (flatContainer) flatContainer.classList.add('hidden');
+  if (flatContainerNew) flatContainerNew.classList.add('hidden');
 
   const defaultFilters = document.getElementById('careLogDefaultFilters');
   const defaultActions = document.getElementById('careLogDefaultActions');
   if (defaultFilters) defaultFilters.classList.remove('hidden');
   if (defaultActions) defaultActions.classList.remove('hidden');
 
+  const defaultFiltersNew = document.getElementById('careLogDefaultFilters_new');
+  const defaultActionsNew = document.getElementById('careLogDefaultActions_new');
+  if (defaultFiltersNew) defaultFiltersNew.classList.remove('hidden');
+  if (defaultActionsNew) defaultActionsNew.classList.remove('hidden');
+
+  const activeBtnClass = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer font-black';
+
   if (mode === 'patient') {
-    if (btnPatient) {
-      btnPatient.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer font-black';
-    }
+    if (btnPatient) btnPatient.className = activeBtnClass;
+    if (btnPatientNew) btnPatientNew.className = activeBtnClass;
     if (patientContainer) patientContainer.classList.remove('hidden');
+    if (patientContainerNew) patientContainerNew.classList.remove('hidden');
     renderCareLogs();
   } else {
     // flat
-    if (btnFlat) {
-      btnFlat.className = 'px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all bg-white text-purple-700 shadow-xs cursor-pointer font-black';
-    }
+    if (btnFlat) btnFlat.className = activeBtnClass;
+    if (btnFlatNew) btnFlatNew.className = activeBtnClass;
     if (flatContainer) flatContainer.classList.remove('hidden');
+    if (flatContainerNew) flatContainerNew.classList.remove('hidden');
     renderCareLogs();
   }
 }
@@ -41030,13 +41333,15 @@ function toggleCarePortPatientSelect(groupId, checked) {
   } else {
     gCarePortSelectedPatients.delete(groupId);
   }
-  const btnBatchZip = document.getElementById('btnBatchDownloadZips');
-  if (btnBatchZip) {
-    const count = gCarePortSelectedPatients.size;
-    btnBatchZip.disabled = count === 0;
-    btnBatchZip.innerHTML = `<i data-lucide="file-down" class="w-3.5 h-3.5"></i><span>선택 환자 일지 PDF 다운로드 (${count})</span>`;
-    if (typeof initIcons === 'function') initIcons(btnBatchZip);
-  }
+  ['btnBatchDownloadZips', 'btnBatchDownloadZips_new'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      const count = gCarePortSelectedPatients.size;
+      btn.disabled = count === 0;
+      btn.innerHTML = `<i data-lucide="file-down" class="w-3.5 h-3.5"></i><span>선택 환자 일지 PDF 다운로드 (${count})</span>`;
+      if (typeof initIcons === 'function') initIcons(btn);
+    }
+  });
 }
 window.toggleCarePortPatientSelect = toggleCarePortPatientSelect;
 
@@ -41047,12 +41352,18 @@ function renderCareLogs() {
   if (typeof gCarePortExpandedPatients === 'undefined' || !gCarePortExpandedPatients) {
     window.gCarePortExpandedPatients = new Set();
   }
-  const topInput = document.getElementById('careLogSearchInput');
+  const isNewTab = (gActiveTab === 'carelogs_new');
+  const topInput = isNewTab
+    ? (document.getElementById('careLogSearchInput_new') || document.getElementById('careLogSearchInput'))
+    : (document.getElementById('careLogSearchInput') || document.getElementById('careLogSearchInput_new'));
   if (gCareLogViewMode === 'call') {
     gCareLogViewMode = 'patient';
   }
   const query = (topInput?.value || '').trim().toLowerCase();
-  const insFilter = document.getElementById('careLogInsuranceFilter')?.value || '삼성화재';
+  const insSelect = isNewTab
+    ? (document.getElementById('careLogInsuranceFilter_new') || document.getElementById('careLogInsuranceFilter'))
+    : (document.getElementById('careLogInsuranceFilter') || document.getElementById('careLogInsuranceFilter_new'));
+  const insFilter = insSelect?.value || '삼성화재';
 
   // Always build fresh patient groups so accurate dates and statuses are immediately reflected
   if (window.CarePortClient && typeof window.CarePortClient.groupLogsByPatient === 'function') {
@@ -41096,18 +41407,25 @@ function renderCareLogs() {
   });
 
   // Badges
-  const patientBadge = document.getElementById('careLogPatientCountBadge');
-  if (patientBadge) patientBadge.innerText = filteredGroups.length;
+  ['careLogPatientCountBadge', 'careLogPatientCountBadge_new'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = filteredGroups.length;
+  });
 
-  const countBadge = document.getElementById('careLogCountBadge');
-  if (countBadge) countBadge.innerText = filteredLogs.length;
+  ['careLogCountBadge', 'careLogCountBadge_new'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = filteredLogs.length;
+  });
 
-  const btnBatchZip2 = document.getElementById('btnBatchDownloadZips');
-  if (btnBatchZip2) {
-    const count = gCarePortSelectedPatients.size;
-    btnBatchZip2.disabled = count === 0;
-    btnBatchZip2.innerHTML = `<i data-lucide="file-down" class="w-3.5 h-3.5"></i><span>선택 환자 일지 PDF 다운로드 (${count})</span>`;
-  }
+  ['btnBatchDownloadZips', 'btnBatchDownloadZips_new'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      const count = gCarePortSelectedPatients.size;
+      btn.disabled = count === 0;
+      btn.innerHTML = `<i data-lucide="file-down" class="w-3.5 h-3.5"></i><span>선택 환자 일지 PDF 다운로드 (${count})</span>`;
+      if (typeof initIcons === 'function') initIcons(btn);
+    }
+  });
 
   // Render view
   if (gCareLogViewMode === 'patient') {
@@ -41118,11 +41436,14 @@ function renderCareLogs() {
 }
 
 function renderCareLogPatientCards(groups) {
-  const container = document.getElementById('careLogPatientCardsContainer');
-  if (!container) return;
+  const containers = [
+    document.getElementById('careLogPatientCardsContainer'),
+    document.getElementById('careLogPatientCardsContainer_new')
+  ].filter(Boolean);
+  if (containers.length === 0) return;
 
   if (!groups || groups.length === 0) {
-    container.innerHTML = `
+    const emptyHtml = `
       <div class="bg-white p-12 rounded-3xl border border-slate-200 text-center text-slate-400 shadow-xs">
         <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-purple-50 text-purple-500 flex items-center justify-center">
           <i data-lucide="folder-search" class="w-7 h-7"></i>
@@ -41131,11 +41452,14 @@ function renderCareLogPatientCards(groups) {
         <p class="text-xs text-slate-400 mt-1.5">상단의 <b>[전산 실시간 동기화]</b> 버튼을 클릭하여 리본케어포트 전산의 최신 일지를 불러오세요.</p>
       </div>
     `;
-    if (typeof initIcons === 'function') initIcons(container);
+    containers.forEach(c => {
+      c.innerHTML = emptyHtml;
+      if (typeof initIcons === 'function') initIcons(c);
+    });
     return;
   }
 
-  container.innerHTML = groups.map((group) => {
+  const cardsHtml = groups.map((group) => {
     const isSelected = gCarePortSelectedPatients.has(group.id);
     const isExpanded = gCarePortExpandedPatients.has(group.id);
     const maskedName = typeof maskName === 'function' ? maskName(group.patientName) : group.patientName;
@@ -41197,7 +41521,24 @@ function renderCareLogPatientCards(groups) {
           </div>
 
           <!-- Quick Action Buttons -->
-          <div class="flex items-center gap-2 self-end lg:self-center shrink-0">
+          <div class="flex items-center gap-2 self-end lg:self-center shrink-0 flex-wrap">
+            <button type="button" onclick="openMobileCareDiaryForPatient('${group.id}')"
+              class="px-3.5 py-2 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 font-bold text-xs border border-pink-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+              title="해당 환자의 모바일 간병일지 리포트 뷰어 열기">
+              <i data-lucide="smartphone" class="w-4 h-4 text-pink-600"></i>
+              <span>모바일 일지</span>
+            </button>
+            <button type="button" onclick="openMobileCareDiarySmsModal('${group.id}')"
+              class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+              title="회원/보호자에게 실제 이동통신사 문자(SMS/LMS) 즉시 발송">
+              <i data-lucide="send" class="w-3.5 h-3.5"></i>
+              <span>문자 실제 발송</span>
+            </button>
+            <button type="button" onclick="copyMobileCareDiarySms('${group.id}')"
+              class="px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200 shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+              title="문자 발송 문구 및 웹 링크 클립보드 복사">
+              <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-500"></i>
+            </button>
             <button type="button" onclick="toggleCarePortPatientAccordion('${group.id}')"
               class="px-3.5 py-2 rounded-xl ${isExpanded ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'} font-bold text-xs border shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer">
               <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4 ${isExpanded ? 'text-purple-700' : 'text-purple-600'}"></i>
@@ -41306,7 +41647,13 @@ function renderCareLogPatientCards(groups) {
                     </div>
                     <span class="font-mono text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-medium">#${sid}</span>
 
-                    <div class="flex items-center shrink-0 ml-1">
+                    <div class="flex items-center shrink-0 ml-1 gap-1.5">
+                      <button type="button" onclick="openMobileCareDiaryForPatient('${group.id}', ${log.dayNumber || (idx + 1)})"
+                        class="px-2.5 py-1 rounded-lg bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+                        title="해당 일차의 모바일 간병일지 열기">
+                        <i data-lucide="smartphone" class="w-3 h-3 text-pink-600"></i>
+                        <span>모바일</span>
+                      </button>
                       <button type="button" onclick="openCarePortOfficialDetail('${sid}', ${log.dayNumber || (idx + 1)})"
                         class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer">
                         <i data-lucide="file-text" class="w-3 h-3"></i>
@@ -41323,27 +41670,36 @@ function renderCareLogPatientCards(groups) {
     `;
   }).join('');
 
-  if (typeof initIcons === 'function') initIcons(container);
+  containers.forEach(c => {
+    c.innerHTML = cardsHtml;
+    if (typeof initIcons === 'function') initIcons(c);
+  });
 }
 window.renderCareLogPatientCards = renderCareLogPatientCards;
 
 function renderCareLogFlatTable(filtered) {
-  const tbody = document.getElementById('careLogsTableBody');
-  if (!tbody) return;
+  const tbodies = [
+    document.getElementById('careLogsTableBody'),
+    document.getElementById('careLogsTableBody_new')
+  ].filter(Boolean);
+  if (tbodies.length === 0) return;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `
+    const emptyRow = `
       <tr>
         <td colspan="10" class="p-8 text-center text-slate-400">
           <div class="font-bold text-slate-600">등록된 케어포트 간병일지가 없습니다.</div>
         </td>
       </tr>
     `;
-    if (typeof initIcons === 'function') initIcons(tbody);
+    tbodies.forEach(tbody => {
+      tbody.innerHTML = emptyRow;
+      if (typeof initIcons === 'function') initIcons(tbody);
+    });
     return;
   }
 
-  tbody.innerHTML = filtered.map((log, idx) => {
+  const rowsHtml = filtered.map((log, idx) => {
     const sid = log.sessionId || (log.id ? String(log.id).replace(/\D/g, '') : '');
     const isChecked = gCareLogSelection.has(sid || log.id);
 
@@ -41401,19 +41757,30 @@ function renderCareLogFlatTable(filtered) {
         <td class="p-2.5 text-center font-mono text-purple-700 font-bold border-r border-slate-100">
           ${duration}
         </td>
-        <!-- 공식 간병일지 (CarePort 원본) -->
+        <!-- 공식 간병일지 (모바일 및 PDF) -->
         <td class="p-2.5 text-center">
-          <button type="button" onclick="openCarePortOfficialDetail('${sid || 0}')" 
-            class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer">
-            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
-            <span>CarePort 원본(PDF)</span>
-          </button>
+          <div class="inline-flex items-center gap-1.5 justify-center flex-wrap">
+            <button type="button" onclick="openMobileCareDiaryPreview('${patientName}', ${log.dayNumber || 1})" 
+              class="px-2.5 py-1.5 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
+              title="모바일 간병일지 열기">
+              <i data-lucide="smartphone" class="w-3.5 h-3.5 text-pink-600"></i>
+              <span>모바일</span>
+            </button>
+            <button type="button" onclick="openCarePortOfficialDetail('${sid || 0}')" 
+              class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] inline-flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer">
+              <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+              <span>CarePort 원본(PDF)</span>
+            </button>
+          </div>
         </td>
       </tr>
     `;
   }).join('');
 
-  if (typeof initIcons === 'function') initIcons(tbody);
+  tbodies.forEach(tbody => {
+    tbody.innerHTML = rowsHtml;
+    if (typeof initIcons === 'function') initIcons(tbody);
+  });
 }
 window.renderCareLogFlatTable = renderCareLogFlatTable;
 window.renderCareLogs = renderCareLogs;
@@ -41427,7 +41794,12 @@ function toggleCareLogSelect(id, checked) {
 }
 
 function toggleCareLogSelectAll(checked) {
-  const checkboxes = document.querySelectorAll('#careLogsTableBody input[type="checkbox"]');
+  const chk1 = document.getElementById('checkAllCareLogs');
+  const chk2 = document.getElementById('checkAllCareLogs_new');
+  if (chk1) chk1.checked = checked;
+  if (chk2) chk2.checked = checked;
+
+  const checkboxes = document.querySelectorAll('#careLogsTableBody input[type="checkbox"], #careLogsTableBody_new input[type="checkbox"]');
   checkboxes.forEach(cb => {
     cb.checked = checked;
     toggleCareLogSelect(cb.value, checked);
@@ -41435,20 +41807,20 @@ function toggleCareLogSelectAll(checked) {
 }
 
 async function syncCarePortLogs(isManual = false) {
-  const syncBtn = document.getElementById('btnSyncCarePort');
-  const syncIcon = document.getElementById('carePortSyncIcon');
-  const timeBadge = document.getElementById('carePortSyncTimeBadge');
+  const syncBtns = [document.getElementById('btnSyncCarePort'), document.getElementById('btnSyncCarePort_new')].filter(Boolean);
+  const syncIcons = [document.getElementById('carePortSyncIcon'), document.getElementById('carePortSyncIcon_new')].filter(Boolean);
+  const timeBadges = [document.getElementById('carePortSyncTimeBadge'), document.getElementById('carePortSyncTimeBadge_new')].filter(Boolean);
 
-  if (syncBtn) {
-    syncBtn.disabled = true;
-    syncBtn.classList.add('opacity-75');
-  }
-  if (syncIcon) {
-    syncIcon.classList.add('animate-spin');
-  }
-  if (timeBadge) {
-    timeBadge.innerText = '전산 동기화 진행 중...';
-  }
+  syncBtns.forEach(btn => {
+    btn.disabled = true;
+    btn.classList.add('opacity-75');
+  });
+  syncIcons.forEach(icon => {
+    icon.classList.add('animate-spin');
+  });
+  timeBadges.forEach(badge => {
+    badge.innerText = '전산 동기화 진행 중...';
+  });
 
   try {
     if (!window.CarePortClient) {
@@ -41514,9 +41886,9 @@ async function syncCarePortLogs(isManual = false) {
 
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-    if (timeBadge) {
-      timeBadge.innerText = `최근 동기화: 오늘 ${timeStr}`;
-    }
+    timeBadges.forEach(badge => {
+      badge.innerText = `최근 동기화: 오늘 ${timeStr}`;
+    });
 
     renderCareLogs();
     if (typeof renderCurrentSamsungSheet === 'function' && (gActiveTab === 'samsungclaimhub' || gActiveTab === 'samsunglist' || gActiveTab === 'samsungleads' || gActiveTab === 'samsung')) {
@@ -41534,21 +41906,388 @@ async function syncCarePortLogs(isManual = false) {
     }
   } catch (err) {
     console.error('CarePort sync error:', err);
-    if (timeBadge) timeBadge.innerText = '동기화 실패';
+    timeBadges.forEach(badge => {
+      badge.innerText = '동기화 실패';
+    });
     if (isManual) {
       alert('케어포트 전산 동기화 실패: ' + err.message);
     }
   } finally {
-    if (syncBtn) {
-      syncBtn.disabled = false;
-      syncBtn.classList.remove('opacity-75');
-    }
-    if (syncIcon) {
-      syncIcon.classList.remove('animate-spin');
-    }
+    syncBtns.forEach(btn => {
+      btn.disabled = false;
+      btn.classList.remove('opacity-75');
+    });
+    syncIcons.forEach(icon => {
+      icon.classList.remove('animate-spin');
+    });
   }
 }
 window.syncCarePortLogs = syncCarePortLogs;
+
+// =========================================================================
+// 모바일 간병일지 (Mobile Care Diary) 뷰어 및 문자(SMS) 연동 제어
+// =========================================================================
+var gCurrentMobileDiaryPatient = null;
+var gMobileDiaryIsPhoneView = false;
+
+function openMobileCareDiaryPreview(patientName = '고연분', dayNum = null) {
+  const modal = document.getElementById('mobileCareDiaryModal');
+  const iframe = document.getElementById('mobileDiaryIframe');
+  const badge = document.getElementById('mobileDiaryPatientBadge');
+  if (!modal || !iframe) return;
+
+  gCurrentMobileDiaryPatient = patientName || '고연분';
+  if (badge) {
+    badge.innerText = `${gCurrentMobileDiaryPatient} 님 ${dayNum ? `(${dayNum}일차)` : ''}`;
+  }
+
+  let src = `mobile-care-diary.html?patient=${encodeURIComponent(gCurrentMobileDiaryPatient)}`;
+  if (dayNum) src += `&day=${dayNum}`;
+  iframe.src = src;
+
+  modal.classList.remove('hidden');
+  if (typeof initIcons === 'function') initIcons(modal);
+}
+
+async function openMobileCareDiaryForPatient(groupId, dayNum = null) {
+  let patient = (gCarePortPatientGroups || []).find(g => g.id === groupId || g.applyId === groupId);
+  if (!patient && Array.isArray(gCarePortPatientGroups)) {
+    patient = gCarePortPatientGroups.find(g => g.patientName === groupId);
+  }
+  const pName = patient ? patient.patientName : '고연분';
+  const carer = patient ? patient.caregiverName : '권은지';
+  const age = patient ? (patient.age || 66) : 66;
+  const gender = patient ? (patient.gender || '여성') : '여성';
+
+  const modal = document.getElementById('mobileCareDiaryModal');
+  const iframe = document.getElementById('mobileDiaryIframe');
+  const badge = document.getElementById('mobileDiaryPatientBadge');
+  if (!modal || !iframe) return;
+
+  gCurrentMobileDiaryPatient = pName;
+  if (badge) {
+    badge.innerText = `${pName} 님 (${patient?.dailyLogs?.length || 16}일간 기록)`;
+  }
+
+  // 1. 서버 API를 통해 실제 간병일지 데이터(날짜별 추세 점수, 카테고리 상태, 돌봄·가족 전달사항)를 로드
+  try {
+    const res = await fetch(`/api/careport/mobile-report?patient=${encodeURIComponent(pName)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.records) && data.records.length > 0) {
+        localStorage.setItem('LIVON_MOBILE_REPORT_' + pName, JSON.stringify({
+          patientInfo: data.patientInfo || {
+            name: pName,
+            age: age,
+            gender: gender,
+            carerName: carer,
+            startDate: data.records[0]?.date,
+            endDate: data.records[data.records.length - 1]?.date,
+            totalDays: data.records.length
+          },
+          records: data.records
+        }));
+      }
+    }
+  } catch (e) {
+    console.warn('[mobile-report fetch error]', e);
+  }
+
+  let src = `mobile-care-diary.html?patient=${encodeURIComponent(pName)}&carer=${encodeURIComponent(carer)}&age=${age}&gender=${encodeURIComponent(gender)}`;
+  if (dayNum) src += `&day=${dayNum}`;
+  iframe.src = src;
+
+  modal.classList.remove('hidden');
+  if (typeof initIcons === 'function') initIcons(modal);
+}
+
+function closeMobileCareDiaryModal() {
+  const modal = document.getElementById('mobileCareDiaryModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function toggleMobileDiaryFrameSize() {
+  const wrapper = document.getElementById('mobileDiaryFrameWrapper');
+  const iframe = document.getElementById('mobileDiaryIframe');
+  const txt = document.getElementById('txtToggleDiaryFrame');
+  if (!wrapper || !iframe) return;
+
+  gMobileDiaryIsPhoneView = !gMobileDiaryIsPhoneView;
+  if (gMobileDiaryIsPhoneView) {
+    wrapper.style.backgroundColor = '#181524';
+    iframe.style.width = '390px';
+    iframe.style.maxWidth = '390px';
+    iframe.style.borderRadius = '32px';
+    iframe.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 10px #2a2438';
+    iframe.style.height = 'calc(100% - 24px)';
+    if (txt) txt.innerText = '데스크톱 뷰';
+  } else {
+    wrapper.style.backgroundColor = '';
+    iframe.style.width = '100%';
+    iframe.style.maxWidth = '100%';
+    iframe.style.borderRadius = '0';
+    iframe.style.boxShadow = 'none';
+    iframe.style.height = '100%';
+    if (txt) txt.innerText = '모바일 폰 뷰';
+  }
+}
+
+function copyCurrentMobileDiarySmsLink() {
+  const pName = gCurrentMobileDiaryPatient || '고연분';
+  const origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
+  const link = `${origin}/mobile-care-diary.html?patient=${encodeURIComponent(pName)}`;
+  const smsText = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 돌봄 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 리포트 바로보기:\n${link}`;
+
+  navigator.clipboard.writeText(smsText).then(() => {
+    alert(`✅ [${pName} 님] 모바일 간병일지 문자 발송 문구가 복사되었습니다!\n\n${smsText}`);
+  }).catch(() => {
+    prompt('아래 문자 발송용 링크를 복사하세요:', link);
+  });
+}
+
+function copyMobileCareDiarySms(groupId) {
+  const patient = (gCarePortPatientGroups || []).find(g => g.id === groupId);
+  const pName = patient ? patient.patientName : '고연분';
+  const origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
+  const link = `${origin}/mobile-care-diary.html?patient=${encodeURIComponent(pName)}`;
+  const smsText = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 돌봄 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 리포트 바로보기:\n${link}`;
+
+  navigator.clipboard.writeText(smsText).then(() => {
+    alert(`✅ [${pName} 님] 모바일 간병일지 문자 발송 문구가 클립보드에 복사되었습니다!\n보호자 알림톡 또는 SMS에 그대로 붙여넣기 하실 수 있습니다.`);
+  }).catch(() => {
+    prompt('아래 링크를 복사하여 문자로 전송하세요:', link);
+  });
+}
+
+function openMobileDiaryExternalTab() {
+  const iframe = document.getElementById('mobileDiaryIframe');
+  const src = iframe?.getAttribute('src') || 'mobile-care-diary.html';
+  window.open(src, '_blank');
+}
+
+// =========================================================================
+// 모바일 간병일지 실제 문자(SMS/LMS) 발송 제어
+// =========================================================================
+let gCurrentSmsTargetGroup = null;
+
+async function openMobileCareDiarySmsModal(groupId) {
+  const modal = document.getElementById('mobileCareDiarySmsModal');
+  if (!modal) return;
+
+  const group = (gCarePortPatientGroups || []).find(g => g.id === groupId);
+  const pName = group ? group.patientName : (gCurrentMobileDiaryPatient || '고연분');
+  gCurrentSmsTargetGroup = group;
+
+  // 휴대폰 번호 찾기 (환자/보호자/신청서 데이터 조회)
+  let phone = '';
+  if (group) {
+    phone = group.patientPhone || group.guardianPhone || group.phone || '';
+    if (!phone && group.applyId) {
+      const app = (gApps || []).find(a => String(a.id) === String(group.applyId) || a.patientName === group.patientName);
+      if (app) phone = app.patientPhone || app.guardianPhone || app.phone || '';
+    }
+  }
+  if (!phone) {
+    const app = (gApps || []).find(a => a.patientName === pName);
+    if (app) phone = app.patientPhone || app.guardianPhone || app.phone || '';
+  }
+
+  const nameInput = document.getElementById('smsTargetPatientName');
+  const recipientInput = document.getElementById('smsRecipientName');
+  const phoneInput = document.getElementById('smsRecipientPhone');
+  const messageInput = document.getElementById('smsMessageContent');
+  const statusBox = document.getElementById('smsSendStatusBox');
+
+  if (nameInput) nameInput.value = `${pName} 님`;
+  if (recipientInput) recipientInput.value = (group?.guardianName || '보호자');
+  if (phoneInput) phoneInput.value = formatPhoneNumberStr(phone);
+  if (statusBox) statusBox.classList.add('hidden');
+
+  const origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
+  const reportLink = `${origin}/mobile-care-diary.html?patient=${encodeURIComponent(pName)}`;
+  const defaultText = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 돌봄 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 리포트 바로보기:\n${reportLink}`;
+
+  if (messageInput) {
+    messageInput.value = defaultText;
+    updateSmsByteCountDisplay();
+  }
+
+  // 잔여 포인트 실시간 확인
+  fetch('/api/sms/balance')
+    .then(r => r.json())
+    .then(data => {
+      const badge = document.getElementById('smsModalBalanceBadge');
+      if (badge && data && data.success) {
+        badge.innerText = `바로빌 잔여: ${Number(data.balance).toLocaleString()} P`;
+      }
+    })
+    .catch(() => {});
+
+  // 모바일 리포트 사전 캐싱 보장
+  fetch(`/api/careport/mobile-report?patient=${encodeURIComponent(pName)}`).catch(() => {});
+
+  modal.classList.remove('hidden');
+  if (typeof initIcons === 'function') initIcons(modal);
+}
+
+function closeMobileCareDiarySmsModal() {
+  const modal = document.getElementById('mobileCareDiarySmsModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function formatPhoneNumberStr(str) {
+  if (!str) return '';
+  const digits = String(str).replace(/\D/g, '');
+  if (digits.length === 11) {
+    return digits.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+  }
+  if (digits.length === 10) {
+    return digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  }
+  return digits;
+}
+
+function formatPhoneInput(el) {
+  el.value = formatPhoneNumberStr(el.value);
+}
+
+function calcKoreanByteLength(str) {
+  let bytes = 0;
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    bytes += code > 127 ? 2 : 1;
+  }
+  return bytes;
+}
+
+function updateSmsByteCountDisplay() {
+  const textarea = document.getElementById('smsMessageContent');
+  const countBadge = document.getElementById('smsByteCountBadge');
+  const typeBadge = document.getElementById('smsTypeBadge');
+  if (!textarea || !countBadge) return;
+
+  const bytes = calcKoreanByteLength(textarea.value || '');
+  const isLms = bytes > 90;
+
+  countBadge.innerText = `${bytes} / ${isLms ? '2,000' : '90'} Byte`;
+  if (typeBadge) {
+    if (isLms) {
+      typeBadge.innerText = '장문 (LMS)';
+      typeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800';
+    } else {
+      typeBadge.innerText = '단문 (SMS)';
+      typeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800';
+    }
+  }
+}
+
+async function handleRealSmsSubmit(e) {
+  if (e) e.preventDefault();
+
+  const phoneInput = document.getElementById('smsRecipientPhone');
+  const nameInput = document.getElementById('smsTargetPatientName');
+  const recipientInput = document.getElementById('smsRecipientName');
+  const senderSelect = document.getElementById('smsSenderNumber');
+  const providerSelect = document.getElementById('smsProviderSelect');
+  const messageInput = document.getElementById('smsMessageContent');
+  const statusBox = document.getElementById('smsSendStatusBox');
+  const submitBtn = document.getElementById('btnSubmitRealSms');
+  const submitTxt = document.getElementById('txtSubmitRealSms');
+  const submitIcon = document.getElementById('iconSubmitRealSms');
+
+  const toPhone = phoneInput?.value?.trim();
+  const toName = recipientInput?.value?.trim() || '';
+  const patientName = nameInput?.value?.replace(' 님', '')?.trim() || '';
+  const senderNumber = senderSelect?.value || '16007835';
+  const provider = providerSelect?.value || 'barobill';
+  const message = messageInput?.value?.trim();
+
+  if (!toPhone || toPhone.replace(/\D/g, '').length < 10) {
+    alert('수신처 휴대폰 번호(010-0000-0000)를 정확히 입력해 주세요.');
+    phoneInput?.focus();
+    return;
+  }
+
+  if (!message) {
+    alert('발송할 메시지 내용을 입력해 주세요.');
+    messageInput?.focus();
+    return;
+  }
+
+  // 발송 진행 UI
+  if (submitBtn) submitBtn.disabled = true;
+  if (submitTxt) submitTxt.innerText = '통신망 발송 전송 중...';
+  if (submitIcon) submitIcon.classList.add('animate-spin');
+  if (statusBox) {
+    statusBox.className = 'p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2';
+    statusBox.innerHTML = '<span class="w-3 h-3 rounded-full bg-rose-500 animate-pulse"></span> 통신사 회선으로 문자 메시지를 전송하고 있습니다. 잠시만 기다려주세요...';
+    statusBox.classList.remove('hidden');
+  }
+
+  try {
+    const res = await fetch('/api/sms/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        toPhone,
+        toName,
+        patientName,
+        senderNumber,
+        provider,
+        message,
+        category: 'CARE_DIARY_MOBILE'
+      })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      if (statusBox) {
+        statusBox.className = 'p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs';
+        statusBox.innerHTML = `✅ <b>문자 발송 성공!</b> (접수번호: ${data.receiptNum}, 회선: ${data.provider.toUpperCase()}, 유형: ${data.sendType})`;
+      }
+      alert(`🎉 [${patientName || toName} 님] 모바일 간병일지 문자가 실제 발송되었습니다!\n\n• 수신번호: ${toPhone}\n• 발송회선: ${data.provider === 'barobill' ? '바로빌 국내 3사 직결' : 'Twilio SMS'}\n• 전송유형: ${data.sendType} (${data.byteLength || 0} Byte)\n• 접수번호: ${data.receiptNum}`);
+      setTimeout(() => {
+        closeMobileCareDiarySmsModal();
+      }, 700);
+    } else {
+      throw new Error(data.error || '문자 발송 처리에 실패했습니다.');
+    }
+  } catch (err) {
+    console.error('[SMS Dispatch Error]', err);
+    if (statusBox) {
+      statusBox.className = 'p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs';
+      statusBox.innerHTML = `❌ <b>발송 실패:</b> ${err.message}`;
+    }
+    alert(`❌ 문자 발송 실패\n${err.message}`);
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+    if (submitTxt) submitTxt.innerText = '실제 문자 즉시 발송';
+    if (submitIcon) submitIcon.classList.remove('animate-spin');
+  }
+}
+
+function openDeviceNativeSmsApp() {
+  const phone = document.getElementById('smsRecipientPhone')?.value?.replace(/\D/g, '') || '';
+  const msg = document.getElementById('smsMessageContent')?.value || '';
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const separator = isIOS ? '&' : '?';
+  const url = `sms:${phone}${separator}body=${encodeURIComponent(msg)}`;
+  window.location.href = url;
+}
+
+window.openMobileCareDiaryPreview = openMobileCareDiaryPreview;
+window.openMobileCareDiaryForPatient = openMobileCareDiaryForPatient;
+window.closeMobileCareDiaryModal = closeMobileCareDiaryModal;
+window.toggleMobileDiaryFrameSize = toggleMobileDiaryFrameSize;
+window.copyCurrentMobileDiarySmsLink = copyCurrentMobileDiarySmsLink;
+window.copyMobileCareDiarySms = copyMobileCareDiarySms;
+window.openMobileDiaryExternalTab = openMobileDiaryExternalTab;
+window.openMobileCareDiarySmsModal = openMobileCareDiarySmsModal;
+window.closeMobileCareDiarySmsModal = closeMobileCareDiarySmsModal;
+window.formatPhoneInput = formatPhoneInput;
+window.updateSmsByteCountDisplay = updateSmsByteCountDisplay;
+window.handleRealSmsSubmit = handleRealSmsSubmit;
+window.openDeviceNativeSmsApp = openDeviceNativeSmsApp;
 
 var gCurrentCarePortSessionId = null;
 var gCurrentCarePortDetail = null;
@@ -42193,13 +42932,13 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     const elDate = document.getElementById('cpMetaDate');
     if (elDate) elDate.innerText = dateWithDay;
 
-    // Image 2 Demographics Strip
+    // Image 1 Demographics Strip
     const elUserTxt = document.getElementById('cpMetaUsernameText');
     if (elUserTxt) elUserTxt.innerText = `${d.patientName} (${d.age}세·${d.gender})`;
     const elCgTxt = document.getElementById('cpMetaCaregiverText');
-    if (elCgTxt) elCgTxt.innerText = d.caregiver;
+    if (elCgTxt) elCgTxt.innerText = `${d.caregiver} (${d.org})`;
     const elPeriodTxt = document.getElementById('cpMetaCarePeriodText');
-    if (elPeriodTxt) elPeriodTxt.innerText = periodText;
+    if (elPeriodTxt) elPeriodTxt.innerText = d.carePeriod;
 
     // Backward-compatibility hidden/fallback elements for downloadCarePortDocumentPdf
     const elUser = document.getElementById('cpMetaUsername');
@@ -42289,11 +43028,12 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     // Section 1: 금일 환자 상태 체크 (Overall Tone, Traffic Light SVG, Description)
     const toneBadge = document.getElementById('cpOverallToneBadge');
     if (toneBadge) {
-      toneBadge.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-current mr-1.5 shrink-0"></span><span>${d.overallStatus.label}</span>`;
-      toneBadge.className = 'inline-flex items-center justify-center h-6 px-2.5 rounded-md text-xs font-black leading-none ' + 
-        (d.overallStatus.tone === 'good' ? 'bg-emerald-50 text-emerald-700 border border-emerald-300' :
-         d.overallStatus.tone === 'warning' ? 'bg-amber-50 text-amber-700 border border-amber-300' :
-         'bg-rose-50 text-rose-700 border border-rose-300');
+      const toneBadgeClass = d.overallStatus.tone === 'good'
+        ? 'background: #eafaf8; color: #079f98; border: 1px solid #10bdb2;'
+        : (d.overallStatus.tone === 'warning' ? 'background: #fef6e7; color: #d97706; border: 1px solid #f5aa18;' : 'background: #fdecee; color: #dc2626; border: 1px solid #eb5c60;');
+      toneBadge.innerHTML = `<span class="careport-dot" style="width: 5px; height: 5px; margin-right: 5px;"></span><span class="pill-text">${d.overallStatus.label}</span>`;
+      toneBadge.className = 'careport-badge-pill text-[11.5px] font-black h-6 px-2.5 rounded-md';
+      toneBadge.style.cssText = toneBadgeClass;
     }
     const overallSvg = document.getElementById('cpOverallTrafficSvg');
     if (overallSvg && window.CarePortClient) {
@@ -42302,23 +43042,25 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     const overallDesc = document.getElementById('cpOverallDesc');
     if (overallDesc) overallDesc.innerText = d.overallStatus.description;
 
-    // 4 Category Status Cards
+    // 4 Category Status Cards (Image 1 style)
     const catContainer = document.getElementById('cpCategoryCardsContainer');
     if (catContainer && window.CarePortClient) {
       catContainer.innerHTML = d.categories.map(c => {
-        const pillCls = c.tone === 'good' ? 'bg-emerald-50 text-emerald-700' : (c.tone === 'warning' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700');
+        const cPillStyle = c.tone === 'good'
+          ? 'background: #eafaf8; color: #079f98; border: 1px solid #10bdb2;'
+          : (c.tone === 'warning' ? 'background: #fef6e7; color: #d97706; border: 1px solid #f5aa18;' : 'background: #fdecee; color: #dc2626; border: 1px solid #eb5c60;');
         return `
-          <div class="bg-slate-50/70 border border-slate-200 rounded-xl p-3 flex flex-col justify-between gap-2 shadow-2xs">
-            <div class="flex items-center justify-between">
-              <span class="inline-flex items-center justify-center h-5 px-2 rounded-md text-[11px] font-black leading-none ${pillCls}">
-                <span class="inline-block w-1.5 h-1.5 rounded-full bg-current mr-1 shrink-0"></span>
-                <span>${c.label}</span>
+          <div style="flex: 1; min-width: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-height: 84px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span class="careport-badge-pill" style="height: 22px; font-size: 11px; font-weight: 800; padding: 0 8px; border-radius: 6px; ${cPillStyle}">
+                <span class="careport-dot" style="width: 5px; height: 5px; margin-right: 4px;"></span>
+                <span class="pill-text">${c.label}</span>
               </span>
               ${window.CarePortClient.renderTrafficLightSvg(c.tone, 'vertical')}
             </div>
-            <p class="text-xs text-slate-700 font-medium leading-relaxed mt-1 line-clamp-2" title="${c.description}">
+            <div style="font-size: 11.5px; color: #334155; line-height: 1.4; font-weight: 500;">
               ${c.description}
-            </p>
+            </div>
           </div>
         `;
       }).join('');
@@ -42338,17 +43080,13 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
       `).join('');
     }
 
-    // Section 3: 금일 간병 수행 내역
+    // Section 3: 금일 간병 수행 내역 (Image 1 style)
     const careLogList = document.getElementById('cpCareLogList');
     if (careLogList) {
       careLogList.innerHTML = d.careLogRows.map(r => `
-        <div class="flex items-center gap-3 py-2 px-2 border-b border-slate-100 last:border-0 min-h-[36px]">
-          <span class="min-w-[85px] max-w-[115px] px-2 text-center text-xs font-black text-slate-800 bg-slate-100 h-6 flex items-center justify-center rounded-md shrink-0 leading-none">
-            ${r.label}
-          </span>
-          <div class="text-xs text-slate-700 font-medium leading-relaxed flex-1 flex items-center min-h-[24px]">
-            ${r.value}
-          </div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; min-height: 32px;">
+          <strong class="careport-badge-pill" style="min-width: 86px; max-width: 110px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; height: 24px; padding: 0 8px;"><span class="pill-text">${r.label}</span></strong>
+          <span style="flex: 1; font-size: 11.5px; color: #334155; line-height: 1.4; display: inline-flex; align-items: center; min-height: 24px; font-weight: 500;">${r.value}</span>
         </div>
       `).join('');
     }
@@ -42369,15 +43107,15 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
       summaryContent.innerText = d.summary;
     }
 
-    // Section 5: 보호자 전달사항 (6 Items)
+    // Section 5: 보호자 전달사항 (6 Items - Image 1 style)
     const guardianNotesGrid = document.getElementById('cpGuardianNotesGrid');
     if (guardianNotesGrid) {
       guardianNotesGrid.innerHTML = d.guardianNotes.map(g => `
-        <div class="flex items-center gap-2 text-xs leading-relaxed min-h-[24px]">
-          <span class="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0"></span>
-          <span class="font-extrabold text-slate-900 w-14 shrink-0 flex items-center">${g.label}</span>
-          <span class="text-slate-300 font-bold shrink-0">·</span>
-          <span class="text-slate-700 font-medium flex-1 flex items-center">${g.value}</span>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 11.5px; line-height: 1.4; min-height: 22px;">
+          <span style="display: inline-block; width: 4.5px; height: 4.5px; border-radius: 50%; background: #10bdb2; flex-shrink: 0;"></span>
+          <span style="font-weight: 800; color: #0f172a; min-width: 50px; flex-shrink: 0; position: relative; top: -0.5px;">${g.label}</span>
+          <span style="color: #cbd5e1; font-weight: bold; flex-shrink: 0;">·</span>
+          <span style="color: #334155; font-weight: 500; flex: 1; position: relative; top: -0.5px;">${g.value}</span>
         </div>
       `).join('');
     }
@@ -42547,11 +43285,15 @@ async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 12) 
       Array.from(pill.childNodes).forEach(node => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           node.style.position = 'relative';
-          node.style.top = '0px';
+          if (node.classList.contains('careport-dot') || node.classList.contains('rounded-full')) {
+            node.style.top = '0px';
+          } else {
+            node.style.top = '-1px';
+          }
         } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
           const wrap = iframeDoc.createElement('span');
           wrap.style.position = 'relative';
-          wrap.style.top = '0px';
+          wrap.style.top = '-1px';
           wrap.textContent = node.textContent;
           pill.replaceChild(wrap, node);
         }
@@ -42701,11 +43443,15 @@ async function renderElementToSinglePageA4PdfBytes(sourceElement, customMargin =
       Array.from(pill.childNodes).forEach(node => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           node.style.position = 'relative';
-          node.style.top = '0px';
+          if (node.classList.contains('careport-dot') || node.classList.contains('rounded-full')) {
+            node.style.top = '0px';
+          } else {
+            node.style.top = '-1px';
+          }
         } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
           const wrap = iframeDoc.createElement('span');
           wrap.style.position = 'relative';
-          wrap.style.top = '0px';
+          wrap.style.top = '-1px';
           wrap.textContent = node.textContent;
           pill.replaceChild(wrap, node);
         }
@@ -42825,18 +43571,31 @@ async function downloadCarePortDocumentPdf() {
       detail.chartImage = chartImage;
       detail.trendScores = curTrends;
 
+      let age = detail.age || '';
+      let gender = detail.gender || '';
+      const ageGenderText = (document.getElementById('cpMetaAgeGender')?.innerText || document.getElementById('cpMetaUsernameText')?.innerText || '').trim();
+      const m = ageGenderText.match(/(\d+)\s*세\s*[·,/]\s*([남여])/);
+      if (m) {
+        age = m[1];
+        gender = m[2];
+      }
+      const caregiverName = (document.getElementById('cpMetaCaregiverText')?.innerText || document.getElementById('cpMetaConsultant')?.innerText || detail.consultantName || detail.caregiverName || '').trim();
+      const carePeriod = (document.getElementById('cpMetaCarePeriodText')?.innerText || document.getElementById('cpMetaCarePeriod')?.innerText || detail.carePeriod || '').trim();
+
       const patient = {
         patientName: username,
-        age: document.getElementById('cpMetaAge')?.innerText || detail.age || '',
-        gender: document.getElementById('cpMetaGender')?.innerText || detail.gender || '',
+        age: age,
+        gender: gender,
         insuranceCompany: document.getElementById('cpMetaOrg')?.innerText || detail.organizationName || '삼성화재',
-        caregiverName: document.getElementById('cpMetaConsultant')?.innerText || detail.consultantName || '',
+        caregiverName: caregiverName,
+        carePeriod: carePeriod,
         chartImage: chartImage,
         trendScores: curTrends
       };
       const log = {
         username: username,
         consultDate: consultDate,
+        carePeriod: carePeriod,
         duration: document.getElementById('cpMetaDuration')?.innerText || detail.duration || '',
         sessionId: gCurrentCarePortSessionId,
         chartImage: chartImage,
@@ -43075,8 +43834,31 @@ async function downloadPatientCareLogsPdfs(groupId) {
       min-height: 1122px !important;
       max-height: 1122px !important;
       box-sizing: border-box !important;
-      padding: 26px 36px !important;
+      padding: 0 36px !important;
       overflow: hidden !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: center !important;
+    }
+    .sec-head {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      border-bottom: 2px solid #0f172a !important;
+      padding-bottom: 5px !important;
+      margin-top: 18px !important;
+      margin-bottom: 12px !important;
+    }
+    .sec-head.sec-head-teal {
+      border-bottom: 2px solid #00897b !important;
+    }
+    .sec-title {
+      font-size: 14.5px !important;
+      font-weight: 900 !important;
+      color: #0f172a !important;
+      letter-spacing: -0.3px !important;
+      display: inline-flex !important;
+      align-items: center !important;
     }
     .careport-badge-pill {
       display: inline-flex !important;
@@ -43088,14 +43870,15 @@ async function downloadPatientCareLogsPdfs(groupId) {
       text-align: center !important;
       white-space: nowrap !important;
     }
-    .careport-badge-pill > span,
+    .careport-badge-pill .pill-text,
+    .careport-badge-pill > span:not(.careport-dot),
     .careport-badge-pill > strong {
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
       line-height: 1 !important;
       position: relative !important;
-      top: 0 !important;
+      top: -1px !important;
     }
     .careport-dot {
       display: inline-block !important;
@@ -43104,7 +43887,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
       flex-shrink: 0 !important;
       vertical-align: middle !important;
       position: relative !important;
-      top: 0 !important;
+      top: 0px !important;
     }
     .no-print { display: none !important; }
   </style>
@@ -54246,6 +55029,61 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
   const sheetNames = workbook.SheetNames || [];
 
   // =========================================================================
+  // 시트 0: 현황대시보드 (엑셀 원본 공식 현황 대시보드 통계 추출)
+  // =========================================================================
+  let parsedDashboardStats = null;
+  const dashSheetName = sheetNames.find(n => n.includes('대시보드') || n.includes('현황'));
+  if (dashSheetName && workbook.Sheets[dashSheetName]) {
+    try {
+      const wsDash = workbook.Sheets[dashSheetName];
+      const parsedDash = {};
+      for (let r = 0; r <= 35; r++) {
+        for (let c = 0; c <= 15; c++) {
+          const cell = wsDash[XLSX.utils.encode_cell({ r, c })];
+          if (!cell || cell.v === undefined) continue;
+          const k = String(cell.v).trim().replace(/^■\s*/, '');
+          if (!k) continue;
+          const rightCell = wsDash[XLSX.utils.encode_cell({ r, c: c + 1 })];
+          if (rightCell && rightCell.v !== undefined && String(rightCell.v).trim() !== '') {
+            parsedDash[k] = rightCell.v;
+          }
+        }
+      }
+      const numOr = (val, fallback = 0) => {
+        if (val === undefined || val === null || val === '') return fallback;
+        const n = Number(String(val).replace(/[^0-9.-]/g, ''));
+        return isNaN(n) ? fallback : n;
+      };
+      parsedDashboardStats = {
+        totalApps: numOr(parsedDash['총 신청건수'], 0),
+        completed: numOr(parsedDash['완료'], 0),
+        inProgress: numOr(parsedDash['진행중'], 0),
+        scheduled: numOr(parsedDash['예정'], 0),
+        cancelled: numOr(parsedDash['취소'], 0),
+        depositConfirmed: numOr(parsedDash['입금확인 금액'], 0),
+        unconfirmedClaims: numOr(parsedDash['미확인 청구건수'], 0),
+        estimatedUnpaid: numOr(parsedDash['추정 미수금 (단가 142,000 기본)'] || parsedDash['추정 미수금'], 0),
+        totalPayout: numOr(parsedDash['총 간병비 지급액'], 0),
+        unclaimedCompleted: numOr(parsedDash['미청구(완료·무청구)'], 0),
+        unclaimedDelayed: numOr(parsedDash['미청구(청구지연·진행중)'], 0),
+        unclaimedNotStarted: numOr(parsedDash['미청구(청구시작안됨)'], 0),
+        unclaimedTotal: numOr(parsedDash['미청구 합계'], 0),
+        assignedCaregivers: numOr(parsedDash['총 배정 간병인'], 0),
+        caregiverChanges: numOr(parsedDash['간병인 변경 건(2명+)'], 0),
+        hyundai: numOr(parsedDash['현대해상'], 0),
+        scor: numOr(parsedDash['현대해상(SCOR)'], 0),
+        samsung: numOr(parsedDash['삼성화재'], 0),
+        raw: parsedDash
+      };
+      if (parsedDashboardStats.totalApps <= 0) {
+        parsedDashboardStats.totalApps = parsedDashboardStats.completed + parsedDashboardStats.inProgress + parsedDashboardStats.scheduled + parsedDashboardStats.cancelled;
+      }
+    } catch (e) {
+      console.warn('[Dashboard Sheet Parse Warn]', e);
+    }
+  }
+
+  // =========================================================================
   // 시트 1: 간병인배정 (배정내역 추출 및 인덱싱)
   // =========================================================================
   const assignSheetName = sheetNames.find(n => n.includes('배정') || n.includes('간병인배정'));
@@ -55060,6 +55898,7 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
     caregivers: parsedCaregivers,
     centers: parsedCenters,
     adjusters: parsedAdjusters,
+    dashboardStats: parsedDashboardStats,
     sheetCounts: {
       apps: validApplications.length,
       assigns: validAssignments.length,
@@ -55073,6 +55912,7 @@ function parseLaunchWorkbook(company, workbook, preferredSheetName, meta = {}) {
     },
     meta: {
       ...meta,
+      dashboardStats: parsedDashboardStats,
       sheetName: targetSheetName,
       rowCount: validApplications.length,
       assignCount: validAssignments.length,
@@ -55774,6 +56614,12 @@ async function executeApplyLaunchData(company) {
     }
   }
 
+  // 5-2. 공식 엑셀 현황대시보드 통계 전역 및 로컬 영구 보존
+  if (data.dashboardStats) {
+    window.gOfficialDashboardStats = data.dashboardStats;
+    try { localStorage.setItem('LIVON_OFFICIAL_DASH_STATS', JSON.stringify(data.dashboardStats)); } catch (e) {}
+  }
+
   // 6. Convex 클라우드 백엔드 동기화 (새 데이터 일괄 등록)
   if (typeof syncRealLaunchDataToConvex === 'function') {
     showToast(`[${companyLabel}] 신규 엑셀 실데이터를 클라우드 DB에 세팅 중입니다...`, 'info');
@@ -55794,6 +56640,7 @@ async function executeApplyLaunchData(company) {
         caregivers: gCaregivers,
         centers: gCenters,
         adjusters: gAdjusters,
+        dashboardStats: data.dashboardStats || window.gOfficialDashboardStats || null,
         sourceInfo: {
           ...data.meta,
           count: newApps.length,
