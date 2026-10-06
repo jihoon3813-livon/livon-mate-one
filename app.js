@@ -42112,7 +42112,7 @@ window.downloadCareReport2PagePdf = downloadCareReport2PagePdf;
  * 신규 표준 A4 2페이지 공식 간병 리포트 미리보기 모달 열기
  * (원문 PDF 모달처럼 화면에 직접 팝업 띄워 1~2P 검토, 인쇄, PDF 다운로드 제공)
  */
-function openCareReport2PageModal(patientNameOrGroupId, dayNum = null) {
+async function openCareReport2PageModal(patientNameOrGroupId, dayNum = null) {
   let pName = patientNameOrGroupId;
   let targetGroup = null;
   if (Array.isArray(gCarePortPatientGroups)) {
@@ -42127,7 +42127,6 @@ function openCareReport2PageModal(patientNameOrGroupId, dayNum = null) {
 
   const modal = document.getElementById('careReport2PageModal');
   if (!modal) {
-    // Fallback: 새 창에서 열기
     return downloadCareReport2PagePdf(pName, dayNum);
   }
 
@@ -42144,7 +42143,7 @@ function openCareReport2PageModal(patientNameOrGroupId, dayNum = null) {
   }
 
   const dayParam = dayNum ? `&day=${encodeURIComponent(dayNum)}` : '';
-  const pdfUrl = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}${dayParam}`;
+  const pdfUrl = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}${dayParam}&inline=1`;
   window._current2PageModalPdfUrl = pdfUrl;
 
   const loadingEl = document.getElementById('careReport2PageLoading');
@@ -42153,16 +42152,35 @@ function openCareReport2PageModal(patientNameOrGroupId, dayNum = null) {
   const iframe = document.getElementById('careReport2PagePreviewFrame');
   if (iframe) {
     iframe.src = 'about:blank';
-    setTimeout(() => {
-      iframe.src = `${pdfUrl}#toolbar=0&view=FitH`;
-      iframe.onload = () => {
-        if (loadingEl) loadingEl.classList.add('hidden');
-      };
-    }, 50);
   }
 
   openModal('careReport2PageModal');
   if (typeof initIcons === 'function') initIcons(modal);
+
+  try {
+    const resp = await fetch(pdfUrl);
+    if (!resp.ok) {
+      throw new Error(`PDF 생성 서버 응답 오류 (HTTP ${resp.status})`);
+    }
+    const blob = await resp.blob();
+
+    if (window._current2PageBlobUrl) {
+      try { URL.revokeObjectURL(window._current2PageBlobUrl); } catch(e) {}
+    }
+    const blobUrl = URL.createObjectURL(blob);
+    window._current2PageBlobUrl = blobUrl;
+    window._current2PageBlob = blob;
+
+    if (iframe) {
+      iframe.src = `${blobUrl}#toolbar=0&view=FitH`;
+    }
+  } catch (err) {
+    console.error('[2Page PDF Modal Error]', err);
+    if (iframe) iframe.src = pdfUrl;
+  } finally {
+    // 로딩 인디케이터 즉시 해제하여 멈춤 현상 원천 차단
+    if (loadingEl) loadingEl.classList.add('hidden');
+  }
 }
 window.openCareReport2PageModal = openCareReport2PageModal;
 
@@ -42177,8 +42195,9 @@ function printCareReport2PageModal() {
       console.warn('iframe print failed, falling back to window.open:', e);
     }
   }
-  if (window._current2PageModalPdfUrl) {
-    const w = window.open(window._current2PageModalPdfUrl, '_blank');
+  const url = window._current2PageBlobUrl || window._current2PageModalPdfUrl;
+  if (url) {
+    const w = window.open(url, '_blank');
     if (w) {
       w.onload = () => w.print();
     }
@@ -42188,6 +42207,19 @@ window.printCareReport2PageModal = printCareReport2PageModal;
 
 function downloadCareReport2PageModalPdf() {
   const pName = window._current2PageModalPatient || '고연분';
+  const fileName = `[케어포트_공식간병일지]_${pName}_2페이지.pdf`;
+
+  if (window._current2PageBlob) {
+    const blobUrl = window._current2PageBlobUrl || URL.createObjectURL(window._current2PageBlob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return;
+  }
+
   const gId = window._current2PageModalGroupId || pName;
   if (typeof downloadPatientCareLogsPdfs === 'function') {
     downloadPatientCareLogsPdfs(gId);
@@ -42198,8 +42230,9 @@ function downloadCareReport2PageModalPdf() {
 window.downloadCareReport2PageModalPdf = downloadCareReport2PageModalPdf;
 
 function openCareReport2PageNewTab() {
-  if (window._current2PageModalPdfUrl) {
-    window.open(window._current2PageModalPdfUrl, '_blank');
+  const url = window._current2PageBlobUrl || window._current2PageModalPdfUrl;
+  if (url) {
+    window.open(url, '_blank');
   }
 }
 window.openCareReport2PageNewTab = openCareReport2PageNewTab;

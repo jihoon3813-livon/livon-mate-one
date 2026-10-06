@@ -133,11 +133,13 @@ module.exports = async (req, res) => {
       try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) {}
     }, 1000);
 
+    const isInline = payload.inline || req.query?.inline || req.headers['x-inline'];
+    const disposition = isInline ? 'inline' : 'attachment';
     const encodedFilename = encodeURIComponent(filename).replace(/['()]/g, escape).replace(/\*/g, '%2A');
     res.writeHead(200, {
       'Content-Type': 'application/pdf',
       'Content-Length': pdfBuffer.length,
-      'Content-Disposition': `attachment; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`
+      'Content-Disposition': `${disposition}; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`
     });
     return res.end(pdfBuffer);
   } catch (err) {

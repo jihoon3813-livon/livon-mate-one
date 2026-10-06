@@ -1621,9 +1621,9 @@ function saveSavedFaxConfig(cfg) {
           const selDay = dayParam ? parseInt(dayParam, 10) - 1 : null;
           const html = generate2PageCareReportHtml(report.patientInfo, report.records, selDay);
           const filename = `[케어포트_공식간병일지]_${report.patientInfo.name}_2페이지.pdf`;
-
+          const isInline = parsedUrl.query?.inline === '1' || parsedUrl.query?.inline === 'true' || parsedUrl.query?.preview === '1';
           req.method = 'POST';
-          req.body = { html, filename };
+          req.body = { html, filename, inline: isInline };
           return generatePdf(req, res);
         } catch (err) {
           console.error('[Care Report PDF Error]', err);
