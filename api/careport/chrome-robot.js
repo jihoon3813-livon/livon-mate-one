@@ -253,8 +253,8 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
           let img1 = null;
           let img2 = null;
 
-          const p1 = cap.querySelector('.first-page') || cap.children[0];
-          const p2 = cap.querySelector('.second-page') || (cap.children.length > 1 ? cap.children[1] : null);
+          const p1 = cap.querySelector('.first-page');
+          const p2 = cap.querySelector('.second-page');
           const consultState = document.getElementById("consult-state");
 
           if (p1 && p2) {
