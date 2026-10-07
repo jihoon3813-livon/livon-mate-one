@@ -43878,7 +43878,7 @@ async function render2PageHtmlToPdfBytes(htmlContent) {
     // Remove screen-only toolbar
     iframeDoc.querySelectorAll('.no-print').forEach(el => el.remove());
 
-    const pageEls = iframeDoc.querySelectorAll('.page');
+    const pageEls = iframeDoc.querySelectorAll('.report-page, .page');
     const targetPages = pageEls.length > 0 ? Array.from(pageEls) : [iframeDoc.body];
 
     const mergedDoc = await PDFLib.PDFDocument.create();
@@ -43894,6 +43894,8 @@ async function render2PageHtmlToPdfBytes(htmlContent) {
         backgroundColor: '#ffffff',
         logging: false,
         windowWidth: 794,
+        width: 794,
+        height: 1122,
         imageTimeout: 0
       });
 
@@ -44180,10 +44182,20 @@ async function downloadCarePortDocumentPdf() {
       } catch (e) {}
 
       if (!pdfBytes) {
-        pdfBytes = await renderHtmlToSinglePageA4PdfBytes(html, 12);
+        const isClassic = window.CarePortClient && typeof window.CarePortClient.isClassicLog === 'function' && window.CarePortClient.isClassicLog(log, detail);
+        if (isClassic) {
+          pdfBytes = await renderHtmlToSinglePageA4PdfBytes(html, 12);
+        } else {
+          pdfBytes = await render2PageHtmlToPdfBytes(html);
+        }
       }
     } else {
-      pdfBytes = await renderElementToSinglePageA4PdfBytes(printArea, 12);
+      const isModern = printArea.querySelector('.report-page, .first-page');
+      if (isModern && typeof render2PageHtmlToPdfBytes === 'function') {
+        pdfBytes = await render2PageHtmlToPdfBytes(printArea.innerHTML);
+      } else {
+        pdfBytes = await renderElementToSinglePageA4PdfBytes(printArea, 12);
+      }
     }
     
     updateGlobalProgress({ percent: 95, statusText: `PDF 파일 패키징 및 다운로드 준비 중...` });
@@ -44250,7 +44262,10 @@ async function generateDailyLogPdfBlob(patient, log, detailData = null) {
   } catch (e) {}
 
   try {
-    const pdfBytes = await renderHtmlToSinglePageA4PdfBytes(html, 12);
+    const isClassic = window.CarePortClient && typeof window.CarePortClient.isClassicLog === 'function' && window.CarePortClient.isClassicLog(log, detail);
+    const pdfBytes = isClassic
+      ? await renderHtmlToSinglePageA4PdfBytes(html, 12)
+      : await render2PageHtmlToPdfBytes(html);
     return new Blob([pdfBytes], { type: 'application/pdf' });
   } catch (err) {
     console.warn('generateDailyLogPdfBlob export error:', err);
