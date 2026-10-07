@@ -13778,15 +13778,33 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
 
   // 6. 1차 시도: 고성능 네이티브 가속 엔진 (/api/careport/generate-pdf) -> 1~2초 내 초고속 단일 벡터 PDF 생성
   try {
+    const styleSet = new Set();
+    dayHtmlList.forEach(h => {
+      const matches = (h || '').match(/<style[^>]*>([\s\S]*?)<\/style>/gi) || [];
+      matches.forEach(m => styleSet.add(m));
+    });
+    const extractedStyles = Array.from(styleSet).join('\n');
+
     let combinedPagesHtml = '';
     dayHtmlList.forEach((dHtml) => {
-      const bodyMatch = dHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-      const inner = bodyMatch ? bodyMatch[1] : dHtml;
-      combinedPagesHtml += `
-        <div class="cp-pdf-page" style="page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; width: 794px; min-height: 1122px; max-height: 1122px; margin: 0 auto; overflow: hidden; position: relative; background: #ffffff;">
-          ${inner}
-        </div>
-      `;
+      const pageSections = (dHtml || '').match(/<section[^>]*class="[^"]*report-page[^"]*"[^>]*>[\s\S]*?<\/section>/gi);
+      if (pageSections && pageSections.length > 0) {
+        pageSections.forEach((sec) => {
+          combinedPagesHtml += `
+            <div class="cp-pdf-page" style="page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; width: 794px; min-height: 1122px; max-height: 1122px; margin: 0 auto; overflow: hidden; position: relative; background: #ffffff;">
+              ${sec}
+            </div>
+          `;
+        });
+      } else {
+        const bodyMatch = dHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+        const inner = bodyMatch ? bodyMatch[1] : dHtml;
+        combinedPagesHtml += `
+          <div class="cp-pdf-page" style="page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; width: 794px; min-height: 1122px; max-height: 1122px; margin: 0 auto; overflow: hidden; position: relative; background: #ffffff;">
+            ${inner}
+          </div>
+        `;
+      }
     });
 
     const fullDocHtml = `<!DOCTYPE html>
@@ -13795,6 +13813,7 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
   <meta charset="UTF-8">
   <title>${fileName}</title>
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  ${extractedStyles}
   <style>
     @page { size: A4 portrait; margin: 0; }
     * { box-sizing: border-box; }
@@ -13823,6 +13842,18 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
     .cp-pdf-page:last-child {
       page-break-after: avoid !important;
       break-after: avoid !important;
+    }
+    .report-page {
+      width: 794px !important;
+      min-height: 1122px !important;
+      max-height: 1122px !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      position: relative !important;
+      background: #ffffff !important;
+      padding: 34px 38px !important;
+      display: flex !important;
+      flex-direction: column !important;
     }
     .page, .report-area {
       width: 794px !important;
@@ -13961,11 +13992,20 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
       const styleMatches = sampleHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/gi) || [];
       const extractedStyles = styleMatches.join('\n');
 
+      const allPageUnits = [];
       for (let i = 0; i < totalDays; i++) {
         const dHtml = dayHtmlList[i];
-        const bodyMatch = dHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-        let inner = bodyMatch ? bodyMatch[1] : dHtml;
-        inner = inner.replace(/<link[^>]*href="[^"]*pretendard[^"]*"[^>]*>/gi, '');
+        const pageSections = (dHtml || '').match(/<section[^>]*class="[^"]*report-page[^"]*"[^>]*>[\s\S]*?<\/section>/gi);
+        if (pageSections && pageSections.length > 0) {
+          pageSections.forEach(sec => allPageUnits.push(sec));
+        } else {
+          const bodyMatch = dHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+          allPageUnits.push(bodyMatch ? bodyMatch[1] : dHtml);
+        }
+      }
+
+      for (let p = 0; p < allPageUnits.length; p++) {
+        let inner = allPageUnits[p].replace(/<link[^>]*href="[^"]*pretendard[^"]*"[^>]*>/gi, '');
 
         const unitHtml = `<!DOCTYPE html>
 <html lang="ko">
@@ -13975,11 +14015,11 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
-    .page, .report-area { width: 794px !important; min-height: 1122px !important; box-sizing: border-box !important; padding: 26px 36px !important; }
+    .page, .report-area, .report-page { width: 794px !important; min-height: 1122px !important; max-height: 1122px !important; box-sizing: border-box !important; overflow: hidden !important; }
   </style>
 </head>
 <body>
-  <div style="width: 794px; min-height: 1122px; background: #ffffff;">${inner}</div>
+  <div style="width: 794px; min-height: 1122px; max-height: 1122px; overflow: hidden; background: #ffffff;">${inner}</div>
 </body>
 </html>`;
 
@@ -44467,15 +44507,33 @@ async function downloadPatientCareLogsPdfs(groupId) {
         statusText: `초고속 네이티브 PDF 가속 엔진 렌더링 중...`
       });
 
+      const styleSet = new Set();
+      dayHtmlList.forEach(h => {
+        const matches = (h || '').match(/<style[^>]*>([\s\S]*?)<\/style>/gi) || [];
+        matches.forEach(m => styleSet.add(m));
+      });
+      const extractedStyles = Array.from(styleSet).join('\n');
+
       let combinedPagesHtml = '';
       dayHtmlList.forEach((dHtml) => {
-        const bodyMatch = dHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-        const inner = bodyMatch ? bodyMatch[1] : dHtml;
-        combinedPagesHtml += `
-          <div class="cp-pdf-page" style="page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; width: 794px; min-height: 1122px; max-height: 1122px; margin: 0 auto; overflow: hidden; position: relative; background: #ffffff;">
-            ${inner}
-          </div>
-        `;
+        const pageSections = (dHtml || '').match(/<section[^>]*class="[^"]*report-page[^"]*"[^>]*>[\s\S]*?<\/section>/gi);
+        if (pageSections && pageSections.length > 0) {
+          pageSections.forEach((sec) => {
+            combinedPagesHtml += `
+              <div class="cp-pdf-page" style="page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; width: 794px; min-height: 1122px; max-height: 1122px; margin: 0 auto; overflow: hidden; position: relative; background: #ffffff;">
+                ${sec}
+              </div>
+            `;
+          });
+        } else {
+          const bodyMatch = dHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+          const inner = bodyMatch ? bodyMatch[1] : dHtml;
+          combinedPagesHtml += `
+            <div class="cp-pdf-page" style="page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; width: 794px; min-height: 1122px; max-height: 1122px; margin: 0 auto; overflow: hidden; position: relative; background: #ffffff;">
+              ${inner}
+            </div>
+          `;
+        }
       });
 
       const fullDocHtml = `<!DOCTYPE html>
@@ -44484,6 +44542,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
   <meta charset="UTF-8">
   <title>${fileName}</title>
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  ${extractedStyles}
   <style>
     @page { size: A4 portrait; margin: 0; }
     * { box-sizing: border-box; }
@@ -44512,6 +44571,18 @@ async function downloadPatientCareLogsPdfs(groupId) {
     .cp-pdf-page:last-child {
       page-break-after: avoid !important;
       break-after: avoid !important;
+    }
+    .report-page {
+      width: 794px !important;
+      min-height: 1122px !important;
+      max-height: 1122px !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      position: relative !important;
+      background: #ffffff !important;
+      padding: 34px 38px !important;
+      display: flex !important;
+      flex-direction: column !important;
     }
     .page, .report-area {
       width: 794px !important;
@@ -44661,27 +44732,47 @@ async function downloadPatientCareLogsPdfs(groupId) {
         });
         const extractedStyles = Array.from(styleSet).join('\n');
 
+        // 모든 일지의 페이지 단위(A4 1장 단위) 추출 (1일차당 2페이지 CarePort 표준 완벽 지원)
+        const allPageUnits = [];
+        dayHtmlList.forEach((dHtml, dayIdx) => {
+          const pageSections = (dHtml || '').match(/<section[^>]*class="[^"]*report-page[^"]*"[^>]*>[\s\S]*?<\/section>/gi);
+          if (pageSections && pageSections.length > 0) {
+            pageSections.forEach((sec, subIdx) => {
+              allPageUnits.push({
+                markup: sec,
+                dayIdx: dayIdx,
+                subPage: subIdx + 1
+              });
+            });
+          } else {
+            const bodyMatch = (dHtml || '').match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+            const inner = bodyMatch ? bodyMatch[1] : (dHtml || '');
+            allPageUnits.push({
+              markup: inner,
+              dayIdx: dayIdx,
+              subPage: 1
+            });
+          }
+        });
+
         // 고해상도 2x 레티나 화질 (192 DPI) + 4페이지 단위 청크 배치 처리 (모바일/PC 메모리 한계 완벽 준수 및 초고화질 보장)
         const BATCH_SIZE = 4;
-        const totalBatches = Math.ceil(sortedLogs.length / BATCH_SIZE);
+        const totalBatches = Math.ceil(allPageUnits.length / BATCH_SIZE);
 
         for (let b = 0; b < totalBatches; b++) {
           const startIdx = b * BATCH_SIZE;
-          const endIdx = Math.min(startIdx + BATCH_SIZE, sortedLogs.length);
-          const currentBatchLogs = sortedLogs.slice(startIdx, endIdx);
-          const currentBatchHtmls = dayHtmlList.slice(startIdx, endIdx);
+          const endIdx = Math.min(startIdx + BATCH_SIZE, allPageUnits.length);
+          const currentBatchUnits = allPageUnits.slice(startIdx, endIdx);
 
           updateGlobalProgress({
             percent: 50 + Math.round(((b + 1) / totalBatches) * 40),
-            statusText: `[${startIdx + 1}~${endIdx}일차 / 총 ${sortedLogs.length}일차] 고화질 일괄 렌더링 중...`
+            statusText: `[${startIdx + 1}~${endIdx}p / 총 ${allPageUnits.length}p] 고화질 일괄 렌더링 중...`
           });
           await new Promise(r => setTimeout(r, 10));
 
           let batchUnitsHtml = '';
-          currentBatchHtmls.forEach((dHtml, idx) => {
-            const bodyMatch = dHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-            let inner = bodyMatch ? bodyMatch[1] : dHtml;
-            inner = inner.replace(/<link[^>]*href="[^"]*pretendard[^"]*"[^>]*>/gi, '');
+          currentBatchUnits.forEach((u, idx) => {
+            let inner = u.markup.replace(/<link[^>]*href="[^"]*pretendard[^"]*"[^>]*>/gi, '');
             batchUnitsHtml += `<div class="careport-pdf-page-unit" data-page="${startIdx + idx + 1}" style="width: 794px; height: 1122px; max-height: 1122px; min-height: 1122px; overflow: hidden; position: relative; background: #ffffff; box-sizing: border-box;">${inner}</div>\n`;
           });
 
@@ -44707,12 +44798,24 @@ async function downloadPatientCareLogsPdfs(groupId) {
       position: relative !important;
       background: #ffffff !important;
     }
+    .report-page {
+      width: 794px !important;
+      min-height: 1122px !important;
+      max-height: 1122px !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      position: relative !important;
+      background: #ffffff !important;
+      padding: 34px 38px !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
     .page, .report-area {
       width: 794px !important;
       max-width: 794px !important;
       height: 1122px !important;
-      max-height: 1122px !important;
       min-height: 1122px !important;
+      max-height: 1122px !important;
       box-sizing: border-box !important;
       padding: 34px 38px !important;
       overflow: hidden !important;
@@ -44826,7 +44929,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
           sliceCanvas.height = unitHeight;
           const sliceCtx = sliceCanvas.getContext('2d');
 
-          for (let j = 0; j < currentBatchLogs.length; j++) {
+          for (let j = 0; j < currentBatchUnits.length; j++) {
             sliceCtx.fillStyle = '#ffffff';
             sliceCtx.fillRect(0, 0, unitWidth, unitHeight);
             sliceCtx.drawImage(canvas, 0, j * unitHeight, unitWidth, unitHeight, 0, 0, unitWidth, unitHeight);

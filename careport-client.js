@@ -894,6 +894,32 @@
         }
       }
 
+      // 9. Important Highlights
+      let importantItems = [];
+      const rawHighlights = raw.today_highlights || raw.important_notes || detail.importantItems || detail.today_highlights || detail.highlights || null;
+      if (Array.isArray(rawHighlights) && rawHighlights.length > 0) {
+        importantItems = rawHighlights.map(h => typeof h === 'string' ? h : (h?.text || h?.content)).filter(Boolean);
+      } else if (typeof rawHighlights === 'string' && rawHighlights.trim()) {
+        importantItems = rawHighlights.split(/\r?\n|•|·/).map(s => s.trim()).filter(Boolean);
+      }
+      if (importantItems.length === 0) {
+        const derived = [];
+        if (raw.guardian_notes?.pain && !raw.guardian_notes.pain.includes('없음') && !raw.guardian_notes.pain.includes('안정')) {
+          derived.push(`통증 모니터링: ${raw.guardian_notes.pain}`);
+        }
+        if (raw.guardian_notes?.diet && !raw.guardian_notes.diet.includes('원활') && !raw.guardian_notes.diet.includes('잘 드')) {
+          derived.push(`식사 관리: ${raw.guardian_notes.diet}`);
+        }
+        if (raw.guardian_notes?.activity && raw.guardian_notes.activity.includes('부축')) {
+          derived.push('이동 안전: 침상 이동 및 보행 시 밀착 부축으로 낙상 사고 예방');
+        }
+        if (derived.length === 0) {
+          derived.push('환자 활력징후 및 전반적인 컨디션이 안정적으로 유지되고 있습니다.');
+          derived.push('정규 처방 복약 및 식사 섭취가 순조롭게 완료되었으며 특이 증상 없습니다.');
+        }
+        importantItems = derived;
+      }
+
       return {
         patientName: pName,
         age,
@@ -912,6 +938,7 @@
         categories,
         vitals,
         careLogRows,
+        importantItems,
         guardianNotes,
         keywords,
         summary
@@ -963,7 +990,7 @@
     /**
      * Generate authentic SVG line chart for CarePort trend scores (matching Image 2)
      */
-    generateTrendChartSvg(trendList) {
+    generateTrendChartSvg(trendList, customW = 714, customH = 250) {
       let list = (trendList && Array.isArray(trendList) && trendList.length > 0) ? trendList : [];
       if (list.length === 0) {
         const todayStr = new Date().toISOString().slice(0, 10);
@@ -971,10 +998,10 @@
           { dayIndex: 1, careDate: todayStr, overallScore: 4, mobilityScore: 4, dietScore: 4, sleepScore: 4, painScore: 2 }
         ];
       }
-      const width = 740;
-      const height = 124;
-      const paddingX = 48;
-      const paddingY = 16;
+      const width = customW;
+      const height = customH;
+      const paddingX = 42;
+      const paddingY = 24;
       const chartW = width - paddingX * 2;
       const chartH = height - paddingY * 2;
       
@@ -987,7 +1014,7 @@
       for (let s = 1; s <= 5; s++) {
         const y = getY(s);
         gridSvg += `<line x1="${paddingX - 10}" y1="${y}" x2="${width - paddingX + 10}" y2="${y}" stroke="#e5e9ed" stroke-width="1"/>`;
-        gridSvg += `<text x="${paddingX - 22}" y="${y + 3.5}" font-size="10" font-weight="bold" fill="#94a3b8" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${s}</text>`;
+        gridSvg += `<text x="${paddingX - 22}" y="${y + 4}" font-size="11" font-weight="bold" fill="#94a3b8" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${s}</text>`;
       }
       
       // X labels with anti-collision step
@@ -997,21 +1024,17 @@
         const isFirst = idx === 0;
         const isLast = idx === numDays - 1;
         if (!isFirst && !isLast && (idx % step !== 0)) return;
-        // Avoid collision between second-to-last and last
-        if (isLast && (idx - 1) >= 0 && ((idx - 1) % step === 0) && (numDays > 4) && step > 1) {
-          // If the last item is too close, keep both or let it render cleanly with text-anchor
-        }
         const x = getX(idx);
         const label = item.careDate ? item.careDate.slice(5, 10).replace('-', '.') : (item.dayIndex ? `${item.dayIndex}일` : `${idx + 1}`);
-        xLabelsSvg += `<text x="${x}" y="${height - 2}" font-size="9" font-weight="bold" fill="#64748b" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${label}</text>`;
+        xLabelsSvg += `<text x="${x}" y="${height - 4}" font-size="11" font-weight="bold" fill="#64748b" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${label}</text>`;
       });
       
       const lines = [
-        { key: 'overallScore', color: '#06C8BB', dash: '', r: 3.5 },
-        { key: 'mobilityScore', color: '#2BBB77', dash: '', r: 3.5 },
-        { key: 'dietScore', color: '#F4A61E', dash: '', r: 3.5 },
-        { key: 'sleepScore', color: '#6366f1', dash: '', r: 3.2 },
-        { key: 'painScore', color: '#FE6FB0', dash: 'stroke-dasharray="6,4"', r: 3.5 }
+        { key: 'overallScore', color: '#06C8BB', dash: '', r: 4 },
+        { key: 'mobilityScore', color: '#2BBB77', dash: '', r: 4 },
+        { key: 'dietScore', color: '#F4A61E', dash: '', r: 4 },
+        { key: 'sleepScore', color: '#6366f1', dash: '', r: 3.5 },
+        { key: 'painScore', color: '#FE6FB0', dash: 'stroke-dasharray="8,5"', r: 4 }
       ];
       
       let linesSvg = '';
@@ -1023,14 +1046,14 @@
           const val = line.key === 'painScore' ? (rawVal != null ? (6 - rawVal) : 3) : rawVal;
           pts.push(`${getX(idx)},${getY(val)}`);
         });
-        linesSvg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${line.color}" stroke-width="2.5" ${line.dash}/>`;
+        linesSvg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${line.color}" stroke-width="3" ${line.dash}/>`;
         pts.forEach(pt => {
           const [px, py] = pt.split(',');
-          linesSvg += `<circle cx="${px}" cy="${py}" r="${line.r || 3.5}" fill="#ffffff" stroke="${line.color}" stroke-width="2"/>`;
+          linesSvg += `<circle cx="${px}" cy="${py}" r="${line.r || 4}" fill="#ffffff" stroke="${line.color}" stroke-width="2.5"/>`;
         });
       });
       
-      return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="width: 100%; max-width: ${width}px; height: auto;">${gridSvg}${xLabelsSvg}${linesSvg}</svg>`;
+      return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="width: 100%; max-width: ${width}px; height: auto; display: block; margin: 0 auto;">${gridSvg}${xLabelsSvg}${linesSvg}</svg>`;
     },
 
     /**
@@ -1437,7 +1460,7 @@
     },
 
     /**
-     * Generate printable HTML report for a single daily log (100% CarePort Modern Caregiver Layout)
+     * Generate printable HTML report for a single daily log (100% CarePort Modern 2-Page Executive Layout)
      */
     generateDailyLogHtml(patient, dailyLog, detailData = null) {
       if (this.isClassicLog(dailyLog, detailData)) {
@@ -1447,63 +1470,61 @@
       const d = this.normalizeCarePortLogData(patient, dailyLog, detailData);
 
       const toneBadgeClass = d.overallStatus.tone === 'good'
-        ? 'background: #eafaf8; color: #079f98; border: 1px solid #10bdb2;'
+        ? 'background: #d9f5e7; color: #168c61;'
         : (d.overallStatus.tone === 'warning'
-          ? 'background: #fef6e7; color: #d97706; border: 1px solid #f5aa18;'
-          : 'background: #fdecee; color: #dc2626; border: 1px solid #eb5c60;');
+          ? 'background: #fff1d4; color: #bf7a00;'
+          : 'background: #fde5e6; color: #ca3d43;');
 
       const overallLightSvg = this.renderTrafficLightSvg(d.overallStatus.tone, 'horizontal');
 
       const catCardsHtml = d.categories.map(c => {
-        const cPillStyle = c.tone === 'good'
-          ? 'background: #eafaf8; color: #079f98; border: 1px solid #10bdb2;'
-          : (c.tone === 'warning' ? 'background: #fef6e7; color: #d97706; border: 1px solid #f5aa18;' : 'background: #fdecee; color: #dc2626; border: 1px solid #eb5c60;');
+        const cPillTone = c.tone === 'good' ? 'good' : (c.tone === 'warning' ? 'warning' : 'poor');
         const vSvg = this.renderTrafficLightSvg(c.tone, 'vertical');
 
         return `
-          <div style="flex: 1; min-width: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; min-height: 64px;">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-              <span class="careport-badge-pill" style="height: 22px; font-size: 11px; font-weight: 800; padding: 0 7px; border-radius: 5px; ${cPillStyle}">
-                <span class="careport-dot" style="width: 4.5px; height: 4.5px; margin-right: 3.5px;"></span>
-                <span class="pill-text">${c.label}</span>
-              </span>
+          <article class="detail-status-card">
+            <span class="status-pill small ${cPillTone}"><i></i>${c.label}</span>
+            <div class="traffic-light vertical ${cPillTone}">
               ${vSvg}
             </div>
-            <div style="font-size: 11.5px; color: #334155; line-height: 1.35; font-weight: 500;">
-              ${c.description}
-            </div>
-          </div>
+            <p title="${c.description}">${c.description}</p>
+          </article>
         `;
       }).join('');
 
       const vitalsHtml = d.vitals.map(v => `
-        <div style="flex: 1; min-width: 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 4px; text-align: center;">
-          <div style="font-size: 9.5px; color: #64748b; font-weight: 700; margin-bottom: 1px;">${v.label}</div>
-          <div style="font-size: 12px; font-weight: 900; color: #0f172a; font-family: monospace;">
-            ${v.value}
-            ${v.unit ? `<small style="font-size: 9px; font-weight: 600; color: #94a3b8; margin-left: 1px;">${v.unit}</small>` : ''}
-          </div>
-        </div>
+        <article class="vital-item">
+          <span>${v.label}</span>
+          <strong>${v.value}${v.unit ? `<small>${v.unit}</small>` : ''}</strong>
+        </article>
       `).join('');
 
       const careLogHtml = d.careLogRows.map(r => `
-        <div style="display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid #f1f5f9; min-height: 28px;">
-          <strong class="careport-badge-pill" style="min-width: 80px; max-width: 92px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; height: 22px; padding: 0 6px;"><span class="pill-text">${r.label}</span></strong>
-          <span style="flex: 1; font-size: 11.5px; color: #334155; line-height: 1.4; display: inline-flex; align-items: center; min-height: 22px; font-weight: 500;">${r.value}</span>
+        <div class="care-log-row">
+          <strong>${r.label}</strong>
+          <span>${r.value}</span>
         </div>
+      `).join('');
+
+      const importantItems = (d.importantItems && d.importantItems.length > 0)
+        ? d.importantItems
+        : ['환자 활력징후 및 전반적인 컨디션이 안정적으로 유지되고 있습니다.', '정규 처방 복약 및 식사 섭취가 순조롭게 완료되었으며 특이 증상 없습니다.'];
+
+      const importantHtml = importantItems.map(item => `<li>${item}</li>`).join('');
+
+      const keywordsPills = d.keywords.map(k => `
+        <span class="guardian-keyword">#${k}</span>
       `).join('');
 
       const guardianNotesHtml = d.guardianNotes.map(g => `
-        <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; line-height: 1.4; min-height: 22px;">
-          <span style="display: inline-block; width: 4.5px; height: 4.5px; border-radius: 50%; background: #10bdb2; flex-shrink: 0;"></span>
-          <span style="font-weight: 800; color: #0f172a; min-width: 48px; flex-shrink: 0; position: relative; top: -0.5px;">${g.label}</span>
-          <span style="color: #cbd5e1; font-weight: bold; flex-shrink: 0;">·</span>
-          <span style="color: #334155; font-weight: 500; flex: 1; position: relative; top: -0.5px;">${g.value}</span>
-        </div>
-      `).join('');
-
-      const keywordsPills = d.keywords.map(k => `
-        <span class="careport-badge-pill" style="font-size: 10.5px; font-weight: 700; color: #079f98; background: #eafaf8; border: 1px solid #a7f3d0; border-radius: 10px; height: 22px; padding: 0 8px; margin-right: 4px; margin-bottom: 4px;"><span class="pill-text">#${k}</span></span>
+        <li class="guardian-note-item">
+          <span class="guardian-note-dot"></span>
+          <div class="guardian-note-content">
+            <span class="guardian-note-label">${g.label}</span>
+            <span class="guardian-note-separator">·</span>
+            <span class="guardian-note-text">${g.value}</span>
+          </div>
+        </li>
       `).join('');
 
       let trendChartHtml = '';
@@ -1511,14 +1532,8 @@
         ? d.trendScores
         : ((patient && patient.trendScores && patient.trendScores.length > 0)
           ? patient.trendScores
-          : ((detail && detail.trendScores && detail.trendScores.length > 0) ? detail.trendScores : []));
-      if (trendList && trendList.length > 0) {
-        trendChartHtml = this.generateTrendChartSvg(trendList);
-      } else if (d.chartImage) {
-        trendChartHtml = `<img src="${d.chartImage}" alt="간병 일자별 환자 상태 변화" style="width: 100%; height: auto; max-height: 120px; object-fit: contain; display: block; margin: 0 auto;" />`;
-      } else {
-        trendChartHtml = this.generateTrendChartSvg(d.trendScores || []);
-      }
+          : ((detailData && detailData.trendScores && detailData.trendScores.length > 0) ? detailData.trendScores : []));
+      trendChartHtml = this.generateTrendChartSvg(trendList, 714, 250);
 
       return `<!DOCTYPE html>
 <html lang="ko">
@@ -1535,15 +1550,19 @@
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       background: #ffffff;
-      color: #0f172a;
+      color: #252b31;
       padding: 0;
       margin: 0;
       line-height: 1.4;
-      overflow: visible;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    .page {
+    .report-area.diary-report {
+      width: 794px;
+      margin: 0 auto;
+      background: #ffffff;
+    }
+    .report-page {
       width: 794px;
       max-width: 794px;
       height: 1122px;
@@ -1551,189 +1570,630 @@
       max-height: 1122px;
       margin: 0 auto;
       background: #ffffff;
-      padding: 34px 38px;
       box-sizing: border-box;
       overflow: hidden;
-      page-break-inside: avoid;
-      break-inside: avoid;
-      display: block;
+      position: relative;
+    }
+    .first-page {
+      padding: 34px 40px 24px;
+      page-break-after: always !important;
+      break-after: page !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+    .second-page {
+      padding: 36px 40px 28px;
+      page-break-after: avoid !important;
+      break-after: page !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
     }
     @media print {
       body { background: #ffffff !important; }
-      .page {
+      .report-page {
         width: 794px !important;
         max-width: 794px !important;
+        height: 1122px !important;
         min-height: 1122px !important;
         max-height: 1122px !important;
         margin: 0 auto !important;
-        padding: 34px 38px !important;
         box-shadow: none !important;
         border: none !important;
         overflow: hidden !important;
         display: block !important;
       }
+      .first-page {
+        page-break-after: always !important;
+        break-after: page !important;
+      }
+      .second-page {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+      }
+    }
+    .diary-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .diary-header .eyebrow {
+      margin: 0 0 2px;
+      color: #86919a;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+    }
+    .diary-header h1 {
+      margin: 0;
+      font-size: 26px;
+      font-weight: 900;
+      color: #0f172a;
+      line-height: 1.15;
+      letter-spacing: -0.8px;
+    }
+    .care-day-badge {
+      width: 130px;
+      height: 60px;
+      border-radius: 12px;
+      background: #10bdb2;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(16, 189, 178, 0.25);
+    }
+    .care-day-badge strong {
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1.15;
+    }
+    .care-day-badge span {
+      margin-top: 2px;
+      font-size: 11px;
+      font-weight: 600;
+      opacity: 0.95;
+    }
+    .patient-summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.2fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .summary-card {
+      box-sizing: border-box;
+      min-height: 52px;
+      padding: 8px 14px;
+      border: 1px solid #dfe7ea;
+      border-radius: 9px;
+      background: #f8fafc;
+      text-align: left;
+    }
+    .summary-card > span {
+      display: block;
+      margin-bottom: 2px;
+      color: #74808a;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .summary-card strong {
+      display: block;
+      overflow: hidden;
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #0f172a;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .summary-card strong small {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #64748b;
+    }
+    .diary-section {
+      margin-top: 13px;
+    }
+    .diary-section h2 {
+      margin: 0;
+      font-size: 13.5px;
+      font-weight: 900;
+      color: #0f172a;
+      line-height: 1.2;
+      letter-spacing: -0.3px;
+      text-align: left;
     }
     .sec-head {
-      display: flex !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      border-bottom: 1.5px solid #0f172a !important;
-      padding-bottom: 4px !important;
-      margin-top: 14px !important;
-      margin-bottom: 8px !important;
-    }
-    .sec-head.sec-head-teal {
-      border-bottom: 1.5px solid #00897b !important;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid #10bdb2;
+      padding-bottom: 4px;
+      margin-bottom: 8px;
     }
     .sec-title {
-      font-size: 13.5px !important;
-      font-weight: 900 !important;
-      color: #0f172a !important;
-      letter-spacing: -0.3px !important;
-      display: inline-flex !important;
-      align-items: center !important;
+      font-size: 13.5px;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.3px;
+      display: inline-flex;
+      align-items: center;
     }
-    .careport-badge-pill {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      vertical-align: middle !important;
-      box-sizing: border-box !important;
-      line-height: 1 !important;
-      text-align: center !important;
-      white-space: nowrap !important;
+    .trend-card {
+      box-sizing: border-box;
+      height: 258px;
+      padding: 6px 8px 4px;
+      border: 1px solid #dfe7ea;
+      border-radius: 10px;
+      background: #fcfefe;
     }
-    .careport-badge-pill .pill-text,
-    .careport-badge-pill > span:not(.careport-dot),
-    .careport-badge-pill > strong {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      line-height: 1 !important;
-      position: relative !important;
-      top: -2.5px !important;
+    .overall-status-card {
+      min-height: 42px;
+      padding: 7px 14px;
+      border: 1px solid #8edfd9;
+      border-radius: 9px;
+      background: #eafaf8;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
     }
-    .careport-dot {
-      display: inline-block !important;
-      border-radius: 50% !important;
-      background: currentColor !important;
-      flex-shrink: 0 !important;
-      vertical-align: middle !important;
-      position: relative !important;
-      top: -0.5px !important;
+    .status-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      color: #168c61;
+      background: #d9f5e7;
+      font-size: 11.5px;
+      font-weight: 800;
+      white-space: nowrap;
+      line-height: 1;
+    }
+    .status-pill.warning {
+      color: #bf7a00;
+      background: #fff1d4;
+    }
+    .status-pill.poor {
+      color: #ca3d43;
+      background: #fde5e6;
+    }
+    .status-pill.neutral {
+      color: #66727a;
+      background: #edf1f2;
+    }
+    .status-pill i {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: currentColor;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .status-decision {
+      padding: 3px 8px;
+      border: 1px solid #9ddfd9;
+      border-radius: 8px;
+      color: #079f98;
+      background: #ffffff;
+      font-size: 10.5px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .detail-caption {
+      display: flex;
+      align-items: center;
+      margin: 8px 0 6px;
+      height: 18px;
+      color: #8c969d;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .detail-caption .line {
+      width: 14px;
+      height: 2px;
+      background-color: #8c969d;
+      border-radius: 2px;
+    }
+    .detail-caption span {
+      padding: 0 6px;
+    }
+    .detail-status-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .detail-status-card {
+      min-height: 82px;
+      padding: 8px 6px;
+      border: 1px solid #dfe7ea;
+      border-radius: 9px;
+      background: #ffffff;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .detail-status-card p {
+      margin: 6px 0 0 0;
+      overflow: hidden;
+      color: #64748b;
+      font-size: 10.5px;
+      font-weight: 600;
+      line-height: 1.3;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+    .status-guide {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 6px;
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .status-guide span {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .status-guide i {
+      width: 6.5px;
+      height: 6.5px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .status-guide .good { color: #20b86a; }
+    .status-guide .warning { color: #f5aa18; }
+    .status-guide .poor { color: #eb5c60; }
+
+    /* VITAL SIGNS GRID */
+    .vital-grid {
+      border: 1px solid #dfe7ea;
+      border-radius: 9px;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      overflow: hidden;
+      background: #ffffff;
+    }
+    .vital-item {
+      min-width: 0;
+      padding: 8px 4px 7px;
+      border-right: 1px solid #dfe7ea;
+      text-align: center;
+      background: #ffffff;
+    }
+    .vital-item:last-child {
+      border-right: 0;
+    }
+    .vital-item > span {
+      display: block;
+      margin-bottom: 3px;
+      color: #74808a;
+      font-size: 9.5px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .vital-item strong {
+      display: block;
+      font-size: 14px;
+      white-space: nowrap;
+      font-weight: 900;
+      color: #0f172a;
+    }
+    .vital-item strong small {
+      margin-left: 1.5px;
+      color: #8a949b;
+      font-size: 9.5px;
+      font-weight: 600;
+    }
+
+    /* PAGE 2 STYLING */
+    .page-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1.5px solid #e2e8f0;
+      padding-bottom: 6px;
+      margin-bottom: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
+    }
+    .care-log-table {
+      border: 1px solid #dfe7ea;
+      border-radius: 9px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+    .care-log-row {
+      min-height: 38px;
+      border-bottom: 1px solid #e8edef;
+      display: grid;
+      grid-template-columns: 110px 1fr;
+    }
+    .care-log-row:last-child {
+      border-bottom: 0;
+    }
+    .care-log-row strong,
+    .care-log-row span {
+      display: flex;
+      align-items: center;
+      padding: 8px 14px;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .care-log-row strong {
+      color: #079f98;
+      background: #f1fbfa;
+      font-weight: 800;
+      border-right: 1px solid #e8edef;
+    }
+    .care-log-row span {
+      color: #334155;
+      font-weight: 500;
+    }
+    .notice-box {
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 11.5px;
+      line-height: 1.55;
+    }
+    .warning-box {
+      border: 1.5px solid #ffad23;
+      border-left-width: 5px;
+      background: #fffaf0;
+      text-align: left;
+    }
+    .warning-box ul {
+      margin: 0;
+      padding-left: 14px;
+    }
+    .warning-box li {
+      margin: 2px 0;
+      color: #78350f;
+      font-weight: 600;
+    }
+    .guardian-box {
+      border: 1.5px solid #10bdb2;
+      border-left-width: 5px;
+      background: #fbffff;
+      text-align: left;
+      padding: 12px 16px;
+    }
+    .guardian-keywords {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 8px;
+    }
+    .guardian-keyword {
+      color: #079f98;
+      background: #eafaf8;
+      border: 1px solid #a7f3d0;
+      border-radius: 10px;
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 2px 8px;
+      line-height: 1;
+    }
+    .guardian-note-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 16px;
+    }
+    .guardian-note-item {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .guardian-note-dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #10bdb2;
+      flex-shrink: 0;
+      margin-top: 6px;
+    }
+    .guardian-note-content {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      flex: 1;
+    }
+    .guardian-note-label {
+      font-weight: 800;
+      color: #0f172a;
+      flex-shrink: 0;
+    }
+    .guardian-note-separator {
+      color: #94a3b8;
+      flex-shrink: 0;
+    }
+    .guardian-note-text {
+      color: #334155;
+      font-weight: 500;
+    }
+    .report-footer {
+      margin-top: 14px;
+      padding-top: 10px;
+      border-top: 1px solid #f1f5f9;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 10px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .report-footer i {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #10bdb2;
+      display: inline-block;
     }
   </style>
 </head>
 <body>
-  <div class="page">
-    <!-- Top Header (Image 1 style) -->
-    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 14px;">
-      <div>
-        <div style="font-size: 11px; font-weight: 800; color: #10bdb2; letter-spacing: 0.5px; text-transform: uppercase;">보호자 안내용 · 공식 간병일지</div>
-        <h1 style="font-size: 23px; font-weight: 900; color: #020617; margin: 2px 0 0 0; letter-spacing: -0.5px;">간병일지</h1>
-      </div>
-      <div style="text-align: right;">
-        <div style="display: inline-flex; align-items: center; gap: 6px;">
-          <span class="careport-badge-pill" style="background: #10bdb2; color: #ffffff; font-size: 11px; font-weight: 900; height: 22px; padding: 0 8px; border-radius: 5px;"><span class="pill-text">공식일지</span></span>
-          <span style="font-size: 13px; font-weight: 800; color: #334155; display: inline-flex; align-items: center; height: 22px;">${d.consultDate}</span>
+  <div class="report-area diary-report">
+    <!-- PAGE 1: 요약, 추이차트, 상태체크, 금일 활력징후 -->
+    <section class="report-page first-page">
+      <!-- Diary Header -->
+      <div class="diary-header">
+        <div>
+          <p class="eyebrow">보호자 안내용 · 공식 간병일지</p>
+          <h1>간병일지</h1>
         </div>
-        <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">리본케어포트(CarePort) 전산 공인 인증 일지</div>
-      </div>
-    </div>
-
-    <!-- Demographics Bar (Image 1 style: 고객명 (피보험자), 담당 간병인 (소속), 간병 기간) -->
-    <div style="display: flex; justify-content: space-between; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 16px; margin-bottom: 14px;">
-      <div style="flex: 1;">
-        <span style="font-size: 10px; color: #64748b; font-weight: 700; display: block; margin-bottom: 2px;">고객명 (피보험자)</span>
-        <div style="display: inline-flex; align-items: baseline; gap: 4px;">
-          <strong style="font-size: 13.5px; font-weight: 900; color: #0f172a;">${d.patientName}</strong>
-          <span style="font-size: 11.5px; font-weight: 700; color: #475569;">(${d.age}세·${d.gender})</span>
+        <div class="care-day-badge">
+          <strong>${d.dayText}</strong>
+          <span>${d.consultDate}</span>
         </div>
       </div>
-      <div style="flex: 1; border-left: 1px solid #e2e8f0; padding-left: 12px;">
-        <span style="font-size: 10px; color: #64748b; font-weight: 700; display: block; margin-bottom: 2px;">담당 간병인 (소속)</span>
-        <div style="display: inline-flex; align-items: baseline; gap: 4px;">
-          <strong style="font-size: 13px; font-weight: 800; color: #0f172a;">${d.caregiver}</strong>
-          <span style="font-size: 11px; color: #64748b;">(${d.org})</span>
+
+      <!-- Patient Summary Grid -->
+      <div class="patient-summary-grid">
+        <article class="summary-card">
+          <span>고객명 (피보험자)</span>
+          <strong>${d.patientName} <small>(${d.age}세·${d.gender})</small></strong>
+        </article>
+        <article class="summary-card">
+          <span>담당 간병인 (소속)</span>
+          <strong>${d.caregiver} <small>(${d.org})</small></strong>
+        </article>
+        <article class="summary-card">
+          <span>간병 기간</span>
+          <strong>${d.carePeriod}</strong>
+        </article>
+      </div>
+
+      <!-- Trend Section -->
+      <div class="diary-section">
+        <div class="sec-head">
+          <span class="sec-title">간병 일자별 환자 상태 변화</span>
+          <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; gap: 8px;">
+            <span style="color: #06C8BB;">― 종합상태</span>
+            <span style="color: #2BBB77;">― 거동능력</span>
+            <span style="color: #F4A61E;">― 식사상태</span>
+            <span style="color: #6366f1;">― 수면상태</span>
+            <span style="color: #FE6FB0;">┄ 통증수준</span>
+          </div>
+        </div>
+        <div class="trend-card">
+          ${trendChartHtml}
         </div>
       </div>
-      <div style="flex: 1.2; border-left: 1px solid #e2e8f0; padding-left: 12px;">
-        <span style="font-size: 10px; color: #64748b; font-weight: 700; display: block; margin-bottom: 2px;">간병 기간</span>
-        <strong style="font-size: 12px; font-weight: 800; color: #0f172a; display: block; line-height: 1.3;">${d.carePeriod}</strong>
-      </div>
-    </div>
 
-    <!-- Section: 간병 일자별 환자 상태 변화 (Image 1 style) -->
-    <div class="sec-head sec-head-teal" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #00897b; margin-top: 14px; margin-bottom: 8px; padding-bottom: 4px;">
-      <span class="sec-title" style="font-size: 13.5px; font-weight: 900; color: #0f172a;">간병 일자별 환자 상태 변화</span>
-      <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; gap: 8px;">
-        <span style="color: #06C8BB;">― 종합상태</span>
-        <span style="color: #2BBB77;">― 거동능력</span>
-        <span style="color: #F4A61E;">― 식사상태</span>
-        <span style="color: #6366f1;">― 수면상태</span>
-        <span style="color: #FE6FB0;">┄ 통증수준</span>
-      </div>
-    </div>
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; text-align: center;">
-      ${trendChartHtml}
-    </div>
-
-    <!-- Section 1: 금일 환자 상태 체크 (신호등 & 세부 상태) -->
-    <div class="sec-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #0f172a; margin-top: 14px; margin-bottom: 8px; padding-bottom: 4px;">
-      <span class="sec-title" style="font-size: 13.5px; font-weight: 900; color: #0f172a;">금일 환자 상태 체크</span>
-      <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; gap: 8px;">
-        <span style="display: inline-flex; align-items: center; gap: 3px;"><b style="color: #20b86a; font-size: 11px;">●</b> 양호·안정</span>
-        <span style="display: inline-flex; align-items: center; gap: 3px;"><b style="color: #f5aa18; font-size: 11px;">●</b> 주의·부분보조</span>
-        <span style="display: inline-flex; align-items: center; gap: 3px;"><b style="color: #eb5c60; font-size: 11px;">●</b> 악화·주의필요</span>
-      </div>
-    </div>
-
-    <!-- Overall Status Verdict Banner -->
-    <div style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 14px; margin-bottom: 10px; min-height: 40px;">
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span class="careport-badge-pill" style="font-size: 11px; font-weight: 900; height: 23px; padding: 0 9px; border-radius: 5px; ${toneBadgeClass}">
-          <span class="careport-dot" style="width: 4.5px; height: 4.5px; margin-right: 4px;"></span>
-          <span class="pill-text">${d.overallStatus.label}</span>
-        </span>
-        <div style="display: inline-flex; align-items: center;">
-          ${overallLightSvg}
+      <!-- Status Section -->
+      <div class="diary-section">
+        <div class="sec-head">
+          <span class="sec-title">금일 환자 상태 체크</span>
+          <div class="status-guide">
+            <span class="good"><i></i>양호 · 안정</span>
+            <span class="warning"><i></i>주의 · 부분보조</span>
+            <span class="poor"><i></i>악화 · 주의 필요</span>
+          </div>
         </div>
-        <span style="font-size: 12px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; height: 23px;">${d.overallStatus.description}</span>
+        
+        <div class="overall-status-card">
+          <div class="status-title-wrap">
+            <span class="status-pill ${d.overallStatus.tone}"><i></i>${d.overallStatus.label}</span>
+            <div class="traffic-light horizontal">
+              ${overallLightSvg}
+            </div>
+            <span style="font-size: 12px; font-weight: 700; color: #1e293b;">${d.overallStatus.description}</span>
+          </div>
+          <span class="status-decision">종합 판정</span>
+        </div>
+
+        <div class="detail-caption">
+          <span class="line"></span>
+          <span>항목별 세부 상태</span>
+        </div>
+
+        <div class="detail-status-grid">
+          ${catCardsHtml}
+        </div>
       </div>
-      <span class="careport-badge-pill" style="font-size: 10.5px; font-weight: 800; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; height: 22px; padding: 0 8px; border-radius: 4px;"><span class="pill-text">종합 판정</span></span>
-    </div>
 
-    <!-- 4 Category Cards (식사, 거동, 수면, 통증) -->
-    <div style="display: flex; gap: 8px; margin-bottom: 14px;">
-      ${catCardsHtml}
-    </div>
+      <!-- Vital Section: 금일 활력징후 (7 Vital Signs) -->
+      <div class="diary-section">
+        <div class="sec-head">
+          <span class="sec-title">금일 활력징후</span>
+          <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">정상 범위 기준 정밀 측정</span>
+        </div>
+        <div class="vital-grid">
+          ${vitalsHtml}
+        </div>
+      </div>
+    </section>
 
-    <!-- Section 2: 금일 활력징후 (7 Vital signs) - 메이트원 요청으로 비노출 -->
-    <div class="sec-head" style="display: none !important;">
-      <span class="sec-title">금일 활력징후</span>
-      <span style="font-size: 9.5px; color: #94a3b8;">정상 범위 기준 정밀 측정</span>
-    </div>
-    <div style="display: none !important; gap: 6px; margin-bottom: 8px;">
-      ${vitalsHtml}
-    </div>
+    <!-- PAGE 2: 수행내역, 오늘의 중요사항, 보호자 전달사항 -->
+    <section class="report-page second-page">
+      <div class="page-indicator">
+        <span>보호자 안내용 · 간병일지 (2/2)</span>
+        <span>${d.patientName} 님 · ${d.consultDate}</span>
+      </div>
 
-    <!-- Section 3: 금일 간병 수행 내역 (5 Detailed rows) -->
-    <div class="sec-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #0f172a; margin-top: 14px; margin-bottom: 8px; padding-bottom: 4px;">
-      <span class="sec-title" style="font-size: 13.5px; font-weight: 900; color: #0f172a;">금일 간병 수행 내역</span>
-      <span style="font-size: 10px; color: #94a3b8;">표준 간병 프로세스 준수</span>
-    </div>
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 14px; margin-bottom: 14px;">
-      ${careLogHtml}
-    </div>
+      <!-- Care Log Section -->
+      <div class="diary-section" style="margin-top: 0;">
+        <div class="sec-head">
+          <span class="sec-title">금일 간병 수행 내역</span>
+          <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">표준 간병 프로세스 준수</span>
+        </div>
+        <div class="care-log-table">
+          ${careLogHtml}
+        </div>
+      </div>
 
-    <!-- Section 5: 보호자 전달사항 (6 Guardian Note rows) -->
-    <div class="sec-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #0f172a; margin-top: 14px; margin-bottom: 8px; padding-bottom: 4px;">
-      <span class="sec-title" style="font-size: 13.5px; font-weight: 900; color: #0f172a;">보호자 전달사항</span>
-      <span style="font-size: 10px; color: #94a3b8;">안심 소통 리포트</span>
-    </div>
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 16px; margin-bottom: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
-      ${guardianNotesHtml}
-    </div>
+      <!-- Important Notes Section -->
+      <div class="diary-section">
+        <div class="sec-head">
+          <span class="sec-title">오늘의 중요사항</span>
+          <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">환자 상태 모니터링 중점 체크</span>
+        </div>
+        <div class="notice-box warning-box">
+          <ul>
+            ${importantHtml}
+          </ul>
+        </div>
+      </div>
+
+      <!-- Guardian Section -->
+      <div class="diary-section">
+        <div class="sec-head">
+          <span class="sec-title">보호자 전달사항</span>
+          <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">안심 소통 리포트</span>
+        </div>
+        <div class="notice-box guardian-box">
+          <div class="guardian-keywords">
+            ${keywordsPills}
+          </div>
+          <ul class="guardian-note-list">
+            ${guardianNotesHtml}
+          </ul>
+        </div>
+      </div>
+
+      <footer class="report-footer">
+        <i></i>본 간병일지는 리본케어 앱을 통해 작성되었습니다.
+      </footer>
+    </section>
   </div>
 </body>
 </html>`;
@@ -1910,5 +2370,10 @@
     }
   };
 
-  window.CarePortClient = CarePortClient;
-})(window);
+  if (typeof window !== 'undefined') {
+    window.CarePortClient = CarePortClient;
+  }
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CarePortClient;
+  }
+})(typeof window !== 'undefined' ? window : global);
