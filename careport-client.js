@@ -1644,31 +1644,22 @@
     .report-page {
       width: 794px;
       max-width: 794px;
-      height: 1122px;
-      min-height: 1122px;
-      max-height: 1122px;
+      min-height: auto;
       margin: 0 auto;
       background: #ffffff;
       box-sizing: border-box;
-      overflow: hidden;
+      overflow: visible;
       position: relative;
     }
-    .first-page {
-      padding: 24px 38px 18px;
-      page-break-after: always !important;
-      break-after: page !important;
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
+    .continuous-page {
+      padding: 24px 38px 24px;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
+      gap: 12px;
     }
-    .second-page {
-      padding: 36px 40px 28px;
-      page-break-after: avoid !important;
-      break-after: page !important;
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
+    .first-page, .second-page {
+      padding: 24px 38px 18px;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
@@ -1678,22 +1669,18 @@
       .report-page {
         width: 794px !important;
         max-width: 794px !important;
-        height: 1122px !important;
-        min-height: 1122px !important;
-        max-height: 1122px !important;
+        height: auto !important;
+        min-height: auto !important;
+        max-height: none !important;
         margin: 0 auto !important;
         box-shadow: none !important;
         border: none !important;
-        overflow: hidden !important;
+        overflow: visible !important;
         display: block !important;
       }
-      .first-page {
-        page-break-after: always !important;
-        break-after: page !important;
-      }
-      .second-page {
-        page-break-after: avoid !important;
-        break-after: avoid !important;
+      .diary-section, .trend-card, .overall-status-card, .detail-status-grid, .vital-grid, .care-log-table, .notice-box {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
       }
     }
     .diary-header {
@@ -2194,8 +2181,8 @@
 </head>
 <body>
   <div class="report-area diary-report">
-    <!-- PAGE 1: 요약, 추이차트, 상태체크, 금일 활력징후 -->
-    <section class="report-page first-page">
+    <!-- 1:1 CarePort 원본 그대로 쭉 이어서 출력되는 일지 본문 -->
+    <article class="report-page continuous-page">
       <!-- Diary Header -->
       <header class="diary-header">
         <div>
@@ -2241,7 +2228,7 @@
       </section>
 
       <!-- Status Section -->
-      <section class="diary-section">
+      <section class="diary-section status-section">
         <h2>금일 환자 상태 체크</h2>
         <div class="section-rule"></div>
         
@@ -2280,17 +2267,9 @@
           ${vitalsHtml}
         </div>
       </section>
-    </section>
 
-    <!-- PAGE 2: 수행내역, 오늘의 중요사항, 보호자 전달사항 -->
-    <section class="report-page second-page">
-      <div class="page-indicator">
-        <span>보호자 안내용 · 간병일지 (2/2)</span>
-        <span>${d.patientName} 님 · ${d.consultDate}</span>
-      </div>
-
-      <!-- Care Log Section -->
-      <div class="diary-section" style="margin-top: 0;">
+      <!-- Care Log Section: 금일 간병 수행 내역 -->
+      <section class="diary-section care-log-section">
         <div class="sec-head">
           <span class="sec-title">금일 간병 수행 내역</span>
           <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">표준 간병 프로세스 준수</span>
@@ -2298,10 +2277,10 @@
         <div class="care-log-table">
           ${careLogHtml}
         </div>
-      </div>
+      </section>
 
-      <!-- Important Notes Section -->
-      <div class="diary-section">
+      <!-- Important Notes Section: 오늘의 중요사항 -->
+      <section class="diary-section important-section">
         <div class="sec-head">
           <span class="sec-title">오늘의 중요사항</span>
           <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">환자 상태 모니터링 중점 체크</span>
@@ -2311,10 +2290,10 @@
             ${importantHtml}
           </ul>
         </div>
-      </div>
+      </section>
 
-      <!-- Guardian Section -->
-      <div class="diary-section">
+      <!-- Guardian Section: 보호자 전달사항 -->
+      <section class="diary-section guardian-section">
         <div class="sec-head">
           <span class="sec-title">보호자 전달사항</span>
           <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">안심 소통 리포트</span>
@@ -2327,12 +2306,12 @@
             ${guardianNotesHtml}
           </ul>
         </div>
-      </div>
+      </section>
 
       <footer class="report-footer">
         <i></i>본 간병일지는 리본케어 앱을 통해 작성되었습니다.
       </footer>
-    </section>
+    </article>
   </div>
 </body>
 </html>`;

@@ -34733,9 +34733,67 @@ function sortFaxLogsNewestFirst(logs) {
 }
 window.sortFaxLogsNewestFirst = sortFaxLogsNewestFirst;
 
+// 팩스 발송 대장의 모든 일시 데이터를 대한민국 표준시(KST, Asia/Seoul, UTC+9)로 엄격 정합화 및 보정
+function normalizeFaxLogsToKoreaTime(logs) {
+  if (!Array.isArray(logs)) return logs;
+  let hasModified = false;
+  logs.forEach(l => {
+    if (!l) return;
+
+    // 1. Convex _creationTime(에포크 밀리초)이 존재하는 경우 KST로 동기화
+    if (l._creationTime && typeof getKoreaDateTimeStr === 'function') {
+      const kstStr = getKoreaDateTimeStr(new Date(l._creationTime));
+      if (kstStr && l.sentDate !== kstStr) {
+        l.sentDate = kstStr;
+        hasModified = true;
+      }
+      return;
+    }
+
+    // 2. 바로빌 접수시간(baroSendDT / sendDT)이 있는 경우 KST로 포맷팅
+    const bDt = l.baroSendDT || l.sendDT;
+    if (bDt && String(bDt).length >= 12) {
+      const s = String(bDt).replace(/[^0-9]/g, '');
+      const kstStr = `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)} ${s.slice(8, 10)}:${s.slice(10, 12)}`;
+      if (l.sentDate !== kstStr) {
+        l.sentDate = kstStr;
+        hasModified = true;
+      }
+      return;
+    }
+
+    // 3. Vercel 서버리스 환경 등에서 UTC(9시간 차이)로 기록되었던 기존 과거 로그 자동 KST 보정 (+9시간)
+    if (l.sentDate && !l._kstNormalized) {
+      const m = String(l.sentDate).trim().match(/^(\d{4})[.-](\d{1,2})[.-](\d{1,2})\s+(\d{1,2}):(\d{1,2})/);
+      if (m) {
+        const y = parseInt(m[1], 10);
+        const mo = parseInt(m[2], 10);
+        const d = parseInt(m[3], 10);
+        const h = parseInt(m[4], 10);
+        const min = parseInt(m[5], 10);
+        // 한국 업무시간(10시~17시) 중 UTC로 저장되어 00시~08시대로 표시되던 건 감지
+        if (h < 9 && (y === 2026 && mo === 10 && (d === 6 || d === 7))) {
+          const utcMs = Date.UTC(y, mo - 1, d, h, min);
+          const kstDate = new Date(utcMs);
+          const kstStr = typeof getKoreaDateTimeStr === 'function'
+            ? getKoreaDateTimeStr(kstDate)
+            : `${kstDate.getUTCFullYear()}.${String(kstDate.getUTCMonth() + 1).padStart(2, '0')}.${String(kstDate.getUTCDate()).padStart(2, '0')} ${String((h + 9) % 24).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+          
+          l.sentDate = kstStr;
+          l._kstNormalized = true;
+          hasModified = true;
+        }
+      }
+    }
+  });
+  return hasModified;
+}
+window.normalizeFaxLogsToKoreaTime = normalizeFaxLogsToKoreaTime;
+
 function saveFaxLogs() {
   try {
     if (Array.isArray(gFaxLogs)) {
+      normalizeFaxLogsToKoreaTime(gFaxLogs);
       gFaxLogs = sortFaxLogsNewestFirst(gFaxLogs);
     }
     localStorage.setItem('LIVON_FAX_LOGS', JSON.stringify(gFaxLogs));
@@ -35335,6 +35393,10 @@ function renderFaxLogsTable() {
   const tbody = document.getElementById('faxLogsTableBody');
   if (!tbody) return;
 
+  if (typeof normalizeFaxLogsToKoreaTime === 'function') {
+    normalizeFaxLogsToKoreaTime(gFaxLogs);
+  }
+
   const search = (document.getElementById('faxLogSearchInput')?.value || '').toLowerCase().trim();
   const statusFilter = document.getElementById('faxLogStatusFilter')?.value || 'ALL';
   const insFilter = document.getElementById('faxLogInsuranceFilter')?.value || 'ALL';
@@ -35932,12 +35994,16 @@ function getBarobillConfig() {
     sender = '02-6499-3917';
     localStorage.setItem('LIVON_FAX_SENDER', sender);
   }
+  const baroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'prod';
+  const prodCertKey = 'A1496EC3-E606-44C0-B126-F03B9AF88588';
+  const testCertKey = 'CF89EE38-7B80-4955-960E-D86A866498ED';
+
   let certKey = localStorage.getItem('LIVON_BAROBILL_CERTKEY');
-  if (!certKey || certKey === 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE') {
-    certKey = 'CF89EE38-7B80-4955-960E-D86A866498ED';
+  if (!certKey || certKey === 'C53EC844-0FE7-4139-80AA-FE06E3ACAABE' || (baroServer === 'prod' && certKey === testCertKey)) {
+    certKey = baroServer === 'prod' ? prodCertKey : testCertKey;
     localStorage.setItem('LIVON_BAROBILL_CERTKEY', certKey);
   } else if (certKey === '1431781E-78BF-4E1F-B4D1-870C4FA64AF6') {
-    certKey = 'A1496EC3-E606-44C0-B126-F03B9AF88588';
+    certKey = prodCertKey;
     localStorage.setItem('LIVON_BAROBILL_CERTKEY', certKey);
   }
   let corpNum = localStorage.getItem('LIVON_BAROBILL_CORPNUM');
@@ -35950,7 +36016,6 @@ function getBarobillConfig() {
     baroId = 'livoncare';
     localStorage.setItem('LIVON_BAROBILL_ID', baroId);
   }
-  const baroServer = localStorage.getItem('LIVON_BAROBILL_SERVER') || 'prod';
   const baroPwd = localStorage.getItem('LIVON_BAROBILL_PWD') || '@flqhszpdj';
   const aligoUser = localStorage.getItem('LIVON_FAX_ALIGO_USER') || '';
   const aligoKey = localStorage.getItem('LIVON_FAX_ALIGO_KEY') || '';
@@ -36004,6 +36069,14 @@ async function loadBarobillSettingsToInputs() {
         const cleanId = data.config.baroId.includes('@') ? 'livoncare' : data.config.baroId;
         localStorage.setItem('LIVON_BAROBILL_ID', cleanId);
         cfg.baroId = cleanId;
+      }
+      if (data.config.baroCertKey) {
+        localStorage.setItem('LIVON_BAROBILL_CERTKEY', data.config.baroCertKey);
+        cfg.certKey = data.config.baroCertKey;
+      }
+      if (data.config.baroServer) {
+        localStorage.setItem('LIVON_BAROBILL_SERVER', data.config.baroServer);
+        cfg.baroServer = data.config.baroServer;
       }
     }
   } catch (e) {}
@@ -43822,22 +43895,172 @@ async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 12) 
 }
 
 /**
- * 격리된 iframe 환경을 활용한 고해상도 공식 2페이지(A4 Multi-page) PDF 생성
- * (Page 1 & Page 2를 각각 개별 고해상도 캔버스로 변환 후 단일 2페이지 PDF로 완벽 결합)
+ * 스마트 공백 감지 기반 연속형 A4 멀티페이지 PDF 슬라이싱 및 생성 엔진
+ * (글자나 표, 카드가 잘리지 않도록 섹션 간 자연스러운 여백을 탐지하여 끊김 없이 연속 A4 분할)
  */
-async function render2PageHtmlToPdfBytes(htmlContent) {
-  await ensureHtml2CanvasLoaded();
+async function sliceCanvasToContinuousA4Pdf(canvas, customMargin = 14) {
   await ensurePdfLibLoaded();
   if (typeof PDFLib === 'undefined' || !PDFLib.PDFDocument) {
     throw new Error('PDFLib 라이브러리를 찾을 수 없습니다.');
   }
+
+  const pdfDoc = await PDFLib.PDFDocument.create();
+  const pageW = 595.28; // A4 pt 폭
+  const pageH = 841.89; // A4 pt 높이
+  const marginH = customMargin;
+  const marginV = customMargin;
+  const availW = pageW - (marginH * 2);
+  const availH = pageH - (marginV * 2);
+
+  const ptPerCanvasPx = availW / canvas.width;
+  const maxCanvasSliceH = Math.floor(availH / ptPerCanvasPx);
+
+  // 전체 내용이 1페이지에 들어가는 경우 단일 페이지 렌더링
+  if (canvas.height <= maxCanvasSliceH) {
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    const arrayBuf = await blob.arrayBuffer();
+    const pngImage = await pdfDoc.embedPng(new Uint8Array(arrayBuf));
+    const finalW = availW;
+    const finalH = canvas.height * ptPerCanvasPx;
+    const posX = marginH;
+    const posY = pageH - marginV - finalH;
+    const page = pdfDoc.addPage([pageW, pageH]);
+    page.drawImage(pngImage, {
+      x: posX,
+      y: posY,
+      width: finalW,
+      height: finalH
+    });
+    return await pdfDoc.save();
+  }
+
+  // 1페이지 초과 시: 섹션/박스 경계의 흰색 공백을 감지하여 자연스럽게 다음 페이지로 넘기는 스마트 슬라이싱
+  let currentY = 0;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+
+  while (currentY < canvas.height) {
+    let cutY = canvas.height;
+    const remainingH = canvas.height - currentY;
+
+    if (remainingH <= maxCanvasSliceH) {
+      // 마지막 페이지
+      cutY = canvas.height;
+    } else {
+      const searchMaxY = currentY + maxCanvasSliceH;
+      const searchMinY = Math.floor(currentY + maxCanvasSliceH * 0.72); // 하단 28% 영역에서 공백 탐색
+      const searchZoneH = searchMaxY - searchMinY;
+
+      let bestCut = searchMaxY;
+      if (searchZoneH > 10) {
+        try {
+          const imgData = ctx.getImageData(0, searchMinY, w, searchZoneH);
+          const data = imgData.data;
+          const startX = Math.floor(w * 0.05);
+          const endX = Math.floor(w * 0.95);
+          const stepX = 4;
+
+          let currentRunStart = -1;
+          let bestRunStart = -1;
+          let bestRunLength = 0;
+          let bestRow = -1;
+          let minNonWhite = Infinity;
+
+          for (let r = 0; r < searchZoneH; r++) {
+            let nonWhiteCount = 0;
+            const rowOffset = r * w * 4;
+            for (let x = startX; x < endX; x += stepX) {
+              const idx = rowOffset + (x * 4);
+              const red = data[idx];
+              const green = data[idx + 1];
+              const blue = data[idx + 2];
+              const alpha = data[idx + 3];
+              // 배경(흰색 또는 투명) 여부 검사
+              if (alpha > 30 && (red < 248 || green < 248 || blue < 248)) {
+                nonWhiteCount++;
+              }
+            }
+
+            if (nonWhiteCount === 0) {
+              if (currentRunStart === -1) currentRunStart = r;
+              const runLen = r - currentRunStart + 1;
+              if (runLen > bestRunLength) {
+                bestRunLength = runLen;
+                bestRunStart = currentRunStart;
+              }
+            } else {
+              currentRunStart = -1;
+            }
+
+            if (nonWhiteCount < minNonWhite) {
+              minNonWhite = nonWhiteCount;
+              bestRow = r;
+            }
+          }
+
+          if (bestRunLength >= 3) {
+            // 섹션 사이의 깨끗한 흰 여백 중간 지점을 절단점으로 지정
+            bestCut = searchMinY + bestRunStart + Math.floor(bestRunLength / 2);
+          } else if (bestRow !== -1 && minNonWhite < (endX - startX) / (stepX * 4)) {
+            bestCut = searchMinY + bestRow;
+          } else {
+            bestCut = searchMaxY;
+          }
+        } catch (e) {
+          console.warn('[PDF Slicing] Gap inspection fallback:', e);
+          bestCut = searchMaxY;
+        }
+      }
+      cutY = Math.min(bestCut, canvas.height);
+    }
+
+    const sliceH = cutY - currentY;
+    if (sliceH <= 0) break;
+
+    const sliceCanvas = document.createElement('canvas');
+    sliceCanvas.width = w;
+    sliceCanvas.height = sliceH;
+    const sliceCtx = sliceCanvas.getContext('2d');
+    sliceCtx.fillStyle = '#ffffff';
+    sliceCtx.fillRect(0, 0, w, sliceH);
+    sliceCtx.drawImage(canvas, 0, currentY, w, sliceH, 0, 0, w, sliceH);
+
+    const blob = await new Promise(res => sliceCanvas.toBlob(res, 'image/png'));
+    const arrayBuf = await blob.arrayBuffer();
+    const pngImage = await pdfDoc.embedPng(new Uint8Array(arrayBuf));
+
+    const finalW = availW;
+    const finalH = sliceH * ptPerCanvasPx;
+    const posX = marginH;
+    const posY = pageH - marginV - finalH;
+
+    const page = pdfDoc.addPage([pageW, pageH]);
+    page.drawImage(pngImage, {
+      x: posX,
+      y: posY,
+      width: finalW,
+      height: finalH
+    });
+
+    currentY = cutY;
+  }
+
+  return await pdfDoc.save();
+}
+
+/**
+ * 일지원문 HTML을 고해상도 연속 A4 규격 PDF로 변환 (누락이나 글자 잘림 없는 끊김 없는 출력)
+ */
+async function renderHtmlToContinuousA4PdfBytes(htmlContent, customMargin = 14) {
+  await ensureHtml2CanvasLoaded();
+  await ensurePdfLibLoaded();
 
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
   iframe.style.left = '-9999px';
   iframe.style.top = '0';
   iframe.style.width = '794px';
-  iframe.style.height = '2400px';
+  iframe.style.height = '4000px';
   iframe.style.border = 'none';
   iframe.style.opacity = '0';
   iframe.style.pointerEvents = 'none';
@@ -43875,51 +44098,105 @@ async function render2PageHtmlToPdfBytes(htmlContent) {
 
     await new Promise(res => setTimeout(res, 80));
 
-    // Remove screen-only toolbar
+    // 화면용 툴바 제거
     iframeDoc.querySelectorAll('.no-print').forEach(el => el.remove());
 
-    const pageEls = iframeDoc.querySelectorAll('.report-page, .page');
-    const targetPages = pageEls.length > 0 ? Array.from(pageEls) : [iframeDoc.body];
+    const targetEl = iframeDoc.querySelector('.report-page, .continuous-page, .report-area') || iframeDoc.body;
 
-    const mergedDoc = await PDFLib.PDFDocument.create();
-    const pageW = 595.28;
-    const pageH = 841.89;
+    const canvas = await html2canvas(targetEl, {
+      scale: 2.0,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      windowWidth: 794,
+      imageTimeout: 0
+    });
 
-    for (let idx = 0; idx < targetPages.length; idx++) {
-      const pEl = targetPages[idx];
-      const canvas = await html2canvas(pEl, {
-        scale: 2.0,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        windowWidth: 794,
-        width: 794,
-        height: 1122,
-        imageTimeout: 0
-      });
-
-      const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
-      const arrayBuf = await blob.arrayBuffer();
-      const pngImage = await mergedDoc.embedPng(new Uint8Array(arrayBuf));
-
-      const pdfPage = mergedDoc.addPage([pageW, pageH]);
-      pdfPage.drawImage(pngImage, {
-        x: 0,
-        y: 0,
-        width: pageW,
-        height: pageH
-      });
-    }
-
-    return await mergedDoc.save();
+    return await sliceCanvasToContinuousA4Pdf(canvas, customMargin);
   } finally {
-    if (document.body.contains(iframe)) {
+    if (iframe && document.body.contains(iframe)) {
       document.body.removeChild(iframe);
     }
   }
 }
+
+/**
+ * 화면 상에 렌더링된 DOM 요소(#carePortPrintArea)를 1:1 그대로 연속 A4 PDF로 변환
+ */
+async function renderElementToContinuousA4PdfBytes(sourceElement, customMargin = 14) {
+  if (!sourceElement) throw new Error('PDF 렌더링 대상 요소를 찾을 수 없습니다.');
+  await ensureHtml2CanvasLoaded();
+  await ensurePdfLibLoaded();
+
+  // 기존 스타일 임시 보관
+  const prevShadow = sourceElement.style.boxShadow;
+  const prevBorder = sourceElement.style.border;
+  const prevRadius = sourceElement.style.borderRadius;
+  const prevWidth = sourceElement.style.width;
+  const prevMaxWidth = sourceElement.style.maxWidth;
+
+  // 다운로드/프린트 버튼 임시 숨김
+  const noPrintEls = sourceElement.querySelectorAll('.no-print');
+  const prevDisplays = Array.from(noPrintEls).map(el => el.style.display);
+  noPrintEls.forEach(el => { el.style.display = 'none'; });
+
+  // 상위 스크롤 컨테이너 오프셋 보정
+  const scrollContainer = sourceElement.parentElement;
+  const prevScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+  if (scrollContainer && scrollContainer.scrollTop > 0) {
+    scrollContainer.scrollTop = 0;
+  }
+
+  try {
+    sourceElement.style.boxShadow = 'none';
+    sourceElement.style.border = 'none';
+    sourceElement.style.borderRadius = '0';
+    sourceElement.style.width = '794px';
+    sourceElement.style.maxWidth = '794px';
+
+    if (document.fonts && document.fonts.ready) {
+      try { await document.fonts.ready; } catch (e) {}
+    }
+    await new Promise(res => setTimeout(res, 40));
+
+    const canvas = await html2canvas(sourceElement, {
+      scale: 2.0,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      windowWidth: 794,
+      scrollX: 0,
+      scrollY: 0,
+      imageTimeout: 0
+    });
+
+    return await sliceCanvasToContinuousA4Pdf(canvas, customMargin);
+  } finally {
+    sourceElement.style.boxShadow = prevShadow;
+    sourceElement.style.border = prevBorder;
+    sourceElement.style.borderRadius = prevRadius;
+    sourceElement.style.width = prevWidth;
+    sourceElement.style.maxWidth = prevMaxWidth;
+    noPrintEls.forEach((el, idx) => {
+      el.style.display = prevDisplays[idx];
+    });
+    if (scrollContainer && prevScrollTop > 0) {
+      scrollContainer.scrollTop = prevScrollTop;
+    }
+  }
+}
+
+/**
+ * 하위 호환성 2페이지 PDF 함수 (연속 A4 렌더링 엔진으로 위임하여 내용 누락/잘림 완벽 해결)
+ */
+async function render2PageHtmlToPdfBytes(htmlContent) {
+  return await renderHtmlToContinuousA4PdfBytes(htmlContent, 14);
+}
 window.render2PageHtmlToPdfBytes = render2PageHtmlToPdfBytes;
+window.renderHtmlToContinuousA4PdfBytes = renderHtmlToContinuousA4PdfBytes;
+window.renderElementToContinuousA4PdfBytes = renderElementToContinuousA4PdfBytes;
 
 async function renderElementToSinglePageA4PdfBytes(sourceElement, customMargin = 12) {
   if (!sourceElement) throw new Error('PDF 렌더링 대상 요소를 찾을 수 없습니다.');
@@ -44115,7 +44392,20 @@ async function downloadCarePortDocumentPdf() {
     updateGlobalProgress({ percent: 65, statusText: `초고속 캔버스 변환 및 PDF 파일 생성 중...` });
 
     let pdfBytes = null;
-    if (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function') {
+
+    // 1순위: 화면에 표시된 완성도 높은 일지원문(#carePortPrintArea)을 1:1 그대로 연속 A4 PDF로 변환 (사용자 원문 그대로 쭉 이어서 다운로드)
+    if (printArea && printArea.offsetHeight > 100) {
+      updateGlobalProgress({ percent: 50, statusText: `화면 일지원문 1:1 고해상도 연속 A4 PDF 변환 중...` });
+      try {
+        pdfBytes = await renderElementToContinuousA4PdfBytes(printArea, 14);
+      } catch (domErr) {
+        console.warn('[CarePort PDF] 모달 영역 직접 렌더링 실패, HTML 생성기 fallback 진행:', domErr);
+      }
+    }
+
+    // 2순위: CarePortClient HTML 생성기를 통한 연속 A4 PDF 변환
+    if (!pdfBytes && window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function') {
+      updateGlobalProgress({ percent: 65, statusText: `일지원문 데이터 정규화 및 연속 A4 PDF 생성 중...` });
       const chartCanvas = document.getElementById('cpStatusChart');
       let chartImage = null;
       if (chartCanvas) {
@@ -44160,42 +44450,15 @@ async function downloadCarePortDocumentPdf() {
         trendScores: curTrends
       };
       const html = window.CarePortClient.generateDailyLogHtml(patient, log, detail);
-      try {
-        const pdfApiUrl = (typeof window !== 'undefined' && window.CarePortClient?.apiBase)
-          ? window.CarePortClient.apiBase.replace(/\/careport$/, '') + '/careport/generate-pdf'
-          : '/api/careport/generate-pdf';
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 25000);
-        const resp = await fetch(pdfApiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ html, filename: fileName }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        if (resp.ok && resp.headers.get('content-type')?.includes('application/pdf')) {
-          const ab = await resp.arrayBuffer();
-          if (ab && ab.byteLength > 1000) {
-            pdfBytes = new Uint8Array(ab);
-          }
-        }
-      } catch (e) {}
 
-      if (!pdfBytes) {
-        const isClassic = window.CarePortClient && typeof window.CarePortClient.isClassicLog === 'function' && window.CarePortClient.isClassicLog(log, detail);
-        if (isClassic) {
-          pdfBytes = await renderHtmlToSinglePageA4PdfBytes(html, 12);
-        } else {
-          pdfBytes = await render2PageHtmlToPdfBytes(html);
-        }
-      }
-    } else {
-      const isModern = printArea.querySelector('.report-page, .first-page');
-      if (isModern && typeof render2PageHtmlToPdfBytes === 'function') {
-        pdfBytes = await render2PageHtmlToPdfBytes(printArea.innerHTML);
+      const isClassic = window.CarePortClient && typeof window.CarePortClient.isClassicLog === 'function' && window.CarePortClient.isClassicLog(log, detail);
+      if (isClassic) {
+        pdfBytes = await renderHtmlToSinglePageA4PdfBytes(html, 12);
       } else {
-        pdfBytes = await renderElementToSinglePageA4PdfBytes(printArea, 12);
+        pdfBytes = await renderHtmlToContinuousA4PdfBytes(html, 14);
       }
+    } else if (!pdfBytes && printArea) {
+      pdfBytes = await renderElementToContinuousA4PdfBytes(printArea, 14);
     }
     
     updateGlobalProgress({ percent: 95, statusText: `PDF 파일 패키징 및 다운로드 준비 중...` });
@@ -44740,260 +45003,22 @@ async function downloadPatientCareLogsPdfs(groupId) {
 
       const mergedDoc = await PDFLib.PDFDocument.create();
 
-      const pageW = 595.28;
-      const pageH = 841.89;
-      const margin = 12;
-      const availW = pageW - (margin * 2);
-      const availH = pageH - (margin * 2);
-
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.left = '-9999px';
-      iframe.style.top = '0';
-      iframe.style.width = '794px';
-      iframe.style.height = '1122px';
-      iframe.style.border = 'none';
-      iframe.style.opacity = '0';
-      iframe.style.pointerEvents = 'none';
-      document.body.appendChild(iframe);
-
-      try {
-        const styleSet = new Set();
-        dayHtmlList.forEach(h => {
-          const matches = (h || '').match(/<style[^>]*>([\s\S]*?)<\/style>/gi) || [];
-          matches.forEach(m => styleSet.add(m));
+      for (let i = 0; i < dayHtmlList.length; i++) {
+        const dHtml = dayHtmlList[i];
+        updateGlobalProgress({
+          percent: 50 + Math.round(((i + 1) / dayHtmlList.length) * 45),
+          statusText: `[${i + 1}/${dayHtmlList.length}일차] 일지원문 고해상도 연속 A4 일지 렌더링 중...`
         });
-        const extractedStyles = Array.from(styleSet).join('\n');
-
-        // 모든 일지의 페이지 단위(A4 1장 단위) 추출 (1일차당 2페이지 CarePort 표준 완벽 지원)
-        const allPageUnits = [];
-        dayHtmlList.forEach((dHtml, dayIdx) => {
-          const pageSections = (dHtml || '').match(/<section[^>]*class="[^"]*report-page[^"]*"[^>]*>[\s\S]*?<\/section>/gi);
-          if (pageSections && pageSections.length > 0) {
-            pageSections.forEach((sec, subIdx) => {
-              allPageUnits.push({
-                markup: sec,
-                dayIdx: dayIdx,
-                subPage: subIdx + 1
-              });
-            });
-          } else {
-            const bodyMatch = (dHtml || '').match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-            const inner = bodyMatch ? bodyMatch[1] : (dHtml || '');
-            allPageUnits.push({
-              markup: inner,
-              dayIdx: dayIdx,
-              subPage: 1
-            });
-          }
-        });
-
-        // 고해상도 2x 레티나 화질 (192 DPI) + 4페이지 단위 청크 배치 처리 (모바일/PC 메모리 한계 완벽 준수 및 초고화질 보장)
-        const BATCH_SIZE = 4;
-        const totalBatches = Math.ceil(allPageUnits.length / BATCH_SIZE);
-
-        for (let b = 0; b < totalBatches; b++) {
-          const startIdx = b * BATCH_SIZE;
-          const endIdx = Math.min(startIdx + BATCH_SIZE, allPageUnits.length);
-          const currentBatchUnits = allPageUnits.slice(startIdx, endIdx);
-
-          updateGlobalProgress({
-            percent: 50 + Math.round(((b + 1) / totalBatches) * 40),
-            statusText: `[${startIdx + 1}~${endIdx}p / 총 ${allPageUnits.length}p] 고화질 일괄 렌더링 중...`
-          });
-          await new Promise(r => setTimeout(r, 10));
-
-          let batchUnitsHtml = '';
-          currentBatchUnits.forEach((u, idx) => {
-            let inner = u.markup.replace(/<link[^>]*href="[^"]*pretendard[^"]*"[^>]*>/gi, '');
-            batchUnitsHtml += `<div class="careport-pdf-page-unit" data-page="${startIdx + idx + 1}" style="width: 794px; height: 1122px; max-height: 1122px; min-height: 1122px; overflow: hidden; position: relative; background: #ffffff; box-sizing: border-box;">${inner}</div>\n`;
-          });
-
-          const fullBatchHtml = `<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  ${extractedStyles}
-  <style>
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0; padding: 0; background: #ffffff;
-      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    .careport-pdf-page-unit {
-      width: 794px !important;
-      height: 1122px !important;
-      max-height: 1122px !important;
-      min-height: 1122px !important;
-      overflow: hidden !important;
-      position: relative !important;
-      background: #ffffff !important;
-    }
-    .report-page {
-      width: 794px !important;
-      min-height: 1122px !important;
-      max-height: 1122px !important;
-      box-sizing: border-box !important;
-      overflow: hidden !important;
-      position: relative !important;
-      background: #ffffff !important;
-      padding: 34px 38px !important;
-      display: flex !important;
-      flex-direction: column !important;
-    }
-    .page, .report-area {
-      width: 794px !important;
-      max-width: 794px !important;
-      height: 1122px !important;
-      min-height: 1122px !important;
-      max-height: 1122px !important;
-      box-sizing: border-box !important;
-      padding: 34px 38px !important;
-      overflow: hidden !important;
-      display: block !important;
-      margin: 0 auto !important;
-    }
-    .sec-head {
-      display: flex !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      border-bottom: 1.5px solid #0f172a !important;
-      padding-bottom: 4px !important;
-      margin-top: 14px !important;
-      margin-bottom: 8px !important;
-    }
-    .sec-head.sec-head-teal {
-      border-bottom: 1.5px solid #00897b !important;
-    }
-    .sec-title {
-      font-size: 13.5px !important;
-      font-weight: 900 !important;
-      color: #0f172a !important;
-      letter-spacing: -0.3px !important;
-      display: inline-flex !important;
-      align-items: center !important;
-    }
-    .careport-badge-pill {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      vertical-align: middle !important;
-      box-sizing: border-box !important;
-      line-height: 1 !important;
-      text-align: center !important;
-      white-space: nowrap !important;
-    }
-    .careport-badge-pill .pill-text,
-    .careport-badge-pill > span:not(.careport-dot),
-    .careport-badge-pill > strong {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      line-height: 1 !important;
-      position: relative !important;
-      top: -2.5px !important;
-    }
-    .careport-dot {
-      display: inline-block !important;
-      border-radius: 50% !important;
-      background: currentColor !important;
-      flex-shrink: 0 !important;
-      vertical-align: middle !important;
-      position: relative !important;
-      top: -0.5px !important;
-    }
-    .state-item {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      line-height: 1 !important;
-      text-align: center !important;
-    }
-    .state-item .btn-text,
-    .state-item.binary > span,
-    .state-item.level > span {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      line-height: 1 !important;
-      position: relative !important;
-      top: -2.5px !important;
-    }
-    .no-print { display: none !important; }
-  </style>
-</head>
-<body>
-  <div id="batchPagesContainer" style="width: 794px; background: #ffffff;">
-    ${batchUnitsHtml}
-  </div>
-</body>
-</html>`;
-
-          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-          iframeDoc.open();
-          iframeDoc.write(fullBatchHtml);
-          iframeDoc.close();
-
-          await new Promise(r => setTimeout(r, 30));
-
-          const batchContainer = iframeDoc.getElementById('batchPagesContainer');
-          if (batchContainer) {
-            batchContainer.querySelectorAll('.no-print').forEach(el => el.remove());
-          }
-
-          const targetEl = batchContainer || iframeDoc.body;
-          const scaleFactor = 2.0; // 2x 고선명 Retina 화질
-          const canvas = await html2canvas(targetEl, {
-            scale: scaleFactor,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: '#ffffff',
-            logging: false,
-            windowWidth: 794,
-            imageTimeout: 1500
-          });
-
-          const unitHeight = Math.round(1122 * scaleFactor);
-          const unitWidth = Math.round(794 * scaleFactor);
-          const sliceCanvas = document.createElement('canvas');
-          sliceCanvas.width = unitWidth;
-          sliceCanvas.height = unitHeight;
-          const sliceCtx = sliceCanvas.getContext('2d');
-
-          for (let j = 0; j < currentBatchUnits.length; j++) {
-            sliceCtx.fillStyle = '#ffffff';
-            sliceCtx.fillRect(0, 0, unitWidth, unitHeight);
-            sliceCtx.drawImage(canvas, 0, j * unitHeight, unitWidth, unitHeight, 0, 0, unitWidth, unitHeight);
-
-            // 고선명 95% JPEG (텍스트/도표 번짐 없는 고화질 압축)
-            const dataUrl = sliceCanvas.toDataURL('image/jpeg', 0.95);
-            const base64Data = dataUrl.split(',')[1];
-            const binaryStr = atob(base64Data);
-            const jpgBytes = new Uint8Array(binaryStr.length);
-            for (let k = 0; k < binaryStr.length; k++) {
-              jpgBytes[k] = binaryStr.charCodeAt(k);
-            }
-
-            const jpgImage = await mergedDoc.embedJpg(jpgBytes);
-            const pdfPage = mergedDoc.addPage([pageW, pageH]);
-            pdfPage.drawImage(jpgImage, {
-              x: margin,
-              y: margin,
-              width: availW,
-              height: availH
-            });
-          }
-        }
-      } finally {
-        if (iframe && document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
+        const dayBytes = await renderHtmlToContinuousA4PdfBytes(dHtml, 14);
+        if (dayBytes) {
+          const dayDoc = await PDFLib.PDFDocument.load(dayBytes);
+          const copiedPages = await mergedDoc.copyPages(dayDoc, dayDoc.getPageIndices());
+          copiedPages.forEach(p => mergedDoc.addPage(p));
         }
       }
 
       updateGlobalProgress({
-        percent: 95,
+        percent: 96,
         statusText: `전체 ${sortedLogs.length}일차 일지 단일 PDF로 결합 및 패키징 중...`
       });
       await new Promise(r => setTimeout(r, 10));

@@ -2304,8 +2304,18 @@ function saveSavedFaxConfig(cfg) {
                 const ftpHost = isProd ? 'ftp.barobill.co.kr' : 'testftp.barobill.co.kr';
                 const ftpPort = isProd ? 9030 : 9031;
                 const pdfFileName = `LIVON_FAX_${Date.now()}.pdf`;
-                const htmlContent = payload.formHtml || payload.html || '';
-                const pdfBuffer = await createDocumentPdfBuffer(htmlContent, `리본케어 팩스 발송 [수신: ${recipient} (${cleanFaxNumber})]`);
+                let pdfBuffer = null;
+                if (payload.pdfBase64 && typeof payload.pdfBase64 === 'string') {
+                  try {
+                    pdfBuffer = Buffer.from(payload.pdfBase64, 'base64');
+                  } catch (e) {
+                    console.warn('[FAX Base64 Decode Error]', e.message);
+                  }
+                }
+                if (!pdfBuffer || pdfBuffer.length < 100) {
+                  const htmlContent = payload.formHtml || payload.html || '';
+                  pdfBuffer = await createDocumentPdfBuffer(htmlContent, `리본케어 팩스 발송 [수신: ${recipient} (${cleanFaxNumber})]`);
+                }
 
                 console.log(`[FAX Barobill Gateway] FTP 파일 업로드 중... (${ftpHost}:${ftpPort}, 파일: ${pdfFileName}, 크기: ${pdfBuffer.length} bytes)`);
                 await uploadToBarobillFTP(ftpHost, ftpPort, baroId, baroPwd, pdfFileName, pdfBuffer);
@@ -2368,6 +2378,7 @@ function saveSavedFaxConfig(cfg) {
           const faxLog = {
             id: realBaroReceiptNum || faxId,
             sentDate: dateStr,
+            timestamp: Date.now(),
             appId,
             roundNumber: Number(roundNumber) || 1,
             memo,

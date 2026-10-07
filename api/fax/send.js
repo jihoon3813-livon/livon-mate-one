@@ -108,14 +108,35 @@ module.exports = async (req, res) => {
       });
     }
 
-    const now = new Date();
-    const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    const getKoreaDateTimeStr = (d = new Date()) => {
+      try {
+        const parts = new Intl.DateTimeFormat('ko-KR', {
+          timeZone: 'Asia/Seoul',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).formatToParts(d);
+        const get = (type) => (parts.find(p => p.type === type) || {}).value || '00';
+        let hour = get('hour');
+        if (hour === '24') hour = '00';
+        return `${get('year')}.${get('month')}.${get('day')} ${hour}:${get('minute')}`;
+      } catch (e) {
+        const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+        return `${kst.getUTCFullYear()}.${String(kst.getUTCMonth() + 1).padStart(2, '0')}.${String(kst.getUTCDate()).padStart(2, '0')} ${String(kst.getUTCHours()).padStart(2, '0')}:${String(kst.getUTCMinutes()).padStart(2, '0')}`;
+      }
+    };
+
+    const dateStr = getKoreaDateTimeStr();
     const faxId = 'FLOG-' + Date.now().toString().slice(-6);
 
     const faxLog = {
       id: matchRes || faxId,
       sendKey: matchRes || '',
       sentDate: dateStr,
+      timestamp: Date.now(),
       appId,
       patientName,
       insuranceCompany,
