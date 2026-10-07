@@ -41782,9 +41782,9 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
             ${downloadBtnHtml}
             <button type="button" onclick="downloadPatientCareLogsViaRobot('${group.id}')"
               class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs shadow-md shadow-purple-900/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
-              title="케어포트 전산에 백그라운드로 자동 접속하여 원본 2장 이미지를 다운로드받아 100% 동일한 A4 2페이지 공식 PDF로 조립합니다">
+              title="케어포트 전산에 백그라운드로 자동 접속하여 1일차부터 마지막 일차까지 모든 일지의 원본 이미지들을 다운로드받아 1개의 공식 합본 PDF로 조립합니다">
               <i data-lucide="bot" class="w-4 h-4 text-amber-300"></i>
-              <span>🤖 원본 무인 다운로드</span>
+              <span>🤖 전체 원본 무인 합본</span>
             </button>
             <button type="button" onclick="attachCarePortLogsAndOpenEmail('${group.id}')"
               class="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-900/30 flex items-center gap-1.5 transition-all cursor-pointer"
@@ -44521,17 +44521,92 @@ async function downloadPatientCareLogsViaRobot(groupId) {
     alert('다운로드할 간병일지가 없습니다.');
     return;
   }
-  if (logs.length === 1) {
-    const sid = logs[0].sessionId || (logs[0].id ? String(logs[0].id).replace(/\D/g, '') : '');
-    await downloadCarePortViaRobot(sid, patient.patientName);
-    return;
-  }
-  const latestLog = logs[0] || {};
-  const sid = latestLog.sessionId || (latestLog.id ? String(latestLog.id).replace(/\D/g, '') : '');
-  const consultDate = latestLog.consultDate ? latestLog.consultDate.slice(0, 10) : '';
-  const proceed = confirm(`[${patient.patientName} 님] 총 ${logs.length}건의 간병일지가 있습니다.\n최근 일자(${consultDate}) 원본 2장 공식 PDF를 바로 다운로드할까요?\n\n(※ 특정 일차만 받으시려면 '일자별 일지 펼치기' 후 해당 날짜 우측의 [🤖 원본무인] 버튼을 클릭하시면 됩니다)`);
-  if (proceed) {
-    await downloadCarePortViaRobot(sid, patient.patientName);
+
+  // 1일차부터 마지막 일차까지 오름차순 정렬
+  const sortedLogs = [...logs].sort((a, b) => {
+    const dayA = a.dayNumber || 0;
+    const dayB = b.dayNumber || 0;
+    if (dayA !== dayB && dayA > 0 && dayB > 0) return dayA - dayB;
+    const dateA = a.dateString || a.consultDate || a.startDate || '';
+    const dateB = b.dateString || b.consultDate || b.startDate || '';
+    return dateA.localeCompare(dateB);
+  });
+
+  const sessionList = sortedLogs.map((l, idx) => ({
+    sessionId: l.sessionId || (l.id ? String(l.id).replace(/\D/g, '') : ''),
+    dayNumber: l.dayNumber || (idx + 1),
+    date: (l.consultDate || l.dateString || '').slice(0, 10)
+  })).filter(it => !!it.sessionId);
+
+  const totalDays = sessionList.length;
+  const username = (patient.patientName || '환자').trim();
+
+  showGlobalProgress({
+    title: `[${username} 님] 전체 ${totalDays}일차 원본 무인 다운로드`,
+    subtitle: `백그라운드 크롬 로봇이 전체 ${totalDays}개 일지 원본 이미지를 받아와 1개의 A4 합본 PDF로 조립합니다.`,
+    percent: 15,
+    statusText: `무인 크롬 로봇 가동 및 케어포트 전산 접속 중...`,
+    icon: 'bot'
+  });
+
+  let currentPct = 15;
+  const ticker = setInterval(() => {
+    if (currentPct < 90) {
+      currentPct += Math.max(1, Math.floor((90 - currentPct) / (totalDays * 1.5 + 3)));
+      updateGlobalProgress({
+        percent: currentPct,
+        statusText: `전산 원본 캡처 및 A4 합성 진행 중 (${currentPct}%)...`
+      });
+    }
+  }, 1000);
+
+  try {
+    const res = await fetch('/api/careport/robot-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionList: sessionList,
+        patient: username
+      })
+    });
+
+    clearInterval(ticker);
+
+    if (!res.ok) {
+      let errMsg = '무인 로봇 처리 실패';
+      try {
+        const errJson = await res.json();
+        errMsg = errJson.message || errMsg;
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    updateGlobalProgress({ percent: 95, statusText: `전체 ${totalDays}일차 (${totalDays * 2}페이지) 공식 PDF 조립 완료!` });
+
+    const blob = await res.blob();
+    const cleanDate = new Date().toISOString().slice(0, 10).replace(/[^0-9]/g, '');
+    const fileName = `[케어포트_공식간병일지_전체일지합본]_${username}_총${totalDays}일차_${cleanDate}.pdf`;
+
+    const downloadUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+
+    updateGlobalProgress({ percent: 100, statusText: `완료! 총 ${totalDays}일차 (${totalDays * 2}P) 전체 원본 합본이 다운로드되었습니다.` });
+    setTimeout(hideGlobalProgress, 1200);
+
+    if (typeof showToast === 'function') {
+      showToast(`[${username} 님] 전체 ${totalDays}일차 (${totalDays * 2}페이지) 원본 합본 PDF 다운로드 완료!`, 'success');
+    }
+  } catch (err) {
+    clearInterval(ticker);
+    console.error('[Robot Download All] 실패:', err);
+    hideGlobalProgress();
+    alert(`무인 로봇 전체 다운로드 안내: ${err.message}`);
   }
 }
 window.downloadPatientCareLogsViaRobot = downloadPatientCareLogsViaRobot;

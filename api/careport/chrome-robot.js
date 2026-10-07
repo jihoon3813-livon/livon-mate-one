@@ -101,7 +101,28 @@ class CdpSession {
 }
 
 // 3. Main Robot Function
-async function captureCarePortOriginalImages(sessionId, options = {}) {
+async function captureCarePortOriginalImages(sessionInput, options = {}) {
+  let items = [];
+  if (Array.isArray(sessionInput)) {
+    items = sessionInput.map((it, idx) => {
+      if (typeof it === 'object' && it !== null) {
+        return {
+          sessionId: it.sessionId || it.id || '',
+          dayNumber: it.dayNumber || (idx + 1),
+          date: it.date || it.consultDate || ''
+        };
+      }
+      return { sessionId: String(it), dayNumber: idx + 1, date: '' };
+    }).filter(it => it.sessionId);
+  } else if (sessionInput) {
+    items = [{ sessionId: String(sessionInput), dayNumber: 1, date: '' }];
+  } else {
+    items = [{ sessionId: '', dayNumber: 1, date: '' }];
+  }
+  if (items.length === 0) {
+    items = [{ sessionId: '', dayNumber: 1, date: '' }];
+  }
+
   const chromePath = getChromePath();
   if (!chromePath) throw new Error('Chrome 또는 Edge 브라우저를 찾을 수 없습니다.');
 
@@ -197,43 +218,12 @@ async function captureCarePortOriginalImages(sessionId, options = {}) {
     `;
     await pageCdp.send('Runtime.evaluate', { expression: injectScript });
 
-    // Step D: Navigate directly to the patient's care note / consult view
-    const targetUrl = sessionId
-      ? `https://careport.livon.care/#/careport/consult/${sessionId}`
-      : `https://careport.livon.care/#/main/consult`;
+    // Step D: Navigate and capture each session in sequence within the same Chrome browser
+    const results = [];
+    const totalCount = items.length;
+    console.log(`[ChromeRobot] 총 ${totalCount}개 세션 원본 캡처 작업 시작...`);
 
-    console.log(`[ChromeRobot] 간병일지 페이지 이동: ${targetUrl}`);
-    await pageCdp.send('Page.navigate', { url: targetUrl });
-
-    // Step E: Wait for DOM elements (#capture and #consult-state) to render
-    console.log('[ChromeRobot] 화면 렌더링 대기 중...');
-    let isRendered = false;
-    for (let i = 0; i < 20; i++) {
-      await new Promise(r => setTimeout(r, 500));
-      const checkRes = await pageCdp.send('Runtime.evaluate', {
-        expression: `(function() {
-          const cap = document.getElementById('capture') || document.querySelector('.report-area');
-          return !!cap && cap.offsetHeight > 100;
-        })()`,
-        returnByValue: true
-      });
-      if (checkRes?.result?.value === true) {
-        isRendered = true;
-        break;
-      }
-    }
-
-    if (!isRendered) {
-      console.warn('[ChromeRobot] #capture 요소가 시간 내에 감지되지 않아 추가 대기 진행...');
-      await new Promise(r => setTimeout(r, 1500));
-    } else {
-      // Extra stabilization time for Chart / Canvas rendering
-      await new Promise(r => setTimeout(r, 1000));
-    }
-
-    console.log('[ChromeRobot] 케어포트 원본 2장 이미지 추출 실행 (printPage 방식)...');
-
-    // Step F: Execute authentic capture extraction
+    // Common capture script
     const extractScript = `
       (async function() {
         try {
@@ -244,12 +234,8 @@ async function captureCarePortOriginalImages(sessionId, options = {}) {
           if (n) n.style.display = "none";
           if (i) i.style.display = "none";
 
-          // Use html2canvas existing in CarePort window
           let html2canvasFn = window.html2canvas;
-          if (!html2canvasFn) {
-            // Find webpack-loaded html2canvas
-            if (typeof Fs === 'function') html2canvasFn = Fs;
-          }
+          if (!html2canvasFn && typeof Fs === 'function') html2canvasFn = Fs;
 
           if (!html2canvasFn && !window.html2canvas) {
             await new Promise((resolve, reject) => {
@@ -264,12 +250,12 @@ async function captureCarePortOriginalImages(sessionId, options = {}) {
 
           if (!s) return { error: 'capture element not found' };
 
-          // 1페이지 캡처
+          // Page 1 capture
           if (t) t.style.display = "none";
           const canvas1 = await html2canvasFn(s, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
           const img1 = canvas1.toDataURL("image/png");
 
-          // 2페이지 캡처
+          // Page 2 capture
           let img2 = null;
           if (t) {
             t.style.display = "block";
@@ -287,26 +273,77 @@ async function captureCarePortOriginalImages(sessionId, options = {}) {
       })()
     `;
 
-    const extractResult = await pageCdp.send('Runtime.evaluate', {
-      expression: extractScript,
-      awaitPromise: true,
-      returnByValue: true
-    });
+    for (let idx = 0; idx < totalCount; idx++) {
+      const item = items[idx];
+      const sid = item.sessionId;
+      const targetUrl = sid
+        ? `https://careport.livon.care/#/careport/consult/${sid}`
+        : `https://careport.livon.care/#/main/consult`;
 
-    const val = extractResult?.result?.value;
-    if (!val || val.error || !val.img1) {
-      throw new Error('케어포트 화면 캡처 실패: ' + (val?.error || '이미지 데이터 누락'));
+      console.log(`[ChromeRobot] [${idx + 1}/${totalCount}] 세션 #${sid || 'default'} 이동: ${targetUrl}`);
+      await pageCdp.send('Page.navigate', { url: targetUrl });
+
+      // Wait for DOM elements (#capture and #consult-state) to render
+      let isRendered = false;
+      for (let attempt = 0; attempt < 25; attempt++) {
+        await new Promise(r => setTimeout(r, 250));
+        const checkRes = await pageCdp.send('Runtime.evaluate', {
+          expression: `(function() {
+            const cap = document.getElementById('capture') || document.querySelector('.report-area');
+            if (!cap || cap.offsetHeight <= 100) return false;
+            if (${JSON.stringify(sid)} && !window.location.hash.includes(${JSON.stringify(sid)})) return false;
+            return true;
+          })()`,
+          returnByValue: true
+        });
+        if (checkRes?.result?.value === true) {
+          isRendered = true;
+          break;
+        }
+      }
+
+      if (!isRendered) {
+        console.warn(`[ChromeRobot] [${idx + 1}/${totalCount}] 세션 #${sid} 렌더링 추가 대기...`);
+        await new Promise(r => setTimeout(r, 600));
+      } else {
+        await new Promise(r => setTimeout(r, 400));
+      }
+
+      const extractResult = await pageCdp.send('Runtime.evaluate', {
+        expression: extractScript,
+        awaitPromise: true,
+        returnByValue: true
+      });
+
+      const val = extractResult?.result?.value;
+      if (val && val.img1) {
+        console.log(`[ChromeRobot] [${idx + 1}/${totalCount}] 세션 #${sid} 2장 캡처 완료 (img1: ${val.img1.length}, img2: ${val.img2 ? val.img2.length : 0})`);
+        results.push({
+          sessionId: sid,
+          dayNumber: item.dayNumber,
+          date: item.date,
+          img1: val.img1,
+          img2: val.img2
+        });
+      } else {
+        console.error(`[ChromeRobot] [${idx + 1}/${totalCount}] 세션 #${sid} 캡처 실패:`, val?.error);
+      }
     }
-
-    console.log('[ChromeRobot] 원본 이미지 2장 획득 완료! (Img1 길이:', val.img1.length, ', Img2 길이:', val.img2 ? val.img2.length : 0, ')');
 
     pageCdp.close();
     cdp.close();
 
+    if (results.length === 0) {
+      throw new Error('케어포트 화면 캡처 실패: 추출된 이미지가 없습니다.');
+    }
+
+    console.log(`[ChromeRobot] 전체 ${results.length}개 세션 캡처 완료! (총 ${results.length * 2}페이지 분량)`);
+
     return {
       success: true,
-      img1: val.img1,
-      img2: val.img2
+      results,
+      img1: results[0]?.img1,
+      img2: results[0]?.img2
     };
 
   } finally {

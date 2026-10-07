@@ -1,9 +1,8 @@
 // api/careport/robot-pdf.js
-// Endpoint for automated CarePort 2-Page authentic PDF generation via Headless Chrome Robot
+// Endpoint for automated CarePort multi-page authentic PDF generation via Headless Chrome Robot
 
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
 const urlModule = require('url');
 const { captureCarePortOriginalImages } = require('./chrome-robot');
 
@@ -19,7 +18,7 @@ function getPdfLib() {
   throw new Error('pdf-lib.min.js 파일을 찾을 수 없습니다.');
 }
 
-async function compileImagesTo2PagePdf(img1DataUrl, img2DataUrl, customMargin = 14) {
+async function compileImagesToMultiPagePdf(imagePairs, customMargin = 14) {
   const PDFLib = getPdfLib();
   const pdfDoc = await PDFLib.PDFDocument.create();
   const pageW = 595.28;
@@ -48,9 +47,10 @@ async function compileImagesTo2PagePdf(img1DataUrl, img2DataUrl, customMargin = 
     });
   };
 
-  await addImagePage(img1DataUrl);
-  if (img2DataUrl) {
-    await addImagePage(img2DataUrl);
+  const list = Array.isArray(imagePairs) ? imagePairs : [imagePairs];
+  for (const pair of list) {
+    if (pair.img1) await addImagePage(pair.img1);
+    if (pair.img2) await addImagePage(pair.img2);
   }
 
   const pdfBytes = await pdfDoc.save();
@@ -76,23 +76,34 @@ module.exports = async (req, res) => {
   } catch (e) {}
 
   const body = req.body || {};
-  const sessionId = query.sessionId || query.id || body.sessionId || body.id || null;
   const patientName = (query.patient || query.name || body.patient || body.name || '환자').trim();
   const format = query.format || body.format || 'pdf'; // 'pdf' or 'json'
 
-  console.log(`[RobotApi] CarePort 무인 로봇 PDF 생성 요청 수신 (세션: #${sessionId || '최신'}, 환자: ${patientName})`);
+  // Extract sessionList
+  let sessionList = body.sessionList || body.sessions || null;
+  if (!sessionList) {
+    const rawIds = query.sessionIds || body.sessionIds || query.sessionId || query.id || body.sessionId || body.id;
+    if (rawIds) {
+      if (Array.isArray(rawIds)) sessionList = rawIds;
+      else if (typeof rawIds === 'string' && rawIds.includes(',')) sessionList = rawIds.split(',').map(s => s.trim()).filter(Boolean);
+      else sessionList = [rawIds];
+    }
+  }
+
+  console.log(`[RobotApi] CarePort 무인 로봇 PDF 생성 요청 수신 (환자: ${patientName}, 세션 수: ${sessionList ? sessionList.length : '기본'})`);
 
   try {
     // 1. Execute Chrome Robot to capture authentic Image 1 and Image 2 directly from CarePort
-    const captureResult = await captureCarePortOriginalImages(sessionId);
-    if (!captureResult.success || !captureResult.img1) {
-      throw new Error('케어포트 원본 이미지 캡처 실패');
+    const captureResult = await captureCarePortOriginalImages(sessionList);
+    if (!captureResult.success || !captureResult.results || captureResult.results.length === 0) {
+      throw new Error('케어포트 원본 이미지 캡처 실패: 추출된 이미지가 없습니다.');
     }
 
     // 2. If client just requested json images:
     if (format === 'json') {
       const payload = {
         success: true,
+        results: captureResult.results,
         img1: captureResult.img1,
         img2: captureResult.img2
       };
@@ -101,11 +112,17 @@ module.exports = async (req, res) => {
       return res.end(JSON.stringify(payload));
     }
 
-    // 3. Compile authentic PNGs into 2-Page A4 PDF
-    console.log('[RobotApi] 원본 PNG 2장을 공식 A4 2페이지 PDF로 합성 중...');
-    const pdfBuffer = await compileImagesTo2PagePdf(captureResult.img1, captureResult.img2, 14);
+    // 3. Compile authentic PNGs into Multi-Page A4 PDF
+    const totalSessions = captureResult.results.length;
+    console.log(`[RobotApi] 총 ${totalSessions}개 세션 (${totalSessions * 2}페이지) 원본 PNG를 공식 A4 PDF로 합성 중...`);
+    const pdfBuffer = await compileImagesToMultiPagePdf(captureResult.results, 14);
 
-    const safeFilename = encodeURIComponent(`[케어포트_공식간병일지_원본]_${patientName}_${sessionId || '최신'}.pdf`);
+    const cleanDate = new Date().toISOString().slice(0, 10).replace(/[^0-9]/g, '');
+    const filenameBase = totalSessions > 1
+      ? `[케어포트_공식간병일지_전체일지합본]_${patientName}_총${totalSessions}일차_${cleanDate}.pdf`
+      : `[케어포트_공식간병일지_원본]_${patientName}_${captureResult.results[0]?.sessionId || '최신'}_${cleanDate}.pdf`;
+
+    const safeFilename = encodeURIComponent(filenameBase);
     res.writeHead(200, {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename*=UTF-8''${safeFilename}`,

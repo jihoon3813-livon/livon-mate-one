@@ -1657,7 +1657,10 @@ function saveSavedFaxConfig(cfg) {
     }
 
     if (reqPath === '/api/careport/robot-pdf') {
-      try { delete require.cache[require.resolve('./api/careport/robot-pdf')]; } catch(e) {}
+      try {
+        delete require.cache[require.resolve('./api/careport/robot-pdf')];
+        delete require.cache[require.resolve('./api/careport/chrome-robot')];
+      } catch(e) {}
       const robotHandler = require('./api/careport/robot-pdf');
       res.status = (code) => ({
         json: (data) => {
