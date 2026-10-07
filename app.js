@@ -41534,10 +41534,12 @@ function toggleCarePortPatientAccordion(groupId) {
       }
     }
   }
-  const el = document.getElementById('patient-accordion-' + groupId);
-  if (el) {
-    el.classList.toggle('hidden', !gCarePortExpandedPatients.has(groupId));
-  }
+  ['patient-accordion-', 'patient-accordion-new-'].forEach(prefix => {
+    const el = document.getElementById(prefix + groupId);
+    if (el) {
+      el.classList.toggle('hidden', !gCarePortExpandedPatients.has(groupId));
+    }
+  });
   renderCareLogs();
 }
 window.toggleCarePortPatientAccordion = toggleCarePortPatientAccordion;
@@ -41572,9 +41574,11 @@ function toggleAllCarePortDays(arg1, arg2) {
   } else {
     groupId = arg1;
   }
+  const isNewTab = (typeof gActiveTab !== 'undefined' && gActiveTab === 'carelogs_new');
+  const fallbackId = isNewTab ? `patient-accordion-new-${groupId}` : `patient-accordion-${groupId}`;
   const accordion = (triggerEl && typeof triggerEl.closest === 'function') 
     ? triggerEl.closest('[id^="patient-accordion-"]') 
-    : document.querySelector(`[id^="patient-accordion-${groupId}"]`);
+    : (document.getElementById(fallbackId) || document.getElementById(`patient-accordion-${groupId}`));
   if (!accordion) return;
   const isChecked = triggerEl ? triggerEl.checked : (arg2 !== undefined ? arg2 : true);
   const cbs = accordion.querySelectorAll('.cp-day-checkbox');
@@ -41592,9 +41596,11 @@ function onCarePortDayCheckboxChanged(arg1, arg2) {
   } else {
     groupId = arg1;
   }
+  const isNewTab = (typeof gActiveTab !== 'undefined' && gActiveTab === 'carelogs_new');
+  const fallbackId = isNewTab ? `patient-accordion-new-${groupId}` : `patient-accordion-${groupId}`;
   const accordion = (triggerEl && typeof triggerEl.closest === 'function') 
     ? triggerEl.closest('[id^="patient-accordion-"]') 
-    : document.querySelector(`[id^="patient-accordion-${groupId}"]`);
+    : (document.getElementById(fallbackId) || document.getElementById(`patient-accordion-${groupId}`));
   if (!accordion) return;
   const cbs = accordion.querySelectorAll('.cp-day-checkbox');
   const checkedCount = Array.from(cbs).filter(cb => cb.checked).length;
@@ -41627,9 +41633,11 @@ async function downloadSelectedCarePortDays(arg1, arg2) {
   } else {
     groupId = arg1;
   }
+  const isNewTab = (typeof gActiveTab !== 'undefined' && gActiveTab === 'carelogs_new');
+  const fallbackId = isNewTab ? `patient-accordion-new-${groupId}` : `patient-accordion-${groupId}`;
   const accordion = (triggerEl && typeof triggerEl.closest === 'function') 
     ? triggerEl.closest('[id^="patient-accordion-"]') 
-    : document.querySelector(`[id^="patient-accordion-${groupId}"]`);
+    : (document.getElementById(fallbackId) || document.getElementById(`patient-accordion-${groupId}`));
   if (!accordion) return;
   const cbs = accordion.querySelectorAll('.cp-day-checkbox:checked');
   const selectedSids = Array.from(cbs).map(cb => cb.dataset.sid).filter(Boolean);
@@ -41874,7 +41882,7 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
         </div>
 
         <!-- Accordion Body: Daily Logs Compact List (명확한 서브 계층 배경 및 콤팩트 리스트) -->
-        <div id="patient-accordion-${group.id}" class="${isExpanded ? '' : 'hidden'} px-4 py-4 sm:px-6 sm:py-5 bg-slate-50/80 border-t-2 border-purple-200/80 space-y-2.5">
+        <div id="patient-accordion-${isNewTab ? 'new-' : ''}${group.id}" data-group-id="${group.id}" class="${isExpanded ? '' : 'hidden'} px-4 py-4 sm:px-6 sm:py-5 bg-slate-50/80 border-t-2 border-purple-200/80 space-y-2.5">
           <div class="flex items-center justify-between px-1 flex-wrap gap-2">
             <div class="flex items-center gap-2">
               <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-purple-100 text-purple-700">
