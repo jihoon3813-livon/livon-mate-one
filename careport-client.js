@@ -613,7 +613,14 @@
 
       const duration = detail.duration ? `${String(detail.duration).replace('s', '')}초` : (log.duration ? `${String(log.duration).replace('s', '')}초` : '120초');
       
-      let dayNum = (raw.day_index ? Number(raw.day_index) : (log.dayNumber || (detail.dayIndex ? Number(detail.dayIndex) : (detail.dayNumber ? Number(detail.dayNumber) : null))));
+      let dayNum = (raw.day_index != null && !isNaN(Number(raw.day_index)))
+        ? Number(raw.day_index)
+        : (detail.dayIndex != null && !isNaN(Number(detail.dayIndex))
+          ? Number(detail.dayIndex)
+          : (log.day_index != null && !isNaN(Number(log.day_index))
+            ? Number(log.day_index)
+            : (log.dayNumber != null && !isNaN(Number(log.dayNumber)) ? Number(log.dayNumber) : null)));
+
       if (!dayNum && patient.careStartDate && rawConsultDate) {
         try {
           const sDt = new Date(patient.careStartDate.replace(/\./g, '-').slice(0, 10));
@@ -624,19 +631,36 @@
           }
         } catch (e) {}
       }
-      const dayText = log.dayText || (dayNum ? `${dayNum}일차` : '1일차');
+      const dayText = dayNum ? `${dayNum}일차` : (log.dayText || '1일차');
+
+      // Format carePeriod matching CarePort exactly: e.g. "09.05~10.03 (토)"
+      const toMMdd = (dtStr) => {
+        if (!dtStr) return '';
+        const clean = String(dtStr).replace(/[^0-9]/g, '');
+        if (clean.length >= 8) return `${clean.slice(4, 6)}.${clean.slice(6, 8)}`;
+        if (clean.length >= 4) return `${clean.slice(0, 2)}.${clean.slice(2, 4)}`;
+        return String(dtStr).slice(5, 10).replace('-', '.');
+      };
+      const toMMddDay = (dtStr) => {
+        if (!dtStr) return '';
+        const dt = new Date(String(dtStr).slice(0, 10).replace(/\./g, '-'));
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+        const mmdd = toMMdd(dtStr);
+        if (!isNaN(dt.getTime())) {
+          return `${mmdd} (${dayNames[dt.getDay()]})`;
+        }
+        return mmdd;
+      };
 
       let carePeriod = '-';
-      if (log.carePeriod && log.carePeriod !== '-') {
+      const sDate = patient.careStartDate || log.startDate || log.careStartDate;
+      const eDate = rawCareDate || patient.careEndDate || log.endDate || log.careEndDate;
+      if (sDate && eDate) {
+        carePeriod = `${toMMdd(sDate)}~${toMMddDay(eDate)}`;
+      } else if (log.carePeriod && log.carePeriod !== '-') {
         carePeriod = log.carePeriod;
-      } else if (patient.careStartDate && patient.careEndDate && patient.careStartDate !== '-' && patient.careEndDate !== '-') {
-        carePeriod = `${patient.careStartDate} ~ ${patient.careEndDate}`;
-      } else if (log.startDate && log.endDate) {
-        carePeriod = `${log.startDate} ~ ${log.endDate}`;
-      } else if (patient.applyDate) {
-        carePeriod = `${patient.applyDate} ~ ${patient.careEndDate || rawConsultDate.slice(0, 10)}`;
       } else {
-        carePeriod = `${rawConsultDate.slice(0, 10)}`;
+        carePeriod = toMMddDay(rawCareDate);
       }
 
       let title = detail.title || raw.consult_title || log.title || `${pName} 님 일상 케어 및 상태 확인`;
@@ -824,16 +848,20 @@
 
       // Filter trendScores UP TO current care date / dayIndex (exact CarePort behavior)
       if (Array.isArray(trendScores) && trendScores.length > 0) {
+        trendScores = [...trendScores].sort((a, b) => {
+          if (a.dayIndex != null && b.dayIndex != null) return Number(a.dayIndex) - Number(b.dayIndex);
+          return new Date(a.careDate) - new Date(b.careDate);
+        });
         if (curCareDate) {
           const filtered = trendScores.filter(t => {
             const tDate = (t.careDate || t.date || '').slice(0, 10);
             if (tDate) return tDate <= curCareDate;
-            if (t.dayIndex != null && curDayIndex != null) return t.dayIndex <= curDayIndex;
+            if (t.dayIndex != null && curDayIndex != null) return Number(t.dayIndex) <= Number(curDayIndex);
             return true;
           });
           if (filtered.length > 0) trendScores = filtered;
         } else if (curDayIndex != null) {
-          const filtered = trendScores.filter(t => (t.dayIndex != null ? t.dayIndex <= curDayIndex : true));
+          const filtered = trendScores.filter(t => (t.dayIndex != null ? Number(t.dayIndex) <= Number(curDayIndex) : true));
           if (filtered.length > 0) trendScores = filtered;
         }
       }
@@ -853,15 +881,16 @@
         } else if (patient && Array.isArray(patient.dailyLogs) && patient.dailyLogs.length > 0) {
           const logsUpToNow = patient.dailyLogs.filter((l, idx) => {
             const lDate = (l.consultDate || l.dateString || '').slice(0, 10);
-            const lDay = l.dayNumber || (idx + 1);
+            const lRaw = l.raw || {};
+            const lDay = lRaw.day_index || l.day_index || l.dayIndex || l.dayNumber;
             if (lDate && curCareDate) return lDate <= curCareDate;
-            if (curDayIndex != null) return lDay <= curDayIndex;
+            if (lDay != null && curDayIndex != null) return Number(lDay) <= Number(curDayIndex);
             return true;
           });
           trendScores = logsUpToNow.map((l, idx) => {
             const lRaw = l.raw || l;
             const s = lRaw.trend_scores || lRaw.trendScores || l.trendScores || {};
-            const day = l.dayNumber || (idx + 1);
+            const day = lRaw.day_index || l.day_index || l.dayIndex || l.dayNumber || (idx + 1);
 
             const cats = lRaw.categories || l.categories || {};
             const dietTone = cats.diet?.level || cats.meal?.tone || (lRaw.care_log?.diet_nutrition?.includes('불량') ? 'warning' : 'good');
@@ -877,7 +906,7 @@
             const oScore = ovTone === 'warning' ? 3 : (ovTone === 'poor' ? 2 : 4);
 
             return {
-              dayIndex: day,
+              dayIndex: Number(day),
               careDate: (l.consultDate || l.dateString || '').slice(0, 10),
               overallScore: s.overallScore != null ? s.overallScore : (s.overall != null ? s.overall : oScore),
               mobilityScore: s.mobilityScore != null ? s.mobilityScore : (s.mobility != null ? s.mobility : mScore),
@@ -953,88 +982,95 @@
       const isWarn = tone === 'warning';
       const isPoor = tone === 'poor';
 
-      const greenCol = isGood ? '#20b86a' : '#cbd5e1';
-      const greenOp = isGood ? '1' : '0.35';
-      const yelCol = isWarn ? '#f5aa18' : '#cbd5e1';
-      const yelOp = isWarn ? '1' : '0.35';
-      const redCol = isPoor ? '#eb5c60' : '#cbd5e1';
-      const redOp = isPoor ? '1' : '0.35';
-
       if (direction === 'horizontal') {
-        return `
-          <svg width="64" height="22" viewBox="0 0 64 22" style="display:inline-block; vertical-align:middle;">
-            <rect x="0" y="0" width="64" height="22" rx="11" fill="#1e293b"/>
-            <circle cx="15" cy="11" r="5.5" fill="${greenCol}" opacity="${greenOp}"/>
-            ${isGood ? '<circle cx="15" cy="11" r="2.5" fill="#ffffff" opacity="0.8"/>' : ''}
-            <circle cx="32" cy="11" r="5.5" fill="${yelCol}" opacity="${yelOp}"/>
-            ${isWarn ? '<circle cx="32" cy="11" r="2.5" fill="#ffffff" opacity="0.8"/>' : ''}
-            <circle cx="49" cy="11" r="5.5" fill="${redCol}" opacity="${redOp}"/>
-            ${isPoor ? '<circle cx="49" cy="11" r="2.5" fill="#ffffff" opacity="0.8"/>' : ''}
-          </svg>
-        `;
+        const redOp = isPoor ? '1' : '0.15';
+        const yelOp = isWarn ? '1' : '0.15';
+        const grnOp = isGood ? '1' : '0.15';
+
+        return `<svg width="67" height="23" viewBox="0 0 67 23" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;">
+<path d="M0 9C0 4.02944 4.02944 0 9 0H57.9648C62.9354 0 66.9648 4.02944 66.9648 9V13.9883C66.9648 18.9588 62.9354 22.9883 57.9648 22.9883H9C4.02944 22.9883 0 18.9588 0 13.9883V9Z" fill="#2B3238"/>
+<g opacity="${redOp}">
+<circle cx="14.4941" cy="11.4941" r="6.4941" fill="#FF5A5F"/>
+</g>
+<g opacity="${yelOp}">
+<circle cx="33.4824" cy="11.4941" r="6.4941" fill="#FFB020"/>
+</g>
+<g opacity="${grnOp}">
+<circle cx="52.4707" cy="11.4941" r="6.4941" fill="#2FBF5B"/>
+</g>
+</svg>`;
       } else {
-        return `
-          <svg width="20" height="48" viewBox="0 0 20 48" style="display:inline-block; vertical-align:middle;">
-            <rect x="0" y="0" width="20" height="48" rx="10" fill="#1e293b"/>
-            <circle cx="10" cy="10" r="4.5" fill="${greenCol}" opacity="${greenOp}"/>
-            ${isGood ? '<circle cx="10" cy="10" r="2" fill="#ffffff" opacity="0.8"/>' : ''}
-            <circle cx="10" cy="24" r="4.5" fill="${yelCol}" opacity="${yelOp}"/>
-            ${isWarn ? '<circle cx="10" cy="24" r="2" fill="#ffffff" opacity="0.8"/>' : ''}
-            <circle cx="10" cy="38" r="4.5" fill="${redCol}" opacity="${redOp}"/>
-            ${isPoor ? '<circle cx="10" cy="38" r="2" fill="#ffffff" opacity="0.8"/>' : ''}
-          </svg>
-        `;
+        const redOp = isPoor ? '1' : '0.15';
+        const yelOp = isWarn ? '1' : '0.15';
+        const grnOp = isGood ? '1' : '0.15';
+
+        return `<svg width="28" height="67" viewBox="0 0 28 67" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block; vertical-align:middle;">
+<path d="M0 9C0 4.02944 4.02944 0 9 0H18.9883C23.9588 0 27.9883 4.02944 27.9883 9V58C27.9883 62.9706 23.9588 67 18.9883 67H9C4.02944 67 0 62.9706 0 58V9Z" fill="#2B3238"/>
+<g opacity="${redOp}">
+<circle cx="13.9941" cy="13.5" r="7.5" fill="#FF5A5F"/>
+</g>
+<g opacity="${yelOp}">
+<circle cx="13.9941" cy="33.5" r="7.5" fill="#FFB020"/>
+</g>
+<g opacity="${grnOp}">
+<circle cx="13.9941" cy="53.5" r="7.5" fill="#2FBF5B"/>
+</g>
+</svg>`;
       }
     },
 
     /**
-     * Generate authentic SVG line chart for CarePort trend scores (matching Image 2)
+     * Generate authentic SVG line chart for CarePort trend scores (matching CarePort 100%)
      */
-    generateTrendChartSvg(trendList, customW = 714, customH = 250) {
+    generateTrendChartSvg(trendList, customW = 714, customH = 220) {
       let list = (trendList && Array.isArray(trendList) && trendList.length > 0) ? trendList : [];
       if (list.length === 0) {
         const todayStr = new Date().toISOString().slice(0, 10);
         list = [
-          { dayIndex: 1, careDate: todayStr, overallScore: 4, mobilityScore: 4, dietScore: 4, sleepScore: 4, painScore: 2 }
+          { dayIndex: 1, careDate: todayStr, overallScore: 4, mobilityScore: 4, dietScore: 4, sleepScore: 4, painScore: 1 }
         ];
       }
       const width = customW;
       const height = customH;
-      const paddingX = 42;
-      const paddingY = 24;
+      const paddingX = 46;
+      const paddingY = 22;
       const chartW = width - paddingX * 2;
       const chartH = height - paddingY * 2;
       
       const numDays = list.length;
       const getX = (idx) => paddingX + (numDays <= 1 ? chartW / 2 : (idx / (numDays - 1)) * chartW);
-      const getY = (val) => height - paddingY - ((val - 1) / 4) * chartH;
+      const getY = (val) => height - paddingY - ((Math.max(1, Math.min(5, val)) - 1) / 4) * chartH;
       
-      // Grid lines 1 to 5
+      // Grid lines 1 to 5 (CarePort official: color #e5e9ed, step 1)
       let gridSvg = '';
       for (let s = 1; s <= 5; s++) {
         const y = getY(s);
-        gridSvg += `<line x1="${paddingX - 10}" y1="${y}" x2="${width - paddingX + 10}" y2="${y}" stroke="#e5e9ed" stroke-width="1"/>`;
-        gridSvg += `<text x="${paddingX - 22}" y="${y + 4}" font-size="11" font-weight="bold" fill="#94a3b8" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${s}</text>`;
+        gridSvg += `<line x1="${paddingX - 12}" y1="${y}" x2="${width - paddingX + 12}" y2="${y}" stroke="#edf1f2" stroke-width="1.2"/>`;
+        gridSvg += `<text x="${paddingX - 24}" y="${y + 4.5}" font-size="12" font-weight="600" fill="#8b959c" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif">${s}</text>`;
       }
       
-      // X labels with anti-collision step
+      // X labels: Prioritize dayIndex (e.g. 15일차, 16일차...) exactly matching CarePort!
       let xLabelsSvg = '';
-      const step = numDays > 24 ? 3 : (numDays > 14 ? 2 : 1);
+      const step = numDays > 22 ? 2 : 1;
       list.forEach((item, idx) => {
         const isFirst = idx === 0;
         const isLast = idx === numDays - 1;
         if (!isFirst && !isLast && (idx % step !== 0)) return;
         const x = getX(idx);
-        const label = item.careDate ? item.careDate.slice(5, 10).replace('-', '.') : (item.dayIndex ? `${item.dayIndex}일` : `${idx + 1}`);
-        xLabelsSvg += `<text x="${x}" y="${height - 4}" font-size="11" font-weight="bold" fill="#64748b" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">${label}</text>`;
+        const label = (item.dayIndex != null)
+          ? `${item.dayIndex}일차`
+          : (item.careDate ? item.careDate.slice(5, 10).replace('-', '.') : `${idx + 1}일차`);
+        xLabelsSvg += `<text x="${x}" y="${height - 3}" font-size="11.5" font-weight="600" fill="#8b959c" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif">${label}</text>`;
       });
       
+      // 5 lines matching CarePort statusChartData:
+      // 1: 총합상태 #06C8BB, 2: 거동능력 #2BBB77, 3: 식사상태 #F4A61E, 4: 수면상태 #6366f1, 5: 통증수준 #FE6FB0 (dash [8,5], data 6 - painScore)
       const lines = [
-        { key: 'overallScore', color: '#06C8BB', dash: '', r: 4 },
-        { key: 'mobilityScore', color: '#2BBB77', dash: '', r: 4 },
-        { key: 'dietScore', color: '#F4A61E', dash: '', r: 4 },
-        { key: 'sleepScore', color: '#6366f1', dash: '', r: 3.5 },
-        { key: 'painScore', color: '#FE6FB0', dash: 'stroke-dasharray="8,5"', r: 4 }
+        { key: 'overallScore', color: '#06C8BB', dash: '', r: 4.5, w: 2.8 },
+        { key: 'mobilityScore', color: '#2BBB77', dash: '', r: 4.5, w: 2.8 },
+        { key: 'dietScore', color: '#F4A61E', dash: '', r: 4.5, w: 2.8 },
+        { key: 'sleepScore', color: '#6366f1', dash: '', r: 4.5, w: 2.8 },
+        { key: 'painScore', color: '#FE6FB0', dash: 'stroke-dasharray="7,4"', r: 4.5, w: 2.8 }
       ];
       
       let linesSvg = '';
@@ -1046,14 +1082,14 @@
           const val = line.key === 'painScore' ? (rawVal != null ? (6 - rawVal) : 3) : rawVal;
           pts.push(`${getX(idx)},${getY(val)}`);
         });
-        linesSvg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${line.color}" stroke-width="3" ${line.dash}/>`;
+        linesSvg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${line.color}" stroke-width="${line.w}" ${line.dash} stroke-linecap="round" stroke-linejoin="round"/>`;
         pts.forEach(pt => {
           const [px, py] = pt.split(',');
-          linesSvg += `<circle cx="${px}" cy="${py}" r="${line.r || 4}" fill="#ffffff" stroke="${line.color}" stroke-width="2.5"/>`;
+          linesSvg += `<circle cx="${px}" cy="${py}" r="${line.r}" fill="#ffffff" stroke="${line.color}" stroke-width="${line.w}"/>`;
         });
       });
       
-      return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="width: 100%; max-width: ${width}px; height: auto; display: block; margin: 0 auto;">${gridSvg}${xLabelsSvg}${linesSvg}</svg>`;
+      return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="width: 100%; max-width: ${width}px; height: auto; display: block; margin: 0 auto; overflow: visible;">${gridSvg}${xLabelsSvg}${linesSvg}</svg>`;
     },
 
     /**
@@ -1168,14 +1204,14 @@
           const isYes = resStr === '1' || resStr === 'true' || resStr === '예';
           control = `
             <div class="state-container binary-container" style="display: inline-flex; border: 1px solid #d1d5db; border-radius: 4px; overflow: hidden; vertical-align: middle;">
-              <span class="state-item binary ${isYes ? 'green' : ''}" style="display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 25px; font-size: 11.5px; font-weight: 800; line-height: 1; ${isYes ? 'background-color: #00b8a9; color: #ffffff;' : 'background-color: #f9fafb; color: #9ca3af;'}"><span class="btn-text" style="display: inline-flex; align-items: center; justify-content: center; line-height: 1; position: relative; top: -2.5px;">예</span></span>
-              <span class="state-item binary ${!isYes ? 'pink' : ''}" style="display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 25px; font-size: 11.5px; font-weight: 800; line-height: 1; border-left: 1px solid #d1d5db; ${!isYes ? 'background-color: #ff5b84; color: #ffffff;' : 'background-color: #f9fafb; color: #9ca3af;'}"><span class="btn-text" style="display: inline-flex; align-items: center; justify-content: center; line-height: 1; position: relative; top: -2.5px;">아니오</span></span>
+              <span class="state-item binary ${isYes ? 'green' : ''}" style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 26px; font-size: 11.5px; font-weight: 800; line-height: 1; margin: 0; padding: 0 0 2px 0; box-sizing: border-box; ${isYes ? 'background-color: #07C9BC; color: #ffffff;' : 'background-color: #f9fafb; color: #9ca3af;'}">예</span>
+              <span class="state-item binary ${!isYes ? 'pink' : ''}" style="display: inline-flex; align-items: center; justify-content: center; width: 50px; height: 26px; font-size: 11.5px; font-weight: 800; line-height: 1; margin: 0; padding: 0 0 2px 0; box-sizing: border-box; border-left: 1px solid #d1d5db; ${!isYes ? 'background-color: #FF70B1; color: #ffffff;' : 'background-color: #f9fafb; color: #9ca3af;'}">아니오</span>
             </div>
           `;
         } else if (cat === 'linear' || endNum > 5) {
           control = `
             <div class="score-wrapper" style="display: inline-flex; align-items: baseline;">
-              <span class="score-result" style="font-size: 14.5px; font-weight: 900; color: #111827;">${resStr}</span>
+              <span class="score-result" style="font-size: 15px; font-weight: 900; color: #111827;">${resStr}</span>
               <span class="score-total" style="font-size: 11px; font-weight: 600; color: #9ca3af; margin-left: 2px;">/${endNum}점</span>
             </div>
           `;
@@ -1185,7 +1221,7 @@
           for (let n = startNum; n <= endNum; n++) {
             const isActive = activeLevel === n;
             btns += `
-              <span class="state-item level ${isActive ? 'levelActive' : ''}" style="display: inline-flex; align-items: center; justify-content: center; width: 25px; height: 25px; font-size: 11px; font-weight: 800; line-height: 1; ${n > startNum ? 'border-left: 1px solid #d1d5db;' : ''} ${isActive ? 'background-color: #00b8a9; color: #ffffff;' : 'background-color: #f9fafb; color: #6b7280;'}"><span class="btn-text" style="display: inline-flex; align-items: center; justify-content: center; line-height: 1; position: relative; top: -2.5px;">${n}</span></span>
+              <span class="state-item level ${isActive ? 'levelActive' : ''}" style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; font-size: 11px; font-weight: 800; line-height: 1; margin: 0; padding: 0 0 2px 0; box-sizing: border-box; ${n > startNum ? 'border-left: 1px solid #d1d5db;' : ''} ${isActive ? 'background-color: #07C9BC; color: #ffffff;' : 'background-color: #f9fafb; color: #6b7280;'}">${n}</span>
             `;
           }
           control = `
@@ -1200,7 +1236,7 @@
         }
 
         return `
-          <div class="result-item" style="display: flex; align-items: center; justify-content: space-between; min-height: 28px;">
+          <div class="result-item" style="display: flex; align-items: center; justify-content: space-between; min-height: 30px;">
             <span class="text" style="font-size: 13px; font-weight: 700; color: #334155;">${name}</span>
             <div style="flex-shrink: 0; margin-left: 12px;">${control}</div>
           </div>
@@ -1259,20 +1295,20 @@
       if (keywordsArr.length === 0) {
         keywordsArr = ['환자 상태', '컨디션 개선', '혈압 및 맥박', '거동 및 편마비', '수면'];
       }
-      const keywordsTagsHtml = keywordsArr.map(k => `<span style="margin-right: 10px; color: #525050; font-weight: 700; font-size: 12px;">#${String(k).replace(/^#/, '')}</span>`).join('');
+      const keywordsTagsHtml = keywordsArr.map(k => `<span style="margin-right: 12px; color: #525050; font-weight: 700; font-size: 12px;">#${String(k).replace(/^#/, '')}</span>`).join('');
 
       let reportHtml = '';
       if (raw.consult_report && typeof raw.consult_report === 'object') {
         const entries = Object.entries(raw.consult_report);
         if (entries.length > 0) {
           reportHtml = `
-            <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 10px;">
               ${entries.map(([label, val], idx) => `
                 <div>
-                  <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-bottom: 2px;">
+                  <div style="font-size: 12.5px; font-weight: 800; color: #0f172a; margin-bottom: 3px;">
                     ${idx + 1}. ${label.replace(/^\d+[\.\)]\s*/, '')}
                   </div>
-                  <div style="font-size: 11px; color: #475569; line-height: 1.5; margin-left: 8px;">
+                  <div style="font-size: 12px; color: #475569; line-height: 1.6; margin-left: 8px;">
                     ${typeof val === 'string' ? val : JSON.stringify(val)}
                   </div>
                 </div>
@@ -1282,9 +1318,9 @@
         }
       }
       const summarySectionHtml = summaryText ? `
-        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0;">
-          <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-bottom: 3px;">[요약]</div>
-          <div style="font-size: 11.5px; color: #334155; line-height: 1.55;">
+        <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
+          <div style="font-size: 12.5px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">[요약]</div>
+          <div style="font-size: 12px; color: #334155; line-height: 1.65;">
             ${summaryText.replace(/\n/g, '<br>')}
           </div>
         </div>
@@ -1315,13 +1351,15 @@
       max-height: 1122px;
       margin: 0 auto;
       background: #ffffff;
-      padding: 34px 40px;
+      padding: 38px 44px 34px;
       box-sizing: border-box;
       position: relative;
       overflow: hidden;
       page-break-inside: avoid;
       break-inside: avoid;
-      display: block;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
     }
     .state-item {
       display: inline-flex !important;
@@ -1329,16 +1367,9 @@
       justify-content: center !important;
       line-height: 1 !important;
       text-align: center !important;
-    }
-    .state-item .btn-text,
-    .state-item.binary > span,
-    .state-item.level > span {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      line-height: 1 !important;
-      position: relative !important;
-      top: -2.5px !important;
+      vertical-align: middle !important;
+      box-sizing: border-box !important;
+      padding-bottom: 2px !important;
     }
     .water-mark {
       position: absolute;
@@ -1358,7 +1389,7 @@
     .result-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 8px 32px;
+      gap: 10px 32px;
       width: 100%;
     }
     @media print {
@@ -1368,11 +1399,12 @@
         max-width: 794px !important;
         min-height: 1122px !important;
         max-height: 1122px !important;
-        padding: 34px 40px !important;
+        padding: 38px 44px 34px !important;
         box-shadow: none !important;
         border: none !important;
         overflow: hidden !important;
-        display: block !important;
+        display: flex !important;
+        flex-direction: column !important;
       }
       .no-print { display: none !important; }
     }
@@ -1380,78 +1412,83 @@
 </head>
 <body>
   <div class="report-area page">
-    <!-- Watermark: LivOn -->
-    <div class="water-mark">LivOn</div>
-
     <!-- Title: 간병일지 -->
     <div style="position: relative; z-index: 1; margin-bottom: 14px;">
       <h1 style="font-size: 24px; font-weight: 900; color: #000000; margin: 0; letter-spacing: -0.8px;">간병일지</h1>
     </div>
 
     <!-- 7 Metadata Columns (대상자명, 연령, 성별, 상담자, 소속기관, 상담일시, 상담시간) -->
-    <div style="position: relative; z-index: 1; display: flex; align-items: stretch; justify-content: space-between; border-bottom: 1.5px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 16px;">
+    <div style="position: relative; z-index: 1; display: flex; align-items: stretch; justify-content: space-between; border-bottom: 1.5px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 18px;">
       <div style="flex: 1;">
         <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">대상자명</div>
-        <div style="font-size: 13px; color: #111827; font-weight: 800;">${username}</div>
+        <div style="font-size: 13.5px; color: #111827; font-weight: 800;">${username}</div>
       </div>
       <div style="width: 1px; background: #e5e7eb; margin: 0 8px;"></div>
       <div style="flex: 0.6;">
         <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">연령</div>
-        <div style="font-size: 13px; color: #111827; font-weight: 800;">${age}</div>
+        <div style="font-size: 13.5px; color: #111827; font-weight: 800;">${age}</div>
       </div>
       <div style="width: 1px; background: #e5e7eb; margin: 0 8px;"></div>
       <div style="flex: 0.6;">
         <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">성별</div>
-        <div style="font-size: 13px; color: #111827; font-weight: 800;">${gender}</div>
+        <div style="font-size: 13.5px; color: #111827; font-weight: 800;">${gender}</div>
       </div>
       <div style="width: 1px; background: #e5e7eb; margin: 0 8px;"></div>
       <div style="flex: 0.9;">
         <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">상담자</div>
-        <div style="font-size: 13px; color: #111827; font-weight: 800;">${consultant}</div>
+        <div style="font-size: 13.5px; color: #111827; font-weight: 800;">${consultant}</div>
       </div>
       <div style="width: 1px; background: #e5e7eb; margin: 0 8px;"></div>
       <div style="flex: 1.1;">
         <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">소속기관</div>
-        <div style="font-size: 13px; color: #111827; font-weight: 800;">${org}</div>
+        <div style="font-size: 13.5px; color: #111827; font-weight: 800;">${org}</div>
       </div>
       <div style="width: 1px; background: #e5e7eb; margin: 0 8px;"></div>
       <div style="flex: 1.6;">
         <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">상담일시</div>
-        <div style="font-size: 13px; color: #111827; font-weight: 800;">${consultDate}</div>
+        <div style="font-size: 13.5px; color: #111827; font-weight: 800;">${consultDate}</div>
       </div>
       <div style="width: 1px; background: #e5e7eb; margin: 0 8px;"></div>
       <div style="flex: 0.7;">
         <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">상담시간</div>
-        <div style="font-size: 13px; color: #111827; font-weight: 800;">${duration}</div>
+        <div style="font-size: 13.5px; color: #111827; font-weight: 800;">${duration}</div>
       </div>
     </div>
 
     <!-- Section 1: 상담내용 -->
-    <div style="position: relative; z-index: 1; margin-bottom: 16px;">
+    <div style="position: relative; z-index: 1; margin-bottom: 18px;">
       <h2 style="font-size: 15px; font-weight: 900; color: #111827; margin: 0 0 10px 0;">상담내용</h2>
       <div class="result-grid">
         ${checkboxGridHtml}
       </div>
     </div>
 
-    <!-- Section 2: 상담요약 -->
-    <div style="position: relative; z-index: 1; border-top: 1.5px solid #e5e7eb; padding-top: 12px;">
+    <!-- Section 2: 상담요약 (CarePort Image 2 완전 일치: 단일 박스로 A4 하단까지 가득 채움) -->
+    <div style="position: relative; z-index: 1; border-top: 1.5px solid #e5e7eb; padding-top: 14px; flex: 1; display: flex; flex-direction: column;">
       <h2 style="font-size: 15px; font-weight: 900; color: #111827; margin: 0 0 8px 0;">상담요약</h2>
       
-      <!-- Consult Title -->
-      <div style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-bottom: 6px;">
-        ${consultTitle}
-      </div>
+      <!-- Content / Report & Summary Container (CarePort .content-body) -->
+      <div class="content-body" style="position: relative; background: rgba(240, 240, 240, 0.35); border: 1px solid #D8DADE; border-radius: 4px; padding: 18px 22px; flex: 1; display: flex; flex-direction: column; justify-content: flex-start; margin-bottom: 6px;">
+        <!-- Watermark inside container matching Image 2 -->
+        <div class="water-mark" style="position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; opacity: 0.04; font-size: 140px; font-weight: 900; color: #ff3366; letter-spacing: -3px; user-select: none; font-family: sans-serif; z-index: 0;">LivOn</div>
 
-      <!-- Keywords with # -->
-      <div style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 4px 0;">
-        ${keywordsTagsHtml}
-      </div>
+        <div style="position: relative; z-index: 1; display: flex; flex-direction: column; gap: 10px; flex: 1;">
+          <!-- Consult Title -->
+          <div style="font-size: 14.5px; font-weight: 800; color: #0f172a; margin-top: 2px;">
+            ${consultTitle}
+          </div>
 
-      <!-- Content / Report & Summary Container -->
-      <div style="background: rgba(248, 250, 252, 0.85); border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px;">
-        ${reportHtml}
-        ${summarySectionHtml}
+          <!-- Keywords with # -->
+          <div style="display: flex; flex-wrap: wrap; gap: 4px 8px; margin-bottom: 4px;">
+            ${keywordsTagsHtml}
+          </div>
+
+          <!-- Report list -->
+          ${reportHtml}
+
+          <!-- Summary section -->
+          ${summarySectionHtml}
+        </div>
       </div>
     </div>
   </div>
@@ -1657,91 +1694,108 @@
     }
     .patient-summary-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr 1.2fr;
+      grid-template-columns: 1fr 1fr 1.15fr;
       gap: 10px;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
     .summary-card {
       box-sizing: border-box;
-      min-height: 52px;
-      padding: 8px 14px;
+      min-height: 56px;
+      padding: 10px 16px;
       border: 1px solid #dfe7ea;
-      border-radius: 9px;
+      border-radius: 12px;
       background: #f8fafc;
       text-align: left;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow: visible;
     }
     .summary-card > span {
       display: block;
-      margin-bottom: 2px;
+      margin-bottom: 4px;
       color: #74808a;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
     }
     .summary-card strong {
       display: block;
-      overflow: hidden;
-      font-size: 13.5px;
+      font-size: 15px;
       font-weight: 800;
       color: #0f172a;
-      text-overflow: ellipsis;
+      line-height: 1.35;
       white-space: nowrap;
+      overflow: visible;
     }
     .summary-card strong small {
-      font-size: 11.5px;
+      font-size: 13px;
       font-weight: 600;
-      color: #64748b;
+      color: #0f172a;
+      margin-left: 2px;
     }
     .diary-section {
-      margin-top: 13px;
+      margin-top: 14px;
     }
     .diary-section h2 {
       margin: 0;
-      font-size: 13.5px;
+      font-size: 14px;
       font-weight: 900;
       color: #0f172a;
       line-height: 1.2;
       letter-spacing: -0.3px;
       text-align: left;
     }
-    .sec-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 2px solid #10bdb2;
-      padding-bottom: 4px;
-      margin-bottom: 8px;
-    }
-    .sec-title {
-      font-size: 13.5px;
-      font-weight: 900;
-      color: #0f172a;
-      letter-spacing: -0.3px;
-      display: inline-flex;
-      align-items: center;
+    .section-rule {
+      height: 2px;
+      margin: 6px 0 10px;
+      background: #10bdb2;
     }
     .trend-card {
       box-sizing: border-box;
-      height: 258px;
-      padding: 6px 8px 4px;
+      height: 260px;
+      padding: 10px 12px 6px;
       border: 1px solid #dfe7ea;
-      border-radius: 10px;
+      border-radius: 12px;
       background: #fcfefe;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .chart-legend {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 2px;
+      color: #59646c;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .chart-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .chart-legend i {
+      width: 16px;
+      height: 3px;
+      border-radius: 2px;
+      display: inline-block;
     }
     .overall-status-card {
-      min-height: 42px;
-      padding: 7px 14px;
+      min-height: 48px;
+      padding: 8px 16px;
       border: 1px solid #8edfd9;
-      border-radius: 9px;
+      border-radius: 12px;
       background: #eafaf8;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
       justify-content: space-between;
     }
     .status-title-wrap {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
     .status-pill {
       display: inline-flex;
@@ -1777,19 +1831,19 @@
       flex-shrink: 0;
     }
     .status-decision {
-      padding: 3px 8px;
+      padding: 4px 10px;
       border: 1px solid #9ddfd9;
-      border-radius: 8px;
+      border-radius: 10px;
       color: #079f98;
       background: #ffffff;
-      font-size: 10.5px;
+      font-size: 11px;
       font-weight: 800;
       white-space: nowrap;
     }
     .detail-caption {
       display: flex;
       align-items: center;
-      margin: 8px 0 6px;
+      margin: 10px 0 8px;
       height: 18px;
       color: #8c969d;
       font-size: 11px;
@@ -1807,27 +1861,43 @@
     .detail-status-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
+      gap: 10px;
     }
     .detail-status-card {
-      min-height: 82px;
-      padding: 8px 6px;
+      box-sizing: border-box;
+      min-height: 120px;
+      padding: 10px 8px 8px;
       border: 1px solid #dfe7ea;
-      border-radius: 9px;
+      border-radius: 12px;
       background: #ffffff;
       text-align: center;
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: space-between;
+    }
+    .detail-status-card .status-pill.small {
+      padding: 3px 12px;
+      border-radius: 16px;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .detail-status-card .traffic-light.vertical {
+      margin: 4px 0;
+      display: flex;
       justify-content: center;
     }
     .detail-status-card p {
-      margin: 6px 0 0 0;
+      margin: 0;
       overflow: hidden;
       color: #64748b;
-      font-size: 10.5px;
+      font-size: 11px;
       font-weight: 600;
-      line-height: 1.3;
+      line-height: 1.35;
       text-overflow: ellipsis;
       white-space: nowrap;
       max-width: 100%;
@@ -1835,20 +1905,20 @@
     .status-guide {
       display: flex;
       justify-content: center;
-      gap: 16px;
-      margin-top: 6px;
-      color: #64748b;
-      font-size: 10px;
-      font-weight: 600;
+      gap: 20px;
+      margin-top: 8px;
+      color: #6e7880;
+      font-size: 11px;
+      font-weight: 700;
     }
     .status-guide span {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
     }
     .status-guide i {
-      width: 6.5px;
-      height: 6.5px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: currentColor;
     }
@@ -2055,60 +2125,53 @@
     <!-- PAGE 1: 요약, 추이차트, 상태체크, 금일 활력징후 -->
     <section class="report-page first-page">
       <!-- Diary Header -->
-      <div class="diary-header">
+      <header class="diary-header">
         <div>
-          <p class="eyebrow">보호자 안내용 · 공식 간병일지</p>
+          <p class="eyebrow">보호자 안내용</p>
           <h1>간병일지</h1>
         </div>
         <div class="care-day-badge">
           <strong>${d.dayText}</strong>
           <span>${d.consultDate}</span>
         </div>
-      </div>
+      </header>
 
       <!-- Patient Summary Grid -->
       <div class="patient-summary-grid">
         <article class="summary-card">
-          <span>고객명 (피보험자)</span>
+          <span>고객명</span>
           <strong>${d.patientName} <small>(${d.age}세·${d.gender})</small></strong>
         </article>
         <article class="summary-card">
-          <span>담당 간병인 (소속)</span>
-          <strong>${d.caregiver} <small>(${d.org})</small></strong>
+          <span>간병인</span>
+          <strong>${d.caregiver}</strong>
         </article>
         <article class="summary-card">
-          <span>간병 기간</span>
+          <span>간병기간</span>
           <strong>${d.carePeriod}</strong>
         </article>
       </div>
 
       <!-- Trend Section -->
-      <div class="diary-section">
-        <div class="sec-head">
-          <span class="sec-title">간병 일자별 환자 상태 변화</span>
-          <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; gap: 8px;">
-            <span style="color: #06C8BB;">― 종합상태</span>
-            <span style="color: #2BBB77;">― 거동능력</span>
-            <span style="color: #F4A61E;">― 식사상태</span>
-            <span style="color: #6366f1;">― 수면상태</span>
-            <span style="color: #FE6FB0;">┄ 통증수준</span>
-          </div>
-        </div>
+      <section class="diary-section trend-section">
+        <h2>간병 일자별 환자 상태 변화</h2>
+        <div class="section-rule"></div>
         <div class="trend-card">
           ${trendChartHtml}
-        </div>
-      </div>
-
-      <!-- Status Section -->
-      <div class="diary-section">
-        <div class="sec-head">
-          <span class="sec-title">금일 환자 상태 체크</span>
-          <div class="status-guide">
-            <span class="good"><i></i>양호 · 안정</span>
-            <span class="warning"><i></i>주의 · 부분보조</span>
-            <span class="poor"><i></i>악화 · 주의 필요</span>
+          <div class="chart-legend">
+            <span><i style="background: #06C8BB;"></i>종합상태</span>
+            <span><i style="background: #2BBB77;"></i>거동능력</span>
+            <span><i style="background: #F4A61E;"></i>식사상태</span>
+            <span><i style="background: #6366f1;"></i>수면상태</span>
+            <span><i style="border-top: 2.5px dashed #FE6FB0;"></i>통증수준</span>
           </div>
         </div>
+      </section>
+
+      <!-- Status Section -->
+      <section class="diary-section">
+        <h2>금일 환자 상태 체크</h2>
+        <div class="section-rule"></div>
         
         <div class="overall-status-card">
           <div class="status-title-wrap">
@@ -2116,7 +2179,7 @@
             <div class="traffic-light horizontal">
               ${overallLightSvg}
             </div>
-            <span style="font-size: 12px; font-weight: 700; color: #1e293b;">${d.overallStatus.description}</span>
+            <p>${d.overallStatus.description}</p>
           </div>
           <span class="status-decision">종합 판정</span>
         </div>
@@ -2129,18 +2192,22 @@
         <div class="detail-status-grid">
           ${catCardsHtml}
         </div>
-      </div>
+
+        <div class="status-guide">
+          <span class="good"><i></i>양호 · 안정</span>
+          <span class="warning"><i></i>주의 · 부분보조</span>
+          <span class="poor"><i></i>악화 · 주의 필요</span>
+        </div>
+      </section>
 
       <!-- Vital Section: 금일 활력징후 (7 Vital Signs) -->
-      <div class="diary-section">
-        <div class="sec-head">
-          <span class="sec-title">금일 활력징후</span>
-          <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">정상 범위 기준 정밀 측정</span>
-        </div>
+      <section class="diary-section vital-section">
+        <h2>금일 활력징후</h2>
+        <div class="section-rule"></div>
         <div class="vital-grid">
           ${vitalsHtml}
         </div>
-      </div>
+      </section>
     </section>
 
     <!-- PAGE 2: 수행내역, 오늘의 중요사항, 보호자 전달사항 -->

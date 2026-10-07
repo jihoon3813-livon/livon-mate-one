@@ -14147,7 +14147,8 @@ async function previewCustomerCareLogPdf(appId) {
   const clusterTrendScores = dailyLogs.map((l, idx) => {
     const lRaw = l.raw || l;
     const s = lRaw.trend_scores || lRaw.trendScores || l.trendScores || {};
-    const day = l.dayNumber || (idx + 1);
+    const rawDay = lRaw.day_index || l.day_index || l.dayIndex || l.dayNumber;
+    const day = rawDay != null && !isNaN(Number(rawDay)) ? Number(rawDay) : (l.dayNumber || (idx + 1));
 
     const cats = lRaw.categories || l.categories || {};
     const dietTone = cats.diet?.level || cats.meal?.tone || (lRaw.care_log?.diet_nutrition?.includes('불량') ? 'warning' : 'good');
@@ -14178,7 +14179,9 @@ async function previewCustomerCareLogPdf(appId) {
     for (let i = 0; i < totalDays; i++) {
       const log = dailyLogs[i];
       const logCareDate = (log.consultDate || log.dateString || '').slice(0, 10);
-      const logDayNum = log.dayNumber || (i + 1);
+      const rawLogDay = log.raw?.day_index || log.day_index || log.dayIndex || log.dayNumber;
+      const logDayNum = rawLogDay != null && !isNaN(Number(rawLogDay)) ? Number(rawLogDay) : (log.dayNumber || (i + 1));
+      log.dayNumber = logDayNum;
       const currentDayTrends = clusterTrendScores.filter((t, tIdx) => {
         const tDate = (t.careDate || t.date || '').slice(0, 10);
         if (tDate && logCareDate) return tDate <= logCareDate;
@@ -42801,7 +42804,7 @@ function renderCarePortTrendChart(trendList) {
     return new Date(a.careDate || 0) - new Date(b.careDate || 0);
   });
 
-  const labels = validTrends.map(t => (t.careDate ? t.careDate.slice(5, 10).replace('-', '.') : (t.dayIndex != null ? `${t.dayIndex}일` : '-')));
+  const labels = validTrends.map(t => (t.dayIndex != null ? `${t.dayIndex}일차` : (t.careDate ? t.careDate.slice(5, 10).replace('-', '.') : '-')));
   
   const overallData = validTrends.map(t => (t.overallScore != null ? t.overallScore : null));
   const mobilityData = validTrends.map(t => (t.mobilityScore != null ? t.mobilityScore : null));
@@ -42887,14 +42890,7 @@ function renderCarePortTrendChart(trendList) {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          display: true,
-          position: 'bottom',
-          labels: {
-            usePointStyle: true,
-            pointStyle: 'line',
-            padding: 20,
-            font: { size: 12, weight: 'bold' }
-          }
+          display: false
         },
         tooltip: {
           callbacks: {
@@ -43389,14 +43385,18 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
       elDayBadge.innerText = '';
       elDayBadge.classList.add('hidden');
     }
+    const elBadgeDayText = document.getElementById('cpBadgeDayText');
+    if (elBadgeDayText) {
+      elBadgeDayText.innerText = d.dayText || '1일차';
+    }
     const elDate = document.getElementById('cpMetaDate');
-    if (elDate) elDate.innerText = dateWithDay;
+    if (elDate) elDate.innerText = d.consultDate || dateWithDay;
 
-    // Image 1 Demographics Strip
+    // CarePort Image 4 Demographics Strip
     const elUserTxt = document.getElementById('cpMetaUsernameText');
     if (elUserTxt) elUserTxt.innerText = `${d.patientName} (${d.age}세·${d.gender})`;
     const elCgTxt = document.getElementById('cpMetaCaregiverText');
-    if (elCgTxt) elCgTxt.innerText = `${d.caregiver} (${d.org})`;
+    if (elCgTxt) elCgTxt.innerText = d.caregiver;
     const elPeriodTxt = document.getElementById('cpMetaCarePeriodText');
     if (elPeriodTxt) elPeriodTxt.innerText = d.carePeriod;
 
@@ -43453,7 +43453,9 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     if (filteredTrends.length === 0 && siblingLogs.length > 0) {
       const logsUpToNow = siblingLogs.filter((l, i) => {
         const lDate = (l.consultDate || l.dateString || '').slice(0, 10);
-        const day = l.dayNumber || (i + 1);
+        const lRaw = l.raw || l;
+        const rawDay = lRaw.day_index || l.day_index || l.dayIndex || l.dayNumber;
+        const day = rawDay != null && !isNaN(Number(rawDay)) ? Number(rawDay) : (i + 1);
         if (curDate && lDate) return lDate <= curDate;
         if (curDayIndex != null) return day <= curDayIndex;
         return true;
@@ -43461,7 +43463,8 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
       filteredTrends = logsUpToNow.map((l, i) => {
         const lRaw = l.raw || l;
         const s = lRaw.trend_scores || lRaw.trendScores || l.trendScores || {};
-        const day = l.dayNumber || (i + 1);
+        const rawDay = lRaw.day_index || l.day_index || l.dayIndex || l.dayNumber;
+        const day = rawDay != null && !isNaN(Number(rawDay)) ? Number(rawDay) : (i + 1);
         return {
           dayIndex: day,
           careDate: (l.consultDate || l.dateString || '').slice(0, 10),
@@ -43489,10 +43492,9 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     const toneBadge = document.getElementById('cpOverallToneBadge');
     if (toneBadge) {
       const toneBadgeClass = d.overallStatus.tone === 'good'
-        ? 'background: #eafaf8; color: #079f98; border: 1px solid #10bdb2;'
-        : (d.overallStatus.tone === 'warning' ? 'background: #fef6e7; color: #d97706; border: 1px solid #f5aa18;' : 'background: #fdecee; color: #dc2626; border: 1px solid #eb5c60;');
-      toneBadge.innerHTML = `<span class="careport-dot" style="width: 5px; height: 5px; margin-right: 5px;"></span><span class="pill-text">${d.overallStatus.label}</span>`;
-      toneBadge.className = 'careport-badge-pill text-[11.5px] font-black h-6 px-2.5 rounded-md';
+        ? 'background: #d9f5e7; color: #168c61;'
+        : (d.overallStatus.tone === 'warning' ? 'background: #fff1d4; color: #bf7a00;' : 'background: #fde5e6; color: #ca3d43;');
+      toneBadge.innerHTML = `<span class="pill-text">● ${d.overallStatus.label}</span>`;
       toneBadge.style.cssText = toneBadgeClass;
     }
     const overallSvg = document.getElementById('cpOverallTrafficSvg');
@@ -43502,25 +43504,22 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     const overallDesc = document.getElementById('cpOverallDesc');
     if (overallDesc) overallDesc.innerText = d.overallStatus.description;
 
-    // 4 Category Status Cards (Image 1 style)
+    // 4 Category Status Cards (CarePort Image 4 authentic layout)
     const catContainer = document.getElementById('cpCategoryCardsContainer');
     if (catContainer && window.CarePortClient) {
       catContainer.innerHTML = d.categories.map(c => {
+        const cPillTone = c.tone === 'good' ? 'good' : (c.tone === 'warning' ? 'warning' : 'poor');
         const cPillStyle = c.tone === 'good'
-          ? 'background: #eafaf8; color: #079f98; border: 1px solid #10bdb2;'
-          : (c.tone === 'warning' ? 'background: #fef6e7; color: #d97706; border: 1px solid #f5aa18;' : 'background: #fdecee; color: #dc2626; border: 1px solid #eb5c60;');
+          ? 'background: #d9f5e7; color: #168c61;'
+          : (c.tone === 'warning' ? 'background: #fff1d4; color: #bf7a00;' : 'background: #fde5e6; color: #ca3d43;');
+        const vSvg = window.CarePortClient.renderTrafficLightSvg(c.tone, 'vertical');
         return `
-          <div style="flex: 1; min-width: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-height: 84px;">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-              <span class="careport-badge-pill" style="height: 22px; font-size: 11px; font-weight: 800; padding: 0 8px; border-radius: 6px; ${cPillStyle}">
-                <span class="careport-dot" style="width: 5px; height: 5px; margin-right: 4px;"></span>
-                <span class="pill-text">${c.label}</span>
-              </span>
-              ${window.CarePortClient.renderTrafficLightSvg(c.tone, 'vertical')}
+          <div style="background: #ffffff; border: 1px solid #dfe7ea; border-radius: 12px; padding: 12px 10px 10px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; min-height: 140px; text-align: center; box-sizing: border-box;">
+            <span class="status-pill small ${cPillTone}" style="padding: 3px 12px; border-radius: 16px; font-size: 11px; font-weight: 800; line-height: 1; display: inline-flex; align-items: center; gap: 4px; ${cPillStyle}">● ${c.label}</span>
+            <div class="traffic-light vertical" style="margin: 6px 0; display: flex; justify-content: center;">
+              ${vSvg}
             </div>
-            <div style="font-size: 11.5px; color: #334155; line-height: 1.4; font-weight: 500;">
-              ${c.description}
-            </div>
+            <p style="margin: 0; overflow: hidden; color: #64748b; font-size: 11.5px; font-weight: 600; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;" title="${c.description}">${c.description}</p>
           </div>
         `;
       }).join('');
@@ -43529,13 +43528,12 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     // Section 2: 금일 활력징후 (7 Vital Signs)
     const vitalsGrid = document.getElementById('cpVitalsGrid');
     if (vitalsGrid) {
-      vitalsGrid.innerHTML = d.vitals.map(v => `
-        <div class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-center shadow-2xs">
-          <div class="text-[10.5px] text-slate-500 font-bold mb-1">${v.label}</div>
-          <div class="text-xs sm:text-sm font-black text-slate-900 font-mono">
-            ${v.value}
-            ${v.unit ? `<span class="text-[9.5px] font-normal text-slate-400 ml-0.5">${v.unit}</span>` : ''}
-          </div>
+      vitalsGrid.innerHTML = d.vitals.map((v, vIdx) => `
+        <div style="padding: 10px 4px 8px; text-align: center; background: #ffffff; ${vIdx < d.vitals.length - 1 ? 'border-right: 1px solid #dfe7ea;' : ''}">
+          <span style="display: block; margin-bottom: 4px; color: #74808a; font-size: 11px; font-weight: 700; white-space: nowrap;">${v.label}</span>
+          <strong style="display: block; font-size: 14.5px; white-space: nowrap; font-weight: 900; color: #0f172a;">
+            ${v.value}${v.unit ? `<small style="margin-left: 2px; color: #8a949b; font-size: 10px; font-weight: 600;">${v.unit}</small>` : ''}
+          </strong>
         </div>
       `).join('');
     }
@@ -44436,6 +44434,20 @@ async function downloadPatientCareLogsPdfs(groupId) {
     });
     await new Promise(r => setTimeout(r, 10));
 
+    // Check if official CarePort trend scores exist across patient or details
+    let officialTrends = (patient.trendScores && Array.isArray(patient.trendScores) && patient.trendScores.length > 0)
+      ? patient.trendScores
+      : null;
+    if (!officialTrends) {
+      for (const l of sortedLogs) {
+        const d = detailDataMap[l.sessionId];
+        if (d && Array.isArray(d.trendScores) && d.trendScores.length > 0) {
+          officialTrends = d.trendScores;
+          break;
+        }
+      }
+    }
+
     // 전체 일차의 종합 트렌드 점수(Cluster Trend Scores) 산출
     const clusterTrendScores = sortedLogs.map((l, idx) => {
       const detail = detailDataMap[l.sessionId] || {};
@@ -44456,8 +44468,11 @@ async function downloadPatientCareLogsPdfs(groupId) {
       const pScore = painTone === 'warning' ? 2 : (painTone === 'poor' ? 4 : 1);
       const oScore = ovTone === 'warning' ? 3 : (ovTone === 'poor' ? 2 : 4);
 
+      const rawDayIndex = rawObj.day_index || detail.day_index || l.day_index || l.dayIndex || l.dayNumber;
+      const day = rawDayIndex != null && !isNaN(Number(rawDayIndex)) ? Number(rawDayIndex) : (l.dayNumber || (idx + 1));
+
       return {
-        dayIndex: l.dayNumber || (idx + 1),
+        dayIndex: day,
         careDate: dateStr,
         overallScore: ts.overallScore != null ? ts.overallScore : (ts.overall != null ? ts.overall : oScore),
         mobilityScore: ts.mobilityScore != null ? ts.mobilityScore : (ts.mobility != null ? ts.mobility : mScore),
@@ -44466,15 +44481,18 @@ async function downloadPatientCareLogsPdfs(groupId) {
         painScore: ts.painScore != null ? ts.painScore : (ts.pain != null ? ts.pain : pScore)
       };
     });
-    patient.trendScores = clusterTrendScores;
+    patient.trendScores = officialTrends || clusterTrendScores;
 
     // 각 일차별 일지 HTML 사전 생성
     const dayHtmlList = [];
     for (let i = 0; i < sortedLogs.length; i++) {
       const log = sortedLogs[i];
       const logDate = (log.consultDate || log.dateString || '').slice(0, 10);
-      const dayNum = log.dayNumber || (i + 1);
-      const currentDayTrends = clusterTrendScores.filter((t, tIdx) => {
+      const rawDay = log.raw?.day_index || log.day_index || log.dayIndex || log.dayNumber;
+      const dayNum = rawDay != null && !isNaN(Number(rawDay)) ? Number(rawDay) : (log.dayNumber || (i + 1));
+      log.dayNumber = dayNum;
+
+      const currentDayTrends = (officialTrends || clusterTrendScores).filter((t, tIdx) => {
         const tDate = (t.careDate || '').slice(0, 10);
         if (tDate && logDate) return tDate <= logDate;
         if (t.dayIndex != null && dayNum != null) return Number(t.dayIndex) <= Number(dayNum);
@@ -45531,7 +45549,8 @@ async function handleAutoGenerateAndImportCarePortLog() {
     const clusterTrendScores = dailyLogsToRender.map((l, idx) => {
       const lRaw = l.raw || l;
       const s = lRaw.trend_scores || lRaw.trendScores || l.trendScores || {};
-      const day = l.dayNumber || (idx + 1);
+      const rawDay = lRaw.day_index || l.day_index || l.dayIndex || l.dayNumber;
+      const day = rawDay != null && !isNaN(Number(rawDay)) ? Number(rawDay) : (l.dayNumber || (idx + 1));
       return {
         dayIndex: day,
         careDate: (l.consultDate || l.dateString || '').slice(0, 10),
@@ -45580,7 +45599,9 @@ async function handleAutoGenerateAndImportCarePortLog() {
         const batchItems = [];
         for (let i = b; i < batchEnd; i++) {
           const log = dailyLogsToRender[i];
-          const dayNum = log.dayNumber || (i + 1);
+          const rawDay = log.raw?.day_index || log.day_index || log.dayIndex || log.dayNumber;
+          const dayNum = rawDay != null && !isNaN(Number(rawDay)) ? Number(rawDay) : (log.dayNumber || (i + 1));
+          log.dayNumber = dayNum;
           const curDate = log.dateString || (log.consultDate ? log.consultDate.slice(0, 10) : startDate);
           const logCareDate = (log.consultDate || log.dateString || '').slice(0, 10);
           const currentDayTrends = clusterTrendScores.filter((t, tIdx) => {
