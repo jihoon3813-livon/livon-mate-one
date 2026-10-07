@@ -41780,6 +41780,12 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
               <span>${isExpanded ? '일지 접기' : `일자별 일지 펼치기 (${group.totalDays}건)`}</span>
             </button>
             ${downloadBtnHtml}
+            <button type="button" onclick="downloadPatientCareLogsViaRobot('${group.id}')"
+              class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs shadow-md shadow-purple-900/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+              title="케어포트 전산에 백그라운드로 자동 접속하여 원본 2장 이미지를 다운로드받아 100% 동일한 A4 2페이지 공식 PDF로 조립합니다">
+              <i data-lucide="bot" class="w-4 h-4 text-amber-300"></i>
+              <span>🤖 원본 무인 다운로드</span>
+            </button>
             <button type="button" onclick="attachCarePortLogsAndOpenEmail('${group.id}')"
               class="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-900/30 flex items-center gap-1.5 transition-all cursor-pointer"
               title="간병 종료 보고 및 청구 메일에 일자별 PDF 일지를 ZIP 없이 개별 첨부">
@@ -44433,10 +44439,10 @@ async function renderElementToSinglePageA4PdfBytes(sourceElement, customMargin =
   }
 }
 
-async function downloadCarePortViaRobot() {
+async function downloadCarePortViaRobot(targetSessionId = null, targetPatientName = null) {
   const detail = gCurrentCarePortDetail || {};
-  const username = (document.getElementById('cpMetaUsernameText')?.innerText || document.getElementById('cpMetaUsername')?.innerText || detail.username || '환자').trim();
-  const sessionId = gCurrentCarePortSessionId || detail.sessionId || detail.id || '';
+  const username = (targetPatientName || document.getElementById('cpMetaUsernameText')?.innerText || document.getElementById('cpMetaUsername')?.innerText || detail.username || '환자').trim();
+  const sessionId = targetSessionId || gCurrentCarePortSessionId || detail.sessionId || detail.id || '';
 
   showGlobalProgress({
     title: `[${username} 님] 케어포트 무인 로봇 다운로드`,
@@ -44491,6 +44497,19 @@ async function downloadCarePortViaRobot() {
   }
 }
 window.downloadCarePortViaRobot = downloadCarePortViaRobot;
+
+async function downloadPatientCareLogsViaRobot(groupId) {
+  const patient = (typeof gCarePortPatientGroups !== 'undefined' ? gCarePortPatientGroups : []).find(p => p.id === groupId);
+  if (!patient) {
+    alert('환자 정보를 찾을 수 없습니다.');
+    return;
+  }
+  const logs = patient.dailyLogs || [];
+  const latestLog = logs[0] || {};
+  const sid = latestLog.sessionId || (latestLog.id ? String(latestLog.id).replace(/\D/g, '') : '');
+  await downloadCarePortViaRobot(sid, patient.patientName);
+}
+window.downloadPatientCareLogsViaRobot = downloadPatientCareLogsViaRobot;
 
 function printCarePortModal() {
   return downloadCarePortDocumentPdf();
