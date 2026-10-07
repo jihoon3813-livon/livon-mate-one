@@ -28687,13 +28687,18 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                   </div>
 
                   <!-- 지급 대상 간병인 배지 -->
-                  <div class="flex items-center gap-2 bg-slate-100 border border-slate-200 px-3.5 py-1.5 rounded-2xl shadow-2xs">
-                    <span class="text-xs text-slate-600 font-bold flex items-center gap-1">
-                      <i data-lucide="user-check" class="w-3.5 h-3.5 text-slate-500"></i> 지급대상:
-                    </span>
-                    <b class="text-xs font-black text-slate-900">${as ? maskName(as.caregiverName) : '간병인 미배정'}</b>
-                    <span class="text-[11px] font-mono text-slate-600 font-bold">(일당 ${formatCurrency(r.cgDailyWage)}원)</span>
-                  </div>
+                  ${(() => {
+                    const setCgName = r.caregiverName || (r.existingPayout && r.existingPayout.caregiverName) || (as ? as.caregiverName : '');
+                    return `
+                      <div class="flex items-center gap-2 bg-slate-100 border border-slate-200 px-3.5 py-1.5 rounded-2xl shadow-2xs">
+                        <span class="text-xs text-slate-600 font-bold flex items-center gap-1">
+                          <i data-lucide="user-check" class="w-3.5 h-3.5 text-slate-500"></i> 지급대상:
+                        </span>
+                        <b class="text-xs font-black text-slate-900">${setCgName ? maskName(setCgName) : '간병인 미배정'}</b>
+                        <span class="text-[11px] font-mono text-slate-600 font-bold">(일당 ${formatCurrency(r.cgDailyWage)}원)</span>
+                      </div>
+                    `;
+                  })()}
                 </div>
 
                 <!-- Round 3-Step Lifecycle Flow Grid (1줄 통일 배치, 처리전: 연한 노랑 / 처리완료: 회색) -->
@@ -30142,7 +30147,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
                         <!-- 손사 청구 ↔ 간병인 정산 연계 정보 (마진 제거) -->
                         <div class="pt-1 border-t border-slate-200/60 flex items-center justify-between text-[10.5px] text-slate-500 font-mono">
-                          <span>지급 대상: <b class="text-slate-800 font-bold">${as ? maskName(as.caregiverName) : '-'}</b></span>
+                          <span>지급 대상: <b class="text-slate-800 font-bold">${maskName(r.caregiverName || (r.existingPayout && r.existingPayout.caregiverName) || (as ? as.caregiverName : '-'))}</b></span>
                           <span>간병비: <b class="${isClaimDone ? 'text-slate-700' : 'text-amber-900'} font-bold">${formatCurrency(r.existingPayout ? (r.existingPayout.payoutAmount || 0) : r.fullPayoutAmount)}원</b></span>
                         </div>
                       </div>
