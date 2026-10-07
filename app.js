@@ -44433,6 +44433,65 @@ async function renderElementToSinglePageA4PdfBytes(sourceElement, customMargin =
   }
 }
 
+async function downloadCarePortViaRobot() {
+  const detail = gCurrentCarePortDetail || {};
+  const username = (document.getElementById('cpMetaUsernameText')?.innerText || document.getElementById('cpMetaUsername')?.innerText || detail.username || '환자').trim();
+  const sessionId = gCurrentCarePortSessionId || detail.sessionId || detail.id || '';
+
+  showGlobalProgress({
+    title: `[${username} 님] 케어포트 무인 로봇 다운로드`,
+    subtitle: `백그라운드 크롬 로봇이 케어포트에 직접 접속하여 원본 2장을 가져옵니다.`,
+    percent: 25,
+    statusText: `무인 크롬 로봇 실행 및 케어포트 접속 중...`,
+    icon: 'bot'
+  });
+
+  try {
+    updateGlobalProgress({ percent: 55, statusText: `케어포트 원본 화면 렌더링 및 2장 이미지 다운로드 중...` });
+
+    const apiUrl = `/api/careport/robot-pdf?sessionId=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(username)}`;
+    const res = await fetch(apiUrl, { method: 'GET' });
+
+    if (!res.ok) {
+      let errMsg = '무인 로봇 처리 실패';
+      try {
+        const errJson = await res.json();
+        errMsg = errJson.message || errMsg;
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    updateGlobalProgress({ percent: 85, statusText: `원본 이미지 2장을 공식 A4 2페이지 PDF로 합성 완료!` });
+
+    const blob = await res.blob();
+    const cleanDate = new Date().toISOString().slice(0, 10).replace(/[^0-9]/g, '');
+    const fileName = `[케어포트_원본2장합성]_${username}_${cleanDate}.pdf`;
+
+    const downloadUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+
+    updateGlobalProgress({ percent: 100, statusText: `완료! 케어포트 100% 원본 PDF 다운로드가 완료되었습니다.` });
+    setTimeout(hideGlobalProgress, 1200);
+
+    if (typeof showToast === 'function') {
+      showToast(`[${username} 님] 케어포트 원본 2장 이미지 기반 공식 PDF가 다운로드되었습니다.`, 'success');
+    }
+  } catch (err) {
+    console.error('[Robot Download] 실패:', err);
+    hideGlobalProgress();
+    if (confirm(`무인 로봇 통신 안내: ${err.message}\n\n화면의 정밀 보정된 2페이지 PDF 다운로드로 전환하시겠습니까?`)) {
+      downloadCarePortDocumentPdf();
+    }
+  }
+}
+window.downloadCarePortViaRobot = downloadCarePortViaRobot;
+
 function printCarePortModal() {
   return downloadCarePortDocumentPdf();
 }

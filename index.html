@@ -12940,11 +12940,18 @@
             <span class="hidden sm:inline">프린트</span>
           </button>
 
+          <button type="button" onclick="downloadCarePortViaRobot()" 
+            class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-md cursor-pointer active:scale-95"
+            title="케어포트에 백그라운드로 자동 접속하여 원본 2장 이미지를 받아와 100% 동일한 PDF로 조립합니다">
+            <i data-lucide="bot" class="w-4 h-4 text-amber-300"></i>
+            <span>🤖 케어포트 원본 무인 다운로드</span>
+          </button>
+
           <button type="button" onclick="downloadCarePortDocumentPdf()" 
-            class="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-black flex items-center gap-1.5 transition-all shadow-md cursor-pointer active:scale-95"
-            title="케어포트 공식 간병일지 PDF 다운로드">
-            <i data-lucide="download" class="w-4 h-4"></i>
-            <span>공식 일지 PDF 다운로드</span>
+            class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            title="현재 화면 2페이지 정밀 PDF 다운로드">
+            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">화면 PDF</span>
           </button>
 
           <button type="button" onclick="closeModal('carePortOfficialModal')" class="p-2 text-slate-400 hover:text-white rounded-lg cursor-pointer">
@@ -12978,13 +12985,19 @@
                 <span>공식 간병일지 1페이지 (기본 개요 &amp; 활력 상태)</span>
               </span>
               <div class="flex items-center gap-2">
+                <button type="button" onclick="downloadCarePortViaRobot()" 
+                  class="px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-xs font-black shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                  title="케어포트 백엔드 크롬 무인 로봇으로 원본 2장 이미지 다운로드 및 PDF 생성">
+                  <i data-lucide="bot" class="w-3.5 h-3.5 text-amber-300"></i>
+                  <span>🤖 케어포트 원본 무인 다운로드</span>
+                </button>
                 <button type="button" onclick="downloadCarePortDocumentPdf()" 
-                  class="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
+                  class="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
                   <i data-lucide="download" class="w-3.5 h-3.5"></i>
-                  <span>2페이지 통합 PDF 다운로드</span>
+                  <span>화면 2P PDF</span>
                 </button>
                 <button type="button" onclick="printCarePortDocument()" 
-                  class="px-4 py-1.5 bg-[#0a192f] hover:bg-slate-900 text-white rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer">
+                  class="px-3 py-1.5 bg-[#0a192f] hover:bg-slate-900 text-white rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer">
                   프린트
                 </button>
               </div>
