@@ -44506,10 +44506,21 @@ async function downloadCarePortViaRobot(targetSessionId = null, targetPatientNam
       showToast(`[${username} 님] 케어포트 원본 2장 이미지 기반 공식 PDF가 다운로드되었습니다.`, 'success');
     }
   } catch (err) {
-    console.error('[Robot Download] 실패:', err);
-    hideGlobalProgress();
-    if (confirm(`무인 로봇 통신 안내: ${err.message}\n\n화면의 정밀 보정된 2페이지 PDF 다운로드로 전환하시겠습니까?`)) {
-      downloadCarePortDocumentPdf();
+    console.warn('[Robot Download] 서버 로봇 통신 실패(Vercel 등), 고해상도 공식 2페이지 PDF 엔진으로 즉시 자동 전환:', err);
+    updateGlobalProgress({
+      percent: 60,
+      statusText: `화면 고해상도 2페이지 PDF 엔진으로 자동 전환하여 다운로드 중...`
+    });
+    try {
+      if (typeof openCarePortOfficialDetail === 'function') {
+        await openCarePortOfficialDetail(sessionId);
+        await new Promise(r => setTimeout(r, 400));
+      }
+      await downloadCarePortDocumentPdf();
+    } catch (fallbackErr) {
+      console.error('[Fallback PDF] 실패:', fallbackErr);
+      hideGlobalProgress();
+      alert(`간병일지 PDF 다운로드 안내: ${fallbackErr.message || err.message}`);
     }
   }
 }
@@ -44609,9 +44620,18 @@ async function downloadPatientCareLogsViaRobot(groupId) {
     }
   } catch (err) {
     clearInterval(ticker);
-    console.error('[Robot Download All] 실패:', err);
-    hideGlobalProgress();
-    alert(`무인 로봇 전체 다운로드 안내: ${err.message}`);
+    console.warn('[Robot Download All] 서버 무인 로봇 불가(Vercel 등), 클라이언트 고해상도 전체합본 PDF 엔진으로 자동 전환:', err);
+    updateGlobalProgress({
+      percent: 45,
+      statusText: `클라이언트 고해상도 전체일지 PDF 엔진으로 자동 전환하여 조립 중...`
+    });
+    try {
+      await downloadPatientCareLogsPdfs(groupId);
+    } catch (fallbackErr) {
+      console.error('[Fallback All PDF] 실패:', fallbackErr);
+      hideGlobalProgress();
+      alert(`전체 일지 다운로드 안내: ${fallbackErr.message || err.message}`);
+    }
   }
 }
 window.downloadPatientCareLogsViaRobot = downloadPatientCareLogsViaRobot;

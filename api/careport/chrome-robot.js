@@ -102,9 +102,15 @@ class CdpSession {
 
 // 3. Main Robot Function
 async function captureCarePortOriginalImages(sessionInput, options = {}) {
+  let list = sessionInput;
+  if (sessionInput && typeof sessionInput === 'object' && !Array.isArray(sessionInput)) {
+    if (sessionInput.sessionList) list = sessionInput.sessionList;
+    else if (sessionInput.sessions) list = sessionInput.sessions;
+    else if (sessionInput.sessionId || sessionInput.id) list = [sessionInput];
+  }
   let items = [];
-  if (Array.isArray(sessionInput)) {
-    items = sessionInput.map((it, idx) => {
+  if (Array.isArray(list)) {
+    items = list.map((it, idx) => {
       if (typeof it === 'object' && it !== null) {
         return {
           sessionId: it.sessionId || it.id || '',
@@ -114,8 +120,8 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
       }
       return { sessionId: String(it), dayNumber: idx + 1, date: '' };
     }).filter(it => it.sessionId);
-  } else if (sessionInput) {
-    items = [{ sessionId: String(sessionInput), dayNumber: 1, date: '' }];
+  } else if (list) {
+    items = [{ sessionId: String(list), dayNumber: 1, date: '' }];
   } else {
     items = [{ sessionId: '', dayNumber: 1, date: '' }];
   }
@@ -227,7 +233,12 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
     const extractScript = `
       (async function() {
         try {
-          const cap = document.getElementById("capture");
+          const cap = document.getElementById("capture") ||
+                      document.querySelector('.report-area') ||
+                      document.getElementById("consult-state") ||
+                      document.querySelector('.consult-detail') ||
+                      document.querySelector('.consult-wrap') ||
+                      document.querySelector('#app');
           if (!cap) return { error: 'capture element not found' };
 
           // Hide download button & print buttons
@@ -235,6 +246,12 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
           const i = document.getElementById("downloadBtn");
           if (n) n.style.display = "none";
           if (i) i.style.display = "none";
+          document.querySelectorAll('.no-print, button, .btn').forEach(btn => {
+            const txt = btn.innerText || '';
+            if (txt.includes('다운로드') || txt.includes('프린트') || txt.includes('인쇄') || txt.includes('목록')) {
+              btn.style.display = 'none';
+            }
+          });
 
           let html2canvasFn = window.html2canvas;
           if (!html2canvasFn && typeof Fs === 'function') html2canvasFn = Fs;
@@ -312,17 +329,36 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
         : `https://careport.livon.care/#/main/consult`;
 
       console.log(`[ChromeRobot] [${idx + 1}/${totalCount}] 세션 #${sid || 'default'} 이동: ${targetUrl}`);
-      await pageCdp.send('Page.navigate', { url: targetUrl });
+      
+      if (idx > 0) {
+        // Remove old capture DOM element and trigger fresh reload to ensure Vue re-fetches the new session's data
+        await pageCdp.send('Runtime.evaluate', {
+          expression: `(function() {
+            const old = document.getElementById('capture');
+            if (old) old.remove();
+            window.location.href = ${JSON.stringify(targetUrl)};
+            window.location.reload();
+          })()`
+        });
+      } else {
+        await pageCdp.send('Page.navigate', { url: targetUrl });
+      }
 
-      // Wait for DOM elements (#capture and #consult-state) to render
+      // Wait for DOM elements (#capture and #consult-state) to render fresh
       let isRendered = false;
-      for (let attempt = 0; attempt < 25; attempt++) {
+      for (let attempt = 0; attempt < 40; attempt++) {
         await new Promise(r => setTimeout(r, 250));
         const checkRes = await pageCdp.send('Runtime.evaluate', {
           expression: `(function() {
-            const cap = document.getElementById('capture') || document.querySelector('.report-area');
-            if (!cap || cap.offsetHeight <= 100) return false;
+            const cap = document.getElementById('capture') ||
+                        document.querySelector('.report-area') ||
+                        document.getElementById('consult-state') ||
+                        document.querySelector('.consult-detail') ||
+                        document.querySelector('.consult-wrap');
+            if (!cap || cap.offsetHeight <= 80) return false;
             if (${JSON.stringify(sid)} && !window.location.hash.includes(${JSON.stringify(sid)})) return false;
+            const txt = (cap.innerText || '').trim();
+            if (txt.length < 20) return false;
             return true;
           })()`,
           returnByValue: true
@@ -335,9 +371,9 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
 
       if (!isRendered) {
         console.warn(`[ChromeRobot] [${idx + 1}/${totalCount}] 세션 #${sid} 렌더링 추가 대기...`);
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, 800));
       } else {
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 500));
       }
 
       const extractResult = await pageCdp.send('Runtime.evaluate', {
