@@ -13,11 +13,7 @@ function getPdfLib() {
   if (gPdfLib) return gPdfLib;
   const pdfLibPath = path.resolve(__dirname, '../../pdf-lib.min.js');
   if (fs.existsSync(pdfLibPath)) {
-    const code = fs.readFileSync(pdfLibPath, 'utf8');
-    const ctx = { window: {}, self: {}, global: {} };
-    vm.createContext(ctx);
-    vm.runInContext(code, ctx);
-    gPdfLib = ctx.PDFLib || ctx.window.PDFLib;
+    gPdfLib = require(pdfLibPath);
     return gPdfLib;
   }
   throw new Error('pdf-lib.min.js 파일을 찾을 수 없습니다.');
@@ -35,9 +31,7 @@ async function compileImagesTo2PagePdf(img1DataUrl, img2DataUrl, customMargin = 
 
   const addImagePage = async (dataUrl) => {
     if (!dataUrl) return;
-    const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-    const imgBytes = Buffer.from(base64Data, 'base64');
-    const pngImage = await pdfDoc.embedPng(imgBytes);
+    const pngImage = await pdfDoc.embedPng(dataUrl);
 
     const scale = Math.min(availW / pngImage.width, availH / pngImage.height);
     const finalW = pngImage.width * scale;
