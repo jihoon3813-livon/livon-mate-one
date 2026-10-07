@@ -13851,7 +13851,7 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
       overflow: hidden !important;
       position: relative !important;
       background: #ffffff !important;
-      padding: 34px 38px !important;
+      padding: 16px 14px 16px !important;
       display: flex !important;
       flex-direction: column !important;
     }
@@ -13862,7 +13862,7 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
       min-height: 1122px !important;
       max-height: 1122px !important;
       box-sizing: border-box !important;
-      padding: 34px 38px !important;
+      padding: 16px 14px 16px !important;
       overflow: hidden !important;
       display: block !important;
       margin: 0 auto !important;
@@ -13872,9 +13872,9 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
       align-items: center !important;
       justify-content: space-between !important;
       border-bottom: 1.5px solid #0f172a !important;
-      padding-bottom: 4px !important;
-      margin-top: 14px !important;
-      margin-bottom: 8px !important;
+      padding-bottom: 3px !important;
+      margin-top: 10px !important;
+      margin-bottom: 6px !important;
     }
     .sec-head.sec-head-teal {
       border-bottom: 1.5px solid #00897b !important;
@@ -43785,7 +43785,7 @@ function triggerDirectPdfDownload(pdfBytes, fileName) {
  * 격리된 iframe 환경을 활용한 초고속 HTML -> 단일 페이지 A4 PDF 생성
  * (메인 문서의 10,000개 DOM 복제를 원천 차단하여 0.1초대 초고속 다운로드 실현)
  */
-async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 12) {
+async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 8) {
   await ensureHtml2CanvasLoaded();
   if (typeof PDFLib === 'undefined' || !PDFLib.PDFDocument) {
     throw new Error('PDFLib 라이브러리를 찾을 수 없습니다.');
@@ -43877,7 +43877,7 @@ async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 12) 
     }
     await new Promise(res => setTimeout(res, 50));
 
-    const canvas = await html2canvas(targetEl, {
+    const rawCanvas = await html2canvas(targetEl, {
       scale: 2.0,
       useCORS: false,
       allowTaint: false,
@@ -43888,6 +43888,43 @@ async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 12) 
       imageTimeout: 0
     });
 
+    // 스마트 하단 여백 트리밍
+    let canvas = rawCanvas;
+    try {
+      const ctx = rawCanvas.getContext('2d');
+      const w = rawCanvas.width;
+      const h = rawCanvas.height;
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const d = imgData.data;
+      let lastY = -1;
+      for (let y = h - 1; y >= 0; y--) {
+        const row = y * w * 4;
+        for (let x = 0; x < w; x += 4) {
+          const idx = row + (x * 4);
+          const a = d[idx + 3];
+          const r = d[idx];
+          const g = d[idx + 1];
+          const b = d[idx + 2];
+          if (a > 20 && (r < 248 || g < 248 || b < 248)) {
+            lastY = y;
+            break;
+          }
+        }
+        if (lastY !== -1) break;
+      }
+      if (lastY !== -1 && lastY < h - 16) {
+        const cropH = Math.min(h, lastY + 24);
+        const cCvs = document.createElement('canvas');
+        cCvs.width = w;
+        cCvs.height = cropH;
+        const cCtx = cCvs.getContext('2d');
+        cCtx.fillStyle = '#ffffff';
+        cCtx.fillRect(0, 0, w, cropH);
+        cCtx.drawImage(rawCanvas, 0, 0, w, cropH, 0, 0, w, cropH);
+        canvas = cCvs;
+      }
+    } catch (e) {}
+
     const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
     const arrayBuf = await blob.arrayBuffer();
     const pngBytes = new Uint8Array(arrayBuf);
@@ -43897,9 +43934,10 @@ async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 12) 
 
     const pageW = 595.28;
     const pageH = 841.89;
-    const margin = customMargin;
-    const availW = pageW - (margin * 2);
-    const availH = pageH - (margin * 2);
+    const marginH = customMargin || 8;
+    const marginV = 10;
+    const availW = pageW - (marginH * 2);
+    const availH = pageH - (marginV * 2);
 
     const imgW = pngImage.width;
     const imgH = pngImage.height;
@@ -43907,8 +43945,8 @@ async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 12) 
     const finalW = imgW * scale;
     const finalH = imgH * scale;
 
-    const posX = margin + (availW - finalW) / 2;
-    const posY = pageH - margin - finalH;
+    const posX = marginH + (availW - finalW) / 2;
+    const posY = pageH - marginV - finalH;
 
     const page = pdfDoc.addPage([pageW, pageH]);
     page.drawImage(pngImage, {
@@ -44083,7 +44121,7 @@ async function sliceCanvasToContinuousA4Pdf(canvas, customMargin = 8) {
 /**
  * 일지원문 HTML을 고해상도 연속 A4 규격 PDF로 변환 (누락이나 글자 잘림 없는 끊김 없는 출력)
  */
-async function renderHtmlToContinuousA4PdfBytes(htmlContent, customMargin = 14) {
+async function renderHtmlToContinuousA4PdfBytes(htmlContent, customMargin = 8) {
   await ensureHtml2CanvasLoaded();
   await ensurePdfLibLoaded();
 
@@ -44249,7 +44287,7 @@ async function renderHtmlToContinuousA4PdfBytes(htmlContent, customMargin = 14) 
 /**
  * 화면 상에 렌더링된 DOM 요소(#carePortPrintArea)를 1:1 그대로 연속 A4 PDF로 변환
  */
-async function renderElementToContinuousA4PdfBytes(sourceElement, customMargin = 14) {
+async function renderElementToContinuousA4PdfBytes(sourceElement, customMargin = 8) {
   if (!sourceElement) throw new Error('PDF 렌더링 대상 요소를 찾을 수 없습니다.');
   await ensureHtml2CanvasLoaded();
   await ensurePdfLibLoaded();
@@ -44411,7 +44449,7 @@ async function renderElementToContinuousA4PdfBytes(sourceElement, customMargin =
  * 하위 호환성 2페이지 PDF 함수 (연속 A4 렌더링 엔진으로 위임하여 내용 누락/잘림 완벽 해결)
  */
 async function render2PageHtmlToPdfBytes(htmlContent) {
-  return await renderHtmlToContinuousA4PdfBytes(htmlContent, 14);
+  return await renderHtmlToContinuousA4PdfBytes(htmlContent, 8);
 }
 window.render2PageHtmlToPdfBytes = render2PageHtmlToPdfBytes;
 window.renderHtmlToContinuousA4PdfBytes = renderHtmlToContinuousA4PdfBytes;
@@ -44801,9 +44839,9 @@ async function downloadCarePortDocumentPdf() {
       });
       try {
         if (isClassic) {
-          pdfBytes = await renderElementToSinglePageA4PdfBytes(printArea, 14);
+          pdfBytes = await renderElementToSinglePageA4PdfBytes(printArea, 8);
         } else {
-          pdfBytes = await renderElementToContinuousA4PdfBytes(printArea, 14);
+          pdfBytes = await renderElementToContinuousA4PdfBytes(printArea, 8);
         }
       } catch (domErr) {
         console.warn('[CarePort PDF] 모달 영역 직접 렌더링 실패, HTML 생성기 fallback 진행:', domErr);
@@ -44860,12 +44898,12 @@ async function downloadCarePortDocumentPdf() {
 
       const isClassic = window.CarePortClient && typeof window.CarePortClient.isClassicLog === 'function' && window.CarePortClient.isClassicLog(log, detail);
       if (isClassic) {
-        pdfBytes = await renderHtmlToSinglePageA4PdfBytes(html, 12);
+        pdfBytes = await renderHtmlToSinglePageA4PdfBytes(html, 8);
       } else {
-        pdfBytes = await renderHtmlToContinuousA4PdfBytes(html, 14);
+        pdfBytes = await renderHtmlToContinuousA4PdfBytes(html, 8);
       }
     } else if (!pdfBytes && printArea) {
-      pdfBytes = await renderElementToContinuousA4PdfBytes(printArea, 14);
+      pdfBytes = await renderElementToContinuousA4PdfBytes(printArea, 8);
     }
     
     updateGlobalProgress({ percent: 95, statusText: `PDF 파일 패키징 및 다운로드 준비 중...` });
@@ -45283,7 +45321,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
       overflow: hidden !important;
       position: relative !important;
       background: #ffffff !important;
-      padding: 34px 38px !important;
+      padding: 16px 14px 16px !important;
       display: flex !important;
       flex-direction: column !important;
     }
@@ -45294,7 +45332,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
       min-height: 1122px !important;
       max-height: 1122px !important;
       box-sizing: border-box !important;
-      padding: 34px 38px !important;
+      padding: 16px 14px 16px !important;
       overflow: hidden !important;
       display: block !important;
       margin: 0 auto !important;
@@ -45304,9 +45342,9 @@ async function downloadPatientCareLogsPdfs(groupId) {
       align-items: center !important;
       justify-content: space-between !important;
       border-bottom: 1.5px solid #0f172a !important;
-      padding-bottom: 4px !important;
-      margin-top: 14px !important;
-      margin-bottom: 8px !important;
+      padding-bottom: 3px !important;
+      margin-top: 10px !important;
+      margin-bottom: 6px !important;
     }
     .sec-head.sec-head-teal {
       border-bottom: 1.5px solid #00897b !important;
@@ -45419,8 +45457,8 @@ async function downloadPatientCareLogsPdfs(groupId) {
           statusText: `[${i + 1}/${dayHtmlList.length}일차] ${isClassic ? '구버전 원본 규격 A4 1장' : '일지원문 고해상도 A4 2P'} 렌더링 중...`
         });
         const dayBytes = isClassic
-          ? await renderHtmlToSinglePageA4PdfBytes(dHtml, 12)
-          : await renderHtmlToContinuousA4PdfBytes(dHtml, 14);
+          ? await renderHtmlToSinglePageA4PdfBytes(dHtml, 8)
+          : await renderHtmlToContinuousA4PdfBytes(dHtml, 8);
         if (dayBytes) {
           const dayDoc = await PDFLib.PDFDocument.load(dayBytes);
           const copiedPages = await mergedDoc.copyPages(dayDoc, dayDoc.getPageIndices());
