@@ -793,19 +793,27 @@
         ];
       }
 
-      // 3. Vitals
+      // 3. Vitals (케어포트 원본 기준: 실제 측정 데이터가 없으면 가짜 더미를 넣지 않고 정확히 '-' 표시)
       const vit = raw.vitals || {};
       const sys = vit.blood_pressure_systolic;
       const dia = vit.blood_pressure_diastolic;
-      const bpStr = (sys && dia) ? `${sys}/${dia}` : (detail.vital?.bp || '120/80');
+      const rawBp = (sys && dia) ? `${sys}/${dia}` : (vit.bp || (detail.vital?.bp && detail.vital.bp !== '120/80' ? detail.vital.bp : null));
+      const rawPulse = vit.pulse || (detail.vital?.pulse && String(detail.vital.pulse) !== '72' ? detail.vital.pulse : null);
+      const rawGlucose = vit.blood_sugar || (detail.vital?.glucose && String(detail.vital.glucose) !== '104' ? detail.vital.glucose : null);
+      const rawTemp = vit.temperature || (detail.vital?.temp && String(detail.vital.temp) !== '36.5' ? detail.vital.temp : null);
+      const rawWeight = vit.weight || (detail.vital?.weight ? detail.vital.weight : null);
+      const rawSpo2 = vit.spo2 || (detail.vital?.spo2 && String(detail.vital.spo2) !== '98' ? detail.vital.spo2 : null);
+      const sleepMinutes = vit.sleep_minutes || (detail.vital?.sleep_minutes ? detail.vital.sleep_minutes : null);
+      const rawSleep = sleepMinutes ? `${Math.floor(sleepMinutes / 60)}시간` : (detail.vital?.sleep && detail.vital.sleep !== '7시간' ? detail.vital.sleep : null);
+
       const vitals = [
-        { key: 'bp', label: '혈압', value: bpStr, unit: 'mmHg' },
-        { key: 'pulse', label: '맥박', value: String(vit.pulse || detail.vital?.pulse || '72'), unit: 'bpm' },
-        { key: 'glucose', label: '공복혈당', value: String(vit.blood_sugar || detail.vital?.glucose || '104'), unit: 'mg/dL' },
-        { key: 'temperature', label: '체온', value: String(vit.temperature || detail.vital?.temp || '36.5'), unit: '℃' },
-        { key: 'weight', label: '체중', value: vit.weight ? String(vit.weight) : '-', unit: vit.weight ? 'kg' : '' },
-        { key: 'spo2', label: '산소포화도', value: String(vit.spo2 || '98'), unit: '%' },
-        { key: 'sleep', label: '수면', value: vit.sleep_minutes ? `${Math.floor(vit.sleep_minutes / 60)}시간` : '7시간', unit: '' }
+        { key: 'bp', label: '혈압', value: rawBp || '-', unit: rawBp ? 'mmHg' : '' },
+        { key: 'pulse', label: '맥박', value: rawPulse ? String(rawPulse) : '-', unit: rawPulse ? 'bpm' : '' },
+        { key: 'glucose', label: '공복혈당', value: rawGlucose ? String(rawGlucose) : '-', unit: rawGlucose ? 'mg/dL' : '' },
+        { key: 'temperature', label: '체온', value: rawTemp ? String(rawTemp) : '-', unit: rawTemp ? '℃' : '' },
+        { key: 'weight', label: '체중', value: rawWeight ? String(rawWeight) : '-', unit: rawWeight ? 'kg' : '' },
+        { key: 'spo2', label: '산소포화도', value: rawSpo2 ? String(rawSpo2) : '-', unit: rawSpo2 ? '%' : '' },
+        { key: 'sleep', label: '수면', value: rawSleep || '-', unit: '' }
       ];
 
       // 4. Care Log Rows (Use 100% authentic consult_report items if available, fallback to 5 standard rows)
@@ -1052,36 +1060,24 @@
     /**
      * Generate authentic SVG line chart for CarePort trend scores (matching CarePort 100%)
      */
-    generateTrendChartSvg(trendList, customW = 714, customH = 220) {
+    generateTrendChartSvg(trendList, customW = 714, customH = 175) {
       let list = (trendList && Array.isArray(trendList) && trendList.length > 0) ? trendList : [];
       if (list.length === 0) {
-        // Fallback default: CarePort authentic 15-day trend (15일차 ~ 29일차)
         list = [
-          { dayIndex: 15, careDate: '09.19', overallScore: 4, mobilityScore: 4, dietScore: 4, sleepScore: 3, painScore: 4 },
-          { dayIndex: 16, careDate: '09.20', overallScore: 4, mobilityScore: 4, dietScore: 4, sleepScore: 3, painScore: 3 },
-          { dayIndex: 19, careDate: '09.23', overallScore: 4, mobilityScore: 4, dietScore: 4, sleepScore: 3, painScore: 4 },
-          { dayIndex: 20, careDate: '09.24', overallScore: 4, mobilityScore: 3, dietScore: 5, sleepScore: 3, painScore: 5 },
-          { dayIndex: 21, careDate: '09.25', overallScore: 4, mobilityScore: 3, dietScore: 5, sleepScore: 3, painScore: 5 },
-          { dayIndex: 22, careDate: '09.26', overallScore: 4, mobilityScore: 3, dietScore: 5, sleepScore: 3, painScore: 5 },
-          { dayIndex: 23, careDate: '09.27', overallScore: 5, mobilityScore: 5, dietScore: 5, sleepScore: 3, painScore: 3 },
-          { dayIndex: 24, careDate: '09.28', overallScore: 4, mobilityScore: 5, dietScore: 5, sleepScore: 3, painScore: 3 },
-          { dayIndex: 25, careDate: '09.29', overallScore: 4, mobilityScore: 4, dietScore: 5, sleepScore: 3, painScore: 4 },
-          { dayIndex: 26, careDate: '09.30', overallScore: 4, mobilityScore: 3, dietScore: 4, sleepScore: 3, painScore: 4 },
-          { dayIndex: 27, careDate: '10.01', overallScore: 2, mobilityScore: 1, dietScore: 2, sleepScore: 3, painScore: 5 },
-          { dayIndex: 28, careDate: '10.02', overallScore: 4, mobilityScore: 3, dietScore: 5, sleepScore: 3, painScore: 5 },
-          { dayIndex: 29, careDate: '10.03', overallScore: 5, mobilityScore: 5, dietScore: 5, sleepScore: 3, painScore: 5 }
+          { dayIndex: 1, careDate: '10.01', overallScore: 3, mobilityScore: 2 }
         ];
       }
       const width = customW;
       const height = customH;
       const paddingX = 46;
-      const paddingY = 22;
+      const paddingTop = 14;
+      const paddingBottom = 26;
       const chartW = width - paddingX * 2;
-      const chartH = height - paddingY * 2;
+      const chartH = height - paddingTop - paddingBottom;
       
       const numDays = list.length;
       const getX = (idx) => paddingX + (numDays <= 1 ? chartW / 2 : (idx / (numDays - 1)) * chartW);
-      const getY = (val) => height - paddingY - ((Math.max(1, Math.min(5, val)) - 1) / 4) * chartH;
+      const getY = (val) => paddingTop + chartH - ((Math.max(1, Math.min(5, val)) - 1) / 4) * chartH;
       
       // Grid lines 1 to 5 (CarePort official: color #e5e9ed, step 1)
       let gridSvg = '';
@@ -1091,7 +1087,7 @@
         gridSvg += `<text x="${paddingX - 24}" y="${y + 4.5}" font-size="12" font-weight="600" fill="#8b959c" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif">${s}</text>`;
       }
       
-      // X labels: Prioritize dayIndex (e.g. 15일차, 16일차...) exactly matching CarePort!
+      // X labels: Prioritize dayIndex (e.g. 1일차, 2일차...) exactly matching CarePort!
       let xLabelsSvg = '';
       const step = numDays > 20 ? 2 : 1;
       list.forEach((item, idx) => {
@@ -1100,7 +1096,7 @@
         const label = (item.dayIndex != null)
           ? `${item.dayIndex}일차`
           : (item.careDate ? item.careDate.slice(5, 10).replace('-', '.') : `${idx + 1}일차`);
-        xLabelsSvg += `<text x="${x}" y="${height - 2}" font-size="11" font-weight="600" fill="#8b959c" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif">${label}</text>`;
+        xLabelsSvg += `<text x="${x}" y="${height - 6}" font-size="11" font-weight="600" fill="#8b959c" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif">${label}</text>`;
       });
       
       // 5 lines matching CarePort statusChartData:
@@ -1118,14 +1114,17 @@
         let pts = [];
         list.forEach((item, idx) => {
           const shortKey = line.key.replace('Score', '');
-          const rawVal = item[line.key] != null ? item[line.key] : (item[shortKey] != null ? item[shortKey] : 3);
-          const val = Number(rawVal != null ? rawVal : 3);
-          pts.push(`${getX(idx)},${getY(val)}`);
+          const rawVal = item[line.key] != null ? item[line.key] : (item[shortKey] != null ? item[shortKey] : null);
+          if (rawVal != null && !isNaN(Number(rawVal)) && Number(rawVal) > 0) {
+            const val = Number(rawVal);
+            pts.push({ x: getX(idx), y: getY(val) });
+          }
         });
-        linesSvg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${line.color}" stroke-width="${line.w}" ${line.dash} stroke-linecap="round" stroke-linejoin="round"/>`;
-        pts.forEach(pt => {
-          const [px, py] = pt.split(',');
-          linesSvg += `<circle cx="${px}" cy="${py}" r="${line.r}" fill="#ffffff" stroke="${line.color}" stroke-width="${line.w}"/>`;
+        if (pts.length > 1) {
+          linesSvg += `<polyline points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" fill="none" stroke="${line.color}" stroke-width="${line.w}" ${line.dash} stroke-linecap="round" stroke-linejoin="round"/>`;
+        }
+        pts.forEach(p => {
+          linesSvg += `<circle cx="${p.x}" cy="${p.y}" r="${line.r}" fill="#ffffff" stroke="${line.color}" stroke-width="${line.w}"/>`;
         });
       });
       
@@ -1562,7 +1561,7 @@
 
         return `
           <article class="detail-status-card">
-            <span class="status-pill small ${cPillTone}"><i></i>${c.label}</span>
+            <span class="status-pill small ${cPillTone}"><i></i><span>${c.label}</span></span>
             <div class="traffic-light vertical ${cPillTone}">
               ${vSvg}
             </div>
@@ -1580,8 +1579,8 @@
 
       const careLogHtml = d.careLogRows.map(r => `
         <div class="care-log-row">
-          <strong><span style="display:inline-block; transform:translateY(-1px);">${r.label}</span></strong>
-          <span><span style="display:inline-block; transform:translateY(-1px);">${r.value}</span></span>
+          <div class="care-log-header">${r.label}</div>
+          <div class="care-log-body">${r.value}</div>
         </div>
       `).join('');
 
@@ -1589,19 +1588,19 @@
         ? d.importantItems
         : ['환자 활력징후 및 전반적인 컨디션이 안정적으로 유지되고 있습니다.', '정규 처방 복약 및 식사 섭취가 순조롭게 완료되었으며 특이 증상 없습니다.'];
 
-      const importantHtml = importantItems.map(item => `<li><span style="display:inline-block; transform:translateY(-1px);">${item}</span></li>`).join('');
+      const importantHtml = importantItems.map(item => `<li><span>${item}</span></li>`).join('');
 
       const keywordsPills = d.keywords.map(k => `
-        <span class="guardian-keyword"><span style="display:inline-block; transform:translateY(-1px);">#${k}</span></span>
+        <span class="guardian-keyword"><span>#${k}</span></span>
       `).join('');
 
       const guardianNotesHtml = d.guardianNotes.map(g => `
         <li class="guardian-note-item">
           <span class="guardian-note-dot"></span>
           <div class="guardian-note-content">
-            <span class="guardian-note-label" style="display:inline-block; transform:translateY(-1px);">${g.label}</span>
+            <span class="guardian-note-label">${g.label}</span>
             <span class="guardian-note-separator">·</span>
-            <span class="guardian-note-text" style="display:inline-block; transform:translateY(-1px);">${g.value}</span>
+            <span class="guardian-note-text">${g.value}</span>
           </div>
         </li>
       `).join('');
@@ -1612,7 +1611,7 @@
         : ((patient && patient.trendScores && patient.trendScores.length > 0)
           ? patient.trendScores
           : ((detailData && detailData.trendScores && detailData.trendScores.length > 0) ? detailData.trendScores : []));
-      trendChartHtml = this.generateTrendChartSvg(trendList, 714, 195);
+      trendChartHtml = this.generateTrendChartSvg(trendList, 714, 175);
 
       return `<!DOCTYPE html>
 <html lang="ko">
@@ -1787,22 +1786,23 @@
     }
     .trend-card {
       box-sizing: border-box;
-      height: 205px;
-      padding: 6px 12px 4px;
+      padding: 12px 14px 10px;
       border: 1px solid #dfe7ea;
       border-radius: 10px;
-      background: #fcfefe;
+      background: #ffffff;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: flex-start;
+      margin-bottom: 12px;
     }
     .chart-legend {
       display: flex;
       justify-content: center;
-      gap: 20px;
-      margin-top: 1px;
-      color: #59646c;
-      font-size: 10.5px;
+      gap: 22px;
+      margin-top: 14px;
+      margin-bottom: 2px;
+      color: #52606d;
+      font-size: 11px;
       font-weight: 700;
     }
     .chart-legend span {
@@ -1833,17 +1833,21 @@
       gap: 10px;
     }
     .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 3px 10px;
-      border-radius: 16px;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 4px !important;
+      height: 22px !important;
+      padding: 0 10px !important;
+      border-radius: 12px !important;
       color: #168c61;
       background: #d9f5e7;
-      font-size: 11px;
-      font-weight: 800;
-      white-space: nowrap;
-      line-height: 1;
+      font-size: 11px !important;
+      font-weight: 800 !important;
+      white-space: nowrap !important;
+      line-height: 1 !important;
+      box-sizing: border-box !important;
+      vertical-align: middle !important;
     }
     .status-pill.warning {
       color: #bf7a00;
@@ -1858,12 +1862,19 @@
       background: #edf1f2;
     }
     .status-pill i {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background-color: currentColor;
-      display: inline-block;
-      flex-shrink: 0;
+      width: 5px !important;
+      height: 5px !important;
+      border-radius: 50% !important;
+      background-color: currentColor !important;
+      display: inline-block !important;
+      flex-shrink: 0 !important;
+      margin-right: 2px !important;
+      transform: translateY(-0.5px) !important;
+    }
+    .status-pill span {
+      display: inline-block !important;
+      line-height: 1 !important;
+      transform: translateY(-0.5px) !important;
     }
     .status-decision {
       padding: 3px 8px;
@@ -1900,8 +1911,8 @@
     }
     .detail-status-card {
       box-sizing: border-box;
-      min-height: 104px;
-      padding: 6px 6px;
+      min-height: 132px;
+      padding: 10px 8px 10px;
       border: 1px solid #dfe7ea;
       border-radius: 10px;
       background: #ffffff;
@@ -1912,30 +1923,26 @@
       justify-content: space-between;
     }
     .detail-status-card .status-pill.small {
-      padding: 2.5px 10px;
-      border-radius: 14px;
-      font-size: 10.5px;
-      font-weight: 800;
-      line-height: 1;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
+      height: 20px !important;
+      padding: 0 8px !important;
+      font-size: 10.5px !important;
     }
     .detail-status-card .traffic-light.vertical {
-      margin: 3px 0;
+      margin: 4px 0;
       display: flex;
       justify-content: center;
     }
     .detail-status-card p {
       margin: 0;
       overflow: hidden;
-      color: #64748b;
-      font-size: 10.5px;
+      color: #52606d;
+      font-size: 11px;
       font-weight: 600;
-      line-height: 1.3;
+      line-height: 1.35;
       text-overflow: ellipsis;
       white-space: nowrap;
       max-width: 100%;
+      padding: 0 2px;
     }
     .status-guide {
       display: flex;
@@ -2034,22 +2041,23 @@
       margin-bottom: 6px;
     }
     .care-log-row {
-      min-height: 46px;
+      min-height: 40px;
       border-bottom: 1px solid #e8edef;
-      display: grid;
-      grid-template-columns: 120px 1fr;
+      display: flex;
       align-items: stretch;
     }
     .care-log-row:last-child {
       border-bottom: 0;
     }
-    .care-log-row strong {
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      padding: 10px 14px !important;
-      font-size: 12px !important;
-      line-height: 1.2 !important;
+    .care-log-header {
+      width: 120px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 12px;
+      font-size: 12px;
+      line-height: 1.2;
       color: #079f98;
       background: #f1fbfa;
       font-weight: 800;
@@ -2057,16 +2065,17 @@
       box-sizing: border-box;
       text-align: center;
     }
-    .care-log-row span {
-      display: flex !important;
-      align-items: center !important;
-      justify-content: flex-start !important;
-      padding: 10px 16px !important;
-      font-size: 12px !important;
-      line-height: 1.45 !important;
+    .care-log-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      padding: 8px 16px;
+      font-size: 12px;
+      line-height: 1.45;
       color: #334155;
       font-weight: 500;
       box-sizing: border-box;
+      text-align: left;
     }
     .notice-box {
       border-radius: 10px;
@@ -2234,7 +2243,7 @@
         
         <div class="overall-status-card">
           <div class="status-title-wrap">
-            <span class="status-pill ${d.overallStatus.tone}"><i></i>${d.overallStatus.label}</span>
+            <span class="status-pill ${d.overallStatus.tone}"><i></i><span>${d.overallStatus.label}</span></span>
             <div class="traffic-light horizontal">
               ${overallLightSvg}
             </div>

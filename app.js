@@ -19643,6 +19643,9 @@ async function sendElectronicFaxDirectly({ appId, formCode, formName, targetReci
     const data = await res.json();
     if (data && data.success && data.log) {
       resultLog = data.log;
+      if (typeof getKoreaDateTimeStr === 'function') {
+        resultLog.sentDate = getKoreaDateTimeStr();
+      }
     } else if (data && !data.success) {
       sendErrorMsg = data.error || '발송 실패';
     }
@@ -34603,6 +34606,9 @@ async function executeSendFaxModal() {
       const data = await res.json();
       if (data && data.success && data.log) {
         resultLog = data.log;
+        if (typeof getKoreaDateTimeStr === 'function') {
+          resultLog.sentDate = getKoreaDateTimeStr();
+        }
       } else if (data && !data.success) {
         sendErrorMsg = data.error || '발송 실패';
       }
@@ -35603,6 +35609,11 @@ async function refreshBarobillFaxStatuses(isSilent = false) {
             targetLog.status = st.status; // '성공' | '실패' | '전송중'
             targetLog.resultMsg = st.resultMsg || targetLog.resultMsg;
             if (st.endDT) targetLog.completedDate = st.endDT;
+            if (st.sendDT && String(st.sendDT).length >= 12) {
+              const s = String(st.sendDT).replace(/[^0-9]/g, '');
+              targetLog.sentDate = `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)} ${s.slice(8, 10)}:${s.slice(10, 12)}`;
+              targetLog._kstNormalized = true;
+            }
             if (st.fileUrl) targetLog.baroFileUrl = st.fileUrl;
           } else if (st.sendState !== undefined && st.sendState < 0) {
             targetLog.status = '실패';
@@ -35674,6 +35685,11 @@ async function checkSingleBarobillStatus(targetIdOrKey) {
       log.status = st.status;
       log.resultMsg = st.resultMsg;
       if (st.endDT) log.completedDate = st.endDT;
+      if (st.sendDT && String(st.sendDT).length >= 12) {
+        const s = String(st.sendDT).replace(/[^0-9]/g, '');
+        log.sentDate = `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)} ${s.slice(8, 10)}:${s.slice(10, 12)}`;
+        log._kstNormalized = true;
+      }
       if (st.fileUrl) log.baroFileUrl = st.fileUrl;
 
       saveFaxLogs();
@@ -36763,6 +36779,9 @@ async function resendFaxLog(logId) {
       const data = await res.json();
       if (data && data.success && data.log) {
         resultLog = data.log;
+        if (typeof getKoreaDateTimeStr === 'function') {
+          resultLog.sentDate = getKoreaDateTimeStr();
+        }
       }
     } catch (err) {
       console.warn('[FAX Resend API Route Fallback]', err);
@@ -42961,6 +42980,9 @@ function renderCarePortTrendChart(trendList) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: {
+        padding: { top: 6, bottom: 4, left: 10, right: 10 }
+      },
       plugins: {
         legend: {
           display: false
@@ -43512,21 +43534,6 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     // Filter trendScores up to current log's date or dayIndex
     const curDate = (detail.raw?.care_date || (d && d.consultDate && d.consultDate.slice(0, 10)) || detail.careDate || (detail.consultDate && detail.consultDate.slice(0, 10)) || '').slice(0, 10);
     const curDayIndex = detail.raw?.day_index ? Number(detail.raw.day_index) : (d && d.dayNumber ? Number(d.dayNumber) : null);
-    const authenticBenchmarkTrends = [
-      { dayIndex: 15, careDate: '2026-09-19', overallScore: 4, mobilityScore: 4, dietScore: 4, sleepScore: 3, painScore: 4 },
-      { dayIndex: 16, careDate: '2026-09-20', overallScore: 4, mobilityScore: 4, dietScore: 4, sleepScore: 3, painScore: 3 },
-      { dayIndex: 19, careDate: '2026-09-23', overallScore: 4, mobilityScore: 4, dietScore: 4, sleepScore: 3, painScore: 4 },
-      { dayIndex: 20, careDate: '2026-09-24', overallScore: 4, mobilityScore: 3, dietScore: 5, sleepScore: 3, painScore: 5 },
-      { dayIndex: 21, careDate: '2026-09-25', overallScore: 4, mobilityScore: 3, dietScore: 5, sleepScore: 3, painScore: 5 },
-      { dayIndex: 22, careDate: '2026-09-26', overallScore: 4, mobilityScore: 3, dietScore: 5, sleepScore: 3, painScore: 5 },
-      { dayIndex: 23, careDate: '2026-09-27', overallScore: 5, mobilityScore: 5, dietScore: 5, sleepScore: 3, painScore: 3 },
-      { dayIndex: 24, careDate: '2026-09-28', overallScore: 4, mobilityScore: 5, dietScore: 5, sleepScore: 3, painScore: 3 },
-      { dayIndex: 25, careDate: '2026-09-29', overallScore: 4, mobilityScore: 4, dietScore: 5, sleepScore: 3, painScore: 4 },
-      { dayIndex: 26, careDate: '2026-09-30', overallScore: 4, mobilityScore: 3, dietScore: 4, sleepScore: 3, painScore: 4 },
-      { dayIndex: 27, careDate: '2026-10-01', overallScore: 2, mobilityScore: 1, dietScore: 2, sleepScore: 3, painScore: 5 },
-      { dayIndex: 28, careDate: '2026-10-02', overallScore: 4, mobilityScore: 3, dietScore: 5, sleepScore: 3, painScore: 5 },
-      { dayIndex: 29, careDate: '2026-10-03', overallScore: 5, mobilityScore: 5, dietScore: 5, sleepScore: 3, painScore: 5 }
-    ];
 
     let filteredTrends = [];
     if (Array.isArray(trendScores) && trendScores.length > 0) {
@@ -43539,21 +43546,25 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
       });
     }
 
-    // Check if filteredTrends has real variance, or is flat fake lines (all same score)
-    const isFlatOrEmpty = filteredTrends.length === 0 || 
-      (filteredTrends.length > 3 && filteredTrends.every(t => (t.dietScore === 5 || t.dietScore === 3 || t.dietScore === 4) && (t.painScore === 1 || t.painScore === 3 || t.painScore === 4) && (t.overallScore === 4 || t.overallScore === 3)));
+    if (filteredTrends.length === 0) {
+      // Create authentic single-day trend data from today's evaluation
+      const dayIdx = curDayIndex || 1;
+      const getScoreFromTone = (tone) => (tone === 'good' ? 4 : (tone === 'warning' ? 3 : (tone === 'poor' ? 2 : null)));
+      const getCategoryScore = (labelKey) => {
+        const cat = d.categories?.find(c => c.label && c.label.includes(labelKey));
+        return cat ? getScoreFromTone(cat.tone) : null;
+      };
 
-    if (isFlatOrEmpty) {
-      // Use authentic benchmark trends matching official CarePort download curve
-      filteredTrends = authenticBenchmarkTrends.filter(t => {
-        const tDate = (t.careDate || t.date || '').slice(0, 10);
-        if (curDate && tDate) return tDate <= curDate;
-        if (curDayIndex != null && t.dayIndex != null) return Number(t.dayIndex) <= Number(curDayIndex);
-        return true;
-      });
-      if (filteredTrends.length < 3) {
-        filteredTrends = authenticBenchmarkTrends.slice(0, 5);
-      }
+      const rawTrend = detail.trendScores?.[0] || detail.raw?.trendScores?.[0] || {};
+      filteredTrends = [{
+        dayIndex: dayIdx,
+        careDate: curDate || new Date().toISOString().slice(0, 10),
+        overallScore: rawTrend.overallScore ?? (d.overallStatus?.tone === 'good' ? 5 : (d.overallStatus?.tone === 'warning' ? 3 : 2)),
+        mobilityScore: rawTrend.mobilityScore ?? getCategoryScore('거동') ?? 2,
+        dietScore: rawTrend.dietScore ?? getCategoryScore('식사') ?? null,
+        sleepScore: rawTrend.sleepScore ?? getCategoryScore('수면') ?? null,
+        painScore: rawTrend.painScore ?? getCategoryScore('통증') ?? null
+      }];
     }
     window._currentTrendScores = filteredTrends;
     if (detail) detail.trendScores = filteredTrends;
@@ -43567,8 +43578,8 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
       const toneBadgeClass = d.overallStatus.tone === 'good'
         ? 'background: #d9f5e7; color: #168c61;'
         : (d.overallStatus.tone === 'warning' ? 'background: #fff1d4; color: #bf7a00;' : 'background: #fde5e6; color: #ca3d43;');
-      toneBadge.innerHTML = `<span class="pill-text">● ${d.overallStatus.label}</span>`;
-      toneBadge.style.cssText = toneBadgeClass;
+      toneBadge.innerHTML = `<i style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 4px; vertical-align: middle;"></i><span style="display: inline-block; vertical-align: middle; line-height: 1; font-weight: 800; font-size: 11px;">${d.overallStatus.label}</span>`;
+      toneBadge.style.cssText = `${toneBadgeClass}; display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 0 10px; border-radius: 12px;`;
     }
     const overallSvg = document.getElementById('cpOverallTrafficSvg');
     if (overallSvg && window.CarePortClient) {
@@ -43587,8 +43598,11 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
           : (c.tone === 'warning' ? 'background: #fff1d4; color: #bf7a00;' : 'background: #fde5e6; color: #ca3d43;');
         const vSvg = window.CarePortClient.renderTrafficLightSvg(c.tone, 'vertical');
         return `
-          <div style="background: #ffffff; border: 1px solid #dfe7ea; border-radius: 12px; padding: 12px 10px 10px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; min-height: 140px; text-align: center; box-sizing: border-box;">
-            <span class="status-pill small ${cPillTone}" style="padding: 3px 12px; border-radius: 16px; font-size: 11px; font-weight: 800; line-height: 1; display: inline-flex; align-items: center; gap: 4px; ${cPillStyle}">● ${c.label}</span>
+          <div style="background: #ffffff; border: 1px solid #dfe7ea; border-radius: 12px; padding: 12px 10px 10px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; min-height: 132px; text-align: center; box-sizing: border-box;">
+            <span class="status-pill small ${cPillTone}" style="padding: 0 10px; border-radius: 16px; font-size: 11px; font-weight: 800; height: 22px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; ${cPillStyle}">
+              <i style="display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: currentColor;"></i>
+              <span style="display: inline-block; line-height: 1; transform: translateY(-0.5px);">${c.label}</span>
+            </span>
             <div class="traffic-light vertical" style="margin: 6px 0; display: flex; justify-content: center;">
               ${vSvg}
             </div>
@@ -43616,7 +43630,7 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     if (careLogList) {
       careLogList.innerHTML = d.careLogRows.map(r => `
         <div style="display: flex; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; min-height: 32px;">
-          <strong class="careport-badge-pill" style="min-width: 86px; max-width: 110px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; height: 24px; padding: 0 8px;"><span class="pill-text">${r.label}</span></strong>
+          <strong class="careport-badge-pill" style="min-width: 86px; max-width: 110px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; height: 24px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; line-height: 1;"><span class="pill-text" style="line-height: 1; transform: translateY(-0.5px);">${r.label}</span></strong>
           <span style="flex: 1; font-size: 11.5px; color: #334155; line-height: 1.4; display: inline-flex; align-items: center; min-height: 24px; font-weight: 500;">${r.value}</span>
         </div>
       `).join('');
@@ -48521,6 +48535,9 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
           const data = await res.json();
           if (data && data.success && data.log) {
             resultLog = data.log;
+            if (typeof getKoreaDateTimeStr === 'function') {
+              resultLog.sentDate = getKoreaDateTimeStr();
+            }
             faxSentSuccess = true;
           } else if (data && !data.success) {
             sendErrorMessage = data.error || '발송 실패';
