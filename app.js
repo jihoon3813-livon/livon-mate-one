@@ -41563,26 +41563,51 @@ function toggleCarePortPatientSelect(groupId, checked) {
 }
 window.toggleCarePortPatientSelect = toggleCarePortPatientSelect;
 
-function toggleAllCarePortDays(groupId, isChecked) {
-  const cbs = document.querySelectorAll(`.cp-day-checkbox-${groupId}`);
+function toggleAllCarePortDays(arg1, arg2) {
+  let triggerEl = null;
+  let groupId = null;
+  if (arg1 && typeof arg1 === 'object' && arg1.nodeType) {
+    triggerEl = arg1;
+    groupId = arg2;
+  } else {
+    groupId = arg1;
+  }
+  const accordion = (triggerEl && typeof triggerEl.closest === 'function') 
+    ? triggerEl.closest('[id^="patient-accordion-"]') 
+    : document.querySelector(`[id^="patient-accordion-${groupId}"]`);
+  if (!accordion) return;
+  const isChecked = triggerEl ? triggerEl.checked : (arg2 !== undefined ? arg2 : true);
+  const cbs = accordion.querySelectorAll('.cp-day-checkbox');
   cbs.forEach(cb => { cb.checked = isChecked; });
-  onCarePortDayCheckboxChanged(groupId);
+  onCarePortDayCheckboxChanged(triggerEl || accordion, groupId);
 }
 window.toggleAllCarePortDays = toggleAllCarePortDays;
 
-function onCarePortDayCheckboxChanged(groupId) {
-  const cbs = document.querySelectorAll(`.cp-day-checkbox-${groupId}`);
+function onCarePortDayCheckboxChanged(arg1, arg2) {
+  let triggerEl = null;
+  let groupId = null;
+  if (arg1 && typeof arg1 === 'object' && arg1.nodeType) {
+    triggerEl = arg1;
+    groupId = arg2;
+  } else {
+    groupId = arg1;
+  }
+  const accordion = (triggerEl && typeof triggerEl.closest === 'function') 
+    ? triggerEl.closest('[id^="patient-accordion-"]') 
+    : document.querySelector(`[id^="patient-accordion-${groupId}"]`);
+  if (!accordion) return;
+  const cbs = accordion.querySelectorAll('.cp-day-checkbox');
   const checkedCount = Array.from(cbs).filter(cb => cb.checked).length;
-  const countEl = document.getElementById(`cpSelectedDaysCount_${groupId}`);
+  const countEl = accordion.querySelector('.cp-selected-days-count');
   if (countEl) {
     countEl.innerText = checkedCount;
   }
-  const selectAllCb = document.getElementById(`cpSelectAllDays_${groupId}`);
+  const selectAllCb = accordion.querySelector('.cp-select-all-days');
   if (selectAllCb) {
     selectAllCb.checked = checkedCount === cbs.length && cbs.length > 0;
     selectAllCb.indeterminate = checkedCount > 0 && checkedCount < cbs.length;
   }
-  const btn = document.getElementById(`cpBtnDownloadSelected_${groupId}`);
+  const btn = accordion.querySelector('.cp-btn-download-selected');
   if (btn) {
     if (checkedCount === 0) {
       btn.classList.add('opacity-50', 'pointer-events-none');
@@ -41593,14 +41618,26 @@ function onCarePortDayCheckboxChanged(groupId) {
 }
 window.onCarePortDayCheckboxChanged = onCarePortDayCheckboxChanged;
 
-async function downloadSelectedCarePortDays(groupId) {
-  const cbs = document.querySelectorAll(`.cp-day-checkbox-${groupId}:checked`);
+async function downloadSelectedCarePortDays(arg1, arg2) {
+  let triggerEl = null;
+  let groupId = null;
+  if (arg1 && typeof arg1 === 'object' && arg1.nodeType) {
+    triggerEl = arg1;
+    groupId = arg2;
+  } else {
+    groupId = arg1;
+  }
+  const accordion = (triggerEl && typeof triggerEl.closest === 'function') 
+    ? triggerEl.closest('[id^="patient-accordion-"]') 
+    : document.querySelector(`[id^="patient-accordion-${groupId}"]`);
+  if (!accordion) return;
+  const cbs = accordion.querySelectorAll('.cp-day-checkbox:checked');
   const selectedSids = Array.from(cbs).map(cb => cb.dataset.sid).filter(Boolean);
   if (selectedSids.length === 0) {
     alert('선택된 일자가 없습니다. 다운로드할 날짜를 1개 이상 선택해주세요.');
     return;
   }
-  const totalCbs = document.querySelectorAll(`.cp-day-checkbox-${groupId}`);
+  const totalCbs = accordion.querySelectorAll('.cp-day-checkbox');
   const sidsToPass = (selectedSids.length === totalCbs.length) ? null : selectedSids;
   await downloadPatientCareLogsViaRobot(groupId, sidsToPass);
 }
@@ -41854,14 +41891,14 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
             <!-- Day Selection Controls & Selected Download Button -->
             <div class="flex items-center gap-2.5 shrink-0">
               <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-2xs hover:bg-slate-50 cursor-pointer select-none">
-                <input type="checkbox" id="cpSelectAllDays_${group.id}" checked onchange="toggleAllCarePortDays('${group.id}', this.checked)" class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer">
+                <input type="checkbox" class="cp-select-all-days w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer" checked onchange="toggleAllCarePortDays(this, '${group.id}')">
                 <span>전체선택</span>
               </label>
-              <button type="button" id="cpBtnDownloadSelected_${group.id}" onclick="downloadSelectedCarePortDays('${group.id}')"
-                class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-black text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+              <button type="button" onclick="downloadSelectedCarePortDays(this, '${group.id}')"
+                class="cp-btn-download-selected px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-black text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                 title="선택된 일자들만 모아서 1개의 공식 A4 합본 PDF로 다운로드합니다">
                 <i data-lucide="check-square" class="w-3.5 h-3.5 text-emerald-200"></i>
-                <span>선택 일자 다운로드 (<b id="cpSelectedDaysCount_${group.id}">${dailyLogs.length}</b>일차)</span>
+                <span>선택 일자 다운로드 (<b class="cp-selected-days-count">${dailyLogs.length}</b>일차)</span>
               </button>
               <span class="text-[11px] text-slate-400 font-medium hidden md:inline ml-1">CarePort 실시간 연동</span>
             </div>
@@ -41934,8 +41971,8 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
                 <div class="px-4 py-3 hover:bg-purple-50/40 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs">
                   <!-- Left: Day Checkbox, Care Note badge, Date, Title -->
                   <div class="flex items-center gap-3 min-w-0 flex-1">
-                    <input type="checkbox" class="cp-day-checkbox-${group.id} w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer shrink-0" 
-                      data-sid="${sid}" checked onchange="onCarePortDayCheckboxChanged('${group.id}')"
+                    <input type="checkbox" class="cp-day-checkbox w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer shrink-0" 
+                      data-sid="${sid}" checked onchange="onCarePortDayCheckboxChanged(this, '${group.id}')"
                       title="이 일차를 선택/해제">
                     <span class="px-2 py-0.5 rounded-md font-black text-[11px] bg-teal-600 text-white shrink-0 shadow-2xs">
                       간병일지
