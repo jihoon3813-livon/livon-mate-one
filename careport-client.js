@@ -943,9 +943,9 @@
         ];
       }
       const width = 740;
-      const height = 135;
+      const height = 96;
       const paddingX = 55;
-      const paddingY = 22;
+      const paddingY = 14;
       const chartW = width - paddingX * 2;
       const chartH = height - paddingY * 2;
       
@@ -958,7 +958,7 @@
       for (let s = 1; s <= 5; s++) {
         const y = getY(s);
         gridSvg += `<line x1="${paddingX - 10}" y1="${y}" x2="${width - paddingX + 10}" y2="${y}" stroke="#e5e9ed" stroke-width="1"/>`;
-        gridSvg += `<text x="${paddingX - 22}" y="${y + 3.5}" font-size="10" font-weight="bold" fill="#94a3b8" text-anchor="middle" font-family="sans-serif">${s}</text>`;
+        gridSvg += `<text x="${paddingX - 20}" y="${y + 3}" font-size="9" font-weight="bold" fill="#94a3b8" text-anchor="middle" font-family="sans-serif">${s}</text>`;
       }
       
       // X labels
@@ -966,7 +966,7 @@
       list.forEach((item, idx) => {
         const x = getX(idx);
         const label = item.careDate ? item.careDate.slice(5, 10).replace('-', '.') : (item.dayIndex ? `${item.dayIndex}일` : `${idx + 1}`);
-        xLabelsSvg += `<text x="${x}" y="${height - 4}" font-size="11" font-weight="bold" fill="#475569" text-anchor="middle" font-family="sans-serif">${label}</text>`;
+        xLabelsSvg += `<text x="${x}" y="${height - 2}" font-size="9.5" font-weight="bold" fill="#475569" text-anchor="middle" font-family="sans-serif">${label}</text>`;
       });
       
       const lines = [
@@ -986,10 +986,10 @@
           const val = line.key === 'painScore' ? (rawVal != null ? (6 - rawVal) : 3) : rawVal;
           pts.push(`${getX(idx)},${getY(val)}`);
         });
-        linesSvg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${line.color}" stroke-width="2.5" ${line.dash}/>`;
+        linesSvg += `<polyline points="${pts.join(' ')}" fill="none" stroke="${line.color}" stroke-width="2" ${line.dash}/>`;
         pts.forEach(pt => {
           const [px, py] = pt.split(',');
-          linesSvg += `<circle cx="${px}" cy="${py}" r="4.5" fill="#ffffff" stroke="${line.color}" stroke-width="2.5"/>`;
+          linesSvg += `<circle cx="${px}" cy="${py}" r="3.5" fill="#ffffff" stroke="${line.color}" stroke-width="2"/>`;
         });
       });
       
@@ -1108,15 +1108,15 @@
           const isYes = resStr === '1' || resStr === 'true' || resStr === '예';
           control = `
             <div class="state-container binary-container" style="display: inline-flex; border: 1px solid #d1d5db; border-radius: 4px; overflow: hidden; vertical-align: middle;">
-              <span class="state-item binary ${isYes ? 'green' : ''}" style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 28px; font-size: 13px; font-weight: 800; ${isYes ? 'background-color: #00b8a9; color: #ffffff;' : 'background-color: #f9fafb; color: #9ca3af;'}">예</span>
-              <span class="state-item binary ${!isYes ? 'pink' : ''}" style="display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 28px; font-size: 13px; font-weight: 800; border-left: 1px solid #d1d5db; ${!isYes ? 'background-color: #ff5b84; color: #ffffff;' : 'background-color: #f9fafb; color: #9ca3af;'}">아니오</span>
+              <span class="state-item binary ${isYes ? 'green' : ''}" style="display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 22px; font-size: 11px; font-weight: 800; ${isYes ? 'background-color: #00b8a9; color: #ffffff;' : 'background-color: #f9fafb; color: #9ca3af;'}">예</span>
+              <span class="state-item binary ${!isYes ? 'pink' : ''}" style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 22px; font-size: 11px; font-weight: 800; border-left: 1px solid #d1d5db; ${!isYes ? 'background-color: #ff5b84; color: #ffffff;' : 'background-color: #f9fafb; color: #9ca3af;'}">아니오</span>
             </div>
           `;
         } else if (cat === 'linear' || endNum > 5) {
           control = `
             <div class="score-wrapper" style="display: inline-flex; align-items: baseline;">
-              <span class="score-result" style="font-size: 18px; font-weight: 900; color: #111827;">${resStr}</span>
-              <span class="score-total" style="font-size: 13px; font-weight: 600; color: #9ca3af; margin-left: 2px;">/${endNum}점</span>
+              <span class="score-result" style="font-size: 14.5px; font-weight: 900; color: #111827;">${resStr}</span>
+              <span class="score-total" style="font-size: 11px; font-weight: 600; color: #9ca3af; margin-left: 2px;">/${endNum}점</span>
             </div>
           `;
         } else if (cat === 'level') {
@@ -1125,7 +1125,7 @@
           for (let n = startNum; n <= endNum; n++) {
             const isActive = activeLevel === n;
             btns += `
-              <span class="state-item level ${isActive ? 'levelActive' : ''}" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; font-size: 13px; font-weight: 800; ${n > startNum ? 'border-left: 1px solid #d1d5db;' : ''} ${isActive ? 'background-color: #00b8a9; color: #ffffff;' : 'background-color: #f9fafb; color: #6b7280;'}">${n}</span>
+              <span class="state-item level ${isActive ? 'levelActive' : ''}" style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; font-size: 10.5px; font-weight: 800; ${n > startNum ? 'border-left: 1px solid #d1d5db;' : ''} ${isActive ? 'background-color: #00b8a9; color: #ffffff;' : 'background-color: #f9fafb; color: #6b7280;'}">${n}</span>
             `;
           }
           control = `
@@ -1135,14 +1135,14 @@
           `;
         } else {
           control = `
-            <div style="font-size: 14px; font-weight: bold; color: #111827;">${resStr}</div>
+            <div style="font-size: 12px; font-weight: bold; color: #111827;">${resStr}</div>
           `;
         }
 
         return `
-          <div class="result-item" style="display: flex; align-items: center; justify-content: space-between; min-height: 38px;">
-            <span class="text" style="font-size: 15px; font-weight: 700; color: #334155;">${name}</span>
-            <div style="flex-shrink: 0; margin-left: 16px;">${control}</div>
+          <div class="result-item" style="display: flex; align-items: center; justify-content: space-between; min-height: 26px;">
+            <span class="text" style="font-size: 12.5px; font-weight: 700; color: #334155;">${name}</span>
+            <div style="flex-shrink: 0; margin-left: 12px;">${control}</div>
           </div>
         `;
       }).join('');
@@ -1199,20 +1199,20 @@
       if (keywordsArr.length === 0) {
         keywordsArr = ['환자 상태', '컨디션 개선', '혈압 및 맥박', '거동 및 편마비', '수면'];
       }
-      const keywordsTagsHtml = keywordsArr.map(k => `<span style="margin-right: 14px; color: #525050; font-weight: 700; font-size: 14px;">#${String(k).replace(/^#/, '')}</span>`).join('');
+      const keywordsTagsHtml = keywordsArr.map(k => `<span style="margin-right: 10px; color: #525050; font-weight: 700; font-size: 11.5px;">#${String(k).replace(/^#/, '')}</span>`).join('');
 
       let reportHtml = '';
       if (raw.consult_report && typeof raw.consult_report === 'object') {
         const entries = Object.entries(raw.consult_report);
         if (entries.length > 0) {
           reportHtml = `
-            <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 6px;">
               ${entries.map(([label, val], idx) => `
                 <div>
-                  <div style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 2px;">
+                  <div style="font-size: 11.5px; font-weight: 800; color: #0f172a; margin-bottom: 1px;">
                     ${idx + 1}. ${label.replace(/^\d+[\.\)]\s*/, '')}
                   </div>
-                  <div style="font-size: 13.5px; color: #475569; line-height: 1.6; margin-left: 10px;">
+                  <div style="font-size: 10.5px; color: #475569; line-height: 1.45; margin-left: 8px;">
                     ${typeof val === 'string' ? val : JSON.stringify(val)}
                   </div>
                 </div>
@@ -1222,9 +1222,9 @@
         }
       }
       const summarySectionHtml = summaryText ? `
-        <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
-          <div style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">[요약]</div>
-          <div style="font-size: 13.5px; color: #334155; line-height: 1.65;">
+        <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #e2e8f0;">
+          <div style="font-size: 11.5px; font-weight: 800; color: #0f172a; margin-bottom: 2px;">[요약]</div>
+          <div style="font-size: 10.5px; color: #334155; line-height: 1.45;">
             ${summaryText.replace(/\n/g, '<br>')}
           </div>
         </div>
@@ -1236,7 +1236,7 @@
   <meta charset="UTF-8">
   <title>간병일지_${username}_${consultDate.replace(/[: ]/g, '_')}</title>
   <style>
-    @page { size: A4 portrait; margin: 8mm 10mm; }
+    @page { size: A4 portrait; margin: 0; }
     * { box-sizing: border-box; }
     html, body {
       font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
@@ -1244,21 +1244,24 @@
       color: #0f172a;
       padding: 0;
       margin: 0;
-      line-height: 1.5;
+      line-height: 1.4;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
     .report-area {
       width: 794px;
       max-width: 794px;
+      min-height: 1122px;
+      max-height: 1122px;
       margin: 0 auto;
       background: #ffffff;
-      padding: 34px 40px;
+      padding: 24px 36px;
       box-sizing: border-box;
       position: relative;
       overflow: hidden;
       page-break-inside: avoid;
       break-inside: avoid;
+      display: block;
     }
     .water-mark {
       position: absolute;
@@ -1266,8 +1269,8 @@
       left: 50%;
       transform: translate(-50%, -50%);
       pointer-events: none;
-      opacity: 0.045;
-      font-size: 160px;
+      opacity: 0.04;
+      font-size: 140px;
       font-weight: 900;
       color: #ff3366;
       letter-spacing: -3px;
@@ -1278,17 +1281,21 @@
     .result-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 16px 44px;
+      gap: 6px 30px;
       width: 100%;
     }
     @media print {
       body { background: #ffffff !important; }
       .report-area {
-        width: 100% !important;
-        max-width: 100% !important;
-        padding: 16px 20px !important;
+        width: 794px !important;
+        max-width: 794px !important;
+        min-height: 1122px !important;
+        max-height: 1122px !important;
+        padding: 24px 36px !important;
         box-shadow: none !important;
         border: none !important;
+        overflow: hidden !important;
+        display: block !important;
       }
       .no-print { display: none !important; }
     }
@@ -1300,72 +1307,72 @@
     <div class="water-mark">LivOn</div>
 
     <!-- Title: 간병일지 -->
-    <div style="position: relative; z-index: 1; margin-bottom: 24px;">
-      <h1 style="font-size: 34px; font-weight: 900; color: #000000; margin: 0; letter-spacing: -0.8px;">간병일지</h1>
+    <div style="position: relative; z-index: 1; margin-bottom: 12px;">
+      <h1 style="font-size: 22px; font-weight: 900; color: #000000; margin: 0; letter-spacing: -0.8px;">간병일지</h1>
     </div>
 
     <!-- 7 Metadata Columns (대상자명, 연령, 성별, 상담자, 소속기관, 상담일시, 상담시간) -->
-    <div style="position: relative; z-index: 1; display: flex; align-items: stretch; justify-content: space-between; border-bottom: 1px solid #e5e7eb; padding-bottom: 18px; margin-bottom: 28px;">
+    <div style="position: relative; z-index: 1; display: flex; align-items: stretch; justify-content: space-between; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;">
       <div style="flex: 1;">
-        <div style="font-size: 12.5px; color: #6b7280; font-weight: 600; margin-bottom: 4px;">대상자명</div>
-        <div style="font-size: 15.5px; color: #111827; font-weight: 800;">${username}</div>
+        <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">대상자명</div>
+        <div style="font-size: 12.5px; color: #111827; font-weight: 800;">${username}</div>
       </div>
-      <div style="width: 1px; background: #e5e7eb; margin: 0 12px;"></div>
+      <div style="width: 1px; background: #e5e7eb; margin: 0 8px;"></div>
       <div style="flex: 0.6;">
-        <div style="font-size: 12.5px; color: #6b7280; font-weight: 600; margin-bottom: 4px;">연령</div>
-        <div style="font-size: 15.5px; color: #111827; font-weight: 800;">${age}</div>
+        <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">연령</div>
+        <div style="font-size: 12.5px; color: #111827; font-weight: 800;">${age}</div>
       </div>
-      <div style="width: 1px; background: #e5e7eb; margin: 0 12px;"></div>
+      <div style="width: 1px; background: #e5e7eb; margin: 0 8px;"></div>
       <div style="flex: 0.6;">
-        <div style="font-size: 12.5px; color: #6b7280; font-weight: 600; margin-bottom: 4px;">성별</div>
-        <div style="font-size: 15.5px; color: #111827; font-weight: 800;">${gender}</div>
+        <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">성별</div>
+        <div style="font-size: 12.5px; color: #111827; font-weight: 800;">${gender}</div>
       </div>
-      <div style="width: 1px; background: #e5e7eb; margin: 0 12px;"></div>
+      <div style="width: 1px; background: #e5e7eb; margin: 0 8px;"></div>
       <div style="flex: 0.9;">
-        <div style="font-size: 12.5px; color: #6b7280; font-weight: 600; margin-bottom: 4px;">상담자</div>
-        <div style="font-size: 15.5px; color: #111827; font-weight: 800;">${consultant}</div>
+        <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">상담자</div>
+        <div style="font-size: 12.5px; color: #111827; font-weight: 800;">${consultant}</div>
       </div>
-      <div style="width: 1px; background: #e5e7eb; margin: 0 12px;"></div>
+      <div style="width: 1px; background: #e5e7eb; margin: 0 8px;"></div>
       <div style="flex: 1.1;">
-        <div style="font-size: 12.5px; color: #6b7280; font-weight: 600; margin-bottom: 4px;">소속기관</div>
-        <div style="font-size: 15.5px; color: #111827; font-weight: 800;">${org}</div>
+        <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">소속기관</div>
+        <div style="font-size: 12.5px; color: #111827; font-weight: 800;">${org}</div>
       </div>
-      <div style="width: 1px; background: #e5e7eb; margin: 0 12px;"></div>
-      <div style="flex: 1.7;">
-        <div style="font-size: 12.5px; color: #6b7280; font-weight: 600; margin-bottom: 4px;">상담일시</div>
-        <div style="font-size: 15.5px; color: #111827; font-weight: 800;">${consultDate}</div>
+      <div style="width: 1px; background: #e5e7eb; margin: 0 8px;"></div>
+      <div style="flex: 1.6;">
+        <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">상담일시</div>
+        <div style="font-size: 12.5px; color: #111827; font-weight: 800;">${consultDate}</div>
       </div>
-      <div style="width: 1px; background: #e5e7eb; margin: 0 12px;"></div>
+      <div style="width: 1px; background: #e5e7eb; margin: 0 8px;"></div>
       <div style="flex: 0.7;">
-        <div style="font-size: 12.5px; color: #6b7280; font-weight: 600; margin-bottom: 4px;">상담시간</div>
-        <div style="font-size: 15.5px; color: #111827; font-weight: 800;">${duration}</div>
+        <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 2px;">상담시간</div>
+        <div style="font-size: 12.5px; color: #111827; font-weight: 800;">${duration}</div>
       </div>
     </div>
 
     <!-- Section 1: 상담내용 -->
-    <div style="position: relative; z-index: 1; margin-bottom: 32px;">
-      <h2 style="font-size: 19px; font-weight: 900; color: #111827; margin: 0 0 16px 0;">상담내용</h2>
+    <div style="position: relative; z-index: 1; margin-bottom: 12px;">
+      <h2 style="font-size: 14px; font-weight: 900; color: #111827; margin: 0 0 8px 0;">상담내용</h2>
       <div class="result-grid">
         ${checkboxGridHtml}
       </div>
     </div>
 
     <!-- Section 2: 상담요약 -->
-    <div style="position: relative; z-index: 1; border-top: 1px solid #e5e7eb; padding-top: 24px;">
-      <h2 style="font-size: 19px; font-weight: 900; color: #111827; margin: 0 0 14px 0;">상담요약</h2>
+    <div style="position: relative; z-index: 1; border-top: 1px solid #e5e7eb; padding-top: 10px;">
+      <h2 style="font-size: 14px; font-weight: 900; color: #111827; margin: 0 0 6px 0;">상담요약</h2>
       
       <!-- Consult Title -->
-      <div style="font-size: 16px; font-weight: 800; color: #0f172a; margin-bottom: 10px;">
+      <div style="font-size: 12.5px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">
         ${consultTitle}
       </div>
 
       <!-- Keywords with # -->
-      <div style="margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 4px 0;">
+      <div style="margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 3px 0;">
         ${keywordsTagsHtml}
       </div>
 
       <!-- Content / Report & Summary Container -->
-      <div style="background: rgba(248, 250, 252, 0.85); border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px 24px;">
+      <div style="background: rgba(248, 250, 252, 0.85); border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px;">
         ${reportHtml}
         ${summarySectionHtml}
       </div>
@@ -1400,15 +1407,15 @@
         const vSvg = this.renderTrafficLightSvg(c.tone, 'vertical');
 
         return `
-          <div style="flex: 1; min-width: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-height: 84px;">
+          <div style="flex: 1; min-width: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: space-between; gap: 4px; min-height: 56px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
-              <span class="careport-badge-pill" style="height: 22px; font-size: 11px; font-weight: 800; padding: 0 8px; border-radius: 6px; ${cPillStyle}">
-                <span class="careport-dot" style="width: 5px; height: 5px; margin-right: 4px;"></span>
+              <span class="careport-badge-pill" style="height: 19px; font-size: 10px; font-weight: 800; padding: 0 6px; border-radius: 5px; ${cPillStyle}">
+                <span class="careport-dot" style="width: 4px; height: 4px; margin-right: 3px;"></span>
                 <span class="pill-text">${c.label}</span>
               </span>
               ${vSvg}
             </div>
-            <div style="font-size: 11.5px; color: #334155; line-height: 1.4; font-weight: 500;">
+            <div style="font-size: 10.5px; color: #334155; line-height: 1.3; font-weight: 500;">
               ${c.description}
             </div>
           </div>
@@ -1416,33 +1423,33 @@
       }).join('');
 
       const vitalsHtml = d.vitals.map(v => `
-        <div style="flex: 1; min-width: 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 6px; text-align: center;">
-          <div style="font-size: 10px; color: #64748b; font-weight: 700; margin-bottom: 2px;">${v.label}</div>
-          <div style="font-size: 13px; font-weight: 900; color: #0f172a; font-family: monospace;">
+        <div style="flex: 1; min-width: 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 4px; text-align: center;">
+          <div style="font-size: 9.5px; color: #64748b; font-weight: 700; margin-bottom: 1px;">${v.label}</div>
+          <div style="font-size: 12px; font-weight: 900; color: #0f172a; font-family: monospace;">
             ${v.value}
-            ${v.unit ? `<small style="font-size: 9.5px; font-weight: 600; color: #94a3b8; margin-left: 1px;">${v.unit}</small>` : ''}
+            ${v.unit ? `<small style="font-size: 9px; font-weight: 600; color: #94a3b8; margin-left: 1px;">${v.unit}</small>` : ''}
           </div>
         </div>
       `).join('');
 
       const careLogHtml = d.careLogRows.map(r => `
-        <div style="display: flex; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; min-height: 32px;">
-          <strong class="careport-badge-pill" style="min-width: 86px; max-width: 110px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; height: 24px; padding: 0 8px;"><span class="pill-text">${r.label}</span></strong>
-          <span style="flex: 1; font-size: 11.5px; color: #334155; line-height: 1.4; display: inline-flex; align-items: center; min-height: 24px; font-weight: 500;">${r.value}</span>
+        <div style="display: flex; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px solid #f1f5f9; min-height: 24px;">
+          <strong class="careport-badge-pill" style="min-width: 74px; max-width: 88px; flex-shrink: 0; font-size: 10px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; height: 20px; padding: 0 6px;"><span class="pill-text">${r.label}</span></strong>
+          <span style="flex: 1; font-size: 10.5px; color: #334155; line-height: 1.35; display: inline-flex; align-items: center; min-height: 20px; font-weight: 500;">${r.value}</span>
         </div>
       `).join('');
 
       const guardianNotesHtml = d.guardianNotes.map(g => `
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 11.5px; line-height: 1.4; min-height: 22px;">
-          <span style="display: inline-block; width: 4.5px; height: 4.5px; border-radius: 50%; background: #10bdb2; flex-shrink: 0;"></span>
-          <span style="font-weight: 800; color: #0f172a; min-width: 50px; flex-shrink: 0; position: relative; top: -0.5px;">${g.label}</span>
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 10.5px; line-height: 1.3; min-height: 18px;">
+          <span style="display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: #10bdb2; flex-shrink: 0;"></span>
+          <span style="font-weight: 800; color: #0f172a; min-width: 44px; flex-shrink: 0; position: relative; top: -0.5px;">${g.label}</span>
           <span style="color: #cbd5e1; font-weight: bold; flex-shrink: 0;">·</span>
           <span style="color: #334155; font-weight: 500; flex: 1; position: relative; top: -0.5px;">${g.value}</span>
         </div>
       `).join('');
 
       const keywordsPills = d.keywords.map(k => `
-        <span class="careport-badge-pill" style="font-size: 11px; font-weight: 700; color: #079f98; background: #eafaf8; border: 1px solid #a7f3d0; border-radius: 12px; height: 22px; padding: 0 9px; margin-right: 4px; margin-bottom: 4px;"><span class="pill-text">#${k}</span></span>
+        <span class="careport-badge-pill" style="font-size: 10px; font-weight: 700; color: #079f98; background: #eafaf8; border: 1px solid #a7f3d0; border-radius: 10px; height: 20px; padding: 0 8px; margin-right: 4px; margin-bottom: 4px;"><span class="pill-text">#${k}</span></span>
       `).join('');
 
       let trendChartHtml = '';
@@ -1454,7 +1461,7 @@
       if (trendList && trendList.length > 0) {
         trendChartHtml = this.generateTrendChartSvg(trendList);
       } else if (d.chartImage) {
-        trendChartHtml = `<img src="${d.chartImage}" alt="간병 일자별 환자 상태 변화" style="width: 100%; height: auto; max-height: 200px; object-fit: contain; display: block; margin: 0 auto;" />`;
+        trendChartHtml = `<img src="${d.chartImage}" alt="간병 일자별 환자 상태 변화" style="width: 100%; height: auto; max-height: 120px; object-fit: contain; display: block; margin: 0 auto;" />`;
       } else {
         trendChartHtml = this.generateTrendChartSvg(d.trendScores || []);
       }
@@ -1489,14 +1496,12 @@
       max-height: 1122px;
       margin: 0 auto;
       background: #ffffff;
-      padding: 0 36px;
+      padding: 24px 36px;
       box-sizing: border-box;
       overflow: hidden;
       page-break-inside: avoid;
       break-inside: avoid;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
+      display: block;
     }
     @media print {
       body { background: #ffffff !important; }
@@ -1506,29 +1511,27 @@
         min-height: 1122px !important;
         max-height: 1122px !important;
         margin: 0 auto !important;
-        padding: 0 36px !important;
+        padding: 24px 36px !important;
         box-shadow: none !important;
         border: none !important;
         overflow: hidden !important;
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important;
+        display: block !important;
       }
     }
     .sec-head {
       display: flex !important;
       align-items: center !important;
       justify-content: space-between !important;
-      border-bottom: 2px solid #0f172a !important;
-      padding-bottom: 5px !important;
-      margin-top: 18px !important;
-      margin-bottom: 12px !important;
+      border-bottom: 1.5px solid #0f172a !important;
+      padding-bottom: 3px !important;
+      margin-top: 10px !important;
+      margin-bottom: 6px !important;
     }
     .sec-head.sec-head-teal {
-      border-bottom: 2px solid #00897b !important;
+      border-bottom: 1.5px solid #00897b !important;
     }
     .sec-title {
-      font-size: 14.5px !important;
+      font-size: 13px !important;
       font-weight: 900 !important;
       color: #0f172a !important;
       letter-spacing: -0.3px !important;
@@ -1569,46 +1572,46 @@
 <body>
   <div class="page">
     <!-- Top Header (Image 1 style) -->
-    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 10px;">
       <div>
-        <div style="font-size: 11px; font-weight: 800; color: #10bdb2; letter-spacing: 0.5px; text-transform: uppercase;">보호자 안내용 · 공식 간병일지</div>
-        <h1 style="font-size: 24px; font-weight: 900; color: #020617; margin: 2px 0 0 0; letter-spacing: -0.5px;">간병일지</h1>
+        <div style="font-size: 10.5px; font-weight: 800; color: #10bdb2; letter-spacing: 0.5px; text-transform: uppercase;">보호자 안내용 · 공식 간병일지</div>
+        <h1 style="font-size: 21px; font-weight: 900; color: #020617; margin: 2px 0 0 0; letter-spacing: -0.5px;">간병일지</h1>
       </div>
       <div style="text-align: right;">
         <div style="display: inline-flex; align-items: center; gap: 6px;">
-          <span class="careport-badge-pill" style="background: #10bdb2; color: #ffffff; font-size: 11px; font-weight: 900; height: 22px; padding: 0 8px; border-radius: 6px;"><span class="pill-text">공식일지</span></span>
-          <span style="font-size: 13px; font-weight: 800; color: #334155; display: inline-flex; align-items: center; height: 22px;">${d.consultDate}</span>
+          <span class="careport-badge-pill" style="background: #10bdb2; color: #ffffff; font-size: 10.5px; font-weight: 900; height: 20px; padding: 0 7px; border-radius: 5px;"><span class="pill-text">공식일지</span></span>
+          <span style="font-size: 12.5px; font-weight: 800; color: #334155; display: inline-flex; align-items: center; height: 20px;">${d.consultDate}</span>
         </div>
-        <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">리본케어포트(CarePort) 전산 공인 인증 일지</div>
+        <div style="font-size: 9.5px; color: #94a3b8; margin-top: 1px;">리본케어포트(CarePort) 전산 공인 인증 일지</div>
       </div>
     </div>
 
     <!-- Demographics Bar (Image 1 style: 고객명 (피보험자), 담당 간병인 (소속), 간병 기간) -->
-    <div style="display: flex; justify-content: space-between; gap: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; margin-bottom: 16px;">
+    <div style="display: flex; justify-content: space-between; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 14px; margin-bottom: 10px;">
       <div style="flex: 1;">
-        <span style="font-size: 10.5px; color: #64748b; font-weight: 700; display: block; margin-bottom: 2px;">고객명 (피보험자)</span>
+        <span style="font-size: 9.5px; color: #64748b; font-weight: 700; display: block; margin-bottom: 1px;">고객명 (피보험자)</span>
         <div style="display: inline-flex; align-items: baseline; gap: 4px;">
-          <strong style="font-size: 13.5px; font-weight: 900; color: #0f172a;">${d.patientName}</strong>
-          <span style="font-size: 11.5px; font-weight: 700; color: #475569;">(${d.age}세·${d.gender})</span>
+          <strong style="font-size: 12.5px; font-weight: 900; color: #0f172a;">${d.patientName}</strong>
+          <span style="font-size: 11px; font-weight: 700; color: #475569;">(${d.age}세·${d.gender})</span>
         </div>
       </div>
-      <div style="flex: 1; border-left: 1px solid #e2e8f0; padding-left: 12px;">
-        <span style="font-size: 10.5px; color: #64748b; font-weight: 700; display: block; margin-bottom: 2px;">담당 간병인 (소속)</span>
+      <div style="flex: 1; border-left: 1px solid #e2e8f0; padding-left: 10px;">
+        <span style="font-size: 9.5px; color: #64748b; font-weight: 700; display: block; margin-bottom: 1px;">담당 간병인 (소속)</span>
         <div style="display: inline-flex; align-items: baseline; gap: 4px;">
-          <strong style="font-size: 13px; font-weight: 800; color: #0f172a;">${d.caregiver}</strong>
-          <span style="font-size: 11px; color: #64748b;">(${d.org})</span>
+          <strong style="font-size: 12px; font-weight: 800; color: #0f172a;">${d.caregiver}</strong>
+          <span style="font-size: 10.5px; color: #64748b;">(${d.org})</span>
         </div>
       </div>
-      <div style="flex: 1.2; border-left: 1px solid #e2e8f0; padding-left: 12px;">
-        <span style="font-size: 10.5px; color: #64748b; font-weight: 700; display: block; margin-bottom: 2px;">간병 기간</span>
-        <strong style="font-size: 12.5px; font-weight: 800; color: #0f172a; display: block; line-height: 1.35;">${d.carePeriod}</strong>
+      <div style="flex: 1.2; border-left: 1px solid #e2e8f0; padding-left: 10px;">
+        <span style="font-size: 9.5px; color: #64748b; font-weight: 700; display: block; margin-bottom: 1px;">간병 기간</span>
+        <strong style="font-size: 11.5px; font-weight: 800; color: #0f172a; display: block; line-height: 1.3;">${d.carePeriod}</strong>
       </div>
     </div>
 
     <!-- Section: 간병 일자별 환자 상태 변화 (Image 1 style) -->
-    <div class="sec-head sec-head-teal" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #00897b; margin-top: 18px; margin-bottom: 12px; padding-bottom: 5px;">
-      <span class="sec-title" style="font-size: 14.5px; font-weight: 900; color: #0f172a;">간병 일자별 환자 상태 변화</span>
-      <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; gap: 8px;">
+    <div class="sec-head sec-head-teal" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #00897b; margin-top: 10px; margin-bottom: 6px; padding-bottom: 3px;">
+      <span class="sec-title" style="font-size: 13px; font-weight: 900; color: #0f172a;">간병 일자별 환자 상태 변화</span>
+      <div style="font-size: 9.5px; font-weight: 700; color: #64748b; display: flex; gap: 6px;">
         <span style="color: #06C8BB;">― 총합상태</span>
         <span style="color: #2BBB77;">― 거동능력</span>
         <span style="color: #F4A61E;">― 식사상태</span>
@@ -1616,80 +1619,67 @@
         <span style="color: #FE6FB0;">┄ 통증수준</span>
       </div>
     </div>
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; text-align: center;">
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; text-align: center;">
       ${trendChartHtml}
     </div>
 
     <!-- Section 1: 금일 환자 상태 체크 (신호등 & 세부 상태) -->
-    <div class="sec-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f172a; margin-top: 18px; margin-bottom: 12px; padding-bottom: 5px;">
-      <span class="sec-title" style="font-size: 14.5px; font-weight: 900; color: #0f172a;">금일 환자 상태 체크</span>
-      <div style="font-size: 10px; font-weight: 700; color: #64748b; display: flex; gap: 8px;">
-        <span style="display: inline-flex; align-items: center; gap: 3px;"><b style="color: #20b86a; font-size: 11px;">●</b> 양호·안정</span>
-        <span style="display: inline-flex; align-items: center; gap: 3px;"><b style="color: #f5aa18; font-size: 11px;">●</b> 주의·부분보조</span>
-        <span style="display: inline-flex; align-items: center; gap: 3px;"><b style="color: #eb5c60; font-size: 11px;">●</b> 악화·주의필요</span>
+    <div class="sec-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #0f172a; margin-top: 10px; margin-bottom: 6px; padding-bottom: 3px;">
+      <span class="sec-title" style="font-size: 13px; font-weight: 900; color: #0f172a;">금일 환자 상태 체크</span>
+      <div style="font-size: 9.5px; font-weight: 700; color: #64748b; display: flex; gap: 6px;">
+        <span style="display: inline-flex; align-items: center; gap: 2px;"><b style="color: #20b86a; font-size: 10px;">●</b> 양호·안정</span>
+        <span style="display: inline-flex; align-items: center; gap: 2px;"><b style="color: #f5aa18; font-size: 10px;">●</b> 주의·부분보조</span>
+        <span style="display: inline-flex; align-items: center; gap: 2px;"><b style="color: #eb5c60; font-size: 10px;">●</b> 악화·주의필요</span>
       </div>
     </div>
 
     <!-- Overall Status Verdict Banner -->
-    <div style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; min-height: 44px;">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <span class="careport-badge-pill" style="font-size: 11.5px; font-weight: 900; height: 24px; padding: 0 10px; border-radius: 6px; ${toneBadgeClass}">
-          <span class="careport-dot" style="width: 5px; height: 5px; margin-right: 5px;"></span>
+    <div style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 12px; margin-bottom: 8px; min-height: 36px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="careport-badge-pill" style="font-size: 10.5px; font-weight: 900; height: 21px; padding: 0 8px; border-radius: 5px; ${toneBadgeClass}">
+          <span class="careport-dot" style="width: 4px; height: 4px; margin-right: 4px;"></span>
           <span class="pill-text">${d.overallStatus.label}</span>
         </span>
         <div style="display: inline-flex; align-items: center;">
           ${overallLightSvg}
         </div>
-        <span style="font-size: 12px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; height: 24px;">${d.overallStatus.description}</span>
+        <span style="font-size: 11.5px; font-weight: 700; color: #1e293b; display: inline-flex; align-items: center; height: 21px;">${d.overallStatus.description}</span>
       </div>
-      <span class="careport-badge-pill" style="font-size: 11px; font-weight: 800; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; height: 24px; padding: 0 9px; border-radius: 5px;"><span class="pill-text">종합 판정</span></span>
+      <span class="careport-badge-pill" style="font-size: 10px; font-weight: 800; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; height: 20px; padding: 0 7px; border-radius: 4px;"><span class="pill-text">종합 판정</span></span>
     </div>
 
     <!-- 4 Category Cards (식사, 거동, 수면, 통증) -->
-    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+    <div style="display: flex; gap: 6px; margin-bottom: 8px;">
       ${catCardsHtml}
     </div>
 
     <!-- Section 2: 금일 활력징후 (7 Vital signs) - 메이트원 요청으로 비노출 -->
     <div class="sec-head" style="display: none !important;">
       <span class="sec-title">금일 활력징후</span>
-      <span style="font-size: 10px; color: #94a3b8;">정상 범위 기준 정밀 측정</span>
+      <span style="font-size: 9.5px; color: #94a3b8;">정상 범위 기준 정밀 측정</span>
     </div>
-    <div style="display: none !important; gap: 6px; margin-bottom: 10px;">
+    <div style="display: none !important; gap: 6px; margin-bottom: 8px;">
       ${vitalsHtml}
     </div>
 
     <!-- Section 3: 금일 간병 수행 내역 (5 Detailed rows) -->
-    <div class="sec-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f172a; margin-top: 18px; margin-bottom: 12px; padding-bottom: 5px;">
-      <span class="sec-title" style="font-size: 14.5px; font-weight: 900; color: #0f172a;">금일 간병 수행 내역</span>
-      <span style="font-size: 10px; color: #94a3b8;">표준 간병 프로세스 준수</span>
+    <div class="sec-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #0f172a; margin-top: 10px; margin-bottom: 6px; padding-bottom: 3px;">
+      <span class="sec-title" style="font-size: 13px; font-weight: 900; color: #0f172a;">금일 간병 수행 내역</span>
+      <span style="font-size: 9.5px; color: #94a3b8;">표준 간병 프로세스 준수</span>
     </div>
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 16px; margin-bottom: 12px;">
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px 12px; margin-bottom: 8px;">
       ${careLogHtml}
     </div>
 
     <!-- Section 5: 보호자 전달사항 (6 Guardian Note rows) -->
-    <div class="sec-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f172a; margin-top: 18px; margin-bottom: 12px; padding-bottom: 5px;">
-      <span class="sec-title" style="font-size: 14.5px; font-weight: 900; color: #0f172a;">보호자 전달사항</span>
-      <span style="font-size: 10px; color: #94a3b8;">안심 소통 리포트</span>
+    <div class="sec-head" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #0f172a; margin-top: 10px; margin-bottom: 6px; padding-bottom: 3px;">
+      <span class="sec-title" style="font-size: 13px; font-weight: 900; color: #0f172a;">보호자 전달사항</span>
+      <span style="font-size: 9.5px; color: #94a3b8;">안심 소통 리포트</span>
     </div>
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 18px; margin-bottom: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 14px; margin-bottom: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px;">
       ${guardianNotesHtml}
     </div>
   </div>
-
-  <script>
-    window.addEventListener('load', function() {
-      var p = document.querySelector('.page');
-      if (!p) return;
-      var maxH = 1060;
-      if (p.scrollHeight > maxH) {
-        var s = (maxH / p.scrollHeight) * 0.98;
-        p.style.transform = 'scale(' + s.toFixed(3) + ')';
-        p.style.transformOrigin = 'top center';
-      }
-    });
-  </script>
 </body>
 </html>`;
     },

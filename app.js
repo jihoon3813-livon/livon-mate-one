@@ -13827,29 +13827,29 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
     .page, .report-area {
       width: 794px !important;
       max-width: 794px !important;
+      height: 1122px !important;
       min-height: 1122px !important;
       max-height: 1122px !important;
       box-sizing: border-box !important;
-      padding: 0 36px !important;
+      padding: 24px 36px !important;
       overflow: hidden !important;
-      display: flex !important;
-      flex-direction: column !important;
-      justify-content: center !important;
+      display: block !important;
+      margin: 0 auto !important;
     }
     .sec-head {
       display: flex !important;
       align-items: center !important;
       justify-content: space-between !important;
-      border-bottom: 2px solid #0f172a !important;
-      padding-bottom: 5px !important;
-      margin-top: 18px !important;
-      margin-bottom: 12px !important;
+      border-bottom: 1.5px solid #0f172a !important;
+      padding-bottom: 3px !important;
+      margin-top: 10px !important;
+      margin-bottom: 6px !important;
     }
     .sec-head.sec-head-teal {
-      border-bottom: 2px solid #00897b !important;
+      border-bottom: 1.5px solid #00897b !important;
     }
     .sec-title {
-      font-size: 14.5px !important;
+      font-size: 13px !important;
       font-weight: 900 !important;
       color: #0f172a !important;
       letter-spacing: -0.3px !important;
@@ -44439,29 +44439,29 @@ async function downloadPatientCareLogsPdfs(groupId) {
     .page, .report-area {
       width: 794px !important;
       max-width: 794px !important;
+      height: 1122px !important;
       min-height: 1122px !important;
       max-height: 1122px !important;
       box-sizing: border-box !important;
-      padding: 0 36px !important;
+      padding: 24px 36px !important;
       overflow: hidden !important;
-      display: flex !important;
-      flex-direction: column !important;
-      justify-content: center !important;
+      display: block !important;
+      margin: 0 auto !important;
     }
     .sec-head {
       display: flex !important;
       align-items: center !important;
       justify-content: space-between !important;
-      border-bottom: 2px solid #0f172a !important;
-      padding-bottom: 5px !important;
-      margin-top: 18px !important;
-      margin-bottom: 12px !important;
+      border-bottom: 1.5px solid #0f172a !important;
+      padding-bottom: 3px !important;
+      margin-top: 10px !important;
+      margin-bottom: 6px !important;
     }
     .sec-head.sec-head-teal {
-      border-bottom: 2px solid #00897b !important;
+      border-bottom: 1.5px solid #00897b !important;
     }
     .sec-title {
-      font-size: 14.5px !important;
+      font-size: 13px !important;
       font-weight: 900 !important;
       color: #0f172a !important;
       letter-spacing: -0.3px !important;
@@ -44560,9 +44560,12 @@ async function downloadPatientCareLogsPdfs(groupId) {
       document.body.appendChild(iframe);
 
       try {
-        const sampleHtml = dayHtmlList[0] || '';
-        const styleMatches = sampleHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/gi) || [];
-        const extractedStyles = styleMatches.join('\n');
+        const styleSet = new Set();
+        dayHtmlList.forEach(h => {
+          const matches = (h || '').match(/<style[^>]*>([\s\S]*?)<\/style>/gi) || [];
+          matches.forEach(m => styleSet.add(m));
+        });
+        const extractedStyles = Array.from(styleSet).join('\n');
 
         // 고해상도 2x 레티나 화질 (192 DPI) + 4페이지 단위 청크 배치 처리 (모바일/PC 메모리 한계 완벽 준수 및 초고화질 보장)
         const BATCH_SIZE = 4;
@@ -44617,8 +44620,30 @@ async function downloadPatientCareLogsPdfs(groupId) {
       max-height: 1122px !important;
       min-height: 1122px !important;
       box-sizing: border-box !important;
-      padding: 26px 36px !important;
+      padding: 24px 36px !important;
       overflow: hidden !important;
+      display: block !important;
+      margin: 0 auto !important;
+    }
+    .sec-head {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      border-bottom: 1.5px solid #0f172a !important;
+      padding-bottom: 3px !important;
+      margin-top: 10px !important;
+      margin-bottom: 6px !important;
+    }
+    .sec-head.sec-head-teal {
+      border-bottom: 1.5px solid #00897b !important;
+    }
+    .sec-title {
+      font-size: 13px !important;
+      font-weight: 900 !important;
+      color: #0f172a !important;
+      letter-spacing: -0.3px !important;
+      display: inline-flex !important;
+      align-items: center !important;
     }
     .no-print { display: none !important; }
   </style>
