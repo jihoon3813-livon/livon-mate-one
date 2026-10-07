@@ -13831,7 +13831,7 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
       min-height: 1122px !important;
       max-height: 1122px !important;
       box-sizing: border-box !important;
-      padding: 24px 36px !important;
+      padding: 34px 38px !important;
       overflow: hidden !important;
       display: block !important;
       margin: 0 auto !important;
@@ -13841,15 +13841,15 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
       align-items: center !important;
       justify-content: space-between !important;
       border-bottom: 1.5px solid #0f172a !important;
-      padding-bottom: 3px !important;
-      margin-top: 10px !important;
-      margin-bottom: 6px !important;
+      padding-bottom: 4px !important;
+      margin-top: 14px !important;
+      margin-bottom: 8px !important;
     }
     .sec-head.sec-head-teal {
       border-bottom: 1.5px solid #00897b !important;
     }
     .sec-title {
-      font-size: 13px !important;
+      font-size: 13.5px !important;
       font-weight: 900 !important;
       color: #0f172a !important;
       letter-spacing: -0.3px !important;
@@ -13874,7 +13874,7 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
       justify-content: center !important;
       line-height: 1 !important;
       position: relative !important;
-      top: -1px !important;
+      top: -2.5px !important;
     }
     .careport-dot {
       display: inline-block !important;
@@ -13883,7 +13883,24 @@ async function generateCarePortPdfBytesForApp(appId, options = {}) {
       flex-shrink: 0 !important;
       vertical-align: middle !important;
       position: relative !important;
-      top: 0px !important;
+      top: -0.5px !important;
+    }
+    .state-item {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      line-height: 1 !important;
+      text-align: center !important;
+    }
+    .state-item .btn-text,
+    .state-item.binary > span,
+    .state-item.level > span {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      line-height: 1 !important;
+      position: relative !important;
+      top: -2.5px !important;
     }
     .no-print { display: none !important; }
   </style>
@@ -14091,14 +14108,28 @@ async function previewCustomerCareLogPdf(appId) {
     const lRaw = l.raw || l;
     const s = lRaw.trend_scores || lRaw.trendScores || l.trendScores || {};
     const day = l.dayNumber || (idx + 1);
+
+    const cats = lRaw.categories || l.categories || {};
+    const dietTone = cats.diet?.level || cats.meal?.tone || (lRaw.care_log?.diet_nutrition?.includes('불량') ? 'warning' : 'good');
+    const mobTone = cats.mobility?.level || cats.mobility?.tone || (lRaw.care_log?.mobility_activity?.includes('어려움') ? 'warning' : 'good');
+    const sleepTone = cats.sleep?.level || cats.sleep?.tone || (lRaw.guardian_notes?.sleep?.includes('불면') || lRaw.guardian_notes?.sleep?.includes('확인') ? 'warning' : 'good');
+    const painTone = cats.pain?.level || cats.pain?.tone || (lRaw.guardian_notes?.pain?.includes('통증') ? 'warning' : 'good');
+    const ovTone = l.overallStatus?.tone || lRaw.overall_status?.level || 'good';
+
+    const dScore = dietTone === 'warning' ? 3 : (dietTone === 'poor' ? 2 : 5);
+    const mScore = mobTone === 'warning' ? 3 : (mobTone === 'poor' ? 2 : 4);
+    const sScore = sleepTone === 'warning' ? 3 : (sleepTone === 'poor' ? 2 : 4);
+    const pScore = painTone === 'warning' ? 2 : (painTone === 'poor' ? 4 : 1);
+    const oScore = ovTone === 'warning' ? 3 : (ovTone === 'poor' ? 2 : 4);
+
     return {
       dayIndex: day,
       careDate: (l.consultDate || l.dateString || '').slice(0, 10),
-      overallScore: s.overallScore != null ? s.overallScore : (s.overall != null ? s.overall : 3),
-      mobilityScore: s.mobilityScore != null ? s.mobilityScore : (s.mobility != null ? s.mobility : 3),
-      dietScore: s.dietScore != null ? s.dietScore : (s.diet != null ? s.diet : 3),
-      sleepScore: s.sleepScore != null ? s.sleepScore : (s.sleep != null ? s.sleep : 3),
-      painScore: s.painScore != null ? s.painScore : (s.pain != null ? s.pain : 3)
+      overallScore: s.overallScore != null ? s.overallScore : (s.overall != null ? s.overall : oScore),
+      mobilityScore: s.mobilityScore != null ? s.mobilityScore : (s.mobility != null ? s.mobility : mScore),
+      dietScore: s.dietScore != null ? s.dietScore : (s.diet != null ? s.diet : dScore),
+      sleepScore: s.sleepScore != null ? s.sleepScore : (s.sleep != null ? s.sleep : sScore),
+      painScore: s.painScore != null ? s.painScore : (s.pain != null ? s.pain : pScore)
     };
   });
 
@@ -44365,11 +44396,57 @@ async function downloadPatientCareLogsPdfs(groupId) {
     });
     await new Promise(r => setTimeout(r, 10));
 
+    // 전체 일차의 종합 트렌드 점수(Cluster Trend Scores) 산출
+    const clusterTrendScores = sortedLogs.map((l, idx) => {
+      const detail = detailDataMap[l.sessionId] || {};
+      const rawObj = detail.raw || l.raw || {};
+      const ts = rawObj.trend_scores || rawObj.trendScores || detail.trendScores || l.trendScores || {};
+      const dateStr = (l.consultDate || l.dateString || detail.careDate || '').slice(0, 10);
+      
+      const cats = rawObj.categories || detail.categories || {};
+      const dietTone = cats.diet?.level || cats.meal?.tone || (rawObj.care_log?.diet_nutrition?.includes('불량') ? 'warning' : 'good');
+      const mobTone = cats.mobility?.level || cats.mobility?.tone || (rawObj.care_log?.mobility_activity?.includes('어려움') ? 'warning' : 'good');
+      const sleepTone = cats.sleep?.level || cats.sleep?.tone || (rawObj.guardian_notes?.sleep?.includes('불면') || rawObj.guardian_notes?.sleep?.includes('확인') ? 'warning' : 'good');
+      const painTone = cats.pain?.level || cats.pain?.tone || (rawObj.guardian_notes?.pain?.includes('통증') ? 'warning' : 'good');
+      const ovTone = l.overallStatus?.tone || rawObj.overall_status?.level || 'good';
+
+      const dScore = dietTone === 'warning' ? 3 : (dietTone === 'poor' ? 2 : 5);
+      const mScore = mobTone === 'warning' ? 3 : (mobTone === 'poor' ? 2 : 4);
+      const sScore = sleepTone === 'warning' ? 3 : (sleepTone === 'poor' ? 2 : 4);
+      const pScore = painTone === 'warning' ? 2 : (painTone === 'poor' ? 4 : 1);
+      const oScore = ovTone === 'warning' ? 3 : (ovTone === 'poor' ? 2 : 4);
+
+      return {
+        dayIndex: l.dayNumber || (idx + 1),
+        careDate: dateStr,
+        overallScore: ts.overallScore != null ? ts.overallScore : (ts.overall != null ? ts.overall : oScore),
+        mobilityScore: ts.mobilityScore != null ? ts.mobilityScore : (ts.mobility != null ? ts.mobility : mScore),
+        dietScore: ts.dietScore != null ? ts.dietScore : (ts.diet != null ? ts.diet : dScore),
+        sleepScore: ts.sleepScore != null ? ts.sleepScore : (ts.sleep != null ? ts.sleep : sScore),
+        painScore: ts.painScore != null ? ts.painScore : (ts.pain != null ? ts.pain : pScore)
+      };
+    });
+    patient.trendScores = clusterTrendScores;
+
     // 각 일차별 일지 HTML 사전 생성
     const dayHtmlList = [];
     for (let i = 0; i < sortedLogs.length; i++) {
       const log = sortedLogs[i];
-      const detailData = detailDataMap[log.sessionId] || null;
+      const logDate = (log.consultDate || log.dateString || '').slice(0, 10);
+      const dayNum = log.dayNumber || (i + 1);
+      const currentDayTrends = clusterTrendScores.filter((t, tIdx) => {
+        const tDate = (t.careDate || '').slice(0, 10);
+        if (tDate && logDate) return tDate <= logDate;
+        if (t.dayIndex != null && dayNum != null) return Number(t.dayIndex) <= Number(dayNum);
+        return tIdx <= i;
+      });
+
+      let detailData = detailDataMap[log.sessionId] ? { ...detailDataMap[log.sessionId] } : null;
+      if (detailData) {
+        detailData.trendScores = currentDayTrends;
+      }
+      log.trendScores = currentDayTrends;
+
       const html = (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function')
         ? window.CarePortClient.generateDailyLogHtml(patient, log, detailData)
         : '';
@@ -44443,7 +44520,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
       min-height: 1122px !important;
       max-height: 1122px !important;
       box-sizing: border-box !important;
-      padding: 24px 36px !important;
+      padding: 34px 38px !important;
       overflow: hidden !important;
       display: block !important;
       margin: 0 auto !important;
@@ -44453,15 +44530,15 @@ async function downloadPatientCareLogsPdfs(groupId) {
       align-items: center !important;
       justify-content: space-between !important;
       border-bottom: 1.5px solid #0f172a !important;
-      padding-bottom: 3px !important;
-      margin-top: 10px !important;
-      margin-bottom: 6px !important;
+      padding-bottom: 4px !important;
+      margin-top: 14px !important;
+      margin-bottom: 8px !important;
     }
     .sec-head.sec-head-teal {
       border-bottom: 1.5px solid #00897b !important;
     }
     .sec-title {
-      font-size: 13px !important;
+      font-size: 13.5px !important;
       font-weight: 900 !important;
       color: #0f172a !important;
       letter-spacing: -0.3px !important;
@@ -44486,7 +44563,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
       justify-content: center !important;
       line-height: 1 !important;
       position: relative !important;
-      top: -1px !important;
+      top: -2.5px !important;
     }
     .careport-dot {
       display: inline-block !important;
@@ -44495,7 +44572,24 @@ async function downloadPatientCareLogsPdfs(groupId) {
       flex-shrink: 0 !important;
       vertical-align: middle !important;
       position: relative !important;
-      top: 0px !important;
+      top: -0.5px !important;
+    }
+    .state-item {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      line-height: 1 !important;
+      text-align: center !important;
+    }
+    .state-item .btn-text,
+    .state-item.binary > span,
+    .state-item.level > span {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      line-height: 1 !important;
+      position: relative !important;
+      top: -2.5px !important;
     }
     .no-print { display: none !important; }
   </style>
@@ -44620,7 +44714,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
       max-height: 1122px !important;
       min-height: 1122px !important;
       box-sizing: border-box !important;
-      padding: 24px 36px !important;
+      padding: 34px 38px !important;
       overflow: hidden !important;
       display: block !important;
       margin: 0 auto !important;
@@ -44630,20 +44724,66 @@ async function downloadPatientCareLogsPdfs(groupId) {
       align-items: center !important;
       justify-content: space-between !important;
       border-bottom: 1.5px solid #0f172a !important;
-      padding-bottom: 3px !important;
-      margin-top: 10px !important;
-      margin-bottom: 6px !important;
+      padding-bottom: 4px !important;
+      margin-top: 14px !important;
+      margin-bottom: 8px !important;
     }
     .sec-head.sec-head-teal {
       border-bottom: 1.5px solid #00897b !important;
     }
     .sec-title {
-      font-size: 13px !important;
+      font-size: 13.5px !important;
       font-weight: 900 !important;
       color: #0f172a !important;
       letter-spacing: -0.3px !important;
       display: inline-flex !important;
       align-items: center !important;
+    }
+    .careport-badge-pill {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      vertical-align: middle !important;
+      box-sizing: border-box !important;
+      line-height: 1 !important;
+      text-align: center !important;
+      white-space: nowrap !important;
+    }
+    .careport-badge-pill .pill-text,
+    .careport-badge-pill > span:not(.careport-dot),
+    .careport-badge-pill > strong {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      line-height: 1 !important;
+      position: relative !important;
+      top: -2.5px !important;
+    }
+    .careport-dot {
+      display: inline-block !important;
+      border-radius: 50% !important;
+      background: currentColor !important;
+      flex-shrink: 0 !important;
+      vertical-align: middle !important;
+      position: relative !important;
+      top: -0.5px !important;
+    }
+    .state-item {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      line-height: 1 !important;
+      text-align: center !important;
+    }
+    .state-item .btn-text,
+    .state-item.binary > span,
+    .state-item.level > span {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      line-height: 1 !important;
+      position: relative !important;
+      top: -2.5px !important;
     }
     .no-print { display: none !important; }
   </style>
