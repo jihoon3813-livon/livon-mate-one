@@ -41563,6 +41563,49 @@ function toggleCarePortPatientSelect(groupId, checked) {
 }
 window.toggleCarePortPatientSelect = toggleCarePortPatientSelect;
 
+function toggleAllCarePortDays(groupId, isChecked) {
+  const cbs = document.querySelectorAll(`.cp-day-checkbox-${groupId}`);
+  cbs.forEach(cb => { cb.checked = isChecked; });
+  onCarePortDayCheckboxChanged(groupId);
+}
+window.toggleAllCarePortDays = toggleAllCarePortDays;
+
+function onCarePortDayCheckboxChanged(groupId) {
+  const cbs = document.querySelectorAll(`.cp-day-checkbox-${groupId}`);
+  const checkedCount = Array.from(cbs).filter(cb => cb.checked).length;
+  const countEl = document.getElementById(`cpSelectedDaysCount_${groupId}`);
+  if (countEl) {
+    countEl.innerText = checkedCount;
+  }
+  const selectAllCb = document.getElementById(`cpSelectAllDays_${groupId}`);
+  if (selectAllCb) {
+    selectAllCb.checked = checkedCount === cbs.length && cbs.length > 0;
+    selectAllCb.indeterminate = checkedCount > 0 && checkedCount < cbs.length;
+  }
+  const btn = document.getElementById(`cpBtnDownloadSelected_${groupId}`);
+  if (btn) {
+    if (checkedCount === 0) {
+      btn.classList.add('opacity-50', 'pointer-events-none');
+    } else {
+      btn.classList.remove('opacity-50', 'pointer-events-none');
+    }
+  }
+}
+window.onCarePortDayCheckboxChanged = onCarePortDayCheckboxChanged;
+
+async function downloadSelectedCarePortDays(groupId) {
+  const cbs = document.querySelectorAll(`.cp-day-checkbox-${groupId}:checked`);
+  const selectedSids = Array.from(cbs).map(cb => cb.dataset.sid).filter(Boolean);
+  if (selectedSids.length === 0) {
+    alert('선택된 일자가 없습니다. 다운로드할 날짜를 1개 이상 선택해주세요.');
+    return;
+  }
+  const totalCbs = document.querySelectorAll(`.cp-day-checkbox-${groupId}`);
+  const sidsToPass = (selectedSids.length === totalCbs.length) ? null : selectedSids;
+  await downloadPatientCareLogsViaRobot(groupId, sidsToPass);
+}
+window.downloadSelectedCarePortDays = downloadSelectedCarePortDays;
+
 function renderCareLogs() {
   if (typeof gCarePortSelectedPatients === 'undefined' || !gCarePortSelectedPatients) {
     window.gCarePortSelectedPatients = new Set();
@@ -41795,7 +41838,7 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
 
         <!-- Accordion Body: Daily Logs Compact List (명확한 서브 계층 배경 및 콤팩트 리스트) -->
         <div id="patient-accordion-${group.id}" class="${isExpanded ? '' : 'hidden'} px-4 py-4 sm:px-6 sm:py-5 bg-slate-50/80 border-t-2 border-purple-200/80 space-y-2.5">
-          <div class="flex items-center justify-between px-1">
+          <div class="flex items-center justify-between px-1 flex-wrap gap-2">
             <div class="flex items-center gap-2">
               <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-purple-100 text-purple-700">
                 <i data-lucide="corner-down-right" class="w-3.5 h-3.5"></i>
@@ -41807,7 +41850,21 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
                 총 ${dailyLogs.length}건
               </span>
             </div>
-            <span class="text-[11px] text-slate-400 font-medium hidden sm:inline">CarePort 전산 실시간 연동</span>
+
+            <!-- Day Selection Controls & Selected Download Button -->
+            <div class="flex items-center gap-2.5 shrink-0">
+              <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-2xs hover:bg-slate-50 cursor-pointer select-none">
+                <input type="checkbox" id="cpSelectAllDays_${group.id}" checked onchange="toggleAllCarePortDays('${group.id}', this.checked)" class="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer">
+                <span>전체선택</span>
+              </label>
+              <button type="button" id="cpBtnDownloadSelected_${group.id}" onclick="downloadSelectedCarePortDays('${group.id}')"
+                class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-black text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                title="선택된 일자들만 모아서 1개의 공식 A4 합본 PDF로 다운로드합니다">
+                <i data-lucide="check-square" class="w-3.5 h-3.5 text-emerald-200"></i>
+                <span>선택 일자 다운로드 (<b id="cpSelectedDaysCount_${group.id}">${dailyLogs.length}</b>일차)</span>
+              </button>
+              <span class="text-[11px] text-slate-400 font-medium hidden md:inline ml-1">CarePort 실시간 연동</span>
+            </div>
           </div>
 
           <!-- Compact List Table / Rows -->
@@ -41875,8 +41932,11 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
 
               return `
                 <div class="px-4 py-3 hover:bg-purple-50/40 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs">
-                  <!-- Left: Care Note badge, Date, Title -->
+                  <!-- Left: Day Checkbox, Care Note badge, Date, Title -->
                   <div class="flex items-center gap-3 min-w-0 flex-1">
+                    <input type="checkbox" class="cp-day-checkbox-${group.id} w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer shrink-0" 
+                      data-sid="${sid}" checked onchange="onCarePortDayCheckboxChanged('${group.id}')"
+                      title="이 일차를 선택/해제">
                     <span class="px-2 py-0.5 rounded-md font-black text-[11px] bg-teal-600 text-white shrink-0 shadow-2xs">
                       간병일지
                     </span>
@@ -44690,7 +44750,7 @@ async function downloadCarePortViaRobot(targetSessionId = null, targetPatientNam
 }
 window.downloadCarePortViaRobot = downloadCarePortViaRobot;
 
-async function downloadPatientCareLogsViaRobot(groupId) {
+async function downloadPatientCareLogsViaRobot(groupId, selectedSessionIds = null) {
   const patient = (typeof gCarePortPatientGroups !== 'undefined' ? gCarePortPatientGroups : []).find(p => p.id === groupId);
   if (!patient) {
     alert('환자 정보를 찾을 수 없습니다.');
@@ -44703,7 +44763,7 @@ async function downloadPatientCareLogsViaRobot(groupId) {
   }
 
   // 1일차부터 마지막 일차까지 오름차순 정렬
-  const sortedLogs = [...logs].sort((a, b) => {
+  let sortedLogs = [...logs].sort((a, b) => {
     const dayA = a.dayNumber || 0;
     const dayB = b.dayNumber || 0;
     if (dayA !== dayB && dayA > 0 && dayB > 0) return dayA - dayB;
@@ -44711,6 +44771,19 @@ async function downloadPatientCareLogsViaRobot(groupId) {
     const dateB = b.dateString || b.consultDate || b.startDate || '';
     return dateA.localeCompare(dateB);
   });
+
+  const isSelective = Array.isArray(selectedSessionIds) && selectedSessionIds.length > 0;
+  if (isSelective) {
+    const sidSet = new Set(selectedSessionIds.map(s => String(s).replace(/\D/g, '')));
+    sortedLogs = sortedLogs.filter(l => {
+      const sid = String(l.sessionId || l.id || '').replace(/\D/g, '');
+      return sidSet.has(sid);
+    });
+    if (sortedLogs.length === 0) {
+      alert('선택된 유효한 일자가 없습니다.');
+      return;
+    }
+  }
 
   const sessionList = sortedLogs.map((l, idx) => ({
     sessionId: l.sessionId || (l.id ? String(l.id).replace(/\D/g, '') : ''),
@@ -44720,10 +44793,11 @@ async function downloadPatientCareLogsViaRobot(groupId) {
 
   const totalDays = sessionList.length;
   const username = (patient.patientName || '환자').trim();
+  const labelPrefix = isSelective ? `선택 ${totalDays}일차` : `전체 ${totalDays}일차`;
 
   showGlobalProgress({
-    title: `[${username} 님] 전체 ${totalDays}일차 원본 다운로드`,
-    subtitle: `전체 ${totalDays}개 일지 원본 데이터를 받아와 1개의 공식 A4 합본 PDF로 조립합니다.`,
+    title: `[${username} 님] ${labelPrefix} 원본 다운로드`,
+    subtitle: `${labelPrefix} 일지 원본 데이터를 받아와 1개의 공식 A4 합본 PDF로 조립합니다.`,
     percent: 15,
     statusText: `무인 로봇 가동 및 케어포트 전산 접속 중...`,
     icon: 'bot'
@@ -44761,11 +44835,13 @@ async function downloadPatientCareLogsViaRobot(groupId) {
       throw new Error(errMsg);
     }
 
-    updateGlobalProgress({ percent: 95, statusText: `전체 ${totalDays}일차 (${totalDays * 2}페이지) 공식 PDF 조립 완료!` });
+    updateGlobalProgress({ percent: 95, statusText: `${labelPrefix} (${totalDays * 2}페이지) 공식 PDF 조립 완료!` });
 
     const blob = await res.blob();
     const cleanDate = new Date().toISOString().slice(0, 10).replace(/[^0-9]/g, '');
-    const fileName = `[케어포트_공식간병일지_전체일지합본]_${username}_총${totalDays}일차_${cleanDate}.pdf`;
+    const fileName = isSelective
+      ? `[케어포트_공식간병일지_선택일지합본]_${username}_선택${totalDays}일차_${cleanDate}.pdf`
+      : `[케어포트_공식간병일지_전체일지합본]_${username}_총${totalDays}일차_${cleanDate}.pdf`;
 
     const downloadUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -44776,25 +44852,25 @@ async function downloadPatientCareLogsViaRobot(groupId) {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
 
-    updateGlobalProgress({ percent: 100, statusText: `완료! 총 ${totalDays}일차 (${totalDays * 2}P) 전체 원본 합본이 다운로드되었습니다.` });
+    updateGlobalProgress({ percent: 100, statusText: `완료! 총 ${totalDays}일차 (${totalDays * 2}P) 합본이 다운로드되었습니다.` });
     setTimeout(hideGlobalProgress, 1200);
 
     if (typeof showToast === 'function') {
-      showToast(`[${username} 님] 전체 ${totalDays}일차 (${totalDays * 2}페이지) 원본 합본 PDF 다운로드 완료!`, 'success');
+      showToast(`[${username} 님] ${labelPrefix} (${totalDays * 2}페이지) 원본 합본 PDF 다운로드 완료!`, 'success');
     }
   } catch (err) {
     clearInterval(ticker);
     console.warn('[Robot Download All] 서버 무인 로봇 불가(Vercel 등), 클라이언트 고해상도 전체합본 PDF 엔진으로 자동 전환:', err);
     updateGlobalProgress({
       percent: 45,
-      statusText: `클라이언트 고해상도 전체일지 PDF 엔진으로 자동 전환하여 조립 중...`
+      statusText: `클라이언트 고해상도 PDF 엔진으로 자동 전환하여 조립 중...`
     });
     try {
-      await downloadPatientCareLogsPdfs(groupId);
+      await downloadPatientCareLogsPdfs(groupId, selectedSessionIds);
     } catch (fallbackErr) {
       console.error('[Fallback All PDF] 실패:', fallbackErr);
       hideGlobalProgress();
-      alert(`전체 일지 다운로드 안내: ${fallbackErr.message || err.message}`);
+      alert(`일지 다운로드 안내: ${fallbackErr.message || err.message}`);
     }
   }
 }
@@ -45107,7 +45183,7 @@ async function downloadPatientCareLogsPdfs_new(groupId) {
  * (1차: 고성능 서버 네이티브 Edge Print-To-PDF 엔진으로 2~3초 초고속 생성)
  * (2차 fallback: 외부 폰트 중복 로딩 제거 & 1-by-1 비동기 렌더링으로 브라우저 프리징 완전 제거)
  */
-async function downloadPatientCareLogsPdfs(groupId) {
+async function downloadPatientCareLogsPdfs(groupId, selectedSessionIds = null) {
   const patient = (gCarePortPatientGroups || []).find(g => g.id === groupId);
   if (!patient) return;
 
@@ -45118,7 +45194,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
   }
 
   // 날짜별 순서(Day 1 -> Day N 또는 시작일 -> 종료일)로 오름차순 정렬
-  const sortedLogs = [...logs].sort((a, b) => {
+  let sortedLogs = [...logs].sort((a, b) => {
     const dayA = a.dayNumber || 0;
     const dayB = b.dayNumber || 0;
     if (dayA !== dayB && dayA > 0 && dayB > 0) return dayA - dayB;
@@ -45127,13 +45203,27 @@ async function downloadPatientCareLogsPdfs(groupId) {
     return dateA.localeCompare(dateB);
   });
 
+  const isSelective = Array.isArray(selectedSessionIds) && selectedSessionIds.length > 0;
+  if (isSelective) {
+    const sidSet = new Set(selectedSessionIds.map(s => String(s).replace(/\D/g, '')));
+    sortedLogs = sortedLogs.filter(l => {
+      const sid = String(l.sessionId || l.id || '').replace(/\D/g, '');
+      return sidSet.has(sid);
+    });
+    if (sortedLogs.length === 0) {
+      alert('선택된 유효한 일자가 없습니다.');
+      return;
+    }
+  }
+
   const totalDays = sortedLogs.length;
+  const labelPrefix = isSelective ? `선택 ${totalDays}일차` : `전체 ${totalDays}일차`;
 
   showGlobalProgress({
-    title: `[${patient.patientName} 님] 전체 ${totalDays}일차 원본 다운로드`,
-    subtitle: `전체 ${totalDays}개 일지 원본 데이터를 받아와 1개의 공식 A4 합본 PDF로 조립합니다.`,
+    title: `[${patient.patientName} 님] ${labelPrefix} 원본 다운로드`,
+    subtitle: `${labelPrefix} 일지 원본 데이터를 받아와 1개의 공식 A4 합본 PDF로 조립합니다.`,
     percent: 15,
-    statusText: `전체 ${totalDays}일차 일지원문 데이터 병렬 로드 중...`,
+    statusText: `${labelPrefix} 일지원문 데이터 병렬 로드 중...`,
     icon: 'bot'
   });
 
@@ -45237,7 +45327,10 @@ async function downloadPatientCareLogsPdfs(groupId) {
     const startDate = (patient.careStartDate || '').replace(/[^0-9]/g, '');
     const endDate = (patient.careEndDate || '').replace(/[^0-9]/g, '');
     const dateRangeStr = (startDate && endDate) ? `_${startDate}-${endDate}` : '';
-    const fileName = `[케어포트_공식간병일지_전체일지합본]_${patient.patientName}_총${totalDays}일차${dateRangeStr}.pdf`;
+    const cleanDate = new Date().toISOString().slice(0, 10).replace(/[^0-9]/g, '');
+    const fileName = isSelective
+      ? `[케어포트_공식간병일지_선택일지합본]_${patient.patientName}_선택${totalDays}일차_${cleanDate}.pdf`
+      : `[케어포트_공식간병일지_전체일지합본]_${patient.patientName}_총${totalDays}일차${dateRangeStr}.pdf`;
 
     let pdfBytes = null;
 

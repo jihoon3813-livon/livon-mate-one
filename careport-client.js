@@ -2201,6 +2201,7 @@
       <!-- Diary Header -->
       <header class="diary-header">
         <div>
+          <p class="eyebrow">보호자 안내용</p>
           <h1>간병일지</h1>
         </div>
         <div class="care-day-badge">
@@ -2286,7 +2287,7 @@
     <!-- 2페이지 시작: 금일 간병 수행 내역 & 보호자 전달사항 -->
     <article class="report-page continuous-page second-page" id="carePortPage2" style="page-break-before: always; margin-top: 24px;">
       <div class="page-indicator" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; font-size: 11px; font-weight: 700; color: #64748b;">
-        <span>간병일지 · 세부 수행 내역 및 보호자 전달사항</span>
+        <span>보호자 안내용 간병일지 · 세부 수행 내역 및 보호자 전달사항</span>
         <span style="font-family: monospace; font-size: 12px; color: #0f172a;">Page 2 / 2</span>
       </div>
 
