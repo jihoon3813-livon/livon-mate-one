@@ -156,10 +156,10 @@
       }
 
       let data = null;
-      // 1. Try Serverless API with timeout (2초로 단축하여 불필요한 대기 방지)
+      // 1. Try Serverless API with timeout (15초로 설정하여 Vercel 및 CarePort 백엔드 응답 완벽 수용)
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
         const res = await fetch(`${this.apiBase}/detail?sessionId=${sessionId}`, { signal: controller.signal });
         clearTimeout(timeoutId);
         if (res.ok) {
@@ -436,7 +436,14 @@
           });
         }
 
-        patientGroups.get(groupKey).rawLogs.push(log);
+        const grp = patientGroups.get(groupKey);
+        const sid = String(log.sessionId || log.id || '').trim();
+        if (!grp._seenSids) grp._seenSids = new Set();
+        if (sid && grp._seenSids.has(sid)) {
+          return; // 중복 수신된 동일 세션 ID 방지 (30일차가 60일차 등으로 뻥튀기되는 현상 원천 차단)
+        }
+        if (sid) grp._seenSids.add(sid);
+        grp.rawLogs.push(log);
       });
 
       // Process each group: sort logs chronologically and assign dayNumber
