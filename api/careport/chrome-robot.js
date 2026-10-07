@@ -296,19 +296,15 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
             // Restore displays
             p1.style.display = origP1Display;
             p2.style.display = origP2Display;
-          } else if (consultState) {
-            // Case 2: AI Consult Call report with #consult-state
-            consultState.style.display = "none";
-            const canvas1 = await html2canvasFn(cap, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-            img1 = canvas1.toDataURL("image/png");
-
-            consultState.style.display = "block";
-            const canvas2 = await html2canvasFn(consultState, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-            img2 = canvas2.toDataURL("image/png");
           } else {
-            // Case 3: Fallback single page
+            // Case 2: 구버전 (Classic / AI 상담 간병일지) -> 원본 전산과 100% 동일하게 전체 내용(상담내용 + 상담요약)을 A4 1장에 온전하게 캡처
+            if (consultState) {
+              consultState.style.display = "block";
+            }
+            await new Promise(r => setTimeout(r, 120));
             const canvas = await html2canvasFn(cap, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
             img1 = canvas.toDataURL("image/png");
+            img2 = null;
           }
 
           if (n) n.style.display = "";
@@ -384,7 +380,8 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
 
       const val = extractResult?.result?.value;
       if (val && val.img1) {
-        console.log(`[ChromeRobot] [${idx + 1}/${totalCount}] 세션 #${sid} 2장 캡처 완료 (img1: ${val.img1.length}, img2: ${val.img2 ? val.img2.length : 0})`);
+        const pageCount = val.img2 ? 2 : 1;
+        console.log(`[ChromeRobot] [${idx + 1}/${totalCount}] 세션 #${sid} ${pageCount}P 캡처 완료 (img1: ${val.img1.length}${val.img2 ? ', img2: ' + val.img2.length : ''})`);
         results.push({
           sessionId: sid,
           dayNumber: item.dayNumber,
@@ -404,7 +401,8 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
       throw new Error('케어포트 화면 캡처 실패: 추출된 이미지가 없습니다.');
     }
 
-    console.log(`[ChromeRobot] 전체 ${results.length}개 세션 캡처 완료! (총 ${results.length * 2}페이지 분량)`);
+    const totalPages = results.reduce((acc, r) => acc + (r.img2 ? 2 : 1), 0);
+    console.log(`[ChromeRobot] 전체 ${results.length}개 세션 캡처 완료! (총 ${totalPages}페이지 분량)`);
 
     return {
       success: true,

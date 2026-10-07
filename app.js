@@ -44666,11 +44666,19 @@ async function downloadCarePortDocumentPdf() {
 
     let pdfBytes = null;
 
-    // 1순위: 화면에 표시된 완성도 높은 일지원문(#carePortPrintArea)을 1:1 그대로 연속 A4 PDF로 변환 (사용자 원문 그대로 쭉 이어서 다운로드)
+    // 1순위: 화면에 표시된 완성도 높은 일지원문(#carePortPrintArea)을 렌더링 (구버전은 원본과 동일하게 A4 1장, 신버전은 2장)
     if (printArea && printArea.offsetHeight > 100) {
-      updateGlobalProgress({ percent: 50, statusText: `화면 일지원문 1:1 고해상도 연속 A4 PDF 변환 중...` });
+      const isClassic = window.CarePortClient && typeof window.CarePortClient.isClassicLog === 'function' && window.CarePortClient.isClassicLog(null, detail);
+      updateGlobalProgress({
+        percent: 50,
+        statusText: isClassic ? `구버전 원본 규격 A4 1장 PDF 변환 중...` : `화면 일지원문 1:1 고해상도 연속 A4 PDF 변환 중...`
+      });
       try {
-        pdfBytes = await renderElementToContinuousA4PdfBytes(printArea, 14);
+        if (isClassic) {
+          pdfBytes = await renderElementToSinglePageA4PdfBytes(printArea, 14);
+        } else {
+          pdfBytes = await renderElementToContinuousA4PdfBytes(printArea, 14);
+        }
       } catch (domErr) {
         console.warn('[CarePort PDF] 모달 영역 직접 렌더링 실패, HTML 생성기 fallback 진행:', domErr);
       }
@@ -45278,11 +45286,15 @@ async function downloadPatientCareLogsPdfs(groupId) {
 
       for (let i = 0; i < dayHtmlList.length; i++) {
         const dHtml = dayHtmlList[i];
+        const log = sortedLogs[i];
+        const isClassic = window.CarePortClient && typeof window.CarePortClient.isClassicLog === 'function' && window.CarePortClient.isClassicLog(log, detailDataMap[log?.sessionId]);
         updateGlobalProgress({
           percent: 50 + Math.round(((i + 1) / dayHtmlList.length) * 45),
-          statusText: `[${i + 1}/${dayHtmlList.length}일차] 일지원문 고해상도 연속 A4 일지 렌더링 중...`
+          statusText: `[${i + 1}/${dayHtmlList.length}일차] ${isClassic ? '구버전 원본 규격 A4 1장' : '일지원문 고해상도 A4 2P'} 렌더링 중...`
         });
-        const dayBytes = await renderHtmlToContinuousA4PdfBytes(dHtml, 14);
+        const dayBytes = isClassic
+          ? await renderHtmlToSinglePageA4PdfBytes(dHtml, 12)
+          : await renderHtmlToContinuousA4PdfBytes(dHtml, 14);
         if (dayBytes) {
           const dayDoc = await PDFLib.PDFDocument.load(dayBytes);
           const copiedPages = await mergedDoc.copyPages(dayDoc, dayDoc.getPageIndices());
