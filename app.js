@@ -41483,14 +41483,23 @@ function renderCareLogs() {
 }
 
 function renderCareLogPatientCards(groups) {
-  const containers = [
-    document.getElementById('careLogPatientCardsContainer'),
-    document.getElementById('careLogPatientCardsContainer_new')
-  ].filter(Boolean);
-  if (containers.length === 0) return;
+  const containerOld = document.getElementById('careLogPatientCardsContainer');
+  const containerNew = document.getElementById('careLogPatientCardsContainer_new');
 
+  if (containerOld) {
+    containerOld.innerHTML = buildCareLogCardsHtml(groups, false);
+    if (typeof initIcons === 'function') initIcons(containerOld);
+  }
+  if (containerNew) {
+    containerNew.innerHTML = buildCareLogCardsHtml(groups, true);
+    if (typeof initIcons === 'function') initIcons(containerNew);
+  }
+}
+window.renderCareLogPatientCards = renderCareLogPatientCards;
+
+function buildCareLogCardsHtml(groups, isNewTab = false) {
   if (!groups || groups.length === 0) {
-    const emptyHtml = `
+    return `
       <div class="bg-white p-12 rounded-3xl border border-slate-200 text-center text-slate-400 shadow-xs">
         <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-purple-50 text-purple-500 flex items-center justify-center">
           <i data-lucide="folder-search" class="w-7 h-7"></i>
@@ -41499,14 +41508,9 @@ function renderCareLogPatientCards(groups) {
         <p class="text-xs text-slate-400 mt-1.5">상단의 <b>[전산 실시간 동기화]</b> 버튼을 클릭하여 리본케어포트 전산의 최신 일지를 불러오세요.</p>
       </div>
     `;
-    containers.forEach(c => {
-      c.innerHTML = emptyHtml;
-      if (typeof initIcons === 'function') initIcons(c);
-    });
-    return;
   }
 
-  const cardsHtml = groups.map((group) => {
+  return groups.map((group) => {
     const isSelected = gCarePortSelectedPatients.has(group.id);
     const isExpanded = gCarePortExpandedPatients.has(group.id);
     const maskedName = typeof maskName === 'function' ? maskName(group.patientName) : group.patientName;
@@ -41520,6 +41524,24 @@ function renderCareLogPatientCards(groups) {
     const cardBorderClass = isSelected
       ? 'border-purple-500 shadow-md ring-2 ring-purple-400/20'
       : (isExpanded ? 'border-purple-300 shadow-sm ring-1 ring-purple-200/60' : 'border-slate-200 shadow-2xs');
+
+    const downloadBtnHtml = isNewTab
+      ? `
+        <button type="button" onclick="downloadPatientCareLogsPdfs_new('${group.id}')"
+          class="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+          title="해당 환자의 공식 A4 2페이지 간병 리포트 PDF 다운로드 (신규 서식)">
+          <i data-lucide="file-check-2" class="w-4 h-4 text-indigo-600"></i>
+          <span>공식 2P PDF 다운로드</span>
+        </button>
+      `
+      : `
+        <button type="button" onclick="downloadPatientCareLogsPdfs('${group.id}')"
+          class="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+          title="해당 환자의 케어포트 등록 전체 간병일지 통합 PDF 다운로드 (기존 서식)">
+          <i data-lucide="file-down" class="w-4 h-4 text-purple-600"></i>
+          <span>전체 일지 PDF 다운로드</span>
+        </button>
+      `;
 
     return `
       <div class="bg-white rounded-3xl border ${cardBorderClass} transition-all overflow-hidden">
@@ -41591,12 +41613,7 @@ function renderCareLogPatientCards(groups) {
               <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4 ${isExpanded ? 'text-purple-700' : 'text-purple-600'}"></i>
               <span>${isExpanded ? '일지 접기' : `일자별 일지 펼치기 (${group.totalDays}건)`}</span>
             </button>
-            <button type="button" onclick="downloadPatientCareLogsPdfs('${group.id}')"
-              class="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
-              title="해당 환자의 공식 A4 2페이지 간병 리포트 PDF 다운로드">
-              <i data-lucide="file-check-2" class="w-4 h-4 text-indigo-600"></i>
-              <span>전체 일지 PDF 다운로드</span>
-            </button>
+            ${downloadBtnHtml}
             <button type="button" onclick="attachCarePortLogsAndOpenEmail('${group.id}')"
               class="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-900/30 flex items-center gap-1.5 transition-all cursor-pointer"
               title="간병 종료 보고 및 청구 메일에 일자별 PDF 일지를 ZIP 없이 개별 첨부">
@@ -41668,6 +41685,24 @@ function renderCareLogPatientCards(groups) {
               }
               const title = rawTitle;
 
+              const actionBtnHtml = isNewTab
+                ? `
+                  <button type="button" onclick="openCareReport2PageModal('${group.id}', ${log.dayNumber || (idx + 1)})"
+                    class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+                    title="공식 A4 2페이지 간병 리포트 미리보기 모달 열기">
+                    <i data-lucide="file-check-2" class="w-3 h-3 text-indigo-600"></i>
+                    <span>공식(2P)</span>
+                  </button>
+                `
+                : `
+                  <button type="button" onclick="openCarePortOfficialModal('${sid}')"
+                    class="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+                    title="케어포트 공인 간병일지 원문 보기 및 단일 인쇄">
+                    <i data-lucide="file-text" class="w-3 h-3 text-purple-600"></i>
+                    <span>일지 원문</span>
+                  </button>
+                `;
+
               return `
                 <div class="px-4 py-3 hover:bg-purple-50/40 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs">
                   <!-- Left: Care Note badge, Date, Title -->
@@ -41701,12 +41736,7 @@ function renderCareLogPatientCards(groups) {
                         <i data-lucide="smartphone" class="w-3 h-3 text-pink-600"></i>
                         <span>모바일</span>
                       </button>
-                      <button type="button" onclick="openCareReport2PageModal('${group.id}', ${log.dayNumber || (idx + 1)})"
-                        class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
-                        title="공식 A4 2페이지 간병 리포트 미리보기 모달 열기">
-                        <i data-lucide="file-check-2" class="w-3 h-3 text-indigo-600"></i>
-                        <span>공식(2P)</span>
-                      </button>
+                      ${actionBtnHtml}
                     </div>
                   </div>
                 </div>
@@ -41717,37 +41747,35 @@ function renderCareLogPatientCards(groups) {
       </div>
     `;
   }).join('');
-
-  containers.forEach(c => {
-    c.innerHTML = cardsHtml;
-    if (typeof initIcons === 'function') initIcons(c);
-  });
 }
-window.renderCareLogPatientCards = renderCareLogPatientCards;
 
 function renderCareLogFlatTable(filtered) {
-  const tbodies = [
-    document.getElementById('careLogsTableBody'),
-    document.getElementById('careLogsTableBody_new')
-  ].filter(Boolean);
-  if (tbodies.length === 0) return;
+  const tbodyOld = document.getElementById('careLogsTableBody');
+  const tbodyNew = document.getElementById('careLogsTableBody_new');
+  if (tbodyOld) {
+    tbodyOld.innerHTML = buildCareLogFlatTableRows(filtered, false);
+    if (typeof initIcons === 'function') initIcons(tbodyOld);
+  }
+  if (tbodyNew) {
+    tbodyNew.innerHTML = buildCareLogFlatTableRows(filtered, true);
+    if (typeof initIcons === 'function') initIcons(tbodyNew);
+  }
+}
+window.renderCareLogFlatTable = renderCareLogFlatTable;
+window.renderCareLogs = renderCareLogs;
 
-  if (filtered.length === 0) {
-    const emptyRow = `
+function buildCareLogFlatTableRows(filtered, isNewTab = false) {
+  if (!filtered || filtered.length === 0) {
+    return `
       <tr>
         <td colspan="10" class="p-8 text-center text-slate-400">
           <div class="font-bold text-slate-600">등록된 케어포트 간병일지가 없습니다.</div>
         </td>
       </tr>
     `;
-    tbodies.forEach(tbody => {
-      tbody.innerHTML = emptyRow;
-      if (typeof initIcons === 'function') initIcons(tbody);
-    });
-    return;
   }
 
-  const rowsHtml = filtered.map((log, idx) => {
+  return filtered.map((log, idx) => {
     const sid = log.sessionId || (log.id ? String(log.id).replace(/\D/g, '') : '');
     const isChecked = gCareLogSelection.has(sid || log.id);
 
@@ -41766,6 +41794,24 @@ function renderCareLogFlatTable(filtered) {
       : org.includes('케어링')
       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
       : 'bg-purple-50 text-purple-700 border-purple-200';
+
+    const actionBtnHtml = isNewTab
+      ? `
+        <button type="button" onclick="openCareReport2PageModal('${pName}', ${log.dayNumber || 1})" 
+          class="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
+          title="공식 A4 2페이지 간병 리포트 미리보기 모달 열기">
+          <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-indigo-600"></i>
+          <span>공식(2P)</span>
+        </button>
+      `
+      : `
+        <button type="button" onclick="openCarePortOfficialModal('${sid}')" 
+          class="px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
+          title="케어포트 공인 간병일지 원문 보기">
+          <i data-lucide="file-text" class="w-3.5 h-3.5 text-purple-600"></i>
+          <span>일지 원문</span>
+        </button>
+      `;
 
     return `
       <tr class="hover:bg-purple-50/40 transition-colors text-xs border-b border-slate-100">
@@ -41805,7 +41851,7 @@ function renderCareLogFlatTable(filtered) {
         <td class="p-2.5 text-center font-mono text-purple-700 font-bold border-r border-slate-100">
           ${duration}
         </td>
-        <!-- 간병일지 열람 (모바일 및 공식 2P 미리보기) -->
+        <!-- 간병일지 열람 (기존: 일지 원문 / NEW: 공식 2P 미리보기) -->
         <td class="p-2.5 text-center">
           <div class="inline-flex items-center gap-1.5 justify-center flex-wrap">
             <button type="button" onclick="openMobileCareDiaryPreview('${pName}', ${log.dayNumber || 1})" 
@@ -41814,25 +41860,13 @@ function renderCareLogFlatTable(filtered) {
               <i data-lucide="smartphone" class="w-3.5 h-3.5 text-pink-600"></i>
               <span>모바일</span>
             </button>
-            <button type="button" onclick="openCareReport2PageModal('${pName}', ${log.dayNumber || 1})" 
-              class="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
-              title="공식 A4 2페이지 간병 리포트 미리보기 모달 열기">
-              <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-indigo-600"></i>
-              <span>공식(2P)</span>
-            </button>
+            ${actionBtnHtml}
           </div>
         </td>
       </tr>
     `;
   }).join('');
-
-  tbodies.forEach(tbody => {
-    tbody.innerHTML = rowsHtml;
-    if (typeof initIcons === 'function') initIcons(tbody);
-  });
 }
-window.renderCareLogFlatTable = renderCareLogFlatTable;
-window.renderCareLogs = renderCareLogs;
 
 function toggleCareLogSelect(id, checked) {
   if (checked) {
@@ -42149,7 +42183,9 @@ function downloadCareReport2PagePdf(patientNameOrGroupId, dayNum = null) {
   }
   if (!pName) pName = (typeof gCurrentMobileDiaryPatient !== 'undefined' && gCurrentMobileDiaryPatient) ? gCurrentMobileDiaryPatient : '고연분';
   
-  if (typeof downloadPatientCareLogsPdfs === 'function') {
+  if (typeof downloadPatientCareLogsPdfs_new === 'function') {
+    downloadPatientCareLogsPdfs_new(patientNameOrGroupId);
+  } else if (typeof downloadPatientCareLogsPdfs === 'function') {
     downloadPatientCareLogsPdfs(patientNameOrGroupId);
   } else {
     const dayParam = dayNum ? `&day=${encodeURIComponent(dayNum)}` : '';
@@ -42296,13 +42332,19 @@ function downloadCareReport2PageModalPdf() {
       hideGlobalProgress(350);
     }).catch(err => {
       hideGlobalProgress();
-      downloadPatientCareLogsPdfs(window._current2PageModalGroupId || pName);
+      if (typeof downloadPatientCareLogsPdfs_new === 'function') {
+        downloadPatientCareLogsPdfs_new(window._current2PageModalGroupId || pName);
+      } else {
+        downloadPatientCareLogsPdfs(window._current2PageModalGroupId || pName);
+      }
     });
     return;
   }
 
   const gId = window._current2PageModalGroupId || pName;
-  if (typeof downloadPatientCareLogsPdfs === 'function') {
+  if (typeof downloadPatientCareLogsPdfs_new === 'function') {
+    downloadPatientCareLogsPdfs_new(gId);
+  } else if (typeof downloadPatientCareLogsPdfs === 'function') {
     downloadPatientCareLogsPdfs(gId);
   } else {
     window.open(`/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}`, '_blank');
@@ -44148,11 +44190,9 @@ async function generateDailyLogPdfBlob(patient, log, detailData = null) {
 }
 
 /**
- * 해당 환자의 전체 일지를 개별 파일이 아닌, 1개의 파일에 날짜별로 연속 연결된 단일 멀티페이지 PDF로 다운로드
- * (1차: 고성능 서버 네이티브 Edge Print-To-PDF 엔진으로 2~3초 초고속 생성)
- * (2차 fallback: 외부 폰트 중복 로딩 제거 & 1-by-1 비동기 렌더링으로 브라우저 프리징 완전 제거)
+ * [신규간병일지 NEW 전용] 해당 환자의 표준 A4 2페이지 공식 간병 리포트 PDF 다운로드
  */
-async function downloadPatientCareLogsPdfs(groupId) {
+async function downloadPatientCareLogsPdfs_new(groupId) {
   let patient = (gCarePortPatientGroups || []).find(g => g && (g.id === groupId || g.patientName === groupId));
   const pName = patient ? patient.patientName : groupId;
   if (!pName) {
@@ -44270,7 +44310,12 @@ async function downloadPatientCareLogsPdfs(groupId) {
   }
 }
 
-async function legacyDownloadPatientCareLogsPdfs(groupId) {
+/**
+ * [기존 간병일지 전용] 해당 환자의 전체 일지를 1개의 파일에 날짜별로 연속 연결된 단일 멀티페이지 PDF로 다운로드
+ * (1차: 고성능 서버 네이티브 Edge Print-To-PDF 엔진으로 2~3초 초고속 생성)
+ * (2차 fallback: 외부 폰트 중복 로딩 제거 & 1-by-1 비동기 렌더링으로 브라우저 프리징 완전 제거)
+ */
+async function downloadPatientCareLogsPdfs(groupId) {
   const patient = (gCarePortPatientGroups || []).find(g => g.id === groupId);
   if (!patient) return;
 
@@ -44683,6 +44728,7 @@ async function legacyDownloadPatientCareLogsPdfs(groupId) {
 var downloadPatientCareLogsZip = downloadPatientCareLogsPdfs;
 window.downloadPatientCareLogsPdfs = downloadPatientCareLogsPdfs;
 window.downloadPatientCareLogsZip = downloadPatientCareLogsZip;
+window.downloadPatientCareLogsPdfs_new = downloadPatientCareLogsPdfs_new;
 
 async function batchDownloadSelectedPatientPdfs() {
   if (typeof gCarePortSelectedPatients === 'undefined' || !gCarePortSelectedPatients || gCarePortSelectedPatients.size === 0) {
@@ -44726,6 +44772,49 @@ async function batchDownloadSelectedPatientPdfs() {
 var batchDownloadSelectedPatientZips = batchDownloadSelectedPatientPdfs;
 window.batchDownloadSelectedPatientPdfs = batchDownloadSelectedPatientPdfs;
 window.batchDownloadSelectedPatientZips = batchDownloadSelectedPatientZips;
+
+async function batchDownloadSelectedPatientPdfs_new() {
+  if (typeof gCarePortSelectedPatients === 'undefined' || !gCarePortSelectedPatients || gCarePortSelectedPatients.size === 0) {
+    alert('다운로드할 환자를 먼저 선택해주세요.');
+    return;
+  }
+  const list = Array.from(gCarePortSelectedPatients);
+  showGlobalProgress({
+    title: `선택 환자 (${list.length}명) 공식 2P 일지 일괄 다운로드`,
+    subtitle: `환자별 표준 A4 2페이지 공식 간병 리포트를 순차 다운로드합니다.`,
+    percent: 0,
+    statusText: `일괄 다운로드 시작...`,
+    icon: 'file-check-2'
+  });
+
+  for (let idx = 0; idx < list.length; idx++) {
+    const gid = list[idx];
+    const patient = (gCarePortPatientGroups || []).find(g => g.id === gid);
+    const pName = patient ? patient.patientName : `환자 ${idx + 1}`;
+    
+    updateGlobalProgress({
+      title: `[${idx + 1}/${list.length}명] ${pName} 님 공식 2P 일지 다운로드`,
+      subtitle: `환자별 표준 A4 2페이지 공식 간병 리포트를 순차 다운로드합니다.`,
+      percent: Math.round((idx / list.length) * 100),
+      statusText: `${pName} 님 공식 2P 리포트 생성 준비 중...`
+    });
+
+    await downloadPatientCareLogsPdfs_new(gid);
+    await new Promise(r => setTimeout(r, 350));
+  }
+
+  showGlobalProgress({
+    title: `선택 환자 (${list.length}명) 다운로드 완료`,
+    subtitle: `모든 선택 환자의 공식 2페이지 간병 리포트 다운로드가 완료되었습니다.`,
+    percent: 100,
+    statusText: `전체 완료!`,
+    icon: 'check-circle-2'
+  });
+  hideGlobalProgress(1500);
+}
+var batchDownloadSelectedPatientZips_new = batchDownloadSelectedPatientPdfs_new;
+window.batchDownloadSelectedPatientPdfs_new = batchDownloadSelectedPatientPdfs_new;
+window.batchDownloadSelectedPatientZips_new = batchDownloadSelectedPatientZips_new;
 
 async function attachCarePortLogsAndOpenEmail(groupId) {
   const patient = (gCarePortPatientGroups || []).find(g => g.id === groupId);
