@@ -18,13 +18,13 @@ function getPdfLib() {
   throw new Error('pdf-lib.min.js 파일을 찾을 수 없습니다.');
 }
 
-async function compileImagesToMultiPagePdf(imagePairs, customMargin = 14) {
+async function compileImagesToMultiPagePdf(imagePairs, customMargin = 8) {
   const PDFLib = getPdfLib();
   const pdfDoc = await PDFLib.PDFDocument.create();
   const pageW = 595.28;
   const pageH = 841.89;
   const marginH = customMargin;
-  const marginV = customMargin;
+  const marginV = 10;
   const availW = pageW - (marginH * 2);
   const availH = pageH - (marginV * 2);
 

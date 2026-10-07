@@ -274,6 +274,37 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
           const p2 = cap.querySelector('.second-page');
           const consultState = document.getElementById("consult-state");
 
+          let r1 = null;
+          let r2 = null;
+
+          const cropCanvasByDom = (cvs, containerEl, padB = 24) => {
+            try {
+              const cRect = containerEl.getBoundingClientRect();
+              let maxBottom = 0;
+              const allEls = containerEl.querySelectorAll('h1, h2, h3, header, section, article, div, table, p, ul');
+              allEls.forEach(el => {
+                const r = el.getBoundingClientRect();
+                if (r.height > 0 && r.bottom > maxBottom) {
+                  maxBottom = r.bottom;
+                }
+              });
+              if (maxBottom <= cRect.top) return cvs;
+              const targetH = Math.min(cvs.height, Math.ceil((maxBottom - cRect.top + padB) * 2));
+              if (targetH >= cvs.height - 10) return cvs;
+
+              const cCvs = document.createElement('canvas');
+              cCvs.width = cvs.width;
+              cCvs.height = targetH;
+              const cCtx = cCvs.getContext('2d');
+              cCtx.fillStyle = '#ffffff';
+              cCtx.fillRect(0, 0, cvs.width, targetH);
+              cCtx.drawImage(cvs, 0, 0, cvs.width, targetH, 0, 0, cvs.width, targetH);
+              return cCvs;
+            } catch (e) {
+              return cvs;
+            }
+          };
+
           if (p1 && p2) {
             // Case 1: Standard CarePort Care Diary (has .first-page and .second-page)
             // Page 1: Hide p2, show p1 (contains Header down to 금일 활력징후)
@@ -284,14 +315,16 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
             p1.style.display = "block";
             await new Promise(r => setTimeout(r, 120));
             const canvas1 = await html2canvasFn(p1, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-            img1 = canvas1.toDataURL("image/png");
+            const finalCvs1 = cropCanvasByDom(canvas1, p1, 24);
+            img1 = finalCvs1.toDataURL("image/png");
 
             // Page 2: Hide p1, show p2 (contains 금일 간병 수행 내역, 중요사항, 전달사항)
             p1.style.display = "none";
             p2.style.display = "block";
             await new Promise(r => setTimeout(r, 120));
             const canvas2 = await html2canvasFn(p2, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-            img2 = canvas2.toDataURL("image/png");
+            const finalCvs2 = cropCanvasByDom(canvas2, p2, 24);
+            img2 = finalCvs2.toDataURL("image/png");
 
             // Restore displays
             p1.style.display = origP1Display;
@@ -310,7 +343,7 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
           if (n) n.style.display = "";
           if (i) i.style.display = "";
 
-          return { success: true, img1, img2 };
+          return { success: true, img1, img2, r1, r2 };
         } catch (err) {
           return { error: err.message || String(err) };
         }

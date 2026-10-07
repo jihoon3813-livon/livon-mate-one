@@ -43930,7 +43930,7 @@ async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 12) 
  * 스마트 공백 감지 기반 연속형 A4 멀티페이지 PDF 슬라이싱 및 생성 엔진
  * (글자나 표, 카드가 잘리지 않도록 섹션 간 자연스러운 여백을 탐지하여 끊김 없이 연속 A4 분할)
  */
-async function sliceCanvasToContinuousA4Pdf(canvas, customMargin = 14) {
+async function sliceCanvasToContinuousA4Pdf(canvas, customMargin = 8) {
   await ensurePdfLibLoaded();
   if (typeof PDFLib === 'undefined' || !PDFLib.PDFDocument) {
     throw new Error('PDFLib 라이브러리를 찾을 수 없습니다.');
@@ -43940,7 +43940,7 @@ async function sliceCanvasToContinuousA4Pdf(canvas, customMargin = 14) {
   const pageW = 595.28; // A4 pt 폭
   const pageH = 841.89; // A4 pt 높이
   const marginH = customMargin;
-  const marginV = customMargin;
+  const marginV = 10;
   const availW = pageW - (marginH * 2);
   const availH = pageH - (marginV * 2);
 
@@ -44136,6 +44136,44 @@ async function renderHtmlToContinuousA4PdfBytes(htmlContent, customMargin = 14) 
     const page1El = iframeDoc.querySelector('#carePortPage1, .first-page');
     const page2El = iframeDoc.querySelector('#carePortPage2, .second-page');
 
+    const cropCanvasBottomWhitespace = (cvs, padB = 24) => {
+      try {
+        const ctx = cvs.getContext('2d');
+        const w = cvs.width;
+        const h = cvs.height;
+        const imgData = ctx.getImageData(0, 0, w, h);
+        const d = imgData.data;
+        let lastY = -1;
+        for (let y = h - 1; y >= 0; y--) {
+          const row = y * w * 4;
+          for (let x = 0; x < w; x += 4) {
+            const idx = row + (x * 4);
+            const a = d[idx + 3];
+            const r = d[idx];
+            const g = d[idx + 1];
+            const b = d[idx + 2];
+            if (a > 20 && (r < 248 || g < 248 || b < 248)) {
+              lastY = y;
+              break;
+            }
+          }
+          if (lastY !== -1) break;
+        }
+        if (lastY === -1 || lastY >= h - 16) return cvs;
+        const cropH = Math.min(h, lastY + padB);
+        const cCvs = document.createElement('canvas');
+        cCvs.width = w;
+        cCvs.height = cropH;
+        const cCtx = cCvs.getContext('2d');
+        cCtx.fillStyle = '#ffffff';
+        cCtx.fillRect(0, 0, w, cropH);
+        cCtx.drawImage(cvs, 0, 0, w, cropH, 0, 0, w, cropH);
+        return cCvs;
+      } catch (e) {
+        return cvs;
+      }
+    };
+
     if (page1El && page2El) {
       const renderPageToCanvas = async (el) => {
         return await html2canvas(el, {
@@ -44151,14 +44189,16 @@ async function renderHtmlToContinuousA4PdfBytes(htmlContent, customMargin = 14) 
         });
       };
 
-      const canvas1 = await renderPageToCanvas(page1El);
-      const canvas2 = await renderPageToCanvas(page2El);
+      const rawCanvas1 = await renderPageToCanvas(page1El);
+      const rawCanvas2 = await renderPageToCanvas(page2El);
+      const canvas1 = cropCanvasBottomWhitespace(rawCanvas1, 30);
+      const canvas2 = cropCanvasBottomWhitespace(rawCanvas2, 30);
 
       const pdfDoc = await PDFLib.PDFDocument.create();
       const pageW = 595.28;
       const pageH = 841.89;
-      const marginH = customMargin || 14;
-      const marginV = customMargin || 14;
+      const marginH = customMargin || 8;
+      const marginV = 10;
       const availW = pageW - (marginH * 2);
       const availH = pageH - (marginV * 2);
 
@@ -44264,14 +44304,54 @@ async function renderElementToContinuousA4PdfBytes(sourceElement, customMargin =
         });
       };
 
-      const canvas1 = await renderPageToCanvas(page1El);
-      const canvas2 = await renderPageToCanvas(page2El);
+      const cropCanvasBottomWhitespace = (cvs, padB = 24) => {
+        try {
+          const ctx = cvs.getContext('2d');
+          const w = cvs.width;
+          const h = cvs.height;
+          const imgData = ctx.getImageData(0, 0, w, h);
+          const d = imgData.data;
+          let lastY = -1;
+          for (let y = h - 1; y >= 0; y--) {
+            const row = y * w * 4;
+            for (let x = 0; x < w; x += 4) {
+              const idx = row + (x * 4);
+              const a = d[idx + 3];
+              const r = d[idx];
+              const g = d[idx + 1];
+              const b = d[idx + 2];
+              if (a > 20 && (r < 248 || g < 248 || b < 248)) {
+                lastY = y;
+                break;
+              }
+            }
+            if (lastY !== -1) break;
+          }
+          if (lastY === -1 || lastY >= h - 16) return cvs;
+          const cropH = Math.min(h, lastY + padB);
+          const cCvs = document.createElement('canvas');
+          cCvs.width = w;
+          cCvs.height = cropH;
+          const cCtx = cCvs.getContext('2d');
+          cCtx.fillStyle = '#ffffff';
+          cCtx.fillRect(0, 0, w, cropH);
+          cCtx.drawImage(cvs, 0, 0, w, cropH, 0, 0, w, cropH);
+          return cCvs;
+        } catch (e) {
+          return cvs;
+        }
+      };
+
+      const rawCanvas1 = await renderPageToCanvas(page1El);
+      const rawCanvas2 = await renderPageToCanvas(page2El);
+      const canvas1 = cropCanvasBottomWhitespace(rawCanvas1, 30);
+      const canvas2 = cropCanvasBottomWhitespace(rawCanvas2, 30);
 
       const pdfDoc = await PDFLib.PDFDocument.create();
       const pageW = 595.28;
       const pageH = 841.89;
-      const marginH = customMargin || 14;
-      const marginV = customMargin || 14;
+      const marginH = customMargin || 8;
+      const marginV = 10;
       const availW = pageW - (marginH * 2);
       const availH = pageH - (marginV * 2);
 
@@ -44337,7 +44417,7 @@ window.render2PageHtmlToPdfBytes = render2PageHtmlToPdfBytes;
 window.renderHtmlToContinuousA4PdfBytes = renderHtmlToContinuousA4PdfBytes;
 window.renderElementToContinuousA4PdfBytes = renderElementToContinuousA4PdfBytes;
 
-async function renderElementToSinglePageA4PdfBytes(sourceElement, customMargin = 12) {
+async function renderElementToSinglePageA4PdfBytes(sourceElement, customMargin = 8) {
   if (!sourceElement) throw new Error('PDF 렌더링 대상 요소를 찾을 수 없습니다.');
   await ensureHtml2CanvasLoaded();
 
@@ -44359,10 +44439,10 @@ async function renderElementToSinglePageA4PdfBytes(sourceElement, customMargin =
     iframeDoc.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
       <style>
         * { box-sizing: border-box; }
-        body { margin: 0; padding: 20px 24px; background: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+        body { margin: 0; padding: 12px 14px; background: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
         .no-print { display: none !important; }
       </style>
-    </head><body style="background:#ffffff;margin:0;padding:20px 24px;"></body></html>`);
+    </head><body style="background:#ffffff;margin:0;padding:12px 14px;"></body></html>`);
     iframeDoc.close();
 
     // 메인 문서 스타일시트 복사하여 Tailwind 등 CSS 적용 유지

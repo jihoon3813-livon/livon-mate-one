@@ -1651,14 +1651,14 @@
       position: relative;
     }
     .continuous-page {
-      padding: 24px 28px 24px;
+      padding: 16px 14px 16px;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
       gap: 12px;
     }
     .first-page, .second-page {
-      padding: 24px 28px 18px;
+      padding: 16px 14px 16px;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
