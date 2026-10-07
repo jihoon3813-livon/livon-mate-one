@@ -1734,8 +1734,8 @@
     }
     .summary-card {
       box-sizing: border-box;
-      min-height: 48px;
-      padding: 6px 14px;
+      min-height: 60px;
+      padding: 8px 14px;
       border: 1px solid #dfe7ea;
       border-radius: 10px;
       background: #f8fafc;
@@ -1747,17 +1747,18 @@
     }
     .summary-card > span {
       display: block;
-      margin-bottom: 2px;
+      margin-bottom: 3px;
       color: #74808a;
       font-size: 10.5px;
       font-weight: 700;
+      line-height: 1;
     }
     .summary-card strong {
       display: block;
-      font-size: 14px;
+      font-size: 14.5px;
       font-weight: 800;
       color: #0f172a;
-      line-height: 1.25;
+      line-height: 1.35;
       white-space: nowrap;
       overflow: visible;
     }
@@ -1768,11 +1769,11 @@
       margin-left: 2px;
     }
     .diary-section {
-      margin-top: 8px;
+      margin-top: 18px;
     }
     .diary-section h2 {
       margin: 0;
-      font-size: 13.5px;
+      font-size: 14px;
       font-weight: 900;
       color: #0f172a;
       line-height: 1.2;
@@ -1781,7 +1782,7 @@
     }
     .section-rule {
       height: 2px;
-      margin: 4px 0 6px;
+      margin: 6px 0 12px;
       background: #10bdb2;
     }
     .trend-card {
@@ -1868,13 +1869,13 @@
       background-color: currentColor !important;
       display: inline-block !important;
       flex-shrink: 0 !important;
-      margin-right: 2px !important;
-      transform: translateY(-0.5px) !important;
+      margin-right: 3px !important;
+      transform: translateY(-1px) !important;
     }
     .status-pill span {
       display: inline-block !important;
       line-height: 1 !important;
-      transform: translateY(-0.5px) !important;
+      transform: translateY(-1px) !important;
     }
     .status-decision {
       padding: 3px 8px;
@@ -2120,10 +2121,15 @@
       border-radius: 12px;
       font-size: 11px;
       font-weight: 800;
-      padding: 3px 10px;
+      height: 24px;
+      padding: 0 10px;
       line-height: 1;
       display: inline-flex;
       align-items: center;
+      justify-content: center;
+    }
+    .guardian-keyword span {
+      transform: translateY(-1px);
     }
     .guardian-note-list {
       list-style: none;
@@ -2268,7 +2274,7 @@
         </div>
       </section>
 
-      <!-- Vital Section: 금일 활력징후 (7 Vital Signs) -->
+      <!-- Vital Section: 금일 활력징후 (7 Vital Signs) - 1페이지 끝 -->
       <section class="diary-section vital-section">
         <h2>금일 활력징후</h2>
         <div class="section-rule"></div>
@@ -2276,6 +2282,14 @@
           ${vitalsHtml}
         </div>
       </section>
+    </article>
+
+    <!-- 2페이지 시작: 금일 간병 수행 내역 & 보호자 전달사항 -->
+    <article class="report-page continuous-page" style="page-break-before: always; margin-top: 24px;">
+      <div class="page-indicator" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; font-size: 11px; font-weight: 700; color: #64748b;">
+        <span>보호자 안내용 간병일지 · 세부 수행 내역 및 보호자 전달사항</span>
+        <span style="font-family: monospace; font-size: 12px; color: #0f172a;">Page 2 / 2</span>
+      </div>
 
       <!-- Care Log Section: 금일 간병 수행 내역 -->
       <section class="diary-section care-log-section">

@@ -43578,8 +43578,8 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
       const toneBadgeClass = d.overallStatus.tone === 'good'
         ? 'background: #d9f5e7; color: #168c61;'
         : (d.overallStatus.tone === 'warning' ? 'background: #fff1d4; color: #bf7a00;' : 'background: #fde5e6; color: #ca3d43;');
-      toneBadge.innerHTML = `<i style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 4px; vertical-align: middle;"></i><span style="display: inline-block; vertical-align: middle; line-height: 1; font-weight: 800; font-size: 11px;">${d.overallStatus.label}</span>`;
-      toneBadge.style.cssText = `${toneBadgeClass}; display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 0 10px; border-radius: 12px;`;
+      toneBadge.innerHTML = `<i style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 4px; margin-top: -1px;"></i><span style="display: inline-block; line-height: 1; font-weight: 800; font-size: 11.5px; margin-top: -1px;">${d.overallStatus.label}</span>`;
+      toneBadge.style.cssText = `${toneBadgeClass}; display: inline-flex; align-items: center; justify-content: center; height: 24px; padding: 0 12px; border-radius: 12px;`;
     }
     const overallSvg = document.getElementById('cpOverallTrafficSvg');
     if (overallSvg && window.CarePortClient) {
@@ -43588,7 +43588,7 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     const overallDesc = document.getElementById('cpOverallDesc');
     if (overallDesc) overallDesc.innerText = d.overallStatus.description;
 
-    // 4 Category Status Cards (CarePort Image 4 authentic layout)
+    // 4 Category Status Cards (CarePort Image 4 authentic layout - 수직 중앙 정렬 완벽 보정)
     const catContainer = document.getElementById('cpCategoryCardsContainer');
     if (catContainer && window.CarePortClient) {
       catContainer.innerHTML = d.categories.map(c => {
@@ -43598,15 +43598,15 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
           : (c.tone === 'warning' ? 'background: #fff1d4; color: #bf7a00;' : 'background: #fde5e6; color: #ca3d43;');
         const vSvg = window.CarePortClient.renderTrafficLightSvg(c.tone, 'vertical');
         return `
-          <div style="background: #ffffff; border: 1px solid #dfe7ea; border-radius: 12px; padding: 12px 10px 10px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; min-height: 132px; text-align: center; box-sizing: border-box;">
-            <span class="status-pill small ${cPillTone}" style="padding: 0 10px; border-radius: 16px; font-size: 11px; font-weight: 800; height: 22px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; ${cPillStyle}">
-              <i style="display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: currentColor;"></i>
-              <span style="display: inline-block; line-height: 1; transform: translateY(-0.5px);">${c.label}</span>
+          <div style="background: #ffffff; border: 1px solid #dfe7ea; border-radius: 12px; padding: 12px 10px 10px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; min-height: 144px; text-align: center; box-sizing: border-box;">
+            <span class="status-pill small ${cPillTone}" style="padding: 0 10px; border-radius: 16px; font-size: 11px; font-weight: 800; height: 24px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; ${cPillStyle}">
+              <i style="display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: currentColor; margin-top: -1px;"></i>
+              <span style="display: inline-block; line-height: 1; margin-top: -1px;">${c.label}</span>
             </span>
             <div class="traffic-light vertical" style="margin: 6px 0; display: flex; justify-content: center;">
               ${vSvg}
             </div>
-            <p style="margin: 0; overflow: hidden; color: #64748b; font-size: 11.5px; font-weight: 600; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;" title="${c.description}">${c.description}</p>
+            <p style="margin: 0; overflow: hidden; color: #52606d; font-size: 11.5px; font-weight: 600; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; padding-bottom: 2px;" title="${c.description}">${c.description}</p>
           </div>
         `;
       }).join('');
@@ -43616,22 +43616,22 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     const vitalsGrid = document.getElementById('cpVitalsGrid');
     if (vitalsGrid) {
       vitalsGrid.innerHTML = d.vitals.map((v, vIdx) => `
-        <div style="padding: 10px 4px 8px; text-align: center; background: #ffffff; ${vIdx < d.vitals.length - 1 ? 'border-right: 1px solid #dfe7ea;' : ''}">
-          <span style="display: block; margin-bottom: 4px; color: #74808a; font-size: 11px; font-weight: 700; white-space: nowrap;">${v.label}</span>
-          <strong style="display: block; font-size: 14.5px; white-space: nowrap; font-weight: 900; color: #0f172a;">
+        <div style="padding: 11px 4px 9px; text-align: center; background: #ffffff; ${vIdx < d.vitals.length - 1 ? 'border-right: 1px solid #dfe7ea;' : ''}">
+          <span style="display: block; margin-bottom: 4px; color: #74808a; font-size: 11px; font-weight: 700; white-space: nowrap; line-height: 1;">${v.label}</span>
+          <strong style="display: block; font-size: 15px; white-space: nowrap; font-weight: 900; color: #0f172a; line-height: 1.2;">
             ${v.value}${v.unit ? `<small style="margin-left: 2px; color: #8a949b; font-size: 10px; font-weight: 600;">${v.unit}</small>` : ''}
           </strong>
         </div>
       `).join('');
     }
 
-    // Section 3: 금일 간병 수행 내역 (Image 1 style)
+    // Section 3: 금일 간병 수행 내역 (2페이지 표 텍스트 쳐짐 완벽 보정)
     const careLogList = document.getElementById('cpCareLogList');
     if (careLogList) {
       careLogList.innerHTML = d.careLogRows.map(r => `
-        <div style="display: flex; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; min-height: 32px;">
-          <strong class="careport-badge-pill" style="min-width: 86px; max-width: 110px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; height: 24px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; line-height: 1;"><span class="pill-text" style="line-height: 1; transform: translateY(-0.5px);">${r.label}</span></strong>
-          <span style="flex: 1; font-size: 11.5px; color: #334155; line-height: 1.4; display: inline-flex; align-items: center; min-height: 24px; font-weight: 500;">${r.value}</span>
+        <div style="display: flex; align-items: center; gap: 14px; padding: 7px 10px; border-bottom: 1px solid #f1f5f9; min-height: 38px;">
+          <strong class="careport-badge-pill" style="min-width: 90px; max-width: 110px; flex-shrink: 0; font-size: 11px; font-weight: 800; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px; height: 26px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; line-height: 1;"><span class="pill-text" style="display: inline-block; line-height: 1; margin-top: -1px;">${r.label}</span></strong>
+          <span style="flex: 1; font-size: 12px; color: #334155; line-height: 1.45; display: inline-flex; align-items: center; min-height: 26px; font-weight: 500; margin-top: -1px;">${r.value}</span>
         </div>
       `).join('');
     }
@@ -43643,7 +43643,9 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
     const tagsEl = document.getElementById('cpCardTags');
     if (tagsEl) {
       tagsEl.innerHTML = d.keywords.map(k => `
-        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200">#${k}</span>
+        <span style="display: inline-flex; align-items: center; justify-content: center; height: 26px; padding: 0 12px; border-radius: 9999px; font-size: 11.5px; font-weight: 800; background: #f0fdfa; color: #0f766e; border: 1px solid #99f6e4; line-height: 1;">
+          <span style="display: inline-block; margin-top: -1px;">#${k}</span>
+        </span>
       `).join('');
     }
 
@@ -43652,15 +43654,15 @@ async function openCarePortOfficialDetail(sessionId, targetDayNum = null) {
       summaryContent.innerText = d.summary;
     }
 
-    // Section 5: 보호자 전달사항 (6 Items - Image 1 style)
+    // Section 5: 보호자 전달사항 (6 Items - 텍스트 쳐짐 완벽 보정)
     const guardianNotesGrid = document.getElementById('cpGuardianNotesGrid');
     if (guardianNotesGrid) {
       guardianNotesGrid.innerHTML = d.guardianNotes.map(g => `
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 11.5px; line-height: 1.4; min-height: 22px;">
-          <span style="display: inline-block; width: 4.5px; height: 4.5px; border-radius: 50%; background: #10bdb2; flex-shrink: 0;"></span>
-          <span style="font-weight: 800; color: #0f172a; min-width: 50px; flex-shrink: 0; position: relative; top: -0.5px;">${g.label}</span>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 1.45; min-height: 26px; padding: 3px 0;">
+          <span style="display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #10bdb2; flex-shrink: 0;"></span>
+          <span style="font-weight: 800; color: #0f172a; min-width: 55px; flex-shrink: 0; display: inline-block; margin-top: -1px;">${g.label}</span>
           <span style="color: #cbd5e1; font-weight: bold; flex-shrink: 0;">·</span>
-          <span style="color: #334155; font-weight: 500; flex: 1; position: relative; top: -0.5px;">${g.value}</span>
+          <span style="color: #334155; font-weight: 500; flex: 1; display: inline-block; margin-top: -1px;">${g.value}</span>
         </div>
       `).join('');
     }
@@ -44173,6 +44175,60 @@ async function renderElementToContinuousA4PdfBytes(sourceElement, customMargin =
       try { await document.fonts.ready; } catch (e) {}
     }
     await new Promise(res => setTimeout(res, 40));
+
+    const page1El = sourceElement.querySelector('#carePortPage1');
+    const page2El = sourceElement.querySelector('#carePortPage2');
+
+    // 🌟 사용자 특별 지시: 1페이지는 활력징후까지, 2페이지는 수행내역부터 분리하여 완벽한 2페이지 PDF 생성
+    if (page1El && page2El) {
+      const renderPageToCanvas = async (el) => {
+        return await html2canvas(el, {
+          scale: 2.0,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          windowWidth: 794,
+          scrollX: 0,
+          scrollY: 0,
+          imageTimeout: 0
+        });
+      };
+
+      const canvas1 = await renderPageToCanvas(page1El);
+      const canvas2 = await renderPageToCanvas(page2El);
+
+      const pdfDoc = await PDFLib.PDFDocument.create();
+      const pageW = 595.28;
+      const pageH = 841.89;
+      const marginH = customMargin || 14;
+      const marginV = customMargin || 14;
+      const availW = pageW - (marginH * 2);
+      const availH = pageH - (marginV * 2);
+
+      const addPageImage = async (cvs) => {
+        const blob = await new Promise(res => cvs.toBlob(res, 'image/png'));
+        const arrayBuf = await blob.arrayBuffer();
+        const pngImage = await pdfDoc.embedPng(new Uint8Array(arrayBuf));
+        const scale = Math.min(availW / pngImage.width, availH / pngImage.height);
+        const finalW = pngImage.width * scale;
+        const finalH = pngImage.height * scale;
+        const posX = marginH + (availW - finalW) / 2;
+        const posY = pageH - marginV - finalH;
+        const page = pdfDoc.addPage([pageW, pageH]);
+        page.drawImage(pngImage, {
+          x: posX,
+          y: posY,
+          width: finalW,
+          height: finalH
+        });
+      };
+
+      await addPageImage(canvas1);
+      await addPageImage(canvas2);
+
+      return await pdfDoc.save();
+    }
 
     const canvas = await html2canvas(sourceElement, {
       scale: 2.0,
