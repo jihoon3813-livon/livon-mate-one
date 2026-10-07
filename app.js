@@ -41909,6 +41909,12 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
                         <span>모바일</span>
                       </button>
                       ${actionBtnHtml}
+                      <button type="button" onclick="downloadCarePortViaRobot('${sid}', '${(group.patientName || '').replace(/'/g, "\\'")}')"
+                        class="px-2.5 py-1 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+                        title="케어포트 전산에 백그라운드로 자동 접속하여 원본 2장 이미지를 다운로드받아 100% 동일한 A4 2페이지 공식 PDF로 조립합니다">
+                        <i data-lucide="bot" class="w-3 h-3 text-amber-300"></i>
+                        <span>🤖 원본 무인</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -42033,6 +42039,12 @@ function buildCareLogFlatTableRows(filtered, isNewTab = false) {
               <span>모바일</span>
             </button>
             ${actionBtnHtml}
+            <button type="button" onclick="downloadCarePortViaRobot('${sid}', '${(pName || '').replace(/'/g, "\\'")}')"
+              class="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer active:scale-95"
+              title="케어포트 전산에 백그라운드로 자동 접속하여 원본 2장 이미지를 다운로드받아 100% 동일한 A4 2페이지 공식 PDF로 조립합니다">
+              <i data-lucide="bot" class="w-3.5 h-3.5 text-amber-300"></i>
+              <span>🤖 원본 무인</span>
+            </button>
           </div>
         </td>
       </tr>
@@ -44505,9 +44517,22 @@ async function downloadPatientCareLogsViaRobot(groupId) {
     return;
   }
   const logs = patient.dailyLogs || [];
+  if (!logs.length) {
+    alert('다운로드할 간병일지가 없습니다.');
+    return;
+  }
+  if (logs.length === 1) {
+    const sid = logs[0].sessionId || (logs[0].id ? String(logs[0].id).replace(/\D/g, '') : '');
+    await downloadCarePortViaRobot(sid, patient.patientName);
+    return;
+  }
   const latestLog = logs[0] || {};
   const sid = latestLog.sessionId || (latestLog.id ? String(latestLog.id).replace(/\D/g, '') : '');
-  await downloadCarePortViaRobot(sid, patient.patientName);
+  const consultDate = latestLog.consultDate ? latestLog.consultDate.slice(0, 10) : '';
+  const proceed = confirm(`[${patient.patientName} 님] 총 ${logs.length}건의 간병일지가 있습니다.\n최근 일자(${consultDate}) 원본 2장 공식 PDF를 바로 다운로드할까요?\n\n(※ 특정 일차만 받으시려면 '일자별 일지 펼치기' 후 해당 날짜 우측의 [🤖 원본무인] 버튼을 클릭하시면 됩니다)`);
+  if (proceed) {
+    await downloadCarePortViaRobot(sid, patient.patientName);
+  }
 }
 window.downloadPatientCareLogsViaRobot = downloadPatientCareLogsViaRobot;
 
