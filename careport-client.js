@@ -1651,14 +1651,14 @@
       position: relative;
     }
     .continuous-page {
-      padding: 24px 38px 24px;
+      padding: 24px 28px 24px;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
       gap: 12px;
     }
     .first-page, .second-page {
-      padding: 24px 38px 18px;
+      padding: 24px 28px 18px;
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
@@ -1935,13 +1935,13 @@
     }
     .detail-status-card p {
       margin: 0;
-      overflow: hidden;
       color: #52606d;
       font-size: 11px;
       font-weight: 600;
-      line-height: 1.35;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      line-height: 1.3;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+      white-space: normal;
       max-width: 100%;
       padding: 0 2px;
     }
@@ -2197,11 +2197,10 @@
 <body>
   <div class="report-area diary-report">
     <!-- 1:1 CarePort 원본 그대로 쭉 이어서 출력되는 일지 본문 -->
-    <article class="report-page continuous-page">
+    <article class="report-page continuous-page first-page" id="carePortPage1">
       <!-- Diary Header -->
       <header class="diary-header">
         <div>
-          <p class="eyebrow">보호자 안내용</p>
           <h1>간병일지</h1>
         </div>
         <div class="care-day-badge">
@@ -2285,9 +2284,9 @@
     </article>
 
     <!-- 2페이지 시작: 금일 간병 수행 내역 & 보호자 전달사항 -->
-    <article class="report-page continuous-page" style="page-break-before: always; margin-top: 24px;">
+    <article class="report-page continuous-page second-page" id="carePortPage2" style="page-break-before: always; margin-top: 24px;">
       <div class="page-indicator" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; font-size: 11px; font-weight: 700; color: #64748b;">
-        <span>보호자 안내용 간병일지 · 세부 수행 내역 및 보호자 전달사항</span>
+        <span>간병일지 · 세부 수행 내역 및 보호자 전달사항</span>
         <span style="font-family: monospace; font-size: 12px; color: #0f172a;">Page 2 / 2</span>
       </div>
 

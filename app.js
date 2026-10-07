@@ -44133,6 +44133,59 @@ async function renderHtmlToContinuousA4PdfBytes(htmlContent, customMargin = 14) 
     // 화면용 툴바 제거
     iframeDoc.querySelectorAll('.no-print').forEach(el => el.remove());
 
+    const page1El = iframeDoc.querySelector('#carePortPage1, .first-page');
+    const page2El = iframeDoc.querySelector('#carePortPage2, .second-page');
+
+    if (page1El && page2El) {
+      const renderPageToCanvas = async (el) => {
+        return await html2canvas(el, {
+          scale: 2.0,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          windowWidth: 794,
+          scrollX: 0,
+          scrollY: 0,
+          imageTimeout: 0
+        });
+      };
+
+      const canvas1 = await renderPageToCanvas(page1El);
+      const canvas2 = await renderPageToCanvas(page2El);
+
+      const pdfDoc = await PDFLib.PDFDocument.create();
+      const pageW = 595.28;
+      const pageH = 841.89;
+      const marginH = customMargin || 14;
+      const marginV = customMargin || 14;
+      const availW = pageW - (marginH * 2);
+      const availH = pageH - (marginV * 2);
+
+      const addPageImage = async (cvs) => {
+        const blob = await new Promise(res => cvs.toBlob(res, 'image/png'));
+        const arrayBuf = await blob.arrayBuffer();
+        const pngImage = await pdfDoc.embedPng(new Uint8Array(arrayBuf));
+        const scale = Math.min(availW / pngImage.width, availH / pngImage.height);
+        const finalW = pngImage.width * scale;
+        const finalH = pngImage.height * scale;
+        const posX = marginH + (availW - finalW) / 2;
+        const posY = pageH - marginV - finalH;
+        const page = pdfDoc.addPage([pageW, pageH]);
+        page.drawImage(pngImage, {
+          x: posX,
+          y: posY,
+          width: finalW,
+          height: finalH
+        });
+      };
+
+      await addPageImage(canvas1);
+      await addPageImage(canvas2);
+
+      return await pdfDoc.save();
+    }
+
     const targetEl = iframeDoc.querySelector('.report-page, .continuous-page, .report-area') || iframeDoc.body;
 
     const canvas = await html2canvas(targetEl, {
@@ -44551,10 +44604,10 @@ async function downloadPatientCareLogsViaRobot(groupId) {
   const username = (patient.patientName || '환자').trim();
 
   showGlobalProgress({
-    title: `[${username} 님] 전체 ${totalDays}일차 원본 무인 다운로드`,
-    subtitle: `백그라운드 크롬 로봇이 전체 ${totalDays}개 일지 원본 이미지를 받아와 1개의 A4 합본 PDF로 조립합니다.`,
+    title: `[${username} 님] 전체 ${totalDays}일차 원본 다운로드`,
+    subtitle: `전체 ${totalDays}개 일지 원본 데이터를 받아와 1개의 공식 A4 합본 PDF로 조립합니다.`,
     percent: 15,
-    statusText: `무인 크롬 로봇 가동 및 케어포트 전산 접속 중...`,
+    statusText: `무인 로봇 가동 및 케어포트 전산 접속 중...`,
     icon: 'bot'
   });
 
@@ -44959,11 +45012,11 @@ async function downloadPatientCareLogsPdfs(groupId) {
   const totalDays = sortedLogs.length;
 
   showGlobalProgress({
-    title: `[${patient.patientName} 님] 전체 간병일지 통합 PDF 초고속 다운로드`,
-    subtitle: `총 ${totalDays}일차 일지 데이터를 병렬 처리 및 초고속 렌더링 중...`,
-    percent: 10,
-    statusText: `전체 ${totalDays}일차 데이터 초고속 병렬 로드 중...`,
-    icon: 'file-down'
+    title: `[${patient.patientName} 님] 전체 ${totalDays}일차 원본 다운로드`,
+    subtitle: `전체 ${totalDays}개 일지 원본 데이터를 받아와 1개의 공식 A4 합본 PDF로 조립합니다.`,
+    percent: 15,
+    statusText: `전체 ${totalDays}일차 일지원문 데이터 병렬 로드 중...`,
+    icon: 'bot'
   });
 
   try {
@@ -45066,7 +45119,7 @@ async function downloadPatientCareLogsPdfs(groupId) {
     const startDate = (patient.careStartDate || '').replace(/[^0-9]/g, '');
     const endDate = (patient.careEndDate || '').replace(/[^0-9]/g, '');
     const dateRangeStr = (startDate && endDate) ? `_${startDate}-${endDate}` : '';
-    const fileName = `[케어포트_통합간병일지]_${patient.patientName}_전체(${totalDays}일차)${dateRangeStr}.pdf`;
+    const fileName = `[케어포트_공식간병일지_전체일지합본]_${patient.patientName}_총${totalDays}일차${dateRangeStr}.pdf`;
 
     let pdfBytes = null;
 
@@ -45318,11 +45371,11 @@ async function downloadPatientCareLogsPdfs(groupId) {
 
     updateGlobalProgress({
       percent: 100,
-      statusText: `✨ 통합 PDF 다운로드 완료! (총 ${sortedLogs.length}페이지)`
+      statusText: `완료! 총 ${totalDays}일차 전체 원본 합본이 다운로드되었습니다.`
     });
 
     triggerDirectPdfDownload(pdfBytes, fileName);
-    hideGlobalProgress(350);
+    setTimeout(hideGlobalProgress, 1200);
   } catch (err) {
     console.error('전체 일지 단일 PDF 통합 다운로드 실패:', err);
     hideGlobalProgress();
