@@ -968,31 +968,15 @@
         }
       }
 
-      // 9. Important Highlights
+      // 9. Important Highlights (100% CarePort authentic logic: normalizeList)
       let importantItems = [];
-      const rawHighlights = raw.today_highlights || raw.important_notes || detail.importantItems || detail.today_highlights || detail.highlights || null;
+      const rawHighlights = raw.importantNotes || raw.importantItems || raw.descMemo || raw.today_highlights || raw.important_notes || detail.importantItems || detail.today_highlights || detail.highlights || null;
       if (Array.isArray(rawHighlights) && rawHighlights.length > 0) {
         importantItems = rawHighlights.map(h => typeof h === 'string' ? h : (h?.text || h?.content)).filter(Boolean);
       } else if (typeof rawHighlights === 'string' && rawHighlights.trim()) {
         importantItems = rawHighlights.split(/\r?\n|•|·/).map(s => s.trim()).filter(Boolean);
       }
-      if (importantItems.length === 0) {
-        const derived = [];
-        if (raw.guardian_notes?.pain && !raw.guardian_notes.pain.includes('없음') && !raw.guardian_notes.pain.includes('안정')) {
-          derived.push(`통증 모니터링: ${raw.guardian_notes.pain}`);
-        }
-        if (raw.guardian_notes?.diet && !raw.guardian_notes.diet.includes('원활') && !raw.guardian_notes.diet.includes('잘 드')) {
-          derived.push(`식사 관리: ${raw.guardian_notes.diet}`);
-        }
-        if (raw.guardian_notes?.activity && raw.guardian_notes.activity.includes('부축')) {
-          derived.push('이동 안전: 침상 이동 및 보행 시 밀착 부축으로 낙상 사고 예방');
-        }
-        if (derived.length === 0) {
-          derived.push('환자 활력징후 및 전반적인 컨디션이 안정적으로 유지되고 있습니다.');
-          derived.push('정규 처방 복약 및 식사 섭취가 순조롭게 완료되었으며 특이 증상 없습니다.');
-        }
-        importantItems = derived;
-      }
+
 
       return {
         patientName: pName,
@@ -1591,11 +1575,11 @@
         </div>
       `).join('');
 
-      const importantItems = (d.importantItems && d.importantItems.length > 0)
-        ? d.importantItems
-        : ['환자 활력징후 및 전반적인 컨디션이 안정적으로 유지되고 있습니다.', '정규 처방 복약 및 식사 섭취가 순조롭게 완료되었으며 특이 증상 없습니다.'];
+      const hasImportantItems = Array.isArray(d.importantItems) && d.importantItems.length > 0;
+      const importantHtml = hasImportantItems
+        ? `<ul>${d.importantItems.map(item => `<li><span>${item}</span></li>`).join('')}</ul>`
+        : `<p style="margin: 0; font-size: 13.5px; color: #334155; font-weight: 500;">특이사항이 없습니다.</p>`;
 
-      const importantHtml = importantItems.map(item => `<li><span>${item}</span></li>`).join('');
 
       const keywordsPills = d.keywords.map(k => `
         <span class="guardian-keyword"><span>#${k}</span></span>
@@ -2293,17 +2277,10 @@
 
     <!-- 2페이지 시작: 금일 간병 수행 내역 & 보호자 전달사항 -->
     <article class="report-page continuous-page second-page" id="carePortPage2" style="page-break-before: always; margin-top: 24px;">
-      <div class="page-indicator" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; font-size: 11px; font-weight: 700; color: #64748b;">
-        <span>보호자 안내용 간병일지 · 세부 수행 내역 및 보호자 전달사항</span>
-        <span style="font-family: monospace; font-size: 12px; color: #0f172a;">Page 2 / 2</span>
-      </div>
-
       <!-- Care Log Section: 금일 간병 수행 내역 -->
       <section class="diary-section care-log-section">
-        <div class="sec-head">
-          <span class="sec-title">금일 간병 수행 내역</span>
-          <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">표준 간병 프로세스 준수</span>
-        </div>
+        <h2>금일 간병 수행 내역</h2>
+        <div class="section-rule"></div>
         <div class="care-log-table">
           ${careLogHtml}
         </div>
@@ -2311,23 +2288,17 @@
 
       <!-- Important Notes Section: 오늘의 중요사항 -->
       <section class="diary-section important-section">
-        <div class="sec-head">
-          <span class="sec-title">오늘의 중요사항</span>
-          <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">환자 상태 모니터링 중점 체크</span>
-        </div>
+        <h2>오늘의 중요사항</h2>
+        <div class="section-rule"></div>
         <div class="notice-box warning-box">
-          <ul>
-            ${importantHtml}
-          </ul>
+          ${importantHtml}
         </div>
       </section>
 
       <!-- Guardian Section: 보호자 전달사항 -->
       <section class="diary-section guardian-section">
-        <div class="sec-head">
-          <span class="sec-title">보호자 전달사항</span>
-          <span style="font-size: 10px; color: #94a3b8; font-weight: 600;">안심 소통 리포트</span>
-        </div>
+        <h2>보호자 전달사항</h2>
+        <div class="section-rule"></div>
         <div class="notice-box guardian-box">
           <div class="guardian-keywords">
             ${keywordsPills}
@@ -2337,6 +2308,7 @@
           </ul>
         </div>
       </section>
+
 
       <footer class="report-footer">
         <i></i>본 간병일지는 리본케어 앱을 통해 작성되었습니다.
