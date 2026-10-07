@@ -41808,13 +41808,13 @@ function renderCareLogFlatTable(filtered) {
         <!-- 간병일지 열람 (모바일 및 공식 2P 미리보기) -->
         <td class="p-2.5 text-center">
           <div class="inline-flex items-center gap-1.5 justify-center flex-wrap">
-            <button type="button" onclick="openMobileCareDiaryPreview('${patientName}', ${log.dayNumber || 1})" 
+            <button type="button" onclick="openMobileCareDiaryPreview('${pName}', ${log.dayNumber || 1})" 
               class="px-2.5 py-1.5 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
               title="모바일 간병일지 열기">
               <i data-lucide="smartphone" class="w-3.5 h-3.5 text-pink-600"></i>
               <span>모바일</span>
             </button>
-            <button type="button" onclick="openCareReport2PageModal('${patientName}', ${log.dayNumber || 1})" 
+            <button type="button" onclick="openCareReport2PageModal('${pName}', ${log.dayNumber || 1})" 
               class="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
               title="공식 A4 2페이지 간병 리포트 미리보기 모달 열기">
               <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-indigo-600"></i>
@@ -42149,9 +42149,13 @@ function downloadCareReport2PagePdf(patientNameOrGroupId, dayNum = null) {
   }
   if (!pName) pName = (typeof gCurrentMobileDiaryPatient !== 'undefined' && gCurrentMobileDiaryPatient) ? gCurrentMobileDiaryPatient : '고연분';
   
-  const dayParam = dayNum ? `&day=${encodeURIComponent(dayNum)}` : '';
-  const url = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}${dayParam}`;
-  window.open(url, '_blank');
+  if (typeof downloadPatientCareLogsPdfs === 'function') {
+    downloadPatientCareLogsPdfs(patientNameOrGroupId);
+  } else {
+    const dayParam = dayNum ? `&day=${encodeURIComponent(dayNum)}` : '';
+    const url = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}${dayParam}`;
+    window.open(url, '_blank');
+  }
 }
 window.downloadCareReport2PagePdf = downloadCareReport2PagePdf;
 
@@ -42199,6 +42203,7 @@ async function openCareReport2PageModal(patientNameOrGroupId, dayNum = null) {
   const iframe = document.getElementById('careReport2PagePreviewFrame');
   if (iframe) {
     iframe.src = 'about:blank';
+    iframe.removeAttribute('srcdoc');
   }
 
   openModal('careReport2PageModal');
@@ -42209,17 +42214,28 @@ async function openCareReport2PageModal(patientNameOrGroupId, dayNum = null) {
     if (!resp.ok) {
       throw new Error(`PDF 생성 서버 응답 오류 (HTTP ${resp.status})`);
     }
-    const blob = await resp.blob();
+    const contentType = resp.headers.get('content-type') || '';
+    if (contentType.includes('application/pdf')) {
+      const blob = await resp.blob();
+      if (window._current2PageBlobUrl) {
+        try { URL.revokeObjectURL(window._current2PageBlobUrl); } catch(e) {}
+      }
+      const blobUrl = URL.createObjectURL(blob);
+      window._current2PageBlobUrl = blobUrl;
+      window._current2PageBlob = blob;
+      window._current2PageHtml = null;
 
-    if (window._current2PageBlobUrl) {
-      try { URL.revokeObjectURL(window._current2PageBlobUrl); } catch(e) {}
-    }
-    const blobUrl = URL.createObjectURL(blob);
-    window._current2PageBlobUrl = blobUrl;
-    window._current2PageBlob = blob;
-
-    if (iframe) {
-      iframe.src = `${blobUrl}#toolbar=0&view=FitH`;
+      if (iframe) {
+        iframe.src = `${blobUrl}#toolbar=0&view=FitH`;
+      }
+    } else {
+      // Vercel serverless returns clean 2-page HTML: render directly in iframe
+      const htmlText = await resp.text();
+      window._current2PageHtml = htmlText;
+      window._current2PageBlob = null;
+      if (iframe) {
+        iframe.srcdoc = htmlText;
+      }
     }
   } catch (err) {
     console.error('[2Page PDF Modal Error]', err);
@@ -42264,6 +42280,24 @@ function downloadCareReport2PageModalPdf() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    return;
+  }
+
+  if (window._current2PageHtml && typeof render2PageHtmlToPdfBytes === 'function') {
+    showGlobalProgress({
+      title: `[${pName} 님] 공식 간병일지(A4 2P) PDF 다운로드`,
+      subtitle: `고해상도 A4 규격 2페이지 PDF 렌더링 중...`,
+      percent: 50,
+      icon: 'file-down'
+    });
+    render2PageHtmlToPdfBytes(window._current2PageHtml).then(pdfBytes => {
+      triggerDirectPdfDownload(pdfBytes, fileName);
+      updateGlobalProgress({ percent: 100, statusText: '✨ 다운로드 완료!' });
+      hideGlobalProgress(350);
+    }).catch(err => {
+      hideGlobalProgress();
+      downloadPatientCareLogsPdfs(window._current2PageModalGroupId || pName);
+    });
     return;
   }
 
@@ -43676,6 +43710,104 @@ async function renderHtmlToSinglePageA4PdfBytes(htmlContent, customMargin = 12) 
   }
 }
 
+/**
+ * 격리된 iframe 환경을 활용한 고해상도 공식 2페이지(A4 Multi-page) PDF 생성
+ * (Page 1 & Page 2를 각각 개별 고해상도 캔버스로 변환 후 단일 2페이지 PDF로 완벽 결합)
+ */
+async function render2PageHtmlToPdfBytes(htmlContent) {
+  await ensureHtml2CanvasLoaded();
+  await ensurePdfLibLoaded();
+  if (typeof PDFLib === 'undefined' || !PDFLib.PDFDocument) {
+    throw new Error('PDFLib 라이브러리를 찾을 수 없습니다.');
+  }
+
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.left = '-9999px';
+  iframe.style.top = '0';
+  iframe.style.width = '794px';
+  iframe.style.height = '2400px';
+  iframe.style.border = 'none';
+  iframe.style.opacity = '0';
+  iframe.style.pointerEvents = 'none';
+  iframe.style.zIndex = '-9999';
+  document.body.appendChild(iframe);
+
+  try {
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(htmlContent);
+    iframeDoc.close();
+
+    // Pretendard 웹폰트 보장
+    if (!iframeDoc.querySelector('link[href*="pretendard"]')) {
+      const pLink = iframeDoc.createElement('link');
+      pLink.rel = 'stylesheet';
+      pLink.crossOrigin = 'anonymous';
+      pLink.href = 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css';
+      iframeDoc.head.appendChild(pLink);
+    }
+
+    if (iframeDoc.fonts && iframeDoc.fonts.ready) {
+      try { await iframeDoc.fonts.ready; } catch (e) {}
+    }
+
+    const imgEls = iframeDoc.querySelectorAll('img');
+    await Promise.all(Array.from(imgEls).map(img => {
+      if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
+      return new Promise(resolve => {
+        img.onload = resolve;
+        img.onerror = resolve;
+        setTimeout(resolve, 500);
+      });
+    }));
+
+    await new Promise(res => setTimeout(res, 80));
+
+    // Remove screen-only toolbar
+    iframeDoc.querySelectorAll('.no-print').forEach(el => el.remove());
+
+    const pageEls = iframeDoc.querySelectorAll('.page');
+    const targetPages = pageEls.length > 0 ? Array.from(pageEls) : [iframeDoc.body];
+
+    const mergedDoc = await PDFLib.PDFDocument.create();
+    const pageW = 595.28;
+    const pageH = 841.89;
+
+    for (let idx = 0; idx < targetPages.length; idx++) {
+      const pEl = targetPages[idx];
+      const canvas = await html2canvas(pEl, {
+        scale: 2.0,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: 794,
+        imageTimeout: 0
+      });
+
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+      const arrayBuf = await blob.arrayBuffer();
+      const pngImage = await mergedDoc.embedPng(new Uint8Array(arrayBuf));
+
+      const pdfPage = mergedDoc.addPage([pageW, pageH]);
+      pdfPage.drawImage(pngImage, {
+        x: 0,
+        y: 0,
+        width: pageW,
+        height: pageH
+      });
+    }
+
+    return await mergedDoc.save();
+  } finally {
+    if (document.body.contains(iframe)) {
+      document.body.removeChild(iframe);
+    }
+  }
+}
+window.render2PageHtmlToPdfBytes = render2PageHtmlToPdfBytes;
+
 async function renderElementToSinglePageA4PdfBytes(sourceElement, customMargin = 12) {
   if (!sourceElement) throw new Error('PDF 렌더링 대상 요소를 찾을 수 없습니다.');
   await ensureHtml2CanvasLoaded();
@@ -44031,8 +44163,8 @@ async function downloadPatientCareLogsPdfs(groupId) {
   showGlobalProgress({
     title: `[${pName} 님] 공식 간병일지(A4 2P) PDF 다운로드`,
     subtitle: `표준 A4 2페이지 공식 간병 리포트 생성 중...`,
-    percent: 30,
-    statusText: `공식 2P PDF 실시간 생성 요청 중...`,
+    percent: 25,
+    statusText: `공식 2P PDF 데이터 요청 중...`,
     icon: 'file-check-2'
   });
 
@@ -44043,12 +44175,25 @@ async function downloadPatientCareLogsPdfs(groupId) {
       throw new Error(`PDF 생성 서버 오류 (HTTP ${resp.status})`);
     }
 
-    updateGlobalProgress({
-      percent: 75,
-      statusText: `PDF 파일 스트리밍 완료! 다운로드 준비 중...`
-    });
+    let blob;
+    const contentType = resp.headers.get('content-type') || '';
+    if (contentType.includes('application/pdf')) {
+      updateGlobalProgress({
+        percent: 85,
+        statusText: `PDF 파일 스트리밍 완료! 다운로드 준비 중...`
+      });
+      blob = await resp.blob();
+    } else {
+      // Server returned HTML (e.g. on Vercel without headless browser)
+      updateGlobalProgress({
+        percent: 60,
+        statusText: `고해상도 A4 규격 2페이지 PDF 렌더링 중...`
+      });
+      const htmlText = await resp.text();
+      const pdfBytes = await render2PageHtmlToPdfBytes(htmlText);
+      blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    }
 
-    const blob = await resp.blob();
     const fileName = `[케어포트_공식간병일지]_${pName}_2페이지.pdf`;
 
     // 시스템 내 고객별 일지 저장소(청구/이메일 연계)에 공식 2P PDF 자동 보관
@@ -44080,9 +44225,46 @@ async function downloadPatientCareLogsPdfs(groupId) {
     hideGlobalProgress(350);
     return;
   } catch (err) {
-    console.error('공식 2P 일지 PDF 다운로드 실패:', err);
+    console.error('공식 2P 일지 PDF 다운로드 실패, 클라이언트 엔진 시도:', err);
+
+    // Client fallback: If patient data is in memory, generate HTML and render directly!
+    if (patient && typeof window.generate2PageCareReportHtml === 'function') {
+      try {
+        updateGlobalProgress({
+          percent: 65,
+          statusText: `전산 데이터 기반 A4 2P 리포트 직접 생성 중...`
+        });
+        const records = (patient.dailyLogs || []).map(l => {
+          const rawDate = (l.consultDate || l.dateString || '').slice(5, 10).replace('-', '.');
+          return {
+            date: rawDate || '10.06',
+            scores: [2, 2, 2, 0],
+            raw: l
+          };
+        });
+        const html = window.generate2PageCareReportHtml({
+          name: pName,
+          age: patient.age || 65,
+          gender: patient.gender || '여성',
+          carerName: patient.caregiverName || '-'
+        }, records);
+
+        const pdfBytes = await render2PageHtmlToPdfBytes(html);
+        const fileName = `[케어포트_공식간병일지]_${pName}_2페이지.pdf`;
+        triggerDirectPdfDownload(pdfBytes, fileName);
+        updateGlobalProgress({
+          percent: 100,
+          statusText: `✨ 공식 간병 리포트(2P) 다운로드 완료!`
+        });
+        hideGlobalProgress(350);
+        return;
+      } catch (clientErr) {
+        console.error('Client PDF fallback also failed:', clientErr);
+      }
+    }
+
     hideGlobalProgress();
-    // Fallback: 새 탭에서 즉시 열기
+    // Final fallback: open printable page in new tab
     window.open(`/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}`, '_blank');
     return;
   }

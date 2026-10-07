@@ -701,6 +701,15 @@ function downloadCurrent2PagePdf() {
   const pName = (gPatientInfo && gPatientInfo.name) ? gPatientInfo.name : '고연분';
   const rec = (Array.isArray(careRecords) && careRecords[selected]) ? careRecords[selected] : null;
   const dayNum = rec ? (rec.dayIndex || (selected + 1)) : (selected + 1);
+
+  // If running inside parent ERP iframe, trigger seamless parent download
+  try {
+    if (window.parent && window.parent !== window && typeof window.parent.downloadPatientCareLogsPdfs === 'function') {
+      window.parent.downloadPatientCareLogsPdfs(pName);
+      return;
+    }
+  } catch (e) {}
+
   const url = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}&day=${encodeURIComponent(dayNum)}`;
   window.open(url, '_blank');
 }

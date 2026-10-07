@@ -1601,37 +1601,32 @@ function saveSavedFaxConfig(cfg) {
     }
 
     if (reqPath === '/api/careport/care-report-pdf') {
+      try { delete require.cache[require.resolve('./api/careport/care-report-pdf')]; } catch(e) {}
+      const pdfReportHandler = require('./api/careport/care-report-pdf');
       const parsedUrl = urlModule.parse(req.url, true);
-      const patientName = parsedUrl.query?.patient || parsedUrl.query?.name;
-      const dayParam = parsedUrl.query?.day;
+      req.query = parsedUrl.query || {};
+      res.status = (code) => ({
+        json: (data) => {
+          res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(data));
+        },
+        end: () => res.end()
+      });
+      res.json = (data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      };
 
-      const { fetchPatientMobileReport } = require('./api/careport/mobile-report');
-      try { delete require.cache[require.resolve('./care-report-2page-pdf')]; } catch(e) {}
-      const { generate2PageCareReportHtml } = require('./care-report-2page-pdf');
-      const generatePdf = require('./api/careport/generate-pdf');
-
-      (async () => {
-        try {
-          const report = await fetchPatientMobileReport(patientName);
-          if (!report) {
-            res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-            return res.end(JSON.stringify({ success: false, message: '환자 간병일지 데이터를 찾을 수 없습니다.' }));
-          }
-
-          const selDay = dayParam ? parseInt(dayParam, 10) - 1 : null;
-          const html = generate2PageCareReportHtml(report.patientInfo, report.records, selDay);
-          const filename = `[케어포트_공식간병일지]_${report.patientInfo.name}_2페이지.pdf`;
-          const isInline = parsedUrl.query?.inline === '1' || parsedUrl.query?.inline === 'true' || parsedUrl.query?.preview === '1';
-          req.method = 'POST';
-          req.body = { html, filename, inline: isInline };
-          return generatePdf(req, res);
-        } catch (err) {
-          console.error('[Care Report PDF Error]', err);
-          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-          return res.end(JSON.stringify({ success: false, message: err.message }));
-        }
-      })();
-      return;
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try { req.body = JSON.parse(body); } catch(e) { req.body = body; }
+          return pdfReportHandler(req, res);
+        });
+        return;
+      }
+      return pdfReportHandler(req, res);
     }
 
     if (reqPath === '/api/careport/generate-pdf') {

@@ -3,7 +3,7 @@
   "functions": {
     "api/**/*.js": {
       "maxDuration": 30,
-      "includeFiles": "*.json"
+      "includeFiles": "{*.json,care-report-2page-pdf.js,pdf-helper.js}"
     }
   },
   "rewrites": [

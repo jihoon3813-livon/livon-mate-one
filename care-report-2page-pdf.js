@@ -824,4 +824,9 @@ function generate2PageCareReportHtml(patientInfo = {}, records = [], selectedInd
 `;
 }
 
-module.exports = { generate2PageCareReportHtml };
+if (typeof window !== 'undefined') {
+  window.generate2PageCareReportHtml = generate2PageCareReportHtml;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { generate2PageCareReportHtml };
+}
