@@ -223,12 +223,14 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
     const totalCount = items.length;
     console.log(`[ChromeRobot] 총 ${totalCount}개 세션 원본 캡처 작업 시작...`);
 
-    // Common capture script
+    // Common capture script: Accurately separates Page 1 (.first-page up to 금일 활력징후) and Page 2 (.second-page from 금일 간병 수행 내역)
     const extractScript = `
       (async function() {
         try {
-          const s = document.getElementById("capture");
-          const t = document.getElementById("consult-state");
+          const cap = document.getElementById("capture");
+          if (!cap) return { error: 'capture element not found' };
+
+          // Hide download button & print buttons
           const n = document.getElementById("printBtn");
           const i = document.getElementById("downloadBtn");
           if (n) n.style.display = "none";
@@ -248,23 +250,52 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
             html2canvasFn = window.html2canvas;
           }
 
-          if (!s) return { error: 'capture element not found' };
-
-          // Page 1 capture
-          if (t) t.style.display = "none";
-          const canvas1 = await html2canvasFn(s, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-          const img1 = canvas1.toDataURL("image/png");
-
-          // Page 2 capture
+          let img1 = null;
           let img2 = null;
-          if (t) {
-            t.style.display = "block";
-            const canvas2 = await html2canvasFn(t, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+
+          const p1 = cap.querySelector('.first-page') || cap.children[0];
+          const p2 = cap.querySelector('.second-page') || (cap.children.length > 1 ? cap.children[1] : null);
+          const consultState = document.getElementById("consult-state");
+
+          if (p1 && p2) {
+            // Case 1: Standard CarePort Care Diary (has .first-page and .second-page)
+            // Page 1: Hide p2, show p1 (contains Header down to 금일 활력징후)
+            const origP2Display = p2.style.display;
+            const origP1Display = p1.style.display;
+
+            p2.style.display = "none";
+            p1.style.display = "block";
+            await new Promise(r => setTimeout(r, 120));
+            const canvas1 = await html2canvasFn(p1, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+            img1 = canvas1.toDataURL("image/png");
+
+            // Page 2: Hide p1, show p2 (contains 금일 간병 수행 내역, 중요사항, 전달사항)
+            p1.style.display = "none";
+            p2.style.display = "block";
+            await new Promise(r => setTimeout(r, 120));
+            const canvas2 = await html2canvasFn(p2, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
             img2 = canvas2.toDataURL("image/png");
+
+            // Restore displays
+            p1.style.display = origP1Display;
+            p2.style.display = origP2Display;
+          } else if (consultState) {
+            // Case 2: AI Consult Call report with #consult-state
+            consultState.style.display = "none";
+            const canvas1 = await html2canvasFn(cap, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+            img1 = canvas1.toDataURL("image/png");
+
+            consultState.style.display = "block";
+            const canvas2 = await html2canvasFn(consultState, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+            img2 = canvas2.toDataURL("image/png");
+          } else {
+            // Case 3: Fallback single page
+            const canvas = await html2canvasFn(cap, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+            img1 = canvas.toDataURL("image/png");
           }
 
-          if (n) n.style.display = "block";
-          if (i) i.style.display = "block";
+          if (n) n.style.display = "";
+          if (i) i.style.display = "";
 
           return { success: true, img1, img2 };
         } catch (err) {
@@ -360,5 +391,6 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
 module.exports = {
   getChromePath,
   fetchCarePortToken,
-  captureCarePortOriginalImages
+  captureCarePortOriginalImages,
+  CdpSession
 };
