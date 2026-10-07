@@ -1825,8 +1825,13 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       }
 
       const url = new URL(window.location);
-      url.searchParams.set('start', s);
-      url.searchParams.set('end', e);
+      if (s === thisWeek.start && e === thisWeek.end) {
+        url.searchParams.delete('start');
+        url.searchParams.delete('end');
+      } else {
+        url.searchParams.set('start', s);
+        url.searchParams.set('end', e);
+      }
       url.searchParams.set('channel', gFilter.channel);
       window.history.replaceState({}, '', url);
 

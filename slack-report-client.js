@@ -62,7 +62,7 @@
               </label>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
-              <input type="text" id="slackScheduleInput" value="09:00, 18:00" placeholder="예: 09:00, 12:00, 18:00 (쉼표로 구분)" 
+              <input type="text" id="slackScheduleInput" value="07:00" placeholder="예: 07:00 (쉼표로 구분)" 
                 class="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-hidden focus:border-indigo-500 shadow-2xs">
               <button type="button" onclick="saveSlackSettings()" 
                 class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0">

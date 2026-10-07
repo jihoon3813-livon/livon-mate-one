@@ -14,8 +14,8 @@ function getSlackConfig() {
   const defaultConfig = {
     webhookUrl: process.env.SLACK_WEBHOOK_URL || '',
     channelName: '#수행_2024_livon_careport_device-alert',
-    enabled: false,
-    schedules: ['09:00', '18:00'],
+    enabled: true,
+    schedules: ['07:00'],
     lastSentAt: null,
     dashboardUrl: 'http://localhost:8080'
   };
@@ -237,16 +237,18 @@ function initSlackScheduler() {
     }
 
     const now = new Date();
-    // Asia/Seoul 시간대 기준 HH:mm 형식 구하기
-    const timeParts = new Intl.DateTimeFormat('ko-KR', {
+    // Asia/Seoul 시간대 기준 HH:mm 및 YYYY-MM-DD 구하기
+    const parts = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Asia/Seoul',
       hour: '2-digit', minute: '2-digit', hour12: false
-    }).format(now);
+    }).formatToParts(now);
+    const hh = parts.find(p => p.type === 'hour')?.value || '00';
+    const mm = parts.find(p => p.type === 'minute')?.value || '00';
+    const currentTime = `${hh}:${mm}`;
 
-    const currentTime = timeParts.trim(); // "09:00"
+    const kstDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(now);
+    const todayMinuteKey = `${kstDate}_${currentTime}`;
 
-    // 오늘 해당 분에 이미 발송했는지 중복 방지
-    const todayMinuteKey = `${now.toISOString().slice(0, 10)}_${currentTime}`;
     if (lastDispatchedMinute === todayMinuteKey) {
       return;
     }
@@ -255,7 +257,7 @@ function initSlackScheduler() {
       lastDispatchedMinute = todayMinuteKey;
       console.log(`[Slack Report] Scheduled trigger time matched: ${currentTime}. Sending daily report...`);
       try {
-        const res = await sendDailyReport(`*[메이트원 통합간병허브 정기 운영보고]* 📊 ${currentTime}`);
+        const res = await sendDailyReport(`*[메이트원 통합간병허브 일일 운영보고]* 📊 ${kstDate} ${currentTime}`);
         console.log('[Slack Report] Scheduled report successfully delivered:', res);
       } catch (err) {
         console.error('[Slack Report] Scheduled report failed:', err.message);

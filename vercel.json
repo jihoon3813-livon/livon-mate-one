@@ -20,6 +20,10 @@
       "destination": "/mobile-care-diary.html"
     },
     {
+      "source": "/call-report-view",
+      "destination": "/call-report-view.html"
+    },
+    {
       "source": "/report",
       "destination": "/mobile-care-diary.html"
     },

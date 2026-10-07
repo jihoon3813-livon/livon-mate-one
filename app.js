@@ -56472,6 +56472,9 @@ function mapRowToApplicationRecord(
     // 단, 엑셀 원본 상태가 명시적으로 '완료'인 경우는 완료 우선 존중
     if (isRawCompleted) {
       status = '완료';
+    } else if (rawStatus.includes('예정') || !caregiverName) {
+      // [사용자 요구사항]: 엑셀 원본 현재상태가 '예정'이거나 간병인이 없는 경우(!caregiverName) 시작일시가 지났더라도 '진행중'으로 자동 변경하지 않고 '예정' 유지
+      status = '예정';
     } else {
       status = '진행중';
     }
@@ -56483,6 +56486,7 @@ function mapRowToApplicationRecord(
   // (5) 시작일시가 없거나 미배정인 경우
   else if (!caregiverName && !careStartDate) {
     if (rawStatus.includes('대기')) status = '배정대기';
+    else if (rawStatus.includes('예정')) status = '예정';
     else status = rawStatus || '신규';
   }
   // (6) 기타 완료 매핑 fallback
@@ -56537,7 +56541,7 @@ function mapRowToApplicationRecord(
     totalPayout = Number(rowObj['총지급액']) || 0;
   }
 
-  const assignedCaregiverCount = caregiverName ? 1 : (status === '완료' || status === '진행중' ? 1 : 0);
+  const assignedCaregiverCount = caregiverName ? 1 : 0;
   const rawCompany = String(getVal('insuranceCompany') || '').trim();
   const insuranceCompany = rawCompany ? (
     rawCompany.includes('SCOR') ? '현대해상(SCOR)' :

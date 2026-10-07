@@ -3435,11 +3435,9 @@ async function getShortenedUrl(longUrl) {
 window.getShortenedUrl = getShortenedUrl;
 
 async function copyReportWebLink(targetChannel = '삼성화재') {
-  const thisWeek = getThisWeekRange();
-  const s = document.getElementById('tabReportStartDate')?.value || thisWeek.start;
-  const e = document.getElementById('tabReportEndDate')?.value || thisWeek.end;
   const origin = window.location.origin;
-  const reportUrl = `${origin}/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(targetChannel)}`;
+  // 접속(클릭) 시점마다 '클릭한 날 기준 일주일'이 실시간 자동 세팅되도록 고정 날짜(start, end)를 제외한 스마트 링크를 생성합니다.
+  const reportUrl = `${origin}/call-report-view.html?channel=${encodeURIComponent(targetChannel)}`;
 
   try {
     const isHyundai = targetChannel.includes('현대');
@@ -3467,45 +3465,18 @@ async function copyReportWebLink(targetChannel = '삼성화재') {
 
   navigator.clipboard.writeText(reportUrl).then(() => {
     if (typeof showToast === 'function') {
-      showToast(`[${targetChannel}] 웹보고서 링크가 복사되었습니다!`, 'success');
+      showToast(`[${targetChannel}] 웹보고서 링크가 복사되었습니다! (클릭 시점 기준 일주일 자동 세팅)`, 'success');
     } else {
-      alert(`[${targetChannel} 전용 보고서 공유 웹링크가 복사되었습니다]\n\n${reportUrl}\n\n${targetChannel} 담당자 및 협력사에 전달하여 웹에서 즉시 열람하실 수 있습니다.`);
+      alert(`[${targetChannel} 전용 보고서 공유 웹링크가 복사되었습니다]\n\n${reportUrl}\n\n* 상대방이 언제 열더라도 접속한 날짜를 기준으로 최근 일주일 데이터가 자동 세팅되어 최신 상태로 열람할 수 있습니다.`);
     }
   }).catch(() => {
-    prompt(`아래 [${targetChannel}] 전용 보고서 링크를 복사하여 전달해주세요:`, reportUrl);
+    prompt(`아래 [${targetChannel}] 전용 보고서 링크를 복사하여 전달해주세요:\n(접속 시점 기준 일주일 자동 세팅)`, reportUrl);
   });
 }
 
 function openReportWebView(targetChannel = '삼성화재') {
-  const thisWeek = getThisWeekRange();
-  const s = document.getElementById('tabReportStartDate')?.value || thisWeek.start;
-  const e = document.getElementById('tabReportEndDate')?.value || thisWeek.end;
-
-  try {
-    const isHyundai = targetChannel.includes('현대');
-    const isLivon = targetChannel.includes('리본');
-    const isAll = targetChannel.includes('전체') || targetChannel === 'all';
-    const cacheKey = isHyundai 
-      ? 'LIVON_CACHED_HYUNDAI_REPORT_DATA' 
-      : (isLivon ? 'LIVON_CACHED_LIVON_REPORT_DATA' : (isAll ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA'));
-
-    if (gSamsungReportData && Array.isArray(gSamsungReportData.callLogs)) {
-      const curDataCh = (gSamsungReportData.reportInfo && gSamsungReportData.reportInfo.channel) || '';
-      const isTargetChannelMatch = isAll
-        ? (curDataCh === 'all' || curDataCh === '전체' || gSamsungReportData.callLogs.length >= 200)
-        : (curDataCh.includes(targetChannel) || gSamsungReportData.callLogs.some(c => (c.channel || '').includes(isHyundai ? '현대' : (isLivon ? '리본' : '삼성'))));
-
-      if (isTargetChannelMatch) {
-        sessionStorage.setItem(cacheKey, JSON.stringify(gSamsungReportData));
-      } else {
-        sessionStorage.removeItem(cacheKey);
-      }
-    } else {
-      sessionStorage.removeItem(cacheKey);
-    }
-  } catch (err) {}
-
-  const reportUrl = `/call-report-view.html?start=${s}&end=${e}&channel=${encodeURIComponent(targetChannel)}`;
+  // 새 탭 열기도 클릭 시점 기준 일주일 자동 세팅 링크로 열기
+  const reportUrl = `/call-report-view.html?channel=${encodeURIComponent(targetChannel)}`;
   window.open(reportUrl, '_blank');
 }
 
