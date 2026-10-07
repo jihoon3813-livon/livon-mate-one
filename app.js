@@ -41705,14 +41705,7 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
           <span>공식 2P PDF 다운로드</span>
         </button>
       `
-      : `
-        <button type="button" onclick="downloadPatientCareLogsPdfs('${group.id}')"
-          class="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
-          title="해당 환자의 케어포트 등록 전체 간병일지 통합 PDF 다운로드 (기존 서식)">
-          <i data-lucide="file-down" class="w-4 h-4 text-purple-600"></i>
-          <span>전체 일지 PDF 다운로드</span>
-        </button>
-      `;
+      : '';
 
     return `
       <div class="bg-white rounded-3xl border ${cardBorderClass} transition-all overflow-hidden">
@@ -41787,9 +41780,9 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
             ${downloadBtnHtml}
             <button type="button" onclick="downloadPatientCareLogsViaRobot('${group.id}')"
               class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs shadow-md shadow-purple-900/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
-              title="케어포트 전산에 백그라운드로 자동 접속하여 1일차부터 마지막 일차까지 모든 일지의 원본 이미지들을 다운로드받아 1개의 공식 합본 PDF로 조립합니다">
-              <i data-lucide="bot" class="w-4 h-4 text-amber-300"></i>
-              <span>🤖 전체 원본 무인 합본</span>
+              title="케어포트 전산에 접속하여 1일차부터 마지막 일차까지 모든 일지의 원본 이미지들을 다운로드받아 1개의 공식 합본 PDF로 조립합니다">
+              <i data-lucide="file-down" class="w-4 h-4 text-amber-300"></i>
+              <span>전체 원본 다운로드</span>
             </button>
             <button type="button" onclick="attachCarePortLogsAndOpenEmail('${group.id}')"
               class="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-900/30 flex items-center gap-1.5 transition-all cursor-pointer"
