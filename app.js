@@ -1471,12 +1471,27 @@ function sortApplicationsNewestFirst(apps) {
     return isNaN(t) ? 0 : t;
   };
 
+  let recentRegIdSet = new Set();
+  try {
+    const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
+    recentRegIdSet = new Set((rList || []).map(String));
+  } catch (e) {}
+
+  const checkIsRecent = (a) => {
+    if (!a) return 0;
+    if (a._isJustRegistered) return 1;
+    if (a.id && (recentRegIdSet.has(String(a.id)) || String(a.id).startsWith('D'))) return 1;
+    return 0;
+  };
+
   return [...apps].sort((a, b) => {
-    // 1. 방금/신규 등록된 고객(_isJustRegistered 또는 D접두사 고객)은 무조건 맨 처음(최상단)
-    const isRecentA = (a && (a._isJustRegistered || (a.id && String(a.id).startsWith('D')))) ? 1 : 0;
-    const isRecentB = (b && (b._isJustRegistered || (b.id && String(b.id).startsWith('D')))) ? 1 : 0;
+    // 1. 방금/신규 등록된 고객(_isJustRegistered, 최근 등록 목록, D접두사 고객)은 무조건 맨 처음(최상단)
+    const isRecentA = checkIsRecent(a);
+    const isRecentB = checkIsRecent(b);
     if (isRecentA !== isRecentB) return isRecentB - isRecentA;
     if (isRecentA === 1 && isRecentB === 1) {
+      const tDiff = parseTime(b?.applyDate) - parseTime(a?.applyDate);
+      if (tDiff !== 0) return tDiff;
       return compareAppIds(a.id, b.id, true);
     }
 
@@ -3264,7 +3279,23 @@ function isAppModifiedOrComplaint(app) {
 window.isAppModifiedOrComplaint = isAppModifiedOrComplaint;
 
 function getAppLatestEventTime(app) {
+  if (!app) return 0;
   let t = 0;
+  if (app.createdAt) {
+    const p = Date.parse(app.createdAt);
+    if (!isNaN(p) && p > t) t = p;
+  }
+  if (app.applyDate) {
+    const s = String(app.applyDate).trim().replace(/[.\/]+/g, '-');
+    const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2}))?/);
+    if (m) {
+      const p = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), m[4] !== undefined ? parseInt(m[4], 10) : 0, m[5] !== undefined ? parseInt(m[5], 10) : 0).getTime();
+      if (!isNaN(p) && p > t) t = p;
+    } else {
+      const p = Date.parse(s);
+      if (!isNaN(p) && p > t) t = p;
+    }
+  }
   if (app.updatedAt) {
     const p = Date.parse(app.updatedAt);
     if (!isNaN(p) && p > t) t = p;
@@ -33165,12 +33196,28 @@ function renderUnifiedCareHub() {
     a._latestEventTime = typeof getAppLatestEventTime === 'function' ? getAppLatestEventTime(a) : (a._updTime || 0);
   }
 
+  // 최근 등록 ID Set 확보 (새로고침 후에도 신규 등록 건 최상단 유지)
+  let recentRegIdSet = new Set();
+  try {
+    const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
+    recentRegIdSet = new Set((rList || []).map(String));
+  } catch (e) {}
+
+  const checkIsRecent = (a) => {
+    if (!a) return 0;
+    if (a._isJustRegistered) return 1;
+    if (a.id && (recentRegIdSet.has(String(a.id)) || String(a.id).startsWith('D'))) return 1;
+    return 0;
+  };
+
   filtered.sort((a, b) => {
-    // 1. 방금/신규 등록된 고객(_isJustRegistered 또는 D접두사 고객)은 무조건 맨 처음(최상단)
-    const isRecentA = (a && (a._isJustRegistered || (a.id && String(a.id).startsWith('D')))) ? 1 : 0;
-    const isRecentB = (b && (b._isJustRegistered || (b.id && String(b.id).startsWith('D')))) ? 1 : 0;
+    // 1. 방금/신규 등록된 고객(_isJustRegistered, 최근 등록 목록, D접두사 고객)은 무조건 맨 처음(최상단)
+    const isRecentA = checkIsRecent(a);
+    const isRecentB = checkIsRecent(b);
     if (isRecentA !== isRecentB) return isRecentB - isRecentA;
     if (isRecentA === 1 && isRecentB === 1) {
+      const tDiff = (b._applyTime || 0) - (a._applyTime || 0);
+      if (tDiff !== 0) return tDiff;
       return compareAppIds(a.id, b.id, true);
     }
 
