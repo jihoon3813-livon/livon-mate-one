@@ -45286,95 +45286,81 @@ async function downloadPatientCareLogsViaRobot(groupId, selectedSessionIds = nul
   const username = (patient.patientName || '환자').trim();
   const labelPrefix = isSelective ? `선택 ${totalDays}일차` : `전체 ${totalDays}일차`;
 
-  const isLocalDev = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'));
+  // 개발 및 운영 환경 공통: 크롬 헤드리스 무인 로봇으로 전산 원본 캡처 및 A4 합성 실행 (1번 화면 방식)
+  showGlobalProgress({
+    title: `[${username} 님] ${labelPrefix} 원본 다운로드`,
+    subtitle: `${labelPrefix} 일지 원본 데이터를 받아와 1개의 공식 A4 합본 PDF로 조립합니다.`,
+    percent: 15,
+    statusText: `무인 로봇 가동 및 케어포트 전산 접속 중...`,
+    icon: 'bot'
+  });
 
-  // 1순위: 로컬 개발 환경(Chrome 브라우저 실행 가능)인 경우 고속 로컬 헤드리스 크롬 로봇 시도
-  if (isLocalDev) {
-    showGlobalProgress({
-      title: `[${username} 님] ${labelPrefix} 원본 다운로드`,
-      subtitle: `${labelPrefix} 일지 원본 데이터를 받아와 1개의 공식 A4 합본 PDF로 조립합니다.`,
-      percent: 15,
-      statusText: `무인 로봇 가동 및 케어포트 전산 접속 중...`,
-      icon: 'bot'
+  let currentPct = 15;
+  const ticker = setInterval(() => {
+    if (currentPct < 90) {
+      currentPct += Math.max(1, Math.floor((90 - currentPct) / (totalDays * 1.5 + 3)));
+      updateGlobalProgress({
+        percent: currentPct,
+        statusText: `전산 원본 캡처 및 A4 합성 진행 중 (${currentPct}%)...`
+      });
+    }
+  }, 1000);
+
+  try {
+    const res = await fetch('/api/careport/robot-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionList: sessionList,
+        patient: username
+      })
     });
 
-    let currentPct = 15;
-    const ticker = setInterval(() => {
-      if (currentPct < 90) {
-        currentPct += Math.max(1, Math.floor((90 - currentPct) / (totalDays * 1.5 + 3)));
-        updateGlobalProgress({
-          percent: currentPct,
-          statusText: `전산 원본 캡처 및 A4 합성 진행 중 (${currentPct}%)...`
-        });
-      }
-    }, 1000);
+    clearInterval(ticker);
 
-    try {
-      const res = await fetch('/api/careport/robot-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionList: sessionList,
-          patient: username
-        })
-      });
-
-      clearInterval(ticker);
-
-      if (!res.ok) {
-        let errMsg = '무인 로봇 처리 실패';
-        try {
-          const errJson = await res.json();
-          errMsg = errJson.message || errMsg;
-        } catch (e) {}
-        throw new Error(errMsg);
-      }
-
-      updateGlobalProgress({ percent: 95, statusText: `${labelPrefix} 공식 PDF 조립 완료!` });
-
-      const blob = await res.blob();
-      const cleanDate = new Date().toISOString().slice(0, 10).replace(/[^0-9]/g, '');
-      const fileName = isSelective
-        ? `[케어포트_공식간병일지_선택일지합본]_${username}_선택${totalDays}일차_${cleanDate}.pdf`
-        : `[케어포트_공식간병일지_전체일지합본]_${username}_총${totalDays}일차_${cleanDate}.pdf`;
-
-      const downloadUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
-
-      updateGlobalProgress({ percent: 100, statusText: `완료! 총 ${totalDays}일차 원본 합본이 다운로드되었습니다.` });
-      setTimeout(hideGlobalProgress, 1200);
-
-      if (typeof showToast === 'function') {
-        showToast(`[${username} 님] ${labelPrefix} 원본 합본 PDF 다운로드 완료!`, 'success');
-      }
-      return;
-    } catch (err) {
-      clearInterval(ticker);
-      console.warn('[Robot Download All] 로컬 무인 로봇 실패, 브라우저 공인 임베드 엔진으로 즉시 전환:', err);
+    if (!res.ok) {
+      let errMsg = '무인 로봇 처리 실패';
+      try {
+        const errJson = await res.json();
+        errMsg = errJson.message || errMsg;
+      } catch (e) {}
+      throw new Error(errMsg);
     }
-  }
 
-  // 2순위 (운영 Vercel 및 로봇 대체): 브라우저 내장 100% 케어포트 공인 원본 DOM 캡처 엔진 (Image 2 완전 일치)
-  try {
-    await captureCarePortOriginalViaIframe(sessionList, username, isSelective, totalDays);
+    updateGlobalProgress({ percent: 95, statusText: `${labelPrefix} 공식 PDF 조립 완료!` });
+
+    const blob = await res.blob();
+    const cleanDate = new Date().toISOString().slice(0, 10).replace(/[^0-9]/g, '');
+    const fileName = isSelective
+      ? `[케어포트_공식간병일지_선택일지합본]_${username}_선택${totalDays}일차_${cleanDate}.pdf`
+      : `[케어포트_공식간병일지_전체일지합본]_${username}_총${totalDays}일차_${cleanDate}.pdf`;
+
+    const downloadUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+
+    updateGlobalProgress({ percent: 100, statusText: `완료! 총 ${totalDays}일차 원본 합본이 다운로드되었습니다.` });
+    setTimeout(hideGlobalProgress, 1200);
+
+    if (typeof showToast === 'function') {
+      showToast(`[${username} 님] ${labelPrefix} 원본 합본 PDF 다운로드 완료!`, 'success');
+    }
     return;
-  } catch (iframeErr) {
-    console.warn('[IframeCapture] 브라우저 공인 캡처 실패, 고해상도 A4 정밀 렌더러로 즉시 대체:', iframeErr);
-  }
-
-  // 3순위 (비상 대체): 클라이언트 1:1 고해상도 A4 원본 조립 엔진
-  try {
-    await compileClientSideAuthenticCarePortPdf(patient, sortedLogs, isSelective, totalDays);
-  } catch (clientErr) {
-    console.error('[Client-Side PDF Engine] 실패:', clientErr);
-    hideGlobalProgress();
-    alert(`공식 간병일지 합본 다운로드 오류: ${clientErr.message}`);
+  } catch (err) {
+    clearInterval(ticker);
+    console.warn('[Robot Download All] 무인 로봇 실패, 비상 클라이언트 고해상도 엔진으로 전환:', err);
+    try {
+      await compileClientSideAuthenticCarePortPdf(patient, sortedLogs, isSelective, totalDays);
+    } catch (clientErr) {
+      console.error('[Client-Side PDF Engine] 실패:', clientErr);
+      hideGlobalProgress();
+      alert(`공식 간병일지 합본 다운로드 오류: ${clientErr.message || err.message}`);
+    }
   }
 }
 window.downloadPatientCareLogsViaRobot = downloadPatientCareLogsViaRobot;

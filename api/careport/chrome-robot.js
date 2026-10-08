@@ -11,12 +11,21 @@ const { execFile } = require('child_process');
 const WebSocket = require('ws');
 
 const CHROME_PATHS = [
+  process.env.CHROME_PATH,
+  process.env.CHROMIUM_PATH,
+  process.env.PUPPETEER_EXECUTABLE_PATH,
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
   'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
   path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
   'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
-];
+  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/snap/bin/chromium',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+].filter(Boolean);
 
 function getChromePath() {
   for (const p of CHROME_PATHS) {
@@ -146,6 +155,9 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
 
   const chromeArgs = [
     '--headless=new',
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
     '--disable-gpu',
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${tmpProfile}`,
