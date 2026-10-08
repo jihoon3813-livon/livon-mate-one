@@ -39,4 +39,7 @@ vonage_private.key
 slack_config.json
 sms_dispatch_log.json
 generated_pdfs/
-
+sample_*.png
+dev_robot_*.pdf
+test_capture_*.js
+test_classic_output.html

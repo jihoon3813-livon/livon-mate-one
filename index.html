@@ -9114,6 +9114,7 @@
 
       <form id="appAdjusterEditForm" onsubmit="handleAppAdjusterEditSubmit(event)" class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4 text-xs">
         <input type="hidden" id="adjEditAppId">
+        <input type="hidden" id="adjEditHistId">
 
         <!-- 1. 원수사 및 담당 손해사정인 정보 -->
         <div class="bg-purple-50/50 p-4 rounded-2xl border border-purple-200 space-y-3">
@@ -9208,6 +9209,116 @@
         <div class="pt-3 border-t flex justify-end gap-2">
           <button type="button" onclick="closeModal('appAdjusterEditModal')" class="px-4 py-2 border rounded-xl font-semibold hover:bg-slate-50 cursor-pointer">취소</button>
           <button type="submit" class="px-6 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold shadow-xs cursor-pointer">손사 정보 저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: NEW / REPLACE ADJUSTER (손사 담당자 추가/교체) ==================== -->
+  <div id="newAdjusterModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+      <div class="p-5 bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white flex items-center justify-between">
+        <div>
+          <h3 id="newAdjModalTitle" class="text-base font-black flex items-center gap-2">
+            <i data-lucide="user-plus" class="w-5 h-5 text-purple-200"></i>
+            <span>손사(보험사) 담당자 추가 등록</span>
+            <span id="newAdjModalIdBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-white/20 text-white font-mono"></span>
+          </h3>
+          <p id="newAdjModalSub" class="text-xs text-purple-200 mt-0.5">후임 담당자 배정 또는 복수 담당자 관리 이력을 등록합니다.</p>
+        </div>
+        <button type="button" onclick="closeModal('newAdjusterModal')" class="p-2 text-purple-200 hover:text-white cursor-pointer"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <form id="newAdjusterForm" onsubmit="handleNewAdjusterSubmit(event)" class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4 text-xs">
+        <input type="hidden" id="newAdjAppId">
+        <input type="hidden" id="newAdjIsReplacement" value="true">
+        <input type="hidden" id="newAdjPrevId" value="">
+
+        <!-- 등록 모드 선택: 교체(후임자) vs 추가(공동담당) -->
+        <div class="grid grid-cols-2 gap-2 p-1.5 bg-purple-50/80 rounded-2xl border border-purple-200/80">
+          <label class="flex items-center justify-center gap-2 cursor-pointer font-bold text-slate-800 text-xs p-2 rounded-xl transition-all has-checked:bg-white has-checked:text-purple-900 has-checked:shadow-xs">
+            <input type="radio" name="newAdjTypeRadio" id="newAdjTypeReplace" value="replace" checked onchange="document.getElementById('newAdjIsReplacement').value = 'true'" class="text-purple-600 focus:ring-purple-500">
+            <span>담당자 교체 (후임자 지정)</span>
+          </label>
+          <label class="flex items-center justify-center gap-2 cursor-pointer font-bold text-slate-800 text-xs p-2 rounded-xl transition-all has-checked:bg-white has-checked:text-purple-900 has-checked:shadow-xs">
+            <input type="radio" name="newAdjTypeRadio" id="newAdjTypeAdd" value="add" onchange="document.getElementById('newAdjIsReplacement').value = 'false'" class="text-purple-600 focus:ring-purple-500">
+            <span>공동/추가 담당자 등록</span>
+          </label>
+        </div>
+
+        <!-- 원수사 및 담당 손해사정인 정보 -->
+        <div class="bg-purple-50/40 p-4 rounded-2xl border border-purple-200/90 space-y-3">
+          <div class="font-extrabold text-purple-950 text-xs flex items-center justify-between pb-2 border-b border-purple-200">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="user-check" class="w-4 h-4 text-purple-700"></i> <span class="hl-pen-yellow">신규/후임 손사 담당자 정보</span>
+            </span>
+            <span class="text-[10.5px] text-purple-700 font-medium">보험사 보상과 / 손해사정법인</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">원수사(보험사) *</label>
+              <select id="newAdjInsuranceCompany" class="w-full p-2.5 border rounded-xl bg-white font-bold text-purple-900 focus:ring-2 focus:ring-purple-500">
+                <option value="현대해상">현대해상</option>
+                <option value="현대해상(SCOR)">현대해상(SCOR)</option>
+                <option value="삼성화재">삼성화재</option>
+                <option value="DB손해보험">DB손해보험</option>
+                <option value="KB손해보험">KB손해보험</option>
+                <option value="메리츠화재">메리츠화재</option>
+                <option value="기타보험사">기타보험사</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">담당 손해사정인 성명 *</label>
+              <input type="text" id="newAdjName" list="allAdjustersDataList" oninput="onAdjusterNameInput(this.value, 'newAdj')" required placeholder="예: 조채영 (기존 등록인 자동매칭)" class="w-full p-2.5 border rounded-xl font-bold text-slate-900 bg-white focus:ring-2 focus:ring-purple-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">손사 법인 / 소속팀</label>
+            <input type="text" id="newAdjFirm" placeholder="예: 다스카손해사정 또는 현대해상 보상지원센터" class="w-full p-2.5 border rounded-xl text-slate-900 bg-white focus:ring-2 focus:ring-purple-500">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">손사 일반전화 (유선)</label>
+              <input type="tel" id="newAdjPhone" placeholder="02-2181-2383" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono text-slate-900 bg-white focus:ring-2 focus:ring-purple-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">손사 핸드폰 (모바일)</label>
+              <input type="tel" id="newAdjMobile" placeholder="010-0000-0000" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono font-bold text-purple-900 bg-white focus:ring-2 focus:ring-purple-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1 text-purple-900">수신 팩스번호 (FAX)</label>
+              <input type="tel" id="newAdjFax" placeholder="02-000-0000" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border-2 border-purple-300 rounded-xl font-mono font-bold text-purple-950 bg-white focus:ring-2 focus:ring-purple-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- 배정 일자 및 사유 메모 -->
+        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1 flex items-center gap-1">
+                <i data-lucide="calendar" class="w-3.5 h-3.5 text-purple-600"></i> 배정 / 변경 일자
+              </label>
+              <input type="text" id="newAdjAssignedDate" placeholder="2026.08.01" class="w-full p-2.5 border rounded-xl font-mono font-bold text-slate-900 bg-white">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">배정 사유 / 비고</label>
+              <input type="text" id="newAdjMemo" placeholder="예: 후임 손사 배정, 2차 청구 담당" class="w-full p-2.5 border rounded-xl text-slate-900 bg-white">
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500 leading-relaxed">
+            * 새로운 담당자를 추가하면 최신 대표 담당자로 지정되며, 상단 차수 탭을 통해 기존 담당자와 후임 담당자의 연락처/팩스 이력을 언제든지 상호 조회할 수 있습니다.
+          </p>
+        </div>
+
+        <div class="pt-3 border-t flex justify-end gap-2">
+          <button type="button" onclick="closeModal('newAdjusterModal')" class="px-4 py-2 border rounded-xl font-semibold hover:bg-slate-50 cursor-pointer">취소</button>
+          <button type="submit" id="newAdjSubmitBtn" class="px-5 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold shadow-xs cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> <span>담당자 등록 완료</span>
+          </button>
         </div>
       </form>
     </div>

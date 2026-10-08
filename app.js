@@ -3621,9 +3621,9 @@ var gHdForm02CustomState = {
   careAddress: '', // 비어있으면 고객 주소 자동 연동
   expectedUsageTime: '', // 비어있으면 데이터 연동 자동 계산
   isContinuingCare: '계속 사용 중', // '계속 사용 중' | '사용 종료'
-  caregiverName: '조정자',
-  caregiverBirth: '19680512',
-  caregiverPhone: '010-7788-9900',
+  caregiverName: '',
+  caregiverBirth: '',
+  caregiverPhone: '',
   firstCareStartDate: '',
   managerName: '리본케어',
   managerPhone: '02-6959-7011',
@@ -3633,7 +3633,7 @@ var gHdForm02CustomState = {
     { start: '', end: '', days: '' },
     { start: '', end: '', days: '' }
   ],
-  customerOverrides: {} // 고객별 개별 수정 사항 저장소 { [appId]: { servicePeriods, expectedUsageTime, managerName, managerPhone, careTarget, careLocation, careAddress, ... } }
+  customerOverrides: {} // 고객별 개별 수정 사항 저장소 { [appId]: { servicePeriods, expectedUsageTime, managerName, managerPhone, careTarget, careLocation, careAddress, caregiverName, caregiverBirth, caregiverPhone, ... } }
 };
 
 function getHdFormCareTarget(app) {
@@ -3657,6 +3657,200 @@ function getHdFormCareAddress(app) {
   return app.patientAddress || app.addressDetail || app.homeAddress || '';
 }
 
+/**
+ * 간병인 생년월일 8자리(YYYYMMDD) 정규화 포맷터
+ */
+function formatHdCaregiverBirth8(raw) {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  const digits = str.replace(/[^0-9]/g, '');
+  if (digits.length === 8) {
+    return digits;
+  }
+  if (digits.length === 6) {
+    const century = parseInt(digits.slice(0, 2), 10) > 30 ? '19' : '20';
+    return century + digits;
+  }
+  if (digits.length >= 7) {
+    const front6 = digits.slice(0, 6);
+    const seventh = digits.charAt(6);
+    let century = '19';
+    if (['3', '4', '7', '8'].includes(seventh)) {
+      century = '20';
+    } else if (['1', '2', '5', '6'].includes(seventh)) {
+      century = '19';
+    } else {
+      century = parseInt(front6.slice(0, 2), 10) > 30 ? '19' : '20';
+    }
+    return century + front6;
+  }
+  return str;
+}
+window.formatHdCaregiverBirth8 = formatHdCaregiverBirth8;
+
+/**
+ * 현대해상 환자의 전체 배정 간병인 이력(교체/추가 포함) 추출
+ */
+function getHdForm02AllCaregivers(app) {
+  if (!app) return [];
+  const list = (typeof gAssigns !== 'undefined' && Array.isArray(gAssigns)) ? gAssigns : (Array.isArray(window.gAssigns) ? window.gAssigns : []);
+  const appId = String(app.id || app.patientId || '').trim();
+  const appName = (app.patientName || app.customerName || '').trim();
+
+  let matched = [];
+  if (appId) {
+    matched = list.filter(a => {
+      if (!a) return false;
+      const aApplyId = String(a.applyId || '').trim();
+      return aApplyId && (aApplyId === appId || aApplyId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || aApplyId.replace(/^C/, 'H') === appId.replace(/^C/, 'H'));
+    });
+  }
+  if ((!matched || matched.length === 0) && appName) {
+    matched = list.filter(a => {
+      if (!a) return false;
+      const aApplyId = String(a.applyId || '').trim();
+      if (!aApplyId && a.patientName && a.patientName.trim() === appName) return true;
+      return false;
+    });
+  }
+
+  // 환자명 동일 배정 건(동일 환자의 연속 접수 건 등) 보조 취합
+  if (appName) {
+    const nameMatches = list.filter(a => a && a.patientName && a.patientName.trim() === appName);
+    nameMatches.forEach(na => {
+      if (!matched.some(m => m.id === na.id)) {
+        matched.push(na);
+      }
+    });
+  }
+
+  const valid = matched.filter(a => {
+    if (!a) return false;
+    const s = String(a.startDate || '').trim();
+    if (s.includes('취소') || s.includes('안내') || s.includes('제외') || s.includes('미해당')) return false;
+    return Boolean(a.caregiverName || s || a.endDate);
+  });
+
+  valid.sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+
+  const activeAs = (typeof getActiveCaregiverAssignment === 'function' ? getActiveCaregiverAssignment(app, valid) : null) || (valid.length > 0 ? valid[valid.length - 1] : null);
+
+  const results = [];
+  const seenCaregivers = new Set();
+
+  valid.forEach(as => {
+    const cgName = (as.caregiverName || '').trim();
+    if (!cgName) return;
+    const cg = (typeof gCaregivers !== 'undefined' && Array.isArray(gCaregivers)) ? gCaregivers.find(c => c.name === cgName) : null;
+    const rawBirth = as.birthDate || as.caregiverBirth || (cg && cg.birthDate) || '';
+    const birth = formatHdCaregiverBirth8(rawBirth);
+    const phone = as.phone || as.caregiverPhone || (cg && cg.phone) || '';
+    const isLatest = activeAs ? (as.id === activeAs.id || (as.caregiverName === activeAs.caregiverName && as.startDate === activeAs.startDate)) : false;
+
+    const key = `${cgName}_${as.startDate || ''}`;
+    if (!seenCaregivers.has(key)) {
+      seenCaregivers.add(key);
+      results.push({
+        id: as.id,
+        name: cgName,
+        birth: birth,
+        phone: phone,
+        startDate: as.startDate || '',
+        endDate: as.endDate || '',
+        isLatest: isLatest
+      });
+    }
+  });
+
+  if (results.length === 0 && app.caregiverName) {
+    const cg = (typeof gCaregivers !== 'undefined' && Array.isArray(gCaregivers)) ? gCaregivers.find(c => c.name === app.caregiverName) : null;
+    const rawBirth = app.caregiverBirth || (cg && cg.birthDate) || '';
+    results.push({
+      id: 'app_direct',
+      name: app.caregiverName,
+      birth: formatHdCaregiverBirth8(rawBirth),
+      phone: app.caregiverPhone || (cg && cg.phone) || '',
+      startDate: app.careStartDate || app.desiredDate || '',
+      endDate: app.careEndDate || '',
+      isLatest: true
+    });
+  }
+
+  if (results.length > 0 && !results.some(r => r.isLatest)) {
+    results[results.length - 1].isLatest = true;
+  }
+
+  return results;
+}
+window.getHdForm02AllCaregivers = getHdForm02AllCaregivers;
+
+/**
+ * 현대해상 청구서용 최신 간병인 정보(성명, 생년월일, 연락처) 획득
+ * - 배정 추가/변경 시 가장 최근 간병인 정보를 최우선 자동 적용
+ * - 사용자 수기 수정(customerOverrides)이 있는 경우 수기 수정값 우선 반영
+ */
+function getHdForm02CaregiverInfo(app) {
+  const result = {
+    name: '',
+    birth: '',
+    phone: ''
+  };
+  if (!app) return result;
+
+  const appId = String(app.id || '').trim();
+  const overrides = (gHdForm02CustomState.customerOverrides && gHdForm02CustomState.customerOverrides[appId]) || {};
+
+  const allCgs = getHdForm02AllCaregivers(app);
+  const latestCg = allCgs.find(c => c.isLatest) || (allCgs.length > 0 ? allCgs[allCgs.length - 1] : null);
+
+  const fallbackName = (latestCg && latestCg.name) || app.caregiverName || '';
+  const fallbackBirth = (latestCg && latestCg.birth) || formatHdCaregiverBirth8(app.caregiverBirth || '');
+  const fallbackPhone = (latestCg && latestCg.phone) || app.caregiverPhone || '';
+
+  const isDummyName = (v) => !v || v === '조정자' || v === '테스트' || v === '홍길동';
+  const isDummyBirth = (v) => !v || v === '19680512';
+  const isDummyPhone = (v) => !v || v === '010-7788-9900' || v === '010-0000-0000';
+
+  result.name = (overrides.caregiverName && !isDummyName(overrides.caregiverName)) ? overrides.caregiverName : fallbackName;
+  result.birth = (overrides.caregiverBirth && !isDummyBirth(overrides.caregiverBirth)) ? overrides.caregiverBirth : fallbackBirth;
+  result.phone = (overrides.caregiverPhone && !isDummyPhone(overrides.caregiverPhone)) ? overrides.caregiverPhone : fallbackPhone;
+
+  return result;
+}
+window.getHdForm02CaregiverInfo = getHdForm02CaregiverInfo;
+
+/**
+ * 청구서 모달 상단에서 간병인 원클릭 즉시 선택/변경
+ */
+function applyHdForm02CaregiverQuick(name, birth, phone, appId) {
+  const targetId = appId || window.gCurrentPreviewAppId || 'C0006';
+  updateHdForm02Field('caregiverName', name, false, targetId);
+  updateHdForm02Field('caregiverBirth', birth, false, targetId);
+  updateHdForm02Field('caregiverPhone', phone, false, targetId);
+
+  const nameInput = document.getElementById('hd2_top_caregiverName') || document.getElementById('hd2_tbl_caregiverName');
+  if (nameInput) nameInput.value = name;
+  const tblName = document.getElementById('hd2_tbl_caregiverName');
+  if (tblName) tblName.value = name;
+
+  const birthInput = document.getElementById('hd2_top_caregiverBirth') || document.getElementById('hd2_tbl_caregiverBirth');
+  if (birthInput) birthInput.value = birth;
+  const tblBirth = document.getElementById('hd2_tbl_caregiverBirth');
+  if (tblBirth) tblBirth.value = birth;
+
+  const phoneInput = document.getElementById('hd2_top_caregiverPhone') || document.getElementById('hd2_tbl_caregiverPhone');
+  if (phoneInput) phoneInput.value = phone;
+  const tblPhone = document.getElementById('hd2_tbl_caregiverPhone');
+  if (tblPhone) tblPhone.value = phone;
+
+  reflectHdForm02FieldLive('caregiverName', name, targetId);
+  reflectHdForm02FieldLive('caregiverBirth', birth, targetId);
+  reflectHdForm02FieldLive('caregiverPhone', phone, targetId);
+
+  saveHdForm02CustomState();
+}
+window.applyHdForm02CaregiverQuick = applyHdForm02CaregiverQuick;
+
 try {
   const savedHd2 = localStorage.getItem('LIVON_HD_FORM_02_STATE');
   if (savedHd2) {
@@ -3670,6 +3864,11 @@ try {
   if (gHdForm02CustomState.productName && gHdForm02CustomState.productName.includes('퍼펙트플러스종합보험')) {
     gHdForm02CustomState.productName = '';
   }
+  // 간병인 더미 기본값 자동 정리
+  if (gHdForm02CustomState.caregiverName === '조정자') gHdForm02CustomState.caregiverName = '';
+  if (gHdForm02CustomState.caregiverBirth === '19680512') gHdForm02CustomState.caregiverBirth = '';
+  if (gHdForm02CustomState.caregiverPhone === '010-7788-9900') gHdForm02CustomState.caregiverPhone = '';
+
   // 전역 고정/기본 항목 (상품명, 담당자 성명, 담당자 연락처) 영구 저장소에서 복원
   const savedProd = localStorage.getItem('LIVON_HD_GLOBAL_productName');
   if (savedProd && !savedProd.includes('퍼펙트플러스종합보험')) {
@@ -3691,6 +3890,9 @@ try {
         delete co.productName;
         delete co.managerName;
         delete co.managerPhone;
+        if (co.caregiverName === '조정자') delete co.caregiverName;
+        if (co.caregiverBirth === '19680512') delete co.caregiverBirth;
+        if (co.caregiverPhone === '010-7788-9900') delete co.caregiverPhone;
         // 구버전 더미 간병기간(2026. 08. 21)이 남아있다면 삭제하여 최신 스케줄 자동 연동 복원
         if (Array.isArray(co.servicePeriods) && co.servicePeriods[0] && String(co.servicePeriods[0].start).includes('2026. 08. 21')) {
           delete co.servicePeriods;
@@ -3786,8 +3988,14 @@ function getHdForm02ServicePeriods(app) {
   const appId = (app && app.id) ? app.id : (window.gCurrentPreviewAppId || 'C0006');
 
   // 1. 고객 배정 및 정산 스케줄 데이터 준비
-  const appAssigns = (typeof gAssigns !== 'undefined' && Array.isArray(gAssigns)) ? gAssigns.filter(a => a.applyId === appId) : [];
-  const as = appAssigns.length > 0 ? appAssigns[0] : null;
+  let as = null;
+  if (typeof getActiveCaregiverAssignment === 'function' && app) {
+    as = getActiveCaregiverAssignment(app);
+  }
+  if (!as) {
+    const appAssigns = (typeof gAssigns !== 'undefined' && Array.isArray(gAssigns)) ? gAssigns.filter(a => String(a.applyId) === String(appId)) : [];
+    as = appAssigns.length > 0 ? appAssigns[appAssigns.length - 1] : null;
+  }
   const prog = (as && typeof getCareProgressInfo === 'function') ? getCareProgressInfo(as) : null;
   const appClaims = (typeof gClaims !== 'undefined' && Array.isArray(gClaims)) ? gClaims.filter(c => c.applyId === appId) : [];
   const appPayouts = (typeof gPayouts !== 'undefined' && Array.isArray(gPayouts)) ? gPayouts.filter(p => p.applyId === appId) : [];
@@ -4051,6 +4259,8 @@ function reflectHdForm02FieldLive(field, value, appId) {
   if (field === 'accidentContent') mappingKey = 'hd2_accidentContent';
   else if (field === 'managerName') mappingKey = 'hd2_managerName';
   else if (field === 'managerPhone') mappingKey = 'hd2_managerPhone';
+  else if (field === 'caregiverName' || field === 'caregiverBirth') mappingKey = 'hd2_caregiverNameBirth';
+  else if (field === 'caregiverPhone') mappingKey = 'hd2_caregiverPhone';
 
   const cell = targetForm.querySelector(`[data-mapping="${mappingKey}"] .form-area-cell`);
   if (cell) {
@@ -17274,6 +17484,17 @@ function onAdjusterNameInput(val, context = 'custEdit') {
     const faxEl = document.getElementById('newAppSamsungAdjusterFax');
     if (phoneEl && match.phone) phoneEl.value = match.phone;
     if (faxEl && match.fax) faxEl.value = match.fax;
+  } else if (context === 'newAdj') {
+    const firmEl = document.getElementById('newAdjFirm');
+    const phoneEl = document.getElementById('newAdjPhone');
+    const mobileEl = document.getElementById('newAdjMobile');
+    const faxEl = document.getElementById('newAdjFax');
+    const insEl = document.getElementById('newAdjInsuranceCompany');
+    if (firmEl && match.firm && !firmEl.value) firmEl.value = match.firm;
+    if (phoneEl && match.phone && !phoneEl.value) phoneEl.value = match.phone;
+    if (mobileEl && match.mobile && !mobileEl.value) mobileEl.value = match.mobile;
+    if (faxEl && match.fax && !faxEl.value) faxEl.value = match.fax;
+    if (insEl && match.insuranceCompany) insEl.value = match.insuranceCompany;
   }
 }
 
@@ -18365,16 +18586,12 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
       return isInjury ? `☐ 질병   ☑ 상해   (${c})` : `☑ 질병   ☐ 상해   (${c})`;
     }
     case 'hd2_caregiverNameBirth': {
-      const appAssigns = (typeof gAssigns !== 'undefined' && Array.isArray(gAssigns) && app) ? gAssigns.filter(a => a.applyId === app.id) : [];
-      const as = appAssigns.length > 0 ? appAssigns[0] : null;
-      const cgName = (app && gHdForm02CustomState.customerOverrides?.[app.id]?.caregiverName) || (as && as.caregiverName) || app.caregiverName || gHdForm02CustomState.caregiverName || '조정자';
-      const cgBirth = (app && gHdForm02CustomState.customerOverrides?.[app.id]?.caregiverBirth) || gHdForm02CustomState.caregiverBirth || '19680512';
-      return cgBirth ? `${cgName} (${cgBirth})` : cgName;
+      const cgInfo = getHdForm02CaregiverInfo(app);
+      return cgInfo.birth ? `${cgInfo.name} (${cgInfo.birth})` : cgInfo.name;
     }
     case 'hd2_caregiverPhone': {
-      const appAssigns = (typeof gAssigns !== 'undefined' && Array.isArray(gAssigns) && app) ? gAssigns.filter(a => a.applyId === app.id) : [];
-      const as = appAssigns.length > 0 ? appAssigns[0] : null;
-      return (app && gHdForm02CustomState.customerOverrides?.[app.id]?.caregiverPhone) || (as && as.caregiverPhone) || app.caregiverPhone || gHdForm02CustomState.caregiverPhone || '010-7788-9900';
+      const cgInfo = getHdForm02CaregiverInfo(app);
+      return cgInfo.phone || '';
     }
     case 'hd2_firstCareStartDate': {
       if (app && gHdForm02CustomState.customerOverrides?.[app.id]?.firstCareStartDate) {
@@ -18382,10 +18599,13 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
       }
       if (gHdForm02CustomState.firstCareStartDate) return gHdForm02CustomState.firstCareStartDate;
       const appAssigns = (typeof gAssigns !== 'undefined' && Array.isArray(gAssigns) && app) ? gAssigns.filter(a => a.applyId === app.id) : [];
-      const as = appAssigns.length > 0 ? appAssigns[0] : null;
-      if (as && as.startDate) {
-        const d = parseCareDate(as.startDate);
-        return d ? `${d.getFullYear()}. ${String(d.getMonth()+1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}` : as.startDate;
+      if (appAssigns.length > 0) {
+        const sorted = appAssigns.slice().filter(a => a.startDate).sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+        const firstAs = sorted[0];
+        if (firstAs && firstAs.startDate) {
+          const d = parseCareDate(firstAs.startDate);
+          return d ? `${d.getFullYear()}. ${String(d.getMonth()+1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}` : firstAs.startDate;
+        }
       }
       return (app && (app.desiredDate || app.applyDate)) || '2026. 08. 21';
     }
@@ -18441,8 +18661,8 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
       return `담당자: ${mName} (${mPhone})`;
     }
     case 'policyNumber': return app.policyNumber || 'L02532037967';
-    case 'accidentNumber': return app.accidentNumber || '2608A01453';
-    case 'caregiverName': return gHdForm02CustomState.caregiverName || app.caregiverName || '조정자';
+    case 'caregiverName': return getHdForm02CaregiverInfo(app).name || '';
+    case 'caregiverPhone': return getHdForm02CaregiverInfo(app).phone || '';
     case 'careDays': {
       const d = parseInt(app.expectedDays, 10) || 10;
       return `${d}일간`;
@@ -18749,6 +18969,8 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
     const firstCareStartDate = resolveFormFieldValue('hd2_firstCareStartDate', app, docNo, todayStr);
     const caregiverNameBirth = resolveFormFieldValue('hd2_caregiverNameBirth', app, docNo, todayStr);
     const caregiverPhone = resolveFormFieldValue('hd2_caregiverPhone', app, docNo, todayStr);
+    const cgInfo = getHdForm02CaregiverInfo(app);
+    const allCaregivers = getHdForm02AllCaregivers(app);
 
     if (customBg) {
       sheet.innerHTML = `
@@ -18826,6 +19048,60 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                 </div>
               </div>
             ` : ''}
+
+            <!-- 2-3행: 담당 간병인 정보 (최근 배정 자동입력 및 실시간 수정) -->
+            <div class="pt-1.5 border-t border-slate-200/70 space-y-1.5">
+              <div class="flex flex-wrap items-center justify-between gap-1">
+                <div class="flex items-center gap-1.5">
+                  <label class="text-[10px] font-bold text-slate-700 flex items-center gap-1">
+                    <i data-lucide="user-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    <span>담당 간병인 정보 (최근 배정 자동입력 · 서식 즉시 반영)</span>
+                  </label>
+                  ${allCaregivers.length > 1 ? `
+                    <span class="text-[9.5px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.2 rounded font-bold">간병인 변경/교체 (${allCaregivers.length}명)</span>
+                  ` : ''}
+                </div>
+                ${allCaregivers.length > 1 ? `
+                  <div class="flex items-center gap-1 text-[10px]">
+                    <span class="text-slate-400 font-medium">배정 선택:</span>
+                    ${allCaregivers.map((c, idx) => `
+                      <button type="button"
+                              onclick="applyHdForm02CaregiverQuick('${(c.name || '').replace(/'/g, "\\'")}', '${c.birth || ''}', '${c.phone || ''}', '${app.id}')"
+                              class="px-1.5 py-0.5 rounded border text-[10.5px] cursor-pointer ${c.name === cgInfo.name ? 'bg-emerald-100 text-emerald-900 border-emerald-300 font-extrabold shadow-2xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'} transition-all"
+                              title="${c.startDate ? c.startDate + ' 근무시작' : ''}${c.endDate ? ' ~ ' + c.endDate : ''}">
+                        ${idx + 1}차: ${c.name}${c.isLatest ? ' <span class=\"text-emerald-700 font-bold\">(최근)</span>' : ''}
+                      </button>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-500 mb-0.5">간병인 성명</label>
+                  <input type="text" id="hd2_top_caregiverName" value="${cgInfo.name || ''}"
+                         oninput="reflectHdForm02FieldLive('caregiverName', this.value, '${app.id}')"
+                         onchange="updateHdForm02Field('caregiverName', this.value, true, '${app.id}')"
+                         class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500"
+                         placeholder="성명 (예: 신금자)">
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-500 mb-0.5">간병인 생년월일 (8자리)</label>
+                  <input type="text" id="hd2_top_caregiverBirth" value="${cgInfo.birth || ''}"
+                         oninput="reflectHdForm02FieldLive('caregiverBirth', this.value, '${app.id}')"
+                         onchange="updateHdForm02Field('caregiverBirth', this.value, true, '${app.id}')"
+                         class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs font-mono focus:ring-1 focus:ring-blue-500"
+                         placeholder="YYYYMMDD (예: 19680512)">
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-500 mb-0.5">간병인 연락처</label>
+                  <input type="text" id="hd2_top_caregiverPhone" value="${cgInfo.phone || ''}"
+                         oninput="reflectHdForm02FieldLive('caregiverPhone', this.value, '${app.id}')"
+                         onchange="updateHdForm02Field('caregiverPhone', this.value, true, '${app.id}')"
+                         class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs font-mono focus:ring-1 focus:ring-blue-500"
+                         placeholder="010-0000-0000">
+                </div>
+              </div>
+            </div>
 
             <!-- 간병 서비스 기간 (1~4행) 빠른 편집 및 자동계산 -->
             <div class="pt-2 border-t border-slate-200">
@@ -19017,15 +19293,15 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                 <th class="bg-slate-100 p-2 text-center w-32 text-slate-700 font-bold border-r border-slate-300">간병인명 (생년월일)</th>
                 <td class="p-2 font-bold text-slate-900 border-r border-slate-300">
                   <div class="flex items-center gap-1">
-                    <input type="text" value="${(app && gHdForm02CustomState.customerOverrides?.[app.id]?.caregiverName) || gHdForm02CustomState.caregiverName || app.caregiverName || '조정자'}" onchange="updateHdForm02Field('caregiverName', this.value, false, '${app.id}')" class="w-20 px-1 py-0.5 border border-slate-300 rounded font-bold text-xs" placeholder="성명">
+                    <input type="text" id="hd2_tbl_caregiverName" value="${cgInfo.name || ''}" oninput="reflectHdForm02FieldLive('caregiverName', this.value, '${app.id}')" onchange="updateHdForm02Field('caregiverName', this.value, false, '${app.id}')" class="w-24 px-1.5 py-0.5 border border-slate-300 rounded font-bold text-xs" placeholder="성명">
                     <span>(</span>
-                    <input type="text" value="${(app && gHdForm02CustomState.customerOverrides?.[app.id]?.caregiverBirth) || gHdForm02CustomState.caregiverBirth || '19680512'}" onchange="updateHdForm02Field('caregiverBirth', this.value, false, '${app.id}')" class="w-24 px-1 py-0.5 border border-slate-300 rounded font-mono text-xs" placeholder="생년월일 8자리">
+                    <input type="text" id="hd2_tbl_caregiverBirth" value="${cgInfo.birth || ''}" oninput="reflectHdForm02FieldLive('caregiverBirth', this.value, '${app.id}')" onchange="updateHdForm02Field('caregiverBirth', this.value, false, '${app.id}')" class="w-24 px-1.5 py-0.5 border border-slate-300 rounded font-mono text-xs" placeholder="생년월일 8자리">
                     <span>)</span>
                   </div>
                 </td>
                 <th class="bg-slate-100 p-2 text-center w-28 text-slate-700 font-bold border-r border-slate-300">간병인 연락처</th>
                 <td class="p-1.5">
-                  <input type="text" value="${caregiverPhone}" onchange="updateHdForm02Field('caregiverPhone', this.value, false, '${app.id}')" class="w-full px-2 py-1 border border-slate-300 rounded font-mono text-xs" placeholder="010-0000-0000">
+                  <input type="text" id="hd2_tbl_caregiverPhone" value="${cgInfo.phone || ''}" oninput="reflectHdForm02FieldLive('caregiverPhone', this.value, '${app.id}')" onchange="updateHdForm02Field('caregiverPhone', this.value, false, '${app.id}')" class="w-full px-2 py-1 border border-slate-300 rounded font-mono text-xs" placeholder="010-0000-0000">
                 </td>
               </tr>
               <tr class="border-b border-slate-300">
@@ -22654,6 +22930,7 @@ function renderCtiCallBtn(phone, targetName = '', role = '', isCompact = false, 
 var gHubModalViewMode = localStorage.getItem('REBORN_HUB_MODAL_VIEW_MODE') || 'timeline'; // 'timeline' | '3card'
 var gActiveHubModalAppId = null;
 var gActiveCaregiverTabAssignId = null;
+var gActiveAdjusterTabId = null;
 
 function switchCaregiverTab(assignId) {
   gActiveCaregiverTabAssignId = assignId;
@@ -22661,6 +22938,39 @@ function switchCaregiverTab(assignId) {
     openHubCustomerDetailModal(gActiveHubModalAppId);
   }
 }
+window.switchCaregiverTab = switchCaregiverTab;
+
+function switchAdjusterTab(adjusterId) {
+  gActiveAdjusterTabId = adjusterId;
+  if (gActiveHubModalAppId) {
+    openHubCustomerDetailModal(gActiveHubModalAppId);
+  }
+}
+window.switchAdjusterTab = switchAdjusterTab;
+
+function getAppAdjusterList(app) {
+  if (!app) return [];
+  if (Array.isArray(app.adjusterHistory) && app.adjusterHistory.length > 0) {
+    return app.adjusterHistory;
+  }
+  if (app.adjusterName && String(app.adjusterName).trim() !== '' && app.adjusterName !== '손사 미지정' && app.adjusterName !== '-') {
+    return [{
+      id: 'ADJ_INIT_' + (app.id || 'TEMP'),
+      round: 1,
+      name: String(app.adjusterName).trim(),
+      firm: app.adjusterFirm || '',
+      phone: app.adjusterPhone || '',
+      mobile: app.adjusterMobile || '',
+      fax: app.adjusterFax || '',
+      insuranceCompany: app.insuranceCompany || '',
+      assignedDate: app.applyDate || (app.createdAt ? String(app.createdAt).slice(0, 10).replace(/-/g, '.') : ''),
+      memo: '초기 배정 담당자',
+      status: '현재'
+    }];
+  }
+  return [];
+}
+window.getAppAdjusterList = getAppAdjusterList;
 
 function switchHubModalViewMode(mode) {
   gHubModalViewMode = mode;
@@ -27710,10 +28020,26 @@ window.deleteSettlementStepMemo = deleteSettlementStepMemo;
  */
 function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims, appPayouts, appLogs, faxInfo, isVoiceSyncOn) {
   faxInfo = faxInfo || { status: '미전송', sentDate: null, faxNumber: (app && app.adjusterFax) || '0507-XXX-XXXX' };
-  const adjInfo = (gAdjusters || []).find(a => a.name === app.adjusterName) || {};
-  const adjPhone = app.adjusterPhone || adjInfo.phone || '';
-  const adjMobile = app.adjusterMobile || adjInfo.mobile || '';
   const isSamsung = (app.insuranceCompany || '').includes('삼성');
+
+  // [Adjuster Management] 손사 담당자 목록 및 현재 선택된 담당자
+  const adjusterList = (typeof getAppAdjusterList === 'function') ? getAppAdjusterList(app) : [];
+  const hasAdjuster = adjusterList.length > 0;
+  let curAdj = null;
+  if (hasAdjuster) {
+    if (gActiveAdjusterTabId) {
+      curAdj = adjusterList.find(a => a.id === gActiveAdjusterTabId);
+    }
+    if (!curAdj) {
+      curAdj = adjusterList[adjusterList.length - 1];
+      gActiveAdjusterTabId = curAdj ? curAdj.id : null;
+    }
+  }
+
+  const adjInfo = (gAdjusters || []).find(a => a.name === ((curAdj && curAdj.name) || app.adjusterName)) || {};
+  const adjPhone = (curAdj && curAdj.phone) || app.adjusterPhone || adjInfo.phone || '';
+  const adjMobile = (curAdj && curAdj.mobile) || app.adjusterMobile || adjInfo.mobile || '';
+  const adjFax = (curAdj && curAdj.fax) || app.adjusterFax || adjInfo.fax || '';
 
   // 1. 간병인 배정 데이터 확인 및 정렬
   const sortedAssigns = (appAssigns || []).slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
@@ -28195,13 +28521,25 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                 </div>
                 <div class="min-w-0">
                   <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5 truncate">
-                    손사(보험사) 청구 관리
+                    <span>손사(보험사) 청구 관리</span>
+                    ${adjusterList.length > 1 ? `<span class="px-1.5 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-black bg-amber-400 text-amber-950 shrink-0">총 ${adjusterList.length}명 교체이력</span>` : ''}
                   </h4>
                   <span class="text-[10px] sm:text-[10.5px] text-purple-200 font-medium truncate block">손사 담당자, 차수별 청구·팩스 및 입금 관리</span>
                 </div>
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
-                <button type="button" onclick="openAppAdjusterEditModal('${app.id}')" class="px-2 sm:px-2.5 py-1 rounded-xl text-[10.5px] sm:text-[11px] font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all flex items-center gap-1 shadow-xs cursor-pointer whitespace-nowrap" title="손사(보험사) 및 증권/청구 정보 수정">
+                ${hasAdjuster ? `
+                  <button type="button" onclick="openNewAdjusterModal('${app.id}', true)" 
+                    class="px-2 sm:px-2.5 py-1 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-xs whitespace-nowrap" title="손사 담당자 추가 및 교체">
+                    <i data-lucide="refresh-cw" class="w-3 h-3"></i> <span>담당자 교체</span>
+                  </button>
+                ` : `
+                  <button type="button" onclick="openNewAdjusterModal('${app.id}', false)" 
+                    class="px-2 sm:px-2.5 py-1 rounded-xl bg-white text-purple-900 font-black text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-xs whitespace-nowrap" title="손사 담당자 신규 등록">
+                    <i data-lucide="plus" class="w-3 h-3"></i> <span>담당자 추가</span>
+                  </button>
+                `}
+                <button type="button" onclick="openAppAdjusterEditModal('${app.id}', '${curAdj ? curAdj.id : ''}')" class="px-2 sm:px-2.5 py-1 rounded-xl text-[10.5px] sm:text-[11px] font-bold bg-white/20 hover:bg-white/30 text-white border border-white/30 transition-all flex items-center gap-1 shadow-xs cursor-pointer whitespace-nowrap" title="손사(보험사) 및 증권/청구 정보 수정">
                   <i data-lucide="edit" class="w-3 h-3"></i> <span>정보수정</span>
                 </button>
                 ${schedule.hasUnpaidClaim ? `
@@ -28222,17 +28560,51 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
 
             <!-- Card Body: 3-column view와 동일한 모듈 구성 (첨부 1 참고) -->
             <div class="p-3.5 sm:p-4 flex-1 flex flex-col justify-between space-y-3 bg-slate-50/50">
+              
+              <!-- [손사 차수별 탭 바] 교체 등으로 담당자가 여러 명일 때 상단 탭으로 즉시 전환 -->
+              ${adjusterList.length > 1 ? `
+                <div class="bg-slate-200/80 p-1.5 rounded-2xl flex items-center gap-1.5 overflow-x-auto custom-scrollbar border border-slate-300/80">
+                  ${adjusterList.map((adjItem, aIdx) => {
+                    const isSelected = Boolean(curAdj && adjItem && adjItem.id === curAdj.id);
+                    const isLatest = aIdx === adjusterList.length - 1;
+                    const roundLabel = `${aIdx + 1}차: ${maskName(adjItem.name || '손사')}`;
+                    return `
+                      <button type="button" onclick="switchAdjusterTab('${adjItem.id}')"
+                        class="px-2.5 py-1 rounded-xl font-black text-[10.5px] flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${
+                          isSelected
+                            ? 'bg-purple-700 text-white shadow-sm ring-2 ring-purple-300'
+                            : 'bg-white/80 hover:bg-white text-slate-700 border border-slate-200 hover:text-purple-700'
+                        }">
+                        <span>${roundLabel}</span>
+                        ${isLatest 
+                          ? `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-amber-400 text-slate-900' : 'bg-purple-100 text-purple-800'}">현재★</span>`
+                          : `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-white/30 text-white' : 'bg-slate-100 text-slate-500'}">교체종료</span>`
+                        }
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+              ` : ''}
+
               <!-- 1. 손사 담당자 연락처 카드 -->
               <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
                 <div class="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div class="flex items-center gap-2">
-                    <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold text-[10.5px]">${app.insuranceCompany || '손사'}</span>
-                    <b class="text-sm text-slate-900">${app.adjusterName || '손사 미지정'}</b>
-                    <span class="text-slate-500 text-[11px]">${app.adjusterFirm ? '(' + app.adjusterFirm + ')' : ''}</span>
+                    <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold text-[10.5px]">${(curAdj && curAdj.insuranceCompany) || app.insuranceCompany || '손사'}</span>
+                    <b class="text-sm text-slate-900">${(curAdj && curAdj.name) || app.adjusterName || '손사 미지정'}</b>
+                    <span class="text-slate-500 text-[11px]">${(curAdj ? curAdj.firm : app.adjusterFirm) ? '(' + (curAdj ? curAdj.firm : app.adjusterFirm) + ')' : ''}</span>
+                    ${curAdj && curAdj.status === '교체종료' ? `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-slate-100 text-slate-500">교체종료</span>` : ((curAdj && curAdj.name) ? `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-purple-100 text-purple-800">현재 담당</span>` : '')}
                   </div>
-                  <button type="button" onclick="openAppAdjusterEditModal('${app.id}')" class="px-2 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer border border-purple-200" title="손사(보험사) 및 증권/청구 정보 수정">
-                    <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
-                  </button>
+                  <div class="flex items-center gap-1">
+                    ${(adjusterList.length > 1 && curAdj) ? `
+                      <button type="button" onclick="deleteAppAdjuster('${app.id}', '${curAdj.id}')" class="px-2 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer border border-rose-200" title="이 담당자 이력 삭제">
+                        <i data-lucide="trash-2" class="w-3 h-3"></i> 삭제
+                      </button>
+                    ` : ''}
+                    <button type="button" onclick="openAppAdjusterEditModal('${app.id}', '${curAdj ? curAdj.id : ''}')" class="px-2 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer border border-purple-200" title="손사(보험사) 및 증권/청구 정보 수정">
+                      <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
+                    </button>
+                  </div>
                 </div>
 
                 <div class="space-y-2 text-slate-600 text-[11.5px]">
@@ -28240,7 +28612,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                     <span class="text-slate-500 font-medium">손사 일반전화:</span>
                     <div class="flex items-center font-mono text-slate-900 font-semibold">
                       <span>${formatPhoneNumber(adjPhone) || '<span class="text-slate-400 font-normal">유선 미등록</span>'}</span>
-                      ${renderCtiCallBtn(adjPhone, app.adjusterName, '손사-일반전화')}
+                      ${renderCtiCallBtn(adjPhone, (curAdj && curAdj.name) || app.adjusterName, '손사-일반전화')}
                     </div>
                   </div>
 
@@ -28248,14 +28620,21 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                     <span class="text-slate-500 font-medium">손사 핸드폰:</span>
                     <div class="flex items-center font-mono text-purple-900 font-bold">
                       <span>${formatPhoneNumber(adjMobile) || '<span class="text-slate-400 font-normal">휴대폰 미등록</span>'}</span>
-                      ${renderCtiCallBtn(adjMobile, app.adjusterName, '손사-핸드폰')}
+                      ${renderCtiCallBtn(adjMobile, (curAdj && curAdj.name) || app.adjusterName, '손사-핸드폰')}
                     </div>
                   </div>
 
                   <div class="flex justify-between items-center pt-1 border-t border-slate-100">
                     <span class="text-slate-500 font-medium">수신 팩스번호:</span>
-                    <b class="text-slate-900 font-mono font-bold">${formatPhoneNumber(app.adjusterFax) || '<span class="text-slate-400 font-normal">FAX 미등록</span>'}</b>
+                    <b class="text-slate-900 font-mono font-bold">${formatPhoneNumber(adjFax) || '<span class="text-slate-400 font-normal">FAX 미등록</span>'}</b>
                   </div>
+
+                  ${(curAdj && (curAdj.assignedDate || curAdj.memo)) ? `
+                    <div class="flex justify-between items-center pt-1 border-t border-slate-100 text-[10.5px]">
+                      <span class="text-slate-400 font-medium">배정일 / 메모:</span>
+                      <span class="font-medium text-slate-700 font-mono">${[curAdj.assignedDate, curAdj.memo].filter(Boolean).join(' · ')}</span>
+                    </div>
+                  ` : ''}
                 </div>
               </div>
 
@@ -29322,10 +29701,26 @@ function switch3CardMobileSubTab(cardId) {
  */
 function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, appLogs, faxInfo, isVoiceSyncOn) {
   faxInfo = faxInfo || { status: '미전송', sentDate: null, faxNumber: (app && app.adjusterFax) || '0507-XXX-XXXX' };
-  const adjInfo = (gAdjusters || []).find(a => a.name === app.adjusterName) || {};
-  const adjPhone = app.adjusterPhone || adjInfo.phone || '';
-  const adjMobile = app.adjusterMobile || adjInfo.mobile || '';
   const isSamsung = (app.insuranceCompany || '').includes('삼성');
+
+  // [Adjuster Management] 손사 담당자 목록 및 현재 선택된 담당자
+  const adjusterList = (typeof getAppAdjusterList === 'function') ? getAppAdjusterList(app) : [];
+  const hasAdjuster = adjusterList.length > 0;
+  let curAdj = null;
+  if (hasAdjuster) {
+    if (gActiveAdjusterTabId) {
+      curAdj = adjusterList.find(a => a.id === gActiveAdjusterTabId);
+    }
+    if (!curAdj) {
+      curAdj = adjusterList[adjusterList.length - 1];
+      gActiveAdjusterTabId = curAdj ? curAdj.id : null;
+    }
+  }
+
+  const adjInfo = (gAdjusters || []).find(a => a.name === ((curAdj && curAdj.name) || app.adjusterName)) || {};
+  const adjPhone = (curAdj && curAdj.phone) || app.adjusterPhone || adjInfo.phone || '';
+  const adjMobile = (curAdj && curAdj.mobile) || app.adjusterMobile || adjInfo.mobile || '';
+  const adjFax = (curAdj && curAdj.fax) || app.adjusterFax || adjInfo.fax || '';
 
   // 1. 간병인 배정 데이터 확인 및 차수별 정렬 (startDate 오름차순)
   const sortedAssigns = (appAssigns || []).slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
@@ -29748,14 +30143,26 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               </div>
               <div class="min-w-0">
                 <h4 class="font-black text-sm tracking-tight text-white flex items-center gap-1.5 truncate">
-                  ${isSamsung ? '삼성화재 본사 청구 관리' : '손사(보험사) 청구 관리'}
+                  <span>${isSamsung ? '삼성화재 본사 청구 관리' : '손사(보험사) 청구 관리'}</span>
+                  ${(!isSamsung && adjusterList.length > 1) ? `<span class="px-1.5 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-black bg-amber-400 text-amber-950 shrink-0">총 ${adjusterList.length}명 교체이력</span>` : ''}
                 </h4>
                 <span class="text-[10px] sm:text-[10.5px] ${isSamsung ? 'text-sky-100' : 'text-purple-100'} font-medium truncate block">
                   ${isSamsung ? '삼성화재 본사 이메일 직송 청구 및 입금 관리' : '손사 담당자, 차수별 청구·팩스 및 입금 관리'}
                 </span>
               </div>
             </div>
-            <div class="shrink-0">
+            <div class="flex items-center gap-1.5 shrink-0">
+              ${!isSamsung ? (hasAdjuster ? `
+                <button type="button" onclick="openNewAdjusterModal('${app.id}', true)" 
+                  class="px-2 sm:px-2.5 py-1 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 font-black text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-xs whitespace-nowrap" title="손사 담당자 추가 및 교체">
+                  <i data-lucide="refresh-cw" class="w-3 h-3"></i> <span>담당자 교체</span>
+                </button>
+              ` : `
+                <button type="button" onclick="openNewAdjusterModal('${app.id}', false)" 
+                  class="px-2 sm:px-2.5 py-1 rounded-xl bg-white text-purple-900 font-black text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-xs whitespace-nowrap" title="손사 담당자 신규 등록">
+                  <i data-lucide="plus" class="w-3 h-3"></i> <span>담당자 추가</span>
+                </button>
+              `) : ''}
               ${schedule.hasUnpaidClaim ? `
                 <span class="px-2 sm:px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-black bg-rose-500 text-white shadow-md animate-pulse flex items-center gap-1 whitespace-nowrap">
                   <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> <span>입금 미완료</span>
@@ -29775,6 +30182,31 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
           <!-- Card Body -->
           <div class="p-3.5 sm:p-5 flex-1 overflow-y-visible lg:overflow-y-auto custom-scrollbar space-y-3.5 text-xs bg-slate-50/50">
             
+            <!-- [손사 차수별 탭 바] 교체 등으로 담당자가 여러 명일 때 상단 탭으로 즉시 전환 -->
+            ${(!isSamsung && adjusterList.length > 1) ? `
+              <div class="bg-slate-200/80 p-1.5 rounded-2xl flex items-center gap-1.5 overflow-x-auto custom-scrollbar border border-slate-300/80">
+                ${adjusterList.map((adjItem, aIdx) => {
+                  const isSelected = Boolean(curAdj && adjItem && adjItem.id === curAdj.id);
+                  const isLatest = aIdx === adjusterList.length - 1;
+                  const roundLabel = `${aIdx + 1}차: ${maskName(adjItem.name || '손사')}`;
+                  return `
+                    <button type="button" onclick="switchAdjusterTab('${adjItem.id}')"
+                      class="px-2.5 py-1 rounded-xl font-black text-[10.5px] flex items-center gap-1 transition-all whitespace-nowrap cursor-pointer ${
+                        isSelected
+                          ? 'bg-purple-700 text-white shadow-sm ring-2 ring-purple-300'
+                          : 'bg-white/80 hover:bg-white text-slate-700 border border-slate-200 hover:text-purple-700'
+                      }">
+                      <span>${roundLabel}</span>
+                      ${isLatest 
+                        ? `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-amber-400 text-slate-900' : 'bg-purple-100 text-purple-800'}">현재★</span>`
+                        : `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-white/30 text-white' : 'bg-slate-100 text-slate-500'}">교체종료</span>`
+                      }
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            ` : ''}
+
             <!-- 1. 손사(보험사) 담당자 연락처 정보 (삼성화재인 경우 본사 직송 이메일 청구 안내 표시) -->
             ${isSamsung ? `
               <div class="bg-gradient-to-br from-sky-50 to-indigo-50/60 p-3.5 rounded-2xl border border-sky-200/90 shadow-2xs space-y-2.5">
@@ -29807,13 +30239,21 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
                 <div class="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div class="flex items-center gap-2">
-                    <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold text-[10.5px]">${app.insuranceCompany}</span>
-                    <b class="text-sm text-slate-900">${app.adjusterName || '손사 미지정'}</b>
-                    <span class="text-slate-500 text-[11px]">${app.adjusterFirm ? '(' + app.adjusterFirm + ')' : ''}</span>
+                    <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold text-[10.5px]">${(curAdj && curAdj.insuranceCompany) || app.insuranceCompany || '손사'}</span>
+                    <b class="text-sm text-slate-900">${(curAdj && curAdj.name) || app.adjusterName || '손사 미지정'}</b>
+                    <span class="text-slate-500 text-[11px]">${(curAdj ? curAdj.firm : app.adjusterFirm) ? '(' + (curAdj ? curAdj.firm : app.adjusterFirm) + ')' : ''}</span>
+                    ${curAdj && curAdj.status === '교체종료' ? `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-slate-100 text-slate-500">교체종료</span>` : ((curAdj && curAdj.name) ? `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-purple-100 text-purple-800">현재 담당</span>` : '')}
                   </div>
-                  <button type="button" onclick="openAppAdjusterEditModal('${app.id}')" class="px-2 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer border border-purple-200" title="손사(보험사) 및 증권/청구 정보 수정">
-                    <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
-                  </button>
+                  <div class="flex items-center gap-1">
+                    ${(adjusterList.length > 1 && curAdj) ? `
+                      <button type="button" onclick="deleteAppAdjuster('${app.id}', '${curAdj.id}')" class="px-2 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer border border-rose-200" title="이 담당자 이력 삭제">
+                        <i data-lucide="trash-2" class="w-3 h-3"></i> 삭제
+                      </button>
+                    ` : ''}
+                    <button type="button" onclick="openAppAdjusterEditModal('${app.id}', '${curAdj ? curAdj.id : ''}')" class="px-2 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer border border-purple-200" title="손사(보험사) 및 증권/청구 정보 수정">
+                      <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
+                    </button>
+                  </div>
                 </div>
 
                 <div class="space-y-2 text-slate-600 text-[11.5px]">
@@ -29821,7 +30261,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                     <span class="text-slate-500 font-medium">손사 일반전화:</span>
                     <div class="flex items-center font-mono text-slate-900 font-semibold">
                       <span>${formatPhoneNumber(adjPhone) || '<span class="text-slate-400 font-normal">유선 미등록</span>'}</span>
-                      ${renderCtiCallBtn(adjPhone, app.adjusterName, '손사-일반전화')}
+                      ${renderCtiCallBtn(adjPhone, (curAdj && curAdj.name) || app.adjusterName, '손사-일반전화')}
                     </div>
                   </div>
 
@@ -29829,14 +30269,21 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                     <span class="text-slate-500 font-medium">손사 핸드폰:</span>
                     <div class="flex items-center font-mono text-purple-900 font-bold">
                       <span>${formatPhoneNumber(adjMobile) || '<span class="text-slate-400 font-normal">휴대폰 미등록</span>'}</span>
-                      ${renderCtiCallBtn(adjMobile, app.adjusterName, '손사-핸드폰')}
+                      ${renderCtiCallBtn(adjMobile, (curAdj && curAdj.name) || app.adjusterName, '손사-핸드폰')}
                     </div>
                   </div>
 
                   <div class="flex justify-between items-center pt-1 border-t border-slate-100">
                     <span class="text-slate-500 font-medium">수신 팩스번호:</span>
-                    <b class="text-slate-900 font-mono font-bold">${formatPhoneNumber(app.adjusterFax) || '<span class="text-slate-400 font-normal">FAX 미등록</span>'}</b>
+                    <b class="text-slate-900 font-mono font-bold">${formatPhoneNumber(adjFax) || '<span class="text-slate-400 font-normal">FAX 미등록</span>'}</b>
                   </div>
+
+                  ${(curAdj && (curAdj.assignedDate || curAdj.memo)) ? `
+                    <div class="flex justify-between items-center pt-1 border-t border-slate-100 text-[10.5px]">
+                      <span class="text-slate-400 font-medium">배정일 / 메모:</span>
+                      <span class="font-medium text-slate-700 font-mono">${[curAdj.assignedDate, curAdj.memo].filter(Boolean).join(' · ')}</span>
+                    </div>
+                  ` : ''}
                 </div>
               </div>
             `}
@@ -50138,38 +50585,354 @@ function handleCustomerEditSubmit(e) {
 }
 
 // -------------------------------------------------------------------------
-// APP ADJUSTER & POLICY EDIT CONTROLLER (손사 및 청구정보 수정)
+// APP ADJUSTER & POLICY EDIT CONTROLLER (손사 담당자 추가/교체/삭제 및 청구정보 수정)
 // -------------------------------------------------------------------------
-function openAppAdjusterEditModal(appId) {
+function openNewAdjusterModal(targetApplyId = null, isReplacement = true) {
+  const app = (gApps || []).find(a => String(a.id) === String(targetApplyId));
+  if (!app) {
+    alert('해당 고객/신청 정보를 찾을 수 없습니다: ' + targetApplyId);
+    return;
+  }
+
+  const adjList = (typeof getAppAdjusterList === 'function') ? getAppAdjusterList(app) : [];
+  let prevAdj = adjList.length > 0 ? adjList[adjList.length - 1] : null;
+
+  const appIdEl = document.getElementById('newAdjAppId');
+  const isRepEl = document.getElementById('newAdjIsReplacement');
+  const prevIdEl = document.getElementById('newAdjPrevId');
+  const titleEl = document.getElementById('newAdjModalTitle');
+  const subEl = document.getElementById('newAdjModalSub');
+  const submitBtnEl = document.getElementById('newAdjSubmitBtn');
+  const idBadge = document.getElementById('newAdjModalIdBadge');
+  const radioReplace = document.getElementById('newAdjTypeReplace');
+  const radioAdd = document.getElementById('newAdjTypeAdd');
+
+  if (appIdEl) appIdEl.value = app.id;
+  if (idBadge) idBadge.innerText = `${app.id} (${typeof maskName === 'function' ? maskName(app.patientName) : (app.patientName || '')})`;
+
+  const effectiveReplacement = Boolean(isReplacement && prevAdj);
+  if (isRepEl) isRepEl.value = effectiveReplacement ? 'true' : 'false';
+  if (prevIdEl) prevIdEl.value = (prevAdj && prevAdj.id) ? prevAdj.id : '';
+
+  if (radioReplace && radioAdd) {
+    if (effectiveReplacement) {
+      radioReplace.checked = true;
+    } else {
+      radioAdd.checked = true;
+    }
+  }
+
+  if (effectiveReplacement && prevAdj) {
+    if (titleEl) titleEl.innerHTML = `<i data-lucide="refresh-cw" class="w-5 h-5 text-purple-200"></i> <span>손사 담당자 교체 (기존: ${prevAdj.name} 손사)</span>`;
+    if (subEl) subEl.innerText = `기존 담당자 [${prevAdj.name}] 님의 업무를 후임 담당자로 인계 및 추가합니다. 기존 청구 내역은 안전하게 보존됩니다.`;
+    if (submitBtnEl) submitBtnEl.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span>교체 담당자 등록 🔄</span>';
+  } else {
+    if (titleEl) titleEl.innerHTML = `<i data-lucide="user-plus" class="w-5 h-5 text-purple-200"></i> <span>손사(보험사) 담당자 추가 등록</span>`;
+    if (subEl) subEl.innerText = '해당 고객 건을 담당할 손해사정사(보험사 보상담당자)를 등록합니다.';
+    if (submitBtnEl) submitBtnEl.innerHTML = '<i data-lucide="user-plus" class="w-3.5 h-3.5"></i> <span>담당자 등록 완료</span>';
+  }
+
+  // Pre-fill insurance company
+  const insCompanyEl = document.getElementById('newAdjInsuranceCompany');
+  if (insCompanyEl) insCompanyEl.value = app.insuranceCompany || '현대해상';
+
+  // Clear fields
+  if (document.getElementById('newAdjName')) document.getElementById('newAdjName').value = '';
+  if (document.getElementById('newAdjFirm')) document.getElementById('newAdjFirm').value = prevAdj ? (prevAdj.firm || '') : (app.adjusterFirm || '');
+  if (document.getElementById('newAdjPhone')) document.getElementById('newAdjPhone').value = '';
+  if (document.getElementById('newAdjMobile')) document.getElementById('newAdjMobile').value = '';
+  if (document.getElementById('newAdjFax')) document.getElementById('newAdjFax').value = prevAdj ? (prevAdj.fax || '') : (app.adjusterFax || '');
+  if (document.getElementById('newAdjMemo')) document.getElementById('newAdjMemo').value = effectiveReplacement ? '후임 손사 배정' : '신규 손사 배정';
+
+  // Date
+  const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '.');
+  if (document.getElementById('newAdjAssignedDate')) {
+    document.getElementById('newAdjAssignedDate').value = todayStr;
+  }
+
+  openModal('newAdjusterModal');
+  initIcons();
+}
+window.openNewAdjusterModal = openNewAdjusterModal;
+
+async function handleNewAdjusterSubmit(e) {
+  e.preventDefault();
+  const appId = document.getElementById('newAdjAppId')?.value;
+  const isReplacement = document.getElementById('newAdjIsReplacement')?.value === 'true';
+  const prevId = document.getElementById('newAdjPrevId')?.value;
+
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  const name = document.getElementById('newAdjName')?.value.trim();
+  if (!name) {
+    alert('담당 손해사정인 성명을 입력해주세요.');
+    return;
+  }
+
+  const insuranceCompany = document.getElementById('newAdjInsuranceCompany')?.value || app.insuranceCompany || '현대해상';
+  const firm = document.getElementById('newAdjFirm')?.value.trim() || '';
+  const phone = document.getElementById('newAdjPhone')?.value.trim() || '';
+  const mobile = document.getElementById('newAdjMobile')?.value.trim() || '';
+  const fax = document.getElementById('newAdjFax')?.value.trim() || '';
+  const assignedDate = document.getElementById('newAdjAssignedDate')?.value.trim() || new Date().toISOString().split('T')[0].replace(/-/g, '.');
+  const memo = document.getElementById('newAdjMemo')?.value.trim() || '';
+
+  // Get current adjuster history (synthesize if empty but app.adjusterName exists)
+  let adjHistory = getAppAdjusterList(app).map(a => ({ ...a }));
+
+  if (isReplacement && adjHistory.length > 0) {
+    adjHistory.forEach(a => {
+      if (a.status === '현재' || a.id === prevId) {
+        a.status = '교체종료';
+      }
+    });
+  }
+
+  const newId = 'ADJ_HIST_' + Date.now();
+  const newRecord = {
+    id: newId,
+    round: adjHistory.length + 1,
+    name: name,
+    firm: firm,
+    phone: phone,
+    mobile: mobile,
+    fax: fax,
+    insuranceCompany: insuranceCompany,
+    assignedDate: assignedDate,
+    memo: memo,
+    status: '현재'
+  };
+
+  adjHistory.push(newRecord);
+  app.adjusterHistory = adjHistory;
+
+  // Update current active adjuster on app
+  app.adjusterName = name;
+  app.adjusterFirm = firm;
+  app.adjusterPhone = phone;
+  app.adjusterMobile = mobile;
+  app.adjusterFax = fax;
+  if (insuranceCompany) app.insuranceCompany = insuranceCompany;
+  app.updatedAt = new Date().toISOString();
+  app.hasManualUpdate = true;
+
+  // Auto-sync directory
+  if (typeof autoSyncAdjusterToDirectory === 'function') {
+    autoSyncAdjusterToDirectory({
+      name: name,
+      insuranceCompany: insuranceCompany,
+      firm: firm,
+      phone: phone,
+      mobile: mobile,
+      fax: fax
+    });
+  }
+
+  // Record audit log
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '손해사정',
+      actionType: isReplacement ? 'STATUS_CHANGE' : 'CREATE',
+      target: `고객 [${app.id}] (${typeof maskName === 'function' ? maskName(app.patientName) : app.patientName})`,
+      summary: `[${app.patientName} 님] 손사 담당자 ${isReplacement ? '교체' : '추가'} 등록: ${name} (${adjHistory.length}차)`,
+      changes: {
+        '담당손사': { before: app.adjusterName || '-', after: name },
+        '차수': { before: null, after: `${adjHistory.length}차` }
+      }
+    });
+  }
+
+  // Persist to server
+  try {
+    await fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: app.id,
+        fields: {
+          adjusterHistory: app.adjusterHistory,
+          adjusterName: app.adjusterName,
+          adjusterFirm: app.adjusterFirm,
+          adjusterPhone: app.adjusterPhone,
+          adjusterMobile: app.adjusterMobile,
+          adjusterFax: app.adjusterFax,
+          insuranceCompany: app.insuranceCompany,
+          hasManualUpdate: true
+        }
+      })
+    });
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+    }
+  } catch (err) {
+    console.warn('Adjuster save error:', err);
+  }
+
+  closeModal('newAdjusterModal');
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'success',
+      title: isReplacement ? '담당자 교체 완료' : '담당자 추가 완료',
+      message: `[${app.patientName}] 손사 담당자 '${name}' 님이 ${adjHistory.length}차 담당자로 등록되었습니다.`,
+      icon: 'user-check'
+    });
+  }
+
+  gActiveAdjusterTabId = newId;
+
+  if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId === app.id) {
+    openHubCustomerDetailModal(app.id);
+  }
+  if (typeof renderUnifiedCareHub === 'function') {
+    renderUnifiedCareHub();
+  }
+  if (typeof renderApplications === 'function') {
+    renderApplications();
+  }
+  if (typeof renderClaims === 'function') {
+    renderClaims();
+  }
+}
+window.handleNewAdjusterSubmit = handleNewAdjusterSubmit;
+
+async function deleteAppAdjuster(appId, histId) {
+  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  if (!app) return;
+
+  const adjList = getAppAdjusterList(app);
+  const target = adjList.find(a => a.id === histId);
+  if (!target) return;
+
+  if (!confirm(`손사 담당자 [${target.name}] (${target.round || ''}차) 이력을 정말 삭제하시겠습니까?`)) {
+    return;
+  }
+
+  let remaining = adjList.filter(a => a.id !== histId);
+  if (remaining.length === 0) {
+    app.adjusterHistory = [];
+    app.adjusterName = '';
+    app.adjusterFirm = '';
+    app.adjusterPhone = '';
+    app.adjusterMobile = '';
+    app.adjusterFax = '';
+    gActiveAdjusterTabId = null;
+  } else {
+    // Re-index rounds
+    remaining.forEach((a, idx) => {
+      a.round = idx + 1;
+      if (idx === remaining.length - 1) {
+        a.status = '현재';
+      } else {
+        a.status = '교체종료';
+      }
+    });
+    const latest = remaining[remaining.length - 1];
+    app.adjusterHistory = remaining;
+    app.adjusterName = latest.name;
+    app.adjusterFirm = latest.firm;
+    app.adjusterPhone = latest.phone;
+    app.adjusterMobile = latest.mobile;
+    app.adjusterFax = latest.fax;
+    gActiveAdjusterTabId = latest.id;
+  }
+
+  app.updatedAt = new Date().toISOString();
+  app.hasManualUpdate = true;
+
+  try {
+    await fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: app.id,
+        fields: {
+          adjusterHistory: app.adjusterHistory,
+          adjusterName: app.adjusterName,
+          adjusterFirm: app.adjusterFirm,
+          adjusterPhone: app.adjusterPhone,
+          adjusterMobile: app.adjusterMobile,
+          adjusterFax: app.adjusterFax,
+          hasManualUpdate: true
+        }
+      })
+    });
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+    }
+  } catch (err) {
+    console.warn('Delete adjuster error:', err);
+  }
+
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'info',
+      title: '담당자 이력 삭제 완료',
+      message: `[${target.name}] 손사 담당자 이력이 삭제되었습니다.`,
+      icon: 'trash-2'
+    });
+  }
+
+  if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId === app.id) {
+    openHubCustomerDetailModal(app.id);
+  }
+  if (typeof renderUnifiedCareHub === 'function') {
+    renderUnifiedCareHub();
+  }
+  if (typeof renderApplications === 'function') {
+    renderApplications();
+  }
+  if (typeof renderClaims === 'function') {
+    renderClaims();
+  }
+}
+window.deleteAppAdjuster = deleteAppAdjuster;
+
+function openAppAdjusterEditModal(appId, histId = null) {
   const app = (gApps || []).find(a => String(a.id) === String(appId));
   if (!app) {
     alert('해당 고객/신청 정보를 찾을 수 없습니다: ' + appId);
     return;
   }
 
-  const adjInfo = (gAdjusters || []).find(a => a.name === app.adjusterName) || {};
+  const adjList = (typeof getAppAdjusterList === 'function') ? getAppAdjusterList(app) : [];
+  let targetAdj = null;
+  if (histId) {
+    targetAdj = adjList.find(a => a.id === histId);
+  }
+  if (!targetAdj && gActiveAdjusterTabId) {
+    targetAdj = adjList.find(a => a.id === gActiveAdjusterTabId);
+  }
+  if (!targetAdj && adjList.length > 0) {
+    targetAdj = adjList[adjList.length - 1];
+  }
+
+  const adjInfo = (gAdjusters || []).find(a => a.name === ((targetAdj && targetAdj.name) || app.adjusterName)) || {};
 
   if (document.getElementById('adjEditAppId')) document.getElementById('adjEditAppId').value = app.id;
+  if (document.getElementById('adjEditHistId')) document.getElementById('adjEditHistId').value = targetAdj ? targetAdj.id : '';
   if (document.getElementById('appAdjusterModalIdBadge')) {
-    document.getElementById('appAdjusterModalIdBadge').innerText = `${app.id} (${typeof maskName === 'function' ? maskName(app.patientName) : (app.patientName || '')})`;
+    const roundTxt = targetAdj && targetAdj.round ? ` · ${targetAdj.round}차` : '';
+    document.getElementById('appAdjusterModalIdBadge').innerText = `${app.id} (${typeof maskName === 'function' ? maskName(app.patientName) : (app.patientName || '')}${roundTxt})`;
   }
   if (document.getElementById('adjEditInsuranceCompany')) {
-    document.getElementById('adjEditInsuranceCompany').value = app.insuranceCompany || '삼성화재';
+    document.getElementById('adjEditInsuranceCompany').value = (targetAdj && targetAdj.insuranceCompany) || app.insuranceCompany || '현대해상';
   }
   if (document.getElementById('adjEditName')) {
-    document.getElementById('adjEditName').value = app.adjusterName || '';
+    document.getElementById('adjEditName').value = (targetAdj && targetAdj.name) || app.adjusterName || '';
   }
   if (document.getElementById('adjEditFirm')) {
-    document.getElementById('adjEditFirm').value = app.adjusterFirm || adjInfo.firm || '';
+    document.getElementById('adjEditFirm').value = (targetAdj && targetAdj.firm) || app.adjusterFirm || adjInfo.firm || '';
   }
   if (document.getElementById('adjEditPhone')) {
-    document.getElementById('adjEditPhone').value = app.adjusterPhone || adjInfo.phone || '';
+    document.getElementById('adjEditPhone').value = (targetAdj && targetAdj.phone) || app.adjusterPhone || adjInfo.phone || '';
   }
   if (document.getElementById('adjEditMobile')) {
-    document.getElementById('adjEditMobile').value = app.adjusterMobile || adjInfo.mobile || '';
+    document.getElementById('adjEditMobile').value = (targetAdj && targetAdj.mobile) || app.adjusterMobile || adjInfo.mobile || '';
   }
   if (document.getElementById('adjEditFax')) {
-    document.getElementById('adjEditFax').value = app.adjusterFax || adjInfo.fax || '';
+    document.getElementById('adjEditFax').value = (targetAdj && targetAdj.fax) || app.adjusterFax || adjInfo.fax || '';
   }
 
   if (document.getElementById('adjEditPolicyNumber')) {
@@ -50197,30 +50960,46 @@ function openAppAdjusterEditModal(appId) {
   openModal('appAdjusterEditModal');
   initIcons();
 }
+window.openAppAdjusterEditModal = openAppAdjusterEditModal;
 
 function handleAppAdjusterEditSubmit(e) {
   e.preventDefault();
   const appId = document.getElementById('adjEditAppId')?.value;
+  const histId = document.getElementById('adjEditHistId')?.value;
   const app = (gApps || []).find(a => String(a.id) === String(appId));
   if (!app) return;
 
-  if (document.getElementById('adjEditInsuranceCompany')) {
-    app.insuranceCompany = document.getElementById('adjEditInsuranceCompany').value;
+  const insCompany = document.getElementById('adjEditInsuranceCompany')?.value || app.insuranceCompany || '현대해상';
+  const name = document.getElementById('adjEditName')?.value.trim() || '';
+  const firm = document.getElementById('adjEditFirm')?.value.trim() || '';
+  const phone = document.getElementById('adjEditPhone')?.value.trim() || '';
+  const mobile = document.getElementById('adjEditMobile')?.value.trim() || '';
+  const fax = document.getElementById('adjEditFax')?.value.trim() || '';
+
+  let adjList = getAppAdjusterList(app).map(a => ({ ...a }));
+  let targetHist = histId ? adjList.find(a => a.id === histId) : null;
+  if (!targetHist && adjList.length > 0) {
+    targetHist = adjList[adjList.length - 1];
   }
-  if (document.getElementById('adjEditName')) {
-    app.adjusterName = document.getElementById('adjEditName').value.trim();
+
+  if (targetHist) {
+    targetHist.name = name;
+    targetHist.firm = firm;
+    targetHist.phone = phone;
+    targetHist.mobile = mobile;
+    targetHist.fax = fax;
+    targetHist.insuranceCompany = insCompany;
+    app.adjusterHistory = adjList;
   }
-  if (document.getElementById('adjEditFirm')) {
-    app.adjusterFirm = document.getElementById('adjEditFirm').value.trim();
-  }
-  if (document.getElementById('adjEditPhone')) {
-    app.adjusterPhone = document.getElementById('adjEditPhone').value.trim();
-  }
-  if (document.getElementById('adjEditMobile')) {
-    app.adjusterMobile = document.getElementById('adjEditMobile').value.trim();
-  }
-  if (document.getElementById('adjEditFax')) {
-    app.adjusterFax = document.getElementById('adjEditFax').value.trim();
+
+  const isLatestOrActive = !targetHist || targetHist.status === '현재' || (adjList.length > 0 && targetHist.id === adjList[adjList.length - 1].id);
+  if (isLatestOrActive) {
+    app.insuranceCompany = insCompany;
+    app.adjusterName = name;
+    app.adjusterFirm = firm;
+    app.adjusterPhone = phone;
+    app.adjusterMobile = mobile;
+    app.adjusterFax = fax;
   }
 
   if (document.getElementById('adjEditPolicyNumber')) {
@@ -50257,16 +51036,17 @@ function handleAppAdjusterEditSubmit(e) {
   }
 
   app.updatedAt = new Date().toISOString();
+  app.hasManualUpdate = true;
 
   // 손해사정인 정보 디렉토리 자동반영 & 동기화
-  if (app.adjusterName) {
+  if (name) {
     autoSyncAdjusterToDirectory({
-      name: app.adjusterName,
-      insuranceCompany: app.insuranceCompany,
-      firm: app.adjusterFirm,
-      phone: app.adjusterPhone,
-      mobile: app.adjusterMobile,
-      fax: app.adjusterFax
+      name: name,
+      insuranceCompany: insCompany,
+      firm: firm,
+      phone: phone,
+      mobile: mobile,
+      fax: fax
     });
   }
 
@@ -50285,6 +51065,34 @@ function handleAppAdjusterEditSubmit(e) {
         '증권번호': { before: null, after: app.policyNumber || '-' }
       }
     });
+  }
+
+  // 서버 저장
+  try {
+    fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: app.id,
+        fields: {
+          adjusterHistory: app.adjusterHistory,
+          adjusterName: app.adjusterName,
+          adjusterFirm: app.adjusterFirm,
+          adjusterPhone: app.adjusterPhone,
+          adjusterMobile: app.adjusterMobile,
+          adjusterFax: app.adjusterFax,
+          insuranceCompany: app.insuranceCompany,
+          policyNumber: app.policyNumber,
+          accidentNumber: app.accidentNumber,
+          productName: app.productName,
+          productCode: app.productCode,
+          contractPeriod: app.contractPeriod,
+          hasManualUpdate: true
+        }
+      })
+    }).catch(console.warn);
+  } catch (err) {
+    console.warn('Update adjuster server error:', err);
   }
 
   closeModal('appAdjusterEditModal');
@@ -50315,6 +51123,7 @@ function handleAppAdjusterEditSubmit(e) {
     iconColor: 'purple'
   });
 }
+window.handleAppAdjusterEditSubmit = handleAppAdjusterEditSubmit;
 
 // -------------------------------------------------------------------------
 // STEP 2 CARE SCHEDULE & WAGE EDIT CONTROLLER (간병인 정보 및 일정/일급 수정)
@@ -52741,6 +53550,10 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null) {
   }
   if (!applyId && Array.isArray(gApps) && gApps.length > 0) {
     applyId = gApps[0].id;
+  }
+  if (gActiveHubModalAppId !== applyId) {
+    gActiveCaregiverTabAssignId = null;
+    gActiveAdjusterTabId = null;
   }
   gActiveHubModalAppId = applyId;
 
