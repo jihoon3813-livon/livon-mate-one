@@ -2,8 +2,9 @@
   "version": 2,
   "functions": {
     "api/**/*.js": {
-      "maxDuration": 30,
-      "includeFiles": "{*.json,care-report-2page-pdf.js,pdf-helper.js}"
+      "maxDuration": 60,
+      "memory": 1024,
+      "includeFiles": "{*.json,care-report-2page-pdf.js,pdf-helper.js,pdf-lib.min.js}"
     }
   },
   "rewrites": [

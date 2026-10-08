@@ -27,9 +27,28 @@ const CHROME_PATHS = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 ].filter(Boolean);
 
-function getChromePath() {
+let sparticuzChromium = null;
+try {
+  sparticuzChromium = require('@sparticuz/chromium-min');
+} catch (e) {}
+
+async function getChromeExecutable() {
   for (const p of CHROME_PATHS) {
-    if (p && fs.existsSync(p)) return p;
+    if (p && fs.existsSync(p)) return { path: p, args: [] };
+  }
+  if (sparticuzChromium) {
+    try {
+      console.log('[ChromeRobot] Vercel 서버리스 Chromium 바이너리 로드 중...');
+      const execPath = await sparticuzChromium.executablePath(
+        'https://github.com/Sparticuz/chromium/releases/download/v130.0.0/chromium-v130.0.0-pack.tar'
+      );
+      return {
+        path: execPath,
+        args: sparticuzChromium.args || []
+      };
+    } catch (spErr) {
+      console.warn('[ChromeRobot] @sparticuz/chromium-min 로드 실패:', spErr);
+    }
   }
   return null;
 }
@@ -138,8 +157,10 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
     items = [{ sessionId: '', dayNumber: 1, date: '' }];
   }
 
-  const chromePath = getChromePath();
-  if (!chromePath) throw new Error('Chrome 또는 Edge 브라우저를 찾을 수 없습니다.');
+  const chromeInfo = await getChromeExecutable();
+  if (!chromeInfo || !chromeInfo.path) throw new Error('Chrome 또는 Chromium 브라우저 엔진을 찾을 수 없습니다.');
+  const chromePath = chromeInfo.path;
+  const extraArgs = chromeInfo.args || [];
 
   // Step A: Login & get token
   console.log('[ChromeRobot] CarePort 인증 토큰 획득 중...');
@@ -165,10 +186,11 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-background-networking',
+    ...extraArgs,
     'about:blank'
   ];
 
-  console.log(`[ChromeRobot] Chrome 헤드리스 시작 (포트: ${port})...`);
+  console.log(`[ChromeRobot] Chrome 헤드리스 시작 (포트: ${port}, 바이너리: ${chromePath})...`);
   const chromeProc = execFile(chromePath, chromeArgs);
 
   let cdp = null;

@@ -9,7 +9,9 @@
     "convex": "node node_modules/convex/bin/main.js dev"
   },
   "dependencies": {
-    "convex": "^1.45.0"
+    "@sparticuz/chromium-min": "^130.0.0",
+    "convex": "^1.45.0",
+    "puppeteer-core": "^23.6.0"
   },
   "keywords": [
     "livoncare",

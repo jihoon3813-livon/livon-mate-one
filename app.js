@@ -44871,63 +44871,25 @@ async function renderHtmlToContinuousA4PdfBytes(htmlContent, customMargin = 8) {
     const page1El = iframeDoc.querySelector('#carePortPage1, .first-page');
     const page2El = iframeDoc.querySelector('#carePortPage2, .second-page');
 
-    const cropCanvasBottomWhitespace = (cvs, padB = 24) => {
-      try {
-        const ctx = cvs.getContext('2d');
-        const w = cvs.width;
-        const h = cvs.height;
-        const imgData = ctx.getImageData(0, 0, w, h);
-        const d = imgData.data;
-        let lastY = -1;
-        for (let y = h - 1; y >= 0; y--) {
-          const row = y * w * 4;
-          for (let x = 0; x < w; x += 4) {
-            const idx = row + (x * 4);
-            const a = d[idx + 3];
-            const r = d[idx];
-            const g = d[idx + 1];
-            const b = d[idx + 2];
-            if (a > 20 && (r < 248 || g < 248 || b < 248)) {
-              lastY = y;
-              break;
-            }
-          }
-          if (lastY !== -1) break;
-        }
-        if (lastY === -1 || lastY >= h - 16) return cvs;
-        const cropH = Math.min(h, lastY + padB);
-        const cCvs = document.createElement('canvas');
-        cCvs.width = w;
-        cCvs.height = cropH;
-        const cCtx = cCvs.getContext('2d');
-        cCtx.fillStyle = '#ffffff';
-        cCtx.fillRect(0, 0, w, cropH);
-        cCtx.drawImage(cvs, 0, 0, w, cropH, 0, 0, w, cropH);
-        return cCvs;
-      } catch (e) {
-        return cvs;
-      }
-    };
-
     if (page1El && page2El) {
       const renderPageToCanvas = async (el) => {
+        const rectH = Math.ceil(el.scrollHeight || el.offsetHeight || 1122);
         return await html2canvas(el, {
-          scale: 2.0,
+          scale: 1.6,
           useCORS: true,
           allowTaint: true,
           backgroundColor: '#ffffff',
           logging: false,
           windowWidth: 794,
+          height: rectH,
           scrollX: 0,
           scrollY: 0,
-          imageTimeout: 0
+          imageTimeout: 2000
         });
       };
 
-      const rawCanvas1 = await renderPageToCanvas(page1El);
-      const rawCanvas2 = await renderPageToCanvas(page2El);
-      const canvas1 = cropCanvasBottomWhitespace(rawCanvas1, 30);
-      const canvas2 = cropCanvasBottomWhitespace(rawCanvas2, 30);
+      const canvas1 = await renderPageToCanvas(page1El);
+      const canvas2 = await renderPageToCanvas(page2El);
 
       const pdfDoc = await PDFLib.PDFDocument.create();
       const pageW = 595.28;
@@ -44938,16 +44900,15 @@ async function renderHtmlToContinuousA4PdfBytes(htmlContent, customMargin = 8) {
       const availH = pageH - (marginV * 2);
 
       const addPageImage = async (cvs) => {
-        const blob = await new Promise(res => cvs.toBlob(res, 'image/png'));
-        const arrayBuf = await blob.arrayBuffer();
-        const pngImage = await pdfDoc.embedPng(new Uint8Array(arrayBuf));
-        const scale = Math.min(availW / pngImage.width, availH / pngImage.height);
-        const finalW = pngImage.width * scale;
-        const finalH = pngImage.height * scale;
+        const jpgDataUrl = cvs.toDataURL('image/jpeg', 0.95);
+        const jpgImage = await pdfDoc.embedJpg(jpgDataUrl);
+        const scale = Math.min(availW / jpgImage.width, availH / jpgImage.height);
+        const finalW = jpgImage.width * scale;
+        const finalH = jpgImage.height * scale;
         const posX = marginH + (availW - finalW) / 2;
         const posY = pageH - marginV - finalH;
         const page = pdfDoc.addPage([pageW, pageH]);
-        page.drawImage(pngImage, {
+        page.drawImage(jpgImage, {
           x: posX,
           y: posY,
           width: finalW,
@@ -45026,61 +44987,23 @@ async function renderElementToContinuousA4PdfBytes(sourceElement, customMargin =
     // 🌟 사용자 특별 지시: 1페이지는 활력징후까지, 2페이지는 수행내역부터 분리하여 완벽한 2페이지 PDF 생성
     if (page1El && page2El) {
       const renderPageToCanvas = async (el) => {
+        const rectH = Math.ceil(el.scrollHeight || el.offsetHeight || 1122);
         return await html2canvas(el, {
-          scale: 2.0,
+          scale: 1.6,
           useCORS: true,
           allowTaint: true,
           backgroundColor: '#ffffff',
           logging: false,
           windowWidth: 794,
+          height: rectH,
           scrollX: 0,
           scrollY: 0,
-          imageTimeout: 0
+          imageTimeout: 2000
         });
       };
 
-      const cropCanvasBottomWhitespace = (cvs, padB = 24) => {
-        try {
-          const ctx = cvs.getContext('2d');
-          const w = cvs.width;
-          const h = cvs.height;
-          const imgData = ctx.getImageData(0, 0, w, h);
-          const d = imgData.data;
-          let lastY = -1;
-          for (let y = h - 1; y >= 0; y--) {
-            const row = y * w * 4;
-            for (let x = 0; x < w; x += 4) {
-              const idx = row + (x * 4);
-              const a = d[idx + 3];
-              const r = d[idx];
-              const g = d[idx + 1];
-              const b = d[idx + 2];
-              if (a > 20 && (r < 248 || g < 248 || b < 248)) {
-                lastY = y;
-                break;
-              }
-            }
-            if (lastY !== -1) break;
-          }
-          if (lastY === -1 || lastY >= h - 16) return cvs;
-          const cropH = Math.min(h, lastY + padB);
-          const cCvs = document.createElement('canvas');
-          cCvs.width = w;
-          cCvs.height = cropH;
-          const cCtx = cCvs.getContext('2d');
-          cCtx.fillStyle = '#ffffff';
-          cCtx.fillRect(0, 0, w, cropH);
-          cCtx.drawImage(cvs, 0, 0, w, cropH, 0, 0, w, cropH);
-          return cCvs;
-        } catch (e) {
-          return cvs;
-        }
-      };
-
-      const rawCanvas1 = await renderPageToCanvas(page1El);
-      const rawCanvas2 = await renderPageToCanvas(page2El);
-      const canvas1 = cropCanvasBottomWhitespace(rawCanvas1, 30);
-      const canvas2 = cropCanvasBottomWhitespace(rawCanvas2, 30);
+      const canvas1 = await renderPageToCanvas(page1El);
+      const canvas2 = await renderPageToCanvas(page2El);
 
       const pdfDoc = await PDFLib.PDFDocument.create();
       const pageW = 595.28;
@@ -45091,16 +45014,15 @@ async function renderElementToContinuousA4PdfBytes(sourceElement, customMargin =
       const availH = pageH - (marginV * 2);
 
       const addPageImage = async (cvs) => {
-        const blob = await new Promise(res => cvs.toBlob(res, 'image/png'));
-        const arrayBuf = await blob.arrayBuffer();
-        const pngImage = await pdfDoc.embedPng(new Uint8Array(arrayBuf));
-        const scale = Math.min(availW / pngImage.width, availH / pngImage.height);
-        const finalW = pngImage.width * scale;
-        const finalH = pngImage.height * scale;
+        const jpgDataUrl = cvs.toDataURL('image/jpeg', 0.95);
+        const jpgImage = await pdfDoc.embedJpg(jpgDataUrl);
+        const scale = Math.min(availW / jpgImage.width, availH / jpgImage.height);
+        const finalW = jpgImage.width * scale;
+        const finalH = jpgImage.height * scale;
         const posX = marginH + (availW - finalW) / 2;
         const posY = pageH - marginV - finalH;
         const page = pdfDoc.addPage([pageW, pageH]);
-        page.drawImage(pngImage, {
+        page.drawImage(jpgImage, {
           x: posX,
           y: posY,
           width: finalW,
@@ -46009,8 +45931,9 @@ async function downloadCarePortDocumentPdf() {
       pdfBytes = await renderElementToContinuousA4PdfBytes(printArea, 8);
     }
     
-    updateGlobalProgress({ percent: 95, statusText: `PDF 파일 패키징 및 다운로드 준비 중...` });
+    updateGlobalProgress({ percent: 100, statusText: `완료! 간병일지 PDF 다운로드가 완료되었습니다.` });
     triggerDirectPdfDownload(pdfBytes, fileName);
+    setTimeout(hideGlobalProgress, 1000);
 
     // 삼성화재 연동 데이터에 자동 등록
     if (gCurrentCarePortSessionId) {
@@ -46025,6 +45948,10 @@ async function downloadCarePortDocumentPdf() {
           date: new Date().toISOString()
         });
       }
+    }
+
+    if (typeof showToast === 'function') {
+      showToast(`[${username} 님] 간병일지 PDF 다운로드가 완료되었습니다.`, 'success');
     }
 
     updateGlobalProgress({ percent: 100, statusText: `✨ 간병일지 PDF 다운로드가 완료되었습니다!` });
