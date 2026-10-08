@@ -45432,74 +45432,91 @@ async function downloadPatientCareLogsViaRobot(groupId, selectedSessionIds = nul
   const username = (patient.patientName || '환자').trim();
   const labelPrefix = isSelective ? `선택 ${totalDays}일차` : `전체 ${totalDays}일차`;
 
-  const isLocalDev = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'));
+  // 개발 및 운영 환경 공통: 크롬 헤드리스 무인 로봇으로 전산 원본 캡처 및 A4 합성 최우선 실행
+  showGlobalProgress({
+    title: `[${username} 님] ${labelPrefix} 원본 다운로드`,
+    subtitle: `${labelPrefix} 일지 원본 데이터를 받아와 1개의 공식 A4 합본 PDF로 조립합니다.`,
+    percent: 15,
+    statusText: `무인 로봇 가동 및 케어포트 전산 접속 중...`,
+    icon: 'bot'
+  });
 
-  // 로컬 개발 환경인 경우 고속 로컬 헤드리스 크롬 로봇 우선 시도
-  if (isLocalDev) {
-    showGlobalProgress({
-      title: `[${username} 님] ${labelPrefix} 원본 다운로드`,
-      subtitle: `${labelPrefix} 일지 원본 데이터를 받아와 1개의 공식 A4 합본 PDF로 조립합니다.`,
-      percent: 15,
-      statusText: `무인 로봇 가동 및 케어포트 전산 접속 중...`,
-      icon: 'bot'
+  let currentPct = 15;
+  const ticker = setInterval(() => {
+    if (currentPct < 90) {
+      currentPct += Math.max(1, Math.floor((90 - currentPct) / (totalDays * 1.5 + 3)));
+      updateGlobalProgress({
+        percent: currentPct,
+        statusText: `전산 원본 캡처 및 A4 합성 진행 중 (${currentPct}%)...`
+      });
+    }
+  }, 1000);
+
+  try {
+    const res = await fetch('/api/careport/robot-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionList: sessionList,
+        patient: username
+      })
     });
 
-    let currentPct = 15;
-    const ticker = setInterval(() => {
-      if (currentPct < 90) {
-        currentPct += Math.max(1, Math.floor((90 - currentPct) / (totalDays * 1.5 + 3)));
-        updateGlobalProgress({
-          percent: currentPct,
-          statusText: `전산 원본 캡처 및 A4 합성 진행 중 (${currentPct}%)...`
-        });
+    clearInterval(ticker);
+
+    if (res.ok) {
+      updateGlobalProgress({ percent: 95, statusText: `${labelPrefix} 공식 PDF 조립 완료!` });
+
+      const blob = await res.blob();
+      const cleanDate = new Date().toISOString().slice(0, 10).replace(/[^0-9]/g, '');
+      const fileName = isSelective
+        ? `[케어포트_공식간병일지_선택일지합본]_${username}_선택${totalDays}일차_${cleanDate}.pdf`
+        : `[케어포트_공식간병일지_전체일지합본]_${username}_총${totalDays}일차_${cleanDate}.pdf`;
+
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+
+      // 고객별 일지 저장소(청구/이메일 연계)에 자동 보관
+      const targetApplyId = patient.applyId || (window.gApps && window.gApps.find(a => a.patientName === patient.patientName)?.id);
+      if (targetApplyId) {
+        const arrayBuf = await blob.arrayBuffer();
+        window.gSamsungCustomerCareLogFiles = window.gSamsungCustomerCareLogFiles || {};
+        window.gSamsungCustomerCareLogFiles[targetApplyId] = [{
+          name: fileName,
+          size: blob.size,
+          bytes: new Uint8Array(arrayBuf),
+          date: new Date().toISOString()
+        }];
       }
-    }, 1000);
 
-    try {
-      const res = await fetch('/api/careport/robot-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionList: sessionList,
-          patient: username
-        })
-      });
+      updateGlobalProgress({ percent: 100, statusText: `완료! 총 ${totalDays}일차 원본 합본이 다운로드되었습니다.` });
+      setTimeout(hideGlobalProgress, 1200);
 
-      clearInterval(ticker);
-
-      if (res.ok) {
-        updateGlobalProgress({ percent: 95, statusText: `${labelPrefix} 공식 PDF 조립 완료!` });
-
-        const blob = await res.blob();
-        const cleanDate = new Date().toISOString().slice(0, 10).replace(/[^0-9]/g, '');
-        const fileName = isSelective
-          ? `[케어포트_공식간병일지_선택일지합본]_${username}_선택${totalDays}일차_${cleanDate}.pdf`
-          : `[케어포트_공식간병일지_전체일지합본]_${username}_총${totalDays}일차_${cleanDate}.pdf`;
-
-        const downloadUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
-
-        updateGlobalProgress({ percent: 100, statusText: `완료! 총 ${totalDays}일차 원본 합본이 다운로드되었습니다.` });
-        setTimeout(hideGlobalProgress, 1200);
-
-        if (typeof showToast === 'function') {
-          showToast(`[${username} 님] ${labelPrefix} 원본 합본 PDF 다운로드 완료!`, 'success');
-        }
-        return;
+      if (typeof showToast === 'function') {
+        showToast(`[${username} 님] ${labelPrefix} 원본 합본 PDF 다운로드 완료!`, 'success');
       }
-    } catch (err) {
-      clearInterval(ticker);
-      console.warn('[Robot Download] 로컬 로봇 미응답, 브라우저 직접 이미지 캡처/A4 합성으로 자동 전환:', err);
+      return;
     }
+  } catch (err) {
+    clearInterval(ticker);
+    console.warn('[Robot Download] 서버 로봇 미응답, 브라우저 공인 원본 iframe 캡처로 자동 전환:', err);
   }
 
-  // 운영 환경 및 브라우저 전산 원본 이미지 직접 캡처 & 1:1 공식 A4 합성 엔진 (1번 화면과 100% 동일 UI/UX)
+  // 2순위 (운영 Vercel 및 로봇 대체): 브라우저 내장 100% 케어포트 공인 원본 DOM 캡처 엔진 (실제 케어포트 전산 화면 추출)
+  try {
+    await captureCarePortOriginalViaIframe(sessionList, username, isSelective, totalDays);
+    return;
+  } catch (iframeErr) {
+    console.warn('[IframeCapture] 브라우저 공인 캡처 실패, 고해상도 A4 정밀 렌더러로 즉시 대체:', iframeErr);
+  }
+
+  // 3순위 (비상 대체)
   try {
     await compileClientSideAuthenticCarePortPdf(patient, sortedLogs, isSelective, totalDays);
   } catch (clientErr) {
@@ -46194,414 +46211,7 @@ async function downloadPatientCareLogsPdfs_new(groupId) {
  * (2차 fallback: 외부 폰트 중복 로딩 제거 & 1-by-1 비동기 렌더링으로 브라우저 프리징 완전 제거)
  */
 async function downloadPatientCareLogsPdfs(groupId, selectedSessionIds = null) {
-  const patient = (gCarePortPatientGroups || []).find(g => g.id === groupId);
-  if (!patient) return;
-
-  const logs = patient.dailyLogs || [];
-  if (logs.length === 0) {
-    alert(`[${patient.patientName}] 환자의 등록된 일별 간병일지가 없습니다.`);
-    return;
-  }
-
-  // 날짜별 순서(Day 1 -> Day N 또는 시작일 -> 종료일)로 오름차순 정렬
-  let sortedLogs = [...logs].sort((a, b) => {
-    const dayA = a.dayNumber || 0;
-    const dayB = b.dayNumber || 0;
-    if (dayA !== dayB && dayA > 0 && dayB > 0) return dayA - dayB;
-    const dateA = a.dateString || a.consultDate || a.startDate || '';
-    const dateB = b.dateString || b.consultDate || b.startDate || '';
-    return dateA.localeCompare(dateB);
-  });
-
-  const isSelective = Array.isArray(selectedSessionIds) && selectedSessionIds.length > 0;
-  if (isSelective) {
-    const sidSet = new Set(selectedSessionIds.map(s => String(s).replace(/\D/g, '')));
-    sortedLogs = sortedLogs.filter(l => {
-      const sid = String(l.sessionId || l.id || '').replace(/\D/g, '');
-      return sidSet.has(sid);
-    });
-    if (sortedLogs.length === 0) {
-      alert('선택된 유효한 일자가 없습니다.');
-      return;
-    }
-  }
-
-  const totalDays = sortedLogs.length;
-  const labelPrefix = isSelective ? `선택 ${totalDays}일차` : `전체 ${totalDays}일차`;
-
-  showGlobalProgress({
-    title: `[${patient.patientName} 님] ${labelPrefix} 원본 다운로드`,
-    subtitle: `${labelPrefix} 일지 원본 데이터를 받아와 1개의 공식 A4 합본 PDF로 조립합니다.`,
-    percent: 15,
-    statusText: `${labelPrefix} 일지원문 데이터 병렬 로드 중...`,
-    icon: 'bot'
-  });
-
-  try {
-    // 1단계: 모든 일차 세부 데이터를 병렬(Parallel)로 사전 조회 (순차 네트워크 대기 완전 제거)
-    const detailDataMap = {};
-    if (window.CarePortClient && typeof window.CarePortClient.fetchLogDetail === 'function') {
-      const fetchPromises = sortedLogs.map(async (log) => {
-        if (!log.sessionId) return;
-        try {
-          const d = await window.CarePortClient.fetchLogDetail(log.sessionId);
-          if (d) detailDataMap[log.sessionId] = d;
-        } catch (e) {}
-      });
-      await Promise.all(fetchPromises);
-    }
-
-    updateGlobalProgress({
-      percent: 25,
-      statusText: `총 ${totalDays}일차 일지 페이지 구성 완료! 초고속 PDF 렌더링 중...`
-    });
-    await new Promise(r => setTimeout(r, 10));
-
-    // Check if official CarePort trend scores exist across patient or details
-    let officialTrends = (patient.trendScores && Array.isArray(patient.trendScores) && patient.trendScores.length > 0)
-      ? patient.trendScores
-      : null;
-    if (!officialTrends) {
-      for (const l of sortedLogs) {
-        const d = detailDataMap[l.sessionId];
-        if (d && Array.isArray(d.trendScores) && d.trendScores.length > 0) {
-          officialTrends = d.trendScores;
-          break;
-        }
-      }
-    }
-
-    // 전체 일차의 종합 트렌드 점수(Cluster Trend Scores) 산출
-    const clusterTrendScores = sortedLogs.map((l, idx) => {
-      const detail = detailDataMap[l.sessionId] || {};
-      const rawObj = detail.raw || l.raw || {};
-      const ts = rawObj.trend_scores || rawObj.trendScores || detail.trendScores || l.trendScores || {};
-      const dateStr = (l.consultDate || l.dateString || detail.careDate || '').slice(0, 10);
-      
-      const cats = rawObj.categories || detail.categories || {};
-      const dietTone = cats.diet?.level || cats.meal?.tone || (rawObj.care_log?.diet_nutrition?.includes('불량') ? 'warning' : 'good');
-      const mobTone = cats.mobility?.level || cats.mobility?.tone || (rawObj.care_log?.mobility_activity?.includes('어려움') ? 'warning' : 'good');
-      const sleepTone = cats.sleep?.level || cats.sleep?.tone || (rawObj.guardian_notes?.sleep?.includes('불면') || rawObj.guardian_notes?.sleep?.includes('확인') ? 'warning' : 'good');
-      const painTone = cats.pain?.level || cats.pain?.tone || (rawObj.guardian_notes?.pain?.includes('통증') ? 'warning' : 'good');
-      const ovTone = l.overallStatus?.tone || rawObj.overall_status?.level || 'good';
-
-      const dScore = dietTone === 'warning' ? 3 : (dietTone === 'poor' ? 2 : 5);
-      const mScore = mobTone === 'warning' ? 3 : (mobTone === 'poor' ? 2 : 4);
-      const sScore = sleepTone === 'warning' ? 3 : (sleepTone === 'poor' ? 2 : 4);
-      const pScore = painTone === 'warning' ? 2 : (painTone === 'poor' ? 4 : 1);
-      const oScore = ovTone === 'warning' ? 3 : (ovTone === 'poor' ? 2 : 4);
-
-      const rawDayIndex = rawObj.day_index || detail.day_index || l.day_index || l.dayIndex || l.dayNumber;
-      const day = rawDayIndex != null && !isNaN(Number(rawDayIndex)) ? Number(rawDayIndex) : (l.dayNumber || (idx + 1));
-
-      return {
-        dayIndex: day,
-        careDate: dateStr,
-        overallScore: ts.overallScore != null ? ts.overallScore : (ts.overall != null ? ts.overall : oScore),
-        mobilityScore: ts.mobilityScore != null ? ts.mobilityScore : (ts.mobility != null ? ts.mobility : mScore),
-        dietScore: ts.dietScore != null ? ts.dietScore : (ts.diet != null ? ts.diet : dScore),
-        sleepScore: ts.sleepScore != null ? ts.sleepScore : (ts.sleep != null ? ts.sleep : sScore),
-        painScore: ts.painScore != null ? ts.painScore : (ts.pain != null ? ts.pain : pScore)
-      };
-    });
-    patient.trendScores = officialTrends || clusterTrendScores;
-
-    // 각 일차별 일지 HTML 사전 생성
-    const dayHtmlList = [];
-    for (let i = 0; i < sortedLogs.length; i++) {
-      const log = sortedLogs[i];
-      const logDate = (log.consultDate || log.dateString || '').slice(0, 10);
-      const rawDay = log.raw?.day_index || log.day_index || log.dayIndex || log.dayNumber;
-      const dayNum = rawDay != null && !isNaN(Number(rawDay)) ? Number(rawDay) : (log.dayNumber || (i + 1));
-      log.dayNumber = dayNum;
-
-      const currentDayTrends = (officialTrends || clusterTrendScores).filter((t, tIdx) => {
-        const tDate = (t.careDate || '').slice(0, 10);
-        if (tDate && logDate) return tDate <= logDate;
-        if (t.dayIndex != null && dayNum != null) return Number(t.dayIndex) <= Number(dayNum);
-        return tIdx <= i;
-      });
-
-      let detailData = detailDataMap[log.sessionId] ? { ...detailDataMap[log.sessionId] } : null;
-      if (detailData) {
-        detailData.trendScores = currentDayTrends;
-      }
-      log.trendScores = currentDayTrends;
-
-      const html = (window.CarePortClient && typeof window.CarePortClient.generateDailyLogHtml === 'function')
-        ? window.CarePortClient.generateDailyLogHtml(patient, log, detailData)
-        : '';
-      dayHtmlList.push(html);
-    }
-
-    const startDate = (patient.careStartDate || '').replace(/[^0-9]/g, '');
-    const endDate = (patient.careEndDate || '').replace(/[^0-9]/g, '');
-    const dateRangeStr = (startDate && endDate) ? `_${startDate}-${endDate}` : '';
-    const cleanDate = new Date().toISOString().slice(0, 10).replace(/[^0-9]/g, '');
-    const fileName = isSelective
-      ? `[케어포트_공식간병일지_선택일지합본]_${patient.patientName}_선택${totalDays}일차_${cleanDate}.pdf`
-      : `[케어포트_공식간병일지_전체일지합본]_${patient.patientName}_총${totalDays}일차${dateRangeStr}.pdf`;
-
-    let pdfBytes = null;
-
-    // 1차 시도: 고성능 네이티브 가속 엔진 (Chromium/Edge Print-To-PDF로 수 초 내 단일 벡터 PDF 생성)
-    try {
-      updateGlobalProgress({
-        percent: 45,
-        statusText: `초고속 네이티브 PDF 가속 엔진 렌더링 중...`
-      });
-
-      const styleSet = new Set();
-      dayHtmlList.forEach(h => {
-        const matches = (h || '').match(/<style[^>]*>([\s\S]*?)<\/style>/gi) || [];
-        matches.forEach(m => styleSet.add(m));
-      });
-      const extractedStyles = Array.from(styleSet).join('\n');
-
-      let combinedPagesHtml = '';
-      dayHtmlList.forEach((dHtml) => {
-        const pageSections = (dHtml || '').match(/<section[^>]*class="[^"]*report-page[^"]*"[^>]*>[\s\S]*?<\/section>/gi);
-        if (pageSections && pageSections.length > 0) {
-          pageSections.forEach((sec) => {
-            combinedPagesHtml += `
-              <div class="cp-pdf-page" style="page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; width: 794px; min-height: 1122px; max-height: 1122px; margin: 0 auto; overflow: hidden; position: relative; background: #ffffff;">
-                ${sec}
-              </div>
-            `;
-          });
-        } else {
-          const bodyMatch = dHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-          const inner = bodyMatch ? bodyMatch[1] : dHtml;
-          combinedPagesHtml += `
-            <div class="cp-pdf-page" style="page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; width: 794px; min-height: 1122px; max-height: 1122px; margin: 0 auto; overflow: hidden; position: relative; background: #ffffff;">
-              ${inner}
-            </div>
-          `;
-        }
-      });
-
-      const fullDocHtml = `<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <title>${fileName}</title>
-  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  ${extractedStyles}
-  <style>
-    @page { size: A4 portrait; margin: 0; }
-    * { box-sizing: border-box; }
-    html, body {
-      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
-      background: #ffffff;
-      color: #0f172a;
-      padding: 0;
-      margin: 0;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    .cp-pdf-page {
-      page-break-after: always !important;
-      break-after: page !important;
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
-      width: 794px !important;
-      min-height: 1122px !important;
-      max-height: 1122px !important;
-      margin: 0 auto !important;
-      overflow: hidden !important;
-      position: relative !important;
-      background: #ffffff !important;
-    }
-    .cp-pdf-page:last-child {
-      page-break-after: avoid !important;
-      break-after: avoid !important;
-    }
-    .report-page {
-      width: 794px !important;
-      min-height: 1122px !important;
-      max-height: 1122px !important;
-      box-sizing: border-box !important;
-      overflow: hidden !important;
-      position: relative !important;
-      background: #ffffff !important;
-      padding: 16px 14px 16px !important;
-      display: flex !important;
-      flex-direction: column !important;
-    }
-    .page, .report-area {
-      width: 794px !important;
-      max-width: 794px !important;
-      height: 1122px !important;
-      min-height: 1122px !important;
-      max-height: 1122px !important;
-      box-sizing: border-box !important;
-      padding: 16px 14px 16px !important;
-      overflow: hidden !important;
-      display: block !important;
-      margin: 0 auto !important;
-    }
-    .sec-head {
-      display: flex !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      border-bottom: 1.5px solid #0f172a !important;
-      padding-bottom: 3px !important;
-      margin-top: 10px !important;
-      margin-bottom: 6px !important;
-    }
-    .sec-head.sec-head-teal {
-      border-bottom: 1.5px solid #00897b !important;
-    }
-    .sec-title {
-      font-size: 13.5px !important;
-      font-weight: 900 !important;
-      color: #0f172a !important;
-      letter-spacing: -0.3px !important;
-      display: inline-flex !important;
-      align-items: center !important;
-    }
-    .careport-badge-pill {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      vertical-align: middle !important;
-      box-sizing: border-box !important;
-      line-height: 1 !important;
-      text-align: center !important;
-      white-space: nowrap !important;
-    }
-    .careport-badge-pill .pill-text,
-    .careport-badge-pill > span:not(.careport-dot),
-    .careport-badge-pill > strong {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      line-height: 1 !important;
-      position: relative !important;
-      top: -2.5px !important;
-    }
-    .careport-dot {
-      display: inline-block !important;
-      border-radius: 50% !important;
-      background: currentColor !important;
-      flex-shrink: 0 !important;
-      vertical-align: middle !important;
-      position: relative !important;
-      top: -0.5px !important;
-    }
-    .state-item {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      line-height: 1 !important;
-      text-align: center !important;
-    }
-    .state-item .btn-text,
-    .state-item.binary > span,
-    .state-item.level > span {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      line-height: 1 !important;
-      position: relative !important;
-      top: -2.5px !important;
-    }
-    .no-print { display: none !important; }
-  </style>
-</head>
-<body>
-  ${combinedPagesHtml}
-</body>
-</html>`;
-
-      const pdfApiUrl = (typeof window !== 'undefined' && window.CarePortClient?.apiBase)
-        ? window.CarePortClient.apiBase.replace(/\/careport$/, '') + '/careport/generate-pdf'
-        : '/api/careport/generate-pdf';
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
-      const resp = await fetch(pdfApiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html: fullDocHtml, filename: fileName }),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-
-      if (resp.ok && resp.headers.get('content-type')?.includes('application/pdf')) {
-        const arrayBuf = await resp.arrayBuffer();
-        if (arrayBuf && arrayBuf.byteLength > 1000) {
-          pdfBytes = new Uint8Array(arrayBuf);
-          updateGlobalProgress({
-            percent: 95,
-            statusText: `초고속 PDF 생성 완료! 파일 저장 중...`
-          });
-          await new Promise(r => setTimeout(r, 10));
-        }
-      }
-    } catch (serverErr) {
-      console.warn('[CarePort PDF] 서버 가속 엔진 연결 지연/오류, 클라이언트 엔진으로 자동 전환:', serverErr.message);
-    }
-
-    // 2차 시도: 클라이언트 초고속 배치 엔진 (독립 iframe 원샷 배치 렌더링으로 메인윈도우 스타일 충돌 완전 차단, 1~2초 내 초고속 완료)
-    if (!pdfBytes) {
-      await ensureHtml2CanvasLoaded();
-      if (typeof PDFLib === 'undefined' || !PDFLib.PDFDocument) {
-        throw new Error('PDFLib 라이브러리를 찾을 수 없습니다.');
-      }
-
-      const mergedDoc = await PDFLib.PDFDocument.create();
-
-      for (let i = 0; i < dayHtmlList.length; i++) {
-        const dHtml = dayHtmlList[i];
-        const log = sortedLogs[i];
-        const isClassic = window.CarePortClient && typeof window.CarePortClient.isClassicLog === 'function' && window.CarePortClient.isClassicLog(log, detailDataMap[log?.sessionId]);
-        updateGlobalProgress({
-          percent: 50 + Math.round(((i + 1) / dayHtmlList.length) * 45),
-          statusText: `[${i + 1}/${dayHtmlList.length}일차] ${isClassic ? '구버전 원본 규격 A4 1장' : '일지원문 고해상도 A4 2P'} 렌더링 중...`
-        });
-        const dayBytes = isClassic
-          ? await renderHtmlToSinglePageA4PdfBytes(dHtml, 8)
-          : await renderHtmlToContinuousA4PdfBytes(dHtml, 8);
-        if (dayBytes) {
-          const dayDoc = await PDFLib.PDFDocument.load(dayBytes);
-          const copiedPages = await mergedDoc.copyPages(dayDoc, dayDoc.getPageIndices());
-          copiedPages.forEach(p => mergedDoc.addPage(p));
-        }
-      }
-
-      updateGlobalProgress({
-        percent: 96,
-        statusText: `전체 ${sortedLogs.length}일차 일지 단일 PDF로 결합 및 패키징 중...`
-      });
-      await new Promise(r => setTimeout(r, 10));
-
-      pdfBytes = await mergedDoc.save();
-    }
-
-    // 시스템 내 고객별 일지 저장소(청구/이메일 연계)에 1개의 통합 PDF로 자동 보관
-    const targetApplyId = patient.applyId || (gApps.find(a => a.patientName === patient.patientName)?.id);
-    if (targetApplyId) {
-      window.gSamsungCustomerCareLogFiles = window.gSamsungCustomerCareLogFiles || {};
-      window.gSamsungCustomerCareLogFiles[targetApplyId] = [{
-        name: fileName,
-        size: pdfBytes.byteLength,
-        bytes: pdfBytes,
-        date: new Date().toISOString()
-      }];
-    }
-
-    updateGlobalProgress({
-      percent: 100,
-      statusText: `완료! 총 ${totalDays}일차 전체 원본 합본이 다운로드되었습니다.`
-    });
-
-    triggerDirectPdfDownload(pdfBytes, fileName);
-    setTimeout(hideGlobalProgress, 1200);
-  } catch (err) {
-    console.error('전체 일지 단일 PDF 통합 다운로드 실패:', err);
-    hideGlobalProgress();
-    alert('전체 일지 다운로드 중 오류가 발생했습니다: ' + err.message);
-  }
+  return await downloadPatientCareLogsViaRobot(groupId, selectedSessionIds);
 }
 var downloadPatientCareLogsZip = downloadPatientCareLogsPdfs;
 window.downloadPatientCareLogsPdfs = downloadPatientCareLogsPdfs;
