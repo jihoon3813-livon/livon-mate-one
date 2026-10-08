@@ -490,7 +490,8 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
 }
 
 module.exports = {
-  getChromePath,
+  getChromeExecutable,
+  getChromePath: getChromeExecutable,
   fetchCarePortToken,
   captureCarePortOriginalImages,
   CdpSession
