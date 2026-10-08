@@ -45299,26 +45299,27 @@ async function downloadCarePortViaRobot(targetSessionId = null, targetPatientNam
   const sessionId = targetSessionId || gCurrentCarePortSessionId || detail.sessionId || detail.id || '';
 
   showGlobalProgress({
-    title: `[${username} 님] 케어포트 공인 일지 다운로드`,
-    subtitle: `1페이지(활력·상태)와 2페이지(수행내역)를 공식 A4 2P PDF로 렌더링 중입니다.`,
+    title: `[${username} 님] 케어포트 무인 로봇 다운로드`,
+    subtitle: `백그라운드 크롬 로봇이 케어포트에 직접 접속하여 원본 파일을 가져옵니다.`,
     percent: 25,
-    statusText: `전산 상세 데이터 수신 및 A4 2P 조립 준비 중...`,
-    icon: 'file-down'
+    statusText: `무인 크롬 로봇 실행 및 케어포트 접속 중...`,
+    icon: 'bot'
   });
 
   const isLocalDev = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'));
 
-  // 1순위: 로컬 개발 환경인 경우 고속 로컬 크롬 로봇 우선 시도 (3초 타임아웃 보장)
+  // 1순위: 로컬 개발 환경인 경우 고속 로컬 크롬 로봇으로 케어포트 접속 및 원본 다운로드 병합
   if (isLocalDev) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      updateGlobalProgress({ percent: 50, statusText: `케어포트 원본 화면 렌더링 및 파일 다운로드 중...` });
       const apiUrl = `/api/careport/robot-pdf?sessionId=${encodeURIComponent(sessionId)}&name=${encodeURIComponent(username)}`;
       const res = await fetch(apiUrl, { method: 'GET', signal: controller.signal });
       clearTimeout(timeoutId);
 
       if (res.ok) {
-        updateGlobalProgress({ percent: 90, statusText: `전산 원본 A4 2페이지 PDF 조립 완료!` });
+        updateGlobalProgress({ percent: 90, statusText: `케어포트 원본을 공식 A4 PDF로 병합 완료!` });
         const blob = await res.blob();
         const cleanDate = new Date().toISOString().slice(0, 10).replace(/[^0-9]/g, '');
         const fileName = `[케어포트_공식간병일지]_${username}_#${sessionId}_${cleanDate}.pdf`;
@@ -45332,16 +45333,16 @@ async function downloadCarePortViaRobot(targetSessionId = null, targetPatientNam
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
 
-        updateGlobalProgress({ percent: 100, statusText: `완료! 케어포트 공식 A4 2P PDF 다운로드가 완료되었습니다.` });
+        updateGlobalProgress({ percent: 100, statusText: `완료! 케어포트 원본 간병일지 병합 파일이 다운로드되었습니다.` });
         setTimeout(hideGlobalProgress, 1200);
 
         if (typeof showToast === 'function') {
-          showToast(`[${username} 님] 케어포트 공식 A4 2P PDF 다운로드 완료!`, 'success');
+          showToast(`[${username} 님] 케어포트 원본 간병일지 다운로드 완료!`, 'success');
         }
         return;
       }
     } catch (err) {
-      console.warn('[Robot Download] 로컬 로봇 미응답, 브라우저 초고속 A4 2P 엔진으로 전환:', err);
+      console.warn('[Robot Download] 로컬 로봇 미응답, 비상 엔진으로 전환:', err);
     }
   }
 
@@ -45472,22 +45473,33 @@ async function downloadPatientCareLogsViaRobot(groupId, selectedSessionIds = nul
   const username = (patient.patientName || '환자').trim();
   const labelPrefix = isSelective ? `선택 ${totalDays}일차` : `전체 ${totalDays}일차`;
 
-  // 개발 및 운영 환경 공통: 무인 로봇 또는 브라우저 공인 A4 2P 결합 엔진 실행
+  // 개발 및 운영 환경 공통: 무인 로봇 케어포트 원본 파일 다운로드 및 공식 PDF 병합
   showGlobalProgress({
-    title: `[${username} 님] ${labelPrefix} 원본 다운로드`,
-    subtitle: `${labelPrefix} 일지 원본 데이터를 받아와 1개의 공식 A4 합본 PDF로 조립합니다.`,
+    title: `[${username} 님] ${labelPrefix} 무인 로봇 다운로드`,
+    subtitle: `백그라운드 크롬 로봇이 케어포트에 직접 접속하여 ${labelPrefix} 원본 일지 파일들을 다운받아 1개로 병합합니다.`,
     percent: 15,
-    statusText: `전산 상세 데이터 수신 및 공식 A4 합본 준비 중...`,
-    icon: 'file-down'
+    statusText: `무인 로봇 가동 및 케어포트 전산 접속 중...`,
+    icon: 'bot'
   });
 
   const isLocalDev = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'));
 
-  // 1순위: 로컬 개발 환경인 경우 고속 로컬 크롬 로봇 우선 시도 (3.5초 타임아웃 보장)
+  // 1순위: 로컬 개발 환경인 경우 고속 로컬 크롬 로봇으로 케어포트 일자별 원본 수신 및 병합
   if (isLocalDev) {
+    let currentPct = 15;
+    const ticker = setInterval(() => {
+      if (currentPct < 90) {
+        currentPct += Math.max(1, Math.floor((90 - currentPct) / (totalDays * 1.5 + 3)));
+        updateGlobalProgress({
+          percent: currentPct,
+          statusText: `케어포트 일자별 원본 파일 다운로드 및 PDF 병합 진행 중 (${currentPct}%)...`
+        });
+      }
+    }, 1000);
+
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), Math.max(60000, totalDays * 15000));
       const res = await fetch('/api/careport/robot-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -45498,9 +45510,10 @@ async function downloadPatientCareLogsViaRobot(groupId, selectedSessionIds = nul
         signal: controller.signal
       });
       clearTimeout(timeoutId);
+      clearInterval(ticker);
 
       if (res.ok) {
-        updateGlobalProgress({ percent: 95, statusText: `${labelPrefix} 공식 PDF 조립 완료!` });
+        updateGlobalProgress({ percent: 95, statusText: `${labelPrefix} 원본 파일 병합 완료!` });
 
         const blob = await res.blob();
         const cleanDate = new Date().toISOString().slice(0, 10).replace(/[^0-9]/g, '');
@@ -45530,7 +45543,7 @@ async function downloadPatientCareLogsViaRobot(groupId, selectedSessionIds = nul
           }];
         }
 
-        updateGlobalProgress({ percent: 100, statusText: `완료! 총 ${totalDays}일차 원본 합본이 다운로드되었습니다.` });
+        updateGlobalProgress({ percent: 100, statusText: `완료! 총 ${totalDays}일차 원본 파일이 1개로 병합되었습니다.` });
         setTimeout(hideGlobalProgress, 1200);
 
         if (typeof showToast === 'function') {
@@ -45539,7 +45552,8 @@ async function downloadPatientCareLogsViaRobot(groupId, selectedSessionIds = nul
         return;
       }
     } catch (err) {
-      console.warn('[Robot Download] 로컬 로봇 미응답, 브라우저 공인 A4 합본 엔진으로 전환:', err);
+      clearInterval(ticker);
+      console.warn('[Robot Download] 로컬 로봇 미응답, 비상 엔진으로 전환:', err);
     }
   }
 
