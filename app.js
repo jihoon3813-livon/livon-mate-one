@@ -1998,7 +1998,7 @@ async function loadConvexData(showSpinner = true) {
     else if (gActiveTab === 'assignments' && typeof renderAssignments === 'function') renderAssignments();
     else if (gActiveTab === 'claims' && typeof renderClaims === 'function') renderClaims();
     else if (gActiveTab === 'payouts' && typeof renderPayouts === 'function') renderPayouts();
-    else if (gActiveTab === 'carelogs' && typeof renderCareLogs === 'function') renderCareLogs();
+    else if ((gActiveTab === 'carelogs' || gActiveTab === 'carelogs_new') && typeof renderCareLogs === 'function') renderCareLogs();
     else if (gActiveTab === 'dashboard' && typeof renderDashboard === 'function') renderDashboard();
     else if (gActiveTab === 'faxmgmt' && typeof renderFaxManagement === 'function') renderFaxManagement();
     else if (gActiveTab === 'carecalendar' && typeof renderCareCalendar === 'function') renderCareCalendar();
@@ -3505,6 +3505,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadConvexData(false);
   }
 
+  // 🌟 [모든 페이지 공통 적용] 페이지 새로고침(F5) 시 케어포트 전산 실시간 자동 동기화
+  if (typeof syncCarePortLogs === 'function') {
+    syncCarePortLogs(false).then(() => {
+      console.log('[AutoSync] 페이지 새로고침 시 케어포트 전산 실시간 동기화 완료');
+    }).catch(err => {
+      console.warn('[AutoSync] 케어포트 전산 동기화 안내:', err);
+    });
+  }
+
   // 수정발생 & 모달 비활성화 확인 상태 전 PC/클라우드 즉시 백그라운드 동기화
   if (typeof syncConfirmedAlertsWithServer === 'function') {
     syncConfirmedAlertsWithServer();
@@ -3663,6 +3672,10 @@ function getHdFormCareAddress(app) {
 function formatHdCaregiverBirth8(raw) {
   if (!raw) return '';
   const str = String(raw).trim();
+  // '교체', '변경', '미상' 등 텍스트는 생년월일이 아니므로 아예 빈칸 반환
+  if (str.includes('교체') || str.includes('변경') || str.includes('미상') || str.includes('확인') || str.includes('없음') || str === '-') {
+    return '';
+  }
   const digits = str.replace(/[^0-9]/g, '');
   if (digits.length === 8) {
     return digits;
@@ -3684,7 +3697,8 @@ function formatHdCaregiverBirth8(raw) {
     }
     return century + front6;
   }
-  return str;
+  // 유효한 숫자가 없으면 빈칸 반환 ('교체' 등 문자열 누출 방지)
+  return '';
 }
 window.formatHdCaregiverBirth8 = formatHdCaregiverBirth8;
 
@@ -3808,12 +3822,17 @@ function getHdForm02CaregiverInfo(app) {
   const fallbackPhone = (latestCg && latestCg.phone) || app.caregiverPhone || '';
 
   const isDummyName = (v) => !v || v === '조정자' || v === '테스트' || v === '홍길동';
-  const isDummyBirth = (v) => !v || v === '19680512';
+  const isDummyBirth = (v) => !v || v === '19680512' || String(v).includes('교체') || String(v).includes('변경') || !/[0-9]/.test(v);
   const isDummyPhone = (v) => !v || v === '010-7788-9900' || v === '010-0000-0000';
 
   result.name = (overrides.caregiverName && !isDummyName(overrides.caregiverName)) ? overrides.caregiverName : fallbackName;
   result.birth = (overrides.caregiverBirth && !isDummyBirth(overrides.caregiverBirth)) ? overrides.caregiverBirth : fallbackBirth;
   result.phone = (overrides.caregiverPhone && !isDummyPhone(overrides.caregiverPhone)) ? overrides.caregiverPhone : fallbackPhone;
+
+  // '교체' 등 비정상 단어 방지: 숫자가 없거나 '교체'가 포함된 경우 아예 빈칸으로 강제
+  if (result.birth && (String(result.birth).includes('교체') || !/[0-9]/.test(result.birth))) {
+    result.birth = '';
+  }
 
   return result;
 }
@@ -3824,8 +3843,9 @@ window.getHdForm02CaregiverInfo = getHdForm02CaregiverInfo;
  */
 function applyHdForm02CaregiverQuick(name, birth, phone, appId) {
   const targetId = appId || window.gCurrentPreviewAppId || 'C0006';
+  const safeBirth = (birth && String(birth).includes('교체')) ? '' : (formatHdCaregiverBirth8(birth) || '');
   updateHdForm02Field('caregiverName', name, false, targetId);
-  updateHdForm02Field('caregiverBirth', birth, false, targetId);
+  updateHdForm02Field('caregiverBirth', safeBirth, false, targetId);
   updateHdForm02Field('caregiverPhone', phone, false, targetId);
 
   const nameInput = document.getElementById('hd2_top_caregiverName') || document.getElementById('hd2_tbl_caregiverName');
@@ -3834,9 +3854,9 @@ function applyHdForm02CaregiverQuick(name, birth, phone, appId) {
   if (tblName) tblName.value = name;
 
   const birthInput = document.getElementById('hd2_top_caregiverBirth') || document.getElementById('hd2_tbl_caregiverBirth');
-  if (birthInput) birthInput.value = birth;
+  if (birthInput) birthInput.value = safeBirth;
   const tblBirth = document.getElementById('hd2_tbl_caregiverBirth');
-  if (tblBirth) tblBirth.value = birth;
+  if (tblBirth) tblBirth.value = safeBirth;
 
   const phoneInput = document.getElementById('hd2_top_caregiverPhone') || document.getElementById('hd2_tbl_caregiverPhone');
   if (phoneInput) phoneInput.value = phone;
@@ -3844,7 +3864,7 @@ function applyHdForm02CaregiverQuick(name, birth, phone, appId) {
   if (tblPhone) tblPhone.value = phone;
 
   reflectHdForm02FieldLive('caregiverName', name, targetId);
-  reflectHdForm02FieldLive('caregiverBirth', birth, targetId);
+  reflectHdForm02FieldLive('caregiverBirth', safeBirth, targetId);
   reflectHdForm02FieldLive('caregiverPhone', phone, targetId);
 
   saveHdForm02CustomState();
@@ -3968,6 +3988,44 @@ function formatCarePeriodDateTime(dateInput, defaultHour = 9, defaultMin = 0) {
   return `${y}. ${m}. ${day} (${hourStr})h (${minStr})m`;
 }
 
+function parseHdPeriodDateTime(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  const dMatch = s.match(/(\d{4})[.-](\d{1,2})[.-](\d{1,2})/);
+  if (!dMatch) return null;
+  const y = parseInt(dMatch[1], 10);
+  const m = parseInt(dMatch[2], 10) - 1;
+  const d = parseInt(dMatch[3], 10);
+
+  let hh = 9, mm = 0;
+  const hMatch = s.match(/\((\d{1,2})\)h(?:\s*\((\d{1,2})\)m)?/i);
+  const tMatch = s.match(/(?:[T\s]+)(\d{1,2}):(\d{1,2})/);
+  const koreanHourMatch = s.match(/(\d{1,2})시(?:\s*(\d{1,2})분)?/);
+  if (hMatch) {
+    hh = parseInt(hMatch[1], 10);
+    mm = hMatch[2] ? parseInt(hMatch[2], 10) : 0;
+  } else if (tMatch) {
+    hh = parseInt(tMatch[1], 10);
+    mm = parseInt(tMatch[2], 10);
+  } else if (koreanHourMatch) {
+    hh = parseInt(koreanHourMatch[1], 10);
+    mm = koreanHourMatch[2] ? parseInt(koreanHourMatch[2], 10) : 0;
+  }
+  return new Date(y, m, d, hh, mm);
+}
+
+function calculateHdPeriodRowDays(startStr, endStr) {
+  const d1 = parseHdPeriodDateTime(startStr);
+  const d2 = parseHdPeriodDateTime(endStr);
+  if (!d1 || !d2) return null;
+  if (typeof calculateCareDays24h === 'function') {
+    return calculateCareDays24h(d1, d2);
+  }
+  const diffMs = d2.getTime() - d1.getTime();
+  if (diffMs <= 0) return 1;
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
 function calculateHdForm02TotalDays(periods, app) {
   let total = 0;
   if (Array.isArray(periods)) {
@@ -4011,9 +4069,19 @@ function getHdForm02ServicePeriods(app) {
     ? Number(window.gPendingFaxDispatchParams.roundNumber)
     : null;
 
-  // 2. 고객별 저장된 직접 수정 내역이 있는 경우 (단, 최신 차수 일시와 불일치 시 실시간 동기화)
+  // 2. 고객별 저장된 직접 수정 내역이 있는 경우
   if (gHdForm02CustomState.customerOverrides && gHdForm02CustomState.customerOverrides[appId] && gHdForm02CustomState.customerOverrides[appId].servicePeriods) {
     const saved = gHdForm02CustomState.customerOverrides[appId].servicePeriods;
+    const hasManual = Boolean(
+      gHdForm02CustomState.customerOverrides[appId].hasManualServicePeriods ||
+      (Array.isArray(saved) && saved.some(r => r && (r.isManualEdited || r.hasCustomDays || (r.start && !String(r.start).includes('2026. 08. 21')))))
+    );
+
+    // 사용자가 직접 입력/수정한 내역이 있다면 어떤 경우에도 자동 덮어쓰기(리셋)를 하지 않고 저장된 값을 그대로 반환
+    if (hasManual) {
+      return saved;
+    }
+
     const isLegacyDummy = Array.isArray(saved) && saved[0] && String(saved[0].start).includes('2026. 08. 21');
     if (!isLegacyDummy) {
       if (sched && sched.rounds && sched.rounds.length > 0) {
@@ -4023,7 +4091,7 @@ function getHdForm02ServicePeriods(app) {
         if (curRound && curRound.endDateStr) {
           const freshEnd = formatCarePeriodDateTime(curRound.endDateStr, 18, 0);
           const freshStart = formatCarePeriodDateTime(curRound.startDateStr, 9, 0);
-          if (saved[0] && saved[0].end !== freshEnd) {
+          if (saved[0] && !saved[0].isManualEdited && saved[0].end !== freshEnd) {
             saved[0].start = freshStart;
             saved[0].end = freshEnd;
             if (curRound.days) saved[0].days = `${curRound.days}일`;
@@ -4151,6 +4219,10 @@ function updateHdForm02Field(field, value, shouldRerender = false, appId = null)
   const targetId = appId || window.gCurrentPreviewAppId || 'C0006';
   const isGlobalField = ['managerName', 'managerPhone'].includes(field);
 
+  if (field === 'caregiverBirth' && value && (String(value).includes('교체') || !/[0-9]/.test(value))) {
+    value = '';
+  }
+
   gHdForm02CustomState[field] = value;
 
   if (isGlobalField) {
@@ -4220,16 +4292,21 @@ function setHdForm02AccidentPrefix(type, appId = null) {
 function updateHdForm02ServicePeriod(rowIdx, col, value, appId = null, shouldRerender = false) {
   const targetId = appId || window.gCurrentPreviewAppId || 'C0006';
   if (!gHdForm02CustomState.customerOverrides) gHdForm02CustomState.customerOverrides = {};
-  if (!gHdForm02CustomState.customerOverrides[targetId] || !gHdForm02CustomState.customerOverrides[targetId].servicePeriods) {
+  if (!gHdForm02CustomState.customerOverrides[targetId]) gHdForm02CustomState.customerOverrides[targetId] = {};
+  if (!gHdForm02CustomState.customerOverrides[targetId].servicePeriods) {
     const currentApp = (typeof gApps !== 'undefined') ? gApps.find(a => a.id === targetId) : { id: targetId };
     const currentPeriods = JSON.parse(JSON.stringify(getHdForm02ServicePeriods(currentApp)));
-    if (!gHdForm02CustomState.customerOverrides[targetId]) gHdForm02CustomState.customerOverrides[targetId] = {};
     gHdForm02CustomState.customerOverrides[targetId].servicePeriods = currentPeriods;
   }
   if (!gHdForm02CustomState.customerOverrides[targetId].servicePeriods[rowIdx]) {
     gHdForm02CustomState.customerOverrides[targetId].servicePeriods[rowIdx] = { start: '', end: '', days: '' };
   }
   gHdForm02CustomState.customerOverrides[targetId].servicePeriods[rowIdx][col] = value;
+  gHdForm02CustomState.customerOverrides[targetId].servicePeriods[rowIdx].isManualEdited = true;
+  if (col === 'days') {
+    gHdForm02CustomState.customerOverrides[targetId].servicePeriods[rowIdx].hasCustomDays = true;
+  }
+  gHdForm02CustomState.customerOverrides[targetId].hasManualServicePeriods = true;
   gHdForm02CustomState.servicePeriods = gHdForm02CustomState.customerOverrides[targetId].servicePeriods;
   saveHdForm02CustomState();
   if (shouldRerender && typeof previewFormForCustomer === 'function') {
@@ -4272,23 +4349,38 @@ function reflectHdForm02ServicePeriodLive(rowIdx, col, value, appId) {
   const targetId = appId || window.gCurrentPreviewAppId || 'C0006';
   updateHdForm02ServicePeriod(rowIdx, col, value, targetId, false);
 
-  const targetForm = document.getElementById('faxCleanFormTarget');
-  if (!targetForm) return;
-
   const currentApp = window.gCurrentPreviewApp || ((typeof gApps !== 'undefined') ? gApps.find(a => a.id === targetId) : null) || { id: targetId };
-  const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '.');
-  const docNo = 'LV-FAX-' + (currentApp.applyDate ? currentApp.applyDate.replace(/[^0-9]/g, '') : '20260907') + '-' + (currentApp.id || 'NEW');
 
-  const rowKey = `hd2_servicePeriod_row${rowIdx + 1}`;
-  const cell = targetForm.querySelector(`[data-mapping="${rowKey}"] .form-area-cell`);
-  if (cell) {
-    cell.innerText = resolveFormFieldValue(rowKey, currentApp, docNo, todayStr);
+  // 시작 또는 종료 변경 시 해당 행 일수 자동 계산 (사용자가 일수를 직접 타이핑하지 않은 경우)
+  if (col === 'start' || col === 'end') {
+    const row = gHdForm02CustomState.customerOverrides?.[targetId]?.servicePeriods?.[rowIdx];
+    if (row && row.start && row.end && !row.hasCustomDays) {
+      const calcDays = calculateHdPeriodRowDays(row.start, row.end);
+      if (calcDays && calcDays > 0) {
+        const daysVal = `${calcDays}일`;
+        row.days = daysVal;
+        const daysInput = document.getElementById(`hd2_period_days_${rowIdx}`);
+        if (daysInput) daysInput.value = daysVal;
+      }
+    }
   }
 
-  // 예상사용시간 즉시 업데이트
-  const usageCell = targetForm.querySelector(`[data-mapping="hd2_expectedUsageTime"] .form-area-cell`);
-  if (usageCell) {
-    usageCell.innerText = resolveFormFieldValue('hd2_expectedUsageTime', currentApp, docNo, todayStr);
+  const targetForm = document.getElementById('faxCleanFormTarget');
+  if (targetForm) {
+    const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '.');
+    const docNo = 'LV-FAX-' + (currentApp.applyDate ? currentApp.applyDate.replace(/[^0-9]/g, '') : '20260907') + '-' + (currentApp.id || 'NEW');
+
+    const rowKey = `hd2_servicePeriod_row${rowIdx + 1}`;
+    const cell = targetForm.querySelector(`[data-mapping="${rowKey}"] .form-area-cell`);
+    if (cell) {
+      cell.innerText = resolveFormFieldValue(rowKey, currentApp, docNo, todayStr);
+    }
+
+    // 예상사용시간 즉시 업데이트
+    const usageCell = targetForm.querySelector(`[data-mapping="hd2_expectedUsageTime"] .form-area-cell`);
+    if (usageCell) {
+      usageCell.innerText = resolveFormFieldValue('hd2_expectedUsageTime', currentApp, docNo, todayStr);
+    }
   }
 
   // 상단 합계 배지 즉시 업데이트
@@ -18587,7 +18679,12 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
     }
     case 'hd2_caregiverNameBirth': {
       const cgInfo = getHdForm02CaregiverInfo(app);
-      return cgInfo.birth ? `${cgInfo.name} (${cgInfo.birth})` : cgInfo.name;
+      const safeB = (cgInfo.birth && !String(cgInfo.birth).includes('교체')) ? cgInfo.birth : '';
+      return safeB ? `${cgInfo.name} (${safeB})` : cgInfo.name;
+    }
+    case 'caregiverBirth': {
+      const b = getHdForm02CaregiverInfo(app).birth || '';
+      return (b && String(b).includes('교체')) ? '' : b;
     }
     case 'hd2_caregiverPhone': {
       const cgInfo = getHdForm02CaregiverInfo(app);
@@ -19080,15 +19177,15 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                   <label class="block text-[10px] font-bold text-slate-500 mb-0.5">간병인 성명</label>
                   <input type="text" id="hd2_top_caregiverName" value="${cgInfo.name || ''}"
                          oninput="reflectHdForm02FieldLive('caregiverName', this.value, '${app.id}')"
-                         onchange="updateHdForm02Field('caregiverName', this.value, true, '${app.id}')"
+                         onchange="updateHdForm02Field('caregiverName', this.value, false, '${app.id}')"
                          class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs focus:ring-1 focus:ring-blue-500"
                          placeholder="성명 (예: 신금자)">
                 </div>
                 <div>
                   <label class="block text-[10px] font-bold text-slate-500 mb-0.5">간병인 생년월일 (8자리)</label>
-                  <input type="text" id="hd2_top_caregiverBirth" value="${cgInfo.birth || ''}"
+                  <input type="text" id="hd2_top_caregiverBirth" value="${(cgInfo.birth && !String(cgInfo.birth).includes('교체')) ? cgInfo.birth : ''}"
                          oninput="reflectHdForm02FieldLive('caregiverBirth', this.value, '${app.id}')"
-                         onchange="updateHdForm02Field('caregiverBirth', this.value, true, '${app.id}')"
+                         onchange="updateHdForm02Field('caregiverBirth', this.value, false, '${app.id}')"
                          class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs font-mono focus:ring-1 focus:ring-blue-500"
                          placeholder="YYYYMMDD (예: 19680512)">
                 </div>
@@ -19096,7 +19193,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                   <label class="block text-[10px] font-bold text-slate-500 mb-0.5">간병인 연락처</label>
                   <input type="text" id="hd2_top_caregiverPhone" value="${cgInfo.phone || ''}"
                          oninput="reflectHdForm02FieldLive('caregiverPhone', this.value, '${app.id}')"
-                         onchange="updateHdForm02Field('caregiverPhone', this.value, true, '${app.id}')"
+                         onchange="updateHdForm02Field('caregiverPhone', this.value, false, '${app.id}')"
                          class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded font-bold text-xs font-mono focus:ring-1 focus:ring-blue-500"
                          placeholder="010-0000-0000">
                 </div>
@@ -19117,10 +19214,10 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                   return `
                     <div class="flex items-center gap-1.5 text-xs">
                       <span class="w-8 text-center text-[10px] font-black text-slate-500 bg-slate-100 py-1 rounded flex-shrink-0">${idx + 1}행</span>
-                      <input type="text" value="${row.start || ''}" placeholder="시작: 2026. 09. 21 (09)h (00)m" oninput="reflectHdForm02ServicePeriodLive(${idx}, 'start', this.value, '${app.id}')" onchange="updateHdForm02ServicePeriod(${idx}, 'start', this.value, '${app.id}', true)" class="flex-1 px-2 py-1 text-[11px] font-mono border border-slate-200 rounded focus:border-blue-500">
+                      <input type="text" id="hd2_period_start_${idx}" value="${row.start || ''}" placeholder="시작: 2026. 09. 21 (09)h (00)m" oninput="reflectHdForm02ServicePeriodLive(${idx}, 'start', this.value, '${app.id}')" onchange="updateHdForm02ServicePeriod(${idx}, 'start', this.value, '${app.id}', false)" class="flex-1 px-2 py-1 text-[11px] font-mono border border-slate-200 rounded focus:border-blue-500">
                       <span class="text-slate-400 font-bold">~</span>
-                      <input type="text" value="${row.end || ''}" placeholder="종료: 2026. 09. 30 (18)h (00)m" oninput="reflectHdForm02ServicePeriodLive(${idx}, 'end', this.value, '${app.id}')" onchange="updateHdForm02ServicePeriod(${idx}, 'end', this.value, '${app.id}', true)" class="flex-1 px-2 py-1 text-[11px] font-mono border border-slate-200 rounded focus:border-blue-500">
-                      <input type="text" value="${row.days || ''}" placeholder="10일" oninput="reflectHdForm02ServicePeriodLive(${idx}, 'days', this.value, '${app.id}')" onchange="updateHdForm02ServicePeriod(${idx}, 'days', this.value, '${app.id}', true)" class="w-16 px-1.5 py-1 text-[11px] font-bold text-center border border-slate-200 rounded focus:border-blue-500 flex-shrink-0">
+                      <input type="text" id="hd2_period_end_${idx}" value="${row.end || ''}" placeholder="종료: 2026. 09. 30 (18)h (00)m" oninput="reflectHdForm02ServicePeriodLive(${idx}, 'end', this.value, '${app.id}')" onchange="updateHdForm02ServicePeriod(${idx}, 'end', this.value, '${app.id}', false)" class="flex-1 px-2 py-1 text-[11px] font-mono border border-slate-200 rounded focus:border-blue-500">
+                      <input type="text" id="hd2_period_days_${idx}" value="${row.days || ''}" placeholder="10일" oninput="reflectHdForm02ServicePeriodLive(${idx}, 'days', this.value, '${app.id}')" onchange="updateHdForm02ServicePeriod(${idx}, 'days', this.value, '${app.id}', false)" class="w-16 px-1.5 py-1 text-[11px] font-bold text-center border border-slate-200 rounded focus:border-blue-500 flex-shrink-0">
                     </div>
                   `;
                 }).join('')}
@@ -19295,7 +19392,7 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                   <div class="flex items-center gap-1">
                     <input type="text" id="hd2_tbl_caregiverName" value="${cgInfo.name || ''}" oninput="reflectHdForm02FieldLive('caregiverName', this.value, '${app.id}')" onchange="updateHdForm02Field('caregiverName', this.value, false, '${app.id}')" class="w-24 px-1.5 py-0.5 border border-slate-300 rounded font-bold text-xs" placeholder="성명">
                     <span>(</span>
-                    <input type="text" id="hd2_tbl_caregiverBirth" value="${cgInfo.birth || ''}" oninput="reflectHdForm02FieldLive('caregiverBirth', this.value, '${app.id}')" onchange="updateHdForm02Field('caregiverBirth', this.value, false, '${app.id}')" class="w-24 px-1.5 py-0.5 border border-slate-300 rounded font-mono text-xs" placeholder="생년월일 8자리">
+                    <input type="text" id="hd2_tbl_caregiverBirth" value="${(cgInfo.birth && !String(cgInfo.birth).includes('교체')) ? cgInfo.birth : ''}" oninput="reflectHdForm02FieldLive('caregiverBirth', this.value, '${app.id}')" onchange="updateHdForm02Field('caregiverBirth', this.value, false, '${app.id}')" class="w-24 px-1.5 py-0.5 border border-slate-300 rounded font-mono text-xs" placeholder="생년월일 8자리">
                     <span>)</span>
                   </div>
                 </td>
@@ -37545,6 +37642,14 @@ function initData() {
       if (savedRaw) gCarePortRawLogs = JSON.parse(savedRaw);
       const savedGroups = localStorage.getItem('LIVON_CAREPORT_GROUPS');
       if (savedGroups) gCarePortPatientGroups = JSON.parse(savedGroups);
+      const savedSyncTime = localStorage.getItem('LIVON_CAREPORT_LAST_SYNC_TIME');
+      if (savedSyncTime) {
+        window._cachedCarePortSyncTime = savedSyncTime;
+        ['carePortSyncTimeBadge', 'carePortSyncTimeBadge_new'].forEach(id => {
+          const b = document.getElementById(id);
+          if (b) b.innerText = `최근 동기화: 오늘 ${savedSyncTime}`;
+        });
+      }
     } catch (e) {
       gCareLogs = [...window.REBORN_DATA.careLogs];
     }
@@ -38657,7 +38762,12 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
     } else {
       renderCareLogs();
     }
-    if (!gCarePortPatientGroups || gCarePortPatientGroups.length === 0) {
+    if (typeof updateCarePortSyncBadgeUI === 'function') {
+      updateCarePortSyncBadgeUI();
+    }
+    // 탭 진입 시 전산 동기화 보장 (최근 20초 이내 동기화 완료 건이 아니거나 진행 중이 아니면 자동 최신화)
+    const lastSync = window._lastCarePortSyncTime || 0;
+    if (!window._isCarePortSyncRunning && (Date.now() - lastSync > 20000 || !gCarePortPatientGroups || gCarePortPatientGroups.length === 0)) {
       syncCarePortLogs(false);
     }
   }
@@ -42117,6 +42227,10 @@ function renderCareLogs() {
     : (document.getElementById('careLogInsuranceFilter') || document.getElementById('careLogInsuranceFilter_new'));
   const insFilter = insSelect?.value || '삼성화재';
 
+  if (typeof updateCarePortSyncBadgeUI === 'function') {
+    updateCarePortSyncBadgeUI();
+  }
+
   // Always build fresh patient groups so accurate dates and statuses are immediately reflected
   if (window.CarePortClient && typeof window.CarePortClient.groupLogsByPatient === 'function') {
     const rawLogs = (gCarePortRawLogs && gCarePortRawLogs.length > 0) ? gCarePortRawLogs : (gCareLogs || []);
@@ -42622,7 +42736,34 @@ function toggleCareLogSelectAll(checked) {
   });
 }
 
+function updateCarePortSyncBadgeUI(customText = null) {
+  const timeBadges = [document.getElementById('carePortSyncTimeBadge'), document.getElementById('carePortSyncTimeBadge_new')].filter(Boolean);
+  const syncIcons = [document.getElementById('carePortSyncIcon'), document.getElementById('carePortSyncIcon_new')].filter(Boolean);
+  
+  if (window._isCarePortSyncRunning) {
+    timeBadges.forEach(b => { b.innerText = '전산 동기화 진행 중...'; });
+    syncIcons.forEach(i => { i.classList.add('animate-spin'); });
+    return;
+  }
+  
+  let text = customText;
+  if (!text) {
+    const cached = window._cachedCarePortSyncTime || localStorage.getItem('LIVON_CAREPORT_LAST_SYNC_TIME');
+    text = cached ? `최근 동기화: 오늘 ${cached}` : '최근 동기화: 전산 연결됨';
+  }
+  timeBadges.forEach(b => { b.innerText = text; });
+  syncIcons.forEach(i => { i.classList.remove('animate-spin'); });
+}
+window.updateCarePortSyncBadgeUI = updateCarePortSyncBadgeUI;
+
 async function syncCarePortLogs(isManual = false) {
+  if (window._isCarePortSyncRunning) {
+    console.log('[CarePort] 이미 전산 동기화가 진행 중입니다.');
+    return;
+  }
+  window._isCarePortSyncRunning = true;
+  window._lastCarePortSyncTime = Date.now();
+
   const syncBtns = [document.getElementById('btnSyncCarePort'), document.getElementById('btnSyncCarePort_new')].filter(Boolean);
   const syncIcons = [document.getElementById('carePortSyncIcon'), document.getElementById('carePortSyncIcon_new')].filter(Boolean);
   const timeBadges = [document.getElementById('carePortSyncTimeBadge'), document.getElementById('carePortSyncTimeBadge_new')].filter(Boolean);
@@ -42705,6 +42846,10 @@ async function syncCarePortLogs(isManual = false) {
     timeBadges.forEach(badge => {
       badge.innerText = `최근 동기화: 오늘 ${timeStr}`;
     });
+    try {
+      localStorage.setItem('LIVON_CAREPORT_LAST_SYNC_TIME', timeStr);
+      window._cachedCarePortSyncTime = timeStr;
+    } catch (e) {}
 
     renderCareLogs();
     if (typeof renderCurrentSamsungSheet === 'function' && (gActiveTab === 'samsungclaimhub' || gActiveTab === 'samsunglist' || gActiveTab === 'samsungleads' || gActiveTab === 'samsung')) {
@@ -42729,6 +42874,7 @@ async function syncCarePortLogs(isManual = false) {
       alert('케어포트 전산 동기화 실패: ' + err.message);
     }
   } finally {
+    window._isCarePortSyncRunning = false;
     syncBtns.forEach(btn => {
       btn.disabled = false;
       btn.classList.remove('opacity-75');
