@@ -2740,6 +2740,29 @@ function saveSavedFaxConfig(cfg) {
       }
     }
 
+    // CarePort Embed & Assets Proxy for authentic in-browser rendering
+    if (reqPath === '/careport-embed' || reqPath.startsWith('/careport-embed/') || reqPath.startsWith('/js/') || reqPath.startsWith('/css/') || reqPath.startsWith('/img/') || reqPath.startsWith('/fonts/')) {
+      const targetPath = (reqPath === '/careport-embed' || reqPath.startsWith('/careport-embed/'))
+        ? (reqPath.replace('/careport-embed', '') || '/')
+        : reqPath;
+      const proxyReq = https.request(`https://careport.livon.care${targetPath}`, {
+        method: req.method,
+        headers: {
+          ...req.headers,
+          host: 'careport.livon.care'
+        }
+      }, proxyRes => {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        proxyRes.pipe(res);
+      });
+      proxyReq.on('error', (err) => {
+        res.writeHead(502, { 'Content-Type': 'text/plain' });
+        res.end('Proxy error: ' + err.message);
+      });
+      req.pipe(proxyReq);
+      return;
+    }
+
     if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
     if (reqPath === '/care-diary' || reqPath === '/report' || reqPath.startsWith('/d/')) {
       reqPath = '/mobile-care-diary.html';

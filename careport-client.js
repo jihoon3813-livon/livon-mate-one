@@ -1090,14 +1090,14 @@
         xLabelsSvg += `<text x="${x}" y="${height - 6}" font-size="11" font-weight="600" fill="#8b959c" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif">${label}</text>`;
       });
       
-      // 5 lines matching CarePort statusChartData:
-      // 1: 총합상태 #06C8BB, 2: 거동능력 #2BBB77, 3: 식사상태 #F4A61E, 4: 수면상태 #6366f1, 5: 통증수준 #FE6FB0 (dash [7,4])
+      // 5 lines matching CarePort statusChartData (Chunk 832):
+      // 1: 종합상태 #13bdb5, 2: 거동능력 #2bb678, 3: 식사상태 #f59b0b, 4: 수면상태 #6366f1, 5: 통증수준 #f43f5e
       const lines = [
-        { key: 'overallScore', color: '#06C8BB', dash: '', r: 4.5, w: 2.8 },
-        { key: 'mobilityScore', color: '#2BBB77', dash: '', r: 4.5, w: 2.8 },
-        { key: 'dietScore', color: '#F4A61E', dash: '', r: 4.5, w: 2.8 },
-        { key: 'sleepScore', color: '#6366f1', dash: '', r: 4.5, w: 2.8 },
-        { key: 'painScore', color: '#FE6FB0', dash: 'stroke-dasharray="7,4"', r: 4.5, w: 2.8 }
+        { key: 'overallScore', color: '#13bdb5', dash: '', r: 5.5, w: 2.5 },
+        { key: 'mobilityScore', color: '#2bb678', dash: '', r: 5.5, w: 2.5 },
+        { key: 'dietScore', color: '#f59b0b', dash: '', r: 5.5, w: 2.5 },
+        { key: 'sleepScore', color: '#6366f1', dash: '', r: 5.5, w: 2.5 },
+        { key: 'painScore', color: '#f43f5e', dash: '', r: 5.5, w: 2.5 }
       ];
       
       let linesSvg = '';
@@ -1597,11 +1597,21 @@
       `).join('');
 
       let trendChartHtml = '';
-      const trendList = (d.trendScores && d.trendScores.length > 0)
+      const curLogDate = (d.consultDate || '').slice(0, 10);
+      const curDayNum = d.careDayText ? parseInt(d.careDayText) : null;
+      let rawTrendList = (d.trendScores && d.trendScores.length > 0)
         ? d.trendScores
-        : ((patient && patient.trendScores && patient.trendScores.length > 0)
-          ? patient.trendScores
-          : ((detailData && detailData.trendScores && detailData.trendScores.length > 0) ? detailData.trendScores : []));
+        : ((detailData && detailData.trendScores && detailData.trendScores.length > 0)
+          ? detailData.trendScores
+          : ((patient && patient.trendScores && patient.trendScores.length > 0) ? patient.trendScores : []));
+
+      // 100% CarePort Chunk 832 loadTrendScores filter: only up to current day's careDate
+      const trendList = rawTrendList.filter((t, tIdx) => {
+        const tDate = (t.careDate || '').slice(0, 10);
+        if (tDate && curLogDate) return tDate <= curLogDate;
+        if (t.dayIndex != null && curDayNum != null) return Number(t.dayIndex) <= Number(curDayNum);
+        return tIdx === 0;
+      });
       trendChartHtml = this.generateTrendChartSvg(trendList, 714, 175);
 
       return `<!DOCTYPE html>

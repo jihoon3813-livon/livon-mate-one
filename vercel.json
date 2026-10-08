@@ -8,6 +8,30 @@
   },
   "rewrites": [
     {
+      "source": "/careport-embed",
+      "destination": "https://careport.livon.care/"
+    },
+    {
+      "source": "/careport-embed/:path*",
+      "destination": "https://careport.livon.care/:path*"
+    },
+    {
+      "source": "/js/:path*",
+      "destination": "https://careport.livon.care/js/:path*"
+    },
+    {
+      "source": "/css/:path*",
+      "destination": "https://careport.livon.care/css/:path*"
+    },
+    {
+      "source": "/img/:path*",
+      "destination": "https://careport.livon.care/img/:path*"
+    },
+    {
+      "source": "/fonts/:path*",
+      "destination": "https://careport.livon.care/fonts/:path*"
+    },
+    {
       "source": "/audio/stream/:encoded.mp3",
       "destination": "/api/carecall/turn-audio?encoded=:encoded"
     },
