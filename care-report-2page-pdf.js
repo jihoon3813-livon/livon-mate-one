@@ -552,7 +552,7 @@ function renderSingleDayReportPages({
             <span style="width: 3px; height: 3px; border-radius: 50%; background: #cbd5e1;"></span>
           </div>
           <!-- 카드 본체 -->
-          <div style="flex: 1; width: 100%; background: #fafafa; border: 1.5px dashed #e2e8f0; border-radius: 16px; padding: 18px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.01); display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box;">
+          <div style="flex: 1; width: 100%; background: #fafafa; border: 1.5px dashed #e2e8f0; border-radius: 16px; padding: 18px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.01); display: flex; flex-direction: column; justify-content: flex-start; box-sizing: border-box;">
             <div>
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
                 <span style="font-size: 15px; font-weight: 800; color: #94a3b8;">${c.date}</span>
@@ -560,7 +560,7 @@ function renderSingleDayReportPages({
               </div>
               <div style="font-size: 14px; font-weight: 800; color: #94a3b8; margin-bottom: 8px; line-height: 1.35; word-break: keep-all;">간병 진행 전</div>
             </div>
-            <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e2e8f0;">
+            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0;">
               <div style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin-bottom: 4px; word-break: keep-all;">${c.line1}</div>
               <div style="font-size: 12px; color: #cbd5e1; line-height: 1.5; word-break: keep-all;">${c.line2}</div>
             </div>
@@ -575,8 +575,8 @@ function renderSingleDayReportPages({
         <div style="position: absolute; top: -19px; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; border-radius: 50%; background: ${c.isLatest ? '#e11d48' : '#ffffff'}; border: 2.5px solid ${c.isLatest ? '#fecdd3' : '#fb7185'}; z-index: 3; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center;">
           ${c.isLatest ? '<span style="width: 4px; height: 4px; border-radius: 50%; background: #ffffff;"></span>' : ''}
         </div>
-        <!-- 카드 박스 (모든 박스 높이 완벽 동일: flex: 1 & stretch) -->
-        <div style="flex: 1; width: 100%; background: ${c.isLatest ? '#fff5f7' : '#ffffff'}; border: 1.5px solid ${c.isLatest ? '#fecdd3' : '#f1f5f9'}; border-radius: 16px; padding: 18px 16px; min-height: 145px; box-shadow: 0 1px 4px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box;">
+        <!-- 카드 박스 (모든 박스 높이 완벽 동일: flex: 1 & stretch, 서술 텍스트는 상단 정렬) -->
+        <div style="flex: 1; width: 100%; background: ${c.isLatest ? '#fff5f7' : '#ffffff'}; border: 1.5px solid ${c.isLatest ? '#fecdd3' : '#f1f5f9'}; border-radius: 16px; padding: 18px 16px; min-height: 145px; box-shadow: 0 1px 4px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: flex-start; box-sizing: border-box;">
           <div>
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
               <span style="font-size: 14px; font-weight: 800; color: ${c.isLatest ? '#e11d48' : '#334155'};">${c.date}</span>

@@ -741,7 +741,7 @@ function buildTimelineCardsHtml(records, dayIdx) {
   const cardsHtml = timelineCardsData.map((c) => {
     if (!c.hasData) {
       return `
-        <div style="flex: 1; min-width: 0; background: #fafafa; border: 1.5px dashed #e2e8f0; border-radius: 14px; padding: 14px 12px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div style="flex: 1; min-width: 0; background: #fafafa; border: 1.5px dashed #e2e8f0; border-radius: 14px; padding: 14px 12px; display: flex; flex-direction: column; justify-content: flex-start;">
           <div>
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
               <span style="font-size: 13.5px; font-weight: 800; color: #94a3b8;">${c.date}</span>
@@ -758,7 +758,7 @@ function buildTimelineCardsHtml(records, dayIdx) {
     }
 
     return `
-      <div ${c.recordIndex >= 0 ? `onclick="selectDate(${c.recordIndex})"` : ''} style="flex: 1; min-width: 0; background: ${c.isLatest ? '#fff5f7' : '#ffffff'}; border: 1.5px solid ${c.isLatest ? '#fecdd3' : '#f1f5f9'}; border-radius: 14px; padding: 14px 12px; display: flex; flex-direction: column; justify-content: space-between; cursor: ${c.recordIndex >= 0 ? 'pointer' : 'default'}; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+      <div ${c.recordIndex >= 0 ? `onclick="selectDate(${c.recordIndex})"` : ''} style="flex: 1; min-width: 0; background: ${c.isLatest ? '#fff5f7' : '#ffffff'}; border: 1.5px solid ${c.isLatest ? '#fecdd3' : '#f1f5f9'}; border-radius: 14px; padding: 14px 12px; display: flex; flex-direction: column; justify-content: flex-start; cursor: ${c.recordIndex >= 0 ? 'pointer' : 'default'}; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
         <div>
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
             <span style="font-size: 13.5px; font-weight: 800; color: ${c.isLatest ? '#e11d48' : '#334155'};">${c.date}</span>
