@@ -80,47 +80,55 @@ function mapMobileScoreAndState(type, comment, score) {
   const cLower = c.toLowerCase();
 
   if (type === 'meal') {
-    if (/거의 못|거부|못 하|못하|못 드|못드|결식|식욕 부진/.test(cLower) || (score != null && score <= 1)) {
+    // 0: 못함/금식, 1: 부족/보조, 2: 양호
+    if (/거의 못|거부|못 하|못하|못 드|못드|결식|식욕 부진|금식/.test(cLower) || (score != null && score <= 1)) {
       return { score: 0, state: c || '식사 거의 못함' };
     }
-    if (/부족|적음|부진|절반|소량|죽만|주의|남김|1\/2|2\/3|반공기/.test(cLower) || score === 2 || score === 3) {
-      return { score: 1, state: c || '식사량 부족' };
+    if (/부족|적음|부진|절반|소량|죽만|주의|남김|1\/2|2\/3|반\s*공기|보조|도움|도와/.test(cLower) || score === 2 || score === 3) {
+      return { score: 1, state: c || '식사량 부족·보조' };
     }
     return { score: 2, state: c || '식사 잘 하심' };
   }
 
   if (type === 'mobility') {
-    if (/어려움|어려|불가|침상|누워|불편|낙상 우려|마비/.test(cLower) || (score != null && score <= 2)) {
+    // 긍정적 자립 보행 문구 우선 처리 (부정어 방지: '불편함 없음' 등)
+    if (/불편(?:함)?\s*없음|문제\s*없음|무리\s*없음|자력|독립|스스로|활발|산책|운동 원활|보행 가능|잘 걸|잘 움직/.test(cLower)) {
+      return { score: 2, state: c || '거동 무리 없음' };
+    }
+    if (/어려움|어려|불가|침상|누워|낙상 우려|마비|움직임 전혀 없음/.test(cLower) || (score != null && score <= 2)) {
       return { score: 0, state: c || '거동 어려움' };
     }
-    if (/부축|보조|휠체어|워커|주의|개선 중|도움/.test(cLower) || score === 3) {
+    if (/부축|보조|휠체어|워커|주의|개선 중|도움|활동량 감소|정보 미제공|동행|화장실 이동/.test(cLower) || score === 3) {
       return { score: 1, state: c || '부축 필요' };
     }
     return { score: 2, state: c || '거동 무리 없음' };
   }
 
   if (type === 'sleep') {
-    if (/불량|자주 깸|각성|불면|어려움|설침|천식|기침/.test(cLower) || (score != null && score <= 2)) {
+    // 0: 수면 불량, 1: 수면 관찰, 2: 수면 양호
+    if (/불량|자주 깸|각성|불면|어려움|설침|천식|기침|땀을 많이/.test(cLower) || (score != null && score <= 2)) {
       return { score: 0, state: c || '수면 불량' };
     }
-    if (/확인 필요|미확인|특이사항 없음|언급 없음/.test(cLower) || !c) {
-      return { score: null, state: c || '확인 필요' };
+    if (/수면제|약 복용|감기약|주의|정보 미제공|새벽에 화장실|새벽 시간|확인 필요|모니터링/.test(cLower) || score === 3) {
+      return { score: 1, state: c || '수면 관찰' };
     }
-    if (/수면제|약 복용|주의/.test(cLower) || score === 3) {
-      return { score: 1, state: c || '중간 상태' };
+    if (/수면 양호|잘 주무|푹 주무|안정적|편안|숙면|기록 있음/.test(cLower) || (score != null && score >= 4)) {
+      return { score: 2, state: c || '수면 양호' };
     }
-    return { score: 2, state: c || '수면 양호' };
+    // 평온한 밤(특이사항 없음/언급 없음)은 안정적 수면(2)으로 연속선 유지
+    return { score: 2, state: c || '수면 안정' };
   }
 
   if (type === 'pain') {
-    if (/호소|극심|심함|통증 있음|수술 후 통증|골절|아픔|복통/.test(cLower) || (score != null && score <= 2)) {
+    // '통증 호소 없음', '불편감 없음' 등 긍정 부정어 우선 처리
+    if (/없음|호소\s*없음|불편(?:감)?\s*없음|이상\s*없음|무|통증\s*감소/.test(cLower) || (score != null && score >= 4)) {
+      return { score: 0, state: c || '특별한 통증 없음' };
+    }
+    if (/극심|심함|수술 후 통증|골절|아픔|복통/.test(cLower) || (score != null && score <= 2)) {
       return { score: 2, state: c || '통증 호소' };
     }
-    if (/관리|경미|주의|약간|불편/.test(cLower) || (score === 3 && !/없음|안정/.test(cLower))) {
-      return { score: 1, state: c || '통증 관리 필요' };
-    }
-    if (/없음|안정|호소 없음|무/.test(cLower) || (score != null && score >= 4)) {
-      return { score: 0, state: c || '특별한 통증 없음' };
+    if (/호소|관리|경미|주의|약간|불편|얼음\s*찜질|물수건|체온 조절|열이 나|발 마사지|미열/.test(cLower) || score === 3) {
+      return { score: 1, state: c || '통증·미열 관리' };
     }
     return { score: 0, state: c || '특별한 통증 없음' };
   }
@@ -173,7 +181,7 @@ async function fetchPatientMobileReport(patientName) {
     }
   });
 
-  uniqueLogs.sort((a, b) => (a.consultDate || '').localeCompare(b.consultDate || ''));
+  uniqueLogs.sort((a, b) => new Date(a.consultDate || '').getTime() - new Date(b.consultDate || '').getTime());
 
   // 2. Fetch latest session detail (has trendScores for entire schedule)
   const lastLog = uniqueLogs[uniqueLogs.length - 1];
@@ -246,25 +254,94 @@ async function fetchPatientMobileReport(patientName) {
 
   await Promise.all(detailFetches);
 
-  // 4. Map into Mobile Report Records
+  // 4. Map into Mobile Report Records with dual-format parsing (신형 & 구형 케어포트 일지)
   const records = uniqueLogs.map((l, idx) => {
     const cDate = (l.consultDate || '').slice(0, 10);
     const dateStr = cDate.slice(5).replace('-', '.');
     const t = trendMap[cDate] || tsList.find(x => x.dayIndex === (idx + 1));
     const d = detailCache[l.sessionId] || {};
     const raw = d.raw || {};
+    const rep = raw.consult_report || {};
+    const chk = Array.isArray(raw.checkboxes) ? raw.checkboxes : [];
+    const sum = (d.summary || raw.consult_summary || l.title || '').trim();
 
-    const mealComment = t?.dietComment || raw.categories?.diet?.comment || raw.care_log?.diet_nutrition || raw.guardian_notes?.diet || '식사 잘 하심';
-    const mealScore = t?.dietScore != null ? t.dietScore : (raw.trend_scores?.diet || 4);
+    // 1) 식사 (Meal)
+    let mealComment = t?.dietComment || raw.categories?.diet?.comment || raw.care_log?.diet_nutrition || raw.guardian_notes?.diet;
+    let mealScore = t?.dietScore != null ? t.dietScore : raw.trend_scores?.diet;
+    if (!mealComment) {
+      const repKey = Object.keys(rep).find(k => /식사|영양|식단|음료/.test(k));
+      if (repKey) mealComment = rep[repKey];
+      const chkItem = chk.find(c => /식사|영양/.test(c.name));
+      if (chkItem) {
+        mealScore = (chkItem.result === '0' || chkItem.result === 0) ? 2 : 4;
+      }
+      if (!mealComment && /금식|죽\s*반|식사량|식사 보조|식사 도움/.test(sum)) {
+        mealComment = sum.slice(0, 80);
+      }
+    }
+    if (!mealComment) mealComment = '식사 잘 하심';
+    if (mealScore == null) mealScore = 4;
 
-    const mobComment = t?.mobilityComment || raw.categories?.mobility?.comment || raw.care_log?.mobility_activity || raw.guardian_notes?.activity || '거동 무리 없음';
-    const mobScore = t?.mobilityScore != null ? t.mobilityScore : (raw.trend_scores?.mobility || 4);
+    // 2) 거동 (Mobility)
+    let mobComment = t?.mobilityComment || raw.categories?.mobility?.comment || raw.care_log?.mobility_activity || raw.guardian_notes?.activity;
+    let mobScore = t?.mobilityScore != null ? t.mobilityScore : raw.trend_scores?.mobility;
+    if (!mobComment) {
+      const repKey = Object.keys(rep).find(k => /거동|이동|운동|신체 활동/.test(k));
+      if (repKey) mobComment = rep[repKey];
+      const chkItem = chk.find(c => /운동 및 이동성/.test(c.name));
+      if (chkItem) {
+        const val = parseInt(chkItem.result, 10);
+        if (!isNaN(val)) {
+          if (val <= 40) mobScore = 2; // bad
+          else if (val <= 65) mobScore = 3; // caution
+          else mobScore = 5; // good
+        }
+      }
+      const chkMove = chk.find(c => /이동 지원/.test(c.name));
+      if (chkMove && (chkMove.result === '1' || chkMove.result === 1)) {
+        mobScore = 3;
+      }
+      if (!mobComment && /화장실 이동|화장실 동행|부축|자력으로|걷기|보행/.test(sum)) {
+        mobComment = sum.slice(0, 80);
+      }
+    }
+    if (!mobComment) mobComment = '거동 무리 없음';
+    if (mobScore == null) mobScore = 4;
 
-    const slpComment = t?.sleepComment || raw.categories?.sleep?.comment || raw.guardian_notes?.sleep || '수면 기록 있음';
-    const slpScore = t?.sleepScore != null ? t.sleepScore : (raw.trend_scores?.sleep || 4);
+    // 3) 수면 (Sleep)
+    let slpComment = t?.sleepComment || raw.categories?.sleep?.comment || raw.guardian_notes?.sleep;
+    let slpScore = t?.sleepScore != null ? t.sleepScore : raw.trend_scores?.sleep;
+    if (!slpComment) {
+      const repKey = Object.keys(rep).find(k => /수면|잠|취침|야간/.test(k));
+      if (repKey) slpComment = rep[repKey];
+      if (/땀을 많이|스트레스|자주 깸|불면|잠을 못/.test(sum)) {
+        slpScore = 2;
+        slpComment = '새벽 시간 불편 호소';
+      } else if (/새벽에 화장실|새벽 시간|약물 복용|감기약/.test(sum)) {
+        slpScore = 3;
+        slpComment = '수면 상태 모니터링';
+      } else {
+        slpScore = 4;
+        slpComment = '수면 양호';
+      }
+    }
+    if (slpScore == null) slpScore = 4;
 
-    const painComment = t?.painComment || raw.categories?.pain?.comment || raw.guardian_notes?.pain || '특별한 통증 없음';
-    const painScore = t?.painScore != null ? t.painScore : (raw.trend_scores?.pain || 5);
+    // 4) 통증 및 체온 관리 (Pain / Temperature)
+    let painComment = t?.painComment || raw.categories?.pain?.comment || raw.guardian_notes?.pain;
+    let painScore = t?.painScore != null ? t.painScore : raw.trend_scores?.pain;
+    if (!painComment) {
+      const repKey = Object.keys(rep).find(k => /체온|열|통증|찜질|수술|상처|마사지/.test(k));
+      if (repKey) painComment = rep[repKey];
+      if (/얼음\s*찜질|물수건|열이 나|팔 부위|발 마사지|미열/.test(sum + ' ' + (painComment || ''))) {
+        painScore = 3; // 관리 필요
+        if (!painComment) painComment = '체온 조절 및 얼음찜질 지원';
+      } else {
+        painScore = 5;
+        if (!painComment) painComment = '특별한 통증 없음';
+      }
+    }
+    if (painScore == null) painScore = 5;
 
     const m = mapMobileScoreAndState('meal', mealComment, mealScore);
     const mob = mapMobileScoreAndState('mobility', mobComment, mobScore);
@@ -274,25 +351,27 @@ async function fetchPatientMobileReport(patientName) {
     const gNotes = raw.guardian_notes || {};
     const cLog = raw.care_log || {};
 
+    const cleanText = (str) => (str || '').replace(/돌봄/g, '간병');
+
     return {
       date: dateStr,
-      overall: t?.overallComment || raw.overall_status?.comment || l.title || '일상 지원 및 환자 상태 점검',
+      overall: cleanText(t?.overallComment || raw.overall_status?.comment || l.title || '일상 지원 및 환자 상태 점검'),
       scores: [m.score, mob.score, s.score, p.score],
-      states: [m.state, mob.state, s.state, p.state],
+      states: [cleanText(m.state), cleanText(mob.state), cleanText(s.state), cleanText(p.state)],
       care: [
-        cLog.diet_nutrition || '정규 식사 제공 및 수분 섭취 지원',
-        cLog.hygiene || '구강 청결 및 환의·침구 정돈',
-        cLog.mobility_activity || '실내 보행 시 밀착 부축으로 낙상 예방',
-        cLog.health_management || '혈압, 맥박, 체온 측정 및 처방 약물 복용 확인',
-        cLog.emotional_support || '환자 심리적 안정 유도 및 안심 케어 상담'
+        cleanText(cLog.diet_nutrition || rep['영양 공급 및 관리'] || rep['식사 및 약물 보조 현황'] || '정규 식사 제공 및 수분 섭취 지원'),
+        cleanText(cLog.hygiene || rep['개인 위생 관리'] || rep['위생 관리 활동'] || '구강 청결 및 환의·침구 정돈'),
+        cleanText(cLog.mobility_activity || rep['신체 활동 및 운동 보조'] || rep['운동 및 활동 보조'] || '실내 보행 시 밀착 부축으로 낙상 예방'),
+        cleanText(cLog.health_management || rep['체온 조절 및 관리'] || rep['약물 투여 기록'] || rep['건강 체크 및 상태 보고'] || '혈압, 맥박, 체온 측정 및 처방 약물 복용 확인'),
+        cleanText(cLog.emotional_support || rep['정신적 지지 및 상담'] || rep['환자 정서 및 심리 지원'] || '환자 심리적 안정 유도 및 안심 케어 상담')
       ],
       family: [
-        gNotes.diet || '식사와 수분 섭취를 안정적으로 잘 하셨습니다.',
-        gNotes.sleep || '밤 사이 편안하게 휴식을 취하셨습니다.',
-        gNotes.activity || '활동이나 거동 시 부축을 받아 무리 없이 진행되었습니다.',
-        gNotes.pain || '특별한 통증이나 극심한 불편 호소는 없었습니다.',
-        gNotes.excretion || '배변 및 배뇨 상태를 확인하였으며 양호합니다.',
-        gNotes.emotional || '심리적으로 평온하고 안정된 상태를 유지하셨습니다.'
+        cleanText(gNotes.diet || rep['영양 공급 및 관리'] || '식사와 수분 섭취를 안정적으로 잘 하셨습니다.'),
+        cleanText(gNotes.sleep || rep['수면 관리'] || '밤 사이 편안하게 휴식을 취하셨습니다.'),
+        cleanText(gNotes.activity || rep['신체 활동 및 운동 보조'] || rep['운동 및 활동 보조'] || '활동이나 거동 시 부축을 받아 무리 없이 진행되었습니다.'),
+        cleanText(gNotes.pain || rep['체온 조절 및 관리'] || rep['열 관리 및 검사 결과 확인'] || '특별한 통증이나 극심한 불편 호소는 없었습니다.'),
+        cleanText(gNotes.excretion || rep['배변 배뇨 관리'] || '배변 및 배뇨 상태를 확인하였으며 양호합니다.'),
+        cleanText(gNotes.emotional || rep['정신적 지지 및 상담'] || '심리적으로 평온하고 안정된 상태를 유지하셨습니다.')
       ]
     };
   });

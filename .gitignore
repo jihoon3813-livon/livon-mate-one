@@ -43,3 +43,5 @@ sample_*.png
 dev_robot_*.pdf
 test_capture_*.js
 test_classic_output.html
+hoon/
+scripts/

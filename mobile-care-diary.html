@@ -4,19 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#f47db8">
-  <title>케어 리포트 · LivOn</title>
-  <meta name="description" content="매일의 기록에서 돌봄의 변화를 읽는 모바일 간병 리포트">
+  <title>간병일지 · LivOn</title>
+  <meta name="description" content="매일의 기록에서 간병의 변화를 읽는 모바일 간병 리포트">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='10' fill='%23f47db8'/%3E%3Cpath d='M10 8v16h13' stroke='white' fill='none' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="mobile-care-diary.css?v=20261006_1615">
+  <link rel="stylesheet" href="mobile-care-diary.css?v=20261010_1420">
 </head>
 <body>
   <div class="layout">
-    <!-- Desktop Left Sidebar (데스크톱에서는 좌측 고정 표시, 모바일에서는 상단 '더보기' 버튼으로 바텀시트 호출) -->
+    <!-- Desktop Left Sidebar -->
     <aside class="desktop-side">
       <a class="logo" href="#overview">Liv<span>On</span><i></i></a>
-      <div class="side-label">PERSONAL CARE REPORT</div>
-      <h1>매일의 기록,<br>이어지는 돌봄.</h1>
-      <p class="side-desc">작은 변화까지 놓치지 않도록<br>하루의 돌봄을 함께 살펴보세요.</p>
+      <div class="side-label">AI CARE REPORT</div>
+      <h1>매일의 기록,<br>이어지는 간병.</h1>
+      <p class="side-desc">작은 변화까지 놓치지 않도록<br>하루의 간병을 함께 살펴보세요.</p>
       
       <div class="side-patient">
         <span class="initial patient-initial">고</span>
@@ -33,10 +33,11 @@
       </dl>
       
       <nav class="side-nav">
-        <a href="#overview">01 <span>오늘의 케어</span></a>
-        <a href="#trends">02 <span>상태 변화</span></a>
-        <a href="#record">03 <span>돌봄·관찰 기록</span></a>
-        <a href="#nextcare">04 <span>다음 확인사항</span></a>
+        <a href="#overview">01 <span>생활·건강 신호등</span></a>
+        <a href="#trends">02 <span>상태 변화 (캘린더)</span></a>
+        <a href="#timeline">03 <span>주요 변화 타임라인</span></a>
+        <a href="#careactions">04 <span>제공한 간병</span></a>
+        <a href="#family">05 <span>보호자에게 전하는 하루</span></a>
       </nav>
 
       <div class="sms-share-box" style="margin-top: 28px;">
@@ -69,9 +70,8 @@
     <!-- Right Mobile App Card / Mobile Screen Container -->
     <div class="mobile-app">
       <header class="topbar">
-        <a class="logo" href="#overview" aria-label="LivOn 케어 리포트">Liv<span>On</span><i></i></a>
+        <a class="logo" href="#overview" aria-label="LivOn 간병 리포트">Liv<span>On</span><i></i></a>
         <div class="top-actions">
-          <!-- 🔥 모바일 전용 "더보기" 버튼 (좌측 사이드바 환자정보 및 메뉴 바텀시트 열기) 🔥 -->
           <button class="mobile-more-btn" id="btn-side-more" aria-label="환자 정보 및 더보기" title="환자 정보 및 리포트 안내 더보기">
             <span data-icon="menu"></span>
             <span>더보기</span>
@@ -93,17 +93,17 @@
       <main>
         <!-- 01. Intro Section -->
         <div class="intro" id="overview">
-          <p class="eyebrow">DAILY CARE REPORT</p>
+          <p class="eyebrow" style="color: #e11d48; font-weight: 800;">LIVON AI 간병일지</p>
           <div class="title-row">
             <h1><span class="patient-name">고연분 님</span>의<br>하루를 전해드려요.</h1>
             <div class="day-seal">
               <b id="day-count">16</b>
-              <span>일째 돌봄</span>
+              <span>일째 간병</span>
             </div>
           </div>
           <div class="person-meta">
             <span class="patient-meta-text">66세 · 여성</span>
-            <span>담당 <b class="carer-name">권은지</b></span>
+            <span>담당 간병인 <b class="carer-name">권은지</b></span>
             <span><span class="side-care-period">09.17</span>부터</span>
           </div>
         </div>
@@ -122,162 +122,131 @@
 
         <!-- Daily Briefing & Status Grid -->
         <div id="daily-content" aria-live="polite">
-          <section class="summary-panel">
-            <div class="summary-top">
-              <span class="badge">오늘의 케어 브리핑</span>
-              <span id="summary-date"></span>
+          <!-- 오늘의 핵심 변화 배너 (PDF 1페이지 배너와 동일) -->
+          <section class="summary-panel" style="background: #fff8f8; border: 1.5px solid #ffe4e6; border-radius: 16px; padding: 16px 18px; margin-bottom: 20px;">
+            <div class="summary-top" style="margin-bottom: 6px;">
+              <span class="badge" style="background: #ffe4e6; color: #e11d48; font-weight: 800;">오늘의 핵심 변화</span>
+              <span id="summary-date" style="font-size: 11.5px; color: #94a3b8; font-weight: 600;"></span>
             </div>
-            <h2 id="summary-title"></h2>
-            <p id="summary-text"></p>
-            <div class="focus-line">
-              <span data-icon="eye"></span>
-              <div>
-                <small>이어서 살펴볼 부분</small>
-                <b id="focus-text"></b>
-              </div>
-            </div>
+            <h2 id="summary-title" style="font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 5px; letter-spacing: -0.4px;"></h2>
+            <p id="summary-text" style="font-size: 13px; color: #475569; line-height: 1.55; word-break: keep-all;"></p>
           </section>
 
+          <!-- 01 생활·건강 신호등 -->
           <div class="section-heading">
             <div>
-              <p class="eyebrow">TODAY AT A GLANCE</p>
+              <p class="eyebrow">01 생활·건강 신호등</p>
               <h2>생활과 건강, 한눈에</h2>
             </div>
-            <span class="caption">서술 기록 기준</span>
+            <span class="caption" id="traffic-date-caption">서술 기록 기준 요약</span>
           </div>
           <div class="status-grid" id="status-grid"></div>
+
+          <!-- 신호등 범례 (PDF와 동일) -->
+          <div class="legend-row" style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; margin-bottom: 24px; font-size: 11.5px; color: #64748b; padding: 0 4px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span> 양호 기록</span>
+              <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></span> 관찰 필요</span>
+              <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444;"></span> 즉시 확인</span>
+              <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #94a3b8;"></span> 미확인</span>
+            </div>
+            <div style="font-size: 11px; color: #94a3b8;">빨강은 이번 요약에 미적용</div>
+          </div>
         </div>
 
-        <!-- 02. Trends Section (식사, 거동, 수면, 통증) -->
+        <!-- 02. 상태 변화 (추이선 + 날짜별 상태 캘린더 매트릭스) -->
         <section id="trends" class="trend-section">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">CARE INSIGHT</p>
-              <h2>하루씩 이어지는 변화</h2>
+              <p class="eyebrow">02 상태 변화</p>
+              <h2 id="matrix-section-title">상태 변화</h2>
             </div>
-            <button class="text-button" id="chart-info" aria-label="추이 분류 기준">
-              분류 기준 <span data-icon="info"></span>
-            </button>
+            <span class="caption">추이선 + 날짜별 상태 캘린더</span>
           </div>
 
-          <div class="trend-card">
-            <div class="period-row">
-              <span id="chart-period"></span>
-              <div class="segmented" aria-label="그래프 조회 기간">
-                <button data-range="7" aria-pressed="true">7일</button>
-                <button data-range="16" aria-pressed="false">전체</button>
-              </div>
-            </div>
+          <div id="matrix-table-container"></div>
 
-            <div class="metric-tabs" role="tablist" aria-label="추이 항목" id="metric-tabs"></div>
-
-            <div id="metric-panel" role="tabpanel">
-              <div class="metric-head">
-                <div>
-                  <span id="chart-label"></span>
-                  <h3 id="chart-value"></h3>
-                </div>
-                <span class="metric-tag" id="chart-tag"></span>
-              </div>
-              <div class="chart-wrap">
-                <svg id="chart" viewBox="0 0 380 190" role="img"></svg>
-              </div>
-              <div class="chart-selected" id="chart-selected"></div>
-              <p class="micro-note">서술 내용의 분류이며, 의학적 점수나 측정값이 아닙니다.</p>
-            </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 10.5px; color: #94a3b8; padding: 0 2px;">
+            <div>회색(-): 미확인 · 추이선 연결 제외</div>
+            <div>높낮이는 서술 분류이며 수치 점수가 아닙니다.</div>
           </div>
-
-          <div class="insight-strip">
-            <span data-icon="spark"></span>
-            <p id="insight-text"></p>
+          <div style="font-size: 10px; color: #94a3b8; margin-top: 3px; padding: 0 2px;">
+            신호등과 그래프는 기록의 이해를 돕는 표현이며 의학적 중증도 판정이 아닙니다.
           </div>
         </section>
 
-        <!-- 03. Care Notes Record List -->
-        <section id="record">
+        <!-- 03. 주요 변화 타임라인 (최근 4일간의 기록) -->
+        <section id="timeline" class="timeline-section" style="margin-top: 32px;">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">DAILY CARE NOTES</p>
-              <h2>돌봄과 관찰의 기록</h2>
+              <p class="eyebrow">03 주요 변화 타임라인</p>
+              <h2>최근 4일간의 기록</h2>
             </div>
-            <button class="text-button" id="source">
-              원문 대조 <span data-icon="document"></span>
-            </button>
+            <span class="caption">일자별 간병 흐름</span>
           </div>
-          <div class="record-list" id="record-list"></div>
+
+          <div id="timeline-container"></div>
         </section>
 
-        <!-- Family Section -->
-        <section class="family-section">
+        <!-- 04. 제공한 간병과 대상자의 반응 -->
+        <section id="careactions" class="careactions-section" style="margin-top: 32px;">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">FOR YOUR FAMILY</p>
-              <h2>보호자에게 전하는 하루</h2>
+              <p class="eyebrow">04 제공한 간병과 대상자의 반응</p>
+              <h2>맞춤 간병 수행 내역</h2>
+            </div>
+            <span class="caption" style="font-size: 11px; color: #94a3b8;">가상 예시 · 실제 기록 아님</span>
+          </div>
+
+          <div id="careactions-container"></div>
+        </section>
+
+        <!-- 05. 보호자에게 전하는 하루 -->
+        <section id="family" class="family-section" style="margin-top: 32px;">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">05 보호자에게 전하는 하루</p>
+              <h2>안심 간병 일과 보고</h2>
             </div>
             <span class="round-icon" data-icon="message"></span>
           </div>
-          <div class="letter">
-            <span class="quote">“</span>
-            <p id="family-message"></p>
-            <div class="letter-sign">
-              <span class="mini-avatar patient-initial">권</span>
-              <span>
+
+          <div class="family-letter-card" id="family-letter-card" style="background: #fff8f8; border: 1.5px solid #ffe4e6; border-radius: 18px; padding: 18px 20px; position: relative;">
+            <div id="family-quote-title" style="font-size: 15.5px; font-weight: 800; color: #be185d; margin-bottom: 12px; line-height: 1.45;"></div>
+            <div id="family-quote-body" style="font-size: 13.5px; color: #1e293b; line-height: 2.0; word-break: keep-all;"></div>
+            <div class="family-quote-sign" style="display: flex; align-items: center; gap: 8px; border-top: 1px solid #ffe4e6; padding-top: 12px; margin-top: 14px;">
+              <span class="mini-avatar carer-initial patient-initial" style="width: 26px; height: 26px; border-radius: 6px; background: #e2e8f0; display: inline-flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 800; color: #475569;">권</span>
+              <span style="font-size: 12px; font-weight: 700; color: #334155;">
                 담당 간병인 <b class="carer-name">권은지</b>
-                <small>보호자 전달사항을 바탕으로 재구성</small>
+                <small style="color: #94a3b8; font-size: 10.5px; margin-left: 4px; font-weight: 400;">· 보호자 전달사항을 바탕으로 재구성</small>
               </span>
             </div>
           </div>
         </section>
 
-        <!-- 04. Next Care Continuity -->
-        <section id="nextcare">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">CONTINUITY OF CARE</p>
-              <h2>다음 돌봄을 위한 확인</h2>
-            </div>
-            <span class="soft-tag">제안 항목</span>
-          </div>
-          <p class="section-description">
-            오늘의 기록에서 도출한 확인사항입니다.<br>
-            실제 수행·확인 완료를 의미하지 않습니다.
-          </p>
-          <div class="follow-list" id="follow-list"></div>
-        </section>
-
-        <!-- Care Journey Milestones -->
-        <section class="journey-section">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">CARE JOURNEY</p>
-              <h2>주요 돌봄 기록 여정</h2>
-            </div>
-          </div>
-          <div class="journey" id="journey"></div>
-        </section>
-
-        <!-- Record Footer -->
-        <div class="record-footer">
+        <!-- Record Footer (PDF와 100% 동일한 근거 문구) -->
+        <div class="record-footer" style="margin-top: 36px;">
           <span data-icon="document"></span>
           <div>
-            <b>기록을 근거로, 돌봄을 더 선명하게.</b>
-            <p>케어포트 통합간병일지 · 2026.09.17~10.02</p>
+            <b>기록을 근거로, 간병을 더 선명하게.</b>
+            <p id="footer-source-text">케어포트 통합간병일지</p>
             <p>원본 서술을 재구성한 화면입니다. 미기록은 미확인으로 구분합니다.</p>
           </div>
         </div>
 
         <footer>
           <span class="logo">Liv<span>On</span><i></i></span>
-          <p>리본케어 · 모바일 케어 리포트</p>
+          <p>리본케어 · 모바일 간병 리포트</p>
         </footer>
       </main>
 
       <!-- Bottom Navigation Bar -->
       <nav class="bottom-nav" aria-label="리포트 메뉴">
-        <a href="#overview" class="active"><span data-icon="heart"></span>오늘의 케어</a>
-        <a href="#trends"><span data-icon="chart"></span>상태 변화</a>
-        <a href="#record"><span data-icon="document"></span>돌봄 기록</a>
-        <a href="#nextcare"><span data-icon="check"></span>다음 확인</a>
+        <a href="#overview" class="active"><span data-icon="heart"></span>01 신호등</a>
+        <a href="#trends"><span data-icon="chart"></span>02 상태변화</a>
+        <a href="#timeline"><span data-icon="walk"></span>03 타임라인</a>
+        <a href="#careactions"><span data-icon="check"></span>04 제공간병</a>
+        <a href="#family"><span data-icon="message"></span>05 가족소식</a>
       </nav>
     </div>
   </div>
@@ -294,6 +263,6 @@
     <div id="sheet-content"></div>
   </dialog>
 
-  <script src="mobile-care-diary.js?v=20261006_1615"></script>
+  <script src="mobile-care-diary.js?v=20261010_1420"></script>
 </body>
 </html>

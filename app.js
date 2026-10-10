@@ -38472,8 +38472,9 @@ function refreshTabData(tabId, filterParam = null) {
         }
         break;
 
-      // 5. 간병일지 (케어포트): 케어포트 실시간 동기화
+      // 5. 간병일지 (케어포트 & new): 케어포트 실시간 동기화
       case 'carelogs':
+      case 'carelogs_new':
         if (typeof syncCarePortLogs === 'function') {
           syncCarePortLogs(true);
         }
@@ -38765,10 +38766,16 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
     if (typeof updateCarePortSyncBadgeUI === 'function') {
       updateCarePortSyncBadgeUI();
     }
-    // 탭 진입 시 전산 동기화 보장 (최근 20초 이내 동기화 완료 건이 아니거나 진행 중이 아니면 자동 최신화)
-    const lastSync = window._lastCarePortSyncTime || 0;
-    if (!window._isCarePortSyncRunning && (Date.now() - lastSync > 20000 || !gCarePortPatientGroups || gCarePortPatientGroups.length === 0)) {
-      syncCarePortLogs(false);
+    // 탭 진입 시 전산 동기화 보장 (간병일지(new) 클릭 시 즉시 최신 동기화 실행)
+    if (tabId === 'carelogs_new') {
+      if (!window._isCarePortSyncRunning && typeof syncCarePortLogs === 'function') {
+        syncCarePortLogs(true);
+      }
+    } else {
+      const lastSync = window._lastCarePortSyncTime || 0;
+      if (!window._isCarePortSyncRunning && (Date.now() - lastSync > 20000 || !gCarePortPatientGroups || gCarePortPatientGroups.length === 0)) {
+        syncCarePortLogs(false);
+      }
     }
   }
   else if (tabId === 'carecall') {
@@ -42288,7 +42295,9 @@ function renderCareLogs() {
     if (btn) {
       const count = gCarePortSelectedPatients.size;
       btn.disabled = count === 0;
-      btn.innerHTML = `<i data-lucide="file-down" class="w-3.5 h-3.5"></i><span>선택 환자 일지 PDF 다운로드 (${count})</span>`;
+      const isNew = id.includes('_new');
+      const label = isNew ? `선택 환자 전체 다운로드(AI 간병일지) (${count})` : `선택 환자 일지 PDF 다운로드 (${count})`;
+      btn.innerHTML = `<i data-lucide="file-down" class="w-3.5 h-3.5"></i><span>${label}</span>`;
       if (typeof initIcons === 'function') initIcons(btn);
     }
   });
@@ -42347,10 +42356,10 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
     const downloadBtnHtml = isNewTab
       ? `
         <button type="button" onclick="downloadPatientCareLogsPdfs_new('${group.id}')"
-          class="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
-          title="해당 환자의 공식 A4 2페이지 간병 리포트 PDF 다운로드 (신규 서식)">
-          <i data-lucide="file-check-2" class="w-4 h-4 text-indigo-600"></i>
-          <span>공식 2P PDF 다운로드</span>
+          class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs shadow-md shadow-purple-900/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+          title="환자의 전체 일지를 LivOn AI 간병일지 공식 서식으로 통합 생성하여 다운로드합니다">
+          <i data-lucide="file-check-2" class="w-4 h-4 text-white"></i>
+          <span>전체 다운로드(AI 간병일지)</span>
         </button>
       `
       : '';
@@ -42426,12 +42435,14 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
               <span>${isExpanded ? '일지 접기' : `일자별 일지 펼치기 (${group.totalDays}건)`}</span>
             </button>
             ${downloadBtnHtml}
+            ${!isNewTab ? `
             <button type="button" onclick="downloadPatientCareLogsViaRobot('${group.id}')"
               class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs shadow-md shadow-purple-900/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
               title="케어포트 전산에 접속하여 1일차부터 마지막 일차까지 모든 일지의 원본 이미지들을 다운로드받아 1개의 공식 합본 PDF로 조립합니다">
               <i data-lucide="file-down" class="w-4 h-4 text-amber-300"></i>
               <span>전체 원본 다운로드</span>
             </button>
+            ` : ''}
             <button type="button" onclick="attachCarePortLogsAndOpenEmail('${group.id}')"
               class="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-900/30 flex items-center gap-1.5 transition-all cursor-pointer"
               title="간병 종료 보고 및 청구 메일에 일자별 PDF 일지를 ZIP 없이 개별 첨부">
@@ -43022,7 +43033,7 @@ function getMobileCareDiaryCleanLink(patientName) {
 function copyCurrentMobileDiarySmsLink() {
   const pName = gCurrentMobileDiaryPatient || '고연분';
   const link = getMobileCareDiaryCleanLink(pName);
-  const smsText = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 돌봄 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 간병일지 열람:\n${link}`;
+  const smsText = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 간병 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 간병일지 열람:\n${link}`;
 
   navigator.clipboard.writeText(smsText).then(() => {
     alert(`✅ [${pName} 님] 보안 안심 단축 링크가 포함된 간병일지 문자 문구가 복사되었습니다!\n(환자 이름 및 파라미터가 URL에 노출되지 않습니다)\n\n${smsText}`);
@@ -43035,7 +43046,7 @@ function copyMobileCareDiarySms(groupId) {
   const patient = (gCarePortPatientGroups || []).find(g => g.id === groupId);
   const pName = patient ? patient.patientName : '고연분';
   const link = getMobileCareDiaryCleanLink(pName);
-  const smsText = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 돌봄 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 간병일지 열람:\n${link}`;
+  const smsText = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 간병 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 간병일지 열람:\n${link}`;
 
   navigator.clipboard.writeText(smsText).then(() => {
     alert(`✅ [${pName} 님] 모바일 간병일지 문자 발송 문구가 클립보드에 복사되었습니다!\n보안 단축 링크가 적용되어 환자 정보가 URL에 노출되지 않습니다.`);
@@ -43288,7 +43299,7 @@ function switchDiarySendChannel(channel) {
 
     // 카카오톡 본문: URL 텍스트 없이 버튼으로 열람하도록 안내
     if (messageInput) {
-      messageInput.value = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 전문 돌봄 기록과 상태 변화를 확인해 보세요.\n\n아래 [모바일 간병일지 열람하기] 버튼을 누르시면 안전하게 간병일지를 확인하실 수 있습니다.`;
+      messageInput.value = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 전문 간병 기록과 상태 변화를 확인해 보세요.\n\n아래 [모바일 간병일지 열람하기] 버튼을 누르시면 안전하게 간병일지를 확인하실 수 있습니다.`;
     }
   } else {
     // 일반 안심 문자 모드
@@ -43314,7 +43325,7 @@ function switchDiarySendChannel(channel) {
 
     // 문자 본문: 환자명이 드러나지 않는 보안 단축 안심 링크 삽입
     if (messageInput) {
-      messageInput.value = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 돌봄 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 간병일지 열람:\n${cleanLink}`;
+      messageInput.value = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 간병 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 간병일지 열람:\n${cleanLink}`;
     }
   }
   updateSmsByteCountDisplay();
@@ -46142,10 +46153,10 @@ async function downloadPatientCareLogsPdfs_new(groupId) {
   }
 
   showGlobalProgress({
-    title: `[${pName} 님] 공식 간병일지(A4 2P) PDF 다운로드`,
-    subtitle: `표준 A4 2페이지 공식 간병 리포트 생성 중...`,
+    title: `[${pName} 님] LivOn AI 간병일지 PDF 다운로드`,
+    subtitle: `LivOn AI 간병일지 공식 서식으로 통합 생성 중...`,
     percent: 25,
-    statusText: `공식 2P PDF 데이터 요청 중...`,
+    statusText: `전체 일지 데이터 수집 및 AI 간병일지 재구성 중...`,
     icon: 'file-check-2'
   });
 
@@ -46175,9 +46186,9 @@ async function downloadPatientCareLogsPdfs_new(groupId) {
       blob = new Blob([pdfBytes], { type: 'application/pdf' });
     }
 
-    const fileName = `[케어포트_공식간병일지]_${pName}_2페이지.pdf`;
+    const fileName = `[LivOn_AI간병일지]_${pName}.pdf`;
 
-    // 시스템 내 고객별 일지 저장소(청구/이메일 연계)에 공식 2P PDF 자동 보관
+    // 시스템 내 고객별 일지 저장소(청구/이메일 연계)에 전체 일지 new PDF 자동 보관
     const targetApplyId = patient?.applyId || (gApps && gApps.find(a => a.patientName === pName)?.id);
     if (targetApplyId) {
       const arrayBuffer = await blob.arrayBuffer();
@@ -46192,7 +46203,7 @@ async function downloadPatientCareLogsPdfs_new(groupId) {
 
     updateGlobalProgress({
       percent: 100,
-      statusText: `✨ 공식 간병 리포트(2P) 다운로드 완료!`
+      statusText: `✨ LivOn AI 간병일지 다운로드 완료!`
     });
 
     const blobUrl = URL.createObjectURL(blob);
@@ -46213,7 +46224,7 @@ async function downloadPatientCareLogsPdfs_new(groupId) {
       try {
         updateGlobalProgress({
           percent: 65,
-          statusText: `전산 데이터 기반 A4 2P 리포트 직접 생성 중...`
+          statusText: `전산 데이터 기반 LivOn AI 간병일지 직접 생성 중...`
         });
         const records = (patient.dailyLogs || []).map(l => {
           const rawDate = (l.consultDate || l.dateString || '').slice(5, 10).replace('-', '.');
@@ -46231,11 +46242,11 @@ async function downloadPatientCareLogsPdfs_new(groupId) {
         }, records);
 
         const pdfBytes = await render2PageHtmlToPdfBytes(html);
-        const fileName = `[케어포트_공식간병일지]_${pName}_2페이지.pdf`;
+        const fileName = `[LivOn_AI간병일지]_${pName}.pdf`;
         triggerDirectPdfDownload(pdfBytes, fileName);
         updateGlobalProgress({
           percent: 100,
-          statusText: `✨ 공식 간병 리포트(2P) 다운로드 완료!`
+          statusText: `✨ LivOn AI 간병일지 다운로드 완료!`
         });
         hideGlobalProgress(350);
         return;
@@ -46314,8 +46325,8 @@ async function batchDownloadSelectedPatientPdfs_new() {
   }
   const list = Array.from(gCarePortSelectedPatients);
   showGlobalProgress({
-    title: `선택 환자 (${list.length}명) 공식 2P 일지 일괄 다운로드`,
-    subtitle: `환자별 표준 A4 2페이지 공식 간병 리포트를 순차 다운로드합니다.`,
+    title: `선택 환자 (${list.length}명) LivOn AI 간병일지 일괄 다운로드`,
+    subtitle: `환자별 LivOn AI 간병일지를 순차 다운로드합니다.`,
     percent: 0,
     statusText: `일괄 다운로드 시작...`,
     icon: 'file-check-2'
@@ -46327,10 +46338,10 @@ async function batchDownloadSelectedPatientPdfs_new() {
     const pName = patient ? patient.patientName : `환자 ${idx + 1}`;
     
     updateGlobalProgress({
-      title: `[${idx + 1}/${list.length}명] ${pName} 님 공식 2P 일지 다운로드`,
-      subtitle: `환자별 표준 A4 2페이지 공식 간병 리포트를 순차 다운로드합니다.`,
+      title: `[${idx + 1}/${list.length}명] ${pName} 님 LivOn AI 간병일지 다운로드`,
+      subtitle: `환자별 LivOn AI 간병일지를 순차 다운로드합니다.`,
       percent: Math.round((idx / list.length) * 100),
-      statusText: `${pName} 님 공식 2P 리포트 생성 준비 중...`
+      statusText: `${pName} 님 AI 간병일지 생성 준비 중...`
     });
 
     await downloadPatientCareLogsPdfs_new(gid);
@@ -46339,7 +46350,7 @@ async function batchDownloadSelectedPatientPdfs_new() {
 
   showGlobalProgress({
     title: `선택 환자 (${list.length}명) 다운로드 완료`,
-    subtitle: `모든 선택 환자의 공식 2페이지 간병 리포트 다운로드가 완료되었습니다.`,
+    subtitle: `모든 선택 환자의 LivOn AI 간병일지 다운로드가 완료되었습니다.`,
     percent: 100,
     statusText: `전체 완료!`,
     icon: 'check-circle-2'

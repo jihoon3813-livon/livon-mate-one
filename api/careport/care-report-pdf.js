@@ -4,6 +4,8 @@
 const fs = require('fs');
 const path = require('path');
 const urlModule = require('url');
+try { delete require.cache[require.resolve('../../care-report-2page-pdf')]; } catch(e) {}
+try { delete require.cache[require.resolve('./mobile-report')]; } catch(e) {}
 const { fetchPatientMobileReport } = require('./mobile-report');
 const { generate2PageCareReportHtml } = require('../../care-report-2page-pdf');
 
@@ -59,6 +61,11 @@ module.exports = async (req, res) => {
     res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
     return res.end(JSON.stringify(errPayload));
   }
+
+  try {
+    delete require.cache[require.resolve('../../care-report-2page-pdf')];
+  } catch(e) {}
+  const { generate2PageCareReportHtml } = require('../../care-report-2page-pdf');
 
   try {
     let report = null;
@@ -117,7 +124,7 @@ module.exports = async (req, res) => {
 
     const selDay = dayParam ? parseInt(dayParam, 10) - 1 : null;
     let html = generate2PageCareReportHtml(report.patientInfo, report.records, selDay);
-    const filename = `[케어포트_공식간병일지]_${report.patientInfo.name || patientName}_2페이지.pdf`;
+    const filename = `[케어포트_전체간병일지_new]_${report.patientInfo.name || patientName}.pdf`;
 
     // If caller wants JSON
     if (format === 'json') {
