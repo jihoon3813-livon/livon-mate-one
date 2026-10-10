@@ -502,14 +502,14 @@ function renderMatrixTableHtml(records, dayIdx, patientTotalDays) {
         else items.push({ lvl: null, text: '-', bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' });
       } else if (type === 'sleep') {
         const s = rec.scores?.[2];
-        if (s === 2) items.push({ lvl: 0, text: '수면', bg: '#ccfbf1', color: '#0f766e', border: '#99f6e4' });
-        else if (s === 1) items.push({ lvl: 1, text: '관찰', bg: '#fef3c7', color: '#854d0e', border: '#fde68a' });
+        if (s === 2) items.push({ lvl: 0, text: '양호', bg: '#ccfbf1', color: '#0f766e', border: '#99f6e4' });
+        else if (s === 1) items.push({ lvl: 1, text: '주의', bg: '#fef3c7', color: '#854d0e', border: '#fde68a' });
         else if (s === 0) items.push({ lvl: 2, text: '불량', bg: '#ffe4e6', color: '#9f1239', border: '#fecdd3' });
         else items.push({ lvl: null, text: '-', bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' });
       } else if (type === 'pain') {
         const s = rec.scores?.[3];
         if (s === 0) items.push({ lvl: 0, text: '없음', bg: '#dcfce7', color: '#166534', border: '#bbf7d0' });
-        else if (s === 1) items.push({ lvl: 1, text: '관찰', bg: '#fef3c7', color: '#854d0e', border: '#fde68a' });
+        else if (s === 1) items.push({ lvl: 1, text: '주의', bg: '#fef3c7', color: '#854d0e', border: '#fde68a' });
         else if (s === 2) items.push({ lvl: 2, text: '호소', bg: '#ffe4e6', color: '#9f1239', border: '#fecdd3' });
         else items.push({ lvl: null, text: '-', bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' });
       }
