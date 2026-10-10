@@ -800,7 +800,7 @@ function buildCareBoxesHtml(r) {
     <div style="display: flex; flex-direction: column; gap: 8px;">
       ${items.map(it => `
         <div style="background: #ffffff; border: 1.2px solid #e2e8f0; border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.015);">
-          <span style="background: #e0f2fe; color: #0369a1; font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0;">
+          <span style="background: #ffe4e6; color: #be185d; border: 1px solid #fecdd3; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0;">
             ${it.cat}
           </span>
           <div style="flex: 1; font-size: 12.5px; color: #1e293b; line-height: 1.45; word-break: keep-all; font-weight: 500;">

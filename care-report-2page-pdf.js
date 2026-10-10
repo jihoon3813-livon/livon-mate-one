@@ -923,7 +923,7 @@ function renderSingleDayReportPages({
           <div style="display: flex; flex-direction: column; gap: 6.5px; margin-top: 8px;">
             ${careExecutionItems.map(item => `
               <div style="background: #f8fafc; border: 1.2px solid #e2e8f0; border-radius: 11px; padding: 8.5px 14px; display: flex; align-items: center; gap: 14px;">
-                <div style="width: 72px; flex-shrink: 0; background: #e0f2fe; color: #0369a1; font-size: 11.5px; font-weight: 800; padding: 4px 0; border-radius: 6px; text-align: center;">
+                <div style="width: 72px; flex-shrink: 0; background: #ffe4e6; color: #be185d; border: 1px solid #fecdd3; font-size: 11.5px; font-weight: 800; padding: 3.5px 0; border-radius: 6px; text-align: center;">
                   ${item.cat}
                 </div>
                 <div style="flex: 1; min-width: 0; font-size: 12.5px; color: #1e293b; line-height: 1.4; word-break: keep-all; font-weight: 500;">
