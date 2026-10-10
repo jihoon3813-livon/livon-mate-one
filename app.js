@@ -42526,9 +42526,9 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
                 ? `
                   <button type="button" onclick="openCareReport2PageModal('${group.id}', ${log.dayNumber || (idx + 1)})"
                     class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
-                    title="공식 A4 2페이지 간병 리포트 미리보기 모달 열기">
+                    title="공식 A4 2페이지 간병 리포트 미리보기 및 다운로드">
                     <i data-lucide="file-check-2" class="w-3 h-3 text-indigo-600"></i>
-                    <span>공식(2P)</span>
+                    <span>다운로드(new)</span>
                   </button>
                 `
                 : `
@@ -42577,12 +42577,14 @@ function buildCareLogCardsHtml(groups, isNewTab = false) {
                         <span>모바일</span>
                       </button>
                       ${actionBtnHtml}
+                      ${!isNewTab ? `
                       <button type="button" onclick="downloadCarePortViaRobot('${sid}', '${(group.patientName || '').replace(/'/g, "\\'")}')"
                         class="px-2.5 py-1 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1 transition-all cursor-pointer active:scale-95"
                         title="케어포트 전산에 백그라운드로 자동 접속하여 원본 2장 이미지를 다운로드받아 100% 동일한 A4 2페이지 공식 PDF로 조립합니다">
                         <i data-lucide="bot" class="w-3 h-3 text-amber-300"></i>
                         <span>🤖 원본 무인</span>
                       </button>
+                      ` : ''}
                     </div>
                   </div>
                 </div>
@@ -42645,9 +42647,9 @@ function buildCareLogFlatTableRows(filtered, isNewTab = false) {
       ? `
         <button type="button" onclick="openCareReport2PageModal('${pName}', ${log.dayNumber || 1})" 
           class="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
-          title="공식 A4 2페이지 간병 리포트 미리보기 모달 열기">
+          title="공식 A4 2페이지 간병 리포트 미리보기 및 다운로드">
           <i data-lucide="file-check-2" class="w-3.5 h-3.5 text-indigo-600"></i>
-          <span>공식(2P)</span>
+          <span>다운로드(new)</span>
         </button>
       `
       : `
@@ -42697,7 +42699,7 @@ function buildCareLogFlatTableRows(filtered, isNewTab = false) {
         <td class="p-2.5 text-center font-mono text-purple-700 font-bold border-r border-slate-100">
           ${duration}
         </td>
-        <!-- 간병일지 열람 (기존: 일지 원문 / NEW: 공식 2P 미리보기) -->
+        <!-- 간병일지 열람 (기존: 일지 원문 / NEW: 공식 2P 미리보기 및 다운로드) -->
         <td class="p-2.5 text-center">
           <div class="inline-flex items-center gap-1.5 justify-center flex-wrap">
             <button type="button" onclick="openMobileCareDiaryPreview('${pName}', ${log.dayNumber || 1})" 
@@ -42707,12 +42709,14 @@ function buildCareLogFlatTableRows(filtered, isNewTab = false) {
               <span>모바일</span>
             </button>
             ${actionBtnHtml}
+            ${!isNewTab ? `
             <button type="button" onclick="downloadCarePortViaRobot('${sid}', '${(pName || '').replace(/'/g, "\\'")}')"
               class="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition-all cursor-pointer active:scale-95"
               title="케어포트 전산에 백그라운드로 자동 접속하여 원본 2장 이미지를 다운로드받아 100% 동일한 A4 2페이지 공식 PDF로 조립합니다">
               <i data-lucide="bot" class="w-3.5 h-3.5 text-amber-300"></i>
               <span>🤖 원본 무인</span>
             </button>
+            ` : ''}
           </div>
         </td>
       </tr>
