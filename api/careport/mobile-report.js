@@ -372,7 +372,28 @@ async function fetchPatientMobileReport(patientName) {
         cleanText(gNotes.pain || rep['체온 조절 및 관리'] || rep['열 관리 및 검사 결과 확인'] || '특별한 통증이나 극심한 불편 호소는 없었습니다.'),
         cleanText(gNotes.excretion || rep['배변 배뇨 관리'] || '배변 및 배뇨 상태를 확인하였으며 양호합니다.'),
         cleanText(gNotes.emotional || rep['정신적 지지 및 상담'] || '심리적으로 평온하고 안정된 상태를 유지하셨습니다.')
-      ]
+      ],
+      vitals: raw.vitals || {
+        blood_pressure_systolic: null,
+        blood_pressure_diastolic: null,
+        note: null
+      },
+      guardian_notes: {
+        diet: cleanText(gNotes.diet || ''),
+        pain: cleanText(gNotes.pain || ''),
+        sleep: cleanText(gNotes.sleep || ''),
+        excretion: cleanText(gNotes.excretion || ''),
+        activity: cleanText(gNotes.activity || ''),
+        emotional: cleanText(gNotes.emotional || ''),
+        summary_paragraph: cleanText(gNotes.summary_paragraph || '')
+      },
+      care_log: {
+        diet_nutrition: cleanText(cLog.diet_nutrition || rep['영양 공급 및 관리'] || rep['식사 및 약물 보조 현황'] || '정규 식사 제공 및 수분 섭취 지원'),
+        hygiene: cleanText(cLog.hygiene || rep['개인 위생 관리'] || rep['위생 관리 활동'] || '특이사항 없음'),
+        mobility_activity: cleanText(cLog.mobility_activity || rep['신체 활동 및 운동 보조'] || rep['운동 및 활동 보조'] || '거동 시 부축 필요'),
+        health_management: cleanText(cLog.health_management || rep['체온 조절 및 관리'] || rep['약물 투여 기록'] || rep['건강 체크 및 상태 보고'] || '혈압 측정 및 건강 체크'),
+        emotional_support: cleanText(cLog.emotional_support || rep['정신적 지지 및 상담'] || rep['환자 정서 및 심리 지원'] || '특이사항 없음')
+      }
     };
   });
 

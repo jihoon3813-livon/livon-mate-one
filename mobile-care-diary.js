@@ -355,12 +355,73 @@ function buildStatusCards(r) {
     painDesc = '통증 부위를 확인하고 편안한 자세를 잡아드려요.';
   }
 
+  // 혈압 정보 추출 및 신호등 판정
+  let bpSys = r.vitals?.blood_pressure_systolic;
+  let bpDia = r.vitals?.blood_pressure_diastolic;
+  let bpNote = r.vitals?.note || '';
+
+  if (!bpSys) {
+    const allText = [bpNote, r.care?.[3] || '', r.family?.[3] || '', r.overall || ''].join(' ');
+    const matchSlash = allText.match(/혈압[^\d]*(\d{2,3})\s*[\/／]\s*(\d{2,3})/);
+    if (matchSlash) {
+      bpSys = parseInt(matchSlash[1], 10);
+      bpDia = parseInt(matchSlash[2], 10);
+    } else {
+      const matchSys = allText.match(/혈압[^\d]*(\d{2,3})/);
+      if (matchSys) {
+        bpSys = parseInt(matchSys[1], 10);
+      }
+    }
+  }
+
+  let bpCard = {
+    cat: '혈압',
+    title: '혈압 측정 예정',
+    desc: '금일은 혈압 측정이 진행되지 않았으며, 다음에 측정 시 안내해 드릴게요.',
+    tl: renderTrafficLightPill(-1)
+  };
+
+  if (bpSys) {
+    if (bpSys < 130 && (!bpDia || bpDia < 85)) {
+      bpCard = {
+        cat: '혈압',
+        title: '혈압이 정상 범위예요',
+        desc: `혈압이 ${bpSys}${bpDia ? `/${bpDia}` : ''} mmHg로 안정적인 수치를 유지하고 계세요.`,
+        tl: renderTrafficLightPill(0)
+      };
+    } else if (bpSys <= 139 && (!bpDia || bpDia <= 89)) {
+      bpCard = {
+        cat: '혈압',
+        title: '혈압을 세심히 관찰해요',
+        desc: `혈압이 ${bpSys}${bpDia ? `/${bpDia}` : ''} mmHg로 약간 높아 지속적으로 체크하고 있어요.`,
+        tl: renderTrafficLightPill(1)
+      };
+    } else {
+      bpCard = {
+        cat: '혈압',
+        title: '혈압 관리에 유의해요',
+        desc: `혈압이 ${bpSys}${bpDia ? `/${bpDia}` : ''} mmHg로 다소 높아 의료진 확인 및 안정을 돕고 있어요.`,
+        tl: renderTrafficLightPill(2)
+      };
+    }
+  } else {
+    const allText = [bpNote, r.care?.[3] || '', r.family?.[3] || '', r.overall || ''].join(' ');
+    if (/혈압\s*(?:측정\s*)?정상|혈압\s*안정/.test(allText)) {
+      bpCard = {
+        cat: '혈압',
+        title: '혈압이 정상 범위예요',
+        desc: '혈압 측정을 완료하였으며 안정적인 상태를 유지하고 계세요.',
+        tl: renderTrafficLightPill(0)
+      };
+    }
+  }
+
   return [
     { cat: '식사', title: mealTitle, desc: mealDesc, tl: renderTrafficLightPill(getTrafficIdx('meal', mScore)) },
     { cat: '거동', title: mobTitle, desc: mobDesc, tl: renderTrafficLightPill(getTrafficIdx('mobility', mobScore)) },
     { cat: '수면', title: sleepTitle, desc: sleepDesc, tl: renderTrafficLightPill(getTrafficIdx('sleep', sScore)) },
     { cat: '통증', title: painTitle, desc: painDesc, tl: renderTrafficLightPill(getTrafficIdx('pain', pScore)) },
-    { cat: '배변·배뇨', title: '배변 상태를 확인 중이에요', desc: '오늘 기록상 확인되지 않아 내일도 세심히 살펴볼게요.', tl: renderTrafficLightPill(-1) },
+    bpCard,
     { cat: '건강관리', title: '지병을 꼼꼼히 관리해요', desc: '혈압과 당뇨 관리 및 처방 약 복용을 잘 챙겨드려요.', tl: renderTrafficLightPill(getTrafficIdx('health', 1)) }
   ];
 }
@@ -725,39 +786,25 @@ function buildTimelineCardsHtml(records, dayIdx) {
 /**
  * 04 제공한 간병과 대상자의 반응 생성기 (PDF와 동일)
  */
-function buildCareBoxesHtml() {
+function buildCareBoxesHtml(r) {
+  const cLog = r?.care_log || {};
   const items = [
-    {
-      badge: '이동 보조',
-      title: '침상에서 의자로 이동할 때 곁에서 부축',
-      desc: '서두르지 않고 이동 속도를 맞추어 도왔습니다. 의자에 앉은 뒤 편안해졌다고 말씀하셨습니다.'
-    },
-    {
-      badge: '위생 보조',
-      title: '세수와 옷 갈아입기를 필요한 부분만 도움',
-      desc: '스스로 하실 수 있는 부분은 기다려 드렸습니다. 옷매무새를 정리한 뒤 개운하다고 표현하셨습니다.'
-    },
-    {
-      badge: '휴식 지원',
-      title: '편안한 자세를 잡고 조용히 쉴 수 있도록 도움',
-      desc: '베개 위치를 조정하고 주변 소음을 줄였습니다. 눈을 감고 쉬셨으며, 추가로 원하는 도움이 있는지 확인했습니다.'
-    }
+    { cat: '식사·영양', text: cLog.diet_nutrition || r?.care?.[0] || '정규 식사 제공 및 수분 섭취 지원' },
+    { cat: '위생', text: cLog.hygiene || r?.care?.[1] || '특이사항 없음' },
+    { cat: '이동·활동', text: cLog.mobility_activity || r?.care?.[2] || '거동 시 부축 필요' },
+    { cat: '건강관리', text: cLog.health_management || r?.care?.[3] || '혈압 측정 및 복약 확인' },
+    { cat: '정서 지원', text: cLog.emotional_support || r?.care?.[4] || '특이사항 없음' }
   ];
 
   return `
-    <div style="display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; flex-direction: column; gap: 8px;">
       ${items.map(it => `
-        <div style="background: #ffffff; border: 1.5px solid #f1f5f9; border-radius: 14px; padding: 13px 15px; display: flex; align-items: flex-start; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.01);">
-          <span style="background: #ffe4e6; color: #e11d48; font-size: 10.5px; font-weight: 800; padding: 3px 8px; border-radius: 6px; white-space: nowrap; margin-top: 1px;">
-            ${it.badge}
+        <div style="background: #ffffff; border: 1.2px solid #e2e8f0; border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.015);">
+          <span style="background: #e0f2fe; color: #0369a1; font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0;">
+            ${it.cat}
           </span>
-          <div style="flex: 1;">
-            <div style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-bottom: 3px; line-height: 1.35;">
-              ${it.title}
-            </div>
-            <div style="font-size: 12px; color: #64748b; line-height: 1.5; word-break: keep-all;">
-              ${it.desc}
-            </div>
+          <div style="flex: 1; font-size: 12.5px; color: #1e293b; line-height: 1.45; word-break: keep-all; font-weight: 500;">
+            ${it.text}
           </div>
         </div>
       `).join('')}
@@ -766,214 +813,63 @@ function buildCareBoxesHtml() {
 }
 
 /**
- * 05 보호자에게 전하는 하루 생성기 (비중복 서로소 인덱싱 + 정중한 ~했어요/~했습니다 어미)
+ * 05 보호자 전달사항 생성기 (케어포트 원문 기반 문장형 스토리텔링)
  */
 function buildGuardianDailyMessage(r, dayIdx, pName) {
-  if (!r) return { opening: `“보호자님, 오늘 하루 간병 소식을 전해드려요.”`, body: '어르신 곁에서 세심히 살피며 편안하게 모셨습니다.' };
+  if (!r) return { opening: `“보호자님, 오늘 ${pName || ''} 어르신의 건강 상태와 하루 일과를 전해드립니다.”`, body: '어르신 곁에서 세심히 살피며 편안하게 모셨습니다.' };
 
-  const mScore = r.scores ? r.scores[0] : 2;
-  const mobScore = r.scores ? r.scores[1] : 2;
-  const sScore = r.scores ? r.scores[2] : null;
-  const pScore = r.scores ? r.scores[3] : 0;
+  const gNotes = r.guardian_notes || {};
+  const fDiet = (gNotes.diet || r.family?.[0] || '').trim();
+  const fSleep = (gNotes.sleep || r.family?.[1] || '').trim();
+  const fMob = (gNotes.activity || r.family?.[2] || '').trim();
+  const fPain = (gNotes.pain || r.family?.[3] || '').trim();
+  const fExcretion = (gNotes.excretion || r.family?.[4] || '').trim();
+  const fEmotional = (gNotes.emotional || r.family?.[5] || '').trim();
+  const fSummary = (gNotes.summary_paragraph || '').trim();
 
   // 1) Opening
   const openingStyles = [
-    `“보호자님, 오늘 ${pName} 어르신의 편안하고 따뜻한 하루 소식을 전해드려요.”`,
-    `“보호자님, 오늘 ${pName} 어르신과 함께 보낸 평온한 간병 일과예요.”`,
-    `“보호자님, 오늘 하루도 어르신 곁을 세심히 지키며 정성껏 보살펴 드렸어요.”`,
     `“보호자님, 오늘 ${pName} 어르신의 건강 상태와 하루 일과를 전해드립니다.”`,
-    `“보호자님, 오늘 어르신께서 보내신 편안한 하루를 정리해 전해드려요.”`,
-    `“보호자님, 오늘도 가족의 마음을 담아 어르신을 성심껏 간병해 드렸어요.”`,
-    `“보호자님, 오늘 ${pName} 어르신의 활력 있고 안정적인 하루 소식입니다.”`,
-    `“보호자님, 오늘 어르신 곁에서 세심히 살피며 편안하게 모셨어요.”`,
-    `“보호자님, 오늘 어르신의 하루가 평안하게 이어지도록 정성을 다했습니다.”`
+    `“보호자님, 오늘 ${pName} 어르신의 편안하고 따뜻한 하루 소식을 전해드려요.”`,
+    `“보호자님, 오늘 하루도 어르신 곁을 세심히 지키며 정성껏 보살펴 드렸어요.”`,
+    `“보호자님, 오늘 ${pName} 어르신과 함께 보낸 평온한 간병 일과예요.”`
   ];
-  const opening = openingStyles[(dayIdx * 7 + 3) % openingStyles.length];
+  const opening = openingStyles[dayIdx % openingStyles.length];
 
-  // 2) Diet
-  let dietText = '';
-  const rawDiet = (r.family?.[0] || r.care?.[0] || r.states?.[0] || '').trim();
-  if (/(초밥|라면|죽|요플레|두유|포도|바나나|흑염소|수술|금식|영양음료|영양|반\s*공기)/.test(rawDiet)) {
-    if (/회\s*초밥/.test(rawDiet)) {
-      dietText = '식사로 준비해 드린 회 초밥을 맛있게 잘 드셨으며, 물도 충분히 드실 수 있게 틈틈이 챙겨드렸어요.';
-    } else if (/죽.*라면|라면.*초밥|라면/.test(rawDiet)) {
-      dietText = '식사는 죽과 별미 음식을 기분 좋게 챙겨 드셨고, 식후 물도 부족함 없이 보충해 드렸습니다.';
-    } else if (/두유|포도|바나나/.test(rawDiet)) {
-      dietText = '식사와 함께 간식으로 두유와 과일을 맛있게 드셨으며, 수분도 충분히 섭취하시도록 도왔어요.';
-    } else if (/수술|금식/.test(rawDiet)) {
-      dietText = '수술과 금식으로 기력이 떨어지지 않도록 저녁에 따뜻한 죽을 조금씩 천천히 드실 수 있게 보조해 드렸어요.';
-    } else if (/반\s*공기|부족/.test(rawDiet)) {
-      dietText = '저녁 식사량이 다소 적으셔서 소화에 부담 없는 음식으로 조금씩 나누어 드실 수 있게 정성껏 도왔습니다.';
-    } else if (/단식|영양/.test(rawDiet)) {
-      dietText = '환자분의 컨디션에 맞춰 식사와 영양 음료를 공급하며 탈수가 오지 않도록 수분 관리에 힘썼어요.';
-    } else {
-      dietText = '식사는 준비해 드린 음식을 편안히 드실 수 있도록 입맛과 소화 상태를 살피며 정성껏 보조해 드렸어요.';
-    }
-  } else {
-    if (mScore === 2) {
-      const goodDiet = [
-        '식사는 준비해 드린 진지를 맛있게 잘 비우셨고 수분도 틈틈이 챙겨 드렸어요.',
-        '오늘 삼시 세끼 식사를 규칙적으로 맛있게 드셨으며, 따뜻한 물과 음료도 충분히 보충해 드렸습니다.',
-        '식사 시간이면 입맛에 맞으시도록 정갈하게 챙겨 드렸고, 식후 수분 섭취도 세심하게 도왔어요.',
-        '식사량이 안정적이셔서 준비해 드린 식사를 남김없이 잘 드셨고, 소화도 편안히 시키셨어요.',
-        '정규 식사를 맛있게 드실 수 있게 곁에서 보조해 드렸으며, 수분 보충도 수시로 챙겨 드렸습니다.',
-        '식사 컨디션이 좋으셔서 준비된 음식을 기분 좋게 비우셨고, 목 넘김이 편안하시도록 물도 충분히 드렸어요.',
-        '식사 때마다 정성스레 수발을 들어드렸으며, 수분 섭취도 하루 권장량에 맞춰 알맞게 채워드렸어요.'
-      ];
-      dietText = goodDiet[(dayIdx * 3 + 1) % goodDiet.length];
-    } else if (mScore === 1) {
-      const moderateDiet = [
-        '식사량이 평소보다 조금 적으셔서 입맛에 맞으시도록 부드러운 음식 위주로 보조해 드렸어요.',
-        '소화에 부담이 없으시도록 부드럽고 따뜻한 식단으로 천천히 드실 수 있게 도왔어요.',
-        '식사량이 다소 적은 편이어서 소화 잘 되는 간식과 따뜻한 물을 자주 챙겨 드렸습니다.',
-        '입맛이 조금 떨어지신 듯하여 소화하기 편한 반찬 위주로 정성껏 챙겨드렸습니다.'
-      ];
-      dietText = moderateDiet[(dayIdx * 5 + 2) % moderateDiet.length];
-    } else {
-      const poorDiet = [
-        '식사를 드시기 어려워하셔서 위에 부담 없도록 소화가 잘 되는 식단으로 정성껏 도와드렸어요.',
-        '위에 무리가 가지 않는 부드러운 영양식 위주로 한 숟가락씩 정성껏 챙겨드렸습니다.',
-        '영양 섭취가 부족하지 않도록 목 넘김이 수월한 유동식과 수분을 세심하게 공급해 드렸어요.'
-      ];
-      dietText = poorDiet[(dayIdx * 7 + 1) % poorDiet.length];
-    }
+  if (fSummary && fSummary.length > 25) {
+    return {
+      opening,
+      body: `${fSummary}<br><span style="display:block; margin-top: 6px; color: #64748b; font-size: 12.5px;">복약 지도와 기본 활력징후도 꼼꼼히 확인하며 정성을 다해 간병하고 있으니 안심하세요. 언제나 가족을 대신해 따뜻하게 모시겠습니다.</span>`
+    };
   }
 
-  // 3) Pain
-  let painText = '';
-  const rawPain = (r.family?.[3] || r.care?.[3] || r.states?.[3] || '').trim();
-  if (/(찜질|물수건|열이|허리|수술|통증\s*호소|뻐근)/.test(rawPain)) {
-    if (/열이|물수건/.test(rawPain)) {
-      painText = '체온 상승이 관찰되어 미온수 마사지와 얼음찜질로 열감을 식혀드리며 세심히 안정시켰습니다.';
-    } else if (/찜질|얼음/.test(rawPain)) {
-      painText = '불편하신 부위에 냉찜질을 해드리며 통증을 덜어드리고 한결 편안한 자세를 잡아드렸어요.';
-    } else if (/허리/.test(rawPain)) {
-      painText = '허리에 무리가 가지 않도록 자세를 수시로 바꾸어 드리며 편안하게 휴식하시도록 살폈습니다.';
-    } else if (/수술/.test(rawPain)) {
-      painText = '수술 부위 회복을 위해 무리한 움직임을 제한하고 편안한 자세로 안정을 취하시게 도왔어요.';
-    } else {
-      painText = '몸의 불편감을 덜어드리기 위해 자세를 자주 바로잡아 드리고 따뜻하게 보살펴 드렸습니다.';
-    }
-  } else {
-    if (pScore === 0) {
-      const noPain = [
-        '특별히 아프거나 불편하다고 말씀하신 곳 없이 편안한 표정이셨어요.',
-        '몸에 불편한 곳이 없으신지 수시로 여쭈어보며 표정과 안색을 살폈고, 종일 편안해하셨어요.',
-        '통증 호소 없이 평온하게 지내셨으며, 안색도 밝으셔서 편안한 하루를 보내셨습니다.',
-        '특별한 통증이나 결림 없이 몸 상태가 안정적이셨고, 기분도 한결 온화한 모습이셨어요.',
-        '불편하신 부위가 없는지 세심하게 살폈으며, 아픈 곳 없이 편안한 컨디션을 유지하셨습니다.',
-        '몸살이나 통증 없이 편안한 상태를 보이셔서 마음 놓고 하루를 안정적으로 마무리하셨어요.',
-        '하루 동안 큰 불편감 없이 편안한 안색을 유지하셔서 안심하고 일과를 마무리하셨습니다.'
-      ];
-      painText = noPain[(dayIdx * 7 + 2) % noPain.length];
-    } else if (pScore === 1) {
-      const mildPain = [
-        '약간의 불편감이 있으신지 수시로 확인하며 편안한 자세를 유지하실 수 있게 도와드렸어요.',
-        '몸에 미세한 뻐근함이 있으신지 수시로 확인하고 편안히 쉬실 수 있게 도와드렸습니다.',
-        '자세를 바꿀 때 약간 불편해하셔서 베개를 받쳐드리며 편안한 자세를 잡아드렸어요.',
-        '환부 주변의 긴장을 풀어드리기 위해 가벼운 마사지와 체위 변경을 세심히 도왔습니다.'
-      ];
-      painText = mildPain[(dayIdx * 3 + 1) % mildPain.length];
-    } else {
-      const heavyPain = [
-        '통증 호소가 있으셔서 찜질과 자세 변경을 도우며 한결 편안해지시도록 집중 간병해 드렸어요.',
-        '불편함을 느끼시는 부위를 세심히 어루만져 드리고 편안한 휴식 자세를 바로잡아 드렸습니다.',
-        '통증으로 고생하시지 않도록 의료진 지침에 맞춰 체위 변경과 안정을 집중적으로 도와드렸습니다.'
-      ];
-      painText = heavyPain[(dayIdx * 5 + 3) % heavyPain.length];
-    }
+  let sentences = [];
+  if (fDiet && !/특이사항\s*없음/.test(fDiet)) {
+    sentences.push(fDiet.endsWith('.') ? fDiet : fDiet + '.');
+  }
+  if (fPain && !/특이사항\s*없음/.test(fPain)) {
+    sentences.push(fPain.endsWith('.') ? fPain : fPain + '.');
+  }
+  if (fMob && !/특이사항\s*없음/.test(fMob)) {
+    sentences.push(fMob.endsWith('.') ? fMob : fMob + '.');
+  }
+  if (fExcretion && !/특이사항\s*없음|확인되지\s*않/.test(fExcretion)) {
+    sentences.push(fExcretion.endsWith('.') ? fExcretion : fExcretion + '.');
+  }
+  if (fSleep && !/특이사항\s*없음|확인되지\s*않/.test(fSleep)) {
+    sentences.push(fSleep.endsWith('.') ? fSleep : fSleep + '.');
+  }
+  if (fEmotional && !/특이사항\s*없음|필요\s*상황은\s*없/.test(fEmotional)) {
+    sentences.push(fEmotional.endsWith('.') ? fEmotional : fEmotional + '.');
   }
 
-  // 4) Mobility
-  let mobText = '';
-  const rawMob = (r.family?.[2] || r.care?.[2] || r.states?.[1] || '').trim();
-  if (/(하늘공원|산책|복도|걷기|스트레칭|운동|적게\s*걸|움직임\s*없)/.test(rawMob)) {
-    if (/하늘공원|공원|산책/.test(rawMob)) {
-      mobText = '야외 공원 산책을 함께하며 바깥공기를 쐬어 드렸고, 안전에 유의하며 즐겁게 동행했습니다.';
-    } else if (/복도.*걷기|걷기\s*운동/.test(rawMob)) {
-      mobText = '복도 걷기 운동을 함께하며 하체 근력과 기력 유지를 도왔고 보폭에 맞춰 안전하게 부축했어요.';
-    } else if (/적게\s*걸|피로/.test(rawMob)) {
-      mobText = '오늘은 무리하지 않도록 활동량을 조절하며 침상에서 편안히 쉬실 수 있게 도왔어요.';
-    } else if (/움직임\s*없|침상/.test(rawMob)) {
-      mobText = '침상 안정을 유지하며 욕창이나 관절 굳음이 없도록 부드러운 체위 변경을 도와드렸어요.';
-    } else {
-      mobText = '활동 시 어르신의 걸음 속도에 맞추어 손을 꼭 잡아드리며 안전하게 이동을 보조했습니다.';
-    }
-  } else {
-    if (mobScore === 2) {
-      const goodMob = [
-        '거동도 스스로 잘 걸어 다니실 만큼 안정적인 컨디션을 보여주셨어요.',
-        '걸음걸이가 한결 가볍고 힘차셔서 실내 보행도 활력 있게 잘 소화하셨습니다.',
-        '스스로 걷고자 하시는 의지가 높으셔서 안전거리 내에서 지켜보며 응원해 드렸어요.',
-        '혼자서도 흔들림 없이 안정적으로 거동하시며 좋은 활동 컨디션을 유지하셨습니다.',
-        '움직임이 원활하셔서 실내에서 편안하게 이동하시도록 곁을 든든히 지켰어요.'
-      ];
-      mobText = goodMob[(dayIdx * 2 + 3) % goodMob.length];
-    } else if (mobScore === 1) {
-      const assistedMob = [
-        '걸으실 때 행여나 넘어지실까 봐 손을 잡고 조심스럽게 부축해 드렸어요.',
-        '실내에서 이동하실 때 넘어지시지 않도록 한 걸음 한 걸음 보폭을 맞추며 안전하게 부축해 드렸어요.',
-        '침상에서 일어나시거나 이동하실 때 곁에서 든든히 손을 잡고 낙상 예방에 만전을 기했습니다.',
-        '자세를 바꾸시거나 거동하실 때 무리가 가지 않도록 천천히 호흡을 맞추며 밀착 보조해 드렸어요.',
-        '가벼운 보행 시에도 균형을 잃지 않으시도록 손을 꼭 잡아드리며 안전하게 지켜봐 드렸습니다.',
-        '이동 시 항상 곁을 지키며 부축해 드렸고, 서두르지 않고 어르신의 편안한 속도에 맞춰 동행했어요.',
-        '어르신께서 이동하실 때마다 부축의 손길을 놓지 않고 안전을 최우선으로 챙겨드렸습니다.',
-        '거동 시 낙상 위험이 없도록 밀착하여 살폈으며, 부드러운 걸음걸이로 이동하시게 도왔어요.'
-      ];
-      mobText = assistedMob[(dayIdx * 5 + 4) % assistedMob.length];
-    } else {
-      const restMob = [
-        '다리나 거동이 조금 불편해하셔서 무리하지 않고 편안히 쉬실 수 있게 밀착 간병해 드렸어요.',
-        '무리하지 않고 편안히 쉬실 수 있도록 침상에서 안락한 환경을 조성해 드렸어요.',
-        '몸에 피로가 쌓이지 않도록 침상 안정을 유도하며 편안한 휴식을 돕는 데 집중했습니다.'
-      ];
-      mobText = restMob[(dayIdx * 3 + 2) % restMob.length];
-    }
-  }
+  const bodyParagraph = sentences.length > 0 ? sentences.join(' ') : '오늘 하루도 어르신 곁에서 식사와 거동을 세심히 살피며 편안히 휴식하실 수 있도록 성심껏 보살펴 드렸습니다.';
+  const closing = '복약 지도와 기본 건강 체크도 꼼꼼히 마쳤으니 안심하셔도 좋습니다. 가족분들의 마음을 담아 정성을 다해 세심하게 간병해 드릴게요.';
 
-  // 5) Sleep
-  let sleepText = '';
-  const rawSleep = (r.family?.[1] || r.states?.[2] || '').trim();
-  if (sScore === 0 || /불량|자주\s*깸|불편|각성/.test(rawSleep)) {
-    const poorSleep = [
-      '밤중에 종종 깨셔서 낮 동안 피로하시지 않도록 조용하고 아늑한 휴식 환경을 만들어 드렸어요.',
-      '새벽에 잠시 뒤척이셔서 따뜻하게 챙겨드리며 낮 시간에 편안히 낮잠을 주무실 수 있게 도왔어요.',
-      '밤사이 수면 유지가 다소 어려우셨던 만큼, 낮 동안 조용한 휴식 시간을 충분히 확보해 드렸습니다.'
-    ];
-    sleepText = poorSleep[(dayIdx * 3 + 1) % poorSleep.length];
-  } else {
-    const goodSleep = [
-      '밤새 뒤척임 없이 푹 주무시고 아침에도 한결 개운한 모습이셨어요.',
-      '취침 환경을 조용히 정돈해 드리며 밤 사이 편안하게 휴식을 취하실 수 있도록 세심히 살폈어요.',
-      '밤 동안 깨지 않고 깊은 잠을 주무셔서 아침에 맑은 얼굴로 인사해 주셨어요.',
-      '아늑한 침상 환경을 마련해 드려 밤새 평온하게 휴식을 취하셨고 아침 기력도 좋으셨어요.',
-      '수면 상태를 꼼꼼히 살피며 불편함 없이 푹 주무실 수 있도록 조용하고 쾌적하게 챙겨드렸습니다.',
-      '깊은 잠을 주무실 수 있도록 침구류를 정돈해 드렸으며, 밤새 안정적으로 주무셨습니다.',
-      '수면에 방해되지 않도록 실내 온습도를 알맞게 맞추어 드려 밤새 포근하게 주무셨어요.'
-    ];
-    sleepText = goodSleep[(dayIdx * 11 + 5) % goodSleep.length];
-  }
-
-  // 6) Closing
-  const closings = [
-    '처방 약과 혈압 등 기본 건강 체크도 꼼꼼히 마쳤으니 안심하셔도 좋습니다. 가족분들의 마음을 담아 정성을 다해 세심하게 간병해 드릴게요.',
-    '복약 관리와 활력징후도 잊지 않고 꼼꼼히 확인했으니 염려 놓으셔도 됩니다. 내일도 내 부모님처럼 따뜻하게 모실게요.',
-    '기본 건강 관리와 컨디션 체크를 빈틈없이 챙겼습니다. 보호자님의 사랑과 정성이 닿도록 곁에서 늘 최선을 다하겠습니다.',
-    '처방 약 복용과 건강 체크도 차질 없이 마쳤으니 안심하세요. 언제나 가족을 대신해 정성으로 보살펴 드릴게요.',
-    '체온과 혈압 등 기초 건강도 이상 없이 꼼꼼하게 살폈습니다. 보호자님께서 마음 편히 지내실 수 있도록 늘 든든히 지키겠습니다.',
-    '필수 건강 체크와 안전 관리를 정성껏 마쳤으니 편안한 마음으로 지켜봐 주세요. 정성을 다해 따뜻하게 함께하겠습니다.',
-    '매일의 작은 변화도 놓치지 않고 세심히 돌보고 있으니 안심하세요. 가족분들의 든든한 동반자가 되어 드리겠습니다.',
-    '정기적인 활력징후 측정과 복약 지도도 성심껏 완료했습니다. 어르신께서 늘 편안하시도록 온 마음을 다해 간병하겠습니다.'
-  ];
-  const closing = closings[(dayIdx * 13 + 7) % closings.length];
-
-  const bodyHtml = `
-    <p style="margin: 0 0 8px 0;">오늘 어르신께서는 ${dietText} ${painText}</p>
-    <p style="margin: 0 0 8px 0;">${mobText} ${sleepText}</p>
-    <p style="margin: 0;">${closing}</p>
-  `;
-
-  return { opening, body: bodyHtml };
+  return {
+    opening,
+    body: `${bodyParagraph}<br><span style="display:block; margin-top: 6px; color: #64748b; font-size: 12.5px;">${closing}</span>`
+  };
 }
 
 /**
@@ -1055,7 +951,7 @@ function render() {
 
   // 04 제공한 간병과 대상자의 반응
   if ($('careactions-container')) {
-    $('careactions-container').innerHTML = buildCareBoxesHtml();
+    $('careactions-container').innerHTML = buildCareBoxesHtml(r);
   }
 
   // 05 보호자에게 전하는 하루
