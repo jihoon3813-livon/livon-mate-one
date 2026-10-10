@@ -325,6 +325,17 @@ function renderSingleDayReportPages({
     }
   });
 
+  function getScore5(rec, idx) {
+    if (rec.rawScores && rec.rawScores[idx] != null) return rec.rawScores[idx];
+    if (rec.trend_scores && rec.trend_scores[idx] != null) return rec.trend_scores[idx];
+    if (rec.scores5 && rec.scores5[idx] != null) return rec.scores5[idx];
+    const s3 = rec.scores?.[idx];
+    if (s3 === 2) return 4;
+    if (s3 === 1) return 3;
+    if (s3 === 0) return 2;
+    return null;
+  }
+
   function getTrendRow(type) {
     const items = [];
     displayCols.forEach((col) => {
@@ -335,28 +346,36 @@ function renderSingleDayReportPages({
       }
       const rec = col.rec;
       if (type === 'meal') {
-        const s = rec.scores?.[0];
-        if (s === 2) items.push({ lvl: 0, text: '양호', bg: '#dcfce7', color: '#166534', border: '#bbf7d0' });
-        else if (s === 1) items.push({ lvl: 1, text: '부족', bg: '#fef3c7', color: '#854d0e', border: '#fde68a' });
-        else if (s === 0) items.push({ lvl: 2, text: '못함', bg: '#ffe4e6', color: '#9f1239', border: '#fecdd3' });
+        const s = getScore5(rec, 0);
+        if (s === 5) items.push({ lvl: 5, text: '완식', bg: '#dcfce7', color: '#15803d', border: '#86efac' });
+        else if (s === 4) items.push({ lvl: 4, text: '양호', bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' });
+        else if (s === 3) items.push({ lvl: 3, text: '부족', bg: '#fef3c7', color: '#854d0e', border: '#fde68a' });
+        else if (s === 2) items.push({ lvl: 2, text: '소량', bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' });
+        else if (s === 1) items.push({ lvl: 1, text: '거부', bg: '#ffe4e6', color: '#9f1239', border: '#fecdd3' });
         else items.push({ lvl: null, text: '-', bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' });
       } else if (type === 'mobility') {
-        const s = rec.scores?.[1];
-        if (s === 2) items.push({ lvl: 0, text: '가능', bg: '#ccfbf1', color: '#0f766e', border: '#99f6e4' });
-        else if (s === 1) items.push({ lvl: 1, text: '부축', bg: '#fef3c7', color: '#9a3412', border: '#fed7aa' });
-        else if (s === 0) items.push({ lvl: 2, text: '불편', bg: '#ffe4e6', color: '#9f1239', border: '#fecdd3' });
+        const s = getScore5(rec, 1);
+        if (s === 5) items.push({ lvl: 5, text: '자립', bg: '#dcfce7', color: '#15803d', border: '#86efac' });
+        else if (s === 4) items.push({ lvl: 4, text: '양호', bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' });
+        else if (s === 3) items.push({ lvl: 3, text: '부축', bg: '#fef3c7', color: '#9a3412', border: '#fed7aa' });
+        else if (s === 2) items.push({ lvl: 2, text: '불편', bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' });
+        else if (s === 1) items.push({ lvl: 1, text: '불가', bg: '#ffe4e6', color: '#9f1239', border: '#fecdd3' });
         else items.push({ lvl: null, text: '-', bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' });
       } else if (type === 'sleep') {
-        const s = rec.scores?.[2];
-        if (s === 2) items.push({ lvl: 0, text: '양호', bg: '#ccfbf1', color: '#0f766e', border: '#99f6e4' });
-        else if (s === 1) items.push({ lvl: 1, text: '주의', bg: '#fef3c7', color: '#854d0e', border: '#fde68a' });
-        else if (s === 0) items.push({ lvl: 2, text: '불량', bg: '#ffe4e6', color: '#9f1239', border: '#fecdd3' });
+        const s = getScore5(rec, 2);
+        if (s === 5) items.push({ lvl: 5, text: '숙면', bg: '#dcfce7', color: '#15803d', border: '#86efac' });
+        else if (s === 4) items.push({ lvl: 4, text: '양호', bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' });
+        else if (s === 3) items.push({ lvl: 3, text: '주의', bg: '#fef3c7', color: '#854d0e', border: '#fde68a' });
+        else if (s === 2) items.push({ lvl: 2, text: '설침', bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' });
+        else if (s === 1) items.push({ lvl: 1, text: '불면', bg: '#ffe4e6', color: '#9f1239', border: '#fecdd3' });
         else items.push({ lvl: null, text: '-', bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' });
       } else if (type === 'pain') {
-        const s = rec.scores?.[3];
-        if (s === 0) items.push({ lvl: 0, text: '없음', bg: '#dcfce7', color: '#166534', border: '#bbf7d0' });
-        else if (s === 1) items.push({ lvl: 1, text: '주의', bg: '#fef3c7', color: '#854d0e', border: '#fde68a' });
-        else if (s === 2) items.push({ lvl: 2, text: '호소', bg: '#ffe4e6', color: '#9f1239', border: '#fecdd3' });
+        const s = getScore5(rec, 3);
+        if (s === 5) items.push({ lvl: 5, text: '없음', bg: '#dcfce7', color: '#15803d', border: '#86efac' });
+        else if (s === 4) items.push({ lvl: 4, text: '미세', bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' });
+        else if (s === 3) items.push({ lvl: 3, text: '주의', bg: '#fef3c7', color: '#854d0e', border: '#fde68a' });
+        else if (s === 2) items.push({ lvl: 2, text: '호소', bg: '#fee2e2', color: '#b91c1c', border: '#fecaca' });
+        else if (s === 1) items.push({ lvl: 1, text: '심함', bg: '#ffe4e6', color: '#9f1239', border: '#fecdd3' });
         else items.push({ lvl: null, text: '-', bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' });
       }
     });
@@ -368,22 +387,25 @@ function renderSingleDayReportPages({
   const sleepItems = getTrendRow('sleep');
   const painItems = getTrendRow('pain');
 
+  const getY5 = (lvl) => {
+    if (lvl === 5) return 9;
+    if (lvl === 4) return 16;
+    if (lvl === 3) return 23;
+    if (lvl === 2) return 30;
+    if (lvl === 1) return 37;
+    return null;
+  };
+
   function renderSvgPolyline(items, lineColor = '#9d174d') {
     const W = 1000;
     const H = 72;
     const colW = W / numCols;
-    const getY = (lvl) => {
-      if (lvl === 0) return 12;
-      if (lvl === 1) return 24;
-      if (lvl === 2) return 36;
-      return null;
-    };
 
     let segments = [];
     let curSeg = [];
     items.forEach((it, idx) => {
       const x = (idx + 0.5) * colW;
-      const y = getY(it.lvl);
+      const y = getY5(it.lvl);
       if (y !== null) {
         curSeg.push({ x, y, idx });
       } else {
@@ -405,9 +427,11 @@ function renderSingleDayReportPages({
 
     return `
       <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;">
-        <line x1="0" y1="12" x2="${W}" y2="12" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3.5,3.5" />
-        <line x1="0" y1="24" x2="${W}" y2="24" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3.5,3.5" />
-        <line x1="0" y1="36" x2="${W}" y2="36" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3.5,3.5" />
+        <line x1="0" y1="9" x2="${W}" y2="9" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3" />
+        <line x1="0" y1="16" x2="${W}" y2="16" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3" />
+        <line x1="0" y1="23" x2="${W}" y2="23" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3,3" />
+        <line x1="0" y1="30" x2="${W}" y2="30" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3" />
+        <line x1="0" y1="37" x2="${W}" y2="37" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3" />
         ${pathsHtml}
       </svg>
     `;
@@ -420,18 +444,20 @@ function renderSingleDayReportPages({
       const isHyphen = it.text === '-';
       const isPending = it.isPending;
 
-      // [원형 점 렌더링]: 기록이 있는 날만 완벽한 원형으로 렌더링 (하단 텍스트박스와 겹치지 않도록 높이 분리)
+      // [원형 점 렌더링]: 5점 척도 높이에 정확히 매핑
       let dotHtml = '';
       if (it.lvl !== null) {
-        const yPos = it.lvl === 0 ? 12 : (it.lvl === 1 ? 24 : 36);
-        if (isLatestCol) {
-          dotHtml = `
-            <div style="position: absolute; top: ${yPos - 4.5}px; left: 50%; transform: translateX(-50%); width: 9px; height: 9px; border-radius: 50%; background: ${lineColor}; border: 2px solid #ffffff; box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.28); z-index: 4; box-sizing: border-box;"></div>
-          `;
-        } else {
-          dotHtml = `
-            <div style="position: absolute; top: ${yPos - 3.5}px; left: 50%; transform: translateX(-50%); width: 7px; height: 7px; border-radius: 50%; background: #ffffff; border: 2px solid ${lineColor}; z-index: 3; box-sizing: border-box;"></div>
-          `;
+        const yPos = getY5(it.lvl);
+        if (yPos !== null) {
+          if (isLatestCol) {
+            dotHtml = `
+              <div style="position: absolute; top: ${yPos - 4.5}px; left: 50%; transform: translateX(-50%); width: 9px; height: 9px; border-radius: 50%; background: ${lineColor}; border: 2px solid #ffffff; box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.28); z-index: 4; box-sizing: border-box;"></div>
+            `;
+          } else {
+            dotHtml = `
+              <div style="position: absolute; top: ${yPos - 3.5}px; left: 50%; transform: translateX(-50%); width: 7px; height: 7px; border-radius: 50%; background: #ffffff; border: 2px solid ${lineColor}; z-index: 3; box-sizing: border-box;"></div>
+            `;
+          }
         }
       }
 

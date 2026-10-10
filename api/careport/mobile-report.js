@@ -357,6 +357,8 @@ async function fetchPatientMobileReport(patientName) {
       date: dateStr,
       overall: cleanText(t?.overallComment || raw.overall_status?.comment || l.title || '일상 지원 및 환자 상태 점검'),
       scores: [m.score, mob.score, s.score, p.score],
+      rawScores: [mealScore, mobScore, slpScore, painScore],
+      trend_scores: [mealScore, mobScore, slpScore, painScore],
       states: [cleanText(m.state), cleanText(mob.state), cleanText(s.state), cleanText(p.state)],
       care: [
         cleanText(cLog.diet_nutrition || rep['영양 공급 및 관리'] || rep['식사 및 약물 보조 현황'] || '정규 식사 제공 및 수분 섭취 지원'),
