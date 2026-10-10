@@ -903,10 +903,10 @@ function renderSingleDayReportPages({
             </div>
 
             <!-- 4 Trend Rows -->
-            ${renderMatrixRow('식사·영양', '위: 잘 드심', mealItems, '#9d174d')}
-            ${renderMatrixRow('이동·활동', '위: 거동 가능', mobilityItems, '#334155')}
-            ${renderMatrixRow('수면·휴식', '위: 수면 기록', sleepItems, '#7c3aed')}
-            ${renderMatrixRow('통증·불편', '위: 통증 없음', painItems, '#be185d')}
+            ${renderMatrixRow('식사·영양', '▲ 위쪽: 안정', mealItems, '#9d174d')}
+            ${renderMatrixRow('이동·활동', '▲ 위쪽: 안정', mobilityItems, '#334155')}
+            ${renderMatrixRow('수면·휴식', '▲ 위쪽: 안정', sleepItems, '#7c3aed')}
+            ${renderMatrixRow('통증·불편', '▲ 위쪽: 안정', painItems, '#be185d')}
           </div>
 
           <!-- Footnote under Table -->
