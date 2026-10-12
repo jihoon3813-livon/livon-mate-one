@@ -83,6 +83,13 @@ try {
   console.warn('[EnvLoader] Error loading local env file:', e.message);
 }
 
+process.on('uncaughtException', (err) => {
+  console.error('[Process UncaughtException]', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Process UnhandledRejection]', reason);
+});
+
 const { createDocumentPdfBuffer, createTestPdfBuffer } = require('./pdf-helper');
 const { uploadToBarobillFTP, callBarobillSoap, getBarobillErrorMessage, getBarobillFaxStatus } = require('./barobill-client');
 const { getEmailConfig, saveEmailConfig, sendSmtpMail, testSmtpConnection } = require('./smtp-client');
@@ -101,7 +108,10 @@ const MIME_TYPES = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon'
+  '.ico': 'image/x-icon',
+  '.wav': 'audio/wav',
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4'
 };
 
 const https = require('https');
@@ -278,11 +288,12 @@ function invalidateRealDataCache() {
   gCachedRealDataMtime = 0;
 }
 
-const CONVEX_PROD_URL = 'https://gallant-weasel-360.convex.cloud';
+// [환경 격리]: 로컬 Node 개발 서버는 오직 개발용 Convex DB(rapid-raccoon-895)와만 통신 (운영 DB 절대 침범 금지)
+const CONVEX_TARGET_URL = process.env.CONVEX_URL || 'https://rapid-raccoon-895.convex.cloud';
 
 async function syncConvexMutation(pathStr, args) {
   try {
-    const res = await fetch(`${CONVEX_PROD_URL}/api/mutation`, {
+    const res = await fetch(`${CONVEX_TARGET_URL}/api/mutation`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: pathStr, args })
@@ -296,7 +307,7 @@ async function syncConvexMutation(pathStr, args) {
 
 async function syncWithConvexCloudOnStartup() {
   try {
-    const res = await fetch(`${CONVEX_PROD_URL}/api/query`, {
+    const res = await fetch(`${CONVEX_TARGET_URL}/api/query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: 'sync:bundleAll', args: { sessionToken: 'dev_session_1' } })
@@ -387,6 +398,8 @@ function saveConfirmedAlertsData(newData) {
   return result;
 }
 
+let gIsSamsungSyncing = false;
+
 function startServer(port) {
   const server = http.createServer(async (req, res) => {
     const parsedUrl = urlModule.parse(req.url, true);
@@ -407,6 +420,7 @@ function startServer(port) {
     // API Route: Live Hospital Search (네이버/카카오 실시간 전국 병원 검색 프록시)
     // =========================================================================
     if (reqPath === '/api/search-hospital') {
+
       const query = parsedUrl.query.q || parsedUrl.query.query || '';
       try {
         const list = await fetchOnlineHospitals(query);
@@ -451,23 +465,68 @@ function startServer(port) {
       try {
         const cfg = getSamsungDriveConfig();
         const latest = findLatestSamsungFile(cfg.folderPath);
-        let records = [];
-        let filename = '';
+        const latestJsonPath = path.join(BASE_DIR, 'samsung_drive_latest.json');
 
-        if (latest && fs.existsSync(latest.fullPath)) {
-          console.log(`[SamsungDrive Server] 최신 파일 [${latest.filename}] 복호화 시작...`);
-          records = await decryptAndParseSamsungExcel(latest.fullPath, cfg.password || '202609');
-          filename = latest.filename;
-        } else {
-          // 로컬 경로 파일이 없을 경우 저장된 최신 JSON 파일 로드
-          const latestJsonPath = path.join(BASE_DIR, 'samsung_drive_latest.json');
+        // 1. 이미 동일한 파일이 복호화 완료되어 있으면 재복호화 없이 즉시 고속 응답 (서버 CPU/메모리 부하 및 OOM 완전 차단)
+        if (latest && cfg.lastSyncedFile === latest.filename && fs.existsSync(latestJsonPath)) {
+          const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(raw));
+        }
+
+        // 2. 동시 복호화 경쟁(Race Condition) 방지 락
+        if (gIsSamsungSyncing) {
           if (fs.existsSync(latestJsonPath)) {
             const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify(raw));
           }
-          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-          return res.end(JSON.stringify({ success: false, error: '구글 드라이브 폴더에서 최신 파일을 찾을 수 없습니다.' }));
+          res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: '동기화가 현재 진행 중입니다.' }));
+        }
+
+        gIsSamsungSyncing = true;
+        let records = [];
+        let filename = '';
+
+        try {
+          if (latest && fs.existsSync(latest.fullPath)) {
+            console.log(`[SamsungDrive Server] 최신 파일 [${latest.filename}] 복호화 시작...`);
+            const now = new Date();
+            const ymNow = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const ymPrev = `${now.getFullYear()}${String(now.getMonth() || 12).padStart(2, '0')}`;
+            const candidatePasswords = Array.from(new Set([cfg.password, ymNow, ymPrev, '202610', '202609'])).filter(Boolean);
+            let decryptError = null;
+            for (const pw of candidatePasswords) {
+              try {
+                records = await decryptAndParseSamsungExcel(latest.fullPath, pw);
+                if (records && records.length > 0) {
+                  filename = latest.filename;
+                  if (cfg.password !== pw) {
+                    saveSamsungDriveConfig({ ...cfg, password: pw });
+                  }
+                  decryptError = null;
+                  break;
+                }
+              } catch (e) {
+                decryptError = e;
+              }
+            }
+            if (decryptError && (!records || records.length === 0)) {
+              throw decryptError;
+            }
+          } else {
+            // 로컬 경로 파일이 없을 경우 저장된 최신 JSON 파일 로드
+            if (fs.existsSync(latestJsonPath)) {
+              const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
+              res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+              return res.end(JSON.stringify(raw));
+            }
+            res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '구글 드라이브 폴더에서 최신 파일을 찾을 수 없습니다.' }));
+          }
+        } finally {
+          gIsSamsungSyncing = false;
         }
 
         const syncedAt = new Date().toLocaleString('ko-KR', { hour12: false });
@@ -841,6 +900,88 @@ function saveSavedFaxConfig(cfg) {
     }
 
     // =========================================================================
+    // Dynamic Stream Audio Endpoint for Telephony Voice Streaming
+    // =========================================================================
+    if (reqPath.startsWith('/audio/stream/')) {
+      const encoded = reqPath.replace('/audio/stream/', '').replace(/\.mp3$/, '');
+      const parsedUrl = urlModule.parse(req.url, true);
+      req.query = { ...parsedUrl.query, encoded };
+      const turnAudioHandler = require(path.join(BASE_DIR, 'api', 'carecall', 'turn-audio.js'));
+      return turnAudioHandler(req, res);
+    }
+
+    // =========================================================================
+    // API Route: AI CareCall Engine (아웃바운드 전화발신, 실시간 세션, 녹음 저장 등)
+    // =========================================================================
+    if (reqPath.startsWith('/api/carecall/')) {
+      const endpoint = reqPath.replace('/api/carecall/', '').split('?')[0];
+      const handlerFile = path.join(BASE_DIR, 'api', 'carecall', `${endpoint}.js`);
+      if (fs.existsSync(handlerFile)) {
+        try {
+          Object.keys(require.cache).forEach(k => {
+            if (k.includes('api\\carecall') || k.includes('api/carecall')) {
+              delete require.cache[k];
+            }
+          });
+        } catch(e) {}
+        const careHandler = require(handlerFile);
+        const parsedUrl = urlModule.parse(req.url, true);
+        req.query = parsedUrl.query;
+        res.status = (code) => ({
+          json: (data) => {
+            res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify(data));
+          },
+          send: (data) => {
+            if (!res.headersSent) res.writeHead(code);
+            res.end(data);
+          },
+          end: () => res.end()
+        });
+        res.json = (data) => {
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(data));
+        };
+        res.send = (data) => {
+          if (!res.headersSent) res.writeHead(200);
+          res.end(data);
+        };
+
+        const executeHandler = () => {
+          try {
+            const result = careHandler(req, res);
+            if (result && typeof result.catch === 'function') {
+              result.catch(err => {
+                console.error(`[CareCall API Error: ${endpoint}]`, err);
+                if (!res.writableEnded) {
+                  res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                  res.end(JSON.stringify({ success: false, error: err.message }));
+                }
+              });
+            }
+          } catch (err) {
+            console.error(`[CareCall API Error: ${endpoint}]`, err);
+            if (!res.writableEnded) {
+              res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+              res.end(JSON.stringify({ success: false, error: err.message }));
+            }
+          }
+        };
+
+        if (req.method === 'POST' || req.method === 'PUT') {
+          let body = '';
+          req.on('data', chunk => body += chunk);
+          req.on('end', () => {
+            try { req.body = JSON.parse(body); } catch(e) { req.body = body; }
+            executeHandler();
+          });
+          return;
+        }
+        return executeHandler();
+      }
+    }
+
+    // =========================================================================
     // API Route: URL Shortening Service (웹보고서 공유용 단축 URL 생성 엔진)
     // =========================================================================
     if (reqPath === '/api/shorten-url') {
@@ -1044,6 +1185,9 @@ function saveSavedFaxConfig(cfg) {
             if (Array.isArray(payload.adjusters)) {
               stored.adjusters = payload.adjusters;
             }
+            if (payload.dashboardStats !== undefined) {
+              stored.dashboardStats = payload.dashboardStats;
+            }
 
             stored.updatedAt = new Date().toISOString();
             fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
@@ -1083,7 +1227,8 @@ function saveSavedFaxConfig(cfg) {
           payouts: [],
           caregivers: [],
           centers: [],
-          adjusters: []
+          adjusters: [],
+          dashboardStats: null
         };
         fs.writeFileSync(realDataFile, JSON.stringify(emptyData, null, 2), 'utf-8');
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1121,6 +1266,61 @@ function saveSavedFaxConfig(cfg) {
           syncConvexMutation('sync:saveApplication', { app: application }).catch(console.warn);
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: true, count: stored.applications.length, appId: application.id }));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    // =========================================================================
+    // API Route: 통합허브 고객 영구 삭제 API (디스크 파일 및 Convex DB 실시간 연동)
+    // =========================================================================
+    if (reqPath === '/api/hub/delete-application' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { appId, appIds } = JSON.parse(body || '{}');
+          const targetIds = new Set();
+          if (appId) targetIds.add(String(appId));
+          if (Array.isArray(appIds)) appIds.forEach(id => { if (id) targetIds.add(String(id)); });
+
+          if (targetIds.size === 0) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '삭제할 appId가 필요합니다.' }));
+          }
+
+          const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+          let stored = { applications: [] };
+          if (fs.existsSync(realDataFile)) {
+            try { stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8')); } catch (e) {}
+          }
+
+          const beforeCount = (stored.applications || []).length;
+          stored.applications = (stored.applications || []).filter(a => a && a.id && !targetIds.has(String(a.id)));
+          if (Array.isArray(stored.assignments)) {
+            stored.assignments = stored.assignments.filter(as => as && as.applyId && !targetIds.has(String(as.applyId)));
+          }
+          if (Array.isArray(stored.claims)) {
+            stored.claims = stored.claims.filter(c => c && c.applyId && !targetIds.has(String(c.applyId)));
+          }
+          if (Array.isArray(stored.payouts)) {
+            stored.payouts = stored.payouts.filter(p => p && p.applyId && !targetIds.has(String(p.applyId)));
+          }
+          stored.updatedAt = new Date().toISOString();
+          fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+          invalidateRealDataCache();
+
+          // Convex 개발 DB에서도 즉시 비동기 삭제
+          targetIds.forEach(id => {
+            syncConvexMutation('sync:deleteApplication', { appId: id }).catch(console.warn);
+          });
+
+          console.log(`[Disk & Convex Delete] 고객 ${targetIds.size}건 영구 삭제 완료 (이전: ${beforeCount}명 -> 현재: ${stored.applications.length}명)`);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, deletedCount: beforeCount - stored.applications.length, remainingCount: stored.applications.length }));
         } catch (err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: false, error: err.message }));
@@ -1369,7 +1569,64 @@ function saveSavedFaxConfig(cfg) {
         });
         return;
       }
-      return trendHandler(req, res);
+    }
+
+    if (reqPath === '/api/careport/mobile-report') {
+      try { delete require.cache[require.resolve('./api/careport/mobile-report')]; } catch(e) {}
+      const mobileReportHandler = require('./api/careport/mobile-report');
+      const parsedUrl = urlModule.parse(req.url, true);
+      req.query = parsedUrl.query;
+      res.status = (code) => ({
+        json: (data) => {
+          res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(data));
+        },
+        end: () => res.end()
+      });
+      res.json = (data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      };
+
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try { req.body = JSON.parse(body); } catch(e) { req.body = body; }
+          return mobileReportHandler(req, res);
+        });
+        return;
+      }
+      return mobileReportHandler(req, res);
+    }
+
+    if (reqPath === '/api/careport/care-report-pdf') {
+      try { delete require.cache[require.resolve('./api/careport/care-report-pdf')]; } catch(e) {}
+      const pdfReportHandler = require('./api/careport/care-report-pdf');
+      const parsedUrl = urlModule.parse(req.url, true);
+      req.query = parsedUrl.query || {};
+      res.status = (code) => ({
+        json: (data) => {
+          res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(data));
+        },
+        end: () => res.end()
+      });
+      res.json = (data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      };
+
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try { req.body = JSON.parse(body); } catch(e) { req.body = body; }
+          return pdfReportHandler(req, res);
+        });
+        return;
+      }
+      return pdfReportHandler(req, res);
     }
 
     if (reqPath === '/api/careport/generate-pdf') {
@@ -1397,6 +1654,63 @@ function saveSavedFaxConfig(cfg) {
         return;
       }
       return pdfHandler(req, res);
+    }
+
+    if (reqPath === '/api/careport/robot-pdf') {
+      try {
+        delete require.cache[require.resolve('./api/careport/robot-pdf')];
+        delete require.cache[require.resolve('./api/careport/chrome-robot')];
+      } catch(e) {}
+      const robotHandler = require('./api/careport/robot-pdf');
+      res.status = (code) => ({
+        json: (data) => {
+          res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(data));
+        },
+        end: () => res.end()
+      });
+      res.json = (data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      };
+
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try { req.body = JSON.parse(body); } catch(e) { req.body = body; }
+          return robotHandler(req, res);
+        });
+        return;
+      }
+      return robotHandler(req, res);
+    }
+
+    if (reqPath === '/api/careport/submit-service') {
+      try { delete require.cache[require.resolve('./api/careport/submit-service')]; } catch(e) {}
+      const submitServiceHandler = require('./api/careport/submit-service');
+      res.status = (code) => ({
+        json: (data) => {
+          res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(data));
+        },
+        end: () => res.end()
+      });
+      res.json = (data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      };
+
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try { req.body = JSON.parse(body); } catch(e) { req.body = body; }
+          return submitServiceHandler(req, res);
+        });
+        return;
+      }
+      return submitServiceHandler(req, res);
     }
 
     if (reqPath === '/api/samsung/call-report/data') {
@@ -1632,29 +1946,100 @@ function saveSavedFaxConfig(cfg) {
       return;
     }
 
-    // 만족도 조사 안내 문자(SMS) 발송 API (본사 메이트원 & 간병인 앱)
-    if (reqPath === '/api/survey/send-sms' && req.method === 'POST') {
+    // =========================================================================
+    // 실제 문자(SMS/LMS) 발송 API (모바일 간병일지 및 안내 문자)
+    // =========================================================================
+    if (reqPath === '/api/sms/send' && req.method === 'POST') {
       let body = '';
       req.on('data', chunk => body += chunk);
-      req.on('end', () => {
+      req.on('end', async () => {
         try {
+          const { dispatchSms } = require('./sms-service');
           const payload = JSON.parse(body || '{}');
-          const protocol = req.headers['x-forwarded-proto'] || 'http';
-          const host = req.headers['host'] || 'localhost:3000';
-          const baseUrl = `${protocol}://${host}`;
-          const result = gSurveyService.sendSurveySms(
-            payload.targetId,
-            { phone: payload.phone, customMessage: payload.customMessage, baseUrl },
-            payload.actor || 'HQ'
-          );
-          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
-          return res.end(JSON.stringify(result));
+
+          const toPhone = payload.toPhone || payload.phone || payload.recipient;
+          const toName = payload.toName || payload.name || '';
+          const message = payload.message || payload.text || payload.customMessage || '';
+          const senderNumber = payload.senderNumber || payload.fromPhone || '16007835';
+          const provider = payload.provider || 'barobill';
+          const channel = payload.channel || 'sms'; // 'sms' | 'kakao'
+          const buttonUrl = payload.buttonUrl || '';
+          const buttonTitle = payload.buttonTitle || '모바일 간병일지 열람하기';
+          const templateName = payload.templateName || '';
+          const subject = payload.subject || '[리본케어] 모바일 간병일지 안내';
+          const patientName = payload.patientName || '';
+          const category = payload.category || 'CARE_DIARY_MOBILE';
+
+          if (!toPhone) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '수신처 휴대폰 번호를 입력해주세요.' }));
+          }
+
+          if (!message && channel !== 'kakao') {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '발송할 메시지 내용을 입력해주세요.' }));
+          }
+
+          console.log(`[Message Send Request] Channel: ${channel}, Provider: ${provider}, To: ${toName}(${toPhone}), From: ${senderNumber}`);
+          const result = await dispatchSms({
+            toPhone,
+            toName,
+            message,
+            senderNumber,
+            provider,
+            channel,
+            buttonUrl,
+            buttonTitle,
+            templateName,
+            subject,
+            patientName,
+            category
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, ...result }));
         } catch (e) {
-          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          console.error('[SMS Send Error]', e.message);
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: false, error: e.message }));
         }
       });
       return;
+    }
+
+    if (reqPath === '/api/kakao/channels' && req.method === 'GET') {
+      try {
+        const { getBarobillKakaoChannels } = require('./sms-service');
+        const data = await getBarobillKakaoChannels();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify(data));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    }
+
+    if (reqPath === '/api/sms/balance' && req.method === 'GET') {
+      try {
+        const { getBarobillSmsBalance } = require('./sms-service');
+        const balanceInfo = await getBarobillSmsBalance();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify(balanceInfo));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    }
+
+    if (reqPath === '/api/sms/logs' && req.method === 'GET') {
+      try {
+        const { getSmsDispatchLogs } = require('./sms-service');
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, logs: getSmsDispatchLogs() }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: e.message }));
+      }
     }
 
     if (reqPath === '/api/survey/summary' && req.method === 'GET') {
@@ -1676,9 +2061,16 @@ function saveSavedFaxConfig(cfg) {
         try {
           const payload = JSON.parse(body || '{}');
           if (payload.action === 'auto_seed') {
-            gSurveyService.ensureInitialData();
+            const result = gSurveyService.extractCompletedTargets(payload.apps);
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            return res.end(JSON.stringify({ success: true, message: '종료 고객 대상자가 생성되었습니다.', items: gSurveyService.getTargets() }));
+            return res.end(JSON.stringify({ 
+              success: true, 
+              message: result.addedCount > 0 
+                ? `실제 종료 고객 대상자가 추출되었습니다. (신규 ${result.addedCount}건 추가, 전체 ${result.totalTargets}건)` 
+                : `현재 등록 가능한 신규 종료 고객이 없습니다. (이미 전체 ${result.totalTargets}건 등록 완료)`,
+              ...result,
+              items: gSurveyService.getTargets() 
+            }));
           }
           const target = gSurveyService.createTargetFromApp(payload);
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1698,6 +2090,23 @@ function saveSavedFaxConfig(cfg) {
         try {
           const payload = JSON.parse(body || '{}');
           const result = gSurveyService.updateTarget(payload.id, payload.updates, payload.actor);
+          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/survey/targets/delete' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const result = gSurveyService.deleteTarget(payload.id, payload.actor);
           res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify(result));
         } catch (e) {
@@ -1925,8 +2334,18 @@ function saveSavedFaxConfig(cfg) {
                 const ftpHost = isProd ? 'ftp.barobill.co.kr' : 'testftp.barobill.co.kr';
                 const ftpPort = isProd ? 9030 : 9031;
                 const pdfFileName = `LIVON_FAX_${Date.now()}.pdf`;
-                const htmlContent = payload.formHtml || payload.html || '';
-                const pdfBuffer = await createDocumentPdfBuffer(htmlContent, `리본케어 팩스 발송 [수신: ${recipient} (${cleanFaxNumber})]`);
+                let pdfBuffer = null;
+                if (payload.pdfBase64 && typeof payload.pdfBase64 === 'string') {
+                  try {
+                    pdfBuffer = Buffer.from(payload.pdfBase64, 'base64');
+                  } catch (e) {
+                    console.warn('[FAX Base64 Decode Error]', e.message);
+                  }
+                }
+                if (!pdfBuffer || pdfBuffer.length < 100) {
+                  const htmlContent = payload.formHtml || payload.html || '';
+                  pdfBuffer = await createDocumentPdfBuffer(htmlContent, `리본케어 팩스 발송 [수신: ${recipient} (${cleanFaxNumber})]`);
+                }
 
                 console.log(`[FAX Barobill Gateway] FTP 파일 업로드 중... (${ftpHost}:${ftpPort}, 파일: ${pdfFileName}, 크기: ${pdfBuffer.length} bytes)`);
                 await uploadToBarobillFTP(ftpHost, ftpPort, baroId, baroPwd, pdfFileName, pdfBuffer);
@@ -1989,6 +2408,7 @@ function saveSavedFaxConfig(cfg) {
           const faxLog = {
             id: realBaroReceiptNum || faxId,
             sentDate: dateStr,
+            timestamp: Date.now(),
             appId,
             roundNumber: Number(roundNumber) || 1,
             memo,
@@ -2072,7 +2492,7 @@ function saveSavedFaxConfig(cfg) {
               if (Array.isArray(sendKeyList) && sendKeyList.length > 0) {
                 const results = {};
                 for (const key of sendKeyList) {
-                  if (!key || typeof key !== 'string' || !key.startsWith('IBB_')) continue;
+                  if (!key || typeof key !== 'string' || key.startsWith('FLOG-')) continue;
                   try {
                     const st = await getBarobillFaxStatus(certKey, corpNum, key, isTest);
                     results[key] = st;
@@ -2258,7 +2678,95 @@ function saveSavedFaxConfig(cfg) {
       return;
     }
 
+    // =========================================================================
+    // API Route: Slack 일일 운영보고 자동 발송 & 웹훅 연동 API
+    // =========================================================================
+    if (reqPath === '/api/slack/config') {
+      const slackService = require('./slack-report-service');
+      if (req.method === 'GET') {
+        const cfg = slackService.getSlackConfig();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, config: cfg }));
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const patch = JSON.parse(body || '{}');
+            const current = slackService.getSlackConfig();
+            const updated = { ...current, ...patch };
+            slackService.saveSlackConfig(updated);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true, config: updated }));
+          } catch (e) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+    }
+
+    if (reqPath === '/api/slack/send-now' && req.method === 'POST') {
+      const slackService = require('./slack-report-service');
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const customTitle = payload.customTitle || null;
+          const result = await slackService.sendDailyReport(customTitle);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, result }));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    if (reqPath === '/api/slack/preview' && req.method === 'GET') {
+      const slackService = require('./slack-report-service');
+      try {
+        const stats = slackService.generateReportData();
+        const previewText = slackService.buildSlackMessage(stats);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, stats, previewText }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    }
+
+    // CarePort Embed & Assets Proxy for authentic in-browser rendering
+    if (reqPath === '/careport-embed' || reqPath.startsWith('/careport-embed/') || reqPath.startsWith('/js/') || reqPath.startsWith('/css/') || reqPath.startsWith('/img/') || reqPath.startsWith('/fonts/')) {
+      const targetPath = (reqPath === '/careport-embed' || reqPath.startsWith('/careport-embed/'))
+        ? (reqPath.replace('/careport-embed', '') || '/')
+        : reqPath;
+      const proxyReq = https.request(`https://careport.livon.care${targetPath}`, {
+        method: req.method,
+        headers: {
+          ...req.headers,
+          host: 'careport.livon.care'
+        }
+      }, proxyRes => {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        proxyRes.pipe(res);
+      });
+      proxyReq.on('error', (err) => {
+        res.writeHead(502, { 'Content-Type': 'text/plain' });
+        res.end('Proxy error: ' + err.message);
+      });
+      req.pipe(proxyReq);
+      return;
+    }
+
     if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
+    if (reqPath === '/care-diary' || reqPath === '/report' || reqPath.startsWith('/d/')) {
+      reqPath = '/mobile-care-diary.html';
+    }
 
     const filePath = path.join(BASE_DIR, decodeURIComponent(reqPath));
 
@@ -2272,14 +2780,40 @@ function saveSavedFaxConfig(cfg) {
       const ext = path.extname(filePath).toLowerCase();
       const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
-      res.writeHead(200, { 'Content-Type': contentType });
+      const headers = { 'Content-Type': contentType };
+      if (ext === '.html' || ext === '.js' || ext === '.json' || ext === '.css') {
+        headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+        headers['Pragma'] = 'no-cache';
+        headers['Expires'] = '0';
+      }
+      res.writeHead(200, headers);
       fs.createReadStream(filePath).pipe(res);
     });
   });
 
+  // Twilio Media Stream WebSocket Server 연동
+  try {
+    const WebSocket = require('ws');
+    const wss = new WebSocket.Server({ noServer: true });
+    const { handleTwilioStream } = require('./api/carecall/stream');
+
+    server.on('upgrade', (request, socket, head) => {
+      const parsed = urlModule.parse(request.url);
+      if (parsed.pathname === '/api/carecall/stream') {
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          handleTwilioStream(ws, request);
+        });
+      } else {
+        socket.destroy();
+      }
+    });
+  } catch (wsErr) {
+    console.warn('[Twilio WebSocket Init Warning]', wsErr.message);
+  }
+
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.warn(`[?뚮┝] ?ы듃 ${port}踰덉씠 ?대? ?ъ슜 以묒엯?덈떎. ?ㅼ쓬 ?ы듃(${port + 1})濡??먮룞 ?꾪솚?⑸땲??..`);
+      console.warn(`[알림] 포트 ${port}번이 이미 사용 중입니다. 다음 포트(${port + 1})로 자동 전환합니다...`);
       startServer(port + 1);
     } else {
       console.error('서버 오류 발생:', err);
@@ -2292,6 +2826,22 @@ function saveSavedFaxConfig(cfg) {
     console.log(`[리본메이트 원 (Livon Mate One)] 개발 서버가 정상 구동되었습니다.`);
     console.log(`로컬 접속 주소: ${url}`);
     console.log('================================================================');
+
+    // AI 간병통화 예약 발신 및 2분 전 사전 문자 스케줄러 가동
+    try {
+      const { initScheduler } = require('./api/carecall/scheduler-daemon');
+      initScheduler();
+    } catch (schedErr) {
+      console.warn('[CareCall Scheduler Init Warning]', schedErr.message);
+    }
+
+    // 슬랙 통합간병허브 일일 운영보고 자동 발송 스케줄러 가동
+    try {
+      const slackReportService = require('./slack-report-service');
+      slackReportService.initSlackScheduler();
+    } catch (slackSchedErr) {
+      console.warn('[Slack Report Scheduler Init Warning]', slackSchedErr.message);
+    }
 
     // Open default browser
     const startCmd = process.platform === 'win32' ? 'start' : (process.platform === 'darwin' ? 'open' : 'xdg-open');

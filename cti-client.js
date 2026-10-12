@@ -196,19 +196,44 @@ async function makeOutboundCall(params) {
   let result = await sendCallReq(cookie);
 
   // 세션 만료 응답 감지 시 재로그인 후 1회 재시도
-  if (result.bodyText.includes('Main.asp') || result.bodyText.includes('로그인')) {
-    console.warn('[CTI] 세션 만료 감지, 재로그인 시도...');
+  if (result.bodyText.includes('Main.asp') || result.bodyText.includes('로그인') || result.bodyText === '') {
+    console.warn('[CTI] 세션 만료 또는 빈 응답 감지, 재로그인 시도...');
     cookie = await ensureCtiSession(true);
     result = await sendCallReq(cookie);
   }
 
-  const reply = result.bodyText;
+  let reply = result.bodyText;
   console.log('[CTI Outbound Call Response]', { phone: cleanPhone, callerId: cleanCallerId, reply });
+
+  // 15337436 발신 실패 시 16007835 대표번호로 자동 2차 재시도
+  if (reply !== '0' && cleanCallerId !== '16007835') {
+    console.warn(`[CTI] 발신번호(${cleanCallerId}) 미응답(코드:${reply}), 대표번호(16007835)로 즉시 재시도...`);
+    const fallbackCallerId = '16007835';
+    const fallbackData = querystring.stringify({ PHONE: cleanPhone, SENDCID: fallbackCallerId, ASKSN: askSn });
+    const fbRes = await httpRequest({
+      hostname: 'crm.goodars.co.kr',
+      port: 443,
+      path: '/CtiLiVon/admin/C_OutCallApp.asp',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(fallbackData),
+        'Cookie': cookie,
+        'Referer': 'https://crm.goodars.co.kr/CtiLiVon/admin/C_CallLog.asp',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LivonMate/3.0'
+      }
+    }, fallbackData);
+    const decoder = new TextDecoder('euc-kr');
+    reply = decoder.decode(fbRes.body).trim();
+    console.log('[CTI Outbound Fallback Response]', { phone: cleanPhone, callerId: fallbackCallerId, reply });
+  }
 
   if (reply === '1') {
     throw new Error('현재 CTI 회선이 사용 중입니다. 통화 종료 후 다시 시도해주세요.');
   } else if (reply === '2') {
     throw new Error('현재 CTI 회선 상태가 초기화되지 않았습니다. 전화기 상태를 확인해주세요.');
+  } else if (reply !== '0') {
+    throw new Error(`CTI 전화 발신 응답 오류 (코드: '${reply || '미응답'}'). CTI 로그인 상태 및 전화기 연결을 확인해주세요.`);
   }
 
   const callerName = cleanCallerId === '15337436' ? '현대해상 (1533-7436)' : '리본케어 (1600-7835)';

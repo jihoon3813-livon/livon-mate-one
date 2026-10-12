@@ -1,0 +1,857 @@
+
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+
+
+
+
+<html lang="ko" >
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>리본스마트케어</title>
+<meta name="description" content="리본스마트케어">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<META http-equiv="Cache-Control" content="No-Cache">
+<META http-equiv="Pragma" content="no-cache">
+<META http-equiv="Expires" content="-1">
+
+
+
+
+
+
+
+
+
+
+<link rel="stylesheet" href="/resources/v3/css/common.css">
+<link rel="stylesheet" href="/resources/v3/css/sub.css">
+<link rel="stylesheet" href="/resources/v3/css/dataTables.bootstrap.wrap.css">
+
+
+<link rel="stylesheet" href="/resources/v3/css/reset.css">
+
+<script src="/resources/v3/js/libs/jquery-3.4.1.js"></script>
+<script src="/resources/v3/js/ui.utill.js"></script>
+<script src="/resources/v3/js/ui.common.js"></script>
+
+<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+<script src="//code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+
+<script src="/webjars/datatables/1.10.16/js/jquery.dataTables.min-114c26084cb472c6a5f8b58908472ad7.js"></script>
+<script src="/webjars/datatables/1.10.16/js/dataTables.bootstrap4.min-8254943567b15f5974aee554496908fa.js"></script>
+
+<script src="/webjars/datatables-buttons/1.5.1/js/dataTables.buttons-05a237151234f7e8caf17d0c608b019b.js"></script>
+<script src="/webjars/datatables-buttons/1.5.1/js/buttons.bootstrap.min-1a87fa81aa1a02f5db6caf1262c14f78.js"></script>
+<script src="/webjars/datatables-buttons/1.5.1/js/buttons.html5.min-2ca88eadf30ab7db84afffaba69f9d42.js"></script>
+<script src="/webjars/datatables-buttons/1.5.1/js/buttons.print.min-c18cbe3bda10908b5e29d23235881392.js"></script>
+<script src="/webjars/datatables-buttons/1.5.1/js/buttons.colVis.min-29f0d01b0b727ed52d24151dbeb49c96.js"></script>
+<script src="/webjars/underscore/1.10.2/underscore-min-52caef864228e0b4ca9f97eced0ab2bb.js"></script>
+
+<script src="/resources/js/common/common-687486a7f60ea0124ac9d538fa93e8fa.js"></script>
+<script src="/resources/js/xcare/v2/common/xcareCommon-793aa47fc5b7d2001b643894fad0086a.js"></script>
+<script src="/resources/js/center/care/care-906d5676d8531a32d9acec8589be2e50.js"></script>
+
+<script>
+
+</script>
+
+<script>
+	var TMZ 			= '9';
+	var locationAverage = 'Average';
+	var locationRoomA 	= 'roomA';
+	var locationRoomB 	= 'roomB';
+	var locationLivingA = 'livingA';
+	var locationLivingB = 'livingB';
+	var locationKitchen = 'kitchen';
+	var locationBath 	= 'bath';
+	var locationBathB 	= 'bathB';
+	var locationOut 	= 'out';
+	
+	var CAREGIVER_INFO = {
+        adminId: 19416,
+        adminName: '김지훈',
+        adminEmail: 'jihoon3813@livon.care',
+        groupId: 29,
+        groupTitle: '대한민국',
+        authLevelId: 2,
+        level8Gid: 0,
+        level8Title: '',
+        level7Gid: 0,
+        level7Title: '',
+        level6Gid: 0,
+        level6Title: '',
+        level5Gid: 0,
+        level5Title: '',
+        level4Gid: 0,
+        level4Title: '',
+        level3Gid: 0,
+        level3Title: '',
+        level2Gid: 29,
+        level2Title: '대한민국',
+        level1Gid: 28,
+        level1Title: '슈퍼어드민'
+	};
+
+    // DataTable 한글 언어 설정
+    var dataTableLanguageKorea = {
+        "decimal" : "",
+        "emptyTable" : "데이터가 없습니다.",
+        "info" : "_START_ - _END_ (총 _TOTAL_ 결과)",
+        "infoEmpty" : "0결과",
+        "infoFiltered" : "(전체 _MAX_ 결과 중 검색결과)",
+        "infoPostFix" : "",
+        "thousands" : ",",
+        "lengthMenu" : "_MENU_ 개씩 보기",
+        "loadingRecords" : "로딩중...",
+        "processing" : '<div class="datatable-processing-spinner-wrap"><div class="dim"></div><span><img src="/resources/public/pdf/es5/web/images/loading-icon.gif"> 처리중...</span></div>',
+        "search" : "검색 : ",
+        "zeroRecords" : "검색된 데이터가 없습니다.",
+        "paginate" : {
+            "first" : "첫 페이지",
+            "last" : "마지막 페이지",
+            "next" : "다음",
+            "previous" : "이전"
+        },
+        "aria" : {
+            "sortAscending" : " :  오름차순 정렬",
+            "sortDescending" : " :  내림차순 정렬"
+        }
+    };
+</script>
+
+</head>
+<body>
+	<div id="wrap">
+		
+
+
+
+
+
+
+
+<style>
+.menu-wrap .gnb .dep-2 {
+	width: 230px !important;
+}
+
+</style>
+
+<script src="/resources/js/main/index-11637323acff51b7d6a00d0abd7d7eba.js">
+</script>
+
+<header id="header">
+	<div class="header-in">
+		<h1>
+			<a href="/main/nursecall" class="">
+
+				
+					
+					
+						<span class="blind">리본 스마트케어</span>
+						<img src="/resources/v3/img/common/livon_white.png" style="width: 140px;padding-top: 16px;">
+					
+				
+
+			</a>
+	 	</h1>
+		<span class="user">
+		
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			&nbsp;
+			서브그룹매니저
+			&nbsp;
+
+			<a href="/main/member/user/list" class="txt ir-b i-name">김지훈</a>
+			<a href="javascript:void(0)" id="pw_write" class="btn-3 ir-b i-pw" >비밀번호 변경</a>
+			<a href="javascript:void(0)" onclick="IndexHandler.logout()" class="btn-3 ir-b i-logout">로그아웃</a>
+		
+
+		</span>
+	</div>
+	<div class="menu-wrap">
+		<ul class="gnb">
+			
+				<li><a href="#none">서비스 대상자관리</a>
+					<ul class="dep-2">
+						<li><a href="/main/user/userList">대상자조회</a></li>
+						<li><a href="/main/user/userWrite">대상자등록</a></li>
+						<li><a href="/main/user/excel/form">대상자등록(엑셀)</a></li>
+						<li><a href="/main/user/mapping">담당자변경</a></li>
+					</ul>
+				</li>
+				<li><a href="#none">서비스관리</a>
+					<ul class="dep-2">
+						<li><a href="/center/emergency/history">응급상황 조회 및 처리</a></li>
+						<li><a href="javascript:void(0)" onclick="IndexHandler.xCareOpen('/center/activity/status/monitoring', 'jihoon3813@livon.care','popup3');">활동미감지 조회 및 처리</a></li>
+						<li><a href="/center/listsearch/status/list">대상자 장비 매핑 조회 및 처리</a></li>
+						<li><a href="/center/activity/status/list">대상자 활동현황</a></li>
+						<li><a href="/center/notice/reg/list">공지사항 음성알림등록</a></li>
+					</ul>
+				</li>
+				<li><a href="#none">장비관리</a>
+					<ul class="dep-2">
+						<li><a href="/center/device/status/list">장비동작현황</a></li>
+						<!--
+						<li><a href="/xcare/v2/report/list">설치 리포트</a></li>
+						<li><a href="/center/warranty/list">A/S 현황</a></li>
+						 -->
+						<li><a href="/center/device/check/list">역점검 및 원격설정</a></li>
+						<li><a href="/center/device/emergencyAlarm/list">응급상황 알림설정</a></li>
+						<!--
+						<li><a href="/center/reception/log/list">수신 로그조회</a></li>
+						<li><a href="/center/inoutmanage/list">입출고 관리</a></li>
+						 -->
+						<li><a href="/center/device/check/contentsDownload">컨텐츠 다운로드</a></li>
+					</ul>
+				</li>
+				<li><a href="#none">시스템 사용자관리</a>
+					<ul class="dep-2">
+						
+
+						<li><a href="/main/member/user/list">사용자조회</a></li>
+
+						
+
+					</ul>
+				</li>
+				
+				 <li><a href="#none">가입자관리</a>
+					<ul class="dep-2">
+						<li><a href="/main/contractor/contractorList">계약자조회</a></li>
+						<li><a href="/main/contractor/contractorRegistration">계약자등록</a></li>
+
+						<li><a href="/main/contractor/contractorList2">회원가입조회</a></li>
+
+					</ul>
+				</li>
+				
+			
+			
+				<li><a href="#none">결제관리</a>
+					<ul class="dep-2">
+						<!-- 각 컨트롤러에 맞는 화면 구성 필요 -->
+						<li><a href="/paymentUserInfo/initView">결제수단관리</a></li>
+						<!-- 각 컨트롤러에 맞는 화면 구성 필요 -->
+						<li><a href="/billInfo/initView">정기결제</a></li>
+					</ul>
+				</li>										<!-- 각 컨트롤러에 맞는 화면 구성 필요 -->
+				
+			
+			<li>
+				<a href="#none">방문관리</a>
+				<ul class="dep-2">
+					<li><a href="/main/schedule/view/visitor/location">방문자 위치확인</a></li>
+					<li><a href="/main/schedule/view/visitor">방문자 조회</a></li>
+				</ul>
+			</li>
+			
+		</ul>
+	</div>
+	
+	<form id="xCarePop" name="xCarePop" method="post" action="">
+		<input type="hidden" id="email" 	name="email" 	value="">
+		<input type="hidden" id="token"		name="token" 	value="">
+		<input type="hidden" id="location"	name="location" value="">
+	</form>
+</header>
+
+<div id="dialog-form" title="비밀번호 변경">
+	<form id="pop_frm">
+	<input type="hidden" id="adminId" name="adminId" value="19416">
+
+	<table class="data-list ty-2 short cmgt-2">
+		<caption>서브그룹 목록</caption>
+		<colgroup>
+			<col style="width:40.3%;">
+			<col style="width:58.3%;">
+		</colgroup>
+		<tbody>
+			<tr>
+				<th scope="col">현재 비밀번호</th>
+				<td class="txt"><input type="password" placeholder="비밀번호" id="pwd1" name="pwd1" maxlength="15" class="fm-ipt" /></td>
+			</tr>
+			<tr>
+				<th scope="col">새 비밀번호</th>
+				<td class="txt"><input type="password" placeholder="비밀번호" id="pwd2" name="pwd2" maxlength="15" class="fm-ipt" /></td>
+			</tr>
+			<tr>
+				<th scope="col">비밀번호 확인</th>
+				<td class="txt"><input type="password" placeholder="비밀번호" id="pwd3" name="pwd3" maxlength="15" class="fm-ipt" /></td>
+			</tr>
+			<tr>
+				<td colspan="2"><span class="fm-txt">* 8자 이상 15자 이내로 영문, 숫자, 특수문자 중 3종류이상으로 조합하여 작성해 주세요</span> </td>
+			</tr>
+		</tbody>
+	</table>
+	</form>
+
+	<div class="btn-area cmgt-2">
+		<span class="side">
+			<a href="javascript:void(0)" onclick="pw_ok()" class="btn-9 ty-2">저 장</a>
+		</span>
+	</div>
+</div>
+
+<script>
+$( function() {
+    $( "#dialog-form" ).dialog({
+    	autoOpen: false,
+    	height: 330,
+    	width: 700,
+    	modal: true,
+    	close: function() {
+    		$( "#dialog-form" ).dialog( "close" );
+    	}
+  	});
+
+	$( "#pw_write" ).button().on( "click", function() {
+		$( "#dialog-form" ).dialog( "open" );
+	});
+
+	$( "#pw_write" ).attr('class','btn-3 ir-b i-pw');
+});
+
+function pw_ok(){
+	//비밀번호 유효성검사
+	var password 	= $("#pwd1").val();
+	var password2 	= $("#pwd2").val();
+	var password3 	= $("#pwd3").val();
+
+    var num2 = password2.search(/[0-9]/g);
+	var eng2 = password2.search(/[a-z]/ig);
+	var spe2 = password2.search(/[``~!@@#$%^&*|\\\'\";:\/?]/gi);
+
+	if (password2.length < 8 || password2.length > 15){
+		alert('비밀번호를 8~15자리 이내로 입력해주세요.');
+	    return;
+	}
+	else if (password2.search(/\s/) != -1){
+	    alert('비밀번호를 공백없이 입력해주세요.');
+	    return;
+	}
+	else if (num2 < 0 || eng2 < 0 || spe2 < 0){
+	    alert('비밀번로를 영문, 숫자, 특수문자를 혼합해주세요.');
+	    return;
+	}
+
+	var num3 = password3.search(/[0-9]/g);
+	var eng3 = password3.search(/[a-z]/ig);
+	var spe3 = password3.search(/[``~!@@#$%^&*|\\\'\";:\/?]/gi);
+
+	if (password3.length < 8 || password3.length > 15){
+		alert('비밀번호를 8~15자리 이내로 입력해주세요.');
+	    return;
+	}
+	else if (password3.search(/\s/) != -1){
+	    alert('비밀번호를 공백없이 입력해주세요.');
+	    return;
+	}
+	else if (num3 < 0 || eng3 < 0 || spe3 < 0){
+	    alert('비밀번로를 영문, 숫자, 특수문자를 혼합해주세요.');
+	    return;
+	}
+
+	if(password2 != password3) {
+		alert("비밀번호가 일치하지 않습니다.");
+		return;
+	}
+
+	if(confirm("비밀번호 변경 후 자동 로그아웃 됩니다.\n변경하시겠습니까?")) {
+		var param = {
+			password: password,
+			email: "jihoon3813@livon.care",
+	    };
+
+		$.ajax({
+			type: 'post',
+		    url: '/main/login/pwchk',
+		    data: param,
+		    dataType: 'json',
+		    success : function(data) {
+			  	if(data == 0){
+		    		alert("현재 비밀번호가 일치하지 않습니다.");
+		    	} else if(data == 1){
+		    		var param = {
+		    			password: password2,
+		    			email: "jihoon3813@livon.care",
+		    	    };
+
+		    		$.ajax({
+		    			type: 'post',
+		    	    	url: '/main/login/pwchange',
+		    	    	data: param,
+		    	    	dataType: 'text',
+		    	    	success : function(data) {
+		    		    	$( "#dialog-form" ).dialog( "close" );
+		    		    	alert("비밀번호가 변경되었습니다.");
+		    		    	IndexHandler.passWordChangelogout();
+		    	    	},
+		    	    	error : function(err) {
+		    				console.log(err);
+		    			}
+		    		});
+		    	}
+		    },
+		    error : function(err) {
+				console.log(err);
+			}
+		});
+	}
+}
+
+</script>
+
+		
+
+
+
+
+
+
+
+	<main id="container">
+		<div class="lnb-wrap">
+		   
+
+
+
+
+<button type="button" class="toggle"><span class="ir i-menu">Menu</span></button>
+<div class="lnb-inner">
+	<div class="inner-max">
+
+
+		<h2 class="lnb-title">선정관리</h2>
+		<ul class="lnb">
+			<li><a href="/main/user/userList">대상자조회</a></li>
+			<li><a href="/main/user/userWrite">대상자등록</a></li>
+			<li><a href="/main/user/excel/form">대상자등록(엑셀)</a></li>
+			<li><a href="/main/user/mapping">담당자변경</a></li>
+		</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		<div class="banner">
+			<dl>
+				<dt>콜센터 연락처</dt>
+				<dd>대표 : 1600-7835</dd>
+				<dd>
+					업무별 ARS<br />
+					<ul class="ars-list">
+						<li>서비스신청 : 070-4513-1723</li>
+						<li>A/S : 070-7875-2418</li>
+						<li>기술지원: 070-7875-4083</li>
+					</ul>
+				</dd>
+			</dl>
+		</div>
+	</div>
+</div>
+
+		</div>
+
+		<div class="contents">
+			<!-- 탭 // -->
+			<div class="tab">
+				<ul>
+					<li class="item active"><a href="#none" class="in">대상자 등록</a><!-- <a href="#none" class="ir i-del">삭제</a> --></li>
+				</ul>
+				<!-- <a href="#none" class="btn-del">전체 탭</a> -->
+			</div>
+			<!-- // 탭 -->
+
+			<div class="side">
+				<a href="/main/user/userList"  class="btn-9">리스트</a>
+				<a href="javascript:void(0)" onclick="UserWriteHandler.userSave()" class="btn-9 ty-2">저 장</a>
+			</div>
+
+			<h4 class="g-title-6 cmgt-3">기본정보</h4>
+			<div class="search-area">
+				<span for="sido">서비스</span>
+				<select id="sido" name="sido" class="fm-sel group-search" title="서비스">
+					<option value="" label="--- 전체 ---"></option>
+					<option value="13899" label="리본스마트케어"></option>
+				</select>
+				<span for="sigungu">그룹</span>
+				<select id="sigungu" name="sigungu" class="fm-sel group-search" title="그룹" disabled="">
+					<option value="" label="서비스 선택 필요"></option>
+				</select>
+				<span for="organization">서브그룹</span>
+				<select id="organization" name="organization" class="fm-sel group-search" title="서브그룹"
+						disabled="">
+					<option value="" label="그룹 선택 필요"></option>
+				</select>
+			</div>
+			<form id="fmUsr" name="fmUsr">
+				<input type="hidden" id="insert_type" 	name="insert_type" 		value="S">
+				<input type="hidden" id="m02_id" 		name="m02_id" 			value="">
+				<input type="hidden" id="m03_id" 		name="m03_id" 			value="" />
+				<input type="hidden" id="status" 		name="status" 			value="NEW">
+
+				<!-- 주소 추가 값 -->
+				<input type="hidden" name="address_jibun_basic" 	id="address_jibun_basic">
+				<input type="hidden" name="address_jibun_detail" 	id="address_jibun_detail">
+
+				<input type="hidden" name="address_bdong" 			id="address_bdong">
+				<input type="hidden" name="address_hdong" 			id="address_hdong">
+				<input type="hidden" name="address_ri" 				id="address_ri">
+				<input type="hidden" name="address_expension" 		id="address_expension">
+
+				<!-- il_care_recipient.cv_code 를 위하여 추가 -->
+				<input type="hidden" name="cv_code" 				id="cv_code">
+				<!-- 주소 추가 값 -->
+
+				<!-- 테이블 // -->
+				<table class="data-list ty-2 tbody cmgt">
+					<caption>기본정보 등록 목록</caption>
+					<colgroup>
+						<col style="width:7.6%;" />
+						<col style="width:43%;" />
+						<col style="width:7.6%;" />
+						<col />
+					</colgroup>
+					<tbody>
+						<tr>
+							<th scope="row">신규 구분</th>
+							<td>
+								<span class="fm-item ty-4"><input type="radio" id="service_type-41" name="service_type" class="fm-rad" value="NEW" checked="checked"><label for="service_type-41" class="checked-i txt">노인</label></span>
+								<span class="fm-item ty-4"><input type="radio" id="service_type-51" name="service_type" class="fm-rad" value="NEW01" ><label for="service_type-51" class="checked-i txt">기타</label></span>
+							</td>
+							<th scope="row">구분</th>
+							<td>
+								<span class="fm-item ty-4"><input type="radio" id="user_type-41" name="user_type" value="41"  checked="checked" class="fm-rad"><label for="user_type-41" class="checked-i txt">Livon</label></span>
+								<span class="fm-item ty-4"><input type="radio" id="user_type-51" name="user_type" value="51"  class="fm-rad"><label for="user_type-51" class="checked-i txt">부모님안심</label></span>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="user_name">대상자명</label></th>
+							<td><input type="text" placeholder="" id="user_name" name="user_name" class="fm-ipt ty-3" maxlength="15"></td>
+							<th scope="row"><label for="birth">생년월일</label></th>
+							<td>
+								<input type="hidden" id="rrno" name="rrno" value="" />
+								<span class="fm-item ty-4"><input type="text"  id="birth" name="birth" class="fm-ipt ty-3 w-3" maxlength="10"></span>
+								<span class="fm-item ty-4"><input type="radio" id="gender-1" name="gender" value="M" checked="checked" class="fm-rad"><label for="gender-1" class="checked-i txt">남자</label></span>
+								<span class="fm-item ty-4"><input type="radio" id="gender-2" name="gender" value="F" class="fm-rad"><label for="gender-2" class="checked-i txt">여자</label></span>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="htel">연락처<br>(집전화)</label></th>
+							<td><input type="text" placeholder="" id="htel" name="htel" class="fm-ipt ty-3" maxlength="11"></td>
+							<th scope="row"><label for="mtel">연락처<br>(핸드폰)</label></th>
+							<td><input type="text" placeholder="" id="mtel" name="mtel" class="fm-ipt ty-3" maxlength="11"></td>
+						</tr>
+
+						<tr>
+							<th scope="row">현주소<br>(실제거주지)</th>
+							<td colspan="3">
+								<div class="fm-add">
+									<div class="fm-item ty-2">
+										<label for="zip"><span class="blind">우편번호</span></label>
+										<input type="text" placeholder="" id="zip" name="zip" class="fm-ipt ty-3" readonly maxlength="6">
+										<a href="javascript:void(0)" onclick="UserWriteHandler.findAddress()" class="btn-8">우편번호 검색</a>
+									</div>
+									<div class="fm-item ty-2">
+										<label for="address_basic"><span class="blind">주소</span></label>
+										<input type="text" placeholder="" id="address_basic" name="address_basic" class="fm-ipt ty-3" readonly>
+									</div>
+									<div class="fm-item ty-2">
+										<label for="address_detail"><span class="blind">상세주소</span></label>
+										<input type="text" placeholder="" id="address_detail" name="address_detail" class="fm-ipt ty-3">
+									</div>
+								</div>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="memo">참고사항</label></th>
+							<td colspan="3">
+								<textarea id="memo" name="memo" class="fm-ta" placeholder=""></textarea>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+				<!-- // 테이블 -->
+
+				<h4 class="g-title-6 cmgt">비상연락자 (보호자)</h4>
+				<!-- 테이블 // -->
+				<table class="data-list ty-2 cmgt">
+					<caption>비상연락자 등록 목록</caption>
+					<colgroup>
+						<col style="width:33%;" />
+						<col style="width:33%;" />
+						<col />
+					</colgroup>
+					<thead>
+						<tr>
+							<th scope="col">성명</th>
+							<th scope="col">관계</th>
+							<th scope="col">연락처</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><input type="text" placeholder="" id="family_tel1_name" name="family_tel1_name" class="fm-ipt ty-3 w-full"></td>
+							<td>
+								<label for="family_tel1_type"><span class="blind">관계</span></label>
+								<select id="family_tel1_type" name="family_tel1_type" class="fm-sel-5 w-full" placeholder="비상연락자 관계">
+									<option value="01">부</option>
+									<option value="02">모</option>
+									<option value="03">시부모</option>
+									<option value="04">자부</option>
+									<option value="05">아들</option>
+									<option value="06">딸</option>
+									<option value="07">손자</option>
+									<option value="08">손녀</option>
+									<option value="09">형제</option>
+									<option value="10">자매</option>
+									<option value="11">백부</option>
+									<option value="12">백모</option>
+									<option value="13">숙부</option>
+									<option value="14">숙모</option>
+									<option value="15">조부</option>
+									<option value="16">조모</option>
+									<option value="17">사위</option>
+									<option value="50">친척</option>
+									<option value="90">이웃</option>
+									<option value="95">본인</option>
+									<option value="96">배우자</option>
+									<option value="99">관계없음</option>
+									<option value="Z1">사회복지사</option>
+									<option value="Z2">공무원</option>
+									<option value="Z3">사무원</option>
+									<option value="Z4">생활지원사</option>
+									<option value="Z5">활동지원사</option>
+									<option value="Z6">요양보호사</option>
+								</select>
+							</td>
+							<td><input type="text" placeholder="" id="family_tel1_number" name="family_tel1_number" maxlength="11"  class="fm-ipt ty-3 w-full"></td>
+						</tr>
+						<tr>
+							<td><input type="text" placeholder="" id="family_tel2_name" name="family_tel2_name" class="fm-ipt ty-3 w-full"></td>
+							<td>
+								<label for="family_tel2_type"><span class="blind">관계</span></label>
+								<select id="family_tel2_type" name="family_tel2_type" class="fm-sel-5 w-full" placeholder="비상연락자 관계">
+									<option value="">선택해 주세요</option>
+									<option value="01">부</option>
+									<option value="02">모</option>
+									<option value="03">시부모</option>
+									<option value="04">자부</option>
+									<option value="05">아들</option>
+									<option value="06">딸</option>
+									<option value="07">손자</option>
+									<option value="08">손녀</option>
+									<option value="09">형제</option>
+									<option value="10">자매</option>
+									<option value="11">백부</option>
+									<option value="12">백모</option>
+									<option value="13">숙부</option>
+									<option value="14">숙모</option>
+									<option value="15">조부</option>
+									<option value="16">조모</option>
+									<option value="17">사위</option>
+									<option value="50">친척</option>
+									<option value="90">이웃</option>
+									<option value="95">본인</option>
+									<option value="96">배우자</option>
+									<option value="99">관계없음</option>
+									<option value="Z1">사회복지사</option>
+									<option value="Z2">공무원</option>
+									<option value="Z3">사무원</option>
+									<option value="Z4">생활지원사</option>
+									<option value="Z5">활동지원사</option>
+									<option value="Z6">요양보호사</option>
+								</select>
+							</td>
+							<td><input type="text" placeholder="" id="family_tel2_number" name="family_tel2_number"  maxlength="11" class="fm-ipt ty-3 w-full"></td>
+						</tr>
+						<tr>
+							<td><input type="text" placeholder="" id="family_tel3_name" name="family_tel3_name" class="fm-ipt ty-3 w-full"></td>
+							<td>
+								<label for="family_tel3_type"><span class="blind">관계</span></label>
+								<select id="family_tel3_type" name="family_tel3_type" class="fm-sel-5 w-full" placeholder="비상연락자 관계">
+									<option value="">선택해 주세요</option>
+									<option value="01">부</option>
+									<option value="02">모</option>
+									<option value="03">시부모</option>
+									<option value="04">자부</option>
+									<option value="05">아들</option>
+									<option value="06">딸</option>
+									<option value="07">손자</option>
+									<option value="08">손녀</option>
+									<option value="09">형제</option>
+									<option value="10">자매</option>
+									<option value="11">백부</option>
+									<option value="12">백모</option>
+									<option value="13">숙부</option>
+									<option value="14">숙모</option>
+									<option value="15">조부</option>
+									<option value="16">조모</option>
+									<option value="17">사위</option>
+									<option value="50">친척</option>
+									<option value="90">이웃</option>
+									<option value="95">본인</option>
+									<option value="96">배우자</option>
+									<option value="99">관계없음</option>
+									<option value="Z1">사회복지사</option>
+									<option value="Z2">공무원</option>
+									<option value="Z3">사무원</option>
+									<option value="Z4">생활지원사</option>
+									<option value="Z5">활동지원사</option>
+									<option value="Z6">요양보호사</option>
+								</select>
+							</td>
+							<td><input type="text" placeholder="" id="family_tel3_number" name="family_tel3_number" maxlength="11"  class="fm-ipt ty-3 w-full"></td>
+						</tr>
+						<tr>
+							<td><input type="text" placeholder="" id="family_tel4_name" name="family_tel4_name" class="fm-ipt ty-3 w-full"></td>
+							<td>
+								<label for="family_tel4_type"><span class="blind">관계</span></label>
+								<select id="family_tel4_type" name="family_tel4_type" class="fm-sel-5 w-full" placeholder="비상연락자 관계">
+									<option value="">선택해 주세요</option>
+									<option value="01">부</option>
+									<option value="02">모</option>
+									<option value="03">시부모</option>
+									<option value="04">자부</option>
+									<option value="05">아들</option>
+									<option value="06">딸</option>
+									<option value="07">손자</option>
+									<option value="08">손녀</option>
+									<option value="09">형제</option>
+									<option value="10">자매</option>
+									<option value="11">백부</option>
+									<option value="12">백모</option>
+									<option value="13">숙부</option>
+									<option value="14">숙모</option>
+									<option value="15">조부</option>
+									<option value="16">조모</option>
+									<option value="17">사위</option>
+									<option value="50">친척</option>
+									<option value="90">이웃</option>
+									<option value="95">본인</option>
+									<option value="96">배우자</option>
+									<option value="99">관계없음</option>
+									<option value="Z1">사회복지사</option>
+									<option value="Z2">공무원</option>
+									<option value="Z3">사무원</option>
+									<option value="Z4">생활지원사</option>
+									<option value="Z5">활동지원사</option>
+									<option value="Z6">요양보호사</option>
+								</select>
+							</td>
+							<td><input type="text" placeholder="" id="family_tel4_number" name="family_tel4_number" maxlength="11"  class="fm-ipt ty-3 w-full"></td>
+						</tr>
+					</tbody>
+				</table>
+				<!-- // 테이블 -->
+			</form>
+
+		</div>
+	</main>
+
+<script src="/resources/js/main/user/userWrite-a57485a196c7e700aec46d07f73d9efe.js"></script>
+
+
+		
+
+
+
+
+
+<style>
+	
+</style>
+	<footer id="footer">
+		<div class="footer-in">
+			<div class="footer-link">
+				
+					
+					
+						<a href="http://www.hidea.kr/" target="_blank">
+							<img src="/resources/v3/img/common/logo_color.png">
+						</a>
+					
+				
+				
+				<!-- <a href="http://www.hidea.kr/" target="_blank" class="item ir i-hidea">하이디어솔루션즈</a>  -->
+				 <a href="/main/common/privacy" class="item bar" onclick ="window.open(this.href,'팝업창','width=650, height=900');return false;">개인정보처리방침</a>
+				 
+			</div>
+			<div class="footer-address">
+				<address>
+					(주)하이디어솔루션즈 (08592) 서울특별시 금천구 가산디지털2로 34 326호<br />
+					<!-- 
+					㈜하이디어솔루션즈 서울시 성동구 아차산로 3 두앤캔빌딩 4층
+					 -->
+				</address>
+				<!-- 
+				<p class="copyright">COPYRIGHT&copy; Hidea Solutions Co. Ltd. All Rights Reserved.</p>
+				 -->
+				<p class="copyright">Copyright@ 2023 리본스마트빌 All Right Reserved</p>
+			</div>
+		</div>
+	</footer>
+
+	</div>
+</body>
+</html>

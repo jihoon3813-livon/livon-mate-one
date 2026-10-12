@@ -48,7 +48,8 @@ export default defineSchema({
     .index("by_policyNumber", ["policyNumber"]),
 
   // 삼성화재 웹 스프레드시트 시트별 레코드 (target, completed, contacts)
-  samsungSheets: defineTable(v.any()),
+  samsungSheets: defineTable(v.any())
+    .index("by_sheetKey", ["sheetKey"]),
 
   // 삼성화재 이메일 주소록
   samsungAddressBook: defineTable(v.any()),

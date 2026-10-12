@@ -1,0 +1,249 @@
+// api/carecall/vonage-service.js
+// Vonage Voice API Engine for Real Phone Calls + NCCO Control
+
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
+const crypto = require('crypto');
+const querystring = require('querystring');
+
+const CONFIG_FILE = path.join(process.cwd(), 'carecall_vonage_config.json');
+const PRIVATE_KEY_FILE = path.join(process.cwd(), 'vonage_private.key');
+
+let gMemoryVonageConfig = null;
+
+/**
+ * Vonage 설정 불러오기
+ */
+function getVonageConfig() {
+  if (gMemoryVonageConfig) return gMemoryVonageConfig;
+
+  let cfg = {
+    apiKey: process.env.VONAGE_API_KEY || '5c5b4ab6',
+    apiSecret: process.env.VONAGE_API_SECRET || 'IZT48tMcTzrQYM1V',
+    applicationId: process.env.VONAGE_APPLICATION_ID || '5fae20dd-651a-4942-8390-d6ff77283601',
+    privateKeyPath: 'vonage_private.key',
+    phoneNumber: process.env.VONAGE_PHONE_NUMBER || '12345678901',
+    publicBaseUrl: process.env.PUBLIC_BASE_URL || 'https://livon-mate-one.vercel.app',
+    voiceName: 'ko-KR-Standard-A'
+  };
+
+  const candidateFiles = [CONFIG_FILE, path.join('/tmp', 'carecall_vonage_config.json')];
+  for (const cFile of candidateFiles) {
+    if (fs.existsSync(cFile)) {
+      try {
+        const data = JSON.parse(fs.readFileSync(cFile, 'utf8'));
+        cfg = { ...cfg, ...data };
+        break;
+      } catch (_) {}
+    }
+  }
+
+  return cfg;
+}
+
+/**
+ * Vonage 설정 저장
+ */
+function saveVonageConfig(newCfg) {
+  const existing = getVonageConfig();
+  const merged = { ...existing, ...newCfg, updatedAt: new Date().toISOString() };
+  gMemoryVonageConfig = merged;
+  try {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2), 'utf8');
+  } catch (err) {
+    try {
+      fs.writeFileSync(path.join('/tmp', 'carecall_vonage_config.json'), JSON.stringify(merged, null, 2), 'utf8');
+    } catch (_) {}
+  }
+  return merged;
+}
+
+/**
+ * RSA-SHA256 기반 Vonage JWT 생성
+ */
+function generateVonageJwt(appId, customPrivateKey) {
+  let privateKey = customPrivateKey;
+  if (!privateKey) {
+    if (process.env.VONAGE_PRIVATE_KEY) {
+      privateKey = process.env.VONAGE_PRIVATE_KEY.replace(/\\n/g, '\n');
+    } else if (fs.existsSync(PRIVATE_KEY_FILE)) {
+      privateKey = fs.readFileSync(PRIVATE_KEY_FILE, 'utf8');
+    } else {
+      const altKey = path.join('/tmp', 'vonage_private.key');
+      if (fs.existsSync(altKey)) {
+        privateKey = fs.readFileSync(altKey, 'utf8');
+      }
+    }
+  }
+
+  if (!privateKey) {
+    throw new Error('Vonage Private Key(.key)를 찾을 수 없습니다.');
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({
+    application_id: appId,
+    iat: now,
+    exp: now + 900,
+    jti: crypto.randomUUID()
+  })).toString('base64url');
+
+  const sign = crypto.createSign('RSA-SHA256');
+  sign.update(header + '.' + payload);
+  const signature = sign.sign(privateKey, 'base64url');
+  return `${header}.${payload}.${signature}`;
+}
+
+/**
+ * 한국 전화번호를 8210XXXXXXXX 형식으로 변환
+ */
+function formatVonagePhone(phone) {
+  if (!phone) return '';
+  const digits = String(phone).replace(/[^0-9]/g, '');
+  if (digits.startsWith('82')) {
+    return digits;
+  }
+  if (digits.startsWith('0')) {
+    return '82' + digits.slice(1);
+  }
+  return '82' + digits;
+}
+
+/**
+ * Vonage Outbound Voice Call 발신
+ */
+async function placeVonageCall({ phone, patientName, caregiverName, workDate, workTime, scheduleId, voice, baseUrl: customBaseUrl }) {
+  const cfg = getVonageConfig();
+
+  if (!cfg.applicationId) {
+    throw new Error('Vonage Application ID가 설정되지 않았습니다.');
+  }
+
+  const toFormatted = formatVonagePhone(phone);
+  if (!toFormatted || toFormatted.length < 10) {
+    throw new Error(`유효하지 않은 수신 전화번호입니다: ${phone}`);
+  }
+
+  let baseUrl = customBaseUrl || cfg.publicBaseUrl || 'https://livon-mate-one.vercel.app';
+  if (!baseUrl || baseUrl.includes('localhost')) {
+    baseUrl = 'https://livon-mate-one.vercel.app';
+  }
+
+  const jwtToken = generateVonageJwt(cfg.applicationId);
+
+  const queryParams = querystring.stringify({
+    patientName: patientName || '',
+    caregiverName: caregiverName || '',
+    workDate: workDate || '',
+    workTime: workTime || '',
+    scheduleId: scheduleId || ''
+  });
+
+  const systemVoice = (function() {
+    try {
+      const cfgFile = path.join(process.cwd(), 'carecall_voice_config.json');
+      if (fs.existsSync(cfgFile)) {
+        const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
+        if (cfg && cfg.voice) return cfg.voice.toLowerCase().trim();
+      }
+    } catch (_) {}
+    return 'coral';
+  })();
+  const effectiveVoice = (voice || systemVoice).toLowerCase().trim();
+  const turnAnswerUrl = `${baseUrl}/api/carecall/vonage-turn?action=answer&${queryParams}&voice=${effectiveVoice}`;
+  const eventUrl = `${baseUrl}/api/carecall/vonage-event?${queryParams}`;
+
+  // 리본메이트 앱 100% 동일 첫 멘트 사전 합성 (전화벨 울리는 동안 캐싱 완료)
+  try {
+    const formattedDate = (function(d) {
+      if (!d) return '오늘';
+      const parts = d.split('-');
+      return parts.length === 3 ? `${parseInt(parts[1], 10)}월 ${parseInt(parts[2], 10)}일` : d;
+    })(workDate);
+    const shortName = (patientName && patientName.length === 3) ? patientName.slice(1) : (patientName || '어르신');
+    const targetName = shortName + '님';
+    const openingText = caregiverName
+      ? `어 안녕하세요 ${caregiverName} 간병사님, 오늘 ${targetName} 돌봐 드리신 거 맞죠? 그날 전반적으로 어떤 모습이셨는지부터 편하게 얘기해 주실 수 있을까요? 그러니까 ${targetName}이 그날 기운이 좀 어떠셨는지 특별히 불편해 보이신 점은 없었는지 그냥 느낌대로 말씀해 주시면 돼요.`
+      : `어 안녕하세요, 오늘 ${targetName} 돌봐 드리신 거 맞죠? 그날 전반적으로 어떤 모습이셨는지부터 편하게 얘기해 주실 수 있을까요? 그러니까 ${targetName}이 그날 기운이 좀 어떠셨는지 특별히 불편해 보이신 점은 없었는지 그냥 느낌대로 말씀해 주시면 돼요.`;
+
+    const { synthesizeTts, storeTurnAudio } = require('./turn-audio');
+    synthesizeTts(openingText, effectiveVoice).then(buf => {
+      const cacheKey = 'hash_' + Buffer.from(openingText).toString('hex').slice(0, 32);
+      storeTurnAudio(cacheKey, buf);
+    }).catch(() => {});
+  } catch (_) {}
+
+  // 리본메이트 공식 양방향 1문1답 AI 대화형 엔진 연동 (OpenAI GPT + OpenAI Voice)
+  const postPayload = {
+    to: [{ type: 'phone', number: toFormatted }],
+    from: { type: 'phone', number: cfg.phoneNumber || '12345678901' },
+    answer_url: [turnAnswerUrl],
+    event_url: [eventUrl],
+    event_method: 'POST'
+  };
+
+  const postData = JSON.stringify(postPayload);
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'api.nexmo.com',
+      port: 443,
+      path: '/v1/calls',
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + jwtToken,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        'User-Agent': 'LivonCareCall/1.0'
+      }
+    }, res => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const bodyStr = Buffer.concat(chunks).toString('utf8');
+        try {
+          const json = JSON.parse(bodyStr);
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve({
+              success: true,
+              uuid: json.uuid,
+              conversationUuid: json.conversation_uuid,
+              status: json.status,
+              direction: json.direction,
+              to: toFormatted,
+              from: cfg.phoneNumber,
+              message: `[${caregiverName || toFormatted}] 님에게 Vonage 음성 통화 발신이 시작되었습니다. (Call UUID: ${json.uuid})`
+            });
+          } else {
+            reject({
+              statusCode: res.statusCode,
+              title: json.title || json.error_title,
+              detail: json.detail || bodyStr
+            });
+          }
+        } catch (e) {
+          reject({ statusCode: res.statusCode, message: `Vonage 응답 파싱 실패: ${bodyStr}` });
+        }
+      });
+    });
+
+    req.on('error', err => reject({ statusCode: 500, message: err.message }));
+    req.setTimeout(12000, () => {
+      req.destroy();
+      reject({ statusCode: 408, message: 'Vonage API 응답 시간 초과 (12초)' });
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+module.exports = {
+  getVonageConfig,
+  saveVonageConfig,
+  generateVonageJwt,
+  formatVonagePhone,
+  placeVonageCall
+};

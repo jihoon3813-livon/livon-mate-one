@@ -8,15 +8,41 @@ module.exports = async (req, res) => {
   }
 
   if (req.method === 'POST') {
-    const payload = req.body || {};
-    const { action, certKey, corpNum, baroId, serverType = 'test' } = payload;
+    let payload = req.body || {};
+    if (typeof payload === 'string') {
+      try { payload = JSON.parse(payload); } catch (e) {}
+    }
+    const { action, certKey, corpNum, baroId, serverType = 'test', sendKey, sendKeyList } = payload;
 
     const cleanCorpNum = (corpNum || '1058621696').replace(/[^0-9]/g, '');
     const activeCertKey = certKey || (serverType === 'prod' ? 'A1496EC3-E606-44C0-B126-F03B9AF88588' : 'CF89EE38-7B80-4955-960E-D86A866498ED');
-    if (action === 'checkSendKey' && payload.sendKey) {
+    const isTest = serverType !== 'prod';
+
+    // 1. 바로빌 팩스 복수 접수건 실시간 상태 일괄 조회 (실시간 동기화)
+    if (Array.isArray(sendKeyList) && sendKeyList.length > 0) {
       try {
         const { getBarobillFaxStatus } = require('../../barobill-client');
-        const statusRes = await getBarobillFaxStatus(activeCertKey, cleanCorpNum, payload.sendKey, serverType !== 'prod');
+        const results = {};
+        for (const key of sendKeyList) {
+          if (!key || typeof key !== 'string' || key.startsWith('FLOG-')) continue;
+          try {
+            const st = await getBarobillFaxStatus(activeCertKey, cleanCorpNum, key, isTest);
+            results[key] = st;
+          } catch (e) {
+            results[key] = { success: false, error: e.message };
+          }
+        }
+        return res.status(200).json({ success: true, results });
+      } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+    }
+
+    // 2. 바로빌 팩스 단일 접수건 실시간 상태 조회
+    if ((action === 'checkSendKey' || action === 'query_barobill_status') && sendKey) {
+      try {
+        const { getBarobillFaxStatus } = require('../../barobill-client');
+        const statusRes = await getBarobillFaxStatus(activeCertKey, cleanCorpNum, sendKey, isTest);
         return res.status(200).json(statusRes);
       } catch (stErr) {
         return res.status(500).json({ success: false, error: stErr.message });

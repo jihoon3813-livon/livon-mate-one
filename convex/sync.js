@@ -32,13 +32,13 @@ export const bundleAll = query({
       careLogs,
       formConfigs,
       faxRecords,
-      samsungEligible,
       samsungSheets,
       samsungAddressBook,
       samsungEmailLogs,
       admins,
       caregivers,
       systemSettings,
+      surveyTargets,
     ] = await Promise.all([
       ctx.db.query("applications").order("desc").collect(),
       ctx.db.query("assignments").collect(),
@@ -49,13 +49,13 @@ export const bundleAll = query({
       ctx.db.query("careLogs").collect(),
       ctx.db.query("formConfigs").collect(),
       ctx.db.query("faxRecords").order("desc").collect(),
-      ctx.db.query("samsungEligible").order("desc").take(100),
       ctx.db.query("samsungSheets").collect(),
       ctx.db.query("samsungAddressBook").collect(),
       ctx.db.query("samsungEmailLogs").order("desc").collect(),
       ctx.db.query("admins").collect(),
       ctx.db.query("caregivers").collect(),
       ctx.db.query("systemSettings").collect(),
+      ctx.db.query("surveyTargets").order("desc").collect(),
     ]);
     return {
       status: "success",
@@ -68,13 +68,14 @@ export const bundleAll = query({
       careLogs,
       formConfigs,
       faxRecords,
-      samsungEligible,
+      samsungEligible: [],
       samsungSheets,
       samsungAddressBook,
       samsungEmailLogs,
       admins: admins.map(({ password, ...safe }) => safe),
       caregivers,
       systemSettings,
+      surveyTargets,
     };
   },
 });
@@ -477,7 +478,7 @@ export const saveSamsungSheetBatch = mutation({
     if (args.replace) {
       const existingRows = await ctx.db
         .query("samsungSheets")
-        .filter((q) => q.eq(q.field("sheetKey"), args.sheetKey))
+        .withIndex("by_sheetKey", (q) => q.eq("sheetKey", args.sheetKey))
         .collect();
       for (const r of existingRows) {
         await ctx.db.delete(r._id);
@@ -1556,6 +1557,180 @@ export const getSystemSettings = query({
   args: {},
   handler: async (ctx) => {
     return await ctx.db.query("systemSettings").collect();
+  },
+});
+
+// 57. 만족도 조사 대상 저장 (Upsert by id or serviceId)
+export const saveSurveyTarget = mutation({
+  args: {
+    target: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const target = args.target;
+    if (!target) return null;
+    const targetId = target.id;
+    let existing = null;
+    if (targetId) {
+      existing = await ctx.db
+        .query("surveyTargets")
+        .filter((q) => q.eq(q.field("id"), targetId))
+        .first();
+    }
+    if (!existing && target.serviceId) {
+      existing = await ctx.db
+        .query("surveyTargets")
+        .withIndex("by_serviceId", (q) => q.eq("serviceId", target.serviceId))
+        .first();
+    }
+
+    if (existing) {
+      await ctx.db.patch(existing._id, { ...target, updatedAt: new Date().toISOString() });
+      return { action: "updated", id: targetId, _id: existing._id };
+    } else {
+      const newId = await ctx.db.insert("surveyTargets", { ...target, createdAt: target.createdAt || new Date().toISOString() });
+      return { action: "inserted", id: targetId, _id: newId };
+    }
+  },
+});
+
+// 58. 만족도 조사 대상 배치 저장
+export const saveSurveyTargetsBatch = mutation({
+  args: {
+    targets: v.array(v.any()),
+  },
+  handler: async (ctx, args) => {
+    let savedCount = 0;
+    for (const target of args.targets) {
+      if (!target || !target.id) continue;
+      const existing = await ctx.db
+        .query("surveyTargets")
+        .filter((q) => q.eq(q.field("id"), target.id))
+        .first();
+      if (existing) {
+        await ctx.db.patch(existing._id, { ...target, updatedAt: new Date().toISOString() });
+      } else {
+        await ctx.db.insert("surveyTargets", { ...target, createdAt: target.createdAt || new Date().toISOString() });
+      }
+      savedCount++;
+    }
+    return { savedCount };
+  },
+});
+
+// 59. 만족도 조사 대상 단건 수정
+export const updateSurveyTarget = mutation({
+  args: {
+    id: v.string(),
+    updates: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("surveyTargets")
+      .filter((q) => q.eq(q.field("id"), args.id))
+      .first();
+    if (!existing) {
+      return { success: false, error: `Target ${args.id} not found` };
+    }
+    await ctx.db.patch(existing._id, { ...args.updates, updatedAt: new Date().toISOString() });
+    return { success: true, id: args.id };
+  },
+});
+
+// 60. 만족도 조사 대상 단건 삭제
+export const deleteSurveyTarget = mutation({
+  args: {
+    id: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("surveyTargets")
+      .filter((q) => q.eq(q.field("id"), args.id))
+      .first();
+    if (existing) {
+      await ctx.db.delete(existing._id);
+      return { success: true, id: args.id };
+    }
+    return { success: false, notFound: true };
+  },
+});
+
+// 61. 만족도 조사 대상 목록 조회
+export const getSurveyTargets = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("surveyTargets").order("desc").collect();
+  },
+});
+
+// 62. 만족도 조사 정책 및 스키마 설정 조회
+export const getSurveySettings = query({
+  args: {},
+  handler: async (ctx) => {
+    const record = await ctx.db
+      .query("surveySettings")
+      .withIndex("by_key", (q) => q.eq("key", "default"))
+      .first();
+    if (record) {
+      return {
+        settings: record.settings || null,
+        schema: record.schema || null,
+      };
+    }
+    return null;
+  },
+});
+
+// 63. 만족도 조사 정책 설정 저장
+export const saveSurveySettings = mutation({
+  args: {
+    settings: v.any(),
+    schema: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("surveySettings")
+      .withIndex("by_key", (q) => q.eq("key", "default"))
+      .first();
+    const payload = {
+      key: "default",
+      settings: args.settings,
+      updatedAt: new Date().toISOString(),
+    };
+    if (args.schema !== undefined) {
+      payload.schema = args.schema;
+    }
+    if (existing) {
+      await ctx.db.patch(existing._id, payload);
+    } else {
+      await ctx.db.insert("surveySettings", payload);
+    }
+    return { success: true };
+  },
+});
+
+// 64. 만족도 조사 문항 스키마 저장
+export const saveSurveySchema = mutation({
+  args: {
+    schema: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("surveySettings")
+      .withIndex("by_key", (q) => q.eq("key", "default"))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        schema: args.schema,
+        updatedAt: new Date().toISOString(),
+      });
+    } else {
+      await ctx.db.insert("surveySettings", {
+        key: "default",
+        schema: args.schema,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    return { success: true };
   },
 });
 
