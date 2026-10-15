@@ -7671,6 +7671,15 @@ function handleCareLogAttachButtonClick(targetId) {
 }
 window.handleCareLogAttachButtonClick = handleCareLogAttachButtonClick;
 
+let gSamsungFilterMode = 'all';
+
+function handleSamsungSheetFilterChange(val) {
+  gSamsungFilterMode = val || 'all';
+  gSamsungSheetPage = 1;
+  renderCurrentSamsungSheet();
+}
+window.handleSamsungSheetFilterChange = handleSamsungSheetFilterChange;
+
 function renderCurrentSamsungSheet() {
   const isClaimHub = (gActiveTab === 'samsungclaimhub');
   const container = document.getElementById(isClaimHub ? 'samsungClaimHubSpreadsheetContainer' : 'samsungSpreadsheetContainer');
@@ -7681,12 +7690,33 @@ function renderCurrentSamsungSheet() {
     gActiveSamsungSheet = 'eligible';
   }
 
+  const isEligibleSheet = (gActiveSamsungSheet === 'eligible');
+  const isTargetSheet = (gActiveSamsungSheet === 'target');
+
   initSamsungSpreadsheet();
   const schema = SAMSUNG_SHEET_SCHEMAS[gActiveSamsungSheet] || SAMSUNG_SHEET_SCHEMAS.target;
   const rawRows = gSamsungSheets[gActiveSamsungSheet] || [];
   const searchInputId = isClaimHub ? 'samsungClaimHubSearchInput' : 'samsungSheetSearchInput';
   const searchInputEl = document.getElementById(searchInputId);
   const query = (searchInputEl?.value || '').trim().toLowerCase();
+
+  // 필터 셀렉트 드롭다운 동적 라벨 및 선택값 동기화
+  const filterSelect = document.getElementById('samsungSheetFilterSelect');
+  if (filterSelect && isEligibleSheet) {
+    let normalCount = 0;
+    let maskedCount = 0;
+    rawRows.forEach(r => {
+      const isM = String(r.patientName || '').includes('*') || (!r.phone || String(r.phone).trim() === '0');
+      if (isM) maskedCount++; else normalCount++;
+    });
+    const optAll = filterSelect.querySelector('option[value="all"]');
+    const optNormal = filterSelect.querySelector('option[value="normal"]');
+    const optMasked = filterSelect.querySelector('option[value="masked"]');
+    if (optAll) optAll.innerText = `전체 가입자 DB (${rawRows.length.toLocaleString()}건)`;
+    if (optNormal) optNormal.innerText = `실명·연락처 완비 가입자만 (${normalCount.toLocaleString()}건)`;
+    if (optMasked) optMasked.innerText = `신규청약 (원천마스킹/미기재 ${maskedCount.toLocaleString()}건)`;
+    filterSelect.value = gSamsungFilterMode || 'all';
+  }
 
   // 검색창 초기화(X) 버튼 가시성 제어
   const btnClear = document.getElementById('btnClearSamsungSearch');
@@ -7705,6 +7735,16 @@ function renderCurrentSamsungSheet() {
   }
 
   let filteredRows = rawRows.map((row, realIdx) => ({ row, realIdx })).filter(({ row }) => {
+    if (isEligibleSheet && gSamsungFilterMode && gSamsungFilterMode !== 'all') {
+      const isMaskedName = String(row.patientName || '').includes('*');
+      const isMissingPhone = !row.phone || String(row.phone).trim() === '0';
+      if (gSamsungFilterMode === 'normal' && (isMaskedName || isMissingPhone)) {
+        return false;
+      }
+      if (gSamsungFilterMode === 'masked' && (!isMaskedName && !isMissingPhone)) {
+        return false;
+      }
+    }
     if (!query) return true;
     return Object.values(row).some(val => val && String(val).toLowerCase().includes(query));
   });
@@ -7816,9 +7856,6 @@ function renderCurrentSamsungSheet() {
   const startIdx = isAll ? 0 : ((gSamsungSheetPage - 1) * gSamsungSheetPageSize);
   const endIdx = isAll ? totalItems : Math.min(startIdx + gSamsungSheetPageSize, totalItems);
   const pageRows = filteredRows.slice(startIdx, endIdx);
-
-  const isEligibleSheet = gActiveSamsungSheet === 'eligible';
-  const isTargetSheet = gActiveSamsungSheet === 'target';
 
   // 엑셀 틀 고정 (Sticky Columns): 선택(0px), 행(40px), 피보험자ID(84px), 피보험자명(194px), 생년월일(294px)
   const getStickyInfo = (colKey, isHeader = false, isSelected = false, displayIdx = 0, hasPending = false) => {
@@ -7994,8 +8031,16 @@ function renderCurrentSamsungSheet() {
               displayVal = eligiblePid || row.patientId || row.appId || rawVal;
             } else if (col.key === 'patientName') {
               displayVal = maskName(rawVal);
+              if (String(rawVal || '').includes('*')) {
+                displayVal = `<span class="inline-flex items-center gap-1.5 font-bold text-slate-900">${displayVal}<span class="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-300 shrink-0" title="삼성화재 원천 마스킹(*) 가입자">원천마스킹</span></span>`;
+              }
             } else if (col.key === 'phone') {
-              displayVal = maskPhone(rawVal);
+              const strPhone = String(rawVal !== undefined && rawVal !== null ? rawVal : '').trim();
+              if (strPhone === '0' || strPhone === '') {
+                displayVal = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] text-slate-400 bg-slate-100 font-medium" title="삼성화재 원본 파일 자체에 연락처 미기재(0)">(미제공)</span>`;
+              } else {
+                displayVal = maskPhone(rawVal);
+              }
             } else if (col.key === 'birthDate') {
               displayVal = maskBirth(rawVal);
             } else if (col.key === 'applicantContact') {

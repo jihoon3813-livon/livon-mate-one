@@ -2323,6 +2323,16 @@
               <input type="search" id="samsungSheetSearchInput" name="samsung_sheet_search_unique" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-protonpass-ignore="true" data-form-type="other" aria-autocomplete="none" role="searchbox" readonly onfocus="this.removeAttribute('readonly');" value="" oninput="renderCurrentSamsungSheet()" placeholder="시트 내 검색 (고객명, 증권번호, 병원명 등)..." 
                 class="pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-sky-500 w-64 transition-all">
             </div>
+            <!-- 가입자 데이터 분류 필터 -->
+            <div id="samsungFilterWrapper" class="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1 text-xs">
+              <i data-lucide="filter" class="w-3.5 h-3.5 text-slate-500"></i>
+              <span class="text-slate-500 text-[11px] font-bold whitespace-nowrap">필터:</span>
+              <select id="samsungSheetFilterSelect" onchange="handleSamsungSheetFilterChange(this.value)" class="bg-transparent border-0 font-bold text-slate-700 focus:outline-hidden cursor-pointer text-xs">
+                <option value="all" selected>전체 가입자 DB (49,989건)</option>
+                <option value="normal">실명·연락처 완비 가입자만</option>
+                <option value="masked">신규청약 (원천마스킹/미기재)</option>
+              </select>
+            </div>
           </div>
         </div>
 
