@@ -251,6 +251,8 @@ module.exports = async (req, res) => {
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(postData),
+        'Origin': 'https://livon-mate-one.vercel.app',
+        'Referer': 'https://livon-mate-one.vercel.app/',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LivonMateOne/1.0'
       }
     }, postData);
