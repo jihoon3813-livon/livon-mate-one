@@ -451,7 +451,9 @@ function renderSingleDayReportPages({
         if (yPos !== null) {
           if (isLatestCol) {
             dotHtml = `
-              <div style="position: absolute; top: ${yPos - 4.5}px; left: 50%; transform: translateX(-50%); width: 9px; height: 9px; border-radius: 50%; background: ${lineColor}; border: 2px solid #ffffff; box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.28); z-index: 4; box-sizing: border-box;"></div>
+              <div style="position: absolute; top: ${yPos - 7.5}px; left: 50%; transform: translateX(-50%); width: 15px; height: 15px; border-radius: 50%; background: rgba(225, 29, 72, 0.16); border: 1px solid rgba(225, 29, 72, 0.35); display: flex; align-items: center; justify-content: center; z-index: 4; box-sizing: border-box;">
+                <div style="width: 7px; height: 7px; border-radius: 50%; background: ${lineColor}; border: 1.5px solid #ffffff; box-sizing: border-box;"></div>
+              </div>
             `;
           } else {
             dotHtml = `
@@ -473,7 +475,7 @@ function renderSingleDayReportPages({
       }
 
       return `
-        <div style="flex: 1; position: relative; height: 72px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 6px; ${isLatestCol ? 'background: #fff5f7; border-left: 1.5px dashed #fecdd3; border-right: 1.5px dashed #fecdd3;' : ''}">
+        <div style="flex: 1; position: relative; height: 72px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 6px;">
           ${dotHtml}
           <div style="z-index: 2;">
             ${badgeHtml}
@@ -842,7 +844,7 @@ function renderSingleDayReportPages({
                   const dStr = col.date.split('.')[1] || '';
                   const hasData = col.hasData;
                   return `
-                    <div style="flex: 1; text-align: center; font-size: 10.5px; font-weight: 700; color: ${hasData ? '#64748b' : '#cbd5e1'}; ${isSelected ? 'background: #fff5f7; border-radius: 6px 6px 0 0;' : ''}">
+                    <div style="flex: 1; text-align: center; font-size: 10.5px; font-weight: 700; color: ${hasData ? '#64748b' : '#cbd5e1'};">
                       ${isSelected 
                         ? `<span style="background: #1e1b4b; color: #ffffff; padding: 2.5px 8px; border-radius: 5px; font-weight: 800; font-size: 11.5px;">${dStr}</span>` 
                         : dStr}
@@ -1042,7 +1044,7 @@ function generate2PageCareReportHtml(patientInfo = {}, records = [], selectedInd
     html, body {
       margin: 0;
       padding: 0;
-      background: #f1f5f9;
+      background: #ffffff;
       font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
       color: #0f172a;
       -webkit-font-smoothing: antialiased;
@@ -1062,11 +1064,12 @@ function generate2PageCareReportHtml(patientInfo = {}, records = [], selectedInd
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      box-shadow: none !important;
     }
     @media screen {
       .page {
-        margin: 20px auto;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        margin: 0 auto !important;
+        box-shadow: none !important;
       }
     }
     @media print {
