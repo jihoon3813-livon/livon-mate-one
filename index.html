@@ -1307,33 +1307,33 @@
                 <!-- 총 신청 -->
                 <button type="button" onclick="setHubFilter('ALL')" id="hubFilterBtn-ALL" class="hub-filter-btn active px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800 text-white font-bold flex items-center gap-1.5 shadow-2xs hover:bg-slate-900 transition-all cursor-pointer" title="전체 신청 건 조회">
                   <span class="text-[11px] text-slate-300 font-medium">총 신청</span>
-                  <strong class="text-sm font-black tracking-tight" id="hubDash-totalApps">308</strong><span class="text-[10px] text-slate-300">건</span>
+                  <strong class="text-sm font-black tracking-tight" id="hubDash-totalApps">0</strong><span class="text-[10px] text-slate-300">건</span>
                 </button>
                 
                 <!-- 완료 -->
                 <button type="button" onclick="setHubFilter('COMPLETED')" id="hubFilterBtn-COMPLETED" class="hub-filter-btn px-2.5 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 text-emerald-800 font-bold flex items-center gap-1 hover:bg-emerald-100 transition-all cursor-pointer" title="완료 건 조회">
                   <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
                   <span class="text-[11px] text-emerald-700 font-medium">완료</span>
-                  <strong class="text-sm font-black text-emerald-700" id="hubDash-completed">-</strong><span class="text-[10px] text-emerald-600">건</span>
+                  <strong class="text-sm font-black text-emerald-700" id="hubDash-completed">0</strong><span class="text-[10px] text-emerald-600">건</span>
                 </button>
 
                 <!-- 진행중 -->
                 <button type="button" onclick="setHubFilter('IN_PROGRESS')" id="hubFilterBtn-IN_PROGRESS" class="hub-filter-btn px-2.5 py-1.5 rounded-xl border border-sky-200 bg-sky-50/80 text-sky-800 font-bold flex items-center gap-1 hover:bg-sky-100 transition-all cursor-pointer" title="진행중 건 조회">
                   <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
                   <span class="text-[11px] text-sky-700 font-medium">진행중</span>
-                  <strong class="text-sm font-black text-sky-700" id="hubDash-inProgress">-</strong><span class="text-[10px] text-sky-600">건</span>
+                  <strong class="text-sm font-black text-sky-700" id="hubDash-inProgress">0</strong><span class="text-[10px] text-sky-600">건</span>
                 </button>
 
                 <!-- 예정 -->
                 <button type="button" onclick="setHubFilter('SCHEDULED')" id="hubFilterBtn-SCHEDULED" class="hub-filter-btn px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 font-bold flex items-center gap-1 hover:bg-slate-100 transition-all cursor-pointer" title="예정 건 조회">
                   <span class="text-[11px] text-slate-500 font-medium">예정</span>
-                  <strong class="text-sm font-black text-slate-700" id="hubDash-scheduled">-</strong><span class="text-[10px] text-slate-500">건</span>
+                  <strong class="text-sm font-black text-slate-700" id="hubDash-scheduled">0</strong><span class="text-[10px] text-slate-500">건</span>
                 </button>
 
                 <!-- 취소 -->
                 <button type="button" onclick="setHubFilter('CANCELLED')" id="hubFilterBtn-CANCELLED" class="hub-filter-btn px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 font-bold flex items-center gap-1 hover:bg-slate-100 transition-all cursor-pointer" title="취소 건 조회">
                   <span class="text-[11px] text-slate-500 font-medium">취소</span>
-                  <strong class="text-sm font-black text-slate-600" id="hubDash-cancelled">-</strong><span class="text-[10px] text-slate-400">건</span>
+                  <strong class="text-sm font-black text-slate-600" id="hubDash-cancelled">0</strong><span class="text-[10px] text-slate-400">건</span>
                 </button>
 
                 <div class="h-4 w-px bg-slate-200 mx-0.5 hidden sm:block"></div>
@@ -1341,22 +1341,22 @@
                 <!-- 배정 간병인 -->
                 <div class="px-2.5 py-1.5 rounded-xl border border-purple-200/80 bg-purple-50/60 text-purple-800 flex items-center gap-1 font-bold">
                   <span class="text-[11px] text-purple-700 font-medium">배정 간병인</span>
-                  <strong class="text-sm font-black text-purple-800" id="hubDash-assignedCaregivers">-</strong><span class="text-[10px] text-purple-600">명</span>
-                  <span class="text-[10px] text-purple-600 bg-white/80 px-1 py-0.2 rounded border border-purple-200 ml-0.5 font-medium">(변경 <b id="hubDash-caregiverChanges">-</b>)</span>
+                  <strong class="text-sm font-black text-purple-800" id="hubDash-assignedCaregivers">0</strong><span class="text-[10px] text-purple-600">명</span>
+                  <span class="text-[10px] text-purple-600 bg-white/80 px-1 py-0.2 rounded border border-purple-200 ml-0.5 font-medium">(변경 <b id="hubDash-caregiverChanges">0</b>)</span>
                 </div>
 
                 <!-- 미수금 -->
                 <button type="button" onclick="setHubFilter('UNPAID_CLAIM')" id="hubFilterBtn-UNPAID_CLAIM" class="hub-filter-btn px-2.5 py-1.5 rounded-xl border border-rose-300 bg-rose-50/90 text-rose-800 font-bold flex items-center gap-1 hover:bg-rose-100 transition-all cursor-pointer" title="미확인 미수금 대사 조회">
                   <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
                   <span class="text-[11px] text-rose-700 font-medium">추정 미수금</span>
-                  <strong class="text-sm font-black text-rose-700" id="hubDash-estimatedUnpaid">-</strong><span class="text-[10px] text-rose-600 font-medium">원</span>
-                  <span class="text-[10px] text-rose-600 bg-white px-1 py-0.2 rounded border border-rose-200 ml-0.5 font-medium">(<b id="hubDash-unconfirmedClaims">-</b>건)</span>
+                  <strong class="text-sm font-black text-rose-700" id="hubDash-estimatedUnpaid">0</strong><span class="text-[10px] text-rose-600 font-medium">원</span>
+                  <span class="text-[10px] text-rose-600 bg-white px-1 py-0.2 rounded border border-rose-200 ml-0.5 font-medium">(<b id="hubDash-unconfirmedClaims">0</b>건)</span>
                 </button>
 
                 <!-- 미청구 -->
                 <div class="px-2.5 py-1.5 rounded-xl border border-amber-300 bg-amber-50/80 text-amber-900 flex items-center gap-1 font-bold">
                   <span class="text-[11px] text-amber-700 font-medium">미청구</span>
-                  <strong class="text-sm font-black text-amber-800" id="hubDash-unclaimedTotal">-</strong><span class="text-[10px] text-amber-600">건</span>
+                  <strong class="text-sm font-black text-amber-800" id="hubDash-unclaimedTotal">0</strong><span class="text-[10px] text-amber-600">건</span>
                 </div>
               </div>
 
@@ -1364,11 +1364,11 @@
               <div class="flex items-center gap-2">
                 <div class="hidden xl:flex items-center gap-1.5 text-[11px] text-slate-500 font-medium bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200">
                   <span>원수사:</span>
-                  <span class="font-bold text-slate-700">현대 <b class="text-orange-600 font-black" id="hubDash-hyundai">-</b></span>
+                  <span class="font-bold text-slate-700">현대 <b class="text-orange-600 font-black" id="hubDash-hyundai">0</b></span>
                   <span class="text-slate-300">&middot;</span>
-                  <span class="font-bold text-slate-700">SCOR <b class="text-slate-800 font-black" id="hubDash-scor">-</b></span>
+                  <span class="font-bold text-slate-700">SCOR <b class="text-slate-800 font-black" id="hubDash-scor">0</b></span>
                   <span class="text-slate-300">&middot;</span>
-                  <span class="font-bold text-slate-700">삼성 <b class="text-blue-600 font-black" id="hubDash-samsung">-</b></span>
+                  <span class="font-bold text-slate-700">삼성 <b class="text-blue-600 font-black" id="hubDash-samsung">0</b></span>
                 </div>
 
                 <!-- 자세히 보기 토글 버튼 -->
@@ -1419,23 +1419,23 @@
                     <tbody>
                       <tr class="border-b border-slate-200 hover:bg-slate-50/80 transition-colors">
                         <td class="px-3 py-1.5 font-bold text-slate-800 bg-slate-50/60 w-1/2">총 신청건수</td>
-                        <td class="px-3 py-1.5 font-black text-right text-slate-900 text-sm" id="detailDash-totalApps">308</td>
+                        <td class="px-3 py-1.5 font-black text-right text-slate-900 text-sm" id="detailDash-totalApps">0</td>
                       </tr>
                       <tr class="border-b border-slate-200 hover:bg-emerald-50/40 transition-colors cursor-pointer" onclick="setHubFilter('COMPLETED')" title="완료 고객 필터링">
                         <td class="px-3 py-1.5 font-semibold text-slate-700">완료</td>
-                        <td class="px-3 py-1.5 font-bold text-right text-emerald-700" id="detailDash-completed">235</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-emerald-700" id="detailDash-completed">0</td>
                       </tr>
                       <tr class="border-b border-slate-200 hover:bg-sky-50/40 transition-colors cursor-pointer" onclick="setHubFilter('IN_PROGRESS')" title="진행중 고객 필터링">
                         <td class="px-3 py-1.5 font-semibold text-slate-700">진행중</td>
-                        <td class="px-3 py-1.5 font-bold text-right text-sky-700" id="detailDash-inProgress">28</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-sky-700" id="detailDash-inProgress">0</td>
                       </tr>
                       <tr class="border-b border-slate-200 hover:bg-slate-50/80 transition-colors cursor-pointer" onclick="setHubFilter('SCHEDULED')" title="예정 고객 필터링">
                         <td class="px-3 py-1.5 font-semibold text-slate-700">예정</td>
-                        <td class="px-3 py-1.5 font-bold text-right text-slate-700" id="detailDash-scheduled">7</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-slate-700" id="detailDash-scheduled">0</td>
                       </tr>
                       <tr class="hover:bg-slate-50/80 transition-colors cursor-pointer" onclick="setHubFilter('CANCELLED')" title="취소 고객 필터링">
                         <td class="px-3 py-1.5 font-semibold text-slate-700">취소</td>
-                        <td class="px-3 py-1.5 font-bold text-right text-slate-500" id="detailDash-cancelled">27</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-slate-500" id="detailDash-cancelled">0</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1450,11 +1450,11 @@
                     <tbody>
                       <tr class="border-b border-slate-200 hover:bg-slate-50/80 transition-colors">
                         <td class="px-3 py-1.5 font-bold text-slate-800 bg-slate-50/60 w-1/2">총 배정 간병인</td>
-                        <td class="px-3 py-1.5 font-black text-right text-purple-900 text-sm" id="detailDash-assignedCaregivers">303</td>
+                        <td class="px-3 py-1.5 font-black text-right text-purple-900 text-sm" id="detailDash-assignedCaregivers">0</td>
                       </tr>
                       <tr class="hover:bg-slate-50/80 transition-colors">
                         <td class="px-3 py-1.5 font-semibold text-slate-700">간병인 변경 건(2명+)</td>
-                        <td class="px-3 py-1.5 font-bold text-right text-purple-700" id="detailDash-caregiverChanges">6</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-purple-700" id="detailDash-caregiverChanges">0</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1478,18 +1478,18 @@
                           <span class="w-2 h-2 rounded-full bg-orange-500"></span>
                           <span>현대해상</span>
                         </td>
-                        <td class="px-3 py-1.5 font-black text-right text-orange-700 text-sm" id="detailDash-hyundai">266</td>
+                        <td class="px-3 py-1.5 font-black text-right text-orange-700 text-sm" id="detailDash-hyundai">0</td>
                       </tr>
                       <tr class="border-b border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer" onclick="setHubInsuranceTab('현대해상')" title="현대해상(SCOR) 필터">
                         <td class="px-3 py-1.5 font-medium text-slate-700 pl-6">현대해상(SCOR)</td>
-                        <td class="px-3 py-1.5 font-bold text-right text-slate-800" id="detailDash-scor">34</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-slate-800" id="detailDash-scor">0</td>
                       </tr>
                       <tr class="hover:bg-blue-50/40 transition-colors cursor-pointer" onclick="setHubInsuranceTab('삼성화재')" title="삼성화재 필터">
                         <td class="px-3 py-1.5 font-bold text-slate-800 flex items-center gap-1.5">
                           <span class="w-2 h-2 rounded-full bg-blue-600"></span>
                           <span>삼성화재</span>
                         </td>
-                        <td class="px-3 py-1.5 font-black text-right text-blue-700 text-sm" id="detailDash-samsung">42</td>
+                        <td class="px-3 py-1.5 font-black text-right text-blue-700 text-sm" id="detailDash-samsung">0</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1510,21 +1510,21 @@
                     <tbody>
                       <tr class="border-b border-slate-200 hover:bg-slate-50/80 transition-colors">
                         <td class="px-3 py-2 font-bold text-slate-800 bg-slate-50/60 w-1/2">입금확인 금액</td>
-                        <td class="px-3 py-2 font-black text-right text-slate-900 text-sm" id="detailDash-depositConfirmed">448,075,000</td>
+                        <td class="px-3 py-2 font-black text-right text-slate-900 text-sm" id="detailDash-depositConfirmed">0</td>
                       </tr>
                       <tr class="border-b border-slate-200 hover:bg-slate-50/80 transition-colors">
                         <td class="px-3 py-2 font-bold text-slate-800 bg-slate-50/60">미확인 청구건수</td>
-                        <td class="px-3 py-2 font-black text-right text-slate-900 text-sm" id="detailDash-unconfirmedClaims">98</td>
+                        <td class="px-3 py-2 font-black text-right text-slate-900 text-sm" id="detailDash-unconfirmedClaims">0</td>
                       </tr>
                       <tr class="border-b border-slate-200 bg-rose-50/30 hover:bg-rose-50/60 transition-colors cursor-pointer" onclick="setHubFilter('UNPAID_CLAIM')" title="미수금 대사 필터">
                         <td class="px-3 py-2 font-extrabold text-rose-700">
                           추정 미수금 <span class="text-[10.5px] font-normal text-rose-500">(단가 142,000 기본)</span>
                         </td>
-                        <td class="px-3 py-2 font-black text-right text-red-600 text-base" id="detailDash-estimatedUnpaid">99,898,000</td>
+                        <td class="px-3 py-2 font-black text-right text-red-600 text-base" id="detailDash-estimatedUnpaid">0</td>
                       </tr>
                       <tr class="hover:bg-slate-50/80 transition-colors">
                         <td class="px-3 py-2 font-bold text-slate-800 bg-slate-50/60">총 간병비 지급액</td>
-                        <td class="px-3 py-2 font-black text-right text-slate-900 text-sm" id="detailDash-totalPayout">551,230,917</td>
+                        <td class="px-3 py-2 font-black text-right text-slate-900 text-sm" id="detailDash-totalPayout">0</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1539,19 +1539,19 @@
                     <tbody>
                       <tr class="border-b border-slate-200 hover:bg-rose-50/30 transition-colors">
                         <td class="px-3 py-1.5 font-semibold text-slate-800 w-2/3">미청구(완료·무청구)</td>
-                        <td class="px-3 py-1.5 font-black text-right text-red-600 text-sm" id="detailDash-unclaimedCompleted">9</td>
+                        <td class="px-3 py-1.5 font-black text-right text-red-600 text-sm" id="detailDash-unclaimedCompleted">0</td>
                       </tr>
                       <tr class="border-b border-slate-200 hover:bg-rose-50/30 transition-colors">
                         <td class="px-3 py-1.5 font-semibold text-slate-800">미청구(청구지연·진행중)</td>
-                        <td class="px-3 py-1.5 font-black text-right text-red-600 text-sm" id="detailDash-unclaimedDelayed">1</td>
+                        <td class="px-3 py-1.5 font-black text-right text-red-600 text-sm" id="detailDash-unclaimedDelayed">0</td>
                       </tr>
                       <tr class="border-b border-slate-200 hover:bg-slate-50 transition-colors">
                         <td class="px-3 py-1.5 font-semibold text-slate-700">미청구(청구시작안됨)</td>
-                        <td class="px-3 py-1.5 font-bold text-right text-slate-700" id="detailDash-unclaimedNotStarted">7</td>
+                        <td class="px-3 py-1.5 font-bold text-right text-slate-700" id="detailDash-unclaimedNotStarted">0</td>
                       </tr>
                       <tr class="bg-amber-50/40 hover:bg-amber-50/70 transition-colors">
                         <td class="px-3 py-2 font-extrabold text-amber-900">미청구 합계</td>
-                        <td class="px-3 py-2 font-black text-right text-red-600 text-base" id="detailDash-unclaimedTotal">17</td>
+                        <td class="px-3 py-2 font-black text-right text-red-600 text-base" id="detailDash-unclaimedTotal">0</td>
                       </tr>
                     </tbody>
                   </table>
@@ -2280,11 +2280,16 @@
           </div>
 
           <div class="flex items-center gap-2 shrink-0">
-            <!-- 구글 드라이브 원본 폴더 바로가기 버튼 -->
-            <a href="https://drive.google.com/drive/folders/1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc" target="_blank" rel="noopener noreferrer" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-sky-700 border border-slate-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap" title="구글 드라이브 [삼성화재 가입자 리스트] 원본 폴더 열기 (1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc)">
-              <i data-lucide="folder-symlink" class="w-3.5 h-3.5 text-sky-600"></i>
-              <span>드라이브 폴더 열기</span>
-            </a>
+            <!-- 구글 드라이브 원본 폴더 바로가기 & 관리 설정 버튼 그룹 -->
+            <div class="flex items-center gap-1">
+              <button type="button" onclick="openSamsungDriveFolder()" id="btnSamsungDriveFolderLink" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-sky-700 border border-slate-200 text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap" title="구글 드라이브 원본 폴더 열기">
+                <i data-lucide="folder-symlink" class="w-3.5 h-3.5 text-sky-600"></i>
+                <span id="labelSamsungDriveFolderName">드라이브 폴더 열기</span>
+              </button>
+              <button type="button" onclick="openSamsungDriveConfigModal()" class="p-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-500 hover:text-sky-700 border border-slate-200 shadow-2xs transition-all cursor-pointer" title="삼성화재 구글 드라이브 폴더 주소 변경 설정">
+                <i data-lucide="settings" class="w-4 h-4"></i>
+              </button>
+            </div>
 
             <!-- 비밀번호 설정 인풋 -->
             <div class="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-2xs text-xs" title="삼성화재 엑셀 파일 복호화 비밀번호">
@@ -6674,17 +6679,12 @@
           </div>
 
           <!-- 삼성화재 프로토콜 안내 배너 -->
-          <div id="bannerSamsungProtocol" class="p-3 bg-sky-50 border border-sky-200 rounded-xl text-[11px] text-sky-900 hidden items-center justify-between flex-wrap gap-2">
+          <div id="bannerSamsungProtocol" class="p-3 bg-sky-50 border border-sky-200 rounded-xl text-[11px] text-sky-900 hidden items-center justify-between">
             <div class="flex items-center gap-2">
               <i data-lucide="file-check-2" class="w-4 h-4 text-sky-600 flex-shrink-0"></i>
               <span><b>삼성화재 프로토콜:</b> 사전명단에 등록된 가입 고객을 검색하여 선택하면 12대 항목 및 손사 정보가 자동 완성됩니다.</span>
             </div>
-            <div class="flex items-center gap-1.5">
-              <button type="button" onclick="openSamsungLeadSearchModal()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs flex items-center gap-1 cursor-pointer transition-all">
-                <i data-lucide="search" class="w-3.5 h-3.5"></i>
-                <span>사전명단 고객 검색 & 채움</span>
-              </button>
-            </div>
+            <span class="px-2 py-0.5 rounded bg-sky-100 font-bold text-sky-800 text-[10px] whitespace-nowrap">사전명단 자동 연동</span>
           </div>
         </div>
 
@@ -9638,6 +9638,86 @@
       <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
         <button type="button" onclick="closeCareCallDriveModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">취소</button>
         <button type="button" onclick="handleSaveCareCallDriveConfig()" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-md cursor-pointer">저장하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: GOOGLE DRIVE FOLDER CONFIG FOR SAMSUNG FIRE ==================== -->
+  <div id="samsungDriveConfigModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl p-6 max-w-lg w-full border border-slate-200 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+            <i data-lucide="folder-cog" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black text-slate-900">삼성화재 구글 드라이브 폴더 설정</h3>
+            <p class="text-[11px] text-slate-400">가입자 리스트 최신 엑셀 연동 경로 관리</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeSamsungDriveConfigModal()" class="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-3 rounded-2xl bg-sky-50/70 border border-sky-100 text-xs text-sky-900 leading-relaxed space-y-1">
+        <div class="font-bold flex items-center gap-1.5 text-sky-800">
+          <i data-lucide="info" class="w-3.5 h-3.5 text-sky-600"></i>
+          <span>구글 드라이브 주소가 변경되었을 때 여기서 바로 변경하세요</span>
+        </div>
+        <p class="text-[11px] text-sky-700">
+          구글 드라이브 폴더 링크(URL)를 복사하여 아래에 붙여넣으시면, 폴더 ID가 자동으로 추출되며 시스템이 즉시 새로운 폴더의 최신 엑셀 파일을 동기화합니다.
+        </p>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">
+            구글 드라이브 폴더 URL <span class="text-rose-500">*</span>
+          </label>
+          <div class="relative">
+            <i data-lucide="link" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+            <input type="url" id="inputSamsungDriveUrl" oninput="onSamsungDriveUrlInput(this.value)" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-xs font-mono" placeholder="https://drive.google.com/drive/folders/1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">폴더 ID (자동 추출)</label>
+            <input type="text" id="inputSamsungDriveFolderId" class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-xs font-mono bg-slate-50" placeholder="1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc" readonly>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">엑셀 복호화 암호</label>
+            <div class="relative">
+              <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+              <input type="text" id="inputSamsungDrivePassword" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-xs font-mono font-bold" placeholder="202610">
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">폴더명 (표시용)</label>
+          <input type="text" id="inputSamsungDriveFolderName" class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-xs" placeholder="삼성화재 가입자 리스트">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">로컬 PC 폴더 경로 <span class="text-slate-400 font-normal">(선택 / 미입력 시 자동 탐색)</span></label>
+          <input type="text" id="inputSamsungDriveFolderPath" class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 text-xs font-mono text-slate-600" placeholder="G:\.shortcut-targets-by-id\1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc\삼성화재 가입자 리스트">
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+        <button type="button" onclick="testSamsungDriveConfigCurrent()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer" title="현재 입력된 드라이브 폴더 열기 테스트">
+          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          <span>링크 테스트</span>
+        </button>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeSamsungDriveConfigModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">취소</button>
+          <button type="button" id="btnSaveSamsungDriveConfig" onclick="handleSaveSamsungDriveConfig()" class="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-black text-xs shadow-md shadow-sky-600/20 flex items-center gap-1.5 transition-all cursor-pointer">
+            <i data-lucide="check" class="w-4 h-4"></i>
+            <span>저장 및 즉시 동기화</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -13485,8 +13565,8 @@
 
   <!-- SCRIPTS (Moved to bottom of body for full DOM availability) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="hub_real_data.js?v=20261002_1235"></script>
-  <script src="data.js?v=20261002_1235"></script>
+  <script src="hub_real_data.js?v=20261015_1045"></script>
+  <script src="data.js?v=20261015_1045"></script>
   <script src="careport-client.js?v=20261008_1255"></script>
   <script src="carecall-client.js?v=20261003_0950"></script>
   <script src="samsung-call-report.js?v=20260920_1330"></script>
@@ -13496,7 +13576,7 @@
   <script src="slack-report-client.js?v=20261006_1510"></script>
   <script src="./xlsx-populate.min.js"></script>
   <script src="care-report-2page-pdf.js?v=20261007_1030"></script>
-  <script src="app.js?v=20261008_1545"></script>
+  <script src="app.js?v=20261015_1045"></script>
   <!-- 🚀 초고속 렌더링 최적화: 대용량 PDF & Excel 라이브러리는 첫 화면 렌더링 이후 비동기 지연 로드 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>

@@ -617,6 +617,77 @@ function saveSavedFaxConfig(cfg) {
   }
 }
 
+// =========================================================================
+// Persistent System Audit Log (시스템 감사 및 변경 이력 추적 영구 보관 파일)
+// =========================================================================
+const AUDIT_LOG_FILE = path.join(BASE_DIR, 'system_audit_logs.json');
+
+function getStoredAuditLogs() {
+  try {
+    if (fs.existsSync(AUDIT_LOG_FILE)) {
+      const data = fs.readFileSync(AUDIT_LOG_FILE, 'utf-8');
+      const parsed = JSON.parse(data || '[]');
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.warn('[Audit Log Load Error]', err.message);
+  }
+  return [];
+}
+
+function saveAuditLogsToDisk(logs) {
+  try {
+    const trimmed = Array.isArray(logs) ? logs.slice(0, 5000) : [];
+    fs.writeFileSync(AUDIT_LOG_FILE, JSON.stringify(trimmed, null, 2), 'utf-8');
+    return true;
+  } catch (err) {
+    console.error('[Audit Log Save Error]', err.message);
+    return false;
+  }
+}
+
+function appendServerAuditLog(logItem) {
+  try {
+    if (!logItem) return null;
+    const logs = getStoredAuditLogs();
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const timestamp = logItem.timestamp || `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    
+    const formattedLog = {
+      id: logItem.id || ('LOG-' + Date.now().toString().slice(-8) + '-' + Math.random().toString(36).substring(2, 6).toUpperCase()),
+      timestamp: timestamp,
+      user: {
+        username: logItem.user?.username || logItem.username || 'superadmin',
+        name: logItem.user?.name || logItem.name || '리본케어',
+        dept: logItem.user?.dept || logItem.dept || '총괄관리',
+        role: logItem.user?.role || logItem.role || 'SUPER_ADMIN'
+      },
+      ip: logItem.ip || logItem.user?.ip || '183.101.192.154',
+      category: logItem.category || '고객신청',
+      actionType: logItem.actionType || 'UPDATE',
+      target: logItem.target || '시스템 데이터',
+      summary: logItem.summary || '데이터 변경 작업 수행',
+      status: logItem.status || 'SUCCESS',
+      changes: logItem.changes || null,
+      details: logItem.details || null,
+      userAgent: logItem.userAgent || 'LivonMate-Server/3.0'
+    };
+
+    const existingIdx = logs.findIndex(l => l && l.id && l.id === formattedLog.id);
+    if (existingIdx >= 0) {
+      logs[existingIdx] = { ...logs[existingIdx], ...formattedLog };
+    } else {
+      logs.unshift(formattedLog);
+    }
+    saveAuditLogsToDisk(logs);
+    return formattedLog;
+  } catch (err) {
+    console.warn('[Audit Log Append Error]', err.message);
+    return null;
+  }
+}
+
     // =========================================================================
     // API Route: FAX Config Settings (설정 저장 및 불러오기)
     // =========================================================================
@@ -1096,6 +1167,73 @@ function saveSavedFaxConfig(cfg) {
     }
 
     // =========================================================================
+    // API Route: 시스템 전체 감사 로그 조회 및 일괄 동기화 API
+    // =========================================================================
+    if (reqPath === '/api/system/audit-logs') {
+      if (req.method === 'GET') {
+        const logs = getStoredAuditLogs();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, logs: logs, count: logs.length }));
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const { logs: newLogs } = JSON.parse(body || '{}');
+            if (Array.isArray(newLogs) && newLogs.length > 0) {
+              const current = getStoredAuditLogs();
+              const idSet = new Set(current.map(l => l && l.id));
+              let addedCount = 0;
+              newLogs.forEach(l => {
+                if (l && l.id && !idSet.has(l.id)) {
+                  current.push(l);
+                  idSet.add(l.id);
+                  addedCount++;
+                }
+              });
+              current.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+              saveAuditLogsToDisk(current);
+              res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+              return res.end(JSON.stringify({ success: true, count: current.length, added: addedCount }));
+            }
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '유효한 로그 배열이 필요합니다.' }));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+    }
+
+    // =========================================================================
+    // API Route: 실시간 시스템 감사 로그 단건 영구 기록 API
+    // =========================================================================
+    if (reqPath === '/api/system/audit-log' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body || '{}');
+          const logPayload = parsed.log || parsed;
+          if (!logPayload || (!logPayload.target && !logPayload.summary)) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '유효한 로그 데이터가 필요합니다.' }));
+          }
+          const savedLog = appendServerAuditLog(logPayload);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, log: savedLog }));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    // =========================================================================
     // API Route: 통합허브 런칭 실데이터 영구 보존 API
     // =========================================================================
     if (reqPath === '/api/hub/real-data') {
@@ -1191,6 +1329,12 @@ function saveSavedFaxConfig(cfg) {
 
             stored.updatedAt = new Date().toISOString();
             fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+            try {
+              const seedJsFile = path.join(BASE_DIR, 'hub_real_data.js');
+              fs.writeFileSync(seedJsFile, 'window.REBORN_REAL_SEED_DATA = ' + JSON.stringify(stored, null, 2) + ';\n', 'utf-8');
+            } catch (seedErr) {
+              console.warn('[Seed JS Sync Warn]', seedErr.message);
+            }
             invalidateRealDataCache();
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1213,11 +1357,12 @@ function saveSavedFaxConfig(cfg) {
     // API Route: 통합허브 신규 고객 실시간 추가 및 영구 저장 API
     // =========================================================================
     // =========================================================================
-    // API Route: 전산 데이터 전체 초기화 (hub_apps_real.json 0건 클린 초기화)
+    // API Route: 전산 데이터 전체 초기화 (hub_apps_real.json 및 hub_real_data.js 0건 클린 초기화)
     // =========================================================================
     if (reqPath === '/api/admin/reset-local-data' && req.method === 'POST') {
       try {
         const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+        const seedJsFile = path.join(BASE_DIR, 'hub_real_data.js');
         const emptyData = {
           updatedAt: new Date().toISOString(),
           sources: {},
@@ -1231,6 +1376,8 @@ function saveSavedFaxConfig(cfg) {
           dashboardStats: null
         };
         fs.writeFileSync(realDataFile, JSON.stringify(emptyData, null, 2), 'utf-8');
+        fs.writeFileSync(seedJsFile, 'window.REBORN_REAL_SEED_DATA = ' + JSON.stringify(emptyData, null, 2) + ';\n', 'utf-8');
+        invalidateRealDataCache();
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         return res.end(JSON.stringify({ success: true, message: '로컬 데이터가 0건으로 초기화되었습니다.' }));
       } catch (err) {
@@ -1264,6 +1411,23 @@ function saveSavedFaxConfig(cfg) {
           fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
           invalidateRealDataCache();
           syncConvexMutation('sync:saveApplication', { app: application }).catch(console.warn);
+
+          // 서버 측 감사 로그 자동 기록
+          appendServerAuditLog({
+            category: '고객신청',
+            actionType: 'CREATE',
+            target: `고객 [${application.id}] (${application.patientName || '신규'})`,
+            summary: `신규 고객 접수 등록 [${application.id} - ${application.patientName || '신규'}] (${application.insuranceCompany || '원수사미지정'})`,
+            changes: {
+              '피보험자': { before: null, after: application.patientName },
+              '원수사': { before: null, after: application.insuranceCompany },
+              '연락처': { before: null, after: application.phone },
+              '접수상태': { before: null, after: application.status || '접수' },
+              '간병유형': { before: null, after: application.careType || '입원' },
+              '병원/장소': { before: null, after: application.hospitalName || application.roadAddress || '-' }
+            }
+          });
+
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: true, count: stored.applications.length, appId: application.id }));
         } catch (err) {
@@ -1316,6 +1480,18 @@ function saveSavedFaxConfig(cfg) {
           // Convex 개발 DB에서도 즉시 비동기 삭제
           targetIds.forEach(id => {
             syncConvexMutation('sync:deleteApplication', { appId: id }).catch(console.warn);
+          });
+
+          // 서버 측 감사 로그 자동 기록
+          appendServerAuditLog({
+            category: '고객신청',
+            actionType: 'DELETE',
+            target: `고객 [${Array.from(targetIds).join(', ')}]`,
+            summary: `고객 데이터 영구 삭제 처리 (${targetIds.size}건: ${Array.from(targetIds).join(', ')})`,
+            changes: {
+              '삭제건수': { before: `${targetIds.size}건`, after: '삭제완료' },
+              '대상ID': { before: Array.from(targetIds).join(', '), after: '-' }
+            }
           });
 
           console.log(`[Disk & Convex Delete] 고객 ${targetIds.size}건 영구 삭제 완료 (이전: ${beforeCount}명 -> 현재: ${stored.applications.length}명)`);
@@ -1405,6 +1581,21 @@ function saveSavedFaxConfig(cfg) {
             if (fields.payout && fields.payout.id) {
               syncConvexMutation('sync:savePayout', { payout: fields.payout }).catch(console.warn);
             }
+
+            // 서버 측 감사 로그 자동 기록
+            const targetPatientName = stored.applications[idx].patientName || targetId;
+            const updatedFieldNames = Object.keys(appFields).slice(0, 5).join(', ');
+            appendServerAuditLog({
+              category: '고객상세',
+              actionType: 'UPDATE',
+              target: `고객 [${targetId}] (${targetPatientName})`,
+              summary: `[${targetPatientName} 님] 고객 필드 정보 실시간 갱신 및 저장 (${updatedFieldNames})`,
+              changes: Object.keys(appFields).reduce((acc, k) => {
+                acc[k] = { before: '-', after: typeof appFields[k] === 'object' ? JSON.stringify(appFields[k]) : String(appFields[k]) };
+                return acc;
+              }, {})
+            });
+
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify({ success: true, updatedApp: stored.applications[idx] }));
           } else {

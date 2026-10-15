@@ -1296,6 +1296,7 @@ export const resetAndPurgeLaunchData = mutation({
           const sheets = await ctx.db.query("samsungSheets").collect();
           for (const s of sheets) {
             await ctx.db.delete(s._id);
+            deletedSheets++;
           }
         }
       }

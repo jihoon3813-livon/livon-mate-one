@@ -273,56 +273,83 @@
   /**
    * 감사 로그 시스템 초기화 (이전 더미/목업 데이터 자동 정화)
    */
-  window.initSystemAuditLogs = function () {
+  window.initSystemAuditLogs = async function () {
     try {
       const saved = localStorage.getItem('LIVON_SYSTEM_AUDIT_LOGS');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // 이전 테스트 목업 데이터(CLM-684296, 윤석찬, PAY-10291, ASN-48291 등)가 포함된 경우 실데이터 기반 로그로 자동 갱신
-        const hasDummyTestLogs = Array.isArray(parsed) && parsed.some(l => 
-          (l.target && (l.target.includes('윤석찬') || l.target.includes('CLM-684296') || l.target.includes('PAY-10291') || l.target.includes('ASN-48291') || l.target.includes('김리본'))) ||
-          (l.user && (l.user.name === '김리본' || l.user.name === '박정산' || l.user.name === '이매칭'))
-        );
-        if (Array.isArray(parsed) && parsed.length > 0 && !hasDummyTestLogs) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           window.gSystemAuditLogs = parsed;
-          return;
         }
       }
     } catch (e) {
-      console.warn('감사 로그 로드 오류:', e);
+      console.warn('감사 로그 로컬 로드 오류:', e);
     }
-    window.gSystemAuditLogs = generateSeedAuditLogs();
+
+    if (!Array.isArray(window.gSystemAuditLogs) || window.gSystemAuditLogs.length === 0) {
+      window.gSystemAuditLogs = generateSeedAuditLogs();
+    }
+
+    // 서버 실시간 영구 보관소(/api/system/audit-logs)와 양방향 자동 동기화
     try {
-      localStorage.setItem('LIVON_SYSTEM_AUDIT_LOGS', JSON.stringify(window.gSystemAuditLogs));
-    } catch (e) {}
+      const res = await fetch('/api/system/audit-logs');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.logs)) {
+          if (data.logs.length > 0) {
+            // 서버에 보관된 영구 로그와 로컬 로그 병합 (id 기준 중복 제거)
+            const map = new Map();
+            data.logs.forEach(l => { if (l && l.id) map.set(l.id, l); });
+            (window.gSystemAuditLogs || []).forEach(l => { if (l && l.id && !map.has(l.id)) map.set(l.id, l); });
+            const merged = Array.from(map.values()).sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+            window.gSystemAuditLogs = merged;
+          } else if (window.gSystemAuditLogs && window.gSystemAuditLogs.length > 0) {
+            // 서버가 비어있으면 현재 로컬 로그를 서버에 최초 영구 업로드(시딩)
+            fetch('/api/system/audit-logs', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ logs: window.gSystemAuditLogs })
+            }).catch(() => {});
+          }
+          try {
+            localStorage.setItem('LIVON_SYSTEM_AUDIT_LOGS', JSON.stringify(window.gSystemAuditLogs));
+          } catch (e) {}
+          if (typeof window.renderSystemAuditLogs === 'function') {
+            window.renderSystemAuditLogs();
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Audit Log Cloud Sync Warning]', err);
+    }
   };
 
   /**
-   * 실시간 시스템 작업 및 변경 감사 로그 기록 함수 (전역 노출)
+   * 실시간 시스템 작업 및 변경 감사 로그 기록 함수 (전역 노출 및 서버 영구 보관)
    */
   window.recordSystemAuditLog = function (logData = {}) {
     try {
       const now = new Date();
       const pad = n => String(n).padStart(2, '0');
-      const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      const timestamp = logData.timestamp || `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 
       // 현재 로그인 관리자 정보 추출
       const currentAdmin = window.gCurrentAdmin || {};
-      const user = {
-        username: logData.username || currentAdmin.username || 'superadmin',
-        name: logData.name || (currentAdmin.name && currentAdmin.name !== '김리본' ? currentAdmin.name : '리본케어'),
-        dept: logData.dept || (currentAdmin.dept && currentAdmin.dept !== '김리본' ? currentAdmin.dept : '총괄관리'),
-        role: logData.role || currentAdmin.role || 'SUPER_ADMIN'
-      };
+      const currentSession = window.gCurrentAdminSession || {};
+      const username = logData.username || logData.user?.username || currentAdmin.username || currentSession.username || 'superadmin';
+      const name = logData.name || logData.user?.name || (currentAdmin.name && currentAdmin.name !== '김리본' ? currentAdmin.name : (currentSession.name || '리본케어'));
+      const dept = logData.dept || logData.user?.dept || (currentAdmin.dept && currentAdmin.dept !== '김리본' ? currentAdmin.dept : (currentSession.dept || '총괄관리'));
+      const role = logData.role || logData.user?.role || currentAdmin.role || currentSession.role || 'SUPER_ADMIN';
 
-      const clientIp = logData.ip || currentAdmin.lastIp || window._clientIp || '121.134.82.15';
+      const user = { username, name, dept, role };
+      const clientIp = logData.ip || currentAdmin.lastIp || window._clientIp || '183.101.192.154';
 
       const newLog = {
-        id: 'LOG-' + Date.now().toString().slice(-8) + '-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
-        timestamp: logData.timestamp || timestamp,
+        id: logData.id || ('LOG-' + Date.now().toString().slice(-8) + '-' + Math.random().toString(36).substring(2, 6).toUpperCase()),
+        timestamp: timestamp,
         user: user,
         ip: clientIp,
-        category: logData.category || '시스템관리',
+        category: logData.category || '고객신청',
         actionType: logData.actionType || 'UPDATE', // CREATE, UPDATE, STATUS_CHANGE, DELETE, LOGIN, EXPORT, RESET
         target: logData.target || '시스템 전반',
         summary: logData.summary || '시스템 데이터 변경 작업 수행',
@@ -336,18 +363,27 @@
         window.gSystemAuditLogs = [];
       }
 
+      // 1. 브라우저 캐시 최상단 추가
       window.gSystemAuditLogs.unshift(newLog);
 
-      // 최대 2,000건 안전 보존
-      if (window.gSystemAuditLogs.length > 2000) {
-        window.gSystemAuditLogs = window.gSystemAuditLogs.slice(0, 2000);
+      if (window.gSystemAuditLogs.length > 5000) {
+        window.gSystemAuditLogs = window.gSystemAuditLogs.slice(0, 5000);
       }
 
       try {
         localStorage.setItem('LIVON_SYSTEM_AUDIT_LOGS', JSON.stringify(window.gSystemAuditLogs));
       } catch (e) {}
 
-      // 현재 감사로그 탭이 열려있다면 즉시 화면 갱신
+      // 2. 서버 영구 디스크(/api/system/audit-log)에 실시간 전송 저장
+      try {
+        fetch('/api/system/audit-log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ log: newLog })
+        }).catch(err => console.warn('감사로그 서버 전송 지연:', err));
+      } catch (e) {}
+
+      // 3. 현재 감사로그 탭이 열려있다면 즉시 화면 갱신
       const auditContainer = document.getElementById('adminAuditLogsSubView');
       if (auditContainer && !auditContainer.classList.contains('hidden')) {
         window.renderSystemAuditLogs();
@@ -382,7 +418,12 @@
         btnAudit.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1.5';
       }
 
-      window.renderSystemAuditLogs();
+      // 서버 최신 감사로그 실시간 동기화 호출
+      if (typeof window.initSystemAuditLogs === 'function') {
+        window.initSystemAuditLogs();
+      } else {
+        window.renderSystemAuditLogs();
+      }
     } else {
       if (rbacView) rbacView.classList.remove('hidden');
       if (auditView) auditView.classList.add('hidden');

@@ -358,14 +358,30 @@
         const ephemeralKey = sessionJson.clientSecret;
         console.log('[CareCall] OpenAI Realtime 세션 발급 완료:', sessionJson.sessionId);
 
-        // 3. 브라우저 마이크 스트림 획득 (AGC 비활성화로 숨소리 과증폭 차단)
-        const micStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: false // 마이크가 무음 시 숨소리를 수십 배로 증폭시키는 현상 차단
+        // 3. 브라우저 마이크 스트림 획득 (마이크 미연결 PC 개발환경에서는 가상 오디오 트랙으로 자동 폴백)
+        let micStream = null;
+        this.hasRealMic = false;
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          try {
+            micStream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: false // 마이크가 무음 시 숨소리를 수십 배로 증폭시키는 현상 차단
+              }
+            });
+            this.hasRealMic = true;
+          } catch (micErr) {
+            try {
+              // 일부 오디오 드라이버에서 세부 제약조건 거부 시 기본 오디오로 재시도
+              micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              this.hasRealMic = true;
+            } catch (fallbackErr) {
+              console.warn('[CareCall] 물리적 마이크를 찾을 수 없어 개발/텍스트 응답 모드로 전환합니다:', fallbackErr.message);
+              this.hasRealMic = false;
+            }
           }
-        });
+        }
 
         // 4. WebRTC PeerConnection 생성
         const pc = new RTCPeerConnection();
@@ -378,20 +394,30 @@
           try { await audioCtx.resume(); } catch (_) {}
         }
 
-        // 입김, 한숨, 마이크 바람소리(120Hz 이하 저음역 팝핑) 차단을 위한 방송용 120Hz 하이패스 필터
-        const micSource = audioCtx.createMediaStreamSource(micStream);
-        const breathFilter = audioCtx.createBiquadFilter();
-        breathFilter.type = 'highpass';
-        breathFilter.frequency.value = 120;
-        breathFilter.Q.value = 0.7; // 부드러운 감쇄 커브
-
         const destination = audioCtx.createMediaStreamDestination();
-        micSource.connect(breathFilter);
-        breathFilter.connect(destination); // 녹음기 버스에 숨소리가 차단된 깨끗한 음성 전달
-
-        // OpenAI WebRTC 전송용 필터링된 마이크 스트림 생성
         const cleanMicDest = audioCtx.createMediaStreamDestination();
-        breathFilter.connect(cleanMicDest);
+
+        if (micStream && this.hasRealMic) {
+          // 입김, 한숨, 마이크 바람소리(120Hz 이하 저음역 팝핑) 차단을 위한 방송용 120Hz 하이패스 필터
+          const micSource = audioCtx.createMediaStreamSource(micStream);
+          const breathFilter = audioCtx.createBiquadFilter();
+          breathFilter.type = 'highpass';
+          breathFilter.frequency.value = 120;
+          breathFilter.Q.value = 0.7; // 부드러운 감쇄 커브
+
+          micSource.connect(breathFilter);
+          breathFilter.connect(destination); // 녹음기 버스에 숨소리가 차단된 깨끗한 음성 전달
+          breathFilter.connect(cleanMicDest); // OpenAI WebRTC 전송용 필터링된 마이크 스트림 생성
+        } else {
+          // 마이크가 없는 PC(Requested device not found)에서도 WebRTC 세션 및 AI 음성 청취/녹취가 동작하도록 무음 오실레이터 연결
+          const silentOsc = audioCtx.createOscillator();
+          const silentGain = audioCtx.createGain();
+          silentGain.gain.value = 0;
+          silentOsc.connect(silentGain);
+          silentGain.connect(destination);
+          silentGain.connect(cleanMicDest);
+          silentOsc.start();
+        }
 
         // 원격 AI 오디오 출력용 Audio 요소
         const remoteAudio = new Audio();
@@ -820,6 +846,36 @@
       liveBox.scrollTop = liveBox.scrollHeight;
     },
 
+    sendTextReply(customText) {
+      const inputEl = document.getElementById('careCallTextReplyInput');
+      const text = (customText !== undefined ? customText : (inputEl ? inputEl.value : '')).trim();
+      if (!text) return;
+      if (inputEl && customText === undefined) inputEl.value = '';
+
+      this.simTranscriptLog.push({ speaker: 'caregiver', text });
+      this.appendLiveTranscript('caregiver', text, true);
+      this.updateSpeakingStatus('processing');
+
+      if (this.dataChannel && this.dataChannel.readyState === 'open') {
+        try {
+          this.dataChannel.send(JSON.stringify({
+            type: 'conversation.item.create',
+            item: {
+              type: 'message',
+              role: 'user',
+              content: [{ type: 'input_text', text }]
+            }
+          }));
+          this.dataChannel.send(JSON.stringify({
+            type: 'response.create',
+            response: { modalities: ['audio', 'text'] }
+          }));
+        } catch (err) {
+          console.warn('[CareCall Text Reply Warning]', err);
+        }
+      }
+    },
+
     openActiveCallModal(callData) {
       let modal = document.getElementById('careCallActiveModal');
       if (!modal) {
@@ -827,7 +883,7 @@
         div.id = 'careCallActiveModal';
         div.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4';
         div.innerHTML = `
-          <div class="bg-white rounded-3xl p-6 max-w-lg w-full border border-slate-200 shadow-2xl space-y-4">
+          <div class="bg-white rounded-3xl p-6 max-w-lg w-full border border-slate-200 shadow-2xl space-y-3.5 max-h-[94vh] flex flex-col">
             <div class="flex items-center justify-between pb-3 border-b border-slate-100">
               <div class="flex items-center gap-2.5">
                 <span class="w-3.5 h-3.5 rounded-full bg-emerald-500 animate-ping"></span>
@@ -836,10 +892,13 @@
                   <span class="text-[11px] text-slate-400 font-mono" id="careCallActiveTimer">00:00</span>
                 </div>
               </div>
-              <span class="text-xs px-2.5 py-1 rounded-full bg-purple-100 text-purple-800 font-bold" id="modalActiveVoiceTag">마린 (Marin)</span>
+              <div class="flex items-center gap-1.5">
+                <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold" id="modalActiveMicTag">🎙️ 마이크 연결</span>
+                <span class="text-xs px-2.5 py-1 rounded-full bg-purple-100 text-purple-800 font-bold" id="modalActiveVoiceTag">마린 (Marin)</span>
+              </div>
             </div>
             
-            <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 grid grid-cols-3 gap-2 text-xs">
+            <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 grid grid-cols-3 gap-2 text-xs">
               <div>
                 <span class="text-slate-400 text-[10px] block">환자명</span>
                 <b class="text-slate-900 font-bold" id="modalActivePatientName">-</b>
@@ -864,7 +923,7 @@
             </div>
 
             <!-- 실시간 대화록 스트림 -->
-            <div class="space-y-1.5">
+            <div class="space-y-1.5 flex-1 min-h-0 flex flex-col">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                   <i data-lucide="message-square" class="w-3.5 h-3.5 text-indigo-500"></i>
@@ -874,13 +933,41 @@
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> 자동 기록
                 </span>
               </div>
-              <div id="careCallLiveTranscript" class="h-56 overflow-y-auto custom-scrollbar p-3 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-2 text-xs">
+              <div id="careCallLiveTranscript" class="h-48 overflow-y-auto custom-scrollbar p-3 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-2 text-xs">
                 <p class="text-slate-400 italic">OpenAI Realtime 연결 중... AI 간병매니저가 먼저 인사를 건넵니다.</p>
               </div>
             </div>
 
-            <div class="flex items-center justify-between pt-2">
-              <span class="text-[11px] text-slate-400">말씀을 마치고 버튼을 누르면 간병일지가 생성됩니다.</span>
+            <!-- 개발/마이크 미연결 PC용 텍스트 답변 입력 및 빠른 테스트 칩 -->
+            <div class="bg-slate-50 p-2.5 rounded-2xl border border-slate-200 space-y-2">
+              <div class="flex items-center gap-1.5">
+                <input type="text" id="careCallTextReplyInput"
+                  placeholder="마이크 없이 텍스트로 답변 입력 후 Enter (또는 마이크로 직접 말씀하세요)"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();CareCallClient.sendTextReply();}"
+                  class="flex-1 px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" />
+                <button type="button" onclick="CareCallClient.sendTextReply()"
+                  class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shrink-0 cursor-pointer">
+                  전송
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <button type="button" onclick="CareCallClient.sendTextReply('오늘 죽 한 공기 다 드시고 어지럼증도 없이 컨디션 아주 좋으셨어요.')"
+                  class="px-2 py-0.5 rounded-lg bg-white hover:bg-emerald-50 text-slate-600 hover:text-emerald-800 border border-slate-200 text-[10px] font-medium cursor-pointer">
+                  💬 식사/컨디션 양호
+                </button>
+                <button type="button" onclick="CareCallClient.sendTextReply('대소변 정상이고 기저귀도 제때 교체해 드렸어요. 2시간마다 체위변경 해서 욕창도 없습니다.')"
+                  class="px-2 py-0.5 rounded-lg bg-white hover:bg-emerald-50 text-slate-600 hover:text-emerald-800 border border-slate-200 text-[10px] font-medium cursor-pointer">
+                  💬 배변/체위변경 정상
+                </button>
+                <button type="button" onclick="CareCallClient.sendTextReply('혈압 125에 80, 체온 36.5도 정상이고 처방약도 식후에 모두 복용하셨습니다. 다른 특이사항은 없어요.')"
+                  class="px-2 py-0.5 rounded-lg bg-white hover:bg-emerald-50 text-slate-600 hover:text-emerald-800 border border-slate-200 text-[10px] font-medium cursor-pointer">
+                  💬 활력징후/복약 완료
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1">
+              <span class="text-[11px] text-slate-400">대화를 마치고 버튼을 누르면 간병일지가 생성됩니다.</span>
               <button type="button" onclick="CareCallClient.stopCall(true)" 
                 class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
                 <i data-lucide="phone-off" class="w-3.5 h-3.5"></i>
@@ -897,6 +984,16 @@
       document.getElementById('modalActiveCaregiverName').innerText = callData.caregiverName || '-';
       document.getElementById('modalActiveCaregiverPhone').innerText = callData.caregiverPhone || '-';
       document.getElementById('modalActiveVoiceTag').innerText = this.selectedVoice || 'marin';
+      const micTag = document.getElementById('modalActiveMicTag');
+      if (micTag) {
+        if (this.hasRealMic) {
+          micTag.className = 'text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold';
+          micTag.innerText = '🎙️ 마이크 연결됨';
+        } else {
+          micTag.className = 'text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold';
+          micTag.innerText = '⌨️ 마이크 없음 (텍스트 응답 모드)';
+        }
+      }
       const transcriptBox = document.getElementById('careCallLiveTranscript');
       if (transcriptBox) {
         transcriptBox.innerHTML = '<p class="text-slate-400 italic">OpenAI Realtime 연결 완료. AI 간병매니저의 첫인사를 기다리는 중입니다...</p>';
@@ -920,14 +1017,25 @@
           <span class="text-[10px] text-purple-700 bg-white/60 px-2 py-0.5 rounded-md font-normal">스피커 재생 중</span>
         `;
       } else if (status === 'user_ready') {
-        badge.className = 'px-3.5 py-2 rounded-2xl bg-emerald-100 text-emerald-950 border border-emerald-300 text-xs font-black flex items-center justify-between shadow-2xs';
-        badge.innerHTML = `
-          <span class="flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-            <span>🎙️ 간병사님 말씀해 주세요 (마이크 켜짐)</span>
-          </span>
-          <span class="text-[10px] text-emerald-800 bg-white/70 px-2 py-0.5 rounded-md font-bold">자유롭게 말씀하세요</span>
-        `;
+        if (this.hasRealMic) {
+          badge.className = 'px-3.5 py-2 rounded-2xl bg-emerald-100 text-emerald-950 border border-emerald-300 text-xs font-black flex items-center justify-between shadow-2xs';
+          badge.innerHTML = `
+            <span class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+              <span>🎙️ 간병사님 말씀해 주세요 (마이크 켜짐)</span>
+            </span>
+            <span class="text-[10px] text-emerald-800 bg-white/70 px-2 py-0.5 rounded-md font-bold">자유롭게 말씀하세요</span>
+          `;
+        } else {
+          badge.className = 'px-3.5 py-2 rounded-2xl bg-amber-50 text-amber-950 border border-amber-300 text-xs font-black flex items-center justify-between shadow-2xs';
+          badge.innerHTML = `
+            <span class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
+              <span>⌨️ PC 마이크 미연결 — 아래 입력창이나 샘플 버튼으로 답변해 주세요</span>
+            </span>
+            <span class="text-[10px] text-amber-800 bg-white/70 px-2 py-0.5 rounded-md font-bold">텍스트 응답 대기</span>
+          `;
+        }
       } else if (status === 'user_speaking') {
         badge.className = 'px-3.5 py-2 rounded-2xl bg-teal-100 text-teal-950 border border-teal-300 text-xs font-black flex items-center justify-between shadow-2xs';
         badge.innerHTML = `

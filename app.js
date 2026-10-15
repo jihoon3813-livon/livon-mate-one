@@ -1528,7 +1528,12 @@ async function loadConvexData(showSpinner = true) {
     } catch (e) {}
   }
 
-  const hasLocalData = (Array.isArray(gApps) && gApps.length > 0) || !!localStorage.getItem('LIVON_CACHED_APPS');
+  const hasRealSeed = typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0;
+  if (hasRealSeed) {
+    try { localStorage.removeItem('LIVON_DATA_RESET_CLEAN'); } catch (e) {}
+  }
+  const isResetClean = !hasRealSeed && (localStorage.getItem('LIVON_DATA_RESET_CLEAN') === 'true');
+  const hasLocalData = (Array.isArray(gApps) && gApps.length > 0) || !!localStorage.getItem('LIVON_CACHED_APPS') || isResetClean;
 
   // Stale-While-Revalidate: 로컬 캐시가 있으면 스피너 없이 0초 즉시 화면 표출
   if (showSpinner && !hasLocalData) {
@@ -1540,6 +1545,7 @@ async function loadConvexData(showSpinner = true) {
 
   // 1. 서버 인메모리 RAM 캐시 실데이터 요청 함수 (로컬 캐시 부재 시 비상 fallback)
   const fetchLocalRealData = async () => {
+    if (localStorage.getItem('LIVON_DATA_RESET_CLEAN') === 'true') return null;
     if (typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0) {
       return window.REBORN_REAL_SEED_DATA;
     }
@@ -1575,6 +1581,7 @@ async function loadConvexData(showSpinner = true) {
 
   const applyRealJson = (realJson) => {
     if (!realJson) return;
+    if (localStorage.getItem('LIVON_DATA_RESET_CLEAN') === 'true') return;
     // [Race Condition 방지] Convex bundleAll 응답이 이미 적용된 후에는 hub_apps_real.json 데이터로 절대 덮어쓰지 않음
     if (gConvexDataApplied) {
       console.log('[Data Sync Guard] Convex 응답이 이미 적용되어 로컬 JSON fallback을 무시합니다.');
@@ -1647,7 +1654,7 @@ async function loadConvexData(showSpinner = true) {
   };
 
   // 로컬 캐시가 완전히 비어있는 첫 실행 시에만 1.4MB 실데이터 JSON 비동기 다운로드 (불필요한 반복 트래픽 차단)
-  if (!hasLocalData) {
+  if (!hasLocalData && !isResetClean) {
     const realDataPromise = fetchLocalRealData();
     realDataPromise.then(applyRealJson);
   }
@@ -1655,8 +1662,8 @@ async function loadConvexData(showSpinner = true) {
   try {
     const res = await queryConvex('sync:bundleAll', { sessionToken: token || '' });
     if (res && res.status === 'success' && res.value) {
-      if (res.value.status === 'unauthorized' || !Array.isArray(res.value.applications) || res.value.applications.length === 0) {
-        console.warn('[Security Guard] bundleAll 미인증 또는 빈 응답: 공개 applications:list 및 최신 로컬 원본으로 보정합니다.');
+      if (res.value.status === 'unauthorized') {
+        console.warn('[Security Guard] bundleAll 미인증 응답: 공개 applications:list 및 최신 로컬 원본으로 보정합니다.');
         let directApps = null;
         try {
           const cvxList = await queryConvex('applications:list', {});
@@ -1672,6 +1679,34 @@ async function loadConvexData(showSpinner = true) {
         }
       }
       const { applications, assignments, claims, payouts, adjusters, partners, careLogs, caregivers, systemSettings } = res.value;
+
+      // Convex DB가 0건(클린 초기화 상태)이면 로컬 시드 및 캐시도 0건으로 완전 동기화하여 좀비 데이터 부활 원천 차단
+      if (Array.isArray(applications) && applications.length === 0) {
+        try { localStorage.setItem('LIVON_DATA_RESET_CLEAN', 'true'); } catch (e) {}
+        if (window.REBORN_REAL_SEED_DATA) {
+          window.REBORN_REAL_SEED_DATA.applications = [];
+          window.REBORN_REAL_SEED_DATA.assignments = [];
+          window.REBORN_REAL_SEED_DATA.claims = [];
+          window.REBORN_REAL_SEED_DATA.payouts = [];
+          window.REBORN_REAL_SEED_DATA.caregivers = [];
+          window.REBORN_REAL_SEED_DATA.centers = [];
+          window.REBORN_REAL_SEED_DATA.adjusters = [];
+          window.REBORN_REAL_SEED_DATA.dashboardStats = null;
+        }
+        if (window.REBORN_DATA) {
+          window.REBORN_DATA.applications = [];
+          window.REBORN_DATA.assignments = [];
+          window.REBORN_DATA.claims = [];
+          window.REBORN_DATA.payouts = [];
+          window.REBORN_DATA.caregivers = [];
+          window.REBORN_DATA.adjusters = [];
+          window.REBORN_DATA.careLogs = [];
+        }
+        window.gOfficialDashboardStats = null;
+        try { localStorage.removeItem('LIVON_OFFICIAL_DASH_STATS'); } catch (e) {}
+      } else if (Array.isArray(applications) && applications.length > 0) {
+        try { localStorage.removeItem('LIVON_DATA_RESET_CLEAN'); } catch (e) {}
+      }
 
       // 삭제 처리된 고객 식별 Set (삭제된 고객이 로컬 캐시나 레이스 컨디션으로 부활하는 현상 원천 차단)
       let deletedAppIdSet = new Set();
@@ -1749,17 +1784,17 @@ async function loadConvexData(showSpinner = true) {
       gConvexDataApplied = true;
 
       // 5. 손해사정사 디렉토리
-      if (Array.isArray(adjusters) && adjusters.length > 0) {
+      if (Array.isArray(adjusters)) {
         gAdjusters = adjusters;
       }
 
       // 6. 협력 센터 / 파트너
-      if (Array.isArray(partners) && partners.length > 0) {
+      if (Array.isArray(partners)) {
         gCenters = partners;
       }
 
       // 7. 인력 (간병인 풀) 디렉토리
-      if (Array.isArray(caregivers) && caregivers.length > 0) {
+      if (Array.isArray(caregivers)) {
         gCaregivers = caregivers;
       }
 
@@ -1919,6 +1954,12 @@ async function loadConvexData(showSpinner = true) {
           gSamsungSheets.completed = [];
           gSamsungSheets.contacts = [];
         }
+        try {
+          localStorage.removeItem('LIVON_SAMSUNG_EXCEL_LEDGER');
+          localStorage.removeItem('LIVON_SAMSUNG_SHEET_TARGET');
+          localStorage.removeItem('LIVON_SAMSUNG_SHEET_COMPLETED');
+          localStorage.removeItem('LIVON_SAMSUNG_SHEET_CONTACTS');
+        } catch (e) {}
       }
 
       // 통합허브(gApps)의 삼성화재 고객들을 실시간으로 대상자 시트에 자동 병합/동기화
@@ -5419,6 +5460,7 @@ const LivonDB = {
         store.clear();
         for (let i = 0; i < records.length; i++) {
           const r = records[i];
+          if (!r) continue;
           const pId = r.patientId || r.id || ('SF-P' + (1000 + i));
           store.put({ ...r, patientId: pId });
         }
@@ -5594,7 +5636,7 @@ function initInsuranceWorkflows() {
   } catch (e) {}
 
   // Ensure full 12 fields are initialized for Samsung List if still empty
-  if (!gSamsungList || gSamsungList.length === 0 || !gSamsungList[0].patientId) {
+  if (!gSamsungList || gSamsungList.length === 0 || !gSamsungList[0]?.patientId) {
     gSamsungList = [
       { id: 'SF-20260903-01', patientId: 'SF-P001', patientName: '김옥경', birthDate: '19661230', gender: '여', phone: '010-3875-7912', policyNumber: 'SF109283741', productCode: 'SF-CARE-01', productName: '무배당 삼성화재 당신에게 좋은간병보험', contractStartDate: '2024-03-01', contractEndDate: '2044-03-01', hasInjuryCare: '가입', hasDiseaseCare: '가입', accidentNumber: '26S008912', adjusterName: '김정현', adjusterPhone: '02-3485-9114', adjusterFax: '02-3485-9100', maxDailyLimit: 144000, maxDays: 180, receiveDate: '2026-09-03', matchStatus: '매칭완료' },
       { id: 'SF-20260903-02', patientId: 'SF-P002', patientName: '이성근', birthDate: '19800718', gender: '남', phone: '010-7187-8718', policyNumber: 'SF992817263', productCode: 'SF-CARE-02', productName: '무배당 삼성화재 행복한돌봄간병보험', contractStartDate: '2023-11-15', contractEndDate: '2043-11-15', hasInjuryCare: '가입', hasDiseaseCare: '가입', accidentNumber: '26S009341', adjusterName: '이민우', adjusterPhone: '02-760-5521', adjusterFax: '02-760-5500', maxDailyLimit: 144000, maxDays: 180, receiveDate: '2026-09-03', matchStatus: '매칭완료' },
@@ -6490,8 +6532,9 @@ function healSamsungSheetData(sheetKey, rows) {
   const defaultList = DEFAULT_SAMSUNG_LEDGER_DATA[sheetKey] || [];
   if (sheetKey === 'target') {
     return rows.map(r => {
+      if (!r) return r;
       const pid = String(r.patientId || r.id || '').trim();
-      const def = defaultList.find(d => String(d.patientId || d.id) === pid || (r.patientName && d.patientName === r.patientName));
+      const def = defaultList.find(d => d && (String(d.patientId || d.id) === pid || (r.patientName && d.patientName === r.patientName)));
       if (!def) return r;
       return {
         ...def,
@@ -6509,17 +6552,18 @@ function healSamsungSheetData(sheetKey, rows) {
         hasDiseaseCare: (r.hasDiseaseCare === 'Y' || r.hasDiseaseCare === true || r.hasDiseaseCare === '가입') ? 'Y' : (def.hasDiseaseCare || 'Y'),
         applicantContact: r.applicantContact || def.applicantContact || r.phone || ''
       };
-    });
+    }).filter(Boolean);
   }
   if (sheetKey === 'completed') {
     // If completed rows are missing assignedRegion, heal from authentic completed dataset
-    const hasAnyRegion = rows.some(r => r.assignedRegion && String(r.assignedRegion).trim() !== '');
+    const hasAnyRegion = rows.some(r => r && r.assignedRegion && String(r.assignedRegion).trim() !== '');
     if (!hasAnyRegion) {
       return defaultList.map(r => ({ ...r }));
     }
     return rows.map(r => {
+      if (!r) return r;
       const pid = String(r.patientId || r.id || '').trim();
-      const def = defaultList.find(d => String(d.patientId || d.id) === pid || (r.patientName && d.patientName === r.patientName));
+      const def = defaultList.find(d => d && (String(d.patientId || d.id) === pid || (r.patientName && d.patientName === r.patientName)));
       if (!def) return r;
       return {
         ...def,
@@ -6534,16 +6578,16 @@ function healSamsungSheetData(sheetKey, rows) {
         vocTransferSamsung: r.vocTransferSamsung || def.vocTransferSamsung || '없음',
         satisfactionScore: r.satisfactionScore || def.satisfactionScore || '미응답'
       };
-    });
+    }).filter(Boolean);
   }
   if (sheetKey === 'contacts') {
-    const hasReal = rows.some(c => (c.name || '').includes('정여진') || (c.name || '').includes('임재현') || (c.email || '').includes('samsungfire.com'));
+    const hasReal = rows.some(c => c && ((c.name || '').includes('정여진') || (c.name || '').includes('임재현') || (c.email || '').includes('samsungfire.com')));
     if (!hasReal) {
       return defaultList.map(r => ({ ...r }));
     }
-    return rows;
+    return rows.filter(Boolean);
   }
-  return rows;
+  return rows.filter(Boolean);
 }
 window.healSamsungSheetData = healSamsungSheetData;
 
@@ -7104,6 +7148,7 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
   // 기존 대상자(target) 시트 검색 매핑
   const targetMap = new Map();
   gSamsungSheets.target.forEach((row, idx) => {
+    if (!row) return;
     if (row.patientName) targetMap.set(`name_${row.patientName.trim()}`, idx);
     if (row.patientId) targetMap.set(`pid_${String(row.patientId).trim()}`, idx);
     if (row.id) targetMap.set(`id_${String(row.id).trim()}`, idx);
@@ -7114,7 +7159,10 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
   });
 
   const newTargetRows = [];
+  const addedNewTargetKeys = new Set();
+
   samsungApps.forEach(app => {
+    if (!app) return;
     const pName = (app.patientName || app.name || '').trim();
     const pId = String(app.patientId || '').trim();
     const appId = String(app.id || '').trim();
@@ -7135,11 +7183,12 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
     else if (polSuffix && targetMap.has(`pol_${polSuffix}`)) matchedIdx = targetMap.get(`pol_${polSuffix}`);
     else if (pName && targetMap.has(`name_${pName}`)) matchedIdx = targetMap.get(`name_${pName}`);
 
-    if (matchedIdx >= 0) {
+    const existing = (matchedIdx >= 0 && matchedIdx < gSamsungSheets.target.length) ? gSamsungSheets.target[matchedIdx] : null;
+
+    if (existing) {
       // 기존 행 업데이트: 웹에서 수정한 내용은 유지하고 신청ID 및 최신 정보 동기화
-      const existing = gSamsungSheets.target[matchedIdx];
       let changed = false;
-      const edited = (existing && existing._editedCols) || {};
+      const edited = existing._editedCols || {};
 
       // 피보험자ID는 사전명단(누적 가입자DB)의 피보험자ID 우선 적용
       const eligiblePid = findSamsungEligiblePatientId(app) || findSamsungEligiblePatientId(existing);
@@ -7179,16 +7228,22 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
       }
       if (changed) updatedTargetCount++;
     } else {
+      // 이미 이번 루프에서 newTargetRows에 추가되었는지 확인하여 중복 방지
+      const isAlreadyAdded = (appId && addedNewTargetKeys.has(`aid_${appId}`)) ||
+                             (pId && addedNewTargetKeys.has(`pid_${pId}`)) ||
+                             (pName && addedNewTargetKeys.has(`name_${pName}`));
+      if (isAlreadyAdded) return;
+
       // 신규 행 추가: 대상자 시트에 없는 통합허브 고객 자동 추가!
       const newTargetRow = convertHubAppToSamsungTargetRow(app);
       if (newTargetRow) {
         newTargetRows.push(newTargetRow);
-        if (pName) targetMap.set(`name_${pName}`, 99999);
-        if (pId) targetMap.set(`pid_${pId}`, 99999);
+        if (pName) addedNewTargetKeys.add(`name_${pName}`);
+        if (pId) addedNewTargetKeys.add(`pid_${pId}`);
         if (appId) {
-          targetMap.set(`aid_${appId}`, 99999);
-          targetMap.set(`id_${appId}`, 99999);
-          targetMap.set(`pid_${appId}`, 99999);
+          addedNewTargetKeys.add(`aid_${appId}`);
+          addedNewTargetKeys.add(`id_${appId}`);
+          addedNewTargetKeys.add(`pid_${appId}`);
         }
         addedTargetCount++;
       }
@@ -7203,13 +7258,17 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
   // 완료(completed) 시트에도 동일 규칙 동기화
   const completedMap = new Map();
   gSamsungSheets.completed.forEach((row, idx) => {
+    if (!row) return;
     if (row.patientName) completedMap.set(`name_${row.patientName.trim()}`, idx);
     if (row.patientId) completedMap.set(`pid_${String(row.patientId).trim()}`, idx);
     if (row.appId) completedMap.set(`aid_${String(row.appId).trim()}`, idx);
   });
 
   const newCompletedRows = [];
+  const addedNewCompletedKeys = new Set();
+
   samsungApps.forEach(app => {
+    if (!app) return;
     const isCompleted = (app.status === '완료' || app.status === '정산완료' || app.status === '종료');
     if (!isCompleted) return;
 
@@ -7226,9 +7285,12 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
     const exists = (appId && completedMap.has(`aid_${appId}`)) ||
                    (appId && completedMap.has(`pid_${appId}`)) ||
                    (pId && completedMap.has(`pid_${pId}`)) ||
-                   (pName && completedMap.has(`name_${pName}`));
+                   (pName && completedMap.has(`name_${pName}`)) ||
+                   (appId && addedNewCompletedKeys.has(`aid_${appId}`)) ||
+                   (pId && addedNewCompletedKeys.has(`pid_${pId}`)) ||
+                   (pName && addedNewCompletedKeys.has(`name_${pName}`));
     if (!exists) {
-      const as = (gAssigns || []).find(a => String(a.applyId) === String(app.id));
+      const as = (gAssigns || []).find(a => a && String(a.applyId) === String(app.id));
       const eligiblePid = findSamsungEligiblePatientId(app);
       newCompletedRows.push({
         sheetKey: 'completed',
@@ -7249,9 +7311,9 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
         actualCareEndDate: app.careEndDate || app.endDate || '',
         importedAt: app.importedAt || new Date().toISOString()
       });
-      if (pName) completedMap.set(`name_${pName}`, 99999);
-      if (pId) completedMap.set(`pid_${pId}`, 99999);
-      if (appId) completedMap.set(`aid_${appId}`, 99999);
+      if (pName) addedNewCompletedKeys.add(`name_${pName}`);
+      if (pId) addedNewCompletedKeys.add(`pid_${pId}`);
+      if (appId) addedNewCompletedKeys.add(`aid_${appId}`);
     }
   });
 
@@ -16894,6 +16956,7 @@ async function loadSamsungDriveConfig() {
         gSamsungDriveLastSyncedFile = data.config.lastSyncedFile;
         updateSamsungDriveSyncUI(data.config.lastSyncedAt, data.config.lastSyncedFile, data.config.lastRecordCount);
       }
+      updateSamsungDriveFolderUI(data.config);
     }
   } catch (err) {
     console.warn('[SamsungDrive] Config load failed:', err.message);
@@ -16949,6 +17012,161 @@ async function handleSaveSamsungExcelPwd(newPwd) {
         iconColor: 'sky'
       });
     }
+  }
+}
+
+// =========================================================================
+// SAMSUNG FIRE GOOGLE DRIVE FOLDER CONFIGURATION MANAGER
+// =========================================================================
+window.gSamsungDriveConfig = null;
+
+function updateSamsungDriveFolderUI(cfg) {
+  if (!cfg) return;
+  window.gSamsungDriveConfig = cfg;
+  const linkBtn = document.getElementById('btnSamsungDriveFolderLink');
+  const labelEl = document.getElementById('labelSamsungDriveFolderName');
+  if (linkBtn && cfg.folderUrl) {
+    linkBtn.title = `구글 드라이브 [${cfg.folderName || '삼성화재 가입자 리스트'}] 원본 폴더 열기 (${cfg.folderId || ''})`;
+  }
+  if (labelEl && cfg.folderName) {
+    labelEl.innerText = '드라이브 폴더 열기';
+  }
+}
+
+function openSamsungDriveFolder() {
+  const url = window.gSamsungDriveConfig?.folderUrl || localStorage.getItem('LIVON_SAMSUNG_DRIVE_FOLDER_URL') || 'https://drive.google.com/drive/folders/1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc';
+  window.open(url, '_blank');
+}
+
+async function openSamsungDriveConfigModal() {
+  const modal = document.getElementById('samsungDriveConfigModal');
+  if (!modal) return;
+
+  // 최신 설정 로드 시도
+  let cfg = window.gSamsungDriveConfig;
+  try {
+    const res = await fetch('/api/samsung-drive/config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success && data.config) {
+        cfg = data.config;
+        window.gSamsungDriveConfig = cfg;
+      }
+    }
+  } catch (e) {}
+
+  cfg = cfg || {};
+  const url = cfg.folderUrl || localStorage.getItem('LIVON_SAMSUNG_DRIVE_FOLDER_URL') || 'https://drive.google.com/drive/folders/1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc';
+  const folderId = cfg.folderId || localStorage.getItem('LIVON_SAMSUNG_DRIVE_FOLDER_ID') || '1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc';
+  const folderName = cfg.folderName || '삼성화재 가입자 리스트';
+  const password = cfg.password || localStorage.getItem('LIVON_SAMSUNG_EXCEL_PWD') || '202610';
+  const folderPath = cfg.folderPath || '';
+
+  const urlInput = document.getElementById('inputSamsungDriveUrl');
+  const idInput = document.getElementById('inputSamsungDriveFolderId');
+  const nameInput = document.getElementById('inputSamsungDriveFolderName');
+  const pwdInput = document.getElementById('inputSamsungDrivePassword');
+  const pathInput = document.getElementById('inputSamsungDriveFolderPath');
+
+  if (urlInput) urlInput.value = url;
+  if (idInput) idInput.value = folderId;
+  if (nameInput) nameInput.value = folderName;
+  if (pwdInput) pwdInput.value = password;
+  if (pathInput) pathInput.value = folderPath;
+
+  modal.classList.remove('hidden');
+  setTimeout(() => {
+    if (urlInput) {
+      urlInput.focus();
+      urlInput.select();
+    }
+  }, 100);
+}
+
+function closeSamsungDriveConfigModal() {
+  const modal = document.getElementById('samsungDriveConfigModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function onSamsungDriveUrlInput(rawVal) {
+  const val = (rawVal || '').trim();
+  const idInput = document.getElementById('inputSamsungDriveFolderId');
+  if (!idInput) return;
+  const match = val.match(/folders\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    idInput.value = match[1];
+  } else if (/^[a-zA-Z0-9_-]{20,}$/.test(val)) {
+    idInput.value = val;
+  }
+}
+
+function testSamsungDriveConfigCurrent() {
+  const url = (document.getElementById('inputSamsungDriveUrl')?.value || '').trim();
+  if (!url) {
+    alert('구글 드라이브 폴더 URL을 먼저 입력해주세요.');
+    return;
+  }
+  window.open(url, '_blank');
+}
+
+async function handleSaveSamsungDriveConfig() {
+  const folderUrl = (document.getElementById('inputSamsungDriveUrl')?.value || '').trim();
+  const folderId = (document.getElementById('inputSamsungDriveFolderId')?.value || '').trim();
+  const folderName = (document.getElementById('inputSamsungDriveFolderName')?.value || '').trim() || '삼성화재 가입자 리스트';
+  const password = (document.getElementById('inputSamsungDrivePassword')?.value || '').trim() || '202610';
+  const folderPath = (document.getElementById('inputSamsungDriveFolderPath')?.value || '').trim();
+
+  if (!folderUrl) {
+    alert('구글 드라이브 폴더 URL을 입력해주세요.');
+    return;
+  }
+
+  const btn = document.getElementById('btnSaveSamsungDriveConfig');
+  if (btn) btn.disabled = true;
+
+  try {
+    // 1. 브라우저 로컬 저장소 캐시 갱신
+    localStorage.setItem('LIVON_SAMSUNG_DRIVE_FOLDER_URL', folderUrl);
+    if (folderId) localStorage.setItem('LIVON_SAMSUNG_DRIVE_FOLDER_ID', folderId);
+    if (password) localStorage.setItem('LIVON_SAMSUNG_EXCEL_PWD', password);
+
+    // 상단 엑셀 암호 인풋도 동기화
+    const topPwdInput = document.getElementById('inputSamsungExcelPwd');
+    if (topPwdInput && password) topPwdInput.value = password;
+
+    // 2. 서버 설정 영구 저장 API 호출
+    const payload = { folderUrl, folderId, folderName, password, folderPath };
+    let savedCfg = payload;
+    try {
+      const res = await fetch('/api/samsung-drive/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success && data.config) {
+          savedCfg = data.config;
+        }
+      }
+    } catch (e) {
+      console.warn('[SamsungDrive Config Save API Warn]', e.message);
+    }
+
+    updateSamsungDriveFolderUI(savedCfg);
+    closeSamsungDriveConfigModal();
+
+    if (typeof showToast === 'function') {
+      showToast('삼성화재 구글 드라이브 폴더 주소가 성공적으로 변경 및 저장되었습니다.', 'success');
+    }
+
+    // 3. 새 폴더에서 최신 엑셀 자동 동기화 실행
+    console.log('[SamsungDrive] 변경된 폴더로 즉시 동기화 실행...');
+    await triggerSamsungDriveSync(false);
+  } catch (err) {
+    alert('설정 저장 중 오류: ' + err.message);
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -17012,6 +17230,13 @@ async function checkSamsungDriveStatus() {
     gSamsungDriveLastSyncedAt = syncedAt;
     gSamsungDriveLastSyncedFile = syncedFile;
     updateSamsungDriveSyncUI(syncedAt, syncedFile, count);
+    if (data.folderUrl || data.folderId) {
+      updateSamsungDriveFolderUI({
+        folderUrl: data.folderUrl,
+        folderId: data.folderId,
+        folderName: data.folderName || '삼성화재 가입자 리스트'
+      });
+    }
 
     // 오직 실제로 구글 드라이브에 더 최신 파일이 감지된 경우(hasNewFile === true)에만 신규파일 배지를 노출합니다.
     const hasRealNewFile = !!(data && data.hasNewFile);
@@ -26211,12 +26436,14 @@ async function saveActiveHubCustomerDetail(silent = false) {
     window.recordSystemAuditLog({
       category: '고객상세',
       actionType: 'UPDATE',
-      target: `고객 [${app.id}] (${maskName(app.patientName)})`,
+      target: `고객 [${app.id}] (${app.patientName})`,
       summary: `[${app.patientName} 님] 상세 모달 전체 변경사항 서버 및 DB 최종 영구 저장 완료`,
       changes: {
-        customSettlementSets: `${(app.customSettlementSets || []).length}개 세트`,
-        claims: `${remainingAppClaims.length}건`,
-        payouts: `${remainingAppPayouts.length}건`
+        '정산·청구 세트': `${(app.customSettlementSets || []).length}개 세트`,
+        '보험금 청구': `${remainingAppClaims.length}건 (청구합계: ${typeof formatCurrency === 'function' ? formatCurrency(appTotalClaim) : appTotalClaim}원)`,
+        '입금확인 금액': `${typeof formatCurrency === 'function' ? formatCurrency(app.depositConfirmedAmount || 0) : app.depositConfirmedAmount}원 (잔여 미수: ${typeof formatCurrency === 'function' ? formatCurrency(app.estimatedUnpaid || 0) : app.estimatedUnpaid}원)`,
+        '간병비 지급': `${remainingAppPayouts.length}건 (지급합계: ${typeof formatCurrency === 'function' ? formatCurrency(app.totalPayout || 0) : app.totalPayout}원)`,
+        '진행상태': app.status || '진행중'
       }
     });
   }
@@ -33133,13 +33360,31 @@ function renderUnifiedCareHub() {
   const container = document.getElementById('hubCustomerCardsList');
   if (!container) return;
 
+  // [초고속 0ms 즉시 복원] 컨트롤+F5 등으로 메모리가 비었을 때 시드 데이터에서 0ms 즉시 복원
+  if (!Array.isArray(gApps) || gApps.length === 0) {
+    if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0) {
+      gApps = [...window.REBORN_REAL_SEED_DATA.applications];
+      if ((!gAssigns || gAssigns.length === 0) && Array.isArray(window.REBORN_REAL_SEED_DATA.assignments)) {
+        gAssigns = [...window.REBORN_REAL_SEED_DATA.assignments];
+      }
+      if ((!gClaims || gClaims.length === 0) && Array.isArray(window.REBORN_REAL_SEED_DATA.claims)) {
+        gClaims = [...window.REBORN_REAL_SEED_DATA.claims];
+      }
+      if ((!gPayouts || gPayouts.length === 0) && Array.isArray(window.REBORN_REAL_SEED_DATA.payouts)) {
+        gPayouts = [...window.REBORN_REAL_SEED_DATA.payouts];
+      }
+    }
+  }
+
   if (!Array.isArray(gApps) || gApps.length === 0) {
     if (typeof loadConvexData === 'function' && !window._isConvexLoadingTriggered) {
       window._isConvexLoadingTriggered = true;
       loadConvexData(false);
     }
-    renderAllLoadingStates();
-    return;
+    if (gIsDataLoading && !gConvexDataApplied && localStorage.getItem('LIVON_DATA_RESET_CLEAN') !== 'true') {
+      renderAllLoadingStates();
+      return;
+    }
   }
 
   try {
@@ -33971,17 +34216,18 @@ function renderUnifiedCareHub() {
   }
 
   if (displayList.length === 0) {
-    const hasActiveFilters = Boolean(query || gHubFilter !== 'ALL' || (insFilter && insFilter !== 'ALL') || gHubStatusFilter || gHubOnlyModified || gHubOnlyDisabled);
+    const isTotalEmpty = activeHubApps.length === 0;
+    const hasActiveFilters = !isTotalEmpty && Boolean(query || gHubFilter !== 'ALL' || (insFilter && insFilter !== 'ALL') || gHubStatusFilter || gHubOnlyModified || gHubOnlyDisabled);
     container.innerHTML = `
-      <div class="col-span-full p-10 text-center bg-white rounded-3xl border border-slate-200 shadow-sm space-y-3">
-        <div class="w-12 h-12 mx-auto rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
-          <i data-lucide="search-x" class="w-6 h-6"></i>
+      <div class="col-span-full p-12 text-center bg-white rounded-3xl border border-slate-200 shadow-sm space-y-3">
+        <div class="w-12 h-12 mx-auto rounded-2xl ${isTotalEmpty ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-amber-50 border-amber-200 text-amber-600'} border flex items-center justify-center">
+          <i data-lucide="${isTotalEmpty ? 'inbox' : 'search-x'}" class="w-6 h-6"></i>
         </div>
         <div class="text-slate-800 font-black text-sm">
-          ${query ? `'${escapeHtml(query)}' 검색 결과와 일치하는 고객이 없습니다.` : '조회 조건과 일치하는 고객 데이터가 없습니다.'}
+          ${isTotalEmpty ? '현재 등록된 간병 고객 데이터가 없습니다 (0건 클린 상태).' : (query ? `'${escapeHtml(query)}' 검색 결과와 일치하는 고객이 없습니다.` : '조회 조건과 일치하는 고객 데이터가 없습니다.')}
         </div>
         <p class="text-xs text-slate-500 max-w-md mx-auto">
-          ${query ? '입력하신 고객명, 휴대폰번호, 사고번호, 병원명을 다시 확인하시거나 모든 필터를 초기화해 보세요.' : '현재 선택된 필터(파이프라인 탭, 원수사 탭, 상태 필터 등)에 해당하는 고객이 없습니다.'}
+          ${isTotalEmpty ? '우측 상단 [신규 고객 접수] 버튼으로 고객을 등록하거나, [환경설정]에서 운영 엑셀 데이터를 업로드해 주세요.' : (query ? '입력하신 고객명, 휴대폰번호, 사고번호, 병원명을 다시 확인하시거나 모든 필터를 초기화해 보세요.' : '현재 선택된 필터(파이프라인 탭, 원수사 탭, 상태 필터 등)에 해당하는 고객이 없습니다.')}
         </p>
         ${hasActiveFilters ? `
           <div class="pt-2">
@@ -33993,6 +34239,8 @@ function renderUnifiedCareHub() {
         ` : ''}
       </div>
     `;
+    if (typeof renderHubPagination === 'function') renderHubPagination(0, 1);
+    if (typeof updateSelectedHubUI === 'function') updateSelectedHubUI();
     if (typeof initIcons === 'function') initIcons(container);
     return;
   }
@@ -37503,20 +37751,53 @@ function initData() {
   } catch (e) {}
 
   // 1. 로컬 캐시(LocalStorage)에서 최신 Convex 동기화 데이터 즉시 복원 (새로고침 시 과거 시드 숫자가 깜빡이는 현상 원천 차단)
-  try {
-    // 삭제 처리된 고객 톰스톤 목록 확인 및 C0653, C0654 영구 소거 보장
-    let deletedAppIdSet = new Set();
+  const hasRealSeedData = typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0;
+  if (hasRealSeedData) {
+    try { localStorage.removeItem('LIVON_DATA_RESET_CLEAN'); } catch (e) {}
+  }
+  const isResetCleanBoot = !hasRealSeedData && (localStorage.getItem('LIVON_DATA_RESET_CLEAN') === 'true');
+  if (isResetCleanBoot) {
+    if (window.REBORN_REAL_SEED_DATA) {
+      window.REBORN_REAL_SEED_DATA.applications = [];
+      window.REBORN_REAL_SEED_DATA.assignments = [];
+      window.REBORN_REAL_SEED_DATA.claims = [];
+      window.REBORN_REAL_SEED_DATA.payouts = [];
+      window.REBORN_REAL_SEED_DATA.caregivers = [];
+      window.REBORN_REAL_SEED_DATA.centers = [];
+      window.REBORN_REAL_SEED_DATA.adjusters = [];
+      window.REBORN_REAL_SEED_DATA.dashboardStats = null;
+    }
+    if (window.REBORN_DATA) {
+      window.REBORN_DATA.applications = [];
+      window.REBORN_DATA.assignments = [];
+      window.REBORN_DATA.claims = [];
+      window.REBORN_DATA.payouts = [];
+      window.REBORN_DATA.caregivers = [];
+      window.REBORN_DATA.adjusters = [];
+      window.REBORN_DATA.careLogs = [];
+    }
+    gApps = [];
+    gAssigns = [];
+    gClaims = [];
+    gPayouts = [];
+    gCaregivers = [];
+    gCenters = [];
+    gAdjusters = [];
+  } else {
     try {
-      const dList = JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]');
-      const merged = Array.from(new Set([...(dList || []).map(String), 'C0653', 'C0654']));
-      localStorage.setItem('LIVON_DELETED_APP_IDS', JSON.stringify(merged));
-      deletedAppIdSet = new Set(merged);
-    } catch (e) {}
+      // 삭제 처리된 고객 톰스톤 목록 확인 및 C0653, C0654 영구 소거 보장
+      let deletedAppIdSet = new Set();
+      try {
+        const dList = JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]');
+        const merged = Array.from(new Set([...(dList || []).map(String), 'C0653', 'C0654']));
+        localStorage.setItem('LIVON_DELETED_APP_IDS', JSON.stringify(merged));
+        deletedAppIdSet = new Set(merged);
+      } catch (e) {}
 
-    const cachedApps = localStorage.getItem('LIVON_CACHED_APPS');
-    if (cachedApps) {
-      let parsed = [];
-      try { parsed = JSON.parse(cachedApps); } catch (e) {}
+      const cachedApps = localStorage.getItem('LIVON_CACHED_APPS');
+      if (cachedApps !== null) {
+        let parsed = [];
+        try { parsed = JSON.parse(cachedApps); } catch (e) {}
         let cleaned = parsed;
         if (typeof filterInvalidSamsungDuplicates === 'function') {
           cleaned = filterInvalidSamsungDuplicates(parsed);
@@ -37526,83 +37807,84 @@ function initData() {
         const filtered = Array.isArray(cleaned) ? cleaned.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id))) : [];
         gApps = (typeof sortApplicationsNewestFirst === 'function') ? sortApplicationsNewestFirst(filtered) : filtered;
         try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
-    } else if (window.REBORN_DATA && window.REBORN_DATA.applications) {
-      gApps = [...window.REBORN_DATA.applications].filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
-    }
-
-    const cachedAssigns = localStorage.getItem('LIVON_CACHED_ASSIGNS');
-    if (cachedAssigns) {
-      const parsed = JSON.parse(cachedAssigns);
-      const filtered = Array.isArray(parsed) ? parsed.filter(as => as && !deletedAppIdSet.has(String(as.applyId))) : [];
-      if (Array.isArray(filtered) && filtered.some(a => a.isRealLaunchData)) {
-        gAssigns = filtered.filter(a => a.isRealLaunchData);
-      } else {
-        gAssigns = filtered;
+      } else if (window.REBORN_DATA && window.REBORN_DATA.applications) {
+        gApps = [...window.REBORN_DATA.applications].filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
       }
-      try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
-    } else if (window.REBORN_DATA && window.REBORN_DATA.assignments) {
-      gAssigns = [...window.REBORN_DATA.assignments].filter(as => as && !deletedAppIdSet.has(String(as.applyId)));
-    }
 
-    const cachedClaims = localStorage.getItem('LIVON_CACHED_CLAIMS');
-    if (cachedClaims) {
-      const parsed = JSON.parse(cachedClaims);
-      const filtered = Array.isArray(parsed) ? parsed.filter(c => c && !deletedAppIdSet.has(String(c.applyId))) : [];
-      if (Array.isArray(filtered) && filtered.some(c => c.isRealLaunchData)) {
-        gClaims = filtered.filter(c => c.isRealLaunchData);
-      } else {
-        gClaims = filtered;
+      const cachedAssigns = localStorage.getItem('LIVON_CACHED_ASSIGNS');
+      if (cachedAssigns !== null) {
+        const parsed = JSON.parse(cachedAssigns);
+        const filtered = Array.isArray(parsed) ? parsed.filter(as => as && !deletedAppIdSet.has(String(as.applyId))) : [];
+        if (Array.isArray(filtered) && filtered.some(a => a.isRealLaunchData)) {
+          gAssigns = filtered.filter(a => a.isRealLaunchData);
+        } else {
+          gAssigns = filtered;
+        }
+        try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
+      } else if (window.REBORN_DATA && window.REBORN_DATA.assignments) {
+        gAssigns = [...window.REBORN_DATA.assignments].filter(as => as && !deletedAppIdSet.has(String(as.applyId)));
       }
-      try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
-    } else if (window.REBORN_DATA && window.REBORN_DATA.claims) {
-      gClaims = [...window.REBORN_DATA.claims].filter(c => c && !deletedAppIdSet.has(String(c.applyId)));
-    }
 
-    const cachedPayouts = localStorage.getItem('LIVON_CACHED_PAYOUTS');
-    if (cachedPayouts) {
-      const parsed = JSON.parse(cachedPayouts);
-      const filtered = Array.isArray(parsed) ? parsed.filter(p => p && !deletedAppIdSet.has(String(p.applyId))) : [];
-      if (Array.isArray(filtered) && filtered.some(p => p.isRealLaunchData)) {
-        gPayouts = filtered.filter(p => p.isRealLaunchData);
-      } else {
-        gPayouts = filtered;
+      const cachedClaims = localStorage.getItem('LIVON_CACHED_CLAIMS');
+      if (cachedClaims !== null) {
+        const parsed = JSON.parse(cachedClaims);
+        const filtered = Array.isArray(parsed) ? parsed.filter(c => c && !deletedAppIdSet.has(String(c.applyId))) : [];
+        if (Array.isArray(filtered) && filtered.some(c => c.isRealLaunchData)) {
+          gClaims = filtered.filter(c => c.isRealLaunchData);
+        } else {
+          gClaims = filtered;
+        }
+        try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
+      } else if (window.REBORN_DATA && window.REBORN_DATA.claims) {
+        gClaims = [...window.REBORN_DATA.claims].filter(c => c && !deletedAppIdSet.has(String(c.applyId)));
       }
-      try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
-    } else if (window.REBORN_DATA && window.REBORN_DATA.payouts) {
-      gPayouts = [...window.REBORN_DATA.payouts].filter(p => p && !deletedAppIdSet.has(String(p.applyId)));
+
+      const cachedPayouts = localStorage.getItem('LIVON_CACHED_PAYOUTS');
+      if (cachedPayouts !== null) {
+        const parsed = JSON.parse(cachedPayouts);
+        const filtered = Array.isArray(parsed) ? parsed.filter(p => p && !deletedAppIdSet.has(String(p.applyId))) : [];
+        if (Array.isArray(filtered) && filtered.some(p => p.isRealLaunchData)) {
+          gPayouts = filtered.filter(p => p.isRealLaunchData);
+        } else {
+          gPayouts = filtered;
+        }
+        try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
+      } else if (window.REBORN_DATA && window.REBORN_DATA.payouts) {
+        gPayouts = [...window.REBORN_DATA.payouts].filter(p => p && !deletedAppIdSet.has(String(p.applyId)));
+      }
+
+      const cachedAdjusters = localStorage.getItem('LIVON_CACHED_ADJUSTERS');
+      if (cachedAdjusters !== null) gAdjusters = JSON.parse(cachedAdjusters);
+      else if (window.REBORN_DATA && window.REBORN_DATA.adjusters) gAdjusters = [...window.REBORN_DATA.adjusters];
+
+      const cachedCaregivers = localStorage.getItem('LIVON_CACHED_CAREGIVERS');
+      if (cachedCaregivers !== null) gCaregivers = JSON.parse(cachedCaregivers);
+
+      const cachedCenters = localStorage.getItem('LIVON_CACHED_CENTERS');
+      if (cachedCenters !== null) gCenters = JSON.parse(cachedCenters);
+    } catch (e) {
+      if (window.REBORN_DATA) {
+        gApps = [...window.REBORN_DATA.applications];
+        gAssigns = [...window.REBORN_DATA.assignments];
+        gClaims = [...window.REBORN_DATA.claims];
+        gPayouts = [...window.REBORN_DATA.payouts];
+        gAdjusters = [...window.REBORN_DATA.adjusters];
+      }
     }
 
-    const cachedAdjusters = localStorage.getItem('LIVON_CACHED_ADJUSTERS');
-    if (cachedAdjusters) gAdjusters = JSON.parse(cachedAdjusters);
-    else if (window.REBORN_DATA && window.REBORN_DATA.adjusters) gAdjusters = [...window.REBORN_DATA.adjusters];
+    const fallbackSource = (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications) && window.REBORN_DATA.applications.length > 0)
+      ? window.REBORN_DATA
+      : (typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0 ? window.REBORN_REAL_SEED_DATA : null);
 
-    const cachedCaregivers = localStorage.getItem('LIVON_CACHED_CAREGIVERS');
-    if (cachedCaregivers) gCaregivers = JSON.parse(cachedCaregivers);
-
-    const cachedCenters = localStorage.getItem('LIVON_CACHED_CENTERS');
-    if (cachedCenters) gCenters = JSON.parse(cachedCenters);
-  } catch (e) {
-    if (window.REBORN_DATA) {
-      gApps = [...window.REBORN_DATA.applications];
-      gAssigns = [...window.REBORN_DATA.assignments];
-      gClaims = [...window.REBORN_DATA.claims];
-      gPayouts = [...window.REBORN_DATA.payouts];
-      gAdjusters = [...window.REBORN_DATA.adjusters];
+    if (fallbackSource && (!gApps || gApps.length === 0)) {
+      if (!gApps || gApps.length === 0) gApps = [...(fallbackSource.applications || [])];
+      if (!gAssigns || gAssigns.length === 0) gAssigns = [...(fallbackSource.assignments || [])];
+      if (!gClaims || gClaims.length === 0) gClaims = [...(fallbackSource.claims || [])];
+      if (!gPayouts || gPayouts.length === 0) gPayouts = [...(fallbackSource.payouts || [])];
+      if (!gAdjusters || gAdjusters.length === 0) gAdjusters = [...(fallbackSource.adjusters || [])];
+      if (!gCenters || gCenters.length === 0) gCenters = [...(fallbackSource.centers || fallbackSource.partners || [])];
+      if (!gCaregivers || gCaregivers.length === 0) gCaregivers = [...(fallbackSource.caregivers || [])];
     }
-  }
-
-  const fallbackSource = (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications) && window.REBORN_DATA.applications.length > 0)
-    ? window.REBORN_DATA
-    : (typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA ? window.REBORN_REAL_SEED_DATA : null);
-
-  if (fallbackSource) {
-    if (!gApps || gApps.length === 0) gApps = [...(fallbackSource.applications || [])];
-    if (!gAssigns || gAssigns.length === 0) gAssigns = [...(fallbackSource.assignments || [])];
-    if (!gClaims || gClaims.length === 0) gClaims = [...(fallbackSource.claims || [])];
-    if (!gPayouts || gPayouts.length === 0) gPayouts = [...(fallbackSource.payouts || [])];
-    if (!gAdjusters || gAdjusters.length === 0) gAdjusters = [...(fallbackSource.adjusters || [])];
-    if (!gCenters || gCenters.length === 0) gCenters = [...(fallbackSource.centers || fallbackSource.partners || [])];
-    if (!gCaregivers || gCaregivers.length === 0) gCaregivers = [...(fallbackSource.caregivers || [])];
   }
 
   (gApps || []).forEach(a => {
@@ -38891,6 +39173,52 @@ async function updateDataResetStatusUI() {
       const cSamsungSheets = v.samsungSheets ? v.samsungSheets.length : 0;
       const cAdmins = (v.admins && v.admins.length > 0) ? v.admins.length : 0;
 
+      // Convex DB의 고객/배정/청구/지급이 이미 0건으로 초기화된 상태라면 로컬 잔여 캐시도 즉시 0건으로 동기화 소거
+      if (cApps === 0 && cAssigns === 0 && cClaims === 0 && cPayouts === 0 && Array.isArray(gApps) && gApps.length > 0) {
+        gApps = [];
+        gAssigns = [];
+        gClaims = [];
+        gPayouts = [];
+        gCaregivers = [];
+        gCenters = [];
+        gAdjusters = [];
+        gCareLogs = [];
+        window.gOfficialDashboardStats = null;
+        if (window.REBORN_REAL_SEED_DATA) {
+          window.REBORN_REAL_SEED_DATA.applications = [];
+          window.REBORN_REAL_SEED_DATA.assignments = [];
+          window.REBORN_REAL_SEED_DATA.claims = [];
+          window.REBORN_REAL_SEED_DATA.payouts = [];
+          window.REBORN_REAL_SEED_DATA.caregivers = [];
+          window.REBORN_REAL_SEED_DATA.centers = [];
+          window.REBORN_REAL_SEED_DATA.adjusters = [];
+          window.REBORN_REAL_SEED_DATA.dashboardStats = null;
+        }
+        if (window.REBORN_DATA) {
+          window.REBORN_DATA.applications = [];
+          window.REBORN_DATA.assignments = [];
+          window.REBORN_DATA.claims = [];
+          window.REBORN_DATA.payouts = [];
+          window.REBORN_DATA.caregivers = [];
+          window.REBORN_DATA.adjusters = [];
+          window.REBORN_DATA.careLogs = [];
+        }
+        try {
+          localStorage.setItem('LIVON_DATA_RESET_CLEAN', 'true');
+          [
+            'LIVON_CACHED_APPS', 'LIVON_CACHED_ASSIGNS', 'LIVON_CACHED_CLAIMS',
+            'LIVON_CACHED_PAYOUTS', 'LIVON_CACHED_CAREGIVERS', 'LIVON_CACHED_CENTERS',
+            'LIVON_CACHED_ADJUSTERS', 'LIVON_CARE_LOGS', 'LIVON_OFFICIAL_DASH_STATS',
+            'reborn_apps', 'reborn_assignments', 'reborn_claims', 'reborn_payouts'
+          ].forEach(k => localStorage.removeItem(k));
+        } catch (e) {}
+        if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+        if (typeof updateDirectoryTotalBadge === 'function') updateDirectoryTotalBadge();
+        if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+        if (typeof renderApplications === 'function') renderApplications();
+        if (typeof renderDashboard === 'function') renderDashboard();
+      }
+
       const localCount = (Array.isArray(gApps) ? gApps.length : 0);
       statApps.innerText = cApps + '건' + (localCount > 0 ? ' (로컬 화면: ' + localCount + '건)' : '');
       statAssigns.innerText = cAssigns + '건';
@@ -38945,25 +39273,56 @@ window.verifyConvexResetStatus = verifyConvexResetStatus;
 async function executeFullDataReset() {
   const ans = confirm('🚨 [중요 확인] 정말로 전산 데이터를 전체 초기화하시겠습니까?\n\n' +
     '1. 관리자 계정(Admin)을 제외한 모든 고객 신청, 배정, 청구, 지급, 간병인 데이터가 0건으로 완전 삭제됩니다.\n' +
-    '2. Convex 클라우드 DB와 로컬 캐시가 모두 0건으로 비워집니다.\n' +
+    '2. Convex 클라우드 DB와 로컬 캐시(통합허브 화면 데이터 포함)가 모두 0건으로 비워집니다.\n' +
     '3. 초기화 후 실제 운영 엑셀 데이터를 업로드하시면 깨끗한 상태로 런칭할 수 있습니다.\n\n' +
     '초기화를 진행하시려면 [확인]을 눌러주세요.');
 
   if (!ans) return;
 
   try {
-    // 1. Convex 클라우드 DB 완전 초기화 (현재 연결된 단 하나의 환경만 엄격하게 초기화)
-    if (typeof syncToConvex === 'function') {
-      await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'all' });
-      try {
-        await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'all' });
-      } catch (e2) {}
-    }
-
-    // 2. 로컬 서버 디스크 파일(hub_apps_real.json) 0건 초기화
+    // 1. 로컬 서버 디스크 파일(hub_apps_real.json, hub_real_data.js) 먼저 0건 초기화하여 재동기화 원천 차단
     try {
       await fetch('/api/admin/reset-local-data', { method: 'POST' });
     } catch (e) {}
+
+    // 2. 전역 변수 및 로컬 시드 객체 즉시 0건 초기화 (비동기 타이밍 중 삼성화재 시트 역동기화 원천 차단)
+    gApps = [];
+    gAssigns = [];
+    gClaims = [];
+    gPayouts = [];
+    gCaregivers = [];
+    gCenters = [];
+    gAdjusters = [];
+    gCareLogs = [];
+    window.gOfficialDashboardStats = null;
+    if (window.REBORN_REAL_SEED_DATA) {
+      window.REBORN_REAL_SEED_DATA.applications = [];
+      window.REBORN_REAL_SEED_DATA.assignments = [];
+      window.REBORN_REAL_SEED_DATA.claims = [];
+      window.REBORN_REAL_SEED_DATA.payouts = [];
+      window.REBORN_REAL_SEED_DATA.caregivers = [];
+      window.REBORN_REAL_SEED_DATA.centers = [];
+      window.REBORN_REAL_SEED_DATA.adjusters = [];
+      window.REBORN_REAL_SEED_DATA.dashboardStats = null;
+    }
+    if (window.REBORN_DATA) {
+      window.REBORN_DATA.applications = [];
+      window.REBORN_DATA.assignments = [];
+      window.REBORN_DATA.claims = [];
+      window.REBORN_DATA.payouts = [];
+      window.REBORN_DATA.caregivers = [];
+      window.REBORN_DATA.adjusters = [];
+      window.REBORN_DATA.careLogs = [];
+    }
+    if (typeof gSamsungSheets !== 'undefined' && gSamsungSheets) {
+      gSamsungSheets.target = [];
+      gSamsungSheets.completed = [];
+      gSamsungSheets.contacts = [];
+    }
+    if (typeof gLaunchParsedData !== 'undefined' && gLaunchParsedData) {
+      delete gLaunchParsedData['hyundai'];
+      delete gLaunchParsedData['samsung'];
+    }
 
     // 3. 브라우저 LocalStorage 캐시 완전 초기화 (관리자 정보는 보존)
     const preserveAdmin = localStorage.getItem('LIVON_ADMINS');
@@ -38975,44 +39334,42 @@ async function executeFullDataReset() {
       'LIVON_CACHED_PAYOUTS', 'LIVON_CACHED_CAREGIVERS', 'LIVON_CACHED_CENTERS',
       'LIVON_CACHED_ADJUSTERS', 'LIVON_CARE_LOGS', 'LIVON_SAMSUNG_SHEETS',
       'LIVON_SAMSUNG_EXCEL_LEDGER', 'LIVON_SAMSUNG_SHEET_TARGET', 'LIVON_SAMSUNG_SHEET_COMPLETED',
+      'LIVON_SAMSUNG_SHEET_CONTACTS', 'LIVON_LAUNCH_DATA_CONFIG', 'LIVON_RECENTLY_REGISTERED_IDS',
       'LIVON_CACHED_TOTAL_CALL_DATA', 'LIVON_LAST_LAUNCH_SYNC_TIME', 'LIVON_OFFICIAL_DASH_STATS',
       'reborn_apps', 'reborn_assignments', 'reborn_claims', 'reborn_payouts'
     ];
     keysToRemove.forEach(k => {
       try { localStorage.removeItem(k); } catch (e) {}
     });
+    try { localStorage.setItem('LIVON_DATA_RESET_CLEAN', 'true'); } catch (e) {}
 
-    gConvexDataApplied = false;
-    window.gOfficialDashboardStats = null;
+    gConvexDataApplied = true;
 
     if (preserveAdmin) localStorage.setItem('LIVON_ADMINS', preserveAdmin);
     if (preserveToken) localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', preserveToken);
     if (preserveUser) localStorage.setItem('REBORN_CURRENT_ADMIN', preserveUser);
 
-    // 4. 전역 변수 즉시 0건 초기화
-    gApps = [];
-    gAssigns = [];
-    gClaims = [];
-    gPayouts = [];
-    gCaregivers = [];
-    gCenters = [];
-    gAdjusters = [];
-    gCareLogs = [];
-    if (window.REBORN_DATA) {
-      window.REBORN_DATA.adjusters = [];
-      window.REBORN_DATA.careLogs = [];
-    }
-    if (typeof gSamsungSheets !== 'undefined' && gSamsungSheets) {
-      gSamsungSheets.target = [];
-      gSamsungSheets.completed = [];
-      gSamsungSheets.contacts = [];
+    // 4. Convex 클라우드 DB 완전 초기화 (현재 연결된 단 하나의 환경만 엄격하게 초기화)
+    if (typeof syncToConvex === 'function') {
+      await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'all' });
+      try {
+        await syncToConvex('sync:resetSamsungCareLedger', { purgeAssociatedHubApps: true });
+      } catch (e2) {}
+      try {
+        await syncToConvex('sync:resetAndPurgeLaunchData', { company: 'all' });
+      } catch (e3) {}
     }
 
     // 5. 모든 화면 실시간 재렌더링
+    if (typeof updateSamsungSheetBadges === 'function') updateSamsungSheetBadges();
+    if (typeof initLaunchDataSettings === 'function') initLaunchDataSettings();
     if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
     if (typeof updateDirectoryTotalBadge === 'function') updateDirectoryTotalBadge();
     if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
     if (typeof renderApplications === 'function') renderApplications();
+    if (typeof renderAssignments === 'function') renderAssignments();
+    if (typeof renderClaims === 'function') renderClaims();
+    if (typeof renderPayouts === 'function') renderPayouts();
     if (typeof renderDashboard === 'function') renderDashboard();
     if (typeof renderCaregivers === 'function') renderCaregivers();
     if (typeof renderCenters === 'function') renderCenters();
@@ -39024,7 +39381,7 @@ async function executeFullDataReset() {
     if (typeof showCustomAlert === 'function') {
       showCustomAlert({
         title: '전산 데이터 전체 초기화 완료',
-        message: 'Convex 클라우드 DB와 로컬 저장소의 모든 고객·배정·청구·지급 데이터가 0건으로 완전 초기화되었습니다.\n\n관리자 계정은 정상 보존되었으며, 이제 실제 엑셀 데이터를 안심하고 업로드하세요.',
+        message: 'Convex 클라우드 DB와 로컬 저장소(통합허브 포함)의 모든 고객·배정·청구·지급 데이터가 0건으로 완전 초기화되었습니다.\n\n관리자 계정은 정상 보존되었으며, 이제 실제 엑셀 데이터를 안심하고 업로드하세요.',
         icon: 'check-circle-2',
         iconColor: 'emerald'
       });
@@ -49502,6 +49859,7 @@ function handleNewAppSubmit(e) {
 
 async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
   try {
+    try { localStorage.removeItem('LIVON_DATA_RESET_CLEAN'); } catch (e) {}
     const isHyundai = (newApp.insuranceCompany || '').includes('현대해상');
     const newId = newApp.id;
     const targetFaxRecipient = newApp.pendingFaxRecipient || '';
@@ -49556,14 +49914,17 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
       window.recordSystemAuditLog({
         category: '고객신청',
         actionType: 'CREATE',
-        target: `${newApp.id} (${newApp.patientName || '신규'})`,
+        target: `고객 [${newApp.id}] (${newApp.patientName || '신규'})`,
         summary: `신규 고객 접수 등록 [${newApp.id} - ${newApp.patientName}] (${newApp.insuranceCompany || '원수사미지정'})`,
         changes: {
           '피보험자': { before: null, after: newApp.patientName },
           '원수사': { before: null, after: newApp.insuranceCompany },
           '연락처': { before: null, after: newApp.phone },
           '접수상태': { before: null, after: newApp.status || '접수' },
-          '간병유형': { before: null, after: newApp.careType || '입원' }
+          '간병유형': { before: null, after: newApp.careType || '입원' },
+          '병원/소재지': { before: null, after: newApp.hospitalName || newApp.roadAddress || '-' },
+          '사고번호': { before: null, after: newApp.accidentNumber || '-' },
+          '증권번호': { before: null, after: newApp.policyNumber || '-' }
         }
       });
     }
@@ -50278,6 +50639,7 @@ function handleCustomerEditSubmit(e) {
   const id = document.getElementById('custEditId').value;
   const app = gApps.find(a => a.id === id);
   if (!app) return;
+  const beforeState = { ...app };
   app.updatedAt = new Date().toISOString();
 
   app.patientName = document.getElementById('custEditName').value.trim();
@@ -50336,22 +50698,63 @@ function handleCustomerEditSubmit(e) {
     });
   }
 
+  // 변경 전/후 항목 상세 diff 분석
+  const fieldLabels = {
+    patientName: '고객명',
+    gender: '성별',
+    birthDate: '생년월일',
+    phone: '연락처',
+    insuranceCompany: '보험사',
+    roadAddress: '소재지/도로명',
+    addressDetail: '상세주소',
+    policyNumber: '증권번호',
+    accidentNumber: '사고번호',
+    adjusterName: '담당손사',
+    adjusterPhone: '손사연락처',
+    adjusterFax: '손사팩스',
+    productName: '보험상품명',
+    productCode: '상품코드',
+    contractPeriod: '계약기간',
+    accidentType: '사고유형',
+    accidentDate: '사고일자',
+    applyDate: '신청일자',
+    diagnosis: '진단명',
+    claimUnitPrice: '청구단가',
+    memo: '고객메모'
+  };
+  const diffChanges = {};
+  for (const [key, label] of Object.entries(fieldLabels)) {
+    const oldV = beforeState[key];
+    const newV = app[key];
+    if (String(oldV || '') !== String(newV || '')) {
+      diffChanges[label] = { before: oldV || '(없음)', after: newV || '(없음)' };
+    }
+  }
+  const changedKeys = Object.keys(diffChanges);
+  if (changedKeys.length === 0) {
+    diffChanges['정보확인'] = { before: '기존정보', after: '수정확인저장' };
+  }
+
   // 감사 로그 기록: 고객 정보 및 단가 수정
   if (typeof window.recordSystemAuditLog === 'function') {
     window.recordSystemAuditLog({
-      category: '고객신청',
+      category: '고객상세',
       actionType: 'UPDATE',
-      target: `${app.id} (${app.patientName})`,
-      summary: `고객 정보 및 단가 수정 [${app.id} - ${app.patientName}]`,
-      changes: {
-        '피보험자': { before: null, after: app.patientName },
-        '연락처': { before: null, after: app.phone },
-        '소재지/병원': { before: null, after: app.roadAddress || app.hospitalName || '-' },
-        '사고번호': { before: null, after: app.accidentNumber || '-' },
-        '청구단가': { before: null, after: `${formatCurrency(app.claimUnitPrice || 160000)}원` }
-      }
+      target: `고객 [${app.id}] (${app.patientName})`,
+      summary: `[${app.patientName} 님] 고객 상세 정보 수정 (${changedKeys.length > 0 ? changedKeys.join(', ') + ' 변경' : '내용 확인 저장'})`,
+      changes: diffChanges
     });
   }
+
+  // 서버 디스크 영구 저장
+  fetch('/api/hub/customer/update-fields', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      appId: app.id,
+      fields: app
+    })
+  }).catch(() => {});
 
   closeModal('customerEditModal');
   renderUnifiedCareHub();
@@ -59145,6 +59548,7 @@ async function executeApplyLaunchData(company) {
   }
 
   // 1. 통합허브(gApps) 전면 교체: 새 엑셀 데이터로 100% 리셋
+  try { localStorage.removeItem('LIVON_DATA_RESET_CLEAN'); } catch (e) {}
   gApps = [...newApps];
   enrichHubSamsungCustomersFromSamsungExcel();
   try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
