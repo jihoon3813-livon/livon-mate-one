@@ -7756,6 +7756,17 @@ function renderCurrentSamsungSheet() {
       const rowA = a.row;
       const rowB = b.row;
 
+      if (isEligibleSheet) {
+        // 사전명단(누적 가입자DB 49,989건)은 접수일시 컬럼이 없으므로 원본 엑셀 행 순서(realIdx)를 기본으로 서빙
+        // 97.3%(48,633건)의 완전한 실명·연락처 가입자가 1페이지부터 자연스럽게 표시됩니다.
+        if (sortMode === 'apply_desc' || sortMode === 'import_desc') {
+          return a.realIdx - b.realIdx;
+        }
+        if (sortMode === 'apply_asc' || sortMode === 'import_asc') {
+          return b.realIdx - a.realIdx;
+        }
+      }
+
       if (sortMode === 'apply_desc' || sortMode === 'apply_asc') {
         const dateA = getSamsungSortComparableDate(rowA.applyDateTime || rowA.applyDate);
         const dateB = getSamsungSortComparableDate(rowB.applyDateTime || rowB.applyDate);
@@ -7783,6 +7794,10 @@ function renderCurrentSamsungSheet() {
   // 툴바 정렬 드롭다운 선택값 동기화
   document.querySelectorAll('.samsung-sheet-sort-select, #samsungSheetSortSelect, #samsungSheetSortSelectList').forEach(el => {
     el.value = gSamsungActiveSortOption || 'apply_desc';
+    const firstOpt = el.querySelector('option[value="apply_desc"]');
+    if (firstOpt) {
+      firstOpt.innerText = isEligibleSheet ? '엑셀 등록 원본순 (기본)' : '간병접수일시 최신순 (기본)';
+    }
   });
 
   const rowCountEl = document.getElementById(isClaimHub ? 'samsungClaimHubRowCount' : 'samsungSheetRowCount');
@@ -7998,9 +8013,15 @@ function renderCurrentSamsungSheet() {
             }
 
             const rawValAttr = String(rawVal !== undefined && rawVal !== null ? rawVal : '').replace(/"/g, '&quot;');
-            const cellTitle = hasPending 
+            let cellTitle = hasPending 
               ? `수정됨 (기존: ${gSamsungPendingChanges.get(changeKey).origVal || '(빈값)'}) - [수정사항 저장] 클릭 시 최종 반영` 
               : rawValAttr;
+
+            if (col.key === 'patientName' && !gIsMasked && String(rawVal).includes('*')) {
+              cellTitle = `[삼성화재 원본 제공 마스킹] 삼성화재 엑셀 원본 파일 자체에 마스킹(*) 처리되어 인입된 가입자입니다. (${rawValAttr})`;
+            } else if (col.key === 'phone' && (String(rawVal) === '0' || String(rawVal) === '')) {
+              cellTitle = '[삼성화재 원본 연락처 미제공] 삼성화재 엑셀 원본 파일 자체에 연락처가 미기재(0) 상태로 인입된 가입자입니다.';
+            }
 
             const st = getStickyInfo(col.key, false, isSelected, displayIdx, hasPending);
             const extraStyle = st.isSticky ? st.style : `min-width: ${col.width}; width: ${col.width};`;
