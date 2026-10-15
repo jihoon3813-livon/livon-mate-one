@@ -49023,9 +49023,9 @@ function openNewAppModal() {
       claimPriceInput.value = typeof formatCurrency === 'function' ? formatCurrency(defaultUnitPrice) : Number(defaultUnitPrice).toLocaleString('ko-KR');
     }
 
-    // 케어포트(방문관리) 전산 자동 등록 기본 활성화
+    // 케어포트(방문관리) 전산 자동 등록 체크 기본 해제
     const chkCarePort = document.getElementById('chkAutoCarePortSubmit');
-    if (chkCarePort) chkCarePort.checked = true;
+    if (chkCarePort) chkCarePort.checked = false;
 
     // 삼성화재 12대 항목 입력 필드 초기화
     const samsungFieldIds = [
