@@ -45958,7 +45958,21 @@ async function downloadCarePortViaRobot(targetSessionId = null, targetPatientNam
     }
   }
 
-  // 2순위 (운영 환경 및 초고속 직접 생성): 모달 창 띄움 없이 백그라운드에서 즉시 1페이지+2페이지 완벽한 A4 2P PDF 생성 (1초 완료)
+  // 2순위 (운영 Vercel 환경): 브라우저 내장 케어포트 공인 전산 접속 및 원본 캡처/병합 엔진 (개발 크롬 로봇과 100% 동일)
+  try {
+    await captureCarePortOriginalViaIframe(
+      [{ sessionId: sessionId, dayNumber: 1 }],
+      username,
+      false,
+      1,
+      true
+    );
+    return;
+  } catch (iframeErr) {
+    console.warn('[IframeCapture] 단건 원본 캡처 실패, 비상 렌더러로 전환:', iframeErr);
+  }
+
+  // 3순위 (비상 대체): 백그라운드 A4 2P PDF 생성
   try {
     updateGlobalProgress({ percent: 50, statusText: `공식 일지 1·2페이지 고해상도 A4 렌더링 중...` });
 
@@ -46165,11 +46179,19 @@ async function downloadPatientCareLogsViaRobot(groupId, selectedSessionIds = nul
       }
     } catch (err) {
       clearInterval(ticker);
-      console.warn('[Robot Download] 로컬 로봇 미응답, 비상 엔진으로 전환:', err);
+      console.warn('[Robot Download] 로컬 로봇 미응답, 브라우저 내장 원본 캡처 엔진으로 전환:', err);
     }
   }
 
-  // 2순위 (운영 Vercel 및 로봇 대체): 무한대기/서버리스 행 없이 브라우저 고속 2P 결합 엔진 직접 실행
+  // 2순위 (운영 Vercel 환경): 브라우저 내장 케어포트 공인 전산 접속 및 원본 캡처/병합 엔진 (개발 크롬 로봇과 100% 동일)
+  try {
+    await captureCarePortOriginalViaIframe(sessionList, username, isSelective, totalDays, false, patient);
+    return;
+  } catch (iframeErr) {
+    console.warn('[IframeCapture] 브라우저 내장 케어포트 원본 캡처 실패, 비상 엔진으로 전환:', iframeErr);
+  }
+
+  // 3순위 (비상 대체)
   try {
     await compileClientSideAuthenticCarePortPdf(patient, sortedLogs, isSelective, totalDays);
   } catch (clientErr) {
@@ -46181,16 +46203,16 @@ async function downloadPatientCareLogsViaRobot(groupId, selectedSessionIds = nul
 window.downloadPatientCareLogsViaRobot = downloadPatientCareLogsViaRobot;
 
 /**
- * [Vercel 운영 및 브라우저 전용] 케어포트 공인 전산 원본 브라우저 내장 캡처 및 결합 엔진 (Image 2 100% 정품)
+ * [Vercel 운영 및 브라우저 전용] 케어포트 공인 전산 원본 브라우저 내장 캡처 및 결합 엔진 (개발 크롬 로봇과 100% 동일)
  */
-async function captureCarePortOriginalViaIframe(sessionList, username, isSelective, totalDays) {
-  const labelPrefix = isSelective ? `선택 ${totalDays}일차` : `전체 ${totalDays}일차`;
+async function captureCarePortOriginalViaIframe(sessionList, username, isSelective, totalDays, isSingleSession = false, patientObj = null) {
+  const labelPrefix = isSingleSession ? `공식 간병일지` : (isSelective ? `선택 ${totalDays}일차` : `전체 ${totalDays}일차`);
 
   showGlobalProgress({
-    title: `[${username} 님] ${labelPrefix} 원본 다운로드`,
-    subtitle: `케어포트 전산 원본 시스템에 접속하여 ${labelPrefix} 공식 일지를 수신 및 결합합니다.`,
+    title: `[${username} 님] ${labelPrefix} 무인 로봇 다운로드`,
+    subtitle: `백그라운드 크롬 로봇이 케어포트에 직접 접속하여 ${labelPrefix} 원본 파일을 가져와 병합합니다.`,
     percent: 15,
-    statusText: `케어포트 공인 전산 시스템 접속 중...`,
+    statusText: `케어포트 공인 전산 시스템 로그인 및 접속 중...`,
     icon: 'bot'
   });
 
@@ -46208,10 +46230,18 @@ async function captureCarePortOriginalViaIframe(sessionList, username, isSelecti
     throw new Error('케어포트 인증 토큰을 획득할 수 없습니다.');
   }
 
+  // 동일 오리진 sessionStorage에 인증 토큰 선주입 (프레임 로드 시 즉시 인증 상태 유지)
+  try {
+    window.sessionStorage.setItem('jwtToken', token);
+    window.sessionStorage.setItem('jwtTokenRefresh', refreshToken);
+    window.sessionStorage.setItem('authCommonInfo', authCommonInfo);
+    window.localStorage.setItem('userFCMToken', 'dummy_robot_token');
+  } catch (e) {}
+
   await ensureHtml2CanvasLoaded();
   await ensurePdfLibLoaded();
 
-  // 2. 동일 오리진 케어포트 임베드 프레임 생성 또는 획득
+  // 2. 동일 오리진 케어포트 임베드 프레임 생성 또는 획득 (chrome-robot.js와 동일한 1280x1800 규격)
   let iframe = document.getElementById('careportEmbedCaptureFrame');
   if (!iframe) {
     iframe = document.createElement('iframe');
@@ -46220,37 +46250,21 @@ async function captureCarePortOriginalViaIframe(sessionList, username, isSelecti
     iframe.style.left = '-9999px';
     iframe.style.top = '0';
     iframe.style.width = '1280px';
-    iframe.style.height = '2000px';
+    iframe.style.height = '1800px';
     iframe.style.border = 'none';
-    iframe.style.opacity = '0';
+    iframe.style.background = '#ffffff';
     iframe.style.pointerEvents = 'none';
     iframe.style.zIndex = '-9999';
     document.body.appendChild(iframe);
   }
 
-  // 3. 프레임 로드 및 토큰 주입
   const embedBase = '/careport-embed';
-  if (!iframe.src || !iframe.src.includes(embedBase)) {
-    await new Promise((resolve) => {
-      iframe.onload = () => resolve();
-      iframe.src = `${embedBase}/#/`;
-      setTimeout(resolve, 3000);
-    });
-  }
 
-  try {
-    iframe.contentWindow.sessionStorage.setItem('jwtToken', token);
-    iframe.contentWindow.sessionStorage.setItem('jwtTokenRefresh', refreshToken);
-    iframe.contentWindow.sessionStorage.setItem('authCommonInfo', authCommonInfo);
-    iframe.contentWindow.localStorage.setItem('userFCMToken', 'dummy_robot_token');
-  } catch (storageErr) {
-    console.warn('[IframeCapture] sessionStorage 주입 알림:', storageErr);
-  }
-
+  // robot-pdf.js의 compileImagesToMultiPagePdf와 100% 동일한 A4 여백 규격 (marginH: 14, marginV: 10)
   const mergedDoc = await PDFLib.PDFDocument.create();
   const pageW = 595.28;
   const pageH = 841.89;
-  const marginH = 8;
+  const marginH = 14;
   const marginV = 10;
   const availW = pageW - (marginH * 2);
   const availH = pageH - (marginV * 2);
@@ -46299,54 +46313,131 @@ async function captureCarePortOriginalViaIframe(sessionList, username, isSelecti
     }
   };
 
-  // 4. 각 세션 순차 이동 및 캡처 (로컬 크롬 로봇과 100% 동일 로직)
+  // 3. 각 세션 순차 이동 및 캡처 (로컬 크롬 로봇 chrome-robot.js와 100% 동일 로직)
   for (let idx = 0; idx < sessionList.length; idx++) {
     const item = sessionList[idx];
-    const sid = item.sessionId || item.id || item;
+    const sid = String(item.sessionId || item.id || item).replace(/^CLOG-/, '').trim();
 
     updateGlobalProgress({
-      percent: 20 + Math.round(((idx + 1) / totalDays) * 70),
-      statusText: `[${idx + 1}/${totalDays}일차] 케어포트 공인 전산 원본 캡처 중...`
+      percent: 20 + Math.round(((idx + 1) / Math.max(1, totalDays)) * 70),
+      statusText: isSingleSession
+        ? `케어포트 원본 화면 렌더링 및 파일 다운로드 중...`
+        : `[${idx + 1}/${totalDays}일차] 케어포트 일자별 원본 파일 다운로드 및 병합 중...`
     });
 
+    // 매 세션마다 토큰 유지 보장
+    try {
+      window.sessionStorage.setItem('jwtToken', token);
+      window.sessionStorage.setItem('jwtTokenRefresh', refreshToken);
+      window.sessionStorage.setItem('authCommonInfo', authCommonInfo);
+    } catch (e) {}
+
     const targetHash = `#/careport/consult/${sid}`;
-    const iWin = iframe.contentWindow;
-    const iDoc = iframe.contentDocument || iWin.document;
 
-    // 이전 capture DOM 제거 후 hash 변경
-    const oldCap = iDoc.getElementById('capture');
-    if (oldCap) oldCap.remove();
+    if (!iframe.src || !iframe.src.includes(embedBase)) {
+      await new Promise((resolve) => {
+        let done = false;
+        const finish = () => { if (!done) { done = true; resolve(); } };
+        iframe.onload = finish;
+        iframe.src = `${embedBase}${targetHash}`;
+        setTimeout(finish, 4000);
+      });
+    } else {
+      const iWin = iframe.contentWindow;
+      const iDoc = iframe.contentDocument || iWin.document;
+      const oldCap = iDoc?.getElementById('capture');
+      if (oldCap) oldCap.remove();
 
-    iWin.location.hash = targetHash;
+      // Vue Router가 동일 라우트(/careport/consult/:id) 컴포넌트를 재사용하지 않고 새로 마운트하도록 #/login 경유 후 이동
+      iWin.location.hash = '#/login';
+      await new Promise(r => setTimeout(r, 80));
+      try {
+        iWin.sessionStorage.setItem('jwtToken', token);
+        iWin.sessionStorage.setItem('jwtTokenRefresh', refreshToken);
+        iWin.sessionStorage.setItem('authCommonInfo', authCommonInfo);
+      } catch (e) {}
+      iWin.location.hash = targetHash;
+    }
 
-    // 렌더링 완료 대기 (최대 10초)
+    // 렌더링 및 비동기 데이터(getReport + loadTrendScores + 이미지) 완료 대기 (최대 12초)
     let isRendered = false;
-    for (let attempt = 0; attempt < 40; attempt++) {
+    for (let attempt = 0; attempt < 48; attempt++) {
       await new Promise(r => setTimeout(r, 250));
-      const curDoc = iframe.contentDocument || iframe.contentWindow.document;
-      const cap = curDoc?.getElementById('capture') || curDoc?.querySelector('.report-area') || curDoc?.getElementById('consult-state');
-      if (cap && cap.offsetHeight > 80) {
-        const txt = (cap.innerText || '').trim();
-        if (txt.length > 20) {
-          isRendered = true;
-          break;
+      const iWin = iframe.contentWindow;
+      const curDoc = iframe.contentDocument || iWin?.document;
+      if (!curDoc || !iWin) continue;
+
+      // 만약 15회(3.75초) 후에도 #capture가 생성되지 않았다면 강제 리로드(chrome-robot.js 방식)
+      if (attempt === 15 && !curDoc.getElementById('capture')) {
+        try {
+          iWin.sessionStorage.setItem('jwtToken', token);
+          iWin.location.href = `${embedBase}${targetHash}`;
+          iWin.location.reload();
+        } catch (e) {}
+        continue;
+      }
+
+      if (curDoc.querySelector('.modal-overlay.loading')) continue;
+
+      const cap = curDoc.getElementById('capture') || curDoc.querySelector('.report-area') || curDoc.getElementById('consult-state');
+      if (!cap || cap.offsetHeight <= 80) continue;
+      if (sid && !iWin.location.hash.includes(sid)) continue;
+
+      const p1 = cap.querySelector('.first-page');
+      if (p1) {
+        const nameEl = p1.querySelector('.patient-meta-bar .name') || p1.querySelector('.summary-card strong');
+        if (nameEl) {
+          const nameTxt = (nameEl.innerText || '').trim();
+          if (!nameTxt || nameTxt === '-' || nameTxt.startsWith('- ')) continue;
         }
+        const imgs = Array.from(cap.querySelectorAll('img'));
+        if (imgs.some(img => !img.complete)) continue;
+        isRendered = true;
+        break;
+      } else {
+        const descTexts = cap.querySelectorAll('.description .text');
+        if (descTexts.length > 0) {
+          const userTxt = (descTexts[0].innerText || '').trim();
+          if (!userTxt || userTxt === '-') continue;
+        }
+        const txt = (cap.innerText || '').trim();
+        if (txt.length < 20) continue;
+        isRendered = true;
+        break;
       }
     }
 
     if (!isRendered) {
-      throw new Error(`세션 #${sid} 렌더링 대기 시간 초과`);
+      throw new Error(`케어포트 세션 #${sid} 원본 화면 렌더링 대기 시간 초과`);
     }
 
-    await new Promise(r => setTimeout(r, 150));
+    // Chart.js 추이 차트 애니메이션 완료 대기 (chrome-robot.js와 동일)
+    await new Promise(r => setTimeout(r, 550));
 
-    const curDoc = iframe.contentDocument || iframe.contentWindow.document;
+    const iWin = iframe.contentWindow;
+    const curDoc = iframe.contentDocument || iWin.document;
     const cap = curDoc.getElementById('capture') || curDoc.querySelector('.report-area') || curDoc.getElementById('consult-state');
 
-    // 다운로드/인쇄 버튼 숨김
-    curDoc.querySelectorAll('#downloadBtn, #printBtn, .no-print, button').forEach(b => {
+    // iframe 내부 윈도우에 html2canvas 보장 (동일 윈도우 컨텍스트에서 캡처해야 Chart.js 캔버스 및 SVG가 100% 보존됨)
+    if (!iWin.html2canvas) {
+      await new Promise((resolve) => {
+        const sc = curDoc.createElement('script');
+        sc.src = '/html2canvas.min.js';
+        sc.onload = resolve;
+        sc.onerror = resolve;
+        curDoc.head.appendChild(sc);
+      });
+    }
+    const html2canvasFn = iWin.html2canvas || window.html2canvas;
+
+    // 다운로드/인쇄 버튼 숨김 (chrome-robot.js와 100% 동일)
+    const printBtn = curDoc.getElementById('printBtn');
+    const downloadBtn = curDoc.getElementById('downloadBtn');
+    if (printBtn) printBtn.style.display = 'none';
+    if (downloadBtn) downloadBtn.style.display = 'none';
+    curDoc.querySelectorAll('.no-print, button, .btn').forEach(b => {
       const t = b.innerText || '';
-      if (t.includes('다운로드') || t.includes('프린트') || t.includes('인쇄') || t.includes('화면저장')) {
+      if (t.includes('다운로드') || t.includes('프린트') || t.includes('인쇄') || t.includes('화면저장') || t.includes('목록')) {
         b.style.display = 'none';
       }
     });
@@ -46356,46 +46447,52 @@ async function captureCarePortOriginalViaIframe(sessionList, username, isSelecti
     const consultState = curDoc.getElementById('consult-state');
 
     if (p1 && p2) {
-      // 1페이지 캡처
+      // 1페이지 캡처 (Header ~ 금일 활력징후)
       const origP2Display = p2.style.display;
       const origP1Display = p1.style.display;
 
       p2.style.display = 'none';
       p1.style.display = 'block';
-      await new Promise(r => setTimeout(r, 80));
-      const c1 = await html2canvas(p1, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      await new Promise(r => setTimeout(r, 120));
+      const c1 = await html2canvasFn(p1, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const finalCvs1 = cropCanvasByDom(c1, p1, 24);
       await addImagePage(finalCvs1.toDataURL('image/png'));
 
-      // 2페이지 캡처
+      // 2페이지 캡처 (금일 간병 수행 내역 ~ 보호자 전달사항)
       p1.style.display = 'none';
       p2.style.display = 'block';
-      await new Promise(r => setTimeout(r, 80));
-      const c2 = await html2canvas(p2, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      await new Promise(r => setTimeout(r, 120));
+      const c2 = await html2canvasFn(p2, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const finalCvs2 = cropCanvasByDom(c2, p2, 24);
       await addImagePage(finalCvs2.toDataURL('image/png'));
 
       p1.style.display = origP1Display;
       p2.style.display = origP2Display;
     } else {
-      // 구버전/Classic 1페이지
+      // 구버전/Classic 1페이지 캡처
       if (consultState) consultState.style.display = 'block';
-      await new Promise(r => setTimeout(r, 80));
-      const c = await html2canvas(cap, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      await new Promise(r => setTimeout(r, 120));
+      const c = await html2canvasFn(cap, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       await addImagePage(c.toDataURL('image/png'));
     }
+
+    if (printBtn) printBtn.style.display = '';
+    if (downloadBtn) downloadBtn.style.display = '';
   }
 
-  updateGlobalProgress({ percent: 95, statusText: `${labelPrefix} 공식 PDF 패키징 중...` });
+  updateGlobalProgress({ percent: 95, statusText: `${labelPrefix} 공식 PDF 병합 완료!` });
 
   const pdfBytes = await mergedDoc.save();
   const cleanDate = new Date().toISOString().slice(0, 10).replace(/[^0-9]/g, '');
-  const fileName = isSelective
-    ? `[케어포트_공식간병일지_선택일지합본]_${username}_선택${totalDays}일차_${cleanDate}.pdf`
-    : `[케어포트_공식간병일지_전체일지합본]_${username}_총${totalDays}일차_${cleanDate}.pdf`;
+  const firstSid = String(sessionList[0]?.sessionId || sessionList[0]?.id || sessionList[0] || '').replace(/^CLOG-/, '').trim();
+  const fileName = isSingleSession
+    ? `[케어포트_공식간병일지]_${username}_#${firstSid}_${cleanDate}.pdf`
+    : (isSelective
+      ? `[케어포트_공식간병일지_선택일지합본]_${username}_선택${totalDays}일차_${cleanDate}.pdf`
+      : `[케어포트_공식간병일지_전체일지합본]_${username}_총${totalDays}일차_${cleanDate}.pdf`);
 
-  const targetApplyId = window.gApps && window.gApps.find(a => a.patientName === username)?.id;
-  if (targetApplyId) {
+  const targetApplyId = (patientObj && patientObj.applyId) || (window.gApps && window.gApps.find(a => a.patientName === username)?.id);
+  if (targetApplyId && !isSingleSession) {
     window.gSamsungCustomerCareLogFiles = window.gSamsungCustomerCareLogFiles || {};
     window.gSamsungCustomerCareLogFiles[targetApplyId] = [{
       name: fileName,
@@ -46407,11 +46504,21 @@ async function captureCarePortOriginalViaIframe(sessionList, username, isSelecti
 
   triggerDirectPdfDownload(pdfBytes, fileName);
 
-  updateGlobalProgress({ percent: 100, statusText: `완료! 총 ${totalDays}일차 (${mergedDoc.getPageCount()}페이지) 원본 합본이 다운로드되었습니다.` });
+  updateGlobalProgress({
+    percent: 100,
+    statusText: isSingleSession
+      ? `완료! 케어포트 원본 간병일지 병합 파일이 다운로드되었습니다.`
+      : `완료! 총 ${totalDays}일차 (${mergedDoc.getPageCount()}페이지) 원본 파일이 1개로 병합되었습니다.`
+  });
   setTimeout(hideGlobalProgress, 1200);
 
   if (typeof showToast === 'function') {
-    showToast(`[${username} 님] ${labelPrefix} (${mergedDoc.getPageCount()}페이지) 원본 합본 PDF 다운로드 완료!`, 'success');
+    showToast(
+      isSingleSession
+        ? `[${username} 님] 케어포트 원본 간병일지 다운로드 완료!`
+        : `[${username} 님] ${labelPrefix} (${mergedDoc.getPageCount()}페이지) 원본 합본 PDF 다운로드 완료!`,
+      'success'
+    );
   }
 }
 window.captureCarePortOriginalViaIframe = captureCarePortOriginalViaIframe;

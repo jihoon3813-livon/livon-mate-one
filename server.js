@@ -2932,7 +2932,7 @@ function appendServerAuditLog(logItem) {
     }
 
     // CarePort Embed & Assets Proxy for authentic in-browser rendering
-    if (reqPath === '/careport-embed' || reqPath.startsWith('/careport-embed/') || reqPath.startsWith('/js/') || reqPath.startsWith('/css/') || reqPath.startsWith('/img/') || reqPath.startsWith('/fonts/')) {
+    if (reqPath === '/careport-embed' || reqPath.startsWith('/careport-embed/') || reqPath.startsWith('/js/') || reqPath.startsWith('/css/') || reqPath.startsWith('/img/') || reqPath.startsWith('/fonts/') || reqPath.startsWith('/resources/')) {
       const targetPath = (reqPath === '/careport-embed' || reqPath.startsWith('/careport-embed/'))
         ? (reqPath.replace('/careport-embed', '') || '/')
         : reqPath;

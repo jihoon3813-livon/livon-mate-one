@@ -33,6 +33,10 @@
       "destination": "https://careport.livon.care/fonts/:path*"
     },
     {
+      "source": "/resources/:path*",
+      "destination": "https://careport.livon.care/resources/:path*"
+    },
+    {
       "source": "/audio/stream/:encoded.mp3",
       "destination": "/api/carecall/turn-audio?encoded=:encoded"
     },

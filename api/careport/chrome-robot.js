@@ -413,6 +413,7 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
         await new Promise(r => setTimeout(r, 250));
         const checkRes = await pageCdp.send('Runtime.evaluate', {
           expression: `(function() {
+            if (document.querySelector('.modal-overlay.loading')) return false;
             const cap = document.getElementById('capture') ||
                         document.querySelector('.report-area') ||
                         document.getElementById('consult-state') ||
@@ -420,6 +421,16 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
                         document.querySelector('.consult-wrap');
             if (!cap || cap.offsetHeight <= 80) return false;
             if (${JSON.stringify(sid)} && !window.location.hash.includes(${JSON.stringify(sid)})) return false;
+            const p1 = cap.querySelector('.first-page');
+            if (p1) {
+              const nameEl = p1.querySelector('.patient-meta-bar .name') || p1.querySelector('.summary-card strong');
+              if (nameEl) {
+                const nameTxt = (nameEl.innerText || '').trim();
+                if (!nameTxt || nameTxt === '-' || nameTxt.startsWith('- ')) return false;
+              }
+              const imgs = Array.from(cap.querySelectorAll('img'));
+              if (imgs.some(img => !img.complete)) return false;
+            }
             const txt = (cap.innerText || '').trim();
             if (txt.length < 20) return false;
             return true;
