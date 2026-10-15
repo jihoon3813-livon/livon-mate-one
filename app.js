@@ -28437,6 +28437,161 @@ async function deleteSettlementStepMemo(appId, roundNumber, stepType, memoId) {
 window.deleteSettlementStepMemo = deleteSettlementStepMemo;
 
 /**
+ * 고객 및 보호자/추가 연락처 정보 정밀 파싱 및 분리
+ * 고객 연락처 필드에 2개의 번호가 병합되어 있는 경우(22자리, 21자리, 20자리 등) 자동 분리하여
+ * 고객 본인 번호와 보호자/추가 연락처로 분할 제공
+ */
+function parseAppContactInfo(app) {
+  if (!app) {
+    return {
+      customerPhone: '',
+      guardianPhone: '',
+      guardianName: '',
+      guardianRelation: '',
+      extraPhone: ''
+    };
+  }
+
+  let rawPhone = String(app.phone || '').trim();
+  let gPhone = String(app.guardianPhone || app.applicantPhone || '').trim();
+  let gName = String(app.guardianName || app.applicantName || '').trim();
+  let gRel = String(app.guardianRelation || app.applicantRelation || '').trim();
+  let extraPhone = String(app.extraPhone || '').trim();
+
+  // 만약 별도의 보호자 연락처가 없고 고객 연락처가 복수 번호로 결합된 경우 자동 분리
+  if (!gPhone && rawPhone) {
+    const digitsOnly = rawPhone.replace(/[^0-9]/g, '');
+    if (digitsOnly.length === 22) {
+      // 예: 0104500136901073556934 -> 01045001369, 01073556934
+      rawPhone = digitsOnly.slice(0, 11);
+      gPhone = digitsOnly.slice(11);
+    } else if (digitsOnly.length === 21 && digitsOnly.startsWith('10') && digitsOnly.includes('010', 8)) {
+      // 예: 106717448001057821887 -> 01067174480, 01057821887
+      rawPhone = '0' + digitsOnly.slice(0, 10);
+      gPhone = digitsOnly.slice(10);
+    } else if (digitsOnly.length === 21) {
+      rawPhone = digitsOnly.slice(0, 11);
+      gPhone = digitsOnly.slice(11);
+    } else if (digitsOnly.length === 20 && digitsOnly.startsWith('10')) {
+      rawPhone = '0' + digitsOnly.slice(0, 10);
+      gPhone = digitsOnly.slice(10);
+    } else if (digitsOnly.length > 22) {
+      rawPhone = digitsOnly.slice(0, 11);
+      gPhone = digitsOnly.slice(11, 22);
+      if (digitsOnly.length > 22 && !extraPhone) {
+        extraPhone = digitsOnly.slice(22);
+      }
+    } else if (rawPhone.includes('/') || rawPhone.includes(',') || rawPhone.includes(' ') || rawPhone.includes(';')) {
+      const parts = rawPhone.split(/[\/,\s;]+/).map(p => p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        rawPhone = parts[0];
+        gPhone = parts[1];
+        if (parts.length >= 3 && !extraPhone) {
+          extraPhone = parts[2];
+        }
+      }
+    }
+  }
+
+  // 기본 보호자 명칭이 비어있을 경우 보정
+  if (gPhone && !gName && !gRel) {
+    gName = '보호자';
+    gRel = '신청인';
+  }
+
+  return {
+    customerPhone: rawPhone,
+    guardianPhone: gPhone,
+    guardianName: gName,
+    guardianRelation: gRel,
+    extraPhone: extraPhone
+  };
+}
+window.parseAppContactInfo = parseAppContactInfo;
+
+function renderAppContactRowsHtml(app, isBorderTop = false, isCompact = false) {
+  const contacts = parseAppContactInfo(app);
+  const padClass = isBorderTop ? 'pt-1.5 border-t border-slate-100' : '';
+  const textClass = isCompact ? 'text-[11px]' : 'text-[11.5px]';
+
+  const custPhoneFormatted = typeof formatPhoneNumber === 'function' ? formatPhoneNumber(contacts.customerPhone) : contacts.customerPhone;
+  const guardPhoneFormatted = contacts.guardianPhone ? (typeof formatPhoneNumber === 'function' ? formatPhoneNumber(contacts.guardianPhone) : contacts.guardianPhone) : '';
+  const extraPhoneFormatted = contacts.extraPhone ? (typeof formatPhoneNumber === 'function' ? formatPhoneNumber(contacts.extraPhone) : contacts.extraPhone) : '';
+
+  const guardLabel = contacts.guardianName 
+    ? `보호자(${contacts.guardianName}${contacts.guardianRelation ? '·' + contacts.guardianRelation : ''})`
+    : (contacts.guardianRelation ? `보호자(${contacts.guardianRelation})` : '보호자(신청인)');
+
+  let html = `
+    <div class="flex justify-between items-center ${padClass}">
+      <span class="text-slate-400 font-medium flex items-center gap-1">
+        <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400"></i> 고객 연락처:
+      </span>
+      <div class="flex items-center font-mono font-bold text-slate-900">
+        <span>${typeof maskPhone === 'function' ? maskPhone(custPhoneFormatted) : custPhoneFormatted}</span>
+        ${typeof renderCtiCallBtn === 'function' ? renderCtiCallBtn(contacts.customerPhone, app.patientName, '고객', false, app.id, app.insuranceCompany) : ''}
+      </div>
+    </div>
+  `;
+
+  if (contacts.guardianPhone || contacts.guardianName) {
+    html += `
+      <div class="flex justify-between items-center pt-1 border-t border-slate-100">
+        <span class="text-slate-400 font-medium flex items-center gap-1">
+          <i data-lucide="user-check" class="w-3.5 h-3.5 text-emerald-600"></i> ${guardLabel}:
+        </span>
+        <div class="flex items-center font-mono text-slate-900 font-bold">
+          <span>${guardPhoneFormatted ? (typeof maskPhone === 'function' ? maskPhone(guardPhoneFormatted) : guardPhoneFormatted) : '<span class=\"text-slate-400 font-normal\">(연락처 미등록)</span>'}</span>
+          ${contacts.guardianPhone && typeof renderCtiCallBtn === 'function' ? renderCtiCallBtn(contacts.guardianPhone, contacts.guardianName || '보호자', '보호자', false, app.id, app.insuranceCompany) : ''}
+          <button type="button" onclick="openCustomerEditModal('${app.id}', 'guardian')" class="ml-1 text-[10px] text-emerald-600 hover:text-emerald-800 font-bold hover:underline cursor-pointer" title="보호자 정보 수정">수정</button>
+        </div>
+      </div>
+    `;
+  } else {
+    html += `
+      <div class="flex justify-between items-center pt-1 border-t border-slate-100">
+        <span class="text-slate-400 font-medium flex items-center gap-1">
+          <i data-lucide="user-plus" class="w-3.5 h-3.5 text-slate-400"></i> 보호자 정보:
+        </span>
+        <button type="button" onclick="openCustomerEditModal('${app.id}', 'guardian')" class="px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[10.5px] border border-emerald-200 flex items-center gap-1 cursor-pointer transition-all shadow-2xs">
+          <i data-lucide="plus" class="w-2.5 h-2.5"></i> 보호자 등록
+        </button>
+      </div>
+    `;
+  }
+
+  if (contacts.extraPhone) {
+    html += `
+      <div class="flex justify-between items-center pt-1 border-t border-slate-100">
+        <span class="text-slate-400 font-medium flex items-center gap-1">
+          <i data-lucide="phone-forwarded" class="w-3.5 h-3.5 text-slate-400"></i> 추가 연락처:
+        </span>
+        <div class="flex items-center font-mono text-slate-800 font-bold">
+          <span>${typeof maskPhone === 'function' ? maskPhone(extraPhoneFormatted) : extraPhoneFormatted}</span>
+          ${typeof renderCtiCallBtn === 'function' ? renderCtiCallBtn(contacts.extraPhone, app.patientName, '추가연락처', false, app.id, app.insuranceCompany) : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  return html;
+}
+window.renderAppContactRowsHtml = renderAppContactRowsHtml;
+
+function onCustEditGuardianRelationChange(val) {
+  const otherInput = document.getElementById('custEditGuardianRelationOther');
+  if (otherInput) {
+    if (val === '기타') {
+      otherInput.classList.remove('hidden');
+      otherInput.focus();
+    } else {
+      otherInput.classList.add('hidden');
+    }
+  }
+}
+window.onCustEditGuardianRelationChange = onCustEditGuardianRelationChange;
+
+/**
  * [NEW] 시계열 정산·청구 라이프사이클 연동 원스탑 워크스페이스 렌더러
  * 시계열 순서: 간병제공 ➡️ 보험금 청구 ➡️ 입금 확인 ➡️ 간병비 지급
  * 청구 기간과 간병비 정산 기간이 1:1로 정확히 동기화되며, 입금 상태를 확인 후 지급하도록 관리합니다.
@@ -28632,23 +28787,8 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
 
                 <!-- 인적/연락처 & 지역 -->
                 <div class="space-y-1.5 py-2 text-slate-600 text-[11px] border-b border-slate-100">
-                  <div class="flex justify-between items-center">
-                    <span class="text-slate-400 font-medium flex items-center gap-1"><i data-lucide="phone" class="w-3 h-3 text-slate-400"></i> 고객 연락처:</span>
-                    <div class="flex items-center font-mono font-bold text-slate-900">
-                      <span>${maskPhone(app.phone)}</span>
-                      ${renderCtiCallBtn(app.phone, app.patientName, '고객')}
-                    </div>
-                  </div>
-                  ${app.applicantPhone && app.applicantPhone !== app.phone ? `
-                    <div class="flex justify-between items-center">
-                      <span class="text-slate-400 font-medium flex items-center gap-1"><i data-lucide="user-check" class="w-3 h-3 text-slate-400"></i> 신청인(${app.applicantName || '보호자'}):</span>
-                      <div class="flex items-center font-mono text-slate-900">
-                        <span>${maskPhone(app.applicantPhone)}</span>
-                        ${renderCtiCallBtn(app.applicantPhone, app.applicantName || '신청인', '보호자')}
-                      </div>
-                    </div>
-                  ` : ''}
-                  <div class="flex justify-between items-start gap-2">
+                  ${renderAppContactRowsHtml(app, false, true)}
+                  <div class="flex justify-between items-start gap-2 pt-1 border-t border-slate-100">
                     <span class="text-slate-400 font-medium flex items-center gap-1 flex-shrink-0 pt-0.5"><i data-lucide="map-pin" class="w-3 h-3 text-slate-400"></i> 지역/주소:</span>
                     <span class="text-slate-800 text-right font-medium break-words leading-relaxed truncate max-w-[220px]" title="${[app.sido, app.sigungu, app.roadAddress, app.addressDetail].filter(Boolean).join(' ')}">
                       ${[app.sido, app.sigungu, app.roadAddress, app.addressDetail].filter(Boolean).join(' ') || '(등록된 주소 없음)'}
@@ -30325,25 +30465,8 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 </div>
               </div>
 
-              <div class="space-y-2 text-slate-600 text-[11.5px]">
-                <div class="flex justify-between items-center">
-                  <span class="text-slate-500 flex items-center gap-1 font-medium"><i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400"></i> 고객 연락처:</span>
-                  <div class="flex items-center font-mono font-bold text-slate-900">
-                    <span>${maskPhone(app.phone)}</span>
-                    ${renderCtiCallBtn(app.phone, app.patientName, '고객')}
-                  </div>
-                </div>
-
-                ${app.applicantPhone && app.applicantPhone !== app.phone ? `
-                  <div class="flex justify-between items-center pt-1 border-t border-slate-100">
-                    <span class="text-slate-500 flex items-center gap-1 font-medium"><i data-lucide="user-check" class="w-3.5 h-3.5 text-slate-400"></i> 신청인(${app.applicantName || '보호자'}):</span>
-                    <div class="flex items-center font-mono text-slate-900">
-                      <span>${maskPhone(app.applicantPhone)}</span>
-                      ${renderCtiCallBtn(app.applicantPhone, app.applicantName || '신청인', '보호자')}
-                    </div>
-                  </div>
-                ` : ''}
-
+              <div class="space-y-1.5 text-slate-600 text-[11.5px]">
+                ${renderAppContactRowsHtml(app, false, false)}
                 <div class="flex justify-between items-start pt-1 border-t border-slate-100">
                   <span class="text-slate-500 flex items-center gap-1 font-medium flex-shrink-0 pt-0.5"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400"></i> 지역/주소:</span>
                   <span class="text-slate-800 text-right font-medium break-words max-w-[210px] leading-relaxed">
@@ -32760,23 +32883,8 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
 
                 <!-- 고객 공통 인적사항 & 주소 -->
                 <div class="space-y-1 text-slate-600 text-[11.5px]">
-                  <div class="flex justify-between items-center">
-                    <span>고객 연락처:</span>
-                    <div class="flex items-center font-mono font-bold text-slate-800">
-                      <span>${maskPhone(app.phone)}</span>
-                      ${renderCtiCallBtn(app.phone, app.patientName, '고객')}
-                    </div>
-                  </div>
-                  ${app.applicantPhone && app.applicantPhone !== app.phone ? `
-                    <div class="flex justify-between items-center">
-                      <span>신청인(${app.applicantName || '보호자'}):</span>
-                      <div class="flex items-center font-mono text-slate-800">
-                        <span>${maskPhone(app.applicantPhone)}</span>
-                        ${renderCtiCallBtn(app.applicantPhone, app.applicantName || '신청인', '보호자')}
-                      </div>
-                    </div>
-                  ` : ''}
-                  <div class="flex justify-between items-center">
+                  ${renderAppContactRowsHtml(app, false, true)}
+                  <div class="flex justify-between items-center pt-1 border-t border-slate-100">
                     <span>지역/주소:</span>
                     <span class="text-slate-800 text-right font-medium break-words max-w-[280px]">${app.sido || ''} ${app.sigungu || ''} ${app.roadAddress || ''} ${app.addressDetail || ''}</span>
                   </div>
@@ -49910,6 +50018,9 @@ function handleNewAppSubmit(e) {
       applicantBirth: applicantBirth,
       applicantPhone: applicantPhone,
       applicantRelation: applicantRelation,
+      guardianName: applicantName,
+      guardianPhone: applicantPhone,
+      guardianRelation: applicantRelation,
       isApplicantSame: isApplicantSame,
       rrnFront: rrnFront,
       rrnBack: rrnBack,
@@ -50729,18 +50840,52 @@ function handleNewAssignSubmit(e) {
 // -------------------------------------------------------------------------
 // STEP 1 CUSTOMER EDIT MODAL CONTROLLER
 // -------------------------------------------------------------------------
-function openCustomerEditModal(appId) {
+function openCustomerEditModal(appId, focusSection = null) {
   const app = gApps.find(a => a.id === appId);
   if (!app) {
     alert('해당 고객 정보를 찾을 수 없습니다: ' + appId);
     return;
   }
+  const contacts = (typeof parseAppContactInfo === 'function') 
+    ? parseAppContactInfo(app) 
+    : { customerPhone: app.phone || '', guardianPhone: app.guardianPhone || app.applicantPhone || '', guardianName: app.guardianName || app.applicantName || '', guardianRelation: app.guardianRelation || app.applicantRelation || '자녀', extraPhone: app.extraPhone || '' };
+
   document.getElementById('custEditId').value = app.id;
   document.getElementById('customerEditModalIdBadge').innerText = app.id;
   document.getElementById('custEditName').value = app.patientName || '';
   document.getElementById('custEditGender').value = app.gender || '남';
   document.getElementById('custEditBirthDate').value = app.birthDate || '';
-  document.getElementById('custEditPhone').value = app.phone || '';
+  document.getElementById('custEditPhone').value = (typeof formatPhoneNumber === 'function' ? formatPhoneNumber(contacts.customerPhone) : contacts.customerPhone) || '';
+
+  // 보호자 및 추가 연락처 바인딩
+  if (document.getElementById('custEditGuardianName')) {
+    document.getElementById('custEditGuardianName').value = contacts.guardianName || '';
+  }
+  if (document.getElementById('custEditGuardianPhone')) {
+    document.getElementById('custEditGuardianPhone').value = (typeof formatPhoneNumber === 'function' ? formatPhoneNumber(contacts.guardianPhone) : contacts.guardianPhone) || '';
+  }
+  if (document.getElementById('custEditGuardianRelation')) {
+    const gRel = contacts.guardianRelation || '자녀';
+    const relSel = document.getElementById('custEditGuardianRelation');
+    const hasOpt = Array.from(relSel.options).some(o => o.value === gRel);
+    if (hasOpt) {
+      relSel.value = gRel;
+      if (document.getElementById('custEditGuardianRelationOther')) {
+        document.getElementById('custEditGuardianRelationOther').classList.add('hidden');
+        document.getElementById('custEditGuardianRelationOther').value = '';
+      }
+    } else {
+      relSel.value = '기타';
+      if (document.getElementById('custEditGuardianRelationOther')) {
+        document.getElementById('custEditGuardianRelationOther').classList.remove('hidden');
+        document.getElementById('custEditGuardianRelationOther').value = gRel;
+      }
+    }
+  }
+  if (document.getElementById('custEditExtraPhone')) {
+    document.getElementById('custEditExtraPhone').value = (typeof formatPhoneNumber === 'function' ? formatPhoneNumber(contacts.extraPhone) : contacts.extraPhone) || '';
+  }
+
   document.getElementById('custEditRrn').value = app.rrn || '';
   document.getElementById('custEditInsurance').value = app.insuranceCompany || '현대해상(SCOR)';
   document.getElementById('custEditRoadAddress').value = app.roadAddress || (app.sido ? `${app.sido} ${app.sigungu || ''}` : '');
@@ -50782,6 +50927,17 @@ function openCustomerEditModal(appId) {
 
   openModal('customerEditModal');
   initIcons();
+
+  if (focusSection === 'guardian') {
+    setTimeout(() => {
+      const gSection = document.getElementById('custEditGuardianSection');
+      if (gSection) {
+        gSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const gNameInput = document.getElementById('custEditGuardianName');
+        if (gNameInput) gNameInput.focus();
+      }
+    }, 150);
+  }
 }
 
 function handleCustomerEditSubmit(e) {
@@ -50796,6 +50952,24 @@ function handleCustomerEditSubmit(e) {
   app.gender = document.getElementById('custEditGender').value;
   app.birthDate = document.getElementById('custEditBirthDate').value.trim();
   app.phone = document.getElementById('custEditPhone').value.trim();
+
+  // 보호자(신청인) 정보 및 추가 연락처 저장
+  const gName = (document.getElementById('custEditGuardianName')?.value || '').trim();
+  const gPhone = (document.getElementById('custEditGuardianPhone')?.value || '').trim();
+  let gRel = document.getElementById('custEditGuardianRelation')?.value || '자녀';
+  if (gRel === '기타') {
+    gRel = (document.getElementById('custEditGuardianRelationOther')?.value || '').trim() || '기타';
+  }
+  const extraPhone = (document.getElementById('custEditExtraPhone')?.value || '').trim();
+
+  app.guardianName = gName;
+  app.applicantName = gName || app.applicantName || '';
+  app.guardianPhone = gPhone;
+  app.applicantPhone = gPhone || app.applicantPhone || '';
+  app.guardianRelation = gRel;
+  app.applicantRelation = gRel || app.applicantRelation || '';
+  app.extraPhone = extraPhone;
+
   app.rrn = document.getElementById('custEditRrn').value.trim();
   app.insuranceCompany = document.getElementById('custEditInsurance').value;
   app.roadAddress = document.getElementById('custEditRoadAddress').value.trim();
@@ -50854,6 +51028,10 @@ function handleCustomerEditSubmit(e) {
     gender: '성별',
     birthDate: '생년월일',
     phone: '연락처',
+    guardianName: '보호자 성명',
+    guardianRelation: '보호자 관계',
+    guardianPhone: '보호자 연락처',
+    extraPhone: '추가 연락처',
     insuranceCompany: '보험사',
     roadAddress: '소재지/도로명',
     addressDetail: '상세주소',

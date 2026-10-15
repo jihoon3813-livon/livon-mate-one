@@ -1,5 +1,5 @@
-window.REBORN_REAL_SEED_DATA = {
-  "updatedAt": "2026-10-15T06:31:57.525Z",
+window.LIVON_LAUNCH_REAL_DATA = {
+  "updatedAt": "2026-10-15T06:36:40.525Z",
   "sources": {
     "종합 간병(현대해상)": {
       "sourceType": "file",
@@ -124,7 +124,8 @@ window.REBORN_REAL_SEED_DATA = {
       "_updTime": 0,
       "_latestEventTime": 1791990000000,
       "hasManualUpdate": true,
-      "updatedAt": "2026-10-15T06:31:57.346Z"
+      "updatedAt": "2026-10-15T06:31:57.346Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1792040931492.58,
@@ -236,7 +237,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "C0677",
       "patientName": "구장수",
-      "phone": "0104500136901073556934",
+      "phone": "010-4500-1369",
       "policyNumber": "",
       "productCode": "",
       "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)",
@@ -249,7 +250,13 @@ window.REBORN_REAL_SEED_DATA = {
       "caregiverCenter": "안양 참나눔 560호",
       "_applyTime": 1791990000000,
       "_updTime": 0,
-      "_latestEventTime": 1791990000000
+      "_latestEventTime": 1791990000000,
+      "guardianPhone": "010-7355-6934",
+      "applicantPhone": "010-7355-6934",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040930971.0552,
@@ -548,7 +555,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "",
       "patientName": "김판영",
-      "phone": "106717448001057821887",
+      "phone": "010-6717-4480",
       "policyNumber": "",
       "productCode": "",
       "productName": "",
@@ -559,7 +566,13 @@ window.REBORN_REAL_SEED_DATA = {
       "unconfirmedClaimCount": 0,
       "_applyTime": 1791990000000,
       "_updTime": 0,
-      "_latestEventTime": 1791990000000
+      "_latestEventTime": 1791990000000,
+      "guardianPhone": "010-5782-1887",
+      "applicantPhone": "010-5782-1887",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040930971.0544,
@@ -1174,7 +1187,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "환자는 전화통화 불가 귀가안들림",
       "patientId": "CF21824812",
       "patientName": "정숙자 교체요청",
-      "phone": "0103697550301088499208",
+      "phone": "010-3697-5503",
       "policyNumber": "00052622876000000",
       "productCode": "ZPB396070",
       "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
@@ -1186,7 +1199,13 @@ window.REBORN_REAL_SEED_DATA = {
       "caregiverCenter": "참사랑간병협회",
       "_applyTime": 1791776700000,
       "_updTime": 0,
-      "_latestEventTime": 1791776700000
+      "_latestEventTime": 1791776700000,
+      "guardianPhone": "010-8849-9208",
+      "applicantPhone": "010-8849-9208",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040930971.0515,
@@ -2742,7 +2761,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "BF03930359",
       "patientName": "정삼순",
-      "phone": "0104095813001044202596",
+      "phone": "010-4095-8130",
       "policyNumber": "52625419720000",
       "productCode": "ZPB455020",
       "productName": "무배당 삼성화재 간편보험 365 당당한 새로고침100세(2608.2) 1종(납입면제/해약환급금 미지급Ⅱ)",
@@ -2754,7 +2773,13 @@ window.REBORN_REAL_SEED_DATA = {
       "caregiverCenter": "(김해)조은간병인협회",
       "_applyTime": 1790910000000,
       "_updTime": 0,
-      "_latestEventTime": 1790910000000
+      "_latestEventTime": 1790910000000,
+      "guardianPhone": "010-4420-2596",
+      "applicantPhone": "010-4420-2596",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040929345.8738,
@@ -3186,7 +3211,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "BF01509580",
       "patientName": "조광희",
-      "phone": "0103397677401022532730",
+      "phone": "010-3397-6774",
       "policyNumber": "00052623025810000",
       "productCode": "ZPB396070",
       "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
@@ -3199,7 +3224,13 @@ window.REBORN_REAL_SEED_DATA = {
       "isAlertConfirmed": true,
       "_applyTime": 1790521200000,
       "_updTime": 0,
-      "_latestEventTime": 1790558520000
+      "_latestEventTime": 1790558520000,
+      "guardianPhone": "010-2253-2730",
+      "applicantPhone": "010-2253-2730",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040929345.8718,
@@ -3565,7 +3596,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "BF01973317",
       "patientName": "이순옥",
-      "phone": "0105258138801097383333",
+      "phone": "010-5258-1388",
       "policyNumber": "52622060060000",
       "productCode": "ZPB396070",
       "productName": "무배당 삼성화재 간편보험 마이핏1680(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
@@ -3578,7 +3609,13 @@ window.REBORN_REAL_SEED_DATA = {
       "isAlertConfirmed": true,
       "_applyTime": 1787410740000,
       "_updTime": 0,
-      "_latestEventTime": 1790476980000
+      "_latestEventTime": 1790476980000,
+      "guardianPhone": "010-9738-3333",
+      "applicantPhone": "010-9738-3333",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040929345.8704,
@@ -5337,7 +5374,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "",
       "patientName": "김명순",
-      "phone": "0104034352501091373525",
+      "phone": "010-4034-3525",
       "policyNumber": "L02213104822",
       "productCode": "",
       "productName": "",
@@ -5350,7 +5387,13 @@ window.REBORN_REAL_SEED_DATA = {
       "isAlertConfirmed": true,
       "_applyTime": 1789102860000,
       "_updTime": 0,
-      "_latestEventTime": 1789105560000
+      "_latestEventTime": 1789105560000,
+      "guardianPhone": "010-9137-3525",
+      "applicantPhone": "010-9137-3525",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040928543.7478,
@@ -5587,7 +5630,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "BA12883103",
       "patientName": "윤석찬",
-      "phone": "0106237472601062274726",
+      "phone": "010-6237-4726",
       "policyNumber": "52622960890000",
       "productCode": "ZPB393070",
       "productName": "무배당 삼성화재 건강보험 마이핏4180(2608.9)(납입면제/해약환급금 미지급형Ⅱ)",
@@ -5600,7 +5643,13 @@ window.REBORN_REAL_SEED_DATA = {
       "isAlertConfirmed": true,
       "_applyTime": 1788966000000,
       "_updTime": 0,
-      "_latestEventTime": 1788966000000
+      "_latestEventTime": 1788966000000,
+      "guardianPhone": "010-6227-4726",
+      "applicantPhone": "010-6227-4726",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040928543.7468,
@@ -6147,7 +6196,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "CB02697381",
       "patientName": "이금주",
-      "phone": "0105552894301055526612",
+      "phone": "010-5552-8943",
       "policyNumber": "52622218120000",
       "productCode": "ZPB335070",
       "productName": "무배당 삼성화재 간편보험 새로고침100세(2608.7) 1종(납입면제형)",
@@ -6159,7 +6208,13 @@ window.REBORN_REAL_SEED_DATA = {
       "isAlertConfirmed": true,
       "_applyTime": 1788419220000,
       "_updTime": 0,
-      "_latestEventTime": 1788481680000
+      "_latestEventTime": 1788481680000,
+      "guardianPhone": "010-5552-6612",
+      "applicantPhone": "010-5552-6612",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040928543.7446,
@@ -6460,7 +6515,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "간병인은 지원했으나 간병일수보험가입자로 서비스취소",
       "patientId": "",
       "patientName": "박소영",
-      "phone": "0102294339001064707443",
+      "phone": "010-2294-3390",
       "policyNumber": "사용일당",
       "productCode": "",
       "productName": "",
@@ -6472,7 +6527,13 @@ window.REBORN_REAL_SEED_DATA = {
       "isAlertConfirmed": true,
       "_applyTime": 1791990000000,
       "_updTime": 0,
-      "_latestEventTime": 1791990000000
+      "_latestEventTime": 1791990000000,
+      "guardianPhone": "010-6470-7443",
+      "applicantPhone": "010-6470-7443",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040928170.7375,
@@ -6891,7 +6952,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "8월26일 재접수 신청건 (7월 서비스이용안함)",
       "patientId": "",
       "patientName": "남경임",
-      "phone": "0102274850901020738509",
+      "phone": "010-2274-8509",
       "policyNumber": "L02532037967",
       "productCode": "",
       "productName": "",
@@ -6903,7 +6964,13 @@ window.REBORN_REAL_SEED_DATA = {
       "isAlertConfirmed": true,
       "_applyTime": 1787706600000,
       "_updTime": 0,
-      "_latestEventTime": 1789691700000
+      "_latestEventTime": 1789691700000,
+      "guardianPhone": "010-2073-8509",
+      "applicantPhone": "010-2073-8509",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040928170.7358,
@@ -7267,7 +7334,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "8월28일소급접수 /신청접수누락완료",
       "patientId": "",
       "patientName": "이정민",
-      "phone": "0102761203301077112733",
+      "phone": "010-2761-2033",
       "policyNumber": "L02205710647",
       "productCode": "",
       "productName": "",
@@ -7280,7 +7347,13 @@ window.REBORN_REAL_SEED_DATA = {
       "isAlertConfirmed": true,
       "_applyTime": 1787877600000,
       "_updTime": 0,
-      "_latestEventTime": 1787877600000
+      "_latestEventTime": 1787877600000,
+      "guardianPhone": "010-7711-2733",
+      "applicantPhone": "010-7711-2733",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040928170.7344,
@@ -9017,7 +9090,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "",
       "patientName": "김일순",
-      "phone": "0105254336901087670082",
+      "phone": "010-5254-3369",
       "policyNumber": "L02120248708",
       "productCode": "",
       "productName": "",
@@ -9029,7 +9102,13 @@ window.REBORN_REAL_SEED_DATA = {
       "caregiverCenter": "햇살간병",
       "_applyTime": 1617894000000,
       "_updTime": 0,
-      "_latestEventTime": 1617894000000
+      "_latestEventTime": 1617894000000,
+      "guardianPhone": "010-8767-0082",
+      "applicantPhone": "010-8767-0082",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040927459.3337,
@@ -9575,7 +9654,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "",
       "patientName": "윤광자",
-      "phone": "0105374597401063256565",
+      "phone": "010-5374-5974",
       "policyNumber": "L02556846044",
       "productCode": "",
       "productName": "",
@@ -9588,7 +9667,13 @@ window.REBORN_REAL_SEED_DATA = {
       "isAlertConfirmed": true,
       "_applyTime": 1783954800000,
       "_updTime": 0,
-      "_latestEventTime": 1789368660000
+      "_latestEventTime": 1789368660000,
+      "guardianPhone": "010-6325-6565",
+      "applicantPhone": "010-6325-6565",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040927459.3315,
@@ -9886,7 +9971,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "아시는 간병사님이 간병하는 것 요청",
       "patientId": "",
       "patientName": "박옥순",
-      "phone": "0105849626601094608385",
+      "phone": "010-5849-6266",
       "policyNumber": "L02130786184",
       "productCode": "",
       "productName": "",
@@ -9898,7 +9983,13 @@ window.REBORN_REAL_SEED_DATA = {
       "caregiverCenter": "목포미소간병",
       "_applyTime": 1783609200000,
       "_updTime": 0,
-      "_latestEventTime": 1783609200000
+      "_latestEventTime": 1783609200000,
+      "guardianPhone": "010-9460-8385",
+      "applicantPhone": "010-9460-8385",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040927459.3306,
@@ -12735,7 +12826,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "",
       "patientName": "김수지",
-      "phone": "0107756510501055265195",
+      "phone": "010-7756-5105",
       "policyNumber": "L02546985620",
       "productCode": "",
       "productName": "",
@@ -12746,7 +12837,13 @@ window.REBORN_REAL_SEED_DATA = {
       "unconfirmedClaimCount": 0,
       "_applyTime": 1748185200000,
       "_updTime": 0,
-      "_latestEventTime": 1748185200000
+      "_latestEventTime": 1748185200000,
+      "guardianPhone": "010-5526-5195",
+      "applicantPhone": "010-5526-5195",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040926406.421,
@@ -12796,7 +12893,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "설계사 정은선(010-5526-5195) 요양보호사 자격=> 본인이 간병할 수 있고 25년11월에 1일 사용함",
       "patientId": "",
       "patientName": "김수지",
-      "phone": "0107756510501055265195",
+      "phone": "010-7756-5105",
       "policyNumber": "L02546985620",
       "productCode": "",
       "productName": "",
@@ -12808,7 +12905,13 @@ window.REBORN_REAL_SEED_DATA = {
       "caregiverCenter": "리본케어",
       "_applyTime": 1748185200000,
       "_updTime": 0,
-      "_latestEventTime": 1748185200000
+      "_latestEventTime": 1748185200000,
+      "guardianPhone": "010-5526-5195",
+      "applicantPhone": "010-5526-5195",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040926406.4207,
@@ -12920,7 +13023,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "",
       "patientName": "김의웅",
-      "phone": "0106541895401035018954",
+      "phone": "010-6541-8954",
       "policyNumber": "L02234539821",
       "productCode": "",
       "productName": "",
@@ -12932,7 +13035,13 @@ window.REBORN_REAL_SEED_DATA = {
       "caregiverCenter": "대구사랑간병",
       "_applyTime": 1779721200000,
       "_updTime": 0,
-      "_latestEventTime": 1779721200000
+      "_latestEventTime": 1779721200000,
+      "guardianPhone": "010-3501-8954",
+      "applicantPhone": "010-3501-8954",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040926406.4202,
@@ -12982,7 +13091,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "지급단가 SCOR확인 예정",
       "patientId": "",
       "patientName": "최재식",
-      "phone": "0104610896401067175121",
+      "phone": "010-4610-8964",
       "policyNumber": "L02544635998",
       "productCode": "",
       "productName": "",
@@ -12994,7 +13103,13 @@ window.REBORN_REAL_SEED_DATA = {
       "caregiverCenter": "서울간병",
       "_applyTime": 1779375600000,
       "_updTime": 0,
-      "_latestEventTime": 1779375600000
+      "_latestEventTime": 1779375600000,
+      "guardianPhone": "010-6717-5121",
+      "applicantPhone": "010-6717-5121",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040926406.42,
@@ -13106,7 +13221,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "",
       "patientName": "박흥규",
-      "phone": "0109426411801094147985",
+      "phone": "010-9426-4118",
       "policyNumber": "L02544400942",
       "productCode": "",
       "productName": "",
@@ -13117,7 +13232,13 @@ window.REBORN_REAL_SEED_DATA = {
       "unconfirmedClaimCount": 0,
       "_applyTime": 1779030000000,
       "_updTime": 0,
-      "_latestEventTime": 1779030000000
+      "_latestEventTime": 1779030000000,
+      "guardianPhone": "010-9414-7985",
+      "applicantPhone": "010-9414-7985",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040926406.4194,
@@ -13784,7 +13905,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "",
       "patientName": "이상수",
-      "phone": "01045839761010744323656",
+      "phone": "010-4583-9761",
       "policyNumber": "L02218981173",
       "productCode": "",
       "productName": "",
@@ -13796,7 +13917,13 @@ window.REBORN_REAL_SEED_DATA = {
       "caregiverCenter": "복음간병(진주)",
       "_applyTime": 1778598000000,
       "_updTime": 0,
-      "_latestEventTime": 1778598000000
+      "_latestEventTime": 1778598000000,
+      "guardianPhone": "010-7443-2365",
+      "applicantPhone": "010-7443-2365",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040926406.4167,
@@ -13970,7 +14097,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "",
       "patientName": "이재철",
-      "phone": "0104164840001057164799",
+      "phone": "010-4164-8400",
       "policyNumber": "L02224017230",
       "productCode": "",
       "productName": "",
@@ -13982,7 +14109,13 @@ window.REBORN_REAL_SEED_DATA = {
       "caregiverCenter": "신광케어",
       "_applyTime": 1778425200000,
       "_updTime": 0,
-      "_latestEventTime": 1778425200000
+      "_latestEventTime": 1778425200000,
+      "guardianPhone": "010-5716-4799",
+      "applicantPhone": "010-5716-4799",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040926088.3174,
@@ -14032,7 +14165,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "",
       "patientName": "이재철",
-      "phone": "0104164840001057164799",
+      "phone": "010-4164-8400",
       "policyNumber": "L02224017230",
       "productCode": "",
       "productName": "",
@@ -14044,7 +14177,13 @@ window.REBORN_REAL_SEED_DATA = {
       "caregiverCenter": "신광케어",
       "_applyTime": 1778425200000,
       "_updTime": 0,
-      "_latestEventTime": 1778425200000
+      "_latestEventTime": 1778425200000,
+      "guardianPhone": "010-5716-4799",
+      "applicantPhone": "010-5716-4799",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040926088.3171,
@@ -14341,7 +14480,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "",
       "patientName": "최경자",
-      "phone": "0108871144901054723644",
+      "phone": "010-8871-1449",
       "policyNumber": "L02509081576",
       "productCode": "",
       "productName": "",
@@ -14354,7 +14493,13 @@ window.REBORN_REAL_SEED_DATA = {
       "isAlertConfirmed": true,
       "_applyTime": 1777993200000,
       "_updTime": 0,
-      "_latestEventTime": 1786673520000
+      "_latestEventTime": 1786673520000,
+      "guardianPhone": "010-5472-3644",
+      "applicantPhone": "010-5472-3644",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040926088.316,
@@ -14962,7 +15107,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "",
       "patientName": "고복순",
-      "phone": "0107151871301064208712",
+      "phone": "010-7151-8713",
       "policyNumber": "L02243841629",
       "productCode": "",
       "productName": "",
@@ -14974,7 +15119,13 @@ window.REBORN_REAL_SEED_DATA = {
       "caregiverCenter": "참좋은간병",
       "_applyTime": 1776956400000,
       "_updTime": 0,
-      "_latestEventTime": 1776956400000
+      "_latestEventTime": 1776956400000,
+      "guardianPhone": "010-6420-8712",
+      "applicantPhone": "010-6420-8712",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040926088.3135,
@@ -15706,7 +15857,7 @@ window.REBORN_REAL_SEED_DATA = {
       "memo": "",
       "patientId": "",
       "patientName": "김우현",
-      "phone": "0109377540201063389998",
+      "phone": "010-9377-5402",
       "policyNumber": "L02156928172",
       "productCode": "",
       "productName": "",
@@ -15719,7 +15870,13 @@ window.REBORN_REAL_SEED_DATA = {
       "isAlertConfirmed": true,
       "_applyTime": 1776351600000,
       "_updTime": 0,
-      "_latestEventTime": 1789697280000
+      "_latestEventTime": 1789697280000,
+      "guardianPhone": "010-6338-9998",
+      "applicantPhone": "010-6338-9998",
+      "guardianName": "보호자",
+      "applicantName": "보호자",
+      "guardianRelation": "신청인",
+      "applicantRelation": "신청인"
     },
     {
       "_creationTime": 1792040925774.714,
