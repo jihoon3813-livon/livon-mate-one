@@ -33372,16 +33372,8 @@ function getHubCustomerChecklistBadgesHtml(app, as, careProg, appClaims, appPayo
           </button>
         </span>
       `);
-    } else {
-      badges.push(`
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold text-[10.5px] whitespace-nowrap" title="수정 확인 완료 (원래 순서로 정렬됨)">
-          <button type="button" onclick="openAppUpdateHistoryModal('${app.id}', event)" class="flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-0 text-indigo-800 p-0 font-bold" title="클릭하여 수정 이력 다시 보기">
-            <i data-lucide="check" class="w-3 h-3 text-indigo-600"></i> 수정확인완료
-          </button>
-          <button type="button" onclick="unconfirmHubAppAlert('${app.id}', event)" class="ml-0.5 text-indigo-400 hover:text-rose-600 font-bold text-[10px] px-1 hover:bg-indigo-200/60 rounded cursor-pointer" title="확인 취소 (다시 맨 앞으로 올리기)">✕</button>
-        </span>
-      `);
     }
+    // 확인 완료 시 '수정확인완료' 라벨은 표시하지 않고 깔끔하게 제거
   }
 
   // 1. 간병인 미배정 체크 (접수, 신청, 진행중, 예정, 배정대기 등 활성 건만 표시하고 완료/취소/미해당/정산완료 건은 제외) -> 녹색!
