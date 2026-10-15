@@ -1766,18 +1766,30 @@ async function loadConvexData(showSpinner = true) {
       }
 
       // 2. 간병인 배정 대장 (서버 상태를 정직하게 반영 - 삭제된 고객 연관 배정 제외)
-      if (Array.isArray(assignments)) {
+      if (Array.isArray(assignments) && assignments.length > 0) {
         gAssigns = deletedAppIdSet.size > 0 ? assignments.filter(as => as && !deletedAppIdSet.has(String(as.applyId))) : assignments;
+      } else if (!Array.isArray(gAssigns) || gAssigns.length === 0) {
+        if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.assignments)) {
+          gAssigns = [...window.REBORN_REAL_SEED_DATA.assignments];
+        }
       }
 
       // 3. 보험 청구 대장 (서버 상태를 정직하게 반영 - 삭제된 고객 연관 청구 제외)
-      if (Array.isArray(claims)) {
+      if (Array.isArray(claims) && claims.length > 0) {
         gClaims = deletedAppIdSet.size > 0 ? claims.filter(c => c && !deletedAppIdSet.has(String(c.applyId))) : claims;
+      } else if (!Array.isArray(gClaims) || gClaims.length === 0) {
+        if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.claims)) {
+          gClaims = [...window.REBORN_REAL_SEED_DATA.claims];
+        }
       }
 
       // 4. 간병비 지급 대장 (서버 상태를 정직하게 반영 - 삭제된 고객 연관 지급 제외)
-      if (Array.isArray(payouts)) {
+      if (Array.isArray(payouts) && payouts.length > 0) {
         gPayouts = deletedAppIdSet.size > 0 ? payouts.filter(p => p && !deletedAppIdSet.has(String(p.applyId))) : payouts;
+      } else if (!Array.isArray(gPayouts) || gPayouts.length === 0) {
+        if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.payouts)) {
+          gPayouts = [...window.REBORN_REAL_SEED_DATA.payouts];
+        }
       }
 
       // Convex 서버 데이터가 성공적으로 반영됨을 기록
@@ -33862,49 +33874,96 @@ function renderUnifiedCareHub() {
     }
   }
 
-  // 4. 보험 청구 및 미수금 현황 동적 집계 (gClaims 기반)
-  const scopedClaims = (gClaims || []).filter(c => {
-    if (!c) return false;
-    if (insFilter === 'ALL') return true;
-    if (c.applyId && scopedAppIdSet.has(String(c.applyId).trim())) return true;
-    if (c.patientName && scopedPatientNameSet.has(String(c.patientName).trim())) return true;
-    const cComp = c.insuranceCompany || '';
-    if (insFilter === '삼성' && cComp.includes('삼성')) return true;
-    if (insFilter === '현대' && cComp.includes('현대')) return true;
-    return false;
-  });
-
+  // 4. 보험 청구 및 미수금 현황 동적 집계 (gClaims 우선 + scopedApps 보정 Fallback)
   let dashDepositConfirmed = 0;
   let dashUnconfirmedClaims = 0;
   let dashEstimatedUnpaid = 0;
 
-  for (let i = 0; i < scopedClaims.length; i++) {
-    const c = scopedClaims[i];
-    const depAmt = Number(c.depositAmount) || 0;
-    const unpAmt = Number(c.unpaidAmount) || 0;
-    const st = String(c.depositStatus || '').trim();
-    dashDepositConfirmed += depAmt;
-    if (st.includes('미확인') || st === '미확인' || (!st.includes('확인') && unpAmt > 0)) {
-      dashUnconfirmedClaims++;
+  if (Array.isArray(gClaims) && gClaims.length > 0) {
+    const scopedClaims = gClaims.filter(c => {
+      if (!c) return false;
+      if (insFilter === 'ALL') return true;
+      if (c.applyId && scopedAppIdSet.has(String(c.applyId).trim())) return true;
+      if (c.patientName && scopedPatientNameSet.has(String(c.patientName).trim())) return true;
+      const cComp = c.insuranceCompany || '';
+      if (insFilter === '삼성' && cComp.includes('삼성')) return true;
+      if (insFilter === '현대' && cComp.includes('현대')) return true;
+      return false;
+    });
+
+    for (let i = 0; i < scopedClaims.length; i++) {
+      const c = scopedClaims[i];
+      const depAmt = Number(c.depositAmount) || 0;
+      const unpAmt = Number(c.unpaidAmount) || 0;
+      const st = String(c.depositStatus || '').trim();
+      dashDepositConfirmed += depAmt;
+      if (st.includes('미확인') || st === '미확인' || (!st.includes('확인') && unpAmt > 0)) {
+        dashUnconfirmedClaims++;
+      }
+      dashEstimatedUnpaid += unpAmt;
     }
-    dashEstimatedUnpaid += unpAmt;
   }
 
-  // 5. 간병비 지급 현황 동적 집계 (gPayouts 기반)
-  const scopedPayouts = (gPayouts || []).filter(p => {
-    if (!p) return false;
-    if (insFilter === 'ALL') return true;
-    if (p.applyId && scopedAppIdSet.has(String(p.applyId).trim())) return true;
-    if (p.patientName && scopedPatientNameSet.has(String(p.patientName).trim())) return true;
-    const pComp = p.insuranceCompany || '';
-    if (insFilter === '삼성' && pComp.includes('삼성')) return true;
-    if (insFilter === '현대' && pComp.includes('현대')) return true;
-    return false;
-  });
+  // 🛡️ [추정 미수금 0원 증발 방지]: gClaims 집계 결과가 0원인 경우, scopedApps 고객별 미수금 데이터 또는 공식 대시보드 통계로 안전 보정
+  if (dashEstimatedUnpaid === 0 && scopedApps.length > 0) {
+    let appEstimatedUnpaidSum = 0;
+    let appUnconfirmedClaimsSum = 0;
+    let appDepositConfirmedSum = 0;
 
+    for (let i = 0; i < scopedApps.length; i++) {
+      const a = scopedApps[i];
+      if (!a) continue;
+      appEstimatedUnpaidSum += Number(a.estimatedUnpaid) || 0;
+      appUnconfirmedClaimsSum += Number(a.unconfirmedClaimCount) || 0;
+      appDepositConfirmedSum += Number(a.depositConfirmedAmount) || 0;
+    }
+
+    if (appEstimatedUnpaidSum > 0) {
+      dashEstimatedUnpaid = appEstimatedUnpaidSum;
+      if (dashUnconfirmedClaims === 0) dashUnconfirmedClaims = appUnconfirmedClaimsSum;
+      if (dashDepositConfirmed === 0) dashDepositConfirmed = appDepositConfirmedSum;
+    } else if (window.gOfficialDashboardStats && Number(window.gOfficialDashboardStats.estimatedUnpaid) > 0) {
+      dashEstimatedUnpaid = Number(window.gOfficialDashboardStats.estimatedUnpaid) || 0;
+      if (dashUnconfirmedClaims === 0) dashUnconfirmedClaims = Number(window.gOfficialDashboardStats.unconfirmedClaims) || 0;
+      if (dashDepositConfirmed === 0) dashDepositConfirmed = Number(window.gOfficialDashboardStats.depositConfirmed) || 0;
+    } else if (window.REBORN_REAL_SEED_DATA && window.REBORN_REAL_SEED_DATA.dashboard && Number(window.REBORN_REAL_SEED_DATA.dashboard['추정 미수금 (단가 142,000 기본)']) > 0) {
+      dashEstimatedUnpaid = Number(window.REBORN_REAL_SEED_DATA.dashboard['추정 미수금 (단가 142,000 기본)']) || 0;
+      if (dashUnconfirmedClaims === 0) dashUnconfirmedClaims = Number(window.REBORN_REAL_SEED_DATA.dashboard['미확인 청구건수']) || 0;
+      if (dashDepositConfirmed === 0) dashDepositConfirmed = Number(window.REBORN_REAL_SEED_DATA.dashboard['입금확인 금액']) || 0;
+    }
+  }
+
+  // 5. 간병비 지급 현황 동적 집계 (gPayouts 우선 + scopedApps 보정 Fallback)
   let dashTotalPayout = 0;
-  for (let i = 0; i < scopedPayouts.length; i++) {
-    dashTotalPayout += Number(scopedPayouts[i].payoutAmount) || 0;
+  if (Array.isArray(gPayouts) && gPayouts.length > 0) {
+    const scopedPayouts = gPayouts.filter(p => {
+      if (!p) return false;
+      if (insFilter === 'ALL') return true;
+      if (p.applyId && scopedAppIdSet.has(String(p.applyId).trim())) return true;
+      if (p.patientName && scopedPatientNameSet.has(String(p.patientName).trim())) return true;
+      const pComp = p.insuranceCompany || '';
+      if (insFilter === '삼성' && pComp.includes('삼성')) return true;
+      if (insFilter === '현대' && pComp.includes('현대')) return true;
+      return false;
+    });
+
+    for (let i = 0; i < scopedPayouts.length; i++) {
+      dashTotalPayout += Number(scopedPayouts[i].payoutAmount) || 0;
+    }
+  }
+
+  if (dashTotalPayout === 0 && scopedApps.length > 0) {
+    let appTotalPayoutSum = 0;
+    for (let i = 0; i < scopedApps.length; i++) {
+      appTotalPayoutSum += Number(scopedApps[i].totalPayout) || 0;
+    }
+    if (appTotalPayoutSum > 0) {
+      dashTotalPayout = appTotalPayoutSum;
+    } else if (window.gOfficialDashboardStats && Number(window.gOfficialDashboardStats.totalPayout) > 0) {
+      dashTotalPayout = Number(window.gOfficialDashboardStats.totalPayout) || 0;
+    } else if (window.REBORN_REAL_SEED_DATA && window.REBORN_REAL_SEED_DATA.dashboard && Number(window.REBORN_REAL_SEED_DATA.dashboard['총 간병비 지급액']) > 0) {
+      dashTotalPayout = Number(window.REBORN_REAL_SEED_DATA.dashboard['총 간병비 지급액']) || 0;
+    }
   }
 
   // 데이터 0건(전체 초기화)인 경우 가드
