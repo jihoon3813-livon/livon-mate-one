@@ -726,8 +726,8 @@ function renderSingleDayReportPages({
       <div>
         <!-- Top Brand & Report Tag -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <div style="display: flex; align-items: baseline; gap: 8px;">
-            <span class="brand-logo">LivOn</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1792052606/LivOn_1_rptk5n.png" alt="LivOn" class="brand-logo-img" style="height: 24px; width: auto; object-fit: contain; display: block;" />
             <span style="font-size: 13px; font-weight: 700; color: #475569; letter-spacing: -0.3px;">AI 간병일지</span>
           </div>
           <span class="kicker-top" style="color: #64748b; font-weight: 700;">${currentDayNum}일차</span>
@@ -885,8 +885,8 @@ function renderSingleDayReportPages({
       <div>
         <!-- Top Brand & Report Tag -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <div style="display: flex; align-items: baseline; gap: 8px;">
-            <span class="brand-logo">LivOn</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1792052606/LivOn_1_rptk5n.png" alt="LivOn" class="brand-logo-img" style="height: 24px; width: auto; object-fit: contain; display: block;" />
             <span style="font-size: 13px; font-weight: 700; color: #475569; letter-spacing: -0.3px;">AI 간병일지</span>
           </div>
           <span class="kicker-top" style="color: #64748b; font-weight: 700;">${currentDayNum}일차</span>
@@ -1080,6 +1080,12 @@ function generate2PageCareReportHtml(patientInfo = {}, records = [], selectedInd
       .no-print {
         display: none !important;
       }
+    }
+    .brand-logo-img {
+      height: 24px;
+      width: auto;
+      object-fit: contain;
+      display: block;
     }
     .brand-logo {
       font-size: 28px;
