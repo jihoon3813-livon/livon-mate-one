@@ -1,5 +1,17 @@
 // api/careport/generate-pdf.js
 // Server-side native Chromium PDF generator supporting both Local Chrome/Edge and Vercel Serverless (@sparticuz/chromium)
+
+// CRITICAL: Set AWS Lambda Node 20+ AL2023 environment variables BEFORE requiring @sparticuz/chromium
+// so that @sparticuz/chromium extracts al2023.tar.br (libnss3.so, etc.) into /tmp/al2023/lib and sets LD_LIBRARY_PATH.
+if (process.platform === 'linux') {
+  if (!process.env.AWS_EXECUTION_ENV) {
+    process.env.AWS_EXECUTION_ENV = 'AWS_Lambda_nodejs20.x';
+  }
+  if (!process.env.AWS_LAMBDA_JS_RUNTIME) {
+    process.env.AWS_LAMBDA_JS_RUNTIME = 'nodejs20.x';
+  }
+}
+
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -35,6 +47,11 @@ function getBrowserExecutable() {
 }
 
 async function renderViaServerlessChromium(htmlContent) {
+  if (process.platform === 'linux') {
+    process.env.AWS_EXECUTION_ENV = process.env.AWS_EXECUTION_ENV || 'AWS_Lambda_nodejs20.x';
+    process.env.AWS_LAMBDA_JS_RUNTIME = process.env.AWS_LAMBDA_JS_RUNTIME || 'nodejs20.x';
+  }
+
   let puppeteer = null;
   try {
     puppeteer = require('puppeteer-core');
@@ -43,8 +60,14 @@ async function renderViaServerlessChromium(htmlContent) {
   }
 
   let sparticuz = null;
+  let sparticuzBinDir = null;
   try {
     sparticuz = require('@sparticuz/chromium');
+    const pkgRoot = path.dirname(require.resolve('@sparticuz/chromium/package.json'));
+    const candidateBin = path.join(pkgRoot, 'bin');
+    if (fs.existsSync(candidateBin)) {
+      sparticuzBinDir = candidateBin;
+    }
   } catch (e) {}
   if (!sparticuz) {
     try {
@@ -63,14 +86,26 @@ async function renderViaServerlessChromium(htmlContent) {
   let execPath = gCachedSparticuzExecPath;
   if (!execPath || !fs.existsSync(execPath)) {
     try {
-      execPath = await sparticuz.executablePath();
+      execPath = sparticuzBinDir
+        ? await sparticuz.executablePath(sparticuzBinDir)
+        : await sparticuz.executablePath();
     } catch (e) {
       execPath = await sparticuz.executablePath(
-        'https://github.com/Sparticuz/chromium/releases/download/v130.0.0/chromium-v130.0.0-pack.tar'
+        'https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar'
       );
     }
     gCachedSparticuzExecPath = execPath;
   }
+
+  // Ensure /tmp/al2023/lib and /tmp/al2/lib are in LD_LIBRARY_PATH for Chromium shared libraries (libnss3.so, etc.)
+  const extraLibDirs = ['/tmp/al2023/lib', '/tmp/al2/lib', '/tmp/lib', '/tmp'];
+  const currentLdPath = (process.env.LD_LIBRARY_PATH || '').split(':').filter(Boolean);
+  for (const d of extraLibDirs) {
+    if (!currentLdPath.includes(d)) {
+      currentLdPath.unshift(d);
+    }
+  }
+  process.env.LD_LIBRARY_PATH = currentLdPath.join(':');
 
   const browser = await puppeteer.launch({
     args: [
@@ -82,7 +117,11 @@ async function renderViaServerlessChromium(htmlContent) {
     ],
     defaultViewport: { width: 1200, height: 1600, deviceScaleFactor: 2 },
     executablePath: execPath,
-    headless: sparticuz.headless !== undefined ? sparticuz.headless : true
+    headless: sparticuz.headless !== undefined ? sparticuz.headless : true,
+    env: {
+      ...process.env,
+      LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH
+    }
   });
 
   try {
