@@ -26404,12 +26404,13 @@ async function saveActiveHubCustomerDetail(silent = false) {
   }
 
   // 3. Recalculate customer statistics
-  const remainingAppClaims = (gClaims || []).filter(c => String(c.applyId) === String(app.id));
+  const remainingAppClaims = (gClaims || []).filter(c => c && String(c.applyId) === String(app.id));
+  const appTotalClaim = remainingAppClaims.reduce((sum, c) => sum + (Number(c.claimAmount) || (Number(c.days || 1) * Number(c.unitPrice || 0)) || 0), 0);
   app.claimCount = remainingAppClaims.length;
   app.unconfirmedClaimCount = remainingAppClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').length;
   app.estimatedUnpaid = remainingAppClaims.filter(c => c.depositStatus !== '수납완료' && c.depositStatus !== '입금완료' && c.status !== '입금완료').reduce((sum, c) => sum + (c.unpaidAmount || c.claimAmount || 0), 0);
 
-  const remainingAppPayouts = (gPayouts || []).filter(p => String(p.applyId) === String(app.id));
+  const remainingAppPayouts = (gPayouts || []).filter(p => p && String(p.applyId) === String(app.id));
   app.totalPayout = remainingAppPayouts.filter(p => p.payoutStatus === '지급완료' || p.payoutStatus === '지급').reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
 
   app.hasManualUpdate = true;
@@ -26498,20 +26499,24 @@ async function saveActiveHubCustomerDetail(silent = false) {
   }
 
   // 10. Audit log
-  if (typeof window.recordSystemAuditLog === 'function') {
-    window.recordSystemAuditLog({
-      category: '고객상세',
-      actionType: 'UPDATE',
-      target: `고객 [${app.id}] (${app.patientName})`,
-      summary: `[${app.patientName} 님] 상세 모달 전체 변경사항 서버 및 DB 최종 영구 저장 완료`,
-      changes: {
-        '정산·청구 세트': `${(app.customSettlementSets || []).length}개 세트`,
-        '보험금 청구': `${remainingAppClaims.length}건 (청구합계: ${typeof formatCurrency === 'function' ? formatCurrency(appTotalClaim) : appTotalClaim}원)`,
-        '입금확인 금액': `${typeof formatCurrency === 'function' ? formatCurrency(app.depositConfirmedAmount || 0) : app.depositConfirmedAmount}원 (잔여 미수: ${typeof formatCurrency === 'function' ? formatCurrency(app.estimatedUnpaid || 0) : app.estimatedUnpaid}원)`,
-        '간병비 지급': `${remainingAppPayouts.length}건 (지급합계: ${typeof formatCurrency === 'function' ? formatCurrency(app.totalPayout || 0) : app.totalPayout}원)`,
-        '진행상태': app.status || '진행중'
-      }
-    });
+  try {
+    if (typeof window.recordSystemAuditLog === 'function') {
+      window.recordSystemAuditLog({
+        category: '고객상세',
+        actionType: 'UPDATE',
+        target: `고객 [${app.id}] (${app.patientName})`,
+        summary: `[${app.patientName} 님] 상세 모달 전체 변경사항 서버 및 DB 최종 영구 저장 완료`,
+        changes: {
+          '정산·청구 세트': `${(app.customSettlementSets || []).length}개 세트`,
+          '보험금 청구': `${remainingAppClaims.length}건 (청구합계: ${typeof formatCurrency === 'function' ? formatCurrency(appTotalClaim) : appTotalClaim}원)`,
+          '입금확인 금액': `${typeof formatCurrency === 'function' ? formatCurrency(app.depositConfirmedAmount || 0) : app.depositConfirmedAmount}원 (잔여 미수: ${typeof formatCurrency === 'function' ? formatCurrency(app.estimatedUnpaid || 0) : app.estimatedUnpaid}원)`,
+          '간병비 지급': `${remainingAppPayouts.length}건 (지급합계: ${typeof formatCurrency === 'function' ? formatCurrency(app.totalPayout || 0) : app.totalPayout}원)`,
+          '진행상태': app.status || '진행중'
+        }
+      });
+    }
+  } catch (auditErr) {
+    console.warn('[saveActiveHubCustomerDetail] audit log error:', auditErr);
   }
 
   if (typeof renderUnifiedCareHub === 'function') {
@@ -26521,7 +26526,7 @@ async function saveActiveHubCustomerDetail(silent = false) {
   return true;
 }
 
-// [사용자 요구사항]: '저장후 닫기' 클릭 시 확인창 없이 곧바로 서버 저장 후 팝업 즉시 닫기
+// [사용자 요구사항]: '저장후 닫기' 클릭 시 모달 창이 자동으로 즉시 닫히고 서버 저장이 안전하게 완료되도록 처리
 async function saveAndCloseActiveHubCustomerDetail() {
   const btnDesktop = document.getElementById('btnSaveHubCustomerModalText');
   const btnMobile = document.getElementById('btnSaveHubCustomerModalMobileText');
@@ -26530,14 +26535,24 @@ async function saveAndCloseActiveHubCustomerDetail() {
   if (btnMobile) btnMobile.innerText = '저장 중...';
   if (btnFooter) btnFooter.innerText = '저장 중...';
 
-  await saveActiveHubCustomerDetail(false);
+  // 1. 모달 창 즉시 자동 닫기 (지연이나 멈춤 현상 완벽 차단)
   closeModal('hubCustomerDetailModal');
+
+  // 2. 백그라운드에서 서버 및 DB 저장 안전하게 완료
+  try {
+    await saveActiveHubCustomerDetail(false);
+  } catch (err) {
+    console.error('[saveAndCloseActiveHubCustomerDetail] 저장 오류:', err);
+  } finally {
+    closeModal('hubCustomerDetailModal');
+    gActiveHubModalAppId = null;
+  }
 }
 
 // [사용자 요구사항]: 저장여부 확인은 'x' 또는 '닫기' 버튼을 눌렀을 때만 물어봄
 async function confirmCloseHubCustomerDetailModal() {
   const appId = (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) ? gActiveHubModalAppId : '';
-  const app = (gApps || []).find(a => String(a.id) === String(appId));
+  const app = (gApps || []).find(a => a && String(a.id) === String(appId));
   const patientName = app ? maskName(app.patientName) : '고객';
 
   const shouldSave = await showCustomConfirm(
@@ -26551,19 +26566,25 @@ async function confirmCloseHubCustomerDetailModal() {
     }
   );
 
+  // 모달 창 즉시 닫기
+  closeModal('hubCustomerDetailModal');
+  gActiveHubModalAppId = null;
+
   if (shouldSave) {
-    await saveActiveHubCustomerDetail(true);
-    if (typeof showNotification === 'function' && app) {
-      showNotification({
-        type: 'success',
-        title: '저장 후 창 닫힘',
-        message: `[${patientName} 님] 변경사항이 서버에 안전하게 영구 저장되었습니다.`,
-        icon: 'check-circle'
-      });
+    try {
+      await saveActiveHubCustomerDetail(true);
+      if (typeof showNotification === 'function' && app) {
+        showNotification({
+          type: 'success',
+          title: '저장 후 창 닫힘',
+          message: `[${patientName} 님] 변경사항이 서버에 안전하게 영구 저장되었습니다.`,
+          icon: 'check-circle'
+        });
+      }
+    } catch (err) {
+      console.error('[confirmCloseHubCustomerDetailModal] 저장 오류:', err);
     }
   }
-
-  closeModal('hubCustomerDetailModal');
 }
 
 window.saveActiveHubCustomerDetail = saveActiveHubCustomerDetail;
