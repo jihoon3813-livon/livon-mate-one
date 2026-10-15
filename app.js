@@ -16607,7 +16607,7 @@ async function uploadAndDecryptSamsungExcel(file, customPassword = null) {
   const countBadge = document.getElementById('samsungExcelCountBadge');
   const listEl = document.getElementById('samsungExcelPreviewList');
   const pwdInput = document.getElementById('inputSamsungExcelPwd');
-  const targetPassword = customPassword || (pwdInput ? pwdInput.value : '') || '202609';
+  const targetPassword = customPassword || (pwdInput ? pwdInput.value : '') || '202610';
 
   try {
     if (countBadge) countBadge.innerText = '🔒 보안 암호 해제 중...';
@@ -17218,14 +17218,14 @@ async function checkSamsungDriveStatus() {
 
     if (!data) {
       if (textEl && !gSamsungDriveLastSyncedAt) {
-        updateSamsungDriveSyncUI('2026-09-17 10:15', '20260916', 25939);
+        updateSamsungDriveSyncUI('2026-10-15 10:54', '20261015', 49989);
       }
       return;
     }
 
-    const syncedAt = data.lastSyncedAt || localStorage.getItem('LIVON_SAMSUNG_DRIVE_SYNCED_AT') || '2026-09-17 10:15';
-    const syncedFile = data.lastSyncedFile || localStorage.getItem('LIVON_SAMSUNG_DRIVE_SYNCED_FILE') || '삼성화재 _간병인지원 대상건 현황_업체제공용_20260916.xlsb';
-    const count = data.lastRecordCount || Number(localStorage.getItem('LIVON_SAMSUNG_COUNT')) || 25939;
+    const syncedAt = data.lastSyncedAt || localStorage.getItem('LIVON_SAMSUNG_DRIVE_SYNCED_AT') || '2026-10-15 10:54';
+    const syncedFile = data.lastSyncedFile || localStorage.getItem('LIVON_SAMSUNG_DRIVE_SYNCED_FILE') || '삼성화재 _간병인지원 대상건 현황_업체제공용_20261015.xlsx';
+    const count = data.lastRecordCount || Number(localStorage.getItem('LIVON_SAMSUNG_COUNT')) || 49989;
 
     gSamsungDriveLastSyncedAt = syncedAt;
     gSamsungDriveLastSyncedFile = syncedFile;
@@ -17256,7 +17256,7 @@ async function checkSamsungDriveStatus() {
   } catch (err) {
     console.warn('[SamsungDrive] Status check failed:', err.message);
     if (textEl && !gSamsungDriveLastSyncedAt) {
-      updateSamsungDriveSyncUI('2026-09-17 10:15', '20260916', 25939);
+      updateSamsungDriveSyncUI('2026-10-15 10:54', '20261015', 49989);
     }
   }
 }
@@ -17323,7 +17323,7 @@ async function triggerSamsungDriveSync(isAuto = false) {
       throw new Error('동기화할 구글 드라이브 레코드가 0건입니다.');
     }
 
-    const filename = data.filename || '삼성화재 _간병인지원 대상건 현황_업체제공용_20260916.xlsb';
+    const filename = data.filename || '삼성화재 _간병인지원 대상건 현황_업체제공용_20261015.xlsx';
     const syncedAt = data.syncedAt || new Date().toLocaleString('ko-KR', { hour12: false });
     const count = records.length;
 
