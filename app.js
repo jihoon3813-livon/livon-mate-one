@@ -46447,6 +46447,32 @@ async function captureCarePortOriginalViaIframe(sessionList, username, isSelecti
     const consultState = curDoc.getElementById('consult-state');
 
     if (p1 && p2) {
+      // 1. 타임라인 그리드를 케어포트 1번 관리자 화면(/main/consult)과 동일하게 좌측 4열 그리드로 정렬 (count-1 가운데 정렬 방지)
+      try {
+        const styleInject = curDoc.createElement('style');
+        styleInject.innerHTML = `
+          .timeline-grid, .timeline-grid.count-1, .timeline-grid.count-2, .timeline-grid.count-3, .timeline-grid.count-4 {
+            display: grid !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            width: 100% !important;
+            margin: 0 !important;
+            gap: 24px !important;
+          }
+        `;
+        curDoc.head.appendChild(styleInject);
+      } catch (e) {}
+
+      // 2. 날짜의 요일 표기를 (월) -> (월요일) 등 케어포트 관리자 화면(/main/consult)과 동일하게 정규화
+      try {
+        const walker = curDoc.createTreeWalker(cap, NodeFilter.SHOW_TEXT, null, false);
+        let tNode;
+        while ((tNode = walker.nextNode())) {
+          if (tNode.nodeValue && /\(([일월화수목금토])\)/.test(tNode.nodeValue)) {
+            tNode.nodeValue = tNode.nodeValue.replace(/\(([일월화수목금토])\)/g, '($1요일)');
+          }
+        }
+      } catch (e) {}
+
       // 1페이지 캡처 (Header ~ 금일 활력징후)
       const origP2Display = p2.style.display;
       const origP1Display = p1.style.display;
