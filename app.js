@@ -45479,6 +45479,11 @@ async function renderHtmlToContinuousA4PdfBytes(htmlContent, customMargin = 8) {
 
     // 화면용 툴바 제거
     iframeDoc.querySelectorAll('.no-print').forEach(el => el.remove());
+    if (iframeDoc.body) {
+      iframeDoc.body.style.margin = '0';
+      iframeDoc.body.style.padding = '0';
+      iframeDoc.body.style.background = '#ffffff';
+    }
 
     // 0순위: LivOn AI 간병일지(new)와 같이 개별 .page 컨테이너로 A4 페이지가 명확히 분할된 경우
     const fixedPageEls = iframeDoc.querySelectorAll('.page:not(.report-area)');
@@ -45491,6 +45496,12 @@ async function renderHtmlToContinuousA4PdfBytes(htmlContent, customMargin = 8) {
         const pageEl = fixedPageEls[idx];
         pageEl.style.margin = '0 auto';
         pageEl.style.boxShadow = 'none';
+        pageEl.style.width = '794px';
+        pageEl.style.maxWidth = '794px';
+        pageEl.style.height = '1123px';
+        pageEl.style.minHeight = '1123px';
+        pageEl.style.maxHeight = '1123px';
+        pageEl.style.boxSizing = 'border-box';
 
         const cvs = await html2canvas(pageEl, {
           scale: 2.0,
@@ -45498,11 +45509,13 @@ async function renderHtmlToContinuousA4PdfBytes(htmlContent, customMargin = 8) {
           allowTaint: true,
           backgroundColor: '#ffffff',
           logging: false,
+          width: 794,
+          height: 1123,
           windowWidth: 794,
-          height: pageEl.offsetHeight || 1123,
+          windowHeight: 1123,
           scrollX: 0,
           scrollY: 0,
-          imageTimeout: 2000
+          imageTimeout: 2500
         });
 
         const jpgDataUrl = cvs.toDataURL('image/jpeg', 0.95);
