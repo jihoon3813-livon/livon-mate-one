@@ -49023,6 +49023,10 @@ function openNewAppModal() {
       claimPriceInput.value = typeof formatCurrency === 'function' ? formatCurrency(defaultUnitPrice) : Number(defaultUnitPrice).toLocaleString('ko-KR');
     }
 
+    // 케어포트(방문관리) 전산 자동 등록 기본 활성화
+    const chkCarePort = document.getElementById('chkAutoCarePortSubmit');
+    if (chkCarePort) chkCarePort.checked = true;
+
     // 삼성화재 12대 항목 입력 필드 초기화
     const samsungFieldIds = [
       'newAppSamsungPatientId', 'newAppSamsungPolicyNumber', 'newAppSamsungProductCode',
@@ -50363,7 +50367,7 @@ async function submitAppToCarePort(app, isManual = false) {
     const res = await fetch('/api/careport/submit-service', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ application: app })
+      body: JSON.stringify({ application: app, isLive: true })
     });
     const result = await res.json();
 
@@ -50412,8 +50416,8 @@ async function submitAppToCarePort(app, isManual = false) {
           actionType: 'UPDATE',
           target: `${app.id} (${pName})`,
           summary: result.isMock 
-            ? `케어포트 방문관리 서비스신청 모의 등록 및 데이터 검증 완료 [모의접수: #${appNo}] (운영서버 미발송)`
-            : `케어포트 방문관리 서비스신청 접수 성공 [접수번호: #${appNo}] (${app.careportInsurance})`
+            ? `케어포트 방문관리 서비스신청 모의 등록 [모의접수: #${appNo}]`
+            : `케어포트 방문관리 서비스신청 실서버 접수 성공 [접수번호: #${appNo}] (${app.careportInsurance})`
         });
       }
 
@@ -50421,15 +50425,15 @@ async function submitAppToCarePort(app, isManual = false) {
 
       if (typeof showToast === 'function') {
         if (result.isMock) {
-          showToast(`[케어포트 모의 등록] ${pName}님의 데이터 검증 및 로깅이 완료되었습니다. (운영 서버/슬랙 발송 차단: #${appNo})`, 'info');
+          showToast(`[케어포트 모의 등록] ${pName}님의 데이터 검증 및 로깅이 완료되었습니다. (#${appNo})`, 'info');
         } else {
-          showToast(`[케어포트 등록 성공] ${pName}님의 서비스 신청서가 케어포트 방문관리(접수번호: #${appNo})에 정상 등록되었습니다.`, 'success');
+          showToast(`[케어포트 전산 등록 성공] ${pName}님의 신청서가 케어포트 방문관리(접수번호: #${appNo})에 정상 등록되었습니다.`, 'success');
         }
       } else {
         if (result.isMock) {
-          alert(`[케어포트 모의 등록 완료]\n${pName}님의 서비스 신청서가 모의 등록(로깅)되었습니다.\n(운영 DB 및 슬랙 발송 차단: #${appNo})`);
+          alert(`[케어포트 모의 등록 완료]\n${pName}님의 서비스 신청서가 모의 등록(로깅)되었습니다. (#${appNo})`);
         } else {
-          alert(`[케어포트 등록 성공]\n${pName}님의 서비스 신청서가 케어포트 방문관리(접수번호: #${appNo})에 정상 등록되었습니다.`);
+          alert(`[케어포트 전산 등록 성공]\n${pName}님의 서비스 신청서가 케어포트 방문관리(접수번호: #${appNo})에 정상 등록되었습니다.`);
         }
       }
 
@@ -50497,8 +50501,8 @@ async function submitActiveHubCustomerToCarePort() {
   const pName = app.patientName || '고객';
   const ins = app.insuranceCompany || '원수사';
   const confirmMsg = app.careportAppNo
-    ? `[${pName} 님 - ${ins}]\n이미 케어포트에 접수된 내역(접수번호: #${app.careportAppNo})이 있습니다.\n\n케어포트 방문관리 서비스 신청서 검증 및 모의 등록(Mocking/로깅)을 다시 진행하시겠습니까?\n\n* 운영진 요청사항 반영: 운영 DB 및 슬랙 발송을 방지하기 위해 Mocking/로깅 모드로 안전하게 처리됩니다.`
-    : `[${pName} 님 - ${ins}]\n고객 정보를 케어포트(방문관리 > 서비스신청) 모의 등록 및 검증을 진행하시겠습니까?\n\n* [운영 서버 보호 모드]: 운영 DB 오염 및 슬랙 발송 방지를 위해 API 요청 Mocking 및 데이터 검증/로깅 모드로 안전하게 처리됩니다.\n* 필수 정보(피보험자, 주민번호/생년월일, 연락처, 주소, 병원명, 진단명, 간병일정 등) 정합성이 모두 검증됩니다.`;
+    ? `[${pName} 님 - ${ins}]\n이미 케어포트에 접수된 내역(접수번호: #${app.careportAppNo})이 있습니다.\n\n케어포트 방문관리 서비스 신청서 재등록을 진행하시겠습니까?`
+    : `[${pName} 님 - ${ins}]\n고객 정보를 케어포트(방문관리 > 서비스신청)에 정식 등록하시겠습니까?\n\n* 고객 정보(피보험자, 생년월일/주민번호, 연락처, 주소, 병원명, 진단명, 간병일정 등)가 케어포트 전산에 실시간 전송됩니다.`;
 
   if (confirm(confirmMsg)) {
     await submitAppToCarePort(app, true);

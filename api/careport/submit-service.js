@@ -114,11 +114,8 @@ module.exports = async (req, res) => {
       ? 'https://samsung-api.livon.care/api/internal' 
       : 'https://hi-api.livon.care/api/internal';
 
-    // 1. 피보험자 정보 매핑 (실서버 운영 혼선 방지를 위해 테스트 표기 필수 강제)
+    // 1. 피보험자 정보 매핑 (실제 고객 정보 그대로 전송)
     let patientName = String(app.patientName).trim();
-    if (!patientName.includes('테스트')) {
-      patientName = `테스트_${patientName}`;
-    }
     const isMale = (app.gender === '남' || app.gender === 'M' || app.gender === '1');
     const genderCode = isMale ? 'M' : 'F';
     const patientPhone = cleanPhone(app.phone);
@@ -128,9 +125,6 @@ module.exports = async (req, res) => {
     // 2. 신청인 (보호자) 정보 매핑
     const isSameApplicant = app.isApplicantSame || (app.applicantRelation === '본인') || (!app.applicantName) || (app.applicantName === patientName);
     let applicantName = (isSameApplicant ? patientName : (app.applicantName || patientName)).trim();
-    if (!applicantName.includes('테스트')) {
-      applicantName = `테스트_${applicantName}`;
-    }
     const applicantPhone = cleanPhone(isSameApplicant ? patientPhone : (app.applicantPhone || patientPhone));
     
     // 관계 코드: 본인('02'), 가족('07'), 기타('99')
@@ -209,13 +203,13 @@ module.exports = async (req, res) => {
     });
 
     // =========================================================================
-    // [운영 서버 보호 조치: Mocking & 로깅 모드]
-    // 케어포트 운영진 요청: 운영 DB 오염 및 슬랙 발송 방지를 위해 Mocking/로깅 모드 채택
-    // 실서버 전송을 명시적으로 요청한 경우(req.body.isLive === true 또는 환경변수 설정)에만 실서버 전송
+    // [운영 서버 정식 전송 활성화 (Live Submit)]
+    // 신규 고객 등록 시 케어포트(리본) 방문관리 서비스신청 실서버에 자동 연동
+    // (단, req.body.isMock === true 또는 req.body.isLive === false 일 때만 모의 등록)
     // =========================================================================
-    const isLiveSubmit = (req.body.isLive === true || process.env.CAREPORT_LIVE_SUBMIT === 'true');
+    const isMockSubmit = (req.body.isMock === true || req.body.isLive === false);
 
-    if (!isLiveSubmit) {
+    if (isMockSubmit) {
       const mockAppNo = `MOCK-${Date.now().toString().slice(-4)}`;
       console.log(`[CarePort Mocking & 로깅] 실서버 전송 건너뜀 (MOCK 모드 활성):`, {
         mockAppNo,
@@ -237,6 +231,14 @@ module.exports = async (req, res) => {
         }
       });
     }
+
+    console.log(`[CarePort Service Application] 실서버 정식 전송 시작 (${isSamsung ? '삼성화재' : '현대해상'}):`, {
+      patientName,
+      patientPhone,
+      policyNumber,
+      careStartDate8,
+      endpoint: `${targetBaseUrl}/applications`
+    });
 
     const postData = JSON.stringify(payload);
     const u = new URL(`${targetBaseUrl}/applications`);
