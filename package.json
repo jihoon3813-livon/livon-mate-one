@@ -9,6 +9,7 @@
     "convex": "node node_modules/convex/bin/main.js dev"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^131.0.1",
     "@sparticuz/chromium-min": "^130.0.0",
     "convex": "^1.45.0",
     "puppeteer-core": "^23.6.0"

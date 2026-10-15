@@ -451,9 +451,7 @@ function renderSingleDayReportPages({
         if (yPos !== null) {
           if (isLatestCol) {
             dotHtml = `
-              <div style="position: absolute; top: ${yPos - 7.5}px; left: 50%; transform: translateX(-50%); width: 15px; height: 15px; border-radius: 50%; background: rgba(225, 29, 72, 0.16); border: 1px solid rgba(225, 29, 72, 0.35); display: flex; align-items: center; justify-content: center; z-index: 4; box-sizing: border-box;">
-                <div style="width: 7px; height: 7px; border-radius: 50%; background: ${lineColor}; border: 1.5px solid #ffffff; box-sizing: border-box;"></div>
-              </div>
+              <div style="position: absolute; top: ${yPos - 4.5}px; left: 50%; transform: translateX(-50%); width: 9px; height: 9px; border-radius: 50%; background: ${lineColor}; border: 2px solid #ffffff; box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.28); z-index: 4; box-sizing: border-box;"></div>
             `;
           } else {
             dotHtml = `
@@ -475,7 +473,7 @@ function renderSingleDayReportPages({
       }
 
       return `
-        <div style="flex: 1; position: relative; height: 72px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 6px;">
+        <div style="flex: 1; position: relative; height: 72px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 6px; ${isLatestCol ? 'background: #fff5f7; border-left: 1.5px dashed #fecdd3; border-right: 1.5px dashed #fecdd3;' : ''}">
           ${dotHtml}
           <div style="z-index: 2;">
             ${badgeHtml}
@@ -761,18 +759,18 @@ function renderSingleDayReportPages({
         </div>
 
         <!-- 오늘의 핵심 변화 -->
-        <div style="background: #fff8f8; border: 1.5px solid #ffe4e6; border-radius: 16px; padding: 13px 18px; margin-bottom: 13px;">
-          <span style="background: #ffe4e6; color: #e11d48; font-size: 11px; font-weight: 800; padding: 2.5px 9px; border-radius: 9999px;">오늘의 핵심 변화</span>
-          <div style="font-size: 16.5px; font-weight: 800; color: #0f172a; margin-top: 6px; margin-bottom: 4px;">
+        <div style="background: #fff8f8; border: 1.5px solid #ffe4e6; border-radius: 16px; padding: 16px 20px; margin-bottom: 18px;">
+          <span style="background: #ffe4e6; color: #e11d48; font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 9999px;">오늘의 핵심 변화</span>
+          <div style="font-size: 17.5px; font-weight: 800; color: #0f172a; margin-top: 7px; margin-bottom: 4px;">
             ${briefingTitle}
           </div>
-          <div style="font-size: 12px; color: #475569; line-height: 1.5; word-break: keep-all;">
+          <div style="font-size: 12.5px; color: #475569; line-height: 1.55; word-break: keep-all;">
             ${briefingDesc}
           </div>
         </div>
 
         <!-- 01 생활·건강 신호등 (친근한 ~어요 말투 & 말줄임 없음) -->
-        <div style="margin-bottom: 15px;">
+        <div style="margin-bottom: 20px;">
           <div class="sec-header">
             <div class="sec-title-group">
               <span class="sec-num">01</span>
@@ -782,16 +780,16 @@ function renderSingleDayReportPages({
           </div>
 
           <!-- 6 Cards Grid (3 cols x 2 rows) -->
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; margin-top: 7px;">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 8px;">
             ${statusCards.map(c => `
-              <div style="background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 10px 14px; min-height: 88px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                  <span style="font-size: 12.5px; color: #475569; font-weight: 700;">${c.cat}</span>
+              <div style="background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 15px; padding: 13px 16px; min-height: 98px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                  <span style="font-size: 13px; color: #475569; font-weight: 700;">${c.cat}</span>
                   ${c.tl}
                 </div>
                 <div>
-                  <div style="font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 2px;">${c.title}</div>
-                  <div style="font-size: 11px; color: #64748b; line-height: 1.35; word-break: keep-all;">${c.desc}</div>
+                  <div style="font-size: 14.5px; font-weight: 800; color: #0f172a; margin-bottom: 3px;">${c.title}</div>
+                  <div style="font-size: 11.5px; color: #64748b; line-height: 1.4; word-break: keep-all;">${c.desc}</div>
                 </div>
               </div>
             `).join('')}
@@ -844,7 +842,7 @@ function renderSingleDayReportPages({
                   const dStr = col.date.split('.')[1] || '';
                   const hasData = col.hasData;
                   return `
-                    <div style="flex: 1; text-align: center; font-size: 10.5px; font-weight: 700; color: ${hasData ? '#64748b' : '#cbd5e1'};">
+                    <div style="flex: 1; text-align: center; font-size: 10.5px; font-weight: 700; color: ${hasData ? '#64748b' : '#cbd5e1'}; ${isSelected ? 'background: #fff5f7; border-radius: 6px 6px 0 0;' : ''}">
                       ${isSelected 
                         ? `<span style="background: #1e1b4b; color: #ffffff; padding: 2.5px 8px; border-radius: 5px; font-weight: 800; font-size: 11.5px;">${dStr}</span>` 
                         : dStr}
@@ -920,7 +918,7 @@ function renderSingleDayReportPages({
         </div>
 
         <!-- 03 주요 변화 타임라인 (말줄임 없이 온전한 서술) -->
-        <div style="margin-bottom: 20px;">
+        <div style="margin-bottom: 26px;">
           <div class="sec-header">
             <div class="sec-title-group">
               <span class="sec-num">03</span>
@@ -929,8 +927,8 @@ function renderSingleDayReportPages({
             <span class="sec-sub">최근 4일간의 기록</span>
           </div>
 
-          <!-- Timeline Container with connecting track (margin-top: 36px ensures rail & pins sit cleanly below title) -->
-          <div style="position: relative; margin-top: 36px;">
+          <!-- Timeline Container with connecting track -->
+          <div style="position: relative; margin-top: 18px;">
             <div style="position: absolute; top: -13px; left: ${railEndpoint}; right: ${railEndpoint}; height: 2.5px; background: ${railBg}; z-index: 1;"></div>
             <div style="display: flex; gap: 14px; align-items: stretch; position: relative; z-index: 2;">
               ${timelineCardsHtml}
@@ -939,7 +937,7 @@ function renderSingleDayReportPages({
         </div>
 
         <!-- 04 금일 간병 수행 내역 -->
-        <div style="margin-bottom: 18px;">
+        <div style="margin-bottom: 22px;">
           <div class="sec-header">
             <div class="sec-title-group">
               <span class="sec-num">04</span>
@@ -948,10 +946,10 @@ function renderSingleDayReportPages({
             <span class="sec-sub">케어포트 공인 간병 수행 기록</span>
           </div>
 
-          <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 7px;">
+          <div style="display: flex; flex-direction: column; gap: 6.5px; margin-top: 8px;">
             ${careExecutionItems.map(item => `
-              <div style="background: #f8fafc; border: 1.2px solid #e2e8f0; border-radius: 11px; padding: 8px 14px; display: flex; align-items: center; gap: 14px;">
-                <div style="width: 72px; flex-shrink: 0; background: #ffe4e6; color: #be185d; border: 1px solid #fecdd3; font-size: 11.5px; font-weight: 800; padding: 3px 0; border-radius: 6px; text-align: center;">
+              <div style="background: #f8fafc; border: 1.2px solid #e2e8f0; border-radius: 11px; padding: 8.5px 14px; display: flex; align-items: center; gap: 14px;">
+                <div style="width: 72px; flex-shrink: 0; background: #ffe4e6; color: #be185d; border: 1px solid #fecdd3; font-size: 11.5px; font-weight: 800; padding: 3.5px 0; border-radius: 6px; text-align: center;">
                   ${item.cat}
                 </div>
                 <div style="flex: 1; min-width: 0; font-size: 12.5px; color: #1e293b; line-height: 1.4; word-break: keep-all; font-weight: 500;">
@@ -963,15 +961,15 @@ function renderSingleDayReportPages({
         </div>
 
         <!-- 05 보호자에게 전하는 하루 (정성 어린 일일 메시지) -->
-        <div style="margin-bottom: 14px;">
-          <div class="sec-header" style="margin-bottom: 7px;">
+        <div style="margin-bottom: 20px;">
+          <div class="sec-header" style="margin-bottom: 8px;">
             <div class="sec-title-group">
               <span class="sec-num">05</span>
               <span class="sec-title">보호자 전달사항</span>
             </div>
           </div>
 
-          <div style="background: #fff8f8; border: 1.5px solid #ffe4e6; border-radius: 16px; padding: 18px 22px; box-shadow: 0 2px 8px rgba(225, 29, 72, 0.03);">
+          <div style="background: #fff8f8; border: 1.5px solid #ffe4e6; border-radius: 16px; padding: 22px 26px; box-shadow: 0 2px 8px rgba(225, 29, 72, 0.03);">
             ${guardianMessage}
           </div>
         </div>
@@ -1031,6 +1029,7 @@ function generate2PageCareReportHtml(patientInfo = {}, records = [], selectedInd
 <head>
   <meta charset="utf-8">
   <title>${pName} 님 · LivOn AI 간병일지</title>
+  <link rel="stylesheet" crossorigin="anonymous" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <style>
     @page {
       size: A4 portrait;
@@ -1044,7 +1043,7 @@ function generate2PageCareReportHtml(patientInfo = {}, records = [], selectedInd
     html, body {
       margin: 0;
       padding: 0;
-      background: #ffffff;
+      background: #f1f5f9;
       font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
       color: #0f172a;
       -webkit-font-smoothing: antialiased;
@@ -1056,7 +1055,7 @@ function generate2PageCareReportHtml(patientInfo = {}, records = [], selectedInd
       max-height: 297mm;
       margin: 0 auto;
       background: #ffffff;
-      padding: 11mm 16mm 9mm 16mm;
+      padding: 13mm 16mm 11mm 16mm;
       position: relative;
       overflow: hidden;
       page-break-after: always;
@@ -1064,12 +1063,11 @@ function generate2PageCareReportHtml(patientInfo = {}, records = [], selectedInd
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      box-shadow: none !important;
     }
     @media screen {
       .page {
-        margin: 0 auto !important;
-        box-shadow: none !important;
+        margin: 20px auto;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
       }
     }
     @media print {
@@ -1121,8 +1119,8 @@ function generate2PageCareReportHtml(patientInfo = {}, records = [], selectedInd
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 12px;
-      padding: 9px 18px;
-      margin-bottom: 13px;
+      padding: 11px 20px;
+      margin-bottom: 18px;
       font-size: 13px;
     }
     .sec-header {
