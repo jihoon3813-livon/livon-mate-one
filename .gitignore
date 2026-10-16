@@ -1,5 +1,6 @@
 node_modules/
 *.bak
+*.pre_split_backup
 scratch_*
 test.txt
 .DS_Store
