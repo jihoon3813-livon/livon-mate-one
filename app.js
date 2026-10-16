@@ -18904,6 +18904,13 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
         }
         return app.patientRrn;
       }
+      if (app.rrn) {
+        const clean = app.rrn.replace(/[^0-9*]/g, '');
+        if (clean.length === 13 && !(app.rrn || '').includes('-')) {
+          return `${clean.slice(0, 6)}-${clean.slice(6)}`;
+        }
+        return app.rrn;
+      }
       if (app.rrnFront && app.rrnBack) {
         return `${app.rrnFront}-${app.rrnBack}`;
       }
@@ -19206,6 +19213,22 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
 
           <!-- Mapped Customer Data Overlay Fields (table-cell 수직 정렬로 글씨 상단 잘림 방지) -->
           ${areas.map(area => {
+            if (area.mapping === 'patientRrn') {
+              const rrnVal = app.patientRrn || (app.rrnFront ? `${app.rrnFront}-${app.rrnBack || ''}` : (app.rrn || ''));
+              return `
+                <div class="absolute z-20"
+                     style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%;">
+                  <input type="text"
+                         id="hd1_custombg_patientRrn"
+                         value="${rrnVal}"
+                         placeholder="YYMMDD-XXXXXXX"
+                         maxlength="14"
+                         class="w-full h-full px-1.5 bg-white/95 border border-blue-400 rounded font-mono font-bold text-slate-950 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none print:border-none print:bg-transparent print:p-0"
+                         oninput="autoHyphenRrn(this); syncHd1RrnToApp(this.value, '${app.id}')"
+                         title="주민등록번호 직접 입력 및 실시간 저장">
+                </div>
+              `;
+            }
             const val = resolveFormFieldValue(area.mapping, app, docNo, todayStr);
             return `
               <div class="absolute z-10 font-bold text-slate-950 text-xs select-none"
@@ -19275,7 +19298,16 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
                 <th class="bg-slate-100 p-2 text-center w-28 text-slate-700 font-bold border-r border-slate-300">피보험자 성명</th>
                 <td class="p-2 font-black text-sm text-slate-900 border-r border-slate-300">${app.patientName} (${app.gender || '미지정'})</td>
                 <th class="bg-slate-100 p-2 text-center w-28 text-slate-700 font-bold border-r border-slate-300">주민등록번호</th>
-                <td class="p-2 font-mono font-bold">${app.patientRrn || (app.rrnFront ? `${app.rrnFront}-${app.rrnBack || '*******'}` : '-')}</td>
+                <td class="p-1 font-mono font-bold">
+                  <input type="text"
+                         id="hd1_preview_patientRrn"
+                         value="${app.patientRrn || (app.rrnFront ? `${app.rrnFront}-${app.rrnBack || ''}` : (app.rrn || ''))}"
+                         placeholder="YYMMDD-XXXXXXX"
+                         maxlength="14"
+                         class="w-full px-2 py-1 bg-white border border-slate-300 rounded font-mono font-bold text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-2xs print:border-none print:bg-transparent print:p-0"
+                         oninput="autoHyphenRrn(this); syncHd1RrnToApp(this.value, '${app.id}')"
+                         title="주민등록번호 직접 입력 및 실시간 저장">
+                </td>
               </tr>
               <tr class="border-b border-slate-300">
                 <th class="bg-slate-100 p-2 text-center text-slate-700 font-bold border-r border-slate-300">환자 연락처</th>
@@ -49710,6 +49742,81 @@ function autoHyphenPhone(input) {
   }
 }
 
+function autoHyphenRrn(input) {
+  if (!input) return '';
+  let val = typeof input === 'string' ? input : (input.value || '');
+  const clean = val.replace(/[^0-9*]/g, '');
+  let formatted = '';
+  if (clean.length <= 6) {
+    formatted = clean;
+  } else {
+    formatted = `${clean.slice(0, 6)}-${clean.slice(6, 13)}`;
+  }
+  if (typeof input !== 'string') {
+    input.value = formatted;
+  }
+  return formatted;
+}
+window.autoHyphenRrn = autoHyphenRrn;
+
+function syncHd1RrnToApp(value, appId) {
+  if (!appId) return;
+  const app = (gApps || []).find(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
+  if (!app) return;
+  const clean = String(value || '').trim();
+  app.rrn = clean;
+  app.patientRrn = clean;
+  const numOnly = clean.replace(/[^0-9*]/g, '');
+  if (numOnly.length >= 6) {
+    app.rrnFront = numOnly.slice(0, 6);
+    if (numOnly.length > 6) {
+      app.rrnBack = numOnly.slice(6, 13);
+    }
+  } else {
+    app.rrnFront = '';
+    app.rrnBack = '';
+  }
+  const appIdx = (gApps || []).findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
+  if (appIdx !== -1) {
+    gApps[appIdx] = app;
+  }
+  if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
+    const rIdx = window.REBORN_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
+    if (rIdx !== -1) {
+      window.REBORN_DATA.applications[rIdx] = { ...window.REBORN_DATA.applications[rIdx], ...app };
+    }
+  }
+  const custRrnInput = document.getElementById('custEditRrn');
+  if (custRrnInput) {
+    custRrnInput.value = clean;
+  }
+  try {
+    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+  } catch (e) {}
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:saveApplication', { app }).catch(() => {});
+  }
+  fetch('/api/hub/customer/update-fields', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      appId: app.id,
+      fields: app
+    })
+  }).catch(() => {});
+  fetch('/api/hub/real-data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      applications: gApps,
+      assignments: (typeof gAssigns !== 'undefined' ? gAssigns : []),
+      claims: (typeof gClaims !== 'undefined' ? gClaims : []),
+      payouts: (typeof gPayouts !== 'undefined' ? gPayouts : [])
+    })
+  }).catch(() => {});
+}
+window.syncHd1RrnToApp = syncHd1RrnToApp;
+
 function onRrnFrontInput(input) {
   input.value = input.value.replace(/[^0-9]/g, '').slice(0, 6);
   if (input.value.length === 6) {
@@ -51073,7 +51180,7 @@ function handleNewAssignSubmit(e) {
 // STEP 1 CUSTOMER EDIT MODAL CONTROLLER
 // -------------------------------------------------------------------------
 function openCustomerEditModal(appId, focusSection = null) {
-  const app = gApps.find(a => a.id === appId);
+  const app = (gApps || []).find(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
   if (!app) {
     alert('해당 고객 정보를 찾을 수 없습니다: ' + appId);
     return;
@@ -51118,7 +51225,11 @@ function openCustomerEditModal(appId, focusSection = null) {
     document.getElementById('custEditExtraPhone').value = (typeof formatPhoneNumber === 'function' ? formatPhoneNumber(contacts.extraPhone) : contacts.extraPhone) || '';
   }
 
-  document.getElementById('custEditRrn').value = app.rrn || '';
+  const rrnVal = app.rrn || app.patientRrn || (app.rrnFront ? `${app.rrnFront}-${app.rrnBack || ''}` : '');
+  const rrnInput = document.getElementById('custEditRrn');
+  if (rrnInput) {
+    rrnInput.value = (typeof autoHyphenRrn === 'function') ? autoHyphenRrn(rrnVal) : rrnVal;
+  }
   document.getElementById('custEditInsurance').value = app.insuranceCompany || '현대해상(SCOR)';
   document.getElementById('custEditRoadAddress').value = app.roadAddress || (app.sido ? `${app.sido} ${app.sigungu || ''}` : '');
   document.getElementById('custEditAddressDetail').value = app.addressDetail || '';
@@ -51175,8 +51286,9 @@ function openCustomerEditModal(appId, focusSection = null) {
 function handleCustomerEditSubmit(e) {
   e.preventDefault();
   const id = document.getElementById('custEditId').value;
-  const app = gApps.find(a => a.id === id);
-  if (!app) return;
+  const appIdx = (gApps || []).findIndex(a => String(a.id) === String(id) || String(a.id).replace(/^[CH]/, '') === String(id).replace(/^[CH]/, ''));
+  if (appIdx === -1) return;
+  const app = gApps[appIdx];
   const beforeState = { ...app };
   app.updatedAt = new Date().toISOString();
 
@@ -51202,7 +51314,27 @@ function handleCustomerEditSubmit(e) {
   app.applicantRelation = gRel || app.applicantRelation || '';
   app.extraPhone = extraPhone;
 
-  app.rrn = document.getElementById('custEditRrn').value.trim();
+  const rawRrn = (document.getElementById('custEditRrn')?.value || '').trim();
+  const formattedRrn = (typeof autoHyphenRrn === 'function') ? autoHyphenRrn(rawRrn) : rawRrn;
+  app.rrn = formattedRrn;
+  app.patientRrn = formattedRrn;
+  const cleanDigits = formattedRrn.replace(/[^0-9*]/g, '');
+  if (cleanDigits.length >= 6) {
+    app.rrnFront = cleanDigits.slice(0, 6);
+    if (cleanDigits.length > 6) {
+      app.rrnBack = cleanDigits.slice(6, 13);
+    }
+  } else {
+    app.rrnFront = '';
+    app.rrnBack = '';
+  }
+
+  // 팩스 미리보기 팝업 인풋이 열려있다면 즉시 값 동기화
+  const hd1PreviewInput = document.getElementById('hd1_preview_patientRrn') || document.getElementById('hd1_custombg_patientRrn');
+  if (hd1PreviewInput) {
+    hd1PreviewInput.value = formattedRrn;
+  }
+
   app.insuranceCompany = document.getElementById('custEditInsurance').value;
   app.roadAddress = document.getElementById('custEditRoadAddress').value.trim();
   app.addressDetail = document.getElementById('custEditAddressDetail').value.trim();
@@ -51260,6 +51392,7 @@ function handleCustomerEditSubmit(e) {
     gender: '성별',
     birthDate: '생년월일',
     phone: '연락처',
+    rrn: '주민등록번호',
     guardianName: '보호자 성명',
     guardianRelation: '보호자 관계',
     guardianPhone: '보호자 연락처',
@@ -51306,13 +51439,38 @@ function handleCustomerEditSubmit(e) {
     });
   }
 
-  // 서버 디스크 영구 저장
+  // 전역 데이터 및 로컬 스토리지 즉시 동기화
+  gApps[appIdx] = app;
+  if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
+    const rIdx = window.REBORN_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
+    if (rIdx !== -1) {
+      window.REBORN_DATA.applications[rIdx] = { ...window.REBORN_DATA.applications[rIdx], ...app };
+    }
+  }
+  try {
+    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+  } catch (err) {
+    console.warn('[handleCustomerEditSubmit] localStorage error:', err);
+  }
+
+  // 서버 디스크 영구 저장 (/api/hub/customer/update-fields & /api/hub/real-data)
   fetch('/api/hub/customer/update-fields', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       appId: app.id,
       fields: app
+    })
+  }).catch(() => {});
+
+  fetch('/api/hub/real-data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      applications: gApps,
+      assignments: (typeof gAssigns !== 'undefined' ? gAssigns : []),
+      claims: (typeof gClaims !== 'undefined' ? gClaims : []),
+      payouts: (typeof gPayouts !== 'undefined' ? gPayouts : [])
     })
   }).catch(() => {});
 
