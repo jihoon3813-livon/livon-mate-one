@@ -1121,20 +1121,36 @@ const PROD_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
 
 function isDevEnvironment() {
   if (typeof window === 'undefined') return false;
-  const host = window.location.hostname || '';
+  const host = (window.location.hostname || '').toLowerCase();
   const port = window.location.port || '';
 
   const urlParam = (typeof URLSearchParams !== 'undefined') ? new URLSearchParams(window.location.search).get('env') : null;
-  if (urlParam === 'dev') return true;
-  if (urlParam === 'prod') return false;
+  if (urlParam === 'dev') {
+    try { localStorage.setItem('LIVON_TARGET_ENV', 'dev'); } catch(e) {}
+    return true;
+  }
+  if (urlParam === 'prod') {
+    try { localStorage.setItem('LIVON_TARGET_ENV', 'prod'); } catch(e) {}
+    return false;
+  }
 
   const storedEnv = (typeof localStorage !== 'undefined' && localStorage.getItem('LIVON_TARGET_ENV')) || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('LIVON_TARGET_ENV'));
   if (storedEnv === 'dev') return true;
   if (storedEnv === 'prod') return false;
 
-  // 로컬 개발 환경(localhost, 127.0.0.1, 개발 포트 등) 및 dev 서브도메인은 DEV(rapid-raccoon-895) 보장
-  const isLocalHost = (host === 'localhost' || host === '127.0.0.1' || host === '' || host.includes('dev') || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:');
+  // 1. 로컬 개발 환경(localhost, 127.0.0.1, 개발 포트 등) 및 파일 프로토콜
+  const isLocalHost = (host === 'localhost' || host === '127.0.0.1' || host === '' || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:');
   if (isLocalHost) return true;
+
+  // 2. 도메인에 dev, test, staging, preview가 들어간 경우
+  if (host.includes('dev') || host.includes('test') || host.includes('staging') || host.includes('preview')) {
+    return true;
+  }
+
+  // 3. Vercel 프리뷰 배포 (메인 운영 도메인인 livon-mate-one.vercel.app 제외한 모든 *.vercel.app)
+  if (host.endsWith('.vercel.app') && host !== 'livon-mate-one.vercel.app') {
+    return true;
+  }
 
   return false;
 }
@@ -1145,19 +1161,31 @@ var CONVEX_URL = IS_DEV_ENV ? DEV_CONVEX_URL : PROD_CONVEX_URL;
 window.IS_DEV_ENV = IS_DEV_ENV;
 window.CURRENT_CONVEX_URL = CONVEX_URL;
 
+// [보안/격리] 프론트엔드 fetch 인터셉터: 모든 /api/ 요청에 현재 환경의 x-convex-url 헤더 자동 주입
+(function setupApiConvexHeaderInterceptor() {
+  if (typeof window === 'undefined' || typeof window.fetch !== 'function') return;
+  const origFetch = window.fetch;
+  window.fetch = function(input, init) {
+    try {
+      const urlStr = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+      if (urlStr.includes('/api/')) {
+        init = init || {};
+        const activeConvexUrl = window.CURRENT_CONVEX_URL || (window.IS_DEV_ENV ? DEV_CONVEX_URL : PROD_CONVEX_URL);
+        if (init.headers instanceof Headers) {
+          if (!init.headers.has('x-convex-url')) init.headers.set('x-convex-url', activeConvexUrl);
+        } else if (init.headers && typeof init.headers === 'object') {
+          if (!init.headers['x-convex-url']) init.headers['x-convex-url'] = activeConvexUrl;
+        } else {
+          init.headers = { 'x-convex-url': activeConvexUrl };
+        }
+      }
+    } catch (e) {}
+    return origFetch.apply(this, arguments);
+  };
+})();
+
 function isDevScreen() {
-  if (typeof window === 'undefined') return false;
-  const host = window.location.hostname || '';
-  const port = window.location.port || '';
-  if (host === 'localhost' || host === '127.0.0.1' || host === '' || host.includes('dev') || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:') {
-    return true;
-  }
-  const urlParam = new URLSearchParams(window.location.search).get('env');
-  if (urlParam === 'dev') return true;
-  if (urlParam === 'prod') return false;
-  if (localStorage.getItem('LIVON_TARGET_ENV') === 'dev' || sessionStorage.getItem('LIVON_TARGET_ENV') === 'dev') return true;
-  if (IS_DEV_ENV) return true;
-  return false;
+  return IS_DEV_ENV;
 }
 window.isDevScreen = isDevScreen;
 
@@ -1167,7 +1195,7 @@ if (typeof document !== 'undefined' && isDevScreen()) {
   } catch (e) {}
 }
 
-console.log('[Livon ERP] Current Running Environment:', IS_DEV_ENV ? '개발 사이트 (DEV)' : '실사이트 (PROD)', '| Convex:', CONVEX_URL, '| DevScreen:', isDevScreen());
+console.log('[Livon ERP] Current Running Environment:', IS_DEV_ENV ? '개발 사이트 (DEV - rapid-raccoon-895)' : '실운영 사이트 (PROD - gallant-weasel-360)', '| Convex:', CONVEX_URL);
 
 async function syncToConvex(path, args = {}) {
   try {
@@ -7291,12 +7319,12 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
 
     let matchedIdx = -1;
     if (appId && targetMap.has(`aid_${appId}`)) matchedIdx = targetMap.get(`aid_${appId}`);
-    else if (appId && targetMap.has(`pid_${appId}`)) matchedIdx = targetMap.get(`pid_${appId}`);
-    else if (pId && targetMap.has(`pid_${pId}`)) matchedIdx = targetMap.get(`pid_${pId}`);
-    else if (appId && targetMap.has(`id_${appId}`)) matchedIdx = targetMap.get(`id_${appId}`);
-    else if (pId && targetMap.has(`id_${pId}`)) matchedIdx = targetMap.get(`id_${pId}`);
-    else if (polSuffix && targetMap.has(`pol_${polSuffix}`)) matchedIdx = targetMap.get(`pol_${polSuffix}`);
     else if (pName && targetMap.has(`name_${pName}`)) matchedIdx = targetMap.get(`name_${pName}`);
+    else if (appId && targetMap.has(`pid_${appId}`)) matchedIdx = targetMap.get(`pid_${appId}`);
+    else if (pId && !pId.startsWith('SF-P') && targetMap.has(`pid_${pId}`)) matchedIdx = targetMap.get(`pid_${pId}`);
+    else if (appId && targetMap.has(`id_${appId}`)) matchedIdx = targetMap.get(`id_${appId}`);
+    else if (pId && !pId.startsWith('SF-P') && targetMap.has(`id_${pId}`)) matchedIdx = targetMap.get(`id_${pId}`);
+    else if (polSuffix && targetMap.has(`pol_${polSuffix}`)) matchedIdx = targetMap.get(`pol_${polSuffix}`);
 
     const existing = (matchedIdx >= 0 && matchedIdx < gSamsungSheets.target.length) ? gSamsungSheets.target[matchedIdx] : null;
 
@@ -30731,7 +30759,7 @@ function handleNewAppSubmit(e) {
       const domAdjusterFax = document.getElementById('newAppSamsungAdjusterFax')?.value?.trim();
       const domAccidentNo = document.getElementById('newAppSamsungAccidentNumber')?.value?.trim();
 
-      newApp.patientId = domPatientId || gPendingSamsungLeadData?.patientId || ('SF-P' + (100 + gApps.length));
+      newApp.patientId = domPatientId || gPendingSamsungLeadData?.patientId || ('SF-' + newApp.id);
       newApp.productCode = domProductCode || gPendingSamsungLeadData?.productCode || '2PB320070';
       newApp.productName = domProductName || gPendingSamsungLeadData?.productName || newApp.productName || '무배당 삼성화재 간편보험 다이렉트(2603.5)(납입면제/해약환급금 미지급형Ⅱ)';
       newApp.contractStartDate = domContractStart || gPendingSamsungLeadData?.contractStartDate || '2026-09-09';

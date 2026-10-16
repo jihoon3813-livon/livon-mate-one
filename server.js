@@ -471,7 +471,7 @@ function startServer(port) {
         if (latest && cfg.lastSyncedFile === latest.filename && fs.existsSync(latestJsonPath)) {
           const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-          return res.end(JSON.stringify(raw));
+          return res.end(JSON.stringify({ success: true, ...raw }));
         }
 
         // 2. 동시 복호화 경쟁(Race Condition) 방지 락
@@ -479,7 +479,7 @@ function startServer(port) {
           if (fs.existsSync(latestJsonPath)) {
             const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            return res.end(JSON.stringify(raw));
+            return res.end(JSON.stringify({ success: true, ...raw }));
           }
           res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: false, error: '동기화가 현재 진행 중입니다.' }));
@@ -520,7 +520,7 @@ function startServer(port) {
             if (fs.existsSync(latestJsonPath)) {
               const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
               res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-              return res.end(JSON.stringify(raw));
+              return res.end(JSON.stringify({ success: true, ...raw }));
             }
             res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify({ success: false, error: '구글 드라이브 폴더에서 최신 파일을 찾을 수 없습니다.' }));

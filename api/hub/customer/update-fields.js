@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const CONVEX_PROD_URL = 'https://gallant-weasel-360.convex.cloud';
+const DEV_CONVEX_URL = 'https://rapid-raccoon-895.convex.cloud';
+const PROD_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
 
 function getFilePath() {
   const candidatePaths = [
@@ -14,16 +15,31 @@ function getFilePath() {
   return found || path.join(process.cwd(), 'hub_apps_real.json');
 }
 
-async function syncToConvexCloud(pathStr, args) {
+function resolveConvexUrl(req) {
+  const headerUrl = req.headers['x-convex-url'];
+  if (headerUrl && (headerUrl.includes('convex.cloud') || headerUrl.includes('convex.site'))) {
+    return headerUrl;
+  }
+  const bodyUrl = req.body && req.body.convexUrl;
+  if (bodyUrl && (bodyUrl.includes('convex.cloud') || bodyUrl.includes('convex.site'))) {
+    return bodyUrl;
+  }
+  if (process.env.CONVEX_URL) {
+    return process.env.CONVEX_URL;
+  }
+  return process.env.VERCEL_ENV === 'production' ? PROD_CONVEX_URL : DEV_CONVEX_URL;
+}
+
+async function syncToConvexCloud(targetUrl, pathStr, args) {
   try {
-    const res = await fetch(`${CONVEX_PROD_URL}/api/mutation`, {
+    const res = await fetch(`${targetUrl}/api/mutation`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: pathStr, args })
     });
     return await res.json();
   } catch (err) {
-    console.warn(`[Convex Cloud Mutation Warn] ${pathStr}:`, err.message);
+    console.warn(`[Convex Mutation Warn] ${targetUrl} ${pathStr}:`, err.message);
     return null;
   }
 }
@@ -120,18 +136,19 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // Always sync to Convex Cloud DB
+    // Always sync to Convex Cloud DB (respecting dev vs prod environment)
+    const targetConvexUrl = resolveConvexUrl(req);
     if (updatedApp) {
-      await syncToConvexCloud('sync:saveApplication', { app: updatedApp });
+      await syncToConvexCloud(targetConvexUrl, 'sync:saveApplication', { app: updatedApp });
     }
     if (fields.claim && fields.claim.id) {
-      await syncToConvexCloud('sync:saveClaim', { claim: fields.claim });
+      await syncToConvexCloud(targetConvexUrl, 'sync:saveClaim', { claim: fields.claim });
     }
     if (fields.payout && fields.payout.id) {
-      await syncToConvexCloud('sync:savePayout', { payout: fields.payout });
+      await syncToConvexCloud(targetConvexUrl, 'sync:savePayout', { payout: fields.payout });
     }
 
-    return res.status(200).json({ success: true, updatedApp: updatedApp || { id: targetId, ...fields } });
+    return res.status(200).json({ success: true, updatedApp: updatedApp || { id: targetId, ...fields }, targetConvexUrl });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

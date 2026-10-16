@@ -1,5 +1,5 @@
 window.REBORN_REAL_SEED_DATA = {
-  "updatedAt": "2026-10-16T08:18:40.103Z",
+  "updatedAt": "2026-10-16T10:47:12.308Z",
   "sources": {
     "종합 간병(현대해상)": {
       "sourceType": "file",
@@ -386,7 +386,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 0,
       "unconfirmedClaimCount": 1,
-      "updatedAt": "2026-10-12T08:24:48.615Z"
+      "updatedAt": "2026-10-12T08:24:48.615Z",
+      "isAlertConfirmed": true
     },
     {
       "id": "C0006",
@@ -1260,7 +1261,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 9590000,
       "unconfirmedClaimCount": 7,
-      "updatedAt": "2026-10-12T08:29:48.345Z"
+      "updatedAt": "2026-10-12T08:29:48.345Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334071471.1235,
@@ -1397,7 +1399,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 18675000,
       "unconfirmedClaimCount": 16,
-      "updatedAt": "2026-10-12T04:15:19.846Z"
+      "updatedAt": "2026-10-12T04:15:19.846Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334071471.124,
@@ -3074,7 +3077,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 7280000,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-07T09:06:54.339Z"
+      "updatedAt": "2026-10-07T09:06:54.339Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334071928.9324,
@@ -5974,7 +5978,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 9750000,
       "unconfirmedClaimCount": 2,
-      "updatedAt": "2026-10-08T08:40:59.555Z"
+      "updatedAt": "2026-10-08T08:40:59.555Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334072895.774,
@@ -6488,7 +6493,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 9585000,
       "unconfirmedClaimCount": 2,
-      "updatedAt": "2026-10-08T09:01:49.046Z"
+      "updatedAt": "2026-10-08T09:01:49.046Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334072895.7751,
@@ -7017,7 +7023,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 945000,
       "unconfirmedClaimCount": 1,
-      "updatedAt": "2026-10-15T06:20:58.808Z"
+      "updatedAt": "2026-10-15T06:20:58.808Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334072895.7773,
@@ -8991,7 +8998,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 14000000,
       "unconfirmedClaimCount": 1,
-      "updatedAt": "2026-10-12T01:54:55.327Z"
+      "updatedAt": "2026-10-12T01:54:55.327Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334073669.5278,
@@ -9801,7 +9809,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 3500000,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-12T06:49:31.079Z"
+      "updatedAt": "2026-10-12T06:49:31.079Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334073669.531,
@@ -10117,7 +10126,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 2240000,
       "unconfirmedClaimCount": 1,
-      "updatedAt": "2026-10-12T07:39:54.414Z"
+      "updatedAt": "2026-10-12T07:39:54.414Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334073669.532,
@@ -10379,7 +10389,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 552000,
       "unconfirmedClaimCount": 1,
-      "updatedAt": "2026-10-07T04:34:41.601Z"
+      "updatedAt": "2026-10-07T04:34:41.601Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334074110.0742,
@@ -11810,7 +11821,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 280000,
       "unconfirmedClaimCount": 2,
-      "updatedAt": "2026-10-07T04:54:16.655Z"
+      "updatedAt": "2026-10-07T04:54:16.655Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334074110.078,
@@ -11890,7 +11902,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 1435000,
       "unconfirmedClaimCount": 1,
-      "updatedAt": "2026-10-07T04:45:58.943Z"
+      "updatedAt": "2026-10-07T04:45:58.943Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334074110.0781,
@@ -12007,7 +12020,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 1200000,
       "unconfirmedClaimCount": 2,
-      "updatedAt": "2026-10-13T02:37:12.697Z"
+      "updatedAt": "2026-10-13T02:37:12.697Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334074110.0784,
@@ -13434,7 +13448,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 13195000,
       "unconfirmedClaimCount": 4,
-      "updatedAt": "2026-10-12T04:01:43.772Z"
+      "updatedAt": "2026-10-12T04:01:43.772Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334074485.6716,
@@ -14397,7 +14412,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 11070000,
       "unconfirmedClaimCount": 2,
-      "updatedAt": "2026-10-08T08:54:28.288Z"
+      "updatedAt": "2026-10-08T08:54:28.288Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334075220.2197,
@@ -14924,7 +14940,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 910000,
       "unconfirmedClaimCount": 2,
-      "updatedAt": "2026-10-16T05:00:48.108Z"
+      "updatedAt": "2026-10-16T05:00:48.108Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334075220.2207,
@@ -17653,7 +17670,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 2100000,
       "unconfirmedClaimCount": 1,
-      "updatedAt": "2026-10-16T04:43:02.096Z"
+      "updatedAt": "2026-10-16T04:43:02.096Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334076117.3083,
@@ -18342,7 +18360,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 560000,
       "unconfirmedClaimCount": 1,
-      "updatedAt": "2026-10-13T06:08:54.309Z"
+      "updatedAt": "2026-10-13T06:08:54.309Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334076117.3103,
@@ -23101,7 +23120,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "완료",
       "totalPayout": 1820000,
       "unconfirmedClaimCount": 2,
-      "updatedAt": "2026-10-10T05:37:48.650Z"
+      "updatedAt": "2026-10-10T05:37:48.650Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334077404.4846,
@@ -23941,7 +23961,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 1390000,
       "unconfirmedClaimCount": 1,
-      "updatedAt": "2026-10-16T03:51:06.236Z"
+      "updatedAt": "2026-10-16T03:51:06.236Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334078011.3677,
@@ -24176,7 +24197,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-15T04:49:11.563Z"
+      "updatedAt": "2026-10-15T04:49:11.563Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334078011.3687,
@@ -24387,7 +24409,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 0,
       "unconfirmedClaimCount": 1,
-      "updatedAt": "2026-10-12T06:33:09.635Z"
+      "updatedAt": "2026-10-12T06:33:09.635Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791334078011.3691,
@@ -24601,7 +24624,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 420000,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-16T06:18:17.452Z"
+      "updatedAt": "2026-10-16T06:18:17.452Z",
+      "isAlertConfirmed": true
     },
     {
       "id": "C0332",
@@ -26206,7 +26230,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-14T06:51:17.480Z"
+      "updatedAt": "2026-10-14T06:51:17.480Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791956192742.9553,
@@ -26292,7 +26317,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-15T04:25:18.126Z"
+      "updatedAt": "2026-10-15T04:25:18.126Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791968910350.5298,
@@ -26367,7 +26393,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "접수",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-14T09:50:27.379Z"
+      "updatedAt": "2026-10-14T09:50:27.379Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791969349992.0796,
@@ -26628,7 +26655,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "신규",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-15T04:37:19.173Z"
+      "updatedAt": "2026-10-15T04:37:19.173Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1792028528916.2812,
@@ -26702,7 +26730,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-15T04:23:54.416Z"
+      "updatedAt": "2026-10-15T04:23:54.416Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1792129901493.6384,
@@ -26856,7 +26885,82 @@ window.REBORN_REAL_SEED_DATA = {
       "roadAddress": "전라남도 목포시 고하대로 724 (산정동)",
       "zip": "58637",
       "addrZip": "58637",
-      "zonecode": "58637"
+      "zonecode": "58637",
+      "isAlertConfirmed": true
+    },
+    {
+      "_creationTime": 1792143154672.889,
+      "_id": "jd72rk3zddhbp5n365afa1pxgd8gcm56",
+      "accidentDate": "2026-10-15",
+      "accidentDetail": "",
+      "accidentNumber": "-",
+      "accidentType": "질병",
+      "addressDetail": "경기 안양시 만안구 삼덕로 9 안양샘병원 560호",
+      "adjusterFax": "",
+      "adjusterFirm": "삼성애니카손해사정",
+      "adjusterMobile": "-",
+      "adjusterName": "-",
+      "adjusterPhone": "-",
+      "applicantBirth": "19550309",
+      "applicantName": "구정수",
+      "applicantPhone": "010-4500-1369",
+      "applicantRelation": "본인",
+      "applyDate": "2026.10.15 10:17",
+      "assignedCaregiverCount": 0,
+      "birthDate": "19550309",
+      "careEndDate": "2026-10-16",
+      "careType": "입원",
+      "careportAppNo": "213",
+      "careportInsurance": "삼성화재",
+      "careportRegisteredAt": "2026-10-16T09:32:48.271Z",
+      "careportStatus": "REGISTERED",
+      "claimCount": 0,
+      "claimUnitPrice": 147000,
+      "contractDate": "-",
+      "contractEndDate": "2046-09-09",
+      "contractPeriod": "2026-09-09 ~ 2046-09-09",
+      "contractStartDate": "2026-09-09",
+      "createdAt": "2026-10-16T09:32:33.986Z",
+      "customDailyClaimPrice": 147000,
+      "depositConfirmedAmount": 0,
+      "desiredDate": "2026-10-15",
+      "docAttached": "아니오",
+      "estimatedUnpaid": 0,
+      "expectedDays": "2",
+      "gender": "남",
+      "guardianName": "구정수",
+      "guardianPhone": "010-4500-1369",
+      "guardianRelation": "본인",
+      "hasDiseaseCare": "가입",
+      "hasInjuryCare": "가입",
+      "hasManualUpdate": false,
+      "hdWorkflowStage": "사전명단매칭완료",
+      "hospitalName": "안양샘병원",
+      "hospitalRoadAddress": "경기 안양시 만안구 삼덕로 9",
+      "hospitalRoom": "560호",
+      "id": "C0695",
+      "insuranceCompany": "삼성화재",
+      "isApplicantSame": true,
+      "isRealLaunchData": true,
+      "memo": "[진단명: 뇌출혈]  (장소: 안양샘병원 560호)",
+      "mobility": "미선택",
+      "patientId": "SF-P443",
+      "patientName": "구정수",
+      "patientRrn": "550309-1000000",
+      "pendingFaxNumber": "",
+      "pendingFaxRecipient": "",
+      "phone": "010-4500-1369",
+      "policyNumber": "-",
+      "productCode": "2PB320070",
+      "productName": "삼성화재 다이렉트 간병보험",
+      "rrnBack": "1000000",
+      "rrnFront": "550309",
+      "sido": "경기",
+      "sigungu": "안양시",
+      "status": "접수",
+      "totalPayout": 0,
+      "unconfirmedClaimCount": 0,
+      "updatedAt": null
     },
     {
       "_creationTime": 1792128683474.886,
@@ -27004,7 +27108,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-16T02:17:15.156Z"
+      "updatedAt": "2026-10-16T02:17:15.156Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1792054436768.5164,
@@ -27147,7 +27252,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "접수",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-15T08:28:20.026Z"
+      "updatedAt": "2026-10-15T08:28:20.026Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1792052312740.4038,
@@ -27288,7 +27394,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-16T04:11:52.543Z"
+      "updatedAt": "2026-10-16T04:11:52.543Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1792049911658.9314,
@@ -27439,7 +27546,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-16T06:28:35.566Z"
+      "updatedAt": "2026-10-16T06:28:35.566Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1792048120987.956,
@@ -27517,7 +27625,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "진행중",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-16T04:55:58.021Z"
+      "updatedAt": "2026-10-16T04:55:58.021Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791942761091.349,
@@ -27582,7 +27691,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "접수",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-14T05:39:57.335Z"
+      "updatedAt": "2026-10-14T05:39:57.335Z",
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791781004153.9543,

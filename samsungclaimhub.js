@@ -5452,28 +5452,44 @@ var gSamsungDriveLastSyncedFile = localStorage.getItem('LIVON_SAMSUNG_DRIVE_SYNC
 async function initSamsungDriveAutoSync() {
   await loadSamsungDriveConfig();
 
-  // [일일 1회 최적화]: 삼성화재 사전 명단은 하루에 한 번만 자동 동기화 체크
+  // [개발사이트 가드]: 개발 환경에서는 구글 드라이브 자동동기화를 완전히 차단 (사용자 요청 엄격 반영)
+  const isDev = (typeof isDevScreen === 'function' && isDevScreen()) || (typeof isDevEnvironment === 'function' && isDevEnvironment());
+  if (isDev) {
+    console.log('[SamsungDrive] 개발 사이트 환경 감지: 구글 드라이브 자동동기화가 비활성화되었습니다. (우측 상단 수동 동기화 버튼으로만 실행 가능)');
+    const alertEl = document.getElementById('samsungDriveNewFileAlert');
+    if (alertEl) alertEl.classList.add('hidden');
+    if (gSamsungDriveLastSyncedAt) {
+      updateSamsungDriveSyncUI(gSamsungDriveLastSyncedAt, gSamsungDriveLastSyncedFile, Number(localStorage.getItem('LIVON_SAMSUNG_COUNT')) || 50652);
+    }
+    const titleEl = document.getElementById('samsungDriveBannerTitle');
+    if (titleEl) {
+      titleEl.innerHTML = '구글 드라이브 일일 연동 <span class="text-[10px] px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold border border-amber-200">개발사이트: 자동동기화 OFF</span>';
+    }
+    return;
+  }
+
+  // [운영사이트 전용]: 삼성화재 사전 명단은 하루에 한 번만 자동 동기화 체크
   const todayStr = new Date().toISOString().slice(0, 10);
   const lastSyncDate = localStorage.getItem('LIVON_SAMSUNG_DRIVE_LAST_SYNC_DATE');
   const needsDailySync = (lastSyncDate !== todayStr);
 
   if (needsDailySync) {
-    console.log(`[SamsungDrive] 금일(${todayStr}) 최초 1회 사전명단 동기화 상태를 확인합니다.`);
+    console.log(`[SamsungDrive 운영] 금일(${todayStr}) 최초 1회 사전명단 동기화 상태를 확인합니다.`);
     await checkSamsungDriveStatus();
     localStorage.setItem('LIVON_SAMSUNG_DRIVE_LAST_SYNC_DATE', todayStr);
   } else {
-    console.log(`[SamsungDrive] 금일(${todayStr}) 사전명단 동기화가 이미 완료되었습니다. (1일 1회 정책 적용)`);
+    console.log(`[SamsungDrive 운영] 금일(${todayStr}) 사전명단 동기화가 이미 완료되었습니다. (1일 1회 정책 적용)`);
     if (gSamsungDriveLastSyncedAt) {
-      updateSamsungDriveSyncUI(gSamsungDriveLastSyncedAt, gSamsungDriveLastSyncedFile, Number(localStorage.getItem('LIVON_SAMSUNG_COUNT')) || 25939);
+      updateSamsungDriveSyncUI(gSamsungDriveLastSyncedAt, gSamsungDriveLastSyncedFile, Number(localStorage.getItem('LIVON_SAMSUNG_COUNT')) || 50652);
     }
   }
 
-  // 1시간 주기로 날짜 변경 여부만 가볍게 확인 (자정이 지나 날짜가 바뀌면 1일 1회 자동 실행)
+  // 운영 사이트: 1시간 주기로 날짜 변경 여부만 가볍게 확인 (자정이 지나 날짜가 바뀌면 1일 1회 자동 실행)
   if (gSamsungDriveSyncInterval) clearInterval(gSamsungDriveSyncInterval);
   gSamsungDriveSyncInterval = setInterval(() => {
     const currentDay = new Date().toISOString().slice(0, 10);
     if (localStorage.getItem('LIVON_SAMSUNG_DRIVE_LAST_SYNC_DATE') !== currentDay) {
-      console.log(`[SamsungDrive] 새로운 날짜(${currentDay}) 도달. 일일 1회 사전명단 자동 동기화를 시작합니다.`);
+      console.log(`[SamsungDrive 운영] 새로운 날짜(${currentDay}) 도달. 일일 1회 사전명단 자동 동기화를 시작합니다.`);
       checkSamsungDriveStatus();
       localStorage.setItem('LIVON_SAMSUNG_DRIVE_LAST_SYNC_DATE', currentDay);
     }
@@ -5780,10 +5796,18 @@ async function checkSamsungDriveStatus() {
     // 오직 실제로 구글 드라이브에 더 최신 파일이 감지된 경우(hasNewFile === true)에만 신규파일 배지를 노출합니다.
     const hasRealNewFile = !!(data && data.hasNewFile);
 
+    // [개발사이트 가드]: 개발 사이트에서는 신규 파일이 있거나 캐시가 비어있어도 절대로 triggerSamsungDriveSync(true)를 자동 실행하지 않음!
+    const isDev = (typeof isDevScreen === 'function' && isDevScreen()) || (typeof isDevEnvironment === 'function' && isDevEnvironment());
+    if (isDev) {
+      if (alertEl) alertEl.classList.add('hidden');
+      console.log('[SamsungDrive] 개발 사이트: 구글 드라이브 자동동기화를 실행하지 않습니다. (동기화 버튼 클릭 시에만 수동 동기화)');
+      return;
+    }
+
     const currentCount = (typeof gSamsungData !== 'undefined' && Array.isArray(gSamsungData)) ? gSamsungData.length : 0;
     if (hasRealNewFile) {
       if (alertEl) alertEl.classList.remove('hidden');
-      console.log(`[SamsungDrive] 구글 드라이브 최신 명단 신규 파일 감지됨! (파일: ${data.latestFile?.filename || '신규'}). 자동 동기화를 실행합니다...`);
+      console.log(`[SamsungDrive 운영] 구글 드라이브 최신 명단 신규 파일 감지됨! (파일: ${data.latestFile?.filename || '신규'}). 자동 동기화를 실행합니다...`);
       await triggerSamsungDriveSync(true);
     } else {
       if (alertEl) alertEl.classList.add('hidden');
@@ -5819,6 +5843,13 @@ function updateSamsungDriveSyncUI(syncedAt, syncedFile, count) {
 }
 
 async function triggerSamsungDriveSync(isAuto = false) {
+  // [개발사이트 가드]: 개발 사이트에서 자동 동기화(isAuto = true) 요청이 들어올 경우 전면 차단
+  const isDev = (typeof isDevScreen === 'function' && isDevScreen()) || (typeof isDevEnvironment === 'function' && isDevEnvironment());
+  if (isAuto && isDev) {
+    console.log('[SamsungDrive] 개발 사이트: 자동 동기화 호출이 차단되었습니다.');
+    return;
+  }
+
   const btn = document.getElementById('btnSamsungDriveSync');
   const icon = document.getElementById('iconSamsungDriveSync');
   const textEl = document.getElementById('samsungDriveSyncText');
@@ -5826,14 +5857,14 @@ async function triggerSamsungDriveSync(isAuto = false) {
 
   if (btn) btn.disabled = true;
   if (icon) icon.classList.add('animate-spin');
-  if (textEl) textEl.innerText = '구글 드라이브(1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc) 최신 명단 동기화 중...';
+  if (textEl) textEl.innerText = isAuto ? '구글 드라이브 최신 명단 자동 동기화 중...' : '구글 드라이브 최신 명단 실시간 동기화 진행 중...';
 
   try {
     let data = null;
 
-    // 1차 시도: API 엔드포인트 호출
+    // 1차 시도: API 엔드포인트 호출 (로컬 개발 서버 또는 Vercel Serverless Function)
     try {
-      const res = await fetch('/api/samsung-drive/sync', { method: 'POST' });
+      const res = await fetch('/api/samsung-drive/sync?t=' + Date.now(), { method: 'POST' });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         data = await res.json();
@@ -5842,9 +5873,12 @@ async function triggerSamsungDriveSync(isAuto = false) {
       console.warn('[SamsungDrive] API route failed, falling back to static file:', e.message);
     }
 
-    // 2차 시도: 구글 드라이브 최신 동기화 파일(/samsung_drive_latest.json)에서 직접 고속 로드
-    if (!data || !data.success) {
-      const resFile = await fetch('/samsung_drive_latest.json?t=' + Date.now());
+    // 유효한 레코드(records 배열 또는 rows 배열) 확인
+    const hasValidData = data && ((Array.isArray(data.records) && data.records.length > 0) || (Array.isArray(data.rows) && data.rows.length > 0));
+
+    // 2차 시도: 1차 시도에서 데이터가 없거나 비어있는 경우 정적 파일(samsung_drive_latest.json)에서 캐시 무효화로 직접 고속 로드
+    if (!hasValidData) {
+      const resFile = await fetch('/samsung_drive_latest.json?t=' + Date.now(), { cache: 'no-store' });
       if (resFile.ok) {
         data = await resFile.json();
       } else {
@@ -5862,12 +5896,13 @@ async function triggerSamsungDriveSync(isAuto = false) {
       throw new Error('동기화할 구글 드라이브 레코드가 0건입니다.');
     }
 
-    const filename = data.filename || '삼성화재 _간병인지원 대상건 현황_업체제공용_20261015.xlsx';
+    const filename = data.filename || '삼성화재 _간병인지원 대상건 현황_업체제공용_20261016.xlsx';
     const syncedAt = data.syncedAt || new Date().toLocaleString('ko-KR', { hour12: false });
     const count = records.length;
 
-    // 1. 가져온 최신 레코드(25,939건)를 클라이언트 데이터베이스에 고속 적용
-    await applySamsungDriveRecords(records, filename, syncedAt);
+    // 1. 가져온 최신 레코드(50,652건)를 클라이언트 데이터베이스 및 스프레드시트에 고속 적용
+    // (수동 동기화 버튼 클릭 시에는 syncConvex: true 로 전달하여 Convex Cloud DB까지 실시간 일괄 반영)
+    await applySamsungDriveRecords(records, filename, syncedAt, !isAuto);
 
     // 2. 동기화 상태 저장
     gSamsungDriveLastSyncedAt = syncedAt;
@@ -5875,6 +5910,7 @@ async function triggerSamsungDriveSync(isAuto = false) {
     localStorage.setItem('LIVON_SAMSUNG_DRIVE_SYNCED_AT', syncedAt);
     localStorage.setItem('LIVON_SAMSUNG_DRIVE_SYNCED_FILE', filename);
     localStorage.setItem('LIVON_SAMSUNG_DRIVE_LAST_SYNC_DATE', new Date().toISOString().slice(0, 10));
+    localStorage.setItem('LIVON_SAMSUNG_COUNT', String(count));
 
     updateSamsungDriveSyncUI(syncedAt, filename, count);
     if (alertEl) alertEl.classList.add('hidden');
@@ -5897,17 +5933,20 @@ async function triggerSamsungDriveSync(isAuto = false) {
       return;
     }
 
-    // 모달 표시
+    // 수동 동기화 또는 신규 파일 감지 시 모달 표시
     if (typeof showCustomAlert === 'function') {
       localStorage.setItem('LIVON_SAMSUNG_AUTO_SYNC_CONFIRMED', syncKey);
+      const targetCount = (window.gSamsungSheets && Array.isArray(window.gSamsungSheets.target)) ? window.gSamsungSheets.target.length : 0;
       showCustomAlert({
-        title: isAuto ? '삼성화재 최신 명단 자동 갱신 완료' : '구글 드라이브 최신 명단 동기화 완료',
-        message: `구글 드라이브 [삼성화재 가입자 리스트] 최신 파일 [${filename}]\n총 ${count.toLocaleString()}건이 정상 동기화되어 스프레드시트에 완벽히 반영되었습니다.\n\n📂 기준 폴더: 1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc\n🕒 동기화 일시: ${syncedAt}`,
+        title: isAuto ? '삼성화재 최신 명단 자동 갱신 완료' : '구글 드라이브 최신 명단 실시간 동기화 완료',
+        message: `구글 드라이브 [삼성화재 가입자 리스트] 최신 파일 [${filename}]\n총 ${count.toLocaleString()}건이 정상 동기화되어 스프레드시트 및 전산에 완벽히 반영되었습니다.\n\n📂 기준 폴더: 1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc\n📋 누적 사전명단: ${count.toLocaleString()}건\n🎯 대상자 시트: ${targetCount}건 실시간 연동\n🕒 동기화 일시: ${syncedAt}`,
         icon: 'cloud-check',
         iconColor: 'sky'
       }).then(() => {
         localStorage.setItem('LIVON_SAMSUNG_AUTO_SYNC_CONFIRMED', syncKey);
       });
+    } else if (typeof showToast === 'function') {
+      showToast(`구글 드라이브 최신 명단 실시간 동기화 완료 (총 ${count.toLocaleString()}건 반영)`, 'success');
     }
   } catch (err) {
     console.error('[SamsungDrive] Sync Error:', err);
@@ -5926,11 +5965,15 @@ async function triggerSamsungDriveSync(isAuto = false) {
   }
 }
 
-async function applySamsungDriveRecords(records, filename, syncedAt) {
+async function applySamsungDriveRecords(records, filename, syncedAt, syncConvex = false) {
   if (!records || records.length === 0) return;
 
-  // 일일 전달 엑셀은 그 날짜 기준의 누적 전체 명단이므로, 최신 원본 파일 레코드(25,939건)로 완전 교체
+  // 일일 전달 엑셀은 그 날짜 기준의 누적 전체 명단이므로, 최신 원본 파일 레코드(50,652건)로 완전 교체
+  if (typeof normalizeSamsungRecordDates === 'function') {
+    records.forEach(normalizeSamsungRecordDates);
+  }
   gSamsungList = records;
+  window._gSamsungDriveCache = records;
 
   // IndexedDB에 대용량 영구 저장
   if (window.LivonDB && typeof window.LivonDB.saveSamsungEligible === 'function') {
@@ -5947,7 +5990,8 @@ async function applySamsungDriveRecords(records, filename, syncedAt) {
     window.gSamsungSheets.eligible = gSamsungList;
   }
   if (typeof syncSamsungSpreadsheetData === 'function') {
-    syncSamsungSpreadsheetData(true);
+    // syncConvex: 수동 동기화 요청 시 true -> Convex Cloud DB 일괄 저장까지 실시간 수행
+    syncSamsungSpreadsheetData(!syncConvex);
   }
   if (typeof updateSamsungSheetBadges === 'function') {
     updateSamsungSheetBadges();
@@ -5955,6 +5999,16 @@ async function applySamsungDriveRecords(records, filename, syncedAt) {
   if (typeof renderCurrentSamsungSheet === 'function') {
     renderCurrentSamsungSheet();
   }
+  if (typeof enrichHubSamsungCustomersFromSamsungExcel === 'function') {
+    enrichHubSamsungCustomersFromSamsungExcel();
+  }
+  if (typeof refreshSamsungSheetPatientIdsFromEligible === 'function') {
+    refreshSamsungSheetPatientIdsFromEligible();
+  }
+  if (typeof syncSamsungTargetSheetWithHubApps === 'function') {
+    syncSamsungTargetSheetWithHubApps(true);
+  }
 
-  // [Convex 과금 방지] 25,939건 대용량 사전명단은 IndexedDB 및 로컬 정적 JSON으로 완벽 서빙되므로 Convex 전송 불필요
+  // [Convex 과금 방지] 50,652건 대용량 사전명단은 IndexedDB 및 로컬 정적 JSON으로 완벽 서빙
+  // 대상자(target), 완료(completed), 연락처(contacts) 시트는 syncSamsungSpreadsheetData를 통해 Convex에 실시간 연동
 }

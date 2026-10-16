@@ -40,14 +40,21 @@
     // 🚨 [보안] 로그아웃 또는 미인증 상태에서 새로고침 시 즉시 잠금 화면 렌더링
     (function() {
       try {
-        var host = window.location.hostname || '';
+        var host = (window.location.hostname || '').toLowerCase();
         var port = window.location.port || '';
-        var isDev = (host === 'localhost' || host === '127.0.0.1' || host === '' || host.includes('dev') || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:');
+        var urlParam = (typeof URLSearchParams !== 'undefined') ? new URLSearchParams(window.location.search).get('env') : null;
+        var storedEnv = (typeof localStorage !== 'undefined' && localStorage.getItem('LIVON_TARGET_ENV')) || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('LIVON_TARGET_ENV'));
+        var isDev = false;
+        if (urlParam === 'dev' || storedEnv === 'dev') isDev = true;
+        else if (urlParam === 'prod' || storedEnv === 'prod') isDev = false;
+        else if (host === 'localhost' || host === '127.0.0.1' || host === '' || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:') isDev = true;
+        else if (host.includes('dev') || host.includes('test') || host.includes('staging') || host.includes('preview')) isDev = true;
+        else if (host.endsWith('.vercel.app') && host !== 'livon-mate-one.vercel.app') isDev = true;
+
         if (isDev) {
           document.documentElement.classList.add('livon-dev-mode');
+          return;
         }
-        // 개발 환경에서는 로그인 잠금 모달 없이 즉시 전산 화면 진입
-        if (isDev) return;
 
         var token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
         var isLoggedOut = localStorage.getItem('LIVON_LOGGED_OUT') === 'true' || sessionStorage.getItem('LIVON_LOGGED_OUT') === 'true' || !localStorage.getItem('REBORN_CURRENT_ADMIN') || !token;
@@ -2266,8 +2273,8 @@
               <i data-lucide="cloud" class="w-4 h-4"></i>
             </div>
             <div class="min-w-0 flex items-center gap-2 flex-wrap">
-              <span class="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                구글 드라이브 일일 자동 연동
+              <span class="text-xs font-black text-slate-800 flex items-center gap-1.5" id="samsungDriveBannerTitle">
+                구글 드라이브 일일 연동
               </span>
               <span id="samsungDriveSyncBadge" class="text-[11px] px-2.5 py-0.5 rounded-full bg-white border border-sky-200 text-sky-800 font-bold flex items-center gap-1.5 shadow-2xs">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="samsungDriveDot"></span>
@@ -13670,7 +13677,7 @@
 
   <!-- SCRIPTS (Moved to bottom of body for full DOM availability) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="hub_real_data.js?v=20261016_1756"></script>
+  <script src="hub_real_data.js?v=20261016_1948"></script>
   <script src="data.js?v=20261016_1730"></script>
   <script src="careport-client.js?v=20261015_1630"></script>
   <script src="carecall-client.js?v=20261003_0950"></script>
@@ -13681,10 +13688,10 @@
   <script src="slack-report-client.js?v=20261006_1510"></script>
   <script src="./xlsx-populate.min.js"></script>
   <script src="care-report-2page-pdf.js?v=20261015_1755"></script>
-  <script src="app.js?v=20261016_1825"></script>
+  <script src="app.js?v=20261016_1948"></script>
   <script src="carehub.js?v=20261016_1725"></script>
   <script src="hyundaiclaimhub.js?v=20261016_split"></script>
-  <script src="samsungclaimhub.js?v=20261016_split"></script>
+  <script src="samsungclaimhub.js?v=20261016_sync_v2"></script>
   <!-- 🚀 초고속 렌더링 최적화: 대용량 PDF & Excel 라이브러리는 첫 화면 렌더링 이후 비동기 지연 로드 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>

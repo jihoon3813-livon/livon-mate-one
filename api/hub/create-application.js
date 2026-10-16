@@ -61,15 +61,19 @@ module.exports = async function handler(req, res) {
       console.warn('Could not write to disk (read-only filesystem on serverless):', writeErr.message);
     }
 
-    // Always sync to Convex Cloud DB
+    // Always sync to Convex Cloud DB (respecting dev vs prod environment)
+    const headerUrl = req.headers['x-convex-url'];
+    const bodyUrl = payload.convexUrl;
+    const targetConvexUrl = headerUrl || bodyUrl || process.env.CONVEX_URL || (process.env.VERCEL_ENV === 'production' ? 'https://gallant-weasel-360.convex.cloud' : 'https://rapid-raccoon-895.convex.cloud');
+
     try {
-      await fetch('https://gallant-weasel-360.convex.cloud/api/mutation', {
+      await fetch(`${targetConvexUrl}/api/mutation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: 'sync:saveApplication', args: { app: application } })
       });
     } catch (cvxErr) {
-      console.warn('Convex save error in create-application serverless route:', cvxErr.message);
+      console.warn(`Convex save error in create-application (${targetConvexUrl}):`, cvxErr.message);
     }
 
     return res.status(200).json({ success: true, count: stored.applications.length, appId: application.id });

@@ -22,7 +22,7 @@ function getSamsungDriveConfig() {
     lastSyncedFile: null,
     lastSyncedAt: null,
     lastRecordCount: 0,
-    autoSyncEnabled: true
+    autoSyncEnabled: false
   };
 
   try {
