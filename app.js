@@ -1958,30 +1958,6 @@ async function loadConvexData(showSpinner = true) {
         }
       }
 
-      // Convex DB에 저장된 팩스 발송 대장(faxRecords) 동기화 복원 및 로컬 기록 병합 보존
-      const { faxRecords } = res.value;
-      if (Array.isArray(faxRecords) && faxRecords.length > 0) {
-        const cloudIds = new Set(faxRecords.map(r => r.id));
-        // 로컬에만 존재하는 최신 발송 이력(시험 발송, 실발송 기록 등) 안전하게 보존
-        const localOnly = (gFaxLogs || []).filter(l => l && l.id && !cloudIds.has(l.id));
-        gFaxLogs = [...localOnly, ...faxRecords];
-        // 중복 제거
-        const seenIds = new Set();
-        gFaxLogs = gFaxLogs.filter(item => {
-          if (!item || !item.id) return false;
-          if (seenIds.has(item.id)) return false;
-          seenIds.add(item.id);
-          return true;
-        });
-        saveFaxLogs();
-        updateFaxKpis();
-        if (typeof renderFaxLogsTable === 'function') renderFaxLogsTable();
-        console.log(`[Convex Cloud] 팩스 발송 대장 동기화 완료 (클라우드: ${faxRecords.length}건, 로컬보존: ${localOnly.length}건, 총 ${gFaxLogs.length}건)`);
-      }
-
-      // Convex DB에 저장된 삼성화재 사전명단(samsungEligible) 및 스프레드시트(samsungSheets) 실시간 동기화
-      // 주의: 삼성화재 가입자 명단의 절대 기준은 구글 드라이브(1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc) 최신 파일(25,939건)이므로
-      // 로컬에 이미 구글드라이브 명단이 로드되어 있거나 로컬스토리지/IndexedDB에 대용량 명단이 있으면 Convex 표본(100건)으로 덮어쓰지 않음
       const { samsungEligible, samsungSheets } = res.value;
       if (Array.isArray(samsungEligible) && samsungEligible.length > 0) {
         if (!gSamsungList || gSamsungList.length <= 10) {
