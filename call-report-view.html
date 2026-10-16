@@ -632,7 +632,16 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
               const rCh = (parsed.reportInfo && parsed.reportInfo.channel) || '';
               const match = isAll ? true : (isHyundai ? (rCh.includes('현대') || rCh.toLowerCase().includes('hyundai')) : (isLivon ? (rCh.includes('리본') || rCh.toLowerCase().includes('livon')) : rCh.includes('삼성')));
               const hasTargetCalls = isAll ? true : parsed.callLogs.some(c => (c.channel || '').includes(isHyundai ? '현대' : (isLivon ? '리본' : '삼성')));
-              if (match && hasTargetCalls) {
+              
+              // 캐시에 현재 조회 시작일(gFilter.startDate) 이상의 최신 콜이 포함되어 있는지 확인 (오래된 캐시로 인한 0건 표시 방지)
+              let maxCallDate = '';
+              parsed.callLogs.forEach(c => {
+                const d = (c.callTime || c.date || '').slice(0, 10);
+                if (d > maxCallDate) maxCallDate = d;
+              });
+              const isStale = gFilter.startDate && maxCallDate && maxCallDate < gFilter.startDate;
+
+              if (match && hasTargetCalls && !isStale) {
                 gReportData = parsed;
                 if (Array.isArray(parsed.callLogs)) {
                   gMasterCallLogs = [...parsed.callLogs];
@@ -710,6 +719,39 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           const urlParams = new URLSearchParams(window.location.search);
           if (urlParams.get('start')) gFilter.startDate = urlParams.get('start');
           if (urlParams.get('end')) gFilter.endDate = urlParams.get('end');
+
+          // URL에 시작일이 명시되지 않았는데 기본 조회 기간의 콜 수가 0건인 경우, 최신 콜이 존재하는 최근 구간으로 자동 포커스
+          if (!urlParams.get('start')) {
+            const tempStats = calculateStats();
+            if (tempStats.totalCalls === 0 && gMasterCallLogs && gMasterCallLogs.length > 0) {
+              const targetCh = gFilter.channel || '삼성화재';
+              const chLogs = gMasterCallLogs.filter(c => {
+                if (!targetCh || targetCh === '전체' || targetCh === 'all') return true;
+                const ch = (c.channel || '').trim();
+                if (targetCh.includes('삼성')) return ch.includes('삼성') || ch === '삼성화재';
+                if (targetCh.includes('현대')) return ch.includes('현대') || ch === '현대해상';
+                if (targetCh.includes('리본')) return ch.includes('리본') || ch === '리본케어';
+                return ch.includes(targetCh) || targetCh.includes(ch);
+              });
+              let maxDate = '';
+              chLogs.forEach(c => {
+                const d = (c.callTime || c.date || '').slice(0, 10);
+                if (d > maxDate) maxDate = d;
+              });
+              if (maxDate) {
+                const d = new Date(maxDate + 'T00:00:00');
+                const day = d.getDay();
+                const diffToMon = day === 0 ? 6 : day - 1;
+                const monDate = new Date(d);
+                monDate.setDate(d.getDate() - diffToMon);
+                const pad = n => String(n).padStart(2, '0');
+                const fmt = dt => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+                gFilter.startDate = fmt(monDate);
+                gFilter.endDate = maxDate;
+              }
+            }
+          }
+
           const sEl = document.getElementById('reportStartDate');
           if (sEl) sEl.value = gFilter.startDate;
           const eEl = document.getElementById('reportEndDate');
@@ -717,8 +759,11 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           updateBranding();
           updatePresetButtons();
           renderAll();
+
+          // 백그라운드에서 실시간 CTI 증분 동기화 조용히 수행 (최신 콜 유지)
+          syncLiveCti(true).catch(() => {});
         } else {
-          await syncLiveCti();
+          await syncLiveCti(false);
         }
       } catch (err) {
         console.error('Error loading report:', err);
@@ -1869,10 +1914,10 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
       }
     }
 
-    async function syncLiveCti() {
+    async function syncLiveCti(isBackground = false) {
       if (isSyncing) return;
       isSyncing = true;
-      setSyncBtnLoading(true);
+      if (!isBackground) setSyncBtnLoading(true);
 
       const ch = document.getElementById('reportChannelSelect')?.value || gFilter.channel || '삼성화재';
       gFilter.channel = ch;
@@ -1950,15 +1995,15 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
         updateBranding();
         const viewerSyncedAt = document.getElementById('viewerSyncedAt');
         if (viewerSyncedAt) viewerSyncedAt.innerText = `CTI 동기화: ${new Date().toLocaleTimeString('ko-KR')}`;
-        setSyncBtnLoading(false);
+        if (!isBackground) setSyncBtnLoading(false);
         renderAll();
       } catch (err) {
         console.error('Sync error:', err);
-        setSyncBtnLoading(false);
+        if (!isBackground) setSyncBtnLoading(false);
         renderAll();
       } finally {
         isSyncing = false;
-        setSyncBtnLoading(false);
+        if (!isBackground) setSyncBtnLoading(false);
       }
     }
 

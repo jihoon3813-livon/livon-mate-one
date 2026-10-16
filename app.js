@@ -32575,10 +32575,31 @@ function openAddressSearchModal(targetInputId) {
           }
           const detailInput = document.getElementById('newAppHospitalDetailAddress');
           if (detailInput) detailInput.focus();
+        } else if (gAddressTargetInputId === 'custEditRoadAddress') {
+          const roadInput = document.getElementById('custEditRoadAddress');
+          if (roadInput) roadInput.value = completeRoadAddress;
+          const sidoInput = document.getElementById('custEditSido');
+          if (sidoInput) sidoInput.value = data.sido || '';
+          const sigunguInput = document.getElementById('custEditSigungu');
+          if (sigunguInput) sigunguInput.value = data.sigungu || '';
+          const detailInput = document.getElementById('custEditAddressDetail');
+          if (detailInput) detailInput.focus();
         } else if (gAddressTargetInputId === 'simAddress') {
           document.getElementById('simAddress').value = completeRoadAddress;
           const simDetail = document.getElementById('simAddressDetail');
           if (simDetail) simDetail.focus();
+        } else {
+          const targetEl = document.getElementById(gAddressTargetInputId);
+          if (targetEl) {
+            targetEl.value = completeRoadAddress;
+            const possibleDetails = [
+              document.getElementById(gAddressTargetInputId + 'Detail'),
+              document.getElementById(gAddressTargetInputId.replace('RoadAddress', 'AddressDetail')),
+              document.getElementById(gAddressTargetInputId.replace('RoadAddress', 'DetailAddress'))
+            ];
+            const detailFound = possibleDetails.find(el => el);
+            if (detailFound) detailFound.focus();
+          }
         }
       }
     }).open();
@@ -32643,6 +32664,15 @@ function selectSampleAddress(sido, sigungu, full, zonecode = '12345') {
     const detailInput = document.getElementById('newAppAddressDetail');
     detailInput.value = '';
     detailInput.focus();
+  } else if (gAddressTargetInputId === 'custEditRoadAddress') {
+    const roadInput = document.getElementById('custEditRoadAddress');
+    if (roadInput) roadInput.value = full;
+    const sidoInput = document.getElementById('custEditSido');
+    if (sidoInput) sidoInput.value = sido || '';
+    const sigunguInput = document.getElementById('custEditSigungu');
+    if (sigunguInput) sigunguInput.value = sigungu || '';
+    const detailInput = document.getElementById('custEditAddressDetail');
+    if (detailInput) detailInput.focus();
   } else if (gAddressTargetInputId === 'newAppCare') {
     const roadInput = document.getElementById('newAppCareRoadAddress');
     if (roadInput) roadInput.value = full;
@@ -32666,6 +32696,18 @@ function selectSampleAddress(sido, sigungu, full, zonecode = '12345') {
     document.getElementById('simAddress').value = full;
     const simDetail = document.getElementById('simAddressDetail');
     if (simDetail) simDetail.focus();
+  } else {
+    const targetEl = document.getElementById(gAddressTargetInputId);
+    if (targetEl) {
+      targetEl.value = full;
+      const possibleDetails = [
+        document.getElementById(gAddressTargetInputId + 'Detail'),
+        document.getElementById(gAddressTargetInputId.replace('RoadAddress', 'AddressDetail')),
+        document.getElementById(gAddressTargetInputId.replace('RoadAddress', 'DetailAddress'))
+      ];
+      const detailFound = possibleDetails.find(el => el);
+      if (detailFound) detailFound.focus();
+    }
   }
   closeModal('addressSearchModal');
 }
