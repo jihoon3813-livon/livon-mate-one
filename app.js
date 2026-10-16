@@ -40825,12 +40825,35 @@ function applyCustomerMemoSave(appId, memoText) {
   app.memo = memoText;
   app.specialNotes = memoText;
   app.updatedAt = new Date().toISOString();
+
+  // memoList 동기화 (개별 항목 배열)
+  const lines = memoText.split('\n').map(l => l.trim()).filter(Boolean);
+  const now = new Date();
+  const dateStr = `${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const oldList = Array.isArray(app.memoList) ? app.memoList : [];
+  app.memoList = lines.map((line, idx) => {
+    const existing = oldList.find(m => m.text === line);
+    if (existing) return existing;
+    return {
+      id: 'memo_' + Date.now() + '_' + idx,
+      text: line,
+      createdAt: dateStr,
+      author: (window.currentUser && window.currentUser.name) || '관리자'
+    };
+  });
+
   gApps[appIdx] = app;
 
   if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
     const rIdx = window.REBORN_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
     if (rIdx !== -1) {
-      window.REBORN_DATA.applications[rIdx] = { ...window.REBORN_DATA.applications[rIdx], memo: memoText, specialNotes: memoText, updatedAt: app.updatedAt };
+      window.REBORN_DATA.applications[rIdx] = { 
+        ...window.REBORN_DATA.applications[rIdx], 
+        memo: memoText, 
+        specialNotes: memoText, 
+        memoList: app.memoList, 
+        updatedAt: app.updatedAt 
+      };
     }
   }
 
@@ -40859,7 +40882,7 @@ function applyCustomerMemoSave(appId, memoText) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       appId: app.id,
-      fields: { memo: memoText, specialNotes: memoText, updatedAt: app.updatedAt }
+      fields: { memo: memoText, specialNotes: memoText, memoList: app.memoList, updatedAt: app.updatedAt }
     })
   }).catch(() => {});
 
@@ -40876,9 +40899,12 @@ function applyCustomerMemoSave(appId, memoText) {
 
   // Convex Cloud 동기화
   if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:updateMemo', { appId: app.id, memo: memoText });
+    syncToConvex('sync:updateMemo', { appId: app.id, memo: memoText, memoList: app.memoList });
     syncToConvex('sync:saveApplication', { app: app });
   }
+
+  // 모달 내부 비고 섹션 실시간 갱신
+  refreshCustomerMemoSection(app.id);
 
   renderUnifiedCareHub();
   renderApplications();
