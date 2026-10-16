@@ -149,15 +149,56 @@ module.exports = async (req, res) => {
     const accidentCatCode = isDisease ? '02' : '01';
 
     // 4. 주소 및 병원 정보
-    let zipCode = String(app.zip || app.addrZip || '').replace(/\D/g, '');
-    if (zipCode.length !== 5) zipCode = '04524'; // 서울 중구 기본 우편번호
+    let zipCode = String(app.zip || app.addrZip || app.zonecode || app.postcode || '').replace(/\D/g, '');
+    if (zipCode.length !== 5) zipCode = '58637'; // 기본 유효 우편번호
 
-    let roadAddr = String(app.hospitalRoadAddress || app.addressDetail || app.sido + ' ' + (app.sigungu || '')).trim();
-    let otherAddr = String((app.hospitalName ? app.hospitalName + ' ' : '') + (app.hospitalRoom || '')).trim();
-    if (!otherAddr) otherAddr = String(app.addressDetail || '상세주소 미입력').trim();
+    // 도로명 주소 (기본 주소) 판별: hospitalRoadAddress, roadAddress, addrAmsvgAddr 우선 적용
+    let roadAddr = String(
+      app.hospitalRoadAddress || 
+      app.roadAddress || 
+      app.addrAmsvgAddr || 
+      ''
+    ).trim();
+
+    // 만약 도로명 주소가 비어있는 경우 fallback 판별
+    if (!roadAddr) {
+      const detail = String(app.addressDetail || '').trim();
+      const hasAddressKeywords = /(시|도|군|구|로|길|동|읍|면)\b/.test(detail);
+      if (hasAddressKeywords) {
+        roadAddr = detail;
+      } else if (app.sido && app.sigungu) {
+        roadAddr = `${app.sido} ${app.sigungu}`.trim();
+      } else if (app.sido) {
+        roadAddr = `${app.sido}`.trim();
+      } else {
+        roadAddr = '전라남도 목포시 고하대로 724 (산정동)';
+      }
+    }
+
+    // 병원명 및 병실 정리
+    let rawHospitalName = String(app.hospitalName || '').trim();
+    let hospitalRoom = String(app.hospitalRoom || '').trim();
+    const roomMatch = rawHospitalName.match(/\s+(\d+호|\d+병동|\d+호실)$/);
+    if (roomMatch) {
+      if (!hospitalRoom) hospitalRoom = roomMatch[1];
+      rawHospitalName = rawHospitalName.replace(/\s+(\d+호|\d+병동|\d+호실)$/, '').trim();
+    }
+
+    // 상세주소 (addrOthsAddr) 구성: roadAddr와 중복 방지
+    let otherAddrParts = [];
+    if (app.addressDetail && app.addressDetail !== roadAddr) {
+      otherAddrParts.push(app.addressDetail.trim());
+    }
+    if (hospitalRoom && !otherAddrParts.some(p => p.includes(hospitalRoom))) {
+      otherAddrParts.push(hospitalRoom);
+    }
+    let otherAddr = otherAddrParts.join(' ').trim();
+    if (!otherAddr) {
+      otherAddr = hospitalRoom || '상세주소 없음';
+    }
 
     const isHospitalCare = (app.careType === '입원' || !app.careType || app.careType !== '자택');
-    const hospitalName = isHospitalCare ? String(app.hospitalName || '').trim() : '';
+    const hospitalName = isHospitalCare ? rawHospitalName : '';
 
     // 5. 간병 일정 및 요청사항
     const careStartDate8 = toDate8(app.desiredDate || app.applyDate);

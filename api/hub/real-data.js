@@ -141,6 +141,10 @@ module.exports = async function handler(req, res) {
 
       try {
         fs.writeFileSync(filePath, JSON.stringify(mergedPayload, null, 2), 'utf8');
+        const realDataJsPath = path.join(path.dirname(filePath), 'hub_real_data.js');
+        if (fs.existsSync(realDataJsPath)) {
+          fs.writeFileSync(realDataJsPath, 'window.REBORN_REAL_SEED_DATA = ' + JSON.stringify(mergedPayload, null, 2) + ';\n', 'utf8');
+        }
       } catch (writeErr) {
         console.warn('[hub/real-data] Read-only disk or write error (e.g. Vercel Lambda):', writeErr.message);
       }

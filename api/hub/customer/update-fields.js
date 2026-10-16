@@ -111,6 +111,10 @@ module.exports = async function handler(req, res) {
       stored.updatedAt = new Date().toISOString();
       try {
         fs.writeFileSync(filePath, JSON.stringify(stored, null, 2), 'utf8');
+        const realDataJsPath = path.join(path.dirname(filePath), 'hub_real_data.js');
+        if (fs.existsSync(realDataJsPath)) {
+          fs.writeFileSync(realDataJsPath, 'window.REBORN_REAL_SEED_DATA = ' + JSON.stringify(stored, null, 2) + ';\n', 'utf8');
+        }
       } catch (writeErr) {
         // Vercel serverless read-only filesystem
       }

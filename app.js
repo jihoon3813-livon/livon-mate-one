@@ -1595,17 +1595,55 @@ async function loadConvexData(showSpinner = true) {
 
     if (Array.isArray(realJson.applications) && realJson.applications.length > 0) {
       const serverRealApps = filterInvalidSamsungDuplicates(realJson.applications).filter(a => a && a.isRealLaunchData && !deletedAppIdSet.has(String(a.id)));
-      const existingNewApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
+      
+      // 로컬 캐시(gApps) 중 사용자가 수정한 데이터 매핑
+      const localAppMap = new Map();
+      (Array.isArray(gApps) ? gApps : []).forEach(localApp => {
+        if (localApp && localApp.id) {
+          localAppMap.set(String(localApp.id), localApp);
+        }
+      });
+
+      // 서버 데이터와 로컬 수정을 스마트하게 병합 (로컬 사용자 수정을 우선 보존)
+      const mergedApps = serverRealApps.map(serverApp => {
+        const localApp = localAppMap.get(String(serverApp.id));
+        if (!localApp) return serverApp;
+        
+        // 사용자가 수정한 이력이 있거나 로컬 데이터가 최신인 경우 필드 보존
+        if (localApp.hasManualUpdate || (localApp.updatedAt && (!serverApp.updatedAt || localApp.updatedAt >= serverApp.updatedAt))) {
+          return {
+            ...serverApp,
+            ...localApp,
+            roadAddress: localApp.roadAddress || serverApp.roadAddress || '',
+            hospitalRoadAddress: localApp.hospitalRoadAddress || serverApp.hospitalRoadAddress || '',
+            addressDetail: localApp.addressDetail || serverApp.addressDetail || '',
+            sido: localApp.sido || serverApp.sido || '',
+            sigungu: localApp.sigungu || serverApp.sigungu || '',
+            zip: localApp.zip || serverApp.zip || '',
+            addrZip: localApp.addrZip || serverApp.addrZip || '',
+            zonecode: localApp.zonecode || serverApp.zonecode || '',
+            hospitalName: localApp.hospitalName || serverApp.hospitalName || '',
+            hospitalRoom: localApp.hospitalRoom || serverApp.hospitalRoom || '',
+            updatedAt: localApp.updatedAt || new Date().toISOString()
+          };
+        }
+        return serverApp;
+      });
+
+      const serverAppIdSet = new Set(serverRealApps.map(s => String(s.id)));
+      const purelyLocalApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
         if (!localApp || !localApp.id) return false;
         if (deletedAppIdSet.has(String(localApp.id))) return false;
-        return !serverRealApps.some(s => String(s.id) === String(localApp.id));
+        return !serverAppIdSet.has(String(localApp.id));
       });
+
       let recentRegIdSet = new Set();
       try {
         const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
         recentRegIdSet = new Set((rList || []).map(String));
       } catch (e) {}
-      const merged = [...existingNewApps, ...serverRealApps];
+
+      const merged = [...purelyLocalApps, ...mergedApps];
       merged.forEach(a => {
         if (a && a.id && (recentRegIdSet.has(String(a.id)) || String(a.id).startsWith('D'))) {
           a._isJustRegistered = true;
@@ -31533,10 +31571,13 @@ function openCustomerEditModal(appId, focusSection = null) {
     rrnInput.value = (typeof autoHyphenRrn === 'function') ? autoHyphenRrn(rrnVal) : rrnVal;
   }
   document.getElementById('custEditInsurance').value = app.insuranceCompany || '현대해상(SCOR)';
-  document.getElementById('custEditRoadAddress').value = app.roadAddress || (app.sido ? `${app.sido} ${app.sigungu || ''}` : '');
+  // 도로명 주소 채우기 (sido 단독값만 있고 sigungu가 없는 경우 "서울"처럼 노출되는 현상 원천 차단)
+  document.getElementById('custEditRoadAddress').value = app.roadAddress || app.hospitalRoadAddress || ((app.sido && app.sigungu) ? `${app.sido} ${app.sigungu}` : (app.sido && !['서울', '서울시', '서울특별시'].includes(app.sido) ? app.sido : ''));
   document.getElementById('custEditAddressDetail').value = app.addressDetail || '';
   document.getElementById('custEditSido').value = app.sido || '';
   document.getElementById('custEditSigungu').value = app.sigungu || '';
+  const zipEl = document.getElementById('custEditZip');
+  if (zipEl) zipEl.value = app.zip || app.addrZip || app.zonecode || '';
   document.getElementById('custEditPolicyNumber').value = app.policyNumber || '';
   document.getElementById('custEditAccidentNumber').value = app.accidentNumber || '';
   const adjInfo = (gAdjusters || []).find(a => a.name === app.adjusterName) || {};
@@ -31640,6 +31681,19 @@ function handleCustomerEditSubmit(e) {
   app.insuranceCompany = document.getElementById('custEditInsurance').value;
   app.roadAddress = document.getElementById('custEditRoadAddress').value.trim();
   app.addressDetail = document.getElementById('custEditAddressDetail').value.trim();
+  app.sido = document.getElementById('custEditSido')?.value || app.sido || '';
+  app.sigungu = document.getElementById('custEditSigungu')?.value || app.sigungu || '';
+  const editZip = document.getElementById('custEditZip')?.value?.trim() || window.gCustEditZonecode;
+  if (editZip) {
+    app.zip = editZip;
+    app.addrZip = editZip;
+    app.zonecode = editZip;
+  }
+  // 입원 건이거나 병원 도로명 주소가 비어있거나 불일치할 때 hospitalRoadAddress 동기화
+  if (app.careType === '입원' || !app.hospitalRoadAddress || (app.hospitalRoadAddress && !app.roadAddress.includes('서울') && app.hospitalRoadAddress.includes('서울'))) {
+    app.hospitalRoadAddress = app.roadAddress;
+  }
+  app.hasManualUpdate = true;
   app.policyNumber = document.getElementById('custEditPolicyNumber').value.trim();
   app.accidentNumber = document.getElementById('custEditAccidentNumber').value.trim();
   app.adjusterName = document.getElementById('custEditAdjusterName').value.trim();
@@ -32582,6 +32636,9 @@ function openAddressSearchModal(targetInputId) {
           if (sidoInput) sidoInput.value = data.sido || '';
           const sigunguInput = document.getElementById('custEditSigungu');
           if (sigunguInput) sigunguInput.value = data.sigungu || '';
+          const zipInput = document.getElementById('custEditZip');
+          if (zipInput) zipInput.value = data.zonecode || '';
+          window.gCustEditZonecode = data.zonecode || '';
           const detailInput = document.getElementById('custEditAddressDetail');
           if (detailInput) detailInput.focus();
         } else if (gAddressTargetInputId === 'simAddress') {
@@ -32671,6 +32728,9 @@ function selectSampleAddress(sido, sigungu, full, zonecode = '12345') {
     if (sidoInput) sidoInput.value = sido || '';
     const sigunguInput = document.getElementById('custEditSigungu');
     if (sigunguInput) sigunguInput.value = sigungu || '';
+    const zipInput = document.getElementById('custEditZip');
+    if (zipInput) zipInput.value = zonecode || '';
+    window.gCustEditZonecode = zonecode || '';
     const detailInput = document.getElementById('custEditAddressDetail');
     if (detailInput) detailInput.focus();
   } else if (gAddressTargetInputId === 'newAppCare') {
