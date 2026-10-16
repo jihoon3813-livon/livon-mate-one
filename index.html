@@ -11821,6 +11821,47 @@
 
 
 
+  <!-- Modal: Customer Memo & Special Notes Edit -->
+  <div id="customerMemoModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200 animate-fadeIn">
+      <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 text-white">
+        <div class="flex items-center gap-3">
+          <span class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center text-amber-100">
+            <i data-lucide="clipboard-pen" class="w-5 h-5"></i>
+          </span>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-black text-white">비고 및 특이사항 입력</h3>
+              <span id="custMemoModalIdBadge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-white/20 text-white border border-white/30">-</span>
+            </div>
+            <p class="text-xs text-amber-100 mt-0.5">간병신청대장 및 고객 상세에 표시될 전달사항을 입력하세요.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeModal('customerMemoModal')" class="p-2 text-amber-200 hover:text-white rounded-lg cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="customerMemoForm" onsubmit="handleCustomerMemoSubmit(event)" class="p-5 space-y-4">
+        <input type="hidden" id="custMemoAppId">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+            <span>비고 및 특이사항 내용</span>
+            <span id="custMemoCharCount" class="text-[11px] text-slate-400 font-normal">0자</span>
+          </label>
+          <textarea id="custMemoContent" rows="5" class="w-full p-3 border border-slate-300 rounded-2xl text-xs leading-relaxed font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none resize-none shadow-inner" placeholder="고객 특이사항, 배정 전달 메모, 청구/정산 관련 참고사항을 입력하세요." oninput="updateCustMemoCharCount(this)"></textarea>
+        </div>
+
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeModal('customerMemoModal')" class="px-4 py-2 border border-slate-300 rounded-xl font-bold text-slate-700 hover:bg-slate-100 text-xs cursor-pointer">취소</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="check" class="w-3.5 h-3.5"></i> 비고 저장하기
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- 6. CS & Complaint History Management Modal -->
   <div id="csHistoryModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-3xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">

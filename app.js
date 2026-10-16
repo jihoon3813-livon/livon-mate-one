@@ -29284,17 +29284,17 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
         <!-- ========================================================================= -->
         <!-- [MEMO BAR] 비고 / 특이사항 바 (3뷰와 동일) -->
         <!-- ========================================================================= -->
-        <div class="bg-white p-3.5 rounded-2xl border ${(app.memo || app.specialNotes) ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200/90'} shadow-xs flex items-center justify-between gap-3 text-xs">
+        <div class="bg-white p-3.5 rounded-2xl border ${(app.memo || app.specialNotes) ? 'border-amber-300 bg-amber-50/60' : 'border-slate-200/90'} shadow-xs flex items-center justify-between gap-3 text-xs">
           <div class="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
-            <span class="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 font-bold text-[10.5px] flex items-center gap-1 shrink-0">
+            <span class="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold text-[10.5px] flex items-center gap-1.5 shrink-0 shadow-2xs">
               <i data-lucide="clipboard-pen" class="w-3.5 h-3.5 text-amber-700"></i> 비고 / 특이사항
             </span>
-            <p class="text-slate-800 text-[11.5px] font-medium leading-relaxed truncate" title="${app.memo || app.specialNotes || ''}">
-              ${app.memo || app.specialNotes || '<span class="text-slate-400 italic">등록된 비고 및 특이사항이 없습니다.</span>'}
-            </p>
+            <div class="text-slate-800 text-[11.5px] font-medium leading-relaxed max-h-[75px] overflow-y-auto custom-scrollbar whitespace-pre-wrap break-words min-w-0 flex-1" title="${escapeHtml(app.memo || app.specialNotes || '')}">
+              ${(app.memo || app.specialNotes) ? escapeHtml(app.memo || app.specialNotes) : '<span class="text-slate-400 italic">등록된 비고 및 특이사항이 없습니다.</span>'}
+            </div>
           </div>
-          <button type="button" onclick="editCustomerMemo('${app.id}')" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer shrink-0">
-            <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
+          <button type="button" onclick="openCustomerMemoModal('${app.id}')" class="px-2.5 py-1 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs" title="비고 및 특이사항 수정">
+            <i data-lucide="edit-2" class="w-3 h-3 text-amber-700"></i> 수정
           </button>
         </div>
 
@@ -40387,20 +40387,142 @@ function deleteSingleApp(appId) {
   }
 }
 
-function editCustomerMemo(appId) {
-  const app = gApps.find(a => a.id === appId);
-  if (!app) return;
-  const currentMemo = app.memo || '';
-  const newMemo = prompt(`[${app.id} - ${app.patientName} 님] 간병신청대장 비고 및 특이사항 입력:`, currentMemo);
-  if (newMemo !== null) {
-    app.memo = newMemo.trim();
-    if (typeof syncToConvex === 'function') {
-      syncToConvex('sync:updateMemo', { appId: appId, memo: app.memo });
+function openCustomerMemoModal(appId) {
+  const app = (gApps || []).find(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
+  if (!app) {
+    alert('해당 고객 정보를 찾을 수 없습니다: ' + appId);
+    return;
+  }
+  const memoEl = document.getElementById('custMemoContent');
+  const idEl = document.getElementById('custMemoAppId');
+  const badgeEl = document.getElementById('custMemoModalIdBadge');
+  const modalEl = document.getElementById('customerMemoModal');
+
+  if (modalEl && memoEl && idEl) {
+    idEl.value = app.id;
+    if (badgeEl) badgeEl.innerText = `${app.id} (${app.patientName})`;
+    const currentVal = app.memo || app.specialNotes || '';
+    memoEl.value = currentVal;
+    updateCustMemoCharCount(memoEl);
+    openModal('customerMemoModal');
+    initIcons();
+    setTimeout(() => {
+      memoEl.focus();
+      memoEl.setSelectionRange(memoEl.value.length, memoEl.value.length);
+    }, 100);
+  } else {
+    // Fallback if modal DOM element not found
+    const currentVal = app.memo || app.specialNotes || '';
+    const newMemo = prompt(`[${app.id} - ${app.patientName} 님] 간병신청대장 비고 및 특이사항 입력:`, currentVal);
+    if (newMemo !== null) {
+      applyCustomerMemoSave(app.id, newMemo.trim());
     }
-    renderUnifiedCareHub();
-    renderApplications();
   }
 }
+window.openCustomerMemoModal = openCustomerMemoModal;
+window.editCustomerMemo = openCustomerMemoModal;
+
+function updateCustMemoCharCount(textarea) {
+  const countEl = document.getElementById('custMemoCharCount');
+  if (countEl && textarea) {
+    countEl.innerText = `${textarea.value.length}자`;
+  }
+}
+window.updateCustMemoCharCount = updateCustMemoCharCount;
+
+function handleCustomerMemoSubmit(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const appId = document.getElementById('custMemoAppId')?.value;
+  const memoText = (document.getElementById('custMemoContent')?.value || '').trim();
+  closeModal('customerMemoModal');
+  applyCustomerMemoSave(appId, memoText);
+}
+window.handleCustomerMemoSubmit = handleCustomerMemoSubmit;
+
+function applyCustomerMemoSave(appId, memoText) {
+  if (!appId) return;
+  const appIdx = (gApps || []).findIndex(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
+  if (appIdx === -1) return;
+  const app = gApps[appIdx];
+  const oldMemo = app.memo || app.specialNotes || '';
+  app.memo = memoText;
+  app.specialNotes = memoText;
+  app.updatedAt = new Date().toISOString();
+  gApps[appIdx] = app;
+
+  if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
+    const rIdx = window.REBORN_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
+    if (rIdx !== -1) {
+      window.REBORN_DATA.applications[rIdx] = { ...window.REBORN_DATA.applications[rIdx], memo: memoText, specialNotes: memoText, updatedAt: app.updatedAt };
+    }
+  }
+
+  try {
+    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+  } catch (e) {
+    console.warn('[applyCustomerMemoSave] localStorage error:', e);
+  }
+
+  // 감사 로그 기록
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '고객상세',
+      actionType: 'UPDATE',
+      target: `고객 [${app.id}] (${app.patientName})`,
+      summary: `[${app.patientName} 님] 비고 및 특이사항 수정 저장`,
+      changes: {
+        '비고/특이사항': { before: oldMemo || '(없음)', after: memoText || '(없음)' }
+      }
+    });
+  }
+
+  // 서버 디스크 영구 저장 (/api/hub/customer/update-fields & /api/hub/real-data)
+  fetch('/api/hub/customer/update-fields', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      appId: app.id,
+      fields: { memo: memoText, specialNotes: memoText, updatedAt: app.updatedAt }
+    })
+  }).catch(() => {});
+
+  fetch('/api/hub/real-data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      applications: gApps,
+      assignments: (typeof gAssigns !== 'undefined' ? gAssigns : []),
+      claims: (typeof gClaims !== 'undefined' ? gClaims : []),
+      payouts: (typeof gPayouts !== 'undefined' ? gPayouts : [])
+    })
+  }).catch(() => {});
+
+  // Convex Cloud 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:updateMemo', { appId: app.id, memo: memoText });
+    syncToConvex('sync:saveApplication', { app: app });
+  }
+
+  renderUnifiedCareHub();
+  renderApplications();
+  renderDashboard();
+
+  // 열려있는 고객상세 팝업이 있다면 즉시 최신 비고 내용으로 재렌더링
+  const hubModal = document.getElementById('hubCustomerDetailModal');
+  if (hubModal && !hubModal.classList.contains('hidden') && (gActiveHubModalAppId || app.id)) {
+    openHubCustomerDetailModal(gActiveHubModalAppId || app.id);
+  }
+
+  if (typeof showCustomAlert === 'function') {
+    showCustomAlert({
+      title: '비고 및 특이사항 저장 완료',
+      message: `[${app.id} - ${app.patientName}] 비고 내용이 성공적으로 저장 및 반영되었습니다.`,
+      icon: 'check-circle-2',
+      iconColor: 'amber'
+    });
+  }
+}
+window.applyCustomerMemoSave = applyCustomerMemoSave;
 
 function renderApplications() {
   const tbody = document.getElementById('appTableBody');
@@ -51360,6 +51482,7 @@ function handleCustomerEditSubmit(e) {
   document.getElementById('custEditApplyDate').value = app.applyDate;
   app.diagnosis = document.getElementById('custEditDiagnosis').value.trim();
   app.memo = document.getElementById('custEditMemo').value.trim();
+  app.specialNotes = app.memo;
   const rawCustPrice = document.getElementById('custEditClaimUnitPrice')?.value || '';
   const parsedCustPrice = Number(rawCustPrice.replace(/[^0-9]/g, '')) || 160000;
   app.claimUnitPrice = parsedCustPrice;
