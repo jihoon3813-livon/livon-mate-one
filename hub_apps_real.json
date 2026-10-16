@@ -19977,7 +19977,12 @@
       "csLatestType": null,
       "_applyTime": 1791903600000,
       "_updTime": 0,
-      "_latestEventTime": 1791903600000
+      "_latestEventTime": 1791903600000,
+      "rrn": "720310-2668311",
+      "patientRrn": "720310-2668311",
+      "rrnFront": "720310",
+      "rrnBack": "2668311",
+      "updatedAt": "2026-10-16T07:20:31.735Z"
     },
     {
       "id": "C0663",
