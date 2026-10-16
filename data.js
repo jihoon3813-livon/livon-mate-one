@@ -14,7 +14,12 @@ const INITIAL_ADMINS = [
   { id: 'ADM001', username: 'superadmin', name: '리본케어', dept: '대표이사', email: 'ceo@reborncare.co.kr', role: 'SUPER_ADMIN', phone: '010-1234-5678', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
   { id: 'ADM002', username: 'kyumari', name: '최규만', dept: '이사', email: 'kyumari@livon.care', role: '최고관리자', phone: '010-2222-3333', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
   { id: 'ADM003', username: 'ejchoi', name: '최은주', dept: '책임/LiVon 연구소', email: 'ejchoi@livon.care', role: '최고관리자', phone: '010-7299-2021', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
-  { id: 'ADM004', username: 'ansghk8855', name: '이주연', dept: '매니저/간병파트', email: 'ansghk8855@livon.care', role: '최고관리자', phone: '010-2222-3333', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] }
+  { id: 'ADM004', username: 'ansghk8855', name: '이주연', dept: '매니저/간병파트', email: 'ansghk8855@livon.care', role: '최고관리자', phone: '010-2222-3333', lastLogin: '', lastIp: '', status: '활성', allowedMenus: ['all'] },
+  { id: 'ADM005', username: 'jjooyoung', name: '전주영', dept: '차장/LiVon 연구소', email: 'jooyoung@livon.care', role: 'SUPER_ADMIN', phone: '010-9651-6458', lastLogin: '', lastIp: '', status: '활성', password: 'asdf1234!@#', allowedMenus: ['all'] },
+  { id: 'ADM006', username: 'lsy', name: '이승엽', dept: '대표이사', email: 'lsy@livon.care', role: 'SUPER_ADMIN', phone: '010-9922-0505', lastLogin: '', lastIp: '', status: '활성', password: '0000', allowedMenus: ['all'] },
+  { id: 'ADM007', username: 'ch02', name: '채동희', dept: 'CX', email: 'ch02@livon.care', role: 'SUPER_ADMIN', phone: '010-4458-0478', lastLogin: '', lastIp: '', status: '활성', password: 'ch#0202', allowedMenus: ['all'] },
+  { id: 'ADM008', username: 'yu.arim1223', name: '유아림', dept: '경영관리', email: 'yu.arim1223@livon.care', role: 'SUPER_ADMIN', phone: '010-8832-2942', lastLogin: '', lastIp: '', status: '활성', password: 'yu.arim1223', allowedMenus: ['all'] },
+  { id: 'ADM009', username: 'kch', name: '김치형', dept: '관리', email: 'kch@livon.care', role: 'SUPER_ADMIN', phone: '010-5158-8245', lastLogin: '', lastIp: '', status: '활성', password: 'hidea1991!', allowedMenus: ['all'] }
 ];
 
 const INITIAL_PARTNERS = [

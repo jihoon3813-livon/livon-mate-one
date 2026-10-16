@@ -1910,7 +1910,7 @@ async function loadConvexData(showSpinner = true) {
       } catch (e) {}
 
       // 과거 더미 계정(이매칭, 박정산, 영등포센터 등) 및 삭제된 계정은 로컬에서 영구 제거
-      const DUMMY_USERNAMES = new Set(['care_counsel', 'settle_mgr', 'ydp_center', 'jjooyoung']);
+      const DUMMY_USERNAMES = new Set(['care_counsel', 'settle_mgr', 'ydp_center']);
       localAdmins = (localAdmins || []).filter(a => a && a.username && !DUMMY_USERNAMES.has(a.username.toLowerCase()));
 
       if (Array.isArray(admins) && admins.length > 0) {
@@ -34743,6 +34743,35 @@ async function initAdminSession() {
     } catch (e) {}
   }
 
+  // 0. URL 쿼리 파라미터를 통한 관리자 다이렉트 자동 로그인 지원 (예: ?reborn_admin_id_unique=...&reborn_admin_pw_unique=...)
+  const urlParams = (typeof URLSearchParams !== 'undefined') ? new URLSearchParams(window.location.search) : null;
+  const paramUser = urlParams ? (urlParams.get('reborn_admin_id_unique') || urlParams.get('admin_id') || urlParams.get('username') || urlParams.get('id')) : null;
+  const paramPass = urlParams ? (urlParams.get('reborn_admin_pw_unique') || urlParams.get('admin_pw') || urlParams.get('password') || urlParams.get('pw')) : null;
+
+  if (paramUser && paramPass) {
+    window._isUrlAutoLoginInProgress = true;
+    try {
+      localStorage.removeItem('LIVON_LOGGED_OUT');
+      sessionStorage.removeItem('LIVON_LOGGED_OUT');
+      const uInput = document.getElementById('loginUsernameInput');
+      const pInput = document.getElementById('loginPasswordInput');
+      if (uInput) uInput.value = paramUser.trim();
+      if (pInput) pInput.value = paramPass.trim();
+
+      const autoLoginSuccess = await handleAdminLoginSubmit(null, paramUser.trim(), paramPass.trim());
+      if (autoLoginSuccess) {
+        return true;
+      }
+    } catch (autoErr) {
+      console.warn('[Auto Login] URL 파라미터 자동 로그인 에러:', autoErr);
+    } finally {
+      window._isUrlAutoLoginInProgress = false;
+    }
+  } else if (paramUser) {
+    const uInput = document.getElementById('loginUsernameInput');
+    if (uInput) uInput.value = paramUser.trim();
+  }
+
   const isExplicitlyLoggedOut = !isDev && (localStorage.getItem('LIVON_LOGGED_OUT') === 'true' || sessionStorage.getItem('LIVON_LOGGED_OUT') === 'true');
   const savedAdmin = localStorage.getItem('REBORN_CURRENT_ADMIN');
   const savedToken = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || sessionStorage.getItem('REBORN_ADMIN_SESSION_TOKEN');
@@ -35062,15 +35091,22 @@ function handleAdminLogout(isAuto = false) {
 
   // 10. 로그인 모달 입력값 초기화 및 브라우저 '342' 자동채움 다중 차단
   const sanitizeLoginInputs = () => {
+    if (window._isUrlAutoLoginInProgress) return;
     const uInput = document.getElementById('loginUsernameInput');
     const pInput = document.getElementById('loginPasswordInput');
     const rememberCheckbox = document.getElementById('loginRememberMe');
     const savedUser = localStorage.getItem('REBORN_REMEMBERED_USERNAME');
+    const urlParams = (typeof URLSearchParams !== 'undefined') ? new URLSearchParams(window.location.search) : null;
+    const urlParamUser = urlParams ? (urlParams.get('reborn_admin_id_unique') || urlParams.get('admin_id') || urlParams.get('username') || urlParams.get('id')) : null;
 
-    if (pInput) {
+    if (pInput && !window._isUrlAutoLoginInProgress) {
       pInput.value = '';
     }
-    if (isDevScreen()) {
+    if (urlParamUser) {
+      if (uInput) uInput.value = urlParamUser.trim();
+      if (rememberCheckbox) rememberCheckbox.checked = true;
+      setTimeout(() => { pInput?.focus(); }, 50);
+    } else if (isDevScreen()) {
       try { document.documentElement.classList.add('livon-dev-mode'); } catch (e) {}
       if (uInput) {
         uInput.value = 'superadmin';
@@ -35106,10 +35142,10 @@ function handleAdminLogout(isAuto = false) {
   initIcons();
 }
 
-async function handleAdminLoginSubmit(e) {
+async function handleAdminLoginSubmit(e, customUser, customPass) {
   if (e && e.preventDefault) e.preventDefault();
-  let username = document.getElementById('loginUsernameInput')?.value.trim();
-  const password = document.getElementById('loginPasswordInput')?.value.trim();
+  let username = (customUser !== undefined && customUser !== null) ? String(customUser).trim() : document.getElementById('loginUsernameInput')?.value.trim();
+  let password = (customPass !== undefined && customPass !== null) ? String(customPass).trim() : document.getElementById('loginPasswordInput')?.value.trim();
 
   if (isDevScreen()) {
     if (!username) username = 'superadmin';
@@ -35144,7 +35180,10 @@ async function handleAdminLoginSubmit(e) {
     if (!Array.isArray(localAdmins) || localAdmins.length === 0) {
       localAdmins = (window.REBORN_DATA && window.REBORN_DATA.admins) || gAdmins || [];
     }
-    const matched = (localAdmins || []).find(a => a && (a.username || '').toLowerCase() === uname);
+    const matched = (localAdmins || []).find(a => a && (
+      (a.username || '').toLowerCase() === uname ||
+      (a.email || '').toLowerCase() === uname
+    ));
     const validPass = matched?.password || '12345678';
     if (matched && (password === validPass || password === 'reborn!@#$' || password === 'livon2026!')) {
       fallbackSuccess = true;
@@ -35166,7 +35205,7 @@ async function handleAdminLoginSubmit(e) {
     } else {
       const errMsg = authResult?.value?.error || '로그인 인증에 실패했습니다. 아이디 또는 비밀번호를 다시 확인해주세요.';
       alert(errMsg);
-      return;
+      return false;
     }
   }
 
@@ -35235,6 +35274,21 @@ async function handleAdminLoginSubmit(e) {
   if (overlay) overlay.classList.add('hidden');
 
   gLastActivityTimestamp = Date.now();
+
+  // URL에서 로그인 파라미터가 포함되어 접속한 경우(원클릭 자동 로그인 등), 브라우저 주소창에서 비밀번호 및 아이디 파라미터 안전 삭제
+  try {
+    const cleanUrl = new URL(window.location.href);
+    let urlChanged = false;
+    ['reborn_admin_id_unique', 'reborn_admin_pw_unique', 'admin_id', 'admin_pw', 'username', 'password', 'pw', 'id'].forEach(k => {
+      if (cleanUrl.searchParams.has(k)) {
+        cleanUrl.searchParams.delete(k);
+        urlChanged = true;
+      }
+    });
+    if (urlChanged) {
+      window.history.replaceState({}, document.title, cleanUrl.pathname + (cleanUrl.search ? cleanUrl.search : '') + cleanUrl.hash);
+    }
+  } catch (err) {}
 
   // 🚨 [보안] 정상 인증 완료 후에 비로소 데이터 초기화 및 실데이터 동기화 시작
   initData();

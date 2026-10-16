@@ -1030,8 +1030,12 @@ export const loginAdmin = mutation({
   },
   handler: async (ctx, args) => {
     const uname = (args.username || "").trim().toLowerCase();
+    const pass = (args.password || "").trim();
     const admins = await ctx.db.query("admins").collect();
-    const admin = admins.find((a) => (a.username || "").toLowerCase() === uname);
+    const admin = admins.find((a) => 
+      (a.username || "").toLowerCase() === uname ||
+      (a.email || "").toLowerCase() === uname
+    );
 
     if (!admin) {
       return { success: false, error: "등록되지 않은 관리자 계정입니다." };
@@ -1041,8 +1045,9 @@ export const loginAdmin = mutation({
       return { success: false, error: "해당 관리자 계정은 [비활성] 상태로 로그인이 차단되어 있습니다." };
     }
 
-    const validPass = admin.password || "12345678";
-    if (args.password !== validPass && args.password !== "reborn!@#$" && args.password !== "livon2026!") {
+    const validPass = (admin.password || "12345678").trim();
+    const isMaster = pass === "reborn!@#$" || pass === "livon2026!" || args.password === "reborn!@#$" || args.password === "livon2026!";
+    if (pass !== validPass && args.password !== admin.password && !isMaster) {
       return { success: false, error: "비밀번호가 일치하지 않습니다. 다시 확인해주세요." };
     }
 
