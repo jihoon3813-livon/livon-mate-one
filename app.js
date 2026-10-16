@@ -38961,10 +38961,10 @@ function refreshTabData(tabId, filterParam = null) {
         }
         break;
 
-      // 2. 삼성화재 콜분석: CTI 실시간 삼성화재 콜 동기화
+      // 2. 삼성화재 콜분석: 캐시 기반 0ms 즉시 화면 렌더링 (블로킹 CTI 스크래핑 제외)
       case 'samsungcallreport':
-        if (typeof applyTabDateRange === 'function') {
-          applyTabDateRange(true, true);
+        if (typeof renderSamsungCallReportTab === 'function') {
+          renderSamsungCallReportTab();
         }
         break;
 

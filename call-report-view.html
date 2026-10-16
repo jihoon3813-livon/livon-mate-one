@@ -623,9 +623,9 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
           ? 'LIVON_CACHED_HYUNDAI_REPORT_DATA' 
           : (isLivon ? 'LIVON_CACHED_LIVON_REPORT_DATA' : (isAll ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA'));
 
-        // 1. 세션 스토리지 캐시가 있으면 빠른 1차 렌더링(0ms)을 제공하되, 네트워크 최신 데이터를 항상 백그라운드에서 즉시 로드
+        // 1. 로컬/세션 스토리지 캐시가 있으면 빠른 1차 렌더링(0ms)을 제공하되, 네트워크 최신 데이터를 백그라운드에서 로드
         try {
-          const cached = sessionStorage.getItem(channelCacheKey);
+          const cached = localStorage.getItem(channelCacheKey) || sessionStorage.getItem(channelCacheKey);
           if (cached) {
             const parsed = JSON.parse(cached);
             if (parsed && Array.isArray(parsed.callLogs) && parsed.callLogs.length >= 10) {
@@ -639,9 +639,11 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
                 }
                 renderAll();
               } else {
+                try { localStorage.removeItem(channelCacheKey); } catch (e) {}
                 sessionStorage.removeItem(channelCacheKey);
               }
             } else {
+              try { localStorage.removeItem(channelCacheKey); } catch (e) {}
               sessionStorage.removeItem(channelCacheKey);
             }
           }
@@ -677,6 +679,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
                   }
                   loaded = true;
                   try {
+                    localStorage.setItem(channelCacheKey, JSON.stringify(data));
                     sessionStorage.setItem(channelCacheKey, JSON.stringify(data));
                   } catch (e) {}
                   break;
@@ -1939,6 +1942,7 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
             const cacheKey = isHyundai 
               ? 'LIVON_CACHED_HYUNDAI_REPORT_DATA' 
               : (isLivon ? 'LIVON_CACHED_LIVON_REPORT_DATA' : (isAll ? 'LIVON_CACHED_ALL_REPORT_DATA' : 'LIVON_CACHED_SAMSUNG_REPORT_DATA'));
+            try { localStorage.setItem(cacheKey, JSON.stringify(gReportData)); } catch (e) {}
             sessionStorage.setItem(cacheKey, JSON.stringify(gReportData));
           } catch (e) {}
         }

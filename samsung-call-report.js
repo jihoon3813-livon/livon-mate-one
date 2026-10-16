@@ -410,29 +410,43 @@ async function initSamsungCallReportModule(resetFilter = true) {
     : ((rInfo.channel || '').includes(ch));
   const isMatch = isChannelMatch && rInfo.startDate === s && rInfo.endDate === e && gSamsungReportData && Array.isArray(gSamsungReportData.callLogs);
 
-  // 1. 메모리 또는 전용 세션 캐시가 있으면 빠른 1차 렌더링(0ms)을 제공하고, 백그라운드에서 최신 정적 데이터 파일을 즉시 로드하여 완벽 동기화
+  // 1. 메모리 또는 로컬/세션 캐시에서 0ms 초고속 즉각 렌더링 (대기 스피너 완전 제거)
+  let hasImmediateData = false;
   if (gSamsungReportData && Array.isArray(gSamsungReportData.callLogs) && gSamsungReportData.callLogs.length >= 10) {
     if (gSamsungMasterLogs.length === 0) {
       gSamsungMasterLogs = [...gSamsungReportData.callLogs];
     }
     renderSamsungCallReportTab();
+    hasImmediateData = true;
+  } else {
+    try {
+      const cached = localStorage.getItem('LIVON_CACHED_SAMSUNG_REPORT_DATA') || sessionStorage.getItem('LIVON_CACHED_SAMSUNG_REPORT_DATA');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const d = (parsed && parsed.data && parsed.data.callLogs) ? parsed.data : parsed;
+        if (d && Array.isArray(d.callLogs) && d.callLogs.length > 0) {
+          gSamsungReportData = d;
+          if (gSamsungMasterLogs.length === 0) {
+            gSamsungMasterLogs = [...d.callLogs];
+          }
+          renderSamsungCallReportTab();
+          hasImmediateData = true;
+        }
+      }
+    } catch (e) {}
   }
 
-  // 2. 채널 전용 정적 데이터 우선 로드 (삼성화재는 call_report_samsung.json, 현대해상은 call_report_hyundai.json)
+  // 2. 채널 전용 정적 데이터 로드 (캐시가 이미 떴으면 백그라운드에서 조용히 동기화)
   const primaryFileName = isAllChannel
     ? 'call_report_all.json'
     : (ch.includes('현대') ? 'call_report_hyundai.json' : (ch.includes('리본') ? 'call_report_livon.json' : 'call_report_samsung.json'));
 
   const staticUrls = [
-    `./${primaryFileName}?t=${Date.now()}`,
-    `${primaryFileName}?t=${Date.now()}`,
-    `/${primaryFileName}?t=${Date.now()}`,
-    isAllChannel ? `./call_report_all.json?t=${Date.now()}` : null,
-    isAllChannel ? `call_report_all.json?t=${Date.now()}` : null,
-    isAllChannel ? `/call_report_all.json?t=${Date.now()}` : null,
-    !isAllChannel ? `./samsung_call_report.json?t=${Date.now()}` : null,
+    `./${primaryFileName}`,
+    `/${primaryFileName}`,
+    primaryFileName,
     `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
-  ].filter(Boolean);
+  ];
 
   let loaded = false;
   for (const u of staticUrls) {
@@ -441,83 +455,83 @@ async function initSamsungCallReportModule(resetFilter = true) {
       if (res.ok) {
         const json = await res.json();
         const data = (json && json.data) ? json.data : json;
-          let finalData = data;
-          if (!isAllChannel && u.includes('call_report_all')) {
-            const filtered = data.callLogs.filter(l => (l.channel || '').includes(ch));
-            if (filtered.length > 0) {
-              finalData = {
-                ...data,
-                reportInfo: {
-                  ...data.reportInfo,
-                  channel: ch,
-                  channelLabel: ch
-                },
-                callLogs: filtered
-              };
-            }
+        let finalData = data;
+        if (!isAllChannel && u.includes('call_report_all')) {
+          const filtered = data.callLogs.filter(l => (l.channel || '').includes(ch));
+          if (filtered.length > 0) {
+            finalData = {
+              ...data,
+              reportInfo: {
+                ...data.reportInfo,
+                channel: ch,
+                channelLabel: ch
+              },
+              callLogs: filtered
+            };
           }
+        }
 
-          // 기존 메모리/세션에 이미 존재하는 최신 수신 콜(예: 20번째 콜 등)이 오래된 정적 파일로 덮어씌워져 유실되지 않도록 스마트 병합
-          const existingLogs = (gSamsungMasterLogs && gSamsungMasterLogs.length > 0)
-            ? gSamsungMasterLogs
-            : ((gSamsungReportData && gSamsungReportData.callLogs) || []);
+        // 기존 메모리/세션에 이미 존재하는 최신 수신 콜이 오래된 정적 파일로 덮어씌워지지 않도록 스마트 병합
+        const existingLogs = (gSamsungMasterLogs && gSamsungMasterLogs.length > 0)
+          ? gSamsungMasterLogs
+          : ((gSamsungReportData && gSamsungReportData.callLogs) || []);
 
-          if (existingLogs.length > 0) {
-            const mergedMap = new Map();
-            (finalData.callLogs || []).forEach(l => {
-              const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
-              mergedMap.set(key, l);
-            });
-            existingLogs.forEach(l => {
-              const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
-              mergedMap.set(key, l);
-            });
-            const mergedLogs = Array.from(mergedMap.values());
-            mergedLogs.sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
-            mergedLogs.forEach((l, idx) => { l.rowNum = idx + 1; });
-            finalData.callLogs = mergedLogs;
-          }
+        if (existingLogs.length > 0) {
+          const mergedMap = new Map();
+          (finalData.callLogs || []).forEach(l => {
+            const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+            mergedMap.set(key, l);
+          });
+          existingLogs.forEach(l => {
+            const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
+            mergedMap.set(key, l);
+          });
+          const mergedLogs = Array.from(mergedMap.values());
+          mergedLogs.sort((a, b) => (b.callTime || '').localeCompare(a.callTime || ''));
+          mergedLogs.forEach((l, idx) => { l.rowNum = idx + 1; });
+          finalData.callLogs = mergedLogs;
+        }
 
-          gSamsungReportData = finalData;
-          if (Array.isArray(finalData.callLogs)) {
-            gSamsungMasterLogs = [...finalData.callLogs];
-          }
+        gSamsungReportData = finalData;
+        if (Array.isArray(finalData.callLogs)) {
+          gSamsungMasterLogs = [...finalData.callLogs];
+        }
 
-          try {
-            sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(finalData));
-          } catch (e) {}
-          renderSamsungCallReportTab();
-          loaded = true;
+        try {
+          localStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(finalData));
+          sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(finalData));
+        } catch (e) {}
 
-          // 백그라운드 최신 CTI 자동 검증 동기화 (최신 콜 유실 원천 방지)
-          setTimeout(() => {
-            if (typeof syncSamsungCallReportCti === 'function') {
-              syncSamsungCallReportCti(true, true);
-            }
-          }, 300);
-          return;
+        // 화면 갱신: 처음 로드되었거나 신규 콜로그가 반영되었을 때 즉시 반영
+        renderSamsungCallReportTab();
+        loaded = true;
+        return;
       }
     } catch (e) {}
   }
 
-  // 3. 정적 파일이 없거나 추가 조회가 필요하면 CTI 실시간 조회 수행
-  if (!loaded) {
+  // 3. 정적 파일이 없고 캐시도 전혀 없는 극단적 초기 실행 시에만 로컬 데이터 폴백
+  if (!loaded && !hasImmediateData) {
     applyTabDateRange(false);
   }
 }
 
-// 2. Main Tab Renderer
+// 2. Main Tab Renderer (0ms 즉시 화면 렌더링)
 function renderSamsungCallReportTab() {
   const container = document.getElementById('tab-samsungcallreport');
   if (!container) return;
 
   if (!gSamsungReportData) {
     try {
-      const cached = sessionStorage.getItem('LIVON_CACHED_SAMSUNG_REPORT_DATA');
+      const cached = localStorage.getItem('LIVON_CACHED_SAMSUNG_REPORT_DATA') || sessionStorage.getItem('LIVON_CACHED_SAMSUNG_REPORT_DATA');
       if (cached) {
-        gSamsungReportData = JSON.parse(cached);
-        if (gSamsungReportData && Array.isArray(gSamsungReportData.callLogs) && gSamsungMasterLogs.length === 0) {
-          gSamsungMasterLogs = [...gSamsungReportData.callLogs];
+        const parsed = JSON.parse(cached);
+        const d = (parsed && parsed.data && parsed.data.callLogs) ? parsed.data : parsed;
+        if (d && Array.isArray(d.callLogs) && d.callLogs.length > 0) {
+          gSamsungReportData = d;
+          if (gSamsungMasterLogs.length === 0) {
+            gSamsungMasterLogs = [...d.callLogs];
+          }
         }
       }
     } catch (e) {}
@@ -3281,6 +3295,7 @@ async function applyTabDateRange(forceSync = false, isBackground = false) {
           }
           gSamsungReportData = finalData;
           try {
+            localStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(finalData));
             sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(finalData));
           } catch (e) {}
           synced = true;
@@ -3296,11 +3311,9 @@ async function applyTabDateRange(forceSync = false, isBackground = false) {
         : (ch.includes('현대') ? 'call_report_hyundai.json' : (ch.includes('리본') ? 'call_report_livon.json' : 'call_report_samsung.json'));
 
       const staticFallbacks = [
-        `/${primaryFallback}?t=${Date.now()}`,
-        `./${primaryFallback}?t=${Date.now()}`,
-        `${primaryFallback}?t=${Date.now()}`,
-        `/samsung_call_report.json?t=${Date.now()}`,
-        `./samsung_call_report.json?t=${Date.now()}`
+        `/${primaryFallback}`,
+        `./${primaryFallback}`,
+        primaryFallback
       ];
       for (const u of staticFallbacks) {
         try {
@@ -3328,9 +3341,10 @@ async function applyTabDateRange(forceSync = false, isBackground = false) {
       }
     }
 
-    // 세션 스토리지 캐시 업데이트
+    // 로컬 및 세션 스토리지 캐시 동시 업데이트
     if (gSamsungReportData) {
       try {
+        localStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(gSamsungReportData));
         sessionStorage.setItem('LIVON_CACHED_SAMSUNG_REPORT_DATA', JSON.stringify(gSamsungReportData));
       } catch (e) {}
     }
@@ -3454,11 +3468,14 @@ async function copyReportWebLink(targetChannel = '삼성화재') {
         : (curDataCh.includes(targetChannel) || gSamsungReportData.callLogs.some(c => (c.channel || '').includes(isHyundai ? '현대' : (isLivon ? '리본' : '삼성'))));
 
       if (isTargetChannelMatch) {
+        try { localStorage.setItem(cacheKey, JSON.stringify(gSamsungReportData)); } catch (e) {}
         sessionStorage.setItem(cacheKey, JSON.stringify(gSamsungReportData));
       } else {
+        try { localStorage.removeItem(cacheKey); } catch (e) {}
         sessionStorage.removeItem(cacheKey);
       }
     } else {
+      try { localStorage.removeItem(cacheKey); } catch (e) {}
       sessionStorage.removeItem(cacheKey);
     }
   } catch (err) {}
