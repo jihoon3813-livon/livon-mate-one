@@ -12499,6 +12499,10 @@
             <i data-lucide="mail" class="w-3.5 h-3.5"></i>
             <span>삼성 접수/청구</span>
           </button>
+          <button id="btnHubHyundaiFax" type="button" onclick="openHyundaiRegistrationFaxModal(gActiveHubModalAppId)" class="hidden px-2.5 sm:px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all bg-blue-600 hover:bg-blue-500 text-white shadow-md cursor-pointer" title="현대해상 1차 고객등록 접수 팩스 발송/재발송">
+            <i data-lucide="printer" class="w-3.5 h-3.5" id="btnHubHyundaiFaxIcon"></i>
+            <span id="btnHubHyundaiFaxText">1차 접수팩스</span>
+          </button>
           <button id="btnSaveHubCustomerModal" type="button" onclick="saveAndCloseActiveHubCustomerDetail()" 
                   class="hidden sm:flex px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-600/30 items-center gap-1.5 whitespace-nowrap shrink-0 transition-all cursor-pointer border border-emerald-400/40" title="변경사항 저장 후 곧바로 닫기">
             <i data-lucide="save" class="w-4 h-4"></i>
