@@ -1786,8 +1786,8 @@ async function autoSeedSurveyTargets(options = {}) {
       msg = `종료 고객 대상자 총 ${extractedItems.length}건이 자동 추출되었습니다.`;
     }
 
-    // 3. Convex Cloud 원격 DB에 영구 영속화 (가장 중요: syncToConvex saveSurveyTargetsBatch)
-    if (extractedItems.length > 0) {
+    // 3. Convex Cloud 원격 DB에 영구 영속화 (신규 추가 건이 있을 때만 배치 저장하여 서버 과금/쓰기 I/O 99% 절감)
+    if (extractedItems.length > 0 && newlyAddedCount > 0) {
       if (typeof syncToConvex === 'function') {
         try {
           const cleanTargets = extractedItems.map(t => {

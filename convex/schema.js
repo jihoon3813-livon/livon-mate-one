@@ -3,31 +3,47 @@ import { v } from "convex/values";
 
 export default defineSchema({
   // 고객 신청 대장
-  applications: defineTable(v.any()),
+  applications: defineTable(v.any())
+    .index("by_custom_id", ["id"]),
 
   // 간병인 배정
-  assignments: defineTable(v.any()),
+  assignments: defineTable(v.any())
+    .index("by_custom_id", ["id"])
+    .index("by_applyId", ["applyId"]),
 
   // 보험 청구 (10일제/월단위)
-  claims: defineTable(v.any()),
+  claims: defineTable(v.any())
+    .index("by_custom_id", ["id"])
+    .index("by_applyId", ["applyId"]),
 
   // 간병비 지급 관리
-  payouts: defineTable(v.any()),
+  payouts: defineTable(v.any())
+    .index("by_custom_id", ["id"])
+    .index("by_applyId", ["applyId"]),
 
   // 리본메이트 모바일 음성일지
-  careLogs: defineTable(v.any()),
+  careLogs: defineTable(v.any())
+    .index("by_custom_id", ["id"])
+    .index("by_applyId", ["applyId"]),
 
   // 팩스 발송 기록
-  faxRecords: defineTable(v.any()),
+  faxRecords: defineTable(v.any())
+    .index("by_custom_id", ["id"]),
 
   // 손해사정사 디렉토리
-  adjusters: defineTable(v.any()),
+  adjusters: defineTable(v.any())
+    .index("by_custom_id", ["id"])
+    .index("by_name", ["name"]),
 
   // 관리자 권한 (RBAC)
-  admins: defineTable(v.any()),
+  admins: defineTable(v.any())
+    .index("by_custom_id", ["id"])
+    .index("by_username", ["username"]),
 
   // 협력 센터 / 파트너
-  partners: defineTable(v.any()),
+  partners: defineTable(v.any())
+    .index("by_custom_id", ["id"])
+    .index("by_name", ["name"]),
 
   // 간병인 인력풀 (Caregivers Directory)
   caregivers: defineTable(v.any())
@@ -39,7 +55,8 @@ export default defineSchema({
     .index("by_key", ["key"]),
 
   // 양식 설정 및 필드 매핑 / 배경 (Form Configs & Backgrounds)
-  formConfigs: defineTable(v.any()),
+  formConfigs: defineTable(v.any())
+    .index("by_formCode", ["formCode"]),
 
   // 삼성화재 사전명단 (누적 가입자 마스터 DB 12대 항목)
   samsungEligible: defineTable(v.any())
@@ -52,10 +69,12 @@ export default defineSchema({
     .index("by_sheetKey", ["sheetKey"]),
 
   // 삼성화재 이메일 주소록
-  samsungAddressBook: defineTable(v.any()),
+  samsungAddressBook: defineTable(v.any())
+    .index("by_custom_id", ["id"]),
 
   // 삼성화재 이메일 발송 이력 (일일접수/월간청구)
-  samsungEmailLogs: defineTable(v.any()),
+  samsungEmailLogs: defineTable(v.any())
+    .index("by_custom_id", ["id"]),
 
   // 삼성화재 발송완료 간병일지 히스토리
   samsungSentCareLogs: defineTable(v.any()),
@@ -67,6 +86,7 @@ export default defineSchema({
 
   // 고객만족도 조사 대상자 (Survey Targets)
   surveyTargets: defineTable(v.any())
+    .index("by_custom_id", ["id"])
     .index("by_serviceId", ["serviceId"])
     .index("by_targetStatus", ["targetStatus"])
     .index("by_dueAt", ["dueAt"])
