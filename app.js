@@ -5649,8 +5649,12 @@ function setSamsungSheetPage(pageNum) {
 
   gSamsungSheetPage = pageNum;
   renderCurrentSamsungSheet();
-  const container = document.getElementById('samsungSpreadsheetContainer');
-  if (container) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const isClaimHub = (gActiveTab === 'samsungclaimhub');
+  const container = document.getElementById(isClaimHub ? 'samsungClaimHubSpreadsheetContainer' : 'samsungSpreadsheetContainer');
+  if (container) {
+    container.scrollTop = 0;
+    container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 }
 
 // Initialize data from window.REBORN_DATA
@@ -7968,27 +7972,32 @@ function renderCurrentSamsungSheet() {
   const endIdx = isAll ? totalItems : Math.min(startIdx + gSamsungSheetPageSize, totalItems);
   const pageRows = filteredRows.slice(startIdx, endIdx);
 
-  // 엑셀 틀 고정 (Sticky Columns): 선택(0px), 행(40px), 피보험자ID(84px), 피보험자명(194px), 생년월일(294px)
-  const getStickyInfo = (colKey, isHeader = false, isSelected = false, displayIdx = 0, hasPending = false) => {
+  // 엑셀 틀 고정 (Sticky Columns & Rows):
+  // 선택(0px), 행(40px), 피보험자ID(84px), 피보험자명(194px), 생년월일(294px)
+  // 헤더 1행: top: 0px, 헤더 2행: top: 28px
+  const getStickyInfo = (colKey, isHeader = false, isSelected = false, displayIdx = 0, hasPending = false, headerRow = 1) => {
     const isCompleted = (gActiveSamsungSheet === 'completed');
+    const topStyle = isHeader ? `top: ${headerRow === 2 ? '28px' : '0px'}; ` : '';
+    const headerZ = headerRow === 2 ? 45 : 46;
+
     if (colKey === 'select') {
       return {
         isSticky: true,
-        style: 'position: sticky; left: 0px; z-index: ' + (isHeader ? 35 : 15) + '; width: 40px; min-width: 40px; max-width: 40px;',
+        style: `position: sticky; ${topStyle}left: 0px; z-index: ${isHeader ? headerZ : 15}; width: 40px; min-width: 40px; max-width: 40px;`,
         bg: isHeader ? 'bg-slate-200' : (isSelected ? 'bg-sky-100' : (displayIdx % 2 === 1 ? 'bg-slate-100' : 'bg-slate-50'))
       };
     }
     if (colKey === 'rowNum') {
       return {
         isSticky: true,
-        style: 'position: sticky; left: 40px; z-index: ' + (isHeader ? 35 : 15) + '; width: 44px; min-width: 44px; max-width: 44px;',
+        style: `position: sticky; ${topStyle}left: 40px; z-index: ${isHeader ? headerZ : 15}; width: 44px; min-width: 44px; max-width: 44px;`,
         bg: isHeader ? 'bg-slate-200' : (isSelected ? 'bg-sky-100' : (displayIdx % 2 === 1 ? 'bg-slate-100' : 'bg-slate-50'))
       };
     }
     if (colKey === 'patientId') {
       return {
         isSticky: true,
-        style: 'position: sticky; left: 84px; z-index: ' + (isHeader ? 30 : 10) + '; width: 110px; min-width: 110px; max-width: 110px;',
+        style: `position: sticky; ${topStyle}left: 84px; z-index: ${isHeader ? (headerZ - 5) : 10}; width: 110px; min-width: 110px; max-width: 110px;`,
         bg: isHeader ? 'bg-slate-200' : (hasPending ? 'bg-amber-100' : (isSelected ? 'bg-sky-100' : (displayIdx % 2 === 1 ? 'bg-slate-50' : 'bg-white')))
       };
     }
@@ -7997,14 +8006,14 @@ function renderCurrentSamsungSheet() {
       const borderShadow = isLastSticky ? 'box-shadow: 4px 0 8px -2px rgba(0,0,0,0.15); border-right: 2px solid #94a3b8;' : '';
       return {
         isSticky: true,
-        style: `position: sticky; left: 194px; z-index: ${isHeader ? 30 : 10}; width: 100px; min-width: 100px; max-width: 100px; ${borderShadow}`,
+        style: `position: sticky; ${topStyle}left: 194px; z-index: ${isHeader ? (headerZ - 5) : 10}; width: 100px; min-width: 100px; max-width: 100px; ${borderShadow}`,
         bg: isHeader ? 'bg-slate-200' : (hasPending ? 'bg-amber-100' : (isSelected ? 'bg-sky-100' : (displayIdx % 2 === 1 ? 'bg-slate-50' : 'bg-white')))
       };
     }
     if (colKey === 'birthDate') {
       return {
         isSticky: true,
-        style: 'position: sticky; left: 294px; z-index: ' + (isHeader ? 30 : 10) + '; width: 100px; min-width: 100px; max-width: 100px; box-shadow: 4px 0 8px -2px rgba(0,0,0,0.15); border-right: 2px solid #94a3b8;',
+        style: `position: sticky; ${topStyle}left: 294px; z-index: ${isHeader ? (headerZ - 5) : 10}; width: 100px; min-width: 100px; max-width: 100px; box-shadow: 4px 0 8px -2px rgba(0,0,0,0.15); border-right: 2px solid #94a3b8;`,
         bg: isHeader ? 'bg-slate-200' : (hasPending ? 'bg-amber-100' : (isSelected ? 'bg-sky-100' : (displayIdx % 2 === 1 ? 'bg-slate-50' : 'bg-white')))
       };
     }
@@ -8013,33 +8022,33 @@ function renderCurrentSamsungSheet() {
 
   let html = `
     <table class="w-full text-left text-xs border-separate border-spacing-0 font-sans min-w-[1400px]">
-      <thead class="sticky top-0 z-20 shadow-xs">
+      <thead class="sticky top-0 z-30 shadow-xs">
         <!-- 1st Header Row: Excel Column Letters (A, B, C...) -->
-        <tr class="bg-slate-100 text-slate-400 font-mono text-[10px] select-none border-b border-slate-200">
-          <th class="p-1.5 text-center border-r border-b border-slate-300 bg-slate-200" style="${getStickyInfo('select', true).style}">
+        <tr class="bg-slate-100 text-slate-400 font-mono text-[10px] select-none border-b border-slate-200 h-[28px] max-h-[28px]">
+          <th class="p-1.5 text-center border-r border-b border-slate-300 bg-slate-200" style="${getStickyInfo('select', true, false, 0, false, 1).style}">
             <input type="checkbox" onchange="toggleSamsungSelectAll(this.checked)" class="w-3.5 h-3.5 rounded text-sky-600 focus:ring-sky-500 cursor-pointer" ${gSamsungSelectedRows.size > 0 && gSamsungSelectedRows.size === filteredRows.length ? 'checked' : ''}>
           </th>
-          <th class="p-1.5 text-center border-r border-b border-slate-300 font-mono text-slate-600 bg-slate-200" style="${getStickyInfo('rowNum', true).style}">#</th>
+          <th class="p-1.5 text-center border-r border-b border-slate-300 font-mono text-slate-600 bg-slate-200" style="${getStickyInfo('rowNum', true, false, 0, false, 1).style}">#</th>
           ${schema.map((col, cIdx) => {
-            const st = getStickyInfo(col.key, true);
-            const extraStyle = st.isSticky ? st.style : `min-width: ${col.width}; width: ${col.width};`;
+            const st = getStickyInfo(col.key, true, false, 0, false, 1);
+            const extraStyle = st.isSticky ? st.style : `position: sticky; top: 0px; z-index: 25; min-width: ${col.width}; width: ${col.width};`;
             const extraBg = st.isSticky ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-400';
             return `
               <th class="p-1.5 text-center border-r border-b border-slate-300 font-bold ${extraBg}" style="${extraStyle}">${getSamsungColumnLetter(cIdx)}</th>
             `;
           }).join('')}
           ${isEligibleSheet ? `
-            <th class="p-1.5 text-center border-r border-b border-slate-300 font-bold bg-sky-100 text-sky-800" style="min-width: 105px;">${getSamsungColumnLetter(schema.length)}</th>
+            <th class="p-1.5 text-center border-r border-b border-slate-300 font-bold bg-sky-100 text-sky-800" style="position: sticky; top: 0px; z-index: 25; min-width: 105px;">${getSamsungColumnLetter(schema.length)}</th>
           ` : ''}
           ${isTargetSheet ? `
-            <th class="p-1.5 text-center border-r border-b border-slate-300 font-bold bg-purple-100 text-purple-800" style="min-width: 135px;">${getSamsungColumnLetter(schema.length)}</th>
+            <th class="p-1.5 text-center border-r border-b border-slate-300 font-bold bg-purple-100 text-purple-800" style="position: sticky; top: 0px; z-index: 25; min-width: 135px;">${getSamsungColumnLetter(schema.length)}</th>
           ` : ''}
         </tr>
 
         <!-- 2nd Header Row: Column Korean Labels with sorting -->
-        <tr class="bg-slate-50 text-slate-800 font-bold border-b-2 border-slate-300 select-none">
-          <th class="p-2 text-center border-r border-b border-slate-300 bg-slate-100" style="${getStickyInfo('select', true).style}">선택</th>
-          <th class="p-2 text-center border-r border-b border-slate-300 bg-slate-100 text-slate-600 font-mono" style="${getStickyInfo('rowNum', true).style}">행</th>
+        <tr class="bg-slate-50 text-slate-800 font-bold border-b-2 border-slate-300 select-none h-[38px] max-h-[38px]">
+          <th class="p-2 text-center border-r border-b border-slate-300 bg-slate-100" style="${getStickyInfo('select', true, false, 0, false, 2).style}">선택</th>
+          <th class="p-2 text-center border-r border-b border-slate-300 bg-slate-100 text-slate-600 font-mono" style="${getStickyInfo('rowNum', true, false, 0, false, 2).style}">행</th>
           ${schema.map(col => {
             const isSorted = gSamsungSortCol === col.key;
             let sortIcon = '<i data-lucide="chevrons-up-down" class="w-3.5 h-3.5 text-slate-400 opacity-60 group-hover:opacity-100 shrink-0"></i>';
@@ -8048,8 +8057,8 @@ function renderCurrentSamsungSheet() {
                 ? '<i data-lucide="arrow-up" class="w-3.5 h-3.5 text-sky-600 font-black shrink-0"></i>'
                 : '<i data-lucide="arrow-down" class="w-3.5 h-3.5 text-sky-600 font-black shrink-0"></i>';
             }
-            const st = getStickyInfo(col.key, true);
-            const extraStyle = st.isSticky ? st.style : `min-width: ${col.width}; width: ${col.width};`;
+            const st = getStickyInfo(col.key, true, false, 0, false, 2);
+            const extraStyle = st.isSticky ? st.style : `position: sticky; top: 28px; z-index: 25; min-width: ${col.width}; width: ${col.width};`;
             const baseBg = isSorted ? 'bg-sky-100 text-sky-950 font-black' : (st.isSticky ? 'bg-slate-100 text-slate-900 font-black' : 'bg-slate-50 text-slate-800');
             return `
               <th onclick="toggleSamsungSort('${col.key}')" 
@@ -8064,7 +8073,7 @@ function renderCurrentSamsungSheet() {
             `;
           }).join('')}
           ${isEligibleSheet ? `
-            <th class="p-2.5 text-center border-r border-b border-slate-300 whitespace-nowrap bg-sky-50 text-sky-950 font-bold shadow-inner" style="min-width: 105px;">
+            <th class="p-2.5 text-center border-r border-b border-slate-300 whitespace-nowrap bg-sky-50 text-sky-950 font-bold shadow-inner" style="position: sticky; top: 28px; z-index: 25; min-width: 105px;">
               <div class="flex items-center justify-center gap-1">
                 <i data-lucide="user-plus" class="w-3.5 h-3.5 text-sky-700"></i>
                 <span>신규 접수</span>
@@ -8072,7 +8081,7 @@ function renderCurrentSamsungSheet() {
             </th>
           ` : ''}
           ${isTargetSheet ? `
-            <th class="p-2.5 text-center border-r border-b border-slate-300 whitespace-nowrap bg-purple-50 text-purple-950 font-bold shadow-inner" style="min-width: 145px;">
+            <th class="p-2.5 text-center border-r border-b border-slate-300 whitespace-nowrap bg-purple-50 text-purple-950 font-bold shadow-inner" style="position: sticky; top: 28px; z-index: 25; min-width: 145px;">
               <div class="flex items-center justify-center gap-1">
                 <i data-lucide="file-text" class="w-3.5 h-3.5 text-purple-700"></i>
                 <span>간병일지 현황/첨부</span>

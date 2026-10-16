@@ -2400,9 +2400,9 @@
           </div>
         </div>
 
-        <!-- 4. 웹 엑셀 테이블 그리드 렌더링 컨테이너 (행 아래를 막지 않고 시원하게 개방) -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-xs">
-          <div class="overflow-x-auto custom-scrollbar" id="samsungSpreadsheetContainer">
+        <!-- 4. 웹 엑셀 테이블 그리드 렌더링 컨테이너 (위 아래 흔들림 없이 시원하게 고정) -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div class="overflow-x-auto overflow-y-auto custom-scrollbar max-h-[calc(100vh-280px)] min-h-[480px]" id="samsungSpreadsheetContainer">
             <!-- Dynamic Spreadsheet rendered by renderCurrentSamsungSheet() in app.js -->
           </div>
         </div>
@@ -2613,8 +2613,8 @@
           </div>
 
           <!-- 웹 엑셀 테이블 그리드 렌더링 컨테이너 -->
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs">
-            <div class="overflow-x-auto custom-scrollbar" id="samsungClaimHubSpreadsheetContainer">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div class="overflow-x-auto overflow-y-auto custom-scrollbar max-h-[calc(100vh-280px)] min-h-[480px]" id="samsungClaimHubSpreadsheetContainer">
               <!-- Rendered by renderCurrentSamsungSheet() -->
             </div>
           </div>
@@ -13681,7 +13681,7 @@
   <script src="slack-report-client.js?v=20261006_1510"></script>
   <script src="./xlsx-populate.min.js"></script>
   <script src="care-report-2page-pdf.js?v=20261015_1755"></script>
-  <script src="app.js?v=20261016_1756"></script>
+  <script src="app.js?v=20261016_1825"></script>
   <script src="carehub.js?v=20261016_1725"></script>
   <script src="hyundaiclaimhub.js?v=20261016_split"></script>
   <script src="samsungclaimhub.js?v=20261016_split"></script>
