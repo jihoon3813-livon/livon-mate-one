@@ -3141,6 +3141,11 @@ function findCustomerMatchedCallLogs(app) {
 
   if (!callLogs || callLogs.length === 0) return [];
 
+  // [초고속 0ms 캐시]: 동일 고객 및 콜로그 참조에 대한 결과 즉시 반환
+  if (app._cachedMatchedCallLogs && app._cachedCallLogsRef === callLogs && app._cachedPhoneKey === String(app.phone || '') && app._cachedNameKey === String(app.patientName || '')) {
+    return app._cachedMatchedCallLogs;
+  }
+
   const cleanDigits = (p) => String(p || '').replace(/[^0-9]/g, '');
   const cleanKorean = (s) => String(s || '').replace(/(님|환자|고객|보호자|어르신|\s)/g, '').trim();
 
@@ -3197,11 +3202,17 @@ function findCustomerMatchedCallLogs(app) {
   });
 
   // 최신 일시 순 정렬
-  return matched.sort((a, b) => {
+  const sorted = matched.sort((a, b) => {
     const ta = Date.parse(String(a.callTime || '').replace(/[.\/]+/g, '-')) || 0;
     const tb = Date.parse(String(b.callTime || '').replace(/[.\/]+/g, '-')) || 0;
     return tb - ta;
   });
+
+  app._cachedMatchedCallLogs = sorted;
+  app._cachedCallLogsRef = callLogs;
+  app._cachedPhoneKey = String(app.phone || '');
+  app._cachedNameKey = String(app.patientName || '');
+  return sorted;
 }
 window.findCustomerMatchedCallLogs = findCustomerMatchedCallLogs;
 
@@ -3249,14 +3260,26 @@ window.getAppCombinedCsRecords = getAppCombinedCsRecords;
 function getCustomerCtiComplaintInfo(app) {
   if (!app) return null;
 
+  // [초고속 0ms 캐시]: 고객 업데이트 일시 및 CS 라벨이 같으면 0ms 즉시 반환
+  if (app._cachedComplaintInfo !== undefined && app._cachedComplaintUpd === (app.updatedAt || '') && app._cachedComplaintCsLabel === (app.csLatestLabel || '')) {
+    return app._cachedComplaintInfo;
+  }
+
+  const _cacheAndReturn = (res) => {
+    app._cachedComplaintInfo = res;
+    app._cachedComplaintUpd = app.updatedAt || '';
+    app._cachedComplaintCsLabel = app.csLatestLabel || '';
+    return res;
+  };
+
   // [사용자 요구사항]: 동일인이 여러 개 리스트에 있는 경우 CTI 정보를 모든 카드에 노출하지 않고 가장 마지막에 등록한 리스트 하나에만 노출
   if (typeof isLatestAppForCustomer === 'function' && !isLatestAppForCustomer(app)) {
-    return null;
+    return _cacheAndReturn(null);
   }
 
   // 1. 고객 대장에 직접 등록된 CS 민원/긴급 라벨 확인
   if (app.csLatestLabel === '민원' || app.csLatestLabel === '긴급' || app.csLatestLabel === '강성') {
-    return {
+    return _cacheAndReturn({
       hasComplaint: true,
       hasInquiry: false,
       type: '민원',
@@ -3264,7 +3287,7 @@ function getCustomerCtiComplaintInfo(app) {
       callTime: app.updatedAt ? app.updatedAt.slice(0, 16).replace('T', ' ') : '',
       title: app.csLatestMemo || `${app.csLatestLabel} 접수`,
       summary: app.csLatestMemo || ''
-    };
+    });
   }
 
   // 2. CTI 상담콜 로그에서 탐색 (종합콜 연동)
@@ -3274,7 +3297,7 @@ function getCustomerCtiComplaintInfo(app) {
     // 2-1. 불만/민원/긴급 인입 확인
     const complaintCall = matchedLogs.find(c => isCallComplaint(c));
     if (complaintCall) {
-      return {
+      return _cacheAndReturn({
         hasComplaint: true,
         hasInquiry: false,
         type: '민원',
@@ -3286,13 +3309,13 @@ function getCustomerCtiComplaintInfo(app) {
         operator: complaintCall.operator || '',
         category: complaintCall.category || '민원',
         callId: complaintCall.id
-      };
+      });
     }
 
     // 2-2. [사용자 요구사항]: 종합콜에 콜이 들어온 건은 민원발생/문의발생 등으로 무조건 노티를 띄워
     const latestCall = matchedLogs[0];
     if (latestCall) {
-      return {
+      return _cacheAndReturn({
         hasComplaint: false,
         hasInquiry: true,
         type: '문의',
@@ -3304,13 +3327,13 @@ function getCustomerCtiComplaintInfo(app) {
         operator: latestCall.operator || '',
         category: latestCall.category || latestCall.arsMenu || '문의',
         callId: latestCall.id
-      };
+      });
     }
   }
 
   // 3. 고객 대장에 등록된 일반 CS 이력이 있는 경우
   if (app.csLatestLabel && app.csLatestLabel !== '처리완료' && app.csLatestLabel !== '처리불가') {
-    return {
+    return _cacheAndReturn({
       hasComplaint: false,
       hasInquiry: true,
       type: '문의',
@@ -3318,10 +3341,10 @@ function getCustomerCtiComplaintInfo(app) {
       callTime: app.updatedAt ? app.updatedAt.slice(0, 16).replace('T', ' ') : '',
       title: app.csLatestMemo || `${app.csLatestLabel} 상담`,
       summary: app.csLatestMemo || ''
-    };
+    });
   }
 
-  return null;
+  return _cacheAndReturn(null);
 }
 window.getCustomerCtiComplaintInfo = getCustomerCtiComplaintInfo;
 
@@ -27571,6 +27594,9 @@ window.getActiveCaregiverAssignment = getActiveCaregiverAssignment;
  */
 function determineRealCareStatus(app, specificAssigns) {
   if (!app) return '신규';
+  if (!specificAssigns && app._renderCareStatus) {
+    return app._renderCareStatus;
+  }
 
   const as = getActiveCaregiverAssignment(app, specificAssigns);
 
@@ -28621,6 +28647,410 @@ function onCustEditGuardianRelationChange(val) {
 }
 window.onCustEditGuardianRelationChange = onCustEditGuardianRelationChange;
 
+// =========================================================================
+// [비고 / 특이사항] 다중 항목 동적 추가/수정/삭제 관리 엔진
+// =========================================================================
+function getCustomerMemoList(app) {
+  if (!app) return [];
+  if (Array.isArray(app.memoList) && app.memoList.length > 0) {
+    return app.memoList;
+  }
+  const raw = (app.memo || app.specialNotes || '').trim();
+  if (!raw) return [];
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  const dateStr = (app.updatedAt ? app.updatedAt.slice(0, 16).replace('T', ' ') : (app.applyDate || ''));
+  if (lines.length > 1) {
+    return lines.map((line, idx) => ({
+      id: 'm_init_' + idx,
+      text: line,
+      createdAt: dateStr,
+      author: '관리자'
+    }));
+  }
+  return [{
+    id: 'm_init_0',
+    text: raw,
+    createdAt: dateStr,
+    author: '관리자'
+  }];
+}
+window.getCustomerMemoList = getCustomerMemoList;
+
+function renderCustomerMemoSectionHtml(app, options = {}) {
+  if (!app) return '';
+  const memoList = getCustomerMemoList(app);
+  const hasMemos = memoList.length > 0 || Boolean(app.memo) || Boolean(app.specialNotes);
+
+  return `
+    <div id="hubMemoSection_${app.id}" class="hub-memo-section-${app.id} bg-white p-3.5 sm:p-4 rounded-2xl border ${hasMemos ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200/90'} shadow-xs space-y-2.5 text-xs transition-all">
+      <!-- 1. 헤더: 비고/특이사항 배지, 건수 배지, 일괄편집 버튼 -->
+      <div class="flex items-center justify-between gap-2 pb-1.5 border-b border-amber-200/70">
+        <div class="flex items-center gap-2 min-w-0 flex-wrap">
+          <span class="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold text-[10.5px] flex items-center gap-1.5 shrink-0 shadow-2xs">
+            <i data-lucide="clipboard-pen" class="w-3.5 h-3.5 text-amber-700"></i> 비고 / 특이사항
+          </span>
+          <span class="px-2 py-0.5 rounded-full text-[10.5px] font-bold ${memoList.length > 0 ? 'bg-amber-200/80 text-amber-900 border border-amber-300' : 'bg-slate-100 text-slate-500'}">
+            총 ${memoList.length}건
+          </span>
+          <span class="text-[10.5px] text-slate-400 font-medium hidden sm:inline">
+            · 항목을 아래로 계속 추가하여 관리할 수 있습니다.
+          </span>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button type="button" onclick="openCustomerMemoModal('${app.id}')" 
+                  class="px-2.5 py-1 rounded-lg bg-white hover:bg-amber-100 text-amber-900 border border-amber-300/80 font-bold text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-2xs" 
+                  title="비고 및 특이사항 전체 일괄 텍스트 편집">
+            <i data-lucide="edit-3" class="w-3 h-3 text-amber-700"></i> 전체편집
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. 항목 리스트 (아래로 차례대로 나열) -->
+      <div id="hubMemoListContainer_${app.id}" class="space-y-1.5 max-h-[190px] overflow-y-auto custom-scrollbar pr-0.5">
+        ${memoList.length === 0 ? `
+          <div class="py-2.5 px-3 text-center text-slate-400 italic text-[11px] bg-white/70 rounded-xl border border-dashed border-amber-200">
+            등록된 비고 및 특이사항이 없습니다. 아래 입력창에 작성 후 [추가]를 눌러주세요.
+          </div>
+        ` : memoList.map((item, idx) => `
+          <div id="hubMemoItemRow_${app.id}_${item.id}" class="group bg-white p-2.5 rounded-xl border border-amber-200/80 hover:border-amber-400 shadow-2xs transition-all flex items-start justify-between gap-2.5 text-xs">
+            <div class="flex items-start gap-2 min-w-0 flex-1">
+              <span class="w-5 h-5 rounded-md bg-amber-100/90 text-amber-800 font-mono font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                ${idx + 1}
+              </span>
+              <div class="min-w-0 flex-1">
+                <div id="hubMemoItemText_${app.id}_${item.id}" class="text-slate-800 text-[11.5px] font-medium leading-relaxed whitespace-pre-wrap break-words">
+                  ${typeof escapeHtml === 'function' ? escapeHtml(item.text) : item.text}
+                </div>
+                <div class="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1.5">
+                  <span>${item.createdAt || ''}</span>
+                  ${item.author ? `<span class="text-slate-400">·</span><span class="text-slate-500 font-sans font-medium">${typeof escapeHtml === 'function' ? escapeHtml(item.author) : item.author}</span>` : ''}
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+              <button type="button" onclick="startEditCustomerMemoItem('${app.id}', '${item.id}')" 
+                      class="p-1 rounded-md text-slate-400 hover:text-amber-800 hover:bg-amber-100 transition-all cursor-pointer" 
+                      title="이 항목 수정">
+                <i data-lucide="edit-2" class="w-3 h-3 text-amber-700"></i>
+              </button>
+              <button type="button" onclick="deleteCustomerMemoItem('${app.id}', '${item.id}')" 
+                      class="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer" 
+                      title="이 항목 삭제">
+                <i data-lucide="trash-2" class="w-3 h-3 text-rose-500"></i>
+              </button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- 3. 빠른 항목 추가 입력창 (아래로 계속 추가) -->
+      <div class="pt-1.5 flex items-center gap-1.5 border-t border-amber-200/50">
+        <div class="relative flex-1">
+          <input type="text" 
+                 id="newHubMemoInput_${app.id}" 
+                 placeholder="새 비고/특이사항 항목 입력 후 [Enter] 또는 [추가] 클릭..." 
+                 class="w-full px-3 py-1.5 bg-white rounded-xl border border-amber-300 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-inner font-medium"
+                 onkeydown="if(event.key === 'Enter' && !event.isComposing) { event.preventDefault(); addCustomerMemoItem('${app.id}'); }">
+        </div>
+        <button type="button" 
+                onclick="addCustomerMemoItem('${app.id}')" 
+                class="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs hover:shadow-sm flex items-center gap-1 transition-all cursor-pointer shrink-0">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+          <span>추가</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+window.renderCustomerMemoSectionHtml = renderCustomerMemoSectionHtml;
+
+function addCustomerMemoItem(appId, customText) {
+  if (!appId) return;
+  const inputEl = document.getElementById(`newHubMemoInput_${appId}`);
+  const text = (customText !== undefined ? customText : (inputEl ? inputEl.value : '')).trim();
+  if (!text) {
+    if (inputEl) inputEl.focus();
+    return;
+  }
+
+  const appIdx = (gApps || []).findIndex(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
+  if (appIdx === -1) return;
+  const app = gApps[appIdx];
+
+  const currentList = getCustomerMemoList(app).slice();
+  const now = new Date();
+  const dateStr = `${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  const newItem = {
+    id: 'memo_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    text: text,
+    createdAt: dateStr,
+    author: (window.currentUser && window.currentUser.name) || '관리자'
+  };
+
+  currentList.push(newItem);
+  app.memoList = currentList;
+  app.memo = currentList.map(m => m.text).join('\n');
+  app.specialNotes = app.memo;
+  app.updatedAt = new Date().toISOString();
+  gApps[appIdx] = app;
+
+  if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
+    const rIdx = window.REBORN_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
+    if (rIdx !== -1) {
+      window.REBORN_DATA.applications[rIdx] = { 
+        ...window.REBORN_DATA.applications[rIdx], 
+        memoList: app.memoList, 
+        memo: app.memo, 
+        specialNotes: app.specialNotes, 
+        updatedAt: app.updatedAt 
+      };
+    }
+  }
+
+  try {
+    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+  } catch (e) {}
+
+  fetch('/api/hub/customer/update-fields', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      appId: app.id,
+      fields: { 
+        memoList: app.memoList, 
+        memo: app.memo, 
+        specialNotes: app.specialNotes, 
+        updatedAt: app.updatedAt 
+      }
+    })
+  }).catch(() => {});
+
+  fetch('/api/hub/real-data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      applications: gApps,
+      assignments: (typeof gAssigns !== 'undefined' ? gAssigns : []),
+      claims: (typeof gClaims !== 'undefined' ? gClaims : []),
+      payouts: (typeof gPayouts !== 'undefined' ? gPayouts : [])
+    })
+  }).catch(() => {});
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:updateMemo', { appId: app.id, memo: app.memo, memoList: app.memoList });
+    syncToConvex('sync:saveApplication', { app: app });
+  }
+
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '고객상세',
+      actionType: 'UPDATE',
+      target: `고객 [${app.id}] (${app.patientName})`,
+      summary: `[${app.patientName} 님] 비고/특이사항 항목 추가`,
+      changes: {
+        '추가내용': { before: '(없음)', after: text }
+      }
+    });
+  }
+
+  // Refresh UI in place
+  refreshCustomerMemoSection(app.id);
+
+  // Scroll to bottom of memo list and refocus input
+  setTimeout(() => {
+    const container = document.getElementById(`hubMemoListContainer_${app.id}`);
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+    const newInput = document.getElementById(`newHubMemoInput_${app.id}`);
+    if (newInput) {
+      newInput.value = '';
+      newInput.focus();
+    }
+  }, 50);
+
+  // Update outer tables/dashboards
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  if (typeof renderApplications === 'function') renderApplications();
+}
+window.addCustomerMemoItem = addCustomerMemoItem;
+
+function startEditCustomerMemoItem(appId, itemId) {
+  const app = (gApps || []).find(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
+  if (!app) return;
+  const list = getCustomerMemoList(app);
+  const item = list.find(m => String(m.id) === String(itemId));
+  if (!item) return;
+
+  const rowEl = document.getElementById(`hubMemoItemRow_${app.id}_${item.id}`);
+  if (!rowEl) return;
+
+  rowEl.innerHTML = `
+    <div class="flex-1 flex items-center gap-1.5 w-full">
+      <input type="text" id="inlineEditMemo_${app.id}_${item.id}" value="${typeof escapeHtml === 'function' ? escapeHtml(item.text) : item.text}" 
+             class="flex-1 px-2.5 py-1 bg-white border border-amber-400 rounded-lg text-xs text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none" 
+             onkeydown="if(event.key === 'Enter' && !event.isComposing) { event.preventDefault(); saveEditCustomerMemoItem('${app.id}', '${item.id}'); } else if (event.key === 'Escape') { cancelEditCustomerMemoItem('${app.id}'); }">
+      <button type="button" onclick="saveEditCustomerMemoItem('${app.id}', '${item.id}')" 
+              class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10.5px] cursor-pointer shrink-0">
+        저장
+      </button>
+      <button type="button" onclick="cancelEditCustomerMemoItem('${app.id}')" 
+              class="px-2 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[10.5px] cursor-pointer shrink-0">
+        취소
+      </button>
+    </div>
+  `;
+  setTimeout(() => {
+    const editInput = document.getElementById(`inlineEditMemo_${app.id}_${item.id}`);
+    if (editInput) {
+      editInput.focus();
+      editInput.setSelectionRange(editInput.value.length, editInput.value.length);
+    }
+  }, 50);
+}
+window.startEditCustomerMemoItem = startEditCustomerMemoItem;
+
+function cancelEditCustomerMemoItem(appId) {
+  refreshCustomerMemoSection(appId);
+}
+window.cancelEditCustomerMemoItem = cancelEditCustomerMemoItem;
+
+function saveEditCustomerMemoItem(appId, itemId) {
+  const inputEl = document.getElementById(`inlineEditMemo_${appId}_${itemId}`);
+  if (!inputEl) return;
+  const newText = inputEl.value.trim();
+  if (!newText) {
+    alert('비고 내용을 입력해주세요.');
+    inputEl.focus();
+    return;
+  }
+
+  const appIdx = (gApps || []).findIndex(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
+  if (appIdx === -1) return;
+  const app = gApps[appIdx];
+
+  const currentList = getCustomerMemoList(app).slice();
+  const itemIdx = currentList.findIndex(m => String(m.id) === String(itemId));
+  if (itemIdx === -1) return;
+
+  currentList[itemIdx] = {
+    ...currentList[itemIdx],
+    text: newText,
+    updatedAt: new Date().toISOString()
+  };
+
+  app.memoList = currentList;
+  app.memo = currentList.map(m => m.text).join('\n');
+  app.specialNotes = app.memo;
+  app.updatedAt = new Date().toISOString();
+  gApps[appIdx] = app;
+
+  if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
+    const rIdx = window.REBORN_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
+    if (rIdx !== -1) {
+      window.REBORN_DATA.applications[rIdx] = { 
+        ...window.REBORN_DATA.applications[rIdx], 
+        memoList: app.memoList, 
+        memo: app.memo, 
+        specialNotes: app.specialNotes, 
+        updatedAt: app.updatedAt 
+      };
+    }
+  }
+
+  try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+
+  fetch('/api/hub/customer/update-fields', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      appId: app.id,
+      fields: { 
+        memoList: app.memoList, 
+        memo: app.memo, 
+        specialNotes: app.specialNotes, 
+        updatedAt: app.updatedAt 
+      }
+    })
+  }).catch(() => {});
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:updateMemo', { appId: app.id, memo: app.memo, memoList: app.memoList });
+    syncToConvex('sync:saveApplication', { app: app });
+  }
+
+  refreshCustomerMemoSection(app.id);
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  if (typeof renderApplications === 'function') renderApplications();
+}
+window.saveEditCustomerMemoItem = saveEditCustomerMemoItem;
+
+function deleteCustomerMemoItem(appId, itemId) {
+  if (!confirm('이 비고/특이사항 항목을 삭제하시겠습니까?')) return;
+
+  const appIdx = (gApps || []).findIndex(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
+  if (appIdx === -1) return;
+  const app = gApps[appIdx];
+
+  const currentList = getCustomerMemoList(app).filter(m => String(m.id) !== String(itemId));
+  app.memoList = currentList;
+  app.memo = currentList.map(m => m.text).join('\n');
+  app.specialNotes = app.memo;
+  app.updatedAt = new Date().toISOString();
+  gApps[appIdx] = app;
+
+  if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
+    const rIdx = window.REBORN_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
+    if (rIdx !== -1) {
+      window.REBORN_DATA.applications[rIdx] = { 
+        ...window.REBORN_DATA.applications[rIdx], 
+        memoList: app.memoList, 
+        memo: app.memo, 
+        specialNotes: app.specialNotes, 
+        updatedAt: app.updatedAt 
+      };
+    }
+  }
+
+  try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+
+  fetch('/api/hub/customer/update-fields', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      appId: app.id,
+      fields: { 
+        memoList: app.memoList, 
+        memo: app.memo, 
+        specialNotes: app.specialNotes, 
+        updatedAt: app.updatedAt 
+      }
+    })
+  }).catch(() => {});
+
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:updateMemo', { appId: app.id, memo: app.memo, memoList: app.memoList });
+    syncToConvex('sync:saveApplication', { app: app });
+  }
+
+  refreshCustomerMemoSection(app.id);
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  if (typeof renderApplications === 'function') renderApplications();
+}
+window.deleteCustomerMemoItem = deleteCustomerMemoItem;
+
+function refreshCustomerMemoSection(appId) {
+  const app = (gApps || []).find(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
+  if (!app) return;
+  const elements = document.querySelectorAll(`.hub-memo-section-${app.id}`);
+  elements.forEach(el => {
+    el.outerHTML = renderCustomerMemoSectionHtml(app);
+  });
+  if (typeof initIcons === 'function') initIcons();
+}
+window.refreshCustomerMemoSection = refreshCustomerMemoSection;
+
 /**
  * [NEW] 시계열 정산·청구 라이프사이클 연동 원스탑 워크스페이스 렌더러
  * 시계열 순서: 간병제공 ➡️ 보험금 청구 ➡️ 입금 확인 ➡️ 간병비 지급
@@ -29282,21 +29712,9 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
         </div>
 
         <!-- ========================================================================= -->
-        <!-- [MEMO BAR] 비고 / 특이사항 바 (3뷰와 동일) -->
+        <!-- [MEMO BAR] 비고 / 특이사항 바 (다중 항목 아래로 계속 추가) -->
         <!-- ========================================================================= -->
-        <div class="bg-white p-3.5 rounded-2xl border ${(app.memo || app.specialNotes) ? 'border-amber-300 bg-amber-50/60' : 'border-slate-200/90'} shadow-xs flex items-center justify-between gap-3 text-xs">
-          <div class="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
-            <span class="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold text-[10.5px] flex items-center gap-1.5 shrink-0 shadow-2xs">
-              <i data-lucide="clipboard-pen" class="w-3.5 h-3.5 text-amber-700"></i> 비고 / 특이사항
-            </span>
-            <div class="text-slate-800 text-[11.5px] font-medium leading-relaxed max-h-[75px] overflow-y-auto custom-scrollbar whitespace-pre-wrap break-words min-w-0 flex-1" title="${escapeHtml(app.memo || app.specialNotes || '')}">
-              ${(app.memo || app.specialNotes) ? escapeHtml(app.memo || app.specialNotes) : '<span class="text-slate-400 italic">등록된 비고 및 특이사항이 없습니다.</span>'}
-            </div>
-          </div>
-          <button type="button" onclick="openCustomerMemoModal('${app.id}')" class="px-2.5 py-1 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-2xs" title="비고 및 특이사항 수정">
-            <i data-lucide="edit-2" class="w-3 h-3 text-amber-700"></i> 수정
-          </button>
-        </div>
+        ${renderCustomerMemoSectionHtml(app)}
 
         <!-- [MEMO BAR] 지급비고 (간병비지급 시트 비고란) -->
         ${(() => {
@@ -30625,20 +31043,8 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
               </div>
             </div>
 
-            <!-- 섹션 3: 비고 및 특이사항 -->
-            <div class="bg-white p-3.5 rounded-2xl border ${(app.memo || app.specialNotes) ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200/80'} shadow-2xs space-y-1.5 mt-auto">
-              <div class="flex items-center justify-between text-xs pb-1 border-b border-slate-100">
-                <span class="font-bold text-slate-800 flex items-center gap-1.5">
-                  <i data-lucide="clipboard-pen" class="w-3.5 h-3.5 text-amber-600"></i> 비고 / 특이사항
-                </span>
-                <button type="button" onclick="editCustomerMemo('${app.id}')" class="text-sky-700 hover:underline font-bold text-[11px] flex items-center gap-0.5">
-                  <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
-                </button>
-              </div>
-              <p class="text-slate-700 leading-relaxed text-[11.5px] whitespace-pre-wrap font-medium">
-                ${app.memo || app.specialNotes || '<span class="text-slate-400 italic">등록된 비고 및 특이사항이 없습니다.</span>'}
-              </p>
-            </div>
+            <!-- 섹션 3: 비고 및 특이사항 (다중 항목 아래로 계속 추가) -->
+            ${renderCustomerMemoSectionHtml(app)}
 
           </div>
         </div>
@@ -33034,18 +33440,8 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
                   <span class="font-medium text-slate-700">${app.accidentType || '-'} · ${app.applyDate || '-'}</span>
                 </div>
 
-                <!-- 신청대장 비고 / 특이사항 -->
-                <div class="mt-2.5 p-2.5 rounded-xl ${app.memo ? 'bg-amber-50/80 border border-amber-200 text-amber-950' : 'bg-slate-50 border border-slate-200 text-slate-500'}">
-                  <div class="flex justify-between items-center text-[11px] font-bold mb-1">
-                    <span class="flex items-center gap-1 text-slate-700">
-                      <i data-lucide="clipboard-pen" class="w-3.5 h-3.5 text-amber-600"></i> 신청대장 비고/특이사항
-                    </span>
-                    <button onclick="event.stopPropagation(); editCustomerMemo('${app.id}')" class="text-primary-700 hover:text-primary-800 hover:underline text-[11px] font-bold flex items-center gap-0.5">
-                      <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
-                    </button>
-                  </div>
-                  <p class="text-xs leading-relaxed whitespace-pre-wrap font-medium">${app.memo || '(등록된 비고 및 특이사항 없음)'}</p>
-                </div>
+                <!-- 신청대장 비고 / 특이사항 (다중 항목 아래로 계속 추가) -->
+                ${renderCustomerMemoSectionHtml(app)}
               </div>
 
               <!-- STEP 2: 간병인 배정 관리 & 간병 기간 진행 경과 그래픽 -->
@@ -33669,35 +34065,6 @@ function renderUnifiedCareHub() {
   const insFilter = (rawInsFilter === 'SAMSUNG' || rawInsFilter === '삼성화재') ? '삼성' : ((rawInsFilter === 'HYUNDAI' || rawInsFilter === '현대해상') ? '현대' : 'ALL');
   if (typeof updateHubInsuranceTabUI === 'function') updateHubInsuranceTabUI();
 
-  // Helper: 간병비 청구 팩스 발송 완료 여부 판별 (신규 1차 고객등록 팩스는 청구 팩스가 아니므로 제외, 삼성화재 및 엑셀 등록 자료는 팩스 대상 제외)
-  const isClaimFaxSentHelper = (id) => {
-    const a = (gApps || []).find(item => item.id === id);
-    if (a && (a.insuranceCompany || '').includes('삼성')) return true;
-    if (a && (a.isRealLaunchData || a.importedFromExcel)) return true;
-    const r = gFaxRecords && gFaxRecords[id];
-    return !!(r && r.status === '전송완료' && r.caseType !== '현대해상 고객등록/조회' && r.formType !== 'HD_FORM_01');
-  };
-
-  // Pre-index unpaid payouts Set for ultra-fast O(1) checks
-  // [사용자 규칙]: 엑셀에서 '지급' 또는 '선지급완료'로 표기되지 않은 것은 모두 미지급(지급대기)
-  const unpaidPayoutAppIdSet = new Set();
-  if (Array.isArray(gPayouts)) {
-    for (let i = 0; i < gPayouts.length; i++) {
-      const p = gPayouts[i];
-      if (!p) continue;
-      const st = String(p.payoutStatus || p.status || '').trim();
-      const isPaid = (st === '지급' || st === '지급완료' || st === '선지급완료' || p.isPaid === true);
-      if (!isPaid) {
-        if (p.applyId) {
-          unpaidPayoutAppIdSet.add(String(p.applyId));
-        } else if (p.patientName) {
-          const matchedApp = (gApps || []).find(a => a.patientName && a.patientName.trim() === p.patientName.trim());
-          if (matchedApp) unpaidPayoutAppIdSet.add(String(matchedApp.id));
-        }
-      }
-    }
-  }
-
   // 1. 원수사 탭 뱃지 총 건수 산출 (실데이터 C-계열, D-계열 및 정상 등록 건 전수 포함)
   const activeHubApps = (gApps || []).filter(x => x && x.id && (!String(x.id).startsWith('S') || x.isRealLaunchData));
 
@@ -33722,27 +34089,148 @@ function renderUnifiedCareHub() {
   const bAll = document.getElementById('hubInsCount-ALL');
   if (bAll) bAll.innerText = allTotal + '건';
 
-  // 2. 선택된 원수사(탭) 기준 6개 파이프라인 KPI 카운트 산출
-  let completedCount = 0;
-  let needAssignCount = 0;
-  let inProgressCount = 0;
-  let unpaidClaimCount = 0;
-  let needPayoutCount = 0;
-  let needFaxCount = 0;
-  let scopedTotal = 0;
+  // [초고속 O(1) 사전 인덱싱 엔진] 배정, 청구, 지급, 일지, 팩스 데이터를 O(1) 맵으로 1회 일괄 색인
+  const appByIdMap = new Map();
+  for (let i = 0; i < activeHubApps.length; i++) {
+    appByIdMap.set(String(activeHubApps[i].id).trim(), activeHubApps[i]);
+  }
 
-  // Pre-index assigned caregiver presence from gAssigns
+  const assignsMap = new Map();
+  const assignsByNameMap = new Map();
   const actualAssignAppIdSet = new Set();
   const actualAssignPatientNameSet = new Set();
   if (Array.isArray(gAssigns)) {
     for (let i = 0; i < gAssigns.length; i++) {
       const as = gAssigns[i];
-      if (as && as.caregiverName && as.caregiverName !== '-' && as.caregiverName !== '미배정' && as.caregiverName !== '배정대기' && !as.caregiverName.includes('미배정')) {
+      if (!as) continue;
+      if (as.applyId) {
+        const k = String(as.applyId).trim();
+        if (!assignsMap.has(k)) assignsMap.set(k, []);
+        assignsMap.get(k).push(as);
+        const altK = k.startsWith('H') ? k.replace(/^H/, 'C') : (k.startsWith('C') ? k.replace(/^C/, 'H') : null);
+        if (altK && altK !== k) {
+          if (!assignsMap.has(altK)) assignsMap.set(altK, []);
+          assignsMap.get(altK).push(as);
+        }
+      }
+      if (as.patientName) {
+        const pKey = as.patientName.trim();
+        if (!assignsByNameMap.has(pKey)) assignsByNameMap.set(pKey, []);
+        assignsByNameMap.get(pKey).push(as);
+      }
+      const cgName = String(as.caregiverName || '').trim();
+      if (cgName && cgName !== '-' && !cgName.includes('미배정')) {
         if (as.applyId) actualAssignAppIdSet.add(as.applyId);
         if (as.patientName) actualAssignPatientNameSet.add(as.patientName.trim());
       }
     }
   }
+
+  const claimsMap = new Map();
+  const claimsByNameMap = new Map();
+  if (Array.isArray(gClaims)) {
+    for (let i = 0; i < gClaims.length; i++) {
+      const c = gClaims[i];
+      if (!c) continue;
+      if (c.applyId) {
+        const k = String(c.applyId).trim();
+        if (!claimsMap.has(k)) claimsMap.set(k, []);
+        claimsMap.get(k).push(c);
+        const altK = k.startsWith('H') ? k.replace(/^H/, 'C') : (k.startsWith('C') ? k.replace(/^C/, 'H') : null);
+        if (altK && altK !== k) {
+          if (!claimsMap.has(altK)) claimsMap.set(altK, []);
+          claimsMap.get(altK).push(c);
+        }
+      }
+      if (c.patientName) {
+        const pKey = c.patientName.trim();
+        if (!claimsByNameMap.has(pKey)) claimsByNameMap.set(pKey, []);
+        claimsByNameMap.get(pKey).push(c);
+      }
+    }
+  }
+
+  const payoutsMap = new Map();
+  const payoutsByNameMap = new Map();
+  if (Array.isArray(gPayouts)) {
+    for (let i = 0; i < gPayouts.length; i++) {
+      const p = gPayouts[i];
+      if (!p) continue;
+      if (p.applyId) {
+        const k = String(p.applyId).trim();
+        if (!payoutsMap.has(k)) payoutsMap.set(k, []);
+        payoutsMap.get(k).push(p);
+        const altK = k.startsWith('H') ? k.replace(/^H/, 'C') : (k.startsWith('C') ? k.replace(/^C/, 'H') : null);
+        if (altK && altK !== k) {
+          if (!payoutsMap.has(altK)) payoutsMap.set(altK, []);
+          payoutsMap.get(altK).push(p);
+        }
+      }
+      if (p.patientName) {
+        const pKey = p.patientName.trim();
+        if (!payoutsByNameMap.has(pKey)) payoutsByNameMap.set(pKey, []);
+        payoutsByNameMap.get(pKey).push(p);
+      }
+    }
+  }
+
+  const logsMap = new Map();
+  if (Array.isArray(gCareLogs)) {
+    for (let i = 0; i < gCareLogs.length; i++) {
+      const l = gCareLogs[i];
+      if (l && l.applyId) {
+        const k = String(l.applyId).trim();
+        if (!logsMap.has(k)) logsMap.set(k, []);
+        logsMap.get(k).push(l);
+      }
+    }
+  }
+
+  const faxLogsMap = new Map();
+  if (Array.isArray(window.gFaxLogs)) {
+    for (let i = 0; i < window.gFaxLogs.length; i++) {
+      const fl = window.gFaxLogs[i];
+      if (fl && fl.appId) {
+        const sid = String(fl.appId).trim();
+        if (!faxLogsMap.has(sid)) faxLogsMap.set(sid, []);
+        faxLogsMap.get(sid).push(fl);
+      }
+    }
+  }
+  window._gFaxLogsByAppId = faxLogsMap;
+
+  const getMatchedItems = (idMap, nameMap, app) => {
+    if (!app) return [];
+    const byId = idMap.get(String(app.id).trim()) || [];
+    const validById = byId.filter(item => (typeof isMatchCustomerRecord === 'function' ? isMatchCustomerRecord(app, item) : true));
+    if (validById.length > 0) return validById;
+    const byName = nameMap.get((app.patientName || '').trim()) || [];
+    return byName.filter(item => (typeof isMatchCustomerRecord === 'function' ? isMatchCustomerRecord(app, item) : true));
+  };
+
+  const getAppAssignsHelper = (app) => getMatchedItems(assignsMap, assignsByNameMap, app);
+  const getAppClaimsHelper = (app) => getMatchedItems(claimsMap, claimsByNameMap, app);
+  const getAppPayoutsHelper = (app) => getMatchedItems(payoutsMap, payoutsByNameMap, app);
+
+  // [상태 판정 0ms 캐시 엔진]
+  const getAppCareStatus = (app) => {
+    if (!app) return '신규';
+    if (app._renderCareStatus) return app._renderCareStatus;
+    const asList = getAppAssignsHelper(app);
+    const st = determineRealCareStatus(app, asList);
+    app._renderCareStatus = st;
+    return st;
+  };
+
+  // Helper: 간병비 청구 팩스 발송 완료 여부 판별 (O(1) 최적화)
+  const isClaimFaxSentHelper = (appOrId) => {
+    const a = (typeof appOrId === 'object' && appOrId !== null) ? appOrId : (appByIdMap.get(String(appOrId).trim()) || (gApps || []).find(item => item.id === appOrId));
+    if (a && (a.insuranceCompany || '').includes('삼성')) return true;
+    if (a && (a.isRealLaunchData || a.importedFromExcel)) return true;
+    const id = a ? a.id : appOrId;
+    const r = gFaxRecords && gFaxRecords[id];
+    return !!(r && r.status === '전송완료' && r.caseType !== '현대해상 고객등록/조회' && r.formType !== 'HD_FORM_01');
+  };
 
   const isAssignedCaregiverHelper = (app) => {
     if (!app) return false;
@@ -33754,13 +34242,13 @@ function renderUnifiedCareHub() {
   };
 
   const isCancelledOrDone = (app) => {
-    const realSt = determineRealCareStatus(app);
+    const realSt = getAppCareStatus(app);
     return realSt === '서비스 취소' || realSt === '취소' || realSt === '미해당' || realSt === '완료' || realSt === '당일서비스취소' || realSt.includes('서비스불가') || realSt === '제외';
   };
 
   const isCompletedHelper = (app) => {
     if (!app) return false;
-    const realSt = determineRealCareStatus(app);
+    const realSt = getAppCareStatus(app);
     return realSt === '완료' || realSt === '정산완료' || realSt.includes('완료') || realSt.includes('종료') || realSt.includes('종결');
   };
 
@@ -33770,58 +34258,33 @@ function renderUnifiedCareHub() {
     return true;
   };
 
-  // [미수금 대사(청구금 미입금) 정밀 판정 헬퍼]:
-  // 1. 미수금이 0원 이하(완납 또는 미수 없음)인 경우 무조건 미수금 대상에서 완전 제외
-  // 2. 미수금(estimatedUnpaid > 0)이 있는 경우 또는 연계 청구서(gClaims)에 미확인/미수납 잔액이 남아있는 경우만 포함
   const isAppHasUnpaidClaimHelper = (app) => {
     if (!app) return false;
-    const realSt = determineRealCareStatus(app);
-    // [사용자 요구사항]: 진행중이고 아직 실제 청구서가 작성되지 않은 건은 미수금 대사에서 제외 (진행 중 자동 세트 생성 차단 연계)
+    const realSt = getAppCareStatus(app);
     if (realSt === '진행중' && (app.claimCount === 0 || !app.claimCount)) {
       return false;
     }
     const unpaidAmt = Number(app.estimatedUnpaid) || 0;
     if (unpaidAmt <= 0) return false;
 
-    const appId = String(app.id || '').trim();
-    const appClaims = (gClaims || []).filter(c => {
-      if (!c) return false;
-      const cApplyId = String(c.applyId || '').trim();
-      if (appId && cApplyId) {
-        return cApplyId === appId || cApplyId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || cApplyId.replace(/^C/, 'H') === appId.replace(/^C/, 'H');
-      }
-      return !cApplyId && c.patientName && c.patientName.trim() === (app.patientName || '').trim();
-    });
+    const appClaims = getAppClaimsHelper(app);
     if (appClaims.length > 0) {
       return appClaims.some(c => !isClaimDepositConfirmed(c) && (Number(c.unpaidAmount) > 0 || (Number(c.claimAmount) > 0 && Number(c.depositAmount || 0) < Number(c.claimAmount))));
     }
     return false;
   };
 
-  // [간병비 미지급(지급 대기) 정밀 판정 헬퍼 (사용자 3대 기준 완벽 적용)]:
-  // 1. 간병 진행 중인 고객 제외: 간병이 아직 진행 중인 건은 간병비 정산/퇴원 전이므로 '지급 대기'에서 완전히 제외
-  // 2. 지급 완료 건 엄격 제외: gPayouts에 등록된 내역이 모두 지급완료이거나, 신청서에 이미 totalPayout이 지급 완료된 건은 어떠한 가상 계산도 배제하고 정상 완료로 종결 처리
-  // 3. 실제 미지급 대상만 집계: 실제 간병비 지급 장부(gPayouts) 상에 '지급대기/미지급'으로 등록된 건이거나, 간병이 완료되었으나 아직 지급 대장에 등록되지 않은 실제 지급 대상 건만 집계
   const isAppHasUnpaidPayoutHelper = (app) => {
     if (!app) return false;
-    const realSt = determineRealCareStatus(app);
+    const realSt = getAppCareStatus(app);
     if (realSt === '취소' || realSt === '서비스 취소' || realSt === '미해당' || realSt === '당일서비스취소' || realSt.includes('서비스불가') || realSt === '제외') {
       return false;
     }
-    // [기준 1] 간병 진행 중인 고객 제외
     if (realSt === '진행중') {
       return false;
     }
 
-    const appId = String(app.id || '').trim();
-    const appPayouts = (gPayouts || []).filter(p => {
-      if (!p) return false;
-      const pApplyId = String(p.applyId || '').trim();
-      return (appId && pApplyId && (pApplyId === appId || pApplyId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || pApplyId.replace(/^C/, 'H') === appId.replace(/^C/, 'H'))) ||
-             (!pApplyId && p.patientName && p.patientName.trim() === (app.patientName || '').trim());
-    });
-
-    // [기준 2] 등록된 모든 지급서가 지급완료이거나 totalPayout이 완납된 경우 완료 종결 (엄격 제외)
+    const appPayouts = getAppPayoutsHelper(app);
     if (appPayouts.length > 0 && appPayouts.every(p => {
       const st = String(p.payoutStatus || p.status || '').trim();
       return st === '지급' || st === '지급완료' || st === '선지급완료' || p.isPaid === true;
@@ -33833,14 +34296,11 @@ function renderUnifiedCareHub() {
       return false;
     }
 
-    // [기준 3-1] gPayouts 상에 실제 미지급/지급대기 건이 등록되어 있는 경우
     const hasUnpaidPayout = appPayouts.some(p => {
       const st = String(p.payoutStatus || p.status || '').trim();
       return st !== '지급' && st !== '지급완료' && st !== '선지급완료' && (p.payoutAmount || 0) > 0;
     });
     if (hasUnpaidPayout) return true;
-
-
 
     return false;
   };
@@ -33850,14 +34310,14 @@ function renderUnifiedCareHub() {
 
   const isInProgressHelper = (app) => {
     if (!app) return false;
-    return determineRealCareStatus(app) === '진행중';
+    return getAppCareStatus(app) === '진행중';
   };
 
   const isNeedFaxHelper = (app) => {
     if (!app) return false;
     const aIns = app.insuranceCompany || '';
     if (aIns.includes('삼성')) return false;
-    const isSent = isClaimFaxSentHelper(app.id);
+    const isSent = isClaimFaxSentHelper(app);
     return app.claimCount > 0 && !isSent;
   };
 
@@ -33877,58 +34337,31 @@ function renderUnifiedCareHub() {
     return st === '취소' || st === '서비스 취소' || st === '당일서비스취소' || st === '미해당' || st.includes('취소') || st.includes('불가') || st.includes('제외');
   };
 
+  // 1. 현재 필터(전체 / 현대해상 / 삼성화재)에 해당하는 고객군 스코프 확정 (O(N) 1회 필터링)
+  const scopedApps = [];
+  const scopedAppIdSet = new Set();
+  const scopedPatientNameSet = new Set();
+
   for (let i = 0; i < activeHubApps.length; i++) {
     const a = activeHubApps[i];
-    const aIns = a.insuranceCompany || '';
-    if (insFilter !== 'ALL' && !aIns.includes(insFilter)) {
-      continue;
-    }
-    scopedTotal++;
-    if (isCompletedHelper(a)) completedCount++;
-    if (isNeedAssignHelper(a)) needAssignCount++;
-    if (isInProgressHelper(a)) inProgressCount++;
-    if (isAppHasUnpaidClaimHelper(a)) unpaidClaimCount++;
-    if (isAppHasUnpaidPayoutHelper(a)) needPayoutCount++;
-    if (isNeedFaxHelper(a)) needFaxCount++;
-  }
-
-  const countAllEl = document.getElementById('hubCount-ALL');
-  if (countAllEl) {
-    countAllEl.innerText = scopedTotal + '건';
-    const countCompEl = document.getElementById('hubCount-COMPLETED');
-    if (countCompEl) countCompEl.innerText = completedCount + '건';
-    const cNeedAssign = document.getElementById('hubCount-NEED_ASSIGN');
-    if (cNeedAssign) cNeedAssign.innerText = needAssignCount + '건';
-    const cInProg = document.getElementById('hubCount-IN_PROGRESS');
-    if (cInProg) cInProg.innerText = inProgressCount + '건';
-    const cUnpaid = document.getElementById('hubCount-UNPAID_CLAIM');
-    if (cUnpaid) cUnpaid.innerText = unpaidClaimCount + '건';
-    const cPayout = document.getElementById('hubCount-NEED_PAYOUT');
-    if (cPayout) cPayout.innerText = needPayoutCount + '건';
-    const cFax = document.getElementById('hubCount-NEED_FAX');
-    if (cFax) cFax.innerText = needFaxCount + '건';
-    if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
-  }
-
-  // ==================== [통합허브 실데이터 기반 동적 써머리 계산 엔진] ====================
-  const updateDashEl = (id, val) => {
-    const el = document.getElementById(id);
-    if (el) el.innerText = (typeof val === 'number') ? val.toLocaleString('ko-KR') : (val !== undefined && val !== null ? val : '0');
-  };
-
-  // 1. 현재 필터(전체 / 현대해상 / 삼성화재)에 해당하는 고객군 스코프 확정
-  const scopedApps = (activeHubApps || []).filter(a => {
-    if (!a) return false;
+    if (!a) continue;
     const comp = a.insuranceCompany || '';
-    if (insFilter === '삼성' && !comp.includes('삼성')) return false;
-    if (insFilter === '현대' && !comp.includes('현대')) return false;
-    return true;
-  });
+    if (insFilter === '삼성' && !comp.includes('삼성')) continue;
+    if (insFilter === '현대' && !comp.includes('현대')) continue;
+    scopedApps.push(a);
+    if (a.id) scopedAppIdSet.add(String(a.id).trim());
+    if (a.patientName) scopedPatientNameSet.add(String(a.patientName).trim());
+  }
 
-  const scopedAppIdSet = new Set(scopedApps.map(a => String(a.id || '').trim()));
-  const scopedPatientNameSet = new Set(scopedApps.map(a => String(a.patientName || '').trim()));
+  // 2. 선택된 원수사(탭) 기준 6개 파이프라인 KPI 및 대시보드 동적 집계 (초고속 단일 패스)
+  let completedCount = 0;
+  let needAssignCount = 0;
+  let inProgressCount = 0;
+  let unpaidClaimCount = 0;
+  let needPayoutCount = 0;
+  let needFaxCount = 0;
+  let scopedTotal = scopedApps.length;
 
-  // 2. 신청 현황 및 미청구 현황 동적 집계
   let dashTotalApps = scopedApps.length;
   let dashCompleted = 0;
   let dashInProgress = 0;
@@ -33943,8 +34376,24 @@ function renderUnifiedCareHub() {
   let dashScor = 0;
   let dashSamsung = 0;
 
+  let modifiedTotal = 0;
+  let disabledTotal = 0;
+
   for (let i = 0; i < scopedApps.length; i++) {
     const a = scopedApps[i];
+
+    // 상태 미리 판정 & 캐시
+    getAppCareStatus(a);
+
+    // KPI 카운트 집계
+    if (isCompletedHelper(a)) completedCount++;
+    if (isNeedAssignHelper(a)) needAssignCount++;
+    if (isInProgressHelper(a)) inProgressCount++;
+    if (isAppHasUnpaidClaimHelper(a)) unpaidClaimCount++;
+    if (isAppHasUnpaidPayoutHelper(a)) needPayoutCount++;
+    if (isNeedFaxHelper(a)) needFaxCount++;
+
+    // 원수사 집계
     const comp = a.insuranceCompany || '';
     if (comp.includes('SCOR') || comp.includes('scor')) {
       dashScor++;
@@ -33978,9 +34427,43 @@ function renderUnifiedCareHub() {
     } else if (cc.includes('청구시작안됨')) {
       dashUnclaimedNotStarted++;
     }
+
+    // 수정발생 여부 집계 & 사전 캐싱
+    const isMod = typeof isAppUnconfirmedModified === 'function' ? isAppUnconfirmedModified(a) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a));
+    a._isMod = isMod ? 1 : 0;
+    if (isMod) modifiedTotal++;
+
+    // 모달 비활성화 여부 집계 & 사전 캐싱
+    const isDis = typeof isCustomerModalDisabledUnconfirmed === 'function' ? isCustomerModalDisabledUnconfirmed(a) : (typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(a));
+    a._isDis = isDis ? 1 : 0;
+    if (isDis) disabledTotal++;
   }
 
   let dashUnclaimedTotal = dashUnclaimedCompleted + dashUnclaimedDelayed + dashUnclaimedNotStarted;
+
+  const countAllEl = document.getElementById('hubCount-ALL');
+  if (countAllEl) {
+    countAllEl.innerText = scopedTotal + '건';
+    const countCompEl = document.getElementById('hubCount-COMPLETED');
+    if (countCompEl) countCompEl.innerText = completedCount + '건';
+    const cNeedAssign = document.getElementById('hubCount-NEED_ASSIGN');
+    if (cNeedAssign) cNeedAssign.innerText = needAssignCount + '건';
+    const cInProg = document.getElementById('hubCount-IN_PROGRESS');
+    if (cInProg) cInProg.innerText = inProgressCount + '건';
+    const cUnpaid = document.getElementById('hubCount-UNPAID_CLAIM');
+    if (cUnpaid) cUnpaid.innerText = unpaidClaimCount + '건';
+    const cPayout = document.getElementById('hubCount-NEED_PAYOUT');
+    if (cPayout) cPayout.innerText = needPayoutCount + '건';
+    const cFax = document.getElementById('hubCount-NEED_FAX');
+    if (cFax) cFax.innerText = needFaxCount + '건';
+    if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+  }
+
+  // ==================== [통합허브 실데이터 기반 동적 써머리 계산 엔진] ====================
+  const updateDashEl = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = (typeof val === 'number') ? val.toLocaleString('ko-KR') : (val !== undefined && val !== null ? val : '0');
+  };
 
   // 3. 간병인 배정 현황 동적 집계 (gAssigns 기반)
   const scopedAssigns = (gAssigns || []).filter(as => {
@@ -34183,17 +34666,7 @@ function renderUnifiedCareHub() {
     currentActiveFilterBtn.classList.add('active', 'ring-2', 'ring-indigo-600', 'ring-offset-1');
   }
 
-  // 3. 수정발생 (또는 CTI 민원발생) 미확인 건수 카운트 & 토글 버튼 UI 갱신
-  let modifiedTotal = 0;
-  for (let i = 0; i < activeHubApps.length; i++) {
-    const a = activeHubApps[i];
-    const aIns = a.insuranceCompany || '';
-    if (insFilter !== 'ALL' && !aIns.includes(insFilter)) continue;
-    if (typeof isAppUnconfirmedModified === 'function' ? isAppUnconfirmedModified(a) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a))) {
-      modifiedTotal++;
-    }
-  }
-
+  // 3. 수정발생 (또는 CTI 민원발생) 미확인 건수 뱃지 UI 갱신
   const modBadge = document.getElementById('hubModifiedCountBadge');
   if (modBadge) modBadge.innerText = modifiedTotal;
   const modBtn = document.getElementById('btnHubModifiedToggle');
@@ -34207,17 +34680,7 @@ function renderUnifiedCareHub() {
     }
   }
 
-  // 3-2. 모달 비활성화 (청구제외/보호모드) 미확인 고객 건수 카운트 & 토글 버튼 UI 갱신
-  let disabledTotal = 0;
-  for (let i = 0; i < activeHubApps.length; i++) {
-    const a = activeHubApps[i];
-    const aIns = a.insuranceCompany || '';
-    if (insFilter !== 'ALL' && !aIns.includes(insFilter)) continue;
-    if (typeof isCustomerModalDisabledUnconfirmed === 'function' ? isCustomerModalDisabledUnconfirmed(a) : (typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(a))) {
-      disabledTotal++;
-    }
-  }
-
+  // 3-2. 모달 비활성화 (청구제외/보호모드) 미확인 고객 건수 뱃지 UI 갱신
   const disBadge = document.getElementById('hubDisabledCountBadge');
   if (disBadge) disBadge.innerText = disabledTotal;
   const disBtn = document.getElementById('btnHubDisabledToggle');
@@ -34244,36 +34707,20 @@ function renderUnifiedCareHub() {
     }
   }
 
-  // Filter application list
-  const filtered = activeHubApps.filter(app => {
+  // Filter application list (O(1) 캐시 기반 초고속 필터링)
+  const baseListForFilter = query ? activeHubApps : scopedApps;
+  const filtered = baseListForFilter.filter(app => {
     const appIns = app.insuranceCompany || '';
     const appSt = app.status || '';
 
     // 검색어(query)가 입력된 경우: 특정 고객 성명, ID, 간병인 등으로 직접 조회 중이므로
     // 파이프라인 탭이나 원수사 탭 필터에 가려져 검색 결과가 누락되지 않도록 검색 매칭 우선 적용
     if (!query) {
-      if (insFilter !== 'ALL' && !appIns.includes(insFilter)) return false;
-
       // [수정발생 모아보기 토글 필터]
-      if (gHubOnlyModified) {
-        if (modifiedTotal > 0) {
-          const isMod = typeof isAppUnconfirmedModified === 'function' ? isAppUnconfirmedModified(app) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(app));
-          if (!isMod) return false;
-        } else {
-          const isMod = typeof isAppModifiedOrComplaint === 'function' ? isAppModifiedOrComplaint(app) : false;
-          if (!isMod) return false;
-        }
-      }
+      if (gHubOnlyModified && !app._isMod) return false;
 
       // [모달 비활성화 고객 모아보기 토글 필터]
-      if (gHubOnlyDisabled) {
-        if (disabledTotal > 0) {
-          const isDisUnconf = typeof isCustomerModalDisabledUnconfirmed === 'function' ? isCustomerModalDisabledUnconfirmed(app) : (typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app));
-          if (!isDisUnconf) return false;
-        } else {
-          if (typeof isCustomerModalDisabled === 'function' && !isCustomerModalDisabled(app)) return false;
-        }
-      }
+      if (gHubOnlyDisabled && !app._isDis) return false;
 
       if (gHubFilter === 'COMPLETED' && !isCompletedHelper(app)) return false;
       if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
@@ -34348,14 +34795,6 @@ function renderUnifiedCareHub() {
     return isNaN(t) ? 0 : t;
   };
 
-  // 사전 밀리초 타임스탬프 산출 (초고속 정렬용)
-  for (let i = 0; i < filtered.length; i++) {
-    const a = filtered[i];
-    a._applyTime = parseApplySortTimestamp(a.applyDate);
-    a._updTime = a.updatedAt ? Date.parse(a.updatedAt) || 0 : 0;
-    a._latestEventTime = typeof getAppLatestEventTime === 'function' ? getAppLatestEventTime(a) : (a._updTime || 0);
-  }
-
   // 최근 등록 ID Set 확보 (새로고침 후에도 신규 등록 건 최상단 유지)
   let recentRegIdSet = new Set();
   try {
@@ -34370,10 +34809,23 @@ function renderUnifiedCareHub() {
     return 0;
   };
 
+  // 사전 밀리초 타임스탬프 및 정렬 속성 일괄 산출 (초고속 정렬용)
+  for (let i = 0; i < filtered.length; i++) {
+    const a = filtered[i];
+    a._applyTime = parseApplySortTimestamp(a.applyDate);
+    a._updTime = a.updatedAt ? Date.parse(a.updatedAt) || 0 : 0;
+    a._latestEventTime = typeof getAppLatestEventTime === 'function' ? getAppLatestEventTime(a) : (a._updTime || 0);
+    a._isRecent = checkIsRecent(a);
+    if (a._isMod === undefined) {
+      a._isMod = (typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(a) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a) ? 1 : 0));
+    }
+    a._isD = (a && a.id && String(a.id).startsWith('D')) ? 1 : 0;
+  }
+
   filtered.sort((a, b) => {
     // 1. 방금/신규 등록된 고객(_isJustRegistered, 최근 등록 목록, D접두사 고객)은 무조건 맨 처음(최상단)
-    const isRecentA = checkIsRecent(a);
-    const isRecentB = checkIsRecent(b);
+    const isRecentA = a._isRecent !== undefined ? a._isRecent : checkIsRecent(a);
+    const isRecentB = b._isRecent !== undefined ? b._isRecent : checkIsRecent(b);
     if (isRecentA !== isRecentB) return isRecentB - isRecentA;
     if (isRecentA === 1 && isRecentB === 1) {
       const tDiff = (b._applyTime || 0) - (a._applyTime || 0);
@@ -34405,8 +34857,8 @@ function renderUnifiedCareHub() {
     }
     if (gHubSort === 'created_desc') {
       // [사용자 요구사항]: 기본 정렬을 신청ID순서대로 (수정건 맨 앞순위, D로 시작하는 건 C보다 무조건 앞)
-      const modA = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(a) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a) ? 1 : 0);
-      const modB = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(b) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(b) ? 1 : 0);
+      const modA = a._isMod || 0;
+      const modB = b._isMod || 0;
       if (modA !== modB) return modB - modA;
       if (modA === 1 && modB === 1) {
         // 둘 다 미확인 수정/민원 발생건이면 최근 발생일시 최신순
@@ -34455,13 +34907,13 @@ function renderUnifiedCareHub() {
     }
 
     // 기본 폴백: D계열 최우선 -> 수정건 맨 앞순위 -> 신청ID 순서대로
-    const isDA = (a && a.id && String(a.id).startsWith('D')) ? 1 : 0;
-    const isDB = (b && b.id && String(b.id).startsWith('D')) ? 1 : 0;
+    const isDA = a._isD !== undefined ? a._isD : ((a && a.id && String(a.id).startsWith('D')) ? 1 : 0);
+    const isDB = b._isD !== undefined ? b._isD : ((b && b.id && String(b.id).startsWith('D')) ? 1 : 0);
     if (isDA !== isDB) return isDB - isDA;
     if (isDA === 1 && isDB === 1) return compareAppIds(a.id, b.id, true);
 
-    const modA = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(a) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(a) ? 1 : 0);
-    const modB = typeof isAppUnconfirmedModified === 'function' ? (isAppUnconfirmedModified(b) ? 1 : 0) : (typeof isAppModifiedOrComplaint === 'function' && isAppModifiedOrComplaint(b) ? 1 : 0);
+    const modA = a._isMod || 0;
+    const modB = b._isMod || 0;
     if (modA !== modB) return modB - modA;
     return compareAppIds(a.id, b.id, true);
   });
@@ -34534,83 +34986,13 @@ function renderUnifiedCareHub() {
     return;
   }
 
-  // Pre-index auxiliary data for O(1) lookup speed boost
-  const assignsMap = new Map();
-  const assignsByNameMap = new Map();
-  for (let i = 0; i < gAssigns.length; i++) {
-    const as = gAssigns[i];
-    if (as.applyId) {
-      if (!assignsMap.has(as.applyId)) assignsMap.set(as.applyId, []);
-      assignsMap.get(as.applyId).push(as);
-    }
-    if (as.patientName) {
-      const pKey = as.patientName.trim();
-      if (!assignsByNameMap.has(pKey)) assignsByNameMap.set(pKey, []);
-      assignsByNameMap.get(pKey).push(as);
-    }
-  }
-  const claimsMap = new Map();
-  const claimsByNameMap = new Map();
-  for (let i = 0; i < gClaims.length; i++) {
-    const c = gClaims[i];
-    if (c.applyId) {
-      if (!claimsMap.has(c.applyId)) claimsMap.set(c.applyId, []);
-      claimsMap.get(c.applyId).push(c);
-    }
-    if (c.patientName) {
-      const pKey = c.patientName.trim();
-      if (!claimsByNameMap.has(pKey)) claimsByNameMap.set(pKey, []);
-      claimsByNameMap.get(pKey).push(c);
-    }
-  }
-  const payoutsMap = new Map();
-  const payoutsByNameMap = new Map();
-  for (let i = 0; i < gPayouts.length; i++) {
-    const p = gPayouts[i];
-    if (p.applyId) {
-      if (!payoutsMap.has(p.applyId)) payoutsMap.set(p.applyId, []);
-      payoutsMap.get(p.applyId).push(p);
-    }
-    if (p.patientName) {
-      const pKey = p.patientName.trim();
-      if (!payoutsByNameMap.has(pKey)) payoutsByNameMap.set(pKey, []);
-      payoutsByNameMap.get(pKey).push(p);
-    }
-  }
-  const logsMap = new Map();
-  for (let i = 0; i < gCareLogs.length; i++) {
-    const l = gCareLogs[i];
-    if (!logsMap.has(l.applyId)) logsMap.set(l.applyId, []);
-    logsMap.get(l.applyId).push(l);
-  }
-  const faxLogsMap = new Map();
-  if (Array.isArray(window.gFaxLogs)) {
-    for (let i = 0; i < window.gFaxLogs.length; i++) {
-      const fl = window.gFaxLogs[i];
-      if (fl && fl.appId) {
-        const sid = String(fl.appId);
-        if (!faxLogsMap.has(sid)) faxLogsMap.set(sid, []);
-        faxLogsMap.get(sid).push(fl);
-      }
-    }
-  }
-  window._gFaxLogsByAppId = faxLogsMap;
-
   container.innerHTML = displayList.map(app => {
     try {
     const isChecked = gSelectedAppIds.has(app.id) ? 'checked' : '';
 
-    const getMatchedItems = (idMap, nameMap) => {
-      const byId = idMap.get(app.id) || [];
-      const validById = byId.filter(item => (typeof isMatchCustomerRecord === 'function' ? isMatchCustomerRecord(app, item) : true));
-      if (validById.length > 0) return validById;
-      const byName = nameMap.get((app.patientName || '').trim()) || [];
-      return byName.filter(item => (typeof isMatchCustomerRecord === 'function' ? isMatchCustomerRecord(app, item) : true));
-    };
-
-    const appAssigns = getMatchedItems(assignsMap, assignsByNameMap);
-    const appClaims = getMatchedItems(claimsMap, claimsByNameMap);
-    const appPayouts = getMatchedItems(payoutsMap, payoutsByNameMap);
+    const appAssigns = getAppAssignsHelper(app);
+    const appClaims = getAppClaimsHelper(app);
+    const appPayouts = getAppPayoutsHelper(app);
     const appLogs = logsMap.get(app.id) || [];
     const rawFax = gFaxRecords[app.id];
     const isClaimFax = rawFax && rawFax.status === '전송완료' && rawFax.caseType !== '현대해상 고객등록/조회' && rawFax.formType !== 'HD_FORM_01';
@@ -34669,11 +35051,6 @@ function renderUnifiedCareHub() {
     const s6_fax = faxInfo.status === '전송완료'
       ? { label: '팩스완료 (' + faxInfo.sentDate + ')', color: 'emerald' }
       : { label: '팩스 미전송', color: 'purple' };
-
-    // When card is expanded in 2 or 3 col view, expand to full width (col-span-full) so details look like 1-col view!
-    // Calculate 24 business hours status (excluding weekends and Korean holidays)
-    const updatedElapsed = app.updatedAt ? getElapsedBusinessHours(app.updatedAt) : 999999;
-    const createdElapsed = app.createdAt ? getElapsedBusinessHours(app.createdAt) : (app.applyDate ? getElapsedBusinessHours(app.applyDate) : 999999);
 
     // [사용자 요구사항]: 고객 카드 좌측 세로 라벨(신규: 파랑, 진행중: 노랑, 완료: 녹색+음영, 취소: 검정+음영, 예정: 보라)
     const cardTheme = getCustomerCardStatusTheme(app, as ? [as] : null);

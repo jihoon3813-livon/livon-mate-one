@@ -217,6 +217,7 @@ export const updateMemo = mutation({
   args: {
     appId: v.string(),
     memo: v.string(),
+    memoList: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const app = await ctx.db
@@ -224,7 +225,11 @@ export const updateMemo = mutation({
       .withIndex("by_custom_id", (q) => q.eq("id", args.appId))
       .first();
     if (app) {
-      await ctx.db.patch(app._id, { memo: args.memo, updatedAt: new Date().toISOString() });
+      const patch = { memo: args.memo, updatedAt: new Date().toISOString() };
+      if (args.memoList !== undefined) {
+        patch.memoList = args.memoList;
+      }
+      await ctx.db.patch(app._id, patch);
     }
   },
 });
