@@ -1678,7 +1678,7 @@ async function loadConvexData(showSpinner = true) {
           return;
         }
       }
-      const { applications, assignments, claims, payouts, adjusters, partners, careLogs, caregivers, systemSettings } = res.value;
+      const { applications, assignments, claims, payouts, adjusters, partners, careLogs, caregivers, systemSettings, faxRecords } = res.value;
 
       // Convex DB가 0건(클린 초기화 상태)이면 로컬 시드 및 캐시도 0건으로 완전 동기화하여 좀비 데이터 부활 원천 차단
       if (Array.isArray(applications) && applications.length === 0) {
@@ -1808,6 +1808,54 @@ async function loadConvexData(showSpinner = true) {
       // 7. 인력 (간병인 풀) 디렉토리
       if (Array.isArray(caregivers)) {
         gCaregivers = caregivers;
+      }
+
+      // 7-1. 팩스 발송 이력 (Convex Cloud DB 원격 실시간 동기화 - superadmin 전사 전체 조회)
+      if (Array.isArray(faxRecords)) {
+        const currentAdmin = window.gCurrentAdmin || {};
+        const isSuperAdmin = !currentAdmin.role || currentAdmin.role === 'SUPER_ADMIN' || currentAdmin.role === 'ADMIN' || (currentAdmin.username === 'superadmin');
+
+        let localLogs = [];
+        try {
+          localLogs = JSON.parse(localStorage.getItem('LIVON_FAX_LOGS') || '[]');
+        } catch (e) {}
+
+        const logMap = new Map();
+        (Array.isArray(faxRecords) ? faxRecords : []).forEach(r => {
+          if (r && (r.id || r.sendKey)) logMap.set(String(r.id || r.sendKey), r);
+        });
+        (Array.isArray(localLogs) ? localLogs : []).forEach(l => {
+          if (l && (l.id || l.sendKey) && !logMap.has(String(l.id || l.sendKey))) {
+            logMap.set(String(l.id || l.sendKey), l);
+          }
+        });
+
+        let mergedLogs = Array.from(logMap.values());
+        if (typeof normalizeFaxLogsToKoreaTime === 'function') {
+          normalizeFaxLogsToKoreaTime(mergedLogs);
+        }
+        if (typeof sortFaxLogsNewestFirst === 'function') {
+          mergedLogs = sortFaxLogsNewestFirst(mergedLogs);
+        }
+
+        if (isSuperAdmin) {
+          // superadmin은 전사 전체 발송 내역(93건+) 전수 표출
+          gFaxLogs = mergedLogs;
+        } else {
+          // 일반 계정은 본인 발송 건 위주
+          const myName = currentAdmin.name || '';
+          const myUser = currentAdmin.username || '';
+          const filtered = mergedLogs.filter(l => {
+            if (!l) return false;
+            if (!myName && !myUser) return true;
+            return (l.operator && (l.operator.includes(myName) || l.operator.includes(myUser))) ||
+                   (l.sender && (l.sender.includes(myName) || l.sender.includes(myUser)));
+          });
+          gFaxLogs = filtered.length > 0 ? filtered : mergedLogs;
+        }
+        try { localStorage.setItem('LIVON_FAX_LOGS', JSON.stringify(gFaxLogs)); } catch (e) {}
+        if (typeof updateFaxKpis === 'function') updateFaxKpis();
+        if (typeof renderFaxLogsTable === 'function' && gActiveTab === 'faxmgmt') renderFaxLogsTable();
       }
 
       // 🚀 [초고속 렌더링 최적화]: 수 메가바이트의 로컬 캐시 저장을 비동기 백그라운드로 지연 분리 (화면 프리징 제로화)
@@ -16617,6 +16665,9 @@ function updateFaxKpis() {
 }
 
 function renderFaxManagement() {
+  if (typeof syncFaxRecordsFromConvex === 'function') {
+    syncFaxRecordsFromConvex();
+  }
   updateFaxKpis();
   renderFaxLogsTable();
   renderFaxDirectoryTable();
@@ -30041,6 +30092,12 @@ function syncHd1RrnToApp(value, appId) {
       window.REBORN_DATA.applications[rIdx] = { ...window.REBORN_DATA.applications[rIdx], ...app };
     }
   }
+  if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications)) {
+    const sIdx = window.REBORN_REAL_SEED_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
+    if (sIdx !== -1) {
+      window.REBORN_REAL_SEED_DATA.applications[sIdx] = { ...window.REBORN_REAL_SEED_DATA.applications[sIdx], ...app };
+    }
+  }
   const custRrnInput = document.getElementById('custEditRrn');
   if (custRrnInput) {
     custRrnInput.value = clean;
@@ -31480,7 +31537,21 @@ function openCustomerEditModal(appId, focusSection = null) {
     document.getElementById('custEditExtraPhone').value = (typeof formatPhoneNumber === 'function' ? formatPhoneNumber(contacts.extraPhone) : contacts.extraPhone) || '';
   }
 
-  const rrnVal = app.rrn || app.patientRrn || (app.rrnFront ? `${app.rrnFront}-${app.rrnBack || ''}` : '');
+  // 주민등록번호 탐색 fallback (gApps, REBORN_DATA, REBORN_REAL_SEED_DATA 전방위 검색)
+  let rrnVal = app.rrn || app.patientRrn || (app.rrnFront ? `${app.rrnFront}-${app.rrnBack || ''}` : '');
+  if (!rrnVal) {
+    const candidates = [
+      ...(Array.isArray(window.gApps) ? window.gApps : []),
+      ...((window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications)) ? window.REBORN_REAL_SEED_DATA.applications : []),
+      ...((window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) ? window.REBORN_DATA.applications : [])
+    ];
+    const match = candidates.find(c => c && (String(c.id) === String(app.id) || String(c.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, '') || (c.patientName === app.patientName && c.phone === app.phone)) && (c.rrn || c.patientRrn || c.rrnFront));
+    if (match) {
+      rrnVal = match.rrn || match.patientRrn || (match.rrnFront ? `${match.rrnFront}-${match.rrnBack || ''}` : '');
+      app.rrn = rrnVal;
+      app.patientRrn = rrnVal;
+    }
+  }
   const rrnInput = document.getElementById('custEditRrn');
   if (rrnInput) {
     rrnInput.value = (typeof autoHyphenRrn === 'function') ? autoHyphenRrn(rrnVal) : rrnVal;
@@ -40365,3 +40436,49 @@ if (typeof window !== 'undefined') {
 
 
 
+
+async function syncFaxRecordsFromConvex() {
+  try {
+    const token = localStorage.getItem('REBORN_ADMIN_SESSION_TOKEN') || '';
+    const res = await queryConvex('sync:bundleAll', { sessionToken: token, includeHeavyStatic: false });
+    if (res && res.status === 'success' && res.value && Array.isArray(res.value.faxRecords)) {
+      const records = res.value.faxRecords;
+      const currentAdmin = window.gCurrentAdmin || {};
+      const isSuperAdmin = !currentAdmin.role || currentAdmin.role === 'SUPER_ADMIN' || currentAdmin.role === 'ADMIN' || (currentAdmin.username === 'superadmin');
+
+      const logMap = new Map();
+      records.forEach(r => {
+        if (r && (r.id || r.sendKey)) logMap.set(String(r.id || r.sendKey), r);
+      });
+      (Array.isArray(gFaxLogs) ? gFaxLogs : []).forEach(l => {
+        if (l && (l.id || l.sendKey) && !logMap.has(String(l.id || l.sendKey))) {
+          logMap.set(String(l.id || l.sendKey), l);
+        }
+      });
+
+      let merged = Array.from(logMap.values());
+      if (typeof normalizeFaxLogsToKoreaTime === 'function') normalizeFaxLogsToKoreaTime(merged);
+      if (typeof sortFaxLogsNewestFirst === 'function') merged = sortFaxLogsNewestFirst(merged);
+
+      if (isSuperAdmin) {
+        gFaxLogs = merged;
+      } else {
+        const myName = currentAdmin.name || '';
+        const myUser = currentAdmin.username || '';
+        const filtered = merged.filter(l => {
+          if (!l) return false;
+          if (!myName && !myUser) return true;
+          return (l.operator && (l.operator.includes(myName) || l.operator.includes(myUser))) ||
+                 (l.sender && (l.sender.includes(myName) || l.sender.includes(myUser)));
+        });
+        gFaxLogs = filtered.length > 0 ? filtered : merged;
+      }
+      try { localStorage.setItem('LIVON_FAX_LOGS', JSON.stringify(gFaxLogs)); } catch (e) {}
+      if (typeof updateFaxKpis === 'function') updateFaxKpis();
+      if (typeof renderFaxLogsTable === 'function') renderFaxLogsTable();
+    }
+  } catch (err) {
+    console.warn('[syncFaxRecordsFromConvex err]', err);
+  }
+}
+window.syncFaxRecordsFromConvex = syncFaxRecordsFromConvex;
