@@ -1490,6 +1490,44 @@ function inferMissingApplyDates(apps) {
 }
 window.inferMissingApplyDates = inferMissingApplyDates;
 
+function safeSetLocalStorage(key, valStr) {
+  try {
+    localStorage.setItem(key, valStr);
+    return true;
+  } catch (e) {
+    // QuotaExceededError 발생 시 대용량 부가 캐시를 우선 비워 핵심 고객 데이터(LIVON_CACHED_APPS 등) 저장 공간 확보
+    const evictableKeys = [
+      'LIVON_CAREPORT_RAW_LOGS',
+      'LIVON_CAREPORT_GROUPS',
+      'LIVON_CARE_LOGS',
+      'LIVON_SAMSUNG_SHEET_ELIGIBLE',
+      'LIVON_SAMSUNG_EXCEL_LEDGER',
+      'LIVON_CACHED_PAYOUTS',
+      'LIVON_CACHED_CLAIMS',
+      'LIVON_CACHED_ASSIGNS',
+      'LIVON_FORM_BACKGROUNDS'
+    ];
+    for (const ek of evictableKeys) {
+      if (ek === key) continue;
+      try { localStorage.removeItem(ek); } catch (err) {}
+    }
+    try {
+      localStorage.setItem(key, valStr);
+      return true;
+    } catch (retryErr) {
+      console.warn('[Storage Quota Warning] Failed to save key:', key, retryErr);
+      return false;
+    }
+  }
+}
+window.safeSetLocalStorage = safeSetLocalStorage;
+
+function safeSaveCachedApps(apps) {
+  if (!Array.isArray(apps)) return false;
+  return safeSetLocalStorage('LIVON_CACHED_APPS', JSON.stringify(apps));
+}
+window.safeSaveCachedApps = safeSaveCachedApps;
+
 function sortApplicationsNewestFirst(apps) {
   if (!Array.isArray(apps)) return [];
   inferMissingApplyDates(apps);
@@ -1516,6 +1554,7 @@ function sortApplicationsNewestFirst(apps) {
   } catch (e) {}
 
   const todayStr = (typeof getKoreaDateTimeStr === 'function' ? getKoreaDateTimeStr().slice(0, 10) : new Date().toISOString().slice(0, 10)).replace(/-/g, '.');
+  const todayIsoPrefix = todayStr.replace(/\./g, '-');
 
   const checkIsRecent = (a) => {
     if (!a) return 0;
@@ -1523,20 +1562,21 @@ function sortApplicationsNewestFirst(apps) {
     if (a._isJustRegistered) return 1;
     if (aId === 'C0701' || aId === 'C0699') return 1;
     if (aId && (recentRegIdSet.has(aId) || aId.startsWith('D'))) return 1;
-    // 오늘 접수된 신규 등록 건 최상단 노출
-    if (a.applyDate && (a.applyDate.startsWith(todayStr) || a.applyDate.startsWith(todayStr.replace(/\./g, '-')))) return 1;
+    // 오늘 접수되었거나 오늘 생성(등록)된 신규 고객 최상단 노출
+    if (a.applyDate && (a.applyDate.startsWith(todayStr) || a.applyDate.startsWith(todayIsoPrefix))) return 1;
+    if (a.createdAt && String(a.createdAt).startsWith(todayIsoPrefix)) return 1;
     return 0;
   };
 
   return [...apps].sort((a, b) => {
-    // 1. 방금/신규 등록된 고객(_isJustRegistered, 최근 등록 목록, D접두사 고객)은 무조건 맨 처음(최상단)
+    // 1. 방금/신규 등록된 고객(_isJustRegistered, 최근 등록 목록, 당일 등록, D접두사 고객)은 무조건 맨 처음(최상단)
     const isRecentA = checkIsRecent(a);
     const isRecentB = checkIsRecent(b);
     if (isRecentA !== isRecentB) return isRecentB - isRecentA;
     if (isRecentA === 1 && isRecentB === 1) {
-      const tDiff = parseTime(b?.applyDate) - parseTime(a?.applyDate);
-      if (tDiff !== 0) return tDiff;
-      return compareAppIds(a.id, b.id, true);
+      const idComp = compareAppIds(a?.id, b?.id, true);
+      if (idComp !== 0) return idComp;
+      return parseTime(b?.applyDate) - parseTime(a?.applyDate);
     }
 
     // 2. [사용자 요구사항]: 수정건 맨 앞순위 (기존 고객 중 미확인 수정/민원 발생건 최상단 노출)
@@ -1694,7 +1734,7 @@ async function loadConvexData(showSpinner = true) {
         }
       });
       gApps = sortApplicationsNewestFirst(merged);
-      try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+      safeSaveCachedApps(gApps);
     }
     if (Array.isArray(realJson.assignments) && realJson.assignments.length > 0) {
       gAssigns = realJson.assignments.filter(a => a && a.isRealLaunchData && !deletedAppIdSet.has(String(a.applyId)));
@@ -1742,6 +1782,7 @@ async function loadConvexData(showSpinner = true) {
   }
 
   try {
+    const isInitial = !gConvexDataApplied;
     const res = await queryConvex('sync:bundleAll', { sessionToken: token || '', includeHeavyStatic: isInitial === true });
     if (res && res.status === 'success' && res.value) {
       if (res.value.status === 'unauthorized') {
@@ -1817,9 +1858,7 @@ async function loadConvexData(showSpinner = true) {
             }
           });
           deletedAppIdSet = new Set(cleanedDeletedList);
-          try {
-            localStorage.setItem('LIVON_DELETED_APP_IDS', JSON.stringify(cleanedDeletedList));
-          } catch (e) {}
+          safeSetLocalStorage('LIVON_DELETED_APP_IDS', JSON.stringify(cleanedDeletedList));
         }
 
         const filteredValidApps = validApps.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
@@ -1837,9 +1876,7 @@ async function loadConvexData(showSpinner = true) {
             if (deletedAppIdSet.has(regId)) recentRegIdSet.delete(regId);
           });
         }
-        try {
-          localStorage.setItem('LIVON_RECENTLY_REGISTERED_IDS', JSON.stringify(Array.from(recentRegIdSet)));
-        } catch (e) {}
+        safeSetLocalStorage('LIVON_RECENTLY_REGISTERED_IDS', JSON.stringify(Array.from(recentRegIdSet)));
 
         // 🚨 [데이터 영구 보존 가드]: 로컬에만 존재하고 서버 응답에 아직 누락된 신규 등록 고객 자동 복원 & Auto-Rescue Sync
         const localOnlyRecentApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
@@ -1868,7 +1905,7 @@ async function loadConvexData(showSpinner = true) {
         });
 
         gApps = sortApplicationsNewestFirst(mergedApps);
-        try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+        safeSaveCachedApps(gApps);
         (gApps || []).forEach(a => {
           if ((Number(a.estimatedUnpaid) || 0) <= 0 && a.unconfirmedClaimCount > 0) {
             a.unconfirmedClaimCount = 0;
@@ -1972,13 +2009,13 @@ async function loadConvexData(showSpinner = true) {
       // 🚀 [초고속 렌더링 최적화]: 수 메가바이트의 로컬 캐시 저장을 비동기 백그라운드로 지연 분리 (화면 프리징 제로화)
       setTimeout(() => {
         try {
-          if (Array.isArray(gApps)) localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
-          if (Array.isArray(gAssigns)) localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns));
-          if (Array.isArray(gClaims)) localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
-          if (Array.isArray(gPayouts)) localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
-          if (Array.isArray(gAdjusters)) localStorage.setItem('LIVON_CACHED_ADJUSTERS', JSON.stringify(gAdjusters));
-          if (Array.isArray(gCenters)) localStorage.setItem('LIVON_CACHED_CENTERS', JSON.stringify(gCenters));
-          if (Array.isArray(gCaregivers)) localStorage.setItem('LIVON_CACHED_CAREGIVERS', JSON.stringify(gCaregivers));
+          if (Array.isArray(gApps)) safeSaveCachedApps(gApps);
+          if (Array.isArray(gAssigns)) try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
+          if (Array.isArray(gClaims)) try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
+          if (Array.isArray(gPayouts)) try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
+          if (Array.isArray(gAdjusters)) try { localStorage.setItem('LIVON_CACHED_ADJUSTERS', JSON.stringify(gAdjusters)); } catch (e) {}
+          if (Array.isArray(gCenters)) try { localStorage.setItem('LIVON_CACHED_CENTERS', JSON.stringify(gCenters)); } catch (e) {}
+          if (Array.isArray(gCaregivers)) try { localStorage.setItem('LIVON_CACHED_CAREGIVERS', JSON.stringify(gCaregivers)); } catch (e) {}
         } catch (storageErr) {
           console.warn('[Cache Save Warn]', storageErr);
         }
@@ -2166,10 +2203,12 @@ async function loadConvexData(showSpinner = true) {
     }
   } catch (err) {
     console.warn('[Convex Data Load Error]', err);
-    try {
-      const fallbackJson = await fetchLocalRealData();
-      if (fallbackJson) applyRealJson(fallbackJson);
-    } catch (e) {}
+    if (!gConvexDataApplied && (!Array.isArray(gApps) || gApps.length === 0)) {
+      try {
+        const fallbackJson = await fetchLocalRealData();
+        if (fallbackJson) applyRealJson(fallbackJson);
+      } catch (e) {}
+    }
     updateConvexStatusBadge(false, gApps.length);
   } finally {
     gIsDataLoading = false;
@@ -18657,12 +18696,13 @@ function initData() {
     gAdjusters = [];
   } else {
     try {
-      // 삭제 처리된 고객 톰스톤 목록 확인 및 C0653, C0654 영구 소거 보장
+      // 삭제 처리된 고객 톰스톤 목록 확인 및 C0653, C0654 영구 소거 보장 (최근 등록 ID는 삭제 목록에서 제외)
       let deletedAppIdSet = new Set();
       try {
+        const recentIds = new Set(['C0701', 'C0699', ...((JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]') || []).map(String))]);
         const dList = JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]');
-        const merged = Array.from(new Set([...(dList || []).map(String), 'C0653', 'C0654']));
-        localStorage.setItem('LIVON_DELETED_APP_IDS', JSON.stringify(merged));
+        const merged = Array.from(new Set([...(dList || []).map(String), 'C0653', 'C0654'])).filter(id => !recentIds.has(String(id)));
+        safeSetLocalStorage('LIVON_DELETED_APP_IDS', JSON.stringify(merged));
         deletedAppIdSet = new Set(merged);
       } catch (e) {}
 
@@ -18678,7 +18718,7 @@ function initData() {
         }
         const filtered = Array.isArray(cleaned) ? cleaned.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id))) : [];
         gApps = (typeof sortApplicationsNewestFirst === 'function') ? sortApplicationsNewestFirst(filtered) : filtered;
-        try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+        safeSaveCachedApps(gApps);
       } else if (window.REBORN_DATA && window.REBORN_DATA.applications) {
         gApps = [...window.REBORN_DATA.applications].filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
       }
@@ -31179,16 +31219,35 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
     newApp.hasManualUpdate = false;
     newApp._isJustRegistered = true;
 
+    // 과거 동일 ID 삭제 톰스톤이 남아있다면 즉시 제거 (재등록 시 은폐 원천 차단)
+    try {
+      const delIds = JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]');
+      if (Array.isArray(delIds) && delIds.includes(String(newApp.id))) {
+        safeSetLocalStorage('LIVON_DELETED_APP_IDS', JSON.stringify(delIds.filter(id => String(id) !== String(newApp.id))));
+      }
+      const samDelIds = JSON.parse(localStorage.getItem('LIVON_SAMSUNG_DELETED_ROW_IDS') || '[]');
+      if (Array.isArray(samDelIds) && samDelIds.length > 0) {
+        const cleanSamDel = samDelIds.filter(k => k !== String(newApp.id) && k !== String(newApp.patientId || '') && k !== String(newApp.patientName || '').trim());
+        safeSetLocalStorage('LIVON_SAMSUNG_DELETED_ROW_IDS', JSON.stringify(cleanSamDel));
+      }
+    } catch (e) {}
+
     // 최근 등록 ID 로컬스토리지에 보존 (새로고침 후에도 최상단 영구 유지)
     try {
       const recentIds = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
       const updatedRecent = Array.from(new Set([newApp.id, ...(recentIds || [])])).slice(0, 100);
-      localStorage.setItem('LIVON_RECENTLY_REGISTERED_IDS', JSON.stringify(updatedRecent));
+      safeSetLocalStorage('LIVON_RECENTLY_REGISTERED_IDS', JSON.stringify(updatedRecent));
     } catch (e) {}
 
     // 2. 고객 신청 대장에 최우선 즉시 등록 (팩스 성공 여부와 무관하게 100% 안전 보존)
     gApps = [newApp, ...(gApps || []).filter(a => a && a.id !== newApp.id)];
-    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+    safeSaveCachedApps(gApps);
+    if (typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications)) {
+      window.REBORN_REAL_SEED_DATA.applications = [newApp, ...window.REBORN_REAL_SEED_DATA.applications.filter(a => a && a.id !== newApp.id)];
+    }
+    if (typeof gLastConvexLiveSyncTime !== 'undefined') {
+      gLastConvexLiveSyncTime = Date.now();
+    }
 
     // [사용자 요구사항]: 통합허브 신규 고객 등록 시 맨 첫번째로 고객이 무조건 노출되도록 필터/탭/정렬 최적화
     if (isHyundai) {
@@ -31205,6 +31264,12 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
       }
       if (typeof syncSamsungTargetSheetWithHubApps === 'function') {
         syncSamsungTargetSheetWithHubApps(true);
+      }
+      if (typeof convertHubAppToSamsungTargetRow === 'function' && typeof syncToConvex === 'function') {
+        const targetRow = convertHubAppToSamsungTargetRow(newApp);
+        if (targetRow) {
+          syncToConvex('sync:saveSamsungSheetRow', { sheetKey: 'target', row: targetRow }).catch(console.warn);
+        }
       }
     }
     if (typeof gHubFilter !== 'undefined') gHubFilter = 'ALL';

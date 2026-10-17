@@ -12305,9 +12305,9 @@ function renderUnifiedCareHub() {
     const isRecentB = b._isRecent !== undefined ? b._isRecent : checkIsRecent(b);
     if (isRecentA !== isRecentB) return isRecentB - isRecentA;
     if (isRecentA === 1 && isRecentB === 1) {
-      const tDiff = (b._applyTime || 0) - (a._applyTime || 0);
-      if (tDiff !== 0) return tDiff;
-      return compareAppIds(a.id, b.id, true);
+      const idComp = compareAppIds(a.id, b.id, true);
+      if (idComp !== 0) return idComp;
+      return (b._applyTime || 0) - (a._applyTime || 0);
     }
 
     if (gHubSort === 'status_inprogress') {
