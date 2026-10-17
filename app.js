@@ -20131,6 +20131,9 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
       if (elBadgeTab && window.gSystemAuditLogs) {
         elBadgeTab.innerText = `${window.gSystemAuditLogs.length}`;
       }
+      if (window.gCurrentAdminSubTab === 'auditlogs') {
+        window.renderSystemAuditLogs();
+      }
     }
   }
   else if (tabId === 'settings') renderSettings();

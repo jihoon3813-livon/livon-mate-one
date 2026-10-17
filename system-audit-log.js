@@ -279,7 +279,7 @@
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          window.gSystemAuditLogs = parsed;
+          window.gSystemAuditLogs = parsed.filter(l => l && typeof l === 'object');
         }
       }
     } catch (e) {
@@ -288,9 +288,17 @@
 
     if (!Array.isArray(window.gSystemAuditLogs) || window.gSystemAuditLogs.length === 0) {
       window.gSystemAuditLogs = generateSeedAuditLogs();
+      try {
+        localStorage.setItem('LIVON_SYSTEM_AUDIT_LOGS', JSON.stringify(window.gSystemAuditLogs));
+      } catch (e) {}
     }
 
-    // 서버 실시간 영구 보관소(/api/system/audit-logs)와 양방향 자동 동기화
+    // 🚀 [핵심 개선] 서버 응답을 기다리지 않고 현재 로컬/시드 로그 즉시 1차 렌더링 (0ms 화면 즉시 표시)
+    if (typeof window.renderSystemAuditLogs === 'function') {
+      window.renderSystemAuditLogs();
+    }
+
+    // 서버 실시간 영구 보관소(/api/system/audit-logs)와 양방향 자동 동기화 (백그라운드)
     try {
       const res = await fetch('/api/system/audit-logs');
       if (res.ok) {
@@ -418,11 +426,14 @@
         btnAudit.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1.5';
       }
 
-      // 서버 최신 감사로그 실시간 동기화 호출
+      // 🚀 [1단계] 즉시 화면 렌더링 (로컬/메모리 캐시 기준 0ms 즉시 표시)
+      if (typeof window.renderSystemAuditLogs === 'function') {
+        window.renderSystemAuditLogs();
+      }
+
+      // 🚀 [2단계] 서버 최신 감사로그 백그라운드 동기화 호출
       if (typeof window.initSystemAuditLogs === 'function') {
         window.initSystemAuditLogs();
-      } else {
-        window.renderSystemAuditLogs();
       }
     } else {
       if (rbacView) rbacView.classList.remove('hidden');
@@ -446,6 +457,19 @@
   };
 
   /**
+   * HTML 특수문자 안전 이스케이프 유틸
+   */
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /**
    * 감사 로그 화면 렌더링 및 필터링
    */
   window.renderSystemAuditLogs = function () {
@@ -463,8 +487,23 @@
       } catch (e) {}
     }
 
+    // 🚀 데이터가 비어있으면 동기적으로 즉시 실데이터 시드 생성
     if (!Array.isArray(window.gSystemAuditLogs) || window.gSystemAuditLogs.length === 0) {
-      window.initSystemAuditLogs();
+      try {
+        const saved = localStorage.getItem('LIVON_SYSTEM_AUDIT_LOGS');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            window.gSystemAuditLogs = parsed.filter(l => l && typeof l === 'object');
+          }
+        }
+      } catch (e) {}
+      if (!Array.isArray(window.gSystemAuditLogs) || window.gSystemAuditLogs.length === 0) {
+        window.gSystemAuditLogs = generateSeedAuditLogs();
+        try {
+          localStorage.setItem('LIVON_SYSTEM_AUDIT_LOGS', JSON.stringify(window.gSystemAuditLogs));
+        } catch (e) {}
+      }
     }
 
     const query = (document.getElementById('auditLogSearchInput')?.value || '').trim().toLowerCase();
@@ -601,6 +640,14 @@
       const actionBadge = actionBadgeMap[log.actionType] || { label: log.actionType, bg: 'bg-slate-100 text-slate-700 border-slate-200' };
       const catBadge = categoryBadgeMap[log.category] || 'bg-slate-100 text-slate-700 border-slate-200';
       const hasChanges = log.changes && Object.keys(log.changes).length > 0;
+      const safeName = escapeHtml(u.name || '관리자');
+      const safeUsername = escapeHtml(u.username || 'admin');
+      const safeDept = escapeHtml(u.dept || u.role || '-');
+      const safeIp = escapeHtml(log.ip || '-');
+      const safeCategory = escapeHtml(log.category || '-');
+      const safeTarget = escapeHtml(log.target || '-');
+      const safeSummary = escapeHtml(log.summary || '-');
+      const safeId = escapeHtml(log.id || '');
 
       return `
         <tr class="hover:bg-slate-50/80 transition-colors text-xs border-b border-slate-100">
@@ -609,21 +656,21 @@
 
           <!-- 2. 작업 일시 -->
           <td class="p-3 font-mono text-slate-700 font-semibold whitespace-nowrap">
-            ${log.timestamp}
+            ${escapeHtml(log.timestamp || '-')}
           </td>
 
           <!-- 3. 작업자 (이름, 계정, 소속) -->
           <td class="p-3">
             <div class="flex items-center gap-2">
               <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 font-black text-[10px] flex items-center justify-center shrink-0">
-                ${(u.name || '관').slice(0, 1)}
+                ${safeName.slice(0, 1)}
               </span>
               <div class="min-w-0">
                 <div class="font-bold text-slate-900 flex items-center gap-1">
-                  <span>${u.name}</span>
-                  <span class="text-[10px] text-slate-400 font-mono font-normal">(@${u.username})</span>
+                  <span>${safeName}</span>
+                  <span class="text-[10px] text-slate-400 font-mono font-normal">(@${safeUsername})</span>
                 </div>
-                <div class="text-[10.5px] text-slate-400 truncate">${u.dept || u.role}</div>
+                <div class="text-[10.5px] text-slate-400 truncate">${safeDept}</div>
               </div>
             </div>
           </td>
@@ -632,14 +679,14 @@
           <td class="p-3 whitespace-nowrap">
             <span class="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200" title="클라이언트 접속 IP">
               <i data-lucide="network" class="w-3 h-3 text-slate-400"></i>
-              <span>${log.ip || '-'}</span>
+              <span>${safeIp}</span>
             </span>
           </td>
 
           <!-- 5. 업무 분류 -->
           <td class="p-3 whitespace-nowrap">
             <span class="px-2 py-0.5 rounded-full text-[11px] font-bold border ${catBadge}">
-              ${log.category}
+              ${safeCategory}
             </span>
           </td>
 
@@ -651,13 +698,13 @@
           </td>
 
           <!-- 7. 작업 대상 -->
-          <td class="p-3 font-medium text-slate-800 max-w-[170px] truncate" title="${log.target || '-'}">
-            ${log.target || '-'}
+          <td class="p-3 font-medium text-slate-800 max-w-[170px] truncate" title="${safeTarget}">
+            ${safeTarget}
           </td>
 
           <!-- 8. 작업 상세 요약 -->
           <td class="p-3 text-slate-700 min-w-[200px] max-w-[320px]">
-            <div class="truncate font-medium" title="${log.summary}">${log.summary}</div>
+            <div class="truncate font-medium" title="${safeSummary}">${safeSummary}</div>
             ${hasChanges ? `
               <div class="text-[10.5px] text-indigo-600 font-semibold mt-0.5 flex items-center gap-1">
                 <i data-lucide="git-commit" class="w-3 h-3"></i>
@@ -668,7 +715,7 @@
 
           <!-- 9. 상세 보기 버튼 -->
           <td class="p-3 text-center pr-4 whitespace-nowrap">
-            <button type="button" onclick="openAuditLogDetailModal('${log.id}')"
+            <button type="button" onclick="openAuditLogDetailModal('${safeId}')"
               class="px-2.5 py-1.5 rounded-xl bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 font-bold text-[11px] shadow-2xs transition-all cursor-pointer inline-flex items-center gap-1">
               <i data-lucide="file-search" class="w-3.5 h-3.5 text-indigo-600"></i>
               <span>변경상세</span>
