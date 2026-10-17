@@ -6710,7 +6710,10 @@
               <i data-lucide="file-check-2" class="w-4 h-4 text-sky-600 flex-shrink-0"></i>
               <span><b>삼성화재 프로토콜:</b> 사전명단에 등록된 가입 고객을 검색하여 선택하면 12대 항목 및 손사 정보가 자동 완성됩니다.</span>
             </div>
-            <span class="px-2 py-0.5 rounded bg-sky-100 font-bold text-sky-800 text-[10px] whitespace-nowrap">사전명단 자동 연동</span>
+            <button type="button" onclick="openSamsungLeadSearchModal()" class="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-[10.5px] shadow-2xs flex items-center gap-1 cursor-pointer transition-all whitespace-nowrap" title="삼성화재 사전명단 검색 및 원클릭 접수">
+              <i data-lucide="user-search" class="w-3.5 h-3.5"></i>
+              <span>명단 불러오기</span>
+            </button>
           </div>
         </div>
 
@@ -6815,9 +6818,9 @@
               </div>
             </div>
             <div class="flex items-center gap-1.5">
-              <button type="button" onclick="openSamsungLeadSearchModal()" class="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-all">
+              <button type="button" onclick="openSamsungLeadSearchModal()" class="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-all" title="최신 사전명단 검색 및 12대 항목 자동 완성">
                 <i data-lucide="search" class="w-3.5 h-3.5"></i>
-                <span>사전명단 검색 & 채움</span>
+                <span>사전명단 불러오기 & 검색</span>
               </button>
             </div>
           </div>
@@ -11735,6 +11738,10 @@
               <i data-lucide="x" class="w-3.5 h-3.5"></i>
             </button>
           </div>
+          <button type="button" id="btnSamsungLeadSearchRefresh" onclick="refreshSamsungLeadSearchData()" class="px-3 py-2.5 rounded-xl border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold flex items-center gap-1.5 transition-all text-xs cursor-pointer shadow-2xs whitespace-nowrap shrink-0" title="구글 드라이브 최신 사전명단 동기화 확인">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>최신 동기화</span>
+          </button>
         </div>
 
         <div class="flex items-center justify-between px-1 text-[11px] text-slate-500 font-medium">
@@ -13697,8 +13704,8 @@
   <script src="slack-report-client.js?v=20261006_1510"></script>
   <script src="./xlsx-populate.min.js"></script>
   <script src="care-report-2page-pdf.js?v=20261015_1755"></script>
-  <script src="app.js?v=20261017_1130"></script>
-  <script src="carehub.js?v=20261017_1130"></script>
+  <script src="app.js?v=20261017_1200"></script>
+  <script src="carehub.js?v=20261017_1200"></script>
   <script src="hyundaiclaimhub.js?v=20261016_split"></script>
   <script src="samsungclaimhub.js?v=20261016_sync_v2"></script>
   <!-- 🚀 초고속 렌더링 최적화: 대용량 PDF & Excel 라이브러리는 첫 화면 렌더링 이후 비동기 지연 로드 -->

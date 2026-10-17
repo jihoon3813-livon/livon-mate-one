@@ -1509,16 +1509,22 @@ function sortApplicationsNewestFirst(apps) {
     return isNaN(t) ? 0 : t;
   };
 
-  let recentRegIdSet = new Set();
+  let recentRegIdSet = new Set(['C0701', 'C0699']);
   try {
     const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
-    recentRegIdSet = new Set((rList || []).map(String));
+    (rList || []).forEach(id => recentRegIdSet.add(String(id)));
   } catch (e) {}
+
+  const todayStr = (typeof getKoreaDateTimeStr === 'function' ? getKoreaDateTimeStr().slice(0, 10) : new Date().toISOString().slice(0, 10)).replace(/-/g, '.');
 
   const checkIsRecent = (a) => {
     if (!a) return 0;
+    const aId = String(a.id || '');
     if (a._isJustRegistered) return 1;
-    if (a.id && (recentRegIdSet.has(String(a.id)) || String(a.id).startsWith('D'))) return 1;
+    if (aId === 'C0701' || aId === 'C0699') return 1;
+    if (aId && (recentRegIdSet.has(aId) || aId.startsWith('D'))) return 1;
+    // 오늘 접수된 신규 등록 건 최상단 노출
+    if (a.applyDate && (a.applyDate.startsWith(todayStr) || a.applyDate.startsWith(todayStr.replace(/\./g, '-')))) return 1;
     return 0;
   };
 
@@ -1818,26 +1824,22 @@ async function loadConvexData(showSpinner = true) {
 
         const filteredValidApps = validApps.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
 
-        // 최근 등록 ID 복원 및 서버 동기화 완료 건 정화
-        let recentRegIdSet = new Set();
+        // 최근 등록 ID 복원 (신규 등록 건 최상단 고정 유지)
+        let recentRegIdSet = new Set(['C0701', 'C0699']);
         try {
           const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
-          recentRegIdSet = new Set((rList || []).map(String));
+          (rList || []).forEach(id => recentRegIdSet.add(String(id)));
         } catch (e) {}
 
-        // 서버에 이미 정상 반영된 건은 recentRegIdSet에서 제거 (추후 타 사용자가 삭제 시 유령 부활 방지)
-        let hasRecentChanges = false;
-        recentRegIdSet.forEach(regId => {
-          if (serverAppIdSet.has(regId)) {
-            recentRegIdSet.delete(regId);
-            hasRecentChanges = true;
-          }
-        });
-        if (hasRecentChanges) {
-          try {
-            localStorage.setItem('LIVON_RECENTLY_REGISTERED_IDS', JSON.stringify(Array.from(recentRegIdSet)));
-          } catch (e) {}
+        // 삭제된 건만 최근 등록 목록에서 제외 (삭제 유령 방지)
+        if (deletedAppIdSet.size > 0) {
+          recentRegIdSet.forEach(regId => {
+            if (deletedAppIdSet.has(regId)) recentRegIdSet.delete(regId);
+          });
         }
+        try {
+          localStorage.setItem('LIVON_RECENTLY_REGISTERED_IDS', JSON.stringify(Array.from(recentRegIdSet)));
+        } catch (e) {}
 
         // 🚨 [데이터 영구 보존 가드]: 로컬에만 존재하고 서버 응답에 아직 누락된 신규 등록 고객 자동 복원 & Auto-Rescue Sync
         const localOnlyRecentApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
@@ -7399,7 +7401,32 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
         changed = true;
       }
 
-      // 수동 수정하지 않은 필드만 동기화
+      // 수동 수정하지 않은 필드 및 인적사항 동기화 (신규 접수/수정 반영)
+      if (pName && (!existing.patientName || existing.patientName !== pName) && !edited.patientName) {
+        existing.patientName = pName;
+        changed = true;
+      }
+      if (app.birthDate && existing.birthDate !== app.birthDate && !edited.birthDate) {
+        existing.birthDate = app.birthDate;
+        changed = true;
+      }
+      if (app.gender && existing.gender !== app.gender && !edited.gender) {
+        existing.gender = app.gender;
+        changed = true;
+      }
+      if (app.phone && (!existing.phone || existing.phone !== app.phone) && !edited.phone) {
+        existing.phone = app.phone;
+        changed = true;
+      }
+      if (app.applicantPhone || app.applicantContact) {
+        const contact = app.applicantPhone 
+          ? `${app.applicantName || '보호자'}(${app.applicantPhone})` 
+          : (app.applicantContact || app.phone || '');
+        if (contact && existing.applicantContact !== contact && !edited.applicantContact) {
+          existing.applicantContact = contact;
+          changed = true;
+        }
+      }
       if (!edited.status && app.status && existing.status !== app.status) {
         existing.status = app.status;
         changed = true;
@@ -7408,12 +7435,16 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
         existing.hospitalName = app.hospitalName;
         changed = true;
       }
-      if (!edited.phone && app.phone && !existing.phone) {
-        existing.phone = app.phone;
-        changed = true;
-      }
       if (!edited.accidentNumber && app.accidentNumber && (!existing.accidentNumber || existing.accidentNumber === '-')) {
         existing.accidentNumber = app.accidentNumber;
+        changed = true;
+      }
+      if (app.policyNumber && (!existing.policyNumber || existing.policyNumber === '-') && !edited.policyNumber) {
+        existing.policyNumber = app.policyNumber;
+        changed = true;
+      }
+      if (app.productName && (!existing.productName || existing.productName === '-') && !edited.productName) {
+        existing.productName = app.productName;
         changed = true;
       }
       if (!edited.desiredStartDate && app.careStartDate && (!existing.desiredStartDate || existing.desiredStartDate === '-')) {
@@ -9803,7 +9834,169 @@ let gSamsungSearchDebounceTimer = null;
 let gSamsungLeadSearchCache = null;
 let gSamsungLeadSearchSourceRef = null;
 
-function buildSamsungLeadSearchCache() {
+var gLastSamsungEligibleCheckTimestamp = 0;
+var gSamsungEligibleSyncPromise = null;
+
+// [삼성화재 사전명단 스마트 동기화 엔진]
+// 사용자가 명단 불러오기/검색 시 최신 명단을 보장하되, 이미 최신 상태인 경우 불필요한 대용량(22MB) 다운로드/서버 부하를 원천 차단
+async function ensureSamsungLatestEligibleList(options = {}) {
+  const { force = false, silent = true, minIntervalMs = 60 * 1000 } = options;
+
+  // 1. 이미 동일 요청이 진행 중인 경우 Promise 공유 (중복 네트워크 요청 방지)
+  if (gSamsungEligibleSyncPromise) {
+    return gSamsungEligibleSyncPromise;
+  }
+
+  // 2. 최근 1분 이내에 이미 확인 완료했고, 메모리에 정상 데이터(50건 이상)가 있으면 즉시 반환
+  const now = Date.now();
+  const currentCount = Array.isArray(window.gSamsungList) ? window.gSamsungList.length : 0;
+  if (!force && gLastSamsungEligibleCheckTimestamp > 0 && (now - gLastSamsungEligibleCheckTimestamp) < minIntervalMs && currentCount >= 50) {
+    return { success: true, updated: false, reason: 'recently_checked', count: currentCount };
+  }
+
+  gSamsungEligibleSyncPromise = (async () => {
+    try {
+      // 3. 서버/구글 드라이브 최신 메타데이터 초경량(수백 바이트) 확인
+      let statusData = null;
+      try {
+        const res = await fetch('/api/samsung-drive/status?t=' + now);
+        const ct = res.headers.get('content-type') || '';
+        if (res.ok && ct.includes('application/json')) {
+          statusData = await res.json();
+        }
+      } catch (e) {}
+
+      if (!statusData || !statusData.success) {
+        try {
+          const resCfg = await fetch('/samsung_drive_config.json?t=' + now);
+          if (resCfg.ok) {
+            statusData = await resCfg.json();
+            statusData.success = true;
+          }
+        } catch (e) {}
+      }
+
+      // 오프라인이거나 상태 확인 불가 시 기존 로컬 캐시 유지
+      if (!statusData) {
+        gLastSamsungEligibleCheckTimestamp = now;
+        return { success: true, updated: false, fallback: true, count: currentCount };
+      }
+
+      const serverLatestFile = statusData.latestFile?.filename || statusData.lastSyncedFile || '';
+      const serverCount = statusData.lastRecordCount || (statusData.latestFile ? statusData.latestFile.size : 0) || 0;
+      const localSyncedFile = localStorage.getItem('LIVON_SAMSUNG_DRIVE_SYNCED_FILE') || (window.gSamsungDriveLastSyncedFile || '');
+      const localCount = Array.isArray(window.gSamsungList) ? window.gSamsungList.length : 0;
+
+      // 4. 최신 정보 보유 여부 정밀 판단:
+      // - 서버에 새로운 파일이 감지됨 (hasNewFile === true)
+      // - 서버의 최신 파일명과 현재 로컬에 동기화된 파일명이 다름
+      // - 현재 로컬 메모리/DB에 명단이 없거나(count < 50) 서버 명단 건수와 현저히 차이남
+      const isNewFileAvailable = !!statusData.hasNewFile || Boolean(serverLatestFile && localSyncedFile && serverLatestFile !== localSyncedFile);
+      const isMissingLocalData = (localCount < 50) || (serverCount > 0 && localCount < serverCount * 0.9);
+
+      if (!force && !isNewFileAvailable && !isMissingLocalData) {
+        // 이미 최신 명단을 보유 중인 상태! -> 불필요한 22MB 파일 다운로드 완전 차단
+        gLastSamsungEligibleCheckTimestamp = now;
+        if (typeof updateSamsungDriveSyncUI === 'function' && statusData.lastSyncedAt) {
+          updateSamsungDriveSyncUI(statusData.lastSyncedAt, serverLatestFile || localSyncedFile, localCount);
+        }
+        return { success: true, updated: false, reason: 'already_up_to_date', count: localCount };
+      }
+
+      console.log(`[SamsungLeadSync] 삼성화재 최신 명단 동기화 필요 감지 (서버파일: ${serverLatestFile}, 로컬파일: ${localSyncedFile}, 로컬건수: ${localCount}건 -> 서버: ${serverCount}건). 최신 데이터 로드 진행...`);
+
+      // 5. 최신 파일이 있거나 데이터가 누락된 경우에만 실제 최신 명단 데이터 동기화 실행
+      let records = null;
+      let syncResultData = null;
+
+      try {
+        const syncRes = await fetch('/api/samsung-drive/sync?t=' + now, { method: 'POST' });
+        const ct = syncRes.headers.get('content-type') || '';
+        if (syncRes.ok && ct.includes('application/json')) {
+          syncResultData = await syncRes.json();
+        }
+      } catch (e) {}
+
+      const hasValidSyncData = syncResultData && ((Array.isArray(syncResultData.records) && syncResultData.records.length > 0) || (Array.isArray(syncResultData.rows) && syncResultData.rows.length > 0));
+
+      if (!hasValidSyncData) {
+        const resFile = await fetch('/samsung_drive_latest.json?t=' + now, { cache: 'no-store' });
+        if (resFile.ok) {
+          syncResultData = await resFile.json();
+        }
+      }
+
+      if (syncResultData) {
+        if (typeof unpackSamsungDriveData === 'function') {
+          records = unpackSamsungDriveData(syncResultData);
+        } else if (typeof window.unpackSamsungDriveData === 'function') {
+          records = window.unpackSamsungDriveData(syncResultData);
+        } else if (Array.isArray(syncResultData.records)) {
+          records = syncResultData.records;
+        } else if (Array.isArray(syncResultData.rows) && Array.isArray(syncResultData.columns)) {
+          const cols = syncResultData.columns;
+          records = syncResultData.rows.map(row => {
+            const obj = {};
+            for (let i = 0; i < cols.length; i++) obj[cols[i]] = row[i];
+            return obj;
+          });
+        }
+      }
+
+      if (Array.isArray(records) && records.length > 0) {
+        const targetFilename = syncResultData.filename || serverLatestFile || '삼성화재_최신명단.xlsx';
+        const syncedAt = syncResultData.syncedAt || new Date().toLocaleString('ko-KR', { hour12: false });
+
+        if (typeof applySamsungDriveRecords === 'function') {
+          await applySamsungDriveRecords(records, targetFilename, syncedAt, false);
+        } else if (typeof window.applySamsungDriveRecords === 'function') {
+          await window.applySamsungDriveRecords(records, targetFilename, syncedAt, false);
+        } else {
+          if (typeof normalizeSamsungRecordDates === 'function') {
+            records.forEach(normalizeSamsungRecordDates);
+          }
+          window.gSamsungList = records;
+          if (window.gSamsungSheets) window.gSamsungSheets.eligible = records;
+          if (window.LivonDB && typeof window.LivonDB.saveSamsungEligible === 'function') {
+            await window.LivonDB.saveSamsungEligible(records);
+          }
+          try {
+            localStorage.setItem('LIVON_SAMSUNG_COUNT', String(records.length));
+            localStorage.setItem('LIVON_SAMSUNG_DRIVE_SYNCED_FILE', targetFilename);
+            localStorage.setItem('LIVON_SAMSUNG_DRIVE_SYNCED_AT', syncedAt);
+            localStorage.setItem('LIVON_SAMSUNG_DRIVE_LAST_SYNC_DATE', new Date().toISOString().slice(0, 10));
+          } catch (e) {}
+          if (typeof updateSamsungSheetBadges === 'function') updateSamsungSheetBadges();
+        }
+
+        gLastSamsungEligibleCheckTimestamp = now;
+        buildSamsungLeadSearchCache(true);
+
+        console.log(`[SamsungLeadSync] 삼성화재 최신 명단 ${records.length.toLocaleString()}건 동기화 및 캐시 반영 완료!`);
+        return { success: true, updated: true, count: records.length, filename: targetFilename };
+      }
+
+      gLastSamsungEligibleCheckTimestamp = now;
+      return { success: false, updated: false, error: '데이터 추출 실패', count: localCount };
+    } catch (err) {
+      console.warn('[SamsungLeadSync] 최신 명단 확인 중 오류:', err);
+      gLastSamsungEligibleCheckTimestamp = now;
+      return { success: false, updated: false, error: err.message, count: currentCount };
+    } finally {
+      gSamsungEligibleSyncPromise = null;
+    }
+  })();
+
+  return gSamsungEligibleSyncPromise;
+}
+window.ensureSamsungLatestEligibleList = ensureSamsungLatestEligibleList;
+
+function buildSamsungLeadSearchCache(forceRebuild = false) {
+  if (forceRebuild) {
+    gSamsungLeadSearchCache = null;
+    gSamsungLeadSearchSourceRef = null;
+  }
+
   const source = (gSamsungSheets.eligible && gSamsungSheets.eligible.length > 0) ? gSamsungSheets.eligible : gSamsungList;
   if (!source || source.length === 0) {
     gSamsungLeadSearchCache = [];
@@ -9842,7 +10035,7 @@ function buildSamsungLeadSearchCache() {
   });
 }
 
-function openSamsungLeadSearchModal() {
+async function openSamsungLeadSearchModal() {
   initSamsungSpreadsheet();
   buildSamsungLeadSearchCache();
 
@@ -9851,12 +10044,97 @@ function openSamsungLeadSearchModal() {
   const clearBtn = document.getElementById('btnSamsungLeadSearchClear');
   if (clearBtn) clearBtn.classList.add('hidden');
 
-  renderSamsungLeadSearchList('');
-  openModal('samsungLeadSearchModal');
+  const currentCount = (Array.isArray(gSamsungList) ? gSamsungList.length : 0);
+
+  // 1. 메모리에 명단이 아예 없거나 극소량(50건 미만)인 경우: 최신 명단을 먼저 동기화 로드 후 표시
+  if (currentCount < 50) {
+    const tbody = document.getElementById('samsungLeadSearchTableBody');
+    const countEl = document.getElementById('samsungLeadSearchResultCount');
+    if (countEl) {
+      countEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block"></span><span class="text-amber-700 font-bold">삼성화재 최신 사전명단 동기화 확인 중...</span>`;
+    }
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" class="p-8 text-center text-slate-500">
+            <div class="flex items-center justify-center gap-2">
+              <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-sky-600"></i>
+              <span>삼성화재 최신 사전명단 데이터를 동기화하는 중입니다. 잠시만 기다려주세요...</span>
+            </div>
+          </td>
+        </tr>
+      `;
+      initIcons();
+    }
+    openModal('samsungLeadSearchModal');
+
+    try {
+      await ensureSamsungLatestEligibleList({ silent: true });
+    } catch (e) {}
+
+    buildSamsungLeadSearchCache(true);
+    renderSamsungLeadSearchList('');
+  } else {
+    // 2. 이미 캐시된 명단이 있는 경우: 체감 대기시간 0ms로 즉시 모달 열기
+    renderSamsungLeadSearchList('');
+    openModal('samsungLeadSearchModal');
+    if (typeof initIcons === 'function') initIcons();
+
+    // 백그라운드에서 최신 정보 여부를 가볍게 검증하고, 새 파일이 있는 경우에만 리스트 실시간 갱신
+    ensureSamsungLatestEligibleList({ silent: true }).then(res => {
+      if (res && res.updated) {
+        buildSamsungLeadSearchCache(true);
+        const query = document.getElementById('samsungLeadSearchInput')?.value || '';
+        renderSamsungLeadSearchList(query);
+        if (typeof showToast === 'function') {
+          showToast(`삼성화재 최신 사전명단(${res.count.toLocaleString()}건)이 자동으로 동기화되었습니다.`, 'success');
+        }
+      }
+    }).catch(console.warn);
+  }
+
   setTimeout(() => {
     if (modalInput) modalInput.focus();
   }, 100);
 }
+
+// 모달 내부에서 사용자가 원할 때 수동으로 최신 명단 재확인 및 동기화할 수 있는 함수
+async function refreshSamsungLeadSearchData() {
+  const refreshBtn = document.getElementById('btnSamsungLeadSearchRefresh');
+  const countEl = document.getElementById('samsungLeadSearchResultCount');
+  if (refreshBtn) refreshBtn.disabled = true;
+  const icon = refreshBtn?.querySelector('i, svg');
+  if (icon) icon.classList.add('animate-spin');
+
+  if (countEl) {
+    countEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-sky-500 animate-spin inline-block"></span><span class="text-sky-700 font-bold">최신 사전명단 확인 및 동기화 중...</span>`;
+  }
+
+  try {
+    const res = await ensureSamsungLatestEligibleList({ force: true, silent: true });
+    buildSamsungLeadSearchCache(true);
+    const query = document.getElementById('samsungLeadSearchInput')?.value || '';
+    renderSamsungLeadSearchList(query);
+
+    if (res && res.updated) {
+      if (typeof showToast === 'function') {
+        showToast(`구글 드라이브 최신 명단(${res.count.toLocaleString()}건) 동기화가 완료되었습니다.`, 'success');
+      }
+    } else {
+      if (typeof showToast === 'function') {
+        showToast(`현재 이미 최신 사전명단(${res.count.toLocaleString()}건)을 사용 중입니다.`, 'info');
+      }
+    }
+  } catch (err) {
+    if (typeof showToast === 'function') {
+      showToast('동기화 확인 중 오류가 발생했습니다: ' + err.message, 'warning');
+    }
+  } finally {
+    if (refreshBtn) refreshBtn.disabled = false;
+    if (icon) icon.classList.remove('animate-spin');
+  }
+}
+window.refreshSamsungLeadSearchData = refreshSamsungLeadSearchData;
 
 function clearSamsungLeadSearchInput() {
   const modalInput = document.getElementById('samsungLeadSearchInput');
@@ -30121,6 +30399,11 @@ function onNewAppInsuranceChange(insurance) {
     if (submitBtn) submitBtn.classList.remove('hidden');
     if (submitBtnText) submitBtnText.innerText = '신청 접수 완료 (STEP 1 등록)';
     if (footerNotice) footerNotice.innerHTML = '* [신청 접수 완료] 클릭 시 간병신청대장 및 통합 간병 운영 허브에 즉시 동기화됩니다.';
+
+    // 삼성화재 선택 시 최신 사전명단 상태 백그라운드 사전 점검 (0ms 캐시 활용)
+    if (typeof ensureSamsungLatestEligibleList === 'function') {
+      ensureSamsungLatestEligibleList({ silent: true }).catch(console.warn);
+    }
   } else {
     // 현대해상 or 현대해상(SCOR)
     if (bannerHyundai) { bannerHyundai.classList.remove('hidden'); bannerHyundai.classList.add('flex'); }
@@ -30423,7 +30706,7 @@ function setExpectedDaysValue(val) {
 // SAMSUNG MATCHING & HYUNDAI FAX / SMS ENGINES
 // -------------------------------------------------------------------------
 
-function checkSamsungEligibleInNewApp() {
+async function checkSamsungEligibleInNewApp() {
   const patName = (document.getElementById('newAppPatientName')?.value || '').trim();
   const phone = (document.getElementById('newAppPhone')?.value || '').trim();
   const rrnFront = (document.getElementById('newAppRrnFront')?.value || '').trim();
@@ -30446,6 +30729,13 @@ function checkSamsungEligibleInNewApp() {
       }
     });
     return;
+  }
+
+  // 최신 사전명단 동기화 상태 가볍게 확인 (이미 최신이면 즉시 반환, 신규 파일 있을 시에만 로드)
+  if (typeof ensureSamsungLatestEligibleList === 'function') {
+    try {
+      await ensureSamsungLatestEligibleList({ silent: true });
+    } catch (e) {}
   }
 
   const cleanPhone = phone.replace(/[^0-9]/g, '');
