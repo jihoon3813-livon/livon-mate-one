@@ -1,5 +1,53 @@
 [
   {
+    "id": "LOG-08571767-UTUA",
+    "timestamp": "2026-10-17 12:42:51",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "59.7.232.159",
+    "category": "데이터동기화",
+    "actionType": "SYNC",
+    "target": "종합 간병(현대해상) 관리대장 엑셀 업로드",
+    "summary": "종합 간병(현대해상) 실데이터 엑셀 업로드 및 동기화 (신청 351건, 배정 349건, 청구 556건, 지급 594건, 간병인 272명, 센터 100개소, 손사 137명)",
+    "status": "SUCCESS",
+    "changes": {
+      "고객신청": {
+        "before": "-",
+        "after": "351건"
+      },
+      "간병배정": {
+        "before": "-",
+        "after": "349건"
+      },
+      "보험청구": {
+        "before": "-",
+        "after": "556건"
+      },
+      "간병인지급": {
+        "before": "-",
+        "after": "594건"
+      },
+      "간병인력풀": {
+        "before": "-",
+        "after": "272명 (실데이터)"
+      },
+      "협력센터": {
+        "before": "-",
+        "after": "100개소"
+      },
+      "손사디렉토리": {
+        "before": "-",
+        "after": "137명"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36"
+  },
+  {
     "id": "LOG-08892845-DC6I",
     "timestamp": "2026-10-16 09:01:32",
     "user": {

@@ -1,5 +1,5 @@
 window.REBORN_REAL_SEED_DATA = {
-  "updatedAt": "2026-10-16T10:47:12.308Z",
+  "updatedAt": "2026-10-17T04:27:31.441Z",
   "sources": {
     "종합 간병(현대해상)": {
       "sourceType": "file",
@@ -24983,7 +24983,8 @@ window.REBORN_REAL_SEED_DATA = {
       "csLatestType": null,
       "_applyTime": 1791439200000,
       "_updTime": 0,
-      "_latestEventTime": 1791439200000
+      "_latestEventTime": 1791439200000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0338",
@@ -25042,7 +25043,8 @@ window.REBORN_REAL_SEED_DATA = {
       "csLatestType": null,
       "_applyTime": 1791442860000,
       "_updTime": 0,
-      "_latestEventTime": 1791442860000
+      "_latestEventTime": 1791442860000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0339",
@@ -25219,7 +25221,8 @@ window.REBORN_REAL_SEED_DATA = {
       "csLatestType": null,
       "_applyTime": 1791525600000,
       "_updTime": 0,
-      "_latestEventTime": 1791525600000
+      "_latestEventTime": 1791525600000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0342",
@@ -25278,7 +25281,8 @@ window.REBORN_REAL_SEED_DATA = {
       "csLatestType": null,
       "_applyTime": 1791685800000,
       "_updTime": 0,
-      "_latestEventTime": 1791685800000
+      "_latestEventTime": 1791685800000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0343",
@@ -25455,7 +25459,8 @@ window.REBORN_REAL_SEED_DATA = {
       "csLatestType": null,
       "_applyTime": 1791765000000,
       "_updTime": 0,
-      "_latestEventTime": 1791765000000
+      "_latestEventTime": 1791765000000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0346",
@@ -25514,7 +25519,8 @@ window.REBORN_REAL_SEED_DATA = {
       "csLatestType": null,
       "_applyTime": 1791776700000,
       "_updTime": 0,
-      "_latestEventTime": 1791776700000
+      "_latestEventTime": 1791776700000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0347",
@@ -26805,7 +26811,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "접수",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": null
+      "updatedAt": null,
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1792129683487.4426,
@@ -27318,7 +27325,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "접수",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": null
+      "updatedAt": null,
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1792051668568.819,
@@ -27462,7 +27470,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "접수",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": null
+      "updatedAt": null,
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1792049252171.0078,
@@ -27825,7 +27834,8 @@ window.REBORN_REAL_SEED_DATA = {
       "status": "접수",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": null
+      "updatedAt": null,
+      "isAlertConfirmed": true
     }
   ],
   "assignments": [
