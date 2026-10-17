@@ -11463,6 +11463,26 @@ function renderUnifiedCareHub() {
   if (!container) return;
 
   // [초고속 0ms 즉시 복원] 새로고침 시 최신 로컬 캐시 및 최신 시드 데이터를 병합 복원하여 과거 312건 표시 현상 원천 차단
+  const isDev = (typeof isDevEnvironment === 'function' && isDevEnvironment()) || (typeof isDevScreen === 'function' && isDevScreen()) || !!window.IS_DEV_ENV;
+
+  // 🚨 [운영환경 PROD 보호]: 358건 개발 시드 캐시 잔여 시 즉시 완전 소거
+  if (!isDev) {
+    try {
+      const cached = localStorage.getItem('LIVON_CACHED_APPS');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length === 358) {
+          localStorage.removeItem('LIVON_CACHED_APPS');
+          gApps = [];
+        }
+      }
+    } catch (e) {}
+
+    if (Array.isArray(gApps) && gApps.length === 358) {
+      gApps = [];
+    }
+  }
+
   if (!Array.isArray(gApps) || gApps.length === 0) {
     let deletedAppIdSet = new Set();
     try {
@@ -11475,11 +11495,15 @@ function renderUnifiedCareHub() {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          gApps = parsed.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
+          if (isDev || parsed.length !== 358) {
+            gApps = parsed.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
+          }
         }
       }
     } catch (e) {}
-    if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0) {
+
+    // 🚨 [운영환경 보호]: window.REBORN_REAL_SEED_DATA는 오직 개발(DEV) 환경에서만 병합/복원
+    if (isDev && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0) {
       const seedApps = window.REBORN_REAL_SEED_DATA.applications.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
       if (!Array.isArray(gApps) || gApps.length === 0) {
         gApps = [...seedApps];
@@ -11509,6 +11533,10 @@ function renderUnifiedCareHub() {
       loadConvexData(false);
     }
     if (gIsDataLoading && !gConvexDataApplied && localStorage.getItem('LIVON_DATA_RESET_CLEAN') !== 'true') {
+      renderAllLoadingStates();
+      return;
+    }
+    if (!isDev && !gConvexDataApplied) {
       renderAllLoadingStates();
       return;
     }
@@ -12042,7 +12070,7 @@ function renderUnifiedCareHub() {
       dashEstimatedUnpaid = Number(window.gOfficialDashboardStats.estimatedUnpaid) || 0;
       if (dashUnconfirmedClaims === 0) dashUnconfirmedClaims = Number(window.gOfficialDashboardStats.unconfirmedClaims) || 0;
       if (dashDepositConfirmed === 0) dashDepositConfirmed = Number(window.gOfficialDashboardStats.depositConfirmed) || 0;
-    } else if (window.REBORN_REAL_SEED_DATA && window.REBORN_REAL_SEED_DATA.dashboard && Number(window.REBORN_REAL_SEED_DATA.dashboard['추정 미수금 (단가 142,000 기본)']) > 0) {
+    } else if (isDev && window.REBORN_REAL_SEED_DATA && window.REBORN_REAL_SEED_DATA.dashboard && Number(window.REBORN_REAL_SEED_DATA.dashboard['추정 미수금 (단가 142,000 기본)']) > 0) {
       dashEstimatedUnpaid = Number(window.REBORN_REAL_SEED_DATA.dashboard['추정 미수금 (단가 142,000 기본)']) || 0;
       if (dashUnconfirmedClaims === 0) dashUnconfirmedClaims = Number(window.REBORN_REAL_SEED_DATA.dashboard['미확인 청구건수']) || 0;
       if (dashDepositConfirmed === 0) dashDepositConfirmed = Number(window.REBORN_REAL_SEED_DATA.dashboard['입금확인 금액']) || 0;
@@ -12077,7 +12105,7 @@ function renderUnifiedCareHub() {
       dashTotalPayout = appTotalPayoutSum;
     } else if (window.gOfficialDashboardStats && Number(window.gOfficialDashboardStats.totalPayout) > 0) {
       dashTotalPayout = Number(window.gOfficialDashboardStats.totalPayout) || 0;
-    } else if (window.REBORN_REAL_SEED_DATA && window.REBORN_REAL_SEED_DATA.dashboard && Number(window.REBORN_REAL_SEED_DATA.dashboard['총 간병비 지급액']) > 0) {
+    } else if (isDev && window.REBORN_REAL_SEED_DATA && window.REBORN_REAL_SEED_DATA.dashboard && Number(window.REBORN_REAL_SEED_DATA.dashboard['총 간병비 지급액']) > 0) {
       dashTotalPayout = Number(window.REBORN_REAL_SEED_DATA.dashboard['총 간병비 지급액']) || 0;
     }
   }

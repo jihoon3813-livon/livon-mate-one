@@ -94,6 +94,11 @@ function safeSetLocalStorage(key, valStr) {
 
 function safeSaveCachedApps(apps) {
   if (!Array.isArray(apps)) return false;
+  const isDev = (typeof isDevEnvironment === 'function' && isDevEnvironment()) || (typeof isDevScreen === 'function' && isDevScreen()) || !!window.IS_DEV_ENV;
+  if (!isDev && apps.length === 358) {
+    console.warn('[Safety Guard] PROD 환경에서 358건 개발 시드 저장을 원천 차단합니다.');
+    return false;
+  }
   return safeSetLocalStorage('LIVON_CACHED_APPS', JSON.stringify(apps));
 }
 
@@ -1229,6 +1234,8 @@ var IS_DEV_ENV = isDevEnvironment();
 // 환경 변수 오염 원천 차단: IS_DEV_ENV에 따라 단일 DB URL 엄격 바인딩
 var CONVEX_URL = IS_DEV_ENV ? DEV_CONVEX_URL : PROD_CONVEX_URL;
 window.IS_DEV_ENV = IS_DEV_ENV;
+window.isDevEnvironment = isDevEnvironment;
+window.isDevScreen = isDevScreen;
 window.CURRENT_CONVEX_URL = CONVEX_URL;
 
 // [환경 격리]: 개발(DEV) 환경에서는 운영 전용 고객(이진화 C0701 등) 잔여 로컬 캐시 및 최근등록 목록 자동 정화
@@ -1921,7 +1928,7 @@ async function loadConvexData(showSpinner = true) {
     if (!isDev) {
       try { localStorage.setItem('LIVON_PROD_CONVEX_SYNCED', 'true'); } catch (e) {}
     }
-    try { localStorage.setItem('LIVON_APPS_CACHE_SYNC_VER', '20261017_v3'); } catch (e) {}
+    try { localStorage.setItem('LIVON_APPS_CACHE_SYNC_VER', '20261017_v4'); } catch (e) {}
     (gApps || []).forEach(a => {
       if ((Number(a.estimatedUnpaid) || 0) <= 0 && a.unconfirmedClaimCount > 0) {
         a.unconfirmedClaimCount = 0;
@@ -1984,7 +1991,7 @@ async function loadConvexData(showSpinner = true) {
       if (Array.isArray(assignments) && assignments.length > 0) {
         gAssigns = deletedAppIdSet.size > 0 ? assignments.filter(as => as && !deletedAppIdSet.has(String(as.applyId))) : assignments;
       } else if (!Array.isArray(gAssigns) || gAssigns.length === 0) {
-        if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.assignments)) {
+        if (isDev && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.assignments)) {
           gAssigns = [...window.REBORN_REAL_SEED_DATA.assignments];
         }
       }
@@ -1993,7 +2000,7 @@ async function loadConvexData(showSpinner = true) {
       if (Array.isArray(claims) && claims.length > 0) {
         gClaims = deletedAppIdSet.size > 0 ? claims.filter(c => c && !deletedAppIdSet.has(String(c.applyId))) : claims;
       } else if (!Array.isArray(gClaims) || gClaims.length === 0) {
-        if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.claims)) {
+        if (isDev && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.claims)) {
           gClaims = [...window.REBORN_REAL_SEED_DATA.claims];
         }
       }
@@ -2002,7 +2009,7 @@ async function loadConvexData(showSpinner = true) {
       if (Array.isArray(payouts) && payouts.length > 0) {
         gPayouts = deletedAppIdSet.size > 0 ? payouts.filter(p => p && !deletedAppIdSet.has(String(p.applyId))) : payouts;
       } else if (!Array.isArray(gPayouts) || gPayouts.length === 0) {
-        if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.payouts)) {
+        if (isDev && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.payouts)) {
           gPayouts = [...window.REBORN_REAL_SEED_DATA.payouts];
         }
       }
@@ -18784,7 +18791,7 @@ function initData() {
         deletedAppIdSet = new Set(merged);
       } catch (e) {}
 
-      const CURRENT_CACHE_SYNC_VER = '20261017_v3';
+      const CURRENT_CACHE_SYNC_VER = '20261017_v4';
       const isStaleSyncVer = localStorage.getItem('LIVON_APPS_CACHE_SYNC_VER') !== CURRENT_CACHE_SYNC_VER;
       const seedApps = (isDev && hasRealSeedData && Array.isArray(window.REBORN_REAL_SEED_DATA.applications))
         ? window.REBORN_REAL_SEED_DATA.applications.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)))
@@ -18802,11 +18809,12 @@ function initData() {
         }
         let filtered = Array.isArray(cleaned) ? cleaned.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id))) : [];
 
-        // 🚨 [운영환경 깜빡임 차단]: 운영(PROD) 환경인데 로컬 캐시가 과거 개발 시드(358건)이거나 아직 정규 동기화 전인 경우 화면 노출 차단
+        // 🚨 [운영환경 깜빡임 차단]: 운영(PROD) 환경인데 로컬 캐시가 과거 개발 시드(358건)이거나 아직 정규 동기화 전인 경우 화면 노출 차단 및 캐시 정화
         if (!isDev) {
           const isProdSynced = localStorage.getItem('LIVON_PROD_CONVEX_SYNCED') === 'true';
           if (!isProdSynced || filtered.length === 358) {
             filtered = [];
+            try { localStorage.removeItem('LIVON_CACHED_APPS'); } catch (e) {}
           }
         }
 
@@ -18835,7 +18843,9 @@ function initData() {
         }
 
         gApps = (typeof sortApplicationsNewestFirst === 'function') ? sortApplicationsNewestFirst(filtered) : filtered;
-        safeSaveCachedApps(gApps);
+        if (isDev || gApps.length !== 358) {
+          safeSaveCachedApps(gApps);
+        }
       } else if (isDev && window.REBORN_DATA && window.REBORN_DATA.applications) {
         gApps = [...window.REBORN_DATA.applications].filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
         safeSaveCachedApps(gApps);

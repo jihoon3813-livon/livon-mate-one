@@ -60,6 +60,10 @@
           else if (host.endsWith('.vercel.app') && host !== 'livon-mate-one.vercel.app') isDev = true;
         }
 
+        window.IS_DEV_ENV = isDev;
+        window.isDevEnvironment = function() { return isDev; };
+        window.isDevScreen = function() { return isDev; };
+
         if (isDev) {
           document.documentElement.classList.add('livon-dev-mode');
           return;
@@ -13702,7 +13706,13 @@
 
   <!-- SCRIPTS (Moved to bottom of body for full DOM availability) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="hub_real_data.js?v=20261017_1325"></script>
+  <script>
+    if (window.IS_DEV_ENV) {
+      document.write('<script src="hub_real_data.js?v=20261017_1650"><\/script>');
+    } else {
+      window.REBORN_REAL_SEED_DATA = null;
+    }
+  </script>
   <script src="data.js?v=20261017_1300"></script>
   <script src="careport-client.js?v=20261015_1630"></script>
   <script src="carecall-client.js?v=20261003_0950"></script>
@@ -13713,8 +13723,8 @@
   <script src="slack-report-client.js?v=20261006_1510"></script>
   <script src="./xlsx-populate.min.js"></script>
   <script src="care-report-2page-pdf.js?v=20261015_1755"></script>
-  <script src="app.js?v=20261017_1325"></script>
-  <script src="carehub.js?v=20261017_1325"></script>
+  <script src="app.js?v=20261017_1650"></script>
+  <script src="carehub.js?v=20261017_1650"></script>
   <script src="hyundaiclaimhub.js?v=20261016_split"></script>
   <script src="samsungclaimhub.js?v=20261016_sync_v2"></script>
   <!-- 🚀 초고속 렌더링 최적화: 대용량 PDF & Excel 라이브러리는 첫 화면 렌더링 이후 비동기 지연 로드 -->
