@@ -1124,6 +1124,16 @@ function isDevEnvironment() {
   const host = (window.location.hostname || '').toLowerCase();
   const port = window.location.port || '';
 
+  // 🚨 [절대 격리 가드]: 공식 실운영 도메인인 livon-mate-one.vercel.app 은 100% PROD로 영구 하드락
+  // URL 파라미터나 로컬스토리지 잔여 플래그로 인한 개발 환경 교차 오염을 완벽히 차단합니다.
+  if (host === 'livon-mate-one.vercel.app') {
+    try {
+      localStorage.removeItem('LIVON_TARGET_ENV');
+      sessionStorage.removeItem('LIVON_TARGET_ENV');
+    } catch(e) {}
+    return false;
+  }
+
   const urlParam = (typeof URLSearchParams !== 'undefined') ? new URLSearchParams(window.location.search).get('env') : null;
   if (urlParam === 'dev') {
     try { localStorage.setItem('LIVON_TARGET_ENV', 'dev'); } catch(e) {}
@@ -1808,19 +1818,33 @@ async function loadConvexData(showSpinner = true) {
 
         const filteredValidApps = validApps.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
 
-        // 최근 등록 ID 및 D계열 신규 접수 고객 식별 플래그 복원
+        // 최근 등록 ID 복원 및 서버 동기화 완료 건 정화
         let recentRegIdSet = new Set();
         try {
           const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
           recentRegIdSet = new Set((rList || []).map(String));
         } catch (e) {}
 
+        // 서버에 이미 정상 반영된 건은 recentRegIdSet에서 제거 (추후 타 사용자가 삭제 시 유령 부활 방지)
+        let hasRecentChanges = false;
+        recentRegIdSet.forEach(regId => {
+          if (serverAppIdSet.has(regId)) {
+            recentRegIdSet.delete(regId);
+            hasRecentChanges = true;
+          }
+        });
+        if (hasRecentChanges) {
+          try {
+            localStorage.setItem('LIVON_RECENTLY_REGISTERED_IDS', JSON.stringify(Array.from(recentRegIdSet)));
+          } catch (e) {}
+        }
+
         // 🚨 [데이터 영구 보존 가드]: 로컬에만 존재하고 서버 응답에 아직 누락된 신규 등록 고객 자동 복원 & Auto-Rescue Sync
         const localOnlyRecentApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
           if (!localApp || !localApp.id) return false;
           if (serverAppIdSet.has(String(localApp.id))) return false;
           if (deletedAppIdSet.has(String(localApp.id))) return false;
-          return recentRegIdSet.has(String(localApp.id)) || localApp._isJustRegistered || String(localApp.id).startsWith('D');
+          return recentRegIdSet.has(String(localApp.id)) || (localApp._isJustRegistered === true);
         });
 
         if (localOnlyRecentApps.length > 0) {
@@ -1836,7 +1860,7 @@ async function loadConvexData(showSpinner = true) {
 
         const mergedApps = [...localOnlyRecentApps, ...filteredValidApps];
         mergedApps.forEach(a => {
-          if (a && a.id && (recentRegIdSet.has(String(a.id)) || String(a.id).startsWith('D'))) {
+          if (a && a.id && recentRegIdSet.has(String(a.id))) {
             a._isJustRegistered = true;
           }
         });
@@ -2276,8 +2300,8 @@ async function runConvexLiveSync(force = false) {
   if (!force && typeof document !== 'undefined' && document.hidden) return;
 
   const now = Date.now();
-  // 창 전환(focus/visibilitychange) 등으로 인한 과도한 재호출 방지: 최소 3분(180,000ms) Throttle 쿨타임 적용
-  if (!force && (now - gLastConvexLiveSyncTime < 180000)) return;
+  // 창 전환(focus/visibilitychange) 등으로 인한 과도한 재호출 방지: 최소 5초(5,000ms) Throttle 쿨타임 적용
+  if (!force && (now - gLastConvexLiveSyncTime < 5000)) return;
 
   // 사용자가 입력 필드(검색창 제외)를 타이핑 중이거나 모달에서 데이터 작성 중일 때는 작업 보호
   const activeEl = document.activeElement;
@@ -2309,14 +2333,14 @@ async function runConvexLiveSync(force = false) {
 
 function startConvexLiveSync() {
   if (gConvexLiveSyncTimer) return;
-  // 5분(300초)마다 백그라운드에서 실시간 변경 감지 (서버 트래픽 및 과금 95% 대폭 절감)
+  // 15초(15,000ms)마다 백그라운드에서 실시간 변경 감지 (다중 사용자 환경 실시간 동기화 보장)
   gConvexLiveSyncTimer = setInterval(() => {
     if (typeof document !== 'undefined' && !document.hidden) {
       runConvexLiveSync();
     }
-  }, 300000);
+  }, 15000);
 
-  // 사용자가 브라우저 탭으로 복귀했을 때 쿨타임(최소 3분) 경과 시에만 동기화
+  // 사용자가 브라우저 탭으로 복귀했을 때 즉시 최신 데이터 동기화 (5초 쿨타임)
   window.addEventListener('focus', () => {
     runConvexLiveSync();
   });
@@ -2325,7 +2349,7 @@ function startConvexLiveSync() {
       runConvexLiveSync();
     }
   });
-  console.log('[LiveSync] Convex 실시간 절약 동기화 엔진 가동 (5분 주기 / 탭 비활성 시 중단 / 3분 쿨타임)');
+  console.log('[LiveSync] Convex 다중 사용자 실시간 동기화 엔진 가동 (15초 주기 / 탭 포커스 즉시 갱신)');
 }
 window.startConvexLiveSync = startConvexLiveSync;
 window.runConvexLiveSync = runConvexLiveSync;

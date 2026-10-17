@@ -42,14 +42,23 @@
       try {
         var host = (window.location.hostname || '').toLowerCase();
         var port = window.location.port || '';
-        var urlParam = (typeof URLSearchParams !== 'undefined') ? new URLSearchParams(window.location.search).get('env') : null;
-        var storedEnv = (typeof localStorage !== 'undefined' && localStorage.getItem('LIVON_TARGET_ENV')) || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('LIVON_TARGET_ENV'));
         var isDev = false;
-        if (urlParam === 'dev' || storedEnv === 'dev') isDev = true;
-        else if (urlParam === 'prod' || storedEnv === 'prod') isDev = false;
-        else if (host === 'localhost' || host === '127.0.0.1' || host === '' || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:') isDev = true;
-        else if (host.includes('dev') || host.includes('test') || host.includes('staging') || host.includes('preview')) isDev = true;
-        else if (host.endsWith('.vercel.app') && host !== 'livon-mate-one.vercel.app') isDev = true;
+
+        if (host === 'livon-mate-one.vercel.app') {
+          try {
+            localStorage.removeItem('LIVON_TARGET_ENV');
+            sessionStorage.removeItem('LIVON_TARGET_ENV');
+          } catch(e) {}
+          isDev = false;
+        } else {
+          var urlParam = (typeof URLSearchParams !== 'undefined') ? new URLSearchParams(window.location.search).get('env') : null;
+          var storedEnv = (typeof localStorage !== 'undefined' && localStorage.getItem('LIVON_TARGET_ENV')) || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('LIVON_TARGET_ENV'));
+          if (urlParam === 'dev' || storedEnv === 'dev') isDev = true;
+          else if (urlParam === 'prod' || storedEnv === 'prod') isDev = false;
+          else if (host === 'localhost' || host === '127.0.0.1' || host === '' || port === '8080' || port === '3000' || port === '5173' || window.location.protocol === 'file:') isDev = true;
+          else if (host.includes('dev') || host.includes('test') || host.includes('staging') || host.includes('preview')) isDev = true;
+          else if (host.endsWith('.vercel.app') && host !== 'livon-mate-one.vercel.app') isDev = true;
+        }
 
         if (isDev) {
           document.documentElement.classList.add('livon-dev-mode');
@@ -13688,8 +13697,8 @@
   <script src="slack-report-client.js?v=20261006_1510"></script>
   <script src="./xlsx-populate.min.js"></script>
   <script src="care-report-2page-pdf.js?v=20261015_1755"></script>
-  <script src="app.js?v=20261017_1120"></script>
-  <script src="carehub.js?v=20261017_1120"></script>
+  <script src="app.js?v=20261017_1130"></script>
+  <script src="carehub.js?v=20261017_1130"></script>
   <script src="hyundaiclaimhub.js?v=20261016_split"></script>
   <script src="samsungclaimhub.js?v=20261016_sync_v2"></script>
   <!-- 🚀 초고속 렌더링 최적화: 대용량 PDF & Excel 라이브러리는 첫 화면 렌더링 이후 비동기 지연 로드 -->
