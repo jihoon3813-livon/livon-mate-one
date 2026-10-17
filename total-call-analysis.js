@@ -4332,82 +4332,21 @@ function getDismissedOutcallIds() {
 }
 
 /**
- * 미처리 아웃콜 상시 플로팅 배지 (모바일 및 PC 모든 화면에서 상시 접근 가능)
+ * 미처리 아웃콜 상시 플로팅 배지 (사용자 요청: 팝업 및 플로팅 배지 비활성화)
  */
 function renderOutcallFloatingPill(count) {
-  // 로그인 화면 창이거나 로그아웃 상태인 경우 플로팅 배지 절대 표시 차단
-  const overlay = document.getElementById('adminLoginOverlay');
-  const isLoginScreen = (typeof window.isUserOnLoginScreen === 'function' && window.isUserOnLoginScreen()) ||
-    (typeof isUserOnLoginScreen === 'function' && isUserOnLoginScreen()) ||
-    (document.documentElement && document.documentElement.classList.contains('livon-locked')) ||
-    (overlay && (!overlay.classList.contains('hidden') || overlay.style.display === 'flex')) ||
-    (typeof gCurrentAdmin !== 'undefined' && !gCurrentAdmin) ||
-    localStorage.getItem('LIVON_LOGGED_OUT') === 'true';
-
-  if (isLoginScreen) {
-    const pill = document.getElementById('outcallFloatingPillBadge');
-    if (pill) pill.remove();
-    return;
-  }
-
-  if (typeof gActiveTab !== 'undefined' && gActiveTab === 'totalcallanalysis') {
-    const pill = document.getElementById('outcallFloatingPillBadge');
-    if (pill) pill.remove();
-    return;
-  }
-  if (!count || count <= 0) {
-    const pill = document.getElementById('outcallFloatingPillBadge');
-    if (pill) pill.remove();
-    return;
-  }
-
-  let pill = document.getElementById('outcallFloatingPillBadge');
-  if (!pill) {
-    pill = document.createElement('button');
-    pill.id = 'outcallFloatingPillBadge';
-    pill.type = 'button';
-    pill.className = 'fixed bottom-4 right-3 sm:right-5 z-[99999] px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 text-white font-black text-xs shadow-xl shadow-rose-600/40 flex items-center gap-2 border border-rose-400 cursor-pointer active:scale-95 transition-all animate-pulse';
-    pill.style.bottom = 'max(16px, calc(16px + env(safe-area-inset-bottom, 0px)))';
-    pill.onclick = () => {
-      openMissedCallsOutcallModal('pending');
-    };
-    document.body.appendChild(pill);
-  }
-  pill.innerHTML = `
-    <i data-lucide="phone-missed" class="w-4 h-4 shrink-0"></i>
-    <span class="tracking-tight">🚨 아웃콜 대기 <b>${count}</b>건</span>
-  `;
-  if (typeof initTotalIcons === 'function') initTotalIcons(pill);
-  else if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons({ root: pill });
+  const pill = document.getElementById('outcallFloatingPillBadge');
+  if (pill) pill.remove();
 }
 
 /**
- * 아웃콜 확인 처리 (큰 팝업 토스트는 닫고 상시 플로팅 배지로 전환)
+ * 아웃콜 확인 처리
  */
 function dismissOutcallNotificationToast(markAllAsDismissed = true) {
   const toast = document.getElementById('outcallNotificationToast');
-  if (toast) {
-    toast.classList.add('opacity-0', 'translate-y-4');
-    setTimeout(() => {
-      if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
-    }, 300);
-  }
-
-  try {
-    const allLogs = typeof getTotalCallLogs === 'function' ? getTotalCallLogs() : [];
-    const pendingMissed = allLogs.filter(c => isCallMissedWaitZero(c) && !isCallOutcallHandled(getCallUniqueId(c)));
-
-    if (markAllAsDismissed) {
-      const dismissed = getDismissedOutcallIds();
-      pendingMissed.forEach(c => dismissed.add(getCallUniqueId(c)));
-      localStorage.setItem('LIVON_DISMISSED_OUTCALL_IDS', JSON.stringify(Array.from(dismissed)));
-    }
-
-    // 큰 알림 팝업을 닫더라도 미처리 건이 남아있다면 화면 하단 플로팅 배지로 유지
-    if (pendingMissed.length > 0) {
-      renderOutcallFloatingPill(pendingMissed.length);
-    }
-  } catch (e) {}
+  if (toast) toast.remove();
+  const pill = document.getElementById('outcallFloatingPillBadge');
+  if (pill) pill.remove();
 }
 
 /**
@@ -4545,7 +4484,7 @@ async function checkAndTriggerOutcallAlert() {
   // 전체 미처리 아웃콜 대상 (상담 0초 & 연결요청 Y & 미처리)
   const pendingMissed = allLogs.filter(c => isCallMissedWaitZero(c) && !isCallOutcallHandled(getCallUniqueId(c)));
 
-  // 사이드바 / 드로어 배지 업데이트
+  // 사이드바 / 드로어 배지 업데이트 (사이드바 메뉴 상의 카운트만 유지)
   const sidebarBadge = document.getElementById('sidebarOutcallBadge');
   if (sidebarBadge) {
     if (pendingMissed.length > 0) {
@@ -4556,115 +4495,12 @@ async function checkAndTriggerOutcallAlert() {
     }
   }
 
-  if (pendingMissed.length === 0) {
-    // 미처리 건이 없으면 열려있던 토스트 및 플로팅 배지 제거
-    const existing = document.getElementById('outcallNotificationToast');
-    if (existing) existing.remove();
-    const pill = document.getElementById('outcallFloatingPillBadge');
-    if (pill) pill.remove();
-    return;
-  }
-
-  // 사용자가 이미 '확인'한 건 제외 (사용자 규칙: 해당 모달은 확인하면 다시 띄우지는 말고)
-  const dismissed = getDismissedOutcallIds();
-  const unnotifiedCalls = pendingMissed.filter(c => !dismissed.has(getCallUniqueId(c)));
-
-  // 확인하지 않은 새로운 아웃콜 대상이 없으면 큰 팝업은 닫고, 상시 플로팅 배지 표시
-  if (unnotifiedCalls.length === 0) {
-    const existing = document.getElementById('outcallNotificationToast');
-    if (existing) existing.remove();
-    renderOutcallFloatingPill(pendingMissed.length);
-    return;
-  }
-
-  // 큰 팝업이 뜰 때는 작은 플로팅 배지는 숨김
+  // 🚨 [사용자 요청]: "아웃콜 대상 명단 확인 팝업은 안뜨게 해 필요없어"
+  // 화면을 가리는 아웃콜 팝업(outcallNotificationToast) 및 플로팅 배지(outcallFloatingPillBadge) 표시 안 함
+  const existing = document.getElementById('outcallNotificationToast');
+  if (existing) existing.remove();
   const pill = document.getElementById('outcallFloatingPillBadge');
   if (pill) pill.remove();
-
-  // 이미 화면에 토스트가 떠있는지 확인
-  let toast = document.getElementById('outcallNotificationToast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'outcallNotificationToast';
-    // 모바일: 화면 하단 안전영역 + 좌우 여백 적용, sm 이상: 우측 하단 고정
-    toast.className = 'fixed bottom-4 left-3 right-3 sm:left-auto sm:right-5 sm:bottom-6 z-[999999] w-auto sm:w-[400px] max-w-[calc(100vw-24px)] bg-white/98 backdrop-blur-md rounded-3xl border-2 border-rose-500 shadow-2xl shadow-rose-600/40 overflow-hidden transition-all duration-300 transform translate-y-0 opacity-100 flex flex-col';
-    toast.style.bottom = 'max(16px, calc(16px + env(safe-area-inset-bottom, 0px)))';
-    document.body.appendChild(toast);
-  }
-
-  // 가장 최신 미연결 콜 정보
-  const newestCall = unnotifiedCalls[0];
-  const match = typeof matchCustomerToMateOne === 'function' ? matchCustomerToMateOne(newestCall) : { patientName: '미등록 고객' };
-  const formattedPhone = typeof formatPhoneDisplay === 'function' ? formatPhoneDisplay(newestCall.phone || newestCall.rawPhone) : (newestCall.phone || '');
-  const channelBadgeClass = newestCall.channel === '삼성화재'
-    ? 'bg-blue-100 text-blue-800 border-blue-200'
-    : (newestCall.channel === '현대해상' ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-emerald-100 text-emerald-900 border-emerald-300');
-
-  toast.innerHTML = `
-    <!-- 상단 헤더 -->
-    <div class="bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 text-white px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <div class="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0 animate-pulse">
-          <i data-lucide="phone-missed" class="w-4 h-4"></i>
-        </div>
-        <div>
-          <div class="flex items-center gap-1.5">
-            <span class="px-1.5 py-0.2 rounded bg-white text-rose-800 font-black text-[9.5px]">긴급 알림</span>
-            <h4 class="font-black text-xs sm:text-sm tracking-tight">아웃콜(콜백) 대상 발생!</h4>
-          </div>
-          <p class="text-[10px] text-rose-100 font-medium">상담사 연결요청 후 미연결(0초) 종료 건입니다.</p>
-        </div>
-      </div>
-      <button type="button" onclick="dismissOutcallNotificationToast(true)" class="text-rose-200 hover:text-white p-1 cursor-pointer" title="닫기 (배지로 접기)">
-        <i data-lucide="x" class="w-4 h-4"></i>
-      </button>
-    </div>
-
-    <!-- 내용 -->
-    <div class="p-3.5 space-y-3 text-xs bg-slate-50/70">
-      <div class="p-2.5 bg-white rounded-2xl border border-rose-200 shadow-2xs space-y-1.5">
-        <div class="flex items-center justify-between text-[11px]">
-          <span class="px-2 py-0.5 rounded text-[10px] font-black border whitespace-nowrap ${channelBadgeClass}">
-            ${newestCall.channel || '인입'}
-          </span>
-          <span class="font-mono text-slate-500 font-bold text-[10.5px]">${newestCall.callTime || '-'}</span>
-        </div>
-        <div class="flex items-baseline justify-between pt-0.5">
-          <div class="font-black text-slate-900 text-sm">${safeMaskName(match.patientName)}</div>
-          <div class="font-mono font-bold text-rose-600 text-xs">${formattedPhone}</div>
-        </div>
-        <div class="text-[10.5px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-100">
-          <span>대기시간: <b class="text-slate-800">${newestCall.waitTime !== undefined ? newestCall.waitTime : 0}초</b> (상담 0초)</span>
-          <span class="text-rose-700 font-bold">🚨 즉시 콜백 권장</span>
-        </div>
-      </div>
-
-      <div class="flex items-center justify-between text-[11px] text-slate-600 px-1 font-bold">
-        <span>신규 아웃콜 대상: <b class="text-rose-600">${unnotifiedCalls.length}건</b></span>
-        <span class="text-slate-400 font-medium">총 미처리: <b>${pendingMissed.length}건</b></span>
-      </div>
-
-      <!-- 액션 버튼 -->
-      <div class="space-y-1.5 pt-0.5">
-        <button type="button" onclick="openMissedCallsOutcallModalFromToast()" 
-          class="w-full py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white font-black text-xs shadow-md shadow-rose-600/30 flex items-center justify-center gap-1.5 cursor-pointer transition-all">
-          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-          <span>아웃콜 대상 명단 확인하기 (${pendingMissed.length}건)</span>
-        </button>
-        <button type="button" onclick="dismissOutcallNotificationToast(true)" 
-          class="w-full py-1.5 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors">
-          <i data-lucide="check" class="w-3.5 h-3.5 text-slate-500"></i>
-          <span>확인 (작은 배지로 접기)</span>
-        </button>
-      </div>
-    </div>
-  `;
-
-  if (typeof initTotalIcons === 'function') {
-    initTotalIcons(toast);
-  } else if (window.lucide && typeof lucide.createIcons === 'function') {
-    lucide.createIcons({ root: toast });
-  }
 }
 
 // [사용자 요구사항]: 종합콜분석 좌측 메뉴 클릭 시 즉시 화면 렌더링(0ms 체감) 및 백그라운드 실시간 CTI 동기화

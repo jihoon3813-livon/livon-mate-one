@@ -1564,7 +1564,7 @@ function sortApplicationsNewestFirst(apps) {
     return isNaN(t) ? 0 : t;
   };
 
-  let recentRegIdSet = new Set(['C0701', 'C0699']);
+  let recentRegIdSet = new Set();
   try {
     const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
     (rList || []).forEach(id => recentRegIdSet.add(String(id)));
@@ -1577,7 +1577,6 @@ function sortApplicationsNewestFirst(apps) {
     if (!a) return 0;
     const aId = String(a.id || '');
     if (a._isJustRegistered) return 1;
-    if (aId === 'C0701' || aId === 'C0699') return 1;
     if (aId && (recentRegIdSet.has(aId) || aId.startsWith('D'))) return 1;
     // 오늘 접수되었거나 오늘 생성(등록)된 신규 고객 최상단 노출
     if (a.applyDate && (a.applyDate.startsWith(todayStr) || a.applyDate.startsWith(todayIsoPrefix))) return 1;
@@ -1852,7 +1851,7 @@ async function loadConvexData(showSpinner = true) {
 
     const filteredValidApps = validApps.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
 
-    let recentRegIdSet = new Set(['C0701', 'C0699']);
+    let recentRegIdSet = new Set();
     try {
       const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
       (rList || []).forEach(id => recentRegIdSet.add(String(id)));
@@ -18748,7 +18747,7 @@ function initData() {
       let deletedAppIdSet = new Set();
       let recentIds = new Set();
       try {
-        recentIds = new Set(['C0701', 'C0699', ...((JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]') || []).map(String))]);
+        recentIds = new Set((JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]') || []).map(String));
         const dList = JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]');
         const merged = Array.from(new Set([...(dList || []).map(String), 'C0653', 'C0654'])).filter(id => !recentIds.has(String(id)));
         safeSetLocalStorage('LIVON_DELETED_APP_IDS', JSON.stringify(merged));
