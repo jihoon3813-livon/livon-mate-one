@@ -1815,7 +1815,26 @@ async function loadConvexData(showSpinner = true) {
           recentRegIdSet = new Set((rList || []).map(String));
         } catch (e) {}
 
-        const mergedApps = filteredValidApps;
+        // 🚨 [데이터 영구 보존 가드]: 로컬에만 존재하고 서버 응답에 아직 누락된 신규 등록 고객 자동 복원 & Auto-Rescue Sync
+        const localOnlyRecentApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
+          if (!localApp || !localApp.id) return false;
+          if (serverAppIdSet.has(String(localApp.id))) return false;
+          if (deletedAppIdSet.has(String(localApp.id))) return false;
+          return recentRegIdSet.has(String(localApp.id)) || localApp._isJustRegistered || String(localApp.id).startsWith('D');
+        });
+
+        if (localOnlyRecentApps.length > 0) {
+          console.warn(`[Auto-Rescue Sync] 서버 응답에서 누락된 최근 신규 고객 ${localOnlyRecentApps.length}건을 로컬에서 안전하게 복원 및 서버 재전송합니다.`);
+          localOnlyRecentApps.forEach(rescueApp => {
+            const cleanDoc = {};
+            for (const [k, v] of Object.entries(rescueApp)) {
+              if (!k.startsWith('_')) cleanDoc[k] = v;
+            }
+            syncToConvex('sync:saveApplication', { app: cleanDoc }).catch(console.warn);
+          });
+        }
+
+        const mergedApps = [...localOnlyRecentApps, ...filteredValidApps];
         mergedApps.forEach(a => {
           if (a && a.id && (recentRegIdSet.has(String(a.id)) || String(a.id).startsWith('D'))) {
             a._isJustRegistered = true;
@@ -2268,6 +2287,18 @@ async function runConvexLiveSync(force = false) {
   gIsLiveSyncing = true;
   gLastConvexLiveSyncTime = now;
   try {
+    // 🚨 [아웃박스 자동 플러시]: 네트워크 복구 시 대기 중인 로컬 신규 건 일괄 서버 전송
+    try {
+      const outbox = JSON.parse(localStorage.getItem('LIVON_PENDING_OUTBOX_APPS') || '[]');
+      if (Array.isArray(outbox) && outbox.length > 0) {
+        console.log(`[Outbox Flush] 대기 중인 신규 등록 ${outbox.length}건을 Convex Cloud로 전송합니다.`);
+        for (const outboxApp of outbox) {
+          await syncToConvex('sync:saveApplication', { app: outboxApp }).catch(console.warn);
+        }
+        localStorage.removeItem('LIVON_PENDING_OUTBOX_APPS');
+      }
+    } catch (e) {}
+
     await loadConvexData(false);
   } catch (e) {
     console.warn('[LiveSync Warning]', e);
@@ -30920,13 +30951,29 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
       if (!k.startsWith('_')) cleanPayload[k] = v;
     }
 
-    // Convex Cloud 실시간 동기화 (현재 연결된 단 하나의 환경에만 엄격하게 저장)
+    // Convex Cloud 실시간 동기화 (재시도 보장 + 오프라인 아웃박스 큐 가드)
     if (typeof syncToConvex === 'function') {
-      try {
-        await syncToConvex('sync:saveApplication', { app: cleanPayload });
-        console.log(`[Convex Cloud] 신규 고객 ${newApp.id} (${newApp.patientName}) -> ${CONVEX_URL} 저장 완료`);
-      } catch (cvxErr) {
-        console.warn(`[Convex Sync Error] ${CONVEX_URL}:`, cvxErr);
+      let syncSucceeded = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const res = await syncToConvex('sync:saveApplication', { app: cleanPayload });
+          if (res !== null && res !== undefined) {
+            syncSucceeded = true;
+            console.log(`[Convex Cloud] 신규 고객 ${newApp.id} (${newApp.patientName}) -> ${CONVEX_URL} 저장 완료 (시도: ${attempt}회)`);
+            break;
+          }
+        } catch (cvxErr) {
+          console.warn(`[Convex Sync Error attempt ${attempt}] ${CONVEX_URL}:`, cvxErr);
+          if (attempt < 3) await new Promise(r => setTimeout(r, 600 * attempt));
+        }
+      }
+      if (!syncSucceeded) {
+        console.warn(`[Convex Outbox] 네트워크 일시 지연으로 신규 고객 ${newApp.id} 건을 로컬 아웃박스에 보관하며, 백그라운드 자동 동기화합니다.`);
+        try {
+          const outbox = JSON.parse(localStorage.getItem('LIVON_PENDING_OUTBOX_APPS') || '[]');
+          outbox.push(cleanPayload);
+          localStorage.setItem('LIVON_PENDING_OUTBOX_APPS', JSON.stringify(outbox));
+        } catch (e) {}
       }
     }
 

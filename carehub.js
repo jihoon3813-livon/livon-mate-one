@@ -11462,9 +11462,16 @@ function renderUnifiedCareHub() {
   const container = document.getElementById('hubCustomerCardsList');
   if (!container) return;
 
-  // [초고속 0ms 즉시 복원] 컨트롤+F5 등으로 메모리가 비었을 때 시드 데이터에서 0ms 즉시 복원
+  // [초고속 0ms 즉시 복원] 새로고침 시 최신 로컬 캐시 우선 복원, 캐시 부재 시에만 정적 시드 데이터에서 복원
   if (!Array.isArray(gApps) || gApps.length === 0) {
-    if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0) {
+    try {
+      const cached = localStorage.getItem('LIVON_CACHED_APPS');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) gApps = parsed;
+      }
+    } catch (e) {}
+    if ((!Array.isArray(gApps) || gApps.length === 0) && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0) {
       gApps = [...window.REBORN_REAL_SEED_DATA.applications];
       if ((!gAssigns || gAssigns.length === 0) && Array.isArray(window.REBORN_REAL_SEED_DATA.assignments)) {
         gAssigns = [...window.REBORN_REAL_SEED_DATA.assignments];
