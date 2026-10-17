@@ -794,7 +794,7 @@
   <script>
     (function() {
       try {
-        var t = localStorage.getItem('REBORN_ACTIVE_THEME') || 'theme-default';
+        var t = localStorage.getItem('REBORN_ACTIVE_THEME') || sessionStorage.getItem('REBORN_ACTIVE_THEME') || 'theme-default';
         if (t === 'theme-dark') t = 'theme-blue';
         if (t === 'theme-contrast') t = 'theme-mint';
         document.documentElement.className = (document.documentElement.className ? document.documentElement.className + ' ' : '') + t;
@@ -806,7 +806,7 @@
   <script>
     (function() {
       try {
-        var t = localStorage.getItem('REBORN_ACTIVE_THEME') || 'theme-default';
+        var t = localStorage.getItem('REBORN_ACTIVE_THEME') || sessionStorage.getItem('REBORN_ACTIVE_THEME') || 'theme-default';
         if (t === 'theme-dark') t = 'theme-blue';
         if (t === 'theme-contrast') t = 'theme-mint';
         document.body.className = (document.body.className ? document.body.className + ' ' : '') + t;
@@ -877,6 +877,15 @@
             <option value="theme-blue">🌊 소프트 블루 (스카이)</option>
             <option value="theme-mint">🌿 소프트 민트 (세이지)</option>
           </select>
+          <script>
+            (function() {
+              try {
+                var t = localStorage.getItem('REBORN_ACTIVE_THEME') || sessionStorage.getItem('REBORN_ACTIVE_THEME') || 'theme-default';
+                var s = document.getElementById('themeSelect');
+                if (s && t) s.value = t;
+              } catch(e) {}
+            })();
+          </script>
         </div>
 
         <!-- Slack Daily Report Modal Button -->

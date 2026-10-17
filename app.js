@@ -69,7 +69,12 @@ function safeSetLocalStorage(key, valStr) {
           'LIVON_CONFIRMED_DISABLED_APP_IDS',
           'LIVON_HUB_INS_TAB',
           'LIVON_HUB_PAGE_SIZE',
-          'LIVON_APPS_CACHE_SYNC_VER'
+          'LIVON_APPS_CACHE_SYNC_VER',
+          'REBORN_ACTIVE_THEME',
+          'REBORN_PRIVACY_MASKING_STATE_V2',
+          'REBORN_HUB_CARD_OPEN_MODE',
+          'LIVON_PROD_CONVEX_SYNCED',
+          'LIVON_TARGET_ENV'
         ]);
         const allKeys = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -1642,7 +1647,8 @@ async function loadConvexData(showSpinner = true) {
     } catch (e) {}
   }
 
-  const hasRealSeed = typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0;
+  const isDev = (typeof isDevEnvironment === 'function' && isDevEnvironment()) || (typeof isDevScreen === 'function' && isDevScreen());
+  const hasRealSeed = isDev && typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0;
   if (hasRealSeed) {
     try { localStorage.removeItem('LIVON_DATA_RESET_CLEAN'); } catch (e) {}
   }
@@ -1657,8 +1663,9 @@ async function loadConvexData(showSpinner = true) {
     gIsDataLoading = false;
   }
 
-  // 1. 서버 인메모리 RAM 캐시 실데이터 요청 함수 (로컬 캐시 부재 시 비상 fallback)
+  // 1. 서버 인메모리 RAM 캐시 실데이터 요청 함수 (🚨 운영 PROD 환경에서는 358건 개발 시드 파일 사용 원천 차단)
   const fetchLocalRealData = async () => {
+    if (!isDev) return null;
     if (localStorage.getItem('LIVON_DATA_RESET_CLEAN') === 'true') return null;
     if (typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0) {
       return window.REBORN_REAL_SEED_DATA;
@@ -1805,8 +1812,8 @@ async function loadConvexData(showSpinner = true) {
     if (gActiveTab === 'carehub' && typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
   };
 
-  // 로컬 캐시가 완전히 비어있는 첫 실행 시에만 1.4MB 실데이터 JSON 비동기 다운로드 (불필요한 반복 트래픽 차단)
-  if (!hasLocalData && !isResetClean) {
+  // 로컬 캐시가 완전히 비어있는 첫 실행 시에만 개발 환경에서 실데이터 JSON 비동기 다운로드 (운영에서는 원천 차단)
+  if (isDev && !hasLocalData && !isResetClean) {
     const realDataPromise = fetchLocalRealData();
     realDataPromise.then(applyRealJson);
   }
@@ -1911,6 +1918,9 @@ async function loadConvexData(showSpinner = true) {
 
     gApps = sortApplicationsNewestFirst(mergedApps);
     safeSaveCachedApps(gApps);
+    if (!isDev) {
+      try { localStorage.setItem('LIVON_PROD_CONVEX_SYNCED', 'true'); } catch (e) {}
+    }
     try { localStorage.setItem('LIVON_APPS_CACHE_SYNC_VER', '20261017_v3'); } catch (e) {}
     (gApps || []).forEach(a => {
       if ((Number(a.estimatedUnpaid) || 0) <= 0 && a.unconfirmedClaimCount > 0) {
@@ -18729,7 +18739,7 @@ function initData() {
   } catch (e) {}
 
   // 1. 로컬 캐시(LocalStorage)에서 최신 Convex 동기화 데이터 즉시 복원 (새로고침 시 과거 시드 숫자가 깜빡이는 현상 원천 차단)
-  const hasRealSeedData = typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0;
+  const hasRealSeedData = isDev && typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0;
   if (hasRealSeedData) {
     try { localStorage.removeItem('LIVON_DATA_RESET_CLEAN'); } catch (e) {}
   }
@@ -18776,7 +18786,7 @@ function initData() {
 
       const CURRENT_CACHE_SYNC_VER = '20261017_v3';
       const isStaleSyncVer = localStorage.getItem('LIVON_APPS_CACHE_SYNC_VER') !== CURRENT_CACHE_SYNC_VER;
-      const seedApps = (hasRealSeedData && Array.isArray(window.REBORN_REAL_SEED_DATA.applications))
+      const seedApps = (isDev && hasRealSeedData && Array.isArray(window.REBORN_REAL_SEED_DATA.applications))
         ? window.REBORN_REAL_SEED_DATA.applications.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)))
         : [];
 
@@ -18792,8 +18802,16 @@ function initData() {
         }
         let filtered = Array.isArray(cleaned) ? cleaned.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id))) : [];
 
-        // [초고속 0ms 복구 가드] 과거 쿼터 초과로 인해 312건에 멈춰있던 구버전 캐시이거나 시드 데이터보다 누락된 건이 있는 경우 즉시 최신 시드와 병합 복원
-        if (seedApps.length > 0) {
+        // 🚨 [운영환경 깜빡임 차단]: 운영(PROD) 환경인데 로컬 캐시가 과거 개발 시드(358건)이거나 아직 정규 동기화 전인 경우 화면 노출 차단
+        if (!isDev) {
+          const isProdSynced = localStorage.getItem('LIVON_PROD_CONVEX_SYNCED') === 'true';
+          if (!isProdSynced || filtered.length === 358) {
+            filtered = [];
+          }
+        }
+
+        // [초고속 0ms 복구 가드] 과거 쿼터 초과로 인해 312건에 멈춰있던 구버전 캐시이거나 시드 데이터보다 누락된 건이 있는 경우 즉시 최신 시드와 병합 복원 (개발 환경 전용)
+        if (isDev && seedApps.length > 0) {
           const cachedMap = new Map(filtered.map(a => [String(a.id), a]));
           const hasMissingSeedApps = seedApps.some(sa => !cachedMap.has(String(sa.id)));
           if (isStaleSyncVer || hasMissingSeedApps) {
@@ -18818,7 +18836,7 @@ function initData() {
 
         gApps = (typeof sortApplicationsNewestFirst === 'function') ? sortApplicationsNewestFirst(filtered) : filtered;
         safeSaveCachedApps(gApps);
-      } else if (window.REBORN_DATA && window.REBORN_DATA.applications) {
+      } else if (isDev && window.REBORN_DATA && window.REBORN_DATA.applications) {
         gApps = [...window.REBORN_DATA.applications].filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
         safeSaveCachedApps(gApps);
       }
@@ -18833,7 +18851,7 @@ function initData() {
           gAssigns = filtered;
         }
         safeSetLocalStorage('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns));
-      } else if (window.REBORN_DATA && window.REBORN_DATA.assignments) {
+      } else if (isDev && window.REBORN_DATA && window.REBORN_DATA.assignments) {
         gAssigns = [...window.REBORN_DATA.assignments].filter(as => as && !deletedAppIdSet.has(String(as.applyId)));
         safeSetLocalStorage('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns));
       }
@@ -18848,7 +18866,7 @@ function initData() {
           gClaims = filtered;
         }
         safeSetLocalStorage('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
-      } else if (window.REBORN_DATA && window.REBORN_DATA.claims) {
+      } else if (isDev && window.REBORN_DATA && window.REBORN_DATA.claims) {
         gClaims = [...window.REBORN_DATA.claims].filter(c => c && !deletedAppIdSet.has(String(c.applyId)));
         safeSetLocalStorage('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
       }
@@ -18863,7 +18881,7 @@ function initData() {
           gPayouts = filtered;
         }
         safeSetLocalStorage('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
-      } else if (window.REBORN_DATA && window.REBORN_DATA.payouts) {
+      } else if (isDev && window.REBORN_DATA && window.REBORN_DATA.payouts) {
         gPayouts = [...window.REBORN_DATA.payouts].filter(p => p && !deletedAppIdSet.has(String(p.applyId)));
         safeSetLocalStorage('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
       }
@@ -18874,7 +18892,7 @@ function initData() {
 
       const cachedAdjusters = localStorage.getItem('LIVON_CACHED_ADJUSTERS');
       if (cachedAdjusters !== null) gAdjusters = JSON.parse(cachedAdjusters);
-      else if (window.REBORN_DATA && window.REBORN_DATA.adjusters) gAdjusters = [...window.REBORN_DATA.adjusters];
+      else if (isDev && window.REBORN_DATA && window.REBORN_DATA.adjusters) gAdjusters = [...window.REBORN_DATA.adjusters];
 
       const cachedCaregivers = localStorage.getItem('LIVON_CACHED_CAREGIVERS');
       if (cachedCaregivers !== null) gCaregivers = JSON.parse(cachedCaregivers);
@@ -18882,7 +18900,7 @@ function initData() {
       const cachedCenters = localStorage.getItem('LIVON_CACHED_CENTERS');
       if (cachedCenters !== null) gCenters = JSON.parse(cachedCenters);
     } catch (e) {
-      if (window.REBORN_DATA) {
+      if (isDev && window.REBORN_DATA) {
         gApps = [...window.REBORN_DATA.applications];
         gAssigns = [...window.REBORN_DATA.assignments];
         gClaims = [...window.REBORN_DATA.claims];
@@ -18891,9 +18909,9 @@ function initData() {
       }
     }
 
-    const fallbackSource = (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications) && window.REBORN_DATA.applications.length > 0)
+    const fallbackSource = isDev ? ((window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications) && window.REBORN_DATA.applications.length > 0)
       ? window.REBORN_DATA
-      : (typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0 ? window.REBORN_REAL_SEED_DATA : null);
+      : (typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0 ? window.REBORN_REAL_SEED_DATA : null)) : null;
 
     if (fallbackSource && (!gApps || gApps.length === 0)) {
       if (!gApps || gApps.length === 0) gApps = [...(fallbackSource.applications || [])];
@@ -35322,7 +35340,7 @@ function initThemeAndMasking() {
   updateMaskingButtonUI();
 
   // 2. Theme persistence
-  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'theme-default';
+  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || sessionStorage.getItem(THEME_STORAGE_KEY) || 'theme-default';
   setAppTheme(savedTheme, false);
 }
 
@@ -35357,13 +35375,17 @@ function setAppTheme(themeName, persist = true) {
   document.body.classList.add(themeName);
   document.documentElement.classList.add(themeName);
   if (persist) {
-    localStorage.setItem(THEME_STORAGE_KEY, themeName);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, themeName);
+      sessionStorage.setItem(THEME_STORAGE_KEY, themeName);
+    } catch (e) {}
   }
   const select = document.getElementById('themeSelect');
   if (select && select.value !== themeName) {
     select.value = themeName;
   }
 }
+window.setAppTheme = setAppTheme;
 
 
 // =========================================================================
