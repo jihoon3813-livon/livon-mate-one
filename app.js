@@ -1226,6 +1226,20 @@ var CONVEX_URL = IS_DEV_ENV ? DEV_CONVEX_URL : PROD_CONVEX_URL;
 window.IS_DEV_ENV = IS_DEV_ENV;
 window.CURRENT_CONVEX_URL = CONVEX_URL;
 
+// [환경 격리]: 개발(DEV) 환경에서는 운영 전용 고객(이진화 C0701 등) 잔여 로컬 캐시 및 최근등록 목록 자동 정화
+if (IS_DEV_ENV && typeof window !== 'undefined') {
+  try {
+    const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
+    if (Array.isArray(rList) && rList.includes('C0701')) {
+      localStorage.setItem('LIVON_RECENTLY_REGISTERED_IDS', JSON.stringify(rList.filter(id => id !== 'C0701')));
+    }
+    const cached = JSON.parse(localStorage.getItem('LIVON_CACHED_APPS') || '[]');
+    if (Array.isArray(cached) && cached.some(a => a && a.id === 'C0701')) {
+      localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(cached.filter(a => a && a.id !== 'C0701')));
+    }
+  } catch (e) {}
+}
+
 // [보안/격리] 프론트엔드 fetch 인터셉터: 모든 /api/ 요청에 현재 환경의 x-convex-url 헤더 자동 주입
 (function setupApiConvexHeaderInterceptor() {
   if (typeof window === 'undefined' || typeof window.fetch !== 'function') return;
@@ -1801,6 +1815,11 @@ async function loadConvexData(showSpinner = true) {
   const applyConvexApplicationsList = (applications) => {
     if (!Array.isArray(applications)) return null;
 
+    // 개발(DEV) 환경에서는 운영 전용 고객(C0701 이진화 등) 유입 원천 차단
+    if (window.IS_DEV_ENV || IS_DEV_ENV) {
+      applications = applications.filter(a => !(a && (a.id === 'C0701' || a.patientName === '이진화')));
+    }
+
     if (applications.length === 0) {
       try { localStorage.setItem('LIVON_DATA_RESET_CLEAN', 'true'); } catch (e) {}
       if (window.REBORN_REAL_SEED_DATA) {
@@ -1866,6 +1885,7 @@ async function loadConvexData(showSpinner = true) {
 
     const localOnlyRecentApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
       if (!localApp || !localApp.id) return false;
+      if ((window.IS_DEV_ENV || IS_DEV_ENV) && (localApp.id === 'C0701' || localApp.patientName === '이진화')) return false;
       if (serverAppIdSet.has(String(localApp.id))) return false;
       if (deletedAppIdSet.has(String(localApp.id))) return false;
       return recentRegIdSet.has(String(localApp.id)) || (localApp._isJustRegistered === true);
