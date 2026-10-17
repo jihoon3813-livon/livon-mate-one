@@ -11462,17 +11462,35 @@ function renderUnifiedCareHub() {
   const container = document.getElementById('hubCustomerCardsList');
   if (!container) return;
 
-  // [초고속 0ms 즉시 복원] 새로고침 시 최신 로컬 캐시 우선 복원, 캐시 부재 시에만 정적 시드 데이터에서 복원
+  // [초고속 0ms 즉시 복원] 새로고침 시 최신 로컬 캐시 및 최신 시드 데이터를 병합 복원하여 과거 312건 표시 현상 원천 차단
   if (!Array.isArray(gApps) || gApps.length === 0) {
+    let deletedAppIdSet = new Set();
+    try {
+      const dList = JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]');
+      deletedAppIdSet = new Set((dList || []).map(String));
+    } catch (e) {}
+
     try {
       const cached = localStorage.getItem('LIVON_CACHED_APPS');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) gApps = parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          gApps = parsed.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
+        }
       }
     } catch (e) {}
-    if ((!Array.isArray(gApps) || gApps.length === 0) && window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0) {
-      gApps = [...window.REBORN_REAL_SEED_DATA.applications];
+    if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications) && window.REBORN_REAL_SEED_DATA.applications.length > 0) {
+      const seedApps = window.REBORN_REAL_SEED_DATA.applications.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
+      if (!Array.isArray(gApps) || gApps.length === 0) {
+        gApps = [...seedApps];
+      } else {
+        const cachedMap = new Map(gApps.map(a => [String(a.id), a]));
+        seedApps.forEach(sa => {
+          if (!cachedMap.has(String(sa.id))) {
+            gApps.push({ ...sa });
+          }
+        });
+      }
       if ((!gAssigns || gAssigns.length === 0) && Array.isArray(window.REBORN_REAL_SEED_DATA.assignments)) {
         gAssigns = [...window.REBORN_REAL_SEED_DATA.assignments];
       }
@@ -11501,7 +11519,8 @@ function renderUnifiedCareHub() {
   // [중요] 레거시 더미 S-id 삼성 데이터 브라우저 로컬 캐시 및 전역 데이터 즉시 영구 제거 (실데이터 C-id 보존)
   if (Array.isArray(gApps) && gApps.some(a => a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성') && !a.isRealLaunchData)) {
     gApps = filterInvalidSamsungDuplicates(gApps);
-    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+    if (typeof safeSaveCachedApps === 'function') safeSaveCachedApps(gApps);
+    else { try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {} }
   }
 
   // [삼성화재 관리대장 상품명 연동]: 통합허브 렌더링 전 삼성화재 고객 상세 정보 자동 연동 (캐시 기반 0ms)

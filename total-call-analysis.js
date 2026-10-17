@@ -4430,20 +4430,20 @@ async function loadOutcallBackgroundData() {
 
   const hadPreviousData = !!(gTotalCallData && gTotalCallData.callLogs && gTotalCallData.callLogs.length > 0);
 
-  // 1) 로컬/세션 스토리지 캐시 확인 (0ms)
+  // 1) 세션 스토리지 캐시 확인 (0ms, localStorage 쿼터 보호를 위해 sessionStorage 전용 사용)
   try {
-    const cached = localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA') || sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+    const legacyLocal = localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
+    if (legacyLocal) {
+      try { sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', legacyLocal); } catch (e) {}
+      try { localStorage.removeItem('LIVON_CACHED_TOTAL_CALL_DATA'); } catch (e) {}
+    }
+    const cached = sessionStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA');
     if (cached) {
       const parsed = JSON.parse(cached);
       const d = (parsed && parsed.data && parsed.data.callLogs) ? parsed.data : parsed;
       if (d && d.callLogs && d.callLogs.length > 0) {
         gTotalCallData = d;
         window.gTotalCallData = d;
-        try {
-          if (!localStorage.getItem('LIVON_CACHED_TOTAL_CALL_DATA')) {
-            localStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(d));
-          }
-        } catch(e){}
         return gTotalCallData;
       }
     }
@@ -4466,7 +4466,7 @@ async function loadOutcallBackgroundData() {
           window.gTotalCallData = data;
           try {
             sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData));
-            localStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData));
+            localStorage.removeItem('LIVON_CACHED_TOTAL_CALL_DATA');
           } catch(e){}
           if (!hadPreviousData && window.gActiveTab === 'carehub' && typeof window.renderUnifiedCareHub === 'function') {
             window.renderUnifiedCareHub();
@@ -4487,7 +4487,7 @@ async function loadOutcallBackgroundData() {
         window.gTotalCallData = json.data;
         try {
           sessionStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData));
-          localStorage.setItem('LIVON_CACHED_TOTAL_CALL_DATA', JSON.stringify(gTotalCallData));
+          localStorage.removeItem('LIVON_CACHED_TOTAL_CALL_DATA');
         } catch(e){}
         if (!hadPreviousData && window.gActiveTab === 'carehub' && typeof window.renderUnifiedCareHub === 'function') {
           window.renderUnifiedCareHub();
