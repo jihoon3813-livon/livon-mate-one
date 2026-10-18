@@ -31227,7 +31227,12 @@ function handleNewAppSubmit(e) {
     const defaultHdStage = isHyundai ? '문자수신대기' : '사전명단매칭완료';
 
     const targetFaxRecipient = document.getElementById('newAppFaxRecipient')?.value?.trim() || '';
-    const targetFaxNumber = document.getElementById('newAppFaxNumber')?.value?.trim() || '';
+    const activeAdmin = (typeof getCurrentMemoAdmin === 'function')
+      ? getCurrentMemoAdmin()
+      : ((typeof gCurrentAdmin !== 'undefined' && gCurrentAdmin)
+          ? { username: gCurrentAdmin.username || 'admin', name: gCurrentAdmin.name || '관리자' }
+          : { username: 'admin', name: '관리자' });
+    const authorTag = `${activeAdmin.name} (${activeAdmin.username})`;
 
     const newApp = {
       id: newId,
@@ -31285,10 +31290,21 @@ function handleNewAppSubmit(e) {
       claimUnitPrice: Number((document.getElementById('newAppClaimUnitPrice')?.value || '').replace(/[^0-9]/g, '')) || 160000,
       customDailyClaimPrice: Number((document.getElementById('newAppClaimUnitPrice')?.value || '').replace(/[^0-9]/g, '')) || 160000,
       memo: formattedMemo.trim(),
+      createdAdmin: activeAdmin.username,
+      creator: activeAdmin.username,
+      creatorName: activeAdmin.name,
+      memoAuthor: authorTag,
+      memoList: formattedMemo.trim() ? [{
+        id: 'm_init_' + Date.now(),
+        text: formattedMemo.trim(),
+        createdAt: (applyDate || formatApplyDateTime(new Date())),
+        author: authorTag
+      }] : [],
       createdAt: new Date().toISOString(),
       updatedAt: null,
       hasManualUpdate: false
     };
+
 
     if ((insurance || '').includes('삼성')) {
       const domPatientId = document.getElementById('newAppSamsungPatientId')?.value?.trim();
@@ -35592,6 +35608,7 @@ async function initAdminSession() {
     }
     // 정상 로그인 세션 유지
     gCurrentAdmin = validSessionAdmin;
+    window.gCurrentAdmin = validSessionAdmin;
     document.documentElement.classList.remove('livon-locked');
     localStorage.removeItem('LIVON_LOGGED_OUT');
     sessionStorage.removeItem('LIVON_LOGGED_OUT');
@@ -35606,6 +35623,7 @@ async function initAdminSession() {
   } else {
     // 🚨 미인증 상태 (운영 실서버 전용): 모든 세션 토큰 및 로컬 캐시 즉시 파기 & 화면 완전 잠금
     gCurrentAdmin = null;
+    window.gCurrentAdmin = null;
     localStorage.removeItem('REBORN_CURRENT_ADMIN');
     sessionStorage.removeItem('REBORN_CURRENT_ADMIN');
     localStorage.removeItem('REBORN_ADMIN_SESSION_TOKEN');
@@ -35940,6 +35958,7 @@ async function handleAdminLoginSubmit(e, customUser, customPass) {
 
   const { token, admin } = authResult.value;
   gCurrentAdmin = admin;
+  window.gCurrentAdmin = admin;
 
   // 세션 토큰 및 계정 정보 안전 저장
   localStorage.setItem('REBORN_ADMIN_SESSION_TOKEN', token);

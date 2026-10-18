@@ -6118,12 +6118,26 @@ window.onCustEditGuardianRelationChange = onCustEditGuardianRelationChange;
 /**
  * 관리자 명단에서 이름이나 아이디로 계정 정보 조회
  */
+function isVagueMemoAuthor(str) {
+  if (!str) return true;
+  const t = String(str).trim();
+  return !t || t === '관리자' || t === 'admin' || t === '운영자' || t === '상담원' || t === '접수처' || t === '()' || t === '리본케어' || t === '시스템';
+}
+window.isVagueMemoAuthor = isVagueMemoAuthor;
+
+/**
+ * 전역 관리자 목록에서 사용자 식별자(아이디/이름/고유ID)로 관리자 계정 정보 조회
+ */
 function findAdminAccountInfo(identifier) {
   if (!identifier) return null;
   const q = String(identifier).trim().toLowerCase();
   const list = (typeof gAdmins !== 'undefined' && Array.isArray(gAdmins) && gAdmins.length > 0)
     ? gAdmins
-    : ((window.REBORN_DATA && Array.isArray(window.REBORN_DATA.admins)) ? window.REBORN_DATA.admins : []);
+    : ((typeof INITIAL_ADMINS !== 'undefined' && Array.isArray(INITIAL_ADMINS) && INITIAL_ADMINS.length > 0)
+        ? INITIAL_ADMINS
+        : ((typeof window !== 'undefined' && window.INITIAL_ADMINS && Array.isArray(window.INITIAL_ADMINS))
+            ? window.INITIAL_ADMINS
+            : ((window.REBORN_DATA && Array.isArray(window.REBORN_DATA.admins)) ? window.REBORN_DATA.admins : [])));
 
   const found = list.find(a => a && (
     (a.username && a.username.toLowerCase() === q) ||
@@ -6136,28 +6150,43 @@ window.findAdminAccountInfo = findAdminAccountInfo;
 
 /**
  * 현재 로그인 관리자 정보 반환 (name + username)
+ * 브라우저 세션 및 전역 변수에서 실제 로그인된 관리자 정보를 정확하게 감지
  */
 function getCurrentMemoAdmin() {
   let admin = null;
   if (typeof gCurrentAdmin !== 'undefined' && gCurrentAdmin && (gCurrentAdmin.name || gCurrentAdmin.username)) {
     admin = gCurrentAdmin;
-  } else {
+  }
+  if (!admin && typeof window !== 'undefined' && window.gCurrentAdmin && (window.gCurrentAdmin.name || window.gCurrentAdmin.username)) {
+    admin = window.gCurrentAdmin;
+  }
+  if (!admin && typeof window !== 'undefined' && window.currentUser && (window.currentUser.name || window.currentUser.username)) {
+    admin = window.currentUser;
+  }
+  if (!admin && typeof window !== 'undefined') {
     try {
       const raw = localStorage.getItem('REBORN_CURRENT_ADMIN') || sessionStorage.getItem('REBORN_CURRENT_ADMIN');
       if (raw) admin = JSON.parse(raw);
     } catch (e) {}
   }
-  if (!admin && typeof window !== 'undefined' && window.currentUser) {
-    admin = window.currentUser;
+
+  if (admin && admin.username) {
+    let username = admin.username;
+    let name = admin.name || '';
+    if (!name || isVagueMemoAuthor(name)) {
+      const matched = findAdminAccountInfo(username);
+      if (matched && matched.name) {
+        name = matched.name;
+      } else if (username === 'superadmin') {
+        name = '김지훈';
+      } else {
+        name = username;
+      }
+    }
+    return { name, username };
   }
 
-  let username = (admin && admin.username) || 'superadmin';
-  let name = (admin && admin.name) || '';
-  if (!name || name === '리본케어' || name === '김리본' || name === '관리자' || name === 'admin') {
-    const matched = findAdminAccountInfo(username) || findAdminAccountInfo('superadmin');
-    name = (matched && matched.name && matched.name !== '리본케어' && matched.name !== '김리본') ? matched.name : '김지훈';
-  }
-  return { name, username };
+  return { name: '관리자', username: 'admin' };
 }
 window.getCurrentMemoAdmin = getCurrentMemoAdmin;
 
@@ -6175,34 +6204,47 @@ window.getCurrentMemoAuthorInfo = getCurrentMemoAuthorInfo;
  */
 function resolveMemoAuthor(author, itemText, app) {
   const text = itemText || '';
-  // "삼성화재 접수처", "현대해상 접수처", "원수사 접수처" 등 불필요한 가상 접수처 문구 전면 제거 및 실명 반영
+  // "삼성화재 접수처", "현대해상 접수처", "원수사 접수처" 등 불필요한 가상 접수처 문구 전면 제거
   let cleanAuthor = (author || '')
     .replace(/(삼성화재|현대해상|원수사|KB손해|DB손해)?\s*접수처/g, '')
-    .replace(/리본케어/g, '김지훈')
     .trim();
 
-  // 1. 엑셀 업로드 / 원수사 초기 접수 메모 (진단명, 병원장소 등)
-  // 원수사 접수처 문구를 배제하고 등록을 수행한 관리자 사용자명(실명)을 명시
-  if (text.startsWith('[진단명:') || text.startsWith('진단명:') || text.includes('장소:') || text.includes('초기 접수') || text.includes('사고번호')) {
-    if (app && (app.createdAdmin || app.creator || app.uploadedBy)) {
-      const creatorInfo = findAdminAccountInfo(app.createdAdmin || app.creator || app.uploadedBy);
+  // 1. 고객 데이터 자체에 기록된 등록자 정보가 있는 경우 최우선 적용
+  if (app) {
+    if (app.memoAuthor && !isVagueMemoAuthor(app.memoAuthor)) {
+      return app.memoAuthor;
+    }
+    const creatorId = app.createdAdmin || app.creator || app.uploadedBy;
+    if (creatorId) {
+      const creatorInfo = findAdminAccountInfo(creatorId);
       if (creatorInfo && creatorInfo.name) {
         return `${creatorInfo.name} (${creatorInfo.username})`;
       }
+      if (app.creatorName) {
+        return `${app.creatorName} (${creatorId})`;
+      }
+      return `${creatorId}`;
     }
-    const curAdm = getCurrentMemoAdmin();
-    return `${curAdm.name} (${curAdm.username})`;
   }
 
-  const isVague = !cleanAuthor || cleanAuthor === '관리자' || cleanAuthor === 'admin' || cleanAuthor === '운영자' || cleanAuthor === '상담원' || cleanAuthor === '접수처' || cleanAuthor === '()';
+  const isVague = isVagueMemoAuthor(cleanAuthor);
 
-  // 2. 이미 아이디 괄호가 포함된 구체적 작성자명인 경우 그대로 사용
+  // 2. 이미 아이디 괄호가 포함된 구체적 작성자명인 경우 그대로 사용 (예: "최은주 (ejchoi)")
   if (!isVague && cleanAuthor.includes('(') && cleanAuthor.includes(')')) {
     return cleanAuthor;
   }
 
-  // 3. 사용자가 실제로 입력한 비고 내용의 경우 -> 작성자 아이디 소급 추적!
-  // 3-1. CTI 콜 기록에서 해당 고객의 담당 오퍼레이터(상담원) 추적
+  // 3. 작성자 텍스트가 특정 관리자 실명이나 아이디인 경우 계정 정보 매핑
+  if (!isVague) {
+    const adm = findAdminAccountInfo(cleanAuthor);
+    if (adm && adm.username) {
+      return `${adm.name} (${adm.username})`;
+    }
+    return cleanAuthor;
+  }
+
+  // 4. 비고 내용 및 등록 맥락에 따른 작성자 추적
+  // 4-1. CTI 콜 기록에서 해당 고객의 담당 오퍼레이터(상담원) 추적
   if (typeof findCustomerMatchedCallLogs === 'function') {
     const matchedCalls = findCustomerMatchedCallLogs(app) || [];
     if (matchedCalls.length > 0) {
@@ -6217,7 +6259,7 @@ function resolveMemoAuthor(author, itemText, app) {
     }
   }
 
-  // 3-2. 배정, 협회 통화, 간병인 수배 등 간병파트 상담/업무 메모 -> 간병파트 매니저(이주연 / ansghk8855) 소급 반영
+  // 4-2. 배정, 협회 통화, 간병인 수배 등 간병파트 상담/업무 메모 -> 간병파트 매니저(이주연 / ansghk8855) 매핑
   if (text.includes('협회') || text.includes('간병인') || text.includes('배정') || text.includes('수배') || text.includes('출퇴근') || text.includes('종료')) {
     const careMgr = findAdminAccountInfo('이주연') || findAdminAccountInfo('ansghk8855');
     if (careMgr) {
@@ -6226,28 +6268,26 @@ function resolveMemoAuthor(author, itemText, app) {
     return '이주연 (ansghk8855)';
   }
 
-  // 3-3. 시스템 감사 로그에서 해당 고객 업데이트 이력 추적
+  // 4-3. 시스템 감사 로그에서 해당 고객 업데이트 이력 추적
   if (typeof window !== 'undefined' && Array.isArray(window.gSystemAuditLogs) && app && app.id) {
     const audit = window.gSystemAuditLogs.find(l => l && l.target && l.target.includes(app.id) && l.user && l.user.username);
-    if (audit) {
-      const uName = (audit.user.name && audit.user.name !== '리본케어') ? audit.user.name : '김지훈';
+    if (audit && audit.user && audit.user.username) {
+      const adm = findAdminAccountInfo(audit.user.username);
+      const uName = (adm && adm.name) || audit.user.name || audit.user.username;
       return `${uName} (${audit.user.username})`;
     }
   }
 
-  // 3-4. 작성자 텍스트가 일반 이름인 경우 계정 정보 매핑
-  if (!isVague) {
-    const adm = findAdminAccountInfo(cleanAuthor);
-    if (adm && adm.username) {
-      return `${adm.name} (${adm.username})`;
-    }
-    return cleanAuthor;
+  // 5. 기본값: 현재 로그인 관리자 아이디 반영 (단, admin/관리자가 아닌 실제 세션 정보인 경우)
+  const curAdm = getCurrentMemoAdmin();
+  if (curAdm && curAdm.username && curAdm.username !== 'admin') {
+    return `${curAdm.name} (${curAdm.username})`;
   }
 
-  // 3-5. 기본값: 현재 로그인 관리자 아이디 반영
-  return getCurrentMemoAuthorInfo();
+  return cleanAuthor || '관리자';
 }
 window.resolveMemoAuthor = resolveMemoAuthor;
+
 
 function getCustomerMemoList(app) {
   if (!app) return [];
@@ -6258,19 +6298,20 @@ function getCustomerMemoList(app) {
   if (!raw) return [];
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   const dateStr = (app.updatedAt ? app.updatedAt.slice(0, 16).replace('T', ' ') : (app.applyDate || ''));
+  const initialAuthor = app.memoAuthor || '관리자';
   if (lines.length > 1) {
     return lines.map((line, idx) => ({
       id: 'm_init_' + idx,
       text: line,
       createdAt: dateStr,
-      author: resolveMemoAuthor('관리자', line, app)
+      author: resolveMemoAuthor(initialAuthor, line, app)
     }));
   }
   return [{
     id: 'm_init_0',
     text: raw,
     createdAt: dateStr,
-    author: resolveMemoAuthor('관리자', raw, app)
+    author: resolveMemoAuthor(initialAuthor, raw, app)
   }];
 }
 window.getCustomerMemoList = getCustomerMemoList;

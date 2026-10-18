@@ -195,3 +195,5 @@ window.REBORN_DATA = {
   faxLogs: []
 };
 
+window.INITIAL_ADMINS = INITIAL_ADMINS;
+
