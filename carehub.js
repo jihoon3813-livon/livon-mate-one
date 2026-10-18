@@ -6116,9 +6116,28 @@ window.onCustEditGuardianRelationChange = onCustEditGuardianRelationChange;
 // =========================================================================
 
 /**
- * 현재 로그인 관리자 또는 시스템 담당자의 명확한 표시명 반환 (로그인 사용자 실명/아이디 자동 반영)
+ * 관리자 명단에서 이름이나 아이디로 계정 정보 조회
  */
-function getCurrentMemoAuthorInfo() {
+function findAdminAccountInfo(identifier) {
+  if (!identifier) return null;
+  const q = String(identifier).trim().toLowerCase();
+  const list = (typeof gAdmins !== 'undefined' && Array.isArray(gAdmins) && gAdmins.length > 0)
+    ? gAdmins
+    : ((window.REBORN_DATA && Array.isArray(window.REBORN_DATA.admins)) ? window.REBORN_DATA.admins : []);
+
+  const found = list.find(a => a && (
+    (a.username && a.username.toLowerCase() === q) ||
+    (a.name && a.name.toLowerCase() === q) ||
+    (a.id && a.id.toLowerCase() === q)
+  ));
+  return found || null;
+}
+window.findAdminAccountInfo = findAdminAccountInfo;
+
+/**
+ * 현재 로그인 관리자 정보 반환 (name + username)
+ */
+function getCurrentMemoAdmin() {
   let admin = null;
   if (typeof gCurrentAdmin !== 'undefined' && gCurrentAdmin && (gCurrentAdmin.name || gCurrentAdmin.username)) {
     admin = gCurrentAdmin;
@@ -6132,32 +6151,86 @@ function getCurrentMemoAuthorInfo() {
     admin = window.currentUser;
   }
 
-  if (admin) {
-    let name = admin.name || admin.username;
-    if (name === '김리본' || name === '김지훈') name = '리본케어';
-    if (name) return name;
-  }
-  return '리본케어';
+  let name = (admin && admin.name) || '리본케어';
+  let username = (admin && admin.username) || 'superadmin';
+  if (name === '김리본' || name === '김지훈') name = '리본케어';
+  return { name, username };
+}
+window.getCurrentMemoAdmin = getCurrentMemoAdmin;
+
+/**
+ * 현재 로그인 관리자 표시명 반환 (실명 + 아이디 자동 반영)
+ */
+function getCurrentMemoAuthorInfo() {
+  const adm = getCurrentMemoAdmin();
+  return `${adm.name} (${adm.username})`;
 }
 window.getCurrentMemoAuthorInfo = getCurrentMemoAuthorInfo;
 
 /**
- * 불명확한 '관리자', 'admin' 등으로 표기된 작성자를 문맥과 현재 담당자에 맞게 스마트 보정
+ * 기존 및 신규 비고 항목의 작성자 및 계정 아이디를 스마트 소급 추적
  */
 function resolveMemoAuthor(author, itemText, app) {
-  const trimmed = (author || '').trim();
-  const isVague = !trimmed || trimmed === '관리자' || trimmed === 'admin' || trimmed === '운영자' || trimmed === '상담원';
-  if (!isVague) return trimmed;
-
   const text = itemText || '';
   const insName = (app && app.insuranceCompany) ? app.insuranceCompany : '원수사';
 
-  // 1. 초기 접수 메모(진단명, 사고유형, 병원장소 등)
+  // 1. 엑셀 업로드 / 원수사 초기 접수 메모 (진단명, 병원장소 등)
+  // 사용자의 명시적 규칙: "엑셀로 업로드한 고객이라면 최고관리자가 되겠지만"
   if (text.startsWith('[진단명:') || text.startsWith('진단명:') || text.includes('장소:') || text.includes('초기 접수') || text.includes('사고번호')) {
-    return `${insName} 접수처`;
+    return `${insName} 접수처 (superadmin)`;
   }
 
-  // 2. 그 외에는 현재 로그인된 사용자 반영
+  const trimmed = (author || '').trim();
+  const isVague = !trimmed || trimmed === '관리자' || trimmed === 'admin' || trimmed === '운영자' || trimmed === '상담원' || trimmed === '리본케어';
+
+  // 2. 이미 아이디 괄호가 포함된 구체적 작성자명인 경우 그대로 사용
+  if (!isVague && trimmed.includes('(') && trimmed.includes(')')) {
+    return trimmed;
+  }
+
+  // 3. 사용자가 실제로 입력한 비고 내용의 경우 -> 작성자 아이디 소급 추적!
+  // 3-1. CTI 콜 기록에서 해당 고객의 담당 오퍼레이터(상담원) 추적
+  if (typeof findCustomerMatchedCallLogs === 'function') {
+    const matchedCalls = findCustomerMatchedCallLogs(app) || [];
+    if (matchedCalls.length > 0) {
+      const op = matchedCalls.find(c => c && c.operator && c.operator !== '상담원')?.operator;
+      if (op) {
+        const adm = findAdminAccountInfo(op);
+        if (adm && adm.username) {
+          return `${adm.name} (${adm.username})`;
+        }
+        return `${op}`;
+      }
+    }
+  }
+
+  // 3-2. 배정, 협회 통화, 간병인 수배 등 간병파트 상담/업무 메모 -> 간병파트 매니저(이주연 / ansghk8855) 소급 반영
+  if (text.includes('협회') || text.includes('간병인') || text.includes('배정') || text.includes('수배') || text.includes('출퇴근') || text.includes('종료')) {
+    const careMgr = findAdminAccountInfo('이주연') || findAdminAccountInfo('ansghk8855');
+    if (careMgr) {
+      return `${careMgr.name} (${careMgr.username})`;
+    }
+    return '이주연 (ansghk8855)';
+  }
+
+  // 3-3. 시스템 감사 로그에서 해당 고객 업데이트 이력 추적
+  if (typeof window !== 'undefined' && Array.isArray(window.gSystemAuditLogs) && app && app.id) {
+    const audit = window.gSystemAuditLogs.find(l => l && l.target && l.target.includes(app.id) && l.user && l.user.username);
+    if (audit) {
+      return `${audit.user.name || audit.user.username} (${audit.user.username})`;
+    }
+  }
+
+  // 3-4. 작성자 텍스트가 일반 이름인 경우 계정 정보 매핑
+  if (!isVague) {
+    const adm = findAdminAccountInfo(trimmed);
+    if (adm && adm.username) {
+      return `${adm.name} (${adm.username})`;
+    }
+    return trimmed;
+  }
+
+  // 3-5. 기본값: 현재 로그인 관리자 아이디 반영
   return getCurrentMemoAuthorInfo();
 }
 window.resolveMemoAuthor = resolveMemoAuthor;
@@ -6241,7 +6314,7 @@ function renderCustomerMemoSectionHtml(app, options = {}) {
                     <i data-lucide="clock" class="w-2.5 h-2.5 text-slate-400"></i> ${item.createdAt || ''}
                   </span>
                   <span class="text-slate-300">·</span>
-                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100/90 text-amber-950 border border-amber-300/80 font-sans font-bold text-[10.5px] shadow-2xs" title="작성자">
+                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100/90 text-amber-950 border border-amber-300/80 font-sans font-bold text-[10.5px] shadow-2xs" title="작성자 및 아이디">
                     <i data-lucide="user-check" class="w-2.5 h-2.5 text-amber-700"></i>
                     작성: ${typeof escapeHtml === 'function' ? escapeHtml(displayAuthor) : displayAuthor}
                   </span>
@@ -6266,7 +6339,7 @@ function renderCustomerMemoSectionHtml(app, options = {}) {
 
       <!-- 3. 빠른 항목 추가 입력창 (로그인 사용자 자동 반영) -->
       <div class="pt-1.5 flex items-center gap-1.5 border-t border-amber-200/50">
-        <span class="px-2.5 py-1.5 rounded-xl bg-amber-100/90 border border-amber-300 text-amber-950 font-bold text-[11px] shrink-0 flex items-center gap-1 shadow-2xs" title="로그인된 작성자">
+        <span class="px-2.5 py-1.5 rounded-xl bg-amber-100/90 border border-amber-300 text-amber-950 font-bold text-[11px] shrink-0 flex items-center gap-1 shadow-2xs" title="로그인된 작성자 아이디">
           <i data-lucide="user" class="w-3.5 h-3.5 text-amber-700"></i>
           <span>${typeof escapeHtml === 'function' ? escapeHtml(currentAuthor) : currentAuthor}</span>
         </span>
@@ -6299,7 +6372,8 @@ function addCustomerMemoItem(appId, customText) {
   }
 
   // 로그인 한 아이디의 사용자를 작성자로 자동 반영
-  const author = getCurrentMemoAuthorInfo();
+  const curAdmin = getCurrentMemoAdmin();
+  const authorDisplay = `${curAdmin.name} (${curAdmin.username})`;
 
   const appIdx = (gApps || []).findIndex(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
   if (appIdx === -1) return;
@@ -6313,7 +6387,9 @@ function addCustomerMemoItem(appId, customText) {
     id: 'memo_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     text: text,
     createdAt: dateStr,
-    author: author
+    author: authorDisplay,
+    authorId: curAdmin.username,
+    authorName: curAdmin.name
   };
 
   currentList.push(newItem);
