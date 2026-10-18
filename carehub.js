@@ -6151,9 +6151,12 @@ function getCurrentMemoAdmin() {
     admin = window.currentUser;
   }
 
-  let name = (admin && admin.name) || '리본케어';
   let username = (admin && admin.username) || 'superadmin';
-  if (name === '김리본' || name === '김지훈') name = '리본케어';
+  let name = (admin && admin.name) || '';
+  if (!name || name === '리본케어' || name === '김리본' || name === '관리자' || name === 'admin') {
+    const matched = findAdminAccountInfo(username) || findAdminAccountInfo('superadmin');
+    name = (matched && matched.name && matched.name !== '리본케어' && matched.name !== '김리본') ? matched.name : '김지훈';
+  }
   return { name, username };
 }
 window.getCurrentMemoAdmin = getCurrentMemoAdmin;
@@ -6172,20 +6175,30 @@ window.getCurrentMemoAuthorInfo = getCurrentMemoAuthorInfo;
  */
 function resolveMemoAuthor(author, itemText, app) {
   const text = itemText || '';
-  const insName = (app && app.insuranceCompany) ? app.insuranceCompany : '원수사';
+  // "삼성화재 접수처", "현대해상 접수처", "원수사 접수처" 등 불필요한 가상 접수처 문구 전면 제거 및 실명 반영
+  let cleanAuthor = (author || '')
+    .replace(/(삼성화재|현대해상|원수사|KB손해|DB손해)?\s*접수처/g, '')
+    .replace(/리본케어/g, '김지훈')
+    .trim();
 
   // 1. 엑셀 업로드 / 원수사 초기 접수 메모 (진단명, 병원장소 등)
-  // 사용자의 명시적 규칙: "엑셀로 업로드한 고객이라면 최고관리자가 되겠지만"
+  // 원수사 접수처 문구를 배제하고 등록을 수행한 관리자 사용자명(실명)을 명시
   if (text.startsWith('[진단명:') || text.startsWith('진단명:') || text.includes('장소:') || text.includes('초기 접수') || text.includes('사고번호')) {
-    return `${insName} 접수처 (superadmin)`;
+    if (app && (app.createdAdmin || app.creator || app.uploadedBy)) {
+      const creatorInfo = findAdminAccountInfo(app.createdAdmin || app.creator || app.uploadedBy);
+      if (creatorInfo && creatorInfo.name) {
+        return `${creatorInfo.name} (${creatorInfo.username})`;
+      }
+    }
+    const curAdm = getCurrentMemoAdmin();
+    return `${curAdm.name} (${curAdm.username})`;
   }
 
-  const trimmed = (author || '').trim();
-  const isVague = !trimmed || trimmed === '관리자' || trimmed === 'admin' || trimmed === '운영자' || trimmed === '상담원' || trimmed === '리본케어';
+  const isVague = !cleanAuthor || cleanAuthor === '관리자' || cleanAuthor === 'admin' || cleanAuthor === '운영자' || cleanAuthor === '상담원' || cleanAuthor === '접수처' || cleanAuthor === '()';
 
   // 2. 이미 아이디 괄호가 포함된 구체적 작성자명인 경우 그대로 사용
-  if (!isVague && trimmed.includes('(') && trimmed.includes(')')) {
-    return trimmed;
+  if (!isVague && cleanAuthor.includes('(') && cleanAuthor.includes(')')) {
+    return cleanAuthor;
   }
 
   // 3. 사용자가 실제로 입력한 비고 내용의 경우 -> 작성자 아이디 소급 추적!
@@ -6217,17 +6230,18 @@ function resolveMemoAuthor(author, itemText, app) {
   if (typeof window !== 'undefined' && Array.isArray(window.gSystemAuditLogs) && app && app.id) {
     const audit = window.gSystemAuditLogs.find(l => l && l.target && l.target.includes(app.id) && l.user && l.user.username);
     if (audit) {
-      return `${audit.user.name || audit.user.username} (${audit.user.username})`;
+      const uName = (audit.user.name && audit.user.name !== '리본케어') ? audit.user.name : '김지훈';
+      return `${uName} (${audit.user.username})`;
     }
   }
 
   // 3-4. 작성자 텍스트가 일반 이름인 경우 계정 정보 매핑
   if (!isVague) {
-    const adm = findAdminAccountInfo(trimmed);
+    const adm = findAdminAccountInfo(cleanAuthor);
     if (adm && adm.username) {
       return `${adm.name} (${adm.username})`;
     }
-    return trimmed;
+    return cleanAuthor;
   }
 
   // 3-5. 기본값: 현재 로그인 관리자 아이디 반영

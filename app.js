@@ -35450,13 +35450,13 @@ async function initAdminSession() {
   }
   try {
     const rawCur = localStorage.getItem('REBORN_CURRENT_ADMIN');
-    if (rawCur && (rawCur.includes('김리본') || rawCur.includes('김지훈'))) {
-      const fixedCur = rawCur.replaceAll('김리본', '리본케어').replaceAll('김지훈', '리본케어');
+    if (rawCur && (rawCur.includes('김리본') || rawCur.includes('리본케어'))) {
+      const fixedCur = rawCur.replaceAll('김리본', '김지훈').replaceAll('리본케어', '김지훈');
       localStorage.setItem('REBORN_CURRENT_ADMIN', fixedCur);
     }
     const rawAdms = localStorage.getItem('LIVON_ADMINS');
-    if (rawAdms && (rawAdms.includes('김리본') || rawAdms.includes('김지훈'))) {
-      const fixedAdms = rawAdms.replaceAll('김리본', '리본케어').replaceAll('김지훈', '리본케어');
+    if (rawAdms && (rawAdms.includes('김리본') || rawAdms.includes('리본케어'))) {
+      const fixedAdms = rawAdms.replaceAll('김리본', '김지훈').replaceAll('리본케어', '김지훈');
       localStorage.setItem('LIVON_ADMINS', fixedAdms);
     }
   } catch (e) {}
@@ -35510,8 +35510,8 @@ async function initAdminSession() {
     try {
       const parsed = JSON.parse(savedAdmin);
       if (parsed && parsed.id && parsed.username !== '342' && parsed.name !== '342') {
-        if ((parsed.id === 'ADM001' || parsed.username === 'superadmin') && (parsed.name === '김리본' || parsed.name === '김지훈')) {
-          parsed.name = '리본케어';
+        if ((parsed.id === 'ADM001' || parsed.username === 'superadmin') && (parsed.name === '김리본' || parsed.name === '리본케어')) {
+          parsed.name = '김지훈';
         }
         validSessionAdmin = parsed;
 
@@ -35552,11 +35552,11 @@ async function initAdminSession() {
 
   const overlay = document.getElementById('adminLoginOverlay');
 
-  // 관리자 세션이 비어있는 경우 (개발 사이트 또는 첫 접속): 최고관리자(리본케어 대표이사)로 자동 안전 세션 발급하여 화면 중단 원천 차단
+  // 관리자 세션이 비어있는 경우 (개발 사이트 또는 첫 접속): 최고관리자(대표이사 김지훈)로 자동 안전 세션 발급하여 화면 중단 원천 차단
   if (!validSessionAdmin && (!isExplicitlyLoggedOut || isDev)) {
     const defaultSuperAdmin = (Array.isArray(gAdmins) && gAdmins.find(a => a.role === 'SUPER_ADMIN'))
       || (window.REBORN_DATA && window.REBORN_DATA.admins && window.REBORN_DATA.admins[0])
-      || { id: 'ADM001', username: 'superadmin', name: '리본케어', dept: '대표이사', role: 'SUPER_ADMIN', permissions: ['all'], allowedMenus: ['all'] };
+      || { id: 'ADM001', username: 'superadmin', name: '김지훈', dept: '대표이사', role: 'SUPER_ADMIN', permissions: ['all'], allowedMenus: ['all'] };
     validSessionAdmin = defaultSuperAdmin;
     try {
       localStorage.removeItem('LIVON_LOGGED_OUT');
@@ -35574,19 +35574,19 @@ async function initAdminSession() {
     if (Array.isArray(adminList) && validSessionAdmin.username) {
       const match = adminList.find(a => a && a.username && a.username.toLowerCase() === validSessionAdmin.username.toLowerCase());
       if (match) {
-        if ((match.id === 'ADM001' || match.username === 'superadmin') && (match.name === '김리본' || match.name === '김지훈')) {
-          match.name = '리본케어';
+        if ((match.id === 'ADM001' || match.username === 'superadmin') && (match.name === '김리본' || match.name === '리본케어')) {
+          match.name = '김지훈';
         }
         validSessionAdmin = { ...validSessionAdmin, id: match.id, role: match.role, dept: match.dept, name: match.name, email: match.email, allowedMenus: match.allowedMenus };
       }
     }
-    if ((validSessionAdmin.id === 'ADM001' || validSessionAdmin.username === 'superadmin') && (validSessionAdmin.name === '김리본' || validSessionAdmin.name === '김지훈')) {
-      validSessionAdmin.name = '리본케어';
+    if ((validSessionAdmin.id === 'ADM001' || validSessionAdmin.username === 'superadmin') && (validSessionAdmin.name === '김리본' || validSessionAdmin.name === '리본케어')) {
+      validSessionAdmin.name = '김지훈';
     }
     if (Array.isArray(gAdmins)) {
       gAdmins.forEach(a => {
-        if (a && (a.id === 'ADM001' || a.username === 'superadmin') && (a.name === '김리본' || a.name === '김지훈')) {
-          a.name = '리본케어';
+        if (a && (a.id === 'ADM001' || a.username === 'superadmin') && (a.name === '김리본' || a.name === '리본케어')) {
+          a.name = '김지훈';
         }
       });
     }
