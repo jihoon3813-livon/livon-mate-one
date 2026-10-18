@@ -54,10 +54,10 @@
 
       <div class="pdf-export-box" style="margin-top: 14px; background: #fdf4ff; border: 1px solid #f0abfc; border-radius: 14px; padding: 12px;">
         <div style="font-size: 12px; font-weight: 700; color: #86198f; margin-bottom: 6px;">
-          📄 공식 간병 리포트 (A4 2장)
+          📄 LivOn AI 간병일지 (전체 일지)
         </div>
-        <button type="button" class="btn-sms-copy" onclick="downloadCurrent2PagePdf()" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; border: none; box-shadow: 0 4px 10px rgba(124, 58, 237, 0.25); margin-bottom: 0;">
-          📥 2P 공식 PDF 다운로드
+        <button type="button" class="btn-sms-copy" onclick="downloadCurrentCareReportPdf()" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; border: none; box-shadow: 0 4px 10px rgba(124, 58, 237, 0.25); margin-bottom: 0;">
+          📥 일지 전체 다운로드
         </button>
       </div>
 
@@ -76,9 +76,9 @@
             <span data-icon="menu"></span>
             <span>더보기</span>
           </button>
-          <button class="presentation" onclick="downloadCurrent2PagePdf()" title="A4 2페이지 공식 PDF 다운로드" style="background: #fdf4ff; border-color: #f0abfc; color: #86198f;">
+          <button class="presentation" onclick="downloadCurrentCareReportPdf()" title="LivOn AI 간병일지 전체 다운로드" style="background: #fdf4ff; border-color: #f0abfc; color: #86198f; white-space: nowrap !important; flex-shrink: 0;">
             <span data-icon="document"></span>
-            <span>2P PDF</span>
+            <span>일지 다운로드</span>
           </button>
           <button class="presentation" id="presentation" aria-pressed="false">
             <span data-icon="shield"></span>
@@ -263,6 +263,6 @@
     <div id="sheet-content"></div>
   </dialog>
 
-  <script src="mobile-care-diary.js?v=20261010_1420"></script>
+  <script src="mobile-care-diary.js?v=20261018_1420"></script>
 </body>
 </html>

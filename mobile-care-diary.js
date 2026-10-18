@@ -172,7 +172,8 @@ async function initFromQueryParams() {
   }
 
   try {
-    if (window.history && window.history.replaceState) {
+    window.__INITIAL_QUERY_STRING__ = window.location.search;
+    if (window.history && window.history.replaceState && !window.location.pathname.includes('survey')) {
       window.history.replaceState(
         { patient: pName || '고연분', masked: true },
         document.title,
@@ -1069,13 +1070,13 @@ function showSideMoreSheet() {
 
       <div class="pdf-export-box" style="margin-top: 14px; background: #fdf4ff; border: 1px solid #f0abfc; border-radius: 14px; padding: 12px;">
         <div style="font-size: 13px; font-weight: 700; color: #86198f; margin-bottom: 4px;">
-          📄 공식 간병 리포트 (A4 2장 규격)
+          📄 LivOn AI 간병일지 (전체 일지)
         </div>
         <p style="font-size: 11px; color: var(--muted); margin: 0 0 8px;">
-          공식 문서 양식으로 완성된 A4 2페이지 리포트를 PDF로 내려받습니다.
+          간병일지(new) 공식 서식으로 전체 일지를 하나의 PDF로 내려받습니다.
         </p>
-        <button type="button" class="btn-sms-copy" onclick="downloadCurrent2PagePdf()" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; border: none; box-shadow: 0 4px 10px rgba(124, 58, 237, 0.25);">
-          📥 2P 공식 PDF 다운로드
+        <button type="button" class="btn-sms-copy" onclick="downloadCurrentCareReportPdf()" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; border: none; box-shadow: 0 4px 10px rgba(124, 58, 237, 0.25);">
+          📥 일지 전체 다운로드
         </button>
       </div>
 
@@ -1151,22 +1152,46 @@ function copyCurrentReportLink() {
   });
 }
 
-function downloadCurrent2PagePdf() {
+async function downloadCurrentCareReportPdf() {
   const pName = (gPatientInfo && gPatientInfo.name) ? gPatientInfo.name : '고연분';
-  const rec = (Array.isArray(careRecords) && careRecords[selected]) ? careRecords[selected] : null;
-  const dayNum = rec ? (rec.dayIndex || (selected + 1)) : (selected + 1);
 
+  // 1. 부모 창(통합 어드민 - 간병일지 new) 함수 연동
   try {
-    if (window.parent && window.parent !== window && typeof window.parent.downloadPatientCareLogsPdfs === 'function') {
-      window.parent.downloadPatientCareLogsPdfs(pName);
+    if (window.parent && window.parent !== window && typeof window.parent.downloadPatientCareLogsPdfs_new === 'function') {
+      await window.parent.downloadPatientCareLogsPdfs_new(pName);
       return;
     }
   } catch (e) {}
 
-  const url = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}&day=${encodeURIComponent(dayNum)}`;
-  window.open(url, '_blank');
+  // 2. 단독 실행(모바일 접속 또는 웹 팝업) 직접 다운로드: 간병일지(new)와 동일한 전체 일지 API 호출
+  try {
+    const url = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}`;
+    const resp = await fetch(url);
+    if (resp.ok) {
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('application/pdf')) {
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `[LivOn_AI간병일지]_${pName}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('Direct PDF download failed, falling back to window.open:', err);
+  }
+
+  // 3. Fallback: 새 탭에서 간병일지(new) 전체 일지 열기
+  const fallbackUrl = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}`;
+  window.open(fallbackUrl, '_blank');
 }
-window.downloadCurrent2PagePdf = downloadCurrent2PagePdf;
+window.downloadCurrentCareReportPdf = downloadCurrentCareReportPdf;
+window.downloadCurrent2PagePdf = downloadCurrentCareReportPdf;
 
 function calendar() {
   showSheet('간병일 선택', `

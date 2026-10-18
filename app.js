@@ -19604,6 +19604,7 @@ var APP_TAB_META = {
   carelogs_new: { name: '간병일지(new)', icon: 'clipboard-check', color: 'text-indigo-500' },
   carecall: { name: 'AI간병통화 관리', icon: 'bot', color: 'text-purple-600' },
   surveymgmt: { name: '만족도조사 관리', icon: 'star', color: 'text-amber-500' },
+  surveymgmt_new: { name: '만족도조사 관리(new)', icon: 'heart-handshake', color: 'text-pink-500' },
   directory: { name: '파트너/인력 디렉토리', icon: 'contact-2', color: 'text-emerald-500' },
   samsunglist: { name: '삼성화재 명단관리', icon: 'file-spreadsheet', color: 'text-sky-500' },
   samsungclaimhub: { name: '삼성화재 접수/청구', icon: 'mail-check', color: 'text-emerald-500' },
@@ -19746,8 +19747,9 @@ function refreshTabData(tabId, filterParam = null) {
         }
         break;
 
-      // 1-2. 고객만족도 조사 관리
+      // 1-2. 고객만족도 조사 관리 & 만족도조사 관리(new)
       case 'surveymgmt':
+      case 'surveymgmt_new':
         if (typeof renderSurveyMgmtTab === 'function') {
           renderSurveyMgmtTab();
         }
@@ -20138,6 +20140,11 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
   }
   else if (tabId === 'settings') renderSettings();
   else if (tabId === 'faxmgmt') renderFaxManagement();
+  else if (tabId === 'surveymgmt' || tabId === 'surveymgmt_new') {
+    if (typeof renderSurveyMgmtTab === 'function') {
+      renderSurveyMgmtTab();
+    }
+  }
 
   if (tabId !== 'carehub') {
     initIcons(target);

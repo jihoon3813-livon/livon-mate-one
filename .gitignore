@@ -13,6 +13,7 @@ desktop.ini
 fax_config.json
 email_config.json
 cti_config.json
+aligo_config.json
 survey_data.json
 
 .vercel

@@ -67,6 +67,30 @@
     {
       "source": "/survey",
       "destination": "/survey.html"
+    },
+    {
+      "source": "/s/:token",
+      "destination": "/survey-care-diary.html"
+    },
+    {
+      "source": "/s",
+      "destination": "/survey-care-diary.html"
+    },
+    {
+      "source": "/survey-new",
+      "destination": "/survey-care-diary.html"
+    },
+    {
+      "source": "/survey-care-diary",
+      "destination": "/survey-care-diary.html"
+    },
+    {
+      "source": "/mate/survey-new",
+      "destination": "/mate-survey-new.html"
+    },
+    {
+      "source": "/mate-survey-new",
+      "destination": "/mate-survey-new.html"
     }
   ],
   "headers": [

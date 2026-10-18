@@ -1,6 +1,6 @@
 // sms-service.js
 // Livon Care System - Multi-Provider Real SMS/LMS Dispatch Engine
-// Supported: Barobill (바로빌 국내 이동통신 3사 직결) & Twilio (글로벌 SMS)
+// Supported: Aligo (알리고 국내 직결 통신망), Barobill (바로빌 3사 직결), Twilio (글로벌 SMS)
 
 const fs = require('fs');
 const path = require('path');
@@ -8,6 +8,7 @@ const https = require('https');
 const querystring = require('querystring');
 
 const SMS_LOG_PATH = path.join(__dirname, 'sms_dispatch_log.json');
+const ALIGO_CONFIG_PATH = path.join(__dirname, 'aligo_config.json');
 const FAX_CONFIG_PATH = path.join(__dirname, 'fax_config.json');
 const TWILIO_CONFIG_PATH = path.join(__dirname, 'carecall_twilio_config.json');
 
@@ -21,6 +22,370 @@ function getKoreanByteLength(str) {
     bytes += code > 127 ? 2 : 1;
   }
   return bytes;
+}
+
+/**
+ * Aligo 설정 가져오기 및 저장
+ */
+function getAligoConfig() {
+  let fileCfg = {};
+  try {
+    if (fs.existsSync(ALIGO_CONFIG_PATH)) {
+      fileCfg = JSON.parse(fs.readFileSync(ALIGO_CONFIG_PATH, 'utf8') || '{}');
+    }
+  } catch (_) {}
+
+  return {
+    userId: fileCfg.userId || process.env.ALIGO_USER_ID || 'livoncare',
+    apiKey: fileCfg.apiKey || process.env.ALIGO_API_KEY || '',
+    sender: fileCfg.sender || process.env.ALIGO_SENDER || '16007835',
+    senderKey: fileCfg.senderKey || process.env.ALIGO_SENDER_KEY || '',
+    senders: fileCfg.senders || [
+      { number: '16007835', label: '리본케어 공식 (1600-7835)', isDefault: true },
+      { number: '15447119', label: '리본케어 고객센터 (1544-7119)', isDefault: false },
+      { number: '15337436', label: '현대해상 전용 (1533-7436)', isDefault: false }
+    ],
+    updatedAt: fileCfg.updatedAt || ''
+  };
+}
+
+function saveAligoConfig(updates) {
+  const current = getAligoConfig();
+  const next = {
+    ...current,
+    ...updates,
+    updatedAt: new Date().toISOString()
+  };
+  fs.writeFileSync(ALIGO_CONFIG_PATH, JSON.stringify(next, null, 2), 'utf8');
+  return next;
+}
+
+/**
+ * Aligo API 통신 헬퍼 (HTTPS POST form-urlencoded)
+ */
+function callAligoApi(hostname, endpointPath, params, timeoutMs = 12000) {
+  return new Promise((resolve, reject) => {
+    const postData = querystring.stringify(params);
+
+    const req = https.request({
+      hostname: hostname || 'apis.aligo.in',
+      port: 443,
+      path: endpointPath,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData, 'utf8')
+      }
+    }, res => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const bodyStr = Buffer.concat(chunks).toString('utf8');
+        try {
+          const json = JSON.parse(bodyStr);
+          resolve({ status: res.statusCode, data: json, raw: bodyStr });
+        } catch (e) {
+          resolve({ status: res.statusCode, data: null, raw: bodyStr });
+        }
+      });
+    });
+
+    req.on('error', err => reject(new Error(`알리고(Aligo) 통신 오류: ${err.message}`)));
+    req.setTimeout(timeoutMs, () => {
+      req.destroy();
+      reject(new Error(`알리고(Aligo) API 응답 시간 초과 (${timeoutMs / 1000}초)`));
+    });
+
+    req.write(postData, 'utf8');
+    req.end();
+  });
+}
+
+let gCachedPublicIp = '';
+
+/**
+ * 현재 서버(클라이언트)의 외부 공인 IP 조회 (알리고 발송 IP 등록 가이드용)
+ */
+async function getPublicIp() {
+  if (gCachedPublicIp) return gCachedPublicIp;
+  try {
+    const ip = await new Promise((resolve, reject) => {
+      const req = https.get('https://api.ipify.org', { timeout: 3500 }, res => {
+        let d = '';
+        res.on('data', c => d += c);
+        res.on('end', () => resolve(d.trim()));
+      });
+      req.on('error', reject);
+      req.setTimeout(3500, () => { req.destroy(); reject(new Error('IP timeout')); });
+    });
+    if (ip && /^[\d\.]+$/.test(ip)) {
+      gCachedPublicIp = ip;
+    }
+    return gCachedPublicIp || '59.7.232.159';
+  } catch (_) {
+    return gCachedPublicIp || '59.7.232.159';
+  }
+}
+
+function getAligoErrorMessage(code, defaultMsg = '', publicIp = '', sender = '') {
+  const c = String(code || '');
+  const msg = String(defaultMsg || '').trim();
+
+  // 알리고 API가 '인증오류입니다.-IP' 등의 상세 메시지를 준 경우
+  if (msg.includes('IP') || msg.includes('-IP') || msg.toLowerCase().includes('ip')) {
+    const ipStr = publicIp || '59.7.232.159';
+    return `IP 인증 오류 (${msg}) - 현재 공인 IP [${ipStr}]가 알리고 허용 IP 목록에 등록되지 않았습니다. smartsms.aligo.in > [문자API] > [API Key 발급/관리]에서 [발송 서버 IP]에 ${ipStr} 를 등록해 주세요.`;
+  }
+
+  if (msg && !msg.startsWith('알리고 응답 코드') && !msg.includes('code')) {
+    return msg;
+  }
+
+  switch (c) {
+    case '-101': return `필수 변수 누락 또는 IP 미등록 (알리고 콘솔 [API Key 발급/관리]에서 현재 공인 IP [${publicIp || '59.7.232.159'}]가 등록되었는지 확인해 주세요)`;
+    case '-102': return 'API 인증 실패 (API Key 또는 사용자 아이디가 일치하지 않습니다)';
+    case '-103': return `등록/인증되지 않은 발신번호입니다. (전송 시도 발신번호: [${sender || '번호미상'}] - smartsms.aligo.in [발신번호 관리]에 사전 승인 등록된 번호여야 합니다)`;
+    case '-105': return '잔여 포인트(금액) 부족 (알리고 캐시 충전이 필요합니다)';
+    case '-201': return '수신 전화번호 오류 (유효하지 않은 휴대폰 번호)';
+    case '-301': return '메시지 내용 누락';
+    case '-901': return '발송 제한 시간 또는 스팸 차단 번호';
+    default: return defaultMsg || `알리고 응답 코드 (${c})`;
+  }
+}
+
+/**
+ * 알리고 잔여 포인트 및 SMS/LMS 잔여 건수 실시간 조회
+ */
+async function getAligoBalance(customCreds = null) {
+  const cfg = customCreds ? { ...getAligoConfig(), ...customCreds } : getAligoConfig();
+  if (!cfg.apiKey || !cfg.userId) {
+    const publicIp = await getPublicIp();
+    return {
+      success: false,
+      configured: false,
+      provider: 'aligo',
+      userId: cfg.userId,
+      publicIp,
+      message: '알리고 API Key가 아직 설정되지 않았습니다. [알리고 설정] 버튼을 눌러 연동키를 저장해 주세요.'
+    };
+  }
+
+  try {
+    const res = await callAligoApi('apis.aligo.in', '/remain/', {
+      key: cfg.apiKey,
+      user_id: cfg.userId,
+      userid: cfg.userId
+    }, 8000);
+
+    const json = res.data;
+    const publicIp = await getPublicIp();
+
+    if (json && (json.result_code == 1 || Number(json.result_code) > 0)) {
+      return {
+        success: true,
+        configured: true,
+        provider: 'aligo',
+        balance: Number(json.POINT || 0),
+        smsCnt: Number(json.SMS_CNT || 0),
+        lmsCnt: Number(json.LMS_CNT || 0),
+        mmsCnt: Number(json.MMS_CNT || 0),
+        userId: cfg.userId,
+        sender: cfg.sender,
+        publicIp,
+        message: `알리고 연결 성공 (SMS: ${json.SMS_CNT}건 / LMS: ${json.LMS_CNT}건 / 포인트: ${Number(json.POINT || 0).toLocaleString()} P)`
+      };
+    } else {
+      const errMsg = getAligoErrorMessage(json?.result_code, json?.message, publicIp);
+      return {
+        success: false,
+        configured: true,
+        provider: 'aligo',
+        code: json?.result_code,
+        rawMessage: json?.message,
+        publicIp,
+        message: `알리고 인증/조회 실패: ${errMsg}`
+      };
+    }
+  } catch (err) {
+    const publicIp = await getPublicIp();
+    return {
+      success: false,
+      configured: true,
+      provider: 'aligo',
+      publicIp,
+      message: err.message
+    };
+  }
+}
+
+/**
+ * 1. 알리고(Aligo)를 통한 실제 SMS / LMS 발송
+ */
+async function sendViaAligo({
+  toPhone,
+  toName = '',
+  message,
+  senderNumber = '16007835',
+  subject = '',
+  testMode = 'REAL_TEST',
+  apiKey = '',
+  userId = ''
+}) {
+  const cfg = getAligoConfig();
+  const effectiveKey = apiKey || cfg.apiKey;
+  const effectiveUserId = userId || cfg.userId;
+
+  let rawSender = senderNumber;
+  if (!rawSender || (rawSender.replace(/[^0-9]/g, '') === '16007835' && cfg.sender && cfg.sender.replace(/[^0-9]/g, '') !== '16007835')) {
+    rawSender = cfg.sender || '16007835';
+  }
+  const effectiveSender = String(rawSender).replace(/[^0-9]/g, '');
+  const cleanTo = String(toPhone || '').replace(/[^0-9]/g, '');
+
+  if (!effectiveKey || !effectiveUserId) {
+    throw new Error('알리고(Aligo) API Key 또는 회원 아이디가 설정되지 않았습니다. [알리고 설정]에서 인증키를 입력해주세요.');
+  }
+
+  if (!cleanTo || cleanTo.length < 10) {
+    throw new Error(`유효하지 않은 수신 전화번호입니다: ${toPhone}`);
+  }
+
+  const byteLen = getKoreanByteLength(message);
+  const isLMS = byteLen > 90;
+  const effectiveSubject = subject || (isLMS ? '[리본케어] 모바일 간병일지 안내' : '');
+
+  const params = {
+    key: effectiveKey,
+    user_id: effectiveUserId,
+    sender: effectiveSender,
+    receiver: cleanTo,
+    msg: message,
+    title: effectiveSubject,
+    msg_type: isLMS ? 'LMS' : 'SMS',
+    testmode_yn: testMode === 'SIMULATION' ? 'Y' : 'N'
+  };
+
+  if (toName) {
+    params.destination = `${cleanTo}|${toName}`;
+  }
+
+  const res = await callAligoApi('apis.aligo.in', '/send/', params);
+  const json = res.data;
+
+  if (!json) {
+    throw new Error(`알리고 응답 파싱 실패 (HTTP ${res.status}): ${res.raw}`);
+  }
+
+  const resultCode = Number(json.result_code);
+  if (resultCode === 1 || resultCode > 0) {
+    const msgId = String(json.msg_id || 'ALIGO-' + Date.now());
+    const finalSendType = json.msg_type || (isLMS ? 'LMS' : 'SMS');
+    return {
+      success: true,
+      provider: 'aligo',
+      sendType: finalSendType,
+      byteLength: byteLen,
+      receiptNum: msgId,
+      toPhone: cleanTo,
+      fromPhone: effectiveSender,
+      message: `알리고 ${finalSendType} 발송 접수 완료 (접수번호: ${msgId})`
+    };
+  } else {
+    const errMsg = getAligoErrorMessage(json.result_code, json.message, '', effectiveSender);
+    throw new Error(`알리고 발송 거절: ${errMsg} (코드: ${json.result_code})`);
+  }
+}
+
+/**
+ * 알리고 카카오 알림톡 발송 (미승인 시 SMS/LMS 자동 대체 전송)
+ */
+async function sendViaAligoKakao({
+  toPhone,
+  toName = '',
+  patientName = '',
+  message,
+  buttonUrl = '',
+  buttonTitle = '모바일 간병일지 & 설문 열람하기',
+  templateCode = '',
+  senderNumber = '16007835',
+  senderKey = '',
+  subject = '',
+  fallbackToSms = true
+}) {
+  const cfg = getAligoConfig();
+  const effectiveSenderKey = senderKey || cfg.senderKey;
+  const cleanTo = String(toPhone || '').replace(/[^0-9]/g, '');
+  const cleanFrom = String(senderNumber || cfg.sender || '16007835').replace(/[^0-9]/g, '');
+  const effectiveSubject = subject || `[리본케어] ${patientName || toName} 님 간병일지 안내`;
+
+  if (cfg.apiKey && cfg.userId && effectiveSenderKey && templateCode) {
+    try {
+      const buttonData = buttonUrl ? JSON.stringify({
+        button: [
+          {
+            name: buttonTitle,
+            linkType: 'WL',
+            linkTypeName: '웹링크',
+            linkMo: buttonUrl,
+            linkPc: buttonUrl
+          }
+        ]
+      }) : '';
+
+      const kakaoParams = {
+        apikey: cfg.apiKey,
+        userid: cfg.userId,
+        senderkey: effectiveSenderKey,
+        tpl_code: templateCode,
+        sender: cleanFrom,
+        receiver_1: cleanTo,
+        subject_1: effectiveSubject,
+        message_1: message,
+        button_1: buttonData,
+        failover: fallbackToSms ? 'Y' : 'N',
+        fsubject_1: effectiveSubject,
+        fmessage_1: message + (buttonUrl ? `\n\n▶ 열람 링크: ${buttonUrl}` : '')
+      };
+
+      const res = await callAligoApi('kakaoapi.aligo.in', '/akv10/alimtalk/send/', kakaoParams);
+      const json = res.data;
+      if (json && (json.code == 0 || json.result_code == 1)) {
+        return {
+          success: true,
+          provider: 'aligo',
+          sendType: 'KAKAO_ALIMTALK',
+          receiptNum: String(json.info?.mid || json.msg_id || 'ALIGO-AT-' + Date.now()),
+          toPhone: cleanTo,
+          fromPhone: cleanFrom,
+          buttonUrl,
+          message: '알리고 카카오 알림톡 정상 접수 완료'
+        };
+      }
+    } catch (kErr) {
+      console.warn('[Aligo Kakao Attempt Error]', kErr.message);
+    }
+  }
+
+  // 알림톡 템플릿 미등록/미승인 시 안전하게 알리고 실통신망 문자(LMS/SMS)로 자동 Fallback
+  if (fallbackToSms) {
+    console.log('[Aligo Kakao Fallback to Aligo SMS/LMS Activated]');
+    const fallbackMessage = message + (buttonUrl ? `\n\n▶ 간병일지 & 설문 바로보기:\n${buttonUrl}` : '');
+    const smsRes = await sendViaAligo({
+      toPhone: cleanTo,
+      toName,
+      message: fallbackMessage,
+      senderNumber: cleanFrom,
+      subject: effectiveSubject
+    });
+    return {
+      ...smsRes,
+      fallbackUsed: true,
+      sendType: `FALLBACK_${smsRes.sendType}`,
+      notice: '카카오 채널 승인 전이므로 알리고 공식 안심 문자(LMS/SMS)로 안전하게 즉시 대체 발송되었습니다.'
+    };
+  }
+
+  throw new Error('알리고 카카오 알림톡 발송에 실패했습니다.');
 }
 
 /**
@@ -519,56 +884,101 @@ async function dispatchSms({
   toName = '',
   message,
   senderNumber = '16007835',
-  provider = 'barobill', // 'barobill' | 'twilio' | 'auto'
+  provider = 'aligo',    // 'aligo' (기본 추천) | 'barobill' | 'twilio' | 'auto'
   channel = 'sms',       // 'sms' | 'kakao'
   buttonUrl = '',
   buttonTitle = '모바일 간병일지 열람하기',
   templateName = '',
   subject = '',
   patientName = '',
-  category = 'CARE_DIARY_MOBILE'
+  category = 'CARE_DIARY_MOBILE',
+  testMode = 'REAL_TEST'
 }) {
   let result = null;
   let lastError = null;
 
+  const targetProvider = (provider || 'aligo').toLowerCase();
+
   // 1. 카카오톡 알림톡 채널 발송
   if (channel === 'kakao') {
-    try {
-      result = await sendViaBarobillKakao({
-        toPhone,
-        toName,
-        patientName,
-        message,
-        buttonUrl,
-        buttonTitle,
-        templateName,
-        senderNumber,
-        fallbackToSms: true // 실패 시 바로빌 SMS로 자동 안심 대체 전송
-      });
-    } catch (kErr) {
-      lastError = kErr;
-      console.warn('[Kakao Dispatch Error]', kErr.message);
+    if (targetProvider === 'aligo' || targetProvider === 'auto') {
+      try {
+        result = await sendViaAligoKakao({
+          toPhone,
+          toName,
+          patientName,
+          message,
+          buttonUrl,
+          buttonTitle,
+          templateCode: templateName,
+          senderNumber,
+          subject,
+          fallbackToSms: true // 알림톡 실패 시 알리고 LMS/SMS로 자동 대체 전송
+        });
+      } catch (kErr) {
+        lastError = kErr;
+        console.warn('[Aligo Kakao Dispatch Error]', kErr.message);
+      }
+    }
+
+    if (!result && (targetProvider === 'barobill' || (targetProvider === 'auto' && !result))) {
+      try {
+        result = await sendViaBarobillKakao({
+          toPhone,
+          toName,
+          patientName,
+          message,
+          buttonUrl,
+          buttonTitle,
+          templateName,
+          senderNumber,
+          fallbackToSms: true // 실패 시 바로빌 SMS로 자동 안심 대체 전송
+        });
+      } catch (bErr) {
+        lastError = bErr;
+        console.warn('[Barobill Kakao Dispatch Error]', bErr.message);
+      }
     }
   }
 
-  // 2. 일반 문자 발송 (SMS/LMS) 또는 카카오 미사용 시
+  // 2. 일반 문자 발송 (SMS/LMS) 또는 카카오 미사용/대체 시
   if (!result && channel !== 'kakao') {
-    if (provider === 'barobill' || provider === 'auto') {
+    // A. 알리고 (Aligo) 우선 발송
+    if (targetProvider === 'aligo' || targetProvider === 'auto') {
+      try {
+        result = await sendViaAligo({
+          toPhone,
+          toName,
+          message,
+          senderNumber,
+          subject,
+          testMode
+        });
+      } catch (err) {
+        lastError = err;
+        console.warn('[SMS Dispatch Aligo Warn]', err.message);
+
+        // Auto 모드인 경우 Barobill -> Twilio 순차 Fallback
+        if (targetProvider === 'auto') {
+          try {
+            result = await sendViaBarobill({ toPhone, toName, message, senderNumber, subject });
+          } catch (baroErr) {
+            lastError = baroErr;
+            try {
+              result = await sendViaTwilio({ toPhone, message });
+            } catch (twErr) {
+              lastError = twErr;
+            }
+          }
+        }
+      }
+    } else if (targetProvider === 'barobill') {
       try {
         result = await sendViaBarobill({ toPhone, toName, message, senderNumber, subject });
       } catch (err) {
         lastError = err;
-        console.warn('[SMS Dispatch Barobill Warn]', err.message);
-        // Auto 모드이고 Barobill 실패 시 Twilio로 2차 시도
-        if (provider === 'auto') {
-          try {
-            result = await sendViaTwilio({ toPhone, message });
-          } catch (twErr) {
-            lastError = twErr;
-          }
-        }
       }
-    } else if (provider === 'twilio') {
+    } else if (targetProvider === 'twilio') {
       try {
         result = await sendViaTwilio({ toPhone, message });
       } catch (err) {
@@ -585,7 +995,7 @@ async function dispatchSms({
       toName,
       patientName,
       senderNumber,
-      provider,
+      provider: targetProvider,
       category,
       message,
       buttonUrl,
@@ -617,6 +1027,13 @@ async function dispatchSms({
 }
 
 module.exports = {
+  getAligoConfig,
+  saveAligoConfig,
+  getAligoBalance,
+  sendViaAligo,
+  sendViaAligoKakao,
+  getPublicIp,
+  getAligoErrorMessage,
   getBarobillConfig,
   getTwilioConfig,
   getKoreanByteLength,

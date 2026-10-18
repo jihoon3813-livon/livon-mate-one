@@ -16,13 +16,16 @@ const crypto = require('crypto');
 
 const DATA_FILE = path.join(__dirname, 'survey_data.json');
 
-// 기본 설정값 (기획서 02절, 08절 준수)
+// 기본 설정값 (기획서 02절, 08절 준수 + 고객 선물/쿠폰 정책)
 const DEFAULT_SETTINGS = {
   version: '1.0',
   dueDaysAfterEnd: 7, // 서비스 종료일 다음날부터 7일째 23:59:59
-  pointsGuide: 10,    // 안내 완료/유효 미참여 사유 기록 시 10점
-  pointsResponse: 5,  // 유효 고객 응답 제출 시 5점
-  pointsMonthBonus: 30, // 월간 대상 100% 처리 시 30점
+  pointsGuide: 10,    // (구) 안내 완료/유효 미참여 사유 기록 시 10점
+  pointsResponse: 5,  // (구) 유효 고객 응답 제출 시 5점
+  pointsMonthBonus: 30, // (구) 월간 대상 100% 처리 시 30점
+  defaultGiftItem: '스타벅스 아메리카노 (Tall)',
+  defaultGiftMethod: '모바일 기프티콘 (MMS 문자발송)',
+  giftPolicyNotice: '만족도 설문 응답 완료 시 입력하신 환자/보호자 연락처로 감사 선물(모바일 커피쿠폰)을 발송해 드립니다.',
   csPhone: '1544-7119', // 리본케어 고객센터
   csOperatingHours: '평일 09:00 ~ 18:00 (점심시간 12:00~13:00, 주말/공휴일 제외)',
   privacyNotice: '본 설문은 리본케어 간병 서비스 품질 향상을 위해 실시되며, 개별 답변과 평가 점수는 담당 간병인에게 일절 공개되지 않습니다.',
@@ -120,13 +123,32 @@ class SurveyService {
       if (fs.existsSync(DATA_FILE)) {
         const raw = fs.readFileSync(DATA_FILE, 'utf8');
         const parsed = JSON.parse(raw);
+        const responses = Array.isArray(parsed.responses) ? parsed.responses : [];
+        const targets = (Array.isArray(parsed.targets) ? parsed.targets : []).map(t => {
+          if (!t) return t;
+          const rDoc = responses.find(r => r.targetId === t.id || (t.serviceId && r.serviceId === t.serviceId));
+          if (rDoc) {
+            if (!t.couponPhone) t.couponPhone = rDoc.couponPhone || rDoc.callbackPhone || (rDoc.answers && (rDoc.answers.couponPhone || rDoc.answers.callbackPhone)) || '';
+            if (!t.respondentType) t.respondentType = rDoc.respondentType || 'PATIENT';
+            if (t.q2Score === undefined) t.q2Score = rDoc.q2;
+            if (t.q3Score === undefined) t.q3Score = rDoc.q3;
+            if (t.q4Score === undefined) t.q4Score = rDoc.q4;
+            if (!t.surveyComment) t.surveyComment = rDoc.comment || '';
+            if (t.callbackRequested === undefined) t.callbackRequested = Boolean(rDoc.callbackRequested);
+            if (!t.submittedAt) t.submittedAt = rDoc.submittedAt || '';
+          }
+          if (!t.giftStatus) {
+            t.giftStatus = (t.responseStatus === 'SUBMITTED') ? 'PENDING' : 'NONE';
+          }
+          return t;
+        });
         this.data = {
           settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
           schema: Array.isArray(parsed.schema) && parsed.schema.length > 0 
             ? parsed.schema 
             : JSON.parse(JSON.stringify(SURVEY_SCHEMA_V1)),
-          targets: Array.isArray(parsed.targets) ? parsed.targets : [],
-          responses: Array.isArray(parsed.responses) ? parsed.responses : [],
+          targets,
+          responses,
           followups: Array.isArray(parsed.followups) ? parsed.followups : [],
           rewards: Array.isArray(parsed.rewards) ? parsed.rewards : [],
           auditLogs: Array.isArray(parsed.auditLogs) ? parsed.auditLogs : []
@@ -252,12 +274,20 @@ class SurveyService {
       caregiverPhone: app.caregiverPhone || '',
       insuranceCompany: app.insuranceCompany || '',
       dueAt: dueAt,
-      // 5대 독립 상태 축
+      // 5대 독립 상태 축 + 고객 선물(쿠폰) 발송 관리
       targetStatus: 'ACTIVE',       // ACTIVE, EXCLUDED, CANCELLED
       guidanceStatus: 'NOT_STARTED', // NOT_STARTED, GUIDED, DECLINED, UNAVAILABLE
       responseStatus: 'NOT_STARTED', // NOT_STARTED, IN_PROGRESS, SUBMITTED, EXPIRED, VOID
       followupStatus: 'NONE',        // NONE, NEW, CONTACTING, ACTION, CLOSED
       rewardStatus: 'NONE',          // NONE, PENDING, APPROVED, REJECTED, REVERSED
+      couponPhone: '',               // 설문 마지막 단계에서 입력한 쿠폰 수신 연락처
+      giftStatus: 'NONE',            // NONE(설문대기), PENDING(미발송/발송대기), SENT(발송완료), EXCLUDED(발송제외)
+      giftItem: '',                  // 어떤 선물 (예: 스타벅스 아메리카노 Tall)
+      giftSentAt: '',                // 언제 발송 (예: 2026-04-16 14:30)
+      giftMethod: '',                // 어떻게 발송 (예: 모바일 기프티콘 MMS, 카카오톡 선물하기 등)
+      giftSender: '',                // 발송 담당자
+      giftMemo: '',                  // 쿠폰번호 / 발송 메모
+      giftHistory: [],               // 선물 발송 이력 배열
       token: token,                  // 모바일 링크 배포용 원문
       tokenHash: tokenHash,          // 서버 저장 검증용
       guidanceRecord: null,
@@ -298,6 +328,10 @@ class SurveyService {
       ? (validScores.reduce((a, b) => a + b, 0) / validScores.length).toFixed(1) 
       : '0.0';
 
+    // 고객 선물(쿠폰) 발송 현황 집계
+    const giftSentCount = targets.filter(t => t.giftStatus === 'SENT').length;
+    const giftPendingCount = targets.filter(t => t.responseStatus === 'SUBMITTED' && t.giftStatus !== 'SENT' && t.giftStatus !== 'EXCLUDED').length;
+
     return {
       totalTargets,
       submittedCount,
@@ -307,8 +341,14 @@ class SurveyService {
       guidanceRate,
       avgScore,
       responseCount: validScores.length,
-      pendingRewardPoints: this.data.rewards.filter(r => r.state === 'PENDING').reduce((acc, r) => acc + (r.points || 0), 0)
+      pendingRewardPoints: this.data.rewards.filter(r => r.state === 'PENDING').reduce((acc, r) => acc + (r.points || 0), 0),
+      giftSentCount,
+      giftPendingCount
     };
+  }
+
+  getResponses() {
+    return (this.data.responses || []).slice();
   }
 
   getTargets(filter = {}) {
@@ -335,7 +375,8 @@ class SurveyService {
         (t.serviceId && t.serviceId.toLowerCase().includes(q)) ||
         (t.caregiverName && t.caregiverName.toLowerCase().includes(q)) ||
         (t.hospitalName && t.hospitalName.toLowerCase().includes(q)) ||
-        (t.patientPhone && t.patientPhone.replace(/[^0-9]/g, '').includes(q.replace(/[^0-9]/g, '')))
+        (t.patientPhone && t.patientPhone.replace(/[^0-9]/g, '').includes(q.replace(/[^0-9]/g, ''))) ||
+        (t.couponPhone && t.couponPhone.replace(/[^0-9]/g, '').includes(q.replace(/[^0-9]/g, '')))
       );
     }
 
@@ -356,14 +397,16 @@ class SurveyService {
   }
 
   updateTarget(id, updates = {}, actor = 'ADMIN') {
-    const target = this.data.targets.find(t => t.id === id);
+    const target = this.data.targets.find(t => t.id === id || t.serviceId === id);
     if (!target) return { success: false, message: '대상을 찾을 수 없습니다.' };
 
     const before = { ...target };
     const editableFields = [
-      'patientName', 'patientPhone', 'hospitalName', 'caregiverName', 
+      'serviceId', 'patientName', 'patientPhone', 'hospitalName', 'caregiverName', 
       'caregiverPhone', 'careStartDate', 'careEndDate', 'dueAt', 
-      'targetStatus', 'guidanceStatus', 'responseStatus'
+      'targetStatus', 'guidanceStatus', 'responseStatus',
+      'couponPhone', 'giftStatus', 'giftItem', 'giftSentAt', 'giftMethod', 'giftSender', 'giftMemo', 'giftHistory',
+      'respondentType', 'q2Score', 'q3Score', 'q3Unknown', 'q4Score', 'q4Unknown', 'surveyComment', 'callbackRequested', 'submittedAt'
     ];
     editableFields.forEach(f => {
       if (updates[f] !== undefined) target[f] = updates[f];
@@ -373,6 +416,55 @@ class SurveyService {
     target.updatedAt = new Date().toISOString();
 
     this.recordAudit(actor, 'UPDATE_TARGET', 'surveyTargets', target.id, { before, after: target }, updates.reason || '관리자 수정');
+    this.saveData();
+    return { success: true, target };
+  }
+
+  updateGiftDispatch(id, giftData = {}, actor = 'ADMIN') {
+    const target = this.data.targets.find(t => t.id === id || t.serviceId === id);
+    if (!target) return { success: false, message: '설문 대상을 찾을 수 없습니다.' };
+
+    const before = {
+      couponPhone: target.couponPhone,
+      giftStatus: target.giftStatus,
+      giftItem: target.giftItem,
+      giftSentAt: target.giftSentAt,
+      giftMethod: target.giftMethod,
+      giftSender: target.giftSender,
+      giftMemo: target.giftMemo
+    };
+
+    if (giftData.couponPhone !== undefined) target.couponPhone = String(giftData.couponPhone).trim();
+    if (giftData.giftStatus !== undefined) target.giftStatus = giftData.giftStatus; // SENT, PENDING, EXCLUDED, NONE
+    if (giftData.giftItem !== undefined) target.giftItem = String(giftData.giftItem).trim();
+    if (giftData.giftSentAt !== undefined) target.giftSentAt = String(giftData.giftSentAt).trim();
+    if (giftData.giftMethod !== undefined) target.giftMethod = String(giftData.giftMethod).trim();
+    if (giftData.giftSender !== undefined) target.giftSender = String(giftData.giftSender).trim();
+    if (giftData.giftMemo !== undefined) target.giftMemo = String(giftData.giftMemo).trim();
+
+    if (target.giftStatus === 'SENT' && !target.giftSentAt) {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      target.giftSentAt = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    }
+
+    if (!Array.isArray(target.giftHistory)) target.giftHistory = [];
+    target.giftHistory.unshift({
+      id: 'GH-' + Date.now().toString().slice(-6),
+      status: target.giftStatus,
+      giftItem: target.giftItem || '',
+      giftSentAt: target.giftSentAt || '',
+      giftMethod: target.giftMethod || '',
+      couponPhone: target.couponPhone || target.patientPhone || '',
+      sender: target.giftSender || actor,
+      memo: target.giftMemo || '',
+      loggedAt: new Date().toISOString()
+    });
+
+    target.revision = (target.revision || 1) + 1;
+    target.updatedAt = new Date().toISOString();
+
+    this.recordAudit(actor, 'UPDATE_GIFT_DISPATCH', 'surveyTargets', target.id, { before, after: giftData }, '고객 선물 발송 상태 관리');
     this.saveData();
     return { success: true, target };
   }
@@ -440,21 +532,34 @@ class SurveyService {
     const target = this.data.targets.find(t => t.id === targetId || t.serviceId === targetId);
     if (!target) return { success: false, message: '설문 대상을 찾을 수 없습니다.' };
 
-    const recipientPhone = options.phone || target.patientPhone;
+    const recipientPhone = options.phone || target.couponPhone || target.patientPhone;
     if (!recipientPhone) {
       return { success: false, message: '환자 연락처가 등록되어 있지 않습니다.' };
     }
 
     const host = options.baseUrl || 'https://admin.livon.care';
-    const surveyUrl = `${host}/survey.html?token=${target.token}`;
+    const isNewSurvey = Boolean(options.isNewSurvey);
+    const shortCode = (target.token || '').slice(0, 8) || (target.id || '').replace(/^ST-/, '');
+    const surveyUrl = options.surveyUrl || (
+      isNewSurvey
+        ? `${host}/s/${encodeURIComponent(shortCode)}`
+        : `${host}/survey.html?token=${target.token}`
+    );
 
-    const message = options.customMessage || 
-      `[리본케어] 고객만족도 조사 안내\n` +
-      `${target.patientName} 고객님, 리본케어 간병 서비스는 만족스러우셨나요?\n` +
-      `담당 간병인(${target.caregiverName || '배정 간병인'}) 서비스 품질 향상을 위해 소중한 의견을 들려주세요.\n` +
-      `별도의 본인인증 절차 없이 아래 링크를 누르면 곧바로 설문 참여가 가능합니다.\n\n` +
-      `▶ 설문 참여 링크:\n${surveyUrl}\n\n` +
-      `※ 문의전화: ${this.data.settings.csPhone || '1544-7119'}`;
+    const subject = options.subject || (isNewSurvey ? '[리본케어] 모바일 간병일지 & 만족도 설문 안내' : '[리본케어] 고객만족도 조사 안내');
+    const message = options.customMessage || (
+      isNewSurvey
+        ? `[리본케어] ${target.patientName} 님의 모바일 안심 간병일지 & 케어 만족도 설문이 도착했습니다.\n\n` +
+          `담당 간병인(${target.caregiverName || '배정 간병인'})의 일자별 상세 간병 기록을 확인하시고, 하단 1분 만족도 조사에 참여해 주시면 환자·보호자님께 감사 선물(${this.data.settings.defaultGiftItem || '스타벅스 아메리카노 모바일 쿠폰'})을 보내드립니다.\n\n` +
+          `▶ 모바일 간병일지 & 만족도 설문 열람:\n${surveyUrl}\n\n` +
+          `※ 문의: 리본케어 고객센터 (${this.data.settings.csPhone || '1544-7119'})`
+        : `[리본케어] 고객만족도 조사 안내\n` +
+          `${target.patientName} 고객님, 리본케어 간병 서비스는 만족스러우셨나요?\n` +
+          `담당 간병인(${target.caregiverName || '배정 간병인'}) 서비스 품질 향상을 위해 소중한 의견을 들려주세요.\n` +
+          `별도의 본인인증 절차 없이 아래 링크를 누르면 곧바로 설문 참여가 가능합니다.\n\n` +
+          `▶ 설문 참여 링크:\n${surveyUrl}\n\n` +
+          `※ 문의전화: ${this.data.settings.csPhone || '1544-7119'}`
+    );
 
     if (!Array.isArray(target.smsSentHistory)) {
       target.smsSentHistory = [];
@@ -463,9 +568,13 @@ class SurveyService {
     const smsRecord = {
       id: 'SMS-' + Date.now().toString().slice(-6),
       recipient: recipientPhone,
+      senderNumber: options.senderNumber || '16007835',
       senderType: actor, // 'HQ' (본사 메이트원) or 'CAREGIVER' (리본메이트 간병인 앱)
+      subject: subject,
       message: message,
       surveyUrl: surveyUrl,
+      receiptNum: options.receiptNum || '',
+      provider: options.provider || '',
       status: 'SENT',
       sentAt: new Date().toISOString()
     };
@@ -484,28 +593,30 @@ class SurveyService {
         occurredAt: smsRecord.sentAt
       };
       
-      // 간병인 안내 달란트 보상 대기 생성
-      const existingReward = this.data.rewards.find(r => r.targetId === target.id && r.ruleCode === 'GUIDE');
-      if (!existingReward && target.caregiverName) {
-        const rewardId = 'RW-' + Date.now().toString().slice(-6) + '-' + Math.floor(100 + Math.random() * 900);
-        const points = this.data.settings.pointsGuide || 10;
-        this.data.rewards.unshift({
-          id: rewardId,
-          targetId: target.id,
-          serviceId: target.serviceId,
-          caregiverName: target.caregiverName,
-          caregiverPhone: target.caregiverPhone,
-          ruleCode: 'GUIDE',
-          points: points,
-          state: 'PENDING',
-          reason: '고객 설문 링크 문자 안내 완료',
-          createdAt: new Date().toISOString()
-        });
-        target.rewardStatus = 'PENDING';
+      // 구버전 만족도조사 관리에서만 간병인 안내 달란트 보상 대기 생성 (new 탭에서는 환자/보호자 선물만 지급)
+      if (!isNewSurvey && !options.skipReward) {
+        const existingReward = this.data.rewards.find(r => r.targetId === target.id && r.ruleCode === 'GUIDE');
+        if (!existingReward && target.caregiverName) {
+          const rewardId = 'RW-' + Date.now().toString().slice(-6) + '-' + Math.floor(100 + Math.random() * 900);
+          const points = this.data.settings.pointsGuide || 10;
+          this.data.rewards.unshift({
+            id: rewardId,
+            targetId: target.id,
+            serviceId: target.serviceId,
+            caregiverName: target.caregiverName,
+            caregiverPhone: target.caregiverPhone,
+            ruleCode: 'GUIDE',
+            points: points,
+            state: 'PENDING',
+            reason: '고객 설문 링크 문자 안내 완료',
+            createdAt: new Date().toISOString()
+          });
+          target.rewardStatus = 'PENDING';
+        }
       }
     }
 
-    this.recordAudit(actor, 'SEND_SMS', 'surveyTargets', target.id, { recipientPhone, message }, '설문 문자 발송');
+    this.recordAudit(actor, 'SEND_SMS', 'surveyTargets', target.id, { recipientPhone, subject, message }, '설문 문자 발송');
     this.saveData();
 
     return {
@@ -565,19 +676,48 @@ class SurveyService {
   }
 
   // =========================================================================
-  // 3. 고객 공개 설문 양식 조회 및 응답 제출 API (P01 ~ P03)
+  // 3. 고객 공개 설문 양식 조회 및 응답 제출 API (P01 ~ P03, 단축코드 /s/:code 호환)
   // =========================================================================
+  findTargetByTokenOrShortCode(code) {
+    if (!code) return null;
+    const raw = String(code).trim();
+    const hash = this.hashToken(raw);
+    return this.data.targets.find(t =>
+      t.tokenHash === hash ||
+      t.token === raw ||
+      t.id === raw ||
+      t.serviceId === raw ||
+      (raw.length >= 6 && t.token && t.token.startsWith(raw)) ||
+      (raw.length >= 6 && t.id && t.id.replace(/^ST-/, '') === raw)
+    ) || null;
+  }
+
   getFormByToken(token) {
     if (!token) return { valid: false, message: '유효한 링크가 아닙니다.' };
-    const hash = this.hashToken(token);
-    const target = this.data.targets.find(t => t.tokenHash === hash || t.token === token);
+    const target = this.findTargetByTokenOrShortCode(token);
     
     if (!target) return { valid: false, message: '설문 연결을 확인할 수 없습니다. 관리자에게 문의해 주세요.' };
     if (target.targetStatus === 'EXCLUDED' || target.targetStatus === 'CANCELLED') {
       return { valid: false, message: '본 설문 조사는 취소되었거나 제외 처리되었습니다.' };
     }
     if (target.responseStatus === 'SUBMITTED') {
-      return { valid: false, message: '이미 응답이 완료된 설문입니다. 참여해 주셔서 감사합니다.', submitted: true };
+      return {
+        valid: false,
+        message: '이미 응답이 완료된 설문입니다. 참여해 주셔서 감사합니다.',
+        submitted: true,
+        serviceInfo: {
+          id: target.id,
+          serviceId: target.serviceId,
+          token: target.token,
+          patientName: target.patientName,
+          patientPhone: target.patientPhone,
+          couponPhone: target.couponPhone,
+          caregiverName: target.caregiverName,
+          careStartDate: target.careStartDate,
+          careEndDate: target.careEndDate,
+          hospitalName: target.hospitalName
+        }
+      };
     }
     if (target.dueAt && new Date(target.dueAt).getTime() < Date.now()) {
       return { valid: false, message: '설문 참여 기간이 종료되었습니다.' };
@@ -587,7 +727,12 @@ class SurveyService {
     return {
       valid: true,
       serviceInfo: {
+        id: target.id,
+        serviceId: target.serviceId,
+        token: target.token,
         patientName: target.patientName,
+        patientPhone: target.patientPhone,
+        couponPhone: target.couponPhone,
         caregiverName: target.caregiverName,
         careStartDate: target.careStartDate,
         careEndDate: target.careEndDate,
@@ -601,8 +746,7 @@ class SurveyService {
   }
 
   submitResponse(token, answers = {}, clientInfo = {}) {
-    const hash = this.hashToken(token);
-    const target = this.data.targets.find(t => t.tokenHash === hash || t.token === token);
+    const target = this.findTargetByTokenOrShortCode(token);
 
     if (!target) return { success: false, code: 'NOT_FOUND', message: '설문 대상을 찾을 수 없습니다.' };
     if (target.responseStatus === 'SUBMITTED') {
@@ -620,6 +764,7 @@ class SurveyService {
     const q4 = answers.q4Unknown ? null : Number(answers.q4 || null);
     const q6Callback = Boolean(answers.q6);
     const comment = String(answers.q5 || '').slice(0, 1000);
+    const couponPhone = String(answers.couponPhone || answers.callbackPhone || target.couponPhone || target.patientPhone || '').trim();
 
     const responseId = 'SR-' + Date.now().toString().slice(-6) + '-' + Math.floor(100 + Math.random() * 900);
     const responseDoc = {
@@ -636,7 +781,8 @@ class SurveyService {
       q4Unknown: Boolean(answers.q4Unknown),
       comment: comment,
       callbackRequested: q6Callback,
-      callbackPhone: (answers.callbackPhone || target.patientPhone || '').trim(),
+      callbackPhone: couponPhone,
+      couponPhone: couponPhone,
       channel: clientInfo.channel || 'QR',
       answers: answers,
       submittedAt: new Date().toISOString()
@@ -645,6 +791,19 @@ class SurveyService {
     this.data.responses.unshift(responseDoc);
     target.responseStatus = 'SUBMITTED';
     target.responseId = responseId;
+    target.couponPhone = couponPhone;
+    target.respondentType = answers.q1;
+    target.q2Score = Number(answers.q2);
+    target.q3Score = q3;
+    target.q3Unknown = Boolean(answers.q3Unknown);
+    target.q4Score = q4;
+    target.q4Unknown = Boolean(answers.q4Unknown);
+    target.surveyComment = comment;
+    target.callbackRequested = q6Callback;
+    target.submittedAt = responseDoc.submittedAt;
+    if (!target.giftStatus || target.giftStatus === 'NONE') {
+      target.giftStatus = 'PENDING';
+    }
     target.revision = (target.revision || 1) + 1;
 
     // 1) 후속 조치 자동 티켓 발행 (1~2점 낮은 평가 또는 연락 요청 발생 시)
@@ -679,33 +838,36 @@ class SurveyService {
       target.followupStatus = 'NEW';
     }
 
-    // 2) 달란트 보상 원장: 유효 고객 응답 보너스 (RESPONSE: 5점)
-    const existingRespReward = this.data.rewards.find(r => r.targetId === target.id && r.ruleCode === 'RESPONSE');
-    if (!existingRespReward) {
-      const rewardId = 'RW-' + Date.now().toString().slice(-6) + '-' + Math.floor(100 + Math.random() * 900);
-      const points = this.data.settings.pointsResponse || 5;
-      this.data.rewards.unshift({
-        id: rewardId,
-        targetId: target.id,
-        serviceId: target.serviceId,
-        caregiverName: target.caregiverName,
-        caregiverPhone: target.caregiverPhone,
-        ruleCode: 'RESPONSE',
-        points: points,
-        state: 'PENDING',
-        reason: '고객 응답 완료 보너스',
-        createdAt: new Date().toISOString()
-      });
-      if (target.rewardStatus === 'NONE') target.rewardStatus = 'PENDING';
+    // 2) 달란트 보상 원장: 유효 고객 응답 보너스 (만족도조사 관리(new) 통합 설문 채널에서는 간병인 달란트를 지급하지 않고 환자/보호자 선물로 관리)
+    if (clientInfo.channel !== 'MOBILE_DIARY_INTEGRATED') {
+      const existingRespReward = this.data.rewards.find(r => r.targetId === target.id && r.ruleCode === 'RESPONSE');
+      if (!existingRespReward) {
+        const rewardId = 'RW-' + Date.now().toString().slice(-6) + '-' + Math.floor(100 + Math.random() * 900);
+        const points = this.data.settings.pointsResponse || 5;
+        this.data.rewards.unshift({
+          id: rewardId,
+          targetId: target.id,
+          serviceId: target.serviceId,
+          caregiverName: target.caregiverName,
+          caregiverPhone: target.caregiverPhone,
+          ruleCode: 'RESPONSE',
+          points: points,
+          state: 'PENDING',
+          reason: '고객 응답 완료 보너스',
+          createdAt: new Date().toISOString()
+        });
+        if (target.rewardStatus === 'NONE') target.rewardStatus = 'PENDING';
+      }
     }
 
-    this.recordAudit('CUSTOMER', 'SUBMIT_SURVEY', 'surveyResponses', responseId, {}, '고객 설문 제출 완료');
+    this.recordAudit('CUSTOMER', 'SUBMIT_SURVEY', 'surveyResponses', responseId, { couponPhone }, '고객 설문 제출 완료');
     this.saveData();
 
     return {
       success: true,
       status: 'SUBMITTED',
       receiptId: responseId,
+      couponPhone: couponPhone,
       message: '소중한 의견을 보내주셔서 감사합니다. 더 나은 간병 서비스를 위해 활용하겠습니다.'
     };
   }

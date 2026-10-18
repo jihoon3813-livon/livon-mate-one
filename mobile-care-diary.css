@@ -258,7 +258,9 @@ h3 {
   font-size: 12px;
   font-weight: 700;
   padding: 7px 11px;
-  min-height: 38px;
+  min-height: 36px;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.15s ease;
 }
 
@@ -269,6 +271,7 @@ h3 {
 .mobile-more-btn svg {
   width: 15px;
   height: 15px;
+  flex-shrink: 0;
 }
 
 .presentation {
@@ -276,17 +279,20 @@ h3 {
   border-radius: 20px;
   background: #fff;
   color: #6f5b70;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 5px;
   font-size: 12px;
-  padding: 8px 10px;
-  min-height: 38px;
+  padding: 7px 10px;
+  min-height: 36px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .presentation svg {
   width: 15px;
   height: 15px;
+  flex-shrink: 0;
 }
 
 .presentation[aria-pressed=true] {

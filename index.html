@@ -1011,6 +1011,15 @@
           <span class="h-5 px-2 rounded-md bg-amber-950 text-amber-300 font-bold text-[10px] flex items-center justify-center border border-amber-800" id="sidebarSurveyBadge">신설</span>
         </button>
 
+        <!-- 3-4. 만족도조사 관리(new) (모바일 간병일지 + 만족도 설문 + 커피쿠폰 통합) -->
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="surveymgmt_new" onclick="handleLeftMenuClick('surveymgmt_new')">
+          <div class="flex items-center space-x-3">
+            <i data-lucide="heart-handshake" class="w-4 h-4 flex-shrink-0 text-pink-400"></i>
+            <span class="tracking-tight font-semibold">만족도조사 관리(new)</span>
+          </div>
+          <span class="h-5 px-2 rounded-md bg-pink-950 text-pink-300 font-bold text-[10px] flex items-center justify-center border border-pink-800" id="sidebarSurveyNewBadge">일지+설문</span>
+        </button>
+
         <!-- 4. 파트너/인력 디렉토리 (간병인 · 간병센터 · 손사디렉토리 통합) -->
         <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="directory" onclick="handleLeftMenuClick('directory')">
           <div class="flex items-center space-x-3">
@@ -4765,20 +4774,20 @@
 
           <!-- 대상자 목록 테이블 -->
           <div class="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
-            <div class="overflow-x-auto custom-scrollbar">
+            <div class="overflow-x-auto overflow-y-auto custom-scrollbar max-h-[calc(100vh-280px)] min-h-[460px] relative">
               <table class="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold select-none">
-                    <th class="p-3 text-center w-12">#</th>
-                    <th class="p-3 whitespace-nowrap">신청ID</th>
-                    <th class="p-3 whitespace-nowrap">환자명</th>
-                    <th class="p-3 whitespace-nowrap">병원 / 서비스기간</th>
-                    <th class="p-3 whitespace-nowrap">담당간병인</th>
-                    <th class="p-3 text-center whitespace-nowrap">안내 상태</th>
-                    <th class="p-3 text-center whitespace-nowrap">응답 상태</th>
-                    <th class="p-3 text-center whitespace-nowrap">후속 조치</th>
-                    <th class="p-3 whitespace-nowrap">설문 마감일</th>
-                    <th class="p-3 text-center whitespace-nowrap">관리 액션</th>
+                <thead class="sticky top-0 z-20 shadow-xs">
+                  <tr class="bg-slate-50 border-b border-slate-200 text-slate-800 font-extrabold select-none">
+                    <th class="p-3 text-center w-12 sticky top-0 bg-slate-50 border-b border-slate-200 z-20">#</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">신청ID</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">환자명</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">병원 / 서비스기간</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">담당간병인</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">안내 상태</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">응답 상태</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">후속 조치</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">설문 마감일</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">관리 액션</th>
                   </tr>
                 </thead>
                 <tbody id="surveyTargetsTableBody" class="divide-y divide-slate-100 bg-white">
@@ -4974,6 +4983,717 @@
 
               <!-- 동적 설문 문항 목록 컨테이너 -->
               <div id="surveySchemaEditorContainer" class="space-y-3 max-h-[520px] overflow-y-auto custom-scrollbar pr-1">
+                <!-- 동적으로 JavaScript에서 렌더링 -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ==================== TAB 4-NEW: CUSTOMER SATISFACTION SURVEY MANAGEMENT (NEW - 모바일 간병일지 + 만족도 설문 통합) ==================== -->
+      <section id="tab-surveymgmt_new" class="tab-content hidden space-y-5">
+        
+        <!-- 상단 헤더 & 컨트롤 바 (리본케어 로즈·플럼 브랜드 아이덴티티) -->
+        <div class="rounded-3xl p-6 text-white shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative overflow-hidden" style="background: linear-gradient(135deg, #2b1838 0%, #4a1942 52%, #831843 100%);">
+          <div class="space-y-1.5 min-w-0 relative z-10">
+            <div class="flex items-center gap-2 text-xs font-bold tracking-wider flex-wrap">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-pink-500/25 text-pink-200 border border-pink-300/40 text-[11px] font-extrabold">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-pink-300"></i>
+                리본케어 브랜드 통합 CX (NEW)
+              </span>
+              <span class="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-200 border border-amber-300/40 text-[10.5px] font-bold">
+                ☕ 설문 완료 시 모바일 커피쿠폰 증정 안내
+              </span>
+              <span class="px-2.5 py-0.5 rounded-full bg-white/10 text-pink-100 border border-white/20 text-[10.5px] font-bold">
+                📖 간병일지(new) 모바일 리포트 + 만족도 설문 원스톱 결합
+              </span>
+            </div>
+            <h1 class="text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-2 flex-wrap">
+              <span>만족도조사 관리 (new)</span>
+              <span class="text-xs font-extrabold text-pink-200 bg-pink-500/30 border border-pink-400/40 px-2.5 py-0.5 rounded-lg">모바일 간병일지 × 만족도 설문 통합본</span>
+            </h1>
+            <p class="text-xs text-pink-100/85 leading-relaxed max-w-3xl">
+              환자·보호자에게 <b>신뢰감 있는 고급 표지 + 일자별 모바일 간병일지 + 리본케어 로즈·플럼 만족도 조사(커피쿠폰 증정)</b>를 하나로 묶어 발송함으로써, 일지를 열람하며 자연스럽게 설문 응답까지 완료하도록 유도합니다.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap shrink-0 relative z-10">
+            <button type="button" onclick="toggleSurveyNewInlineStudio()" id="btnToggleSurveyNewStudio"
+              class="px-3.5 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 border border-pink-300/40 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs">
+              <i data-lucide="layout-panel-left" class="w-4 h-4 text-pink-300"></i>
+              <span id="btnToggleSurveyNewStudioLabel">웹뷰 스튜디오 접기</span>
+            </button>
+            <button type="button" onclick="openSurveyNewWebviewModal()" 
+              class="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md">
+              <i data-lucide="smartphone" class="w-4 h-4"></i>
+              <span>전체 웹뷰 미리보기</span>
+            </button>
+            <button type="button" onclick="openSurveySmsComposeModal()" 
+              class="px-3.5 py-2.5 rounded-xl bg-sky-500/25 hover:bg-sky-500/35 border border-sky-300/40 text-sky-100 font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              title="문자 발송 전 문구 미리보기·수정 및 내 번호로 테스트 문자 발송">
+              <i data-lucide="message-square-text" class="w-4 h-4 text-sky-300"></i>
+              <span>문자 미리보기 · 테스트 발송</span>
+            </button>
+            <button type="button" onclick="autoSeedSurveyTargets()" 
+              class="px-3.5 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs" 
+              title="최근 종료된 간병 신청 건을 조사 대상자로 자동 등록합니다.">
+              <i data-lucide="sparkles" class="w-4 h-4 text-amber-300"></i>
+              <span>종료건 자동추출</span>
+            </button>
+            <button type="button" onclick="openNewSurveyTargetModal()" 
+              class="px-3.5 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>대상 수동등록</span>
+            </button>
+            <button type="button" onclick="loadSurveyMgmtData(true)" 
+              class="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-pink-100 hover:text-white border border-white/20 transition-all cursor-pointer" 
+              title="데이터 새로고침">
+              <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- ==================== [핵심] 모바일 간병일지 × 만족도 설문 실시간 웹뷰 미리보기 & 표지 타이틀 추천 스튜디오 ==================== -->
+        <div id="surveyNewInlineStudio" class="bg-white rounded-3xl border-2 border-pink-200/90 shadow-md overflow-hidden">
+          <div class="px-5 py-3.5 bg-gradient-to-r from-pink-50/90 via-rose-50/60 to-amber-50/70 border-b border-pink-100 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-xs">
+                <i data-lucide="smartphone" class="w-4 h-4"></i>
+              </span>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-black text-slate-900">모바일 간병일지 &amp; 만족도 조사 통합 웹뷰 스튜디오</h3>
+                  <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-extrabold border border-rose-200">실시간 인터랙티브 프리뷰</span>
+                </div>
+                <p class="text-[11px] text-slate-500">우측 웹뷰에서 첫화면(표지) · 환자/보호자 선택 · 커피쿠폰 안내 · 일자별 간병일지 · 로즈·플럼 만족도 조사를 직접 조작해 볼 수 있습니다.</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <div class="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-pink-200 text-xs">
+                <span class="text-[11px] font-bold text-rose-700">미리보기 대상 환자:</span>
+                <select id="surveyNewPreviewTargetSelect" onchange="changeSurveyNewPreviewTarget(this.value)" class="text-xs font-extrabold text-slate-800 bg-transparent focus:outline-none cursor-pointer">
+                  <option value="">고연분 님 (기본 샘플 · 16일 일지)</option>
+                </select>
+              </div>
+              <button type="button" onclick="openSurveyNewStandaloneWindow()" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all">
+                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                <span>새 탭에서 크게 열기</span>
+              </button>
+              <button type="button" onclick="copySurveyNewCurrentPreviewUrl()" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span>현재 통합링크 복사</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-12 divide-y xl:divide-y-0 xl:divide-x divide-pink-100">
+            <!-- 좌측 (5컬럼): 세련된 제목 추천 선택기 & 표지/설문 UX 빠른 이동 컨트롤 -->
+            <div class="xl:col-span-5 p-5 space-y-4 bg-gradient-to-b from-white to-pink-50/20">
+              <!-- 1. 추천 타이틀 4선 선택 -->
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-rose-600"></span>
+                    <span>1. 첫화면(표지) 세련된 타이틀 추천 (클릭 시 즉시 반영)</span>
+                  </label>
+                  <span class="text-[10.5px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">선택 즉시 우측 웹뷰 적용</span>
+                </div>
+                <p class="text-[11px] text-slate-500 leading-relaxed">
+                  기존 <span class="line-through text-slate-400">"리본케어 간병일지 &amp; 케어 만족도 조사"</span> 대신 환자·보호자에게 신뢰감과 대우받는 느낌을 주는 4가지 추천 타이틀입니다.
+                </p>
+
+                <div class="space-y-2 pt-1" id="surveyNewTitlePresetList">
+                  <button type="button" onclick="switchSurveyNewTitleTheme('1')" data-theme-btn="1"
+                    class="survey-title-preset-btn w-full text-left p-3 rounded-2xl border-2 border-rose-500 bg-rose-50/70 transition-all cursor-pointer flex items-start justify-between gap-2 shadow-2xs">
+                    <div>
+                      <div class="flex items-center gap-1.5 mb-0.5">
+                        <span class="px-1.5 py-0.2 rounded bg-rose-600 text-white text-[10px] font-black">추천 1 · 기본적용</span>
+                        <span class="text-[10.5px] font-bold text-rose-700">신뢰감 · 프리미엄 리포트형</span>
+                      </div>
+                      <div class="text-xs font-black text-slate-900">리본케어 안심 케어 리포트 &amp; 동행 만족도 설문</div>
+                    </div>
+                    <span class="text-rose-600 font-black text-xs shrink-0 mt-1">✓ 적용중</span>
+                  </button>
+
+                  <button type="button" onclick="switchSurveyNewTitleTheme('2')" data-theme-btn="2"
+                    class="survey-title-preset-btn w-full text-left p-3 rounded-2xl border border-slate-200 hover:border-pink-300 bg-white transition-all cursor-pointer flex items-start justify-between gap-2">
+                    <div>
+                      <div class="flex items-center gap-1.5 mb-0.5">
+                        <span class="px-1.5 py-0.2 rounded bg-pink-100 text-pink-800 text-[10px] font-extrabold">추천 2 · 감성 에디토리얼</span>
+                        <span class="text-[10.5px] font-semibold text-slate-500">따뜻한 정성 · 매거진 스타일</span>
+                      </div>
+                      <div class="text-xs font-black text-slate-800">리본케어 돌봄 저널 : 회복의 기록과 소중한 목소리</div>
+                    </div>
+                    <span class="text-slate-400 font-bold text-[11px] shrink-0 mt-1">선택</span>
+                  </button>
+
+                  <button type="button" onclick="switchSurveyNewTitleTheme('3')" data-theme-btn="3"
+                    class="survey-title-preset-btn w-full text-left p-3 rounded-2xl border border-slate-200 hover:border-pink-300 bg-white transition-all cursor-pointer flex items-start justify-between gap-2">
+                    <div>
+                      <div class="flex items-center gap-1.5 mb-0.5">
+                        <span class="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[10px] font-extrabold">추천 3 · 친근·공감형</span>
+                        <span class="text-[10.5px] font-semibold text-slate-500">부담 없는 설문 참여 유도</span>
+                      </div>
+                      <div class="text-xs font-black text-slate-800">리본케어 하루 안심 리포트 &amp; 케어 경험 나눔</div>
+                    </div>
+                    <span class="text-slate-400 font-bold text-[11px] shrink-0 mt-1">선택</span>
+                  </button>
+
+                  <button type="button" onclick="switchSurveyNewTitleTheme('4')" data-theme-btn="4"
+                    class="survey-title-preset-btn w-full text-left p-3 rounded-2xl border border-slate-200 hover:border-pink-300 bg-white transition-all cursor-pointer flex items-start justify-between gap-2">
+                    <div>
+                      <div class="flex items-center gap-1.5 mb-0.5">
+                        <span class="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 text-[10px] font-extrabold">추천 4 · 직관·명확형</span>
+                        <span class="text-[10.5px] font-semibold text-slate-500">원안의 의미를 살린 세련된 표현</span>
+                      </div>
+                      <div class="text-xs font-black text-slate-800">리본케어 스마트 간병일지 &amp; 케어 만족도 조사</div>
+                    </div>
+                    <span class="text-slate-400 font-bold text-[11px] shrink-0 mt-1">선택</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 2. 웹뷰 섹션 퀵 점프 & 응답자 역할 시뮬레이션 -->
+              <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3">
+                <div class="text-xs font-black text-slate-800 flex items-center justify-between">
+                  <span>2. 웹뷰 화면 구간 바로가기 &amp; 테스트</span>
+                  <span class="text-[10.5px] text-slate-400 font-medium">우측 화면이 해당 위치로 즉시 스크롤됩니다</span>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                  <button type="button" onclick="scrollSurveyNewPreview('cover')" class="py-2 px-2.5 rounded-xl bg-white hover:bg-pink-50 border border-pink-200 text-rose-700 font-extrabold text-[11.5px] shadow-2xs transition-all cursor-pointer flex flex-col items-center gap-1 whitespace-nowrap">
+                    <span class="whitespace-nowrap">✨ 00 표지 (첫화면)</span>
+                    <span class="text-[10px] text-slate-400 font-medium whitespace-nowrap">선물·환자/보호자 선택</span>
+                  </button>
+                  <button type="button" onclick="scrollSurveyNewPreview('overview')" class="py-2 px-2.5 rounded-xl bg-white hover:bg-pink-50 border border-slate-200 text-slate-700 font-extrabold text-[11.5px] shadow-2xs transition-all cursor-pointer flex flex-col items-center gap-1 whitespace-nowrap">
+                    <span class="whitespace-nowrap">📖 01~05 간병일지</span>
+                    <span class="text-[10px] text-slate-400 font-medium whitespace-nowrap">신호등·캘린더·수행</span>
+                  </button>
+                  <button type="button" onclick="scrollSurveyNewPreview('survey-section')" class="py-2 px-2.5 rounded-xl bg-gradient-to-br from-rose-600 to-pink-600 text-white font-extrabold text-[11.5px] shadow-xs transition-all cursor-pointer flex flex-col items-center gap-1 whitespace-nowrap">
+                    <span class="whitespace-nowrap">☕ 06 만족도 설문</span>
+                    <span class="text-[10px] text-pink-100 font-medium whitespace-nowrap">로즈·플럼 4단계 설문</span>
+                  </button>
+                </div>
+
+                <!-- 환자 / 보호자 사전 선택 시뮬레이션 -->
+                <div class="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2 flex-wrap">
+                  <span class="text-[11px] font-bold text-slate-600 whitespace-nowrap">표지 응답자 사전 선택 테스트:</span>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="simulateSurveyNewRole('PATIENT')" class="px-2.5 py-1 rounded-lg bg-white hover:bg-pink-50 border border-slate-300 text-slate-700 text-[11px] font-bold cursor-pointer whitespace-nowrap">
+                      🧑‍🦳 환자 본인 선택
+                    </button>
+                    <button type="button" onclick="simulateSurveyNewRole('GUARDIAN')" class="px-2.5 py-1 rounded-lg bg-white hover:bg-pink-50 border border-slate-300 text-slate-700 text-[11px] font-bold cursor-pointer whitespace-nowrap">
+                      👨‍👩‍👧 가족·보호자 선택
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 3. 핵심 디자인 반영 체크리스트 요약 -->
+              <div class="p-3.5 rounded-2xl bg-gradient-to-br from-pink-50/80 to-amber-50/60 border border-pink-200/80 text-[11.5px] space-y-1.5 text-slate-700">
+                <div class="font-black text-rose-800 flex items-center gap-1.5">
+                  <i data-lucide="check-circle-2" class="w-4 h-4 text-rose-600"></i>
+                  <span>요청사항 100% 반영 완료 내역</span>
+                </div>
+                <ul class="space-y-1 text-[11px] text-slate-600 pl-1">
+                  <li>• <b>고급 표지 + 당부 안내</b>: 타이틀 바로 아래 작은 글씨로 간병일지 확인 및 만족도 조사 참여 당부</li>
+                  <li>• <b>소정의 선물(커피쿠폰) 이미지 &amp; 안내</b>: 표지 및 설문 완료 화면에 커피쿠폰 일러스트 카드 배치</li>
+                  <li>• <b>환자 / 보호자 사전 선택</b>: 표지에서 [환자 본인] / [가족·보호자] 선택 시 맞춤 인사말 및 Q1 자동 연동</li>
+                  <li>• <b>리본케어 컬러 아이덴티티</b>: 기존 그린 색상을 리본케어 로즈·플럼(`#be185d` · `#f47db8` · `#2b1938`)으로 통일</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- 우측 (7컬럼): 인터랙티브 라이브 웹뷰 프리뷰 프레임 -->
+            <div class="xl:col-span-7 p-4 sm:p-5 bg-slate-900 flex flex-col items-center justify-center">
+              <!-- 상단 뷰포트 모드 전환 바 -->
+              <div class="w-full flex items-center justify-between mb-3 px-2 gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0"></span>
+                  <span class="text-[11px] font-mono text-pink-200 ml-2 truncate" id="surveyNewPreviewUrlLabel">/survey-care-diary.html?titleTheme=1</span>
+                </div>
+                <div class="flex items-center gap-1 bg-slate-800 p-1 rounded-xl border border-slate-700 shrink-0">
+                  <button type="button" onclick="setSurveyNewViewportMode('mobile')" id="btnSurveyNewVpMobile" class="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-[11px] font-bold cursor-pointer transition-all whitespace-nowrap">
+                    📱 모바일 뷰 (430px)
+                  </button>
+                  <button type="button" onclick="setSurveyNewViewportMode('wide')" id="btnSurveyNewVpWide" class="px-2.5 py-1 rounded-lg text-slate-300 hover:text-white text-[11px] font-bold cursor-pointer transition-all whitespace-nowrap">
+                    🖥️ 데스크톱 2단 뷰 (100%)
+                  </button>
+                </div>
+              </div>
+
+              <!-- 웹뷰 컨테이너 (2중 라운드 베젤 + GPU clip-path 라운드 클리핑) -->
+              <div id="surveyNewInlineFrameWrap" class="w-full transition-all duration-300 relative mx-auto"
+                style="max-width: 446px; height: 748px; border-radius: 38px; padding: 10px; background: linear-gradient(145deg, #334155 0%, #1e293b 50%, #0f172a 100%); border: 2px solid #475569; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), inset 0 1px 2px rgba(255, 255, 255, 0.25);">
+                <div id="surveyNewInlineScreenClip"
+                  style="width: 100%; height: 100%; border-radius: 28px; overflow: hidden; clip-path: inset(0 round 28px); -webkit-mask-image: -webkit-radial-gradient(white, black); background: #ffffff; position: relative; isolation: isolate;">
+                  <iframe id="surveyNewInlineIframe" src="survey-care-diary.html?titleTheme=1" class="w-full h-full border-0"
+                    style="width: 100%; height: 100%; border: 0; border-radius: 28px; clip-path: inset(0 round 28px); display: block; background: #ffffff;" loading="lazy"></iframe>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5대 핵심 지표 요약 카드 (KPI Cards) -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+          <!-- 1. 조사 대상 -->
+          <div class="bg-white p-4 rounded-2xl border border-pink-100 shadow-xs flex items-center gap-3.5">
+            <div class="w-11 h-11 rounded-xl bg-pink-50 text-rose-600 flex items-center justify-center shrink-0">
+              <i data-lucide="users" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-bold text-slate-500">조사 대상 건수</p>
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-xl font-black text-slate-900" id="surveyKpiTotalTargets_new">0</span>
+                <span class="text-[10px] text-slate-400 font-medium">(미안내 <b id="surveyKpiUnguided_new" class="text-amber-600">0</b>)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. 응답 완료율 -->
+          <div class="bg-white p-4 rounded-2xl border border-pink-100 shadow-xs flex items-center gap-3.5">
+            <div class="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+              <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-bold text-slate-500">응답 완료율 (선물 대상)</p>
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-xl font-black text-slate-900" id="surveyKpiResponseRate_new">0%</span>
+                <span class="text-[10px] text-slate-400 font-medium">(<b id="surveyKpiSubmittedCount_new" class="text-rose-600">0</b>건 완료)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. 환자/보호자 선물(쿠폰) 발송 현황 -->
+          <div onclick="switchSurveySubTab('rewards')" class="bg-white p-4 rounded-2xl border border-amber-200 shadow-xs flex items-center gap-3.5 cursor-pointer hover:bg-amber-50/40 transition-all" title="클릭하여 선물 발송 관리 대장으로 이동">
+            <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <i data-lucide="gift" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-bold text-slate-500">고객 선물(쿠폰) 발송</p>
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-xl font-black text-emerald-600" id="surveyKpiGiftSentCount_new">0</span>
+                <span class="text-[10px] text-slate-500 font-bold">발송완료 (미발송 <b id="surveyKpiGiftPendingCount_new" class="text-rose-600 font-black">0</b>)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. 확인 대기 (후속 조치) -->
+          <div class="bg-white p-4 rounded-2xl border border-pink-100 shadow-xs flex items-center gap-3.5">
+            <div class="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+              <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-bold text-slate-500">후속 확인 대기</p>
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-xl font-black text-rose-600" id="surveyKpiUrgentFollowups_new">0</span>
+                <span class="text-[10px] text-rose-500 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">불만/연락요청</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. 평균 만족도 (Q2) -->
+          <div class="bg-white p-4 rounded-2xl border border-pink-100 shadow-xs flex items-center gap-3.5">
+            <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
+              <i data-lucide="star" class="w-5 h-5 fill-amber-400"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-bold text-slate-500">종합 만족도 평균</p>
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-xl font-black text-slate-900" id="surveyKpiAvgScore_new">0.0</span>
+                <span class="text-[10px] text-slate-400 font-medium">/ 5.0 (<b id="surveyKpiResponseCount_new" class="text-slate-700">0</b>명)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 서브 탭 네비게이션 (A01, A02/A03, 고객 선물 발송 관리, 설정) -->
+        <div class="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto custom-scrollbar">
+          <button type="button" onclick="switchSurveySubTab('targets')" id="surveySubTab_new-targets" 
+            class="survey-sub-tab-new px-4 py-2 rounded-xl text-xs font-bold transition-all bg-rose-600 text-white shadow-xs flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="list-checks" class="w-4 h-4"></i>
+            <span>대상·진행 및 선물발송 현황 (A01)</span>
+          </button>
+          <button type="button" onclick="switchSurveySubTab('rewards')" id="surveySubTab_new-rewards" 
+            class="survey-sub-tab-new px-4 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="gift" class="w-4 h-4"></i>
+            <span>환자·보호자 선물(쿠폰) 발송 관리</span>
+            <span id="surveyGiftPendingBadge_new" class="hidden px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px] font-black">0</span>
+          </button>
+          <button type="button" onclick="switchSurveySubTab('results')" id="surveySubTab_new-results" 
+            class="survey-sub-tab-new px-4 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="message-square-heart" class="w-4 h-4"></i>
+            <span>설문 결과·후속 조치 (A02, A03)</span>
+            <span id="surveyFollowupBadge_new" class="hidden px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-black">0</span>
+          </button>
+          <button type="button" onclick="switchSurveySubTab('settings')" id="surveySubTab_new-settings" 
+            class="survey-sub-tab-new px-4 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="sliders" class="w-4 h-4"></i>
+            <span>설문 및 선물 정책 설정 (A04)</span>
+          </button>
+        </div>
+
+        <!-- ==================== 서브 탭 1 (NEW): 대상·진행 현황 (A01) ==================== -->
+        <div id="surveySubView_new-targets" class="space-y-4">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+            <!-- 1. 빠른 상태 필터 칩 -->
+            <div class="flex items-center justify-between gap-2 flex-wrap border-b border-slate-100 pb-3">
+              <div class="flex items-center gap-1.5 flex-wrap" id="surveyQuickFilterChips_new">
+                <button type="button" onclick="setSurveyQuickFilter('ALL')" data-quick="ALL" 
+                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 cursor-pointer">
+                  <span>전체 보기</span>
+                  <span id="surveyChipCountAll_new" class="px-1.5 py-0.2 rounded-full bg-white/20 text-[10px]">0</span>
+                </button>
+                <button type="button" onclick="setSurveyQuickFilter('RECENT')" data-quick="RECENT" 
+                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="sparkles" class="w-3 h-3 text-amber-600"></i>
+                  <span>최근 등록</span>
+                  <span id="surveyChipCountRecent_new" class="px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 text-[10px] font-black">0</span>
+                </button>
+                <button type="button" onclick="setSurveyQuickFilter('UNNOTIFIED')" data-quick="UNNOTIFIED" 
+                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="send" class="w-3 h-3 text-slate-500"></i>
+                  <span>안내 미처리</span>
+                  <span id="surveyChipCountUnnotified_new" class="px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[10px]">0</span>
+                </button>
+                <button type="button" onclick="setSurveyQuickFilter('COMPLETED')" data-quick="COMPLETED" 
+                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-600"></i>
+                  <span>응답 완료</span>
+                  <span id="surveyChipCountCompleted_new" class="px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[10px]">0</span>
+                </button>
+                <button type="button" onclick="setSurveyQuickFilter('GIFT_PENDING')" data-quick="GIFT_PENDING" 
+                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="gift" class="w-3 h-3 text-amber-600"></i>
+                  <span>선물 미발송(발송대기)</span>
+                  <span id="surveyChipCountGiftPending_new" class="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black">0</span>
+                </button>
+                <button type="button" onclick="setSurveyQuickFilter('GIFT_SENT')" data-quick="GIFT_SENT" 
+                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="package-check" class="w-3 h-3 text-emerald-600"></i>
+                  <span>선물 발송완료</span>
+                  <span id="surveyChipCountGiftSent_new" class="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">0</span>
+                </button>
+                <button type="button" onclick="setSurveyQuickFilter('FOLLOWUP')" data-quick="FOLLOWUP" 
+                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="alert-triangle" class="w-3 h-3 text-rose-600"></i>
+                  <span>불만/연락요청</span>
+                  <span id="surveyChipCountFollowup_new" class="px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 text-[10px] font-black">0</span>
+                </button>
+              </div>
+
+              <button type="button" onclick="resetSurveyFilters()" 
+                class="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 flex items-center gap-1 transition-all cursor-pointer">
+                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                <span>필터 초기화</span>
+              </button>
+            </div>
+
+            <!-- 2. 하단: 검색창, 상세 드롭다운 및 정렬 셀렉트 -->
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <div class="flex items-center gap-2 flex-wrap flex-1 min-w-[300px]">
+                <div class="relative flex-1 min-w-[200px] max-w-sm">
+                  <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                  <input type="text" id="surveySearchInput_new" oninput="syncSurveyNewFilterInputs(this)" 
+                    placeholder="환자명, 쿠폰연락처, 신청ID, 간병인명, 선물품목 검색..." 
+                    class="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white transition-all">
+                </div>
+                <select id="surveyFilterGuidance_new" onchange="syncSurveyNewFilterInputs(this)" class="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 font-semibold focus:outline-none">
+                  <option value="ALL">안내 상태: 전체</option>
+                  <option value="NOT_STARTED">안내 미처리</option>
+                  <option value="GUIDED">안내 완료</option>
+                  <option value="DECLINED">고객 거절</option>
+                  <option value="UNAVAILABLE">참여 불가(부재/컨디션)</option>
+                </select>
+                <select id="surveyFilterResponse_new" onchange="syncSurveyNewFilterInputs(this)" class="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 font-semibold focus:outline-none">
+                  <option value="ALL">응답 상태: 전체</option>
+                  <option value="NOT_STARTED">미응답</option>
+                  <option value="SUBMITTED">응답 완료</option>
+                  <option value="EXPIRED">기간 만료</option>
+                </select>
+                <select id="surveyFilterGift_new" onchange="applySurveyFilters()" class="text-xs bg-amber-50 border border-amber-200 rounded-xl px-2.5 py-1.5 text-amber-900 font-bold focus:outline-none">
+                  <option value="ALL">🎁 선물 발송: 전체</option>
+                  <option value="PENDING">선물 미발송 (발송대기)</option>
+                  <option value="SENT">선물 발송완료</option>
+                  <option value="NONE">설문 미응답 (대기)</option>
+                  <option value="EXCLUDED">발송 제외</option>
+                </select>
+                <select id="surveyFilterInsurance_new" onchange="syncSurveyNewFilterInputs(this)" class="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 font-semibold focus:outline-none">
+                  <option value="ALL">보험사: 전체</option>
+                  <option value="삼성화재">삼성화재</option>
+                  <option value="현대해상">현대해상</option>
+                  <option value="OTHER">기타 보험사</option>
+                </select>
+                <select id="surveyFilterSort_new" onchange="syncSurveyNewFilterInputs(this)" class="text-xs bg-pink-50 border border-pink-300 rounded-xl px-2.5 py-1.5 text-rose-900 font-bold focus:outline-none">
+                  <option value="RECENT_FIRST">⚡ 최근 등록순 (기본)</option>
+                  <option value="DUE_ASC">설문 마감 임박순</option>
+                  <option value="NAME_ASC">환자명 가나다순</option>
+                  <option value="END_DATE_DESC">종료일 최신순</option>
+                </select>
+              </div>
+
+              <div class="text-xs text-slate-500 font-medium whitespace-nowrap">
+                조회 결과: <b id="surveyTargetFilterCount_new" class="text-slate-900 font-bold text-sm">0</b>건
+              </div>
+            </div>
+          </div>
+
+          <!-- 대상자 목록 테이블 (NEW) -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+            <div class="overflow-x-auto overflow-y-auto custom-scrollbar max-h-[calc(100vh-280px)] min-h-[460px] relative">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead class="sticky top-0 z-20 shadow-xs">
+                  <tr class="bg-pink-50 border-b border-pink-200 text-slate-800 font-extrabold select-none">
+                    <th class="p-3 text-center w-12 sticky top-0 bg-pink-50 border-b border-pink-200 z-20">#</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">신청ID</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">환자명 / 기본연락처</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">병원 / 서비스기간</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">담당간병인</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">안내 상태</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">설문 응답</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">📱 쿠폰 수신 연락처 (설문입력)</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">🎁 선물 발송 현황 (품목/일시/방법)</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">후속 조치</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">관리 액션 (선물관리 / 웹뷰 / 발송)</th>
+                  </tr>
+                </thead>
+                <tbody id="surveyTargetsTableBody_new" class="divide-y divide-slate-100 bg-white">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== 서브 탭 2 (NEW): 결과·후속 조치 (A02, A03) ==================== -->
+        <div id="surveySubView_new-results" class="hidden space-y-5">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                <h3 class="font-black text-sm text-slate-900">불만 및 연락요청 후속 조치 케이스 (A03)</h3>
+                <span class="text-xs text-slate-400 font-medium">1~2점 낮은 평가 또는 Q6 연락 희망 건</span>
+              </div>
+              <select id="surveyFilterFollowupStatus_new" onchange="document.getElementById('surveyFilterFollowupStatus').value=this.value; renderSurveyFollowups();" class="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-slate-700 font-bold focus:outline-none">
+                <option value="ALL">전체 상태</option>
+                <option value="NEW">확인 대기 (NEW)</option>
+                <option value="CONTACTING">연락 진행</option>
+                <option value="ACTION">조치 중</option>
+                <option value="CLOSED">완료됨</option>
+              </select>
+            </div>
+            
+            <div class="overflow-x-auto overflow-y-auto custom-scrollbar border border-slate-200 rounded-xl max-h-[calc(100vh-320px)] relative">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead class="sticky top-0 z-20 shadow-xs">
+                  <tr class="bg-slate-50 border-b border-slate-200 text-slate-800 font-extrabold">
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">티켓 ID</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">환자명 / 연락처</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">담당간병인</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">발생 사유</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">우선순위</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">진행 상태</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">처리 이력 / 메모</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">조치 관리</th>
+                  </tr>
+                </thead>
+                <tbody id="surveyFollowupsTableBody_new" class="divide-y divide-slate-100 bg-white">
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="font-black text-sm text-slate-900 flex items-center gap-2">
+                <i data-lucide="clipboard-check" class="w-4 h-4 text-rose-600"></i>
+                <span>고객 설문 응답 내역 및 쿠폰 연락처·선물 발송 상태</span>
+              </h3>
+              <span class="text-xs text-slate-400">총 <b id="surveyResponseCountLabel_new" class="text-slate-700">0</b>건 제출됨</span>
+            </div>
+            <div class="overflow-x-auto overflow-y-auto custom-scrollbar border border-slate-200 rounded-xl max-h-[calc(100vh-320px)] relative">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead class="sticky top-0 z-20 shadow-xs">
+                  <tr class="bg-slate-50 border-b border-slate-200 text-slate-800 font-extrabold">
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">응답 ID</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">신청ID</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">고객(환자명)</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">응답자 구분</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">📱 설문 입력 쿠폰 연락처</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">Q2. 전반 만족도</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">Q3. 친절함</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">Q4. 간병 품질</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">Q5. 고객 의견</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">Q6. 연락 희망</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">🎁 선물 발송 내역 / 관리</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">제출 일시</th>
+                  </tr>
+                </thead>
+                <tbody id="surveyResponsesTableBody_new" class="divide-y divide-slate-100 bg-white">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== 서브 탭 3 (NEW): 환자·보호자 선물(쿠폰) 발송 관리 대장 ==================== -->
+        <div id="surveySubView_new-rewards" class="hidden space-y-4">
+          <div class="bg-white p-4 rounded-2xl border border-amber-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold border border-amber-200">
+                <i data-lucide="gift" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h4 class="text-xs font-black text-slate-900">환자·보호자 감사 선물(쿠폰) 발송 관리 대장</h4>
+                  <span class="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black">간병인 달란트 미지급 · 고객 직접 보상</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-0.5">설문 마지막 단계에서 환자/보호자가 입력한 쿠폰 수신 연락처를 확인하고, <b>어떤 선물을 언제 어떻게 발송했는지</b> 환자별로 관리합니다.</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <div class="relative min-w-[210px]">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                <input type="text" id="surveyGiftSearchInput_new" oninput="renderSurveyRewards()" placeholder="환자명, 쿠폰연락처, 선물품목, 발송방법 검색..." class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+              </div>
+              <select id="surveyFilterRewardState_new" onchange="renderSurveyRewards()" class="text-xs bg-amber-50 border border-amber-200 rounded-xl px-2.5 py-1.5 text-amber-900 font-bold focus:outline-none">
+                <option value="ALL">발송 상태: 전체 환자 보기</option>
+                <option value="PENDING">🎁 선물 미발송 (설문완료·발송대기)</option>
+                <option value="SENT">✅ 선물 발송완료</option>
+                <option value="NOT_SUBMITTED">⏳ 설문 미응답 (대기)</option>
+                <option value="EXCLUDED">🚫 발송 제외</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+            <div class="overflow-x-auto overflow-y-auto custom-scrollbar max-h-[calc(100vh-320px)] relative">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead class="sticky top-0 z-20 shadow-xs">
+                  <tr class="bg-amber-50/80 border-b border-amber-200 text-slate-800 font-extrabold">
+                    <th class="p-3 text-center w-12 whitespace-nowrap sticky top-0 bg-amber-50 border-b border-amber-200 z-20">#</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-amber-50 border-b border-amber-200 z-20">신청ID</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-amber-50 border-b border-amber-200 z-20">환자명 (응답자 구분)</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-amber-50 border-b border-amber-200 z-20">설문 응답 상태 / 만족도</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-amber-50 border-b border-amber-200 z-20">📱 설문 입력 쿠폰 연락처</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-amber-50 border-b border-amber-200 z-20">🎁 발송 여부</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-amber-50 border-b border-amber-200 z-20">어떤 선물 (발송 품목)</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-amber-50 border-b border-amber-200 z-20">언제 (발송 일시)</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-amber-50 border-b border-amber-200 z-20">어떻게 (발송 방법 · 담당자 · 메모)</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-amber-50 border-b border-amber-200 z-20">선물 발송 관리</th>
+                  </tr>
+                </thead>
+                <tbody id="surveyRewardsTableBody_new" class="divide-y divide-slate-100 bg-white">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== 서브 탭 4 (NEW): 설문 및 정책 설정 (A04) ==================== -->
+        <div id="surveySubView_new-settings" class="hidden space-y-5">
+          <!-- 상단 알림 및 안내 바 -->
+          <div class="bg-gradient-to-r from-pink-50 via-rose-50 to-white p-5 rounded-2xl border border-pink-200/90 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span class="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <i data-lucide="sliders" class="w-5 h-5"></i>
+              </span>
+              <div>
+                <h4 class="font-black text-sm text-slate-900 flex items-center gap-2">
+                  <span>설문 운영 정책 및 문항 관리</span>
+                  <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">실시간 연동</span>
+                </h4>
+                <p class="text-xs text-slate-500 mt-1">
+                  설문 유효기한, 환자·보호자 감사 선물(쿠폰) 기본 품목/발송방법 및 설문 문항 구성을 편집할 수 있습니다. 저장 시 모바일 간병일지 &amp; 만족도 웹뷰에 즉시 반영됩니다.
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button type="button" onclick="openSurveyNewWebviewModal()" class="px-3.5 py-2 rounded-xl bg-white hover:bg-pink-50 text-rose-700 border border-pink-200 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer">
+                <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+                <span>통합 웹뷰 미리보기</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <!-- 좌측: 운영 정책 설정 (5 cols) -->
+            <div class="lg:col-span-5 bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+              <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <i data-lucide="gift" class="w-4 h-4 text-rose-600"></i>
+                <h4 class="font-black text-sm text-slate-900">조사 및 고객 감사 선물(쿠폰) 운영 기준</h4>
+              </div>
+              <form id="surveySettingsForm_new" onsubmit="handleSaveSurveySettings(event)" class="space-y-4 text-xs">
+                <div>
+                  <label class="block font-bold text-slate-700 mb-1">설문 응답 유효 기한 (일)</label>
+                  <input type="number" id="setDueDays_new" min="1" max="30" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 font-bold text-slate-800">
+                  <p class="text-[11px] text-slate-400 mt-1">간병 서비스 종료일 다음 날부터 마감일까지의 기간 (기본 7일)</p>
+                </div>
+                <div class="p-3.5 bg-amber-50/60 rounded-2xl border border-amber-200/80 space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="font-black text-amber-900 flex items-center gap-1.5">
+                      <i data-lucide="gift" class="w-3.5 h-3.5 text-amber-600"></i>
+                      <span>환자·보호자 감사 선물(쿠폰) 기본 설정</span>
+                    </span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-amber-700 border border-amber-200">고객 리워드</span>
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">기본 발송 선물 품목 (어떤 선물)</label>
+                    <input type="text" id="setDefaultGiftItem_new" placeholder="예: 스타벅스 아메리카노 Tall 1매" class="w-full p-2 bg-white border border-amber-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-amber-500">
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">기본 발송 수단 (어떻게 발송)</label>
+                    <select id="setDefaultGiftMethod_new" class="w-full p-2 bg-white border border-amber-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-amber-500">
+                      <option value="모바일 기프티콘 (MMS)">모바일 기프티콘 (MMS)</option>
+                      <option value="카카오톡 선물하기">카카오톡 선물하기</option>
+                      <option value="기프티쇼 / 비즈콘 발송">기프티쇼 / 비즈콘 발송</option>
+                      <option value="SMS 쿠폰번호 발송">SMS 쿠폰번호 발송</option>
+                      <option value="기타 / 직접 전달">기타 / 직접 전달</option>
+                    </select>
+                  </div>
+                  <p class="text-[11px] text-amber-800/80">※ 만족도조사 관리(new)에서는 간병인 달란트를 지급하지 않으며, 설문에 참여한 환자 또는 보호자에게 선물을 발송합니다.</p>
+                </div>
+                <div>
+                  <label class="block font-bold text-slate-700 mb-1">고객센터 안내 전화번호</label>
+                  <input type="text" id="setCsPhone_new" placeholder="1544-7119" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 font-bold text-slate-800">
+                </div>
+                <div>
+                  <label class="block font-bold text-slate-700 mb-1">고객센터 운영시간 안내 문구</label>
+                  <input type="text" id="setCsHours_new" placeholder="평일 09:00 ~ 18:00 (주말/공휴일 휴무)" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 font-medium text-slate-800">
+                </div>
+                <div class="pt-2">
+                  <button type="submit" class="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    <span>운영 정책 저장하기</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- 우측: 설문 문항 관리 및 편집기 (7 cols) -->
+            <div class="lg:col-span-7 bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+              <div class="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="file-edit" class="w-4 h-4 text-purple-600"></i>
+                  <h4 class="font-black text-sm text-slate-900">설문 문항 관리 및 실시간 편집</h4>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="addSurveyQuestion()" class="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                    <span>문항 추가</span>
+                  </button>
+                  <button type="button" onclick="saveSurveySchema()" class="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer">
+                    <i data-lucide="save" class="w-3.5 h-3.5"></i>
+                    <span>문항 저장</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 동적 설문 문항 목록 컨테이너 -->
+              <div id="surveySchemaEditorContainer_new" class="space-y-3 max-h-[560px] overflow-y-auto custom-scrollbar pr-1">
                 <!-- 동적으로 JavaScript에서 렌더링 -->
               </div>
             </div>
@@ -5977,6 +6697,62 @@
   </div><!-- End of BODY WRAPPER -->
 
   <!-- ==================== MODALS: SURVEY MANAGEMENT (만족도조사 관리 모달) ==================== -->
+  <!-- 0-NEW. 모바일 간병일지 × 만족도 설문 (커피쿠폰) 통합 웹뷰 미리보기 모달 -->
+  <div id="surveyNewWebviewModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center hidden p-3 sm:p-5">
+    <div class="bg-slate-900 rounded-3xl w-full max-w-6xl shadow-2xl overflow-hidden border border-pink-500/30 flex flex-col max-h-[94vh]">
+      <!-- 모달 헤더 -->
+      <div class="px-5 py-3.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-white shrink-0" style="background: linear-gradient(90deg, #2b1838 0%, #4a1942 60%, #831843 100%);">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-pink-500/25 border border-pink-300/40 text-pink-200 flex items-center justify-center">
+            <i data-lucide="smartphone" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-black text-white">리본케어 안심 케어 리포트 &amp; 만족도 설문 (웹뷰 미리보기)</h3>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-200 font-bold border border-amber-300/30">☕ 커피쿠폰 증정 · 환자/보호자 통합뷰</span>
+            </div>
+            <p class="text-[11px] text-pink-200 font-medium" id="surveyNewWebviewModalSub">표지 · 일자별 모바일 간병일지 · 만족도 설문 통합 페이지</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <!-- 모달 내 구간 바로가기 -->
+          <div class="flex items-center gap-1 bg-black/25 p-1 rounded-xl border border-white/15">
+            <button type="button" onclick="scrollSurveyNewModalIframe('cover')" class="px-2.5 py-1 rounded-lg bg-pink-600/80 hover:bg-pink-600 text-white text-[11px] font-bold cursor-pointer whitespace-nowrap">
+              00 표지·선물
+            </button>
+            <button type="button" onclick="scrollSurveyNewModalIframe('overview')" class="px-2.5 py-1 rounded-lg hover:bg-white/10 text-pink-100 text-[11px] font-bold cursor-pointer whitespace-nowrap">
+              01~05 간병일지
+            </button>
+            <button type="button" onclick="scrollSurveyNewModalIframe('survey-section')" class="px-2.5 py-1 rounded-lg bg-amber-500/80 hover:bg-amber-500 text-white text-[11px] font-bold cursor-pointer whitespace-nowrap">
+              06 만족도 설문 ☕
+            </button>
+          </div>
+          <button type="button" onclick="copySurveyNewModalUrl()" class="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span>링크·문자 복사</span>
+          </button>
+          <button type="button" onclick="openSurveyNewModalNewTab()" class="px-3 py-1.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap">
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+            <span>새 창 열기</span>
+          </button>
+          <button type="button" onclick="closeSurveyModal('surveyNewWebviewModal')" class="p-1.5 rounded-lg text-pink-200 hover:text-white hover:bg-white/10 cursor-pointer">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+      <!-- 본문 iframe -->
+      <div class="p-3 sm:p-4 bg-slate-950 flex-1 flex items-center justify-center overflow-hidden">
+        <div class="w-full h-[78vh] transition-all relative"
+          style="border-radius: 26px; padding: 6px; background: linear-gradient(145deg, #334155 0%, #0f172a 100%); border: 1.5px solid #475569; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);">
+          <div style="width: 100%; height: 100%; border-radius: 20px; overflow: hidden; clip-path: inset(0 round 20px); -webkit-mask-image: -webkit-radial-gradient(white, black); background: #ffffff; position: relative; isolation: isolate;">
+            <iframe id="surveyNewModalIframe" src="about:blank" class="w-full h-full border-0"
+              style="width: 100%; height: 100%; border: 0; border-radius: 20px; clip-path: inset(0 round 20px); display: block; background: #ffffff;"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 0. 간병인 모바일 앱 뷰 (앱 시뮬레이터) 모달 -->
   <div id="surveyAppViewModal" class="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center hidden p-4">
     <div class="bg-slate-900 rounded-3xl w-full max-w-[420px] shadow-2xl overflow-hidden border border-slate-700 flex flex-col max-h-[92vh]">
@@ -6063,19 +6839,21 @@
           </div>
           <p class="text-[11px] text-slate-600">간병인이 직접 링크를 전하기 어려운 경우, 본사 메이트원에서 환자 번호로 설문 링크를 즉시 발송합니다.</p>
           <div class="flex items-center gap-2">
-            <input type="tel" id="surveyQrSmsPhone" placeholder="010-0000-0000" class="flex-1 px-3 py-2 text-xs font-mono font-bold bg-white border border-sky-200 rounded-xl focus:ring-2 focus:ring-sky-500">
-            <button type="button" onclick="sendDirectSurveySmsFromQrModal()" id="btnQrModalSms" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold text-xs flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shadow-xs">
-              <i data-lucide="mail" class="w-3.5 h-3.5"></i>
-              <span>문자 즉시 발송</span>
+            <input type="tel" id="surveyQrSmsPhone" inputmode="numeric" pattern="[0-9\-]*" maxlength="13" placeholder="010-0000-0000"
+              oninput="if(typeof formatCouponPhoneDisplay==='function') this.value=formatCouponPhoneDisplay(this.value);"
+              class="flex-1 px-3 py-2 text-xs font-mono font-bold bg-white border border-sky-200 rounded-xl focus:ring-2 focus:ring-sky-500">
+            <button type="button" onclick="sendDirectSurveySmsFromQrModal()" id="btnQrModalSms" class="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold text-xs flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shadow-xs">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+              <span>문구 미리보기 · 발송</span>
             </button>
           </div>
         </div>
 
         <!-- 간병인 안내 결과 기록 액션 (C02 시뮬레이션) -->
-        <div class="pt-3 border-t border-slate-100 text-left space-y-2">
+        <div id="qrModalGuidanceBox" class="pt-3 border-t border-slate-100 text-left space-y-2">
           <p class="text-[11px] font-bold text-slate-700 flex items-center gap-1">
             <i data-lucide="user-check" class="w-3.5 h-3.5 text-emerald-600"></i>
-            <span>간병인 안내 결과 기록 (안내 달란트 10P 적립)</span>
+            <span id="qrModalGuidanceTitle">간병인 안내 결과 기록</span>
           </p>
           <div class="grid grid-cols-2 gap-2">
             <button type="button" onclick="recordGuidanceFromResult('GUIDED')" class="py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer">
@@ -6095,8 +6873,8 @@
               <option value="CONDITION">환자 건강/컨디션 난조</option>
               <option value="OTHER">기타 사유</option>
             </select>
-            <button type="button" onclick="submitGuidanceDecline()" class="w-full py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg font-bold text-xs cursor-pointer">
-              미참여 사유 저장 (달란트 적립)
+            <button type="button" onclick="submitGuidanceDecline()" id="btnQrModalDeclineSave" class="w-full py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg font-bold text-xs cursor-pointer">
+              미참여 사유 저장
             </button>
           </div>
         </div>
@@ -6125,18 +6903,32 @@
       <div class="p-6 overflow-y-auto space-y-4 custom-scrollbar text-xs">
         <!-- 5대 독립 상태 뱃지 요약 -->
         <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-          <div class="text-[11px] font-bold text-slate-500">5대 상태 현황</div>
+          <div class="text-[11px] font-bold text-slate-500">상태 현황</div>
           <div class="flex flex-wrap gap-2 text-xs" id="surveyDetailStatusBadges"></div>
         </div>
 
         <!-- 기본 정보 -->
         <div class="grid grid-cols-2 gap-3 p-3.5 bg-white rounded-2xl border border-slate-200">
           <div><span class="text-slate-400">환자명:</span> <b id="detailPatientName" class="text-slate-800">-</b></div>
-          <div><span class="text-slate-400">연락처:</span> <b id="detailPatientPhone" class="text-slate-800">-</b></div>
-          <div><span class="text-slate-400">담당간병인2:</span> <b id="detailCaregiverName" class="text-slate-800">-</b></div>
+          <div><span class="text-slate-400">기본 연락처:</span> <b id="detailPatientPhone" class="text-slate-800">-</b></div>
+          <div><span class="text-slate-400">담당간병인:</span> <b id="detailCaregiverName" class="text-slate-800">-</b></div>
           <div><span class="text-slate-400">간병기간:</span> <b id="detailCarePeriod" class="text-slate-800">-</b></div>
           <div><span class="text-slate-400">마감일:</span> <b id="detailDueAt" class="text-slate-800">-</b></div>
           <div><span class="text-slate-400">병원:</span> <b id="detailHospitalName" class="text-slate-800">-</b></div>
+        </div>
+
+        <!-- 환자/보호자 쿠폰 연락처 및 선물 발송 현황 -->
+        <div id="detailGiftSection" class="p-3.5 bg-amber-50/70 rounded-2xl border border-amber-200 space-y-2">
+          <div class="flex items-center justify-between">
+            <h4 class="font-black text-amber-900 flex items-center gap-1.5">
+              <i data-lucide="gift" class="w-4 h-4 text-amber-600"></i>
+              <span>환자·보호자 쿠폰 수신 연락처 및 선물 발송 정보</span>
+            </h4>
+            <button type="button" onclick="openSurveyGiftModal(gSurveyState.selectedTargetId)" class="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold cursor-pointer shadow-2xs">
+              🎁 선물 발송 관리
+            </button>
+          </div>
+          <div id="detailGiftContent" class="grid grid-cols-2 gap-2 text-xs text-slate-700"></div>
         </div>
 
         <!-- 응답 내용 (제출된 경우) -->
@@ -6292,7 +7084,7 @@
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">환자/보호자 연락처 <span class="text-rose-500">*</span></label>
-              <input type="tel" id="newTargetPhone" placeholder="010-0000-0000" required oninput="if(typeof formatPhoneNumber==='function') this.value=formatPhoneNumber(this.value);" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white font-mono font-bold">
+              <input type="tel" id="newTargetPhone" inputmode="numeric" maxlength="13" placeholder="010-0000-0000" required oninput="if(typeof formatPhoneNumber==='function') this.value=formatPhoneNumber(this.value);" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white font-mono font-bold">
             </div>
           </div>
 
@@ -6365,7 +7157,7 @@
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">환자/보호자 연락처 <span class="text-rose-500">*</span></label>
-              <input type="tel" id="editTargetPhone" placeholder="010-0000-0000" required oninput="if(typeof formatPhoneNumber==='function') this.value=formatPhoneNumber(this.value);" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white font-mono font-bold text-xs focus:ring-2 focus:ring-indigo-500">
+              <input type="tel" id="editTargetPhone" inputmode="numeric" maxlength="13" placeholder="010-0000-0000" required oninput="if(typeof formatPhoneNumber==='function') this.value=formatPhoneNumber(this.value);" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white font-mono font-bold text-xs focus:ring-2 focus:ring-indigo-500">
             </div>
           </div>
 
@@ -6425,6 +7217,539 @@
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 환자·보호자 선물(쿠폰) 발송 상세 관리 모달 (Gift Dispatch Management Modal) -->
+  <div id="surveyGiftManageModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-3xl w-full max-w-lg max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-amber-200">
+      <div class="p-5 border-b border-amber-100 flex items-center justify-between bg-gradient-to-r from-amber-50 via-rose-50 to-white">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-xs">
+            <i data-lucide="gift" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-black text-slate-900">환자·보호자 감사 선물(쿠폰) 발송 관리</h3>
+            <p class="text-[11px] text-slate-500" id="giftModalPatientSub">설문 참여 고객 선물 발송 여부 및 상세 내역(품목·일시·방법) 기록</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeSurveyModal('surveyGiftManageModal')" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto custom-scrollbar space-y-4 text-xs">
+        <!-- 환자 및 설문 응답 요약 배너 -->
+        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between gap-2 flex-wrap">
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-2">
+              <span class="font-black text-sm text-slate-900" id="giftModalPatientName">-</span>
+              <span class="font-mono text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200" id="giftModalServiceId">-</span>
+              <span id="giftModalSurveyBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">-</span>
+            </div>
+            <div class="text-[11px] text-slate-500" id="giftModalCareInfo">-</div>
+          </div>
+          <button type="button" onclick="quickFillGiftSentNow()" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all">
+            <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+            <span>지금 즉시 발송완료 채우기</span>
+          </button>
+        </div>
+
+        <form id="surveyGiftManageForm" onsubmit="saveSurveyGiftDispatch(event)" class="space-y-3.5">
+          <input type="hidden" id="giftModalTargetId">
+
+          <!-- 1. 설문에서 입력한 쿠폰 수신 연락처 -->
+          <div class="p-3.5 bg-amber-50/70 rounded-2xl border border-amber-200 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <label class="font-black text-amber-950 flex items-center gap-1.5">
+                <i data-lucide="smartphone" class="w-4 h-4 text-amber-600"></i>
+                <span>📱 쿠폰 수신 연락처 (설문 마지막 단계 입력 번호)</span>
+              </label>
+              <button type="button" onclick="copyCouponPhone(document.getElementById('giftModalCouponPhone').value)" class="px-2 py-0.5 rounded-lg bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-[10.5px] cursor-pointer">
+                번호 복사
+              </button>
+            </div>
+            <input type="tel" id="giftModalCouponPhone" inputmode="numeric" pattern="[0-9\-]*" maxlength="13" placeholder="010-0000-0000"
+              oninput="if(typeof formatPhoneNumber==='function') this.value=formatPhoneNumber(this.value);"
+              class="w-full p-2.5 bg-white border border-amber-300 rounded-xl font-mono font-black text-sm text-slate-900 tracking-wider focus:ring-2 focus:ring-amber-500 focus:outline-none">
+            <p class="text-[11px] text-amber-800" id="giftModalPhoneCompareNote">기본 등록 연락처: -</p>
+          </div>
+
+          <!-- 2. 실제 선물 발송 여부 -->
+          <div>
+            <label class="block font-black text-slate-800 mb-1.5">1) 실제 선물 발송 여부 <span class="text-rose-500">*</span></label>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="cursor-pointer">
+                <input type="radio" name="giftModalStatusRadio" value="PENDING" class="peer sr-only" onchange="onGiftModalStatusChange(this.value)">
+                <div class="p-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-center font-bold text-slate-600 peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-900 transition-all">
+                  🎁 미발송 (발송대기)
+                </div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="giftModalStatusRadio" value="SENT" class="peer sr-only" onchange="onGiftModalStatusChange(this.value)">
+                <div class="p-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-center font-bold text-slate-600 peer-checked:border-emerald-600 peer-checked:bg-emerald-50 peer-checked:text-emerald-900 transition-all">
+                  ✅ 발송 완료
+                </div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="giftModalStatusRadio" value="EXCLUDED" class="peer sr-only" onchange="onGiftModalStatusChange(this.value)">
+                <div class="p-2.5 rounded-xl border-2 border-slate-200 bg-slate-50 text-center font-bold text-slate-600 peer-checked:border-rose-500 peer-checked:bg-rose-50 peer-checked:text-rose-800 transition-all">
+                  🚫 발송 제외
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- 3. 어떤 선물을 발송했는지 (품목) -->
+          <div>
+            <label class="block font-black text-slate-800 mb-1">2) 어떤 선물 (발송 선물/쿠폰 품목)</label>
+            <div class="flex flex-wrap gap-1.5 mb-2">
+              <button type="button" onclick="setGiftModalPresetItem('스타벅스 아메리카노 Tall 1매')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 text-[11px] font-bold text-slate-700 cursor-pointer">☕ 스타벅스 아메리카노</button>
+              <button type="button" onclick="setGiftModalPresetItem('스타벅스 카페라떼 Tall 1매')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 text-[11px] font-bold text-slate-700 cursor-pointer">🥛 스타벅스 카페라떼</button>
+              <button type="button" onclick="setGiftModalPresetItem('메가커피 아메리카노 쿠폰')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 text-[11px] font-bold text-slate-700 cursor-pointer">🥤 메가커피 쿠폰</button>
+              <button type="button" onclick="setGiftModalPresetItem('CU/GS25 모바일 상품권 5,000원')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 text-[11px] font-bold text-slate-700 cursor-pointer">🏪 편의점 5천원권</button>
+              <button type="button" onclick="setGiftModalPresetItem('신세계/이마트 상품권 10,000원')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 text-[11px] font-bold text-slate-700 cursor-pointer">🛍️ 상품권 1만원권</button>
+            </div>
+            <input type="text" id="giftModalItem" placeholder="발송한 선물/쿠폰 이름을 입력하세요 (예: 스타벅스 아메리카노 Tall 1매)"
+              class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500">
+          </div>
+
+          <!-- 4. 언제 & 어떻게 발송했는지 -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="font-black text-slate-800">3) 언제 발송 (발송 일시)</label>
+                <button type="button" onclick="setGiftModalNowTime()" class="text-[10.5px] font-bold text-rose-600 hover:underline cursor-pointer">[현재 시각 입력]</button>
+              </div>
+              <input type="datetime-local" id="giftModalSentAt" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-amber-500">
+            </div>
+            <div>
+              <label class="block font-black text-slate-800 mb-1">4) 어떻게 발송 (발송 방법/채널)</label>
+              <select id="giftModalMethod" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-amber-500">
+                <option value="모바일 기프티콘 (MMS)">모바일 기프티콘 (MMS 문자)</option>
+                <option value="카카오톡 선물하기">카카오톡 선물하기</option>
+                <option value="기프티쇼 / 비즈콘 발송">기프티쇼 / 비즈콘 대량발송</option>
+                <option value="SMS 쿠폰번호 발송">SMS 쿠폰번호 발송</option>
+                <option value="기타 / 직접 전달">기타 / 직접 전달</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 5. 발송 담당자 및 메모/쿠폰번호 -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">발송 처리 담당자</label>
+              <input type="text" id="giftModalSender" placeholder="예: 본사 관리자" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-800 focus:bg-white">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block font-bold text-slate-700 mb-1">발송 메모 / 쿠폰 핀번호(주문번호)</label>
+              <input type="text" id="giftModalMemo" placeholder="쿠폰번호, 주문번호 또는 특이사항 메모" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-800 focus:bg-white">
+            </div>
+          </div>
+
+          <!-- 발송 이력 로그 -->
+          <div class="space-y-1.5 pt-2 border-t border-slate-100">
+            <div class="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+              <i data-lucide="history" class="w-3.5 h-3.5"></i>
+              <span>선물 발송 처리 이력</span>
+            </div>
+            <div id="giftModalHistoryBox" class="max-h-28 overflow-y-auto custom-scrollbar p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-[11px] text-slate-600">
+              <div class="text-slate-400">기록된 발송 이력이 없습니다.</div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+            <button type="button" onclick="closeSurveyModal('surveyGiftManageModal')" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer">
+              취소
+            </button>
+            <button type="submit" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95 transition-all">
+              <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+              <span>선물 발송 정보 저장</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. 만족도조사(new) 문자 발송 미리보기 · 문구 수정 · 테스트 발송 모달 (Survey SMS Preview, Edit & Test Modal) -->
+  <div id="surveySmsComposeModal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center hidden p-3 sm:p-4">
+    <div class="bg-white rounded-3xl w-full max-w-4xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-sky-200">
+      <!-- 헤더 -->
+      <div class="px-5 py-4 bg-gradient-to-r from-[#2b1838] via-[#4a1c44] to-rose-900 text-white flex items-center justify-between border-b border-pink-800/40 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-sky-500/20 border border-sky-400/40 text-sky-200 flex items-center justify-center font-black shadow-xs shrink-0">
+            <i data-lucide="message-square-text" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-pink-500/30 text-pink-200 border border-pink-400/30">
+                SMS / LMS 미리보기 &amp; 편집 스튜디오
+              </span>
+              <button type="button" onclick="openAligoConfigModal()" id="surveySmsModalBalanceBadge" class="text-[11px] font-bold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-500/30 transition-all cursor-pointer flex items-center gap-1.5" title="클릭 시 알리고 연동 설정 열기">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>알리고 잔여: 조회중</span>
+              </button>
+            </div>
+            <h3 class="text-sm sm:text-base font-black text-white mt-0.5">만족도조사(new) 안내 문자 미리보기 · 수정 및 테스트 발송</h3>
+          </div>
+        </div>
+        <button type="button" onclick="closeSurveyModal('surveySmsComposeModal')" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- 본문 (좌측: 문구 편집 및 테스트 발송 / 우측: 실시간 스마트폰 문자 미리보기) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 overflow-y-auto custom-scrollbar flex-1 text-xs">
+        
+        <!-- 좌측 7컬럼: 발송 대상 · 문구 편집 · 테스트 발송 컨트롤 -->
+        <div class="lg:col-span-7 p-5 space-y-4">
+          <input type="hidden" id="surveySmsModalTargetId">
+
+          <!-- 1. 링크 주소 비노출 발송 방식 선택 (안심 단축링크 문자 vs URL 완전 숨김 카카오 알림톡 버튼형) -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <label class="font-black text-slate-800 flex items-center gap-1.5">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+                <span>링크 주소 노출 방지 방식 선택</span>
+              </label>
+              <span class="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">파라미터·환자명 URL 완전 은닉</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200">
+              <button type="button" id="btnSurveySmsChannel_sms" onclick="switchSurveySmsChannelMode('sms')"
+                class="py-2.5 px-3 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all bg-rose-600 text-white shadow-xs cursor-pointer">
+                <span>📱 안심 단축문자 (/s/짧은코드)</span>
+              </button>
+              <button type="button" id="btnSurveySmsChannel_kakao" onclick="switchSurveySmsChannelMode('kakao')"
+                class="py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 cursor-pointer">
+                <span>💬 카카오 알림톡 (URL 100% 숨김·버튼형)</span>
+              </button>
+            </div>
+            <input type="hidden" id="surveySmsChannelMode" value="sms">
+            <div id="surveySmsChannelHelpBar" class="px-3 py-2 rounded-xl bg-emerald-50/70 border border-emerald-200 text-[11px] text-emerald-900 flex items-center justify-between gap-2 flex-wrap">
+              <span>🔒 긴 전체 주소(<code>?t=...&amp;patient=%EC%...</code>) 대신 <b>초단축 보안 링크(<code>/s/8자리코드</code>)</b> 1줄로 깔끔하게 전송됩니다.</span>
+            </div>
+          </div>
+
+          <!-- 2. 대상 환자 선택 및 정보 요약 -->
+          <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <label class="font-black text-slate-800 flex items-center gap-1.5">
+                <i data-lucide="user-check" class="w-4 h-4 text-rose-600"></i>
+                <span>발송 대상 환자 선택</span>
+              </label>
+              <span id="surveySmsModalGuidanceBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">-</span>
+            </div>
+            <select id="surveySmsTargetSelect" onchange="onChangeSurveySmsTarget(this.value)" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-bold text-xs text-slate-900 focus:ring-2 focus:ring-rose-500 cursor-pointer"></select>
+            <div class="text-[11px] text-slate-500 flex items-center justify-between flex-wrap gap-1" id="surveySmsTargetMetaInfo">
+              <span>병원/간병인 정보가 여기에 표시됩니다.</span>
+            </div>
+          </div>
+
+          <!-- 3. 수신 휴대폰 번호 및 발신번호/통신망 설정 -->
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+            <div class="sm:col-span-5">
+              <label class="block font-black text-slate-800 mb-1 flex items-center justify-between">
+                <span>고객 수신 번호 <span class="text-rose-600">*</span></span>
+                <span class="text-[10px] text-slate-400 font-normal">자동 하이픈</span>
+              </label>
+              <input type="tel" id="surveySmsRecipientPhone" inputmode="numeric" pattern="[0-9\-]*" maxlength="13" placeholder="010-0000-0000"
+                oninput="this.value=formatCouponPhoneDisplay(this.value); updateSurveySmsLivePreview();"
+                class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-mono font-black text-sm text-slate-900 focus:ring-2 focus:ring-rose-500">
+            </div>
+            <div class="sm:col-span-4">
+              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <span>발신 대표번호</span>
+                <span class="text-[10px] text-emerald-600 font-bold">알리고 등록번호</span>
+              </label>
+              <select id="surveySmsSenderNumber" onchange="updateSurveySmsLivePreview()" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500">
+                <option value="01026660883" selected>010-2666-0883 (알리고 등록 대표번호 · 기본)</option>
+                <option value="16007835">1600-7835 (리본케어 공식)</option>
+                <option value="15447119">1544-7119 (리본 고객센터)</option>
+                <option value="15337436">1533-7436 (현대해상 전용)</option>
+              </select>
+            </div>
+            <div class="sm:col-span-3">
+              <div class="flex items-center justify-between mb-1">
+                <label class="font-bold text-slate-700">전송 통신사</label>
+                <button type="button" onclick="openAligoConfigModal()" class="text-[10px] text-rose-600 font-black hover:underline cursor-pointer flex items-center gap-0.5" title="알리고 API 인증키 및 발신번호 설정">
+                  <i data-lucide="settings" class="w-3 h-3"></i> 알리고 설정
+                </button>
+              </div>
+              <select id="surveySmsProviderSelect" onchange="onSurveySmsProviderChange(this.value)" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 cursor-pointer">
+                <option value="aligo" selected>알리고 Aligo (추천 · 실통신망)</option>
+                <option value="barobill">바로빌 Barobill (3사 직결)</option>
+                <option value="twilio">Twilio (글로벌)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 4. 문구 템플릿 선택 & 치환 변수 삽입 -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between flex-wrap gap-1">
+              <label class="font-black text-slate-800 flex items-center gap-1.5">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+                <span>문구 템플릿 프리셋 (클릭 시 자동 완성 후 자유 수정 가능)</span>
+              </label>
+              <button type="button" onclick="applySurveySmsTemplate(gCurrentSurveySmsTemplateType || 'DEFAULT')" class="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer">
+                🔄 기본 문구로 초기화
+              </button>
+            </div>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button type="button" id="btnSmsTpl_DEFAULT" onclick="applySurveySmsTemplate('DEFAULT')" class="p-2 rounded-xl border-2 border-rose-500 bg-rose-50 text-rose-900 font-extrabold text-[11px] text-center transition-all cursor-pointer">
+                📒 일지 + 설문(커피쿠폰) 기본
+              </button>
+              <button type="button" id="btnSmsTpl_COUPON_FOCUS" onclick="applySurveySmsTemplate('COUPON_FOCUS')" class="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-[11px] text-center transition-all cursor-pointer">
+                ☕ 스타벅스 쿠폰 증정 강조
+              </button>
+              <button type="button" id="btnSmsTpl_REMIND" onclick="applySurveySmsTemplate('REMIND')" class="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-[11px] text-center transition-all cursor-pointer">
+                🔔 미응답 고객 리마인드
+              </button>
+            </div>
+          </div>
+
+          <!-- 5. 문자 제목 (LMS) 및 본문 자유 수정 -->
+          <div class="space-y-2.5">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">문자/알림톡 제목</label>
+              <input type="text" id="surveySmsSubjectInput" oninput="updateSurveySmsLivePreview()" placeholder="[리본케어] 모바일 안심 간병일지 & 만족도 설문 안내"
+                class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-rose-500">
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-1 flex-wrap gap-1">
+                <label class="font-black text-slate-800">발송 내용 직접 수정 <span class="text-rose-500">*</span></label>
+                <div class="flex items-center gap-1.5">
+                  <button type="button" onclick="insertSurveySmsToken('PATIENT')" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] cursor-pointer">+ 환자명</button>
+                  <button type="button" onclick="insertSurveySmsToken('CAREGIVER')" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] cursor-pointer">+ 간병인명</button>
+                  <button type="button" onclick="insertSurveySmsToken('HOSPITAL')" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] cursor-pointer">+ 병원명</button>
+                  <button type="button" id="btnInsertShortLinkToken" onclick="insertSurveySmsToken('LINK')" class="px-2 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[10.5px] cursor-pointer">+ 안심단축링크</button>
+                  <span id="surveySmsByteBadge" class="font-mono font-bold text-slate-600 text-[11px] ml-1">0 Byte</span>
+                  <span id="surveySmsTypeBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">장문 (LMS)</span>
+                </div>
+              </div>
+              <textarea id="surveySmsBodyTextarea" rows="8" oninput="updateSurveySmsLivePreview()"
+                placeholder="발송할 문자 내용을 자유롭게 수정하세요..."
+                class="w-full p-3 bg-slate-50 border border-slate-300 rounded-2xl font-sans text-xs text-slate-800 leading-relaxed focus:bg-white focus:ring-2 focus:ring-rose-500 focus:outline-none"></textarea>
+            </div>
+          </div>
+
+          <!-- 6. 🧪 문자 발송 테스트 섹션 (내 번호로 테스트 발송 / 모의 시뮬레이션 테스트) -->
+          <div class="p-3.5 bg-gradient-to-r from-indigo-50/90 via-sky-50/80 to-emerald-50/60 rounded-2xl border border-indigo-200 space-y-2.5">
+            <div class="flex items-center justify-between flex-wrap gap-1">
+              <div class="flex items-center gap-1.5 font-black text-indigo-950">
+                <i data-lucide="flask-conical" class="w-4 h-4 text-indigo-600"></i>
+                <span>🧪 문자 발송 사전 테스트 (고객에게 발송하기 전 미리 테스트)</span>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-indigo-700 border border-indigo-200">고객 안내상태 미변경</span>
+            </div>
+            <p class="text-[11px] text-slate-600">
+              실제 고객에게 보내기 전에 관리자/담당자 휴대폰 번호로 위 수정된 문자와 단축링크/버튼이 어떻게 도착하는지 테스트할 수 있습니다.
+            </p>
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <div class="relative flex-1">
+                <input type="tel" id="surveySmsTestPhoneInput" inputmode="numeric" pattern="[0-9\-]*" maxlength="13" placeholder="테스트 수신 번호 (예: 010-1234-5678)"
+                  oninput="this.value=formatCouponPhoneDisplay(this.value);"
+                  class="w-full px-3 py-2 bg-white border border-indigo-300 rounded-xl font-mono font-black text-xs text-slate-900 focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <button type="button" id="btnSurveySmsRealTest" onclick="sendSurveyTestSms('REAL_TEST')"
+                class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap active:scale-95">
+                <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+                <span>실제 번호로 테스트 발송</span>
+              </button>
+              <button type="button" id="btnSurveySmsSimTest" onclick="sendSurveyTestSms('SIMULATION')"
+                class="px-3 py-2 rounded-xl bg-white hover:bg-indigo-50 text-indigo-800 border border-indigo-300 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer whitespace-nowrap"
+                title="통신비 차감 없이 문자 전문·바이트·설문 링크를 즉시 모의 검증합니다">
+                <i data-lucide="check-check" class="w-3.5 h-3.5 text-indigo-600"></i>
+                <span>모의 검증 테스트</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 발송 진행/결과 상태 표시 박스 -->
+          <div id="surveySmsStatusBox" class="hidden p-3 rounded-xl text-xs"></div>
+
+          <!-- 하단 액션 버튼 -->
+          <div class="pt-3 border-t border-slate-200 flex items-center justify-between gap-2 flex-wrap">
+            <button type="button" onclick="copySurveySmsBodyText()" class="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>문자 내용 전체 복사</span>
+            </button>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="closeSurveyModal('surveySmsComposeModal')" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">
+                닫기
+              </button>
+              <button type="button" id="btnSubmitSurveyCustomerSms" onclick="submitSurveyCustomerSms()"
+                class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95 transition-all">
+                <i data-lucide="send" class="w-4 h-4"></i>
+                <span id="txtSubmitSurveyCustomerSms">고객에게 실제 문자 발송</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 우측 5컬럼: 실시간 스마트폰 문자 수신 화면 미리보기 -->
+        <div class="lg:col-span-5 p-5 bg-slate-900 flex flex-col items-center justify-between">
+          <div class="w-full flex items-center justify-between text-slate-300 mb-3">
+            <span class="text-xs font-extrabold flex items-center gap-1.5 text-white">
+              <i data-lucide="eye" class="w-4 h-4 text-pink-400"></i>
+              <span>실시간 스마트폰 수신 화면 미리보기</span>
+            </span>
+            <span class="text-[10.5px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-200 border border-pink-400/30 font-bold">편집 즉시 반영</span>
+          </div>
+
+          <!-- 스마트폰 목업 프레임 -->
+          <div class="w-full max-w-[330px] bg-slate-950 rounded-[32px] p-2.5 border-2 border-slate-700 shadow-2xl">
+            <div id="surveySmsPhoneScreenBg" class="bg-[#f2f4f7] rounded-[24px] overflow-hidden flex flex-col h-[490px] transition-colors">
+              <!-- 폰 상단 상태바 & 발신자 헤더 -->
+              <div class="bg-white px-4 py-3 border-b border-slate-200 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-2">
+                  <div id="surveySmsPreviewAvatar" class="w-8 h-8 rounded-full bg-gradient-to-br from-rose-600 to-pink-700 text-white flex items-center justify-center font-black text-xs">
+                    Liv
+                  </div>
+                  <div>
+                    <div class="text-xs font-black text-slate-900" id="surveySmsPreviewSender">리본케어 (1600-7835)</div>
+                    <div class="text-[10px] text-slate-400 font-mono" id="surveySmsPreviewRecipient">수신: 010-0000-0000</div>
+                  </div>
+                </div>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200" id="surveySmsPreviewBadge">LMS</span>
+              </div>
+
+              <!-- 문자/알림톡 말풍선 영역 -->
+              <div class="p-3.5 overflow-y-auto custom-scrollbar flex-1 space-y-2.5">
+                <div class="text-center">
+                  <span id="surveySmsPreviewTimeChip" class="inline-block px-2.5 py-0.5 rounded-full bg-slate-200/80 text-slate-500 text-[10px] font-semibold">안심 단축문자 · 방금 전</span>
+                </div>
+
+                <!-- 시뮬레이션/테스트 배너 (테스트 시 노출) -->
+                <div id="surveySmsPreviewSimBanner" class="hidden p-2 rounded-xl bg-indigo-600 text-white text-[10.5px] font-bold text-center shadow-xs">
+                  ✓ 테스트 수신 시뮬레이션 완료
+                </div>
+
+                <!-- 말풍선 본체 -->
+                <div class="bg-white rounded-2xl rounded-tl-sm overflow-hidden shadow-xs border border-slate-200/90">
+                  <!-- 카카오 알림톡 노란 상단 바 (알림톡 모드 시 노출) -->
+                  <div id="surveySmsPreviewKakaoTopBar" class="hidden bg-[#FEE500] px-3.5 py-2 flex items-center justify-between text-[#191919]">
+                    <span class="text-[10.5px] font-black tracking-tight">알림톡 도착</span>
+                    <span class="text-[9.5px] font-bold bg-black/10 px-1.5 py-0.5 rounded">kakao</span>
+                  </div>
+                  <div class="p-3.5 space-y-2">
+                    <div id="surveySmsPreviewSubject" class="font-black text-rose-800 text-xs border-b border-slate-100 pb-1.5">
+                      [리본케어] 모바일 간병일지 &amp; 만족도 설문 안내
+                    </div>
+                    <div id="surveySmsPreviewBody" class="text-[11.5px] text-slate-800 whitespace-pre-wrap break-all leading-relaxed font-sans"></div>
+
+                    <!-- 카카오 알림톡 공식 버튼 (URL 비노출 버튼형 모드 시 노출) -->
+                    <div id="surveySmsPreviewKakaoBtnWrap" class="hidden pt-2 border-t border-slate-100">
+                      <button type="button" onclick="openSurveySmsPreviewUrl()" class="w-full py-2.5 px-3 rounded-xl bg-[#f8f9fa] hover:bg-slate-100 border border-slate-300 text-slate-900 font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs">
+                        <span>📖 모바일 간병일지 &amp; 설문 열람하기</span>
+                        <span class="text-slate-400">↗</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 폰 하단 링크 바로 열기 바 -->
+              <div class="p-2.5 bg-white border-t border-slate-200 shrink-0">
+                <button type="button" onclick="openSurveySmsPreviewUrl()" class="w-full py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-extrabold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer">
+                  <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                  <span id="surveySmsPreviewBottomBtnTxt">단축 링크(/s/코드) 실제 열람 테스트</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-[10.5px] text-slate-400 text-center mt-3 leading-relaxed">
+            ※ 긴 전체 주소 대신 <b>/s/단축코드</b> 또는 <b>알림톡 버튼</b>으로 깔끔하게 전달됩니다.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 알리고(Aligo) SMS/LMS & 알림톡 통신망 설정 모달 -->
+  <div id="aligoConfigModal" class="fixed inset-0 z-[9999] bg-slate-900/75 backdrop-blur-xs flex items-center justify-center hidden p-4" style="z-index: 99999;">
+    <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200 relative z-10">
+      <div class="p-4 bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center font-black">
+            📱
+          </div>
+          <div>
+            <h3 class="text-sm font-black">알리고(Aligo) SMS/LMS 연동 설정</h3>
+            <p class="text-[10.5px] text-rose-100">국내 실통신망 직결 발송 엔진 및 잔액 관리</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeAligoConfigModal()" class="p-1.5 text-white/80 hover:text-white rounded-lg cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-3.5 text-xs">
+        <div id="aligoConfigStatusBox" class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-[11px]">
+          <div class="flex items-center justify-between font-bold mb-1">
+            <span>연결 상태:</span>
+            <span id="aligoConfigStatusBadge" class="px-2 py-0.5 rounded text-[10px] bg-slate-200 text-slate-700 font-mono">조회 대기</span>
+          </div>
+          <div id="aligoConfigStatusDesc" class="text-slate-500">알리고(smartsms.aligo.in) 계정 정보를 확인해주세요.</div>
+        </div>
+
+        <!-- 현재 공인 IP 안내 배너 (알리고 API Key IP등록용) -->
+        <div class="p-2.5 rounded-xl bg-blue-50/90 border border-blue-200 text-[11px] flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="font-bold text-blue-900 shrink-0">🌐 접속 공인 IP:</span>
+            <span id="aligoConfigCurrentIp" class="font-mono font-bold text-blue-700 select-all">59.7.232.159</span>
+          </div>
+          <button type="button" onclick="copyAligoCurrentIp()" class="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10.5px] shrink-0 cursor-pointer shadow-2xs flex items-center gap-1">
+            <i data-lucide="copy" class="w-3 h-3"></i> IP 복사
+          </button>
+        </div>
+
+        <div>
+          <label class="block font-black text-slate-800 mb-1">알리고 회원 아이디 (user_id) <span class="text-rose-600">*</span></label>
+          <input type="text" id="aligoConfigUserId" placeholder="예: livoncare" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-rose-500">
+        </div>
+
+        <div>
+          <label class="block font-black text-slate-800 mb-1 flex items-center justify-between">
+            <span>알리고 API Key (인증키) <span class="text-rose-600">*</span></span>
+            <a href="https://smartsms.aligo.in/admin/api/spec.html" target="_blank" class="text-[10px] text-rose-600 hover:underline">알리고 API 발급 안내 ↗</a>
+          </label>
+          <div class="relative">
+            <input type="password" id="aligoConfigApiKey" placeholder="알리고 발급 인증키 입력" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono text-slate-900 pr-10 focus:bg-white focus:ring-2 focus:ring-rose-500">
+            <button type="button" onclick="toggleAligoApiKeyVisibility()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
+              <i id="aligoConfigEyeIcon" data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">※ smartsms.aligo.in &gt; [문자API] &gt; [API Key 발급/관리]에서 확인</p>
+        </div>
+
+        <div>
+          <label class="block font-black text-slate-800 mb-1">알리고 등록 대표 발신번호 <span class="text-rose-600">*</span></label>
+          <input type="text" id="aligoConfigSender" placeholder="예: 16007835 또는 15447119" value="16007835" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-rose-500">
+          <p class="text-[10px] text-slate-400 mt-1">※ 알리고에 사전 등록 승인된 발신번호만 실제 전송이 허용됩니다.</p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">카카오 알림톡 발신프로필키 (선택)</label>
+          <input type="text" id="aligoConfigSenderKey" placeholder="카카오 발신프로필키(선택)" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl font-mono text-slate-800 text-[11px] focus:bg-white">
+        </div>
+
+        <div class="pt-2 flex items-center justify-between gap-2">
+          <button type="button" id="btnTestAligoConnection" onclick="testAligoConnection()" class="px-3 py-2 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> 잔액/연결 테스트
+          </button>
+          <div class="flex items-center gap-1.5">
+            <button type="button" onclick="closeAligoConfigModal()" class="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs cursor-pointer">
+              닫기
+            </button>
+            <button type="button" id="btnSaveAligoConfig" onclick="saveAligoConfig()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-xs cursor-pointer">
+              설정 저장
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -12251,6 +13576,10 @@
                 <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200/80 hover:border-indigo-300 cursor-pointer text-slate-700 text-xs shadow-2xs">
                   <input type="checkbox" name="adminMenuCheck" value="surveymgmt" class="rounded text-indigo-600 focus:ring-indigo-500">
                   <span class="font-medium">만족도조사 관리</span>
+                </label>
+                <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200/80 hover:border-indigo-300 cursor-pointer text-slate-700 text-xs shadow-2xs">
+                  <input type="checkbox" name="adminMenuCheck" value="surveymgmt_new" class="rounded text-indigo-600 focus:ring-indigo-500">
+                  <span class="font-medium">만족도조사 관리(new)</span>
                 </label>
                 <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200/80 hover:border-indigo-300 cursor-pointer text-slate-700 text-xs shadow-2xs">
                   <input type="checkbox" name="adminMenuCheck" value="directory" class="rounded text-indigo-600 focus:ring-indigo-500">
