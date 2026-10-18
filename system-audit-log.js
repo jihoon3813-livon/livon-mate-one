@@ -26,309 +26,108 @@
   } catch (e) {}
 
   /**
-   * 현실적인 초기 시스템 감사 로그 시드 데이터 생성
+   * 목업/더미/샘플 감사 로그 감지 함수 (과거 생성된 가짜 11건 샘플 등 전수 필터링)
    */
-  /**
-   * 실제 운영 데이터 기반 실시간 감사 로그 생성기
-   */
-  function generateSeedAuditLogs() {
-    const now = new Date();
-    const subMin = (min) => new Date(now.getTime() - min * 60 * 1000);
-    const fmt = (d) => {
-      const pad = n => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    };
+  function isMockAuditLog(l) {
+    if (!l || typeof l !== 'object') return true;
+    const id = String(l.id || '');
+    const uname = String(l.user?.username || '');
+    const name = String(l.user?.name || '');
+    const target = String(l.target || '');
+    const summary = String(l.summary || '');
 
-    // 실시간 운영 데이터 추출 (메모리 또는 기본 백업 실데이터)
-    const apps = Array.isArray(window.gApps) && window.gApps.length > 0 ? window.gApps : [];
-    const assigns = Array.isArray(window.gAssigns) && window.gAssigns.length > 0 ? window.gAssigns : [];
-    const claims = Array.isArray(window.gClaims) && window.gClaims.length > 0 ? window.gClaims : [];
-    const payouts = Array.isArray(window.gPayouts) && window.gPayouts.length > 0 ? window.gPayouts : [];
-    const caregivers = Array.isArray(window.gCaregivers) && window.gCaregivers.length > 0 ? window.gCaregivers : [];
-    const centers = Array.isArray(window.gCenters) && window.gCenters.length > 0 ? window.gCenters : [];
-    const adjusters = Array.isArray(window.gAdjusters) && window.gAdjusters.length > 0 ? window.gAdjusters : [];
+    // 1. 과거 더미 시드 패턴
+    if (id.includes('LOG-1790120476967-')) return true;
+    if (/^LOG-\d{10,14}-(0[1-9]|1[0-1])$/.test(id)) return true;
+    if (uname === 'settle_mgr' || uname === 'care_counsel') return true;
+    if (name === '정산팀장' || name === '상담팀장' || name === '이매칭' || name === '박정산') return true;
+    if (target.includes('윤석찬') || target.includes('CLM-684296') || target.includes('PAY-10291') || target.includes('ASN-48291')) return true;
+    if (target.includes('청구 Q0487 (고객: 이혜숙') || target.includes('지급 P0627 (간병인: 최이순') || target.includes('배정 A0269 (고객: 박은희')) return true;
+    if (target.includes('신청 C0302 (고객: 이해열') || target.includes('신청 C0303 (고객: 김성곤')) return true;
+    if (summary.includes('1차 간병비 청구금액 420,000원 입금확인') || summary.includes('1차 간병비 420,000원 정산 승인 및 계좌 송금')) return true;
+    if (summary.includes('담당 간병인 박순천 매칭 확정') || summary.includes('케어포트(CarePort) 모바일 음성 간병일지')) return true;
+    if (summary.includes('현대해상 간병 서비스 개시 통보서 및 접수 확인증 팩스 정상 발송')) return true;
+    if (summary.includes('재무정산팀 관리자 정상 로그인 인증 완료') || summary.includes('원수사 탭 정렬 순서 [전체 > 삼성화재 > 현대해상]')) return true;
 
-    const p1 = apps.find(a => a.patientName === '이혜숙') || apps.find(a => a.patientName && a.accidentNumber) || { patientName: '이혜숙', accidentNumber: '2609918702', insuranceCompany: '현대해상', hospitalName: '익산제일병원', id: 'C0297' };
-    const p2 = apps.find(a => a.patientName === '박은희') || apps.find(a => a.patientName && a.id !== p1.id) || { patientName: '박은희', accidentNumber: '2605519345', insuranceCompany: '현대해상', hospitalName: '성모병원', id: 'C0300' };
-    const p3 = apps.find(a => a.patientName === '김성곤') || { patientName: '김성곤', accidentNumber: '26S113533', insuranceCompany: '삼성화재', hospitalName: '강동병원 516호', id: 'C0303' };
-    const p4 = apps.find(a => a.patientName === '이해열') || { patientName: '이해열', accidentNumber: '26S120040', insuranceCompany: '삼성화재', hospitalName: '씨엠병원 534호', id: 'C0302' };
-    const p5 = apps.find(a => a.patientName === '박지영') || { patientName: '박지영', accidentNumber: '26S115759', insuranceCompany: '삼성화재', hospitalName: '삼육병원', id: 'C0294' };
-
-    const cg1 = caregivers.find(c => c.name === '최이순') || caregivers[0] || { name: '최이순', centerName: '경남성심간병', phone: '010-8645-1345', id: 'CG010' };
-    const cg2 = caregivers.find(c => c.name === '박순천') || caregivers[1] || { name: '박순천', centerName: '개인', phone: '010-6861-4997', id: 'CG001' };
-    const cg3 = caregivers.find(c => c.name === '박종수') || caregivers[2] || { name: '박종수', centerName: '영등포', phone: '010-5342-7053', id: 'CG002' };
-
-    const adj1 = adjusters.find(a => a.name === '배진희') || adjusters[0] || { name: '배진희', firm: '하이라이프손해사정', phone: '042-829-1418', fax: '0507-739-0092', insuranceCompany: '현대해상' };
-    const adj2 = adjusters.find(a => a.name === '김정현') || adjusters[1] || { name: '김정현', firm: '삼성화재 간병지원파트', phone: '02-3485-9114', fax: '02-3485-9100', insuranceCompany: '삼성화재' };
-
-    const totalAppCount = apps.length || 284;
-    const totalAssignCount = assigns.length || 270;
-    const totalClaimCount = claims.length || 487;
-    const totalPayoutCount = payouts.length || 505;
-    const totalCgCount = caregivers.length || 219;
-    const totalCtrCount = centers.length || 86;
-    const totalAdjCount = adjusters.length || 131;
-
-    return [
-      {
-        id: 'LOG-' + Date.now() + '-01',
-        timestamp: fmt(subMin(2)),
-        user: { username: 'settle_mgr', name: '정산팀장', dept: '재무정산팀', role: 'FINANCE_ADMIN' },
-        ip: '211.204.17.92',
-        category: '보험청구',
-        actionType: 'STATUS_CHANGE',
-        target: `청구 Q0487 (고객: ${p1.patientName}, ${p1.insuranceCompany})`,
-        summary: `1차 간병비 청구금액 420,000원 입금확인 및 수납완료 처리`,
-        status: 'SUCCESS',
-        changes: {
-          '청구상태': { before: '미수납 (청구 대기)', after: '입금확인됨 (수납완료)' },
-          '실입금액': { before: '0원', after: '420,000원' },
-          '원수사/사고번호': { before: '-', after: `${p1.insuranceCompany} (${p1.accidentNumber || '2609918702'})` },
-          '입금일시': { before: '-', after: fmt(subMin(2)) }
-        },
-        userAgent: navigator.userAgent
-      },
-      {
-        id: 'LOG-' + Date.now() + '-02',
-        timestamp: fmt(subMin(8)),
-        user: { username: 'settle_mgr', name: '정산팀장', dept: '재무정산팀', role: 'FINANCE_ADMIN' },
-        ip: '211.204.17.92',
-        category: '간병비지급',
-        actionType: 'STATUS_CHANGE',
-        target: `지급 P0627 (간병인: ${cg1.name} / 고객: ${p1.patientName})`,
-        summary: `1차 간병비 420,000원 정산 승인 및 계좌 송금 완료`,
-        status: 'SUCCESS',
-        changes: {
-          '지급상태': { before: '미지급 (지급 대기)', after: '지급완료' },
-          '지급금액': { before: '0원', after: '420,000원' },
-          '수령계좌': { before: '-', after: '농협 352-1682-5290 (최이순)' },
-          '지급일시': { before: '-', after: fmt(subMin(8)) }
-        },
-        userAgent: navigator.userAgent
-      },
-      {
-        id: 'LOG-' + Date.now() + '-03',
-        timestamp: fmt(subMin(18)),
-        user: { username: 'care_counsel', name: '상담팀장', dept: '고객상담팀', role: 'COUNSEL_ADMIN' },
-        ip: '175.209.41.88',
-        category: '간병배정',
-        actionType: 'UPDATE',
-        target: `배정 A0269 (고객: ${p2.patientName}, ${p2.hospitalName || '성모병원'})`,
-        summary: `담당 간병인 ${cg2.name} 매칭 확정 및 스케줄 캘린더 등록`,
-        status: 'SUCCESS',
-        changes: {
-          '배정상태': { before: '배정대기', after: '배정완료' },
-          '담당간병인': { before: '미배정', after: `${cg2.name} (${cg2.phone || '010-8645-1345'})` },
-          '소속센터': { before: '미지정', after: `${cg2.centerName || '개인'}` },
-          '일당기준': { before: '-', after: '140,000원' }
-        },
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0'
-      },
-      {
-        id: 'LOG-' + Date.now() + '-04',
-        timestamp: fmt(subMin(32)),
-        user: { username: 'superadmin', name: '김지훈 대표이사', dept: '총괄관리', role: 'SUPER_ADMIN' },
-        ip: window._clientIp || '121.134.82.15',
-        category: '간병일지',
-        actionType: 'READ',
-        target: `간병일지 (환자: ${p5.patientName}, 간병인: ${cg3.name})`,
-        summary: `케어포트(CarePort) 모바일 음성 간병일지 원문 및 바이탈 체크 확인`,
-        status: 'SUCCESS',
-        changes: {
-          '조회일자': { before: '-', after: '2026-09-22 케어일지' },
-          '담당간병인': { before: '-', after: `${cg3.name} (${cg3.centerName || '영등포'})` },
-          '환자상태': { before: '-', after: '식사 정상 / 투약 완료 / 거동 보조 정상' }
-        },
-        userAgent: navigator.userAgent
-      },
-      {
-        id: 'LOG-' + Date.now() + '-05',
-        timestamp: fmt(subMin(45)),
-        user: { username: 'care_counsel', name: '상담팀장', dept: '고객상담팀', role: 'COUNSEL_ADMIN' },
-        ip: '175.209.41.88',
-        category: '고객신청',
-        actionType: 'CREATE',
-        target: `신청 ${p4.id || 'C0302'} (고객: ${p4.patientName}, ${p4.hospitalName || '씨엠병원 534호'})`,
-        summary: `${p4.insuranceCompany}(사고번호: ${p4.accidentNumber || '26S120040'}) 신규 간병 지원 신청 접수 완료`,
-        status: 'SUCCESS',
-        changes: {
-          '신청상태': { before: '-', after: '접수 (사전명단매칭완료)' },
-          '입원병원': { before: '-', after: `${p4.hospitalName || '씨엠병원 534호'}` },
-          '원수사': { before: '-', after: `${p4.insuranceCompany}` },
-          '신청일시': { before: '-', after: fmt(subMin(45)) }
-        },
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0'
-      },
-      {
-        id: 'LOG-' + Date.now() + '-06',
-        timestamp: fmt(subMin(65)),
-        user: { username: 'care_counsel', name: '상담팀장', dept: '고객상담팀', role: 'COUNSEL_ADMIN' },
-        ip: '175.209.41.88',
-        category: '고객신청',
-        actionType: 'CREATE',
-        target: `신청 ${p3.id || 'C0303'} (고객: ${p3.patientName}, ${p3.hospitalName || '강동병원 516호'})`,
-        summary: `${p3.insuranceCompany}(사고번호: ${p3.accidentNumber || '26S113533'}) 간병 지원 접수 및 사전 매칭 검토`,
-        status: 'SUCCESS',
-        changes: {
-          '신청상태': { before: '-', after: '접수' },
-          '입원병원': { before: '-', after: `${p3.hospitalName || '강동병원 516호'}` },
-          '원수사': { before: '-', after: `${p3.insuranceCompany}` }
-        },
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0'
-      },
-      {
-        id: 'LOG-' + Date.now() + '-07',
-        timestamp: fmt(subMin(85)),
-        user: { username: 'superadmin', name: '김지훈 대표이사', dept: '총괄관리', role: 'SUPER_ADMIN' },
-        ip: window._clientIp || '121.134.82.15',
-        category: '데이터동기화',
-        actionType: 'SYNC',
-        target: `종합 관리대장 실데이터 엑셀 업로드 동기화`,
-        summary: `운영 엑셀 관리대장 전수 파싱 및 파트너/인력 디렉토리 동기화 완료`,
-        status: 'SUCCESS',
-        changes: {
-          '고객신청': { before: '-', after: `${totalAppCount}건 전수 적재` },
-          '간병배정': { before: '-', after: `${totalAssignCount}건 전수 적재` },
-          '보험청구': { before: '-', after: `${totalClaimCount}건 전수 적재` },
-          '간병인지급': { before: '-', after: `${totalPayoutCount}건 전수 적재` },
-          '간병인력풀': { before: '-', after: `${totalCgCount}명 실데이터 연동` },
-          '협력센터': { before: '-', after: `${totalCtrCount}개소 등록` },
-          '손사디렉토리': { before: '-', after: `${totalAdjCount}명 등록` }
-        },
-        userAgent: navigator.userAgent
-      },
-      {
-        id: 'LOG-' + Date.now() + '-08',
-        timestamp: fmt(subMin(110)),
-        user: { username: 'superadmin', name: '김지훈 대표이사', dept: '총괄관리', role: 'SUPER_ADMIN' },
-        ip: window._clientIp || '121.134.82.15',
-        category: '시스템설정',
-        actionType: 'UPDATE',
-        target: `통합 고객 관리 허브 탭 정렬 및 기본 뷰 환경설정`,
-        summary: `원수사 탭 정렬 순서 [전체 > 삼성화재 > 현대해상] 및 디폴트 탭 [전체] 설정 적용`,
-        status: 'SUCCESS',
-        changes: {
-          '탭배치순서': { before: '삼성화재, 현대해상, 전체', after: '전체, 삼성화재, 현대해상' },
-          '디폴트뷰': { before: '원수사별 개별 뷰', after: '전체(ALL) 고객 및 파이프라인 통합 모드' },
-          '반영위치': { before: '-', after: '상단 메인 탭바 & 스티키 퀵 세그먼트 버튼' }
-        },
-        userAgent: navigator.userAgent
-      },
-      {
-        id: 'LOG-' + Date.now() + '-09',
-        timestamp: fmt(subMin(150)),
-        user: { username: 'care_counsel', name: '상담팀장', dept: '고객상담팀', role: 'COUNSEL_ADMIN' },
-        ip: '175.209.41.88',
-        category: '팩스관리',
-        actionType: 'SEND',
-        target: `팩스 발송 (${adj1.firm} ${adj1.name} 손사, ${adj1.fax || '0507-739-0092'})`,
-        summary: `현대해상 간병 서비스 개시 통보서 및 접수 확인증 팩스 정상 발송 완료`,
-        status: 'SUCCESS',
-        changes: {
-          '수신처': { before: '-', after: `${adj1.firm} (${adj1.name} 손사)` },
-          '팩스번호': { before: '-', after: `${adj1.fax || '0507-739-0092'}` },
-          '발송문서': { before: '-', after: 'HD_FORM_01 (간병개시통보서 2장)' },
-          '발송결과': { before: '발송대기', after: '전송완료 (2페이지 성공)' }
-        },
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0'
-      },
-      {
-        id: 'LOG-' + Date.now() + '-10',
-        timestamp: fmt(subMin(240)),
-        user: { username: 'superadmin', name: '김지훈 대표이사', dept: '총괄관리', role: 'SUPER_ADMIN' },
-        ip: window._clientIp || '121.134.82.15',
-        category: '인증/로그인',
-        actionType: 'LOGIN',
-        target: `사내 보안 KMS 인증 세션`,
-        summary: `최고관리자 사내망(IP: 121.134.82.15) 정상 로그인 인증 및 권한 토큰 발급`,
-        status: 'SUCCESS',
-        changes: {
-          '로그인계정': { before: '-', after: 'superadmin (김지훈 대표이사)' },
-          '인증수단': { before: '-', after: '사내 보안 인증 및 토큰 검증' },
-          '접속IP': { before: '-', after: window._clientIp || '121.134.82.15' },
-          '권한등급': { before: '-', after: 'SUPER_ADMIN (전체 시스템 권한)' }
-        },
-        userAgent: navigator.userAgent
-      },
-      {
-        id: 'LOG-' + Date.now() + '-11',
-        timestamp: fmt(subMin(400)),
-        user: { username: 'settle_mgr', name: '정산팀장', dept: '재무정산팀', role: 'FINANCE_ADMIN' },
-        ip: '211.204.17.92',
-        category: '인증/로그인',
-        actionType: 'LOGIN',
-        target: `사내 보안 KMS 인증 세션`,
-        summary: `재무정산팀 관리자 정상 로그인 인증 완료`,
-        status: 'SUCCESS',
-        changes: {
-          '로그인계정': { before: '-', after: 'settle_mgr (정산팀장)' },
-          '접속IP': { before: '-', after: '211.204.17.92' },
-          '허용업무': { before: '-', after: '보험청구 대사, 간병비 지급 정산, 엑셀 대장 추출' }
-        },
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0'
-      }
-    ];
+    return false;
   }
+  window.isMockAuditLog = isMockAuditLog;
 
   /**
-   * 감사 로그 시스템 초기화 (이전 더미/목업 데이터 자동 정화)
+   * 감사 로그 시스템 초기화 (가짜 목업 데이터 완전 제거 및 실제 감사 로그 영구 로드)
    */
   window.initSystemAuditLogs = async function () {
+    const logMap = new Map();
+
+    // 1. 시스템 실제 감사 로그 데이터(system-audit-data.js) 우선 적재
+    if (Array.isArray(window.REAL_SYSTEM_AUDIT_LOGS)) {
+      window.REAL_SYSTEM_AUDIT_LOGS.forEach(l => {
+        if (l && l.id && !isMockAuditLog(l)) {
+          logMap.set(l.id, l);
+        }
+      });
+    }
+
+    // 2. 브라우저 LocalStorage에 저장된 실제 사용자 활동 로그 병합 (가짜 샘플은 자동 정화 및 삭제)
     try {
       const saved = localStorage.getItem('LIVON_SYSTEM_AUDIT_LOGS');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          window.gSystemAuditLogs = parsed.filter(l => l && typeof l === 'object');
+        if (Array.isArray(parsed)) {
+          parsed.forEach(l => {
+            if (l && l.id && !isMockAuditLog(l)) {
+              logMap.set(l.id, l);
+            }
+          });
         }
       }
     } catch (e) {
       console.warn('감사 로그 로컬 로드 오류:', e);
     }
 
-    if (!Array.isArray(window.gSystemAuditLogs) || window.gSystemAuditLogs.length === 0) {
-      window.gSystemAuditLogs = generateSeedAuditLogs();
-      try {
-        localStorage.setItem('LIVON_SYSTEM_AUDIT_LOGS', JSON.stringify(window.gSystemAuditLogs));
-      } catch (e) {}
-    }
+    // 3. 시간 역순 정렬 후 전역 변수에 반영
+    let list = Array.from(logMap.values());
+    list.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+    window.gSystemAuditLogs = list;
 
-    // 🚀 [핵심 개선] 서버 응답을 기다리지 않고 현재 로컬/시드 로그 즉시 1차 렌더링 (0ms 화면 즉시 표시)
+    // 4. 정제된 실제 로그만 로컬스토리지에 재저장 (더미 완벽 소멸)
+    try {
+      localStorage.setItem('LIVON_SYSTEM_AUDIT_LOGS', JSON.stringify(window.gSystemAuditLogs));
+    } catch (e) {}
+
+    // 5. 1차 화면 즉시 표시
     if (typeof window.renderSystemAuditLogs === 'function') {
       window.renderSystemAuditLogs();
     }
 
-    // 서버 실시간 영구 보관소(/api/system/audit-logs)와 양방향 자동 동기화 (백그라운드)
+    // 6. 서버 실시간 영구 보관소(/api/system/audit-logs)와 양방향 자동 동기화
     try {
       const res = await fetch('/api/system/audit-logs');
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.logs)) {
-          if (data.logs.length > 0) {
-            // 서버에 보관된 영구 로그와 로컬 로그 병합 (id 기준 중복 제거)
-            const map = new Map();
-            data.logs.forEach(l => { if (l && l.id) map.set(l.id, l); });
-            (window.gSystemAuditLogs || []).forEach(l => { if (l && l.id && !map.has(l.id)) map.set(l.id, l); });
-            const merged = Array.from(map.values()).sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-            window.gSystemAuditLogs = merged;
-          } else if (window.gSystemAuditLogs && window.gSystemAuditLogs.length > 0) {
-            // 서버가 비어있으면 현재 로컬 로그를 서버에 최초 영구 업로드(시딩)
-            fetch('/api/system/audit-logs', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ logs: window.gSystemAuditLogs })
-            }).catch(() => {});
-          }
-          try {
-            localStorage.setItem('LIVON_SYSTEM_AUDIT_LOGS', JSON.stringify(window.gSystemAuditLogs));
-          } catch (e) {}
-          if (typeof window.renderSystemAuditLogs === 'function') {
-            window.renderSystemAuditLogs();
+          let hasNew = false;
+          data.logs.forEach(l => {
+            if (l && l.id && !isMockAuditLog(l) && !logMap.has(l.id)) {
+              logMap.set(l.id, l);
+              hasNew = true;
+            }
+          });
+
+          if (hasNew || data.logs.some(l => isMockAuditLog(l))) {
+            const cleanList = Array.from(logMap.values()).sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+            window.gSystemAuditLogs = cleanList;
+            try {
+              localStorage.setItem('LIVON_SYSTEM_AUDIT_LOGS', JSON.stringify(cleanList));
+            } catch (e) {}
+            if (typeof window.renderSystemAuditLogs === 'function') {
+              window.renderSystemAuditLogs();
+            }
           }
         }
       }
     } catch (err) {
-      console.warn('[Audit Log Cloud Sync Warning]', err);
+      console.warn('[Audit Log Server Sync Warning]', err);
     }
   };
 
@@ -476,30 +275,21 @@
     const tbody = document.getElementById('auditLogsTableBody');
     if (!tbody) return;
 
-    // 이전 테스트 목업 데이터(윤석찬, CLM-684296 등)가 남아있는 경우 즉시 실데이터 로그로 전면 교체
-    if (Array.isArray(window.gSystemAuditLogs) && window.gSystemAuditLogs.some(l => 
-      (l.target && (l.target.includes('윤석찬') || l.target.includes('CLM-684296') || l.target.includes('PAY-10291') || l.target.includes('ASN-48291') || l.target.includes('김리본'))) ||
-      (l.user && (l.user.name === '김리본' || l.user.name === '박정산' || l.user.name === '이매칭'))
-    )) {
-      window.gSystemAuditLogs = generateSeedAuditLogs();
-      try {
-        localStorage.setItem('LIVON_SYSTEM_AUDIT_LOGS', JSON.stringify(window.gSystemAuditLogs));
-      } catch (e) {}
+    // 가짜 목업/더미 데이터가 남아있는 경우 즉시 실데이터 로그로 전면 정화(Cleanse)
+    if (Array.isArray(window.gSystemAuditLogs)) {
+      const beforeLen = window.gSystemAuditLogs.length;
+      window.gSystemAuditLogs = window.gSystemAuditLogs.filter(l => !isMockAuditLog(l));
+      if (window.gSystemAuditLogs.length !== beforeLen) {
+        try {
+          localStorage.setItem('LIVON_SYSTEM_AUDIT_LOGS', JSON.stringify(window.gSystemAuditLogs));
+        } catch (e) {}
+      }
     }
 
-    // 🚀 데이터가 비어있으면 동기적으로 즉시 실데이터 시드 생성
+    // 🚀 데이터가 비어있으면 실제 시스템 감사 로그(REAL_SYSTEM_AUDIT_LOGS) 즉시 탑재
     if (!Array.isArray(window.gSystemAuditLogs) || window.gSystemAuditLogs.length === 0) {
-      try {
-        const saved = localStorage.getItem('LIVON_SYSTEM_AUDIT_LOGS');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            window.gSystemAuditLogs = parsed.filter(l => l && typeof l === 'object');
-          }
-        }
-      } catch (e) {}
-      if (!Array.isArray(window.gSystemAuditLogs) || window.gSystemAuditLogs.length === 0) {
-        window.gSystemAuditLogs = generateSeedAuditLogs();
+      if (Array.isArray(window.REAL_SYSTEM_AUDIT_LOGS) && window.REAL_SYSTEM_AUDIT_LOGS.length > 0) {
+        window.gSystemAuditLogs = window.REAL_SYSTEM_AUDIT_LOGS.filter(l => !isMockAuditLog(l));
         try {
           localStorage.setItem('LIVON_SYSTEM_AUDIT_LOGS', JSON.stringify(window.gSystemAuditLogs));
         } catch (e) {}

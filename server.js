@@ -635,9 +635,27 @@ function getStoredAuditLogs() {
   return [];
 }
 
+function isMockAuditLog(l) {
+  if (!l || typeof l !== 'object') return true;
+  const id = String(l.id || '');
+  const uname = String(l.user?.username || '');
+  const name = String(l.user?.name || '');
+  const target = String(l.target || '');
+  const summary = String(l.summary || '');
+  if (id.includes('LOG-1790120476967-')) return true;
+  if (/^LOG-\d{10,14}-(0[1-9]|1[0-1])$/.test(id)) return true;
+  if (uname === 'settle_mgr' || uname === 'care_counsel') return true;
+  if (name === '정산팀장' || name === '상담팀장' || name === '이매칭' || name === '박정산') return true;
+  if (target.includes('청구 Q0487 (고객: 이혜숙') || target.includes('지급 P0627 (간병인: 최이순') || target.includes('배정 A0269 (고객: 박은희')) return true;
+  if (target.includes('신청 C0302 (고객: 이해열') || target.includes('신청 C0303 (고객: 김성곤')) return true;
+  if (summary.includes('1차 간병비 청구금액 420,000원 입금확인') || summary.includes('1차 간병비 420,000원 정산 승인 및 계좌 송금')) return true;
+  return false;
+}
+
 function saveAuditLogsToDisk(logs) {
   try {
-    const trimmed = Array.isArray(logs) ? logs.slice(0, 5000) : [];
+    const cleanLogs = Array.isArray(logs) ? logs.filter(l => !isMockAuditLog(l)) : [];
+    const trimmed = cleanLogs.slice(0, 5000);
     fs.writeFileSync(AUDIT_LOG_FILE, JSON.stringify(trimmed, null, 2), 'utf-8');
     return true;
   } catch (err) {
@@ -648,7 +666,7 @@ function saveAuditLogsToDisk(logs) {
 
 function appendServerAuditLog(logItem) {
   try {
-    if (!logItem) return null;
+    if (!logItem || isMockAuditLog(logItem)) return null;
     const logs = getStoredAuditLogs();
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');
@@ -1186,7 +1204,7 @@ function appendServerAuditLog(logItem) {
               const idSet = new Set(current.map(l => l && l.id));
               let addedCount = 0;
               newLogs.forEach(l => {
-                if (l && l.id && !idSet.has(l.id)) {
+                if (l && l.id && !isMockAuditLog(l) && !idSet.has(l.id)) {
                   current.push(l);
                   idSet.add(l.id);
                   addedCount++;

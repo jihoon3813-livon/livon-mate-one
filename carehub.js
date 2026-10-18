@@ -6114,6 +6114,117 @@ window.onCustEditGuardianRelationChange = onCustEditGuardianRelationChange;
 // =========================================================================
 // [비고 / 특이사항] 다중 항목 동적 추가/수정/삭제 관리 엔진
 // =========================================================================
+
+/**
+ * 현재 로그인 관리자 또는 시스템 담당자의 명확한 표시명 반환
+ */
+function getCurrentMemoAuthorInfo() {
+  let admin = null;
+  if (typeof gCurrentAdmin !== 'undefined' && gCurrentAdmin && (gCurrentAdmin.name || gCurrentAdmin.username)) {
+    admin = gCurrentAdmin;
+  } else {
+    try {
+      const raw = localStorage.getItem('REBORN_CURRENT_ADMIN') || sessionStorage.getItem('REBORN_CURRENT_ADMIN');
+      if (raw) admin = JSON.parse(raw);
+    } catch (e) {}
+  }
+  if (!admin && typeof window !== 'undefined' && window.currentUser) {
+    admin = window.currentUser;
+  }
+
+  if (admin && admin.name) {
+    let name = admin.name;
+    if (name === '김리본' || name === '김지훈') name = '리본케어';
+    const dept = admin.dept || '';
+    const role = admin.role || '';
+    if (dept && !name.includes(dept)) {
+      return `${name} (${dept})`;
+    } else if (role && role !== 'SUPER_ADMIN' && role !== '최고관리자' && !name.includes(role)) {
+      return `${name} (${role})`;
+    } else if (name === '리본케어') {
+      return '리본케어 (운영총괄)';
+    }
+    return name;
+  }
+  return '간병상담팀';
+}
+window.getCurrentMemoAuthorInfo = getCurrentMemoAuthorInfo;
+
+/**
+ * 불명확한 '관리자', 'admin' 등으로 표기된 작성자를 문맥과 현재 담당자에 맞게 스마트 보정
+ */
+function resolveMemoAuthor(author, itemText, app) {
+  const trimmed = (author || '').trim();
+  const isVague = !trimmed || trimmed === '관리자' || trimmed === 'admin' || trimmed === '운영자' || trimmed === '상담원';
+  if (!isVague) return trimmed;
+
+  const text = itemText || '';
+  const insName = (app && app.insuranceCompany) ? app.insuranceCompany : '원수사';
+
+  // 1. 초기 접수 메모(진단명, 사고유형, 병원장소 등)
+  if (text.startsWith('[진단명:') || text.startsWith('진단명:') || text.includes('장소:') || text.includes('초기 접수') || text.includes('사고번호')) {
+    return `${insName} 접수처`;
+  }
+
+  // 2. 현재 로그인 관리자 정보가 있으면 반영
+  const currentAuthor = getCurrentMemoAuthorInfo();
+  if (currentAuthor && currentAuthor !== '간병상담팀') {
+    return currentAuthor;
+  }
+
+  // 3. 기본 비고/업무 메모
+  return '간병상담팀';
+}
+window.resolveMemoAuthor = resolveMemoAuthor;
+
+/**
+ * 비고 작성자 후보 목록 생성
+ */
+function getMemoAuthorCandidates(app) {
+  const currentAuthor = getCurrentMemoAuthorInfo();
+  const insName = (app && app.insuranceCompany) ? app.insuranceCompany : '원수사';
+  const insCandidate = `${insName} 접수처`;
+
+  const candidates = [];
+  if (currentAuthor) candidates.push(currentAuthor);
+  if (!candidates.includes(insCandidate)) candidates.push(insCandidate);
+  if (!candidates.includes('간병상담팀')) candidates.push('간병상담팀');
+  if (!candidates.includes('간병배정팀')) candidates.push('간병배정팀');
+  if (!candidates.includes('정산·청구팀')) candidates.push('정산·청구팀');
+
+  // gAdmins 목록에서 주요 관리자들 추가
+  const adminList = (typeof gAdmins !== 'undefined' && Array.isArray(gAdmins) && gAdmins.length > 0)
+    ? gAdmins
+    : ((window.REBORN_DATA && Array.isArray(window.REBORN_DATA.admins)) ? window.REBORN_DATA.admins : []);
+
+  adminList.forEach(a => {
+    if (!a || !a.name) return;
+    let n = a.name;
+    if (n === '김리본' || n === '김지훈') n = '리본케어';
+    const d = a.dept ? ` (${a.dept})` : '';
+    const label = `${n}${d}`;
+    if (!candidates.includes(label) && !candidates.includes(n)) {
+      candidates.push(label);
+    }
+  });
+
+  return candidates;
+}
+window.getMemoAuthorCandidates = getMemoAuthorCandidates;
+
+function handleMemoAuthorSelectChange(appId, selectEl) {
+  if (!selectEl) return;
+  const customInput = document.getElementById(`newHubMemoAuthorCustom_${appId}`);
+  if (!customInput) return;
+  if (selectEl.value === '__custom__') {
+    customInput.classList.remove('hidden');
+    customInput.focus();
+  } else {
+    customInput.classList.add('hidden');
+  }
+}
+window.handleMemoAuthorSelectChange = handleMemoAuthorSelectChange;
+
 function getCustomerMemoList(app) {
   if (!app) return [];
   if (Array.isArray(app.memoList) && app.memoList.length > 0) {
@@ -6128,14 +6239,14 @@ function getCustomerMemoList(app) {
       id: 'm_init_' + idx,
       text: line,
       createdAt: dateStr,
-      author: '관리자'
+      author: resolveMemoAuthor('관리자', line, app)
     }));
   }
   return [{
     id: 'm_init_0',
     text: raw,
     createdAt: dateStr,
-    author: '관리자'
+    author: resolveMemoAuthor('관리자', raw, app)
   }];
 }
 window.getCustomerMemoList = getCustomerMemoList;
@@ -6144,6 +6255,7 @@ function renderCustomerMemoSectionHtml(app, options = {}) {
   if (!app) return '';
   const memoList = getCustomerMemoList(app);
   const hasMemos = memoList.length > 0 || Boolean(app.memo) || Boolean(app.specialNotes);
+  const authorCandidates = getMemoAuthorCandidates(app);
 
   return `
     <div id="hubMemoSection_${app.id}" class="hub-memo-section-${app.id} bg-white p-3.5 sm:p-4 rounded-2xl border ${hasMemos ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200/90'} shadow-xs space-y-2.5 text-xs transition-all">
@@ -6175,7 +6287,9 @@ function renderCustomerMemoSectionHtml(app, options = {}) {
           <div class="py-2.5 px-3 text-center text-slate-400 italic text-[11px] bg-white/70 rounded-xl border border-dashed border-amber-200">
             등록된 비고 및 특이사항이 없습니다. 아래 입력창에 작성 후 [추가]를 눌러주세요.
           </div>
-        ` : memoList.map((item, idx) => `
+        ` : memoList.map((item, idx) => {
+          const displayAuthor = resolveMemoAuthor(item.author, item.text, app);
+          return `
           <div id="hubMemoItemRow_${app.id}_${item.id}" class="group bg-white p-2.5 rounded-xl border border-amber-200/80 hover:border-amber-400 shadow-2xs transition-all flex items-start justify-between gap-2.5 text-xs">
             <div class="flex items-start gap-2 min-w-0 flex-1">
               <span class="w-5 h-5 rounded-md bg-amber-100/90 text-amber-800 font-mono font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
@@ -6185,16 +6299,22 @@ function renderCustomerMemoSectionHtml(app, options = {}) {
                 <div id="hubMemoItemText_${app.id}_${item.id}" class="text-slate-800 text-[11.5px] font-medium leading-relaxed whitespace-pre-wrap break-words">
                   ${typeof escapeHtml === 'function' ? escapeHtml(item.text) : item.text}
                 </div>
-                <div class="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1.5">
-                  <span>${item.createdAt || ''}</span>
-                  ${item.author ? `<span class="text-slate-400">·</span><span class="text-slate-500 font-sans font-medium">${typeof escapeHtml === 'function' ? escapeHtml(item.author) : item.author}</span>` : ''}
+                <div class="text-[10px] text-slate-400 font-mono mt-1 flex items-center gap-1.5 flex-wrap">
+                  <span class="inline-flex items-center gap-1 text-slate-500 font-sans">
+                    <i data-lucide="clock" class="w-2.5 h-2.5 text-slate-400"></i> ${item.createdAt || ''}
+                  </span>
+                  <span class="text-slate-300">·</span>
+                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100/90 text-amber-950 border border-amber-300/80 font-sans font-bold text-[10.5px] shadow-2xs" title="작성자">
+                    <i data-lucide="user-check" class="w-2.5 h-2.5 text-amber-700"></i>
+                    작성: ${typeof escapeHtml === 'function' ? escapeHtml(displayAuthor) : displayAuthor}
+                  </span>
                 </div>
               </div>
             </div>
             <div class="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
               <button type="button" onclick="startEditCustomerMemoItem('${app.id}', '${item.id}')" 
                       class="p-1 rounded-md text-slate-400 hover:text-amber-800 hover:bg-amber-100 transition-all cursor-pointer" 
-                      title="이 항목 수정">
+                      title="이 항목 수정 (내용 및 작성자)">
                 <i data-lucide="edit-2" class="w-3 h-3 text-amber-700"></i>
               </button>
               <button type="button" onclick="deleteCustomerMemoItem('${app.id}', '${item.id}')" 
@@ -6204,11 +6324,27 @@ function renderCustomerMemoSectionHtml(app, options = {}) {
               </button>
             </div>
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
 
-      <!-- 3. 빠른 항목 추가 입력창 (아래로 계속 추가) -->
-      <div class="pt-1.5 flex items-center gap-1.5 border-t border-amber-200/50">
+      <!-- 3. 빠른 항목 추가 입력창 (작성자 선택 + 내용 입력 + 추가) -->
+      <div class="pt-1.5 flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 border-t border-amber-200/50">
+        <div class="flex items-center gap-1 shrink-0">
+          <label for="newHubMemoAuthor_${app.id}" class="text-[11px] font-bold text-slate-600 shrink-0 flex items-center gap-1">
+            <i data-lucide="user" class="w-3 h-3 text-amber-600"></i> 작성자:
+          </label>
+          <select id="newHubMemoAuthor_${app.id}" 
+                  class="px-2 py-1.5 bg-amber-50/80 border border-amber-300 rounded-xl text-[11px] font-bold text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs cursor-pointer max-w-[170px]"
+                  onchange="handleMemoAuthorSelectChange('${app.id}', this)"
+                  title="작성자 선택">
+            ${authorCandidates.map(c => `<option value="${typeof escapeHtml === 'function' ? escapeHtml(c) : c}">${typeof escapeHtml === 'function' ? escapeHtml(c) : c}</option>`).join('')}
+            <option value="__custom__">✏️ 직접 입력...</option>
+          </select>
+          <input type="text" 
+                 id="newHubMemoAuthorCustom_${app.id}" 
+                 placeholder="작성자명 직접입력" 
+                 class="hidden px-2 py-1.5 bg-white border border-amber-300 rounded-xl text-[11px] font-bold text-slate-800 w-28 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-inner">
+        </div>
         <div class="relative flex-1">
           <input type="text" 
                  id="newHubMemoInput_${app.id}" 
@@ -6218,7 +6354,7 @@ function renderCustomerMemoSectionHtml(app, options = {}) {
         </div>
         <button type="button" 
                 onclick="addCustomerMemoItem('${app.id}')" 
-                class="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs hover:shadow-sm flex items-center gap-1 transition-all cursor-pointer shrink-0">
+                class="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs hover:shadow-sm flex items-center justify-center gap-1 transition-all cursor-pointer shrink-0">
           <i data-lucide="plus" class="w-3.5 h-3.5"></i>
           <span>추가</span>
         </button>
@@ -6228,13 +6364,30 @@ function renderCustomerMemoSectionHtml(app, options = {}) {
 }
 window.renderCustomerMemoSectionHtml = renderCustomerMemoSectionHtml;
 
-function addCustomerMemoItem(appId, customText) {
+function addCustomerMemoItem(appId, customText, customAuthor) {
   if (!appId) return;
   const inputEl = document.getElementById(`newHubMemoInput_${appId}`);
   const text = (customText !== undefined ? customText : (inputEl ? inputEl.value : '')).trim();
   if (!text) {
     if (inputEl) inputEl.focus();
     return;
+  }
+
+  // 작성자 판별: 매개변수 > select/customInput > getCurrentMemoAuthorInfo()
+  let author = (customAuthor || '').trim();
+  if (!author) {
+    const authorSelect = document.getElementById(`newHubMemoAuthor_${appId}`);
+    const authorCustom = document.getElementById(`newHubMemoAuthorCustom_${appId}`);
+    if (authorSelect) {
+      if (authorSelect.value === '__custom__' && authorCustom && authorCustom.value.trim()) {
+        author = authorCustom.value.trim();
+      } else if (authorSelect.value && authorSelect.value !== '__custom__') {
+        author = authorSelect.value.trim();
+      }
+    }
+  }
+  if (!author) {
+    author = getCurrentMemoAuthorInfo();
   }
 
   const appIdx = (gApps || []).findIndex(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
@@ -6249,7 +6402,7 @@ function addCustomerMemoItem(appId, customText) {
     id: 'memo_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     text: text,
     createdAt: dateStr,
-    author: (window.currentUser && window.currentUser.name) || '관리자'
+    author: author
   };
 
   currentList.push(newItem);
@@ -6311,9 +6464,9 @@ function addCustomerMemoItem(appId, customText) {
       category: '고객상세',
       actionType: 'UPDATE',
       target: `고객 [${app.id}] (${app.patientName})`,
-      summary: `[${app.patientName} 님] 비고/특이사항 항목 추가`,
+      summary: `[${app.patientName} 님] 비고/특이사항 항목 추가 (작성자: ${author})`,
       changes: {
-        '추가내용': { before: '(없음)', after: text }
+        '추가내용': { before: '(없음)', after: `[${author}] ${text}` }
       }
     });
   }
@@ -6350,19 +6503,28 @@ function startEditCustomerMemoItem(appId, itemId) {
   const rowEl = document.getElementById(`hubMemoItemRow_${app.id}_${item.id}`);
   if (!rowEl) return;
 
+  const currentAuthor = resolveMemoAuthor(item.author, item.text, app);
+
   rowEl.innerHTML = `
-    <div class="flex-1 flex items-center gap-1.5 w-full">
+    <div class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 w-full">
+      <div class="flex items-center gap-1 shrink-0">
+        <span class="text-[10.5px] font-bold text-slate-500 whitespace-nowrap">작성자:</span>
+        <input type="text" id="inlineEditMemoAuthor_${app.id}_${item.id}" value="${typeof escapeHtml === 'function' ? escapeHtml(currentAuthor) : currentAuthor}" 
+               class="px-2 py-1 bg-white border border-amber-400 rounded-lg text-xs font-bold text-amber-950 w-28 sm:w-36 focus:ring-2 focus:ring-amber-500 focus:outline-none" placeholder="작성자 입력">
+      </div>
       <input type="text" id="inlineEditMemo_${app.id}_${item.id}" value="${typeof escapeHtml === 'function' ? escapeHtml(item.text) : item.text}" 
              class="flex-1 px-2.5 py-1 bg-white border border-amber-400 rounded-lg text-xs text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none" 
              onkeydown="if(event.key === 'Enter' && !event.isComposing) { event.preventDefault(); saveEditCustomerMemoItem('${app.id}', '${item.id}'); } else if (event.key === 'Escape') { cancelEditCustomerMemoItem('${app.id}'); }">
-      <button type="button" onclick="saveEditCustomerMemoItem('${app.id}', '${item.id}')" 
-              class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10.5px] cursor-pointer shrink-0">
-        저장
-      </button>
-      <button type="button" onclick="cancelEditCustomerMemoItem('${app.id}')" 
-              class="px-2 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[10.5px] cursor-pointer shrink-0">
-        취소
-      </button>
+      <div class="flex items-center gap-1 shrink-0 justify-end">
+        <button type="button" onclick="saveEditCustomerMemoItem('${app.id}', '${item.id}')" 
+                class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10.5px] cursor-pointer shrink-0">
+          저장
+        </button>
+        <button type="button" onclick="cancelEditCustomerMemoItem('${app.id}')" 
+                class="px-2 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[10.5px] cursor-pointer shrink-0">
+          취소
+        </button>
+      </div>
     </div>
   `;
   setTimeout(() => {
@@ -6389,6 +6551,8 @@ function saveEditCustomerMemoItem(appId, itemId) {
     inputEl.focus();
     return;
   }
+  const authorEl = document.getElementById(`inlineEditMemoAuthor_${appId}_${itemId}`);
+  const newAuthor = authorEl ? authorEl.value.trim() : '';
 
   const appIdx = (gApps || []).findIndex(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
   if (appIdx === -1) return;
@@ -6401,6 +6565,7 @@ function saveEditCustomerMemoItem(appId, itemId) {
   currentList[itemIdx] = {
     ...currentList[itemIdx],
     text: newText,
+    author: newAuthor || currentList[itemIdx].author || getCurrentMemoAuthorInfo(),
     updatedAt: new Date().toISOString()
   };
 

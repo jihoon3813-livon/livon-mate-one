@@ -21183,15 +21183,20 @@ function applyCustomerMemoSave(appId, memoText) {
   const lines = memoText.split('\n').map(l => l.trim()).filter(Boolean);
   const now = new Date();
   const dateStr = `${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  const oldList = Array.isArray(app.memoList) ? app.memoList : [];
+  const currentAuthor = (typeof getCurrentMemoAuthorInfo === 'function') ? getCurrentMemoAuthorInfo() : ((window.currentUser && window.currentUser.name) || '간병상담팀');
   app.memoList = lines.map((line, idx) => {
     const existing = oldList.find(m => m.text === line);
-    if (existing) return existing;
+    if (existing) {
+      return {
+        ...existing,
+        author: (typeof resolveMemoAuthor === 'function') ? resolveMemoAuthor(existing.author, existing.text, app) : (existing.author || currentAuthor)
+      };
+    }
     return {
       id: 'memo_' + Date.now() + '_' + idx,
       text: line,
       createdAt: dateStr,
-      author: (window.currentUser && window.currentUser.name) || '관리자'
+      author: (typeof resolveMemoAuthor === 'function') ? resolveMemoAuthor(null, line, app) : currentAuthor
     };
   });
 
