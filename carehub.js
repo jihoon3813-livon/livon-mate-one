@@ -6152,7 +6152,7 @@ window.onCustEditGuardianRelationChange = onCustEditGuardianRelationChange;
 function isVagueMemoAuthor(str) {
   if (!str) return true;
   const t = String(str).trim();
-  return !t || t === '관리자' || t === 'admin' || t === '운영자' || t === '상담원' || t === '접수처' || t === '()' || t === '리본케어' || t === '시스템';
+  return !t || t === '관리자' || t === 'admin' || t === '운영자' || t === '상담원' || t === '접수처' || t === '()' || t === '리본케어' || t === '시스템' || t === '업무용 휴대폰' || t.includes('접수처');
 }
 window.isVagueMemoAuthor = isVagueMemoAuthor;
 
@@ -6209,7 +6209,7 @@ function getCurrentMemoAdmin() {
       if (matched && matched.name) {
         name = matched.name;
       } else if (username === 'superadmin') {
-        name = '김지훈';
+        name = '리본케어';
       } else {
         name = username;
       }
@@ -6231,22 +6231,37 @@ function getCurrentMemoAuthorInfo() {
 window.getCurrentMemoAuthorInfo = getCurrentMemoAuthorInfo;
 
 /**
- * 기존 및 신규 비고 항목의 작성자 및 계정 아이디를 스마트 소급 추적
+ * 비고/특이사항 작성자 계정 정보 표기
+ * - 작성자가 직접 입력하거나 등록한 실제 관리자 계정 정보(실명 + 아이디)를 그대로 표출
+ * - CTI 상담원 연동이나 키워드 추론을 일절 수행하지 않음
  */
 function resolveMemoAuthor(author, itemText, app) {
-  const text = itemText || '';
-  // "삼성화재 접수처", "현대해상 접수처", "원수사 접수처" 등 불필요한 가상 접수처 문구 전면 제거
   let cleanAuthor = (author || '')
     .replace(/(삼성화재|현대해상|원수사|KB손해|DB손해)?\s*접수처/g, '')
     .trim();
 
-  // 1. 고객 데이터 자체에 기록된 등록자 정보가 있는 경우 최우선 적용
+  // 1. 이미 아이디 괄호가 포함된 구체적 작성자명인 경우 그대로 사용 (예: "최은주 (ejchoi)")
+  if (cleanAuthor && !isVagueMemoAuthor(cleanAuthor)) {
+    if (cleanAuthor.includes('(') && cleanAuthor.includes(')')) {
+      return cleanAuthor;
+    }
+    // 관리자 계정 목록에서 작성자 실명이나 아이디로 계정 매핑
+    const adm = findAdminAccountInfo(cleanAuthor);
+    if (adm && adm.username) {
+      return `${adm.name} (${adm.username})`;
+    }
+    return cleanAuthor;
+  }
+
+  // 2. 고객 데이터 자체에 기록된 등록자/작성자 정보가 있는 경우 적용
   if (app) {
     if (app.memoAuthor && !isVagueMemoAuthor(app.memoAuthor)) {
+      const adm = findAdminAccountInfo(app.memoAuthor);
+      if (adm && adm.username) return `${adm.name} (${adm.username})`;
       return app.memoAuthor;
     }
     const creatorId = app.createdAdmin || app.creator || app.uploadedBy;
-    if (creatorId) {
+    if (creatorId && !isVagueMemoAuthor(creatorId)) {
       const creatorInfo = findAdminAccountInfo(creatorId);
       if (creatorInfo && creatorInfo.name) {
         return `${creatorInfo.name} (${creatorInfo.username})`;
@@ -6258,60 +6273,9 @@ function resolveMemoAuthor(author, itemText, app) {
     }
   }
 
-  const isVague = isVagueMemoAuthor(cleanAuthor);
-
-  // 2. 이미 아이디 괄호가 포함된 구체적 작성자명인 경우 그대로 사용 (예: "최은주 (ejchoi)")
-  if (!isVague && cleanAuthor.includes('(') && cleanAuthor.includes(')')) {
-    return cleanAuthor;
-  }
-
-  // 3. 작성자 텍스트가 특정 관리자 실명이나 아이디인 경우 계정 정보 매핑
-  if (!isVague) {
-    const adm = findAdminAccountInfo(cleanAuthor);
-    if (adm && adm.username) {
-      return `${adm.name} (${adm.username})`;
-    }
-    return cleanAuthor;
-  }
-
-  // 4. 비고 내용 및 등록 맥락에 따른 작성자 추적
-  // 4-1. CTI 콜 기록에서 해당 고객의 담당 오퍼레이터(상담원) 추적
-  if (typeof findCustomerMatchedCallLogs === 'function') {
-    const matchedCalls = findCustomerMatchedCallLogs(app) || [];
-    if (matchedCalls.length > 0) {
-      const op = matchedCalls.find(c => c && c.operator && c.operator !== '상담원')?.operator;
-      if (op) {
-        const adm = findAdminAccountInfo(op);
-        if (adm && adm.username) {
-          return `${adm.name} (${adm.username})`;
-        }
-        return `${op}`;
-      }
-    }
-  }
-
-  // 4-2. 배정, 협회 통화, 간병인 수배 등 간병파트 상담/업무 메모 -> 간병파트 매니저(이주연 / ansghk8855) 매핑
-  if (text.includes('협회') || text.includes('간병인') || text.includes('배정') || text.includes('수배') || text.includes('출퇴근') || text.includes('종료')) {
-    const careMgr = findAdminAccountInfo('이주연') || findAdminAccountInfo('ansghk8855');
-    if (careMgr) {
-      return `${careMgr.name} (${careMgr.username})`;
-    }
-    return '이주연 (ansghk8855)';
-  }
-
-  // 4-3. 시스템 감사 로그에서 해당 고객 업데이트 이력 추적
-  if (typeof window !== 'undefined' && Array.isArray(window.gSystemAuditLogs) && app && app.id) {
-    const audit = window.gSystemAuditLogs.find(l => l && l.target && l.target.includes(app.id) && l.user && l.user.username);
-    if (audit && audit.user && audit.user.username) {
-      const adm = findAdminAccountInfo(audit.user.username);
-      const uName = (adm && adm.name) || audit.user.name || audit.user.username;
-      return `${uName} (${audit.user.username})`;
-    }
-  }
-
-  // 5. 기본값: 현재 로그인 관리자 아이디 반영 (단, admin/관리자가 아닌 실제 세션 정보인 경우)
+  // 3. 현재 로그인된 관리자 계정 정보 반영 (실제 로그인된 사용자)
   const curAdm = getCurrentMemoAdmin();
-  if (curAdm && curAdm.username && curAdm.username !== 'admin') {
+  if (curAdm && curAdm.username) {
     return `${curAdm.name} (${curAdm.username})`;
   }
 
@@ -6329,7 +6293,7 @@ function getCustomerMemoList(app) {
   if (!raw) return [];
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   const dateStr = (app.updatedAt ? app.updatedAt.slice(0, 16).replace('T', ' ') : (app.applyDate || ''));
-  const initialAuthor = app.memoAuthor || '관리자';
+  const initialAuthor = app.memoAuthor || app.createdAdmin || app.creator || app.uploadedBy || '';
   if (lines.length > 1) {
     return lines.map((line, idx) => ({
       id: 'm_init_' + idx,
