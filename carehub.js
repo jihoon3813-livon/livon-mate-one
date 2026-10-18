@@ -3783,10 +3783,22 @@ function deleteCurrentSettlementSetFromModal() {
 // [UNIFIED CUSTOMER FINAL SAVE & MODAL CLOSE INTERCEPTION ENGINE]
 // =========================================================================
 
-async function saveActiveHubCustomerDetail(silent = false) {
-  const appId = (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) 
-    ? gActiveHubModalAppId 
-    : document.getElementById('settlementSetModalAppId')?.value;
+let gHubModalInstanceId = 0;
+
+function resetHubCustomerModalSaveButtons() {
+  const btnDesktop = document.getElementById('btnSaveHubCustomerModalText');
+  const btnMobile = document.getElementById('btnSaveHubCustomerModalMobileText');
+  const btnFooter = document.getElementById('btnSaveHubCustomerModalFooterText');
+  if (btnDesktop) btnDesktop.innerText = '저장후 닫기';
+  if (btnMobile) btnMobile.innerText = '저장후 닫기';
+  if (btnFooter) btnFooter.innerText = '저장후 닫기';
+}
+window.resetHubCustomerModalSaveButtons = resetHubCustomerModalSaveButtons;
+
+async function saveActiveHubCustomerDetail(silent = false, targetAppId = null) {
+  const appId = targetAppId 
+    || ((typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) ? gActiveHubModalAppId : '') 
+    || document.getElementById('settlementSetModalAppId')?.value;
 
   if (!appId) {
     if (!silent && typeof showNotification === 'function') {
@@ -4004,18 +4016,22 @@ async function saveActiveHubCustomerDetail(silent = false) {
     console.warn('[saveActiveHubCustomerDetail] real-data sync error:', e);
   }
 
-  // 8. Button feedback
-  const btnDesktop = document.getElementById('btnSaveHubCustomerModalText');
-  const btnMobile = document.getElementById('btnSaveHubCustomerModalMobileText');
-  const btnFooter = document.getElementById('btnSaveHubCustomerModalFooterText');
-  if (btnDesktop) btnDesktop.innerText = '저장 완료 ✅';
-  if (btnMobile) btnMobile.innerText = '저장 완료 ✅';
-  if (btnFooter) btnFooter.innerText = '저장 완료 ✅';
-  setTimeout(() => {
-    if (btnDesktop) btnDesktop.innerText = '저장후 닫기';
-    if (btnMobile) btnMobile.innerText = '저장후 닫기';
-    if (btnFooter) btnFooter.innerText = '저장후 닫기';
-  }, 2500);
+  // 8. Button feedback (오직 모달이 열려있고 대상 고객이 일치할 때만 피드백 노출)
+  const modalEl = document.getElementById('hubCustomerDetailModal');
+  const isModalCurrentlyOpen = modalEl && !modalEl.classList.contains('hidden') && modalEl.style.display !== 'none';
+  if (isModalCurrentlyOpen && String(gActiveHubModalAppId) === String(app.id)) {
+    const btnDesktop = document.getElementById('btnSaveHubCustomerModalText');
+    const btnMobile = document.getElementById('btnSaveHubCustomerModalMobileText');
+    const btnFooter = document.getElementById('btnSaveHubCustomerModalFooterText');
+    if (btnDesktop) btnDesktop.innerText = '저장 완료 ✅';
+    if (btnMobile) btnMobile.innerText = '저장 완료 ✅';
+    if (btnFooter) btnFooter.innerText = '저장 완료 ✅';
+    setTimeout(() => {
+      resetHubCustomerModalSaveButtons();
+    }, 2000);
+  } else {
+    resetHubCustomerModalSaveButtons();
+  }
 
   // 9. Toast notification
   if (!silent && typeof showNotification === 'function') {
@@ -4057,24 +4073,30 @@ async function saveActiveHubCustomerDetail(silent = false) {
 
 // [사용자 요구사항]: '저장후 닫기' 클릭 시 모달 창이 자동으로 즉시 닫히고 서버 저장이 안전하게 완료되도록 처리
 async function saveAndCloseActiveHubCustomerDetail() {
-  const btnDesktop = document.getElementById('btnSaveHubCustomerModalText');
-  const btnMobile = document.getElementById('btnSaveHubCustomerModalMobileText');
-  const btnFooter = document.getElementById('btnSaveHubCustomerModalFooterText');
-  if (btnDesktop) btnDesktop.innerText = '저장 중...';
-  if (btnMobile) btnMobile.innerText = '저장 중...';
-  if (btnFooter) btnFooter.innerText = '저장 중...';
+  const closingAppId = (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId) 
+    ? gActiveHubModalAppId 
+    : document.getElementById('settlementSetModalAppId')?.value;
+  const currentInstance = gHubModalInstanceId;
 
-  // 1. 모달 창 즉시 자동 닫기 (지연이나 멈춤 현상 완벽 차단)
+  // 1. 모달 창 즉시 자동 닫기 & 활성 ID 해제
   closeModal('hubCustomerDetailModal');
+  gActiveHubModalAppId = null;
 
-  // 2. 백그라운드에서 서버 및 DB 저장 안전하게 완료
+  // 2. 버튼 상태를 즉시 정상('저장후 닫기')으로 복원하여 다음 모달 오픈 시 '저장 중...' 잔여 원천 차단
+  resetHubCustomerModalSaveButtons();
+
+  // 3. 백그라운드에서 서버 및 DB 저장 안전하게 완료
   try {
-    await saveActiveHubCustomerDetail(false);
+    await saveActiveHubCustomerDetail(false, closingAppId);
   } catch (err) {
     console.error('[saveAndCloseActiveHubCustomerDetail] 저장 오류:', err);
   } finally {
-    closeModal('hubCustomerDetailModal');
-    gActiveHubModalAppId = null;
+    // 🚨 중요: 만약 사용자가 백그라운드 저장 도중 새로운 모달을 다시 열었다면(인스턴스가 변경됨) 새로 열린 모달을 절대 닫지 않음!
+    if (gHubModalInstanceId === currentInstance) {
+      closeModal('hubCustomerDetailModal');
+      gActiveHubModalAppId = null;
+    }
+    resetHubCustomerModalSaveButtons();
   }
 }
 
@@ -4095,13 +4117,16 @@ async function confirmCloseHubCustomerDetailModal() {
     }
   );
 
+  const closingInstance = gHubModalInstanceId;
+
   // 모달 창 즉시 닫기
   closeModal('hubCustomerDetailModal');
   gActiveHubModalAppId = null;
+  resetHubCustomerModalSaveButtons();
 
   if (shouldSave) {
     try {
-      await saveActiveHubCustomerDetail(true);
+      await saveActiveHubCustomerDetail(true, appId);
       if (typeof showNotification === 'function' && app) {
         showNotification({
           type: 'success',
@@ -4112,6 +4137,12 @@ async function confirmCloseHubCustomerDetailModal() {
       }
     } catch (err) {
       console.error('[confirmCloseHubCustomerDetailModal] 저장 오류:', err);
+    } finally {
+      if (gHubModalInstanceId === closingInstance) {
+        closeModal('hubCustomerDetailModal');
+        gActiveHubModalAppId = null;
+      }
+      resetHubCustomerModalSaveButtons();
     }
   }
 }
@@ -13399,6 +13430,9 @@ function closeAllCareCardExpands() {
 }
 
 function openHubCustomerDetailModal(applyId, targetSetIndex = null) {
+  gHubModalInstanceId++;
+  resetHubCustomerModalSaveButtons();
+
   const modalEl = document.getElementById('hubCustomerDetailModal');
   if (!modalEl) {
     console.error('hubCustomerDetailModal element not found!');
@@ -13425,6 +13459,7 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null) {
 
   // Open modal container & ensure high z-index and visible flex layout
   openModal('hubCustomerDetailModal');
+  resetHubCustomerModalSaveButtons();
   modalEl.classList.remove('hidden');
   modalEl.style.display = 'flex';
   modalEl.style.zIndex = '1000';
