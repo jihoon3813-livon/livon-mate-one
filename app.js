@@ -74,7 +74,10 @@ function safeSetLocalStorage(key, valStr) {
           'REBORN_PRIVACY_MASKING_STATE_V2',
           'REBORN_HUB_CARD_OPEN_MODE',
           'LIVON_PROD_CONVEX_SYNCED',
-          'LIVON_TARGET_ENV'
+          'LIVON_TARGET_ENV',
+          'LIVON_OPEN_TABS',
+          'LIVON_ACTIVE_TAB',
+          'LIVON_ACTIVE_FILTER'
         ]);
         const allKeys = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -3864,11 +3867,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   clearHubInputSafely();
   window.addEventListener('pageshow', clearHubInputSafely);
 
-  // URL 쿼리스트링(?tab=...) 또는 세션스토리지에 저장된 메뉴 탭 복원 및 초고속 0ms 즉시 렌더링
+  // URL 쿼리스트링(?tab=...) 또는 세션스토리지/로컬스토리지에 저장된 메뉴 탭 복원 및 초고속 0ms 즉시 렌더링
   const urlParams = new URLSearchParams(window.location.search);
-  let initialTab = urlParams.get('tab') || sessionStorage.getItem('LIVON_ACTIVE_TAB') || 'carehub';
+  let initialTab = urlParams.get('tab') || sessionStorage.getItem('LIVON_ACTIVE_TAB') || localStorage.getItem('LIVON_ACTIVE_TAB') || 'carehub';
   if (initialTab === 'dashboard') initialTab = 'carehub';
-  const initialFilter = urlParams.get('filter') || sessionStorage.getItem('LIVON_ACTIVE_FILTER') || null;
+  const initialFilter = urlParams.get('filter') || sessionStorage.getItem('LIVON_ACTIVE_FILTER') || localStorage.getItem('LIVON_ACTIVE_FILTER') || null;
 
   // 상단 멀티 탭 및 데스크톱 사이드바 상태 초기화
   if (typeof initOpenAppTabs === 'function') initOpenAppTabs();
@@ -3880,6 +3883,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
     renderUnifiedCareHub();
   }
+  if (typeof renderMultiTabBar === 'function') renderMultiTabBar();
   initIcons();
 
   // Convex Cloud 운영 서버 실시간 데이터 동기화 (비차단 백그라운드 실행으로 화면 대기 시간 0초 실현)
@@ -20039,7 +20043,12 @@ var gOpenAppTabs = ['carehub'];
 
 function initOpenAppTabs() {
   try {
-    const saved = localStorage.getItem('LIVON_OPEN_TABS');
+    // 1차: sessionStorage에서 복원 시도 (현재 브라우저 탭 세션 최우선)
+    let saved = sessionStorage.getItem('LIVON_OPEN_TABS');
+    // 2차: sessionStorage에 없으면 localStorage에서 복원 시도
+    if (!saved) {
+      saved = localStorage.getItem('LIVON_OPEN_TABS');
+    }
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -20051,13 +20060,33 @@ function initOpenAppTabs() {
   if (!gOpenAppTabs || gOpenAppTabs.length === 0) {
     gOpenAppTabs = ['carehub'];
   }
+
+  // 현재 활성 탭이 멀티 탭 목록에 빠져있다면 자동 포함
+  const currentTab = gActiveTab || sessionStorage.getItem('LIVON_ACTIVE_TAB') || localStorage.getItem('LIVON_ACTIVE_TAB') || 'carehub';
+  if (currentTab && APP_TAB_META[currentTab] && !gOpenAppTabs.includes(currentTab)) {
+    gOpenAppTabs.push(currentTab);
+  }
+
   saveOpenAppTabs();
 }
 
 function saveOpenAppTabs() {
+  if (!Array.isArray(gOpenAppTabs) || gOpenAppTabs.length === 0) {
+    gOpenAppTabs = ['carehub'];
+  }
+  const serialized = JSON.stringify(gOpenAppTabs);
+  // 1. sessionStorage에 안전 보존 (브라우저 쿼터 정리 영향 없음)
   try {
-    localStorage.setItem('LIVON_OPEN_TABS', JSON.stringify(gOpenAppTabs));
+    sessionStorage.setItem('LIVON_OPEN_TABS', serialized);
   } catch (e) {}
+  // 2. localStorage에도 영구 보존
+  try {
+    localStorage.setItem('LIVON_OPEN_TABS', serialized);
+  } catch (e) {
+    if (typeof safeSetLocalStorage === 'function') {
+      safeSetLocalStorage('LIVON_OPEN_TABS', serialized);
+    }
+  }
 }
 
 function addAppTab(tabId) {
@@ -20361,8 +20390,14 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
   if (triggerReload && gActiveTab && tabId !== gActiveTab) {
     try {
       sessionStorage.setItem('LIVON_ACTIVE_TAB', tabId);
-      if (filterParam) sessionStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
-      else sessionStorage.removeItem('LIVON_ACTIVE_FILTER');
+      localStorage.setItem('LIVON_ACTIVE_TAB', tabId);
+      if (filterParam) {
+        sessionStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
+        localStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
+      } else {
+        sessionStorage.removeItem('LIVON_ACTIVE_FILTER');
+        localStorage.removeItem('LIVON_ACTIVE_FILTER');
+      }
     } catch (e) {}
 
     const newUrl = new URL(window.location.href);
@@ -20377,7 +20412,14 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
   gActiveTab = tabId;
   try {
     sessionStorage.setItem('LIVON_ACTIVE_TAB', tabId);
-    if (filterParam) sessionStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
+    localStorage.setItem('LIVON_ACTIVE_TAB', tabId);
+    if (filterParam) {
+      sessionStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
+      localStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
+    } else {
+      sessionStorage.removeItem('LIVON_ACTIVE_FILTER');
+      localStorage.removeItem('LIVON_ACTIVE_FILTER');
+    }
     const newUrl = new URL(window.location.href);
     newUrl.searchParams.set('tab', tabId);
     if (filterParam) newUrl.searchParams.set('filter', filterParam);
