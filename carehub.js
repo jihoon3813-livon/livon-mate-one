@@ -6424,6 +6424,7 @@ function addCustomerMemoItem(appId, customText) {
   // 로그인 한 아이디의 사용자를 작성자로 자동 반영
   const curAdmin = getCurrentMemoAdmin();
   const authorDisplay = `${curAdmin.name} (${curAdmin.username})`;
+  const author = authorDisplay;
 
   const appIdx = (gApps || []).findIndex(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
   if (appIdx === -1) return;
@@ -6449,69 +6450,10 @@ function addCustomerMemoItem(appId, customText) {
   app.updatedAt = new Date().toISOString();
   gApps[appIdx] = app;
 
-  if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
-    const rIdx = window.REBORN_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
-    if (rIdx !== -1) {
-      window.REBORN_DATA.applications[rIdx] = { 
-        ...window.REBORN_DATA.applications[rIdx], 
-        memoList: app.memoList, 
-        memo: app.memo, 
-        specialNotes: app.specialNotes, 
-        updatedAt: app.updatedAt 
-      };
-    }
-  }
-
-  try {
-    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
-  } catch (e) {}
-
-  fetch('/api/hub/customer/update-fields', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      appId: app.id,
-      fields: { 
-        memoList: app.memoList, 
-        memo: app.memo, 
-        specialNotes: app.specialNotes, 
-        updatedAt: app.updatedAt 
-      }
-    })
-  }).catch(() => {});
-
-  fetch('/api/hub/real-data', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      applications: gApps,
-      assignments: (typeof gAssigns !== 'undefined' ? gAssigns : []),
-      claims: (typeof gClaims !== 'undefined' ? gClaims : []),
-      payouts: (typeof gPayouts !== 'undefined' ? gPayouts : [])
-    })
-  }).catch(() => {});
-
-  if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:updateMemo', { appId: app.id, memo: app.memo, memoList: app.memoList });
-    syncToConvex('sync:saveApplication', { app: app });
-  }
-
-  if (typeof window.recordSystemAuditLog === 'function') {
-    window.recordSystemAuditLog({
-      category: '고객상세',
-      actionType: 'UPDATE',
-      target: `고객 [${app.id}] (${app.patientName})`,
-      summary: `[${app.patientName} 님] 비고/특이사항 항목 추가 (작성자: ${author})`,
-      changes: {
-        '추가내용': { before: '(없음)', after: `[${author}] ${text}` }
-      }
-    });
-  }
-
-  // Refresh UI in place
+  // ⚡ [0ms 초고속 즉시 UI 렌더링]: 추가된 항목이 눈 깜짝할 사이에 바로 모달에 조회되도록 보장
   refreshCustomerMemoSection(app.id);
 
-  // Scroll to bottom of memo list and refocus input
+  // 입력창 즉시 비우기 & 포커스 유지 & 리스트 최하단 자동 스크롤
   setTimeout(() => {
     const container = document.getElementById(`hubMemoListContainer_${app.id}`);
     if (container) {
@@ -6522,11 +6464,73 @@ function addCustomerMemoItem(appId, customText) {
       newInput.value = '';
       newInput.focus();
     }
-  }, 50);
+  }, 10);
 
-  // Update outer tables/dashboards
-  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
-  if (typeof renderApplications === 'function') renderApplications();
+  // 🚀 [비차단 백그라운드 저장 & 동기화]: 화면 프리징과 클릭 지연 제로화
+  setTimeout(() => {
+    if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
+      const rIdx = window.REBORN_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
+      if (rIdx !== -1) {
+        window.REBORN_DATA.applications[rIdx] = { 
+          ...window.REBORN_DATA.applications[rIdx], 
+          memoList: app.memoList, 
+          memo: app.memo, 
+          specialNotes: app.specialNotes, 
+          updatedAt: app.updatedAt 
+        };
+      }
+    }
+
+    try {
+      localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    } catch (e) {}
+
+    fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: app.id,
+        fields: { 
+          memoList: app.memoList, 
+          memo: app.memo, 
+          specialNotes: app.specialNotes, 
+          updatedAt: app.updatedAt 
+        }
+      })
+    }).catch(() => {});
+
+    fetch('/api/hub/real-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        applications: gApps,
+        assignments: (typeof gAssigns !== 'undefined' ? gAssigns : []),
+        claims: (typeof gClaims !== 'undefined' ? gClaims : []),
+        payouts: (typeof gPayouts !== 'undefined' ? gPayouts : [])
+      })
+    }).catch(() => {});
+
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:updateMemo', { appId: app.id, memo: app.memo, memoList: app.memoList });
+      syncToConvex('sync:saveApplication', { app: app });
+    }
+
+    if (typeof window.recordSystemAuditLog === 'function') {
+      try {
+        window.recordSystemAuditLog({
+          category: '고객상세',
+          actionType: 'UPDATE',
+          target: `고객 [${app.id}] (${app.patientName})`,
+          summary: `[${app.patientName} 님] 비고/특이사항 항목 추가 (작성자: ${author})`,
+          changes: {
+            '추가내용': { before: '(없음)', after: `[${author}] ${text}` }
+          }
+        });
+      } catch (err) {}
+    }
+
+    if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+  }, 0);
 }
 window.addCustomerMemoItem = addCustomerMemoItem;
 
@@ -6600,43 +6604,44 @@ function saveEditCustomerMemoItem(appId, itemId) {
   app.updatedAt = new Date().toISOString();
   gApps[appIdx] = app;
 
-  if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
-    const rIdx = window.REBORN_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
-    if (rIdx !== -1) {
-      window.REBORN_DATA.applications[rIdx] = { 
-        ...window.REBORN_DATA.applications[rIdx], 
-        memoList: app.memoList, 
-        memo: app.memo, 
-        specialNotes: app.specialNotes, 
-        updatedAt: app.updatedAt 
-      };
-    }
-  }
-
-  try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
-
-  fetch('/api/hub/customer/update-fields', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      appId: app.id,
-      fields: { 
-        memoList: app.memoList, 
-        memo: app.memo, 
-        specialNotes: app.specialNotes, 
-        updatedAt: app.updatedAt 
-      }
-    })
-  }).catch(() => {});
-
-  if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:updateMemo', { appId: app.id, memo: app.memo, memoList: app.memoList });
-    syncToConvex('sync:saveApplication', { app: app });
-  }
-
+  // ⚡ 즉시 UI 렌더링
   refreshCustomerMemoSection(app.id);
-  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
-  if (typeof renderApplications === 'function') renderApplications();
+
+  setTimeout(() => {
+    if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
+      const rIdx = window.REBORN_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
+      if (rIdx !== -1) {
+        window.REBORN_DATA.applications[rIdx] = { 
+          ...window.REBORN_DATA.applications[rIdx], 
+          memoList: app.memoList, 
+          memo: app.memo, 
+          specialNotes: app.specialNotes, 
+          updatedAt: app.updatedAt 
+        };
+      }
+    }
+
+    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+
+    fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: app.id,
+        fields: { 
+          memoList: app.memoList, 
+          memo: app.memo, 
+          specialNotes: app.specialNotes, 
+          updatedAt: app.updatedAt 
+        }
+      })
+    }).catch(() => {});
+
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:updateMemo', { appId: app.id, memo: app.memo, memoList: app.memoList });
+      syncToConvex('sync:saveApplication', { app: app });
+    }
+  }, 0);
 }
 window.saveEditCustomerMemoItem = saveEditCustomerMemoItem;
 
@@ -6654,43 +6659,44 @@ function deleteCustomerMemoItem(appId, itemId) {
   app.updatedAt = new Date().toISOString();
   gApps[appIdx] = app;
 
-  if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
-    const rIdx = window.REBORN_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
-    if (rIdx !== -1) {
-      window.REBORN_DATA.applications[rIdx] = { 
-        ...window.REBORN_DATA.applications[rIdx], 
-        memoList: app.memoList, 
-        memo: app.memo, 
-        specialNotes: app.specialNotes, 
-        updatedAt: app.updatedAt 
-      };
-    }
-  }
-
-  try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
-
-  fetch('/api/hub/customer/update-fields', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      appId: app.id,
-      fields: { 
-        memoList: app.memoList, 
-        memo: app.memo, 
-        specialNotes: app.specialNotes, 
-        updatedAt: app.updatedAt 
-      }
-    })
-  }).catch(() => {});
-
-  if (typeof syncToConvex === 'function') {
-    syncToConvex('sync:updateMemo', { appId: app.id, memo: app.memo, memoList: app.memoList });
-    syncToConvex('sync:saveApplication', { app: app });
-  }
-
+  // ⚡ 즉시 UI 렌더링
   refreshCustomerMemoSection(app.id);
-  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
-  if (typeof renderApplications === 'function') renderApplications();
+
+  setTimeout(() => {
+    if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
+      const rIdx = window.REBORN_DATA.applications.findIndex(a => String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''));
+      if (rIdx !== -1) {
+        window.REBORN_DATA.applications[rIdx] = { 
+          ...window.REBORN_DATA.applications[rIdx], 
+          memoList: app.memoList, 
+          memo: app.memo, 
+          specialNotes: app.specialNotes, 
+          updatedAt: app.updatedAt 
+        };
+      }
+    }
+
+    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+
+    fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: app.id,
+        fields: { 
+          memoList: app.memoList, 
+          memo: app.memo, 
+          specialNotes: app.specialNotes, 
+          updatedAt: app.updatedAt 
+        }
+      })
+    }).catch(() => {});
+
+    if (typeof syncToConvex === 'function') {
+      syncToConvex('sync:updateMemo', { appId: app.id, memo: app.memo, memoList: app.memoList });
+      syncToConvex('sync:saveApplication', { app: app });
+    }
+  }, 0);
 }
 window.deleteCustomerMemoItem = deleteCustomerMemoItem;
 

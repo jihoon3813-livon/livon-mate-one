@@ -21187,6 +21187,7 @@ function applyCustomerMemoSave(appId, memoText) {
   app.updatedAt = new Date().toISOString();
 
   // memoList 동기화 (개별 항목 배열)
+  const oldList = (typeof getCustomerMemoList === 'function' ? getCustomerMemoList(app) : (app.memoList || [])) || [];
   const lines = memoText.split('\n').map(l => l.trim()).filter(Boolean);
   const now = new Date();
   const dateStr = `${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
