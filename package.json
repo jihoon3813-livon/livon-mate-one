@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
+    "sync-samsung": "node scripts/sync-samsung-drive.js",
     "convex": "node node_modules/convex/bin/main.js dev"
   },
   "dependencies": {
