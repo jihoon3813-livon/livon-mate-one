@@ -1954,8 +1954,8 @@ async function loadConvexData(showSpinner = true) {
       }).catch(() => {});
     }
 
-    // 양식 좌표 캐시가 이미 존재하면 1.1MB 대용량 formConfigs 이미지를 중복 다운로드하지 않음 (응답 속도 2배 향상)
-    const needHeavyStatic = isInitial === true && !localStorage.getItem('LIVON_FORM_AREAS');
+    // 최초 로딩 시 최신 양식 배경 및 좌표 설정을 클라우드에서 안전하게 로드
+    const needHeavyStatic = isInitial === true;
     const res = await queryConvex('sync:bundleAll', { sessionToken: token || '', includeHeavyStatic: needHeavyStatic });
     if (res && res.status === 'success' && res.value) {
       if (res.value.status === 'unauthorized') {
@@ -2159,30 +2159,37 @@ async function loadConvexData(showSpinner = true) {
       if (Array.isArray(formConfigs) && formConfigs.length > 0) {
         let hasUpdatedConfig = false;
         formConfigs.forEach(fc => {
-          if (fc.formCode) {
+          if (fc && fc.formCode) {
             if (Array.isArray(fc.areas) && fc.areas.length > 0) {
               gFormAreaStore[fc.formCode] = fc.areas;
               hasUpdatedConfig = true;
             }
             if (fc.background) {
               gFormBackgroundStore[fc.formCode] = fc.background;
+              hasUpdatedConfig = true;
             } else if (fc.background === '') {
               delete gFormBackgroundStore[fc.formCode];
+              hasUpdatedConfig = true;
             }
           }
         });
         if (hasUpdatedConfig) {
           try {
             localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
-            const bgStr = JSON.stringify(gFormBackgroundStore);
-            if (bgStr.length < 150000) {
-              localStorage.setItem('LIVON_FORM_BACKGROUNDS', bgStr);
-            } else {
-              localStorage.removeItem('LIVON_FORM_BACKGROUNDS');
-            }
           } catch (e) {}
-          console.log('[Convex Cloud] 양식 설정 및 배경 클라우드 동기화 완료');
+          try {
+            localStorage.setItem('LIVON_FORM_BACKGROUNDS', JSON.stringify(gFormBackgroundStore));
+          } catch (e) {
+            console.warn('[LIVON_FORM_BACKGROUNDS LocalStorage Warning]', e);
+          }
+          console.log(`[Convex Cloud] 양식 설정 및 배경 클라우드 동기화 완료 (배경 ${Object.keys(gFormBackgroundStore).length}종 로드됨)`);
         }
+      } else {
+        setTimeout(() => {
+          if (typeof loadFormConfigsFromConvex === 'function') {
+            loadFormConfigsFromConvex(true);
+          }
+        }, 300);
       }
 
       const { samsungEligible, samsungSheets } = res.value;
@@ -4822,6 +4829,103 @@ try {
   if (savedBg) gFormBackgroundStore = JSON.parse(savedBg);
 } catch (e) {}
 
+var gFormConfigsLoadingPromise = null;
+var gLastFormConfigsLoadedTime = 0;
+async function loadFormConfigsFromConvex(force = false) {
+  const now = Date.now();
+  if (gFormConfigsLoadingPromise && !force) return gFormConfigsLoadingPromise;
+  if (!force && (now - gLastFormConfigsLoadedTime < 10000)) return true;
+
+  gFormConfigsLoadingPromise = (async () => {
+    try {
+      if (typeof queryConvex !== 'function') {
+        gFormConfigsLoadingPromise = null;
+        return false;
+      }
+      const configs = await queryConvex('sync:getFormConfigs', {});
+      const list = (configs && configs.value && Array.isArray(configs.value)) ? configs.value : (Array.isArray(configs) ? configs : null);
+      if (Array.isArray(list) && list.length > 0) {
+        let hasUpdated = false;
+        list.forEach(fc => {
+          if (fc && fc.formCode) {
+            if (Array.isArray(fc.areas) && fc.areas.length > 0) {
+              gFormAreaStore[fc.formCode] = fc.areas;
+              hasUpdated = true;
+            }
+            if (fc.background) {
+              gFormBackgroundStore[fc.formCode] = fc.background;
+              hasUpdated = true;
+            }
+          }
+        });
+        if (hasUpdated) {
+          try { localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore)); } catch (e) {}
+          try { localStorage.setItem('LIVON_FORM_BACKGROUNDS', JSON.stringify(gFormBackgroundStore)); } catch (e) {}
+          console.log(`[FormConfig OnDemand] Convex에서 ${list.length}개 양식 설정 및 배경 로드 완료`);
+        }
+        gLastFormConfigsLoadedTime = Date.now();
+        gFormConfigsLoadingPromise = null;
+        return true;
+      }
+    } catch (err) {
+      console.warn('[loadFormConfigsFromConvex Error]', err);
+    }
+    gFormConfigsLoadingPromise = null;
+    return false;
+  })();
+  return gFormConfigsLoadingPromise;
+}
+
+async function ensureFormConfigLoaded(formCode, force = false) {
+  if (!force && gFormBackgroundStore && gFormBackgroundStore[formCode] && gFormAreaStore && gFormAreaStore[formCode]) {
+    return true;
+  }
+  return await loadFormConfigsFromConvex(force);
+}
+
+var gLastFormConfigSyncTime = 0;
+async function syncFormConfigQuietly(formCode) {
+  const now = Date.now();
+  if (now - gLastFormConfigSyncTime < 20000) return; // 20초 내 중복 호출 방지
+  gLastFormConfigSyncTime = now;
+  try {
+    const loaded = await loadFormConfigsFromConvex(true);
+    if (loaded && gCurrentPreviewFormCode === formCode) {
+      if (typeof previewFormForCustomer === 'function' && gCurrentPreviewAppId) {
+        previewFormForCustomer(formCode, gCurrentPreviewAppId, window.gCurrentPreviewIsFaxConfirmation, window.gCurrentPreviewFaxRecipient, window.gCurrentPreviewFaxNumber);
+      }
+    }
+  } catch (e) {}
+}
+
+async function refreshFormConfigsFromCloud() {
+  try {
+    const loaded = await loadFormConfigsFromConvex(true);
+    if (loaded) {
+      if (typeof previewFormForCustomer === 'function' && gCurrentPreviewFormCode) {
+        previewFormForCustomer(gCurrentPreviewFormCode, gCurrentPreviewAppId, window.gCurrentPreviewIsFaxConfirmation, window.gCurrentPreviewFaxRecipient, window.gCurrentPreviewFaxNumber);
+      }
+      if (typeof renderEditorCanvasAndList === 'function' && typeof gCurrentEditingFormCode !== 'undefined') {
+        renderEditorCanvasAndList();
+      }
+      if (typeof showCustomAlert === 'function') {
+        showCustomAlert({
+          title: '최신 양식 동기화 완료',
+          message: '다른 PC에서 등록된 최신 양식 및 배경 이미지를 클라우드 서버에서 성공적으로 불러왔습니다.',
+          icon: 'check',
+          iconColor: 'emerald'
+        });
+      } else {
+        alert('클라우드 서버의 최신 양식 설정이 정상적으로 동기화되었습니다.');
+      }
+    } else {
+      alert('클라우드에 저장된 양식 설정이 없거나 이미 최신 상태입니다.');
+    }
+  } catch (e) {
+    alert('양식 동기화 중 오류가 발생했습니다: ' + e.message);
+  }
+}
+
 var gCurrentEditingFormCode = 'HD_FORM_01';
 var gDraggingAreaId = null;
 var gEditorZoom = 1.0;
@@ -4893,6 +4997,12 @@ function openFormEditor(formCode) {
     } catch (e) {}
   }
 
+  ensureFormConfigLoaded(formCode, true).then(loaded => {
+    if (loaded && gCurrentEditingFormCode === formCode) {
+      renderEditorCanvasAndList();
+    }
+  });
+
   const form = gFormTemplates.find(f => f.code === formCode) || { name: formCode, code: formCode };
 
   const codeEl = document.getElementById('editorFormCode');
@@ -4906,6 +5016,27 @@ function openFormEditor(formCode) {
   renderEditorCanvasAndList();
   openModal('formFieldEditorModal');
   initIcons();
+}
+
+function compressCanvasToSafeDataUrl(canvas, maxChars = 750000) {
+  // 1. JPEG quality 0.85 시도 (문서 텍스트 가독성 최상)
+  let dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  if (dataUrl.length <= maxChars) return dataUrl;
+
+  // 2. JPEG quality 0.75 시도
+  dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+  if (dataUrl.length <= maxChars) return dataUrl;
+
+  // 3. 해상도 80% 축소 리사이즈 (Convex 1MB 한도 절대 초과 방지)
+  const scaledCanvas = document.createElement('canvas');
+  scaledCanvas.width = Math.round(canvas.width * 0.8);
+  scaledCanvas.height = Math.round(canvas.height * 0.8);
+  const sCtx = scaledCanvas.getContext('2d');
+  sCtx.fillStyle = '#ffffff';
+  sCtx.fillRect(0, 0, scaledCanvas.width, scaledCanvas.height);
+  sCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+  dataUrl = scaledCanvas.toDataURL('image/jpeg', 0.75);
+  return dataUrl;
 }
 
 async function handleFormTemplateUpload(e) {
@@ -4927,26 +5058,40 @@ async function handleFormTemplateUpload(e) {
       const pdf = await loadingTask.promise;
       const page = await pdf.getPage(1);
 
-      // 2.0x 고해상도 렌더링
-      const viewport = page.getViewport({ scale: 2.0 });
+      // 1.5x 고해상도 렌더링 (A4 크기 최적 가독성)
+      const viewport = page.getViewport({ scale: 1.5 });
       const canvas = document.createElement('canvas');
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-      const dataUrl = canvas.toDataURL('image/png', 0.95);
+      const dataUrl = compressCanvasToSafeDataUrl(canvas);
 
-      saveFormBackgroundData(dataUrl, file.name);
+      await saveFormBackgroundData(dataUrl, file.name);
     } catch (err) {
       console.error('PDF 변환 오류:', err);
       alert('PDF 변환 중 오류가 발생했습니다: ' + err.message);
     }
   } else {
-    // 이미지 파일 (PNG, JPG, WebP 등)
+    // 이미지 파일 (PNG, JPG, WebP 등) - 캔버스 압축 후 서버 업로드
     const reader = new FileReader();
     reader.onload = function(evt) {
-      saveFormBackgroundData(evt.target.result, file.name);
+      const img = new Image();
+      img.onload = async function() {
+        const c = document.createElement('canvas');
+        c.width = img.width;
+        c.height = img.height;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0);
+        const compressedDataUrl = compressCanvasToSafeDataUrl(c);
+        await saveFormBackgroundData(compressedDataUrl, file.name);
+      };
+      img.src = evt.target.result;
     };
     reader.readAsDataURL(file);
   }
@@ -4963,27 +5108,39 @@ async function saveFormBackgroundData(dataUrl, fileName) {
   }
 
   // Convex Cloud DB에 배경 이미지 영구 보존
+  let saveSuccess = false;
+  let errorMsg = '';
   try {
-    await syncToConvex('sync:saveFormConfig', {
+    const res = await syncToConvex('sync:saveFormConfig', {
       formCode: gCurrentEditingFormCode,
       background: dataUrl,
       updatedAt: new Date().toISOString()
     });
-    console.log(`[Form Background] ${gCurrentEditingFormCode} 배경 이미지가 Convex Cloud DB에 영구 저장되었습니다.`);
+    if (res && res.status !== 'error') {
+      saveSuccess = true;
+      console.log(`[Form Background] ${gCurrentEditingFormCode} 배경 이미지가 Convex Cloud DB에 영구 저장되었습니다. (크기: ${Math.round(dataUrl.length / 1024)}KB)`);
+    } else {
+      errorMsg = (res && res.message) || '서버 응답 오류';
+    }
   } catch (err) {
-    console.warn('[Form Background Convex Save Error]', err);
+    console.error('[Form Background Convex Save Error]', err);
+    errorMsg = err.message || '네트워크 오류';
   }
 
   renderEditorCanvasAndList();
-  if (typeof showCustomAlert === 'function') {
-    showCustomAlert({
-      title: '빈양식 배경 적용 완료',
-      message: `[${fileName}] 서식이 캔버스 배경으로 등록되었으며, Convex 클라우드 DB에 영구 보존됩니다.\n영역 박스를 마우스로 드래그하여 서식 칸에 맞춰 배치할 수 있습니다.`,
-      icon: 'file-check',
-      iconColor: 'emerald'
-    });
+  if (saveSuccess) {
+    if (typeof showCustomAlert === 'function') {
+      showCustomAlert({
+        title: '빈양식 배경 서버 저장 완료',
+        message: `[${fileName}] 서식이 성공적으로 압축되어 Convex 클라우드 서버에 영구 보존되었습니다.\n(용량: ${Math.round(dataUrl.length / 1024)}KB)\n다른 모든 PC에서도 팩스 양식이 즉시 동일하게 적용됩니다.`,
+        icon: 'file-check',
+        iconColor: 'emerald'
+      });
+    } else {
+      alert(`[${fileName}] 서식이 Convex 클라우드 서버에 안전하게 영구 저장되었습니다.\n(용량: ${Math.round(dataUrl.length / 1024)}KB)\n다른 PC에서도 동일하게 적용됩니다.`);
+    }
   } else {
-    alert(`[${fileName}] 서식이 캔버스 배경으로 설정 및 영구 저장되었습니다.`);
+    alert(`⚠️ 로컬에는 임시 반영되었으나 Convex 클라우드 서버 저장에 실패했습니다.\n(원인: ${errorMsg})\n다른 PC 동기화를 위해 다시 시도해주세요.`);
   }
 }
 
@@ -5690,22 +5847,37 @@ async function saveFormAreas() {
   } catch (e) {}
 
   // Convex Cloud DB에 영구 백업 저장!
+  let savedOk = false;
+  let errMsg = '';
   try {
     const currentAreas = gFormAreaStore[gCurrentEditingFormCode] || [];
     const currentBg = gFormBackgroundStore && gFormBackgroundStore[gCurrentEditingFormCode];
-    await syncToConvex('sync:saveFormConfig', {
+    const payload = {
       formCode: gCurrentEditingFormCode,
       areas: currentAreas,
-      background: currentBg || undefined,
       updatedAt: new Date().toISOString()
-    });
-    console.log(`[Form Config] ${gCurrentEditingFormCode} 양식 영역 및 배경 설정이 Convex Cloud DB에 영구 저장되었습니다.`);
+    };
+    if (currentBg) payload.background = currentBg;
+
+    const res = await syncToConvex('sync:saveFormConfig', payload);
+    if (res && res.status !== 'error') {
+      savedOk = true;
+      console.log(`[Form Config] ${gCurrentEditingFormCode} 양식 영역 및 배경 설정이 Convex Cloud DB에 영구 저장되었습니다.`);
+    } else {
+      errMsg = (res && res.message) || '서버 응답 오류';
+    }
   } catch (err) {
     console.warn('[Form Config Convex Save Error]', err);
+    errMsg = err.message || '네트워크 오류';
   }
 
-  alert('💾 [' + gCurrentEditingFormCode + '] 양식의 서식 배경 및 데이터 매핑 설정이 Convex 클라우드 DB와 로컬에 안전하게 영구 저장되었습니다!');
-  closeModal('formFieldEditorModal');
+  if (savedOk) {
+    alert('💾 [' + gCurrentEditingFormCode + '] 양식의 서식 배경 및 데이터 매핑 설정이 Convex 클라우드 DB에 안전하게 영구 저장되었습니다!\n다른 모든 PC에서도 실시간으로 동기화됩니다.');
+    closeModal('formFieldEditorModal');
+  } else {
+    alert('⚠️ 로컬에 임시 저장되었으나 클라우드 서버 저장에 실패했습니다.\n(원인: ' + errMsg + ')\n네트워크를 확인한 후 다시 저장해 주세요.');
+    closeModal('formFieldEditorModal');
+  }
 }
 
 async function resetFormAreasToDefault() {
@@ -13271,6 +13443,9 @@ function deleteCenter(id) {
 // 3. FORM TEMPLATE CENTER TAB
 // -------------------------------------------------------------------------
 function renderForms() {
+  if (typeof loadFormConfigsFromConvex === 'function') {
+    loadFormConfigsFromConvex(true);
+  }
   const container = document.getElementById('formTemplatesGrid');
   if (!container) return;
 
@@ -13753,6 +13928,11 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
   if (faxRecipient) window.gCurrentPreviewFaxRecipient = faxRecipient;
   if (faxNumber) window.gCurrentPreviewFaxNumber = faxNumber;
 
+  // 다른 PC에서 업데이트된 최신 양식을 백그라운드 자동 동기화
+  if (typeof syncFormConfigQuietly === 'function') {
+    syncFormConfigQuietly(formCode);
+  }
+
   const titleEl = document.getElementById('formPreviewModalTitle');
   if (titleEl) {
     titleEl.innerHTML = `
@@ -13825,6 +14005,16 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
     // =========================================================================
     const customBg = gFormBackgroundStore && gFormBackgroundStore['HD_FORM_01'];
     const areas = gFormAreaStore && gFormAreaStore['HD_FORM_01'] ? gFormAreaStore['HD_FORM_01'] : [];
+
+    if (typeof ensureFormConfigLoaded === 'function') {
+      ensureFormConfigLoaded('HD_FORM_01', !customBg).then(loaded => {
+        if (loaded && gFormBackgroundStore['HD_FORM_01'] && gCurrentPreviewFormCode === 'HD_FORM_01') {
+          if (!customBg || gFormBackgroundStore['HD_FORM_01'] !== customBg) {
+            previewFormForCustomer('HD_FORM_01', app, isFaxConfirmation, faxRecipient, faxNumber);
+          }
+        }
+      });
+    }
 
     if (customBg) {
       sheet.innerHTML = `
@@ -14022,6 +14212,14 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
     const isScor = (formCode === 'HD_FORM_03' || (app && (app.insuranceCompany || '').includes('SCOR')));
     const customBg = gFormBackgroundStore && (gFormBackgroundStore[formCode] || gFormBackgroundStore['HD_FORM_02']);
     const areas = gFormAreaStore && (gFormAreaStore[formCode] || gFormAreaStore['HD_FORM_02']) ? (gFormAreaStore[formCode] || gFormAreaStore['HD_FORM_02']) : [];
+
+    if (!customBg && typeof ensureFormConfigLoaded === 'function') {
+      ensureFormConfigLoaded(formCode).then(loaded => {
+        if (loaded && (gFormBackgroundStore[formCode] || gFormBackgroundStore['HD_FORM_02']) && gCurrentPreviewFormCode === formCode) {
+          previewFormForCustomer(formCode, app, isFaxConfirmation, faxRecipient, faxNumber);
+        }
+      });
+    }
 
     const currentCareTarget = getHdFormCareTarget(app);
     const currentCareLocation = getHdFormCareLocation(app);
