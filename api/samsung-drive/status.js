@@ -8,9 +8,9 @@ module.exports = async function handler(req, res) {
       folderId: '1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc',
       folderUrl: 'https://drive.google.com/drive/folders/1MBd2yf3A6CQwHVnWw_6keclS9lc18TZc',
       folderName: '삼성화재 가입자 리스트',
-      lastSyncedFile: '삼성화재 _간병인지원 대상건 현황_업체제공용_20261016.xlsx',
-      lastSyncedAt: '2026. 10. 16. 19:40:44',
-      lastRecordCount: 50652,
+      lastSyncedFile: '삼성화재 _간병인지원 대상건 현황_업체제공용_20261019.xlsx',
+      lastSyncedAt: '2026. 10. 19. 11:43:02',
+      lastRecordCount: 51840,
       hasNewFile: false
     };
 
@@ -20,8 +20,8 @@ module.exports = async function handler(req, res) {
     }
 
     const latest = {
-      filename: cfg.lastSyncedFile || '삼성화재 _간병인지원 대상건 현황_업체제공용_20261016.xlsx',
-      fileDateStr: (cfg.lastSyncedFile && (cfg.lastSyncedFile.match(/(\d{8})/) || [])[1]) || '20261016'
+      filename: cfg.lastSyncedFile || '삼성화재 _간병인지원 대상건 현황_업체제공용_20261019.xlsx',
+      fileDateStr: (cfg.lastSyncedFile && (cfg.lastSyncedFile.match(/(\d{8})/) || [])[1]) || '20261019'
     };
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -36,7 +36,7 @@ module.exports = async function handler(req, res) {
       latestFile: latest,
       lastSyncedFile: cfg.lastSyncedFile,
       lastSyncedAt: cfg.lastSyncedAt,
-      lastRecordCount: cfg.lastRecordCount || 50652,
+      lastRecordCount: cfg.lastRecordCount || 51840,
       hasNewFile: false
     });
   } catch (err) {

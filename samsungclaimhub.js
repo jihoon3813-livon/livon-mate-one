@@ -5779,8 +5779,8 @@ async function checkSamsungDriveStatus() {
     }
 
     const syncedAt = data.lastSyncedAt || localStorage.getItem('LIVON_SAMSUNG_DRIVE_SYNCED_AT') || '2026-10-15 10:54';
-    const syncedFile = data.lastSyncedFile || localStorage.getItem('LIVON_SAMSUNG_DRIVE_SYNCED_FILE') || '삼성화재 _간병인지원 대상건 현황_업체제공용_20261015.xlsx';
-    const count = data.lastRecordCount || Number(localStorage.getItem('LIVON_SAMSUNG_COUNT')) || 49989;
+    const syncedFile = data.lastSyncedFile || localStorage.getItem('LIVON_SAMSUNG_DRIVE_SYNCED_FILE') || '삼성화재 _간병인지원 대상건 현황_업체제공용_20261019.xlsx';
+    const count = data.lastRecordCount || Number(localStorage.getItem('LIVON_SAMSUNG_COUNT')) || 51840;
 
     gSamsungDriveLastSyncedAt = syncedAt;
     gSamsungDriveLastSyncedFile = syncedFile;
@@ -5896,7 +5896,7 @@ async function triggerSamsungDriveSync(isAuto = false) {
       throw new Error('동기화할 구글 드라이브 레코드가 0건입니다.');
     }
 
-    const filename = data.filename || '삼성화재 _간병인지원 대상건 현황_업체제공용_20261016.xlsx';
+    const filename = data.filename || '삼성화재 _간병인지원 대상건 현황_업체제공용_20261019.xlsx';
     const syncedAt = data.syncedAt || new Date().toLocaleString('ko-KR', { hour12: false });
     const count = records.length;
 
