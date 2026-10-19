@@ -32052,6 +32052,15 @@ async function submitAppToCarePort(app, isManual = false) {
       app.careportStatus = 'REGISTERED';
       app.careportInsurance = result.insuranceCompany || app.insuranceCompany;
 
+      // gApps 내 원본 객체에도 즉시 동기화
+      const originalApp = (Array.isArray(window.gApps) ? window.gApps : []).find(a => a && (String(a.id) === String(app.id) || String(a.patientId) === String(app.id)));
+      if (originalApp) {
+        originalApp.careportAppNo = appNo;
+        originalApp.careportRegisteredAt = app.careportRegisteredAt;
+        originalApp.careportStatus = 'REGISTERED';
+        originalApp.careportInsurance = app.careportInsurance;
+      }
+
       // Local storage update
       try {
         localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
@@ -32166,20 +32175,128 @@ async function submitActiveHubCustomerToCarePort() {
     alert('선택된 고객이 없습니다.');
     return;
   }
-  const app = (gApps || []).find(a => a && (String(a.id) === String(targetId) || String(a.patientId) === String(targetId)));
+
+  // 1. [자동 동기화] 통합허브 상세 모달이 열려있는 경우, 미저장된 인라인 변경사항(정산세트, 입금액, 상태 등)을 먼저 저장
+  if (typeof window.saveActiveHubCustomerDetail === 'function') {
+    try {
+      await window.saveActiveHubCustomerDetail(true, targetId);
+    } catch (saveErr) {
+      console.warn('[submitActiveHubCustomerToCarePort] 모달 자동 저장 경고:', saveErr);
+    }
+  }
+
+  // 2. [최신 데이터 검색] gApps, REBORN_DATA, localStorage 순으로 가장 최신 고객 데이터 확보
+  const targetStr = String(targetId).trim();
+  const targetCleanPhone = targetStr.replace(/[^0-9]/g, '');
+  const isMatchTarget = (a) => {
+    if (!a) return false;
+    if (String(a.id) === targetStr || String(a.patientId) === targetStr) return true;
+    if (String(a.id).replace(/^[CH]/, '') === targetStr.replace(/^[CH]/, '')) return true;
+    if (targetCleanPhone && targetCleanPhone.length >= 8) {
+      const p1 = String(a.phone || '').replace(/[^0-9]/g, '');
+      const p2 = String(a.patientPhone || a.guardianPhone || '').replace(/[^0-9]/g, '');
+      if (p1 === targetCleanPhone || p2 === targetCleanPhone) return true;
+    }
+    return false;
+  };
+
+  let app = (Array.isArray(window.gApps) ? window.gApps : []).find(isMatchTarget);
+  if (!app && window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
+    app = window.REBORN_DATA.applications.find(isMatchTarget);
+  }
+  if (!app) {
+    try {
+      const cached = JSON.parse(localStorage.getItem('LIVON_CACHED_APPS') || '[]');
+      app = cached.find(isMatchTarget);
+    } catch (e) {}
+  }
+
   if (!app) {
     alert(`고객 정보(${targetId})를 찾을 수 없습니다.`);
     return;
   }
 
-  const pName = app.patientName || '고객';
-  const ins = app.insuranceCompany || '원수사';
-  const confirmMsg = app.careportAppNo
-    ? `[${pName} 님 - ${ins}]\n이미 케어포트에 접수된 내역(접수번호: #${app.careportAppNo})이 있습니다.\n\n케어포트 방문관리 서비스 신청서 재등록을 진행하시겠습니까?`
-    : `[${pName} 님 - ${ins}]\n고객 정보를 케어포트(방문관리 > 서비스신청)에 정식 등록하시겠습니까?\n\n* 고객 정보(피보험자, 생년월일/주민번호, 연락처, 주소, 병원명, 진단명, 간병일정 등)가 케어포트 전산에 실시간 전송됩니다.`;
+  // 3. [최신 정보 실시간 결합(Enrichment)] 최신 배정(Assignment) 및 정산 세트(Settlement Set) 연동
+  const appAssigns = (window.gAssigns || []).filter(a => a && (
+    String(a.applyId) === String(app.id) || 
+    String(a.applyId) === targetStr ||
+    String(a.applyId).replace(/^[CH]/, '') === targetStr.replace(/^[CH]/, '')
+  ));
+  const sortedAssigns = appAssigns.slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+  const latestAssign = (typeof getActiveCaregiverAssignment === 'function' ? getActiveCaregiverAssignment(app, sortedAssigns) : null) || 
+    (sortedAssigns.length > 0 ? sortedAssigns[sortedAssigns.length - 1] : null);
+
+  const customSets = Array.isArray(app.customSettlementSets) ? app.customSettlementSets : [];
+  const firstSet = customSets.length > 0 ? customSets[0] : null;
+
+  // 실제 간병 일정 최신화
+  const latestStartDate = (latestAssign && latestAssign.startDate) || 
+    (firstSet && firstSet.startDateStr) || 
+    app.startDate || 
+    app.careStartDate || 
+    app.desiredDate || 
+    app.applyDate;
+  const latestEndDate = (latestAssign && latestAssign.endDate) || 
+    (firstSet && firstSet.endDateStr) || 
+    app.endDate || 
+    app.careEndDate;
+  const latestDays = (firstSet && (firstSet.claimDays || firstSet.days)) || 
+    (latestAssign && latestAssign.days) || 
+    app.days || 
+    app.expectedDays || 
+    30;
+
+  // 병원 및 병실 최신화
+  const latestHospital = (latestAssign && latestAssign.hospitalName) || 
+    app.hospitalName || 
+    app.hospital || 
+    app.careHospital || 
+    '';
+  const latestRoom = (latestAssign && latestAssign.hospitalRoom) || 
+    app.hospitalRoom || 
+    app.room || 
+    '';
+
+  // 보호자(신청인) 정보 최신화
+  const latestApplicantName = (app.applicantName || app.guardianName || '').trim();
+  const latestApplicantPhone = (app.applicantPhone || app.guardianPhone || '').trim();
+  const latestApplicantRelation = (app.applicantRelation || app.guardianRelation || '자녀').trim();
+
+  // 주민등록번호 최신화
+  const latestRrn = (app.patientRrn || app.rrn || '').trim();
+
+  // 최신 데이터가 완전 반영된 전송용 enrichedApp 객체 생성
+  const enrichedApp = {
+    ...app,
+    startDate: latestStartDate,
+    careStartDate: latestStartDate,
+    endDate: latestEndDate,
+    careEndDate: latestEndDate,
+    expectedDays: latestDays,
+    days: latestDays,
+    hospitalName: latestHospital,
+    hospitalRoom: latestRoom,
+    applicantName: latestApplicantName,
+    guardianName: latestApplicantName,
+    applicantPhone: latestApplicantPhone,
+    guardianPhone: latestApplicantPhone,
+    applicantRelation: latestApplicantRelation,
+    guardianRelation: latestApplicantRelation,
+    patientRrn: latestRrn,
+    rrn: latestRrn
+  };
+
+  const pName = enrichedApp.patientName || '고객';
+  const ins = enrichedApp.insuranceCompany || '원수사';
+  const dateDisplay = latestStartDate ? String(latestStartDate).slice(0, 10).replace(/-/g, '.') : '-';
+  const locDisplay = latestHospital || (enrichedApp.roadAddress ? (enrichedApp.roadAddress.slice(0, 24) + '...') : '자택');
+
+  const confirmMsg = enrichedApp.careportAppNo
+    ? `[${pName} 님 - ${ins}]\n이미 케어포트에 접수된 내역(접수번호: #${enrichedApp.careportAppNo})이 있습니다.\n\n[최신 반영 데이터 검증]\n• 피보험자: ${pName} (${enrichedApp.phone || '-'})\n• 간병일정: ${dateDisplay} (${latestDays}일간)\n• 병원/장소: ${locDisplay}\n• 보호자(신청인): ${latestApplicantName || '본인'} (${latestApplicantPhone || '-'})\n\n최신 데이터로 케어포트 방문관리 서비스 신청서 재등록을 진행하시겠습니까?`
+    : `[${pName} 님 - ${ins}]\n고객 정보를 케어포트(방문관리 > 서비스신청)에 최신 데이터로 정식 등록하시겠습니까?\n\n[최신 반영 데이터 검증]\n• 피보험자: ${pName} (${enrichedApp.phone || '-'})\n• 간병일정: ${dateDisplay} (${latestDays}일간)\n• 병원/장소: ${locDisplay}\n• 보호자(신청인): ${latestApplicantName || '본인'} (${latestApplicantPhone || '-'})\n\n* 고객 정보가 케어포트 전산에 실시간 전송됩니다.`;
 
   if (confirm(confirmMsg)) {
-    await submitAppToCarePort(app, true);
+    await submitAppToCarePort(enrichedApp, true);
   }
 }
 
@@ -32476,6 +32593,20 @@ function openCustomerEditModal(appId, focusSection = null) {
   document.getElementById('custEditSigungu').value = app.sigungu || '';
   const zipEl = document.getElementById('custEditZip');
   if (zipEl) zipEl.value = app.zip || app.addrZip || app.zonecode || '';
+
+  // 간병 장소 및 입원 병원 정보 바인딩
+  const hospNameInput = document.getElementById('custEditHospitalName');
+  if (hospNameInput) {
+    hospNameInput.value = app.hospitalName || app.hospital || (app.careType === '자택' ? '자택' : '');
+  }
+  const hospRoomInput = document.getElementById('custEditHospitalRoom');
+  if (hospRoomInput) {
+    hospRoomInput.value = app.hospitalRoom || app.room || '';
+  }
+  const hospRoadInput = document.getElementById('custEditHospitalRoadAddress');
+  if (hospRoadInput) {
+    hospRoadInput.value = app.hospitalRoadAddress || '';
+  }
   document.getElementById('custEditPolicyNumber').value = app.policyNumber || '';
   document.getElementById('custEditAccidentNumber').value = app.accidentNumber || '';
   const adjInfo = (gAdjusters || []).find(a => a.name === app.adjusterName) || {};
@@ -32587,9 +32718,27 @@ function handleCustomerEditSubmit(e) {
     app.addrZip = editZip;
     app.zonecode = editZip;
   }
+  // 간병 장소 및 입원 병원 정보 저장 (케어포트 연동 핵심 최신화)
+  const newHospName = (document.getElementById('custEditHospitalName')?.value || '').trim();
+  const newHospRoom = (document.getElementById('custEditHospitalRoom')?.value || '').trim();
+  const newHospRoad = (document.getElementById('custEditHospitalRoadAddress')?.value || '').trim();
+
+  if (newHospName) {
+    app.hospitalName = newHospName;
+    app.hospital = newHospName;
+    app.careHospital = newHospName;
+  }
+  if (newHospRoom !== undefined) {
+    app.hospitalRoom = newHospRoom;
+    app.room = newHospRoom;
+  }
+  if (newHospRoad) {
+    app.hospitalRoadAddress = newHospRoad;
+  }
+
   // 입원 건이거나 병원 도로명 주소가 비어있거나 불일치할 때 hospitalRoadAddress 동기화
   if (app.careType === '입원' || !app.hospitalRoadAddress || (app.hospitalRoadAddress && !app.roadAddress.includes('서울') && app.hospitalRoadAddress.includes('서울'))) {
-    app.hospitalRoadAddress = app.roadAddress;
+    app.hospitalRoadAddress = app.hospitalRoadAddress || app.roadAddress;
   }
   app.hasManualUpdate = true;
   app.policyNumber = document.getElementById('custEditPolicyNumber').value.trim();
@@ -32655,6 +32804,9 @@ function handleCustomerEditSubmit(e) {
     insuranceCompany: '보험사',
     roadAddress: '소재지/도로명',
     addressDetail: '상세주소',
+    hospitalName: '입원병원명',
+    hospitalRoom: '병실/병동',
+    hospitalRoadAddress: '병원소재지',
     policyNumber: '증권번호',
     accidentNumber: '사고번호',
     adjusterName: '담당손사',

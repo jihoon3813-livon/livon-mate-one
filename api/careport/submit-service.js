@@ -66,12 +66,16 @@ function cleanPhone(val) {
  * Build 13 digits RRN (주민등록번호)
  */
 function buildFullRrn(app) {
-  const rawRrn = (app.patientRrn || '').replace(/\D/g, '');
+  const rawRrn = String(app.patientRrn || app.rrn || '').replace(/\D/g, '');
   if (rawRrn.length === 13) return rawRrn;
 
-  const f = (app.rrnFront || '').replace(/\D/g, '');
-  const b = (app.rrnBack || '').replace(/\D/g, '');
+  const f = String(app.rrnFront || '').replace(/\D/g, '');
+  const b = String(app.rrnBack || '').replace(/\D/g, '');
   if (f.length === 6 && b.length === 7) return f + b;
+
+  // 6자리 + 7자리 문자열 조합 (예: 900101-1234567)
+  const fullClean = String(app.patientRrn || app.rrn || '').replace(/[^0-9*]/g, '');
+  if (fullClean.length === 13 && !fullClean.includes('*')) return fullClean;
 
   // Fallback from birthDate and gender
   const birth8 = toDate8(app.birthDate);
@@ -118,20 +122,28 @@ module.exports = async (req, res) => {
     let patientName = String(app.patientName).trim();
     const isMale = (app.gender === '남' || app.gender === 'M' || app.gender === '1');
     const genderCode = isMale ? 'M' : 'F';
-    const patientPhone = cleanPhone(app.phone);
+    const patientPhone = cleanPhone(app.phone || app.patientPhone || app.customerPhone);
     const birthDate8 = toDate8(app.birthDate);
     const fullRrn = buildFullRrn(app);
 
-    // 2. 신청인 (보호자) 정보 매핑
-    const isSameApplicant = app.isApplicantSame || (app.applicantRelation === '본인') || (!app.applicantName) || (app.applicantName === patientName);
-    let applicantName = (isSameApplicant ? patientName : (app.applicantName || patientName)).trim();
-    const applicantPhone = cleanPhone(isSameApplicant ? patientPhone : (app.applicantPhone || patientPhone));
+    // 2. 신청인 (보호자) 정보 매핑 (최신 수정된 보호자 정보 완벽 연동)
+    const applicantNameVal = String(app.applicantName || app.guardianName || '').trim();
+    const applicantPhoneVal = cleanPhone(app.applicantPhone || app.guardianPhone || '');
+    const applicantRelVal = String(app.applicantRelation || app.guardianRelation || '').trim();
+
+    const isSameApplicant = app.isApplicantSame || 
+      (applicantRelVal === '본인') || 
+      (!applicantNameVal) || 
+      (applicantNameVal === patientName);
+
+    let applicantName = (isSameApplicant ? patientName : applicantNameVal).trim();
+    const applicantPhone = cleanPhone(isSameApplicant ? patientPhone : applicantPhoneVal);
     
     // 관계 코드: 본인('02'), 가족('07'), 기타('99')
     let relationCode = '02';
     if (!isSameApplicant) {
-      const rel = String(app.applicantRelation || '');
-      if (rel.includes('가족') || rel.includes('배우자') || rel.includes('자녀') || rel.includes('부모') || rel.includes('아들') || rel.includes('딸')) {
+      const rel = applicantRelVal;
+      if (rel.includes('가족') || rel.includes('배우자') || rel.includes('자녀') || rel.includes('부모') || rel.includes('아들') || rel.includes('딸') || rel.includes('형제') || rel.includes('자매')) {
         relationCode = '07';
       } else {
         relationCode = '99';
@@ -141,7 +153,9 @@ module.exports = async (req, res) => {
     // 3. 계약 및 사고 정보
     const contractDate8 = toDate8(app.contractStartDate || app.contractDate || app.accidentDate);
     const accidentDate8 = toDate8(app.accidentDate);
-    const policyNumber = (app.policyNumber && app.policyNumber !== '-') ? String(app.policyNumber).trim() : (app.accidentNumber || '00000000');
+    const policyNumber = (app.policyNumber && app.policyNumber !== '-') 
+      ? String(app.policyNumber).trim() 
+      : (app.accidentNumber && app.accidentNumber !== '-' ? String(app.accidentNumber).trim() : '00000000');
     
     // 사고유형: '01'(질병), '02'(상해)
     const isDisease = (app.accidentType === '질병');
@@ -152,10 +166,10 @@ module.exports = async (req, res) => {
     let zipCode = String(app.zip || app.addrZip || app.zonecode || app.postcode || '').replace(/\D/g, '');
     if (zipCode.length !== 5) zipCode = '58637'; // 기본 유효 우편번호
 
-    // 도로명 주소 (기본 주소) 판별: hospitalRoadAddress, roadAddress, addrAmsvgAddr 우선 적용
+    // 도로명 주소 (기본 주소) 판별: 사용자가 수정한 roadAddress 우선 적용
     let roadAddr = String(
-      app.hospitalRoadAddress || 
       app.roadAddress || 
+      app.hospitalRoadAddress || 
       app.addrAmsvgAddr || 
       ''
     ).trim();
@@ -175,9 +189,9 @@ module.exports = async (req, res) => {
       }
     }
 
-    // 병원명 및 병실 정리
-    let rawHospitalName = String(app.hospitalName || '').trim();
-    let hospitalRoom = String(app.hospitalRoom || '').trim();
+    // 병원명 및 병실 정리 (최신 배정 및 모달 수정내역 반영)
+    let rawHospitalName = String(app.hospitalName || app.hospital || app.careHospital || '').trim();
+    let hospitalRoom = String(app.hospitalRoom || app.room || '').trim();
     const roomMatch = rawHospitalName.match(/\s+(\d+호|\d+병동|\d+호실)$/);
     if (roomMatch) {
       if (!hospitalRoom) hospitalRoom = roomMatch[1];
@@ -200,11 +214,23 @@ module.exports = async (req, res) => {
     const isHospitalCare = (app.careType === '입원' || !app.careType || app.careType !== '자택');
     const hospitalName = isHospitalCare ? rawHospitalName : '';
 
-    // 5. 간병 일정 및 요청사항
-    const careStartDate8 = toDate8(app.desiredDate || app.applyDate);
-    const expectedPeriod = String(app.expectedDays || '30').replace(/\D/g, '') || '30';
-    const diagnosis = String(app.diagnosis || '상해/질병 간병 신청').trim();
-    const accidentDetail = String(app.accidentDetail || app.memo || '통합허브 고객 접수 연동').trim();
+    // 5. 간병 일정 및 요청사항 (배정 및 정산세트의 최신 실제 간병일정 우선 반영)
+    const latestCareStart = app.startDate || 
+      app.careStartDate || 
+      (app.customSettlementSets && app.customSettlementSets[0] && app.customSettlementSets[0].startDateStr) ||
+      app.desiredDate || 
+      app.applyDate;
+    const careStartDate8 = toDate8(latestCareStart);
+
+    const expectedPeriod = String(
+      app.days || 
+      (app.customSettlementSets && app.customSettlementSets[0] && (app.customSettlementSets[0].claimDays || app.customSettlementSets[0].days)) ||
+      app.expectedDays || 
+      '30'
+    ).replace(/\D/g, '') || '30';
+
+    const diagnosis = String(app.diagnosis || app.diseaseName || '상해/질병 간병 신청').trim();
+    const accidentDetail = String(app.accidentDetail || app.memo || app.specialNotes || '통합허브 고객 접수 연동').trim();
     const mobilityYn = (app.mobility === '불가' || app.mobility === 'N') ? 'N' : 'Y';
     const applyDate8 = toDate8(app.applyDate);
 

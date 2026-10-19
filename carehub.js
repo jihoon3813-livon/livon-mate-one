@@ -6914,6 +6914,14 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                 <!-- 인적/연락처 & 지역 -->
                 <div class="space-y-1.5 py-2 text-slate-600 text-[11px] border-b border-slate-100">
                   ${renderAppContactRowsHtml(app, false, true)}
+                  ${app.hospitalName ? `
+                  <div class="flex justify-between items-center gap-2 pt-1 border-t border-slate-100">
+                    <span class="text-slate-400 font-medium flex items-center gap-1 flex-shrink-0"><i data-lucide="building-2" class="w-3 h-3 text-emerald-600"></i> 입원병원:</span>
+                    <span class="text-slate-900 text-right font-black break-words leading-relaxed truncate max-w-[220px]">
+                      ${app.hospitalName} ${app.hospitalRoom ? `<span class="text-slate-500 font-normal text-[10.5px]">(${app.hospitalRoom})</span>` : ''}
+                    </span>
+                  </div>
+                  ` : ''}
                   <div class="flex justify-between items-start gap-2 pt-1 border-t border-slate-100">
                     <span class="text-slate-400 font-medium flex items-center gap-1 flex-shrink-0 pt-0.5"><i data-lucide="map-pin" class="w-3 h-3 text-slate-400"></i> 지역/주소:</span>
                     <span class="text-slate-800 text-right font-medium break-words leading-relaxed truncate max-w-[220px]" title="${[app.sido, app.sigungu, app.roadAddress, app.addressDetail].filter(Boolean).join(' ')}">
@@ -8596,6 +8604,14 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
               <div class="space-y-1.5 text-slate-600 text-[11.5px]">
                 ${renderAppContactRowsHtml(app, false, false)}
+                ${app.hospitalName ? `
+                <div class="flex justify-between items-center pt-1 border-t border-slate-100">
+                  <span class="text-slate-500 flex items-center gap-1 font-medium flex-shrink-0"><i data-lucide="building-2" class="w-3.5 h-3.5 text-emerald-600"></i> 입원병원:</span>
+                  <span class="text-slate-900 text-right font-black break-words max-w-[210px] leading-relaxed">
+                    ${app.hospitalName} ${app.hospitalRoom ? `<span class="text-slate-500 font-normal text-[10.5px]">(${app.hospitalRoom})</span>` : ''}
+                  </span>
+                </div>
+                ` : ''}
                 <div class="flex justify-between items-start pt-1 border-t border-slate-100">
                   <span class="text-slate-500 flex items-center gap-1 font-medium flex-shrink-0 pt-0.5"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400"></i> 지역/주소:</span>
                   <span class="text-slate-800 text-right font-medium break-words max-w-[210px] leading-relaxed">
