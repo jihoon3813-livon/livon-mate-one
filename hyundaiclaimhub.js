@@ -46,11 +46,6 @@ function isHyundaiCareEnded(app) {
     if (cleanEnd !== '-' && cleanEnd <= todayStr) return true;
   }
 
-  if (app.lastClaimDate) {
-    const cleanClaim = formatHyundaiDate(app.lastClaimDate);
-    if (cleanClaim !== '-' && cleanClaim <= todayStr) return true;
-  }
-
   const as = (gAssigns || []).find(a => String(a.applyId) === String(app.id));
   if (as) {
     if (['완료', '종료', '간병종료'].includes(as.status)) return true;
@@ -58,6 +53,60 @@ function isHyundaiCareEnded(app) {
   }
 
   return false;
+}
+
+function parseHyundaiClaimDate(value) {
+  if (!value) return null;
+  const normalized = formatHyundaiDate(value).replace(/\./g, '-');
+  const match = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getNextHyundaiClaimDate(referenceDate, includeReference = false) {
+  const reference = new Date(referenceDate);
+  if (Number.isNaN(reference.getTime())) return null;
+
+  for (let offset = 0; offset < 24; offset++) {
+    const month = new Date(reference.getFullYear(), reference.getMonth() + offset, 1);
+    const lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    const dueDays = [10, 20, lastDay].filter((day, index, list) => list.indexOf(day) === index);
+    for (const day of dueDays) {
+      const due = new Date(month.getFullYear(), month.getMonth(), day);
+      if (includeReference ? due >= reference : due > reference) return due;
+    }
+  }
+  return null;
+}
+
+function getHyundaiLatestClaimDate(app) {
+  if (!app) return null;
+  const pName = (app.patientName || '').trim();
+  const dates = [];
+  (gClaims || []).forEach(claim => {
+    if (String(claim.applyId) !== String(app.id) && !(pName && claim.patientName && claim.patientName.trim() === pName)) return;
+    const date = parseHyundaiClaimDate(claim.claimDate || claim.faxSentDate || claim.standardDate);
+    if (date) dates.push(date);
+  });
+  (gFaxLogs || []).forEach(log => {
+    if (String(log.appId) !== String(app.id) && !(pName && log.patientName && log.patientName.trim() === pName)) return;
+    const isClaimFax = log.formCode === 'HD_FORM_02' || log.formCode === 'HD_FORM_03' || log.category === '정산청구' || (log.formName && log.formName.includes('비용청구서'));
+    const isSuccess = log.status === '성공' || log.status === '전송성공' || log.status === '완료';
+    const date = parseHyundaiClaimDate(log.sentDate || log.createdAt);
+    if (isClaimFax && isSuccess && date) dates.push(date);
+  });
+  return dates.sort((a, b) => b - a)[0] || null;
+}
+
+function hasHyundaiCaregiver(app) {
+  if (!app) return false;
+  const assignments = (gAssigns || []).filter(a => String(a.applyId) === String(app.id));
+  const names = [app.caregiverName, app.assignedCaregiverName, ...assignments.map(a => a.caregiverName)];
+  return names.some(value => {
+    const name = String(value || '').trim();
+    return name && name !== '-' && name !== '미배정' && name !== '배정대기' && !name.includes('미배정') && !name.includes('배정대기');
+  });
 }
 
 function getHyundaiClaimStatus(app) {
@@ -69,35 +118,46 @@ function getHyundaiClaimStatus(app) {
     return { isClaimed: true, isUnbilled: true, statusText: '무청구(종결)', lastSentDate: null };
   }
 
-  const pName = (app.patientName || '').trim();
-
-  // 1. Check gClaims (신청ID 또는 환자명으로 정밀 대조)
-  const c = (gClaims || []).find(claim =>
-    (String(claim.applyId) === String(app.id) || (pName && claim.patientName && claim.patientName.trim() === pName)) &&
-    (claim.claimDate || claim.faxStatus === '전송완료' || ['수납완료', '입금완료', '입금확인'].includes(claim.depositStatus) || (claim.days && claim.days > 0))
-  );
-  if (c) {
-    return { isClaimed: true, statusText: '청구완료', lastSentDate: c.claimDate || c.faxSentDate || '청구완료' };
+  if (!hasHyundaiCaregiver(app)) {
+    return { isClaimed: false, isBlocked: true, statusText: '간병인 미배정', lastSentDate: null };
   }
 
-  // 2. Check gFaxLogs for successful claims
-  const logs = (gFaxLogs || []).filter(l =>
-    (String(l.appId) === String(app.id) || (pName && l.patientName && l.patientName.trim() === pName)) &&
-    (l.formCode === 'HD_FORM_02' || l.formCode === 'HD_FORM_03' || l.category === '정산청구' || (l.formName && l.formName.includes('비용청구서'))) &&
-    (l.status === '성공' || l.status === '전송성공' || l.status === '완료')
-  );
-  if (logs.length > 0) {
-    return { isClaimed: true, statusText: '청구완료', lastSentDate: logs[0].sentDate };
+  const pName = (app.patientName || '').trim();
+
+  // 최근 청구일 이후 다음 청구일(10일·20일·말일)이 도달했는지 판단한다.
+  const latestClaimDate = getHyundaiLatestClaimDate(app);
+  const startDate = parseHyundaiClaimDate(app.careStartDate || app.startDate || app.applyDate);
+  const nextClaimDate = latestClaimDate
+    ? getNextHyundaiClaimDate(latestClaimDate)
+    : getNextHyundaiClaimDate(startDate || new Date(), true);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const claimDue = nextClaimDate ? today >= nextClaimDate : false;
+  const ended = isHyundaiCareEnded(app);
+  const endDate = parseHyundaiClaimDate(app.careEndDate || app.endDate);
+
+  // 간병이 종료된 경우에는 10일·20일·말일을 기다리지 않고 즉시 청구 대상이다.
+  // 종료일 이후(또는 종료일 당일)의 청구 이력이 있을 때만 청구완료로 본다.
+  if (ended) {
+    const claimedThroughEnd = latestClaimDate && (!endDate || latestClaimDate >= endDate);
+    if (claimedThroughEnd) {
+      return { isClaimed: true, statusText: '청구완료', lastSentDate: formatHyundaiDate(latestClaimDate) };
+    }
+    return { isClaimed: false, statusText: '청구필요', lastSentDate: latestClaimDate ? formatHyundaiDate(latestClaimDate) : null };
+  }
+
+  if (latestClaimDate && !claimDue) {
+    return { isClaimed: true, statusText: '청구완료', lastSentDate: formatHyundaiDate(latestClaimDate) };
+  }
+
+  if (claimDue) {
+    return { isClaimed: false, statusText: '청구필요', lastSentDate: latestClaimDate ? formatHyundaiDate(latestClaimDate) : null };
   }
 
   if (app.claimCategory === '미청구(청구지연)') {
     return { isClaimed: false, isDelayed: true, statusText: '청구지연', lastSentDate: null };
   }
 
-  const ended = isHyundaiCareEnded(app);
-  if (ended) {
-    return { isClaimed: false, statusText: '청구필요', lastSentDate: null };
-  }
   return { isClaimed: false, statusText: '간병진행중', lastSentDate: null };
 }
 
@@ -197,7 +257,9 @@ function updateHyundaiClaimKpis() {
 
     if (ended) {
       totalEndedCount++;
-      if (statusInfo.isClaimed) {
+      if (statusInfo.isBlocked) {
+        // 간병인 미배정 고객은 청구완료/청구필요 어느 쪽에도 포함하지 않는다.
+      } else if (statusInfo.isClaimed) {
         claimedCount++;
       } else {
         endedPendingCount++;
@@ -265,7 +327,7 @@ function updateSidebarHyundaiEndedBadge() {
   hdApps.forEach(app => {
     if (isHyundaiCareEnded(app)) {
       const statusInfo = getHyundaiClaimStatus(app);
-      if (!statusInfo.isClaimed) {
+      if (!statusInfo.isClaimed && !statusInfo.isBlocked) {
         endedPendingCount++;
       }
     }
@@ -440,7 +502,7 @@ function buildHyundaiCustomerGroups(appsList) {
     const s = getHyundaiClaimStatus(app);
     if (s.isClaimed) {
       grp.claimedAppsCount++;
-    } else if (isHyundaiCareEnded(app)) {
+    } else if (!s.isBlocked && isHyundaiCareEnded(app)) {
       grp.pendingAppsCount++;
       grp.pendingFee += fee.totalAmount;
     } else {
@@ -487,7 +549,26 @@ function renderHyundaiClaimTable() {
   if (statusFilter === 'pending') {
     list = list.filter(app => {
       const s = getHyundaiClaimStatus(app);
-      return !s.isClaimed && !s.isUnbilled && !s.isExcluded && app.status !== '서비스 취소' && app.status !== '취소' && app.status !== '미해당' && app.claimCategory !== '제외';
+      const matched = !s.isClaimed && !s.isBlocked && !s.isUnbilled && !s.isExcluded && app.status !== '서비스 취소' && app.status !== '취소' && app.status !== '미해당' && app.claimCategory !== '제외';
+      if (String(app.patientName || '').trim() === '권종두') {
+        console.log('[Hyundai pending][권종두]', {
+          matched,
+          id: app.id,
+          status: app.status,
+          claimCategory: app.claimCategory,
+          caregiverName: app.caregiverName,
+          careStartDate: app.careStartDate,
+          careEndDate: app.careEndDate,
+          lastClaimDate: app.lastClaimDate,
+          claimStatus: s.statusText,
+          isClaimed: s.isClaimed,
+          isBlocked: s.isBlocked,
+          isUnbilled: s.isUnbilled,
+          isExcluded: s.isExcluded,
+          lastSentDate: s.lastSentDate
+        });
+      }
+      return matched;
     });
   } else if (statusFilter === 'unbilled') {
     list = list.filter(app => {
