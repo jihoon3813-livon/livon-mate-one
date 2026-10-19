@@ -11073,7 +11073,7 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
                   ${renderAppContactRowsHtml(app, false, true)}
                   <div class="flex justify-between items-center pt-1 border-t border-slate-100">
                     <span>지역/주소:</span>
-                    <span class="text-slate-800 text-right font-medium break-words max-w-[280px]">${app.sido || ''} ${app.sigungu || ''} ${app.roadAddress || ''} ${app.addressDetail || ''}</span>
+                    <span class="text-slate-800 text-right font-medium break-words max-w-[280px]" title="${typeof escapeHtml === 'function' ? escapeHtml(formatCareHubAddress(app)) : formatCareHubAddress(app)}">${typeof escapeHtml === 'function' ? escapeHtml(formatCareHubAddress(app)) : formatCareHubAddress(app)}</span>
                   </div>
                 </div>
 
