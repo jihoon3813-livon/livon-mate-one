@@ -74,7 +74,10 @@ function safeSetLocalStorage(key, valStr) {
           'REBORN_PRIVACY_MASKING_STATE_V2',
           'REBORN_HUB_CARD_OPEN_MODE',
           'LIVON_PROD_CONVEX_SYNCED',
-          'LIVON_TARGET_ENV'
+          'LIVON_TARGET_ENV',
+          'LIVON_OPEN_TABS',
+          'LIVON_ACTIVE_TAB',
+          'LIVON_ACTIVE_FILTER'
         ]);
         const allKeys = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -3864,11 +3867,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   clearHubInputSafely();
   window.addEventListener('pageshow', clearHubInputSafely);
 
-  // URL 쿼리스트링(?tab=...) 또는 세션스토리지에 저장된 메뉴 탭 복원 및 초고속 0ms 즉시 렌더링
+  // URL 쿼리스트링(?tab=...) 또는 세션스토리지/로컬스토리지에 저장된 메뉴 탭 복원 및 초고속 0ms 즉시 렌더링
   const urlParams = new URLSearchParams(window.location.search);
-  let initialTab = urlParams.get('tab') || sessionStorage.getItem('LIVON_ACTIVE_TAB') || 'carehub';
+  let initialTab = urlParams.get('tab') || sessionStorage.getItem('LIVON_ACTIVE_TAB') || localStorage.getItem('LIVON_ACTIVE_TAB') || 'carehub';
   if (initialTab === 'dashboard') initialTab = 'carehub';
-  const initialFilter = urlParams.get('filter') || sessionStorage.getItem('LIVON_ACTIVE_FILTER') || null;
+  const initialFilter = urlParams.get('filter') || sessionStorage.getItem('LIVON_ACTIVE_FILTER') || localStorage.getItem('LIVON_ACTIVE_FILTER') || null;
 
   // 상단 멀티 탭 및 데스크톱 사이드바 상태 초기화
   if (typeof initOpenAppTabs === 'function') initOpenAppTabs();
@@ -3880,6 +3883,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
     renderUnifiedCareHub();
   }
+  if (typeof renderMultiTabBar === 'function') renderMultiTabBar();
   initIcons();
 
   // Convex Cloud 운영 서버 실시간 데이터 동기화 (비차단 백그라운드 실행으로 화면 대기 시간 0초 실현)
@@ -15860,12 +15864,12 @@ function parseHyundaiSmsText(text) {
   const res = {};
 
   // 1. Contract Information Block (▶ 계약정보 ~ ▶ or 모바일 or end)
-  const contractMatch = text.match(/▶\s*계약정보([\s\S]*?)(?:▶|모바일|$)/i);
+  const contractMatch = text.match(/(?:▶|:arrow_forward:|[\[\s])\s*계약정보([\s\S]*?)(?:▶|:arrow_forward:|접수정보|모바일|$)/i);
   if (contractMatch) {
     const lines = contractMatch[1].split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     for (const l of lines) {
-      const clean = l.replace(/^[-•*\s]+/, '').trim();
-      if (!clean.startsWith('계약번호') && !clean.startsWith('계약기간') && !clean.startsWith('피보험자')) {
+      const clean = l.replace(/^[-•*▶\s]+/, '').trim();
+      if (!clean.startsWith('계약번호') && !clean.startsWith('증권번호') && !clean.startsWith('계약기간') && !clean.startsWith('피보험자') && !clean.startsWith('환자')) {
         if (clean.length >= 2) {
           res.productName = clean;
           break;
@@ -15874,36 +15878,53 @@ function parseHyundaiSmsText(text) {
     }
   }
 
-  // 2. Policy Number (계약번호)
-  const policyMatch = text.match(/계약번호\s*[:：]\s*([A-Za-z0-9]+)/i);
+  // 2. Policy Number (계약번호 or 증권번호)
+  const policyMatch = text.match(/(?:계약번호|증권번호)\s*[:：]\s*([A-Za-z0-9]+)/i);
   if (policyMatch) res.policyNumber = policyMatch[1].trim();
 
   // 3. Contract Period (계약기간)
   const periodMatch = text.match(/계약기간\s*[:：]\s*([0-9]{4}[.\-\/][0-9]{1,2}[.\-\/][0-9]{1,2}\s*[~～]\s*[0-9]{4}[.\-\/][0-9]{1,2}[.\-\/][0-9]{1,2}|[^\n\r]+)/i);
   if (periodMatch) res.contractPeriod = periodMatch[1].trim();
 
-  // 4. Patient Name (피보험자명 or 피보험자)
-  const patientMatch = text.match(/피보험자(?:명)?\s*[:：]\s*([^\n\r]+)/i);
+  // 4. Patient Name (피보험자명 or 피보험자 or 환자)
+  const patientMatch = text.match(/(?:피보험자(?:명)?|환자(?:명)?)\s*[:：]\s*([^\n\r/]+)/i);
   if (patientMatch) res.patientName = patientMatch[1].trim();
 
   // 5. Accident Number (사고번호)
   const accidentMatch = text.match(/사고번호\s*[:：]\s*([A-Za-z0-9]+)/i);
   if (accidentMatch) res.accidentNumber = accidentMatch[1].trim();
 
-  // 6. Adjuster Info (손사담당자)
-  const adjMatch = text.match(/손사담당자\s*[:：]\s*([^\n\r]+)/i);
+  // 6. Adjuster Info (손사담당자, 담당손사, 손해사정사, 담당자)
+  const adjMatch = text.match(/(?:손사\s*담당자|담당\s*손사|손해사정사|담당자)\s*[:：]\s*([^\n\r]+)/i);
   if (adjMatch) {
-    res.adjusterRaw = adjMatch[1].trim();
-    const parts = res.adjusterRaw.split(/\s+/);
-    res.adjusterName = parts[0];
-    if (parts.length > 1) {
-      res.adjusterFirm = parts.slice(1).join(' ');
+    let rawAdj = adjMatch[1].trim();
+    res.adjusterRaw = rawAdj;
+
+    // Check if phone number is inline: e.g. "이미지(H00718) 02-2181-2322"
+    const inlinePhoneMatch = rawAdj.match(/(0\d{1,2}-\d{3,4}-\d{4})/);
+    if (inlinePhoneMatch) {
+      res.adjusterPhone = inlinePhoneMatch[1];
+      rawAdj = rawAdj.replace(inlinePhoneMatch[1], '').trim();
+    }
+
+    const parts = rawAdj.split(/\s+/).filter(Boolean);
+    if (parts.length > 0) {
+      res.adjusterName = parts[0];
+      if (parts.length > 1) {
+        res.adjusterFirm = parts.slice(1).join(' ');
+      }
     }
   }
 
-  // 7. Adjuster Phone (손사담당자 연락처)
-  const phoneMatch = text.match(/손사담당자\s*연락처\s*[:：]\s*([0-9\-]+)/i);
-  if (phoneMatch) res.adjusterPhone = phoneMatch[1].trim();
+  // 7. Adjuster Phone (손사담당자 연락처, 담당자 연락처, 손사 연락처, 연락처, Tel, HP)
+  if (!res.adjusterPhone) {
+    const phoneMatch = text.match(/(?:손사담당자\s*연락처|담당자\s*연락처|손사\s*연락처|손사\s*전화|연락처|Tel|HP)\s*[:：]\s*([0-9\-]+)/i);
+    if (phoneMatch) res.adjusterPhone = phoneMatch[1].trim();
+  }
+
+  // 8. Adjuster Fax (손사FAX, 팩스, Fax)
+  const faxMatch = text.match(/(?:손사\s*FAX|손사\s*팩스|FAX|팩스|Fax)\s*[:：]\s*([0-9\-]+)/i);
+  if (faxMatch) res.adjusterFax = faxMatch[1].trim();
 
   return res;
 }
@@ -15987,15 +16008,19 @@ function parseAndApplyHyundaiSms() {
     const el = document.getElementById('hdSmsAdjusterPhone');
     if (el) { el.value = parsed.adjusterPhone; parsedCount++; }
   }
+  if (parsed.adjusterFax) {
+    const el = document.getElementById('hdSmsAdjusterFax');
+    if (el) { el.value = parsed.adjusterFax; parsedCount++; }
+  }
 
   // Auto match adjuster in directory
   const faxEl = document.getElementById('hdSmsAdjusterFax');
   const selEl = document.getElementById('hdSmsAdjusterSelect');
-  if (parsed.adjusterName) {
-    const matchAdj = gAdjusters.find(a => parsed.adjusterName.includes(a.name) || a.name.includes(parsed.adjusterName));
+  if (parsed.adjusterName && Array.isArray(gAdjusters)) {
+    const matchAdj = gAdjusters.find(a => a && a.name && (parsed.adjusterName.includes(a.name) || a.name.includes(parsed.adjusterName)));
     if (matchAdj) {
       if (selEl) selEl.value = matchAdj.name;
-      if (faxEl && (!faxEl.value || faxEl.value.trim() === '')) faxEl.value = matchAdj.fax;
+      if (faxEl && (!faxEl.value || faxEl.value.trim() === '')) faxEl.value = matchAdj.fax || '';
     } else {
       if (faxEl && (!faxEl.value || faxEl.value.trim() === '') && parsed.adjusterPhone) {
         const areaMatch = parsed.adjusterPhone.match(/^(0[0-9]{1,2})-/);
@@ -16012,31 +16037,43 @@ function parseAndApplyHyundaiSms() {
     banner.innerHTML = `
       <span class="flex items-center gap-1.5 font-bold">
         <i data-lucide="sparkles" class="w-4 h-4 text-emerald-600"></i>
-        7대 항목 자동 추출 성공! (상품명: ${parsed.productName || '-'}, 계약번호: ${parsed.policyNumber || '-'}, 사고번호: ${parsed.accidentNumber || '-'})
+        항목 자동 추출 성공! (상품명: ${parsed.productName || '-'}, 계약번호: ${parsed.policyNumber || '-'}, 사고번호: ${parsed.accidentNumber || '-'}, 담당: ${parsed.adjusterName || '-'})
       </span>
       <span class="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md font-extrabold text-[10px]">${parsedCount}개 필드 자동채움</span>
     `;
-    initIcons();
+    if (typeof initIcons === 'function') initIcons();
   }
 }
 
 function openHyundaiSmsInputModal(applyId) {
-  const app = gApps.find(a => a.id === applyId);
-  if (!app) return;
+  const app = (gApps || []).find(a => a && (String(a.id) === String(applyId) || String(a.id).replace(/^[CH]/, '') === String(applyId).replace(/^[CH]/, '')));
+  if (!app) {
+    console.warn('[openHyundaiSmsInputModal] 대상 고객을 찾을 수 없습니다:', applyId);
+    return;
+  }
 
-  gActiveHyundaiTargetAppId = applyId;
+  gActiveHyundaiTargetAppId = app.id;
 
-  document.getElementById('hdSmsPatientTitle').innerText = (app.patientName || '고객') + ' 님 (' + app.id + ')';
-  document.getElementById('hdSmsProductName').value = app.productName || '';
-  document.getElementById('hdSmsPatientName').value = app.patientName || '';
-  document.getElementById('hdSmsPolicyNumber').value = app.policyNumber || '';
-  document.getElementById('hdSmsContractPeriod').value = app.contractPeriod || '';
-  document.getElementById('hdSmsAccidentNumber').value = app.accidentNumber || '';
-  document.getElementById('hdSmsAdjusterName').value = app.adjusterName || '';
-  document.getElementById('hdSmsAdjusterFirm').value = app.adjusterFirm || '';
-  document.getElementById('hdSmsAdjusterPhone').value = app.adjusterPhone || '';
-  document.getElementById('hdSmsAdjusterFax').value = app.adjusterFax || '';
-  document.getElementById('hdSmsRawText').value = app.hdSmsRawText || '';
+  const titleEl = document.getElementById('hdSmsPatientTitle');
+  if (titleEl) titleEl.innerText = (app.patientName || '고객') + ' 님 (' + app.id + ')';
+
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = (val && val !== '-') ? val : '';
+  };
+
+  setVal('hdSmsProductName', app.productName || '무배당현대해상내삶엔(3N)맞춤간편건강보험');
+  setVal('hdSmsPatientName', app.patientName);
+  setVal('hdSmsPolicyNumber', app.policyNumber);
+  setVal('hdSmsContractPeriod', app.contractPeriod);
+  setVal('hdSmsAccidentNumber', app.accidentNumber);
+  setVal('hdSmsAdjusterName', app.adjusterName);
+  setVal('hdSmsAdjusterFirm', app.adjusterFirm || '하이라이프손해사정');
+  setVal('hdSmsAdjusterPhone', app.adjusterPhone);
+  setVal('hdSmsAdjusterFax', app.adjusterFax || app.pendingFaxNumber || '');
+
+  const rawEl = document.getElementById('hdSmsRawText');
+  if (rawEl) rawEl.value = app.hdSmsRawText || '';
 
   // Reset banner
   const banner = document.getElementById('hdSmsParseBanner');
@@ -16055,35 +16092,38 @@ function openHyundaiSmsInputModal(applyId) {
 
   // Populate Adjusters select
   const select = document.getElementById('hdSmsAdjusterSelect');
-  if (select) {
-    select.innerHTML = '<option value="">-- 기존 손사 디렉토리에서 선택 (선택 시 자동바인딩) --</option>' + gAdjusters.filter(a => (a.insuranceCompany || '').includes('현대해상')).map(a => `
-      <option value="${a.name}" data-firm="${a.firm}" data-phone="${a.phone}" data-fax="${a.fax}" ${app.adjusterName === a.name ? 'selected' : ''}>${a.name} (${a.firm} ${a.branch} · Fax: ${a.fax})</option>
+  if (select && Array.isArray(gAdjusters)) {
+    select.innerHTML = '<option value="">-- 기존 손사 디렉토리에서 선택 (선택 시 자동바인딩) --</option>' + gAdjusters.filter(a => a && (a.insuranceCompany || '').includes('현대해상')).map(a => `
+      <option value="${a.name}" data-firm="${a.firm}" data-phone="${a.phone}" data-fax="${a.fax}" ${app.adjusterName === a.name ? 'selected' : ''}>${a.name} (${a.firm} ${a.branch || ''} · Fax: ${a.fax || '-'})</option>
     `).join('');
   }
 
   openModal('hyundaiSmsInputModal');
-  initIcons();
+  if (typeof initIcons === 'function') initIcons();
 }
 
 function onSelectAdjusterInSms(adjName) {
   if (!adjName) return;
-  const adj = gAdjusters.find(a => a.name === adjName);
+  const adj = (gAdjusters || []).find(a => a && a.name === adjName);
   if (adj) {
     const nameEl = document.getElementById('hdSmsAdjusterName');
     const firmEl = document.getElementById('hdSmsAdjusterFirm');
     const phoneEl = document.getElementById('hdSmsAdjusterPhone');
     const faxEl = document.getElementById('hdSmsAdjusterFax');
     if (nameEl) nameEl.value = adj.name;
-    if (firmEl) firmEl.value = adj.firm + ' ' + (adj.branch || '');
-    if (phoneEl) phoneEl.value = adj.phone;
-    if (faxEl) faxEl.value = adj.fax;
+    if (firmEl) firmEl.value = adj.firm + (adj.branch ? ' ' + adj.branch : '');
+    if (phoneEl) phoneEl.value = adj.phone || adj.mobile || '';
+    if (faxEl) faxEl.value = adj.fax || '';
   }
 }
 
-function executeSaveHyundaiSms() {
+async function executeSaveHyundaiSms() {
   const applyId = gActiveHyundaiTargetAppId;
-  const app = gApps.find(a => a.id === applyId);
-  if (!app) return;
+  const app = (gApps || []).find(a => a && (String(a.id) === String(applyId) || String(a.id).replace(/^[CH]/, '') === String(applyId).replace(/^[CH]/, '')));
+  if (!app) {
+    alert('대상 고객 정보를 찾을 수 없습니다: ' + applyId);
+    return;
+  }
 
   const productName = document.getElementById('hdSmsProductName')?.value.trim() || '';
   const patientName = document.getElementById('hdSmsPatientName')?.value.trim() || '';
@@ -16096,50 +16136,153 @@ function executeSaveHyundaiSms() {
   const adjFax = document.getElementById('hdSmsAdjusterFax')?.value.trim() || '';
   const rawText = document.getElementById('hdSmsRawText')?.value.trim() || '';
 
-  if (!policy || !accident) {
-    alert('증권번호(계약번호)와 사고번호를 입력해주세요.');
+  if (!policy || !accident || policy === '-' || accident === '-') {
+    alert('증권번호(계약번호)와 사고번호를 정확히 입력해주세요.');
     return;
   }
 
-  if (productName) app.productName = productName;
-  if (patientName) app.patientName = patientName;
+  if (productName && productName !== '-') app.productName = productName;
+  if (patientName && patientName !== '-') app.patientName = patientName;
   app.policyNumber = policy;
-  if (contractPeriod) app.contractPeriod = contractPeriod;
+  if (contractPeriod && contractPeriod !== '-') app.contractPeriod = contractPeriod;
   app.accidentNumber = accident;
-  if (adjName) app.adjusterName = adjName;
-  if (adjFirm) app.adjusterFirm = adjFirm;
-  if (adjPhone) app.adjusterPhone = adjPhone;
-  if (adjFax) app.adjusterFax = adjFax;
+  if (adjName && adjName !== '-') app.adjusterName = adjName;
+  if (adjFirm && adjFirm !== '-') app.adjusterFirm = adjFirm;
+  if (adjPhone && adjPhone !== '-') app.adjusterPhone = adjPhone;
+  if (adjFax && adjFax !== '-') {
+    app.adjusterFax = adjFax;
+    app.pendingFaxNumber = adjFax;
+  }
   if (rawText) app.hdSmsRawText = rawText;
 
   // Auto register adjuster to directory if not exists
-  if (adjName) {
-    autoSyncAdjusterToDirectory({
-      name: adjName,
-      insuranceCompany: app.insuranceCompany || '현대해상',
-      firm: adjFirm || '하이라이프손해사정',
-      branch: '관할팀',
-      phone: adjPhone || '',
-      mobile: adjPhone || '',
-      fax: adjFax || '051-602-5700'
-    });
+  if (adjName && adjName !== '-' && adjName !== '미지정' && !adjName.includes('미지정')) {
+    if (typeof autoSyncAdjusterToDirectory === 'function') {
+      autoSyncAdjusterToDirectory({
+        name: adjName,
+        insuranceCompany: app.insuranceCompany || '현대해상',
+        firm: (adjFirm && adjFirm !== '-') ? adjFirm : '하이라이프손해사정',
+        branch: '관할팀',
+        phone: (adjPhone && adjPhone !== '-') ? adjPhone : '',
+        mobile: (adjPhone && adjPhone !== '-') ? adjPhone : '',
+        fax: (adjFax && adjFax !== '-') ? adjFax : '051-602-5700'
+      });
+    }
   }
 
   app.hdWorkflowStage = '간병인배정대기';
+  app.hasManualUpdate = true;
   app.updatedAt = new Date().toISOString();
 
+  // 1. REBORN_DATA 실시간 업데이트
+  if (window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications)) {
+    const rIdx = window.REBORN_DATA.applications.findIndex(a => a && (String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, '')));
+    if (rIdx >= 0) {
+      window.REBORN_DATA.applications[rIdx] = { ...window.REBORN_DATA.applications[rIdx], ...app };
+    }
+  }
+
+  // 2. LocalStorage 영구 보존
+  if (typeof safeSaveCachedApps === 'function') {
+    safeSaveCachedApps(gApps);
+  } else {
+    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+  }
+
+  // 3. 서버 디스크 영구 저장 API 비동기 전송
+  try {
+    fetch('/api/hub/customer/update-fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: app.id,
+        fields: {
+          productName: app.productName,
+          patientName: app.patientName,
+          policyNumber: app.policyNumber,
+          contractPeriod: app.contractPeriod,
+          accidentNumber: app.accidentNumber,
+          adjusterName: app.adjusterName,
+          adjusterFirm: app.adjusterFirm,
+          adjusterPhone: app.adjusterPhone,
+          adjusterFax: app.adjusterFax,
+          pendingFaxNumber: app.pendingFaxNumber,
+          hdSmsRawText: app.hdSmsRawText,
+          hdWorkflowStage: app.hdWorkflowStage,
+          hasManualUpdate: true,
+          updatedAt: app.updatedAt
+        }
+      })
+    }).catch(console.warn);
+
+    fetch('/api/hub/real-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        applications: gApps,
+        assignments: (typeof gAssigns !== 'undefined' ? gAssigns : []),
+        claims: (typeof gClaims !== 'undefined' ? gClaims : []),
+        payouts: (typeof gPayouts !== 'undefined' ? gPayouts : [])
+      })
+    }).catch(console.warn);
+  } catch (err) {
+    console.warn('[executeSaveHyundaiSms] API sync error:', err);
+  }
+
+  // 4. Convex Cloud DB 실시간 동기화
+  if (typeof syncToConvex === 'function') {
+    try {
+      syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
+    } catch (e) {
+      console.warn('[executeSaveHyundaiSms] syncToConvex error:', e);
+    }
+  }
+
+  // 5. 모달 닫기 및 모든 관련 화면 즉시 재렌더링
   closeModal('hyundaiSmsInputModal');
-  renderUnifiedCareHub();
-  renderApplications();
-  renderDashboard();
+
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  if (typeof renderHyundaiClaimHub === 'function') renderHyundaiClaimHub();
+  if (typeof renderApplications === 'function') renderApplications();
+  if (typeof renderDashboard === 'function') renderDashboard();
+
+  // 6. 만약 고객 상세 팝업(hubCustomerDetailModal)이 열려있다면 즉시 최신 정보로 재갱신
+  const hubModal = document.getElementById('hubCustomerDetailModal');
+  if (hubModal && !hubModal.classList.contains('hidden')) {
+    if (typeof openHubCustomerDetailModal === 'function') {
+      openHubCustomerDetailModal(app.id);
+    }
+  }
+
+  // 7. 시스템 감사로그 기록
+  if (typeof window.recordSystemAuditLog === 'function') {
+    try {
+      window.recordSystemAuditLog({
+        category: '현대해상문자파싱',
+        actionType: 'UPDATE',
+        target: `고객 [${app.id}] (${app.patientName})`,
+        summary: `[${app.patientName} 님] 현대해상 수신 문자 파싱 등록 완료 (사고번호: ${app.accidentNumber}, 증권번호: ${app.policyNumber})`,
+        changes: {
+          '사고번호': { before: '-', after: app.accidentNumber },
+          '증권번호': { before: '-', after: app.policyNumber },
+          '담당손사': { before: '-', after: app.adjusterName || '-' }
+        }
+      });
+    } catch (err) {}
+  }
 
   showCustomAlert({
     title: '현대해상 수신 문자 정보 등록 완료',
-    message: `[${app.patientName} 고객님]의 현대해상 회신 문자 정보가 완벽히 저장되었습니다.\n\n• 상품명: ${app.productName || '-'}\n• 증권번호: ${app.policyNumber}\n• 계약기간: ${app.contractPeriod || '-'}\n• 사고번호: ${app.accidentNumber}\n• 담당손사: ${app.adjusterName} (${app.adjusterPhone || '-'} / Fax: ${app.adjusterFax || '-'})\n\n고객 상세카드(STEP 1)에 즉시 반영되었으며, '간병인 배정 대기' 단계로 승격되었습니다.`,
+    message: `[${app.patientName} 고객님]의 현대해상 회신 문자 정보가 완벽히 저장되었습니다.\n\n• 상품명: ${app.productName || '-'}\n• 증권번호: ${app.policyNumber}\n• 계약기간: ${app.contractPeriod || '-'}\n• 사고번호: ${app.accidentNumber}\n• 담당손사: ${app.adjusterName || '-'} (${app.adjusterPhone || '-'} / Fax: ${app.adjusterFax || '-'})\n\n고객 상세카드(STEP 1) 및 신청대장에 즉시 반영되었으며, '간병인 배정 대기' 단계로 승격되었습니다.`,
     icon: 'message-square',
     iconColor: 'emerald'
   });
 }
+
+window.parseHyundaiSmsText = parseHyundaiSmsText;
+window.parseAndApplyHyundaiSms = parseAndApplyHyundaiSms;
+window.openHyundaiSmsInputModal = openHyundaiSmsInputModal;
+window.executeSaveHyundaiSms = executeSaveHyundaiSms;
 
 // =========================================================================
 // [화면 모듈 분리] 현대해상 청구관리 시스템 -> hyundaiclaimhub.js 로 분리됨
@@ -19901,7 +20044,12 @@ var gOpenAppTabs = ['carehub'];
 
 function initOpenAppTabs() {
   try {
-    const saved = localStorage.getItem('LIVON_OPEN_TABS');
+    // 1차: sessionStorage에서 복원 시도 (현재 브라우저 탭 세션 최우선)
+    let saved = sessionStorage.getItem('LIVON_OPEN_TABS');
+    // 2차: sessionStorage에 없으면 localStorage에서 복원 시도
+    if (!saved) {
+      saved = localStorage.getItem('LIVON_OPEN_TABS');
+    }
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -19913,13 +20061,33 @@ function initOpenAppTabs() {
   if (!gOpenAppTabs || gOpenAppTabs.length === 0) {
     gOpenAppTabs = ['carehub'];
   }
+
+  // 현재 활성 탭이 멀티 탭 목록에 빠져있다면 자동 포함
+  const currentTab = gActiveTab || sessionStorage.getItem('LIVON_ACTIVE_TAB') || localStorage.getItem('LIVON_ACTIVE_TAB') || 'carehub';
+  if (currentTab && APP_TAB_META[currentTab] && !gOpenAppTabs.includes(currentTab)) {
+    gOpenAppTabs.push(currentTab);
+  }
+
   saveOpenAppTabs();
 }
 
 function saveOpenAppTabs() {
+  if (!Array.isArray(gOpenAppTabs) || gOpenAppTabs.length === 0) {
+    gOpenAppTabs = ['carehub'];
+  }
+  const serialized = JSON.stringify(gOpenAppTabs);
+  // 1. sessionStorage에 안전 보존 (브라우저 쿼터 정리 영향 없음)
   try {
-    localStorage.setItem('LIVON_OPEN_TABS', JSON.stringify(gOpenAppTabs));
+    sessionStorage.setItem('LIVON_OPEN_TABS', serialized);
   } catch (e) {}
+  // 2. localStorage에도 영구 보존
+  try {
+    localStorage.setItem('LIVON_OPEN_TABS', serialized);
+  } catch (e) {
+    if (typeof safeSetLocalStorage === 'function') {
+      safeSetLocalStorage('LIVON_OPEN_TABS', serialized);
+    }
+  }
 }
 
 function addAppTab(tabId) {
@@ -20223,8 +20391,14 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
   if (triggerReload && gActiveTab && tabId !== gActiveTab) {
     try {
       sessionStorage.setItem('LIVON_ACTIVE_TAB', tabId);
-      if (filterParam) sessionStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
-      else sessionStorage.removeItem('LIVON_ACTIVE_FILTER');
+      localStorage.setItem('LIVON_ACTIVE_TAB', tabId);
+      if (filterParam) {
+        sessionStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
+        localStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
+      } else {
+        sessionStorage.removeItem('LIVON_ACTIVE_FILTER');
+        localStorage.removeItem('LIVON_ACTIVE_FILTER');
+      }
     } catch (e) {}
 
     const newUrl = new URL(window.location.href);
@@ -20239,7 +20413,14 @@ function switchTab(tabId, filterParam = null, triggerReload = false) {
   gActiveTab = tabId;
   try {
     sessionStorage.setItem('LIVON_ACTIVE_TAB', tabId);
-    if (filterParam) sessionStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
+    localStorage.setItem('LIVON_ACTIVE_TAB', tabId);
+    if (filterParam) {
+      sessionStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
+      localStorage.setItem('LIVON_ACTIVE_FILTER', filterParam);
+    } else {
+      sessionStorage.removeItem('LIVON_ACTIVE_FILTER');
+      localStorage.removeItem('LIVON_ACTIVE_FILTER');
+    }
     const newUrl = new URL(window.location.href);
     newUrl.searchParams.set('tab', tabId);
     if (filterParam) newUrl.searchParams.set('filter', filterParam);

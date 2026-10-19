@@ -19,9 +19,11 @@ module.exports = async (req, res) => {
       const cfg = customCreds ? { ...getAligoConfig(), ...customCreds } : getAligoConfig();
       const maskedKey = cfg.apiKey ? `${cfg.apiKey.slice(0, 4)}••••••••${cfg.apiKey.slice(-4)}` : '';
       let balanceInfo = null;
-      try {
-        balanceInfo = await getAligoBalance(customCreds);
-      } catch (_) {}
+      if (q.includeBalance === 'true') {
+        try {
+          balanceInfo = await getAligoBalance(customCreds);
+        } catch (_) {}
+      }
 
       return res.status(200).json({
         success: true,
@@ -53,7 +55,6 @@ module.exports = async (req, res) => {
       }
 
       const saved = saveAligoConfig(updates);
-      const balanceInfo = await getAligoBalance();
 
       return res.status(200).json({
         success: true,
@@ -63,8 +64,7 @@ module.exports = async (req, res) => {
           sender: saved.sender,
           hasKey: Boolean(saved.apiKey),
           maskedKey: saved.apiKey ? `${saved.apiKey.slice(0, 4)}••••••••${saved.apiKey.slice(-4)}` : ''
-        },
-        balance: balanceInfo
+        }
       });
     }
 

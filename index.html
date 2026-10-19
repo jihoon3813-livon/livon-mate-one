@@ -7394,9 +7394,9 @@
               <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-pink-500/30 text-pink-200 border border-pink-400/30">
                 SMS / LMS 미리보기 &amp; 편집 스튜디오
               </span>
-              <button type="button" onclick="openAligoConfigModal()" id="surveySmsModalBalanceBadge" class="text-[11px] font-bold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-500/30 transition-all cursor-pointer flex items-center gap-1.5" title="클릭 시 알리고 연동 설정 열기">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>알리고 잔여: 조회중</span>
+              <button type="button" onclick="openAligoConfigModal()" id="surveySmsModalBalanceBadge" class="text-[11px] font-bold text-slate-200 bg-white/10 hover:bg-white/20 px-2.5 py-0.5 rounded-full border border-white/20 transition-all cursor-pointer flex items-center gap-1.5" title="클릭 시 알리고 연동 설정 열기">
+                <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+                <span>알리고 연동 설정</span>
               </button>
             </div>
             <h3 class="text-sm sm:text-base font-black text-white mt-0.5">만족도조사(new) 안내 문자 미리보기 · 수정 및 테스트 발송</h3>
@@ -7686,7 +7686,7 @@
           </div>
           <div>
             <h3 class="text-sm font-black">알리고(Aligo) SMS/LMS 연동 설정</h3>
-            <p class="text-[10.5px] text-rose-100">국내 실통신망 직결 발송 엔진 및 잔액 관리</p>
+            <p class="text-[10.5px] text-rose-100">국내 실통신망 직결 발송 엔진 및 접속 IP 관리</p>
           </div>
         </div>
         <button type="button" onclick="closeAligoConfigModal()" class="p-1.5 text-white/80 hover:text-white rounded-lg cursor-pointer">
@@ -7697,26 +7697,31 @@
       <div class="p-5 space-y-3.5 text-xs">
         <div id="aligoConfigStatusBox" class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-[11px]">
           <div class="flex items-center justify-between font-bold mb-1">
-            <span>연결 상태:</span>
-            <span id="aligoConfigStatusBadge" class="px-2 py-0.5 rounded text-[10px] bg-slate-200 text-slate-700 font-mono">조회 대기</span>
+            <span>연동 상태:</span>
+            <span id="aligoConfigStatusBadge" class="px-2 py-0.5 rounded text-[10px] bg-slate-200 text-slate-700 font-mono">설정 확인 중</span>
           </div>
-          <div id="aligoConfigStatusDesc" class="text-slate-500">알리고(smartsms.aligo.in) 계정 정보를 확인해주세요.</div>
+          <div id="aligoConfigStatusDesc" class="text-slate-500">알리고(smartsms.aligo.in) 계정 정보 및 접속 IP를 관리합니다.</div>
         </div>
 
-        <!-- 현재 공인 IP 안내 배너 (알리고 API Key IP등록용) -->
-        <div class="p-2.5 rounded-xl bg-blue-50/90 border border-blue-200 text-[11px] flex items-center justify-between gap-2">
-          <div class="flex items-center gap-1.5 min-w-0">
-            <span class="font-bold text-blue-900 shrink-0">🌐 접속 공인 IP:</span>
-            <span id="aligoConfigCurrentIp" class="font-mono font-bold text-blue-700 select-all">59.7.232.159</span>
+        <!-- 현재 공인 IP 안내 배너 (알리고 다중 IP 등록 가이드) -->
+        <div class="p-3 rounded-xl bg-blue-50/90 border border-blue-200 text-[11px] space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="font-bold text-blue-900 shrink-0">🌐 현재 접속 공인 IP:</span>
+              <span id="aligoConfigCurrentIp" class="font-mono font-bold text-blue-700 select-all">조회중...</span>
+            </div>
+            <button type="button" onclick="copyAligoCurrentIp()" class="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10.5px] shrink-0 cursor-pointer shadow-2xs flex items-center gap-1">
+              <i data-lucide="copy" class="w-3 h-3"></i> IP 복사
+            </button>
           </div>
-          <button type="button" onclick="copyAligoCurrentIp()" class="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10.5px] shrink-0 cursor-pointer shadow-2xs flex items-center gap-1">
-            <i data-lucide="copy" class="w-3 h-3"></i> IP 복사
-          </button>
+          <div class="text-[10.5px] text-blue-900/90 leading-relaxed bg-white/80 p-2.5 rounded-lg border border-blue-200/80">
+            💡 <b>다중 IP 등록 안내:</b> 집, 사무실 등 여러 장소에서 접속하시는 경우, 알리고 사이트(<b>smartsms.aligo.in</b>) &gt; <b>[문자API]</b> &gt; <b>[API Key 발급/관리]</b>에서 <b>[IP 추가하기]</b> 버튼으로 집, 사무실 등의 IP를 각각 모두 등록해 두시면 장소에 관계없이 정상 발송됩니다.
+          </div>
         </div>
 
         <div>
           <label class="block font-black text-slate-800 mb-1">알리고 회원 아이디 (user_id) <span class="text-rose-600">*</span></label>
-          <input type="text" id="aligoConfigUserId" placeholder="예: livoncare" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-rose-500">
+          <input type="text" id="aligoConfigUserId" placeholder="예: lifenjoy" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-rose-500">
         </div>
 
         <div>
@@ -7735,7 +7740,7 @@
 
         <div>
           <label class="block font-black text-slate-800 mb-1">알리고 등록 대표 발신번호 <span class="text-rose-600">*</span></label>
-          <input type="text" id="aligoConfigSender" placeholder="예: 16007835 또는 15447119" value="16007835" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-rose-500">
+          <input type="text" id="aligoConfigSender" placeholder="예: 01026660883 또는 16007835" value="01026660883" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-rose-500">
           <p class="text-[10px] text-slate-400 mt-1">※ 알리고에 사전 등록 승인된 발신번호만 실제 전송이 허용됩니다.</p>
         </div>
 
@@ -7744,18 +7749,13 @@
           <input type="text" id="aligoConfigSenderKey" placeholder="카카오 발신프로필키(선택)" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl font-mono text-slate-800 text-[11px] focus:bg-white">
         </div>
 
-        <div class="pt-2 flex items-center justify-between gap-2">
-          <button type="button" id="btnTestAligoConnection" onclick="testAligoConnection()" class="px-3 py-2 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> 잔액/연결 테스트
+        <div class="pt-2 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeAligoConfigModal()" class="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs cursor-pointer">
+            닫기
           </button>
-          <div class="flex items-center gap-1.5">
-            <button type="button" onclick="closeAligoConfigModal()" class="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs cursor-pointer">
-              닫기
-            </button>
-            <button type="button" id="btnSaveAligoConfig" onclick="saveAligoConfig()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-xs cursor-pointer">
-              설정 저장
-            </button>
-          </div>
+          <button type="button" id="btnSaveAligoConfig" onclick="saveAligoConfig()" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-xs cursor-pointer">
+            설정 저장
+          </button>
         </div>
       </div>
     </div>
@@ -15098,7 +15098,7 @@
   <script src="data.js?v=20261017_1300"></script>
   <script src="careport-client.js?v=20261015_1630"></script>
   <script src="carecall-client.js?v=20261003_0950"></script>
-  <script src="samsung-call-report.js?v=20260920_1330"></script>
+  <script src="samsung-call-report.js?v=20261019_1835"></script>
   <script src="total-call-analysis.js?v=20261017_1325"></script>
   <script src="system-audit-data.js?v=20261017_2145"></script>
   <script src="system-audit-log.js?v=20261017_2145"></script>

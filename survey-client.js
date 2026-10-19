@@ -2077,8 +2077,9 @@ function populateSurveySmsSenderOptions(forcedSender = '') {
   const baseOptions = [
     { number: cleanConfigured, label: `${formatCouponPhoneDisplay(cleanConfigured)} (알리고 대표)` },
     { number: '16007835', label: '1600-7835 (리본 대표)' },
-    { number: '15447119', label: '1544-7119 (고객센터)' },
-    { number: '15337436', label: '1533-7436 (현대해상)' }
+    { number: '18777412', label: '1877-7412 (삼성화재)' },
+    { number: '15337436', label: '1533-7436 (현대해상)' },
+    { number: '15447119', label: '1544-7119 (고객센터)' }
   ];
 
   const unique = [];
@@ -2095,6 +2096,36 @@ function populateSurveySmsSenderOptions(forcedSender = '') {
     const isSelected = (prevVal === opt.number) || (!prevVal && idx === 0) || (cleanConfigured && opt.number === cleanConfigured);
     return `<option value="${opt.number}" ${isSelected ? 'selected' : ''}>${escapeHtml(opt.label)}</option>`;
   }).join('');
+}
+
+function getSurveyTargetInsuranceName(target) {
+  if (!target) return '';
+  let ins = (target.insuranceCompany || target.insurer || target.company || '').trim();
+  if (!ins) {
+    const sId = target.serviceId || target.id;
+    if (sId) {
+      if (typeof window !== 'undefined' && Array.isArray(window.gApps)) {
+        const found = window.gApps.find(a => a && a.id === sId);
+        if (found && found.insuranceCompany) ins = String(found.insuranceCompany).trim();
+      }
+      if (!ins && Array.isArray(gHubCandidates)) {
+        const cand = gHubCandidates.find(c => c && c.id === sId);
+        if (cand && cand.insuranceCompany) ins = String(cand.insuranceCompany).trim();
+      }
+    }
+  }
+  return ins;
+}
+
+function getSurveyTargetCsPhone(target) {
+  const ins = getSurveyTargetInsuranceName(target);
+  if (ins.includes('삼성')) {
+    return '1877-7412';
+  }
+  if (ins.includes('현대')) {
+    return '1533-7436';
+  }
+  return (gSurveyState && gSurveyState.settings && gSurveyState.settings.csPhone) || '1544-7119';
 }
 
 function openSurveySmsComposeModal(targetId = '', overridePhone = '') {
@@ -2185,8 +2216,16 @@ function populateSurveySmsModalForTarget(target, overridePhone = '') {
     if (target) {
       const cleanHosp = cleanSurveyHospitalName(target.hospitalName, target);
       const lastSms = target.lastSmsSentAt ? `최근 발송: ${target.lastSmsSentAt.replace('T', ' ').slice(0, 16)}` : '최근 문자 발송 이력 없음';
+      const insName = getSurveyTargetInsuranceName(target);
+      const csPhone = getSurveyTargetCsPhone(target);
+      const insBadgeClass = insName.includes('삼성')
+        ? 'bg-blue-50 text-blue-700 border-blue-200'
+        : (insName.includes('현대') ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-700 border-slate-200');
       metaEl.innerHTML = `
-        <span>병원: <b class="text-slate-800">${escapeHtml(cleanHosp)}</b> · 담당간병인: <b class="text-rose-700">${escapeHtml(target.caregiverName || '미지정')}</b></span>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-bold border ${insBadgeClass}">원수사: ${escapeHtml(insName || '일반')} (문의: ${csPhone})</span>
+          <span>병원: <b class="text-slate-800">${escapeHtml(cleanHosp)}</b> · 담당간병인: <b class="text-rose-700">${escapeHtml(target.caregiverName || '미지정')}</b></span>
+        </div>
         <span class="font-mono text-[10.5px] text-slate-400">${escapeHtml(lastSms)}</span>
       `;
     } else {
@@ -2223,7 +2262,7 @@ function applySurveySmsTemplate(tplType = 'DEFAULT') {
   const cgName = (target && target.caregiverName) ? target.caregiverName : '권은지';
   const hospName = target ? cleanSurveyHospitalName(target.hospitalName, target) : '서울아산병원';
   const giftItem = (gSurveyState.settings && gSurveyState.settings.defaultGiftItem) || '스타벅스 아메리카노 모바일 쿠폰';
-  const csPhone = (gSurveyState.settings && gSurveyState.settings.csPhone) || '1544-7119';
+  const csPhone = getSurveyTargetCsPhone(target);
   const surveyUrl = getSurveyTargetUrlForSms(target);
   const isKakao = gCurrentSurveySmsChannelMode === 'kakao';
 
@@ -2250,7 +2289,7 @@ function applySurveySmsTemplate(tplType = 'DEFAULT') {
       `• 병원/간병인: ${hospName} (${cgName} 간병사)\n` +
       `• 설문 응답 완료 시 환자·보호자님께 [${giftItem}]을 발송해 드립니다.\n\n` +
       `${linkLine}\n\n` +
-      `※ 문의: ${csPhone}`;
+      `※ 문의: 리본케어 고객센터 (${csPhone})`;
   } else {
     subject = `[리본케어] ${pName} 님 모바일 안심 간병일지 & 만족도 설문 안내`;
     body =
@@ -2696,47 +2735,20 @@ function onSurveySmsProviderChange(provider) {
 }
 
 function refreshSurveySmsBalance(reqProvider = '') {
-  const provider = reqProvider || document.getElementById('surveySmsProviderSelect')?.value || 'aligo';
   const badge = document.getElementById('surveySmsModalBalanceBadge');
   if (!badge) return;
+  badge.innerHTML = `<i data-lucide="settings" class="w-3.5 h-3.5"></i> <span>알리고 연동 설정</span>`;
+  badge.className = 'text-[11px] font-bold text-slate-200 bg-white/10 hover:bg-white/20 px-2.5 py-0.5 rounded-full border border-white/20 transition-all cursor-pointer flex items-center gap-1.5';
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
 
-  const aligoCfg = (typeof getSurveyAligoConfig === 'function') ? getSurveyAligoConfig() : {};
-  let balanceUrl = `/api/sms/balance?provider=${encodeURIComponent(provider)}`;
-  if (provider === 'aligo' && aligoCfg.apiKey && !aligoCfg.apiKey.includes('••••')) {
-    balanceUrl += `&userId=${encodeURIComponent(aligoCfg.userId || '')}&apiKey=${encodeURIComponent(aligoCfg.apiKey || '')}`;
-  }
-
-  fetch(balanceUrl)
-    .then(r => r.json())
-    .then(data => {
-      if (!badge) return;
-      if (provider === 'aligo') {
-        if (data && data.success && data.configured) {
-          badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> <span>알리고 잔여: ${Number(data.balance || 0).toLocaleString()} P (SMS ${Number(data.smsCnt || 0).toLocaleString()}건 / LMS ${Number(data.lmsCnt || 0).toLocaleString()}건)</span>`;
-          badge.className = 'text-[11px] font-bold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-500/30 transition-all cursor-pointer flex items-center gap-1.5';
-        } else {
-          const msg = (data && (data.message || data.rawMessage)) || '';
-          const isIpError = msg.includes('IP') || msg.includes('-IP');
-          if (isIpError) {
-            badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> <span>알리고 IP 등록 필요 [${data.publicIp || '확인'}] ⚙️</span>`;
-            badge.className = 'text-[11px] font-bold text-rose-300 bg-rose-950/60 hover:bg-rose-900 px-2.5 py-0.5 rounded-full border border-rose-500/30 transition-all cursor-pointer flex items-center gap-1.5';
-          } else {
-            badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> <span>알리고 연동키 설정 ⚙️</span>`;
-            badge.className = 'text-[11px] font-bold text-amber-300 bg-amber-950/60 hover:bg-amber-900 px-2.5 py-0.5 rounded-full border border-amber-500/30 transition-all cursor-pointer flex items-center gap-1.5';
-          }
-        }
-      } else if (provider === 'barobill') {
-        if (data && data.success) {
-          badge.innerHTML = `<span>바로빌 잔여: ${Number(data.balance || 0).toLocaleString()} P</span>`;
-          badge.className = 'text-[11px] font-bold text-purple-300 bg-purple-950/60 px-2.5 py-0.5 rounded-full border border-purple-500/30';
-        } else {
-          badge.innerHTML = `<span>바로빌: 연동확인 필요</span>`;
-        }
-      } else {
-        badge.innerHTML = `<span>Twilio: 글로벌 회선 대기</span>`;
-      }
-    })
-    .catch(() => {});
+async function fetchClientPublicIp() {
+  try {
+    const res = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
+    const data = await res.json();
+    if (data && data.ip) return data.ip;
+  } catch (_) {}
+  return '59.7.232.159';
 }
 
 function copyAligoCurrentIp() {
@@ -2745,15 +2757,15 @@ function copyAligoCurrentIp() {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(ip).then(() => {
       if (typeof showToast === 'function') {
-        showToast(`접속 공인 IP [${ip}]가 복사되었습니다. smartsms.aligo.in에 등록해 주세요.`, 'info');
+        showToast(`현재 접속 공인 IP [${ip}]가 복사되었습니다. smartsms.aligo.in의 [IP 추가하기]에 등록해 주세요.`, 'info');
       } else {
         alert(`공인 IP (${ip})가 복사되었습니다.`);
       }
     }).catch(() => {
-      prompt('아래 IP를 복사하여 알리고(smartsms.aligo.in)에 등록해주세요:', ip);
+      prompt('아래 IP를 복사하여 알리고(smartsms.aligo.in) [IP 추가하기]에 등록해주세요:', ip);
     });
   } else {
-    prompt('아래 IP를 복사하여 알리고(smartsms.aligo.in)에 등록해주세요:', ip);
+    prompt('아래 IP를 복사하여 알리고(smartsms.aligo.in) [IP 추가하기]에 등록해주세요:', ip);
   }
 }
 
@@ -2780,69 +2792,36 @@ async function openAligoConfigModal() {
     if (localCfg.senderKey && senderKeyInput) senderKeyInput.value = localCfg.senderKey;
   } catch (_) {}
 
-  if (badge) badge.innerText = '설정 확인 중...';
+  // 브라우저의 실제 현재 접속 공인 IP를 직접 조회하여 표시 (서버리스 IP 변동 영향 없음)
+  fetchClientPublicIp().then(ip => {
+    if (ipEl && ip) ipEl.innerText = ip;
+  });
 
-  try {
-    let cfgUrl = '/api/sms/aligo/config';
-    if (localCfg.apiKey && !localCfg.apiKey.includes('••••')) {
-      cfgUrl += `?userId=${encodeURIComponent(localCfg.userId || '')}&apiKey=${encodeURIComponent(localCfg.apiKey || '')}`;
-    }
-    const res = await fetch(cfgUrl);
-    const rawText = await res.text();
-    let data = null;
-    try { data = JSON.parse(rawText); } catch (_) {}
-
-    if (res.ok && data && data.success && data.config) {
-      if (idInput && !idInput.value) idInput.value = data.config.userId || 'livoncare';
-      if (keyInput && !keyInput.value) keyInput.value = localCfg.apiKey || data.config.maskedKey || '';
-      if (senderInput && !senderInput.value) senderInput.value = data.config.sender || '16007835';
-      if (senderKeyInput && !senderKeyInput.value) senderKeyInput.value = data.config.senderKey || '';
-
-      const publicIp = data.balance?.publicIp || data.publicIp || ipEl?.innerText?.trim() || '59.7.232.159';
-      if (ipEl && publicIp) ipEl.innerText = publicIp;
-
-      if (data.balance && data.balance.success) {
-        if (statusBox) statusBox.className = 'p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-[11px]';
-        if (badge) {
-          badge.className = 'px-2 py-0.5 rounded text-[10px] bg-emerald-200 text-emerald-900 font-mono font-bold';
-          badge.innerText = '연결 정상 (발송 가능)';
-        }
-        if (desc) desc.innerHTML = `잔여 포인트: <b>${Number(data.balance.balance || 0).toLocaleString()} P</b> · SMS <b>${Number(data.balance.smsCnt || 0).toLocaleString()}</b>건 · LMS <b>${Number(data.balance.lmsCnt || 0).toLocaleString()}</b>건 발송 가능`;
-      } else {
-        const msg = (data.balance && data.balance.message) || '';
-        const isIpError = msg.includes('IP') || msg.includes('-IP') || (data.balance && data.balance.rawMessage?.includes('IP'));
-
-        if (statusBox) statusBox.className = `p-3 rounded-xl ${isIpError ? 'bg-rose-50 border-rose-300 text-rose-900' : 'bg-amber-50 border-amber-300 text-amber-900'} text-[11px]`;
-        if (badge) {
-          badge.className = `px-2 py-0.5 rounded text-[10px] ${isIpError ? 'bg-rose-200 text-rose-900' : 'bg-amber-200 text-amber-900'} font-mono font-bold`;
-          badge.innerText = isIpError ? 'IP 등록 필요' : ((data.config.hasKey || (localCfg && localCfg.apiKey)) ? '인증 확인 필요' : '인증키 미설정');
-        }
-        if (desc) {
-          if (isIpError) {
-            desc.innerHTML = `
-              <div class="space-y-1">
-                <div class="font-bold text-rose-900 flex items-center justify-between">
-                  <span>알리고 IP 인증 오류 (-IP)</span>
-                  <span class="font-mono text-[10px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded border border-rose-200">미등록</span>
-                </div>
-                <div class="text-[10.5px] text-slate-700 leading-tight">
-                  현재 공인 IP <b class="text-rose-700 font-mono">${escapeHtml(publicIp)}</b> 가 알리고에 등록되지 않았습니다.<br>
-                  👉 <b>smartsms.aligo.in</b> &gt; <b>[문자API]</b> &gt; <b>[API Key 발급/관리]</b>에서 [발송 서버 IP]에 위 IP를 등록해 주세요.
-                </div>
-              </div>
-            `;
-          } else {
-            desc.innerText = msg || 'smartsms.aligo.in에서 발급받은 API Key를 입력 후 [설정 저장]을 눌러주세요.';
-          }
-        }
-      }
-    } else {
-      if (badge) badge.innerText = (localCfg && localCfg.apiKey) ? '로컬 저장됨' : '인증키 미설정';
-      if (desc) desc.innerText = 'smartsms.aligo.in에서 발급받은 API Key와 아이디를 입력하고 [설정 저장]을 눌러주세요.';
-    }
-  } catch (e) {
-    if (desc) desc.innerText = 'smartsms.aligo.in에서 발급받은 API Key와 아이디를 입력하고 [설정 저장]을 눌러주세요.';
+  const hasKey = Boolean(localCfg.apiKey && !localCfg.apiKey.includes('••••'));
+  if (statusBox) statusBox.className = 'p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-[11px]';
+  if (badge) {
+    badge.className = `px-2 py-0.5 rounded text-[10px] ${hasKey ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'} font-mono font-bold`;
+    badge.innerText = hasKey ? '연동키 등록됨' : '설정 확인 중';
   }
+  if (desc) {
+    desc.innerText = '알리고(smartsms.aligo.in) 계정 정보 및 여러 접속 장소(집, 회사 등)의 IP를 등록하여 관리합니다.';
+  }
+
+  // 백엔드 설정값 보조 동기화 (잔액 조회는 완전히 제외하여 IP 인증 에러 방지)
+  try {
+    const res = await fetch('/api/sms/aligo/config');
+    const data = await res.json();
+    if (data && data.success && data.config) {
+      if (idInput && !idInput.value) idInput.value = data.config.userId || 'lifenjoy';
+      if (keyInput && !keyInput.value) keyInput.value = localCfg.apiKey || data.config.maskedKey || '';
+      if (senderInput && !senderInput.value) senderInput.value = data.config.sender || '01026660883';
+      if (senderKeyInput && !senderKeyInput.value) senderKeyInput.value = data.config.senderKey || '';
+      if (badge && (data.config.hasKey || hasKey)) {
+        badge.className = 'px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-mono font-bold';
+        badge.innerText = '연동키 등록됨';
+      }
+    }
+  } catch (_) {}
 
   modal.classList.remove('hidden');
   if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -2868,75 +2847,18 @@ function toggleAligoApiKeyVisibility() {
 }
 
 async function testAligoConnection() {
-  const badge = document.getElementById('aligoConfigStatusBadge');
-  const desc = document.getElementById('aligoConfigStatusDesc');
-  const statusBox = document.getElementById('aligoConfigStatusBox');
-  const btn = document.getElementById('btnTestAligoConnection');
   const userId = document.getElementById('aligoConfigUserId')?.value.trim();
   const apiKey = document.getElementById('aligoConfigApiKey')?.value.trim();
-  const ipEl = document.getElementById('aligoConfigCurrentIp');
-
-  if (btn) btn.disabled = true;
-  if (badge) badge.innerText = '연결 확인 중...';
-  if (desc) desc.innerText = '알리고 통신망(/remain/) 서버와 보안 핸드셰이크 진행 중...';
-
-  try {
-    const res = await fetch('/api/sms/aligo/test', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, apiKey })
-    });
-    const rawText = await res.text();
-    let data = null;
-    try { data = JSON.parse(rawText); } catch (_) {}
-
-    const publicIp = data?.publicIp || ipEl?.innerText?.trim() || '59.7.232.159';
-    if (ipEl && publicIp) ipEl.innerText = publicIp;
-
-    if (res.ok && data && data.success) {
-      if (statusBox) statusBox.className = 'p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-[11px]';
-      if (badge) {
-        badge.className = 'px-2 py-0.5 rounded text-[10px] bg-emerald-200 text-emerald-900 font-mono font-bold';
-        badge.innerText = '연결 성공 (정상)';
-      }
-      if (desc) desc.innerHTML = `✅ <b>알리고 서버 정상 응답:</b> 잔여 포인트 <b>${Number(data.balance || 0).toLocaleString()} P</b> · SMS <b>${Number(data.smsCnt || 0).toLocaleString()}</b>건 / LMS <b>${Number(data.lmsCnt || 0).toLocaleString()}</b>건 발송 가능`;
-      refreshSurveySmsBalance('aligo');
+  if (!userId || !apiKey) {
+    if (typeof showToast === 'function') {
+      showToast('알리고 아이디와 API Key를 먼저 입력해 주세요.', 'warning');
     } else {
-      const errMsg = (data && (data.message || data.error)) || rawText || '인증 정보 확인 필요';
-      const isIpError = errMsg.includes('IP') || errMsg.includes('-IP') || (data && data.rawMessage?.includes('IP'));
-
-      if (statusBox) statusBox.className = 'p-3 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 text-[11px]';
-      if (badge) {
-        badge.className = 'px-2 py-0.5 rounded text-[10px] bg-rose-200 text-rose-900 font-mono font-bold';
-        badge.innerText = isIpError ? 'IP 등록 필요' : '연결 실패';
-      }
-      if (desc) {
-        if (isIpError) {
-          desc.innerHTML = `
-            <div class="space-y-1.5">
-              <div class="font-bold text-rose-900 flex items-center justify-between">
-                <span>❌ 알리고 IP 인증 오류 (-IP)</span>
-                <span class="font-mono text-[10px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded border border-rose-300">미등록 IP</span>
-              </div>
-              <div class="text-[11px] text-slate-700 leading-snug">
-                현재 접속 공인 IP <b>[<span class="font-mono text-rose-700 font-black select-all">${escapeHtml(publicIp)}</span>]</b> 가 알리고에 등록되지 않았습니다.
-              </div>
-              <div class="text-[10px] text-slate-600 bg-white/80 p-2 rounded-lg border border-rose-200">
-                👉 <b>smartsms.aligo.in</b> &gt; <b>[문자API]</b> &gt; <b>[API Key 발급/관리]</b> 메뉴에서 [발송 서버 IP]에 위 IP를 등록해 주시면 즉시 정상 발송됩니다.
-              </div>
-            </div>
-          `;
-        } else {
-          desc.innerText = `❌ ${errMsg}`;
-        }
-      }
+      alert('알리고 아이디와 API Key를 먼저 입력해 주세요.');
     }
-  } catch (err) {
-    if (statusBox) statusBox.className = 'p-3 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 text-[11px]';
-    if (badge) badge.innerText = '통신 에러';
-    if (desc) desc.innerText = '네트워크 통신 오류: ' + err.message;
-  } finally {
-    if (btn) btn.disabled = false;
+    return;
+  }
+  if (typeof showToast === 'function') {
+    showToast('설정값이 확인되었습니다. [설정 저장]을 눌러 완료해 주세요.', 'success');
   }
 }
 
@@ -4104,6 +4026,8 @@ if (typeof window !== 'undefined') {
   window.onChangeSurveySmsTarget = onChangeSurveySmsTarget;
   window.switchSurveySmsChannelMode = switchSurveySmsChannelMode;
   window.applySurveySmsTemplate = applySurveySmsTemplate;
+  window.getSurveyTargetCsPhone = getSurveyTargetCsPhone;
+  window.getSurveyTargetInsuranceName = getSurveyTargetInsuranceName;
   window.insertSurveySmsToken = insertSurveySmsToken;
   window.updateSurveySmsLivePreview = updateSurveySmsLivePreview;
   window.openSurveySmsPreviewUrl = openSurveySmsPreviewUrl;

@@ -546,19 +546,27 @@ class SurveyService {
         : `${host}/survey.html?token=${target.token}`
     );
 
+    const ins = String(target.insuranceCompany || target.insurer || target.company || '').trim();
+    let csPhone = this.data.settings.csPhone || '1544-7119';
+    if (ins.includes('삼성')) {
+      csPhone = '1877-7412';
+    } else if (ins.includes('현대')) {
+      csPhone = '1533-7436';
+    }
+
     const subject = options.subject || (isNewSurvey ? '[리본케어] 모바일 간병일지 & 만족도 설문 안내' : '[리본케어] 고객만족도 조사 안내');
     const message = options.customMessage || (
       isNewSurvey
         ? `[리본케어] ${target.patientName} 님의 모바일 안심 간병일지 & 케어 만족도 설문이 도착했습니다.\n\n` +
           `담당 간병인(${target.caregiverName || '배정 간병인'})의 일자별 상세 간병 기록을 확인하시고, 하단 1분 만족도 조사에 참여해 주시면 환자·보호자님께 감사 선물(${this.data.settings.defaultGiftItem || '스타벅스 아메리카노 모바일 쿠폰'})을 보내드립니다.\n\n` +
           `▶ 모바일 간병일지 & 만족도 설문 열람:\n${surveyUrl}\n\n` +
-          `※ 문의: 리본케어 고객센터 (${this.data.settings.csPhone || '1544-7119'})`
+          `※ 문의: 리본케어 고객센터 (${csPhone})`
         : `[리본케어] 고객만족도 조사 안내\n` +
           `${target.patientName} 고객님, 리본케어 간병 서비스는 만족스러우셨나요?\n` +
           `담당 간병인(${target.caregiverName || '배정 간병인'}) 서비스 품질 향상을 위해 소중한 의견을 들려주세요.\n` +
           `별도의 본인인증 절차 없이 아래 링크를 누르면 곧바로 설문 참여가 가능합니다.\n\n` +
           `▶ 설문 참여 링크:\n${surveyUrl}\n\n` +
-          `※ 문의전화: ${this.data.settings.csPhone || '1544-7119'}`
+          `※ 문의전화: ${csPhone}`
     );
 
     if (!Array.isArray(target.smsSentHistory)) {
