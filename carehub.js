@@ -6060,6 +6060,47 @@ function parseAppContactInfo(app) {
 }
 window.parseAppContactInfo = parseAppContactInfo;
 
+/**
+ * 통합허브 고객 주소 일관 포맷팅 헬퍼
+ * - 도로명 주소와 상세주소(호수) 사이에 공백 보장 및 중복 결합 방지
+ * - sido/sigungu가 roadAddress에 이미 포함되어 있는 경우 시/도 중복 노출 방지
+ */
+function formatCareHubAddress(app) {
+  if (!app) return '(등록된 주소 없음)';
+  const road = (app.roadAddress || app.hospitalRoadAddress || '').trim();
+  const detail = (app.addressDetail || '').trim();
+  const sido = (app.sido || '').trim();
+  const sigungu = (app.sigungu || '').trim();
+
+  // 1. 도로명 주소가 있는 경우
+  if (road) {
+    let full = road;
+    // road에 sido/sigungu가 포함되어 있지 않다면 앞에 보충
+    if (sido && !full.includes(sido)) {
+      full = `${sido} ${sigungu} ${full}`.trim();
+    }
+    // detail(호수/상세)이 존재하고 road에 아직 포함되지 않은 경우 깔끔하게 1칸 띄우고 결합
+    if (detail && !full.includes(detail)) {
+      full = `${full} ${detail}`.trim();
+    }
+    return full;
+  }
+
+  // 2. roadAddress가 없고 addressDetail만 있는 경우
+  if (detail) {
+    let full = detail;
+    if (sido && !full.includes(sido)) {
+      full = `${sido} ${sigungu} ${full}`.trim();
+    }
+    return full;
+  }
+
+  // 3. sido/sigungu만 있는 경우
+  const region = [sido, sigungu].filter(Boolean).join(' ');
+  return region || '(등록된 주소 없음)';
+}
+window.formatCareHubAddress = formatCareHubAddress;
+
 function renderAppContactRowsHtml(app, isBorderTop = false, isCompact = false) {
   const contacts = parseAppContactInfo(app);
   const padClass = isBorderTop ? 'pt-1.5 border-t border-slate-100' : '';
@@ -6925,8 +6966,8 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                   ` : ''}
                   <div class="flex justify-between items-start gap-2 pt-1 border-t border-slate-100">
                     <span class="text-slate-400 font-medium flex items-center gap-1 flex-shrink-0 pt-0.5"><i data-lucide="map-pin" class="w-3 h-3 text-slate-400"></i> 지역/주소:</span>
-                    <span class="text-slate-800 text-right font-medium break-words leading-relaxed truncate max-w-[220px]" title="${[app.sido, app.sigungu, app.roadAddress, app.addressDetail].filter(Boolean).join(' ')}">
-                      ${[app.sido, app.sigungu, app.roadAddress, app.addressDetail].filter(Boolean).join(' ') || '(등록된 주소 없음)'}
+                    <span class="text-slate-800 text-right font-medium break-words leading-relaxed truncate max-w-[220px]" title="${typeof escapeHtml === 'function' ? escapeHtml(formatCareHubAddress(app)) : formatCareHubAddress(app)}">
+                      ${typeof escapeHtml === 'function' ? escapeHtml(formatCareHubAddress(app)) : formatCareHubAddress(app)}
                     </span>
                   </div>
                 </div>
@@ -8619,8 +8660,8 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 ` : ''}
                 <div class="flex justify-between items-start pt-1 border-t border-slate-100">
                   <span class="text-slate-500 flex items-center gap-1 font-medium flex-shrink-0 pt-0.5"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400"></i> 지역/주소:</span>
-                  <span class="text-slate-800 text-right font-medium break-words max-w-[210px] leading-relaxed">
-                    ${[app.sido, app.sigungu, app.roadAddress, app.addressDetail].filter(Boolean).join(' ') || '(등록된 주소 없음)'}
+                  <span class="text-slate-800 text-right font-medium break-words max-w-[210px] leading-relaxed" title="${typeof escapeHtml === 'function' ? escapeHtml(formatCareHubAddress(app)) : formatCareHubAddress(app)}">
+                    ${typeof escapeHtml === 'function' ? escapeHtml(formatCareHubAddress(app)) : formatCareHubAddress(app)}
                   </span>
                 </div>
               </div>

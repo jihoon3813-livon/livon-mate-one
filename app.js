@@ -31437,7 +31437,7 @@ function handleNewAppSubmit(e) {
       const hospRoad = (document.getElementById('newAppHospitalRoadAddress')?.value || '').trim();
       const hospDetail = (document.getElementById('newAppHospitalDetailAddress')?.value || '').trim();
       roadAddr = hospRoad;
-      detailAddr = (hospName + ' ' + hospDetail).trim();
+      detailAddr = hospDetail;
       if (hospRoad) {
         const parts = hospRoad.split(' ');
         sido = parts[0] || '서울';
@@ -31490,13 +31490,8 @@ function handleNewAppSubmit(e) {
     const adjusterFax = document.getElementById('newAppAdjusterFax')?.value?.trim() || '';
     const rawMemo = document.getElementById('newAppMemo')?.value?.trim() || '';
 
-    let formattedMemo = rawMemo;
-    if (diagnosis) {
-      formattedMemo = `[진단명: ${diagnosis}] ` + formattedMemo;
-    }
-    if (hospitalName) {
-      formattedMemo += ` (장소: ${hospitalName})`;
-    }
+    // [진단명/메모 독립 보존]: 진단명(diagnosis)은 newApp.diagnosis/diseaseName 필드로 독립 저장되므로 비고(memo)에 합성하지 않고 순수 사용자 메모만 보존
+    const formattedMemo = rawMemo;
 
     const isHyundai = (insurance || '').includes('현대해상');
     const defaultHdStage = isHyundai ? '문자수신대기' : '사전명단매칭완료';
@@ -31518,7 +31513,8 @@ function handleNewAppSubmit(e) {
       phone: phone,
       sido: sido || '서울',
       sigungu: sigungu || '',
-      addressDetail: fullCombinedAddress,
+      roadAddress: roadAddr,
+      addressDetail: detailAddr || fullCombinedAddress,
       insuranceCompany: insurance,
       isRealLaunchData: true,
       productName: productName || (isHyundai ? '무배당현대해상내삶엔(3N)맞춤간편건강보험' : '삼성화재 다이렉트 간병보험'),
@@ -31537,8 +31533,8 @@ function handleNewAppSubmit(e) {
       desiredDate: desiredDate,
       careType: careType,
       hospitalName: !isHome ? (document.getElementById('newAppHospitalName')?.value || '').trim() : '자택 간병',
-      hospitalRoom: !isHome ? (document.getElementById('newAppHospitalDetailAddress')?.value || '').trim() : '',
-      hospitalRoadAddress: !isHome ? (document.getElementById('newAppHospitalRoadAddress')?.value || '').trim() : '',
+      hospitalRoom: !isHome ? (document.getElementById('newAppHospitalDetailAddress')?.value || '').trim() : (detailAddr || ''),
+      hospitalRoadAddress: !isHome ? (document.getElementById('newAppHospitalRoadAddress')?.value || '').trim() : roadAddr,
       expectedDays: expectedDays,
       careEndDate: careEndDate,
       status: '접수',
@@ -32605,9 +32601,23 @@ function openCustomerEditModal(appId, focusSection = null) {
     rrnInput.value = (typeof autoHyphenRrn === 'function') ? autoHyphenRrn(rrnVal) : rrnVal;
   }
   document.getElementById('custEditInsurance').value = app.insuranceCompany || '현대해상(SCOR)';
-  // 도로명 주소 채우기 (sido 단독값만 있고 sigungu가 없는 경우 "서울"처럼 노출되는 현상 원천 차단)
-  document.getElementById('custEditRoadAddress').value = app.roadAddress || app.hospitalRoadAddress || ((app.sido && app.sigungu) ? `${app.sido} ${app.sigungu}` : (app.sido && !['서울', '서울시', '서울특별시'].includes(app.sido) ? app.sido : ''));
-  document.getElementById('custEditAddressDetail').value = app.addressDetail || '';
+  // 도로명 주소 및 상세주소(호수) 깔끔하게 분리 바인딩 (주소와 호수가 한 칸에 붙어서 나오는 현상 방지)
+  let editRoad = app.roadAddress || app.hospitalRoadAddress || '';
+  let editDetail = app.addressDetail || '';
+  if (!editRoad && editDetail) {
+    // roadAddress가 없고 addressDetail에 전체 주소가 합쳐져 있던 경우 도로명과 상세주소(호수) 자동 분리
+    const m = editDetail.match(/^(.+?[로|길|대로|읍|면|리]\s*\d+(?:-\d+)?(?:\s*\([^\)]+\))?)\s*(.*)$/);
+    if (m) {
+      editRoad = m[1].trim();
+      editDetail = m[2].trim();
+    } else if (app.sido && app.sigungu) {
+      editRoad = `${app.sido} ${app.sigungu}`;
+    }
+  } else if (!editRoad && app.sido && app.sigungu) {
+    editRoad = `${app.sido} ${app.sigungu}`;
+  }
+  document.getElementById('custEditRoadAddress').value = editRoad;
+  document.getElementById('custEditAddressDetail').value = editDetail;
   document.getElementById('custEditSido').value = app.sido || '';
   document.getElementById('custEditSigungu').value = app.sigungu || '';
   const zipEl = document.getElementById('custEditZip');
