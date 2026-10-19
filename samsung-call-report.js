@@ -8,6 +8,16 @@
 var gSamsungReportData = null;
 var gSamsungMasterLogs = [];
 var gActiveReportSubTab = 'summary'; // 'summary' | 'daily' | 'logs'
+
+function getReportLast30Range() {
+  const now = new Date();
+  const past = new Date(now);
+  past.setDate(now.getDate() - 30);
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return { start: fmt(past), end: fmt(now) };
+}
+
 function getThisWeekRange() {
   const now = new Date();
   const day = now.getDay();
@@ -23,16 +33,16 @@ function getThisWeekRange() {
   return { start: fmt(monday), end: endStr };
 }
 
-const defaultReportThisWeek = getThisWeekRange();
+const defaultReportRange = getReportLast30Range();
 var gReportFilter = {
   category: '',
   actor: '',
   search: '',
   channel: '삼성화재',
   consultedOnly: true,
-  periodKey: 'thisWeek',
-  startDate: defaultReportThisWeek.start,
-  endDate: defaultReportThisWeek.end
+  periodKey: 'last30',
+  startDate: defaultReportRange.start,
+  endDate: defaultReportRange.end
 };
 if (typeof window !== 'undefined') {
   window.gReportFilter = gReportFilter;
@@ -374,8 +384,8 @@ function resolveMemberName(rawPhone, fallbackName, title = '', summary = '') {
 
 // 1. Initializer (0ms 캐시 로드 + 최신 데이터 파일 즉시 반영)
 async function initSamsungCallReportModule(resetFilter = true) {
-  // 다른 메뉴를 보다가 들어왔을 때는 항상 이번 주(오늘까지)로 필터 리셋
-  const thisWeek = getThisWeekRange();
+  // 기본 조회 기간: 최근 30일 (월요일/연휴 직후 콜 부재로 인한 0건 노출 원천 차단 및 종합분석과 일관성 유지)
+  const defaultRange = getReportLast30Range();
   if (resetFilter) {
     gReportFilter = {
       category: '',
@@ -383,9 +393,9 @@ async function initSamsungCallReportModule(resetFilter = true) {
       search: '',
       channel: '삼성화재',
       consultedOnly: true,
-      periodKey: 'thisWeek',
-      startDate: thisWeek.start,
-      endDate: thisWeek.end
+      periodKey: 'last30',
+      startDate: defaultRange.start,
+      endDate: defaultRange.end
     };
     if (typeof window !== 'undefined') {
       window.gReportFilter = gReportFilter;
@@ -393,15 +403,15 @@ async function initSamsungCallReportModule(resetFilter = true) {
     }
     const sInput = document.getElementById('tabReportStartDate');
     const eInput = document.getElementById('tabReportEndDate');
-    if (sInput) sInput.value = thisWeek.start;
-    if (eInput) eInput.value = thisWeek.end;
+    if (sInput) sInput.value = defaultRange.start;
+    if (eInput) eInput.value = defaultRange.end;
     const chSelect = document.getElementById('tabReportChannelSelect');
     if (chSelect) chSelect.value = '삼성화재';
   }
 
   const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || {};
-  const s = curFilter.startDate || thisWeek.start;
-  const e = curFilter.endDate || thisWeek.end;
+  const s = curFilter.startDate || defaultRange.start;
+  const e = curFilter.endDate || defaultRange.end;
   const ch = curFilter.channel || '삼성화재';
   const isAllChannel = !ch || ch === '전체' || ch === 'all';
   const rInfo = (gSamsungReportData && gSamsungReportData.reportInfo) || {};
@@ -441,11 +451,12 @@ async function initSamsungCallReportModule(resetFilter = true) {
     ? 'call_report_all.json'
     : (ch.includes('현대') ? 'call_report_hyundai.json' : (ch.includes('리본') ? 'call_report_livon.json' : 'call_report_samsung.json'));
 
+  const cacheBust = '?t=' + Date.now();
   const staticUrls = [
-    `./${primaryFileName}`,
-    `/${primaryFileName}`,
-    primaryFileName,
-    `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}`
+    `./${primaryFileName}${cacheBust}`,
+    `/${primaryFileName}${cacheBust}`,
+    `${primaryFileName}${cacheBust}`,
+    `/api/samsung/call-report/data?channel=${encodeURIComponent(ch)}&t=${Date.now()}`
   ];
 
   let loaded = false;
@@ -471,18 +482,18 @@ async function initSamsungCallReportModule(resetFilter = true) {
           }
         }
 
-        // 기존 메모리/세션에 이미 존재하는 최신 수신 콜이 오래된 정적 파일로 덮어씌워지지 않도록 스마트 병합
+        // 기존 로컬 캐시보다 서버 최신 파일이 우선하도록 스마트 병합 (기존 로그 -> 최신 파일 순으로 덮어쓰기)
         const existingLogs = (gSamsungMasterLogs && gSamsungMasterLogs.length > 0)
           ? gSamsungMasterLogs
           : ((gSamsungReportData && gSamsungReportData.callLogs) || []);
 
         if (existingLogs.length > 0) {
           const mergedMap = new Map();
-          (finalData.callLogs || []).forEach(l => {
+          existingLogs.forEach(l => {
             const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
             mergedMap.set(key, l);
           });
-          existingLogs.forEach(l => {
+          (finalData.callLogs || []).forEach(l => {
             const key = l.askSn ? `sn_${l.askSn}` : `${l.callTime}_${l.phone || l.rawPhone}`;
             mergedMap.set(key, l);
           });
@@ -505,6 +516,11 @@ async function initSamsungCallReportModule(resetFilter = true) {
         // 화면 갱신: 처음 로드되었거나 신규 콜로그가 반영되었을 때 즉시 반영
         renderSamsungCallReportTab();
         loaded = true;
+
+        // 백그라운드 최신 CTI 자동 동기화 (사용자 조작 방해 없이 조용히 최신 당일 콜 수신)
+        setTimeout(() => {
+          applyTabDateRange(true, true);
+        }, 300);
         return;
       }
     } catch (e) {}
@@ -565,13 +581,17 @@ function renderSamsungCallReportTab() {
   const curFilter = (typeof gReportFilter !== 'undefined' && gReportFilter) || (typeof gSamsungReportFilter !== 'undefined' && gSamsungReportFilter) || {};
   const stats = calculateReportStats();
 
-  const thisWeekRange = getThisWeekRange();
-  const curStart = curFilter.startDate || thisWeekRange.start;
-  const curEnd = curFilter.endDate || thisWeekRange.end;
+  const defaultRange = getReportLast30Range();
+  const curStart = curFilter.startDate || defaultRange.start;
+  const curEnd = curFilter.endDate || defaultRange.end;
   const curCh = curFilter.channel || info.channelLabel || info.channel || '삼성화재';
   const isAllChannel = !curCh || curCh === '전체' || curCh === 'all';
   const dateRangeStr = `${curStart} ~ ${curEnd}`;
-  const curPKey = curFilter.periodKey || ((curStart === thisWeekRange.start && curEnd === thisWeekRange.end) ? 'thisWeek' : '');
+  const curPKey = curFilter.periodKey || (
+    (curStart === defaultRange.start && curEnd === defaultRange.end) ? 'last30' : (
+      (curStart === thisWeekRange.start && curEnd === thisWeekRange.end) ? 'thisWeek' : ''
+    )
+  );
   const getPresetBtnClass = (k) => {
     return curPKey === k
       ? 'px-2.5 py-1.5 rounded-xl border border-blue-600 bg-blue-600 text-white font-bold text-xs shadow-2xs cursor-pointer shrink-0 whitespace-nowrap'
@@ -1238,6 +1258,28 @@ function calculateReportStats() {
 function renderReportSummarySubTab(stats) {
   return `
     <div class="space-y-6">
+
+      ${stats.totalCalls === 0 ? `
+        <div class="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-amber-50/90 border border-amber-200 text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div class="flex items-start sm:items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+              <i data-lucide="info" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-sm font-bold">선택하신 조회 기간에 인바운드 콜 내역이 없습니다.</p>
+              <p class="text-xs text-amber-700 mt-0.5">상단 빠른 기간 프리셋 또는 아래 버튼을 눌러 직전 통화 분석 데이터를 바로 확인하실 수 있습니다.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" onclick="setTabPresetRange('last30')" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition cursor-pointer flex items-center gap-1">
+              <i data-lucide="calendar" class="w-3.5 h-3.5"></i> 최근 30일 전체 조회
+            </button>
+            <button type="button" onclick="setTabPresetRange('lastWeek')" class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 font-bold text-xs shadow-2xs transition cursor-pointer">
+              지난 주 조회
+            </button>
+          </div>
+        </div>
+      ` : ''}
 
       <!-- ================================================================= -->
       <!-- 4대 핵심 KPI 카드 (모바일 최적화 및 CTI 지표 1:1 완벽 정합) -->
