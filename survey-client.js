@@ -2383,6 +2383,30 @@ function copySurveySmsBodyText() {
   });
 }
 
+function getSurveyAligoConfig() {
+  let cfg = {
+    userId: 'lifenjoy',
+    apiKey: 'bhhro60er9uovr47gra0y5hjp3c5clfe',
+    sender: '01026660883',
+    senderKey: ''
+  };
+  try {
+    const raw = localStorage.getItem('LIVON_ALIGO_CONFIG');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.userId) cfg.userId = parsed.userId;
+      if (parsed.apiKey && !parsed.apiKey.includes('••••')) cfg.apiKey = parsed.apiKey;
+      if (parsed.sender) cfg.sender = parsed.sender;
+      if (parsed.senderKey) cfg.senderKey = parsed.senderKey;
+    } else {
+      localStorage.setItem('LIVON_ALIGO_CONFIG', JSON.stringify(cfg));
+      localStorage.setItem('LIVON_ALIGO_USER', cfg.userId);
+      localStorage.setItem('LIVON_ALIGO_KEY', cfg.apiKey);
+    }
+  } catch (_) {}
+  return cfg;
+}
+
 async function sendSurveyTestSms(testMode = 'REAL_TEST') {
   const targetId = document.getElementById('surveySmsModalTargetId')?.value || '';
   const target = (gSurveyState.targets || []).find(t => t.id === targetId || t.serviceId === targetId) || null;
@@ -2391,14 +2415,13 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST') {
   const subject = (document.getElementById('surveySmsSubjectInput')?.value || '').trim();
   const bodyText = (document.getElementById('surveySmsBodyTextarea')?.value || '').trim();
   const provider = document.getElementById('surveySmsProviderSelect')?.value || 'aligo';
+  const aligoCfg = getSurveyAligoConfig();
+
   let senderNumber = document.getElementById('surveySmsSenderNumber')?.value || '';
   if (provider === 'aligo' && (!senderNumber || senderNumber === '16007835')) {
-    try {
-      const localCfg = JSON.parse(localStorage.getItem('LIVON_ALIGO_CONFIG') || '{}');
-      if (localCfg.sender && localCfg.sender.replace(/[^0-9]/g, '') !== '16007835') {
-        senderNumber = localCfg.sender.replace(/[^0-9]/g, '');
-      }
-    } catch (_) {}
+    if (aligoCfg.sender && aligoCfg.sender.replace(/[^0-9]/g, '') !== '16007835') {
+      senderNumber = aligoCfg.sender.replace(/[^0-9]/g, '');
+    }
   }
   if (!senderNumber) senderNumber = '01026660883';
   const statusBox = document.getElementById('surveySmsStatusBox');
@@ -2454,7 +2477,9 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST') {
         buttonUrl: surveyUrl,
         buttonTitle: '모바일 간병일지 & 설문 열람하기',
         senderNumber,
-        provider
+        provider,
+        userId: aligoCfg.userId,
+        apiKey: aligoCfg.apiKey
       })
     });
     const result = await res.json();
@@ -2483,10 +2508,17 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST') {
       }
     } else {
       if (statusBox) {
-        statusBox.className = 'p-3.5 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl text-xs space-y-1';
+        const isIpError = result.message && (result.message.includes('-IP') || result.message.includes('IP 등록') || result.message.includes('미등록'));
+        statusBox.className = 'p-3.5 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl text-xs space-y-1.5';
         statusBox.innerHTML = `
           <div class="font-black text-amber-900">⚠️ 통신망 응답 안내: ${escapeHtml(result.message || '통신망 연동 확인 필요')}</div>
           <div class="text-[11px] text-amber-800">우측 스마트폰 미리보기에서 편집된 전문(${getSurveySmsKoreanBytes(bodyText)} Byte)과 안심 단축 링크(${escapeHtml(surveyUrl)}) 정상 동작이 확인되었습니다.</div>
+          ${isIpError ? `
+            <div class="mt-1.5 p-2 rounded-lg bg-white/90 border border-amber-300 text-[10.5px] text-slate-700 leading-relaxed">
+              💡 <b>알리고 IP 인증 안내:</b> 현재 접속 중인 공인 IP가 알리고 발송 서버 IP에 미등록 상태입니다.<br>
+              • 상단 <b>[알리고 설정]</b>을 열어 공인 IP를 복사한 뒤 <b>smartsms.aligo.in</b> &gt; [문자API]에 등록하시거나,<br>
+              • 바로 옆 <b>[✓ 모의 검증 테스트]</b>를 누르시면 과금 없이 단축 링크와 발송 문구를 즉시 검증하실 수 있습니다.
+            </div>` : ''}
         `;
       }
     }
@@ -2520,14 +2552,13 @@ async function submitSurveyCustomerSms() {
   const subject = (document.getElementById('surveySmsSubjectInput')?.value || '').trim();
   const bodyText = (document.getElementById('surveySmsBodyTextarea')?.value || '').trim();
   const provider = document.getElementById('surveySmsProviderSelect')?.value || 'aligo';
+  const aligoCfg = getSurveyAligoConfig();
+
   let senderNumber = document.getElementById('surveySmsSenderNumber')?.value || '';
   if (provider === 'aligo' && (!senderNumber || senderNumber === '16007835')) {
-    try {
-      const localCfg = JSON.parse(localStorage.getItem('LIVON_ALIGO_CONFIG') || '{}');
-      if (localCfg.sender && localCfg.sender.replace(/[^0-9]/g, '') !== '16007835') {
-        senderNumber = localCfg.sender.replace(/[^0-9]/g, '');
-      }
-    } catch (_) {}
+    if (aligoCfg.sender && aligoCfg.sender.replace(/[^0-9]/g, '') !== '16007835') {
+      senderNumber = aligoCfg.sender.replace(/[^0-9]/g, '');
+    }
   }
   if (!senderNumber) senderNumber = '01026660883';
   const statusBox = document.getElementById('surveySmsStatusBox');
@@ -2575,6 +2606,8 @@ async function submitSurveyCustomerSms() {
         buttonTitle: '모바일 간병일지 & 설문 열람하기',
         senderNumber,
         provider,
+        userId: aligoCfg.userId,
+        apiKey: aligoCfg.apiKey,
         isNewSurvey: isNewTab,
         skipReward: isNewTab,
         actor: 'HQ'
@@ -2667,7 +2700,13 @@ function refreshSurveySmsBalance(reqProvider = '') {
   const badge = document.getElementById('surveySmsModalBalanceBadge');
   if (!badge) return;
 
-  fetch(`/api/sms/balance?provider=${encodeURIComponent(provider)}`)
+  const aligoCfg = (typeof getSurveyAligoConfig === 'function') ? getSurveyAligoConfig() : {};
+  let balanceUrl = `/api/sms/balance?provider=${encodeURIComponent(provider)}`;
+  if (provider === 'aligo' && aligoCfg.apiKey && !aligoCfg.apiKey.includes('••••')) {
+    balanceUrl += `&userId=${encodeURIComponent(aligoCfg.userId || '')}&apiKey=${encodeURIComponent(aligoCfg.apiKey || '')}`;
+  }
+
+  fetch(balanceUrl)
     .then(r => r.json())
     .then(data => {
       if (!badge) return;
@@ -2676,8 +2715,15 @@ function refreshSurveySmsBalance(reqProvider = '') {
           badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> <span>알리고 잔여: ${Number(data.balance || 0).toLocaleString()} P (SMS ${Number(data.smsCnt || 0).toLocaleString()}건 / LMS ${Number(data.lmsCnt || 0).toLocaleString()}건)</span>`;
           badge.className = 'text-[11px] font-bold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-500/30 transition-all cursor-pointer flex items-center gap-1.5';
         } else {
-          badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> <span>알리고 인증키 설정 필요 ⚙️</span>`;
-          badge.className = 'text-[11px] font-bold text-amber-300 bg-amber-950/60 hover:bg-amber-900 px-2.5 py-0.5 rounded-full border border-amber-500/30 transition-all cursor-pointer flex items-center gap-1.5';
+          const msg = (data && (data.message || data.rawMessage)) || '';
+          const isIpError = msg.includes('IP') || msg.includes('-IP');
+          if (isIpError) {
+            badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> <span>알리고 IP 등록 필요 [${data.publicIp || '확인'}] ⚙️</span>`;
+            badge.className = 'text-[11px] font-bold text-rose-300 bg-rose-950/60 hover:bg-rose-900 px-2.5 py-0.5 rounded-full border border-rose-500/30 transition-all cursor-pointer flex items-center gap-1.5';
+          } else {
+            badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> <span>알리고 연동키 설정 ⚙️</span>`;
+            badge.className = 'text-[11px] font-bold text-amber-300 bg-amber-950/60 hover:bg-amber-900 px-2.5 py-0.5 rounded-full border border-amber-500/30 transition-all cursor-pointer flex items-center gap-1.5';
+          }
         }
       } else if (provider === 'barobill') {
         if (data && data.success) {
@@ -2727,7 +2773,7 @@ async function openAligoConfigModal() {
   // 로컬스토리지 우선 복원
   let localCfg = {};
   try {
-    localCfg = JSON.parse(localStorage.getItem('LIVON_ALIGO_CONFIG') || '{}');
+    localCfg = getSurveyAligoConfig();
     if (localCfg.userId && idInput) idInput.value = localCfg.userId;
     if (localCfg.apiKey && keyInput) keyInput.value = localCfg.apiKey;
     if (localCfg.sender && senderInput) senderInput.value = localCfg.sender;
@@ -2737,18 +2783,22 @@ async function openAligoConfigModal() {
   if (badge) badge.innerText = '설정 확인 중...';
 
   try {
-    const res = await fetch('/api/sms/aligo/config');
+    let cfgUrl = '/api/sms/aligo/config';
+    if (localCfg.apiKey && !localCfg.apiKey.includes('••••')) {
+      cfgUrl += `?userId=${encodeURIComponent(localCfg.userId || '')}&apiKey=${encodeURIComponent(localCfg.apiKey || '')}`;
+    }
+    const res = await fetch(cfgUrl);
     const rawText = await res.text();
     let data = null;
     try { data = JSON.parse(rawText); } catch (_) {}
 
     if (res.ok && data && data.success && data.config) {
       if (idInput && !idInput.value) idInput.value = data.config.userId || 'livoncare';
-      if (keyInput && !keyInput.value) keyInput.value = data.config.maskedKey || '';
+      if (keyInput && !keyInput.value) keyInput.value = localCfg.apiKey || data.config.maskedKey || '';
       if (senderInput && !senderInput.value) senderInput.value = data.config.sender || '16007835';
       if (senderKeyInput && !senderKeyInput.value) senderKeyInput.value = data.config.senderKey || '';
 
-      const publicIp = data.balance?.publicIp || data.publicIp || '59.7.232.159';
+      const publicIp = data.balance?.publicIp || data.publicIp || ipEl?.innerText?.trim() || '59.7.232.159';
       if (ipEl && publicIp) ipEl.innerText = publicIp;
 
       if (data.balance && data.balance.success) {

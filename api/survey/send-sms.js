@@ -33,6 +33,8 @@ module.exports = async (req, res) => {
     const buttonTitle = payload.buttonTitle || '모바일 간병일지 & 설문 열람하기';
     const isTest = Boolean(payload.isTest);
     const testMode = payload.testMode || 'REAL_TEST';
+    const apiKey = (payload.apiKey || '').trim();
+    const userId = (payload.userId || '').trim();
 
     if (!toPhone) {
       return res.status(400).json({ success: false, message: '수신 휴대폰 번호를 입력해 주세요.' });
@@ -64,7 +66,10 @@ module.exports = async (req, res) => {
           buttonUrl,
           buttonTitle,
           subject,
-          category: 'SURVEY_SMS_TEST'
+          category: 'SURVEY_SMS_TEST',
+          testMode,
+          apiKey,
+          userId
         });
         return res.status(200).json({
           success: true,
@@ -99,7 +104,9 @@ module.exports = async (req, res) => {
           buttonUrl,
           buttonTitle,
           subject,
-          category: payload.isNewSurvey ? 'SURVEY_NEW_SMS' : 'SURVEY_SMS'
+          category: payload.isNewSurvey ? 'SURVEY_NEW_SMS' : 'SURVEY_SMS',
+          apiKey,
+          userId
         });
       } catch (gwErr) {
         gatewayWarning = gwErr.message || '';

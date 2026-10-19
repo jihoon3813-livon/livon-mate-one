@@ -14,11 +14,13 @@ module.exports = async (req, res) => {
 
   try {
     if (req.method === 'GET') {
-      const cfg = getAligoConfig();
+      const q = req.query || {};
+      const customCreds = (q.userId && q.apiKey && !q.apiKey.includes('••••')) ? { userId: q.userId.trim(), apiKey: q.apiKey.trim() } : null;
+      const cfg = customCreds ? { ...getAligoConfig(), ...customCreds } : getAligoConfig();
       const maskedKey = cfg.apiKey ? `${cfg.apiKey.slice(0, 4)}••••••••${cfg.apiKey.slice(-4)}` : '';
       let balanceInfo = null;
       try {
-        balanceInfo = await getAligoBalance();
+        balanceInfo = await getAligoBalance(customCreds);
       } catch (_) {}
 
       return res.status(200).json({

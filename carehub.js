@@ -6835,6 +6835,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
   const claimVal = String(app.claimClassification || app.claimCategory || '').trim();
   const claimStatus = checkCustomerClaimSetStatus(app, appAssigns);
   const isPeekMode = Boolean(gClaimSetPeekMode[app.id]);
+  const displayDiagnosis = app.diagnosis || app.diseaseName || app.disease || (app.memo && String(app.memo).match(/\[진단명:\s*([^\]]+)\]/)?.[1]?.trim()) || '';
 
   return `
     <div class="space-y-4 w-full">
@@ -7007,6 +7008,10 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                   <div class="flex justify-between items-center">
                     <span class="text-slate-400">사고유형 / 신청일시:</span>
                     <span class="font-semibold text-slate-800">${app.accidentType || '질병'} · <span class="font-mono font-bold">${app.applyDate || '-'}</span></span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-slate-400">진단명 / 증상:</span>
+                    <span class="font-bold text-slate-900 text-right truncate max-w-[220px]" title="${typeof escapeHtml === 'function' ? escapeHtml(displayDiagnosis || '-') : (displayDiagnosis || '-')}">${displayDiagnosis ? `<span class="px-1.5 py-0.2 rounded bg-amber-50 text-amber-900 border border-amber-200 font-semibold text-[10.5px]">${typeof escapeHtml === 'function' ? escapeHtml(displayDiagnosis) : displayDiagnosis}</span>` : '<span class="text-slate-400 font-normal">-</span>'}</span>
                   </div>
                   ${isSamsung ? `
                     <div class="flex justify-between items-center pt-1 border-t border-slate-100 text-[10.5px]">
@@ -13570,6 +13575,14 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null) {
   // [정산/청구 정화] 모달 오픈 시 오생성된 유령 중복 청구서(CLM-*) 자동 정화 및 정합성 보정
   if (app && app.id && typeof sanitizeAccidentalDuplicateClaims === 'function') {
     sanitizeAccidentalDuplicateClaims(app.id);
+  }
+
+  // [진단명 정합성 보장]: app.diagnosis가 비어있으나 memo 또는 diseaseName에 진단명이 존재하는 경우 자동 바인딩
+  if (app && (!app.diagnosis || app.diagnosis === '-')) {
+    const fallbackDiag = app.diseaseName || app.disease || app.sicknessName || (app.memo && String(app.memo).match(/\[진단명:\s*([^\]]+)\]/)?.[1]?.trim());
+    if (fallbackDiag) {
+      app.diagnosis = fallbackDiag;
+    }
   }
 
   const titleEl = document.getElementById('hubDetailModalTitle');

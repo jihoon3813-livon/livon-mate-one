@@ -2278,11 +2278,13 @@ function appendServerAuditLog(logItem) {
       const { getAligoConfig, saveAligoConfig, getAligoBalance } = require('./sms-service');
 
       if (req.method === 'GET') {
-        const cfg = getAligoConfig();
+        const q = parsedUrl.query || {};
+        const customCreds = (q.userId && q.apiKey && !q.apiKey.includes('••••')) ? { userId: String(q.userId).trim(), apiKey: String(q.apiKey).trim() } : null;
+        const cfg = customCreds ? { ...getAligoConfig(), ...customCreds } : getAligoConfig();
         const maskedKey = cfg.apiKey ? `${cfg.apiKey.slice(0, 4)}••••••••${cfg.apiKey.slice(-4)}` : '';
         let balanceInfo = null;
         try {
-          balanceInfo = await getAligoBalance();
+          balanceInfo = await getAligoBalance(customCreds);
         } catch (_) {}
 
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -2378,6 +2380,9 @@ function appendServerAuditLog(logItem) {
       try {
         const { getAligoBalance, getBarobillSmsBalance } = require('./sms-service');
         const reqProvider = (parsedUrl.query && parsedUrl.query.provider) || 'aligo';
+        const qUserId = parsedUrl.query && parsedUrl.query.userId;
+        const qApiKey = parsedUrl.query && parsedUrl.query.apiKey;
+        const customCreds = (qUserId && qApiKey && !String(qApiKey).includes('••••')) ? { userId: String(qUserId).trim(), apiKey: String(qApiKey).trim() } : null;
 
         if (reqProvider === 'barobill') {
           const baroInfo = await getBarobillSmsBalance();
@@ -2385,7 +2390,7 @@ function appendServerAuditLog(logItem) {
           return res.end(JSON.stringify(baroInfo));
         }
 
-        const aligoInfo = await getAligoBalance();
+        const aligoInfo = await getAligoBalance(customCreds);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         return res.end(JSON.stringify(aligoInfo));
       } catch (e) {
@@ -2532,6 +2537,8 @@ function appendServerAuditLog(logItem) {
           const buttonTitle = payload.buttonTitle || '모바일 간병일지 & 설문 열람하기';
           const isTest = Boolean(payload.isTest);
           const testMode = payload.testMode || 'REAL_TEST'; // 'REAL_TEST' | 'SIMULATION'
+          const apiKey = (payload.apiKey || '').trim();
+          const userId = (payload.userId || '').trim();
 
           if (!toPhone) {
             res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -2567,7 +2574,10 @@ function appendServerAuditLog(logItem) {
                 buttonUrl,
                 buttonTitle,
                 subject,
-                category: 'SURVEY_SMS_TEST'
+                category: 'SURVEY_SMS_TEST',
+                testMode,
+                apiKey,
+                userId
               });
               res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
               return res.end(JSON.stringify({
@@ -2604,7 +2614,9 @@ function appendServerAuditLog(logItem) {
                 buttonUrl,
                 buttonTitle,
                 subject,
-                category: payload.isNewSurvey ? 'SURVEY_NEW_SMS' : 'SURVEY_SMS'
+                category: payload.isNewSurvey ? 'SURVEY_NEW_SMS' : 'SURVEY_SMS',
+                apiKey,
+                userId
               });
             } catch (gwErr) {
               gatewayWarning = gwErr.message || '';

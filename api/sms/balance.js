@@ -14,13 +14,16 @@ module.exports = async (req, res) => {
 
   try {
     const provider = (req.query?.provider || 'aligo').toLowerCase();
+    const userId = req.query?.userId;
+    const apiKey = req.query?.apiKey;
+    const customCreds = (userId && apiKey && !apiKey.includes('••••')) ? { userId: userId.trim(), apiKey: apiKey.trim() } : null;
 
     if (provider === 'barobill') {
       const baroInfo = await getBarobillSmsBalance();
       return res.status(200).json(baroInfo);
     }
 
-    const aligoInfo = await getAligoBalance();
+    const aligoInfo = await getAligoBalance(customCreds);
     return res.status(200).json(aligoInfo);
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });

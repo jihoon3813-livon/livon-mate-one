@@ -36,9 +36,9 @@ function getAligoConfig() {
   } catch (_) {}
 
   return {
-    userId: fileCfg.userId || process.env.ALIGO_USER_ID || 'livoncare',
-    apiKey: fileCfg.apiKey || process.env.ALIGO_API_KEY || '',
-    sender: fileCfg.sender || process.env.ALIGO_SENDER || '16007835',
+    userId: fileCfg.userId || process.env.ALIGO_USER_ID || 'lifenjoy',
+    apiKey: fileCfg.apiKey || process.env.ALIGO_API_KEY || 'bhhro60er9uovr47gra0y5hjp3c5clfe',
+    sender: fileCfg.sender || process.env.ALIGO_SENDER || '01026660883',
     senderKey: fileCfg.senderKey || process.env.ALIGO_SENDER_KEY || '',
     senders: fileCfg.senders || [
       { number: '16007835', label: '리본케어 공식 (1600-7835)', isDefault: true },
@@ -56,7 +56,11 @@ function saveAligoConfig(updates) {
     ...updates,
     updatedAt: new Date().toISOString()
   };
-  fs.writeFileSync(ALIGO_CONFIG_PATH, JSON.stringify(next, null, 2), 'utf8');
+  try {
+    fs.writeFileSync(ALIGO_CONFIG_PATH, JSON.stringify(next, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[Aligo Config Save Warning]', err.message);
+  }
   return next;
 }
 
@@ -310,15 +314,19 @@ async function sendViaAligoKakao({
   senderNumber = '16007835',
   senderKey = '',
   subject = '',
-  fallbackToSms = true
+  fallbackToSms = true,
+  apiKey = '',
+  userId = ''
 }) {
   const cfg = getAligoConfig();
+  const effectiveKey = apiKey || cfg.apiKey;
+  const effectiveUserId = userId || cfg.userId;
   const effectiveSenderKey = senderKey || cfg.senderKey;
   const cleanTo = String(toPhone || '').replace(/[^0-9]/g, '');
   const cleanFrom = String(senderNumber || cfg.sender || '16007835').replace(/[^0-9]/g, '');
   const effectiveSubject = subject || `[리본케어] ${patientName || toName} 님 간병일지 안내`;
 
-  if (cfg.apiKey && cfg.userId && effectiveSenderKey && templateCode) {
+  if (effectiveKey && effectiveUserId && effectiveSenderKey && templateCode) {
     try {
       const buttonData = buttonUrl ? JSON.stringify({
         button: [
@@ -333,8 +341,8 @@ async function sendViaAligoKakao({
       }) : '';
 
       const kakaoParams = {
-        apikey: cfg.apiKey,
-        userid: cfg.userId,
+        apikey: effectiveKey,
+        userid: effectiveUserId,
         senderkey: effectiveSenderKey,
         tpl_code: templateCode,
         sender: cleanFrom,
@@ -892,7 +900,9 @@ async function dispatchSms({
   subject = '',
   patientName = '',
   category = 'CARE_DIARY_MOBILE',
-  testMode = 'REAL_TEST'
+  testMode = 'REAL_TEST',
+  apiKey = '',
+  userId = ''
 }) {
   let result = null;
   let lastError = null;
@@ -913,7 +923,9 @@ async function dispatchSms({
           templateCode: templateName,
           senderNumber,
           subject,
-          fallbackToSms: true // 알림톡 실패 시 알리고 LMS/SMS로 자동 대체 전송
+          fallbackToSms: true, // 알림톡 실패 시 알리고 LMS/SMS로 자동 대체 전송
+          apiKey,
+          userId
         });
       } catch (kErr) {
         lastError = kErr;
@@ -952,7 +964,9 @@ async function dispatchSms({
           message,
           senderNumber,
           subject,
-          testMode
+          testMode,
+          apiKey,
+          userId
         });
       } catch (err) {
         lastError = err;

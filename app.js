@@ -1752,6 +1752,8 @@ async function loadConvexData(showSpinner = true) {
             zonecode: localApp.zonecode || serverApp.zonecode || '',
             hospitalName: localApp.hospitalName || serverApp.hospitalName || '',
             hospitalRoom: localApp.hospitalRoom || serverApp.hospitalRoom || '',
+            diagnosis: localApp.diagnosis || serverApp.diagnosis || '',
+            diseaseName: localApp.diseaseName || serverApp.diseaseName || localApp.diagnosis || serverApp.diagnosis || '',
             updatedAt: localApp.updatedAt || new Date().toISOString()
           };
         }
@@ -1883,6 +1885,16 @@ async function loadConvexData(showSpinner = true) {
     }
 
     const filteredValidApps = validApps.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
+
+    // 로컬에서 사용자가 수정한 진단명/질병명이 서버 응답에서 빈값으로 덮어써지지 않도록 안전 보존
+    const localAppMap = new Map((Array.isArray(gApps) ? gApps : []).map(a => [String(a.id), a]));
+    filteredValidApps.forEach(sApp => {
+      const lApp = localAppMap.get(String(sApp.id));
+      if (lApp) {
+        if (!sApp.diagnosis && lApp.diagnosis) sApp.diagnosis = lApp.diagnosis;
+        if (!sApp.diseaseName && lApp.diseaseName) sApp.diseaseName = lApp.diseaseName;
+      }
+    });
 
     let recentRegIdSet = new Set();
     try {
@@ -7641,7 +7653,7 @@ function convertHubAppToSamsungTargetRow(app) {
     accidentType: app.accidentType || '질병',
     accidentDate: app.accidentDate || '',
     accidentNumber: app.accidentNumber || '',
-    diagnosis: app.diagnosis || app.diseaseName || '',
+    diagnosis: app.diagnosis || app.diseaseName || (app.memo && String(app.memo).match(/\[진단명:\s*([^\]]+)\]/)?.[1]?.trim()) || '',
     hospitalName: app.hospitalName || '',
     addressDetail: app.addressDetail || app.hospitalName || '',
     desiredStartDate: app.desiredStartDate || app.desiredDate || app.careStartDate || app.startDate || '',
@@ -7790,6 +7802,11 @@ function syncSamsungTargetSheetWithHubApps(silent = true) {
       }
       if (app.productName && (!existing.productName || existing.productName === '-') && !edited.productName) {
         existing.productName = app.productName;
+        changed = true;
+      }
+      const appDiag = app.diagnosis || app.diseaseName || (app.memo && String(app.memo).match(/\[진단명:\s*([^\]]+)\]/)?.[1]?.trim()) || '';
+      if (appDiag && (!existing.diagnosis || existing.diagnosis === '-' || existing.diagnosis !== appDiag) && !edited.diagnosis) {
+        existing.diagnosis = appDiag;
         changed = true;
       }
       if (!edited.desiredStartDate && app.careStartDate && (!existing.desiredStartDate || existing.desiredStartDate === '-')) {
@@ -31539,6 +31556,8 @@ function handleNewAppSubmit(e) {
       docAttached: docAttached,
       mobility: mobility,
       accidentDetail: accidentDetail,
+      diagnosis: diagnosis,
+      diseaseName: diagnosis,
       hdWorkflowStage: defaultHdStage,
       assignedCaregiverCount: 0,
       totalPayout: 0,
@@ -32632,7 +32651,17 @@ function openCustomerEditModal(appId, focusSection = null) {
   if (editApplyPicker && editApplyVal) {
     editApplyPicker.value = editApplyVal.slice(0, 10).replace(/\./g, '-');
   }
-  document.getElementById('custEditDiagnosis').value = app.diagnosis || '';
+  let editDiagVal = app.diagnosis || app.diseaseName || app.disease || app.sicknessName || '';
+  if (!editDiagVal && app.memo) {
+    const memoDiagMatch = String(app.memo).match(/\[진단명:\s*([^\]]+)\]/);
+    if (memoDiagMatch) {
+      editDiagVal = memoDiagMatch[1].trim();
+    }
+  }
+  if (!app.diagnosis && editDiagVal) {
+    app.diagnosis = editDiagVal;
+  }
+  document.getElementById('custEditDiagnosis').value = editDiagVal;
   document.getElementById('custEditMemo').value = app.memo || '';
   const claimPriceInput = document.getElementById('custEditClaimUnitPrice');
   if (claimPriceInput) {
@@ -32762,7 +32791,14 @@ function handleCustomerEditSubmit(e) {
   app.applyDate = rawEditApply ? formatApplyDateTime(rawEditApply) : (app.applyDate || '');
   document.getElementById('custEditApplyDate').value = app.applyDate;
   app.diagnosis = document.getElementById('custEditDiagnosis').value.trim();
+  app.diseaseName = app.diagnosis;
   app.memo = document.getElementById('custEditMemo').value.trim();
+  // 사용자가 메모에 [진단명: ...] 형태로 기존 작성된 메모가 있다면 최신 진단명으로 함께 동기화
+  if (app.diagnosis && app.memo && /\[진단명:[^\]]*\]/.test(app.memo)) {
+    app.memo = app.memo.replace(/\[진단명:[^\]]*\]/, `[진단명: ${app.diagnosis}]`);
+    const editMemoEl = document.getElementById('custEditMemo');
+    if (editMemoEl) editMemoEl.value = app.memo;
+  }
   app.specialNotes = app.memo;
   const rawCustPrice = document.getElementById('custEditClaimUnitPrice')?.value || '';
   const parsedCustPrice = Number(rawCustPrice.replace(/[^0-9]/g, '')) || 160000;
