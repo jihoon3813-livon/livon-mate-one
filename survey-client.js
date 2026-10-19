@@ -2077,8 +2077,9 @@ function populateSurveySmsSenderOptions(forcedSender = '') {
   const baseOptions = [
     { number: cleanConfigured, label: `${formatCouponPhoneDisplay(cleanConfigured)} (알리고 대표)` },
     { number: '16007835', label: '1600-7835 (리본 대표)' },
-    { number: '15447119', label: '1544-7119 (고객센터)' },
-    { number: '15337436', label: '1533-7436 (현대해상)' }
+    { number: '18777412', label: '1877-7412 (삼성화재)' },
+    { number: '15337436', label: '1533-7436 (현대해상)' },
+    { number: '15447119', label: '1544-7119 (고객센터)' }
   ];
 
   const unique = [];
@@ -2095,6 +2096,36 @@ function populateSurveySmsSenderOptions(forcedSender = '') {
     const isSelected = (prevVal === opt.number) || (!prevVal && idx === 0) || (cleanConfigured && opt.number === cleanConfigured);
     return `<option value="${opt.number}" ${isSelected ? 'selected' : ''}>${escapeHtml(opt.label)}</option>`;
   }).join('');
+}
+
+function getSurveyTargetInsuranceName(target) {
+  if (!target) return '';
+  let ins = (target.insuranceCompany || target.insurer || target.company || '').trim();
+  if (!ins) {
+    const sId = target.serviceId || target.id;
+    if (sId) {
+      if (typeof window !== 'undefined' && Array.isArray(window.gApps)) {
+        const found = window.gApps.find(a => a && a.id === sId);
+        if (found && found.insuranceCompany) ins = String(found.insuranceCompany).trim();
+      }
+      if (!ins && Array.isArray(gHubCandidates)) {
+        const cand = gHubCandidates.find(c => c && c.id === sId);
+        if (cand && cand.insuranceCompany) ins = String(cand.insuranceCompany).trim();
+      }
+    }
+  }
+  return ins;
+}
+
+function getSurveyTargetCsPhone(target) {
+  const ins = getSurveyTargetInsuranceName(target);
+  if (ins.includes('삼성')) {
+    return '1877-7412';
+  }
+  if (ins.includes('현대')) {
+    return '1533-7436';
+  }
+  return (gSurveyState && gSurveyState.settings && gSurveyState.settings.csPhone) || '1544-7119';
 }
 
 function openSurveySmsComposeModal(targetId = '', overridePhone = '') {
@@ -2185,8 +2216,16 @@ function populateSurveySmsModalForTarget(target, overridePhone = '') {
     if (target) {
       const cleanHosp = cleanSurveyHospitalName(target.hospitalName, target);
       const lastSms = target.lastSmsSentAt ? `최근 발송: ${target.lastSmsSentAt.replace('T', ' ').slice(0, 16)}` : '최근 문자 발송 이력 없음';
+      const insName = getSurveyTargetInsuranceName(target);
+      const csPhone = getSurveyTargetCsPhone(target);
+      const insBadgeClass = insName.includes('삼성')
+        ? 'bg-blue-50 text-blue-700 border-blue-200'
+        : (insName.includes('현대') ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-700 border-slate-200');
       metaEl.innerHTML = `
-        <span>병원: <b class="text-slate-800">${escapeHtml(cleanHosp)}</b> · 담당간병인: <b class="text-rose-700">${escapeHtml(target.caregiverName || '미지정')}</b></span>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-bold border ${insBadgeClass}">원수사: ${escapeHtml(insName || '일반')} (문의: ${csPhone})</span>
+          <span>병원: <b class="text-slate-800">${escapeHtml(cleanHosp)}</b> · 담당간병인: <b class="text-rose-700">${escapeHtml(target.caregiverName || '미지정')}</b></span>
+        </div>
         <span class="font-mono text-[10.5px] text-slate-400">${escapeHtml(lastSms)}</span>
       `;
     } else {
@@ -2223,7 +2262,7 @@ function applySurveySmsTemplate(tplType = 'DEFAULT') {
   const cgName = (target && target.caregiverName) ? target.caregiverName : '권은지';
   const hospName = target ? cleanSurveyHospitalName(target.hospitalName, target) : '서울아산병원';
   const giftItem = (gSurveyState.settings && gSurveyState.settings.defaultGiftItem) || '스타벅스 아메리카노 모바일 쿠폰';
-  const csPhone = (gSurveyState.settings && gSurveyState.settings.csPhone) || '1544-7119';
+  const csPhone = getSurveyTargetCsPhone(target);
   const surveyUrl = getSurveyTargetUrlForSms(target);
   const isKakao = gCurrentSurveySmsChannelMode === 'kakao';
 
@@ -2250,7 +2289,7 @@ function applySurveySmsTemplate(tplType = 'DEFAULT') {
       `• 병원/간병인: ${hospName} (${cgName} 간병사)\n` +
       `• 설문 응답 완료 시 환자·보호자님께 [${giftItem}]을 발송해 드립니다.\n\n` +
       `${linkLine}\n\n` +
-      `※ 문의: ${csPhone}`;
+      `※ 문의: 리본케어 고객센터 (${csPhone})`;
   } else {
     subject = `[리본케어] ${pName} 님 모바일 안심 간병일지 & 만족도 설문 안내`;
     body =
@@ -4104,6 +4143,8 @@ if (typeof window !== 'undefined') {
   window.onChangeSurveySmsTarget = onChangeSurveySmsTarget;
   window.switchSurveySmsChannelMode = switchSurveySmsChannelMode;
   window.applySurveySmsTemplate = applySurveySmsTemplate;
+  window.getSurveyTargetCsPhone = getSurveyTargetCsPhone;
+  window.getSurveyTargetInsuranceName = getSurveyTargetInsuranceName;
   window.insertSurveySmsToken = insertSurveySmsToken;
   window.updateSurveySmsLivePreview = updateSurveySmsLivePreview;
   window.openSurveySmsPreviewUrl = openSurveySmsPreviewUrl;
