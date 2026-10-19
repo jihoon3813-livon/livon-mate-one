@@ -2327,7 +2327,7 @@ async function loadConvexData(showSpinner = true) {
     else if (gActiveTab === 'caregiverDirectory' && typeof renderCaregivers === 'function') renderCaregivers();
     else if (gActiveTab === 'centerDirectory' && typeof renderCenters === 'function') renderCenters();
     else if (gActiveTab === 'samsungclaimhub' && typeof renderSamsungClaimHub === 'function') renderSamsungClaimHub();
-    if ((gActiveTab === 'surveymgmt' || gActiveTab === 'survey') && typeof loadSurveyMgmtData === 'function') loadSurveyMgmtData(false);
+    if ((gActiveTab === 'surveymgmt' || gActiveTab === 'surveymgmt_new' || gActiveTab === 'survey') && typeof loadSurveyMgmtData === 'function') loadSurveyMgmtData(false);
 
     if (!gConvexLiveSyncTimer) {
       startConvexLiveSync();
@@ -16129,6 +16129,10 @@ function executeSaveHyundaiSms() {
 // =========================================================================
 // [화면 모듈 분리] 통합허브 (All-in-One Care Hub) 메인 엔진 -> carehub.js 로 분리됨
 // =========================================================================
+// =========================================================================
+// [화면 모듈 분리] 만족도조사 관리 & 만족도조사 관리(new) -> survey-client.js 로 분리됨
+// ⚠️ 만족도조사 관련 화면/기능 수정 시에는 survey-client.js 파일만 수정하십시오. (타 메뉴 영향 차단)
+// =========================================================================
 
 // =========================================================================
 // ELECTRONIC FAX DISPATCH CONTROLLER
@@ -19656,7 +19660,7 @@ function rerenderActiveTabForMasking() {
     if (typeof renderFaxManagement === 'function') renderFaxManagement();
   } else if (tab === 'forms') {
     if (typeof renderForms === 'function') renderForms();
-  } else if (tab === 'surveymgmt') {
+  } else if (tab === 'surveymgmt' || tab === 'surveymgmt_new') {
     if (typeof renderSurveyMgmtTab === 'function') {
       renderSurveyMgmtTab();
     } else if (typeof renderActiveSurveySubTab === 'function') {
