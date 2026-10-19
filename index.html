@@ -7425,12 +7425,12 @@
             </div>
             <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200">
               <button type="button" id="btnSurveySmsChannel_sms" onclick="switchSurveySmsChannelMode('sms')"
-                class="py-2.5 px-3 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all bg-rose-600 text-white shadow-xs cursor-pointer">
-                <span>📱 안심 단축문자 (/s/짧은코드)</span>
+                class="py-2.5 px-2 rounded-xl font-extrabold text-[11.5px] sm:text-xs flex items-center justify-center gap-1.5 transition-all bg-rose-600 text-white shadow-xs cursor-pointer whitespace-nowrap">
+                <span>📱 안심 단축문자 (/s/단축코드)</span>
               </button>
               <button type="button" id="btnSurveySmsChannel_kakao" onclick="switchSurveySmsChannelMode('kakao')"
-                class="py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 cursor-pointer">
-                <span>💬 카카오 알림톡 (URL 100% 숨김·버튼형)</span>
+                class="py-2.5 px-2 rounded-xl font-bold text-[11.5px] sm:text-xs flex items-center justify-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 cursor-pointer whitespace-nowrap">
+                <span>💬 카카오 알림톡 (URL 100% 숨김)</span>
               </button>
             </div>
             <input type="hidden" id="surveySmsChannelMode" value="sms">
@@ -7454,38 +7454,38 @@
             </div>
           </div>
 
-          <!-- 3. 수신 휴대폰 번호 및 발신번호/통신망 설정 -->
+          <!-- 3. 수신 휴대폰 번호 및 발신번호/통신망 설정 (4:4:4 균등 분할로 줄바꿈 및 글자 잘림 방지) -->
           <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
-            <div class="sm:col-span-5">
-              <label class="block font-black text-slate-800 mb-1 flex items-center justify-between">
-                <span>고객 수신 번호 <span class="text-rose-600">*</span></span>
-                <span class="text-[10px] text-slate-400 font-normal">자동 하이픈</span>
+            <div class="sm:col-span-4">
+              <label class="block font-black text-slate-800 mb-1 flex items-center justify-between gap-1 whitespace-nowrap">
+                <span class="whitespace-nowrap">고객 수신 번호 <span class="text-rose-600">*</span></span>
+                <span class="text-[10px] text-slate-400 font-normal whitespace-nowrap shrink-0">자동 하이픈</span>
               </label>
               <input type="tel" id="surveySmsRecipientPhone" inputmode="numeric" pattern="[0-9\-]*" maxlength="13" placeholder="010-0000-0000"
                 oninput="this.value=formatCouponPhoneDisplay(this.value); updateSurveySmsLivePreview();"
                 class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-mono font-black text-sm text-slate-900 focus:ring-2 focus:ring-rose-500">
             </div>
             <div class="sm:col-span-4">
-              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
-                <span>발신 대표번호</span>
-                <span class="text-[10px] text-emerald-600 font-bold">알리고 등록번호</span>
+              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between gap-1 whitespace-nowrap">
+                <span class="whitespace-nowrap">발신 대표번호</span>
+                <span class="text-[10px] text-emerald-600 font-bold whitespace-nowrap shrink-0">알리고 등록번호</span>
               </label>
-              <select id="surveySmsSenderNumber" onchange="updateSurveySmsLivePreview()" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500">
-                <option value="01026660883" selected>010-2666-0883 (알리고 등록 대표번호 · 기본)</option>
-                <option value="16007835">1600-7835 (리본케어 공식)</option>
-                <option value="15447119">1544-7119 (리본 고객센터)</option>
-                <option value="15337436">1533-7436 (현대해상 전용)</option>
+              <select id="surveySmsSenderNumber" onchange="updateSurveySmsLivePreview()" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 cursor-pointer">
+                <option value="01026660883" selected>010-2666-0883 (알리고 대표)</option>
+                <option value="16007835">1600-7835 (리본 대표)</option>
+                <option value="15447119">1544-7119 (고객센터)</option>
+                <option value="15337436">1533-7436 (현대해상)</option>
               </select>
             </div>
-            <div class="sm:col-span-3">
-              <div class="flex items-center justify-between mb-1">
-                <label class="font-bold text-slate-700">전송 통신사</label>
-                <button type="button" onclick="openAligoConfigModal()" class="text-[10px] text-rose-600 font-black hover:underline cursor-pointer flex items-center gap-0.5" title="알리고 API 인증키 및 발신번호 설정">
-                  <i data-lucide="settings" class="w-3 h-3"></i> 알리고 설정
+            <div class="sm:col-span-4">
+              <div class="flex items-center justify-between mb-1 gap-1 whitespace-nowrap">
+                <label class="font-bold text-slate-700 text-xs shrink-0 whitespace-nowrap">전송 통신사</label>
+                <button type="button" onclick="openAligoConfigModal()" class="text-[10.5px] text-rose-600 font-black hover:underline cursor-pointer flex items-center gap-0.5 shrink-0 whitespace-nowrap" title="알리고 API 인증키 및 발신번호 설정">
+                  <i data-lucide="settings" class="w-3 h-3 shrink-0"></i> <span>알리고 설정</span>
                 </button>
               </div>
               <select id="surveySmsProviderSelect" onchange="onSurveySmsProviderChange(this.value)" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-rose-500 cursor-pointer">
-                <option value="aligo" selected>알리고 Aligo (추천 · 실통신망)</option>
+                <option value="aligo" selected>알리고 Aligo (실통신망)</option>
                 <option value="barobill">바로빌 Barobill (3사 직결)</option>
                 <option value="twilio">Twilio (글로벌)</option>
               </select>

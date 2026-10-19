@@ -2018,11 +2018,11 @@ function switchSurveySmsChannelMode(channelMode = 'sms') {
 
   if (btnSms && btnKakao) {
     if (gCurrentSurveySmsChannelMode === 'kakao') {
-      btnSms.className = 'p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-left transition-all cursor-pointer';
-      btnKakao.className = 'p-2.5 rounded-xl border-2 border-amber-400 bg-amber-50/70 text-left transition-all cursor-pointer shadow-2xs';
+      btnSms.className = 'py-2.5 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-center font-bold text-[11.5px] sm:text-xs text-slate-600 hover:text-slate-900 transition-all cursor-pointer whitespace-nowrap';
+      btnKakao.className = 'py-2.5 px-2 rounded-xl border-2 border-amber-500 bg-amber-50 text-center font-extrabold text-[11.5px] sm:text-xs text-amber-950 transition-all cursor-pointer shadow-xs whitespace-nowrap';
     } else {
-      btnSms.className = 'p-2.5 rounded-xl border-2 border-rose-500 bg-rose-50/70 text-left transition-all cursor-pointer shadow-2xs';
-      btnKakao.className = 'p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-left transition-all cursor-pointer';
+      btnSms.className = 'py-2.5 px-2 rounded-xl border-2 border-rose-500 bg-rose-50 text-center font-extrabold text-[11.5px] sm:text-xs text-rose-950 transition-all cursor-pointer shadow-xs whitespace-nowrap';
+      btnKakao.className = 'py-2.5 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-center font-bold text-[11.5px] sm:text-xs text-slate-600 hover:text-slate-900 transition-all cursor-pointer whitespace-nowrap';
     }
   }
 
@@ -2075,10 +2075,10 @@ function populateSurveySmsSenderOptions(forcedSender = '') {
 
   const cleanConfigured = configuredSender.replace(/[^0-9]/g, '');
   const baseOptions = [
-    { number: cleanConfigured, label: `${formatCouponPhoneDisplay(cleanConfigured)} (알리고 등록 대표번호 · 기본)` },
-    { number: '16007835', label: '1600-7835 (리본케어 공식)' },
-    { number: '15447119', label: '1544-7119 (리본 고객센터)' },
-    { number: '15337436', label: '1533-7436 (현대해상 전용)' }
+    { number: cleanConfigured, label: `${formatCouponPhoneDisplay(cleanConfigured)} (알리고 대표)` },
+    { number: '16007835', label: '1600-7835 (리본 대표)' },
+    { number: '15447119', label: '1544-7119 (고객센터)' },
+    { number: '15337436', label: '1533-7436 (현대해상)' }
   ];
 
   const unique = [];
