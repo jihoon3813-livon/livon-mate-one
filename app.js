@@ -31227,6 +31227,7 @@ function handleNewAppSubmit(e) {
     const defaultHdStage = isHyundai ? '문자수신대기' : '사전명단매칭완료';
 
     const targetFaxRecipient = document.getElementById('newAppFaxRecipient')?.value?.trim() || '';
+    const targetFaxNumber = document.getElementById('newAppFaxNumber')?.value?.trim() || adjusterFax || '';
     const activeAdmin = (typeof getCurrentMemoAdmin === 'function')
       ? getCurrentMemoAdmin()
       : ((typeof gCurrentAdmin !== 'undefined' && gCurrentAdmin)
