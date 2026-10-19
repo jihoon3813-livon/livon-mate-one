@@ -268,6 +268,24 @@ export const deletePayout = mutation({
   },
 });
 
+// 9-1. 간병인 배정 단독 삭제
+export const deleteAssignment = mutation({
+  args: {
+    assignId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const assigns = await ctx.db
+      .query("assignments")
+      .withIndex("by_custom_id", (q) => q.eq("id", args.assignId))
+      .collect();
+    for (const a of assigns) {
+      await ctx.db.delete(a._id);
+    }
+    return { deletedAssignId: args.assignId, count: assigns.length };
+  },
+});
+
+
 // 10. 양식 설정 및 배경 저장 (Upsert by formCode)
 export const saveFormConfig = mutation({
   args: {

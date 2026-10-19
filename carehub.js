@@ -7114,10 +7114,18 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                         </span>
                       ` : ''}
                     </div>
-                    <button type="button" onclick="openCareScheduleModal('${as ? as.id : ''}')" 
-                      class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1 cursor-pointer">
-                      <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
-                    </button>
+                    <div class="flex items-center gap-1">
+                      ${as ? `
+                        <button type="button" onclick="deleteCaregiverAssign('${app.id}', '${as.id}')" 
+                          class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-rose-50 text-rose-600 border border-rose-300 shadow-2xs transition-all flex items-center gap-1 cursor-pointer" title="이 간병인 배정 삭제">
+                          <i data-lucide="trash-2" class="w-3 h-3"></i> 삭제
+                        </button>
+                      ` : ''}
+                      <button type="button" onclick="openCareScheduleModal('${as ? as.id : ''}')" 
+                        class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1 cursor-pointer">
+                        <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
+                      </button>
+                    </div>
                   </div>
 
                   <div class="grid grid-cols-2 gap-x-3 gap-y-2 text-[11.5px] text-slate-600">
@@ -9385,10 +9393,18 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                       </span>
                     ` : ''}
                   </div>
-                  <button type="button" onclick="openCareScheduleModal('${as ? as.id : ''}')" 
-                    class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1">
-                    <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
-                  </button>
+                  <div class="flex items-center gap-1">
+                    ${as ? `
+                      <button type="button" onclick="deleteCaregiverAssign('${app.id}', '${as.id}')" 
+                        class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-rose-50 text-rose-600 border border-rose-300 shadow-2xs transition-all flex items-center gap-1 cursor-pointer" title="이 간병인 배정 삭제">
+                        <i data-lucide="trash-2" class="w-3 h-3"></i> 삭제
+                      </button>
+                    ` : ''}
+                    <button type="button" onclick="openCareScheduleModal('${as ? as.id : ''}')" 
+                      class="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-white hover:bg-sky-50 text-sky-700 border border-sky-300 shadow-2xs transition-all flex items-center gap-1 cursor-pointer">
+                      <i data-lucide="edit-2" class="w-3 h-3"></i> 수정
+                    </button>
+                  </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-x-3 gap-y-2 text-[11.5px] text-slate-600">
@@ -11130,9 +11146,14 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
                               <b class="text-slate-900 text-xs">${maskName(as.caregiverName)}</b>
                               <span class="text-[10px] text-slate-500">(${maskBirth(birth)})</span>
                             </div>
-                            <button onclick="event.stopPropagation(); openCareScheduleModal('${as.id}')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs transition-all flex items-center gap-1">
-                              <i data-lucide="edit-2" class="w-3 h-3"></i> 일시/일급 수정 ✏️
-                            </button>
+                            <div class="flex items-center gap-1">
+                              <button type="button" onclick="event.stopPropagation(); deleteCaregiverAssign('${app.id}', '${as.id}')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-white hover:bg-rose-50 text-rose-600 border border-rose-300 shadow-2xs transition-all flex items-center gap-1 cursor-pointer" title="이 간병인 배정 삭제">
+                                <i data-lucide="trash-2" class="w-3 h-3"></i> 삭제
+                              </button>
+                              <button onclick="event.stopPropagation(); openCareScheduleModal('${as.id}')" class="px-2 py-0.5 rounded text-[10px] font-bold bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs transition-all flex items-center gap-1 cursor-pointer">
+                                <i data-lucide="edit-2" class="w-3 h-3"></i> 일시/일급 수정 ✏️
+                              </button>
+                            </div>
                           </div>
 
                           <!-- 10 Detailed Fields Grid -->

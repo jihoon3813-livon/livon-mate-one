@@ -1552,7 +1552,7 @@ function appendServerAuditLog(logItem) {
             return false;
           });
           if (idx !== -1) {
-            const { claim, payout, deleteClaimIds, deleteClaimId, deletePayoutIds, deletePayoutId, ...appFields } = fields;
+            const { claim, payout, deleteClaimIds, deleteClaimId, deletePayoutIds, deletePayoutId, deleteAssignIds, deleteAssignId, ...appFields } = fields;
             stored.applications[idx] = {
               ...stored.applications[idx],
               ...appFields,
@@ -1567,6 +1567,14 @@ function appendServerAuditLog(logItem) {
             const delPayoutIdList = Array.isArray(deletePayoutIds) ? deletePayoutIds : (deletePayoutId ? [deletePayoutId] : []);
             if (delPayoutIdList.length > 0) {
               stored.payouts = (stored.payouts || []).filter(p => !delPayoutIdList.includes(p.id));
+            }
+
+            const delAssignIdList = Array.isArray(deleteAssignIds) ? deleteAssignIds : (deleteAssignId ? [deleteAssignId] : []);
+            if (delAssignIdList.length > 0) {
+              stored.assignments = (stored.assignments || []).filter(a => !delAssignIdList.includes(a.id));
+              for (const delAsId of delAssignIdList) {
+                syncConvexMutation('sync:deleteAssignment', { assignId: delAsId }).catch(console.warn);
+              }
             }
 
             if (claim && claim.id) {
@@ -1627,6 +1635,43 @@ function appendServerAuditLog(logItem) {
       });
       return;
     }
+
+    // =========================================================================
+    // API Route: 간병인 배정 단독 삭제 API
+    // =========================================================================
+    if (reqPath === '/api/hub/assignment/delete' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { assignId } = JSON.parse(body || '{}');
+          if (!assignId) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: 'assignId가 필요합니다.' }));
+          }
+          const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+          let stored = { applications: [], assignments: [] };
+          if (fs.existsSync(realDataFile)) {
+            try { stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8')); } catch (e) {}
+          }
+          const beforeCount = (stored.assignments || []).length;
+          stored.assignments = (stored.assignments || []).filter(a => a && a.id !== assignId);
+          stored.updatedAt = new Date().toISOString();
+          fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+          if (typeof invalidateRealDataCache === 'function') {
+            try { invalidateRealDataCache(); } catch (e) {}
+          }
+          syncConvexMutation('sync:deleteAssignment', { assignId }).catch(console.warn);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, deletedAssignId: assignId, count: beforeCount - stored.assignments.length }));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
 
     // =========================================================================
     // API Route: 통합허브 수정발생 & 모달 비활성화 확인(Acknowledge) 전 PC/사용자 공통 동기화 API

@@ -2160,6 +2160,11 @@ async function loadConvexData(showSpinner = true) {
         let hasUpdatedConfig = false;
         formConfigs.forEach(fc => {
           if (fc && fc.formCode) {
+            // 🛡️ 사용자가 양식 편집 모달에서 현재 해당 서식을 작업 중인 경우 실시간 덮어쓰기 절대 금지!
+            if (typeof isFormEditorActiveFor === 'function' && isFormEditorActiveFor(fc.formCode)) {
+              console.log(`[Form Config Sync] ${fc.formCode} 양식 편집 작업 중이므로 실시간 덮어쓰기를 보호합니다.`);
+              return;
+            }
             if (Array.isArray(fc.areas) && fc.areas.length > 0) {
               gFormAreaStore[fc.formCode] = fc.areas;
               hasUpdatedConfig = true;
@@ -2185,11 +2190,14 @@ async function loadConvexData(showSpinner = true) {
           console.log(`[Convex Cloud] 양식 설정 및 배경 클라우드 동기화 완료 (배경 ${Object.keys(gFormBackgroundStore).length}종 로드됨)`);
         }
       } else {
-        setTimeout(() => {
-          if (typeof loadFormConfigsFromConvex === 'function') {
-            loadFormConfigsFromConvex(true);
-          }
-        }, 300);
+        // 편집 모달이 열려있지 않을 때만 온디맨드 로드
+        if (typeof isFormEditorActiveFor !== 'function' || !isFormEditorActiveFor()) {
+          setTimeout(() => {
+            if (typeof loadFormConfigsFromConvex === 'function') {
+              loadFormConfigsFromConvex(true);
+            }
+          }, 300);
+        }
       }
 
       const { samsungEligible, samsungSheets } = res.value;
@@ -4829,6 +4837,17 @@ try {
   if (savedBg) gFormBackgroundStore = JSON.parse(savedBg);
 } catch (e) {}
 
+// 🛡️ 양식 편집기 실시간 보호 상태 관리
+var gIsFormEditorDirty = false;
+
+function isFormEditorActiveFor(formCode) {
+  const modal = document.getElementById('formFieldEditorModal');
+  const isOpen = modal && !modal.classList.contains('hidden');
+  if (!isOpen) return false;
+  return formCode ? (gCurrentEditingFormCode === formCode) : true;
+}
+window.isFormEditorActiveFor = isFormEditorActiveFor;
+
 var gFormConfigsLoadingPromise = null;
 var gLastFormConfigsLoadedTime = 0;
 async function loadFormConfigsFromConvex(force = false) {
@@ -4848,6 +4867,11 @@ async function loadFormConfigsFromConvex(force = false) {
         let hasUpdated = false;
         list.forEach(fc => {
           if (fc && fc.formCode) {
+            // 🛡️ 사용자가 현재 편집 창을 열고 작업 중인 양식은 실시간 덮어쓰기 절대 금지!
+            if (isFormEditorActiveFor(fc.formCode)) {
+              console.log(`[FormConfig OnDemand] ${fc.formCode} 편집 작업 중이므로 덮어쓰기 보호`);
+              return;
+            }
             if (Array.isArray(fc.areas) && fc.areas.length > 0) {
               gFormAreaStore[fc.formCode] = fc.areas;
               hasUpdated = true;
@@ -4978,8 +5002,9 @@ function handleEditorCanvasWheel(e) {
   }
 }
 
-function openFormEditor(formCode) {
+async function openFormEditor(formCode) {
   gCurrentEditingFormCode = formCode;
+  gIsFormEditorDirty = false;
 
   // HD_FORM_02의 등록 영역이 23개 미만인 경우 즉시 신규 23개 필드로 자동 확장 업그레이드
   if (formCode === 'HD_FORM_02' && (!gFormAreaStore.HD_FORM_02 || gFormAreaStore.HD_FORM_02.length < 23)) {
@@ -4997,12 +5022,6 @@ function openFormEditor(formCode) {
     } catch (e) {}
   }
 
-  ensureFormConfigLoaded(formCode, true).then(loaded => {
-    if (loaded && gCurrentEditingFormCode === formCode) {
-      renderEditorCanvasAndList();
-    }
-  });
-
   const form = gFormTemplates.find(f => f.code === formCode) || { name: formCode, code: formCode };
 
   const codeEl = document.getElementById('editorFormCode');
@@ -5012,6 +5031,13 @@ function openFormEditor(formCode) {
 
   gEditorZoom = 1.0;
   applyEditorZoom();
+
+  // 🛡️ 모달을 열기 전에 클라우드 최신 설정을 먼저 완벽히 동기화 완료 (편집 도중 뒤늦게 덮어써지는 레이스 컨디션 원천 차단)
+  try {
+    await ensureFormConfigLoaded(formCode, true);
+  } catch (e) {
+    console.warn('[openFormEditor] 설정 로드 경고:', e);
+  }
 
   renderEditorCanvasAndList();
   openModal('formFieldEditorModal');
@@ -5111,11 +5137,16 @@ async function saveFormBackgroundData(dataUrl, fileName) {
   let saveSuccess = false;
   let errorMsg = '';
   try {
-    const res = await syncToConvex('sync:saveFormConfig', {
+    const currentAreas = gFormAreaStore[gCurrentEditingFormCode] || [];
+    const payload = {
       formCode: gCurrentEditingFormCode,
       background: dataUrl,
       updatedAt: new Date().toISOString()
-    });
+    };
+    if (Array.isArray(currentAreas) && currentAreas.length > 0) {
+      payload.areas = currentAreas;
+    }
+    const res = await syncToConvex('sync:saveFormConfig', payload);
     if (res && res.status !== 'error') {
       saveSuccess = true;
       console.log(`[Form Background] ${gCurrentEditingFormCode} 배경 이미지가 Convex Cloud DB에 영구 저장되었습니다. (크기: ${Math.round(dataUrl.length / 1024)}KB)`);
@@ -5216,6 +5247,8 @@ function alignSelectedAreas(direction) {
     return;
   }
 
+  gIsFormEditorDirty = true;
+
   if (direction === 'left') {
     const minX = Math.min(...selected.map(a => a.x));
     selected.forEach(a => { a.x = minX; });
@@ -5247,6 +5280,8 @@ function adjustAreaSize(areaId, dimension, delta) {
   const areas = gFormAreaStore[gCurrentEditingFormCode] || [];
   const area = areas.find(a => a.id === areaId);
   if (!area) return;
+
+  gIsFormEditorDirty = true;
 
   if (dimension === 'w') {
     let newW = Math.round((area.w + delta) * 10) / 10;
@@ -5498,6 +5533,7 @@ function startResizeArea(e, areaId) {
 
   const onMouseMove = (moveEvent) => {
     if (!gResizingAreaId) return;
+    gIsFormEditorDirty = true;
     const deltaX = moveEvent.clientX - startClientX;
     const deltaY = moveEvent.clientY - startClientY;
 
@@ -5683,6 +5719,7 @@ function startDragArea(e, areaId) {
 
     if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
       gHasDragged = true;
+      gIsFormEditorDirty = true;
     }
 
     const deltaPercentX = (deltaX / rect.width) * 100;
@@ -5757,6 +5794,7 @@ function handleEditorKeyDown(e) {
     e.preventDefault();
     const count = gSelectedAreaIds.size;
     if (confirm(`선택된 ${count}개 영역을 삭제하시겠습니까?`)) {
+      gIsFormEditorDirty = true;
       gFormAreaStore[gCurrentEditingFormCode] = (gFormAreaStore[gCurrentEditingFormCode] || []).filter(a => !gSelectedAreaIds.has(a.id));
       gSelectedAreaIds.clear();
       renderEditorCanvasAndList();
@@ -5768,6 +5806,7 @@ function handleEditorKeyDown(e) {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
     if (gSelectedAreaIds.size === 0) return;
     e.preventDefault();
+    gIsFormEditorDirty = true;
 
     // Shift 키 누르면 2.0% 단위 빠른 이동, 일반 방향키는 0.5% 단위 초정밀 이동
     const step = e.shiftKey ? 2.0 : 0.5;
@@ -5808,6 +5847,7 @@ function addNewAreaToForm() {
   if (!gFormAreaStore[gCurrentEditingFormCode]) {
     gFormAreaStore[gCurrentEditingFormCode] = [];
   }
+  gIsFormEditorDirty = true;
   const list = gFormAreaStore[gCurrentEditingFormCode];
   const nextNum = list.length + 1;
   const newId = 'AREA-' + String(nextNum).padStart(2, '0');
@@ -5829,6 +5869,7 @@ function updateAreaField(areaId, field, value) {
   const list = gFormAreaStore[gCurrentEditingFormCode] || [];
   const area = list.find(a => a.id === areaId);
   if (area) {
+    gIsFormEditorDirty = true;
     area[field] = value;
     renderEditorCanvasAndList();
   }
@@ -5836,12 +5877,25 @@ function updateAreaField(areaId, field, value) {
 
 function removeAreaFromForm(areaId) {
   if (confirm(areaId + ' 영역을 삭제하시겠습니까?')) {
+    gIsFormEditorDirty = true;
     gFormAreaStore[gCurrentEditingFormCode] = (gFormAreaStore[gCurrentEditingFormCode] || []).filter(a => a.id !== areaId);
     renderEditorCanvasAndList();
   }
 }
 
+function closeFormEditorModal() {
+  if (gIsFormEditorDirty) {
+    if (!confirm('저장하지 않은 양식 편집 내용이 있습니다. 저장하지 않고 창을 닫으시겠습니까?')) {
+      return;
+    }
+  }
+  gIsFormEditorDirty = false;
+  closeModal('formFieldEditorModal');
+}
+window.closeFormEditorModal = closeFormEditorModal;
+
 async function saveFormAreas() {
+  gIsFormEditorDirty = false;
   try {
     localStorage.setItem('LIVON_FORM_AREAS', JSON.stringify(gFormAreaStore));
   } catch (e) {}
@@ -5897,6 +5951,7 @@ async function resetFormAreasToDefault() {
       });
       console.log(`[Form Config] ${gCurrentEditingFormCode} 양식 초기화가 Convex Cloud DB에 반영되었습니다.`);
     } catch (err) {}
+    gIsFormEditorDirty = false;
     gSelectedAreaIds.clear();
     renderEditorCanvasAndList();
   }
@@ -33002,6 +33057,154 @@ async function deleteAppAdjuster(appId, histId) {
   }
 }
 window.deleteAppAdjuster = deleteAppAdjuster;
+
+// =========================================================================
+// 간병인 배정 삭제 컨트롤러 (통합허브 모달 및 배정 대장 공통)
+// =========================================================================
+async function deleteCaregiverAssign(appId, assignId) {
+  let app = (gApps || []).find(a => String(a.id) === String(appId) || String(a.id).replace(/^[CH]/, '') === String(appId).replace(/^[CH]/, ''));
+  const as = (gAssigns || []).find(a => a && a.id === assignId);
+
+  if (!as) {
+    alert('해당 간병인 배정 정보를 찾을 수 없습니다: ' + assignId);
+    return;
+  }
+
+  if (!app && as.applyId) {
+    app = (gApps || []).find(a => String(a.id) === String(as.applyId) || String(a.id).replace(/^[CH]/, '') === String(as.applyId).replace(/^[CH]/, ''));
+  }
+
+  const cgName = as.caregiverName || '간병인';
+  const confirmMsg = `[${cgName}] 간병인 배정 내역(${as.id})을 정말 삭제하시겠습니까?\n\n삭제 시 해당 간병인의 근무 배정 데이터가 영구 제거됩니다.`;
+  if (!confirm(confirmMsg)) {
+    return;
+  }
+
+  // 1. 메모리 배열에서 제거
+  gAssigns = (gAssigns || []).filter(a => a && a.id !== assignId);
+
+  // 2. 고객(app)의 잔여 배정 확인 및 대표 간병인 정보 재동기화
+  const targetAppId = app ? app.id : (as.applyId || appId);
+  const remainingAssigns = (gAssigns || []).filter(a => a && a.applyId && (
+    String(a.applyId) === String(targetAppId) ||
+    (app && String(a.applyId) === String(app.id)) ||
+    (app && String(a.applyId).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, ''))
+  )).sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+
+  if (app) {
+    if (remainingAssigns.length === 0) {
+      app.caregiverName = '';
+      app.caregiverPhone = '';
+      app.careStartDate = '';
+      app.careEndDate = '';
+      app.dailyWage = null;
+      if (typeof gActiveCaregiverTabAssignId !== 'undefined') {
+        gActiveCaregiverTabAssignId = null;
+      }
+    } else {
+      const allStarts = remainingAssigns.map(a => a.startDate).filter(d => d && /^\d{4}/.test(d)).sort();
+      app.careStartDate = (allStarts.length > 0 && allStarts[0]) ? allStarts[0].slice(0, 10) : (remainingAssigns[0].startDate || '');
+      
+      const latest = remainingAssigns[remainingAssigns.length - 1];
+      app.caregiverName = latest.caregiverName;
+      app.caregiverPhone = latest.phone || latest.caregiverPhone;
+      app.careEndDate = latest.endDate;
+      app.dailyWage = latest.dailyWage;
+      if (typeof gActiveCaregiverTabAssignId !== 'undefined') {
+        gActiveCaregiverTabAssignId = latest.id;
+      }
+    }
+    app.updatedAt = new Date().toISOString();
+    app.hasManualUpdate = true;
+  }
+
+  // 3. 서버 API 호출 (로컬 JSON 및 캐시 반영)
+  try {
+    if (app) {
+      await fetch('/api/hub/customer/update-fields', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: app.id,
+          fields: {
+            caregiverName: app.caregiverName,
+            caregiverPhone: app.caregiverPhone,
+            careStartDate: app.careStartDate,
+            careEndDate: app.careEndDate,
+            dailyWage: app.dailyWage,
+            deleteAssignIds: [assignId],
+            hasManualUpdate: true
+          }
+        })
+      });
+    }
+    await fetch('/api/hub/assignment/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assignId })
+    });
+  } catch (err) {
+    console.warn('Assignment delete API error:', err);
+  }
+
+  // 4. Convex Cloud DB 동기화
+  if (typeof syncToConvex === 'function') {
+    syncToConvex('sync:deleteAssignment', { assignId }).catch(console.warn);
+    if (app) {
+      syncToConvex('sync:saveApplication', { app }).catch(console.warn);
+    }
+  }
+
+  // 5. 감사 로그 기록
+  if (typeof window.recordSystemAuditLog === 'function') {
+    window.recordSystemAuditLog({
+      category: '간병배정',
+      actionType: 'DELETE',
+      target: `${as.id} (${cgName} / ${app ? app.patientName : '고객'})`,
+      summary: `간병인 배정 삭제 [${as.id} - ${cgName}]`,
+      changes: {
+        '배정코드': { before: as.id, after: '삭제됨' },
+        '간병인명': { before: cgName, after: '-' }
+      }
+    });
+  }
+
+  // 6. 열려있는 스케줄 수정 모달 닫기
+  if (typeof closeModal === 'function') {
+    closeModal('careScheduleModal');
+  }
+
+  // 7. 완료 토스트 알림
+  if (typeof showNotification === 'function') {
+    showNotification({
+      type: 'info',
+      title: '간병인 배정 삭제 완료',
+      message: `[${cgName}] 간병인 배정이 삭제되었습니다.`,
+      icon: 'trash-2'
+    });
+  }
+
+  // 8. 열려있는 통합허브 상세 모달 및 각 탭 즉시 리렌더링
+  if (typeof gActiveHubModalAppId !== 'undefined' && app && gActiveHubModalAppId === app.id) {
+    openHubCustomerDetailModal(app.id);
+  }
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+  if (typeof renderApplications === 'function') renderApplications();
+  if (typeof renderAssignments === 'function') renderAssignments();
+  if (typeof renderPayouts === 'function') renderPayouts();
+  if (typeof renderClaims === 'function') renderClaims();
+}
+window.deleteCaregiverAssign = deleteCaregiverAssign;
+
+function deleteCurrentScheduleCaregiver() {
+  const assignId = document.getElementById('schedEditAssignId')?.value;
+  if (!assignId) return;
+  const as = (gAssigns || []).find(a => a.id === assignId);
+  if (!as) return;
+  deleteCaregiverAssign(as.applyId, assignId);
+}
+window.deleteCurrentScheduleCaregiver = deleteCurrentScheduleCaregiver;
+
 
 function openAppAdjusterEditModal(appId, histId = null) {
   const app = (gApps || []).find(a => String(a.id) === String(appId));
