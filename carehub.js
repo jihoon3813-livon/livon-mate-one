@@ -12004,9 +12004,34 @@ function renderUnifiedCareHub() {
   };
 
   const isNeedAssignHelper = (app) => {
-    if (isAssignedCaregiverHelper(app)) return false;
-    if (isCancelledOrDone(app)) return false;
-    return true;
+    if (!app) return false;
+
+    // 카드 상태 필터의 "배정대기(미배정)" 기준과 동일하게 판정한다.
+    // 배정 기록이 있더라도 간병인명이 비어 있으면 배정대기로 본다.
+    const customerAssignments = Array.isArray(gAssigns)
+      ? gAssigns.filter(item => item && String(item.applyId) === String(app.id))
+      : [];
+    const hasCaregiverName = [
+      app.caregiverName,
+      ...customerAssignments.map(item => item.caregiverName),
+    ].some(value => {
+      const caregiverName = String(value || '').trim();
+      return caregiverName &&
+        caregiverName !== '-' &&
+        caregiverName !== '미배정' &&
+        caregiverName !== '배정대기' &&
+        !caregiverName.includes('미배정') &&
+        !caregiverName.includes('배정대기');
+    });
+
+    const isFinishedOrCancelled = app.status === '완료' ||
+      app.status === '서비스 취소' ||
+      app.status === '취소' ||
+      app.status === '미해당' ||
+      app.status === '정산완료';
+    const theme = getCustomerCardStatusTheme(app);
+
+    return !hasCaregiverName && !isFinishedOrCancelled && theme.type !== 'in_progress';
   };
 
   const isAppHasUnpaidClaimHelper = (app) => {
@@ -12370,6 +12395,7 @@ function renderUnifiedCareHub() {
   updateDashEl('hubDash-completed', dashCompleted);
   updateDashEl('hubDash-inProgress', dashInProgress);
   updateDashEl('hubDash-scheduled', dashScheduled);
+  updateDashEl('hubDash-needAssign', needAssignCount);
   updateDashEl('hubDash-cancelled', dashCancelled);
 
   updateDashEl('detailDash-totalApps', dashTotalApps);
@@ -12486,6 +12512,29 @@ function renderUnifiedCareHub() {
         const theme = getCustomerCardStatusTheme(app);
         let match = false;
         if (gHubStatusFilter === '신규' && theme.type === 'new') match = true;
+        else if (gHubStatusFilter === '대기') {
+          const customerAssignments = Array.isArray(gAssigns)
+            ? gAssigns.filter(item => item && String(item.applyId) === String(app.id))
+            : [];
+          const hasCaregiverName = [
+            app.caregiverName,
+            ...(customerAssignments.map(item => item.caregiverName)),
+          ].some(value => {
+            const caregiverName = String(value || '').trim();
+            return caregiverName &&
+              caregiverName !== '-' &&
+              caregiverName !== '미배정' &&
+              caregiverName !== '배정대기' &&
+              !caregiverName.includes('미배정') &&
+              !caregiverName.includes('배정대기');
+          });
+          const isFinishedOrCancelled = app.status === '완료' ||
+            app.status === '서비스 취소' ||
+            app.status === '취소' ||
+            app.status === '미해당' ||
+            app.status === '정산완료';
+          if (!hasCaregiverName && !isFinishedOrCancelled && theme.type !== 'in_progress') match = true;
+        }
         else if (gHubStatusFilter === '진행중' && theme.type === 'in_progress') match = true;
         else if (gHubStatusFilter === '완료' && theme.type === 'completed') match = true;
         else if (gHubStatusFilter === '취소' && (theme.type === 'cancelled' || theme.type === 'not_applicable' || theme.statusText === '당일서비스취소' || theme.statusText.includes('서비스불가') || theme.statusText === '제외' || app.status === '미해당' || (app.status && app.status.includes('취소')))) match = true;

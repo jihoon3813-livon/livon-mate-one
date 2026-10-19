@@ -1368,6 +1368,13 @@
                   <strong class="text-sm font-black text-slate-700" id="hubDash-scheduled">0</strong><span class="text-[10px] text-slate-500">건</span>
                 </button>
 
+                <!-- 배정대기 -->
+                <button type="button" onclick="setHubFilter('NEED_ASSIGN')" id="hubFilterBtn-NEED_ASSIGN" class="hub-filter-btn px-2.5 py-1.5 rounded-xl border border-slate-300 bg-slate-100 text-slate-700 font-bold flex items-center gap-1 hover:bg-slate-200 transition-all cursor-pointer" title="배정대기 건 조회">
+                  <span class="w-2 h-2 rounded-full bg-slate-500 shrink-0"></span>
+                  <span class="text-[11px] text-slate-600 font-medium">배정대기</span>
+                  <strong class="text-sm font-black text-slate-700" id="hubDash-needAssign">0</strong><span class="text-[10px] text-slate-500">건</span>
+                </button>
+
                 <!-- 취소 -->
                 <button type="button" onclick="setHubFilter('CANCELLED')" id="hubFilterBtn-CANCELLED" class="hub-filter-btn px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 font-bold flex items-center gap-1 hover:bg-slate-100 transition-all cursor-pointer" title="취소 건 조회">
                   <span class="text-[11px] text-slate-500 font-medium">취소</span>
