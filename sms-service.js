@@ -332,19 +332,29 @@ async function sendViaAligoKakao({
   userId = ''
 }) {
   const cfg = getAligoConfig();
-  const effectiveKey = apiKey || cfg.apiKey;
-  const effectiveUserId = userId || cfg.userId;
-  const effectiveSenderKey = senderKey || cfg.senderKey;
+  const effectiveKey = apiKey || cfg.apiKey || 'bhhro60er9uovr47gra0y5hjp3c5clfe';
+  const effectiveUserId = userId || cfg.userId || 'lifenjoy';
+  const effectiveSenderKey = senderKey || cfg.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430';
+  const effectiveTemplateCode = templateCode || (message.includes('1533-7436') || message.includes('현대해상') ? 'UM_6527' : 'UM_6526');
   const cleanTo = String(toPhone || '').replace(/[^0-9]/g, '');
-  const cleanFrom = String(senderNumber || cfg.sender || '16007835').replace(/[^0-9]/g, '');
+  let cleanFrom = String(senderNumber || cfg.sender || '01026660883').replace(/[^0-9]/g, '');
+  // 알리고 카카오 발신번호는 알리고에 등록된 대표번호(01026660883) 필수
+  if (!cleanFrom || cleanFrom === '16007835') {
+    cleanFrom = String(cfg.sender || '01026660883').replace(/[^0-9]/g, '');
+  }
   const effectiveSubject = subject || `[리본케어] ${patientName || toName} 님 간병일지 안내`;
 
-  if (effectiveKey && effectiveUserId && effectiveSenderKey && templateCode) {
+  if (effectiveKey && effectiveUserId && effectiveSenderKey && effectiveTemplateCode) {
     try {
+      // 카카오 공식 승인 규격(채널 추가 + 웹링크 2단 버튼) 완벽 준수
       const buttonData = buttonUrl ? JSON.stringify({
         button: [
           {
-            name: buttonTitle,
+            name: '채널 추가',
+            linkType: 'AC'
+          },
+          {
+            name: '모바일 간병일지 & 설문',
             linkType: 'WL',
             linkTypeName: '웹링크',
             linkMo: buttonUrl,
@@ -357,7 +367,7 @@ async function sendViaAligoKakao({
         apikey: effectiveKey,
         userid: effectiveUserId,
         senderkey: effectiveSenderKey,
-        tpl_code: templateCode,
+        tpl_code: effectiveTemplateCode,
         sender: cleanFrom,
         receiver_1: cleanTo,
         subject_1: effectiveSubject,
@@ -381,9 +391,12 @@ async function sendViaAligoKakao({
           buttonUrl,
           message: '알리고 카카오 알림톡 정상 접수 완료'
         };
+      } else {
+        const errMsg = json?.message || '알리고 알림톡 전송 거절';
+        console.warn('[Aligo Kakao Attempt Error]', errMsg, json);
       }
     } catch (kErr) {
-      console.warn('[Aligo Kakao Attempt Error]', kErr.message);
+      console.warn('[Aligo Kakao Attempt Exception]', kErr.message);
     }
   }
 
@@ -915,7 +928,8 @@ async function dispatchSms({
   category = 'CARE_DIARY_MOBILE',
   testMode = 'REAL_TEST',
   apiKey = '',
-  userId = ''
+  userId = '',
+  senderKey = ''
 }) {
   let result = null;
   let lastError = null;

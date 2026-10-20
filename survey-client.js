@@ -2626,8 +2626,8 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST', forceChannel = null) {
         provider,
         userId: aligoCfg.userId,
         apiKey: aligoCfg.apiKey,
-        senderKey: aligoCfg.senderKey || '',
-        templateCode: aligoCfg.templateCode || ''
+        senderKey: aligoCfg.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
+        templateCode: aligoCfg.templateCode || (getSurveyTargetInsuranceName(target).includes('현대') ? 'UM_6527' : 'UM_6526')
       })
     });
     const result = await res.json();
@@ -2763,8 +2763,8 @@ async function submitSurveyCustomerSms() {
         provider,
         userId: aligoCfg.userId,
         apiKey: aligoCfg.apiKey,
-        senderKey: aligoCfg.senderKey || '',
-        templateCode: aligoCfg.templateCode || '',
+        senderKey: aligoCfg.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
+        templateCode: aligoCfg.templateCode || (getSurveyTargetInsuranceName(target).includes('현대') ? 'UM_6527' : 'UM_6526'),
         isNewSurvey: isNewTab,
         skipReward: isNewTab,
         actor: 'HQ'
