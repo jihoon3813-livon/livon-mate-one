@@ -346,8 +346,9 @@ async function sendViaAligoKakao({
 
   if (effectiveKey && effectiveUserId && effectiveSenderKey && effectiveTemplateCode) {
     try {
-      // 카카오 공식 승인 규격(채널 추가 + 웹링크 2단 버튼) 완벽 준수
-      const buttonData = buttonUrl ? JSON.stringify({
+      // 카카오 공식 승인 규격(채널 추가 + http://#{url} 웹링크 2단 버튼) 완벽 준수
+      const kakaoUrl = buttonUrl ? buttonUrl.replace(/^https?:\/\//, 'http://') : '';
+      const buttonData = kakaoUrl ? JSON.stringify({
         button: [
           {
             name: '채널 추가',
@@ -357,8 +358,8 @@ async function sendViaAligoKakao({
             name: '모바일 간병일지 & 설문',
             linkType: 'WL',
             linkTypeName: '웹링크',
-            linkMo: buttonUrl,
-            linkPc: buttonUrl
+            linkMo: kakaoUrl,
+            linkPc: kakaoUrl
           }
         ]
       }) : '';

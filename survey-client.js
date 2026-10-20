@@ -2341,7 +2341,32 @@ function applySurveySmsTemplate(tplType = 'DEFAULT') {
   let subject = '';
   let body = '';
 
-  if (tplType === 'COUPON_FOCUS') {
+  const insName = target ? getSurveyTargetInsuranceName(target) : '삼성화재';
+  const isHyundai = insName.includes('현대');
+  const effectiveCsPhone = isHyundai ? '1533-7436' : (csPhone || '1877-7412');
+  const cleanGift = '스타벅스 아메리카노 Tall 1매';
+
+  if (isKakao) {
+    // 카카오 공식 승인 템플릿(UM_6526 / UM_6527)과 100% 일치 보장 (줄바꿈/문장부호 일치)
+    subject = `[리본케어] ${pName} 님 모바일 안심 간병일지 & 만족도 설문 안내`;
+    if (isHyundai) {
+      body =
+        `[리본케어] ${pName} 님의 모바일 안심 간병일지 & 케어 만족도 설문이 도착했습니다.\n\n` +
+        `• 병원/간병인: ${hospName} (${cgName} 간병사)\n` +
+        `• 참여 혜택: 설문 완료 시 환자·보호자님께 ${cleanGift} 100% 증정\n` +
+        `일자별 상세 간병일지를 확인하시고 하단 1분 만족도 조사에 소중한 의견을 들려주세요.\n\n` +
+        `아래 [모바일 간병일지 & 설문 열람하기] 버튼을 눌러 바로 확인해 주세요.\n\n` +
+        `※ 문의: 리본케어 고객센터 (1533-7436)`;
+    } else {
+      body =
+        `[리본케어] ${pName} 님의 모바일 안심 간병일지 & 케어 만족도 설문이 도착했습니다.\n\n` +
+        `• 병원/간병인: ${hospName} (${cgName} 간병사)\n` +
+        `• 참여 혜택: 설문 완료 시 환자·보호자님께 ${cleanGift} 100% 증정\n` +
+        `일자별 상세 간병일지를 확인하시고 하단 1분 만족도 조사에 소중한 의견을 들려주세요.\n\n` +
+        `👇 아래 [모바일 간병일지 & 설문 열람하기] 버튼을 눌러 바로 확인해 주세요.\n\n` +
+        `※ 문의: 리본케어 고객센터 (1877-7412)`;
+    }
+  } else if (tplType === 'COUPON_FOCUS') {
     subject = `[리본케어] 케어 만족도 설문 참여 및 감사 쿠폰 증정 안내`;
     body =
       `[리본케어] 안녕하세요, ${pName} 님 보호자(환자)분께 안내드립니다.\n` +
