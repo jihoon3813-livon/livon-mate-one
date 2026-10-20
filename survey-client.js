@@ -2055,17 +2055,18 @@ function switchSurveySmsChannelMode(channelMode = 'sms') {
 
   if (btnReal) {
     if (isKakao) {
-      btnReal.className = 'px-3.5 py-2 rounded-xl bg-[#FEE500] hover:bg-[#FADA0A] text-[#191919] border border-[#E5CE00] font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap active:scale-95';
+      btnReal.className = 'flex-1 py-2.5 px-3 rounded-xl bg-[#FEE500] hover:bg-[#FADA0A] text-[#191919] border border-[#E5CE00] font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap active:scale-95';
       btnReal.innerHTML = '<span class="text-xs">🟡</span> <span>알림톡 테스트 발송</span>';
       btnReal.onclick = () => sendSurveyTestSms('REAL_TEST', 'kakao');
     } else {
-      btnReal.className = 'px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap active:scale-95';
+      btnReal.className = 'flex-1 py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap active:scale-95';
       btnReal.innerHTML = '<i data-lucide="smartphone" class="w-3.5 h-3.5"></i> <span>실제 번호로 테스트 발송</span>';
       btnReal.onclick = () => sendSurveyTestSms('REAL_TEST', 'sms');
     }
   }
 
   if (btnSim) {
+    btnSim.className = 'shrink-0 px-3 py-2.5 rounded-xl bg-white hover:bg-indigo-50 text-indigo-800 border border-indigo-300 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer whitespace-nowrap';
     btnSim.innerHTML = isKakao
       ? '<i data-lucide="check-check" class="w-3.5 h-3.5 text-amber-600"></i> <span>알림톡 모의 검증</span>'
       : '<i data-lucide="check-check" class="w-3.5 h-3.5 text-indigo-600"></i> <span>모의 검증 테스트</span>';
@@ -2082,12 +2083,12 @@ function switchSurveySmsChannelMode(channelMode = 'sms') {
   }
   if (subBtn) {
     if (isKakao) {
-      subBtn.className = 'px-2.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer whitespace-nowrap';
-      subBtn.innerHTML = '<i data-lucide="message-square" class="w-3 h-3 text-slate-500"></i> <span>문자(LMS)로도 테스트</span>';
+      subBtn.className = 'shrink-0 px-3 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer whitespace-nowrap';
+      subBtn.innerHTML = '<i data-lucide="message-square" class="w-3.5 h-3.5 text-slate-500"></i> <span>문자(LMS)로도 테스트</span>';
       subBtn.onclick = () => sendSurveyTestSms('REAL_TEST', 'sms');
       subBtn.style.display = 'inline-flex';
     } else {
-      subBtn.className = 'px-2.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer whitespace-nowrap';
+      subBtn.className = 'shrink-0 px-3 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer whitespace-nowrap';
       subBtn.innerHTML = '<span class="text-xs">🟡</span> <span>알림톡으로도 테스트</span>';
       subBtn.onclick = () => sendSurveyTestSms('REAL_TEST', 'kakao');
       subBtn.style.display = 'inline-flex';
