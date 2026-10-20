@@ -2039,6 +2039,73 @@ function switchSurveySmsChannelMode(channelMode = 'sms') {
     }
   }
 
+  // 테스트 발송 섹션 및 하단 버튼 레이블을 선택된 채널에 맞게 동적 최적화
+  const isKakao = gCurrentSurveySmsChannelMode === 'kakao';
+  const testSectionTitle = document.getElementById('surveySmsTestSectionTitle');
+  const btnReal = document.getElementById('btnSurveySmsRealTest');
+  const btnSim = document.getElementById('btnSurveySmsSimTest');
+  const submitBtn = document.getElementById('btnSubmitSurveyCustomerSms');
+  const submitTxt = document.getElementById('txtSubmitSurveyCustomerSms');
+
+  if (testSectionTitle) {
+    testSectionTitle.innerHTML = isKakao
+      ? '🧪 카카오 알림톡 발송 사전 테스트 <span class="ml-1 text-[10px] font-bold text-amber-950 bg-[#FEE500] px-2 py-0.5 rounded-full border border-amber-400">알림톡 검증 모드</span>'
+      : '🧪 문자 발송 사전 테스트 <span class="ml-1 text-[10px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full border border-indigo-200">SMS/LMS 모드</span>';
+  }
+
+  if (btnReal) {
+    if (isKakao) {
+      btnReal.className = 'px-3.5 py-2 rounded-xl bg-[#FEE500] hover:bg-[#FADA0A] text-[#191919] border border-[#E5CE00] font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap active:scale-95';
+      btnReal.innerHTML = '<span class="text-xs">🟡</span> <span>알림톡 테스트 발송</span>';
+      btnReal.onclick = () => sendSurveyTestSms('REAL_TEST', 'kakao');
+    } else {
+      btnReal.className = 'px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer whitespace-nowrap active:scale-95';
+      btnReal.innerHTML = '<i data-lucide="smartphone" class="w-3.5 h-3.5"></i> <span>실제 번호로 테스트 발송</span>';
+      btnReal.onclick = () => sendSurveyTestSms('REAL_TEST', 'sms');
+    }
+  }
+
+  if (btnSim) {
+    btnSim.innerHTML = isKakao
+      ? '<i data-lucide="check-check" class="w-3.5 h-3.5 text-amber-600"></i> <span>알림톡 모의 검증</span>'
+      : '<i data-lucide="check-check" class="w-3.5 h-3.5 text-indigo-600"></i> <span>모의 검증 테스트</span>';
+    btnSim.onclick = () => sendSurveyTestSms('SIMULATION', isKakao ? 'kakao' : 'sms');
+  }
+
+  // 보조 원클릭 버튼 (문자 <-> 알림톡 상호 즉시 테스트용)
+  let subBtn = document.getElementById('btnSurveySmsCrossChannelTest');
+  if (!subBtn && btnReal && btnReal.parentElement) {
+    subBtn = document.createElement('button');
+    subBtn.id = 'btnSurveySmsCrossChannelTest';
+    subBtn.type = 'button';
+    btnReal.parentElement.insertBefore(subBtn, btnSim);
+  }
+  if (subBtn) {
+    if (isKakao) {
+      subBtn.className = 'px-2.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer whitespace-nowrap';
+      subBtn.innerHTML = '<i data-lucide="message-square" class="w-3 h-3 text-slate-500"></i> <span>문자(LMS)로도 테스트</span>';
+      subBtn.onclick = () => sendSurveyTestSms('REAL_TEST', 'sms');
+      subBtn.style.display = 'inline-flex';
+    } else {
+      subBtn.className = 'px-2.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer whitespace-nowrap';
+      subBtn.innerHTML = '<span class="text-xs">🟡</span> <span>알림톡으로도 테스트</span>';
+      subBtn.onclick = () => sendSurveyTestSms('REAL_TEST', 'kakao');
+      subBtn.style.display = 'inline-flex';
+    }
+  }
+
+  if (submitBtn && submitTxt) {
+    if (isKakao) {
+      submitBtn.className = 'px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95 transition-all';
+      submitTxt.innerText = '고객에게 실제 알림톡 발송';
+    } else {
+      submitBtn.className = 'px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95 transition-all';
+      submitTxt.innerText = '고객에게 실제 문자 발송';
+    }
+  }
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
   applySurveySmsTemplate(gCurrentSurveySmsTemplateType || 'DEFAULT');
 }
 
@@ -2358,12 +2425,12 @@ function updateSurveySmsLivePreview() {
   if (typeBadge) {
     if (isKakao) {
       typeBadge.innerText = '알림톡 버튼형 (URL 비노출)';
-      typeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300';
+      typeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 whitespace-nowrap shrink-0';
     } else {
       typeBadge.innerText = isLms ? '장문 (LMS · 단축링크)' : '단문 (SMS · 단축링크)';
-      typeBadge.className = isLms
+      typeBadge.className = (isLms
         ? 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800'
-        : 'px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800';
+        : 'px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800') + ' whitespace-nowrap shrink-0';
     }
   }
 
@@ -2386,10 +2453,41 @@ function updateSurveySmsLivePreview() {
   if (kakaoTopBar) kakaoTopBar.classList.toggle('hidden', !isKakao);
   if (kakaoBtnWrap) kakaoBtnWrap.classList.toggle('hidden', !isKakao);
 
+  const phoneFrame = document.getElementById('surveySmsPhoneScreenBg')?.parentElement;
+  if (phoneFrame) {
+    phoneFrame.classList.remove('max-w-[330px]');
+    phoneFrame.classList.add('max-w-[345px]');
+  }
+
   const prevSubj = document.getElementById('surveySmsPreviewSubject');
   if (prevSubj) {
     prevSubj.innerText = subject || '[제목 없음]';
     prevSubj.classList.toggle('hidden', !isLms && !subject);
+
+    // 제목이 두 줄로 줄바꿈되지 않고 항상 깔끔하게 한 줄로 보이도록 최적화
+    prevSubj.style.whiteSpace = 'nowrap';
+    prevSubj.style.overflow = 'hidden';
+    prevSubj.style.textOverflow = 'ellipsis';
+    prevSubj.style.letterSpacing = '-0.04em';
+    prevSubj.style.display = (!isLms && !subject) ? 'none' : 'block';
+
+    if (isKakao) {
+      // 카카오 알림톡 탭: 제목 한 줄 표시 최적화
+      if (subject.length > 28) {
+        prevSubj.style.fontSize = '10px';
+      } else if (subject.length > 22) {
+        prevSubj.style.fontSize = '10.5px';
+      } else {
+        prevSubj.style.fontSize = '11.5px';
+      }
+    } else {
+      if (subject.length > 28) {
+        prevSubj.style.fontSize = '10.5px';
+      } else {
+        prevSubj.style.fontSize = '11.5px';
+      }
+    }
+    prevSubj.title = subject;
   }
 
   const prevBody = document.getElementById('surveySmsPreviewBody');
@@ -2446,7 +2544,7 @@ function getSurveyAligoConfig() {
   return cfg;
 }
 
-async function sendSurveyTestSms(testMode = 'REAL_TEST') {
+async function sendSurveyTestSms(testMode = 'REAL_TEST', forceChannel = null) {
   const targetId = document.getElementById('surveySmsModalTargetId')?.value || '';
   const target = (gSurveyState.targets || []).find(t => t.id === targetId || t.serviceId === targetId) || null;
   const testPhoneInput = document.getElementById('surveySmsTestPhoneInput');
@@ -2466,7 +2564,8 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST') {
   const statusBox = document.getElementById('surveySmsStatusBox');
   const simBanner = document.getElementById('surveySmsPreviewSimBanner');
   const surveyUrl = getSurveyTargetUrlForSms(target);
-  const channel = gCurrentSurveySmsChannelMode || 'sms';
+  const channel = forceChannel || gCurrentSurveySmsChannelMode || 'sms';
+  const isKakao = channel === 'kakao';
 
   let testPhone = formatCouponPhoneDisplay(testPhoneInput?.value || '');
   if (!testPhone && testMode === 'SIMULATION') {
@@ -2474,13 +2573,13 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST') {
   }
 
   if (!testPhone || testPhone.replace(/[^0-9]/g, '').length < 9) {
-    alert('테스트 문자를 수신할 휴대폰 번호(예: 010-1234-5678)를 테스트 번호 입력란에 입력해 주세요.');
+    alert(`테스트 ${isKakao ? '알림톡' : '문자'}를 수신할 휴대폰 번호(예: 010-1234-5678)를 테스트 번호 입력란에 입력해 주세요.`);
     if (testPhoneInput) testPhoneInput.focus();
     return;
   }
 
   if (!bodyText) {
-    alert('테스트 발송할 문자 본문 내용을 입력해 주세요.');
+    alert(`테스트 발송할 ${isKakao ? '알림톡' : '문자'} 본문 내용을 입력해 주세요.`);
     return;
   }
 
@@ -2490,12 +2589,19 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST') {
 
   const btnReal = document.getElementById('btnSurveySmsRealTest');
   const btnSim = document.getElementById('btnSurveySmsSimTest');
+  const btnCross = document.getElementById('btnSurveySmsCrossChannelTest');
   if (btnReal) btnReal.disabled = true;
   if (btnSim) btnSim.disabled = true;
+  if (btnCross) btnCross.disabled = true;
 
   if (statusBox) {
-    statusBox.className = 'p-3 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl text-xs flex items-center gap-2';
-    statusBox.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-ping shrink-0"></span> <span><b>[${testPhone}]</b> 번호로 ${testMode === 'SIMULATION' ? '모의 검증 테스트' : '실제 테스트 메시지'}를 전송하고 있습니다...</span>`;
+    if (isKakao) {
+      statusBox.className = 'p-3 bg-amber-50 border border-amber-300 text-amber-950 rounded-xl text-xs flex items-center gap-2';
+      statusBox.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping shrink-0"></span> <span>🟡 <b>[${testPhone}]</b> 번호로 ${testMode === 'SIMULATION' ? '카카오 알림톡 모의 검증' : '카카오 알림톡 테스트 메시지'}를 전송하고 있습니다...</span>`;
+    } else {
+      statusBox.className = 'p-3 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl text-xs flex items-center gap-2';
+      statusBox.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-ping shrink-0"></span> <span><b>[${testPhone}]</b> 번호로 ${testMode === 'SIMULATION' ? '모의 검증 테스트' : '실제 테스트 메시지'}를 전송하고 있습니다...</span>`;
+    }
     statusBox.classList.remove('hidden');
   }
 
@@ -2509,7 +2615,7 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST') {
         targetId: target ? target.id : '',
         patientName: target ? target.patientName : '고연분',
         phone: testPhone,
-        subject: subject ? `[테스트] ${subject}` : '[테스트] 리본케어 만족도 설문 안내',
+        subject: isKakao ? (subject || '리본케어 만족도 설문 안내') : (subject ? `[테스트] ${subject}` : '[테스트] 리본케어 만족도 설문 안내'),
         customMessage: bodyText,
         surveyUrl,
         channel,
@@ -2518,32 +2624,35 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST') {
         senderNumber,
         provider,
         userId: aligoCfg.userId,
-        apiKey: aligoCfg.apiKey
+        apiKey: aligoCfg.apiKey,
+        senderKey: aligoCfg.senderKey || '',
+        templateCode: aligoCfg.templateCode || ''
       })
     });
     const result = await res.json();
 
     if (simBanner) {
-      simBanner.innerText = `✓ [${testPhone}] ${testMode === 'SIMULATION' ? '모의 검증 완료' : '테스트 발송 완료'} (${new Date().toLocaleTimeString('ko-KR')})`;
+      simBanner.innerText = `✓ [${testPhone}] ${isKakao ? '알림톡' : '문자'} ${testMode === 'SIMULATION' ? '모의 검증 완료' : '테스트 발송 완료'} (${new Date().toLocaleTimeString('ko-KR')})`;
       simBanner.classList.remove('hidden');
     }
 
     if (result.success) {
       if (statusBox) {
         statusBox.className = 'p-3.5 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl text-xs space-y-1';
+        const isKakaoSuccess = (result.sendType === 'KAKAO_ALIMTALK' || result.sendType?.includes('알림톡')) && channel === 'kakao';
         statusBox.innerHTML = `
           <div class="font-black text-emerald-800 flex items-center justify-between">
-            <span>✅ ${testMode === 'SIMULATION' ? '모의 발송 검증 성공!' : '실제 번호 테스트 발송 성공!'}</span>
+            <span>✅ ${isKakaoSuccess ? '카카오 알림톡 테스트 발송 성공!' : (testMode === 'SIMULATION' ? (isKakao ? '카카오 알림톡 모의 검증 성공!' : '모의 발송 검증 성공!') : (isKakao ? '카카오 알림톡(또는 자동대체) 테스트 발송 성공!' : '실제 번호 테스트 발송 성공!'))}</span>
             <span class="font-mono text-[10.5px] bg-white px-2 py-0.5 rounded border border-emerald-200">접수번호: ${escapeHtml(result.receiptNum || 'TEST-OK')}</span>
           </div>
           <div class="text-[11px] text-emerald-700">
-            • 테스트 수신번호: <b class="font-mono">${escapeHtml(testPhone)}</b> · 통신망: <b>${escapeHtml(result.provider || provider).toUpperCase()}</b> (${channel === 'kakao' ? '알림톡' : 'SMS/LMS'})
+            • 테스트 수신번호: <b class="font-mono">${escapeHtml(testPhone)}</b> · 통신망: <b>${escapeHtml(result.provider || provider).toUpperCase()}</b> (${channel === 'kakao' ? '🟡 카카오 알림톡' : '📱 SMS/LMS'})
           </div>
           <div class="text-[10.5px] text-slate-500">※ 테스트 발송이므로 실제 환자의 안내 상태(미안내/안내완료)는 변경되지 않았습니다.</div>
         `;
       }
       if (typeof showToast === 'function') {
-        showToast(`[테스트 발송 완료] ${testPhone} 번호로 테스트 메시지가 전송되었습니다.`, 'success');
+        showToast(isKakao ? `[카카오 알림톡 테스트 완료] ${testPhone} 번호로 알림톡이 전송되었습니다.` : `[테스트 발송 완료] ${testPhone} 번호로 테스트 메시지가 전송되었습니다.`, 'success');
       }
     } else {
       if (statusBox) {
@@ -2556,7 +2665,7 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST') {
             <div class="mt-1.5 p-2 rounded-lg bg-white/90 border border-amber-300 text-[10.5px] text-slate-700 leading-relaxed">
               💡 <b>알리고 IP 인증 안내:</b> 현재 접속 중인 공인 IP가 알리고 발송 서버 IP에 미등록 상태입니다.<br>
               • 상단 <b>[알리고 설정]</b>을 열어 공인 IP를 복사한 뒤 <b>smartsms.aligo.in</b> &gt; [문자API]에 등록하시거나,<br>
-              • 바로 옆 <b>[✓ 모의 검증 테스트]</b>를 누르시면 과금 없이 단축 링크와 발송 문구를 즉시 검증하실 수 있습니다.
+              • 바로 옆 <b>[✓ ${isKakao ? '알림톡 모의 검증' : '모의 검증 테스트'}]</b>를 누르시면 과금 없이 단축 링크와 발송 문구를 즉시 검증하실 수 있습니다.
             </div>` : ''}
         `;
       }
@@ -2569,14 +2678,20 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST') {
     if (statusBox) {
       statusBox.className = 'p-3.5 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl text-xs space-y-1';
       statusBox.innerHTML = `
-        <div class="font-black text-emerald-800">✅ [${escapeHtml(testPhone)}] 메시지 전문 및 단축링크 검증 완료</div>
+        <div class="font-black text-emerald-800">✅ [${escapeHtml(testPhone)}] ${isKakao ? '카카오 알림톡 전문 및 버튼 링크' : '메시지 전문 및 단축링크'} 검증 완료</div>
         <div class="text-[11px] text-emerald-700">총 ${getSurveySmsKoreanBytes(bodyText)} Byte · 연결 주소: <code class="font-mono font-bold">${escapeHtml(surveyUrl)}</code></div>
       `;
     }
   } finally {
     if (btnReal) btnReal.disabled = false;
     if (btnSim) btnSim.disabled = false;
+    if (btnCross) btnCross.disabled = false;
   }
+}
+
+// 전용 카카오 알림톡 테스트 함수
+async function sendSurveyTestKakao(testMode = 'REAL_TEST') {
+  return sendSurveyTestSms(testMode, 'kakao');
 }
 
 async function submitSurveyCustomerSms() {
@@ -2647,6 +2762,8 @@ async function submitSurveyCustomerSms() {
         provider,
         userId: aligoCfg.userId,
         apiKey: aligoCfg.apiKey,
+        senderKey: aligoCfg.senderKey || '',
+        templateCode: aligoCfg.templateCode || '',
         isNewSurvey: isNewTab,
         skipReward: isNewTab,
         actor: 'HQ'
@@ -4059,6 +4176,7 @@ if (typeof window !== 'undefined') {
   window.openSurveySmsPreviewUrl = openSurveySmsPreviewUrl;
   window.copySurveySmsBodyText = copySurveySmsBodyText;
   window.sendSurveyTestSms = sendSurveyTestSms;
+  window.sendSurveyTestKakao = sendSurveyTestKakao;
   window.submitSurveyCustomerSms = submitSurveyCustomerSms;
   window.onSurveySmsProviderChange = onSurveySmsProviderChange;
   window.refreshSurveySmsBalance = refreshSurveySmsBalance;

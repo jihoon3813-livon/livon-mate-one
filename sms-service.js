@@ -243,7 +243,8 @@ async function sendViaAligo({
   subject = '',
   testMode = 'REAL_TEST',
   apiKey = '',
-  userId = ''
+  userId = '',
+  senderKey = ''
 }) {
   const cfg = getAligoConfig();
   const effectiveKey = apiKey || cfg.apiKey;
@@ -937,7 +938,8 @@ async function dispatchSms({
           subject,
           fallbackToSms: true, // 알림톡 실패 시 알리고 LMS/SMS로 자동 대체 전송
           apiKey,
-          userId
+          userId,
+          senderKey
         });
       } catch (kErr) {
         lastError = kErr;

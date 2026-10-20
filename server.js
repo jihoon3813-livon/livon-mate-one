@@ -2539,6 +2539,8 @@ function appendServerAuditLog(logItem) {
           const testMode = payload.testMode || 'REAL_TEST'; // 'REAL_TEST' | 'SIMULATION'
           const apiKey = (payload.apiKey || '').trim();
           const userId = (payload.userId || '').trim();
+          const senderKey = (payload.senderKey || '').trim();
+          const templateCode = (payload.templateCode || payload.templateName || '').trim();
 
           if (!toPhone) {
             res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -2577,7 +2579,9 @@ function appendServerAuditLog(logItem) {
                 category: 'SURVEY_SMS_TEST',
                 testMode,
                 apiKey,
-                userId
+                userId,
+                senderKey,
+                templateName: templateCode
               });
               res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
               return res.end(JSON.stringify({
@@ -2616,7 +2620,9 @@ function appendServerAuditLog(logItem) {
                 subject,
                 category: payload.isNewSurvey ? 'SURVEY_NEW_SMS' : 'SURVEY_SMS',
                 apiKey,
-                userId
+                userId,
+                senderKey,
+                templateName: templateCode
               });
             } catch (gwErr) {
               gatewayWarning = gwErr.message || '';

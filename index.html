@@ -7525,15 +7525,19 @@
             </div>
 
             <div>
-              <div class="flex items-center justify-between mb-1 flex-wrap gap-1">
-                <label class="font-black text-slate-800">발송 내용 직접 수정 <span class="text-rose-500">*</span></label>
-                <div class="flex items-center gap-1.5">
-                  <button type="button" onclick="insertSurveySmsToken('PATIENT')" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] cursor-pointer">+ 환자명</button>
-                  <button type="button" onclick="insertSurveySmsToken('CAREGIVER')" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] cursor-pointer">+ 간병인명</button>
-                  <button type="button" onclick="insertSurveySmsToken('HOSPITAL')" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10.5px] cursor-pointer">+ 병원명</button>
-                  <button type="button" id="btnInsertShortLinkToken" onclick="insertSurveySmsToken('LINK')" class="px-2 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[10.5px] cursor-pointer">+ 안심단축링크</button>
-                  <span id="surveySmsByteBadge" class="font-mono font-bold text-slate-600 text-[11px] ml-1">0 Byte</span>
-                  <span id="surveySmsTypeBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">장문 (LMS)</span>
+              <div class="space-y-1.5 mb-1.5">
+                <div class="flex items-center justify-between gap-2">
+                  <label class="font-black text-slate-800 text-xs sm:text-sm">발송 내용 직접 수정 <span class="text-rose-500">*</span></label>
+                  <div class="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+                    <span id="surveySmsByteBadge" class="font-mono font-bold text-slate-600 text-[11px] whitespace-nowrap">0 Byte</span>
+                    <span id="surveySmsTypeBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 whitespace-nowrap shrink-0">장문 (LMS)</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <button type="button" onclick="insertSurveySmsToken('PATIENT')" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] whitespace-nowrap shrink-0 cursor-pointer transition-colors">+ 환자명</button>
+                  <button type="button" onclick="insertSurveySmsToken('CAREGIVER')" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] whitespace-nowrap shrink-0 cursor-pointer transition-colors">+ 간병인명</button>
+                  <button type="button" onclick="insertSurveySmsToken('HOSPITAL')" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] whitespace-nowrap shrink-0 cursor-pointer transition-colors">+ 병원명</button>
+                  <button type="button" id="btnInsertShortLinkToken" onclick="insertSurveySmsToken('LINK')" class="px-2.5 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[11px] whitespace-nowrap shrink-0 cursor-pointer transition-colors">+ 안심단축링크</button>
                 </div>
               </div>
               <textarea id="surveySmsBodyTextarea" rows="8" oninput="updateSurveySmsLivePreview()"
