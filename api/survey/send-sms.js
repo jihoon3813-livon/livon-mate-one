@@ -35,6 +35,8 @@ module.exports = async (req, res) => {
     const testMode = payload.testMode || 'REAL_TEST';
     const apiKey = (payload.apiKey || '').trim();
     const userId = (payload.userId || '').trim();
+    const senderKey = (payload.senderKey || '').trim() || 'a29152d7931a5d9102a4d545b9a50d9ca3187430';
+    const templateCode = (payload.templateCode || payload.templateName || '').trim() || 'UM_6526';
 
     if (!toPhone) {
       return res.status(400).json({ success: false, message: '수신 휴대폰 번호를 입력해 주세요.' });
@@ -69,7 +71,9 @@ module.exports = async (req, res) => {
           category: 'SURVEY_SMS_TEST',
           testMode,
           apiKey,
-          userId
+          userId,
+          senderKey,
+          templateName: templateCode
         });
         return res.status(200).json({
           success: true,
@@ -106,7 +110,9 @@ module.exports = async (req, res) => {
           subject,
           category: payload.isNewSurvey ? 'SURVEY_NEW_SMS' : 'SURVEY_SMS',
           apiKey,
-          userId
+          userId,
+          senderKey,
+          templateName: templateCode
         });
       } catch (gwErr) {
         gatewayWarning = gwErr.message || '';

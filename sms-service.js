@@ -395,13 +395,19 @@ async function sendViaAligoKakao({
       } else {
         const errMsg = json?.message || '알리고 알림톡 전송 거절';
         console.warn('[Aligo Kakao Attempt Error]', errMsg, json);
+        if (!fallbackToSms) {
+          throw new Error(`알리고 알림톡 전송 실패: ${errMsg}`);
+        }
       }
     } catch (kErr) {
       console.warn('[Aligo Kakao Attempt Exception]', kErr.message);
+      if (!fallbackToSms) {
+        throw kErr;
+      }
     }
   }
 
-  // 알림톡 템플릿 미등록/미승인 시 안전하게 알리고 실통신망 문자(LMS/SMS)로 자동 Fallback
+  // 알림톡 실패 시 문자로 Fallback (단, fallbackToSms가 true일 때만)
   if (fallbackToSms) {
     console.log('[Aligo Kakao Fallback to Aligo SMS/LMS Activated]');
     const fallbackMessage = message + (buttonUrl ? `\n\n▶ 간병일지 & 설문 바로보기:\n${buttonUrl}` : '');
@@ -951,7 +957,7 @@ async function dispatchSms({
           templateCode: templateName,
           senderNumber,
           subject,
-          fallbackToSms: true, // 알림톡 실패 시 알리고 LMS/SMS로 자동 대체 전송
+          fallbackToSms: false, // 알림톡 채널 발송 시에는 문자 Fallback을 차단하여 Vercel 유동 IP 인증오류를 원천 방지
           apiKey,
           userId,
           senderKey
