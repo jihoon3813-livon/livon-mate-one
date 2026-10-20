@@ -2743,17 +2743,43 @@ function refreshSurveySmsBalance(reqProvider = '') {
 }
 
 async function fetchClientPublicIp() {
+  // 1순위: 백엔드 API에서 조회된 실발송 서버 공인 IP 우선 사용
+  try {
+    const res = await fetch('/api/sms/aligo/config');
+    const data = await res.json();
+    if (data?.balance?.publicIp && /^[\d\.]+$/.test(data.balance.publicIp)) {
+      return data.balance.publicIp;
+    }
+  } catch (_) {}
+
+  // 2순위: 브라우저 직접 공인 IP 조회 (ipify)
   try {
     const res = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
     const data = await res.json();
-    if (data && data.ip) return data.ip;
+    if (data && data.ip && /^[\d\.]+$/.test(data.ip)) return data.ip;
   } catch (_) {}
-  return '59.7.232.159';
+
+  // 3순위: 보조 IP 조회 (icanhazip)
+  try {
+    const res = await fetch('https://icanhazip.com', { signal: AbortSignal.timeout(3000) });
+    const text = (await res.text()).trim();
+    if (text && /^[\d\.]+$/.test(text)) return text;
+  } catch (_) {}
+
+  return '';
 }
 
 function copyAligoCurrentIp() {
   const ipEl = document.getElementById('aligoConfigCurrentIp');
-  const ip = ipEl?.innerText?.trim() || '59.7.232.159';
+  const ip = ipEl?.innerText?.trim();
+  if (!ip || ip === '조회중...' || ip.includes('확인')) {
+    if (typeof showToast === 'function') {
+      showToast('공인 IP를 조회하는 중입니다. 잠시 후 다시 시도해 주세요.', 'warning');
+    } else {
+      alert('공인 IP를 조회하는 중입니다.');
+    }
+    return;
+  }
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(ip).then(() => {
       if (typeof showToast === 'function') {

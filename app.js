@@ -97,11 +97,6 @@ function safeSetLocalStorage(key, valStr) {
 
 function safeSaveCachedApps(apps) {
   if (!Array.isArray(apps)) return false;
-  const isDev = (typeof isDevEnvironment === 'function' && isDevEnvironment()) || (typeof isDevScreen === 'function' && isDevScreen()) || !!window.IS_DEV_ENV;
-  if (!isDev && apps.length === 358) {
-    console.warn('[Safety Guard] PROD 환경에서 358건 개발 시드 저장을 원천 차단합니다.');
-    return false;
-  }
   return safeSetLocalStorage('LIVON_CACHED_APPS', JSON.stringify(apps));
 }
 
@@ -19227,10 +19222,10 @@ function initData() {
         }
         let filtered = Array.isArray(cleaned) ? cleaned.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id))) : [];
 
-        // 🚨 [운영환경 깜빡임 차단]: 운영(PROD) 환경인데 로컬 캐시가 과거 개발 시드(358건)이거나 아직 정규 동기화 전인 경우 화면 노출 차단 및 캐시 정화
+        // 🚨 [운영환경 초기 동기화 보장]: 운영(PROD) 환경인데 아직 Convex 정규 동기화 전인 경우 화면 깜빡임 방지
         if (!isDev) {
           const isProdSynced = localStorage.getItem('LIVON_PROD_CONVEX_SYNCED') === 'true';
-          if (!isProdSynced || filtered.length === 358) {
+          if (!isProdSynced) {
             filtered = [];
             try { localStorage.removeItem('LIVON_CACHED_APPS'); } catch (e) {}
           }
@@ -19261,9 +19256,7 @@ function initData() {
         }
 
         gApps = (typeof sortApplicationsNewestFirst === 'function') ? sortApplicationsNewestFirst(filtered) : filtered;
-        if (isDev || gApps.length !== 358) {
-          safeSaveCachedApps(gApps);
-        }
+        safeSaveCachedApps(gApps);
       } else if (isDev && window.REBORN_DATA && window.REBORN_DATA.applications) {
         gApps = [...window.REBORN_DATA.applications].filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
         safeSaveCachedApps(gApps);
