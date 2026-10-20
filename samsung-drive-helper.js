@@ -288,7 +288,7 @@ function parseSamsungCsv(csvContent, originFilePath) {
       hasInjuryCare: hasInjuryCare,
       hasDiseaseCare: hasDiseaseCare,
       accidentNumber: '26S' + (100000 + (i % 900000)),
-      adjusterName: (i & 1) === 0 ? '김정현' : '이민우',
+      adjusterName: '-',// (i & 1) === 0 ? '김정현' : '이민우',
       adjusterPhone: (i & 1) === 0 ? '02-3485-9114' : '02-760-5521',
       adjusterFax: (i & 1) === 0 ? '02-3485-9100' : '02-760-5500',
       maxDailyLimit: 144000,

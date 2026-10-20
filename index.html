@@ -8250,7 +8250,7 @@
           <div class="p-3 bg-white rounded-xl border border-sky-200 grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
               <label class="block font-bold text-slate-700 mb-1">담당 손해사정사</label>
-              <input type="text" id="newAppSamsungAdjuster" list="allAdjustersDataList" oninput="onAdjusterNameInput(this.value, 'newAppSamsung')" value="김정현" placeholder="손사 성명 검색/입력" class="w-full p-2 border border-slate-200 rounded-lg font-bold text-slate-900 bg-slate-50">
+              <input type="text" id="newAppSamsungAdjuster" list="allAdjustersDataList" oninput="onAdjusterNameInput(this.value, 'newAppSamsung')" value="" placeholder="손사 성명 검색/입력" class="w-full p-2 border border-slate-200 rounded-lg font-bold text-slate-900 bg-slate-50">
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">손사 연락처</label>
@@ -10302,7 +10302,7 @@
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">원수사(보험사) *</label>
-              <select id="custEditInsurance" class="w-full p-2.5 border rounded-xl bg-white font-bold text-primary-700">
+              <select id="custEditInsurance" onchange="updateCustomerEditInsuranceFields(this.value)" class="w-full p-2.5 border rounded-xl bg-white font-bold text-primary-700">
                 <option value="현대해상(SCOR)">현대해상(SCOR)</option>
                 <option value="현대해상">현대해상</option>
                 <option value="삼성화재">삼성화재</option>
@@ -10418,7 +10418,7 @@
         </div>
 
         <!-- 2. 증권 및 손사 정보 -->
-        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+        <div id="custEditSecuritiesSection" class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
           <div class="font-extrabold text-slate-800 text-xs flex items-center gap-1.5 pb-2 border-b border-slate-200">
             <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i> <span class="hl-pen-yellow">증권번호 & 손해사정인 정보</span>
           </div>
@@ -10595,7 +10595,7 @@
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label class="block font-bold text-slate-700 mb-1">원수사(보험사) *</label>
-              <select id="adjEditInsuranceCompany" class="w-full p-2.5 border rounded-xl bg-white font-bold text-purple-900 focus:ring-2 focus:ring-purple-500">
+              <select id="adjEditInsuranceCompany" onchange="updateAdjusterEditInsuranceFields(this.value)" class="w-full p-2.5 border rounded-xl bg-white font-bold text-purple-900 focus:ring-2 focus:ring-purple-500">
                 <option value="삼성화재">삼성화재</option>
                 <option value="현대해상(SCOR)">현대해상(SCOR)</option>
                 <option value="현대해상">현대해상</option>
@@ -10632,7 +10632,7 @@
         </div>
 
         <!-- 2. 증권 및 사고 정보 -->
-        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+        <div id="adjEditSecuritiesSection" class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
           <div class="font-extrabold text-slate-800 text-xs flex items-center justify-between pb-2 border-b border-slate-200">
             <span class="flex items-center gap-1.5">
               <i data-lucide="file-text" class="w-4 h-4 text-indigo-600"></i> <span class="hl-pen-yellow">증권, 사고 및 계약 정보</span>

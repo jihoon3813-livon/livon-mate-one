@@ -30996,6 +30996,14 @@ function updateCareTypeByInsurance(insurance) {
   }
 }
 
+function updateCustomerEditInsuranceFields(insurance) {
+  const section = document.getElementById('custEditSecuritiesSection');
+  if (!section) return;
+  section.classList.toggle('hidden', String(insurance || '').trim() === '삼성화재');
+}
+
+window.updateCustomerEditInsuranceFields = updateCustomerEditInsuranceFields;
+
 function submitNewAppWithMode(mode) {
   window._gNewAppSubmitMode = mode; // 'save_only' or 'save_and_fax'
   const form = document.getElementById('newAppForm');
@@ -31455,7 +31463,7 @@ async function checkSamsungEligibleInNewApp() {
         `보험상품: ${match.productName || '-'} (${match.productCode || '-'})`,
         `계약기간: ${(match.contractStartDate && match.contractEndDate) ? `${match.contractStartDate} ~ ${match.contractEndDate}` : '-'}`,
         `간병담보: 상해(${match.hasInjuryCare || '가입'}), 질병(${match.hasDiseaseCare || '가입'})`,
-        `담당손사: ${match.adjusterName || '김정현'} (${match.adjusterPhone || '02-3485-9114'})`
+        `담당손사: ${match.adjusterName || '-'} (${match.adjusterPhone || '02-3485-9114'})`
       ]
     });
   } else {
@@ -32775,7 +32783,9 @@ function openCustomerEditModal(appId, focusSection = null) {
   if (rrnInput) {
     rrnInput.value = (typeof autoHyphenRrn === 'function') ? autoHyphenRrn(rrnVal) : rrnVal;
   }
-  document.getElementById('custEditInsurance').value = app.insuranceCompany || '현대해상(SCOR)';
+  const insuranceInput = document.getElementById('custEditInsurance');
+  insuranceInput.value = app.insuranceCompany || '현대해상(SCOR)';
+  updateCustomerEditInsuranceFields(insuranceInput.value);
   // 도로명 주소 및 상세주소(호수) 깔끔하게 분리 바인딩 (주소와 호수가 한 칸에 붙어서 나오는 현상 방지)
   let editRoad = app.roadAddress || app.hospitalRoadAddress || '';
   let editDetail = app.addressDetail || '';
