@@ -11744,23 +11744,7 @@ function renderUnifiedCareHub() {
   // [초고속 0ms 즉시 복원] 새로고침 시 최신 로컬 캐시 및 최신 시드 데이터를 병합 복원하여 과거 312건 표시 현상 원천 차단
   const isDev = (typeof isDevEnvironment === 'function' && isDevEnvironment()) || (typeof isDevScreen === 'function' && isDevScreen()) || !!window.IS_DEV_ENV;
 
-  // 🚨 [운영환경 PROD 보호]: 358건 개발 시드 캐시 잔여 시 즉시 완전 소거
-  if (!isDev) {
-    try {
-      const cached = localStorage.getItem('LIVON_CACHED_APPS');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length === 358) {
-          localStorage.removeItem('LIVON_CACHED_APPS');
-          gApps = [];
-        }
-      }
-    } catch (e) {}
 
-    if (Array.isArray(gApps) && gApps.length === 358) {
-      gApps = [];
-    }
-  }
 
   if (!Array.isArray(gApps) || gApps.length === 0) {
     let deletedAppIdSet = new Set();
@@ -11774,9 +11758,7 @@ function renderUnifiedCareHub() {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          if (isDev || parsed.length !== 358) {
-            gApps = parsed.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
-          }
+          gApps = parsed.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
         }
       }
     } catch (e) {}

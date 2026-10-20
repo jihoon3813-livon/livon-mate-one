@@ -112,23 +112,29 @@ let gCachedPublicIp = '';
  */
 async function getPublicIp() {
   if (gCachedPublicIp) return gCachedPublicIp;
-  try {
-    const ip = await new Promise((resolve, reject) => {
-      const req = https.get('https://api.ipify.org', { timeout: 3500 }, res => {
-        let d = '';
-        res.on('data', c => d += c);
-        res.on('end', () => resolve(d.trim()));
+  const ipServices = [
+    'https://api.ipify.org',
+    'https://icanhazip.com',
+    'https://ifconfig.me/ip'
+  ];
+  for (const svc of ipServices) {
+    try {
+      const ip = await new Promise((resolve, reject) => {
+        const req = https.get(svc, { timeout: 3000 }, res => {
+          let d = '';
+          res.on('data', c => d += c);
+          res.on('end', () => resolve(d.trim()));
+        });
+        req.on('error', reject);
+        req.setTimeout(3000, () => { req.destroy(); reject(new Error('IP timeout')); });
       });
-      req.on('error', reject);
-      req.setTimeout(3500, () => { req.destroy(); reject(new Error('IP timeout')); });
-    });
-    if (ip && /^[\d\.]+$/.test(ip)) {
-      gCachedPublicIp = ip;
-    }
-    return gCachedPublicIp || '59.7.232.159';
-  } catch (_) {
-    return gCachedPublicIp || '59.7.232.159';
+      if (ip && /^[\d\.]+$/.test(ip.trim())) {
+        gCachedPublicIp = ip.trim();
+        return gCachedPublicIp;
+      }
+    } catch (_) {}
   }
+  return gCachedPublicIp || '';
 }
 
 function getAligoErrorMessage(code, defaultMsg = '', publicIp = '', sender = '') {
@@ -137,8 +143,9 @@ function getAligoErrorMessage(code, defaultMsg = '', publicIp = '', sender = '')
 
   // 알리고 API가 '인증오류입니다.-IP' 등의 상세 메시지를 준 경우
   if (msg.includes('IP') || msg.includes('-IP') || msg.toLowerCase().includes('ip')) {
-    const ipStr = publicIp || '59.7.232.159';
-    return `IP 인증 오류 (${msg}) - 현재 공인 IP [${ipStr}]가 알리고 허용 IP 목록에 등록되지 않았습니다. smartsms.aligo.in > [문자API] > [API Key 발급/관리]에서 [발송 서버 IP]에 ${ipStr} 를 등록해 주세요.`;
+    const ipGuide = publicIp ? `현재 공인 IP [${publicIp}]` : '현재 공인 IP';
+    const regGuide = publicIp ? `[발송 서버 IP]에 ${publicIp} 를` : '[발송 서버 IP]에 현재 접속 IP를';
+    return `IP 인증 오류 (${msg}) - ${ipGuide}가 알리고 허용 IP 목록에 등록되지 않았습니다. smartsms.aligo.in > [문자API] > [API Key 발급/관리]에서 ${regGuide} 등록해 주세요.`;
   }
 
   if (msg && !msg.startsWith('알리고 응답 코드') && !msg.includes('code')) {
@@ -146,7 +153,10 @@ function getAligoErrorMessage(code, defaultMsg = '', publicIp = '', sender = '')
   }
 
   switch (c) {
-    case '-101': return `필수 변수 누락 또는 IP 미등록 (알리고 콘솔 [API Key 발급/관리]에서 현재 공인 IP [${publicIp || '59.7.232.159'}]가 등록되었는지 확인해 주세요)`;
+    case '-101': {
+      const ipGuide = publicIp ? `현재 공인 IP [${publicIp}]가` : '현재 공인 IP가';
+      return `필수 변수 누락 또는 IP 미등록 (알리고 콘솔 [API Key 발급/관리]에서 ${ipGuide} 등록되었는지 확인해 주세요)`;
+    }
     case '-102': return 'API 인증 실패 (API Key 또는 사용자 아이디가 일치하지 않습니다)';
     case '-103': return `등록/인증되지 않은 발신번호입니다. (전송 시도 발신번호: [${sender || '번호미상'}] - smartsms.aligo.in [발신번호 관리]에 사전 승인 등록된 번호여야 합니다)`;
     case '-105': return '잔여 포인트(금액) 부족 (알리고 캐시 충전이 필요합니다)';
@@ -295,7 +305,9 @@ async function sendViaAligo({
       message: `알리고 ${finalSendType} 발송 접수 완료 (접수번호: ${msgId})`
     };
   } else {
-    const errMsg = getAligoErrorMessage(json.result_code, json.message, '', effectiveSender);
+    let curIp = '';
+    try { curIp = await getPublicIp(); } catch (_) {}
+    const errMsg = getAligoErrorMessage(json.result_code, json.message, curIp, effectiveSender);
     throw new Error(`알리고 발송 거절: ${errMsg} (코드: ${json.result_code})`);
   }
 }
