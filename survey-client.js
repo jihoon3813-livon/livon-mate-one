@@ -2317,9 +2317,9 @@ function applySurveySmsTemplate(tplType = 'DEFAULT') {
     const btn = document.getElementById(`btnSmsTpl_${code}`);
     if (!btn) return;
     if (code === tplType) {
-      btn.className = 'p-2 rounded-xl border-2 border-rose-500 bg-rose-50 text-rose-900 font-extrabold text-[11px] text-center transition-all cursor-pointer shadow-2xs';
+      btn.className = 'py-2 px-1 sm:px-1.5 rounded-xl border-2 border-rose-500 bg-rose-50 text-rose-900 font-extrabold text-[10px] sm:text-[10.5px] tracking-tight whitespace-nowrap text-center transition-all cursor-pointer shadow-2xs';
     } else {
-      btn.className = 'p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-[11px] text-center transition-all cursor-pointer';
+      btn.className = 'py-2 px-1 sm:px-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-[10px] sm:text-[10.5px] tracking-tight whitespace-nowrap text-center transition-all cursor-pointer';
     }
   });
 
