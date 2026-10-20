@@ -2372,6 +2372,34 @@ function appendServerAuditLog(logItem) {
       }
     }
 
+    // 바로빌 카카오 채널 관리 즉시 SSO 리다이렉트
+    if (reqPath === '/api/sms/barobill/open-channel') {
+      try {
+        const { getBarobillKakaoMgmtUrls } = require('./sms-service');
+        const urls = await getBarobillKakaoMgmtUrls();
+        const targetUrl = urls.channelUrl || 'https://www.barobill.co.kr';
+        res.writeHead(302, { Location: targetUrl, 'Cache-Control': 'no-store, no-cache' });
+        return res.end();
+      } catch (e) {
+        res.writeHead(302, { Location: 'https://www.barobill.co.kr' });
+        return res.end();
+      }
+    }
+
+    // 바로빌 카카오 템플릿 관리 즉시 SSO 리다이렉트
+    if (reqPath === '/api/sms/barobill/open-template') {
+      try {
+        const { getBarobillKakaoMgmtUrls } = require('./sms-service');
+        const urls = await getBarobillKakaoMgmtUrls();
+        const targetUrl = urls.templateUrl || 'https://www.barobill.co.kr';
+        res.writeHead(302, { Location: targetUrl, 'Cache-Control': 'no-store, no-cache' });
+        return res.end();
+      } catch (e) {
+        res.writeHead(302, { Location: 'https://www.barobill.co.kr' });
+        return res.end();
+      }
+    }
+
     // 알리고 연결 및 발송 테스트 API
     if (reqPath === '/api/sms/aligo/test' && req.method === 'POST') {
       let body = '';

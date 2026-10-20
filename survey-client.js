@@ -9,7 +9,7 @@ async function fetchBarobillKakaoInfo() {
       gBarobillKakaoInfo = data;
       const link = document.getElementById('btnBarobillKakaoLink');
       if (link && data.channelUrl) {
-        link.href = data.channelUrl;
+
       }
       return data;
     }
@@ -2058,13 +2058,13 @@ function switchSurveySmsChannelMode(channelMode = 'sms') {
             <b>바로빌 카카오 알림톡 모드 (Vercel IP 차단 없음):</b> 링크 주소를 본문에서 숨기고 하단 <b>[모바일 간병일지 & 설문 열람하기]</b> 버튼으로 전송합니다.
           </div>
         </div>
-        <a id="surveyHelpBarChannelLink" href="https://www.barobill.co.kr" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-[10.5px] inline-flex items-center gap-1 shrink-0 shadow-xs cursor-pointer whitespace-nowrap">
+        <a id="surveyHelpBarChannelLink" href="/api/sms/barobill/open-channel" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-[10.5px] inline-flex items-center gap-1 shrink-0 shadow-xs cursor-pointer whitespace-nowrap">
           <span>채널 등록 ↗</span>
         </a>
       `;
       fetchBarobillKakaoInfo().then(info => {
         const link = document.getElementById('surveyHelpBarChannelLink');
-        if (link && info?.channelUrl) link.href = info.channelUrl;
+
         if (info && info.hasChannel) {
           if (link) link.style.display = 'none';
         }
@@ -2928,7 +2928,7 @@ function onSurveySmsProviderChange(provider) {
   if (provider === 'barobill') {
     if (baroLink) baroLink.classList.remove('hidden');
     fetchBarobillKakaoInfo().then(info => {
-      if (baroLink && info?.channelUrl) baroLink.href = info.channelUrl;
+
     });
   } else {
     if (baroLink) baroLink.classList.add('hidden');
