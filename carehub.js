@@ -12141,6 +12141,16 @@ function renderUnifiedCareHub() {
     return st === '취소' || st === '서비스 취소' || st === '당일서비스취소' || st === '미해당' || st.includes('취소') || st.includes('불가') || st.includes('제외');
   };
 
+  // 상단 상태 KPI는 고객 1건이 반드시 하나의 상태에만 포함되도록 우선순위로 분류한다.
+  const getHubPipelineType = (app) => {
+    if (isCancelledHelper(app)) return 'CANCELLED';
+    if (isCompletedHelper(app)) return 'COMPLETED';
+    if (isInProgressHelper(app)) return 'IN_PROGRESS';
+    if (isScheduledHelper(app)) return 'SCHEDULED';
+    if (isNeedAssignHelper(app)) return 'NEED_ASSIGN';
+    return 'SCHEDULED';
+  };
+
   // 1. 현재 필터(전체 / 현대해상 / 삼성화재)에 해당하는 고객군 스코프 확정 (O(N) 1회 필터링)
   const scopedApps = [];
   const scopedAppIdSet = new Set();
@@ -12161,6 +12171,8 @@ function renderUnifiedCareHub() {
   let completedCount = 0;
   let needAssignCount = 0;
   let inProgressCount = 0;
+  let scheduledCount = 0;
+  let cancelledCount = 0;
   let unpaidClaimCount = 0;
   let needPayoutCount = 0;
   let needFaxCount = 0;
@@ -12190,9 +12202,12 @@ function renderUnifiedCareHub() {
     getAppCareStatus(a);
 
     // KPI 카운트 집계
-    if (isCompletedHelper(a)) completedCount++;
-    if (isNeedAssignHelper(a)) needAssignCount++;
-    if (isInProgressHelper(a)) inProgressCount++;
+    const pipelineType = getHubPipelineType(a);
+    if (pipelineType === 'COMPLETED') completedCount++;
+    else if (pipelineType === 'NEED_ASSIGN') needAssignCount++;
+    else if (pipelineType === 'IN_PROGRESS') inProgressCount++;
+    else if (pipelineType === 'SCHEDULED') scheduledCount++;
+    else if (pipelineType === 'CANCELLED') cancelledCount++;
     if (isAppHasUnpaidClaimHelper(a)) unpaidClaimCount++;
     if (isAppHasUnpaidPayoutHelper(a)) needPayoutCount++;
     if (isNeedFaxHelper(a)) needFaxCount++;
@@ -12398,6 +12413,11 @@ function renderUnifiedCareHub() {
 
   // 데이터 0건(전체 초기화)인 경우 가드
   if (activeHubApps.length === 0) {
+    completedCount = 0;
+    needAssignCount = 0;
+    inProgressCount = 0;
+    scheduledCount = 0;
+    cancelledCount = 0;
     dashTotalApps = 0;
     dashCompleted = 0;
     dashInProgress = 0;
@@ -12420,17 +12440,17 @@ function renderUnifiedCareHub() {
 
   // 1. 신청 현황 (컴팩트 & 상세)
   updateDashEl('hubDash-totalApps', dashTotalApps);
-  updateDashEl('hubDash-completed', dashCompleted);
-  updateDashEl('hubDash-inProgress', dashInProgress);
-  updateDashEl('hubDash-scheduled', dashScheduled);
+  updateDashEl('hubDash-completed', completedCount);
+  updateDashEl('hubDash-inProgress', inProgressCount);
+  updateDashEl('hubDash-scheduled', scheduledCount);
   updateDashEl('hubDash-needAssign', needAssignCount);
-  updateDashEl('hubDash-cancelled', dashCancelled);
+  updateDashEl('hubDash-cancelled', cancelledCount);
 
   updateDashEl('detailDash-totalApps', dashTotalApps);
-  updateDashEl('detailDash-completed', dashCompleted);
-  updateDashEl('detailDash-inProgress', dashInProgress);
-  updateDashEl('detailDash-scheduled', dashScheduled);
-  updateDashEl('detailDash-cancelled', dashCancelled);
+  updateDashEl('detailDash-completed', completedCount);
+  updateDashEl('detailDash-inProgress', inProgressCount);
+  updateDashEl('detailDash-scheduled', scheduledCount);
+  updateDashEl('detailDash-cancelled', cancelledCount);
 
   // 2. 간병인 배정
   updateDashEl('hubDash-assignedCaregivers', dashAssignedCaregivers);
@@ -12527,11 +12547,11 @@ function renderUnifiedCareHub() {
       // [모달 비활성화 고객 모아보기 토글 필터]
       if (gHubOnlyDisabled && !app._isDis) return false;
 
-      if (gHubFilter === 'COMPLETED' && !isCompletedHelper(app)) return false;
-      if (gHubFilter === 'NEED_ASSIGN' && !isNeedAssignHelper(app)) return false;
-      if (gHubFilter === 'IN_PROGRESS' && !isInProgressHelper(app)) return false;
-      if (gHubFilter === 'SCHEDULED' && !isScheduledHelper(app)) return false;
-      if (gHubFilter === 'CANCELLED' && !isCancelledHelper(app)) return false;
+      if (gHubFilter === 'COMPLETED' && getHubPipelineType(app) !== 'COMPLETED') return false;
+      if (gHubFilter === 'NEED_ASSIGN' && getHubPipelineType(app) !== 'NEED_ASSIGN') return false;
+      if (gHubFilter === 'IN_PROGRESS' && getHubPipelineType(app) !== 'IN_PROGRESS') return false;
+      if (gHubFilter === 'SCHEDULED' && getHubPipelineType(app) !== 'SCHEDULED') return false;
+      if (gHubFilter === 'CANCELLED' && getHubPipelineType(app) !== 'CANCELLED') return false;
       if (gHubFilter === 'UNPAID_CLAIM' && !isAppHasUnpaidClaimHelper(app)) return false;
       if (gHubFilter === 'NEED_PAYOUT' && !isAppHasUnpaidPayoutHelper(app)) return false;
       if (gHubFilter === 'NEED_FAX' && !isNeedFaxHelper(app)) return false;
@@ -12540,33 +12560,11 @@ function renderUnifiedCareHub() {
         const theme = getCustomerCardStatusTheme(app);
         let match = false;
         if (gHubStatusFilter === '신규' && theme.type === 'new') match = true;
-        else if (gHubStatusFilter === '대기') {
-          const customerAssignments = Array.isArray(gAssigns)
-            ? gAssigns.filter(item => item && String(item.applyId) === String(app.id))
-            : [];
-          const hasCaregiverName = [
-            app.caregiverName,
-            ...(customerAssignments.map(item => item.caregiverName)),
-          ].some(value => {
-            const caregiverName = String(value || '').trim();
-            return caregiverName &&
-              caregiverName !== '-' &&
-              caregiverName !== '미배정' &&
-              caregiverName !== '배정대기' &&
-              !caregiverName.includes('미배정') &&
-              !caregiverName.includes('배정대기');
-          });
-          const isFinishedOrCancelled = app.status === '완료' ||
-            app.status === '서비스 취소' ||
-            app.status === '취소' ||
-            app.status === '미해당' ||
-            app.status === '정산완료';
-          if (!hasCaregiverName && !isFinishedOrCancelled && theme.type !== 'in_progress') match = true;
-        }
-        else if (gHubStatusFilter === '진행중' && theme.type === 'in_progress') match = true;
-        else if (gHubStatusFilter === '완료' && theme.type === 'completed') match = true;
-        else if (gHubStatusFilter === '취소' && (theme.type === 'cancelled' || theme.type === 'not_applicable' || theme.statusText === '당일서비스취소' || theme.statusText.includes('서비스불가') || theme.statusText === '제외' || app.status === '미해당' || (app.status && app.status.includes('취소')))) match = true;
-        else if (gHubStatusFilter === '예정' && theme.type === 'upcoming') match = true;
+        else if (gHubStatusFilter === '대기' && getHubPipelineType(app) === 'NEED_ASSIGN') match = true;
+        else if (gHubStatusFilter === '진행중' && getHubPipelineType(app) === 'IN_PROGRESS') match = true;
+        else if (gHubStatusFilter === '완료' && getHubPipelineType(app) === 'COMPLETED') match = true;
+        else if (gHubStatusFilter === '취소' && getHubPipelineType(app) === 'CANCELLED') match = true;
+        else if (gHubStatusFilter === '예정' && getHubPipelineType(app) === 'SCHEDULED') match = true;
         else if (gHubStatusFilter === '비활성' && typeof isCustomerModalDisabled === 'function' && isCustomerModalDisabled(app)) match = true;
         if (!match) return false;
       }

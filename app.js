@@ -10715,6 +10715,7 @@ function populateSamsungLeadDataToForm(lead) {
   const adjPhone = lead.adjusterPhone || '02-3485-9114';
   const adjFax = lead.adjusterFax || '02-3485-9100';
 
+
   if (document.getElementById('newAppSamsungPatientId')) document.getElementById('newAppSamsungPatientId').value = patientIdVal;
   if (document.getElementById('newAppSamsungPolicyNumber')) document.getElementById('newAppSamsungPolicyNumber').value = policyVal;
   if (document.getElementById('newAppSamsungProductCode')) document.getElementById('newAppSamsungProductCode').value = prodCodeVal;
@@ -10736,7 +10737,7 @@ function populateSamsungLeadDataToForm(lead) {
   if (document.getElementById('newAppAdjuster')) document.getElementById('newAppAdjuster').value = adjName;
   if (document.getElementById('newAppAdjusterPhone')) document.getElementById('newAppAdjusterPhone').value = adjPhone;
   if (document.getElementById('newAppAdjusterFax')) document.getElementById('newAppAdjusterFax').value = adjFax;
-  if (document.getElementById('newAppAdjusterFirm')) document.getElementById('newAppAdjusterFirm').value = '삼성화재 간병지원파트';
+  if (document.getElementById('newAppAdjusterFirm')) document.getElementById('newAppAdjusterFirm').value = "삼성화재 간병지원파트";
 
   // 5. Default Address & Memo
   if (document.getElementById('newAppZonecode')) document.getElementById('newAppZonecode').value = '04523';
