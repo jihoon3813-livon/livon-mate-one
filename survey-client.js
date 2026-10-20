@@ -1,3 +1,22 @@
+
+let gBarobillKakaoInfo = null;
+async function fetchBarobillKakaoInfo() {
+  if (gBarobillKakaoInfo) return gBarobillKakaoInfo;
+  try {
+    const res = await fetch('/api/sms/barobill/kakao');
+    const data = await res.json();
+    if (data && data.success) {
+      gBarobillKakaoInfo = data;
+      const link = document.getElementById('btnBarobillKakaoLink');
+      if (link && data.channelUrl) {
+        link.href = data.channelUrl;
+      }
+      return data;
+    }
+  } catch (_) {}
+  return gBarobillKakaoInfo;
+}
+
 /**
  * survey-client.js
  * [독립 화면 모듈] 리본케어 만족도조사 관리 & 만족도조사 관리(new) 전용 클라이언트
@@ -2031,8 +2050,25 @@ function switchSurveySmsChannelMode(channelMode = 'sms') {
     const target = (gSurveyState.targets || []).find(t => t.id === targetId || t.serviceId === targetId) || null;
     const shortUrl = getSurveyTargetUrlForSms(target);
     if (gCurrentSurveySmsChannelMode === 'kakao') {
-      helpBar.className = 'mt-2 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-[10.5px] text-amber-900 flex items-center justify-between gap-2';
-      helpBar.innerHTML = `<span>✨ <b>링크 주소 100% 숨김:</b> 문자 본문에서 URL 주소를 완전히 제거하고 하단 <b>[모바일 간병일지 & 설문 열람하기]</b> 버튼으로 연결합니다.</span>`;
+      helpBar.className = 'mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-[11px] text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs';
+      helpBar.innerHTML = `
+        <div class="flex items-center gap-1.5 flex-1">
+          <span class="text-base shrink-0">🟡</span>
+          <div>
+            <b>바로빌 카카오 알림톡 모드 (Vercel IP 차단 없음):</b> 링크 주소를 본문에서 숨기고 하단 <b>[모바일 간병일지 & 설문 열람하기]</b> 버튼으로 전송합니다.
+          </div>
+        </div>
+        <a id="surveyHelpBarChannelLink" href="https://www.barobill.co.kr" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-[10.5px] inline-flex items-center gap-1 shrink-0 shadow-xs cursor-pointer whitespace-nowrap">
+          <span>채널 등록 ↗</span>
+        </a>
+      `;
+      fetchBarobillKakaoInfo().then(info => {
+        const link = document.getElementById('surveyHelpBarChannelLink');
+        if (link && info?.channelUrl) link.href = info.channelUrl;
+        if (info && info.hasChannel) {
+          if (link) link.style.display = 'none';
+        }
+      });
     } else {
       helpBar.className = 'mt-2 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[10.5px] text-emerald-800 flex items-center justify-between gap-2';
       helpBar.innerHTML = `<span>🔒 <b>긴 파라미터 주소 숨김 적용됨:</b> 환자명·토큰 노출 없이 <code class="font-mono font-black bg-white px-1.5 py-0.5 rounded border border-emerald-300 text-emerald-900">${escapeHtml(shortUrl)}</code> 한 줄로 발송됩니다.</span>`;
@@ -2041,6 +2077,13 @@ function switchSurveySmsChannelMode(channelMode = 'sms') {
 
   // 테스트 발송 섹션 및 하단 버튼 레이블을 선택된 채널에 맞게 동적 최적화
   const isKakao = gCurrentSurveySmsChannelMode === 'kakao';
+  const providerSel = document.getElementById('surveySmsProviderSelect');
+  if (providerSel && isKakao && providerSel.value === 'aligo') {
+    providerSel.value = 'barobill';
+  }
+  if (typeof onSurveySmsProviderChange === 'function') {
+    onSurveySmsProviderChange(providerSel ? providerSel.value : (isKakao ? 'barobill' : 'aligo'));
+  }
   const testSectionTitle = document.getElementById('surveySmsTestSectionTitle');
   const btnReal = document.getElementById('btnSurveySmsRealTest');
   const btnSim = document.getElementById('btnSurveySmsSimTest');
@@ -2583,7 +2626,7 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST', forceChannel = null) {
   const recipientPhoneInput = document.getElementById('surveySmsRecipientPhone');
   const subject = (document.getElementById('surveySmsSubjectInput')?.value || '').trim();
   const bodyText = (document.getElementById('surveySmsBodyTextarea')?.value || '').trim();
-  const provider = document.getElementById('surveySmsProviderSelect')?.value || 'aligo';
+  const provider = document.getElementById('surveySmsProviderSelect')?.value || (channel === 'kakao' ? 'barobill' : 'aligo');
   const aligoCfg = getSurveyAligoConfig();
 
   let senderNumber = document.getElementById('surveySmsSenderNumber')?.value || '';
@@ -2737,7 +2780,7 @@ async function submitSurveyCustomerSms() {
   const recipientPhone = formatCouponPhoneDisplay(document.getElementById('surveySmsRecipientPhone')?.value || '');
   const subject = (document.getElementById('surveySmsSubjectInput')?.value || '').trim();
   const bodyText = (document.getElementById('surveySmsBodyTextarea')?.value || '').trim();
-  const provider = document.getElementById('surveySmsProviderSelect')?.value || 'aligo';
+  const provider = document.getElementById('surveySmsProviderSelect')?.value || (channel === 'kakao' ? 'barobill' : 'aligo');
   const aligoCfg = getSurveyAligoConfig();
 
   let senderNumber = document.getElementById('surveySmsSenderNumber')?.value || '';
@@ -2880,6 +2923,16 @@ async function submitSurveyCustomerSms() {
 }
 
 function onSurveySmsProviderChange(provider) {
+  const baroLink = document.getElementById('btnBarobillKakaoLink');
+  const aligoLink = document.getElementById('btnAligoConfigLink');
+  if (provider === 'barobill') {
+    if (baroLink) baroLink.classList.remove('hidden');
+    fetchBarobillKakaoInfo().then(info => {
+      if (baroLink && info?.channelUrl) baroLink.href = info.channelUrl;
+    });
+  } else {
+    if (baroLink) baroLink.classList.add('hidden');
+  }
   refreshSurveySmsBalance(provider);
 }
 

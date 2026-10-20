@@ -27,7 +27,7 @@ module.exports = async (req, res) => {
     const customMessage = (payload.customMessage || payload.message || '').trim();
     const subject = (payload.subject || '[리본케어] 모바일 간병일지 & 만족도 설문 안내').trim();
     const senderNumber = (payload.senderNumber || '16007835').trim();
-    const provider = payload.provider || 'aligo';
+    const provider = payload.provider || (payload.channel === 'kakao' ? 'barobill' : 'aligo');
     const channel = payload.channel || 'sms'; // 'sms' | 'kakao'
     const buttonUrl = payload.buttonUrl || payload.surveyUrl || '';
     const buttonTitle = payload.buttonTitle || '모바일 간병일지 & 설문 열람하기';

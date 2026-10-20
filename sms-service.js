@@ -615,6 +615,55 @@ async function getBarobillKakaoChannels() {
 }
 
 /**
+ * 바로빌 카카오 채널 및 템플릿 관리 원클릭 SSO URL 조회
+ */
+async function getBarobillKakaoMgmtUrls() {
+  const cfg = getBarobillConfig();
+  const isTest = cfg.server === 'test';
+  try {
+    const [chRes, tmplRes] = await Promise.all([
+      callBarobillKakaoSoap('GetKakaotalkChannelManagementURL', `
+        <CERTKEY>${cfg.certKey}</CERTKEY>
+        <CorpNum>${cfg.corpNum}</CorpNum>
+        <ID>${cfg.id}</ID>
+        <PWD>${cfg.pwd}</PWD>
+      `, isTest),
+      callBarobillKakaoSoap('GetKakaotalkTemplateManagementURL', `
+        <CERTKEY>${cfg.certKey}</CERTKEY>
+        <CorpNum>${cfg.corpNum}</CorpNum>
+        <ID>${cfg.id}</ID>
+        <PWD>${cfg.pwd}</PWD>
+      `, isTest)
+    ]);
+    const channelUrl = chRes.body.match(/<GetKakaotalkChannelManagementURLResult>(.*?)<\/GetKakaotalkChannelManagementURLResult>/)?.[1] || '';
+    const templateUrl = tmplRes.body.match(/<GetKakaotalkTemplateManagementURLResult>(.*?)<\/GetKakaotalkTemplateManagementURLResult>/)?.[1] || '';
+    return {
+      success: true,
+      channelUrl: channelUrl.replace(/&amp;/g, '&'),
+      templateUrl: templateUrl.replace(/&amp;/g, '&')
+    };
+  } catch (e) {
+    return { success: false, error: e.message, channelUrl: '', templateUrl: '' };
+  }
+}
+
+/**
+ * 바로빌 카카오톡 오류 메시지 조회
+ */
+async function getBarobillKakaoErrorMessage(certKey, errCode, isTest = false) {
+  try {
+    const res = await callBarobillKakaoSoap('GetErrString', `
+      <CERTKEY>${certKey}</CERTKEY>
+      <ErrCode>${errCode}</ErrCode>
+    `, isTest);
+    const msg = res.body.match(/<GetErrStringResult>(.*?)<\/GetErrStringResult>/)?.[1];
+    return msg || `오류코드 (${errCode})`;
+  } catch (e) {
+    return `오류코드 (${errCode})`;
+  }
+}
+
+/**
  * 바로빌 카카오 알림톡/친구톡 실제 발송
  * URL 텍스트를 메시지 본문에 노출하지 않고 하단 [간병일지 열람하기] 웹링크 버튼으로 제공
  */
@@ -642,7 +691,7 @@ async function sendViaBarobillKakao({
 
   const title = `[리본케어] ${patientName || toName} 님의 모바일 간병일지`;
   const effectiveChannel = channelId || '@리본케어';
-  const effectiveTemplate = templateName || 'LIVON_CARE_DIARY';
+  const effectiveTemplate = templateName || 'UM_6526';
 
   // 버튼 XML 블록 (본문에 URL 텍스트 노출 안 됨!)
   const buttonsXml = buttonUrl ? `
@@ -657,7 +706,7 @@ async function sendViaBarobillKakao({
   ` : '';
 
   // 1차 시도: 알림톡 (SendATKakaotalkEx)
-  // SmsReply: "1" (알림톡 실패 시 자동으로 SMS/LMS 대체 전송)
+  // SmsReply: "A" (알림톡 실패 시 대체문자 자동 발송) / "N" (미발송)
   const bodyXml = `
     <CERTKEY>${cfg.certKey}</CERTKEY>
     <CorpNum>${cfg.corpNum}</CorpNum>
@@ -665,7 +714,7 @@ async function sendViaBarobillKakao({
     <YellowId>${escapeXml(effectiveChannel)}</YellowId>
     <TemplateName>${escapeXml(effectiveTemplate)}</TemplateName>
     <SendDT></SendDT>
-    <SmsReply>${fallbackToSms ? '1' : '2'}</SmsReply>
+    <SmsReply>${fallbackToSms ? 'A' : 'N'}</SmsReply>
     <SmsSenderNum>${cleanFrom}</SmsSenderNum>
     <KakaotalkMessage>
       <ReceiverName>${escapeXml(toName || patientName)}</ReceiverName>
@@ -678,6 +727,7 @@ async function sendViaBarobillKakao({
     </KakaotalkMessage>
   `;
 
+  let lastBaroError = null;
   try {
     const res = await callBarobillKakaoSoap('SendATKakaotalkEx', bodyXml, isTest);
     if (res.status === 200) {
@@ -697,13 +747,18 @@ async function sendViaBarobillKakao({
           buttonUrl,
           message: `바로빌 카카오 알림톡 정상 접수 완료 (접수번호: ${sendKey})`
         };
+      } else {
+        const errMsg = await getBarobillKakaoErrorMessage(cfg.certKey, sendKey, isTest);
+        lastBaroError = new Error(`바로빌 알림톡 오류: ${errMsg} (코드: ${sendKey})`);
+        console.warn('[Barobill Kakao AT Attempt Failed]', lastBaroError.message);
       }
     }
   } catch (err) {
+    lastBaroError = err;
     console.warn('[Barobill Kakao AT Attempt Failed]', err.message);
   }
 
-  // 알림톡 템플릿 미등록/미승인 상태이거나 실패한 경우,
+  // 알림톡 템플릿/채널 미등록 상태이거나 실패한 경우,
   // 2차: 안전하게 바로빌 문자(LMS/SMS)로 자동 Fallback 전송!
   if (fallbackToSms) {
     console.log('[Barobill Kakao Fallback to Real SMS/LMS Activated]');
@@ -719,10 +774,11 @@ async function sendViaBarobillKakao({
       ...smsResult,
       fallbackUsed: true,
       sendType: `FALLBACK_${smsResult.sendType}`,
-      notice: '카카오 채널/템플릿 승인 전 상태이므로 바로빌 공식 문자로 안전하게 즉시 대체 발송되었습니다.'
+      notice: `카카오 알림톡(${lastBaroError ? lastBaroError.message : '채널/템플릿 미승인'}) 사유로 바로빌 공식 문자로 즉시 대체 발송되었습니다.`
     };
   }
 
+  if (lastBaroError) throw lastBaroError;
   throw new Error('바로빌 카카오톡 발송에 실패했습니다.');
 }
 
@@ -979,7 +1035,7 @@ async function dispatchSms({
           buttonTitle,
           templateName,
           senderNumber,
-          fallbackToSms: true // 실패 시 바로빌 SMS로 자동 안심 대체 전송
+          fallbackToSms: testMode === 'REAL_TEST' ? false : true // 테스트 발송 시에는 대체 문자 대신 정확한 알림톡 상태를 안내
         });
       } catch (bErr) {
         lastError = bErr;
@@ -1088,6 +1144,8 @@ module.exports = {
   getKoreanByteLength,
   getBarobillSmsBalance,
   getBarobillKakaoChannels,
+  getBarobillKakaoMgmtUrls,
+  getBarobillKakaoErrorMessage,
   sendViaBarobillKakao,
   sendViaBarobill,
   sendViaTwilio,

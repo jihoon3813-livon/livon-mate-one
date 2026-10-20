@@ -2342,6 +2342,36 @@ function appendServerAuditLog(logItem) {
       }
     }
 
+    // 바로빌 카카오톡 채널/템플릿 상태 및 원클릭 SSO URL API
+    if (reqPath === '/api/sms/barobill/kakao') {
+      try {
+        const { getBarobillKakaoChannels, getBarobillKakaoMgmtUrls, getBarobillConfig } = require('./sms-service');
+        const cfg = getBarobillConfig();
+        const [channelsRes, urlsRes] = await Promise.all([
+          getBarobillKakaoChannels().catch(e => ({ success: false, channels: [], error: e.message })),
+          getBarobillKakaoMgmtUrls().catch(e => ({ success: false, channelUrl: '', templateUrl: '', error: e.message }))
+        ]);
+        const channels = channelsRes.channels || [];
+        const hasChannel = channels.length > 0;
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({
+          success: true,
+          hasChannel,
+          channels,
+          channelUrl: urlsRes.channelUrl || 'https://www.barobill.co.kr',
+          templateUrl: urlsRes.templateUrl || 'https://www.barobill.co.kr',
+          corpNum: cfg.corpNum,
+          baroId: cfg.id,
+          message: hasChannel
+            ? `바로빌 카카오 채널 연동 완료 (${channels.map(c => c.channelName || c.channelId).join(', ')})`
+            : '바로빌 카카오 채널이 아직 등록되지 않았습니다. [바로빌 채널 등록]을 통해 카카오톡 채널을 1회 등록해 주세요.'
+        }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    }
+
     // 알리고 연결 및 발송 테스트 API
     if (reqPath === '/api/sms/aligo/test' && req.method === 'POST') {
       let body = '';
