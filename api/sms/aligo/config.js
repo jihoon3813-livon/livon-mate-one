@@ -30,7 +30,7 @@ module.exports = async (req, res) => {
         config: {
           userId: cfg.userId,
           sender: cfg.sender,
-          senderKey: cfg.senderKey,
+          senderKey: cfg.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
           hasKey: Boolean(cfg.apiKey),
           maskedKey,
           senders: cfg.senders,
@@ -62,6 +62,7 @@ module.exports = async (req, res) => {
         config: {
           userId: saved.userId,
           sender: saved.sender,
+          senderKey: saved.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
           hasKey: Boolean(saved.apiKey),
           maskedKey: saved.apiKey ? `${saved.apiKey.slice(0, 4)}••••••••${saved.apiKey.slice(-4)}` : ''
         }

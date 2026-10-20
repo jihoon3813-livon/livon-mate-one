@@ -2551,7 +2551,7 @@ function getSurveyAligoConfig() {
     userId: 'lifenjoy',
     apiKey: 'bhhro60er9uovr47gra0y5hjp3c5clfe',
     sender: '01026660883',
-    senderKey: ''
+    senderKey: 'a29152d7931a5d9102a4d545b9a50d9ca3187430'
   };
   try {
     const raw = localStorage.getItem('LIVON_ALIGO_CONFIG');
@@ -2560,11 +2560,17 @@ function getSurveyAligoConfig() {
       if (parsed.userId) cfg.userId = parsed.userId;
       if (parsed.apiKey && !parsed.apiKey.includes('••••')) cfg.apiKey = parsed.apiKey;
       if (parsed.sender) cfg.sender = parsed.sender;
-      if (parsed.senderKey) cfg.senderKey = parsed.senderKey;
+      if (parsed.senderKey) {
+        cfg.senderKey = parsed.senderKey;
+      } else {
+        const extraKey = localStorage.getItem('LIVON_ALIGO_SENDER_KEY') || localStorage.getItem('LIVON_KAKAO_SENDER_KEY');
+        cfg.senderKey = extraKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430';
+      }
     } else {
       localStorage.setItem('LIVON_ALIGO_CONFIG', JSON.stringify(cfg));
       localStorage.setItem('LIVON_ALIGO_USER', cfg.userId);
       localStorage.setItem('LIVON_ALIGO_KEY', cfg.apiKey);
+      localStorage.setItem('LIVON_ALIGO_SENDER_KEY', cfg.senderKey);
     }
   } catch (_) {}
   return cfg;
@@ -2958,7 +2964,8 @@ async function openAligoConfigModal() {
     if (localCfg.userId && idInput) idInput.value = localCfg.userId;
     if (localCfg.apiKey && keyInput) keyInput.value = localCfg.apiKey;
     if (localCfg.sender && senderInput) senderInput.value = localCfg.sender;
-    if (localCfg.senderKey && senderKeyInput) senderKeyInput.value = localCfg.senderKey;
+    const resolvedSenderKey = localCfg.senderKey || localStorage.getItem('LIVON_ALIGO_SENDER_KEY') || localStorage.getItem('LIVON_KAKAO_SENDER_KEY') || 'a29152d7931a5d9102a4d545b9a50d9ca3187430';
+    if (senderKeyInput) senderKeyInput.value = resolvedSenderKey;
   } catch (_) {}
 
   // 브라우저의 실제 현재 접속 공인 IP를 직접 조회하여 표시 (서버리스 IP 변동 영향 없음)
@@ -2984,7 +2991,7 @@ async function openAligoConfigModal() {
       if (idInput && !idInput.value) idInput.value = data.config.userId || 'lifenjoy';
       if (keyInput && !keyInput.value) keyInput.value = localCfg.apiKey || data.config.maskedKey || '';
       if (senderInput && !senderInput.value) senderInput.value = data.config.sender || '01026660883';
-      if (senderKeyInput && !senderKeyInput.value) senderKeyInput.value = data.config.senderKey || '';
+      if (senderKeyInput && (!senderKeyInput.value || senderKeyInput.value.length < 5)) senderKeyInput.value = data.config.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430';
       if (badge && (data.config.hasKey || hasKey)) {
         badge.className = 'px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-mono font-bold';
         badge.innerText = '연동키 등록됨';
@@ -3049,10 +3056,12 @@ async function saveAligoConfig() {
       userId,
       apiKey: apiKey && !apiKey.includes('••••') ? apiKey : ((JSON.parse(localStorage.getItem('LIVON_ALIGO_CONFIG') || '{}')).apiKey || ''),
       sender: sender || '16007835',
-      senderKey: senderKey || '',
+      senderKey: senderKey || localStorage.getItem('LIVON_ALIGO_SENDER_KEY') || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
       updatedAt: new Date().toISOString()
     };
     localStorage.setItem('LIVON_ALIGO_CONFIG', JSON.stringify(localCfg));
+    localStorage.setItem('LIVON_ALIGO_SENDER_KEY', localCfg.senderKey);
+    localStorage.setItem('LIVON_KAKAO_SENDER_KEY', localCfg.senderKey);
     if (apiKey && !apiKey.includes('••••')) {
       localStorage.setItem('LIVON_FAX_ALIGO_KEY', apiKey);
       localStorage.setItem('LIVON_ALIGO_KEY', apiKey);

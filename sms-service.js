@@ -39,7 +39,7 @@ function getAligoConfig() {
     userId: fileCfg.userId || process.env.ALIGO_USER_ID || 'lifenjoy',
     apiKey: fileCfg.apiKey || process.env.ALIGO_API_KEY || 'bhhro60er9uovr47gra0y5hjp3c5clfe',
     sender: fileCfg.sender || process.env.ALIGO_SENDER || '01026660883',
-    senderKey: fileCfg.senderKey || process.env.ALIGO_SENDER_KEY || '',
+    senderKey: fileCfg.senderKey || process.env.ALIGO_SENDER_KEY || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
     senders: fileCfg.senders || [
       { number: '16007835', label: '리본케어 공식 (1600-7835)', isDefault: true },
       { number: '15447119', label: '리본케어 고객센터 (1544-7119)', isDefault: false },
