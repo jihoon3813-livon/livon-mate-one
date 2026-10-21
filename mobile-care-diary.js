@@ -640,9 +640,9 @@ function renderMatrixTableHtml(records, dayIdx, patientTotalDays) {
 
     return `
       <div style="display: flex; align-items: stretch; border-top: 1px solid #f1f5f9; position: relative;">
-        <div style="width: 84px; flex-shrink: 0; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; z-index: 5; background: #ffffff; position: sticky; left: 0; box-shadow: 2px 0 5px rgba(0,0,0,0.02);">
-          <div style="font-size: 12.5px; font-weight: 800; color: #0f172a; line-height: 1.2;">${title}</div>
-          <div style="font-size: 9px; color: #94a3b8; margin-top: 3px;">${sub}</div>
+        <div style="width: 86px; flex-shrink: 0; padding: 8px 6px 8px 12px; display: flex; flex-direction: column; justify-content: center; z-index: 5; background: #ffffff; position: sticky; left: 0; border-right: 1.5px solid #e2e8f0; box-shadow: none;">
+          <div style="font-size: 12px; font-weight: 800; color: #0f172a; line-height: 1.2; white-space: nowrap;">${title}</div>
+          <div style="font-size: 9px; color: #94a3b8; margin-top: 3px; white-space: nowrap;">${sub}</div>
         </div>
         <div style="flex: 1; display: flex; position: relative; background: #ffffff;">
           ${svgOverlay}
@@ -655,11 +655,11 @@ function renderMatrixTableHtml(records, dayIdx, patientTotalDays) {
   const tableInnerWidth = Math.max(340, numCols * 36 + 84);
 
   return `
-    <div style="background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 12px 14px; margin-top: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.02); overflow-x: auto; -webkit-overflow-scrolling: touch;">
+    <div style="background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 12px 0; margin-top: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.02); overflow-x: auto; -webkit-overflow-scrolling: touch;">
       <div style="min-width: ${tableInnerWidth}px;">
         <!-- Month Groups Header Row -->
         <div style="display: flex; align-items: center; margin-bottom: 6px;">
-          <div style="width: 84px; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #64748b; padding-left: 6px; position: sticky; left: 0; background: #ffffff; z-index: 6;">
+          <div style="width: 86px; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #64748b; padding-left: 12px; position: sticky; left: 0; background: #ffffff; z-index: 6; border-right: 1.5px solid #e2e8f0;">
             항목 / 날짜
           </div>
           <div style="flex: 1; display: flex;">
@@ -673,7 +673,7 @@ function renderMatrixTableHtml(records, dayIdx, patientTotalDays) {
 
         <!-- Day Numbers Row -->
         <div style="display: flex; align-items: center; margin-bottom: 8px;">
-          <div style="width: 84px; flex-shrink: 0; position: sticky; left: 0; background: #ffffff; z-index: 6;"></div>
+          <div style="width: 86px; flex-shrink: 0; position: sticky; left: 0; background: #ffffff; z-index: 6; border-right: 1.5px solid #e2e8f0;"></div>
           <div style="flex: 1; display: flex;">
             ${displayCols.map((col, idx) => {
               const isSelected = (idx === targetColIdx);
@@ -785,7 +785,7 @@ function buildTimelineCardsHtml(records, dayIdx) {
     }
 
     return `
-      <div ${c.recordIndex >= 0 ? `onclick="selectDate(${c.recordIndex})"` : ''} style="flex: 1; min-width: 0; background: ${c.isLatest ? '#fff5f7' : '#ffffff'}; border: 1.5px solid ${c.isLatest ? '#fecdd3' : '#f1f5f9'}; border-radius: 14px; padding: 14px 12px; display: flex; flex-direction: column; justify-content: flex-start; cursor: ${c.recordIndex >= 0 ? 'pointer' : 'default'}; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+      <div style="flex: 1; min-width: 0; background: ${c.isLatest ? '#fff5f7' : '#ffffff'}; border: 1.5px solid ${c.isLatest ? '#fecdd3' : '#f1f5f9'}; border-radius: 14px; padding: 14px 12px; display: flex; flex-direction: column; justify-content: flex-start; cursor: default; box-shadow: 0 1px 3px rgba(0,0,0,0.02); user-select: none;">
         <div>
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
             <span style="font-size: 13.5px; font-weight: 800; color: ${c.isLatest ? '#e11d48' : '#334155'};">${c.date}</span>

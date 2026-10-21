@@ -47,23 +47,44 @@
     /* 상단 헤더 및 모든 액션 버튼 한 줄(Single-line) 정렬 보장 */
     .topbar {
       height: 58px !important;
-      padding: 0 12px !important;
+      padding: 0 10px !important;
       gap: 6px;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+      will-change: transform;
     }
 
+    /* 로고가 더보기 버튼에 가려지지 않도록 최소 너비 및 z-index 확보 */
     .topbar .logo {
-      font-size: 22px !important;
-      flex-shrink: 0;
-      white-space: nowrap;
+      font-size: 20px !important;
+      min-width: 68px !important;
+      flex-shrink: 0 !important;
+      white-space: nowrap !important;
+      z-index: 2;
+      margin-right: 4px;
     }
 
     .top-actions {
       display: flex !important;
       align-items: center !important;
       justify-content: flex-end;
-      gap: 4px !important;
+      gap: 3.5px !important;
       flex-wrap: nowrap !important;
-      min-width: 0;
+      flex-shrink: 1 !important;
+      min-width: 0 !important;
+      overflow-x: auto !important;
+      scrollbar-width: none !important;
+      -webkit-overflow-scrolling: touch !important;
+    }
+    .top-actions::-webkit-scrollbar {
+      display: none !important;
+    }
+
+    /* 1번 요청: 스크롤 내릴 때 상단 바 & 스텝 바 자동 숨김 -> 상하 뷰포트 영역 최대화 */
+    body.header-hidden .topbar {
+      transform: translateY(-100%) !important;
+    }
+    body.header-hidden .journey-stepper {
+      transform: translateY(-220%) !important;
     }
 
     .top-actions button,
@@ -151,6 +172,8 @@
       align-items: center;
       justify-content: space-between;
       gap: 5px;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+      will-change: transform;
     }
 
     @media (min-width: 900px) {
@@ -619,10 +642,22 @@
 
     .role-card-txt b {
       display: block;
-      font-size: 13px;
+      font-size: 12.5px !important;
       font-weight: 800;
       color: #2b1938;
       line-height: 1.25;
+      white-space: nowrap !important;
+      word-break: keep-all !important;
+      letter-spacing: -0.04em !important;
+    }
+    .role-select-card {
+      padding: 10px 8px !important;
+      gap: 7px !important;
+    }
+    .role-icon-circle {
+      width: 34px !important;
+      height: 34px !important;
+      font-size: 16px !important;
     }
 
     .role-card-txt small {
@@ -702,18 +737,25 @@
 
     .btn-cover-secondary {
       width: 100%;
-      padding: 12px 16px;
+      padding: 11px 8px !important;
       border-radius: 14px;
       border: 1px solid rgba(253, 230, 138, 0.55);
       background: rgba(254, 243, 199, 0.12);
       color: #fde68a;
-      font-size: 13px;
+      font-size: 11.5px !important;
       font-weight: 700;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 4px;
+      white-space: nowrap !important;
+      word-break: keep-all !important;
+      letter-spacing: -0.04em !important;
       transition: all 0.2s ease;
+    }
+    .btn-cover-secondary span {
+      white-space: nowrap !important;
+      word-break: keep-all !important;
     }
 
     .btn-cover-secondary:hover {
@@ -1288,9 +1330,8 @@
 
           <div id="matrix-table-container"></div>
 
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 10.5px; color: #94a3b8; padding: 0 2px;">
-            <div>회색(-): 미확인 · 추이선 연결 제외</div>
-            <div>높낮이는 서술 분류이며 수치 점수가 아닙니다.</div>
+          <div style="margin-top: 8px; font-size: 10px; color: #94a3b8; line-height: 1.5; padding: 0 4px; word-break: keep-all; letter-spacing: -0.02em;">
+            ※ 회색(-) : 미확인 기록 (추이선 연결 제외) · 높낮이는 서술 분류이며 수치 점수가 아닙니다.
           </div>
         </section>
 
@@ -1331,11 +1372,11 @@
           <div class="family-letter-card" id="family-letter-card" style="background: #fff8fb; border: 1.5px solid #fbcfe8; border-radius: 18px; padding: 18px 20px; position: relative;">
             <div id="family-quote-title" style="font-size: 15.5px; font-weight: 800; color: #be185d; margin-bottom: 12px; line-height: 1.45;"></div>
             <div id="family-quote-body" style="font-size: 13.5px; color: #1e293b; line-height: 2.0; word-break: keep-all;"></div>
-            <div class="family-quote-sign" style="display: flex; align-items: center; gap: 8px; border-top: 1px solid #fbcfe8; padding-top: 12px; margin-top: 14px;">
-              <span class="mini-avatar carer-initial patient-initial" style="width: 26px; height: 26px; border-radius: 6px; background: #fce7f3; display: inline-flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 800; color: #be185d;">권</span>
-              <span style="font-size: 12px; font-weight: 700; color: #334155;">
-                담당 간병인 <b class="carer-name">권은지</b>
-                <small style="color: #94a3b8; font-size: 10.5px; margin-left: 4px; font-weight: 400;">· 보호자 전달사항을 바탕으로 재구성</small>
+            <div class="family-quote-sign" style="display: flex; align-items: center; gap: 6px; border-top: 1px solid #fbcfe8; padding-top: 10px; margin-top: 12px; white-space: nowrap; overflow: hidden;">
+              <span class="mini-avatar carer-initial patient-initial" style="width: 24px; height: 24px; border-radius: 6px; background: #fce7f3; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #be185d; flex-shrink: 0;">권</span>
+              <span style="font-size: 11px; font-weight: 700; color: #334155; white-space: nowrap; letter-spacing: -0.04em;">
+                담당 간병인 <b class="carer-name" style="color: #be185d;">권은지</b>
+                <small style="color: #94a3b8; font-size: 9.5px; margin-left: 3px; font-weight: 400; white-space: nowrap;">· 보호자 전달사항 바탕 재구성</small>
               </span>
             </div>
           </div>
@@ -1347,19 +1388,19 @@
         <section id="survey-section" style="scroll-margin-top: 130px;">
           <!-- 자연스러운 연결 브릿지 카드 -->
           <div class="survey-bridge-banner">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px;">
-              <div>
-                <span style="display: inline-block; font-size: 10.5px; font-weight: 800; color: #be185d; background: #ffffff; border: 1px solid #f9a8d4; padding: 3px 9px; border-radius: 999px; margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px;">
+              <div style="flex: 1; min-width: 0;">
+                <span style="display: inline-block; font-size: 10px; font-weight: 800; color: #be185d; background: #ffffff; border: 1px solid #f9a8d4; padding: 2px 8px; border-radius: 999px; margin-bottom: 5px;">
                   PART 02 · 케어 경험 &amp; 만족도 설문
                 </span>
-                <h2 style="font-size: 20px; font-weight: 850; color: #2b1938; line-height: 1.35; letter-spacing: -0.04em;">
+                <h2 style="font-size: 17px; font-weight: 850; color: #2b1938; line-height: 1.3; letter-spacing: -0.05em; white-space: nowrap !important; word-break: keep-all !important;">
                   간병일지를 잘 확인하셨나요?<br>
-                  <span style="color: #be185d;">소중한 의견을 들려주세요.</span>
+                  <span style="color: #be185d; font-size: 16px;">소중한 의견을 들려주세요.</span>
                 </h2>
               </div>
-              <div style="width: 56px; height: 56px; border-radius: 18px; background: #ffffff; border: 1.5px solid #fde68a; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.14);">
-                <span style="font-size: 22px; line-height: 1;">☕</span>
-                <span style="font-size: 9px; font-weight: 800; color: #b45309; margin-top: 2px;">쿠폰증정</span>
+              <div style="width: 48px; height: 48px; border-radius: 14px; background: #ffffff; border: 1.5px solid #fde68a; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.12);">
+                <span style="font-size: 20px; line-height: 1;">☕</span>
+                <span style="font-size: 8.5px; font-weight: 800; color: #b45309; margin-top: 1px;">쿠폰증정</span>
               </div>
             </div>
             <p style="font-size: 12.5px; color: #5b425c; line-height: 1.55; word-break: keep-all;">
@@ -1640,6 +1681,27 @@
 
   <!-- Integrated Survey & Cover Controller Script -->
   <script>
+    // 1번 요청: 스크롤 내릴 때 상단 메뉴 숨김 (상하 여백 최대화) 및 스크롤 올릴 때 복원
+    (function initSmartHeaderScroll() {
+      let lastScrollY = window.pageYOffset || document.documentElement.scrollTop;
+      let isTicking = false;
+      window.addEventListener('scroll', () => {
+        if (!isTicking) {
+          window.requestAnimationFrame(() => {
+            const currentY = window.pageYOffset || document.documentElement.scrollTop;
+            const scrollDelta = currentY - lastScrollY;
+            if (currentY > 60 && scrollDelta > 8) {
+              document.body.classList.add('header-hidden');
+            } else if (scrollDelta < -8 || currentY <= 30) {
+              document.body.classList.remove('header-hidden');
+            }
+            lastScrollY = Math.max(0, currentY);
+            isTicking = false;
+          });
+          isTicking = true;
+        }
+      }, { passive: true });
+    })();
     // 추천 타이틀 프리셋 4종 (관리자 웹뷰 미리보기 및 URL 파라미터로 실시간 전환 지원)
     const RECOMMENDED_TITLES = {
       '1': {

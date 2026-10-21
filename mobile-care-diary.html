@@ -167,9 +167,8 @@
 
           <div id="matrix-table-container"></div>
 
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 10.5px; color: #94a3b8; padding: 0 2px;">
-            <div>회색(-): 미확인 · 추이선 연결 제외</div>
-            <div>높낮이는 서술 분류이며 수치 점수가 아닙니다.</div>
+          <div style="margin-top: 8px; font-size: 10px; color: #94a3b8; line-height: 1.5; padding: 0 4px; word-break: keep-all; letter-spacing: -0.02em;">
+            ※ 회색(-) : 미확인 기록 (추이선 연결 제외) · 높낮이는 서술 분류이며 수치 점수가 아닙니다.
           </div>
           <div style="font-size: 10px; color: #94a3b8; margin-top: 3px; padding: 0 2px;">
             신호등과 그래프는 기록의 이해를 돕는 표현이며 의학적 중증도 판정이 아닙니다.
@@ -215,11 +214,11 @@
           <div class="family-letter-card" id="family-letter-card" style="background: #fff8f8; border: 1.5px solid #ffe4e6; border-radius: 18px; padding: 18px 20px; position: relative;">
             <div id="family-quote-title" style="font-size: 15.5px; font-weight: 800; color: #be185d; margin-bottom: 12px; line-height: 1.45;"></div>
             <div id="family-quote-body" style="font-size: 13.5px; color: #1e293b; line-height: 2.0; word-break: keep-all;"></div>
-            <div class="family-quote-sign" style="display: flex; align-items: center; gap: 8px; border-top: 1px solid #ffe4e6; padding-top: 12px; margin-top: 14px;">
-              <span class="mini-avatar carer-initial patient-initial" style="width: 26px; height: 26px; border-radius: 6px; background: #e2e8f0; display: inline-flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 800; color: #475569;">권</span>
-              <span style="font-size: 12px; font-weight: 700; color: #334155;">
-                담당 간병인 <b class="carer-name">권은지</b>
-                <small style="color: #94a3b8; font-size: 10.5px; margin-left: 4px; font-weight: 400;">· 보호자 전달사항을 바탕으로 재구성</small>
+            <div class="family-quote-sign" style="display: flex; align-items: center; gap: 6px; border-top: 1px solid #ffe4e6; padding-top: 10px; margin-top: 12px; white-space: nowrap; overflow: hidden;">
+              <span class="mini-avatar carer-initial patient-initial" style="width: 24px; height: 24px; border-radius: 6px; background: #e2e8f0; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #475569; flex-shrink: 0;">권</span>
+              <span style="font-size: 11px; font-weight: 700; color: #334155; white-space: nowrap; letter-spacing: -0.04em;">
+                담당 간병인 <b class="carer-name" style="color: #be185d;">권은지</b>
+                <small style="color: #94a3b8; font-size: 9.5px; margin-left: 3px; font-weight: 400; white-space: nowrap;">· 보호자 전달사항 바탕 재구성</small>
               </span>
             </div>
           </div>
@@ -265,5 +264,27 @@
   </dialog>
 
   <script src="/mobile-care-diary.js?v=20261020_1830"></script>
+  <script>
+    (function initSmartHeaderScroll() {
+      let lastScrollY = window.pageYOffset || document.documentElement.scrollTop;
+      let isTicking = false;
+      window.addEventListener('scroll', () => {
+        if (!isTicking) {
+          window.requestAnimationFrame(() => {
+            const currentY = window.pageYOffset || document.documentElement.scrollTop;
+            const scrollDelta = currentY - lastScrollY;
+            if (currentY > 60 && scrollDelta > 8) {
+              document.body.classList.add('header-hidden');
+            } else if (scrollDelta < -8 || currentY <= 30) {
+              document.body.classList.remove('header-hidden');
+            }
+            lastScrollY = Math.max(0, currentY);
+            isTicking = false;
+          });
+          isTicking = true;
+        }
+      }, { passive: true });
+    })();
+  </script>
 </body>
 </html>
