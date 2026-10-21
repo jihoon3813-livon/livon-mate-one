@@ -2373,26 +2373,37 @@ function appendServerAuditLog(logItem) {
     // 바로빌 카카오톡 채널/템플릿 상태 및 원클릭 SSO URL API
     if (reqPath === '/api/sms/barobill/kakao') {
       try {
-        const { getBarobillKakaoChannels, getBarobillKakaoMgmtUrls, getBarobillConfig } = require('./sms-service');
+        const { getBarobillKakaoChannels, getBarobillKakaoTemplates, getBarobillKakaoMgmtUrls, getBarobillConfig } = require('./sms-service');
         const cfg = getBarobillConfig();
-        const [channelsRes, urlsRes] = await Promise.all([
+        const [channelsRes, tmplRes, urlsRes] = await Promise.all([
           getBarobillKakaoChannels().catch(e => ({ success: false, channels: [], error: e.message })),
+          getBarobillKakaoTemplates().catch(e => ({ success: false, templates: [], error: e.message })),
           getBarobillKakaoMgmtUrls().catch(e => ({ success: false, channelUrl: '', templateUrl: '', error: e.message }))
         ]);
         const channels = channelsRes.channels || [];
+        const templates = tmplRes.templates || [];
         const hasChannel = channels.length > 0;
+        const approvedTemplates = templates.filter(t => t.status === 3);
+        const hasApprovedTemplates = approvedTemplates.length > 0;
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         return res.end(JSON.stringify({
           success: true,
           hasChannel,
           channels,
+          hasTemplates: hasApprovedTemplates,
+          templates,
+          approvedTemplates,
           channelUrl: urlsRes.channelUrl || 'https://www.barobill.co.kr',
           templateUrl: urlsRes.templateUrl || 'https://www.barobill.co.kr',
           corpNum: cfg.corpNum,
           baroId: cfg.id,
-          message: hasChannel
-            ? `바로빌 카카오 채널 연동 완료 (${channels.map(c => c.channelName || c.channelId).join(', ')})`
-            : '바로빌 카카오 채널이 아직 등록되지 않았습니다. [바로빌 채널 등록]을 통해 카카오톡 채널을 1회 등록해 주세요.'
+          channelId: channels[0]?.channelId || '@hidea_mohw',
+          channelName: channels[0]?.channelName || '리본 메이트',
+          message: hasApprovedTemplates
+            ? `바로빌 카카오 알림톡 정상 연동 완료 (채널: ${channels[0]?.channelName || '리본 메이트'} / 승인 템플릿 ${approvedTemplates.length}건)`
+            : (hasChannel
+              ? `바로빌 카카오 채널 연동 완료 (${channels.map(c => c.channelName || c.channelId).join(', ')}). 템플릿 심사 진행 필요.`
+              : '바로빌 카카오 채널이 아직 등록되지 않았습니다.')
         }));
       } catch (e) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });

@@ -615,6 +615,43 @@ async function getBarobillKakaoChannels() {
 }
 
 /**
+ * 바로빌 등록된 카카오 알림톡 템플릿 목록 조회
+ */
+async function getBarobillKakaoTemplates(channelId = '@hidea_mohw') {
+  const cfg = getBarobillConfig();
+  const isTest = cfg.server === 'test';
+  try {
+    const res = await callBarobillKakaoSoap('GetKakaotalkTemplates', `
+      <CERTKEY>${cfg.certKey}</CERTKEY>
+      <CorpNum>${cfg.corpNum}</CorpNum>
+      <ChannelId>${escapeXml(channelId)}</ChannelId>
+    `, isTest);
+    const templates = [];
+    const regex = /<KakaotalkTemplate>([\s\S]*?)<\/KakaotalkTemplate>/g;
+    let m;
+    while ((m = regex.exec(res.body)) !== null) {
+      const tXml = m[1];
+      const chId = tXml.match(/<ChannelId>(.*?)<\/ChannelId>/)?.[1] || '';
+      const tName = tXml.match(/<TemplateName>(.*?)<\/TemplateName>/)?.[1] || '';
+      const st = parseInt(tXml.match(/<Status>(.*?)<\/Status>/)?.[1] || '0', 10);
+      const content = tXml.match(/<TemplateContent>([\s\S]*?)<\/TemplateContent>/)?.[1] || '';
+      if (tName) {
+        templates.push({
+          channelId: chId,
+          templateName: tName,
+          status: st,
+          statusLabel: st === 3 ? '승인완료' : (st === 1 ? '심사중' : (st === 2 ? '반려' : `상태 ${st}`)),
+          content
+        });
+      }
+    }
+    return { success: true, templates };
+  } catch (e) {
+    return { success: false, error: e.message, templates: [] };
+  }
+}
+
+/**
  * 바로빌 카카오 채널 및 템플릿 관리 원클릭 SSO URL 조회
  */
 async function getBarobillKakaoMgmtUrls() {
@@ -690,17 +727,47 @@ async function sendViaBarobillKakao({
   }
 
   const title = `[리본케어] ${patientName || toName} 님의 모바일 간병일지`;
-  const effectiveChannel = channelId || '@리본케어';
-  const effectiveTemplate = templateName || 'UM_6526';
+  const effectiveChannel = channelId || '@hidea_mohw';
 
-  // 버튼 XML 블록 (본문에 URL 텍스트 노출 안 됨!)
-  const buttonsXml = buttonUrl ? `
+  // 바로빌 승인 템플릿(삼성화재/현대해상) 자동 매핑
+  let effectiveTemplate = templateName;
+  const isHyundai = (message && (message.includes('1533-7436') || message.includes('현대해상'))) ||
+                    (templateName && (templateName.includes('UM_6527') || templateName.includes('현대'))) ||
+                    (toName && toName.includes('현대')) ||
+                    (patientName && patientName.includes('현대'));
+
+  if (!effectiveTemplate || effectiveTemplate === 'UM_6526' || effectiveTemplate === 'UM_6527') {
+    effectiveTemplate = isHyundai
+      ? '리본케어 간병일지 및 만족도 설문 안내(현대해상)'
+      : '리본케어 간병일지 및 만족도 설문 안내(삼성화재)';
+  }
+
+  // 바로빌 공식 승인 템플릿 규격: 1) 채널추가 (AC), 2) 모바일 간병일지 & 설문 (WL)
+  // 카카오 알림톡 정책:
+  // 1) localhost, 127.0.0.1 등 로컬 주소는 버튼 링크로 카카오 검증 서버에서 즉시 거절됨 -> 실도메인(admin.livon.care) 치환
+  // 2) 바로빌 승인 템플릿의 버튼 규격이 'http://#{url}' 이므로 프로토콜은 반드시 'http://' 로 통일
+  let targetUrl = String(buttonUrl || '').trim();
+  if (targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1')) {
+    targetUrl = targetUrl.replace(/^https?:\/\/[^\/]+/, 'http://admin.livon.care');
+  } else if (targetUrl.startsWith('https://')) {
+    targetUrl = targetUrl.replace(/^https:\/\//, 'http://');
+  } else if (targetUrl && !targetUrl.startsWith('http://')) {
+    targetUrl = 'http://' + targetUrl;
+  }
+
+  const buttonsXml = targetUrl ? `
     <Buttons>
       <KakaotalkButton>
-        <Name>${escapeXml(buttonTitle)}</Name>
+        <Name>채널추가</Name>
+        <ButtonType>AC</ButtonType>
+        <Url1></Url1>
+        <Url2></Url2>
+      </KakaotalkButton>
+      <KakaotalkButton>
+        <Name>모바일 간병일지 &amp; 설문</Name>
         <ButtonType>WL</ButtonType>
-        <Url1>${escapeXml(buttonUrl)}</Url1>
-        <Url2>${escapeXml(buttonUrl)}</Url2>
+        <Url1>${escapeXml(targetUrl)}</Url1>
+        <Url2>${escapeXml(targetUrl)}</Url2>
       </KakaotalkButton>
     </Buttons>
   ` : '';
@@ -721,7 +788,7 @@ async function sendViaBarobillKakao({
       <ReceiverNum>${cleanTo}</ReceiverNum>
       <Title>${escapeXml(title)}</Title>
       <Message>${escapeXml(message)}</Message>
-      <SmsMessage>${escapeXml(message + (buttonUrl ? `\n\n▶ 간병일지 확인: ${buttonUrl}` : ''))}</SmsMessage>
+      <SmsMessage>${escapeXml(message + (targetUrl ? `\n\n▶ 간병일지 확인: ${targetUrl}` : ''))}</SmsMessage>
       <SmsSubject>${escapeXml(title)}</SmsSubject>
       ${buttonsXml}
     </KakaotalkMessage>
@@ -732,10 +799,13 @@ async function sendViaBarobillKakao({
     const res = await callBarobillKakaoSoap('SendATKakaotalkEx', bodyXml, isTest);
     if (res.status === 200) {
       const match = res.body.match(/<SendATKakaotalkExResult>(.*?)<\/SendATKakaotalkExResult>/);
-      const sendKey = match ? match[1] : '';
-      const numVal = parseInt(sendKey, 10);
+      const sendKey = match ? match[1].trim() : '';
 
-      if (!isNaN(numVal) && numVal > 0) {
+      // 바로빌 접수키: "BB_1058621696_AT_..." 또는 양수 문자열
+      // 오류코드: "-10001", "-31301" 등의 음수 문자열
+      const isSuccess = sendKey && !sendKey.startsWith('-') && sendKey.length > 2;
+
+      if (isSuccess) {
         return {
           success: true,
           provider: 'barobill',
@@ -744,7 +814,7 @@ async function sendViaBarobillKakao({
           toPhone: cleanTo,
           fromPhone: cleanFrom,
           channel: effectiveChannel,
-          buttonUrl,
+          buttonUrl: targetUrl,
           message: `바로빌 카카오 알림톡 정상 접수 완료 (접수번호: ${sendKey})`
         };
       } else {
@@ -1144,6 +1214,7 @@ module.exports = {
   getKoreanByteLength,
   getBarobillSmsBalance,
   getBarobillKakaoChannels,
+  getBarobillKakaoTemplates,
   getBarobillKakaoMgmtUrls,
   getBarobillKakaoErrorMessage,
   sendViaBarobillKakao,

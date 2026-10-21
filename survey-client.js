@@ -9,7 +9,7 @@ async function fetchBarobillKakaoInfo() {
       gBarobillKakaoInfo = data;
       const link = document.getElementById('btnBarobillKakaoLink');
       if (link && data.channelUrl) {
-
+        link.title = `바로빌 카카오 채널: ${data.channelName || data.channelId || '@hidea_mohw'} (승인 완료)`;
       }
       return data;
     }
@@ -2021,7 +2021,15 @@ function getSurveyTargetShortCode(target) {
 }
 
 function getSurveyTargetUrlForSms(target) {
-  const origin = window.location.origin;
+  let origin = window.location.origin;
+  // 카카오 알림톡 정책:
+  // 1) localhost, 127.0.0.1 등 사설 주소는 카카오 검증 서버에서 즉시 차단됨
+  // 2) 바로빌 승인 템플릿의 버튼 규격이 'http://#{url}' 이므로 알림톡 모드 시 프로토콜 일치 필수
+  if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    origin = 'http://admin.livon.care';
+  } else if (gCurrentSurveySmsChannelMode === 'kakao' && origin.startsWith('https://')) {
+    origin = origin.replace(/^https:\/\//, 'http://');
+  }
   const shortCode = getSurveyTargetShortCode(target);
   return `${origin}/s/${shortCode}`;
 }
@@ -2050,25 +2058,27 @@ function switchSurveySmsChannelMode(channelMode = 'sms') {
     const target = (gSurveyState.targets || []).find(t => t.id === targetId || t.serviceId === targetId) || null;
     const shortUrl = getSurveyTargetUrlForSms(target);
     if (gCurrentSurveySmsChannelMode === 'kakao') {
-      helpBar.className = 'mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-[11px] text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs';
+      helpBar.className = 'mt-2 p-2.5 rounded-xl bg-amber-50/90 border border-amber-300 text-[11px] text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs';
       helpBar.innerHTML = `
-        <div class="flex items-center gap-1.5 flex-1">
+        <div class="flex items-center gap-2 flex-1">
           <span class="text-base shrink-0">🟡</span>
           <div>
-            <b>바로빌 카카오 알림톡 모드 (Vercel IP 차단 없음):</b> 링크 주소를 본문에서 숨기고 하단 <b>[모바일 간병일지 & 설문 열람하기]</b> 버튼으로 전송합니다.
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="font-black text-amber-950">바로빌 카카오 알림톡 정식 연동 완료</span>
+              <span class="px-1.5 py-0.5 rounded bg-emerald-600 text-white font-black text-[9.5px]">승인 완료</span>
+              <span class="font-mono text-[10.5px] text-amber-800 font-bold">@hidea_mohw (리본 메이트)</span>
+            </div>
+            <div class="text-[10.5px] text-slate-600 mt-0.5">
+              공식 승인 템플릿(삼성/현대 2종) 규격이 적용되어 본문 주소 100% 은닉 + <b>[채널추가] · [모바일 간병일지 & 설문]</b> 버튼으로 즉시 안전 발송됩니다.
+            </div>
           </div>
         </div>
-        <a id="surveyHelpBarChannelLink" href="/api/sms/barobill/open-channel" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-[10.5px] inline-flex items-center gap-1 shrink-0 shadow-xs cursor-pointer whitespace-nowrap">
-          <span>채널 등록 ↗</span>
-        </a>
+        <div class="flex items-center gap-1 shrink-0 self-end sm:self-center">
+          <a id="surveyHelpBarChannelLink" href="/api/sms/barobill/open-channel" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 bg-[#FEE500] hover:bg-[#FADA0A] text-[#191919] border border-[#E5CE00] font-black rounded-lg text-[10.5px] inline-flex items-center gap-1 shrink-0 shadow-2xs cursor-pointer whitespace-nowrap">
+            <span>바로빌 채널관리 ↗</span>
+          </a>
+        </div>
       `;
-      fetchBarobillKakaoInfo().then(info => {
-        const link = document.getElementById('surveyHelpBarChannelLink');
-
-        if (info && info.hasChannel) {
-          if (link) link.style.display = 'none';
-        }
-      });
     } else {
       helpBar.className = 'mt-2 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[10.5px] text-emerald-800 flex items-center justify-between gap-2';
       helpBar.innerHTML = `<span>🔒 <b>긴 파라미터 주소 숨김 적용됨:</b> 환자명·토큰 노출 없이 <code class="font-mono font-black bg-white px-1.5 py-0.5 rounded border border-emerald-300 text-emerald-900">${escapeHtml(shortUrl)}</code> 한 줄로 발송됩니다.</span>`;
@@ -2390,23 +2400,23 @@ function applySurveySmsTemplate(tplType = 'DEFAULT') {
   const cleanGift = '스타벅스 아메리카노 Tall 1매';
 
   if (isKakao) {
-    // 카카오 공식 승인 템플릿(UM_6526 / UM_6527)과 100% 일치 보장 (줄바꿈/문장부호 일치)
+    // 바로빌 공식 승인 템플릿(삼성화재/현대해상)과 100% 일치 보장 (줄바꿈/문장부호 일치)
     subject = `[리본케어] ${pName} 님 모바일 안심 간병일지 & 만족도 설문 안내`;
     if (isHyundai) {
       body =
         `[리본케어] ${pName} 님의 모바일 안심 간병일지 & 케어 만족도 설문이 도착했습니다.\n\n` +
-        `• 병원/간병인: ${hospName} (${cgName} 간병사)\n` +
-        `• 참여 혜택: 설문 완료 시 환자·보호자님께 ${cleanGift} 100% 증정\n` +
+        `• 병원/간병인: ${hospName} (${cgName} 간병사)\n\n` +
+        `• 참여 혜택: 설문 완료 시 환자·보호자님께 ${cleanGift} 100% 증정\n\n` +
         `일자별 상세 간병일지를 확인하시고 하단 1분 만족도 조사에 소중한 의견을 들려주세요.\n\n` +
         `아래 [모바일 간병일지 & 설문 열람하기] 버튼을 눌러 바로 확인해 주세요.\n\n` +
         `※ 문의: 리본케어 고객센터 (1533-7436)`;
     } else {
       body =
         `[리본케어] ${pName} 님의 모바일 안심 간병일지 & 케어 만족도 설문이 도착했습니다.\n\n` +
-        `• 병원/간병인: ${hospName} (${cgName} 간병사)\n` +
-        `• 참여 혜택: 설문 완료 시 환자·보호자님께 ${cleanGift} 100% 증정\n` +
+        `• 병원/간병인: ${hospName} (${cgName} 간병사)\n\n` +
+        `• 참여 혜택: 설문 완료 시 환자·보호자님께 ${cleanGift} 100% 증정\n\n` +
         `일자별 상세 간병일지를 확인하시고 하단 1분 만족도 조사에 소중한 의견을 들려주세요.\n\n` +
-        `👇 아래 [모바일 간병일지 & 설문 열람하기] 버튼을 눌러 바로 확인해 주세요.\n\n` +
+        `아래 [모바일 간병일지 & 설문 열람하기] 버튼을 눌러 바로 확인해 주세요.\n\n` +
         `※ 문의: 리본케어 고객센터 (1877-7412)`;
     }
   } else if (tplType === 'COUPON_FOCUS') {
@@ -2520,7 +2530,22 @@ function updateSurveySmsLivePreview() {
   const kakaoTopBar = document.getElementById('surveySmsPreviewKakaoTopBar');
   const kakaoBtnWrap = document.getElementById('surveySmsPreviewKakaoBtnWrap');
   if (kakaoTopBar) kakaoTopBar.classList.toggle('hidden', !isKakao);
-  if (kakaoBtnWrap) kakaoBtnWrap.classList.toggle('hidden', !isKakao);
+  if (kakaoBtnWrap) {
+    kakaoBtnWrap.classList.toggle('hidden', !isKakao);
+    if (isKakao) {
+      kakaoBtnWrap.innerHTML = `
+        <div class="space-y-1.5 pt-2 border-t border-slate-100">
+          <button type="button" class="w-full py-2 px-3 rounded-xl bg-[#FEE500] hover:bg-[#FADA0A] text-[#191919] font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs border border-[#E5CE00]">
+            <span class="text-xs">🟡</span> <span>채널추가</span>
+          </button>
+          <button type="button" onclick="openSurveySmsPreviewUrl()" class="w-full py-2.5 px-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-900 font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs">
+            <span>모바일 간병일지 &amp; 설문</span>
+            <span class="text-slate-400 text-xs">↗</span>
+          </button>
+        </div>
+      `;
+    }
+  }
 
   const phoneFrame = document.getElementById('surveySmsPhoneScreenBg')?.parentElement;
   if (phoneFrame) {
@@ -2695,13 +2720,16 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST', forceChannel = null) {
         surveyUrl,
         channel,
         buttonUrl: surveyUrl,
-        buttonTitle: '모바일 간병일지 & 설문 열람하기',
+        buttonTitle: '모바일 간병일지 & 설문',
         senderNumber,
-        provider,
+        provider: provider || (channel === 'kakao' ? 'barobill' : 'aligo'),
+        channelId: '@hidea_mohw',
         userId: aligoCfg.userId,
         apiKey: aligoCfg.apiKey,
         senderKey: aligoCfg.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
-        templateCode: aligoCfg.templateCode || (getSurveyTargetInsuranceName(target).includes('현대') ? 'UM_6527' : 'UM_6526')
+        templateCode: (provider === 'barobill' || channel === 'kakao')
+          ? (getSurveyTargetInsuranceName(target).includes('현대') ? '리본케어 간병일지 및 만족도 설문 안내(현대해상)' : '리본케어 간병일지 및 만족도 설문 안내(삼성화재)')
+          : (aligoCfg.templateCode || (getSurveyTargetInsuranceName(target).includes('현대') ? 'UM_6527' : 'UM_6526'))
       })
     });
     const result = await res.json();
@@ -2832,13 +2860,16 @@ async function submitSurveyCustomerSms() {
         surveyUrl,
         channel,
         buttonUrl: surveyUrl,
-        buttonTitle: '모바일 간병일지 & 설문 열람하기',
+        buttonTitle: '모바일 간병일지 & 설문',
         senderNumber,
-        provider,
+        provider: provider || (channel === 'kakao' ? 'barobill' : 'aligo'),
+        channelId: '@hidea_mohw',
         userId: aligoCfg.userId,
         apiKey: aligoCfg.apiKey,
         senderKey: aligoCfg.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
-        templateCode: aligoCfg.templateCode || (getSurveyTargetInsuranceName(target).includes('현대') ? 'UM_6527' : 'UM_6526'),
+        templateCode: (provider === 'barobill' || channel === 'kakao')
+          ? (getSurveyTargetInsuranceName(target).includes('현대') ? '리본케어 간병일지 및 만족도 설문 안내(현대해상)' : '리본케어 간병일지 및 만족도 설문 안내(삼성화재)')
+          : (aligoCfg.templateCode || (getSurveyTargetInsuranceName(target).includes('현대') ? 'UM_6527' : 'UM_6526')),
         isNewSurvey: isNewTab,
         skipReward: isNewTab,
         actor: 'HQ'

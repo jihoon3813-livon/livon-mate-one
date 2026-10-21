@@ -7666,10 +7666,13 @@
                     <div id="surveySmsPreviewBody" class="text-[11.5px] text-slate-800 whitespace-pre-wrap break-all leading-relaxed font-sans"></div>
 
                     <!-- 카카오 알림톡 공식 버튼 (URL 비노출 버튼형 모드 시 노출) -->
-                    <div id="surveySmsPreviewKakaoBtnWrap" class="hidden pt-2 border-t border-slate-100">
-                      <button type="button" onclick="openSurveySmsPreviewUrl()" class="w-full py-2.5 px-3 rounded-xl bg-[#f8f9fa] hover:bg-slate-100 border border-slate-300 text-slate-900 font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs">
-                        <span>📖 모바일 간병일지 &amp; 설문 열람하기</span>
-                        <span class="text-slate-400">↗</span>
+                    <div id="surveySmsPreviewKakaoBtnWrap" class="hidden space-y-1.5 pt-2 border-t border-slate-100">
+                      <button type="button" class="w-full py-2 px-3 rounded-xl bg-[#FEE500] hover:bg-[#FADA0A] text-[#191919] font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs border border-[#E5CE00]">
+                        <span class="text-xs">🟡</span> <span>채널추가</span>
+                      </button>
+                      <button type="button" onclick="openSurveySmsPreviewUrl()" class="w-full py-2.5 px-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-900 font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs">
+                        <span>모바일 간병일지 &amp; 설문</span>
+                        <span class="text-slate-400 text-xs">↗</span>
                       </button>
                     </div>
                   </div>
