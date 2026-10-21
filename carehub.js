@@ -6521,6 +6521,18 @@ function addCustomerMemoItem(appId, customText) {
         };
       }
     }
+    if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications)) {
+      const sIdx = window.REBORN_REAL_SEED_DATA.applications.findIndex(a => a && (String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, '')));
+      if (sIdx !== -1) {
+        window.REBORN_REAL_SEED_DATA.applications[sIdx] = { 
+          ...window.REBORN_REAL_SEED_DATA.applications[sIdx], 
+          memoList: app.memoList, 
+          memo: app.memo, 
+          specialNotes: app.specialNotes, 
+          updatedAt: app.updatedAt 
+        };
+      }
+    }
 
     try {
       localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
@@ -6661,6 +6673,18 @@ function saveEditCustomerMemoItem(appId, itemId) {
         };
       }
     }
+    if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications)) {
+      const sIdx = window.REBORN_REAL_SEED_DATA.applications.findIndex(a => a && (String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, '')));
+      if (sIdx !== -1) {
+        window.REBORN_REAL_SEED_DATA.applications[sIdx] = { 
+          ...window.REBORN_REAL_SEED_DATA.applications[sIdx], 
+          memoList: app.memoList, 
+          memo: app.memo, 
+          specialNotes: app.specialNotes, 
+          updatedAt: app.updatedAt 
+        };
+      }
+    }
 
     try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
@@ -6709,6 +6733,18 @@ function deleteCustomerMemoItem(appId, itemId) {
       if (rIdx !== -1) {
         window.REBORN_DATA.applications[rIdx] = { 
           ...window.REBORN_DATA.applications[rIdx], 
+          memoList: app.memoList, 
+          memo: app.memo, 
+          specialNotes: app.specialNotes, 
+          updatedAt: app.updatedAt 
+        };
+      }
+    }
+    if (window.REBORN_REAL_SEED_DATA && Array.isArray(window.REBORN_REAL_SEED_DATA.applications)) {
+      const sIdx = window.REBORN_REAL_SEED_DATA.applications.findIndex(a => a && (String(a.id) === String(app.id) || String(a.id).replace(/^[CH]/, '') === String(app.id).replace(/^[CH]/, '')));
+      if (sIdx !== -1) {
+        window.REBORN_REAL_SEED_DATA.applications[sIdx] = { 
+          ...window.REBORN_REAL_SEED_DATA.applications[sIdx], 
           memoList: app.memoList, 
           memo: app.memo, 
           specialNotes: app.specialNotes, 

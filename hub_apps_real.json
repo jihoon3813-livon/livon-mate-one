@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-17T12:50:17.316Z",
+  "updatedAt": "2026-10-21T00:55:37.605Z",
   "sources": {
     "종합 간병(현대해상)": {
       "sourceType": "file",
@@ -147,7 +147,7 @@
       "status": "접수",
       "totalPayout": 0,
       "unconfirmedClaimCount": 0,
-      "updatedAt": "2026-10-17T02:48:15.779Z"
+      "updatedAt": "2026-10-21T00:55:37.604Z"
     },
     {
       "_creationTime": 1791334071471.1199,
@@ -24830,7 +24830,8 @@
       "csLatestType": null,
       "_applyTime": 1791425040000,
       "_updTime": 0,
-      "_latestEventTime": 1791425040000
+      "_latestEventTime": 1791425040000,
+      "isAlertConfirmed": true
     },
     {
       "id": "C0334",
@@ -26085,7 +26086,8 @@
       "csLatestType": null,
       "_applyTime": 1791864000000,
       "_updTime": 0,
-      "_latestEventTime": 1791864000000
+      "_latestEventTime": 1791864000000,
+      "isAlertConfirmed": true
     },
     {
       "_creationTime": 1791874890487.9126,

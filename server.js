@@ -1543,12 +1543,13 @@ function appendServerAuditLog(logItem) {
             try { stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8')); } catch (e) {}
           }
           stored.applications = stored.applications || [];
-          const idx = stored.applications.findIndex(a => {
+          let idx = stored.applications.findIndex(a => {
             if (a.id === targetId) return true;
             if (targetId && targetId.startsWith('H') && a.id === targetId.replace(/^H/, 'C')) return true;
             if (targetId && targetId.startsWith('C') && a.id === targetId.replace(/^C/, 'H')) return true;
             if (a.patientId && a.patientId === targetId) return true;
             if (fields.patientName && a.patientName === fields.patientName) return true;
+            if (fields.phone && a.phone && String(a.phone).replace(/[^0-9]/g, '') === String(fields.phone).replace(/[^0-9]/g, '')) return true;
             return false;
           });
           if (idx !== -1) {
@@ -1597,6 +1598,12 @@ function appendServerAuditLog(logItem) {
             }
             stored.updatedAt = new Date().toISOString();
             fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+            try {
+              const seedJsFile = path.join(BASE_DIR, 'hub_real_data.js');
+              fs.writeFileSync(seedJsFile, 'window.REBORN_REAL_SEED_DATA = ' + JSON.stringify(stored, null, 2) + ';\n', 'utf-8');
+            } catch (seedErr) {
+              console.warn('[Seed JS Sync Warn]', seedErr.message);
+            }
             if (typeof invalidateRealDataCache === 'function') {
               try { invalidateRealDataCache(); } catch (e) {}
             }
@@ -1625,8 +1632,29 @@ function appendServerAuditLog(logItem) {
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify({ success: true, updatedApp: stored.applications[idx] }));
           } else {
-            res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-            return res.end(JSON.stringify({ success: false, error: '해당 고객을 찾을 수 없습니다.' }));
+            // 신규접수 건이거나 아직 hub_apps_real.json에 등록되지 않았던 고객의 경우 자동 추가하여 영구 저장 보장
+            const { claim, payout, deleteClaimIds, deleteClaimId, deletePayoutIds, deletePayoutId, deleteAssignIds, deleteAssignId, ...appFields } = fields;
+            const newAppRecord = {
+              id: targetId,
+              ...appFields,
+              updatedAt: new Date().toISOString()
+            };
+            stored.applications.unshift(newAppRecord);
+            stored.updatedAt = new Date().toISOString();
+            fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+            try {
+              const seedJsFile = path.join(BASE_DIR, 'hub_real_data.js');
+              fs.writeFileSync(seedJsFile, 'window.REBORN_REAL_SEED_DATA = ' + JSON.stringify(stored, null, 2) + ';\n', 'utf-8');
+            } catch (seedErr) {
+              console.warn('[Seed JS Sync Warn]', seedErr.message);
+            }
+            if (typeof invalidateRealDataCache === 'function') {
+              try { invalidateRealDataCache(); } catch (e) {}
+            }
+            syncConvexMutation('sync:saveApplication', { app: newAppRecord }).catch(console.warn);
+
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true, updatedApp: newAppRecord }));
           }
         } catch (err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });

@@ -1,5 +1,57 @@
 [
   {
+    "id": "LOG-44137665-QVHP",
+    "timestamp": "2026-10-21 09:55:37",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0701] (이진화)",
+    "summary": "[이진화 님] 고객 필드 정보 실시간 갱신 및 저장 (memo, specialNotes)",
+    "status": "SUCCESS",
+    "changes": {
+      "memo": {
+        "before": "-",
+        "after": "[진단명: 교통사고 입원]  (장소: 우리들한방병원 미정)\n한방병원 입원하였는데 건강상 문제 없으며, 협회에서 통화시 간병인 사고 우려로 배정 불가"
+      },
+      "specialNotes": {
+        "before": "-",
+        "after": "[진단명: 교통사고 입원]  (장소: 우리들한방병원 미정)\n한방병원 입원하였는데 건강상 문제 없으며, 협회에서 통화시 간병인 사고 우려로 배정 불가"
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
+    "id": "LOG-44131516-36Z2",
+    "timestamp": "2026-10-21 09:55:31",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0701] (이진화)",
+    "summary": "[이진화 님] 고객 필드 정보 실시간 갱신 및 저장 (memo)",
+    "status": "SUCCESS",
+    "changes": {
+      "memo": {
+        "before": "-",
+        "after": "테스트 메모 자동 저장 확인"
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
     "id": "LOG-08571767-UTUA",
     "timestamp": "2026-10-17 12:42:51",
     "user": {
