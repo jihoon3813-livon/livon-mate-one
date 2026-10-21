@@ -1170,6 +1170,9 @@ var gFaxRecords = {};
 var gFaxDirectory = [];
 var gFaxLogs = [];
 var gClaimUnitPriceRules = [];
+
+const DISABLE_SAMSUNG_DRIVE_LATEST_TEMPORARILY = true;
+var gSkipFirstBundleAll = false;
 // =========================================================================
 // [데이터 동기화 Race Condition 방지] 전역 상태 플래그
 // =========================================================================
@@ -1826,7 +1829,7 @@ async function loadConvexData(showSpinner = true) {
   }
 
   // [초고속 고객 목록 패스트트랙 적용기]: bundleAll 완료 전에도 applications:list 응답 즉시 화면/건수 선반영 (0.5초 내 최신화)
-  const applyConvexApplicationsList = (applications) => {
+  const applyConvexApplicationsList = (applications, preferConvex = false) => {
     if (!Array.isArray(applications)) return null;
 
     // 개발(DEV) 환경에서는 운영 전용 고객(C0701 이진화 등) 유입 원천 차단
@@ -1884,16 +1887,6 @@ async function loadConvexData(showSpinner = true) {
 
     const filteredValidApps = validApps.filter(a => a && a.id && !deletedAppIdSet.has(String(a.id)));
 
-    // 로컬에서 사용자가 수정한 진단명/질병명이 서버 응답에서 빈값으로 덮어써지지 않도록 안전 보존
-    const localAppMap = new Map((Array.isArray(gApps) ? gApps : []).map(a => [String(a.id), a]));
-    filteredValidApps.forEach(sApp => {
-      const lApp = localAppMap.get(String(sApp.id));
-      if (lApp) {
-        if (!sApp.diagnosis && lApp.diagnosis) sApp.diagnosis = lApp.diagnosis;
-        if (!sApp.diseaseName && lApp.diseaseName) sApp.diseaseName = lApp.diseaseName;
-      }
-    });
-
     let recentRegIdSet = new Set();
     try {
       const rList = JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]');
@@ -1907,7 +1900,7 @@ async function loadConvexData(showSpinner = true) {
     }
     safeSetLocalStorage('LIVON_RECENTLY_REGISTERED_IDS', JSON.stringify(Array.from(recentRegIdSet)));
 
-    const localOnlyRecentApps = (Array.isArray(gApps) ? gApps : []).filter(localApp => {
+    const localOnlyRecentApps = preferConvex ? [] : (Array.isArray(gApps) ? gApps : []).filter(localApp => {
       if (!localApp || !localApp.id) return false;
       if ((window.IS_DEV_ENV || IS_DEV_ENV) && (localApp.id === 'C0701' || localApp.patientName === '이진화')) return false;
       if (serverAppIdSet.has(String(localApp.id))) return false;
@@ -2484,16 +2477,16 @@ function startConvexLiveSync() {
       runConvexLiveSync();
     }
   }, 15000);
-
+//  runConvexLiveSync();
   // 사용자가 브라우저 탭으로 복귀했을 때 즉시 최신 데이터 동기화 (5초 쿨타임)
-  window.addEventListener('focus', () => {
+ /* window.addEventListener('focus', () => {
     runConvexLiveSync();
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       runConvexLiveSync();
     }
-  });
+  });*/
   console.log('[LiveSync] Convex 다중 사용자 실시간 동기화 엔진 가동 (15초 주기 / 탭 포커스 즉시 갱신)');
 }
 window.startConvexLiveSync = startConvexLiveSync;
@@ -3837,6 +3830,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // 3. 정상 인증된 세션에서만 데이터 초기화 및 실데이터 동기화 수행
+  showGlobalProgress({
+    title: '초기 데이터를 불러오는 중입니다',
+    subtitle: '운영 데이터와 화면을 준비하고 있습니다.',
+    percent: 10,
+    statusText: '잠시만 기다려 주세요...'
+  });
   initData();
   initInsuranceWorkflows();
 
@@ -3898,6 +3897,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 수정발생 & 모달 비활성화 확인 상태 전 PC/클라우드 즉시 백그라운드 동기화
   if (typeof syncConfirmedAlertsWithServer === 'function') {
     syncConfirmedAlertsWithServer();
+  }
+
+  // 초기 진입 데이터 로딩이 끝난 뒤에만 전역 로딩 모달을 닫는다.
+  if (typeof loadConvexData === 'function') {
+    try {
+      updateGlobalProgress({ percent: 35, statusText: '운영 데이터를 동기화하고 있습니다...' });
+      await loadConvexData(true);
+      if (initialCarePortSyncPromise) {
+        updateGlobalProgress({ percent: 75, statusText: '케어포트 데이터를 반영하고 있습니다...' });
+        await initialCarePortSyncPromise;
+      }
+      updateGlobalProgress({ percent: 100, statusText: '초기 화면 준비 완료' });
+    } catch (initialLoadErr) {
+      console.warn('[Initial Load Warning]', initialLoadErr);
+      updateGlobalProgress({ percent: 100, statusText: '일부 데이터 로딩이 지연되고 있습니다.' });
+    } finally {
+      hideGlobalProgress(350);
+    }
+  } else {
+    hideGlobalProgress();
   }
 
   // 경량 초기화 작업만 유휴 시점에 실행 (비활성 탭은 탭 클릭 시 온디맨드 렌더링)
@@ -6142,7 +6161,7 @@ function initInsuranceWorkflows() {
       console.log(`[LivonDB] IndexedDB로부터 삼성화재 사전명단 ${cached.length.toLocaleString()}건 날짜 정규화 및 로드 완료`);
     } else {
       // IndexedDB에 명단이 없거나 소량일 경우, 구글 드라이브 최신 명단(25,939건) 자동 로드
-      fetch('/samsung_drive_latest.json')
+      if (!DISABLE_SAMSUNG_DRIVE_LATEST_TEMPORARILY) fetch('/samsung_drive_latest.json')
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data) {
@@ -10711,7 +10730,7 @@ function populateSamsungLeadDataToForm(lead) {
   const prodCodeVal = lead.productCode || '2PB320070';
   const prodNameVal = lead.productName || '무배당 삼성화재 간편보험 다이렉트(2603.5)(납입면제/해약환급금 미지급형Ⅱ)';
   const accidentVal = lead.accidentNumber || ('26S' + Math.floor(100000 + Math.random() * 900000));
-  const adjName = lead.adjusterName || '김정현';
+  const adjName = lead.adjusterName || '-';
   const adjPhone = lead.adjusterPhone || '02-3485-9114';
   const adjFax = lead.adjusterFax || '02-3485-9100';
 
@@ -34851,6 +34870,7 @@ function initFontSize() {
 // SYSTEM SETTINGS CONTROLLERS (전용 탭 & 로컬스토리지 영구 동기화)
 // =========================================================================
 function renderSettings() {
+  updateInactivityBadge();
   if (typeof initLaunchDataSettings === 'function') {
     initLaunchDataSettings();
   }
@@ -36360,7 +36380,11 @@ window.setAppTheme = setAppTheme;
 var gCurrentAdmin = null;
 var gAutoLogoutMinutes = 30;
 var gLastActivityTimestamp = Date.now();
+var gInactivityMonitoringStarted = false;
+// Legacy 1초 주기 감시 타이머는 아래 주석 블록으로 보존합니다.
+/*
 var gAutoLogoutTimerInterval = null;
+*/
 
 function isUserOnLoginScreen() {
   if (typeof gCurrentAdmin === 'undefined' || !gCurrentAdmin) return true;
@@ -36594,7 +36618,8 @@ async function initAdminSession() {
 
   const savedMins = localStorage.getItem('REBORN_AUTO_LOGOUT_MINUTES');
   if (savedMins !== null) {
-    gAutoLogoutMinutes = parseInt(savedMins, 10);
+    const minutes = Number(savedMins);
+    gAutoLogoutMinutes = [0, 5, 15, 30, 60].includes(minutes) ? minutes : 30;
     const select = document.getElementById('settingAutoLogoutMinutes');
     if (select) select.value = gAutoLogoutMinutes.toString();
   }
@@ -36944,6 +36969,8 @@ async function handleAdminLoginSubmit(e, customUser, customPass) {
   if (overlay) overlay.classList.add('hidden');
 
   gLastActivityTimestamp = Date.now();
+
+  updateInactivityBadge();
 
   // URL에서 로그인 파라미터가 포함되어 접속한 경우(원클릭 자동 로그인 등), 브라우저 주소창에서 비밀번호 및 아이디 파라미터 안전 삭제
   try {
@@ -37462,59 +37489,48 @@ window.applyAdminMenuPermissions = applyAdminMenuPermissions;
 window.saveAdminsToStorage = saveAdminsToStorage;
 
 function handleSaveAutoLogoutSetting(minsStr) {
-  gAutoLogoutMinutes = parseInt(minsStr, 10);
+  const minutes = Number(minsStr);
+  if (![0, 5, 15, 30, 60].includes(minutes)) return;
+  gAutoLogoutMinutes = minutes;
   localStorage.setItem('REBORN_AUTO_LOGOUT_MINUTES', gAutoLogoutMinutes.toString());
+  updateInactivityBadge();
   showCustomAlert({
     title: '자동 로그아웃 설정 저장',
-    message: gAutoLogoutMinutes > 0 ? `미활동 ${gAutoLogoutMinutes}분 후 자동 로그아웃되도록 설정되었습니다.` : '자동 로그아웃이 비활성화되었습니다.',
+    message: gAutoLogoutMinutes > 0 ? `미활동 ${gAutoLogoutMinutes}분 경과 후 다음 활동 시 자동 로그아웃됩니다.` : '자동 로그아웃이 비활성화되었습니다.',
     icon: 'shield-alert',
     iconColor: 'rose'
   });
 }
 
+function updateInactivityBadge() {
+  const badge = document.getElementById('sessionTimerBadge');
+  if (!badge) return;
+  const label = badge.previousElementSibling;
+  if (label && label.textContent !== '자동 로그아웃 기준 (다음 활동 시 확인):') {
+    label.textContent = '자동 로그아웃 기준 (다음 활동 시 확인):';
+  }
+  const text = !gCurrentAdmin ? '세션 만료됨' :
+    gAutoLogoutMinutes <= 0 ? '자동 로그아웃 해제됨' : `미활동 ${gAutoLogoutMinutes}분`;
+  if (badge.textContent !== text) badge.textContent = text;
+  const select = document.getElementById('settingAutoLogoutMinutes');
+  if (select) select.value = String(gAutoLogoutMinutes);
+}
+
 function startInactivityMonitoring() {
-  const resetTimer = () => {
+  updateInactivityBadge();
+  if (gInactivityMonitoringStarted) return;
+  gInactivityMonitoringStarted = true;
+
+  const checkActivity = (event) => {
+    if (!gCurrentAdmin) return;
     const overlay = document.getElementById('adminLoginOverlay');
     if (overlay && !overlay.classList.contains('hidden')) return;
-    gLastActivityTimestamp = Date.now();
-  };
-  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
-    window.addEventListener(evt, resetTimer, { passive: true });
-  });
-
-  if (gAutoLogoutTimerInterval) clearInterval(gAutoLogoutTimerInterval);
-  gAutoLogoutTimerInterval = setInterval(() => {
-    // 1. 이미 로그아웃 화면(오버레이)이 표시 중인 경우 타이머 중지 및 추가 모달 팝업 방지
-    const overlay = document.getElementById('adminLoginOverlay');
-    const isLoggedOut = overlay && !overlay.classList.contains('hidden');
-    if (isLoggedOut) {
-      const badge = document.getElementById('sessionTimerBadge');
-      if (badge) badge.innerText = '세션 만료됨';
-      return;
-    }
-
-    if (gAutoLogoutMinutes <= 0) {
-      const badge = document.getElementById('sessionTimerBadge');
-      if (badge) badge.innerText = '자동 로그아웃 해제됨';
-      return;
-    }
-
-    const elapsedMs = Date.now() - gLastActivityTimestamp;
-    const limitMs = gAutoLogoutMinutes * 60 * 1000;
-    const remainMs = Math.max(0, limitMs - elapsedMs);
-
-    const badge = document.getElementById('sessionTimerBadge');
-    if (badge) {
-      const remainSec = Math.floor(remainMs / 1000);
-      const m = Math.floor(remainSec / 60);
-      const s = remainSec % 60;
-      badge.innerText = `${m}분 ${s < 10 ? '0' : ''}${s}초`;
-    }
-
-    if (remainMs <= 0) {
-      // Trigger Auto Logout without confirmation prompt
+    const now = Date.now();
+    // 마지막 활동 시각을 갱신하기 전에 만료를 확인하고, 해당 동작도 차단한다.
+    if (gAutoLogoutMinutes > 0 && now - gLastActivityTimestamp >= gAutoLogoutMinutes * 60 * 1000) {
+      if (event.cancelable) event.preventDefault();
+      event.stopImmediatePropagation();
       handleAdminLogout(true);
-      gLastActivityTimestamp = Date.now();
 
       // 이미 보안 로그아웃 모달이 떠 있거나 대기 큐에 있으면 중복 추가 방지
       const isAlreadyAlerting = window._livonAlertActive && (window._livonAlertActiveOptions?.title === '보안 자동 로그아웃');
@@ -37528,8 +37544,53 @@ function startInactivityMonitoring() {
           iconColor: 'rose'
         });
       }
+      return;
+    }
+    gLastActivityTimestamp = now;
+    updateInactivityBadge();
+  };
+  ['click', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
+    window.addEventListener(evt, checkActivity, { capture: true, passive: false });
+  });
+
+  /*
+  // Legacy implementation (1초마다 잔여 시간을 계산하던 방식)
+  if (gAutoLogoutTimerInterval) clearInterval(gAutoLogoutTimerInterval);
+  gAutoLogoutTimerInterval = setInterval(() => {
+    const overlay = document.getElementById('adminLoginOverlay');
+    const isLoggedOut = overlay && !overlay.classList.contains('hidden');
+    if (isLoggedOut) {
+      const badge = document.getElementById('sessionTimerBadge');
+      if (badge) badge.innerText = '세션 만료됨';
+      return;
+    }
+    if (gAutoLogoutMinutes <= 0) {
+      const badge = document.getElementById('sessionTimerBadge');
+      if (badge) badge.innerText = '자동 로그아웃 해제됨';
+      return;
+    }
+    const elapsedMs = Date.now() - gLastActivityTimestamp;
+    const limitMs = gAutoLogoutMinutes * 60 * 1000;
+    const remainMs = Math.max(0, limitMs - elapsedMs);
+    const badge = document.getElementById('sessionTimerBadge');
+    if (badge) {
+      const remainSec = Math.floor(remainMs / 1000);
+      const m = Math.floor(remainSec / 60);
+      const s = remainSec % 60;
+      badge.innerText = `${m}분 ${s < 10 ? '0' : ''}${s}초`;
+    }
+    if (remainMs <= 0) {
+      handleAdminLogout(true);
+      gLastActivityTimestamp = Date.now();
+      showCustomAlert({
+        title: '보안 자동 로그아웃',
+        message: `장시간(${gAutoLogoutMinutes}분) 동안 활동이 없어 개인정보 보호를 위해 자동으로 로그아웃되었습니다.`,
+        icon: 'shield-alert',
+        iconColor: 'rose'
+      });
     }
   }, 1000);
+  */
 }
 
 
