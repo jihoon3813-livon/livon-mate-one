@@ -13515,6 +13515,15 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null) {
   gHubModalInstanceId++;
   resetHubCustomerModalSaveButtons();
 
+  if (typeof showGlobalProgress === 'function') {
+    showGlobalProgress({
+      title: '고객 상세정보를 불러오는 중입니다',
+      subtitle: '최신 운영 데이터를 확인하고 있습니다.',
+      percent: 25,
+      statusText: '고객 데이터를 준비하고 있습니다...'
+    });
+  }
+
   const modalEl = document.getElementById('hubCustomerDetailModal');
   if (!modalEl) {
     console.error('hubCustomerDetailModal element not found!');
@@ -13533,11 +13542,6 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null) {
     gActiveAdjusterTabId = null;
   }
   gActiveHubModalAppId = applyId;
-
-  // [삼성화재 관리대장 연동]: 모달 상세 데이터 조회 전 삼성화재 고객 상세정보(상품명 등) 최신 연동
-  if (typeof enrichHubSamsungCustomersFromSamsungExcel === 'function') {
-    enrichHubSamsungCustomersFromSamsungExcel();
-  }
 
   // Open modal container & ensure high z-index and visible flex layout
   openModal('hubCustomerDetailModal');
@@ -13850,6 +13854,10 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null) {
         <div class="text-xs text-slate-500 font-mono">${err.message}</div>
       </div>`;
     }
+    if (typeof updateGlobalProgress === 'function') {
+      updateGlobalProgress({ percent: 100, statusText: '고객 상세정보 준비 완료' });
+    }
+    if (typeof hideGlobalProgress === 'function') hideGlobalProgress(250);
   }
 }
 
