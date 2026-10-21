@@ -15997,13 +15997,21 @@ function parseHyundaiSmsText(text) {
   // 1. Contract Information Block (▶ 계약정보 ~ ▶ or 모바일 or end)
   const contractMatch = text.match(/(?:▶|:arrow_forward:|[\[\s])\s*계약정보([\s\S]*?)(?:▶|:arrow_forward:|접수정보|모바일|$)/i);
   if (contractMatch) {
-    const lines = contractMatch[1].split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    for (const l of lines) {
-      const clean = l.replace(/^[-•*▶\s]+/, '').trim();
-      if (!clean.startsWith('계약번호') && !clean.startsWith('증권번호') && !clean.startsWith('계약기간') && !clean.startsWith('피보험자') && !clean.startsWith('환자')) {
-        if (clean.length >= 2) {
-          res.productName = clean;
-          break;
+    const contractText = contractMatch[1];
+    const productMatch = contractText.match(/(?:^|[-•*▶\s])(?:(?:보험|가입)\s*)?상품명\s*[:：]\s*(.*?)(?=\s*[-•*]\s*(?:고객명|계약번호|증권번호|담보|보험기간|계약기간|피보험자|환자)\s*[:：]|\r?\n|$)/i);
+    if (productMatch && productMatch[1].trim()) {
+      res.productName = productMatch[1].trim();
+    }
+
+    if (!res.productName) {
+      const lines = contractText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      for (const l of lines) {
+        const clean = l.replace(/^[-•*▶\s]+/, '').trim();
+        if (!clean.startsWith('계약번호') && !clean.startsWith('증권번호') && !clean.startsWith('계약기간') && !clean.startsWith('피보험자') && !clean.startsWith('환자') && !/^(?:(?:보험|가입)\s*)?상품명\s*[:：]/i.test(clean)) {
+          if (clean.length >= 2) {
+            res.productName = clean;
+            break;
+          }
         }
       }
     }
