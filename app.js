@@ -15166,9 +15166,113 @@ function getCleanFaxTransmissionHtml(formCode) {
   return clone.innerHTML;
 }
 
-async function sendElectronicFaxDirectly({ appId, formCode, formName, targetRecipient, targetNumber, memoText, category, silentAlert = false }) {
+// =========================================================================
+// [안전장치] 동일 고객 및 동일 팩스번호 중복 발송 방지 감지 및 확인
+// =========================================================================
+function findDuplicateFaxSendLog(appId, targetNumber, formCode, patientName = '') {
+  if (!targetNumber || !Array.isArray(gFaxLogs) || gFaxLogs.length === 0) return null;
+
+  const cleanTarget = String(targetNumber).replace(/[^0-9]/g, '');
+  if (!cleanTarget || cleanTarget.length < 7) return null;
+
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const todayDots = `${y}.${m}.${d}`;
+  const todayHyphens = `${y}-${m}-${d}`;
+
+  for (const log of gFaxLogs) {
+    if (!log) continue;
+
+    // 1. 고객 일치 여부 확인 (신청 ID 또는 환자명)
+    const isAppMatch = appId && log.appId && String(log.appId).trim() === String(appId).trim();
+    const isNameMatch = patientName && log.patientName && String(log.patientName).trim() === String(patientName).trim();
+    if (!isAppMatch && !isNameMatch) continue;
+
+    // 2. 발송 성공 건인지 확인 (실패 건은 재발송 허용)
+    const isSuccess = log.status === '성공' || log.status === '전송성공' || log.status === '전송완료' || (log.resultMsg && log.resultMsg.includes('완료'));
+    if (!isSuccess) continue;
+
+    // 3. 팩스 번호 일치 여부 확인 (숫자만 추출하여 완벽 일치 또는 뒷자리 8자리 일치)
+    const cleanLogNum = String(log.faxNumber || '').replace(/[^0-9]/g, '');
+    if (!cleanLogNum) continue;
+
+    const isNumMatch = (cleanLogNum === cleanTarget) ||
+      (cleanLogNum.length >= 8 && cleanTarget.length >= 8 && cleanLogNum.slice(-8) === cleanTarget.slice(-8));
+    if (!isNumMatch) continue;
+
+    // 4. 발송 일자 확인 (당일 또는 최근 24시간 이내)
+    const sentDateStr = String(log.sentDate || '');
+    let isRecent = sentDateStr.includes(todayDots) || sentDateStr.includes(todayHyphens);
+
+    if (!isRecent && sentDateStr) {
+      try {
+        const parsed = new Date(sentDateStr.replace(/\./g, '-'));
+        if (!isNaN(parsed.getTime())) {
+          const diffHours = (now.getTime() - parsed.getTime()) / (1000 * 60 * 60);
+          if (diffHours >= 0 && diffHours < 24) {
+            isRecent = true;
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (isRecent) {
+      return log; // 가장 최신의 중복 발송 이력 발견
+    }
+  }
+
+  return null;
+}
+
+async function confirmDuplicateFaxSendIfNeeded(appId, targetNumber, formCode, patientName = '') {
+  const dupLog = findDuplicateFaxSendLog(appId, targetNumber, formCode, patientName);
+  if (!dupLog) return true; // 중복 발송 이력 없음 -> 정상 진행
+
+  const name = patientName || dupLog.patientName || '해당 고객';
+  let timeStr = dupLog.sentDate || '이전';
+  const timeMatch = String(timeStr).match(/(\d{1,2}:\d{2})/);
+  if (timeMatch) {
+    timeStr = timeMatch[1];
+  }
+
+  const formTitle = dupLog.formName || (formCode === 'HD_FORM_01' ? '1차 접수서' : '팩스 서식');
+  const targetRecipient = dupLog.recipient ? ` (${dupLog.recipient})` : '';
+
+  const confirmMessage =
+    `⚠️ [동일 팩스번호 중복 발송 주의]\n\n` +
+    `피보험자: ${name} 님 (신청ID: ${appId || dupLog.appId || '-'})` +
+    `\n수신 팩스번호: ${targetNumber}${targetRecipient}\n\n` +
+    `해당 고객은 오늘 [${timeStr}]에 이미 동일한 팩스번호로\n` +
+    `"${formTitle}"\n` +
+    `문서가 성공적으로 발송 완료된 이력이 있습니다.\n\n` +
+    `수신처(보상센터/손해사정사)에 동일한 서류가 중복 전달되어 혼선이 생길 수 있습니다.\n\n` +
+    `그래도 계속해서 추가 발송하시겠습니까?`;
+
+  const confirmed = await showCustomConfirm(confirmMessage, {
+    title: '⚠️ 동일 번호 중복 발송 확인',
+    icon: 'alert-triangle',
+    theme: 'warning',
+    confirmText: '중복 감수하고 발송 📠',
+    cancelText: '발송 취소'
+  });
+
+  return Boolean(confirmed);
+}
+
+window.findDuplicateFaxSendLog = findDuplicateFaxSendLog;
+window.confirmDuplicateFaxSendIfNeeded = confirmDuplicateFaxSendIfNeeded;
+
+async function sendElectronicFaxDirectly({ appId, formCode, formName, targetRecipient, targetNumber, memoText, category, silentAlert = false, skipDuplicateCheck = false }) {
   const app = (gApps || []).find(a => a.id === appId);
   if (!app) throw new Error('고객 데이터를 찾을 수 없습니다.');
+
+  // 모달을 거치지 않은 직접 호출 시 중복 발송 안전 검사
+  if (!skipDuplicateCheck) {
+    const canProceedDup = await confirmDuplicateFaxSendIfNeeded(appId, targetNumber, formCode, app.patientName);
+    if (!canProceedDup) return null;
+  }
 
   const pages = 1;
   const caseTitle = category === '1차접수' ? '1차 고객등록 및 신청' : '간병비 정산청구';
@@ -15525,6 +15629,10 @@ async function executeRealFaxSendFromPreview() {
       return;
     }
 
+    // [안전장치] 동일 번호 중복 발송 방지 확인
+    const canProceedDup = await confirmDuplicateFaxSendIfNeeded(pendingApp.id, number, 'HD_FORM_01', pendingApp.patientName);
+    if (!canProceedDup) return;
+
     const confirmed = await showCustomConfirm(
       `[최종 발송 확인]\n\n` +
       `피보험자: ${pendingApp.patientName} 님\n` +
@@ -15614,6 +15722,10 @@ async function executeRealFaxSendFromPreview() {
   const isResend = isInitial && typeof isHyundaiInitialFaxSent === 'function' && isHyundaiInitialFaxSent(app);
   const category = isInitial ? '1차접수' : '정산청구';
 
+  // [안전장치] 동일 번호 중복 발송 방지 확인
+  const canProceedDup = await confirmDuplicateFaxSendIfNeeded(app.id, targetNumber, formCode, app.patientName);
+  if (!canProceedDup) return;
+
   const modalTitle = isInitial
     ? (isResend ? '1차 고객등록 접수 팩스 재발송 확인' : '1차 고객등록 접수 팩스 발송 확인')
     : '최종 청구 팩스 발송 확인';
@@ -15665,7 +15777,8 @@ async function executeRealFaxSendFromPreview() {
       targetNumber,
       memoText: memo,
       category,
-      silentAlert: true
+      silentAlert: true,
+      skipDuplicateCheck: true
     });
   } catch (err) {
     console.error('청구 팩스 발송 에러:', err);
@@ -15851,6 +15964,10 @@ async function executeSendHyundaiInitialFax() {
 
   const targetNumber = document.getElementById('hdFaxTargetNumber')?.value.trim() || '02-2195-5000';
   const memoText = document.getElementById('hdFaxMemo')?.value.trim() || '';
+
+  // [안전장치] 동일 번호 중복 발송 방지 확인
+  const canProceedDup = await confirmDuplicateFaxSendIfNeeded(app.id, targetNumber, 'HD_FORM_01', app.patientName);
+  if (!canProceedDup) return;
 
   closeModal('hyundaiInitialFaxModal');
 
@@ -16686,6 +16803,10 @@ async function executeSendFaxModal() {
   const formName = gCurrentFaxCase === 1
     ? '현대해상 1차 고객등록 및 신청 접수서'
     : (isScor ? '현대해상(SCOR) 간병서비스제공확인서 및 비용청구서' : '현대해상 간병서비스제공확인서 및 비용청구서');
+  // [안전장치] 동일 번호 중복 발송 방지 확인
+  const canProceedDup = await confirmDuplicateFaxSendIfNeeded(app.id, targetNumber, formCode, app.patientName);
+  if (!canProceedDup) return;
+
   const pages = gCurrentFaxCase === 1 ? 1 : 2;
 
   const careLogSelect = document.getElementById('faxCareLogSelect');
