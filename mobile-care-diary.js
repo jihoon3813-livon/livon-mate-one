@@ -990,7 +990,7 @@ function render() {
   if ($('footer-source-text')) {
     const sDate = careRecords[0]?.date || '09.17';
     const eDate = careRecords[careRecords.length - 1]?.date || '10.02';
-    $('footer-source-text').textContent = `근거: 케어포트 통합간병일지(${pName}), 2026.${sDate}~${eDate}, 총 ${totalDays}일.`;
+    $('footer-source-text').textContent = `근거: 케어포트 통합간병일지(${pName}) · 2026.${sDate}~${eDate} (${totalDays}일간)`;
   }
 
   applyIdentity();
