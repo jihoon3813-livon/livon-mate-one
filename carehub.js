@@ -52,6 +52,54 @@ const hubFilterConfig = {
   }
 };
 
+
+/**
+ * 삼성화재 가입자 피보험자ID(마스터 엑셀 식별코드, 예: BA00006156, BF03146516 등) 조회 헬퍼
+ */
+function getSamsungDisplayPatientId(app) {
+  if (!app) return '-';
+  // 1. 전역 findSamsungEligiblePatientId 함수가 있다면 사전명단에서 매칭 조회
+  if (typeof findSamsungEligiblePatientId === 'function') {
+    const matchedPid = findSamsungEligiblePatientId(app);
+    if (matchedPid) return matchedPid;
+  }
+  // 2. app.patientId가 실제 피보험자 식별코드(BA..., BF..., CF..., SF-...)인 경우
+  const pid = String(app.patientId || '').trim();
+  if (pid && !pid.startsWith('C0') && !pid.startsWith('D0') && pid !== 'SF-P') {
+    return pid;
+  }
+  // 3. app.insuredId 확인
+  if (app.insuredId && String(app.insuredId).trim()) {
+    return String(app.insuredId).trim();
+  }
+  // 4. 사전명단(gSamsungSheets.eligible) 직접 탐색 fallback
+  try {
+    const eligibleList = (window.gSamsungSheets && Array.isArray(window.gSamsungSheets.eligible)) ? window.gSamsungSheets.eligible : (window.SAMSUNG_ELIGIBLE_LIST || []);
+    if (Array.isArray(eligibleList) && eligibleList.length > 0) {
+      const pNum = String(app.policyNumber || '').replace(/[^a-zA-Z0-9]/g, '');
+      const pName = String(app.patientName || '').trim();
+      const pBirth = String(app.birthDate || '').replace(/[^0-9]/g, '');
+      const found = eligibleList.find(r => {
+        if (!r) return false;
+        const rPolicy = String(r.policyNumber || '').replace(/[^a-zA-Z0-9]/g, '');
+        if (pNum && rPolicy && pNum === rPolicy) return true;
+        const rName = String(r.patientName || '').trim();
+        const rBirth = String(r.birthDate || '').replace(/[^0-9]/g, '');
+        if (pName && rName && pName === rName && pBirth && rBirth && (pBirth.includes(rBirth) || rBirth.includes(pBirth))) return true;
+        return false;
+      });
+      if (found && found.patientId) {
+        return String(found.patientId).trim();
+      }
+    }
+  } catch (e) {}
+
+  // 5. 기본 pid fallback (만약 위에서 못찾았는데 pid가 있다면)
+  if (pid) return pid;
+  return '-';
+}
+window.getSamsungDisplayPatientId = getSamsungDisplayPatientId;
+
 function toggleHubDashboardDetail(forceState) {
   const container = document.getElementById('hubDashDetailedContainer');
   const btnText = document.getElementById('btnToggleHubDashDetailText');
@@ -7227,6 +7275,10 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                 <!-- 보험 계약 상세 -->
                 <div class="pt-1 space-y-1.5 text-[11px]">
                   ${isSamsung ? `
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-400 flex-shrink-0">피보험자ID:</span>
+                      <span class="font-mono font-bold text-sky-800 bg-sky-50 border border-sky-200 px-1.5 py-0.2 rounded text-[10.5px]">${getSamsungDisplayPatientId(app)}</span>
+                    </div>
                     <div class="flex justify-between items-start gap-2">
                       <span class="text-slate-400 flex-shrink-0">보험상품명:</span>
                       <span class="font-bold text-slate-900 text-right flex-1 break-keep leading-snug">${app.productName || '-'}</span>
@@ -9007,6 +9059,10 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
               <div class="space-y-1.5 text-slate-600">
                 ${(app.insuranceCompany || '').includes('삼성') ? `
+                  <div class="flex justify-between items-center">
+                    <span class="text-slate-500 flex-shrink-0">피보험자ID:</span>
+                    <span class="font-mono font-bold text-sky-800 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded text-[11px]">${getSamsungDisplayPatientId(app)}</span>
+                  </div>
                   <div class="flex justify-between items-start gap-2">
                     <span class="text-slate-500 flex-shrink-0">보험상품명:</span>
                     <span class="font-bold text-slate-900 text-right flex-1 break-keep leading-snug">${app.productName || '-'}</span>
@@ -11459,7 +11515,7 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
                   <div class="p-2.5 rounded-xl bg-sky-50/50 border border-sky-100 space-y-1 text-[11.5px]">
                     <div class="flex justify-between items-center">
                       <span class="text-slate-600">피보험자 ID:</span>
-                      <span class="font-mono font-bold text-sky-800">${app.patientId || app.id}</span>
+                      <span class="font-mono font-bold text-sky-800">${getSamsungDisplayPatientId(app)}</span>
                     </div>
                     <div class="flex justify-between items-center">
                       <span class="text-slate-600">보험상품:</span>

@@ -20181,6 +20181,7 @@ var APP_TAB_META = {
   directory: { name: '파트너/인력 디렉토리', icon: 'contact-2', color: 'text-emerald-500' },
   samsunglist: { name: '삼성화재 명단관리', icon: 'file-spreadsheet', color: 'text-sky-500' },
   samsungclaimhub: { name: '삼성화재 접수/청구', icon: 'mail-check', color: 'text-emerald-500' },
+  samsungsla: { name: '삼성화재 SLA', icon: 'award', color: 'text-amber-500' },
   hyundaiclaimhub: { name: '현대해상 청구관리', icon: 'printer', color: 'text-orange-500' },
   samsungcallreport: { name: '삼성화재 콜분석', icon: 'phone-forwarded', color: 'text-blue-500' },
   totalcallanalysis: { name: '종합 콜분석', icon: 'phone-call', color: 'text-cyan-500' },
@@ -20391,6 +20392,13 @@ function refreshTabData(tabId, filterParam = null) {
       case 'samsungclaimhub':
         if (typeof renderSamsungClaimHub === 'function') {
           renderSamsungClaimHub(filterParam);
+        }
+        break;
+
+      // 4-1. 삼성화재 SLA 관리: 간병종료 고객 대상 SLA 산출 및 히스토리 관리
+      case 'samsungsla':
+        if (typeof renderSamsungSlaHub === 'function') {
+          renderSamsungSlaHub();
         }
         break;
 
@@ -33438,7 +33446,10 @@ function openCustomerEditModal(appId, focusSection = null) {
   if (document.getElementById('custEditProductName')) document.getElementById('custEditProductName').value = app.productName || '';
   if (document.getElementById('custEditProductCode')) document.getElementById('custEditProductCode').value = app.productCode || '';
   if (document.getElementById('custEditContractPeriod')) document.getElementById('custEditContractPeriod').value = app.contractPeriod || (app.contractStartDate ? (app.contractStartDate + '~' + (app.contractEndDate || '')) : '');
-  if (document.getElementById('custEditPatientId')) document.getElementById('custEditPatientId').value = app.patientId || '';
+  if (document.getElementById('custEditPatientId')) {
+    const sPid = (typeof getSamsungDisplayPatientId === 'function' ? getSamsungDisplayPatientId(app) : '') || app.patientId || '';
+    document.getElementById('custEditPatientId').value = (sPid !== '-' ? sPid : (app.patientId || ''));
+  }
   if (document.getElementById('custEditHasInjuryCare')) document.getElementById('custEditHasInjuryCare').value = (app.hasInjuryCare === 'Y' || app.hasInjuryCare === true || app.hasInjuryCare === '가입') ? '가입' : '미가입';
   if (document.getElementById('custEditHasDiseaseCare')) document.getElementById('custEditHasDiseaseCare').value = (app.hasDiseaseCare === 'Y' || app.hasDiseaseCare === true || app.hasDiseaseCare === '가입') ? '가입' : '미가입';
 

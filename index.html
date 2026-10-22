@@ -1051,6 +1051,15 @@
           <span class="h-5 px-2 rounded-md bg-emerald-950 text-emerald-300 font-bold text-[10px] flex items-center justify-center border border-emerald-800">이메일</span>
         </button>
 
+                <!-- 7-2-1. 삼성화재 SLA 관리 -->
+        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="samsungsla" onclick="handleLeftMenuClick('samsungsla')">
+          <div class="flex items-center space-x-3">
+            <i data-lucide="award" class="w-4 h-4 flex-shrink-0 text-amber-400"></i>
+            <span class="tracking-tight font-semibold">삼성화재 SLA 관리</span>
+          </div>
+          <span class="h-5 px-2 rounded-md bg-amber-950 text-amber-300 font-bold text-[10px] flex items-center justify-center border border-amber-800">SLA</span>
+        </button>
+
         <!-- 7-2-2. 현대해상 청구관리 (간병종료 고객 자동집계 & 팩스청구 시스템) -->
         <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="hyundaiclaimhub" onclick="handleLeftMenuClick('hyundaiclaimhub')">
           <div class="flex items-center space-x-3">
@@ -3029,6 +3038,256 @@
             <button type="button" id="btnSubmitSamsungDispatch" onclick="handleDispatchSamsungEmail(event)" class="px-8 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs shadow-md flex items-center gap-2 transition-all cursor-pointer">
               <i data-lucide="send" class="w-4 h-4"></i>
               <span id="btnSubmitSamsungDispatchText">이메일 발송하기</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      
+      <!-- ==================== TAB: SAMSUNG FIRE SLA MANAGEMENT (삼성화재 SLA 관리) ==================== -->
+      <section id="tab-samsungsla" class="tab-content hidden flex flex-col h-[calc(100vh-125px)] space-y-3 pb-1">
+        <!-- 1. 최상단 헤더 & 컨트롤 바 -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200 shrink-0 shadow-2xs">
+              <i data-lucide="award" class="w-5 h-5 text-amber-600"></i>
+            </div>
+            <div class="min-w-0">
+              <h2 class="text-xl font-black text-slate-900 flex items-center gap-2 flex-wrap">
+                <span>삼성화재 SLA 관리</span>
+                <span class="text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-200">서비스 수준 지표 &amp; 엑셀 편집</span>
+              </h2>
+              <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                삼성화재 간병완료 고객 대상 배정소요시간, 도달시간, 매칭률, VOC 및 만족도 지표를 산출하여 웹 엑셀로 확정하고, Convex 운영서버에 저장 및 이력을 관리합니다.
+              </p>
+            </div>
+          </div>
+
+          <!-- 서브탭 스위처 -->
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="switchSamsungSlaSubTab('edit')" id="btnSamsungSlaTabEdit"
+              class="px-4 py-2 rounded-xl text-xs font-black bg-amber-600 border-amber-500 text-white shadow-xs flex items-center gap-2 border transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-white"></i>
+              <span>SLA 산출/편집</span>
+              <span id="samsungSlaRowCountBadge" class="px-2 py-0.5 rounded-full bg-white text-amber-950 font-black text-[10.5px]">0건</span>
+            </button>
+            <button type="button" onclick="switchSamsungSlaSubTab('history')" id="btnSamsungSlaTabHistory"
+              class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-2 border border-slate-200 transition-all cursor-pointer whitespace-nowrap">
+              <i data-lucide="history" class="w-3.5 h-3.5 text-slate-600"></i>
+              <span>저장 히스토리</span>
+              <span id="samsungSlaHistoryCountBadge" class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-800 font-bold text-[10.5px]">0차수</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. 편집 작업 뷰 (samsungSlaEditSection) -->
+        <div id="samsungSlaEditSection" class="flex-1 min-h-0 flex flex-col space-y-3">
+          <!-- 상단 툴바: 기간 선택 & 대상자 불러오기 & 기능 버튼들 -->
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <!-- 기간 선택 & 불러오기 -->
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5 shrink-0">
+                <i data-lucide="calendar-range" class="w-4 h-4 text-amber-600"></i>
+                간병기간:
+              </span>
+              <input type="date" id="slaFilterStartDate"
+                class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-amber-500">
+              <span class="text-xs text-slate-400 font-bold">~</span>
+              <input type="date" id="slaFilterEndDate"
+                class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-amber-500">
+              <div class="flex items-center gap-1.5 shrink-0 bg-slate-50 px-2 py-1 rounded-xl border border-slate-200">
+                <span class="text-xs font-bold text-slate-600">간병인 매칭:</span>
+                <select id="slaFilterMatching" onchange="loadSamsungSlaTargets()"
+                  class="px-2 py-0.5 rounded-lg border border-slate-300 text-xs font-black text-amber-800 bg-white focus:ring-2 focus:ring-amber-500 cursor-pointer">
+                  <option value="Y" selected>매칭완료 (Y)</option>
+                  <option value="N">미매칭 (N)</option>
+                  <option value="ALL">전체보기</option>
+                </select>
+              </div>
+              <button type="button" onclick="loadSamsungSlaTargets()"
+                class="px-4 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-black text-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5 shrink-0">
+                <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
+                <span>간병완료 대상자 불러오기</span>
+              </button>
+              <!-- 실시간 검색창 -->
+              <div class="relative flex items-center min-w-[200px] sm:min-w-[240px]">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none"></i>
+                <input type="text" id="slaSearchInput" placeholder="피보험자명 / ID / 비고 검색..."
+                  oninput="handleSamsungSlaSearch(this.value)"
+                  class="w-full pl-8 pr-7 py-1.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-amber-500 placeholder:text-slate-400 placeholder:font-normal">
+                <button type="button" onclick="clearSamsungSlaSearch()" id="btnSlaSearchClear"
+                  class="absolute right-2 text-slate-400 hover:text-slate-600 hidden p-1 cursor-pointer" title="검색어 지우기">
+                  <i data-lucide="x" class="w-3 h-3"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- 우측 액션 버튼들 -->
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" onclick="addSamsungSlaRow()"
+                class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs transition-all cursor-pointer flex items-center gap-1 shrink-0">
+                <i data-lucide="plus" class="w-3.5 h-3.5 text-slate-600"></i>
+                <span>행 추가</span>
+              </button>
+              <button type="button" onclick="deleteSamsungSlaSelectedRows()"
+                class="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition-all cursor-pointer flex items-center gap-1 shrink-0">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-600"></i>
+                <span>선택 삭제</span>
+              </button>
+              <button type="button" onclick="resetSamsungSlaWorksheet()"
+                class="px-2.5 py-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 border border-transparent font-bold text-xs transition-all cursor-pointer shrink-0" title="현재 시트 비우기">
+                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+              </button>
+              <div class="h-4 w-px bg-slate-300 mx-1"></div>
+              <button type="button" onclick="downloadSamsungSlaExcel()"
+                class="px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 shrink-0">
+                <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span>엑셀 다운로드</span>
+              </button>
+              <button type="button" onclick="openSamsungSlaSaveModal()"
+                class="px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 active:scale-95 text-white font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5 shrink-0">
+                <i data-lucide="save" class="w-3.5 h-3.5"></i>
+                <span>SLA 확정 및 운영 저장</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 웹 엑셀 스프레드시트 컨테이너 -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex-1 min-h-0 flex flex-col">
+            <!-- 가로/세로 스크롤 테이블 (화면 아래 꽉 참) -->
+            <div class="overflow-x-auto flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+              <table class="w-full border-collapse text-left text-xs whitespace-nowrap">
+                <thead class="bg-slate-100 text-slate-700 font-black sticky top-0 z-20 border-b border-slate-300 shadow-2xs">
+                  <tr>
+                    <th class="p-2.5 text-center border-r border-slate-300 bg-slate-100 sticky left-0 z-30 w-10">
+                      <input type="checkbox" onchange="toggleSelectAllSlaRows(this)" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer">
+                    </th>
+                    <th class="p-2.5 text-center border-r border-slate-300 text-slate-500 font-mono text-[11px] w-12">No</th>
+                    <th class="p-2.5 border-r border-slate-300 min-w-[120px]">피보험자ID</th>
+                    <th class="p-2.5 border-r border-slate-300 min-w-[100px]">피보험자명</th>
+                    <th class="p-2.5 border-r border-slate-300 text-center min-w-[80px]">간병인 매칭 여부</th>
+                    <th class="p-2.5 border-r border-slate-300 text-center min-w-[100px]">배정소요시간</th>
+                    <th class="p-2.5 border-r border-slate-300 min-w-[140px]">신청일시</th>
+                    <th class="p-2.5 border-r border-slate-300 min-w-[140px]">간병시작일시</th>
+                    <th class="p-2.5 border-r border-slate-300 text-center min-w-[90px]">도달 시간</th>
+                    <th class="p-2.5 border-r border-slate-300 min-w-[140px]">간병사 관련</th>
+                    <th class="p-2.5 border-r border-slate-300 text-center min-w-[100px]">고객만족도</th>
+                    <th class="p-2.5 border-r border-slate-300 min-w-[150px]">비고</th>
+                    <th class="p-2.5 text-center w-12">관리</th>
+                  </tr>
+                </thead>
+                <tbody id="samsungSlaTableBody" class="divide-y divide-slate-200">
+                  <!-- Dynamic rows rendered by renderSamsungSlaSpreadsheet() -->
+                </tbody>
+                <!-- 하단 공식 요약 (Summary Rows - 첨부 이미지 Row 46, 47 양식) -->
+                <tfoot class="border-t-2 border-slate-300 bg-slate-50 font-bold sticky bottom-0 z-20">
+                  <!-- Row 1: 요약 수치 행 -->
+                  <tr class="border-b border-slate-200 text-xs">
+                    <td class="p-2 bg-slate-100 border-r border-slate-200 sticky left-0 z-30"></td>
+                    <td class="p-2 bg-slate-100 border-r border-slate-200"></td>
+                    <td class="p-2 border-r border-slate-200"></td>
+                    <td class="p-2 border-r border-slate-200"></td>
+                    <td class="p-2 border-r border-slate-200 text-center font-black text-slate-900" id="slaSummaryMatchRate">100%</td>
+                    <td class="p-2 border-r border-slate-200 text-center font-black text-slate-900" id="slaSummaryAssignHours">0시간</td>
+                    <td class="p-2 border-r border-slate-200"></td>
+                    <td class="p-2 border-r border-slate-200"></td>
+                    <td class="p-2 border-r border-slate-200 text-center font-black text-slate-900" id="slaSummaryArrivalHours">0시간</td>
+                    <td class="p-2 border-r border-slate-200 text-center font-black text-slate-900" id="slaSummaryStrikeOut">0명</td>
+                    <td class="p-2 border-r border-slate-200 text-center font-black text-slate-900" id="slaSummarySatisfaction">-</td>
+                    <td class="p-2 border-r border-slate-200"></td>
+                    <td class="p-2"></td>
+                  </tr>
+                  <!-- Row 2: 요약 라벨 행 (노란색 강조) -->
+                  <tr class="text-xs">
+                    <td class="p-2 bg-slate-100 border-r border-slate-200 sticky left-0 z-30"></td>
+                    <td class="p-2 bg-slate-100 border-r border-slate-200"></td>
+                    <td class="p-2 border-r border-slate-200"></td>
+                    <td class="p-2 border-r border-slate-200"></td>
+                    <td class="p-2 border-r border-slate-200 text-center bg-yellow-300 font-black text-slate-900">평균 매칭률</td>
+                    <td class="p-2 border-r border-slate-200 text-center bg-yellow-300 font-black text-slate-900">평균 배정시간</td>
+                    <td class="p-2 border-r border-slate-200"></td>
+                    <td class="p-2 border-r border-slate-200"></td>
+                    <td class="p-2 border-r border-slate-200 text-center bg-yellow-300 font-black text-slate-900">평균 도달시간</td>
+                    <td class="p-2 border-r border-slate-200 text-center bg-yellow-300 font-black text-slate-900">삼진아웃 간병인 수</td>
+                    <td class="p-2 border-r border-slate-200 text-center bg-yellow-300 font-black text-slate-900">평균 고객만족도</td>
+                    <td class="p-2 border-r border-slate-200"></td>
+                    <td class="p-2"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <!-- 하단 가이드 바 -->
+            <div class="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-2">
+              <div class="flex items-center gap-2">
+                <i data-lucide="info" class="w-3.5 h-3.5 text-amber-600"></i>
+                <span>각 셀을 직접 클릭하여 수정할 수 있으며, 수정 시 하단 요약 지표가 실시간으로 재계산됩니다.</span>
+              </div>
+              <span class="font-semibold text-slate-600">※ 확정 후 반드시 우측 상단의 [SLA 확정 및 운영 저장]을 눌러야 Convex 운영서버에 영구 보존됩니다.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 저장 히스토리 뷰 (samsungSlaHistorySection) -->
+        <div id="samsungSlaHistorySection" class="hidden space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" id="samsungSlaHistoryCardsContainer">
+            <!-- Dynamic cards rendered by renderSamsungSlaHistoryView() -->
+          </div>
+        </div>
+      </section>
+
+      <!-- SLA 저장 확정 모달 -->
+      <div id="samsungSlaSaveModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+          <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-amber-50/50">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                <i data-lucide="cloud-upload" class="w-4 h-4 text-amber-700"></i>
+              </div>
+              <div>
+                <h3 class="font-black text-slate-900 text-sm">SLA 확정 및 Convex 운영서버 저장</h3>
+                <p class="text-[11px] text-slate-500">현재 입력된 SLA 표를 히스토리 목록으로 영구 보존합니다.</p>
+              </div>
+            </div>
+            <button type="button" onclick="closeSamsungSlaSaveModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <div class="p-5 space-y-4">
+            <!-- 요약 지표 프리뷰 -->
+            <div id="slaSaveModalSummaryPreview"></div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">SLA 회차 제목 *</label>
+              <input type="text" id="slaSaveTitleInput" placeholder="예: 2026년 10월 상반기 삼성화재 SLA 보고서"
+                class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 focus:bg-white bg-slate-50">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">비고 및 기록 메모 (선택)</label>
+              <textarea id="slaSaveMemoInput" rows="2" placeholder="특이사항이나 회차 관련 전달사항을 입력하세요."
+                class="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-amber-500 focus:bg-white bg-slate-50"></textarea>
+            </div>
+
+            <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-[11.5px] text-emerald-800 leading-relaxed flex items-start gap-2">
+              <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+              <div>
+                <strong>Convex 운영서버(PROD - gallant-weasel-360) 직접 저장</strong><br>
+                저장 완료 즉시 히스토리 목록에 보관되며, 언제든 [불러오기 &amp; 편집]으로 다시 확인 및 엑셀 다운로드가 가능합니다.
+              </div>
+            </div>
+          </div>
+
+          <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+            <button type="button" onclick="closeSamsungSlaSaveModal()"
+              class="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs transition-all cursor-pointer">
+              취소
+            </button>
+            <button type="button" id="btnExecuteSaveSla" onclick="executeSaveSamsungSla()"
+              class="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-black text-xs shadow-md flex items-center gap-1.5 transition-all cursor-pointer">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>저장 확정</span>
             </button>
           </div>
         </div>
@@ -10828,24 +11087,27 @@
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <span>피보험자ID</span>
+                <span class="text-[10px] text-sky-700 font-mono font-semibold">삼성 식별코드</span>
+              </label>
+              <input type="text" id="custEditPatientId" placeholder="예: BA00006156" class="w-full p-2.5 border border-sky-300 rounded-xl font-mono font-bold text-sky-950 bg-sky-50/70 focus:bg-white focus:ring-2 focus:ring-sky-500">
+            </div>
             <div class="sm:col-span-2">
               <label class="block font-bold text-slate-700 mb-1">보험 상품명</label>
               <input type="text" id="custEditProductName" placeholder="예: 무배당현대해상내삶엔(3N)맞춤간편건강보험" class="w-full p-2.5 border rounded-xl font-bold text-slate-800 bg-white">
-            </div>
-            <div>
-              <label class="block font-bold text-slate-700 mb-1">상품코드</label>
-              <input type="text" id="custEditProductCode" placeholder="예: SF-CARE-01" class="w-full p-2.5 border rounded-xl font-mono bg-white">
             </div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label class="block font-bold text-slate-700 mb-1">계약기간 (시작일~종료일)</label>
-              <input type="text" id="custEditContractPeriod" placeholder="예: 2025-07-17 ~ 2045-07-17" class="w-full p-2.5 border rounded-xl font-mono text-slate-800 bg-white">
+              <label class="block font-bold text-slate-700 mb-1">상품코드</label>
+              <input type="text" id="custEditProductCode" placeholder="예: SF-CARE-01" class="w-full p-2.5 border rounded-xl font-mono bg-white">
             </div>
             <div>
-              <label class="block font-bold text-slate-700 mb-1">피보험자ID (삼성 사전명단 번호 등)</label>
-              <input type="text" id="custEditPatientId" placeholder="예: SF-P001" class="w-full p-2.5 border rounded-xl font-mono text-slate-800 bg-white">
+              <label class="block font-bold text-slate-700 mb-1">계약기간 (시작일~종료일)</label>
+              <input type="text" id="custEditContractPeriod" placeholder="예: 2025-07-17 ~ 2045-07-17" class="w-full p-2.5 border rounded-xl font-mono text-slate-800 bg-white">
             </div>
           </div>
 
@@ -14022,6 +14284,11 @@
                   <span class="font-medium">삼성화재 접수/청구관리</span>
                 </label>
                 <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200/80 hover:border-indigo-300 cursor-pointer text-slate-700 text-xs shadow-2xs">
+                  <input type="checkbox" name="adminMenuCheck" value="samsungsla" class="rounded text-indigo-600 focus:ring-indigo-500">
+                  <span class="font-medium">삼성화재 SLA 관리</span>
+                </label>
+
+                <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200/80 hover:border-indigo-300 cursor-pointer text-slate-700 text-xs shadow-2xs">
                   <input type="checkbox" name="adminMenuCheck" value="hyundaiclaimhub" class="rounded text-indigo-600 focus:ring-indigo-500">
                   <span class="font-medium">현대해상 청구관리</span>
                 </label>
@@ -15476,6 +15743,7 @@
   <script src="carehub.js?v=20261020_1215"></script>
   <script src="hyundaiclaimhub.js?v=20261016_split"></script>
   <script src="samsungclaimhub.js?v=20261019_sync"></script>
+  <script src="samsung-sla.js?v=20261022_sla"></script>
   <!-- 🚀 초고속 렌더링 최적화: 대용량 PDF & Excel 라이브러리는 첫 화면 렌더링 이후 비동기 지연 로드 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
