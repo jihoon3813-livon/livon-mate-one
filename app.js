@@ -6225,7 +6225,7 @@ function initInsuranceWorkflows() {
   } catch (e) {}
 
   // Ensure full 12 fields are initialized for Samsung List if still empty
-  if (!gSamsungList || gSamsungList.length === 0 || !gSamsungList[0]?.patientId) {
+/*  if (!gSamsungList || gSamsungList.length === 0 || !gSamsungList[0]?.patientId) {
     gSamsungList = [
       { id: 'SF-20260903-01', patientId: 'SF-P001', patientName: '김옥경', birthDate: '19661230', gender: '여', phone: '010-3875-7912', policyNumber: 'SF109283741', productCode: 'SF-CARE-01', productName: '무배당 삼성화재 당신에게 좋은간병보험', contractStartDate: '2024-03-01', contractEndDate: '2044-03-01', hasInjuryCare: '가입', hasDiseaseCare: '가입', accidentNumber: '26S008912', adjusterName: '김정현', adjusterPhone: '02-3485-9114', adjusterFax: '02-3485-9100', maxDailyLimit: 144000, maxDays: 180, receiveDate: '2026-09-03', matchStatus: '매칭완료' },
       { id: 'SF-20260903-02', patientId: 'SF-P002', patientName: '이성근', birthDate: '19800718', gender: '남', phone: '010-7187-8718', policyNumber: 'SF992817263', productCode: 'SF-CARE-02', productName: '무배당 삼성화재 행복한돌봄간병보험', contractStartDate: '2023-11-15', contractEndDate: '2043-11-15', hasInjuryCare: '가입', hasDiseaseCare: '가입', accidentNumber: '26S009341', adjusterName: '이민우', adjusterPhone: '02-760-5521', adjusterFax: '02-760-5500', maxDailyLimit: 144000, maxDays: 180, receiveDate: '2026-09-03', matchStatus: '매칭완료' },
@@ -6261,7 +6261,7 @@ function initInsuranceWorkflows() {
       receiveDate: '2026-09-16',
       matchStatus: '접수진행중'
     });
-  }
+  }*/
 
   // Initialize Centers & Caregivers (100% 엑셀 실데이터만 적용, 임의 목업 생성 원천 차단)
   if (!Array.isArray(gCenters)) gCenters = [];
@@ -10743,10 +10743,7 @@ function populateSamsungLeadDataToForm(lead) {
   const policyVal = lead.policyNumber || ('SF' + Math.floor(100000000 + Math.random() * 900000000));
   const prodCodeVal = lead.productCode || '2PB320070';
   const prodNameVal = lead.productName || '무배당 삼성화재 간편보험 다이렉트(2603.5)(납입면제/해약환급금 미지급형Ⅱ)';
-  const accidentVal = lead.accidentNumber || ('26S' + Math.floor(100000 + Math.random() * 900000));
-  const adjName = lead.adjusterName || '-';
-  const adjPhone = lead.adjusterPhone || '02-3485-9114';
-  const adjFax = lead.adjusterFax || '02-3485-9100';
+
 
 
   if (document.getElementById('newAppSamsungPatientId')) document.getElementById('newAppSamsungPatientId').value = patientIdVal;
@@ -10757,20 +10754,16 @@ function populateSamsungLeadDataToForm(lead) {
   if (document.getElementById('newAppSamsungContractEndDate')) document.getElementById('newAppSamsungContractEndDate').value = cleanEndDate;
   if (document.getElementById('newAppSamsungHasInjuryCare')) document.getElementById('newAppSamsungHasInjuryCare').value = injuryVal;
   if (document.getElementById('newAppSamsungHasDiseaseCare')) document.getElementById('newAppSamsungHasDiseaseCare').value = diseaseVal;
-  if (document.getElementById('newAppSamsungAdjuster')) document.getElementById('newAppSamsungAdjuster').value = adjName;
-  if (document.getElementById('newAppSamsungAdjusterPhone')) document.getElementById('newAppSamsungAdjusterPhone').value = adjPhone;
-  if (document.getElementById('newAppSamsungAdjusterFax')) document.getElementById('newAppSamsungAdjusterFax').value = adjFax;
-  if (document.getElementById('newAppSamsungAccidentNumber')) document.getElementById('newAppSamsungAccidentNumber').value = accidentVal;
-
+ 
   // 4. Fallback hidden inputs
   if (document.getElementById('newAppPolicy')) document.getElementById('newAppPolicy').value = policyVal;
   if (document.getElementById('newAppProductName')) document.getElementById('newAppProductName').value = prodNameVal;
   if (document.getElementById('newAppContractPeriod')) document.getElementById('newAppContractPeriod').value = `${cleanStartDate} ~ ${cleanEndDate}`;
-  if (document.getElementById('newAppAccidentNo')) document.getElementById('newAppAccidentNo').value = accidentVal;
-  if (document.getElementById('newAppAdjuster')) document.getElementById('newAppAdjuster').value = adjName;
-  if (document.getElementById('newAppAdjusterPhone')) document.getElementById('newAppAdjusterPhone').value = adjPhone;
-  if (document.getElementById('newAppAdjusterFax')) document.getElementById('newAppAdjusterFax').value = adjFax;
-  if (document.getElementById('newAppAdjusterFirm')) document.getElementById('newAppAdjusterFirm').value = "삼성화재 간병지원파트";
+  if (document.getElementById('newAppAccidentNo')) document.getElementById('newAppAccidentNo').value = '';
+  if (document.getElementById('newAppAdjuster')) document.getElementById('newAppAdjuster').value = '';
+  if (document.getElementById('newAppAdjusterPhone')) document.getElementById('newAppAdjusterPhone').value = '';
+  if (document.getElementById('newAppAdjusterFax')) document.getElementById('newAppAdjusterFax').value = '';
+  if (document.getElementById('newAppAdjusterFirm')) document.getElementById('newAppAdjusterFirm').value = '';
 
   // 5. Default Address & Memo
   if (document.getElementById('newAppZonecode')) document.getElementById('newAppZonecode').value = '04523';
@@ -10802,11 +10795,11 @@ function populateSamsungLeadDataToForm(lead) {
     contractPeriod: `${cleanStartDate} ~ ${cleanEndDate}`,
     hasInjuryCare: injuryVal,
     hasDiseaseCare: diseaseVal,
-    adjusterName: adjName,
-    adjusterPhone: adjPhone,
-    adjusterFax: adjFax,
-    adjusterFirm: '삼성화재 간병지원파트',
-    accidentNumber: accidentVal
+    adjusterName: '',
+    adjusterPhone: '',
+    adjusterFax: '',
+    adjusterFirm: '',
+    accidentNumber: ''
   };
 
   lead.matchStatus = '매칭완료';
@@ -32013,10 +32006,7 @@ function handleNewAppSubmit(e) {
       const domContractEnd = document.getElementById('newAppSamsungContractEndDate')?.value?.trim();
       const domHasInjury = document.getElementById('newAppSamsungHasInjuryCare')?.value?.trim();
       const domHasDisease = document.getElementById('newAppSamsungHasDiseaseCare')?.value?.trim();
-      const domAdjuster = document.getElementById('newAppSamsungAdjuster')?.value?.trim();
-      const domAdjusterPhone = document.getElementById('newAppSamsungAdjusterPhone')?.value?.trim();
-      const domAdjusterFax = document.getElementById('newAppSamsungAdjusterFax')?.value?.trim();
-      const domAccidentNo = document.getElementById('newAppSamsungAccidentNumber')?.value?.trim();
+
 
       newApp.patientId = domPatientId || gPendingSamsungLeadData?.patientId || ('SF-' + newApp.id);
       newApp.productCode = domProductCode || gPendingSamsungLeadData?.productCode || '2PB320070';
@@ -32030,11 +32020,12 @@ function handleNewAppSubmit(e) {
       newApp.hasDiseaseCare = domHasDisease || gPendingSamsungLeadData?.hasDiseaseCare || '가입';
 
       if (domPolicyNumber) newApp.policyNumber = domPolicyNumber;
-      if (domAdjuster) newApp.adjusterName = domAdjuster;
-      if (domAdjusterPhone) newApp.adjusterPhone = domAdjusterPhone;
-      if (domAdjusterFax) newApp.adjusterFax = domAdjusterFax;
-      if (domAccidentNo) newApp.accidentNumber = domAccidentNo;
-
+      newApp.adjusterName = '';
+      newApp.adjusterFirm = '';
+      newApp.adjusterPhone = '';
+      newApp.adjusterMobile = '';
+      newApp.adjusterFax = '';
+      newApp.accidentNumber = '';
       gPendingSamsungLeadData = null;
     }
 
