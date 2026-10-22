@@ -10261,65 +10261,134 @@
   </div>
 
   <!-- ==================== MODAL 1: STEP 1 CUSTOMER EDIT MODAL ==================== -->
-  <div id="customerEditModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-3xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
-      <div class="p-4 sm:p-5 bg-slate-900 text-white flex items-center justify-between">
-        <div>
-          <h3 class="text-base font-black flex items-center gap-2">
-            <i data-lucide="edit" class="w-5 h-5 text-amber-400"></i>
-            고객 및 접수정보 수정 <span id="customerEditModalIdBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-amber-300 font-mono">C0001</span>
-          </h3>
-          <p class="text-xs text-slate-400 mt-0.5">고객 기본정보, 손사 연락처, 사고정보 및 비고란을 직접 수정합니다.</p>
+  <div id="customerEditModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-3 sm:p-4">
+    <div class="bg-white rounded-3xl w-full max-w-4xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+      <!-- 헤더 -->
+      <div class="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-between shrink-0 border-b border-slate-700/60">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-400/40 text-amber-300 flex items-center justify-center font-bold shadow-xs shrink-0">
+            <i data-lucide="edit" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black flex items-center gap-2">
+              고객 및 접수/신청 정보 수정
+              <span id="customerEditModalIdBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-amber-300 font-mono border border-slate-700">C0001</span>
+              <span id="customerEditModalInsuranceBadge" class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 font-bold border border-emerald-700/60">현대해상</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">신규 접수 시 입력한 피보험자/신청자 정보, 간병장소, 희망일/예상기간, 문자파싱 및 손사계약 정보를 모두 조회 및 수정합니다.</p>
+          </div>
         </div>
-        <button onclick="closeModal('customerEditModal')" class="p-2 text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        <button type="button" onclick="closeModal('customerEditModal')" class="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
       </div>
 
-      <form id="customerEditForm" onsubmit="handleCustomerEditSubmit(event)" class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4 text-xs">
+      <!-- 폼 본문 -->
+      <form id="customerEditForm" onsubmit="handleCustomerEditSubmit(event)" class="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-4 text-xs">
         <input type="hidden" id="custEditId">
         <input type="hidden" id="custEditSido">
         <input type="hidden" id="custEditSigungu">
         <input type="hidden" id="custEditZip">
 
-        <!-- 1. 피보험자 정보 -->
+        <!-- ==================== 0. 추가 확인 정보 배너 (원수사별 특화: 현대해상 문자파싱 / 삼성화재 사전명단) ==================== -->
+        <!-- 현대해상 문자파싱 정보 배너 -->
+        <div id="custEditHdBanner" class="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-blue-50 via-sky-50 to-indigo-50 border border-blue-200/90 shadow-2xs space-y-2.5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+              </div>
+              <div class="min-w-0">
+                <div class="font-extrabold text-xs text-blue-950 flex items-center gap-1.5 flex-wrap">
+                  <span>현대해상 접수안내 문자 파싱 연동 정보</span>
+                  <span id="custEditHdParseStatusBadge" class="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-200 text-blue-900 border border-blue-300">파싱완료</span>
+                </div>
+                <p class="text-[11px] text-blue-800 mt-0.5">현대해상 회신 문자에서 자동 추출된 증권·사고번호, 담당손사 및 상품정보가 연계되어 있습니다.</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button type="button" onclick="openHyundaiSmsInputModal(document.getElementById('custEditId').value)" class="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs flex items-center gap-1 cursor-pointer transition-all">
+                <i data-lucide="scan-text" class="w-3.5 h-3.5"></i> 문자파싱 재실행 / 입력
+              </button>
+              <button type="button" id="custEditBtnToggleRawSms" onclick="toggleCustEditRawSms()" class="px-2.5 py-1.5 rounded-xl bg-white border border-blue-300 hover:bg-blue-100 text-blue-800 font-bold text-xs shadow-2xs flex items-center gap-1 cursor-pointer transition-all">
+                <i data-lucide="file-text" class="w-3.5 h-3.5"></i> 문자 원문 확인
+              </button>
+            </div>
+          </div>
+          <!-- 현대해상 문자 원문 접이식 영역 -->
+          <div id="custEditHdRawSmsArea" class="hidden pt-2 border-t border-blue-200/80">
+            <label class="block font-bold text-blue-900 mb-1 text-[11px]">수신된 현대해상 문자 원문 (Raw SMS)</label>
+            <textarea id="custEditHdRawSmsText" readonly rows="3" class="w-full p-2.5 rounded-xl border border-blue-300 bg-white font-mono text-[11px] text-slate-800 leading-relaxed custom-scrollbar shadow-inner" placeholder="등록된 문자 원문이 없습니다. [문자파싱 재실행 / 입력] 버튼을 통해 문자를 등록할 수 있습니다."></textarea>
+          </div>
+        </div>
+
+        <!-- 삼성화재 사전명단 연동 배너 -->
+        <div id="custEditSamsungBanner" class="hidden p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-sky-50 via-teal-50 to-emerald-50 border border-sky-200/90 shadow-2xs space-y-2.5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="w-8 h-8 rounded-xl bg-sky-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+              </div>
+              <div class="min-w-0">
+                <div class="font-extrabold text-xs text-sky-950 flex items-center gap-1.5 flex-wrap">
+                  <span>삼성화재 사전명단 자동 매칭 정보 (12대 항목 연동)</span>
+                  <span id="custEditSamsungStatusBadge" class="px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-200 text-sky-900 border border-sky-300">사전명단매칭완료</span>
+                </div>
+                <p class="text-[11px] text-sky-800 mt-0.5">삼성화재 사전명단에서 피보험자ID, 증권번호, 상품코드, 계약기간, 담보가입여부가 자동으로 안전하게 끌고와졌습니다.</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button type="button" onclick="checkSamsungEligibleInCustEdit()" class="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs flex items-center gap-1 cursor-pointer transition-all">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> 사전명단 재조회 / 매칭
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== 1. 피보험자(환자) 인적사항 ==================== -->
         <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-          <div class="font-extrabold text-slate-800 text-xs flex items-center gap-1.5 pb-2 border-b border-slate-200">
-            <i data-lucide="user" class="w-4 h-4 text-primary-600"></i> <span class="hl-pen-yellow">피보험자(환자) 인적사항</span>
+          <div class="font-extrabold text-slate-800 text-xs flex items-center justify-between pb-2 border-b border-slate-200">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="user" class="w-4 h-4 text-primary-600"></i>
+              <span class="hl-pen-yellow">피보험자(환자) 인적사항</span>
+            </div>
+            <span class="text-[10.5px] text-slate-500 font-semibold">* 표시는 필수 항목</span>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
-              <label class="block font-bold text-slate-700 mb-1">고객 성명 *</label>
-              <input type="text" id="custEditName" required class="w-full p-2.5 border rounded-xl font-bold">
+              <label class="block font-bold text-slate-700 mb-1">고객 성명 (피보험자) *</label>
+              <input type="text" id="custEditName" required class="w-full p-2.5 border rounded-xl font-bold bg-white text-slate-900 focus:ring-2 focus:ring-primary-500">
             </div>
             <div>
-              <label class="block font-bold text-slate-700 mb-1">성별</label>
-              <select id="custEditGender" class="w-full p-2.5 border rounded-xl bg-white font-semibold">
+              <label class="block font-bold text-slate-700 mb-1">성별 *</label>
+              <select id="custEditGender" class="w-full p-2.5 border rounded-xl bg-white font-semibold text-slate-900 focus:ring-2 focus:ring-primary-500">
                 <option value="남">남</option>
                 <option value="여">여</option>
               </select>
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">생년월일 (8자리)</label>
-              <input type="text" id="custEditBirthDate" placeholder="YYYYMMDD" maxlength="8" class="w-full p-2.5 border rounded-xl font-mono">
+              <input type="text" id="custEditBirthDate" placeholder="YYYYMMDD" maxlength="8" class="w-full p-2.5 border rounded-xl font-mono bg-white text-slate-900 focus:ring-2 focus:ring-primary-500">
             </div>
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="font-bold text-slate-700">고객 연락처 *</label>
-                <button type="button" onclick="triggerCtiCall(document.getElementById('custEditPhone').value, document.getElementById('custEditName').value, '고객')" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 text-[11px] hover:underline" title="CTI 통화 발신">
+                <button type="button" onclick="triggerCtiCall(document.getElementById('custEditPhone').value, document.getElementById('custEditName').value, '고객')" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 text-[11px] hover:underline cursor-pointer" title="CTI 통화 발신">
                   <i data-lucide="phone-call" class="w-3 h-3 text-emerald-600"></i> CTI발신
                 </button>
               </div>
-              <input type="tel" id="custEditPhone" required placeholder="010-0000-0000" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono">
+              <input type="tel" id="custEditPhone" required placeholder="010-0000-0000" inputmode="numeric" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono bg-white text-slate-900 focus:ring-2 focus:ring-primary-500">
             </div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label class="block font-bold text-slate-700 mb-1">주민등록번호 (전체 13자리)</label>
-              <input type="text" id="custEditRrn" placeholder="주민번호 13자리 입력" maxlength="14" oninput="autoHyphenRrn(this)" class="w-full p-2.5 border rounded-xl font-mono">
+              <label class="block font-bold text-slate-700 mb-1">주민등록번호 (전체 13자리) *</label>
+              <input type="text" id="custEditRrn" placeholder="주민번호 13자리 입력" maxlength="14" oninput="autoHyphenRrn(this)" class="w-full p-2.5 border rounded-xl font-mono bg-white text-slate-900 focus:ring-2 focus:ring-primary-500">
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">원수사(보험사) *</label>
-              <select id="custEditInsurance" onchange="updateCustomerEditInsuranceFields(this.value)" class="w-full p-2.5 border rounded-xl bg-white font-bold text-primary-700">
+              <select id="custEditInsurance" onchange="updateCustomerEditInsuranceFields(this.value)" class="w-full p-2.5 border rounded-xl bg-white font-bold text-primary-700 focus:ring-2 focus:ring-primary-500">
                 <option value="현대해상(SCOR)">현대해상(SCOR)</option>
                 <option value="현대해상">현대해상</option>
                 <option value="삼성화재">삼성화재</option>
@@ -10336,177 +10405,342 @@
               </div>
             </div>
           </div>
-
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">주소 (도로명 주소)</label>
-            <div class="flex gap-2">
-              <input type="text" id="custEditRoadAddress" placeholder="도로명 주소" class="flex-1 p-2.5 border rounded-xl bg-slate-50 font-medium">
-              <button type="button" onclick="openAddressSearchModal('custEditRoadAddress')" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold whitespace-nowrap flex items-center gap-1">
-                <i data-lucide="map-pin" class="w-3.5 h-3.5"></i> 주소검색
-              </button>
-            </div>
-            <input type="text" id="custEditAddressDetail" placeholder="상세주소 (동/호수/층)" class="w-full mt-1.5 p-2.5 border rounded-xl">
-          </div>
         </div>
 
-        <!-- 1-0. 간병 장소 및 입원 병원 정보 (케어포트 연동 핵심) -->
-        <div class="bg-emerald-50/40 p-4 rounded-2xl border border-emerald-200/80 space-y-3">
-          <div class="font-extrabold text-slate-800 text-xs flex items-center justify-between pb-2 border-b border-emerald-200/60">
-            <div class="flex items-center gap-1.5">
-              <i data-lucide="building-2" class="w-4 h-4 text-emerald-600"></i>
-              <span class="hl-pen-yellow text-emerald-950 font-black">간병 장소 / 입원 병원 정보</span>
-            </div>
-            <span class="text-[10.5px] text-emerald-700 font-semibold">케어포트 방문관리 및 대장 실시간 반영</span>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div class="sm:col-span-2">
-              <div class="flex items-center justify-between mb-1">
-                <label class="block font-bold text-slate-700">입원 병원명 *</label>
-                <button type="button" onclick="openHospitalSearchModal('custEdit')" class="text-[10.5px] font-bold text-emerald-700 hover:text-emerald-900 bg-white hover:bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300 flex items-center gap-1 shadow-2xs cursor-pointer">
-                  <i data-lucide="search" class="w-3 h-3 text-emerald-600"></i> 병원 검색
-                </button>
-              </div>
-              <input type="text" id="custEditHospitalName" placeholder="예: 서울아산병원, 삼성서울병원 (자택일 경우 '자택')" class="w-full p-2.5 border rounded-xl font-bold text-slate-900 bg-white focus:ring-2 focus:ring-emerald-500">
-            </div>
-            <div>
-              <label class="block font-bold text-slate-700 mb-1">병실 / 병동</label>
-              <input type="text" id="custEditHospitalRoom" placeholder="예: 본관 602호, 8층 간호간병통합" class="w-full p-2.5 border rounded-xl font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-500">
-            </div>
-          </div>
-
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">병원 도로명 주소</label>
-            <div class="flex gap-2">
-              <input type="text" id="custEditHospitalRoadAddress" placeholder="병원 소재지 주소 (병원 검색 시 자동 입력)" class="flex-1 p-2.5 border rounded-xl bg-slate-50 font-medium">
-              <button type="button" onclick="openAddressSearchModal('custEditHospitalRoadAddress')" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold whitespace-nowrap flex items-center gap-1 cursor-pointer">
-                <i data-lucide="map-pin" class="w-3.5 h-3.5"></i> 주소검색
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 1-1. 보호자(신청인) 및 추가 연락처 정보 -->
-        <div id="custEditGuardianSection" class="bg-gradient-to-r from-emerald-50/50 via-teal-50/40 to-indigo-50/40 p-4 rounded-2xl border border-emerald-200/90 shadow-2xs space-y-3 transition-all">
+        <!-- ==================== 2. 신청자(보호자) 인적사항 ==================== -->
+        <div id="custEditGuardianSection" class="bg-gradient-to-r from-emerald-50/40 via-teal-50/30 to-indigo-50/30 p-4 rounded-2xl border border-emerald-200/90 shadow-2xs space-y-3 transition-all">
           <div class="font-extrabold text-slate-800 text-xs flex items-center justify-between pb-2 border-b border-emerald-200/70">
             <div class="flex items-center gap-1.5">
-              <i data-lucide="user-check" class="w-4 h-4 text-emerald-700"></i> 
-              <span class="hl-pen-yellow text-emerald-950 font-black">보호자(신청인) 정보 및 추가 연락처</span>
+              <i data-lucide="user-check" class="w-4 h-4 text-emerald-700"></i>
+              <span class="hl-pen-yellow text-emerald-950 font-black">신청자 인적사항</span>
             </div>
-            <span class="text-[10px] text-emerald-700 font-semibold bg-emerald-100/70 px-2 py-0.5 rounded-md border border-emerald-200/60">환자 부재 시 비상 연락 및 간병 안내 수신자</span>
+            <label class="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700 bg-white/90 px-2.5 py-1 rounded-xl border border-emerald-300 shadow-2xs hover:bg-emerald-50 transition-all select-none">
+              <input type="checkbox" id="custEditChkApplicantSame" onchange="onToggleCustEditApplicantSame(this.checked)" class="w-4 h-4 rounded text-primary-600 accent-primary-600 cursor-pointer">
+              <span>피보험자와 동일</span>
+            </label>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
-              <label class="block font-bold text-slate-700 mb-1">보호자 성명</label>
-              <input type="text" id="custEditGuardianName" placeholder="예: 홍길동" class="w-full p-2.5 border rounded-xl font-bold bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500">
+              <label class="block font-bold text-slate-700 mb-1">신청자 성명 *</label>
+              <input type="text" id="custEditApplicantName" placeholder="예: 홍길동" class="w-full p-2.5 border rounded-xl font-bold bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500">
             </div>
             <div>
-              <label class="block font-bold text-slate-700 mb-1">피보험자와의 관계</label>
-              <select id="custEditGuardianRelation" onchange="onCustEditGuardianRelationChange(this.value)" class="w-full p-2.5 border rounded-xl bg-white font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500">
-                <option value="자녀">자녀</option>
+              <label class="block font-bold text-slate-700 mb-1">생년월일 (8자리)</label>
+              <input type="text" id="custEditApplicantBirth" placeholder="YYYYMMDD" maxlength="8" class="w-full p-2.5 border rounded-xl font-mono bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="font-bold text-slate-700">신청자 연락처 *</label>
+                <button type="button" onclick="triggerCtiCall(document.getElementById('custEditApplicantPhone').value, document.getElementById('custEditApplicantName').value || '신청인', '신청인')" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 text-[11px] hover:underline cursor-pointer" title="CTI 통화 발신">
+                  <i data-lucide="phone-call" class="w-3 h-3 text-emerald-600"></i> CTI발신
+                </button>
+              </div>
+              <input type="tel" id="custEditApplicantPhone" placeholder="010-0000-0000" inputmode="numeric" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">피보험자와의 관계 *</label>
+              <select id="custEditApplicantRelation" onchange="onCustEditApplicantRelationChange(this.value)" class="w-full p-2.5 border rounded-xl bg-white font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500">
+                <option value="본인">본인</option>
                 <option value="배우자">배우자</option>
+                <option value="자녀">자녀</option>
                 <option value="부모">부모</option>
                 <option value="형제자매">형제자매</option>
-                <option value="본인">본인</option>
                 <option value="기타">기타 (직접입력)</option>
               </select>
-              <input type="text" id="custEditGuardianRelationOther" placeholder="관계 직접입력 (예: 며느리, 사위, 지인)" class="hidden mt-1.5 w-full p-2 border rounded-xl text-xs bg-white font-medium">
+              <input type="text" id="custEditApplicantRelationOther" placeholder="관계 직접입력 (예: 간병인, 지인, 며느리)" class="hidden mt-1.5 w-full p-2 border rounded-xl text-xs bg-white font-medium">
             </div>
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <label class="font-bold text-slate-700">보호자 연락처</label>
-                <button type="button" onclick="triggerCtiCall(document.getElementById('custEditGuardianPhone').value, document.getElementById('custEditGuardianName').value || '보호자', '보호자')" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 text-[11px] hover:underline cursor-pointer" title="CTI 통화 발신">
-                  <i data-lucide="phone-call" class="w-3 h-3 text-emerald-600"></i> CTI발신
-                </button>
-              </div>
-              <input type="tel" id="custEditGuardianPhone" placeholder="010-0000-0000" inputmode="numeric" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500">
+          </div>
+
+          <div class="pt-1">
+            <div class="flex items-center justify-between mb-1">
+              <label class="font-bold text-slate-700">추가 / 비상 연락처 (선택)</label>
+              <button type="button" onclick="triggerCtiCall(document.getElementById('custEditExtraPhone').value, document.getElementById('custEditName').value || '추가연락처', '비상연락처')" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 text-[11px] hover:underline cursor-pointer" title="CTI 통화 발신">
+                <i data-lucide="phone-call" class="w-3 h-3 text-emerald-600"></i> CTI발신
+              </button>
             </div>
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <label class="font-bold text-slate-700">추가/비상 연락처</label>
-                <button type="button" onclick="triggerCtiCall(document.getElementById('custEditExtraPhone').value, document.getElementById('custEditName').value || '추가연락처', '비상연락처')" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 text-[11px] hover:underline cursor-pointer" title="CTI 통화 발신">
-                  <i data-lucide="phone-call" class="w-3 h-3 text-emerald-600"></i> CTI발신
-                </button>
-              </div>
-              <input type="tel" id="custEditExtraPhone" placeholder="010-0000-0000" inputmode="numeric" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500">
-            </div>
+            <input type="tel" id="custEditExtraPhone" placeholder="010-0000-0000" inputmode="numeric" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono bg-white text-slate-900 focus:ring-2 focus:ring-emerald-500">
           </div>
         </div>
 
-        <!-- 2. 증권 및 손사 정보 -->
-        <div id="custEditSecuritiesSection" class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-          <div class="font-extrabold text-slate-800 text-xs flex items-center gap-1.5 pb-2 border-b border-slate-200">
-            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i> <span class="hl-pen-yellow">증권번호 & 손해사정인 정보</span>
+        <!-- ==================== 3. 간병인 서비스 신청 내역 ==================== -->
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div class="pb-2 border-b border-slate-100 flex items-center justify-between">
+            <h4 class="font-extrabold text-slate-900 text-xs flex items-center gap-2">
+              <i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-600"></i>
+              <span class="hl-pen-yellow">간병인 서비스 신청 내역</span>
+            </h4>
+            <span class="text-[10.5px] text-slate-500">접수 시 등록한 기간·유형 및 장소 정보</span>
           </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+            <div class="sm:col-span-4">
+              <div class="flex items-center justify-between mb-1">
+                <label onclick="triggerDatePicker('custEditApplyDate_picker')" class="block font-bold text-slate-700 cursor-pointer select-none whitespace-nowrap" title="클릭 시 달력 열기">신청일시 (고객접수일) *</label>
+                <button type="button" onclick="setApplyDateNow('custEditApplyDate')" class="text-[10px] font-bold text-primary-600 hover:text-primary-800 bg-primary-50 hover:bg-primary-100 px-1.5 py-0.5 rounded border border-primary-200 transition-all cursor-pointer whitespace-nowrap" title="현재 시각으로 자동 입력">
+                  현재시각 ⚡
+                </button>
+              </div>
+              <div class="relative flex items-center">
+                <input type="text" id="custEditApplyDate" required placeholder="YYYY.MM.DD HH:mm" class="w-full p-2.5 pr-10 border rounded-xl font-mono font-bold bg-white text-slate-800 text-xs shadow-xs focus:ring-2 focus:ring-primary-500">
+                <input type="date" id="custEditApplyDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('custEditApplyDate', this.value)">
+                <button type="button" onclick="triggerDatePicker('custEditApplyDate_picker')" class="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-none" title="달력 선택">
+                  <i data-lucide="calendar" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="sm:col-span-4">
+              <label onclick="triggerDatePicker('custEditAccidentDate_picker')" class="block font-bold text-slate-700 mb-1 cursor-pointer select-none whitespace-nowrap" title="클릭 시 달력 열기">사고일자 *</label>
+              <div class="relative flex items-center">
+                <input type="text" id="custEditAccidentDate" required placeholder="YYYY-MM-DD" class="w-full p-2.5 pr-10 border rounded-xl font-semibold bg-white cursor-pointer" onclick="triggerDatePicker('custEditAccidentDate_picker')">
+                <input type="date" id="custEditAccidentDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('custEditAccidentDate', this.value)">
+                <button type="button" onclick="triggerDatePicker('custEditAccidentDate_picker')" class="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-none" title="달력 선택">
+                  <i data-lucide="calendar" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="sm:col-span-4">
+              <label class="block font-bold text-slate-700 mb-1 whitespace-nowrap">사고유형 *</label>
+              <div class="flex items-center gap-4 pt-2">
+                <label class="flex items-center gap-1.5 cursor-pointer font-bold text-slate-800 whitespace-nowrap">
+                  <input type="radio" name="custEditAccidentTypeRadio" value="질병" class="accent-primary-600 w-4 h-4"> 질병
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer font-bold text-slate-800 whitespace-nowrap">
+                  <input type="radio" name="custEditAccidentTypeRadio" value="상해" checked class="accent-primary-600 w-4 h-4"> 상해
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">진단명 (선택 입력)</label>
+              <input type="text" id="custEditDiagnosis" placeholder="예: 요추 골절, 뇌경색 등" class="w-full p-2.5 border rounded-xl font-semibold bg-white text-slate-900 focus:ring-2 focus:ring-primary-500">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">사고(발병) 경위</label>
+              <input type="text" id="custEditAccidentDetail" placeholder="예: 빙판길 낙상으로 요추 부상, 자택 내 실신 등" class="w-full p-2.5 border rounded-xl bg-white text-slate-900 focus:ring-2 focus:ring-primary-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1.5">병명확인 서류첨부 여부</label>
+              <div class="flex items-center gap-4">
+                <label class="flex items-center gap-1.5 cursor-pointer text-xs font-semibold">
+                  <input type="radio" name="custEditDocAttachedRadio" value="아니오" checked class="accent-primary-600 w-4 h-4"> 아니오 (기본)
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer text-xs font-semibold">
+                  <input type="radio" name="custEditDocAttachedRadio" value="예" class="accent-primary-600 w-4 h-4"> 예 (서류 구비됨)
+                </label>
+              </div>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1.5">거동가능 여부</label>
+              <div class="flex items-center gap-4">
+                <label class="flex items-center gap-1.5 cursor-pointer text-xs font-semibold">
+                  <input type="radio" name="custEditMobilityRadio" value="가능" class="accent-primary-600 w-4 h-4"> 가능
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer text-xs font-semibold">
+                  <input type="radio" name="custEditMobilityRadio" value="불가" class="accent-primary-600 w-4 h-4"> 불가 (와상/보조필요)
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- 간병 신청 장소 구분 (입원 vs 재택) -->
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3.5">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+              <label class="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
+                <i data-lucide="map-pin" class="w-4 h-4 text-emerald-600"></i>
+                <span class="hl-pen-yellow">간병 신청 장소 구분 *</span>
+              </label>
+              <div class="w-52">
+                <select id="custEditCareType" onchange="onCustEditCareTypeChange(this.value)" class="w-full p-2 border-2 border-emerald-500 rounded-xl bg-white font-extrabold text-emerald-800 text-xs focus:ring-2 focus:ring-emerald-500 cursor-pointer">
+                  <option value="입원">🏥 입원 (병원 / 병실)</option>
+                  <option value="자택">🏡 재택 (자택 간병)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 입원 시 UI -->
+            <div id="custEditCareHospitalArea" class="space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                  <i data-lucide="building" class="w-3.5 h-3.5 text-emerald-600"></i>
+                  입원 병원명 검색 (전국 병·의원 실시간 검색) *
+                </span>
+                <div class="flex items-center gap-1.5">
+                  <button type="button" onclick="openHospitalSearchModal('custEdit')" class="py-1 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs whitespace-nowrap flex items-center gap-1 shadow-2xs cursor-pointer">
+                    <i data-lucide="search" class="w-3 h-3"></i> 병원 검색
+                  </button>
+                  <button type="button" onclick="openAddressSearchModal('custEditHospitalRoadAddress')" class="py-1 px-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs whitespace-nowrap flex items-center gap-1 cursor-pointer">
+                    <i data-lucide="map" class="w-3 h-3"></i> 도로명 검색
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-600 mb-0.5">병원명 *</label>
+                  <input type="text" id="custEditHospitalName" placeholder="예: 서울아산병원" class="w-full p-2.5 border rounded-xl bg-white font-bold text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-600 mb-0.5">병원 도로명 주소 (전체)</label>
+                  <input type="text" id="custEditHospitalRoadAddress" placeholder="병원 소재지 주소 (병원 검색 시 자동 완성)" class="w-full p-2.5 border rounded-xl bg-slate-50 font-medium text-slate-700 text-xs">
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 mb-0.5">상세 병실 / 호수 *</label>
+                <input type="text" id="custEditHospitalRoom" placeholder="예: 본관 6층 602호 (중환자실/일반병동 등)" class="w-full p-2.5 border rounded-xl font-bold text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500">
+              </div>
+            </div>
+
+            <!-- 재택 시 UI -->
+            <div id="custEditCareHomeArea" class="space-y-2.5 hidden">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold text-slate-700">재택(자택) 도로명 주소 (전체) *</span>
+                <button type="button" onclick="openAddressSearchModal('custEditRoadAddress')" class="text-xs font-bold text-primary-700 hover:text-primary-800 flex items-center gap-1 hover:underline cursor-pointer">
+                  <i data-lucide="search" class="w-3.5 h-3.5"></i> 도로명 주소 검색 🔍
+                </button>
+              </div>
+              <input type="text" id="custEditRoadAddress" readonly placeholder="[도로명 주소 검색 🔍]을 클릭하여 도로명 주소를 선택하세요." class="w-full p-2.5 border rounded-xl bg-white font-bold text-slate-900 text-xs cursor-pointer" onclick="openAddressSearchModal('custEditRoadAddress')">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 mb-0.5">상세 주소 (동호수/방위치) *</label>
+                <input type="text" id="custEditAddressDetail" placeholder="예: 101동 1203호, 안방 침대 완비 등" class="w-full p-2.5 border rounded-xl font-bold text-slate-900 text-xs focus:ring-2 focus:ring-primary-500">
+              </div>
+            </div>
+          </div>
+
+          <!-- 간병시작 희망일, 예상 사용기간, 간병종료 예정일 -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label onclick="triggerDatePicker('custEditDesiredDate_picker')" class="block font-bold text-slate-700 mb-1 cursor-pointer select-none" title="클릭 시 달력 열기">간병시작 희망일 *</label>
+              <div class="relative flex items-center">
+                <input type="text" id="custEditDesiredDate" required placeholder="YYYY-MM-DD" class="w-full p-2.5 pr-10 border rounded-xl font-semibold bg-white cursor-pointer" onclick="triggerDatePicker('custEditDesiredDate_picker')" oninput="calculateAndSetEndDateCustEdit()">
+                <input type="date" id="custEditDesiredDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('custEditDesiredDate', this.value); calculateAndSetEndDateCustEdit();">
+                <button type="button" onclick="triggerDatePicker('custEditDesiredDate_picker')" class="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-none" title="달력 선택">
+                  <i data-lucide="calendar" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">예상 사용기간</label>
+              <div class="flex items-center gap-1 mb-1.5 overflow-x-auto pb-0.5">
+                <button type="button" onclick="setCustEditExpectedDaysValue('7일')" class="px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] border border-blue-200 shrink-0 cursor-pointer">7일</button>
+                <button type="button" onclick="setCustEditExpectedDaysValue('14일')" class="px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] border border-blue-200 shrink-0 cursor-pointer">14일</button>
+                <button type="button" onclick="setCustEditExpectedDaysValue('30일')" class="px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] border border-blue-200 shrink-0 cursor-pointer">30일</button>
+                <button type="button" onclick="setCustEditExpectedDaysValue('미정')" class="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] shrink-0 cursor-pointer">미정</button>
+                <button type="button" onclick="setCustEditExpectedDaysValue('퇴원시까지')" class="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] shrink-0 cursor-pointer">퇴원시</button>
+              </div>
+              <input type="text" id="custEditExpectedDays" oninput="calculateAndSetEndDateCustEdit()" placeholder="예: 30일, 퇴원시까지" class="w-full p-2.5 border rounded-xl font-bold text-slate-800 bg-white focus:ring-2 focus:ring-primary-500">
+            </div>
+
+            <div>
+              <label onclick="triggerDatePicker('custEditEndDate_picker')" class="block font-bold text-slate-700 mb-1 flex items-center justify-between cursor-pointer select-none" title="클릭 시 달력 열기">
+                <span>간병종료 예정일</span>
+                <span class="text-[10px] text-blue-700 font-bold bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded-md">자동 계산</span>
+              </label>
+              <div class="relative flex items-center">
+                <input type="text" id="custEditEndDate" placeholder="YYYY-MM-DD" class="w-full p-2.5 pr-10 border rounded-xl font-semibold bg-white cursor-pointer" onclick="triggerDatePicker('custEditEndDate_picker')" oninput="onCustEditEndDateManualChange()">
+                <input type="date" id="custEditEndDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('custEditEndDate', this.value); onCustEditEndDateManualChange();">
+                <button type="button" onclick="triggerDatePicker('custEditEndDate_picker')" class="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-none" title="달력 선택">
+                  <i data-lucide="calendar" class="w-4 h-4 text-blue-600"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">비고 및 환자 특이사항 (메모)</label>
+            <textarea id="custEditMemo" rows="3" placeholder="환자 질병/수술 상태, 주의사항, 서비스 희망 요청사항 등 (통합허브 고객상세 및 간병신청대장에 반영됩니다)" class="w-full p-2.5 border rounded-xl bg-white leading-relaxed focus:ring-2 focus:ring-primary-500"></textarea>
+          </div>
+        </div>
+
+        <!-- ==================== 4. 증권, 보험상품 및 손해사정인 정보 (문자파싱 & 사전명단 상세) ==================== -->
+        <div id="custEditSecuritiesSection" class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+          <div class="font-extrabold text-slate-800 text-xs flex items-center justify-between pb-2 border-b border-slate-200">
+            <div class="flex items-center gap-1.5">
+              <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+              <span class="hl-pen-yellow">증권번호 & 손해사정인 정보</span>
+            </div>
+            <span class="text-[10px] text-slate-500 font-normal">현대해상 문자파싱 / 삼성화재 사전명단 연계 필드</span>
+          </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block font-bold text-slate-700 mb-1">증권번호</label>
-              <input type="text" id="custEditPolicyNumber" placeholder="L025..." class="w-full p-2.5 border rounded-xl font-mono">
+              <input type="text" id="custEditPolicyNumber" placeholder="예: L025..." class="w-full p-2.5 border rounded-xl font-mono bg-white font-bold text-slate-900">
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">사고번호</label>
-              <input type="text" id="custEditAccidentNumber" placeholder="2511..." class="w-full p-2.5 border rounded-xl font-mono font-bold text-purple-700">
+              <input type="text" id="custEditAccidentNumber" placeholder="예: 2511..." class="w-full p-2.5 border rounded-xl font-mono font-bold text-purple-700 bg-white">
             </div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
               <label class="block font-bold text-slate-700 mb-1">손해사정인 성명</label>
-              <input type="text" id="custEditAdjusterName" list="allAdjustersDataList" oninput="onAdjusterNameInput(this.value, 'custEdit')" placeholder="손사 성명 (신규입력 시 디렉토리 자동등록)" class="w-full p-2.5 border rounded-xl font-bold">
+              <input type="text" id="custEditAdjusterName" list="allAdjustersDataList" oninput="onAdjusterNameInput(this.value, 'custEdit')" placeholder="손사 성명" class="w-full p-2.5 border rounded-xl font-bold bg-white text-slate-900">
             </div>
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="font-bold text-slate-700">손사 일반전화 (유선)</label>
-                <button type="button" onclick="triggerCtiCall(document.getElementById('custEditAdjusterPhone').value, document.getElementById('custEditAdjusterName').value, '손사-일반전화')" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 text-[11px] hover:underline" title="CTI 통화 발신">
+                <button type="button" onclick="triggerCtiCall(document.getElementById('custEditAdjusterPhone').value, document.getElementById('custEditAdjusterName').value, '손사-일반전화')" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 text-[11px] hover:underline cursor-pointer" title="CTI 통화 발신">
                   <i data-lucide="phone-call" class="w-3 h-3 text-emerald-600"></i> CTI발신
                 </button>
               </div>
-              <input type="text" id="custEditAdjusterPhone" placeholder="02-000-0000" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono">
+              <input type="text" id="custEditAdjusterPhone" placeholder="02-000-0000" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono bg-white">
             </div>
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="font-bold text-purple-800">손사 핸드폰 (모바일)</label>
-                <button type="button" onclick="triggerCtiCall(document.getElementById('custEditAdjusterMobile').value, document.getElementById('custEditAdjusterName').value, '손사-핸드폰')" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 text-[11px] hover:underline" title="CTI 통화 발신">
+                <button type="button" onclick="triggerCtiCall(document.getElementById('custEditAdjusterMobile').value, document.getElementById('custEditAdjusterName').value, '손사-핸드폰')" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 text-[11px] hover:underline cursor-pointer" title="CTI 통화 발신">
                   <i data-lucide="phone-call" class="w-3 h-3 text-emerald-600"></i> CTI발신
                 </button>
               </div>
-              <input type="text" id="custEditAdjusterMobile" placeholder="010-0000-0000" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono font-bold text-purple-900">
+              <input type="text" id="custEditAdjusterMobile" placeholder="010-0000-0000" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono font-bold text-purple-900 bg-white">
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1 text-purple-700">손사 팩스번호 (Fax)</label>
-              <input type="text" id="custEditAdjusterFax" placeholder="02-000-0000" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border-2 border-purple-300 rounded-xl font-mono font-bold text-purple-900">
+              <input type="text" id="custEditAdjusterFax" placeholder="02-000-0000" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border-2 border-purple-300 rounded-xl font-mono font-bold text-purple-900 bg-white">
             </div>
           </div>
         </div>
 
-        <!-- 2-1. 보험 상품 및 보장 내역 (현대해상 / 삼성화재 특화) -->
+        <!-- ==================== 5. 보험 상품 및 보장 계약 정보 ==================== -->
         <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
           <div class="font-extrabold text-slate-800 text-xs flex items-center justify-between pb-2 border-b border-slate-200">
             <span class="flex items-center gap-1.5">
-              <i data-lucide="file-badge" class="w-4 h-4 text-primary-600"></i> <span class="hl-pen-yellow">보험 상품명 및 보장 계약 정보</span>
+              <i data-lucide="file-badge" class="w-4 h-4 text-primary-600"></i>
+              <span class="hl-pen-yellow">보험 상품명 및 보장 계약 정보</span>
             </span>
-            <span class="text-[10px] text-slate-500 font-normal">원수사별 상품 및 특약 내역</span>
+            <span class="text-[10px] text-slate-500 font-normal">원수사별 상품 및 특약 보장 내역</span>
           </div>
+
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div class="sm:col-span-2">
               <label class="block font-bold text-slate-700 mb-1">보험 상품명</label>
-              <input type="text" id="custEditProductName" placeholder="예: 무배당현대해상내삶엔(3N)맞춤간편건강보험" class="w-full p-2.5 border rounded-xl font-bold text-slate-800">
+              <input type="text" id="custEditProductName" placeholder="예: 무배당현대해상내삶엔(3N)맞춤간편건강보험" class="w-full p-2.5 border rounded-xl font-bold text-slate-800 bg-white">
             </div>
             <div>
               <label class="block font-bold text-slate-700 mb-1">상품코드</label>
-              <input type="text" id="custEditProductCode" placeholder="예: SF-CARE-01" class="w-full p-2.5 border rounded-xl font-mono">
+              <input type="text" id="custEditProductCode" placeholder="예: SF-CARE-01" class="w-full p-2.5 border rounded-xl font-mono bg-white">
             </div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block font-bold text-slate-700 mb-1">계약기간 (시작일~종료일)</label>
-              <input type="text" id="custEditContractPeriod" placeholder="예: 2025-07-17~2045-07-17" class="w-full p-2.5 border rounded-xl font-mono text-slate-800">
+              <input type="text" id="custEditContractPeriod" placeholder="예: 2025-07-17 ~ 2045-07-17" class="w-full p-2.5 border rounded-xl font-mono text-slate-800 bg-white">
             </div>
             <div>
-              <label class="block font-bold text-slate-700 mb-1">피보험자ID (삼성사전명단 등)</label>
-              <input type="text" id="custEditPatientId" placeholder="예: SF-P001" class="w-full p-2.5 border rounded-xl font-mono text-slate-800">
+              <label class="block font-bold text-slate-700 mb-1">피보험자ID (삼성 사전명단 번호 등)</label>
+              <input type="text" id="custEditPatientId" placeholder="예: SF-P001" class="w-full p-2.5 border rounded-xl font-mono text-slate-800 bg-white">
             </div>
           </div>
 
@@ -10528,59 +10762,20 @@
           </div>
         </div>
 
-        <!-- 3. 사고 및 신청 상세 내역 -->
-        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-          <div class="font-extrabold text-slate-800 text-xs flex items-center gap-1.5 pb-2 border-b border-slate-200">
-            <i data-lucide="clipboard-list" class="w-4 h-4 text-sky-600"></i> <span class="hl-pen-yellow">사고 및 신청 상세 내역</span>
+        <!-- 하단 액션 버튼 -->
+        <div class="pt-3 border-t flex items-center justify-between gap-2 shrink-0">
+          <div class="text-[11px] text-slate-400">
+            수정 후 <b class="text-slate-700">[정보 수정 저장]</b>을 클릭하면 서버 DB 및 브라우저에 즉시 안전하게 반영됩니다.
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label class="block font-bold text-slate-700 mb-1">사고유형</label>
-              <select id="custEditAccidentType" class="w-full p-2.5 border rounded-xl bg-white font-bold">
-                <option value="상해">상해</option>
-                <option value="질병">질병</option>
-              </select>
-            </div>
-            <div>
-              <label class="block font-bold text-slate-700 mb-1">사고일자</label>
-              <input type="text" id="custEditAccidentDate" placeholder="YYYY.MM.DD" class="w-full p-2.5 border rounded-xl font-mono">
-            </div>
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <label onclick="triggerDatePicker('custEditApplyDate_picker')" class="block font-bold text-slate-700 cursor-pointer select-none" title="클릭 시 달력 열기">신청일시 (고객접수일)</label>
-                <button type="button" onclick="setApplyDateNow('custEditApplyDate')" class="text-[10px] font-bold text-primary-600 hover:text-primary-800 bg-primary-50 hover:bg-primary-100 px-1.5 py-0.5 rounded border border-primary-200 transition-all cursor-pointer" title="현재 시각으로 자동 입력">
-                  현재시각 ⚡
-                </button>
-              </div>
-              <div class="relative flex items-center">
-                <input type="text" id="custEditApplyDate" placeholder="YYYY.MM.DD HH:mm" class="w-full p-2.5 pr-10 border rounded-xl font-mono font-bold bg-white text-slate-800 text-xs shadow-xs focus:ring-2 focus:ring-primary-500">
-                <input type="date" id="custEditApplyDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('custEditApplyDate', this.value)">
-                <button type="button" onclick="triggerDatePicker('custEditApplyDate_picker')" class="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-none" title="달력 선택">
-                  <i data-lucide="calendar" class="w-4 h-4"></i>
-                </button>
-              </div>
-            </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="closeModal('customerEditModal')" class="px-4 py-2 border border-slate-300 hover:bg-slate-100 rounded-xl font-semibold text-slate-700 cursor-pointer">취소</button>
+            <button type="submit" class="px-6 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold shadow-xs cursor-pointer transition-all">정보 수정 저장 💾</button>
           </div>
-
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">진단명</label>
-            <input type="text" id="custEditDiagnosis" placeholder="진단명" class="w-full p-2.5 border rounded-xl">
-          </div>
-
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">신청대장 비고 / 특이사항</label>
-            <textarea id="custEditMemo" rows="3" placeholder="특이사항이나 전달 메모를 입력하세요." class="w-full p-2.5 border rounded-xl leading-relaxed"></textarea>
-          </div>
-        </div>
-
-        <div class="pt-3 border-t flex justify-end gap-2">
-          <button type="button" onclick="closeModal('customerEditModal')" class="px-4 py-2 border rounded-xl font-semibold">취소</button>
-          <button type="submit" class="px-6 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold shadow-xs">정보 수정 저장</button>
         </div>
       </form>
     </div>
   </div>
-
+  
   <!-- ==================== MODAL: APP ADJUSTER & POLICY EDIT ==================== -->
   <div id="appAdjusterEditModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">

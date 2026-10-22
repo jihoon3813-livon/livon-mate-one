@@ -1115,14 +1115,44 @@ function quickImportCtiTranscript(appId, scenarioIndex) {
 
 function toggleCsRecordResolved(appId, recordId, targetStatus) {
   const app = (gApps || []).find(a => String(a.id) === String(appId));
-  if (!app || !app.csRecords) return;
+  if (!app) return;
+  if (!Array.isArray(app.csRecords)) app.csRecords = [];
 
-  const rec = app.csRecords.find(r => String(r.id) === String(recordId));
+  let rec = app.csRecords.find(r => String(r.id) === String(recordId));
+  if (!rec) {
+    // CTI 상담콜 연동 등으로 동적 합성된 레코드인 경우, 고객의 정식 csRecords에 등록하여 상태 관리
+    const combined = (typeof getAppCombinedCsRecords === 'function') ? getAppCombinedCsRecords(app) : [];
+    const virtualRec = combined.find(r => String(r.id) === String(recordId));
+    if (virtualRec) {
+      rec = { ...virtualRec };
+      app.csRecords.push(rec);
+    } else {
+      const matchedLogs = (typeof findCustomerMatchedCallLogs === 'function') ? findCustomerMatchedCallLogs(app) : [];
+      const matchedCall = matchedLogs.find(c => String(c.id) === String(recordId) || `CTI-${c.callTime}` === String(recordId));
+      if (matchedCall) {
+        rec = {
+          id: matchedCall.id || `CTI-${matchedCall.callTime}`,
+          label: '긴급',
+          type: '민원',
+          category: matchedCall.category || matchedCall.arsMenu || '긴급민원',
+          dateTime: matchedCall.callTime || '-',
+          channel: matchedCall.channel || 'CTI',
+          summary: matchedCall.summary || matchedCall.title || '',
+          content: matchedCall.summary || matchedCall.title || '',
+          isResolved: false,
+          operator: matchedCall.operator || '상담원',
+          isAutoCti: true,
+          rawLog: matchedCall
+        };
+        app.csRecords.push(rec);
+      }
+    }
+  }
   if (!rec) return;
 
   if (targetStatus === '처리완료') {
     rec.isResolved = true;
-    rec.previousLabel = rec.label;
+    rec.previousLabel = rec.label || '긴급';
     rec.label = '처리완료';
     rec.resolvedAt = new Date().toISOString();
     if (!rec.actionTaken || rec.actionTaken.includes('미해결')) {
@@ -1130,7 +1160,7 @@ function toggleCsRecordResolved(appId, recordId, targetStatus) {
     }
   } else if (targetStatus === '처리불가') {
     rec.isResolved = true;
-    rec.previousLabel = rec.label;
+    rec.previousLabel = rec.label || '긴급';
     rec.label = '처리불가';
     rec.resolvedAt = new Date().toISOString();
   } else if (targetStatus === '미해결') {
@@ -1139,6 +1169,22 @@ function toggleCsRecordResolved(appId, recordId, targetStatus) {
     rec.resolvedAt = null;
   }
 
+  // CTI 로그 원본 객체 동기화
+  if (rec.rawLog) {
+    rec.rawLog.isResolved = (targetStatus === '처리완료' || targetStatus === '처리불가');
+    rec.rawLog.status = (targetStatus === '처리완료' || targetStatus === '처리불가') ? targetStatus : '미처리';
+    rec.rawLog.resolvedStatus = targetStatus;
+  }
+  if (window.gTotalCallData && Array.isArray(window.gTotalCallData.callLogs)) {
+    const origLog = window.gTotalCallData.callLogs.find(c => String(c.id) === String(recordId) || `CTI-${c.callTime}` === String(recordId));
+    if (origLog) {
+      origLog.isResolved = (targetStatus === '처리완료' || targetStatus === '처리불가');
+      origLog.status = (targetStatus === '처리완료' || targetStatus === '처리불가') ? targetStatus : '미처리';
+      origLog.resolvedStatus = targetStatus;
+    }
+  }
+
+  // 최신 라벨 재산출
   const unresolved = app.csRecords.find(r => !r.isResolved && (r.type === '민원' || r.label === '긴급' || r.label === '강성' || r.label === '중요' || r.label === '민원'));
   if (unresolved) {
     app.csLatestLabel = unresolved.label;
@@ -1150,6 +1196,11 @@ function toggleCsRecordResolved(appId, recordId, targetStatus) {
     app.csLatestLabel = null;
     app.csLatestType = null;
   }
+
+  // CTI 민원 판별 캐시 무효화
+  delete app._cachedComplaintInfo;
+  delete app._cachedComplaintUpd;
+  delete app._cachedComplaintCsLabel;
 
   app.updatedAt = new Date().toISOString();
   if (gActiveHubModalAppId) {
@@ -1172,12 +1223,22 @@ function toggleCsRecordResolved(appId, recordId, targetStatus) {
     });
   }
 }
+window.toggleCsRecordResolved = toggleCsRecordResolved;
 
 function saveCsActionMemo(appId, recordId) {
   const app = (gApps || []).find(a => String(a.id) === String(appId));
-  if (!app || !app.csRecords) return;
+  if (!app) return;
+  if (!Array.isArray(app.csRecords)) app.csRecords = [];
 
-  const rec = app.csRecords.find(r => String(r.id) === String(recordId));
+  let rec = app.csRecords.find(r => String(r.id) === String(recordId));
+  if (!rec) {
+    const combined = (typeof getAppCombinedCsRecords === 'function') ? getAppCombinedCsRecords(app) : [];
+    const virtualRec = combined.find(r => String(r.id) === String(recordId));
+    if (virtualRec) {
+      rec = { ...virtualRec };
+      app.csRecords.push(rec);
+    }
+  }
   if (!rec) return;
 
   const inputEl = document.getElementById(`csActionInput-${recordId}`);
@@ -1200,6 +1261,7 @@ function saveCsActionMemo(appId, recordId) {
     }
   }
 }
+window.saveCsActionMemo = saveCsActionMemo;
 
 // =========================================================================
 // [HELPERS] 청구 입금확인 여부 통합 판정 함수
@@ -7090,6 +7152,31 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                     <span class="text-slate-400">진단명 / 증상:</span>
                     <span class="font-bold text-slate-900 text-right truncate max-w-[220px]" title="${typeof escapeHtml === 'function' ? escapeHtml(displayDiagnosis || '-') : (displayDiagnosis || '-')}">${displayDiagnosis ? `<span class="px-1.5 py-0.2 rounded bg-amber-50 text-amber-900 border border-amber-200 font-semibold text-[10.5px]">${typeof escapeHtml === 'function' ? escapeHtml(displayDiagnosis) : displayDiagnosis}</span>` : '<span class="text-slate-400 font-normal">-</span>'}</span>
                   </div>
+                  ${(app.desiredDate || app.expectedDays || app.careEndDate) ? `
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-400">희망일 / 예상기간:</span>
+                      <span class="font-semibold text-slate-800 text-right">
+                        <span class="font-mono text-emerald-700 font-bold">${app.desiredDate || '-'}</span>
+                        ${app.expectedDays ? `<span class="ml-1 px-1.5 py-0.2 rounded bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-bold">예상: ${app.expectedDays}</span>` : ''}
+                        ${app.careEndDate ? `<span class="ml-1 text-[10.5px] text-slate-500 font-mono">(~${app.careEndDate})</span>` : ''}
+                      </span>
+                    </div>
+                  ` : ''}
+                  ${app.accidentDetail ? `
+                    <div class="flex justify-between items-start gap-2">
+                      <span class="text-slate-400 flex-shrink-0">사고(발병) 경위:</span>
+                      <span class="font-medium text-slate-700 text-right break-keep leading-tight text-[10.5px] max-w-[220px]">${app.accidentDetail}</span>
+                    </div>
+                  ` : ''}
+                  ${(app.mobility || app.docAttached) ? `
+                    <div class="flex justify-between items-center text-[10.5px]">
+                      <span class="text-slate-400">거동 / 서류첨부:</span>
+                      <span class="font-semibold text-slate-700">
+                        거동: <b class="${app.mobility === '불가' ? 'text-rose-600' : 'text-emerald-700'}">${app.mobility || '가능'}</b> · 
+                        서류: <b class="${app.docAttached === '예' ? 'text-blue-600' : 'text-slate-500'}">${app.docAttached || '아니오'}</b>
+                      </span>
+                    </div>
+                  ` : ''}
                   ${isSamsung ? `
                     <div class="flex justify-between items-center pt-1 border-t border-slate-100 text-[10.5px]">
                       <span class="text-slate-500 font-medium">1일 청구단가:</span>
