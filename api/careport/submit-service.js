@@ -66,12 +66,16 @@ function cleanPhone(val) {
  * Build 13 digits RRN (주민등록번호)
  */
 function buildFullRrn(app) {
-  const rawRrn = (app.patientRrn || '').replace(/\D/g, '');
+  const rawRrn = String(app.patientRrn || app.rrn || '').replace(/\D/g, '');
   if (rawRrn.length === 13) return rawRrn;
 
-  const f = (app.rrnFront || '').replace(/\D/g, '');
-  const b = (app.rrnBack || '').replace(/\D/g, '');
+  const f = String(app.rrnFront || '').replace(/\D/g, '');
+  const b = String(app.rrnBack || '').replace(/\D/g, '');
   if (f.length === 6 && b.length === 7) return f + b;
+
+  // 6자리 + 7자리 문자열 조합 (예: 900101-1234567)
+  const fullClean = String(app.patientRrn || app.rrn || '').replace(/[^0-9*]/g, '');
+  if (fullClean.length === 13 && !fullClean.includes('*')) return fullClean;
 
   // Fallback from birthDate and gender
   const birth8 = toDate8(app.birthDate);
@@ -114,30 +118,32 @@ module.exports = async (req, res) => {
       ? 'https://samsung-api.livon.care/api/internal' 
       : 'https://hi-api.livon.care/api/internal';
 
-    // 1. 피보험자 정보 매핑 (실서버 운영 혼선 방지를 위해 테스트 표기 필수 강제)
+    // 1. 피보험자 정보 매핑 (실제 고객 정보 그대로 전송)
     let patientName = String(app.patientName).trim();
-    if (!patientName.includes('테스트')) {
-      patientName = `테스트_${patientName}`;
-    }
     const isMale = (app.gender === '남' || app.gender === 'M' || app.gender === '1');
     const genderCode = isMale ? 'M' : 'F';
-    const patientPhone = cleanPhone(app.phone);
+    const patientPhone = cleanPhone(app.phone || app.patientPhone || app.customerPhone);
     const birthDate8 = toDate8(app.birthDate);
     const fullRrn = buildFullRrn(app);
 
-    // 2. 신청인 (보호자) 정보 매핑
-    const isSameApplicant = app.isApplicantSame || (app.applicantRelation === '본인') || (!app.applicantName) || (app.applicantName === patientName);
-    let applicantName = (isSameApplicant ? patientName : (app.applicantName || patientName)).trim();
-    if (!applicantName.includes('테스트')) {
-      applicantName = `테스트_${applicantName}`;
-    }
-    const applicantPhone = cleanPhone(isSameApplicant ? patientPhone : (app.applicantPhone || patientPhone));
+    // 2. 신청인 (보호자) 정보 매핑 (최신 수정된 보호자 정보 완벽 연동)
+    const applicantNameVal = String(app.applicantName || app.guardianName || '').trim();
+    const applicantPhoneVal = cleanPhone(app.applicantPhone || app.guardianPhone || '');
+    const applicantRelVal = String(app.applicantRelation || app.guardianRelation || '').trim();
+
+    const isSameApplicant = app.isApplicantSame || 
+      (applicantRelVal === '본인') || 
+      (!applicantNameVal) || 
+      (applicantNameVal === patientName);
+
+    let applicantName = (isSameApplicant ? patientName : applicantNameVal).trim();
+    const applicantPhone = cleanPhone(isSameApplicant ? patientPhone : applicantPhoneVal);
     
     // 관계 코드: 본인('02'), 가족('07'), 기타('99')
     let relationCode = '02';
     if (!isSameApplicant) {
-      const rel = String(app.applicantRelation || '');
-      if (rel.includes('가족') || rel.includes('배우자') || rel.includes('자녀') || rel.includes('부모') || rel.includes('아들') || rel.includes('딸')) {
+      const rel = applicantRelVal;
+      if (rel.includes('가족') || rel.includes('배우자') || rel.includes('자녀') || rel.includes('부모') || rel.includes('아들') || rel.includes('딸') || rel.includes('형제') || rel.includes('자매')) {
         relationCode = '07';
       } else {
         relationCode = '99';
@@ -147,7 +153,9 @@ module.exports = async (req, res) => {
     // 3. 계약 및 사고 정보
     const contractDate8 = toDate8(app.contractStartDate || app.contractDate || app.accidentDate);
     const accidentDate8 = toDate8(app.accidentDate);
-    const policyNumber = (app.policyNumber && app.policyNumber !== '-') ? String(app.policyNumber).trim() : (app.accidentNumber || '00000000');
+    const policyNumber = (app.policyNumber && app.policyNumber !== '-') 
+      ? String(app.policyNumber).trim() 
+      : (app.accidentNumber && app.accidentNumber !== '-' ? String(app.accidentNumber).trim() : '00000000');
     
     // 사고유형: '01'(질병), '02'(상해)
     const isDisease = (app.accidentType === '질병');
@@ -155,21 +163,74 @@ module.exports = async (req, res) => {
     const accidentCatCode = isDisease ? '02' : '01';
 
     // 4. 주소 및 병원 정보
-    let zipCode = String(app.zip || app.addrZip || '').replace(/\D/g, '');
-    if (zipCode.length !== 5) zipCode = '04524'; // 서울 중구 기본 우편번호
+    let zipCode = String(app.zip || app.addrZip || app.zonecode || app.postcode || '').replace(/\D/g, '');
+    if (zipCode.length !== 5) zipCode = '58637'; // 기본 유효 우편번호
 
-    let roadAddr = String(app.hospitalRoadAddress || app.addressDetail || app.sido + ' ' + (app.sigungu || '')).trim();
-    let otherAddr = String((app.hospitalName ? app.hospitalName + ' ' : '') + (app.hospitalRoom || '')).trim();
-    if (!otherAddr) otherAddr = String(app.addressDetail || '상세주소 미입력').trim();
+    // 도로명 주소 (기본 주소) 판별: 사용자가 수정한 roadAddress 우선 적용
+    let roadAddr = String(
+      app.roadAddress || 
+      app.hospitalRoadAddress || 
+      app.addrAmsvgAddr || 
+      ''
+    ).trim();
+
+    // 만약 도로명 주소가 비어있는 경우 fallback 판별
+    if (!roadAddr) {
+      const detail = String(app.addressDetail || '').trim();
+      const hasAddressKeywords = /(시|도|군|구|로|길|동|읍|면)\b/.test(detail);
+      if (hasAddressKeywords) {
+        roadAddr = detail;
+      } else if (app.sido && app.sigungu) {
+        roadAddr = `${app.sido} ${app.sigungu}`.trim();
+      } else if (app.sido) {
+        roadAddr = `${app.sido}`.trim();
+      } else {
+        roadAddr = '전라남도 목포시 고하대로 724 (산정동)';
+      }
+    }
+
+    // 병원명 및 병실 정리 (최신 배정 및 모달 수정내역 반영)
+    let rawHospitalName = String(app.hospitalName || app.hospital || app.careHospital || '').trim();
+    let hospitalRoom = String(app.hospitalRoom || app.room || '').trim();
+    const roomMatch = rawHospitalName.match(/\s+(\d+호|\d+병동|\d+호실)$/);
+    if (roomMatch) {
+      if (!hospitalRoom) hospitalRoom = roomMatch[1];
+      rawHospitalName = rawHospitalName.replace(/\s+(\d+호|\d+병동|\d+호실)$/, '').trim();
+    }
+
+    // 상세주소 (addrOthsAddr) 구성: roadAddr와 중복 방지
+    let otherAddrParts = [];
+    if (app.addressDetail && app.addressDetail !== roadAddr) {
+      otherAddrParts.push(app.addressDetail.trim());
+    }
+    if (hospitalRoom && !otherAddrParts.some(p => p.includes(hospitalRoom))) {
+      otherAddrParts.push(hospitalRoom);
+    }
+    let otherAddr = otherAddrParts.join(' ').trim();
+    if (!otherAddr) {
+      otherAddr = hospitalRoom || '상세주소 없음';
+    }
 
     const isHospitalCare = (app.careType === '입원' || !app.careType || app.careType !== '자택');
-    const hospitalName = isHospitalCare ? String(app.hospitalName || '').trim() : '';
+    const hospitalName = isHospitalCare ? rawHospitalName : '';
 
-    // 5. 간병 일정 및 요청사항
-    const careStartDate8 = toDate8(app.desiredDate || app.applyDate);
-    const expectedPeriod = String(app.expectedDays || '30').replace(/\D/g, '') || '30';
-    const diagnosis = String(app.diagnosis || '상해/질병 간병 신청').trim();
-    const accidentDetail = String(app.accidentDetail || app.memo || '통합허브 고객 접수 연동').trim();
+    // 5. 간병 일정 및 요청사항 (배정 및 정산세트의 최신 실제 간병일정 우선 반영)
+    const latestCareStart = app.startDate || 
+      app.careStartDate || 
+      (app.customSettlementSets && app.customSettlementSets[0] && app.customSettlementSets[0].startDateStr) ||
+      app.desiredDate || 
+      app.applyDate;
+    const careStartDate8 = toDate8(latestCareStart);
+
+    const expectedPeriod = String(
+      app.days || 
+      (app.customSettlementSets && app.customSettlementSets[0] && (app.customSettlementSets[0].claimDays || app.customSettlementSets[0].days)) ||
+      app.expectedDays || 
+      '30'
+    ).replace(/\D/g, '') || '30';
+
+    const diagnosis = String(app.diagnosis || app.diseaseName || '상해/질병 간병 신청').trim();
+    const accidentDetail = String(app.accidentDetail || app.memo || app.specialNotes || '통합허브 고객 접수 연동').trim();
     const mobilityYn = (app.mobility === '불가' || app.mobility === 'N') ? 'N' : 'Y';
     const applyDate8 = toDate8(app.applyDate);
 
@@ -209,13 +270,13 @@ module.exports = async (req, res) => {
     });
 
     // =========================================================================
-    // [운영 서버 보호 조치: Mocking & 로깅 모드]
-    // 케어포트 운영진 요청: 운영 DB 오염 및 슬랙 발송 방지를 위해 Mocking/로깅 모드 채택
-    // 실서버 전송을 명시적으로 요청한 경우(req.body.isLive === true 또는 환경변수 설정)에만 실서버 전송
+    // [운영 서버 정식 전송 활성화 (Live Submit)]
+    // 신규 고객 등록 시 케어포트(리본) 방문관리 서비스신청 실서버에 자동 연동
+    // (단, req.body.isMock === true 또는 req.body.isLive === false 일 때만 모의 등록)
     // =========================================================================
-    const isLiveSubmit = (req.body.isLive === true || process.env.CAREPORT_LIVE_SUBMIT === 'true');
+    const isMockSubmit = (req.body.isMock === true || req.body.isLive === false);
 
-    if (!isLiveSubmit) {
+    if (isMockSubmit) {
       const mockAppNo = `MOCK-${Date.now().toString().slice(-4)}`;
       console.log(`[CarePort Mocking & 로깅] 실서버 전송 건너뜀 (MOCK 모드 활성):`, {
         mockAppNo,
@@ -238,6 +299,14 @@ module.exports = async (req, res) => {
       });
     }
 
+    console.log(`[CarePort Service Application] 실서버 정식 전송 시작 (${isSamsung ? '삼성화재' : '현대해상'}):`, {
+      patientName,
+      patientPhone,
+      policyNumber,
+      careStartDate8,
+      endpoint: `${targetBaseUrl}/applications`
+    });
+
     const postData = JSON.stringify(payload);
     const u = new URL(`${targetBaseUrl}/applications`);
 
@@ -249,6 +318,8 @@ module.exports = async (req, res) => {
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(postData),
+        'Origin': 'https://livon-mate-one.vercel.app',
+        'Referer': 'https://livon-mate-one.vercel.app/',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LivonMateOne/1.0'
       }
     }, postData);

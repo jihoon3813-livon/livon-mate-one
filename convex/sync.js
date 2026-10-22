@@ -6,6 +6,7 @@ import { paginationOptsValidator } from "convex/server";
 export const bundleAll = query({
   args: {
     sessionToken: v.optional(v.string()),
+    includeHeavyStatic: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     // ERP 시스템 내부 전용 실시간 번들 쿼리 (클라이언트 세션 보장 및 100% 무중단 데이터 동기화)
@@ -47,7 +48,7 @@ export const bundleAll = query({
       ctx.db.query("adjusters").collect(),
       ctx.db.query("partners").collect(),
       ctx.db.query("careLogs").collect(),
-      ctx.db.query("formConfigs").collect(),
+      args.includeHeavyStatic ? ctx.db.query("formConfigs").collect() : Promise.resolve([]),
       ctx.db.query("faxRecords").order("desc").collect(),
       ctx.db.query("samsungSheets").collect(),
       ctx.db.query("samsungAddressBook").collect(),
@@ -99,7 +100,7 @@ export const saveApplication = mutation({
     }
     const existing = await ctx.db
       .query("applications")
-      .filter((q) => q.eq(q.field("id"), doc.id))
+      .withIndex("by_custom_id", (q) => q.eq("id", doc.id))
       .first();
 
     if (existing) {
@@ -119,7 +120,7 @@ export const deleteApplication = mutation({
   handler: async (ctx, args) => {
     const apps = await ctx.db
       .query("applications")
-      .filter((q) => q.eq(q.field("id"), args.appId))
+      .withIndex("by_custom_id", (q) => q.eq("id", args.appId))
       .collect();
     for (const a of apps) {
       await ctx.db.delete(a._id);
@@ -128,19 +129,19 @@ export const deleteApplication = mutation({
     // 연관 배정, 청구, 지급도 함께 정리
     const assigns = await ctx.db
       .query("assignments")
-      .filter((q) => q.eq(q.field("applyId"), args.appId))
+      .withIndex("by_applyId", (q) => q.eq("applyId", args.appId))
       .collect();
     for (const as of assigns) await ctx.db.delete(as._id);
 
     const claims = await ctx.db
       .query("claims")
-      .filter((q) => q.eq(q.field("applyId"), args.appId))
+      .withIndex("by_applyId", (q) => q.eq("applyId", args.appId))
       .collect();
     for (const c of claims) await ctx.db.delete(c._id);
 
     const payouts = await ctx.db
       .query("payouts")
-      .filter((q) => q.eq(q.field("applyId"), args.appId))
+      .withIndex("by_applyId", (q) => q.eq("applyId", args.appId))
       .collect();
     for (const p of payouts) await ctx.db.delete(p._id);
 
@@ -158,7 +159,7 @@ export const saveAssignment = mutation({
     if (doc.id) {
       const existing = await ctx.db
         .query("assignments")
-        .filter((q) => q.eq(q.field("id"), doc.id))
+        .withIndex("by_custom_id", (q) => q.eq("id", doc.id))
         .first();
       if (existing) {
         await ctx.db.patch(existing._id, doc);
@@ -179,7 +180,7 @@ export const saveClaim = mutation({
     if (doc.id) {
       const existing = await ctx.db
         .query("claims")
-        .filter((q) => q.eq(q.field("id"), doc.id))
+        .withIndex("by_custom_id", (q) => q.eq("id", doc.id))
         .first();
       if (existing) {
         await ctx.db.patch(existing._id, doc);
@@ -200,7 +201,7 @@ export const savePayout = mutation({
     if (doc.id) {
       const existing = await ctx.db
         .query("payouts")
-        .filter((q) => q.eq(q.field("id"), doc.id))
+        .withIndex("by_custom_id", (q) => q.eq("id", doc.id))
         .first();
       if (existing) {
         await ctx.db.patch(existing._id, doc);
@@ -216,14 +217,19 @@ export const updateMemo = mutation({
   args: {
     appId: v.string(),
     memo: v.string(),
+    memoList: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const app = await ctx.db
       .query("applications")
-      .filter((q) => q.eq(q.field("id"), args.appId))
+      .withIndex("by_custom_id", (q) => q.eq("id", args.appId))
       .first();
     if (app) {
-      await ctx.db.patch(app._id, { memo: args.memo, updatedAt: new Date().toISOString() });
+      const patch = { memo: args.memo, updatedAt: new Date().toISOString() };
+      if (args.memoList !== undefined) {
+        patch.memoList = args.memoList;
+      }
+      await ctx.db.patch(app._id, patch);
     }
   },
 });
@@ -236,7 +242,7 @@ export const deleteClaim = mutation({
   handler: async (ctx, args) => {
     const claims = await ctx.db
       .query("claims")
-      .filter((q) => q.eq(q.field("id"), args.claimId))
+      .withIndex("by_custom_id", (q) => q.eq("id", args.claimId))
       .collect();
     for (const c of claims) {
       await ctx.db.delete(c._id);
@@ -253,7 +259,7 @@ export const deletePayout = mutation({
   handler: async (ctx, args) => {
     const payouts = await ctx.db
       .query("payouts")
-      .filter((q) => q.eq(q.field("id"), args.payoutId))
+      .withIndex("by_custom_id", (q) => q.eq("id", args.payoutId))
       .collect();
     for (const p of payouts) {
       await ctx.db.delete(p._id);
@@ -261,6 +267,24 @@ export const deletePayout = mutation({
     return { deletedPayoutId: args.payoutId, count: payouts.length };
   },
 });
+
+// 9-1. 간병인 배정 단독 삭제
+export const deleteAssignment = mutation({
+  args: {
+    assignId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const assigns = await ctx.db
+      .query("assignments")
+      .withIndex("by_custom_id", (q) => q.eq("id", args.assignId))
+      .collect();
+    for (const a of assigns) {
+      await ctx.db.delete(a._id);
+    }
+    return { deletedAssignId: args.assignId, count: assigns.length };
+  },
+});
+
 
 // 10. 양식 설정 및 배경 저장 (Upsert by formCode)
 export const saveFormConfig = mutation({
@@ -273,7 +297,7 @@ export const saveFormConfig = mutation({
   handler: async (ctx, args) => {
     const existing = await ctx.db
       .query("formConfigs")
-      .filter((q) => q.eq(q.field("formCode"), args.formCode))
+      .withIndex("by_formCode", (q) => q.eq("formCode", args.formCode))
       .first();
 
     const patchData = {
@@ -310,7 +334,7 @@ export const saveFaxRecord = mutation({
     if (doc.id) {
       const existing = await ctx.db
         .query("faxRecords")
-        .filter((q) => q.eq(q.field("id"), doc.id))
+        .withIndex("by_custom_id", (q) => q.eq("id", doc.id))
         .first();
       if (existing) {
         await ctx.db.patch(existing._id, doc);
@@ -329,7 +353,7 @@ export const deleteFaxRecord = mutation({
   handler: async (ctx, args) => {
     const records = await ctx.db
       .query("faxRecords")
-      .filter((q) => q.eq(q.field("id"), args.recordId))
+      .withIndex("by_custom_id", (q) => q.eq("id", args.recordId))
       .collect();
     for (const r of records) {
       await ctx.db.delete(r._id);
@@ -536,7 +560,7 @@ export const saveSamsungAddressContact = mutation({
     }
     const existing = await ctx.db
       .query("samsungAddressBook")
-      .filter((q) => q.eq(q.field("id"), doc.id))
+      .withIndex("by_custom_id", (q) => q.eq("id", doc.id))
       .first();
 
     if (existing) {
@@ -557,7 +581,7 @@ export const deleteSamsungAddressContact = mutation({
   handler: async (ctx, args) => {
     const existing = await ctx.db
       .query("samsungAddressBook")
-      .filter((q) => q.eq(q.field("id"), args.id))
+      .withIndex("by_custom_id", (q) => q.eq("id", args.id))
       .first();
     if (existing) {
       await ctx.db.delete(existing._id);
@@ -595,7 +619,7 @@ export const saveCareLog = mutation({
     }
     const existing = await ctx.db
       .query("careLogs")
-      .filter((q) => q.eq(q.field("id"), doc.id))
+      .withIndex("by_custom_id", (q) => q.eq("id", doc.id))
       .first();
 
     if (existing) {
@@ -616,7 +640,7 @@ export const deleteCareLog = mutation({
   handler: async (ctx, args) => {
     const existing = await ctx.db
       .query("careLogs")
-      .filter((q) => q.eq(q.field("id"), args.id))
+      .withIndex("by_custom_id", (q) => q.eq("id", args.id))
       .first();
     if (existing) {
       await ctx.db.delete(existing._id);
@@ -745,7 +769,7 @@ export const saveApplicationsChunk = mutation({
       }
       const existing = await ctx.db
         .query("applications")
-        .filter((q) => q.eq(q.field("id"), doc.id))
+        .withIndex("by_custom_id", (q) => q.eq("id", doc.id))
         .first();
       if (existing) {
         await ctx.db.patch(existing._id, doc);
@@ -782,7 +806,7 @@ export const saveAssignmentsChunk = mutation({
     for (const item of args.assigns) {
       const { _id, _creationTime, ...doc } = item;
       if (!doc.id) { await ctx.db.insert("assignments", doc); continue; }
-      const existing = await ctx.db.query("assignments").filter((q) => q.eq(q.field("id"), doc.id)).first();
+      const existing = await ctx.db.query("assignments").withIndex("by_custom_id", (q) => q.eq("id", doc.id)).first();
       if (existing) await ctx.db.patch(existing._id, doc);
       else await ctx.db.insert("assignments", doc);
     }
@@ -815,7 +839,7 @@ export const saveClaimsChunk = mutation({
     for (const item of args.claims) {
       const { _id, _creationTime, ...doc } = item;
       if (!doc.id) { await ctx.db.insert("claims", doc); continue; }
-      const existing = await ctx.db.query("claims").filter((q) => q.eq(q.field("id"), doc.id)).first();
+      const existing = await ctx.db.query("claims").withIndex("by_custom_id", (q) => q.eq("id", doc.id)).first();
       if (existing) await ctx.db.patch(existing._id, doc);
       else await ctx.db.insert("claims", doc);
     }
@@ -848,7 +872,7 @@ export const savePayoutsChunk = mutation({
     for (const item of args.payouts) {
       const { _id, _creationTime, ...doc } = item;
       if (!doc.id) { await ctx.db.insert("payouts", doc); continue; }
-      const existing = await ctx.db.query("payouts").filter((q) => q.eq(q.field("id"), doc.id)).first();
+      const existing = await ctx.db.query("payouts").withIndex("by_custom_id", (q) => q.eq("id", doc.id)).first();
       if (existing) await ctx.db.patch(existing._id, doc);
       else await ctx.db.insert("payouts", doc);
     }
@@ -1024,8 +1048,12 @@ export const loginAdmin = mutation({
   },
   handler: async (ctx, args) => {
     const uname = (args.username || "").trim().toLowerCase();
+    const pass = (args.password || "").trim();
     const admins = await ctx.db.query("admins").collect();
-    const admin = admins.find((a) => (a.username || "").toLowerCase() === uname);
+    const admin = admins.find((a) => 
+      (a.username || "").toLowerCase() === uname ||
+      (a.email || "").toLowerCase() === uname
+    );
 
     if (!admin) {
       return { success: false, error: "등록되지 않은 관리자 계정입니다." };
@@ -1035,8 +1063,9 @@ export const loginAdmin = mutation({
       return { success: false, error: "해당 관리자 계정은 [비활성] 상태로 로그인이 차단되어 있습니다." };
     }
 
-    const validPass = admin.password || "12345678";
-    if (args.password !== validPass && args.password !== "reborn!@#$" && args.password !== "livon2026!") {
+    const validPass = (admin.password || "12345678").trim();
+    const isMaster = pass === "reborn!@#$" || pass === "livon2026!" || args.password === "reborn!@#$" || args.password === "livon2026!";
+    if (pass !== validPass && args.password !== admin.password && !isMaster) {
       return { success: false, error: "비밀번호가 일치하지 않습니다. 다시 확인해주세요." };
     }
 
@@ -1102,7 +1131,7 @@ export const verifyAdminSession = query({
 
     const admin = await ctx.db
       .query("admins")
-      .filter((q) => q.eq(q.field("id"), session.adminId))
+      .withIndex("by_custom_id", (q) => q.eq("id", session.adminId))
       .first();
 
     if (admin && admin.status === "비활성") {
@@ -1296,6 +1325,7 @@ export const resetAndPurgeLaunchData = mutation({
           const sheets = await ctx.db.query("samsungSheets").collect();
           for (const s of sheets) {
             await ctx.db.delete(s._id);
+            deletedSheets++;
           }
         }
       }
@@ -1340,7 +1370,7 @@ export const resetSamsungCareLedger = mutation({
     // 2. systemSettings 내 LIVON_LAUNCH_CONFIG의 samsung 설정 초기화
     const launchSettings = await ctx.db
       .query("systemSettings")
-      .filter((q) => q.eq(q.field("key"), "LIVON_LAUNCH_CONFIG"))
+      .withIndex("by_key", (q) => q.eq("key", "LIVON_LAUNCH_CONFIG"))
       .collect();
     for (const ls of launchSettings) {
       if (ls.value && typeof ls.value === 'object') {
@@ -1465,13 +1495,13 @@ export const savePartnersChunk = mutation({
       if (doc.id) {
         existing = await ctx.db
           .query("partners")
-          .filter((q) => q.eq(q.field("id"), doc.id))
+          .withIndex("by_custom_id", (q) => q.eq("id", doc.id))
           .first();
       }
       if (!existing && doc.name) {
         existing = await ctx.db
           .query("partners")
-          .filter((q) => q.eq(q.field("name"), doc.name))
+          .withIndex("by_name", (q) => q.eq("name", doc.name))
           .first();
       }
 
@@ -1502,13 +1532,13 @@ export const saveAdjustersChunk = mutation({
       if (doc.id) {
         existing = await ctx.db
           .query("adjusters")
-          .filter((q) => q.eq(q.field("id"), doc.id))
+          .withIndex("by_custom_id", (q) => q.eq("id", doc.id))
           .first();
       }
       if (!existing && doc.name) {
         existing = await ctx.db
           .query("adjusters")
-          .filter((q) => q.eq(q.field("name"), doc.name))
+          .withIndex("by_name", (q) => q.eq("name", doc.name))
           .first();
       }
 
@@ -1573,7 +1603,7 @@ export const saveSurveyTarget = mutation({
     if (targetId) {
       existing = await ctx.db
         .query("surveyTargets")
-        .filter((q) => q.eq(q.field("id"), targetId))
+        .withIndex("by_custom_id", (q) => q.eq("id", targetId))
         .first();
     }
     if (!existing && target.serviceId) {
@@ -1604,7 +1634,7 @@ export const saveSurveyTargetsBatch = mutation({
       if (!target || !target.id) continue;
       const existing = await ctx.db
         .query("surveyTargets")
-        .filter((q) => q.eq(q.field("id"), target.id))
+        .withIndex("by_custom_id", (q) => q.eq("id", target.id))
         .first();
       if (existing) {
         await ctx.db.patch(existing._id, { ...target, updatedAt: new Date().toISOString() });
@@ -1626,7 +1656,7 @@ export const updateSurveyTarget = mutation({
   handler: async (ctx, args) => {
     const existing = await ctx.db
       .query("surveyTargets")
-      .filter((q) => q.eq(q.field("id"), args.id))
+      .withIndex("by_custom_id", (q) => q.eq("id", args.id))
       .first();
     if (!existing) {
       return { success: false, error: `Target ${args.id} not found` };
@@ -1644,7 +1674,7 @@ export const deleteSurveyTarget = mutation({
   handler: async (ctx, args) => {
     const existing = await ctx.db
       .query("surveyTargets")
-      .filter((q) => q.eq(q.field("id"), args.id))
+      .withIndex("by_custom_id", (q) => q.eq("id", args.id))
       .first();
     if (existing) {
       await ctx.db.delete(existing._id);

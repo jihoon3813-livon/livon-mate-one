@@ -1,5 +1,6 @@
 node_modules/
 *.bak
+*.pre_split_backup
 scratch_*
 test.txt
 .DS_Store
@@ -12,8 +13,7 @@ desktop.ini
 fax_config.json
 email_config.json
 cti_config.json
-samsung_drive_config.json
-samsung_drive_latest.json
+aligo_config.json
 survey_data.json
 
 .vercel

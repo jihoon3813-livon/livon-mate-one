@@ -88,6 +88,15 @@ module.exports = async (req, res) => {
   try {
     const token = await getAccessToken();
 
+    if (req.query && (req.query.authOnly === '1' || req.query.authOnly === 'true')) {
+      return res.status(200).json({
+        success: true,
+        accessToken: token,
+        refreshToken: token,
+        user: { id: CAREPORT_ID }
+      });
+    }
+
     // Fetch carenotes across target organizations
     const fetchPromises = TARGET_ORGS.map(async org => {
       const resp = await requestHttps({

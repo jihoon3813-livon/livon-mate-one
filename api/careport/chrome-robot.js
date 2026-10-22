@@ -341,6 +341,24 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
 
           if (p1 && p2) {
             // Case 1: Standard CarePort Care Diary (has .first-page and .second-page)
+            // 1. 타임라인 그리드를 케어포트 1번 관리자 화면(/main/consult)과 동일하게 좌측 4열 그리드로 정렬 (count-1 가운데 정렬 방지)
+            try {
+              const styleInject = document.createElement('style');
+              styleInject.textContent = '.timeline-grid, .timeline-grid.count-1, .timeline-grid.count-2, .timeline-grid.count-3, .timeline-grid.count-4 { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; width: 100% !important; margin: 0 !important; gap: 24px !important; }';
+              document.head.appendChild(styleInject);
+            } catch (e) {}
+
+            // 2. 날짜의 요일 표기를 (월) -> (월요일) 등 케어포트 관리자 화면(/main/consult)과 동일하게 정규화
+            try {
+              const walker = document.createTreeWalker(cap, NodeFilter.SHOW_TEXT, null, false);
+              let tNode;
+              while ((tNode = walker.nextNode())) {
+                if (tNode.nodeValue && /\(([일월화수목금토])\)/.test(tNode.nodeValue)) {
+                  tNode.nodeValue = tNode.nodeValue.replace(/\(([일월화수목금토])\)/g, '($1요일)');
+                }
+              }
+            } catch (e) {}
+
             // Page 1: Hide p2, show p1 (contains Header down to 금일 활력징후)
             const origP2Display = p2.style.display;
             const origP1Display = p1.style.display;
@@ -413,6 +431,7 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
         await new Promise(r => setTimeout(r, 250));
         const checkRes = await pageCdp.send('Runtime.evaluate', {
           expression: `(function() {
+            if (document.querySelector('.modal-overlay.loading')) return false;
             const cap = document.getElementById('capture') ||
                         document.querySelector('.report-area') ||
                         document.getElementById('consult-state') ||
@@ -420,6 +439,16 @@ async function captureCarePortOriginalImages(sessionInput, options = {}) {
                         document.querySelector('.consult-wrap');
             if (!cap || cap.offsetHeight <= 80) return false;
             if (${JSON.stringify(sid)} && !window.location.hash.includes(${JSON.stringify(sid)})) return false;
+            const p1 = cap.querySelector('.first-page');
+            if (p1) {
+              const nameEl = p1.querySelector('.patient-meta-bar .name') || p1.querySelector('.summary-card strong');
+              if (nameEl) {
+                const nameTxt = (nameEl.innerText || '').trim();
+                if (!nameTxt || nameTxt === '-' || nameTxt.startsWith('- ')) return false;
+              }
+              const imgs = Array.from(cap.querySelectorAll('img'));
+              if (imgs.some(img => !img.complete)) return false;
+            }
             const txt = (cap.innerText || '').trim();
             if (txt.length < 20) return false;
             return true;

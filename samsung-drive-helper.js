@@ -22,7 +22,7 @@ function getSamsungDriveConfig() {
     lastSyncedFile: null,
     lastSyncedAt: null,
     lastRecordCount: 0,
-    autoSyncEnabled: true
+    autoSyncEnabled: false
   };
 
   try {
@@ -50,7 +50,52 @@ function getSamsungDriveConfig() {
 function saveSamsungDriveConfig(newCfg) {
   try {
     const existing = getSamsungDriveConfig();
-    const merged = { ...existing, ...newCfg, updatedAt: new Date().toISOString() };
+
+    // 1. URL에서 folderId 자동 추출
+    let folderId = newCfg.folderId || existing.folderId || '';
+    if (newCfg.folderUrl) {
+      const match = newCfg.folderUrl.match(/folders\/([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        folderId = match[1];
+      }
+    }
+
+    // 2. folderPath 자동 구성 및 유효성 검사
+    let folderPath = newCfg.folderPath || '';
+    if (!folderPath && folderId) {
+      const candidatePaths = [
+        `G:\\.shortcut-targets-by-id\\${folderId}\\삼성화재 가입자 리스트`,
+        `G:\\.shortcut-targets-by-id\\${folderId}`,
+        `H:\\.shortcut-targets-by-id\\${folderId}\\삼성화재 가입자 리스트`,
+        `H:\\.shortcut-targets-by-id\\${folderId}`,
+        `C:\\.shortcut-targets-by-id\\${folderId}\\삼성화재 가입자 리스트`
+      ];
+      for (const cand of candidatePaths) {
+        if (fs.existsSync(cand)) {
+          folderPath = cand;
+          break;
+        }
+      }
+      if (!folderPath) {
+        folderPath = `G:\\.shortcut-targets-by-id\\${folderId}\\삼성화재 가입자 리스트`;
+      }
+    }
+
+    // 폴더가 변경되었으면 기존 동기화 파일 초기화하여 새 파일 재감지 유도
+    const isFolderChanged = (folderId && existing.folderId && folderId !== existing.folderId);
+
+    const merged = {
+      ...existing,
+      ...newCfg,
+      folderId: folderId || existing.folderId,
+      folderPath: folderPath || existing.folderPath,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (isFolderChanged) {
+      merged.lastSyncedFile = null;
+    }
+
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2), 'utf-8');
     return merged;
   } catch (err) {
@@ -243,7 +288,7 @@ function parseSamsungCsv(csvContent, originFilePath) {
       hasInjuryCare: hasInjuryCare,
       hasDiseaseCare: hasDiseaseCare,
       accidentNumber: '26S' + (100000 + (i % 900000)),
-      adjusterName: (i & 1) === 0 ? '김정현' : '이민우',
+      adjusterName: '-',// (i & 1) === 0 ? '김정현' : '이민우',
       adjusterPhone: (i & 1) === 0 ? '02-3485-9114' : '02-760-5521',
       adjusterFax: (i & 1) === 0 ? '02-3485-9100' : '02-760-5500',
       maxDailyLimit: 144000,

@@ -172,7 +172,8 @@ async function initFromQueryParams() {
   }
 
   try {
-    if (window.history && window.history.replaceState) {
+    window.__INITIAL_QUERY_STRING__ = window.location.search;
+    if (window.history && window.history.replaceState && !window.location.pathname.includes('survey')) {
       window.history.replaceState(
         { patient: pName || '고연분', masked: true },
         document.title,
@@ -639,9 +640,9 @@ function renderMatrixTableHtml(records, dayIdx, patientTotalDays) {
 
     return `
       <div style="display: flex; align-items: stretch; border-top: 1px solid #f1f5f9; position: relative;">
-        <div style="width: 84px; flex-shrink: 0; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; z-index: 5; background: #ffffff; position: sticky; left: 0; box-shadow: 2px 0 5px rgba(0,0,0,0.02);">
-          <div style="font-size: 12.5px; font-weight: 800; color: #0f172a; line-height: 1.2;">${title}</div>
-          <div style="font-size: 9px; color: #94a3b8; margin-top: 3px;">${sub}</div>
+        <div style="width: 86px; flex-shrink: 0; padding: 8px 6px 8px 12px; display: flex; flex-direction: column; justify-content: center; z-index: 5; background: #ffffff; position: sticky; left: 0; border-right: 1.5px solid #e2e8f0; box-shadow: none;">
+          <div style="font-size: 12px; font-weight: 800; color: #0f172a; line-height: 1.2; white-space: nowrap;">${title}</div>
+          <div style="font-size: 9px; color: #94a3b8; margin-top: 3px; white-space: nowrap;">${sub}</div>
         </div>
         <div style="flex: 1; display: flex; position: relative; background: #ffffff;">
           ${svgOverlay}
@@ -654,11 +655,11 @@ function renderMatrixTableHtml(records, dayIdx, patientTotalDays) {
   const tableInnerWidth = Math.max(340, numCols * 36 + 84);
 
   return `
-    <div style="background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 12px 14px; margin-top: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.02); overflow-x: auto; -webkit-overflow-scrolling: touch;">
+    <div style="background: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 12px 0; margin-top: 8px; box-shadow: 0 1px 6px rgba(0,0,0,0.02); overflow-x: auto; -webkit-overflow-scrolling: touch;">
       <div style="min-width: ${tableInnerWidth}px;">
         <!-- Month Groups Header Row -->
         <div style="display: flex; align-items: center; margin-bottom: 6px;">
-          <div style="width: 84px; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #64748b; padding-left: 6px; position: sticky; left: 0; background: #ffffff; z-index: 6;">
+          <div style="width: 86px; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #64748b; padding-left: 12px; position: sticky; left: 0; background: #ffffff; z-index: 6; border-right: 1.5px solid #e2e8f0;">
             항목 / 날짜
           </div>
           <div style="flex: 1; display: flex;">
@@ -672,7 +673,7 @@ function renderMatrixTableHtml(records, dayIdx, patientTotalDays) {
 
         <!-- Day Numbers Row -->
         <div style="display: flex; align-items: center; margin-bottom: 8px;">
-          <div style="width: 84px; flex-shrink: 0; position: sticky; left: 0; background: #ffffff; z-index: 6;"></div>
+          <div style="width: 86px; flex-shrink: 0; position: sticky; left: 0; background: #ffffff; z-index: 6; border-right: 1.5px solid #e2e8f0;"></div>
           <div style="flex: 1; display: flex;">
             ${displayCols.map((col, idx) => {
               const isSelected = (idx === targetColIdx);
@@ -784,7 +785,7 @@ function buildTimelineCardsHtml(records, dayIdx) {
     }
 
     return `
-      <div ${c.recordIndex >= 0 ? `onclick="selectDate(${c.recordIndex})"` : ''} style="flex: 1; min-width: 0; background: ${c.isLatest ? '#fff5f7' : '#ffffff'}; border: 1.5px solid ${c.isLatest ? '#fecdd3' : '#f1f5f9'}; border-radius: 14px; padding: 14px 12px; display: flex; flex-direction: column; justify-content: flex-start; cursor: ${c.recordIndex >= 0 ? 'pointer' : 'default'}; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+      <div style="flex: 1; min-width: 0; background: ${c.isLatest ? '#fff5f7' : '#ffffff'}; border: 1.5px solid ${c.isLatest ? '#fecdd3' : '#f1f5f9'}; border-radius: 14px; padding: 14px 12px; display: flex; flex-direction: column; justify-content: flex-start; cursor: default; box-shadow: 0 1px 3px rgba(0,0,0,0.02); user-select: none;">
         <div>
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
             <span style="font-size: 13.5px; font-weight: 800; color: ${c.isLatest ? '#e11d48' : '#334155'};">${c.date}</span>
@@ -989,7 +990,7 @@ function render() {
   if ($('footer-source-text')) {
     const sDate = careRecords[0]?.date || '09.17';
     const eDate = careRecords[careRecords.length - 1]?.date || '10.02';
-    $('footer-source-text').textContent = `근거: 케어포트 통합간병일지(${pName}), 2026.${sDate}~${eDate}, 총 ${totalDays}일.`;
+    $('footer-source-text').textContent = `근거: 케어포트 통합간병일지(${pName}) · 2026.${sDate}~${eDate} (${totalDays}일간)`;
   }
 
   applyIdentity();
@@ -1069,13 +1070,13 @@ function showSideMoreSheet() {
 
       <div class="pdf-export-box" style="margin-top: 14px; background: #fdf4ff; border: 1px solid #f0abfc; border-radius: 14px; padding: 12px;">
         <div style="font-size: 13px; font-weight: 700; color: #86198f; margin-bottom: 4px;">
-          📄 공식 간병 리포트 (A4 2장 규격)
+          📄 LivOn AI 간병일지 (전체 일지)
         </div>
         <p style="font-size: 11px; color: var(--muted); margin: 0 0 8px;">
-          공식 문서 양식으로 완성된 A4 2페이지 리포트를 PDF로 내려받습니다.
+          간병일지(new) 공식 서식으로 전체 일지를 하나의 PDF로 내려받습니다.
         </p>
-        <button type="button" class="btn-sms-copy" onclick="downloadCurrent2PagePdf()" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; border: none; box-shadow: 0 4px 10px rgba(124, 58, 237, 0.25);">
-          📥 2P 공식 PDF 다운로드
+        <button type="button" class="btn-sms-copy" onclick="downloadCurrentCareReportPdf()" style="background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; border: none; box-shadow: 0 4px 10px rgba(124, 58, 237, 0.25);">
+          📥 일지 전체 다운로드
         </button>
       </div>
 
@@ -1151,22 +1152,46 @@ function copyCurrentReportLink() {
   });
 }
 
-function downloadCurrent2PagePdf() {
+async function downloadCurrentCareReportPdf() {
   const pName = (gPatientInfo && gPatientInfo.name) ? gPatientInfo.name : '고연분';
-  const rec = (Array.isArray(careRecords) && careRecords[selected]) ? careRecords[selected] : null;
-  const dayNum = rec ? (rec.dayIndex || (selected + 1)) : (selected + 1);
 
+  // 1. 부모 창(통합 어드민 - 간병일지 new) 함수 연동
   try {
-    if (window.parent && window.parent !== window && typeof window.parent.downloadPatientCareLogsPdfs === 'function') {
-      window.parent.downloadPatientCareLogsPdfs(pName);
+    if (window.parent && window.parent !== window && typeof window.parent.downloadPatientCareLogsPdfs_new === 'function') {
+      await window.parent.downloadPatientCareLogsPdfs_new(pName);
       return;
     }
   } catch (e) {}
 
-  const url = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}&day=${encodeURIComponent(dayNum)}`;
-  window.open(url, '_blank');
+  // 2. 단독 실행(모바일 접속 또는 웹 팝업) 직접 다운로드: 간병일지(new)와 동일한 전체 일지 API 호출
+  try {
+    const url = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}`;
+    const resp = await fetch(url);
+    if (resp.ok) {
+      const contentType = resp.headers.get('content-type') || '';
+      if (contentType.includes('application/pdf')) {
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `[LivOn_AI간병일지]_${pName}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('Direct PDF download failed, falling back to window.open:', err);
+  }
+
+  // 3. Fallback: 새 탭에서 간병일지(new) 전체 일지 열기
+  const fallbackUrl = `/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}`;
+  window.open(fallbackUrl, '_blank');
 }
-window.downloadCurrent2PagePdf = downloadCurrent2PagePdf;
+window.downloadCurrentCareReportPdf = downloadCurrentCareReportPdf;
+window.downloadCurrent2PagePdf = downloadCurrentCareReportPdf;
 
 function calendar() {
   showSheet('간병일 선택', `

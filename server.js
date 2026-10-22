@@ -471,7 +471,7 @@ function startServer(port) {
         if (latest && cfg.lastSyncedFile === latest.filename && fs.existsSync(latestJsonPath)) {
           const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-          return res.end(JSON.stringify(raw));
+          return res.end(JSON.stringify({ success: true, ...raw }));
         }
 
         // 2. 동시 복호화 경쟁(Race Condition) 방지 락
@@ -479,7 +479,7 @@ function startServer(port) {
           if (fs.existsSync(latestJsonPath)) {
             const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            return res.end(JSON.stringify(raw));
+            return res.end(JSON.stringify({ success: true, ...raw }));
           }
           res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: false, error: '동기화가 현재 진행 중입니다.' }));
@@ -520,7 +520,7 @@ function startServer(port) {
             if (fs.existsSync(latestJsonPath)) {
               const raw = JSON.parse(fs.readFileSync(latestJsonPath, 'utf8'));
               res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-              return res.end(JSON.stringify(raw));
+              return res.end(JSON.stringify({ success: true, ...raw }));
             }
             res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify({ success: false, error: '구글 드라이브 폴더에서 최신 파일을 찾을 수 없습니다.' }));
@@ -614,6 +614,95 @@ function saveSavedFaxConfig(cfg) {
   } catch (err) {
     console.error('[Fax Config Save Error]', err.message);
     return cfg;
+  }
+}
+
+// =========================================================================
+// Persistent System Audit Log (시스템 감사 및 변경 이력 추적 영구 보관 파일)
+// =========================================================================
+const AUDIT_LOG_FILE = path.join(BASE_DIR, 'system_audit_logs.json');
+
+function getStoredAuditLogs() {
+  try {
+    if (fs.existsSync(AUDIT_LOG_FILE)) {
+      const data = fs.readFileSync(AUDIT_LOG_FILE, 'utf-8');
+      const parsed = JSON.parse(data || '[]');
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.warn('[Audit Log Load Error]', err.message);
+  }
+  return [];
+}
+
+function isMockAuditLog(l) {
+  if (!l || typeof l !== 'object') return true;
+  const id = String(l.id || '');
+  const uname = String(l.user?.username || '');
+  const name = String(l.user?.name || '');
+  const target = String(l.target || '');
+  const summary = String(l.summary || '');
+  if (id.includes('LOG-1790120476967-')) return true;
+  if (/^LOG-\d{10,14}-(0[1-9]|1[0-1])$/.test(id)) return true;
+  if (uname === 'settle_mgr' || uname === 'care_counsel') return true;
+  if (name === '정산팀장' || name === '상담팀장' || name === '이매칭' || name === '박정산') return true;
+  if (target.includes('청구 Q0487 (고객: 이혜숙') || target.includes('지급 P0627 (간병인: 최이순') || target.includes('배정 A0269 (고객: 박은희')) return true;
+  if (target.includes('신청 C0302 (고객: 이해열') || target.includes('신청 C0303 (고객: 김성곤')) return true;
+  if (summary.includes('1차 간병비 청구금액 420,000원 입금확인') || summary.includes('1차 간병비 420,000원 정산 승인 및 계좌 송금')) return true;
+  return false;
+}
+
+function saveAuditLogsToDisk(logs) {
+  try {
+    const cleanLogs = Array.isArray(logs) ? logs.filter(l => !isMockAuditLog(l)) : [];
+    const trimmed = cleanLogs.slice(0, 5000);
+    fs.writeFileSync(AUDIT_LOG_FILE, JSON.stringify(trimmed, null, 2), 'utf-8');
+    return true;
+  } catch (err) {
+    console.error('[Audit Log Save Error]', err.message);
+    return false;
+  }
+}
+
+function appendServerAuditLog(logItem) {
+  try {
+    if (!logItem || isMockAuditLog(logItem)) return null;
+    const logs = getStoredAuditLogs();
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const timestamp = logItem.timestamp || `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    
+    const formattedLog = {
+      id: logItem.id || ('LOG-' + Date.now().toString().slice(-8) + '-' + Math.random().toString(36).substring(2, 6).toUpperCase()),
+      timestamp: timestamp,
+      user: {
+        username: logItem.user?.username || logItem.username || 'superadmin',
+        name: logItem.user?.name || logItem.name || '리본케어',
+        dept: logItem.user?.dept || logItem.dept || '총괄관리',
+        role: logItem.user?.role || logItem.role || 'SUPER_ADMIN'
+      },
+      ip: logItem.ip || logItem.user?.ip || '183.101.192.154',
+      category: logItem.category || '고객신청',
+      actionType: logItem.actionType || 'UPDATE',
+      target: logItem.target || '시스템 데이터',
+      summary: logItem.summary || '데이터 변경 작업 수행',
+      status: logItem.status || 'SUCCESS',
+      changes: logItem.changes || null,
+      details: logItem.details || null,
+      userAgent: logItem.userAgent || 'LivonMate-Server/3.0'
+    };
+
+    const existingIdx = logs.findIndex(l => l && l.id && l.id === formattedLog.id);
+    if (existingIdx >= 0) {
+      logs[existingIdx] = { ...logs[existingIdx], ...formattedLog };
+    } else {
+      logs.unshift(formattedLog);
+    }
+    saveAuditLogsToDisk(logs);
+    return formattedLog;
+  } catch (err) {
+    console.warn('[Audit Log Append Error]', err.message);
+    return null;
   }
 }
 
@@ -1096,6 +1185,73 @@ function saveSavedFaxConfig(cfg) {
     }
 
     // =========================================================================
+    // API Route: 시스템 전체 감사 로그 조회 및 일괄 동기화 API
+    // =========================================================================
+    if (reqPath === '/api/system/audit-logs') {
+      if (req.method === 'GET') {
+        const logs = getStoredAuditLogs();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, logs: logs, count: logs.length }));
+      }
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+          try {
+            const { logs: newLogs } = JSON.parse(body || '{}');
+            if (Array.isArray(newLogs) && newLogs.length > 0) {
+              const current = getStoredAuditLogs();
+              const idSet = new Set(current.map(l => l && l.id));
+              let addedCount = 0;
+              newLogs.forEach(l => {
+                if (l && l.id && !isMockAuditLog(l) && !idSet.has(l.id)) {
+                  current.push(l);
+                  idSet.add(l.id);
+                  addedCount++;
+                }
+              });
+              current.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+              saveAuditLogsToDisk(current);
+              res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+              return res.end(JSON.stringify({ success: true, count: current.length, added: addedCount }));
+            }
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '유효한 로그 배열이 필요합니다.' }));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+    }
+
+    // =========================================================================
+    // API Route: 실시간 시스템 감사 로그 단건 영구 기록 API
+    // =========================================================================
+    if (reqPath === '/api/system/audit-log' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body || '{}');
+          const logPayload = parsed.log || parsed;
+          if (!logPayload || (!logPayload.target && !logPayload.summary)) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: '유효한 로그 데이터가 필요합니다.' }));
+          }
+          const savedLog = appendServerAuditLog(logPayload);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, log: savedLog }));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
+    // =========================================================================
     // API Route: 통합허브 런칭 실데이터 영구 보존 API
     // =========================================================================
     if (reqPath === '/api/hub/real-data') {
@@ -1191,6 +1347,12 @@ function saveSavedFaxConfig(cfg) {
 
             stored.updatedAt = new Date().toISOString();
             fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+            try {
+              const seedJsFile = path.join(BASE_DIR, 'hub_real_data.js');
+              fs.writeFileSync(seedJsFile, 'window.REBORN_REAL_SEED_DATA = ' + JSON.stringify(stored, null, 2) + ';\n', 'utf-8');
+            } catch (seedErr) {
+              console.warn('[Seed JS Sync Warn]', seedErr.message);
+            }
             invalidateRealDataCache();
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1213,11 +1375,12 @@ function saveSavedFaxConfig(cfg) {
     // API Route: 통합허브 신규 고객 실시간 추가 및 영구 저장 API
     // =========================================================================
     // =========================================================================
-    // API Route: 전산 데이터 전체 초기화 (hub_apps_real.json 0건 클린 초기화)
+    // API Route: 전산 데이터 전체 초기화 (hub_apps_real.json 및 hub_real_data.js 0건 클린 초기화)
     // =========================================================================
     if (reqPath === '/api/admin/reset-local-data' && req.method === 'POST') {
       try {
         const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+        const seedJsFile = path.join(BASE_DIR, 'hub_real_data.js');
         const emptyData = {
           updatedAt: new Date().toISOString(),
           sources: {},
@@ -1231,6 +1394,8 @@ function saveSavedFaxConfig(cfg) {
           dashboardStats: null
         };
         fs.writeFileSync(realDataFile, JSON.stringify(emptyData, null, 2), 'utf-8');
+        fs.writeFileSync(seedJsFile, 'window.REBORN_REAL_SEED_DATA = ' + JSON.stringify(emptyData, null, 2) + ';\n', 'utf-8');
+        invalidateRealDataCache();
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         return res.end(JSON.stringify({ success: true, message: '로컬 데이터가 0건으로 초기화되었습니다.' }));
       } catch (err) {
@@ -1264,6 +1429,23 @@ function saveSavedFaxConfig(cfg) {
           fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
           invalidateRealDataCache();
           syncConvexMutation('sync:saveApplication', { app: application }).catch(console.warn);
+
+          // 서버 측 감사 로그 자동 기록
+          appendServerAuditLog({
+            category: '고객신청',
+            actionType: 'CREATE',
+            target: `고객 [${application.id}] (${application.patientName || '신규'})`,
+            summary: `신규 고객 접수 등록 [${application.id} - ${application.patientName || '신규'}] (${application.insuranceCompany || '원수사미지정'})`,
+            changes: {
+              '피보험자': { before: null, after: application.patientName },
+              '원수사': { before: null, after: application.insuranceCompany },
+              '연락처': { before: null, after: application.phone },
+              '접수상태': { before: null, after: application.status || '접수' },
+              '간병유형': { before: null, after: application.careType || '입원' },
+              '병원/장소': { before: null, after: application.hospitalName || application.roadAddress || '-' }
+            }
+          });
+
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: true, count: stored.applications.length, appId: application.id }));
         } catch (err) {
@@ -1318,6 +1500,18 @@ function saveSavedFaxConfig(cfg) {
             syncConvexMutation('sync:deleteApplication', { appId: id }).catch(console.warn);
           });
 
+          // 서버 측 감사 로그 자동 기록
+          appendServerAuditLog({
+            category: '고객신청',
+            actionType: 'DELETE',
+            target: `고객 [${Array.from(targetIds).join(', ')}]`,
+            summary: `고객 데이터 영구 삭제 처리 (${targetIds.size}건: ${Array.from(targetIds).join(', ')})`,
+            changes: {
+              '삭제건수': { before: `${targetIds.size}건`, after: '삭제완료' },
+              '대상ID': { before: Array.from(targetIds).join(', '), after: '-' }
+            }
+          });
+
           console.log(`[Disk & Convex Delete] 고객 ${targetIds.size}건 영구 삭제 완료 (이전: ${beforeCount}명 -> 현재: ${stored.applications.length}명)`);
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           return res.end(JSON.stringify({ success: true, deletedCount: beforeCount - stored.applications.length, remainingCount: stored.applications.length }));
@@ -1349,16 +1543,17 @@ function saveSavedFaxConfig(cfg) {
             try { stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8')); } catch (e) {}
           }
           stored.applications = stored.applications || [];
-          const idx = stored.applications.findIndex(a => {
+          let idx = stored.applications.findIndex(a => {
             if (a.id === targetId) return true;
             if (targetId && targetId.startsWith('H') && a.id === targetId.replace(/^H/, 'C')) return true;
             if (targetId && targetId.startsWith('C') && a.id === targetId.replace(/^C/, 'H')) return true;
             if (a.patientId && a.patientId === targetId) return true;
             if (fields.patientName && a.patientName === fields.patientName) return true;
+            if (fields.phone && a.phone && String(a.phone).replace(/[^0-9]/g, '') === String(fields.phone).replace(/[^0-9]/g, '')) return true;
             return false;
           });
           if (idx !== -1) {
-            const { claim, payout, deleteClaimIds, deleteClaimId, deletePayoutIds, deletePayoutId, ...appFields } = fields;
+            const { claim, payout, deleteClaimIds, deleteClaimId, deletePayoutIds, deletePayoutId, deleteAssignIds, deleteAssignId, ...appFields } = fields;
             stored.applications[idx] = {
               ...stored.applications[idx],
               ...appFields,
@@ -1373,6 +1568,14 @@ function saveSavedFaxConfig(cfg) {
             const delPayoutIdList = Array.isArray(deletePayoutIds) ? deletePayoutIds : (deletePayoutId ? [deletePayoutId] : []);
             if (delPayoutIdList.length > 0) {
               stored.payouts = (stored.payouts || []).filter(p => !delPayoutIdList.includes(p.id));
+            }
+
+            const delAssignIdList = Array.isArray(deleteAssignIds) ? deleteAssignIds : (deleteAssignId ? [deleteAssignId] : []);
+            if (delAssignIdList.length > 0) {
+              stored.assignments = (stored.assignments || []).filter(a => !delAssignIdList.includes(a.id));
+              for (const delAsId of delAssignIdList) {
+                syncConvexMutation('sync:deleteAssignment', { assignId: delAsId }).catch(console.warn);
+              }
             }
 
             if (claim && claim.id) {
@@ -1395,6 +1598,12 @@ function saveSavedFaxConfig(cfg) {
             }
             stored.updatedAt = new Date().toISOString();
             fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+            try {
+              const seedJsFile = path.join(BASE_DIR, 'hub_real_data.js');
+              fs.writeFileSync(seedJsFile, 'window.REBORN_REAL_SEED_DATA = ' + JSON.stringify(stored, null, 2) + ';\n', 'utf-8');
+            } catch (seedErr) {
+              console.warn('[Seed JS Sync Warn]', seedErr.message);
+            }
             if (typeof invalidateRealDataCache === 'function') {
               try { invalidateRealDataCache(); } catch (e) {}
             }
@@ -1405,11 +1614,47 @@ function saveSavedFaxConfig(cfg) {
             if (fields.payout && fields.payout.id) {
               syncConvexMutation('sync:savePayout', { payout: fields.payout }).catch(console.warn);
             }
+
+            // 서버 측 감사 로그 자동 기록
+            const targetPatientName = stored.applications[idx].patientName || targetId;
+            const updatedFieldNames = Object.keys(appFields).slice(0, 5).join(', ');
+            appendServerAuditLog({
+              category: '고객상세',
+              actionType: 'UPDATE',
+              target: `고객 [${targetId}] (${targetPatientName})`,
+              summary: `[${targetPatientName} 님] 고객 필드 정보 실시간 갱신 및 저장 (${updatedFieldNames})`,
+              changes: Object.keys(appFields).reduce((acc, k) => {
+                acc[k] = { before: '-', after: typeof appFields[k] === 'object' ? JSON.stringify(appFields[k]) : String(appFields[k]) };
+                return acc;
+              }, {})
+            });
+
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify({ success: true, updatedApp: stored.applications[idx] }));
           } else {
-            res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-            return res.end(JSON.stringify({ success: false, error: '해당 고객을 찾을 수 없습니다.' }));
+            // 신규접수 건이거나 아직 hub_apps_real.json에 등록되지 않았던 고객의 경우 자동 추가하여 영구 저장 보장
+            const { claim, payout, deleteClaimIds, deleteClaimId, deletePayoutIds, deletePayoutId, deleteAssignIds, deleteAssignId, ...appFields } = fields;
+            const newAppRecord = {
+              id: targetId,
+              ...appFields,
+              updatedAt: new Date().toISOString()
+            };
+            stored.applications.unshift(newAppRecord);
+            stored.updatedAt = new Date().toISOString();
+            fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+            try {
+              const seedJsFile = path.join(BASE_DIR, 'hub_real_data.js');
+              fs.writeFileSync(seedJsFile, 'window.REBORN_REAL_SEED_DATA = ' + JSON.stringify(stored, null, 2) + ';\n', 'utf-8');
+            } catch (seedErr) {
+              console.warn('[Seed JS Sync Warn]', seedErr.message);
+            }
+            if (typeof invalidateRealDataCache === 'function') {
+              try { invalidateRealDataCache(); } catch (e) {}
+            }
+            syncConvexMutation('sync:saveApplication', { app: newAppRecord }).catch(console.warn);
+
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true, updatedApp: newAppRecord }));
           }
         } catch (err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1418,6 +1663,43 @@ function saveSavedFaxConfig(cfg) {
       });
       return;
     }
+
+    // =========================================================================
+    // API Route: 간병인 배정 단독 삭제 API
+    // =========================================================================
+    if (reqPath === '/api/hub/assignment/delete' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const { assignId } = JSON.parse(body || '{}');
+          if (!assignId) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: 'assignId가 필요합니다.' }));
+          }
+          const realDataFile = path.join(BASE_DIR, 'hub_apps_real.json');
+          let stored = { applications: [], assignments: [] };
+          if (fs.existsSync(realDataFile)) {
+            try { stored = JSON.parse(fs.readFileSync(realDataFile, 'utf-8')); } catch (e) {}
+          }
+          const beforeCount = (stored.assignments || []).length;
+          stored.assignments = (stored.assignments || []).filter(a => a && a.id !== assignId);
+          stored.updatedAt = new Date().toISOString();
+          fs.writeFileSync(realDataFile, JSON.stringify(stored, null, 2), 'utf-8');
+          if (typeof invalidateRealDataCache === 'function') {
+            try { invalidateRealDataCache(); } catch (e) {}
+          }
+          syncConvexMutation('sync:deleteAssignment', { assignId }).catch(console.warn);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: true, deletedAssignId: assignId, count: beforeCount - stored.assignments.length }));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
 
     // =========================================================================
     // API Route: 통합허브 수정발생 & 모달 비활성화 확인(Acknowledge) 전 PC/사용자 공통 동기화 API
@@ -1961,13 +2243,14 @@ function saveSavedFaxConfig(cfg) {
           const toName = payload.toName || payload.name || '';
           const message = payload.message || payload.text || payload.customMessage || '';
           const senderNumber = payload.senderNumber || payload.fromPhone || '16007835';
-          const provider = payload.provider || 'barobill';
+          const provider = payload.provider || 'aligo';
           const channel = payload.channel || 'sms'; // 'sms' | 'kakao'
           const buttonUrl = payload.buttonUrl || '';
           const buttonTitle = payload.buttonTitle || '모바일 간병일지 열람하기';
           const templateName = payload.templateName || '';
           const subject = payload.subject || '[리본케어] 모바일 간병일지 안내';
           const patientName = payload.patientName || '';
+          const channelId = payload.channelId || '';
           const category = payload.category || 'CARE_DIARY_MOBILE';
 
           if (!toPhone) {
@@ -1993,6 +2276,7 @@ function saveSavedFaxConfig(cfg) {
             templateName,
             subject,
             patientName,
+            channelId,
             category
           });
 
@@ -2019,12 +2303,205 @@ function saveSavedFaxConfig(cfg) {
       }
     }
 
+    // 알리고(Aligo) 설정 조회 및 저장 API
+    if (reqPath === '/api/sms/aligo/config') {
+      const { getAligoConfig, saveAligoConfig, getAligoBalance } = require('./sms-service');
+
+      if (req.method === 'GET') {
+        const q = parsedUrl.query || {};
+        const customCreds = (q.userId && q.apiKey && !q.apiKey.includes('••••')) ? { userId: String(q.userId).trim(), apiKey: String(q.apiKey).trim() } : null;
+        const cfg = customCreds ? { ...getAligoConfig(), ...customCreds } : getAligoConfig();
+        const maskedKey = cfg.apiKey ? `${cfg.apiKey.slice(0, 4)}••••••••${cfg.apiKey.slice(-4)}` : '';
+        let balanceInfo = null;
+        try {
+          balanceInfo = await getAligoBalance(customCreds);
+        } catch (_) {}
+
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({
+          success: true,
+          config: {
+            userId: cfg.userId,
+            sender: cfg.sender,
+            senderKey: cfg.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
+            hasKey: Boolean(cfg.apiKey),
+            maskedKey,
+            senders: cfg.senders,
+            updatedAt: cfg.updatedAt
+          },
+          balance: balanceInfo
+        }));
+      }
+
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const updates = {};
+            if (payload.userId) updates.userId = payload.userId.trim();
+            if (payload.sender) updates.sender = payload.sender.trim();
+            if (payload.senderKey !== undefined) updates.senderKey = payload.senderKey.trim();
+            if (payload.apiKey && !payload.apiKey.includes('••••')) {
+              updates.apiKey = payload.apiKey.trim();
+            }
+
+            const saved = saveAligoConfig(updates);
+            const balanceInfo = await getAligoBalance();
+
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({
+              success: true,
+              message: '알리고(Aligo) 연동 설정이 성공적으로 저장되었습니다.',
+              config: {
+                userId: saved.userId,
+                sender: saved.sender,
+                senderKey: saved.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
+                hasKey: Boolean(saved.apiKey),
+                maskedKey: saved.apiKey ? `${saved.apiKey.slice(0, 4)}••••••••${saved.apiKey.slice(-4)}` : ''
+              },
+              balance: balanceInfo
+            }));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
+        return;
+      }
+    }
+
+    // 바로빌 카카오톡 채널/템플릿 상태 및 원클릭 SSO URL API
+    if (reqPath === '/api/sms/barobill/kakao') {
+      try {
+        const { getBarobillKakaoChannels, getBarobillKakaoTemplates, getBarobillKakaoMgmtUrls, getBarobillConfig, DEFAULT_BAROBILL_KAKAO_CHANNEL_ID, DEFAULT_BAROBILL_KAKAO_CHANNEL_NAME } = require('./sms-service');
+        const cfg = getBarobillConfig();
+        const channelsRes = await getBarobillKakaoChannels().catch(e => ({ success: false, channels: [], error: e.message }));
+        const channels = channelsRes.channels || [];
+        const activeChannel = channels.find(c =>
+          c.channelId === '@독거노인-장애인-돌봄' ||
+          c.channelId?.includes('독거노인') ||
+          c.channelName?.includes('리본스마트케어')
+        ) || channels[0];
+
+        const targetChannelId = activeChannel?.channelId || DEFAULT_BAROBILL_KAKAO_CHANNEL_ID || '@독거노인-장애인-돌봄';
+        const targetChannelName = activeChannel?.channelName || DEFAULT_BAROBILL_KAKAO_CHANNEL_NAME || '리본스마트케어';
+
+        const [tmplRes, urlsRes] = await Promise.all([
+          getBarobillKakaoTemplates(targetChannelId).catch(e => ({ success: false, templates: [], error: e.message })),
+          getBarobillKakaoMgmtUrls().catch(e => ({ success: false, channelUrl: '', templateUrl: '', error: e.message }))
+        ]);
+        const templates = tmplRes.templates || [];
+        const hasChannel = channels.length > 0;
+        const approvedTemplates = templates.filter(t => t.status === 3);
+        const hasApprovedTemplates = approvedTemplates.length > 0;
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({
+          success: true,
+          hasChannel,
+          channels,
+          hasTemplates: hasApprovedTemplates,
+          templates,
+          approvedTemplates,
+          channelUrl: urlsRes.channelUrl || 'https://www.barobill.co.kr',
+          templateUrl: urlsRes.templateUrl || 'https://www.barobill.co.kr',
+          corpNum: cfg.corpNum,
+          baroId: cfg.id,
+          channelId: targetChannelId,
+          channelName: targetChannelName,
+          message: hasApprovedTemplates
+            ? `바로빌 카카오 알림톡 정상 연동 완료 (채널: ${targetChannelName} / 승인 템플릿 ${approvedTemplates.length}건)`
+            : (hasChannel
+              ? `바로빌 카카오 채널 연동 완료 (선택 채널: ${targetChannelName} / 등록: ${channels.map(c => c.channelName || c.channelId).join(', ')}). 템플릿 심사 진행 필요.`
+              : '바로빌 카카오 채널이 아직 등록되지 않았습니다.')
+        }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    }
+
+    // 바로빌 카카오 채널 관리 즉시 SSO 리다이렉트
+    if (reqPath === '/api/sms/barobill/open-channel') {
+      try {
+        const { getBarobillKakaoMgmtUrls } = require('./sms-service');
+        const urls = await getBarobillKakaoMgmtUrls();
+        const targetUrl = urls.channelUrl || 'https://www.barobill.co.kr';
+        res.writeHead(302, { Location: targetUrl, 'Cache-Control': 'no-store, no-cache' });
+        return res.end();
+      } catch (e) {
+        res.writeHead(302, { Location: 'https://www.barobill.co.kr' });
+        return res.end();
+      }
+    }
+
+    // 바로빌 카카오 템플릿 관리 즉시 SSO 리다이렉트
+    if (reqPath === '/api/sms/barobill/open-template') {
+      try {
+        const { getBarobillKakaoMgmtUrls } = require('./sms-service');
+        const urls = await getBarobillKakaoMgmtUrls();
+        const targetUrl = urls.templateUrl || 'https://www.barobill.co.kr';
+        res.writeHead(302, { Location: targetUrl, 'Cache-Control': 'no-store, no-cache' });
+        return res.end();
+      } catch (e) {
+        res.writeHead(302, { Location: 'https://www.barobill.co.kr' });
+        return res.end();
+      }
+    }
+
+    // 알리고 연결 및 발송 테스트 API
+    if (reqPath === '/api/sms/aligo/test' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', async () => {
+        try {
+          const { getAligoBalance, sendViaAligo, getPublicIp } = require('./sms-service');
+          const payload = JSON.parse(body || '{}');
+          const { toPhone, message, testMode = 'SIMULATION', userId, apiKey } = payload;
+          const customCreds = (userId && apiKey && !apiKey.includes('••••')) ? { userId, apiKey } : null;
+
+          if (toPhone && message) {
+            const result = await sendViaAligo({
+              toPhone,
+              toName: '알리고테스트',
+              message,
+              testMode,
+              userId,
+              apiKey: (apiKey && !apiKey.includes('••••')) ? apiKey : undefined
+            });
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true, result }));
+          } else {
+            const balance = await getAligoBalance(customCreds);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify(balance));
+          }
+        } catch (e) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
     if (reqPath === '/api/sms/balance' && req.method === 'GET') {
       try {
-        const { getBarobillSmsBalance } = require('./sms-service');
-        const balanceInfo = await getBarobillSmsBalance();
+        const { getAligoBalance, getBarobillSmsBalance } = require('./sms-service');
+        const reqProvider = (parsedUrl.query && parsedUrl.query.provider) || 'aligo';
+        const qUserId = parsedUrl.query && parsedUrl.query.userId;
+        const qApiKey = parsedUrl.query && parsedUrl.query.apiKey;
+        const customCreds = (qUserId && qApiKey && !String(qApiKey).includes('••••')) ? { userId: String(qUserId).trim(), apiKey: String(qApiKey).trim() } : null;
+
+        if (reqProvider === 'barobill') {
+          const baroInfo = await getBarobillSmsBalance();
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(baroInfo));
+        }
+
+        const aligoInfo = await getAligoBalance(customCreds);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        return res.end(JSON.stringify(balanceInfo));
+        return res.end(JSON.stringify(aligoInfo));
       } catch (e) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         return res.end(JSON.stringify({ success: false, error: e.message }));
@@ -2151,6 +2628,146 @@ function saveSavedFaxConfig(cfg) {
       return;
     }
 
+    if (reqPath === '/api/survey/send-sms' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', async () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const { dispatchSms } = require('./sms-service');
+
+          const toPhone = (payload.phone || payload.toPhone || '').trim();
+          const customMessage = (payload.customMessage || payload.message || '').trim();
+          const subject = (payload.subject || '[리본케어] 모바일 간병일지 & 만족도 설문 안내').trim();
+          const senderNumber = (payload.senderNumber || '16007835').trim();
+          const provider = payload.provider || 'aligo';
+          const channel = payload.channel || 'sms'; // 'sms' | 'kakao'
+          const buttonUrl = payload.buttonUrl || payload.surveyUrl || '';
+          const buttonTitle = payload.buttonTitle || '모바일 간병일지 & 설문 열람하기';
+          const isTest = Boolean(payload.isTest);
+          const testMode = payload.testMode || 'REAL_TEST'; // 'REAL_TEST' | 'SIMULATION'
+          const apiKey = (payload.apiKey || '').trim();
+          const userId = (payload.userId || '').trim();
+          const senderKey = (payload.senderKey || '').trim();
+          const templateCode = (payload.templateCode || payload.templateName || '').trim();
+
+          if (!toPhone) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, message: '수신 휴대폰 번호를 입력해 주세요.' }));
+          }
+
+          // 1) 테스트 발송 모드 (환자 안내 상태는 변경하지 않음)
+          if (isTest) {
+            if (testMode === 'SIMULATION') {
+              res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+              return res.end(JSON.stringify({
+                success: true,
+                isTest: true,
+                testMode: 'SIMULATION',
+                receiptNum: 'SIM-' + Date.now().toString().slice(-6),
+                sendType: channel === 'kakao' ? '카카오 알림톡 버튼형 (모의 테스트)' : '안심 단축문자 LMS (모의 테스트)',
+                provider: 'Smart Sandbox (무과금 시뮬레이션)',
+                toPhone,
+                message: `[모의 테스트 성공] ${toPhone} 번호로 문자 전문 및 링크 검증이 완료되었습니다.`
+              }));
+            }
+
+            // 실제 통신망(바로빌/Twilio)으로 테스트 문자/알림톡 발송
+            try {
+              const gwRes = await dispatchSms({
+                toPhone,
+                toName: (payload.patientName || '테스트') + '(테스트)',
+                patientName: payload.patientName || '테스트환자',
+                message: customMessage,
+                senderNumber,
+                provider,
+                channel,
+                buttonUrl,
+                buttonTitle,
+                subject,
+                category: 'SURVEY_SMS_TEST',
+                testMode,
+                apiKey,
+                userId,
+                senderKey,
+                templateName: templateCode
+              });
+              res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+              return res.end(JSON.stringify({
+                success: true,
+                isTest: true,
+                testMode: 'REAL_TEST',
+                ...gwRes,
+                message: `[실제 테스트 발송 완료] ${toPhone} 번호로 테스트 메시지가 전송되었습니다.`
+              }));
+            } catch (gwErr) {
+              res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+              return res.end(JSON.stringify({
+                success: false,
+                isTest: true,
+                testMode: 'REAL_TEST',
+                message: gwErr.message || '실제 통신망 테스트 발송 중 오류가 발생했습니다.'
+              }));
+            }
+          }
+
+          // 2) 실제 고객 대상 발송 모드
+          let gatewayResult = null;
+          let gatewayWarning = '';
+          if (payload.useRealGateway !== false && customMessage) {
+            try {
+              gatewayResult = await dispatchSms({
+                toPhone,
+                toName: payload.patientName || '고객',
+                patientName: payload.patientName || '',
+                message: customMessage,
+                senderNumber,
+                provider,
+                channel,
+                buttonUrl,
+                buttonTitle,
+                subject,
+                category: payload.isNewSurvey ? 'SURVEY_NEW_SMS' : 'SURVEY_SMS',
+                apiKey,
+                userId,
+                senderKey,
+                templateName: templateCode
+              });
+            } catch (gwErr) {
+              gatewayWarning = gwErr.message || '';
+              console.warn('[Survey SMS Gateway Warning]', gatewayWarning);
+            }
+          }
+
+          const result = gSurveyService.sendSurveySms(payload.targetId, {
+            phone: toPhone,
+            customMessage: customMessage || undefined,
+            subject,
+            surveyUrl: payload.surveyUrl || undefined,
+            baseUrl: payload.baseUrl || undefined,
+            senderNumber,
+            isNewSurvey: Boolean(payload.isNewSurvey),
+            skipReward: Boolean(payload.skipReward),
+            receiptNum: gatewayResult ? gatewayResult.receiptNum : ('LOCAL-' + Date.now().toString().slice(-6)),
+            provider: gatewayResult ? gatewayResult.provider : provider
+          }, payload.actor || 'HQ');
+
+          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({
+            ...result,
+            gatewayDispatched: Boolean(gatewayResult),
+            receiptNum: gatewayResult ? gatewayResult.receiptNum : (result.smsRecord ? result.smsRecord.receiptNum : ''),
+            sendType: gatewayResult ? gatewayResult.sendType : 'LMS',
+            gatewayWarning
+          }));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, message: e.message, error: e.message }));
+        }
+      });
+      return;
+    }
+
     if (reqPath === '/api/survey/followups' && req.method === 'GET') {
       const list = gSurveyService.getFollowups(parsedUrl.query || {});
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -2214,6 +2831,29 @@ function saveSavedFaxConfig(cfg) {
       return;
     }
 
+    if (reqPath === '/api/survey/responses' && req.method === 'GET') {
+      const list = gSurveyService.getResponses();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      return res.end(JSON.stringify({ success: true, count: list.length, items: list }));
+    }
+
+    if (reqPath === '/api/survey/gift/update' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(body || '{}');
+          const result = gSurveyService.updateGiftDispatch(payload.id, payload.giftData || payload, payload.actor || 'ADMIN');
+          res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify(result));
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          return res.end(JSON.stringify({ success: false, error: e.message }));
+        }
+      });
+      return;
+    }
+
     if (reqPath === '/api/survey/settings' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       return res.end(JSON.stringify({ success: true, data: gSurveyService.getSettings() }));
@@ -2238,7 +2878,25 @@ function saveSavedFaxConfig(cfg) {
 
     if (reqPath === '/api/public/survey/form' && req.method === 'GET') {
       const token = parsedUrl.query.token || parsedUrl.query.t || '';
-      const formData = gSurveyService.getFormByToken(token);
+      let formData = gSurveyService.getFormByToken(token);
+      if (!formData || !formData.valid || !formData.serviceInfo) {
+        const fallbackPatient = parsedUrl.query.patient || parsedUrl.query.p || '';
+        const fallbackHospital = parsedUrl.query.hospital || parsedUrl.query.h || '';
+        const fallbackCarer = parsedUrl.query.carer || parsedUrl.query.c || '';
+        if (fallbackPatient) {
+          formData = {
+            valid: true,
+            serviceInfo: {
+              id: token ? 'TMP-' + token : 'TMP-' + Date.now(),
+              serviceId: token || '',
+              token: token,
+              patientName: fallbackPatient,
+              hospitalName: fallbackHospital || '리본케어 협약병원',
+              caregiverName: fallbackCarer || '담당 간병인'
+            }
+          };
+        }
+      }
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       return res.end(JSON.stringify(formData));
     }
@@ -2741,7 +3399,7 @@ function saveSavedFaxConfig(cfg) {
     }
 
     // CarePort Embed & Assets Proxy for authentic in-browser rendering
-    if (reqPath === '/careport-embed' || reqPath.startsWith('/careport-embed/') || reqPath.startsWith('/js/') || reqPath.startsWith('/css/') || reqPath.startsWith('/img/') || reqPath.startsWith('/fonts/')) {
+    if (reqPath === '/careport-embed' || reqPath.startsWith('/careport-embed/') || reqPath.startsWith('/js/') || reqPath.startsWith('/css/') || reqPath.startsWith('/img/') || reqPath.startsWith('/fonts/') || reqPath.startsWith('/resources/')) {
       const targetPath = (reqPath === '/careport-embed' || reqPath.startsWith('/careport-embed/'))
         ? (reqPath.replace('/careport-embed', '') || '/')
         : reqPath;
@@ -2766,6 +3424,18 @@ function saveSavedFaxConfig(cfg) {
     if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
     if (reqPath === '/care-diary' || reqPath === '/report' || reqPath.startsWith('/d/')) {
       reqPath = '/mobile-care-diary.html';
+    }
+    if (reqPath === '/survey-new' || reqPath === '/survey-care-diary' || reqPath === '/s' || reqPath.startsWith('/s/')) {
+      reqPath = '/survey-care-diary.html';
+    }
+    if (reqPath === '/mate-survey-new' || reqPath === '/mate/survey-new') {
+      reqPath = '/mate-survey-new.html';
+    }
+    if (reqPath === '/survey') {
+      reqPath = '/survey.html';
+    }
+    if (reqPath === '/mate-survey' || reqPath === '/mate/survey') {
+      reqPath = '/mate-survey.html';
     }
 
     const filePath = path.join(BASE_DIR, decodeURIComponent(reqPath));

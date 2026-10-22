@@ -285,7 +285,7 @@
             </div>
             <div>
               <label class="block text-[11px] font-bold text-slate-600 mb-1">다른 번호로 연락을 받으시려면 입력해 주세요:</label>
-              <input type="tel" id="altPhone" placeholder="010-0000-0000 (선택)" class="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:ring-2 focus:ring-sky-500 focus:outline-none">
+              <input type="tel" inputmode="numeric" pattern="[0-9\-]*" maxlength="13" autocomplete="tel" id="altPhone" oninput="const c=this.value.replace(/[^0-9]/g,'').slice(0,11);this.value=c.length<=3?c:c.length<=6?c.slice(0,3)+'-'+c.slice(3):c.length<=10?c.slice(0,3)+'-'+c.slice(3,6)+'-'+c.slice(6):c.slice(0,3)+'-'+c.slice(3,7)+'-'+c.slice(7,11);" placeholder="010-0000-0000 (선택)" class="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 font-mono font-bold focus:ring-2 focus:ring-sky-500 focus:outline-none">
             </div>
           </div>
           <input type="hidden" id="ansQ6" name="q6">

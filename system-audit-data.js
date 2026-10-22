@@ -1,0 +1,2550 @@
+/**
+ * system-audit-data.js
+ * 시스템 실제 운영 감사 로그 데이터 (정적 fallback 및 기준 실데이터)
+ */
+window.REAL_SYSTEM_AUDIT_LOGS = [
+  {
+    "id": "LOG-08571767-UTUA",
+    "timestamp": "2026-10-17 12:42:51",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "59.7.232.159",
+    "category": "데이터동기화",
+    "actionType": "SYNC",
+    "target": "종합 간병(현대해상) 관리대장 엑셀 업로드",
+    "summary": "종합 간병(현대해상) 실데이터 엑셀 업로드 및 동기화 (신청 351건, 배정 349건, 청구 556건, 지급 594건, 간병인 272명, 센터 100개소, 손사 137명)",
+    "status": "SUCCESS",
+    "changes": {
+      "고객신청": {
+        "before": "-",
+        "after": "351건"
+      },
+      "간병배정": {
+        "before": "-",
+        "after": "349건"
+      },
+      "보험청구": {
+        "before": "-",
+        "after": "556건"
+      },
+      "간병인지급": {
+        "before": "-",
+        "after": "594건"
+      },
+      "간병인력풀": {
+        "before": "-",
+        "after": "272명 (실데이터)"
+      },
+      "협력센터": {
+        "before": "-",
+        "after": "100개소"
+      },
+      "손사디렉토리": {
+        "before": "-",
+        "after": "137명"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-08892845-DC6I",
+    "timestamp": "2026-10-16 09:01:32",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0680] (배정임)",
+    "summary": "[배정임 님] 상세 모달 전체 변경사항 서버 및 DB 최종 영구 저장 완료",
+    "status": "SUCCESS",
+    "changes": {
+      "정산·청구 세트": "0개 세트",
+      "보험금 청구": "0건 (청구합계: 0원)",
+      "입금확인 금액": "0원 (잔여 미수: 0원)",
+      "간병비 지급": "0건 (지급합계: 0원)",
+      "진행상태": "신규"
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-08892625-12GL",
+    "timestamp": "2026-10-16 09:01:32",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0680] (배정임)",
+    "summary": "[배정임 님] 고객 필드 정보 실시간 갱신 및 저장 (claimCount, unconfirmedClaimCount, estimatedUnpaid, totalPayout, hasManualUpdate)",
+    "status": "SUCCESS",
+    "changes": {
+      "claimCount": {
+        "before": "-",
+        "after": "0"
+      },
+      "unconfirmedClaimCount": {
+        "before": "-",
+        "after": "0"
+      },
+      "estimatedUnpaid": {
+        "before": "-",
+        "after": "0"
+      },
+      "totalPayout": {
+        "before": "-",
+        "after": "0"
+      },
+      "hasManualUpdate": {
+        "before": "-",
+        "after": "true"
+      },
+      "status": {
+        "before": "-",
+        "after": "신규"
+      },
+      "claimClassification": {
+        "before": "-",
+        "after": ""
+      },
+      "claimCategory": {
+        "before": "-",
+        "after": ""
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
+    "id": "LOG-08701932-NFMW",
+    "timestamp": "2026-10-16 08:58:21",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "데이터동기화",
+    "actionType": "SYNC",
+    "target": "종합 간병(현대해상) 관리대장 엑셀 업로드",
+    "summary": "종합 간병(현대해상) 실데이터 엑셀 업로드 및 동기화 (신청 343건, 배정 342건, 청구 544건, 지급 583건, 간병인 269명, 센터 98개소, 손사 137명)",
+    "status": "SUCCESS",
+    "changes": {
+      "고객신청": {
+        "before": "-",
+        "after": "343건"
+      },
+      "간병배정": {
+        "before": "-",
+        "after": "342건"
+      },
+      "보험청구": {
+        "before": "-",
+        "after": "544건"
+      },
+      "간병인지급": {
+        "before": "-",
+        "after": "583건"
+      },
+      "간병인력풀": {
+        "before": "-",
+        "after": "269명 (실데이터)"
+      },
+      "협력센터": {
+        "before": "-",
+        "after": "98개소"
+      },
+      "손사디렉토리": {
+        "before": "-",
+        "after": "137명"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-47368582-3Q9E",
+    "timestamp": "2026-10-15 15:56:08",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0667] (김판영)",
+    "summary": "[김판영 님] 상세 모달 전체 변경사항 서버 및 DB 최종 영구 저장 완료",
+    "status": "SUCCESS",
+    "changes": {
+      "정산·청구 세트": "0개 세트",
+      "보험금 청구": "0건 (청구합계: 0원)",
+      "입금확인 금액": "0원 (잔여 미수: 0원)",
+      "간병비 지급": "0건 (지급합계: 0원)",
+      "진행상태": "신규"
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-47368345-2FFR",
+    "timestamp": "2026-10-15 15:56:08",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0667] (김판영)",
+    "summary": "[김판영 님] 고객 필드 정보 실시간 갱신 및 저장 (claimCount, unconfirmedClaimCount, estimatedUnpaid, totalPayout, hasManualUpdate)",
+    "status": "SUCCESS",
+    "changes": {
+      "claimCount": {
+        "before": "-",
+        "after": "0"
+      },
+      "unconfirmedClaimCount": {
+        "before": "-",
+        "after": "0"
+      },
+      "estimatedUnpaid": {
+        "before": "-",
+        "after": "0"
+      },
+      "totalPayout": {
+        "before": "-",
+        "after": "0"
+      },
+      "hasManualUpdate": {
+        "before": "-",
+        "after": "true"
+      },
+      "status": {
+        "before": "-",
+        "after": "신규"
+      },
+      "claimClassification": {
+        "before": "-",
+        "after": ""
+      },
+      "claimCategory": {
+        "before": "-",
+        "after": ""
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
+    "id": "LOG-47354649-U3LZ",
+    "timestamp": "2026-10-15 15:55:54",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0667] (김판영)",
+    "summary": "[김판영 님] 고객 필드 정보 실시간 갱신 및 저장 (_creationTime, _id, accidentDate, accidentNumber, accidentType)",
+    "status": "SUCCESS",
+    "changes": {
+      "_creationTime": {
+        "before": "-",
+        "after": "1792040930971.054"
+      },
+      "_id": {
+        "before": "-",
+        "after": "jd784ss7715dm5mkvg4vr629k98gbt0w"
+      },
+      "accidentDate": {
+        "before": "-",
+        "after": ""
+      },
+      "accidentNumber": {
+        "before": "-",
+        "after": ""
+      },
+      "accidentType": {
+        "before": "-",
+        "after": "상해"
+      },
+      "addressDetail": {
+        "before": "-",
+        "after": "백병원/ 인재대학  809호 호실변경될수 있음 /30일  뇌출혈"
+      },
+      "adjusterFax": {
+        "before": "-",
+        "after": ""
+      },
+      "adjusterName": {
+        "before": "-",
+        "after": ""
+      },
+      "adjusterPhone": {
+        "before": "-",
+        "after": ""
+      },
+      "applicantContact": {
+        "before": "-",
+        "after": "106717448001057821887"
+      },
+      "applyDate": {
+        "before": "-",
+        "after": "2026.10.15 15:55"
+      },
+      "applyDateTime": {
+        "before": "-",
+        "after": "2026.10.15"
+      },
+      "applyType": {
+        "before": "-",
+        "after": "입원"
+      },
+      "assignedCaregiverCount": {
+        "before": "-",
+        "after": "0"
+      },
+      "birthDate": {
+        "before": "-",
+        "after": "561122-2908211"
+      },
+      "careEndDate": {
+        "before": "-",
+        "after": ""
+      },
+      "careStartDate": {
+        "before": "-",
+        "after": ""
+      },
+      "careType": {
+        "before": "-",
+        "after": "입원"
+      },
+      "caregiverName": {
+        "before": "-",
+        "after": ""
+      },
+      "caregiverPhone": {
+        "before": "-",
+        "after": ""
+      },
+      "claimCategory": {
+        "before": "-",
+        "after": ""
+      },
+      "claimClassification": {
+        "before": "-",
+        "after": ""
+      },
+      "claimCount": {
+        "before": "-",
+        "after": "0"
+      },
+      "claimUnitPrice": {
+        "before": "-",
+        "after": "142000"
+      },
+      "contractEndDate": {
+        "before": "-",
+        "after": ""
+      },
+      "contractStartDate": {
+        "before": "-",
+        "after": ""
+      },
+      "csLatestLabel": {
+        "before": "-",
+        "after": "null"
+      },
+      "csLatestType": {
+        "before": "-",
+        "after": "null"
+      },
+      "customDailyClaimPrice": {
+        "before": "-",
+        "after": "142000"
+      },
+      "dailyRate": {
+        "before": "-",
+        "after": ""
+      },
+      "depositConfirmedAmount": {
+        "before": "-",
+        "after": "0"
+      },
+      "desiredStartDate": {
+        "before": "-",
+        "after": ""
+      },
+      "diagnosis": {
+        "before": "-",
+        "after": ""
+      },
+      "estimatedUnpaid": {
+        "before": "-",
+        "after": "0"
+      },
+      "expectedDays": {
+        "before": "-",
+        "after": "2일"
+      },
+      "expectedEndDate": {
+        "before": "-",
+        "after": ""
+      },
+      "gender": {
+        "before": "-",
+        "after": "여"
+      },
+      "hasDiseaseCare": {
+        "before": "-",
+        "after": ""
+      },
+      "hasInjuryCare": {
+        "before": "-",
+        "after": ""
+      },
+      "hospitalName": {
+        "before": "-",
+        "after": "백병원/ 인재대학  809호 호실변경될수 있음 /30일  뇌출혈"
+      },
+      "id": {
+        "before": "-",
+        "after": "C0667"
+      },
+      "importedAt": {
+        "before": "-",
+        "after": "2026-10-15T05:08:34.021Z"
+      },
+      "insuranceCompany": {
+        "before": "-",
+        "after": "현대해상"
+      },
+      "isRealLaunchData": {
+        "before": "-",
+        "after": "true"
+      },
+      "memo": {
+        "before": "-",
+        "after": ""
+      },
+      "patientId": {
+        "before": "-",
+        "after": ""
+      },
+      "patientName": {
+        "before": "-",
+        "after": "김판영"
+      },
+      "phone": {
+        "before": "-",
+        "after": "010-6717-4480"
+      },
+      "policyNumber": {
+        "before": "-",
+        "after": ""
+      },
+      "productCode": {
+        "before": "-",
+        "after": ""
+      },
+      "productName": {
+        "before": "-",
+        "after": ""
+      },
+      "sido": {
+        "before": "-",
+        "after": "부산"
+      },
+      "sigungu": {
+        "before": "-",
+        "after": "해운대구"
+      },
+      "status": {
+        "before": "-",
+        "after": "신규"
+      },
+      "totalPayout": {
+        "before": "-",
+        "after": "0"
+      },
+      "unconfirmedClaimCount": {
+        "before": "-",
+        "after": "0"
+      },
+      "_applyTime": {
+        "before": "-",
+        "after": "1791990000000"
+      },
+      "_updTime": {
+        "before": "-",
+        "after": "0"
+      },
+      "_latestEventTime": {
+        "before": "-",
+        "after": "1791990000000"
+      },
+      "updatedAt": {
+        "before": "-",
+        "after": "2026-10-15T06:55:54.530Z"
+      },
+      "guardianName": {
+        "before": "-",
+        "after": "보호자"
+      },
+      "applicantName": {
+        "before": "-",
+        "after": "보호자"
+      },
+      "guardianPhone": {
+        "before": "-",
+        "after": "010-5782-1887"
+      },
+      "applicantPhone": {
+        "before": "-",
+        "after": "010-5782-1887"
+      },
+      "guardianRelation": {
+        "before": "-",
+        "after": "며느님"
+      },
+      "applicantRelation": {
+        "before": "-",
+        "after": "며느님"
+      },
+      "extraPhone": {
+        "before": "-",
+        "after": ""
+      },
+      "rrn": {
+        "before": "-",
+        "after": ""
+      },
+      "roadAddress": {
+        "before": "-",
+        "after": "부산 해운대구"
+      },
+      "adjusterMobile": {
+        "before": "-",
+        "after": ""
+      },
+      "contractPeriod": {
+        "before": "-",
+        "after": ""
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
+    "id": "LOG-47354530-0Z42",
+    "timestamp": "2026-10-15 15:55:54",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0667] (김판영)",
+    "summary": "[김판영 님] 고객 상세 정보 수정 (연락처, 보호자 성명, 보호자 관계, 보호자 연락처, 소재지/도로명, 신청일자 변경)",
+    "status": "SUCCESS",
+    "changes": {
+      "연락처": {
+        "before": "106717448001057821887",
+        "after": "010-6717-4480"
+      },
+      "보호자 성명": {
+        "before": "(없음)",
+        "after": "보호자"
+      },
+      "보호자 관계": {
+        "before": "(없음)",
+        "after": "며느님"
+      },
+      "보호자 연락처": {
+        "before": "(없음)",
+        "after": "010-5782-1887"
+      },
+      "소재지/도로명": {
+        "before": "(없음)",
+        "after": "부산 해운대구"
+      },
+      "신청일자": {
+        "before": "2026.10.15",
+        "after": "2026.10.15 15:55"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-47182116-04MA",
+    "timestamp": "2026-10-15 15:53:02",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0675] (진정이)",
+    "summary": "[진정이 님] 상세 모달 전체 변경사항 서버 및 DB 최종 영구 저장 완료",
+    "status": "SUCCESS",
+    "changes": {
+      "정산·청구 세트": "0개 세트",
+      "보험금 청구": "0건 (청구합계: 0원)",
+      "입금확인 금액": "0원 (잔여 미수: 0원)",
+      "간병비 지급": "0건 (지급합계: 0원)",
+      "진행상태": "신규"
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-47181960-9047",
+    "timestamp": "2026-10-15 15:53:01",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0675] (진정이)",
+    "summary": "[진정이 님] 고객 필드 정보 실시간 갱신 및 저장 (claimCount, unconfirmedClaimCount, estimatedUnpaid, totalPayout, hasManualUpdate)",
+    "status": "SUCCESS",
+    "changes": {
+      "claimCount": {
+        "before": "-",
+        "after": "0"
+      },
+      "unconfirmedClaimCount": {
+        "before": "-",
+        "after": "0"
+      },
+      "estimatedUnpaid": {
+        "before": "-",
+        "after": "0"
+      },
+      "totalPayout": {
+        "before": "-",
+        "after": "0"
+      },
+      "hasManualUpdate": {
+        "before": "-",
+        "after": "true"
+      },
+      "status": {
+        "before": "-",
+        "after": "신규"
+      },
+      "claimClassification": {
+        "before": "-",
+        "after": ""
+      },
+      "claimCategory": {
+        "before": "-",
+        "after": ""
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
+    "id": "LOG-47176716-D3R3",
+    "timestamp": "2026-10-15 15:52:56",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0680] (배정임)",
+    "summary": "[배정임 님] 상세 모달 전체 변경사항 서버 및 DB 최종 영구 저장 완료",
+    "status": "SUCCESS",
+    "changes": {
+      "정산·청구 세트": "0개 세트",
+      "보험금 청구": "0건 (청구합계: 0원)",
+      "입금확인 금액": "0원 (잔여 미수: 0원)",
+      "간병비 지급": "0건 (지급합계: 0원)",
+      "진행상태": "신규"
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-47176532-D207",
+    "timestamp": "2026-10-15 15:52:56",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0680] (배정임)",
+    "summary": "[배정임 님] 고객 필드 정보 실시간 갱신 및 저장 (claimCount, unconfirmedClaimCount, estimatedUnpaid, totalPayout, hasManualUpdate)",
+    "status": "SUCCESS",
+    "changes": {
+      "claimCount": {
+        "before": "-",
+        "after": "0"
+      },
+      "unconfirmedClaimCount": {
+        "before": "-",
+        "after": "0"
+      },
+      "estimatedUnpaid": {
+        "before": "-",
+        "after": "0"
+      },
+      "totalPayout": {
+        "before": "-",
+        "after": "0"
+      },
+      "hasManualUpdate": {
+        "before": "-",
+        "after": "true"
+      },
+      "status": {
+        "before": "-",
+        "after": "신규"
+      },
+      "claimClassification": {
+        "before": "-",
+        "after": ""
+      },
+      "claimCategory": {
+        "before": "-",
+        "after": ""
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
+    "id": "LOG-45917581-5O4R",
+    "timestamp": "2026-10-15 15:31:57",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0680] (배정임)",
+    "summary": "[배정임 님] 상세 모달 전체 변경사항 서버 및 DB 최종 영구 저장 완료",
+    "status": "SUCCESS",
+    "changes": {
+      "정산·청구 세트": "0개 세트",
+      "보험금 청구": "0건 (청구합계: 0원)",
+      "입금확인 금액": "0원 (잔여 미수: 0원)",
+      "간병비 지급": "0건 (지급합계: 0원)",
+      "진행상태": "신규"
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-45917443-B51G",
+    "timestamp": "2026-10-15 15:31:57",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0680] (배정임)",
+    "summary": "[배정임 님] 고객 필드 정보 실시간 갱신 및 저장 (claimCount, unconfirmedClaimCount, estimatedUnpaid, totalPayout, hasManualUpdate)",
+    "status": "SUCCESS",
+    "changes": {
+      "claimCount": {
+        "before": "-",
+        "after": "0"
+      },
+      "unconfirmedClaimCount": {
+        "before": "-",
+        "after": "0"
+      },
+      "estimatedUnpaid": {
+        "before": "-",
+        "after": "0"
+      },
+      "totalPayout": {
+        "before": "-",
+        "after": "0"
+      },
+      "hasManualUpdate": {
+        "before": "-",
+        "after": "true"
+      },
+      "status": {
+        "before": "-",
+        "after": "신규"
+      },
+      "claimClassification": {
+        "before": "-",
+        "after": ""
+      },
+      "claimCategory": {
+        "before": "-",
+        "after": ""
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
+    "id": "LOG-40957606-26NH",
+    "timestamp": "2026-10-15 14:09:17",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "데이터동기화",
+    "actionType": "SYNC",
+    "target": "종합 간병(현대해상) 관리대장 엑셀 업로드",
+    "summary": "종합 간병(현대해상) 실데이터 엑셀 업로드 및 동기화 (신청 343건, 배정 342건, 청구 544건, 지급 583건, 간병인 269명, 센터 98개소, 손사 137명)",
+    "status": "SUCCESS",
+    "changes": {
+      "고객신청": {
+        "before": "-",
+        "after": "343건"
+      },
+      "간병배정": {
+        "before": "-",
+        "after": "342건"
+      },
+      "보험청구": {
+        "before": "-",
+        "after": "544건"
+      },
+      "간병인지급": {
+        "before": "-",
+        "after": "583건"
+      },
+      "간병인력풀": {
+        "before": "-",
+        "after": "269명 (실데이터)"
+      },
+      "협력센터": {
+        "before": "-",
+        "after": "98개소"
+      },
+      "손사디렉토리": {
+        "before": "-",
+        "after": "137명"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-39825471-RC5G",
+    "timestamp": "2026-10-15 13:50:25",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0672] (유아림)",
+    "summary": "[유아림 님] 고객 필드 정보 실시간 갱신 및 저장 (customSettlementSets, claimCount, unconfirmedClaimCount, estimatedUnpaid, totalPayout)",
+    "status": "SUCCESS",
+    "changes": {
+      "customSettlementSets": {
+        "before": "-",
+        "after": "[{\"caregiverName\":\"김지훈\",\"cgDailyWage\":140000,\"claimAmount\":1420000,\"claimDate\":\"\",\"claimDays\":10,\"claimId\":\"Q0672.1\",\"claimRound\":\"10월 1차\",\"claimStandardDate\":\"2026.10.10\",\"claimStatus\":\"청구전\",\"dailyClaimPrice\":142000,\"days\":10,\"depositAmount\":0,\"depositDate\":\"\",\"depositStatus\":\"미입금\",\"endDateStr\":\"2026.10.10 10:00\",\"memo\":\"\",\"payoutAmount\":1400000,\"payoutDate\":\"\",\"payoutDays\":10,\"payoutId\":\"P0672.1\",\"payoutRound\":\"10월 1차\",\"payoutStandardDate\":\"2026.10.10 10:00\",\"payoutStatus\":\"지급전\",\"setIndex\":1,\"startDateStr\":\"2026.10.01 09:00\"}]"
+      },
+      "claimCount": {
+        "before": "-",
+        "after": "1"
+      },
+      "unconfirmedClaimCount": {
+        "before": "-",
+        "after": "1"
+      },
+      "estimatedUnpaid": {
+        "before": "-",
+        "after": "1420000"
+      },
+      "totalPayout": {
+        "before": "-",
+        "after": "0"
+      },
+      "hasManualUpdate": {
+        "before": "-",
+        "after": "true"
+      },
+      "status": {
+        "before": "-",
+        "after": "진행중"
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
+    "id": "LOG-39818351-C60A",
+    "timestamp": "2026-10-15 13:50:18",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0672] (유아림)",
+    "summary": "[유아림 님] 고객 필드 정보 실시간 갱신 및 저장 (customSettlementSets, claimCount, unconfirmedClaimCount, estimatedUnpaid, totalPayout)",
+    "status": "SUCCESS",
+    "changes": {
+      "customSettlementSets": {
+        "before": "-",
+        "after": "[{\"caregiverName\":\"김지훈\",\"cgDailyWage\":140000,\"claimAmount\":1420000,\"claimDate\":\"\",\"claimDays\":10,\"claimId\":\"Q0672.1\",\"claimRound\":\"10월 1차\",\"claimStandardDate\":\"2026.10.10\",\"claimStatus\":\"청구전\",\"dailyClaimPrice\":142000,\"days\":10,\"depositAmount\":0,\"depositDate\":\"\",\"depositStatus\":\"미입금\",\"endDateStr\":\"2026.10.10 10:00\",\"memo\":\"\",\"payoutAmount\":1400000,\"payoutDate\":\"\",\"payoutDays\":10,\"payoutId\":\"P0672.1\",\"payoutRound\":\"10월 1차\",\"payoutStandardDate\":\"2026.10.10 10:00\",\"payoutStatus\":\"지급전\",\"setIndex\":1,\"startDateStr\":\"2026.10.01 09:00\"}]"
+      },
+      "claimCount": {
+        "before": "-",
+        "after": "1"
+      },
+      "unconfirmedClaimCount": {
+        "before": "-",
+        "after": "1"
+      },
+      "estimatedUnpaid": {
+        "before": "-",
+        "after": "1420000"
+      },
+      "totalPayout": {
+        "before": "-",
+        "after": "0"
+      },
+      "hasManualUpdate": {
+        "before": "-",
+        "after": "true"
+      },
+      "status": {
+        "before": "-",
+        "after": "진행중"
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
+    "id": "LOG-39724695-231X",
+    "timestamp": "2026-10-15 13:48:44",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0672] (유아림)",
+    "summary": "[유아림 님] 고객 필드 정보 실시간 갱신 및 저장 (customSettlementSets, claimCount, unconfirmedClaimCount, estimatedUnpaid, totalPayout)",
+    "status": "SUCCESS",
+    "changes": {
+      "customSettlementSets": {
+        "before": "-",
+        "after": "[{\"caregiverName\":\"김지훈\",\"cgDailyWage\":140000,\"claimAmount\":1420000,\"claimDate\":\"\",\"claimDays\":10,\"claimId\":\"Q0672.1\",\"claimRound\":\"10월 1차\",\"claimStandardDate\":\"2026.10.10\",\"claimStatus\":\"청구전\",\"dailyClaimPrice\":142000,\"days\":10,\"depositAmount\":0,\"depositDate\":\"\",\"depositStatus\":\"미입금\",\"endDateStr\":\"2026.10.10 10:00\",\"memo\":\"\",\"payoutAmount\":1400000,\"payoutDate\":\"\",\"payoutDays\":10,\"payoutId\":\"P0672.1\",\"payoutRound\":\"10월 1차\",\"payoutStandardDate\":\"2026.10.10 10:00\",\"payoutStatus\":\"지급전\",\"setIndex\":1,\"startDateStr\":\"2026.10.01 09:00\"}]"
+      },
+      "claimCount": {
+        "before": "-",
+        "after": "1"
+      },
+      "unconfirmedClaimCount": {
+        "before": "-",
+        "after": "1"
+      },
+      "estimatedUnpaid": {
+        "before": "-",
+        "after": "1420000"
+      },
+      "totalPayout": {
+        "before": "-",
+        "after": "0"
+      },
+      "hasManualUpdate": {
+        "before": "-",
+        "after": "true"
+      },
+      "status": {
+        "before": "-",
+        "after": "진행중"
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
+    "id": "LOG-39513378-KEC1",
+    "timestamp": "2026-10-15 13:45:13",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [C0672] (유아림)",
+    "summary": "[유아림 님] 고객 필드 정보 실시간 갱신 및 저장 (customSettlementSets, claimCount, unconfirmedClaimCount, estimatedUnpaid, totalPayout)",
+    "status": "SUCCESS",
+    "changes": {
+      "customSettlementSets": {
+        "before": "-",
+        "after": "[{\"setIndex\":1,\"claimRound\":\"10월 1차\",\"payoutRound\":\"10월 1차\",\"claimStandardDate\":\"2026.10.10\",\"payoutStandardDate\":\"2026.10.10 10:00\",\"claimDate\":\"\",\"payoutDate\":\"\",\"startDateStr\":\"2026.10.01 09:00\",\"endDateStr\":\"2026.10.10 10:00\",\"days\":10,\"claimDays\":10,\"payoutDays\":10,\"dailyClaimPrice\":142000,\"claimAmount\":1420000,\"claimStatus\":\"청구전\",\"depositAmount\":0,\"depositDate\":\"\",\"depositStatus\":\"미입금\",\"caregiverName\":\"김지훈\",\"cgDailyWage\":140000,\"payoutAmount\":1400000,\"payoutStatus\":\"지급전\",\"claimId\":\"Q0672.1\",\"payoutId\":\"P0672.1\",\"memo\":\"\"}]"
+      },
+      "claimCount": {
+        "before": "-",
+        "after": "1"
+      },
+      "unconfirmedClaimCount": {
+        "before": "-",
+        "after": "1"
+      },
+      "estimatedUnpaid": {
+        "before": "-",
+        "after": "1420000"
+      },
+      "totalPayout": {
+        "before": "-",
+        "after": "0"
+      },
+      "hasManualUpdate": {
+        "before": "-",
+        "after": "true"
+      },
+      "status": {
+        "before": "-",
+        "after": "진행중"
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
+    "id": "LOG-39455413-D9DB",
+    "timestamp": "2026-10-15 13:44:15",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "간병배정",
+    "actionType": "UPDATE",
+    "target": "A0341 (김지훈 / 유아림)",
+    "summary": "간병인 일정/일당 정보 수정 [A0341 - 김지훈] (2026.10.01 09:00 ~ 2026.10.22 09:00)",
+    "status": "SUCCESS",
+    "changes": {
+      "간병인명": {
+        "before": null,
+        "after": "김지훈"
+      },
+      "근무일정": {
+        "before": null,
+        "after": "2026.10.01 09:00 ~ 2026.10.22 09:00"
+      },
+      "일당": {
+        "before": null,
+        "after": "140,000원"
+      },
+      "협력센터": {
+        "before": null,
+        "after": "영등포센터"
+      },
+      "정산방식": {
+        "before": null,
+        "after": "개인"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-39442471-ZJMZ",
+    "timestamp": "2026-10-15 13:44:02",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "간병배정",
+    "actionType": "UPDATE",
+    "target": "A0341 (김지훈 / 유아림)",
+    "summary": "간병인 일정/일당 정보 수정 [A0341 - 김지훈] (2026.10.08 09:00 ~ 2026.10.22 09:00)",
+    "status": "SUCCESS",
+    "changes": {
+      "간병인명": {
+        "before": null,
+        "after": "김지훈"
+      },
+      "근무일정": {
+        "before": null,
+        "after": "2026.10.08 09:00 ~ 2026.10.22 09:00"
+      },
+      "일당": {
+        "before": null,
+        "after": "140,000원"
+      },
+      "협력센터": {
+        "before": null,
+        "after": "영등포센터"
+      },
+      "정산방식": {
+        "before": null,
+        "after": "개인"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-39270929-3TCG",
+    "timestamp": "2026-10-15 13:41:10",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "간병배정",
+    "actionType": "CREATE",
+    "target": "C0672 (유아림) - 김지훈",
+    "summary": "신규 간병인 매칭 배정 [김지훈] (C0672 - 유아림)",
+    "status": "SUCCESS",
+    "changes": {
+      "담당간병인": {
+        "before": "미배정",
+        "after": "김지훈"
+      },
+      "근무시작일": {
+        "before": null,
+        "after": "2026.10.15 09:00"
+      },
+      "일당": {
+        "before": null,
+        "after": "140,000원"
+      },
+      "소속센터": {
+        "before": null,
+        "after": "영등포센터"
+      },
+      "고객상태": {
+        "before": "접수",
+        "after": "진행중"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-39223303-VL4H",
+    "timestamp": "2026-10-15 13:40:23",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "고객 [C0674] (유화자)",
+    "summary": "신규 고객 접수 등록 [C0674 - 유화자] (삼성화재)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "유화자"
+      },
+      "원수사": {
+        "before": null,
+        "after": "삼성화재"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-3029-7350"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      },
+      "병원/장소": {
+        "before": null,
+        "after": "바른세상병원"
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
+    "id": "LOG-39223200-J267",
+    "timestamp": "2026-10-15 13:40:23",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "고객 [C0674] (유화자)",
+    "summary": "신규 고객 접수 등록 [C0674 - 유화자] (삼성화재)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "유화자"
+      },
+      "원수사": {
+        "before": null,
+        "after": "삼성화재"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-3029-7350"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      },
+      "병원/소재지": {
+        "before": null,
+        "after": "바른세상병원"
+      },
+      "사고번호": {
+        "before": null,
+        "after": "26S113024"
+      },
+      "증권번호": {
+        "before": null,
+        "after": "00052624309510000"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-39093842-51FL",
+    "timestamp": "2026-10-15 13:38:13",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "고객 [C0672] (유아림)",
+    "summary": "신규 고객 접수 등록 [C0672 - 유아림] (현대해상)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "유아림"
+      },
+      "원수사": {
+        "before": null,
+        "after": "현대해상"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-2222-3333"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      },
+      "병원/장소": {
+        "before": null,
+        "after": "강동성심병원"
+      }
+    },
+    "details": null,
+    "userAgent": "LivonMate-Server/3.0"
+  },
+  {
+    "id": "LOG-39093715-D444",
+    "timestamp": "2026-10-15 13:38:13",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "고객 [C0672] (유아림)",
+    "summary": "신규 고객 접수 등록 [C0672 - 유아림] (현대해상)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "유아림"
+      },
+      "원수사": {
+        "before": null,
+        "after": "현대해상"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-2222-3333"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      },
+      "병원/소재지": {
+        "before": null,
+        "after": "강동성심병원"
+      },
+      "사고번호": {
+        "before": null,
+        "after": "-"
+      },
+      "증권번호": {
+        "before": null,
+        "after": "-"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-30791793-30Y6",
+    "timestamp": "2026-10-07 08:53:11",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "데이터동기화",
+    "actionType": "SYNC",
+    "target": "종합 간병(현대해상) 관리대장 엑셀 업로드",
+    "summary": "종합 간병(현대해상) 실데이터 엑셀 업로드 및 동기화 (신청 310건, 배정 305건, 청구 513건, 지급 545건, 간병인 251명, 센터 89개소, 손사 136명)",
+    "status": "SUCCESS",
+    "changes": {
+      "고객신청": {
+        "before": "-",
+        "after": "310건"
+      },
+      "간병배정": {
+        "before": "-",
+        "after": "305건"
+      },
+      "보험청구": {
+        "before": "-",
+        "after": "513건"
+      },
+      "간병인지급": {
+        "before": "-",
+        "after": "545건"
+      },
+      "간병인력풀": {
+        "before": "-",
+        "after": "251명 (실데이터)"
+      },
+      "협력센터": {
+        "before": "-",
+        "after": "89개소"
+      },
+      "손사디렉토리": {
+        "before": "-",
+        "after": "136명"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-67461187-1Q2R",
+    "timestamp": "2026-10-06 15:17:41",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "대표이사",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "데이터동기화",
+    "actionType": "SYNC",
+    "target": "종합 간병(현대해상) 관리대장 엑셀 업로드",
+    "summary": "종합 간병(현대해상) 실데이터 엑셀 업로드 및 동기화 (신청 308건, 배정 304건, 청구 513건, 지급 545건, 간병인 249명, 센터 87개소, 손사 134명)",
+    "status": "SUCCESS",
+    "changes": {
+      "고객신청": {
+        "before": "-",
+        "after": "308건"
+      },
+      "간병배정": {
+        "before": "-",
+        "after": "304건"
+      },
+      "보험청구": {
+        "before": "-",
+        "after": "513건"
+      },
+      "간병인지급": {
+        "before": "-",
+        "after": "545건"
+      },
+      "간병인력풀": {
+        "before": "-",
+        "after": "249명 (실데이터)"
+      },
+      "협력센터": {
+        "before": "-",
+        "after": "87개소"
+      },
+      "손사디렉토리": {
+        "before": "-",
+        "after": "134명"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-66889507-QFDX",
+    "timestamp": "2026-10-06 15:08:09",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "데이터동기화",
+    "actionType": "SYNC",
+    "target": "종합 간병(현대해상) 관리대장 엑셀 업로드",
+    "summary": "종합 간병(현대해상) 실데이터 엑셀 업로드 및 동기화 (신청 308건, 배정 304건, 청구 513건, 지급 545건, 간병인 250명, 센터 88개소, 손사 134명)",
+    "status": "SUCCESS",
+    "changes": {
+      "고객신청": {
+        "before": "-",
+        "after": "308건"
+      },
+      "간병배정": {
+        "before": "-",
+        "after": "304건"
+      },
+      "보험청구": {
+        "before": "-",
+        "after": "513건"
+      },
+      "간병인지급": {
+        "before": "-",
+        "after": "545건"
+      },
+      "간병인력풀": {
+        "before": "-",
+        "after": "250명 (실데이터)"
+      },
+      "협력센터": {
+        "before": "-",
+        "after": "88개소"
+      },
+      "손사디렉토리": {
+        "before": "-",
+        "after": "134명"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-54921232-XQ0A",
+    "timestamp": "2026-10-06 11:48:41",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "데이터동기화",
+    "actionType": "SYNC",
+    "target": "종합 간병(현대해상) 관리대장 엑셀 업로드",
+    "summary": "종합 간병(현대해상) 실데이터 엑셀 업로드 및 동기화 (신청 308건, 배정 303건, 청구 505건, 지급 544건, 간병인 249명, 센터 87개소, 손사 134명)",
+    "status": "SUCCESS",
+    "changes": {
+      "고객신청": {
+        "before": "-",
+        "after": "308건"
+      },
+      "간병배정": {
+        "before": "-",
+        "after": "303건"
+      },
+      "보험청구": {
+        "before": "-",
+        "after": "505건"
+      },
+      "간병인지급": {
+        "before": "-",
+        "after": "544건"
+      },
+      "간병인력풀": {
+        "before": "-",
+        "after": "249명 (실데이터)"
+      },
+      "협력센터": {
+        "before": "-",
+        "after": "87개소"
+      },
+      "손사디렉토리": {
+        "before": "-",
+        "after": "134명"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-14548010-VU37",
+    "timestamp": "2026-10-02 13:15:48",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객상세",
+    "actionType": "UPDATE",
+    "target": "고객 [D0008] (김지훈)",
+    "summary": "[김지훈 님] 상세 모달 전체 변경사항 서버 및 DB 최종 영구 저장 완료",
+    "status": "SUCCESS",
+    "changes": {
+      "customSettlementSets": "0개 세트",
+      "claims": "0건",
+      "payouts": "0건"
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-14472925-13YY",
+    "timestamp": "2026-10-02 13:14:32",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "간병배정",
+    "actionType": "CREATE",
+    "target": "D0008 (김지훈) - 김지훈",
+    "summary": "신규 간병인 매칭 배정 [김지훈] (D0008 - 김지훈)",
+    "status": "SUCCESS",
+    "changes": {
+      "담당간병인": {
+        "before": "미배정",
+        "after": "김지훈"
+      },
+      "근무시작일": {
+        "before": null,
+        "after": "2026.10.01 09:00"
+      },
+      "일당": {
+        "before": null,
+        "after": "140,000원"
+      },
+      "소속센터": {
+        "before": null,
+        "after": "영등포"
+      },
+      "고객상태": {
+        "before": "접수",
+        "after": "진행중"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-97999795-AHYA",
+    "timestamp": "2026-10-02 08:39:59",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "D0016 (박종일)",
+    "summary": "신규 고객 접수 등록 [D0016 - 박종일] (삼성화재)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "박종일"
+      },
+      "원수사": {
+        "before": null,
+        "after": "삼성화재"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-3688-3895"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-52854351-TG4X",
+    "timestamp": "2026-09-30 16:20:54",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "D0014 (윤애림)",
+    "summary": "신규 고객 접수 등록 [D0014 - 윤애림] (삼성화재)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "윤애림"
+      },
+      "원수사": {
+        "before": null,
+        "after": "삼성화재"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-2447-1165"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-50080475-GXKA",
+    "timestamp": "2026-09-30 15:34:40",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "D0012 (테스트5)",
+    "summary": "신규 고객 접수 등록 [D0012 - 테스트5] (현대해상)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "테스트5"
+      },
+      "원수사": {
+        "before": null,
+        "after": "현대해상"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-4322-3813"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-48932650-IX2I",
+    "timestamp": "2026-09-30 15:15:32",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "D0010 (테스트3)",
+    "summary": "신규 고객 접수 등록 [D0010 - 테스트3] (현대해상)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "테스트3"
+      },
+      "원수사": {
+        "before": null,
+        "after": "현대해상"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-4322-3813"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-45988071-JXIA",
+    "timestamp": "2026-09-30 14:26:28",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "D0008 (김지훈)",
+    "summary": "신규 고객 접수 등록 [D0008 - 김지훈] (현대해상)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "김지훈"
+      },
+      "원수사": {
+        "before": null,
+        "after": "현대해상"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-4322-3813"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-35094190-EY85",
+    "timestamp": "2026-09-30 11:24:54",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "D0006 (이경희)",
+    "summary": "신규 고객 접수 등록 [D0006 - 이경희] (삼성화재)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "이경희"
+      },
+      "원수사": {
+        "before": null,
+        "after": "삼성화재"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-5147-3407"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-32086400-MVLD",
+    "timestamp": "2026-09-30 10:34:46",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "총괄관리",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "인증/로그인",
+    "actionType": "LOGIN",
+    "target": "관리자 보안 인증 세션",
+    "summary": "[리본케어 (@superadmin)] 관리자 정상 로그인 인증 완료",
+    "status": "SUCCESS",
+    "changes": {
+      "로그인계정": {
+        "before": "-",
+        "after": "리본케어 (@superadmin)"
+      },
+      "부서/역할": {
+        "before": "-",
+        "after": "- / SUPER_ADMIN"
+      },
+      "인증상태": {
+        "before": "미인증",
+        "after": "보안 토큰 정상 발급"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-80225001-W6VW",
+    "timestamp": "2026-09-28 16:23:45",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "보험청구",
+    "actionType": "STATUS_CHANGE",
+    "target": "청구 Q0444 (김국선, 4차)",
+    "summary": "4차 보험금 (1,420,000원) 입금확인 처리 완료",
+    "status": "SUCCESS",
+    "changes": {
+      "입금상태": {
+        "before": "미수납 (대기)",
+        "after": "입금확인됨"
+      },
+      "실입금액": {
+        "before": "0원",
+        "after": "1,420,000원"
+      },
+      "미수잔액": {
+        "before": "0원",
+        "after": "0원"
+      },
+      "입금일시": {
+        "before": "-",
+        "after": "2026.09.28 16:23"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-80110319-8FEI",
+    "timestamp": "2026-09-28 16:21:50",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "보험청구",
+    "actionType": "STATUS_CHANGE",
+    "target": "청구 Q0431 (김철재, 6차)",
+    "summary": "6차 보험금 (1,820,000원) 입금확인 처리 완료",
+    "status": "SUCCESS",
+    "changes": {
+      "입금상태": {
+        "before": "미수납 (대기)",
+        "after": "입금확인됨"
+      },
+      "실입금액": {
+        "before": "0원",
+        "after": "1,820,000원"
+      },
+      "미수잔액": {
+        "before": "0원",
+        "after": "0원"
+      },
+      "입금일시": {
+        "before": "-",
+        "after": "2026.09.28 16:21"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-80093575-9GYW",
+    "timestamp": "2026-09-28 16:21:33",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "보험청구",
+    "actionType": "STATUS_CHANGE",
+    "target": "청구 Q0417 (김철재, 5차)",
+    "summary": "5차 보험금 (1,540,000원) 입금확인 처리 완료",
+    "status": "SUCCESS",
+    "changes": {
+      "입금상태": {
+        "before": "미수납 (대기)",
+        "after": "입금확인됨"
+      },
+      "실입금액": {
+        "before": "0원",
+        "after": "1,540,000원"
+      },
+      "미수잔액": {
+        "before": "0원",
+        "after": "0원"
+      },
+      "입금일시": {
+        "before": "-",
+        "after": "2026.09.28 16:21"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-79955896-HK6S",
+    "timestamp": "2026-09-28 16:19:15",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "보험청구",
+    "actionType": "STATUS_CHANGE",
+    "target": "청구 [Q0485] (환자: 민지애, 1차)",
+    "summary": "[민지애 님] 1차 보험금 입금액 100,000원 저장 및 입금확인 처리",
+    "status": "SUCCESS",
+    "changes": {
+      "입금상태": {
+        "before": "미확인",
+        "after": "부분입금"
+      },
+      "차수입금액": {
+        "before": "0원",
+        "after": "100,000원"
+      },
+      "누적입금합계": {
+        "before": "-",
+        "after": "100,000원"
+      },
+      "잔여미수금": {
+        "before": "-",
+        "after": "0원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-48177257-GRST",
+    "timestamp": "2026-09-23 16:22:57",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "STATUS_CHANGE",
+    "target": "고객 [C0300] (박은희)",
+    "summary": "[박은희 님] 현재상태 설정 변경 ('진행중' ➡️ '완료')",
+    "status": "SUCCESS",
+    "changes": {
+      "현재상태": {
+        "before": "진행중",
+        "after": "완료"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-48163560-13ZR",
+    "timestamp": "2026-09-23 16:22:43",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "STATUS_CHANGE",
+    "target": "고객 [C0300] (박은희)",
+    "summary": "[박은희 님] 현재상태 설정 변경 ('완료' ➡️ '진행중')",
+    "status": "SUCCESS",
+    "changes": {
+      "현재상태": {
+        "before": "완료",
+        "after": "진행중"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-48137934-X09Q",
+    "timestamp": "2026-09-23 16:22:17",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "STATUS_CHANGE",
+    "target": "고객 [C0301] (박현숙)",
+    "summary": "[박현숙 님] 현재상태 설정 변경 ('완료' ➡️ '진행중')",
+    "status": "SUCCESS",
+    "changes": {
+      "현재상태": {
+        "before": "완료",
+        "after": "진행중"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-44469077-RLRV",
+    "timestamp": "2026-09-23 15:21:09",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "데이터동기화",
+    "actionType": "SYNC",
+    "target": "종합 간병(현대해상) 관리대장 엑셀 업로드",
+    "summary": "종합 간병(현대해상) 실데이터 엑셀 업로드 및 동기화 (신청 284건, 배정 274건, 청구 489건, 지급 507건, 간병인 224명, 센터 85개소, 손사 128명)",
+    "status": "SUCCESS",
+    "changes": {
+      "고객신청": {
+        "before": "-",
+        "after": "284건"
+      },
+      "간병배정": {
+        "before": "-",
+        "after": "274건"
+      },
+      "보험청구": {
+        "before": "-",
+        "after": "489건"
+      },
+      "간병인지급": {
+        "before": "-",
+        "after": "507건"
+      },
+      "간병인력풀": {
+        "before": "-",
+        "after": "224명 (실데이터)"
+      },
+      "협력센터": {
+        "before": "-",
+        "after": "85개소"
+      },
+      "손사디렉토리": {
+        "before": "-",
+        "after": "128명"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-38300182-UL55",
+    "timestamp": "2026-09-23 13:38:20",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "C0658 (전은재)",
+    "summary": "신규 고객 접수 등록 [C0658 - 전은재] (삼성화재)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "전은재"
+      },
+      "원수사": {
+        "before": null,
+        "after": "삼성화재"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-5034-8711"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-37178589-HIRS",
+    "timestamp": "2026-09-23 13:19:38",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "DELETE",
+    "target": "고객 일괄삭제 (1명)",
+    "summary": "선택 고객 1명 일괄 삭제 처리 (C0156)",
+    "status": "SUCCESS",
+    "changes": {
+      "삭제건수": {
+        "before": "1명",
+        "after": "삭제완료"
+      },
+      "대상ID": {
+        "before": "C0156",
+        "after": "-"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-37171965-DMYU",
+    "timestamp": "2026-09-23 13:19:31",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "DELETE",
+    "target": "고객 일괄삭제 (1명)",
+    "summary": "선택 고객 1명 일괄 삭제 처리 (C0656)",
+    "status": "SUCCESS",
+    "changes": {
+      "삭제건수": {
+        "before": "1명",
+        "after": "삭제완료"
+      },
+      "대상ID": {
+        "before": "C0656",
+        "after": "-"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-29874940-AYPJ",
+    "timestamp": "2026-09-23 11:17:54",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "C0656 (김지훈)",
+    "summary": "신규 고객 접수 등록 [C0656 - 김지훈] (현대해상)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "김지훈"
+      },
+      "원수사": {
+        "before": null,
+        "after": "현대해상"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-3874-6238"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-29294886-TIA8",
+    "timestamp": "2026-09-23 11:08:14",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "C0654 (윤수현)",
+    "summary": "신규 고객 접수 등록 [C0654 - 윤수현] (삼성화재)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "윤수현"
+      },
+      "원수사": {
+        "before": null,
+        "after": "삼성화재"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-9324-3176"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-28655744-TWOD",
+    "timestamp": "2026-09-23 10:57:35",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "C0652 (류종열)",
+    "summary": "신규 고객 접수 등록 [C0652 - 류종열] (삼성화재)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "류종열"
+      },
+      "원수사": {
+        "before": null,
+        "after": "삼성화재"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-8332-3136"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-25959759-TEW1",
+    "timestamp": "2026-09-23 10:12:39",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "C0650 (임효섭)",
+    "summary": "신규 고객 접수 등록 [C0650 - 임효섭] (현대해상)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "임효섭"
+      },
+      "원수사": {
+        "before": null,
+        "after": "현대해상"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-4322-3813"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-25929276-7AKK",
+    "timestamp": "2026-09-23 10:12:09",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "최고관리자",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "C0648 (윤수현)",
+    "summary": "신규 고객 접수 등록 [C0648 - 윤수현] (삼성화재)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "윤수현"
+      },
+      "원수사": {
+        "before": null,
+        "after": "삼성화재"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-9324-3176"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-25238211-NNRJ",
+    "timestamp": "2026-09-23 10:00:38",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "대표이사",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "고객신청",
+    "actionType": "CREATE",
+    "target": "C0646 (김지훈)",
+    "summary": "신규 고객 접수 등록 [C0646 - 김지훈] (현대해상)",
+    "status": "SUCCESS",
+    "changes": {
+      "피보험자": {
+        "before": null,
+        "after": "김지훈"
+      },
+      "원수사": {
+        "before": null,
+        "after": "현대해상"
+      },
+      "연락처": {
+        "before": null,
+        "after": "010-4322-3813"
+      },
+      "접수상태": {
+        "before": null,
+        "after": "접수"
+      },
+      "간병유형": {
+        "before": null,
+        "after": "입원"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  },
+  {
+    "id": "LOG-23587006-ZVC1",
+    "timestamp": "2026-09-23 09:33:07",
+    "user": {
+      "username": "superadmin",
+      "name": "리본케어",
+      "dept": "대표이사",
+      "role": "SUPER_ADMIN"
+    },
+    "ip": "183.101.192.154",
+    "category": "간병비지급",
+    "actionType": "STATUS_CHANGE",
+    "target": "지급 [P0539] (이옥분, 8월 2차)",
+    "summary": "간병비 지급완료 취소 및 미지급 원복",
+    "status": "SUCCESS",
+    "changes": {
+      "지급상태": {
+        "before": "지급완료",
+        "after": "미지급"
+      },
+      "지급금액": {
+        "before": "280,000원",
+        "after": "0원"
+      },
+      "지급계좌": {
+        "before": "-",
+        "after": "-"
+      },
+      "지급일시": {
+        "before": "-",
+        "after": "-"
+      }
+    },
+    "details": null,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+  }
+];

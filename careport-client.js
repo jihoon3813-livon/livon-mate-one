@@ -39,6 +39,7 @@
     ],
 
     directToken: null,
+    directAuthData: null,
 
     /**
      * Direct login fallback for local/standalone browser execution
@@ -61,9 +62,51 @@
       const data = await res.json();
       if (data && data.accessToken) {
         this.directToken = data.accessToken;
+        this.directAuthData = {
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken || data.accessToken,
+          authCommonInfo: data.authCommonInfo || data.user || {},
+          user: data.user || {}
+        };
         return this.directToken;
       }
       throw new Error('CarePort 직접 로그인 실패: ' + (data?.message || '인증 불가'));
+    },
+
+    /**
+     * Ensure CarePort authentication token & session payload for authentic iframe rendering
+     */
+    async ensureAuthenticated() {
+      if (this.directAuthData && this.directAuthData.accessToken) {
+        return this.directAuthData;
+      }
+      try {
+        await this.directLogin();
+        if (this.directAuthData && this.directAuthData.accessToken) {
+          return this.directAuthData;
+        }
+      } catch (e) {
+        console.warn('[CarePortClient] directLogin fallback to /api/careport/sync?authOnly=1:', e.message);
+      }
+      try {
+        const res = await fetch(`${this.apiBase}/sync?authOnly=1`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.accessToken) {
+            this.directToken = json.accessToken;
+            this.directAuthData = {
+              accessToken: json.accessToken,
+              refreshToken: json.refreshToken || json.accessToken,
+              authCommonInfo: json.authCommonInfo || json.user || {},
+              user: json.user || {}
+            };
+            return this.directAuthData;
+          }
+        }
+      } catch (apiErr) {
+        console.warn('[CarePortClient] /api/careport/sync?authOnly=1 error:', apiErr.message);
+      }
+      throw new Error('CarePort 전산 인증 토큰을 획득할 수 없습니다.');
     },
 
     /**

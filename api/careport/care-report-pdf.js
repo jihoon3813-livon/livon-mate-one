@@ -140,15 +140,23 @@ module.exports = async (req, res) => {
       return res.end(JSON.stringify(jsonPayload));
     }
 
-    // Check if server can generate native PDF via headless browser
-    if (hasServerBrowser() && format !== 'html') {
+    // Generate native PDF via Chromium (Local Chrome/Edge or Vercel Serverless @sparticuz/chromium)
+    if (format !== 'html') {
       try {
-        const generatePdf = require('./generate-pdf');
-        req.method = 'POST';
-        req.body = { html, filename, inline: isInline };
-        return generatePdf(req, res);
+        const { renderHtmlToPdfBuffer } = require('./generate-pdf');
+        const pdfBuffer = await renderHtmlToPdfBuffer(html);
+        if (pdfBuffer && pdfBuffer.length > 100) {
+          const disposition = isInline ? 'inline' : 'attachment';
+          const encodedFilename = encodeURIComponent(filename).replace(/['()]/g, escape).replace(/\*/g, '%2A');
+          res.writeHead(200, {
+            'Content-Type': 'application/pdf',
+            'Content-Length': pdfBuffer.length,
+            'Content-Disposition': `${disposition}; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`
+          });
+          return res.end(pdfBuffer);
+        }
       } catch (pdfErr) {
-        console.warn('[care-report-pdf] generate-pdf failed, falling back to HTML response:', pdfErr.message);
+        console.warn('[care-report-pdf] Native PDF generation failed, falling back to HTML response:', pdfErr.message);
       }
     }
 
