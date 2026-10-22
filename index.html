@@ -8348,7 +8348,7 @@
               <div class="relative flex items-center">
                 <input type="text" id="newAppApplyDate" required placeholder="YYYY.MM.DD HH:mm" class="w-full p-2.5 pr-10 border rounded-xl font-mono font-bold bg-white text-slate-800 text-xs shadow-xs focus:ring-2 focus:ring-primary-500">
                 <input type="date" id="newAppApplyDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('newAppApplyDate', this.value)">
-                <button type="button" onclick="triggerDatePicker('newAppApplyDate_picker')" class="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-none" title="달력 선택">
+                <button type="button" onclick="triggerDatePicker('newAppApplyDate_picker')" class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer" title="달력 선택">
                   <i data-lucide="calendar" class="w-4 h-4"></i>
                 </button>
               </div>
@@ -8502,13 +8502,43 @@
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label onclick="triggerDatePicker('newAppDesiredDate_picker')" class="block font-bold text-slate-700 mb-1 cursor-pointer select-none" title="클릭 시 달력 열기">간병시작 희망일 *</label>
-              <div class="relative flex items-center">
-                <input type="text" id="newAppDesiredDate" required placeholder="YYYY-MM-DD" class="w-full p-2.5 pr-10 border rounded-xl font-semibold bg-white cursor-pointer" onclick="triggerDatePicker('newAppDesiredDate_picker')" oninput="calculateAndSetEndDate()">
-                <input type="date" id="newAppDesiredDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('newAppDesiredDate', this.value); calculateAndSetEndDate();">
-                <button type="button" onclick="triggerDatePicker('newAppDesiredDate_picker')" class="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-none" title="달력 선택">
-                  <i data-lucide="calendar" class="w-4 h-4"></i>
-                </button>
+              <div class="flex items-center justify-between mb-1">
+                <label onclick="triggerDatePicker('newAppDesiredDate_picker')" class="block font-bold text-slate-700 cursor-pointer select-none whitespace-nowrap" title="클릭 시 달력 열기">간병시작 희망일시 *</label>
+                <span class="text-[10px] text-sky-600 font-bold bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">시간 선택 ⚡</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1 min-w-0 flex items-center">
+                  <input type="text" id="newAppDesiredDate" required placeholder="YYYY-MM-DD" class="w-full h-[40px] pl-3 pr-9 border rounded-xl font-bold bg-white cursor-pointer text-xs text-slate-800 focus:ring-2 focus:ring-primary-500 shadow-2xs" onclick="triggerDatePicker('newAppDesiredDate_picker')" oninput="calculateAndSetEndDate()">
+                  <input type="date" id="newAppDesiredDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('newAppDesiredDate', this.value); calculateAndSetEndDate();">
+                  <button type="button" onclick="triggerDatePicker('newAppDesiredDate_picker')" class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer" title="달력 선택">
+                    <i data-lucide="calendar" class="w-4 h-4"></i>
+                  </button>
+                </div>
+                <div class="w-28 sm:w-32 shrink-0">
+                  <select id="newAppDesiredTime" onchange="onDesiredTimeSelectChange('newApp')" class="w-full h-[40px] px-2.5 border rounded-xl bg-white font-bold text-xs text-sky-800 shadow-2xs focus:ring-2 focus:ring-primary-500 cursor-pointer" title="간병시작 희망시간">
+                    <optgroup label="오전 (AM)">
+                      <option value="00:00">00:00 (자정)</option>
+                      <option value="06:00">06:00</option>
+                      <option value="07:00">07:00</option>
+                      <option value="08:00">08:00</option>
+                      <option value="09:00" selected>09:00 (오전)</option>
+                      <option value="10:00">10:00</option>
+                      <option value="11:00">11:00</option>
+                    </optgroup>
+                    <optgroup label="오후 (PM)">
+                      <option value="12:00">12:00 (정오)</option>
+                      <option value="13:00">13:00 (13시)</option>
+                      <option value="14:00">14:00 (14시)</option>
+                      <option value="15:00">15:00 (15시)</option>
+                      <option value="16:00">16:00 (16시)</option>
+                      <option value="17:00">17:00 (17시)</option>
+                      <option value="18:00">18:00 (18시)</option>
+                      <option value="19:00">19:00 (19시)</option>
+                      <option value="20:00">20:00 (20시)</option>
+                      <option value="21:00">21:00 (21시)</option>
+                    </optgroup>
+                  </select>
+                </div>
               </div>
             </div>
             <div>
@@ -8803,6 +8833,51 @@
             <label class="block font-bold text-slate-700 mb-1">일급 (원, 자동 콤마) *</label>
             <input type="text" id="newAssignDailyWage" required placeholder="140,000" inputmode="numeric" class="w-full p-2.5 border rounded-xl font-bold text-primary-700">
           </div>
+        </div>
+
+                <!-- 간병인 배정일시 (섭외완료 일시) -->
+        <div class="p-3.5 bg-indigo-50/60 rounded-2xl border border-indigo-200/80 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label for="newAssignAssignedDate_date" onclick="triggerDatePicker('newAssignAssignedDate_date')" class="block font-bold text-indigo-950 flex items-center gap-1 cursor-pointer select-none" title="클릭 시 달력 열기">
+              <i data-lucide="user-check" class="w-3.5 h-3.5 text-indigo-600"></i> 간병인 배정일시 (섭외완료 일시) *
+            </label>
+            <span class="text-[10px] text-indigo-600 font-semibold bg-indigo-100/70 px-2 py-0.5 rounded-full">
+              ※ 간병 시작일시가 아닌, 간병인을 섭외완료한 일시
+            </span>
+          </div>
+          <div class="flex items-center gap-1.5 min-w-0">
+            <input type="date" id="newAssignAssignedDate_date" onclick="this.showPicker && this.showPicker()" onchange="syncCombinedDateTime('newAssignAssignedDate')" class="flex-1 min-w-0 p-2.5 border rounded-xl bg-white font-medium text-xs cursor-pointer shadow-2xs" title="클릭 시 달력 열기">
+            <select id="newAssignAssignedDate_time" onchange="syncCombinedDateTime('newAssignAssignedDate')" class="w-32 flex-shrink-0 p-2.5 border rounded-xl bg-white font-bold text-xs text-indigo-900 shadow-2xs">
+              <optgroup label="오전 (AM)">
+                <option value="00:00">오전 12:00 (자정)</option>
+                <option value="01:00">오전 01:00</option>
+                <option value="02:00">오전 02:00</option>
+                <option value="03:00">오전 03:00</option>
+                <option value="04:00">오전 04:00</option>
+                <option value="05:00">오전 05:00</option>
+                <option value="06:00">오전 06:00</option>
+                <option value="07:00">오전 07:00</option>
+                <option value="08:00">오전 08:00</option>
+                <option value="09:00">오전 09:00</option>
+                <option value="10:00">오전 10:00</option>
+                <option value="11:00">오전 11:00</option>
+              </optgroup>
+              <optgroup label="오후 (PM)">
+                <option value="12:00">오후 12:00 (정오)</option>
+                <option value="13:00">오후 01:00 (13시)</option>
+                <option value="14:00" selected>오후 02:00 (14시)</option>
+                <option value="15:00">오후 03:00 (15시)</option>
+                <option value="16:00">오후 04:00 (16시)</option>
+                <option value="17:00">오후 05:00 (17시)</option>
+                <option value="18:00">오후 06:00 (18시)</option>
+                <option value="19:00">오후 07:00 (19시)</option>
+                <option value="20:00">오후 08:00 (20시)</option>
+                <option value="21:00">오후 09:00 (21시)</option>
+                <option value="22:00">오후 10:00 (22시)</option>
+                <option value="23:00">오후 11:00 (23시)</option>
+              </select>
+          </div>
+          <input type="hidden" id="newAssignAssignedDate" value="">
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200">
@@ -10484,7 +10559,7 @@
               <div class="relative flex items-center">
                 <input type="text" id="custEditApplyDate" required placeholder="YYYY.MM.DD HH:mm" class="w-full p-2.5 pr-10 border rounded-xl font-mono font-bold bg-white text-slate-800 text-xs shadow-xs focus:ring-2 focus:ring-primary-500">
                 <input type="date" id="custEditApplyDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('custEditApplyDate', this.value)">
-                <button type="button" onclick="triggerDatePicker('custEditApplyDate_picker')" class="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-none" title="달력 선택">
+                <button type="button" onclick="triggerDatePicker('custEditApplyDate_picker')" class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer" title="달력 선택">
                   <i data-lucide="calendar" class="w-4 h-4"></i>
                 </button>
               </div>
@@ -10618,13 +10693,43 @@
           <!-- 간병시작 희망일, 예상 사용기간, 간병종료 예정일 -->
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label onclick="triggerDatePicker('custEditDesiredDate_picker')" class="block font-bold text-slate-700 mb-1 cursor-pointer select-none" title="클릭 시 달력 열기">간병시작 희망일 *</label>
-              <div class="relative flex items-center">
-                <input type="text" id="custEditDesiredDate" required placeholder="YYYY-MM-DD" class="w-full p-2.5 pr-10 border rounded-xl font-semibold bg-white cursor-pointer" onclick="triggerDatePicker('custEditDesiredDate_picker')" oninput="calculateAndSetEndDateCustEdit()">
-                <input type="date" id="custEditDesiredDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('custEditDesiredDate', this.value); calculateAndSetEndDateCustEdit();">
-                <button type="button" onclick="triggerDatePicker('custEditDesiredDate_picker')" class="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-none" title="달력 선택">
-                  <i data-lucide="calendar" class="w-4 h-4"></i>
-                </button>
+              <div class="flex items-center justify-between mb-1">
+                <label onclick="triggerDatePicker('custEditDesiredDate_picker')" class="block font-bold text-slate-700 cursor-pointer select-none whitespace-nowrap" title="클릭 시 달력 열기">간병시작 희망일시 *</label>
+                <span class="text-[10px] text-sky-600 font-bold bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">시간 선택 ⚡</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1 min-w-0 flex items-center">
+                  <input type="text" id="custEditDesiredDate" required placeholder="YYYY-MM-DD" class="w-full h-[40px] pl-3 pr-9 border rounded-xl font-bold bg-white cursor-pointer text-xs text-slate-800 focus:ring-2 focus:ring-primary-500 shadow-2xs" onclick="triggerDatePicker('custEditDesiredDate_picker')" oninput="calculateAndSetEndDateCustEdit()">
+                  <input type="date" id="custEditDesiredDate_picker" tabindex="-1" class="sr-only" onchange="syncDatePickerValue('custEditDesiredDate', this.value); calculateAndSetEndDateCustEdit();">
+                  <button type="button" onclick="triggerDatePicker('custEditDesiredDate_picker')" class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer" title="달력 선택">
+                    <i data-lucide="calendar" class="w-4 h-4"></i>
+                  </button>
+                </div>
+                <div class="w-28 sm:w-32 shrink-0">
+                  <select id="custEditDesiredTime" onchange="onDesiredTimeSelectChange('custEdit')" class="w-full h-[40px] px-2.5 border rounded-xl bg-white font-bold text-xs text-sky-800 shadow-2xs focus:ring-2 focus:ring-primary-500 cursor-pointer" title="간병시작 희망시간">
+                    <optgroup label="오전 (AM)">
+                      <option value="00:00">00:00 (자정)</option>
+                      <option value="06:00">06:00</option>
+                      <option value="07:00">07:00</option>
+                      <option value="08:00">08:00</option>
+                      <option value="09:00" selected>09:00 (오전)</option>
+                      <option value="10:00">10:00</option>
+                      <option value="11:00">11:00</option>
+                    </optgroup>
+                    <optgroup label="오후 (PM)">
+                      <option value="12:00">12:00 (정오)</option>
+                      <option value="13:00">13:00 (13시)</option>
+                      <option value="14:00">14:00 (14시)</option>
+                      <option value="15:00">15:00 (15시)</option>
+                      <option value="16:00">16:00 (16시)</option>
+                      <option value="17:00">17:00 (17시)</option>
+                      <option value="18:00">18:00 (18시)</option>
+                      <option value="19:00">19:00 (19시)</option>
+                      <option value="20:00">20:00 (20시)</option>
+                      <option value="21:00">21:00 (21시)</option>
+                    </optgroup>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -11050,6 +11155,51 @@
               <input type="tel" id="schedEditCenterPhone" placeholder="02-2633-1120" oninput="autoHyphenPhone(this)" class="w-full p-2.5 border rounded-xl font-mono text-slate-900 bg-white">
             </div>
           </div>
+        </div>
+
+                <!-- 간병인 배정일시 (섭외완료 일시) -->
+        <div class="p-3.5 bg-indigo-50/60 rounded-2xl border border-indigo-200/80 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label for="schedEditAssignedDate_date" onclick="triggerDatePicker('schedEditAssignedDate_date')" class="block font-bold text-indigo-950 flex items-center gap-1 cursor-pointer select-none" title="클릭 시 달력 열기">
+              <i data-lucide="user-check" class="w-3.5 h-3.5 text-indigo-600"></i> 간병인 배정일시 (섭외완료 일시) *
+            </label>
+            <span class="text-[10px] text-indigo-600 font-semibold bg-indigo-100/70 px-2 py-0.5 rounded-full">
+              ※ 간병 시작일시가 아닌, 간병인을 섭외완료한 일시
+            </span>
+          </div>
+          <div class="flex items-center gap-1.5 min-w-0">
+            <input type="date" id="schedEditAssignedDate_date" onclick="this.showPicker && this.showPicker()" onchange="syncCombinedDateTime('schedEditAssignedDate')" class="flex-1 min-w-0 p-2.5 border rounded-xl bg-white font-medium text-xs cursor-pointer shadow-2xs" title="클릭 시 달력 열기">
+            <select id="schedEditAssignedDate_time" onchange="syncCombinedDateTime('schedEditAssignedDate')" class="w-32 flex-shrink-0 p-2.5 border rounded-xl bg-white font-bold text-xs text-indigo-900 shadow-2xs">
+              <optgroup label="오전 (AM)">
+                <option value="00:00">오전 12:00 (자정)</option>
+                <option value="01:00">오전 01:00</option>
+                <option value="02:00">오전 02:00</option>
+                <option value="03:00">오전 03:00</option>
+                <option value="04:00">오전 04:00</option>
+                <option value="05:00">오전 05:00</option>
+                <option value="06:00">오전 06:00</option>
+                <option value="07:00">오전 07:00</option>
+                <option value="08:00">오전 08:00</option>
+                <option value="09:00">오전 09:00</option>
+                <option value="10:00">오전 10:00</option>
+                <option value="11:00">오전 11:00</option>
+              </optgroup>
+              <optgroup label="오후 (PM)">
+                <option value="12:00">오후 12:00 (정오)</option>
+                <option value="13:00">오후 01:00 (13시)</option>
+                <option value="14:00" selected>오후 02:00 (14시)</option>
+                <option value="15:00">오후 03:00 (15시)</option>
+                <option value="16:00">오후 04:00 (16시)</option>
+                <option value="17:00">오후 05:00 (17시)</option>
+                <option value="18:00">오후 06:00 (18시)</option>
+                <option value="19:00">오후 07:00 (19시)</option>
+                <option value="20:00">오후 08:00 (20시)</option>
+                <option value="21:00">오후 09:00 (21시)</option>
+                <option value="22:00">오후 10:00 (22시)</option>
+                <option value="23:00">오후 11:00 (23시)</option>
+              </select>
+          </div>
+          <input type="hidden" id="schedEditAssignedDate" value="">
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200">

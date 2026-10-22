@@ -242,6 +242,43 @@ function formatWithTime(dtStr, defaultTime = '') {
   return `${s.replace(/-/g, '.')} ${defaultTime}`;
 }
 
+
+/**
+ * 고객의 신청일시(날짜+시간)를 안전하게 정규화하고 기존 고객의 시간정보를 복원하는 헬퍼
+ */
+function resolveAppApplyDateTime(app) {
+  if (!app) return '';
+  let str = String(app.applyDateTime || app.applyDate || '').trim();
+  
+  // 이미 시간(HH:mm)이 포함되어 있는 경우
+  const timeMatch = str.match(/\b(\d{1,2}:\d{2})\b/);
+  if (timeMatch) {
+    const rawDate = str.split(/[\sT]+/)[0].replace(/-/g, '.');
+    return `${rawDate} ${timeMatch[1]}`;
+  }
+
+  // 날짜만 있는 경우, createdAt에서 시간 복원 시도
+  let timePart = '';
+  if (app.createdAt) {
+    try {
+      const cd = new Date(app.createdAt);
+      if (!isNaN(cd.getTime())) {
+        const hh = String(cd.getHours()).padStart(2, '0');
+        const mm = String(cd.getMinutes()).padStart(2, '0');
+        timePart = `${hh}:${mm}`;
+      }
+    } catch (e) {}
+  }
+  
+  if (!timePart || timePart === '00:00') {
+    timePart = '09:00'; // 기본 업무 개시 시각
+  }
+
+  const datePart = str ? str.slice(0, 10).replace(/-/g, '.') : new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+  return `${datePart} ${timePart}`;
+}
+window.resolveAppApplyDateTime = resolveAppApplyDateTime;
+
 function parseCareDateTime(dateTimeStr) {
   if (!dateTimeStr) return null;
   if (dateTimeStr instanceof Date) return isNaN(dateTimeStr.getTime()) ? null : dateTimeStr;
@@ -260,6 +297,84 @@ function parseCareDateTime(dateTimeStr) {
   const ss = match[6] !== undefined ? parseInt(match[6], 10) : 0;
   return new Date(y, m, d, hh, mm, ss);
 }
+/**
+ * 시간 차이(ms)를 사람이 읽기 쉬운 포맷(일/시간/분)으로 변환
+ */
+function formatDurationDifference(diffMs) {
+  if (diffMs === null || diffMs === undefined || isNaN(diffMs)) return '-';
+  if (diffMs < 0) {
+    if (Math.abs(diffMs) <= 3600000) return '즉시 (당일)';
+    return '-';
+  }
+  const totalMinutes = Math.floor(diffMs / 60000);
+  if (totalMinutes < 1) return '즉시 (1분 이내)';
+  if (totalMinutes < 60) return totalMinutes + '분';
+  
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  
+  if (hours < 24) {
+    return mins > 0 ? (hours + '시간 ' + mins + '분') : (hours + '시간');
+  }
+  
+  const days = Math.floor(hours / 24);
+  const remainHours = hours % 24;
+  return remainHours > 0 ? (days + '일 ' + remainHours + '시간') : (days + '일');
+}
+
+/**
+ * 간병인 배정 소요시간 계산:
+ * 간병신청일시(applyDateTime/applyDate) 기준 간병인 배정(섭외완료) 일시(as.assignedDate/assignedDateTime)까지의 소요시간
+ */
+function calcCareAssignDuration(app, as) {
+  if (!app || !as) return '-';
+  let applyStr = (typeof resolveAppApplyDateTime === 'function') 
+    ? resolveAppApplyDateTime(app) 
+    : (app.applyDateTime || app.applyDate || app.createdAt);
+  
+  // 날짜만 있는 경우 09:00 기본 시간 보완
+  if (applyStr && !applyStr.includes(':')) {
+    applyStr = applyStr.trim().replace(/-/g, '.') + ' 09:00';
+  }
+  
+  const assignStr = as.assignedDateTime || as.assignedDate || as.createdAt;
+  if (!applyStr || !assignStr) return '-';
+  
+  const dStart = parseCareDateTime(applyStr);
+  const dEnd = parseCareDateTime(assignStr);
+  if (!dStart || !dEnd) return '-';
+  
+  const diffMs = dEnd.getTime() - dStart.getTime();
+  return formatDurationDifference(diffMs);
+}
+window.calcCareAssignDuration = calcCareAssignDuration;
+
+/**
+ * 간병인 배정 도달시간 계산:
+ * 간병신청일시(applyDateTime/applyDate) 기준 실제 간병 시작일시(as.startDate/app.careStartDate)까지의 도달시간
+ */
+function calcCareLeadTime(app, as) {
+  if (!app || !as) return '-';
+  let applyStr = (typeof resolveAppApplyDateTime === 'function') 
+    ? resolveAppApplyDateTime(app) 
+    : (app.applyDateTime || app.applyDate || app.createdAt);
+  
+  if (applyStr && !applyStr.includes(':')) {
+    applyStr = applyStr.trim().replace(/-/g, '.') + ' 09:00';
+  }
+  
+  const careStartStr = as.startDate || app.careStartDate || app.desiredDate;
+  if (!applyStr || !careStartStr) return '-';
+  
+  const dStart = parseCareDateTime(applyStr);
+  const dEnd = parseCareDateTime(careStartStr);
+  if (!dStart || !dEnd) return '-';
+  
+  const diffMs = dEnd.getTime() - dStart.getTime();
+  return formatDurationDifference(diffMs);
+}
+window.calcCareLeadTime = calcCareLeadTime;
+
 
 /**
  * 24시간 기준 간병일수 계산 엔진
@@ -7047,7 +7162,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                   <span class="px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-950 border border-emerald-300 font-mono font-bold text-[11px] flex items-center gap-1.5 shadow-2xs shrink-0" title="신청일시 (간병신청대장 S열)">
                     <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-600"></i>
                     <span class="text-emerald-700 font-medium">신청일:</span>
-                    <span class="font-black text-emerald-900">${app.applyDate || '-'}</span>
+                    <span class="font-black text-emerald-900">${resolveAppApplyDateTime(app)}</span>
                   </span>
                 </div>
 
@@ -7146,7 +7261,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                   </div>
                   <div class="flex justify-between items-center">
                     <span class="text-slate-400">사고유형 / 신청일시:</span>
-                    <span class="font-semibold text-slate-800">${app.accidentType || '질병'} · <span class="font-mono font-bold">${app.applyDate || '-'}</span></span>
+                    <span class="font-semibold text-slate-800">${app.accidentType || '질병'} · <span class="font-mono font-bold">${resolveAppApplyDateTime(app)}</span></span>
                   </div>
                   <div class="flex justify-between items-center">
                     <span class="text-slate-400">진단명 / 증상:</span>
@@ -7339,6 +7454,55 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                   </div>
                 </div>
 
+
+                <!-- NEW: 간병인 배정 현황 및 리드타임 분석 (배정일시, 배정 소요시간, 배정 도달시간) -->
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
+                  <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
+                    <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                      <i data-lucide="timer" class="w-3.5 h-3.5 text-indigo-600"></i>
+                      <span>간병인 배정 현황 및 소요시간</span>
+                    </span>
+                    <span class="text-[10px] text-slate-500 font-medium">
+                      신청: <b class="font-mono text-slate-700">${formatWithTime((typeof resolveAppApplyDateTime === 'function' ? resolveAppApplyDateTime(app) : (app.applyDateTime || app.applyDate)), '09:00')}</b>
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-3 gap-2 text-center font-mono">
+                    <div class="p-2 rounded-xl bg-slate-50 border border-slate-100 flex flex-col justify-between">
+                      <div class="text-[9.5px] text-slate-500 mb-0.5 flex items-center justify-center gap-1 font-sans">
+                        <i data-lucide="user-check" class="w-3 h-3 text-sky-600"></i>
+                        <span>간병인 배정일시</span>
+                      </div>
+                      <b class="text-slate-900 text-[10.5px] block truncate" title="${formatWithTime(as.assignedDateTime || as.assignedDate, '09:00')}">
+                        ${(as.assignedDateTime || as.assignedDate) ? formatWithTime(as.assignedDateTime || as.assignedDate, '09:00') : '<span class="text-slate-400 font-sans font-normal text-[10px]">미입력 (수정클릭)</span>'}
+                      </b>
+                      <span class="text-[8.5px] text-slate-400 font-sans mt-0.5">간병인 섭외완료</span>
+                    </div>
+
+                    <div class="p-2 rounded-xl bg-indigo-50/60 border border-indigo-100/90 flex flex-col justify-between">
+                      <div class="text-[9.5px] text-indigo-600 mb-0.5 flex items-center justify-center gap-1 font-sans">
+                        <i data-lucide="clock" class="w-3 h-3 text-indigo-600"></i>
+                        <span>배정 소요시간</span>
+                      </div>
+                      <b class="text-indigo-950 font-black text-[11px] block">
+                        ${calcCareAssignDuration(app, as)}
+                      </b>
+                      <span class="text-[8.5px] text-indigo-400 font-sans mt-0.5">신청 ➔ 섭외확정</span>
+                    </div>
+
+                    <div class="p-2 rounded-xl bg-sky-50/60 border border-sky-100/90 flex flex-col justify-between">
+                      <div class="text-[9.5px] text-sky-700 mb-0.5 flex items-center justify-center gap-1 font-sans">
+                        <i data-lucide="zap" class="w-3 h-3 text-sky-600"></i>
+                        <span>배정 도달시간</span>
+                      </div>
+                      <b class="text-sky-950 font-black text-[11px] block">
+                        ${calcCareLeadTime(app, as)}
+                      </b>
+                      <span class="text-[8.5px] text-sky-500 font-sans mt-0.5">신청 ➔ 간병시작</span>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- 2. 간병일시 관리 및 프로그레스 바 (첨부 2 하단 카드) -->
                 <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
                   <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
@@ -7352,11 +7516,11 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
                   <div class="grid grid-cols-2 gap-2 text-center text-[11px] font-mono">
                     <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
                       <div class="text-[10px] text-slate-400 mb-0.5">간병 시작일시</div>
-                      <b class="text-slate-900">${formatWithTime(as.startDate, '')}</b>
+                      <b class="text-slate-900">${formatWithTime(as.startDate, '09:00')}</b>
                     </div>
                     <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
                       <div class="text-[10px] text-slate-400 mb-0.5">간병 종료일시</div>
-                      <b class="text-slate-900">${as.endDate ? formatWithTime(as.endDate, '') : '<span class="text-emerald-600 font-bold">진행중</span>'}</b>
+                      <b class="text-slate-900">${as.endDate ? formatWithTime(as.endDate, '09:00') : '<span class="text-emerald-600 font-bold">진행중</span>'}</b>
                     </div>
                   </div>
 
@@ -8765,7 +8929,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                   <span class="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-950 border border-emerald-300 font-mono font-bold text-[11px] flex items-center gap-1 shadow-2xs shrink-0" title="신청일시 (간병신청대장 S열)">
                     <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-600"></i>
                     <span class="text-emerald-700 font-medium">신청일:</span>
-                    <span class="font-black text-emerald-900">${app.applyDate || '-'}</span>
+                    <span class="font-black text-emerald-900">${resolveAppApplyDateTime(app)}</span>
                   </span>
                   <span class="font-bold shrink-0 ${(app.insuranceCompany || '').includes('삼성') ? 'text-sky-700' : 'text-emerald-700'}">${app.insuranceCompany || '현대해상'}</span>
                 </div>
@@ -8877,7 +9041,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 </div>
                 <div class="flex justify-between items-center pt-1 border-t border-slate-100">
                   <span class="text-slate-500">사고유형 / 신청일시:</span>
-                  <span class="font-semibold text-slate-800">${app.accidentType || '질병'} · <span class="font-mono font-bold">${app.applyDate || '-'}</span></span>
+                  <span class="font-semibold text-slate-800">${app.accidentType || '질병'} · <span class="font-mono font-bold">${resolveAppApplyDateTime(app)}</span></span>
                 </div>
                 ${(app.insuranceCompany || '').includes('현대해상') ? `
                   <div class="flex justify-between items-center pt-1 border-t border-slate-100">
@@ -9626,6 +9790,55 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 </div>
               </div>
 
+
+                <!-- NEW: 간병인 배정 현황 및 리드타임 분석 (배정일시, 배정 소요시간, 배정 도달시간) -->
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
+                  <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
+                    <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                      <i data-lucide="timer" class="w-3.5 h-3.5 text-indigo-600"></i>
+                      <span>간병인 배정 현황 및 소요시간</span>
+                    </span>
+                    <span class="text-[10px] text-slate-500 font-medium">
+                      신청: <b class="font-mono text-slate-700">${formatWithTime((typeof resolveAppApplyDateTime === 'function' ? resolveAppApplyDateTime(app) : (app.applyDateTime || app.applyDate)), '09:00')}</b>
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-3 gap-2 text-center font-mono">
+                    <div class="p-2 rounded-xl bg-slate-50 border border-slate-100 flex flex-col justify-between">
+                      <div class="text-[9.5px] text-slate-500 mb-0.5 flex items-center justify-center gap-1 font-sans">
+                        <i data-lucide="user-check" class="w-3 h-3 text-sky-600"></i>
+                        <span>간병인 배정일시</span>
+                      </div>
+                      <b class="text-slate-900 text-[10.5px] block truncate" title="${formatWithTime(as.assignedDateTime || as.assignedDate, '09:00')}">
+                        ${(as.assignedDateTime || as.assignedDate) ? formatWithTime(as.assignedDateTime || as.assignedDate, '09:00') : '<span class="text-slate-400 font-sans font-normal text-[10px]">미입력 (수정클릭)</span>'}
+                      </b>
+                      <span class="text-[8.5px] text-slate-400 font-sans mt-0.5">간병인 섭외완료</span>
+                    </div>
+
+                    <div class="p-2 rounded-xl bg-indigo-50/60 border border-indigo-100/90 flex flex-col justify-between">
+                      <div class="text-[9.5px] text-indigo-600 mb-0.5 flex items-center justify-center gap-1 font-sans">
+                        <i data-lucide="clock" class="w-3 h-3 text-indigo-600"></i>
+                        <span>배정 소요시간</span>
+                      </div>
+                      <b class="text-indigo-950 font-black text-[11px] block">
+                        ${calcCareAssignDuration(app, as)}
+                      </b>
+                      <span class="text-[8.5px] text-indigo-400 font-sans mt-0.5">신청 ➔ 섭외확정</span>
+                    </div>
+
+                    <div class="p-2 rounded-xl bg-sky-50/60 border border-sky-100/90 flex flex-col justify-between">
+                      <div class="text-[9.5px] text-sky-700 mb-0.5 flex items-center justify-center gap-1 font-sans">
+                        <i data-lucide="zap" class="w-3 h-3 text-sky-600"></i>
+                        <span>배정 도달시간</span>
+                      </div>
+                      <b class="text-sky-950 font-black text-[11px] block">
+                        ${calcCareLeadTime(app, as)}
+                      </b>
+                      <span class="text-[8.5px] text-sky-500 font-sans mt-0.5">신청 ➔ 간병시작</span>
+                    </div>
+                  </div>
+                </div>
+
               <!-- 2. 간병일시 관리 및 프로그레스 바 -->
               <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
                 <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-100">
@@ -9639,11 +9852,11 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
                 <div class="grid grid-cols-2 gap-2 text-center text-[11px] font-mono">
                   <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
                     <div class="text-[10px] text-slate-400 mb-0.5">간병 시작일시</div>
-                    <b class="text-slate-900">${formatWithTime(as.startDate, '')}</b>
+                    <b class="text-slate-900">${formatWithTime(as.startDate, '09:00')}</b>
                   </div>
                   <div class="p-2 rounded-xl bg-slate-50 border border-slate-100">
                     <div class="text-[10px] text-slate-400 mb-0.5">간병 종료일시</div>
-                    <b class="text-slate-900">${as.endDate ? formatWithTime(as.endDate, '') : '<span class="text-emerald-600 font-bold">진행중</span>'}</b>
+                    <b class="text-slate-900">${as.endDate ? formatWithTime(as.endDate, '09:00') : '<span class="text-emerald-600 font-bold">진행중</span>'}</b>
                   </div>
                 </div>
 
@@ -13665,6 +13878,15 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null) {
     gActiveAdjusterTabId = null;
   }
   gActiveHubModalAppId = applyId;
+  const curApp = (gApps || []).find(a => a && String(a.id) === String(applyId));
+  if (curApp) {
+    const fullApply = resolveAppApplyDateTime(curApp);
+    if (fullApply && (!curApp.applyDate || !curApp.applyDate.includes(':'))) {
+      curApp.applyDate = fullApply;
+      curApp.applyDateTime = fullApply;
+    }
+  }
+
 
   // Open modal container & ensure high z-index and visible flex layout
   openModal('hubCustomerDetailModal');
@@ -13791,7 +14013,7 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null) {
 
   if (titleEl) {
     const preRegBadge = app.isPreRegistered ? ' [사전등록]' : '';
-    const applyDateText = app.applyDate ? ` · 신청일: ${app.applyDate}` : '';
+    const applyDateText = app.applyDate ? ` · 신청일: ${resolveAppApplyDateTime(app)}` : '';
     titleEl.innerText = `${maskName(app.patientName)} (${app.id})${preRegBadge}${applyDateText} - 고객 상세 업무 원스탑 모달`;
   }
 

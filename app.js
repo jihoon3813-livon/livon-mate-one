@@ -31110,6 +31110,59 @@ function setupGlobalDatePickerTriggers() {
   }, true);
 }
 
+
+/**
+ * 간병시작 희망시간 선택 변경 시 날짜 input의 시간 동기화
+ */
+/**
+ * 고객의 신청일시(날짜+시간)를 안전하게 정규화하고 기존 고객의 시간정보를 복원하는 헬퍼
+ */
+function resolveAppApplyDateTime(app) {
+  if (!app) return '';
+  let str = String(app.applyDateTime || app.applyDate || '').trim();
+  
+  // 이미 시간(HH:mm)이 포함되어 있는 경우
+  const timeMatch = str.match(/\b(\d{1,2}:\d{2})\b/);
+  if (timeMatch) {
+    const rawDate = str.split(/[\sT]+/)[0].replace(/-/g, '.');
+    return `${rawDate} ${timeMatch[1]}`;
+  }
+
+  // 날짜만 있는 경우, createdAt에서 시간 복원 시도
+  let timePart = '';
+  if (app.createdAt) {
+    try {
+      const cd = new Date(app.createdAt);
+      if (!isNaN(cd.getTime())) {
+        const hh = String(cd.getHours()).padStart(2, '0');
+        const mm = String(cd.getMinutes()).padStart(2, '0');
+        // KST 기준 유의미한 시각이 있으면 사용
+        timePart = `${hh}:${mm}`;
+      }
+    } catch (e) {}
+  }
+  
+  if (!timePart || timePart === '00:00') {
+    timePart = '09:00'; // 기본 업무 개시 시각
+  }
+
+  const datePart = str ? str.slice(0, 10).replace(/-/g, '.') : new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+  return `${datePart} ${timePart}`;
+}
+window.resolveAppApplyDateTime = resolveAppApplyDateTime;
+
+/**
+ * 간병시작 희망시간 선택 변경 시
+ */
+function onDesiredTimeSelectChange(prefix) {
+  if (prefix === 'newApp' && typeof calculateAndSetEndDate === 'function') {
+    calculateAndSetEndDate();
+  } else if (prefix === 'custEdit' && typeof calculateAndSetEndDateCustEdit === 'function') {
+    calculateAndSetEndDateCustEdit();
+  }
+}
+window.onDesiredTimeSelectChange = onDesiredTimeSelectChange;
+
 function syncDatePickerValue(textId, val) {
   const textEl = document.getElementById(textId);
   if (textEl && val) {
@@ -31126,6 +31179,8 @@ function syncDatePickerValue(textId, val) {
       calculateAndSetEndDate();
     } else if (textId === 'newAppEndDate') {
       onEndDateManualChange();
+    } else if (textId === 'custEditDesiredDate' || textId === 'custEditExpectedDays') {
+      calculateAndSetEndDateCustEdit();
     }
   }
 }
@@ -31483,7 +31538,7 @@ function calculateAndSetEndDate() {
   }
 
   if (days > 0) {
-    const cleanStart = startDateStr.replace(/\./g, '-');
+    const cleanStart = startDateStr.split(/\s+/)[0].replace(/\./g, '-');
     const parts = cleanStart.split('-');
     if (parts.length === 3) {
       const year = parseInt(parts[0], 10);
@@ -31830,7 +31885,13 @@ function handleNewAppSubmit(e) {
     const hospitalName = !isHome 
       ? ((document.getElementById('newAppHospitalName')?.value || '') + ' ' + (document.getElementById('newAppHospitalDetailAddress')?.value || '')).trim()
       : '자택 간병';
-    const desiredDate = document.getElementById('newAppDesiredDate')?.value || applyDate;
+    const rawDesiredDate = (document.getElementById('newAppDesiredDate')?.value || '').trim() || applyDate;
+    const rawDesiredTime = (document.getElementById('newAppDesiredTime')?.value || '').trim() || '09:00';
+    let desiredDate = rawDesiredDate;
+    if (rawDesiredDate) {
+      const dateOnly = rawDesiredDate.split(/\s+/)[0];
+      desiredDate = `${dateOnly} ${rawDesiredTime}`;
+    }
     const expectedDays = document.getElementById('newAppExpectedDays')?.value?.trim() || '30일';
 
     // Additional fields (safely read)
@@ -32734,6 +32795,11 @@ function openNewAssignModal(targetApplyId = null, isReplacement = false) {
     defaultEndDate = prevAssign.endDate; // inherit target schedule end date
   }
 
+  const now = new Date();
+  const currentHour = String(now.getHours()).padStart(2, '0') + ':00';
+  const defaultAssignedDate = todayStr.replace(/-/g, '.') + ' ' + currentHour;
+  populateCombinedDateTime('newAssignAssignedDate', defaultAssignedDate);
+
   populateCombinedDateTime('newAssignStartDate', defaultStartDate);
   populateCombinedDateTime('newAssignEndDate', defaultEndDate);
 
@@ -32749,8 +32815,10 @@ function handleNewAssignSubmit(e) {
   const name = document.getElementById('newAssignCaregiverName').value.trim();
   const wageRaw = document.getElementById('newAssignDailyWage').value.replace(/[^0-9]/g, '');
 
+  syncCombinedDateTime('newAssignAssignedDate');
   syncCombinedDateTime('newAssignStartDate');
   syncCombinedDateTime('newAssignEndDate');
+  const assignedDateVal = document.getElementById('newAssignAssignedDate')?.value || '';
 
   const isRepEl = document.getElementById('newAssignIsReplacement');
   const isReplacement = isRepEl && isRepEl.value === 'true';
@@ -32792,7 +32860,8 @@ function handleNewAssignSubmit(e) {
     centerPhone: '',
     settlementType: document.getElementById('newAssignSettlementType').value || '개인',
     dailyWage: Number(wageRaw) || 140000,
-    assignedDate: new Date().toISOString().split('T')[0],
+    assignedDate: assignedDateVal || new Date().toISOString().split('T')[0],
+    assignedDateTime: assignedDateVal || '',
     startDate: newStartDate,
     endDate: newEndDate,
     accountInfo: document.getElementById('newAssignAccount').value || ''
@@ -33285,12 +33354,21 @@ function openCustomerEditModal(appId, focusSection = null) {
     hospRoadInput.value = app.hospitalRoadAddress || (!isHome ? editRoad : '');
   }
 
-  // 5. 간병 서비스 신청 내역 바인딩
-  const editApplyVal = app.applyDate || '';
-  document.getElementById('custEditApplyDate').value = editApplyVal;
+  // 5. 간병 서비스 신청 내역 바인딩 (기존 고객 시간정보까지 완벽 복원)
+  const resolvedApply = (typeof resolveAppApplyDateTime === 'function') 
+    ? resolveAppApplyDateTime(app) 
+    : (app.applyDateTime || app.applyDate || '');
+  
+  // 고객 데이터에도 시간정보가 비어있었다면 보완
+  if (app && (!app.applyDate || !app.applyDate.includes(':'))) {
+    app.applyDate = resolvedApply;
+    app.applyDateTime = resolvedApply;
+  }
+  
+  document.getElementById('custEditApplyDate').value = resolvedApply;
   const editApplyPicker = document.getElementById('custEditApplyDate_picker');
-  if (editApplyPicker && editApplyVal) {
-    editApplyPicker.value = editApplyVal.slice(0, 10).replace(/\./g, '-');
+  if (editApplyPicker && resolvedApply) {
+    editApplyPicker.value = resolvedApply.slice(0, 10).replace(/\./g, '-');
   }
 
   const accidentDateVal = app.accidentDate || '';
@@ -33300,51 +33378,28 @@ function openCustomerEditModal(appId, focusSection = null) {
     editAccidentPicker.value = accidentDateVal.slice(0, 10).replace(/\./g, '-');
   }
 
-  // 사고유형 라디오
-  const accTypeVal = app.accidentType || '상해';
-  const typeRadios = document.querySelectorAll('input[name="custEditAccidentTypeRadio"]');
-  typeRadios.forEach(r => {
-    r.checked = (r.value === accTypeVal);
-  });
-
-  // 진단명
-  let editDiagVal = app.diagnosis || app.diseaseName || app.disease || app.sicknessName || '';
-  if (!editDiagVal && app.memo) {
-    const memoDiagMatch = String(app.memo).match(/\[진단명:\s*([^\]]+)\]/);
-    if (memoDiagMatch) {
-      editDiagVal = memoDiagMatch[1].trim();
-    }
-  }
-  if (!app.diagnosis && editDiagVal) {
-    app.diagnosis = editDiagVal;
-  }
-  document.getElementById('custEditDiagnosis').value = editDiagVal;
-
-  // 사고(발병) 경위
-  if (document.getElementById('custEditAccidentDetail')) {
-    document.getElementById('custEditAccidentDetail').value = app.accidentDetail || '';
-  }
-
-  // 서류첨부 여부
-  const docVal = (app.docAttached === '예' || app.docAttached === true) ? '예' : '아니오';
-  const docRadios = document.querySelectorAll('input[name="custEditDocAttachedRadio"]');
-  docRadios.forEach(r => {
-    r.checked = (r.value === docVal);
-  });
-
-  // 거동가능 여부
-  const mobVal = (app.mobility === '불가' || app.mobility === '와상' || app.mobility === '보조필요') ? '불가' : '가능';
-  const mobRadios = document.querySelectorAll('input[name="custEditMobilityRadio"]');
-  mobRadios.forEach(r => {
-    r.checked = (r.value === mobVal);
-  });
-
-  // 간병시작 희망일
-  const desiredVal = app.desiredDate || (editApplyVal ? editApplyVal.slice(0, 10).replace(/\./g, '-') : '');
+  // 간병시작 희망일시 (날짜 인풋에는 YYYY-MM-DD만 표시하여 잘림 방지, 시간은 셀렉트에 분리)
+  const rawDesired = app.desiredDate || (resolvedApply ? resolvedApply.slice(0, 10).replace(/\./g, '-') : '');
   const desiredInput = document.getElementById('custEditDesiredDate');
   const desiredPicker = document.getElementById('custEditDesiredDate_picker');
-  if (desiredInput) desiredInput.value = desiredVal;
-  if (desiredPicker && desiredVal) desiredPicker.value = desiredVal.replace(/\./g, '-');
+  const desiredTimeSelect = document.getElementById('custEditDesiredTime');
+  
+  if (rawDesired) {
+    const parts = rawDesired.trim().split(/\s+/);
+    const datePart = parts[0] ? parts[0].replace(/\./g, '-') : '';
+    const timePart = (parts[1] && parts[1].includes(':')) ? parts[1].slice(0, 5) : '09:00';
+    
+    if (desiredInput) desiredInput.value = datePart;
+    if (desiredPicker && datePart) desiredPicker.value = datePart;
+    if (desiredTimeSelect) {
+      const matchOpt = Array.from(desiredTimeSelect.options).find(o => o.value === timePart);
+      desiredTimeSelect.value = matchOpt ? matchOpt.value : timePart;
+    }
+  } else {
+    if (desiredInput) desiredInput.value = '';
+    if (desiredPicker) desiredPicker.value = '';
+    if (desiredTimeSelect) desiredTimeSelect.value = '09:00';
+  }
 
   // 예상 사용기간
   const expectedVal = app.expectedDays || '30일';
@@ -33546,7 +33601,14 @@ async function handleCustomerEditSubmit(e) {
     const mobRadio = document.querySelector('input[name="custEditMobilityRadio"]:checked');
     app.mobility = mobRadio ? mobRadio.value : '가능';
 
-    app.desiredDate = (document.getElementById('custEditDesiredDate')?.value || '').trim() || app.applyDate;
+    const editDesiredDateVal = (document.getElementById('custEditDesiredDate')?.value || '').trim();
+    const editDesiredTimeVal = (document.getElementById('custEditDesiredTime')?.value || '').trim() || '09:00';
+    let finalDesired = editDesiredDateVal;
+    if (editDesiredDateVal) {
+      const dateOnly = editDesiredDateVal.split(/\s+/)[0];
+      finalDesired = `${dateOnly} ${editDesiredTimeVal}`;
+    }
+    app.desiredDate = finalDesired || app.applyDate;
     app.expectedDays = (document.getElementById('custEditExpectedDays')?.value || '').trim() || '30일';
     app.careEndDate = (document.getElementById('custEditEndDate')?.value || '').trim();
 
@@ -34521,6 +34583,9 @@ function openCareScheduleModal(assignId) {
     document.getElementById('schedEditCenterPhone').value = as.centerPhone || (center && center.phone) || '02-2633-1120';
   }
 
+  const assignedVal = as.assignedDateTime || as.assignedDate || as.createdAt || '';
+  populateCombinedDateTime('schedEditAssignedDate', assignedVal);
+
   populateCombinedDateTime('schedEditStartDate', as.startDate || '');
   populateCombinedDateTime('schedEditEndDate', as.endDate || '');
   if (document.getElementById('schedEditDailyWage')) {
@@ -34559,8 +34624,15 @@ function handleCareScheduleSubmit(e) {
   }
 
   if (typeof syncCombinedDateTime === 'function') {
+    syncCombinedDateTime('schedEditAssignedDate');
     syncCombinedDateTime('schedEditStartDate');
     syncCombinedDateTime('schedEditEndDate');
+  }
+
+  const assignedVal = document.getElementById('schedEditAssignedDate')?.value.trim();
+  if (assignedVal) {
+    as.assignedDate = assignedVal;
+    as.assignedDateTime = assignedVal;
   }
 
   const startVal = document.getElementById('schedEditStartDate')?.value.trim() || as.startDate;
