@@ -9,7 +9,7 @@ async function fetchBarobillKakaoInfo() {
       gBarobillKakaoInfo = data;
       const link = document.getElementById('btnBarobillKakaoLink');
       if (link && data.channelUrl) {
-        link.title = `바로빌 카카오 채널: ${data.channelName || data.channelId || '@hidea_mohw'} (승인 완료)`;
+        link.title = `바로빌 카카오 채널: ${data.channelName || data.channelId || '@독거노인-장애인-돌봄'} (승인 완료)`;
       }
       return data;
     }
@@ -2066,7 +2066,7 @@ function switchSurveySmsChannelMode(channelMode = 'sms') {
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="font-black text-amber-950">바로빌 카카오 알림톡 정식 연동 완료</span>
               <span class="px-1.5 py-0.5 rounded bg-emerald-600 text-white font-black text-[9.5px]">승인 완료</span>
-              <span class="font-mono text-[10.5px] text-amber-800 font-bold">@hidea_mohw (리본 메이트)</span>
+              <span class="font-mono text-[10.5px] text-amber-800 font-bold">${(gBarobillKakaoInfo && (gBarobillKakaoInfo.channelName ? `${gBarobillKakaoInfo.channelId} (${gBarobillKakaoInfo.channelName})` : gBarobillKakaoInfo.channelId)) || '@독거노인-장애인-돌봄 (리본스마트케어)'}</span>
             </div>
             <div class="text-[10.5px] text-slate-600 mt-0.5">
               공식 승인 템플릿(삼성/현대 2종) 규격이 적용되어 본문 주소 100% 은닉 + <b>[채널추가] · [모바일 간병일지 & 설문]</b> 버튼으로 즉시 안전 발송됩니다.
@@ -2723,12 +2723,12 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST', forceChannel = null) {
         buttonTitle: '모바일 간병일지 & 설문',
         senderNumber,
         provider: provider || (channel === 'kakao' ? 'barobill' : 'aligo'),
-        channelId: '@hidea_mohw',
+        channelId: '@독거노인-장애인-돌봄',
         userId: aligoCfg.userId,
         apiKey: aligoCfg.apiKey,
         senderKey: aligoCfg.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
         templateCode: (provider === 'barobill' || channel === 'kakao')
-          ? (getSurveyTargetInsuranceName(target).includes('현대') ? '리본케어 간병일지 및 만족도 설문 안내(현대해상)' : '리본케어 간병일지 및 만족도 설문 안내(삼성화재)')
+          ? (getSurveyTargetInsuranceName(target).includes('현대') ? '리본케어 간병일지 및 만족도 설문 안내(현대해상)_2' : '리본케어 간병일지 및 만족도 설문 안내(삼성화재)_2')
           : (aligoCfg.templateCode || (getSurveyTargetInsuranceName(target).includes('현대') ? 'UM_6527' : 'UM_6526'))
       })
     });
@@ -2863,12 +2863,12 @@ async function submitSurveyCustomerSms() {
         buttonTitle: '모바일 간병일지 & 설문',
         senderNumber,
         provider: provider || (channel === 'kakao' ? 'barobill' : 'aligo'),
-        channelId: '@hidea_mohw',
+        channelId: '@독거노인-장애인-돌봄',
         userId: aligoCfg.userId,
         apiKey: aligoCfg.apiKey,
         senderKey: aligoCfg.senderKey || 'a29152d7931a5d9102a4d545b9a50d9ca3187430',
         templateCode: (provider === 'barobill' || channel === 'kakao')
-          ? (getSurveyTargetInsuranceName(target).includes('현대') ? '리본케어 간병일지 및 만족도 설문 안내(현대해상)' : '리본케어 간병일지 및 만족도 설문 안내(삼성화재)')
+          ? (getSurveyTargetInsuranceName(target).includes('현대') ? '리본케어 간병일지 및 만족도 설문 안내(현대해상)_2' : '리본케어 간병일지 및 만족도 설문 안내(삼성화재)_2')
           : (aligoCfg.templateCode || (getSurveyTargetInsuranceName(target).includes('현대') ? 'UM_6527' : 'UM_6526')),
         isNewSurvey: isNewTab,
         skipReward: isNewTab,

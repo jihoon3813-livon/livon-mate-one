@@ -2250,6 +2250,7 @@ function appendServerAuditLog(logItem) {
           const templateName = payload.templateName || '';
           const subject = payload.subject || '[리본케어] 모바일 간병일지 안내';
           const patientName = payload.patientName || '';
+          const channelId = payload.channelId || '';
           const category = payload.category || 'CARE_DIARY_MOBILE';
 
           if (!toPhone) {
@@ -2275,6 +2276,7 @@ function appendServerAuditLog(logItem) {
             templateName,
             subject,
             patientName,
+            channelId,
             category
           });
 
@@ -2373,14 +2375,23 @@ function appendServerAuditLog(logItem) {
     // 바로빌 카카오톡 채널/템플릿 상태 및 원클릭 SSO URL API
     if (reqPath === '/api/sms/barobill/kakao') {
       try {
-        const { getBarobillKakaoChannels, getBarobillKakaoTemplates, getBarobillKakaoMgmtUrls, getBarobillConfig } = require('./sms-service');
+        const { getBarobillKakaoChannels, getBarobillKakaoTemplates, getBarobillKakaoMgmtUrls, getBarobillConfig, DEFAULT_BAROBILL_KAKAO_CHANNEL_ID, DEFAULT_BAROBILL_KAKAO_CHANNEL_NAME } = require('./sms-service');
         const cfg = getBarobillConfig();
-        const [channelsRes, tmplRes, urlsRes] = await Promise.all([
-          getBarobillKakaoChannels().catch(e => ({ success: false, channels: [], error: e.message })),
-          getBarobillKakaoTemplates().catch(e => ({ success: false, templates: [], error: e.message })),
+        const channelsRes = await getBarobillKakaoChannels().catch(e => ({ success: false, channels: [], error: e.message }));
+        const channels = channelsRes.channels || [];
+        const activeChannel = channels.find(c =>
+          c.channelId === '@독거노인-장애인-돌봄' ||
+          c.channelId?.includes('독거노인') ||
+          c.channelName?.includes('리본스마트케어')
+        ) || channels[0];
+
+        const targetChannelId = activeChannel?.channelId || DEFAULT_BAROBILL_KAKAO_CHANNEL_ID || '@독거노인-장애인-돌봄';
+        const targetChannelName = activeChannel?.channelName || DEFAULT_BAROBILL_KAKAO_CHANNEL_NAME || '리본스마트케어';
+
+        const [tmplRes, urlsRes] = await Promise.all([
+          getBarobillKakaoTemplates(targetChannelId).catch(e => ({ success: false, templates: [], error: e.message })),
           getBarobillKakaoMgmtUrls().catch(e => ({ success: false, channelUrl: '', templateUrl: '', error: e.message }))
         ]);
-        const channels = channelsRes.channels || [];
         const templates = tmplRes.templates || [];
         const hasChannel = channels.length > 0;
         const approvedTemplates = templates.filter(t => t.status === 3);
@@ -2397,12 +2408,12 @@ function appendServerAuditLog(logItem) {
           templateUrl: urlsRes.templateUrl || 'https://www.barobill.co.kr',
           corpNum: cfg.corpNum,
           baroId: cfg.id,
-          channelId: channels[0]?.channelId || '@hidea_mohw',
-          channelName: channels[0]?.channelName || '리본 메이트',
+          channelId: targetChannelId,
+          channelName: targetChannelName,
           message: hasApprovedTemplates
-            ? `바로빌 카카오 알림톡 정상 연동 완료 (채널: ${channels[0]?.channelName || '리본 메이트'} / 승인 템플릿 ${approvedTemplates.length}건)`
+            ? `바로빌 카카오 알림톡 정상 연동 완료 (채널: ${targetChannelName} / 승인 템플릿 ${approvedTemplates.length}건)`
             : (hasChannel
-              ? `바로빌 카카오 채널 연동 완료 (${channels.map(c => c.channelName || c.channelId).join(', ')}). 템플릿 심사 진행 필요.`
+              ? `바로빌 카카오 채널 연동 완료 (선택 채널: ${targetChannelName} / 등록: ${channels.map(c => c.channelName || c.channelId).join(', ')}). 템플릿 심사 진행 필요.`
               : '바로빌 카카오 채널이 아직 등록되지 않았습니다.')
         }));
       } catch (e) {

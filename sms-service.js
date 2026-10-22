@@ -244,7 +244,8 @@ async function sendViaAligo({
   testMode = 'REAL_TEST',
   apiKey = '',
   userId = '',
-  senderKey = ''
+  senderKey = '',
+  channelId = ''
 }) {
   const cfg = getAligoConfig();
   const effectiveKey = apiKey || cfg.apiKey;
@@ -326,6 +327,7 @@ async function sendViaAligoKakao({
   templateCode = '',
   senderNumber = '16007835',
   senderKey = '',
+  channelId = '',
   subject = '',
   fallbackToSms = true,
   apiKey = '',
@@ -617,7 +619,11 @@ async function getBarobillKakaoChannels() {
 /**
  * 바로빌 등록된 카카오 알림톡 템플릿 목록 조회
  */
-async function getBarobillKakaoTemplates(channelId = '@hidea_mohw') {
+// 기본 바로빌 카카오 알림톡 채널 (기존: @hidea_mohw -> 변경: @독거노인-장애인-돌봄 / 리본스마트케어)
+const DEFAULT_BAROBILL_KAKAO_CHANNEL_ID = '@독거노인-장애인-돌봄';
+const DEFAULT_BAROBILL_KAKAO_CHANNEL_NAME = '리본스마트케어';
+
+async function getBarobillKakaoTemplates(channelId = DEFAULT_BAROBILL_KAKAO_CHANNEL_ID) {
   const cfg = getBarobillConfig();
   const isTest = cfg.server === 'test';
   try {
@@ -727,7 +733,7 @@ async function sendViaBarobillKakao({
   }
 
   const title = `[리본케어] ${patientName || toName} 님의 모바일 간병일지`;
-  const effectiveChannel = channelId || '@hidea_mohw';
+  const effectiveChannel = channelId || DEFAULT_BAROBILL_KAKAO_CHANNEL_ID;
 
   // 바로빌 승인 템플릿(삼성화재/현대해상) 자동 매핑
   let effectiveTemplate = templateName;
@@ -736,10 +742,12 @@ async function sendViaBarobillKakao({
                     (toName && toName.includes('현대')) ||
                     (patientName && patientName.includes('현대'));
 
-  if (!effectiveTemplate || effectiveTemplate === 'UM_6526' || effectiveTemplate === 'UM_6527') {
+  if (!effectiveTemplate || effectiveTemplate === 'UM_6526' || effectiveTemplate === 'UM_6527' || effectiveTemplate.startsWith('리본케어 간병일지 및 만족도 설문 안내')) {
+    const isChannel2 = effectiveChannel.includes('독거노인');
+    const suffix = isChannel2 ? '_2' : '';
     effectiveTemplate = isHyundai
-      ? '리본케어 간병일지 및 만족도 설문 안내(현대해상)'
-      : '리본케어 간병일지 및 만족도 설문 안내(삼성화재)';
+      ? `리본케어 간병일지 및 만족도 설문 안내(현대해상)${suffix}`
+      : `리본케어 간병일지 및 만족도 설문 안내(삼성화재)${suffix}`;
   }
 
   // 바로빌 공식 승인 템플릿 규격: 1) 채널추가 (AC), 2) 모바일 간병일지 & 설문 (WL)
@@ -1062,7 +1070,8 @@ async function dispatchSms({
   testMode = 'REAL_TEST',
   apiKey = '',
   userId = '',
-  senderKey = ''
+  senderKey = '',
+  channelId = ''
 }) {
   let result = null;
   let lastError = null;
@@ -1105,6 +1114,7 @@ async function dispatchSms({
           buttonTitle,
           templateName,
           senderNumber,
+          channelId: channelId || DEFAULT_BAROBILL_KAKAO_CHANNEL_ID,
           fallbackToSms: testMode === 'REAL_TEST' ? false : true // 테스트 발송 시에는 대체 문자 대신 정확한 알림톡 상태를 안내
         });
       } catch (bErr) {
@@ -1202,6 +1212,8 @@ async function dispatchSms({
 }
 
 module.exports = {
+  DEFAULT_BAROBILL_KAKAO_CHANNEL_ID,
+  DEFAULT_BAROBILL_KAKAO_CHANNEL_NAME,
   getAligoConfig,
   saveAligoConfig,
   getAligoBalance,
