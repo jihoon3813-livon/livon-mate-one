@@ -215,14 +215,18 @@ class SurveyService {
       }
     }
 
-    const todayYmd = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+    const normDate = (d) => String(d || '').trim().slice(0, 10).replace(/\./g, '-');
+    const todayIso = new Date().toISOString().slice(0, 10);
 
     // 실제 종료/완료 대상자 필터링 (상태값 완료/정산완료/종료/진행완료 또는 종료일 경과 건)
     const completedApps = sourceApps.filter(app => {
       if (!app || !app.patientName) return false;
       const st = String(app.status || '').trim();
+      if (st === '취소' || st === '신청취소' || st === '접수취소') return false;
       const isCompletedStatus = st === '완료' || st === '정산완료' || st === '종료' || st === '진행완료';
-      const isEndedByDate = app.careEndDate && app.careEndDate.slice(0, 10) <= todayYmd;
+      const isNotStarted = st === '접수' || st === '대기' || st === '배정대기';
+      const endDateIso = normDate(app.careEndDate);
+      const isEndedByDate = !isNotStarted && endDateIso.length === 10 && endDateIso < todayIso;
       return isCompletedStatus || isEndedByDate;
     });
 
@@ -245,7 +249,7 @@ class SurveyService {
     const existing = this.data.targets.find(t => t.serviceId === app.id && t.targetStatus !== 'CANCELLED');
     if (existing) return existing;
 
-    const targetId = 'ST-' + Date.now().toString().slice(-6) + '-' + Math.floor(100 + Math.random() * 900);
+    const targetId = app.id ? ('ST-' + app.id) : ('ST-' + Date.now().toString().slice(-6) + '-' + Math.floor(100 + Math.random() * 900));
     const token = this.generateToken();
     const tokenHash = this.hashToken(token);
     const dueAt = this.calculateDueAt(app.careEndDate || app.expectedEndDate || app.applyDate);

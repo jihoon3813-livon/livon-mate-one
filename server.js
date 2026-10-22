@@ -2878,7 +2878,25 @@ function appendServerAuditLog(logItem) {
 
     if (reqPath === '/api/public/survey/form' && req.method === 'GET') {
       const token = parsedUrl.query.token || parsedUrl.query.t || '';
-      const formData = gSurveyService.getFormByToken(token);
+      let formData = gSurveyService.getFormByToken(token);
+      if (!formData || !formData.valid || !formData.serviceInfo) {
+        const fallbackPatient = parsedUrl.query.patient || parsedUrl.query.p || '';
+        const fallbackHospital = parsedUrl.query.hospital || parsedUrl.query.h || '';
+        const fallbackCarer = parsedUrl.query.carer || parsedUrl.query.c || '';
+        if (fallbackPatient) {
+          formData = {
+            valid: true,
+            serviceInfo: {
+              id: token ? 'TMP-' + token : 'TMP-' + Date.now(),
+              serviceId: token || '',
+              token: token,
+              patientName: fallbackPatient,
+              hospitalName: fallbackHospital || '리본케어 협약병원',
+              caregiverName: fallbackCarer || '담당 간병인'
+            }
+          };
+        }
+      }
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       return res.end(JSON.stringify(formData));
     }

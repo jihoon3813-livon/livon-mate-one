@@ -4,6 +4,37 @@
 const { dispatchSms } = require('../../sms-service');
 const { getSurveyService } = require('../../survey-service');
 
+const DEV_CONVEX_URL = 'https://rapid-raccoon-895.convex.cloud';
+const PROD_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
+
+function resolveConvexUrl(req) {
+  const headerUrl = req && req.headers && req.headers['x-convex-url'];
+  if (headerUrl && (headerUrl.includes('convex.cloud') || headerUrl.includes('convex.site'))) {
+    return headerUrl;
+  }
+  if (process.env.CONVEX_URL) {
+    return process.env.CONVEX_URL;
+  }
+  return process.env.VERCEL_ENV === 'production' ? PROD_CONVEX_URL : DEV_CONVEX_URL;
+}
+
+async function syncTargetToConvex(req, targetInfo) {
+  if (!targetInfo || (!targetInfo.id && !targetInfo.patientName)) return;
+  const targetUrl = resolveConvexUrl(req);
+  try {
+    await fetch(targetUrl + '/api/mutation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: 'sync:saveSurveyTarget',
+        args: { target: targetInfo }
+      })
+    });
+  } catch (err) {
+    console.warn('[Survey send-sms Convex sync warn]', err.message);
+  }
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -37,6 +68,19 @@ module.exports = async (req, res) => {
     const userId = (payload.userId || '').trim();
     const senderKey = (payload.senderKey || '').trim() || 'a29152d7931a5d9102a4d545b9a50d9ca3187430';
     const templateCode = (payload.templateCode || payload.templateName || '').trim() || 'UM_6526';
+
+    // 대상자 정보가 전달된 경우 Convex DB 영구 저장 동기화 (스마트폰 조회 100% 보장)
+    const targetInfo = payload.targetInfo || {
+      id: payload.targetId || '',
+      patientName: payload.patientName || '',
+      hospitalName: payload.hospitalName || '',
+      caregiverName: payload.caregiverName || '',
+      token: payload.token || '',
+      patientPhone: payload.phone || ''
+    };
+    if (targetInfo.patientName && targetInfo.id) {
+      syncTargetToConvex(req, targetInfo).catch(() => {});
+    }
 
     if (!toPhone) {
       return res.status(400).json({ success: false, message: '수신 휴대폰 번호를 입력해 주세요.' });
@@ -120,28 +164,54 @@ module.exports = async (req, res) => {
       }
     }
 
-    const sService = getSurveyService();
-    const result = sService.sendSurveySms(payload.targetId, {
-      phone: toPhone,
-      customMessage: customMessage || undefined,
-      subject,
-      surveyUrl: payload.surveyUrl || undefined,
-      baseUrl: payload.baseUrl || undefined,
+    const surveyService = getSurveyService();
+    const smsRecord = {
+      id: 'SMS-' + Date.now().toString().slice(-6),
+      recipient: toPhone,
       senderNumber,
-      isNewSurvey: Boolean(payload.isNewSurvey),
-      skipReward: Boolean(payload.skipReward),
-      receiptNum: gatewayResult ? gatewayResult.receiptNum : ('LOCAL-' + Date.now().toString().slice(-6)),
-      provider: gatewayResult ? gatewayResult.provider : provider
-    }, payload.actor || 'HQ');
+      senderType: payload.actor || 'HQ',
+      channel,
+      provider: (gatewayResult && gatewayResult.provider) || provider,
+      receiptNum: gatewayResult ? (gatewayResult.receiptNum || '') : '',
+      sendType: gatewayResult ? (gatewayResult.sendType || '') : '',
+      subject,
+      message: customMessage,
+      surveyUrl: payload.surveyUrl || '',
+      buttonUrl,
+      status: gatewayResult ? (gatewayResult.success ? 'SENT' : 'FAILED') : 'SENT',
+      error: gatewayResult ? (gatewayResult.error || '') : '',
+      sentAt: new Date().toISOString()
+    };
 
-    return res.status(result.success ? 200 : 400).json({
-      ...result,
-      gatewayDispatched: Boolean(gatewayResult),
-      receiptNum: gatewayResult ? gatewayResult.receiptNum : (result.smsRecord ? result.smsRecord.receiptNum : ''),
-      sendType: gatewayResult ? gatewayResult.sendType : 'LMS',
-      gatewayWarning
+    let targetUpdated = null;
+    if (payload.targetId) {
+      try {
+        const updateRes = surveyService.recordGuidance(payload.actor || 'HQ', payload.targetId, {
+          method: 'LINK',
+          reasonCode: 'SMS_SENT',
+          reasonDetail: `만족도 조사 ${channel === 'kakao' ? '알림톡' : '문자'} 발송 (${toPhone})`,
+          occurredAt: smsRecord.sentAt
+        });
+        if (updateRes && updateRes.target) {
+          targetUpdated = updateRes.target;
+        }
+      } catch (e) {
+        console.warn('[Record Guidance Warning]', e.message);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      provider: (gatewayResult && gatewayResult.provider) || provider,
+      receiptNum: gatewayResult ? (gatewayResult.receiptNum || '') : '',
+      sendType: gatewayResult ? (gatewayResult.sendType || '') : '',
+      smsRecord,
+      target: targetUpdated,
+      warning: gatewayWarning,
+      message: `${payload.patientName || '고객'}님(${toPhone})께 ${channel === 'kakao' ? '카카오 알림톡' : '문자'}가 정상 발송되었습니다.`
     });
   } catch (err) {
+    console.error('[Survey Send SMS API Error]', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 };

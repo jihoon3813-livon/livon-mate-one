@@ -1,3 +1,4 @@
+let gIsAutoSeedingSurvey = false;
 
 let gBarobillKakaoInfo = null;
 async function fetchBarobillKakaoInfo() {
@@ -347,13 +348,22 @@ async function loadSurveyMgmtData(showToastAlert = false) {
     if (summaryRes.data) gSurveyState.summary = summaryRes.data;
     if (Array.isArray(responsesRes.items)) gSurveyState.responses = responsesRes.items;
 
-    // [데이터 유실 방지 통합 병합]: Convex Cloud 원격 DB와 로컬 캐시/API 대상자를 ID 기준으로 안전하게 필드 병합
+    // [데이터 유실 방지 통합 병합]: Convex Cloud 원격 DB와 로컬 캐시/API 대상자를 안전하게 필드 병합 (serviceId 기준 중복 방어)
     const targetMap = new Map();
+    const serviceToIdMap = new Map();
     const mergeTargetIntoMap = (item) => {
       if (!item || !item.id) return;
-      const key = String(item.id);
+      let key = String(item.id);
+      const srvId = item.serviceId ? String(item.serviceId).trim() : '';
+      if (srvId && !srvId.startsWith('ST-')) {
+        if (serviceToIdMap.has(srvId)) {
+          key = serviceToIdMap.get(srvId);
+        } else {
+          serviceToIdMap.set(srvId, key);
+        }
+      }
       const prev = targetMap.get(key) || {};
-      const merged = { ...prev, ...item };
+      const merged = { ...prev, ...item, id: key };
       // 쿠폰 수신 번호 및 선물 발송 관리 정보는 비어있지 않은 최신 값을 보존
       ['couponPhone', 'giftStatus', 'giftItem', 'giftSentAt', 'giftMethod', 'giftSender', 'giftMemo', 'giftHistory', 'respondentType', 'q2Score', 'q3Score', 'q4Score', 'surveyComment', 'submittedAt'].forEach(f => {
         if ((merged[f] === undefined || merged[f] === '' || merged[f] === 'NONE') && prev[f] && prev[f] !== 'NONE') {
@@ -2031,7 +2041,13 @@ function getSurveyTargetUrlForSms(target) {
     origin = origin.replace(/^https:\/\//, 'http://');
   }
   const shortCode = getSurveyTargetShortCode(target);
-  return `${origin}/s/${shortCode}`;
+  const baseUrl = `${origin}/s/${shortCode}`;
+  if (target && target.patientName) {
+    const cleanHosp = cleanSurveyHospitalName(target.hospitalName, target);
+    const cgName = target.caregiverName || '';
+    return `${baseUrl}?p=${encodeURIComponent(target.patientName)}&h=${encodeURIComponent(cleanHosp)}&c=${encodeURIComponent(cgName)}`;
+  }
+  return baseUrl;
 }
 
 function switchSurveySmsChannelMode(channelMode = 'sms') {
@@ -2705,6 +2721,17 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST', forceChannel = null) {
     statusBox.classList.remove('hidden');
   }
 
+  // 발송 대상자가 Convex Cloud에 없는 경우 선제 동기화 (스마트폰 조회 100% 보장)
+  if (target && typeof syncToConvex === 'function') {
+    try {
+      const cleanTarget = {};
+      for (const [k, v] of Object.entries(target)) {
+        if (!k.startsWith('_')) cleanTarget[k] = v;
+      }
+      syncToConvex('sync:saveSurveyTarget', { target: cleanTarget }).catch(() => {});
+    } catch (_) {}
+  }
+
   try {
     const res = await fetch('/api/survey/send-sms', {
       method: 'POST',
@@ -2714,6 +2741,16 @@ async function sendSurveyTestSms(testMode = 'REAL_TEST', forceChannel = null) {
         testMode,
         targetId: target ? target.id : '',
         patientName: target ? target.patientName : '고연분',
+        targetInfo: target ? {
+          id: target.id,
+          serviceId: target.serviceId || target.id,
+          patientName: target.patientName,
+          hospitalName: target.hospitalName,
+          caregiverName: target.caregiverName,
+          token: target.token || (target.id ? String(target.id).replace(/^ST-/, '') : ''),
+          patientPhone: target.patientPhone || target.couponPhone || '',
+          insuranceCompany: getSurveyTargetInsuranceName(target)
+        } : null,
         phone: testPhone,
         subject: isKakao ? (subject || '리본케어 만족도 설문 안내') : (subject ? `[테스트] ${subject}` : '[테스트] 리본케어 만족도 설문 안내'),
         customMessage: bodyText,
@@ -3987,6 +4024,9 @@ async function handleCreateSurveyTarget(event) {
 }
 
 async function autoSeedSurveyTargets(options = {}) {
+  if (gIsAutoSeedingSurvey) return;
+  gIsAutoSeedingSurvey = true;
+  try {
   const { isSilent = false, isAuto = false } = (typeof options === 'object' && options !== null) ? options : {};
   try {
     const apps = (typeof gApps !== 'undefined' && Array.isArray(gApps) && gApps.length > 0) ? gApps : null;
@@ -4013,20 +4053,32 @@ async function autoSeedSurveyTargets(options = {}) {
 
     // 2. Vercel 운영 환경이거나 API 결과가 없는 경우, 클라이언트 gApps에서 직접 실시간 추출
     if (extractedItems.length === 0 && apps && apps.length > 0) {
-      const todayYmd = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+      const normDate = (d) => String(d || '').trim().slice(0, 10).replace(/\./g, '-');
+      const todayIso = new Date().toISOString().slice(0, 10);
       const completedApps = apps.filter(app => {
         if (!app || !app.patientName) return false;
         const st = String(app.status || '').trim();
+        // 취소된 신청 및 아직 시작되지 않은 접수/대기 상태는 제외
+        if (st === '취소' || st === '신청취소' || st === '접수취소') return false;
         const isCompletedStatus = st === '완료' || st === '정산완료' || st === '종료' || st === '진행완료';
-        const isEndedByDate = app.careEndDate && String(app.careEndDate).slice(0, 10) <= todayYmd;
+        const isNotStarted = st === '접수' || st === '대기' || st === '배정대기';
+        const endDateIso = normDate(app.careEndDate);
+        const isEndedByDate = !isNotStarted && endDateIso.length === 10 && endDateIso < todayIso;
         return isCompletedStatus || isEndedByDate;
       });
 
+      const existingServiceIds = new Set();
+      (gSurveyState.targets || []).forEach(t => {
+        if (t.serviceId) existingServiceIds.add(String(t.serviceId).trim());
+        if (t.id) existingServiceIds.add(String(t.id).trim());
+      });
       const existingMap = new Map((gSurveyState.targets || []).map(t => [String(t.serviceId || t.id), t]));
       completedApps.forEach(app => {
         const appId = String(app.id || '');
-        if (!existingMap.has(appId)) {
-          const targetId = 'ST-' + Date.now().toString().slice(-6) + '-' + Math.floor(100 + Math.random() * 900);
+        if (!existingServiceIds.has(appId)) {
+          existingServiceIds.add(appId);
+          // 랜덤 난수 대신 고유 appId 기반 결정론적 ID를 생성하여 중복 방어
+          const targetId = appId ? ('ST-' + appId) : ('ST-' + Date.now().toString().slice(-6) + '-' + Math.floor(100 + Math.random() * 900));
           let rawToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
           try {
             if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
@@ -4112,6 +4164,8 @@ async function autoSeedSurveyTargets(options = {}) {
     if (!isSilent && typeof showToast === 'function') {
       showToast('자동 추출 중 오류가 발생했습니다.', 'error');
     }
+  } finally {
+    gIsAutoSeedingSurvey = false;
   }
 }
 

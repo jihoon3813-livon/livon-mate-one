@@ -2182,9 +2182,23 @@
 
       gSurveyToken = params.get('t') || params.get('token') || pathShortCode || '';
       gTargetId = params.get('targetId') || params.get('id') || '';
+      const urlPatient = (params.get('patient') || params.get('p') || '').trim();
+      const urlHosp = (params.get('hospital') || params.get('h') || '').trim();
+      const urlCarer = (params.get('caregiver') || params.get('carer') || params.get('c') || '').trim();
       const titleTheme = params.get('titleTheme') || params.get('title') || localStorage.getItem('LIVON_SURVEY_NEW_TITLE_THEME') || '1';
       const jumpSection = params.get('section') || '';
       const preRole = params.get('role') || '';
+
+      // [즉시 반영 Fallback]: URL에 환자 파라미터가 있는 경우 화면 깜빡임 없이 즉시 환자명/병원명 선제 동기화
+      if (urlPatient) {
+        gPatientInfo.name = urlPatient;
+        if (urlCarer) gPatientInfo.carerName = urlCarer;
+        if (urlHosp) gPatientInfo.hospitalName = urlHosp;
+        document.querySelectorAll('.patient-name').forEach(el => el.textContent = `${urlPatient} 님`);
+        document.querySelectorAll('.patient-initial').forEach(el => el.textContent = urlPatient.charAt(0));
+        if (urlCarer) document.querySelectorAll('.carer-name').forEach(el => el.textContent = urlCarer);
+        if (urlHosp) document.querySelectorAll('.hospital-name').forEach(el => el.textContent = urlHosp);
+      }
 
       applyTitleTheme(titleTheme);
 
@@ -2224,14 +2238,27 @@
 
       // 2. 서버 공개 설문 폼 API 조회 (토큰 또는 단축코드가 있는 경우)
       const lookupCode = gSurveyToken || gTargetId;
-      if (lookupCode) {
+      if (lookupCode || urlPatient) {
         try {
-          const res = await fetch(`/api/public/survey/form?token=${encodeURIComponent(lookupCode)}`);
+          const qUrl = `/api/public/survey/form?token=${encodeURIComponent(lookupCode || '')}&p=${encodeURIComponent(urlPatient)}&h=${encodeURIComponent(urlHosp)}&c=${encodeURIComponent(urlCarer)}`;
+          const res = await fetch(qUrl);
           const data = await res.json();
           if (data && data.serviceInfo) {
             target = { ...(target || {}), ...data.serviceInfo, token: data.serviceInfo.token || gSurveyToken };
           }
         } catch (e) {}
+      }
+
+      // 3. 대상자가 여전히 null이지만 URL 파라미터가 있는 경우 자동 복원
+      if (!target && urlPatient) {
+        target = {
+          id: gTargetId || ('TEMP-' + Date.now()),
+          serviceId: gTargetId || '',
+          token: gSurveyToken,
+          patientName: urlPatient,
+          hospitalName: urlHosp || '리본케어 협약병원',
+          caregiverName: urlCarer || '담당 간병인'
+        };
       }
 
       if (target) {
