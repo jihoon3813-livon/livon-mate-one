@@ -1297,9 +1297,9 @@
   };
 
   /**
-   * 엑셀 다운로드 (첨부 이미지 양식 규격에 맞추어 생성, 검색 중일 때는 검색 결과 대상)
+   * 엑셀 다운로드 (전산 및 첨부 이미지 양식과 100% 동일한 고품격 스타일링 엑셀 생성)
    */
-  window.downloadSamsungSlaExcel = function() {
+  window.downloadSamsungSlaExcel = async function() {
     const allRows = window.gSamsungSlaRows || [];
     if (allRows.length === 0) {
       alert('다운로드할 데이터가 없습니다.');
@@ -1324,29 +1324,183 @@
     }
 
     const summary = calcSamsungSlaSummary(rows);
-    const XLSX = window.XLSX;
-    if (!XLSX) {
-      alert('엑셀 라이브러리가 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
-      return;
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+    const filename = `삼성화재_SLA관리_${dateStr}.xlsx`;
+
+    // 1. ExcelJS 스타일링 엔진 적용 (전산 및 첨부 엑셀과 100% 일치하는 서식)
+    if (typeof ExcelJS !== 'undefined') {
+      try {
+        const wb = new ExcelJS.Workbook();
+        wb.creator = '리본케어';
+        wb.created = today;
+
+        const ws = wb.addWorksheet('삼성화재 SLA', {
+          views: [{ state: 'frozen', xSplit: 0, ySplit: 1, showGridLines: true }]
+        });
+
+        // 컬럼 정의 (너비 및 정렬 규칙)
+        ws.columns = [
+          { header: '피보험자ID', key: 'patientId', width: 16 },
+          { header: '피보험자명', key: 'patientName', width: 14 },
+          { header: '간병인 매칭 여부', key: 'isMatched', width: 16 },
+          { header: '배정소요시간', key: 'assignDuration', width: 14 },
+          { header: '신청일시', key: 'applyDateTime', width: 20 },
+          { header: '간병시작일시', key: 'careStartDateTime', width: 20 },
+          { header: '도달 시간', key: 'reachDuration', width: 13 },
+          { header: '간병사 관련', key: 'caregiverNote', width: 24 },
+          { header: '고객만족도', key: 'customerSatisfaction', width: 14 },
+          { header: '비고', key: 'remark', width: 45 }
+        ];
+
+        // 1행: 헤더 스타일링 (비즈니스 소프트 슬레이트 #E2E8F0, 볼드, 테두리, 가운데 정렬)
+        const headerRow = ws.getRow(1);
+        headerRow.height = 28;
+        headerRow.eachCell((cell) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE2E8F0' } // 소프트 비즈니스 슬레이트 음영
+          };
+          cell.font = { name: '맑은 고딕', size: 10, bold: true, color: { argb: 'FF1E293B' } };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            bottom: { style: 'medium', color: { argb: 'FF64748B' } },
+            right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+          };
+        });
+
+        // 2행부터: 데이터 행들 추가
+        rows.forEach(r => {
+          const row = ws.addRow({
+            patientId: r.patientId || '',
+            patientName: r.patientName || '',
+            isMatched: r.isMatched || 'Y',
+            assignDuration: r.assignDuration || '2시간',
+            applyDateTime: r.applyDateTime || '',
+            careStartDateTime: r.careStartDateTime || '',
+            reachDuration: r.reachDuration || '0.0',
+            caregiverNote: r.caregiverNote || '',
+            customerSatisfaction: r.customerSatisfaction || '응답없음',
+            remark: r.remark || ''
+          });
+          row.height = 22;
+
+          row.eachCell((cell, colNum) => {
+            cell.font = { name: '맑은 고딕', size: 9.5, color: { argb: 'FF1E293B' } };
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+              left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+              bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+              right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+            };
+
+            // 가로 정렬 규칙: 8(간병사 관련), 10(비고)는 좌측 정렬, 나머지는 가운데 정렬
+            if (colNum === 8 || colNum === 10) {
+              cell.alignment = { vertical: 'middle', horizontal: 'left' };
+            } else {
+              cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            }
+          });
+        });
+
+        // 구분 빈 행
+        const emptyRow = ws.addRow([]);
+        emptyRow.height = 14;
+
+        // 하단 요약 1: 수치 행
+        const statValuesRow = ws.addRow([
+          '',
+          '',
+          summary.matchRate,        // C열: 평균 매칭률 수치
+          summary.avgAssignHours,   // D열: 평균 배정시간 수치
+          '',
+          '',
+          summary.avgArrivalHours,  // G열: 평균 도달시간 수치
+          summary.strikeOutCount,   // H열: 삼진아웃 수치
+          summary.avgSatisfaction,  // I열: 평균 고객만족도 수치
+          ''
+        ]);
+        statValuesRow.height = 26;
+
+        // 수치 셀 스타일 적용 (테두리 및 볼드 가운데 정렬)
+        [3, 4, 7, 8, 9].forEach(colIdx => {
+          const cell = statValuesRow.getCell(colIdx);
+          cell.font = { name: '맑은 고딕', size: 10, bold: true, color: { argb: 'FF0F172A' } };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+          };
+        });
+
+        // 하단 요약 2: 라벨 행 (첨부 캡쳐 Row 47과 동일한 노란색 강조 배경 #FFFF00)
+        const statLabelsRow = ws.addRow([
+          '',
+          '',
+          '평균 매칭률',
+          '평균 배정시간',
+          '',
+          '',
+          '평균 도달시간',
+          '삼진아웃 간병인 수',
+          '평균 고객만족도',
+          ''
+        ]);
+        statLabelsRow.height = 26;
+
+        // 라벨 셀 스타일 적용 (노란색 배경 & 굵은 글씨 & 테두리)
+        [3, 4, 7, 8, 9].forEach(colIdx => {
+          const cell = statLabelsRow.getCell(colIdx);
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFFFF00' } // 선명한 표준 엑셀 노란색
+          };
+          cell.font = { name: '맑은 고딕', size: 9.5, bold: true, color: { argb: 'FF000000' } };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+          };
+        });
+
+        // 버퍼 생성 및 파일 다운로드 실행
+        const buffer = await wb.xlsx.writeBuffer();
+        if (typeof downloadExcelFileBlob === 'function') {
+          await downloadExcelFileBlob(buffer, filename);
+        } else {
+          const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+        return;
+      } catch (err) {
+        console.warn('[ExcelJS Export Warning]', err);
+      }
     }
 
-    const wsData = [];
-
-    // Row 1: 헤더
-    wsData.push([
-      '피보험자ID',
-      '피보험자명',
-      '간병인 매칭 여부',
-      '배정소요시간',
-      '신청일시',
-      '간병시작일시',
-      '도달 시간',
-      '간병사 관련',
-      '고객만족도',
-      '비고'
-    ]);
-
-    // Row 2 ~ N: 데이터 행들
+    // 2. SheetJS Fallback
+    const XLSX = window.XLSX;
+    if (!XLSX) {
+      alert('엑셀 라이브러리가 로드되지 않았습니다.');
+      return;
+    }
+    const wsData = [
+      ['피보험자ID', '피보험자명', '간병인 매칭 여부', '배정소요시간', '신청일시', '간병시작일시', '도달 시간', '간병사 관련', '고객만족도', '비고']
+    ];
     rows.forEach(r => {
       wsData.push([
         r.patientId || '',
@@ -1355,66 +1509,23 @@
         r.assignDuration || '2시간',
         r.applyDateTime || '',
         r.careStartDateTime || '',
-        r.reachDuration || '미적용',
+        r.reachDuration || '0.0',
         r.caregiverNote || '',
         r.customerSatisfaction || '응답없음',
         r.remark || ''
       ]);
     });
-
-    // Row N+1: 빈 구분 행
     wsData.push(['', '', '', '', '', '', '', '', '', '']);
-
-    // Row N+2: 요약 수치 행
-    wsData.push([
-      '',
-      '',
-      summary.matchRate,
-      summary.avgAssignHours,
-      '',
-      '',
-      summary.avgArrivalHours,
-      summary.strikeOutCount,
-      summary.avgSatisfaction,
-      ''
-    ]);
-
-    // Row N+3: 요약 라벨 행
-    wsData.push([
-      '',
-      '',
-      '평균 매칭률',
-      '평균 배정시간',
-      '',
-      '',
-      '평균 도달시간',
-      '삼진아웃 간병인 수',
-      '평균 고객만족도',
-      ''
-    ]);
+    wsData.push(['', '', summary.matchRate, summary.avgAssignHours, '', '', summary.avgArrivalHours, summary.strikeOutCount, summary.avgSatisfaction, '']);
+    wsData.push(['', '', '평균 매칭률', '평균 배정시간', '', '', '평균 도달시간', '삼진아웃 간병인 수', '평균 고객만족도', '']);
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
-
     ws['!cols'] = [
-      { wch: 15 },
-      { wch: 12 },
-      { wch: 16 },
-      { wch: 14 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 12 },
-      { wch: 22 },
-      { wch: 14 },
-      { wch: 22 }
+      { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 20 },
+      { wch: 20 }, { wch: 13 }, { wch: 24 }, { wch: 14 }, { wch: 45 }
     ];
-
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '삼성화재 SLA');
-
-    const today = new Date();
-    const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
-    const filename = `삼성화재_SLA관리_${dateStr}.xlsx`;
-
     XLSX.writeFile(wb, filename);
   };
 
