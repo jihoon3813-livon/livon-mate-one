@@ -6519,7 +6519,6 @@ function resolveMemoAuthor(author, itemText, app) {
     return cleanAuthor;
   }
 
-  // 2. 고객 데이터 자체에 기록된 등록자/작성자 정보가 있는 경우 적용
   if (app) {
     if (app.memoAuthor && !isVagueMemoAuthor(app.memoAuthor)) {
       const adm = findAdminAccountInfo(app.memoAuthor);
@@ -6529,25 +6528,40 @@ function resolveMemoAuthor(author, itemText, app) {
     const creatorId = app.createdAdmin || app.creator || app.uploadedBy;
     if (creatorId && !isVagueMemoAuthor(creatorId)) {
       const creatorInfo = findAdminAccountInfo(creatorId);
-      if (creatorInfo && creatorInfo.name) {
-        return `${creatorInfo.name} (${creatorInfo.username})`;
-      }
-      if (app.creatorName) {
-        return `${app.creatorName} (${creatorId})`;
-      }
+      if (creatorInfo && creatorInfo.name) return `${creatorInfo.name} (${creatorInfo.username})`;
+      if (app.creatorName) return `${app.creatorName} (${creatorId})`;
       return `${creatorId}`;
     }
   }
 
-  // 3. 현재 로그인된 관리자 계정 정보 반영 (실제 로그인된 사용자)
   const curAdm = getCurrentMemoAdmin();
-  if (curAdm && curAdm.username) {
-    return `${curAdm.name} (${curAdm.username})`;
-  }
-
+  if (curAdm && curAdm.username) return `${curAdm.name} (${curAdm.username})`;
   return cleanAuthor || '관리자';
 }
 window.resolveMemoAuthor = resolveMemoAuthor;
+
+function formatCustomerMemoCreatedAt(item) {
+  if (!item) return '';
+
+  const localText = String(item.createdAt || item.dateStr || '').trim();
+  if (localText) {
+    const localMatch = localText.match(/^(\d{1,2})[./-](\d{1,2})\s+(\d{1,2}):(\d{2})$/);
+    if (localMatch) {
+      const year = getKoreaDateParts(new Date()).year;
+      return `${year}.${localMatch[1].padStart(2, '0')}.${localMatch[2].padStart(2, '0')} ${localMatch[3].padStart(2, '0')}:${localMatch[4]}`;
+    }
+    if (/^\d{4}[./-]\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2}$/.test(localText)) return localText;
+  }
+
+  const timestamp = item.timestamp || item.createdAt;
+  if (timestamp && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(String(timestamp).trim())) {
+    const date = new Date(timestamp);
+    if (!isNaN(date.getTime())) return formatCareDateTimeStr(date);
+  }
+
+  return localText || '';
+}
+window.formatCustomerMemoCreatedAt = formatCustomerMemoCreatedAt;
 
 
 function getCustomerMemoList(app) {
@@ -6614,7 +6628,8 @@ function renderCustomerMemoSectionHtml(app, options = {}) {
             등록된 비고 및 특이사항이 없습니다. 아래 입력창에 작성 후 [추가]를 눌러주세요.
           </div>
         ` : memoList.map((item, idx) => {
-          const displayAuthor = resolveMemoAuthor(item.author, item.text, app);
+          const displayAuthor = resolveMemoAuthor(item.author || (item.authorName && item.authorId ? `${item.authorName} (${item.authorId})` : ''), item.text, app);
+          const displayCreatedAt = formatCustomerMemoCreatedAt(item);
           return `
           <div id="hubMemoItemRow_${app.id}_${item.id}" class="group bg-white p-2.5 rounded-xl border border-amber-200/80 hover:border-amber-400 shadow-2xs transition-all flex items-start justify-between gap-2.5 text-xs">
             <div class="flex items-start gap-2 min-w-0 flex-1">
@@ -6627,7 +6642,7 @@ function renderCustomerMemoSectionHtml(app, options = {}) {
                 </div>
                 <div class="text-[10px] text-slate-400 font-mono mt-1 flex items-center gap-1.5 flex-wrap">
                   <span class="inline-flex items-center gap-1 text-slate-500 font-sans">
-                    <i data-lucide="clock" class="w-2.5 h-2.5 text-slate-400"></i> ${item.createdAt || ''}
+                    <i data-lucide="clock" class="w-2.5 h-2.5 text-slate-400"></i> ${typeof escapeHtml === 'function' ? escapeHtml(displayCreatedAt) : displayCreatedAt}
                   </span>
                   <span class="text-slate-300">·</span>
                   <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100/90 text-amber-950 border border-amber-300/80 font-sans font-bold text-[10.5px] shadow-2xs" title="작성자 및 아이디">
@@ -6698,7 +6713,7 @@ function addCustomerMemoItem(appId, customText) {
 
   const currentList = getCustomerMemoList(app).slice();
   const now = new Date();
-  const dateStr = `${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const dateStr = formatCareDateTimeStr(now);
 
   const newItem = {
     id: 'memo_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
@@ -6706,7 +6721,9 @@ function addCustomerMemoItem(appId, customText) {
     createdAt: dateStr,
     author: authorDisplay,
     authorId: curAdmin.username,
-    authorName: curAdmin.name
+    authorName: curAdmin.name,
+    updatedAt: null,
+    updatedBy: null
   };
 
   currentList.push(newItem);
@@ -6873,7 +6890,8 @@ function saveEditCustomerMemoItem(appId, itemId) {
   currentList[itemIdx] = {
     ...currentList[itemIdx],
     text: newText,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    updatedBy: `${getCurrentMemoAdmin().name} (${getCurrentMemoAdmin().username})`
   };
 
   app.memoList = currentList;

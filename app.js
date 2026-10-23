@@ -21794,29 +21794,56 @@ function applyCustomerMemoSave(appId, memoText) {
   if (appIdx === -1) return;
   const app = gApps[appIdx];
   const oldMemo = app.memo || app.specialNotes || '';
+  const oldList = (typeof getCustomerMemoList === 'function' ? getCustomerMemoList(app) : (app.memoList || [])) || [];
   app.memo = memoText;
   app.specialNotes = memoText;
   app.updatedAt = new Date().toISOString();
 
-  // memoList 동기화 (개별 항목 배열)
-  const oldList = (typeof getCustomerMemoList === 'function' ? getCustomerMemoList(app) : (app.memoList || [])) || [];
   const lines = memoText.split('\n').map(l => l.trim()).filter(Boolean);
   const now = new Date();
-  const dateStr = `${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  const currentAuthor = (typeof getCurrentMemoAuthorInfo === 'function') ? getCurrentMemoAuthorInfo() : ((window.currentUser && window.currentUser.name) || '간병상담팀');
-  app.memoList = lines.map((line, idx) => {
-    const existing = oldList.find(m => m.text === line);
-    if (existing) {
-      return {
-        ...existing,
-        author: (typeof resolveMemoAuthor === 'function') ? resolveMemoAuthor(existing.author, existing.text, app) : (existing.author || currentAuthor)
-      };
+  const dateStr = (typeof formatCareDateTimeStr === 'function') ? formatCareDateTimeStr(now) : now.toISOString();
+  const currentAdmin = (typeof getCurrentMemoAdmin === 'function') ? getCurrentMemoAdmin() : { name: '관리자', username: 'admin' };
+  const author = `${currentAdmin.name} (${currentAdmin.username})`;
+  const oldLines = oldList.map(m => String(m.text || '').trim());
+
+  // LCS keeps metadata only for unchanged lines in their original sequence.
+  const rows = oldLines.length + 1;
+  const cols = lines.length + 1;
+  const lcs = Array.from({ length: rows }, () => Array(cols).fill(0));
+  for (let i = oldLines.length - 1; i >= 0; i--) {
+    for (let j = lines.length - 1; j >= 0; j--) {
+      lcs[i][j] = oldLines[i] === lines[j]
+        ? lcs[i + 1][j + 1] + 1
+        : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
     }
+  }
+  const matchedOldByNew = new Map();
+  let oldIdx = 0;
+  let newIdx = 0;
+  while (oldIdx < oldLines.length && newIdx < lines.length) {
+    if (oldLines[oldIdx] === lines[newIdx]) {
+      matchedOldByNew.set(newIdx, oldIdx);
+      oldIdx++;
+      newIdx++;
+    } else if (lcs[oldIdx + 1][newIdx] >= lcs[oldIdx][newIdx + 1]) {
+      oldIdx++;
+    } else {
+      newIdx++;
+    }
+  }
+
+  app.memoList = lines.map((line, idx) => {
+    const matchedOldIdx = matchedOldByNew.get(idx);
+    if (matchedOldIdx !== undefined) return { ...oldList[matchedOldIdx], text: line };
     return {
-      id: 'memo_' + Date.now() + '_' + idx,
+      id: `memo_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
       text: line,
       createdAt: dateStr,
-      author: (typeof resolveMemoAuthor === 'function') ? resolveMemoAuthor(null, line, app) : currentAuthor
+      author,
+      authorId: currentAdmin.username,
+      authorName: currentAdmin.name,
+      updatedAt: null,
+      updatedBy: null
     };
   });
 
@@ -33377,6 +33404,23 @@ function openCustomerEditModal(appId, focusSection = null) {
     editAccidentPicker.value = accidentDateVal.slice(0, 10).replace(/\./g, '-');
   }
 
+  const accidentTypeVal = String(app.accidentType || '').trim();
+  const accidentTypeRadios = document.querySelectorAll('input[name="custEditAccidentTypeRadio"]');
+  accidentTypeRadios.forEach(radio => {
+    radio.checked = accidentTypeVal
+      ? radio.value === accidentTypeVal || (accidentTypeVal.includes('상해') && radio.value === '상해') || (accidentTypeVal.includes('질병') && radio.value === '질병')
+      : radio.value === '상해';
+  });
+
+  const diagnosisInput = document.getElementById('custEditDiagnosis');
+  if (diagnosisInput) {
+    diagnosisInput.value = app.diagnosis || app.diseaseName || app.disease || app.sicknessName || (app.memo && String(app.memo).match(/\[진단명:\s*([^\]]+)\]/)?.[1]?.trim()) || '';
+  }
+  const accidentDetailInput = document.getElementById('custEditAccidentDetail');
+  if (accidentDetailInput) {
+    accidentDetailInput.value = app.accidentDetail || '';
+  }
+
   // 간병시작 희망일시 (날짜 인풋에는 YYYY-MM-DD만 표시하여 잘림 방지, 시간은 셀렉트에 분리)
   const rawDesired = app.desiredDate || (resolvedApply ? resolvedApply.slice(0, 10).replace(/\./g, '-') : '');
   const desiredInput = document.getElementById('custEditDesiredDate');
@@ -33624,14 +33668,50 @@ async function handleCustomerEditSubmit(e) {
 
     if (app.memo) {
       const lines = app.memo.split('\n').map(l => l.trim()).filter(Boolean);
-      const author = (typeof getCurrentMemoAuthorInfo === 'function') ? getCurrentMemoAuthorInfo().name : '운영자';
-      const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
-      app.memoList = lines.map((line, idx) => ({
-        id: "m_edit_" + Date.now() + "_" + idx,
-        text: line,
-        createdAt: nowStr,
-        author: author
-      }));
+      const previousList = (typeof getCustomerMemoList === 'function' ? getCustomerMemoList(app) : (app.memoList || [])) || [];
+      const now = new Date();
+      const nowStr = (typeof formatCareDateTimeStr === 'function') ? formatCareDateTimeStr(now) : now.toISOString();
+      const currentAdmin = (typeof getCurrentMemoAdmin === 'function') ? getCurrentMemoAdmin() : { name: '관리자', username: 'admin' };
+      const author = `${currentAdmin.name} (${currentAdmin.username})`;
+      const previousLines = previousList.map(m => String(m.text || '').trim());
+      const rows = previousLines.length + 1;
+      const cols = lines.length + 1;
+      const lcs = Array.from({ length: rows }, () => Array(cols).fill(0));
+      for (let i = previousLines.length - 1; i >= 0; i--) {
+        for (let j = lines.length - 1; j >= 0; j--) {
+          lcs[i][j] = previousLines[i] === lines[j]
+            ? lcs[i + 1][j + 1] + 1
+            : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+        }
+      }
+      const matchedOldByNew = new Map();
+      let oldIdx = 0;
+      let newIdx = 0;
+      while (oldIdx < previousLines.length && newIdx < lines.length) {
+        if (previousLines[oldIdx] === lines[newIdx]) {
+          matchedOldByNew.set(newIdx, oldIdx);
+          oldIdx++;
+          newIdx++;
+        } else if (lcs[oldIdx + 1][newIdx] >= lcs[oldIdx][newIdx + 1]) {
+          oldIdx++;
+        } else {
+          newIdx++;
+        }
+      }
+      app.memoList = lines.map((line, idx) => {
+        const matchedOldIdx = matchedOldByNew.get(idx);
+        if (matchedOldIdx !== undefined) return { ...previousList[matchedOldIdx], text: line };
+        return {
+          id: `memo_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
+          text: line,
+          createdAt: nowStr,
+          author,
+          authorId: currentAdmin.username,
+          authorName: currentAdmin.name,
+          updatedAt: null,
+          updatedBy: null
+        };
+      });
     } else {
       app.memoList = [];
     }
