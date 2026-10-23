@@ -6519,24 +6519,7 @@ function resolveMemoAuthor(author, itemText, app) {
     return cleanAuthor;
   }
 
-  if (app) {
-    if (app.memoAuthor && !isVagueMemoAuthor(app.memoAuthor)) {
-      const adm = findAdminAccountInfo(app.memoAuthor);
-      if (adm && adm.username) return `${adm.name} (${adm.username})`;
-      return app.memoAuthor;
-    }
-    const creatorId = app.createdAdmin || app.creator || app.uploadedBy;
-    if (creatorId && !isVagueMemoAuthor(creatorId)) {
-      const creatorInfo = findAdminAccountInfo(creatorId);
-      if (creatorInfo && creatorInfo.name) return `${creatorInfo.name} (${creatorInfo.username})`;
-      if (app.creatorName) return `${app.creatorName} (${creatorId})`;
-      return `${creatorId}`;
-    }
-  }
-
-  const curAdm = getCurrentMemoAdmin();
-  if (curAdm && curAdm.username) return `${curAdm.name} (${curAdm.username})`;
-  return cleanAuthor || '관리자';
+  return cleanAuthor || '';
 }
 window.resolveMemoAuthor = resolveMemoAuthor;
 
@@ -6572,8 +6555,8 @@ function getCustomerMemoList(app) {
   const raw = (app.memo || app.specialNotes || '').trim();
   if (!raw) return [];
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
-  const dateStr = (app.updatedAt ? app.updatedAt.slice(0, 16).replace('T', ' ') : (app.applyDate || ''));
-  const initialAuthor = app.memoAuthor || app.createdAdmin || app.creator || app.uploadedBy || '';
+  const dateStr = '';
+  const initialAuthor = '';
   if (lines.length > 1) {
     return lines.map((line, idx) => ({
       id: 'm_init_' + idx,
@@ -6641,14 +6624,9 @@ function renderCustomerMemoSectionHtml(app, options = {}) {
                   ${typeof escapeHtml === 'function' ? escapeHtml(item.text) : item.text}
                 </div>
                 <div class="text-[10px] text-slate-400 font-mono mt-1 flex items-center gap-1.5 flex-wrap">
-                  <span class="inline-flex items-center gap-1 text-slate-500 font-sans">
-                    <i data-lucide="clock" class="w-2.5 h-2.5 text-slate-400"></i> ${typeof escapeHtml === 'function' ? escapeHtml(displayCreatedAt) : displayCreatedAt}
-                  </span>
-                  <span class="text-slate-300">·</span>
-                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100/90 text-amber-950 border border-amber-300/80 font-sans font-bold text-[10.5px] shadow-2xs" title="작성자 및 아이디">
-                    <i data-lucide="user-check" class="w-2.5 h-2.5 text-amber-700"></i>
-                    작성: ${typeof escapeHtml === 'function' ? escapeHtml(displayAuthor) : displayAuthor}
-                  </span>
+                  ${displayCreatedAt ? `<span class="inline-flex items-center gap-1 text-slate-500 font-sans"><i data-lucide="clock" class="w-2.5 h-2.5 text-slate-400"></i> ${typeof escapeHtml === 'function' ? escapeHtml(displayCreatedAt) : displayCreatedAt}</span>` : ''}
+                  ${displayCreatedAt && displayAuthor ? '<span class="text-slate-300">·</span>' : ''}
+                  ${displayAuthor ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100/90 text-amber-950 border border-amber-300/80 font-sans font-bold text-[10.5px] shadow-2xs" title="작성자 및 아이디"><i data-lucide="user-check" class="w-2.5 h-2.5 text-amber-700"></i> 작성: ${typeof escapeHtml === 'function' ? escapeHtml(displayAuthor) : displayAuthor}</span>` : ''}
                 </div>
               </div>
             </div>
