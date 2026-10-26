@@ -204,11 +204,22 @@ function cleanSurveyHospitalName(name, target) {
 function isTargetRecentlyAdded(target) {
   if (!target) return false;
   if (target.isRecentlyAdded === true) return true;
+  if (target.completedAt) {
+    const compTime = new Date(target.completedAt).getTime();
+    if (!isNaN(compTime) && (Date.now() - compTime < 48 * 3600 * 1000)) return true;
+  }
   if (target.createdAt) {
     const createdTime = new Date(target.createdAt).getTime();
-    if (!isNaN(createdTime) && (Date.now() - createdTime < 24 * 3600 * 1000)) {
+    if (!isNaN(createdTime) && (Date.now() - createdTime < 48 * 3600 * 1000)) {
       return true;
     }
+  }
+  // 간병 종료일이 오늘이거나 최근 2일 이내인 경우도 최근 종료로 판정
+  if (target.careEndDate) {
+    const endStr = String(target.careEndDate).trim().slice(0, 10).replace(/[^0-9]/g, '');
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10).replace(/[^0-9]/g, '');
+    if (endStr && endStr.length === 8 && endStr >= todayStr) return true;
   }
   return false;
 }
@@ -433,12 +444,22 @@ async function loadSurveyMgmtData(showToastAlert = false) {
       return t;
     });
 
-    // 기본 정렬: 최근 등록순(최신순) 맨 위에 배치
+    // 기본 정렬: 최근 간병 종료 고객 및 최근 등록순 최우선 맨 위 배치
     gSurveyState.targets.sort((a, b) => {
       const aRecent = isTargetRecentlyAdded(a);
       const bRecent = isTargetRecentlyAdded(b);
       if (aRecent && !bRecent) return -1;
       if (!aRecent && bRecent) return 1;
+
+      // 간병 종료일(careEndDate) 최신순 (최근 종료된 고객이 맨 위로!)
+      const aEnd = String(a.careEndDate || '').replace(/[^0-9]/g, '');
+      const bEnd = String(b.careEndDate || '').replace(/[^0-9]/g, '');
+      if (aEnd && bEnd && aEnd !== bEnd) {
+        return bEnd.localeCompare(aEnd);
+      }
+      if (aEnd && !bEnd) return -1;
+      if (!aEnd && bEnd) return 1;
+
       const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return tb - ta;
@@ -742,13 +763,23 @@ function applySurveyFilters() {
     );
   }
 
-  // 4. 정렬 (최근 등록완료건 맨 위 정렬)
+  // 4. 정렬 (최근 간병 종료 고객 최우선 맨 위 상단 정렬)
   filtered.sort((a, b) => {
     if (filterSort === 'RECENT_FIRST') {
       const aRecent = isTargetRecentlyAdded(a);
       const bRecent = isTargetRecentlyAdded(b);
       if (aRecent && !bRecent) return -1;
       if (!aRecent && bRecent) return 1;
+
+      // 간병 종료일(careEndDate) 최신순 (최근 종료된 고객이 맨 위로!)
+      const aEnd = String(a.careEndDate || '').replace(/[^0-9]/g, '');
+      const bEnd = String(b.careEndDate || '').replace(/[^0-9]/g, '');
+      if (aEnd && bEnd && aEnd !== bEnd) {
+        return bEnd.localeCompare(aEnd);
+      }
+      if (aEnd && !bEnd) return -1;
+      if (!aEnd && bEnd) return 1;
+
       const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return tb - ta;
@@ -4174,10 +4205,13 @@ async function autoSeedSurveyTargets(options = {}) {
         const st = String(app.status || '').trim();
         // 취소된 신청 및 아직 시작되지 않은 접수/대기 상태는 제외
         if (st === '취소' || st === '신청취소' || st === '접수취소') return false;
-        const isCompletedStatus = st === '완료' || st === '정산완료' || st === '종료' || st === '진행완료';
-        const isNotStarted = st === '접수' || st === '대기' || st === '배정대기';
-        const endDateIso = normDate(app.careEndDate);
-        const isEndedByDate = !isNotStarted && endDateIso.length === 10 && endDateIso < todayIso;
+        const realSt = (typeof determineRealCareStatus === 'function') 
+          ? determineRealCareStatus(app) 
+          : st;
+        const isCompletedStatus = realSt === '완료' || realSt === '정산완료' || realSt.includes('종료') || realSt.includes('종결') || st === '완료' || st === '정산완료' || st === '종료';
+        const isNotStarted = realSt === '접수' || realSt === '대기' || realSt === '배정대기' || realSt === '예정';
+        const endDateIso = normDate(app.careEndDate || app.expectedEndDate);
+        const isEndedByDate = !isNotStarted && endDateIso.length === 10 && endDateIso <= todayIso;
         return isCompletedStatus || isEndedByDate;
       });
 
@@ -4225,6 +4259,7 @@ async function autoSeedSurveyTargets(options = {}) {
             responseId: null,
             revision: 1,
             createdAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
             isRecentlyAdded: true
           };
           existingMap.set(appId, newTarget);
@@ -4273,6 +4308,9 @@ async function autoSeedSurveyTargets(options = {}) {
     }
 
     await loadSurveyMgmtData(false);
+    if (typeof applySurveyFilters === 'function') {
+      applySurveyFilters();
+    }
   } catch (e) {
     console.error('[Survey AutoSeed Error]', e);
     if (!isSilent && typeof showToast === 'function') {

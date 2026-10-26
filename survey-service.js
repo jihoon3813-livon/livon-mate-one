@@ -225,8 +225,8 @@ class SurveyService {
       if (st === '취소' || st === '신청취소' || st === '접수취소') return false;
       const isCompletedStatus = st === '완료' || st === '정산완료' || st === '종료' || st === '진행완료';
       const isNotStarted = st === '접수' || st === '대기' || st === '배정대기';
-      const endDateIso = normDate(app.careEndDate);
-      const isEndedByDate = !isNotStarted && endDateIso.length === 10 && endDateIso < todayIso;
+      const endDateIso = normDate(app.careEndDate || app.expectedEndDate);
+      const isEndedByDate = !isNotStarted && endDateIso.length === 10 && endDateIso <= todayIso;
       return isCompletedStatus || isEndedByDate;
     });
 
@@ -298,6 +298,7 @@ class SurveyService {
       responseId: null,
       revision: 1,
       createdAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
       isRecentlyAdded: true
     };
 

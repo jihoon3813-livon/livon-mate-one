@@ -32997,7 +32997,8 @@ function handleNewAssignSubmit(e) {
   e.preventDefault();
   const select = document.getElementById('newAssignApplySelect');
   const applyId = select ? select.value : '';
-  const app = gApps.find(a => a.id === applyId);
+  const app = (gApps || []).find(a => a && (String(a.id) === String(applyId) || String(a.id).replace(/^[CH]/, '') === String(applyId).replace(/^[CH]/, '')));
+  const targetAppId = app ? app.id : applyId;
   const name = document.getElementById('newAssignCaregiverName').value.trim();
   const wageRaw = document.getElementById('newAssignDailyWage').value.replace(/[^0-9]/g, '');
 
@@ -33037,7 +33038,7 @@ function handleNewAssignSubmit(e) {
 
   const newAssign = {
     id: newAssignId,
-    applyId: applyId,
+    applyId: targetAppId,
     patientName: app ? app.patientName : '고객',
     caregiverName: name,
     birthDate: '',
@@ -33058,9 +33059,15 @@ function handleNewAssignSubmit(e) {
 
   if (app) {
     app.assignedCaregiverCount = (app.assignedCaregiverCount || 0) + 1;
+    app.caregiverName = name;
+    app.caregiverPhone = newAssign.phone;
+    app.caregiverCenter = newAssign.centerName;
     app.status = '진행중';
     if (!isReplacement) {
       app.careStartDate = newAssign.startDate;
+    }
+    if (!app.careEndDate) {
+      app.careEndDate = newAssign.endDate;
     }
   }
 
@@ -33113,10 +33120,16 @@ function handleNewAssignSubmit(e) {
   renderApplications();
   renderDashboard();
 
-  // 열려있는 고객상세 팝업이 있다면 즉시 최신 간병인 배정 데이터로 재렌더링
+  // 열려있는 고객상세 팝업이 있다면 즉시 최신 간병인 배정 데이터로 재렌더링 (원격 덮어쓰기 방지: skipRemoteRefresh=true, suppressProgress=true)
   const hubModal = document.getElementById('hubCustomerDetailModal');
-  if (hubModal && !hubModal.classList.contains('hidden') && (gActiveHubModalAppId || applyId)) {
-    openHubCustomerDetailModal(gActiveHubModalAppId || applyId);
+  const isHubModalOpen = hubModal && !hubModal.classList.contains('hidden') && hubModal.style.display !== 'none';
+  const modalTargetId = targetAppId || gActiveHubModalAppId;
+  if (isHubModalOpen && modalTargetId) {
+    gActiveHubModalAppId = modalTargetId;
+    gActiveCaregiverTabAssignId = newAssign.id;
+    if (typeof openHubCustomerDetailModal === 'function') {
+      openHubCustomerDetailModal(modalTargetId, null, true, true);
+    }
   }
 
   // Convex Cloud 운영 DB 실시간 동기화
@@ -34506,9 +34519,14 @@ async function deleteCaregiverAssign(appId, assignId) {
     });
   }
 
-  // 8. 열려있는 통합허브 상세 모달 및 각 탭 즉시 리렌더링
-  if (typeof gActiveHubModalAppId !== 'undefined' && app && gActiveHubModalAppId === app.id) {
-    openHubCustomerDetailModal(app.id);
+  // 8. 열려있는 통합허브 상세 모달 및 각 탭 즉시 리렌더링 (원격 덮어쓰기 방지)
+  const delHubModal = document.getElementById('hubCustomerDetailModal');
+  const isDelHubModalOpen = delHubModal && !delHubModal.classList.contains('hidden') && delHubModal.style.display !== 'none';
+  if (isDelHubModalOpen && app) {
+    gActiveCaregiverTabAssignId = null;
+    if (typeof openHubCustomerDetailModal === 'function') {
+      openHubCustomerDetailModal(app.id, null, true, true);
+    }
   }
   if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
   if (typeof renderApplications === 'function') renderApplications();
@@ -34953,10 +34971,16 @@ function handleCareScheduleSubmit(e) {
   if (typeof renderAssignments === 'function') renderAssignments();
   if (typeof renderPayouts === 'function') renderPayouts();
 
-  // 열려있는 고객상세 팝업이 있다면 즉시 갱신
+  // 열려있는 고객상세 팝업이 있다면 즉시 갱신 (원격 덮어쓰기 방지)
   const hubModal = document.getElementById('hubCustomerDetailModal');
-  if (hubModal && !hubModal.classList.contains('hidden') && (gActiveHubModalAppId || as.applyId)) {
-    openHubCustomerDetailModal(gActiveHubModalAppId || as.applyId);
+  const isHubModalOpen = hubModal && !hubModal.classList.contains('hidden') && hubModal.style.display !== 'none';
+  if (isHubModalOpen && (as.applyId || gActiveHubModalAppId)) {
+    const activeId = as.applyId || gActiveHubModalAppId;
+    gActiveHubModalAppId = activeId;
+    gActiveCaregiverTabAssignId = as.id;
+    if (typeof openHubCustomerDetailModal === 'function') {
+      openHubCustomerDetailModal(activeId, null, true, true);
+    }
   }
 
   // Convex Cloud 운영 DB 실시간 동기화

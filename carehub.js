@@ -5333,6 +5333,12 @@ window.getActiveCaregiverAssignment = getActiveCaregiverAssignment;
  */
 function determineRealCareStatus(app, specificAssigns) {
   if (!app) return '신규';
+
+  // [수동 설정값 최우선 반영] 관리자가 분류관리에서 직접 지정한 상태가 있는 경우 즉시 최우선 적용
+  if (app.hasManualUpdate && app.status) {
+    return app.status;
+  }
+
   if (!specificAssigns && app._renderCareStatus) {
     return app._renderCareStatus;
   }
@@ -10470,15 +10476,42 @@ function handlePayoutEditSubmit(e) {
 // [NEW] 관리자 고객 필드(신청유형, 청구분류, 입금확인금액, 추정미수금 등) 실시간 설정 및 동기화
 // =========================================================================
 async function updateCustomerField(appId, field, value) {
-  const app = (gApps || []).find(a => a.id === appId);
+  const targetIdStr = String(appId || '').trim();
+  const app = (gApps || []).find(a => a && (String(a.id).trim() === targetIdStr || (a.patientId && String(a.patientId).trim() === targetIdStr)));
   if (!app) return;
   const oldValue = app[field];
   app[field] = value;
-  if (field === 'claimClassification') {
+
+  if (field === 'status') {
+    app.rawStatus = value;
+    app._renderCareStatus = value; // [상태 캐시 즉시 동기화]
+  } else if (field === 'claimClassification') {
     app.claimCategory = value;
+    delete app._renderCareStatus; // [청구분류 변경 시 캐시 무효화]
   }
   app.updatedAt = new Date().toISOString();
   app.hasManualUpdate = true;
+
+  // [즉시 낙관적(Optimistic) 화면 렌더링]: 서버 비동기 완료 대기 없이 UI에 즉시 실시간 반영!
+  try {
+    if (typeof renderUnifiedCareHub === 'function') {
+      renderUnifiedCareHub();
+    }
+    if (typeof gActiveHubModalAppId !== 'undefined' && String(gActiveHubModalAppId).trim() === targetIdStr) {
+      openHubCustomerDetailModal(app.id, null, true, true);
+    }
+  } catch (renderErr) {
+    console.warn('[updateCustomerField] optimistic render warning:', renderErr);
+  }
+
+  // [간병 완료 시 만족도조사 자동 연동]
+  if (field === 'status' && (value === '완료' || value === '정산완료')) {
+    try {
+      if (typeof window.autoSeedSurveyTargets === 'function') {
+        window.autoSeedSurveyTargets({ isSilent: true, isAuto: true });
+      }
+    } catch (_) {}
+  }
 
   // [시스템 감사 로그 기록]
   if (typeof window.recordSystemAuditLog === 'function') {
@@ -10503,7 +10536,7 @@ async function updateCustomerField(appId, field, value) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        appId: appId,
+        appId: app.id,
         fields: fieldsPayload
       })
     });
@@ -10512,7 +10545,7 @@ async function updateCustomerField(appId, field, value) {
       if (typeof syncToConvex === 'function') {
         try {
           await syncToConvex('sync:updateCustomerField', {
-            appId: appId,
+            appId: app.id,
             field: field,
             value: value
           });
@@ -10527,9 +10560,8 @@ async function updateCustomerField(appId, field, value) {
           icon: 'check-circle-2'
         });
       }
-      renderUnifiedCareHub();
-      if (typeof gActiveHubModalAppId !== 'undefined' && gActiveHubModalAppId === appId) {
-        openHubCustomerDetailModal(appId);
+      if (typeof renderUnifiedCareHub === 'function') {
+        renderUnifiedCareHub();
       }
       if (field === 'status' || field === 'claimClassification') {
         const claimCheck = checkCustomerClaimSetStatus(app);
@@ -14454,15 +14486,22 @@ function closeAllCareCardExpands() {
 function applyHubCustomerDetailSnapshot(appId, detail) {
   if (!detail || detail.status !== 'success' || !detail.application || String(detail.application.id) !== String(appId)) return false;
 
-  const replaceRelated = (current, incoming, belongsToApp) => [
-    ...(Array.isArray(current) ? current : []).filter(item => !belongsToApp(item)),
-    ...(Array.isArray(incoming) ? incoming : [])
-  ];
+  const replaceRelated = (current, incoming, belongsToApp) => {
+    const curList = Array.isArray(current) ? current : [];
+    const inList = Array.isArray(incoming) ? incoming : [];
+    const incomingIds = new Set(inList.map(item => item && item.id).filter(Boolean));
+    const pendingLocal = curList.filter(item => belongsToApp(item) && item && item.id && !incomingIds.has(item.id));
+    return [
+      ...curList.filter(item => !belongsToApp(item)),
+      ...inList,
+      ...pendingLocal
+    ];
+  };
   const appIndex = (gApps || []).findIndex(item => item && String(item.id) === String(appId));
   if (appIndex < 0) return false;
 
   gApps[appIndex] = detail.application;
-  const hasApplyId = item => item && String(item.applyId) === String(appId);
+  const hasApplyId = item => item && (String(item.applyId) === String(appId) || String(item.id) === String(appId));
   gAssigns = replaceRelated(gAssigns, detail.assignments, hasApplyId);
   gClaims = replaceRelated(gClaims, detail.claims, hasApplyId);
   gPayouts = replaceRelated(gPayouts, detail.payouts, hasApplyId);

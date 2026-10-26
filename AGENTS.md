@@ -47,3 +47,10 @@ Convex agent skills for common tasks can be installed by running
   2. 공통 라우터인 `app.js`는 각 모듈 함수 존재 여부(`typeof ... === 'function'`)를 확인하고 호출하는 최소한의 디스패치 역할만 유지하며, 임의로 메뉴 전용 로직을 `app.js`에 삽입하지 않습니다.
   3. 한 메뉴의 변경이 다른 메뉴의 동작이나 데이터, 전역 변수에 예기치 않은 부작용(Side Effect)을 일으키지 않도록 모듈 간 스코프를 철저히 격리합니다.
 
+## 5. 배포 및 푸시 전 최신 원격 변경사항 동기화 필수 (Strict Pre-Deployment / Push Verification)
+- **배포 및 Git 푸시 전 사전 확인 필수**:
+  - 기능 개발 후 배포/푸시를 진행하기 전에는 **항상 먼저 `git pull bitbucket main`을 실행**하여 상대방의 작업 내용이 있는지 확인 및 병합한 후 푸시/배포해야 합니다.
+  - 사용자가 배포를 요청하거나 배포 절차를 밟을 때, 사용자가 언급하지 않더라도 **AI 에이전트가 먼저 이 절차(`git pull bitbucket main` 확인)를 상기하고 선행 검증**해야 합니다.
+  - 이를 통해 상대방의 작업 내용이 덮어씌워지거나 유실되는 현상을 완벽히 차단합니다.
+
+
