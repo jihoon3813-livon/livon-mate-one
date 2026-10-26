@@ -545,7 +545,11 @@ function updateSidebarSurveyBadge() {
 // =========================================================================
 // 2. 전체 탭 렌더링 (만족도 조사 메뉴 클릭 시 자동 조회 및 로딩 표시)
 // =========================================================================
+let gIsRenderingSurveyTab = false;
 async function renderSurveyMgmtTab() {
+  if (gIsRenderingSurveyTab) return;
+  gIsRenderingSurveyTab = true;
+  restoreSurveyNewStudioState();
   showSurveyLoading(true, '종료 고객 명단 자동 조회 및 동기화 중...');
   try {
     // 1차: 기존 저장된 데이터 우선 신속 렌더링
@@ -557,6 +561,7 @@ async function renderSurveyMgmtTab() {
     console.warn('[SurveyClient] renderSurveyMgmtTab auto-sync error:', e);
   } finally {
     showSurveyLoading(false);
+    gIsRenderingSurveyTab = false;
   }
 }
 
@@ -662,12 +667,13 @@ function renderActiveSurveySubTab() {
 function applySurveyFilters() {
   const isNewTab = (typeof gActiveTab !== 'undefined' && gActiveTab === 'surveymgmt_new');
   const sfx = isNewTab ? '_new' : '';
-  const search = (document.getElementById('surveySearchInput' + sfx)?.value || document.getElementById('surveySearchInput')?.value || '').trim().toLowerCase();
-  const filterGuidance = document.getElementById('surveyFilterGuidance' + sfx)?.value || document.getElementById('surveyFilterGuidance')?.value || 'ALL';
-  const filterResponse = document.getElementById('surveyFilterResponse' + sfx)?.value || document.getElementById('surveyFilterResponse')?.value || 'ALL';
-  const filterGift = document.getElementById('surveyFilterGift_new')?.value || 'ALL';
-  const filterInsurance = document.getElementById('surveyFilterInsurance' + sfx)?.value || document.getElementById('surveyFilterInsurance')?.value || 'ALL';
-  const filterSort = document.getElementById('surveyFilterSort' + sfx)?.value || document.getElementById('surveyFilterSort')?.value || 'RECENT_FIRST';
+  const searchInputEl = document.getElementById('surveySearchInput' + sfx) || (!isNewTab ? document.getElementById('surveySearchInput') : null);
+  const search = (searchInputEl?.value || '').trim().toLowerCase();
+  const filterGuidance = (document.getElementById('surveyFilterGuidance' + sfx)?.value) || 'ALL';
+  const filterResponse = (document.getElementById('surveyFilterResponse' + sfx)?.value) || 'ALL';
+  const filterGift = isNewTab ? (document.getElementById('surveyFilterGift_new')?.value || 'ALL') : 'ALL';
+  const filterInsurance = (document.getElementById('surveyFilterInsurance' + sfx)?.value) || 'ALL';
+  const filterSort = (document.getElementById('surveyFilterSort' + sfx)?.value) || 'RECENT_FIRST';
 
   let filtered = (gSurveyState.targets || []).slice();
 
@@ -1838,14 +1844,59 @@ function changeSurveyNewPreviewTarget(targetId) {
   if (urlLabel) urlLabel.textContent = relUrl;
 }
 
-function toggleSurveyNewInlineStudio() {
+function toggleSurveyNewInlineStudio(forceState = null) {
   const studio = document.getElementById('surveyNewInlineStudio');
   const label = document.getElementById('btnToggleSurveyNewStudioLabel');
+  const btn = document.getElementById('btnToggleSurveyNewStudio');
   if (!studio) return;
-  const isHidden = studio.classList.toggle('hidden');
-  if (label) {
-    label.textContent = isHidden ? '웹뷰 스튜디오 펼치기' : '웹뷰 스튜디오 접기';
+
+  let shouldHide;
+  if (forceState !== null && typeof forceState === 'boolean') {
+    shouldHide = forceState;
+    if (shouldHide) {
+      studio.classList.add('hidden');
+      studio.style.display = 'none';
+    } else {
+      studio.classList.remove('hidden');
+      studio.style.display = '';
+    }
+  } else {
+    const currentlyHidden = studio.classList.contains('hidden') || studio.style.display === 'none';
+    shouldHide = !currentlyHidden;
+    if (shouldHide) {
+      studio.classList.add('hidden');
+      studio.style.display = 'none';
+    } else {
+      studio.classList.remove('hidden');
+      studio.style.display = '';
+    }
   }
+
+  if (label) {
+    label.textContent = shouldHide ? '웹뷰 스튜디오 펼치기' : '웹뷰 스튜디오 접기';
+  }
+  if (btn) {
+    if (shouldHide) {
+      btn.className = 'px-3.5 py-2.5 rounded-xl bg-pink-500 hover:bg-pink-600 border border-pink-300 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md';
+    } else {
+      btn.className = 'px-3.5 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 border border-pink-300/40 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs';
+    }
+  }
+
+  try {
+    localStorage.setItem('LIVON_SURVEY_NEW_STUDIO_HIDDEN', shouldHide ? 'true' : 'false');
+  } catch (e) {}
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function restoreSurveyNewStudioState() {
+  try {
+    const isSavedHidden = localStorage.getItem('LIVON_SURVEY_NEW_STUDIO_HIDDEN') === 'true';
+    if (isSavedHidden) {
+      toggleSurveyNewInlineStudio(true);
+    }
+  } catch (e) {}
 }
 
 function openSurveyNewStandaloneWindow() {
@@ -4026,7 +4077,6 @@ async function handleCreateSurveyTarget(event) {
 async function autoSeedSurveyTargets(options = {}) {
   if (gIsAutoSeedingSurvey) return;
   gIsAutoSeedingSurvey = true;
-  try {
   const { isSilent = false, isAuto = false } = (typeof options === 'object' && options !== null) ? options : {};
   try {
     const apps = (typeof gApps !== 'undefined' && Array.isArray(gApps) && gApps.length > 0) ? gApps : null;
@@ -4384,6 +4434,7 @@ if (typeof window !== 'undefined') {
   window.setSurveyNewViewportMode = setSurveyNewViewportMode;
   window.changeSurveyNewPreviewTarget = changeSurveyNewPreviewTarget;
   window.toggleSurveyNewInlineStudio = toggleSurveyNewInlineStudio;
+  window.restoreSurveyNewStudioState = restoreSurveyNewStudioState;
   window.openSurveyNewStandaloneWindow = openSurveyNewStandaloneWindow;
   window.copySurveyNewCurrentPreviewUrl = copySurveyNewCurrentPreviewUrl;
   window.openSurveyNewWebviewModal = openSurveyNewWebviewModal;
