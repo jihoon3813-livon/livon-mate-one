@@ -2396,7 +2396,7 @@ function sanitizeAccidentalDuplicateClaims(targetAppId = null) {
     try {
       localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
       localStorage.setItem('LIVON_CLAIMS', JSON.stringify(gClaims));
-      localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+      // TEMP disabled LIVON_CACHED_APPS save: localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
     } catch (e) {}
     console.log('[Sanitizer] 오생성 유령 청구서 정화 완료 및 로컬스토리지 갱신 완료');
   }
@@ -2602,7 +2602,7 @@ async function executeImmediatePayout(applyId, roundNumber, targetDays) {
     app.updatedAt = now.toISOString();
 
     try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
-    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+    // TEMP disabled LIVON_CACHED_APPS save: try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
     if (typeof syncToConvex === 'function') {
       syncToConvex('sync:savePayout', { payout: newPayout });
@@ -2653,7 +2653,7 @@ async function deleteInterimPayout(applyId, payoutId) {
   }
 
   try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
-  try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+  // TEMP disabled LIVON_CACHED_APPS save: try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
   const pRoundNum = parseInt(String((p && p.round) || '').replace(/[^0-9]/g, ''), 10) || null;
   if (gActiveHubModalAppId) openHubCustomerDetailModal(gActiveHubModalAppId, pRoundNum);
@@ -2736,7 +2736,7 @@ async function executeBatchCaregiverPayout(applyId, assignId) {
     app.updatedAt = now.toISOString();
 
     try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
-    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+    // TEMP disabled LIVON_CACHED_APPS save: try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
     if (typeof syncToConvex === 'function') {
       (gPayouts.filter(p => p.applyId === applyId)).forEach(p => {
@@ -3698,7 +3698,7 @@ async function handleSaveSettlementSet(e) {
 
     // Save to localStorage & Convex
     try {
-      localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+      // TEMP disabled LIVON_CACHED_APPS save: localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
       localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
       localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
     } catch (err) {
@@ -3909,7 +3909,7 @@ async function deleteSettlementSet(appId, setIndex) {
 
   // 8. Persist to localStorage
   try {
-    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    // TEMP disabled LIVON_CACHED_APPS save: localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
     localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
     localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
   } catch (e) {
@@ -4189,7 +4189,7 @@ async function saveActiveHubCustomerDetail(silent = false, targetAppId = null) {
 
   // 4. Save to localStorage
   try {
-    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    // TEMP disabled LIVON_CACHED_APPS save: localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
     localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
     localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
   } catch (err) {
@@ -4322,6 +4322,7 @@ async function saveAndCloseActiveHubCustomerDetail() {
       gActiveHubModalAppId = null;
     }
     resetHubCustomerModalSaveButtons();
+    refreshHubCardsAfterCustomerModalClose();
   }
 }
 
@@ -4368,11 +4369,29 @@ async function confirmCloseHubCustomerDetailModal() {
         gActiveHubModalAppId = null;
       }
       resetHubCustomerModalSaveButtons();
+      refreshHubCardsAfterCustomerModalClose();
     }
+  } else {
+    refreshHubCardsAfterCustomerModalClose();
   }
 }
 
 window.saveActiveHubCustomerDetail = saveActiveHubCustomerDetail;
+
+function refreshHubCardsAfterCustomerModalClose() {
+  renderPendingCareHubSnapshot();
+  // 구독이 활성 상태면 저장 변경은 구독 이벤트가 반영하므로 닫을 때 재조회하지 않는다.
+  // 다음 자동 갱신 주기만 닫은 시점부터 다시 계산한다.
+  if (gCareHubSubscriptionReady) {
+    resetHubAutoRefreshTimer();
+    return;
+  }
+
+  if (typeof refreshLatestData === 'function') {
+    refreshLatestData().catch(err => console.warn('[Hub Cards Refresh After Modal Close]', err));
+  }
+}
+
 window.saveAndCloseActiveHubCustomerDetail = saveAndCloseActiveHubCustomerDetail;
 window.confirmCloseHubCustomerDetailModal = confirmCloseHubCustomerDetailModal;
 
@@ -5174,7 +5193,7 @@ async function handleManualFaxClaimSubmit(e) {
   gFaxLogs.unshift(faxLog);
 
   // 4. 로컬 및 서버 동기화
-  try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+  // TEMP disabled LIVON_CACHED_APPS save: try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
   try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
   if (typeof saveFaxLogs === 'function') saveFaxLogs();
 
@@ -5531,7 +5550,7 @@ function reconcileAppsWithActiveAssignments(targetApps = null, targetAssigns = n
 
   if (updatedAny && !targetApps) {
     try {
-      localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+      // TEMP disabled LIVON_CACHED_APPS save: localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
     } catch (e) {}
   }
 }
@@ -6068,7 +6087,7 @@ async function addSettlementStepMemo(appId, roundNumber, stepType) {
 
   // 4. 로컬 스토리지 즉시 동기화
   try {
-    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    // TEMP disabled LIVON_CACHED_APPS save: localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
     if (targetClaim) localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
     if (targetPayout) localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
   } catch (err) {
@@ -6175,7 +6194,7 @@ async function deleteSettlementStepMemo(appId, roundNumber, stepType, memoId) {
   app.updatedAt = new Date().toISOString();
 
   try {
-    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    // TEMP disabled LIVON_CACHED_APPS save: localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
     if (targetClaim) localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
     if (targetPayout) localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts));
   } catch (err) {
@@ -6519,35 +6538,42 @@ function resolveMemoAuthor(author, itemText, app) {
     return cleanAuthor;
   }
 
-  // 2. 고객 데이터 자체에 기록된 등록자/작성자 정보가 있는 경우 적용
-  if (app) {
-    if (app.memoAuthor && !isVagueMemoAuthor(app.memoAuthor)) {
-      const adm = findAdminAccountInfo(app.memoAuthor);
-      if (adm && adm.username) return `${adm.name} (${adm.username})`;
-      return app.memoAuthor;
-    }
-    const creatorId = app.createdAdmin || app.creator || app.uploadedBy;
-    if (creatorId && !isVagueMemoAuthor(creatorId)) {
-      const creatorInfo = findAdminAccountInfo(creatorId);
-      if (creatorInfo && creatorInfo.name) {
-        return `${creatorInfo.name} (${creatorInfo.username})`;
-      }
-      if (app.creatorName) {
-        return `${app.creatorName} (${creatorId})`;
-      }
-      return `${creatorId}`;
-    }
-  }
-
-  // 3. 현재 로그인된 관리자 계정 정보 반영 (실제 로그인된 사용자)
-  const curAdm = getCurrentMemoAdmin();
-  if (curAdm && curAdm.username) {
-    return `${curAdm.name} (${curAdm.username})`;
-  }
-
-  return cleanAuthor || '관리자';
+  return cleanAuthor || '';
 }
 window.resolveMemoAuthor = resolveMemoAuthor;
+
+function formatCustomerMemoKoreaIso(date) {
+  return new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00');
+}
+
+function formatCustomerMemoCreatedAt(item) {
+  if (!item) return '';
+
+  const updatedAt = String(item.updatedAt || '').trim();
+  if (updatedAt) {
+    const updatedDate = new Date(updatedAt);
+    if (!isNaN(updatedDate.getTime())) return formatCareDateTimeStr(updatedDate);
+  }
+
+  const localText = String(item.createdAt || item.dateStr || '').trim();
+  if (localText) {
+    const localMatch = localText.match(/^(\d{1,2})[./-](\d{1,2})\s+(\d{1,2}):(\d{2})$/);
+    if (localMatch) {
+      const year = getKoreaDateParts(new Date()).year;
+      return `${year}.${localMatch[1].padStart(2, '0')}.${localMatch[2].padStart(2, '0')} ${localMatch[3].padStart(2, '0')}:${localMatch[4]}`;
+    }
+    if (/^\d{4}[./-]\d{1,2}[./-]\d{1,2}\s+\d{1,2}:\d{2}$/.test(localText)) return localText;
+  }
+
+  const timestamp = item.timestamp || item.createdAt;
+  if (timestamp && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(String(timestamp).trim())) {
+    const date = new Date(timestamp);
+    if (!isNaN(date.getTime())) return formatCareDateTimeStr(date);
+  }
+
+  return localText || '';
+}
+window.formatCustomerMemoCreatedAt = formatCustomerMemoCreatedAt;
 
 
 function getCustomerMemoList(app) {
@@ -6558,8 +6584,8 @@ function getCustomerMemoList(app) {
   const raw = (app.memo || app.specialNotes || '').trim();
   if (!raw) return [];
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
-  const dateStr = (app.updatedAt ? app.updatedAt.slice(0, 16).replace('T', ' ') : (app.applyDate || ''));
-  const initialAuthor = app.memoAuthor || app.createdAdmin || app.creator || app.uploadedBy || '';
+  const dateStr = '';
+  const initialAuthor = '';
   if (lines.length > 1) {
     return lines.map((line, idx) => ({
       id: 'm_init_' + idx,
@@ -6614,7 +6640,8 @@ function renderCustomerMemoSectionHtml(app, options = {}) {
             등록된 비고 및 특이사항이 없습니다. 아래 입력창에 작성 후 [추가]를 눌러주세요.
           </div>
         ` : memoList.map((item, idx) => {
-          const displayAuthor = resolveMemoAuthor(item.author, item.text, app);
+          const displayAuthor = resolveMemoAuthor(item.author || (item.authorName && item.authorId ? `${item.authorName} (${item.authorId})` : ''), item.text, app);
+          const displayCreatedAt = formatCustomerMemoCreatedAt(item);
           return `
           <div id="hubMemoItemRow_${app.id}_${item.id}" class="group bg-white p-2.5 rounded-xl border border-amber-200/80 hover:border-amber-400 shadow-2xs transition-all flex items-start justify-between gap-2.5 text-xs">
             <div class="flex items-start gap-2 min-w-0 flex-1">
@@ -6626,14 +6653,9 @@ function renderCustomerMemoSectionHtml(app, options = {}) {
                   ${typeof escapeHtml === 'function' ? escapeHtml(item.text) : item.text}
                 </div>
                 <div class="text-[10px] text-slate-400 font-mono mt-1 flex items-center gap-1.5 flex-wrap">
-                  <span class="inline-flex items-center gap-1 text-slate-500 font-sans">
-                    <i data-lucide="clock" class="w-2.5 h-2.5 text-slate-400"></i> ${item.createdAt || ''}
-                  </span>
-                  <span class="text-slate-300">·</span>
-                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100/90 text-amber-950 border border-amber-300/80 font-sans font-bold text-[10.5px] shadow-2xs" title="작성자 및 아이디">
-                    <i data-lucide="user-check" class="w-2.5 h-2.5 text-amber-700"></i>
-                    작성: ${typeof escapeHtml === 'function' ? escapeHtml(displayAuthor) : displayAuthor}
-                  </span>
+                  ${displayCreatedAt ? `<span class="inline-flex items-center gap-1 text-slate-500 font-sans"><i data-lucide="clock" class="w-2.5 h-2.5 text-slate-400"></i> ${typeof escapeHtml === 'function' ? escapeHtml(displayCreatedAt) : displayCreatedAt}</span>` : ''}
+                  ${displayCreatedAt && displayAuthor ? '<span class="text-slate-300">·</span>' : ''}
+                  ${displayAuthor ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100/90 text-amber-950 border border-amber-300/80 font-sans font-bold text-[10.5px] shadow-2xs" title="작성자 및 아이디"><i data-lucide="user-check" class="w-2.5 h-2.5 text-amber-700"></i> 작성: ${typeof escapeHtml === 'function' ? escapeHtml(displayAuthor) : displayAuthor}</span>` : ''}
                 </div>
               </div>
             </div>
@@ -6698,15 +6720,16 @@ function addCustomerMemoItem(appId, customText) {
 
   const currentList = getCustomerMemoList(app).slice();
   const now = new Date();
-  const dateStr = `${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
   const newItem = {
     id: 'memo_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     text: text,
-    createdAt: dateStr,
+    createdAt: formatCustomerMemoKoreaIso(now),
     author: authorDisplay,
     authorId: curAdmin.username,
-    authorName: curAdmin.name
+    authorName: curAdmin.name,
+    updatedAt: null,
+    updatedBy: null
   };
 
   currentList.push(newItem);
@@ -6760,7 +6783,7 @@ function addCustomerMemoItem(appId, customText) {
     }
 
     try {
-      localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+      // TEMP disabled LIVON_CACHED_APPS save: localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
     } catch (e) {}
 
     fetch('/api/hub/customer/update-fields', {
@@ -6873,7 +6896,8 @@ function saveEditCustomerMemoItem(appId, itemId) {
   currentList[itemIdx] = {
     ...currentList[itemIdx],
     text: newText,
-    updatedAt: new Date().toISOString()
+    updatedAt: formatCustomerMemoKoreaIso(new Date()),
+    updatedBy: `${getCurrentMemoAdmin().name} (${getCurrentMemoAdmin().username})`
   };
 
   app.memoList = currentList;
@@ -6911,7 +6935,7 @@ function saveEditCustomerMemoItem(appId, itemId) {
       }
     }
 
-    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+    // TEMP disabled LIVON_CACHED_APPS save: try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
     fetch('/api/hub/customer/update-fields', {
       method: 'POST',
@@ -6978,7 +7002,7 @@ function deleteCustomerMemoItem(appId, itemId) {
       }
     }
 
-    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+    // TEMP disabled LIVON_CACHED_APPS save: try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
     fetch('/api/hub/customer/update-fields', {
       method: 'POST',
@@ -10804,7 +10828,7 @@ async function togglePayoutStatus(payoutId) {
     }
 
     try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
-    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+    // TEMP disabled LIVON_CACHED_APPS save: try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
     if (typeof syncToConvex === 'function') {
       syncToConvex('sync:savePayout', { payout: p });
@@ -12129,7 +12153,531 @@ if (typeof window !== 'undefined') {
   window.updateHubStatusLegendUI = updateHubStatusLegendUI;
 }
 
+const AUTO_REFRESH_SETTINGS_STORAGE_KEY = 'LIVON_AUTO_REFRESH_SETTINGS';
+const HUB_AUTO_REFRESH_PAGE_ID = 'carehub';
+var gHubAutoRefreshTimer = null;
+var gHubReturnRefreshPromise = null;
+var gHubTabVisibilityObserver = null;
+var gHubReturnProgressOwned = false;
+var gCareHubConvexClient = null;
+var gCareHubSnapshotUnsubscribe = null;
+var gCareHubSubscriptionPromise = null;
+var gCareHubSubscriptionUrl = '';
+var gCareHubSubscriptionGeneration = 0;
+var gCareHubSubscriptionReady = false;
+var gCareHubInitialSubscriptionResolve = null;
+var gCareHubSnapshotRenderTimer = null;
+var gCareHubSnapshotPendingRender = false;
+var gCareHubModalCloseObserver = null;
+
+function renderPendingCareHubSnapshot() {
+  if (!gCareHubSnapshotPendingRender || gActiveTab !== HUB_AUTO_REFRESH_PAGE_ID || !isCareHubTabVisible()) return;
+  const modal = document.getElementById('hubCustomerDetailModal');
+  if (modal && !modal.classList.contains('hidden')) return;
+  gCareHubSnapshotPendingRender = false;
+  if (gCareHubModalCloseObserver) {
+    gCareHubModalCloseObserver.disconnect();
+    gCareHubModalCloseObserver = null;
+  }
+  if (typeof renderUnifiedCareHub === 'function') renderUnifiedCareHub();
+}
+
+function applyCareHubSnapshot(snapshot) {
+  if (!snapshot || snapshot.status !== 'success') return false;
+  if (!Array.isArray(snapshot.applications) || !Array.isArray(snapshot.assignments) ||
+      !Array.isArray(snapshot.claims) || !Array.isArray(snapshot.payouts) ||
+      !Array.isArray(snapshot.careLogs) || !Array.isArray(snapshot.faxRecords)) return false;
+
+  let deletedAppIds = new Set();
+  let recentlyRegisteredIds = new Set();
+  let outboxApps = [];
+  try {
+    deletedAppIds = new Set(JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]').map(String));
+  } catch (e) {}
+  try {
+    recentlyRegisteredIds = new Set(JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]').map(String));
+  } catch (e) {}
+  try {
+    const parsedOutbox = JSON.parse(localStorage.getItem('LIVON_PENDING_OUTBOX_APPS') || '[]');
+    if (Array.isArray(parsedOutbox)) outboxApps = parsedOutbox;
+  } catch (e) {}
+
+  let serverApps = snapshot.applications.filter(app => app && app.id && !deletedAppIds.has(String(app.id)));
+  if (typeof filterInvalidSamsungDuplicates === 'function') {
+    serverApps = filterInvalidSamsungDuplicates(serverApps);
+  }
+  const serverAppIds = new Set(serverApps.map(app => String(app.id)));
+  const localPendingApps = (Array.isArray(gApps) ? gApps : []).filter(app => app && app.id &&
+    !deletedAppIds.has(String(app.id)) && !serverAppIds.has(String(app.id)) &&
+    (app._isJustRegistered === true || recentlyRegisteredIds.has(String(app.id))));
+  outboxApps.forEach(app => {
+    if (app && app.id && !deletedAppIds.has(String(app.id)) && !serverAppIds.has(String(app.id)) &&
+        !localPendingApps.some(localApp => String(localApp.id) === String(app.id))) {
+      localPendingApps.push(app);
+    }
+  });
+
+  const mergedApps = [...localPendingApps, ...serverApps];
+  gApps = typeof sortApplicationsNewestFirst === 'function'
+    ? sortApplicationsNewestFirst(mergedApps)
+    : mergedApps;
+  gAssigns = snapshot.assignments.filter(item => item && !deletedAppIds.has(String(item.applyId || '')));
+  gClaims = snapshot.claims.filter(item => item && !deletedAppIds.has(String(item.applyId || '')));
+  gPayouts = snapshot.payouts.filter(item => item && !deletedAppIds.has(String(item.applyId || '')));
+  gCareLogs = snapshot.careLogs.filter(item => item && !deletedAppIds.has(String(item.applyId || '')));
+  gFaxLogs = snapshot.faxRecords;
+  gConvexDataApplied = true;
+  gIsDataLoading = false;
+  window._isConvexLoadingTriggered = true;
+
+  if (gApps.length === 0) {
+    try { localStorage.setItem('LIVON_DATA_RESET_CLEAN', 'true'); } catch (e) {}
+  } else {
+    try { localStorage.removeItem('LIVON_DATA_RESET_CLEAN'); } catch (e) {}
+  }
+
+  if (typeof safeSaveCachedApps === 'function') safeSaveCachedApps(gApps);
+  // TEMP disabled LIVON_CACHED_APPS save: else { try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {} }
+  try { localStorage.setItem('LIVON_CACHED_ASSIGNS', JSON.stringify(gAssigns)); } catch (e) {}
+  try { localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims)); } catch (e) {}
+  try { localStorage.setItem('LIVON_CACHED_PAYOUTS', JSON.stringify(gPayouts)); } catch (e) {}
+  try { localStorage.setItem('LIVON_CARE_LOGS', JSON.stringify(gCareLogs)); } catch (e) {}
+
+  if (typeof updateConvexStatusBadge === 'function') updateConvexStatusBadge(true, gApps.length);
+  if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+  const customerModal = document.getElementById('hubCustomerDetailModal');
+  const isCustomerModalOpen = customerModal && !customerModal.classList.contains('hidden');
+  if (gActiveTab === HUB_AUTO_REFRESH_PAGE_ID && isCareHubTabVisible()) {
+    gCareHubSnapshotPendingRender = true;
+    if (isCustomerModalOpen && !gCareHubModalCloseObserver && typeof MutationObserver === 'function') {
+      gCareHubModalCloseObserver = new MutationObserver(renderPendingCareHubSnapshot);
+      gCareHubModalCloseObserver.observe(customerModal, { attributes: true, attributeFilter: ['class', 'style'] });
+    }
+    if (!isCustomerModalOpen) {
+      if (gCareHubSnapshotRenderTimer) clearTimeout(gCareHubSnapshotRenderTimer);
+      gCareHubSnapshotRenderTimer = setTimeout(() => {
+        gCareHubSnapshotRenderTimer = null;
+        renderPendingCareHubSnapshot();
+      }, 100);
+    }
+  }
+  if (gActiveTab === 'hyundaiclaimhub' && isHyundaiClaimTabVisible() && typeof renderHyundaiClaimHub === 'function') {
+    renderHyundaiClaimHub(undefined, true);
+  }
+  return true;
+}
+
+function stopCareHubCardSubscription() {
+  gCareHubSubscriptionGeneration++;
+  gCareHubSnapshotPendingRender = false;
+  if (gCareHubModalCloseObserver) {
+    gCareHubModalCloseObserver.disconnect();
+    gCareHubModalCloseObserver = null;
+  }
+  if (gCareHubSnapshotRenderTimer) {
+    clearTimeout(gCareHubSnapshotRenderTimer);
+    gCareHubSnapshotRenderTimer = null;
+  }
+  if (gCareHubSnapshotUnsubscribe) {
+    try { gCareHubSnapshotUnsubscribe(); } catch (e) {}
+    gCareHubSnapshotUnsubscribe = null;
+  }
+  if (gCareHubConvexClient) {
+    try { gCareHubConvexClient.close(); } catch (e) {}
+    gCareHubConvexClient = null;
+  }
+  gCareHubSubscriptionUrl = '';
+  gCareHubSubscriptionReady = false;
+  gCareHubSubscriptionPromise = null;
+  if (gCareHubInitialSubscriptionResolve) {
+    gCareHubInitialSubscriptionResolve(false);
+    gCareHubInitialSubscriptionResolve = null;
+  }
+}
+
+function refreshCareHubSnapshotOnce() {
+  if (typeof queryConvex !== 'function') return Promise.resolve(false);
+  return queryConvex('applications:careHubSnapshot', {}).then(response => {
+    const snapshot = response && response.value ? response.value : response;
+    return applyCareHubSnapshot(snapshot);
+  }).catch(err => {
+    console.warn('[CareHub Snapshot Refresh]', err);
+    return false;
+  });
+}
+
+function startCareHubCardSubscription() {
+  if (!isCareHubSnapshotConsumerVisible()) return Promise.resolve(false);
+  if (gActiveTab === HUB_AUTO_REFRESH_PAGE_ID && gIsDataLoading && !gConvexDataApplied) return Promise.resolve(false);
+  if (gCareHubSubscriptionReady && gCareHubSnapshotUnsubscribe) return Promise.resolve(true);
+  if (gCareHubSubscriptionPromise) return gCareHubSubscriptionPromise;
+
+  const Client = window.CareHubConvexClient;
+  const convexUrl = window.CURRENT_CONVEX_URL;
+  if (typeof Client !== 'function' || !convexUrl) {
+    return refreshCareHubSnapshotOnce();
+  }
+
+  const generation = ++gCareHubSubscriptionGeneration;
+  gCareHubSubscriptionUrl = convexUrl;
+  let settled = false;
+  let timeoutId = null;
+  gCareHubSubscriptionPromise = new Promise(resolve => {
+    const settle = value => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      if (gCareHubInitialSubscriptionResolve === settle) gCareHubInitialSubscriptionResolve = null;
+      resolve(value);
+    };
+    gCareHubInitialSubscriptionResolve = settle;
+
+    try {
+      gCareHubConvexClient = new Client(convexUrl);
+      gCareHubSnapshotUnsubscribe = gCareHubConvexClient.onUpdate(
+        'applications:careHubSnapshot',
+        {},
+        snapshot => {
+          if (generation !== gCareHubSubscriptionGeneration || !isCareHubSnapshotConsumerVisible()) return;
+          if (!applyCareHubSnapshot(snapshot)) return;
+          gCareHubSubscriptionReady = true;
+          settle(true);
+        },
+        err => {
+          if (generation !== gCareHubSubscriptionGeneration) return;
+          console.warn('[CareHub Live Subscription]', err);
+          settle(false);
+          stopCareHubCardSubscription();
+        }
+      );
+      timeoutId = setTimeout(() => {
+        settle(false);
+        if (!gCareHubSubscriptionReady) stopCareHubCardSubscription();
+      }, 15000);
+    } catch (err) {
+      console.warn('[CareHub Live Subscription Init]', err);
+      settle(false);
+    }
+  }).finally(() => {
+    gCareHubSubscriptionPromise = null;
+  });
+
+  return gCareHubSubscriptionPromise;
+}
+
+function showHubReturnBlockingProgress() {
+  const progressModal = document.getElementById('globalProgressModal') || document.getElementById('globalCareLogProgressModal');
+  if (progressModal && !progressModal.classList.contains('hidden')) return;
+  if (typeof showGlobalProgress !== 'function') return;
+
+  showGlobalProgress({
+    title: '통합허브 최신자료 조회 중',
+    subtitle: 'Convex에서 최신 고객 및 관련 기록을 불러오고 있습니다.',
+    percent: 25,
+    statusText: '최신 자료를 확인하고 있습니다...',
+    icon: 'refresh-cw'
+  });
+  gHubReturnProgressOwned = true;
+}
+
+function hideHubReturnBlockingProgress() {
+  if (!gHubReturnProgressOwned) return;
+  gHubReturnProgressOwned = false;
+  if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
+}
+
+function isCareHubTabVisible() {
+  const tab = document.getElementById('tab-carehub');
+  return !!tab && !tab.classList.contains('hidden');
+}
+
+function isCareHubSnapshotConsumerVisible() {
+  return (gActiveTab === HUB_AUTO_REFRESH_PAGE_ID && isCareHubTabVisible()) ||
+    (gActiveTab === 'hyundaiclaimhub' && typeof isHyundaiClaimTabVisible === 'function' && isHyundaiClaimTabVisible());
+}
+
+async function refreshCareHubOnTabReturn() {
+  if (gHubReturnRefreshPromise) return gHubReturnRefreshPromise;
+  showHubReturnBlockingProgress();
+
+  gHubReturnRefreshPromise = (async () => {
+    try {
+       while (window.gIsRefreshingHubData) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        if (gActiveTab !== HUB_AUTO_REFRESH_PAGE_ID || !isCareHubTabVisible()) return;
+      }
+      if (gActiveTab !== HUB_AUTO_REFRESH_PAGE_ID || !isCareHubTabVisible()) return;
+
+      window.gIsRefreshingHubData = true;
+      setHubAutoRefreshLoading(true);
+      try {
+        const receivedLiveSnapshot = await startCareHubCardSubscription();
+        if (!receivedLiveSnapshot && !gCareHubSubscriptionReady) {
+          await refreshCareHubSnapshotOnce();
+        }
+      } catch (err) {
+        console.warn('[Care Hub Tab Return Refresh]', err);
+      } finally {
+        setHubAutoRefreshLoading(false);
+        window.gIsRefreshingHubData = false;
+        resetHubAutoRefreshTimer();
+      }
+    } finally {
+      hideHubReturnBlockingProgress();
+    }
+  })();
+
+  try {
+    await gHubReturnRefreshPromise;
+  } finally {
+    gHubReturnRefreshPromise = null;
+  }
+}
+
+function installCareHubTabVisibilityObserver() {
+  if (gHubTabVisibilityObserver || typeof MutationObserver !== 'function') return;
+  const tab = document.getElementById('tab-carehub');
+  if (!tab) return;
+
+  let isCareHubClickRoutePending = false;
+  document.addEventListener('click', event => {
+    const careHubMenuButton = event.target.closest && event.target.closest('aside [data-tab="carehub"]');
+    if (!careHubMenuButton || gActiveTab === HUB_AUTO_REFRESH_PAGE_ID || isCareHubClickRoutePending) return;
+
+  
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    isCareHubClickRoutePending = true;
+    showHubReturnBlockingProgress();
+    const routeToCareHub = () => setTimeout(() => {
+      try {
+        if (typeof handleLeftMenuClick === 'function') handleLeftMenuClick(HUB_AUTO_REFRESH_PAGE_ID);
+        else if (typeof switchTab === 'function') switchTab(HUB_AUTO_REFRESH_PAGE_ID);
+      } finally {
+        isCareHubClickRoutePending = false;
+        if (gActiveTab !== HUB_AUTO_REFRESH_PAGE_ID) hideHubReturnBlockingProgress();
+      }
+    }, 0);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(routeToCareHub);
+    else routeToCareHub();
+  }, true);
+
+  let wasVisible = !tab.classList.contains('hidden');
+  gHubTabVisibilityObserver = new MutationObserver(() => {
+    const isVisible = !tab.classList.contains('hidden');
+    if (!wasVisible && isVisible && gActiveTab === HUB_AUTO_REFRESH_PAGE_ID) {
+      syncHubAutoRefreshTimer();
+      refreshCareHubOnTabReturn();
+    } else if (wasVisible && !isVisible) {
+      stopHubAutoRefreshTimer();
+    
+      if (!isCareHubSnapshotConsumerVisible()) stopCareHubCardSubscription();
+    }
+    wasVisible = isVisible;
+  });
+  gHubTabVisibilityObserver.observe(tab, { attributes: true, attributeFilter: ['class'] });
+  if (isCareHubSnapshotConsumerVisible()) {
+    startCareHubCardSubscription();
+  }
+}
+
+function readAutoRefreshSettings() {
+  try {
+    const saved = localStorage.getItem(AUTO_REFRESH_SETTINGS_STORAGE_KEY);
+    if (saved) {
+      const stored = JSON.parse(saved);
+      return stored && typeof stored === 'object' ? stored : {};
+    }
+  
+    if (localStorage.getItem('LIVON_HUB_AUTO_REFRESH_ENABLED') === 'true') {
+      const migrated = { pages: { [HUB_AUTO_REFRESH_PAGE_ID]: { enabled: true, intervalMs: 60000 } } };
+      localStorage.setItem(AUTO_REFRESH_SETTINGS_STORAGE_KEY, JSON.stringify(migrated));
+      localStorage.removeItem('LIVON_HUB_AUTO_REFRESH_ENABLED');
+      return migrated;
+    }
+    return {};
+  } catch (e) { return {}; }
+}
+
+function writeAutoRefreshSettings(settings) {
+  try {
+    localStorage.setItem(AUTO_REFRESH_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    return true;
+  } catch (e) {
+    console.warn('[Care Hub Auto Refresh] 설정 저장 실패:', e);
+    return false;
+  }
+}
+
+function isHubAutoRefreshEnabled() {
+  const settings = readAutoRefreshSettings();
+  return settings.pages?.[HUB_AUTO_REFRESH_PAGE_ID]?.enabled === true;
+}
+
+function getHubAutoRefreshIntervalMs() {
+  const settings = readAutoRefreshSettings();
+  const intervalMs = Number(settings.pages?.[HUB_AUTO_REFRESH_PAGE_ID]?.intervalMs);
+  return Number.isFinite(intervalMs) && intervalMs >= 10000 ? intervalMs : 60000;
+}
+
+function updateHubAutoRefreshControl() {
+  const toggle = document.getElementById('hubAutoRefreshToggle');
+  const state = document.getElementById('hubAutoRefreshState');
+  const enabled = isHubAutoRefreshEnabled();
+  if (toggle) {
+    toggle.setAttribute('aria-checked', String(enabled));
+    toggle.classList.toggle('bg-emerald-500', enabled);
+    toggle.classList.toggle('bg-slate-300', !enabled);
+    const knob = toggle.querySelector('span');
+    if (knob) knob.classList.toggle('translate-x-4', enabled);
+  }
+  if (state) {
+    state.textContent = enabled ? '켬' : '끔';
+    state.className = `text-[10px] font-bold ${enabled ? 'text-emerald-700' : 'text-slate-500'}`;
+  }
+}
+
+function syncHubAutoRefreshTimer() {
+  const enabled = isHubAutoRefreshEnabled();
+  const isActivePage = gActiveTab === HUB_AUTO_REFRESH_PAGE_ID && isCareHubTabVisible();
+  if ((!enabled || !isActivePage) && gHubAutoRefreshTimer) stopHubAutoRefreshTimer();
+  if (enabled && isActivePage && !gHubAutoRefreshTimer) {
+    scheduleHubAutoRefresh();
+  }
+}
+
+function stopHubAutoRefreshTimer() {
+  if (!gHubAutoRefreshTimer) return;
+  clearTimeout(gHubAutoRefreshTimer);
+  gHubAutoRefreshTimer = null;
+}
+
+function scheduleHubAutoRefresh(delayMs = getHubAutoRefreshIntervalMs()) {
+  if (!isHubAutoRefreshEnabled()) return;
+  if (gHubAutoRefreshTimer) clearTimeout(gHubAutoRefreshTimer);
+  gHubAutoRefreshTimer = setTimeout(async () => {
+    gHubAutoRefreshTimer = null;
+    if (!isHubAutoRefreshEnabled()) return;
+
+    const customerModal = document.getElementById('hubCustomerDetailModal');
+    const shouldDefer = gActiveTab !== 'carehub' || document.hidden ||
+      (customerModal && !customerModal.classList.contains('hidden')) ||
+      window.gIsRefreshingHubData;
+    if (shouldDefer) {
+      scheduleHubAutoRefresh();
+      return;
+    }
+
+    window.gIsRefreshingHubData = true;
+    setHubAutoRefreshLoading(true);
+    try {
+    
+      if (!gCareHubSubscriptionReady) await refreshCareHubSnapshotOnce();
+    } catch (err) {
+      console.warn('[Care Hub Auto Refresh]', err);
+    } finally {
+      setHubAutoRefreshLoading(false);
+      window.gIsRefreshingHubData = false;
+
+      scheduleHubAutoRefresh();
+    }
+  }, delayMs);
+}
+
+function resetHubAutoRefreshTimer() {
+  if (!isHubAutoRefreshEnabled()) return;
+  scheduleHubAutoRefresh(getHubAutoRefreshIntervalMs());
+}
+
+function installHubRefreshTimerHook() {
+  const currentRefresh = window.refreshLatestData;
+  if (typeof currentRefresh !== 'function' || currentRefresh.__hubAutoRefreshTimerHook) return;
+
+  const wrappedRefresh = async function(...args) {
+    try {
+      if (gActiveTab === HUB_AUTO_REFRESH_PAGE_ID && isCareHubTabVisible()) {
+        setHubAutoRefreshLoading(true);
+        const refreshed = await refreshCareHubSnapshotOnce();
+        if (refreshed && typeof showToast === 'function') {
+          showToast(`통합허브 최신 데이터(총 ${gApps.length}건)가 실시간 반영되었습니다.`, 'success');
+        }
+        return;
+      }
+      return await currentRefresh.apply(this, args);
+    } finally {
+      setHubAutoRefreshLoading(false);
+     
+      resetHubAutoRefreshTimer();
+    }
+  };
+  wrappedRefresh.__hubAutoRefreshTimerHook = true;
+  window.refreshLatestData = wrappedRefresh;
+}
+
+function ensureHubAutoRefreshControl() {
+  const refreshIcon = document.getElementById('hubRefreshBtnIcon');
+  const refreshButton = refreshIcon && refreshIcon.closest('button');
+  if (!refreshButton) return;
+
+  if (!document.getElementById('hubAutoRefreshControl')) {
+    const control = document.createElement('div');
+    control.id = 'hubAutoRefreshControl';
+    control.className = 'inline-flex items-center justify-center gap-2 px-3 py-2 sm:py-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs';
+    control.innerHTML = `
+      <span class="text-[11px] font-bold text-slate-600 whitespace-nowrap">1분 자동조회</span>
+      <button id="hubAutoRefreshToggle" type="button" role="switch" aria-checked="false" onclick="toggleHubAutoRefresh()" class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-slate-300 transition-colors cursor-pointer" title="통합허브에서 1분마다 최신자료를 자동 조회합니다.">
+        <span class="inline-block h-4 w-4 translate-x-0.5 rounded-full bg-white shadow transition-transform"></span>
+      </button>
+      <span id="hubAutoRefreshState" class="text-[10px] font-bold text-slate-500">끔</span>`;
+    refreshButton.insertAdjacentElement('afterend', control);
+  }
+
+  if (!document.getElementById('hubAutoRefreshLoading')) {
+    const loading = document.createElement('div');
+    loading.id = 'hubAutoRefreshLoading';
+    loading.className = 'fixed inset-0 z-[9998] hidden items-center justify-center pointer-events-none';
+    loading.innerHTML = `
+      <div class="flex items-center gap-3 px-5 py-3 rounded-2xl bg-slate-900/90 text-white shadow-xl border border-white/15">
+        <div class="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+        <span class="text-sm font-bold">최신자료 업데이트 중</span>
+      </div>`;
+    document.body.appendChild(loading);
+  }
+
+  updateHubAutoRefreshControl();
+  installHubRefreshTimerHook();
+  installCareHubTabVisibilityObserver();
+  syncHubAutoRefreshTimer();
+  if (typeof window.CareHubConvexClient === 'function' && isCareHubTabVisible() &&
+      (!gIsDataLoading || gConvexDataApplied) && !gCareHubSubscriptionReady && !gCareHubSubscriptionPromise) {
+    startCareHubCardSubscription();
+  }
+}
+
+function toggleHubAutoRefresh() {
+  const nextValue = !isHubAutoRefreshEnabled();
+  const settings = readAutoRefreshSettings();
+  if (!settings.pages || typeof settings.pages !== 'object') settings.pages = {};
+  settings.pages[HUB_AUTO_REFRESH_PAGE_ID] = {
+    ...(settings.pages[HUB_AUTO_REFRESH_PAGE_ID] || {}),
+    enabled: nextValue,
+    intervalMs: 60000
+  };
+  writeAutoRefreshSettings(settings);
+  updateHubAutoRefreshControl();
+  syncHubAutoRefreshTimer();
+}
+
+function setHubAutoRefreshLoading(isLoading) {
+  const loading = document.getElementById('hubAutoRefreshLoading');
+  if (!loading) return;
+  loading.classList.toggle('hidden', !isLoading);
+  loading.classList.toggle('flex', isLoading);
+}
+window.toggleHubAutoRefresh = toggleHubAutoRefresh;
+
 function renderUnifiedCareHub() {
+  ensureHubAutoRefreshControl();
   const container = document.getElementById('hubCustomerCardsList');
   if (!container) return;
 
@@ -12201,7 +12749,7 @@ function renderUnifiedCareHub() {
   if (Array.isArray(gApps) && gApps.some(a => a && a.id && String(a.id).startsWith('S') && (a.insuranceCompany || '').includes('삼성') && !a.isRealLaunchData)) {
     gApps = filterInvalidSamsungDuplicates(gApps);
     if (typeof safeSaveCachedApps === 'function') safeSaveCachedApps(gApps);
-    else { try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {} }
+    // TEMP disabled LIVON_CACHED_APPS save: else { try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {} }
   }
 
   // [삼성화재 관리대장 상품명 연동]: 통합허브 렌더링 전 삼성화재 고객 상세 정보 자동 연동 (캐시 기반 0ms)
@@ -13903,11 +14451,67 @@ function closeAllCareCardExpands() {
   updateCardDimBackdrop();
 }
 
-function openHubCustomerDetailModal(applyId, targetSetIndex = null) {
+function applyHubCustomerDetailSnapshot(appId, detail) {
+  if (!detail || detail.status !== 'success' || !detail.application || String(detail.application.id) !== String(appId)) return false;
+
+  const replaceRelated = (current, incoming, belongsToApp) => [
+    ...(Array.isArray(current) ? current : []).filter(item => !belongsToApp(item)),
+    ...(Array.isArray(incoming) ? incoming : [])
+  ];
+  const appIndex = (gApps || []).findIndex(item => item && String(item.id) === String(appId));
+  if (appIndex < 0) return false;
+
+  gApps[appIndex] = detail.application;
+  const hasApplyId = item => item && String(item.applyId) === String(appId);
+  gAssigns = replaceRelated(gAssigns, detail.assignments, hasApplyId);
+  gClaims = replaceRelated(gClaims, detail.claims, hasApplyId);
+  gPayouts = replaceRelated(gPayouts, detail.payouts, hasApplyId);
+  gCareLogs = replaceRelated(gCareLogs, detail.careLogs, hasApplyId);
+  gFaxLogs = replaceRelated(gFaxLogs, detail.faxRecords, item => item && String(item.appId) === String(appId));
+  const latestClaimFax = (detail.faxRecords || [])
+    .filter(item => item && item.caseType !== '현대해상 고객등록/조회' && item.formType !== 'HD_FORM_01' &&
+      ['성공', '전송완료', '발송완료'].includes(item.status))
+    .sort((a, b) => String(b.sentDate || b.sentAt || '').localeCompare(String(a.sentDate || a.sentAt || '')))[0];
+  if (latestClaimFax) {
+    gFaxRecords[appId] = {
+      ...latestClaimFax,
+      status: '전송완료',
+      sentDate: latestClaimFax.sentDate || latestClaimFax.sentAt || null,
+      faxNumber: latestClaimFax.faxNumber || ''
+    };
+  }
+  gSamsungEmailLogs = replaceRelated(gSamsungEmailLogs, detail.samsungEmailLogs,
+    item => item && (String(item.appId) === String(appId) || String(item.targetAppId) === String(appId)));
+
+  const replaceByName = (current, incoming) => {
+    const newNames = new Set((incoming || []).map(item => item && item.name).filter(Boolean));
+    return [...(Array.isArray(current) ? current : []).filter(item => !item || !newNames.has(item.name)), ...(incoming || [])];
+  };
+  gAdjusters = replaceByName(gAdjusters, detail.adjusters);
+  gCaregivers = replaceByName(gCaregivers, detail.caregivers);
+  gCenters = replaceByName(gCenters, detail.partners);
+  return true;
+}
+
+async function refreshHubCustomerDetailFromConvex(appId, modalInstanceId, targetSetIndex) {
+  if (typeof queryConvex !== 'function') return;
+  try {
+    const response = await queryConvex('applications:getCustomerDetail', { appId: String(appId) });
+    const detail = response && response.status === 'success' ? response.value : null;
+    const modalEl = document.getElementById('hubCustomerDetailModal');
+    if (!modalEl || modalEl.classList.contains('hidden') || gHubModalInstanceId !== modalInstanceId || String(gActiveHubModalAppId) !== String(appId)) return;
+    if (!applyHubCustomerDetailSnapshot(appId, detail)) return;
+    openHubCustomerDetailModal(appId, targetSetIndex, true, true);
+  } catch (err) {
+    console.warn('[Care Hub Detail Refresh]', err);
+  }
+}
+
+function openHubCustomerDetailModal(applyId, targetSetIndex = null, skipRemoteRefresh = false, suppressProgress = false) {
   gHubModalInstanceId++;
   resetHubCustomerModalSaveButtons();
 
-  if (typeof showGlobalProgress === 'function') {
+  if (!suppressProgress && typeof showGlobalProgress === 'function') {
     showGlobalProgress({
       title: '고객 상세정보를 불러오는 중입니다',
       subtitle: '최신 운영 데이터를 확인하고 있습니다.',
@@ -14255,10 +14859,14 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null) {
         <div class="text-xs text-slate-500 font-mono">${err.message}</div>
       </div>`;
     }
-    if (typeof updateGlobalProgress === 'function') {
+    if (!suppressProgress && typeof updateGlobalProgress === 'function') {
       updateGlobalProgress({ percent: 100, statusText: '고객 상세정보 준비 완료' });
     }
-    if (typeof hideGlobalProgress === 'function') hideGlobalProgress(250);
+    if (!suppressProgress && typeof hideGlobalProgress === 'function') hideGlobalProgress(250);
+  }
+  if (!skipRemoteRefresh && app && !app.isPreRegistered && Array.isArray(gApps) &&
+      gApps.some(item => item && String(item.id) === String(app.id))) {
+    refreshHubCustomerDetailFromConvex(app.id, gHubModalInstanceId, targetSetIndex);
   }
 }
 

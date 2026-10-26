@@ -97,7 +97,8 @@ function safeSetLocalStorage(key, valStr) {
 
 function safeSaveCachedApps(apps) {
   if (!Array.isArray(apps)) return false;
-  return safeSetLocalStorage('LIVON_CACHED_APPS', JSON.stringify(apps));
+  // 임시 확인을 위해 LIVON_CACHED_APPS 저장만 비활성화합니다.
+  return false;
 }
 
 if (typeof window !== 'undefined') {
@@ -1248,7 +1249,7 @@ if (IS_DEV_ENV && typeof window !== 'undefined') {
     }
     const cached = JSON.parse(localStorage.getItem('LIVON_CACHED_APPS') || '[]');
     if (Array.isArray(cached) && cached.some(a => a && a.id === 'C0701')) {
-      localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(cached.filter(a => a && a.id !== 'C0701')));
+      // TEMP disabled LIVON_CACHED_APPS save: localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(cached.filter(a => a && a.id !== 'C0701')));
     }
   } catch (e) {}
 }
@@ -2472,11 +2473,11 @@ async function runConvexLiveSync(force = false) {
 function startConvexLiveSync() {
   if (gConvexLiveSyncTimer) return;
   // 15초(15,000ms)마다 백그라운드에서 실시간 변경 감지 (다중 사용자 환경 실시간 동기화 보장)
-  gConvexLiveSyncTimer = setInterval(() => {
+/* gConvexLiveSyncTimer = setInterval(() => {
     if (typeof document !== 'undefined' && !document.hidden) {
       runConvexLiveSync();
     }
-  }, 15000);
+  }, 15000);*/
 //  runConvexLiveSync();
   // 사용자가 브라우저 탭으로 복귀했을 때 즉시 최신 데이터 동기화 (5초 쿨타임)
  /* window.addEventListener('focus', () => {
@@ -2487,7 +2488,7 @@ function startConvexLiveSync() {
       runConvexLiveSync();
     }
   });*/
-  console.log('[LiveSync] Convex 다중 사용자 실시간 동기화 엔진 가동 (15초 주기 / 탭 포커스 즉시 갱신)');
+ // console.log('[LiveSync] Convex 다중 사용자 실시간 동기화 엔진 가동 (15초 주기 / 탭 포커스 즉시 갱신)');
 }
 window.startConvexLiveSync = startConvexLiveSync;
 window.runConvexLiveSync = runConvexLiveSync;
@@ -3850,6 +3851,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     percent: 10,
     statusText: '잠시만 기다려 주세요...'
   });
+  try { localStorage.removeItem('LIVON_CACHED_APPS'); } catch (e) {}
   initData();
   initInsuranceWorkflows();
 
@@ -6225,7 +6227,7 @@ function initInsuranceWorkflows() {
   } catch (e) {}
 
   // Ensure full 12 fields are initialized for Samsung List if still empty
-  if (!gSamsungList || gSamsungList.length === 0 || !gSamsungList[0]?.patientId) {
+/*  if (!gSamsungList || gSamsungList.length === 0 || !gSamsungList[0]?.patientId) {
     gSamsungList = [
       { id: 'SF-20260903-01', patientId: 'SF-P001', patientName: '김옥경', birthDate: '19661230', gender: '여', phone: '010-3875-7912', policyNumber: 'SF109283741', productCode: 'SF-CARE-01', productName: '무배당 삼성화재 당신에게 좋은간병보험', contractStartDate: '2024-03-01', contractEndDate: '2044-03-01', hasInjuryCare: '가입', hasDiseaseCare: '가입', accidentNumber: '26S008912', adjusterName: '김정현', adjusterPhone: '02-3485-9114', adjusterFax: '02-3485-9100', maxDailyLimit: 144000, maxDays: 180, receiveDate: '2026-09-03', matchStatus: '매칭완료' },
       { id: 'SF-20260903-02', patientId: 'SF-P002', patientName: '이성근', birthDate: '19800718', gender: '남', phone: '010-7187-8718', policyNumber: 'SF992817263', productCode: 'SF-CARE-02', productName: '무배당 삼성화재 행복한돌봄간병보험', contractStartDate: '2023-11-15', contractEndDate: '2043-11-15', hasInjuryCare: '가입', hasDiseaseCare: '가입', accidentNumber: '26S009341', adjusterName: '이민우', adjusterPhone: '02-760-5521', adjusterFax: '02-760-5500', maxDailyLimit: 144000, maxDays: 180, receiveDate: '2026-09-03', matchStatus: '매칭완료' },
@@ -6261,7 +6263,7 @@ function initInsuranceWorkflows() {
       receiveDate: '2026-09-16',
       matchStatus: '접수진행중'
     });
-  }
+  }*/
 
   // Initialize Centers & Caregivers (100% 엑셀 실데이터만 적용, 임의 목업 생성 원천 차단)
   if (!Array.isArray(gCenters)) gCenters = [];
@@ -7436,7 +7438,7 @@ function enrichHubSamsungCustomersFromSamsungExcel(extraSamsungRecords = null) {
   }
 
   if (enrichedCount > 0) {
-    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+    // TEMP disabled LIVON_CACHED_APPS save: try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
   }
   window._isSamsungExcelEnriched = true;
   return enrichedCount;
@@ -10743,10 +10745,7 @@ function populateSamsungLeadDataToForm(lead) {
   const policyVal = lead.policyNumber || ('SF' + Math.floor(100000000 + Math.random() * 900000000));
   const prodCodeVal = lead.productCode || '2PB320070';
   const prodNameVal = lead.productName || '무배당 삼성화재 간편보험 다이렉트(2603.5)(납입면제/해약환급금 미지급형Ⅱ)';
-  const accidentVal = lead.accidentNumber || ('26S' + Math.floor(100000 + Math.random() * 900000));
-  const adjName = lead.adjusterName || '-';
-  const adjPhone = lead.adjusterPhone || '02-3485-9114';
-  const adjFax = lead.adjusterFax || '02-3485-9100';
+
 
 
   if (document.getElementById('newAppSamsungPatientId')) document.getElementById('newAppSamsungPatientId').value = patientIdVal;
@@ -10757,20 +10756,16 @@ function populateSamsungLeadDataToForm(lead) {
   if (document.getElementById('newAppSamsungContractEndDate')) document.getElementById('newAppSamsungContractEndDate').value = cleanEndDate;
   if (document.getElementById('newAppSamsungHasInjuryCare')) document.getElementById('newAppSamsungHasInjuryCare').value = injuryVal;
   if (document.getElementById('newAppSamsungHasDiseaseCare')) document.getElementById('newAppSamsungHasDiseaseCare').value = diseaseVal;
-  if (document.getElementById('newAppSamsungAdjuster')) document.getElementById('newAppSamsungAdjuster').value = adjName;
-  if (document.getElementById('newAppSamsungAdjusterPhone')) document.getElementById('newAppSamsungAdjusterPhone').value = adjPhone;
-  if (document.getElementById('newAppSamsungAdjusterFax')) document.getElementById('newAppSamsungAdjusterFax').value = adjFax;
-  if (document.getElementById('newAppSamsungAccidentNumber')) document.getElementById('newAppSamsungAccidentNumber').value = accidentVal;
-
+ 
   // 4. Fallback hidden inputs
   if (document.getElementById('newAppPolicy')) document.getElementById('newAppPolicy').value = policyVal;
   if (document.getElementById('newAppProductName')) document.getElementById('newAppProductName').value = prodNameVal;
   if (document.getElementById('newAppContractPeriod')) document.getElementById('newAppContractPeriod').value = `${cleanStartDate} ~ ${cleanEndDate}`;
-  if (document.getElementById('newAppAccidentNo')) document.getElementById('newAppAccidentNo').value = accidentVal;
-  if (document.getElementById('newAppAdjuster')) document.getElementById('newAppAdjuster').value = adjName;
-  if (document.getElementById('newAppAdjusterPhone')) document.getElementById('newAppAdjusterPhone').value = adjPhone;
-  if (document.getElementById('newAppAdjusterFax')) document.getElementById('newAppAdjusterFax').value = adjFax;
-  if (document.getElementById('newAppAdjusterFirm')) document.getElementById('newAppAdjusterFirm').value = "삼성화재 간병지원파트";
+  if (document.getElementById('newAppAccidentNo')) document.getElementById('newAppAccidentNo').value = '';
+  if (document.getElementById('newAppAdjuster')) document.getElementById('newAppAdjuster').value = '';
+  if (document.getElementById('newAppAdjusterPhone')) document.getElementById('newAppAdjusterPhone').value = '';
+  if (document.getElementById('newAppAdjusterFax')) document.getElementById('newAppAdjusterFax').value = '';
+  if (document.getElementById('newAppAdjusterFirm')) document.getElementById('newAppAdjusterFirm').value = '';
 
   // 5. Default Address & Memo
   if (document.getElementById('newAppZonecode')) document.getElementById('newAppZonecode').value = '04523';
@@ -10802,11 +10797,11 @@ function populateSamsungLeadDataToForm(lead) {
     contractPeriod: `${cleanStartDate} ~ ${cleanEndDate}`,
     hasInjuryCare: injuryVal,
     hasDiseaseCare: diseaseVal,
-    adjusterName: adjName,
-    adjusterPhone: adjPhone,
-    adjusterFax: adjFax,
-    adjusterFirm: '삼성화재 간병지원파트',
-    accidentNumber: accidentVal
+    adjusterName: '',
+    adjusterPhone: '',
+    adjusterFax: '',
+    adjusterFirm: '',
+    accidentNumber: ''
   };
 
   lead.matchStatus = '매칭완료';
@@ -16339,7 +16334,7 @@ async function executeSaveHyundaiSms() {
   if (typeof safeSaveCachedApps === 'function') {
     safeSaveCachedApps(gApps);
   } else {
-    try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+    // TEMP disabled LIVON_CACHED_APPS save: try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
   }
 
   // 3. 서버 디스크 영구 저장 API 비동기 전송
@@ -20301,28 +20296,136 @@ function renderMultiTabBar() {
 window.renderMultiTabBar = renderMultiTabBar;
 
 function switchMultiTab(tabId) {
-  // [사용자 요구사항] 상단 멀티 탭 클릭 시에는 기존 화면 그대로 초고속 유지 (데이터 재조회/새로고침 없이 0ms 즉시 표시)
-  switchTab(tabId, null, false);
+  return runAppTabEntry(tabId, null, 'multi');
 }
 window.switchMultiTab = switchMultiTab;
+
+var gAppTabNavigationSequence = 0;
+var gAppTabProgressOwnerSequence = 0;
+var gGlobalProgressOwner = '';
+
+function shouldShowGlobalTabLoading(tabId) {
+  return !['surveymgmt', 'surveymgmt_new', 'totalcallanalysis'].includes(tabId);
+}
+
+function beginAppTabLoading(tabId, showProgress = true) {
+  const sequence = ++gAppTabNavigationSequence;
+
+  if (!showProgress) {
+    // 제외 메뉴로 이동하면 공통 탭 진입이 띄운 로딩만 닫고, 다른 로딩은 건드리지 않는다.
+    if (gAppTabProgressOwnerSequence) {
+      gAppTabProgressOwnerSequence = 0;
+      if (typeof hideGlobalProgress === 'function') hideGlobalProgress(0, 'appTab');
+    }
+    return sequence;
+  }
+
+  if (gGlobalProgressOwner === 'carelogPdf') {
+    // PDF 처리 모달이 열려 있으면 탭 전환 문구로 덮지 않고, 완료 후 탭 로딩을 이어 표시합니다.
+    gAppTabProgressOwnerSequence = sequence;
+  } else if (typeof showGlobalProgress === 'function') {
+    const meta = APP_TAB_META[tabId] || { name: tabId };
+    showGlobalProgress({
+      owner: 'appTab',
+      title: `${meta.name} 화면 준비 중`,
+      subtitle: '화면과 최신 데이터를 불러오고 있습니다.',
+      percent: 20,
+      statusText: '데이터를 확인하고 있습니다...',
+      icon: 'refresh-cw'
+    });
+    gAppTabProgressOwnerSequence = sequence;
+  } else if (gAppTabProgressOwnerSequence) {
+    // 공통 탭 로딩 중 다른 탭을 선택하면 가장 최근 이동이 모달 소유권을 이어받는다.
+    gAppTabProgressOwnerSequence = sequence;
+  }
+
+  return sequence;
+}
+
+function finishAppTabLoading(sequence) {
+  if (sequence !== gAppTabNavigationSequence || sequence !== gAppTabProgressOwnerSequence) return;
+  gAppTabProgressOwnerSequence = 0;
+  if (gGlobalProgressOwner !== 'carelogPdf' && typeof hideGlobalProgress === 'function') hideGlobalProgress(0, 'appTab');
+}
+
+function waitForAppPaint() {
+  return new Promise(resolve => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
+}
+
+async function runAppTabEntry(tabId, filterParam = null, source = 'menu') {
+  const routeTabId = tabId === 'dashboard' ? 'carehub' : (['adjusters', 'caregivers', 'centers'].includes(tabId) ? 'directory' : tabId);
+  if (source === 'menu' && gCurrentAdmin && gCurrentAdmin.role !== 'SUPER_ADMIN') {
+    const allowed = gCurrentAdmin.allowedMenus || ['all'];
+    if (!allowed.includes('all') && !allowed.includes('*') && !allowed.includes(tabId)) {
+      alert(`[${tabId}] 메뉴에 대한 접근 권한이 없습니다. 시스템 관리자에게 문의하세요.`);
+      return false;
+    }
+  }
+
+  const showProgress = shouldShowGlobalTabLoading(routeTabId);
+  const sequence = beginAppTabLoading(routeTabId, showProgress);
+  try {
+    if (showProgress) await waitForAppPaint();
+    if (sequence !== gAppTabNavigationSequence) return false;
+
+    switchTab(tabId, filterParam, false);
+    if (gActiveTab !== routeTabId && !(routeTabId === 'directory' && gActiveTab === 'directory')) return false;
+
+    const refreshResult = refreshTabData(tabId, filterParam);
+    if (refreshResult && typeof refreshResult.then === 'function') await refreshResult;
+    return true;
+  } catch (err) {
+    console.warn('[Tab Entry Loading Error]', tabId, err);
+    return false;
+  } finally {
+    finishAppTabLoading(sequence);
+  }
+}
+
+function handleAppTabClickCapture(event) {
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target || target.closest('button[onclick*="closeMultiTab"]')) return;
+
+  let tabId = '';
+  let filterParam = null;
+  let source = 'direct';
+  const menuButton = target.closest('.nav-tab-btn[data-tab]');
+  if (menuButton) {
+    tabId = menuButton.getAttribute('data-tab') || '';
+    source = 'menu';
+  } else {
+    const multiTab = target.closest('.multi-tab-item');
+    const multiMatch = multiTab && (multiTab.getAttribute('onclick') || '').match(/switchMultiTab\(['"]([^'"]+)['"]\)/);
+    if (multiMatch) {
+      tabId = multiMatch[1];
+      source = 'multi';
+    } else {
+      const directControl = target.closest('[onclick*="switchTab("]');
+      const directMatch = directControl && (directControl.getAttribute('onclick') || '').match(/switchTab\(['"]([^'"]+)['"](?:\s*,\s*['"]([^'"]*)['"])?/);
+      if (directMatch) {
+        tabId = directMatch[1];
+        filterParam = directMatch[2] || null;
+      }
+    }
+  }
+
+  if (!tabId || !APP_TAB_META[tabId]) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  runAppTabEntry(tabId, filterParam, source);
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', handleAppTabClickCapture, true);
+}
 
 /**
  * [사용자 요구사항]: 모든 좌측메뉴는 클릭하면 항상 최신 데이터를 불러옴 (탭은 기존화면 그대로, 좌측메뉴는 최신데이터)
  */
 function handleLeftMenuClick(tabId, filterParam = null) {
-  if (tabId === 'dashboard') tabId = 'carehub';
-  if (gCurrentAdmin && gCurrentAdmin.role !== 'SUPER_ADMIN') {
-    const allowed = gCurrentAdmin.allowedMenus || ['all'];
-    if (!allowed.includes('all') && !allowed.includes('*') && !allowed.includes(tabId)) {
-      alert(`[${tabId}] 메뉴에 대한 접근 권한이 없습니다. 시스템 관리자에게 문의하세요.`);
-      return;
-    }
-  }
-  // 1. 기존 화면/캐시 데이터로 0ms 즉각 전환 (화면 공백/깜빡임 없이 즉시 전환)
-  switchTab(tabId, filterParam, false);
-
-  // 2. 좌측 메뉴 클릭 시에만 해당 메뉴별 최신 데이터 새로고침 / 실시간 동기화 실행
-  refreshTabData(tabId, filterParam);
+  return runAppTabEntry(tabId, filterParam, 'menu');
 }
 window.handleLeftMenuClick = handleLeftMenuClick;
 
@@ -20330,18 +20433,22 @@ window.handleLeftMenuClick = handleLeftMenuClick;
  * 메뉴별 최신 데이터 새로고침 & 실시간 동기화 엔진
  */
 function refreshTabData(tabId, filterParam = null) {
+  const pendingJobs = [];
+  const trackJob = job => {
+    if (job && typeof job.then === 'function') pendingJobs.push(job);
+  };
   try {
     switch (tabId) {
       // 1. 종합 콜분석: 메뉴 클릭 시 즉시 렌더링 후 자동으로 최신 CTI 전수 데이터 실시간 동기화 실행
       case 'totalcallanalysis':
         if (typeof renderTotalCallAnalysisTab === 'function') {
-          renderTotalCallAnalysisTab();
+          trackJob(renderTotalCallAnalysisTab());
         }
         {
           const isSyncing = (typeof isTotalSyncing !== 'undefined' ? isTotalSyncing : (window.isTotalSyncing || false));
           const syncFn = (typeof loadTotalCallData === 'function' ? loadTotalCallData : (window.loadTotalCallData || null));
           if (syncFn && !isSyncing) {
-            syncFn(true, false);
+            trackJob(syncFn(true, false));
           }
         }
         break;
@@ -20350,23 +20457,23 @@ function refreshTabData(tabId, filterParam = null) {
       case 'surveymgmt':
       case 'surveymgmt_new':
         if (typeof renderSurveyMgmtTab === 'function') {
-          renderSurveyMgmtTab();
+          trackJob(renderSurveyMgmtTab());
         }
         break;
 
       // 1-3. AI간병통화 관리: 최신 음성/녹취 및 대상자 현황 갱신
       case 'carecall':
         if (typeof refreshCareCallData === 'function') {
-          refreshCareCallData();
+          trackJob(refreshCareCallData());
         } else if (typeof renderCareCallTargets === 'function') {
-          renderCareCallTargets();
+          trackJob(renderCareCallTargets());
         }
         break;
 
       // 2. 삼성화재 콜분석: 캐시 기반 0ms 즉시 화면 렌더링 (블로킹 CTI 스크래핑 제외)
       case 'samsungcallreport':
         if (typeof renderSamsungCallReportTab === 'function') {
-          renderSamsungCallReportTab();
+          trackJob(renderSamsungCallReportTab());
         }
         break;
 
@@ -20376,36 +20483,36 @@ function refreshTabData(tabId, filterParam = null) {
       case 'samsung':
         gActiveSamsungSheet = 'eligible';
         if (typeof checkSamsungDriveStatus === 'function') {
-          checkSamsungDriveStatus();
+          trackJob(checkSamsungDriveStatus());
         }
         if (typeof syncSamsungSpreadsheetData === 'function') {
-          syncSamsungSpreadsheetData(true);
+          trackJob(syncSamsungSpreadsheetData(true));
         }
         if (typeof renderSamsungList === 'function') {
-          renderSamsungList('eligible');
+          trackJob(renderSamsungList('eligible'));
         } else if (typeof renderCurrentSamsungSheet === 'function') {
-          renderCurrentSamsungSheet();
+          trackJob(renderCurrentSamsungSheet());
         }
         break;
 
       // 4. 삼성화재 접수/청구관리: 접수/청구 최신 내역 갱신
       case 'samsungclaimhub':
         if (typeof renderSamsungClaimHub === 'function') {
-          renderSamsungClaimHub(filterParam);
+          trackJob(renderSamsungClaimHub(filterParam));
         }
         break;
 
       // 4-1. 삼성화재 SLA 관리: 간병종료 고객 대상 SLA 산출 및 히스토리 관리
       case 'samsungsla':
         if (typeof renderSamsungSlaHub === 'function') {
-          renderSamsungSlaHub();
+          trackJob(renderSamsungSlaHub());
         }
         break;
 
       // 4-2. 현대해상 청구관리: 간병종료 고객 및 팩스청구 내역 갱신
       case 'hyundaiclaimhub':
         if (typeof renderHyundaiClaimHub === 'function') {
-          renderHyundaiClaimHub(filterParam);
+          trackJob(renderHyundaiClaimHub(filterParam));
         }
         break;
 
@@ -20413,74 +20520,77 @@ function refreshTabData(tabId, filterParam = null) {
       case 'carelogs':
       case 'carelogs_new':
         if (typeof syncCarePortLogs === 'function') {
-          syncCarePortLogs(true);
+          trackJob(syncCarePortLogs(true));
         }
         break;
 
       // 6. 통합허브: 통합 데이터 리프레시 및 아웃콜 긴급 체크
       case 'carehub':
         if (typeof renderUnifiedCareHub === 'function') {
-          renderUnifiedCareHub();
+          trackJob(renderUnifiedCareHub());
+        }
+        if (typeof refreshCareHubOnTabReturn === 'function') {
+          trackJob(refreshCareHubOnTabReturn());
         }
         if (typeof isUserOnLoginScreen === 'function' && isUserOnLoginScreen()) break;
         if (typeof syncConfirmedAlertsWithServer === 'function') {
-          syncConfirmedAlertsWithServer();
+          trackJob(syncConfirmedAlertsWithServer());
         }
         if (typeof checkAndTriggerOutcallAlert === 'function') {
-          checkAndTriggerOutcallAlert();
+          trackJob(checkAndTriggerOutcallAlert());
         }
         break;
 
       // 7. 간병캘린더: 최신 배정 스케줄 갱신
       case 'carecalendar':
         if (typeof renderCareCalendar === 'function') {
-          renderCareCalendar();
+          trackJob(renderCareCalendar());
         }
         break;
 
       // 8. 파트너/인력 디렉토리: 최신 인력/센터/손사 명단 갱신
       case 'directory':
         if (typeof renderDirectoryHeaderStats === 'function') {
-          renderDirectoryHeaderStats();
+          trackJob(renderDirectoryHeaderStats());
         }
         if (typeof switchDirectorySubTab === 'function') {
-          switchDirectorySubTab(filterParam || gActiveDirectorySubTab || 'caregivers');
+          trackJob(switchDirectorySubTab(filterParam || gActiveDirectorySubTab || 'caregivers'));
         }
         break;
 
       // 9. 팩스관리: 팩스 최신 송수신 내역 갱신
       case 'faxmgmt':
         if (typeof renderFaxManagement === 'function') {
-          renderFaxManagement();
+          trackJob(renderFaxManagement());
         }
         break;
 
       // 10. 대시보드: 전체 통계 및 차트 재계산
       case 'dashboard':
         if (typeof renderDashboard === 'function') {
-          renderDashboard();
+          trackJob(renderDashboard());
         }
         break;
 
       // 11. 참고자료 서브메뉴
       case 'applications':
-        if (typeof renderApplications === 'function') renderApplications();
+        if (typeof renderApplications === 'function') trackJob(renderApplications());
         break;
       case 'assignments':
-        if (typeof renderAssignments === 'function') renderAssignments();
+        if (typeof renderAssignments === 'function') trackJob(renderAssignments());
         break;
       case 'claims':
-        if (typeof renderClaims === 'function') renderClaims();
+        if (typeof renderClaims === 'function') trackJob(renderClaims());
         break;
       case 'payouts':
-        if (typeof renderPayouts === 'function') renderPayouts();
+        if (typeof renderPayouts === 'function') trackJob(renderPayouts());
         break;
       case 'forms':
-        if (typeof renderForms === 'function') renderForms();
+        if (typeof renderForms === 'function') trackJob(renderForms());
         break;
       case 'adminmgmt':
       case 'admins':
-        if (typeof renderAdmins === 'function') renderAdmins();
+        if (typeof renderAdmins === 'function') trackJob(renderAdmins());
         break;
       default:
         break;
@@ -20488,6 +20598,7 @@ function refreshTabData(tabId, filterParam = null) {
   } catch (err) {
     console.warn('[refreshTabData error]', tabId, err);
   }
+  return Promise.allSettled(pendingJobs);
 }
 window.refreshTabData = refreshTabData;
 
@@ -21801,29 +21912,56 @@ function applyCustomerMemoSave(appId, memoText) {
   if (appIdx === -1) return;
   const app = gApps[appIdx];
   const oldMemo = app.memo || app.specialNotes || '';
+  const oldList = (typeof getCustomerMemoList === 'function' ? getCustomerMemoList(app) : (app.memoList || [])) || [];
   app.memo = memoText;
   app.specialNotes = memoText;
   app.updatedAt = new Date().toISOString();
 
-  // memoList 동기화 (개별 항목 배열)
-  const oldList = (typeof getCustomerMemoList === 'function' ? getCustomerMemoList(app) : (app.memoList || [])) || [];
   const lines = memoText.split('\n').map(l => l.trim()).filter(Boolean);
   const now = new Date();
-  const dateStr = `${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  const currentAuthor = (typeof getCurrentMemoAuthorInfo === 'function') ? getCurrentMemoAuthorInfo() : ((window.currentUser && window.currentUser.name) || '간병상담팀');
-  app.memoList = lines.map((line, idx) => {
-    const existing = oldList.find(m => m.text === line);
-    if (existing) {
-      return {
-        ...existing,
-        author: (typeof resolveMemoAuthor === 'function') ? resolveMemoAuthor(existing.author, existing.text, app) : (existing.author || currentAuthor)
-      };
+  const dateStr = (typeof formatCareDateTimeStr === 'function') ? formatCareDateTimeStr(now) : now.toISOString();
+  const currentAdmin = (typeof getCurrentMemoAdmin === 'function') ? getCurrentMemoAdmin() : { name: '관리자', username: 'admin' };
+  const author = `${currentAdmin.name} (${currentAdmin.username})`;
+  const oldLines = oldList.map(m => String(m.text || '').trim());
+
+  // LCS keeps metadata only for unchanged lines in their original sequence.
+  const rows = oldLines.length + 1;
+  const cols = lines.length + 1;
+  const lcs = Array.from({ length: rows }, () => Array(cols).fill(0));
+  for (let i = oldLines.length - 1; i >= 0; i--) {
+    for (let j = lines.length - 1; j >= 0; j--) {
+      lcs[i][j] = oldLines[i] === lines[j]
+        ? lcs[i + 1][j + 1] + 1
+        : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
     }
+  }
+  const matchedOldByNew = new Map();
+  let oldIdx = 0;
+  let newIdx = 0;
+  while (oldIdx < oldLines.length && newIdx < lines.length) {
+    if (oldLines[oldIdx] === lines[newIdx]) {
+      matchedOldByNew.set(newIdx, oldIdx);
+      oldIdx++;
+      newIdx++;
+    } else if (lcs[oldIdx + 1][newIdx] >= lcs[oldIdx][newIdx + 1]) {
+      oldIdx++;
+    } else {
+      newIdx++;
+    }
+  }
+
+  app.memoList = lines.map((line, idx) => {
+    const matchedOldIdx = matchedOldByNew.get(idx);
+    if (matchedOldIdx !== undefined) return { ...oldList[matchedOldIdx], text: line };
     return {
-      id: 'memo_' + Date.now() + '_' + idx,
+      id: `memo_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
       text: line,
       createdAt: dateStr,
-      author: (typeof resolveMemoAuthor === 'function') ? resolveMemoAuthor(null, line, app) : currentAuthor
+      author,
+      authorId: currentAdmin.username,
+      authorName: currentAdmin.name,
+      updatedAt: null,
+      updatedBy: null
     };
   });
 
@@ -21843,7 +21981,7 @@ function applyCustomerMemoSave(appId, memoText) {
   }
 
   try {
-    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    // TEMP disabled LIVON_CACHED_APPS save: localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
   } catch (e) {
     console.warn('[applyCustomerMemoSave] localStorage error:', e);
   }
@@ -25409,6 +25547,7 @@ function downloadCareReport2PageModalPdf() {
 
   if (window._current2PageHtml && typeof render2PageHtmlToPdfBytes === 'function') {
     showGlobalProgress({
+      owner: 'carelogPdf',
       title: `[${pName} 님] 공식 간병일지(A4 2P) PDF 다운로드`,
       subtitle: `고해상도 A4 규격 2페이지 PDF 렌더링 중...`,
       percent: 50,
@@ -25417,9 +25556,9 @@ function downloadCareReport2PageModalPdf() {
     render2PageHtmlToPdfBytes(window._current2PageHtml).then(pdfBytes => {
       triggerDirectPdfDownload(pdfBytes, fileName);
       updateGlobalProgress({ percent: 100, statusText: '✨ 다운로드 완료!' });
-      hideGlobalProgress(350);
+      hideGlobalProgress(350, 'carelogPdf');
     }).catch(err => {
-      hideGlobalProgress();
+      hideGlobalProgress(0, 'carelogPdf');
       if (typeof downloadPatientCareLogsPdfs_new === 'function') {
         downloadPatientCareLogsPdfs_new(window._current2PageModalGroupId || pName);
       } else {
@@ -26612,6 +26751,7 @@ async function ensureHtml2CanvasLoaded() {
 function showGlobalProgress(opts) {
   const modal = document.getElementById('globalProgressModal') || document.getElementById('globalCareLogProgressModal');
   if (!modal) return;
+  if (gGlobalProgressOwner === 'carelogPdf' && opts.owner !== 'carelogPdf') return;
 
   const titleEl = document.getElementById('globalProgressTitle');
   const subEl = document.getElementById('globalProgressSubtitle');
@@ -26621,8 +26761,10 @@ function showGlobalProgress(opts) {
 
   const iconEl = document.getElementById('globalProgressIcon');
 
-  if (titleEl) titleEl.innerText = opts.title || '작업 진행 중';
-  if (subEl) subEl.innerText = opts.subtitle || '';
+  gGlobalProgressOwner = opts.owner || 'global';
+  const isCareLogPdf = gGlobalProgressOwner === 'carelogPdf';
+  if (titleEl) titleEl.innerText = isCareLogPdf ? '간병일지 PDF 처리 중' : (opts.title || '작업 진행 중');
+  if (subEl) subEl.innerText = isCareLogPdf ? '잠시만 기다려주세요...' : (opts.subtitle || '');
   const p = Math.min(100, Math.max(0, opts.percent || 0));
   if (barEl) barEl.style.width = `${p}%`;
   if (pctEl) pctEl.innerText = `${p}%`;
@@ -26650,8 +26792,13 @@ function updateGlobalProgress(opts) {
   const titleEl = document.getElementById('globalProgressTitle');
   const subEl = document.getElementById('globalProgressSubtitle');
 
-  if (opts.title && titleEl) titleEl.innerText = opts.title;
-  if (opts.subtitle && subEl) subEl.innerText = opts.subtitle;
+  if (gGlobalProgressOwner !== 'carelogPdf') {
+    if (opts.title && titleEl) titleEl.innerText = opts.title;
+    if (opts.subtitle && subEl) subEl.innerText = opts.subtitle;
+  } else {
+    if (titleEl) titleEl.innerText = '간병일지 PDF 처리 중';
+    if (subEl) subEl.innerText = '잠시만 기다려주세요...';
+  }
   if (typeof opts.percent === 'number') {
     const p = Math.min(100, Math.max(0, opts.percent));
     if (barEl) barEl.style.width = `${p}%`;
@@ -26660,18 +26807,40 @@ function updateGlobalProgress(opts) {
   if (opts.statusText && statusEl) statusEl.innerText = opts.statusText;
 }
 
-function hideGlobalProgress(delay = 0) {
+function resumeAppTabProgressAfterPdf() {
+  if (!gAppTabProgressOwnerSequence || gAppTabProgressOwnerSequence !== gAppTabNavigationSequence) return;
+  const tabId = gActiveTab || 'carehub';
+  const meta = APP_TAB_META[tabId] || { name: tabId };
+  showGlobalProgress({
+    owner: 'appTab',
+    title: `${meta.name} 화면 준비 중`,
+    subtitle: '화면과 최신 데이터를 불러오고 있습니다.',
+    percent: 20,
+    statusText: '데이터를 확인하고 있습니다...',
+    icon: 'refresh-cw'
+  });
+}
+
+function hideGlobalProgress(delay = 0, owner = '') {
   const modal = document.getElementById('globalProgressModal') || document.getElementById('globalCareLogProgressModal');
   if (!modal) return;
+  if (gGlobalProgressOwner === 'carelogPdf' && owner !== 'carelogPdf') return;
 
   if (delay > 0) {
+    const scheduledOwner = owner || gGlobalProgressOwner;
     setTimeout(() => {
+      if (scheduledOwner && gGlobalProgressOwner !== scheduledOwner) return;
       modal.classList.add('hidden');
       modal.style.display = 'none';
+      gGlobalProgressOwner = '';
+      if (scheduledOwner === 'carelogPdf') resumeAppTabProgressAfterPdf();
     }, delay);
   } else {
+    const wasCareLogPdf = gGlobalProgressOwner === 'carelogPdf';
     modal.classList.add('hidden');
     modal.style.display = 'none';
+    gGlobalProgressOwner = '';
+    if (wasCareLogPdf) resumeAppTabProgressAfterPdf();
   }
 }
 
@@ -27560,6 +27729,7 @@ async function downloadCarePortViaRobot(targetSessionId = null, targetPatientNam
   const sessionId = targetSessionId || gCurrentCarePortSessionId || detail.sessionId || detail.id || '';
 
   showGlobalProgress({
+    owner: 'carelogPdf',
     title: `[${username} 님] 케어포트 무인 로봇 다운로드`,
     subtitle: `백그라운드 크롬 로봇이 케어포트에 직접 접속하여 원본 파일을 가져옵니다.`,
     percent: 25,
@@ -27595,7 +27765,7 @@ async function downloadCarePortViaRobot(targetSessionId = null, targetPatientNam
         setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
 
         updateGlobalProgress({ percent: 100, statusText: `완료! 케어포트 원본 간병일지 병합 파일이 다운로드되었습니다.` });
-        setTimeout(hideGlobalProgress, 1200);
+        hideGlobalProgress(1200, 'carelogPdf');
 
         if (typeof showToast === 'function') {
           showToast(`[${username} 님] 케어포트 원본 간병일지 다운로드 완료!`, 'success');
@@ -27690,14 +27860,14 @@ async function downloadCarePortViaRobot(targetSessionId = null, targetPatientNam
     triggerDirectPdfDownload(pdfBytes, fileName);
 
     updateGlobalProgress({ percent: 100, statusText: `완료! 케어포트 공식 A4 일지가 다운로드되었습니다.` });
-    setTimeout(hideGlobalProgress, 1000);
+    hideGlobalProgress(1000, 'carelogPdf');
 
     if (typeof showToast === 'function') {
       showToast(`[${patient.patientName} 님] 케어포트 공식 A4 일지 다운로드 완료!`, 'success');
     }
   } catch (clientErr) {
     console.error('[Fast PDF Engine] 실패:', clientErr);
-    hideGlobalProgress();
+    hideGlobalProgress(0, 'carelogPdf');
     alert(`공식 간병일지 다운로드 안내: ${clientErr.message}`);
   }
 }
@@ -27750,6 +27920,7 @@ async function downloadPatientCareLogsViaRobot(groupId, selectedSessionIds = nul
 
   // 개발 및 운영 환경 공통: 무인 로봇 케어포트 원본 파일 다운로드 및 공식 PDF 병합
   showGlobalProgress({
+    owner: 'carelogPdf',
     title: `[${username} 님] ${labelPrefix} 무인 로봇 다운로드`,
     subtitle: `백그라운드 크롬 로봇이 케어포트에 직접 접속하여 ${labelPrefix} 원본 일지 파일들을 다운받아 1개로 병합합니다.`,
     percent: 15,
@@ -27819,7 +27990,7 @@ async function downloadPatientCareLogsViaRobot(groupId, selectedSessionIds = nul
         }
 
         updateGlobalProgress({ percent: 100, statusText: `완료! 총 ${totalDays}일차 원본 파일이 1개로 병합되었습니다.` });
-        setTimeout(hideGlobalProgress, 1200);
+        hideGlobalProgress(1200, 'carelogPdf');
 
         if (typeof showToast === 'function') {
           showToast(`[${username} 님] ${labelPrefix} 원본 합본 PDF 다운로드 완료!`, 'success');
@@ -27845,7 +28016,7 @@ async function downloadPatientCareLogsViaRobot(groupId, selectedSessionIds = nul
     await compileClientSideAuthenticCarePortPdf(patient, sortedLogs, isSelective, totalDays);
   } catch (clientErr) {
     console.error('[Client-Side PDF Engine] 실패:', clientErr);
-    hideGlobalProgress();
+    hideGlobalProgress(0, 'carelogPdf');
     alert(`공식 간병일지 합본 다운로드 오류: ${clientErr.message}`);
   }
 }
@@ -27858,6 +28029,7 @@ async function captureCarePortOriginalViaIframe(sessionList, username, isSelecti
   const labelPrefix = isSingleSession ? `공식 간병일지` : (isSelective ? `선택 ${totalDays}일차` : `전체 ${totalDays}일차`);
 
   showGlobalProgress({
+    owner: 'carelogPdf',
     title: `[${username} 님] ${labelPrefix} 무인 로봇 다운로드`,
     subtitle: `백그라운드 크롬 로봇이 케어포트에 직접 접속하여 ${labelPrefix} 원본 파일을 가져와 병합합니다.`,
     percent: 15,
@@ -28185,7 +28357,7 @@ async function captureCarePortOriginalViaIframe(sessionList, username, isSelecti
       ? `완료! 케어포트 원본 간병일지 병합 파일이 다운로드되었습니다.`
       : `완료! 총 ${totalDays}일차 (${mergedDoc.getPageCount()}페이지) 원본 파일이 1개로 병합되었습니다.`
   });
-  setTimeout(hideGlobalProgress, 1200);
+  hideGlobalProgress(1200, 'carelogPdf');
 
   if (typeof showToast === 'function') {
     showToast(
@@ -28208,6 +28380,7 @@ async function compileClientSideAuthenticCarePortPdf(patient, sortedLogs, isSele
   const labelPrefix = isSelective ? `선택 ${totalDays}일차` : `전체 ${totalDays}일차`;
 
   showGlobalProgress({
+    owner: 'carelogPdf',
     title: `[${username} 님] ${labelPrefix} 원본 다운로드`,
     subtitle: `${labelPrefix} 일지 원본 데이터를 받아와 1개의 공식 A4 합본 PDF로 조립합니다.`,
     percent: 15,
@@ -28330,7 +28503,7 @@ async function compileClientSideAuthenticCarePortPdf(patient, sortedLogs, isSele
     percent: 100,
     statusText: `완료! 총 ${totalDays}일차 (${mergedDoc.getPageCount()}페이지) 원본 합본이 다운로드되었습니다.`
   });
-  setTimeout(hideGlobalProgress, 1200);
+  hideGlobalProgress(1200, 'carelogPdf');
 
   if (typeof showToast === 'function') {
     showToast(`[${username} 님] ${labelPrefix} (${mergedDoc.getPageCount()}페이지) 원본 합본 PDF 다운로드 완료!`, 'success');
@@ -28356,6 +28529,7 @@ async function downloadCarePortDocumentPdf() {
   const fileName = `[케어포트_공식간병일지]_${username}_${cleanDate || gCurrentCarePortSessionId || '일지'}.pdf`;
 
   showGlobalProgress({
+    owner: 'carelogPdf',
     title: `[${username} 님] 공식 간병일지 PDF 다운로드`,
     subtitle: `케어포트 공식 간병일지를 고해상도 A4 규격 PDF로 렌더링 중입니다.`,
     percent: 30,
@@ -28446,7 +28620,7 @@ async function downloadCarePortDocumentPdf() {
     
     updateGlobalProgress({ percent: 100, statusText: `완료! 간병일지 PDF 다운로드가 완료되었습니다.` });
     triggerDirectPdfDownload(pdfBytes, fileName);
-    setTimeout(hideGlobalProgress, 1000);
+    hideGlobalProgress(1000, 'carelogPdf');
 
     // 삼성화재 연동 데이터에 자동 등록
     if (gCurrentCarePortSessionId) {
@@ -28468,10 +28642,10 @@ async function downloadCarePortDocumentPdf() {
     }
 
     updateGlobalProgress({ percent: 100, statusText: `✨ 간병일지 PDF 다운로드가 완료되었습니다!` });
-    hideGlobalProgress(350);
+    hideGlobalProgress(350, 'carelogPdf');
   } catch (err) {
     console.error('간병일지 PDF 다운로드 실패:', err);
-    hideGlobalProgress();
+    hideGlobalProgress(0, 'carelogPdf');
     alert('간병일지 PDF 다운로드 중 오류가 발생했습니다: ' + err.message);
   }
 }
@@ -28536,6 +28710,7 @@ async function downloadPatientCareLogsPdfs_new(groupId) {
   }
 
   showGlobalProgress({
+    owner: 'carelogPdf',
     title: `[${pName} 님] LivOn AI 간병일지 PDF 다운로드`,
     subtitle: `LivOn AI 간병일지 공식 서식으로 통합 생성 중...`,
     percent: 25,
@@ -28597,7 +28772,7 @@ async function downloadPatientCareLogsPdfs_new(groupId) {
     link.click();
     document.body.removeChild(link);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-    hideGlobalProgress(350);
+    hideGlobalProgress(350, 'carelogPdf');
     return;
   } catch (err) {
     console.error('공식 2P 일지 PDF 다운로드 실패, 클라이언트 엔진 시도:', err);
@@ -28631,14 +28806,14 @@ async function downloadPatientCareLogsPdfs_new(groupId) {
           percent: 100,
           statusText: `✨ LivOn AI 간병일지 다운로드 완료!`
         });
-        hideGlobalProgress(350);
+        hideGlobalProgress(350, 'carelogPdf');
         return;
       } catch (clientErr) {
         console.error('Client PDF fallback also failed:', clientErr);
       }
     }
 
-    hideGlobalProgress();
+    hideGlobalProgress(0, 'carelogPdf');
     // Final fallback: open printable page in new tab
     window.open(`/api/careport/care-report-pdf?patient=${encodeURIComponent(pName)}`, '_blank');
     return;
@@ -28665,6 +28840,7 @@ async function batchDownloadSelectedPatientPdfs() {
   }
   const list = Array.from(gCarePortSelectedPatients);
   showGlobalProgress({
+    owner: 'carelogPdf',
     title: `선택 환자 (${list.length}명) 통합 일지 일괄 다운로드`,
     subtitle: `환자별 전체 일지를 1개의 단일 PDF로 순차 생성합니다.`,
     percent: 0,
@@ -28689,13 +28865,14 @@ async function batchDownloadSelectedPatientPdfs() {
   }
 
   showGlobalProgress({
+    owner: 'carelogPdf',
     title: `선택 환자 (${list.length}명) 다운로드 완료`,
     subtitle: `모든 선택 환자의 전체 일지가 단일 통합 PDF 파일로 다운로드되었습니다.`,
     percent: 100,
     statusText: `전체 완료!`,
     icon: 'check-circle-2'
   });
-  hideGlobalProgress(1500);
+  hideGlobalProgress(1500, 'carelogPdf');
 }
 var batchDownloadSelectedPatientZips = batchDownloadSelectedPatientPdfs;
 window.batchDownloadSelectedPatientPdfs = batchDownloadSelectedPatientPdfs;
@@ -28708,6 +28885,7 @@ async function batchDownloadSelectedPatientPdfs_new() {
   }
   const list = Array.from(gCarePortSelectedPatients);
   showGlobalProgress({
+    owner: 'carelogPdf',
     title: `선택 환자 (${list.length}명) LivOn AI 간병일지 일괄 다운로드`,
     subtitle: `환자별 LivOn AI 간병일지를 순차 다운로드합니다.`,
     percent: 0,
@@ -28732,13 +28910,14 @@ async function batchDownloadSelectedPatientPdfs_new() {
   }
 
   showGlobalProgress({
+    owner: 'carelogPdf',
     title: `선택 환자 (${list.length}명) 다운로드 완료`,
     subtitle: `모든 선택 환자의 LivOn AI 간병일지 다운로드가 완료되었습니다.`,
     percent: 100,
     statusText: `전체 완료!`,
     icon: 'check-circle-2'
   });
-  hideGlobalProgress(1500);
+  hideGlobalProgress(1500, 'carelogPdf');
 }
 var batchDownloadSelectedPatientZips_new = batchDownloadSelectedPatientPdfs_new;
 window.batchDownloadSelectedPatientPdfs_new = batchDownloadSelectedPatientPdfs_new;
@@ -29817,6 +29996,7 @@ async function downloadCarePortPdfLog(id) {
   const fileName = log.pdfFileName || `[${aId}_${pName}]_케어포트_간병일지.pdf`;
 
   showGlobalProgress({
+    owner: 'carelogPdf',
     title: `[${pName} 님] 간병일지 PDF 다운로드`,
     subtitle: `케어포트 정규 일지 서식을 고해상도 A4 규격 PDF로 렌더링 중입니다.`,
     percent: 25,
@@ -29916,7 +30096,7 @@ async function downloadCarePortPdfLog(id) {
       const pdfBytes = await renderElementToSinglePageA4PdfBytes(tempContainer, 12);
       updateGlobalProgress({ percent: 100, statusText: `✨ 다운로드 완료!` });
       triggerDirectPdfDownload(pdfBytes, fileName);
-      hideGlobalProgress(900);
+      hideGlobalProgress(900, 'carelogPdf');
       if (document.body.contains(tempContainer)) document.body.removeChild(tempContainer);
       return;
     } catch (e) {
@@ -29932,7 +30112,7 @@ async function downloadCarePortPdfLog(id) {
     if (gen && gen.bytes) {
       triggerDirectPdfDownload(gen.bytes, fileName);
       updateGlobalProgress({ percent: 100, statusText: `✨ 다운로드 완료!` });
-      hideGlobalProgress(900);
+      hideGlobalProgress(900, 'carelogPdf');
       return;
     }
   } catch (errFallback) {
@@ -29949,7 +30129,7 @@ async function downloadCarePortPdfLog(id) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   updateGlobalProgress({ percent: 100, statusText: `✨ 다운로드 완료!` });
-  hideGlobalProgress(900);
+  hideGlobalProgress(900, 'carelogPdf');
 }
 
 function downloadCurrentCarePortViewFile() {
@@ -30456,7 +30636,7 @@ function submitSimulatorLead() {
   };
 
   gApps.unshift(newApp);
-  try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+  // TEMP disabled LIVON_CACHED_APPS save: try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:saveApplication', { app: newApp });
   }
@@ -31385,7 +31565,7 @@ function syncHd1RrnToApp(value, appId) {
     custRrnInput.value = clean;
   }
   try {
-    localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    // TEMP disabled LIVON_CACHED_APPS save: localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
   } catch (e) {}
   if (typeof syncToConvex === 'function') {
     syncToConvex('sync:saveApplication', { app }).catch(() => {});
@@ -32013,10 +32193,7 @@ function handleNewAppSubmit(e) {
       const domContractEnd = document.getElementById('newAppSamsungContractEndDate')?.value?.trim();
       const domHasInjury = document.getElementById('newAppSamsungHasInjuryCare')?.value?.trim();
       const domHasDisease = document.getElementById('newAppSamsungHasDiseaseCare')?.value?.trim();
-      const domAdjuster = document.getElementById('newAppSamsungAdjuster')?.value?.trim();
-      const domAdjusterPhone = document.getElementById('newAppSamsungAdjusterPhone')?.value?.trim();
-      const domAdjusterFax = document.getElementById('newAppSamsungAdjusterFax')?.value?.trim();
-      const domAccidentNo = document.getElementById('newAppSamsungAccidentNumber')?.value?.trim();
+
 
       newApp.patientId = domPatientId || gPendingSamsungLeadData?.patientId || ('SF-' + newApp.id);
       newApp.productCode = domProductCode || gPendingSamsungLeadData?.productCode || '2PB320070';
@@ -32030,11 +32207,12 @@ function handleNewAppSubmit(e) {
       newApp.hasDiseaseCare = domHasDisease || gPendingSamsungLeadData?.hasDiseaseCare || '가입';
 
       if (domPolicyNumber) newApp.policyNumber = domPolicyNumber;
-      if (domAdjuster) newApp.adjusterName = domAdjuster;
-      if (domAdjusterPhone) newApp.adjusterPhone = domAdjusterPhone;
-      if (domAdjusterFax) newApp.adjusterFax = domAdjusterFax;
-      if (domAccidentNo) newApp.accidentNumber = domAccidentNo;
-
+      newApp.adjusterName = '';
+      newApp.adjusterFirm = '';
+      newApp.adjusterPhone = '';
+      newApp.adjusterMobile = '';
+      newApp.adjusterFax = '';
+      newApp.accidentNumber = '';
       gPendingSamsungLeadData = null;
     }
 
@@ -32502,7 +32680,7 @@ async function submitAppToCarePort(app, isManual = false) {
 
       // Local storage update
       try {
-        localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+        // TEMP disabled LIVON_CACHED_APPS save: localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
       } catch (e) {}
 
       // Save to disk
@@ -33386,6 +33564,23 @@ function openCustomerEditModal(appId, focusSection = null) {
     editAccidentPicker.value = accidentDateVal.slice(0, 10).replace(/\./g, '-');
   }
 
+  const accidentTypeVal = String(app.accidentType || '').trim();
+  const accidentTypeRadios = document.querySelectorAll('input[name="custEditAccidentTypeRadio"]');
+  accidentTypeRadios.forEach(radio => {
+    radio.checked = accidentTypeVal
+      ? radio.value === accidentTypeVal || (accidentTypeVal.includes('상해') && radio.value === '상해') || (accidentTypeVal.includes('질병') && radio.value === '질병')
+      : radio.value === '상해';
+  });
+
+  const diagnosisInput = document.getElementById('custEditDiagnosis');
+  if (diagnosisInput) {
+    diagnosisInput.value = app.diagnosis || app.diseaseName || app.disease || app.sicknessName || (app.memo && String(app.memo).match(/\[진단명:\s*([^\]]+)\]/)?.[1]?.trim()) || '';
+  }
+  const accidentDetailInput = document.getElementById('custEditAccidentDetail');
+  if (accidentDetailInput) {
+    accidentDetailInput.value = app.accidentDetail || '';
+  }
+
   // 간병시작 희망일시 (날짜 인풋에는 YYYY-MM-DD만 표시하여 잘림 방지, 시간은 셀렉트에 분리)
   const rawDesired = app.desiredDate || (resolvedApply ? resolvedApply.slice(0, 10).replace(/\./g, '-') : '');
   const desiredInput = document.getElementById('custEditDesiredDate');
@@ -33633,14 +33828,50 @@ async function handleCustomerEditSubmit(e) {
 
     if (app.memo) {
       const lines = app.memo.split('\n').map(l => l.trim()).filter(Boolean);
-      const author = (typeof getCurrentMemoAuthorInfo === 'function') ? getCurrentMemoAuthorInfo().name : '운영자';
-      const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
-      app.memoList = lines.map((line, idx) => ({
-        id: "m_edit_" + Date.now() + "_" + idx,
-        text: line,
-        createdAt: nowStr,
-        author: author
-      }));
+      const previousList = (typeof getCustomerMemoList === 'function' ? getCustomerMemoList(app) : (app.memoList || [])) || [];
+      const now = new Date();
+      const nowStr = (typeof formatCareDateTimeStr === 'function') ? formatCareDateTimeStr(now) : now.toISOString();
+      const currentAdmin = (typeof getCurrentMemoAdmin === 'function') ? getCurrentMemoAdmin() : { name: '관리자', username: 'admin' };
+      const author = `${currentAdmin.name} (${currentAdmin.username})`;
+      const previousLines = previousList.map(m => String(m.text || '').trim());
+      const rows = previousLines.length + 1;
+      const cols = lines.length + 1;
+      const lcs = Array.from({ length: rows }, () => Array(cols).fill(0));
+      for (let i = previousLines.length - 1; i >= 0; i--) {
+        for (let j = lines.length - 1; j >= 0; j--) {
+          lcs[i][j] = previousLines[i] === lines[j]
+            ? lcs[i + 1][j + 1] + 1
+            : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+        }
+      }
+      const matchedOldByNew = new Map();
+      let oldIdx = 0;
+      let newIdx = 0;
+      while (oldIdx < previousLines.length && newIdx < lines.length) {
+        if (previousLines[oldIdx] === lines[newIdx]) {
+          matchedOldByNew.set(newIdx, oldIdx);
+          oldIdx++;
+          newIdx++;
+        } else if (lcs[oldIdx + 1][newIdx] >= lcs[oldIdx][newIdx + 1]) {
+          oldIdx++;
+        } else {
+          newIdx++;
+        }
+      }
+      app.memoList = lines.map((line, idx) => {
+        const matchedOldIdx = matchedOldByNew.get(idx);
+        if (matchedOldIdx !== undefined) return { ...previousList[matchedOldIdx], text: line };
+        return {
+          id: `memo_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
+          text: line,
+          createdAt: nowStr,
+          author,
+          authorId: currentAdmin.username,
+          authorName: currentAdmin.name,
+          updatedAt: null,
+          updatedBy: null
+        };
+      });
     } else {
       app.memoList = [];
     }
@@ -33752,7 +33983,7 @@ async function handleCustomerEditSubmit(e) {
       }
     }
     try {
-      localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+      // TEMP disabled LIVON_CACHED_APPS save: localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
     } catch (err) {
       console.warn('[handleCustomerEditSubmit] localStorage error:', err);
     }
@@ -36163,7 +36394,7 @@ function handleClaimEditSubmit(e) {
 
   try {
     localStorage.setItem('LIVON_CACHED_CLAIMS', JSON.stringify(gClaims));
-    if (app) localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
+    // TEMP disabled LIVON_CACHED_APPS save: if (app) localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps));
   } catch(e) {}
 
   if (typeof syncToConvex === 'function') {
@@ -37581,6 +37812,7 @@ async function handleAdminLoginSubmit(e, customUser, customPass) {
   } catch (err) {}
 
   // 🚨 [보안] 정상 인증 완료 후에 비로소 데이터 초기화 및 실데이터 동기화 시작
+  try { localStorage.removeItem('LIVON_CACHED_APPS'); } catch (e) {}
   initData();
   initInsuranceWorkflows();
   if (typeof loadConvexData === 'function') {
@@ -42604,7 +42836,7 @@ async function executeApplyLaunchData(company) {
   try { localStorage.removeItem('LIVON_DATA_RESET_CLEAN'); } catch (e) {}
   gApps = [...newApps];
   enrichHubSamsungCustomersFromSamsungExcel();
-  try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
+  // TEMP disabled LIVON_CACHED_APPS save: try { localStorage.setItem('LIVON_CACHED_APPS', JSON.stringify(gApps)); } catch (e) {}
 
   // 2. 간병인 배정(gAssigns) 전면 교체
   gAssigns = [...newAssigns];
