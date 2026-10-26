@@ -144,6 +144,7 @@
   async function loadSlackConfig() {
     try {
       const res = await fetch('/api/slack/config');
+      if (!res.ok) return;
       const data = await res.json();
       if (data && data.success && data.config) {
         const c = data.config;
@@ -186,11 +187,14 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ schedules, enabled })
       });
+      if (!res.ok) {
+        throw new Error(`서버 응답 오류 (HTTP ${res.status})`);
+      }
       const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         alert('✅ 슬랙 정기 발송 설정이 안전하게 저장되었습니다!');
       } else {
-        alert('설정 저장 실패: ' + (data.error || '알 수 없는 오류'));
+        alert('설정 저장 실패: ' + (data?.error || '알 수 없는 오류'));
       }
     } catch (e) {
       alert('오류 발생: ' + e.message);
@@ -203,11 +207,18 @@
     box.textContent = '최신 허브 데이터 집계 중...';
     try {
       const res = await fetch('/api/slack/preview');
+      if (!res.ok) {
+        throw new Error(`서버 응답 오류 (HTTP ${res.status})`);
+      }
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('서버 응답 형식이 올바르지 않습니다.');
+      }
       const data = await res.json();
       if (data && data.success && data.previewText) {
         box.textContent = data.previewText;
       } else {
-        box.textContent = '미리보기 데이터를 불러오지 못했습니다.';
+        box.textContent = '미리보기 데이터를 불러오지 못했습니다: ' + (data?.error || '데이터 없음');
       }
     } catch (e) {
       box.textContent = '오류: ' + e.message;
@@ -227,15 +238,24 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
       });
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => '');
+        let errMsg = `서버 응답 오류 (HTTP ${res.status})`;
+        try {
+          const errJson = JSON.parse(errorText);
+          if (errJson && errJson.error) errMsg = errJson.error;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
       const data = await res.json();
       if (data && data.success) {
         alert('🎉 [발송 성공]\n슬랙 채널로 일일 운영보고서가 즉시 전송되었습니다!');
         await loadSlackConfig();
       } else {
-        alert('발송 실패: ' + (data.error || '응답 오류'));
+        alert('발송 실패: ' + (data?.error || '응답 오류'));
       }
     } catch (e) {
-      alert('발송 중 통신 오류가 발생했습니다: ' + e.message);
+      alert('발송 중 오류가 발생했습니다: ' + e.message);
     } finally {
       if (btn) {
         btn.disabled = false;

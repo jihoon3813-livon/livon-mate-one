@@ -6,8 +6,18 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
-const CONFIG_PATH = path.join(__dirname, 'slack_config.json');
-const REAL_DATA_PATH = path.join(__dirname, 'hub_apps_real.json');
+function resolveFilePath(fileName) {
+  const candidates = [
+    path.join(process.cwd(), fileName),
+    path.join(__dirname, fileName),
+    path.join(__dirname, '..', fileName),
+    path.join(__dirname, '..', '..', fileName),
+    path.join('/tmp', fileName)
+  ];
+  return candidates.find(p => fs.existsSync(p)) || path.join(process.cwd(), fileName);
+}
+
+let inMemoryConfig = null;
 
 // 기본 설정 로드 또는 초기화
 function getSlackConfig() {
@@ -20,35 +30,54 @@ function getSlackConfig() {
     dashboardUrl: 'http://localhost:8080'
   };
 
-  if (!fs.existsSync(CONFIG_PATH)) {
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(defaultConfig, null, 2), 'utf8');
+  if (inMemoryConfig) {
+    return { ...defaultConfig, ...inMemoryConfig };
+  }
+
+  const configPath = resolveFilePath('slack_config.json');
+  if (!fs.existsSync(configPath)) {
+    try {
+      fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), 'utf8');
+    } catch (_) {}
     return defaultConfig;
   }
 
   try {
-    const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
-    return { ...defaultConfig, ...JSON.parse(raw) };
+    const raw = fs.readFileSync(configPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    inMemoryConfig = parsed;
+    return { ...defaultConfig, ...parsed };
   } catch (err) {
     return defaultConfig;
   }
 }
 
 function saveSlackConfig(cfg) {
+  inMemoryConfig = cfg;
+  const configPath = resolveFilePath('slack_config.json');
   try {
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2), 'utf8');
+    fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2), 'utf8');
     return true;
   } catch (err) {
-    console.error('[Slack Config Error]', err);
-    return false;
+    // Vercel Serverless 환경 등 Read-Only 파일시스템 대응 (/tmp 쓰기 fallback)
+    try {
+      const tmpPath = path.join('/tmp', 'slack_config.json');
+      fs.writeFileSync(tmpPath, JSON.stringify(cfg, null, 2), 'utf8');
+      return true;
+    } catch (tmpErr) {
+      console.error('[Slack Config Error]', err, tmpErr);
+      return false;
+    }
   }
 }
 
 // 실데이터 기반 집계 지표 연산
 function generateReportData() {
   let apps = [];
-  if (fs.existsSync(REAL_DATA_PATH)) {
+  const realDataPath = resolveFilePath('hub_apps_real.json');
+  if (fs.existsSync(realDataPath)) {
     try {
-      const data = JSON.parse(fs.readFileSync(REAL_DATA_PATH, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(realDataPath, 'utf8'));
       apps = data.applications || [];
     } catch (err) {
       console.warn('[Slack Report] Failed to parse hub_apps_real.json:', err.message);
@@ -144,6 +173,10 @@ function buildSlackMessage(stats, customTitle = null) {
     lines.push(`🔹 등록 데이터 없음`);
   }
 
+  const effectiveDashboardUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL 
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : (config.dashboardUrl || 'http://localhost:8080'));
+
   lines.push(
     ``,
     `──────────────────────────`,
@@ -154,7 +187,7 @@ function buildSlackMessage(stats, customTitle = null) {
     `💵 간병인 총 지급액: *${stats.totalPayout.toLocaleString()}원*`,
     ``,
     `──────────────────────────`,
-    `🔗 *통합간병센터 시스템:* <${config.dashboardUrl}|대시보드 바로가기>`
+    `🔗 *통합간병센터 시스템:* <${effectiveDashboardUrl}|대시보드 바로가기>`
   );
 
   return lines.join('\n');

@@ -7,6 +7,12 @@
       "includeFiles": "{*.json,care-report-2page-pdf.js,pdf-helper.js,pdf-lib.min.js}"
     }
   },
+  "crons": [
+    {
+      "path": "/api/slack/cron",
+      "schedule": "0 22 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/careport-embed",
