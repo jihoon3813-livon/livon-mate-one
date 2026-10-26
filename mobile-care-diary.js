@@ -903,6 +903,9 @@ function buildGuardianDailyMessage(r, dayIdx, pName) {
  * 화면 전체 렌더링
  */
 function render() {
+  if (!Array.isArray(careRecords) || careRecords.length === 0) {
+    return;
+  }
   const r = careRecords[selected] || careRecords[0];
   const b = buildBriefing(r);
 

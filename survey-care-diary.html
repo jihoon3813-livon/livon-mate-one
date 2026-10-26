@@ -2379,9 +2379,10 @@
         document.querySelectorAll('.side-care-days').forEach(el => el.textContent = diffDays + '일');
         document.querySelectorAll('.total-days-num').forEach(el => el.textContent = diffDays + '일');
 
-        // 해당 환자의 실제 케어포트 모바일 일지가 있는지 확인하고, 없으면 기간에 맞춰 일지 날짜 동기화
+        // 해당 환자의 실제 케어포트 모바일 일지가 있는지 확인
         let hasRealLogs = false;
         if (target.patientName && target.patientName !== '고연분') {
+          // 1. 로컬스토리지 확인
           try {
             const cached = localStorage.getItem('LIVON_MOBILE_REPORT_' + target.patientName);
             if (cached) {
@@ -2394,6 +2395,25 @@
             }
           } catch (e) {}
 
+          // 2. target 자체 속성 확인
+          if (!hasRealLogs && (target.hasCareLog === true || (typeof target.careLogCount === 'number' && target.careLogCount > 0))) {
+            hasRealLogs = true;
+          }
+
+          // 3. 부모창(window.parent) 전역 일지 배열(gCareLogs) 매칭 확인
+          if (!hasRealLogs && window.parent && Array.isArray(window.parent.gCareLogs) && window.parent.gCareLogs.length > 0) {
+            const sId = String(target.serviceId || target.id || '').replace(/^ST-/, '');
+            const pName = (target.patientName || '').trim();
+            const matchLog = window.parent.gCareLogs.some(l => {
+              if (!l) return false;
+              const lAppId = String(l.applyId || '').trim();
+              const lName = (l.patientName || '').trim();
+              return (sId && lAppId && (lAppId === sId || lAppId === target.id)) || (pName && lName && lName === pName);
+            });
+            if (matchLog) hasRealLogs = true;
+          }
+
+          // 4. 서버 API 확인
           if (!hasRealLogs) {
             try {
               const resp = await fetch(`/api/careport/mobile-report?patient=${encodeURIComponent(target.patientName)}`);
@@ -2408,45 +2428,120 @@
             } catch (e) {}
           }
 
-          // 케어포트 원격 일지가 아직 없는 타겟 환자인 경우에도, 환자의 실제 간병 시작~종료일에 맞춘 맞춤 일지 날짜 구성
+          // 🚨 간병일지가 없는 환자: 더미 샘플 일지를 절대 주입하지 않고 일지 미작성 전용 UI 적용
           if (!hasRealLogs) {
-            const baseDate = startParts ? startParts.mmdd : '10.25';
-            const customCount = Math.min(diffDays, DEFAULT_RECORDS.length);
-            careRecords = DEFAULT_RECORDS.slice(0, customCount).map((rec, idx) => ({
-              ...rec,
-              date: addDaysToDateStr(baseDate, idx)
-            }));
-            selected = careRecords.length - 1;
+            careRecords = [];
+            applyNoCareLogMode(target);
+          } else {
+            if (typeof render === 'function') render();
+          }
+        } else {
+          // '고연분' 데모 환자이거나 기본 샘플인 경우 정상 렌더링
+          if (typeof render === 'function') render();
+        }
+      }
 
-            // 모바일 화면 상단에 일지 미작성 안내 배너 노출
-            let noLogBanner = document.getElementById('noRealLogNoticeBanner');
-            if (!noLogBanner) {
-              noLogBanner = document.createElement('div');
-              noLogBanner.id = 'noRealLogNoticeBanner';
-              noLogBanner.style.cssText = 'margin: 10px 14px 4px; padding: 11px 14px; background: linear-gradient(135deg, #fff1f2, #ffe4e6); border: 1.5px solid #fecdd3; border-radius: 14px; font-size: 12px; color: #9f1239; display: flex; align-items: center; justify-content: space-between; gap: 8px; box-shadow: 0 2px 6px rgba(225, 29, 72, 0.08);';
-              noLogBanner.innerHTML = `
-                <div>
-                  <div style="font-weight: 800; font-size: 12px; color: #be123c; margin-bottom: 2px;">
-                    📋 아직 등록된 모바일 간병일지가 없습니다
-                  </div>
-                  <div style="font-size: 11px; color: #881337;">
-                    하단 만족도 설문에 바로 참여하여 모바일 커피쿠폰을 받아보세요!
-                  </div>
-                </div>
-                <button type="button" onclick="scrollToSurveyForm()" style="background: linear-gradient(135deg, #e11d48, #be185d); color: #fff; border: none; border-radius: 10px; padding: 6px 12px; font-size: 11px; font-weight: 800; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
-                  설문 바로가기 ☕
-                </button>
-              `;
-              const appContainer = document.querySelector('.mobile-app');
-              const stepper = document.querySelector('.journey-stepper');
-              if (appContainer && stepper) {
-                appContainer.insertBefore(noLogBanner, stepper.nextSibling);
-              }
-            }
+      // 간병일지가 없는 환자 전용 UI 모드 적용 (가짜 일지 노출 완전 차단 및 설문 중심 안내)
+      function applyNoCareLogMode(target) {
+        // 1. 일지 렌더링 영역(신호등, 상태변화, 타임라인, 수행내역, 보호자편지, 날짜선택바) 숨김
+        const diarySectionIds = ['overview', 'daily-content', 'trends', 'timeline', 'careactions', 'family'];
+        diarySectionIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = 'none';
+        });
+        const dateBox = document.querySelector('.date-box');
+        if (dateBox) dateBox.style.display = 'none';
+        const dateStrip = document.getElementById('date-strip');
+        if (dateStrip) dateStrip.style.display = 'none';
+
+        // 2. 일지 대신 친절한 '간병일지 미작성 안내 카드' 삽입
+        let emptyCard = document.getElementById('diaryEmptyStateCard');
+        if (!emptyCard) {
+          emptyCard = document.createElement('div');
+          emptyCard.id = 'diaryEmptyStateCard';
+          emptyCard.style.cssText = 'margin: 20px 14px 28px; padding: 26px 20px; background: #ffffff; border: 1.5px solid #fecdd3; border-radius: 20px; text-align: center; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.06);';
+          emptyCard.innerHTML = `
+            <div style="width: 56px; height: 56px; border-radius: 18px; background: #fff1f2; border: 1px solid #fecdd3; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 12px;">📋</div>
+            <h3 style="font-size: 17px; font-weight: 850; color: #9f1239; margin-bottom: 6px; letter-spacing: -0.03em;">등록된 모바일 간병일지가 없습니다</h3>
+            <p style="font-size: 13px; color: #475569; line-height: 1.6; word-break: keep-all; margin-bottom: 18px;">
+              담당 간병인의 모바일 일지 작성이 아직 완료되지 않았거나 일지 작성 대상이 아닙니다.<br>
+              더 나은 간병 돌봄을 위해 아래 <b>만족도 설문</b>에 참여해 주시면 <b>스타벅스 모바일 커피쿠폰</b>을 100% 선물해 드립니다.
+            </p>
+            <button type="button" onclick="scrollToSection('survey-section')" style="background: linear-gradient(135deg, #e11d48, #be185d); color: #fff; font-weight: 850; font-size: 13.5px; padding: 12px 24px; border-radius: 12px; border: none; cursor: pointer; box-shadow: 0 4px 14px rgba(225, 29, 72, 0.3); display: inline-flex; align-items: center; gap: 8px;">
+              <span>☕ 만족도 설문 바로 참여하기 (선물 증정)</span>
+              <span style="font-size: 15px;">↓</span>
+            </button>
+          `;
+          const surveySection = document.getElementById('survey-section');
+          if (surveySection && surveySection.parentNode) {
+            surveySection.parentNode.insertBefore(emptyCard, surveySection);
           }
         }
 
-        if (typeof render === 'function') render();
+        // 3. 표지(Cover) 튜닝
+        // 3-1. 티켓의 일수 배지 수정
+        document.querySelectorAll('.ticket-day-badge').forEach(badge => {
+          badge.style.background = '#f1f5f9';
+          badge.style.borderColor = '#cbd5e1';
+          badge.innerHTML = `<b style="font-size: 12px; color: #475569; font-weight: 800;">일지 미작성</b><span style="color: #64748b; font-size: 10px;">설문 참여 대상</span>`;
+        });
+        document.querySelectorAll('.side-care-days').forEach(el => el.textContent = '미작성');
+
+        // 3-2. 표지 하단 CTA 버튼 조정
+        const btnCoverPrimary = document.querySelector('.btn-cover-primary');
+        if (btnCoverPrimary) btnCoverPrimary.style.display = 'none'; // 일지 보기 버튼 숨김
+
+        const btnCoverSecondary = document.querySelector('.btn-cover-secondary');
+        if (btnCoverSecondary) {
+          btnCoverSecondary.style.background = 'linear-gradient(135deg, #be185d 0%, #e11d48 100%)';
+          btnCoverSecondary.style.color = '#ffffff';
+          btnCoverSecondary.style.borderColor = 'transparent';
+          btnCoverSecondary.style.boxShadow = '0 6px 18px rgba(190, 24, 93, 0.35)';
+          btnCoverSecondary.style.fontSize = '14.5px';
+          btnCoverSecondary.innerHTML = `<span>☕ 만족도 설문 바로 참여하기 (커피쿠폰 선물 증정)</span> <span style="font-size: 16px;">↓</span>`;
+        }
+
+        // 3-3. 표지 서브 안내 문구 변경
+        const subNotice = document.getElementById('cover-sub-notice-text');
+        if (subNotice) {
+          subNotice.innerHTML = `리본케어 돌봄 서비스를 이용해 주셔서 진심으로 감사드립니다. 더 세심하고 따뜻한 돌봄을 위해 아래 <b>만족도 설문</b>에 참여해 주시면 <strong>스타벅스 모바일 커피쿠폰을 100% 선물해 드립니다.</strong>`;
+        }
+
+        // 4. 모바일 Stepper (표지·안내 / 간병일지(미작성) / 만족도 설문)
+        const pillDiary = document.getElementById('pill-diary');
+        if (pillDiary) {
+          pillDiary.style.opacity = '0.45';
+          pillDiary.style.pointerEvents = 'none';
+          pillDiary.innerHTML = `<span class="step-num">2</span><span>일지 미작성</span>`;
+        }
+
+        // 5. 모바일 상단 툴바의 [일지 다운로드] 버튼 숨김
+        document.querySelectorAll('button[onclick*="downloadCurrentCareReportPdf"]').forEach(btn => {
+          btn.style.display = 'none';
+        });
+
+        // 6. 데스크탑 좌측 사이드바 Nav
+        document.querySelectorAll('.side-nav a').forEach(a => {
+          const href = a.getAttribute('href') || '';
+          if (['#overview', '#trends', '#timeline', '#careactions', '#family'].includes(href)) {
+            a.style.opacity = '0.45';
+            a.style.pointerEvents = 'none';
+            const sp = a.querySelector('span');
+            if (sp && !sp.textContent.includes('미작성')) {
+              sp.textContent += ' (미작성)';
+            }
+          }
+        });
+
+        // 7. 모바일 하단 Bottom Nav 숨김
+        const bottomNav = document.querySelector('.bottom-nav');
+        if (bottomNav) bottomNav.style.display = 'none';
+
+        // 8. 데스크탑 사이드바 설명 문구
+        const sideDesc = document.querySelector('.side-desc');
+        if (sideDesc) {
+          sideDesc.textContent = '더 나은 돌봄을 위해 소중한 만족도 설문에 참여해 주시면 모바일 커피쿠폰을 100% 보내드립니다.';
+        }
       }
 
       // 병원명 및 총 일수 표지 반영

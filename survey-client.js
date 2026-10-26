@@ -2112,12 +2112,26 @@ function openSurveyNewWebviewModal(targetId = '') {
   const relUrl = buildIntegratedSurveyUrl(effectiveId, { titleTheme: gSurveyNewTitleTheme });
   gSurveyNewModalCurrentUrl = getSurveyTargetUrlForSms(target);
 
+  const hasLog = target ? hasTargetCareLog(target) : true;
   const subEl = document.getElementById('surveyNewWebviewModalSub');
   if (subEl) {
     if (target) {
-      subEl.textContent = `${maskPatientName(target.patientName)} (${target.serviceId || target.id}) · 담당 간병인: ${target.caregiverName || '미지정'} · 모바일 일지 & 설문 통합`;
+      const modeText = hasLog ? '모바일 일지 & 설문 통합' : '만족도 설문 단독 (간병일지 미작성)';
+      subEl.textContent = `${maskPatientName(target.patientName)} (${target.serviceId || target.id}) · 담당 간병인: ${target.caregiverName || '미지정'} · ${modeText}`;
     } else {
       subEl.textContent = `고연분 님 (기본 샘플 · 16일 모바일 간병일지 & 커피쿠폰 만족도 설문 통합본)`;
+    }
+  }
+
+  // 상단 01~05 간병일지 바로가기 버튼 제어
+  const diaryScrollBtn = document.querySelector('button[onclick*="overview"]');
+  if (diaryScrollBtn) {
+    if (!hasLog) {
+      diaryScrollBtn.classList.add('opacity-40');
+      diaryScrollBtn.title = '해당 환자는 작성된 모바일 간병일지가 없습니다.';
+    } else {
+      diaryScrollBtn.classList.remove('opacity-40');
+      diaryScrollBtn.title = '';
     }
   }
 
