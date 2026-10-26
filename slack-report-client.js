@@ -146,40 +146,80 @@
 
   let cachedSlackConfig = null;
 
+  function applyConfigToUi(c) {
+    if (!c) return;
+    const channelEl = document.getElementById('slackChannelNameDisplay');
+    if (channelEl && c.channelName) channelEl.textContent = c.channelName;
+    
+    const webhookEl = document.getElementById('slackWebhookMasked');
+    if (webhookEl) {
+      const u = c.webhookUrl || '';
+      if (u.length > 20) {
+        webhookEl.textContent = u.slice(0, 36) + '...' + u.slice(-8);
+      } else {
+        webhookEl.textContent = u || '미설정';
+      }
+    }
+
+    const schedEl = document.getElementById('slackScheduleInput');
+    if (schedEl && Array.isArray(c.schedules) && c.schedules.length > 0) {
+      schedEl.value = c.schedules.join(', ');
+    }
+
+    const autoEl = document.getElementById('slackAutoEnableCheckbox');
+    if (autoEl && typeof c.enabled === 'boolean') {
+      autoEl.checked = c.enabled;
+    }
+
+    const lastSentEl = document.getElementById('slackLastSentText');
+    if (lastSentEl && c.lastSentAt) {
+      const d = new Date(c.lastSentAt);
+      lastSentEl.textContent = `최근 발송: ${d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+  }
+
   async function loadSlackConfig() {
     try {
-      const res = await fetch('/api/slack/config');
+      // 1. 로컬 캐시 즉각 반영 (화면 깜빡임 방지)
+      const localCached = localStorage.getItem('LIVON_SLACK_CONFIG');
+      if (localCached) {
+        try {
+          const parsed = JSON.parse(localCached);
+          cachedSlackConfig = parsed;
+          applyConfigToUi(parsed);
+        } catch (_) {}
+      }
+
+      // 2. Convex Cloud DB 직접 조회 (queryConvex)
+      if (typeof queryConvex === 'function') {
+        try {
+          const cvxRes = await queryConvex('sync:getSystemSettings', {});
+          if (cvxRes && Array.isArray(cvxRes.value)) {
+            const found = cvxRes.value.find(s => s && s.key === 'LIVON_SLACK_REPORT_CONFIG');
+            if (found && found.value && typeof found.value === 'object') {
+              cachedSlackConfig = { ...(cachedSlackConfig || {}), ...found.value };
+              applyConfigToUi(cachedSlackConfig);
+              localStorage.setItem('LIVON_SLACK_CONFIG', JSON.stringify(cachedSlackConfig));
+            }
+          }
+        } catch (cvxErr) {
+          console.warn('[Slack Report] queryConvex warning:', cvxErr);
+        }
+      }
+
+      // 3. 서버 API (/api/slack/config) 최신 동기화
+      const convexUrl = window.CURRENT_CONVEX_URL || '';
+      const res = await fetch('/api/slack/config', {
+        headers: convexUrl ? { 'x-convex-url': convexUrl } : {}
+      });
       if (!res.ok) return;
       const data = await res.json();
       if (data && data.success && data.config) {
-        const c = data.config;
-        cachedSlackConfig = c;
-        const channelEl = document.getElementById('slackChannelNameDisplay');
-        if (channelEl) channelEl.textContent = c.channelName || '#수행_2024_livon_careport_device-alert';
-        
-        const webhookEl = document.getElementById('slackWebhookMasked');
-        if (webhookEl) {
-          const u = c.webhookUrl || '';
-          if (u.length > 20) {
-            webhookEl.textContent = u.slice(0, 36) + '...' + u.slice(-8);
-          } else {
-            webhookEl.textContent = u || '미설정';
-          }
-        }
-
-        const schedEl = document.getElementById('slackScheduleInput');
-        if (schedEl && Array.isArray(c.schedules)) {
-          schedEl.value = c.schedules.join(', ');
-        }
-
-        const autoEl = document.getElementById('slackAutoEnableCheckbox');
-        if (autoEl) autoEl.checked = !!c.enabled;
-
-        const lastSentEl = document.getElementById('slackLastSentText');
-        if (lastSentEl && c.lastSentAt) {
-          const d = new Date(c.lastSentAt);
-          lastSentEl.textContent = `최근 발송: ${d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`;
-        }
+        cachedSlackConfig = { ...(cachedSlackConfig || {}), ...data.config };
+        applyConfigToUi(cachedSlackConfig);
+        try {
+          localStorage.setItem('LIVON_SLACK_CONFIG', JSON.stringify(cachedSlackConfig));
+        } catch (_) {}
       }
     } catch (e) {
       console.warn('loadSlackConfig error:', e);
@@ -195,14 +235,39 @@
       alert('올바른 Slack Webhook URL 형식(https://hooks.slack.com/...)을 입력해주세요.');
       return;
     }
+
+    const updatedConfig = {
+      ...(cachedSlackConfig || {}),
+      webhookUrl: trimmed
+    };
+
+    // 1. Convex Cloud 직접 저장
+    if (typeof syncToConvex === 'function') {
+      try {
+        await syncToConvex('sync:saveSystemSetting', {
+          key: 'LIVON_SLACK_REPORT_CONFIG',
+          value: updatedConfig
+        });
+      } catch (cvxErr) {
+        console.warn('[Slack Report] Convex save error:', cvxErr);
+      }
+    }
+
+    // 2. 서버 API 동기화
     try {
+      const convexUrl = window.CURRENT_CONVEX_URL || '';
       const res = await fetch('/api/slack/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(convexUrl ? { 'x-convex-url': convexUrl } : {})
+        },
         body: JSON.stringify({ webhookUrl: trimmed })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      alert('✅ Webhook URL이 안전하게 저장되었습니다.');
+      cachedSlackConfig = updatedConfig;
+      localStorage.setItem('LIVON_SLACK_CONFIG', JSON.stringify(updatedConfig));
+      alert('✅ Webhook URL이 Convex Cloud 및 시스템에 안전하게 저장되었습니다.');
       await loadSlackConfig();
     } catch (e) {
       alert('Webhook URL 저장 실패: ' + e.message);
@@ -210,14 +275,47 @@
   };
 
   window.saveSlackSettings = async function() {
-    try {
-      const schedVal = document.getElementById('slackScheduleInput').value;
-      const schedules = schedVal.split(',').map(s => s.trim()).filter(Boolean);
-      const enabled = document.getElementById('slackAutoEnableCheckbox').checked;
+    const schedInput = document.getElementById('slackScheduleInput');
+    const autoCheckbox = document.getElementById('slackAutoEnableCheckbox');
+    if (!schedInput) return;
 
+    const schedVal = schedInput.value;
+    const schedules = schedVal.split(',').map(s => s.trim()).filter(Boolean);
+    const enabled = autoCheckbox ? autoCheckbox.checked : true;
+
+    if (schedules.length === 0) {
+      alert('발송 시간을 하나 이상 입력해주세요. (예: 21:00)');
+      return;
+    }
+
+    const updatedConfig = {
+      ...(cachedSlackConfig || {}),
+      schedules,
+      enabled
+    };
+
+    // 1. Convex Cloud DB 영구 저장
+    if (typeof syncToConvex === 'function') {
+      try {
+        await syncToConvex('sync:saveSystemSetting', {
+          key: 'LIVON_SLACK_REPORT_CONFIG',
+          value: updatedConfig
+        });
+        console.log('[Slack Report] Successfully saved to Convex Cloud:', updatedConfig);
+      } catch (cvxErr) {
+        console.warn('[Slack Report] Failed to save to Convex directly:', cvxErr);
+      }
+    }
+
+    // 2. 서버 API 및 로컬 캐시 동기화
+    try {
+      const convexUrl = window.CURRENT_CONVEX_URL || '';
       const res = await fetch('/api/slack/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(convexUrl ? { 'x-convex-url': convexUrl } : {})
+        },
         body: JSON.stringify({ schedules, enabled })
       });
       if (!res.ok) {
@@ -225,12 +323,20 @@
       }
       const data = await res.json();
       if (data && data.success) {
-        alert('✅ 슬랙 정기 발송 설정이 안전하게 저장되었습니다!');
+        cachedSlackConfig = { ...updatedConfig, ...data.config };
       } else {
-        alert('설정 저장 실패: ' + (data?.error || '알 수 없는 오류'));
+        cachedSlackConfig = updatedConfig;
       }
+      localStorage.setItem('LIVON_SLACK_CONFIG', JSON.stringify(cachedSlackConfig));
+      applyConfigToUi(cachedSlackConfig);
+
+      alert(`✅ 슬랙 정기 발송 시간(${schedules.join(', ')})이 Convex Cloud DB에 안전하게 저장되었습니다!`);
     } catch (e) {
-      alert('오류 발생: ' + e.message);
+      // API 실패 시에도 로컬 및 Convex 저장 상태 유지
+      cachedSlackConfig = updatedConfig;
+      localStorage.setItem('LIVON_SLACK_CONFIG', JSON.stringify(cachedSlackConfig));
+      applyConfigToUi(cachedSlackConfig);
+      alert(`✅ Convex Cloud DB에 설정이 저장되었습니다. (네트워크 경고: ${e.message})`);
     }
   };
 

@@ -12,7 +12,8 @@ module.exports = async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
   try {
-    const config = slackService.getSlackConfig();
+    const convexCfg = await slackService.fetchSlackConfigFromConvex(req);
+    const config = convexCfg ? { ...slackService.getSlackConfig(), ...convexCfg } : slackService.getSlackConfig();
     if (!config.enabled) {
       return res.status(200).json({
         success: false,

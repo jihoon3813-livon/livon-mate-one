@@ -13,13 +13,16 @@ module.exports = async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const cfg = slackService.getSlackConfig();
-      return res.status(200).json({ success: true, config: cfg });
+      const convexCfg = await slackService.fetchSlackConfigFromConvex(req);
+      const base = slackService.getSlackConfig();
+      const merged = convexCfg ? { ...base, ...convexCfg } : base;
+      return res.status(200).json({ success: true, config: merged });
     }
 
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-      const current = slackService.getSlackConfig();
+      const convexCfg = await slackService.fetchSlackConfigFromConvex(req);
+      const current = convexCfg ? { ...slackService.getSlackConfig(), ...convexCfg } : slackService.getSlackConfig();
       const updated = {
         ...current,
         enabled: typeof body.enabled === 'boolean' ? body.enabled : current.enabled,
@@ -29,6 +32,7 @@ module.exports = async function handler(req, res) {
         dashboardUrl: body.dashboardUrl || current.dashboardUrl
       };
       slackService.saveSlackConfig(updated);
+      await slackService.saveSlackConfigToConvex(updated, req);
       return res.status(200).json({ success: true, config: updated });
     }
 

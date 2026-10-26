@@ -69,6 +69,75 @@ function getSlackConfig() {
   }
 }
 
+const DEV_CONVEX_URL = 'https://rapid-raccoon-895.convex.cloud';
+const PROD_CONVEX_URL = 'https://gallant-weasel-360.convex.cloud';
+
+function resolveConvexUrl(reqOrUrl) {
+  if (typeof reqOrUrl === 'string' && (reqOrUrl.includes('convex.cloud') || reqOrUrl.includes('convex.site'))) {
+    return reqOrUrl;
+  }
+  const req = reqOrUrl;
+  const headerUrl = req && req.headers && (req.headers['x-convex-url'] || req.headers['X-Convex-Url']);
+  if (headerUrl && (headerUrl.includes('convex.cloud') || headerUrl.includes('convex.site'))) {
+    return headerUrl;
+  }
+  const bodyUrl = req && req.body && req.body.convexUrl;
+  if (bodyUrl && (bodyUrl.includes('convex.cloud') || bodyUrl.includes('convex.site'))) {
+    return bodyUrl;
+  }
+  if (process.env.CONVEX_URL) {
+    return process.env.CONVEX_URL;
+  }
+  return process.env.VERCEL_ENV === 'production' ? PROD_CONVEX_URL : DEV_CONVEX_URL;
+}
+
+async function fetchSlackConfigFromConvex(reqOrUrl = null) {
+  const convexUrl = resolveConvexUrl(reqOrUrl);
+  try {
+    const res = await fetch(`${convexUrl}/api/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: 'sync:getSystemSettings',
+        args: {}
+      })
+    });
+    const data = await res.json();
+    if (data && Array.isArray(data.value)) {
+      const found = data.value.find(s => s && s.key === 'LIVON_SLACK_REPORT_CONFIG');
+      if (found && found.value && typeof found.value === 'object') {
+        inMemoryConfig = { ...getSlackConfig(), ...found.value };
+        return found.value;
+      }
+    }
+  } catch (err) {
+    console.warn('[Slack Report] Failed to fetch config from Convex:', err.message);
+  }
+  return null;
+}
+
+async function saveSlackConfigToConvex(cfg, reqOrUrl = null) {
+  const convexUrl = resolveConvexUrl(reqOrUrl);
+  try {
+    const res = await fetch(`${convexUrl}/api/mutation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: 'sync:saveSystemSetting',
+        args: {
+          key: 'LIVON_SLACK_REPORT_CONFIG',
+          value: cfg
+        }
+      })
+    });
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.warn('[Slack Report] Failed to save config to Convex:', err.message);
+    return null;
+  }
+}
+
 function saveSlackConfig(cfg) {
   inMemoryConfig = cfg;
   const configPath = resolveFilePath('slack_config.json');
@@ -324,6 +393,9 @@ function initSlackScheduler() {
 module.exports = {
   getSlackConfig,
   saveSlackConfig,
+  fetchSlackConfigFromConvex,
+  saveSlackConfigToConvex,
+  resolveConvexUrl,
   generateReportData,
   buildSlackMessage,
   sendSlackNotification,

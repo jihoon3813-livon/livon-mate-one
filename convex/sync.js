@@ -1590,6 +1590,17 @@ export const getSystemSettings = query({
   },
 });
 
+// 56-1. 단일 시스템 환경설정 조회 (by key)
+export const getSystemSettingByKey = query({
+  args: { key: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("systemSettings")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .first();
+  },
+});
+
 // 57. 만족도 조사 대상 저장 (Upsert by id or serviceId)
 export const saveSurveyTarget = mutation({
   args: {
