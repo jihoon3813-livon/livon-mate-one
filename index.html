@@ -967,7 +967,7 @@
         </button>
 
         <!-- 2-2. 간병캘린더 (월별/주별 스마트 스케줄러) -->
-        <button class="nav-tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="carecalendar" onclick="handleLeftMenuClick('carecalendar')">
+        <button class="nav-tab-btn hidden w-full items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all" data-tab="carecalendar" onclick="handleLeftMenuClick('carecalendar')" style="display: none !important;">
           <div class="flex items-center space-x-3">
             <i data-lucide="calendar-days" class="w-4 h-4 flex-shrink-0 text-sky-400"></i>
             <span class="tracking-tight font-semibold">간병캘린더</span>
@@ -1293,7 +1293,7 @@
           </div>
 
           <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto">
-            <button onclick="switchTab('carecalendar')" class="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-200 text-xs font-black shadow-2xs transition-all cursor-pointer" title="월별/주별 스마트 간병캘린더 화면으로 이동">
+            <button onclick="switchTab('carecalendar')" style="display: none !important;" class="hidden flex items-center justify-center gap-1.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-200 text-xs font-black shadow-2xs transition-all cursor-pointer" title="월별/주별 스마트 간병캘린더 화면으로 이동">
               <i data-lucide="calendar-days" class="w-4 h-4 text-sky-600 shrink-0"></i>
               <span class="truncate">간병캘린더</span>
             </button>
