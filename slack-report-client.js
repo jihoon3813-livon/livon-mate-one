@@ -341,17 +341,30 @@
   };
 
   function getCurrentHubApps() {
-    if (typeof gApps !== 'undefined' && Array.isArray(gApps) && gApps.length > 0) return gApps;
-    if (typeof window !== 'undefined' && window.gApps && Array.isArray(window.gApps) && window.gApps.length > 0) return window.gApps;
-    if (typeof window !== 'undefined' && window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications) && window.REBORN_DATA.applications.length > 0) return window.REBORN_DATA.applications;
-    try {
-      const cached = localStorage.getItem('LIVON_CACHED_APPS');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (_) {}
-    return [];
+    let raw = [];
+    if (typeof gApps !== 'undefined' && Array.isArray(gApps) && gApps.length > 0) raw = gApps;
+    else if (typeof window !== 'undefined' && window.gApps && Array.isArray(window.gApps) && window.gApps.length > 0) raw = window.gApps;
+    else if (typeof window !== 'undefined' && window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications) && window.REBORN_DATA.applications.length > 0) raw = window.REBORN_DATA.applications;
+    else {
+      try {
+        const cached = localStorage.getItem('LIVON_CACHED_APPS');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) raw = parsed;
+        }
+      } catch (_) {}
+    }
+    if (!Array.isArray(raw) || raw.length === 0) return [];
+
+    // HTTP 413 방지: 전체 필드(수십개) 대신 슬랙 집계에 필요한 6개 필드만 추출하여 경량화
+    return raw.map(a => ({
+      status: a.status || '',
+      insuranceCompany: a.insuranceCompany || '',
+      caregiverName: a.caregiverName || '',
+      totalPayout: Number(a.totalPayout || 0),
+      depositConfirmedAmount: Number(a.depositConfirmedAmount || 0),
+      estimatedUnpaid: Number(a.estimatedUnpaid || 0)
+    }));
   }
 
   window.loadSlackPreview = async function() {
