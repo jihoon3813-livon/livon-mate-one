@@ -207,38 +207,58 @@ function hasTargetCareLog(target) {
   const sId = String(target.serviceId || target.id || '').trim();
   const cleanSId = sId.replace(/^ST-/, '');
 
-  // 1. gCareLogs 배열 확인 (통합허브 및 시스템 전역 일지)
-  if (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs) && gCareLogs.length > 0) {
-    const found = gCareLogs.some(l => {
+  // 1. target 자체 속성 확인
+  if (target.hasCareLog === true || (typeof target.careLogCount === 'number' && target.careLogCount > 0)) {
+    return true;
+  }
+
+  // 2. gCareLogs 및 window.gCareLogs 확인
+  const allLogs = (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs)) 
+    ? gCareLogs 
+    : ((typeof window !== 'undefined' && window.gCareLogs && Array.isArray(window.gCareLogs)) ? window.gCareLogs : null);
+  if (allLogs && allLogs.length > 0) {
+    const found = allLogs.some(l => {
       if (!l) return false;
       const lAppId = String(l.applyId || '').trim();
-      const lName = (l.patientName || '').trim();
+      const lName = (l.patientName || l.username || l.targetName || '').trim();
       return (cleanSId && lAppId && (lAppId === cleanSId || lAppId === sId)) || 
              (pName && lName && lName === pName);
     });
     if (found) return true;
   }
 
-  // 2. target 자체 속성
-  if (target.hasCareLog === true || (typeof target.careLogCount === 'number' && target.careLogCount > 0)) {
-    return true;
-  }
-
-  // 3. gApps 신청건 확인
-  if (typeof gApps !== 'undefined' && Array.isArray(gApps)) {
-    const app = gApps.find(a => (cleanSId && String(a.id) === cleanSId) || (pName && a.patientName && (a.patientName || '').trim() === pName));
-    if (app && (app.hasCareLog === true || (app.careLogCount > 0) || (Array.isArray(app.careLogs) && app.careLogs.length > 0))) {
+  // 3. gCarePortRawLogs (케어포트 원본 일지) 및 groups 확인
+  const rawPortLogs = (typeof gCarePortRawLogs !== 'undefined' && Array.isArray(gCarePortRawLogs)) 
+    ? gCarePortRawLogs 
+    : ((typeof window !== 'undefined' && window.gCarePortRawLogs) ? window.gCarePortRawLogs : null);
+  if (rawPortLogs && rawPortLogs.length > 0 && pName) {
+    if (rawPortLogs.some(l => (l.username && l.username.trim() === pName) || (l.targetName && l.targetName.trim() === pName) || (cleanSId && l.applyId && String(l.applyId).trim() === cleanSId))) {
       return true;
     }
   }
 
-  // 4. 로컬스토리지 모바일 리포트 캐시 확인
+  // 4. gApps 신청건 확인
+  if (typeof gApps !== 'undefined' && Array.isArray(gApps)) {
+    const app = gApps.find(a => (cleanSId && String(a.id) === cleanSId) || (pName && a.patientName && (a.patientName || '').trim() === pName));
+    if (app && (app.hasCareLog === true || (app.careLogCount > 0) || (Array.isArray(app.careLogs) && app.careLogs.length > 0) || app.careLogFile)) {
+      return true;
+    }
+  }
+
+  // 5. 로컬스토리지 확인
   try {
     if (pName && pName !== '고연분') {
       const cached = localStorage.getItem('LIVON_MOBILE_REPORT_' + pName);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed?.records) && parsed.records.length > 0) return true;
+      }
+    }
+    const localLogsRaw = localStorage.getItem('LIVON_CARE_LOGS');
+    if (localLogsRaw) {
+      const localLogs = JSON.parse(localLogsRaw);
+      if (Array.isArray(localLogs) && localLogs.some(l => (pName && (l.patientName || l.username) === pName) || (cleanSId && String(l.applyId) === cleanSId))) {
+        return true;
       }
     }
   } catch (e) {}
@@ -772,6 +792,10 @@ function applySurveyFilters() {
     filtered = filtered.filter(t => t.guidanceStatus === 'NOT_STARTED' && t.excludeStatus !== 'EXCLUDED');
   } else if (gSurveyQuickFilter === 'COMPLETED') {
     filtered = filtered.filter(t => t.responseStatus === 'SUBMITTED' && t.excludeStatus !== 'EXCLUDED');
+  } else if (gSurveyQuickFilter === 'HAS_LOG') {
+    filtered = filtered.filter(t => hasTargetCareLog(t) && t.excludeStatus !== 'EXCLUDED');
+  } else if (gSurveyQuickFilter === 'NO_LOG') {
+    filtered = filtered.filter(t => !hasTargetCareLog(t) && t.excludeStatus !== 'EXCLUDED');
   } else if (gSurveyQuickFilter === 'GIFT_PENDING') {
     filtered = filtered.filter(t => getEffectiveGiftStatus(t) === 'PENDING' && t.excludeStatus !== 'EXCLUDED');
   } else if (gSurveyQuickFilter === 'GIFT_SENT') {
@@ -798,6 +822,13 @@ function applySurveyFilters() {
       filtered = filtered.filter(t => t.insuranceCompany !== '삼성화재' && t.insuranceCompany !== '현대해상');
     } else {
       filtered = filtered.filter(t => (t.insuranceCompany || '').includes(filterInsurance));
+    }
+  }
+  if (filterCareLog !== 'ALL') {
+    if (filterCareLog === 'HAS_LOG') {
+      filtered = filtered.filter(t => hasTargetCareLog(t));
+    } else if (filterCareLog === 'NO_LOG') {
+      filtered = filtered.filter(t => !hasTargetCareLog(t));
     }
   }
 
@@ -989,8 +1020,8 @@ function renderSurveyTargetsTable(list) {
       : '';
     const hasLog = hasTargetCareLog(target);
     const logBadge = hasLog
-      ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-3xs shrink-0" title="모바일 간병일지 등록됨"><i data-lucide="file-check-2" class="w-2.5 h-2.5 text-emerald-600"></i>일지작성</span>`
-      : `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200 shrink-0" title="간병일지 미작성"><i data-lucide="file-x-2" class="w-2.5 h-2.5 text-slate-400"></i>일지없음</span>`;
+      ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-3xs shrink-0" title="모바일 간병일지 등록됨"><i data-lucide="file-check-2" class="w-2.5 h-2.5 text-emerald-600"></i>일지작성</span>`
+      : `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200 shrink-0" title="간병일지 미작성"><i data-lucide="file-x-2" class="w-2.5 h-2.5 text-slate-400"></i>일지없음</span>`;
     const rowClass = isRecent 
       ? 'bg-amber-50/70 hover:bg-amber-100/70 border-l-4 border-l-amber-500 transition-colors' 
       : (isNewTable ? 'hover:bg-pink-50/40 transition-colors' : 'hover:bg-sky-50/50 transition-colors');
@@ -1065,6 +1096,7 @@ function renderSurveyTargetsTable(list) {
             <div class="flex items-center gap-1.5 flex-wrap">
               <span>${maskedName}</span>
               ${recentBadge}
+              ${logBadge}
             </div>
             ${target.patientPhone ? `<span class="block text-[10.5px] text-slate-400 font-normal font-mono">기본: ${formatCouponPhoneDisplay(target.patientPhone)}</span>` : ''}
           </td>
