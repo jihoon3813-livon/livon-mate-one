@@ -286,6 +286,15 @@ function updateSurveyChipCounts() {
   setEl('surveyChipCountGiftPending', giftPendingCount);
   setEl('surveyChipCountGiftSent', giftSentCount);
 
+  const candidateCount = targets.filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED').length;
+  const excludedCount = targets.filter(t => t.excludeStatus === 'EXCLUDED').length;
+  const elCand = document.getElementById('surveyChipCountCandidate_new');
+  if (elCand) elCand.innerText = candidateCount;
+  const elExcl = document.getElementById('surveyChipCountExcluded_new');
+  if (elExcl) elExcl.innerText = excludedCount;
+  const elBatchCount = document.getElementById('surveyCandidateBatchCount');
+  if (elBatchCount) elBatchCount.innerText = candidateCount;
+
   const giftBadge = document.getElementById('surveyGiftPendingBadge_new');
   if (giftBadge) {
     if (giftPendingCount > 0) {
@@ -677,19 +686,26 @@ function applySurveyFilters() {
 
   let filtered = (gSurveyState.targets || []).slice();
 
-  // 1. 빠른 상태 필터 칩 적용
-  if (gSurveyQuickFilter === 'RECENT') {
-    filtered = filtered.filter(t => isTargetRecentlyAdded(t));
+  // 1. 빠른 상태 필터 칩 적용 (발송 후보 & 발송 제외 통합)
+  if (gSurveyQuickFilter === 'CANDIDATE') {
+    filtered = filtered.filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED');
+  } else if (gSurveyQuickFilter === 'EXCLUDED') {
+    filtered = filtered.filter(t => t.excludeStatus === 'EXCLUDED');
+  } else if (gSurveyQuickFilter === 'RECENT') {
+    filtered = filtered.filter(t => isTargetRecentlyAdded(t) && t.excludeStatus !== 'EXCLUDED');
   } else if (gSurveyQuickFilter === 'UNNOTIFIED') {
-    filtered = filtered.filter(t => t.guidanceStatus === 'NOT_STARTED');
+    filtered = filtered.filter(t => t.guidanceStatus === 'NOT_STARTED' && t.excludeStatus !== 'EXCLUDED');
   } else if (gSurveyQuickFilter === 'COMPLETED') {
-    filtered = filtered.filter(t => t.responseStatus === 'SUBMITTED');
+    filtered = filtered.filter(t => t.responseStatus === 'SUBMITTED' && t.excludeStatus !== 'EXCLUDED');
   } else if (gSurveyQuickFilter === 'GIFT_PENDING') {
-    filtered = filtered.filter(t => getEffectiveGiftStatus(t) === 'PENDING');
+    filtered = filtered.filter(t => getEffectiveGiftStatus(t) === 'PENDING' && t.excludeStatus !== 'EXCLUDED');
   } else if (gSurveyQuickFilter === 'GIFT_SENT') {
-    filtered = filtered.filter(t => getEffectiveGiftStatus(t) === 'SENT');
+    filtered = filtered.filter(t => getEffectiveGiftStatus(t) === 'SENT' && t.excludeStatus !== 'EXCLUDED');
   } else if (gSurveyQuickFilter === 'FOLLOWUP') {
-    filtered = filtered.filter(t => t.followupStatus && t.followupStatus !== 'NONE');
+    filtered = filtered.filter(t => t.followupStatus && t.followupStatus !== 'NONE' && t.excludeStatus !== 'EXCLUDED');
+  } else if (!search) {
+    // 전체 보기에서도 발송제외 고객은 기본 분리 (단, 검색어로 찾을 시 노출)
+    filtered = filtered.filter(t => t.excludeStatus !== 'EXCLUDED');
   }
 
   // 2. 드롭다운 필터 적용
@@ -860,7 +876,7 @@ function renderSurveyTargetsTable(list) {
     if (tbodyNew) {
       tbodyNew.innerHTML = `
         <tr>
-          <td colspan="11" class="p-8 text-center text-slate-400">
+          <td colspan="12" class="p-8 text-center text-slate-400">
             <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
             <p class="font-medium">조회 조건에 해당하는 만족도 조사 대상이 없습니다.</p>
           </td>
@@ -905,9 +921,56 @@ function renderSurveyTargetsTable(list) {
         </button>
       ` : '';
 
+      const isExcluded = target.excludeStatus === 'EXCLUDED';
+      const isCandidate = Boolean(target.isCandidate && !isExcluded);
+      let candidateCellHtml = '';
+      if (isExcluded) {
+        candidateCellHtml = `
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold" title="${escapeHtml(target.excludeMemo || target.excludeReason || '발송 제외')}">
+            <i data-lucide="slash" class="w-3 h-3 text-slate-500"></i>
+            <span>제외됨</span>
+          </span>
+        `;
+      } else if (isCandidate) {
+        candidateCellHtml = `
+          <button type="button" onclick="toggleSurveyCandidate('${target.id}')" 
+            class="px-2.5 py-1 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 text-white font-black text-[11px] shadow-2xs flex items-center gap-1 mx-auto cursor-pointer hover:opacity-90 transition-all" 
+            title="클릭하여 발송 후보 지정 해제">
+            <i data-lucide="check" class="w-3 h-3"></i>
+            <span>후보선택</span>
+          </button>
+        `;
+      } else {
+        candidateCellHtml = `
+          <button type="button" onclick="toggleSurveyCandidate('${target.id}')" 
+            class="px-2 py-1 rounded-xl bg-white hover:bg-pink-50 text-slate-600 hover:text-rose-700 border border-slate-300 font-semibold text-[11px] flex items-center gap-1 mx-auto cursor-pointer shadow-3xs transition-all" 
+            title="클릭하여 발송 후보로 지정">
+            <i data-lucide="plus" class="w-3 h-3 text-slate-400"></i>
+            <span>후보추가</span>
+          </button>
+        `;
+      }
+
+      const excludeActionBtn = isExcluded ? `
+        <button type="button" onclick="restoreExcludedSurveyTarget('${target.id}')" 
+          class="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs" 
+          title="발송 제외 해제 (정상 복구)">
+          <i data-lucide="rotate-ccw" class="w-3 h-3 text-emerald-600"></i>
+          <span>복구</span>
+        </button>
+      ` : `
+        <button type="button" onclick="openSurveyExcludeModal('${target.id}')" 
+          class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 border border-slate-200 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer" 
+          title="컴플레인, 결번 등 만족도조사 발송 제외(보류) 처리">
+          <i data-lucide="slash" class="w-3 h-3"></i>
+          <span>제외</span>
+        </button>
+      `;
+
       return `
         <tr class="${rowClass}">
           <td class="p-3 text-center font-mono text-slate-400 text-[11px]">${idx + 1}</td>
+          <td class="p-3 text-center whitespace-nowrap">${candidateCellHtml}</td>
           <td class="p-3 font-mono font-bold text-rose-700 whitespace-nowrap">${displayAppId}</td>
           <td class="p-3 font-bold text-slate-900 whitespace-nowrap">
             <div class="flex items-center gap-1.5 flex-wrap">
@@ -969,6 +1032,7 @@ function renderSurveyTargetsTable(list) {
                 <i data-lucide="edit-3" class="w-3 h-3 text-indigo-600"></i>
                 <span>수정</span>
               </button>
+              ${excludeActionBtn}
               <button type="button" onclick="deleteSurveyTarget('${target.id}')" 
                 class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer" 
                 title="만족도 조사 대상 목록에서 삭제">
@@ -4355,6 +4419,363 @@ function getFollowupStatusBadge(status) {
   }
 }
 
+
+// =========================================================================
+// [아이디어 2, 3, 4] 발송 후보 선별, 스마트 조건 자동선별, 발송 제외 및 일괄 발송 모듈
+// =========================================================================
+function persistSurveyTargets() {
+  try {
+    if (Array.isArray(gSurveyState.targets)) {
+      localStorage.setItem('LIVON_SURVEY_TARGETS', JSON.stringify(gSurveyState.targets));
+    }
+  } catch (e) {}
+
+  if (typeof syncToConvex === 'function') {
+    try {
+      const cleanTargets = (gSurveyState.targets || []).map(t => {
+        const clean = {};
+        for (const [k, v] of Object.entries(t)) {
+          if (!k.startsWith('_')) clean[k] = v;
+        }
+        return clean;
+      });
+      syncToConvex('sync:saveSurveyTargetsBatch', { targets: cleanTargets }).catch(() => {});
+    } catch (_) {}
+  }
+}
+
+// 1. 단일 대상 발송 후보 토글 (아이디어 2)
+function toggleSurveyCandidate(targetId) {
+  const target = (gSurveyState.targets || []).find(t => t.id === targetId || t.serviceId === targetId);
+  if (!target) return;
+  
+  if (target.excludeStatus === 'EXCLUDED') {
+    if (typeof showToast === 'function') showToast('발송 제외된 고객은 먼저 제외 해제 후 후보로 지정할 수 있습니다.', 'warning');
+    return;
+  }
+
+  target.isCandidate = !target.isCandidate;
+  if (target.isCandidate) {
+    target.candidateAt = new Date().toISOString();
+  }
+
+  persistSurveyTargets();
+  updateSurveyChipCounts();
+  applySurveyFilters();
+
+  if (typeof showToast === 'function') {
+    const pName = maskPatientName(target.patientName);
+    showToast(target.isCandidate ? `${pName} 님이 🎯 발송 후보로 지정되었습니다.` : `${pName} 님의 후보 지정이 해제되었습니다.`, 'info');
+  }
+}
+
+// 2. 조건부 스마트 자동 선별 (아이디어 3)
+function autoSelectSurveyCandidates(criteria) {
+  const targets = (gSurveyState.targets || []).filter(t => t.excludeStatus !== 'EXCLUDED');
+  if (targets.length === 0) {
+    if (typeof showToast === 'function') showToast('선별 가능한 고객 대상이 없습니다.', 'warning');
+    return;
+  }
+
+  const now = Date.now();
+  const parseEnd = (d) => {
+    if (!d) return 0;
+    const clean = String(d).trim().slice(0, 10).replace(/\./g, '-');
+    const t = new Date(clean).getTime();
+    return isNaN(t) ? 0 : t;
+  };
+  const parseStart = (d) => {
+    if (!d) return 0;
+    const clean = String(d).trim().slice(0, 10).replace(/\./g, '-');
+    const t = new Date(clean).getTime();
+    return isNaN(t) ? 0 : t;
+  };
+
+  let matchedCount = 0;
+
+  targets.forEach(t => {
+    let match = false;
+    const endMs = parseEnd(t.careEndDate);
+    const startMs = parseStart(t.careStartDate);
+    const daysSinceEnd = endMs > 0 ? Math.floor((now - endMs) / 86400000) : 999;
+    const careDays = (endMs > 0 && startMs > 0 && endMs >= startMs) ? Math.round((endMs - startMs) / 86400000) + 1 : 1;
+
+    switch (criteria) {
+      case 'RECENT_3D':
+        if (daysSinceEnd >= 0 && daysSinceEnd <= 3 && t.guidanceStatus === 'NOT_STARTED') match = true;
+        break;
+      case 'RECENT_7D':
+        if (daysSinceEnd >= 0 && daysSinceEnd <= 7 && t.guidanceStatus === 'NOT_STARTED') match = true;
+        break;
+      case 'LONG_TERM_5D':
+        if (careDays >= 5 && t.guidanceStatus === 'NOT_STARTED') match = true;
+        break;
+      case 'UNNOTIFIED_ALL':
+        if (t.guidanceStatus === 'NOT_STARTED') match = true;
+        break;
+    }
+
+    if (match) {
+      t.isCandidate = true;
+      t.candidateAt = new Date().toISOString();
+      matchedCount++;
+    }
+  });
+
+  persistSurveyTargets();
+  updateSurveyChipCounts();
+  applySurveyFilters();
+
+  if (typeof showToast === 'function') {
+    showToast(`스마트 조건에 부합하는 고객 총 ${matchedCount}명이 🎯 발송 후보로 선별되었습니다.`, 'success');
+  }
+}
+
+// 3. 후보 전체 비우기
+function clearAllSurveyCandidates() {
+  const currentCount = (gSurveyState.targets || []).filter(t => t.isCandidate).length;
+  if (currentCount === 0) {
+    if (typeof showToast === 'function') showToast('현재 지정된 발송 후보가 없습니다.', 'info');
+    return;
+  }
+  if (!confirm(`지정된 발송 후보 ${currentCount}명을 모두 비우시겠습니까?`)) return;
+
+  (gSurveyState.targets || []).forEach(t => {
+    t.isCandidate = false;
+  });
+
+  persistSurveyTargets();
+  updateSurveyChipCounts();
+  applySurveyFilters();
+
+  if (typeof showToast === 'function') {
+    showToast('발송 후보 목록이 초기화되었습니다.', 'info');
+  }
+}
+
+// 4. 발송 제외 모달 관리 (아이디어 4)
+let gActiveExcludeTargetId = null;
+
+function openSurveyExcludeModal(targetId) {
+  const target = (gSurveyState.targets || []).find(t => t.id === targetId || t.serviceId === targetId);
+  if (!target) return;
+  gActiveExcludeTargetId = target.id;
+
+  const modal = document.getElementById('surveyExcludeModal');
+  const pNameEl = document.getElementById('excludeModalPatientName');
+  const appIdEl = document.getElementById('excludeModalAppId');
+  const subEl = document.getElementById('excludeModalSubInfo');
+  const reasonSel = document.getElementById('excludeModalReasonSelect');
+  const memoInput = document.getElementById('excludeModalMemo');
+
+  if (pNameEl) pNameEl.innerText = maskPatientName(target.patientName);
+  if (appIdEl) appIdEl.innerText = target.serviceId || target.id;
+  if (subEl) {
+    const hosp = cleanSurveyHospitalName(target.hospitalName, target);
+    const caregiver = target.caregiverName || '미지정';
+    subEl.innerText = `${hosp} · 간병인: ${caregiver} (${formatSurveyDate(target.careStartDate)} ~ ${formatSurveyDate(target.careEndDate)})`;
+  }
+  if (reasonSel) reasonSel.value = 'COMPLAINT';
+  if (memoInput) memoInput.value = '';
+
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeSurveyExcludeModal() {
+  const modal = document.getElementById('surveyExcludeModal');
+  if (modal) modal.classList.add('hidden');
+  gActiveExcludeTargetId = null;
+}
+
+function confirmSurveyExclude() {
+  if (!gActiveExcludeTargetId) return;
+  const target = (gSurveyState.targets || []).find(t => t.id === gActiveExcludeTargetId || t.serviceId === gActiveExcludeTargetId);
+  if (!target) return;
+
+  const reasonSel = document.getElementById('excludeModalReasonSelect');
+  const memoInput = document.getElementById('excludeModalMemo');
+  const reason = reasonSel ? reasonSel.value : 'OTHER';
+  const memo = memoInput ? memoInput.value.trim() : '';
+
+  target.excludeStatus = 'EXCLUDED';
+  target.excludeReason = reason;
+  target.excludeMemo = memo;
+  target.excludeAt = new Date().toISOString();
+  target.isCandidate = false;
+
+  persistSurveyTargets();
+  closeSurveyExcludeModal();
+  updateSurveyChipCounts();
+  applySurveyFilters();
+
+  if (typeof showToast === 'function') {
+    showToast(`${maskPatientName(target.patientName)} 님이 만족도조사 발송 제외(보류) 처리되었습니다.`, 'info');
+  }
+}
+
+function restoreExcludedSurveyTarget(targetId) {
+  const target = (gSurveyState.targets || []).find(t => t.id === targetId || t.serviceId === targetId);
+  if (!target) return;
+  if (!confirm(`${maskPatientName(target.patientName)} 님의 발송 제외를 해제하고 정상 상태로 복구하시겠습니까?`)) return;
+
+  target.excludeStatus = 'NONE';
+  target.excludeReason = '';
+  target.excludeMemo = '';
+  target.excludeAt = null;
+
+  persistSurveyTargets();
+  updateSurveyChipCounts();
+  applySurveyFilters();
+
+  if (typeof showToast === 'function') {
+    showToast(`${maskPatientName(target.patientName)} 님이 정상 발송 가능 상태로 복구되었습니다.`, 'success');
+  }
+}
+
+// 5. 후보군 일괄 문자 발송 모달 및 실행 플로우
+function openBatchCandidateSmsModal() {
+  const candidates = (gSurveyState.targets || []).filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED');
+  if (candidates.length === 0) {
+    alert('현재 지정된 발송 후보가 없습니다.\n\n고객 목록에서 [후보추가] 버튼이나 [스마트 후보 자동선별] 버튼을 먼저 눌러 대상을 지정해 주세요.');
+    return;
+  }
+
+  const modal = document.getElementById('surveyBatchCandidateSmsModal');
+  const countEl = document.getElementById('batchSmsTargetCount');
+  const bodyEl = document.getElementById('batchCandidateListBody');
+  const progressArea = document.getElementById('batchSmsProgressArea');
+  const btnExecute = document.getElementById('btnExecuteBatchSms');
+
+  if (countEl) countEl.innerText = candidates.length;
+  if (progressArea) progressArea.classList.add('hidden');
+  if (btnExecute) {
+    btnExecute.disabled = false;
+    btnExecute.innerHTML = '<i data-lucide="send" class="w-3.5 h-3.5"></i><span>일괄 문자 발송 시작</span>';
+  }
+
+  if (bodyEl) {
+    bodyEl.innerHTML = candidates.map((t, idx) => {
+      const pName = maskPatientName(t.patientName);
+      const phone = formatCouponPhoneDisplay(t.couponPhone || t.patientPhone || '');
+      const hosp = cleanSurveyHospitalName(t.hospitalName, t);
+      const endDate = formatSurveyDate(t.careEndDate);
+      const cName = t.caregiverName || '미지정';
+      return `
+        <tr class="hover:bg-pink-50/50">
+          <td class="p-2.5 text-center font-mono text-slate-400 text-[11px]">${idx + 1}</td>
+          <td class="p-2.5 font-bold text-slate-900 whitespace-nowrap">${pName}</td>
+          <td class="p-2.5 font-mono text-rose-700 font-bold whitespace-nowrap">${phone || '연락처없음'}</td>
+          <td class="p-2.5 text-slate-600 whitespace-nowrap">${hosp} (${endDate})</td>
+          <td class="p-2.5 whitespace-nowrap text-slate-700 font-medium">${cName}</td>
+          <td class="p-2.5 text-center whitespace-nowrap">
+            <button type="button" onclick="toggleSurveyCandidate('${t.id}'); openBatchCandidateSmsModal();" class="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer" title="발송 후보에서 제외">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  if (modal) modal.classList.remove('hidden');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function closeBatchCandidateSmsModal() {
+  const modal = document.getElementById('surveyBatchCandidateSmsModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function executeBatchCandidateSms() {
+  const candidates = (gSurveyState.targets || []).filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED');
+  if (candidates.length === 0) {
+    alert('발송 대상 후보가 없습니다.');
+    return;
+  }
+
+  const validTargets = candidates.filter(t => (t.couponPhone || t.patientPhone));
+  if (validTargets.length === 0) {
+    alert('수신 가능한 휴대폰 번호가 등록된 대상자가 없습니다.');
+    return;
+  }
+
+  if (!confirm(`총 ${validTargets.length}명의 후보 고객에게 모바일 간병일지 & 만족도조사 안내 문자를 발송하시겠습니까?`)) return;
+
+  const btnExecute = document.getElementById('btnExecuteBatchSms');
+  const btnCancel = document.getElementById('btnCancelBatchSms');
+  const progressArea = document.getElementById('batchSmsProgressArea');
+  const progressLabel = document.getElementById('batchSmsProgressLabel');
+  const progressPercent = document.getElementById('batchSmsProgressPercent');
+  const progressBar = document.getElementById('batchSmsProgressBar');
+
+  if (btnExecute) btnExecute.disabled = true;
+  if (btnCancel) btnCancel.disabled = true;
+  if (progressArea) progressArea.classList.remove('hidden');
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (let i = 0; i < validTargets.length; i++) {
+    const t = validTargets[i];
+    const currentIdx = i + 1;
+    const pct = Math.round((currentIdx / validTargets.length) * 100);
+
+    if (progressLabel) progressLabel.innerText = `발송 진행 중... (${currentIdx} / ${validTargets.length}) : ${maskPatientName(t.patientName)} 님`;
+    if (progressPercent) progressPercent.innerText = pct + '%';
+    if (progressBar) progressBar.style.width = pct + '%';
+
+    try {
+      const recipientPhone = (t.couponPhone || t.patientPhone || '').replace(/[^0-9]/g, '');
+      const shortUrl = getSurveyTargetUrlForSms(t);
+      const titlePreset = getEffectiveSurveyTitle();
+      const pName = t.patientName || '고객';
+      const defaultItem = (gSurveyState.settings && gSurveyState.settings.defaultGiftItem) || '스타벅스 아메리카노 Tall 1매';
+
+      const smsText = `[리본케어] ${pName} 님, ${titlePreset.title}\n\n간병 서비스 일자별 안심 일지를 확인하시고 간단한 만족도 설문에 참여해 주시면, 감사의 뜻으로 ${defaultItem} 모바일 쿠폰을 보내드립니다.\n\n▶ 안심 간병일지 열람 & 설문 참여:\n${shortUrl}\n\n문의: ${gSurveyState.settings.csPhone || '1544-7119'}`;
+
+      const res = await fetch('/api/survey/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetId: t.id,
+          recipientPhone,
+          patientName: t.patientName,
+          customText: smsText,
+          channel: 'sms'
+        })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        successCount++;
+        t.guidanceStatus = 'GUIDED';
+        t.isCandidate = false;
+      } else {
+        failCount++;
+      }
+    } catch (e) {
+      failCount++;
+    }
+
+    await new Promise(r => setTimeout(r, 150));
+  }
+
+  persistSurveyTargets();
+  updateSurveyChipCounts();
+  applySurveyFilters();
+
+  if (btnExecute) btnExecute.disabled = false;
+  if (btnCancel) btnCancel.disabled = false;
+
+  closeBatchCandidateSmsModal();
+
+  if (typeof showToast === 'function') {
+    showToast(`일괄 문자 발송 완료: 성공 ${successCount}건 / 실패 ${failCount}건`, successCount > 0 ? 'success' : 'error');
+  } else {
+    alert(`일괄 문자 발송이 완료되었습니다.\n성공: ${successCount}건 / 실패: ${failCount}건`);
+  }
+}
+
+
 // 글로벌 등록
 if (typeof window !== 'undefined') {
   window.loadSurveyMgmtData = loadSurveyMgmtData;
@@ -4435,6 +4856,17 @@ if (typeof window !== 'undefined') {
   window.changeSurveyNewPreviewTarget = changeSurveyNewPreviewTarget;
   window.toggleSurveyNewInlineStudio = toggleSurveyNewInlineStudio;
   window.restoreSurveyNewStudioState = restoreSurveyNewStudioState;
+  window.toggleSurveyCandidate = toggleSurveyCandidate;
+  window.autoSelectSurveyCandidates = autoSelectSurveyCandidates;
+  window.clearAllSurveyCandidates = clearAllSurveyCandidates;
+  window.openSurveyExcludeModal = openSurveyExcludeModal;
+  window.closeSurveyExcludeModal = closeSurveyExcludeModal;
+  window.confirmSurveyExclude = confirmSurveyExclude;
+  window.restoreExcludedSurveyTarget = restoreExcludedSurveyTarget;
+  window.openBatchCandidateSmsModal = openBatchCandidateSmsModal;
+  window.closeBatchCandidateSmsModal = closeBatchCandidateSmsModal;
+  window.executeBatchCandidateSms = executeBatchCandidateSms;
+  window.persistSurveyTargets = persistSurveyTargets;
   window.openSurveyNewStandaloneWindow = openSurveyNewStandaloneWindow;
   window.copySurveyNewCurrentPreviewUrl = copySurveyNewCurrentPreviewUrl;
   window.openSurveyNewWebviewModal = openSurveyNewWebviewModal;

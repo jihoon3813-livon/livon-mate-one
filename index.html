@@ -5619,6 +5619,13 @@
                   <span>최근 등록</span>
                   <span id="surveyChipCountRecent_new" class="px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 text-[10px] font-black">0</span>
                 </button>
+                <button type="button" onclick="setSurveyQuickFilter('CANDIDATE')" data-quick="CANDIDATE" 
+                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-pink-50 text-rose-800 border border-pink-300 hover:bg-pink-100 flex items-center gap-1.5 cursor-pointer"
+                  title="선별된 발송 후보 고객만 모아보기">
+                  <i data-lucide="target" class="w-3.5 h-3.5 text-rose-600"></i>
+                  <span>🎯 발송 후보</span>
+                  <span id="surveyChipCountCandidate_new" class="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-black">0</span>
+                </button>
                 <button type="button" onclick="setSurveyQuickFilter('UNNOTIFIED')" data-quick="UNNOTIFIED" 
                   class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer">
                   <i data-lucide="send" class="w-3 h-3 text-slate-500"></i>
@@ -5649,6 +5656,13 @@
                   <span>불만/연락요청</span>
                   <span id="surveyChipCountFollowup_new" class="px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 text-[10px] font-black">0</span>
                 </button>
+                <button type="button" onclick="setSurveyQuickFilter('EXCLUDED')" data-quick="EXCLUDED" 
+                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer"
+                  title="컴플레인, 결번 등 발송 제외(보류)된 고객 목록">
+                  <i data-lucide="slash" class="w-3 h-3 text-slate-400"></i>
+                  <span>🚫 발송 제외</span>
+                  <span id="surveyChipCountExcluded_new" class="px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold">0</span>
+                </button>
               </div>
 
               <button type="button" onclick="resetSurveyFilters()" 
@@ -5656,6 +5670,49 @@
                 <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
                 <span>필터 초기화</span>
               </button>
+            </div>
+
+            <!-- 1-2. 스마트 후보 선별 & 일괄 발송 액션 바 (NEW) -->
+            <div class="flex items-center justify-between gap-3 p-3 rounded-2xl bg-gradient-to-r from-pink-50/90 via-rose-50/60 to-amber-50/70 border border-pink-200 flex-wrap">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="inline-flex items-center gap-1 text-xs font-black text-rose-900 mr-1">
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5 text-rose-600"></i>
+                  스마트 후보 자동선별:
+                </span>
+                <button type="button" onclick="autoSelectSurveyCandidates('RECENT_3D')" 
+                  class="px-2.5 py-1 rounded-xl bg-white hover:bg-rose-100 text-rose-900 border border-pink-300 text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1">
+                  <span>⚡ 최근 3일 이내 종료</span>
+                </button>
+                <button type="button" onclick="autoSelectSurveyCandidates('RECENT_7D')" 
+                  class="px-2.5 py-1 rounded-xl bg-white hover:bg-rose-100 text-rose-900 border border-pink-300 text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1">
+                  <span>⚡ 최근 7일 이내 종료</span>
+                </button>
+                <button type="button" onclick="autoSelectSurveyCandidates('LONG_TERM_5D')" 
+                  class="px-2.5 py-1 rounded-xl bg-white hover:bg-rose-100 text-rose-900 border border-pink-300 text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1">
+                  <span>⚡ 간병 5일 이상 건</span>
+                </button>
+                <button type="button" onclick="autoSelectSurveyCandidates('UNNOTIFIED_ALL')" 
+                  class="px-2.5 py-1 rounded-xl bg-white hover:bg-rose-100 text-rose-900 border border-pink-300 text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1">
+                  <span>⚡ 미안내 전원 담기</span>
+                </button>
+                <button type="button" onclick="clearAllSurveyCandidates()" 
+                  class="px-2 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300 text-xs font-medium transition-all cursor-pointer" title="후보 지정 전체 해제">
+                  <span>🧹 후보 전체 비우기</span>
+                </button>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="setSurveyQuickFilter('CANDIDATE')" 
+                  class="px-3 py-1.5 rounded-xl bg-white hover:bg-pink-100 text-rose-700 border border-pink-300 font-extrabold text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer">
+                  <i data-lucide="filter" class="w-3.5 h-3.5"></i>
+                  <span>후보만 모아보기</span>
+                </button>
+                <button type="button" onclick="openBatchCandidateSmsModal()" id="btnBatchSendCandidateSms" 
+                  class="px-4 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer">
+                  <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                  <span>후보군 일괄 문자 발송 (<b id="surveyCandidateBatchCount" class="underline">0</b>명)</span>
+                </button>
+              </div>
             </div>
 
             <!-- 2. 하단: 검색창, 상세 드롭다운 및 정렬 셀렉트 -->
@@ -5714,6 +5771,7 @@
                 <thead class="sticky top-0 z-20 shadow-xs">
                   <tr class="bg-pink-50 border-b border-pink-200 text-slate-800 font-extrabold select-none">
                     <th class="p-3 text-center w-12 sticky top-0 bg-pink-50 border-b border-pink-200 z-20">#</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">🎯 발송후보</th>
                     <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">신청ID</th>
                     <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">환자명 / 기본연락처</th>
                     <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">병원 / 서비스기간</th>
@@ -6963,6 +7021,147 @@
   </div><!-- End of BODY WRAPPER -->
 
   <!-- ==================== MODALS: SURVEY MANAGEMENT (만족도조사 관리 모달) ==================== -->
+  <!-- 0-EXCLUDE. 만족도조사 발송 제외(보류) 사유 등록 모달 -->
+  <div id="surveyExcludeModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center hidden p-3 sm:p-5">
+    <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200 flex flex-col">
+      <div class="px-5 py-4 bg-gradient-to-r from-slate-800 to-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-7 h-7 rounded-lg bg-rose-500/20 text-rose-300 flex items-center justify-center border border-rose-400/30">
+            <i data-lucide="slash" class="w-4 h-4"></i>
+          </span>
+          <h3 class="text-sm font-black text-white">만족도조사 발송 제외(보류)</h3>
+        </div>
+        <button type="button" onclick="closeSurveyExcludeModal()" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+          <div class="text-xs font-bold text-slate-500">제외 대상 고객:</div>
+          <div class="text-sm font-black text-slate-900 flex items-center gap-2">
+            <span id="excludeModalPatientName">-</span>
+            <span class="text-xs font-mono font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md" id="excludeModalAppId">-</span>
+          </div>
+          <div class="text-xs text-slate-600" id="excludeModalSubInfo">-</div>
+        </div>
+
+        <div class="space-y-2">
+          <label class="text-xs font-black text-slate-800 flex items-center gap-1.5">
+            <span>제외 사유 선택 (필수)</span>
+            <span class="text-rose-600">*</span>
+          </label>
+          <select id="excludeModalReasonSelect" class="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500">
+            <option value="COMPLAINT">1. 고객 컴플레인 / 불만 접수 건 (발송 금지)</option>
+            <option value="WRONG_PHONE">2. 연락처 오류 / 결번 / 타인 수신</option>
+            <option value="LONG_STAY">3. 장기 입원 / 중환자 / 의식 불명</option>
+            <option value="DECLINED">4. 고객 요청 / 설문 수신 거절</option>
+            <option value="OTHER">5. 기타 내부 보류 사유</option>
+          </select>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="text-xs font-black text-slate-800">상세 사유 및 메모 (선택)</label>
+          <textarea id="excludeModalMemo" rows="3" placeholder="제외 사유나 담당자 전달사항을 입력하세요..." class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500"></textarea>
+        </div>
+
+        <p class="text-[11px] text-slate-500 leading-relaxed">
+          ※ 발송 제외 처리 시 최근 등록 및 발송 대기 목록에서 안전하게 분리되며, 상단 <b>[🚫 발송 제외]</b> 칩에서 언제든지 사유 확인 및 복구가 가능합니다.
+        </p>
+
+        <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+          <button type="button" onclick="closeSurveyExcludeModal()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer transition-all">취소</button>
+          <button type="button" onclick="confirmSurveyExclude()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-xs cursor-pointer transition-all flex items-center gap-1">
+            <i data-lucide="slash" class="w-3.5 h-3.5"></i>
+            <span>발송 제외 확정</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 0-BATCH. 선택 후보군 일괄 문자 발송 모달 -->
+  <div id="surveyBatchCandidateSmsModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center hidden p-3 sm:p-5">
+    <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden border border-pink-200 flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 bg-gradient-to-r from-pink-600 via-rose-600 to-pink-700 text-white flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2.5">
+          <span class="w-8 h-8 rounded-xl bg-white/20 text-white flex items-center justify-center shadow-xs">
+            <i data-lucide="send" class="w-4 h-4"></i>
+          </span>
+          <div>
+            <h3 class="text-sm font-black text-white">선택 발송 후보군 일괄 문자 발송</h3>
+            <p class="text-[11px] text-pink-100" id="batchSmsModalSubTitle">선별된 고객 명단을 최종 확인하고 한 번에 발송합니다.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeBatchCandidateSmsModal()" class="p-1.5 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-all cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-4 custom-scrollbar flex-1">
+        <!-- 요약 배너 -->
+        <div class="p-3.5 rounded-2xl bg-pink-50 border border-pink-200 flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div class="text-xs font-bold text-rose-800">총 발송 대상 인원</div>
+            <div class="text-xl font-black text-slate-900 flex items-baseline gap-1">
+              <span id="batchSmsTargetCount">0</span>
+              <span class="text-xs text-slate-500 font-normal">명</span>
+            </div>
+          </div>
+          <div class="text-xs text-slate-600 bg-white px-3 py-1.5 rounded-xl border border-pink-200">
+            🎁 혜택: <b>설문 완료 시 모바일 커피쿠폰 증정</b> 안내문자 일괄 발송
+          </div>
+        </div>
+
+        <!-- 대상자 리스트 표 -->
+        <div class="space-y-1.5">
+          <div class="text-xs font-black text-slate-800 flex items-center justify-between">
+            <span>발송 대상자 목록:</span>
+            <span class="text-[11px] text-slate-400 font-medium">안내 미처리 고객 우선 발송</span>
+          </div>
+          <div class="border border-slate-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto custom-scrollbar">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-50 border-b border-slate-200 sticky top-0 font-bold text-slate-700">
+                <tr>
+                  <th class="p-2.5 text-center w-10">#</th>
+                  <th class="p-2.5">환자명</th>
+                  <th class="p-2.5">수신 휴대폰번호</th>
+                  <th class="p-2.5">병원 / 종료일</th>
+                  <th class="p-2.5">담당간병인</th>
+                  <th class="p-2.5 text-center w-14">제외</th>
+                </tr>
+              </thead>
+              <tbody id="batchCandidateListBody" class="divide-y divide-slate-100 bg-white">
+                <!-- Dynamic -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 발송 상태 안내 -->
+        <div id="batchSmsProgressArea" class="hidden p-3 rounded-xl bg-amber-50 border border-amber-300 text-xs space-y-1.5">
+          <div class="flex items-center justify-between font-bold text-amber-900">
+            <span id="batchSmsProgressLabel">발송 진행 중... (0 / 0)</span>
+            <span id="batchSmsProgressPercent">0%</span>
+          </div>
+          <div class="w-full bg-amber-200 rounded-full h-2 overflow-hidden">
+            <div id="batchSmsProgressBar" class="bg-rose-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+        <span class="text-xs text-slate-500">※ 발송 시 단축 안내링크(/s/코드)가 환자별로 자동 포함됩니다.</span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeBatchCandidateSmsModal()" id="btnCancelBatchSms" class="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold cursor-pointer transition-all">닫기</button>
+          <button type="button" onclick="executeBatchCandidateSms()" id="btnExecuteBatchSms" class="px-5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white text-xs font-black shadow-md cursor-pointer transition-all flex items-center gap-1.5">
+            <i data-lucide="send" class="w-3.5 h-3.5"></i>
+            <span>일괄 문자 발송 시작</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 0-NEW. 모바일 간병일지 × 만족도 설문 (커피쿠폰) 통합 웹뷰 미리보기 모달 -->
   <div id="surveyNewWebviewModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center hidden p-3 sm:p-5">
     <div class="bg-slate-900 rounded-3xl w-full max-w-6xl shadow-2xl overflow-hidden border border-pink-500/30 flex flex-col max-h-[94vh]">
