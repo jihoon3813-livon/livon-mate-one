@@ -7,7 +7,8 @@
     "dev": "node server.js",
     "start": "node server.js",
     "sync-samsung": "node scripts/sync-samsung-drive.js",
-    "convex": "node node_modules/convex/bin/main.js dev"
+    "convex": "node node_modules/convex/bin/main.js dev",
+    "build:carehub-convex-client": "esbuild carehub-convex-client-entry.js --bundle --minify --format=iife --outfile=carehub-convex-client.js"
   },
   "dependencies": {
     "@sparticuz/chromium": "^131.0.1",
