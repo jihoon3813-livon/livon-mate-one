@@ -15,7 +15,9 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
       const customTitle = body.title || null;
-      const result = await slackService.sendDailyReport(customTitle);
+      const providedApps = Array.isArray(body.apps) && body.apps.length > 0 ? body.apps : null;
+      const customWebhook = body.webhookUrl || null;
+      const result = await slackService.sendDailyReport(customTitle, providedApps, customWebhook);
       return res.status(200).json({ success: true, result });
     }
 

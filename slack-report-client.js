@@ -41,11 +41,14 @@
                 <i data-lucide="hash" class="w-4 h-4 text-purple-600"></i>
                 수신 채널: <b id="slackChannelNameDisplay" class="text-purple-700">#수행_2024_livon_careport_device-alert</b>
               </span>
-              <span id="slackLastSentText" class="text-[11px] text-slate-500 font-medium">최근 발송: 방금 전</span>
+              <span id="slackLastSentText" class="text-[11px] text-slate-500 font-medium">최근 발송: 대기중</span>
             </div>
-            <div class="text-[11px] text-slate-600 flex items-center gap-1.5 bg-white p-2.5 rounded-xl border border-purple-100 font-mono break-all">
-              <span class="text-slate-400 shrink-0">Webhook:</span>
-              <span id="slackWebhookMasked" class="truncate text-slate-700 font-semibold">https://hooks.slack.com/services/T080...</span>
+            <div class="text-[11px] text-slate-600 flex items-center justify-between gap-2 bg-white p-2.5 rounded-xl border border-purple-100 font-mono">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="text-slate-400 shrink-0">Webhook:</span>
+                <span id="slackWebhookMasked" class="truncate text-slate-700 font-semibold">https://hooks.slack.com/services/T080...</span>
+              </div>
+              <button type="button" onclick="editSlackWebhookUrl()" class="text-[10px] text-purple-600 hover:text-purple-800 font-bold underline cursor-pointer shrink-0">변경</button>
             </div>
           </div>
 
@@ -141,6 +144,8 @@
     if (modal) modal.classList.add('hidden');
   };
 
+  let cachedSlackConfig = null;
+
   async function loadSlackConfig() {
     try {
       const res = await fetch('/api/slack/config');
@@ -148,13 +153,18 @@
       const data = await res.json();
       if (data && data.success && data.config) {
         const c = data.config;
+        cachedSlackConfig = c;
         const channelEl = document.getElementById('slackChannelNameDisplay');
         if (channelEl) channelEl.textContent = c.channelName || '#수행_2024_livon_careport_device-alert';
         
         const webhookEl = document.getElementById('slackWebhookMasked');
-        if (webhookEl && c.webhookUrl) {
-          const u = c.webhookUrl;
-          webhookEl.textContent = u.slice(0, 36) + '...' + u.slice(-8);
+        if (webhookEl) {
+          const u = c.webhookUrl || '';
+          if (u.length > 20) {
+            webhookEl.textContent = u.slice(0, 36) + '...' + u.slice(-8);
+          } else {
+            webhookEl.textContent = u || '미설정';
+          }
         }
 
         const schedEl = document.getElementById('slackScheduleInput');
@@ -175,6 +185,29 @@
       console.warn('loadSlackConfig error:', e);
     }
   }
+
+  window.editSlackWebhookUrl = async function() {
+    const currentUrl = (cachedSlackConfig && cachedSlackConfig.webhookUrl) || '';
+    const newUrl = prompt('슬랙 Incoming Webhook URL을 입력하세요:', currentUrl);
+    if (newUrl === null) return;
+    const trimmed = newUrl.trim();
+    if (trimmed && !trimmed.startsWith('https://hooks.slack.com/')) {
+      alert('올바른 Slack Webhook URL 형식(https://hooks.slack.com/...)을 입력해주세요.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/slack/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webhookUrl: trimmed })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      alert('✅ Webhook URL이 안전하게 저장되었습니다.');
+      await loadSlackConfig();
+    } catch (e) {
+      alert('Webhook URL 저장 실패: ' + e.message);
+    }
+  };
 
   window.saveSlackSettings = async function() {
     try {
@@ -201,12 +234,31 @@
     }
   };
 
+  function getCurrentHubApps() {
+    if (typeof gApps !== 'undefined' && Array.isArray(gApps) && gApps.length > 0) return gApps;
+    if (typeof window !== 'undefined' && window.gApps && Array.isArray(window.gApps) && window.gApps.length > 0) return window.gApps;
+    if (typeof window !== 'undefined' && window.REBORN_DATA && Array.isArray(window.REBORN_DATA.applications) && window.REBORN_DATA.applications.length > 0) return window.REBORN_DATA.applications;
+    try {
+      const cached = localStorage.getItem('LIVON_CACHED_APPS');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return [];
+  }
+
   window.loadSlackPreview = async function() {
     const box = document.getElementById('slackPreviewBox');
     if (!box) return;
     box.textContent = '최신 허브 데이터 집계 중...';
     try {
-      const res = await fetch('/api/slack/preview');
+      const currentApps = getCurrentHubApps();
+      const res = await fetch('/api/slack/preview', {
+        method: currentApps.length > 0 ? 'POST' : 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        body: currentApps.length > 0 ? JSON.stringify({ apps: currentApps }) : undefined
+      });
       if (!res.ok) {
         throw new Error(`서버 응답 오류 (HTTP ${res.status})`);
       }
@@ -233,10 +285,17 @@
     }
 
     try {
+      const currentApps = getCurrentHubApps();
+      const payload = {
+        apps: currentApps.length > 0 ? currentApps : undefined
+      };
+      if (cachedSlackConfig && cachedSlackConfig.webhookUrl) {
+        payload.webhookUrl = cachedSlackConfig.webhookUrl;
+      }
       const res = await fetch('/api/slack/send-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
+        body: JSON.stringify(payload)
       });
       if (!res.ok) {
         const errorText = await res.text().catch(() => '');

@@ -33,7 +33,6 @@ carecall_dispatch_log.json
 drive_sync/
 *.key
 vonage_private.key
-slack_config.json
 sms_dispatch_log.json
 generated_pdfs/
 sample_*.png
@@ -44,5 +43,3 @@ hoon/
 scripts/
 audio/
 고연분_*.pdf
-hub_real_data.js
-hub_apps_real.json
