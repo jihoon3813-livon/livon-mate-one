@@ -201,6 +201,52 @@ function cleanSurveyHospitalName(name, target) {
   return hName || '병원 미지정';
 }
 
+function hasTargetCareLog(target) {
+  if (!target) return false;
+  const pName = (target.patientName || '').trim();
+  const sId = String(target.serviceId || target.id || '').trim();
+  const cleanSId = sId.replace(/^ST-/, '');
+
+  // 1. gCareLogs 배열 확인 (통합허브 및 시스템 전역 일지)
+  if (typeof gCareLogs !== 'undefined' && Array.isArray(gCareLogs) && gCareLogs.length > 0) {
+    const found = gCareLogs.some(l => {
+      if (!l) return false;
+      const lAppId = String(l.applyId || '').trim();
+      const lName = (l.patientName || '').trim();
+      return (cleanSId && lAppId && (lAppId === cleanSId || lAppId === sId)) || 
+             (pName && lName && lName === pName);
+    });
+    if (found) return true;
+  }
+
+  // 2. target 자체 속성
+  if (target.hasCareLog === true || (typeof target.careLogCount === 'number' && target.careLogCount > 0)) {
+    return true;
+  }
+
+  // 3. gApps 신청건 확인
+  if (typeof gApps !== 'undefined' && Array.isArray(gApps)) {
+    const app = gApps.find(a => (cleanSId && String(a.id) === cleanSId) || (pName && a.patientName && (a.patientName || '').trim() === pName));
+    if (app && (app.hasCareLog === true || (app.careLogCount > 0) || (Array.isArray(app.careLogs) && app.careLogs.length > 0))) {
+      return true;
+    }
+  }
+
+  // 4. 로컬스토리지 모바일 리포트 캐시 확인
+  try {
+    if (pName && pName !== '고연분') {
+      const cached = localStorage.getItem('LIVON_MOBILE_REPORT_' + pName);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed?.records) && parsed.records.length > 0) return true;
+      }
+    }
+  } catch (e) {}
+
+  return false;
+}
+window.hasTargetCareLog = hasTargetCareLog;
+
 function isTargetRecentlyAdded(target) {
   if (!target) return false;
   if (target.isRecentlyAdded === true) return true;
@@ -267,12 +313,14 @@ function resetSurveyFilters() {
     const responseSelect = document.getElementById('surveyFilterResponse' + sfx);
     const giftSelect = document.getElementById('surveyFilterGift' + sfx);
     const insuranceSelect = document.getElementById('surveyFilterInsurance' + sfx);
+    const careLogSelect = document.getElementById('surveyFilterCareLog' + sfx);
     const sortSelect = document.getElementById('surveyFilterSort' + sfx);
     if (searchInput) searchInput.value = '';
     if (guidanceSelect) guidanceSelect.value = 'ALL';
     if (responseSelect) responseSelect.value = 'ALL';
     if (giftSelect) giftSelect.value = 'ALL';
     if (insuranceSelect) insuranceSelect.value = 'ALL';
+    if (careLogSelect) careLogSelect.value = 'ALL';
     if (sortSelect) sortSelect.value = 'RECENT_FIRST';
   });
   setSurveyQuickFilter('ALL');
@@ -296,6 +344,11 @@ function updateSurveyChipCounts() {
   setEl('surveyChipCountFollowup', targets.filter(t => t.followupStatus && t.followupStatus !== 'NONE').length);
   setEl('surveyChipCountGiftPending', giftPendingCount);
   setEl('surveyChipCountGiftSent', giftSentCount);
+
+  const hasLogCount = targets.filter(t => hasTargetCareLog(t) && t.excludeStatus !== 'EXCLUDED').length;
+  const noLogCount = targets.filter(t => !hasTargetCareLog(t) && t.excludeStatus !== 'EXCLUDED').length;
+  setEl('surveyChipCountHasLog', hasLogCount);
+  setEl('surveyChipCountNoLog', noLogCount);
 
   const candidateCount = targets.filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED').length;
   const excludedCount = targets.filter(t => t.excludeStatus === 'EXCLUDED').length;
@@ -703,6 +756,7 @@ function applySurveyFilters() {
   const filterResponse = (document.getElementById('surveyFilterResponse' + sfx)?.value) || 'ALL';
   const filterGift = isNewTab ? (document.getElementById('surveyFilterGift_new')?.value || 'ALL') : 'ALL';
   const filterInsurance = (document.getElementById('surveyFilterInsurance' + sfx)?.value) || 'ALL';
+  const filterCareLog = (document.getElementById('surveyFilterCareLog' + sfx)?.value) || 'ALL';
   const filterSort = (document.getElementById('surveyFilterSort' + sfx)?.value) || 'RECENT_FIRST';
 
   let filtered = (gSurveyState.targets || []).slice();
@@ -933,6 +987,10 @@ function renderSurveyTargetsTable(list) {
     const recentBadge = isRecent 
       ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-2xs animate-pulse tracking-tight shrink-0"><i data-lucide="sparkles" class="w-2.5 h-2.5"></i>최근등록</span>`
       : '';
+    const hasLog = hasTargetCareLog(target);
+    const logBadge = hasLog
+      ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-3xs shrink-0" title="모바일 간병일지 등록됨"><i data-lucide="file-check-2" class="w-2.5 h-2.5 text-emerald-600"></i>일지작성</span>`
+      : `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200 shrink-0" title="간병일지 미작성"><i data-lucide="file-x-2" class="w-2.5 h-2.5 text-slate-400"></i>일지없음</span>`;
     const rowClass = isRecent 
       ? 'bg-amber-50/70 hover:bg-amber-100/70 border-l-4 border-l-amber-500 transition-colors' 
       : (isNewTable ? 'hover:bg-pink-50/40 transition-colors' : 'hover:bg-sky-50/50 transition-colors');
@@ -1084,6 +1142,7 @@ function renderSurveyTargetsTable(list) {
           <div class="flex items-center gap-1.5 flex-wrap">
             <span>${maskedName}</span>
             ${recentBadge}
+            ${logBadge}
           </div>
           ${target.patientPhone ? `<span class="block text-[10.5px] text-slate-400 font-normal font-mono">${maskPhone(target.patientPhone)}</span>` : ''}
         </td>

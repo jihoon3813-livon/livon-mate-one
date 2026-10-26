@@ -2292,9 +2292,96 @@
           }
         }
 
+        // =========================================================================
+        // [환자 정보 동적 계산]: 시작/종료일 파싱, 기간, 일수, 나이/성별 동적 치환
+        // =========================================================================
+        function parseCustomDateParts(dStr) {
+          if (!dStr) return null;
+          const clean = String(dStr).trim();
+          const m = clean.match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
+          if (m) {
+            return {
+              year: parseInt(m[1], 10),
+              month: parseInt(m[2], 10),
+              day: parseInt(m[3], 10),
+              mmdd: String(m[2]).padStart(2, '0') + '.' + String(m[3]).padStart(2, '0')
+            };
+          }
+          const mShort = clean.match(/(\d{1,2})[.\-/](\d{1,2})/);
+          if (mShort) {
+            return {
+              year: 2026,
+              month: parseInt(mShort[1], 10),
+              day: parseInt(mShort[2], 10),
+              mmdd: String(mShort[1]).padStart(2, '0') + '.' + String(mShort[2]).padStart(2, '0')
+            };
+          }
+          return null;
+        }
+
+        const startParts = parseCustomDateParts(target.careStartDate);
+        const endParts = parseCustomDateParts(target.careEndDate);
+        let carePeriodStr = '간병 기간';
+        let diffDays = 1;
+
+        if (startParts && endParts) {
+          carePeriodStr = startParts.mmdd + ' — ' + endParts.mmdd;
+          const dtStart = new Date(startParts.year, startParts.month - 1, startParts.day);
+          const dtEnd = new Date(endParts.year, endParts.month - 1, endParts.day);
+          const dDiff = Math.round((dtEnd - dtStart) / (1000 * 3600 * 24));
+          diffDays = Math.max(1, dDiff <= 0 ? 1 : dDiff);
+        } else if (startParts) {
+          carePeriodStr = startParts.mmdd + '부터';
+        }
+
+        // 성별 및 나이 추출 (target 및 gApps 매핑)
+        let ageVal = target.patientAge || target.age || '';
+        let genderVal = target.patientGender || target.gender || '';
+        if (!ageVal || !genderVal) {
+          try {
+            const allApps = (window.parent && window.parent.gApps) || (typeof gApps !== 'undefined' ? gApps : []);
+            const matchedApp = (Array.isArray(allApps) && allApps.length > 0)
+              ? allApps.find(a => (target.serviceId && String(a.id) === String(target.serviceId)) || (target.patientName && (a.patientName || '').trim() === (target.patientName || '').trim()))
+              : null;
+            if (matchedApp) {
+              if (!genderVal) genderVal = matchedApp.gender;
+              if (!genderVal && matchedApp.patientRrn) {
+                const bDigit = String(matchedApp.patientRrn).replace(/[^0-9]/g, '').slice(6, 7);
+                if (bDigit === '1' || bDigit === '3') genderVal = '남성';
+                else if (bDigit === '2' || bDigit === '4') genderVal = '여성';
+              }
+              if (!ageVal && (matchedApp.birthDate || matchedApp.rrnFront)) {
+                const bStr = String(matchedApp.birthDate || matchedApp.rrnFront).replace(/[^0-9]/g, '');
+                let bYear = 0;
+                if (bStr.length >= 8) bYear = parseInt(bStr.slice(0, 4), 10);
+                else if (bStr.length >= 6) {
+                  const twoY = parseInt(bStr.slice(0, 2), 10);
+                  bYear = twoY >= 30 ? (1900 + twoY) : (2000 + twoY);
+                }
+                if (bYear > 0) ageVal = new Date().getFullYear() - bYear;
+              }
+            }
+          } catch (e) {}
+        }
+        if (genderVal) {
+          if (genderVal === '남' || genderVal === 'M') genderVal = '남성';
+          if (genderVal === '여' || genderVal === 'F') genderVal = '여성';
+        }
+        const patientMetaDisplay = (ageVal && genderVal) 
+          ? (ageVal + '세 · ' + genderVal) 
+          : (genderVal ? (genderVal + ' 환자') : (ageVal ? (ageVal + '세 환자') : '환자 정보'));
+
+        gPatientInfo.age = ageVal || '';
+        gPatientInfo.gender = genderVal || '';
+
+        document.querySelectorAll('.patient-meta-text').forEach(el => el.textContent = patientMetaDisplay);
+        document.querySelectorAll('.side-care-period').forEach(el => el.textContent = carePeriodStr);
+        document.querySelectorAll('.side-care-days').forEach(el => el.textContent = diffDays + '일');
+        document.querySelectorAll('.total-days-num').forEach(el => el.textContent = diffDays + '일');
+
         // 해당 환자의 실제 케어포트 모바일 일지가 있는지 확인하고, 없으면 기간에 맞춰 일지 날짜 동기화
+        let hasRealLogs = false;
         if (target.patientName && target.patientName !== '고연분') {
-          let hasRealLogs = false;
           try {
             const cached = localStorage.getItem('LIVON_MOBILE_REPORT_' + target.patientName);
             if (cached) {
@@ -2322,15 +2409,40 @@
           }
 
           // 케어포트 원격 일지가 아직 없는 타겟 환자인 경우에도, 환자의 실제 간병 시작~종료일에 맞춘 맞춤 일지 날짜 구성
-          if (!hasRealLogs && (target.careStartDate || target.careEndDate)) {
-            const mStart = String(target.careStartDate || '').match(/(\d{1,2})\.(\d{1,2})$/);
-            const baseDate = mStart ? `${mStart[1].padStart(2, '0')}.${mStart[2].padStart(2, '0')}` : '10.05';
-            const customCount = Math.min(10, DEFAULT_RECORDS.length);
-            careRecords = DEFAULT_RECORDS.slice(DEFAULT_RECORDS.length - customCount).map((rec, idx) => ({
+          if (!hasRealLogs) {
+            const baseDate = startParts ? startParts.mmdd : '10.25';
+            const customCount = Math.min(diffDays, DEFAULT_RECORDS.length);
+            careRecords = DEFAULT_RECORDS.slice(0, customCount).map((rec, idx) => ({
               ...rec,
               date: addDaysToDateStr(baseDate, idx)
             }));
             selected = careRecords.length - 1;
+
+            // 모바일 화면 상단에 일지 미작성 안내 배너 노출
+            let noLogBanner = document.getElementById('noRealLogNoticeBanner');
+            if (!noLogBanner) {
+              noLogBanner = document.createElement('div');
+              noLogBanner.id = 'noRealLogNoticeBanner';
+              noLogBanner.style.cssText = 'margin: 10px 14px 4px; padding: 11px 14px; background: linear-gradient(135deg, #fff1f2, #ffe4e6); border: 1.5px solid #fecdd3; border-radius: 14px; font-size: 12px; color: #9f1239; display: flex; align-items: center; justify-content: space-between; gap: 8px; box-shadow: 0 2px 6px rgba(225, 29, 72, 0.08);';
+              noLogBanner.innerHTML = `
+                <div>
+                  <div style="font-weight: 800; font-size: 12px; color: #be123c; margin-bottom: 2px;">
+                    📋 아직 등록된 모바일 간병일지가 없습니다
+                  </div>
+                  <div style="font-size: 11px; color: #881337;">
+                    하단 만족도 설문에 바로 참여하여 모바일 커피쿠폰을 받아보세요!
+                  </div>
+                </div>
+                <button type="button" onclick="scrollToSurveyForm()" style="background: linear-gradient(135deg, #e11d48, #be185d); color: #fff; border: none; border-radius: 10px; padding: 6px 12px; font-size: 11px; font-weight: 800; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+                  설문 바로가기 ☕
+                </button>
+              `;
+              const appContainer = document.querySelector('.mobile-app');
+              const stepper = document.querySelector('.journey-stepper');
+              if (appContainer && stepper) {
+                appContainer.insertBefore(noLogBanner, stepper.nextSibling);
+              }
+            }
           }
         }
 
