@@ -20,6 +20,9 @@ module.exports = async function handler(req, res) {
           providedApps = body.apps;
         }
       }
+      if (!providedApps) {
+        providedApps = await slackService.fetchApplicationsFromConvex(req);
+      }
       const stats = slackService.generateReportData(providedApps);
       const previewText = slackService.buildSlackMessage(stats);
       return res.status(200).json({

@@ -11,10 +11,6 @@
     {
       "path": "/api/slack/cron",
       "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/slack/cron",
-      "schedule": "0 22 * * *"
     }
   ],
   "rewrites": [

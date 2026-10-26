@@ -34,9 +34,9 @@ function getSlackConfig() {
     webhookUrl: process.env.SLACK_WEBHOOK_URL || DEFAULT_WEBHOOK_URL,
     channelName: '#수행_2024_livon_careport_device-alert',
     enabled: true,
-    schedules: ['07:00'],
+    schedules: ['21:00'],
     lastSentAt: null,
-    dashboardUrl: 'http://localhost:8080'
+    dashboardUrl: 'https://careport.livon.care'
   };
 
   if (inMemoryConfig) {
@@ -88,7 +88,33 @@ function resolveConvexUrl(reqOrUrl) {
   if (process.env.CONVEX_URL) {
     return process.env.CONVEX_URL;
   }
-  return process.env.VERCEL_ENV === 'production' ? PROD_CONVEX_URL : DEV_CONVEX_URL;
+  // 자동 크론 또는 본사 채널 일일 보고 발송 시 실시간 운영(PROD) DB 우선 연결
+  return PROD_CONVEX_URL;
+}
+
+async function fetchApplicationsFromConvex(reqOrUrl = null) {
+  const convexUrl = resolveConvexUrl(reqOrUrl);
+  try {
+    const res = await fetch(`${convexUrl}/api/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: 'applications:list',
+        args: {}
+      })
+    });
+    if (!res.ok) {
+      throw new Error(`Convex query failed (HTTP ${res.status})`);
+    }
+    const data = await res.json();
+    if (data && Array.isArray(data.value) && data.value.length > 0) {
+      console.log(`[Slack Report] Successfully fetched ${data.value.length} real-time applications from Convex (${convexUrl}).`);
+      return data.value;
+    }
+  } catch (err) {
+    console.warn('[Slack Report] Failed to fetch applications from Convex:', err.message);
+  }
+  return null;
 }
 
 async function fetchSlackConfigFromConvex(reqOrUrl = null) {
@@ -342,9 +368,13 @@ function sendSlackNotification(messageText, overrideWebhookUrl = null) {
   });
 }
 
-// 즉시 리포트 발송
-async function sendDailyReport(customTitle = null, providedApps = null, overrideWebhookUrl = null) {
-  const stats = generateReportData(providedApps);
+// 즉시 리포트 발송 (데이터 미전달 시 Convex Cloud 실시간 DB에서 자동 쿼리)
+async function sendDailyReport(customTitle = null, providedApps = null, overrideWebhookUrl = null, reqOrUrl = null) {
+  let apps = providedApps;
+  if (!Array.isArray(apps) || apps.length === 0) {
+    apps = await fetchApplicationsFromConvex(reqOrUrl);
+  }
+  const stats = generateReportData(apps);
   const text = buildSlackMessage(stats, customTitle);
   return await sendSlackNotification(text, overrideWebhookUrl);
 }
@@ -395,6 +425,7 @@ module.exports = {
   saveSlackConfig,
   fetchSlackConfigFromConvex,
   saveSlackConfigToConvex,
+  fetchApplicationsFromConvex,
   resolveConvexUrl,
   generateReportData,
   buildSlackMessage,
