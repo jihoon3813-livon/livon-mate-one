@@ -7072,7 +7072,25 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
   const adjFax = (curAdj && curAdj.fax) || app.adjusterFax || adjInfo.fax || '';
 
   // 1. 간병인 배정 데이터 확인 및 정렬
-  const sortedAssigns = (appAssigns || []).slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+  let sortedAssigns = (appAssigns || []).slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+  // [목록-모달 일관성 보장]: 배정대장에 행이 없더라도 신청서(app) 자체에 간병인명이 기재되어 있는 경우 가상 배정 객체 생성
+  if (sortedAssigns.length === 0 && app && app.caregiverName && app.caregiverName !== '-' && !app.caregiverName.includes('미배정') && !app.caregiverName.includes('배정대기')) {
+    const rawWage = app.dailyWage || app.dailyRate || 140000;
+    const numWage = typeof rawWage === 'string' ? (parseInt(rawWage.replace(/[^0-9]/g, ''), 10) || 140000) : (Number(rawWage) || 140000);
+    const resolvedCenter = app.caregiverCenter || app.centerName || '개인';
+    sortedAssigns = [{
+      id: 'AS-' + (app.id || 'TEMP'),
+      applyId: app.id,
+      patientName: app.patientName,
+      caregiverName: app.caregiverName,
+      phone: app.caregiverPhone || app.phone || '',
+      centerName: resolvedCenter,
+      settlementType: app.settlementType || (resolvedCenter.includes('개인') ? '개인' : '협력센터'),
+      dailyWage: numWage,
+      startDate: app.serviceStartDate || app.careStartDate || app.startDate || '',
+      endDate: app.serviceEndDate || app.careEndDate || app.endDate || ''
+    }];
+  }
   const hasAssign = sortedAssigns.length > 0;
   
   let as = null;
@@ -7088,9 +7106,9 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
 
   const prog = as ? getCareProgressInfo(as) : null;
   const cg = as ? (gCaregivers || []).find(c => c.name === as.caregiverName) : null;
-  const center = as ? (gCenters || []).find(ctr => ctr.name === as.centerName) : null;
+  const center = as ? (gCenters || []).find(ctr => ctr.name === (as.centerName || (app && (app.caregiverCenter || app.centerName)))) : null;
   const birth = as ? (as.birthDate || as.caregiverBirth || (cg && cg.birthDate) || '-') : '-';
-  const caregiverPhone = as ? (as.phone || as.caregiverPhone || (cg && cg.phone) || '-') : '-';
+  const caregiverPhone = as ? (as.phone || as.caregiverPhone || (app && app.caregiverPhone) || (cg && cg.phone) || '-') : '-';
   const centerPhone = as ? (as.centerPhone || (center && center.phone) || '02-2633-1120') : '-';
   const account = as ? (as.accountInfo || (cg && cg.account) || '-') : '-';
   const cgDailyWage = as ? (as.dailyWage || 140000) : 140000;
@@ -8838,7 +8856,25 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
   const adjFax = (curAdj && curAdj.fax) || app.adjusterFax || adjInfo.fax || '';
 
   // 1. 간병인 배정 데이터 확인 및 차수별 정렬 (startDate 오름차순)
-  const sortedAssigns = (appAssigns || []).slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+  let sortedAssigns = (appAssigns || []).slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+  // [목록-모달 일관성 보장]: 배정대장에 행이 없더라도 신청서(app) 자체에 간병인명이 기재되어 있는 경우 가상 배정 객체 생성
+  if (sortedAssigns.length === 0 && app && app.caregiverName && app.caregiverName !== '-' && !app.caregiverName.includes('미배정') && !app.caregiverName.includes('배정대기')) {
+    const rawWage = app.dailyWage || app.dailyRate || 140000;
+    const numWage = typeof rawWage === 'string' ? (parseInt(rawWage.replace(/[^0-9]/g, ''), 10) || 140000) : (Number(rawWage) || 140000);
+    const resolvedCenter = app.caregiverCenter || app.centerName || '개인';
+    sortedAssigns = [{
+      id: 'AS-' + (app.id || 'TEMP'),
+      applyId: app.id,
+      patientName: app.patientName,
+      caregiverName: app.caregiverName,
+      phone: app.caregiverPhone || app.phone || '',
+      centerName: resolvedCenter,
+      settlementType: app.settlementType || (resolvedCenter.includes('개인') ? '개인' : '협력센터'),
+      dailyWage: numWage,
+      startDate: app.serviceStartDate || app.careStartDate || app.startDate || '',
+      endDate: app.serviceEndDate || app.careEndDate || app.endDate || ''
+    }];
+  }
   const hasAssign = sortedAssigns.length > 0;
   
   // 현재 선택된 간병인 탭 매칭 (없거나 유효하지 않으면 가장 최신 배정 건을 기본값으로 설정)
@@ -8855,9 +8891,9 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
 
   const prog = as ? getCareProgressInfo(as) : null;
   const cg = as ? (gCaregivers || []).find(c => c.name === as.caregiverName) : null;
-  const center = as ? (gCenters || []).find(ctr => ctr.name === as.centerName) : null;
+  const center = as ? (gCenters || []).find(ctr => ctr.name === (as.centerName || (app && (app.caregiverCenter || app.centerName)))) : null;
   const birth = as ? (as.birthDate || as.caregiverBirth || (cg && cg.birthDate) || '-') : '-';
-  const caregiverPhone = as ? (as.phone || as.caregiverPhone || (cg && cg.phone) || '-') : '-';
+  const caregiverPhone = as ? (as.phone || as.caregiverPhone || (app && app.caregiverPhone) || (cg && cg.phone) || '-') : '-';
   const centerPhone = as ? (as.centerPhone || (center && center.phone) || '02-2633-1120') : '-';
   const account = as ? (as.accountInfo || (cg && cg.account) || '-') : '-';
 
@@ -14782,11 +14818,69 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null, skipRemoteRe
 
   if (bodyEl) {
     try {
-      const isMatchApp = (item) => (typeof isMatchCustomerRecord === 'function' ? isMatchCustomerRecord(app, item) : (String(item.applyId) === String(app.id)));
-      const assigns = (gAssigns || []).filter(isMatchApp);
-      const claims = (gClaims || []).filter(isMatchApp);
-      const payouts = (gPayouts || []).filter(isMatchApp);
-      const logs = (gCareLogs || []).filter(isMatchApp);
+      // [목록-모달 100% 일치 매칭 엔진]: ID 매칭 -> 환자명 매칭 -> 신청서 caregiverName fallback 보장
+      const getModalEntityList = (rawList, targetApp) => {
+        if (!targetApp || !Array.isArray(rawList)) return [];
+        const appId = String(targetApp.id || targetApp.patientId || '').trim();
+        const appName = (targetApp.patientName || targetApp.customerName || '').trim();
+
+        // 1단계: isMatchCustomerRecord 또는 applyId 일치(C/H 정규화 포함)
+        let matches = rawList.filter(item => {
+          if (!item) return false;
+          if (typeof isMatchCustomerRecord === 'function' && isMatchCustomerRecord(targetApp, item)) return true;
+          const aId = String(item.applyId || '').trim();
+          if (aId && appId && (aId === appId || aId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || aId.replace(/^C/, 'H') === appId.replace(/^C/, 'H'))) {
+            return true;
+          }
+          return false;
+        });
+
+        // 2단계: 1단계에서 못 찾았고 환자명이 있는 경우, 환자명 일치 검색 (단, 타인 신청서의 ID가 아닌 경우)
+        if (matches.length === 0 && appName) {
+          matches = rawList.filter(item => {
+            if (!item) return false;
+            const pName = (item.patientName || item.customerName || '').trim();
+            if (pName !== appName) return false;
+            const foreignApplyId = String(item.applyId || '').trim();
+            if (foreignApplyId && foreignApplyId !== appId) {
+              const foreignApp = Array.isArray(gApps) ? gApps.find(x => x && x.id === foreignApplyId) : null;
+              if (foreignApp && foreignApp.patientName && foreignApp.patientName.trim() !== appName) {
+                return false;
+              }
+            }
+            return true;
+          });
+        }
+        return matches;
+      };
+
+      let assigns = getModalEntityList(gAssigns, app);
+      // 3단계: 배정대장(gAssigns)에 매칭 레코드가 없지만 신청서 자체에 간병인 정보가 기재된 경우 가상 배정 보강
+      if (assigns.length === 0 && app && app.caregiverName && app.caregiverName !== '-' && !app.caregiverName.includes('미배정') && !app.caregiverName.includes('배정대기')) {
+        const rawWage = app.dailyWage || app.dailyRate || 140000;
+        const numWage = typeof rawWage === 'string' ? (parseInt(rawWage.replace(/[^0-9]/g, ''), 10) || 140000) : (Number(rawWage) || 140000);
+        const resolvedCenter = app.caregiverCenter || app.centerName || '개인';
+        assigns = [{
+          id: 'AS-' + (app.id || 'TEMP'),
+          applyId: app.id,
+          patientName: app.patientName,
+          caregiverName: app.caregiverName,
+          phone: app.caregiverPhone || app.phone || '',
+          centerName: resolvedCenter,
+          settlementType: app.settlementType || (resolvedCenter.includes('개인') ? '개인' : '협력센터'),
+          dailyWage: numWage,
+          startDate: app.serviceStartDate || app.careStartDate || app.startDate || '',
+          endDate: app.serviceEndDate || app.careEndDate || app.endDate || ''
+        }];
+      }
+
+      const claims = getModalEntityList(gClaims, app);
+      const payouts = getModalEntityList(gPayouts, app);
+      const logs = (gCareLogs || []).filter(item => {
+        if (!item) return false;
+        if (typeof isMatchCustomerRecord === 'function' && isMatchCustomerRecord(app, item)) return true;
+        return String(item.applyId || '').trim() === String(app.id || '').trim();
+      });
       const rawFax = (gFaxRecords && gFaxRecords[app.id]);
       const isClaimFax = rawFax && rawFax.status === '전송완료' && rawFax.caseType !== '현대해상 고객등록/조회' && rawFax.formType !== 'HD_FORM_01';
       const faxInfo = isClaimFax ? rawFax : { status: '미전송', sentDate: null, faxNumber: app.adjusterFax || '0507-XXX-XXXX' };
