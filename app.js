@@ -3821,6 +3821,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       updateHeaderAdminProfile();
     } catch (e) {}
   }
+  
 
   // 2. 🚨 [보안] 미인증(로그아웃) 상태: 고객·정산 민감 데이터의 메모리/DOM 적재를 원천 차단 (단, 개발 환경은 항상 안전하게 접근 허용)
   if (!isAuthenticated && !isDevMode) {
@@ -3841,6 +3842,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const payoutBody = document.getElementById('payoutTableBody');
     if (payoutBody) payoutBody.innerHTML = '';
     initIcons();
+    hideGlobalProgress();
     return;
   }
 
@@ -15684,7 +15686,15 @@ async function executeRealFaxSendFromPreview() {
     });
 
     try {
-      await finalizeNewAppRegistration(pendingApp, true);
+      const registrationCompleted = await finalizeNewAppRegistration(pendingApp, true, { progressAlreadyVisible: true });
+      if (registrationCompleted !== true) {
+        updateGlobalProgress({
+          percent: 100,
+          statusText: '⚠️ 등록 과정이 완료되지 않았습니다.'
+        });
+        hideGlobalProgress(1000);
+        return;
+      }
       updateGlobalProgress({
         percent: 100,
         statusText: '✅ 1차 접수 팩스 발송 완료!'
@@ -32257,7 +32267,28 @@ function handleNewAppSubmit(e) {
   }
 }
 
-async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
+async function finalizeNewAppRegistration(newApp, shouldSendFax = true, options = {}) {
+  if (window._newAppRegistrationInProgress) return false;
+  window._newAppRegistrationInProgress = true;
+
+  const progressAlreadyVisible = options.progressAlreadyVisible === true;
+  const progressOwner = 'newAppRegistration';
+  const registrationButtons = ['btnNewAppSaveOnly', 'btnNewAppSaveAndFax', 'newAppSubmitBtn']
+    .map(id => document.getElementById(id))
+    .filter(Boolean);
+  registrationButtons.forEach(button => { button.disabled = true; });
+
+  if (!progressAlreadyVisible && typeof showGlobalProgress === 'function') {
+    showGlobalProgress({
+      owner: progressOwner,
+      title: '신규 고객 등록 중',
+      subtitle: `[${newApp.patientName || '고객'}] 정보를 저장하고 있습니다.`,
+      percent: 10,
+      statusText: '신청 정보를 준비하고 있습니다...',
+      icon: 'user-plus'
+    });
+  }
+
   try {
     try { localStorage.removeItem('LIVON_DATA_RESET_CLEAN'); } catch (e) {}
     const isHyundai = (newApp.insuranceCompany || '').includes('현대해상');
@@ -32365,6 +32396,10 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
       });
     }
 
+    if (!progressAlreadyVisible && typeof updateGlobalProgress === 'function') {
+      updateGlobalProgress({ percent: 35, statusText: '고객 정보를 서버에 저장하고 있습니다...' });
+    }
+
     // 서버 로컬 디스크 파일(hub_apps_real.json)에 즉시 영구 저장
     try {
       await fetch('/api/hub/create-application', {
@@ -32384,9 +32419,15 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
 
     // Convex Cloud 실시간 동기화 (재시도 보장 + 오프라인 아웃박스 큐 가드)
     if (typeof syncToConvex === 'function') {
+      if (!progressAlreadyVisible && typeof updateGlobalProgress === 'function') {
+        updateGlobalProgress({ percent: 55, statusText: 'Convex 데이터베이스에 등록 내용을 동기화하고 있습니다...' });
+      }
       let syncSucceeded = false;
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
+          if (!progressAlreadyVisible && attempt > 1 && typeof updateGlobalProgress === 'function') {
+            updateGlobalProgress({ percent: 55 + attempt * 8, statusText: `서버 응답을 확인하고 있습니다... (${attempt}/3)` });
+          }
           const res = await syncToConvex('sync:saveApplication', { app: cleanPayload });
           if (res !== null && res !== undefined) {
             syncSucceeded = true;
@@ -32423,6 +32464,10 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
       if (typeof submitAppToCarePort === 'function') {
         submitAppToCarePort(newApp, false).catch(err => console.warn('[Auto CarePort Warning]', err));
       }
+    }
+
+    if (!progressAlreadyVisible && typeof updateGlobalProgress === 'function') {
+      updateGlobalProgress({ percent: 90, statusText: '등록 결과를 화면에 반영하고 있습니다...' });
     }
 
     // 3. 팩스 발송 (shouldSendFax가 true이고 targetFaxNumber가 있으며 initialFaxSent가 취소되지 않은 경우에만 비동기 발송)
@@ -32637,9 +32682,17 @@ async function finalizeNewAppRegistration(newApp, shouldSendFax = true) {
     if ((newApp.insuranceCompany || '').includes('삼성')) {
       syncSamsungSpreadsheetData(true);
     }
+    return true;
   } catch (err) {
     console.error('신규 접수 저장 중 오류 발생:', err);
     alert('신규 신청 저장 중 오류가 발생했습니다: ' + err.message);
+    return false;
+  } finally {
+    if (!progressAlreadyVisible && typeof hideGlobalProgress === 'function') {
+      hideGlobalProgress(0, progressOwner);
+    }
+    window._newAppRegistrationInProgress = false;
+    registrationButtons.forEach(button => { button.disabled = false; });
   }
 }
 
@@ -33583,6 +33636,14 @@ function openCustomerEditModal(appId, focusSection = null) {
     radio.checked = accidentTypeVal
       ? radio.value === accidentTypeVal || (accidentTypeVal.includes('상해') && radio.value === '상해') || (accidentTypeVal.includes('질병') && radio.value === '질병')
       : radio.value === '상해';
+  });
+
+  const mobilityVal = String(app.mobility ?? '').trim().toLowerCase();
+  const isMobilityUnavailable = ['불가', '불가능', 'n', 'no', 'false', '0'].includes(mobilityVal);
+  document.querySelectorAll('input[name="custEditMobilityRadio"]').forEach(radio => {
+    radio.checked = mobilityVal
+      ? radio.value === (isMobilityUnavailable ? '불가' : '가능')
+      : radio.value === '가능';
   });
 
   const diagnosisInput = document.getElementById('custEditDiagnosis');
@@ -37840,7 +37901,20 @@ async function handleAdminLoginSubmit(e, customUser, customPass) {
   initData();
   initInsuranceWorkflows();
   if (typeof loadConvexData === 'function') {
-    loadConvexData(true);
+    showGlobalProgress({
+      title: '초기 데이터를 불러오는 중입니다',
+      subtitle: '로그인이 완료되어 운영 데이터를 불러오고 있습니다.',
+      percent: 25,
+      statusText: '서버에서 최신 데이터를 확인하고 있습니다...',
+      icon: 'refresh-cw'
+    });
+    try {
+      await loadConvexData(true);
+    } catch (loadErr) {
+      console.warn('[Admin Login Initial Data Load]', loadErr);
+    } finally {
+      hideGlobalProgress();
+    }
   }
 
   // 현재 활성 탭 렌더링
