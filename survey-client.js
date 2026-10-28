@@ -7088,13 +7088,19 @@ async function exportSurveyResponsesToExcel(onlySelected = false) {
   });
 
   // -------------------------------------------------------------
-  // 시트 2: 📋 세부 응답 데이터 (Raw Data)
+  // 시트 2: 📋 세부 응답 데이터 (Raw Data) - 사용자 설정 문항 스키마 100% 동적 반영
   // -------------------------------------------------------------
   const wsData = wb.addWorksheet('고객별 세부 응답 내역', {
     views: [{ showGridLines: true }]
   });
 
-  const columnsDef = [
+  // 사용자가 [설문 관리]에서 직접 설정한 최신 문항 스키마 동적 로드
+  const currentSchema = (Array.isArray(gSurveyState.schema) && gSurveyState.schema.length > 0)
+    ? gSurveyState.schema
+    : DEFAULT_SURVEY_SCHEMA_V1;
+
+  // 1. 기본 인적사항 및 서비스 정보 고정 컬럼
+  const baseColumns = [
     { header: 'No', key: 'no', width: 6 },
     { header: '신청ID', key: 'appId', width: 11 },
     { header: '응답ID', key: 'respId', width: 14 },
@@ -7106,19 +7112,36 @@ async function exportSurveyResponsesToExcel(onlySelected = false) {
     { header: '서비스 종료일', key: 'endDate', width: 13 },
     { header: '담당 간병인', key: 'caregiver', width: 13 },
     { header: '간병일지', key: 'hasCareLog', width: 11 },
-    { header: '종합 만족도', key: 'avgScore', width: 13 },
-    { header: 'Q1. 응답자 구분 상세', key: 'q1Detail', width: 16 },
-    { header: 'Q2. 전반적 만족도', key: 'q2', width: 18 },
-    { header: 'Q3. 친절도 및 태도', key: 'q3', width: 18 },
-    { header: 'Q4. 돌봄 및 위생', key: 'q4', width: 18 },
-    { header: 'Q5. 고객 주관식 의견 (좋았던 점/개선점)', key: 'q5', width: 38 },
-    { header: 'Q6. 유선 연락 요청', key: 'q6', width: 14 },
+    { header: '종합 만족도', key: 'avgScore', width: 13 }
+  ];
+
+  // 2. 사용자가 설정한 설문 문항들 동적 컬럼 생성
+  const questionColumns = currentSchema.map((q, qIdx) => {
+    const qNum = q.id || ('Q' + (qIdx + 1));
+    const cleanTitle = (q.title || '설문 문항').replace(/\r?\n/g, ' ').trim();
+    let colWidth = 22;
+    if (q.type === 'text') colWidth = 38;
+    else if (q.type === 'boolean_callback') colWidth = 16;
+    else if (q.type === 'single_choice') colWidth = 20;
+
+    return {
+      header: `[${qNum}] ${cleanTitle}`,
+      key: `q_dyn_${qNum}`,
+      width: colWidth,
+      schemaQuestion: q,
+      qNum: qNum
+    };
+  });
+
+  // 3. 후속 관리 및 일시 고정 컬럼
+  const endColumns = [
     { header: '선물 발송 상태', key: 'giftStatus', width: 14 },
     { header: '선물 품목', key: 'giftItem', width: 22 },
     { header: '선물 발송 일시', key: 'giftSentAt', width: 16 },
     { header: '응답 제출 일시', key: 'submittedAt', width: 16 }
   ];
 
+  const columnsDef = [...baseColumns, ...questionColumns, ...endColumns];
   wsData.columns = columnsDef;
 
   const headerRow = wsData.getRow(1);
@@ -7132,12 +7155,20 @@ async function exportSurveyResponsesToExcel(onlySelected = false) {
 
   const respTypeMap = { PATIENT: '환자 본인', GUARDIAN: '가족 및 보호자', OTHER: '기타' };
   const ratingLabels = {
-    5: '5점 (매우 만족한다)',
-    4: '4점 (만족한다)',
-    3: '3점 (보통이다)',
-    2: '2점 (불만이다)',
-    1: '1점 (매우 불만이다)'
+    5: '매우 만족한다.',
+    4: '만족한다.',
+    3: '보통이다',
+    2: '불만이다.',
+    1: '매우 불만이다.'
   };
+
+  // 텍스트/긴 내용 컬럼 인덱스 집합 (좌측 정렬 & 자동 줄바꿈)
+  const textColIndices = new Set([7]); // 병원명
+  questionColumns.forEach((qc, qIdx) => {
+    if (qc.schemaQuestion.type === 'text') {
+      textColIndices.add(baseColumns.length + qIdx + 1);
+    }
+  });
 
   targetList.forEach((r, idx) => {
     const targetObj = r._target || (gSurveyState.targets || []).find(t => t.id === r.targetId || t.serviceId === r.serviceId) || r;
@@ -7149,16 +7180,6 @@ async function exportSurveyResponsesToExcel(onlySelected = false) {
     const hasLog = Boolean(r.hasCareLog || hasTargetCareLog(targetObj));
     const giftStatus = getEffectiveGiftStatus(targetObj);
     const avgScore = r.avgRating || calculateSurveyAvgScore(r);
-
-    const ans = r.answers || {};
-    const q1Ans = ans.q1 || ans.Q1 || r.respondentType || 'PATIENT';
-    const q2Val = ans.q2 !== undefined ? ans.q2 : r.q2;
-    const q3Val = ans.q3 !== undefined ? ans.q3 : r.q3;
-    const q3Unk = Boolean(ans.q3Unknown || ans.Q3Unknown || r.q3Unknown);
-    const q4Val = ans.q4 !== undefined ? ans.q4 : r.q4;
-    const q4Unk = Boolean(ans.q4Unknown || ans.Q4Unknown || r.q4Unknown);
-    const q5Val = (ans.q5 !== undefined ? ans.q5 : r.comment) || '-';
-    const q6Val = (ans.q6 !== undefined ? ans.q6 : r.callbackRequested) ? '연락 희망' : '불필요';
 
     const rowData = {
       no: idx + 1,
@@ -7172,18 +7193,78 @@ async function exportSurveyResponsesToExcel(onlySelected = false) {
       endDate: endDateClean || '-',
       caregiver: carerName,
       hasCareLog: hasLog ? '작성됨' : '미작성',
-      avgScore: `★ ${avgScore}점`,
-      q1Detail: respTypeMap[q1Ans] || q1Ans,
-      q2: ratingLabels[q2Val] || `${q2Val}점`,
-      q3: q3Unk ? '잘 모르겠음' : (ratingLabels[q3Val] || `${q3Val}점`),
-      q4: q4Unk ? '잘 모르겠음' : (ratingLabels[q4Val] || `${q4Val}점`),
-      q5: q5Val,
-      q6: q6Val,
-      giftStatus: giftStatus === 'SENT' ? '발송완료' : '미발송 (대기)',
-      giftItem: targetObj.giftItem || (gSurveyState.settings && gSurveyState.settings.defaultGiftItem) || '스타벅스 아메리카노 1매',
-      giftSentAt: targetObj.giftSentAt ? formatSurveyDate(targetObj.giftSentAt) : '-',
-      submittedAt: formatSurveyDate(r.submittedAt) || '-'
+      avgScore: `★ ${avgScore}점`
     };
+
+    // 사용자 설정 문항별 응답 동적 매핑
+    const ans = r.answers || {};
+
+    questionColumns.forEach(qc => {
+      const q = qc.schemaQuestion;
+      const qNum = qc.qNum;
+      const qLower = qNum.toLowerCase();
+      const qUpper = qNum.toUpperCase();
+
+      let val = ans[qLower] !== undefined ? ans[qLower] : (ans[qUpper] !== undefined ? ans[qUpper] : ans[q.id]);
+      const isUnk = Boolean(
+        ans[qLower + 'Unknown'] || ans[qUpper + 'Unknown'] || ans[q.id + 'Unknown'] ||
+        (qNum === 'Q3' && r.q3Unknown) || (qNum === 'Q4' && r.q4Unknown)
+      );
+
+      // fallback
+      if (val === undefined || val === null || val === '') {
+        if (qNum === 'Q1') val = r.respondentType;
+        else if (qNum === 'Q2') val = r.q2;
+        else if (qNum === 'Q3') val = isUnk ? '' : r.q3;
+        else if (qNum === 'Q4') val = isUnk ? '' : r.q4;
+        else if (q.type === 'text') val = r.comment;
+        else if (q.type === 'boolean_callback') val = r.callbackRequested;
+      }
+
+      let formattedAns = '';
+
+      if (q.type === 'single_choice') {
+        let optLabel = val;
+        if (q.options && Array.isArray(q.options)) {
+          const matchedOpt = q.options.find(o => o.value === val);
+          if (matchedOpt) optLabel = matchedOpt.label;
+        }
+        if (!optLabel && qNum === 'Q1') optLabel = respTypeMap[val] || val;
+        formattedAns = optLabel || '-';
+      } else if (q.type === 'rating_5' || q.type === 'rating_5_with_unknown') {
+        if (isUnk || val === 'unknown' || val === 0) {
+          formattedAns = '잘 모르겠음';
+        } else {
+          const scoreNum = Number(val);
+          if (!isNaN(scoreNum) && scoreNum >= 1 && scoreNum <= 5) {
+            let optLabel = '';
+            if (q.options && Array.isArray(q.options)) {
+              const matchedOpt = q.options.find(o => Number(o.score) === scoreNum);
+              if (matchedOpt) optLabel = matchedOpt.label;
+            }
+            if (!optLabel && ratingLabels[scoreNum]) optLabel = ratingLabels[scoreNum];
+            formattedAns = optLabel ? `${scoreNum}점 (${optLabel})` : `${scoreNum}점`;
+          } else {
+            formattedAns = String(val || '-');
+          }
+        }
+      } else if (q.type === 'text') {
+        formattedAns = String(val || '').trim() || '-';
+      } else if (q.type === 'boolean_callback') {
+        const isYes = Boolean(val === true || val === 'true');
+        formattedAns = isYes ? '유선 연락 희망' : '연락 불필요';
+      } else {
+        formattedAns = String(val || '-');
+      }
+
+      rowData[qc.key] = formattedAns;
+    });
+
+    // 후속 공통 컬럼
+    rowData.giftStatus = giftStatus === 'SENT' ? '발송완료' : '미발송 (대기)';
+    rowData.giftItem = targetObj.giftItem || (gSurveyState.settings && gSurveyState.settings.defaultGiftItem) || '스타벅스 아메리카노 1매';
+    rowData.giftSentAt = targetObj.giftSentAt ? formatSurveyDate(targetObj.giftSentAt) : '-';
+    rowData.submittedAt = formatSurveyDate(r.submittedAt) || '-';
 
     const row = wsData.addRow(rowData);
     row.height = 24;
@@ -7191,14 +7272,20 @@ async function exportSurveyResponsesToExcel(onlySelected = false) {
       cell.border = borderThin;
       cell.font = { name: '맑은 고딕', size: 9.5 };
       if (idx % 2 === 1) cell.fill = fillLightGray;
-      if (colNum === 7 || colNum === 17) {
+      
+      if (textColIndices.has(colNum)) {
         cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
       } else {
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
       }
+
+      // 신청ID 하이라이트 (컬럼 2)
       if (colNum === 2) cell.font = { name: '맑은 고딕', size: 9.5, bold: true, color: { argb: 'FFE11D48' } };
+      // 종합 만족도 하이라이트 (컬럼 12)
       if (colNum === 12) cell.font = { name: '맑은 고딕', size: 10, bold: true, color: { argb: 'FFD97706' } };
-      if (colNum === 19) {
+      // 선물 상태 하이라이트 (끝에서 4번째)
+      const giftStatusColIdx = columnsDef.length - 3;
+      if (colNum === giftStatusColIdx) {
         if (giftStatus === 'SENT') {
           cell.font = { name: '맑은 고딕', size: 9.5, bold: true, color: { argb: 'FF059669' } };
         } else {
@@ -7208,7 +7295,7 @@ async function exportSurveyResponsesToExcel(onlySelected = false) {
     });
   });
 
-  // 파일 생성 및 다운로드 브라우저 트리거
+    // 파일 생성 및 다운로드 브라우저 트리거
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = window.URL.createObjectURL(blob);
