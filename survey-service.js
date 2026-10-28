@@ -136,6 +136,7 @@ class SurveyService {
             if (!t.surveyComment) t.surveyComment = rDoc.comment || '';
             if (t.callbackRequested === undefined) t.callbackRequested = Boolean(rDoc.callbackRequested);
             if (!t.submittedAt) t.submittedAt = rDoc.submittedAt || '';
+            if ((!t.answers || Object.keys(t.answers).length === 0) && rDoc.answers) t.answers = rDoc.answers;
           }
           if (!t.giftStatus) {
             t.giftStatus = (t.responseStatus === 'SUBMITTED') ? 'PENDING' : 'NONE';
@@ -804,6 +805,7 @@ class SurveyService {
     this.data.responses.unshift(responseDoc);
     target.responseStatus = 'SUBMITTED';
     target.responseId = responseId;
+    target.answers = answers;
     target.couponPhone = couponPhone;
     target.respondentType = answers.q1;
     target.q2Score = Number(answers.q2);

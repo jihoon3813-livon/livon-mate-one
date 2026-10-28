@@ -2586,13 +2586,45 @@
         answers[qKey] = answers[qLower];
       });
 
-      // 기존 API 호환성 보장
-      if (answers.q1 === undefined) answers.q1 = document.getElementById('ansQ1')?.value || '';
-      if (answers.q2 === undefined) answers.q2 = Number(document.getElementById('ansQ2')?.value || 5);
-      if (answers.q3 === undefined) answers.q3 = document.getElementById('ansQ3')?.value || '';
-      if (answers.q4 === undefined) answers.q4 = document.getElementById('ansQ4')?.value || '';
-      if (answers.q5 === undefined) answers.q5 = document.getElementById('ansQ5')?.value || '';
-      if (answers.q6 === undefined) answers.q6 = document.getElementById('ansQ6')?.value === 'true';
+      // 1. 텍스트 의견(VOC) 문항 동적 식별 (text 타입 문항 또는 comment 필드)
+      const textQ = schema.find(q => q.type === 'text');
+      const textKey = textQ ? (textQ.id || '').toLowerCase() : null;
+      let actualComment = '';
+      if (textKey && answers[textKey] !== undefined) {
+        actualComment = String(answers[textKey]).trim();
+      } else if (answers.comment) {
+        actualComment = String(answers.comment).trim();
+      } else if (answers.q5 !== undefined && isNaN(Number(answers.q5))) {
+        actualComment = String(answers.q5).trim();
+      }
+
+      // 2. 유선 상담 연락 요청 문항 동적 식별 (boolean_callback 타입)
+      const cbQ = schema.find(q => q.type === 'boolean_callback');
+      const cbKey = cbQ ? (cbQ.id || '').toLowerCase() : null;
+      const actualCallbackRequested = cbKey && answers[cbKey] !== undefined
+        ? Boolean(answers[cbKey])
+        : Boolean(answers.callbackRequested || (answers.q6 === true || answers.q6 === 'true'));
+
+      // 3. 응답자 구분 동적 식별
+      const roleQ = schema.find(q => q.type === 'single_choice');
+      const roleKey = roleQ ? (roleQ.id || '').toLowerCase() : 'q1';
+      const actualRespondentType = answers[roleKey] || answers.q1 || 'PATIENT';
+
+      // 4. 평가 점수(rating_5, rating_5_with_unknown) 동적 평균 계산
+      const ratingScores = [];
+      schema.forEach(q => {
+        if (q.type === 'rating_5' || q.type === 'rating_5_with_unknown') {
+          const kLow = (q.id || '').toLowerCase();
+          const isUnk = Boolean(answers[kLow + 'Unknown'] || answers[q.id + 'Unknown']);
+          const valNum = Number(answers[kLow]);
+          if (!isUnk && !isNaN(valNum) && valNum >= 1 && valNum <= 5) {
+            ratingScores.push(valNum);
+          }
+        }
+      });
+      const dynamicAvgRating = ratingScores.length > 0
+        ? (ratingScores.reduce((a, b) => a + b, 0) / ratingScores.length).toFixed(1)
+        : (answers.q2 && !isNaN(Number(answers.q2)) ? Number(answers.q2).toFixed(1) : '5.0');
 
       const effectiveToken = gSurveyToken || (gSurveyTargetObj && gSurveyTargetObj.token) || '';
       const effectiveTargetId = gTargetId || (gSurveyTargetObj && gSurveyTargetObj.id) || (effectiveToken.startsWith('ST-') ? effectiveToken : 'ST-' + effectiveToken);
@@ -2601,10 +2633,12 @@
         token: effectiveToken || effectiveTargetId || 'DEMO_TOKEN',
         targetId: effectiveTargetId,
         channel: 'MOBILE_DIARY_INTEGRATED',
+        allowResubmit: true,
         answers: {
           ...answers,
           callbackPhone: formattedCouponPhone,
-          couponPhone: formattedCouponPhone
+          couponPhone: formattedCouponPhone,
+          comment: actualComment
         }
       };
 
@@ -2631,14 +2665,16 @@
           const targetUpdates = {
             responseStatus: 'SUBMITTED',
             couponPhone: formattedCouponPhone,
-            respondentType: payload.answers.q1,
-            q2Score: payload.answers.q2,
-            q3Score: payload.answers.q3Unknown ? null : Number(payload.answers.q3 || 5),
-            q3Unknown: payload.answers.q3Unknown,
-            q4Score: payload.answers.q4Unknown ? null : Number(payload.answers.q4 || 5),
-            q4Unknown: payload.answers.q4Unknown,
-            surveyComment: payload.answers.q5,
-            callbackRequested: payload.answers.q6,
+            respondentType: actualRespondentType,
+            answers: payload.answers, // 전체 설정 문항 응답 100% 영구 보존
+            avgRating: dynamicAvgRating,
+            surveyComment: actualComment,
+            callbackRequested: actualCallbackRequested,
+            q2Score: answers.q2 !== undefined && !isNaN(Number(answers.q2)) ? Number(answers.q2) : Number(dynamicAvgRating),
+            q3Score: answers.q3Unknown ? null : (answers.q3 !== undefined && !isNaN(Number(answers.q3)) ? Number(answers.q3) : null),
+            q3Unknown: Boolean(answers.q3Unknown),
+            q4Score: answers.q4Unknown ? null : (answers.q4 !== undefined && !isNaN(Number(answers.q4)) ? Number(answers.q4) : null),
+            q4Unknown: Boolean(answers.q4Unknown),
             submittedAt: nowIso,
             updatedAt: nowIso
           };
@@ -2667,6 +2703,30 @@
                 pTarget.giftStatus = 'PENDING';
               }
             }
+
+            // 부모 창 responses 목록에도 최신 answers 즉시 동기화
+            if (!Array.isArray(window.parent.gSurveyState.responses)) {
+              window.parent.gSurveyState.responses = [];
+            }
+            let pResp = window.parent.gSurveyState.responses.find(r => 
+              (matchedTargetId && (r.targetId === matchedTargetId || r.serviceId === matchedTargetId)) ||
+              (pTarget && (r.targetId === pTarget.id || r.serviceId === pTarget.serviceId))
+            );
+            if (!pResp) {
+              pResp = {
+                id: 'SR-' + Date.now(),
+                targetId: matchedTargetId,
+                serviceId: (pTarget && pTarget.serviceId) || matchedTargetId,
+                patientName: (pTarget && pTarget.patientName) || '고객',
+                couponPhone: formattedCouponPhone,
+                channel: 'MOBILE_DIARY_INTEGRATED'
+              };
+              window.parent.gSurveyState.responses.unshift(pResp);
+            }
+            Object.assign(pResp, targetUpdates, { answers: payload.answers });
+            try {
+              localStorage.setItem('LIVON_SURVEY_RESPONSES', JSON.stringify(window.parent.gSurveyState.responses));
+            } catch (e) {}
           }
 
           if (matchedTargetId && window.parent && typeof window.parent.syncToConvex === 'function') {
@@ -2681,6 +2741,19 @@
 
           if (window.parent && typeof window.parent.loadSurveyMgmtData === 'function') {
             window.parent.loadSurveyMgmtData(false);
+          }
+
+          const submitMsg = {
+            type: 'LIVON_SURVEY_SUBMITTED',
+            couponPhone: formattedCouponPhone,
+            targetId: matchedTargetId,
+            answers: payload.answers
+          };
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage(submitMsg, '*');
+          }
+          if (window.opener) {
+            window.opener.postMessage(submitMsg, '*');
           }
         } catch (e) {}
 

@@ -323,44 +323,296 @@ function toggleAllSurveyResponseChecks(masterCb) {
   checkboxes.forEach(cb => cb.checked = masterCb.checked);
 }
 
+// 삭제된 고객 ID 영구 보존 헬퍼 (새로고침/재시딩 시 자동 부활 방지)
+function markSurveyDeletedId(serviceId, targetId) {
+  try {
+    const raw = localStorage.getItem('LIVON_SURVEY_DELETED_IDS') || '[]';
+    const list = JSON.parse(raw);
+    const set = new Set(Array.isArray(list) ? list : []);
+    if (serviceId && serviceId !== '-' && !String(serviceId).startsWith('TMP-')) set.add(String(serviceId).trim());
+    if (targetId && targetId !== '-') set.add(String(targetId).trim());
+    localStorage.setItem('LIVON_SURVEY_DELETED_IDS', JSON.stringify(Array.from(set)));
+  } catch (e) {}
+}
+
+// 결과 관리 리스트 내 고객 및 설문 응답 삭제 (단건)
+async function deleteSurveyResponseCustomer(responseId, targetId) {
+  const allCompleted = typeof getAllCompletedResponses === 'function' ? getAllCompletedResponses() : [];
+  const matched = allCompleted.find(r => 
+    (responseId && r.id === responseId) ||
+    (targetId && (r.targetId === targetId || r.serviceId === targetId))
+  );
+
+  let target = (gSurveyState.targets || []).find(t => 
+    (targetId && (t.id === targetId || t.serviceId === targetId)) ||
+    (responseId && (t.responseId === responseId || t.id === responseId))
+  );
+
+  let resp = (gSurveyState.responses || []).find(r => 
+    (responseId && r.id === responseId) ||
+    (targetId && (r.targetId === targetId || r.serviceId === targetId))
+  );
+
+  const patientName = (matched && matched.patientName) || (target && target.patientName) || (resp && resp.patientName) || '고객';
+  const appId = (matched && (matched.displayAppId || matched.serviceId)) || (target && (target.serviceId || target.id)) || (resp && (resp.displayAppId || resp.serviceId)) || '-';
+  const actualTargetId = target ? target.id : (targetId || (matched && matched.targetId));
+  const actualServiceId = (target && target.serviceId) || (matched && matched.serviceId) || (resp && resp.serviceId) || (appId !== '-' ? appId : null);
+
+  if (!confirm(`[${patientName}] (${appId}) 고객의 설문 결과 및 대상자 정보를 완전히 삭제하시겠습니까?\n\n삭제 시 설문 결과 목록 및 대상자 대장에서 영구 삭제됩니다.`)) {
+    return;
+  }
+
+  // 1. 응답 목록(responses)에서 제거
+  if (Array.isArray(gSurveyState.responses)) {
+    gSurveyState.responses = gSurveyState.responses.filter(r => {
+      if (responseId && r.id === responseId) return false;
+      if (actualTargetId && (r.targetId === actualTargetId || r.id === actualTargetId)) return false;
+      if (actualServiceId && actualServiceId !== '-' && r.serviceId === actualServiceId) return false;
+      if (matched && (r.id === matched.id || r.targetId === matched.targetId)) return false;
+      return true;
+    });
+    try {
+      localStorage.setItem('LIVON_SURVEY_RESPONSES', JSON.stringify(gSurveyState.responses));
+    } catch (e) {}
+  }
+
+  // 2. 대상자 목록(targets)에서 제거
+  if (Array.isArray(gSurveyState.targets)) {
+    gSurveyState.targets = gSurveyState.targets.filter(t => {
+      if (actualTargetId && (t.id === actualTargetId || t.serviceId === actualTargetId)) return false;
+      if (actualServiceId && actualServiceId !== '-' && (t.serviceId === actualServiceId || t.id === actualServiceId)) return false;
+      if (responseId && (t.responseId === responseId || t.id === responseId)) return false;
+      if (matched && ((matched.targetId && t.id === matched.targetId) || (matched.serviceId && t.serviceId === matched.serviceId))) return false;
+      return true;
+    });
+    try {
+      localStorage.setItem('LIVON_SURVEY_TARGETS', JSON.stringify(gSurveyState.targets));
+    } catch (e) {}
+  }
+
+  // 3. 재시딩 방지 영구 보존
+  markSurveyDeletedId(actualServiceId, actualTargetId);
+
+  // 4. Convex Cloud DB에서 대상자 삭제
+  if (actualTargetId && typeof syncToConvex === 'function') {
+    syncToConvex('sync:deleteSurveyTarget', { id: actualTargetId }).catch(err => console.warn('[Convex Delete Error]', err));
+  }
+
+  // 5. 로컬 Node 백엔드에서 삭제
+  if (actualTargetId) {
+    try {
+      fetch('/api/survey/targets/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: actualTargetId, actor: 'ADMIN' })
+      }).catch(() => {});
+    } catch (e) {}
+  }
+
+  // 6. 통계 재계산
+  const activeTargets = (gSurveyState.targets || []).filter(t => t.targetStatus !== 'CANCELLED');
+  const submitted = activeTargets.filter(t => t.responseStatus === 'SUBMITTED');
+  gSurveyState.summary.totalTargets = activeTargets.length;
+  gSurveyState.summary.submittedCount = submitted.length;
+  gSurveyState.summary.responseRate = activeTargets.length > 0 ? Math.round((submitted.length / activeTargets.length) * 100) : 0;
+  gSurveyState.summary.unguidedCount = activeTargets.filter(t => t.guidanceStatus === 'NOT_STARTED').length;
+
+  // 7. 화면 및 배지 갱신
+  renderSurveyResponses();
+  renderSurveyResponses();
+  applySurveyFilters();
+  renderSurveyKpis();
+  updateSidebarSurveyBadge();
+  updateSurveyChipCounts();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+  updateSurveyChipCounts();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  if (typeof showToast === 'function') {
+    showToast(`[${patientName}] 고객이 설문 결과 목록에서 삭제되었습니다.`, 'info');
+  } else {
+    alert(`[${patientName}] 고객이 삭제되었습니다.`);
+  }
+}
+
+// 선택된 응답자 일괄 삭제 (다건)
+async function batchDeleteSelectedSurveyResponses() {
+  const checkboxes = document.querySelectorAll('.survey-response-check:checked');
+  if (checkboxes.length === 0) {
+    if (typeof showToast === 'function') showToast('삭제할 고객을 먼저 선택해 주세요.', 'warning');
+    else alert('삭제할 고객을 먼저 선택해 주세요.');
+    return;
+  }
+
+  if (!confirm(`선택하신 ${checkboxes.length}명의 고객 및 설문 결과를 모두 삭제하시겠습니까?\n\n삭제 시 설문 결과 목록 및 대상자 대장에서 완전히 삭제됩니다.`)) {
+    return;
+  }
+
+  let deletedCount = 0;
+  const allCompleted = typeof getAllCompletedResponses === 'function' ? getAllCompletedResponses() : [];
+
+  checkboxes.forEach(cb => {
+    const targetId = cb.getAttribute('data-target-id');
+    const responseId = cb.getAttribute('data-response-id');
+
+    const matched = allCompleted.find(r => 
+      (responseId && r.id === responseId) ||
+      (targetId && (r.targetId === targetId || r.serviceId === targetId))
+    );
+    const target = (gSurveyState.targets || []).find(t => 
+      (targetId && (t.id === targetId || t.serviceId === targetId)) ||
+      (responseId && (t.responseId === responseId || t.id === responseId))
+    );
+    const resp = (gSurveyState.responses || []).find(r => 
+      (responseId && r.id === responseId) ||
+      (targetId && (r.targetId === targetId || r.serviceId === targetId))
+    );
+
+    const actualTargetId = target ? target.id : (targetId || (matched && matched.targetId));
+    const actualServiceId = (target && target.serviceId) || (matched && matched.serviceId) || (resp && resp.serviceId);
+
+    // 1) responses에서 제거
+    if (Array.isArray(gSurveyState.responses)) {
+      gSurveyState.responses = gSurveyState.responses.filter(r => {
+        if (responseId && r.id === responseId) return false;
+        if (actualTargetId && (r.targetId === actualTargetId || r.id === actualTargetId)) return false;
+        if (actualServiceId && actualServiceId !== '-' && r.serviceId === actualServiceId) return false;
+        if (matched && (r.id === matched.id || r.targetId === matched.targetId)) return false;
+        return true;
+      });
+    }
+
+    // 2) targets에서 제거
+    if (Array.isArray(gSurveyState.targets)) {
+      gSurveyState.targets = gSurveyState.targets.filter(t => {
+        if (actualTargetId && (t.id === actualTargetId || t.serviceId === actualTargetId)) return false;
+        if (actualServiceId && actualServiceId !== '-' && (t.serviceId === actualServiceId || t.id === actualServiceId)) return false;
+        if (responseId && (t.responseId === responseId || t.id === responseId)) return false;
+        if (matched && ((matched.targetId && t.id === matched.targetId) || (matched.serviceId && t.serviceId === matched.serviceId))) return false;
+        return true;
+      });
+    }
+
+    // 3) 재시딩 방지
+    markSurveyDeletedId(actualServiceId, actualTargetId);
+
+    // 4) Convex 삭제
+    if (actualTargetId && typeof syncToConvex === 'function') {
+      syncToConvex('sync:deleteSurveyTarget', { id: actualTargetId }).catch(() => {});
+    }
+
+    // 5) 백엔드 삭제
+    if (actualTargetId) {
+      try {
+        fetch('/api/survey/targets/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: actualTargetId, actor: 'ADMIN' })
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
+    deletedCount++;
+  });
+
+  // 로컬 스토리지 보존
+  try {
+    localStorage.setItem('LIVON_SURVEY_RESPONSES', JSON.stringify(gSurveyState.responses || []));
+    localStorage.setItem('LIVON_SURVEY_TARGETS', JSON.stringify(gSurveyState.targets || []));
+  } catch (e) {}
+
+  // 마스터 체크박스 해제
+  const masterCb = document.getElementById('checkAllSurveyResponses');
+  if (masterCb) masterCb.checked = false;
+
+  // 통계 재계산
+  const activeTargets = (gSurveyState.targets || []).filter(t => t.targetStatus !== 'CANCELLED');
+  const submitted = activeTargets.filter(t => t.responseStatus === 'SUBMITTED');
+  gSurveyState.summary.totalTargets = activeTargets.length;
+  gSurveyState.summary.submittedCount = submitted.length;
+  gSurveyState.summary.responseRate = activeTargets.length > 0 ? Math.round((submitted.length / activeTargets.length) * 100) : 0;
+  gSurveyState.summary.unguidedCount = activeTargets.filter(t => t.guidanceStatus === 'NOT_STARTED').length;
+
+  // 화면 일괄 갱신
+  renderSurveyResponses();
+  applySurveyFilters();
+  renderSurveyKpis();
+  updateSidebarSurveyBadge();
+  updateSurveyChipCounts();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  if (typeof showToast === 'function') {
+    showToast(`선택한 ${deletedCount}명의 고객이 설문 결과 목록에서 삭제되었습니다.`, 'success');
+  } else {
+    alert(`선택한 ${deletedCount}명의 고객이 삭제되었습니다.`);
+  }
+}
+
 // =========================================================================
 // 0-B. 설문 응답 상세 모달 & 통합 응답 수집기 (개선판)
 // =========================================================================
 
-// 응답 평가 점수 평균 계산 헬퍼 (평가 문항들의 평균 점수 산출)
+// 응답 평가 점수 평균 계산 헬퍼 (사용자가 설정한 모든 평점 문항 동적 산출)
 function calculateSurveyAvgScore(r) {
   if (!r) return '5.0';
   const scores = [];
   const ans = r.answers || {};
 
-  // 1. answers 객체 내 평가 점수 문항 수집
-  Object.keys(ans).forEach(k => {
-    const kLow = k.toLowerCase();
-    if (kLow.endsWith('unknown') || kLow === 'q1' || kLow === 'q5' || kLow === 'q6' || kLow === 'couponphone' || kLow === 'callbackphone') return;
-    const v = ans[k];
-    const num = Number(v);
-    if (!isNaN(num) && num >= 1 && num <= 5) {
-      if (ans[k + 'Unknown'] || ans[kLow + 'unknown'] || ans[k.toUpperCase() + 'UNKNOWN']) return;
-      scores.push(num);
-    }
-  });
+  const currentSchema = (Array.isArray(gSurveyState.schema) && gSurveyState.schema.length > 0)
+    ? gSurveyState.schema
+    : (typeof DEFAULT_SURVEY_SCHEMA_V1 !== 'undefined' ? DEFAULT_SURVEY_SCHEMA_V1 : []);
 
-  // 2. answers에 없거나 수집되지 않은 경우 r.q2, r.q3, r.q4 점수 활용
+  // 1. 현재 설정된 schema 내 평점 문항(rating_5, rating_5_with_unknown) 동적 수집
+  const ratingQuestions = currentSchema.filter(q => q.type === 'rating_5' || q.type === 'rating_5_with_unknown');
+
+  if (ratingQuestions.length > 0) {
+    ratingQuestions.forEach(q => {
+      const qNum = q.id;
+      const qLower = qNum.toLowerCase();
+      const qUpper = qNum.toUpperCase();
+
+      let val = ans[qLower] !== undefined ? ans[qLower] : (ans[qUpper] !== undefined ? ans[qUpper] : ans[qNum]);
+      const isUnk = Boolean(
+        ans[qLower + 'Unknown'] || ans[qUpper + 'Unknown'] || ans[qNum + 'Unknown'] ||
+        ans[qLower + 'unknown'] || ans[qUpper + 'unknown'] ||
+        val === 'unknown' || val === 0
+      );
+
+      if (!isUnk && val !== undefined && val !== null && val !== '') {
+        const num = Number(val);
+        if (!isNaN(num) && num >= 1 && num <= 5) {
+          scores.push(num);
+        }
+      }
+    });
+  }
+
+  // 2. schema에서 찾지 못했으나 answers에 평가 점수가 존재하는 경우 동적 수집
+  if (scores.length === 0 && ans && Object.keys(ans).length > 0) {
+    Object.keys(ans).forEach(k => {
+      const kLow = k.toLowerCase();
+      if (kLow.endsWith('unknown') || kLow.includes('phone') || kLow.includes('comment') || kLow.includes('token')) return;
+      const isUnk = Boolean(ans[k + 'Unknown'] || ans[kLow + 'unknown']);
+      if (isUnk) return;
+      const v = ans[k];
+      const num = Number(v);
+      if (!isNaN(num) && num >= 1 && num <= 5 && typeof v !== 'boolean') {
+        scores.push(num);
+      }
+    });
+  }
+
+  // 3. answers가 비어있는 과거 데이터에 대한 최소 호환
   if (scores.length === 0) {
-    if (r.q2 !== undefined && !isNaN(Number(r.q2)) && Number(r.q2) >= 1 && Number(r.q2) <= 5) {
-      scores.push(Number(r.q2));
-    }
-    if (!r.q3Unknown && r.q3 !== undefined && !isNaN(Number(r.q3)) && Number(r.q3) >= 1 && Number(r.q3) <= 5) {
-      scores.push(Number(r.q3));
-    }
-    if (!r.q4Unknown && r.q4 !== undefined && !isNaN(Number(r.q4)) && Number(r.q4) >= 1 && Number(r.q4) <= 5) {
-      scores.push(Number(r.q4));
-    }
+    if (r.avgRating && !isNaN(Number(r.avgRating))) return Number(r.avgRating).toFixed(1);
+    if (r.q2Score !== undefined && !isNaN(Number(r.q2Score))) scores.push(Number(r.q2Score));
+    else if (r.q2 !== undefined && !isNaN(Number(r.q2))) scores.push(Number(r.q2));
+    if (r.q3Score !== undefined && !isNaN(Number(r.q3Score)) && !r.q3Unknown) scores.push(Number(r.q3Score));
+    if (r.q4Score !== undefined && !isNaN(Number(r.q4Score)) && !r.q4Unknown) scores.push(Number(r.q4Score));
   }
 
   if (scores.length === 0) {
-    const defaultScore = Number(r.q2) || 5;
-    return defaultScore.toFixed(1);
+    return '5.0';
   }
 
   const sum = scores.reduce((acc, cur) => acc + cur, 0);
@@ -603,20 +855,22 @@ function openSurveyDetailResponseModal(responseId, targetId) {
     const qKeyLower = qNum.toLowerCase();
     const qKeyUpper = qNum.toUpperCase();
 
-    // 답변 값 추출 (answers 객체 또는 resp 기본 프로퍼티)
-    let val = ans[qKeyLower] !== undefined ? ans[qKeyLower] : (ans[qKeyUpper] !== undefined ? ans[qKeyUpper] : ans[q.id]);
+    // 답변 값 동적 추출 (answers 객체 최우선)
+    let val = ans[qKeyLower] !== undefined ? ans[qKeyLower] : (ans[qKeyUpper] !== undefined ? ans[qKeyUpper] : ans[qNum]);
     const isUnk = Boolean(
-      ans[qKeyLower + 'Unknown'] || ans[qKeyUpper + 'Unknown'] || ans[q.id + 'Unknown'] ||
-      (qNum === 'Q3' && resp.q3Unknown) || (qNum === 'Q4' && resp.q4Unknown)
+      ans[qKeyLower + 'Unknown'] || ans[qKeyUpper + 'Unknown'] || ans[qNum + 'Unknown'] ||
+      ans[qKeyLower + 'unknown'] || ans[qKeyUpper + 'unknown'] ||
+      val === 'unknown' || val === 0
     );
 
+    // answers가 없는 과거 데이터에 대한 최소 호환 (하드코딩 배제)
     if (val === undefined || val === null || val === '') {
-      if (qNum === 'Q1') val = resp.respondentType;
-      else if (qNum === 'Q2') val = resp.q2;
-      else if (qNum === 'Q3') val = isUnk ? '' : resp.q3;
-      else if (qNum === 'Q4') val = isUnk ? '' : resp.q4;
-      else if (qNum === 'Q5') val = resp.comment;
-      else if (qNum === 'Q6') val = resp.callbackRequested;
+      if (qNum === 'Q1' && q.type === 'single_choice') val = resp.respondentType;
+      else if (qNum === 'Q2' && (q.type === 'rating_5' || q.type === 'rating_5_with_unknown')) val = resp.q2Score !== undefined ? resp.q2Score : resp.q2;
+      else if (qNum === 'Q3' && (q.type === 'rating_5' || q.type === 'rating_5_with_unknown')) val = isUnk ? '' : (resp.q3Score !== undefined ? resp.q3Score : resp.q3);
+      else if (qNum === 'Q4' && (q.type === 'rating_5' || q.type === 'rating_5_with_unknown')) val = isUnk ? '' : (resp.q4Score !== undefined ? resp.q4Score : resp.q4);
+      else if (q.type === 'text' && resp.comment && isNaN(Number(resp.comment))) val = resp.comment;
+      else if (q.type === 'boolean_callback' && resp.callbackRequested !== undefined) val = resp.callbackRequested;
     }
 
     let answerHtml = '';
@@ -636,23 +890,27 @@ function openSurveyDetailResponseModal(responseId, targetId) {
     } else if (q.type === 'rating_5' || q.type === 'rating_5_with_unknown') {
       if (isUnk || val === 0 || val === 'unknown') {
         answerHtml = `<span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold border border-slate-200 text-xs">잘모름</span>`;
+      } else if (val !== undefined && val !== null && val !== '' && !isNaN(Number(val))) {
+        answerHtml = `<div>${starsHtml(Number(val))}</div>`;
       } else {
-        answerHtml = `<div>${starsHtml(val || 5)}</div>`;
+        answerHtml = `<span class="text-slate-400 font-normal text-xs">- (미응답)</span>`;
       }
     } else if (q.type === 'text') {
-      const textVal = String(val || resp.comment || '').trim();
+      const textVal = String(val || '').trim();
       answerHtml = `
         <div class="p-3 bg-slate-50 rounded-xl text-slate-800 font-medium leading-relaxed whitespace-pre-wrap text-xs border border-slate-200">
           ${textVal ? escapeHtml(textVal) : '<span class="text-slate-400 font-normal">(남겨주신 의견이 없습니다)</span>'}
         </div>
       `;
     } else if (q.type === 'boolean_callback') {
-      const isYes = Boolean(val === true || val === 'true' || resp.callbackRequested);
+      const isYes = Boolean(val === true || val === 'true');
       answerHtml = `
         <div>
-          ${isYes 
-            ? '<span class="px-3 py-1 rounded-full bg-rose-100 text-rose-800 font-extrabold border border-rose-300 text-xs inline-flex items-center gap-1">📞 담당자 유선 연락 희망</span>' 
-            : '<span class="px-3 py-1 rounded-full bg-slate-100 text-slate-500 font-medium border border-slate-200 text-xs">연락 불필요</span>'}
+          ${(val !== undefined && val !== null && val !== '')
+            ? (isYes
+                ? '<span class="px-3 py-1 rounded-full bg-rose-100 text-rose-800 font-extrabold border border-rose-300 text-xs inline-flex items-center gap-1">📞 담당자 유선 연락 희망</span>' 
+                : '<span class="px-3 py-1 rounded-full bg-slate-100 text-slate-500 font-medium border border-slate-200 text-xs">연락 불필요</span>')
+            : '<span class="text-slate-400 text-xs">-</span>'}
         </div>
       `;
     } else {
@@ -797,30 +1055,40 @@ function getAllCompletedResponses() {
     const endD = (matchedApp && (matchedApp.serviceEndDate || matchedApp.careEndDate || matchedApp.endDate)) || t.careEndDate || '';
     const carer = findCaregiverForApp(matchedApp, t, t);
 
+    const matchedResp = (gSurveyState.responses || []).find(r => 
+      (t.responseId && r.id === t.responseId) ||
+      r.targetId === t.id ||
+      (t.serviceId && r.serviceId === t.serviceId) ||
+      (t.token && r.token && t.token === r.token)
+    );
+    const effAnswers = (t.answers && Object.keys(t.answers).length > 0)
+      ? t.answers
+      : (matchedResp && matchedResp.answers && Object.keys(matchedResp.answers).length > 0 ? matchedResp.answers : (t.answers || {}));
+
     const key = String(cleanAppId || t.serviceId || t.id);
     const item = {
-      id: t.responseId || ('SR-' + t.id),
+      id: t.responseId || (matchedResp && matchedResp.id) || ('SR-' + t.id),
       targetId: t.id,
       serviceId: t.serviceId || t.id,
       displayAppId: cleanAppId,
       patientName: resolvedName,
       patientPhone: (matchedApp && (matchedApp.patientPhone || matchedApp.phone)) || t.patientPhone || '',
-      couponPhone: t.couponPhone || t.patientPhone || (matchedApp && (matchedApp.phone || matchedApp.patientPhone)) || '',
+      couponPhone: t.couponPhone || (matchedResp && (matchedResp.couponPhone || matchedResp.callbackPhone)) || t.patientPhone || '',
       hospitalName: cleanHospital,
       careStartDate: startD,
       careEndDate: endD,
       caregiverName: carer,
       hasCareLog: hasTargetCareLog(matchedApp || t),
-      respondentType: t.respondentType || 'PATIENT',
-      q2: t.q2Score !== undefined ? t.q2Score : 5,
-      q3: t.q3Score !== undefined ? t.q3Score : 5,
-      q3Unknown: Boolean(t.q3Unknown),
-      q4: t.q4Score !== undefined ? t.q4Score : 5,
-      q4Unknown: Boolean(t.q4Unknown),
-      comment: t.surveyComment || '',
-      callbackRequested: Boolean(t.callbackRequested),
-      submittedAt: t.submittedAt || t.updatedAt || t.createdAt,
-      answers: t.answers || {},
+      respondentType: effAnswers.q1 || effAnswers.Q1 || t.respondentType || (matchedResp && matchedResp.respondentType) || 'PATIENT',
+      q2: effAnswers.q2 !== undefined ? effAnswers.q2 : t.q2Score,
+      q3: effAnswers.q3 !== undefined ? effAnswers.q3 : t.q3Score,
+      q3Unknown: Boolean(effAnswers.q3Unknown !== undefined ? effAnswers.q3Unknown : t.q3Unknown),
+      q4: effAnswers.q4 !== undefined ? effAnswers.q4 : t.q4Score,
+      q4Unknown: Boolean(effAnswers.q4Unknown !== undefined ? effAnswers.q4Unknown : t.q4Unknown),
+      comment: t.surveyComment || (matchedResp && matchedResp.comment) || '',
+      callbackRequested: Boolean(t.callbackRequested || (matchedResp && matchedResp.callbackRequested)),
+      submittedAt: t.submittedAt || (matchedResp && matchedResp.submittedAt) || t.updatedAt || t.createdAt,
+      answers: effAnswers,
       _target: t,
       _app: matchedApp
     };
@@ -1251,9 +1519,9 @@ async function loadSurveyMgmtData(showToastAlert = false) {
       }
       const prev = targetMap.get(key) || {};
       const merged = { ...prev, ...item, id: key };
-      // 쿠폰 수신 번호 및 선물 발송 관리 정보는 비어있지 않은 최신 값을 보존
-      ['couponPhone', 'giftStatus', 'giftItem', 'giftSentAt', 'giftMethod', 'giftSender', 'giftMemo', 'giftHistory', 'respondentType', 'q2Score', 'q3Score', 'q4Score', 'surveyComment', 'submittedAt'].forEach(f => {
-        if ((merged[f] === undefined || merged[f] === '' || merged[f] === 'NONE') && prev[f] && prev[f] !== 'NONE') {
+      // 쿠폰 수신 번호, 설문 응답(answers) 및 선물 발송 관리 정보는 비어있지 않은 최신 값을 보존
+      ['answers', 'avgRating', 'couponPhone', 'giftStatus', 'giftItem', 'giftSentAt', 'giftMethod', 'giftSender', 'giftMemo', 'giftHistory', 'respondentType', 'q2Score', 'q3Score', 'q4Score', 'surveyComment', 'submittedAt'].forEach(f => {
+        if ((merged[f] === undefined || merged[f] === '' || merged[f] === 'NONE' || (f === 'answers' && (!merged[f] || Object.keys(merged[f]).length === 0))) && prev[f] && prev[f] !== 'NONE') {
           merged[f] = prev[f];
         }
       });
@@ -1288,7 +1556,7 @@ async function loadSurveyMgmtData(showToastAlert = false) {
       t.careStartDate = formatSurveyDate(t.careStartDate);
       t.careEndDate = formatSurveyDate(t.careEndDate);
 
-      const resp = (gSurveyState.responses || []).find(r => r.targetId === t.id || (t.responseId && r.id === t.responseId));
+      const resp = (gSurveyState.responses || []).find(r => r.targetId === t.id || (t.responseId && r.id === t.responseId) || (t.serviceId && r.serviceId === t.serviceId));
       if (resp) {
         if (!t.couponPhone && (resp.couponPhone || resp.callbackPhone)) {
           t.couponPhone = formatCouponPhoneDisplay(resp.couponPhone || resp.callbackPhone);
@@ -1299,6 +1567,16 @@ async function loadSurveyMgmtData(showToastAlert = false) {
         if (t.q4Score === undefined && resp.q4 !== undefined) t.q4Score = resp.q4;
         if (!t.surveyComment && resp.comment) t.surveyComment = resp.comment;
         if (!t.submittedAt && resp.submittedAt) t.submittedAt = resp.submittedAt;
+        if ((!t.answers || Object.keys(t.answers).length === 0) && resp.answers && Object.keys(resp.answers).length > 0) {
+          t.answers = resp.answers;
+        }
+        if ((!resp.answers || Object.keys(resp.answers).length === 0) && t.answers && Object.keys(t.answers).length > 0) {
+          resp.answers = t.answers;
+        }
+      }
+      if (t.answers && Object.keys(t.answers).length > 0) {
+        t.avgRating = calculateSurveyAvgScore(t);
+        if (resp) resp.avgRating = t.avgRating;
       }
       if (t.couponPhone) {
         t.couponPhone = formatCouponPhoneDisplay(t.couponPhone);
@@ -2182,7 +2460,7 @@ function renderSurveyResponses() {
   const totalCount = responses.length;
   let avgScoreDisplay = '0.0';
   if (totalCount > 0) {
-    const totalScoreSum = responses.reduce((acc, r) => acc + (Number(r.avgRating || r.q2) || 5), 0);
+    const totalScoreSum = responses.reduce((acc, r) => acc + (Number(r.avgRating || calculateSurveyAvgScore(r)) || 5), 0);
     avgScoreDisplay = (totalScoreSum / totalCount).toFixed(1);
   }
 
@@ -2292,7 +2570,9 @@ function renderSurveyResponses() {
           <td class="p-3 text-center whitespace-nowrap">
             <div class="inline-flex flex-col items-center">
               <span class="text-sm font-black text-amber-600">★ ${avgScore}점</span>
-              <span class="text-[10px] text-slate-500 font-mono font-medium">(전반 ${r.q2 || 5}점)</span>
+              ${r.answers && Object.keys(r.answers).length > 0 
+                ? `<span class="text-[10px] text-slate-500 font-mono font-medium">(설문문항 ${Object.keys(r.answers).filter(k => !k.toLowerCase().includes('unknown') && !k.toLowerCase().includes('phone') && !k.toLowerCase().includes('token')).length}개 반영)</span>`
+                : (r.q2 ? `<span class="text-[10px] text-slate-500 font-mono font-medium">(전반 ${r.q2}점)</span>` : '')}
             </div>
           </td>
           <td class="p-3 text-center whitespace-nowrap font-mono text-slate-600 text-xs">${submitTimeStr}</td>
@@ -2310,6 +2590,12 @@ function renderSurveyResponses() {
                 class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs cursor-pointer transition-all" 
                 title="선물 품목, 방법, 일시, 메모 관리">
                 <span>선물관리</span>
+              </button>
+              <button type="button" onclick="deleteSurveyResponseCustomer('${r.id}', '${targetId}')" 
+                class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center gap-1 cursor-pointer transition-all shadow-3xs" 
+                title="해당 고객의 설문 결과 및 대상 정보 삭제">
+                <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
+                <span>삭제</span>
               </button>
             </div>
           </td>
@@ -2347,7 +2633,7 @@ function renderSurveyResponses() {
           </td>
           <td class="p-3 whitespace-nowrap font-medium text-slate-800">${carerName}</td>
           <td class="p-3 text-center whitespace-nowrap">${logBadge}</td>
-          <td class="p-3 text-center font-black whitespace-nowrap text-amber-600">★ ${r.avgRating || r.q2 || 5}점</td>
+          <td class="p-3 text-center font-black whitespace-nowrap text-amber-600">★ ${r.avgRating || calculateSurveyAvgScore(r)}점</td>
           <td class="p-3 text-center whitespace-nowrap">
             ${r.callbackRequested 
               ? '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold border border-rose-300">연락 희망</span>' 
@@ -4817,8 +5103,16 @@ window.addEventListener('message', (event) => {
     return;
   }
 
-  // 2. 설문 응답 완료 시 어드민 테이블 즉시 갱신
+  // 2. 설문 응답 완료 시 어드민 테이블 및 answers 즉시 동기화
   if (data.type === 'LIVON_SURVEY_SUBMITTED') {
+    if (data.targetId && data.answers) {
+      const t = (gSurveyState.targets || []).find(x => x.id === data.targetId || x.serviceId === data.targetId);
+      if (t) {
+        t.answers = data.answers;
+        t.responseStatus = 'SUBMITTED';
+        t.avgRating = calculateSurveyAvgScore(t);
+      }
+    }
     loadSurveyMgmtData(false);
     if (typeof showToast === 'function') {
       showToast(`설문 응답 및 쿠폰 수신 연락처(${formatCouponPhoneDisplay(data.couponPhone || '')})가 실시간 반영되었습니다.`, 'success');
@@ -5268,6 +5562,12 @@ async function autoSeedSurveyTargets(options = {}) {
         if (t.serviceId) existingServiceIds.add(String(t.serviceId).trim());
         if (t.id) existingServiceIds.add(String(t.id).trim());
       });
+      try {
+        const deletedArr = JSON.parse(localStorage.getItem('LIVON_SURVEY_DELETED_IDS') || '[]');
+        if (Array.isArray(deletedArr)) {
+          deletedArr.forEach(id => existingServiceIds.add(String(id).trim()));
+        }
+      } catch (e) {}
       const existingMap = new Map((gSurveyState.targets || []).map(t => [String(t.serviceId || t.id), t]));
       completedApps.forEach(app => {
         const appId = String(app.id || '');
@@ -5895,6 +6195,8 @@ if (typeof window !== 'undefined') {
   window.openEditSurveyTargetModal = openEditSurveyTargetModal;
   window.submitSurveyTargetEdit = submitSurveyTargetEdit;
   window.deleteSurveyTarget = deleteSurveyTarget;
+  window.deleteSurveyResponseCustomer = deleteSurveyResponseCustomer;
+  window.batchDeleteSelectedSurveyResponses = batchDeleteSelectedSurveyResponses;
   window.openNewSurveyTargetModal = openNewSurveyTargetModal;
   window.handleCreateSurveyTarget = handleCreateSurveyTarget;
   window.autoSeedSurveyTargets = autoSeedSurveyTargets;
@@ -6103,10 +6405,21 @@ async function deleteSurveyTarget(targetId) {
     gSurveyState.targets.splice(idx, 1);
   }
 
+  // responses에서도 연관 응답 제거
+  if (Array.isArray(gSurveyState.responses)) {
+    gSurveyState.responses = gSurveyState.responses.filter(r => r.targetId !== target.id && r.serviceId !== target.serviceId && r.id !== target.id);
+    try {
+      localStorage.setItem('LIVON_SURVEY_RESPONSES', JSON.stringify(gSurveyState.responses));
+    } catch (e) {}
+  }
+
   // 2. localStorage 영구 보존
   try {
     localStorage.setItem('LIVON_SURVEY_TARGETS', JSON.stringify(gSurveyState.targets));
   } catch (e) {}
+
+  // 2-1. 재시딩 방지 영구 보존
+  markSurveyDeletedId(target.serviceId, target.id);
 
   // 3. Convex 클라우드 DB에서 삭제
   if (typeof syncToConvex === 'function') {
@@ -6236,8 +6549,13 @@ function calculateSurveySummaryAnalytics(targetResponses) {
     dItem.count += 1;
     dItem.scoreSum += avgScoreNum;
 
-    // 고객 의견 (VOC) 분류
-    const comment = (r.comment || (r.answers && r.answers.q5) || '').trim();
+    // 고객 의견 (VOC) 분류 - 사용자가 설정한 text 문항 동적 추출 (숫자 평점 오인 배제)
+    const textQ = currentSchema.find(q => q.type === 'text');
+    const textKey = textQ ? textQ.id.toLowerCase() : null;
+    let comment = (textKey && r.answers && r.answers[textKey] !== undefined ? String(r.answers[textKey]) : '').trim();
+    if (!comment && r.comment && isNaN(Number(r.comment))) {
+      comment = String(r.comment).trim();
+    }
     if (comment && comment !== '-' && comment.length >= 2) {
       const targetObj = r._target || (gSurveyState.targets || []).find(t => t.id === r.targetId || t.serviceId === r.serviceId) || r;
       const cleanAppId = r.displayAppId || resolveResponseDisplayAppId(r, targetObj);
@@ -6260,31 +6578,33 @@ function calculateSurveySummaryAnalytics(targetResponses) {
       }
     }
 
-    // 문항별 통계 계산
+    // 문항별 통계 계산 - 설정된 스키마 기반 100% 동적 매핑
     const ans = r.answers || {};
     questionStats.forEach(qStat => {
       const qNum = qStat.id;
       const qLower = qNum.toLowerCase();
       const qUpper = qNum.toUpperCase();
 
-      let val = ans[qLower] !== undefined ? ans[qLower] : (ans[qUpper] !== undefined ? ans[qUpper] : ans[qStat.id]);
+      let val = ans[qLower] !== undefined ? ans[qLower] : (ans[qUpper] !== undefined ? ans[qUpper] : ans[qNum]);
       const isUnk = Boolean(
-        ans[qLower + 'Unknown'] || ans[qUpper + 'Unknown'] || ans[qStat.id + 'Unknown'] ||
-        (qNum === 'Q3' && r.q3Unknown) || (qNum === 'Q4' && r.q4Unknown)
+        ans[qLower + 'Unknown'] || ans[qUpper + 'Unknown'] || ans[qNum + 'Unknown'] ||
+        ans[qLower + 'unknown'] || ans[qUpper + 'unknown'] ||
+        val === 'unknown' || val === 0
       );
 
+      // answers가 완전히 비어있는 과거 데이터에 대해서만 타입 일치 시 최소 호환
       if (val === undefined || val === null || val === '') {
-        if (qNum === 'Q1') val = r.respondentType;
-        else if (qNum === 'Q2') val = r.q2;
-        else if (qNum === 'Q3') val = isUnk ? '' : r.q3;
-        else if (qNum === 'Q4') val = isUnk ? '' : r.q4;
+        if (qNum === 'Q1' && qStat.type === 'single_choice') val = r.respondentType;
+        else if (qNum === 'Q2' && (qStat.type === 'rating_5' || qStat.type === 'rating_5_with_unknown')) val = r.q2Score !== undefined ? r.q2Score : r.q2;
+        else if (qNum === 'Q3' && (qStat.type === 'rating_5' || qStat.type === 'rating_5_with_unknown')) val = isUnk ? '' : (r.q3Score !== undefined ? r.q3Score : r.q3);
+        else if (qNum === 'Q4' && (qStat.type === 'rating_5' || qStat.type === 'rating_5_with_unknown')) val = isUnk ? '' : (r.q4Score !== undefined ? r.q4Score : r.q4);
       }
 
       if (isUnk) {
         qStat.unknownCount += 1;
       } else {
         const num = Number(val);
-        if (!isNaN(num) && num >= 1 && num <= 5) {
+        if (!isNaN(num) && num >= 1 && num <= 5 && (qStat.type === 'rating_5' || qStat.type === 'rating_5_with_unknown')) {
           qStat.count += 1;
           qStat.totalScore += num;
           qStat.dist[num] = (qStat.dist[num] || 0) + 1;
@@ -6683,7 +7003,7 @@ function renderSurveyBreakdownTable(analytics) {
   if (!tbody) return;
 
   const ratingQuestions = analytics.questionStats.filter(q => 
-    q.type === 'rating_5' || q.type === 'rating_5_with_unknown' || q.id === 'Q2' || q.id === 'Q3' || q.id === 'Q4'
+    q.type === 'rating_5' || q.type === 'rating_5_with_unknown'
   );
 
   if (ratingQuestions.length === 0) {
@@ -7061,7 +7381,7 @@ async function exportSurveyResponsesToExcel(onlySelected = false) {
   }
 
   const ratingQuestions = analytics.questionStats.filter(q => 
-    q.type === 'rating_5' || q.type === 'rating_5_with_unknown' || q.id === 'Q2' || q.id === 'Q3' || q.id === 'Q4'
+    q.type === 'rating_5' || q.type === 'rating_5_with_unknown'
   );
 
   ratingQuestions.forEach((qStat, idx) => {
@@ -7205,20 +7525,21 @@ async function exportSurveyResponsesToExcel(onlySelected = false) {
       const qLower = qNum.toLowerCase();
       const qUpper = qNum.toUpperCase();
 
-      let val = ans[qLower] !== undefined ? ans[qLower] : (ans[qUpper] !== undefined ? ans[qUpper] : ans[q.id]);
+      let val = ans[qLower] !== undefined ? ans[qLower] : (ans[qUpper] !== undefined ? ans[qUpper] : ans[qNum]);
       const isUnk = Boolean(
-        ans[qLower + 'Unknown'] || ans[qUpper + 'Unknown'] || ans[q.id + 'Unknown'] ||
-        (qNum === 'Q3' && r.q3Unknown) || (qNum === 'Q4' && r.q4Unknown)
+        ans[qLower + 'Unknown'] || ans[qUpper + 'Unknown'] || ans[qNum + 'Unknown'] ||
+        ans[qLower + 'unknown'] || ans[qUpper + 'unknown'] ||
+        val === 'unknown' || val === 0
       );
 
-      // fallback
+      // answers에 값이 없는 레거시 건에 대해서만 최소 호환 (하드코딩 배제)
       if (val === undefined || val === null || val === '') {
-        if (qNum === 'Q1') val = r.respondentType;
-        else if (qNum === 'Q2') val = r.q2;
-        else if (qNum === 'Q3') val = isUnk ? '' : r.q3;
-        else if (qNum === 'Q4') val = isUnk ? '' : r.q4;
-        else if (q.type === 'text') val = r.comment;
-        else if (q.type === 'boolean_callback') val = r.callbackRequested;
+        if (qNum === 'Q1' && q.type === 'single_choice') val = r.respondentType;
+        else if (qNum === 'Q2' && (q.type === 'rating_5' || q.type === 'rating_5_with_unknown')) val = r.q2Score !== undefined ? r.q2Score : r.q2;
+        else if (qNum === 'Q3' && (q.type === 'rating_5' || q.type === 'rating_5_with_unknown')) val = isUnk ? '' : (r.q3Score !== undefined ? r.q3Score : r.q3);
+        else if (qNum === 'Q4' && (q.type === 'rating_5' || q.type === 'rating_5_with_unknown')) val = isUnk ? '' : (r.q4Score !== undefined ? r.q4Score : r.q4);
+        else if (q.type === 'text' && r.comment && isNaN(Number(r.comment))) val = r.comment;
+        else if (q.type === 'boolean_callback' && r.callbackRequested !== undefined) val = r.callbackRequested;
       }
 
       let formattedAns = '';
@@ -7234,9 +7555,9 @@ async function exportSurveyResponsesToExcel(onlySelected = false) {
       } else if (q.type === 'rating_5' || q.type === 'rating_5_with_unknown') {
         if (isUnk || val === 'unknown' || val === 0) {
           formattedAns = '잘 모르겠음';
-        } else {
+        } else if (val !== undefined && val !== null && val !== '' && !isNaN(Number(val))) {
           const scoreNum = Number(val);
-          if (!isNaN(scoreNum) && scoreNum >= 1 && scoreNum <= 5) {
+          if (scoreNum >= 1 && scoreNum <= 5) {
             let optLabel = '';
             if (q.options && Array.isArray(q.options)) {
               const matchedOpt = q.options.find(o => Number(o.score) === scoreNum);
@@ -7245,14 +7566,18 @@ async function exportSurveyResponsesToExcel(onlySelected = false) {
             if (!optLabel && ratingLabels[scoreNum]) optLabel = ratingLabels[scoreNum];
             formattedAns = optLabel ? `${scoreNum}점 (${optLabel})` : `${scoreNum}점`;
           } else {
-            formattedAns = String(val || '-');
+            formattedAns = '-';
           }
+        } else {
+          formattedAns = '-';
         }
       } else if (q.type === 'text') {
-        formattedAns = String(val || '').trim() || '-';
+        formattedAns = (val && String(val).trim()) ? String(val).trim() : '-';
       } else if (q.type === 'boolean_callback') {
         const isYes = Boolean(val === true || val === 'true');
-        formattedAns = isYes ? '유선 연락 희망' : '연락 불필요';
+        formattedAns = (val !== undefined && val !== null && val !== '')
+          ? (isYes ? '유선 연락 희망' : '연락 불필요')
+          : '-';
       } else {
         formattedAns = String(val || '-');
       }

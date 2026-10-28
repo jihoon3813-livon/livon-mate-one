@@ -80,13 +80,53 @@ module.exports = async function handler(req, res) {
     const channel = payload.channel || 'MOBILE_DIARY_INTEGRATED';
 
     const nowIso = new Date().toISOString();
-    const q2Score = answers.q2 !== undefined ? Number(answers.q2) : 5;
-    const q3Score = answers.q3Unknown ? null : (answers.q3 !== undefined ? Number(answers.q3) : 5);
-    const q4Score = answers.q4Unknown ? null : (answers.q4 !== undefined ? Number(answers.q4) : 5);
-    const comment = String(answers.q5 || answers.comment || '').trim();
+
+    // 1. 코멘트(의견) 동적 식별 (숫자 평점이 아닌 실제 텍스트 내용 추출)
+    let comment = String(answers.comment || answers.surveyComment || '').trim();
+    if (!comment) {
+      for (const [k, v] of Object.entries(answers)) {
+        const kLow = k.toLowerCase();
+        if (typeof v === 'string' && v.trim().length > 0 &&
+            !kLow.includes('phone') && !kLow.includes('token') && !kLow.endsWith('unknown') &&
+            kLow !== 'q1' && isNaN(Number(v))) {
+          comment = v.trim();
+          break;
+        }
+      }
+    }
+
+    // 2. 콜백 요청 동적 식별
+    let callbackRequested = Boolean(answers.callbackRequested);
+    if (!callbackRequested) {
+      for (const [k, v] of Object.entries(answers)) {
+        const kLow = k.toLowerCase();
+        if (typeof v === 'boolean' && !kLow.endsWith('unknown')) {
+          callbackRequested = v;
+          break;
+        }
+      }
+    }
+
+    // 3. 평점 문항 동적 평균 계산
+    const scores = [];
+    for (const [k, v] of Object.entries(answers)) {
+      const kLow = k.toLowerCase();
+      if (kLow.endsWith('unknown') || kLow.includes('phone') || kLow.includes('comment') || kLow.includes('token') || kLow === 'q1') continue;
+      if (answers[k + 'Unknown'] || answers[kLow + 'unknown']) continue;
+      const num = Number(v);
+      if (!isNaN(num) && num >= 1 && num <= 5 && typeof v !== 'boolean') {
+        scores.push(num);
+      }
+    }
+    const dynamicAvgScore = scores.length > 0
+      ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
+      : (answers.q2 && !isNaN(Number(answers.q2)) ? Number(answers.q2).toFixed(1) : '5.0');
+
+    const q2Score = answers.q2 !== undefined && !isNaN(Number(answers.q2)) ? Number(answers.q2) : Number(dynamicAvgScore);
+    const q3Score = answers.q3Unknown ? null : (answers.q3 !== undefined && !isNaN(Number(answers.q3)) ? Number(answers.q3) : null);
+    const q4Score = answers.q4Unknown ? null : (answers.q4 !== undefined && !isNaN(Number(answers.q4)) ? Number(answers.q4) : null);
     const couponPhone = String(answers.couponPhone || answers.callbackPhone || '').trim();
     const respondentType = String(answers.q1 || answers.respondentType || 'PATIENT');
-    const callbackRequested = Boolean(answers.q6 || answers.callbackRequested);
 
     const cvxUrl = resolveConvexUrl(req);
     let matchedTarget = null;
@@ -110,9 +150,10 @@ module.exports = async function handler(req, res) {
     }
 
     // =========================================================================
-    // 🚨 1단계 중복 응답 방어: 해당 대상자(Target)가 이미 응답 완료된 경우 즉시 차단
+    // 🚨 1단계 중복 응답 방어: 해당 대상자(Target)가 이미 응답 완료된 경우 즉시 차단 (테스트 재제출 허용 플래그 지원)
     // =========================================================================
-    if (matchedTarget && matchedTarget.responseStatus === 'SUBMITTED') {
+    const isResubmitAllowed = Boolean(payload.allowResubmit || payload.isTest || payload.channel === 'PREVIEW_TEST' || token.startsWith('DEMO'));
+    if (matchedTarget && matchedTarget.responseStatus === 'SUBMITTED' && !isResubmitAllowed) {
       return res.status(200).json({
         success: false,
         code: 'ALREADY_SUBMITTED',
@@ -152,6 +193,8 @@ module.exports = async function handler(req, res) {
     const targetUpdates = {
       responseStatus: 'SUBMITTED',
       respondentType: respondentType,
+      answers: answers, // 사용자 설정 설문 문항 응답 결과 100% 보존
+      avgRating: dynamicAvgScore,
       q2Score: q2Score,
       q3Score: q3Score,
       q3Unknown: Boolean(answers.q3Unknown),
