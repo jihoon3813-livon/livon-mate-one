@@ -3125,6 +3125,26 @@
         document.querySelectorAll('.total-days-num').forEach(el => el.textContent = `${careRecords.length}일`);
       }
 
+      // 🚨 이미 응답 완료된 고객일 경우 중복 참여 방지 화면 즉시 노출
+      if (gSurveyTargetObj && (gSurveyTargetObj.responseStatus === 'SUBMITTED' || gSurveyTargetObj.alreadySubmitted)) {
+        const formContainer = document.getElementById('surveyFormContainer');
+        const completeView = document.getElementById('surveyCompleteView');
+        if (formContainer) formContainer.style.display = 'none';
+        if (completeView) {
+          completeView.style.display = 'block';
+          const titleEl = completeView.querySelector('h2');
+          if (titleEl) titleEl.textContent = '이미 만족도 설문 참여가 완료되었습니다';
+          const subEl = completeView.querySelector('.complete-sub');
+          if (subEl) {
+            subEl.innerHTML = '고객님의 소중한 의견이 이미 안전하게 접수되었습니다.<br>입력하신 연락처로 감사 선물(커피쿠폰)이 발송 준비 중입니다.';
+          }
+          const completePhone = document.getElementById('completeCouponPhoneDisplay');
+          if (completePhone && (gSurveyTargetObj.couponPhone || gSurveyTargetObj.patientPhone)) {
+            completePhone.textContent = formatSurveyPhoneInput(gSurveyTargetObj.couponPhone || gSurveyTargetObj.patientPhone);
+          }
+        }
+      }
+
       // 글자수 카운터
       const q5Input = document.getElementById('ansQ5');
       if (q5Input) {

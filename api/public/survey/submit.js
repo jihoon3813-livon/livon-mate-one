@@ -1,5 +1,5 @@
 // api/public/survey/submit.js
-// Vercel Serverless Function & Node.js API: Public Survey Submission Handler
+// Vercel Serverless Function & Node.js API: Public Survey Submission Handler (중복 응답 방지 강화)
 
 const fs = require('fs');
 const path = require('path');
@@ -90,11 +90,13 @@ module.exports = async function handler(req, res) {
 
     const cvxUrl = resolveConvexUrl(req);
     let matchedTarget = null;
+    let cvxTargetsList = [];
 
-    // 1. Convex DB에서 대상자 찾기
+    // 1. Convex DB에서 대상자 찾기 및 전체 목록 조회
     try {
       const list = await queryConvex(cvxUrl, 'sync:getSurveyTargets', {});
       if (Array.isArray(list) && list.length > 0) {
+        cvxTargetsList = list;
         matchedTarget = list.find(t =>
           (targetId && (t.id === targetId || t.serviceId === targetId || (t.id && t.id.replace(/^ST-/, '') === targetId))) ||
           (token && (t.token === token || t.id === token || t.serviceId === token ||
@@ -105,6 +107,44 @@ module.exports = async function handler(req, res) {
       }
     } catch (e) {
       console.warn('[Survey Submit] Convex find target error:', e.message);
+    }
+
+    // =========================================================================
+    // 🚨 1단계 중복 응답 방어: 해당 대상자(Target)가 이미 응답 완료된 경우 즉시 차단
+    // =========================================================================
+    if (matchedTarget && matchedTarget.responseStatus === 'SUBMITTED') {
+      return res.status(200).json({
+        success: false,
+        code: 'ALREADY_SUBMITTED',
+        message: '이미 만족도 설문 응답이 완료된 건입니다. (중복 참여 불가)',
+        submittedAt: matchedTarget.submittedAt
+      });
+    }
+
+    // =========================================================================
+    // 🚨 2단계 중복 응답 방어: 동일한 환자/쿠폰 전화번호로 이미 제출된 건이 있는 경우 차단
+    // =========================================================================
+    const cleanCouponDigits = couponPhone.replace(/[^0-9]/g, '');
+    const cleanPatientDigits = matchedTarget && matchedTarget.patientPhone ? matchedTarget.patientPhone.replace(/[^0-9]/g, '') : '';
+    const targetDigits = cleanCouponDigits.length >= 9 ? cleanCouponDigits : cleanPatientDigits;
+
+    if (targetDigits && targetDigits.length >= 9 && cvxTargetsList.length > 0) {
+      const alreadySubmittedByPhone = cvxTargetsList.find(t => {
+        if (t.responseStatus !== 'SUBMITTED') return false;
+        // 자기 자신이 아닌 다른 레코드와의 비교이거나, 동일 환자의 중복 제출 방지
+        const tCoupon = (t.couponPhone || '').replace(/[^0-9]/g, '');
+        const tPhone = (t.patientPhone || '').replace(/[^0-9]/g, '');
+        return (tCoupon && tCoupon === targetDigits) || (tPhone && tPhone === targetDigits);
+      });
+
+      if (alreadySubmittedByPhone && (!matchedTarget || alreadySubmittedByPhone.id !== matchedTarget.id)) {
+        return res.status(200).json({
+          success: false,
+          code: 'ALREADY_SUBMITTED_PHONE',
+          message: '해당 연락처로는 이미 만족도 설문 참여 및 선물 접수가 완료되었습니다. (중복 참여 불가)',
+          submittedAt: alreadySubmittedByPhone.submittedAt
+        });
+      }
     }
 
     const effectiveTargetId = matchedTarget ? matchedTarget.id : (targetId || (token ? (token.startsWith('ST-') ? token : `ST-${token}`) : `ST-DEMO-${Date.now()}`));

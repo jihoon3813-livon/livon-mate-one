@@ -364,6 +364,11 @@
           return;
         }
 
+        if (data.alreadySubmitted) {
+          showError('참여 완료 안내', '이미 만족도 설문 응답을 완료하셨습니다. 소중한 의견에 감사드립니다. (감사 선물 발송 대기 중)');
+          return;
+        }
+
         surveyData = data;
         renderServiceSummary(data.serviceInfo);
         if (data.schema) {

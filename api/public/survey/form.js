@@ -126,6 +126,8 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    const isAlreadySubmitted = target.responseStatus === 'SUBMITTED';
+
     const serviceInfo = {
       id: target.id || '',
       serviceId: target.serviceId || target.id || '',
@@ -137,7 +139,10 @@ module.exports = async function handler(req, res) {
       careStartDate: target.careStartDate || '',
       careEndDate: target.careEndDate || '',
       hospitalName: target.hospitalName || fallbackHospital || '리본케어 협약병원',
-      insuranceCompany: target.insuranceCompany || '삼성화재'
+      insuranceCompany: target.insuranceCompany || '삼성화재',
+      responseStatus: target.responseStatus || 'NOT_STARTED',
+      alreadySubmitted: isAlreadySubmitted,
+      submittedAt: target.submittedAt || null
     };
 
     // 4. 설문 문항 스키마(Schema) 조회 (Convex -> 로컬 survey_data.json)
@@ -160,6 +165,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({
       valid: true,
       serviceInfo,
+      alreadySubmitted: isAlreadySubmitted,
       schema: schema || null,
       csPhone: serviceInfo.insuranceCompany.includes('현대') ? '1533-7436' : '1877-7412'
     });
