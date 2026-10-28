@@ -865,6 +865,40 @@
       scroll-margin-top: 80px;
     }
 
+    .btn-survey-submit-single {
+      width: 100% !important;
+      padding: 14px 16px !important;
+      border-radius: 14px !important;
+      border: none;
+      background: linear-gradient(135deg, #e11d48 0%, #be185d 50%, #831843 100%);
+      color: #ffffff;
+      font-size: 14px !important;
+      font-weight: 850;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap !important;
+      letter-spacing: -0.03em !important;
+      box-sizing: border-box !important;
+      box-shadow: 0 6px 20px rgba(190, 24, 93, 0.28);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .btn-survey-submit-single:active {
+      transform: scale(0.98);
+    }
+
+    .survey-q-card.highlight-missing {
+      border-color: #e11d48 !important;
+      box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.25) !important;
+      animation: pulse-missing 1.2s ease-in-out;
+    }
+    @keyframes pulse-missing {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.015); }
+    }
+
     .callback-btn {
       padding: 10px 4px !important;
       font-size: 11px !important;
@@ -1495,200 +1529,188 @@
             </p>
           </div>
 
-          <!-- 설문 본문 카드 -->
+          <!-- 설문 본문 카드 (전 문항 세로 전체 노출 & 원클릭 완료) -->
           <div id="surveyFormContainer" class="survey-section-container">
-            <!-- 상단 진행 표시줄 -->
+            <!-- 상단 설문 안내 & 실시간 응답 진행 표시줄 -->
             <div class="survey-progress-header">
-              <span class="survey-step-badge" id="surveyStepBadge">STEP 1 / 4 · 기본 만족도</span>
-              <span style="font-size: 11.5px; font-weight: 700; color: #9d174d;" id="surveyStepPercent">25%</span>
+              <span class="survey-step-badge" id="surveyStepBadge">
+                <span style="font-size: 11px;">📋</span>
+                <span>만족도 설문 (총 6문항)</span>
+              </span>
+              <span style="font-size: 11.5px; font-weight: 800; color: #be185d;" id="surveyStepPercent">0 / 6 완료</span>
             </div>
             <div class="survey-progress-track">
-              <div id="surveyProgressFill" class="survey-progress-fill" style="width: 25%;"></div>
+              <div id="surveyProgressFill" class="survey-progress-fill" style="width: 0%;"></div>
             </div>
 
-            <!-- [STEP 1] 응답자 유형(환자/보호자) 선택 확인 & Q2 전반적 만족도 -->
-            <div id="sStep1" class="s-step-panel">
-              <!-- Q1. 환자 / 보호자 선택 -->
-              <div class="survey-q-card">
-                <div class="survey-q-title" id="q1Title">
-                  <span class="q-num">Q1.</span>설문에 참여하시는 분은 누구인가요? <span style="color:#e11d48;">*</span>
-                </div>
-                <div class="survey-q-sub">설문 시작 전 환자 본인인지 보호자인지 선택해 주세요.</div>
-                <div class="livon-role-pill-group">
-                  <button type="button" class="livon-role-pill" data-role="PATIENT" onclick="selectRespondentRole('PATIENT')">
-                    <span style="font-size: 20px;">🧑‍🦳</span>
-                    <span>환자 본인</span>
-                  </button>
-                  <button type="button" class="livon-role-pill" data-role="GUARDIAN" onclick="selectRespondentRole('GUARDIAN')">
-                    <span style="font-size: 20px;">👨‍👩‍👧</span>
-                    <span>가족 · 보호자</span>
-                  </button>
-                  <button type="button" class="livon-role-pill" data-role="OTHER" onclick="selectRespondentRole('OTHER')">
-                    <span style="font-size: 20px;">🤝</span>
-                    <span>기타 지인</span>
-                  </button>
-                </div>
-                <input type="hidden" id="ansQ1" value="">
+            <!-- Q1. 환자 / 보호자 선택 -->
+            <div id="qCard1" class="survey-q-card">
+              <div class="survey-q-title" id="q1Title">
+                <span class="q-num">Q1.</span>설문에 참여하시는 분은 누구인가요? <span style="color:#e11d48;">*</span>
               </div>
-
-              <!-- Q2. 전반적 만족도 -->
-              <div class="survey-q-card" style="margin-bottom: 0;">
-                <div class="survey-q-title" id="q2Title">
-                  <span class="q-num">Q2.</span>이번 간병 서비스에 전반적으로 얼마나 만족하셨나요? <span style="color:#e11d48;">*</span>
-                </div>
-                <div class="survey-q-sub">위 간병일지와 실제 경험하신 돌봄 서비스를 종합해 평가해 주세요.</div>
-                <div>
-                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 5, this)">
-                    <span>😍 매우 만족스러웠어요</span>
-                    <span class="livon-opt-score">★ 5점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 4, this)">
-                    <span>🙂 대체로 만족해요</span>
-                    <span class="livon-opt-score">★ 4점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 3, this)">
-                    <span>😐 보통이에요</span>
-                    <span class="livon-opt-score">★ 3점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 2, this)">
-                    <span>🙁 조금 아쉬웠어요</span>
-                    <span class="livon-opt-score">2점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 1, this)">
-                    <span>😡 많이 불만족스러웠어요</span>
-                    <span class="livon-opt-score">1점</span>
-                  </button>
-                </div>
-                <input type="hidden" id="ansQ2" value="">
+              <div class="survey-q-sub">설문 시작 전 환자 본인인지 보호자인지 선택해 주세요.</div>
+              <div class="livon-role-pill-group">
+                <button type="button" class="livon-role-pill" data-role="PATIENT" onclick="selectRespondentRole('PATIENT')">
+                  <span style="font-size: 20px;">🧑‍🦳</span>
+                  <span>환자 본인</span>
+                </button>
+                <button type="button" class="livon-role-pill" data-role="GUARDIAN" onclick="selectRespondentRole('GUARDIAN')">
+                  <span style="font-size: 20px;">👨‍👩‍👧</span>
+                  <span>가족 · 보호자</span>
+                </button>
+                <button type="button" class="livon-role-pill" data-role="OTHER" onclick="selectRespondentRole('OTHER')">
+                  <span style="font-size: 20px;">🤝</span>
+                  <span>기타 지인</span>
+                </button>
               </div>
+              <input type="hidden" id="ansQ1" value="">
             </div>
 
-            <!-- [STEP 2] Q3 간병인의 친절함과 태도 -->
-            <div id="sStep2" class="s-step-panel" style="display: none;">
-              <div class="survey-q-card" style="margin-bottom: 0;">
-                <div class="survey-q-title" id="q3Title">
-                  <span class="q-num">Q3.</span>담당 간병인(<span class="carer-name">권은지</span>)의 친절함과 환자를 대하는 태도는 어떠셨나요? <span style="color:#e11d48;">*</span>
-                </div>
-                <div class="survey-q-sub">따뜻한 말씨, 환자 존중 및 정서적 배려 정도를 선택해 주세요.</div>
-                <div>
-                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 5, this)">
-                    <span>💖 가족처럼 매우 친절하고 따뜻했어요</span>
-                    <span class="livon-opt-score">★ 5점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 4, this)">
-                    <span>😊 친절하고 예의 바르셨어요</span>
-                    <span class="livon-opt-score">★ 4점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 3, this)">
-                    <span>😐 무난하고 보통이었어요</span>
-                    <span class="livon-opt-score">★ 3점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 2, this)">
-                    <span>🙁 다소 불친절하게 느껴졌어요</span>
-                    <span class="livon-opt-score">2점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 1, this)">
-                    <span>😡 매우 불친절했어요</span>
-                    <span class="livon-opt-score">1점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q3-btn" style="border-style: dashed; color: #7c687b; justify-content: center; font-size: 12px;" onclick="selectSurveyUnknown('q3', this)">
-                    <span>❓ 잘 모르겠음 (직접 대면하지 못했거나 판단이 어려움)</span>
-                  </button>
-                </div>
-                <input type="hidden" id="ansQ3" value="">
-                <input type="hidden" id="ansQ3Unknown" value="false">
+            <!-- Q2. 전반적 만족도 -->
+            <div id="qCard2" class="survey-q-card">
+              <div class="survey-q-title" id="q2Title">
+                <span class="q-num">Q2.</span>이번 간병 서비스에 전반적으로 얼마나 만족하셨나요? <span style="color:#e11d48;">*</span>
               </div>
+              <div class="survey-q-sub">위 간병일지와 실제 경험하신 돌봄 서비스를 종합해 평가해 주세요.</div>
+              <div>
+                <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 5, this)">
+                  <span>😍 매우 만족스러웠어요</span>
+                  <span class="livon-opt-score">★ 5점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 4, this)">
+                  <span>🙂 대체로 만족해요</span>
+                  <span class="livon-opt-score">★ 4점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 3, this)">
+                  <span>😐 보통이에요</span>
+                  <span class="livon-opt-score">★ 3점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 2, this)">
+                  <span>🙁 조금 아쉬웠어요</span>
+                  <span class="livon-opt-score">2점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 1, this)">
+                  <span>😡 많이 불만족스러웠어요</span>
+                  <span class="livon-opt-score">1점</span>
+                </button>
+              </div>
+              <input type="hidden" id="ansQ2" value="">
             </div>
 
-            <!-- [STEP 3] Q4 돌봄 전문성 및 간병 품질 -->
-            <div id="sStep3" class="s-step-panel" style="display: none;">
-              <div class="survey-q-card" style="margin-bottom: 0;">
-                <div class="survey-q-title" id="q4Title">
-                  <span class="q-num">Q4.</span>식사 보조, 위생 관리, 거동 부축 등 실제 제공된 돌봄 품질은 어떠셨나요? <span style="color:#e11d48;">*</span>
-                </div>
-                <div class="survey-q-sub">간병일지에 기록된 일상 케어 및 환자 안전 관리의 꼼꼼함을 평가해 주세요.</div>
-                <div>
-                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 5, this)">
-                    <span>✨ 매우 꼼꼼하고 능숙하게 잘 돌봐주셨어요</span>
-                    <span class="livon-opt-score">★ 5점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 4, this)">
-                    <span>👍 전반적으로 원활하고 양호했어요</span>
-                    <span class="livon-opt-score">★ 4점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 3, this)">
-                    <span>😐 보통 수준이었어요</span>
-                    <span class="livon-opt-score">★ 3점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 2, this)">
-                    <span>🙁 다소 미흡한 부분이 있었어요</span>
-                    <span class="livon-opt-score">2점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 1, this)">
-                    <span>😡 돌봄 품질이 매우 미흡했어요</span>
-                    <span class="livon-opt-score">1점</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn q4-btn" style="border-style: dashed; color: #7c687b; justify-content: center; font-size: 12px;" onclick="selectSurveyUnknown('q4', this)">
-                    <span>❓ 잘 모르겠음 (직접 보지 못했거나 판단이 어려움)</span>
-                  </button>
-                </div>
-                <input type="hidden" id="ansQ4" value="">
-                <input type="hidden" id="ansQ4Unknown" value="false">
+            <!-- Q3 간병인의 친절함과 태도 -->
+            <div id="qCard3" class="survey-q-card">
+              <div class="survey-q-title" id="q3Title">
+                <span class="q-num">Q3.</span>담당 간병인(<span class="carer-name">권은지</span>)의 친절함과 환자를 대하는 태도는 어떠셨나요? <span style="color:#e11d48;">*</span>
               </div>
+              <div class="survey-q-sub">따뜻한 말씨, 환자 존중 및 정서적 배려 정도를 선택해 주세요.</div>
+              <div>
+                <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 5, this)">
+                  <span>💖 가족처럼 매우 친절하고 따뜻했어요</span>
+                  <span class="livon-opt-score">★ 5점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 4, this)">
+                  <span>😊 친절하고 예의 바르셨어요</span>
+                  <span class="livon-opt-score">★ 4점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 3, this)">
+                  <span>😐 무난하고 보통이었어요</span>
+                  <span class="livon-opt-score">★ 3점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 2, this)">
+                  <span>🙁 다소 불친절하게 느껴졌어요</span>
+                  <span class="livon-opt-score">2점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 1, this)">
+                  <span>😡 매우 불친절했어요</span>
+                  <span class="livon-opt-score">1점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q3-btn" style="border-style: dashed; color: #7c687b; justify-content: center; font-size: 12px;" onclick="selectSurveyUnknown('q3', this)">
+                  <span>❓ 잘 모르겠음 (직접 대면하지 못했거나 판단이 어려움)</span>
+                </button>
+              </div>
+              <input type="hidden" id="ansQ3" value="">
+              <input type="hidden" id="ansQ3Unknown" value="false">
             </div>
 
-            <!-- [STEP 4] Q5 자유의견 & Q6 연락 요청 & 커피쿠폰 수신 번호 -->
-            <div id="sStep4" class="s-step-panel" style="display: none;">
-              <div class="survey-q-card">
-                <div class="survey-q-title" id="q5Title">
-                  <span class="q-num">Q5.</span>간병인께 전하고 싶은 감사 인사나 리본케어에 바라는 점을 남겨주세요. <span style="font-size:11.5px; color:#94a3b8; font-weight:500;">(선택)</span>
-                </div>
-                <textarea id="ansQ5" rows="3" maxlength="1000" placeholder="따뜻한 격려의 한마디나 개선이 필요한 점을 편하게 적어주세요. (주민번호 등 민감정보 제외)" style="width: 100%; padding: 12px; border-radius: 14px; border: 1.5px solid #e9d8e4; font-size: 13px; color: #2b1938; outline: none; resize: vertical; font-family: inherit;"></textarea>
-                <div style="text-align: right; font-size: 11px; color: #94a3b8; margin-top: 3px;">
-                  <span id="charCount">0</span> / 1000자
-                </div>
+            <!-- Q4 돌봄 전문성 및 간병 품질 -->
+            <div id="qCard4" class="survey-q-card">
+              <div class="survey-q-title" id="q4Title">
+                <span class="q-num">Q4.</span>식사 보조, 위생 관리, 거동 부축 등 실제 제공된 돌봄 품질은 어떠셨나요? <span style="color:#e11d48;">*</span>
               </div>
-
-              <div class="survey-q-card">
-                <div class="survey-q-title" id="q6Title">
-                  <span class="q-num">Q6.</span>남겨주신 의견과 관련하여 리본케어 전담 매니저의 유선 연락을 원하시나요? <span style="color:#e11d48;">*</span>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
-                  <button type="button" class="livon-opt-btn callback-btn" style="justify-content: center; margin-bottom: 0;" onclick="selectSurveyCallback(true, this)">
-                    <span>📞 예, 상담 연락 희망</span>
-                  </button>
-                  <button type="button" class="livon-opt-btn callback-btn" style="justify-content: center; margin-bottom: 0;" onclick="selectSurveyCallback(false, this)">
-                    <span>👌 아니요, 괜찮습니다</span>
-                  </button>
-                </div>
-                <input type="hidden" id="ansQ6" value="">
+              <div class="survey-q-sub">간병일지에 기록된 일상 케어 및 환자 안전 관리의 꼼꼼함을 평가해 주세요.</div>
+              <div>
+                <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 5, this)">
+                  <span>✨ 매우 꼼꼼하고 능숙하게 잘 돌봐주셨어요</span>
+                  <span class="livon-opt-score">★ 5점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 4, this)">
+                  <span>👍 전반적으로 원활하고 양호했어요</span>
+                  <span class="livon-opt-score">★ 4점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 3, this)">
+                  <span>😐 보통 수준이었어요</span>
+                  <span class="livon-opt-score">★ 3점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 2, this)">
+                  <span>🙁 다소 미흡한 부분이 있었어요</span>
+                  <span class="livon-opt-score">2점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 1, this)">
+                  <span>😡 돌봄 품질이 매우 미흡했어요</span>
+                  <span class="livon-opt-score">1점</span>
+                </button>
+                <button type="button" class="livon-opt-btn q4-btn" style="border-style: dashed; color: #7c687b; justify-content: center; font-size: 12px;" onclick="selectSurveyUnknown('q4', this)">
+                  <span>❓ 잘 모르겠음 (직접 보지 못했거나 판단이 어려움)</span>
+                </button>
               </div>
+              <input type="hidden" id="ansQ4" value="">
+              <input type="hidden" id="ansQ4Unknown" value="false">
+            </div>
 
-              <!-- 선물(커피쿠폰) 수신 휴대폰 번호 확인 박스 -->
-              <div class="survey-q-card" style="background: linear-gradient(135deg, #fffdf9 0%, #fef3c7 100%); border-color: #fcd34d; margin-bottom: 0; padding: 12px 12px !important;">
-                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-                  <span style="font-size: 16px;">☕</span>
-                  <div style="font-size: 12px; font-weight: 800; color: #78350f; white-space: nowrap !important; letter-spacing: -0.04em;">
-                    감사 선물(모바일 커피쿠폰) 수신 연락처 확인 <span style="color:#e11d48;">*</span>
-                  </div>
-                </div>
-                <p style="font-size: 10.5px; color: #92400e; margin-bottom: 6px; line-height: 1.35; letter-spacing: -0.02em;">
-                  설문 완료 시 아래 번호로 모바일 커피쿠폰을 발송해 드립니다.
-                </p>
-                <input type="tel" inputmode="numeric" pattern="[0-9\-]*" maxlength="13" autocomplete="tel" id="giftPhoneInput" oninput="this.value = formatSurveyPhoneInput(this.value)" placeholder="010-0000-0000 (쿠폰 수신처)" style="width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 11px; border: 1.5px solid #f59e0b; background: #ffffff; font-size: 13.5px; font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; letter-spacing: 0.02em; color: #2b1938; outline: none;">
+            <!-- Q5 자유의견 -->
+            <div id="qCard5" class="survey-q-card">
+              <div class="survey-q-title" id="q5Title">
+                <span class="q-num">Q5.</span>간병인께 전하고 싶은 감사 인사나 리본케어에 바라는 점을 남겨주세요. <span style="font-size:11.5px; color:#94a3b8; font-weight:500;">(선택)</span>
+              </div>
+              <textarea id="ansQ5" rows="3" maxlength="1000" placeholder="따뜻한 격려의 한마디나 개선이 필요한 점을 편하게 적어주세요. (주민번호 등 민감정보 제외)" style="width: 100%; padding: 12px; border-radius: 14px; border: 1.5px solid #e9d8e4; font-size: 13px; color: #2b1938; outline: none; resize: vertical; font-family: inherit;"></textarea>
+              <div style="text-align: right; font-size: 11px; color: #94a3b8; margin-top: 3px;">
+                <span id="charCount">0</span> / 1000자
               </div>
             </div>
 
-            <!-- 설문 이전 / 다음 / 제출 버튼 -->
-            <div class="survey-nav-row">
-              <button type="button" id="surveyPrevBtn" class="btn-survey-prev" style="display: none;" onclick="prevSurveyStep()">
-                이전 단계
-              </button>
-              <button type="button" id="surveyNextBtn" class="btn-survey-next" onclick="nextSurveyStep()">
-                <span>다음 문항으로</span>
-                <span>→</span>
-              </button>
-              <button type="button" id="surveySubmitBtn" class="btn-survey-next" style="display: none; background: linear-gradient(135deg, #be185d 0%, #9d174d 50%, #b45309 100%);" onclick="submitIntegratedSurvey()">
+            <!-- Q6 연락 요청 -->
+            <div id="qCard6" class="survey-q-card">
+              <div class="survey-q-title" id="q6Title">
+                <span class="q-num">Q6.</span>남겨주신 의견과 관련하여 리본케어 전담 매니저의 유선 연락을 원하시나요? <span style="color:#e11d48;">*</span>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
+                <button type="button" class="livon-opt-btn callback-btn" style="justify-content: center; margin-bottom: 0;" onclick="selectSurveyCallback(true, this)">
+                  <span>📞 예, 상담 연락 희망</span>
+                </button>
+                <button type="button" class="livon-opt-btn callback-btn" style="justify-content: center; margin-bottom: 0;" onclick="selectSurveyCallback(false, this)">
+                  <span>👌 아니요, 괜찮습니다</span>
+                </button>
+              </div>
+              <input type="hidden" id="ansQ6" value="">
+            </div>
+
+            <!-- 선물(커피쿠폰) 수신 휴대폰 번호 확인 박스 -->
+            <div id="giftPhoneCard" class="survey-q-card" style="background: linear-gradient(135deg, #fffdf9 0%, #fef3c7 100%); border-color: #fcd34d; padding: 14px 12px !important;">
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                <span style="font-size: 18px;">☕</span>
+                <div style="font-size: 13px; font-weight: 850; color: #78350f; white-space: nowrap !important; letter-spacing: -0.04em;">
+                  감사 선물(모바일 커피쿠폰) 수신 연락처 확인 <span style="color:#e11d48;">*</span>
+                </div>
+              </div>
+              <p style="font-size: 11px; color: #92400e; margin-bottom: 8px; line-height: 1.4; letter-spacing: -0.02em;">
+                설문 완료 시 아래 번호로 모바일 커피쿠폰을 발송해 드립니다.
+              </p>
+              <input type="tel" inputmode="numeric" pattern="[0-9-]*" maxlength="13" autocomplete="tel" id="giftPhoneInput" oninput="this.value = formatSurveyPhoneInput(this.value); if (typeof updateSurveyProgress === 'function') updateSurveyProgress();" placeholder="010-0000-0000 (쿠폰 수신처)" style="width: 100%; box-sizing: border-box; padding: 11px 12px; border-radius: 12px; border: 1.5px solid #f59e0b; background: #ffffff; font-size: 14px; font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; letter-spacing: 0.02em; color: #2b1938; outline: none;">
+            </div>
+
+            <!-- 설문 원클릭 완료 및 제출 버튼 (한번에 끝내기) -->
+            <div class="survey-nav-row" style="margin-top: 14px;">
+              <button type="button" id="surveySubmitBtn" class="btn-survey-submit-single" onclick="submitIntegratedSurvey()">
                 <span>🎁 설문 완료하고 커피쿠폰 받기</span>
               </button>
             </div>
@@ -1971,6 +1993,109 @@
       }
     }
 
+    // 실시간 응답 진행률 계산 및 상단 인디케이터 업데이트 (총 6개 필수 항목)
+    function updateSurveyProgress() {
+      const q1El = document.getElementById('ansQ1');
+      const q2El = document.getElementById('ansQ2');
+      const q3El = document.getElementById('ansQ3');
+      const q3UnkEl = document.getElementById('ansQ3Unknown');
+      const q4El = document.getElementById('ansQ4');
+      const q4UnkEl = document.getElementById('ansQ4Unknown');
+      const q6El = document.getElementById('ansQ6');
+      const giftInput = document.getElementById('giftPhoneInput');
+
+      const q1Filled = Boolean(q1El && q1El.value);
+      const q2Filled = Boolean(q2El && q2El.value);
+      const q3Filled = Boolean((q3El && q3El.value) || (q3UnkEl && q3UnkEl.value === 'true'));
+      const q4Filled = Boolean((q4El && q4El.value) || (q4UnkEl && q4UnkEl.value === 'true'));
+      const q6Filled = Boolean(q6El && q6El.value);
+      const phoneDigits = giftInput ? giftInput.value.replace(/[^0-9]/g, '') : '';
+      const phoneFilled = phoneDigits.length >= 9;
+
+      const items = [q1Filled, q2Filled, q3Filled, q4Filled, q6Filled, phoneFilled];
+      const filledCount = items.filter(Boolean).length;
+      const pct = Math.round((filledCount / 6) * 100);
+
+      const pctEl = document.getElementById('surveyStepPercent');
+      const fillEl = document.getElementById('surveyProgressFill');
+      if (pctEl) {
+        pctEl.textContent = (filledCount === 6)
+          ? '전체 작성 완료 (100%)'
+          : `${filledCount} / 6 완료 (${pct}%)`;
+      }
+      if (fillEl) {
+        fillEl.style.width = `${pct}%`;
+      }
+    }
+    window.updateSurveyProgress = updateSurveyProgress;
+
+    // 미작성 항목으로 부드럽게 스크롤 및 강조 애니메이션
+    function highlightMissingCard(cardId) {
+      const card = document.getElementById(cardId);
+      if (!card) return;
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.classList.add('highlight-missing');
+      setTimeout(() => {
+        card.classList.remove('highlight-missing');
+      }, 1600);
+    }
+    window.highlightMissingCard = highlightMissingCard;
+
+    // 전체 설문 필수 항목 일괄 유효성 검사 (위에서 아래 순서)
+    function validateAllSurveyFields() {
+      // 1. Q1 응답자 유형
+      const q1 = document.getElementById('ansQ1') ? document.getElementById('ansQ1').value : '';
+      if (!q1) {
+        alert('Q1. 설문에 참여하시는 분(환자 본인 또는 보호자)을 선택해 주세요.');
+        highlightMissingCard('qCard1');
+        return false;
+      }
+      // 2. Q2 전반적 만족도
+      const q2 = document.getElementById('ansQ2') ? document.getElementById('ansQ2').value : '';
+      if (!q2) {
+        alert('Q2. 전반적인 간병 서비스 만족도 점수를 선택해 주세요.');
+        highlightMissingCard('qCard2');
+        return false;
+      }
+      // 3. Q3 간병인 친절함
+      const q3 = document.getElementById('ansQ3') ? document.getElementById('ansQ3').value : '';
+      const q3Unk = document.getElementById('ansQ3Unknown') ? document.getElementById('ansQ3Unknown').value === 'true' : false;
+      if (!q3 && !q3Unk) {
+        alert('Q3. 담당 간병인의 친절함 점수 또는 "잘 모르겠음"을 선택해 주세요.');
+        highlightMissingCard('qCard3');
+        return false;
+      }
+      // 4. Q4 간병 품질
+      const q4 = document.getElementById('ansQ4') ? document.getElementById('ansQ4').value : '';
+      const q4Unk = document.getElementById('ansQ4Unknown') ? document.getElementById('ansQ4Unknown').value === 'true' : false;
+      if (!q4 && !q4Unk) {
+        alert('Q4. 제공된 돌봄 품질 점수 또는 "잘 모르겠음"을 선택해 주세요.');
+        highlightMissingCard('qCard4');
+        return false;
+      }
+      // 5. Q6 상담 연락 희망 여부
+      const q6 = document.getElementById('ansQ6') ? document.getElementById('ansQ6').value : '';
+      if (!q6) {
+        alert('Q6. 전담 매니저 유선 상담 연락 희망 여부를 선택해 주세요.');
+        highlightMissingCard('qCard6');
+        return false;
+      }
+      // 6. 선물 커피쿠폰 수신 연락처
+      const giftInput = document.getElementById('giftPhoneInput');
+      const cleanDigits = (giftInput ? giftInput.value : '').replace(/[^0-9]/g, '');
+      if (cleanDigits.length < 9) {
+        alert('감사 선물(커피쿠폰)을 받으실 휴대폰 번호를 정확히 입력해 주세요.');
+        highlightMissingCard('giftPhoneCard');
+        if (giftInput) giftInput.focus();
+        return false;
+      }
+      if (giftInput) {
+        giftInput.value = formatSurveyPhoneInput(giftInput.value);
+      }
+      return true;
+    }
+    window.validateAllSurveyFields = validateAllSurveyFields;
+
     // 환자 본인 / 가족·보호자 선택 핸들러 (표지 & 설문 Q1 양방향 동기화)
     function selectRespondentRole(role) {
       const ansQ1 = document.getElementById('ansQ1');
@@ -1979,6 +2104,7 @@
       document.querySelectorAll('.livon-role-pill').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-role') === role);
       });
+      updateSurveyProgress();
     }
     window.selectRespondentRole = selectRespondentRole;
 
@@ -1990,6 +2116,7 @@
 
       document.querySelectorAll(`.${qKey}-btn`).forEach(b => b.classList.remove('active'));
       if (btnEl) btnEl.classList.add('active');
+      updateSurveyProgress();
     }
     window.selectSurveyScore = selectSurveyScore;
 
@@ -2001,6 +2128,7 @@
 
       document.querySelectorAll(`.${qKey}-btn`).forEach(b => b.classList.remove('active'));
       if (btnEl) btnEl.classList.add('active');
+      updateSurveyProgress();
     }
     window.selectSurveyUnknown = selectSurveyUnknown;
 
@@ -2009,40 +2137,17 @@
       if (input) input.value = val ? 'true' : 'false';
       document.querySelectorAll('.callback-btn').forEach(b => b.classList.remove('active'));
       if (btnEl) btnEl.classList.add('active');
+      updateSurveyProgress();
     }
     window.selectSurveyCallback = selectSurveyCallback;
 
     function updateSurveyWizardUI() {
-      const stepLabels = [
-        'STEP 1 / 4 · 응답자 확인 및 전반 만족도',
-        'STEP 2 / 4 · 담당 간병인 친절도 평가',
-        'STEP 3 / 4 · 간병 수행 및 돌봄 품질 평가',
-        'STEP 4 / 4 · 자유 의견 및 선물 연락처 확인'
-      ];
-      for (let s = 1; s <= gIntegratedTotalSteps; s++) {
-        const panel = document.getElementById('sStep' + s);
-        if (panel) panel.style.display = (s === gIntegratedSurveyStep) ? 'block' : 'none';
-      }
-      const badge = document.getElementById('surveyStepBadge');
-      const pct = document.getElementById('surveyStepPercent');
-      const fill = document.getElementById('surveyProgressFill');
-      if (badge) badge.textContent = stepLabels[gIntegratedSurveyStep - 1];
-      if (pct) pct.textContent = `${gIntegratedSurveyStep * 25}%`;
-      if (fill) fill.style.width = `${gIntegratedSurveyStep * 25}%`;
-
-      const prevBtn = document.getElementById('surveyPrevBtn');
-      const nextBtn = document.getElementById('surveyNextBtn');
+      // 단일 스크롤 페이지 지원: 실시간 진행률 동기화 및 버튼 항상 노출
+      updateSurveyProgress();
       const submitBtn = document.getElementById('surveySubmitBtn');
-
-      if (prevBtn) prevBtn.style.display = (gIntegratedSurveyStep === 1) ? 'none' : 'inline-block';
-      if (gIntegratedSurveyStep === gIntegratedTotalSteps) {
-        if (nextBtn) nextBtn.style.display = 'none';
-        if (submitBtn) submitBtn.style.display = 'flex';
-      } else {
-        if (nextBtn) nextBtn.style.display = 'flex';
-        if (submitBtn) submitBtn.style.display = 'none';
-      }
+      if (submitBtn) submitBtn.style.display = 'flex';
     }
+    window.updateSurveyWizardUI = updateSurveyWizardUI;
 
     function formatSurveyPhoneInput(val) {
       if (!val) return '';
@@ -2065,72 +2170,24 @@
     window.formatSurveyPhoneInput = formatSurveyPhoneInput;
 
     function validateIntegratedStep(step) {
-      if (step === 1) {
-        const q1 = document.getElementById('ansQ1').value;
-        if (!q1) {
-          alert('설문을 시작하기 전에 [환자 본인] 또는 [가족·보호자] 여부를 먼저 선택해 주세요.');
-          return false;
-        }
-        const q2 = document.getElementById('ansQ2').value;
-        if (!q2) {
-          alert('Q2. 전반적인 간병 서비스 만족도 점수를 선택해 주세요.');
-          return false;
-        }
-      } else if (step === 2) {
-        const q3 = document.getElementById('ansQ3').value;
-        const q3Unk = document.getElementById('ansQ3Unknown').value === 'true';
-        if (!q3 && !q3Unk) {
-          alert('Q3. 담당 간병인의 친절함 점수 또는 "잘 모르겠음"을 선택해 주세요.');
-          return false;
-        }
-      } else if (step === 3) {
-        const q4 = document.getElementById('ansQ4').value;
-        const q4Unk = document.getElementById('ansQ4Unknown').value === 'true';
-        if (!q4 && !q4Unk) {
-          alert('Q4. 제공된 돌봄 품질 점수 또는 "잘 모르겠음"을 선택해 주세요.');
-          return false;
-        }
-      } else if (step === 4) {
-        const q6 = document.getElementById('ansQ6').value;
-        if (!q6) {
-          alert('Q6. 전담 매니저 유선 연락 희망 여부를 선택해 주세요.');
-          return false;
-        }
-        const giftInput = document.getElementById('giftPhoneInput');
-        const cleanDigits = (giftInput ? giftInput.value : '').replace(/[^0-9]/g, '');
-        if (cleanDigits.length < 9) {
-          alert('감사 선물(커피쿠폰)을 받으실 휴대폰 번호를 정확히 입력해 주세요.');
-          if (giftInput) giftInput.focus();
-          return false;
-        }
-        if (giftInput) {
-          giftInput.value = formatSurveyPhoneInput(giftInput.value);
-        }
-      }
-      return true;
+      // 기존 호환성 유지: 전체 검사 수행
+      return validateAllSurveyFields();
     }
+    window.validateIntegratedStep = validateIntegratedStep;
 
     function nextSurveyStep() {
-      if (!validateIntegratedStep(gIntegratedSurveyStep)) return;
-      if (gIntegratedSurveyStep < gIntegratedTotalSteps) {
-        gIntegratedSurveyStep++;
-        updateSurveyWizardUI();
-        scrollToSurveyForm(true);
-      }
+      // 단일 페이지에서는 더 이상 스텝 이동 없이 제출 검사 수행
+      submitIntegratedSurvey();
     }
     window.nextSurveyStep = nextSurveyStep;
 
     function prevSurveyStep() {
-      if (gIntegratedSurveyStep > 1) {
-        gIntegratedSurveyStep--;
-        updateSurveyWizardUI();
-        scrollToSurveyForm(true);
-      }
+      // 단일 페이지에서는 이전 스텝 불필요
     }
     window.prevSurveyStep = prevSurveyStep;
 
     async function submitIntegratedSurvey() {
-      if (!validateIntegratedStep(4)) return;
+      if (!validateAllSurveyFields()) return;
 
       const submitBtn = document.getElementById('surveySubmitBtn');
       if (submitBtn) {
