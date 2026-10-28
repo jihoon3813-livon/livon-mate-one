@@ -5208,12 +5208,11 @@
                   <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
                     <th class="p-3 whitespace-nowrap">응답 ID</th>
                     <th class="p-3 whitespace-nowrap">신청ID</th>
-                    <th class="p-3 whitespace-nowrap">고객(환자명)</th>
-                    <th class="p-3 whitespace-nowrap">응답자 구분</th>
-                    <th class="p-3 text-center whitespace-nowrap">Q2. 전반 만족도</th>
-                    <th class="p-3 text-center whitespace-nowrap">Q3. 친절함</th>
-                    <th class="p-3 text-center whitespace-nowrap">Q4. 간병 품질</th>
-                    <th class="p-3 whitespace-nowrap">Q5. 고객 의견</th>
+                    <th class="p-3 whitespace-nowrap">환자명 / 연락처</th>
+                    <th class="p-3 whitespace-nowrap">병원 / 서비스기간</th>
+                    <th class="p-3 whitespace-nowrap">담당간병인</th>
+                    <th class="p-3 text-center whitespace-nowrap">간병일지</th>
+                    <th class="p-3 text-center whitespace-nowrap">종합 만족도</th>
                     <th class="p-3 text-center whitespace-nowrap">Q6. 연락 희망</th>
                     <th class="p-3 whitespace-nowrap">제출 일시</th>
                   </tr>
@@ -5911,6 +5910,8 @@
               <div class="text-xs text-slate-600 font-bold whitespace-nowrap flex items-center gap-2">
                 <span>총 응답: <b id="surveyResponseCountLabel_new" class="text-emerald-700 font-black text-sm">0</b>건</span>
                 <span class="text-slate-300">|</span>
+                <span>평균 만족도: <b id="surveyResultAvgScore_new" class="text-amber-600 font-black text-sm">★ 0.0점</b></span>
+                <span class="text-slate-300">|</span>
                 <span class="text-amber-700">미발송 대기: <b id="surveyResultPendingGiftCount" class="font-black text-sm">0</b>건</span>
               </div>
             </div>
@@ -5925,13 +5926,12 @@
                     </th>
                     <th class="p-3 text-center w-12 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">#</th>
                     <th class="p-3 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">신청ID</th>
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">환자명 (응답자)</th>
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">📱 쿠폰 수신 연락처</th>
-                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">응답일시</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">환자명 / 연락처</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">병원 / 서비스기간</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">담당간병인</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">간병일지</th>
                     <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">종합 만족도</th>
-                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">간병 친절</th>
-                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">돌봄 품질</th>
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">세부 의견</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">응답일시</th>
                     <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">선물 발송 상태</th>
                     <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">세부응답 & 선물관리</th>
                   </tr>

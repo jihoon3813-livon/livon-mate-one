@@ -323,14 +323,139 @@ function toggleAllSurveyResponseChecks(masterCb) {
   checkboxes.forEach(cb => cb.checked = masterCb.checked);
 }
 
-// 세부 응답 내역 모달 팝업 열기
+// =========================================================================
+// 0-B. 설문 응답 상세 모달 & 통합 응답 수집기 (개선판)
+// =========================================================================
+
+// 응답 평가 점수 평균 계산 헬퍼 (평가 문항들의 평균 점수 산출)
+function calculateSurveyAvgScore(r) {
+  if (!r) return '5.0';
+  const scores = [];
+  const ans = r.answers || {};
+
+  // 1. answers 객체 내 평가 점수 문항 수집
+  Object.keys(ans).forEach(k => {
+    const kLow = k.toLowerCase();
+    if (kLow.endsWith('unknown') || kLow === 'q1' || kLow === 'q5' || kLow === 'q6' || kLow === 'couponphone' || kLow === 'callbackphone') return;
+    const v = ans[k];
+    const num = Number(v);
+    if (!isNaN(num) && num >= 1 && num <= 5) {
+      if (ans[k + 'Unknown'] || ans[kLow + 'unknown'] || ans[k.toUpperCase() + 'UNKNOWN']) return;
+      scores.push(num);
+    }
+  });
+
+  // 2. answers에 없거나 수집되지 않은 경우 r.q2, r.q3, r.q4 점수 활용
+  if (scores.length === 0) {
+    if (r.q2 !== undefined && !isNaN(Number(r.q2)) && Number(r.q2) >= 1 && Number(r.q2) <= 5) {
+      scores.push(Number(r.q2));
+    }
+    if (!r.q3Unknown && r.q3 !== undefined && !isNaN(Number(r.q3)) && Number(r.q3) >= 1 && Number(r.q3) <= 5) {
+      scores.push(Number(r.q3));
+    }
+    if (!r.q4Unknown && r.q4 !== undefined && !isNaN(Number(r.q4)) && Number(r.q4) >= 1 && Number(r.q4) <= 5) {
+      scores.push(Number(r.q4));
+    }
+  }
+
+  if (scores.length === 0) {
+    const defaultScore = Number(r.q2) || 5;
+    return defaultScore.toFixed(1);
+  }
+
+  const sum = scores.reduce((acc, cur) => acc + cur, 0);
+  return (sum / scores.length).toFixed(1);
+}
+
+// 신청ID(C0633 등 실제 관리 아이디) 정밀 복원 헬퍼
+function resolveResponseDisplayAppId(r, targetObj) {
+  const isRealId = (id) => id && !String(id).startsWith('ST-') && !String(id).startsWith('TMP-') && !String(id).startsWith('TEMP-') && !String(id).startsWith('SR-');
+
+  // 1. r 또는 targetObj에 이미 C0633 등 실제 관리 번호가 있는 경우
+  if (targetObj && isRealId(targetObj.serviceId)) return targetObj.serviceId;
+  if (isRealId(r.serviceId)) return r.serviceId;
+  if (targetObj && targetObj.displayAppId && isRealId(targetObj.displayAppId)) return targetObj.displayAppId;
+
+  // 2. gApps에서 전화번호(쿠폰번호/환자전화번호) 또는 환자명으로 신청번호(C0633 등) 매칭
+  const phoneDigits = String(r.couponPhone || r.patientPhone || (targetObj && (targetObj.couponPhone || targetObj.patientPhone)) || '').replace(/[^0-9]/g, '');
+  const pName = (r.patientName || (targetObj && targetObj.patientName) || '').trim();
+
+  if (typeof gApps !== 'undefined' && Array.isArray(gApps)) {
+    if (phoneDigits && phoneDigits.length >= 8) {
+      const matchByPhone = gApps.find(a => {
+        const aPhone = String(a.patientPhone || a.contact || a.phone || '').replace(/[^0-9]/g, '');
+        return aPhone && aPhone.slice(-8) === phoneDigits.slice(-8);
+      });
+      if (matchByPhone && matchByPhone.id) return matchByPhone.id;
+    }
+    if (pName && pName !== '-' && pName !== '고객') {
+      const matchByName = gApps.find(a => a.patientName && a.patientName.trim() === pName);
+      if (matchByName && matchByName.id) return matchByName.id;
+    }
+  }
+
+  // 3. targetObj.serviceId 또는 targetObj.id
+  if (targetObj && targetObj.serviceId && !targetObj.serviceId.startsWith('TMP-')) return targetObj.serviceId;
+  if (r.serviceId && !r.serviceId.startsWith('TMP-')) return r.serviceId;
+  if (targetObj && targetObj.id) return targetObj.id;
+  return r.serviceId || r.targetId || '-';
+}
+
+// 환자명 정밀 복원 헬퍼 (누락 방지)
+function resolveResponsePatientName(r, targetObj) {
+  if (r.patientName && r.patientName.trim() !== '' && r.patientName.trim() !== '-') {
+    return r.patientName.trim();
+  }
+  if (targetObj && targetObj.patientName && targetObj.patientName.trim() !== '' && targetObj.patientName.trim() !== '-') {
+    return targetObj.patientName.trim();
+  }
+  // gApps에서 전화번호로 환자명 매칭
+  const phoneDigits = String(r.couponPhone || r.patientPhone || (targetObj && (targetObj.couponPhone || targetObj.patientPhone)) || '').replace(/[^0-9]/g, '');
+  if (phoneDigits && phoneDigits.length >= 8 && typeof gApps !== 'undefined' && Array.isArray(gApps)) {
+    const matchByPhone = gApps.find(a => {
+      const aPhone = String(a.patientPhone || a.contact || a.phone || '').replace(/[^0-9]/g, '');
+      return aPhone && aPhone.slice(-8) === phoneDigits.slice(-8);
+    });
+    if (matchByPhone && matchByPhone.patientName) return matchByPhone.patientName.trim();
+  }
+  return '고객';
+}
+
+// 세부 응답 내역 모달 팝업 열기 (설정된 설문 문항 스키마 gSurveyState.schema 기반 동적 렌더링)
 function openSurveyDetailResponseModal(responseId, targetId) {
   const responses = getAllCompletedResponses();
-  const resp = responses.find(r => r.id === responseId || r.targetId === targetId || r.serviceId === targetId);
+  let resp = responses.find(r => 
+    r.id === responseId || 
+    r.targetId === targetId || 
+    r.serviceId === targetId || 
+    (r.displayAppId && r.displayAppId === targetId) ||
+    (targetId && (r.id === targetId || r.serviceId === targetId || r.targetId === targetId)) ||
+    (responseId && (r.serviceId === responseId || r.targetId === responseId || r.displayAppId === responseId))
+  );
+
+  // Fallback: gSurveyState.responses 또는 gSurveyState.targets에서 직접 조회
+  if (!resp) {
+    const rawR = (gSurveyState.responses || []).find(r => r.id === responseId || r.targetId === targetId || r.serviceId === targetId || r.serviceId === responseId);
+    if (rawR) {
+      const targetObj = (gSurveyState.targets || []).find(t => t.id === rawR.targetId || t.serviceId === rawR.serviceId) || rawR;
+      resp = {
+        ...rawR,
+        displayAppId: resolveResponseDisplayAppId(rawR, targetObj),
+        patientName: resolveResponsePatientName(rawR, targetObj),
+        avgRating: calculateSurveyAvgScore(rawR),
+        _target: targetObj
+      };
+    }
+  }
+
   if (!resp) {
     alert('해당 설문 응답 정보를 찾을 수 없습니다.');
     return;
   }
+
+  const targetObj = resp._target || (gSurveyState.targets || []).find(t => t.id === resp.targetId || t.serviceId === resp.serviceId) || resp;
+  const cleanAppId = resp.displayAppId || resolveResponseDisplayAppId(resp, targetObj);
+  const realPatientName = resp.patientName || resolveResponsePatientName(resp, targetObj);
 
   let modal = document.getElementById('surveyDetailResponseModal');
   if (!modal) {
@@ -357,6 +482,92 @@ function openSurveyDetailResponseModal(responseId, targetId) {
     ? '<span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">발송완료</span>'
     : '<span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs">미발송 (발송대기)</span>';
 
+  const cleanHospital = cleanSurveyHospitalName(resp.hospitalName || targetObj.hospitalName, targetObj);
+  const startDateClean = formatSurveyDate(resp.careStartDate || targetObj.careStartDate);
+  const endDateClean = formatSurveyDate(resp.careEndDate || targetObj.careEndDate);
+  const carerName = resp.caregiverName || targetObj.caregiverName || '담당 간병인';
+  const hasLog = Boolean(resp.hasCareLog || hasTargetCareLog(targetObj));
+
+  // 현재 설정된 문항 스키마 (gSurveyState.schema) 기반 동적 문항 렌더링
+  const currentSchema = (Array.isArray(gSurveyState.schema) && gSurveyState.schema.length > 0)
+    ? gSurveyState.schema
+    : DEFAULT_SURVEY_SCHEMA_V1;
+
+  const ans = resp.answers || {};
+
+  const questionsHtml = currentSchema.map((q, idx) => {
+    const qNum = q.id || `Q${idx + 1}`;
+    const qKeyLower = qNum.toLowerCase();
+    const qKeyUpper = qNum.toUpperCase();
+
+    // 답변 값 추출 (answers 객체 또는 resp 기본 프로퍼티)
+    let val = ans[qKeyLower] !== undefined ? ans[qKeyLower] : (ans[qKeyUpper] !== undefined ? ans[qKeyUpper] : ans[q.id]);
+    const isUnk = Boolean(
+      ans[qKeyLower + 'Unknown'] || ans[qKeyUpper + 'Unknown'] || ans[q.id + 'Unknown'] ||
+      (qNum === 'Q3' && resp.q3Unknown) || (qNum === 'Q4' && resp.q4Unknown)
+    );
+
+    if (val === undefined || val === null || val === '') {
+      if (qNum === 'Q1') val = resp.respondentType;
+      else if (qNum === 'Q2') val = resp.q2;
+      else if (qNum === 'Q3') val = isUnk ? '' : resp.q3;
+      else if (qNum === 'Q4') val = isUnk ? '' : resp.q4;
+      else if (qNum === 'Q5') val = resp.comment;
+      else if (qNum === 'Q6') val = resp.callbackRequested;
+    }
+
+    let answerHtml = '';
+
+    if (q.type === 'single_choice') {
+      let optLabel = val;
+      if (q.options && Array.isArray(q.options)) {
+        const matchedOpt = q.options.find(o => o.value === val);
+        if (matchedOpt) optLabel = matchedOpt.label;
+      }
+      if (!optLabel && qNum === 'Q1') optLabel = roleText;
+      answerHtml = `
+        <div class="inline-flex items-center px-3 py-1 rounded-xl bg-emerald-50 text-emerald-800 font-extrabold border border-emerald-200 text-xs">
+          ${escapeHtml(optLabel || '-')}
+        </div>
+      `;
+    } else if (q.type === 'rating_5' || q.type === 'rating_5_with_unknown') {
+      if (isUnk || val === 0 || val === 'unknown') {
+        answerHtml = `<span class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold border border-slate-200 text-xs">잘모름</span>`;
+      } else {
+        answerHtml = `<div>${starsHtml(val || 5)}</div>`;
+      }
+    } else if (q.type === 'text') {
+      const textVal = String(val || resp.comment || '').trim();
+      answerHtml = `
+        <div class="p-3 bg-slate-50 rounded-xl text-slate-800 font-medium leading-relaxed whitespace-pre-wrap text-xs border border-slate-200">
+          ${textVal ? escapeHtml(textVal) : '<span class="text-slate-400 font-normal">(남겨주신 의견이 없습니다)</span>'}
+        </div>
+      `;
+    } else if (q.type === 'boolean_callback') {
+      const isYes = Boolean(val === true || val === 'true' || resp.callbackRequested);
+      answerHtml = `
+        <div>
+          ${isYes 
+            ? '<span class="px-3 py-1 rounded-full bg-rose-100 text-rose-800 font-extrabold border border-rose-300 text-xs inline-flex items-center gap-1">📞 담당자 유선 연락 희망</span>' 
+            : '<span class="px-3 py-1 rounded-full bg-slate-100 text-slate-500 font-medium border border-slate-200 text-xs">연락 불필요</span>'}
+        </div>
+      `;
+    } else {
+      answerHtml = `<div class="text-slate-800 font-bold text-xs">${escapeHtml(String(val || '-'))}</div>`;
+    }
+
+    return `
+      <div class="p-3.5 bg-white rounded-2xl border border-slate-200 space-y-2 shadow-3xs">
+        <div class="flex items-center justify-between">
+          <span class="text-slate-700 font-bold block text-xs leading-snug">
+            <span class="text-emerald-700 font-black mr-1">[${qNum}]</span>${escapeHtml(q.title || '설문 문항')}
+          </span>
+        </div>
+        <div>${answerHtml}</div>
+      </div>
+    `;
+  }).join('');
+
   modal.innerHTML = `
     <div class="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
       <div class="p-5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between">
@@ -366,7 +577,7 @@ function openSurveyDetailResponseModal(responseId, targetId) {
           </div>
           <div>
             <h3 class="font-black text-sm">고객 만족도 설문 상세 응답서</h3>
-            <p class="text-[11px] text-white/80 font-mono mt-0.5">응답ID: ${resp.id} · 신청ID: ${resp.serviceId || '-'}</p>
+            <p class="text-[11px] text-white/90 font-mono mt-0.5">신청ID: <b class="text-white underline font-bold">${cleanAppId}</b> · 응답ID: ${resp.id}</p>
           </div>
         </div>
         <button type="button" onclick="closeSurveyDetailResponseModal()" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center cursor-pointer transition-all">
@@ -375,74 +586,75 @@ function openSurveyDetailResponseModal(responseId, targetId) {
       </div>
 
       <div class="p-6 space-y-4 max-h-[calc(85vh-130px)] overflow-y-auto custom-scrollbar text-xs">
-        <!-- 기본 정보 카드 -->
-        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 grid grid-cols-2 gap-2.5">
-          <div>
-            <span class="text-slate-400 font-medium block text-[11px]">환자명</span>
-            <span class="font-extrabold text-slate-900 text-sm">${maskPatientName(resp.patientName)}</span>
+        <!-- 기본 정보 카드 (대상자 관리 정보 통합 연동) -->
+        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <span class="text-slate-400 font-medium block text-[11px]">환자명 (응답자)</span>
+              <span class="font-black text-slate-900 text-sm">${maskPatientName(realPatientName)}</span>
+              <span class="text-slate-500 text-[11px] ml-1">(${roleText})</span>
+            </div>
+            <div>
+              <span class="text-slate-400 font-medium block text-[11px]">신청 ID</span>
+              <span class="font-extrabold text-sky-800 font-mono text-sm">${cleanAppId}</span>
+            </div>
+            <div>
+              <span class="text-slate-400 font-medium block text-[11px]">쿠폰 수신 연락처</span>
+              <span class="font-bold text-indigo-700 font-mono text-xs">${formatCouponPhoneDisplay(resp.couponPhone || resp.callbackPhone || '-')}</span>
+            </div>
+            <div>
+              <span class="text-slate-400 font-medium block text-[11px]">설문 제출 일시</span>
+              <span class="font-mono text-slate-700">${formatSurveyDate(resp.submittedAt)}</span>
+            </div>
           </div>
-          <div>
-            <span class="text-slate-400 font-medium block text-[11px]">응답자 구분</span>
-            <span class="font-extrabold text-emerald-800">${roleText}</span>
-          </div>
-          <div>
-            <span class="text-slate-400 font-medium block text-[11px]">쿠폰 수신 연락처</span>
-            <span class="font-bold text-sky-800 font-mono">${formatCouponPhoneDisplay(resp.couponPhone || resp.callbackPhone || '-')}</span>
-          </div>
-          <div>
-            <span class="text-slate-400 font-medium block text-[11px]">설문 제출 일시</span>
-            <span class="font-mono text-slate-700">${formatSurveyDate(resp.submittedAt)}</span>
+
+          <div class="pt-2 border-t border-slate-200/80 grid grid-cols-2 gap-2.5">
+            <div>
+              <span class="text-slate-400 font-medium block text-[11px]">병원 / 서비스기간</span>
+              <span class="font-bold text-slate-800 text-[11.5px] block">${cleanHospital}</span>
+              <span class="text-slate-500 font-mono text-[10.5px]">${startDateClean || '-'} ~ ${endDateClean || '종료'}</span>
+            </div>
+            <div>
+              <span class="text-slate-400 font-medium block text-[11px]">담당간병인 / 일지</span>
+              <span class="font-bold text-slate-800 text-[11.5px] block">${carerName}</span>
+              <span class="inline-block mt-0.5">
+                ${hasLog 
+                  ? '<span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300">일지작성</span>' 
+                  : '<span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">일지없음</span>'}
+              </span>
+            </div>
           </div>
         </div>
 
-        <!-- 문항별 응답 상세 내역 -->
+        <!-- 평가 종합 요약 바 -->
+        <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center justify-between">
+          <div class="flex items-center gap-1.5">
+            <i data-lucide="star" class="w-4 h-4 text-amber-500 fill-amber-500"></i>
+            <span class="font-bold text-amber-900 text-xs">평가 항목 종합 평균</span>
+          </div>
+          <div class="text-sm font-black text-amber-600">
+            ★ ${resp.avgRating || '5.0'}점 <span class="text-[11px] text-amber-700 font-semibold">(5점 만점)</span>
+          </div>
+        </div>
+
+        <!-- 문항별 응답 상세 내역 (설정된 문항 스키마 실시간 연동) -->
         <div class="space-y-3">
           <h4 class="font-black text-slate-800 text-xs border-b border-slate-100 pb-1.5 flex items-center gap-1.5">
             <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
-            문항별 세부 평가 결과
+            문항별 세부 평가 결과 (내가 설정한 문답 내역)
           </h4>
-
-          <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
-            <span class="text-slate-500 font-semibold block text-[11px]">Q2. 이번 간병 서비스 전반적 만족도</span>
-            <div>${starsHtml(resp.q2)}</div>
-          </div>
-
-          <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
-            <span class="text-slate-500 font-semibold block text-[11px]">Q3. 담당 간병인의 친절함 및 태도</span>
-            <div>${resp.q3Unknown ? '<span class="text-slate-400 font-bold">잘모름</span>' : starsHtml(resp.q3)}</div>
-          </div>
-
-          <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
-            <span class="text-slate-500 font-semibold block text-[11px]">Q4. 제공된 돌봄(식사, 위생, 체위 등) 품질</span>
-            <div>${resp.q4Unknown ? '<span class="text-slate-400 font-bold">잘모름</span>' : starsHtml(resp.q4)}</div>
-          </div>
-
-          <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5">
-            <span class="text-slate-500 font-semibold block text-[11px]">Q5. 좋았던 점 또는 개선 의견 (고객 코멘트)</span>
-            <div class="p-2.5 bg-slate-50 rounded-lg text-slate-800 font-medium leading-relaxed whitespace-pre-wrap">
-              ${resp.comment ? escapeHtml(resp.comment) : '<span class="text-slate-400">(남겨주신 의견이 없습니다)</span>'}
-            </div>
-          </div>
-
-          <div class="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-            <span class="text-slate-500 font-semibold text-[11px]">Q6. 담당자 유선 연락 희망 여부</span>
-            <div>
-              ${resp.callbackRequested 
-                ? '<span class="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold border border-rose-300">📞 연락 희망</span>' 
-                : '<span class="text-slate-400 font-medium">연락 불필요</span>'}
-            </div>
-          </div>
+          ${questionsHtml}
         </div>
 
         <!-- 선물 발송 상태 섹션 -->
         <div class="p-3.5 bg-amber-50/70 rounded-2xl border border-amber-200 flex items-center justify-between">
           <div>
             <span class="text-amber-900 font-extrabold text-xs block">🎁 고객 선물(쿠폰) 발송 현황</span>
-            <span class="text-[11px] text-amber-800 mt-0.5 block">${resp._target?.giftItem || '스타벅스 아메리카노 Tall 1매'}</span>
+            <span class="text-[11px] text-amber-800 mt-0.5 block">${targetObj?.giftItem || '스타벅스 아메리카노 Tall 1매'}</span>
           </div>
           <div class="flex items-center gap-2">
             ${giftStatusBadge}
-            <button type="button" onclick="toggleSurveyGiftSent('${resp.targetId || resp.serviceId}'); closeSurveyDetailResponseModal();" 
+            <button type="button" onclick="toggleSurveyGiftSent('${targetObj.id || resp.targetId || resp.serviceId}'); closeSurveyDetailResponseModal();" 
               class="px-2.5 py-1 rounded-xl bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs cursor-pointer shadow-3xs transition-all">
               상태변경
             </button>
@@ -468,20 +680,27 @@ function closeSurveyDetailResponseModal() {
   if (modal) modal.classList.add('hidden');
 }
 
-// 완료된 전체 응답 목록 수집 헬퍼 (중복 제거 및 김지훈 등 전수 포함)
+// 완료된 전체 응답 목록 수집 헬퍼 (중복 제거, 신청ID 및 대상자 정보 정밀 매핑)
 function getAllCompletedResponses() {
   const respMap = new Map();
 
   // 1) gSurveyState.targets 중 SUBMITTED인 건
   (gSurveyState.targets || []).filter(t => t.responseStatus === 'SUBMITTED').forEach(t => {
-    const key = String(t.serviceId || t.id);
-    respMap.set(key, {
+    const cleanAppId = resolveResponseDisplayAppId(t, t);
+    const key = String(t.serviceId || t.id || cleanAppId);
+    const item = {
       id: t.responseId || ('SR-' + t.id),
       targetId: t.id,
       serviceId: t.serviceId || t.id,
-      patientName: t.patientName,
-      patientPhone: t.patientPhone,
-      couponPhone: t.couponPhone || t.patientPhone,
+      displayAppId: cleanAppId,
+      patientName: t.patientName || '고객',
+      patientPhone: t.patientPhone || '',
+      couponPhone: t.couponPhone || t.patientPhone || '',
+      hospitalName: t.hospitalName || '',
+      careStartDate: t.careStartDate || '',
+      careEndDate: t.careEndDate || '',
+      caregiverName: t.caregiverName || '',
+      hasCareLog: hasTargetCareLog(t),
       respondentType: t.respondentType || 'PATIENT',
       q2: t.q2Score !== undefined ? t.q2Score : 5,
       q3: t.q3Score !== undefined ? t.q3Score : 5,
@@ -491,26 +710,66 @@ function getAllCompletedResponses() {
       comment: t.surveyComment || '',
       callbackRequested: Boolean(t.callbackRequested),
       submittedAt: t.submittedAt || t.updatedAt || t.createdAt,
+      answers: t.answers || {},
       _target: t
-    });
+    };
+    item.avgRating = calculateSurveyAvgScore(item);
+    respMap.set(key, item);
   });
 
   // 2) gSurveyState.responses
   (gSurveyState.responses || []).forEach(r => {
     const sId = String(r.serviceId || r.targetId || r.id);
-    const matchedTarget = (gSurveyState.targets || []).find(t => t.id === r.targetId || t.serviceId === r.serviceId || t.id === sId || t.serviceId === sId);
-    const existing = respMap.get(sId);
+    const phoneDigits = String(r.couponPhone || r.patientPhone || r.callbackPhone || '').replace(/[^0-9]/g, '');
+
+    // 정밀 대상자 매칭 (ID -> 토큰 -> 전화번호 -> 환자명)
+    let matchedTarget = (gSurveyState.targets || []).find(t => 
+      t.id === r.targetId || t.serviceId === r.serviceId || t.id === sId || t.serviceId === sId ||
+      (t.token && r.token && t.token === r.token)
+    );
+
+    if (!matchedTarget && phoneDigits && phoneDigits.length >= 8) {
+      matchedTarget = (gSurveyState.targets || []).find(t => {
+        const tDigits = String(t.patientPhone || t.couponPhone || '').replace(/[^0-9]/g, '');
+        return tDigits && tDigits.slice(-8) === phoneDigits.slice(-8);
+      });
+    }
+
+    if (!matchedTarget && r.patientName && r.patientName.trim() !== '' && r.patientName.trim() !== '-') {
+      matchedTarget = (gSurveyState.targets || []).find(t => t.patientName && t.patientName.trim() === r.patientName.trim());
+    }
+
+    const cleanAppId = resolveResponseDisplayAppId(r, matchedTarget);
+    const resolvedName = resolveResponsePatientName(r, matchedTarget);
+    const mapKey = String(cleanAppId || sId);
+
+    const existing = respMap.get(mapKey) || respMap.get(sId);
     if (!existing) {
-      respMap.set(sId, {
+      const item = {
         ...r,
-        patientName: r.patientName || (matchedTarget && matchedTarget.patientName) || '고객',
+        displayAppId: cleanAppId,
+        patientName: resolvedName,
         patientPhone: r.patientPhone || (matchedTarget && matchedTarget.patientPhone) || '',
         couponPhone: r.couponPhone || r.callbackPhone || (matchedTarget && (matchedTarget.couponPhone || matchedTarget.patientPhone)) || '',
-        _target: matchedTarget || { id: r.targetId, serviceId: r.serviceId, giftStatus: 'PENDING' }
-      });
+        hospitalName: r.hospitalName || (matchedTarget && matchedTarget.hospitalName) || '',
+        careStartDate: r.careStartDate || (matchedTarget && matchedTarget.careStartDate) || '',
+        careEndDate: r.careEndDate || (matchedTarget && matchedTarget.careEndDate) || '',
+        caregiverName: r.caregiverName || (matchedTarget && matchedTarget.caregiverName) || '',
+        hasCareLog: hasTargetCareLog(matchedTarget || r),
+        _target: matchedTarget || { id: r.targetId || cleanAppId, serviceId: cleanAppId, giftStatus: 'PENDING' }
+      };
+      item.avgRating = calculateSurveyAvgScore(item);
+      respMap.set(mapKey, item);
     } else {
       if (!existing.comment && r.comment) existing.comment = r.comment;
-      if (r.answers && !existing.answers) existing.answers = r.answers;
+      if (r.answers && (!existing.answers || Object.keys(existing.answers).length === 0)) existing.answers = r.answers;
+      if (cleanAppId && cleanAppId !== '-' && (!existing.displayAppId || existing.displayAppId.startsWith('TMP-'))) {
+        existing.displayAppId = cleanAppId;
+      }
+      if (resolvedName && resolvedName !== '-' && (!existing.patientName || existing.patientName === '고객')) {
+        existing.patientName = resolvedName;
+      }
+      existing.avgRating = calculateSurveyAvgScore(existing);
     }
   });
 
@@ -789,18 +1048,22 @@ function updateSurveyChipCounts() {
   const previewSelect = document.getElementById('surveyNewPreviewTargetSelect');
   if (previewSelect) {
     const prevVal = previewSelect.value;
+    const firstRealTarget = targets.find(t => t.serviceId && !t.serviceId.startsWith('TMP-')) || targets[0];
     const optionsHtml = [
-      `<option value="">고연분 님 (기본 샘플 · 16일 모바일 일지)</option>`,
+      ...(firstRealTarget ? [`<option value="${firstRealTarget.id}">[기본 선택] ${maskPatientName(firstRealTarget.patientName || '고객')} 님 (${firstRealTarget.serviceId || firstRealTarget.id} · 간병인: ${firstRealTarget.caregiverName || '지정'})</option>`] : [`<option value="">고연분 님 (기본 샘플 · 16일 모바일 일지)</option>`]),
       ...targets.slice(0, 50).map(t => {
+        if (firstRealTarget && t.id === firstRealTarget.id) return '';
         const pName = maskPatientName(t.patientName || '고객');
         const cName = t.caregiverName || '미지정';
         const sId = t.serviceId || t.id;
         return `<option value="${t.id}">${pName} 님 (${sId} · 간병인: ${cName})</option>`;
-      })
+      }).filter(Boolean)
     ].join('');
     previewSelect.innerHTML = optionsHtml;
     if (prevVal && Array.from(previewSelect.options).some(o => o.value === prevVal)) {
       previewSelect.value = prevVal;
+    } else if (firstRealTarget) {
+      previewSelect.value = firstRealTarget.id;
     }
   }
 }
@@ -1714,7 +1977,7 @@ function renderSurveyResponses() {
   const tbodyNew = document.getElementById('surveyResponsesTableBody_new');
   if (!tbody && !tbodyNew) return;
 
-  // 1. 전체 응답 수집 (김지훈 포함 누락 없는 통합 수집)
+  // 1. 전체 응답 수집 (김지훈 포함 누락 없는 통합 수집 & 신청ID/환자명/병원/간병인/일지 정밀 연동)
   let responses = getAllCompletedResponses();
 
   // 2. 검색 필터
@@ -1724,8 +1987,11 @@ function renderSurveyResponses() {
     const searchDigits = search.replace(/[^0-9]/g, '');
     responses = responses.filter(r => 
       (r.patientName && r.patientName.toLowerCase().includes(search)) ||
+      (r.displayAppId && r.displayAppId.toLowerCase().includes(search)) ||
       (r.serviceId && r.serviceId.toLowerCase().includes(search)) ||
       (r.id && r.id.toLowerCase().includes(search)) ||
+      (r.hospitalName && r.hospitalName.toLowerCase().includes(search)) ||
+      (r.caregiverName && r.caregiverName.toLowerCase().includes(search)) ||
       (r.comment && r.comment.toLowerCase().includes(search)) ||
       (searchDigits && r.couponPhone && r.couponPhone.replace(/[^0-9]/g, '').includes(searchDigits)) ||
       (searchDigits && r.patientPhone && r.patientPhone.replace(/[^0-9]/g, '').includes(searchDigits))
@@ -1745,12 +2011,12 @@ function renderSurveyResponses() {
   const sortVal = document.getElementById('surveyResultSortSelect')?.value || 'RECENT_FIRST';
   responses.sort((a, b) => {
     if (sortVal === 'RATING_DESC') {
-      const sa = Number(a.q2) || 0;
-      const sb = Number(b.q2) || 0;
+      const sa = Number(a.avgRating || a.q2) || 0;
+      const sb = Number(b.avgRating || b.q2) || 0;
       if (sa !== sb) return sb - sa;
     } else if (sortVal === 'RATING_ASC') {
-      const sa = Number(a.q2) || 0;
-      const sb = Number(b.q2) || 0;
+      const sa = Number(a.avgRating || a.q2) || 0;
+      const sb = Number(b.avgRating || b.q2) || 0;
       if (sa !== sb) return sa - sb;
     } else if (sortVal === 'GIFT_PENDING_FIRST') {
       const ga = getEffectiveGiftStatus(a._target || a) === 'PENDING' ? 0 : 1;
@@ -1771,10 +2037,25 @@ function renderSurveyResponses() {
     return tb - ta;
   });
 
+  // 상단 카운트 및 평균 만족도 통계 계산
+  const totalCount = responses.length;
+  let avgScoreDisplay = '0.0';
+  if (totalCount > 0) {
+    const totalScoreSum = responses.reduce((acc, r) => acc + (Number(r.avgRating || r.q2) || 5), 0);
+    avgScoreDisplay = (totalScoreSum / totalCount).toFixed(1);
+  }
+
   const labelEl = document.getElementById('surveyResponseCountLabel');
-  if (labelEl) labelEl.innerText = responses.length;
+  if (labelEl) labelEl.innerText = totalCount;
   const labelElNew = document.getElementById('surveyResponseCountLabel_new');
-  if (labelElNew) labelElNew.innerText = responses.length;
+  if (labelElNew) labelElNew.innerText = totalCount;
+  const avgScoreElNew = document.getElementById('surveyResultAvgScore_new');
+  if (avgScoreElNew) avgScoreElNew.innerText = `★ ${avgScoreDisplay}점`;
+
+  // 미발송 선물 대기 건수
+  const pendingGiftCount = responses.filter(r => getEffectiveGiftStatus(r._target || r) === 'PENDING').length;
+  const pendingGiftEl = document.getElementById('surveyResultPendingGiftCount');
+  if (pendingGiftEl) pendingGiftEl.innerText = pendingGiftCount;
 
   if (responses.length === 0) {
     const emptyRow = (cols) => `
@@ -1785,8 +2066,8 @@ function renderSurveyResponses() {
         </td>
       </tr>
     `;
-    if (tbody) tbody.innerHTML = emptyRow(10);
-    if (tbodyNew) tbodyNew.innerHTML = emptyRow(12);
+    if (tbody) tbody.innerHTML = emptyRow(9);
+    if (tbodyNew) tbodyNew.innerHTML = emptyRow(11);
     if (typeof lucide !== 'undefined') lucide.createIcons();
     return;
   }
@@ -1797,12 +2078,21 @@ function renderSurveyResponses() {
     tbodyNew.innerHTML = responses.map((r, idx) => {
       const targetObj = r._target || (gSurveyState.targets || []).find(t => t.id === r.targetId || t.serviceId === r.serviceId) || r;
       const targetId = targetObj.id || r.targetId || r.serviceId;
+      const displayAppId = r.displayAppId || resolveResponseDisplayAppId(r, targetObj);
       const giftStatus = getEffectiveGiftStatus(targetObj);
       const isSent = giftStatus === 'SENT';
 
-      const q3Display = r.q3Unknown ? '<span class="text-slate-400">잘모름</span>' : (r.q3 ? `${r.q3}점` : '-');
-      const q4Display = r.q4Unknown ? '<span class="text-slate-400">잘모름</span>' : (r.q4 ? `${r.q4}점` : '-');
+      const cleanHospital = cleanSurveyHospitalName(r.hospitalName || targetObj.hospitalName, targetObj);
+      const startDateClean = formatSurveyDate(r.careStartDate || targetObj.careStartDate);
+      const endDateClean = formatSurveyDate(r.careEndDate || targetObj.careEndDate);
+      const carerName = r.caregiverName || targetObj.caregiverName || '미지정';
+      const hasLog = Boolean(r.hasCareLog || hasTargetCareLog(targetObj));
+      const logBadge = hasLog
+        ? `<span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-3xs shrink-0" title="모바일 간병일지 등록됨"><i data-lucide="file-check-2" class="w-3 h-3 text-emerald-600"></i>일지작성</span>`
+        : `<span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-slate-100 text-slate-500 border border-slate-200 shrink-0" title="간병일지 미작성"><i data-lucide="file-x-2" class="w-3 h-3 text-slate-400"></i>일지없음</span>`;
+
       const submitTimeStr = formatSurveyDate(r.submittedAt);
+      const avgScore = r.avgRating || calculateSurveyAvgScore(r);
 
       const giftStatusBadge = isSent ? `
         <div class="inline-flex flex-col items-center">
@@ -1840,30 +2130,37 @@ function renderSurveyResponses() {
             <input type="checkbox" class="survey-response-check rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" data-target-id="${targetId}">
           </td>
           <td class="p-3 text-center font-mono text-slate-400 text-[11px]">${idx + 1}</td>
-          <td class="p-3 font-mono font-bold text-sky-700 whitespace-nowrap">${r.serviceId || '-'}</td>
+          <td class="p-3 font-mono font-black text-rose-700 whitespace-nowrap text-xs">${displayAppId}</td>
           <td class="p-3 font-bold text-slate-900 whitespace-nowrap">
-            <span>${maskPatientName(r.patientName)}</span>
-            <span class="text-slate-400 text-[11px] font-normal ml-1">(${respTypes[r.respondentType] || r.respondentType || '고객'})</span>
-            ${r.patientPhone ? `<span class="block text-[10.5px] text-slate-400 font-normal font-mono">${maskPhone(r.patientPhone)}</span>` : ''}
+            <div class="flex items-center gap-1">
+              <span>${maskPatientName(r.patientName)}</span>
+              <span class="text-slate-500 text-[10.5px] font-normal">(${respTypes[r.respondentType] || r.respondentType || '고객'})</span>
+            </div>
+            <span class="block text-[10.5px] text-indigo-700 font-bold font-mono mt-0.5">
+              ${formatCouponPhoneDisplay(r.couponPhone || r.patientPhone || '-')}
+            </span>
           </td>
-          <td class="p-3 whitespace-nowrap font-mono font-bold text-indigo-700">
-            ${formatCouponPhoneDisplay(r.couponPhone || r.callbackPhone || '-')}
+          <td class="p-3 text-slate-600 whitespace-nowrap">
+            <div class="font-semibold text-slate-800 text-xs">${cleanHospital}</div>
+            <div class="text-[10.5px] text-slate-500 font-mono">${startDateClean || '-'} ~ ${endDateClean || '종료'}</div>
           </td>
-          <td class="p-3 text-center whitespace-nowrap font-mono text-slate-600">${submitTimeStr}</td>
-          <td class="p-3 text-center font-extrabold whitespace-nowrap text-amber-600">
-            <span class="text-sm">★ ${r.q2 || 5}</span>점
+          <td class="p-3 whitespace-nowrap">
+            <span class="font-bold text-slate-800 text-xs">${carerName}</span>
           </td>
-          <td class="p-3 text-center whitespace-nowrap font-semibold">${q3Display}</td>
-          <td class="p-3 text-center whitespace-nowrap font-semibold">${q4Display}</td>
-          <td class="p-3 text-slate-700 max-w-[200px] truncate" title="${escapeHtml(r.comment || '')}">
-            ${r.comment ? escapeHtml(r.comment) : '<span class="text-slate-300 font-normal">(의견 없음)</span>'}
+          <td class="p-3 text-center whitespace-nowrap">${logBadge}</td>
+          <td class="p-3 text-center whitespace-nowrap">
+            <div class="inline-flex flex-col items-center">
+              <span class="text-sm font-black text-amber-600">★ ${avgScore}점</span>
+              <span class="text-[10px] text-slate-500 font-mono font-medium">(전반 ${r.q2 || 5}점)</span>
+            </div>
           </td>
+          <td class="p-3 text-center whitespace-nowrap font-mono text-slate-600 text-xs">${submitTimeStr}</td>
           <td class="p-3 text-center whitespace-nowrap">${giftStatusBadge}</td>
           <td class="p-3 text-center whitespace-nowrap">
             <div class="inline-flex items-center gap-1.5 justify-center">
               <button type="button" onclick="openSurveyDetailResponseModal('${r.id}', '${targetId}')" 
                 class="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 font-extrabold text-xs flex items-center gap-1 cursor-pointer transition-all shadow-3xs" 
-                title="문항별 세부 응답 내역 보기">
+                title="내가 설정한 문항별 세부 응답 내역 보기">
                 <i data-lucide="eye" class="w-3 h-3 text-sky-600"></i>
                 <span>세부응답 보기</span>
               </button>
@@ -1883,18 +2180,33 @@ function renderSurveyResponses() {
   // 구버전 테이블 호환 렌더링
   if (tbody) {
     tbody.innerHTML = responses.map(r => {
-      const q3Display = r.q3Unknown ? '<span class="text-slate-400">잘모름</span>' : (r.q3 ? `${r.q3}점` : '-');
-      const q4Display = r.q4Unknown ? '<span class="text-slate-400">잘모름</span>' : (r.q4 ? `${r.q4}점` : '-');
+      const targetObj = r._target || (gSurveyState.targets || []).find(t => t.id === r.targetId || t.serviceId === r.serviceId) || r;
+      const displayAppId = r.displayAppId || resolveResponseDisplayAppId(r, targetObj);
+      const cleanHospital = cleanSurveyHospitalName(r.hospitalName || targetObj.hospitalName, targetObj);
+      const startDateClean = formatSurveyDate(r.careStartDate || targetObj.careStartDate);
+      const endDateClean = formatSurveyDate(r.careEndDate || targetObj.careEndDate);
+      const carerName = r.caregiverName || targetObj.caregiverName || '미지정';
+      const hasLog = Boolean(r.hasCareLog || hasTargetCareLog(targetObj));
+      const logBadge = hasLog
+        ? `<span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-300">일지작성</span>`
+        : `<span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-semibold text-[10px] border border-slate-200">일지없음</span>`;
+
       return `
         <tr class="hover:bg-slate-50 transition-colors">
           <td class="p-3 font-mono font-bold text-slate-700 whitespace-nowrap">${r.id}</td>
-          <td class="p-3 font-mono font-bold text-sky-700 whitespace-nowrap">${r.serviceId || '-'}</td>
-          <td class="p-3 font-bold text-slate-900 whitespace-nowrap">${maskPatientName(r.patientName)}</td>
-          <td class="p-3 whitespace-nowrap font-medium text-slate-800">${respTypes[r.respondentType] || r.respondentType}</td>
-          <td class="p-3 text-center font-bold whitespace-nowrap text-amber-600">${r.q2 || '-'}점</td>
-          <td class="p-3 text-center whitespace-nowrap font-semibold">${q3Display}</td>
-          <td class="p-3 text-center whitespace-nowrap font-semibold">${q4Display}</td>
-          <td class="p-3 text-slate-700 max-w-sm truncate" title="${r.comment || ''}">${r.comment || '<span class="text-slate-300">(의견 없음)</span>'}</td>
+          <td class="p-3 font-mono font-bold text-rose-700 whitespace-nowrap">${displayAppId}</td>
+          <td class="p-3 font-bold text-slate-900 whitespace-nowrap">
+            ${maskPatientName(r.patientName)}
+            <span class="text-slate-400 text-[10.5px] ml-1">(${respTypes[r.respondentType] || r.respondentType})</span>
+            <span class="block text-[10.5px] text-indigo-700 font-mono font-normal mt-0.5">${formatCouponPhoneDisplay(r.couponPhone || r.patientPhone || '-')}</span>
+          </td>
+          <td class="p-3 text-slate-700 whitespace-nowrap">
+            <div class="font-bold">${cleanHospital}</div>
+            <div class="text-[10px] text-slate-400 font-mono">${startDateClean || '-'} ~ ${endDateClean || '종료'}</div>
+          </td>
+          <td class="p-3 whitespace-nowrap font-medium text-slate-800">${carerName}</td>
+          <td class="p-3 text-center whitespace-nowrap">${logBadge}</td>
+          <td class="p-3 text-center font-black whitespace-nowrap text-amber-600">★ ${r.avgRating || r.q2 || 5}점</td>
           <td class="p-3 text-center whitespace-nowrap">
             ${r.callbackRequested 
               ? '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold border border-rose-300">연락 희망</span>' 
@@ -2351,11 +2663,16 @@ let gSurveyNewTitleTheme = localStorage.getItem('LIVON_SURVEY_NEW_TITLE_THEME') 
 let gSurveyNewModalCurrentUrl = '';
 
 function buildIntegratedSurveyUrl(targetId, extraParams = {}) {
-  const target = targetId ? (gSurveyState.targets || []).find(t => t.id === targetId || t.serviceId === targetId) : null;
+  let target = targetId ? (gSurveyState.targets || []).find(t => t.id === targetId || t.serviceId === targetId) : null;
+  // targetId가 없더라도 gSurveyState.targets에 대상자가 있으면 실제 대상자 기본 매핑 (TMP 방지)
+  if (!target && gSurveyState.targets && gSurveyState.targets.length > 0) {
+    target = gSurveyState.targets.find(t => t.serviceId && !t.serviceId.startsWith('TMP-')) || gSurveyState.targets[0];
+  }
   const q = new URLSearchParams();
   if (target) {
     if (target.token) q.set('t', target.token);
     if (target.id) q.set('targetId', target.id);
+    if (target.serviceId) q.set('serviceId', target.serviceId);
     if (target.patientName) q.set('patient', target.patientName);
     if (target.caregiverName) q.set('carer', target.caregiverName);
     if (target.hospitalName) q.set('hospital', cleanSurveyHospitalName(target.hospitalName, target));
