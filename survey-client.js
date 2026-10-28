@@ -146,6 +146,378 @@ const gSurveyState = {
 // =========================================================================
 // 0. 공통 유틸 및 헬퍼 함수
 // =========================================================================
+
+// 발송 결과 (성공/실패/미발송, 일시) 뱃지 렌더러
+function renderSmsResultBadge(target) {
+  if (!target) return '<span class="text-slate-400 font-medium text-[11px]">-</span>';
+
+  const history = Array.isArray(target.smsSentHistory) ? target.smsSentHistory : [];
+  const lastItem = history.length > 0 ? history[0] : null;
+  const sentTimeStr = target.lastSmsSentAt || (lastItem && lastItem.sentAt) || (target.guidanceRecord && target.guidanceRecord.occurredAt);
+
+  const formatShortTime = (iso) => {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return String(iso).slice(5, 16);
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const h = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      return `${m}.${day} ${h}:${min}`;
+    } catch (_) { return String(iso).slice(5, 16); }
+  };
+
+  if (lastItem) {
+    if (lastItem.status === 'SENT' || lastItem.status === 'SUCCESS') {
+      const timeFmt = formatShortTime(lastItem.sentAt || sentTimeStr);
+      return `
+        <div class="inline-flex flex-col items-center">
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-300 text-[10.5px]">
+            <i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-600"></i>
+            <span>성공</span>
+          </span>
+          ${timeFmt ? `<span class="text-[10px] text-slate-500 font-mono mt-0.5">${timeFmt}</span>` : ''}
+        </div>
+      `;
+    } else if (lastItem.status === 'FAILED' || lastItem.status === 'ERROR') {
+      const timeFmt = formatShortTime(lastItem.sentAt || sentTimeStr);
+      return `
+        <div class="inline-flex flex-col items-center">
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 font-bold border border-rose-300 text-[10.5px]" title="${escapeHtml(lastItem.error || '발송 실패')}">
+            <i data-lucide="alert-circle" class="w-3 h-3 text-rose-600"></i>
+            <span>실패</span>
+          </span>
+          ${timeFmt ? `<span class="text-[10px] text-rose-500 font-mono mt-0.5">${timeFmt}</span>` : ''}
+        </div>
+      `;
+    }
+  }
+
+  if (target.lastSmsSentAt || target.guidanceStatus === 'GUIDED') {
+    const timeFmt = formatShortTime(sentTimeStr);
+    return `
+      <div class="inline-flex flex-col items-center">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-300 text-[10.5px]">
+          <i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-600"></i>
+          <span>성공</span>
+        </span>
+        ${timeFmt ? `<span class="text-[10px] text-slate-500 font-mono mt-0.5">${timeFmt}</span>` : ''}
+      </div>
+    `;
+  }
+
+  return '<span class="text-slate-400 font-medium text-[11px]">미발송</span>';
+}
+
+// 설문 선물 발송완료 토글 함수
+async function toggleSurveyGiftSent(targetId) {
+  const target = (gSurveyState.targets || []).find(t => t.id === targetId || t.serviceId === targetId);
+  if (!target) return;
+
+  const currentStatus = getEffectiveGiftStatus(target);
+  const newStatus = currentStatus === 'SENT' ? 'PENDING' : 'SENT';
+  const nowIso = new Date().toISOString();
+
+  target.giftStatus = newStatus;
+  if (newStatus === 'SENT') {
+    target.giftSentAt = nowIso;
+    target.giftItem = target.giftItem || (gSurveyState.settings && gSurveyState.settings.defaultGiftItem) || '스타벅스 아메리카노 Tall 1매';
+    target.giftMethod = target.giftMethod || '모바일 기프티콘 (MMS)';
+    target.giftSender = '운영관리자';
+  } else {
+    target.giftSentAt = null;
+  }
+
+  // 로컬 영속화
+  persistSurveyTargets();
+  updateSurveyChipCounts();
+  renderSurveyResponses();
+  applySurveyFilters();
+
+  // Convex Cloud 동기화
+  if (typeof syncToConvex === 'function') {
+    try {
+      await syncToConvex('sync:updateSurveyTarget', {
+        id: target.id,
+        updates: {
+          giftStatus: target.giftStatus,
+          giftSentAt: target.giftSentAt,
+          giftItem: target.giftItem,
+          giftMethod: target.giftMethod,
+          giftSender: target.giftSender,
+          updatedAt: nowIso
+        }
+      });
+    } catch (e) {
+      console.warn('[Survey] Gift status sync warning:', e);
+    }
+  }
+
+  if (typeof showToast === 'function') {
+    showToast(newStatus === 'SENT' 
+      ? `${maskPatientName(target.patientName)} 님 선물 발송완료 처리되었습니다.`
+      : `${maskPatientName(target.patientName)} 님 선물 미발송(대기)으로 변경되었습니다.`, 
+      newStatus === 'SENT' ? 'success' : 'info');
+  }
+}
+
+// 선택된 응답자 일괄 선물 발송완료 처리
+async function batchMarkSelectedGiftsSent() {
+  const checkboxes = document.querySelectorAll('.survey-response-check:checked');
+  if (checkboxes.length === 0) {
+    if (typeof showToast === 'function') showToast('선물 발송완료 처리할 고객을 먼저 선택해 주세요.', 'warning');
+    else alert('선물 발송완료 처리할 고객을 먼저 선택해 주세요.');
+    return;
+  }
+
+  if (!confirm(`선택하신 ${checkboxes.length}명의 고객에게 선물이 발송완료되었음을 체크하시겠습니까?`)) {
+    return;
+  }
+
+  const nowIso = new Date().toISOString();
+  let updatedCount = 0;
+
+  for (const cb of checkboxes) {
+    const targetId = cb.getAttribute('data-target-id');
+    const target = (gSurveyState.targets || []).find(t => t.id === targetId || t.serviceId === targetId);
+    if (target) {
+      target.giftStatus = 'SENT';
+      target.giftSentAt = nowIso;
+      target.giftItem = target.giftItem || (gSurveyState.settings && gSurveyState.settings.defaultGiftItem) || '스타벅스 아메리카노 Tall 1매';
+      target.giftMethod = target.giftMethod || '모바일 기프티콘 (MMS)';
+      target.giftSender = '운영관리자';
+      updatedCount++;
+
+      if (typeof syncToConvex === 'function') {
+        syncToConvex('sync:updateSurveyTarget', {
+          id: target.id,
+          updates: {
+            giftStatus: 'SENT',
+            giftSentAt: nowIso,
+            giftItem: target.giftItem,
+            giftMethod: target.giftMethod,
+            giftSender: target.giftSender,
+            updatedAt: nowIso
+          }
+        }).catch(() => {});
+      }
+    }
+  }
+
+  persistSurveyTargets();
+  updateSurveyChipCounts();
+  renderSurveyResponses();
+  applySurveyFilters();
+
+  if (typeof showToast === 'function') {
+    showToast(`선택한 ${updatedCount}명의 선물 발송완료 처리가 안전하게 완료되었습니다.`, 'success');
+  } else {
+    alert(`선택한 ${updatedCount}명의 선물 발송완료 처리가 안전하게 완료되었습니다.`);
+  }
+}
+
+// 전체 선택/해제 토글
+function toggleAllSurveyResponseChecks(masterCb) {
+  const checkboxes = document.querySelectorAll('.survey-response-check');
+  checkboxes.forEach(cb => cb.checked = masterCb.checked);
+}
+
+// 세부 응답 내역 모달 팝업 열기
+function openSurveyDetailResponseModal(responseId, targetId) {
+  const responses = getAllCompletedResponses();
+  const resp = responses.find(r => r.id === responseId || r.targetId === targetId || r.serviceId === targetId);
+  if (!resp) {
+    alert('해당 설문 응답 정보를 찾을 수 없습니다.');
+    return;
+  }
+
+  let modal = document.getElementById('surveyDetailResponseModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'surveyDetailResponseModal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity';
+    document.body.appendChild(modal);
+  }
+
+  const roleText = resp.respondentType === 'PATIENT' ? '환자 본인' : (resp.respondentType === 'GUARDIAN' ? '가족 및 보호자' : (resp.respondentType || '고객'));
+  const starsHtml = (score) => {
+    const s = Number(score) || 0;
+    let stars = '';
+    for (let i = 1; i <= 5; i++) {
+      stars += i <= s 
+        ? '<span class="text-amber-500 font-bold">★</span>' 
+        : '<span class="text-slate-300 font-bold">☆</span>';
+    }
+    return `${stars} <b class="text-amber-700 ml-1">${s}점</b>`;
+  };
+
+  const giftStatus = getEffectiveGiftStatus(resp._target || resp);
+  const giftStatusBadge = giftStatus === 'SENT' 
+    ? '<span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">발송완료</span>'
+    : '<span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs">미발송 (발송대기)</span>';
+
+  modal.innerHTML = `
+    <div class="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+      <div class="p-5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+            <i data-lucide="clipboard-check" class="w-5 h-5 text-white"></i>
+          </div>
+          <div>
+            <h3 class="font-black text-sm">고객 만족도 설문 상세 응답서</h3>
+            <p class="text-[11px] text-white/80 font-mono mt-0.5">응답ID: ${resp.id} · 신청ID: ${resp.serviceId || '-'}</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeSurveyDetailResponseModal()" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center cursor-pointer transition-all">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 max-h-[calc(85vh-130px)] overflow-y-auto custom-scrollbar text-xs">
+        <!-- 기본 정보 카드 -->
+        <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 grid grid-cols-2 gap-2.5">
+          <div>
+            <span class="text-slate-400 font-medium block text-[11px]">환자명</span>
+            <span class="font-extrabold text-slate-900 text-sm">${maskPatientName(resp.patientName)}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 font-medium block text-[11px]">응답자 구분</span>
+            <span class="font-extrabold text-emerald-800">${roleText}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 font-medium block text-[11px]">쿠폰 수신 연락처</span>
+            <span class="font-bold text-sky-800 font-mono">${formatCouponPhoneDisplay(resp.couponPhone || resp.callbackPhone || '-')}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 font-medium block text-[11px]">설문 제출 일시</span>
+            <span class="font-mono text-slate-700">${formatSurveyDate(resp.submittedAt)}</span>
+          </div>
+        </div>
+
+        <!-- 문항별 응답 상세 내역 -->
+        <div class="space-y-3">
+          <h4 class="font-black text-slate-800 text-xs border-b border-slate-100 pb-1.5 flex items-center gap-1.5">
+            <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+            문항별 세부 평가 결과
+          </h4>
+
+          <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+            <span class="text-slate-500 font-semibold block text-[11px]">Q2. 이번 간병 서비스 전반적 만족도</span>
+            <div>${starsHtml(resp.q2)}</div>
+          </div>
+
+          <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+            <span class="text-slate-500 font-semibold block text-[11px]">Q3. 담당 간병인의 친절함 및 태도</span>
+            <div>${resp.q3Unknown ? '<span class="text-slate-400 font-bold">잘모름</span>' : starsHtml(resp.q3)}</div>
+          </div>
+
+          <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+            <span class="text-slate-500 font-semibold block text-[11px]">Q4. 제공된 돌봄(식사, 위생, 체위 등) 품질</span>
+            <div>${resp.q4Unknown ? '<span class="text-slate-400 font-bold">잘모름</span>' : starsHtml(resp.q4)}</div>
+          </div>
+
+          <div class="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5">
+            <span class="text-slate-500 font-semibold block text-[11px]">Q5. 좋았던 점 또는 개선 의견 (고객 코멘트)</span>
+            <div class="p-2.5 bg-slate-50 rounded-lg text-slate-800 font-medium leading-relaxed whitespace-pre-wrap">
+              ${resp.comment ? escapeHtml(resp.comment) : '<span class="text-slate-400">(남겨주신 의견이 없습니다)</span>'}
+            </div>
+          </div>
+
+          <div class="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
+            <span class="text-slate-500 font-semibold text-[11px]">Q6. 담당자 유선 연락 희망 여부</span>
+            <div>
+              ${resp.callbackRequested 
+                ? '<span class="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold border border-rose-300">📞 연락 희망</span>' 
+                : '<span class="text-slate-400 font-medium">연락 불필요</span>'}
+            </div>
+          </div>
+        </div>
+
+        <!-- 선물 발송 상태 섹션 -->
+        <div class="p-3.5 bg-amber-50/70 rounded-2xl border border-amber-200 flex items-center justify-between">
+          <div>
+            <span class="text-amber-900 font-extrabold text-xs block">🎁 고객 선물(쿠폰) 발송 현황</span>
+            <span class="text-[11px] text-amber-800 mt-0.5 block">${resp._target?.giftItem || '스타벅스 아메리카노 Tall 1매'}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            ${giftStatusBadge}
+            <button type="button" onclick="toggleSurveyGiftSent('${resp.targetId || resp.serviceId}'); closeSurveyDetailResponseModal();" 
+              class="px-2.5 py-1 rounded-xl bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs cursor-pointer shadow-3xs transition-all">
+              상태변경
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button type="button" onclick="closeSurveyDetailResponseModal()" 
+          class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs cursor-pointer transition-all">
+          닫기
+        </button>
+      </div>
+    </div>
+  `;
+
+  modal.classList.remove('hidden');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function closeSurveyDetailResponseModal() {
+  const modal = document.getElementById('surveyDetailResponseModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+// 완료된 전체 응답 목록 수집 헬퍼 (중복 제거 및 김지훈 등 전수 포함)
+function getAllCompletedResponses() {
+  const respMap = new Map();
+
+  // 1) gSurveyState.targets 중 SUBMITTED인 건
+  (gSurveyState.targets || []).filter(t => t.responseStatus === 'SUBMITTED').forEach(t => {
+    const key = String(t.serviceId || t.id);
+    respMap.set(key, {
+      id: t.responseId || ('SR-' + t.id),
+      targetId: t.id,
+      serviceId: t.serviceId || t.id,
+      patientName: t.patientName,
+      patientPhone: t.patientPhone,
+      couponPhone: t.couponPhone || t.patientPhone,
+      respondentType: t.respondentType || 'PATIENT',
+      q2: t.q2Score !== undefined ? t.q2Score : 5,
+      q3: t.q3Score !== undefined ? t.q3Score : 5,
+      q3Unknown: Boolean(t.q3Unknown),
+      q4: t.q4Score !== undefined ? t.q4Score : 5,
+      q4Unknown: Boolean(t.q4Unknown),
+      comment: t.surveyComment || '',
+      callbackRequested: Boolean(t.callbackRequested),
+      submittedAt: t.submittedAt || t.updatedAt || t.createdAt,
+      _target: t
+    });
+  });
+
+  // 2) gSurveyState.responses
+  (gSurveyState.responses || []).forEach(r => {
+    const sId = String(r.serviceId || r.targetId || r.id);
+    const matchedTarget = (gSurveyState.targets || []).find(t => t.id === r.targetId || t.serviceId === r.serviceId || t.id === sId || t.serviceId === sId);
+    const existing = respMap.get(sId);
+    if (!existing) {
+      respMap.set(sId, {
+        ...r,
+        patientName: r.patientName || (matchedTarget && matchedTarget.patientName) || '고객',
+        patientPhone: r.patientPhone || (matchedTarget && matchedTarget.patientPhone) || '',
+        couponPhone: r.couponPhone || r.callbackPhone || (matchedTarget && (matchedTarget.couponPhone || matchedTarget.patientPhone)) || '',
+        _target: matchedTarget || { id: r.targetId, serviceId: r.serviceId, giftStatus: 'PENDING' }
+      });
+    } else {
+      if (!existing.comment && r.comment) existing.comment = r.comment;
+      if (r.answers && !existing.answers) existing.answers = r.answers;
+    }
+  });
+
+  return Array.from(respMap.values());
+}
+
+
 function formatSurveyDate(d) {
   if (!d) return '-';
   const str = String(d).trim();
@@ -354,40 +726,64 @@ function updateSurveyChipCounts() {
     const elNew = document.getElementById(id + '_new');
     if (elNew) elNew.innerText = count;
   };
+  const submittedCount = targets.filter(t => t.responseStatus === 'SUBMITTED').length;
   const giftPendingCount = targets.filter(t => getEffectiveGiftStatus(t) === 'PENDING').length;
   const giftSentCount = targets.filter(t => getEffectiveGiftStatus(t) === 'SENT').length;
-
-  setEl('surveyChipCountAll', targets.length);
-  setEl('surveyChipCountRecent', targets.filter(t => isTargetRecentlyAdded(t)).length);
-  setEl('surveyChipCountUnnotified', targets.filter(t => t.guidanceStatus === 'NOT_STARTED').length);
-  setEl('surveyChipCountCompleted', targets.filter(t => t.responseStatus === 'SUBMITTED').length);
-  setEl('surveyChipCountFollowup', targets.filter(t => t.followupStatus && t.followupStatus !== 'NONE').length);
-  setEl('surveyChipCountGiftPending', giftPendingCount);
-  setEl('surveyChipCountGiftSent', giftSentCount);
+  const candidateCount = targets.filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED').length;
+  const excludedCount = targets.filter(t => t.excludeStatus === 'EXCLUDED').length;
 
   const hasLogCount = targets.filter(t => hasTargetCareLog(t) && t.excludeStatus !== 'EXCLUDED').length;
   const noLogCount = targets.filter(t => !hasTargetCareLog(t) && t.excludeStatus !== 'EXCLUDED').length;
-  setEl('surveyChipCountHasLog', hasLogCount);
-  setEl('surveyChipCountNoLog', noLogCount);
 
-  const candidateCount = targets.filter(t => Boolean(t.isCandidate) && t.excludeStatus !== 'EXCLUDED').length;
-  const excludedCount = targets.filter(t => t.excludeStatus === 'EXCLUDED').length;
+  // 1) 대상자 관리 작은 탭 3개 카운트
+  setEl('surveyChipCountAll', targets.length);
   const elCand = document.getElementById('surveyChipCountCandidate_new');
   if (elCand) elCand.innerText = candidateCount;
   const elExcl = document.getElementById('surveyChipCountExcluded_new');
   if (elExcl) elExcl.innerText = excludedCount;
-  const elBatchCount = document.getElementById('surveyCandidateBatchCount');
-  if (elBatchCount) elBatchCount.innerText = candidateCount;
 
+  // 2) 스마트 후보 선별 바 카운트 (일지 작성, 일지 없음)
+  const elSmartHasLog = document.getElementById('surveySmartCountHasLog');
+  if (elSmartHasLog) elSmartHasLog.innerText = hasLogCount;
+  const elSmartNoLog = document.getElementById('surveySmartCountNoLog');
+  if (elSmartNoLog) elSmartNoLog.innerText = noLogCount;
+
+  // 3) 상단 대분류 탭 뱃지
+  const navTargetsBadge = document.getElementById('surveyNavTargetsCountBadge_new');
+  if (navTargetsBadge) navTargetsBadge.innerText = targets.length;
+  const navResponsesBadge = document.getElementById('surveyNavResponsesCountBadge_new');
+  if (navResponsesBadge) navResponsesBadge.innerText = submittedCount;
+
+  // 4) 선물 대기 뱃지
   const giftBadge = document.getElementById('surveyGiftPendingBadge_new');
   if (giftBadge) {
     if (giftPendingCount > 0) {
-      giftBadge.innerText = `${giftPendingCount}건 대기`;
+      giftBadge.innerText = `선물대기 ${giftPendingCount}`;
       giftBadge.classList.remove('hidden');
     } else {
       giftBadge.classList.add('hidden');
     }
   }
+
+  // 5) 결과 관리 탭 내부 통계
+  const elResCount = document.getElementById('surveyResponseCountLabel_new');
+  if (elResCount) elResCount.innerText = submittedCount;
+  const elPendingCount = document.getElementById('surveyResultPendingGiftCount');
+  if (elPendingCount) elPendingCount.innerText = giftPendingCount;
+
+  // 후보군 일괄 발송 버튼 카운트
+  const elBatchCount = document.getElementById('surveyCandidateBatchCount');
+  if (elBatchCount) elBatchCount.innerText = candidateCount;
+
+  // 기존 호환 카운트
+  setEl('surveyChipCountRecent', targets.filter(t => isTargetRecentlyAdded(t)).length);
+  setEl('surveyChipCountUnnotified', targets.filter(t => t.guidanceStatus === 'NOT_STARTED').length);
+  setEl('surveyChipCountCompleted', submittedCount);
+  setEl('surveyChipCountFollowup', targets.filter(t => t.followupStatus && t.followupStatus !== 'NONE').length);
+  setEl('surveyChipCountGiftPending', giftPendingCount);
+  setEl('surveyChipCountGiftSent', giftSentCount);
+  setEl('surveyChipCountHasLog', hasLogCount);
+  setEl('surveyChipCountNoLog', noLogCount);
 
   // 웹뷰 스튜디오 환자 선택 셀렉트 박스 동기화
   const previewSelect = document.getElementById('surveyNewPreviewTargetSelect');
@@ -1044,16 +1440,6 @@ function renderSurveyTargetsTable(list) {
     const endDateClean = formatSurveyDate(target.careEndDate);
 
     if (isNewTable) {
-      const giftStatus = getEffectiveGiftStatus(target);
-      const quickGiftBtn = giftStatus === 'PENDING' ? `
-        <button type="button" onclick="quickMarkGiftSent('${target.id}')" 
-          class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1 transition-all cursor-pointer shadow-xs" 
-          title="기본 선물 품목으로 즉시 발송완료 처리">
-          <i data-lucide="check-circle-2" class="w-3 h-3"></i>
-          <span>즉시발송완료</span>
-        </button>
-      ` : '';
-
       const isExcluded = target.excludeStatus === 'EXCLUDED';
       const isCandidate = Boolean(target.isCandidate && !isExcluded);
       let candidateCellHtml = '';
@@ -1094,11 +1480,13 @@ function renderSurveyTargetsTable(list) {
       ` : `
         <button type="button" onclick="openSurveyExcludeModal('${target.id}')" 
           class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 border border-slate-200 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer" 
-          title="컴플레인, 결번 등 만족도조사 발송 제외(보류) 처리">
+          title="컴플레인, 결번 등 만족도조사 발송 제외 처리">
           <i data-lucide="slash" class="w-3 h-3"></i>
           <span>제외</span>
         </button>
       `;
+
+      const smsResultHtml = renderSmsResultBadge(target);
 
       return `
         <tr class="${rowClass}">
@@ -1109,9 +1497,8 @@ function renderSurveyTargetsTable(list) {
             <div class="flex items-center gap-1.5 flex-wrap">
               <span>${maskedName}</span>
               ${recentBadge}
-              ${logBadge}
             </div>
-            ${target.patientPhone ? `<span class="block text-[10.5px] text-slate-400 font-normal font-mono">기본: ${formatCouponPhoneDisplay(target.patientPhone)}</span>` : ''}
+            ${target.patientPhone ? `<span class="block text-[10.5px] text-slate-400 font-normal font-mono mt-0.5">기본: ${formatCouponPhoneDisplay(target.patientPhone)}</span>` : ''}
           </td>
           <td class="p-3 text-slate-600 whitespace-nowrap">
             <div class="font-semibold text-slate-800">${cleanHospital}</div>
@@ -1120,56 +1507,42 @@ function renderSurveyTargetsTable(list) {
           <td class="p-3 whitespace-nowrap">
             <span class="font-bold text-slate-800">${target.caregiverName || '지정 안 됨'}</span>
           </td>
-          <td class="p-3 text-center whitespace-nowrap">${guidanceBadge}</td>
+          <td class="p-3 text-center whitespace-nowrap">${logBadge}</td>
+          <td class="p-3 text-center whitespace-nowrap">${smsResultHtml}</td>
           <td class="p-3 text-center whitespace-nowrap">
             ${responseBadge}
             ${target.q2Score ? `<div class="text-[10px] font-black text-amber-600 mt-0.5">★ ${target.q2Score}점</div>` : ''}
           </td>
-          <td class="p-3 whitespace-nowrap">${renderCouponPhoneCellHtml(target)}</td>
-          <td class="p-3 whitespace-nowrap">${renderGiftSummaryCellHtml(target)}</td>
           <td class="p-3 text-center whitespace-nowrap">${followupBadge}</td>
           <td class="p-3 text-center whitespace-nowrap">
             <div class="inline-flex items-center gap-1.5 justify-center flex-wrap">
-              <button type="button" onclick="openSurveyGiftModal('${target.id}')" 
-                class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-xs" 
-                title="어떤 선물을 언제 어떻게 발송했는지 환자별 선물 발송 관리">
-                <i data-lucide="gift" class="w-3 h-3"></i>
-                <span>선물관리</span>
-              </button>
-              ${quickGiftBtn}
               <button type="button" onclick="openSurveyNewWebviewModal('${target.id}')" 
                 class="px-2.5 py-1 rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-extrabold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-xs" 
-                title="해당 환자의 모바일 간병일지 + 만족도 설문(커피쿠폰) 통합 웹뷰 미리보기">
+                title="모바일 간병일지 + 만족도 설문(커피쿠폰) 웹뷰 열기">
                 <i data-lucide="book-open-check" class="w-3 h-3"></i>
-                <span>일지+설문 웹뷰</span>
+                <span>웹뷰</span>
               </button>
               <button type="button" onclick="sendDirectSurveySms('${target.id}')" 
-                class="px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer" 
-                title="문자 발송 전 내용 미리보기 · 문구 수정 및 테스트 발송">
+                class="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer" 
+                title="문자 발송 전 미리보기 및 전송">
                 <i data-lucide="send" class="w-3 h-3 text-sky-600"></i>
                 <span>문자</span>
               </button>
-              <button type="button" onclick="openSurveyQrModal('${target.id}')" 
-                class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer" 
-                title="QR코드 보기 및 설문 링크 안내">
-                <i data-lucide="qr-code" class="w-3 h-3"></i>
-                <span>QR</span>
-              </button>
               <button type="button" onclick="openSurveyDetailModal('${target.id}')" 
                 class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all cursor-pointer" 
-                title="상세 정보 및 감사 이력">
+                title="상세 정보">
                 <span>상세</span>
               </button>
               <button type="button" onclick="openEditSurveyTargetModal('${target.id}')" 
                 class="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer" 
-                title="대상 고객 및 간병 정보 수정">
+                title="정보 수정">
                 <i data-lucide="edit-3" class="w-3 h-3 text-indigo-600"></i>
                 <span>수정</span>
               </button>
               ${excludeActionBtn}
               <button type="button" onclick="deleteSurveyTarget('${target.id}')" 
                 class="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer" 
-                title="만족도 조사 대상 목록에서 삭제">
+                title="삭제">
                 <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
                 <span>삭제</span>
               </button>
@@ -1341,28 +1714,62 @@ function renderSurveyResponses() {
   const tbodyNew = document.getElementById('surveyResponsesTableBody_new');
   if (!tbody && !tbodyNew) return;
 
-  const responses = gSurveyState.targets
-    .filter(t => t.responseStatus === 'SUBMITTED')
-    .map(t => {
-      const rDoc = gSurveyState.responses.find(r => r.targetId === t.id) || {
-        id: t.responseId || ('SR-' + t.id),
-        serviceId: t.serviceId,
-        targetId: t.id,
-        patientName: t.patientName,
-        patientPhone: t.patientPhone,
-        couponPhone: t.couponPhone || t.patientPhone,
-        respondentType: t.respondentType || 'PATIENT',
-        q2: t.q2Score || 5,
-        q3: t.q3Score !== undefined ? t.q3Score : 5,
-        q3Unknown: Boolean(t.q3Unknown),
-        q4: t.q4Score !== undefined ? t.q4Score : 5,
-        q4Unknown: Boolean(t.q4Unknown),
-        comment: t.surveyComment || '(응답 등록됨)',
-        callbackRequested: Boolean(t.callbackRequested),
-        submittedAt: t.submittedAt || t.updatedAt || t.createdAt
-      };
-      return { ...rDoc, _target: t };
+  // 1. 전체 응답 수집 (김지훈 포함 누락 없는 통합 수집)
+  let responses = getAllCompletedResponses();
+
+  // 2. 검색 필터
+  const searchInput = document.getElementById('surveyResultSearchInput');
+  const search = (searchInput?.value || '').trim().toLowerCase();
+  if (search) {
+    const searchDigits = search.replace(/[^0-9]/g, '');
+    responses = responses.filter(r => 
+      (r.patientName && r.patientName.toLowerCase().includes(search)) ||
+      (r.serviceId && r.serviceId.toLowerCase().includes(search)) ||
+      (r.id && r.id.toLowerCase().includes(search)) ||
+      (r.comment && r.comment.toLowerCase().includes(search)) ||
+      (searchDigits && r.couponPhone && r.couponPhone.replace(/[^0-9]/g, '').includes(searchDigits)) ||
+      (searchDigits && r.patientPhone && r.patientPhone.replace(/[^0-9]/g, '').includes(searchDigits))
+    );
+  }
+
+  // 3. 선물 상태 필터
+  const giftFilter = document.getElementById('surveyResultGiftFilter')?.value || 'ALL';
+  if (giftFilter !== 'ALL') {
+    responses = responses.filter(r => {
+      const gSt = getEffectiveGiftStatus(r._target || r);
+      return gSt === giftFilter;
     });
+  }
+
+  // 4. 다양한 정렬
+  const sortVal = document.getElementById('surveyResultSortSelect')?.value || 'RECENT_FIRST';
+  responses.sort((a, b) => {
+    if (sortVal === 'RATING_DESC') {
+      const sa = Number(a.q2) || 0;
+      const sb = Number(b.q2) || 0;
+      if (sa !== sb) return sb - sa;
+    } else if (sortVal === 'RATING_ASC') {
+      const sa = Number(a.q2) || 0;
+      const sb = Number(b.q2) || 0;
+      if (sa !== sb) return sa - sb;
+    } else if (sortVal === 'GIFT_PENDING_FIRST') {
+      const ga = getEffectiveGiftStatus(a._target || a) === 'PENDING' ? 0 : 1;
+      const gb = getEffectiveGiftStatus(b._target || b) === 'PENDING' ? 0 : 1;
+      if (ga !== gb) return ga - gb;
+    } else if (sortVal === 'GIFT_SENT_FIRST') {
+      const ga = getEffectiveGiftStatus(a._target || a) === 'SENT' ? 0 : 1;
+      const gb = getEffectiveGiftStatus(b._target || b) === 'SENT' ? 0 : 1;
+      if (ga !== gb) return ga - gb;
+    } else if (sortVal === 'NAME_ASC') {
+      const na = String(a.patientName || '');
+      const nb = String(b.patientName || '');
+      return na.localeCompare(nb, 'ko');
+    }
+    // 기본: RECENT_FIRST (최신 제출일시순)
+    const ta = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+    const tb = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+    return tb - ta;
+  });
 
   const labelEl = document.getElementById('surveyResponseCountLabel');
   if (labelEl) labelEl.innerText = responses.length;
@@ -1370,45 +1777,119 @@ function renderSurveyResponses() {
   if (labelElNew) labelElNew.innerText = responses.length;
 
   if (responses.length === 0) {
-    if (tbody) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="10" class="p-6 text-center text-slate-400">
-            <p class="font-medium text-xs">아직 제출된 고객 만족도 설문 응답이 없습니다.</p>
-          </td>
-        </tr>
-      `;
-    }
-    if (tbodyNew) {
-      tbodyNew.innerHTML = `
-        <tr>
-          <td colspan="12" class="p-6 text-center text-slate-400">
-            <p class="font-medium text-xs">아직 제출된 고객 만족도 설문 응답이 없습니다.</p>
-          </td>
-        </tr>
-      `;
-    }
+    const emptyRow = (cols) => `
+      <tr>
+        <td colspan="${cols}" class="p-8 text-center text-slate-400">
+          <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+          <p class="font-medium">제출된 고객 만족도 설문 응답이 없습니다.</p>
+        </td>
+      </tr>
+    `;
+    if (tbody) tbody.innerHTML = emptyRow(10);
+    if (tbodyNew) tbodyNew.innerHTML = emptyRow(12);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
     return;
   }
 
   const respTypes = { PATIENT: '환자 본인', GUARDIAN: '가족/보호자', OTHER: '기타' };
 
+  if (tbodyNew) {
+    tbodyNew.innerHTML = responses.map((r, idx) => {
+      const targetObj = r._target || (gSurveyState.targets || []).find(t => t.id === r.targetId || t.serviceId === r.serviceId) || r;
+      const targetId = targetObj.id || r.targetId || r.serviceId;
+      const giftStatus = getEffectiveGiftStatus(targetObj);
+      const isSent = giftStatus === 'SENT';
+
+      const q3Display = r.q3Unknown ? '<span class="text-slate-400">잘모름</span>' : (r.q3 ? `${r.q3}점` : '-');
+      const q4Display = r.q4Unknown ? '<span class="text-slate-400">잘모름</span>' : (r.q4 ? `${r.q4}점` : '-');
+      const submitTimeStr = formatSurveyDate(r.submittedAt);
+
+      const giftStatusBadge = isSent ? `
+        <div class="inline-flex flex-col items-center">
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-300 text-[11px]">
+            <i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-600"></i>
+            <span>발송완료</span>
+          </span>
+          ${targetObj.giftSentAt ? `<span class="text-[10px] text-slate-500 font-mono mt-0.5">${formatSurveyDate(targetObj.giftSentAt).slice(5)}</span>` : ''}
+        </div>
+      ` : `
+        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-300 text-[11px] animate-pulse">
+          <i data-lucide="clock" class="w-3 h-3 text-amber-600"></i>
+          <span>미발송 (대기)</span>
+        </span>
+      `;
+
+      const giftToggleBtn = isSent ? `
+        <button type="button" onclick="toggleSurveyGiftSent('${targetId}')" 
+          class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs border border-slate-300 transition-all cursor-pointer" 
+          title="클릭하여 미발송(대기)으로 되돌리기">
+          <span>취소</span>
+        </button>
+      ` : `
+        <button type="button" onclick="toggleSurveyGiftSent('${targetId}')" 
+          class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs transition-all cursor-pointer flex items-center gap-1" 
+          title="클릭하여 선물 발송완료 처리">
+          <i data-lucide="check" class="w-3 h-3"></i>
+          <span>발송완료 체크</span>
+        </button>
+      `;
+
+      return `
+        <tr class="hover:bg-slate-50 transition-colors">
+          <td class="p-3 text-center">
+            <input type="checkbox" class="survey-response-check rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer" data-target-id="${targetId}">
+          </td>
+          <td class="p-3 text-center font-mono text-slate-400 text-[11px]">${idx + 1}</td>
+          <td class="p-3 font-mono font-bold text-sky-700 whitespace-nowrap">${r.serviceId || '-'}</td>
+          <td class="p-3 font-bold text-slate-900 whitespace-nowrap">
+            <span>${maskPatientName(r.patientName)}</span>
+            <span class="text-slate-400 text-[11px] font-normal ml-1">(${respTypes[r.respondentType] || r.respondentType || '고객'})</span>
+            ${r.patientPhone ? `<span class="block text-[10.5px] text-slate-400 font-normal font-mono">${maskPhone(r.patientPhone)}</span>` : ''}
+          </td>
+          <td class="p-3 whitespace-nowrap font-mono font-bold text-indigo-700">
+            ${formatCouponPhoneDisplay(r.couponPhone || r.callbackPhone || '-')}
+          </td>
+          <td class="p-3 text-center whitespace-nowrap font-mono text-slate-600">${submitTimeStr}</td>
+          <td class="p-3 text-center font-extrabold whitespace-nowrap text-amber-600">
+            <span class="text-sm">★ ${r.q2 || 5}</span>점
+          </td>
+          <td class="p-3 text-center whitespace-nowrap font-semibold">${q3Display}</td>
+          <td class="p-3 text-center whitespace-nowrap font-semibold">${q4Display}</td>
+          <td class="p-3 text-slate-700 max-w-[200px] truncate" title="${escapeHtml(r.comment || '')}">
+            ${r.comment ? escapeHtml(r.comment) : '<span class="text-slate-300 font-normal">(의견 없음)</span>'}
+          </td>
+          <td class="p-3 text-center whitespace-nowrap">${giftStatusBadge}</td>
+          <td class="p-3 text-center whitespace-nowrap">
+            <div class="inline-flex items-center gap-1.5 justify-center">
+              <button type="button" onclick="openSurveyDetailResponseModal('${r.id}', '${targetId}')" 
+                class="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 font-extrabold text-xs flex items-center gap-1 cursor-pointer transition-all shadow-3xs" 
+                title="문항별 세부 응답 내역 보기">
+                <i data-lucide="eye" class="w-3 h-3 text-sky-600"></i>
+                <span>세부응답 보기</span>
+              </button>
+              ${giftToggleBtn}
+              <button type="button" onclick="openSurveyGiftModal('${targetId}')" 
+                class="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs cursor-pointer transition-all" 
+                title="선물 품목, 방법, 일시, 메모 관리">
+                <span>선물관리</span>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // 구버전 테이블 호환 렌더링
   if (tbody) {
     tbody.innerHTML = responses.map(r => {
       const q3Display = r.q3Unknown ? '<span class="text-slate-400">잘모름</span>' : (r.q3 ? `${r.q3}점` : '-');
       const q4Display = r.q4Unknown ? '<span class="text-slate-400">잘모름</span>' : (r.q4 ? `${r.q4}점` : '-');
-      const targetObj = r._target || gSurveyState.targets.find(t => t.id === r.targetId || t.serviceId === r.serviceId);
-      const patientName = r.patientName || (targetObj && targetObj.patientName) || '-';
-      const patientPhone = r.patientPhone || (targetObj && targetObj.patientPhone) || '';
-
       return `
         <tr class="hover:bg-slate-50 transition-colors">
           <td class="p-3 font-mono font-bold text-slate-700 whitespace-nowrap">${r.id}</td>
           <td class="p-3 font-mono font-bold text-sky-700 whitespace-nowrap">${r.serviceId || '-'}</td>
-          <td class="p-3 font-bold text-slate-900 whitespace-nowrap">
-            <span>${maskPatientName(patientName)}</span>
-            ${patientPhone ? `<span class="block text-[10.5px] text-slate-400 font-normal font-mono">${maskPhone(patientPhone)}</span>` : ''}
-          </td>
+          <td class="p-3 font-bold text-slate-900 whitespace-nowrap">${maskPatientName(r.patientName)}</td>
           <td class="p-3 whitespace-nowrap font-medium text-slate-800">${respTypes[r.respondentType] || r.respondentType}</td>
           <td class="p-3 text-center font-bold whitespace-nowrap text-amber-600">${r.q2 || '-'}점</td>
           <td class="p-3 text-center whitespace-nowrap font-semibold">${q3Display}</td>
@@ -1419,58 +1900,16 @@ function renderSurveyResponses() {
               ? '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold border border-rose-300">연락 희망</span>' 
               : '<span class="text-slate-400">불필요</span>'}
           </td>
-          <td class="p-3 text-slate-500 whitespace-nowrap font-mono">${r.submittedAt ? r.submittedAt.slice(0, 16).replace('T', ' ') : '-'}</td>
+          <td class="p-3 text-slate-500 whitespace-nowrap font-mono text-[11px]">${formatSurveyDate(r.submittedAt)}</td>
         </tr>
       `;
     }).join('');
   }
 
-  if (tbodyNew) {
-    tbodyNew.innerHTML = responses.map(r => {
-      const q3Display = r.q3Unknown ? '<span class="text-slate-400">잘모름</span>' : (r.q3 ? `${r.q3}점` : '-');
-      const q4Display = r.q4Unknown ? '<span class="text-slate-400">잘모름</span>' : (r.q4 ? `${r.q4}점` : '-');
-      const targetObj = r._target || gSurveyState.targets.find(t => t.id === r.targetId || t.serviceId === r.serviceId) || {};
-      const patientName = r.patientName || targetObj.patientName || '-';
-      const patientPhone = r.patientPhone || targetObj.patientPhone || '';
-
-      return `
-        <tr class="hover:bg-pink-50/30 transition-colors">
-          <td class="p-3 font-mono font-bold text-slate-700 whitespace-nowrap">${r.id}</td>
-          <td class="p-3 font-mono font-bold text-rose-700 whitespace-nowrap">${r.serviceId || '-'}</td>
-          <td class="p-3 font-bold text-slate-900 whitespace-nowrap">
-            <span>${maskPatientName(patientName)}</span>
-            ${patientPhone ? `<span class="block text-[10.5px] text-slate-400 font-normal font-mono">기본: ${formatCouponPhoneDisplay(patientPhone)}</span>` : ''}
-          </td>
-          <td class="p-3 whitespace-nowrap font-bold text-slate-800">${respTypes[r.respondentType] || r.respondentType}</td>
-          <td class="p-3 whitespace-nowrap">${renderCouponPhoneCellHtml(targetObj)}</td>
-          <td class="p-3 text-center font-bold whitespace-nowrap text-amber-600">${r.q2 || '-'}점</td>
-          <td class="p-3 text-center whitespace-nowrap font-semibold">${q3Display}</td>
-          <td class="p-3 text-center whitespace-nowrap font-semibold">${q4Display}</td>
-          <td class="p-3 text-slate-700 max-w-sm truncate" title="${r.comment || ''}">${r.comment || '<span class="text-slate-300">(의견 없음)</span>'}</td>
-          <td class="p-3 text-center whitespace-nowrap">
-            ${r.callbackRequested 
-              ? '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold border border-rose-300">연락 희망</span>' 
-              : '<span class="text-slate-400">불필요</span>'}
-          </td>
-          <td class="p-3 whitespace-nowrap">
-            <div class="flex items-center gap-2">
-              <div>${renderGiftSummaryCellHtml(targetObj)}</div>
-              <button type="button" onclick="openSurveyGiftModal('${targetObj.id}')" class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs cursor-pointer shrink-0">
-                선물관리
-              </button>
-            </div>
-          </td>
-          <td class="p-3 text-slate-500 whitespace-nowrap font-mono">${r.submittedAt ? r.submittedAt.slice(0, 16).replace('T', ' ') : '-'}</td>
-        </tr>
-      `;
-    }).join('');
-  }
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-// =========================================================================
-// 5. 서브탭 3: 기존(달란트 보상 원장) vs NEW(환자·보호자 선물 발송 관리 대장)
-// =========================================================================
+
 function renderSurveyRewards() {
   const tbody = document.getElementById('surveyRewardsTableBody');
   const tbodyNew = document.getElementById('surveyRewardsTableBody_new');
@@ -4690,6 +5129,12 @@ function autoSelectSurveyCandidates(criteria) {
     const careDays = (endMs > 0 && startMs > 0 && endMs >= startMs) ? Math.round((endMs - startMs) / 86400000) + 1 : 1;
 
     switch (criteria) {
+      case 'HAS_LOG':
+        if (hasTargetCareLog(t) && t.guidanceStatus !== 'GUIDED') match = true;
+        break;
+      case 'NO_LOG':
+        if (!hasTargetCareLog(t) && t.guidanceStatus !== 'GUIDED') match = true;
+        break;
       case 'RECENT_3D':
         if (daysSinceEnd >= 0 && daysSinceEnd <= 3 && t.guidanceStatus === 'NOT_STARTED') match = true;
         break;

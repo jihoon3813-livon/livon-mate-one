@@ -2594,8 +2594,12 @@
       if (answers.q5 === undefined) answers.q5 = document.getElementById('ansQ5')?.value || '';
       if (answers.q6 === undefined) answers.q6 = document.getElementById('ansQ6')?.value === 'true';
 
+      const effectiveToken = gSurveyToken || (gSurveyTargetObj && gSurveyTargetObj.token) || '';
+      const effectiveTargetId = gTargetId || (gSurveyTargetObj && gSurveyTargetObj.id) || (effectiveToken.startsWith('ST-') ? effectiveToken : 'ST-' + effectiveToken);
+
       const payload = {
-        token: gSurveyToken || 'DEMO_TOKEN',
+        token: effectiveToken || effectiveTargetId || 'DEMO_TOKEN',
+        targetId: effectiveTargetId,
         channel: 'MOBILE_DIARY_INTEGRATED',
         answers: {
           ...answers,

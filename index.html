@@ -4999,7 +4999,7 @@
           <button type="button" onclick="switchSurveySubTab('targets')" id="surveySubTab-targets" 
             class="survey-sub-tab px-4 py-2 rounded-xl text-xs font-bold transition-all bg-primary-600 text-white shadow-xs flex items-center gap-1.5">
             <i data-lucide="list-checks" class="w-4 h-4"></i>
-            <span>대상·진행 현황 (A01)</span>
+            <span>대상자 관리</span>
           </button>
           <button type="button" onclick="switchSurveySubTab('results')" id="surveySubTab-results" 
             class="survey-sub-tab px-4 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 flex items-center gap-1.5">
@@ -5015,7 +5015,7 @@
           <button type="button" onclick="switchSurveySubTab('settings')" id="surveySubTab-settings" 
             class="survey-sub-tab px-4 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 flex items-center gap-1.5">
             <i data-lucide="sliders" class="w-4 h-4"></i>
-            <span>설문 및 정책 설정 (A04)</span>
+            <span>설문 관리</span>
           </button>
         </div>
 
@@ -5666,29 +5666,25 @@
           </div>
         </div>
 
-        <!-- 서브 탭 네비게이션 (A01, A02/A03, 고객 선물 발송 관리, 설정) -->
+        <!-- 대분류 탭 네비게이션: 대상자 관리 / 결과 관리 / 설문 관리 -->
         <div class="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto custom-scrollbar">
           <button type="button" onclick="switchSurveySubTab('targets')" id="surveySubTab_new-targets" 
-            class="survey-sub-tab-new px-4 py-2 rounded-xl text-xs font-bold transition-all bg-rose-600 text-white shadow-xs flex items-center gap-1.5 cursor-pointer">
-            <i data-lucide="list-checks" class="w-4 h-4"></i>
-            <span>대상·진행 및 선물발송 현황 (A01)</span>
-          </button>
-          <button type="button" onclick="switchSurveySubTab('rewards')" id="surveySubTab_new-rewards" 
-            class="survey-sub-tab-new px-4 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 flex items-center gap-1.5 cursor-pointer">
-            <i data-lucide="gift" class="w-4 h-4"></i>
-            <span>환자·보호자 선물(쿠폰) 발송 관리</span>
-            <span id="surveyGiftPendingBadge_new" class="hidden px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px] font-black">0</span>
+            class="survey-sub-tab-new px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-rose-600 text-white shadow-xs flex items-center gap-2 cursor-pointer">
+            <i data-lucide="users" class="w-4 h-4"></i>
+            <span>대상자 관리</span>
+            <span id="surveyNavTargetsCountBadge_new" class="px-1.5 py-0.2 rounded-full bg-white/25 text-[10px] font-black">0</span>
           </button>
           <button type="button" onclick="switchSurveySubTab('results')" id="surveySubTab_new-results" 
-            class="survey-sub-tab-new px-4 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 flex items-center gap-1.5 cursor-pointer">
-            <i data-lucide="message-square-heart" class="w-4 h-4"></i>
-            <span>설문 결과·후속 조치 (A02, A03)</span>
-            <span id="surveyFollowupBadge_new" class="hidden px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-black">0</span>
+            class="survey-sub-tab-new px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 flex items-center gap-2 cursor-pointer">
+            <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+            <span>결과 관리</span>
+            <span id="surveyNavResponsesCountBadge_new" class="px-1.5 py-0.2 rounded-full bg-emerald-500 text-white text-[10px] font-black">0</span>
+            <span id="surveyGiftPendingBadge_new" class="hidden px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px] font-black">선물대기 0</span>
           </button>
           <button type="button" onclick="switchSurveySubTab('settings')" id="surveySubTab_new-settings" 
-            class="survey-sub-tab-new px-4 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 flex items-center gap-1.5 cursor-pointer">
+            class="survey-sub-tab-new px-5 py-2.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 flex items-center gap-2 cursor-pointer">
             <i data-lucide="sliders" class="w-4 h-4"></i>
-            <span>설문 및 선물 정책 설정 (A04)</span>
+            <span>설문 관리</span>
           </button>
         </div>
 
@@ -5697,75 +5693,25 @@
           <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
             <!-- 1. 빠른 상태 필터 칩 -->
             <div class="flex items-center justify-between gap-2 flex-wrap border-b border-slate-100 pb-3">
-              <div class="flex items-center gap-1.5 flex-wrap" id="surveyQuickFilterChips_new">
+              <div class="flex items-center gap-2 flex-wrap" id="surveyQuickFilterChips_new">
                 <button type="button" onclick="setSurveyQuickFilter('ALL')" data-quick="ALL" 
-                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 cursor-pointer">
-                  <span>전체 보기</span>
+                  class="survey-quick-chip px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-rose-600 text-white shadow-2xs flex items-center gap-1.5 cursor-pointer">
+                  <span>전체 보기 (최신 등록 순)</span>
                   <span id="surveyChipCountAll_new" class="px-1.5 py-0.2 rounded-full bg-white/20 text-[10px]">0</span>
                 </button>
-                <button type="button" onclick="setSurveyQuickFilter('RECENT')" data-quick="RECENT" 
-                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 flex items-center gap-1.5 cursor-pointer">
-                  <i data-lucide="sparkles" class="w-3 h-3 text-amber-600"></i>
-                  <span>최근 등록</span>
-                  <span id="surveyChipCountRecent_new" class="px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 text-[10px] font-black">0</span>
-                </button>
                 <button type="button" onclick="setSurveyQuickFilter('CANDIDATE')" data-quick="CANDIDATE" 
-                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-pink-50 text-rose-800 border border-pink-300 hover:bg-pink-100 flex items-center gap-1.5 cursor-pointer"
+                  class="survey-quick-chip px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-pink-50 text-rose-800 border border-pink-300 hover:bg-pink-100 flex items-center gap-1.5 cursor-pointer"
                   title="선별된 발송 후보 고객만 모아보기">
                   <i data-lucide="target" class="w-3.5 h-3.5 text-rose-600"></i>
                   <span>🎯 발송 후보</span>
                   <span id="surveyChipCountCandidate_new" class="px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-black">0</span>
                 </button>
-                <button type="button" onclick="setSurveyQuickFilter('UNNOTIFIED')" data-quick="UNNOTIFIED" 
-                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer">
-                  <i data-lucide="send" class="w-3 h-3 text-slate-500"></i>
-                  <span>안내 미처리</span>
-                  <span id="surveyChipCountUnnotified_new" class="px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[10px]">0</span>
-                </button>
-                <button type="button" onclick="setSurveyQuickFilter('COMPLETED')" data-quick="COMPLETED" 
-                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer">
-                  <i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-600"></i>
-                  <span>응답 완료</span>
-                  <span id="surveyChipCountCompleted_new" class="px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[10px]">0</span>
-                </button>
-                <button type="button" onclick="setSurveyQuickFilter('HAS_LOG')" data-quick="HAS_LOG" 
-                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 flex items-center gap-1.5 cursor-pointer"
-                  title="모바일 간병일지가 작성된 환자만 모아보기">
-                  <i data-lucide="file-check-2" class="w-3 h-3 text-emerald-600"></i>
-                  <span>📝 일지 작성</span>
-                  <span id="surveyChipCountHasLog_new" class="px-1.5 py-0.2 rounded-full bg-emerald-200 text-emerald-900 text-[10px] font-black">0</span>
-                </button>
-                <button type="button" onclick="setSurveyQuickFilter('NO_LOG')" data-quick="NO_LOG" 
-                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer"
-                  title="모바일 간병일지가 없는 환자만 모아보기">
-                  <i data-lucide="file-x-2" class="w-3 h-3 text-slate-400"></i>
-                  <span>일지 없음</span>
-                  <span id="surveyChipCountNoLog_new" class="px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[10px]">0</span>
-                </button>
-                <button type="button" onclick="setSurveyQuickFilter('GIFT_PENDING')" data-quick="GIFT_PENDING" 
-                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer">
-                  <i data-lucide="gift" class="w-3 h-3 text-amber-600"></i>
-                  <span>선물 미발송(발송대기)</span>
-                  <span id="surveyChipCountGiftPending_new" class="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black">0</span>
-                </button>
-                <button type="button" onclick="setSurveyQuickFilter('GIFT_SENT')" data-quick="GIFT_SENT" 
-                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer">
-                  <i data-lucide="package-check" class="w-3 h-3 text-emerald-600"></i>
-                  <span>선물 발송완료</span>
-                  <span id="surveyChipCountGiftSent_new" class="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">0</span>
-                </button>
-                <button type="button" onclick="setSurveyQuickFilter('FOLLOWUP')" data-quick="FOLLOWUP" 
-                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer">
-                  <i data-lucide="alert-triangle" class="w-3 h-3 text-rose-600"></i>
-                  <span>불만/연락요청</span>
-                  <span id="surveyChipCountFollowup_new" class="px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 text-[10px] font-black">0</span>
-                </button>
                 <button type="button" onclick="setSurveyQuickFilter('EXCLUDED')" data-quick="EXCLUDED" 
-                  class="survey-quick-chip px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer"
-                  title="컴플레인, 결번 등 발송 제외(보류)된 고객 목록">
-                  <i data-lucide="slash" class="w-3 h-3 text-slate-400"></i>
+                  class="survey-quick-chip px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center gap-1.5 cursor-pointer"
+                  title="발송 제외(보류)된 고객 목록">
+                  <i data-lucide="slash" class="w-3.5 h-3.5 text-slate-500"></i>
                   <span>🚫 발송 제외</span>
-                  <span id="surveyChipCountExcluded_new" class="px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold">0</span>
+                  <span id="surveyChipCountExcluded_new" class="px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[10px] font-black">0</span>
                 </button>
               </div>
 
@@ -5783,6 +5729,18 @@
                   <i data-lucide="sparkles" class="w-3.5 h-3.5 text-rose-600"></i>
                   스마트 후보 자동선별:
                 </span>
+                <button type="button" onclick="autoSelectSurveyCandidates('HAS_LOG')" 
+                  class="px-2.5 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1"
+                  title="모바일 간병일지가 작성된 대상자를 발송 후보로 자동 선별">
+                  <i data-lucide="file-check-2" class="w-3 h-3 text-emerald-600"></i>
+                  <span>📝 일지 작성 (<b id="surveySmartCountHasLog">0</b>)</span>
+                </button>
+                <button type="button" onclick="autoSelectSurveyCandidates('NO_LOG')" 
+                  class="px-2.5 py-1 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1"
+                  title="간병일지가 없는 대상자를 발송 후보로 자동 선별">
+                  <i data-lucide="file-x-2" class="w-3 h-3 text-slate-500"></i>
+                  <span>📄 일지 없음 (<b id="surveySmartCountNoLog">0</b>)</span>
+                </button>
                 <button type="button" onclick="autoSelectSurveyCandidates('RECENT_3D')" 
                   class="px-2.5 py-1 rounded-xl bg-white hover:bg-rose-100 text-rose-900 border border-pink-300 text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1">
                   <span>⚡ 최근 3일 이내 종료</span>
@@ -5882,15 +5840,14 @@
                     <th class="p-3 text-center w-12 sticky top-0 bg-pink-50 border-b border-pink-200 z-20">#</th>
                     <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">🎯 발송후보</th>
                     <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">신청ID</th>
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">환자명 / 기본연락처</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">환자명 / 연락처</th>
                     <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">병원 / 서비스기간</th>
                     <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">담당간병인</th>
-                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">안내 상태</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">간병일지</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">발송결과</th>
                     <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">설문 응답</th>
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">📱 쿠폰 수신 연락처 (설문입력)</th>
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">🎁 선물 발송 현황 (품목/일시/방법)</th>
                     <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">후속 조치</th>
-                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">관리 액션 (선물관리 / 웹뷰 / 발송)</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-pink-50 border-b border-pink-200 z-20">관리 액션</th>
                   </tr>
                 </thead>
                 <tbody id="surveyTargetsTableBody_new" class="divide-y divide-slate-100 bg-white">
@@ -5901,8 +5858,92 @@
           </div>
         </div>
 
-        <!-- ==================== 서브 탭 2 (NEW): 결과·후속 조치 (A02, A03) ==================== -->
+        <!-- ==================== 서브 탭 2 (NEW): 결과 관리 (응답완료 리스트 & 선물관리) ==================== -->
         <div id="surveySubView_new-results" class="hidden space-y-5">
+          <!-- 1. 응답완료 리스트 및 선물관리 전용 카드 -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+            <div class="flex items-center justify-between flex-wrap gap-3 border-b border-slate-100 pb-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold border border-emerald-200">
+                  <i data-lucide="clipboard-check" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h3 class="font-black text-sm text-slate-900 flex items-center gap-2">
+                    <span>설문 응답완료 리스트 & 선물(쿠폰) 발송 관리</span>
+                    <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black">실시간 집계</span>
+                  </h3>
+                  <p class="text-xs text-slate-500 mt-0.5">설문을 완료한 고객의 상세 평가 내역을 확인하고, 감사 선물(스타벅스 커피쿠폰 등) 발송완료 여부를 체크합니다.</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="batchMarkSelectedGiftsSent()" 
+                  class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer">
+                  <i data-lucide="check-check" class="w-4 h-4"></i>
+                  <span>선택 고객 선물 발송완료 처리</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 정렬 및 검색 필터 바 -->
+            <div class="flex items-center justify-between gap-3 flex-wrap bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+              <div class="flex items-center gap-2 flex-wrap flex-1 min-w-[280px]">
+                <div class="relative flex-1 min-w-[180px] max-w-sm">
+                  <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                  <input type="text" id="surveyResultSearchInput" oninput="renderSurveyResponses()" 
+                    placeholder="환자명, 쿠폰연락처, 신청ID, 의견 검색..." 
+                    class="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all">
+                </div>
+                <select id="surveyResultSortSelect" onchange="renderSurveyResponses()" class="text-xs bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-800 font-bold focus:outline-none cursor-pointer">
+                  <option value="RECENT_FIRST">⚡ 최신 응답순 (기본)</option>
+                  <option value="RATING_DESC">★ 만족도 높은순 (5점 → 1점)</option>
+                  <option value="RATING_ASC">★ 만족도 낮은순 (1점 → 5점, 불만 우선)</option>
+                  <option value="GIFT_PENDING_FIRST">🎁 선물 미발송(대기) 우선</option>
+                  <option value="GIFT_SENT_FIRST">✅ 선물 발송완료 우선</option>
+                  <option value="NAME_ASC">환자명 가나다순</option>
+                </select>
+                <select id="surveyResultGiftFilter" onchange="renderSurveyResponses()" class="text-xs bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-800 font-semibold focus:outline-none cursor-pointer">
+                  <option value="ALL">선물 상태: 전체</option>
+                  <option value="PENDING">선물 미발송(발송대기)</option>
+                  <option value="SENT">선물 발송완료</option>
+                </select>
+              </div>
+
+              <div class="text-xs text-slate-600 font-bold whitespace-nowrap flex items-center gap-2">
+                <span>총 응답: <b id="surveyResponseCountLabel_new" class="text-emerald-700 font-black text-sm">0</b>건</span>
+                <span class="text-slate-300">|</span>
+                <span class="text-amber-700">미발송 대기: <b id="surveyResultPendingGiftCount" class="font-black text-sm">0</b>건</span>
+              </div>
+            </div>
+
+            <!-- 응답완료 리스트 테이블 -->
+            <div class="overflow-x-auto overflow-y-auto custom-scrollbar border border-slate-200 rounded-xl max-h-[calc(100vh-340px)] min-h-[300px] relative">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead class="sticky top-0 z-20 shadow-xs">
+                  <tr class="bg-emerald-50/80 border-b border-emerald-200 text-slate-800 font-extrabold select-none">
+                    <th class="p-3 text-center w-10 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">
+                      <input type="checkbox" id="checkAllSurveyResponses" onchange="toggleAllSurveyResponseChecks(this)" class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                    </th>
+                    <th class="p-3 text-center w-12 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">#</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">신청ID</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">환자명 (응답자)</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">📱 쿠폰 수신 연락처</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">응답일시</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">종합 만족도</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">간병 친절</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">돌봄 품질</th>
+                    <th class="p-3 whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">세부 의견</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">선물 발송 상태</th>
+                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-emerald-50 border-b border-emerald-200 z-20">세부응답 & 선물관리</th>
+                  </tr>
+                </thead>
+                <tbody id="surveyResponsesTableBody_new" class="divide-y divide-slate-100 bg-white">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 2. 불만 및 연락요청 후속 조치 케이스 (A03) -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
@@ -5934,38 +5975,6 @@
                   </tr>
                 </thead>
                 <tbody id="surveyFollowupsTableBody_new" class="divide-y divide-slate-100 bg-white">
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
-            <div class="flex items-center justify-between">
-              <h3 class="font-black text-sm text-slate-900 flex items-center gap-2">
-                <i data-lucide="clipboard-check" class="w-4 h-4 text-rose-600"></i>
-                <span>고객 설문 응답 내역 및 쿠폰 연락처·선물 발송 상태</span>
-              </h3>
-              <span class="text-xs text-slate-400">총 <b id="surveyResponseCountLabel_new" class="text-slate-700">0</b>건 제출됨</span>
-            </div>
-            <div class="overflow-x-auto overflow-y-auto custom-scrollbar border border-slate-200 rounded-xl max-h-[calc(100vh-320px)] relative">
-              <table class="w-full text-left border-collapse text-xs">
-                <thead class="sticky top-0 z-20 shadow-xs">
-                  <tr class="bg-slate-50 border-b border-slate-200 text-slate-800 font-extrabold">
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">응답 ID</th>
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">신청ID</th>
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">고객(환자명)</th>
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">응답자 구분</th>
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">📱 설문 입력 쿠폰 연락처</th>
-                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">Q2. 전반 만족도</th>
-                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">Q3. 친절함</th>
-                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">Q4. 간병 품질</th>
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">Q5. 고객 의견</th>
-                    <th class="p-3 text-center whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">Q6. 연락 희망</th>
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">🎁 선물 발송 내역 / 관리</th>
-                    <th class="p-3 whitespace-nowrap sticky top-0 bg-slate-50 border-b border-slate-200 z-20">제출 일시</th>
-                  </tr>
-                </thead>
-                <tbody id="surveyResponsesTableBody_new" class="divide-y divide-slate-100 bg-white">
                 </tbody>
               </table>
             </div>
