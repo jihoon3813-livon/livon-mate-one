@@ -179,9 +179,24 @@
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .floating-survey-bar.hidden {
-      opacity: 0;
-      transform: translateY(20px);
+      opacity: 0 !important;
+      visibility: hidden !important;
       pointer-events: none !important;
+      display: none !important;
+      transform: translateY(20px) !important;
+    }
+    .floating-survey-bar.hidden * {
+      pointer-events: none !important;
+      cursor: default !important;
+    }
+    @media (max-width: 768px) {
+      input[type="text"],
+      input[type="tel"],
+      input[type="number"],
+      textarea,
+      select {
+        font-size: 16px !important;
+      }
     }
     .floating-survey-inner {
       pointer-events: auto;
@@ -1807,7 +1822,7 @@
                 <div class="survey-q-title" id="q5Title">
                   <span class="q-num">Q5.</span>간병인께 전하고 싶은 감사 인사나 리본케어에 바라는 점을 남겨주세요. <span style="font-size:11.5px; color:#94a3b8; font-weight:500;">(선택)</span>
                 </div>
-                <textarea id="ansQ5" rows="3" maxlength="1000" placeholder="따뜻한 격려의 한마디나 개선이 필요한 점을 편하게 적어주세요. (주민번호 등 민감정보 제외)" oninput="handleSurveyTextInput('Q5', this)" style="width: 100%; box-sizing: border-box; padding: 12px; border-radius: 14px; border: 1.5px solid #e9d8e4; font-size: 13px; color: #2b1938; outline: none; resize: vertical; font-family: inherit;"></textarea>
+                <textarea id="ansQ5" rows="3" maxlength="1000" placeholder="따뜻한 격려의 한마디나 개선이 필요한 점을 편하게 적어주세요. (주민번호 등 민감정보 제외)" oninput="handleSurveyTextInput('Q5', this)" style="width: 100%; box-sizing: border-box; padding: 12px; border-radius: 14px; border: 1.5px solid #e9d8e4; font-size: 16px; color: #2b1938; outline: none; resize: vertical; font-family: inherit;"></textarea>
                 <div style="text-align: right; font-size: 11px; color: #94a3b8; margin-top: 3px;">
                   <span id="charCount_Q5">0</span> / 1000자
                 </div>
@@ -1831,7 +1846,7 @@
             </div>
 
             <!-- 선물(커피쿠폰) 수신 휴대폰 번호 확인 박스 -->
-            <div id="giftPhoneCard" class="survey-q-card" style="background: linear-gradient(135deg, #fffdf9 0%, #fef3c7 100%); border-color: #fcd34d; padding: 14px 12px !important;">
+            <div id="giftPhoneCard" class="survey-q-card" style="background: linear-gradient(135deg, #fffdf9 0%, #fef3c7 100%); border-color: #fcd34d; padding: 14px 12px !important; position: relative; z-index: 10;">
               <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
                 <span style="font-size: 18px;">☕</span>
                 <div style="font-size: 13px; font-weight: 850; color: #78350f; white-space: nowrap !important; letter-spacing: -0.04em;">
@@ -1841,7 +1856,7 @@
               <p style="font-size: 11px; color: #92400e; margin-bottom: 8px; line-height: 1.4; letter-spacing: -0.02em;">
                 설문 완료 시 아래 번호로 모바일 커피쿠폰을 발송해 드립니다.
               </p>
-              <input type="tel" inputmode="numeric" pattern="[0-9-]*" maxlength="13" autocomplete="tel" id="giftPhoneInput" oninput="this.value = formatSurveyPhoneInput(this.value); if (typeof updateSurveyProgress === 'function') updateSurveyProgress();" placeholder="010-0000-0000 (쿠폰 수신처)" style="width: 100%; box-sizing: border-box; padding: 11px 12px; border-radius: 12px; border: 1.5px solid #f59e0b; background: #ffffff; font-size: 14px; font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; letter-spacing: 0.02em; color: #2b1938; outline: none;">
+              <input type="tel" inputmode="numeric" pattern="[0-9-]*" maxlength="13" autocomplete="tel" id="giftPhoneInput" oninput="this.value = formatSurveyPhoneInput(this.value); if (typeof updateSurveyProgress === 'function') updateSurveyProgress();" placeholder="010-0000-0000 (쿠폰 수신처)" style="width: 100%; box-sizing: border-box; padding: 12px; border-radius: 12px; border: 1.5px solid #f59e0b; background: #ffffff; font-size: 16px; font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; letter-spacing: 0.02em; color: #2b1938; outline: none;">
             </div>
 
             <!-- 설문 원클릭 완료 및 제출 버튼 (한번에 끝내기) -->
@@ -1936,14 +1951,18 @@
       window.addEventListener('scroll', () => {
         if (!isTicking) {
           window.requestAnimationFrame(() => {
-            const currentY = window.pageYOffset || document.documentElement.scrollTop;
-            const scrollDelta = currentY - lastScrollY;
-            if (currentY > 60 && scrollDelta > 8) {
-              document.body.classList.add('header-hidden');
-            } else if (scrollDelta < -8 || currentY <= 30) {
-              document.body.classList.remove('header-hidden');
+            const activeEl = document.activeElement;
+            const isEditing = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
+            if (!isEditing) {
+              const currentY = window.pageYOffset || document.documentElement.scrollTop;
+              const scrollDelta = currentY - lastScrollY;
+              if (currentY > 60 && scrollDelta > 8) {
+                document.body.classList.add('header-hidden');
+              } else if (scrollDelta < -8 || currentY <= 30) {
+                document.body.classList.remove('header-hidden');
+              }
+              lastScrollY = Math.max(0, currentY);
             }
-            lastScrollY = Math.max(0, currentY);
             isTicking = false;
           });
           isTicking = true;
@@ -2141,7 +2160,7 @@
           const maxLen = q.maxLength || 1000;
           const ph = q.placeholder || '따뜻한 격려의 한마디나 개선이 필요한 점을 편하게 적어주세요. (주민번호 등 민감정보 제외)';
           bodyHtml = `
-            <textarea id="ans${qKey}" rows="3" maxlength="${maxLen}" placeholder="${ph}" oninput="handleSurveyTextInput('${qKey}', this)" style="width: 100%; box-sizing: border-box; padding: 12px; border-radius: 14px; border: 1.5px solid #e9d8e4; font-size: 13px; color: #2b1938; outline: none; resize: vertical; font-family: inherit;">${prevAnswers[qKey] || ''}</textarea>
+            <textarea id="ans${qKey}" rows="3" maxlength="${maxLen}" placeholder="${ph}" oninput="handleSurveyTextInput('${qKey}', this)" style="width: 100%; box-sizing: border-box; padding: 12px; border-radius: 14px; border: 1.5px solid #e9d8e4; font-size: 16px; color: #2b1938; outline: none; resize: vertical; font-family: inherit;">${prevAnswers[qKey] || ''}</textarea>
             <div style="text-align: right; font-size: 11px; color: #94a3b8; margin-top: 3px;">
               <span id="charCount_${qKey}">${(prevAnswers[qKey] || '').length}</span> / ${maxLen}자
             </div>
@@ -2256,7 +2275,7 @@
       });
     })();
 
-    // 플로팅 설문 바로가기 바 제어 (표지 및 설문 작성 영역에서는 숨김)
+    // 플로팅 설문 바로가기 바 제어 (표지 및 설문 작성 영역에서는 완벽 숨김 및 클릭 차단)
     (function initFloatingSurveyBar() {
       const bar = document.getElementById('floatingSurveyBar');
       const surveySec = document.getElementById('survey-section');
@@ -2268,17 +2287,30 @@
         const surveyRect = surveySec ? surveySec.getBoundingClientRect() : null;
         const coverRect = coverSec ? coverSec.getBoundingClientRect() : null;
 
-        const inCover = coverRect && coverRect.bottom > 100;
-        const inSurvey = surveyRect && surveyRect.top <= (window.innerHeight - 60);
+        const activeTag = (document.activeElement && document.activeElement.tagName) || '';
+        const isEditing = activeTag === 'INPUT' || activeTag === 'TEXTAREA';
 
-        if (inCover || inSurvey || scrollY < 120) {
+        const inCover = coverRect && coverRect.bottom > 100;
+        // 설문 영역 상단이 화면 뷰포트 하단 근처에 도달하면 설문 진입으로 간주하여 즉시 완전 은닉
+        const inSurvey = surveyRect && surveyRect.top <= (window.innerHeight - 30);
+
+        if (inCover || inSurvey || scrollY < 120 || isEditing) {
           bar.classList.add('hidden');
+          bar.style.display = 'none';
+          bar.style.visibility = 'hidden';
+          bar.style.pointerEvents = 'none';
         } else {
+          bar.style.display = 'block';
+          bar.style.visibility = 'visible';
+          bar.style.pointerEvents = '';
           bar.classList.remove('hidden');
         }
       }
 
       window.addEventListener('scroll', updateFloatingBar, { passive: true });
+      window.addEventListener('resize', updateFloatingBar, { passive: true });
+      document.addEventListener('focusin', updateFloatingBar, { passive: true });
+      document.addEventListener('focusout', () => setTimeout(updateFloatingBar, 150), { passive: true });
       setTimeout(updateFloatingBar, 400);
     })();
 
@@ -2540,6 +2572,53 @@
       return validateAllSurveyFields();
     }
     window.validateIntegratedStep = validateIntegratedStep;
+
+    // 모바일 환경에서 마지막 서술식 입력 후 쿠폰 번호 입력 터치 시 상단 스크롤 튐 방지
+    (function initGiftPhoneFocusHandler() {
+      function attachGiftPhoneListeners() {
+        const giftInput = document.getElementById('giftPhoneInput');
+        const giftCard = document.getElementById('giftPhoneCard');
+        if (!giftInput || giftInput.dataset.focusGuardAttached) return;
+        giftInput.dataset.focusGuardAttached = 'true';
+
+        const secureFocusView = () => {
+          // 플로팅 바 즉시 완벽 비활성화 (오터치로 인한 scrollToSection 호출 방지)
+          const bar = document.getElementById('floatingSurveyBar');
+          if (bar) {
+            bar.classList.add('hidden');
+            bar.style.display = 'none';
+            bar.style.visibility = 'hidden';
+            bar.style.pointerEvents = 'none';
+          }
+          // 가상 키보드 오픈/전환 후 스크롤 튐 방지 및 뷰 안정화
+          setTimeout(() => {
+            if (giftCard) {
+              const rect = giftCard.getBoundingClientRect();
+              if (rect.top < 60 || rect.bottom > window.innerHeight) {
+                giftCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }
+          }, 80);
+        };
+
+        giftInput.addEventListener('focus', secureFocusView, { passive: true });
+        giftInput.addEventListener('touchstart', () => {
+          const bar = document.getElementById('floatingSurveyBar');
+          if (bar) {
+            bar.classList.add('hidden');
+            bar.style.display = 'none';
+            bar.style.visibility = 'hidden';
+            bar.style.pointerEvents = 'none';
+          }
+        }, { passive: true });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachGiftPhoneListeners);
+      } else {
+        attachGiftPhoneListeners();
+      }
+    })();
 
     function nextSurveyStep() {
       submitIntegratedSurvey();
