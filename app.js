@@ -3821,7 +3821,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       updateHeaderAdminProfile();
     } catch (e) {}
   }
-  
 
   // 2. 🚨 [보안] 미인증(로그아웃) 상태: 고객·정산 민감 데이터의 메모리/DOM 적재를 원천 차단 (단, 개발 환경은 항상 안전하게 접근 허용)
   if (!isAuthenticated && !isDevMode) {
@@ -20177,23 +20176,23 @@ window.addEventListener('keydown', (e) => {
 var APP_TAB_META = {
   carehub: { name: '통합허브', icon: 'layers', color: 'text-amber-500' },
   // dashboard: { name: '대시보드', icon: 'layout-dashboard', color: 'text-sky-500' }, // 임시 숨김 처리
-  carecalendar: { name: '간병캘린더', icon: 'calendar-days', color: 'text-sky-500' },
-  carelogs: { name: '간병일지 (케어포트)', icon: 'clipboard-list', color: 'text-purple-500' },
+  // carecalendar: { name: '간병캘린더', icon: 'calendar-days', color: 'text-sky-500' }, // 메뉴 비활성화
+  // carelogs: { name: '간병일지 (케어포트)', icon: 'clipboard-list', color: 'text-purple-500' }, // 메뉴 비활성화
   carelogs_new: { name: '간병일지(new)', icon: 'clipboard-check', color: 'text-indigo-500' },
   carecall: { name: 'AI간병통화 관리', icon: 'bot', color: 'text-purple-600' },
-  surveymgmt: { name: '만족도조사 관리', icon: 'star', color: 'text-amber-500' },
+  // surveymgmt: { name: '만족도조사 관리', icon: 'star', color: 'text-amber-500' }, // 메뉴 비활성화
   surveymgmt_new: { name: '만족도조사 관리(new)', icon: 'heart-handshake', color: 'text-pink-500' },
   directory: { name: '파트너/인력 디렉토리', icon: 'contact-2', color: 'text-emerald-500' },
-  samsunglist: { name: '삼성화재 명단관리', icon: 'file-spreadsheet', color: 'text-sky-500' },
+  // samsunglist: { name: '삼성화재 명단관리', icon: 'file-spreadsheet', color: 'text-sky-500' }, // 메뉴 비활성화
   samsungclaimhub: { name: '삼성화재 접수/청구', icon: 'mail-check', color: 'text-emerald-500' },
   samsungsla: { name: '삼성화재 SLA', icon: 'award', color: 'text-amber-500' },
   hyundaiclaimhub: { name: '현대해상 청구관리', icon: 'printer', color: 'text-orange-500' },
-  samsungcallreport: { name: '삼성화재 콜분석', icon: 'phone-forwarded', color: 'text-blue-500' },
+  // samsungcallreport: { name: '삼성화재 콜분석', icon: 'phone-forwarded', color: 'text-blue-500' }, // 메뉴 비활성화
   totalcallanalysis: { name: '종합 콜분석', icon: 'phone-call', color: 'text-cyan-500' },
   forms: { name: '양식', icon: 'files', color: 'text-amber-500' },
   faxmgmt: { name: '팩스관리', icon: 'printer', color: 'text-purple-500' },
   adminmgmt: { name: '시스템관리(권한,설정)', icon: 'settings', color: 'text-amber-500' },
-  branchmall: { name: '분양몰관리', icon: 'store', color: 'text-pink-500' },
+  // branchmall: { name: '분양몰관리', icon: 'store', color: 'text-pink-500' }, // 메뉴 비활성화
   applications: { name: '간병신청대장', icon: 'clipboard-list', color: 'text-sky-500' },
   assignments: { name: '간병인배정관리', icon: 'user-check', color: 'text-emerald-500' },
   claims: { name: '보험청구', icon: 'receipt', color: 'text-amber-500' },
@@ -20365,6 +20364,11 @@ function waitForAppPaint() {
 }
 
 async function runAppTabEntry(tabId, filterParam = null, source = 'menu') {
+  // 메뉴 비활성화
+  if (['carecalendar', 'carelogs', 'surveymgmt', 'samsunglist', 'samsungcallreport', 'branchmall'].includes(tabId)) {
+    tabId = 'carehub';
+    filterParam = null;
+  }
   const routeTabId = tabId === 'dashboard' ? 'carehub' : (['adjusters', 'caregivers', 'centers'].includes(tabId) ? 'directory' : tabId);
   if (source === 'menu' && gCurrentAdmin && gCurrentAdmin.role !== 'SUPER_ADMIN') {
     const allowed = gCurrentAdmin.allowedMenus || ['all'];
@@ -20464,7 +20468,7 @@ function refreshTabData(tabId, filterParam = null) {
         break;
 
       // 1-2. 고객만족도 조사 관리 & 만족도조사 관리(new)
-      case 'surveymgmt':
+      // case 'surveymgmt': // 메뉴 비활성화
       case 'surveymgmt_new':
         if (typeof renderSurveyMgmtTab === 'function') {
           trackJob(renderSurveyMgmtTab());
@@ -20481,29 +20485,21 @@ function refreshTabData(tabId, filterParam = null) {
         break;
 
       // 2. 삼성화재 콜분석: 캐시 기반 0ms 즉시 화면 렌더링 (블로킹 CTI 스크래핑 제외)
-      case 'samsungcallreport':
-        if (typeof renderSamsungCallReportTab === 'function') {
-          trackJob(renderSamsungCallReportTab());
-        }
-        break;
+      // case 'samsungcallreport': // 메뉴 비활성화
+      //   if (typeof renderSamsungCallReportTab === 'function') trackJob(renderSamsungCallReportTab());
+      //   break;
 
       // 3. 삼성화재 명단관리: 구글 드라이브 및 최신 시트 동기화
-      case 'samsunglist':
-      case 'samsungleads':
-      case 'samsung':
-        gActiveSamsungSheet = 'eligible';
-        if (typeof checkSamsungDriveStatus === 'function') {
-          trackJob(checkSamsungDriveStatus());
-        }
-        if (typeof syncSamsungSpreadsheetData === 'function') {
-          trackJob(syncSamsungSpreadsheetData(true));
-        }
-        if (typeof renderSamsungList === 'function') {
-          trackJob(renderSamsungList('eligible'));
-        } else if (typeof renderCurrentSamsungSheet === 'function') {
-          trackJob(renderCurrentSamsungSheet());
-        }
-        break;
+      // 비활성화
+      // case 'samsunglist':
+      // case 'samsungleads':
+      // case 'samsung':
+      //   gActiveSamsungSheet = 'eligible';
+      //   if (typeof checkSamsungDriveStatus === 'function') trackJob(checkSamsungDriveStatus());
+      //   if (typeof syncSamsungSpreadsheetData === 'function') trackJob(syncSamsungSpreadsheetData(true));
+      //   if (typeof renderSamsungList === 'function') trackJob(renderSamsungList('eligible'));
+      //   else if (typeof renderCurrentSamsungSheet === 'function') trackJob(renderCurrentSamsungSheet());
+      //   break;
 
       // 4. 삼성화재 접수/청구관리: 접수/청구 최신 내역 갱신
       case 'samsungclaimhub':
@@ -20527,7 +20523,7 @@ function refreshTabData(tabId, filterParam = null) {
         break;
 
       // 5. 간병일지 (케어포트 & new): 케어포트 실시간 동기화
-      case 'carelogs':
+      // case 'carelogs': // 메뉴 비활성화
       case 'carelogs_new':
         if (typeof syncCarePortLogs === 'function') {
           trackJob(syncCarePortLogs(true));
@@ -20552,11 +20548,9 @@ function refreshTabData(tabId, filterParam = null) {
         break;
 
       // 7. 간병캘린더: 최신 배정 스케줄 갱신
-      case 'carecalendar':
-        if (typeof renderCareCalendar === 'function') {
-          trackJob(renderCareCalendar());
-        }
-        break;
+      // case 'carecalendar': // 메뉴 비활성화
+      //   if (typeof renderCareCalendar === 'function') trackJob(renderCareCalendar());
+      //   break;
 
       // 8. 파트너/인력 디렉토리: 최신 인력/센터/손사 명단 갱신
       case 'directory':
@@ -20644,6 +20638,11 @@ function closeAllMultiTabs() {
 window.closeAllMultiTabs = closeAllMultiTabs;
 
 function switchTab(tabId, filterParam = null, triggerReload = false) {
+  // 메뉴 비활성화
+  if (['carecalendar', 'carelogs', 'surveymgmt', 'samsunglist', 'samsungcallreport', 'branchmall'].includes(tabId)) {
+    tabId = 'carehub';
+    filterParam = null;
+  }
   if (tabId === 'dashboard') tabId = 'carehub';
   // 모바일 사이드바 드로어가 열려있는 경우 메뉴 선택 시 자동 닫기
   if (typeof toggleMobileSidebar === 'function' && window.innerWidth < 1024) {
