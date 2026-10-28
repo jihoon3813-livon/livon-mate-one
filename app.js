@@ -32150,6 +32150,7 @@ function handleNewAppSubmit(e) {
       hospitalRoadAddress: !isHome ? (document.getElementById('newAppHospitalRoadAddress')?.value || '').trim() : roadAddr,
       expectedDays: expectedDays,
       careEndDate: careEndDate,
+      surgeryStatus: document.querySelector('input[name="newAppSurgeryStatus"]:checked')?.value || '아니오',
       status: '접수',
       applicantName: applicantName,
       applicantBirth: applicantBirth,
@@ -33692,6 +33693,9 @@ function openCustomerEditModal(appId, focusSection = null) {
 
   // 비고 메모
   document.getElementById('custEditMemo').value = app.memo || '';
+  const surgeryStatus = app.surgeryStatus === '예' || app.surgeryStatus === true ? '예' : '아니오';
+  const surgeryRadio = document.querySelector(`input[name="custEditSurgeryStatus"][value="${surgeryStatus}"]`);
+  if (surgeryRadio) surgeryRadio.checked = true;
 
   // 1일 청구단가
   const claimPriceInput = document.getElementById('custEditClaimUnitPrice');
@@ -33743,6 +33747,14 @@ async function handleCustomerEditSubmit(e) {
   e.preventDefault();
   const submitBtn = e.target ? e.target.querySelector('button[type="submit"]') : null;
   const originalBtnText = submitBtn ? submitBtn.innerText : '정보 수정 저장';
+  showGlobalProgress({
+    owner: 'customerEditSave',
+    title: '고객 정보 저장 중',
+    subtitle: '저장이 완료될 때까지 잠시만 기다려주세요.',
+    percent: 10,
+    statusText: '수정 내용을 확인하고 있습니다...',
+    icon: 'save'
+  });
   if (submitBtn) {
     submitBtn.innerText = '서버 저장 중... ⏳';
     submitBtn.disabled = true;
@@ -33766,6 +33778,7 @@ async function handleCustomerEditSubmit(e) {
       }
     }
     const app = gApps[appIdx];
+    updateGlobalProgress({ percent: 25, statusText: '수정된 고객 정보를 반영하고 있습니다...' });
     const beforeState = { ...app };
     app.updatedAt = new Date().toISOString();
 
@@ -33879,6 +33892,9 @@ async function handleCustomerEditSubmit(e) {
 
     const mobRadio = document.querySelector('input[name="custEditMobilityRadio"]:checked');
     app.mobility = mobRadio ? mobRadio.value : '가능';
+
+    const surgeryRadio = document.querySelector('input[name="custEditSurgeryStatus"]:checked');
+    app.surgeryStatus = surgeryRadio ? surgeryRadio.value : '아니오';
 
     const editDesiredDateVal = (document.getElementById('custEditDesiredDate')?.value || '').trim();
     const editDesiredTimeVal = (document.getElementById('custEditDesiredTime')?.value || '').trim() || '09:00';
@@ -34062,6 +34078,7 @@ async function handleCustomerEditSubmit(e) {
     }
 
     // ⚡ 2. 서버 및 디스크에 영구 저장
+    updateGlobalProgress({ percent: 55, statusText: '서버에 고객 정보를 저장하고 있습니다...' });
     try {
       await fetch('/api/hub/customer/update-fields', {
         method: 'POST',
@@ -34091,6 +34108,7 @@ async function handleCustomerEditSubmit(e) {
     }
 
     // ⚡ 3. 상세 모달 백엔드 즉시 영구 저장 연동
+    updateGlobalProgress({ percent: 75, statusText: '통합허브 정보를 동기화하고 있습니다...' });
     if (typeof saveActiveHubCustomerDetail === 'function') {
       try {
         await saveActiveHubCustomerDetail(true, app.id);
@@ -34100,6 +34118,7 @@ async function handleCustomerEditSubmit(e) {
     }
 
     // ⚡ 4. Convex Cloud DB 실시간 동기화
+    updateGlobalProgress({ percent: 90, statusText: '저장 결과를 화면에 반영하고 있습니다...' });
     if (typeof syncToConvex === 'function') {
       syncToConvex('sync:saveApplication', { app: app }).catch(console.warn);
     }
@@ -34142,6 +34161,8 @@ async function handleCustomerEditSubmit(e) {
     console.error('[handleCustomerEditSubmit] error:', err);
     alert("저장 중 오류가 발생했습니다: " + (err.message || err));
   } finally {
+    updateGlobalProgress({ percent: 100, statusText: '고객 정보 저장이 완료되었습니다.' });
+    hideGlobalProgress(350, 'customerEditSave');
     if (submitBtn) {
       submitBtn.innerText = originalBtnText;
       submitBtn.disabled = false;
