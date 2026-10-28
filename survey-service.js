@@ -51,11 +51,11 @@ const SURVEY_SCHEMA_V1 = [
     type: 'rating_5',
     required: true,
     options: [
-      { score: 5, label: '매우 만족' },
-      { score: 4, label: '만족' },
-      { score: 3, label: '보통' },
-      { score: 2, label: '불만족' },
-      { score: 1, label: '매우 불만족' }
+      { score: 5, label: '매우 만족한다.' },
+      { score: 4, label: '만족한다.' },
+      { score: 3, label: '보통이다' },
+      { score: 2, label: '불만이다.' },
+      { score: 1, label: '매우 불만이다.' }
     ]
   },
   {
@@ -65,11 +65,11 @@ const SURVEY_SCHEMA_V1 = [
     required: true,
     allowUnknown: true,
     options: [
-      { score: 5, label: '매우 친절' },
-      { score: 4, label: '친절' },
-      { score: 3, label: '보통' },
-      { score: 2, label: '불친절' },
-      { score: 1, label: '매우 불친절' }
+      { score: 5, label: '매우 만족한다.' },
+      { score: 4, label: '만족한다.' },
+      { score: 3, label: '보통이다' },
+      { score: 2, label: '불만이다.' },
+      { score: 1, label: '매우 불만이다.' }
     ]
   },
   {
@@ -79,11 +79,11 @@ const SURVEY_SCHEMA_V1 = [
     required: true,
     allowUnknown: true,
     options: [
-      { score: 5, label: '매우 꼼꼼하고 능숙함' },
-      { score: 4, label: '원활함' },
-      { score: 3, label: '보통' },
-      { score: 2, label: '미흡함' },
-      { score: 1, label: '매우 미흡함' }
+      { score: 5, label: '매우 만족한다.' },
+      { score: 4, label: '만족한다.' },
+      { score: 3, label: '보통이다' },
+      { score: 2, label: '불만이다.' },
+      { score: 1, label: '매우 불만이다.' }
     ]
   },
   {

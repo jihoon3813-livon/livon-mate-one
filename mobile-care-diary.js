@@ -34,15 +34,15 @@ const icon = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const $ = id => document.getElementById(id);
 const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-// 기본 데이터 세트 (고연분 님 실기록 기준 16일치)
+// 기본 데이터 세트 (초기 기본 템플릿)
 const DEFAULT_PATIENT_INFO = {
-  name: '고연분',
-  age: '66',
-  gender: '여성',
-  carerName: '권은지',
-  startDate: '09.17',
-  endDate: '10.02',
-  totalDays: 16
+  name: '',
+  age: '',
+  gender: '',
+  carerName: '',
+  startDate: '',
+  endDate: '',
+  totalDays: 0
 };
 
 const DEFAULT_RECORDS = [
@@ -175,7 +175,7 @@ async function initFromQueryParams() {
     window.__INITIAL_QUERY_STRING__ = window.location.search;
     if (window.history && window.history.replaceState && !window.location.pathname.includes('survey')) {
       window.history.replaceState(
-        { patient: pName || '고연분', masked: true },
+        { patient: pName || '고객', masked: true },
         document.title,
         '/care-diary'
       );
@@ -909,18 +909,31 @@ function render() {
   const r = careRecords[selected] || careRecords[0];
   const b = buildBriefing(r);
 
-  const pName = gPatientInfo.name || '고연분';
-  const cName = gPatientInfo.carerName || '권은지';
-  const initial = pName.charAt(0);
+  const pName = gPatientInfo.name || '';
+  const cName = gPatientInfo.carerName || '';
+  const initial = pName ? pName.charAt(0) : '';
   const totalDays = careRecords.length;
 
-  document.querySelectorAll('.patient-initial').forEach(e => e.textContent = presentation ? '고' : initial);
-  document.querySelectorAll('.carer-initial').forEach(e => e.textContent = presentation ? '권' : cName.charAt(0));
-  document.querySelectorAll('.patient-name').forEach(e => e.textContent = presentation ? '고○○ 님' : `${pName} 님`);
-  document.querySelectorAll('.carer-name').forEach(e => e.textContent = presentation ? '권○○' : cName);
-  document.querySelectorAll('.patient-meta-text').forEach(e => e.textContent = `${gPatientInfo.age || 66}세 · ${gPatientInfo.gender || '여성'}`);
-  document.querySelectorAll('.side-care-period').forEach(e => e.textContent = `${careRecords[0]?.date || '09.17'} — ${careRecords[careRecords.length - 1]?.date || '10.02'}`);
-  document.querySelectorAll('.side-care-days').forEach(e => e.textContent = `${totalDays}일`);
+  if (pName) {
+    document.querySelectorAll('.patient-initial').forEach(e => e.textContent = presentation ? '고' : initial);
+    document.querySelectorAll('.patient-name').forEach(e => e.textContent = presentation ? (pName.slice(0, 1) + '○○ 님') : `${pName} 님`);
+  }
+  if (cName) {
+    document.querySelectorAll('.carer-initial').forEach(e => e.textContent = presentation ? '권' : cName.charAt(0));
+    document.querySelectorAll('.carer-name').forEach(e => e.textContent = presentation ? (cName.slice(0, 1) + '○○') : cName);
+  }
+  if (gPatientInfo.age || gPatientInfo.gender) {
+    const metaParts = [];
+    if (gPatientInfo.age) metaParts.push(`${gPatientInfo.age}세`);
+    if (gPatientInfo.gender) metaParts.push(gPatientInfo.gender);
+    document.querySelectorAll('.patient-meta-text').forEach(e => e.textContent = metaParts.join(' · '));
+  }
+  if (careRecords[0]?.date && careRecords[careRecords.length - 1]?.date) {
+    document.querySelectorAll('.side-care-period').forEach(e => e.textContent = `${careRecords[0].date} — ${careRecords[careRecords.length - 1].date}`);
+  }
+  if (totalDays > 0) {
+    document.querySelectorAll('.side-care-days').forEach(e => e.textContent = `${totalDays}일`);
+  }
 
   $('day-count').textContent = selected + 1;
   $('selected-date').textContent = dateLabel(selected);
@@ -1000,15 +1013,19 @@ function render() {
 }
 
 function applyIdentity() {
-  const pName = gPatientInfo.name || '고연분';
-  const cName = gPatientInfo.carerName || '권은지';
+  const pName = gPatientInfo.name || '';
+  const cName = gPatientInfo.carerName || '';
 
-  document.querySelectorAll('.patient-name').forEach(e => {
-    e.textContent = presentation ? '고○○ 님' : `${pName} 님`;
-  });
-  document.querySelectorAll('.carer-name').forEach(e => {
-    e.textContent = presentation ? '권○○' : cName;
-  });
+  if (pName) {
+    document.querySelectorAll('.patient-name').forEach(e => {
+      e.textContent = presentation ? (pName.slice(0, 1) + '○○ 님') : `${pName} 님`;
+    });
+  }
+  if (cName) {
+    document.querySelectorAll('.carer-name').forEach(e => {
+      e.textContent = presentation ? (cName.slice(0, 1) + '○○') : cName;
+    });
+  }
 
   if ($('presentation')) {
     $('presentation').setAttribute('aria-pressed', presentation);
@@ -1017,7 +1034,7 @@ function applyIdentity() {
   if ($('source')) {
     $('source').hidden = presentation;
   }
-  document.title = presentation ? '간병일지 · LivOn' : `${pName} 님의 간병일지 · LivOn`;
+  document.title = presentation ? '간병일지 · LivOn' : (pName ? `${pName} 님의 간병일지 · LivOn` : '리본케어 안심 케어 리포트 · LivOn');
   document.body.classList.toggle('presenting', presentation);
 }
 
@@ -1028,24 +1045,24 @@ function showSheet(title, html) {
 }
 
 function showSideMoreSheet() {
-  const pName = gPatientInfo.name || '고연분';
-  const cName = gPatientInfo.carerName || '권은지';
-  const initial = pName.charAt(0);
+  const pName = gPatientInfo.name || '고객';
+  const cName = gPatientInfo.carerName || '담당 간병사';
+  const initial = pName.charAt(0) || '·';
 
   const html = `
     <div class="mobile-side-content">
       <div class="side-patient" style="margin-top: 10px;">
         <span class="initial" style="width: 44px; height: 44px; font-size: 18px;">${presentation ? '고' : initial}</span>
         <div>
-          <b class="patient-name" style="font-size: 17px; color: var(--plum);">${presentation ? '고○○ 님' : `${pName} 님`}</b>
-          <small>${gPatientInfo.age || 66}세 · ${gPatientInfo.gender || '여성'}</small>
+          <b class="patient-name" style="font-size: 17px; color: var(--plum);">${presentation ? (pName.slice(0, 1) + '○○ 님') : `${pName} 님`}</b>
+          <small>${gPatientInfo.age ? (gPatientInfo.age + '세 · ') : ''}${gPatientInfo.gender || '환자'}</small>
         </div>
       </div>
 
       <dl class="side-info">
-        <div><dt>간병 기간</dt><dd class="side-care-period">${careRecords[0]?.date || '09.17'} — ${careRecords[careRecords.length - 1]?.date || '10.02'}</dd></div>
-        <div><dt>기록 일수</dt><dd class="side-care-days">${careRecords.length}일</dd></div>
-        <div><dt>담당 간병인</dt><dd class="carer-name">${presentation ? '권○○' : cName}</dd></div>
+        <div><dt>간병 기간</dt><dd class="side-care-period">${(careRecords[0]?.date && careRecords[careRecords.length - 1]?.date) ? (careRecords[0].date + ' — ' + careRecords[careRecords.length - 1].date) : '-'}</dd></div>
+        <div><dt>기록 일수</dt><dd class="side-care-days">${careRecords.length > 0 ? (careRecords.length + '일') : '-'}</dd></div>
+        <div><dt>담당 간병인</dt><dd class="carer-name">${presentation ? (cName.slice(0, 1) + '○○') : cName}</dd></div>
       </dl>
 
       <nav class="side-nav" style="border-top: 1px solid #dfd6e1; padding-top: 18px;">
@@ -1094,7 +1111,7 @@ function showSideMoreSheet() {
 }
 
 async function sendRealSmsPrompt() {
-  const pName = gPatientInfo.name || '고연분';
+  const pName = gPatientInfo.name || '고객';
   const targetPhone = prompt(`[${pName} 님] 모바일 간병일지를 전송할 수신자 휴대폰 번호를 입력하세요:`, '010-');
   if (!targetPhone) return;
 
@@ -1145,7 +1162,7 @@ async function sendRealSmsPrompt() {
 
 function copyCurrentReportLink() {
   const url = window.location.href;
-  const pName = gPatientInfo.name || '고연분';
+  const pName = gPatientInfo.name || '고객';
   const smsText = `[리본케어] ${pName} 님의 모바일 간병일지가 도착했습니다.\n매일의 간병 기록과 상태 변화를 확인해 보세요.\n\n▶ 모바일 리포트 바로보기:\n${url}`;
 
   navigator.clipboard.writeText(smsText).then(() => {
@@ -1156,7 +1173,7 @@ function copyCurrentReportLink() {
 }
 
 async function downloadCurrentCareReportPdf() {
-  const pName = (gPatientInfo && gPatientInfo.name) ? gPatientInfo.name : '고연분';
+  const pName = (gPatientInfo && gPatientInfo.name) ? gPatientInfo.name : '고객';
 
   // 1. 부모 창(통합 어드민 - 간병일지 new) 함수 연동
   try {

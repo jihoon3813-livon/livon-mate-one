@@ -46,6 +46,24 @@ const DEFAULT_SURVEY_SETTINGS = {
   csOperatingHours: '평일 09:00 ~ 18:00 (주말/공휴일 휴무)'
 };
 
+const UNIFIED_RATING_5_OPTIONS = [
+  { score: 5, label: '매우 만족한다.' },
+  { score: 4, label: '만족한다.' },
+  { score: 3, label: '보통이다' },
+  { score: 2, label: '불만이다.' },
+  { score: 1, label: '매우 불만이다.' }
+];
+
+function normalizeSurveySchemaRating5(schemaList) {
+  if (!Array.isArray(schemaList)) return schemaList;
+  schemaList.forEach(q => {
+    if (q && (q.type === 'rating_5' || q.type === 'rating_5_with_unknown')) {
+      q.options = JSON.parse(JSON.stringify(UNIFIED_RATING_5_OPTIONS));
+    }
+  });
+  return schemaList;
+}
+
 const DEFAULT_SURVEY_SCHEMA_V1 = [
   {
     id: 'Q1',
@@ -63,13 +81,7 @@ const DEFAULT_SURVEY_SCHEMA_V1 = [
     title: '이번 간병 서비스에 전반적으로 얼마나 만족하셨나요?',
     type: 'rating_5',
     required: true,
-    options: [
-      { score: 5, label: '매우 만족' },
-      { score: 4, label: '만족' },
-      { score: 3, label: '보통' },
-      { score: 2, label: '불만족' },
-      { score: 1, label: '매우 불만족' }
-    ]
+    options: JSON.parse(JSON.stringify(UNIFIED_RATING_5_OPTIONS))
   },
   {
     id: 'Q3',
@@ -77,13 +89,7 @@ const DEFAULT_SURVEY_SCHEMA_V1 = [
     type: 'rating_5_with_unknown',
     required: true,
     allowUnknown: true,
-    options: [
-      { score: 5, label: '매우 친절' },
-      { score: 4, label: '친절' },
-      { score: 3, label: '보통' },
-      { score: 2, label: '불친절' },
-      { score: 1, label: '매우 불친절' }
-    ]
+    options: JSON.parse(JSON.stringify(UNIFIED_RATING_5_OPTIONS))
   },
   {
     id: 'Q4',
@@ -91,13 +97,7 @@ const DEFAULT_SURVEY_SCHEMA_V1 = [
     type: 'rating_5_with_unknown',
     required: true,
     allowUnknown: true,
-    options: [
-      { score: 5, label: '매우 꼼꼼하고 능숙함' },
-      { score: 4, label: '원활함' },
-      { score: 3, label: '보통' },
-      { score: 2, label: '미흡함' },
-      { score: 1, label: '매우 미흡함' }
-    ]
+    options: JSON.parse(JSON.stringify(UNIFIED_RATING_5_OPTIONS))
   },
   {
     id: 'Q5',
@@ -572,12 +572,15 @@ async function loadSurveyMgmtData(showToastAlert = false) {
     // 1) Convex Cloud DB에서 설정 조회 시도
     if (typeof queryConvex === 'function') {
       try {
-        const cvxSettings = await queryConvex('sync:getSurveySettings', {});
+        const cvxRes = await queryConvex('sync:getSurveySettings', {});
+        const cvxSettings = (cvxRes && cvxRes.value !== undefined) ? cvxRes.value : cvxRes;
         if (cvxSettings) {
           if (cvxSettings.settings) restoredSettings = cvxSettings.settings;
           if (Array.isArray(cvxSettings.schema) && cvxSettings.schema.length > 0) restoredSchema = cvxSettings.schema;
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[Survey] getSurveySettings load warning:', e);
+      }
     }
 
     // 2) API 응답 반영
@@ -606,8 +609,18 @@ async function loadSurveyMgmtData(showToastAlert = false) {
     // 4) 최종 기본값 폴백 (화면이 비거나 누락되지 않도록 100% 보장)
     gSurveyState.settings = { ...DEFAULT_SURVEY_SETTINGS, ...(restoredSettings || {}) };
     gSurveyState.schema = (Array.isArray(restoredSchema) && restoredSchema.length > 0)
-      ? restoredSchema
+      ? normalizeSurveySchemaRating5(restoredSchema)
       : JSON.parse(JSON.stringify(DEFAULT_SURVEY_SCHEMA_V1));
+
+    // 최신 설문 스키마 및 설정 로컬 캐시 동기화
+    try {
+      if (Array.isArray(gSurveyState.schema) && gSurveyState.schema.length > 0) {
+        localStorage.setItem('LIVON_SURVEY_SCHEMA', JSON.stringify(gSurveyState.schema));
+      }
+      if (gSurveyState.settings) {
+        localStorage.setItem('LIVON_SURVEY_SETTINGS', JSON.stringify(gSurveyState.settings));
+      }
+    } catch (e) {}
 
     // 칩 카운트 갱신
     updateSurveyChipCounts();
@@ -1739,24 +1752,13 @@ function updateQuestionField(idx, field, value) {
   if (!gSurveyState.schema || !gSurveyState.schema[idx]) return;
   gSurveyState.schema[idx][field] = value;
   if (field === 'type') {
-    if (value === 'rating_5') {
-      gSurveyState.schema[idx].options = [
-        { score: 5, label: '매우 만족' },
-        { score: 4, label: '만족' },
-        { score: 3, label: '보통' },
-        { score: 2, label: '불만족' },
-        { score: 1, label: '매우 불만족' }
-      ];
-      delete gSurveyState.schema[idx].allowUnknown;
-    } else if (value === 'rating_5_with_unknown') {
-      gSurveyState.schema[idx].options = [
-        { score: 5, label: '매우 친절' },
-        { score: 4, label: '친절' },
-        { score: 3, label: '보통' },
-        { score: 2, label: '불친절' },
-        { score: 1, label: '매우 불친절' }
-      ];
-      gSurveyState.schema[idx].allowUnknown = true;
+    if (value === 'rating_5' || value === 'rating_5_with_unknown') {
+      gSurveyState.schema[idx].options = JSON.parse(JSON.stringify(UNIFIED_RATING_5_OPTIONS));
+      if (value === 'rating_5_with_unknown') {
+        gSurveyState.schema[idx].allowUnknown = true;
+      } else {
+        delete gSurveyState.schema[idx].allowUnknown;
+      }
     } else if (value === 'single_choice') {
       if (!Array.isArray(gSurveyState.schema[idx].options) || gSurveyState.schema[idx].options.length === 0) {
         gSurveyState.schema[idx].options = [
@@ -1778,13 +1780,7 @@ function addSurveyQuestion() {
     title: '새로운 설문 문항 내용을 입력해 주세요.',
     type: 'rating_5',
     required: true,
-    options: [
-      { score: 5, label: '매우 만족' },
-      { score: 4, label: '만족' },
-      { score: 3, label: '보통' },
-      { score: 2, label: '불만족' },
-      { score: 1, label: '매우 불만족' }
-    ]
+    options: JSON.parse(JSON.stringify(UNIFIED_RATING_5_OPTIONS))
   };
   gSurveyState.schema.push(newQ);
   renderSurveySchemaEditor();
@@ -1803,6 +1799,7 @@ function deleteSurveyQuestion(idx) {
 
 async function saveSurveySchema() {
   try {
+    normalizeSurveySchemaRating5(gSurveyState.schema);
     // 1. 상태 즉시 반영 및 로컬스토리지 영구 보존
     try {
       localStorage.setItem('LIVON_SURVEY_SCHEMA', JSON.stringify(gSurveyState.schema));
@@ -1923,6 +1920,10 @@ function buildIntegratedSurveyUrl(targetId, extraParams = {}) {
     if (target.patientName) q.set('patient', target.patientName);
     if (target.caregiverName) q.set('carer', target.caregiverName);
     if (target.hospitalName) q.set('hospital', cleanSurveyHospitalName(target.hospitalName, target));
+    if (target.careStartDate) q.set('start', target.careStartDate);
+    if (target.careEndDate) q.set('end', target.careEndDate);
+    if (target.patientAge || target.age) q.set('age', target.patientAge || target.age);
+    if (target.patientGender || target.gender) q.set('gender', target.patientGender || target.gender);
   }
   q.set('titleTheme', extraParams.titleTheme || gSurveyNewTitleTheme || '1');
   if (extraParams.section) q.set('section', extraParams.section);

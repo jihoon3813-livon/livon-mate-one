@@ -1168,9 +1168,124 @@
         font-size: 21px;
       }
     }
+
+    /* Fullscreen Smooth Loading Overlay */
+    #surveyLoadingOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #ffffff;
+      z-index: 999999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: all;
+    }
+    #surveyLoadingOverlay.fade-out {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    @keyframes livonPulseRing {
+      0% { transform: scale(0.92); opacity: 0.8; }
+      50% { transform: scale(1.06); opacity: 1; }
+      100% { transform: scale(0.92); opacity: 0.8; }
+    }
+    @keyframes livonSpinRing {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
+  <script>
+    (function() {
+      // 0ms 인터벌 선제 주입: URL 파라미터에서 환자/간병인/기간 정보 즉시 추출하여 DOM 생성 즉시 반영
+      try {
+        const p = new URLSearchParams(window.location.search);
+        const pName = (p.get('patient') || p.get('p') || p.get('name') || '').trim();
+        const carer = (p.get('carer') || p.get('caregiver') || p.get('c') || '').trim();
+        const hosp = (p.get('hospital') || p.get('h') || '').trim();
+        const start = (p.get('start') || p.get('s') || '').trim();
+        const end = (p.get('end') || p.get('e') || '').trim();
+        const days = (p.get('days') || p.get('d') || '').trim();
+        const age = (p.get('age') || '').trim();
+        const gender = (p.get('gender') || '').trim();
+
+        window.__FAST_PARAM_DATA__ = { pName, carer, hosp, start, end, days, age, gender };
+
+        function applyFastParams() {
+          if (pName) {
+            document.querySelectorAll('.patient-name').forEach(el => el.textContent = `${pName} 님`);
+            document.querySelectorAll('.patient-initial').forEach(el => el.textContent = pName.charAt(0));
+          }
+          if (carer) {
+            document.querySelectorAll('.carer-name').forEach(el => el.textContent = carer);
+            document.querySelectorAll('.carer-initial').forEach(el => el.textContent = carer.charAt(0));
+          }
+          if (hosp) {
+            document.querySelectorAll('.hospital-name').forEach(el => el.textContent = hosp);
+          }
+          const metaArr = [];
+          if (age) metaArr.push(`${age}세`);
+          if (gender) metaArr.push(gender === '남' || gender === 'M' ? '남성' : (gender === '여' || gender === 'F' ? '여성' : gender));
+          if (metaArr.length > 0) {
+            document.querySelectorAll('.patient-meta-text').forEach(el => el.textContent = metaArr.join(' · '));
+          }
+          if (start && end) {
+            document.querySelectorAll('.side-care-period').forEach(el => el.textContent = `${start} — ${end}`);
+          } else if (start) {
+            document.querySelectorAll('.side-care-period').forEach(el => el.textContent = `${start}부터`);
+          }
+          if (days) {
+            document.querySelectorAll('.side-care-days, .total-days-num').forEach(el => el.textContent = `${days}일`);
+            const dEl = document.getElementById('day-count');
+            if (dEl) dEl.textContent = days;
+          }
+        }
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', applyFastParams);
+        } else {
+          applyFastParams();
+        }
+      } catch (e) {}
+    })();
+
+    function hideSurveyLoadingOverlay() {
+      const el = document.getElementById('surveyLoadingOverlay');
+      if (!el || el.classList.contains('fade-out')) return;
+      el.classList.add('fade-out');
+      setTimeout(function() {
+        try { el.remove(); } catch (e) {}
+      }, 320);
+    }
+    window.hideSurveyLoadingOverlay = hideSurveyLoadingOverlay;
+
+    // 만약의 네트워크 지연 대비 최대 3.5초 안전 자동 해제
+    setTimeout(hideSurveyLoadingOverlay, 3500);
+  </script>
 </head>
 <body>
+  <!-- Fullscreen Initial Loading Overlay (디폴트값 깜빡임 및 노출 원천 차단) -->
+  <div id="surveyLoadingOverlay" aria-label="리본케어 안심 리포트 로딩 중">
+    <div style="display: flex; flex-direction: column; align-items: center; text-align: center; padding: 24px 20px; max-width: 320px; width: 100%;">
+      <div style="position: relative; width: 68px; height: 68px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center;">
+        <div style="position: absolute; inset: 0; border: 3px solid #fce7f3; border-top-color: #be185d; border-radius: 22px; animation: livonSpinRing 1s linear infinite;"></div>
+        <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1789622263/ChatGPT_Image_2026%EB%85%84_9%EC%9B%94_17%EC%9D%BC_%EC%98%A4%ED%9B%84_02_17_20_kh5ydh.png" alt="리본케어" style="width: 44px; height: 44px; border-radius: 14px; object-fit: contain; animation: livonPulseRing 2s ease-in-out infinite;">
+      </div>
+      <div style="font-size: 16.5px; font-weight: 850; color: #2b1938; margin-bottom: 6px; letter-spacing: -0.02em;">리본케어 안심 케어 리포트</div>
+      <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 0; word-break: keep-all;">
+        모바일 간병일지 및 만족도 설문을<br>안전하게 불러오는 중입니다...
+      </p>
+    </div>
+  </div>
   <div class="layout">
     <!-- Desktop Left Sidebar -->
     <aside class="desktop-side">
@@ -1186,18 +1301,18 @@
       <p class="side-desc">정성껏 작성한 모바일 간병일지를 확인하시고, 더 나은 돌봄을 위해 만족도 설문에 참여해 주세요.</p>
       
       <div class="side-patient">
-        <span class="initial patient-initial">고</span>
+        <span class="initial patient-initial">&nbsp;</span>
         <div>
-          <b class="patient-name">고연분 님</b>
-          <small class="patient-meta-text">66세 · 여성</small>
+          <b class="patient-name">고객 님</b>
+          <small class="patient-meta-text">케어 정보</small>
         </div>
       </div>
       
       <dl class="side-info">
-        <div><dt>입원 병원</dt><dd class="hospital-name">지정 병원</dd></div>
-        <div><dt>간병 기간</dt><dd class="side-care-period">09.17 — 10.02</dd></div>
-        <div><dt>기록 일수</dt><dd class="side-care-days">16일</dd></div>
-        <div><dt>담당 간병인</dt><dd class="carer-name">권은지</dd></div>
+        <div><dt>입원 병원</dt><dd class="hospital-name">-</dd></div>
+        <div><dt>간병 기간</dt><dd class="side-care-period">-</dd></div>
+        <div><dt>기록 일수</dt><dd class="side-care-days">-</dd></div>
+        <div><dt>담당 간병인</dt><dd class="carer-name">담당 간병사</dd></div>
       </dl>
       
       <nav class="side-nav">
@@ -1285,29 +1400,29 @@
           <div class="cover-patient-ticket">
             <div class="ticket-header">
               <div class="ticket-patient-profile">
-                <div class="ticket-avatar patient-initial">고</div>
+                <div class="ticket-avatar patient-initial">&nbsp;</div>
                 <div>
                   <div class="ticket-patient-name">
-                    <span class="patient-name">고연분 님</span>
+                    <span class="patient-name">고객 님</span>
                   </div>
                   <div class="ticket-patient-meta">
-                    <span class="patient-meta-text">66세 · 여성</span> · <span class="hospital-name">지정 병원</span>
+                    <span class="patient-meta-text">케어 정보</span> · <span class="hospital-name">-</span>
                   </div>
                 </div>
               </div>
               <div class="ticket-day-badge">
-                <b class="total-days-num">16일</b>
+                <b class="total-days-num">-</b>
                 <span>간병 기록</span>
               </div>
             </div>
             <div class="ticket-grid">
               <div class="ticket-item">
                 <span class="lbl">담당 간병인</span>
-                <span class="val"><span class="carer-name">권은지</span> 간병사</span>
+                <span class="val"><span class="carer-name">담당 간병사</span></span>
               </div>
               <div class="ticket-item">
                 <span class="lbl">간병 기간</span>
-                <span class="val side-care-period">09.17 — 10.02</span>
+                <span class="val side-care-period">-</span>
               </div>
             </div>
           </div>
@@ -1380,16 +1495,16 @@
         <div class="intro" id="overview" style="padding-top: 8px;">
           <p class="eyebrow" style="color: #be185d; font-weight: 800;">PART 01 · LIVON AI 모바일 간병일지</p>
           <div class="title-row">
-            <h1><span class="patient-name">고연분 님</span>의<br>하루를 전해드려요.</h1>
+            <h1><span class="patient-name">고객 님</span>의<br>하루를 전해드려요.</h1>
             <div class="day-seal">
-              <b id="day-count">16</b>
+              <b id="day-count">-</b>
               <span>일째 간병</span>
             </div>
           </div>
           <div class="person-meta">
-            <span class="patient-meta-text">66세 · 여성</span>
-            <span>담당 간병인 <b class="carer-name">권은지</b></span>
-            <span><span class="side-care-period">09.17</span>부터</span>
+            <span class="patient-meta-text">케어 정보</span>
+            <span>담당 간병인 <b class="carer-name">담당 간병사</b></span>
+            <span><span class="side-care-period">-</span></span>
           </div>
         </div>
 
@@ -1493,9 +1608,9 @@
             <div id="family-quote-title" style="font-size: 15.5px; font-weight: 800; color: #be185d; margin-bottom: 12px; line-height: 1.45;"></div>
             <div id="family-quote-body" style="font-size: 13.5px; color: #1e293b; line-height: 2.0; word-break: keep-all;"></div>
             <div class="family-quote-sign" style="display: flex; align-items: center; gap: 6px; border-top: 1px solid #fbcfe8; padding-top: 10px; margin-top: 12px; white-space: nowrap; overflow: hidden;">
-              <span class="mini-avatar carer-initial patient-initial" style="width: 24px; height: 24px; border-radius: 6px; background: #fce7f3; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #be185d; flex-shrink: 0;">권</span>
+              <span class="mini-avatar carer-initial patient-initial" style="width: 24px; height: 24px; border-radius: 6px; background: #fce7f3; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #be185d; flex-shrink: 0;">·</span>
               <span style="font-size: 11px; font-weight: 700; color: #334155; white-space: nowrap; letter-spacing: -0.04em;">
-                담당 간병인 <b class="carer-name" style="color: #be185d;">권은지</b>
+                담당 간병인 <b class="carer-name" style="color: #be185d;">담당 간병사</b>
                 <small style="color: #94a3b8; font-size: 9.5px; margin-left: 3px; font-weight: 400; white-space: nowrap;">· 보호자 전달사항 바탕 재구성</small>
               </span>
             </div>
@@ -1574,23 +1689,23 @@
               <div class="survey-q-sub">위 간병일지와 실제 경험하신 돌봄 서비스를 종합해 평가해 주세요.</div>
               <div>
                 <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 5, this)">
-                  <span>😍 매우 만족스러웠어요</span>
+                  <span>매우 만족한다.</span>
                   <span class="livon-opt-score">★ 5점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 4, this)">
-                  <span>🙂 대체로 만족해요</span>
+                  <span>만족한다.</span>
                   <span class="livon-opt-score">★ 4점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 3, this)">
-                  <span>😐 보통이에요</span>
+                  <span>보통이다</span>
                   <span class="livon-opt-score">★ 3점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 2, this)">
-                  <span>🙁 조금 아쉬웠어요</span>
+                  <span>불만이다.</span>
                   <span class="livon-opt-score">2점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 1, this)">
-                  <span>😡 많이 불만족스러웠어요</span>
+                  <span>매우 불만이다.</span>
                   <span class="livon-opt-score">1점</span>
                 </button>
               </div>
@@ -1600,28 +1715,28 @@
             <!-- Q3 간병인의 친절함과 태도 -->
             <div id="qCard3" class="survey-q-card">
               <div class="survey-q-title" id="q3Title">
-                <span class="q-num">Q3.</span>담당 간병인(<span class="carer-name">권은지</span>)의 친절함과 환자를 대하는 태도는 어떠셨나요? <span style="color:#e11d48;">*</span>
+                <span class="q-num">Q3.</span>담당 간병인(<span class="carer-name">담당 간병사</span>)의 친절함과 환자를 대하는 태도는 어떠셨나요? <span style="color:#e11d48;">*</span>
               </div>
               <div class="survey-q-sub">따뜻한 말씨, 환자 존중 및 정서적 배려 정도를 선택해 주세요.</div>
               <div>
                 <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 5, this)">
-                  <span>💖 가족처럼 매우 친절하고 따뜻했어요</span>
+                  <span>매우 만족한다.</span>
                   <span class="livon-opt-score">★ 5점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 4, this)">
-                  <span>😊 친절하고 예의 바르셨어요</span>
+                  <span>만족한다.</span>
                   <span class="livon-opt-score">★ 4점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 3, this)">
-                  <span>😐 무난하고 보통이었어요</span>
+                  <span>보통이다</span>
                   <span class="livon-opt-score">★ 3점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 2, this)">
-                  <span>🙁 다소 불친절하게 느껴졌어요</span>
+                  <span>불만이다.</span>
                   <span class="livon-opt-score">2점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 1, this)">
-                  <span>😡 매우 불친절했어요</span>
+                  <span>매우 불만이다.</span>
                   <span class="livon-opt-score">1점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q3-btn" style="border-style: dashed; color: #7c687b; justify-content: center; font-size: 12px;" onclick="selectSurveyUnknown('q3', this)">
@@ -1640,23 +1755,23 @@
               <div class="survey-q-sub">간병일지에 기록된 일상 케어 및 환자 안전 관리의 꼼꼼함을 평가해 주세요.</div>
               <div>
                 <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 5, this)">
-                  <span>✨ 매우 꼼꼼하고 능숙하게 잘 돌봐주셨어요</span>
+                  <span>매우 만족한다.</span>
                   <span class="livon-opt-score">★ 5점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 4, this)">
-                  <span>👍 전반적으로 원활하고 양호했어요</span>
+                  <span>만족한다.</span>
                   <span class="livon-opt-score">★ 4점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 3, this)">
-                  <span>😐 보통 수준이었어요</span>
+                  <span>보통이다</span>
                   <span class="livon-opt-score">★ 3점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 2, this)">
-                  <span>🙁 다소 미흡한 부분이 있었어요</span>
+                  <span>불만이다.</span>
                   <span class="livon-opt-score">2점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 1, this)">
-                  <span>😡 돌봄 품질이 매우 미흡했어요</span>
+                  <span>매우 불만이다.</span>
                   <span class="livon-opt-score">1점</span>
                 </button>
                 <button type="button" class="livon-opt-btn q4-btn" style="border-style: dashed; color: #7c687b; justify-content: center; font-size: 12px;" onclick="selectSurveyUnknown('q4', this)">
@@ -2352,14 +2467,34 @@
       const preRole = params.get('role') || '';
 
       // [즉시 반영 Fallback]: URL에 환자 파라미터가 있는 경우 화면 깜빡임 없이 즉시 환자명/병원명 선제 동기화
+      const urlStart = (params.get('start') || params.get('s') || '').trim();
+      const urlEnd = (params.get('end') || params.get('e') || '').trim();
+      const urlAge = (params.get('age') || '').trim();
+      const urlGender = (params.get('gender') || '').trim();
+
       if (urlPatient) {
         gPatientInfo.name = urlPatient;
         if (urlCarer) gPatientInfo.carerName = urlCarer;
         if (urlHosp) gPatientInfo.hospitalName = urlHosp;
+        if (urlAge) gPatientInfo.age = urlAge;
+        if (urlGender) gPatientInfo.gender = urlGender;
         document.querySelectorAll('.patient-name').forEach(el => el.textContent = `${urlPatient} 님`);
         document.querySelectorAll('.patient-initial').forEach(el => el.textContent = urlPatient.charAt(0));
         if (urlCarer) document.querySelectorAll('.carer-name').forEach(el => el.textContent = urlCarer);
         if (urlHosp) document.querySelectorAll('.hospital-name').forEach(el => el.textContent = urlHosp);
+
+        if (urlStart && urlEnd) {
+          document.querySelectorAll('.side-care-period').forEach(el => el.textContent = `${urlStart} — ${urlEnd}`);
+        } else if (urlStart) {
+          document.querySelectorAll('.side-care-period').forEach(el => el.textContent = `${urlStart}부터`);
+        }
+        const fastMeta = [];
+        if (urlAge) fastMeta.push(`${urlAge}세`);
+        if (urlGender) fastMeta.push(urlGender === '남' || urlGender === 'M' ? '남성' : (urlGender === '여' || urlGender === 'F' ? '여성' : urlGender));
+        if (fastMeta.length > 0) {
+          document.querySelectorAll('.patient-meta-text').forEach(el => el.textContent = fastMeta.join(' · '));
+        }
+        hideSurveyLoadingOverlay();
       }
 
       applyTitleTheme(titleTheme);
@@ -2543,10 +2678,13 @@
         document.querySelectorAll('.side-care-period').forEach(el => el.textContent = carePeriodStr);
         document.querySelectorAll('.side-care-days').forEach(el => el.textContent = diffDays + '일');
         document.querySelectorAll('.total-days-num').forEach(el => el.textContent = diffDays + '일');
+        const dayCountEl = document.getElementById('day-count');
+        if (dayCountEl) dayCountEl.textContent = diffDays;
+        hideSurveyLoadingOverlay();
 
         // 해당 환자의 실제 케어포트 모바일 일지가 있는지 확인
         let hasRealLogs = false;
-        if (target.patientName && target.patientName !== '고연분') {
+        if (target.patientName) {
           // 1. 로컬스토리지 확인
           try {
             const cached = localStorage.getItem('LIVON_MOBILE_REPORT_' + target.patientName);
@@ -2601,7 +2739,7 @@
             if (typeof render === 'function') render();
           }
         } else {
-          // '고연분' 데모 환자이거나 기본 샘플인 경우 정상 렌더링
+          // 기본 샘플 또는 환자명이 없는 경우 정상 렌더링
           if (typeof render === 'function') render();
         }
       }

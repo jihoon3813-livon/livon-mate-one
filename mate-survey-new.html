@@ -115,7 +115,7 @@
 
   <script>
     let gIntegratedUrl = '';
-    let gPatientName = '고연분';
+    let gPatientName = '고객';
 
     async function initMateSurveyNew() {
       const params = new URLSearchParams(window.location.search);
@@ -142,12 +142,12 @@
       }
 
       if (info) {
-        gPatientName = info.patientName || '고연분';
+        gPatientName = info.patientName || '고객';
         document.getElementById('mateServiceId').textContent = info.serviceId || info.id || 'SV-2026';
-        document.getElementById('matePatientName').textContent = (info.patientName || '고연분') + ' 님';
+        document.getElementById('matePatientName').textContent = (info.patientName || '고객') + ' 님';
         document.getElementById('mateHospital').textContent = info.hospitalName || '지정 병원';
         document.getElementById('matePeriod').textContent = `${info.careStartDate || '-'} ~ ${info.careEndDate || '-'}`;
-        document.getElementById('mateCaregiver').textContent = (info.caregiverName || '권은지') + ' 간병사';
+        document.getElementById('mateCaregiver').textContent = (info.caregiverName || '담당') + ' 간병사';
       }
 
       const q = new URLSearchParams();
@@ -156,6 +156,10 @@
       if (info && info.patientName) q.set('patient', info.patientName);
       if (info && info.caregiverName) q.set('carer', info.caregiverName);
       if (info && info.hospitalName) q.set('hospital', info.hospitalName);
+      if (info && info.careStartDate) q.set('start', info.careStartDate);
+      if (info && info.careEndDate) q.set('end', info.careEndDate);
+      if (info && (info.patientAge || info.age)) q.set('age', info.patientAge || info.age);
+      if (info && (info.patientGender || info.gender)) q.set('gender', info.patientGender || info.gender);
 
       gIntegratedUrl = `${window.location.origin}/survey-care-diary.html?${q.toString()}`;
 
