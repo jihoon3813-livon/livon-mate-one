@@ -2038,7 +2038,16 @@ function setSurveyNewViewportMode(mode) {
 function changeSurveyNewPreviewTarget(targetId) {
   const relUrl = buildIntegratedSurveyUrl(targetId, { titleTheme: gSurveyNewTitleTheme });
   const inlineFrame = document.getElementById('surveyNewInlineIframe');
-  if (inlineFrame) inlineFrame.src = relUrl;
+  if (inlineFrame) {
+    inlineFrame.onload = () => {
+      try {
+        if (inlineFrame.contentWindow && gSurveyState.schema) {
+          inlineFrame.contentWindow.postMessage({ type: 'LIVON_SURVEY_SCHEMA_UPDATE', schema: gSurveyState.schema }, '*');
+        }
+      } catch (e) {}
+    };
+    inlineFrame.src = relUrl;
+  }
   const urlLabel = document.getElementById('surveyNewPreviewUrlLabel');
   if (urlLabel) urlLabel.textContent = relUrl;
 }
@@ -2149,7 +2158,16 @@ function openSurveyNewWebviewModal(targetId = '') {
   }
 
   const iframe = document.getElementById('surveyNewModalIframe');
-  if (iframe) iframe.src = relUrl;
+  if (iframe) {
+    iframe.onload = () => {
+      try {
+        if (iframe.contentWindow && gSurveyState.schema) {
+          iframe.contentWindow.postMessage({ type: 'LIVON_SURVEY_SCHEMA_UPDATE', schema: gSurveyState.schema }, '*');
+        }
+      } catch (e) {}
+    };
+    iframe.src = relUrl;
+  }
 
   const modal = document.getElementById('surveyNewWebviewModal');
   if (modal) modal.classList.remove('hidden');
@@ -3886,13 +3904,28 @@ async function applyGiftDispatchUpdate(target, giftData) {
   }
 }
 
-// 모바일 통합 설문 웹뷰(iframe)에서 설문 완료 시 실시간 수신하여 어드민 테이블 즉시 갱신
+// 모바일 통합 설문 웹뷰(iframe) 양방향 실시간 메시지 통신 (설문 제출 수신 & 최신 문항 스키마 즉시 제공)
 window.addEventListener('message', (event) => {
   const data = event.data;
-  if (!data || data.type !== 'LIVON_SURVEY_SUBMITTED') return;
-  loadSurveyMgmtData(false);
-  if (typeof showToast === 'function') {
-    showToast(`설문 응답 및 쿠폰 수신 연락처(${formatCouponPhoneDisplay(data.couponPhone || '')})가 실시간 반영되었습니다.`, 'success');
+  if (!data) return;
+
+  // 1. 웹뷰에서 로드 완료 시 최신 스키마 요청
+  if (data.type === 'LIVON_SURVEY_READY' && event.source) {
+    try {
+      event.source.postMessage({
+        type: 'LIVON_SURVEY_SCHEMA_UPDATE',
+        schema: gSurveyState.schema || []
+      }, '*');
+    } catch (e) {}
+    return;
+  }
+
+  // 2. 설문 응답 완료 시 어드민 테이블 즉시 갱신
+  if (data.type === 'LIVON_SURVEY_SUBMITTED') {
+    loadSurveyMgmtData(false);
+    if (typeof showToast === 'function') {
+      showToast(`설문 응답 및 쿠폰 수신 연락처(${formatCouponPhoneDisplay(data.couponPhone || '')})가 실시간 반영되었습니다.`, 'success');
+    }
   }
 });
 
