@@ -1867,6 +1867,65 @@
     }
     window.scrollToSection = scrollToSection;
 
+    // 설문 문항(Schema) 동적 반영 함수 (문항 제목, 필수 여부, 간병인명 치환)
+    function applySchemaToDiarySurvey(schema) {
+      if (!Array.isArray(schema) || schema.length === 0) return;
+      const cName = (typeof gPatientInfo !== 'undefined' && gPatientInfo && gPatientInfo.carerName) ? gPatientInfo.carerName : '담당 간병사';
+
+      schema.forEach((q, idx) => {
+        const qKey = (q.id || ('Q' + (idx + 1))).toUpperCase();
+        const elId = qKey.toLowerCase() + 'Title';
+        const el = document.getElementById(elId);
+        if (!el || !q.title) return;
+
+        let displayTitle = q.title;
+        // 문항 내 {carer} 또는 (간병인) 텍스트가 있으면 실제 배정된 간병인명으로 동적 치환
+        displayTitle = displayTitle.replace(/\{carer\}|\(간병인\)/g, '(<span class="carer-name">' + cName + '</span>)');
+
+        const reqBadge = q.required !== false
+          ? ' <span style="color:#e11d48;">*</span>'
+          : ' <span style="font-size:11.5px; color:#94a3b8; font-weight:500;">(선택)</span>';
+
+        el.innerHTML = '<span class="q-num">' + qKey + '.</span>' + displayTitle + reqBadge;
+
+        // 주관식 플레이스홀더 동적 반영
+        if (qKey === 'Q5') {
+          const ta = document.getElementById('ansQ5');
+          if (ta && q.placeholder) ta.placeholder = q.placeholder;
+        }
+      });
+    }
+    window.applySchemaToDiarySurvey = applySchemaToDiarySurvey;
+
+    // 페이지 진입 즉시 로컬 캐시 및 서버 최신 문항 복원 실행
+    (async function initDiarySurveySchema() {
+      try {
+        const cached = localStorage.getItem('LIVON_SURVEY_SCHEMA');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            applySchemaToDiarySurvey(parsed);
+          }
+        }
+      } catch (e) {}
+
+      try {
+        const res = await fetch('/api/survey/schema');
+        const data = await res.json();
+        if (data && Array.isArray(data.schema) && data.schema.length > 0) {
+          applySchemaToDiarySurvey(data.schema);
+        }
+      } catch (e) {}
+
+      // 부모 창(관리자 화면)에서의 실시간 문항 변경 동기화 수신
+      window.addEventListener('message', (event) => {
+        const data = event.data || {};
+        if (data.type === 'LIVON_SURVEY_SCHEMA_UPDATE' && Array.isArray(data.schema)) {
+          applySchemaToDiarySurvey(data.schema);
+        }
+      });
+    })();
+
     // 플로팅 설문 바로가기 바 제어 (표지 및 설문 작성 영역에서는 숨김)
     (function initFloatingSurveyBar() {
       const bar = document.getElementById('floatingSurveyBar');
@@ -2291,6 +2350,9 @@
           const data = await res.json();
           if (data && data.serviceInfo) {
             target = { ...(target || {}), ...data.serviceInfo, token: data.serviceInfo.token || gSurveyToken };
+          }
+          if (data && Array.isArray(data.schema) && data.schema.length > 0) {
+            applySchemaToDiarySurvey(data.schema);
           }
         } catch (e) {}
       }

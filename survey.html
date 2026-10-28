@@ -368,6 +368,11 @@
         renderServiceSummary(data.serviceInfo);
         if (data.schema) {
           applySchemaToForm(data.schema);
+        } else {
+          try {
+            const cached = localStorage.getItem('LIVON_SURVEY_SCHEMA');
+            if (cached) applySchemaToForm(JSON.parse(cached));
+          } catch (e) {}
         }
         if (data.csPhone) {
           document.getElementById('errorCsPhone').innerText = data.csPhone;

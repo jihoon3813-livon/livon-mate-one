@@ -1828,6 +1828,18 @@ async function saveSurveySchema() {
       console.warn('[Survey] API schema save fallback:', apiErr);
     }
 
+    // 4. 열려있는 설문 미리보기(iframe)에 실시간 문항 즉시 동기화 브로드캐스트
+    try {
+      const inlineFrame = document.getElementById('surveyNewInlineIframe');
+      if (inlineFrame && inlineFrame.contentWindow) {
+        inlineFrame.contentWindow.postMessage({ type: 'LIVON_SURVEY_SCHEMA_UPDATE', schema: gSurveyState.schema }, '*');
+      }
+      const modalFrame = document.getElementById('surveyNewModalIframe');
+      if (modalFrame && modalFrame.contentWindow) {
+        modalFrame.contentWindow.postMessage({ type: 'LIVON_SURVEY_SCHEMA_UPDATE', schema: gSurveyState.schema }, '*');
+      }
+    } catch (msgErr) {}
+
     if (typeof showToast === 'function') showToast('설문 문항 구성이 성공적으로 저장되었습니다.', 'success');
     renderSurveySchemaEditor();
   } catch (e) {

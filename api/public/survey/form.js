@@ -140,9 +140,27 @@ module.exports = async function handler(req, res) {
       insuranceCompany: target.insuranceCompany || '삼성화재'
     };
 
+    // 4. 설문 문항 스키마(Schema) 조회 (Convex -> 로컬 survey_data.json)
+    let schema = null;
+    const cvxUrl = resolveConvexUrl(req);
+    try {
+      const cvxSettings = await queryConvex(cvxUrl, 'sync:getSurveySettings', {});
+      if (cvxSettings && Array.isArray(cvxSettings.schema) && cvxSettings.schema.length > 0) {
+        schema = cvxSettings.schema;
+      }
+    } catch (e) {}
+
+    if (!schema) {
+      const localData = getLocalSurveyData();
+      if (localData && Array.isArray(localData.schema) && localData.schema.length > 0) {
+        schema = localData.schema;
+      }
+    }
+
     return res.status(200).json({
       valid: true,
       serviceInfo,
+      schema: schema || null,
       csPhone: serviceInfo.insuranceCompany.includes('현대') ? '1533-7436' : '1877-7412'
     });
   } catch (err) {
