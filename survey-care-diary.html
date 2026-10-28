@@ -44,201 +44,279 @@
       font-family: -apple-system, BlinkMacSystemFont, "Pretendard Variable", Pretendard, 'Noto Sans KR', sans-serif;
     }
 
-    /* 상단 헤더 및 모든 액션 버튼 한 줄(Single-line) 정렬 보장 */
+    /* 상단 헤더: 리본케어 공식 로고와 직관적인 설문 참여 버튼 단 하나 */
     .topbar {
-      height: 58px !important;
-      padding: 0 10px !important;
-      gap: 6px;
+      height: 56px !important;
+      padding: 0 14px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      background: rgba(255, 255, 255, 0.98) !important;
+      backdrop-filter: blur(12px) !important;
+      border-bottom: 1px solid #f0e0eb !important;
+      position: sticky !important;
+      top: 0 !important;
+      z-index: 30 !important;
       transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
       will-change: transform;
     }
 
-    /* 로고가 더보기 버튼에 가려지지 않도록 최소 너비 및 z-index 확보 */
-    .topbar .logo {
-      font-size: 20px !important;
-      min-width: 68px !important;
-      flex-shrink: 0 !important;
-      white-space: nowrap !important;
-      z-index: 2;
-      margin-right: 4px;
+    body.header-hidden .topbar {
+      transform: translateY(-100%) !important;
     }
 
+    /* 공식 리본케어 브랜드 로고 (심볼 이미지 + 브랜드명) */
+    .topbar .brand-logo-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      flex-shrink: 0;
+      min-width: 0;
+    }
+    .topbar .brand-logo-img {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      object-fit: contain;
+      background: #ffffff;
+      border: 1px solid #f2dce8;
+      box-shadow: 0 2px 5px rgba(43, 25, 56, 0.08);
+      flex-shrink: 0;
+    }
+    .topbar .brand-logo-text-group {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.15;
+    }
+    .topbar .brand-logo-name {
+      font-size: 16px;
+      font-weight: 850;
+      color: #2b1938;
+      letter-spacing: -0.02em;
+    }
+    .topbar .brand-logo-sub {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #be185d;
+      letter-spacing: -0.01em;
+    }
+
+    /* 상단 우측: 설문 참여를 최우선으로 유도하는 직관적인 원클릭 버튼 */
     .top-actions {
       display: flex !important;
       align-items: center !important;
       justify-content: flex-end;
-      gap: 3.5px !important;
-      flex-wrap: nowrap !important;
-      flex-shrink: 1 !important;
-      min-width: 0 !important;
-      overflow-x: auto !important;
-      scrollbar-width: none !important;
-      -webkit-overflow-scrolling: touch !important;
-    }
-    .top-actions::-webkit-scrollbar {
-      display: none !important;
-    }
-
-    /* 1번 요청: 스크롤 내릴 때 상단 바 & 스텝 바 자동 숨김 -> 상하 뷰포트 영역 최대화 */
-    body.header-hidden .topbar {
-      transform: translateY(-100%) !important;
-    }
-    body.header-hidden .journey-stepper {
-      transform: translateY(-220%) !important;
-    }
-
-    .top-actions button,
-    .topbar .mobile-more-btn,
-    .topbar .presentation {
-      white-space: nowrap !important;
-      word-break: keep-all !important;
       flex-shrink: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    .btn-top-survey {
       display: inline-flex !important;
       align-items: center !important;
-      justify-content: center !important;
-      gap: 3.5px !important;
-      padding: 6px 9px !important;
-      min-height: 31px !important;
-      height: 31px !important;
-      font-size: 11px !important;
-      font-weight: 700 !important;
-      line-height: 1 !important;
+      gap: 6px !important;
+      padding: 7px 13px !important;
+      background: linear-gradient(135deg, #e11d48 0%, #be185d 100%) !important;
+      color: #ffffff !important;
+      border: none !important;
       border-radius: 999px !important;
-    }
-
-    .top-actions button span,
-    .topbar .mobile-more-btn span,
-    .topbar .presentation span {
+      font-size: 12px !important;
+      font-weight: 800 !important;
+      letter-spacing: -0.01em !important;
+      box-shadow: 0 3px 12px rgba(190, 24, 93, 0.32) !important;
+      cursor: pointer !important;
+      text-decoration: none !important;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
       white-space: nowrap !important;
-      display: inline-flex;
-      align-items: center;
-      line-height: 1 !important;
     }
-
-    .top-actions button svg,
-    .topbar .mobile-more-btn svg,
-    .topbar .presentation svg {
-      width: 13px !important;
-      height: 13px !important;
-      flex-shrink: 0;
+    .btn-top-survey:hover {
+      filter: brightness(1.06);
+      transform: translateY(-1px);
+    }
+    .btn-top-survey:active {
+      transform: scale(0.96);
+    }
+    .btn-top-survey .badge {
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 2px 5.5px;
+      border-radius: 999px;
+      line-height: 1;
     }
 
     @media (min-width: 900px) {
       .topbar {
-        height: 64px !important;
+        height: 62px !important;
         padding: 0 20px !important;
       }
-      .top-actions {
-        gap: 6px !important;
+      .topbar .brand-logo-img {
+        width: 36px;
+        height: 36px;
       }
-      .top-actions button,
-      .topbar .presentation {
-        padding: 7px 12px !important;
-        height: 34px !important;
-        font-size: 12px !important;
+      .topbar .brand-logo-name {
+        font-size: 17px;
       }
-    }
-
-    @media (max-width: 390px) {
-      .topbar {
-        padding: 0 10px !important;
-      }
-      .topbar .logo {
-        font-size: 19.5px !important;
-      }
-      .top-actions {
-        gap: 3px !important;
-      }
-      .top-actions button,
-      .topbar .mobile-more-btn,
-      .topbar .presentation {
-        padding: 5px 7.5px !important;
-        font-size: 10.5px !important;
-        height: 29px !important;
-        min-height: 29px !important;
+      .btn-top-survey {
+        padding: 8px 16px !important;
+        font-size: 13px !important;
       }
     }
 
-    /* Sticky Top Mode Switcher Strip (상단 헤더 바로 아래 빈틈 없이 밀착) */
-    .journey-stepper {
-      position: sticky;
-      top: 58px;
-      z-index: 9;
-      background: rgba(255, 250, 253, 0.96);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid #f2dfeb;
-      padding: 7px 12px;
+    /* Floating Survey CTA Bar (일지 탐색 중 언제든 원클릭 설문 참여) */
+    .floating-survey-bar {
+      position: fixed;
+      bottom: 16px;
+      left: 0;
+      right: 0;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 0 14px;
+      z-index: 25;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .floating-survey-bar.hidden {
+      opacity: 0;
+      transform: translateY(20px);
+      pointer-events: none !important;
+    }
+    .floating-survey-inner {
+      pointer-events: auto;
+      background: linear-gradient(135deg, #2b1838 0%, #4a1c44 60%, #be185d 100%);
+      color: #ffffff;
+      border-radius: 18px;
+      padding: 11px 15px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 5px;
-      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
-      will-change: transform;
+      gap: 10px;
+      box-shadow: 0 10px 25px -4px rgba(43, 24, 56, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.15);
     }
-
-    @media (min-width: 900px) {
-      .journey-stepper {
-        top: 64px;
-        padding: 8px 16px;
-        gap: 6px;
-      }
+    .floating-survey-txt {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
     }
-
-    .journey-pill {
-      flex: 1;
+    .floating-gift-badge {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      gap: 4px;
-      padding: 6.5px 6px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      line-height: 1;
-      color: #7d687d;
-      background: #f8f1f6;
-      border: 1px solid transparent;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      white-space: nowrap !important;
-      word-break: keep-all !important;
-      flex-shrink: 0;
-      cursor: pointer;
-    }
-
-    .journey-pill span {
-      white-space: nowrap !important;
-      line-height: 1;
-    }
-
-    .journey-pill .step-num {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: #e6d6e4;
-      color: #5b425c;
+      gap: 3px;
       font-size: 10px;
       font-weight: 800;
+      color: #fde68a;
+      letter-spacing: -0.01em;
+    }
+    .floating-title {
+      font-size: 12.5px;
+      font-weight: 750;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .btn-floating-go {
+      flex-shrink: 0;
       display: inline-flex;
       align-items: center;
-      justify-content: center;
+      gap: 5px;
+      padding: 8px 14px;
+      background: #ffffff;
+      color: #be185d;
+      border: none;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 850;
+      cursor: pointer;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+      transition: transform 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-floating-go:active {
+      transform: scale(0.96);
+    }
+
+    /* Cover CTA Buttons - 설문 조사를 최우선 Primary로 강조 */
+    .cover-cta-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      z-index: 2;
+      margin-top: 18px;
+    }
+
+    .btn-cover-primary-survey {
+      width: 100%;
+      padding: 14px 18px;
+      border-radius: 18px;
+      border: none;
+      background: linear-gradient(135deg, #f47db8 0%, #db2777 50%, #be185d 100%);
+      color: #ffffff;
+      box-shadow: 0 8px 24px -4px rgba(219, 39, 119, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      text-align: left;
+    }
+    .btn-cover-primary-survey:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+    .btn-cover-primary-survey:active {
+      transform: scale(0.98);
+    }
+    .btn-cover-primary-survey .btn-cta-icon {
+      font-size: 24px;
       flex-shrink: 0;
     }
-
-    .journey-pill.active {
-      background: linear-gradient(135deg, #be185d 0%, #9d174d 100%);
-      color: #ffffff;
-      box-shadow: 0 4px 12px rgba(190, 24, 93, 0.24);
+    .btn-cover-primary-survey .btn-cta-text {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.25;
+    }
+    .btn-cover-primary-survey .btn-cta-main {
+      font-size: 15px;
+      font-weight: 850;
+      letter-spacing: -0.02em;
+    }
+    .btn-cover-primary-survey .btn-cta-sub {
+      font-size: 11px;
+      font-weight: 700;
+      color: #fef08a;
+    }
+    .btn-cover-primary-survey .btn-cta-arrow {
+      font-size: 18px;
+      font-weight: 800;
+      opacity: 0.9;
     }
 
-    .journey-pill.active .step-num {
-      background: rgba(255, 255, 255, 0.25);
+    .btn-cover-secondary-diary {
+      width: 100%;
+      padding: 11px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.12);
       color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: all 0.2s ease;
     }
-
-    .journey-pill.gift-pill:not(.active) {
-      background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-      color: #92400e;
-      border-color: #fde68a;
+    .btn-cover-secondary-diary:hover {
+      background: rgba(255, 255, 255, 0.18);
     }
 
     /* =====================================================
@@ -1062,7 +1140,13 @@
   <div class="layout">
     <!-- Desktop Left Sidebar -->
     <aside class="desktop-side">
-      <a class="logo" href="#cover">Liv<span>On</span><i></i></a>
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+        <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1789622263/ChatGPT_Image_2026%EB%85%84_9%EC%9B%94_17%EC%9D%BC_%EC%98%A4%ED%9B%84_02_17_20_kh5ydh.png" alt="리본케어 로고" style="width: 38px; height: 38px; border-radius: 10px; object-fit: contain; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.08); border: 1px solid #f0e0eb; flex-shrink: 0;">
+        <div>
+          <div style="font-size: 18px; font-weight: 900; color: #2b1938; letter-spacing: -0.02em;">리본케어</div>
+          <div style="font-size: 10px; font-weight: 700; color: #be185d;">공식 안심 리포트 &amp; 설문</div>
+        </div>
+      </div>
       <div class="side-label">LIVON CARE ARCHIVE &amp; VOICE</div>
       <h1 id="side-main-heading">돌봄의 기록,<br>마음의 소리.</h1>
       <p class="side-desc">정성껏 작성한 모바일 간병일지를 확인하시고, 더 나은 돌봄을 위해 만족도 설문에 참여해 주세요.</p>
@@ -1083,7 +1167,7 @@
       </dl>
       
       <nav class="side-nav">
-        <a href="#cover">00 <span>표지 · 선물 및 응답자 선택</span></a>
+        <a href="#cover">00 <span>표지 · 선물 안내</span></a>
         <a href="#overview">01 <span>생활·건강 신호등</span></a>
         <a href="#trends">02 <span>상태 변화 (캘린더)</span></a>
         <a href="#timeline">03 <span>주요 변화 타임라인</span></a>
@@ -1124,41 +1208,21 @@
     <div class="mobile-app">
       <!-- Topbar -->
       <header class="topbar">
-        <a class="logo" href="#cover" aria-label="LivOn 간병 리포트">Liv<span>On</span><i></i></a>
+        <a class="brand-logo-wrap" href="#cover" aria-label="리본케어 홈">
+          <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1789622263/ChatGPT_Image_2026%EB%85%84_9%EC%9B%94_17%EC%9D%BC_%EC%98%A4%ED%9B%84_02_17_20_kh5ydh.png" alt="리본케어" class="brand-logo-img">
+          <div class="brand-logo-text-group">
+            <span class="brand-logo-name">리본케어</span>
+            <span class="brand-logo-sub">안심 케어 리포트</span>
+          </div>
+        </a>
         <div class="top-actions">
-          <button class="mobile-more-btn" id="btn-side-more" aria-label="환자 정보 및 더보기">
-            <span data-icon="menu"></span>
-            <span>더보기</span>
-          </button>
-          <button class="presentation" onclick="scrollToSection('survey-section')" style="background: linear-gradient(135deg, #fdf2f8, #fef3c7); border-color: #f9a8d4; color: #be185d; font-weight: 800; white-space: nowrap !important; flex-shrink: 0;">
-            <span>☕ 설문·선물</span>
-          </button>
-          <button class="presentation" onclick="downloadCurrentCareReportPdf()" title="LivOn AI 간병일지 전체 다운로드" style="background: #fdf4ff; border-color: #f0abfc; color: #86198f; white-space: nowrap !important; flex-shrink: 0;">
-            <span data-icon="document"></span>
-            <span>일지 다운로드</span>
-          </button>
-          <button class="presentation" id="presentation" aria-pressed="false">
-            <span data-icon="shield"></span>
-            <span id="presentation-label">이름 가리기</span>
+          <button type="button" class="btn-top-survey" onclick="scrollToSection('survey-section')" aria-label="만족도 설문 바로가기">
+            <span>☕</span>
+            <span>만족도 설문</span>
+            <span class="badge">100% 선물</span>
           </button>
         </div>
       </header>
-
-      <!-- Journey Stepper Bar -->
-      <div class="journey-stepper" role="navigation" aria-label="리포트 및 설문 단계">
-        <button type="button" class="journey-pill active" id="pill-cover" onclick="scrollToSection('cover')">
-          <span class="step-num">1</span>
-          <span>표지·안내</span>
-        </button>
-        <button type="button" class="journey-pill" id="pill-diary" onclick="scrollToSection('overview')">
-          <span class="step-num">2</span>
-          <span>모바일 간병일지</span>
-        </button>
-        <button type="button" class="journey-pill gift-pill" id="pill-survey" onclick="scrollToSection('survey-section')">
-          <span class="step-num">3</span>
-          <span>만족도 조사 ☕</span>
-        </button>
-      </div>
 
       <main>
         <!-- =======================================================
@@ -1259,41 +1323,19 @@
             </div>
           </div>
 
-          <!-- 만족도 시작 전 환자/보호자 선택 카드 -->
-          <div class="cover-role-box">
-            <div class="cover-role-label">
-              <span>👤 열람 및 설문에 참여하시는 분을 선택해 주세요</span>
-              <small>선택 시 맞춤 안내 적용</small>
-            </div>
-            <div class="role-cards-grid">
-              <button type="button" class="role-select-card" id="coverRolePatient" onclick="selectRespondentRole('PATIENT')">
-                <span class="role-check-badge">✓</span>
-                <div class="role-icon-circle">🧑‍🦳</div>
-                <div class="role-card-txt">
-                  <b>환자 본인</b>
-                  <small>직접 간병을 받았어요</small>
-                </div>
-              </button>
-              <button type="button" class="role-select-card" id="coverRoleGuardian" onclick="selectRespondentRole('GUARDIAN')">
-                <span class="role-check-badge">✓</span>
-                <div class="role-icon-circle">👨‍👩‍👧</div>
-                <div class="role-card-txt">
-                  <b>가족 · 보호자</b>
-                  <small>환자의 보호자예요</small>
-                </div>
-              </button>
-            </div>
-            <div id="coverRoleToast" class="role-greeting-toast"></div>
-          </div>
-
-          <!-- 표지 하단 액션 버튼 -->
+          <!-- 표지 핵심 액션 버튼 (만족도 설문 바로가기를 최우선으로 강조) -->
           <div class="cover-cta-group">
-            <button type="button" class="btn-cover-primary" onclick="scrollToSection('overview')">
-              <span>📖 일자별 모바일 간병일지 쭉 살펴보기</span>
-              <span style="font-size: 16px;">↓</span>
+            <button type="button" class="btn-cover-primary-survey" onclick="scrollToSection('survey-section')">
+              <span class="btn-cta-icon">☕</span>
+              <span class="btn-cta-text">
+                <span class="btn-cta-main">만족도 설문 바로가기</span>
+                <span class="btn-cta-sub">스타벅스 커피쿠폰 100% 증정 · 1분 소요</span>
+              </span>
+              <span class="btn-cta-arrow">→</span>
             </button>
-            <button type="button" class="btn-cover-secondary" onclick="scrollToSection('survey-section')">
-              <span>☕ 간병일지 확인 후 만족도 조사 바로가기 (선물 증정)</span>
+            <button type="button" class="btn-cover-secondary-diary" onclick="scrollToSection('overview')">
+              <span>📖 일자별 모바일 간병일지 먼저 보기</span>
+              <span style="font-size: 13px;">↓</span>
             </button>
           </div>
         </section>
@@ -1466,7 +1508,7 @@
 
             <!-- [STEP 1] 응답자 유형(환자/보호자) 선택 확인 & Q2 전반적 만족도 -->
             <div id="sStep1" class="s-step-panel">
-              <!-- Q1. 환자 / 보호자 선택 (표지와 실시간 양방향 연동) -->
+              <!-- Q1. 환자 / 보호자 선택 -->
               <div class="survey-q-card">
                 <div class="survey-q-title" id="q1Title">
                   <span class="q-num">Q1.</span>설문에 참여하시는 분은 누구인가요? <span style="color:#e11d48;">*</span>
@@ -1696,15 +1738,19 @@
         </footer>
       </main>
 
-      <!-- Bottom Navigation Bar (6 items: 표지 + 4 일지 섹션 + 만족도설문) -->
-      <nav class="bottom-nav" aria-label="리포트 및 설문 메뉴">
-        <a href="#cover" class="active"><span data-icon="spark"></span>표지·안내</a>
-        <a href="#overview"><span data-icon="heart"></span>01 신호등</a>
-        <a href="#trends"><span data-icon="chart"></span>02 상태변화</a>
-        <a href="#timeline"><span data-icon="walk"></span>03 타임라인</a>
-        <a href="#careactions"><span data-icon="check"></span>04 수행·전달</a>
-        <a href="#survey-section" class="survey-tab-link"><span data-icon="message"></span>☕ 설문·선물</a>
-      </nav>
+      <!-- Floating Survey CTA Bar (스크롤 중 언제든 원클릭 설문 참여) -->
+      <aside id="floatingSurveyBar" class="floating-survey-bar hidden" aria-label="만족도 설문 바로가기 바">
+        <div class="floating-survey-inner">
+          <div class="floating-survey-txt">
+            <span class="floating-gift-badge">☕ 스타벅스 커피쿠폰 100% 증정</span>
+            <span class="floating-title"><b>케어 만족도 설문</b>에 참여해 주세요</span>
+          </div>
+          <button type="button" class="btn-floating-go" onclick="scrollToSection('survey-section')">
+            <span>설문 작성하기</span>
+            <span>→</span>
+          </button>
+        </div>
+      </aside>
     </div>
   </div>
 
@@ -1792,8 +1838,7 @@
       if (!formEl) return;
 
       const topbar = document.querySelector('.topbar');
-      const stepper = document.querySelector('.journey-stepper');
-      const stickyOffset = (topbar ? topbar.offsetHeight : 58) + (stepper ? stepper.offsetHeight : 46) + 6;
+      const stickyOffset = (topbar ? topbar.offsetHeight : 56) + 12;
 
       formEl.style.scrollMarginTop = stickyOffset + 'px';
 
@@ -1807,8 +1852,6 @@
           behavior: smooth ? 'smooth' : 'auto'
         });
       }
-
-      updateJourneyStepper('survey-section');
     }
     window.scrollToSurveyForm = scrollToSurveyForm;
 
@@ -1821,9 +1864,34 @@
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-      updateJourneyStepper(id);
     }
     window.scrollToSection = scrollToSection;
+
+    // 플로팅 설문 바로가기 바 제어 (표지 및 설문 작성 영역에서는 숨김)
+    (function initFloatingSurveyBar() {
+      const bar = document.getElementById('floatingSurveyBar');
+      const surveySec = document.getElementById('survey-section');
+      const coverSec = document.getElementById('cover');
+      if (!bar) return;
+
+      function updateFloatingBar() {
+        const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+        const surveyRect = surveySec ? surveySec.getBoundingClientRect() : null;
+        const coverRect = coverSec ? coverSec.getBoundingClientRect() : null;
+
+        const inCover = coverRect && coverRect.bottom > 100;
+        const inSurvey = surveyRect && surveyRect.top <= (window.innerHeight - 60);
+
+        if (inCover || inSurvey || scrollY < 120) {
+          bar.classList.add('hidden');
+        } else {
+          bar.classList.remove('hidden');
+        }
+      }
+
+      window.addEventListener('scroll', updateFloatingBar, { passive: true });
+      setTimeout(updateFloatingBar, 400);
+    })();
 
     function updateJourneyStepper(activeSectionId) {
       const pCover = document.getElementById('pill-cover');
@@ -1849,26 +1917,6 @@
       const ansQ1 = document.getElementById('ansQ1');
       if (ansQ1) ansQ1.value = role;
 
-      // 1. 표지 카드 하이라이트
-      const cPatient = document.getElementById('coverRolePatient');
-      const cGuardian = document.getElementById('coverRoleGuardian');
-      if (cPatient) cPatient.classList.toggle('selected', role === 'PATIENT');
-      if (cGuardian) cGuardian.classList.toggle('selected', role === 'GUARDIAN');
-
-      const toast = document.getElementById('coverRoleToast');
-      const pName = (typeof gPatientInfo !== 'undefined' && gPatientInfo.name) ? gPatientInfo.name : '고객';
-      if (toast) {
-        toast.classList.add('show');
-        if (role === 'PATIENT') {
-          toast.innerHTML = `✨ <b>${pName} 환자분</b> 반갑습니다! 쾌유를 진심으로 기원합니다. 아래 간병일지를 확인하신 후 설문에 응답해 주시면 커피쿠폰을 보내드립니다.`;
-        } else if (role === 'GUARDIAN') {
-          toast.innerHTML = `💝 <b>${pName} 님의 보호자분</b> 반갑습니다! 일자별 간병일지를 꼼꼼히 살펴보신 후 하단 만족도 설문에 참여해 주시면 커피쿠폰을 보내드립니다.`;
-        } else {
-          toast.innerHTML = `🤝 반갑습니다! 간병일지를 확인하신 후 하단 만족도 설문에 참여해 주세요.`;
-        }
-      }
-
-      // 2. 설문 섹션 Q1 버튼 하이라이트
       document.querySelectorAll('.livon-role-pill').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-role') === role);
       });
@@ -2133,8 +2181,7 @@
         if (completeView) {
           completeView.style.display = 'block';
           const topbar = document.querySelector('.topbar');
-          const stepper = document.querySelector('.journey-stepper');
-          const stickyOffset = (topbar ? topbar.offsetHeight : 58) + (stepper ? stepper.offsetHeight : 46) + 6;
+          const stickyOffset = (topbar ? topbar.offsetHeight : 56) + 12;
           completeView.style.scrollMarginTop = stickyOffset + 'px';
           completeView.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
@@ -2144,8 +2191,7 @@
         if (completeView) {
           completeView.style.display = 'block';
           const topbar = document.querySelector('.topbar');
-          const stepper = document.querySelector('.journey-stepper');
-          const stickyOffset = (topbar ? topbar.offsetHeight : 58) + (stepper ? stepper.offsetHeight : 46) + 6;
+          const stickyOffset = (topbar ? topbar.offsetHeight : 56) + 12;
           completeView.style.scrollMarginTop = stickyOffset + 'px';
           completeView.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
@@ -2487,19 +2533,9 @@
         });
         document.querySelectorAll('.side-care-days').forEach(el => el.textContent = '미작성');
 
-        // 3-2. 표지 하단 CTA 버튼 조정
-        const btnCoverPrimary = document.querySelector('.btn-cover-primary');
-        if (btnCoverPrimary) btnCoverPrimary.style.display = 'none'; // 일지 보기 버튼 숨김
-
-        const btnCoverSecondary = document.querySelector('.btn-cover-secondary');
-        if (btnCoverSecondary) {
-          btnCoverSecondary.style.background = 'linear-gradient(135deg, #be185d 0%, #e11d48 100%)';
-          btnCoverSecondary.style.color = '#ffffff';
-          btnCoverSecondary.style.borderColor = 'transparent';
-          btnCoverSecondary.style.boxShadow = '0 6px 18px rgba(190, 24, 93, 0.35)';
-          btnCoverSecondary.style.fontSize = '14.5px';
-          btnCoverSecondary.innerHTML = `<span>☕ 만족도 설문 바로 참여하기 (커피쿠폰 선물 증정)</span> <span style="font-size: 16px;">↓</span>`;
-        }
+        // 3-2. 표지 하단 CTA 버튼 조정 (일지 미작성이므로 일지 보기 버튼 숨김)
+        const btnDiarySec = document.querySelector('.btn-cover-secondary-diary');
+        if (btnDiarySec) btnDiarySec.style.display = 'none';
 
         // 3-3. 표지 서브 안내 문구 변경
         const subNotice = document.getElementById('cover-sub-notice-text');
