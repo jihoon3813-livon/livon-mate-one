@@ -367,6 +367,127 @@ function calculateSurveyAvgScore(r) {
   return (sum / scores.length).toFixed(1);
 }
 
+// =========================================================================
+// 0-A. 전역 신청 데이터(gApps / assignments) 및 대상자 정보 통합 연동 엔진
+// =========================================================================
+
+// 전역 신청 데이터 목록 수집기 (gApps, window.gApps, REBORN_REAL_SEED_DATA 등 전수 탐색)
+function getGlobalApplicationsList() {
+  const list = [];
+  const seenIds = new Set();
+
+  const addApps = (arr) => {
+    if (!Array.isArray(arr)) return;
+    arr.forEach(a => {
+      if (a && a.id && !seenIds.has(a.id)) {
+        seenIds.add(a.id);
+        list.push(a);
+      }
+    });
+  };
+
+  if (typeof gApps !== 'undefined') addApps(gApps);
+  if (typeof window !== 'undefined' && window.gApps) addApps(window.gApps);
+  if (typeof window !== 'undefined' && window.gAllApps) addApps(window.gAllApps);
+  if (typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && window.REBORN_REAL_SEED_DATA.applications) {
+    addApps(window.REBORN_REAL_SEED_DATA.applications);
+  }
+  if (typeof window !== 'undefined' && window.gSamsungApps) addApps(window.gSamsungApps);
+  if (typeof window !== 'undefined' && window.gHyundaiApps) addApps(window.gHyundaiApps);
+
+  return list;
+}
+
+// 전역 배정(assignment) 데이터 목록 수집기
+function getGlobalAssignmentsList() {
+  const list = [];
+  const addAssigns = (arr) => {
+    if (!Array.isArray(arr)) return;
+    arr.forEach(as => { if (as) list.push(as); });
+  };
+
+  if (typeof gAssigns !== 'undefined') addAssigns(gAssigns);
+  if (typeof window !== 'undefined' && window.gAssigns) addAssigns(window.gAssigns);
+  if (typeof gAssignments !== 'undefined') addAssigns(gAssignments);
+  if (typeof window !== 'undefined' && window.gAssignments) addAssigns(window.gAssignments);
+  if (typeof window !== 'undefined' && window.REBORN_REAL_SEED_DATA && window.REBORN_REAL_SEED_DATA.assignments) {
+    addAssigns(window.REBORN_REAL_SEED_DATA.assignments);
+  }
+
+  return list;
+}
+
+// 응답(r) 또는 대상자(targetObj)에 매칭되는 실제 신청 건(C0779 등) 정밀 탐색
+function findMatchedApplication(r, targetObj) {
+  const allApps = getGlobalApplicationsList();
+  if (allApps.length === 0) return null;
+
+  // 1. 이미 유효한 관리 신청ID가 있는 경우 (예: C0779, C0633, D0008 등)
+  const isRealId = (id) => id && !String(id).startsWith('ST-') && !String(id).startsWith('TMP-') && !String(id).startsWith('TEMP-') && !String(id).startsWith('SR-');
+  const targetId = (r && isRealId(r.displayAppId)) ? r.displayAppId :
+                   ((targetObj && isRealId(targetObj.serviceId)) ? targetObj.serviceId :
+                   ((r && isRealId(r.serviceId)) ? r.serviceId : null));
+
+  if (targetId) {
+    const matchById = allApps.find(a => a.id === targetId);
+    if (matchById) return matchById;
+  }
+
+  // 2. 전화번호 매칭 (쿠폰번호, 환자전화번호 등 끝 8자리 비교)
+  const phoneDigits = String((r && (r.couponPhone || r.patientPhone || r.callbackPhone)) ||
+                             (targetObj && (targetObj.couponPhone || targetObj.patientPhone)) || '').replace(/[^0-9]/g, '');
+  if (phoneDigits && phoneDigits.length >= 8) {
+    const matchByPhone = allApps.find(a => {
+      const aPhone = String(a.patientPhone || a.contact || a.phone || a.applicantPhone || a.guardianPhone || '').replace(/[^0-9]/g, '');
+      return aPhone && aPhone.slice(-8) === phoneDigits.slice(-8);
+    });
+    if (matchByPhone) return matchByPhone;
+  }
+
+  // 3. 환자명 매칭
+  const pName = String((r && r.patientName) || (targetObj && targetObj.patientName) || '').trim();
+  if (pName && pName !== '-' && pName !== '고객') {
+    const matchByName = allApps.find(a => {
+      const aName = String(a.patientName || a.applicantName || a.customerName || a.name || '').trim();
+      return aName && aName === pName;
+    });
+    if (matchByName) return matchByName;
+  }
+
+  return null;
+}
+
+// 신청 건에 배정된 간병인명 탐색
+function findCaregiverForApp(app, targetObj, r) {
+  if (app && app.caregiverName && app.caregiverName !== '-' && !app.caregiverName.includes('미배정')) {
+    return app.caregiverName;
+  }
+  if (targetObj && targetObj.caregiverName && targetObj.caregiverName !== '-' && !targetObj.caregiverName.includes('미배정')) {
+    return targetObj.caregiverName;
+  }
+  if (r && r.caregiverName && r.caregiverName !== '-' && !r.caregiverName.includes('미배정')) {
+    return r.caregiverName;
+  }
+
+  // assignments 목록에서 applyId 또는 patientName으로 배정된 간병인 탐색
+  const allAssigns = getGlobalAssignmentsList();
+  if (allAssigns.length > 0) {
+    const appId = app ? app.id : (targetObj ? targetObj.serviceId : (r ? r.serviceId : null));
+    const pName = (app ? (app.patientName || app.applicantName) : (targetObj ? targetObj.patientName : (r ? r.patientName : ''))) || '';
+
+    if (appId) {
+      const as = allAssigns.find(a => a.applyId === appId && a.caregiverName && a.caregiverName !== '-');
+      if (as) return as.caregiverName;
+    }
+    if (pName && pName !== '-' && pName !== '고객') {
+      const as = allAssigns.find(a => a.patientName === pName && a.caregiverName && a.caregiverName !== '-');
+      if (as) return as.caregiverName;
+    }
+  }
+
+  return '미지정';
+}
+
 // 신청ID(C0633 등 실제 관리 아이디) 정밀 복원 헬퍼
 function resolveResponseDisplayAppId(r, targetObj) {
   const isRealId = (id) => id && !String(id).startsWith('ST-') && !String(id).startsWith('TMP-') && !String(id).startsWith('TEMP-') && !String(id).startsWith('SR-');
@@ -376,23 +497,9 @@ function resolveResponseDisplayAppId(r, targetObj) {
   if (isRealId(r.serviceId)) return r.serviceId;
   if (targetObj && targetObj.displayAppId && isRealId(targetObj.displayAppId)) return targetObj.displayAppId;
 
-  // 2. gApps에서 전화번호(쿠폰번호/환자전화번호) 또는 환자명으로 신청번호(C0633 등) 매칭
-  const phoneDigits = String(r.couponPhone || r.patientPhone || (targetObj && (targetObj.couponPhone || targetObj.patientPhone)) || '').replace(/[^0-9]/g, '');
-  const pName = (r.patientName || (targetObj && targetObj.patientName) || '').trim();
-
-  if (typeof gApps !== 'undefined' && Array.isArray(gApps)) {
-    if (phoneDigits && phoneDigits.length >= 8) {
-      const matchByPhone = gApps.find(a => {
-        const aPhone = String(a.patientPhone || a.contact || a.phone || '').replace(/[^0-9]/g, '');
-        return aPhone && aPhone.slice(-8) === phoneDigits.slice(-8);
-      });
-      if (matchByPhone && matchByPhone.id) return matchByPhone.id;
-    }
-    if (pName && pName !== '-' && pName !== '고객') {
-      const matchByName = gApps.find(a => a.patientName && a.patientName.trim() === pName);
-      if (matchByName && matchByName.id) return matchByName.id;
-    }
-  }
+  // 2. 전역 신청 데이터(gApps 등) 매칭
+  const matchedApp = findMatchedApplication(r, targetObj);
+  if (matchedApp && matchedApp.id) return matchedApp.id;
 
   // 3. targetObj.serviceId 또는 targetObj.id
   if (targetObj && targetObj.serviceId && !targetObj.serviceId.startsWith('TMP-')) return targetObj.serviceId;
@@ -402,21 +509,17 @@ function resolveResponseDisplayAppId(r, targetObj) {
 }
 
 // 환자명 정밀 복원 헬퍼 (누락 방지)
-function resolveResponsePatientName(r, targetObj) {
-  if (r.patientName && r.patientName.trim() !== '' && r.patientName.trim() !== '-') {
+function resolveResponsePatientName(r, targetObj, matchedApp = null) {
+  if (r.patientName && r.patientName.trim() !== '' && r.patientName.trim() !== '-' && r.patientName.trim() !== '고객') {
     return r.patientName.trim();
   }
-  if (targetObj && targetObj.patientName && targetObj.patientName.trim() !== '' && targetObj.patientName.trim() !== '-') {
+  if (targetObj && targetObj.patientName && targetObj.patientName.trim() !== '' && targetObj.patientName.trim() !== '-' && targetObj.patientName.trim() !== '고객') {
     return targetObj.patientName.trim();
   }
-  // gApps에서 전화번호로 환자명 매칭
-  const phoneDigits = String(r.couponPhone || r.patientPhone || (targetObj && (targetObj.couponPhone || targetObj.patientPhone)) || '').replace(/[^0-9]/g, '');
-  if (phoneDigits && phoneDigits.length >= 8 && typeof gApps !== 'undefined' && Array.isArray(gApps)) {
-    const matchByPhone = gApps.find(a => {
-      const aPhone = String(a.patientPhone || a.contact || a.phone || '').replace(/[^0-9]/g, '');
-      return aPhone && aPhone.slice(-8) === phoneDigits.slice(-8);
-    });
-    if (matchByPhone && matchByPhone.patientName) return matchByPhone.patientName.trim();
+  const app = matchedApp || findMatchedApplication(r, targetObj);
+  if (app) {
+    const name = String(app.patientName || app.applicantName || app.customerName || app.name || '').trim();
+    if (name && name !== '-' && name !== '고객') return name;
   }
   return '고객';
 }
@@ -686,21 +789,28 @@ function getAllCompletedResponses() {
 
   // 1) gSurveyState.targets 중 SUBMITTED인 건
   (gSurveyState.targets || []).filter(t => t.responseStatus === 'SUBMITTED').forEach(t => {
+    const matchedApp = findMatchedApplication(t, t);
     const cleanAppId = resolveResponseDisplayAppId(t, t);
-    const key = String(t.serviceId || t.id || cleanAppId);
+    const resolvedName = resolveResponsePatientName(t, t, matchedApp);
+    const cleanHospital = (matchedApp && (matchedApp.hospitalName || matchedApp.addressDetail)) || t.hospitalName || '';
+    const startD = (matchedApp && (matchedApp.serviceStartDate || matchedApp.careStartDate || matchedApp.startDate || matchedApp.applyDate)) || t.careStartDate || '';
+    const endD = (matchedApp && (matchedApp.serviceEndDate || matchedApp.careEndDate || matchedApp.endDate)) || t.careEndDate || '';
+    const carer = findCaregiverForApp(matchedApp, t, t);
+
+    const key = String(cleanAppId || t.serviceId || t.id);
     const item = {
       id: t.responseId || ('SR-' + t.id),
       targetId: t.id,
       serviceId: t.serviceId || t.id,
       displayAppId: cleanAppId,
-      patientName: t.patientName || '고객',
-      patientPhone: t.patientPhone || '',
-      couponPhone: t.couponPhone || t.patientPhone || '',
-      hospitalName: t.hospitalName || '',
-      careStartDate: t.careStartDate || '',
-      careEndDate: t.careEndDate || '',
-      caregiverName: t.caregiverName || '',
-      hasCareLog: hasTargetCareLog(t),
+      patientName: resolvedName,
+      patientPhone: (matchedApp && (matchedApp.patientPhone || matchedApp.phone)) || t.patientPhone || '',
+      couponPhone: t.couponPhone || t.patientPhone || (matchedApp && (matchedApp.phone || matchedApp.patientPhone)) || '',
+      hospitalName: cleanHospital,
+      careStartDate: startD,
+      careEndDate: endD,
+      caregiverName: carer,
+      hasCareLog: hasTargetCareLog(matchedApp || t),
       respondentType: t.respondentType || 'PATIENT',
       q2: t.q2Score !== undefined ? t.q2Score : 5,
       q3: t.q3Score !== undefined ? t.q3Score : 5,
@@ -711,7 +821,8 @@ function getAllCompletedResponses() {
       callbackRequested: Boolean(t.callbackRequested),
       submittedAt: t.submittedAt || t.updatedAt || t.createdAt,
       answers: t.answers || {},
-      _target: t
+      _target: t,
+      _app: matchedApp
     };
     item.avgRating = calculateSurveyAvgScore(item);
     respMap.set(key, item);
@@ -735,12 +846,23 @@ function getAllCompletedResponses() {
       });
     }
 
-    if (!matchedTarget && r.patientName && r.patientName.trim() !== '' && r.patientName.trim() !== '-') {
+    if (!matchedTarget && r.patientName && r.patientName.trim() !== '' && r.patientName.trim() !== '-' && r.patientName.trim() !== '고객') {
       matchedTarget = (gSurveyState.targets || []).find(t => t.patientName && t.patientName.trim() === r.patientName.trim());
     }
 
+    // 전역 신청 데이터(gApps 등)에서 C0779 등 실시간 신청 건 정밀 탐색
+    const matchedApp = findMatchedApplication(r, matchedTarget);
     const cleanAppId = resolveResponseDisplayAppId(r, matchedTarget);
-    const resolvedName = resolveResponsePatientName(r, matchedTarget);
+    const resolvedName = resolveResponsePatientName(r, matchedTarget, matchedApp);
+
+    const cleanHospital = (matchedApp && (matchedApp.hospitalName || matchedApp.addressDetail || matchedApp.hospitalRoadAddress)) ||
+                          (matchedTarget && matchedTarget.hospitalName) || r.hospitalName || '';
+    const startD = (matchedApp && (matchedApp.serviceStartDate || matchedApp.careStartDate || matchedApp.startDate || matchedApp.applyDate)) ||
+                   (matchedTarget && matchedTarget.careStartDate) || r.careStartDate || '';
+    const endD = (matchedApp && (matchedApp.serviceEndDate || matchedApp.careEndDate || matchedApp.endDate)) ||
+                 (matchedTarget && matchedTarget.careEndDate) || r.careEndDate || '';
+    const carer = findCaregiverForApp(matchedApp, matchedTarget, r);
+
     const mapKey = String(cleanAppId || sId);
 
     const existing = respMap.get(mapKey) || respMap.get(sId);
@@ -749,14 +871,15 @@ function getAllCompletedResponses() {
         ...r,
         displayAppId: cleanAppId,
         patientName: resolvedName,
-        patientPhone: r.patientPhone || (matchedTarget && matchedTarget.patientPhone) || '',
-        couponPhone: r.couponPhone || r.callbackPhone || (matchedTarget && (matchedTarget.couponPhone || matchedTarget.patientPhone)) || '',
-        hospitalName: r.hospitalName || (matchedTarget && matchedTarget.hospitalName) || '',
-        careStartDate: r.careStartDate || (matchedTarget && matchedTarget.careStartDate) || '',
-        careEndDate: r.careEndDate || (matchedTarget && matchedTarget.careEndDate) || '',
-        caregiverName: r.caregiverName || (matchedTarget && matchedTarget.caregiverName) || '',
-        hasCareLog: hasTargetCareLog(matchedTarget || r),
-        _target: matchedTarget || { id: r.targetId || cleanAppId, serviceId: cleanAppId, giftStatus: 'PENDING' }
+        patientPhone: r.patientPhone || (matchedTarget && matchedTarget.patientPhone) || (matchedApp && (matchedApp.patientPhone || matchedApp.phone)) || '',
+        couponPhone: r.couponPhone || r.callbackPhone || (matchedTarget && (matchedTarget.couponPhone || matchedTarget.patientPhone)) || (matchedApp && (matchedApp.phone || matchedApp.patientPhone)) || '',
+        hospitalName: cleanHospital,
+        careStartDate: startD,
+        careEndDate: endD,
+        caregiverName: carer,
+        hasCareLog: hasTargetCareLog(matchedApp || matchedTarget || r),
+        _target: matchedTarget || { id: r.targetId || cleanAppId, serviceId: cleanAppId, giftStatus: 'PENDING' },
+        _app: matchedApp
       };
       item.avgRating = calculateSurveyAvgScore(item);
       respMap.set(mapKey, item);
@@ -766,8 +889,20 @@ function getAllCompletedResponses() {
       if (cleanAppId && cleanAppId !== '-' && (!existing.displayAppId || existing.displayAppId.startsWith('TMP-'))) {
         existing.displayAppId = cleanAppId;
       }
-      if (resolvedName && resolvedName !== '-' && (!existing.patientName || existing.patientName === '고객')) {
+      if (resolvedName && resolvedName !== '-' && resolvedName !== '고객' && (!existing.patientName || existing.patientName === '고객')) {
         existing.patientName = resolvedName;
+      }
+      if (cleanHospital && (!existing.hospitalName || existing.hospitalName === '병원 미지정')) {
+        existing.hospitalName = cleanHospital;
+      }
+      if (startD && !existing.careStartDate) existing.careStartDate = startD;
+      if (endD && !existing.careEndDate) existing.careEndDate = endD;
+      if (carer && carer !== '미지정' && (!existing.caregiverName || existing.caregiverName === '미지정')) {
+        existing.caregiverName = carer;
+      }
+      if (matchedApp) {
+        existing._app = matchedApp;
+        existing.hasCareLog = hasTargetCareLog(matchedApp || existing);
       }
       existing.avgRating = calculateSurveyAvgScore(existing);
     }
