@@ -2749,7 +2749,6 @@
         if (fastMeta.length > 0) {
           document.querySelectorAll('.patient-meta-text').forEach(el => el.textContent = fastMeta.join(' · '));
         }
-        hideSurveyLoadingOverlay();
       }
 
       applyTitleTheme(titleTheme);
@@ -2877,14 +2876,9 @@
         const startParts = parseCustomDateParts(target.careStartDate);
         const endParts = parseCustomDateParts(target.careEndDate);
         let carePeriodStr = '간병 기간';
-        let diffDays = 1;
 
         if (startParts && endParts) {
           carePeriodStr = startParts.mmdd + ' — ' + endParts.mmdd;
-          const dtStart = new Date(startParts.year, startParts.month - 1, startParts.day);
-          const dtEnd = new Date(endParts.year, endParts.month - 1, endParts.day);
-          const dDiff = Math.round((dtEnd - dtStart) / (1000 * 3600 * 24));
-          diffDays = Math.max(1, dDiff <= 0 ? 1 : dDiff);
         } else if (startParts) {
           carePeriodStr = startParts.mmdd + '부터';
         }
@@ -2930,14 +2924,11 @@
         gPatientInfo.gender = genderVal || '';
 
         document.querySelectorAll('.patient-meta-text').forEach(el => el.textContent = patientMetaDisplay);
-        document.querySelectorAll('.side-care-period').forEach(el => el.textContent = carePeriodStr);
-        document.querySelectorAll('.side-care-days').forEach(el => el.textContent = diffDays + '일');
-        document.querySelectorAll('.total-days-num').forEach(el => el.textContent = diffDays + '일');
-        const dayCountEl = document.getElementById('day-count');
-        if (dayCountEl) dayCountEl.textContent = diffDays;
-        hideSurveyLoadingOverlay();
 
-        // 해당 환자의 실제 케어포트 모바일 일지가 있는지 확인
+        // 🚨 플리커링 원천 방지:
+        // 실제 일지 유무(hasRealLogs)가 확정되기 전에 임의의 '1일'을 화면에 성급하게 노출하지 않음!
+        // 비동기 일지 확인을 먼저 완료한 후 실제 일수(예: 16일) 또는 '일지 미작성'을 한 번에 확정 노출합니다.
+
         let hasRealLogs = false;
         if (target.patientName) {
           // 1. 로컬스토리지 확인
@@ -2986,12 +2977,25 @@
             } catch (e) {}
           }
 
-          // 🚨 간병일지가 없는 환자: 더미 샘플 일지를 절대 주입하지 않고 일지 미작성 전용 UI 적용
-          if (!hasRealLogs) {
-            careRecords = [];
-            applyNoCareLogMode(target);
-          } else {
+          // 간병일지 유무 확정 후 정확한 일수 또는 미작성 모드 단 1회 렌더링
+          if (hasRealLogs && careRecords.length > 0) {
+            const actualDays = careRecords.length;
+            if (careRecords[0]?.date && careRecords[careRecords.length - 1]?.date) {
+              carePeriodStr = `${careRecords[0].date} — ${careRecords[careRecords.length - 1].date}`;
+            }
+            document.querySelectorAll('.side-care-period').forEach(el => el.textContent = carePeriodStr);
+            document.querySelectorAll('.side-care-days').forEach(el => el.textContent = actualDays + '일');
+            document.querySelectorAll('.total-days-num').forEach(el => el.textContent = actualDays + '일');
+            const dayCountEl = document.getElementById('day-count');
+            if (dayCountEl) dayCountEl.textContent = actualDays;
             if (typeof render === 'function') render();
+          } else {
+            // 🚨 간병일지가 없는 환자: 더미 일지를 절대 주입하지 않고 일지 미작성 전용 UI 적용
+            careRecords = [];
+            document.querySelectorAll('.side-care-period').forEach(el => el.textContent = (carePeriodStr !== '간병 기간' ? carePeriodStr : '-'));
+            document.querySelectorAll('.side-care-days').forEach(el => el.textContent = '미작성');
+            document.querySelectorAll('.total-days-num').forEach(el => el.textContent = '미작성');
+            applyNoCareLogMode(target);
           }
         } else {
           // 기본 샘플 또는 환자명이 없는 경우 정상 렌더링
@@ -3095,7 +3099,9 @@
       // 병원명 및 총 일수 표지 반영
       const hospName = (gSurveyTargetObj && gSurveyTargetObj.hospitalName) || params.get('hospital') || '리본케어 협약병원';
       document.querySelectorAll('.hospital-name').forEach(el => el.textContent = hospName);
-      document.querySelectorAll('.total-days-num').forEach(el => el.textContent = `${careRecords.length}일`);
+      if (careRecords && careRecords.length > 0) {
+        document.querySelectorAll('.total-days-num').forEach(el => el.textContent = `${careRecords.length}일`);
+      }
 
       // 글자수 카운터
       const q5Input = document.getElementById('ansQ5');
@@ -3129,6 +3135,9 @@
       if (jumpSection) {
         setTimeout(() => scrollToSection(jumpSection), 150);
       }
+
+      // 모든 데이터 로딩 및 동적 일수/미작성 UI 세팅이 100% 완료된 후 로딩 오버레이 페이드아웃
+      hideSurveyLoadingOverlay();
     }
 
     // 관리자 메뉴(만족도조사 관리 new)의 웹뷰 미리보기 컨트롤러와 실시간 통신
