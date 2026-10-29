@@ -171,7 +171,21 @@ const INITIAL_FAX_DIRECTORY = [
     email: 'sspark@koreains.co.kr',
     isDefault: false,
     memo: '경기 남부 권역 간병비 정산 청구'
-  }
+  },
+  {
+  id: 'FDIR-005',
+  insuranceCompany: '현대해상',
+  category: '1차접수',
+  firm: '현대해상',
+  department: '접수 총괄센터',
+  contactPerson: '접수 총괄',
+  faxNumber: '0507-071-0554',
+  phone: '',
+  mobile: '010-6206-7835',
+  email: '',
+  isDefault: false,
+  memo: '현대해상 접수 청구'
+}
 ];
 
 const INITIAL_FAX_LOGS = [];
