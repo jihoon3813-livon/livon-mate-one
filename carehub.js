@@ -296,13 +296,18 @@ function formatWithTime(dtStr, defaultTime = '') {
  */
 function resolveAppApplyDateTime(app) {
   if (!app) return '';
-  let str = String(app.applyDateTime || app.applyDate || '').trim();
-  
-  // 이미 시간(HH:mm)이 포함되어 있는 경우
-  const timeMatch = str.match(/\b(\d{1,2}:\d{2})\b/);
-  if (timeMatch) {
-    const rawDate = str.split(/[\sT]+/)[0].replace(/-/g, '.');
-    return `${rawDate} ${timeMatch[1]}`;
+  const applyDate = String(app.applyDate || '').trim();
+  const applyDateTime = String(app.applyDateTime || '').trim();
+  const dateSource = applyDate || applyDateTime;
+  const rawDate = dateSource.split(/[\sT]+/)[0];
+  const datePart = rawDate ? rawDate.replace(/-/g, '.') : '';
+  const getDateKey = value => String(value || '').split(/[\sT]+/)[0].replace(/[^0-9]/g, '');
+
+  const applyDateTimeMatchesDate = !applyDate || getDateKey(applyDate) === getDateKey(applyDateTime);
+  const timeMatch = applyDate.match(/\b(\d{1,2}:\d{2})\b/)
+    || (applyDateTimeMatchesDate ? applyDateTime.match(/\b(\d{1,2}:\d{2})\b/) : null);
+  if (timeMatch && datePart) {
+    return `${datePart} ${timeMatch[1]}`;
   }
 
   // 날짜만 있는 경우, createdAt에서 시간 복원 시도
@@ -322,10 +327,30 @@ function resolveAppApplyDateTime(app) {
     timePart = '09:00'; // 기본 업무 개시 시각
   }
 
-  const datePart = str ? str.slice(0, 10).replace(/-/g, '.') : new Date().toISOString().slice(0, 10).replace(/-/g, '.');
-  return `${datePart} ${timePart}`;
+  const fallbackDatePart = datePart || new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+  return `${fallbackDatePart} ${timePart}`;
 }
 window.resolveAppApplyDateTime = resolveAppApplyDateTime;
+
+function findCaregiverProfileForAssignment(assignment) {
+  if (!assignment || !Array.isArray(gCaregivers)) return null;
+  const caregiverName = String(assignment.caregiverName || '').trim();
+  const caregiverId = String(assignment.caregiverId || assignment.caregiverID || assignment.cgId || '').trim();
+  if (caregiverId) {
+    const byId = gCaregivers.find(c => c && String(c.id || '').trim() === caregiverId);
+    if (byId) return byId;
+  }
+
+  const assignmentPhone = String(assignment.phone || assignment.caregiverPhone || '').replace(/\D/g, '');
+  if (assignmentPhone) {
+    const byPhone = gCaregivers.filter(c => c && (!caregiverName || String(c.name || '').trim() === caregiverName)
+      && String(c.phone || '').replace(/\D/g, '') === assignmentPhone);
+    if (byPhone.length === 1) return byPhone[0];
+  }
+
+  const byUniqueName = gCaregivers.filter(c => c && String(c.name || '').trim() === caregiverName);
+  return byUniqueName.length === 1 ? byUniqueName[0] : null;
+}
 
 function parseCareDateTime(dateTimeStr) {
   if (!dateTimeStr) return null;
@@ -7105,7 +7130,7 @@ function renderSequentialCareSettlementWorkspaceHtml(app, appAssigns, appClaims,
   }
 
   const prog = as ? getCareProgressInfo(as) : null;
-  const cg = as ? (gCaregivers || []).find(c => c.name === as.caregiverName) : null;
+  const cg = as ? findCaregiverProfileForAssignment(as) : null;
   const center = as ? (gCenters || []).find(ctr => ctr.name === (as.centerName || (app && (app.caregiverCenter || app.centerName)))) : null;
   const birth = as ? (as.birthDate || as.caregiverBirth || (cg && cg.birthDate) || '-') : '-';
   const caregiverPhone = as ? (as.phone || as.caregiverPhone || (app && app.caregiverPhone) || (cg && cg.phone) || '-') : '-';
@@ -8890,7 +8915,7 @@ function renderEntityBased3CardWorkspaceHtml(app, appAssigns, appClaims, appPayo
   }
 
   const prog = as ? getCareProgressInfo(as) : null;
-  const cg = as ? (gCaregivers || []).find(c => c.name === as.caregiverName) : null;
+  const cg = as ? findCaregiverProfileForAssignment(as) : null;
   const center = as ? (gCenters || []).find(ctr => ctr.name === (as.centerName || (app && (app.caregiverCenter || app.centerName)))) : null;
   const birth = as ? (as.birthDate || as.caregiverBirth || (cg && cg.birthDate) || '-') : '-';
   const caregiverPhone = as ? (as.phone || as.caregiverPhone || (app && app.caregiverPhone) || (cg && cg.phone) || '-') : '-';
@@ -11678,7 +11703,7 @@ function renderCareCardWorkspaceHtml(app, appAssigns, appClaims, appPayouts, app
                   <div class="space-y-2">
                     ${appAssigns.map(as => {
                       const prog = getCareProgressInfo(as);
-                      const cg = (gCaregivers || []).find(c => c.name === as.caregiverName);
+                      const cg = findCaregiverProfileForAssignment(as);
                       const center = (gCenters || []).find(ctr => ctr.name === as.centerName);
                       const birth = as.birthDate || as.caregiverBirth || (cg && cg.birthDate) || '-';
                       const phone = as.phone || as.caregiverPhone || (cg && cg.phone) || '-';
@@ -14655,7 +14680,8 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null, skipRemoteRe
 
   // 1. Check gApps & REBORN_DATA.applications
   const appList = (Array.isArray(gApps) && gApps.length > 0) ? gApps : ((window.REBORN_DATA && window.REBORN_DATA.applications) || []);
-  let app = appList.find(checkAppMatch);
+  let app = appList.find(a => a && String(a.id || '') === targetStr);
+  if (!app) app = appList.find(checkAppMatch);
 
   // 2. Check Samsung lists (gSamsungList, REBORN_DATA.samsungList, SAMSUNG_ELIGIBLE_LIST, gSamsungSheets)
   if (!app) {
@@ -14824,31 +14850,21 @@ function openHubCustomerDetailModal(applyId, targetSetIndex = null, skipRemoteRe
         const appId = String(targetApp.id || targetApp.patientId || '').trim();
         const appName = (targetApp.patientName || targetApp.customerName || '').trim();
 
-        // 1단계: isMatchCustomerRecord 또는 applyId 일치(C/H 정규화 포함)
+        const normalizeApplyId = value => String(value || '').trim().replace(/^H/, 'C');
+
         let matches = rawList.filter(item => {
           if (!item) return false;
-          if (typeof isMatchCustomerRecord === 'function' && isMatchCustomerRecord(targetApp, item)) return true;
           const aId = String(item.applyId || '').trim();
-          if (aId && appId && (aId === appId || aId.replace(/^H/, 'C') === appId.replace(/^H/, 'C') || aId.replace(/^C/, 'H') === appId.replace(/^C/, 'H'))) {
-            return true;
-          }
-          return false;
+          if (aId) return Boolean(appId && normalizeApplyId(aId) === normalizeApplyId(appId));
+          return typeof isMatchCustomerRecord === 'function' && isMatchCustomerRecord(targetApp, item);
         });
 
-        // 2단계: 1단계에서 못 찾았고 환자명이 있는 경우, 환자명 일치 검색 (단, 타인 신청서의 ID가 아닌 경우)
         if (matches.length === 0 && appName) {
           matches = rawList.filter(item => {
             if (!item) return false;
+            if (String(item.applyId || '').trim()) return false;
             const pName = (item.patientName || item.customerName || '').trim();
-            if (pName !== appName) return false;
-            const foreignApplyId = String(item.applyId || '').trim();
-            if (foreignApplyId && foreignApplyId !== appId) {
-              const foreignApp = Array.isArray(gApps) ? gApps.find(x => x && x.id === foreignApplyId) : null;
-              if (foreignApp && foreignApp.patientName && foreignApp.patientName.trim() !== appName) {
-                return false;
-              }
-            }
-            return true;
+            return pName === appName;
           });
         }
         return matches;
