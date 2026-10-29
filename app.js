@@ -5487,6 +5487,12 @@ function renderEditorCanvasAndList() {
                   <option value="applyDate" ${area.mapping === 'applyDate' ? 'selected' : ''}>신청일자 (applyDate)</option>
                   <option value="accidentDate" ${area.mapping === 'accidentDate' ? 'selected' : ''}>사고일자 (accidentDate)</option>
                   <option value="accidentType" ${area.mapping === 'accidentType' ? 'selected' : ''}>사고유형 (질병/상해) (accidentType)</option>
+                  <option value="diagnosis" ${area.mapping === 'diagnosis' ? 'selected' : ''}>진단명 (diagnosis)</option>
+                  <option value="accidentDetail" ${area.mapping === 'accidentDetail' ? 'selected' : ''}>사고(발병) 경위 (accidentDetail)</option>
+                  <option value="hd1_docAttached_yes" ${area.mapping === 'hd1_docAttached_yes' ? 'selected' : ''}>병명확인 서류첨부 - 예 체크</option>
+                  <option value="hd1_docAttached_no" ${area.mapping === 'hd1_docAttached_no' ? 'selected' : ''}>병명확인 서류첨부 - 아니오 체크</option>
+                  <option value="hd1_mobility_yes" ${area.mapping === 'hd1_mobility_yes' ? 'selected' : ''}>거동가능 - 예 체크</option>
+                  <option value="hd1_mobility_no" ${area.mapping === 'hd1_mobility_no' ? 'selected' : ''}>거동가능 - 아니오 체크</option>
                   <option value="homeAddress" ${area.mapping === 'homeAddress' ? 'selected' : ''}>신청유형 [재택] 자택주소 (homeAddress)</option>
                   <option value="hospitalAddress" ${area.mapping === 'hospitalAddress' ? 'selected' : ''}>신청유형 [입원] 병원명 및 병실주소 (hospitalAddress)</option>
                   <option value="careLocationAddress" ${area.mapping === 'careLocationAddress' || area.mapping === 'addressDetail' ? 'selected' : ''}>신청유형 (통합: 재택/입원 자동표시)</option>
@@ -13822,8 +13828,26 @@ function resolveFormFieldValue(mappingKey, app, docNo, todayStr) {
     case 'applicantRelation': return app.applicantRelation || ((app.isApplicantSame || !app.applicantName || app.applicantName === app.patientName) ? '본인' : '');
     case 'applicantSameText': return (app.isApplicantSame || app.applicantRelation === '본인' || (!app.applicantName || app.applicantName === app.patientName)) ? '신청자와 동일함' : `${app.applicantRelation || '가족'} (${app.applicantName || ''})`;
     case 'applyDate': return app.applyDate || todayStr;
-    case 'accidentDate': return (app.accidentDate && app.accidentDate !== '-') ? app.accidentDate : (app.applyDate || todayStr);
+    case 'accidentDate': return (app.accidentDate && app.accidentDate !== '-') ? app.accidentDate : '';
     case 'accidentType': return app.accidentType || '질병/상해';
+    case 'diagnosis': return app.diagnosis || app.diagnosisName || app.diseaseName || app.disease || app.sicknessName || (app.memo && String(app.memo).match(/\[진단명:\s*([^\]]+)\]/)?.[1]?.trim()) || '';
+    case 'accidentDetail': return app.accidentDetail || app.accidentHistory || '';
+    case 'hd1_docAttached_yes': {
+      const value = String(app.docAttached ?? '').trim().toLowerCase();
+      return ['예', 'y', 'yes', 'true', '1', '첨부'].includes(value) ? '✓' : '';
+    }
+    case 'hd1_docAttached_no': {
+      const value = String(app.docAttached ?? '').trim().toLowerCase();
+      return ['아니오', '아니요', 'n', 'no', 'false', '0', '미첨부'].includes(value) ? '✓' : '';
+    }
+    case 'hd1_mobility_yes': {
+      const value = String(app.mobility ?? '').trim().toLowerCase();
+      return ['가능', '예', 'y', 'yes', 'true', '1'].includes(value) ? '✓' : '';
+    }
+    case 'hd1_mobility_no': {
+      const value = String(app.mobility ?? '').trim().toLowerCase();
+      return ['불가', '불가능', '아니오', '아니요', 'n', 'no', 'false', '0'].includes(value) ? '✓' : '';
+    }
     case 'homeAddress': return app.careType === '자택' ? (app.addressDetail || app.patientAddress || '서울특별시 영등포구 선유동2로 123 (자택)') : '';
     case 'hospitalAddress': return app.careType !== '자택' ? formatHospitalDisplay(app) : '';
     case 'careLocationAddress':
@@ -14105,7 +14129,24 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
     // 에디터에서 등록된 배경 이미지(PDF/이미지)가 있을 경우 A4 시트 위에 좌표 오버레이로 렌더링
     // =========================================================================
     const customBg = gFormBackgroundStore && gFormBackgroundStore['HD_FORM_01'];
-    const areas = gFormAreaStore && gFormAreaStore['HD_FORM_01'] ? gFormAreaStore['HD_FORM_01'] : [];
+    const configuredAreas = gFormAreaStore && Array.isArray(gFormAreaStore['HD_FORM_01']) ? gFormAreaStore['HD_FORM_01'] : [];
+    const requiredHd1Areas = [
+      { id: 'HD1_AUTO_ACCIDENT_DATE', label: '사고일자', mapping: 'accidentDate', x: 70, y: 40.5, w: 22, h: 3.5 },
+      { id: 'HD1_AUTO_DIAGNOSIS', label: '진단명', mapping: 'diagnosis', x: 70, y:44.5, w: 22, h: 3.5 },
+      { id: 'HD1_AUTO_ACCIDENT_DETAIL', label: '사고(발병) 경위', mapping: 'accidentDetail', x: 24.5, y: 48, w: 70.5, h: 3.5 },
+      { id: 'HD1_AUTO_DOC_YES', label: '병명확인 서류첨부 - 예', mapping: 'hd1_docAttached_yes', x: 27, y: 52, w: 3.5, h: 3.5 },
+      { id: 'HD1_AUTO_DOC_NO', label: '병명확인 서류첨부 - 아니오', mapping: 'hd1_docAttached_no', x: 36.5, y: 52, w: 3.5, h: 3.5 },
+      { id: 'HD1_AUTO_MOBILITY_YES', label: '거동가능 - 예', mapping: 'hd1_mobility_yes', x: 70.5, y: 52, w: 3.5, h: 3.5 },
+      { id: 'HD1_AUTO_MOBILITY_NO', label: '거동가능 - 아니오', mapping: 'hd1_mobility_no', x: 78.5, y: 52, w: 3.5, h: 3.5 }
+    ];
+    const requiredHd1Mappings = new Set(requiredHd1Areas.map(area => area.mapping));
+    const areas = [
+      ...configuredAreas.map(area => {
+        const required = requiredHd1Areas.find(item => item.mapping === (area && area.mapping));
+        return required ? { ...area, x: required.x, y: required.y, w: required.w, h: required.h } : area;
+      }),
+      ...requiredHd1Areas.filter(required => !configuredAreas.some(area => area && area.mapping === required.mapping))
+    ];
 
     if (typeof ensureFormConfigLoaded === 'function') {
       ensureFormConfigLoaded('HD_FORM_01', !customBg).then(loaded => {
@@ -14142,11 +14183,22 @@ function previewFormForCustomer(formCode, applyId = 'C0006', isFaxConfirmation =
               `;
             }
             const val = resolveFormFieldValue(area.mapping, app, docNo, todayStr);
+            const isCheckMarkArea = String(area.mapping || '').startsWith('hd1_docAttached_') || String(area.mapping || '').startsWith('hd1_mobility_');
+            const isNarrativeArea = area.mapping === 'accidentDetail';
+            const isDiagnosisArea = area.mapping === 'diagnosis';
+            const overlayStyle = isCheckMarkArea
+              ? 'text-align:center; font-size:15px; line-height:1;'
+              : (isNarrativeArea
+                ? 'font-size:9px; line-height:1.15; white-space:normal; word-break:break-word; overflow:visible;'
+                : (isDiagnosisArea ? 'font-size:10px; line-height:1.15; white-space:normal; word-break:break-word; overflow:visible;' : ''));
+            const cellStyle = isCheckMarkArea
+              ? 'display:table-cell; vertical-align:middle; padding:0; text-align:center; overflow:visible; white-space:nowrap;'
+              : `display:table-cell; vertical-align:middle; padding:0 4px; ${isNarrativeArea || isDiagnosisArea ? 'overflow:visible; white-space:normal; word-break:break-word;' : 'overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'} line-height:1.25;`;
             return `
               <div class="absolute z-10 font-bold text-slate-950 text-xs select-none"
-                   style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; display: table; table-layout: fixed;"
+                   style="left: ${area.x}%; top: ${area.y}%; width: ${area.w}%; height: ${area.h}%; display: table; table-layout: fixed; ${overlayStyle}"
                    title="[${area.id}] ${area.label}: ${val}">
-                <div style="display: table-cell; vertical-align: middle; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4;">
+                <div style="${cellStyle}">
                   ${val}
                 </div>
               </div>
@@ -15895,6 +15947,13 @@ function previewNewAppDraftFax() {
   const hospName = document.getElementById('newAppHospitalName')?.value.trim() || '입원병원명';
   const desiredDate = document.getElementById('newAppDesiredDate')?.value.trim() || '2026.09.07';
   const memo = document.getElementById('newAppMemo')?.value.trim() || '';
+  const diagnosis = document.getElementById('newAppDiagnosis')?.value.trim() || '';
+  const accidentDetail = document.getElementById('newAppAccidentDetail')?.value.trim() || '';
+  const docAttachedRadio = document.querySelector('input[name="newAppDocAttached"]:checked');
+  const docAttached = docAttachedRadio ? docAttachedRadio.value : '아니오';
+  const mobilityRadio = document.querySelector('input[name="newAppMobility"]:checked');
+  const mobility = mobilityRadio ? mobilityRadio.value : '미선택';
+
 
   const rrnFront = document.getElementById('newAppRrnFront')?.value?.trim() || '';
   const rrnBack = document.getElementById('newAppRrnBack')?.value?.trim() || '';
@@ -15938,6 +15997,11 @@ function previewNewAppDraftFax() {
     applyDate: document.getElementById('newAppApplyDate')?.value?.trim() || new Date().toISOString().split('T')[0].replace(/-/g, '.'),
     accidentDate: document.getElementById('newAppAccidentDate')?.value?.trim() || document.getElementById('newAppApplyDate')?.value?.trim() || new Date().toISOString().split('T')[0].replace(/-/g, '.'),
     accidentType: document.querySelector('input[name="newAppAccidentTypeRadio"]:checked')?.value || '상해',
+    diagnosis: diagnosis,
+    diseaseName: diagnosis,
+    accidentDetail: accidentDetail,
+    docAttached: docAttached,
+    mobility: mobility,
     memo: memo,
     isApplicantSame: isApplicantSame,
     applicantName: applicantName,
