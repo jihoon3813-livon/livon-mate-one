@@ -35,9 +35,7 @@
     <!-- 리본케어 로즈·플럼 앱 상단바 -->
     <header class="livon-header text-white px-5 py-4 flex items-center justify-between sticky top-0 z-20 shadow-md">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-white/15 border border-pink-300/30 flex items-center justify-center font-black text-base text-pink-200">
-          Liv
-        </div>
+        <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1789622263/ChatGPT_Image_2026%EB%85%84_9%EC%9B%94_17%EC%9D%BC_%EC%98%A4%ED%9B%84_02_17_20_kh5ydh.png" alt="리본케어" class="w-9 h-9 rounded-xl bg-white object-contain p-1 border border-pink-300/30 shadow-sm">
         <div>
           <span class="text-[10px] font-extrabold text-pink-300 block tracking-widest uppercase">LIVON CARE PARTNER</span>
           <h1 class="text-base font-extrabold leading-tight">리본케어 안심일지 & 설문 안내</h1>
@@ -117,7 +115,7 @@
 
   <script>
     let gIntegratedUrl = '';
-    let gPatientName = '고연분';
+    let gPatientName = '고객';
 
     async function initMateSurveyNew() {
       const params = new URLSearchParams(window.location.search);
@@ -144,12 +142,12 @@
       }
 
       if (info) {
-        gPatientName = info.patientName || '고연분';
+        gPatientName = info.patientName || '고객';
         document.getElementById('mateServiceId').textContent = info.serviceId || info.id || 'SV-2026';
-        document.getElementById('matePatientName').textContent = (info.patientName || '고연분') + ' 님';
+        document.getElementById('matePatientName').textContent = (info.patientName || '고객') + ' 님';
         document.getElementById('mateHospital').textContent = info.hospitalName || '지정 병원';
         document.getElementById('matePeriod').textContent = `${info.careStartDate || '-'} ~ ${info.careEndDate || '-'}`;
-        document.getElementById('mateCaregiver').textContent = (info.caregiverName || '권은지') + ' 간병사';
+        document.getElementById('mateCaregiver').textContent = (info.caregiverName || '담당') + ' 간병사';
       }
 
       const q = new URLSearchParams();
@@ -158,6 +156,10 @@
       if (info && info.patientName) q.set('patient', info.patientName);
       if (info && info.caregiverName) q.set('carer', info.caregiverName);
       if (info && info.hospitalName) q.set('hospital', info.hospitalName);
+      if (info && info.careStartDate) q.set('start', info.careStartDate);
+      if (info && info.careEndDate) q.set('end', info.careEndDate);
+      if (info && (info.patientAge || info.age)) q.set('age', info.patientAge || info.age);
+      if (info && (info.patientGender || info.gender)) q.set('gender', info.patientGender || info.gender);
 
       gIntegratedUrl = `${window.location.origin}/survey-care-diary.html?${q.toString()}`;
 

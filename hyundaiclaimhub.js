@@ -9,6 +9,349 @@
 var gHyundaiClaimSubTab = 'ended'; // 'ended' | 'all' | 'history'
 var gHyundaiSelectedClaimApps = new Set();
 var gHyundaiClaimSearchTimer = null;
+var gHyundaiEntryRefreshStarted = false;
+var gHyundaiEntryRefreshPromise = null;
+var gHyundaiEntryProgressOwned = false;
+var gHyundaiTabVisibilityObserver = null;
+var gHyundaiTabVisibilityListenerInstalled = false;
+var gHyundaiConvexClient = null;
+var gHyundaiSnapshotUnsubscribe = null;
+var gHyundaiSubscriptionPromise = null;
+var gHyundaiSubscriptionGeneration = 0;
+var gHyundaiSubscriptionReady = false;
+var gHyundaiInitialSubscriptionResolve = null;
+var gHyundaiSubscriptionTimeoutId = null;
+var gHyundaiSnapshotRenderFrame = null;
+
+function hasSameHyundaiSnapshotData(snapshot, next) {
+  if (!snapshot || !next) return false;
+  try {
+    if (Array.isArray(snapshot) && Array.isArray(next)) {
+      if (snapshot.length !== next.length) return false;
+      for (let i = 0; i < next.length; i++) {
+        const before = snapshot[i];
+        const after = next[i];
+        if (!before || !after) {
+          if (before !== after) return false;
+          continue;
+        }
+        const visibleFields = [
+          '_id', 'updatedAt', 'status', 'claimCategory', 'caregiverName', 'assignedCaregiverName',
+          'careEndDate', 'careStartDate', 'claimDate', 'depositStatus', 'sentDate', 'createdAt',
+          'appId', 'applyId', 'insuranceCompany', 'patientName', 'policyNumber', 'accidentNumber',
+          'adjusterName', 'adjusterFax', 'centerName', 'startDate', 'endDate', 'lastClaimDate',
+          'claimUnitPrice', 'customDailyClaimPrice', 'expectedDays', 'elapsedDays',
+          'depositConfirmedAmount', 'unpaidAmount', 'claimAmount', 'formCode', 'formName'
+        ];
+        if (visibleFields.some(key => before[key] !== after[key])) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return snapshot === next;
+  } catch (e) {
+    return false;
+  }
+}
+
+function applyHyundaiClaimSnapshot(snapshot) {
+  if (!snapshot || snapshot.status !== 'success' ||
+      !Array.isArray(snapshot.applications) || !Array.isArray(snapshot.assignments) ||
+      !Array.isArray(snapshot.claims) || !Array.isArray(snapshot.faxRecords)) return false;
+
+  let deletedAppIds = new Set();
+  let recentlyRegisteredIds = new Set();
+  let outboxApps = [];
+  try { deletedAppIds = new Set(JSON.parse(localStorage.getItem('LIVON_DELETED_APP_IDS') || '[]').map(String)); } catch (e) {}
+  try { recentlyRegisteredIds = new Set(JSON.parse(localStorage.getItem('LIVON_RECENTLY_REGISTERED_IDS') || '[]').map(String)); } catch (e) {}
+  try {
+    const savedOutbox = JSON.parse(localStorage.getItem('LIVON_PENDING_OUTBOX_APPS') || '[]');
+    if (Array.isArray(savedOutbox)) outboxApps = savedOutbox;
+  } catch (e) {}
+
+  const currentApps = Array.isArray(gApps) ? gApps : [];
+  const serverApps = typeof filterInvalidSamsungDuplicates === 'function'
+    ? filterInvalidSamsungDuplicates(snapshot.applications)
+    : snapshot.applications;
+  const visibleServerApps = serverApps.filter(app => app && app.id && !deletedAppIds.has(String(app.id)));
+  const serverIds = new Set(visibleServerApps.map(app => String(app.id)));
+  const localOnlyApps = currentApps.filter(app => app && app.id &&
+    !deletedAppIds.has(String(app.id)) && !serverIds.has(String(app.id)) &&
+    (app._isJustRegistered === true || recentlyRegisteredIds.has(String(app.id))));
+  outboxApps.forEach(app => {
+    if (app && app.id && !deletedAppIds.has(String(app.id)) && !serverIds.has(String(app.id)) &&
+        !localOnlyApps.some(local => String(local.id) === String(app.id))) localOnlyApps.push(app);
+  });
+
+  const currentAppsById = new Map(currentApps.filter(app => app && app.id).map(app => [String(app.id), app]));
+  const protectedKeys = new Set([
+    'hasManualUpdate', 'updatedAt', 'roadAddress', 'hospitalRoadAddress', 'addressDetail',
+    'sido', 'sigungu', 'zip', 'addrZip', 'zonecode', 'hospitalName', 'hospitalRoom',
+    'diagnosis', 'diseaseName'
+  ]);
+  const mergedServerApps = visibleServerApps.map(serverApp => {
+      const currentApp = currentAppsById.get(String(serverApp.id));
+      if (!currentApp || (!currentApp.hasManualUpdate && !(currentApp.updatedAt &&
+          (!serverApp.updatedAt || currentApp.updatedAt >= serverApp.updatedAt)))) return serverApp;
+      const merged = { ...serverApp };
+      protectedKeys.forEach(key => {
+        if (currentApp[key] !== undefined && currentApp[key] !== null && currentApp[key] !== '') merged[key] = currentApp[key];
+      });
+      return merged;
+    });
+
+  const previousState = {
+    apps: gApps,
+    assigns: gAssigns,
+    claims: gClaims,
+    faxLogs: gFaxLogs,
+  };
+  const nextFaxLogs = snapshot.faxRecords;
+  const faxLogMap = new Map();
+  nextFaxLogs.forEach(log => {
+    if (log && (log.id || log.sendKey)) faxLogMap.set(String(log.id || log.sendKey), log);
+  });
+  (Array.isArray(gFaxLogs) ? gFaxLogs : []).forEach(log => {
+    const key = log && (log.id || log.sendKey);
+    if (key && !faxLogMap.has(String(key))) faxLogMap.set(String(key), log);
+  });
+  let mergedFaxLogs = Array.from(faxLogMap.values());
+  if (typeof normalizeFaxLogsToKoreaTime === 'function') normalizeFaxLogsToKoreaTime(mergedFaxLogs);
+  if (typeof sortFaxLogsNewestFirst === 'function') mergedFaxLogs = sortFaxLogsNewestFirst(mergedFaxLogs);
+  const nextApps = typeof sortApplicationsNewestFirst === 'function'
+    ? sortApplicationsNewestFirst([...localOnlyApps, ...mergedServerApps])
+    : [...localOnlyApps, ...mergedServerApps];
+  const nextAssigns = snapshot.assignments.filter(item => item && !deletedAppIds.has(String(item.applyId || '')));
+  const nextClaims = snapshot.claims.filter(item => item && !deletedAppIds.has(String(item.applyId || '')));
+  const changed = !hasSameHyundaiSnapshotData(previousState.apps, nextApps) ||
+    !hasSameHyundaiSnapshotData(previousState.assigns, nextAssigns) ||
+    !hasSameHyundaiSnapshotData(previousState.claims, nextClaims) ||
+    !hasSameHyundaiSnapshotData(previousState.faxLogs, mergedFaxLogs);
+
+  // 객체 identity를 유지해 다른 메뉴에서 기존 참조를 들고 있는 경우도 최신 값으로 전달한다.
+  const replaceArrayContents = (target, next) => {
+    if (!Array.isArray(target)) return next;
+    target.length = 0;
+    const chunkSize = 5000;
+    for (let offset = 0; offset < next.length; offset += chunkSize) {
+      target.push(...next.slice(offset, offset + chunkSize));
+    }
+    return target;
+  };
+  if (Array.isArray(gApps)) gApps = replaceArrayContents(gApps, nextApps);
+  else gApps = nextApps;
+  if (Array.isArray(gAssigns)) gAssigns = replaceArrayContents(gAssigns, nextAssigns);
+  else gAssigns = nextAssigns;
+  if (Array.isArray(gClaims)) gClaims = replaceArrayContents(gClaims, nextClaims);
+  else gClaims = nextClaims;
+  if (Array.isArray(gFaxLogs)) gFaxLogs = replaceArrayContents(gFaxLogs, mergedFaxLogs);
+  else gFaxLogs = mergedFaxLogs;
+
+  gConvexDataApplied = true;
+  gIsDataLoading = false;
+  // 구독 이벤트마다 대용량 캐시를 동기 localStorage에 다시 직렬화하지 않는다.
+  // 메모리 전역 배열은 최신으로 유지하고, 다음 앱 로드는 기존 bundle 경로가 복원한다.
+  if (typeof updateConvexStatusBadge === 'function') updateConvexStatusBadge(true, gApps.length);
+  if (typeof updateSidebarCounts === 'function') updateSidebarCounts();
+
+  if (changed && !gHyundaiEntryRefreshPromise && gActiveTab === 'hyundaiclaimhub' && isHyundaiClaimTabVisible()) {
+    if (gHyundaiSnapshotRenderFrame !== null) cancelAnimationFrame(gHyundaiSnapshotRenderFrame);
+    gHyundaiSnapshotRenderFrame = requestAnimationFrame(() => {
+      gHyundaiSnapshotRenderFrame = null;
+      if (gActiveTab === 'hyundaiclaimhub' && isHyundaiClaimTabVisible()) {
+        renderHyundaiClaimHub(null, true);
+      }
+    });
+  }
+  return true;
+}
+
+function stopHyundaiClaimSubscription() {
+  gHyundaiSubscriptionGeneration++;
+  if (gHyundaiSnapshotRenderFrame !== null) {
+    cancelAnimationFrame(gHyundaiSnapshotRenderFrame);
+    gHyundaiSnapshotRenderFrame = null;
+  }
+  if (gHyundaiSnapshotUnsubscribe) {
+    try { gHyundaiSnapshotUnsubscribe(); } catch (e) {}
+    gHyundaiSnapshotUnsubscribe = null;
+  }
+  if (gHyundaiConvexClient) {
+    try { gHyundaiConvexClient.close(); } catch (e) {}
+    gHyundaiConvexClient = null;
+  }
+  gHyundaiSubscriptionReady = false;
+  gHyundaiSubscriptionPromise = null;
+  if (gHyundaiInitialSubscriptionResolve) {
+    gHyundaiInitialSubscriptionResolve(false);
+    gHyundaiInitialSubscriptionResolve = null;
+  }
+  if (gHyundaiSubscriptionTimeoutId) {
+    clearTimeout(gHyundaiSubscriptionTimeoutId);
+    gHyundaiSubscriptionTimeoutId = null;
+  }
+}
+
+function refreshHyundaiClaimSnapshotOnce() {
+  if (typeof queryConvex !== 'function') return Promise.resolve(false);
+  return queryConvex('applications:careHubSnapshot', {}).then(response => {
+    const snapshot = response && response.value ? response.value : response;
+    return applyCareHubSnapshot(snapshot);
+  }).catch(err => {
+    console.warn('[Hyundai Claim Snapshot Refresh]', err);
+    return false;
+  });
+}
+
+function startHyundaiClaimSubscription() {
+  // [임시 비활성화] 현대해상 전용 구독은 중단하고 CareHub 공통 스냅샷 구독을 사용합니다.
+  // 원복하려면 아래 공통 구독 호출을 주석 처리하고 기존 onUpdate 구현을 복구하세요.
+  if (gActiveTab !== 'hyundaiclaimhub' || !isHyundaiClaimTabVisible() || document.hidden) return Promise.resolve(false);
+  if (typeof startCareHubCardSubscription === 'function') return startCareHubCardSubscription();
+  return refreshHyundaiClaimSnapshotOnce();
+
+  /* 기존 applications:hyundaiClaimSnapshot onUpdate 구독 임시 보관 시작
+  if (gActiveTab !== 'hyundaiclaimhub' || !isHyundaiClaimTabVisible() || document.hidden) return Promise.resolve(false);
+  if (gHyundaiSubscriptionReady && gHyundaiSnapshotUnsubscribe) return Promise.resolve(true);
+  if (gHyundaiSubscriptionPromise) return gHyundaiSubscriptionPromise;
+
+  const Client = window.CareHubConvexClient;
+  const convexUrl = window.CURRENT_CONVEX_URL;
+  if (typeof Client !== 'function' || !convexUrl) return refreshHyundaiClaimSnapshotOnce();
+
+  const generation = ++gHyundaiSubscriptionGeneration;
+  let settled = false;
+  let timeoutId = null;
+  gHyundaiSubscriptionPromise = new Promise(resolve => {
+    const settle = result => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      if (gHyundaiSubscriptionTimeoutId === timeoutId) gHyundaiSubscriptionTimeoutId = null;
+      if (gHyundaiInitialSubscriptionResolve === settle) gHyundaiInitialSubscriptionResolve = null;
+      resolve(result);
+    };
+    gHyundaiInitialSubscriptionResolve = settle;
+
+    try {
+      gHyundaiConvexClient = new Client(convexUrl);
+      gHyundaiSnapshotUnsubscribe = gHyundaiConvexClient.onUpdate(
+        'applications:hyundaiClaimSnapshot',
+        {},
+        snapshot => {
+          if (generation !== gHyundaiSubscriptionGeneration || gActiveTab !== 'hyundaiclaimhub') return;
+          if (!applyHyundaiClaimSnapshot(snapshot)) return;
+          gHyundaiSubscriptionReady = true;
+          settle(true);
+        },
+        err => {
+          if (generation !== gHyundaiSubscriptionGeneration) return;
+          console.warn('[Hyundai Claim Live Subscription]', err);
+          settle(false);
+          stopHyundaiClaimSubscription();
+        }
+      );
+      timeoutId = setTimeout(() => {
+        settle(false);
+        if (!gHyundaiSubscriptionReady) stopHyundaiClaimSubscription();
+      }, 15000);
+      gHyundaiSubscriptionTimeoutId = timeoutId;
+    } catch (err) {
+      console.warn('[Hyundai Claim Live Subscription Init]', err);
+      settle(false);
+      stopHyundaiClaimSubscription();
+    }
+  }).finally(() => {
+    gHyundaiSubscriptionPromise = null;
+  });
+  return gHyundaiSubscriptionPromise;
+  기존 전용 구독 임시 보관 종료 */
+}
+
+function isHyundaiClaimTabVisible() {
+  const tab = document.getElementById('tab-hyundaiclaimhub');
+  return !!tab && !tab.classList.contains('hidden');
+}
+
+function showHyundaiEntryProgress() {
+  if (gHyundaiEntryProgressOwned) return;
+  const progressModal = document.getElementById('globalProgressModal') || document.getElementById('globalCareLogProgressModal');
+  if ((!progressModal || progressModal.classList.contains('hidden')) && typeof showGlobalProgress === 'function') {
+    showGlobalProgress({
+      title: '현대해상 청구관리 최신자료 조회 중',
+      subtitle: 'Convex에서 최신 고객 및 청구 데이터를 불러오고 있습니다.',
+      percent: 30,
+      statusText: '최신 데이터를 확인하고 있습니다...',
+      icon: 'refresh-cw'
+    });
+    gHyundaiEntryProgressOwned = true;
+  }
+}
+
+function observeHyundaiClaimTabVisibility() {
+  const tab = document.getElementById('tab-hyundaiclaimhub');
+  if (!tab) return;
+
+  if (!gHyundaiTabVisibilityObserver && typeof MutationObserver === 'function') {
+    gHyundaiTabVisibilityObserver = new MutationObserver(() => {
+      if (!isHyundaiClaimTabVisible()) {
+        gHyundaiEntryRefreshStarted = false;
+        // CareHub도 화면 밖이면 공통 스냅샷 구독을 종료합니다.
+        if (typeof isCareHubTabVisible !== 'function' || !isCareHubTabVisible()) stopCareHubCardSubscription();
+      } else if (gActiveTab === 'hyundaiclaimhub' && !gHyundaiEntryRefreshPromise) {
+        startCareHubCardSubscription();
+      }
+    });
+    gHyundaiTabVisibilityObserver.observe(tab, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  if (!gHyundaiTabVisibilityListenerInstalled && typeof document !== 'undefined') {
+    gHyundaiTabVisibilityListenerInstalled = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopCareHubCardSubscription();
+        gHyundaiEntryRefreshStarted = false;
+      }
+      else if (gActiveTab === 'hyundaiclaimhub' && isHyundaiClaimTabVisible()) startCareHubCardSubscription();
+    });
+  }
+}
+
+function startHyundaiEntryRefresh(subTabParam) {
+  if (gHyundaiEntryRefreshPromise) return gHyundaiEntryRefreshPromise;
+  showHyundaiEntryProgress();
+
+  gHyundaiEntryRefreshPromise = (async () => {
+    let firstSnapshotReceived = false;
+    try {
+      // [임시 비활성화] 현대해상 탭 진입 시 전체 bundleAll 조회를 건너뜁니다.
+      // 원복하려면 아래 loadConvexData 호출 주석을 해제하세요.
+      // if (typeof loadConvexData === 'function' && !gConvexDataApplied) await loadConvexData(false);
+      if (gActiveTab === 'hyundaiclaimhub' && isHyundaiClaimTabVisible()) {
+        const subscriptionReady = await startHyundaiClaimSubscription();
+        firstSnapshotReceived = subscriptionReady;
+      }
+    } catch (err) {
+      console.warn('[Hyundai Claim Hub] 탭 진입 최신 데이터 조회 실패:', err);
+    } finally {
+      if (gActiveTab === 'hyundaiclaimhub' && isHyundaiClaimTabVisible()) {
+        if (!firstSnapshotReceived) {
+          const refreshed = await refreshHyundaiClaimSnapshotOnce();
+          // 공통 스냅샷 조회 실패 시에도 bundleAll로 확대 조회하지 않습니다.
+        }
+        renderHyundaiClaimHub(subTabParam, true);
+      }
+      if (gHyundaiEntryProgressOwned) {
+        gHyundaiEntryProgressOwned = false;
+        if (typeof hideGlobalProgress === 'function') hideGlobalProgress();
+      }
+      gHyundaiEntryRefreshPromise = null;
+    }
+  })();
+
+  return gHyundaiEntryRefreshPromise;
+}
 
 function isHyundaiApp(app) {
   if (!app) return false;
@@ -199,10 +542,24 @@ function getHyundaiClaimFeeInfo(app) {
   return { days, dailyRate, totalAmount };
 }
 
-function renderHyundaiClaimHub(subTabParam = null) {
+function renderHyundaiClaimHub(subTabParam = null, skipEntryRefresh = false) {
   if (subTabParam) {
     gHyundaiClaimSubTab = subTabParam;
   }
+
+  observeHyundaiClaimTabVisibility();
+  if (gActiveTab === 'hyundaiclaimhub' && isHyundaiClaimTabVisible() && !document.hidden &&
+      typeof window.CareHubConvexClient === 'function' && !gHyundaiSubscriptionReady && !gHyundaiSubscriptionPromise) {
+    startCareHubCardSubscription();
+  }
+  if (!skipEntryRefresh && gActiveTab === 'hyundaiclaimhub' && isHyundaiClaimTabVisible() && !gHyundaiEntryRefreshStarted) {
+    gHyundaiEntryRefreshStarted = true;
+    return startHyundaiEntryRefresh(gHyundaiClaimSubTab);
+  }
+  if (!skipEntryRefresh && gActiveTab === 'hyundaiclaimhub' && isHyundaiClaimTabVisible() && gHyundaiEntryRefreshPromise) {
+    return gHyundaiEntryRefreshPromise;
+  }
+
   updateHyundaiClaimTabsUI();
   updateHyundaiClaimKpis();
 

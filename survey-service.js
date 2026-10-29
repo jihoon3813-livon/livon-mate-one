@@ -51,11 +51,11 @@ const SURVEY_SCHEMA_V1 = [
     type: 'rating_5',
     required: true,
     options: [
-      { score: 5, label: '매우 만족' },
-      { score: 4, label: '만족' },
-      { score: 3, label: '보통' },
-      { score: 2, label: '불만족' },
-      { score: 1, label: '매우 불만족' }
+      { score: 5, label: '매우 만족한다.' },
+      { score: 4, label: '만족한다.' },
+      { score: 3, label: '보통이다' },
+      { score: 2, label: '불만이다.' },
+      { score: 1, label: '매우 불만이다.' }
     ]
   },
   {
@@ -65,11 +65,11 @@ const SURVEY_SCHEMA_V1 = [
     required: true,
     allowUnknown: true,
     options: [
-      { score: 5, label: '매우 친절' },
-      { score: 4, label: '친절' },
-      { score: 3, label: '보통' },
-      { score: 2, label: '불친절' },
-      { score: 1, label: '매우 불친절' }
+      { score: 5, label: '매우 만족한다.' },
+      { score: 4, label: '만족한다.' },
+      { score: 3, label: '보통이다' },
+      { score: 2, label: '불만이다.' },
+      { score: 1, label: '매우 불만이다.' }
     ]
   },
   {
@@ -79,11 +79,11 @@ const SURVEY_SCHEMA_V1 = [
     required: true,
     allowUnknown: true,
     options: [
-      { score: 5, label: '매우 꼼꼼하고 능숙함' },
-      { score: 4, label: '원활함' },
-      { score: 3, label: '보통' },
-      { score: 2, label: '미흡함' },
-      { score: 1, label: '매우 미흡함' }
+      { score: 5, label: '매우 만족한다.' },
+      { score: 4, label: '만족한다.' },
+      { score: 3, label: '보통이다' },
+      { score: 2, label: '불만이다.' },
+      { score: 1, label: '매우 불만이다.' }
     ]
   },
   {
@@ -136,6 +136,7 @@ class SurveyService {
             if (!t.surveyComment) t.surveyComment = rDoc.comment || '';
             if (t.callbackRequested === undefined) t.callbackRequested = Boolean(rDoc.callbackRequested);
             if (!t.submittedAt) t.submittedAt = rDoc.submittedAt || '';
+            if ((!t.answers || Object.keys(t.answers).length === 0) && rDoc.answers) t.answers = rDoc.answers;
           }
           if (!t.giftStatus) {
             t.giftStatus = (t.responseStatus === 'SUBMITTED') ? 'PENDING' : 'NONE';
@@ -225,8 +226,8 @@ class SurveyService {
       if (st === '취소' || st === '신청취소' || st === '접수취소') return false;
       const isCompletedStatus = st === '완료' || st === '정산완료' || st === '종료' || st === '진행완료';
       const isNotStarted = st === '접수' || st === '대기' || st === '배정대기';
-      const endDateIso = normDate(app.careEndDate);
-      const isEndedByDate = !isNotStarted && endDateIso.length === 10 && endDateIso < todayIso;
+      const endDateIso = normDate(app.careEndDate || app.expectedEndDate);
+      const isEndedByDate = !isNotStarted && endDateIso.length === 10 && endDateIso <= todayIso;
       return isCompletedStatus || isEndedByDate;
     });
 
@@ -298,6 +299,7 @@ class SurveyService {
       responseId: null,
       revision: 1,
       createdAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
       isRecentlyAdded: true
     };
 
@@ -803,6 +805,7 @@ class SurveyService {
     this.data.responses.unshift(responseDoc);
     target.responseStatus = 'SUBMITTED';
     target.responseId = responseId;
+    target.answers = answers;
     target.couponPhone = couponPhone;
     target.respondentType = answers.q1;
     target.q2Score = Number(answers.q2);

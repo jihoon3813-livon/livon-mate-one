@@ -44,201 +44,294 @@
       font-family: -apple-system, BlinkMacSystemFont, "Pretendard Variable", Pretendard, 'Noto Sans KR', sans-serif;
     }
 
-    /* 상단 헤더 및 모든 액션 버튼 한 줄(Single-line) 정렬 보장 */
+    /* 상단 헤더: 리본케어 공식 로고와 직관적인 설문 참여 버튼 단 하나 */
     .topbar {
-      height: 58px !important;
-      padding: 0 10px !important;
-      gap: 6px;
+      height: 56px !important;
+      padding: 0 14px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      background: rgba(255, 255, 255, 0.98) !important;
+      backdrop-filter: blur(12px) !important;
+      border-bottom: 1px solid #f0e0eb !important;
+      position: sticky !important;
+      top: 0 !important;
+      z-index: 30 !important;
       transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
       will-change: transform;
     }
 
-    /* 로고가 더보기 버튼에 가려지지 않도록 최소 너비 및 z-index 확보 */
-    .topbar .logo {
-      font-size: 20px !important;
-      min-width: 68px !important;
-      flex-shrink: 0 !important;
-      white-space: nowrap !important;
-      z-index: 2;
-      margin-right: 4px;
+    body.header-hidden .topbar {
+      transform: translateY(-100%) !important;
     }
 
+    /* 공식 리본케어 브랜드 로고 (심볼 이미지 + 브랜드명) */
+    .topbar .brand-logo-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      flex-shrink: 0;
+      min-width: 0;
+    }
+    .topbar .brand-logo-img {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      object-fit: contain;
+      background: #ffffff;
+      border: 1px solid #f2dce8;
+      box-shadow: 0 2px 5px rgba(43, 25, 56, 0.08);
+      flex-shrink: 0;
+    }
+    .topbar .brand-logo-text-group {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.15;
+    }
+    .topbar .brand-logo-name {
+      font-size: 16px;
+      font-weight: 850;
+      color: #2b1938;
+      letter-spacing: -0.02em;
+    }
+    .topbar .brand-logo-sub {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #be185d;
+      letter-spacing: -0.01em;
+    }
+
+    /* 상단 우측: 설문 참여를 최우선으로 유도하는 직관적인 원클릭 버튼 */
     .top-actions {
       display: flex !important;
       align-items: center !important;
       justify-content: flex-end;
-      gap: 3.5px !important;
-      flex-wrap: nowrap !important;
-      flex-shrink: 1 !important;
-      min-width: 0 !important;
-      overflow-x: auto !important;
-      scrollbar-width: none !important;
-      -webkit-overflow-scrolling: touch !important;
-    }
-    .top-actions::-webkit-scrollbar {
-      display: none !important;
-    }
-
-    /* 1번 요청: 스크롤 내릴 때 상단 바 & 스텝 바 자동 숨김 -> 상하 뷰포트 영역 최대화 */
-    body.header-hidden .topbar {
-      transform: translateY(-100%) !important;
-    }
-    body.header-hidden .journey-stepper {
-      transform: translateY(-220%) !important;
-    }
-
-    .top-actions button,
-    .topbar .mobile-more-btn,
-    .topbar .presentation {
-      white-space: nowrap !important;
-      word-break: keep-all !important;
       flex-shrink: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    .btn-top-survey {
       display: inline-flex !important;
       align-items: center !important;
-      justify-content: center !important;
-      gap: 3.5px !important;
-      padding: 6px 9px !important;
-      min-height: 31px !important;
-      height: 31px !important;
-      font-size: 11px !important;
-      font-weight: 700 !important;
-      line-height: 1 !important;
+      gap: 6px !important;
+      padding: 7px 13px !important;
+      background: linear-gradient(135deg, #e11d48 0%, #be185d 100%) !important;
+      color: #ffffff !important;
+      border: none !important;
       border-radius: 999px !important;
-    }
-
-    .top-actions button span,
-    .topbar .mobile-more-btn span,
-    .topbar .presentation span {
+      font-size: 12px !important;
+      font-weight: 800 !important;
+      letter-spacing: -0.01em !important;
+      box-shadow: 0 3px 12px rgba(190, 24, 93, 0.32) !important;
+      cursor: pointer !important;
+      text-decoration: none !important;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
       white-space: nowrap !important;
-      display: inline-flex;
-      align-items: center;
-      line-height: 1 !important;
     }
-
-    .top-actions button svg,
-    .topbar .mobile-more-btn svg,
-    .topbar .presentation svg {
-      width: 13px !important;
-      height: 13px !important;
-      flex-shrink: 0;
+    .btn-top-survey:hover {
+      filter: brightness(1.06);
+      transform: translateY(-1px);
+    }
+    .btn-top-survey:active {
+      transform: scale(0.96);
+    }
+    .btn-top-survey .badge {
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 2px 5.5px;
+      border-radius: 999px;
+      line-height: 1;
     }
 
     @media (min-width: 900px) {
       .topbar {
-        height: 64px !important;
+        height: 62px !important;
         padding: 0 20px !important;
       }
-      .top-actions {
-        gap: 6px !important;
+      .topbar .brand-logo-img {
+        width: 36px;
+        height: 36px;
       }
-      .top-actions button,
-      .topbar .presentation {
-        padding: 7px 12px !important;
-        height: 34px !important;
-        font-size: 12px !important;
+      .topbar .brand-logo-name {
+        font-size: 17px;
       }
-    }
-
-    @media (max-width: 390px) {
-      .topbar {
-        padding: 0 10px !important;
-      }
-      .topbar .logo {
-        font-size: 19.5px !important;
-      }
-      .top-actions {
-        gap: 3px !important;
-      }
-      .top-actions button,
-      .topbar .mobile-more-btn,
-      .topbar .presentation {
-        padding: 5px 7.5px !important;
-        font-size: 10.5px !important;
-        height: 29px !important;
-        min-height: 29px !important;
+      .btn-top-survey {
+        padding: 8px 16px !important;
+        font-size: 13px !important;
       }
     }
 
-    /* Sticky Top Mode Switcher Strip (상단 헤더 바로 아래 빈틈 없이 밀착) */
-    .journey-stepper {
-      position: sticky;
-      top: 58px;
-      z-index: 9;
-      background: rgba(255, 250, 253, 0.96);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid #f2dfeb;
-      padding: 7px 12px;
+    /* Floating Survey CTA Bar (일지 탐색 중 언제든 원클릭 설문 참여) */
+    .floating-survey-bar {
+      position: fixed;
+      bottom: 16px;
+      left: 0;
+      right: 0;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 0 14px;
+      z-index: 25;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .floating-survey-bar.hidden {
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+      display: none !important;
+      transform: translateY(20px) !important;
+    }
+    .floating-survey-bar.hidden * {
+      pointer-events: none !important;
+      cursor: default !important;
+    }
+    @media (max-width: 768px) {
+      input[type="text"],
+      input[type="tel"],
+      input[type="number"],
+      textarea,
+      select {
+        font-size: 16px !important;
+      }
+    }
+    .floating-survey-inner {
+      pointer-events: auto;
+      background: linear-gradient(135deg, #2b1838 0%, #4a1c44 60%, #be185d 100%);
+      color: #ffffff;
+      border-radius: 18px;
+      padding: 11px 15px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 5px;
-      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
-      will-change: transform;
+      gap: 10px;
+      box-shadow: 0 10px 25px -4px rgba(43, 24, 56, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.15);
     }
-
-    @media (min-width: 900px) {
-      .journey-stepper {
-        top: 64px;
-        padding: 8px 16px;
-        gap: 6px;
-      }
+    .floating-survey-txt {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
     }
-
-    .journey-pill {
-      flex: 1;
+    .floating-gift-badge {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      gap: 4px;
-      padding: 6.5px 6px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      line-height: 1;
-      color: #7d687d;
-      background: #f8f1f6;
-      border: 1px solid transparent;
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      white-space: nowrap !important;
-      word-break: keep-all !important;
-      flex-shrink: 0;
-      cursor: pointer;
-    }
-
-    .journey-pill span {
-      white-space: nowrap !important;
-      line-height: 1;
-    }
-
-    .journey-pill .step-num {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: #e6d6e4;
-      color: #5b425c;
+      gap: 3px;
       font-size: 10px;
       font-weight: 800;
+      color: #fde68a;
+      letter-spacing: -0.01em;
+    }
+    .floating-title {
+      font-size: 12.5px;
+      font-weight: 750;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .btn-floating-go {
+      flex-shrink: 0;
       display: inline-flex;
       align-items: center;
-      justify-content: center;
+      gap: 5px;
+      padding: 8px 14px;
+      background: #ffffff;
+      color: #be185d;
+      border: none;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 850;
+      cursor: pointer;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+      transition: transform 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-floating-go:active {
+      transform: scale(0.96);
+    }
+
+    /* Cover CTA Buttons - 설문 조사를 최우선 Primary로 강조 */
+    .cover-cta-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      z-index: 2;
+      margin-top: 18px;
+    }
+
+    .btn-cover-primary-survey {
+      width: 100%;
+      padding: 14px 18px;
+      border-radius: 18px;
+      border: none;
+      background: linear-gradient(135deg, #f47db8 0%, #db2777 50%, #be185d 100%);
+      color: #ffffff;
+      box-shadow: 0 8px 24px -4px rgba(219, 39, 119, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      text-align: left;
+    }
+    .btn-cover-primary-survey:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+    .btn-cover-primary-survey:active {
+      transform: scale(0.98);
+    }
+    .btn-cover-primary-survey .btn-cta-icon {
+      font-size: 24px;
       flex-shrink: 0;
     }
-
-    .journey-pill.active {
-      background: linear-gradient(135deg, #be185d 0%, #9d174d 100%);
-      color: #ffffff;
-      box-shadow: 0 4px 12px rgba(190, 24, 93, 0.24);
+    .btn-cover-primary-survey .btn-cta-text {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.25;
+    }
+    .btn-cover-primary-survey .btn-cta-main {
+      font-size: 15px;
+      font-weight: 850;
+      letter-spacing: -0.02em;
+    }
+    .btn-cover-primary-survey .btn-cta-sub {
+      font-size: 11px;
+      font-weight: 700;
+      color: #fef08a;
+    }
+    .btn-cover-primary-survey .btn-cta-arrow {
+      font-size: 18px;
+      font-weight: 800;
+      opacity: 0.9;
     }
 
-    .journey-pill.active .step-num {
-      background: rgba(255, 255, 255, 0.25);
+    .btn-cover-secondary-diary {
+      width: 100%;
+      padding: 11px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.12);
       color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: all 0.2s ease;
     }
-
-    .journey-pill.gift-pill:not(.active) {
-      background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-      color: #92400e;
-      border-color: #fde68a;
+    .btn-cover-secondary-diary:hover {
+      background: rgba(255, 255, 255, 0.18);
     }
 
     /* =====================================================
@@ -316,6 +409,24 @@
       font-weight: 800;
       color: #f9a8d4;
       letter-spacing: -0.03em;
+      display: inline-flex;
+      align-items: center;
+      line-height: 1;
+    }
+
+    .cover-brand-logo-img {
+      height: 22px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+    }
+
+    .footer-brand-logo-img {
+      height: 28px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto;
     }
 
     .cover-eyebrow {
@@ -787,6 +898,40 @@
       scroll-margin-top: 80px;
     }
 
+    .btn-survey-submit-single {
+      width: 100% !important;
+      padding: 14px 16px !important;
+      border-radius: 14px !important;
+      border: none;
+      background: linear-gradient(135deg, #e11d48 0%, #be185d 50%, #831843 100%);
+      color: #ffffff;
+      font-size: 14px !important;
+      font-weight: 850;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap !important;
+      letter-spacing: -0.03em !important;
+      box-sizing: border-box !important;
+      box-shadow: 0 6px 20px rgba(190, 24, 93, 0.28);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .btn-survey-submit-single:active {
+      transform: scale(0.98);
+    }
+
+    .survey-q-card.highlight-missing {
+      border-color: #e11d48 !important;
+      box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.25) !important;
+      animation: pulse-missing 1.2s ease-in-out;
+    }
+    @keyframes pulse-missing {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.015); }
+    }
+
     .callback-btn {
       padding: 10px 4px !important;
       font-size: 11px !important;
@@ -1056,34 +1201,155 @@
         font-size: 21px;
       }
     }
+
+    /* Fullscreen Smooth Loading Overlay */
+    #surveyLoadingOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #ffffff;
+      z-index: 999999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: all;
+    }
+    #surveyLoadingOverlay.fade-out {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    @keyframes livonPulseRing {
+      0% { transform: scale(0.92); opacity: 0.8; }
+      50% { transform: scale(1.06); opacity: 1; }
+      100% { transform: scale(0.92); opacity: 0.8; }
+    }
+    @keyframes livonSpinRing {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
+  <script>
+    (function() {
+      // 0ms 인터벌 선제 주입: URL 파라미터에서 환자/간병인/기간 정보 즉시 추출하여 DOM 생성 즉시 반영
+      try {
+        const p = new URLSearchParams(window.location.search);
+        const pName = (p.get('patient') || p.get('p') || p.get('name') || '').trim();
+        const carer = (p.get('carer') || p.get('caregiver') || p.get('c') || '').trim();
+        const hosp = (p.get('hospital') || p.get('h') || '').trim();
+        const start = (p.get('start') || p.get('s') || '').trim();
+        const end = (p.get('end') || p.get('e') || '').trim();
+        const days = (p.get('days') || p.get('d') || '').trim();
+        const age = (p.get('age') || '').trim();
+        const gender = (p.get('gender') || '').trim();
+
+        window.__FAST_PARAM_DATA__ = { pName, carer, hosp, start, end, days, age, gender };
+
+        function applyFastParams() {
+          if (pName) {
+            document.querySelectorAll('.patient-name').forEach(el => el.textContent = `${pName} 님`);
+            document.querySelectorAll('.patient-initial').forEach(el => el.textContent = pName.charAt(0));
+          }
+          if (carer) {
+            document.querySelectorAll('.carer-name').forEach(el => el.textContent = carer);
+            document.querySelectorAll('.carer-initial').forEach(el => el.textContent = carer.charAt(0));
+          }
+          if (hosp) {
+            document.querySelectorAll('.hospital-name').forEach(el => el.textContent = hosp);
+          }
+          const metaArr = [];
+          if (age) metaArr.push(`${age}세`);
+          if (gender) metaArr.push(gender === '남' || gender === 'M' ? '남성' : (gender === '여' || gender === 'F' ? '여성' : gender));
+          if (metaArr.length > 0) {
+            document.querySelectorAll('.patient-meta-text').forEach(el => el.textContent = metaArr.join(' · '));
+          }
+          if (start && end) {
+            document.querySelectorAll('.side-care-period').forEach(el => el.textContent = `${start} — ${end}`);
+          } else if (start) {
+            document.querySelectorAll('.side-care-period').forEach(el => el.textContent = `${start}부터`);
+          }
+          if (days) {
+            document.querySelectorAll('.side-care-days, .total-days-num').forEach(el => el.textContent = `${days}일`);
+            const dEl = document.getElementById('day-count');
+            if (dEl) dEl.textContent = days;
+          }
+        }
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', applyFastParams);
+        } else {
+          applyFastParams();
+        }
+      } catch (e) {}
+    })();
+
+    function hideSurveyLoadingOverlay() {
+      const el = document.getElementById('surveyLoadingOverlay');
+      if (!el || el.classList.contains('fade-out')) return;
+      el.classList.add('fade-out');
+      setTimeout(function() {
+        try { el.remove(); } catch (e) {}
+      }, 320);
+    }
+    window.hideSurveyLoadingOverlay = hideSurveyLoadingOverlay;
+
+    // 만약의 네트워크 지연 대비 최대 3.5초 안전 자동 해제
+    setTimeout(hideSurveyLoadingOverlay, 3500);
+  </script>
 </head>
 <body>
+  <!-- Fullscreen Initial Loading Overlay (디폴트값 깜빡임 및 노출 원천 차단) -->
+  <div id="surveyLoadingOverlay" aria-label="리본케어 안심 리포트 로딩 중">
+    <div style="display: flex; flex-direction: column; align-items: center; text-align: center; padding: 24px 20px; max-width: 320px; width: 100%;">
+      <div style="position: relative; width: 68px; height: 68px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center;">
+        <div style="position: absolute; inset: 0; border: 3px solid #fce7f3; border-top-color: #be185d; border-radius: 22px; animation: livonSpinRing 1s linear infinite;"></div>
+        <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1789622263/ChatGPT_Image_2026%EB%85%84_9%EC%9B%94_17%EC%9D%BC_%EC%98%A4%ED%9B%84_02_17_20_kh5ydh.png" alt="리본케어" style="width: 44px; height: 44px; border-radius: 14px; object-fit: contain; animation: livonPulseRing 2s ease-in-out infinite;">
+      </div>
+      <div style="font-size: 16.5px; font-weight: 850; color: #2b1938; margin-bottom: 6px; letter-spacing: -0.02em;">리본케어 안심 케어 리포트</div>
+      <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 0; word-break: keep-all;">
+        모바일 간병일지 및 만족도 설문을<br>안전하게 불러오는 중입니다...
+      </p>
+    </div>
+  </div>
   <div class="layout">
     <!-- Desktop Left Sidebar -->
     <aside class="desktop-side">
-      <a class="logo" href="#cover">Liv<span>On</span><i></i></a>
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+        <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1789622263/ChatGPT_Image_2026%EB%85%84_9%EC%9B%94_17%EC%9D%BC_%EC%98%A4%ED%9B%84_02_17_20_kh5ydh.png" alt="리본케어 로고" style="width: 38px; height: 38px; border-radius: 10px; object-fit: contain; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.08); border: 1px solid #f0e0eb; flex-shrink: 0;">
+        <div>
+          <div style="font-size: 18px; font-weight: 900; color: #2b1938; letter-spacing: -0.02em;">리본케어</div>
+          <div style="font-size: 10px; font-weight: 700; color: #be185d;">공식 안심 리포트 &amp; 설문</div>
+        </div>
+      </div>
       <div class="side-label">LIVON CARE ARCHIVE &amp; VOICE</div>
       <h1 id="side-main-heading">돌봄의 기록,<br>마음의 소리.</h1>
       <p class="side-desc">정성껏 작성한 모바일 간병일지를 확인하시고, 더 나은 돌봄을 위해 만족도 설문에 참여해 주세요.</p>
       
       <div class="side-patient">
-        <span class="initial patient-initial">고</span>
+        <span class="initial patient-initial">&nbsp;</span>
         <div>
-          <b class="patient-name">고연분 님</b>
-          <small class="patient-meta-text">66세 · 여성</small>
+          <b class="patient-name">고객 님</b>
+          <small class="patient-meta-text">케어 정보</small>
         </div>
       </div>
       
       <dl class="side-info">
-        <div><dt>입원 병원</dt><dd class="hospital-name">지정 병원</dd></div>
-        <div><dt>간병 기간</dt><dd class="side-care-period">09.17 — 10.02</dd></div>
-        <div><dt>기록 일수</dt><dd class="side-care-days">16일</dd></div>
-        <div><dt>담당 간병인</dt><dd class="carer-name">권은지</dd></div>
+        <div><dt>입원 병원</dt><dd class="hospital-name">-</dd></div>
+        <div><dt>간병 기간</dt><dd class="side-care-period">-</dd></div>
+        <div><dt>기록 일수</dt><dd class="side-care-days">-</dd></div>
+        <div><dt>담당 간병인</dt><dd class="carer-name">담당 간병사</dd></div>
       </dl>
       
       <nav class="side-nav">
-        <a href="#cover">00 <span>표지 · 선물 및 응답자 선택</span></a>
+        <a href="#cover">00 <span>표지 · 선물 안내</span></a>
         <a href="#overview">01 <span>생활·건강 신호등</span></a>
         <a href="#trends">02 <span>상태 변화 (캘린더)</span></a>
         <a href="#timeline">03 <span>주요 변화 타임라인</span></a>
@@ -1124,41 +1390,21 @@
     <div class="mobile-app">
       <!-- Topbar -->
       <header class="topbar">
-        <a class="logo" href="#cover" aria-label="LivOn 간병 리포트">Liv<span>On</span><i></i></a>
+        <a class="brand-logo-wrap" href="#cover" aria-label="리본케어 홈">
+          <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1789622263/ChatGPT_Image_2026%EB%85%84_9%EC%9B%94_17%EC%9D%BC_%EC%98%A4%ED%9B%84_02_17_20_kh5ydh.png" alt="리본케어" class="brand-logo-img">
+          <div class="brand-logo-text-group">
+            <span class="brand-logo-name">리본케어</span>
+            <span class="brand-logo-sub">안심 케어 리포트</span>
+          </div>
+        </a>
         <div class="top-actions">
-          <button class="mobile-more-btn" id="btn-side-more" aria-label="환자 정보 및 더보기">
-            <span data-icon="menu"></span>
-            <span>더보기</span>
-          </button>
-          <button class="presentation" onclick="scrollToSection('survey-section')" style="background: linear-gradient(135deg, #fdf2f8, #fef3c7); border-color: #f9a8d4; color: #be185d; font-weight: 800; white-space: nowrap !important; flex-shrink: 0;">
-            <span>☕ 설문·선물</span>
-          </button>
-          <button class="presentation" onclick="downloadCurrentCareReportPdf()" title="LivOn AI 간병일지 전체 다운로드" style="background: #fdf4ff; border-color: #f0abfc; color: #86198f; white-space: nowrap !important; flex-shrink: 0;">
-            <span data-icon="document"></span>
-            <span>일지 다운로드</span>
-          </button>
-          <button class="presentation" id="presentation" aria-pressed="false">
-            <span data-icon="shield"></span>
-            <span id="presentation-label">이름 가리기</span>
+          <button type="button" class="btn-top-survey" onclick="scrollToSection('survey-section')" aria-label="만족도 설문 바로가기">
+            <span>☕</span>
+            <span>만족도 설문</span>
+            <span class="badge">100% 선물</span>
           </button>
         </div>
       </header>
-
-      <!-- Journey Stepper Bar -->
-      <div class="journey-stepper" role="navigation" aria-label="리포트 및 설문 단계">
-        <button type="button" class="journey-pill active" id="pill-cover" onclick="scrollToSection('cover')">
-          <span class="step-num">1</span>
-          <span>표지·안내</span>
-        </button>
-        <button type="button" class="journey-pill" id="pill-diary" onclick="scrollToSection('overview')">
-          <span class="step-num">2</span>
-          <span>모바일 간병일지</span>
-        </button>
-        <button type="button" class="journey-pill gift-pill" id="pill-survey" onclick="scrollToSection('survey-section')">
-          <span class="step-num">3</span>
-          <span>만족도 조사 ☕</span>
-        </button>
-      </div>
 
       <main>
         <!-- =======================================================
@@ -1170,7 +1416,7 @@
               <span class="cover-cert-dot"></span>
               <span>리본케어 공식 안심 리포트</span>
             </span>
-            <span class="cover-brand-mark">LivOn Care</span>
+            <span class="cover-brand-mark"><img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1792052606/LivOn_1_rptk5n.png" alt="LivOn Care" class="cover-brand-logo-img"></span>
           </div>
 
           <p class="cover-eyebrow" id="cover-eyebrow-text">LIVON CARE ARCHIVE &amp; VOICE</p>
@@ -1187,29 +1433,29 @@
           <div class="cover-patient-ticket">
             <div class="ticket-header">
               <div class="ticket-patient-profile">
-                <div class="ticket-avatar patient-initial">고</div>
+                <div class="ticket-avatar patient-initial">&nbsp;</div>
                 <div>
                   <div class="ticket-patient-name">
-                    <span class="patient-name">고연분 님</span>
+                    <span class="patient-name">고객 님</span>
                   </div>
                   <div class="ticket-patient-meta">
-                    <span class="patient-meta-text">66세 · 여성</span> · <span class="hospital-name">지정 병원</span>
+                    <span class="patient-meta-text">케어 정보</span> · <span class="hospital-name">-</span>
                   </div>
                 </div>
               </div>
               <div class="ticket-day-badge">
-                <b class="total-days-num">16일</b>
+                <b class="total-days-num">-</b>
                 <span>간병 기록</span>
               </div>
             </div>
             <div class="ticket-grid">
               <div class="ticket-item">
                 <span class="lbl">담당 간병인</span>
-                <span class="val"><span class="carer-name">권은지</span> 간병사</span>
+                <span class="val"><span class="carer-name">담당 간병사</span></span>
               </div>
               <div class="ticket-item">
                 <span class="lbl">간병 기간</span>
-                <span class="val side-care-period">09.17 — 10.02</span>
+                <span class="val side-care-period">-</span>
               </div>
             </div>
           </div>
@@ -1259,41 +1505,19 @@
             </div>
           </div>
 
-          <!-- 만족도 시작 전 환자/보호자 선택 카드 -->
-          <div class="cover-role-box">
-            <div class="cover-role-label">
-              <span>👤 열람 및 설문에 참여하시는 분을 선택해 주세요</span>
-              <small>선택 시 맞춤 안내 적용</small>
-            </div>
-            <div class="role-cards-grid">
-              <button type="button" class="role-select-card" id="coverRolePatient" onclick="selectRespondentRole('PATIENT')">
-                <span class="role-check-badge">✓</span>
-                <div class="role-icon-circle">🧑‍🦳</div>
-                <div class="role-card-txt">
-                  <b>환자 본인</b>
-                  <small>직접 간병을 받았어요</small>
-                </div>
-              </button>
-              <button type="button" class="role-select-card" id="coverRoleGuardian" onclick="selectRespondentRole('GUARDIAN')">
-                <span class="role-check-badge">✓</span>
-                <div class="role-icon-circle">👨‍👩‍👧</div>
-                <div class="role-card-txt">
-                  <b>가족 · 보호자</b>
-                  <small>환자의 보호자예요</small>
-                </div>
-              </button>
-            </div>
-            <div id="coverRoleToast" class="role-greeting-toast"></div>
-          </div>
-
-          <!-- 표지 하단 액션 버튼 -->
+          <!-- 표지 핵심 액션 버튼 (만족도 설문 바로가기를 최우선으로 강조) -->
           <div class="cover-cta-group">
-            <button type="button" class="btn-cover-primary" onclick="scrollToSection('overview')">
-              <span>📖 일자별 모바일 간병일지 쭉 살펴보기</span>
-              <span style="font-size: 16px;">↓</span>
+            <button type="button" class="btn-cover-primary-survey" onclick="scrollToSection('survey-section')">
+              <span class="btn-cta-icon">☕</span>
+              <span class="btn-cta-text">
+                <span class="btn-cta-main">만족도 설문 바로가기</span>
+                <span class="btn-cta-sub">스타벅스 커피쿠폰 100% 증정 · 1분 소요</span>
+              </span>
+              <span class="btn-cta-arrow">→</span>
             </button>
-            <button type="button" class="btn-cover-secondary" onclick="scrollToSection('survey-section')">
-              <span>☕ 간병일지 확인 후 만족도 조사 바로가기 (선물 증정)</span>
+            <button type="button" class="btn-cover-secondary-diary" onclick="scrollToSection('overview')">
+              <span>📖 일자별 모바일 간병일지 먼저 보기</span>
+              <span style="font-size: 13px;">↓</span>
             </button>
           </div>
         </section>
@@ -1304,16 +1528,16 @@
         <div class="intro" id="overview" style="padding-top: 8px;">
           <p class="eyebrow" style="color: #be185d; font-weight: 800;">PART 01 · LIVON AI 모바일 간병일지</p>
           <div class="title-row">
-            <h1><span class="patient-name">고연분 님</span>의<br>하루를 전해드려요.</h1>
+            <h1><span class="patient-name">고객 님</span>의<br>하루를 전해드려요.</h1>
             <div class="day-seal">
-              <b id="day-count">16</b>
+              <b id="day-count">-</b>
               <span>일째 간병</span>
             </div>
           </div>
           <div class="person-meta">
-            <span class="patient-meta-text">66세 · 여성</span>
-            <span>담당 간병인 <b class="carer-name">권은지</b></span>
-            <span><span class="side-care-period">09.17</span>부터</span>
+            <span class="patient-meta-text">케어 정보</span>
+            <span>담당 간병인 <b class="carer-name">담당 간병사</b></span>
+            <span><span class="side-care-period">-</span></span>
           </div>
         </div>
 
@@ -1417,9 +1641,9 @@
             <div id="family-quote-title" style="font-size: 15.5px; font-weight: 800; color: #be185d; margin-bottom: 12px; line-height: 1.45;"></div>
             <div id="family-quote-body" style="font-size: 13.5px; color: #1e293b; line-height: 2.0; word-break: keep-all;"></div>
             <div class="family-quote-sign" style="display: flex; align-items: center; gap: 6px; border-top: 1px solid #fbcfe8; padding-top: 10px; margin-top: 12px; white-space: nowrap; overflow: hidden;">
-              <span class="mini-avatar carer-initial patient-initial" style="width: 24px; height: 24px; border-radius: 6px; background: #fce7f3; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #be185d; flex-shrink: 0;">권</span>
+              <span class="mini-avatar carer-initial patient-initial" style="width: 24px; height: 24px; border-radius: 6px; background: #fce7f3; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #be185d; flex-shrink: 0;">·</span>
               <span style="font-size: 11px; font-weight: 700; color: #334155; white-space: nowrap; letter-spacing: -0.04em;">
-                담당 간병인 <b class="carer-name" style="color: #be185d;">권은지</b>
+                담당 간병인 <b class="carer-name" style="color: #be185d;">담당 간병사</b>
                 <small style="color: #94a3b8; font-size: 9.5px; margin-left: 3px; font-weight: 400; white-space: nowrap;">· 보호자 전달사항 바탕 재구성</small>
               </span>
             </div>
@@ -1453,35 +1677,38 @@
             </p>
           </div>
 
-          <!-- 설문 본문 카드 -->
+          <!-- 설문 본문 카드 (전 문항 세로 전체 노출 & 원클릭 완료) -->
           <div id="surveyFormContainer" class="survey-section-container">
-            <!-- 상단 진행 표시줄 -->
+            <!-- 상단 설문 안내 & 실시간 응답 진행 표시줄 -->
             <div class="survey-progress-header">
-              <span class="survey-step-badge" id="surveyStepBadge">STEP 1 / 4 · 기본 만족도</span>
-              <span style="font-size: 11.5px; font-weight: 700; color: #9d174d;" id="surveyStepPercent">25%</span>
+              <span class="survey-step-badge" id="surveyStepBadge">
+                <span style="font-size: 11px;">📋</span>
+                <span>만족도 설문 (총 6문항)</span>
+              </span>
+              <span style="font-size: 11.5px; font-weight: 800; color: #be185d;" id="surveyStepPercent">0 / 6 완료</span>
             </div>
             <div class="survey-progress-track">
-              <div id="surveyProgressFill" class="survey-progress-fill" style="width: 25%;"></div>
+              <div id="surveyProgressFill" class="survey-progress-fill" style="width: 0%;"></div>
             </div>
 
-            <!-- [STEP 1] 응답자 유형(환자/보호자) 선택 확인 & Q2 전반적 만족도 -->
-            <div id="sStep1" class="s-step-panel">
-              <!-- Q1. 환자 / 보호자 선택 (표지와 실시간 양방향 연동) -->
-              <div class="survey-q-card">
+            <!-- 동적 설문 문항 카드 컨테이너 (Schema 기반 완벽 동적 렌더링) -->
+            <div id="surveyQuestionsListContainer" class="space-y-3">
+              <!-- Q1. 환자 / 보호자 선택 -->
+              <div id="qCard_Q1" class="survey-q-card" data-qid="Q1">
                 <div class="survey-q-title" id="q1Title">
                   <span class="q-num">Q1.</span>설문에 참여하시는 분은 누구인가요? <span style="color:#e11d48;">*</span>
                 </div>
                 <div class="survey-q-sub">설문 시작 전 환자 본인인지 보호자인지 선택해 주세요.</div>
                 <div class="livon-role-pill-group">
-                  <button type="button" class="livon-role-pill" data-role="PATIENT" onclick="selectRespondentRole('PATIENT')">
+                  <button type="button" class="livon-role-pill" data-role="PATIENT" onclick="selectRespondentRole('PATIENT', this, 'Q1')">
                     <span style="font-size: 20px;">🧑‍🦳</span>
                     <span>환자 본인</span>
                   </button>
-                  <button type="button" class="livon-role-pill" data-role="GUARDIAN" onclick="selectRespondentRole('GUARDIAN')">
+                  <button type="button" class="livon-role-pill" data-role="GUARDIAN" onclick="selectRespondentRole('GUARDIAN', this, 'Q1')">
                     <span style="font-size: 20px;">👨‍👩‍👧</span>
                     <span>가족 · 보호자</span>
                   </button>
-                  <button type="button" class="livon-role-pill" data-role="OTHER" onclick="selectRespondentRole('OTHER')">
+                  <button type="button" class="livon-role-pill" data-role="OTHER" onclick="selectRespondentRole('OTHER', this, 'Q1')">
                     <span style="font-size: 20px;">🤝</span>
                     <span>기타 지인</span>
                   </button>
@@ -1490,163 +1717,151 @@
               </div>
 
               <!-- Q2. 전반적 만족도 -->
-              <div class="survey-q-card" style="margin-bottom: 0;">
+              <div id="qCard_Q2" class="survey-q-card" data-qid="Q2">
                 <div class="survey-q-title" id="q2Title">
                   <span class="q-num">Q2.</span>이번 간병 서비스에 전반적으로 얼마나 만족하셨나요? <span style="color:#e11d48;">*</span>
                 </div>
                 <div class="survey-q-sub">위 간병일지와 실제 경험하신 돌봄 서비스를 종합해 평가해 주세요.</div>
                 <div>
-                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 5, this)">
-                    <span>😍 매우 만족스러웠어요</span>
+                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('Q2', 5, this)">
+                    <span>매우 만족한다.</span>
                     <span class="livon-opt-score">★ 5점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 4, this)">
-                    <span>🙂 대체로 만족해요</span>
+                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('Q2', 4, this)">
+                    <span>만족한다.</span>
                     <span class="livon-opt-score">★ 4점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 3, this)">
-                    <span>😐 보통이에요</span>
+                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('Q2', 3, this)">
+                    <span>보통이다</span>
                     <span class="livon-opt-score">★ 3점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 2, this)">
-                    <span>🙁 조금 아쉬웠어요</span>
+                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('Q2', 2, this)">
+                    <span>불만이다.</span>
                     <span class="livon-opt-score">2점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('q2', 1, this)">
-                    <span>😡 많이 불만족스러웠어요</span>
+                  <button type="button" class="livon-opt-btn q2-btn" onclick="selectSurveyScore('Q2', 1, this)">
+                    <span>매우 불만이다.</span>
                     <span class="livon-opt-score">1점</span>
                   </button>
                 </div>
                 <input type="hidden" id="ansQ2" value="">
               </div>
-            </div>
 
-            <!-- [STEP 2] Q3 간병인의 친절함과 태도 -->
-            <div id="sStep2" class="s-step-panel" style="display: none;">
-              <div class="survey-q-card" style="margin-bottom: 0;">
+              <!-- Q3 간병인의 친절함과 태도 -->
+              <div id="qCard_Q3" class="survey-q-card" data-qid="Q3">
                 <div class="survey-q-title" id="q3Title">
-                  <span class="q-num">Q3.</span>담당 간병인(<span class="carer-name">권은지</span>)의 친절함과 환자를 대하는 태도는 어떠셨나요? <span style="color:#e11d48;">*</span>
+                  <span class="q-num">Q3.</span>담당 간병인(<span class="carer-name">담당 간병사</span>)의 친절함과 환자를 대하는 태도는 어떠셨나요? <span style="color:#e11d48;">*</span>
                 </div>
                 <div class="survey-q-sub">따뜻한 말씨, 환자 존중 및 정서적 배려 정도를 선택해 주세요.</div>
                 <div>
-                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 5, this)">
-                    <span>💖 가족처럼 매우 친절하고 따뜻했어요</span>
+                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('Q3', 5, this)">
+                    <span>매우 만족한다.</span>
                     <span class="livon-opt-score">★ 5점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 4, this)">
-                    <span>😊 친절하고 예의 바르셨어요</span>
+                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('Q3', 4, this)">
+                    <span>만족한다.</span>
                     <span class="livon-opt-score">★ 4점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 3, this)">
-                    <span>😐 무난하고 보통이었어요</span>
+                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('Q3', 3, this)">
+                    <span>보통이다</span>
                     <span class="livon-opt-score">★ 3점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 2, this)">
-                    <span>🙁 다소 불친절하게 느껴졌어요</span>
+                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('Q3', 2, this)">
+                    <span>불만이다.</span>
                     <span class="livon-opt-score">2점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('q3', 1, this)">
-                    <span>😡 매우 불친절했어요</span>
+                  <button type="button" class="livon-opt-btn q3-btn" onclick="selectSurveyScore('Q3', 1, this)">
+                    <span>매우 불만이다.</span>
                     <span class="livon-opt-score">1점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q3-btn" style="border-style: dashed; color: #7c687b; justify-content: center; font-size: 12px;" onclick="selectSurveyUnknown('q3', this)">
+                  <button type="button" class="livon-opt-btn q3-btn" style="border-style: dashed; color: #7c687b; justify-content: center; font-size: 12px;" onclick="selectSurveyUnknown('Q3', this)">
                     <span>❓ 잘 모르겠음 (직접 대면하지 못했거나 판단이 어려움)</span>
                   </button>
                 </div>
                 <input type="hidden" id="ansQ3" value="">
                 <input type="hidden" id="ansQ3Unknown" value="false">
               </div>
-            </div>
 
-            <!-- [STEP 3] Q4 돌봄 전문성 및 간병 품질 -->
-            <div id="sStep3" class="s-step-panel" style="display: none;">
-              <div class="survey-q-card" style="margin-bottom: 0;">
+              <!-- Q4 돌봄 전문성 및 간병 품질 -->
+              <div id="qCard_Q4" class="survey-q-card" data-qid="Q4">
                 <div class="survey-q-title" id="q4Title">
                   <span class="q-num">Q4.</span>식사 보조, 위생 관리, 거동 부축 등 실제 제공된 돌봄 품질은 어떠셨나요? <span style="color:#e11d48;">*</span>
                 </div>
                 <div class="survey-q-sub">간병일지에 기록된 일상 케어 및 환자 안전 관리의 꼼꼼함을 평가해 주세요.</div>
                 <div>
-                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 5, this)">
-                    <span>✨ 매우 꼼꼼하고 능숙하게 잘 돌봐주셨어요</span>
+                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('Q4', 5, this)">
+                    <span>매우 만족한다.</span>
                     <span class="livon-opt-score">★ 5점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 4, this)">
-                    <span>👍 전반적으로 원활하고 양호했어요</span>
+                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('Q4', 4, this)">
+                    <span>만족한다.</span>
                     <span class="livon-opt-score">★ 4점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 3, this)">
-                    <span>😐 보통 수준이었어요</span>
+                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('Q4', 3, this)">
+                    <span>보통이다</span>
                     <span class="livon-opt-score">★ 3점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 2, this)">
-                    <span>🙁 다소 미흡한 부분이 있었어요</span>
+                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('Q4', 2, this)">
+                    <span>불만이다.</span>
                     <span class="livon-opt-score">2점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('q4', 1, this)">
-                    <span>😡 돌봄 품질이 매우 미흡했어요</span>
+                  <button type="button" class="livon-opt-btn q4-btn" onclick="selectSurveyScore('Q4', 1, this)">
+                    <span>매우 불만이다.</span>
                     <span class="livon-opt-score">1점</span>
                   </button>
-                  <button type="button" class="livon-opt-btn q4-btn" style="border-style: dashed; color: #7c687b; justify-content: center; font-size: 12px;" onclick="selectSurveyUnknown('q4', this)">
+                  <button type="button" class="livon-opt-btn q4-btn" style="border-style: dashed; color: #7c687b; justify-content: center; font-size: 12px;" onclick="selectSurveyUnknown('Q4', this)">
                     <span>❓ 잘 모르겠음 (직접 보지 못했거나 판단이 어려움)</span>
                   </button>
                 </div>
                 <input type="hidden" id="ansQ4" value="">
                 <input type="hidden" id="ansQ4Unknown" value="false">
               </div>
-            </div>
 
-            <!-- [STEP 4] Q5 자유의견 & Q6 연락 요청 & 커피쿠폰 수신 번호 -->
-            <div id="sStep4" class="s-step-panel" style="display: none;">
-              <div class="survey-q-card">
+              <!-- Q5 자유의견 -->
+              <div id="qCard_Q5" class="survey-q-card" data-qid="Q5">
                 <div class="survey-q-title" id="q5Title">
                   <span class="q-num">Q5.</span>간병인께 전하고 싶은 감사 인사나 리본케어에 바라는 점을 남겨주세요. <span style="font-size:11.5px; color:#94a3b8; font-weight:500;">(선택)</span>
                 </div>
-                <textarea id="ansQ5" rows="3" maxlength="1000" placeholder="따뜻한 격려의 한마디나 개선이 필요한 점을 편하게 적어주세요. (주민번호 등 민감정보 제외)" style="width: 100%; padding: 12px; border-radius: 14px; border: 1.5px solid #e9d8e4; font-size: 13px; color: #2b1938; outline: none; resize: vertical; font-family: inherit;"></textarea>
+                <textarea id="ansQ5" rows="3" maxlength="1000" placeholder="따뜻한 격려의 한마디나 개선이 필요한 점을 편하게 적어주세요. (주민번호 등 민감정보 제외)" oninput="handleSurveyTextInput('Q5', this)" style="width: 100%; box-sizing: border-box; padding: 12px; border-radius: 14px; border: 1.5px solid #e9d8e4; font-size: 16px; color: #2b1938; outline: none; resize: vertical; font-family: inherit;"></textarea>
                 <div style="text-align: right; font-size: 11px; color: #94a3b8; margin-top: 3px;">
-                  <span id="charCount">0</span> / 1000자
+                  <span id="charCount_Q5">0</span> / 1000자
                 </div>
               </div>
 
-              <div class="survey-q-card">
+              <!-- Q6 연락 요청 -->
+              <div id="qCard_Q6" class="survey-q-card" data-qid="Q6">
                 <div class="survey-q-title" id="q6Title">
                   <span class="q-num">Q6.</span>남겨주신 의견과 관련하여 리본케어 전담 매니저의 유선 연락을 원하시나요? <span style="color:#e11d48;">*</span>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
-                  <button type="button" class="livon-opt-btn callback-btn" style="justify-content: center; margin-bottom: 0;" onclick="selectSurveyCallback(true, this)">
+                  <button type="button" class="livon-opt-btn callback-btn q6-callback-btn" style="justify-content: center; margin-bottom: 0;" onclick="selectSurveyCallback('Q6', true, this)">
                     <span>📞 예, 상담 연락 희망</span>
                   </button>
-                  <button type="button" class="livon-opt-btn callback-btn" style="justify-content: center; margin-bottom: 0;" onclick="selectSurveyCallback(false, this)">
+                  <button type="button" class="livon-opt-btn callback-btn q6-callback-btn" style="justify-content: center; margin-bottom: 0;" onclick="selectSurveyCallback('Q6', false, this)">
                     <span>👌 아니요, 괜찮습니다</span>
                   </button>
                 </div>
                 <input type="hidden" id="ansQ6" value="">
               </div>
-
-              <!-- 선물(커피쿠폰) 수신 휴대폰 번호 확인 박스 -->
-              <div class="survey-q-card" style="background: linear-gradient(135deg, #fffdf9 0%, #fef3c7 100%); border-color: #fcd34d; margin-bottom: 0; padding: 12px 12px !important;">
-                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-                  <span style="font-size: 16px;">☕</span>
-                  <div style="font-size: 12px; font-weight: 800; color: #78350f; white-space: nowrap !important; letter-spacing: -0.04em;">
-                    감사 선물(모바일 커피쿠폰) 수신 연락처 확인 <span style="color:#e11d48;">*</span>
-                  </div>
-                </div>
-                <p style="font-size: 10.5px; color: #92400e; margin-bottom: 6px; line-height: 1.35; letter-spacing: -0.02em;">
-                  설문 완료 시 아래 번호로 모바일 커피쿠폰을 발송해 드립니다.
-                </p>
-                <input type="tel" inputmode="numeric" pattern="[0-9\-]*" maxlength="13" autocomplete="tel" id="giftPhoneInput" oninput="this.value = formatSurveyPhoneInput(this.value)" placeholder="010-0000-0000 (쿠폰 수신처)" style="width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 11px; border: 1.5px solid #f59e0b; background: #ffffff; font-size: 13.5px; font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; letter-spacing: 0.02em; color: #2b1938; outline: none;">
-              </div>
             </div>
 
-            <!-- 설문 이전 / 다음 / 제출 버튼 -->
-            <div class="survey-nav-row">
-              <button type="button" id="surveyPrevBtn" class="btn-survey-prev" style="display: none;" onclick="prevSurveyStep()">
-                이전 단계
-              </button>
-              <button type="button" id="surveyNextBtn" class="btn-survey-next" onclick="nextSurveyStep()">
-                <span>다음 문항으로</span>
-                <span>→</span>
-              </button>
-              <button type="button" id="surveySubmitBtn" class="btn-survey-next" style="display: none; background: linear-gradient(135deg, #be185d 0%, #9d174d 50%, #b45309 100%);" onclick="submitIntegratedSurvey()">
+            <!-- 선물(커피쿠폰) 수신 휴대폰 번호 확인 박스 -->
+            <div id="giftPhoneCard" class="survey-q-card" style="background: linear-gradient(135deg, #fffdf9 0%, #fef3c7 100%); border-color: #fcd34d; padding: 14px 12px !important; position: relative; z-index: 10;">
+              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                <span style="font-size: 18px;">☕</span>
+                <div style="font-size: 13px; font-weight: 850; color: #78350f; white-space: nowrap !important; letter-spacing: -0.04em;">
+                  감사 선물(모바일 커피쿠폰) 수신 연락처 확인 <span style="color:#e11d48;">*</span>
+                </div>
+              </div>
+              <p style="font-size: 11px; color: #92400e; margin-bottom: 8px; line-height: 1.4; letter-spacing: -0.02em;">
+                설문 완료 시 아래 번호로 모바일 커피쿠폰을 발송해 드립니다.
+              </p>
+              <input type="tel" inputmode="numeric" pattern="[0-9-]*" maxlength="13" autocomplete="tel" id="giftPhoneInput" oninput="this.value = formatSurveyPhoneInput(this.value); if (typeof updateSurveyProgress === 'function') updateSurveyProgress();" placeholder="010-0000-0000 (쿠폰 수신처)" style="width: 100%; box-sizing: border-box; padding: 12px; border-radius: 12px; border: 1.5px solid #f59e0b; background: #ffffff; font-size: 16px; font-weight: 800; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; letter-spacing: 0.02em; color: #2b1938; outline: none;">
+            </div>
+
+            <!-- 설문 원클릭 완료 및 제출 버튼 (한번에 끝내기) -->
+            <div class="survey-nav-row" style="margin-top: 14px;">
+              <button type="button" id="surveySubmitBtn" class="btn-survey-submit-single" onclick="submitIntegratedSurvey()">
                 <span>🎁 설문 완료하고 커피쿠폰 받기</span>
               </button>
             </div>
@@ -1691,20 +1906,24 @@
         </div>
 
         <footer>
-          <span class="logo">Liv<span>On</span><i></i></span>
+          <img src="https://res.cloudinary.com/lyjyvy54/image/upload/v1792052606/LivOn_1_rptk5n.png" alt="LivOn" class="footer-brand-logo-img">
           <p>리본케어 · 모바일 간병 리포트 &amp; 고객경험 설문</p>
         </footer>
       </main>
 
-      <!-- Bottom Navigation Bar (6 items: 표지 + 4 일지 섹션 + 만족도설문) -->
-      <nav class="bottom-nav" aria-label="리포트 및 설문 메뉴">
-        <a href="#cover" class="active"><span data-icon="spark"></span>표지·안내</a>
-        <a href="#overview"><span data-icon="heart"></span>01 신호등</a>
-        <a href="#trends"><span data-icon="chart"></span>02 상태변화</a>
-        <a href="#timeline"><span data-icon="walk"></span>03 타임라인</a>
-        <a href="#careactions"><span data-icon="check"></span>04 수행·전달</a>
-        <a href="#survey-section" class="survey-tab-link"><span data-icon="message"></span>☕ 설문·선물</a>
-      </nav>
+      <!-- Floating Survey CTA Bar (스크롤 중 언제든 원클릭 설문 참여) -->
+      <aside id="floatingSurveyBar" class="floating-survey-bar hidden" aria-label="만족도 설문 바로가기 바">
+        <div class="floating-survey-inner">
+          <div class="floating-survey-txt">
+            <span class="floating-gift-badge">☕ 스타벅스 커피쿠폰 100% 증정</span>
+            <span class="floating-title"><b>케어 만족도 설문</b>에 참여해 주세요</span>
+          </div>
+          <button type="button" class="btn-floating-go" onclick="scrollToSection('survey-section')">
+            <span>설문 작성하기</span>
+            <span>→</span>
+          </button>
+        </div>
+      </aside>
     </div>
   </div>
 
@@ -1732,14 +1951,18 @@
       window.addEventListener('scroll', () => {
         if (!isTicking) {
           window.requestAnimationFrame(() => {
-            const currentY = window.pageYOffset || document.documentElement.scrollTop;
-            const scrollDelta = currentY - lastScrollY;
-            if (currentY > 60 && scrollDelta > 8) {
-              document.body.classList.add('header-hidden');
-            } else if (scrollDelta < -8 || currentY <= 30) {
-              document.body.classList.remove('header-hidden');
+            const activeEl = document.activeElement;
+            const isEditing = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
+            if (!isEditing) {
+              const currentY = window.pageYOffset || document.documentElement.scrollTop;
+              const scrollDelta = currentY - lastScrollY;
+              if (currentY > 60 && scrollDelta > 8) {
+                document.body.classList.add('header-hidden');
+              } else if (scrollDelta < -8 || currentY <= 30) {
+                document.body.classList.remove('header-hidden');
+              }
+              lastScrollY = Math.max(0, currentY);
             }
-            lastScrollY = Math.max(0, currentY);
             isTicking = false;
           });
           isTicking = true;
@@ -1792,8 +2015,7 @@
       if (!formEl) return;
 
       const topbar = document.querySelector('.topbar');
-      const stepper = document.querySelector('.journey-stepper');
-      const stickyOffset = (topbar ? topbar.offsetHeight : 58) + (stepper ? stepper.offsetHeight : 46) + 6;
+      const stickyOffset = (topbar ? topbar.offsetHeight : 56) + 12;
 
       formEl.style.scrollMarginTop = stickyOffset + 'px';
 
@@ -1807,8 +2029,6 @@
           behavior: smooth ? 'smooth' : 'auto'
         });
       }
-
-      updateJourneyStepper('survey-section');
     }
     window.scrollToSurveyForm = scrollToSurveyForm;
 
@@ -1821,9 +2041,278 @@
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-      updateJourneyStepper(id);
     }
     window.scrollToSection = scrollToSection;
+
+    let gCurrentSurveySchema = null;
+
+    // 설문 문항 카드 동적 생성 렌더러 (관리자 화면에서 추가/수정된 Schema 100% 동적 렌더링)
+    function renderDynamicDiarySurvey(schema) {
+      if (!Array.isArray(schema) || schema.length === 0) return;
+      gCurrentSurveySchema = schema;
+
+      const container = document.getElementById('surveyQuestionsListContainer');
+      if (!container) return;
+
+      const cName = (typeof gPatientInfo !== 'undefined' && gPatientInfo && gPatientInfo.carerName) ? gPatientInfo.carerName : '담당 간병사';
+
+      // 기존 입력값 임시 보관
+      const prevAnswers = {};
+      const prevUnknowns = {};
+      schema.forEach((q, idx) => {
+        const qKey = (q.id || ('Q' + (idx + 1))).toUpperCase();
+        const input = document.getElementById('ans' + qKey);
+        if (input && input.value) prevAnswers[qKey] = input.value;
+        const unkInput = document.getElementById('ans' + qKey + 'Unknown');
+        if (unkInput && unkInput.value === 'true') prevUnknowns[qKey] = true;
+      });
+
+      const cardsHtml = schema.map((q, idx) => {
+        const qKey = (q.id || ('Q' + (idx + 1))).toUpperCase();
+        const qLower = qKey.toLowerCase();
+        let displayTitle = q.title || `문항 ${idx + 1}`;
+        displayTitle = displayTitle.replace(/\{carer\}|\(간병인\)/g, '(<span class="carer-name">' + cName + '</span>)');
+
+        const isRequired = q.required !== false;
+        const reqBadge = isRequired
+          ? ' <span style="color:#e11d48;">*</span>'
+          : ' <span style="font-size:11.5px; color:#94a3b8; font-weight:500;">(선택)</span>';
+
+        const subtitle = q.subtitle || (
+          q.type === 'single_choice' ? '설문 시작 전 환자 본인인지 보호자인지 선택해 주세요.' :
+          q.type === 'rating_5' ? '위 간병일지와 실제 경험하신 돌봄 서비스를 종합해 평가해 주세요.' :
+          q.type === 'rating_5_with_unknown' ? '따뜻한 말씨, 정서적 배려 및 실제 제공된 돌봄 품질을 평가해 주세요.' :
+          q.type === 'text' ? '자유롭게 의견을 편하게 남겨주세요.' :
+          q.type === 'boolean_callback' ? '남겨주신 의견과 관련하여 매니저의 유선 안내 여부를 선택해 주세요.' : ''
+        );
+
+        let bodyHtml = '';
+
+        if (q.type === 'single_choice') {
+          const opts = Array.isArray(q.options) && q.options.length > 0 ? q.options : [
+            { value: 'PATIENT', label: '환자 본인' },
+            { value: 'GUARDIAN', label: '가족 · 보호자' },
+            { value: 'OTHER', label: '기타 지인' }
+          ];
+
+          const isRoleGroup = opts.some(o => o.value === 'PATIENT' || o.value === 'GUARDIAN');
+          if (isRoleGroup) {
+            bodyHtml = `
+              <div class="livon-role-pill-group">
+                ${opts.map(opt => {
+                  const icon = opt.value === 'PATIENT' ? '🧑‍🦳' : (opt.value === 'GUARDIAN' ? '👨‍👩‍👧' : '🤝');
+                  return `
+                    <button type="button" class="livon-role-pill" data-role="${opt.value}" onclick="selectRespondentRole('${opt.value}', this, '${qKey}')">
+                      <span style="font-size: 20px;">${icon}</span>
+                      <span>${opt.label}</span>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+              <input type="hidden" id="ans${qKey}" value="${prevAnswers[qKey] || ''}">
+            `;
+          } else {
+            bodyHtml = `
+              <div class="space-y-1.5" style="display:flex; flex-direction:column; gap:6px;">
+                ${opts.map(opt => `
+                  <button type="button" class="livon-opt-btn ${qLower}-btn" onclick="selectSurveySingleChoice('${qKey}', '${opt.value}', this)">
+                    <span>${opt.label}</span>
+                  </button>
+                `).join('')}
+              </div>
+              <input type="hidden" id="ans${qKey}" value="${prevAnswers[qKey] || ''}">
+            `;
+          }
+        } else if (q.type === 'rating_5' || q.type === 'rating_5_with_unknown') {
+          const showUnknown = q.type === 'rating_5_with_unknown' || q.allowUnknown;
+          bodyHtml = `
+            <div>
+              <button type="button" class="livon-opt-btn ${qLower}-btn" onclick="selectSurveyScore('${qKey}', 5, this)">
+                <span>매우 만족한다.</span>
+                <span class="livon-opt-score">★ 5점</span>
+              </button>
+              <button type="button" class="livon-opt-btn ${qLower}-btn" onclick="selectSurveyScore('${qKey}', 4, this)">
+                <span>만족한다.</span>
+                <span class="livon-opt-score">★ 4점</span>
+              </button>
+              <button type="button" class="livon-opt-btn ${qLower}-btn" onclick="selectSurveyScore('${qKey}', 3, this)">
+                <span>보통이다</span>
+                <span class="livon-opt-score">★ 3점</span>
+              </button>
+              <button type="button" class="livon-opt-btn ${qLower}-btn" onclick="selectSurveyScore('${qKey}', 2, this)">
+                <span>불만이다.</span>
+                <span class="livon-opt-score">2점</span>
+              </button>
+              <button type="button" class="livon-opt-btn ${qLower}-btn" onclick="selectSurveyScore('${qKey}', 1, this)">
+                <span>매우 불만이다.</span>
+                <span class="livon-opt-score">1점</span>
+              </button>
+              ${showUnknown ? `
+                <button type="button" class="livon-opt-btn ${qLower}-btn" style="border-style: dashed; color: #7c687b; justify-content: center; font-size: 12px;" onclick="selectSurveyUnknown('${qKey}', this)">
+                  <span>❓ 잘 모르겠음 (직접 보지 못했거나 판단이 어려움)</span>
+                </button>
+              ` : ''}
+            </div>
+            <input type="hidden" id="ans${qKey}" value="${prevAnswers[qKey] || ''}">
+            ${showUnknown ? `<input type="hidden" id="ans${qKey}Unknown" value="${prevUnknowns[qKey] ? 'true' : 'false'}">` : ''}
+          `;
+        } else if (q.type === 'text') {
+          const maxLen = q.maxLength || 1000;
+          const ph = q.placeholder || '따뜻한 격려의 한마디나 개선이 필요한 점을 편하게 적어주세요. (주민번호 등 민감정보 제외)';
+          bodyHtml = `
+            <textarea id="ans${qKey}" rows="3" maxlength="${maxLen}" placeholder="${ph}" oninput="handleSurveyTextInput('${qKey}', this)" style="width: 100%; box-sizing: border-box; padding: 12px; border-radius: 14px; border: 1.5px solid #e9d8e4; font-size: 16px; color: #2b1938; outline: none; resize: vertical; font-family: inherit;">${prevAnswers[qKey] || ''}</textarea>
+            <div style="text-align: right; font-size: 11px; color: #94a3b8; margin-top: 3px;">
+              <span id="charCount_${qKey}">${(prevAnswers[qKey] || '').length}</span> / ${maxLen}자
+            </div>
+          `;
+        } else if (q.type === 'boolean_callback') {
+          bodyHtml = `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
+              <button type="button" class="livon-opt-btn callback-btn ${qLower}-callback-btn" style="justify-content: center; margin-bottom: 0;" onclick="selectSurveyCallback('${qKey}', true, this)">
+                <span>📞 예, 상담 연락 희망</span>
+              </button>
+              <button type="button" class="livon-opt-btn callback-btn ${qLower}-callback-btn" style="justify-content: center; margin-bottom: 0;" onclick="selectSurveyCallback('${qKey}', false, this)">
+                <span>👌 아니요, 괜찮습니다</span>
+              </button>
+            </div>
+            <input type="hidden" id="ans${qKey}" value="${prevAnswers[qKey] || ''}">
+          `;
+        }
+
+        return `
+          <div id="qCard_${qKey}" class="survey-q-card" data-qid="${qKey}">
+            <div class="survey-q-title" id="${qLower}Title">
+              <span class="q-num">${qKey}.</span>${displayTitle}${reqBadge}
+            </div>
+            ${subtitle ? `<div class="survey-q-sub">${subtitle}</div>` : ''}
+            ${bodyHtml}
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = cardsHtml;
+
+      // 상단 배지 문구 업데이트
+      const badgeTextEl = document.querySelector('#surveyStepBadge span:last-child');
+      if (badgeTextEl) {
+        badgeTextEl.textContent = `만족도 설문 (총 ${schema.length}문항)`;
+      }
+
+      // 이전 선택값 UI 복원 (active 클래스 부여)
+      schema.forEach((q, idx) => {
+        const qKey = (q.id || ('Q' + (idx + 1))).toUpperCase();
+        const val = prevAnswers[qKey];
+        const unk = prevUnknowns[qKey];
+        if (unk) {
+          const card = document.getElementById('qCard_' + qKey);
+          const unkBtn = card ? card.querySelector('button[onclick*="selectSurveyUnknown"]') : null;
+          if (unkBtn) unkBtn.classList.add('active');
+        } else if (val) {
+          const card = document.getElementById('qCard_' + qKey);
+          if (!card) return;
+          if (q.type === 'single_choice') {
+            const btn = card.querySelector(`[data-role="${val}"]`) || Array.from(card.querySelectorAll('button')).find(b => b.textContent.includes(val));
+            if (btn) btn.classList.add('active');
+          } else if (q.type === 'rating_5' || q.type === 'rating_5_with_unknown') {
+            const btn = card.querySelector(`button[onclick*="'${val}',"], button[onclick*=",${val},"], button[onclick*=", ${val},"]`);
+            if (btn) btn.classList.add('active');
+          } else if (q.type === 'boolean_callback') {
+            const btn = card.querySelector(`button[onclick*="${val === 'true'},"]`);
+            if (btn) btn.classList.add('active');
+          }
+        }
+      });
+
+      updateSurveyProgress();
+    }
+
+    // 설문 문항(Schema) 동적 반영 함수
+    function applySchemaToDiarySurvey(schema) {
+      if (!Array.isArray(schema) || schema.length === 0) return;
+      renderDynamicDiarySurvey(schema);
+    }
+    window.applySchemaToDiarySurvey = applySchemaToDiarySurvey;
+    window.renderDynamicDiarySurvey = renderDynamicDiarySurvey;
+
+    // 페이지 진입 즉시 로컬 캐시 및 서버 최신 문항 복원 실행
+    (async function initDiarySurveySchema() {
+      // 1. 로컬 캐시 즉시 복원
+      try {
+        const cached = localStorage.getItem('LIVON_SURVEY_SCHEMA');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            applySchemaToDiarySurvey(parsed);
+          }
+        }
+      } catch (e) {}
+
+      // 2. 부모 창(관리자 화면 iframe)에 준비 완료 알림 전송하여 최신 스키마 요청
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'LIVON_SURVEY_READY' }, '*');
+        }
+        if (window.opener) {
+          window.opener.postMessage({ type: 'LIVON_SURVEY_READY' }, '*');
+        }
+      } catch (e) {}
+
+      // 3. 서버 API 최신 스키마 복원
+      try {
+        const res = await fetch('/api/survey/schema');
+        const data = await res.json();
+        if (data && Array.isArray(data.schema) && data.schema.length > 0) {
+          applySchemaToDiarySurvey(data.schema);
+        }
+      } catch (e) {}
+
+      // 4. 부모 창(관리자 화면)에서의 실시간 문항 변경 동기화 수신
+      window.addEventListener('message', (event) => {
+        const data = event.data || {};
+        if (data.type === 'LIVON_SURVEY_SCHEMA_UPDATE' && Array.isArray(data.schema)) {
+          applySchemaToDiarySurvey(data.schema);
+        }
+      });
+    })();
+
+    // 플로팅 설문 바로가기 바 제어 (표지 및 설문 작성 영역에서는 완벽 숨김 및 클릭 차단)
+    (function initFloatingSurveyBar() {
+      const bar = document.getElementById('floatingSurveyBar');
+      const surveySec = document.getElementById('survey-section');
+      const coverSec = document.getElementById('cover');
+      if (!bar) return;
+
+      function updateFloatingBar() {
+        const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+        const surveyRect = surveySec ? surveySec.getBoundingClientRect() : null;
+        const coverRect = coverSec ? coverSec.getBoundingClientRect() : null;
+
+        const activeTag = (document.activeElement && document.activeElement.tagName) || '';
+        const isEditing = activeTag === 'INPUT' || activeTag === 'TEXTAREA';
+
+        const inCover = coverRect && coverRect.bottom > 100;
+        // 설문 영역 상단이 화면 뷰포트 하단 근처에 도달하면 설문 진입으로 간주하여 즉시 완전 은닉
+        const inSurvey = surveyRect && surveyRect.top <= (window.innerHeight - 30);
+
+        if (inCover || inSurvey || scrollY < 120 || isEditing) {
+          bar.classList.add('hidden');
+          bar.style.display = 'none';
+          bar.style.visibility = 'hidden';
+          bar.style.pointerEvents = 'none';
+        } else {
+          bar.style.display = 'block';
+          bar.style.visibility = 'visible';
+          bar.style.pointerEvents = '';
+          bar.classList.remove('hidden');
+        }
+      }
+
+      window.addEventListener('scroll', updateFloatingBar, { passive: true });
+      window.addEventListener('resize', updateFloatingBar, { passive: true });
+      document.addEventListener('focusin', updateFloatingBar, { passive: true });
+      document.addEventListener('focusout', () => setTimeout(updateFloatingBar, 150), { passive: true });
+      setTimeout(updateFloatingBar, 400);
+    })();
 
     function updateJourneyStepper(activeSectionId) {
       const pCover = document.getElementById('pill-cover');
@@ -1844,98 +2333,220 @@
       }
     }
 
-    // 환자 본인 / 가족·보호자 선택 핸들러 (표지 & 설문 Q1 양방향 동기화)
-    function selectRespondentRole(role) {
-      const ansQ1 = document.getElementById('ansQ1');
-      if (ansQ1) ansQ1.value = role;
+    // 실시간 응답 진행률 계산 및 상단 인디케이터 업데이트 (동적 문항 및 100% 반영)
+    function updateSurveyProgress() {
+      const schema = (Array.isArray(gCurrentSurveySchema) && gCurrentSurveySchema.length > 0)
+        ? gCurrentSurveySchema
+        : [
+            { id: 'Q1', required: true },
+            { id: 'Q2', required: true },
+            { id: 'Q3', required: true },
+            { id: 'Q4', required: true },
+            { id: 'Q6', required: true }
+          ];
 
-      // 1. 표지 카드 하이라이트
-      const cPatient = document.getElementById('coverRolePatient');
-      const cGuardian = document.getElementById('coverRoleGuardian');
-      if (cPatient) cPatient.classList.toggle('selected', role === 'PATIENT');
-      if (cGuardian) cGuardian.classList.toggle('selected', role === 'GUARDIAN');
+      const requiredQuestions = schema.filter(q => q.required !== false);
+      let filledReqCount = 0;
 
-      const toast = document.getElementById('coverRoleToast');
-      const pName = (typeof gPatientInfo !== 'undefined' && gPatientInfo.name) ? gPatientInfo.name : '고객';
-      if (toast) {
-        toast.classList.add('show');
-        if (role === 'PATIENT') {
-          toast.innerHTML = `✨ <b>${pName} 환자분</b> 반갑습니다! 쾌유를 진심으로 기원합니다. 아래 간병일지를 확인하신 후 설문에 응답해 주시면 커피쿠폰을 보내드립니다.`;
-        } else if (role === 'GUARDIAN') {
-          toast.innerHTML = `💝 <b>${pName} 님의 보호자분</b> 반갑습니다! 일자별 간병일지를 꼼꼼히 살펴보신 후 하단 만족도 설문에 참여해 주시면 커피쿠폰을 보내드립니다.`;
-        } else {
-          toast.innerHTML = `🤝 반갑습니다! 간병일지를 확인하신 후 하단 만족도 설문에 참여해 주세요.`;
+      requiredQuestions.forEach((q, idx) => {
+        const qKey = (q.id || ('Q' + (idx + 1))).toUpperCase();
+        const input = document.getElementById('ans' + qKey);
+        const unkInput = document.getElementById('ans' + qKey + 'Unknown');
+        const isUnk = unkInput && unkInput.value === 'true';
+        const hasVal = Boolean(input && String(input.value).trim().length > 0);
+        if (hasVal || isUnk) {
+          filledReqCount++;
+        }
+      });
+
+      const giftInput = document.getElementById('giftPhoneInput');
+      const phoneDigits = giftInput ? giftInput.value.replace(/[^0-9]/g, '') : '';
+      const phoneFilled = phoneDigits.length >= 9;
+
+      const totalRequired = requiredQuestions.length + 1; // 필수 문항수 + 커피쿠폰 연락처
+      const filledCount = filledReqCount + (phoneFilled ? 1 : 0);
+      const pct = totalRequired > 0 ? Math.round((filledCount / totalRequired) * 100) : 100;
+
+      const pctEl = document.getElementById('surveyStepPercent');
+      const fillEl = document.getElementById('surveyProgressFill');
+      if (pctEl) {
+        pctEl.textContent = (filledCount === totalRequired)
+          ? '전체 작성 완료 (100%)'
+          : `${filledCount} / ${totalRequired} 완료 (${pct}%)`;
+      }
+      if (fillEl) {
+        fillEl.style.width = `${pct}%`;
+      }
+    }
+    window.updateSurveyProgress = updateSurveyProgress;
+
+    // 미작성 항목으로 부드럽게 스크롤 및 강조 애니메이션
+    function highlightMissingCard(cardId) {
+      const card = document.getElementById(cardId) || document.getElementById('qCard_' + cardId) || document.getElementById('qCard' + cardId);
+      if (!card) return;
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.classList.add('highlight-missing');
+      setTimeout(() => {
+        card.classList.remove('highlight-missing');
+      }, 1600);
+    }
+    window.highlightMissingCard = highlightMissingCard;
+
+    // 전체 설문 필수 항목 일괄 유효성 검사 (위에서 아래 순서)
+    function validateAllSurveyFields() {
+      const schema = (Array.isArray(gCurrentSurveySchema) && gCurrentSurveySchema.length > 0)
+        ? gCurrentSurveySchema
+        : [
+            { id: 'Q1', title: '설문에 참여하시는 분', required: true },
+            { id: 'Q2', title: '전반적인 간병 서비스 만족도', required: true },
+            { id: 'Q3', title: '담당 간병인의 친절함과 태도', required: true },
+            { id: 'Q4', title: '실제 제공된 돌봄 품질', required: true },
+            { id: 'Q6', title: '유선 상담 연락 희망 여부', required: true }
+          ];
+
+      for (let i = 0; i < schema.length; i++) {
+        const q = schema[i];
+        if (q.required === false) continue;
+        const qKey = (q.id || ('Q' + (i + 1))).toUpperCase();
+        const input = document.getElementById('ans' + qKey);
+        const unkInput = document.getElementById('ans' + qKey + 'Unknown');
+        const isUnk = unkInput && unkInput.value === 'true';
+        const hasVal = Boolean(input && String(input.value).trim().length > 0);
+
+        if (!hasVal && !isUnk) {
+          const cleanTitle = (q.title || `문항 ${qKey}`).replace(/<[^>]+>/g, '').trim();
+          alert(`${qKey}. ${cleanTitle} 항목을 선택 또는 입력해 주세요.`);
+          highlightMissingCard('qCard_' + qKey);
+          highlightMissingCard('qCard' + qKey.replace('Q', '')); // fallback
+          return false;
         }
       }
 
-      // 2. 설문 섹션 Q1 버튼 하이라이트
-      document.querySelectorAll('.livon-role-pill').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-role') === role);
+      // 선물 커피쿠폰 수신 연락처 검사
+      const giftInput = document.getElementById('giftPhoneInput');
+      const cleanDigits = (giftInput ? giftInput.value : '').replace(/[^0-9]/g, '');
+      if (cleanDigits.length < 9) {
+        alert('감사 선물(모바일 커피쿠폰)을 받으실 휴대폰 번호를 정확히 입력해 주세요.');
+        highlightMissingCard('giftPhoneCard');
+        if (giftInput) giftInput.focus();
+        return false;
+      }
+      if (giftInput) {
+        giftInput.value = formatSurveyPhoneInput(giftInput.value);
+      }
+      return true;
+    }
+    window.validateAllSurveyFields = validateAllSurveyFields;
+
+    // 환자 본인 / 가족·보호자 선택 핸들러
+    function selectRespondentRole(role, btnEl, qKey = 'Q1') {
+      const qKeyUpper = String(qKey || 'Q1').toUpperCase();
+      const input = document.getElementById('ans' + qKeyUpper) || document.getElementById('ansQ1');
+      if (input) input.value = role;
+
+      const card = document.getElementById('qCard_' + qKeyUpper) || (btnEl ? btnEl.closest('.survey-q-card') : null);
+      const scope = card || document;
+      scope.querySelectorAll('.livon-role-pill').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-role') === role);
       });
+      updateSurveyProgress();
     }
     window.selectRespondentRole = selectRespondentRole;
 
+    // 단일 선택형(single_choice) 선택 핸들러
+    function selectSurveySingleChoice(qKey, val, btnEl) {
+      const qKeyUpper = String(qKey || 'Q1').toUpperCase();
+      const input = document.getElementById('ans' + qKeyUpper);
+      if (input) input.value = val;
+      const card = document.getElementById('qCard_' + qKeyUpper) || (btnEl ? btnEl.closest('.survey-q-card') : null);
+      if (card) {
+        card.querySelectorAll('.livon-opt-btn, .livon-role-pill').forEach(b => b.classList.remove('active'));
+      }
+      if (btnEl) btnEl.classList.add('active');
+      updateSurveyProgress();
+    }
+    window.selectSurveySingleChoice = selectSurveySingleChoice;
+
     function selectSurveyScore(qKey, score, btnEl) {
-      const input = document.getElementById('ans' + qKey.toUpperCase());
+      const qKeyUpper = String(qKey || '').toUpperCase();
+      const input = document.getElementById('ans' + qKeyUpper);
       if (input) input.value = String(score);
-      const unk = document.getElementById('ans' + qKey.toUpperCase() + 'Unknown');
+      const unk = document.getElementById('ans' + qKeyUpper + 'Unknown');
       if (unk) unk.value = 'false';
 
-      document.querySelectorAll(`.${qKey}-btn`).forEach(b => b.classList.remove('active'));
+      const card = document.getElementById('qCard_' + qKeyUpper) || (btnEl ? btnEl.closest('.survey-q-card') : null);
+      if (card) {
+        card.querySelectorAll('.livon-opt-btn').forEach(b => b.classList.remove('active'));
+      } else {
+        document.querySelectorAll(`.${qKey.toLowerCase()}-btn`).forEach(b => b.classList.remove('active'));
+      }
       if (btnEl) btnEl.classList.add('active');
+      updateSurveyProgress();
     }
     window.selectSurveyScore = selectSurveyScore;
 
     function selectSurveyUnknown(qKey, btnEl) {
-      const input = document.getElementById('ans' + qKey.toUpperCase());
+      const qKeyUpper = String(qKey || '').toUpperCase();
+      const input = document.getElementById('ans' + qKeyUpper);
       if (input) input.value = '';
-      const unk = document.getElementById('ans' + qKey.toUpperCase() + 'Unknown');
+      const unk = document.getElementById('ans' + qKeyUpper + 'Unknown');
       if (unk) unk.value = 'true';
 
-      document.querySelectorAll(`.${qKey}-btn`).forEach(b => b.classList.remove('active'));
+      const card = document.getElementById('qCard_' + qKeyUpper) || (btnEl ? btnEl.closest('.survey-q-card') : null);
+      if (card) {
+        card.querySelectorAll('.livon-opt-btn').forEach(b => b.classList.remove('active'));
+      } else {
+        document.querySelectorAll(`.${qKey.toLowerCase()}-btn`).forEach(b => b.classList.remove('active'));
+      }
       if (btnEl) btnEl.classList.add('active');
+      updateSurveyProgress();
     }
     window.selectSurveyUnknown = selectSurveyUnknown;
 
-    function selectSurveyCallback(val, btnEl) {
-      const input = document.getElementById('ansQ6');
+    function selectSurveyCallback(qKeyOrVal, maybeValOrBtn, maybeBtn) {
+      let qKey = 'Q6';
+      let val = false;
+      let btnEl = null;
+
+      if (typeof qKeyOrVal === 'boolean' || qKeyOrVal === 'true' || qKeyOrVal === 'false') {
+        val = (qKeyOrVal === true || qKeyOrVal === 'true');
+        btnEl = maybeValOrBtn;
+      } else {
+        qKey = String(qKeyOrVal || 'Q6').toUpperCase();
+        val = (maybeValOrBtn === true || maybeValOrBtn === 'true');
+        btnEl = maybeBtn;
+      }
+
+      const input = document.getElementById('ans' + qKey) || document.getElementById('ansQ6');
       if (input) input.value = val ? 'true' : 'false';
-      document.querySelectorAll('.callback-btn').forEach(b => b.classList.remove('active'));
+
+      const card = document.getElementById('qCard_' + qKey) || (btnEl ? btnEl.closest('.survey-q-card') : null);
+      if (card) {
+        card.querySelectorAll('.callback-btn').forEach(b => b.classList.remove('active'));
+      } else {
+        document.querySelectorAll('.callback-btn').forEach(b => b.classList.remove('active'));
+      }
       if (btnEl) btnEl.classList.add('active');
+      updateSurveyProgress();
     }
     window.selectSurveyCallback = selectSurveyCallback;
 
-    function updateSurveyWizardUI() {
-      const stepLabels = [
-        'STEP 1 / 4 · 응답자 확인 및 전반 만족도',
-        'STEP 2 / 4 · 담당 간병인 친절도 평가',
-        'STEP 3 / 4 · 간병 수행 및 돌봄 품질 평가',
-        'STEP 4 / 4 · 자유 의견 및 선물 연락처 확인'
-      ];
-      for (let s = 1; s <= gIntegratedTotalSteps; s++) {
-        const panel = document.getElementById('sStep' + s);
-        if (panel) panel.style.display = (s === gIntegratedSurveyStep) ? 'block' : 'none';
+    function handleSurveyTextInput(qKey, taEl) {
+      const qKeyUpper = String(qKey || '').toUpperCase();
+      const counter = document.getElementById('charCount_' + qKeyUpper) || document.getElementById('charCount');
+      if (counter && taEl) {
+        counter.textContent = String(taEl.value.length);
       }
-      const badge = document.getElementById('surveyStepBadge');
-      const pct = document.getElementById('surveyStepPercent');
-      const fill = document.getElementById('surveyProgressFill');
-      if (badge) badge.textContent = stepLabels[gIntegratedSurveyStep - 1];
-      if (pct) pct.textContent = `${gIntegratedSurveyStep * 25}%`;
-      if (fill) fill.style.width = `${gIntegratedSurveyStep * 25}%`;
-
-      const prevBtn = document.getElementById('surveyPrevBtn');
-      const nextBtn = document.getElementById('surveyNextBtn');
-      const submitBtn = document.getElementById('surveySubmitBtn');
-
-      if (prevBtn) prevBtn.style.display = (gIntegratedSurveyStep === 1) ? 'none' : 'inline-block';
-      if (gIntegratedSurveyStep === gIntegratedTotalSteps) {
-        if (nextBtn) nextBtn.style.display = 'none';
-        if (submitBtn) submitBtn.style.display = 'flex';
-      } else {
-        if (nextBtn) nextBtn.style.display = 'flex';
-        if (submitBtn) submitBtn.style.display = 'none';
-      }
+      updateSurveyProgress();
     }
+    window.handleSurveyTextInput = handleSurveyTextInput;
+
+    function updateSurveyWizardUI() {
+      updateSurveyProgress();
+      const submitBtn = document.getElementById('surveySubmitBtn');
+      if (submitBtn) submitBtn.style.display = 'flex';
+    }
+    window.updateSurveyWizardUI = updateSurveyWizardUI;
 
     function formatSurveyPhoneInput(val) {
       if (!val) return '';
@@ -1958,72 +2569,67 @@
     window.formatSurveyPhoneInput = formatSurveyPhoneInput;
 
     function validateIntegratedStep(step) {
-      if (step === 1) {
-        const q1 = document.getElementById('ansQ1').value;
-        if (!q1) {
-          alert('설문을 시작하기 전에 [환자 본인] 또는 [가족·보호자] 여부를 먼저 선택해 주세요.');
-          return false;
-        }
-        const q2 = document.getElementById('ansQ2').value;
-        if (!q2) {
-          alert('Q2. 전반적인 간병 서비스 만족도 점수를 선택해 주세요.');
-          return false;
-        }
-      } else if (step === 2) {
-        const q3 = document.getElementById('ansQ3').value;
-        const q3Unk = document.getElementById('ansQ3Unknown').value === 'true';
-        if (!q3 && !q3Unk) {
-          alert('Q3. 담당 간병인의 친절함 점수 또는 "잘 모르겠음"을 선택해 주세요.');
-          return false;
-        }
-      } else if (step === 3) {
-        const q4 = document.getElementById('ansQ4').value;
-        const q4Unk = document.getElementById('ansQ4Unknown').value === 'true';
-        if (!q4 && !q4Unk) {
-          alert('Q4. 제공된 돌봄 품질 점수 또는 "잘 모르겠음"을 선택해 주세요.');
-          return false;
-        }
-      } else if (step === 4) {
-        const q6 = document.getElementById('ansQ6').value;
-        if (!q6) {
-          alert('Q6. 전담 매니저 유선 연락 희망 여부를 선택해 주세요.');
-          return false;
-        }
-        const giftInput = document.getElementById('giftPhoneInput');
-        const cleanDigits = (giftInput ? giftInput.value : '').replace(/[^0-9]/g, '');
-        if (cleanDigits.length < 9) {
-          alert('감사 선물(커피쿠폰)을 받으실 휴대폰 번호를 정확히 입력해 주세요.');
-          if (giftInput) giftInput.focus();
-          return false;
-        }
-        if (giftInput) {
-          giftInput.value = formatSurveyPhoneInput(giftInput.value);
-        }
-      }
-      return true;
+      return validateAllSurveyFields();
     }
+    window.validateIntegratedStep = validateIntegratedStep;
+
+    // 모바일 환경에서 마지막 서술식 입력 후 쿠폰 번호 입력 터치 시 상단 스크롤 튐 방지
+    (function initGiftPhoneFocusHandler() {
+      function attachGiftPhoneListeners() {
+        const giftInput = document.getElementById('giftPhoneInput');
+        const giftCard = document.getElementById('giftPhoneCard');
+        if (!giftInput || giftInput.dataset.focusGuardAttached) return;
+        giftInput.dataset.focusGuardAttached = 'true';
+
+        const secureFocusView = () => {
+          // 플로팅 바 즉시 완벽 비활성화 (오터치로 인한 scrollToSection 호출 방지)
+          const bar = document.getElementById('floatingSurveyBar');
+          if (bar) {
+            bar.classList.add('hidden');
+            bar.style.display = 'none';
+            bar.style.visibility = 'hidden';
+            bar.style.pointerEvents = 'none';
+          }
+          // 가상 키보드 오픈/전환 후 스크롤 튐 방지 및 뷰 안정화
+          setTimeout(() => {
+            if (giftCard) {
+              const rect = giftCard.getBoundingClientRect();
+              if (rect.top < 60 || rect.bottom > window.innerHeight) {
+                giftCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }
+          }, 80);
+        };
+
+        giftInput.addEventListener('focus', secureFocusView, { passive: true });
+        giftInput.addEventListener('touchstart', () => {
+          const bar = document.getElementById('floatingSurveyBar');
+          if (bar) {
+            bar.classList.add('hidden');
+            bar.style.display = 'none';
+            bar.style.visibility = 'hidden';
+            bar.style.pointerEvents = 'none';
+          }
+        }, { passive: true });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachGiftPhoneListeners);
+      } else {
+        attachGiftPhoneListeners();
+      }
+    })();
 
     function nextSurveyStep() {
-      if (!validateIntegratedStep(gIntegratedSurveyStep)) return;
-      if (gIntegratedSurveyStep < gIntegratedTotalSteps) {
-        gIntegratedSurveyStep++;
-        updateSurveyWizardUI();
-        scrollToSurveyForm(true);
-      }
+      submitIntegratedSurvey();
     }
     window.nextSurveyStep = nextSurveyStep;
 
-    function prevSurveyStep() {
-      if (gIntegratedSurveyStep > 1) {
-        gIntegratedSurveyStep--;
-        updateSurveyWizardUI();
-        scrollToSurveyForm(true);
-      }
-    }
+    function prevSurveyStep() {}
     window.prevSurveyStep = prevSurveyStep;
 
     async function submitIntegratedSurvey() {
-      if (!validateIntegratedStep(4)) return;
+      if (!validateAllSurveyFields()) return;
 
       const submitBtn = document.getElementById('surveySubmitBtn');
       if (submitBtn) {
@@ -2035,20 +2641,83 @@
       const formattedCouponPhone = formatSurveyPhoneInput(giftPhoneEl ? giftPhoneEl.value : '');
       const nowIso = new Date().toISOString();
 
+      const answers = {};
+      const schema = (Array.isArray(gCurrentSurveySchema) && gCurrentSurveySchema.length > 0)
+        ? gCurrentSurveySchema
+        : [{ id: 'Q1' }, { id: 'Q2' }, { id: 'Q3' }, { id: 'Q4' }, { id: 'Q5' }, { id: 'Q6' }];
+
+      schema.forEach((q, idx) => {
+        const qKey = (q.id || ('Q' + (idx + 1))).toUpperCase();
+        const qLower = qKey.toLowerCase();
+        const input = document.getElementById('ans' + qKey);
+        const unkInput = document.getElementById('ans' + qKey + 'Unknown');
+        const isUnk = unkInput ? (unkInput.value === 'true') : false;
+        const val = input ? input.value : '';
+
+        if (q.type === 'rating_5' || q.type === 'rating_5_with_unknown') {
+          answers[qLower] = val ? Number(val) : (isUnk ? 0 : '');
+          answers[qLower + 'Unknown'] = isUnk;
+        } else if (q.type === 'boolean_callback') {
+          answers[qLower] = (val === 'true');
+        } else {
+          answers[qLower] = val;
+        }
+        answers[qKey] = answers[qLower];
+      });
+
+      // 1. 텍스트 의견(VOC) 문항 동적 식별 (text 타입 문항 또는 comment 필드)
+      const textQ = schema.find(q => q.type === 'text');
+      const textKey = textQ ? (textQ.id || '').toLowerCase() : null;
+      let actualComment = '';
+      if (textKey && answers[textKey] !== undefined) {
+        actualComment = String(answers[textKey]).trim();
+      } else if (answers.comment) {
+        actualComment = String(answers.comment).trim();
+      } else if (answers.q5 !== undefined && isNaN(Number(answers.q5))) {
+        actualComment = String(answers.q5).trim();
+      }
+
+      // 2. 유선 상담 연락 요청 문항 동적 식별 (boolean_callback 타입)
+      const cbQ = schema.find(q => q.type === 'boolean_callback');
+      const cbKey = cbQ ? (cbQ.id || '').toLowerCase() : null;
+      const actualCallbackRequested = cbKey && answers[cbKey] !== undefined
+        ? Boolean(answers[cbKey])
+        : Boolean(answers.callbackRequested || (answers.q6 === true || answers.q6 === 'true'));
+
+      // 3. 응답자 구분 동적 식별
+      const roleQ = schema.find(q => q.type === 'single_choice');
+      const roleKey = roleQ ? (roleQ.id || '').toLowerCase() : 'q1';
+      const actualRespondentType = answers[roleKey] || answers.q1 || 'PATIENT';
+
+      // 4. 평가 점수(rating_5, rating_5_with_unknown) 동적 평균 계산
+      const ratingScores = [];
+      schema.forEach(q => {
+        if (q.type === 'rating_5' || q.type === 'rating_5_with_unknown') {
+          const kLow = (q.id || '').toLowerCase();
+          const isUnk = Boolean(answers[kLow + 'Unknown'] || answers[q.id + 'Unknown']);
+          const valNum = Number(answers[kLow]);
+          if (!isUnk && !isNaN(valNum) && valNum >= 1 && valNum <= 5) {
+            ratingScores.push(valNum);
+          }
+        }
+      });
+      const dynamicAvgRating = ratingScores.length > 0
+        ? (ratingScores.reduce((a, b) => a + b, 0) / ratingScores.length).toFixed(1)
+        : (answers.q2 && !isNaN(Number(answers.q2)) ? Number(answers.q2).toFixed(1) : '5.0');
+
+      const effectiveToken = gSurveyToken || (gSurveyTargetObj && gSurveyTargetObj.token) || '';
+      const effectiveTargetId = gTargetId || (gSurveyTargetObj && gSurveyTargetObj.id) || (effectiveToken.startsWith('ST-') ? effectiveToken : 'ST-' + effectiveToken);
+
       const payload = {
-        token: gSurveyToken || 'DEMO_TOKEN',
+        token: effectiveToken || effectiveTargetId || 'DEMO_TOKEN',
+        targetId: effectiveTargetId,
         channel: 'MOBILE_DIARY_INTEGRATED',
+        allowResubmit: true,
         answers: {
-          q1: document.getElementById('ansQ1').value,
-          q2: Number(document.getElementById('ansQ2').value),
-          q3: document.getElementById('ansQ3').value,
-          q3Unknown: document.getElementById('ansQ3Unknown').value === 'true',
-          q4: document.getElementById('ansQ4').value,
-          q4Unknown: document.getElementById('ansQ4Unknown').value === 'true',
-          q5: (document.getElementById('ansQ5').value || '').trim(),
-          q6: document.getElementById('ansQ6').value === 'true',
+          ...answers,
           callbackPhone: formattedCouponPhone,
-          couponPhone: formattedCouponPhone
+          couponPhone: formattedCouponPhone,
+          comment: actualComment
         }
       };
 
@@ -2075,14 +2744,16 @@
           const targetUpdates = {
             responseStatus: 'SUBMITTED',
             couponPhone: formattedCouponPhone,
-            respondentType: payload.answers.q1,
-            q2Score: payload.answers.q2,
-            q3Score: payload.answers.q3Unknown ? null : Number(payload.answers.q3 || 5),
-            q3Unknown: payload.answers.q3Unknown,
-            q4Score: payload.answers.q4Unknown ? null : Number(payload.answers.q4 || 5),
-            q4Unknown: payload.answers.q4Unknown,
-            surveyComment: payload.answers.q5,
-            callbackRequested: payload.answers.q6,
+            respondentType: actualRespondentType,
+            answers: payload.answers, // 전체 설정 문항 응답 100% 영구 보존
+            avgRating: dynamicAvgRating,
+            surveyComment: actualComment,
+            callbackRequested: actualCallbackRequested,
+            q2Score: answers.q2 !== undefined && !isNaN(Number(answers.q2)) ? Number(answers.q2) : Number(dynamicAvgRating),
+            q3Score: answers.q3Unknown ? null : (answers.q3 !== undefined && !isNaN(Number(answers.q3)) ? Number(answers.q3) : null),
+            q3Unknown: Boolean(answers.q3Unknown),
+            q4Score: answers.q4Unknown ? null : (answers.q4 !== undefined && !isNaN(Number(answers.q4)) ? Number(answers.q4) : null),
+            q4Unknown: Boolean(answers.q4Unknown),
             submittedAt: nowIso,
             updatedAt: nowIso
           };
@@ -2111,6 +2782,30 @@
                 pTarget.giftStatus = 'PENDING';
               }
             }
+
+            // 부모 창 responses 목록에도 최신 answers 즉시 동기화
+            if (!Array.isArray(window.parent.gSurveyState.responses)) {
+              window.parent.gSurveyState.responses = [];
+            }
+            let pResp = window.parent.gSurveyState.responses.find(r => 
+              (matchedTargetId && (r.targetId === matchedTargetId || r.serviceId === matchedTargetId)) ||
+              (pTarget && (r.targetId === pTarget.id || r.serviceId === pTarget.serviceId))
+            );
+            if (!pResp) {
+              pResp = {
+                id: 'SR-' + Date.now(),
+                targetId: matchedTargetId,
+                serviceId: (pTarget && pTarget.serviceId) || matchedTargetId,
+                patientName: (pTarget && pTarget.patientName) || '고객',
+                couponPhone: formattedCouponPhone,
+                channel: 'MOBILE_DIARY_INTEGRATED'
+              };
+              window.parent.gSurveyState.responses.unshift(pResp);
+            }
+            Object.assign(pResp, targetUpdates, { answers: payload.answers });
+            try {
+              localStorage.setItem('LIVON_SURVEY_RESPONSES', JSON.stringify(window.parent.gSurveyState.responses));
+            } catch (e) {}
           }
 
           if (matchedTargetId && window.parent && typeof window.parent.syncToConvex === 'function') {
@@ -2126,6 +2821,19 @@
           if (window.parent && typeof window.parent.loadSurveyMgmtData === 'function') {
             window.parent.loadSurveyMgmtData(false);
           }
+
+          const submitMsg = {
+            type: 'LIVON_SURVEY_SUBMITTED',
+            couponPhone: formattedCouponPhone,
+            targetId: matchedTargetId,
+            answers: payload.answers
+          };
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage(submitMsg, '*');
+          }
+          if (window.opener) {
+            window.opener.postMessage(submitMsg, '*');
+          }
         } catch (e) {}
 
         document.getElementById('surveyFormContainer').style.display = 'none';
@@ -2133,8 +2841,7 @@
         if (completeView) {
           completeView.style.display = 'block';
           const topbar = document.querySelector('.topbar');
-          const stepper = document.querySelector('.journey-stepper');
-          const stickyOffset = (topbar ? topbar.offsetHeight : 58) + (stepper ? stepper.offsetHeight : 46) + 6;
+          const stickyOffset = (topbar ? topbar.offsetHeight : 56) + 12;
           completeView.style.scrollMarginTop = stickyOffset + 'px';
           completeView.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
@@ -2144,8 +2851,7 @@
         if (completeView) {
           completeView.style.display = 'block';
           const topbar = document.querySelector('.topbar');
-          const stepper = document.querySelector('.journey-stepper');
-          const stickyOffset = (topbar ? topbar.offsetHeight : 58) + (stepper ? stepper.offsetHeight : 46) + 6;
+          const stickyOffset = (topbar ? topbar.offsetHeight : 56) + 12;
           completeView.style.scrollMarginTop = stickyOffset + 'px';
           completeView.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
@@ -2190,14 +2896,33 @@
       const preRole = params.get('role') || '';
 
       // [즉시 반영 Fallback]: URL에 환자 파라미터가 있는 경우 화면 깜빡임 없이 즉시 환자명/병원명 선제 동기화
+      const urlStart = (params.get('start') || params.get('s') || '').trim();
+      const urlEnd = (params.get('end') || params.get('e') || '').trim();
+      const urlAge = (params.get('age') || '').trim();
+      const urlGender = (params.get('gender') || '').trim();
+
       if (urlPatient) {
         gPatientInfo.name = urlPatient;
         if (urlCarer) gPatientInfo.carerName = urlCarer;
         if (urlHosp) gPatientInfo.hospitalName = urlHosp;
+        if (urlAge) gPatientInfo.age = urlAge;
+        if (urlGender) gPatientInfo.gender = urlGender;
         document.querySelectorAll('.patient-name').forEach(el => el.textContent = `${urlPatient} 님`);
         document.querySelectorAll('.patient-initial').forEach(el => el.textContent = urlPatient.charAt(0));
         if (urlCarer) document.querySelectorAll('.carer-name').forEach(el => el.textContent = urlCarer);
         if (urlHosp) document.querySelectorAll('.hospital-name').forEach(el => el.textContent = urlHosp);
+
+        if (urlStart && urlEnd) {
+          document.querySelectorAll('.side-care-period').forEach(el => el.textContent = `${urlStart} — ${urlEnd}`);
+        } else if (urlStart) {
+          document.querySelectorAll('.side-care-period').forEach(el => el.textContent = `${urlStart}부터`);
+        }
+        const fastMeta = [];
+        if (urlAge) fastMeta.push(`${urlAge}세`);
+        if (urlGender) fastMeta.push(urlGender === '남' || urlGender === 'M' ? '남성' : (urlGender === '여' || urlGender === 'F' ? '여성' : urlGender));
+        if (fastMeta.length > 0) {
+          document.querySelectorAll('.patient-meta-text').forEach(el => el.textContent = fastMeta.join(' · '));
+        }
       }
 
       applyTitleTheme(titleTheme);
@@ -2246,6 +2971,9 @@
           if (data && data.serviceInfo) {
             target = { ...(target || {}), ...data.serviceInfo, token: data.serviceInfo.token || gSurveyToken };
           }
+          if (data && Array.isArray(data.schema) && data.schema.length > 0) {
+            applySchemaToDiarySurvey(data.schema);
+          }
         } catch (e) {}
       }
 
@@ -2292,9 +3020,92 @@
           }
         }
 
-        // 해당 환자의 실제 케어포트 모바일 일지가 있는지 확인하고, 없으면 기간에 맞춰 일지 날짜 동기화
-        if (target.patientName && target.patientName !== '고연분') {
-          let hasRealLogs = false;
+        // =========================================================================
+        // [환자 정보 동적 계산]: 시작/종료일 파싱, 기간, 일수, 나이/성별 동적 치환
+        // =========================================================================
+        function parseCustomDateParts(dStr) {
+          if (!dStr) return null;
+          const clean = String(dStr).trim();
+          const m = clean.match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
+          if (m) {
+            return {
+              year: parseInt(m[1], 10),
+              month: parseInt(m[2], 10),
+              day: parseInt(m[3], 10),
+              mmdd: String(m[2]).padStart(2, '0') + '.' + String(m[3]).padStart(2, '0')
+            };
+          }
+          const mShort = clean.match(/(\d{1,2})[.\-/](\d{1,2})/);
+          if (mShort) {
+            return {
+              year: 2026,
+              month: parseInt(mShort[1], 10),
+              day: parseInt(mShort[2], 10),
+              mmdd: String(mShort[1]).padStart(2, '0') + '.' + String(mShort[2]).padStart(2, '0')
+            };
+          }
+          return null;
+        }
+
+        const startParts = parseCustomDateParts(target.careStartDate);
+        const endParts = parseCustomDateParts(target.careEndDate);
+        let carePeriodStr = '간병 기간';
+
+        if (startParts && endParts) {
+          carePeriodStr = startParts.mmdd + ' — ' + endParts.mmdd;
+        } else if (startParts) {
+          carePeriodStr = startParts.mmdd + '부터';
+        }
+
+        // 성별 및 나이 추출 (target 및 gApps 매핑)
+        let ageVal = target.patientAge || target.age || '';
+        let genderVal = target.patientGender || target.gender || '';
+        if (!ageVal || !genderVal) {
+          try {
+            const allApps = (window.parent && window.parent.gApps) || (typeof gApps !== 'undefined' ? gApps : []);
+            const matchedApp = (Array.isArray(allApps) && allApps.length > 0)
+              ? allApps.find(a => (target.serviceId && String(a.id) === String(target.serviceId)) || (target.patientName && (a.patientName || '').trim() === (target.patientName || '').trim()))
+              : null;
+            if (matchedApp) {
+              if (!genderVal) genderVal = matchedApp.gender;
+              if (!genderVal && matchedApp.patientRrn) {
+                const bDigit = String(matchedApp.patientRrn).replace(/[^0-9]/g, '').slice(6, 7);
+                if (bDigit === '1' || bDigit === '3') genderVal = '남성';
+                else if (bDigit === '2' || bDigit === '4') genderVal = '여성';
+              }
+              if (!ageVal && (matchedApp.birthDate || matchedApp.rrnFront)) {
+                const bStr = String(matchedApp.birthDate || matchedApp.rrnFront).replace(/[^0-9]/g, '');
+                let bYear = 0;
+                if (bStr.length >= 8) bYear = parseInt(bStr.slice(0, 4), 10);
+                else if (bStr.length >= 6) {
+                  const twoY = parseInt(bStr.slice(0, 2), 10);
+                  bYear = twoY >= 30 ? (1900 + twoY) : (2000 + twoY);
+                }
+                if (bYear > 0) ageVal = new Date().getFullYear() - bYear;
+              }
+            }
+          } catch (e) {}
+        }
+        if (genderVal) {
+          if (genderVal === '남' || genderVal === 'M') genderVal = '남성';
+          if (genderVal === '여' || genderVal === 'F') genderVal = '여성';
+        }
+        const patientMetaDisplay = (ageVal && genderVal) 
+          ? (ageVal + '세 · ' + genderVal) 
+          : (genderVal ? (genderVal + ' 환자') : (ageVal ? (ageVal + '세 환자') : '환자 정보'));
+
+        gPatientInfo.age = ageVal || '';
+        gPatientInfo.gender = genderVal || '';
+
+        document.querySelectorAll('.patient-meta-text').forEach(el => el.textContent = patientMetaDisplay);
+
+        // 🚨 플리커링 원천 방지:
+        // 실제 일지 유무(hasRealLogs)가 확정되기 전에 임의의 '1일'을 화면에 성급하게 노출하지 않음!
+        // 비동기 일지 확인을 먼저 완료한 후 실제 일수(예: 16일) 또는 '일지 미작성'을 한 번에 확정 노출합니다.
+
+        let hasRealLogs = false;
+        if (target.patientName) {
+          // 1. 로컬스토리지 확인
           try {
             const cached = localStorage.getItem('LIVON_MOBILE_REPORT_' + target.patientName);
             if (cached) {
@@ -2307,6 +3118,25 @@
             }
           } catch (e) {}
 
+          // 2. target 자체 속성 확인
+          if (!hasRealLogs && (target.hasCareLog === true || (typeof target.careLogCount === 'number' && target.careLogCount > 0))) {
+            hasRealLogs = true;
+          }
+
+          // 3. 부모창(window.parent) 전역 일지 배열(gCareLogs) 매칭 확인
+          if (!hasRealLogs && window.parent && Array.isArray(window.parent.gCareLogs) && window.parent.gCareLogs.length > 0) {
+            const sId = String(target.serviceId || target.id || '').replace(/^ST-/, '');
+            const pName = (target.patientName || '').trim();
+            const matchLog = window.parent.gCareLogs.some(l => {
+              if (!l) return false;
+              const lAppId = String(l.applyId || '').trim();
+              const lName = (l.patientName || '').trim();
+              return (sId && lAppId && (lAppId === sId || lAppId === target.id)) || (pName && lName && lName === pName);
+            });
+            if (matchLog) hasRealLogs = true;
+          }
+
+          // 4. 서버 API 확인
           if (!hasRealLogs) {
             try {
               const resp = await fetch(`/api/careport/mobile-report?patient=${encodeURIComponent(target.patientName)}`);
@@ -2321,26 +3151,151 @@
             } catch (e) {}
           }
 
-          // 케어포트 원격 일지가 아직 없는 타겟 환자인 경우에도, 환자의 실제 간병 시작~종료일에 맞춘 맞춤 일지 날짜 구성
-          if (!hasRealLogs && (target.careStartDate || target.careEndDate)) {
-            const mStart = String(target.careStartDate || '').match(/(\d{1,2})\.(\d{1,2})$/);
-            const baseDate = mStart ? `${mStart[1].padStart(2, '0')}.${mStart[2].padStart(2, '0')}` : '10.05';
-            const customCount = Math.min(10, DEFAULT_RECORDS.length);
-            careRecords = DEFAULT_RECORDS.slice(DEFAULT_RECORDS.length - customCount).map((rec, idx) => ({
-              ...rec,
-              date: addDaysToDateStr(baseDate, idx)
-            }));
-            selected = careRecords.length - 1;
+          // 간병일지 유무 확정 후 정확한 일수 또는 미작성 모드 단 1회 렌더링
+          if (hasRealLogs && careRecords.length > 0) {
+            const actualDays = careRecords.length;
+            if (careRecords[0]?.date && careRecords[careRecords.length - 1]?.date) {
+              carePeriodStr = `${careRecords[0].date} — ${careRecords[careRecords.length - 1].date}`;
+            }
+            document.querySelectorAll('.side-care-period').forEach(el => el.textContent = carePeriodStr);
+            document.querySelectorAll('.side-care-days').forEach(el => el.textContent = actualDays + '일');
+            document.querySelectorAll('.total-days-num').forEach(el => el.textContent = actualDays + '일');
+            const dayCountEl = document.getElementById('day-count');
+            if (dayCountEl) dayCountEl.textContent = actualDays;
+            if (typeof render === 'function') render();
+          } else {
+            // 🚨 간병일지가 없는 환자: 더미 일지를 절대 주입하지 않고 일지 미작성 전용 UI 적용
+            careRecords = [];
+            document.querySelectorAll('.side-care-period').forEach(el => el.textContent = (carePeriodStr !== '간병 기간' ? carePeriodStr : '-'));
+            document.querySelectorAll('.side-care-days').forEach(el => el.textContent = '미작성');
+            document.querySelectorAll('.total-days-num').forEach(el => el.textContent = '미작성');
+            applyNoCareLogMode(target);
+          }
+        } else {
+          // 기본 샘플 또는 환자명이 없는 경우 정상 렌더링
+          if (typeof render === 'function') render();
+        }
+      }
+
+      // 간병일지가 없는 환자 전용 UI 모드 적용 (가짜 일지 노출 완전 차단 및 설문 중심 안내)
+      function applyNoCareLogMode(target) {
+        // 1. 일지 렌더링 영역(신호등, 상태변화, 타임라인, 수행내역, 보호자편지, 날짜선택바) 숨김
+        const diarySectionIds = ['overview', 'daily-content', 'trends', 'timeline', 'careactions', 'family'];
+        diarySectionIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = 'none';
+        });
+        const dateBox = document.querySelector('.date-box');
+        if (dateBox) dateBox.style.display = 'none';
+        const dateStrip = document.getElementById('date-strip');
+        if (dateStrip) dateStrip.style.display = 'none';
+
+        // 2. 일지 대신 친절한 '간병일지 미작성 안내 카드' 삽입
+        let emptyCard = document.getElementById('diaryEmptyStateCard');
+        if (!emptyCard) {
+          emptyCard = document.createElement('div');
+          emptyCard.id = 'diaryEmptyStateCard';
+          emptyCard.style.cssText = 'margin: 20px 14px 28px; padding: 26px 20px; background: #ffffff; border: 1.5px solid #fecdd3; border-radius: 20px; text-align: center; box-shadow: 0 4px 16px rgba(225, 29, 72, 0.06);';
+          emptyCard.innerHTML = `
+            <div style="width: 56px; height: 56px; border-radius: 18px; background: #fff1f2; border: 1px solid #fecdd3; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 12px;">📋</div>
+            <h3 style="font-size: 17px; font-weight: 850; color: #9f1239; margin-bottom: 6px; letter-spacing: -0.03em;">등록된 모바일 간병일지가 없습니다</h3>
+            <p style="font-size: 13px; color: #475569; line-height: 1.6; word-break: keep-all; margin-bottom: 18px;">
+              담당 간병인의 모바일 일지 작성이 아직 완료되지 않았거나 일지 작성 대상이 아닙니다.<br>
+              더 나은 간병 돌봄을 위해 아래 <b>만족도 설문</b>에 참여해 주시면 <b>스타벅스 모바일 커피쿠폰</b>을 100% 선물해 드립니다.
+            </p>
+            <button type="button" onclick="scrollToSection('survey-section')" style="background: linear-gradient(135deg, #e11d48, #be185d); color: #fff; font-weight: 850; font-size: 13.5px; padding: 12px 24px; border-radius: 12px; border: none; cursor: pointer; box-shadow: 0 4px 14px rgba(225, 29, 72, 0.3); display: inline-flex; align-items: center; gap: 8px;">
+              <span>☕ 만족도 설문 바로 참여하기 (선물 증정)</span>
+              <span style="font-size: 15px;">↓</span>
+            </button>
+          `;
+          const surveySection = document.getElementById('survey-section');
+          if (surveySection && surveySection.parentNode) {
+            surveySection.parentNode.insertBefore(emptyCard, surveySection);
           }
         }
 
-        if (typeof render === 'function') render();
+        // 3. 표지(Cover) 튜닝
+        // 3-1. 티켓의 일수 배지 수정
+        document.querySelectorAll('.ticket-day-badge').forEach(badge => {
+          badge.style.background = '#f1f5f9';
+          badge.style.borderColor = '#cbd5e1';
+          badge.innerHTML = `<b style="font-size: 12px; color: #475569; font-weight: 800;">일지 미작성</b><span style="color: #64748b; font-size: 10px;">설문 참여 대상</span>`;
+        });
+        document.querySelectorAll('.side-care-days').forEach(el => el.textContent = '미작성');
+
+        // 3-2. 표지 하단 CTA 버튼 조정 (일지 미작성이므로 일지 보기 버튼 숨김)
+        const btnDiarySec = document.querySelector('.btn-cover-secondary-diary');
+        if (btnDiarySec) btnDiarySec.style.display = 'none';
+
+        // 3-3. 표지 서브 안내 문구 변경
+        const subNotice = document.getElementById('cover-sub-notice-text');
+        if (subNotice) {
+          subNotice.innerHTML = `리본케어 돌봄 서비스를 이용해 주셔서 진심으로 감사드립니다. 더 세심하고 따뜻한 돌봄을 위해 아래 <b>만족도 설문</b>에 참여해 주시면 <strong>스타벅스 모바일 커피쿠폰을 100% 선물해 드립니다.</strong>`;
+        }
+
+        // 4. 모바일 Stepper (표지·안내 / 간병일지(미작성) / 만족도 설문)
+        const pillDiary = document.getElementById('pill-diary');
+        if (pillDiary) {
+          pillDiary.style.opacity = '0.45';
+          pillDiary.style.pointerEvents = 'none';
+          pillDiary.innerHTML = `<span class="step-num">2</span><span>일지 미작성</span>`;
+        }
+
+        // 5. 모바일 상단 툴바의 [일지 다운로드] 버튼 숨김
+        document.querySelectorAll('button[onclick*="downloadCurrentCareReportPdf"]').forEach(btn => {
+          btn.style.display = 'none';
+        });
+
+        // 6. 데스크탑 좌측 사이드바 Nav
+        document.querySelectorAll('.side-nav a').forEach(a => {
+          const href = a.getAttribute('href') || '';
+          if (['#overview', '#trends', '#timeline', '#careactions', '#family'].includes(href)) {
+            a.style.opacity = '0.45';
+            a.style.pointerEvents = 'none';
+            const sp = a.querySelector('span');
+            if (sp && !sp.textContent.includes('미작성')) {
+              sp.textContent += ' (미작성)';
+            }
+          }
+        });
+
+        // 7. 모바일 하단 Bottom Nav 숨김
+        const bottomNav = document.querySelector('.bottom-nav');
+        if (bottomNav) bottomNav.style.display = 'none';
+
+        // 8. 데스크탑 사이드바 설명 문구
+        const sideDesc = document.querySelector('.side-desc');
+        if (sideDesc) {
+          sideDesc.textContent = '더 나은 돌봄을 위해 소중한 만족도 설문에 참여해 주시면 모바일 커피쿠폰을 100% 보내드립니다.';
+        }
       }
 
       // 병원명 및 총 일수 표지 반영
       const hospName = (gSurveyTargetObj && gSurveyTargetObj.hospitalName) || params.get('hospital') || '리본케어 협약병원';
       document.querySelectorAll('.hospital-name').forEach(el => el.textContent = hospName);
-      document.querySelectorAll('.total-days-num').forEach(el => el.textContent = `${careRecords.length}일`);
+      if (careRecords && careRecords.length > 0) {
+        document.querySelectorAll('.total-days-num').forEach(el => el.textContent = `${careRecords.length}일`);
+      }
+
+      // 🚨 이미 응답 완료된 고객일 경우 중복 참여 방지 화면 즉시 노출
+      if (gSurveyTargetObj && (gSurveyTargetObj.responseStatus === 'SUBMITTED' || gSurveyTargetObj.alreadySubmitted)) {
+        const formContainer = document.getElementById('surveyFormContainer');
+        const completeView = document.getElementById('surveyCompleteView');
+        if (formContainer) formContainer.style.display = 'none';
+        if (completeView) {
+          completeView.style.display = 'block';
+          const titleEl = completeView.querySelector('h2');
+          if (titleEl) titleEl.textContent = '이미 만족도 설문 참여가 완료되었습니다';
+          const subEl = completeView.querySelector('.complete-sub');
+          if (subEl) {
+            subEl.innerHTML = '고객님의 소중한 의견이 이미 안전하게 접수되었습니다.<br>입력하신 연락처로 감사 선물(커피쿠폰)이 발송 준비 중입니다.';
+          }
+          const completePhone = document.getElementById('completeCouponPhoneDisplay');
+          if (completePhone && (gSurveyTargetObj.couponPhone || gSurveyTargetObj.patientPhone)) {
+            completePhone.textContent = formatSurveyPhoneInput(gSurveyTargetObj.couponPhone || gSurveyTargetObj.patientPhone);
+          }
+        }
+      }
 
       // 글자수 카운터
       const q5Input = document.getElementById('ansQ5');
@@ -2374,6 +3329,9 @@
       if (jumpSection) {
         setTimeout(() => scrollToSection(jumpSection), 150);
       }
+
+      // 모든 데이터 로딩 및 동적 일수/미작성 UI 세팅이 100% 완료된 후 로딩 오버레이 페이드아웃
+      hideSurveyLoadingOverlay();
     }
 
     // 관리자 메뉴(만족도조사 관리 new)의 웹뷰 미리보기 컨트롤러와 실시간 통신
